@@ -1,0 +1,1 @@
+boost_module(filesystem DEPENDS system smart_ptr)

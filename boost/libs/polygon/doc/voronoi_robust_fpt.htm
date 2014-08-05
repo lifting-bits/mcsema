@@ -1,0 +1,212 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+
+
+
+
+
+  
+  <meta http-equiv="Content-Language" content="en-us">
+
+  
+  <meta http-equiv="Content-Type" content="text/html; charset=windows-1252"><title>Voronoi Robust FPT</title></head><body>
+<table style="margin: 0pt; padding: 0pt; width: 100%;" border="0" cellpadding="0" cellspacing="0">
+
+  <tbody>
+    <tr>
+      <td style="background-color: rgb(238, 238, 238);" nowrap="1" valign="top">
+      <div style="padding: 5px;" align="center"> <img src="images/boost.png" border="0" height="86" width="277"><a title="www.boost.org home page" tabindex="2" style="border: medium none ;" href="http://www.boost.org/"> </a></div>
+      <div style="margin: 5px;">
+      <h3 class="navbar">Contents</h3>
+      <ul>
+        <li><a href="index.htm">Boost.Polygon Main Page</a></li>
+        <li><a href="gtl_design_overview.htm">Design Overview</a></li>
+        <li><a href="gtl_isotropy.htm">Isotropy</a></li>
+        <li><a href="gtl_coordinate_concept.htm">Coordinate Concept</a></li>
+        <li><a href="gtl_interval_concept.htm">Interval Concept</a></li>
+        <li><a href="gtl_point_concept.htm">Point Concept</a></li>
+        <li><a href="gtl_segment_concept.htm">Segment Concept</a></li>
+
+        <li><a href="gtl_rectangle_concept.htm">Rectangle Concept</a></li>
+        <li><a href="gtl_polygon_90_concept.htm">Polygon 90 Concept</a></li>
+        <li><a href="gtl_polygon_90_with_holes_concept.htm">Polygon 90
+With Holes Concept</a></li>
+        <li><a href="gtl_polygon_45_concept.htm">Polygon 45 Concept</a></li>
+        <li><a href="gtl_polygon_45_with_holes_concept.htm">Polygon 45
+With Holes Concept</a></li>
+        <li><a href="gtl_polygon_concept.htm">Polygon Concept</a></li>
+        <li><a href="gtl_polygon_with_holes_concept.htm">Polygon With
+Holes Concept</a></li>
+        <li><a href="gtl_polygon_90_set_concept.htm">Polygon 90 Set
+Concept</a></li>
+        <li><a href="gtl_polygon_45_set_concept.htm">Polygon 45 Set
+Concept</a></li>
+        <li><a href="gtl_polygon_set_concept.htm">Polygon Set Concept</a></li>
+        <li><a href="gtl_connectivity_extraction_90.htm">Connectivity
+Extraction 90</a></li>
+        <li><a href="gtl_connectivity_extraction_45.htm">Connectivity
+Extraction 45</a></li>
+        <li><a href="gtl_connectivity_extraction.htm">Connectivity
+Extraction</a></li>
+        <li><a href="gtl_property_merge_90.htm">Property Merge 90</a></li>
+        <li><a href="gtl_property_merge_45.htm">Property Merge 45</a></li>
+        <li><a href="gtl_property_merge.htm">Property Merge</a></li>
+        <li><a href="voronoi_main.htm">Voronoi Main Page<br>
+          </a></li>
+        <li><a href="voronoi_benchmark.htm">Voronoi Benchmark</a></li>
+        <li><a href="voronoi_builder.htm">Voronoi Builder</a><br>
+        </li>
+        <li><a href="voronoi_diagram.htm">Voronoi Diagram</a></li>
+        <li><a href="voronoi_predicates.htm">Voronoi Predicates</a></li>
+        <li>Voronoi Robust FPT<br>
+        </li>
+        
+      </ul>
+      <h3 class="navbar">Other Resources</h3>
+      <ul>
+        <li><a href="GTL_boostcon2009.pdf">GTL Boostcon 2009 Paper</a></li>
+        <li><a href="GTL_boostcon_draft03.pdf">GTL Boostcon 2009
+Presentation</a></li>
+        <li><a href="analysis.htm">Performance Analysis</a></li>
+        <li><a href="gtl_tutorial.htm">Layout Versus Schematic Tutorial</a></li>
+        <li><a href="gtl_minkowski_tutorial.htm">Minkowski Sum Tutorial</a></li>
+        <li><a href="voronoi_basic_tutorial.htm">Voronoi Basic Tutorial</a></li>
+        <li><a href="voronoi_advanced_tutorial.htm">Voronoi Advanced
+Tutorial</a></li>
+      </ul>
+      </div>
+      <h3 class="navbar">Polygon Sponsor</h3>
+      <div style="padding: 5px;" align="center"> <img src="images/intlogo.gif" border="0" height="51" width="127"><a title="www.adobe.com home page" tabindex="2" style="border: medium none ;" href="http://www.adobe.com/"> </a></div>
+      </td>
+      <td style="padding-left: 10px; padding-right: 10px; padding-bottom: 10px;" valign="top" width="100%"><!-- End Header --> <br>
+      
+      <h1>Voronoi Robust FPT</h1>
+The Voronoi
+robust floating-point types are the set of classes and tools that
+allow to estimate relative error of the arithmetic expressions. It is
+assumed that the other Boost libraries may find this unit functionality
+extremely useful, as it can be used to implement robust and efficient
+arithmetic predicates or functors that compute values within known
+relative error.<br>
+      <h2>Robust Fpt Type</h2>
+The robust
+fpt type (robust floating-point type)
+- represents the IEEE-754 floating-point type wrapper that also
+contains
+information about the relative error of the underlying value. The
+implementation overloads 5 standard operations: +, -, *, /, sqrt and
+apart from the evaluating value of the expression also computes its
+relative
+error. Let's consider two values A and B; C - rounding error, re(X)
+- relative error of the X expression, then following rules apply:<br>
+      <br>
+      <span style="font-family: Courier New,Courier,monospace;">re(A+B)
+&lt;= max(re(A), re(B)) + C, if A * B &gt;= 0;</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">re(A-B)
+&lt;= (B * re(A) + A * re(B)) / |A - B| + C, if A * B &lt; 0;</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">re(A*B)
+&lt;= re(A) + re(B) + C;</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">re(A/B)
+&lt;= re(A) + re(B) + C;</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">re(sqrt(A))
+&lt;= re(A) * 0.5 + C;<br>
+      <br>
+      </span>The constant C is equal to the rounding error,
+which for the above set of arithmetic operations in the IEEE-754
+floating-point implementation should be equal to 1 machine epsilon. <br>
+      <h2>Robust Difference Type</h2>
+The robust
+difference type -
+represents expression wrapper that holds the positive and negative
+partial
+sums of the expression in a separate values in order to avoid
+the cancellation errors before evaluating the final difference.
+Following
+arithmetic operators are overloaded for the robust difference type: +,
+-, *, / (division operator is not overloaded for the case were both
+arguments have robust difference type).<br>
+Looking at the relative error formulas above one may notice a few facts:<br>
+1) all of the formulas evaluate upper bound of the relative error, the
+actual value could be a lot smaller;<br>
+2) relative error estimate for the expression depends on the order
+operations are evaluated;<br>
+3) relative error of&nbsp; the difference of two positive numbers may
+be
+extremely large in case their values are close to each other (this is
+also known as the cancellation error).<br>
+To explain this a bit, consider the following expression (~ - stands for
+almost equal, &lt;&lt; - many times larger than):<br>
+      <br>
+      <span style="font-family: Courier New,Courier,monospace;">A - B +
+C, where A ~ B and C &lt;&lt; B;</span><br>
+      <br>
+Computing the relative error of this expression from left to right will
+produce extremely large relative error:<br>
+      <br>
+      <span style="font-family: Courier New,Courier,monospace;">re(A-B+C)
+= max(re(A-B), re(C)) = re(A-B) = (B * re(A) + A * re(B)) / 0 = INF;<br>
+      <br>
+      </span>While doing this from right to left will keep the relative
+error value small:<br>
+      <br>
+      <span style="font-family: Courier New,Courier,monospace;">re(A-B+C)
+= re(C-B+A) = max(re(C-B), re(A)) = max(re(A), re(B));<br>
+      <br>
+      </span>While both estimates are valid (they define upper bound of
+the relative error), of course the second one is preferable.<br>
+Here is the place where robust difference type comes useful. Basically
+it splits expression onto positive and negative partial sums and
+evaluates the
+difference only when the result is required. And did I mention that
+positive and negative values might be of the robust fpt type, that's
+why
+the relative error is always known for the expression result.<br>
+      <h2>Robust Sqrt Expression Structure</h2>
+The robust square root expression structure allows to compute the
+result of
+the expression that contains square roots within defined relative
+error.
+As an example, consider the following expression:<br>
+      <br>
+      <span style="font-family: Courier New,Courier,monospace;">A *
+sqrt(a) - B * sqrt(b), A * B &gt; 0, a &gt;= 0, b &gt;= 0;</span><br>
+      <br>
+Computing this expressions directly may apply huge cancellation error,
+however it may be transformed to the next equivalent expression:<br>
+      <span style="font-family: Courier New,Courier,monospace;"><br>
+(A * A * a - B * B * b) / (A * sqrt(a) + B * sqrt(b));</span><br>
+      <br>
+The numerator and denominator of this expression could be computed
+directly as those won't lead to the cancellation errors.<br>
+      <br>
+In general case the robust sqrt expression structure allows to evaluate
+the following set of expressions:<br>
+      <span style="font-family: Courier New,Courier,monospace;"><br>
+sum(A[i] * sqrt(a[i]), i = 1 .. N), N &lt;= 4;</span><br>
+      <br>
+This appears to be enough for the Boost.Polygon Voronoi.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: rgb(238, 238, 238);" nowrap="1" valign="top">&nbsp;</td>
+      <td style="padding-left: 10px; padding-right: 10px; padding-bottom: 10px;" valign="top" width="100%">
+      <table class="docinfo" id="table2" frame="void" rules="none">
+        <colgroup> <col class="docinfo-name"><col class="docinfo-content"> </colgroup> <tbody valign="top">
+          <tr>
+            <th class="docinfo-name">Copyright:</th>
+            <td>Copyright © Andrii Sydorchuk 2010-2012</td>
+          </tr>
+          <tr class="field">
+            <th class="docinfo-name">License:</th>
+            <td class="field-body">Distributed under the Boost Software
+License, Version 1.0. (See accompanying file <tt class="literal"><span class="pre">LICENSE_1_0.txt</span></tt> or copy at <a class="reference" target="_top" href="http://www.boost.org/LICENSE_1_0.txt">
+http://www.boost.org/LICENSE_1_0.txt</a>)</td>
+          </tr>
+        </tbody>
+      </table>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+</body></html>

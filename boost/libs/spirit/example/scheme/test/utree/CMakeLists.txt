@@ -1,0 +1,11 @@
+foreach(
+    example
+    utree_test
+)
+boost_add_executable(
+    ${example}
+    COMPILE_FLAGS
+    "-I../.."
+)
+endforeach(
+)

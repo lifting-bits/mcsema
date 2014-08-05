@@ -1,4 +1,54 @@
-mc-sema
-=======
+MC-Semantics
+============
 
-x86 to machine code translation framework
+MC-Semantics (or mcsema) is a library to translate the semantics of native code to LLVM IR. The MC-Semantics project is separated into a few sub-projects: 
+  * Control Flow Recovery
+  * Instruction Semantics
+  * Binary File Parsing
+  * Semantics Testing
+
+We hope that this library is useful to the program analysis and reverse engineering community. Currently it supports the translation of semantics for x86 programs and supports subsets of integer arithmetic, floating point, and vector operations. Work is in progress, and additional semantics are constantly being added.
+
+Patches are welcome. 
+
+## Separation of Components
+
+MC-Semantics is separated into two conceptual parts: control flow recovery and instruction translation. 
+
+The two parts communicate via a control flow graph structure that contains native code. This control flow graph structure connects basic blocks and defines information about external calls, but provides no further semantic information. The control flow graph may also be serialized via Google Protocol Buffers. 
+
+The `bin_descend` program attempts to recover a control flow graph from a given binary file. It will write the recovered control flow graph into a protocol buffer serialized file. There is also an IDAPython script to recover control flow from within IDA Pro.
+
+The `cfg_to_bc` program attempts to convert a control flow graph structure into LLVM bitcode. This translation process is more a transcription act than an analysis, since a control flow structure has already been recovered.
+
+The problems of instruction semantics and control flow recovery are separated. Any recovered control flow graph, from any mechanism, may be analyzed and studied in an LLVM intermediate representation. 
+
+## Documentation
+Detailed design and usage information can be found in the docs directory.
+
+### Building
+
+Detailed build instructions are at [docs/BUILDING.md](docs/BUILDING.md).
+
+### Usage
+
+Usage instructions, with examples, are at [docs/TOOLS.md](docs/TOOLS.md). For more examples, see the demos described in [docs/DEMOS.md](docs/DEMOS.md).
+
+### Source Code Information 
+
+The layout of the source code is described in [docs/NAVIGATION.md](docs/NAVIGATION.md). The description of the protocol buffer layout and the translation process is in [docs/USAGE_AND_APIS.md](docs/USAGE_AND_APIS.md).
+
+## External Code
+mcsema uses external code which has been included in this source release:
+ * LLVM 3.2
+ * Google Protocol Buffers
+ * Boost
+
+mcsema also uses external code which has **not** been included in this source release, but is freely available:
+ * Intel Pin 2.10
+
+## Contact
+
+For any questions, contact opensource@trailofbits.com.
+
+There is a mailing list dedicated to mcsema: mcsema-dev@googlegroups.com. It can also be accessed via web at: https://groups.google.com/forum/?hl=en#!forum/mcsema-dev

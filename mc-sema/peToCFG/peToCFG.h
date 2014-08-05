@@ -1,0 +1,582 @@
+/*
+Copyright (c) 2013, Trail of Bits
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+  Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+  Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+  other materials provided with the distribution.
+
+  Neither the name of the {organization} nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+#ifndef _PETOCFG_H
+#define _PETOCFG_H
+#include "llvm/MC/MCAsmInfo.h"
+#include "llvm/MC/MCDisassembler.h"
+#include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCInstPrinter.h"
+#include "llvm/MC/MCSubtargetInfo.h"
+#include "llvm/ADT/OwningPtr.h"
+#include "llvm/ADT/Triple.h"
+#include "llvm/ADT/Twine.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/MemoryObject.h"
+#include "llvm/Object/COFF.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Module.h"
+#include "llvm/Function.h"
+#include "llvm/LLVMContext.h"
+#include "llvm/Type.h"
+#include "llvm/DerivedTypes.h"
+#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/system_error.h"
+
+#include <stack>
+#include <set>
+#include <map>
+#include <list>
+
+#include <stdio.h>
+#include <assert.h>
+#include <iostream>
+
+#include <boost/shared_ptr.hpp>
+#include <boost/enable_shared_from_this.hpp>
+
+#include <boost/program_options/config.hpp>
+#include <boost/program_options/parsers.hpp>
+#include <boost/program_options/variables_map.hpp>
+#include <boost/program_options/options_description.hpp>
+
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/graphviz.hpp>
+#include <boost/graph/adjacency_matrix.hpp>
+
+typedef boost::adjacency_matrix<boost::directedS> CFG;
+typedef boost::uint64_t FuncID;
+typedef boost::uint64_t VA;
+
+class Inst;
+typedef boost::shared_ptr<Inst> InstPtr;
+
+#include <BaseBMO.h>
+
+#include "inst_decoder_fe.h"
+#include "../common/to_string.h"
+
+#include "../cfgToLLVM/Externals.h"
+
+class JumpTable;
+class JumpIndexTable;
+typedef boost::shared_ptr<ExternalCodeRef> ExternalCodeRefPtr;
+typedef boost::shared_ptr<ExternalDataRef> ExternalDataRefPtr;
+typedef boost::shared_ptr<JumpTable> JumpTablePtr;
+typedef boost::shared_ptr<JumpIndexTable> JumpIndexTablePtr;
+
+class BufferMemoryObject : public llvm::MemoryObject {
+private:
+    std::vector<uint8_t> Bytes;
+public:
+    BufferMemoryObject( const uint8_t   *bytes,
+                        uint64_t        length) {
+        for( unsigned int i = 0; i < length; i++ ) {
+            this->Bytes.push_back(bytes[i]);
+        }
+        return;
+    }
+
+    uint64_t getBase() const { return 0; }
+    uint64_t getExtent() const { return this->Bytes.size(); }
+
+    int readByte(uint64_t addr, uint8_t *byte) const {
+        if (addr > this->getExtent())
+            return -1;
+        *byte = this->Bytes[addr];
+        return 0;
+    }
+};
+
+/* we're going to make some assumptions about external calls:
+ *  - they have some sane calling convention
+ *  - they take a defined number of arguments
+ *  - they either return no values and have no effects on local
+      registers, or, they return a single integer value and 
+      assign that value to the EAX register
+ */
+
+class Inst {
+    public:
+    enum Prefix {
+        NoPrefix,
+        RepPrefix,
+        RepNePrefix,
+        FSPrefix,
+        GSPrefix
+    };
+
+    private:
+    std::vector<VA>   targets;
+    std::vector<boost::uint8_t> instBytes;
+    VA              tgtIfTrue;
+    VA              tgtIfFalse;
+    VA              loc;
+    llvm::MCInst    NativeInst;
+    std::string     instRep;
+    ExternalCodeRefPtr   extCallTgt;
+    ExternalDataRefPtr   extDataRef;
+
+    JumpTablePtr        jumpTable;
+    bool                jump_table;
+    JumpIndexTablePtr   jumpIndexTable;
+    bool                jump_index_table;
+
+    Prefix          pfx;
+    bool            ext_call_target;
+    bool            ext_data_ref;
+    bool            is_call_external;
+    boost::uint32_t data_offset;
+    bool            has_data_offset;
+    uint8_t         len;
+    bool            is_terminator;
+    // relocation offset: the number of bytes from the start of the instruction
+    // that there is a relocation.
+    // Zero if there is no relocation that occurs in the bytes of this
+    // instruction
+    uint8_t         reloc_offset;
+
+    public:
+    std::vector<boost::uint8_t> get_bytes(void) { return this->instBytes; }
+    std::string printInst(void) { 
+        return this->instRep;
+    }
+
+    bool terminator(void) { return this->is_terminator; }
+    void set_terminator(void) { this->is_terminator = true; }
+
+    uint8_t get_reloc_offset() {
+        return this->reloc_offset;
+    }
+
+    void set_reloc_offset(uint8_t ro) {
+        this->reloc_offset = ro;
+    }
+
+    void set_data_offset(boost::uint32_t d) { 
+        this->has_data_offset = true;
+        this->data_offset = d;
+        return;
+    }
+
+    bool is_data_offset(void) { return this->has_data_offset; }
+
+    boost::uint32_t get_data_offset(void) { return this->data_offset; }
+
+    bool get_is_call_external(void) { return this->is_call_external; }
+    void set_is_call_external(void) { this->is_call_external = true; }
+
+    llvm::MCInst get_inst(void) { return this->NativeInst; }
+	void set_inst(llvm::MCInst i) { this->NativeInst = i; }
+	void set_inst_rep(std::string s) { this->instRep = s; }
+
+    VA get_loc(void) { return this->loc; }
+
+    void set_tr(VA a) { this->tgtIfTrue = a; }
+    void set_fa(VA a) { this->tgtIfFalse = a; }
+
+    VA get_tr(void) { return this->tgtIfTrue; }
+    VA get_fa(void) { return this->tgtIfFalse; }
+
+    uint8_t get_len(void) { return this->len; }
+
+    void set_call_tgt(VA addr) { this->targets.push_back(addr); return; }
+    bool has_call_tgt() { return !this->targets.empty(); }
+    VA get_call_tgt(int index) { return this->targets.at(index); }
+
+    void set_ext_call_target(ExternalCodeRefPtr t) { 
+        this->extCallTgt = t; 
+        this->ext_call_target = true;
+        return; 
+    }
+
+    void set_ext_data_ref(ExternalDataRefPtr t) { 
+        this->extDataRef = t;
+        this->ext_data_ref = true;
+        return; 
+    }
+
+    bool has_ext_data_ref(void) {
+        return this->ext_data_ref;
+    }
+
+    bool has_ext_call_target(void) {
+        return this->ext_call_target;
+    }
+
+    bool has_external_ref(void) {
+        return this->has_ext_call_target() || this->has_ext_data_ref();
+    }
+
+    // accessors for JumpTable
+    void set_jump_table(JumpTablePtr p) {
+        this->jump_table = true;
+        this->jumpTable = p;
+    }
+    JumpTablePtr get_jump_table(void) {
+        return this->jumpTable;
+    }
+    bool has_jump_table(void) {
+        return this->jump_table;
+    }
+
+    // accessors for JumpIndexTable
+    void set_jump_index_table(JumpIndexTablePtr p) {
+        this->jump_index_table = true;
+        this->jumpIndexTable = p;
+    }
+    JumpIndexTablePtr get_jump_index_table(void) {
+        return this->jumpIndexTable;
+    }
+    bool has_jump_index_table(void) {
+        return this->jump_index_table;
+    }
+    
+    Prefix get_prefix(void) { return this->pfx; }
+    unsigned int get_addr_space(void) { 
+
+        switch(this->pfx) {
+            case GSPrefix:
+                return 256;
+            case FSPrefix:
+                return 257;
+            default:
+                return 0;
+        }
+    }
+
+    ExternalCodeRefPtr get_ext_call_target(void) { return this->extCallTgt; }
+    ExternalDataRefPtr get_ext_data_ref(void) { return this->extDataRef; }
+
+    Inst( VA      v, 
+          uint8_t l, 
+          llvm::MCInst inst, 
+          std::string instR, 
+          Prefix k,
+          std::vector<boost::uint8_t> bytes) : 
+        instBytes(bytes),
+        tgtIfTrue(0),
+        tgtIfFalse(0),
+        loc(v), 
+        NativeInst(inst),
+        instRep(instR),
+        pfx(k),
+        ext_call_target(false),
+        is_call_external(false),
+        has_data_offset(false),
+        is_terminator(false),
+        len(l),
+        reloc_offset(0),
+        jump_table(false),
+        jump_index_table(false),
+        ext_data_ref(false)
+       { }
+};
+
+
+class NativeBlock {
+    private:
+    //a list of instructions
+    VA                      baseAddr;
+    std::list<InstPtr>      instructions;
+    std::list<VA>           follows;
+    llvm::MCInstPrinter     *MyPrinter;
+    public:
+    NativeBlock(VA, llvm::MCInstPrinter *);
+    void add_inst(InstPtr);
+    VA get_base(void) { return this->baseAddr; }
+    void add_follow(VA f) { this->follows.push_back(f); }
+    std::list<VA> &get_follows(void) { return this->follows; }
+    std::string print_block(void);
+    std::string get_name(void);
+    std::list<InstPtr> get_insts(void) { return this->instructions; }
+    llvm::MCInstPrinter *get_printer(void) { return this->MyPrinter; }
+    uint32_t get_size(void) {
+        uint32_t    blockLen = 0;
+
+        for(std::list<InstPtr>::iterator i = this->instructions.begin();
+            i != this->instructions.end();
+            ++i)
+        {
+            InstPtr inst = *i;
+            blockLen += inst->get_len();
+        }
+
+        return blockLen;
+    }
+};
+
+typedef boost::shared_ptr<NativeBlock> NativeBlockPtr;
+
+class NativeFunction {
+    public:
+    NativeFunction(VA b) : funcEntryVA(b),nextBlockID(0) { }
+    void add_block(NativeBlockPtr );
+    VA get_start(void) { return this->funcEntryVA; }
+    boost::uint64_t num_blocks(void) { return this->IDtoBlock.size(); }
+    NativeBlockPtr block_from_id(uint64_t);
+    NativeBlockPtr block_from_base(VA);
+    boost::uint64_t entry_block_id() const;
+    void compute_graph(void);
+    CFG get_cfg(void) { return *this->graph; }
+    std::string get_name(void);
+    private:
+    //a graph of blocks
+    CFG                         *graph;
+    //a map of block bases to block IDs
+    std::map<VA, uint64_t>       baseToID;
+    //a map of block IDs to blocks
+    std::map<uint64_t, NativeBlockPtr> IDtoBlock;
+    //addr of function entry point
+    VA                          funcEntryVA;
+    //next available block ID
+    uint64_t                    nextBlockID;
+};
+
+typedef boost::shared_ptr<NativeBlock>            NativeBlockPtr;
+typedef boost::shared_ptr<NativeFunction>   NativeFunctionPtr;
+
+class DataSectionEntry {
+public:
+    DataSectionEntry(uint64_t base, const std::vector<uint8_t>& b) : 
+        base(base), bytes(b), is_symbol(false) 
+    {
+        //empty
+    }
+
+    DataSectionEntry(uint64_t base, const std::string& sname) :
+        base(base), sym_name(sname), is_symbol(true) 
+    {
+        // initialize bytes to null
+        this->bytes.push_back(0x0);
+        this->bytes.push_back(0x0);
+        this->bytes.push_back(0x0);
+        this->bytes.push_back(0x0);
+    }
+
+    uint64_t getBase() const { return this->base; }
+    uint64_t getSize() const { return this->bytes.size(); }
+    std::vector<uint8_t> getBytes() const {return this->bytes; }
+
+    bool getSymbol(std::string &sname) const
+    { 
+        if(this->is_symbol) {
+            sname = this->sym_name;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    virtual ~DataSectionEntry() {};
+
+protected:
+    uint64_t base;
+    std::vector<uint8_t> bytes;
+    bool is_symbol;
+    std::string sym_name;
+};
+
+class DataSection 
+{
+protected:
+    std::list<DataSectionEntry> entries;
+    uint64_t base;
+    bool read_only;
+    
+
+public:
+    static const uint64_t NO_BASE = (uint64_t)(-1);
+
+    DataSection() : base(NO_BASE), read_only(false) {}
+
+    virtual ~DataSection() {};
+
+    void setReadOnly(bool isro) {this->read_only = isro;}
+    bool isReadOnly() const {return this->read_only; }
+    uint64_t getBase() const { return this->base; }
+
+    std::list<DataSectionEntry>& getEntries()
+    {
+        return this->entries;
+    }
+
+    void addEntry(const DataSectionEntry &dse) 
+    {
+        this->entries.push_back(dse);
+        if(this->base == NO_BASE ||
+            this->base > dse.getBase() ) 
+        {
+            this->base = dse.getBase();
+        } 
+    }
+
+    uint64_t getSize() const
+    {
+        uint64_t size_sum=0;
+        for(std::list<DataSectionEntry>::const_iterator itr = entries.begin();
+                itr != entries.end();
+                itr++) 
+        {
+           size_sum += itr->getSize(); 
+        }
+
+        return size_sum;
+    }
+    std::vector<uint8_t> getBytes() const
+    {
+        std::vector<uint8_t> all_bytes;
+        for(std::list<DataSectionEntry>::const_iterator itr = entries.begin();
+                itr != entries.end();
+                itr++) 
+        {
+           std::vector<uint8_t> vec = itr->getBytes();
+           all_bytes.insert(all_bytes.end(), vec.begin(), vec.end());
+        }
+
+        return all_bytes;
+    }
+};
+
+class NativeModule {
+    public:
+    class EntrySymbol {
+        private:
+            std::string name;
+            VA          addr;
+            bool        has_extra;
+            int         argc;
+            bool        does_return;
+            ExternalCodeRef::CallingConvention cconv;
+            
+        public:
+            EntrySymbol(const std::string &name, 
+                        VA  addr): name(name), addr(addr), has_extra(false) {}
+            EntrySymbol(VA addr) : addr(addr), has_extra(false)
+                {
+                    this->name = "sub_"+to_string<VA>(this->addr, std::hex);
+                }
+
+            const std::string&  getName() const { return this->name; }
+            VA                  getAddr() const { return this->addr; }
+            bool                hasExtra() const { return this->has_extra; }
+            int                 getArgc() const { return this->argc; }
+            bool                doesReturn() const { return this->does_return; }
+            ExternalCodeRef::CallingConvention getConv() const { return this->cconv; }
+
+            void                setExtra(int argc, 
+                                        bool does_ret, 
+                                        ExternalCodeRef::CallingConvention conv) 
+            {
+                this->argc = argc;
+                this->does_return = does_ret;
+                this->cconv = conv;
+                this->has_extra = true;
+            }
+    };
+
+    NativeModule(std::string, std::list<NativeFunctionPtr>, llvm::MCInstPrinter *);
+    void add_func(NativeFunctionPtr f) { this->funcs.push_back(f); }
+    std::list<NativeFunctionPtr>   get_funcs(void) { return this->funcs; }
+    CFG get_cfg(void) { return this->callGraph; }
+    std::string printModule(void);
+    std::string name(void) { return this->nameStr; }
+    llvm::MCInstPrinter *get_printer(void) { return this->MyPrinter; }
+
+    //add a data section from a COFF object
+    void addDataSection(VA, std::vector<uint8_t> &);
+    void addDataSection(const DataSection &d);
+    std::list<DataSection> &getData(void) { return this->dataSecs; }
+
+    //add an external reference
+    void addExtCall(ExternalCodeRefPtr p) { this->extCalls.push_back(p); return; }
+    std::list<ExternalCodeRefPtr> getExtCalls(void) { return this->extCalls; }
+
+    //external data ref
+    void addExtDataRef(ExternalDataRefPtr p) { this->extData.push_back(p); return; }
+    std::list<ExternalDataRefPtr> getExtDataRefs(void) {return this->extData; }
+    
+    std::vector<EntrySymbol> entries;
+
+    const std::vector<EntrySymbol>& getEntryPoints() const { return this->entries; }
+    void addEntryPoint(const EntrySymbol& ep) {
+        this->entries.push_back(ep);
+    }
+
+
+    private:
+    std::list<NativeFunctionPtr>          funcs;
+    std::map<FuncID, NativeFunctionPtr>   IDtoFunc;
+    CFG                             callGraph;
+    FuncID                          nextID;
+    std::string                     nameStr;
+    const llvm::Target              *MyTarget;
+    const llvm::MCAsmInfo           *MyAsmInfo;
+    const llvm::MCSubtargetInfo     *MySubtargetInfo;
+    llvm::MCInstPrinter             *MyPrinter;
+
+    std::list<DataSection>          dataSecs;
+    std::list<ExternalCodeRefPtr>   extCalls;
+    std::list<ExternalDataRefPtr>   extData;
+
+};
+
+typedef boost::shared_ptr<NativeModule>      NativeModulePtr;
+
+enum ModuleInputFormat {
+    COFFObject,
+    PEFile,
+    ASMText,
+    ProtoBuff
+};
+
+const llvm::Target *findDisTarget(std::string );
+NativeModulePtr readModule(std::string, ModuleInputFormat, std::list<VA>);
+
+// used in testSemantics.cpp via funcFromBuff
+NativeBlockPtr blockFromBuff( VA, 
+                              BufferMemoryObject &, 
+                              const llvm::MCDisassembler *, 
+                              llvm::MCInstPrinter *);
+
+// used in testSemantics.cpp
+NativeFunctionPtr funcFromBuff( VA, 
+                                BufferMemoryObject &, 
+                                const llvm::MCDisassembler *, 
+                                llvm::MCInstPrinter *);
+
+void addExterns(std::list<NativeFunctionPtr>, NativeModulePtr); 
+
+std::string dumpProtoBuf(NativeModulePtr);
+
+#endif

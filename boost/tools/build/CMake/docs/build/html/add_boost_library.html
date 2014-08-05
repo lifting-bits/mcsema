@@ -1,0 +1,156 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Adding a Library Project &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="index.html" />
+    <link rel="next" title="Adding a Compiled Library to CMake" href="add_compiled_library.html" />
+    <link rel="prev" title="Building individual libraries with cmake" href="individual_libraries.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="add_compiled_library.html" title="Adding a Compiled Library to CMake"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="individual_libraries.html" title="Building individual libraries with cmake"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="individual_libraries.html"
+                                  title="previous chapter">Building individual libraries with cmake</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="add_compiled_library.html"
+                                  title="next chapter">Adding a Compiled Library to CMake</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/add_boost_library.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="adding-a-library-project">
+<span id="add-boost-library-project"></span><h1>Adding a Library Project<a class="headerlink" href="#adding-a-library-project" title="Permalink to this headline">¶</a></h1>
+<p>This page describes how to introduce a new Boost library project into
+the CMake-based build system. Any Boost library that provides a
+library binary (e.g., <tt class="docutils literal"><span class="pre">boost_signals.dll</span></tt>) or has regression tests
+(hopefully, every Boost library!) will need to be part of the build
+system.</p>
+<p>To introduce a new library, which resides in the subdirectory
+<tt class="docutils literal"><span class="pre">libs/libname</span></tt>, follow these steps:</p>
+<ol class="arabic">
+<li><p class="first">Create a new file <tt class="docutils literal"><span class="pre">libs/libname/CMakeLists.txt</span></tt> with your
+favorite text editor. This file will contain an invocation of the
+<a class="reference external" href="reference/boost_library_project.html#boost-library-project-macro"><em>boost_library_project</em></a>, which
+identifies each Boost library to the build system. The invocation
+of the <tt class="docutils literal"><span class="pre">boost_library_project</span></tt> will look like this:</p>
+<div class="highlight-python"><pre>boost_library_project(
+  Libname
+  SRCDIRS src
+  TESTDIRS test
+  EXAMPLEDIRS test
+  )</pre>
+</div>
+<p>where <tt class="docutils literal"><span class="pre">Libname</span></tt> is the properly-capitalization library name,
+e.g., <tt class="docutils literal"><span class="pre">Signals</span></tt> or <tt class="docutils literal"><span class="pre">Smart_ptr</span></tt>. The <tt class="docutils literal"><span class="pre">SRCDIRS</span> <span class="pre">src</span></tt> line should
+only be present if your Boost library actually needs to compile a
+library binary; header-only libraries can skip this step. The
+<tt class="docutils literal"><span class="pre">TESTDIRS</span> <span class="pre">test</span></tt> line indicates that the subdirectory <tt class="docutils literal"><span class="pre">test</span></tt>
+contains regression tests for your library. Every Boost library
+should have these.</p>
+</li>
+<li><p class="first">Re-run CMake (see <a class="reference external" href="quickstart.html#quickstart"><em>Quickstart</em></a>) to reconfigure the source
+tree, causing CMake to find the new Boost library. CMake can be
+re-run either from the command line (by invoking <tt class="docutils literal"><span class="pre">cmake</span>
+<span class="pre">/path/to/boost</span></tt> or <tt class="docutils literal"><span class="pre">ccmake</span> <span class="pre">/path/to/boost</span></tt>) or, on Windows,
+using the CMake GUI. Once you have reconfigured and generated new
+makefiles or project files, CMake knows about your library.</p>
+</li>
+<li><p class="first">If your library has compiled sources (i.e., it is not a header-only
+library), follow the instructions on <a class="reference external" href="add_compiled_library.html#add-compiled-library"><em>Adding a Compiled Library to CMake</em></a> to
+get CMake building and installing your library.</p>
+</li>
+<li><p class="first">If your library has regression tests (it <em>does</em> regression tests,
+right?), follow the instructions on <a class="reference external" href="adding_regression_tests.html#adding-regression-tests"><em>Adding Regression Tests</em></a>
+to get CMake to build and run regression tests for your library.</p>
+</li>
+</ol>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="add_compiled_library.html" title="Adding a Compiled Library to CMake"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="individual_libraries.html" title="Building individual libraries with cmake"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

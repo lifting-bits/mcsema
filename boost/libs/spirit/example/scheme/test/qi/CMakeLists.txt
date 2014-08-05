@@ -1,0 +1,11 @@
+foreach(
+    example
+    qi_interpreter
+)
+boost_add_executable(
+    ${example}
+    COMPILE_FLAGS
+    "-I../.."
+)
+endforeach(
+)

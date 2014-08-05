@@ -1,0 +1,25 @@
+Microsoft Visual Studio Solution File, Format Version 9.00
+# Visual Studio 2005
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "arithmetic", "arithmetic.vcproj", "{4D447233-54DC-4C1B-B8DF-4689590ACF56}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dot_product", "dot_product.vcproj", "{C9CD2A98-3327-4560-A979-4BF506F777A8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4D447233-54DC-4C1B-B8DF-4689590ACF56}.Debug|Win32.ActiveCfg = Debug|Win32
+		{4D447233-54DC-4C1B-B8DF-4689590ACF56}.Debug|Win32.Build.0 = Debug|Win32
+		{4D447233-54DC-4C1B-B8DF-4689590ACF56}.Release|Win32.ActiveCfg = Release|Win32
+		{4D447233-54DC-4C1B-B8DF-4689590ACF56}.Release|Win32.Build.0 = Release|Win32
+		{C9CD2A98-3327-4560-A979-4BF506F777A8}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C9CD2A98-3327-4560-A979-4BF506F777A8}.Debug|Win32.Build.0 = Debug|Win32
+		{C9CD2A98-3327-4560-A979-4BF506F777A8}.Release|Win32.ActiveCfg = Release|Win32
+		{C9CD2A98-3327-4560-A979-4BF506F777A8}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

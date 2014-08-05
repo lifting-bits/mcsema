@@ -1,0 +1,470 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
+<title>Boost.Math</title>
+<link rel="stylesheet" href="../../../../doc/src/boostbook.css" type="text/css">
+<meta name="generator" content="DocBook XSL Stylesheets V1.74.0">
+<link rel="home" href="index.html" title="Boost.Math">
+</head>
+<body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
+<table cellpadding="2" width="100%"><tr>
+<td valign="top"><img alt="Boost C++ Libraries" width="277" height="86" src="../../../../boost.png"></td>
+<td align="center"><a href="../../../../index.html">Home</a></td>
+<td align="center"><a href="../../../../libs/libraries.htm">Libraries</a></td>
+<td align="center"><a href="http://www.boost.org/users/people.html">People</a></td>
+<td align="center"><a href="http://www.boost.org/users/faq.html">FAQ</a></td>
+<td align="center"><a href="../../../../more/index.htm">More</a></td>
+</tr></table>
+<hr>
+<div class="spirit-nav"></div>
+<div class="article" lang="en">
+<div class="titlepage">
+<div>
+<div><h2 class="title">
+<a name="boost_math"></a>Boost.Math</h2></div>
+<div><div class="authorgroup">
+<div class="author"><h3 class="author">
+<span class="firstname">John</span> <span class="surname">Maddock</span>
+</h3></div>
+<div class="author"><h3 class="author">
+<span class="firstname">Paul A.</span> <span class="surname">Bristow</span>
+</h3></div>
+<div class="author"><h3 class="author">
+<span class="firstname">Hubert</span> <span class="surname">Holin</span>
+</h3></div>
+<div class="author"><h3 class="author">
+<span class="firstname">Daryle</span> <span class="surname">Walker</span>
+</h3></div>
+<div class="author"><h3 class="author">
+<span class="firstname">Xiaogang</span> <span class="surname">Zhang</span>
+</h3></div>
+<div class="author"><h3 class="author">
+<span class="firstname">Bruno</span> <span class="surname">Lalande</span>
+</h3></div>
+<div class="author"><h3 class="author">
+<span class="firstname">Johan</span> <span class="surname">R&#229;de</span>
+</h3></div>
+<div class="author"><h3 class="author">
+<span class="firstname">Gautam</span> <span class="surname">Sewani</span>
+</h3></div>
+<div class="author"><h3 class="author">
+<span class="firstname">Thijs</span> <span class="surname">van den Berg</span>
+</h3></div>
+</div></div>
+<div><p class="copyright">Copyright &#169; 2006 , 2007, 2008, 2009, 2010 John Maddock, Paul A. Bristow,
+      Hubert Holin, Daryle Walker, Xiaogang Zhang, Bruno Lalande, Johan R&#229;de,
+      Gautam Sewani and Thijs van den Berg</p></div>
+<div><div class="legalnotice">
+<a name="id889386"></a><p>
+        Distributed under the Boost Software License, Version 1.0. (See accompanying
+        file LICENSE_1_0.txt or copy at <a href="http://www.boost.org/LICENSE_1_0.txt" target="_top">http://www.boost.org/LICENSE_1_0.txt</a>)
+      </p>
+</div></div>
+</div>
+<hr>
+</div>
+<p>
+    The following libraries are present in Boost.Math:
+  </p>
+<div class="informaltable"><table class="table">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<thead><tr>
+<th>
+            <p>
+              Library
+            </p>
+          </th>
+<th>
+            <p>
+              Description
+            </p>
+          </th>
+</tr></thead>
+<tbody>
+<tr>
+<td>
+            <p>
+              Complex Number Inverse Trigonometric Functions
+            </p>
+            <p>
+              <a href="../complex/html/index.html" target="_top">HTML Docs</a>
+            </p>
+            <p>
+              <a href="http://sourceforge.net/projects/boost/files/boost-docs/" target="_top">PDF
+              Docs</a>
+            </p>
+          </td>
+<td>
+            <p>
+              These complex number algorithms are the inverses of trigonometric functions
+              currently present in the C++ standard. Equivalents to these functions
+              are part of the C99 standard, and are part of the <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2005/n1836.pdf" target="_top">Technical
+              Report on C++ Library Extensions</a>.
+            </p>
+          </td>
+</tr>
+<tr>
+<td>
+            <p>
+              Greatest Common Divisor and Least Common Multiple
+            </p>
+            <p>
+              <a href="../gcd/html/index.html" target="_top">HTML Docs</a>
+            </p>
+            <p>
+              <a href="http://sourceforge.net/projects/boost/files/boost-docs/" target="_top">PDF
+              Docs</a>
+            </p>
+          </td>
+<td>
+            <p>
+              The class and function templates in &lt;boost/math/common_factor.hpp&gt;
+              provide run-time and compile-time evaluation of the greatest common
+              divisor (GCD) or least common multiple (LCM) of two integers. These
+              facilities are useful for many numeric-oriented generic programming
+              problems.
+            </p>
+          </td>
+</tr>
+<tr>
+<td>
+            <p>
+              Octonions
+            </p>
+            <p>
+              <a href="../octonion/html/index.html" target="_top">HTML Docs</a>
+            </p>
+            <p>
+              <a href="http://sourceforge.net/projects/boost/files/boost-docs/" target="_top">PDF
+              Docs</a>
+            </p>
+          </td>
+<td>
+            <p>
+              Octonions, like <a href="../quaternion/html/index.html" target="_top">quaternions</a>,
+              are a relative of complex numbers.
+            </p>
+            <p>
+              Octonions see some use in theoretical physics.
+            </p>
+            <p>
+              In practical terms, an octonion is simply an octuple of real numbers
+              (&#945;,&#946;,&#947;,&#948;,&#949;,&#950;,&#951;,&#952;), which we can write in the form <span class="emphasis"><em><code class="literal">o = &#945; + &#946;i + &#947;j + &#948;k + &#949;e' + &#950;i' + &#951;j' + &#952;k'</code></em></span>,
+              where <span class="emphasis"><em><code class="literal">i</code></em></span>, <span class="emphasis"><em><code class="literal">j</code></em></span>
+              and <span class="emphasis"><em><code class="literal">k</code></em></span> are the same objects
+              as for quaternions, and <span class="emphasis"><em><code class="literal">e'</code></em></span>,
+              <span class="emphasis"><em><code class="literal">i'</code></em></span>, <span class="emphasis"><em><code class="literal">j'</code></em></span>
+              and <span class="emphasis"><em><code class="literal">k'</code></em></span> are distinct objects
+              which play essentially the same kind of role as <span class="emphasis"><em><code class="literal">i</code></em></span>
+              (or <span class="emphasis"><em><code class="literal">j</code></em></span> or <span class="emphasis"><em><code class="literal">k</code></em></span>).
+            </p>
+            <p>
+              Addition and a multiplication is defined on the set of octonions, which
+              generalize their quaternionic counterparts. The main novelty this time
+              is that <span class="bold"><strong>the multiplication is not only not commutative,
+              is now not even associative</strong></span> (i.e. there are quaternions
+              <span class="emphasis"><em><code class="literal">x</code></em></span>, <span class="emphasis"><em><code class="literal">y</code></em></span>
+              and <span class="emphasis"><em><code class="literal">z</code></em></span> such that <span class="emphasis"><em><code class="literal">x(yz)
+              &#8800; (xy)z</code></em></span>). A way of remembering things is by using
+              the following multiplication table:
+            </p>
+            <p>
+              <span class="inlinemediaobject"><img src="../../octonion/graphics/octonion_blurb17.jpeg" alt="octonion_blurb17"></span>
+            </p>
+            <p>
+              Octonions (and their kin) are described in far more details in this
+              other <a href="../../quaternion/TQE.pdf" target="_top">document</a> (with
+              <a href="../../quaternion/TQE_EA.pdf" target="_top">errata and addenda</a>).
+            </p>
+            <p>
+              Some traditional constructs, such as the exponential, carry over without
+              too much change into the realms of octonions, but other, such as taking
+              a square root, do not (the fact that the exponential has a closed form
+              is a result of the author, but the fact that the exponential exists
+              at all for octonions is known since quite a long time ago).
+            </p>
+          </td>
+</tr>
+<tr>
+<td>
+            <p>
+              Special Functions
+            </p>
+            <p>
+              <a href="../sf_and_dist/html/index.html" target="_top">HTML Docs</a>
+            </p>
+            <p>
+              <a href="http://sourceforge.net/projects/boost/files/boost-docs/" target="_top">PDF
+              Docs</a>
+            </p>
+          </td>
+<td>
+            <p>
+              Provides a number of high quality special functions, initially these
+              were concentrated on functions used in statistical applications along
+              with those in the Technical Report on C++ Library Extensions.
+            </p>
+            <p>
+              The function families currently implemented are the gamma, beta &amp;
+              erf functions along with the incomplete gamma and beta functions (four
+              variants of each) and all the possible inverses of these, plus digamma,
+              various factorial functions, Bessel functions, elliptic integrals,
+              sinus cardinals (along with their hyperbolic variants), inverse hyperbolic
+              functions, Legrendre/Laguerre/Hermite polynomials and various special
+              power and logarithmic functions.
+            </p>
+            <p>
+              All the implementations are fully generic and support the use of arbitrary
+              "real-number" types, although they are optimised for use
+              with types with known-about significand (or mantissa) sizes: typically
+              float, double or long double.
+            </p>
+          </td>
+</tr>
+<tr>
+<td>
+            <p>
+              Statistical Distributions
+            </p>
+            <p>
+              <a href="../sf_and_dist/html/index.html" target="_top">HTML Docs</a>
+            </p>
+            <p>
+              <a href="http://sourceforge.net/projects/boost/files/boost-docs/" target="_top">PDF
+              Docs</a>
+            </p>
+          </td>
+<td>
+            <p>
+              Provides a reasonably comprehensive set of statistical distributions,
+              upon which higher level statistical tests can be built.
+            </p>
+            <p>
+              The initial focus is on the central univariate distributions. Both
+              continuous (like normal &amp; Fisher) and discrete (like binomial &amp;
+              Poisson) distributions are provided.
+            </p>
+            <p>
+              A comprehensive tutorial is provided, along with a series of worked
+              examples illustrating how the library is used to conduct statistical
+              tests.
+            </p>
+          </td>
+</tr>
+<tr>
+<td>
+            <p>
+              Quaternions
+            </p>
+            <p>
+              <a href="../quaternion/html/index.html" target="_top">HTML Docs</a>
+            </p>
+            <p>
+              <a href="http://sourceforge.net/projects/boost/files/boost-docs/" target="_top">PDF
+              Docs</a>
+            </p>
+          </td>
+<td>
+            <p>
+              Quaternions are a relative of complex numbers.
+            </p>
+            <p>
+              Quaternions are in fact part of a small hierarchy of structures built
+              upon the real numbers, which comprise only the set of real numbers
+              (traditionally named <span class="emphasis"><em><span class="bold"><strong>R</strong></span></em></span>),
+              the set of complex numbers (traditionally named <span class="emphasis"><em><span class="bold"><strong>C</strong></span></em></span>), the set of quaternions (traditionally
+              named <span class="emphasis"><em><span class="bold"><strong>H</strong></span></em></span>) and
+              the set of octonions (traditionally named <span class="emphasis"><em><span class="bold"><strong>O</strong></span></em></span>),
+              which possess interesting mathematical properties (chief among which
+              is the fact that they are <span class="emphasis"><em>division algebras</em></span>,
+              <span class="emphasis"><em>i.e.</em></span> where the following property is true: if
+              <span class="emphasis"><em><code class="literal">y</code></em></span> is an element of that algebra
+              and is <span class="bold"><strong>not equal to zero</strong></span>, then <span class="emphasis"><em><code class="literal">yx
+              = yx'</code></em></span>, where <span class="emphasis"><em><code class="literal">x</code></em></span>
+              and <span class="emphasis"><em><code class="literal">x'</code></em></span> denote elements of that
+              algebra, implies that <span class="emphasis"><em><code class="literal">x = x'</code></em></span>).
+              Each member of the hierarchy is a super-set of the former.
+            </p>
+            <p>
+              One of the most important aspects of quaternions is that they provide
+              an efficient way to parameterize rotations in <span class="emphasis"><em><span class="bold"><strong>R<sup>3</sup></strong></span></em></span>
+              (the usual three-dimensional space) and <span class="emphasis"><em><span class="bold"><strong>R<sup>4</sup></strong></span></em></span>.
+            </p>
+            <p>
+              In practical terms, a quaternion is simply a quadruple of real numbers
+              (&#945;,&#946;,&#947;,&#948;), which we can write in the form <span class="emphasis"><em><code class="literal">q = &#945; + &#946;i + &#947;j + &#948;k</code></em></span>,
+              where <span class="emphasis"><em><code class="literal">i</code></em></span> is the same object
+              as for complex numbers, and <span class="emphasis"><em><code class="literal">j</code></em></span>
+              and <span class="emphasis"><em><code class="literal">k</code></em></span> are distinct objects
+              which play essentially the same kind of role as <span class="emphasis"><em><code class="literal">i</code></em></span>.
+            </p>
+            <p>
+              An addition and a multiplication is defined on the set of quaternions,
+              which generalize their real and complex counterparts. The main novelty
+              here is that <span class="bold"><strong>the multiplication is not commutative</strong></span>
+              (i.e. there are quaternions <span class="emphasis"><em><code class="literal">x</code></em></span>
+              and <span class="emphasis"><em><code class="literal">y</code></em></span> such that <span class="emphasis"><em><code class="literal">xy
+              &#8800; yx</code></em></span>). A good mnemotechnical way of remembering
+              things is by using the formula <span class="emphasis"><em><code class="literal">i*i = j*j = k*k =
+              -1</code></em></span>.
+            </p>
+            <p>
+              Quaternions (and their kin) are described in far more details in this
+              other <a href="../../quaternion/TQE.pdf" target="_top">document</a> (with
+              <a href="../../quaternion/TQE_EA.pdf" target="_top">errata and addenda</a>).
+            </p>
+            <p>
+              Some traditional constructs, such as the exponential, carry over without
+              too much change into the realms of quaternions, but other, such as
+              taking a square root, do not.
+            </p>
+          </td>
+</tr>
+</tbody>
+</table></div>
+<p>
+    The following Boost libraries are also mathematically oriented:
+  </p>
+<div class="informaltable"><table class="table">
+<colgroup>
+<col>
+<col>
+</colgroup>
+<thead><tr>
+<th>
+            <p>
+              Library
+            </p>
+          </th>
+<th>
+            <p>
+              Description
+            </p>
+          </th>
+</tr></thead>
+<tbody>
+<tr>
+<td>
+            <p>
+              <a href="../../../integer/index.html" target="_top">Integer</a>
+            </p>
+          </td>
+<td>
+            <p>
+              Headers to ease dealing with integral types.
+            </p>
+          </td>
+</tr>
+<tr>
+<td>
+            <p>
+              <a href="../../../numeric/interval/doc/interval.htm" target="_top">Interval</a>
+            </p>
+          </td>
+<td>
+            <p>
+              As implied by its name, this library is intended to help manipulating
+              mathematical intervals. It consists of a single header &lt;boost/numeric/interval.hpp&gt;
+              and principally a type which can be used as interval&lt;T&gt;.
+            </p>
+          </td>
+</tr>
+<tr>
+<td>
+            <p>
+              <a href="../../../multi_array/doc/index.html" target="_top">Multi Array</a>
+            </p>
+          </td>
+<td>
+            <p>
+              Boost.MultiArray provides a generic N-dimensional array concept definition
+              and common implementations of that interface.
+            </p>
+          </td>
+</tr>
+<tr>
+<td>
+            <p>
+              <a href="../../../numeric/conversion/index.html" target="_top">Numeric.Conversion</a>
+            </p>
+          </td>
+<td>
+            <p>
+              The Boost Numeric Conversion library is a collection of tools to describe
+              and perform conversions between values of different numeric types.
+            </p>
+          </td>
+</tr>
+<tr>
+<td>
+            <p>
+              <a href="../../../utility/operators.htm" target="_top">Operators</a>
+            </p>
+          </td>
+<td>
+            <p>
+              The header &lt;boost/operators.hpp&gt; supplies several sets of class
+              templates (in namespace boost). These templates define operators at
+              namespace scope in terms of a minimal number of fundamental operators
+              provided by the class.
+            </p>
+          </td>
+</tr>
+<tr>
+<td>
+            <p>
+              <a href="../../../random/index.html" target="_top">Random</a>
+            </p>
+          </td>
+<td>
+            <p>
+              Random numbers are useful in a variety of applications. The Boost Random
+              Number Library (Boost.Random for short) provides a vast variety of
+              generators and distributions to produce random numbers having useful
+              properties, such as uniform distribution.
+            </p>
+          </td>
+</tr>
+<tr>
+<td>
+            <p>
+              <a href="../../../rational/index.html" target="_top">Rational</a>
+            </p>
+          </td>
+<td>
+            <p>
+              The header rational.hpp provides an implementation of rational numbers.
+              The implementation is template-based, in a similar manner to the standard
+              complex number class.
+            </p>
+          </td>
+</tr>
+<tr>
+<td>
+            <p>
+              <a href="../../../numeric/ublas/doc/index.htm" target="_top">uBLAS</a>
+            </p>
+          </td>
+<td>
+            <p>
+              uBLAS is a C++ template class library that provides BLAS level 1, 2,
+              3 functionality for dense, packed and sparse matrices. The design and
+              implementation unify mathematical notation via operator overloading
+              and efficient code generation via expression templates.
+            </p>
+          </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
+<td align="left"><p><small>Last revised: January 01, 2011 at 17:16:10 +0000</small></p></td>
+<td align="right"><div class="copyright-footer"></div></td>
+</tr></table>
+<hr>
+<div class="spirit-nav"></div>
+</body>
+</html>

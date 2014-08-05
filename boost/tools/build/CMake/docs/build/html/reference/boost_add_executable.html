@@ -1,0 +1,220 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>boost_add_executable &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="../_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="../index.html" />
+    <link rel="next" title="boost_python_module" href="boost_python_module.html" />
+    <link rel="prev" title="boost_add_library" href="boost_add_library.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="boost_python_module.html" title="boost_python_module"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="boost_add_library.html" title="boost_add_library"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="../index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="boost_add_library.html"
+                                  title="previous chapter">boost_add_library</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="boost_python_module.html"
+                                  title="next chapter">boost_python_module</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="../_sources/reference/boost_add_executable.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="boost-add-executable">
+<span id="boost-add-executable-macro"></span><span id="index-59"></span><h1>boost_add_executable<a class="headerlink" href="#boost-add-executable" title="Permalink to this headline">¶</a></h1>
+<p>Adds an executable to the build</p>
+<dl class="cmake">
+<dt id="boost_add_executable">
+<tt class="descname">boost_add_executable</tt><big>(</big><em>exename source1 source2 ...</em><big>)</big><a class="headerlink" href="#boost_add_executable" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><em>source1 source2...</em> &#8211; sourcefiles</li>
+<li><em>COMPILE_FLAGS flag1 flag2 ...</em> &#8211; (optional) compile flags</li>
+<li><em>LINK_FLAGS flag1 flag2 ...</em> &#8211; (optional) link flags</li>
+<li><em>feature_LINK_LIBS lib1 lib2 ...</em> &#8211; (optional) link libraries</li>
+<li><em>DEPENDS dep1 dep2 ...</em> &#8211; (optional) intraboost dependencies</li>
+<li><em>OUTPUT_NAME name</em> &#8211; (optional) output name</li>
+<li><em>NO_INSTALL</em> &#8211; (optional) don&#8217;t install</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<p>where exename is the name of the executable (e.g., &#8220;wave&#8221;).  source1,
+source2, etc. are the source files used to build the executable, e.g.,
+cpp.cpp. If no source files are provided, &#8220;exename.cpp&#8221; will be
+used.</p>
+<p>This macro has a variety of options that affect its behavior. In
+several cases, we use the placeholder &#8220;feature&#8221; in the option name
+to indicate that there are actually several different kinds of
+options, each referring to a different build feature, e.g., shared
+libraries, multi-threaded, debug build, etc. For a complete listing
+of these features, please refer to the CMakeLists.txt file in the
+root of the Boost distribution, which defines the set of features
+that will be used to build Boost libraries by default.</p>
+<p>The options that affect this macro&#8217;s behavior are:</p>
+<span class="target" id="compile-flags"></span><ul class="simple" id="index-60">
+<li><strong>COMPILE_FLAGS</strong> &#8211; Provides additional compilation flags that will be
+used when building the executable.</li>
+</ul>
+<span class="target" id="feature-compile-flags"></span><ul class="simple" id="index-61">
+<li><strong>feature_COMPILE_FLAGS</strong> &#8211; Provides additional compilation flags that
+will be used only when building the executable with the given
+feature (e.g., <tt class="docutils literal"><span class="pre">SHARED_COMPILE_FLAGS</span></tt> when we&#8217;re linking against
+shared libraries). Note that the set of features used to build the
+executable depends both on the arguments given to
+boost_add_executable (see the &#8220;feature&#8221; argument description, below)
+and on the user&#8217;s choice of variants to build.</li>
+</ul>
+<span class="target" id="link-flags"></span><ul class="simple" id="index-62">
+<li><strong>LINK_FLAGS</strong> &#8211; Provides additional flags that will be passed to the
+linker when linking the executable. This option should not be used
+to link in additional libraries; see <tt class="docutils literal"><span class="pre">LINK_LIBS</span></tt> and <tt class="docutils literal"><span class="pre">DEPENDS</span></tt>.</li>
+</ul>
+<span class="target" id="feature-link-flags"></span><ul class="simple" id="index-63">
+<li><strong>feature_LINK_FLAGS</strong> &#8211; Provides additional flags that will be passed
+to the linker when linking the executable with the given feature
+(e.g., <tt class="docutils literal"><span class="pre">MULTI_THREADED_LINK_FLAGS</span></tt> when we&#8217;re linking a multi-threaded
+executable).</li>
+</ul>
+<span class="target" id="link-libs"></span><ul class="simple" id="index-64">
+<li><strong>LINK_LIBS</strong> &#8211; Provides additional libraries against which the
+executable will be linked. For example, one might provide &#8220;expat&#8221; as
+options to <tt class="docutils literal"><span class="pre">LINK_LIBS</span></tt>, to state that the executable will link against
+the expat library binary. Use <tt class="docutils literal"><span class="pre">LINK_LIBS</span></tt> for libraries external to
+Boost; for Boost libraries, use <tt class="docutils literal"><span class="pre">DEPENDS</span></tt>.</li>
+</ul>
+<span class="target" id="feature-link-libs"></span><ul class="simple" id="index-65">
+<li><strong>feature_LINK_LIBS</strong> &#8211; Provides additional libraries to link against
+when linking an executable built with the given feature.</li>
+</ul>
+<span class="target" id="depends"></span><ul class="simple" id="index-66">
+<li><strong>DEPENDS</strong> &#8211; States that this executable depends on and links
+against a Boost library. The arguments to <tt class="docutils literal"><span class="pre">DEPENDS</span></tt> should be the
+unversioned name of the Boost library, such as
+&#8220;boost_filesystem&#8221;. Like <tt class="docutils literal"><span class="pre">LINK_LIBS</span></tt>, this option states that the
+executable will link against the stated libraries. Unlike <tt class="docutils literal"><span class="pre">LINK_LIBS</span></tt>,
+however, <tt class="docutils literal"><span class="pre">DEPENDS</span></tt> takes particular library variants into account,
+always linking to the appropriate variant of a Boost library. For
+example, if the <tt class="docutils literal"><span class="pre">MULTI_THREADED</span></tt> feature was requested in the call to
+boost_add_executable, <tt class="docutils literal"><span class="pre">DEPENDS</span></tt> will ensure that we only link against
+multi-threaded libraries.</li>
+</ul>
+<span class="target" id="feature"></span><ul class="simple" id="index-67">
+<li><strong>feature</strong> &#8211; States that the executable should always be built using a
+given feature, e.g., <tt class="docutils literal"><span class="pre">SHARED</span></tt> linking (against its libraries) or
+<tt class="docutils literal"><span class="pre">MULTI_THREADED</span></tt> (for multi-threaded builds). If that feature has
+been turned off by the user, the executable will not build.</li>
+</ul>
+<span class="target" id="no-install"></span><ul class="simple" id="index-68">
+<li><strong>NO_INSTALL</strong> &#8211; Don&#8217;t install this executable with the rest of
+Boost.</li>
+</ul>
+<span class="target" id="output-name"></span><ul class="simple" id="index-69">
+<li><strong>OUTPUT_NAME</strong> &#8211; If you want the executable to be generated
+somewhere other than the binary directory, pass the path (including
+directory and file name) via the <tt class="docutils literal"><span class="pre">OUTPUT_NAME</span></tt> parameter.</li>
+</ul>
+<p class="rubric">Example</p>
+<div class="highlight-python"><pre>boost_add_executable(wave cpp.cpp
+   DEPENDS boost_wave boost_program_options
+           boost_filesystem
+           boost_serialization
+   )</pre>
+</div>
+<p class="rubric">Where Defined</p>
+<p>This macro is defined in the Boost Core module in
+<tt class="docutils literal"><span class="pre">tools/build/CMake/BoostCore.cmake</span></tt></p>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="boost_python_module.html" title="boost_python_module"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="boost_add_library.html" title="boost_add_library"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="../index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

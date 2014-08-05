@@ -1,0 +1,1 @@
+boost_module(polygon DEPENDS smart_ptr)

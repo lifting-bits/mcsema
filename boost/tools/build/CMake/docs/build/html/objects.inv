@@ -1,0 +1,6 @@
+# Sphinx inventory version 1
+# Project: Boost.CMake
+# Version: 1.41.0
+boost_add_library cmake reference/boost_add_library.html
+boost_library_project cmake reference/boost_library_project.html
+boost_add_executable cmake reference/boost_add_executable.html

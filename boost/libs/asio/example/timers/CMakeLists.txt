@@ -1,0 +1,16 @@
+boost_add_executable(
+    time_t_timer
+    DEPENDS
+    boost_system
+)
+if(
+    WIN32
+)
+boost_add_executable(
+    tick_count_timer
+    DEPENDS
+    boost_system
+)
+endif(
+    WIN32
+)

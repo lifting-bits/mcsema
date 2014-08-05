@@ -1,0 +1,581 @@
+/*
+Copyright (c) 2014, Trail of Bits
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+  Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+  Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+  other materials provided with the distribution.
+
+  Neither the name of Trail of Bits nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+#include "InstructionDispatch.h"
+#include "toLLVM.h"
+#include "X86.h"
+#include "raiseX86.h"
+#include "x86Helpers.h"
+#include "x86Instrs_MOV.h"
+#include "JumpTables.h"
+#include "Externals.h"
+
+#define NASSERT(cond) TASSERT(cond, "")
+
+using namespace llvm;
+
+template <int width>
+static Value* getSegmentValue(BasicBlock *&b, unsigned sreg) {
+
+    Value *val = NULL;
+
+    switch(sreg)
+    {
+        case X86::SS:
+            val = CONST_V<width>(b, 0x23);
+            break;
+        case X86::CS:
+            val = CONST_V<width>(b, 0x1B);
+            break;
+        case X86::DS:
+            val = CONST_V<width>(b, 0x23);
+            break;
+        case X86::ES:
+            val = CONST_V<width>(b, 0x23);
+            break;
+        case X86::FS:
+            val = CONST_V<width>(b, 0x3B);
+            break;
+        case X86::GS:
+            val = CONST_V<width>(b, 0x00);
+            break;
+        default:
+            throw TErr(__LINE__, __FILE__, "Unknown Segment Register");
+            break;
+    }
+
+    return val;
+
+}
+
+template <int width>
+static InstTransResult doMSMov(InstPtr ip, BasicBlock *&b,
+                        Value           *dstAddr,
+                        const MCOperand &src)
+{
+    NASSERT(dstAddr != NULL);
+    NASSERT(src.isReg());
+
+    Value *seg_val = getSegmentValue<width>(b, src.getReg());
+
+    M_WRITE<width>(ip, b, dstAddr, seg_val);
+
+    return ContinueBlock;
+}
+
+template <int width>
+static InstTransResult doRSMov(InstPtr ip,   BasicBlock *&b,
+                            const MCOperand &dst,
+                            const MCOperand &src)
+{
+    NASSERT(dst.isReg());
+    NASSERT(src.isReg());
+
+    Value *seg_val = getSegmentValue<width>(b, src.getReg());
+    R_WRITE<width>(b, dst.getReg(), seg_val);
+    return ContinueBlock;
+}
+
+template <int dstWidth>
+static Value *doMovSXV(InstPtr ip, BasicBlock * b, Value *src) {
+	// do an SX
+	return new SExtInst(src, Type::getIntNTy(b->getContext(), dstWidth), "", b);
+}
+
+template <int width>
+static InstTransResult doRIMovV(InstPtr ip,
+                        BasicBlock *&b,
+                        Value *src,
+                        const MCOperand &dst)
+{
+    //MOV <r>, <imm>
+    NASSERT(src != NULL);
+    NASSERT(dst.isReg());
+
+    //write the constant into the supplied register
+    R_WRITE<width>(b, dst.getReg(), src);
+
+    return ContinueBlock;
+}
+
+template <int width>
+static InstTransResult doRIMov(InstPtr ip, BasicBlock *&b,
+                        const MCOperand &src,
+                        const MCOperand &dst)
+{
+    //MOV <r>, <imm>
+    NASSERT(src.isImm());
+    NASSERT(dst.isReg());
+
+    //write the constant into the supplied register
+    R_WRITE<width>(b, dst.getReg(), CONST_V<width>(b, src.getImm()));
+
+    return ContinueBlock;
+}
+
+template <int width>
+static InstTransResult doMIMovV(InstPtr ip, BasicBlock *&b,
+                        Value           *dstAddr,
+                        Value           *src)
+{
+    //MOV <m>, <imm>
+    //store the constant in src into dstAddr
+
+    M_WRITE<width>(ip, b, dstAddr, src);
+
+    return ContinueBlock;
+}
+
+template <int width>
+static InstTransResult doMIMov(InstPtr ip, BasicBlock *&b,
+                        Value           *dstAddr,
+                        const MCOperand &src)
+{
+    //MOV <m>, <imm>
+    //store the constant in src into dstAddr
+    NASSERT(dstAddr != NULL);
+    NASSERT(src.isImm());
+
+    return doMIMovV<width>(ip, b, dstAddr, CONST_V<width>(b, src.getImm()));
+}
+
+template <int width>
+static InstTransResult doMRMov(InstPtr ip, BasicBlock *&b,
+                        Value           *dstAddr,
+                        const MCOperand &src)
+{
+    //MOV <mem>, <r>
+    NASSERT(src.isReg());
+    NASSERT(dstAddr != NULL);
+
+    M_WRITE<width>(ip, b, dstAddr, R_READ<width>(b, src.getReg()));
+
+    return ContinueBlock;
+}
+
+template <int dstWidth, int srcWidth>
+static InstTransResult doMovZXRR(InstPtr ip,   BasicBlock *&b,
+                            const MCOperand &dst,
+                            const MCOperand &src)
+{
+    NASSERT(dst.isReg());
+    NASSERT(src.isReg());
+
+    //do a read from src of the appropriate width
+    Value   *fromSrc = R_READ<srcWidth>(b, src.getReg());
+
+    //extend 
+    Type    *toT = Type::getIntNTy(b->getContext(), dstWidth);
+    Value   *xt = new ZExtInst(fromSrc, toT, "", b);
+
+    //write into dst
+    R_WRITE<dstWidth>(b, dst.getReg(), xt);
+
+    return ContinueBlock;
+}
+
+template <int dstWidth, int srcWidth>
+static InstTransResult doMovZXRM(InstPtr ip,   BasicBlock *&b,
+                            const MCOperand &dst,
+                            Value *src)
+{
+    NASSERT(dst.isReg());
+	NASSERT(src != NULL);
+
+    if( dstWidth == 32 && 
+        srcWidth == 8 && 
+        ip->has_jump_index_table()) 
+    {
+       doJumpIndexTableViaSwitch(b, ip); 
+       return ContinueBlock;
+    }
+
+    //do a read from src of the appropriate width
+    Value   *fromSrc = M_READ<srcWidth>(ip, b, src);
+
+    //extend 
+    Type    *toT = Type::getIntNTy(b->getContext(), dstWidth);
+    Value   *xt = new ZExtInst(fromSrc, toT, "", b);
+
+    //write into dst
+    R_WRITE<dstWidth>(b, dst.getReg(), xt);
+
+    return ContinueBlock;
+}
+
+template<int dstWidth, int srcWidth>
+static InstTransResult doMovSXRR(InstPtr ip, 	BasicBlock *&b,
+							const MCOperand	&dst,
+							const MCOperand &src)
+{
+	NASSERT(dst.isReg());
+	NASSERT(src.isReg());
+
+	Value	*r = doMovSXV<dstWidth>(ip, b, R_READ<srcWidth>(b, src.getReg()));
+
+	R_WRITE<dstWidth>(b, dst.getReg(), r);
+
+	return ContinueBlock;
+}
+
+template <int dstWidth, int srcWidth>
+static InstTransResult doMovSXRM(InstPtr ip, 	BasicBlock *&b,
+							const MCOperand	&dst,
+							Value			*src)
+{
+	NASSERT(dst.isReg());
+	NASSERT(src != NULL);
+
+	Value	*r = doMovSXV<dstWidth>(ip, b, M_READ<srcWidth>(ip, b, src));
+
+	R_WRITE<dstWidth>(b, dst.getReg(), r);
+	
+	return ContinueBlock;
+}
+
+template <int dstWidth, int srcWidth>
+static InstTransResult doMovSMR(InstPtr ip, 	BasicBlock *&b,
+							Value			*memAddr,
+							const MCOperand	&dest)
+{
+	NASSERT(dest.isReg());
+	NASSERT(memAddr != NULL);
+
+  throw TErr(__LINE__, __FILE__, "NIY");
+
+	return ContinueBlock;
+}
+
+GENERIC_TRANSLATION(MOV8rr, doRRMov<8>(ip, block, OP(0), OP(1)) )
+GENERIC_TRANSLATION(MOV8rr_REV, doRRMov<8>(ip, block, OP(0), OP(1)) )
+GENERIC_TRANSLATION(MOV16rr, doRRMov<16>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION(MOV16rr_REV, doRRMov<16>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION(MOV32rr, doRRMov<32>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION(MOV32rr_REV, doRRMov<32>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION(MOV8ri, doRIMov<8>(ip, block, OP(1), OP(0)))
+GENERIC_TRANSLATION(MOV16ri, doRIMov<16>(ip, block, OP(1), OP(0)))
+
+GENERIC_TRANSLATION_MEM(MOV8mi, 
+	doMIMov<8>(ip,    block, ADDR(0), OP(5)),
+	doMIMov<8>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+
+GENERIC_TRANSLATION_MEM(MOV16mi, 
+	doMIMov<16>(ip,   block, ADDR(0), OP(5)),
+	doMIMov<16>(ip,   block, STD_GLOBAL_OP(0), OP(5)))
+
+//GENERIC_TRANSLATION_32MI(MOV32mi, 
+//	doMIMov<32>(ip,   block, ADDR(0), OP(5)),
+//	doMIMov<32>(ip,   block, STD_GLOBAL_OP(0), OP(5)),
+//    doMIMovV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip))
+//    )
+//
+static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
+    InstTransResult ret;
+    Function *F = block->getParent();
+    if( ip->has_call_tgt() ) {
+        Value *callback_fn = makeCallbackForLocalFunction(
+                block->getParent()->getParent(), 
+                ip->get_call_tgt(0)
+            );
+        Value *addrInt = new PtrToIntInst(
+            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+        ret = doMIMovV<32>(ip, block, ADDR(0), addrInt);
+    }
+    else if( ip->is_data_offset() ) {
+        if( ip->get_reloc_offset() < OP(5).getOffset() ) {
+            doMIMov<32>(ip,   block, STD_GLOBAL_OP(0), OP(5));
+        } else {
+            doMIMovV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip));
+        } 
+        ret = ContinueBlock;
+    } else { 
+        ret = doMIMov<32>(ip,   block, ADDR(0), OP(5));
+    }
+    return ret;
+}
+
+
+GENERIC_TRANSLATION_MEM(MOV8mr, 
+	doMRMov<8>(ip,    block, ADDR(0), OP(5)),
+	doMRMov<8>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_MEM(MOV16mr, 
+	doMRMov<16>(ip,   block, ADDR(0), OP(5)),
+	doMRMov<16>(ip,   block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_MEM(MOV8rm, 
+	doRMMov<8>(ip,   block, ADDR(1), OP(0)),
+	doRMMov<8>(ip,   block, STD_GLOBAL_OP(1), OP(0)))
+GENERIC_TRANSLATION_MEM(MOV16rm, 
+	doRMMov<16>(ip,   block, ADDR(1), OP(0)),
+	doRMMov<16>(ip,   block, STD_GLOBAL_OP(1), OP(0)))
+GENERIC_TRANSLATION(MOVZX16rr8, (doMovZXRR<16,8>(ip, block, OP(0), OP(1))) ) 
+GENERIC_TRANSLATION(MOVZX32rr8, (doMovZXRR<32,8>(ip, block, OP(0), OP(1))) )
+GENERIC_TRANSLATION(MOVZX32rr16,( doMovZXRR<32,16>(ip, block, OP(0), OP(1))) )
+
+GENERIC_TRANSLATION(MOV32rs, doRSMov<32>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION_MEM(MOV32ms, 
+	doMSMov<32>(ip,    block, ADDR(0), OP(5)),
+	doMSMov<32>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+
+GENERIC_TRANSLATION_MEM(MOV16ms, 
+	doMSMov<16>(ip,    block, ADDR(0), OP(5)),
+	doMSMov<16>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+    
+GENERIC_TRANSLATION_MEM(MOVZX16rm8, 
+	(doMovZXRM<16,8>(ip, block, OP(0), ADDR(1))),
+	(doMovZXRM<16,8>(ip, block, OP(0), STD_GLOBAL_OP(1))) ) 
+GENERIC_TRANSLATION_MEM(MOVZX32rm8,
+	(doMovZXRM<32,8>(ip, block, OP(0), ADDR(1))),
+	(doMovZXRM<32,8>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_MEM(MOVZX32rm16, 
+	(doMovZXRM<32,16>(ip, block, OP(0), ADDR(1))),
+	(doMovZXRM<32,16>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+
+GENERIC_TRANSLATION(MOVSX16rr8, (doMovSXRR<16,8>(ip, block, OP(0), OP(1))) )
+GENERIC_TRANSLATION(MOVSX32rr16,( doMovSXRR<32,16>(ip, block, OP(0), OP(1))) )
+GENERIC_TRANSLATION(MOVSX32rr8, (doMovSXRR<32,8>(ip, block, OP(0), OP(1))) )
+GENERIC_TRANSLATION_MEM(MOVSX16rm8,
+	(doMovSXRM<16,8>(ip, block, OP(0), ADDR(1))),
+	(doMovSXRM<16,8>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_MEM(MOVSX32rm8,
+	(doMovSXRM<32,8>(ip, 	block, OP(0), ADDR(1))),
+	(doMovSXRM<32,8>(ip, 	block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_MEM(MOVSX32rm16, 
+	(doMovSXRM<32,16>(ip, 	block, OP(0), ADDR(1))),
+	(doMovSXRM<32,16>(ip, 	block, OP(0), STD_GLOBAL_OP(1))) )
+
+static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+    InstTransResult ret;
+    Function *F = block->getParent();
+    if( ip->has_call_tgt() ) {
+        Value *callback_fn = makeCallbackForLocalFunction(
+                block->getParent()->getParent(), 
+                ip->get_call_tgt(0)
+            );
+        Value *addrInt = new PtrToIntInst(
+            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+        ret = doRIMovV<32>(ip, block, 
+                addrInt,
+                OP(0) );
+    }
+    else if( ip->is_data_offset() ) {
+        ret = doRIMovV<32>(ip, block, 
+                GLOBAL_DATA_OFFSET(block, natM, ip), 
+                OP(0) );
+    } else { 
+        ret = doRIMov<32>(ip, block, OP(1), OP(0)) ;
+    }
+    return ret ;
+}
+
+//write to memory
+template <int width>
+static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+    InstTransResult ret;
+    Function *F = block->getParent();
+    if( ip->is_data_offset() ) {
+        ret = doMRMov<width>(ip, block, 
+                GLOBAL_DATA_OFFSET(block, natM, ip), 
+                MCOperand::CreateReg(X86::EAX) ); 
+    } else { 
+        Value *addrv = CONST_V<width>(block, OP(0).getImm());
+        ret = doMRMov<width>(ip, block, addrv, MCOperand::CreateReg(X86::EAX)) ;
+    }
+    return ret ; 
+}
+
+template <int width>
+static Value *getValueForExternal(Module *M, InstPtr ip, BasicBlock *block) {
+
+    Value *addrInt = NULL;
+
+    if( ip->has_ext_call_target() ) {
+        if (width != 32) {
+            throw TErr(__LINE__, __FILE__, "NIY: non 32-bit width for external calls");
+        }
+        std::string target = ip->get_ext_call_target()->getSymbolName();
+        Value *ext_fn = M->getFunction(target);
+        TASSERT(ext_fn != NULL, "Could not find external: " + target);
+        Value *addrInt = new PtrToIntInst(
+                ext_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+
+        return addrInt;
+    } else if (ip->has_ext_data_ref() ) {
+        std::string target = ip->get_ext_data_ref()->getSymbolName();
+        Value *gvar = M->getGlobalVariable(target);
+
+        TASSERT(gvar != NULL, "Could not find external data: " + target);
+
+        
+        if(gvar->getType()->isPointerTy()) {
+            addrInt = new PtrToIntInst(
+                    gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
+        } else {
+
+            IntegerType *int_t = dyn_cast<IntegerType>(gvar->getType());
+            if( int_t == NULL) {
+                throw TErr(__LINE__, __FILE__, "NIY: non-integer external data");
+            }
+            else if(int_t->getBitWidth() < width) {
+                addrInt = new ZExtInst(gvar, 
+                        Type::getIntNTy(block->getContext(), width),
+                        "",
+                        block);
+            }
+            else if(int_t->getBitWidth() == width) {
+                addrInt = gvar;
+            }
+            else {
+                throw TErr(__LINE__, __FILE__, "NIY: external type > width");
+            }
+        }
+
+    } else {
+        throw TErr(__LINE__, __FILE__, "No external refernce to get value for!");
+    }
+
+    return addrInt;
+
+}
+
+//write to EAX
+template <int width>
+static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+    InstTransResult ret;
+    Function *F = block->getParent();
+    // loading functions only available if its a 32-bit offset
+    if( ip->has_external_ref() && width == 32) {
+        Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
+        TASSERT(addrInt != 0, "Could not get external data reference");
+        R_WRITE<width>(block, X86::EAX, addrInt);
+        return ContinueBlock;
+        //ret = doRMMov<32>(ip, block, addrInt, MCOperand::CreateReg(X86::EAX)) ;
+    }
+    else if( ip->has_call_tgt() && width == 32 ) {
+        Value *callback_fn = makeCallbackForLocalFunction(
+                block->getParent()->getParent(), 
+                ip->get_call_tgt(0)
+            );
+        Value *addrInt = new PtrToIntInst(
+            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+        ret = doRMMov<32>(ip, block, addrInt, MCOperand::CreateReg(X86::EAX)) ;
+    }
+    else if( ip->is_data_offset() ) {
+        ret = doRMMov<width>(ip, block, 
+                GLOBAL_DATA_OFFSET(block, natM, ip), 
+                MCOperand::CreateReg(X86::EAX) ); 
+    } else { 
+        Value *addrv = CONST_V<width>(block, OP(0).getImm());
+        ret = doRMMov<width>(ip, block, addrv, MCOperand::CreateReg(X86::EAX)) ;
+    }
+    return ret ; 
+}
+
+static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) 
+{
+    InstTransResult ret;
+    Function *F = block->getParent();
+    if( ip->has_external_ref()) {
+        Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
+        //ret = doRMMov<32>(ip, block, addrInt, OP(0) );
+        TASSERT(addrInt != NULL, "Could not get address for external");
+        R_WRITE<32>(block, OP(0).getReg(), addrInt);
+        return ContinueBlock;
+    }
+    else if( ip->is_data_offset() ) {
+        ret = doRMMov<32>(ip, block, 
+                GLOBAL( block, natM, inst, ip, 1 ),
+                OP(0) );
+    } else {
+        ret = doRMMov<32>(ip, block, ADDR(1), OP(0));
+    }
+    return ret ;
+}
+
+static InstTransResult translate_MOV32mr(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) 
+{
+    InstTransResult ret;
+    Function *F = block->getParent();
+    if( ip->has_external_ref()) {
+        Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
+        TASSERT(addrInt != NULL, "Could not get address for external");
+        return doMRMov<32>(ip, block, addrInt, OP(5) );
+    }
+    else if( ip->is_data_offset() ) {
+        ret = doMRMov<32>(ip, block, GLOBAL( block, natM, inst, ip, 0), OP(5) );
+    } else { 
+        ret = doMRMov<32>(ip, block, ADDR(0), OP(5)) ; 
+    }
+    return ret ; 
+}
+
+
+void MOV_populateDispatchMap(DispatchMap &m) {
+    m[X86::MOV8rr] = translate_MOV8rr;
+    m[X86::MOV8rr_REV] = translate_MOV8rr_REV;
+    m[X86::MOV16rr] = translate_MOV16rr;
+    m[X86::MOV16rr_REV] = translate_MOV16rr_REV;
+    m[X86::MOV32rr] = translate_MOV32rr;
+    m[X86::MOV32rr_REV] = translate_MOV32rr_REV;
+    m[X86::MOV8ri] = translate_MOV8ri;
+    m[X86::MOV16ri] = translate_MOV16ri;
+    m[X86::MOV32ao32] = translate_MOVao<32>;
+    m[X86::MOV16ao16] = translate_MOVao<16>;
+    m[X86::MOV8ao8] = translate_MOVao<8>;
+    m[X86::MOV32o32a] = translate_MOVoa<32>;
+    m[X86::MOV16o16a] = translate_MOVoa<16>;
+    m[X86::MOV8o8a] = translate_MOVoa<8>;
+    m[X86::MOV32ri] = translate_MOV32ri;
+    m[X86::MOV8mi] = translate_MOV8mi;
+    m[X86::MOV16mi] = translate_MOV16mi;
+    m[X86::MOV32mi] = translate_MOV32mi;
+    m[X86::MOV8mr] = translate_MOV8mr;
+    m[X86::MOV16mr] = translate_MOV16mr;
+    m[X86::MOV32mr] = translate_MOV32mr;
+    m[X86::MOV8rm] = translate_MOV8rm;
+    m[X86::MOV16rm] = translate_MOV16rm;
+    m[X86::MOV32rm] = translate_MOV32rm;
+    m[X86::MOVZX16rr8] = translate_MOVZX16rr8;
+    m[X86::MOVZX32rr8] = translate_MOVZX32rr8;
+    m[X86::MOVZX32rr16] = translate_MOVZX32rr16;
+
+    m[X86::MOVZX16rm8] = translate_MOVZX16rm8;
+    m[X86::MOVZX32rm8] = translate_MOVZX32rm8;
+    m[X86::MOVZX32rm16] = translate_MOVZX32rm16;
+
+    m[X86::MOVSX16rr8] = translate_MOVSX16rr8;
+    m[X86::MOVSX32rr16] = translate_MOVSX32rr16;
+    m[X86::MOVSX32rr8] = translate_MOVSX32rr8;
+    m[X86::MOVSX16rm8] = translate_MOVSX16rm8;
+    m[X86::MOVSX32rm8] = translate_MOVSX32rm8;
+    m[X86::MOVSX32rm16] = translate_MOVSX32rm16;
+
+    m[X86::MOV32rs] = translate_MOV32rs;
+    m[X86::MOV32ms] = translate_MOV32ms;
+    m[X86::MOV16ms] = translate_MOV16ms;
+}
+

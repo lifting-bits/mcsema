@@ -1,0 +1,150 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>External Dependencies &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="../_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="../index.html" />
+    <link rel="next" title="BZip2" href="bzip2.html" />
+    <link rel="prev" title="FAQ" href="../faq.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="bzip2.html" title="BZip2"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="../faq.html" title="FAQ"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="../index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="../faq.html"
+                                  title="previous chapter">FAQ</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="bzip2.html"
+                                  title="next chapter">BZip2</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="../_sources/externals/index.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="external-dependencies">
+<span id="index-33"></span><span id="id1"></span><h1>External Dependencies<a class="headerlink" href="#external-dependencies" title="Permalink to this headline">¶</a></h1>
+<p>Each external dependency has an associated option <tt class="docutils literal"><span class="pre">WITH_</span></tt><em>dependency</em> that controls whether detection of the dependency will
+happen at all.  These options default to <tt class="docutils literal"><span class="pre">ON</span></tt>.</p>
+<p>Each external will set a variable <em>external</em><tt class="docutils literal"><span class="pre">_FOUND</span></tt> if detection
+was successful.  If this variable is empty (or <tt class="docutils literal"><span class="pre">FALSE</span></tt>, 0, or
+<tt class="docutils literal"><span class="pre">NO</span></tt>) detection will be reattempted each time you configure.</p>
+<p>To <strong>disable</strong> the detection of any given external dependency and
+thereby any libraries or features that depend on it, set option
+<tt class="docutils literal"><span class="pre">WITH_</span></tt><em>dependency</em> to <tt class="docutils literal"><span class="pre">NO</span></tt> (or <tt class="docutils literal"><span class="pre">OFF</span></tt>, etc.):</p>
+<div class="highlight-python"><pre>% cmake ../src -DWITH_PYTHON=OFF
+-- The C compiler identification is GNU
+-- The CXX compiler identification is GNU
+... more output ...
+--
+-- Python:
+-- Disabled since WITH_PYTHON=OFF
+--
+... more output ...
+-- + python
+-- +-- disabled since PYTHON_FOUND is false
+--</pre>
+</div>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="bzip2.html">BZip2</a></li>
+<li class="toctree-l1"><a class="reference external" href="doxygen.html">Doxygen</a></li>
+<li class="toctree-l1"><a class="reference external" href="expat.html">Expat</a></li>
+<li class="toctree-l1"><a class="reference external" href="icu.html">ICU (International Components for Unicode)</a></li>
+<li class="toctree-l1"><a class="reference external" href="mpi.html">MPI</a></li>
+<li class="toctree-l1"><a class="reference external" href="python.html">Python</a><ul>
+<li class="toctree-l2"><a class="reference external" href="python.html#python-executable">PYTHON_EXECUTABLE</a></li>
+<li class="toctree-l2"><a class="reference external" href="python.html#python-debug-libraries">PYTHON_DEBUG_LIBRARIES</a></li>
+<li class="toctree-l2"><a class="reference external" href="python.html#python-libraries">PYTHON_LIBRARIES</a></li>
+<li class="toctree-l2"><a class="reference external" href="python.html#python-include-path">PYTHON_INCLUDE_PATH</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="xsltproc.html">Xsltproc</a></li>
+<li class="toctree-l1"><a class="reference external" href="valgrind.html">Valgrind</a></li>
+<li class="toctree-l1"><a class="reference external" href="zlib.html">Zlib</a></li>
+</ul>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="bzip2.html" title="BZip2"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="../faq.html" title="FAQ"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="../index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,1 @@
+boost_module(assign DEPENDS ptr_container)

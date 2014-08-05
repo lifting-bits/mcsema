@@ -1,0 +1,2 @@
+version = "@BOOST_VERSION@"
+release = "@BOOST_CMAKE_VERSION@"

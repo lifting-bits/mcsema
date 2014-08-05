@@ -1,0 +1,1 @@
+boost_module(accumulators DEPENDS parameter typeof foreach)

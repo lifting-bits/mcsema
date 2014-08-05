@@ -1,0 +1,110 @@
+[/
+  (C) Copyright 2011-12 Vicente J. Botet Escriba.
+  Distributed under the Boost Software License, Version 1.0.
+  (See accompanying file LICENSE_1_0.txt or copy at
+  http://www.boost.org/LICENSE_1_0.txt).
+]
+
+[section:compliance Conformance and Extension]
+
+[section:cpp11 C++11 standard Thread library]
+
+
+[table C++11 standard Conformance
+    [[Section]        [Description]  [Status] [Comments] [Ticket]]
+    [[30]        [Thread support library]  [Partial] [-] [-]]
+    [[30.1]        [General]  [-] [-] [-]]
+    [[30.2]        [Requirements]  [-] [-] [-]]
+    [[30.2.1]        [Template parameter names]  [-] [-] [-]]
+    [[30.2.2]        [Exceptions]  [Yes] [-] [-]]
+    [[30.2.3]        [Native handles]  [Yes] [-] [-]]
+    [[30.2.4]        [Timing specifications]  [Yes] [-] [-]]
+    [[30.2.5]        [Requirements for Lockable types]  [Yes] [-] [-]]
+    [[30.2.5.1]        [In general]  [-] [-] [-]]
+    [[30.2.5.2]        [BasicLockable requirements]  [Yes] [-] [-]]
+    [[30.2.5.3]        [Lockable requirements]  [yes] [-] [-]]
+    [[30.2.5.4]        [TimedLockable requirements]  [Yes] [-] [-]]
+    [[30.2.6]        [decay_copy]  [-] [-] [-]]
+    [[30.3]        [Threads]  [Partial] [-] [-]]
+    [[30.3.1]        [Class thread]  [Partial] [move,variadic,terminate] [#6270]]
+    [[30.3.1.1]        [Class thread::id]  [Yes] [-] [-]]
+    [[30.3.1.2]        [thread constructors]  [Partial] [move,variadic] [#6270]]
+    [[30.3.1.3]        [thread destructor]  [Yes] [-] [-]]
+    [[30.3.1.4]        [thread assignment]  [Yes] [-] [-]]
+    [[30.3.1.5]        [thread members]  [Yes] [-] [-]]
+    [[30.3.1.6]        [thread static members]  [Yes] [-] [-]]
+    [[30.3.1.7]        [thread specialized algorithms]  [Yes] [-] [-]]
+
+    [[30.3.2]        [Namespace this_thread]  [Yes] [-] [-]]
+    [[30.4]        [Mutual exclusion]  [Partial] [-] [-]]
+    [[30.4.1]        [Mutex requirements]  [Yes] [-] [-]]
+    [[30.4.1.1]        [In general]  [Yes] [-] [-]]
+    [[30.4.1.2]        [Mutex types]  [Yes] [-] [-]]
+    [[30.4.1.2.1]        [Class mutex]  [Yes] [-] [-]]
+    [[30.4.1.2.2]        [Class recursive_mutex]  [Yes] [-] [-]]
+    [[30.4.1.3]        [Timed mutex types]  [Yes] [-] [-]]
+    [[30.4.1.3.1]        [Class timed_mutex]  [Yes] [-] [-]]
+    [[30.4.1.3.1]        [Class recursive_timed_mutex]  [Yes] [-] [-]]
+    [[30.4.2]        [Locks]  [Partial] [variadic] [#6227]]
+    [[30.4.2.1]        [Class template lock_guard]  [Yes] [-] [-]]
+    [[30.4.2.2]        [Class template unique_lock]  [Yes] [-] [-]]
+    [[30.4.2.2.1]        [unique_lock constructors, destructor, and assignment] [Yes]  [-]  [-]]
+    [[30.4.2.2.2]        [unique_lock locking]  [Yes] [-] [-]]
+    [[30.4.2.2.3]        [unique_lock modifiers]  [Yes] [-] [-]]
+    [[30.4.2.2.4]        [unique_lock observers]  [Yes] [] [-]]
+    [[30.4.3]        [Generic locking algorithms]  [Partial] [variadic] [#6227]]
+    [[30.4.4]        [Call once]  [Partial] [call_once] [#7285]]
+    [[30.4.4.1]        [Struct once_flag] [Yes] [-] [-]]
+    [[30.4.4.2]        [Function call_once] [Partial] [interface] [#7285]]
+    [[30.5]        [Condition variables]  [Partial] [notify_all_at_thread_exit] [#7283]]
+    [[30.5 6-10]        [Function notify_all_at_thread_exit]  [No] [-] [#7283]]
+    [[30.5.1]        [Class condition_variable]  [Yes] [-] [-]]
+    [[30.5.2]        [Class condition_variable_any]  [Yes] [-] [-]]
+    [[30.6]        [Futures]  [Partial] [async,at_thread_exit] [#4710,#7280]]
+    [[30.6.1]        [Overview]  [Partial] [-] [-]]
+    [[30.6.2]        [Error handling]  [Yes] [-] [-]]
+    [[30.6.3]        [Class future_error]  [Partial] [noexcept] [#7279]]
+    [[30.6.4]        [Shared state]  [-] [-] [-]]
+    [[30.6.5]        [Class template promise]  [Partial] [at_thread_exit] [#7280]]
+    [[30.6.6]        [Class template future]  [Yes] [-] [-]]
+    [[30.6.7]        [Class template shared_future]  [Yes] [-] [-]]
+    [[30.6.8]        [Function template async]  [Partial] [deferred not implemented and only a copyable functor is allowed yet] [#4710]]
+    [[30.6.9]        [Class template packaged_task]  [Partial] [args,make_ready_at_thread_exit] [#7281,#7282]]
+]
+
+[/
+[table Extension
+    [[Section]     [Description]   [Comments]]
+    [[30.3.1.5.x]        [interrupt]   [-]]
+    [[30.3.2.x]        [Interruption]  [-]]
+    [[30.3.2.y]        [at_thread_exit]  [-]]
+    [[30.4.3.x]        [Generic locking algorithms begin/end]  [-]]
+    [[30.x]        [Barriers]  [-]]
+    [[30.y]        [Thread Local Storage]  [-]]
+    [[30.z]        [Class thread_group]  [-]]
+]
+]
+[endsect]
+
+
+[section:shared Shared Locking extensions]
+
+[table Howard's Shared Locking Proposal Conformance
+    [[Section]  [Description]  [Status] [Comments]]
+    [[X]        [Shared Locking]  [Yes] [Needs `BOOST_THREAD_PROVIDES_SHARED_MUTEX_UPWARDS_CONVERSION]]
+    [[X.1]      [Shared Lockables Concepts]  [Yes] [ - ]]
+    [[X.1.1]      [SharedLockable concept]  [Yes] [ - ]]
+    [[X.1.2]      [UpgradeLockable concept]  [Yes] [ - ]]
+    [[X.2]      [Shared Mutex Types]  [Yes] [ - ]]
+    [[X.2.1]      [shared_mutex class]  [Yes] [ - ]]
+    [[X.2.2]      [upgrade_mutex class]  [Yes] [ - ]]
+    [[X.3]      [Locks]  [Yes] [-]]
+    [[X.3.1]      [unique_lock class adaptations]  [Yes] [-]]
+    [[X.3.2]      [shared_lock class]  [Yes] [ - ]]
+    [[X.3.3]      [upgrade_lock class]  [Yes] [-]]
+]
+
+[endsect]
+
+
+[endsect]

@@ -1,0 +1,14 @@
+foreach(
+    example
+    async_client
+    sync_client
+)
+boost_add_executable(
+    ${example}
+    DEPENDS
+    boost_system
+    TARGET_PREFIX
+    "client-"
+)
+endforeach(
+)

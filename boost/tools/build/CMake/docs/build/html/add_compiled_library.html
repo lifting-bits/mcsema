@@ -1,0 +1,329 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Adding a Compiled Library to CMake &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="index.html" />
+    <link rel="next" title="Testing" href="testing.html" />
+    <link rel="prev" title="Adding a Library Project" href="add_boost_library.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="testing.html" title="Testing"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="add_boost_library.html" title="Adding a Library Project"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">Adding a Compiled Library to CMake</a><ul>
+<li><a class="reference external" href="#compilation-flags">Compilation Flags</a></li>
+<li><a class="reference external" href="#linking-to-other-boost-libraries">Linking to Other Boost Libraries</a></li>
+<li><a class="reference external" href="#linking-external-libraries-optional-sources">Linking External Libraries/Optional Sources</a></li>
+<li><a class="reference external" href="#build-variants">Build Variants</a></li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="add_boost_library.html"
+                                  title="previous chapter">Adding a Library Project</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="testing.html"
+                                  title="next chapter">Testing</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/add_compiled_library.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="adding-a-compiled-library-to-cmake">
+<span id="add-compiled-library"></span><h1>Adding a Compiled Library to CMake<a class="headerlink" href="#adding-a-compiled-library-to-cmake" title="Permalink to this headline">¶</a></h1>
+<p>This page describes how to add a new, compiled library to the
+CMake-based build system. If your library is a &#8220;header-only&#8221; library,
+and does not require separate compilation of object files into a
+library binary, you can safely skip this step. Before adding compiled
+libraries to CMake, make sure you have already followed the directions
+for <a class="reference external" href="reference/boost_library_project.html#boost-library-project-macro"><em>boost_library_project</em></a>, so that the CMake system recognizes your
+Boost library.</p>
+<p>We will assume that your library resides in the subdirectory
+<tt class="docutils literal"><span class="pre">libs/libname</span></tt>, and that we want to create the compiled library
+<tt class="docutils literal"><span class="pre">boost_libname</span></tt>. We will also assume that the sources for this
+library reside in the subdirectory <tt class="docutils literal"><span class="pre">libs/libname/src</span></tt>. The source
+directory should be listed via <tt class="docutils literal"><span class="pre">SRCDIRS</span></tt> in the use of the
+<a class="reference external" href="reference/boost_library_project.html#boost-library-project-macro"><em>boost_library_project</em></a> macro, as described in the previous
+section. Follow these steps to add this new
+library into Boost&#8217;s build system. If your library has multiple source
+directories listed after <tt class="docutils literal"><span class="pre">SRCDIRS</span></tt>, follow these steps for each one.</p>
+<ol class="arabic">
+<li><p class="first">Create a new file <tt class="docutils literal"><span class="pre">libs/libname/src/CMakeLists.txt</span></tt> with your
+favorite text editor. This file will contain build rules for your
+compiled library. In this file, we will create one or more
+invocations of the <a class="reference external" href="reference/boost_add_library.html#boost-add-library-macro"><em>boost_add_library</em></a> macro, which adds a
+compiled Boost library to the CMake system. This macro provides the
+name of the library, the source files from which the library will
+be built, and any specific compiler and linker options needed to
+help build the library. Let&#8217;s start by adding a simple library with
+a few source files:</p>
+<div class="highlight-python"><pre>boost_add_library(libname
+   mysrc1.cpp mysrc2.cpp
+   )</pre>
+</div>
+<p>This invocation will build several variants of the
+<tt class="docutils literal"><span class="pre">boost_libname</span></tt> library from the source files <tt class="docutils literal"><span class="pre">mysrc1.cpp</span></tt> and
+<tt class="docutils literal"><span class="pre">mysrc2.cpp</span></tt>. For example, it will build both static and shared
+library, single- and multi-threaded, debug and release, etc. This
+invocation also handles the installation of these libraries.</p>
+</li>
+<li><p class="first">For simple libraries, that&#8217;s it! Rebuilding via CMake (e.g.,
+running <tt class="docutils literal"><span class="pre">make</span></tt> or reloading and rebuilding the Boost project in
+your IDE) will build the new library, including several different
+variants for different compilation options. Your Boost library will
+also be included when the user installs Boost or builds a binary
+package of Boost. Within the CMake configuration, you will also see
+an option <tt class="docutils literal"><span class="pre">BUILD_LIBNAME</span></tt>, which allows the user to decide
+whether or not to build this Boost library.</p>
+</li>
+<li><p class="first">Many libraries will need specific compilation options when
+building, need to link against other libraries (Boost or
+otherwise), or rely on certain features of the compilation process
+to proceed. Follow the instructions in the remaining part of this
+page to address these library-specific needs.</p>
+</li>
+</ol>
+<div class="section" id="compilation-flags">
+<h2>Compilation Flags<a class="headerlink" href="#compilation-flags" title="Permalink to this headline">¶</a></h2>
+<p>Many libraries require certain compilation flags when we are building
+the library binaries themselves (rather than when the library headers
+are included by the user). For example, we want to define the macro
+<tt class="docutils literal"><span class="pre">BUILDING_BOOST_LIBNAME</span></tt> when building the library. We can do so by
+passing the <tt class="docutils literal"><span class="pre">COMPILE_FLAGS</span></tt> option to <tt class="docutils literal"><span class="pre">boost_add_library</span></tt>:</p>
+<div class="highlight-python"><pre>boost_add_library(libname
+    mysrc1.cpp mysrc2.cpp
+    COMPILE_FLAGS "-DBUILDING_BOOST_LIBNAME=1"
+    )</pre>
+</div>
+<p>Now when CMake builds the library, it will pass the flag
+<tt class="docutils literal"><span class="pre">-DBUILDING_BOOST_LIBNAME=1</span></tt> to the compiler.</p>
+<p>On Windows, shared libraries are built very differently from static
+libraries. In particular, when building a shared library, one needs to
+be sure to export the right symbols from the DLL using
+<tt class="docutils literal"><span class="pre">dllexport</span></tt>. When users use the shared library, these symbols will be
+imported (via <tt class="docutils literal"><span class="pre">dllimport</span></tt>). The typical way to handle this is to
+define a macro (say, <tt class="docutils literal"><span class="pre">BOOST_LIBNAME_DYN_LINK</span></tt>) when building the
+shared library. This macro instructs the library headers to
+<tt class="docutils literal"><span class="pre">dllexport</span></tt> everything that needs to be exported. We can do this with
+variant-specific compile flags, e.g.,</p>
+<div class="highlight-python"><pre>boost_add_library(libname
+    mysrc1.cpp mysrc2.cpp
+    COMPILE_FLAGS "-DBUILDING_BOOST_LIBNAME=1"
+    SHARED_COMPILE_FLAGS "-DBOOST_LIBNAME_DYN_LINK=1"
+    )</pre>
+</div>
+<p>When building a shared library, the <tt class="docutils literal"><span class="pre">SHARED_COMPILE_FLAGS</span></tt> options
+will be combined with the <tt class="docutils literal"><span class="pre">COMPILE_FLAGS</span></tt> options. When building a
+static library, the <tt class="docutils literal"><span class="pre">SHARED_COMPILE_FLAGS</span></tt> options will be
+ignored. There are other options that can be specified per-feature,
+such as <tt class="docutils literal"><span class="pre">LINK_FLAGS</span></tt> and <tt class="docutils literal"><span class="pre">LINK_LIBS</span></tt>; refer to the
+<a class="reference external" href="reference/boost_add_library.html#boost-add-library-macro"><em>boost_add_library</em></a> reference for more
+information.</p>
+</div>
+<div class="section" id="linking-to-other-boost-libraries">
+<h2>Linking to Other Boost Libraries<a class="headerlink" href="#linking-to-other-boost-libraries" title="Permalink to this headline">¶</a></h2>
+<p>Some Boost libraries depends on other Boost libraries. For example,
+perhaps our library uses the Boost.Filesystem library under the
+hood. We can use the <tt class="docutils literal"><span class="pre">DEPENDS</span></tt> feature of the
+<a class="reference external" href="reference/boost_add_library.html#boost-add-library-macro"><em>boost_add_library</em></a> to state which libraries our library
+depends on. In this example, we&#8217;ll link against <tt class="docutils literal"><span class="pre">boost_filesystem</span></tt>:</p>
+<div class="highlight-python"><pre>boost_add_library(libname
+    mysrc1.cpp mysrc2.cpp
+    COMPILE_FLAGS "-DBUILDING_BOOST_LIBNAME=1"
+    SHARED_COMPILE_FLAGS "-DBOOST_LIBNAME_DYN_LINK=1"
+    DEPENDS boost_filesystem
+    )</pre>
+</div>
+<p>Now, each variant of the <tt class="docutils literal"><span class="pre">boost_libname</span></tt> library will link against
+the appropriate <tt class="docutils literal"><span class="pre">boost_filesystem</span></tt> library variant. Whenever
+<tt class="docutils literal"><span class="pre">boost_filesystem</span></tt> changes, our library will be relinked
+appropriately.</p>
+</div>
+<div class="section" id="linking-external-libraries-optional-sources">
+<h2>Linking External Libraries/Optional Sources<a class="headerlink" href="#linking-external-libraries-optional-sources" title="Permalink to this headline">¶</a></h2>
+<p>Sometimes, Boost libraries need to link against other libraries
+supplied by the system. The primary challenge in linking against these
+libraries is <em>finding</em> those libraries, and their associated headers,
+on the system. If the library is found, we usually want to pass some
+extra compilation flags to our library and add in additional
+sources. Otherwise, we just skip these extra sources.</p>
+<p>CMake already contains modules that search for many common system
+libraries and tools; search the
+[<a class="reference external" href="http://www.cmake.org/HTML/Documentation.html">http://www.cmake.org/HTML/Documentation.html</a> CMake Documentation] for
+existing modules that do what you need. For example, say we want to
+link against the system&#8217;s <tt class="docutils literal"><span class="pre">PNG</span></tt> (portable network graphics) library.
+We can use the supplied <tt class="docutils literal"><span class="pre">FindPNG</span></tt> module by adding the following
+early in our <tt class="docutils literal"><span class="pre">CMakeLists.txt</span></tt> file:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">include</span><span class="p">(</span><span class="n">FindPNG</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Documentation for CMake modules is typically found in the module file
+itself. Look into the <tt class="docutils literal"><span class="pre">Modules</span></tt> subdirectory of your CMake
+installation, either in <tt class="docutils literal"><span class="pre">Program</span> <span class="pre">Files\CMake</span></tt> (on Windows) or
+<tt class="docutils literal"><span class="pre">/usr/share/cmake-version</span></tt> (on Unix variants) to find the module of
+the same name. The module will typically set a variable that indicates
+whether the library was found. For the <tt class="docutils literal"><span class="pre">FindPNG</span></tt> module, this variable
+is called <tt class="docutils literal"><span class="pre">PNG_FOUND</span></tt>. We can use this variable to optionally add
+sources to a variable <tt class="docutils literal"><span class="pre">EXTRA_SOURCES</span></tt>:</p>
+<div class="highlight-python"><pre>include(FindPNG)
+set(EXTRA_SOURCES)
+if (PNG_FOUND)
+  list(APPEND EXTRA_SOURCES png.cpp)
+endif (PNG_FOUND)</pre>
+</div>
+<p>CMake modules also typically define macros specifying the include
+directories needed for the library, any compile-time definitions
+required to use the library, and linking information for the library
+binary. For the <tt class="docutils literal"><span class="pre">FindPNG</span></tt> module, these variables are called
+<tt class="docutils literal"><span class="pre">PNG_INCLUDE_DIR</span></tt>, <tt class="docutils literal"><span class="pre">PNG_DEFINITIONS</span></tt> and <tt class="docutils literal"><span class="pre">PNG_LIBRARY</span></tt>, respectively.</p>
+<p>The include directory should be added via the CMake
+<tt class="docutils literal"><span class="pre">include_directories</span></tt> macro, e.g.,</p>
+<div class="highlight-python"><pre>include_directories(${PNG_INCLUDE_DIR})</pre>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">PNG_DEFINITIONS</span></tt> value should be added to the <tt class="docutils literal"><span class="pre">COMPILE_FLAGS</span></tt>
+and the <tt class="docutils literal"><span class="pre">PNG_LIBRARIES</span></tt> value to the <tt class="docutils literal"><span class="pre">LINK_LIBS</span></tt> option to the
+<a class="reference external" href="reference/boost_add_library.html#boost-add-library-macro"><em>boost_add_library</em></a>. Using these features together, we can
+search for the <tt class="docutils literal"><span class="pre">PNG</span></tt> library on the system and optionally include
+PNG support into our library:</p>
+<div class="highlight-python"><pre>include(FindPNG)
+set(EXTRA_SOURCES)
+if (PNG_FOUND)
+  include_directories(${PNG_PNG_INCLUDE_DIR})
+  list(APPEND EXTRA_SOURCES png.cpp)
+endif (PNG_FOUND)
+
+boost_add_library(libname
+  mysrc1.cpp mysrc2.cpp
+  ${EXTRA_SOURCES}
+  COMPILE_FLAGS "-DBUILDING_BOOST_LIBNAME=1 ${PNG_DEFINITIONS}"
+  LINK_LIBS "${PNG_LIBRARIES}"
+  SHARED_COMPILE_FLAGS "-DBOOST_LIBNAME_DYN_LINK=1"
+  DEPENDS boost_filesystem
+  )</pre>
+</div>
+<p>If CMake does not provide a module to search for the library you need,
+don&#8217;t worry! You can write your own module relatively easily,
+following the examples from the CMake <tt class="docutils literal"><span class="pre">Modules</span></tt> directory or some of
+the Boost-specific examples, such as
+<a class="reference external" href="http://svn.boost.org/svn/boost/branches/release/tools/build/CMake/FindICU.cmake">http://svn.boost.org/svn/boost/branches/release/tools/build/CMake/FindICU.cmake</a>
+For a real-life example of finding system libraries and using that
+information to add optional, extra capabilities to a Boost library,
+check out the build rules for the Boost.IOStreams library at
+<a class="reference external" href="http://svn.boost.org/svn/boost/branches/release/libs/iostreams/src/CMakeLists.txt">http://svn.boost.org/svn/boost/branches/release/libs/iostreams/src/CMakeLists.txt</a></p>
+</div>
+<div class="section" id="build-variants">
+<span id="index-0"></span><h2>Build Variants<a class="headerlink" href="#build-variants" title="Permalink to this headline">¶</a></h2>
+<p>The Boost build system defines many different <a class="reference external" href="build_variants.html#variants"><em>Build Variants and Features</em></a>, which
+describe specific properties of certain builds. For example, the
+<tt class="docutils literal"><span class="pre">SHARED</span></tt> feature indicates that we are building a shared library,
+while the <tt class="docutils literal"><span class="pre">MULTI_THREADED</span></tt> feature indicates that we are building a
+multi-threaded library. A specific set of features is called a
+<tt class="docutils literal"><span class="pre">````variant````</span></tt>, e.g., <tt class="docutils literal"><span class="pre">RELEASE</span></tt> and <tt class="docutils literal"><span class="pre">MULTI_THREADED</span></tt> and
+<tt class="docutils literal"><span class="pre">SHARED</span></tt>. By default, the CMake-based build system builds several
+different variants of each Boost library.</p>
+<p>Since some features conflict with certain libraries (a threading
+library cannot be <tt class="docutils literal"><span class="pre">SINGLE_THREADED</span></tt>!), one can pass additional flags
+to <a class="reference external" href="reference/boost_add_library.html#boost-add-library-macro"><em>boost_add_library</em></a> stating which features should the library
+cannot be built with.  For example, say that our library cannot be
+built as a multi-threaded library, because it uses thread-unsafe
+routines from the underlying C library. To disable multi-threaded
+variants of the library, pass the option <tt class="docutils literal"><span class="pre">NOT_MULTI_THREADED</span></tt>:</p>
+<div class="highlight-python"><pre>boost_add_library(libname
+    mysrc1.cpp mysrc2.cpp
+    COMPILE_FLAGS "-DBUILDING_BOOST_LIBNAME=1"
+    SHARED_COMPILE_FLAGS "-DBOOST_LIBNAME_DYN_LINK=1"
+    DEPENDS boost_filesystem
+    NOT_MULTI_THREADED
+    )</pre>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="testing.html" title="Testing"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="add_boost_library.html" title="Adding a Library Project"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

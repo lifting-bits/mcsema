@@ -1,0 +1,30 @@
+if(
+    UNIX
+)
+set(
+    main_entry
+    posix_main.cpp
+)
+else(
+)
+set(
+    main_entry
+    win_main.cpp
+)
+endif(
+    UNIX
+)
+boost_add_executable(
+    main
+    ${main_entry}
+    file_handler.cpp
+    mime_types.cpp
+    reply.cpp
+    request_parser.cpp
+    server.cpp
+    DEPENDS
+    boost_thread
+    boost_system
+    TARGET_PREFIX
+    "server4-"
+)

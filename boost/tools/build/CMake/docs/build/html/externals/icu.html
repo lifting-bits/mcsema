@@ -1,0 +1,141 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>ICU (International Components for Unicode) &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="../_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="../index.html" />
+    <link rel="up" title="External Dependencies" href="index.html" />
+    <link rel="next" title="MPI" href="mpi.html" />
+    <link rel="prev" title="Expat" href="expat.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="mpi.html" title="MPI"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="expat.html" title="Expat"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="../index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+
+          <li><a href="index.html" accesskey="U">External Dependencies</a> &raquo;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="expat.html"
+                                  title="previous chapter">Expat</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="mpi.html"
+                                  title="next chapter">MPI</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="../_sources/externals/icu.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="icu-international-components-for-unicode">
+<span id="icu"></span><span id="index-32"></span><h1>ICU (International Components for Unicode)<a class="headerlink" href="#icu-international-components-for-unicode" title="Permalink to this headline">¶</a></h1>
+<p>If <tt class="docutils literal"><span class="pre">WITH_ICU</span></tt> is <tt class="docutils literal"><span class="pre">ON</span></tt>, ICU is detected via the standard cmake
+<tt class="docutils literal"><span class="pre">find_package(ICU)</span></tt>.  The following variables are set:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="37%" />
+<col width="63%" />
+</colgroup>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">ICU_FOUND</span></tt></td>
+<td>ON if icu was found</td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">ICU_I18N_FOUND</span></tt></td>
+<td>ON if the i18n part (whatever that is)
+of ICU was found.</td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">ICU_INCLUDE_DIRS</span></tt></td>
+<td>path to ICU headers</td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">ICU_LIBRARIES</span></tt></td>
+<td>full paths to ICU libraries</td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">ICU_I18N_LIBRARIES</span></tt></td>
+<td>full paths to the i18n libraries</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="mpi.html" title="MPI"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="expat.html" title="Expat"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="../index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+
+          <li><a href="index.html" >External Dependencies</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

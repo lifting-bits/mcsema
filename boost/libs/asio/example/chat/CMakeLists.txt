@@ -1,0 +1,14 @@
+foreach(
+    example
+    chat_server
+    chat_client
+    posix_chat_client
+)
+boost_add_executable(
+    ${example}
+    DEPENDS
+    boost_thread
+    boost_system
+)
+endforeach(
+)

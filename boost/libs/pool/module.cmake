@@ -1,0 +1,1 @@
+boost_module(pool DEPENDS config detail exception)

@@ -1,0 +1,25 @@
+foreach(
+    example
+    word_count_functor_flex
+    #word_count
+    #word_count_lexer
+    #strip_comments
+    #strip_comments_lexer
+    #example1
+    #example2
+    #example3
+    #example4
+    #example5
+    #example6
+    reference
+    #custom_token_attribute
+    #print_numbers
+    #word_count_functor
+)
+boost_add_executable(
+    ${example}
+    TARGET_PREFIX
+    "lex-"
+)
+endforeach(
+)

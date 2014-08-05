@@ -1,0 +1,14 @@
+foreach(
+    example
+    daytime_server
+    daytime_client
+)
+boost_add_executable(
+    ${example}
+    DEPENDS
+    boost_system
+    TARGET_PREFIX
+    "iostreams-"
+)
+endforeach(
+)

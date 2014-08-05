@@ -1,0 +1,528 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Testing &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="index.html" />
+    <link rel="next" title="Adding Regression Tests" href="adding_regression_tests.html" />
+    <link rel="prev" title="Adding a Compiled Library to CMake" href="add_compiled_library.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="adding_regression_tests.html" title="Adding Regression Tests"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="add_compiled_library.html" title="Adding a Compiled Library to CMake"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">Testing</a><ul>
+<li><a class="reference external" href="#build-tests">BUILD_TESTS</a></li>
+<li><a class="reference external" href="#build">Build</a></li>
+<li><a class="reference external" href="#test">Test</a><ul>
+<li><a class="reference external" href="#unix-and-nmake">Unix and nmake</a></li>
+<li><a class="reference external" href="#visual-studio">Visual Studio</a></li>
+</ul>
+</li>
+<li><a class="reference external" href="#targets">Targets</a></li>
+<li><a class="reference external" href="#the-dashboard">The Dashboard</a></li>
+<li><a class="reference external" href="#submitting-results">Submitting Results</a></li>
+<li><a class="reference external" href="#automatic-testing">Automatic testing</a><ul>
+<li><a class="reference external" href="#continuous">Continuous</a></li>
+<li><a class="reference external" href="#nightly">Nightly</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="add_compiled_library.html"
+                                  title="previous chapter">Adding a Compiled Library to CMake</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="adding_regression_tests.html"
+                                  title="next chapter">Adding Regression Tests</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/testing.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="testing">
+<span id="id1"></span><h1>Testing<a class="headerlink" href="#testing" title="Permalink to this headline">¶</a></h1>
+<p>Boost&#8217;s CMake-based build system provides regression testing via
+<a class="reference external" href="http://www.cmake.org/Wiki/CMake_Testing_With_CTest">CTest</a>, which
+comes as part of CMake. This regression testing system can be used by
+Boost developers to test their libraries locally and also by testers
+and users to submit regression tests to a <a class="reference external" href="http://www.cdash.org/CDashPublic/index.php?project=Boost">CDash server</a>, which
+collects and reports regression-testing results from different
+sites. This document assumes that the reader has already learned how
+to build and configure Boost using CMake.</p>
+<div class="section" id="build-tests">
+<span id="index-80"></span><span id="id2"></span><h2>BUILD_TESTS<a class="headerlink" href="#build-tests" title="Permalink to this headline">¶</a></h2>
+<p>The variable BUILD_TESTS is a comma-separated list of projects for
+which testing will be enabled, e.g.:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="s">&quot;accumulators;iostreams;variant&quot;</span>
+</pre></div>
+</div>
+<p>or the string <tt class="docutils literal"><span class="pre">&quot;ALL&quot;</span></tt> for all projects, or the string
+<tt class="docutils literal"><span class="pre">&quot;NONE&quot;</span></tt> to disable testing.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">if you pass this list from a unix shell, don&#8217;t forget to
+enclose the whole thing in quotes or escape the
+semicolons.</p>
+</div>
+<p>If you re-run the CMake configuration for Boost with <tt class="docutils literal"><span class="pre">BUILD_TESTS</span></tt>
+set to <tt class="docutils literal"><span class="pre">ALL</span></tt>, you will notice that configuration takes significantly
+longer when we are building all of the regression tests.  This is due
+to the very large number of toplevel targets (thousands) that are
+created.  Until boost&#8217;s testing scheme is reorganized to reduce this
+number, we anticipate that only testing nodes will want to test ALL,
+whereas developers will want to test the library under development and
+those that are dependent on it.</p>
+<span class="target" id="index-81"></span><span class="target" id="index-82"></span><div class="admonition warning" id="index-83">
+<p class="first admonition-title">Warning</p>
+<p class="last">It is <strong>not</strong> recommended to set <tt class="docutils literal"><span class="pre">BUILD_TESTS</span></tt> to
+<tt class="docutils literal"><span class="pre">&quot;ALL&quot;</span></tt> when using Visual Studio generators.  A very
+large number (thousands) of targets are generated and
+this can bring VS to grinding halt.  To run all tests,
+choose the <tt class="docutils literal"><span class="pre">NMake</span></tt> generator, see <a class="reference external" href="quickstart.html#nmake"><em>Configuration for NMake</em></a>.</p>
+</div>
+<p>Be sure to re-configure CMake once you are done tweaking these
+options, and generate makefiles or project files, as mentioned in
+<a class="reference external" href="quickstart.html#quickstart"><em>Quickstart</em></a>.</p>
+<p>If you&#8217;re using a command-line configuration (nmake files, unix
+makefiles) you can simplify this process by passing the value of
+<tt class="docutils literal"><span class="pre">BUILD_TESTS</span></tt> on the command line, e.g.</p>
+<div class="highlight-python"><pre>cmake ../src -DBUILD_TESTS="mpi;graph_parallel"</pre>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">In Visual Studio, you should be prompted by the gui to
+reload the project.  If you&#8217;re unlucky, you will be prompted a
+thousand times to reload each individual solution.  For this
+reason, our current best recommendataion is to close and reopen the
+project if you rebuild <tt class="docutils literal"><span class="pre">Boost.sln</span></tt>.</p>
+</div>
+</div>
+<div class="section" id="build">
+<h2>Build<a class="headerlink" href="#build" title="Permalink to this headline">¶</a></h2>
+<p>Follow the same building process described in <a class="reference external" href="quickstart.html#quickstart"><em>Quickstart</em></a>.  For
+Unix users, don&#8217;t forget the <cite>-i</cite> option to <cite>make</cite> (ignore errors),
+and also possibly <cite>-j 2</cite> (or more) to run the build process in
+parallel. Building all of the regression tests for the Boost libraries
+can take a long time.</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">make</span> <span class="o">-</span><span class="n">j2</span> <span class="o">-</span><span class="n">i</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">If you change Boost source files in a way that affects your
+tests, you will need to rebuild to update the libraries and
+test executables before moving on to the next step.</p>
+</div>
+</div>
+<div class="section" id="test">
+<h2>Test<a class="headerlink" href="#test" title="Permalink to this headline">¶</a></h2>
+<p>Once regression tests have finished building,</p>
+<div class="section" id="unix-and-nmake">
+<h3>Unix and nmake<a class="headerlink" href="#unix-and-nmake" title="Permalink to this headline">¶</a></h3>
+<p>at a command prompt, <tt class="docutils literal"><span class="pre">cd</span></tt> to the Boost binary directory. Then, run
+the command:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">ctest</span>
+</pre></div>
+</div>
+<p>to execute all of the regression tests. The <cite>ctest</cite> executable comes
+with cmake.  On Unix platforms, this is the same place where <cite>ccmake</cite>
+resides. On Windows platforms, it will be in <tt class="docutils literal"><span class="pre">C:\Program</span>
+<span class="pre">Files\CMake</span> <span class="pre">X.Y\bin</span></tt>. The ctest program should produce output like the
+following:</p>
+<div class="highlight-python"><pre>Start processing tests
+Test project /Users/dgregor/Projects/boost-darwin
+  1/ 22 Testing any-any_test                    Passed
+  2/ 22 Testing any-any_to_ref_test             Passed
+  3/ 22 Testing function-lib_function_test      Passed
+  4/ 22 Testing function-function_n_test        Passed
+  5/ 22 Testing function-allocator_test         Passed
+  6/ 22 Testing function-stateless_test         Passed
+  7/ 22 Testing function-lambda_test            Passed
+  8/ 22 Testing function-function_test_fail1 ***Failed - supposed to fail
+  9/ 22 Testing function-function_test_fail2 ***Failed - supposed to fail
+ 10/ 22 Testing function-function_30            Passed
+ 11/ 22 Testing function-function_arith_cxx98   Passed
+ 12/ 22 Testing function-function_arith_porta   Passed
+ 13/ 22 Testing function-sum_avg_cxx98          Passed
+ 14/ 22 Testing function-sum_avg_portable       Passed
+ 15/ 22 Testing function-mem_fun_cxx98          Passed
+ 16/ 22 Testing function-mem_fun_portable       Passed
+ 17/ 22 Testing function-std_bind_cxx98         Passed
+ 18/ 22 Testing function-std_bind_portable      Passed
+ 19/ 22 Testing function-function_ref_cxx98     Passed
+ 20/ 22 Testing function-function_ref_portabl   Passed
+ 21/ 22 Testing function-contains_test          Passed
+ 22/ 22 Testing function-contains2_test         Passed
+
+100% tests passed, 0 tests failed out of 22</pre>
+</div>
+<p>Here, we have only enabled testing of the Boost.Any and Boost.Function
+libraries, by setting <cite>BUILD_TESTS</cite> to <cite>any;function</cite>.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">Again, This <tt class="docutils literal"><span class="pre">ctest</span></tt> step runs the tests without first
+running a build.  If you change a source file and run the
+<tt class="docutils literal"><span class="pre">ctest</span></tt> step you will see that no build is invoked.</p>
+</div>
+<p>To run just a subset of the tests, pass <tt class="docutils literal"><span class="pre">-R</span></tt> and a regular
+expression to <tt class="docutils literal"><span class="pre">ctest</span></tt> (see the output of <tt class="docutils literal"><span class="pre">ctest</span> <span class="pre">--help-full</span></tt>). For
+example, to run all of the Python tests, use:</p>
+<div class="highlight-python"><pre>ctest -R python</pre>
+</div>
+<p>There is also a <tt class="docutils literal"><span class="pre">-E</span></tt> (exclude) option which does the inverse of <tt class="docutils literal"><span class="pre">-R</span></tt>.
+<tt class="docutils literal"><span class="pre">ctest</span> <span class="pre">--help</span></tt> shows the full list of options.</p>
+<span class="target" id="index-84"></span></div>
+<div class="section" id="visual-studio">
+<span id="index-85"></span><h3>Visual Studio<a class="headerlink" href="#visual-studio" title="Permalink to this headline">¶</a></h3>
+<p>You will see a solution named <tt class="docutils literal"><span class="pre">RUN_TESTS</span></tt>.  Build this to run the
+tests.  If you want to run them from the commandline, for some
+projects you will have to use the <tt class="docutils literal"><span class="pre">-C</span></tt> flag to ctest to specify the
+ctest configuration type (Debug or Release, typically).</p>
+</div>
+</div>
+<div class="section" id="targets">
+<h2>Targets<a class="headerlink" href="#targets" title="Permalink to this headline">¶</a></h2>
+<p>The testing subsystem adds toplevel targets to the build.  On unix you
+can see them in the output of <tt class="docutils literal"><span class="pre">make</span> <span class="pre">help</span></tt>.  For example some of the
+accumulators test targets look like this:</p>
+<div class="highlight-python"><pre>% make help | grep accum
+... accumulators-tests-count
+... accumulators-tests-covariance
+... accumulators-tests-droppable
+... accumulators-tests-error_of
+... accumulators-tests-extended_p_square
+... accumulators-tests-extended_p_square_quantile</pre>
+</div>
+<p>Note that they are prefixed with the name of the project, a dash, and
+&#8216;tests&#8217;.  Under visual studio you will see these targets in the
+&#8216;solution explorer&#8217;.</p>
+</div>
+<div class="section" id="the-dashboard">
+<span id="id3"></span><h2>The Dashboard<a class="headerlink" href="#the-dashboard" title="Permalink to this headline">¶</a></h2>
+<p>Donated by kitware, it is here:</p>
+<p><a class="reference external" href="http://www.cdash.org/CDashPublic/index.php?project=Boost">http://www.cdash.org/CDashPublic/index.php?project=Boost</a></p>
+</div>
+<div class="section" id="submitting-results">
+<h2>Submitting Results<a class="headerlink" href="#submitting-results" title="Permalink to this headline">¶</a></h2>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">This needs updating for git</p>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">ctest</span></tt> command can be used by individual developers to test
+local changes to their libraries. The same program can also be used to
+build all of Boost, run its regression tests, and submit the results
+to a central server where others can view them. Currently, regression
+test results based on the CMake build system are displayed on the Dart
+server at <a class="reference external" href="http://www.cdash.org/CDashPublic/index.php?project=Boost">http://www.cdash.org/CDashPublic/index.php?project=Boost</a>.</p>
+<p>To submit &#8220;experimental&#8221; results to the Dart server, configure a Boost
+binary tree by following the configuration instructions in the section
+<a class="reference external" href="quickstart.html#quickstart"><em>Quickstart</em></a>, and then enable regression testing via the
+<cite>BOOST_TESTS=ALL</cite> option, as described above. At this point, don&#8217;t build
+anything! We&#8217;ll let CTest do that work. You may want to customize some
+of the advanced CMake options, such as <cite>SITE</cite> (to give your site
+name), and <cite>MAKECOMMAND</cite> (which, for makefile targets, governs the
+top-level make call when building Boost). Finally, go into the Boost
+binary directory and execute:</p>
+<div class="highlight-python"><pre>ctest -D Experimental</pre>
+</div>
+<p>CTest will then reconfigure Boost, build all of the Boost libraries
+and regression tests, execute the regression tests, and submit the
+results to the Dart dashboard at
+<a class="reference external" href="http://www.cdash.org/CDashPublic/index.php?project=Boost">http://www.cdash.org/CDashPublic/index.php?project=Boost</a>.  Results
+submitted to the dashboard are usually browsable momentarily within a
+minute or two.</p>
+</div>
+<div class="section" id="automatic-testing">
+<h2>Automatic testing<a class="headerlink" href="#automatic-testing" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="continuous">
+<h3>Continuous<a class="headerlink" href="#continuous" title="Permalink to this headline">¶</a></h3>
+<p>Here is a recommended setup.</p>
+<p>Create a directory <tt class="docutils literal"><span class="pre">ctest</span></tt> on your test drone containing
+subdirectories for the branches you&#8217;ll be testing, in this case
+<em>release</em> and <em>trunk</em>.</p>
+<div class="highlight-python"><pre>boost/
+  ctest/
+    branches/
+      release/
+        continuous/
+          build/        &lt;= run ctest here
+          src/          &lt;= checkout to here
+        nightly/
+          build/        &lt;= run ctest here
+          src/          &lt;= checkout to here</pre>
+</div>
+<p>and check out source to the directories listed above.  We&#8217;ll do the
+release branch as an example:</p>
+<div class="highlight-python"><pre>% cd boost/ctest/branches/release
+% svn co http://svn.boost.org/svn/boost/branches/release src
+#
+# lots of output
+#
+% mkdir continuous
+% cd continuous</pre>
+</div>
+<p>now configure your build, enabling testing.  In this case I&#8217;ll also
+use an alternate compiler, from Intel:</p>
+<div class="highlight-python"><pre>% cmake ../src -DBUILD_TESTING=ON -DCMAKE_C_COMPILER=icc -DCMAKE_CXX_COMPILER=icpc
+-- The C compiler identification is Intel
+-- The CXX compiler identification is Intel
+-- Check for working C compiler: /opt/intel/Compiler/11.0/083/bin/intel64/icc
+-- Check for working C compiler: /opt/intel/Compiler/11.0/083/bin/intel64/icc -- works
+
+   (etc)
+
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/troy/Projects/boost/ctest/release/continuous/build</pre>
+</div>
+<p>Now run <tt class="docutils literal"><span class="pre">ctest</span> <span class="pre">-D</span> <span class="pre">Continuous</span></tt> in a loop:</p>
+<div class="highlight-python"><pre>% while true
+while&gt; do
+while&gt; ctest -D Continuous
+while&gt; sleep 600   # take it easy on the repository
+while&gt; done
+   Site: zinc
+   Build name: intel-11.0-linux
+Create new tag: 20090514-2207 - Continuous
+Start processing tests
+Updating the repository
+   Updating the repository: /home/troy/Projects/boost/ctest/release/nightly/src
+   Use SVN repository type
+   Old revision of repository is: 53002
+   New revision of repository is: 53005
+   Gathering version information (one . per revision):
+
+   (etc)</pre>
+</div>
+<p>If you add <tt class="docutils literal"><span class="pre">-V</span> <span class="pre">or</span> <span class="pre">-VV</span></tt> you&#8217;ll get a little more feedback about what
+is going on.  On unix it is handy to do this via the utility <em>screen</em>.</p>
+<div class="admonition-todo admonition " id="todo-86">
+<p class="first admonition-title">Todo</p>
+<p class="last">Figure out how to do this on windows, encapsulate some of
+this scripting.  Just use the ctest builtin scripting
+language.</p>
+</div>
+</div>
+<div class="section" id="nightly">
+<h3>Nightly<a class="headerlink" href="#nightly" title="Permalink to this headline">¶</a></h3>
+<p>Nightly testing should run triggered by a cron job or by Windows Task
+Scheduler or what-have-you.  You will need,</p>
+<ul class="simple">
+<li>a directory to work in</li>
+<li>installed cmake/ctest/svn</li>
+</ul>
+<p>but not a checkout of boost.  CTest will do the checkout, build, test
+and submit on its own.</p>
+<p>Create a directory to run in.  As in the previous section, we&#8217;ll use
+<tt class="docutils literal"><span class="pre">boost/ctest/branches/release/nightly</span></tt>, which I&#8217;ll call <tt class="docutils literal"><span class="pre">$DIR</span></tt>.
+The CTest script should look like the following (you can copy/paste
+this into <tt class="docutils literal"><span class="pre">$DIR/CTestNightly.cmake</span></tt></p>
+<div class="highlight-python"><pre>execute_process(COMMAND /bin/pwd
+  OUTPUT_VARIABLE PWD
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+message(STATUS "Running nightly build in ${PWD}")
+
+set(CTEST_SOURCE_DIRECTORY ${PWD}/src)
+set(CTEST_BINARY_DIRECTORY ${PWD}/build)
+
+# what cmake command to use for configuring this dashboard
+set(CTEST_CMAKE_COMMAND "/usr/local/bin/cmake")
+set(CTEST_CTEST_COMMAND "/usr/local/bin/ctest")
+set(CTEST_CVS_COMMAND "svn")
+
+set(CTEST_CVS_CHECKOUT  "${CTEST_CVS_COMMAND} co https://svn.boost.org/svn/boost/branches/release ${CTEST_SOURCE_DIRECTORY}")
+
+# which ctest command to use for running the dashboard
+set(CTEST_COMMAND
+  "${CTEST_CTEST_COMMAND} -VV -D Experimental -A ${PWD}/notes.txt -O ctest.log"
+  )
+
+
+
+####################################################################
+# The values in this section are optional you can either
+# have them or leave them commented out
+####################################################################
+
+# should ctest wipe the binary tree before running
+set(CTEST_START_WITH_EMPTY_BINARY_DIRECTORY TRUE)
+
+#
+# this is the initial cache to use for the binary tree, be careful to escape
+# any quotes inside of this string if you use it
+#
+# Yes you can pass cmake -DBUILD_WHATEVER=ON type options here.
+#
+set(CTEST_INITIAL_CACHE "
+
+CMAKE_CXX_COMPILER:STRING=/opt/intel/Compiler/11.0/083/bin/intel64/icpc
+CMAKE_C_COMPILER:STRING=/opt/intel/Compiler/11.0/083/bin/intel64/icc
+
+SITE:STRING=zinc
+MAKECOMMAND:STRING=make -i -j2
+DART_TESTING_TIMEOUT:STRING=30
+BUILD_TESTS:STRING=ALL
+BUILD_EXAMPLES:STRING=ALL
+CVSCOMMAND:FILEPATH=${CTEST_CVS_COMMAND}
+")</pre>
+</div>
+<p>You will need to customize several variables:</p>
+<ul class="simple">
+<li><strong>CTEST_CMAKE_COMMAND</strong> the path to your cmake binary</li>
+<li><strong>CTEST_CTEST_COMMAND</strong> the path to your ctest binary (should be in
+the same place as cmake)</li>
+<li><strong>CTEST_CVS_COMMAND</strong> The path to subversion.</li>
+<li><strong>CMAKE_CXX_COMPILER:STRING</strong>, <strong>CMAKE_C_COMPILER:STRING</strong> Note the
+syntax here, the trailing <tt class="docutils literal"><span class="pre">:STRING</span></tt>.  If you are using a
+nonstandard compiler, set it here.</li>
+<li><strong>MAKECOMMAND:STRING</strong> The path to your make command.  <em>NOTE</em> if you
+set this, be sure that the <tt class="docutils literal"><span class="pre">-i</span></tt> (ignore-errors) flag is included.
+If it isn&#8217;t, the first compile/link error will stop the build and
+testing will commence.</li>
+<li><strong>SITE:STRING</strong> This is what will appear as the &#8216;hostname&#8217; in your
+posted dashboards.  Customize as you like.</li>
+</ul>
+<p>Now you&#8217;ll create a &#8220;notes&#8221; file, call it <tt class="docutils literal"><span class="pre">notes.txt</span></tt>.  This will be
+visible from the dashboard.   Add the output of, e.g:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">gcc</span> <span class="o">--</span><span class="n">version</span>
+<span class="n">uname</span> <span class="o">-</span><span class="n">a</span>
+</pre></div>
+</div>
+<p>and the contents of the <tt class="docutils literal"><span class="pre">CTestNightly.cmake</span></tt> itself.  Example:</p>
+<div class="highlight-python"><pre>**************** CMAKE DASHBOARD NOTES *****************
+
+Notes file for CMake Nightly Dashboard.
+
+This dashboard is being generated on an eight core, 64 bit
+Ubuntu 9.04 machine with an intel c++ compiler.
+
+
+Questions about this Dashboard should be directed to troy@resophonic.com
+
+Linux zinc 2.6.27-11-generic #1 SMP Wed Apr 1 20:53:41 UTC 2009 x86_64 GNU/Linux
+
+icpc (ICC) 11.0 20090318
+Copyright (C) 1985-2009 Intel Corporation.  All rights reserved.
+
+--------------- Script file ---------------
+
+(contents of CTestNightly.cmake)</pre>
+</div>
+<p>Now run (as a cronjob or at the command line):</p>
+<div class="highlight-python"><pre>ctest -S CTestNightly.cmake</pre>
+</div>
+<p>if you want extra verbosity add a <tt class="docutils literal"><span class="pre">-VV</span></tt> flag.  You&#8217;ll see something like the following:</p>
+<div class="highlight-python"><pre>+ /opt/local/bin/ctest -VV -S CMakeDashBoard.cmake
+* Extra verbosity turned on
+Reading Script: /Users/troy/ctest/boost/release/nightly/CMakeDashBoard.cmake
+Run cmake command: /opt/i3/ports/bin/cmake "/Users/troy/ctest/boost/release/nightly/src"
+-- The C compiler identification is GNU
+-- The CXX compiler identification is GNU
+-- Check for working C compiler: /usr/bin/gcc
+(etc)
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /Users/troy/ctest/boost/release/nightly/build
+Run ctest command: /opt/i3/ports/bin/ctest -VV -D Nightly -A /Users/troy/ctest/boost/release/nightly/notes.txt -O ctest.log
+UpdateCTestConfiguration  from :/Users/troy/ctest/boost/release/nightly/build/DartConfiguration.tcl
+Parse Config file:/Users/troy/ctest/boost/release/nightly/build/DartConfiguration.tcl
+   Site: silver
+   Build name: gcc-4.0.1-macos
+(etc, etc)</pre>
+</div>
+<p>You&#8217;ll see it configure again, run... and sooner or later you&#8217;ll see
+your results on <a class="reference internal" href="#the-dashboard"><em>The Dashboard</em></a>.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="adding_regression_tests.html" title="Adding Regression Tests"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="add_compiled_library.html" title="Adding a Compiled Library to CMake"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

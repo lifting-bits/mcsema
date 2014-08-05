@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioPropertySheet
+	ProjectType="Visual C++"
+	Version="8.00"
+	Name="ttmath"
+	>
+	<Tool
+		Name="VCCLCompilerTool"
+		AdditionalIncludeDirectories="&quot;$(TTMATH_ROOT)&quot;;&quot;../$(TTMATH_ROOT)&quot;;&quot;../../$(TTMATH_ROOT)&quot;"
+	/>
+	<UserMacro
+		Name="TTMATH_ROOT"
+		Value="..\..\..\boost\geometry\extensions\contrib\ttmath"
+	/>
+</VisualStudioPropertySheet>

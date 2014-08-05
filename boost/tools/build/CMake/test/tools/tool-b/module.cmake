@@ -1,0 +1,1 @@
+boost_module(b DEPENDS a)

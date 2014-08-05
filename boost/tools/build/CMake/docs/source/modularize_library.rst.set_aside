@@ -1,0 +1,183 @@
+Modularizing a Library with CMake
+=================================
+
+.. warning:: Don't Do This!  This doc is a placeholder. 
+
+Boost's CMake-based build system supports the notion of "modular"
+libraries, which are libraries that are contained entirely within a
+single directory structure. Since modular libraries are
+self-contained, it is easier to bring in libraries of different
+versions and select specific subsets of libraries. Additionally,
+modular libraries explicitly declare their dependencies on other
+libraries (or "modules"), making it possible to build and install
+coherent subsets of Boost. For example, the binary installer for
+Windows allows one to turn on or off installation of each modular
+library.
+
+Eventually, we hope that most of Boost's libraries will be modular, to
+make it easier for users to install the subset of Boost that they are
+interested in. Many "core" libraries, on which most users and many
+other libraries depend, may remain in the core Boost distribution and
+will not be modularized. Even then, modularizing Boost is an
+evolutionary process, and it is best to work on modularizing libraries
+on which no other libraries depend (first) and then libraries on which
+other modularized libraries depend, moving from the more peripheral
+libraries (that no other libraries depend on) toward the core
+libraries.
+
+Layout of a modular library
+---------------------------
+
+A modular library has a similar layout to non-modular libraries. The
+main difference is in the handling of include files, which are stored
+within the library's directory in ``libs/libname/include`` rather
+than in the main "boost" include directory. A modular library will
+typically have the following subdirectories::
+  
+  libs/libname - Main library directory
+    include/   - Library headers. Since most Boost headers go into boost/, the actual library headers will be in the subdirectory include/boost (or its subdirectoiries)
+    src/       - Source files for compiled library binaries (if any)
+    test/      - Regression tests
+    example/   - Example programs, libraries, and applications
+    doc/       - Documentation
+  
+
+Throughout this document, we will use the Filesystem library as an
+example of a modular library. Please refer to the contents of
+``libs/filesystem`` to see a fully-working modular library's
+description.
+
+.. Restructuring the include directory
+.. -----------------------------------
+.. 
+.. For most Boost libraries, the only changes needed to the directory
+.. structure is to introduce the include directory. To do so, create an
+.. empty directories ``include`` and then ``include/boost`` in
+.. ``libs/libname``. Then, add these two new directories to
+.. Subversion. If you're using the command-line Subversion, you can do
+.. this with the following command run from ``libs/libname``::
+.. 
+..   svn add include
+.. 
+.. Next, we need to identify each of the include files that are part of
+.. this library (but *not* part of libraries that it depends on) and move
+.. each of these libraries from the main Boost include directory into our
+.. library-specific include directory. We handle library-specific
+.. subdirectories of the Boost include directories (e.g.,
+.. ``boost/filesystem``) slightly differently from individual headers
+.. (e.g., ``boost/shared_ptr.hpp``):
+.. 
+.. .. warning:: Don't Do This!  This doc is a placeholder. 
+.. 
+.. Library-specific include directories are handled by
+.. [http://svnbook.red-bean.com/en/1.1/ch07s04.html Subversion
+.. externals]. To move the directory ``boost/filesystem``, for example,
+.. one should first delete ``boost/filesystem`` entirely from the main
+.. Boost include directory. With the command-line Subversion, this can be
+.. done by changing into the top-level ``boost`` include directory (e.g.,
+.. ``$BOOST/boost``) and running::
+.. 
+..   svn rm filesystem
+.. 
+.. Next, change into the include directory within the library-specific
+.. directory, e.g., ``libs/filesystem/include``. Add a new Subversion
+.. ``svn:externals`` property to this directory that references the
+.. corresponding include directory from the main Boost directory
+.. tree. For example, we want our ``filesystem`` directory to point at
+.. ``branches/release/boost/filesystem``. This way, our modularized
+.. version of the library automatically picks up fixes from the main
+.. release branch. The ``svn:externals`` property contains one or more
+.. lines corresponding to external definitions. Each line contains the
+.. local directory name (e.g., `filesystem`) followed by a space and then
+.. the Subversion directory that this directory will come from, e.g.,
+.. https://svn.boost.org/svn/branches/release/boost/filesystem. For
+.. example
+.. 
+..   filesystem https://svn.boost.org/svn/boost/branches/release/boost/filesystem
+.. 
+.. The ``svn:externals`` property with this value must be attached to the
+.. library-specific ``boost`` subdirectory, because each line is a
+.. subdirectory within ``boost``. Using the command-line Subversion client,
+.. this can be done with::
+.. 
+..   svn propset svn:externals "filesystem https://svn.boost.org/svn/boost/branches/release/boost/filesystem" boost 
+.. 
+.. Note that, to see the actual changes this involves, you will
+.. need to commit all of your changes to the Subversion repository and
+.. then execute an update operation.
+.. 
+.. Individual headers are handled by moving the headers from the main
+.. Boost include directory into the library-specific include
+.. directory. This is effectively just a rename operation, e.g., to
+.. rename `boost/shared_ptr.hpp` to
+.. `libs/smart_ptr/include/boost/shared_ptr.hpp`. To perform this rename
+.. operation via the command-line Subversion client, change to the
+.. top-level Boost directory and execute ::
+.. 
+..   svn move boost/shared_ptr.hpp libs/smart_ptr/include/boost/
+.. 
+.. Once all of the headers have been moved and the changes have been
+.. committed, there should be no remaining headers in the main Boost
+.. include directory.
+
+Informing CMake that the library is modular
+-------------------------------------------
+
+The CMake build system needs to know that the layout of the Boost
+library follows the rules of a modular library, which also instructs
+it to add the appropriate include paths when compiling itself and any
+of its dependencies. To label the library as modular, edit the
+``CMakeLists.txt`` file contained in the library's subdirectory (e.g.,
+``libs/filesystem/CMakeLists.txt``, and add the argument ``MODULAR`` to
+the use of ``boost_library_project``). After
+this change, Filesystem library's ``CMakeLists.txt`` looks like this::
+
+
+  boost_library_project(
+    Filesystem 
+    SRCDIRS src 
+    TESTDIRS test
+    MODULAR
+    DESCRIPTION "Provides portable facilities to query and manipulate paths, files, and directories."
+    AUTHORS "Beman Dawes <bdawes -at- acm.org>"
+    )
+
+If the library you're modularizing does not have ``DESCRIPTION``,
+``AUTHORS``, or ``MAINTAINERS`` arguments, please add them! Short library
+descriptions are available at http://www.boost.org/doc/ along with
+author information; additional maintainer information can be found in
+http://svn.boost.org/svn/boost/trunk/libs/maintainers.txt.
+
+Library dependencies
+--------------------
+
+Each modular library must declare the libraries on which it
+depends. This declaration is provided by the file ``module.cmake``
+within the library's directory, and uses the ``boost_modular`` command
+to explicitly declare dependencies via its ``DEPENDS`` argument. The
+contents on the Filesystem library's ``libs/filesystem/module.cmake``
+follow::
+
+  boost_module(Filesystem DEPENDS system)
+
+The first argument to ``boost_module`` is the name of the library
+we're description. The arguments following ``DEPENDS`` (there may be
+more than one!) are the names of the libraries on which this library
+depends. Those libraries may or may not be modular yet: it does not
+matter. Thus, the Filesystem library depends on the System library. If
+the System library were not available for some reason (say, the user
+forgot to include it in the subset of Boost she downloaded), the
+Filesystem library would not attempt to build.
+
+Testing the modular library
+---------------------------
+
+Once a library has been modularized, it is important to build the
+library and all of the regression tests, including the regression
+tests for other libraries (that might depend on the modularized
+library). Follow the instructors for [wiki:CMakeTesting building and
+running the regression tests]. Most of the failures that will crop up
+from this exercise will come in the form of "include file not found"
+messages due to missing dependency information. When this happens, add
+the appropriate dependencies to ``module.cmake`` and try again. The
+result is well worth it!

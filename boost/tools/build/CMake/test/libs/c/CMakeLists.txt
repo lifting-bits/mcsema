@@ -1,0 +1,27 @@
+#
+# Copyright Troy D. Straszheim
+#
+# Distributed under the Boost Software License, Version 1.0.
+# See http://www.boost.org/LICENSE_1_0.txt
+#
+add_definitions(-DLIBNAME=c)
+
+set(RELEASE_COMPILE_FLAGS "-DTOPLEVEL_DEBUG_OR_RELEASE=RELEASE")
+set(DEBUG_COMPILE_FLAGS "-DTOPLEVEL_DEBUG_OR_RELEASE=DEBUG")
+set(SHARED_COMPILE_FLAGS "-DTOPLEVEL_SHARED_OR_STATIC=SHARED")
+set(STATIC_COMPILE_FLAGS "-DTOPLEVEL_SHARED_OR_STATIC=STATIC")
+set(MULTI_THREADED_COMPILE_FLAGS "-DTOPLEVEL_MULTI_OR_SINGLE=MULTI_THREADED")
+set(SINGLE_THREADED_COMPILE_FLAGS "-DTOPLEVEL_MULTI_OR_SINGLE=SINGLE_THREADED")
+
+# Add a library target to the build system
+boost_library_project(
+  c
+  SRCDIRS  src
+  TESTDIRS test
+  #  DOCDIRS 
+  #  DESCRIPTION 
+  #  AUTHORS 
+  #  MAINTAINERS 
+)
+
+

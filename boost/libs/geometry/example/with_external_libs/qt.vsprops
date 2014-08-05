@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioPropertySheet
+	ProjectType="Visual C++"
+	Version="8.00"
+	Name="qt"
+	>
+	<Tool
+		Name="VCCLCompilerTool"
+		AdditionalIncludeDirectories="$(QT)\include;$(QT)\include\QtGui;$(QT)\include\QtCore"
+		PreprocessorDefinitions="QT_NO_DEBUG;QT_GUI_LIB;QT_CORE_LIB;QT_THREAD_SUPPORT"
+	/>
+	<Tool
+		Name="VCLinkerTool"
+		AdditionalDependencies="qtmain.lib QtGui4.lib QtCore4.lib"
+		AdditionalLibraryDirectories="$(QT)\lib"
+		IgnoreDefaultLibraryNames="msvcrt.lib"
+	/>
+	<UserMacro
+		Name="QT"
+		Value="c:\software\libraries\Qt\4.7.1"
+	/>
+</VisualStudioPropertySheet>

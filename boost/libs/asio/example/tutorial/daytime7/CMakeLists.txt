@@ -1,0 +1,13 @@
+foreach(
+    example
+    server
+)
+boost_add_executable(
+    ${example}
+    DEPENDS
+    boost_system
+    TARGET_PREFIX
+    "daytime7-"
+)
+endforeach(
+)

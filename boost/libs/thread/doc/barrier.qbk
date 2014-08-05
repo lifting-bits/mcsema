@@ -1,0 +1,72 @@
+[/
+  (C) Copyright 2007-8 Anthony Williams.
+  Distributed under the Boost Software License, Version 1.0.
+  (See accompanying file LICENSE_1_0.txt or copy at
+  http://www.boost.org/LICENSE_1_0.txt).
+]
+
+[section:barriers Barriers]
+
+A barrier is a simple concept. Also known as a ['rendezvous], it is a synchronization point between multiple threads. The barrier is
+configured for a particular number of threads (`n`), and as threads reach the barrier they must wait until all `n` threads have
+arrived. Once the `n`-th thread has reached the barrier, all the waiting threads can proceed, and the barrier is reset.
+
+[section:barrier Class `barrier`]
+
+    #include <boost/thread/barrier.hpp>
+
+    class barrier
+    {
+    public:
+        barrier(unsigned int count);
+        ~barrier();
+
+        bool wait();
+    };
+
+Instances of __barrier__ are not copyable or movable.
+
+[heading Constructor]
+
+    barrier(unsigned int count);
+
+[variablelist
+
+[[Effects:] [Construct a barrier for `count` threads.]]
+
+[[Throws:] [__thread_resource_error__ if an error occurs.]]
+
+]
+
+[heading Destructor]
+
+    ~barrier();
+
+[variablelist
+
+[[Precondition:] [No threads are waiting on `*this`.]]
+
+[[Effects:] [Destroys `*this`.]]
+
+[[Throws:] [Nothing.]]
+
+]
+
+[heading Member function `wait`]
+
+    bool wait();
+
+[variablelist
+
+[[Effects:] [Block until `count` threads have called `wait` on `*this`. When the `count`-th thread calls `wait`, all waiting threads
+are unblocked, and the barrier is reset. ]]
+
+[[Returns:] [`true` for exactly one thread from each batch of waiting threads, `false` otherwise.]]
+
+[[Throws:] [__thread_resource_error__ if an error occurs.]]
+
+]
+
+[endsect]
+
+[endsect]

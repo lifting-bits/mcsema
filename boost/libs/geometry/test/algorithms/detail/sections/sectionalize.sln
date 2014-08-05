@@ -1,0 +1,25 @@
+Microsoft Visual Studio Solution File, Format Version 9.00
+# Visual C++ Express 2005
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sectionalize", "sectionalize.vcproj", "{50410F81-7B83-49D9-BDAE-FA3F0ADB2ADC}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "range_by_section", "range_by_section.vcproj", "{A91434CB-CB32-48AE-8C74-81B6A1EB342F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{50410F81-7B83-49D9-BDAE-FA3F0ADB2ADC}.Debug|Win32.ActiveCfg = Debug|Win32
+		{50410F81-7B83-49D9-BDAE-FA3F0ADB2ADC}.Debug|Win32.Build.0 = Debug|Win32
+		{50410F81-7B83-49D9-BDAE-FA3F0ADB2ADC}.Release|Win32.ActiveCfg = Release|Win32
+		{50410F81-7B83-49D9-BDAE-FA3F0ADB2ADC}.Release|Win32.Build.0 = Release|Win32
+		{A91434CB-CB32-48AE-8C74-81B6A1EB342F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A91434CB-CB32-48AE-8C74-81B6A1EB342F}.Debug|Win32.Build.0 = Debug|Win32
+		{A91434CB-CB32-48AE-8C74-81B6A1EB342F}.Release|Win32.ActiveCfg = Release|Win32
+		{A91434CB-CB32-48AE-8C74-81B6A1EB342F}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

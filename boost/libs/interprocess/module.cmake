@@ -1,0 +1,1 @@
+boost_module(interprocess DEPENDS date_time intrusive math)

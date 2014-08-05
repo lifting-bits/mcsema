@@ -1,0 +1,20 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "recursive_polygons_buffer", "recursive_polygons_buffer.vcxproj", "{02C9CFA4-C625-55CA-1C8E-2B96EBB09FE8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{02C9CFA4-C625-55CA-1C8E-2B96EBB09FE8}.Debug|Win32.ActiveCfg = Debug|Win32
+		{02C9CFA4-C625-55CA-1C8E-2B96EBB09FE8}.Debug|Win32.Build.0 = Debug|Win32
+		{02C9CFA4-C625-55CA-1C8E-2B96EBB09FE8}.Release|Win32.ActiveCfg = Release|Win32
+		{02C9CFA4-C625-55CA-1C8E-2B96EBB09FE8}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

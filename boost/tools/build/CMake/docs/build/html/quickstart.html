@@ -1,0 +1,348 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Quickstart &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="index.html" />
+    <link rel="next" title="Configuring the buildspace" href="build_configuration.html" />
+    <link rel="prev" title="Boost-CMake 1.41.0.cmake0" href="index.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="build_configuration.html" title="Configuring the buildspace"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Boost-CMake 1.41.0.cmake0"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">Quickstart</a><ul>
+<li><a class="reference external" href="#download-cmake">Download CMake</a></li>
+<li><a class="reference external" href="#checkout-download-the-code">Checkout / download the code</a></li>
+<li><a class="reference external" href="#on-unix">On Unix</a><ul>
+<li><a class="reference external" href="#configure">Configure</a></li>
+<li><a class="reference external" href="#build-and-install">Build and Install</a></li>
+</ul>
+</li>
+<li><a class="reference external" href="#windows">Windows</a><ul>
+<li><a class="reference external" href="#configuration-for-visual-studio">Configuration for Visual Studio</a></li>
+<li><a class="reference external" href="#configuration-for-nmake">Configuration for NMake</a></li>
+<li><a class="reference external" href="#build-visual-studio">Build &#8211; Visual Studio</a></li>
+<li><a class="reference external" href="#build-nmake">Build &#8211; NMake</a></li>
+<li><a class="reference external" href="#installation">Installation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="index.html"
+                                  title="previous chapter">Boost-CMake 1.41.0.cmake0</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="build_configuration.html"
+                                  title="next chapter">Configuring the buildspace</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/quickstart.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="quickstart">
+<span id="id1"></span><h1>Quickstart<a class="headerlink" href="#quickstart" title="Permalink to this headline">¶</a></h1>
+<p>This page describes how to configure and build Boost with CMake. By
+following these instructions, you should be able to get CMake,
+configure a Boost build tree to your liking with CMake, and then
+build, install, and package Boost libraries.</p>
+<div class="section" id="download-cmake">
+<h2>Download CMake<a class="headerlink" href="#download-cmake" title="Permalink to this headline">¶</a></h2>
+<p>You can get it here:  <a class="reference external" href="http://www.cmake.org/HTML/Download.html">http://www.cmake.org/HTML/Download.html</a></p>
+<p>There are precompiled binaries for CMake on several different
+platforms. The installation of these pre-compiled binaries is mostly
+self-explanatory. If you need to build your own copy of CMake, please
+see the <a class="reference external" href="http://www.cmake.org/HTML/Install.html">CMake installation instructions</a>.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>In these instructions, we will do things such that the Boost source
+tree (with CMake build files) is available in the directory
+<tt class="docutils literal"><span class="pre">$BOOST/src</span></tt> and that the build will happen in <tt class="docutils literal"><span class="pre">$BOOST/build</span></tt>:</p>
+<div class="highlight-python"><pre>$BOOST/
+  src/     # (source checked out to here)
+  build/   # (build output here)</pre>
+</div>
+<p class="last">Note that it is <em>not</em> actually necessary to set any environment
+variable <tt class="docutils literal"><span class="pre">BOOST</span></tt>, this is a convention used in this document.</p>
+</div>
+</div>
+<div class="section" id="checkout-download-the-code">
+<h2>Checkout / download the code<a class="headerlink" href="#checkout-download-the-code" title="Permalink to this headline">¶</a></h2>
+<p>Tarballs and zipfiles are avaiable at
+<a class="reference external" href="http://sodium.resophonic.com/boost-cmake">http://sodium.resophonic.com/boost-cmake</a> in subdirectory 1.41.0.cmake0.</p>
+<p>Boost.CMake is distributed <em>separately</em> from upstream boost.  Code is
+in a <a class="reference external" href="http://git-scm.com">git</a> repository at
+<a class="reference external" href="http://gitorious.org/boost/cmake.git">http://gitorious.org/boost/cmake.git</a>.  These documents correspond to
+tag 1.41.0.cmake0.  You can clone the repository locally and then check out
+the tag:</p>
+<div class="highlight-python"><pre>git clone git://gitorious.org/boost/cmake.git src
+cd src
+git checkout &lt;TAG&gt;</pre>
+</div>
+<p>where <tt class="docutils literal"><span class="pre">&lt;TAG&gt;</span></tt> is 1.41.0.cmake0</p>
+</div>
+<div class="section" id="on-unix">
+<h2>On Unix<a class="headerlink" href="#on-unix" title="Permalink to this headline">¶</a></h2>
+<p>Create and change to the directory that will hold the binaries that
+CMake build:</p>
+<div class="highlight-python"><pre>mkdir $BOOST/build
+cd $BOOST/build</pre>
+</div>
+<div class="section" id="configure">
+<span id="unix-configure"></span><h3>Configure<a class="headerlink" href="#configure" title="Permalink to this headline">¶</a></h3>
+<p>Run the CMake configuration program, providing it with the Boost
+source directory:</p>
+<div class="highlight-python"><pre>cmake -DCMAKE_INSTALL_PREFIX=/somewhere $BOOST/src</pre>
+</div>
+<p>(<a class="reference external" href="install_customization.html#cmake-install-prefix"><em>CMAKE_INSTALL_PREFIX</em></a> defaults to <tt class="docutils literal"><span class="pre">/usr/local</span></tt> on unix and
+<tt class="docutils literal"><span class="pre">C:\\Program</span> <span class="pre">Files\Boost</span></tt> on windows).  Replace <tt class="docutils literal"><span class="pre">/somewhere</span></tt> above
+with a path you like if the defaults aren&#8217;t okay.  You&#8217;ll see output
+from <tt class="docutils literal"><span class="pre">cmake</span></tt>.  It looks somewhat like this:</p>
+<div class="highlight-python"><pre>-- Check for working C compiler: /usr/bin/gcc
+-- Check for working C compiler: /usr/bin/gcc -- works
+-- Check size of void*
+-- Check size of void* - done
+-- Check for working CXX compiler: /usr/bin/c++
+-- Check for working CXX compiler: /usr/bin/c++ -- works
+-- Scanning subdirectories:
+--  + io
+--  + any
+--  + crc
+--  + mpl
+
+  (etc, etc)
+
+--  + program_options
+--  + ptr_container
+--  + type_traits
+-- Configuring done
+-- Generating done
+-- Build files have been written to: $BOOST/build</pre>
+</div>
+<p>The directory <tt class="docutils literal"><span class="pre">$BOOST/build</span></tt> should now contain a bunch of generated
+files, including a top level <tt class="docutils literal"><span class="pre">Makefile</span></tt>, something like this:</p>
+<div class="highlight-python"><pre>% ls
+CMakeCache.txt           CPackConfig.cmake    Makefile
+cmake_install.cmake      libs/                CMakeFiles/
+CPackSourceConfig.cmake  bin/                 lib/</pre>
+</div>
+</div>
+<div class="section" id="build-and-install">
+<h3>Build and Install<a class="headerlink" href="#build-and-install" title="Permalink to this headline">¶</a></h3>
+<p>Now build and install boost:</p>
+<div class="highlight-python"><pre>make install</pre>
+</div>
+<p>You&#8217;ll see:</p>
+<div class="highlight-python"><pre>Scanning dependencies of target boost_date_time-mt-shared
+[  0%] Building CXX object libs/date_time/src/CMakeFiles/boost_date_time-mt-shared.dir/gregorian/greg_month.cpp.o
+[  0%] Building CXX object libs/date_time/src/CMakeFiles/boost_date_time-mt-shared.dir/gregorian/greg_weekday.cpp.o
+[  1%] Building CXX object libs/date_time/src/CMakeFiles/boost_date_time-mt-shared.dir/gregorian/date_generators.cpp.o
+Linking CXX shared library ../../../lib/libboost_date_time-mt.so
+[  1%] Built target boost_date_time-mt-shared
+
+(etc etc)
+
+[100%] Built bcp
+
+(etc etc)
+
+-- Installing: /tmp/flanboost/lib/libboost_wave-mt-d.a
+-- Installing: /tmp/flanboost/lib/libboost_wave-mt-d.so
+-- Removed runtime path from "/tmp/flanboost/lib/libboost_wave-mt-d.so"
+-- Installing: /tmp/flanboost/bin/bcp
+-- Installing: /tmp/flanboost/bin/inspect</pre>
+</div>
+<p>And you&#8217;re done. Once the build completes (which make take a while, if
+you are building all of the Boost libraries), the Boost libraries will
+be in a predictable layout under the directory passed to
+<a class="reference external" href="install_customization.html#cmake-install-prefix"><em>CMAKE_INSTALL_PREFIX</em></a> (default <tt class="docutils literal"><span class="pre">/usr/local</span></tt>)</p>
+</div>
+</div>
+<div class="section" id="windows">
+<h2>Windows<a class="headerlink" href="#windows" title="Permalink to this headline">¶</a></h2>
+<p>There are two different sets of directions: visual studio, which is
+quite specific, and nmake, which is much like the Unix version, above.</p>
+<div class="section" id="configuration-for-visual-studio">
+<span id="vs-configure"></span><span id="index-57"></span><h3>Configuration for Visual Studio<a class="headerlink" href="#configuration-for-visual-studio" title="Permalink to this headline">¶</a></h3>
+<p>Run CMake by selecting it from the Start menu.</p>
+<ul>
+<li><p class="first">Use the <em>Browse...</em> button next to <em>Where is the source code</em> to
+point CMake at the Boost source code in <tt class="docutils literal"><span class="pre">$BOOST\src</span></tt>.</p>
+</li>
+<li><p class="first">Use the second <em>Browse...</em> button to next to <em>Where to build the
+binaries</em> to select the directory where Boost will build binaries,
+<tt class="docutils literal"><span class="pre">$BOOST\build</span></tt>.</p>
+</li>
+<li><p class="first">Click <em>Configure</em> a first time to configure Boost, which will search
+for various libraries on your system and prepare the build.  CMake
+will ask you what kind of project files or make files to build. If
+you&#8217;re using Microsoft Visual Studio, select the appropriate version
+to generate project files. Otherwise, you can use Borland&#8217;s make
+files.  If you&#8217;re using NMake, see the next section.</p>
+</li>
+<li><p class="first">On an XP box with VS9 one sees roughly this in the output window at
+the bottom:</p>
+<div class="highlight-python"><pre>Check for working C compiler: cl
+Check for working C compiler: cl -- works
+Detecting C compiler ABI info
+Detecting C compiler ABI info - done
+Check for working CXX compiler: cl
+Check for working CXX compiler: cl -- works
+Detecting CXX compiler ABI info
+Detecting CXX compiler ABI info - done
+Boost version 1.41.0
+Found PythonInterp: C:/Python26/python.exe
+Found PythonLibs: C:/Python26/libs/python26.lib
+Boost compiler: msvc
+Boost toolset:  vc90
+Boost platform: windows
+Could NOT find Doxygen  (missing:  DOXYGEN_EXECUTABLE)
+Build name: msvc-9.0-windows
+ + preprocessor
+ + concept_check
+ ...
+ + units
+ + wave
+Configuring done</pre>
+</div>
+</li>
+<li><p class="first">The messages about &#8216;missing doxygen&#8217; and whatnot are not
+showstoppers for now, so long as configuration is successful.  You
+will be given the opportunity to tune build options in the CMake GUI
+(see <a class="reference external" href="build_configuration.html#configure-and-build"><em>Configuring the buildspace</em></a> for more detail). They will
+initially appear red.  Click <em>Configure</em> again when you are done
+editing them.  The one thing that you may wish to configure as part
+of this &#8216;quickstart&#8217; is <tt class="docutils literal"><span class="pre">CMAKE_INSTALL_PREFIX</span></tt>.</p>
+</li>
+<li><p class="first">Finally, click <em>Generate</em> to generate project files.  <tt class="docutils literal"><span class="pre">Boost.sln</span></tt>,
+the VS solution file, will appear in the <em>where to build the
+binaries</em> directory from the cmake gui.</p>
+</li>
+</ul>
+</div>
+<div class="section" id="configuration-for-nmake">
+<span id="nmake"></span><span id="index-58"></span><h3>Configuration for NMake<a class="headerlink" href="#configuration-for-nmake" title="Permalink to this headline">¶</a></h3>
+<ul>
+<li><p class="first">Start a <cite>Visual Studio Command Prompt</cite> from the start menu.  This
+will spawn a command prompt window with certain env variables set.
+CMake will detect these and automatically choose to generate NMake
+files.</p>
+</li>
+<li><p class="first">cd to $BOOST/build and execute:</p>
+<div class="highlight-python"><pre>cmake ..\src</pre>
+</div>
+<p>You will see output very similar to that on unix, see
+<a class="reference internal" href="#unix-configure"><em>Configure</em></a>.</p>
+</li>
+</ul>
+</div>
+<div class="section" id="build-visual-studio">
+<h3>Build &#8211; Visual Studio<a class="headerlink" href="#build-visual-studio" title="Permalink to this headline">¶</a></h3>
+<blockquote>
+Start up Visual Studio, load the solution or project <tt class="docutils literal"><span class="pre">Boost</span></tt> from
+the Boost build directory you set in the CMake configuration
+earlier. Then, just click <em>Build</em> to build all of Boost.</blockquote>
+</div>
+<div class="section" id="build-nmake">
+<h3>Build &#8211; NMake<a class="headerlink" href="#build-nmake" title="Permalink to this headline">¶</a></h3>
+<blockquote>
+Execute <tt class="docutils literal"><span class="pre">nmake</span></tt> from the command prompt in the build directory.</blockquote>
+</div>
+<div class="section" id="installation">
+<h3>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h3>
+<p>The installation of Boost&#8217;s headers and compiled libraries uses the
+same tools as building the library. With Microsoft Visual Studio, just
+load the Boost solution or project and build the &#8216;INSTALL&#8217; target to
+perform the installation.  With NMake, <tt class="docutils literal"><span class="pre">nmake</span> <span class="pre">install</span></tt>.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="build_configuration.html" title="Configuring the buildspace"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Boost-CMake 1.41.0.cmake0"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

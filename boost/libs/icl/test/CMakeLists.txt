@@ -1,0 +1,41 @@
+#
+# Copyright Troy D. Straszheim
+#
+# Distributed under the Boost Software License, Version 1.0.
+# See http://www.boost.org/LICENSE_1_0.txt
+#
+boost_additional_test_dependencies(icl BOOST_DEPENDS test date_time)
+
+SET(TESTS 
+ fastest_icl_interval_/fastest_icl_interval
+ fastest_interval_set_/fastest_interval_set
+ fastest_interval_set_infix_/fastest_interval_set_infix
+ fastest_separate_interval_set_/fastest_separate_interval_set
+ fastest_separate_interval_set_infix_/fastest_separate_interval_set_infix
+ fastest_split_interval_set_/fastest_split_interval_set
+ fastest_split_interval_set_infix_/fastest_split_interval_set_infix
+ fastest_interval_set_mixed_/fastest_interval_set_mixed
+ fastest_interval_map_/fastest_interval_map
+ fastest_interval_map_infix_/fastest_interval_map_infix
+ fastest_split_interval_map_/fastest_split_interval_map
+ fastest_split_interval_map_infix_/fastest_split_interval_map_infix
+ fastest_interval_map_mixed_/fastest_interval_map_mixed
+ fastest_interval_map_mixed2_/fastest_interval_map_mixed2
+ fastest_interval_map_infix_mixed_/fastest_interval_map_infix_mixed
+ fastest_icl_map_/fastest_icl_map
+ fastest_set_interval_set_/fastest_set_interval_set
+ fastest_set_icl_set_/fastest_set_icl_set
+ fastest_partial_interval_quantifier_/fastest_partial_interval_quantifier
+ fastest_total_interval_quantifier_/fastest_total_interval_quantifier
+ fastest_partial_icl_quantifier_/fastest_partial_icl_quantifier
+ fastest_total_icl_quantifier_/fastest_total_icl_quantifier
+ test_misc_/test_misc
+ test_doc_code_/test_doc_code
+ test_type_traits_/test_type_traits
+ test_changing_interval_defaults_/test_changing_interval_defaults)
+
+FOREACH(test ${TESTS})
+  boost_test_run(${test} DEPENDS boost_unit_test_framework boost_date_time)
+ENDFOREACH(test ${TESTS})
+
+

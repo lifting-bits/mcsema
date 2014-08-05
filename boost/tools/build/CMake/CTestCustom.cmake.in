@@ -1,0 +1,5 @@
+message(FATAL_ERROR "Please customize CTestCustom.cmake, found in your build directory")
+
+set(SITE "Set To Your Hostname")
+set(CMAKE_VERBOSE_MAKEFILE TRUE)
+

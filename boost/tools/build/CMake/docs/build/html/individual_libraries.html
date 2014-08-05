@@ -1,0 +1,251 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Building individual libraries with cmake &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="index.html" />
+    <link rel="next" title="Adding a Library Project" href="add_boost_library.html" />
+    <link rel="prev" title="Differences between this release and upstream" href="diff.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="add_boost_library.html" title="Adding a Library Project"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="diff.html" title="Differences between this release and upstream"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">Building individual libraries with cmake</a><ul>
+<li><a class="reference external" href="#preprocessing">Preprocessing</a></li>
+<li><a class="reference external" href="#tests-and-examples">Tests and examples</a></li>
+<li><a class="reference external" href="#building-individual-targets-ignoring-prerequisites">Building individual targets, ignoring prerequisites</a></li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="diff.html"
+                                  title="previous chapter">Differences between this release and upstream</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="add_boost_library.html"
+                                  title="next chapter">Adding a Library Project</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/individual_libraries.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="building-individual-libraries-with-cmake">
+<h1>Building individual libraries with cmake<a class="headerlink" href="#building-individual-libraries-with-cmake" title="Permalink to this headline">¶</a></h1>
+<p>In a configured cmake workspace, <tt class="docutils literal"><span class="pre">make</span> <span class="pre">help</span></tt> will display a list of available targets.  Example:</p>
+<div class="highlight-python"><pre>% make help
+The following are some of the valid targets for this Makefile:
+... all (the default if no target is provided)
+... clean
+... depend
+... edit_cache
+... install
+... install/local
+... install/strip
+... list_install_components
+... package
+... package_source
+... rebuild_cache
+... boost_date_time
+... boost_date_time-mt-shared
+... boost_date_time-mt-shared-debug
+... boost_date_time-mt-static
+... boost_date_time-mt-static-debug
+... boost_date_time-shared
+... boost_date_time-shared-debug
+... boost_date_time-static
+... boost_date_time-static-debug
+... boost_filesystem
+... boost_filesystem-mt-shared
+... boost_filesystem-mt-shared-debug
+... boost_filesystem-mt-static
+... boost_filesystem-mt-static-debug
+... boost_filesystem-shared
+... boost_filesystem-shared-debug
+... boost_filesystem-static
+... boost_filesystem-static-debug
+[etc]</pre>
+</div>
+<p>You can build any target by passing it as an argument:</p>
+<div class="highlight-python"><pre>% make boost_signals-static
+[  0%] Building CXX object libs/signals/src/CMakeFiles/boost_signals-static.dir/trackable.cpp.o
+[  0%] Building CXX object libs/signals/src/CMakeFiles/boost_signals-static.dir/connection.cpp.o
+[100%] Building CXX object libs/signals/src/CMakeFiles/boost_signals-static.dir/named_slot_map.cpp.o
+[100%] Building CXX object libs/signals/src/CMakeFiles/boost_signals-static.dir/signal_base.cpp.o
+[100%] Building CXX object libs/signals/src/CMakeFiles/boost_signals-static.dir/slot.cpp.o
+Linking CXX static library ../../../lib/libboost_signals-gcc41-1_35.a
+[100%] Built target boost_signals-static</pre>
+</div>
+<div class="section" id="preprocessing">
+<h2>Preprocessing<a class="headerlink" href="#preprocessing" title="Permalink to this headline">¶</a></h2>
+<p>In build directories corresponding to a source library containing a
+<tt class="docutils literal"><span class="pre">CMakeLists.txt</span></tt> containing a <a class="reference external" href="reference/boost_add_library.html#boost-add-library-macro"><em>boost_add_library</em></a> invocation
+(e.g. <tt class="docutils literal"><span class="pre">build/libs/signals/src,</span> <span class="pre">build/libs/filesystem/src</span></tt>), more
+detailed targets are available:</p>
+<div class="highlight-python"><pre>% cd libs/signals/src
+% make help
+The following are some of the valid targets for this Makefile:
+  [many omitted]
+... signal_base.o
+... signal_base.i
+... signal_base.s
+... slot.o
+... slot.i
+... slot.s</pre>
+</div>
+<p>making <tt class="docutils literal"><span class="pre">slot.i</span></tt> will run <tt class="docutils literal"><span class="pre">slot.cpp</span></tt> through the preprocessor:</p>
+<div class="highlight-python"><pre>% make slot.i
+Preprocessing CXX source to CMakeFiles/boost_signals-mt-shared.dir/slot.cpp.i</pre>
+</div>
+<p>If you are always interested in seeing the compiler flags you can
+enable <tt class="docutils literal"><span class="pre">CMAKE_VERBOSE_MAKEFILES</span></tt> via <tt class="docutils literal"><span class="pre">ccmake</span></tt>, or for a one-off
+just pass <tt class="docutils literal"><span class="pre">VERBOSE=1</span></tt> on the command line:</p>
+<div class="highlight-python"><pre>% make VERBOSE=1 slot.i
+make[1]: Entering directory `/home/troy/Projects/boost/branches/CMake/Boost_1_35_0-build'
+Preprocessing CXX source to CMakeFiles/boost_signals-mt-shared.dir/slot.cpp.i
+cd /home/troy/Projects/boost/branches/CMake/Boost_1_35_0-build/libs/signals/src &amp;&amp; /usr/bin/gcc-4.1
+-DBOOST_ALL_NO_LIB=1 -DBOOST_SIGNALS_NO_LIB=1 -Dboost_signals_mt_shared_EXPORTS -fPIC
+-I/home/troy/Projects/boost/branches/CMake/Boost_1_35_0     -O3 -DNDEBUG -DBOOST_SIGNALS_DYN_LINK=1
+-pthread -D_REENTRANT -E /home/troy/Projects/boost/branches/CMake/Boost_1_35_0/libs/signals/src/slot.cpp &gt; CMakeFiles/boost_signals-mt-shared.dir/slot.cpp.i</pre>
+</div>
+</div>
+<div class="section" id="tests-and-examples">
+<h2>Tests and examples<a class="headerlink" href="#tests-and-examples" title="Permalink to this headline">¶</a></h2>
+<p>Tests and examples are typically grouped into subdirectories, e.g.:</p>
+<div class="highlight-python"><pre>libs/
+  iostreams/
+    test/
+    examples/</pre>
+</div>
+<p>CMake builds a parallel directory hierarchy in the build directory. If
+you are working on, say, the examples for iostreams, you can just
+<tt class="docutils literal"><span class="pre">cd</span></tt> into the directory $BUILDDIR/libs/iostreams/examples and type
+<tt class="docutils literal"><span class="pre">make</span></tt>:</p>
+<div class="highlight-python"><pre>% cd libs/iostreams/example
+% make
+[  0%] Built target boost_iostreams-mt-static
+Scanning dependencies of target iostreams-examples-boost_back_inserter_example
+[  0%] Building CXX object libs/iostreams/example/CMakeFiles/iostreams-examples-boost_back_inserter_example.dir/boost_back_inserter_example.cpp.o
+Linking CXX executable ../../../bin/iostreams-examples-boost_back_inserter_example
+[  0%] Built target iostreams-examples-boost_back_inserter_example
+Scanning dependencies of target iostreams-examples-container_device_example
+[  0%] Building CXX object libs/iostreams/example/CMakeFiles/iostreams-examples-container_device_example.dir/container_device_example.cpp.o
+Linking CXX executable ../../../bin/iostreams-examples-container_device_example
+[  0%] Built target iostreams-examples-container_device_example
+Scanning dependencies of target iostreams-examples-container_sink_example
+[  0%] Building CXX object libs/iostreams/example/CMakeFiles/iostreams-examples-container_sink_example.dir/container_sink_example.cpp.o</pre>
+</div>
+</div>
+<div class="section" id="building-individual-targets-ignoring-prerequisites">
+<h2>Building individual targets, ignoring prerequisites<a class="headerlink" href="#building-individual-targets-ignoring-prerequisites" title="Permalink to this headline">¶</a></h2>
+<p>If you find yourself working on a compiler error in a file that takes
+a long time to compile, waiting for make to check all of the
+prerequisites might become tedious.  You can have make skip the
+prerequisite testing (you do this at your own risk), by appending
+<tt class="docutils literal"><span class="pre">/fast</span></tt> to the target name.  For instance, bcp depends on the
+<tt class="docutils literal"><span class="pre">system</span></tt>, <tt class="docutils literal"><span class="pre">filesystem</span></tt> <tt class="docutils literal"><span class="pre">regex</span></tt> and <tt class="docutils literal"><span class="pre">prg_exec_monitor</span></tt>
+libraries:</p>
+<div class="highlight-python"><pre>% cd tools/bcp
+% make bcp
+[  0%] Built target boost_system-mt-static
+[  0%] Built target boost_filesystem-mt-static
+[ 50%] Built target boost_regex-mt-static
+[ 75%] Built target boost_prg_exec_monitor-mt-static
+[ 75%] Building CXX object tools/bcp/CMakeFiles/bcp.dir/add_path.cpp.o</pre>
+</div>
+<p>if I make <tt class="docutils literal"><span class="pre">bcp/fast</span></tt>, the dependencies are assumed to be built
+already:</p>
+<div class="highlight-python"><pre>% make bcp/fast
+[ 75%] Building CXX object tools/bcp/CMakeFiles/bcp.dir/add_path.cpp.o
+[ 75%] Building CXX object tools/bcp/CMakeFiles/bcp.dir/bcp_imp.cpp.o
+(etc)</pre>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="add_boost_library.html" title="Adding a Library Project"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="diff.html" title="Differences between this release and upstream"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

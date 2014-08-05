@@ -1,0 +1,1 @@
+boost_module(math DEPENDS format array)

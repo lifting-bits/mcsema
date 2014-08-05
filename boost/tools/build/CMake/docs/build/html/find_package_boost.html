@@ -1,0 +1,153 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>find_package(Boost) &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="index.html" />
+    <link rel="next" title="FAQ" href="faq.html" />
+    <link rel="prev" title="Customizing the install" href="install_customization.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="faq.html" title="FAQ"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="install_customization.html" title="Customizing the install"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="install_customization.html"
+                                  title="previous chapter">Customizing the install</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="faq.html"
+                                  title="next chapter">FAQ</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/find_package_boost.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <span class="target" id="index-145"></span><div class="section" id="find-package-boost">
+<span id="index-146"></span><span id="id1"></span><h1>find_package(Boost)<a class="headerlink" href="#find-package-boost" title="Permalink to this headline">¶</a></h1>
+<p>See <a class="reference external" href="install_customization.html#install-customization"><em>Customizing the install</em></a> for more information about variables
+used in this section.</p>
+<p>If you plan on using the <tt class="docutils literal"><span class="pre">FindBoost.cmake</span></tt> packaged with cmake
+versions 2.8.0 and earlier, (that is, third party packages that build
+with cmake need to find this boost installation via the cmake command
+<tt class="docutils literal"><span class="pre">find_package(Boost...</span></tt>), you will need to layout your boost
+installation in a way that is consistent with the way boost was
+installed by bjam during the many Dark Years.  Michael Jackson of
+bluequartz.net reports success with the configuration below.  He
+refers to boost.cmake variables <a class="reference external" href="install_customization.html#install-versioned"><em>INSTALL_VERSIONED</em></a>,
+<a class="reference external" href="install_customization.html#boost-include-install-dir"><em>BOOST_INCLUDE_INSTALL_DIR</em></a>, and <a class="reference external" href="install_customization.html#boost-lib-install-dir"><em>BOOST_LIB_INSTALL_DIR</em></a>:</p>
+<div class="highlight-python"><pre>&gt; Set INSTALL_VERSIONED=OFF
+&gt; set BOOST_INCLUDE_INSTALL_DIR=include/boost-1_41
+&gt; set BOOST_LIB_INSTALL_DIR=lib
+&gt;
+&gt; and then go. I also set an environment variable BOOST_ROOT to the
+&gt; CMAKE_INSTALL_PREFIX.
+&gt;
+&gt; In my CMake file I have the following;
+&gt;
+&gt; # ---------- Find Boost Headers/Libraries -----------------------
+&gt; SET (Boost_FIND_REQUIRED TRUE)
+&gt; SET (Boost_FIND_QUIETLY TRUE)
+&gt; set (Boost_USE_MULTITHREADED TRUE)
+&gt; set (Boost_USE_STATIC_LIBS TRUE)
+&gt; SET (Boost_ADDITIONAL_VERSIONS "1.41" "1.41.0")
+&gt;
+&gt; if ( NOT MXA_BOOST_HEADERS_ONLY)
+&gt;  set (MXA_BOOST_COMPONENTS program_options unit_test_framework
+&gt; test_exec_monitor)
+&gt; endif()
+&gt; FIND_PACKAGE(Boost COMPONENTS  ${MXA_BOOST_COMPONENTS} )
+&gt; INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIRS})
+&gt; LINK_DIRECTORIES(${Boost_LIBRARY_DIRS})
+&gt;
+&gt; This successfully works with the FindBoost.cmake that is included with CMake 2.6.4
+&gt;</pre>
+</div>
+<p>Currently in development there are other, perhaps easier, ways to
+detect your boost installations if you aren&#8217;t dependent on this older
+FindBoost; see <a class="reference external" href="exported_targets.html#exported-targets"><em>Tricks for Building against Boost with CMake</em></a>.</p>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="faq.html" title="FAQ"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="install_customization.html" title="Customizing the install"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

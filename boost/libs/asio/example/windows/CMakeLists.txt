@@ -1,0 +1,17 @@
+if(
+    WIN32
+)
+foreach(
+    example
+    transmit_file
+)
+boost_add_executable(
+    ${example}
+    DEPENDS
+    boost_system
+)
+endforeach(
+)
+endif(
+    WIN32
+)

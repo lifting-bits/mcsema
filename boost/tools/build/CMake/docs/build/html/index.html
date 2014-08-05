@@ -1,0 +1,377 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Boost-CMake 1.41.0.cmake0 &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="" />
+    <link rel="next" title="Quickstart" href="quickstart.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quickstart"
+             accesskey="N">next</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="">
+              <img class="logo" src="_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h3><a href="">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">Boost-CMake 1.41.0.cmake0</a></li>
+<li><a class="reference external" href="#users-s-guide">Users&#8217;s guide</a><ul>
+</ul>
+</li>
+<li><a class="reference external" href="#developer-s-guide">Developer&#8217;s guide</a><ul>
+</ul>
+</li>
+<li><a class="reference external" href="#reference">Reference</a><ul>
+</ul>
+</li>
+<li><a class="reference external" href="#about-this-documentation">About this documentation</a><ul>
+<li><a class="reference external" href="#release-checklist">Release checklist</a></li>
+<li><a class="reference external" href="#why-alt-boost">Why &#8220;alt.boost&#8221;?</a></li>
+</ul>
+</li>
+</ul>
+
+            <h4>Next topic</h4>
+            <p class="topless"><a href="quickstart.html"
+                                  title="next chapter">Quickstart</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/index.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="boost-cmake-release">
+<h1>Boost-CMake 1.41.0.cmake0<a class="headerlink" href="#boost-cmake-release" title="Permalink to this headline">¶</a></h1>
+<p>Boost.<a class="reference external" href="http://www.cmake.org">CMake</a> (or <a class="reference internal" href="#alt-boost"><em>alt.boost</em></a>) is the boost distribution that all the cool kids are
+using.  The effort started in earnest at <a class="reference external" href="http://www.boostcon.com">BoostCon &#8216;07</a>; by the end of which it was possible to do
+a basic build of boost with cmake.  In 2009, the project moved out to
+git version control.  Today, <tt class="docutils literal"><span class="pre">Boost.CMake</span></tt> is stable, mature, and
+supported by the developers, a large base of expert users, and
+occasionally by the authors of CMake itself.</p>
+<p id="index-131"><strong>boost-cmake mailing list</strong></p>
+<blockquote>
+<a class="reference external" href="http://lists.boost.org/mailman/listinfo.cgi/boost-cmake">http://lists.boost.org/mailman/listinfo.cgi/boost-cmake</a></blockquote>
+<p><strong>IRC</strong></p>
+<blockquote>
+<tt class="docutils literal"><span class="pre">#boost-cmake</span></tt> on the <a class="reference external" href="http://freenode.net">freenode network</a></blockquote>
+<p><strong>CMake home page</strong></p>
+<blockquote>
+<a class="reference external" href="http://www.cmake.org">http://www.cmake.org</a></blockquote>
+<p><strong>Source code</strong></p>
+<blockquote>
+Boost.CMake is distributed <em>separately</em> from upstream boost.  Code
+is in a <a class="reference external" href="http://git-scm.com">git</a> repository at
+<a class="reference external" href="http://gitorious.org/boost/cmake.git">http://gitorious.org/boost/cmake.git</a>.  These documents correspond to
+tag 1.41.0.cmake0.  See also <a class="reference external" href="git.html#hacking-cmake-with-git"><em>Hacking Boost.CMake with Git</em></a>.</blockquote>
+<p><strong>Tarballs</strong></p>
+<blockquote>
+Tarballs and zipfiles are available at
+<a class="reference external" href="http://sodium.resophonic.com/boost-cmake/">http://sodium.resophonic.com/boost-cmake/</a> in subdirectory 1.41.0.cmake0.</blockquote>
+</div>
+<div class="section" id="users-s-guide">
+<h1>Users&#8217;s guide<a class="headerlink" href="#users-s-guide" title="Permalink to this headline">¶</a></h1>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="quickstart.html">Quickstart</a><ul>
+<li class="toctree-l2"><a class="reference external" href="quickstart.html#download-cmake">Download CMake</a></li>
+<li class="toctree-l2"><a class="reference external" href="quickstart.html#checkout-download-the-code">Checkout / download the code</a></li>
+<li class="toctree-l2"><a class="reference external" href="quickstart.html#on-unix">On Unix</a><ul>
+<li class="toctree-l3"><a class="reference external" href="quickstart.html#configure">Configure</a></li>
+<li class="toctree-l3"><a class="reference external" href="quickstart.html#build-and-install">Build and Install</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference external" href="quickstart.html#windows">Windows</a><ul>
+<li class="toctree-l3"><a class="reference external" href="quickstart.html#configuration-for-visual-studio">Configuration for Visual Studio</a></li>
+<li class="toctree-l3"><a class="reference external" href="quickstart.html#configuration-for-nmake">Configuration for NMake</a></li>
+<li class="toctree-l3"><a class="reference external" href="quickstart.html#build-visual-studio">Build &#8211; Visual Studio</a></li>
+<li class="toctree-l3"><a class="reference external" href="quickstart.html#build-nmake">Build &#8211; NMake</a></li>
+<li class="toctree-l3"><a class="reference external" href="quickstart.html#installation">Installation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="build_configuration.html">Configuring the buildspace</a><ul>
+<li class="toctree-l2"><a class="reference external" href="build_configuration.html#configuration-tools">Configuration tools</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="build_configuration.html#cmakecache-txt">CMakeCache.txt</a><ul>
+<li class="toctree-l2"><a class="reference external" href="build_configuration.html#cmake-binary-dir">CMAKE_BINARY_DIR</a></li>
+<li class="toctree-l2"><a class="reference external" href="build_configuration.html#a-few-useful-options">A few useful options</a><ul>
+<li class="toctree-l3"><a class="reference external" href="build_configuration.html#cmake-osx-architectures">CMAKE_OSX_ARCHITECTURES</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_configuration.html#winmangle-libnames">WINMANGLE_LIBNAMES</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_configuration.html#build-projects">BUILD_PROJECTS</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_configuration.html#build-examples">BUILD_EXAMPLES</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_configuration.html#build-tools">BUILD_TOOLS</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_configuration.html#cmake-verbose-makefile">CMAKE_VERBOSE_MAKEFILE</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_configuration.html#cmake-cxx-compiler">CMAKE_CXX_COMPILER</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_configuration.html#build-soversioned">BUILD_SOVERSIONED</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="build_variants.html">Build Variants and Features</a><ul>
+<li class="toctree-l2"><a class="reference external" href="build_variants.html#name-mangling">Name Mangling</a></li>
+<li class="toctree-l2"><a class="reference external" href="build_variants.html#configuring-features">Configuring features</a><ul>
+<li class="toctree-l3"><a class="reference external" href="build_variants.html#enable-static">ENABLE_STATIC</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_variants.html#enable-shared">ENABLE_SHARED</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_variants.html#enable-debug">ENABLE_DEBUG</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_variants.html#enable-release">ENABLE_RELEASE</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_variants.html#enable-single-threaded">ENABLE_SINGLE_THREADED</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_variants.html#enable-multi-threaded">ENABLE_MULTI_THREADED</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_variants.html#enable-static-runtime">ENABLE_STATIC_RUNTIME</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_variants.html#enable-dynamic-runtime">ENABLE_DYNAMIC_RUNTIME</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference external" href="build_variants.html#per-feature-compilation-and-linker-options">Per-feature Compilation and Linker Options</a><ul>
+<li class="toctree-l3"><a class="reference external" href="build_variants.html#feature-compile-flags">feature_COMPILE_FLAGS</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_variants.html#feature-link-flags">feature_LINK_FLAGS</a></li>
+<li class="toctree-l3"><a class="reference external" href="build_variants.html#feature-link-libs">feature_LINK_LIBS</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference external" href="build_variants.html#default-variants">Default Variants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="exported_targets.html">Tricks for Building against Boost with CMake</a><ul>
+<li class="toctree-l2"><a class="reference external" href="exported_targets.html#with-an-uninstalled-build">With an uninstalled build</a><ul>
+<li class="toctree-l3"><a class="reference external" href="exported_targets.html#example">Example</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference external" href="exported_targets.html#with-an-installed-boost">With an installed boost</a><ul>
+<li class="toctree-l3"><a class="reference external" href="exported_targets.html#try-this-first">Try this first</a></li>
+<li class="toctree-l3"><a class="reference external" href="exported_targets.html#alternative-via-boost-dir">Alternative: via Boost_DIR</a></li>
+<li class="toctree-l3"><a class="reference external" href="exported_targets.html#multiple-versions-of-boost-installed">Multiple versions of boost installed</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="install_customization.html">Customizing the install</a><ul>
+<li class="toctree-l2"><a class="reference external" href="install_customization.html#cmake-install-prefix">CMAKE_INSTALL_PREFIX</a></li>
+<li class="toctree-l2"><a class="reference external" href="install_customization.html#lib-suffix">LIB_SUFFIX</a></li>
+<li class="toctree-l2"><a class="reference external" href="install_customization.html#install-versioned">INSTALL_VERSIONED</a></li>
+<li class="toctree-l2"><a class="reference external" href="install_customization.html#boost-lib-install-dir">BOOST_LIB_INSTALL_DIR</a></li>
+<li class="toctree-l2"><a class="reference external" href="install_customization.html#boost-include-install-dir">BOOST_INCLUDE_INSTALL_DIR</a></li>
+<li class="toctree-l2"><a class="reference external" href="install_customization.html#boost-cmake-infrastructure-install-dir">BOOST_CMAKE_INFRASTRUCTURE_INSTALL_DIR</a></li>
+<li class="toctree-l2"><a class="reference external" href="install_customization.html#boost-install-cmake-drivers">BOOST_INSTALL_CMAKE_DRIVERS</a></li>
+<li class="toctree-l2"><a class="reference external" href="install_customization.html#boost-cmake-drivers-install-dir">BOOST_CMAKE_DRIVERS_INSTALL_DIR</a></li>
+<li class="toctree-l2"><a class="reference external" href="install_customization.html#boost-exports-file">BOOST_EXPORTS_FILE</a></li>
+<li class="toctree-l2"><a class="reference external" href="install_customization.html#boost-exports-install-dir">BOOST_EXPORTS_INSTALL_DIR</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="find_package_boost.html">find_package(Boost)</a></li>
+<li class="toctree-l1"><a class="reference external" href="faq.html">FAQ</a><ul>
+<li class="toctree-l2"><a class="reference external" href="faq.html#how-do-i-set-d-secure-scl-0-on-the-commandline-for-release-builds">How do I set <tt class="docutils literal"><span class="pre">/D</span> <span class="pre">_SECURE_SCL=0</span></tt> on the commandline for release builds?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="externals/index.html">External Dependencies</a><ul>
+<li class="toctree-l2"><a class="reference external" href="externals/bzip2.html">BZip2</a></li>
+<li class="toctree-l2"><a class="reference external" href="externals/doxygen.html">Doxygen</a></li>
+<li class="toctree-l2"><a class="reference external" href="externals/expat.html">Expat</a></li>
+<li class="toctree-l2"><a class="reference external" href="externals/icu.html">ICU (International Components for Unicode)</a></li>
+<li class="toctree-l2"><a class="reference external" href="externals/mpi.html">MPI</a></li>
+<li class="toctree-l2"><a class="reference external" href="externals/python.html">Python</a><ul>
+<li class="toctree-l3"><a class="reference external" href="externals/python.html#python-executable">PYTHON_EXECUTABLE</a></li>
+<li class="toctree-l3"><a class="reference external" href="externals/python.html#python-debug-libraries">PYTHON_DEBUG_LIBRARIES</a></li>
+<li class="toctree-l3"><a class="reference external" href="externals/python.html#python-libraries">PYTHON_LIBRARIES</a></li>
+<li class="toctree-l3"><a class="reference external" href="externals/python.html#python-include-path">PYTHON_INCLUDE_PATH</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference external" href="externals/xsltproc.html">Xsltproc</a></li>
+<li class="toctree-l2"><a class="reference external" href="externals/valgrind.html">Valgrind</a></li>
+<li class="toctree-l2"><a class="reference external" href="externals/zlib.html">Zlib</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="git.html">Hacking Boost.CMake with Git</a><ul>
+<li class="toctree-l2"><a class="reference external" href="git.html#i-just-want-to-try-the-head-of-the-whatever-branch">I just want to try the HEAD of the &lt;whatever&gt; branch</a></li>
+<li class="toctree-l2"><a class="reference external" href="git.html#i-want-to-svn-update">I want to svn update</a></li>
+<li class="toctree-l2"><a class="reference external" href="git.html#but-i-want-a-different-branch-than-that">But I want a different branch than that</a></li>
+<li class="toctree-l2"><a class="reference external" href="git.html#i-have-changes-how-do-i-make-a-patch">I have changes, how do I make a patch?</a></li>
+<li class="toctree-l2"><a class="reference external" href="git.html#oops-i-screwed-up-and-want-to-revert">Oops, I screwed up and want to revert</a></li>
+<li class="toctree-l2"><a class="reference external" href="git.html#i-want-to-switch-branches">I want to switch branches</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="diff.html">Differences between this release and upstream</a></li>
+</ul>
+</div>
+<div class="section" id="developer-s-guide">
+<h1>Developer&#8217;s guide<a class="headerlink" href="#developer-s-guide" title="Permalink to this headline">¶</a></h1>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="individual_libraries.html">Building individual libraries with cmake</a><ul>
+<li class="toctree-l2"><a class="reference external" href="individual_libraries.html#preprocessing">Preprocessing</a></li>
+<li class="toctree-l2"><a class="reference external" href="individual_libraries.html#tests-and-examples">Tests and examples</a></li>
+<li class="toctree-l2"><a class="reference external" href="individual_libraries.html#building-individual-targets-ignoring-prerequisites">Building individual targets, ignoring prerequisites</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="add_boost_library.html">Adding a Library Project</a></li>
+<li class="toctree-l1"><a class="reference external" href="add_compiled_library.html">Adding a Compiled Library to CMake</a><ul>
+<li class="toctree-l2"><a class="reference external" href="add_compiled_library.html#compilation-flags">Compilation Flags</a></li>
+<li class="toctree-l2"><a class="reference external" href="add_compiled_library.html#linking-to-other-boost-libraries">Linking to Other Boost Libraries</a></li>
+<li class="toctree-l2"><a class="reference external" href="add_compiled_library.html#linking-external-libraries-optional-sources">Linking External Libraries/Optional Sources</a></li>
+<li class="toctree-l2"><a class="reference external" href="add_compiled_library.html#build-variants">Build Variants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="testing.html">Testing</a><ul>
+<li class="toctree-l2"><a class="reference external" href="testing.html#build-tests">BUILD_TESTS</a></li>
+<li class="toctree-l2"><a class="reference external" href="testing.html#build">Build</a></li>
+<li class="toctree-l2"><a class="reference external" href="testing.html#test">Test</a><ul>
+<li class="toctree-l3"><a class="reference external" href="testing.html#unix-and-nmake">Unix and nmake</a></li>
+<li class="toctree-l3"><a class="reference external" href="testing.html#visual-studio">Visual Studio</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference external" href="testing.html#targets">Targets</a></li>
+<li class="toctree-l2"><a class="reference external" href="testing.html#the-dashboard">The Dashboard</a></li>
+<li class="toctree-l2"><a class="reference external" href="testing.html#submitting-results">Submitting Results</a></li>
+<li class="toctree-l2"><a class="reference external" href="testing.html#automatic-testing">Automatic testing</a><ul>
+<li class="toctree-l3"><a class="reference external" href="testing.html#continuous">Continuous</a></li>
+<li class="toctree-l3"><a class="reference external" href="testing.html#nightly">Nightly</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="adding_regression_tests.html">Adding Regression Tests</a></li>
+<li class="toctree-l1"><a class="reference external" href="build_installer.html">Building a Binary Installer</a></li>
+<li class="toctree-l1"><a class="reference external" href="notes_by_version.html">Notes by Boost Version</a><ul>
+<li class="toctree-l2"><a class="reference external" href="notes_by_version.html#cmake1">1.41.0.cmake1</a></li>
+<li class="toctree-l2"><a class="reference external" href="notes_by_version.html#beta1-cmake1">1.41.0.beta1.cmake1</a></li>
+<li class="toctree-l2"><a class="reference external" href="notes_by_version.html#cmakebeta4">1.41.0.cmakebeta4</a></li>
+<li class="toctree-l2"><a class="reference external" href="notes_by_version.html#cmakebeta3">1.41.0.cmakebeta3</a></li>
+<li class="toctree-l2"><a class="reference external" href="notes_by_version.html#upstream">1.41.0 (upstream)</a></li>
+<li class="toctree-l2"><a class="reference external" href="notes_by_version.html#cmake4">1.40.0.cmake4</a></li>
+<li class="toctree-l2"><a class="reference external" href="notes_by_version.html#cmake3">1.40.0.cmake3</a></li>
+<li class="toctree-l2"><a class="reference external" href="notes_by_version.html#cmake2">1.40.0.cmake2</a></li>
+<li class="toctree-l2"><a class="reference external" href="notes_by_version.html#id1">1.40.0.cmake1</a></li>
+<li class="toctree-l2"><a class="reference external" href="notes_by_version.html#cmake0">1.40.0.cmake0</a></li>
+<li class="toctree-l2"><a class="reference external" href="notes_by_version.html#id2">1.40.0</a></li>
+<li class="toctree-l2"><a class="reference external" href="notes_by_version.html#and-1-39-0">1.38.0 and 1.39.0</a><ul>
+<li class="toctree-l3"><a class="reference external" href="notes_by_version.html#known-issues">Known Issues</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference external" href="notes_by_version.html#id3">1.35.0 - 1.37</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="reference">
+<h1>Reference<a class="headerlink" href="#reference" title="Permalink to this headline">¶</a></h1>
+<ul>
+<li class="toctree-l1"><a class="reference external" href="reference/boost_library_project.html">boost_library_project</a></li>
+<li class="toctree-l1"><a class="reference external" href="reference/boost_module.html">boost_module</a></li>
+<li class="toctree-l1"><a class="reference external" href="reference/boost_add_library.html">boost_add_library</a></li>
+<li class="toctree-l1"><a class="reference external" href="reference/boost_add_executable.html">boost_add_executable</a></li>
+<li class="toctree-l1"><a class="reference external" href="reference/boost_python_module.html">boost_python_module</a></li>
+<li class="toctree-l1"><a class="reference external" href="reference/boost_additional_test_dependencies.html">boost_additional_test_dependencies</a></li>
+<li class="toctree-l1"><a class="reference external" href="reference/boost_test_compile.html">boost_test_compile</a></li>
+<li class="toctree-l1"><a class="reference external" href="reference/boost_test_compile_fail.html">boost_test_compile_fail</a></li>
+<li class="toctree-l1"><a class="reference external" href="reference/boost_test_run.html">boost_test_run</a></li>
+<li class="toctree-l1"><a class="reference external" href="reference/boost_test_run_fail.html">boost_test_run_fail</a></li>
+</ul>
+</div>
+<div class="section" id="about-this-documentation">
+<h1>About this documentation<a class="headerlink" href="#about-this-documentation" title="Permalink to this headline">¶</a></h1>
+<p>This documentation was created with <a class="reference external" href="http://sphinx.pocoo.org">Sphinx</a>.</p>
+<p>The source is in the restructuredtext files in subdirectory
+<tt class="docutils literal"><span class="pre">tools/build/CMake/docs/source/</span></tt>.  Hack on them (see the
+<a class="reference external" href="http://sphinx.pocoo.org/contents.html">documentation for Sphinx</a>).
+When you&#8217;re ready to see the html:</p>
+<div class="highlight-python"><pre>make html</pre>
+</div>
+<p>Once you&#8217;ve written a ton of docs, push them someplace where I can see
+them (or use <tt class="docutils literal"><span class="pre">git</span> <span class="pre">diff</span></tt> to send a patch).</p>
+<div class="section" id="release-checklist">
+<h2>Release checklist<a class="headerlink" href="#release-checklist" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>Update <tt class="docutils literal"><span class="pre">BOOST_CMAKE_VERSION</span></tt> in toplevel <tt class="docutils literal"><span class="pre">CMakeLists.txt</span></tt></li>
+<li>Update notes by version in <tt class="docutils literal"><span class="pre">tools/build/CMake/docs/notes_by_version.rst</span></tt></li>
+<li>Reconfig cmake with <tt class="docutils literal"><span class="pre">BOOST_MAINTAINER</span></tt> set to ON</li>
+<li>set UPSTREAM_TAG in root <tt class="docutils literal"><span class="pre">CMakeLists.txt</span></tt></li>
+<li>make make-diff</li>
+<li>Rebuild docs and commit</li>
+<li>Tag commit with <tt class="docutils literal"><span class="pre">BOOST_CMAKE_VERSION</span></tt></li>
+<li><tt class="docutils literal"><span class="pre">make</span> <span class="pre">do-release</span></tt></li>
+<li>push tag</li>
+<li>update wiki</li>
+</ul>
+</div>
+<div class="section" id="why-alt-boost">
+<span id="alt-boost"></span><span id="index-132"></span><h2>Why &#8220;alt.boost&#8221;?<a class="headerlink" href="#why-alt-boost" title="Permalink to this headline">¶</a></h2>
+<p>The &#8216;alt&#8217; is a reference to the <tt class="docutils literal"><span class="pre">alt.*</span></tt> Usenet hierarchy.  Here, as
+in Usenet, <em>alt</em> stands for <a class="reference external" href="http://nylon.net/alt/index.htm">Anarchists, Lunatics and Terrorists</a>.  This independent effort explores
+and applies alternate techniques/technologies in the areas of build,
+version control, testing, packaging, documentation and release
+management.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quickstart"
+             >next</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

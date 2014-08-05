@@ -1,0 +1,189 @@
+[/
+  (C) Copyright 2008-11 Anthony Williams.
+  Distributed under the Boost Software License, Version 1.0.
+  (See accompanying file LICENSE_1_0.txt or copy at
+  http://www.boost.org/LICENSE_1_0.txt).
+]
+
+[section:futures Futures]
+
+[template future_state_link[link_text] [link thread.synchronization.futures.reference.future_state [link_text]]]
+[def __uninitialized__ [future_state_link `boost::future_state::uninitialized`]]
+[def __ready__ [future_state_link `boost::future_state::ready`]]
+[def __waiting__ [future_state_link `boost::future_state::waiting`]]
+
+[def __future_uninitialized__ `boost::future_uninitialized`]
+[def __broken_promise__ `boost::broken_promise`]
+[def __future_already_retrieved__ `boost::future_already_retrieved`]
+[def __task_moved__ `boost::task_moved`]
+[def __task_already_started__ `boost::task_already_started`]
+[def __promise_already_satisfied__ `boost::promise_already_satisfied`]
+
+[def __thread_interrupted__ `boost::thread_interrupted`]
+
+
+[template unique_future_link[link_text] [link thread.synchronization.futures.reference.unique_future [link_text]]]
+[def __unique_future__ [unique_future_link `future`]]
+[def __unique_future `future`]
+
+[template unique_future_get_link[link_text] [link thread.synchronization.futures.reference.unique_future.get [link_text]]]
+[def __unique_future_get__ [unique_future_get_link `boost::future<R>::get()`]]
+
+[template unique_future_wait_link[link_text] [link thread.synchronization.futures.reference.unique_future.wait [link_text]]]
+[def __unique_future_wait__ [unique_future_wait_link `boost::future<R>::wait()`]]
+
+[template unique_future_is_ready_link[link_text] [link thread.synchronization.futures.reference.unique_future.is_ready [link_text]]]
+[def __unique_future_is_ready__ [unique_future_is_ready_link `boost::future<R>::is_ready()`]]
+
+[template unique_future_has_value_link[link_text] [link thread.synchronization.futures.reference.unique_future.has_value [link_text]]]
+[def __unique_future_has_value__ [unique_future_has_value_link `boost::future<R>::has_value()`]]
+
+[template unique_future_has_exception_link[link_text] [link thread.synchronization.futures.reference.unique_future.has_exception [link_text]]]
+[def __unique_future_has_exception__ [unique_future_has_exception_link `boost::future<R>::has_exception()`]]
+
+[template unique_future_get_state_link[link_text] [link thread.synchronization.futures.reference.unique_future.get_state [link_text]]]
+[def __unique_future_get_state__ [unique_future_get_state_link `boost::future<R>::get_state()`]]
+
+[template shared_future_link[link_text] [link thread.synchronization.futures.reference.shared_future [link_text]]]
+[def __shared_future__ [shared_future_link `boost::shared_future`]]
+
+[template shared_future_get_link[link_text] [link thread.synchronization.futures.reference.shared_future.get [link_text]]]
+[def __shared_future_get__ [shared_future_get_link `boost::shared_future<R>::get()`]]
+
+[template shared_future_wait_link[link_text] [link thread.synchronization.futures.reference.shared_future.wait [link_text]]]
+[def __shared_future_wait__ [shared_future_wait_link `boost::shared_future<R>::wait()`]]
+
+[template shared_future_is_ready_link[link_text] [link thread.synchronization.futures.reference.shared_future.is_ready [link_text]]]
+[def __shared_future_is_ready__ [shared_future_is_ready_link `boost::shared_future<R>::is_ready()`]]
+
+[template shared_future_has_value_link[link_text] [link thread.synchronization.futures.reference.shared_future.has_value [link_text]]]
+[def __shared_future_has_value__ [shared_future_has_value_link `boost::shared_future<R>::has_value()`]]
+
+[template shared_future_has_exception_link[link_text] [link thread.synchronization.futures.reference.shared_future.has_exception [link_text]]]
+[def __shared_future_has_exception__ [shared_future_has_exception_link `boost::shared_future<R>::has_exception()`]]
+
+[template shared_future_get_state_link[link_text] [link thread.synchronization.futures.reference.shared_future.get_state [link_text]]]
+[def __shared_future_get_state__ [shared_future_get_state_link `boost::shared_future<R>::get_state()`]]
+
+[template promise_link[link_text] [link thread.synchronization.futures.reference.promise [link_text]]]
+[def __promise__ [promise_link `boost::promise`]]
+
+[template packaged_task_link[link_text] [link thread.synchronization.futures.reference.packaged_task [link_text]]]
+[def __packaged_task__ [packaged_task_link `boost::packaged_task`]]
+[def __packaged_task [packaged_task_link `boost::packaged_task`]]
+
+[template wait_for_any_link[link_text] [link thread.synchronization.futures.reference.wait_for_any [link_text]]]
+[def __wait_for_any__ [wait_for_any_link `boost::wait_for_any()`]]
+
+[template wait_for_all_link[link_text] [link thread.synchronization.futures.reference.wait_for_all [link_text]]]
+[def __wait_for_all__ [wait_for_all_link `boost::wait_for_all()`]]
+
+
+[section:overview Overview]
+
+The futures library provides a means of handling synchronous future values, whether those values are generated by another thread, or
+on a single thread in response to external stimuli, or on-demand.
+
+This is done through the provision of four class templates: __unique_future__ and __shared_future__ which are used to retrieve the
+asynchronous results, and __promise__ and __packaged_task__ which are used to generate the asynchronous results.
+
+An instance of __unique_future__ holds the one and only reference to a result. Ownership can be transferred between instances using
+the move constructor or move-assignment operator, but at most one instance holds a reference to a given asynchronous result. When
+the result is ready, it is returned from __unique_future_get__ by rvalue-reference to allow the result to be moved or copied as
+appropriate for the type.
+
+On the other hand, many instances of __shared_future__ may reference the same result. Instances can be freely copied and assigned,
+and __shared_future_get__ returns a `const` reference so that multiple calls to __shared_future_get__ are safe. You can move an
+instance of __unique_future__ into an instance of __shared_future__, thus transferring ownership of the associated asynchronous
+result, but not vice-versa.
+
+You can wait for futures either individually or with one of the __wait_for_any__ and __wait_for_all__ functions.
+
+[endsect]
+
+[section:creating Creating asynchronous values]
+
+You can set the value in a future with either a __promise__ or a __packaged_task__. A __packaged_task__ is a callable object that
+wraps a function or callable object. When the packaged task is invoked, it invokes the contained function in turn, and populates a
+future with the return value. This is an answer to the perennial question: "how do I return a value from a thread?": package the
+function you wish to run as a __packaged_task__ and pass the packaged task to the thread constructor. The future retrieved from the
+packaged task can then be used to obtain the return value. If the function throws an exception, that is stored in the future in
+place of the return value.
+
+    int calculate_the_answer_to_life_the_universe_and_everything()
+    {
+        return 42;
+    }
+
+    boost::packaged_task<int> pt(calculate_the_answer_to_life_the_universe_and_everything);
+    boost::__unique_future__<int> fi=pt.get_future();
+
+    boost::thread task(boost::move(pt)); // launch task on a thread
+
+    fi.wait(); // wait for it to finish
+        
+    assert(fi.is_ready());
+    assert(fi.has_value());
+    assert(!fi.has_exception());
+    assert(fi.get_state()==boost::future_state::ready);
+    assert(fi.get()==42);
+
+
+A __promise__ is a bit more low level: it just provides explicit functions to store a value or an exception in the associated
+future. A promise can therefore be used where the value may come from more than one possible source, or where a single operation may
+produce multiple values.
+
+    boost::promise<int> pi;
+    boost::__unique_future__<int> fi;
+    fi=pi.get_future();
+
+    pi.set_value(42);
+    
+    assert(fi.is_ready());
+    assert(fi.has_value());
+    assert(!fi.has_exception());
+    assert(fi.get_state()==boost::future_state::ready);
+    assert(fi.get()==42);
+
+[endsect]
+
+[section:lazy_futures Wait Callbacks and Lazy Futures]
+
+Both __promise__ and __packaged_task__ support ['wait callbacks] that are invoked when a thread blocks in a call to `wait()` or
+`timed_wait()` on a future that is waiting for the result from the __promise__ or __packaged_task__, in the thread that is doing the
+waiting. These can be set using the `set_wait_callback()` member function on the __promise__ or __packaged_task__ in question.
+
+This allows ['lazy futures] where the result is not actually computed until it is needed by some thread. In the example below, the
+call to `f.get()` invokes the callback `invoke_lazy_task`, which runs the task to set the value. If you remove the call to
+`f.get()`, the task is not ever run.
+
+    int calculate_the_answer_to_life_the_universe_and_everything()
+    {
+        return 42;
+    }
+
+    void invoke_lazy_task(boost::packaged_task<int>& task)
+    {
+        try
+        {
+            task();
+        }
+        catch(boost::task_already_started&)
+        {}
+    }
+
+    int main()
+    {
+        boost::packaged_task<int> task(calculate_the_answer_to_life_the_universe_and_everything);
+        task.set_wait_callback(invoke_lazy_task);
+        boost::__unique_future__<int> f(task.get_future());
+
+        assert(f.get()==42);
+    }
+
+
+[endsect]
+
+[include future_ref.qbk]
+
+[endsect]

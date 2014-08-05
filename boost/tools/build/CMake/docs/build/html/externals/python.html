@@ -1,0 +1,180 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Python &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="../_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="../index.html" />
+    <link rel="up" title="External Dependencies" href="index.html" />
+    <link rel="next" title="Xsltproc" href="xsltproc.html" />
+    <link rel="prev" title="MPI" href="mpi.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="xsltproc.html" title="Xsltproc"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="mpi.html" title="MPI"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="../index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+
+          <li><a href="index.html" accesskey="U">External Dependencies</a> &raquo;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h3><a href="../index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">Python</a><ul>
+<li><a class="reference external" href="#python-executable">PYTHON_EXECUTABLE</a></li>
+<li><a class="reference external" href="#python-debug-libraries">PYTHON_DEBUG_LIBRARIES</a></li>
+<li><a class="reference external" href="#python-libraries">PYTHON_LIBRARIES</a></li>
+<li><a class="reference external" href="#python-include-path">PYTHON_INCLUDE_PATH</a></li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="mpi.html"
+                                  title="previous chapter">MPI</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="xsltproc.html"
+                                  title="next chapter">Xsltproc</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="../_sources/externals/python.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="python">
+<span id="python-external"></span><span id="index-35"></span><h1>Python<a class="headerlink" href="#python" title="Permalink to this headline">¶</a></h1>
+<p>By default, Boost.CMake will use the python detection built in to
+cmake.  The relevant variables (command line or environment) are:</p>
+<div class="section" id="python-executable">
+<span id="index-36"></span><span id="id1"></span><h2>PYTHON_EXECUTABLE<a class="headerlink" href="#python-executable" title="Permalink to this headline">¶</a></h2>
+<p>The path to the python executable, e.g. <tt class="docutils literal"><span class="pre">/usr/local/Python-3.1.1/bin/python3</span></tt></p>
+</div>
+<div class="section" id="python-debug-libraries">
+<span id="index-37"></span><span id="id2"></span><h2>PYTHON_DEBUG_LIBRARIES<a class="headerlink" href="#python-debug-libraries" title="Permalink to this headline">¶</a></h2>
+<p>The path to the python debug library,  typically only used by developers.</p>
+</div>
+<div class="section" id="python-libraries">
+<span id="index-38"></span><span id="id3"></span><h2>PYTHON_LIBRARIES<a class="headerlink" href="#python-libraries" title="Permalink to this headline">¶</a></h2>
+<p>The path to the python library,
+e.g. <tt class="docutils literal"><span class="pre">/usr/local/Python-3.1.1/lib/libpython3.1.so</span></tt></p>
+<span class="target" id="index-39"></span></div>
+<div class="section" id="python-include-path">
+<span id="index-40"></span><span id="id4"></span><h2>PYTHON_INCLUDE_PATH<a class="headerlink" href="#python-include-path" title="Permalink to this headline">¶</a></h2>
+<p>The path to the include directory,
+e.g. <tt class="docutils literal"><span class="pre">/usr/local/Python-3.1.1/include/python3.1</span></tt>.  Note that cmake
+will check for the file <tt class="docutils literal"><span class="pre">Python.h</span></tt> in this directory and complain if
+it is not found.</p>
+<p>There are two ways to specify these, on the command line or via
+environment variables.  Environment variables will override command
+line flags if present.</p>
+<p class="rubric">Command line</p>
+<div class="highlight-python"><pre>% cmake ../src -DPYTHON_EXECUTABLE=/path/to/bin/python3          \
+               -DPYTHON_LIBRARIES=/path/to/libpython3.1.so       \
+               -DPYTHON_INCLUDE_PATH=/path/to/include/python3.1</pre>
+</div>
+<p class="rubric">Exported environment variables</p>
+<div class="highlight-python"><pre>% export PYTHON_EXECUTABLE=/path/to/bin/python
+% export PYTHON_LIBRARIES=/path/to/libpython3.1.so
+% export PYTHON_INCLUDE_PATH=/path/to/include/python3.1
+% cmake ../src</pre>
+</div>
+<p>Either way, in the configuration output, you should see something
+like:</p>
+<div class="highlight-python"><pre>-- Testing PYTHON_EXECUTABLE from environment
+-- Ok, using /path/to/bin/python3
+-- Testing PYTHON_LIBRARIES from environment
+-- Ok, using /path/to/lib/libpython3.1.so.
+-- Skipping optional PYTHON_DEBUG_LIBRARIES:  not set.
+-- Testing PYTHON_INCLUDE_PATH from environment
+-- Ok, using /path/to/include/python3.1
+-- Python:
+--   executable:   /path/to/bin/python3
+--   lib:          /path/to/lib/libpython3.1.so
+--   debug lib:
+--   include path: /path/to/include/python3.1</pre>
+</div>
+<p><strong>NOTE</strong>, once successfully detected, the python configuration will
+not be redetected.  To modify, edit the relevant entries in your
+CMakeCache.txt, or delete it entirely to trigger redetection.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="xsltproc.html" title="Xsltproc"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="mpi.html" title="MPI"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="../index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+
+          <li><a href="index.html" >External Dependencies</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

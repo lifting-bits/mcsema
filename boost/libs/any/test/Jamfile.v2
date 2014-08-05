@@ -1,0 +1,14 @@
+#  Copyright Vladimur Prus 2005. Use, modification and
+#  distribution is subject to the Boost Software License, Version
+#  1.0. (See accompanying file LICENSE_1_0.txt or copy at
+#  http://www.boost.org/LICENSE_1_0.txt)
+#
+# For more information, see http://www.boost.org/libs/any
+#
+
+test-suite any :
+    [ run ../any_test.cpp ]
+    [ compile-fail any_cast_cv_failed.cpp ]
+    ;
+
+

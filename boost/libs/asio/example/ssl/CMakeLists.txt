@@ -1,0 +1,17 @@
+foreach(
+    example
+    server
+    client
+)
+boost_add_executable(
+    ${example}
+    LINK_LIBS
+    crypto
+    ssl
+    DEPENDS
+    boost_system
+    TARGET_PREFIX
+    "ssl-"
+)
+endforeach(
+)

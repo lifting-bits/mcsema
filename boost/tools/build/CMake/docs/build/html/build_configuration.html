@@ -1,0 +1,369 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Configuring the buildspace &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="index.html" />
+    <link rel="next" title="Build Variants and Features" href="build_variants.html" />
+    <link rel="prev" title="Quickstart" href="quickstart.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="build_variants.html" title="Build Variants and Features"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quickstart"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">Configuring the buildspace</a><ul>
+<li><a class="reference external" href="#configuration-tools">Configuration tools</a></li>
+</ul>
+</li>
+<li><a class="reference external" href="#cmakecache-txt">CMakeCache.txt</a><ul>
+<li><a class="reference external" href="#cmake-binary-dir">CMAKE_BINARY_DIR</a></li>
+<li><a class="reference external" href="#a-few-useful-options">A few useful options</a><ul>
+<li><a class="reference external" href="#cmake-osx-architectures">CMAKE_OSX_ARCHITECTURES</a></li>
+<li><a class="reference external" href="#winmangle-libnames">WINMANGLE_LIBNAMES</a></li>
+<li><a class="reference external" href="#build-projects">BUILD_PROJECTS</a></li>
+<li><a class="reference external" href="#build-examples">BUILD_EXAMPLES</a></li>
+<li><a class="reference external" href="#build-tools">BUILD_TOOLS</a></li>
+<li><a class="reference external" href="#cmake-verbose-makefile">CMAKE_VERBOSE_MAKEFILE</a></li>
+<li><a class="reference external" href="#cmake-cxx-compiler">CMAKE_CXX_COMPILER</a></li>
+<li><a class="reference external" href="#build-soversioned">BUILD_SOVERSIONED</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="quickstart.html"
+                                  title="previous chapter">Quickstart</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="build_variants.html"
+                                  title="next chapter">Build Variants and Features</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/build_configuration.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="configuring-the-buildspace">
+<span id="configure-and-build"></span><h1>Configuring the buildspace<a class="headerlink" href="#configuring-the-buildspace" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="configuration-tools">
+<h2>Configuration tools<a class="headerlink" href="#configuration-tools" title="Permalink to this headline">¶</a></h2>
+<p>Included in the standard cmake distribution are the Windows <cite>CMake</cite>
+gui and the unix <cite>ccmake</cite> curses interface, which allow one to
+configure various aspects of the cmake build.  On Microsoft Windows
+run the CMake configuration program from the Start menu.</p>
+<p>Having done the initial configuration step as in <a class="reference external" href="quickstart.html#quickstart"><em>Quickstart</em></a>,
+on unix run:</p>
+<div class="highlight-python"><pre>make edit_cache</pre>
+</div>
+<p>in the binary directory.  On windows just run the cmake gui and choose
+the binary dir from the pulldown menu.  You will be presented with a list of editable build options something
+like this:</p>
+<div class="highlight-python"><pre>BOOST_PLATFORM                   linux
+BUILD_BCP                        ON
+BUILD_BOOST_WSERIALIZATION       ON
+BUILD_EXAMPLES                   NONE
+BUILD_INSPECT                    ON
+BUILD_TESTS                      NONE
+CMAKE_BUILD_TYPE                 Release
+CMAKE_INSTALL_PREFIX             /usr/local
+DART_TESTING_TIMEOUT             15
+DEBUG_COMPILE_FLAGS              -g
+DOCBOOK_AUTOCONFIG               OFF
+DOCBOOK_DTD_DIR                  DOCBOOK_DTD_DIR-NOTFOUND
+DOCBOOK_XSL_DIR                  DOCBOOK_XSL_DIR-NOTFOUND
+ENABLE_DEBUG                     ON
+ENABLE_MULTI_THREADED            ON
+ENABLE_RELEASE                   ON
+ENABLE_SHARED                    ON
+ENABLE_SINGLE_THREADED           OFF
+ENABLE_STATIC                    ON
+RELEASE_COMPILE_FLAGS            -O3 -DNDEBUG
+UNZIP                            /usr/bin/unzip
+WINMANGLE_LIBNAMES               OFF
+XSLTPROC                         /usr/bin/xsltproc
+XSLTPROC_FLAGS                   --xinclude</pre>
+</div>
+<p>On windows, the configurables will be right in the middle of the gui;
+can&#8217;t miss &#8216;em.  Note the <tt class="docutils literal"><span class="pre">[t]</span></tt> key to toggle &#8216;advanced mode&#8217; which
+will show more options (on windows this is a selection box that says
+<tt class="docutils literal"><span class="pre">Simple</span> <span class="pre">View</span></tt> by default, pull it down to see Advanced and Grouped
+views).</p>
+<p>Use the arrow keys to select particular options.  Press <tt class="docutils literal"><span class="pre">c</span></tt> (for
+(c)onfigure) to perform the preliminary configuration of the CMake
+build system when you are done.  When the options you have selected
+have stabilized, CMake will give you the (g)enerate option. If you do
+not see this option, press <tt class="docutils literal"><span class="pre">c</span></tt> again to reconfigure.  Try the
+<tt class="docutils literal"><span class="pre">t</span></tt> key to see more options.  When you&#8217;re done press <tt class="docutils literal"><span class="pre">g</span></tt> to
+generate makefiles and exit.</p>
+<p>See <a class="reference external" href="build_variants.html#variants"><em>Build Variants and Features</em></a> for information about the feature-specific options
+(ie <tt class="docutils literal"><span class="pre">ENABLE_whatever</span></tt> listed above.)</p>
+</div>
+</div>
+<div class="section" id="cmakecache-txt">
+<span id="id1"></span><h1>CMakeCache.txt<a class="headerlink" href="#cmakecache-txt" title="Permalink to this headline">¶</a></h1>
+<p>The same information is stored in a file <cite>CMakeCache.txt</cite> located in
+the build directory.  For this reason, after you&#8217;ve done the initial
+configuration of a build directory you can invoke <cite>ccmake</cite> like this:</p>
+<div class="highlight-python"><pre>ccmake &lt;path-to-build&gt;</pre>
+</div>
+<p>or have the makefiles do it for you:</p>
+<div class="highlight-python"><pre>make edit_cache</pre>
+</div>
+<p>The CMakeCache.txt file is hand-editable, though this is usually not
+as convenient as the cmake-supplied configuration tools mentioned
+above.  An excerpt of this file:</p>
+<div class="highlight-python"><pre>//
+// Enable/Disable color output during build.
+//
+CMAKE_COLOR_MAKEFILE:BOOL=ON
+
+//
+// Mangle lib names for windows, e.g., boost_filesystem-gcc41-1_34
+//
+WINMANGLE_LIBNAMES:BOOL=ON</pre>
+</div>
+<p>On unix, (?windows too?) the generated makefiles will detect if this
+file has been edited and will automatically rerun the makefile
+generation phase.  If you should need to trigger this regeneration
+manually you may execute</p>
+<div class="highlight-python"><pre>make rebuild_cache</pre>
+</div>
+<p class="rubric">Deleting the cache</p>
+<p>You may find yourself wanting to start from scratch, for instance if
+you want to switch from using Visual Studio to using NMake.  To do
+this, <strong>delete the cache file</strong>.  On windows, there is a <em>Delete
+Cache</em> option in the CMake gui&#8217;s <em>File</em> menu.  On unix you can simply
+<tt class="docutils literal"><span class="pre">rm</span> <span class="pre">CMakeCache.txt</span></tt>.</p>
+<div class="section" id="cmake-binary-dir">
+<span id="index-2"></span><span id="id2"></span><h2>CMAKE_BINARY_DIR<a class="headerlink" href="#cmake-binary-dir" title="Permalink to this headline">¶</a></h2>
+<p>This variable is set by cmake and corresponds to the toplevel of your
+<tt class="docutils literal"><span class="pre">build/</span></tt> directory.</p>
+</div>
+<div class="section" id="a-few-useful-options">
+<span id="useful-options"></span><h2>A few useful options<a class="headerlink" href="#a-few-useful-options" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="cmake-osx-architectures">
+<h3>CMAKE_OSX_ARCHITECTURES<a class="headerlink" href="#cmake-osx-architectures" title="Permalink to this headline">¶</a></h3>
+<blockquote>
+<dl class="docutils">
+<dt><em>Mac OS X users</em>: to build universal binaries, set this to</dt>
+<dd><tt class="docutils literal"><span class="pre">ppc;i386</span></tt>.</dd>
+</dl>
+</blockquote>
+</div>
+<div class="section" id="winmangle-libnames">
+<span id="index-3"></span><span id="id3"></span><h3>WINMANGLE_LIBNAMES<a class="headerlink" href="#winmangle-libnames" title="Permalink to this headline">¶</a></h3>
+<p>This option controls whether libraries will be built with mangled-in
+compiler name/version and boost version.  For example, with
+<tt class="docutils literal"><span class="pre">BUILD_VERSIONED</span></tt> set to <tt class="docutils literal"><span class="pre">OFF</span></tt>, the signals library looks like
+this:</p>
+<div class="highlight-python"><pre>% ls lib/*signals*
+lib/libboost_signals-mt-d.a    lib/libboost_signals-mt.a
+lib/libboost_signals-mt-d.so*  lib/libboost_signals-mt.so*</pre>
+</div>
+<p>But with it on, (on a gcc 4.3 linux box):</p>
+<div class="highlight-python"><pre>% ls lib/*signal*
+lib/libboost_signals-gcc43-mt-1_40.a
+lib/libboost_signals-gcc43-mt-d-1_40.a
+lib/libboost_signals-gcc43-mt-1_40.so*
+lib/libboost_signals-gcc43-mt-d-1_40.so*</pre>
+</div>
+<p>Historically this mangling has been convenient for windows users and a
+bane to unix users, thus <em>winmangle_libnames</em>.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The on-disk names of library <a class="reference external" href="build_variants.html#variants"><em>variants</em></a> are
+always mangled with the active <a class="reference external" href="build_variants.html#features"><em>features</em></a>.
+<tt class="docutils literal"><span class="pre">WINMANGLED_LIBNAMES</span></tt> affects mangling of compiler and boost
+version only.</p>
+</div>
+</div>
+<div class="section" id="build-projects">
+<span id="index-4"></span><span id="id4"></span><h3>BUILD_PROJECTS<a class="headerlink" href="#build-projects" title="Permalink to this headline">¶</a></h3>
+<p>This is a semicolon-separated list of projects to be built, or
+<tt class="docutils literal"><span class="pre">&quot;ALL&quot;</span></tt> (the default) for all projects, or <tt class="docutils literal"><span class="pre">&quot;NONE&quot;</span></tt>.  Projects not
+appearing in this list (if list not <tt class="docutils literal"><span class="pre">&quot;ALL&quot;</span></tt>) are ignored; no targets in
+this project will appear.  Example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">BUILD_PROJECTS</span><span class="o">=</span><span class="n">thread</span><span class="p">;</span><span class="n">python</span>
+</pre></div>
+</div>
+<p>See also the <a class="reference external" href="reference/boost_library_project.html#boost-library-project-macro"><em>boost_library_project</em></a> macro.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>If you specify a project with link time dependencies on other
+projects, e.g. <tt class="docutils literal"><span class="pre">filesystem</span></tt>, (which depends on <tt class="docutils literal"><span class="pre">system</span></tt>) and
+omit the dependencies, you will get an error from cmake something
+like this:</p>
+<div class="last highlight-python"><pre>CMake Error at tools/build/CMake/BoostCore.cmake:736 (get_property):
+  get_property could not find TARGET boost_system-mt-shared.  Perhaps it has
+  not yet been created.
+Call Stack (most recent call first):
+  tools/build/CMake/BoostCore.cmake:1170 (boost_library_variant)
+  libs/filesystem/src/CMakeLists.txt:7 (boost_add_library)</pre>
+</div>
+</div>
+</div>
+<div class="section" id="build-examples">
+<span id="index-5"></span><span id="id5"></span><h3>BUILD_EXAMPLES<a class="headerlink" href="#build-examples" title="Permalink to this headline">¶</a></h3>
+<p>This is a semicolon-separated list of projects whose examples should
+be built, e.g.:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">BUILD_EXAMPLES</span><span class="o">=</span><span class="s">&quot;iostreams;accumulators&quot;</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">If you pass this on the commandline in a unix shell,
+don&#8217;t forget to quote the list of arguments or escape the
+semicolons...</p>
+</div>
+<p>Per-library examples are specified with the <a class="reference external" href="reference/boost_library_project.html#exampledirs"><em>EXAMPLEDIRS</em></a>
+argument to the <a class="reference external" href="reference/boost_library_project.html#boost-library-project-macro"><em>boost_library_project</em></a> macro.</p>
+<p class="rubric">Note:</p>
+<p>A project&#8217;s examples will only be built if the project appears in
+<strong>both</strong> <a class="reference internal" href="#build-projects"><em>BUILD_PROJECTS</em></a> and <a class="reference internal" href="#build-examples"><em>BUILD_EXAMPLES</em></a>.  I.e., the
+<tt class="docutils literal"><span class="pre">BUILD_PROJECTS</span></tt> filter is applied first, and the <tt class="docutils literal"><span class="pre">BUILD_EXAMPLES</span></tt>
+filter has no ability to reverse the result.</p>
+</div>
+<div class="section" id="build-tools">
+<span id="index-6"></span><span id="id6"></span><h3>BUILD_TOOLS<a class="headerlink" href="#build-tools" title="Permalink to this headline">¶</a></h3>
+<p>Similar to BUILD_EXAMPLES and BUILD_PROJECTS above, this is a
+semicolon-separated list of tools (in subdirectory
+<tt class="docutils literal"><span class="pre">$BOOST_ROOT/tools/</span></tt>) that should be built, e.g.:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">BUILD_TOOLS</span><span class="o">=</span><span class="n">quickbook</span><span class="p">;</span><span class="n">wave</span>
+</pre></div>
+</div>
+<p><tt class="docutils literal"><span class="pre">&quot;ALL&quot;</span></tt> will build all tools, <tt class="docutils literal"><span class="pre">&quot;NONE&quot;</span></tt> will build none.  Note that
+the values here are lowercase (only subdirectories of <tt class="docutils literal"><span class="pre">tools/</span></tt>
+matching one of the strings in the list will be traversed by cmake).</p>
+</div>
+<div class="section" id="cmake-verbose-makefile">
+<span id="index-7"></span><h3>CMAKE_VERBOSE_MAKEFILE<a class="headerlink" href="#cmake-verbose-makefile" title="Permalink to this headline">¶</a></h3>
+<blockquote>
+Displays full build commands during build.  Good for debugging.
+This option will generate permanently verbose makefiles; it is
+generally easier to invoke make with the option <tt class="docutils literal"><span class="pre">VERBOSE=1</span></tt>
+instead (this has the same effect, but is not persistent).</blockquote>
+</div>
+<div class="section" id="cmake-cxx-compiler">
+<span id="index-8"></span><span id="id7"></span><h3>CMAKE_CXX_COMPILER<a class="headerlink" href="#cmake-cxx-compiler" title="Permalink to this headline">¶</a></h3>
+<blockquote>
+<p>Sets the compiler.  If you have a nonstandard compiler and no
+default compiler, you may have to pass the value of this option on
+the commandline, for example:</p>
+<div class="highlight-python"><pre>cmake ../src -DCMAKE_CXX_COMPILER=gcc-4.4</pre>
+</div>
+<p>On windows you can set this in the gui, but you will probably prefer
+to have cmake generate a set of nmake or project files by choosing
+an appropriate generator.</p>
+</blockquote>
+<span class="target" id="index-9"></span><span class="target" id="index-10"></span></div>
+<div class="section" id="build-soversioned">
+<span id="index-11"></span><span id="id8"></span><h3>BUILD_SOVERSIONED<a class="headerlink" href="#build-soversioned" title="Permalink to this headline">¶</a></h3>
+<p>Enables the setting of SOVERSION in built libraries.  If
+this is on:</p>
+<div class="highlight-python"><pre>% ls -l libboost_thread*.so*
+lrwxrwxrwx 1 troy troy     30 Oct 29 18:37 libboost_thread-mt-d.so -&gt; libboost_thread-mt-d.so.1.41.0*
+-rwxr-xr-x 1 troy troy 571361 Oct 29 18:37 libboost_thread-mt-d.so.1.41.0*
+lrwxrwxrwx 1 troy troy     28 Oct 29 18:37 libboost_thread-mt.so -&gt; libboost_thread-mt.so.1.41.0*
+-rwxr-xr-x 1 troy troy 114963 Oct 29 18:37 libboost_thread-mt.so.1.41.0*
+
+% readelf -a libboost_thread-mt.so | grep SONAME
+ 0x000000000000000e (SONAME)             Library soname: [libboost_thread-mt.so.1.41.0]</pre>
+</div>
+<p>and if off:</p>
+<div class="highlight-python"><pre>% ls -l lib/*signals*
+-rwxr-xr-x 1 troy troy  835522 Oct 29 15:10 lib/libboost_signals-mt-d.so*
+-rwxr-xr-x 1 troy troy  121886 Oct 29 15:10 lib/libboost_signals-mt.so*</pre>
+</div>
+<p>(Unix only, <tt class="docutils literal"><span class="pre">ON</span></tt> by default)</p>
+<p>This setting also determines whether libraries are <em>installed</em>
+with/without soversions.  See also <a class="reference external" href="install_customization.html#install-versioned"><em>INSTALL_VERSIONED</em></a>.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="build_variants.html" title="Build Variants and Features"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quickstart"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

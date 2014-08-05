@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioPropertySheet
+	ProjectType="Visual C++"
+	Version="8.00"
+	Name="shapelib"
+	>
+	<Tool
+		Name="VCCLCompilerTool"
+		AdditionalIncludeDirectories="$(SHAPELIB)"
+	/>
+	<UserMacro
+		Name="SHAPELIB"
+		Value=".\contrib\shapelib-1.3.0b2"
+	/>
+</VisualStudioPropertySheet>

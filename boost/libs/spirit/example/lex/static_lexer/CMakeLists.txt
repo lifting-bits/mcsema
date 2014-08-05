@@ -1,0 +1,12 @@
+foreach(
+    example
+    word_count_lexer_generate
+    word_count_generate
+    word_count_lexer_static
+    word_count_static
+)
+boost_add_executable(
+    ${example}
+)
+endforeach(
+)

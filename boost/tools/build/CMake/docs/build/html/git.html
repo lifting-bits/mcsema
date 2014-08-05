@@ -1,0 +1,288 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Hacking Boost.CMake with Git &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="index.html" />
+    <link rel="next" title="Differences between this release and upstream" href="diff.html" />
+    <link rel="prev" title="Zlib" href="externals/zlib.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="diff.html" title="Differences between this release and upstream"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="externals/zlib.html" title="Zlib"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">Hacking Boost.CMake with Git</a><ul>
+<li><a class="reference external" href="#i-just-want-to-try-the-head-of-the-whatever-branch">I just want to try the HEAD of the &lt;whatever&gt; branch</a></li>
+<li><a class="reference external" href="#i-want-to-svn-update">I want to svn update</a></li>
+<li><a class="reference external" href="#but-i-want-a-different-branch-than-that">But I want a different branch than that</a></li>
+<li><a class="reference external" href="#i-have-changes-how-do-i-make-a-patch">I have changes, how do I make a patch?</a></li>
+<li><a class="reference external" href="#oops-i-screwed-up-and-want-to-revert">Oops, I screwed up and want to revert</a></li>
+<li><a class="reference external" href="#i-want-to-switch-branches">I want to switch branches</a></li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="externals/zlib.html"
+                                  title="previous chapter">Zlib</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="diff.html"
+                                  title="next chapter">Differences between this release and upstream</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/git.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="hacking-boost-cmake-with-git">
+<span id="hacking-cmake-with-git"></span><h1>Hacking Boost.CMake with Git<a class="headerlink" href="#hacking-boost-cmake-with-git" title="Permalink to this headline">¶</a></h1>
+<p>Boost-cmake, in addition to using an alternative build system, uses
+alternate version control.  This makes boost.cmake feasable: without
+distributed version control it would be very difficult to maintain a
+build system against upstream boost.</p>
+<p>This document will review some common version-control procedures for
+those who are unfamiliar with git.  More documentation is available at
+<a class="reference external" href="http://gitorious.org/boost/git-docs/blobs/raw/master/build/html/index.html">Hacking Boost via Git</a>.</p>
+<p>The first step is to get <a class="reference external" href="http://git-scm.com">Git</a>.  Any recent
+version will do.  On windows, git downloads come with a bash shell, so
+the commandline interface is essentially identical.  There is also
+<a class="reference external" href="http://code.google.com/p/tortoisegit/">TortoiseGit</a>, which is
+evolving quickly and quite usable.</p>
+<div class="section" id="i-just-want-to-try-the-head-of-the-whatever-branch">
+<h2>I just want to try the HEAD of the &lt;whatever&gt; branch<a class="headerlink" href="#i-just-want-to-try-the-head-of-the-whatever-branch" title="Permalink to this headline">¶</a></h2>
+<p>Pick some directory to work in.  Here I&#8217;ll use <tt class="docutils literal"><span class="pre">/tmp</span></tt>.  My prompt is
+a percent sign.  Clone the repository to a subdirectory called
+<tt class="docutils literal"><span class="pre">src</span></tt>.  This will take a while the first time, after that things
+will be very fast.</p>
+<div class="highlight-git_shell"><div class="highlight"><pre><span class="k">% git</span><span class="g-Whitespace"> </span><span class="gd">clone </span><span class="s">git://gitorious.org/boost/cmake.git</span><span class="g-Whitespace"> </span>src<span class="g-Whitespace"></span>
+<span class="go">Initialized</span><span class="g-Whitespace"> </span><span class="go">empty</span><span class="g-Whitespace"> </span><span class="go">Git</span><span class="g-Whitespace"> </span><span class="go">repository</span><span class="g-Whitespace"> </span><span class="go">in</span><span class="g-Whitespace"> </span><span class="go">/tmp/src/.git/</span><span class="g-Whitespace"></span>
+<span class="go">remote:</span><span class="g-Whitespace"> </span><span class="go">Counting</span><span class="g-Whitespace"> </span><span class="go">objects:</span><span class="g-Whitespace"> </span><span class="go">425396,</span><span class="g-Whitespace"> </span><span class="go">done.</span><span class="g-Whitespace"></span>
+<span class="go">remote:</span><span class="g-Whitespace"> </span><span class="go">Compressing</span><span class="g-Whitespace"> </span><span class="go">objects:</span><span class="g-Whitespace"> </span><span class="go">100%</span><span class="g-Whitespace"> </span><span class="go">(129689/129689),</span><span class="g-Whitespace"> </span><span class="go">done.</span><span class="g-Whitespace"></span>
+<span class="go">remote:</span><span class="g-Whitespace"> </span><span class="go">Total</span><span class="g-Whitespace"> </span><span class="go">425396</span><span class="g-Whitespace"> </span><span class="go">(delta</span><span class="g-Whitespace"> </span><span class="go">298454),</span><span class="g-Whitespace"> </span><span class="go">reused</span><span class="g-Whitespace"> </span><span class="go">419119</span><span class="g-Whitespace"> </span><span class="go">(delta</span><span class="g-Whitespace"> </span><span class="go">292368)</span><span class="g-Whitespace"></span>
+<span class="go">Receiving</span><span class="g-Whitespace"> </span><span class="go">objects:</span><span class="g-Whitespace"> </span><span class="go">100%</span><span class="g-Whitespace"> </span><span class="go">(425396/425396),</span><span class="g-Whitespace"> </span><span class="go">135.56</span><span class="g-Whitespace"> </span><span class="go">MiB</span><span class="g-Whitespace"> </span><span class="go">|</span><span class="g-Whitespace"> </span><span class="go">1260</span><span class="g-Whitespace"> </span><span class="go">KiB/s,</span><span class="g-Whitespace"> </span><span class="go">done.</span><span class="g-Whitespace"></span>
+<span class="go">Resolving</span><span class="g-Whitespace"> </span><span class="go">deltas:</span><span class="g-Whitespace"> </span><span class="go">100%</span><span class="g-Whitespace"> </span><span class="go">(298454/298454),</span><span class="g-Whitespace"> </span><span class="go">done.</span><span class="g-Whitespace"></span>
+<span class="go">Checking</span><span class="g-Whitespace"> </span><span class="go">out</span><span class="g-Whitespace"> </span><span class="go">files:</span><span class="g-Whitespace"> </span><span class="go">100%</span><span class="g-Whitespace"> </span><span class="go">(23865/23865),</span><span class="g-Whitespace"> </span><span class="go">done.</span><span class="g-Whitespace"></span>
+</pre></div>
+</div>
+<p>inside this directory you&#8217;ll see the branch that is checked out:</p>
+<div class="highlight-git_shell"><div class="highlight"><pre><span class="k">% </span>cd src
+<span class="k">% git</span><span class="g-Whitespace"> </span><span class="gd">branch </span>-l<span class="g-Whitespace"></span>
+<span class="go">*</span><span class="g-Whitespace"> </span><span class="go">1.41.0</span><span class="g-Whitespace"></span>
+</pre></div>
+</div>
+<p>This means I&#8217;m on the <tt class="docutils literal"><span class="pre">1.41.0</span></tt> branch, and the files are checked
+out:</p>
+<div class="highlight-git_shell"><div class="highlight"><pre><span class="k">% </span>ls
+<span class="go">CMakeLists.txt</span><span class="g-Whitespace">     </span><span class="go">boost/</span><span class="g-Whitespace">           </span><span class="go">bootstrap.sh*</span><span class="g-Whitespace">  </span><span class="go">libs/</span><span class="g-Whitespace">    </span><span class="go">tools/</span><span class="g-Whitespace"></span>
+<span class="go">CTestConfig.cmake</span><span class="g-Whitespace">  </span><span class="go">boost-build.jam</span><span class="g-Whitespace">  </span><span class="go">build/</span><span class="g-Whitespace">         </span><span class="go">more/</span><span class="g-Whitespace">    </span><span class="go">wiki/</span><span class="g-Whitespace"></span>
+<span class="go">INSTALL</span><span class="g-Whitespace">            </span><span class="go">boost.css</span><span class="g-Whitespace">        </span><span class="go">doc/</span><span class="g-Whitespace">           </span><span class="go">people/</span><span class="g-Whitespace"></span>
+<span class="go">Jamroot</span><span class="g-Whitespace">            </span><span class="go">boost.png</span><span class="g-Whitespace">        </span><span class="go">index.htm</span><span class="g-Whitespace">      </span><span class="go">rst.css</span><span class="g-Whitespace"></span>
+<span class="go">LICENSE_1_0.txt</span><span class="g-Whitespace">    </span><span class="go">bootstrap.bat</span><span class="g-Whitespace">    </span><span class="go">index.html</span><span class="g-Whitespace">     </span><span class="go">status/</span><span class="g-Whitespace"></span>
+</pre></div>
+</div>
+<p>Now you can go ahead and do your out-of-source build.</p>
+</div>
+<div class="section" id="i-want-to-svn-update">
+<h2>I want to svn update<a class="headerlink" href="#i-want-to-svn-update" title="Permalink to this headline">¶</a></h2>
+<p>When new changes arrive upstream, you&#8217;ll want to <tt class="docutils literal"><span class="pre">git</span> <span class="pre">pull</span></tt>:</p>
+<div class="highlight-git_shell"><div class="highlight"><pre><span class="k">% git</span><span class="g-Whitespace"> </span><span class="gd">pull</span>
+<span class="go">remote:</span><span class="g-Whitespace"> </span><span class="go">Counting</span><span class="g-Whitespace"> </span><span class="go">objects:</span><span class="g-Whitespace"> </span><span class="go">310,</span><span class="g-Whitespace"> </span><span class="go">done.</span><span class="g-Whitespace"></span>
+<span class="go">remote:</span><span class="g-Whitespace"> </span><span class="go">Compressing</span><span class="g-Whitespace"> </span><span class="go">objects:</span><span class="g-Whitespace"> </span><span class="go">100%</span><span class="g-Whitespace"> </span><span class="go">(45/45),</span><span class="g-Whitespace"> </span><span class="go">done.</span><span class="g-Whitespace"></span>
+<span class="go">remote:</span><span class="g-Whitespace"> </span><span class="go">Total</span><span class="g-Whitespace"> </span><span class="go">205</span><span class="g-Whitespace"> </span><span class="go">(delta</span><span class="g-Whitespace"> </span><span class="go">154),</span><span class="g-Whitespace"> </span><span class="go">reused</span><span class="g-Whitespace"> </span><span class="go">203</span><span class="g-Whitespace"> </span><span class="go">(delta</span><span class="g-Whitespace"> </span><span class="go">152)</span><span class="g-Whitespace"></span>
+<span class="go">Receiving</span><span class="g-Whitespace"> </span><span class="go">objects:</span><span class="g-Whitespace"> </span><span class="go">100%</span><span class="g-Whitespace"> </span><span class="go">(205/205),</span><span class="g-Whitespace"> </span><span class="go">49.59</span><span class="g-Whitespace"> </span><span class="go">KiB,</span><span class="g-Whitespace"> </span><span class="go">done.</span><span class="g-Whitespace"></span>
+<span class="go">Resolving</span><span class="g-Whitespace"> </span><span class="go">deltas:</span><span class="g-Whitespace"> </span><span class="go">100%</span><span class="g-Whitespace"> </span><span class="go">(154/154),</span><span class="g-Whitespace"> </span><span class="go">completed</span><span class="g-Whitespace"> </span><span class="go">with</span><span class="g-Whitespace"> </span><span class="go">81</span><span class="g-Whitespace"> </span><span class="go">local</span><span class="g-Whitespace"> </span><span class="go">objects.</span><span class="g-Whitespace"></span>
+<span class="go">From</span><span class="g-Whitespace"> </span><span class="go">git://gitorious.org/boost/cmake</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace">   </span><span class="go">1818334..b945719</span><span class="g-Whitespace">  </span><span class="go">1.41.0</span><span class="g-Whitespace">     </span><span class="go">-&gt;</span><span class="g-Whitespace"> </span><span class="go">origin/1.41.0</span><span class="g-Whitespace"></span>
+<span class="go">Updating</span><span class="g-Whitespace"> </span><span class="go">1818334..b945719</span><span class="g-Whitespace"></span>
+<span class="go">Fast</span><span class="g-Whitespace"> </span><span class="go">forward</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace"> </span><span class="go">CMakeLists.txt</span><span class="g-Whitespace">                                     </span><span class="go">|</span><span class="g-Whitespace">    </span><span class="go">6</span><span class="g-Whitespace"> </span><span class="go">+-</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace"> </span><span class="go">CTestConfig.cmake</span><span class="g-Whitespace">                                  </span><span class="go">|</span><span class="g-Whitespace">    </span><span class="go">5</span><span class="g-Whitespace"> </span><span class="go">+-</span><span class="g-Whitespace"></span>
+<span class="go">...</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace"> </span><span class="go">83</span><span class="g-Whitespace"> </span><span class="go">files</span><span class="g-Whitespace"> </span><span class="go">changed,</span><span class="g-Whitespace"> </span><span class="go">1071</span><span class="g-Whitespace"> </span><span class="go">insertions(+),</span><span class="g-Whitespace"> </span><span class="go">537</span><span class="g-Whitespace"> </span><span class="go">deletions(-)</span><span class="g-Whitespace"></span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="but-i-want-a-different-branch-than-that">
+<span id="makeremote"></span><h2>But I want a different branch than that<a class="headerlink" href="#but-i-want-a-different-branch-than-that" title="Permalink to this headline">¶</a></h2>
+<p><tt class="docutils literal"><span class="pre">git</span> <span class="pre">branch</span> <span class="pre">-r</span></tt> will show your &#8216;remote&#8217; branches:</p>
+<div class="highlight-git_shell"><div class="highlight"><pre><span class="k">% git</span><span class="g-Whitespace"> </span><span class="gd">branch </span>-r<span class="g-Whitespace"></span>
+<span class="g-Whitespace">  </span><span class="go">origin/1.40.0</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace">  </span><span class="go">origin/1.41.0</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace">  </span><span class="go">origin/HEAD</span><span class="g-Whitespace"> </span><span class="go">-&gt;</span><span class="g-Whitespace"> </span><span class="go">origin/1.41.0</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace">  </span><span class="go">origin/master</span><span class="g-Whitespace"></span>
+</pre></div>
+</div>
+<p>This shows that in <em>origin</em> (the repository you cloned from), there
+are <em>1.40.0</em>, <em>1.41.0</em>, and <em>master</em> branches.  To switch to e.g. the
+<em>1.40.0</em> branch, you make a local branch that &#8216;tracks&#8217; the upstream
+branch:</p>
+<div class="highlight-git_shell"><div class="highlight"><pre><span class="k">% git</span><span class="g-Whitespace"> </span><span class="gd">checkout </span><span class="o">-b </span>1.40.0<span class="g-Whitespace"> </span>origin/1.40.0<span class="g-Whitespace"></span>
+<span class="go">Branch</span><span class="g-Whitespace"> </span><span class="go">1.40.0</span><span class="g-Whitespace"> </span><span class="go">set</span><span class="g-Whitespace"> </span><span class="go">up</span><span class="g-Whitespace"> </span><span class="go">to</span><span class="g-Whitespace"> </span><span class="go">track</span><span class="g-Whitespace"> </span><span class="go">remote</span><span class="g-Whitespace"> </span><span class="go">branch</span><span class="g-Whitespace"> </span><span class="go">1.40.0</span><span class="g-Whitespace"> </span><span class="go">from</span><span class="g-Whitespace"> </span><span class="go">origin.</span><span class="g-Whitespace"></span>
+<span class="go">Switched</span><span class="g-Whitespace"> </span><span class="go">to</span><span class="g-Whitespace"> </span><span class="go">a</span><span class="g-Whitespace"> </span><span class="go">new</span><span class="g-Whitespace"> </span><span class="go">branch</span><span class="g-Whitespace"> </span><span class="go">&#39;1.40.0&#39;</span><span class="g-Whitespace"></span>
+</pre></div>
+</div>
+<p>Now you will see this new local branch in your branch list:</p>
+<div class="highlight-git_shell"><div class="highlight"><pre><span class="k">% git</span><span class="g-Whitespace"> </span><span class="gd">branch </span>-l<span class="g-Whitespace"></span>
+<span class="go">*</span><span class="g-Whitespace"> </span><span class="go">1.40.0</span><span class="g-Whitespace">   </span><span class="go">#</span><span class="g-Whitespace"> </span><span class="go">the</span><span class="g-Whitespace"> </span><span class="go">star</span><span class="g-Whitespace"> </span><span class="go">means</span><span class="g-Whitespace"> </span><span class="go">this</span><span class="g-Whitespace"> </span><span class="go">one</span><span class="g-Whitespace"> </span><span class="go">is</span><span class="g-Whitespace"> </span><span class="go">checked</span><span class="g-Whitespace"> </span><span class="go">out</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace">  </span><span class="go">1.41.0</span><span class="g-Whitespace"></span>
+</pre></div>
+</div>
+<p>And your status will show it as well:</p>
+<div class="highlight-git_shell"><div class="highlight"><pre><span class="k">% git</span><span class="g-Whitespace"> </span><span class="gd">status</span>
+<span class="go">#</span><span class="g-Whitespace"> </span><span class="go">On</span><span class="g-Whitespace"> </span><span class="go">branch</span><span class="g-Whitespace"> </span><span class="go">1.40.0</span><span class="g-Whitespace"></span>
+<span class="go">nothing</span><span class="g-Whitespace"> </span><span class="go">to</span><span class="g-Whitespace"> </span><span class="go">commit</span><span class="g-Whitespace"> </span><span class="go">(working</span><span class="g-Whitespace"> </span><span class="go">directory</span><span class="g-Whitespace"> </span><span class="go">clean)</span><span class="g-Whitespace"></span>
+</pre></div>
+</div>
+<p>now, any <em>git pull</em>-ing you do will come from the upstream <em>1.40.0</em>
+branch in to your local 1.40.0 branch.</p>
+</div>
+<div class="section" id="i-have-changes-how-do-i-make-a-patch">
+<h2>I have changes, how do I make a patch?<a class="headerlink" href="#i-have-changes-how-do-i-make-a-patch" title="Permalink to this headline">¶</a></h2>
+<p>Just change the files and <tt class="docutils literal"><span class="pre">git</span> <span class="pre">diff</span></tt>:</p>
+<div class="highlight-git_shell"><div class="highlight"><pre><span class="k">% git</span><span class="g-Whitespace"> </span><span class="gd">diff</span>
+<span class="go">diff</span><span class="g-Whitespace"> </span><span class="go">--git</span><span class="g-Whitespace"> </span><span class="go">a/CMakeLists.txt</span><span class="g-Whitespace"> </span><span class="go">b/CMakeLists.txt</span><span class="g-Whitespace"></span>
+<span class="go">index</span><span class="g-Whitespace"> </span><span class="go">d2bc809..d5e055e</span><span class="g-Whitespace"> </span><span class="go">100644</span><span class="g-Whitespace"></span>
+<span class="go">---</span><span class="g-Whitespace"> </span><span class="go">a/CMakeLists.txt</span><span class="g-Whitespace"></span>
+<span class="go">+++</span><span class="g-Whitespace"> </span><span class="go">b/CMakeLists.txt</span><span class="g-Whitespace"></span>
+<span class="go">@@</span><span class="g-Whitespace"> </span><span class="go">-27,6</span><span class="g-Whitespace"> </span><span class="go">+27,10</span><span class="g-Whitespace"> </span><span class="go">@@</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace"> </span><span class="go">cmake_minimum_required(VERSION</span><span class="g-Whitespace"> </span><span class="go">2.6.4</span><span class="g-Whitespace"> </span><span class="go">FATAL_ERROR)</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace"> </span><span class="go">project(Boost)</span><span class="g-Whitespace"></span>
+
+<span class="go">+#</span><span class="g-Whitespace"></span>
+<span class="go">+#</span><span class="g-Whitespace"> </span><span class="go">These</span><span class="g-Whitespace"> </span><span class="go">are</span><span class="g-Whitespace"> </span><span class="go">my</span><span class="g-Whitespace"> </span><span class="go">changes</span><span class="g-Whitespace"></span>
+<span class="go">+#</span><span class="g-Whitespace"></span>
+<span class="go">+</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace"> </span><span class="go">##########################################################################</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace"> </span><span class="go">#</span><span class="g-Whitespace"> </span><span class="go">Version</span><span class="g-Whitespace"> </span><span class="go">information</span><span class="g-Whitespace">                                                    </span><span class="go">#</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace"> </span><span class="go">##########################################################################</span><span class="g-Whitespace"></span>
+<span class="go">@@</span><span class="g-Whitespace"> </span><span class="go">-323,6</span><span class="g-Whitespace"> </span><span class="go">+327,7</span><span class="g-Whitespace"> </span><span class="go">@@</span><span class="g-Whitespace"> </span><span class="go">endif()</span><span class="g-Whitespace"></span>
+
+<span class="g-Whitespace"> </span><span class="go">mark_as_advanced(BOOST_EXPORTS_FILE</span><span class="g-Whitespace"> </span><span class="go">BOOST_INSTALL_EXPORTS_FILE)</span><span class="g-Whitespace"></span>
+
+<span class="go">+#</span><span class="g-Whitespace"> </span><span class="go">and</span><span class="g-Whitespace"> </span><span class="go">some</span><span class="g-Whitespace"> </span><span class="go">here</span><span class="g-Whitespace"> </span><span class="go">too</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace"> </span><span class="go">#</span><span class="g-Whitespace"> </span><span class="go">Add</span><span class="g-Whitespace"> </span><span class="go">build</span><span class="g-Whitespace"> </span><span class="go">rules</span><span class="g-Whitespace"> </span><span class="go">for</span><span class="g-Whitespace"> </span><span class="go">documentation</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace"> </span><span class="go">add_subdirectory(doc)</span><span class="g-Whitespace"></span>
+</pre></div>
+</div>
+<p>and mail it in.</p>
+</div>
+<div class="section" id="oops-i-screwed-up-and-want-to-revert">
+<h2>Oops, I screwed up and want to revert<a class="headerlink" href="#oops-i-screwed-up-and-want-to-revert" title="Permalink to this headline">¶</a></h2>
+<p>Use <tt class="docutils literal"><span class="pre">git</span> <span class="pre">reset</span></tt>:</p>
+<div class="highlight-git_shell"><div class="highlight"><pre><span class="k">% git</span><span class="g-Whitespace"> </span><span class="gd">reset </span>--hard<span class="g-Whitespace"> </span>HEAD<span class="g-Whitespace"></span>
+<span class="go">HEAD</span><span class="g-Whitespace"> </span><span class="go">is</span><span class="g-Whitespace"> </span><span class="go">now</span><span class="g-Whitespace"> </span><span class="go">at</span><span class="g-Whitespace"> </span><span class="go">e26008e</span><span class="g-Whitespace"> </span><span class="go">Don&#39;t</span><span class="g-Whitespace"> </span><span class="go">build</span><span class="g-Whitespace"> </span><span class="go">tools</span><span class="g-Whitespace"> </span><span class="go">by</span><span class="g-Whitespace"> </span><span class="go">default.</span><span class="g-Whitespace">  </span><span class="go">All</span><span class="g-Whitespace"> </span><span class="go">they</span><span class="g-Whitespace"> </span><span class="go">do</span><span class="g-Whitespace"> </span><span class="go">is</span><span class="g-Whitespace"> </span><span class="go">break.</span><span class="g-Whitespace"></span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="i-want-to-switch-branches">
+<h2>I want to switch branches<a class="headerlink" href="#i-want-to-switch-branches" title="Permalink to this headline">¶</a></h2>
+<p>If you&#8217;ve already created a local branch, i.e. it appears in the
+output of <tt class="docutils literal"><span class="pre">git</span> <span class="pre">branch</span> <span class="pre">-l</span></tt>:</p>
+<div class="highlight-git_shell"><div class="highlight"><pre><span class="k">% git</span><span class="g-Whitespace"> </span><span class="gd">branch </span>-l<span class="g-Whitespace"></span>
+<span class="go">*</span><span class="g-Whitespace"> </span><span class="go">1.40.0</span><span class="g-Whitespace"></span>
+<span class="g-Whitespace">  </span><span class="go">1.41.0</span><span class="g-Whitespace"></span>
+</pre></div>
+</div>
+<p>Then just check it out:</p>
+<div class="highlight-git_shell"><div class="highlight"><pre><span class="k">% git</span><span class="g-Whitespace"> </span><span class="gd">checkout </span>1.41.0<span class="g-Whitespace"></span>
+<span class="go">Switched</span><span class="g-Whitespace"> </span><span class="go">to</span><span class="g-Whitespace"> </span><span class="go">branch</span><span class="g-Whitespace"> </span><span class="go">&#39;1.41.0&#39;</span><span class="g-Whitespace"></span>
+
+<span class="k">% git</span><span class="g-Whitespace"> </span><span class="gd">branch </span>-l<span class="g-Whitespace"></span>
+<span class="g-Whitespace">  </span><span class="go">1.40.0</span><span class="g-Whitespace"></span>
+<span class="go">*</span><span class="g-Whitespace"> </span><span class="go">1.41.0</span><span class="g-Whitespace"></span>
+
+<span class="k">% git</span><span class="g-Whitespace"> </span><span class="gd">status</span>
+<span class="go">#</span><span class="g-Whitespace"> </span><span class="go">On</span><span class="g-Whitespace"> </span><span class="go">branch</span><span class="g-Whitespace"> </span><span class="go">1.41.0</span><span class="g-Whitespace"></span>
+<span class="go">nothing</span><span class="g-Whitespace"> </span><span class="go">to</span><span class="g-Whitespace"> </span><span class="go">commit</span><span class="g-Whitespace"> </span><span class="go">(working</span><span class="g-Whitespace"> </span><span class="go">directory</span><span class="g-Whitespace"> </span><span class="go">clean)</span><span class="g-Whitespace"></span>
+</pre></div>
+</div>
+<p>If not (i.e. it only appears in the output of <tt class="docutils literal"><span class="pre">git</span> <span class="pre">branch</span> <span class="pre">-r</span></tt>),
+see <a class="reference internal" href="#makeremote"><em>But I want a different branch than that</em></a>.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="diff.html" title="Differences between this release and upstream"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="externals/zlib.html" title="Zlib"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

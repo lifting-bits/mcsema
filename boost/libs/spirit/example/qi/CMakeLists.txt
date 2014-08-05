@@ -1,0 +1,43 @@
+foreach(
+    example
+    employee
+    complex_number
+    mini_xml1
+    mini_xml2
+    mini_xml3
+    porting_guide_qi
+    key_value_sequence_empty_value
+    parse_date
+    # adapt_template_struct
+    num_list1
+    num_list2
+    num_list3
+    num_list4
+    calc2_ast
+    iter_pos_parser
+    display_attribute_type
+    reorder_struct
+    key_value_sequence_ordered
+    sum
+    actions
+    calc1
+    calc2
+    calc3
+    calc4
+    calc5
+    calc4_debug
+    # reference
+    # boost_array
+    roman
+    nabialek
+    typeof
+    key_value_sequence
+    porting_guide_classic
+)
+boost_add_executable(
+    ${example}
+    TARGET_PREFIX
+    "qi-"
+)
+endforeach(
+)

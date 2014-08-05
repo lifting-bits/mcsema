@@ -1,0 +1,328 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Notes by Boost Version &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="index.html" />
+    <link rel="next" title="boost_library_project" href="reference/boost_library_project.html" />
+    <link rel="prev" title="Building a Binary Installer" href="build_installer.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="reference/boost_library_project.html" title="boost_library_project"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="build_installer.html" title="Building a Binary Installer"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">Notes by Boost Version</a><ul>
+<li><a class="reference external" href="#cmake1">1.41.0.cmake1</a></li>
+<li><a class="reference external" href="#beta1-cmake1">1.41.0.beta1.cmake1</a></li>
+<li><a class="reference external" href="#cmakebeta4">1.41.0.cmakebeta4</a></li>
+<li><a class="reference external" href="#cmakebeta3">1.41.0.cmakebeta3</a></li>
+<li><a class="reference external" href="#upstream">1.41.0 (upstream)</a></li>
+<li><a class="reference external" href="#cmake4">1.40.0.cmake4</a></li>
+<li><a class="reference external" href="#cmake3">1.40.0.cmake3</a></li>
+<li><a class="reference external" href="#cmake2">1.40.0.cmake2</a></li>
+<li><a class="reference external" href="#id1">1.40.0.cmake1</a></li>
+<li><a class="reference external" href="#cmake0">1.40.0.cmake0</a></li>
+<li><a class="reference external" href="#id2">1.40.0</a></li>
+<li><a class="reference external" href="#and-1-39-0">1.38.0 and 1.39.0</a><ul>
+<li><a class="reference external" href="#known-issues">Known Issues</a></li>
+</ul>
+</li>
+<li><a class="reference external" href="#id3">1.35.0 - 1.37</a></li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="build_installer.html"
+                                  title="previous chapter">Building a Binary Installer</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="reference/boost_library_project.html"
+                                  title="next chapter">boost_library_project</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/notes_by_version.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="notes-by-boost-version">
+<h1>Notes by Boost Version<a class="headerlink" href="#notes-by-boost-version" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="cmake1">
+<h2>1.41.0.cmake1<a class="headerlink" href="#cmake1" title="Permalink to this headline">¶</a></h2>
+<p>Again, innumerable tiny tweaks.</p>
+</div>
+<div class="section" id="beta1-cmake1">
+<h2>1.41.0.beta1.cmake1<a class="headerlink" href="#beta1-cmake1" title="Permalink to this headline">¶</a></h2>
+<p>This is the first cmake beta based on upstream <tt class="docutils literal"><span class="pre">Boost_1_41_0_beta1</span></tt>.
+There are <em>way</em> too many enhancements to mention.</p>
+</div>
+<div class="section" id="cmakebeta4">
+<h2>1.41.0.cmakebeta4<a class="headerlink" href="#cmakebeta4" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>CMake minimum 2.6.4 required (found bugs with 2.6.2)</li>
+<li>Move MPI detection up</li>
+<li>Clean up output</li>
+</ul>
+</div>
+<div class="section" id="cmakebeta3">
+<h2>1.41.0.cmakebeta3<a class="headerlink" href="#cmakebeta3" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><a class="reference external" href="build_variants.html#variants"><em>Build Variants and Features</em></a> names switched to <tt class="docutils literal"><span class="pre">ENABLE_&lt;feature&gt;</span></tt> to distinguish
+from <tt class="docutils literal"><span class="pre">BUILD_*</span></tt> options.</li>
+<li>Many docs improvements</li>
+<li>Special targets for the boost-cmake maintainer</li>
+<li><a class="reference external" href="build_configuration.html#build-projects"><em>BUILD_PROJECTS</em></a> <tt class="docutils literal"><span class="pre">(=</span> <span class="pre">NONE|ALL|proj1;proj2;...;projN)</span></tt>
+variable for building only certain projects.</li>
+<li><a class="reference external" href="build_configuration.html#build-examples"><em>BUILD_EXAMPLES</em></a> <tt class="docutils literal"><span class="pre">(=</span> <span class="pre">NONE|ALL|proj1;proj2;...;projN)</span></tt>
+variable for building examples only of certain projects.</li>
+<li><a class="reference external" href="install_customization.html#lib-suffix"><em>LIB_SUFFIX</em></a> for installing libs to nonstandard lib directory
+name, e.g. for LIB_SUFFIX=64, libs installed to <tt class="docutils literal"><span class="pre">$PREFIX/lib64</span></tt></li>
+<li>Testing improvements: cmake now runs 2408 tests, 99% of which pass.
+This isn&#8217;t the full set, upstream is a moving target.  The few
+remaining failures (assuming upstream is bug-free) are assumed to be
+problems in the testing setup, not the underlying libraries.</li>
+<li>Python: python location customizable via command line or environment
+variables, see <a class="reference external" href="externals/index.html#external-dependencies"><em>External Dependencies</em></a>.</li>
+</ul>
+<p>(1.41.0.cmakebeta1 and 2 omitted)</p>
+</div>
+<div class="section" id="upstream">
+<h2>1.41.0 (upstream)<a class="headerlink" href="#upstream" title="Permalink to this headline">¶</a></h2>
+<p>This release (as released by upstream Boost) does <strong>not</strong> contain
+CMake support.  See above for independenly released CMake versions.</p>
+</div>
+<div class="section" id="cmake4">
+<h2>1.40.0.cmake4<a class="headerlink" href="#cmake4" title="Permalink to this headline">¶</a></h2>
+<p>Backport features from 1.41.0.cmakebeta3</p>
+</div>
+<div class="section" id="cmake3">
+<h2>1.40.0.cmake3<a class="headerlink" href="#cmake3" title="Permalink to this headline">¶</a></h2>
+<p>Skipped</p>
+</div>
+<div class="section" id="cmake2">
+<h2>1.40.0.cmake2<a class="headerlink" href="#cmake2" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>Modularization disabled... this can waste your source directory
+and was causing confusion.</li>
+<li>Docs tagged with specific boost-cmake release version.</li>
+</ul>
+</div>
+<div class="section" id="id1">
+<h2>1.40.0.cmake1<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>From the boost-cmake list:</p>
+<div class="highlight-python"><pre>&gt; As of now, your Boost 1.40.0 branch builds and installs without error
+&gt; for me on Windows (Intel 11.1, Visual Studio 2009, Visual Studio 2010
+&gt; Beta 1), Linux (GCC 4.2, GCC 4.4, Intel 11.1), and Mac OS X 10.6 (GCC
+&gt; 4.2, Intel 11.1).</pre>
+</div>
+<p>This version also includes fixes for cmake version 2.8 (as of this
+writing, in beta).</p>
+<p>Special thanks in alphabetical order:</p>
+<ul class="simple">
+<li>Claudio Bley</li>
+<li>Justin Holewinski</li>
+<li>Philip Lowman</li>
+</ul>
+</div>
+<div class="section" id="cmake0">
+<h2>1.40.0.cmake0<a class="headerlink" href="#cmake0" title="Permalink to this headline">¶</a></h2>
+<p>This version works on windows with MSVC and linux with gcc.</p>
+</div>
+<div class="section" id="id2">
+<h2>1.40.0<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
+<p>This version is <strong>broken</strong> in the svn distribution.  See later
+releases with the <tt class="docutils literal"><span class="pre">.cmakeN</span></tt> suffix.</p>
+</div>
+<div class="section" id="and-1-39-0">
+<h2>1.38.0 and 1.39.0<a class="headerlink" href="#and-1-39-0" title="Permalink to this headline">¶</a></h2>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p>-DCMAKE_IS_EXPERIMENTAL=ORLY_YARLY</p>
+<p class="last">This guard variable is included in releases of Boost.CMake through
+version 1.38.  You just need to set this variable to some value (be
+creative) when running cmake for the first time to disable the
+guard.</p>
+</div>
+<p>Boost.CMake was included as an experimental system for the first time.
+It is perfectly capable of doing the basic build and install of boost.
+You <em>must</em> pass the argument</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="o">-</span><span class="n">DCMAKE_IS_EXPERIMENTAL</span><span class="o">=</span><span class="n">ORLY</span>
+</pre></div>
+</div>
+<p>to the initial run of cmake, or you will see an intimidating message
+explaining that Boost.CMake != Boost.Build.  It looks like this:</p>
+<div class="highlight-python"><pre>-- ##########################################################################
+--
+--               Only Boost.Build is officially supported.
+--
+--                       This is not Boost.Build.
+--
+--  This is an alternate, cmake-based build system that is currently under development.
+--  To try it out, invoke CMake with the argument
+--         -DCMAKE_IS_EXPERIMENTAL=YES_I_KNOW
+--  Or use the gui to set the variable CMAKE_IS_EXPERIMENTAL to some value.
+--  This will only be necessary the first time.
+--
+--  For more information on boost-cmake see the wiki:
+--      https://svn.boost.org/trac/boost/wiki/CMake
+--
+--  Subscribe to the mailing list:
+--      http://lists.boost.org/mailman/listinfo.cgi/boost-cmake
+--
+--  NOTE:  Please ask questions about this build system on the boost-cmake list,
+--         not on other boost lists.
+--
+--  And/or check the archives:
+--      http://news.gmane.org/gmane.comp.lib.boost.cmake
+--
+-- ##########################################################################
+CMake Error at CMakeLists.txt:61 (message):
+  Magic variable CMAKE_IS_EXPERIMENTAL unset.
+
+
+-- Configuring incomplete, errors occurred!</pre>
+</div>
+<p>Again, f you see this, just set that guard variable to something, to
+demonstrate your tenacity and dedication.  Then things will work fine.</p>
+<p class="rubric">Quick and dirty HOWTO</p>
+<div class="highlight-python"><pre>% mkdir /tmp/boost
+% cd /tmp/boost
+% svn co https://svn.boost.org/svn/boost/tags/release/Boost_1_38_0 src
+% mkdir build
+% cd build
+% cmake -DCMAKE_IS_EXPERIMENTAL=ORLY -DCMAKE_INSTALL_PREFIX=/path/to/installdir ../src</pre>
+</div>
+<p>At this point, you have two options: you either want to leave boost in
+place and use it there, or you want to install it to a particular
+location.</p>
+<p><strong>In-place</strong></p>
+<blockquote>
+<p>If you&#8217;re competent to specify header/library paths
+yourself and want to build in place:</p>
+<div class="highlight-python"><pre>% make</pre>
+</div>
+<p>and your libraries will be in /tmp/boost/build/lib, and the headers in
+/tmp/boost/src, (where you&#8217;d expect them to be).</p>
+</blockquote>
+<p><strong>Installed to some location</strong></p>
+<blockquote>
+<p>This will install boost to <tt class="docutils literal"><span class="pre">lib/</span></tt> and <tt class="docutils literal"><span class="pre">include/</span></tt> under the
+<tt class="docutils literal"><span class="pre">CMAKE_INSTALL_PREFIX</span></tt> given above:</p>
+<div class="highlight-python"><pre>% make modularize   # shuffles some headers around
+% make install</pre>
+</div>
+</blockquote>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">In versions 1.38 and 1.39, if you want to <tt class="docutils literal"><span class="pre">make</span> <span class="pre">install</span></tt>, you
+<em>must</em> <tt class="docutils literal"><span class="pre">make</span> <span class="pre">modularize</span></tt> first.  This is an intermediate step
+that we expect to go away in future versions.</p>
+</div>
+<p>Also note that cmake supports <tt class="docutils literal"><span class="pre">DESTDIR</span></tt> for making .deb and .rpm
+packages;  see the standard cmake documentation</p>
+<div class="section" id="known-issues">
+<h3>Known Issues<a class="headerlink" href="#known-issues" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>There isn&#8217;t much support for building/running tests within boost in
+these releases.</li>
+<li>In version 1.39, the <tt class="docutils literal"><span class="pre">BOOST_VERSION_MINOR</span></tt> is wrong: it is set to
+1.38.  You can set this manually by looking for
+<tt class="docutils literal"><span class="pre">BOOST_VERSION_MINOR</span></tt> in the toplevel <tt class="docutils literal"><span class="pre">CMakeLists.txt</span></tt></li>
+<li>The boost build names the <tt class="docutils literal"><span class="pre">boost_prg_exec_monitor</span></tt> and
+<tt class="docutils literal"><span class="pre">boost_unit_test_framework</span></tt> libraries with an additional trailing
+<tt class="docutils literal"><span class="pre">-s</span></tt>.  You will probably need to modify your build if you use
+these libraries.</li>
+</ul>
+</div>
+</div>
+<div class="section" id="id3">
+<h2>1.35.0 - 1.37<a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h2>
+<p>There was a CMake branch that built these releases, but Boost.CMake
+was not included in the official distribution.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="reference/boost_library_project.html" title="boost_library_project"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="build_installer.html" title="Building a Binary Installer"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

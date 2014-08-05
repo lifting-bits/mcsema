@@ -1,0 +1,13 @@
+foreach(
+    example
+    timer
+)
+boost_add_executable(
+    ${example}
+    DEPENDS
+    boost_system
+    TARGET_PREFIX
+    "timer4-"
+)
+endforeach(
+)

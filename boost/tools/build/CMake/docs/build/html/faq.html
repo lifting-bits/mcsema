@@ -1,0 +1,140 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>FAQ &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="index.html" />
+    <link rel="next" title="External Dependencies" href="externals/index.html" />
+    <link rel="prev" title="find_package(Boost)" href="find_package_boost.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="externals/index.html" title="External Dependencies"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="find_package_boost.html" title="find_package(Boost)"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h3><a href="index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">FAQ</a><ul>
+<li><a class="reference external" href="#how-do-i-set-d-secure-scl-0-on-the-commandline-for-release-builds">How do I set <tt class="docutils literal"><span class="pre">/D</span> <span class="pre">_SECURE_SCL=0</span></tt> on the commandline for release builds?</a></li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="find_package_boost.html"
+                                  title="previous chapter">find_package(Boost)</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="externals/index.html"
+                                  title="next chapter">External Dependencies</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/faq.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="faq">
+<span id="id1"></span><h1>FAQ<a class="headerlink" href="#faq" title="Permalink to this headline">¶</a></h1>
+<p>A collection of asked questions.</p>
+<div class="section" id="how-do-i-set-d-secure-scl-0-on-the-commandline-for-release-builds">
+<h2>How do I set <tt class="docutils literal"><span class="pre">/D</span> <span class="pre">_SECURE_SCL=0</span></tt> on the commandline for release builds?<a class="headerlink" href="#how-do-i-set-d-secure-scl-0-on-the-commandline-for-release-builds" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li>Run the cmake gui, pick the source and build directories, click
+<em>Configure</em></li>
+<li>Find the entry called <tt class="docutils literal"><span class="pre">RELEASE_COMPILE_FLAGS</span></tt> and modify to taste.
+(See also <a class="reference external" href="build_variants.html#per-feature-flags"><em>Per-feature Compilation and Linker Options</em></a>)</li>
+<li>Click <em>Configure</em> again, settings will be regenerated with your
+flags intact.</li>
+<li>Click <em>Generate</em></li>
+<li>Run Visual Studio, navigate to the build directory, open
+<tt class="docutils literal"><span class="pre">Boost.sln</span></tt>, build, profit.</li>
+</ul>
+<p>Note:   I couldn&#8217;t find the magic checkbox to tell visual studio show me
+what commands it executes while building.   I switched the cmake gui to
+&#8216;advanced mode&#8217; and change CMAKE_VERBOSE_MAKEFILES to TRUE.  Is there a
+more &#8216;visualstudioesque&#8217; way to do this?</p>
+<p>-t</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="externals/index.html" title="External Dependencies"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="find_package_boost.html" title="find_package(Boost)"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

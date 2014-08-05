@@ -1,0 +1,211 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Adding Regression Tests &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="index.html" />
+    <link rel="next" title="Building a Binary Installer" href="build_installer.html" />
+    <link rel="prev" title="Testing" href="testing.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="build_installer.html" title="Building a Binary Installer"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="testing.html" title="Testing"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="testing.html"
+                                  title="previous chapter">Testing</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="build_installer.html"
+                                  title="next chapter">Building a Binary Installer</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/adding_regression_tests.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="adding-regression-tests">
+<span id="index-1"></span><span id="id1"></span><h1>Adding Regression Tests<a class="headerlink" href="#adding-regression-tests" title="Permalink to this headline">¶</a></h1>
+<p>This page describes how to add regression tests for a Boost library in
+the CMake-based build system. Before adding regression tests, make
+sure you have already followed the directions for
+<a class="reference external" href="reference/boost_library_project.html#boost-library-project-macro"><em>boost_library_project</em></a> , so that the CMake system
+recognizes your Boost library project, and (if necessary)
+<a class="reference external" href="add_compiled_library.html#add-compiled-library"><em>Adding a Compiled Library to CMake</em></a>. We also assume that you have already
+configured your build tree for regression testing of your library, by
+adding your library project&#8217;s name to the <a class="reference external" href="testing.html#build-tests"><em>BUILD_TESTS</em></a> option
+described in the section <a class="reference external" href="testing.html#testing"><em>Testing</em></a>.</p>
+<p>In this page, we will assume that your library resides in the
+subdirectory <tt class="docutils literal"><span class="pre">libs/libname</span></tt>, and that tests for this library are
+stored in <tt class="docutils literal"><span class="pre">libs/libname/test</span></tt>. The test directory should be listed
+via <a class="reference external" href="reference/boost_library_project.html#testdirs"><em>TESTDIRS</em></a> in the call of
+<a class="reference external" href="reference/boost_library_project.html#boost-library-project-macro"><em>boost_library_project</em></a>. Follow these steps to add this new
+library into Boost&#8217;s build system. If your library has multiple
+testing directories listed after <a class="reference external" href="reference/boost_library_project.html#testdirs"><em>TESTDIRS</em></a>, follow these steps for
+each one.</p>
+<ol class="arabic">
+<li><p class="first">Create a new file <tt class="docutils literal"><span class="pre">libs/libname/test/CMakeLists.txt</span></tt> file with
+your favorite text editor. This file will contain instructions for
+building and running each of the regression tests for your library.</p>
+</li>
+<li><p class="first">If your regression test depends on any other part of boost then
+you will need to inform the build system of such with the
+following line:</p>
+<div class="highlight-python"><pre>boost_additional_test_dependencies(libname BOOST_DEPENDS test fusion)</pre>
+</div>
+<p>where &#8216;libname&#8217; is the name of your library that you are testing.</p>
+</li>
+<li><p class="first">For each test that only needs to be compiled (but not executed),
+add a <tt class="docutils literal"><span class="pre">compile</span></tt> or <tt class="docutils literal"><span class="pre">compile_fail</span></tt> test using the
+<a class="reference external" href="reference/boost_test_compile.html#boost-test-compile"><em>boost_test_compile</em></a> or <a class="reference external" href="reference/boost_test_compile_fail.html#boost-test-compile-fail"><em>boost_test_compile_fail</em></a>
+macros, respectively. The most basic usage of these macros
+provides only the test name, e.g.,</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">boost_test_compile</span><span class="p">(</span><span class="n">compile_test</span><span class="p">)</span>
+<span class="n">boost_test_compile_fail</span><span class="p">(</span><span class="n">compile_fail_test</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This code will create two regression tests. The first,
+<tt class="docutils literal"><span class="pre">compile_test</span></tt>, will try to compile the source file
+<tt class="docutils literal"><span class="pre">compile_test.cpp</span></tt> in the current source directory. If the
+compile is successful, the regression test passes. If the compile
+fails, the regression test fails. The second regression test works
+the opposite way: it will try to compile
+<tt class="docutils literal"><span class="pre">compile_fail_test.cpp</span></tt>: if the compilation is successful, the
+regression test fails. When you run the regression tests (e.g., by
+calling <tt class="docutils literal"><span class="pre">ctest</span></tt> from the build directory), the regression tests
+will execute and produce output like the following:</p>
+<div class="highlight-python"><pre>Running tests...
+Start processing tests
+Test project /Users/dgregor/Projects/boost-darwin
+  1/  2 Testing libname::compile_test            Passed
+  2/  2 Testing libname::compile_fail_test     ***Failed - supposed to fail
+
+100% tests passed, 0 tests failed out of 2</pre>
+</div>
+</li>
+</ol>
+<ol class="arabic" start="3">
+<li><p class="first">For any tests that need to be built and executed, use the
+<a class="reference external" href="reference/boost_test_run.html#boost-test-run"><em>boost_test_run</em></a> or <a class="reference external" href="reference/boost_test_run_fail.html#boost-test-run-fail"><em>boost_test_run_fail</em></a> macros. Both
+tests will build, link and execute a regression test. The
+<a class="reference external" href="reference/boost_test_run.html#boost-test-run"><em>boost_test_run</em></a> macro expects that executable to return an
+exit code of zero, while the <a class="reference external" href="reference/boost_test_run_fail.html#boost-test-run-fail"><em>boost_test_run_fail</em></a> macro
+expects that executable to return a non-zero exit code. For
+example, we might build a simple test <tt class="docutils literal"><span class="pre">simple_test</span></tt> from the
+source file <tt class="docutils literal"><span class="pre">simple_test.cpp</span></tt>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">boost_test_run</span><span class="p">(</span><span class="n">simple_test</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Often, we&#8217;ll want to link against our own Boost library, which we
+do using the <tt class="docutils literal"><span class="pre">DEPENDS</span></tt> argument to <tt class="docutils literal"><span class="pre">boost_test_run</span></tt>:</p>
+<div class="highlight-python"><pre>boost_test_run(big_test big_test1.cpp big_test2.cpp
+  DEPENDS boost_libname-static
+  )</pre>
+</div>
+<p>Here, we have created a test <tt class="docutils literal"><span class="pre">big_test</span></tt>, built from the source
+files <tt class="docutils literal"><span class="pre">big_test1.cpp</span></tt> and <tt class="docutils literal"><span class="pre">big_test2.cpp</span></tt>, which will link
+against the static library for <tt class="docutils literal"><span class="pre">boost_libname</span></tt>. We could create
+a similar test that links against the shared library for
+<tt class="docutils literal"><span class="pre">boost_libname</span></tt>, passing along compilation flags specific to the
+shared library:</p>
+<div class="highlight-python"><pre>boost_test_run(big_test_dll big_test1.cpp big_test2.cpp
+  DEPENDS boost_libname-shared
+  COMPILE_FLAGS "-DBOOST_LIBNAME_DYN_LINK=1"
+  )</pre>
+</div>
+<p>Some tests require command-line arguments. For example, say we
+want to pass <tt class="docutils literal"><span class="pre">-loop</span> <span class="pre">1000</span></tt> to a randomized test. We can do so
+using the <tt class="docutils literal"><span class="pre">ARGS</span></tt> argument to <tt class="docutils literal"><span class="pre">boost_test_run</span></tt> (or
+<tt class="docutils literal"><span class="pre">boost_test_run_fail</span></tt>):</p>
+<div class="highlight-python"><pre>boost_test_run(random_test ARGS "-loop" "1000" DEPENDS boost_libname-static)</pre>
+</div>
+<p>Once you have finished describing your regression tests to the
+CMake system, you&#8217;re done! Your library will now build, test, and
+install with CMake and this behavior should be portable across
+many different platforms.</p>
+</li>
+</ol>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="build_installer.html" title="Building a Binary Installer"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="testing.html" title="Testing"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,194 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>boost_library_project &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="../_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="../index.html" />
+    <link rel="next" title="boost_module" href="boost_module.html" />
+    <link rel="prev" title="Notes by Boost Version" href="../notes_by_version.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="boost_module.html" title="boost_module"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="../notes_by_version.html" title="Notes by Boost Version"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="../index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h3><a href="../index.html">Table Of Contents</a></h3>
+            <ul>
+<li><a class="reference external" href="">boost_library_project</a><ul>
+<li><a class="reference external" href="#testdirs">TESTDIRS</a></li>
+<li><a class="reference external" href="#exampledirs">EXAMPLEDIRS</a></li>
+<li><a class="reference external" href="#modular">MODULAR</a></li>
+</ul>
+</li>
+</ul>
+
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="../notes_by_version.html"
+                                  title="previous chapter">Notes by Boost Version</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="boost_module.html"
+                                  title="next chapter">boost_module</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="../_sources/reference/boost_library_project.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="boost-library-project">
+<span id="boost-library-project-macro"></span><span id="index-72"></span><h1>boost_library_project<a class="headerlink" href="#boost-library-project" title="Permalink to this headline">¶</a></h1>
+<p>Define a boost library project.</p>
+<dl class="cmake">
+<dt id="boost_library_project">
+<tt class="descname">boost_library_project</tt><big>(</big><em>libname</em><span class="optional">[</span>, <em>...</em><span class="optional">]</span><big>)</big><a class="headerlink" href="#boost_library_project" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><em>libname</em> &#8211; name of library to add</li>
+<li><em>SRCDIRS</em> (optional) &#8211; srcdir1 srcdir2 ...</li>
+<li><em>TESTDIRS</em> (optional) &#8211; testdir1 testdir2 ..</li>
+<li><em>EXAMPLEDIRS</em> (optional) &#8211; testdir1 testdir2 ..</li>
+<li><em>DESCRIPTION</em> &#8211; description</li>
+<li><em>AUTHORS</em> &#8211; author1 author2</li>
+<li><em>MAINTAINERS</em> &#8211; maint maint2</li>
+<li><em>MODULAR</em> (optional) &#8211; </li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<p>where <cite>libname</cite> is the name of the library (e.g., Python,
+Filesystem), <cite>srcdir1</cite>, <cite>srcdir2</cite>, etc, are subdirectories containing
+library sources (for Boost libraries that build actual library
+binaries), and <cite>testdir1</cite>, <cite>testdir2</cite>, etc, are subdirectories
+containing regression tests.</p>
+<p><cite>DESCRIPTION</cite> provides a brief description of the library, which can
+be used to summarize the behavior of the library for a user. <cite>AUTHORS</cite>
+lists the authors of the library, while <cite>MAINTAINERS</cite> lists the active
+maintainers. If <cite>MAINTAINERS</cite> is left empty, it is assumed that the
+authors are still maintaining the library. Both authors and maintainers
+should have their name followed by their current e-mail address in
+angle brackets, with -at- instead of the at sign, e.g.,</p>
+<div class="highlight-python"><pre>Douglas Gregor &lt;doug.gregor -at- gmail.com&gt;</pre>
+</div>
+<div class="section" id="testdirs">
+<span id="index-73"></span><span id="id1"></span><h2>TESTDIRS<a class="headerlink" href="#testdirs" title="Permalink to this headline">¶</a></h2>
+<p>For libraries that have regression tests, and when testing is enabled
+either by <cite>BUILD_TESTS</cite> containing the (lowercase) name of this
+library or the string <tt class="docutils literal"><span class="pre">ALL</span></tt>, the generated makefiles/project files
+will contain regression tests for this library.</p>
+</div>
+<div class="section" id="exampledirs">
+<span id="index-74"></span><span id="id2"></span><h2>EXAMPLEDIRS<a class="headerlink" href="#exampledirs" title="Permalink to this headline">¶</a></h2>
+<p>This option specifies directories containing examples.  Examples are
+just libraries/executables created with <a class="reference external" href="boost_add_library.html#boost-add-library-macro"><em>boost_add_library</em></a>
+and <a class="reference external" href="boost_add_executable.html#boost-add-executable-macro"><em>boost_add_executable</em></a>, except they are only built if
+the name of the current project is specified in <a class="reference external" href="../build_configuration.html#build-examples"><em>BUILD_EXAMPLES</em></a>.</p>
+</div>
+<div class="section" id="modular">
+<span id="index-75"></span><span id="id3"></span><h2>MODULAR<a class="headerlink" href="#modular" title="Permalink to this headline">¶</a></h2>
+<p>Currently unused.</p>
+<p class="rubric">Example</p>
+<p>The Boost.Thread library uses the following invocation of the
+<cite>boost_library_project</cite> macro, since it has both a compiled library
+(built in the &#8220;src&#8221; subdirectory) and regression tests (listed in the
+&#8220;test&#8221; subdirectory):</p>
+<div class="highlight-python"><pre>boost_library_project(
+  Thread
+  SRCDIRS src
+  TESTDIRS test
+  DESCRIPTION "Portable threading"
+  AUTHORS "Anthony Williams &lt;anthony -at- justsoftwaresolutions.co.uk"&gt;
+  )</pre>
+</div>
+<p class="rubric">Where Defined</p>
+<p>This macro is defined in the Boost Core module in
+<tt class="docutils literal"><span class="pre">tools/build/CMake/BoostCore.cmake</span></tt></p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="boost_module.html" title="boost_module"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="../notes_by_version.html" title="Notes by Boost Version"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="../index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

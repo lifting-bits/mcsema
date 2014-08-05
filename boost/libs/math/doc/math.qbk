@@ -1,0 +1,230 @@
+[article Boost.Math
+    [quickbook 1.5]
+    [copyright 2006, 2007, 2008, 2009, 2010 John Maddock, Paul A. Bristow, Hubert Holin, Daryle Walker, Xiaogang Zhang, Bruno Lalande, Johan R&#xE5;de, Gautam Sewani and Thijs van den Berg]
+    [license
+        Distributed under the Boost Software License, Version 1.0.
+        (See accompanying file LICENSE_1_0.txt or copy at
+        [@http://www.boost.org/LICENSE_1_0.txt http://www.boost.org/LICENSE_1_0.txt])
+    ]
+    [authors [Maddock, John], [Bristow, Paul A.], [Holin, Hubert], [Walker, Daryle], [Zhang, Xiaogang], [Lalande, Bruno], [R&#xE5;de, Johan], [Sewani, Gautam], [van den Berg, Thijs]]
+    [last-revision $Date$]
+]
+
+[def __R ['[*R]]]
+[def __C ['[*C]]]
+[def __H ['[*H]]]
+[def __O ['[*O]]]
+[def __R3 ['[*'''R<superscript>3</superscript>''']]]
+[def __R4 ['[*'''R<superscript>4</superscript>''']]]
+[def __quadrulple ('''&#x03B1;,&#x03B2;,&#x03B3;,&#x03B4;''')]
+[def __quat_formula ['[^q = '''&#x03B1; + &#x03B2;i + &#x03B3;j + &#x03B4;k''']]]
+[def __quat_complex_formula ['[^q = ('''&#x03B1; + &#x03B2;i) + (&#x03B3; + &#x03B4;i)j''' ]]]
+[def __not_equal ['[^xy '''&#x2260;''' yx]]]
+[def __octulple ('''&#x03B1;,&#x03B2;,&#x03B3;,&#x03B4;,&#x03B5;,&#x03B6;,&#x03B7;,&#x03B8;''')]
+[def __oct_formula ['[^o = '''&#x03B1; + &#x03B2;i + &#x03B3;j + &#x03B4;k + &#x03B5;e' + &#x03B6;i' + &#x03B7;j' + &#x03B8;k' ''']]]
+[def __oct_complex_formula ['[^o = ('''&#x03B1; + &#x03B2;i) + (&#x03B3; + &#x03B4;i)j + (&#x03B5; + &#x03B6;i)e' + (&#x03B7; - &#x03B8;i)j' ''']]]
+[def __oct_quat_formula ['[^o = ('''&#x03B1; + &#x03B2;i + &#x03B3;j + &#x03B4;k) + (&#x03B5; + &#x03B6;i + &#x03B7;j - &#x03B8;j)e' ''']]]
+[def __oct_not_equal ['[^x(yz) '''&#x2260;''' (xy)z]]]
+[template tr1[] [@http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2005/n1836.pdf Technical Report on C++ Library Extensions]]
+
+The following libraries are present in Boost.Math:
+
+[table
+[[Library][Description]]
+
+   [[Complex Number Inverse Trigonometric Functions
+   
+   [@../complex/html/index.html HTML Docs]
+   
+   [@http://sourceforge.net/projects/boost/files/boost-docs/ 
+   PDF Docs]]
+   [
+These complex number algorithms are the inverses of trigonometric functions currently
+present in the C++ standard.  Equivalents to these functions are part of the C99 standard, and
+are part of the [tr1].
+   ]]
+   
+   [[Greatest Common Divisor and Least Common Multiple
+   
+   [@../gcd/html/index.html HTML Docs]
+   
+   [@http://sourceforge.net/projects/boost/files/boost-docs/ 
+   PDF Docs]]
+   [
+The class and function templates in <boost/math/common_factor.hpp> 
+provide run-time and compile-time evaluation of the greatest common divisor 
+(GCD) or least common multiple (LCM) of two integers. 
+These facilities are useful for many numeric-oriented generic 
+programming problems.
+   ]]
+
+[[Octonions
+
+[@../octonion/html/index.html HTML Docs]
+
+[@http://sourceforge.net/projects/boost/files/boost-docs/ 
+PDF Docs]]
+   [
+Octonions, like [@../quaternion/html/index.html quaternions], are a relative of complex numbers.
+
+Octonions see some use in theoretical physics.
+
+In practical terms, an octonion is simply an octuple of real numbers __octulple, 
+which we can write in the form __oct_formula, where ['[^i]], ['[^j]] and ['[^k]] 
+are the same objects as for quaternions, and ['[^e']], ['[^i']], ['[^j']] and ['[^k']] 
+are distinct objects which play essentially the same kind of role as ['[^i]] (or ['[^j]] or ['[^k]]).
+
+Addition and a multiplication is defined on the set of octonions, 
+which generalize their quaternionic counterparts. The main novelty this time 
+is that [*the multiplication is not only not commutative, is now not even 
+associative] (i.e. there are quaternions ['[^x]], ['[^y]] and ['[^z]] such that __oct_not_equal). 
+A way of remembering things is by using the following multiplication table:
+
+[$../../octonion/graphics/octonion_blurb17.jpeg]
+
+Octonions (and their kin) are described in far more details in this other 
+[@../../quaternion/TQE.pdf document] 
+(with [@../../quaternion/TQE_EA.pdf errata and addenda]).
+
+Some traditional constructs, such as the exponential, carry over without too 
+much change into the realms of octonions, but other, such as taking a square root, 
+do not (the fact that the exponential has a closed form is a result of the 
+author, but the fact that the exponential exists at all for octonions is known 
+since quite a long time ago).
+   ]]
+   
+[[Special Functions
+
+[@../sf_and_dist/html/index.html HTML Docs]
+
+[@http://sourceforge.net/projects/boost/files/boost-docs/ 
+PDF Docs]]
+
+   [ Provides a number of high quality special functions, initially 
+   these were concentrated on functions used in statistical applications 
+   along with those in the Technical Report on C++ Library Extensions.
+
+   The function families currently implemented are the gamma, beta & erf 
+   functions along with the incomplete gamma and beta functions 
+   (four variants of each) and all the possible inverses of these, 
+   plus digamma, various factorial functions, Bessel functions, 
+   elliptic integrals, sinus cardinals (along with their 
+   hyperbolic variants), inverse hyperbolic functions, 
+   Legrendre/Laguerre/Hermite polynomials and various special power 
+   and logarithmic functions.
+
+   All the implementations are fully generic and support the use of 
+   arbitrary "real-number" types, although they are optimised for 
+   use with types with known-about significand (or mantissa) 
+   sizes: typically float, double or long double.  ]]
+
+[[Statistical Distributions
+
+[@../sf_and_dist/html/index.html HTML Docs]
+
+[@http://sourceforge.net/projects/boost/files/boost-docs/ 
+PDF Docs]]
+
+   [Provides a reasonably comprehensive set of statistical distributions, 
+   upon which higher level statistical tests can be built.
+
+   The initial focus is on the central univariate distributions. 
+   Both continuous (like normal & Fisher) and discrete (like binomial 
+   & Poisson) distributions are provided.
+
+   A comprehensive tutorial is provided, along with a series of worked 
+   examples illustrating how the library is used to conduct statistical tests. ]]
+
+[[Quaternions
+
+[@../quaternion/html/index.html HTML Docs]
+
+[@http://sourceforge.net/projects/boost/files/boost-docs/ 
+PDF Docs]]
+
+   [
+Quaternions are a relative of complex numbers.
+
+Quaternions are in fact part of a small hierarchy of structures built 
+upon the real numbers, which comprise only the set of real numbers 
+(traditionally named __R), the set of complex numbers (traditionally named __C), 
+the set of quaternions (traditionally named __H) and the set of octonions 
+(traditionally named __O), which possess interesting mathematical properties 
+(chief among which is the fact that they are ['division algebras], 
+['i.e.] where the following property is true: if ['[^y]] is an element of that 
+algebra and is [*not equal to zero], then ['[^yx = yx']], where ['[^x]] and ['[^x']] 
+denote elements of that algebra, implies that ['[^x = x']]). 
+Each member of the hierarchy is a super-set of the former.
+
+One of the most important aspects of quaternions is that they provide an 
+efficient way to parameterize rotations in __R3 (the usual three-dimensional space) 
+and __R4.
+
+In practical terms, a quaternion is simply a quadruple of real numbers __quadrulple, 
+which we can write in the form __quat_formula, where ['[^i]] is the same object as for complex numbers, 
+and ['[^j]] and ['[^k]] are distinct objects which play essentially the same kind of role as ['[^i]].
+
+An addition and a multiplication is defined on the set of quaternions, 
+which generalize their real and complex counterparts. The main novelty 
+here is that [*the multiplication is not commutative] (i.e. there are 
+quaternions ['[^x]] and ['[^y]] such that __not_equal). A good mnemotechnical way of remembering 
+things is by using the formula ['[^i*i = j*j = k*k = -1]].
+
+Quaternions (and their kin) are described in far more details in this 
+other [@../../quaternion/TQE.pdf document] 
+(with [@../../quaternion/TQE_EA.pdf errata and addenda]).
+
+Some traditional constructs, such as the exponential, carry over without 
+too much change into the realms of quaternions, but other, such as taking 
+a square root, do not.
+    ]]
+    
+]
+
+The following Boost libraries are also mathematically oriented:
+
+[table
+[[Library][Description]]
+
+   [[[@../../../integer/index.html Integer]]
+   [Headers to ease dealing with integral types.]]
+
+   [[[@../../../numeric/interval/doc/interval.htm Interval]]
+   [As implied by its name, this library is intended to help manipulating 
+   mathematical intervals. It consists of a single header 
+   <boost/numeric/interval.hpp> and principally a type which can be 
+   used as interval<T>. ]]
+   
+   [[[@../../../multi_array/doc/index.html Multi Array]]
+   [Boost.MultiArray provides a generic N-dimensional array concept 
+   definition and common implementations of that interface.]]
+
+   [[[@../../../numeric/conversion/index.html Numeric.Conversion]]
+   [The Boost Numeric Conversion library is a collection of tools to 
+   describe and perform conversions between values of different numeric types.]]
+   
+   [[[@../../../utility/operators.htm Operators]]
+   [The header <boost/operators.hpp> supplies several sets of class 
+   templates (in namespace boost). These templates define operators at 
+   namespace scope in terms of a minimal number of fundamental 
+   operators provided by the class.]]
+
+   [[[@../../../random/index.html Random]]
+   [Random numbers are useful in a variety of applications. The Boost 
+   Random Number Library (Boost.Random for short) provides a vast variety 
+   of generators and distributions to produce random numbers having useful 
+   properties, such as uniform distribution.]]
+   
+   [[[@../../../rational/index.html Rational]]
+   [The header rational.hpp provides an implementation of rational numbers. 
+   The implementation is template-based, in a similar manner to the 
+   standard complex number class.]]
+   
+   [[[@../../../numeric/ublas/doc/index.htm uBLAS]]
+   [uBLAS is a C++ template class library that provides BLAS level 1, 2, 3 
+   functionality for dense, packed and sparse matrices. The design and 
+   implementation unify mathematical notation via operator overloading and 
+   efficient code generation via expression templates.]]
+
+]
+

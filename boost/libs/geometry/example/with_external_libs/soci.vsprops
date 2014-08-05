@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioPropertySheet
+	ProjectType="Visual C++"
+	Version="8.00"
+	Name="soci"
+	>
+	<Tool
+		Name="VCCLCompilerTool"
+		AdditionalIncludeDirectories="&quot;$(SOCI_ROOT)/src/core&quot;;&quot;$(SOCI_ROOT)/src/backends/postgresql&quot;"
+		PreprocessorDefinitions="SOCI_USE_BOOST;SOCI_LIB_PREFIX=\&quot;libsoci_\&quot;;SOCI_LIB_SUFFIX=\&quot;.so\&quot;"
+	/>
+	<UserMacro
+		Name="SOCI_ROOT"
+		Value="contrib/soci-3.1.0"
+	/>
+</VisualStudioPropertySheet>

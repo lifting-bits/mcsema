@@ -1,0 +1,149 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Building a Binary Installer &mdash; Boost.CMake 1.41.0.cmake0</title>
+    <link rel="stylesheet" href="_static/sphinxdoc.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '1.41.0.cmake0',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Boost.CMake 1.41.0.cmake0" href="index.html" />
+    <link rel="next" title="Notes by Boost Version" href="notes_by_version.html" />
+    <link rel="prev" title="Adding Regression Tests" href="adding_regression_tests.html" />
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+try {
+var pageTracker = _gat._getTracker("UA-11690634-1");
+pageTracker._trackPageview();
+} catch(err) {}</script>
+
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="notes_by_version.html" title="Notes by Boost Version"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="adding_regression_tests.html" title="Adding Regression Tests"
+             accesskey="P">previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/alt.boost.png" alt="Logo"/>
+            </a></p>
+            <h4>Previous topic</h4>
+            <p class="topless"><a href="adding_regression_tests.html"
+                                  title="previous chapter">Adding Regression Tests</a></p>
+            <h4>Next topic</h4>
+            <p class="topless"><a href="notes_by_version.html"
+                                  title="next chapter">Notes by Boost Version</a></p>
+            <h3>This Page</h3>
+            <ul class="this-page-menu">
+              <li><a href="_sources/build_installer.txt"
+                     rel="nofollow">Show Source</a></li>
+            </ul>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="building-a-binary-installer">
+<h1>Building a Binary Installer<a class="headerlink" href="#building-a-binary-installer" title="Permalink to this headline">¶</a></h1>
+<p>CMake can easily build binary installers for a variety of
+platforms. On Windows and Mac OS X, CMake builds graphical
+installation programs. For other Unix operating systems, CMake
+currently builds tarballs and self-installing shell scripts. This
+CMake functionality, provided by the
+<a class="reference external" href="http://www.cmake.org/Wiki/CMake:Packaging_With_CPack">CPack</a> program
+that is part of CMake, is used to create all of CMake&#8217;s binary
+installers. We use CPack to build binary installers for Boost. To
+build a binary installer for Boost, follow these steps:</p>
+<ol class="arabic simple">
+<li>Build Boost using CMake.  (see <a class="reference external" href="quickstart.html#quickstart"><em>Quickstart</em></a>)</li>
+<li>(&#8216;&#8217;&#8216;Windows only&#8217;&#8216;&#8217;) Download and install the <a class="reference external" href="http://nsis.sourceforge.net/Main_Page">Nullsoft Scriptable
+Install System (NSIS)</a>,
+which is used to create graphical installers on Windows. Unix users
+do not need to install any extra tools.</li>
+<li>Using the same development tools for building Boost, build the
+&#8220;package&#8221; target to create the binary installers.<ul>
+<li>With Microsoft Visual Studio, build the target named <tt class="docutils literal"><span class="pre">PACKAGE</span></tt></li>
+<li>With makefiles, run ` make package``.</li>
+</ul>
+</li>
+</ol>
+<p>The output of the packaging process will be one or more binary
+packages of the form Boost-<em>version</em>-<em>platform</em>.*extension*. The
+type of package will differ from one platform to another:</p>
+<ul class="simple">
+<li>On Windows: The primary output is an executable (<tt class="docutils literal"><span class="pre">.exe</span></tt>) that
+provides a graphical installer.</li>
+<li>On Mac OS X: The primary output is a disk image (<tt class="docutils literal"><span class="pre">.dmg</span></tt>) that
+contains a graphical installer package.</li>
+<li>On Unix: Packaging produces compressed tarballs (<tt class="docutils literal"><span class="pre">.tar.gz</span></tt>) and
+a self-installing shell script (<tt class="docutils literal"><span class="pre">.sh</span></tt>)</li>
+</ul>
+<p>Windows installer:</p>
+<img alt="_images/WindowsInstaller.png" src="_images/WindowsInstaller.png" />
+<p>Mac installer:</p>
+<img alt="_images/MacInstaller.png" src="_images/MacInstaller.png" />
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="notes_by_version.html" title="Notes by Boost Version"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="adding_regression_tests.html" title="Adding Regression Tests"
+             >previous</a> |</li>
+    <li><a href="http://www.boost.org/">Boost</a> &raquo;</li>
+    
+        <li><a href="index.html">Boost.CMake 1.41.0.cmake0</a> &raquo;</li>
+ 
+      </ul>
+    </div>
+    <div class="footer">
+      &copy; Copyright 2008-2009, Troy D. Straszheim, 2008 Douglas Gregor --  Version bc009eaa45da9c417f10b76f02a9af1718456165, Thu, 26 Nov 2009.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 0.6.2.
+    </div>
+  </body>
+</html>

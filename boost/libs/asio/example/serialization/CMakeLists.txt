@@ -1,0 +1,15 @@
+foreach(
+    example
+    server
+    client
+)
+boost_add_executable(
+    ${example}
+    DEPENDS
+    boost_serialization
+    boost_system
+    TARGET_PREFIX
+    "serialization-"
+)
+endforeach(
+)

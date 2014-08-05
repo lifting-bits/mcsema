@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioPropertySheet
+	ProjectType="Visual C++"
+	Version="8.00"
+	Name="postgresql"
+	>
+	<Tool
+		Name="VCCLCompilerTool"
+		AdditionalIncludeDirectories="$(POSTGRESQL_ROOT)/include"
+	/>
+	<Tool
+		Name="VCLinkerTool"
+		AdditionalDependencies="libpq.lib"
+		AdditionalLibraryDirectories="$(POSTGRESQL_ROOT)/lib"
+	/>
+	<UserMacro
+		Name="POSTGRESQL_ROOT"
+		Value="c:\software\PostgreSQL\8.4"
+	/>
+</VisualStudioPropertySheet>

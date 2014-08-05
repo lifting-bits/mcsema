@@ -1,0 +1,994 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  <meta http-equiv="Content-Language" content="en-us">
+
+  
+  <meta http-equiv="Content-Type" content="text/html; charset=windows-1252"><title>Voronoi Diagram</title>
+  
+
+  
+  
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+
+  
+  <meta http-equiv="content-type" content="text/html; charset=utf-8"></head><body>
+<table style="margin: 0pt; padding: 0pt; width: 100%;" border="0" cellpadding="0" cellspacing="0">
+
+  <tbody>
+    <tr>
+      <td style="background-color: rgb(238, 238, 238);" nowrap="1" valign="top">
+      <div style="padding: 5px;" align="center"> <img src="images/boost.png" border="0" height="86" width="277"><a title="www.boost.org home page" tabindex="2" style="border: medium none ;" href="http://www.boost.org/"> </a></div>
+      <div style="margin: 5px;">
+      <h3 class="navbar">Contents</h3>
+      <ul>
+        <li><a href="index.htm">Boost.Polygon Main Page</a></li>
+        <li><a href="gtl_design_overview.htm">Design Overview</a></li>
+        <li><a href="gtl_isotropy.htm">Isotropy</a></li>
+        <li><a href="gtl_coordinate_concept.htm">Coordinate Concept</a></li>
+        <li><a href="gtl_interval_concept.htm">Interval Concept</a></li>
+        <li><a href="gtl_point_concept.htm">Point Concept</a></li>
+        <li><a href="gtl_segment_concept.htm">Segment Concept</a></li>
+
+        <li><a href="gtl_rectangle_concept.htm">Rectangle Concept</a></li>
+        <li><a href="gtl_polygon_90_concept.htm">Polygon 90 Concept</a></li>
+        <li><a href="gtl_polygon_90_with_holes_concept.htm">Polygon 90
+With Holes Concept</a></li>
+        <li><a href="gtl_polygon_45_concept.htm">Polygon 45 Concept</a></li>
+        <li><a href="gtl_polygon_45_with_holes_concept.htm">Polygon 45
+With Holes Concept</a></li>
+        <li><a href="gtl_polygon_concept.htm">Polygon Concept</a></li>
+        <li><a href="gtl_polygon_with_holes_concept.htm">Polygon With
+Holes Concept</a></li>
+        <li><a href="gtl_polygon_90_set_concept.htm">Polygon 90 Set
+Concept</a></li>
+        <li><a href="gtl_polygon_45_set_concept.htm">Polygon 45 Set
+Concept</a></li>
+        <li><a href="gtl_polygon_set_concept.htm">Polygon Set Concept</a></li>
+        <li><a href="gtl_connectivity_extraction_90.htm">Connectivity
+Extraction 90</a></li>
+        <li><a href="gtl_connectivity_extraction_45.htm">Connectivity
+Extraction 45</a></li>
+        <li><a href="gtl_connectivity_extraction.htm">Connectivity
+Extraction</a></li>
+        <li><a href="gtl_property_merge_90.htm">Property Merge 90</a></li>
+        <li><a href="gtl_property_merge_45.htm">Property Merge 45</a></li>
+        <li><a href="gtl_property_merge.htm">Property Merge</a></li>
+        <li><a href="voronoi_main.htm">Voronoi Main Page<br>
+          </a></li>
+        <li><a href="voronoi_benchmark.htm">Voronoi Benchmark</a></li>
+        <li><a href="voronoi_builder.htm">Voronoi Builder</a><br>
+        </li>
+        <li>Voronoi Diagram</li>
+        <li><a href="voronoi_predicates.htm">Voronoi Predicates</a></li>
+        <li><a href="voronoi_robust_fpt.htm">Voronoi Robust FPT</a><br>
+        </li>
+        
+      </ul>
+      <h3 class="navbar">Other Resources</h3>
+      <ul>
+        <li><a href="GTL_boostcon2009.pdf">GTL Boostcon 2009 Paper</a></li>
+        <li><a href="GTL_boostcon_draft03.pdf">GTL Boostcon 2009
+Presentation</a></li>
+        <li><a href="analysis.htm">Performance Analysis</a></li>
+        <li><a href="gtl_tutorial.htm">Layout Versus Schematic Tutorial</a></li>
+        <li><a href="gtl_minkowski_tutorial.htm">Minkowski Sum Tutorial</a></li>
+        <li><a href="voronoi_basic_tutorial.htm">Voronoi Basic Tutorial</a></li>
+        <li><a href="voronoi_advanced_tutorial.htm">Voronoi Advanced
+Tutorial</a></li>
+      </ul>
+      </div>
+      <h3 class="navbar">Polygon Sponsor</h3>
+      <div style="padding: 5px;" align="center"> <img src="images/intlogo.gif" border="0" height="51" width="127"><a title="www.adobe.com home page" tabindex="2" style="border: medium none ;" href="http://www.adobe.com/"> </a></div>
+      </td>
+      <td style="padding-left: 10px; padding-right: 10px; padding-bottom: 10px;" valign="top" width="100%"><!-- End Header --> <br>
+      
+      <h1>Voronoi Diagram</h1>
+Voronoi
+diagram is the computational geometry concept that represents partition
+of the given space onto regions, with bounds determined by distances to a
+specified family of objects. The application area of this concept vary <a href="http://www.ics.uci.edu/%7Eeppstein/gina/scot.drysdale.html">from
+Archaeology to Zoology</a>. The Boost.Polygon library provides implementation of
+the Voronoi diagram data structure in 2D space. The internal representation
+consists of the three arrays, that respectively contain: Voronoi cells
+(represent the area around the input sites bounded by the Voronoi edges), Voronoi vertices
+(points where three or more Voronoi edges intersect), Voronoi edges
+(the one dimensional curves containing points equidistant from the two
+closest input sites). Each of the primitives (cell, vertex, edge)
+contains pointers to the other linked primitives, so that it's always
+possible to efficiently traverse Voronoi graph. The picture below shows
+the Voronoi vertices in red, Voronoi edges in black, input sites that
+correspond to the Voronoi cells in blue. It is considered that each
+input segment consists of the three sites: segment itself and its
+endpoints. As the result two additional
+Voronoi edges are constructed per each input segment. This is made to
+simplify the representation of the Voronoi diagram.<br>
+      <br>
+
+      
+      <img style="border: 1px solid ; width: 300px; height: 300px;" alt="" src="images/voronoi2.png"><br>
+      <h2>Important</h2>All
+the Voronoi primitive data structures (edge, vertex, cell) contain
+mutable color member. Color type is equivalent to the std::size_t type,
+except that the upper five bits are reserved for the internal usage.
+That would mean that the maximum supported value by color member is 32
+times less than the one supported by std::size_t.<br>
+      <h2>Declaration<br>
+      </h2>
+
+
+
+
+      
+      <span style="font-family: Courier New,Courier,monospace;">template
+&lt;typename T, typename TRAITS = voronoi_diagram_traits&lt;T&gt; &gt;</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">class
+voronoi_diagram;<br>
+      <br>
+</span><font face="Courier New"><span style="font-family: 'Courier New',Courier,monospace;">T</span></font>
+- specifies the coordinate type of the Voronoi vertices.<br>
+      <span style="font-family: Courier New,Courier,monospace;">TRAITS</span><font face="Courier New"><span style="font-family: 'Courier New',Courier,monospace;"></span></font>
+- Voronoi diagram traits (explained in the end of this chapter).<br>
+      <h2>Member Functions</h2>
+
+      <span style="font-family: Courier New,Courier,monospace;">
+      
+      </span>
+      <table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
+        <tbody>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;"><span style="font-weight: bold;">voronoi_diagram</span>()<br>
+            </td>
+            <td>Default constructor.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">void
+            <span style="font-weight: bold;">clear</span>()<br>
+            </td>
+            <td>Clears diagram.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+cell_container_type&amp; <span style="font-weight: bold;">cells</span>() const<br>
+            </td>
+            <td>Returns the const
+reference to the cell container.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+vertex_container_type&amp; <span style="font-weight: bold;">vertices</span>() const<br>
+            </td>
+            <td>Returns the const
+reference to the vertex container.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+edge_container_type&amp; <span style="font-weight: bold;">edges</span>() const<br>
+            </td>
+            <td>Returns the const
+reference to the edge container.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">size_t <span style="font-weight: bold;">num_cells</span>() const<br>
+            </td>
+            <td>Returns the number of the
+cells in the Voronoi diagram.<br>
+This value should be the same as the size of the cell container.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">size_t <span style="font-weight: bold;">num_edges</span>() const<br>
+            </td>
+            <td>Returns the number of the
+edges (half-edges) in the Voronoi diagram.<br>This value should be the same as the size of the edge container.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">size_t <span style="font-weight: bold;">num_vertices</span>() const<br>
+            </td>
+            <td>Returns the number of the
+vertices in the Voronoi diagram.<br>
+This value should be the same as the size of the vertex container.<br>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <h2>Member Types</h2>
+      <table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
+        <tbody>
+          <tr>
+            <td style="font-weight: bold;">coordinate_type<br>
+            </td>
+            <td>Coordinate type.<br>
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="font-weight: bold;">cell_type<br>
+            </td>
+            <td>Voronoi cell.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">vertex_type<br>
+            </td>
+            <td>Voronoi vertex.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">edge_type<br>
+            </td>
+            <td>Voronoi edge.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">cell_container_type<br>
+            </td>
+            <td>Container of Voronoi cells.<br>
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="font-weight: bold;">const_cell_iterator<br>
+            </td>
+            <td>Const cell container iterator.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">vertex_container_type<br>
+            </td>
+            <td>Container of Voronoi vertices.<br>
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="font-weight: bold;">const_vertex_iterator<br>
+            </td>
+            <td>Const vertex container iterator.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">edge_container_type<br>
+            </td>
+            <td>Container of Voronoi edges.<br>
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="font-weight: bold;">const_edge_iterator<br>
+            </td>
+            <td>Const edge container iterator.<br>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+
+      
+      <h1>Voronoi Geometry Type<br>
+      </h1>
+      <h2>GeometryCategory<br>
+      </h2>
+Defines geometry type of the input objects.<br>
+      <br>
+      <span style="font-family: Courier New,Courier,monospace;">enum GeometryCategory {</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp; GEOMETRY_CATEGORY_POINT = 0x0,</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp; GEOMETRY_CATEGORY_SEGMENT = 0x1</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">};</span><br>
+      <h2>SourceCategory</h2>
+
+Defines category of the input site that forms Voronoi cell.<br>
+      <br>
+      <span style="font-family: Courier New,Courier,monospace;">enum SourceCategory {</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp; // Point subtypes.</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp; SOURCE_CATEGORY_SINGLE_POINT = 0x0,</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp; SOURCE_CATEGORY_SEGMENT_START_POINT = 0x1,</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp; SOURCE_CATEGORY_SEGMENT_END_POINT = 0x2,</span><br style="font-family: Courier New,Courier,monospace;">
+      <br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp; // Segment subtypes.</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp; SOURCE_CATEGORY_INITIAL_SEGMENT = 0x8,</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp; SOURCE_CATEGORY_REVERSE_SEGMENT = 0x9,</span><br style="font-family: Courier New,Courier,monospace;">
+      <br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp; SOURCE_CATEGORY_GEOMETRY_SHIFT = 0x3,</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp; SOURCE_CATEGORY_BITMASK = 0x1F</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">};</span><br>
+      <br>
+Voronoi
+diagram data structure doesn't store coordinates of the input
+geometries.
+Instead it links with those via source index and source category method
+of the Voronoi cell primitive. Source index is incrementally given
+(starting from zero) to each input site inserted into Voronoi builder.
+Considering the fact that each input segment is splitted onto three
+separate sites with the same index, we distinguish between them using
+SourceCategory. For the example see <a href="voronoi_basic_tutorial.htm">Voronoi basic tutorial</a>.<br>
+      <h2>Member Functions</h2>
+      <table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
+        <tbody>
+          <tr>
+            <td style="vertical-align: top;"><span style="font-family: Courier New,Courier,monospace;">bool <span style="font-weight: bold;">belongs</span>(</span><br style="font-family: Courier New,Courier,monospace;">
+            <span style="font-family: Courier New,Courier,monospace;">&nbsp; &nbsp; SourceCategory source_category,</span><br style="font-family: Courier New,Courier,monospace;">
+            <span style="font-family: Courier New,Courier,monospace;">&nbsp;&nbsp;&nbsp; GeometryCategory geometry_category)</span><br>
+            </td>
+            <td style="vertical-align: middle;">Returns true if source category belongs to the given geometry category.<br>
+Returns false else.<br>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <h1>Voronoi Edge</h1>
+
+
+Voronoi edge is represented as enhanced classical <a href="http://www.flipcode.com/archives/The_Half-Edge_Data_Structure.shtml">half-edge</a>
+data structure.<br>
+      <h2>Declaration</h2>
+
+
+      
+      <span style="font-family: Courier New,Courier,monospace;">template
+&lt;typename T&gt;</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">class
+voronoi_edge;<br>
+      <br>
+T</span> - coordinate type.<br>
+      <h2>Member Functions</h2>
+
+      <span style="font-family: Courier New,Courier,monospace;">
+      
+      </span>
+      <table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
+        <tbody>
+          
+          <tr>
+            <td><span style="font-family: Courier New,Courier,monospace;"><span style="font-weight: bold;">voronoi_edge</span>(bool is_linear, bool is_primary)</span><br>
+            </td>
+            <td>Voronoi edge constructor.<br>
+            </td>
+          </tr>
+<tr>
+            <td style="font-family: Courier New,Courier,monospace;">voronoi_cell_type* <span style="font-weight: bold;">cell</span>()<br>
+            </td>
+            <td>Returns the pointer to the
+Voronoi <span style="font-family: Courier New,Courier,monospace;"></span>cell
+that edge belongs to.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+voronoi_cell_type* <span style="font-weight: bold;">cell</span>() const<br>
+            </td>
+            <td>Returns the const pointer
+to the Voronoi cell that edge belongs to.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">void
+            <span style="font-weight: bold;">cell</span>(voronoi_cell_type* c)<br>
+            </td>
+            <td>Sets the Voronoi cell
+pointer for the cell current edge belongs to.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">voronoi_vertex_type* <span style="font-weight: bold;">vertex0</span>()<br>
+            </td>
+            <td>Returns the pointer to the
+start point of the edge.<br>
+If the edge is infinite in that direction returns NULL.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+voronoi_vertex_type* <span style="font-weight: bold;">vertex0</span>() const<br>
+            </td>
+            <td>Returns the const pointer
+to the point vertex of the edge.<br>
+If the edge is infinite in that direction returns NULL.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">void
+            <span style="font-weight: bold;">vertex0</span>(voronoi_vertex_type* v)<br>
+            </td>
+            <td>Sets the start point
+pointer of the edge.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">voronoi_vertex_type* <span style="font-weight: bold;">vertex1</span>()<br>
+            </td>
+            <td>Returns the pointer to the
+end point of the edge.<br>
+If the edge is infinite in that direction returns NULL.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+voronoi_vertex_type* <span style="font-weight: bold;">vertex1</span>() const<br>
+            </td>
+            <td>Returns the const pointer
+to the end point of the edge.<br>
+If the edge is infinite in that direction returns NULL.<br>
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">voronoi_edge_type* <span style="font-weight: bold;">twin</span>()<br>
+            </td>
+            <td>Returns the pointer to the
+twin edge.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+voronoi_edge_type* <span style="font-weight: bold;">twin</span>() const<br>
+            </td>
+            <td>Returns the const pointer
+to the twin edge.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">void
+            <span style="font-weight: bold;">twin</span>(voronoi_edge_type* e)<br>
+            </td>
+            <td>Sets the twin edge pointer
+of the edge.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">voronoi_edge_type* <span style="font-weight: bold;">next</span>()<br>
+            </td>
+            <td>Returns the pointer to the
+CCW next edge within the corresponding Voronoi cell.<br>
+Edges not necessarily share a common vertex (e.g. infinite edges).<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+voronoi_edge_type* <span style="font-weight: bold;">next</span>() const<br>
+            </td>
+            <td>Returns the const pointer
+to the CCW next edge within the corresponding Voronoi cell.<br>
+Edges not necessarily share a common vertex (e.g. infinite edges).<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">void
+            <span style="font-weight: bold;">next</span>(voronoi_edge_type* e)<br>
+            </td>
+            <td>Sets the CCW next edge
+pointer of the edge.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">voronoi_edge_type* <span style="font-weight: bold;">prev</span>()<br>
+            </td>
+            <td>Returns the pointer to the
+CCW prev edge within the corresponding Voronoi cell.<br>
+Edges not necessarily share a common vertex (e.g. infinite edges).<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+voronoi_edge_type* <span style="font-weight: bold;">prev</span>() const<br>
+            </td>
+            <td>Returns the const pointer
+to the CCW prev edge within the corresponding Voronoi cell.<br>
+Edges not necessarily share a common vertex (e.g. infinite edges).<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">void
+            <span style="font-weight: bold;">prev</span>(voronoi_edge_type* e)<br>
+            </td>
+            <td>Sets the CCW prev edge
+pointer of the edge.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">color_type <span style="font-weight: bold;">color</span>() const<br>
+            </td>
+            <td>Returns the color value.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">void <span style="font-weight: bold;">color</span>(color_type color) const<br>
+            </td>
+            <td>Sets the color of
+the edge.<br>
+Allows to execute graph algorithms and associate data.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">voronoi_edge_type* <span style="font-weight: bold;">rot_next</span>()<br>
+            </td>
+            <td>Returns the pointer to the
+CCW next edge rotated around the edge start point.<br>Works for infinite
+              edges as well.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+voronoi_edge_type* <span style="font-weight: bold;">rot_next</span>() const<br>
+            </td>
+            <td>Returns the const pointer
+to the CCW next edge rotated around the edge start point.<br>Works for infinite edges as well.</td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">voronoi_edge_type* <span style="font-weight: bold;">rot_prev</span>()<br>
+            </td>
+            <td>Returns the pointer to the
+CCW prev edge rotated around the edge start point.<br>Works for infinite edges as well.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+voronoi_edge_type* <span style="font-weight: bold;">rot_prev</span>() const<br>
+            </td>
+            <td>Returns the const pointer
+to the CCW prev edge rotated around the edge start point.<br>Works for infinite edges as well.</td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">bool
+            <span style="font-weight: bold;">is_finite</span>() const<br>
+            </td>
+            <td>Returns true if the both
+end points of the edge are finite, else false.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">bool
+            <span style="font-weight: bold;">is_infinite</span>() const</td>
+            <td>Returns true if one of the
+end points of the edge is infinite, else false.</td>
+          </tr>
+<tr>
+            <td style="font-family: Courier New,Courier,monospace;">bool
+            <span style="font-weight: bold;">is_linear</span>() const<br>
+            </td>
+            <td>Returns true if the edge
+is linear (segment, ray, line), else false.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">bool
+            <span style="font-weight: bold;">is_curved</span>() const<br>
+            </td>
+            <td>Returns true if the edge
+is curved (parabolic arc), else false.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">bool
+            <span style="font-weight: bold;">is_primary</span>() const<br>
+            </td>
+            <td>Returns false if the edge
+goes through the endpoint of the segment site, else true.<br>
+            </td>
+          </tr><tr>
+            <td style="font-family: Courier New,Courier,monospace;">bool
+            <span style="font-weight: bold;">is_secondary</span>() const</td>
+            <td>Returns true if the edge
+goes through the endpoint of the segment site, else false.</td>
+          </tr>
+
+        </tbody>
+      </table>
+      <span style="font-family: Courier New,Courier,monospace;"><br>
+      </span>All
+the above methods have O(1) complexity. The size of
+the Voronoi edge structure is equal to: 5 * sizeof(void *) + sizeof(size_t).<span style="font-family: Courier New,Courier,monospace;"></span><br>
+      <h2>Member Types</h2>
+
+      <table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
+        <tbody>
+          <tr>
+            <td style="font-weight: bold;">coordinate_type<br>
+            </td>
+            <td>Coordinate type.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">voronoi_cell_type<br>
+            </td>
+            <td>Voronoi cell type.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">voronoi_vertex_type<br>
+            </td>
+            <td>Voronoi vertex type.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">voronoi_edge_type<br>
+            </td>
+            <td>Voronoi edge type.<br>
+            </td>
+          </tr><tr>
+            <td style="vertical-align: top; font-weight: bold;">color_type<br>
+            </td>
+            <td style="vertical-align: top;">Color type (check the Important section).<br>
+            </td>
+          </tr>
+
+        </tbody>
+      </table>
+      <h1>Voronoi Cell</h1>
+
+Voronoi cell is represented by a site the cell contains and a pointer
+to the incident edge.<br>
+      <h2>Declaration</h2>
+
+
+      
+      <span style="font-family: Courier New,Courier,monospace;">template
+&lt;typename T&gt;<br>
+class voronoi_cell;<br>
+      <br>
+</span><span style="font-family: Courier New,Courier,monospace;">T</span> - coordinate type.<br>
+      <h2>Member Functions</h2>
+
+      <span style="font-family: Courier New,Courier,monospace;">
+      
+      </span>
+      <table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
+        <tbody>
+          
+          
+          <tr>
+            <td><span style="font-family: Courier New,Courier,monospace;"><span style="font-weight: bold;">voronoi_cell</span>(source_index_type source_index,</span><span style="font-family: Courier New,Courier,monospace;"><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; source_category_type source_category)</span><br>
+            </td>
+            <td>Voronoi cell constructor.<br>
+            </td>
+          </tr>
+<tr>
+            <td style="font-family: Courier New,Courier,monospace;">source_index_type <span style="font-weight: bold;">source_index</span>() const<br>
+            </td>
+            <td>Returns input site index among the other sites.<br>
+Both segment endpoints and segment itself will have the same index.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">source_category_type <span style="font-weight: bold;">source_category</span>() const<br>
+            </td>
+            <td>Returns input site category among the other sites.<br>
+Allows to distinguish between segment site and its endpoints.<br>
+
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">voronoi_edge_type* <span style="font-weight: bold;">incident_edge</span>()<br>
+            </td>
+            <td>Returns the pointer to the
+one of the boundary edges.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+voronoi_edge_type* <span style="font-weight: bold;">incident_edge</span>() const<br>
+            </td>
+            <td>Returns the const pointer
+to the one of the boundary edges.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">void
+            <span style="font-weight: bold;">incident_edge</span>(voronoi_edge_type* e)<br>
+            </td>
+            <td>Sets the incident boundary
+edge pointer of the cell.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">color_type <span style="font-weight: bold;">color</span>() const<br>
+            </td>
+            <td>Returns the color associated with the cell.</td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">void <span style="font-weight: bold;">color</span>(color_type color) const<br>
+            </td>
+            <td>Sets the color of
+the cell.<br>
+
+Allows to execute graph algorithms and associate data.<br>
+</td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">bool
+            <span style="font-weight: bold;">contains_point</span>() const</td>
+            <td>Returns true if the cell
+contains a point site, else false.</td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">bool
+            <span style="font-weight: bold;">contains_segment</span>() const</td>
+            <td>Returns true if the cell
+contains a segment site, else false.</td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">bool
+            <span style="font-weight: bold;">is_degenerate</span>() const </td>
+            <td>Returns true if the cell
+doesn't have an incident edge.<br>
+Could happen if a few input segments share a common endpoint.</td>
+          </tr>
+        </tbody>
+      </table>
+      <span style="font-family: Courier New,Courier,monospace;"><br>
+      </span>All the above methods have O(1) complexity. The size of
+the Voronoi cell structure is equal to: sizeof(void *) + 2 * sizeof(size_t).<span style="font-family: Courier New,Courier,monospace;"></span>
+      <h2>Member Types</h2>
+
+
+      
+      <table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
+        <tbody>
+          <tr>
+            <td style="font-weight: bold;">coordinate_type<br>
+            </td>
+            <td>Coordinate type.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">source_index_type</td>
+            <td>Source index type.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="vertical-align: top; font-weight: bold;">source_category_type<br>
+            </td>
+            <td style="vertical-align: top;">Source category type.<br>
+            </td>
+          </tr>
+<tr>
+            <td style="vertical-align: top; font-weight: bold;">voronoi_edge_type
+            </td>
+            <td style="vertical-align: top;">Voronoi edge type.
+            </td>
+          </tr>
+<tr>
+            <td style="font-weight: bold;">color_type
+            </td>
+            <td>Color type (check the Important section).
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <h2>Miscellaneous</h2>
+
+The following code snippet effectively traverses the Voronoi edges around the
+Voronoi cell:<br>
+      <br>
+      <span style="font-family: Courier New,Courier,monospace;">const
+voronoi_edge&lt;double&gt;* edge = cell-&gt;incident_edge();</span><br>
+      <span style="font-family: Courier New,Courier,monospace;">do {</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp;
+edge = edge-&gt;next();</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp;
+// Do smth. with edge.</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">} while
+(edge != cell-&gt;incident_edge());</span><br>
+      <h1>Voronoi Vertex</h1>
+Voronoi vertex is represented by a point that corresponds to the vertex
+and a pointer to the incident edge.<br>
+      <h2>Declaration</h2>
+
+
+      
+      <span style="font-family: Courier New,Courier,monospace;">template
+&lt;typename T&gt;</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">class
+voronoi_vertex;<br>
+      <br>
+</span><span style="font-family: Courier New,Courier,monospace;">T</span> - coordinate type.<br>
+      <h2>Member Functions</h2>
+
+      <span style="font-family: Courier New,Courier,monospace;">
+      
+      </span>
+      <table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
+        <tbody>
+          
+          <tr>
+            <td><span style="font-family: Courier New,Courier,monospace;"><span style="font-weight: bold;">voronoi_vertex</span>(const coordinate_type&amp; x,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const coordinate_type&amp; y)</span><span style="font-family: Courier New,Courier,monospace;"></span><br>
+            </td>
+            <td>Voronoi vertex constructor.<br>
+            </td>
+          </tr>
+<tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+point_type&amp; <span style="font-weight: bold;">x</span>() const<br>
+            </td>
+            <td>Returns the x-coordinate of the point that represents the vertex.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+point_type&amp; <span style="font-weight: bold;">y</span>() const</td>
+            <td>Returns the y-coordinate of the point that represents the vertex.<br>
+            </td>
+          </tr>
+<tr>
+            <td style="font-family: Courier New,Courier,monospace;">voronoi_edge_type* <span style="font-weight: bold;">incident_edge</span>()<br>
+            </td>
+            <td>Returns the incident edge
+pointer.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">const
+voronoi_edge_type* <span style="font-weight: bold;">incident_edge</span>() const<br>
+            </td>
+            <td>Returns the const pointer
+to the incident edge.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">void
+            <span style="font-weight: bold;">incident_edge</span>(voronoi_edge_type* e)<br>
+            </td>
+            <td>Sets the incident edge
+pointer.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">color_type <span style="font-weight: bold;">color</span>() const<br>
+            </td>
+            <td>Returns the color associated with the vertex.</td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace;">void <span style="font-weight: bold;">color</span>(color_type color) const<br>
+            </td>
+            <td>Sets the color of
+the vertex.<br>
+Allows to executegraph algorithms and associate data.</td>
+          </tr>
+        </tbody>
+      </table>
+      <span style="font-family: Courier New,Courier,monospace;"><br>
+      </span>All the above methods have O(1) complexity. The size of
+the Voronoi vertex structure is equal to: sizeof(void *) + sizeof(size_t) + 2 *
+sizeof(coordinate_type).<span style="font-family: Courier New,Courier,monospace;"></span>
+      <h2>Member Types</h2>
+      <table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
+        <tbody>
+          <tr>
+            <td style="font-weight: bold;">coordinate_type<br>
+            </td>
+            <td>Coordainte type.<br>
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="vertical-align: top; font-weight: bold;">voronoi_edge_type<br>
+            </td>
+            <td style="vertical-align: top;">Voronoi edge type.<br>
+            </td>
+          </tr>
+<tr>
+            <td style="font-weight: bold;">color_type
+            </td>
+            <td>Color type (check the Important section).
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Miscellaneous</h2>The following code snippet effectively traverses the Voronoi edges around the
+Voronoi vertex:<br>
+      <br>
+      <span style="font-family: Courier New,Courier,monospace;">const
+voronoi_edge&lt;double&gt;* edge = vertex-&gt;incident_edge();</span><br>
+      <span style="font-family: Courier New,Courier,monospace;">do {</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp;
+edge = edge-&gt;next();</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">&nbsp;
+// Do smth. with edge.</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">} while
+(edge != vertex-&gt;incident_edge());<br>
+</span>
+      <h1>Voronoi Diagram Traits<br>
+      </h1>
+Voronoi diagram traits are used to configure Voronoi diagram data
+structure.<br>
+      <h2>Declaration</h2>
+
+
+      
+      <span style="font-family: Courier New,Courier,monospace;">template
+&lt;typename T&gt;</span><br style="font-family: Courier New,Courier,monospace;">
+      <span style="font-family: Courier New,Courier,monospace;">struct
+voronoi_diagram_traits;<br>
+      <br>
+</span><span style="font-family: Courier New,Courier,monospace;">T</span> - coordinate type.<br>
+      <h2>Member Types</h2>
+
+      <span style="font-family: Courier New,Courier,monospace;">
+      
+      </span>
+      <table style="text-align: left; width: 100%;" border="1" cellpadding="2" cellspacing="2">
+        <tbody>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace; font-weight: bold;">coordinate_type<br>
+            </td>
+            <td>The main coordinate type
+of the Voronoi diagram primitives.<br>
+            </td>
+          </tr>
+          
+          
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace; font-weight: bold;">cell_type<br>
+            </td>
+            <td>Voronoi cell type.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace; font-weight: bold;">vertex_type<br>
+            </td>
+            <td>Voronoi vertex_type.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace; font-weight: bold;">edge_type<br>
+            </td>
+            <td>Voronoi edge_type.<br>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-family: Courier New,Courier,monospace; font-weight: bold;">vertex_equality_predicate_type<br>
+            </td>
+            <td>Predicate that returns
+true if two points are considered to be equal.<br>
+This is used to unite nearby Voronoi vertices.<br>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: rgb(238, 238, 238);" nowrap="1" valign="top">&nbsp;</td>
+      <td style="padding-left: 10px; padding-right: 10px; padding-bottom: 10px;" valign="top" width="100%">
+      <table class="docinfo" id="table2" frame="void" rules="none">
+        <colgroup> <col class="docinfo-name"><col class="docinfo-content"> </colgroup> <tbody valign="top">
+          <tr>
+            <th class="docinfo-name">Copyright:</th>
+            <td>Copyright © Andrii Sydorchuk 2010-2012.</td>
+          </tr>
+          <tr class="field">
+            <th class="docinfo-name">License:</th>
+            <td class="field-body">Distributed under the Boost Software
+License, Version 1.0. (See accompanying file <tt class="literal"><span class="pre">LICENSE_1_0.txt</span></tt> or copy at <a class="reference" target="_top" href="http://www.boost.org/LICENSE_1_0.txt">
+http://www.boost.org/LICENSE_1_0.txt</a>)</td>
+          </tr>
+        </tbody>
+      </table>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+
+</body></html>

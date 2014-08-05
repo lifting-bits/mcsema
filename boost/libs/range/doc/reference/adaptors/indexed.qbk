@@ -1,0 +1,93 @@
+[/
+    Copyright 2010 Neil Groves
+    Distributed under the Boost Software License, Version 1.0.
+    (See accompanying file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+/]
+[section:indexed indexed]
+
+[table
+    [[Syntax] [Code]]
+    [[Pipe] [`rng | boost::adaptors::indexed`]]
+    [[Function] [`boost::adaptors::index(rng)`]]
+]
+
+* [*Returns:] A range adapted to return both the element and the associated index. The returned range consists of iterators that have in addition to the usual iterator member functions an `index()` member function that returns the appropriate index for the element in the sequence corresponding with the iterator.
+* [*Range Category:] __single_pass_range__
+* [*Range Return Type:] `boost::indexed_range<typeof(rng)>`
+* [*Returned Range Category:] The range category of `rng`
+
+[section:indexed_example indexed example]
+``
+#include <boost/range/adaptor/indexed.hpp>
+#include <boost/range/algorithm/copy.hpp>
+#include <boost/assign.hpp>
+#include <algorithm>
+#include <iostream>
+#include <vector>
+
+template<class Iterator>
+void display_element_and_index(Iterator first, Iterator last)
+{
+    for (Iterator it = first; it != last; ++it)
+    {
+        std::cout << "Element = " << *it << " Index = " << it.index() << std::endl;
+    }
+}
+
+template<class SinglePassRange>
+void display_element_and_index(const SinglePassRange& rng)
+{
+    display_element_and_index(boost::begin(rng), boost::end(rng));
+}
+
+template<class Iterator1, class Iterator2>
+void check_element_and_index(
+        Iterator1 test_first,
+        Iterator1 test_last,
+        Iterator2 reference_first,
+        Iterator2 reference_last)
+{
+    BOOST_CHECK_EQUAL( std::distance(test_first, test_last),
+                       std::distance(reference_first, reference_last) );
+
+    int reference_index = 0;
+
+    Iterator1 test_it = test_first;
+    Iterator2 reference_it = reference_first;
+    for (; test_it != test_last; ++test_it, ++reference_it, ++reference_index)
+    {
+        BOOST_CHECK_EQUAL( *test_it, *reference_it );
+        BOOST_CHECK_EQUAL( test_it.index(), reference_index );
+    }
+}
+
+int main(int argc, const char* argv[])
+{
+    using namespace boost::assign;
+    using namespace boost::adaptors;
+
+    std::vector<int> input;
+    input += 10,20,30,40,50,60,70,80,90;
+
+    display_element_and_index( input | indexed(0) );
+
+    return 0;
+}
+``
+[endsect]
+
+This would produce the output:
+``
+Element = 10 Index = 0
+Element = 20 Index = 1
+Element = 30 Index = 2
+Element = 40 Index = 3
+Element = 50 Index = 4
+Element = 60 Index = 5
+Element = 70 Index = 6
+Element = 80 Index = 7
+Element = 90 Index = 8
+``
+[endsect]
+
+

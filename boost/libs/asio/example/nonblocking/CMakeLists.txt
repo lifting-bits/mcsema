@@ -1,0 +1,11 @@
+foreach(
+    example
+    third_party_lib
+)
+boost_add_executable(
+    ${example}
+    DEPENDS
+    boost_system
+)
+endforeach(
+)

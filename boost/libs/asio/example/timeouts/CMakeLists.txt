@@ -1,0 +1,14 @@
+foreach(
+    example
+    async_tcp_client
+    blocking_tcp_client
+    blocking_udp_client
+    server
+)
+boost_add_executable(
+    ${example}
+    DEPENDS
+    boost_system
+)
+endforeach(
+)
