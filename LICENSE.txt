@@ -14,7 +14,7 @@ so, subject to the following conditions:
       this list of conditions and the following disclaimers in the
       documentation and/or other materials provided with the distribution.
 
-    * Neither the names of Trail of Bits, DARPA, nor the names of contributors 
+    * Neither the names of Trail of Bits, nor the names of contributors 
       may be used to endorse or promote products derived from this Software 
       without specific prior written permission.
 

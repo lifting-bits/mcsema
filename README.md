@@ -1,7 +1,7 @@
 MC-Semantics
 ============
 
-MC-Semantics (or mcsema) is a library to translate the semantics of native code to LLVM IR. The MC-Semantics project is separated into a few sub-projects: 
+MC-Semantics (or mcsema, pronounced 'em see se ma') is a library to translate the semantics of native code to LLVM IR. The MC-Semantics project is separated into a few sub-projects: 
   * Control Flow Recovery
   * Instruction Semantics
   * Binary File Parsing
@@ -15,9 +15,9 @@ Patches are welcome.
 
 MC-Semantics is separated into two conceptual parts: control flow recovery and instruction translation. 
 
-The two parts communicate via a control flow graph structure that contains native code. This control flow graph structure connects basic blocks and defines information about external calls, but provides no further semantic information. The control flow graph may also be serialized via Google Protocol Buffers. 
+The two parts communicate via a control flow graph structure that contains native code. This control flow graph structure connects basic blocks and defines information about external calls, but provides no further semantic information.
 
-The `bin_descend` program attempts to recover a control flow graph from a given binary file. It will write the recovered control flow graph into a protocol buffer serialized file. There is also an IDAPython script to recover control flow from within IDA Pro.
+The `bin_descend` program attempts to recover a control flow graph from a given binary file. It will write the recovered control flow graph into a Google Protocol Buffer serialized file. There is also an IDAPython script to recover control flow from within IDA Pro.
 
 The `cfg_to_bc` program attempts to convert a control flow graph structure into LLVM bitcode. This translation process is more a transcription act than an analysis, since a control flow structure has already been recovered.
 
