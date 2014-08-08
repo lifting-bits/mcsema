@@ -1,5 +1,5 @@
 language: cpp
-script: cmake . && make
+script: mkdir build && cd build && cmake .. && make
 compiler:
   - clang
   - gcc
