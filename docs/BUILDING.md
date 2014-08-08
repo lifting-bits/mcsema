@@ -2,7 +2,7 @@
 
 This section describes how to build mcsema on Windows using Visual Studio 2010 or Visual Studio Express 2013.
 
-The specific platforms used for these examples were Windows 7 32-bit (for Visual Studio 10) and WIndows 8.1 64-bit for Visual Studio Express 13.
+The specific platforms used for these examples were Windows 7 32-bit (for Visual Studio 10) and Windows 8.1 64-bit for Visual Studio Express 13.
 
 The semantics testing can **only be built on Visual Studio 2010** due to a dependency on a specific version of Intel PIN. The rest of mcsema will build using other versions of Visual Studio. 
 
