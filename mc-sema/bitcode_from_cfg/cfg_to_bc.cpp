@@ -54,6 +54,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <raiseX86.h>
 #include "../common/to_string.h"
 #include "../common/LExcn.h"
+#include "../common/Defaults.h"
 
 #include <boost/tokenizer.hpp>
 #include <boost/foreach.hpp>
@@ -70,7 +71,7 @@ static cl::opt<string>
 InputFilename("i", cl::desc("Input filename"), cl::value_desc("<filename>"), cl::Required);
 
 static cl::opt<string>
-TargetTriple("mtriple", cl::desc("Target Triple"), cl::value_desc("target triple"), cl::init("i686-pc-win32"));
+TargetTriple("mtriple", cl::desc("Target Triple"), cl::value_desc("target triple"), cl::init(DEFAULT_TRIPLE));
 
 static cl::list<string>
 Drivers("driver", 
@@ -210,7 +211,8 @@ static bool driverArgsToDriver(const string &args, DriverEntry &new_d) {
     if(vtok[2] == "raw") {
         new_d.is_raw = true;
     } else {
-    // if not, parse number of arguments
+        // if not, parse number of arguments
+        new_d.is_raw = false;
         new_d.argc = (int)string_to_int(vtok[2]);
     }
 

@@ -55,6 +55,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <iostream>
 #include <sstream>
 #include <boost/filesystem.hpp>
+#include "../common/to_string.h"
+
+#include "../common/Defaults.h"
 
 using namespace std;
 using namespace boost;
@@ -93,7 +96,7 @@ EntrySymbol("entry-symbol",
             cl::value_desc("symbol1,symbol2,symbol3,..."));
 
 cl::opt<string>
-TargetTriple("mtriple", cl::desc("Target Triple"), cl::value_desc("target triple"), cl::init("i686-pc-win32"));
+TargetTriple("mtriple", cl::desc("Target Triple"), cl::value_desc("target triple"), cl::init(DEFAULT_TRIPLE));
 
 
 NativeModulePtr makeNativeModule( ExecutableContainer *exc, 
@@ -181,7 +184,6 @@ NativeModulePtr makeNativeModule( ExecutableContainer *exc,
       addDataEntryPoints(exc, entryPoints, nulls());
   }
 
-
   set<VA> visited;
   //now, get functions for these entry points with this executable 
   //context
@@ -225,8 +227,11 @@ NativeModulePtr makeNativeModule( ExecutableContainer *exc,
     if(s.type == ExecutableContainer::DataSection) {
       //add to m
       DataSection ds = processDataSection(exc, s);
-      ds.setReadOnly(s.read_only);
-      m->addDataSection(ds);
+      // make sure data section is not empty
+      if(ds.getBase() != DataSection::NO_BASE) {
+          ds.setReadOnly(s.read_only);
+          m->addDataSection(ds);
+      }
     }
   }
 
@@ -299,6 +304,9 @@ int main(int argc, char *argv[]) {
   
   try {
       exc = ExecutableContainer::open(InputFilename, x86Target);
+  } catch (LErr &l) {
+      errs() << "Could not open: " << InputFilename << ", reason: " << l.what() << "\n";
+      return -1;
   } catch (...) {
       errs() << "Could not open: " << InputFilename << "\n";
       return -1;

@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sstream>
 
 #include "ExternalFuncMap.h"
+#include "../common/Defaults.h"
 
 #include <boost/tokenizer.hpp>
 #include <boost/foreach.hpp>
@@ -200,6 +201,9 @@ void ExternalFunctionMap::parseMap(string fileName)
 
       /* read argument count */
       istringstream(vtok[1]) >> argCount;  
+      if(argCount < 0) {
+          throw LErr(__LINE__, __FILE__, "Could not parse arg count from: " + vtok[1]);
+      }
 
       /* read calling convention */
       char  k = vtok[2][0];
@@ -251,7 +255,7 @@ ExternalFunctionMap::ExternalFunctionMap(string tple) : triple(tple)
 {
     return;
 }
-ExternalFunctionMap::ExternalFunctionMap(void) : triple("i686-pc-win32")
+ExternalFunctionMap::ExternalFunctionMap(void) : triple(DEFAULT_TRIPLE)
 {
     return;
 }

@@ -27,6 +27,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "bincomm.h"
+#include "ELFTarget.h"
 #include <LExcn.h>
 #include "../common/to_string.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -102,6 +103,7 @@ CoffTarget::CoffTarget(string f, const Target *T) {
 
   this->mod_name = filesystem::path(f).stem().string();
   this->coff = new object::COFFObjectFile(buff.take(), ec);
+  if(ec) throw LErr(__LINE__, __FILE__, ec.message());
 
   if(this->coff) {
     //build up a list of section objects and their 
@@ -1016,9 +1018,12 @@ ExecutableContainer *ExecutableContainer::open(string f, const Target *T) {
       return new CoffTarget(p.string(), T);
       break;
 
+    case ELF_TGT:
+      return new ElfTarget(p.string(), T);
+      break;
+
     case UNK_TGT:
     case RAW_TGT:
-    case ELF_TGT:
       throw LErr(__LINE__, __FILE__, "Unsupported format, NIY");
       break;
   }

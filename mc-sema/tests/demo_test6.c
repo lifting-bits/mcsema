@@ -49,7 +49,7 @@ static void doStuff(char *src, char *dst) {
 
 void doWork(char **f, int l) {
     int a = 0;
-    char* b = malloc(l);
+    char* b = malloc(l*sizeof(char*));
     for( ; a < l; a++ ) {
         char *c = f[a];
         if( checkFn(c) == 0 ) {

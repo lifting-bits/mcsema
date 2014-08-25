@@ -1,3 +1,7 @@
+#ifdef linux
+#define __fastcall __attribute__((fastcall))
+#endif
+
 extern int __fastcall threeArgs(int a1, int a2, int a3);
 extern int __fastcall twoArgs(int a1, int a2);
 extern int __fastcall oneArg(int a1);

@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
 #ifdef _WIN32
     int k = demo5_entry("c:\\windows\\temp\\foo.txt");
 #else
-    int k = demo5_entry("/tmp/foo.txt");
+    int k = demo5_entry("/tmp/demo5_foo.txt");
 #endif
     printf("%d\n", k);
 

@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "X86.h"
 #include "x86Instrs.h"
 #include "x86Helpers.h"
-#include "win32cb.h"
+#include "ArchOps.h"
 
 #include <llvm/Object/COFF.h>
 #include <llvm/Constants.h>
@@ -99,7 +99,7 @@ static FunctionType    *GetCBInternalFnTy(Module *M) {
 
 static Function *getCallbackPrologueInternal(Module *M) {
 
-    // should be created by addWin32CallbacksToModule()
+    // should be created by archAddCallbacksToModule()
     Function *F = M->getFunction("callback_adapter_prologue_internal");
     TASSERT(F != NULL, "Want to use callback_adapter_prologue_internal, but its not defined");
 
@@ -300,7 +300,7 @@ Value *makeCallbackForLocalFunction(Module *M, VA local_target) {
 
     if(!added_callbacks) {
         std::cout << __FUNCTION__ << ": Adding Callbacks to Module!" << std::endl;
-        addWin32CallbacksToModule(M);
+        archAddCallbacksToModule(M);
         added_callbacks = true;
     }
 
@@ -1130,14 +1130,6 @@ bool addEntryPointDriver(Module *M,
                                                 "driverBlock",
                                                 driverF);
 
-    // VirtualAlloc a stack buffer the same size as the current thread's
-    // stack size
-    Value *pTEB = win32GetTib(driverBB);
-    Value *stackSize = win32GetStackSize(pTEB, driverBB);
-    Value *aStack = win32CallVirtualAlloc(stackSize, driverBB);
-    TASSERT(aStack != NULL, "Could not allocate stack!");
-
-
     //insert an alloca for the register context structure
     Instruction *aCtx = new AllocaInst(g_RegStruct, "", driverBB);
     TASSERT(aCtx != NULL, "Could not allocate register context!");
@@ -1152,9 +1144,6 @@ bool addEntryPointDriver(Module *M,
 
     if (cconv == ExternalCodeRef::FastCall) 
     {
-        
-
-
         // make __fastcall functions work:
         // set ecx to arg[0]
         if(fwd_it != fwd_end) {
@@ -1200,6 +1189,9 @@ bool addEntryPointDriver(Module *M,
       driverF->getArgumentList().rbegin();
     Function::ArgumentListType::reverse_iterator  end = 
       driverF->getArgumentList().rend();
+
+    Value *stackSize = archGetStackSize(M, driverBB);
+    Value *aStack = archAllocateStack(M, stackSize, driverBB);
 
     // position pointer to end of stack
     Value *stackBaseInt = BinaryOperator::Create(BinaryOperator::Add,
@@ -1299,8 +1291,7 @@ bool addEntryPointDriver(Module *M,
     CallInst* ci = CallInst::Create(F, subArg, "", driverBB);
     ci->setCallingConv(CallingConv::X86_StdCall);
 
-    // free our allocated stack
-    win32CallVirtualFree(aStack, driverBB);
+    archFreeStack(M, aStack, driverBB);
 
     //if we are requested, return the EAX value, else return void
     if(ret) {

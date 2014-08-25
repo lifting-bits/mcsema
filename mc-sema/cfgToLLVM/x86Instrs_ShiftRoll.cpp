@@ -247,6 +247,28 @@ static InstTransResult doShrdRI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
+static InstTransResult doShrdRCL(InstPtr ip, BasicBlock *&b,
+                        const MCOperand &dst,
+                        const MCOperand &src1)
+{
+    TASSERT(src1.isReg(), "");
+    TASSERT(dst.isReg(), "");
+
+    Type* doubleTy = Type::getIntNTy(b->getContext(), width*2); 
+
+    Value   *count = R_READ<width>(b, X86::CL);
+    // ShrdVV needs a 64-bit count
+    Value   *extCount = new ZExtInst(count, doubleTy, "", b);
+
+    doShrdVV<width>(ip, b, 
+            dst.getReg(), 
+            src1.getReg(), 
+            extCount);
+    
+    return ContinueBlock;
+}
+
+template <int width>
 static InstTransResult doShrRI(InstPtr ip, BasicBlock *&b,
                         const MCOperand &src1,
                         const MCOperand &src2,
@@ -2063,6 +2085,7 @@ GENERIC_TRANSLATION(SHR8r1, doShrR1<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHR8rCL, doShrRCL<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHR8ri, doShrRI<8>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SHRD32rri8, doShrdRI<32>(ip, block, OP(1), OP(2), OP(3)))
+GENERIC_TRANSLATION(SHRD32rrCL, doShrdRCL<32>(ip, block, OP(1), OP(2)))
 
 void ShiftRoll_populateDispatchMap(DispatchMap &m) {
         m[X86::RCL8m1] = translate_RCL8m1;
@@ -2192,4 +2215,5 @@ void ShiftRoll_populateDispatchMap(DispatchMap &m) {
         m[X86::SHR8rCL] = translate_SHR8rCL;
         m[X86::SHR8ri] = translate_SHR8ri;
         m[X86::SHRD32rri8] = translate_SHRD32rri8;
+        m[X86::SHRD32rrCL] = translate_SHRD32rrCL;
 }

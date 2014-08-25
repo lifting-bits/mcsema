@@ -119,7 +119,12 @@ DataSection processDataSection( ExecutableContainer *c,
         max_limit = size;
     }
 
-    LASSERT(min_limit < max_limit, "Minimum must be greater than maximum");
+    dbgs() << "Section: " << sec.secName << "\n";
+    dbgs() << "\tMinimum: " << to_string<VA>(min_limit, hex) << "\n";
+    dbgs() << "\tMaximum: " << to_string<VA>(max_limit, hex) << "\n";
+
+
+    LASSERT(min_limit <= max_limit, "Minimum must be greater than maximum");
 
     for(vector<VA>::const_iterator reloc_itr = sec.reloc_addrs.begin();
         reloc_itr != sec.reloc_addrs.end();
@@ -157,7 +162,7 @@ DataSection processDataSection( ExecutableContainer *c,
             prev += 4;
 
         } else {
-            llvm::dbgs() << "WARNING: relocated an address but no symbol found!\n";
+            llvm::dbgs() << "WARNING: relocation at address (0x" << to_string<VA>(addr, hex) << ") but no symbol found!\n";
         }
     }
 
@@ -264,6 +269,7 @@ ExternalCodeRefPtr makeExtCodeRefFromString(string callName, ExternalFunctionMap
   LASSERT(res, "Could not find no return for "+s);
   res = f.get_num_stack_params(s, numParams);
   LASSERT(res, "Could not find number of stack params for "+s);
+  LASSERT(numParams >= 0, "Invalid number of arguments for extcall:"+s+". Is it in your external call map file?");
 
   //make an ExternalCodeRef
   ExternalCodeRef::ReturnType        rty = ExternalCodeRef::Unknown;
@@ -628,8 +634,12 @@ bool treatCodeAsData( ExecutableContainer *c,
     if(!getSectionForAddr(c, addr, sd)) {
         return false;
     }
-    addDataEntryPointsFromSection(c, sd, funcs, addr, addr+size, llvm::outs() );
-    processDataSection(c, sd, addr, addr+size);
+
+    if (size != 0) {
+        addDataEntryPointsFromSection(c, sd, funcs, addr, addr+size, llvm::outs() );
+        processDataSection(c, sd, addr, addr+size);
+    }
+
     return true;
 }
 
@@ -744,6 +754,9 @@ do
             bool is_reloc_data = isAddrOfType(c, addr, ExecutableContainer::DataSection);
             unsigned opc = I->get_inst().getOpcode();
 
+            out << "Found a relocation at: 0x" << to_string<VA>(addrInInst, hex) 
+                << ", pointing to: 0x" << to_string<VA>(addr, hex) << "\n";
+
             if(isBranchViaMemory(I)) {
                 out << "Detect branch via memory, relocation handled later\n";      
             }
@@ -758,6 +771,7 @@ do
                             nfi != new_funcs.end();
                             nfi++)
                     {
+                        out << "Adding: 0x" << to_string<VA>(addr, hex) << " as target because of DataInCode heuristic\n";
                         funcs.push(*nfi);
                     }
 
@@ -773,6 +787,7 @@ do
             // TODO: extract this from .text and shove into .data?
             else if(( !can_ref_code && is_reloc_code) || is_reloc_data )
             {
+                out << "Adding data reference to 0x" << to_string<VA>(addr, hex) << "\n";
               I->set_data_offset(addr);
             } else {
               out << "WARNING: relocation points to neither code nor data:" << to_string<VA>(addr, hex) << "\n";
@@ -805,6 +820,7 @@ do
                 has_follow = false;
             } else {
                 // this is an internal jmp. probably a jump table.
+                out << "Found a possible jump table!\n";
                 bool did_jmptable = handlePossibleJumpTable(c, B, I, curAddr, funcs, blockChildren, out); 
 
                 LASSERT(did_jmptable, "JMP32m processing aborted: couldn't parse jumptable");
@@ -815,6 +831,13 @@ do
         //this could be an external call in COFF, or not
         op = I->get_inst().getOperand(0);
         LASSERT(op.isImm(), "Nonsense for CALLpcrel32");
+
+          //check to see if this is an external call...
+        if(I->has_ext_call_target()) {
+            out << "External call to: " << I->get_ext_call_target()->getSymbolName() << "\n";
+            break;
+        }
+
         if(op.getImm() !=0) {
           VA    callTgt = curAddr+op.getImm()+I->get_len();
           bool  foldFunc = false;
@@ -833,26 +856,22 @@ do
           }
           if(foldFunc == false) {
             //add this to our list of funcs to search
+            out << "Adding: 0x" << to_string<VA>(callTgt, hex) << " as target because its a call target\n";
             funcs.push(callTgt);
           }
         } else {
-          //check to see if this is an external call...
-          if(I->has_ext_call_target() == false) {
             // may be a local call
             VA addr=curAddr+1, relo_addr=0;
             out << "Symbol not found, maybe a local call\n";
             if(c->relocate_addr(addr, relo_addr)){
                 out << "Found local call to: " << to_string<VA>(relo_addr, hex) << "\n";
                 I->set_call_tgt(relo_addr);
-                out << "Adding: 0x" << to_string<VA>(relo_addr, hex) << " as target\n";
+                out << "Adding: 0x" << to_string<VA>(relo_addr, hex) << " as target because its relo-able and internal\n";
                 funcs.push(relo_addr);
             } else {
                 out << "Could not relocate addr for local call at: ";
                 out << to_string<VA>(curAddr, hex) << "\n";
             }
-          } else {
-            out << "External call to: " << I->get_ext_call_target()->getSymbolName() << "\n";
-          }
         }
         break;
 
@@ -899,6 +918,7 @@ NativeFunctionPtr getFunc(ExecutableContainer *c,
   toVisit.push(e);
 
   out << "getFunc: Starting at 0x" << to_string<VA>(e,hex) << "\n";
+  out << "getFunc: toVisit size is: " << toVisit.size() << "\n";
 
   while(toVisit.size() > 0) {
     VA  curBlockHeader = toVisit.top();
@@ -910,6 +930,8 @@ NativeFunctionPtr getFunc(ExecutableContainer *c,
       visited.insert(curBlockHeader);
     }
 
+    // funcs is new functions to visit later
+    // toVisit is basic blocks of *this* function to visit now
     NativeBlockPtr  B = decodeBlock(c, 
                                     f, 
                                     d, 
@@ -968,6 +990,7 @@ list<NativeFunctionPtr> getFuncs( ExecutableContainer *c,
   //start from 'e'
   toVisit.push(e);
 
+
   while(toVisit.size() > 0) {
     VA  curFuncEntry = toVisit.top();
     toVisit.pop();
@@ -977,6 +1000,8 @@ list<NativeFunctionPtr> getFuncs( ExecutableContainer *c,
     } else {
       visited.insert(curFuncEntry);
     }
+
+    out << "Calling getFunc on: " << to_string<VA>(curFuncEntry, hex) << "\n";
 
     NativeFunctionPtr thisFunc = getFunc(c, dec, toVisit, funcMap, curFuncEntry, out);
     funcs.push_back(thisFunc);

@@ -1,5 +1,9 @@
 #include <stdio.h>
 
+#ifdef linux
+#define __fastcall __attribute__((fastcall))
+#endif
+
 extern int demo14_entry(void);
 
 int __fastcall threeArgs(int a1, int a2, int a3) {

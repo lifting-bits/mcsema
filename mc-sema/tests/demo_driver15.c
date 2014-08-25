@@ -1,5 +1,11 @@
 #include <stdio.h>
 
+#ifdef linux
+#define __fastcall __attribute__((fastcall))
+#define __cdecl __attribute__((cdecl))
+#define __stdcall __attribute__((stdcall))
+#endif
+
 extern int __fastcall imfastcall(int a0, int a1);
 extern int __stdcall imstdcall(int a0, int a1);
 extern int __cdecl imcdecl(int a0, int a1);
