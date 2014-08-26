@@ -130,9 +130,11 @@ DataSection processDataSection( ExecutableContainer *c,
         reloc_itr != sec.reloc_addrs.end();
         reloc_itr++) 
     {
+        // fix address from section relative to absolute
         addr = base+*reloc_itr;
 
         if(addr < min_limit || addr > max_limit) {
+            dbgs() << __FUNCTION__ << ": Address outside limits: " << to_string<VA>(addr ,hex) << "\n";
             continue;
         }
     
@@ -151,9 +153,11 @@ DataSection processDataSection( ExecutableContainer *c,
             if(isAddrOfType(c, new_addr, ExecutableContainer::CodeSection)) 
             {
                 string new_sym = "sub_" + to_string<VA>(new_addr, hex);
+                llvm::outs() << __FUNCTION__ << ": Recovered function symbol from data section: " << new_sym << "\n";
                 addDataSymbol(ds, addr, new_sym);
             } else if ( isAddrOfType(c, new_addr, ExecutableContainer::DataSection)) {
                 string new_sym = "dta_" + to_string<VA>(new_addr, hex);
+                llvm::outs() << __FUNCTION__ << ": Recovered data symbol from data section: " << new_sym << "\n";
                 addDataSymbol(ds, addr, new_sym);
             } else {
                 assert(!"address in unsupported section type!");
@@ -162,7 +166,7 @@ DataSection processDataSection( ExecutableContainer *c,
             prev += 4;
 
         } else {
-            llvm::dbgs() << "WARNING: relocation at address (0x" << to_string<VA>(addr, hex) << ") but no symbol found!\n";
+            llvm::dbgs() << __FUNCTION__<< ": WARNING: relocation at address (0x" << to_string<VA>(addr, hex) << ") but no symbol found!\n";
         }
     }
 
@@ -207,30 +211,42 @@ static void addDataEntryPointsFromSection(
         raw_ostream         &out) 
 {
     VA addr;
+
+    out << __FUNCTION__ << "Bounds are: " << to_string<VA>(lower_limit, hex)  
+                        << " to " << to_string<VA>(upper_limit, hex) << "\n";
+
     for(vector<VA>::const_iterator reloc_itr = s.reloc_addrs.begin();
             reloc_itr != s.reloc_addrs.end();
             reloc_itr++) 
     {
-        addr = *reloc_itr;
+        addr = s.base+*reloc_itr;
 
         // skip addresses not in limits
         if(addr < lower_limit || addr > upper_limit) {
+            out << __FUNCTION__ << "Relocation address out of bounds: " << to_string<VA>(addr, hex) << "\n";
             continue;
         }
 
         VA  new_addr;
-        if(c->relocate_addr(addr, new_addr ) &&
-                isAddrOfType(c, new_addr, ExecutableContainer::CodeSection))  
-        {
-            out << "Adding data entry point for: " << to_string<VA>(new_addr, hex) << "\n";
-            if(find( entryPoints.begin(), entryPoints.end(), new_addr) 
-                    == entryPoints.end()) 
+        out << __FUNCTION__ << ": Looking at relocation at: " << to_string<VA>(addr, hex) << "\n";
+        if(c->relocate_addr(addr, new_addr )) {
+            if( isAddrOfType(c, new_addr, ExecutableContainer::CodeSection))  
             {
-                entryPoints.push_back(new_addr);
+                out << __FUNCTION__ << ": Adding data entry point for: sub_" 
+                    << to_string<VA>(new_addr, hex) << "\n";
+                if(find( entryPoints.begin(), entryPoints.end(), new_addr) 
+                        == entryPoints.end()) 
+                {
+                    entryPoints.push_back(new_addr);
+                }
+            } else {
+                out << __FUNCTION__ << ": Relocation does not point to code: " 
+                    << to_string<VA>(new_addr, hex) << "\n";
             }
-        } else {
-            // empty for now
-        }
+        } else { 
+                out << __FUNCTION__ << ": Could not process reloc at: " 
+                    << to_string<VA>(addr, hex) << "\n";
+         }
     }
 
 }
@@ -966,7 +982,10 @@ void addDataEntryPoints( ExecutableContainer  *c,
         ExecutableContainer::SectionDesc  s = *it;
 
         if(s.type != ExecutableContainer::DataSection) {
+            out << __FUNCTION__ << ": skipping non-data section: " << s.secName << "\n";
             continue;
+        } else {
+            out << __FUNCTION__ << ": looking for entry points in: " << s.secName << "\n";
         }
 
         addDataEntryPointsFromSection(c, s, entryPoints, 
