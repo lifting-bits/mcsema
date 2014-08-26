@@ -527,11 +527,10 @@ static llvm::Value *linuxMakeCallbackForLocalFunction(Module *M , VA local_targe
     std::string			call_tgt_name = "sub_" + to_string<VA>(local_target, std::hex);
 
     Function        *call_tgt = M->getFunction(call_tgt_name);
-    TASSERT(call_tgt != NULL, "Cannot find call target function in callback stub");
+    TASSERT(call_tgt != NULL, "Cannot find call target function in callback stub: "+call_tgt_name);
 
     std::cout << "!!!WARNING WARNING WARNING!!!" << "\n";
-    std::cout << "Assuming all callbacks are to translated code!!!\n";
-    std::cout << "!!!WARNING WARNING WARNING!!!" << std::endl;
+    std::cout << "\tAssuming all callbacks are to translated code!!!\n";
 
     return call_tgt;
 }
