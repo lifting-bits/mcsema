@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef _TO_MODULE_H
 #define _TO_MODULE_H
 #include "Externals.h"
+
 //translate a NativeModule into an LLVM Module
 bool natModToModule(NativeModulePtr, llvm::Module *, llvm::raw_ostream &);
 bool addEntryPointDriver(llvm::Module *, std::string, VA, int, bool, llvm::raw_ostream &, ExternalCodeRef::CallingConvention cconv);

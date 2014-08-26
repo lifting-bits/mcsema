@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "TransExcn.h"
 #include "llvm/BasicBlock.h"
+#include "peToCFG.h"
 #include "toModule.h"
 #include <llvm/Constants.h>
 

@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Instrs_Stack.h"
 #include "x86Helpers.h"
 #include "Externals.h"
+#include "ArchOps.h"
 #include <llvm/Attributes.h>
 
 #define NASSERT(cond) TASSERT(cond, "")
@@ -442,7 +443,7 @@ static InstTransResult translate_PUSHi32(NativeModulePtr natM, BasicBlock *&bloc
     InstTransResult ret;
     Function *F = block->getParent();
     if( ip->has_call_tgt() ) {
-        Value *callback_fn = makeCallbackForLocalFunction(block->getParent()->getParent(), ip->get_call_tgt(0));
+        Value *callback_fn = archMakeCallbackForLocalFunction(block->getParent()->getParent(), ip->get_call_tgt(0));
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
         doPushV<32>(ip, block, addrInt );

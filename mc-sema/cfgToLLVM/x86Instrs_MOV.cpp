@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Instrs_MOV.h"
 #include "JumpTables.h"
 #include "Externals.h"
+#include "ArchOps.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
 
@@ -298,7 +299,7 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
     InstTransResult ret;
     Function *F = block->getParent();
     if( ip->has_call_tgt() ) {
-        Value *callback_fn = makeCallbackForLocalFunction(
+        Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(), 
                 ip->get_call_tgt(0)
             );
@@ -372,7 +373,7 @@ static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& blo
     InstTransResult ret;
     Function *F = block->getParent();
     if( ip->has_call_tgt() ) {
-        Value *callback_fn = makeCallbackForLocalFunction(
+        Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(), 
                 ip->get_call_tgt(0)
             );
@@ -476,7 +477,7 @@ static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& bloc
         //ret = doRMMov<32>(ip, block, addrInt, MCOperand::CreateReg(X86::EAX)) ;
     }
     else if( ip->has_call_tgt() && width == 32 ) {
-        Value *callback_fn = makeCallbackForLocalFunction(
+        Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(), 
                 ip->get_call_tgt(0)
             );
