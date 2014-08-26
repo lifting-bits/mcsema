@@ -1303,11 +1303,12 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
     // insert all functions (but not populate yet)
     while( i != funcs.end() ) {
         NativeFunctionPtr   f = *i;
+        std::string fname = f->get_name();
 
-        Function *F = M->getFunction(f->get_name());
+        Function *F = M->getFunction(fname);
 
         if(F == NULL) { 
-            Constant *FC = M->getOrInsertFunction(f->get_name(), getBaseFunctionType(M));
+            Constant *FC = M->getOrInsertFunction(fname, getBaseFunctionType(M));
             F = dyn_cast<Function>(FC);
 
             TASSERT(F != NULL, "Could not insert function into module");
@@ -1316,8 +1317,9 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
             F->setCallingConv(CallingConv::X86_StdCall);
             // make local functions 'static'
             F->setLinkage(GlobalValue::InternalLinkage);
+            cout << "Inserted function: " << fname << std::endl;
         } else {
-            cout << "Already inserted function: " << f->get_name() <<", skipping." << std::endl;
+            cout << "Already inserted function: " << fname << ", skipping." << std::endl;
         }
 
         ++i;
