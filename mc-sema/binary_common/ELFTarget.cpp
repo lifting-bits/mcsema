@@ -101,6 +101,9 @@ static bool getRelocForAddr(llvm::object::SectionRef    &sr,
 
             e = rr.getAddress((::uint64_t &)addr);
             LASSERT(!e, "Can't get address for relocation ref");
+            //llvm::dbgs() << "\t" << __FUNCTION__ << ": Testing " << to_string<VA>(address, hex) 
+            //           << " vs. " << to_string<VA>(addr+off, hex) << "\n";
+
             if( address == (addr+off) ) {
                 return true;
             }
@@ -472,7 +475,14 @@ bool ElfTarget::relocate_addr(VA addr, VA &toAddr) {
   if (found_offt == false) 
   {
       // its not in a section. this is bad.
+      llvm::dbgs() << __FUNCTION__ << ": Could not find section for: " 
+                   << to_string<VA>(addr, hex) << "\n";
       return false;
+  } else {
+      StringRef secName;
+      section.getName(secName);
+      llvm::dbgs() << __FUNCTION__ << ": Relocation lives in: " << secName.str() << "\n";
+      llvm::dbgs() << __FUNCTION__ << ": Offset is: " << to_string<VA>(offt, hex) << "\n";
   }
 
   // get a relocation reference for this address. this is how we
@@ -480,6 +490,8 @@ bool ElfTarget::relocate_addr(VA addr, VA &toAddr) {
   // relocation from its section base
   llvm::object::RelocationRef rref;
   if(!getRelocForAddr(section, offt, addr, rref)) {
+      llvm::dbgs() << __FUNCTION__ << ": Could not find reloc ref for: " 
+                   << to_string<VA>(addr, hex) << "\n";
       return false;
   }
 
@@ -489,6 +501,8 @@ bool ElfTarget::relocate_addr(VA addr, VA &toAddr) {
   LASSERT(!e, e.message());
 
   VA offt_from_sym = 0;
+
+  llvm::dbgs() << __FUNCTION__ << ": Looking at relocation type: " << relocType << "\n";
 
   if(relocType == "R_386_32") {
       // these are absolute relocations and they are relative to 
@@ -508,6 +522,8 @@ bool ElfTarget::relocate_addr(VA addr, VA &toAddr) {
            ((uint32_t)data[relo_offt+2] << 16) | 
            ((uint32_t)data[relo_offt+1] <<  8) | 
            ((uint32_t)data[relo_offt+0] <<  0));
+
+      llvm::dbgs() << __FUNCTION__ << ": Original bytes are: " << to_string<VA>(offt_from_sym, hex) << "\n";
   }
 
   // find what symbol name this relocation points to. 
@@ -517,11 +533,14 @@ bool ElfTarget::relocate_addr(VA addr, VA &toAddr) {
     return false;
   }
 
+  llvm::dbgs() << __FUNCTION__ << ": Relocation symbol is: " << s << "\n";
+
   llvm::object::section_iterator sym_sec = this->elf->end_sections();
   // get the address of the symbol name. No, we couldn't directly
   // get it from the SymbolRef that is attached to the RelocationRef.
   // Life is complicated.
   ::int64_t found = getAddressForString(*this->elf, s, sym_sec);
+  llvm::dbgs() << __FUNCTION__ << ": Address of symbol is: " << to_string<VA>(found, hex) << "\n";
 
   // check if this symbol is in a section
   if(sym_sec != this->elf->end_sections()) {
@@ -534,6 +553,7 @@ bool ElfTarget::relocate_addr(VA addr, VA &toAddr) {
           sym_sec->getName(sn);
           // symbol address is :
           // destination section base + symbol address
+          llvm::dbgs() << __FUNCTION__ << ": Section base is: " << to_string< ::uint64_t>(sec_offt, hex) << "\n";
           found += sec_offt;
       } else {
           return false;
@@ -543,6 +563,8 @@ bool ElfTarget::relocate_addr(VA addr, VA &toAddr) {
   // if this is an absolute relocation
   // add the original file bytes to the destination addr
   found += offt_from_sym;
+
+  llvm::dbgs() << __FUNCTION__ << ": Final addr is: " << to_string<VA>(found, hex) << "\n";
 
   if(found == 0) {
     return false;
