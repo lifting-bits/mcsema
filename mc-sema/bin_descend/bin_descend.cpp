@@ -48,6 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "llvm/Support/system_error.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/DataTypes.h"
+#include "llvm/Support/Debug.h"
 #include "cfg_recover.h"
 #include <bincomm.h>
 #include <peToCFG.h>
@@ -179,7 +180,7 @@ NativeModulePtr makeNativeModule( ExecutableContainer *exc,
   }
 
   if(DebugMode) {
-      addDataEntryPoints(exc, entryPoints, outs());
+      addDataEntryPoints(exc, entryPoints, llvm::dbgs());
   } else {
       addDataEntryPoints(exc, entryPoints, nulls());
   }
@@ -193,7 +194,7 @@ NativeModulePtr makeNativeModule( ExecutableContainer *exc,
   {
     list<NativeFunctionPtr> tmp;
     if(DebugMode) {
-      tmp = getFuncs(exc, byteDec, visited, *it, funcs, outs());
+      tmp = getFuncs(exc, byteDec, visited, *it, funcs, llvm::dbgs());
     } else {
       tmp = getFuncs(exc, byteDec, visited, *it, funcs, nulls());
     }
