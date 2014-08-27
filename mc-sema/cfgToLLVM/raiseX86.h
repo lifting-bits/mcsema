@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "peToCFG.h"
 #include "toModule.h"
 #include <llvm/Constants.h>
+#include "X86.h"
 
 enum InstTransResult {
     ContinueBlock,
@@ -99,7 +100,12 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
 	llvm::Value	*readVal;
     //if the width requested is less than the native bitwidth, 
     //then we need to truncate the read
-    if( width != 32 ) {
+    int regwidth = 32;
+    if(reg >= llvm::X86::XMM0 && reg <= llvm::X86::XMM7) {
+        regwidth = 128;
+    }
+
+    if( width < regwidth ) {
         int     readOff = mapPlatRegToOffset(reg);
         llvm::Value   *shiftedVal = NULL;
 
@@ -109,7 +115,7 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
 			shiftedVal = 
 				llvm::BinaryOperator::Create(llvm::Instruction::LShr, 
 										tmpVal, 
-										CONST_V<32>(b, readOff), 
+										CONST_V<width>(b, readOff), 
 										"", 
 										b);
         } else {
@@ -136,71 +142,99 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
     //lookup the 'stack' local for the register we want to write
     llvm::Value   *localRegVar = MCRegToValue(b, reg);
     if(localRegVar == NULL)
-      throw TErr(__LINE__, __FILE__, "Could not find register");
+        throw TErr(__LINE__, __FILE__, "Could not find register");
 
-    //store to that stack local
-	if( width == 32 ) {
-		llvm::Value   *v = new llvm::StoreInst(write, localRegVar, b);
-		TASSERT(v != NULL, "");
-	} else {
-		//we need to model this as a write of a specific offset and width
-		int		writeOff = mapPlatRegToOffset(reg);
-		llvm::Value	*maskVal;
-		llvm::Value	*addVal;
-		llvm::Value	*write_z = 
-			new llvm::ZExtInst(write, llvm::Type::getInt32Ty(b->getContext()), "", b);
+    int regwidth = 32;
+    if(reg >= llvm::X86::XMM0 && reg <= llvm::X86::XMM7) {
+        regwidth = 128;
+    }
 
-		//maskVal will be whatever the appropriate mask is
-		//addVal will be the value in 'write', shifted appropriately
-		if( writeOff ) {
-			//this is a write to a high offset + some width, so, 
-			//shift the mask and add values to the left by writeOff
-            switch(width) {
-                case 8:
-                    maskVal = CONST_V<32>(b, ~0xFF00);
-                    addVal = llvm::BinaryOperator::CreateShl(	write_z, 
-                            CONST_V<32>(b, writeOff), 
-                            "", 
-                            b);
-                    break;
+    llvm::Type *regWidthType = llvm::Type::getIntNTy(b->getContext(), regwidth);
 
-                default:
-                    throw TErr(__LINE__, __FILE__, "Unsupported bit width in write");
+    if( width <= 128 && regwidth == 128) {
+        if (regwidth == width) {
+            llvm::Value   *v = new llvm::StoreInst(write, localRegVar, b);
+            TASSERT(v != NULL, "Cannot make storage instruction")
+        } else if( width < 128) {
+            llvm::Value *zeros_128 = CONST_V<128>(b, 0);
+            llvm::Value *all_ones = llvm::BinaryOperator::CreateNot(zeros_128, "", b);
+            llvm::Value *shift_right = llvm::BinaryOperator::CreateLShr(
+                    all_ones, 
+                    CONST_V<128>(b, 128-width), 
+                    "", b);
+            llvm::Value *and_mask = llvm::BinaryOperator::CreateNot(shift_right, "", b);
+            llvm::Value *fullReg = R_READ<128>(b, reg);
+
+            llvm::Value *remove_bits = llvm::BinaryOperator::CreateAnd(fullReg, and_mask, "", b);
+            llvm::Value	*write_z = new llvm::ZExtInst(write, regWidthType, "", b);
+            llvm::Value *final_val = llvm::BinaryOperator::CreateOr(remove_bits, write_z, "", b);
+            llvm::Value *v = new llvm::StoreInst(final_val, localRegVar, b);
+        }
+    } else if( width <= 32 && regwidth == 32) {
+        if (regwidth == width) {
+            llvm::Value   *v = new llvm::StoreInst(write, localRegVar, b);
+            TASSERT(v != NULL, "Cannot make storage instruction")
+        } else if( width < 32) {
+            //we need to model this as a write of a specific offset and width
+            int		writeOff = mapPlatRegToOffset(reg);
+            llvm::Value	*maskVal;
+            llvm::Value	*addVal;
+            llvm::Value	*write_z = 
+                new llvm::ZExtInst(write, llvm::Type::getInt32Ty(b->getContext()), "", b);
+
+            //maskVal will be whatever the appropriate mask is
+            //addVal will be the value in 'write', shifted appropriately
+            if( writeOff ) {
+                //this is a write to a high offset + some width, so, 
+                //shift the mask and add values to the left by writeOff
+                switch(width) {
+                    case 8:
+                        maskVal = CONST_V<32>(b, ~0xFF00);
+                        addVal = llvm::BinaryOperator::CreateShl(	write_z, 
+                                CONST_V<32>(b, writeOff), 
+                                "", 
+                                b);
+                        break;
+
+                    default:
+                        throw TErr(__LINE__, __FILE__, "Unsupported bit width in write");
+                }
+            } else {
+                //this is a write to the base + some width
+                //simply compute the mask and add values 
+                switch(width) {
+                    case 16:
+                        maskVal = CONST_V<32>(b, ~0xFFFF);
+                        addVal = write_z;
+                        break;
+
+                    case 8:
+                        maskVal = CONST_V<32>(b, ~0xFF);
+                        addVal = write_z;
+                        break;
+
+                    default:
+                        throw TErr(__LINE__, __FILE__, "Unsupported bit width in write");
+                }
             }
-		} else {
-			//this is a write to the base + some width
-			//simply compute the mask and add values 
-            switch(width) {
-                case 16:
-                    maskVal = CONST_V<32>(b, ~0xFFFF);
-                    addVal = write_z;
-                    break;
 
-                case 8:
-                    maskVal = CONST_V<32>(b, ~0xFF);
-                    addVal = write_z;
-                    break;
+            //read the full register
+            llvm::Value	*fullReg = R_READ<32>(b, reg);
 
-                default:
-                    throw TErr(__LINE__, __FILE__, "Unsupported bit width in write");
-            }
-		}
+            //AND the value with maskVal
+            llvm::Value	*andedVal =
+                llvm::BinaryOperator::CreateAnd(fullReg, maskVal, "", b);
 
-		//read the full register
-		llvm::Value	*fullReg = R_READ<32>(b, reg);
+            //ADD the addVal to the resulting value
+            llvm::Value	*addedVal = 
+                llvm::BinaryOperator::CreateAdd(andedVal, addVal, "", b);
 
-		//AND the value with maskVal
-		llvm::Value	*andedVal =
-			llvm::BinaryOperator::CreateAnd(fullReg, maskVal, "", b);
-
-		//ADD the addVal to the resulting value
-		llvm::Value	*addedVal = 
-			llvm::BinaryOperator::CreateAdd(andedVal, addVal, "", b);
-
-		//write this value back into the full-width local
-		R_WRITE<32>(b, reg, addedVal);
-	}
-
+            //write this value back into the full-width local
+            R_WRITE<32>(b, reg, addedVal);
+        } // width < 32
+    } else { // width <= 32 && register bitwidth == 32
+        throw TErr(__LINE__, __FILE__, "Unsupported bit width in write");
+    }
     return;
 }
 
@@ -219,6 +253,7 @@ llvm::Value *INTERNAL_M_READ(unsigned addrspace, llvm::BasicBlock *b, llvm::Valu
 
     bool is_volatile = addrspace != 0;
     llvm::Value   *read = new llvm::LoadInst(readLoc, "", is_volatile , b);
+    TASSERT(read != NULL, "Could not create a LoadInst in M_READ");
 
     return read;
 }
