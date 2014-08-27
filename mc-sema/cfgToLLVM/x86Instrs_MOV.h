@@ -32,6 +32,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 void MOV_populateDispatchMap(DispatchMap &m);
 
 template <int width>
+InstTransResult doMRMov(InstPtr ip, llvm::BasicBlock *&b,
+                        llvm::Value           *dstAddr,
+                        const llvm::MCOperand &src)
+{
+    //MOV <mem>, <r>
+    TASSERT(src.isReg(), "src is not a register");
+    TASSERT(dstAddr != NULL, "Destination addr can't be null");
+
+    M_WRITE<width>(ip, b, dstAddr, R_READ<width>(b, src.getReg()));
+
+    return ContinueBlock;
+}
+
+
+template <int width>
 InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b, 
                         const llvm::MCOperand &dst, 
                         const llvm::MCOperand &src) 
@@ -48,7 +63,7 @@ InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b,
 }
 
 template <int width>
- InstTransResult doRMMov(InstPtr ip, llvm::BasicBlock      *b,
+InstTransResult doRMMov(InstPtr ip, llvm::BasicBlock      *b,
                         llvm::Value           *srcAddr,
                         const llvm::MCOperand &dst)
 {
@@ -60,3 +75,58 @@ template <int width>
 
     return ContinueBlock;
 }
+
+template <int width>
+llvm::Value *getValueForExternal(llvm::Module *M, InstPtr ip, llvm::BasicBlock *block) {
+
+    llvm::Value *addrInt = NULL;
+
+    if( ip->has_ext_call_target() ) {
+        if (width != 32) {
+            throw TErr(__LINE__, __FILE__, "NIY: non 32-bit width for external calls");
+        }
+        std::string target = ip->get_ext_call_target()->getSymbolName();
+        llvm::Value *ext_fn = M->getFunction(target);
+        TASSERT(ext_fn != NULL, "Could not find external: " + target);
+        llvm::Value *addrInt = new llvm::PtrToIntInst(
+                ext_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+
+        return addrInt;
+    } else if (ip->has_ext_data_ref() ) {
+        std::string target = ip->get_ext_data_ref()->getSymbolName();
+        llvm::Value *gvar = M->getGlobalVariable(target);
+
+        TASSERT(gvar != NULL, "Could not find external data: " + target);
+
+        
+        if(gvar->getType()->isPointerTy()) {
+            addrInt = new llvm::PtrToIntInst(
+                    gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
+        } else {
+
+            llvm::IntegerType *int_t = llvm::dyn_cast<llvm::IntegerType>(gvar->getType());
+            if( int_t == NULL) {
+                throw TErr(__LINE__, __FILE__, "NIY: non-integer external data");
+            }
+            else if(int_t->getBitWidth() < width) {
+                addrInt = new llvm::ZExtInst(gvar, 
+                        llvm::Type::getIntNTy(block->getContext(), width),
+                        "",
+                        block);
+            }
+            else if(int_t->getBitWidth() == width) {
+                addrInt = gvar;
+            }
+            else {
+                throw TErr(__LINE__, __FILE__, "NIY: external type > width");
+            }
+        }
+
+    } else {
+        throw TErr(__LINE__, __FILE__, "No external refernce to get value for!");
+    }
+
+    return addrInt;
+
+}
+

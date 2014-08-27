@@ -165,20 +165,6 @@ static InstTransResult doMIMov(InstPtr ip, BasicBlock *&b,
     return doMIMovV<width>(ip, b, dstAddr, CONST_V<width>(b, src.getImm()));
 }
 
-template <int width>
-static InstTransResult doMRMov(InstPtr ip, BasicBlock *&b,
-                        Value           *dstAddr,
-                        const MCOperand &src)
-{
-    //MOV <mem>, <r>
-    NASSERT(src.isReg());
-    NASSERT(dstAddr != NULL);
-
-    M_WRITE<width>(ip, b, dstAddr, R_READ<width>(b, src.getReg()));
-
-    return ContinueBlock;
-}
-
 template <int dstWidth, int srcWidth>
 static InstTransResult doMovZXRR(InstPtr ip,   BasicBlock *&b,
                             const MCOperand &dst,
@@ -407,60 +393,6 @@ static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& bloc
         ret = doMRMov<width>(ip, block, addrv, MCOperand::CreateReg(X86::EAX)) ;
     }
     return ret ; 
-}
-
-template <int width>
-static Value *getValueForExternal(Module *M, InstPtr ip, BasicBlock *block) {
-
-    Value *addrInt = NULL;
-
-    if( ip->has_ext_call_target() ) {
-        if (width != 32) {
-            throw TErr(__LINE__, __FILE__, "NIY: non 32-bit width for external calls");
-        }
-        std::string target = ip->get_ext_call_target()->getSymbolName();
-        Value *ext_fn = M->getFunction(target);
-        TASSERT(ext_fn != NULL, "Could not find external: " + target);
-        Value *addrInt = new PtrToIntInst(
-                ext_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
-
-        return addrInt;
-    } else if (ip->has_ext_data_ref() ) {
-        std::string target = ip->get_ext_data_ref()->getSymbolName();
-        Value *gvar = M->getGlobalVariable(target);
-
-        TASSERT(gvar != NULL, "Could not find external data: " + target);
-
-        
-        if(gvar->getType()->isPointerTy()) {
-            addrInt = new PtrToIntInst(
-                    gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
-        } else {
-
-            IntegerType *int_t = dyn_cast<IntegerType>(gvar->getType());
-            if( int_t == NULL) {
-                throw TErr(__LINE__, __FILE__, "NIY: non-integer external data");
-            }
-            else if(int_t->getBitWidth() < width) {
-                addrInt = new ZExtInst(gvar, 
-                        Type::getIntNTy(block->getContext(), width),
-                        "",
-                        block);
-            }
-            else if(int_t->getBitWidth() == width) {
-                addrInt = gvar;
-            }
-            else {
-                throw TErr(__LINE__, __FILE__, "NIY: external type > width");
-            }
-        }
-
-    } else {
-        throw TErr(__LINE__, __FILE__, "No external refernce to get value for!");
-    }
-
-    return addrInt;
-
 }
 
 //write to EAX
