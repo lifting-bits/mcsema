@@ -46,6 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Instrs_String.h"
 #include "x86Instrs_Branches.h"
 #include "x86Instrs_SETcc.h"
+#include "x86Instrs_SSE.h"
 
 DispatchMap translationDispatchMap;
 
@@ -68,6 +69,7 @@ bool initInstructionDispatch() {
     String_populateDispatchMap(translationDispatchMap);
     Branches_populateDispatchMap(translationDispatchMap);
     SETcc_populateDispatchMap(translationDispatchMap);
+    SSE_populateDispatchMap(translationDispatchMap);
 
     return true;
 }
