@@ -5,4 +5,4 @@ add_subdirectory(pe-parse)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${PROTOBUF_INCLUDE_DIR})
 
-add_library(binary_common ${PROTO_SRCS} ${PROTO_HDRS} bincomm.cpp ELFTarget.cpp)
+add_library(binary_common ${PROTO_SRCS} ${PROTO_HDRS} bincomm.cpp ELFTarget.cpp PETarget.cpp)
