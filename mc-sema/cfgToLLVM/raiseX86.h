@@ -115,7 +115,7 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
 			shiftedVal = 
 				llvm::BinaryOperator::Create(llvm::Instruction::LShr, 
 										tmpVal, 
-										CONST_V<width>(b, readOff), 
+										CONST_V<32>(b, readOff), 
 										"", 
 										b);
         } else {
