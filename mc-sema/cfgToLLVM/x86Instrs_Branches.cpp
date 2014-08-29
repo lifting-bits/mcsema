@@ -57,12 +57,12 @@ static InstTransResult doRet(BasicBlock    *b) {
 }
 
 static InstTransResult doRetI(BasicBlock *&b, const MCOperand &o) {
-    TASSERT(o.isImm(), "");
+    TASSERT(o.isImm(), "Operand not immediate");
 
     Value   *c = CONST_V<32>(b, o.getImm());
     Value   *rESP = R_READ<32>(b, X86::ESP);
     Value       *fromStack = M_READ_0<32>(b, rESP);
-    TASSERT(fromStack != NULL, "");
+    TASSERT(fromStack != NULL, "Could not read value from stack");
 
     //add the immediate to ESP
     Value       *rESP_1 = 
@@ -85,7 +85,7 @@ static InstTransResult doRetI(BasicBlock *&b, const MCOperand &o) {
 
 //emit a nonconditional branch 
 static InstTransResult doNonCondBranch(BasicBlock *&b, BasicBlock *tgt) {
-    TASSERT(tgt != NULL, "");
+    TASSERT(tgt != NULL, "Branch to a NULL target");
 
     BranchInst::Create(tgt, b);
 
@@ -96,8 +96,8 @@ static InstTransResult doNonCondBranch(BasicBlock *&b, BasicBlock *tgt) {
 //target of the loop branch has already been defined as a block
 
 static InstTransResult doLoop(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
-    TASSERT(T != NULL, "");
-    TASSERT(F != NULL, "");
+    TASSERT(T != NULL, "True block is NULL");
+    TASSERT(F != NULL, "False block is NULL");
 
     //retrieve ECX
     Value   *count = R_READ<32>(b, X86::ECX);
@@ -518,6 +518,7 @@ static InstTransResult translate_JMP32r(NativeModulePtr  natM,
     std::string  trueStrName = "block_0x"+to_string<VA>(ip->get_tr(), std::hex); \
     std::string  falseStrName = "block_0x"+to_string<VA>(ip->get_fa(), std::hex); \
     BasicBlock          *ifTrue = bbFromStrName(trueStrName, F); \
+    TASSERT(ifTrue != NULL, "Could not find true block:"+trueStrName); \
     BasicBlock          *ifFalse = bbFromStrName(falseStrName, F); \
     InstTransResult ret;\
     ret = THECALL ; \
