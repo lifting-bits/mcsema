@@ -13,6 +13,10 @@ We hope that this library is useful to the program analysis and reverse engineer
 
 Patches are welcome. 
 
+## News
+
+09/01/2014: MC-Semantics now builds on Linux and supports ELF object files. Linux support is not as well tested as Windows, and currenlty assumes all indirect branches and callbacks are to translated code. 
+
 ## Separation of Components
 
 MC-Semantics is separated into two conceptual parts: control flow recovery and instruction translation. 
@@ -26,6 +30,7 @@ The `cfg_to_bc` program attempts to convert a control flow graph structure into 
 The problems of instruction semantics and control flow recovery are separated. Any recovered control flow graph, from any mechanism, may be analyzed and studied in an LLVM intermediate representation. 
 
 ## Documentation
+
 Detailed design and usage information can be found in the docs directory.
 
 ### Building
@@ -35,6 +40,8 @@ Detailed build instructions are at [docs/BUILDING.md](docs/BUILDING.md).
 ### Usage
 
 Usage instructions, with examples, are at [docs/TOOLS.md](docs/TOOLS.md). For more examples, see the demos described in [docs/DEMOS.md](docs/DEMOS.md).
+
+Most of the documentation uses Windows-based examples, but pretty much everything should be cross-platform.
 
 ### Source Code Information 
 
