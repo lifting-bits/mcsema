@@ -27,7 +27,6 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "bincomm.h"
-#include "ELFTarget.h"
 #include <LExcn.h>
 #include "llvm/ADT/StringSwitch.h"
 #include <boost/filesystem.hpp> 
@@ -38,6 +37,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "PETarget.h"
 #include "COFFTarget.h"
+#include "ELFTarget.h"
 
 using namespace std;
 using namespace llvm;
@@ -80,11 +80,11 @@ ExecutableContainer *ExecutableContainer::open(string f, const Target *T) {
       break;
 
     case COFF_TGT:
-      return new CoffTarget(p.string(), T);
+      return CoffTarget::CreateCoffTarget(p.string(), T);
       break;
 
     case ELF_TGT:
-      return new ElfTarget(p.string(), T);
+      return ElfTarget::CreateElfTarget(p.string(), T);
       break;
 
     case UNK_TGT:
