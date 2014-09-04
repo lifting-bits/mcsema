@@ -854,7 +854,7 @@ do
             break;
         }
 
-        if(op.getImm() !=0) {
+        if(op.getImm() !=0 && ((uint32_t)op.getImm()) != 0xFFFFFFFC) {
           VA    callTgt = curAddr+op.getImm()+I->get_len();
           bool  foldFunc = false;
           //speculate about callTgt
