@@ -211,6 +211,7 @@ string getSymForReloc(llvm::object::RelocationRef &rref,
     llvm::error_code            e;
     llvm::object::SymbolRef       symref;
     llvm::object::SymbolRef::Type symType;
+    std::string rt = "";
 
     e = rref.getSymbol(symref);
     LASSERT(!e, "Can't get symbol for relocation ref");
@@ -224,12 +225,15 @@ string getSymForReloc(llvm::object::RelocationRef &rref,
     if(onlyFuncs) {
         //it's a function (really an import..) if the type is UNK
         if(symType == llvm::object::SymbolRef::ST_Unknown ||
-                symType == llvm::object::SymbolRef::ST_Other ) {
-            return strr.str();
+                symType == llvm::object::SymbolRef::ST_Other ||
+                symType == llvm::object::SymbolRef::ST_Function ) {
+            rt = strr.str();
         }
     } else {
-        return strr.str();
+        rt = strr.str();
     }
+
+    return rt;
 }
 
 
@@ -286,7 +290,7 @@ bool getSectionForAddr(vector<LLVMObjectTarget::secT> &secs,
   return false;
 }
 
-bool LLVMObjectTarget::find_import_name(uint32_t lookupAddr, string &symname) {
+bool LLVMObjectTarget::find_import_name(uint32_t lookupAddr, std::string &symname) {
   LASSERT(this->objectfile != NULL, "Object File not initialized");
 
   uint32_t  offt;
@@ -297,8 +301,16 @@ bool LLVMObjectTarget::find_import_name(uint32_t lookupAddr, string &symname) {
 
   symname = getSymForRelocAddr(section, offt, lookupAddr, true);
 
-  // externals should be outside the relocation range
-  return symname.size() != 0 && false == this->relocate_addr(((VA)lookupAddr), dummy);
+  llvm::error_code e;
+  bool is_text_ref;
+  e = section.isText(is_text_ref);
+  LASSERT(!e, e.message());
+
+  bool can_reloc = this->relocate_addr(((VA)lookupAddr), dummy);
+
+  // if we *can't* relocate this to a sane address, its probably an import
+  return (symname.size() != 0 && false == can_reloc) ||
+      ((uint32_t)dummy == 0xFFFFFFFF);
 }
 
 static
@@ -335,8 +347,10 @@ bool isAddrRelocated(const object::SectionRef &sr, uint32_t offt, VA address) {
         SmallString<32> relocType;
         e = rref.getTypeName(relocType);
         LASSERT(!e, e.message());
-        // these absolute ELF relocations seem to fail other tests
-        if(relocType == "R_386_32") {
+        // shortcut for ELF relocations by type
+        // TODO: move this to ELF speific code
+        if(relocType == "R_386_32" ||
+           relocType == "R_386_PC32") {
             return true;
         }
 
@@ -363,7 +377,6 @@ bool isAddrRelocated(const object::SectionRef &sr, uint32_t offt, VA address) {
 bool LLVMObjectTarget::is_addr_relocated(uint32_t address) {
   LASSERT(this->objectfile != NULL, "Object File not initialized");
 
-  //bool      found_offt = getOffsetForAddr(this->secs, address, offt);
   object::SectionRef section;
   uint32_t offt = 0;
   bool      found_sec = getSectionForAddr(this->secs, address, section, offt);
@@ -396,7 +409,7 @@ bool getOffsetForSection(vector<LLVMObjectTarget::secT> &secs,
 }
 
 static
-::uint64_t getAddressForString(object::ObjectFile &k, 
+::int64_t getAddressForString(object::ObjectFile &k, 
         string callTarget,
         llvm::object::section_iterator &symbol_sec) {
   //walk all the symbols
@@ -421,30 +434,30 @@ static
     }
 
     if( curName == sr ) {
-      ::uint64_t  addr = 0;
+      ::uint64_t  addr = -1;
 
       ec = i->getAddress(addr);
 
       if( ec ) {
-        return 0;
+        return -1;
       }
 
       if(addr == object::UnknownAddressOrSize) {
-        return 0;
+        return -1;
       }
 
       // get which section this symbol references.
       ec = i->getSection(symbol_sec);
 
       if(ec) {
-        return 0;
+        return -1;
       }
       
-      return addr;
+      return (::int64_t)addr;
 
     }
   }
-  return 0;
+  return -1;
 }
 
 bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
@@ -541,6 +554,10 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
   ::int64_t found = getAddressForString(*this->objectfile, s, sym_sec);
   llvm::dbgs() << __FUNCTION__ << ": Address of symbol is: " << to_string<VA>(found, hex) << "\n";
 
+  if(found == -1) {
+    return false;
+  }
+
   // check if this symbol is in a section
   if(sym_sec != this->objectfile->end_sections()) {
       ::uint64_t sec_offt;
@@ -565,11 +582,7 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
 
   llvm::dbgs() << __FUNCTION__ << ": Final addr is: " << to_string<VA>(found, hex) << "\n";
 
-  if(found == 0) {
-    return false;
-  } else {
-    toAddr = (VA)found;
-  }
+  toAddr = (VA)found;
 
   return true;
 }
