@@ -225,7 +225,7 @@ static InstTransResult doCallPC(BasicBlock *&b, VA tgtAddr) {
     std::string			fname = "sub_"+to_string<VA>(tgtAddr, std::hex);
     Function        *F = M->getFunction(fname);
 
-    TASSERT( F != NULL, "" );
+    TASSERT( F != NULL, "Could not find function: " + fname );
 
     Value   *espOld = R_READ<32>(b, X86::ESP);
     Value   *espSub = 
