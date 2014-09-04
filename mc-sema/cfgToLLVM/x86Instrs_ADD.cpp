@@ -159,6 +159,29 @@ static InstTransResult doAddRM(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
+static InstTransResult doAddRV(InstPtr ip, BasicBlock *&b,
+                               Value           *addr,
+                               const MCOperand &o1,
+                               const MCOperand &o2)
+{
+    TASSERT(o1.isReg(), "");
+    TASSERT(o2.isReg(), "");
+    TASSERT(addr != NULL, "");
+
+    // Read from o1.
+    Value *v2 = R_READ<width>(b, o1.getReg());
+
+    // Do add.
+    Value *res = doAddVV<width>(ip, b, addr, v2);
+
+    // Write to o2.
+    R_WRITE<width>(b, o2.getReg(), res);
+
+    return ContinueBlock;
+}
+
+
+template <int width>
 static InstTransResult doAddRR(InstPtr ip, BasicBlock *&b,
                                const MCOperand &dst,
                                const MCOperand &o1,
@@ -454,7 +477,9 @@ GENERIC_TRANSLATION_MEM(ADD16rm,
 GENERIC_TRANSLATION(ADD16rr, doAddRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD16rr_DB, doAddRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD16rr_REV, doAddRR<16>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(ADD32i32, doAddRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION_MEM(ADD32i32, 
+        doAddRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
+        doAddRV<32>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
 
 GENERIC_TRANSLATION_32MI(ADD32mi, 
         doAddMI<32>(ip, block, ADDR(0), OP(5)),
