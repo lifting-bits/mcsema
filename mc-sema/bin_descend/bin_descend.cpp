@@ -230,6 +230,9 @@ NativeModulePtr makeNativeModule( ExecutableContainer *exc,
       DataSection ds = processDataSection(exc, s);
       // make sure data section is not empty
       if(ds.getBase() != DataSection::NO_BASE) {
+          outs() << "Adding data section: " 
+              << to_string<VA>(ds.getBase(), hex) << " - "
+              << to_string<VA>(ds.getBase()+ds.getSize(), hex) << "\n";
           ds.setReadOnly(s.read_only);
           m->addDataSection(ds);
       }
