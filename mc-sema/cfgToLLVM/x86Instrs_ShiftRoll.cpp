@@ -161,6 +161,173 @@ Value *doShrVV32(BasicBlock *&b, Value *src, Value *count)
     return doShrVV<32>( InstPtr ((Inst*)(NULL)), b, src, count);
 }
 
+template <int width>
+static Value *doShlVV(InstPtr ip, BasicBlock *&b, Value *src, Value *count) {
+    //let's encode this the way that it's encoded in the manual
+    Function    *F = b->getParent();
+
+    //AND the count value, do this in the initial block context
+    Value   *tempCOUNT = 
+        BinaryOperator::CreateAnd(count, CONST_V<width>(b, 0x1F), "", b);
+
+    BasicBlock  *loopHeader = 
+        BasicBlock::Create(b->getContext(), "ShlLH", F);
+    BasicBlock  *body = 
+        BasicBlock::Create(b->getContext(), "ShlBody", F);
+    BasicBlock  *loopEnd =
+        BasicBlock::Create(b->getContext(), "ShlEnd", F);
+
+    BranchInst::Create(loopHeader, b);
+    //define DEST as a PHI
+    PHINode   *DEST = PHINode::Create(Type::getIntNTy(b->getContext(), width),
+                                    2,
+                                    "",
+                                    loopHeader);
+    //add the first incoming now
+    DEST->addIncoming(src, b);
+
+    PHINode     *tempCOUNT0 = PHINode::Create(  Type::getIntNTy(b->getContext(), width),
+                                            2,
+                                            "",
+                                            loopHeader);
+    //the first incoming is from the initial 
+    tempCOUNT0->addIncoming(tempCOUNT, b);
+
+    //the test to see if the tempCOUNT crossed the line 
+    Value   *loopCheck = new ICmpInst(  *loopHeader, 
+                                        CmpInst::ICMP_NE,
+                                        tempCOUNT0,
+                                        CONST_V<width>(b, 0));
+    BranchInst::Create(body, loopEnd, loopCheck, loopHeader); 
+
+    //populate the body
+    Value   *highBit = 
+        new TruncInst(  BinaryOperator::CreateLShr(DEST, CONST_V<width>(b, width-1), "", body), 
+                        Type::getInt1Ty(b->getContext()), "", body);
+    F_WRITE(body, "CF", highBit);
+
+    //DEST = DEST*2
+    Value   *mulRes = 
+        BinaryOperator::CreateMul(DEST, CONST_V<width>(b, 2), "", body);
+    Value   *newCount = 
+        BinaryOperator::CreateSub(tempCOUNT0, CONST_V<width>(b, 1), "", body);
+    DEST->addIncoming(mulRes, body);
+    tempCOUNT0->addIncoming(newCount, body);
+
+    //loop body always branches back to the loop header
+    BranchInst::Create(loopHeader, body);
+
+    //set the SF, ZF, and PF flags according to the result, 
+    //but only if the tempCOUNT value is non-zero 
+    BasicBlock  *ifCountGreaterZero = 
+        BasicBlock::Create(b->getContext(), "ifCountGreaterZero", F);
+    BasicBlock  *ifCountOne = 
+        BasicBlock::Create(b->getContext(), "ifCountOne", F);
+    BasicBlock  *ifCountTwoOrMore = 
+        BasicBlock::Create(b->getContext(), "ifCountTwoOrMore", F);
+    BasicBlock  *done = 
+        BasicBlock::Create(b->getContext(), "done", F);
+    
+    // See if the count was 0
+    Value   *isCountZ = 
+        new ICmpInst(   *loopEnd,
+                        CmpInst::ICMP_UGT,
+                        tempCOUNT,
+                        CONST_V<width>(b, 0));
+    BranchInst::Create(ifCountGreaterZero, done, isCountZ, loopEnd);
+    
+    // If the count was one, handle OF, AF undefinted, and others set according to result
+    Value   *isCountOne = 
+        new ICmpInst(   *ifCountGreaterZero,
+                        CmpInst::ICMP_EQ,
+                        tempCOUNT,
+                        CONST_V<width>(b, 1));
+    BranchInst::Create(ifCountOne, ifCountTwoOrMore, isCountOne, ifCountGreaterZero);
+
+    // OF Flag
+    Value   *msb = 
+        new TruncInst(  BinaryOperator::CreateLShr(DEST, CONST_V<width>(b, width-1), "", ifCountOne), 
+                        Type::getInt1Ty(b->getContext()), "", ifCountOne);
+    Value   *cf = F_READ(ifCountOne, "CF");
+    Value   *xorRes = BinaryOperator::CreateXor(msb, cf, "", ifCountOne);
+    F_WRITE(ifCountOne, "OF", xorRes);
+
+    // Handle the other flags
+    WriteSF<width>(ifCountOne, DEST);
+    WriteZF<width>(ifCountOne, DEST);
+    WritePF<width>(ifCountOne, DEST);
+    F_ZAP(ifCountOne, "AF");
+    
+    BranchInst::Create(done, ifCountOne);
+
+    // If the count was greater than one, OF and AF undefined, others set according to result
+    WriteSF<width>(ifCountTwoOrMore, DEST);
+    WriteZF<width>(ifCountTwoOrMore, DEST);
+    WritePF<width>(ifCountTwoOrMore, DEST);
+    F_ZAP(ifCountTwoOrMore, "AF");
+    F_ZAP(ifCountTwoOrMore, "OF");
+    BranchInst::Create(done, ifCountTwoOrMore);
+
+    //update our parents concept of what the current block is
+    b = done;
+
+    //the result is in DEST
+    return DEST;
+}
+
+
+template <int width>
+static Value *doShldVV(InstPtr ip,
+        BasicBlock *&b,
+        unsigned dstReg,
+        unsigned srcReg1,
+        //unsigned shiftBy)
+        Value* shiftBy)
+{
+    Type* widthTy = Type::getIntNTy(b->getContext(), width); 
+    Type* doubleTy = Type::getIntNTy(b->getContext(), width*2); 
+
+    // read left part
+    Value   *from_left = R_READ<width>(b, dstReg);
+    // and extend it to double width
+    Value   *le = new ZExtInst(from_left, doubleTy, "", b);
+
+    // read right part
+    Value   *from_right = R_READ<width>(b, srcReg1);
+    // and extend it to double width
+    Value   *re = new ZExtInst(from_right, doubleTy, "", b);
+
+    // put the left part on the left of a double-width int
+    Value *v1 = BinaryOperator::CreateShl(
+            le, 
+            CONST_V<width*2>(b, width), 
+            "", 
+            b);
+
+    // or the right part and left part to create
+    // a complete double width thing to shift
+    Value *from = BinaryOperator::CreateOr(v1, re, "", b);
+
+    // read "how much to shift by"
+    //Value   *imm = CONST_V<width*2>(b, shiftBy);
+    Value   *imm = shiftBy;
+
+
+    // do the shift
+    Value   *shift_res = doShlVV<width*2>(ip, b, from, imm);
+
+    Value   *fix_it = BinaryOperator::CreateLShr(shift_res, CONST_V<width*2>(b, width), "", b);
+
+    // truncate result to width type
+    Value *reg_val = new TruncInst( fix_it, 
+                                    widthTy,
+                                    "", 
+                                    b);
+
+    // save result
+    R_WRITE<width>(b, dstReg, reg_val);
+    return reg_val;
+}
 
 template <int width>
 static Value *doShrdVV(InstPtr ip,
@@ -242,6 +409,46 @@ static InstTransResult doShrdRI(InstPtr ip, BasicBlock *&b,
             dst.getReg(), 
             src1.getReg(), 
             CONST_V<width*2>(b, src2.getImm()));
+    
+    return ContinueBlock;
+}
+
+template <int width>
+static InstTransResult doShldRI(InstPtr ip, BasicBlock *&b,
+                        const MCOperand &dst,
+                        const MCOperand &src1,
+                        const MCOperand &src2)
+{
+    TASSERT(src2.isImm(), "");
+    TASSERT(src1.isReg(), "");
+    TASSERT(dst.isReg(), "");
+
+    doShldVV<width>(ip, b, 
+            dst.getReg(), 
+            src1.getReg(), 
+            CONST_V<width*2>(b, src2.getImm()));
+    
+    return ContinueBlock;
+}
+
+template <int width>
+static InstTransResult doShldRCL(InstPtr ip, BasicBlock *&b,
+                        const MCOperand &dst,
+                        const MCOperand &src1)
+{
+    TASSERT(src1.isReg(), "");
+    TASSERT(dst.isReg(), "");
+
+    Type* doubleTy = Type::getIntNTy(b->getContext(), width*2); 
+
+    Value   *count = R_READ<width>(b, X86::CL);
+    // ShrdVV needs a 64-bit count
+    Value   *extCount = new ZExtInst(count, doubleTy, "", b);
+
+    doShldVV<width>(ip, b, 
+            dst.getReg(), 
+            src1.getReg(), 
+            extCount);
     
     return ContinueBlock;
 }
@@ -385,120 +592,6 @@ static InstTransResult doShrMCL(InstPtr ip, BasicBlock *&b,
     M_WRITE<width>(ip, b, addr, res);
 
     return ContinueBlock;
-}
-
-template <int width>
-static Value *doShlVV(InstPtr ip, BasicBlock *&b, Value *src, Value *count) {
-    //let's encode this the way that it's encoded in the manual
-    Function    *F = b->getParent();
-
-    //AND the count value, do this in the initial block context
-    Value   *tempCOUNT = 
-        BinaryOperator::CreateAnd(count, CONST_V<width>(b, 0x1F), "", b);
-
-    BasicBlock  *loopHeader = 
-        BasicBlock::Create(b->getContext(), "ShlLH", F);
-    BasicBlock  *body = 
-        BasicBlock::Create(b->getContext(), "ShlBody", F);
-    BasicBlock  *loopEnd =
-        BasicBlock::Create(b->getContext(), "ShlEnd", F);
-
-    BranchInst::Create(loopHeader, b);
-    //define DEST as a PHI
-    PHINode   *DEST = PHINode::Create(Type::getIntNTy(b->getContext(), width),
-                                    2,
-                                    "",
-                                    loopHeader);
-    //add the first incoming now
-    DEST->addIncoming(src, b);
-
-    PHINode     *tempCOUNT0 = PHINode::Create(  Type::getIntNTy(b->getContext(), width),
-                                            2,
-                                            "",
-                                            loopHeader);
-    //the first incoming is from the initial 
-    tempCOUNT0->addIncoming(tempCOUNT, b);
-
-    //the test to see if the tempCOUNT crossed the line 
-    Value   *loopCheck = new ICmpInst(  *loopHeader, 
-                                        CmpInst::ICMP_NE,
-                                        tempCOUNT0,
-                                        CONST_V<width>(b, 0));
-    BranchInst::Create(body, loopEnd, loopCheck, loopHeader); 
-
-    //populate the body
-    Value   *highBit = 
-        new TruncInst(  BinaryOperator::CreateLShr(DEST, CONST_V<width>(b, width-1), "", body), 
-                        Type::getInt1Ty(b->getContext()), "", body);
-    F_WRITE(body, "CF", highBit);
-
-    //DEST = DEST*2
-    Value   *mulRes = 
-        BinaryOperator::CreateMul(DEST, CONST_V<width>(b, 2), "", body);
-    Value   *newCount = 
-        BinaryOperator::CreateSub(tempCOUNT0, CONST_V<width>(b, 1), "", body);
-    DEST->addIncoming(mulRes, body);
-    tempCOUNT0->addIncoming(newCount, body);
-
-    //loop body always branches back to the loop header
-    BranchInst::Create(loopHeader, body);
-
-    //set the SF, ZF, and PF flags according to the result, 
-    //but only if the tempCOUNT value is non-zero 
-    BasicBlock  *ifCountGreaterZero = 
-        BasicBlock::Create(b->getContext(), "ifCountGreaterZero", F);
-    BasicBlock  *ifCountOne = 
-        BasicBlock::Create(b->getContext(), "ifCountOne", F);
-    BasicBlock  *ifCountTwoOrMore = 
-        BasicBlock::Create(b->getContext(), "ifCountTwoOrMore", F);
-    BasicBlock  *done = 
-        BasicBlock::Create(b->getContext(), "done", F);
-    
-    // See if the count was 0
-    Value   *isCountZ = 
-        new ICmpInst(   *loopEnd,
-                        CmpInst::ICMP_UGT,
-                        tempCOUNT,
-                        CONST_V<width>(b, 0));
-    BranchInst::Create(ifCountGreaterZero, done, isCountZ, loopEnd);
-    
-    // If the count was one, handle OF, AF undefinted, and others set according to result
-    Value   *isCountOne = 
-        new ICmpInst(   *ifCountGreaterZero,
-                        CmpInst::ICMP_EQ,
-                        tempCOUNT,
-                        CONST_V<width>(b, 1));
-    BranchInst::Create(ifCountOne, ifCountTwoOrMore, isCountOne, ifCountGreaterZero);
-
-    // OF Flag
-    Value   *msb = 
-        new TruncInst(  BinaryOperator::CreateLShr(DEST, CONST_V<width>(b, width-1), "", ifCountOne), 
-                        Type::getInt1Ty(b->getContext()), "", ifCountOne);
-    Value   *cf = F_READ(ifCountOne, "CF");
-    Value   *xorRes = BinaryOperator::CreateXor(msb, cf, "", ifCountOne);
-    F_WRITE(ifCountOne, "OF", xorRes);
-
-    // Handle the other flags
-    WriteSF<width>(ifCountOne, DEST);
-    WriteZF<width>(ifCountOne, DEST);
-    WritePF<width>(ifCountOne, DEST);
-    F_ZAP(ifCountOne, "AF");
-    
-    BranchInst::Create(done, ifCountOne);
-
-    // If the count was greater than one, OF and AF undefined, others set according to result
-    WriteSF<width>(ifCountTwoOrMore, DEST);
-    WriteZF<width>(ifCountTwoOrMore, DEST);
-    WritePF<width>(ifCountTwoOrMore, DEST);
-    F_ZAP(ifCountTwoOrMore, "AF");
-    F_ZAP(ifCountTwoOrMore, "OF");
-    BranchInst::Create(done, ifCountTwoOrMore);
-
-    //update our parents concept of what the current block is
-    b = done;
-
-    //the result is in DEST
-    return DEST;
 }
 
 template <int width>
@@ -2085,7 +2178,9 @@ GENERIC_TRANSLATION(SHR8r1, doShrR1<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHR8rCL, doShrRCL<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHR8ri, doShrRI<8>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SHRD32rri8, doShrdRI<32>(ip, block, OP(1), OP(2), OP(3)))
+GENERIC_TRANSLATION(SHLD32rri8, doShldRI<32>(ip, block, OP(1), OP(2), OP(3)))
 GENERIC_TRANSLATION(SHRD32rrCL, doShrdRCL<32>(ip, block, OP(1), OP(2)))
+GENERIC_TRANSLATION(SHLD32rrCL, doShldRCL<32>(ip, block, OP(1), OP(2)))
 
 void ShiftRoll_populateDispatchMap(DispatchMap &m) {
         m[X86::RCL8m1] = translate_RCL8m1;
@@ -2216,4 +2311,6 @@ void ShiftRoll_populateDispatchMap(DispatchMap &m) {
         m[X86::SHR8ri] = translate_SHR8ri;
         m[X86::SHRD32rri8] = translate_SHRD32rri8;
         m[X86::SHRD32rrCL] = translate_SHRD32rrCL;
+        m[X86::SHLD32rrCL] = translate_SHLD32rrCL;
+        m[X86::SHLD32rri8] = translate_SHLD32rri8;
 }
