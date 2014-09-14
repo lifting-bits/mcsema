@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Instrs_fpu.h"
 #include "InstructionDispatch.h"
 #include <vector>
+#include <cmath>
 
 #define NASSERT(cond) TASSERT(cond, "")
 
@@ -41,6 +42,23 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MAKE_FOPCODE(x, y) (MAKEWORD(x, y) & 0x7FF)
 
 using namespace llvm;
+
+template <int width, int maskbits>
+static void SHR_SET_FLAG(llvm::BasicBlock *block, Value *val,
+    std::string flag, int shrbits)
+{
+    Value *shr = llvm::BinaryOperator::CreateLShr(
+        val, CONST_V<width>(block, shrbits), "", block);
+    Value *mask_pre = CONST_V<maskbits>(block, 0);
+    Value *mask = llvm::BinaryOperator::CreateNot(mask_pre, "", block);
+    Value *shr_trunc = new llvm::TruncInst(shr, 
+            Type::getIntNTy(block->getContext(), maskbits), "", block);
+
+    Value *anded = llvm::BinaryOperator::CreateAnd(shr_trunc, mask, "", block);
+
+    F_WRITE(block, flag, anded);
+
+}
 
 template <int width>
 static Value *SHL_NOTXOR_FLAG(llvm::BasicBlock *block, Value *val,
@@ -108,6 +126,12 @@ static void setFpuInstPtr(llvm::BasicBlock *b)
     return setFpuInstPtr(b, b);
 }
 
+#if 0
+static Value* adjustFpuPrecision(BasicBlock *&b, Value *fpuval)
+{
+    return fpuval;
+}
+#else
 static Value* adjustFpuPrecision(BasicBlock *&b, Value *fpuval)
 {
     // We only expect to be called on native FPU types that need to be
@@ -168,6 +192,7 @@ static Value* adjustFpuPrecision(BasicBlock *&b, Value *fpuval)
     b = block_done_adjusting;
     return adjustedVal;
 }
+#endif
 
 static void FPUF_SET(BasicBlock *&b, std::string flag)
 {
@@ -732,6 +757,38 @@ static InstTransResult doFOpPRR(InstPtr ip, BasicBlock *&b,
     return ContinueBlock;
 }
 
+static InstTransResult doFldcw(InstPtr ip, BasicBlock *&b, Value *memAddr)
+{
+    Value *memPtr;
+    llvm::Type *int16ptr = llvm::Type::getIntNPtrTy(b->getContext(), 16);
+
+    NASSERT(memAddr != NULL);
+
+    if (memAddr->getType()->isPointerTy() == false)
+    {
+        memPtr = new llvm::IntToPtrInst(memAddr, int16ptr , "", b); 
+    }
+    else if (memAddr->getType() != int16ptr)
+    {
+        memPtr = llvm::CastInst::CreatePointerCast(
+            memAddr, llvm::Type::getIntNPtrTy(b->getContext(), 16), "", b);
+    }
+
+    Value *memVal = M_READ<16>(ip, b, memPtr);
+
+    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_IM", 0 );
+    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_DM", 1 );
+    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_ZM", 2 );
+    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_OM", 3 );
+    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_UM", 4 );
+    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_PM", 5 );
+    SHR_SET_FLAG<16, 2>(b, memVal, "FPU_PC", 8 );
+    SHR_SET_FLAG<16, 2>(b, memVal, "FPU_RC", 10);
+    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_X",  12);
+
+    return ContinueBlock; 
+}
+
 static InstTransResult doFstcw(InstPtr ip, BasicBlock *&b, Value *memAddr)
 {
     Value *memPtr;
@@ -940,6 +997,26 @@ static InstTransResult doFldR(InstPtr ip, BasicBlock *&b, const MCOperand &r)
 }
 
 template<int width>
+static InstTransResult doFistM(InstPtr ip, BasicBlock *&b, Value *memAddr)
+{
+    NASSERT(memAddr != NULL);
+
+    Value *regVal = FPUR_READ(b, X86::ST0);
+    
+    Value *ToInt = llvm::CastInst::Create(
+            llvm::Instruction::FPToSI,
+            regVal,
+            Type::getIntNTy(b->getContext(), width),
+            "",
+            b);
+
+    M_WRITE<width>(ip, b, memAddr, ToInt);
+
+    // Next instruction.
+    return ContinueBlock;
+}
+
+template<int width>
 static InstTransResult doFstM(InstPtr ip, BasicBlock *&b, Value *memAddr)
 {
     NASSERT(memAddr != NULL);
@@ -992,6 +1069,19 @@ static InstTransResult doFstpM(InstPtr ip, BasicBlock *&b, Value *memAddr)
 {
     // Do the FST.
     doFstM<width>(ip, b, memAddr);
+
+    // Pop the stack.
+    FPU_POP(b);
+
+    // Next instruction.
+    return ContinueBlock;
+}
+
+template<int width>
+static InstTransResult doFistpM(InstPtr ip, BasicBlock *&b, Value *memAddr)
+{
+    // Do the FST.
+    doFistM<width>(ip, b, memAddr);
 
     // Pop the stack.
     FPU_POP(b);
@@ -1217,6 +1307,10 @@ FPU_TRANSLATION(LD_F0, true, false, true, false,
         doFldC(ip, block, 0.0))
 FPU_TRANSLATION(LD_F1, true, false, true, false,
         doFldC(ip, block, 1.0))
+
+FPU_TRANSLATION(FLDPI, true, false, true, false,
+        doFldC(ip, block, M_PI))
+
 FPU_TRANSLATION(ILD_F16m, true, true, true, true,
         doFildM<16>(ip, block, mem_src))
 FPU_TRANSLATION(ILD_F32m, true, true, true, true,
@@ -1225,6 +1319,19 @@ FPU_TRANSLATION(ILD_F64m, true, true, true, true,
         doFildM<64>(ip, block, mem_src))
 
 FPU_TRANSLATION(FNSTCW16m, false, false, true, true, doFstcw(ip, block, mem_src))
+FPU_TRANSLATION(FLDCW16m, false, false, true, true, doFldcw(ip, block, mem_src))
+
+FPU_TRANSLATION(IST_F16m, true, true, true, true,
+        doFistM<16>(ip, block, mem_src))
+FPU_TRANSLATION(IST_F32m, true, true, true, true,
+        doFistM<32>(ip, block, mem_src))
+
+FPU_TRANSLATION(IST_FP16m, true, true, true, true,
+        doFistpM<16>(ip, block, mem_src))
+FPU_TRANSLATION(IST_FP32m, true, true, true, true,
+        doFistpM<32>(ip, block, mem_src))
+FPU_TRANSLATION(IST_FP64m, true, true, true, true,
+        doFistpM<64>(ip, block, mem_src))
 
 static InstTransResult translate_WAIT(NativeModulePtr natM, BasicBlock *&block,
     InstPtr ip, MCInst &inst)
@@ -1269,6 +1376,13 @@ void FPU_populateDispatchMap(DispatchMap &m)
     m[X86::MUL_FrST0] = translate_MUL_FrST0;
     m[X86::ST_F32m] = translate_ST_F32m;
     m[X86::ST_F64m] = translate_ST_F64m;
+
+    m[X86::IST_FP32m] = translate_IST_FP32m;
+    m[X86::IST_FP64m] = translate_IST_FP64m;
+    m[X86::IST_F32m] = translate_IST_F32m;
+    m[X86::IST_F16m] = translate_IST_F16m;
+    m[X86::IST_FP16m] = translate_IST_FP16m;
+
     m[X86::ST_FP32m] = translate_ST_FP32m;
     m[X86::ST_FP64m] = translate_ST_FP64m;
     m[X86::ST_FP80m] = translate_ST_FP80m;
@@ -1293,8 +1407,11 @@ void FPU_populateDispatchMap(DispatchMap &m)
     m[X86::SIN_F] = translate_SIN_F;
     m[X86::LD_F0] = translate_LD_F0;
     m[X86::LD_F1] = translate_LD_F1;
+    m[X86::FLDPI] = translate_FLDPI;
+
     m[X86::ILD_F16m] = translate_ILD_F16m;
     m[X86::ILD_F32m] = translate_ILD_F32m;
     m[X86::ILD_F64m] = translate_ILD_F64m;
     m[X86::FNSTCW16m] = translate_FNSTCW16m;
+    m[X86::FLDCW16m] = translate_FLDCW16m;
 }
