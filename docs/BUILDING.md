@@ -27,11 +27,11 @@ Clone the source from Git. If you are reading this, odds are you know where the 
 ## Building
 
 Ubuntu 14.04 - i386
-* sudo apt-get install git gcc-multilib build-essential
+* sudo apt-get install git gcc-multilib build-essential cmake
 
 Ubuntu 14.04 - x86_64
 
-* sudo apt-get install git gcc-multilib build-essential libc6-i386
+* sudo apt-get install git gcc-multilib build-essential cmake libc6-i386
 
 
 The following examples assume the source has already been cloned from git into a directory called `mcsema`.
