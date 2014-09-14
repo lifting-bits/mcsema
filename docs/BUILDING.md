@@ -19,6 +19,9 @@ Required:
 Recommended:
 * clang
 
+Ubuntu 14.04
+* sudo apt-get install git gcc-multilib build-essential
+
 ## Get The Source
 
 Clone the source from Git. If you are reading this, odds are you know where the git repository is located.  For the rest of these examples, please check out the source into the `llvm-lift` directory.
