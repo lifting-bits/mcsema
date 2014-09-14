@@ -26,12 +26,18 @@ Clone the source from Git. If you are reading this, odds are you know where the 
 
 ## Building
 
-Ubuntu 14.04
+Ubuntu 14.04 - i386
 * sudo apt-get install git gcc-multilib build-essential
 
-The following examples assume the source has already been cloned from git into a directory called `mc-sema`.
+Ubuntu 14.04 - x86_64
 
-* `cd ~/git/mc-sema` (or wherever you checked out the source).
+* sudo apt-get install git gcc-multilib build-essential libc6-i386
+
+
+The following examples assume the source has already been cloned from git into a directory called `mcsema`.
+
+* `git clone https://github.com/trailofbits/mcsema`
+* `cd mcsema` (or wherever you checked out the source)
 * `mkdir build`
 * `cd build`
 
