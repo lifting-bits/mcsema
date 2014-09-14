@@ -15,7 +15,7 @@ Patches are welcome.
 
 ## News
 
-09/01/2014: MC-Semantics now builds on Linux and supports ELF object files. Linux support is not as well tested as Windows, and currenlty assumes all indirect branches and callbacks are to translated code. 
+09/01/2014: MC-Semantics now builds on Linux and supports ELF object files. Linux support is not as well tested as Windows, and currently assumes all indirect branches and callbacks are to translated code. 
 
 ## Separation of Components
 
