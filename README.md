@@ -35,7 +35,7 @@ Detailed design and usage information can be found in the docs directory.
 
 ### Building
 
-Detailed build instructions are at [docs/BUILDING.md](docs/BUILDING.md).
+Detailed build instructions for Windows and Linux are at [docs/BUILDING.md](docs/BUILDING.md). If you use Ubuntu 14.04, then `bash bootstrap.sh` will install dependencies via apt-get and compile the release version of the tools into a directory called `build`. The entire process can take over 40 minutes. Modify the `make` command within `bootstrap.sh` to use multiple cores.  
 
 ### Usage
 
