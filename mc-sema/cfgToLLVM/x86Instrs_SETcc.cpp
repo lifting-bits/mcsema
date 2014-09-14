@@ -68,6 +68,18 @@ static Value *doSetbV(InstPtr ip, BasicBlock *&b)
     return ext_to_set;
 }
 
+static Value *doSetsV(InstPtr ip, BasicBlock *&b)
+{
+    // sets == set if sf == 1
+    // essentially, read SF
+    Value *sf_val = F_READ(b, "SF");
+
+    // zero extend to desired width
+    Value   *ext_to_set = new ZExtInst(sf_val, Type::getIntNTy(b->getContext(), 8), "", b);
+    
+    return ext_to_set;
+}
+
 static Value *doSetneV(InstPtr ip, BasicBlock *&b)
 {
     //read ZF
@@ -218,6 +230,8 @@ DO_SETCC_OP_REG(Setl)
 DO_SETCC_OP_MEM(Setl)
 DO_SETCC_OP_REG(Setle)
 DO_SETCC_OP_MEM(Setle)
+DO_SETCC_OP_REG(Sets)
+DO_SETCC_OP_MEM(Sets)
 
 GENERIC_TRANSLATION_MEM(SETAm, 
 	doSetaM(ip, block, ADDR(0)),
@@ -251,6 +265,10 @@ GENERIC_TRANSLATION(SETLEr, doSetleR(ip, block, OP(0)))
 GENERIC_TRANSLATION_MEM(SETLEm,
   doSetleM(ip, block, ADDR(0)),
   doSetleM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION(SETSr, doSetsR(ip, block, OP(0)))
+GENERIC_TRANSLATION_MEM(SETSm,
+  doSetsM(ip, block, ADDR(0)),
+  doSetsM(ip, block, STD_GLOBAL_OP(0)))
 
 void SETcc_populateDispatchMap(DispatchMap &m) {
         m[X86::SETAm] = translate_SETAm;
@@ -269,4 +287,6 @@ void SETcc_populateDispatchMap(DispatchMap &m) {
         m[X86::SETLEm] = translate_SETLEm;
         m[X86::SETGr] = translate_SETGr;
         m[X86::SETGm] = translate_SETGm;
+        m[X86::SETSr] = translate_SETSr;
+        m[X86::SETSm] = translate_SETSm;
 }
