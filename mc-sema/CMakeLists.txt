@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 2.8)
+
 set(CMAKE_MODULE_PATH
   ${CMAKE_MODULE_PATH}
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules"
@@ -7,6 +9,7 @@ set(PROTOBUF_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/protobuf-2.5.0)
 if( WIN32 OR CYGWIN)
   # MinGW warns if -fvisibility-inlines-hidden is used.
 else()
+  include(CheckCXXCompilerFlag)
   check_cxx_compiler_flag("-fvisibility-inlines-hidden" SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG)
   if( SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG )
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility-inlines-hidden")
