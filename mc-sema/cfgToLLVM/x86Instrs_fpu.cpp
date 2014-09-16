@@ -36,6 +36,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <vector>
 #include <cmath>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 #define NASSERT(cond) TASSERT(cond, "")
 
 #define MAKEWORD(x, y) (((x) << 8) | (y))
