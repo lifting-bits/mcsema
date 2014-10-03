@@ -39,12 +39,21 @@ using namespace boost;
 ElfTarget* ElfTarget::CreateElfTarget(string f, const Target *T) 
 {
     OwningPtr<MemoryBuffer>	buff;
-    llvm::error_code			ec = MemoryBuffer::getFile(f, buff);
+    error_code			ec = MemoryBuffer::getFile(f, buff);
     LASSERT(!ec, ec.message());
 
     std::string mn = filesystem::path(f).stem().string();
-    llvm::object::ObjectFile *objf = 
-        new llvm::object::ELFObjectFile<support::little, false> (buff.take(), ec);
 
-    return new ElfTarget(mn, objf);
+    return new ElfTarget(
+            mn, 
+            new llvm::object::ELFObjectFile<support::little, false> (buff.take(), ec)
+            );
 }
+
+bool ElfTarget::getEntryPoint(::uint64_t &ep) 
+{
+    error_code ec;
+    ec = this->elf_obj->getEntryPoint(ep);
+    return ec == object::object_error::success;
+}
+

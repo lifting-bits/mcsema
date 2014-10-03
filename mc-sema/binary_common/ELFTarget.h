@@ -31,16 +31,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <string>
 #include "LLVMObjectTarget.h"
+#include "llvm/Object/ELF.h"
 
 
 class ElfTarget : public LLVMObjectTarget {
 public:
     static ElfTarget* CreateElfTarget(std::string f, const llvm::Target *T);
     virtual ~ElfTarget(void) {};
+
+    bool getEntryPoint(::uint64_t &ep); 
 private:
     ElfTarget();
 protected:
-  ElfTarget(const std::string &modname, llvm::object::ObjectFile *of): LLVMObjectTarget(modname, of) {};
+  llvm::object::ELFObjectFile<llvm::support::little, false> *elf_obj;
+  ElfTarget(const std::string &modname, llvm::object::ELFObjectFile<llvm::support::little, false> *of): LLVMObjectTarget(modname, of), elf_obj(of)
+    {
+    };
 }; 
 
 #endif
