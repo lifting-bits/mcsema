@@ -680,7 +680,17 @@ def recoverBlock(startEA):
         follows = [cref for cref in crefs]
 
         if follows == [nextEA] or isCall(curEA):
-            # read next instruction
+            # there is only one following branch, to the next instruction
+            # check if this is a JMP 0; in that case, make a new block
+            if isUnconditionalJump(curEA):
+                b.endEA = nextEA
+                for f in follows:
+                    # do not decode external code refs
+                    if not isExternalReference(f):
+                        b.succs.append(f)
+                return b
+
+            # if its not JMP 0, add next instruction to current block
             curEA = nextEA
         # check if we need to make a new block
         elif len(follows) == 0:
