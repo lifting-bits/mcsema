@@ -609,6 +609,7 @@ public:
   const Elf_Dyn  *getDyn(DataRefImpl DynData) const;
   error_code getSymbolVersion(SymbolRef Symb, StringRef &Version,
                               bool &IsDefault) const;
+  error_code getEntryPoint(uint64_t &entry) const;
 protected:
   virtual error_code getSymbolNext(DataRefImpl Symb, SymbolRef &Res) const;
   virtual error_code getSymbolName(DataRefImpl Symb, StringRef &Res) const;
@@ -750,6 +751,20 @@ void ELFObjectFile<target_endianness, is64Bits>::
     VersionMap[index] = VersionMapEntry(vd);
     p += vd->vd_next;
   }
+}
+
+// Get the Entry Point for this ELF file
+template<support::endianness target_endianness, bool is64Bits>
+error_code ELFObjectFile<target_endianness, is64Bits>
+                        ::getEntryPoint(uint64_t &entry) const {
+
+  Elf_Addr ep_addr = Header->e_entry;
+
+  uint64_t the_addr = static_cast<uint64_t>(ep_addr);
+
+  entry = ep_addr;
+
+  return object_error::success;
 }
 
 // Iterate through the versions needed section, and place each Elf_Vernaux
