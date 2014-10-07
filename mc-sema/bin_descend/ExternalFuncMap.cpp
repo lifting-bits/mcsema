@@ -40,6 +40,56 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
+string ExternalFunctionMap::mangleELFSymbol(string inSym, CallingConvention &conv, int &rNumParams) 
+{
+    return inSym;
+}
+
+string ExternalFunctionMap::manglePESymbol(string inSym, CallingConvention &conv, int &rNumParams) 
+{
+    string outSym = inSym;
+
+    /* COFF objects have this semantic */
+    if( outSym.substr(0, strlen("__imp__")) == "__imp__" )
+    {
+        outSym = outSym.substr(strlen("__imp__"));
+    } 
+    /* OR this */
+    if( outSym.substr(0, strlen("__imp_")) == "__imp_" )
+    {
+        outSym = outSym.substr(strlen("__imp_"));
+    } 
+
+    /* maybe we can learn something about this symbol as is */ 
+    else if( outSym.substr(0, strlen("_")) == "_")
+    {
+        outSym = outSym.substr(strlen("_"));
+        // assume sdcall for _<word>
+        if (outSym.substr(1, strlen("_")) != "_" ) {
+            conv = CalleeCleanup;
+        }
+    } 
+    else if (outSym.substr(0, strlen("@")) == "@")
+    {
+        outSym = outSym.substr(strlen("@"));
+        // assume fastcall for @<word>
+        if (outSym.substr(1, strlen("@")) != "@" ) {
+            conv = FastCall;
+        }
+    }
+
+    int atPos = outSym.rfind('@');
+    if(atPos >= 0)
+    {
+        string  strNArgs = outSym.substr(atPos+1, outSym.size());
+        istringstream(strNArgs) >> rNumParams;
+        rNumParams = rNumParams/4;
+        outSym = outSym.substr(0, atPos);
+    }
+
+    return outSym;
+}
+
 string ExternalFunctionMap::sym_sym(string inSym)
 {
   string            outSym = inSym;
@@ -64,50 +114,18 @@ string ExternalFunctionMap::sym_sym(string inSym)
   }
  
 
+  bool is_coff_pe = this->triple.find("win32") != string::npos || 
+                 this->triple.find("mingw32") != string::npos;
+
   CallingConvention conv =  CallerCleanup;
-  if( this->triple.find("win32") != string::npos ||
-	    this->triple.find("mingw32") != string::npos)
+  if( is_coff_pe )
   {
-	conv = CalleeCleanup;
+      conv = CalleeCleanup;
+      outSym = this->manglePESymbol(outSym, conv, rNumParams);
+  } else {
+      outSym = this->mangleELFSymbol(outSym, conv, rNumParams);
   }
 
-  /* COFF objects have this semantic */
-  if( outSym.substr(0, strlen("__imp__")) == "__imp__" )
-  {
-      outSym = outSym.substr(strlen("__imp__"));
-  } 
-  /* OR this */
-  if( outSym.substr(0, strlen("__imp_")) == "__imp_" )
-  {
-      outSym = outSym.substr(strlen("__imp_"));
-  } 
-
-  /* maybe we can learn something about this symbol as is */ 
-  else if( outSym.substr(0, strlen("_")) == "_")
-  {
-    outSym = outSym.substr(strlen("_"));
-    // assume sdcall for _<word>
-    if (outSym.substr(1, strlen("_")) != "_" ) {
-        conv = CalleeCleanup;
-    }
-  } 
-  else if (outSym.substr(0, strlen("@")) == "@")
-  {
-    outSym = outSym.substr(strlen("@"));
-    // assume fastcall for @<word>
-    if (outSym.substr(1, strlen("@")) != "@" ) {
-        conv = FastCall;
-    }
-  }
-
-  int atPos = outSym.rfind('@');
-  if(atPos >= 0)
-  {
-    string  strNArgs = outSym.substr(atPos+1, outSym.size());
-    istringstream(strNArgs) >> rNumParams;
-    rNumParams = rNumParams/4;
-    outSym = outSym.substr(0, atPos);
-  }
 
   /* do we already have a record for this symbol? if we don't, we should add */
   it = this->external_map.find(outSym);
