@@ -68,7 +68,7 @@ private:
 
 };
 
-bool getSectionForAddr(std::vector<LLVMObjectTarget::secT> &secs, 
+bool getSectionForAddr(const std::vector<LLVMObjectTarget::secT> &secs, 
         uint32_t addr, 
         llvm::object::SectionRef &secref,
         uint32_t &offt);

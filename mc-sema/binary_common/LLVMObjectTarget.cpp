@@ -281,13 +281,13 @@ string getSymForRelocAddr(llvm::object::SectionRef      &sr,
     return getSymForReloc(rref, onlyFuncs);
 }
 
-bool getSectionForAddr(vector<LLVMObjectTarget::secT> &secs, 
+bool getSectionForAddr(const vector<LLVMObjectTarget::secT> &secs, 
         uint32_t addr, 
         object::SectionRef &secref,
         uint32_t &offt) 
 {
   //get the offset for this address
-  for(vector<LLVMObjectTarget::secT>::iterator it = secs.begin(), en = secs.end();
+  for(vector<LLVMObjectTarget::secT>::const_iterator it = secs.begin(), en = secs.end();
       it != en;
       ++it)
   {
