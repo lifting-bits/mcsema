@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "X86.h"
 #include "Externals.h"
 #include "JumpTables.h"
+#include "ELFTarget.h"
 #include "llvm/Support/Debug.h"
 #include <iostream>
 #include <algorithm>
@@ -824,6 +825,23 @@ do
     MCOperand op;
     string  imp;
     switch(I->get_inst().getOpcode()) {
+      case X86::PUSHi32:
+          // only applies for fully linked ELFs
+          {
+              ElfTarget *elft = dynamic_cast<ElfTarget*>(c);
+              op = I->get_inst().getOperand(0);
+              LASSERT(op.isImm(), "No immediate operand for PUSHi32");
+              VA imm = op.getImm();
+              if(elft && elft->is_in_code(imm)) {
+                // this instruction references code
+                I->set_call_tgt(imm);               
+                // make sure we disassemble at this new address
+                funcs.push(imm);
+                out << "Found new function entry from PUSH: " << to_string<VA>(imm, hex) << "\n";
+              }
+          }
+          break;
+         
       case X86::JMP32m:
           {
             string  thunkSym;
