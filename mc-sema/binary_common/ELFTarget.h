@@ -39,14 +39,19 @@ public:
     static ElfTarget* CreateElfTarget(std::string f, const llvm::Target *T);
     virtual ~ElfTarget(void) {};
 
-    bool getEntryPoint(::uint64_t &ep); 
+    virtual bool getEntryPoint(::uint64_t &ep) const;
+    virtual bool find_import_name(uint32_t, std::string &);
+
 private:
     ElfTarget();
+
 protected:
   llvm::object::ELFObjectFile<llvm::support::little, false> *elf_obj;
   ElfTarget(const std::string &modname, llvm::object::ELFObjectFile<llvm::support::little, false> *of): LLVMObjectTarget(modname, of), elf_obj(of)
     {
     };
+
+  bool isLinked() const;
 }; 
 
 #endif

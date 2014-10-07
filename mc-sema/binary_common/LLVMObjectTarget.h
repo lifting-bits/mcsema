@@ -57,6 +57,7 @@ public:
   virtual ::uint64_t getBase(void) const;
   virtual ::uint64_t getExtent(void) const;
   virtual int readByte(::uint64_t, uint8_t *) const;
+  virtual bool getEntryPoint(::uint64_t &ep) const;
 protected:
   std::vector<secT>              secs;
 
@@ -66,5 +67,10 @@ private:
     LLVMObjectTarget();
 
 };
+
+bool getSectionForAddr(std::vector<LLVMObjectTarget::secT> &secs, 
+        uint32_t addr, 
+        llvm::object::SectionRef &secref,
+        uint32_t &offt);
 
 #endif

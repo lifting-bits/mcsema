@@ -101,6 +101,7 @@ public:
   virtual uint64_t getBase() const = 0;
   virtual uint64_t getExtent() const = 0;
   virtual int readByte(uint64_t addr, uint8_t *b) const = 0;
+  virtual bool getEntryPoint(uint64_t &ep) const = 0;
 };
 
 #endif //BINCOMM_H
