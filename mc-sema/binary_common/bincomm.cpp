@@ -59,6 +59,7 @@ UnderlyingTarget targetFromExtension(string extension) {
     .Case(".dll", PE_TGT)
     .Case(".so", ELF_TGT)
     .Case(".o", ELF_TGT)
+    .Case("", ELF_TGT) // assume no extension == ELF
     .Case(".bin", RAW_TGT)
     .Default(UNK_TGT);
 
