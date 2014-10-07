@@ -75,6 +75,7 @@ bool ElfTarget::find_import_name(uint32_t addrToFind, std::string &import_name)
 
     uint32_t final_target = addrToFind;
     if(this->isLinked()) {
+        llvm::dbgs() << __FUNCTION__ << "Doing extra deref" << "\n";
         // one more level of indirection for fully linked binaries
         uint8_t *ft_ptr = (uint8_t*)&final_target;
         this->readByte(addrToFind+0, ft_ptr+0);
@@ -127,5 +128,25 @@ bool ElfTarget::find_import_name(uint32_t addrToFind, std::string &import_name)
 bool ElfTarget::isLinked() const {
     // partially linked objects have no entry point
     ::uint64_t dummy;
-    return false == this->getEntryPoint(dummy);
+    return true == this->getEntryPoint(dummy);
+}
+
+bool ElfTarget::is_in_code(VA addr) const {
+
+    uint32_t offt;
+    uint32_t addr32 = (uint32_t)(addr);
+    object::SectionRef section;
+
+    bool      found_offt = getSectionForAddr(this->secs, addr32, section, offt);
+    if (false == found_offt) {
+        return false;
+    }
+
+    llvm::error_code e;
+    bool is_text_ref;
+    e = section.isText(is_text_ref);
+
+    LASSERT(!e, e.message());
+
+    return is_text_ref;
 }

@@ -41,6 +41,7 @@ public:
 
     virtual bool getEntryPoint(::uint64_t &ep) const;
     virtual bool find_import_name(uint32_t, std::string &);
+    virtual bool is_in_code(VA addr) const;
 
 private:
     ElfTarget();
