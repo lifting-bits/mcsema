@@ -844,51 +844,64 @@ do
           }
           break;
       case X86::CALLpcrel32:
-        //this could be an external call in COFF, or not
-        op = I->get_inst().getOperand(0);
-        LASSERT(op.isImm(), "Nonsense for CALLpcrel32");
+      {
+          //this could be an external call in COFF, or not
+          op = I->get_inst().getOperand(0);
+          LASSERT(op.isImm(), "Nonsense for CALLpcrel32");
 
           //check to see if this is an external call...
-        if(I->has_ext_call_target()) {
-            out << "External call to: " << I->get_ext_call_target()->getSymbolName() << "\n";
-            break;
-        }
+          if(I->has_ext_call_target()) {
+              out << "External call to: " << I->get_ext_call_target()->getSymbolName() << "\n";
+              break;
+          }
 
-        if(op.getImm() !=0 && ((uint32_t)op.getImm()) != 0xFFFFFFFC) {
-          VA    callTgt = curAddr+op.getImm()+I->get_len();
-          bool  foldFunc = false;
-          //speculate about callTgt
-          InstPtr spec = d.getInstFromBuff(callTgt, c);
-          if(spec->terminator() && spec->get_inst().getOpcode() == X86::JMP32m) {
-            string  thunkSym;
-            bool r = c->find_import_name(callTgt+2, thunkSym);
-            LASSERT(r, "Need to find thunk import addr");
-            ExternalCodeRefPtr p = makeExtCodeRefFromString(thunkSym, f);
-            I->set_ext_call_target(p);
-            foldFunc = true;
-            if(p->getReturnType() == ExternalCodeRef::NoReturn) {
-              has_follow = false;
-            }
+          bool is_extcall = false;
+
+          if(op.getImm() !=0 && ((uint32_t)op.getImm()) != 0xFFFFFFFC) {
+              VA    callTgt = curAddr+op.getImm()+I->get_len();
+              bool  foldFunc = false;
+              //speculate about callTgt
+              InstPtr spec = d.getInstFromBuff(callTgt, c);
+              if(spec->terminator() && spec->get_inst().getOpcode() == X86::JMP32m) {
+                  string  thunkSym;
+
+                  bool r = c->find_import_name(callTgt+2, thunkSym);
+                  if(r) {
+                      is_extcall = true;
+
+                      ExternalCodeRefPtr p = makeExtCodeRefFromString(thunkSym, f);
+                      I->set_ext_call_target(p);
+                      foldFunc = true;
+                      if(p->getReturnType() == ExternalCodeRef::NoReturn) {
+                          has_follow = false;
+                      }
+                  }
+
+
+              }
+              if(foldFunc == false) {
+                  //add this to our list of funcs to search
+                  out << "Adding: 0x" << to_string<VA>(callTgt, hex) << " as target because its a call target\n";
+                  funcs.push(callTgt);
+              }
           }
-          if(foldFunc == false) {
-            //add this to our list of funcs to search
-            out << "Adding: 0x" << to_string<VA>(callTgt, hex) << " as target because its a call target\n";
-            funcs.push(callTgt);
+
+          if(is_extcall == false) {
+              // may be a local call
+              VA addr=curAddr+1, relo_addr=0;
+              out << "Symbol not found, maybe a local call\n";
+              if(c->relocate_addr(addr, relo_addr)){
+                  out << "Found local call to: " << to_string<VA>(relo_addr, hex) << "\n";
+                  I->set_call_tgt(relo_addr);
+                  out << "Adding: 0x" << to_string<VA>(relo_addr, hex) << " as target because its relo-able and internal\n";
+                  funcs.push(relo_addr);
+              } else {
+                  out << "Could not relocate addr for local call at: ";
+                  out << to_string<VA>(curAddr, hex) << "\n";
+              }
           }
-        } else {
-            // may be a local call
-            VA addr=curAddr+1, relo_addr=0;
-            out << "Symbol not found, maybe a local call\n";
-            if(c->relocate_addr(addr, relo_addr)){
-                out << "Found local call to: " << to_string<VA>(relo_addr, hex) << "\n";
-                I->set_call_tgt(relo_addr);
-                out << "Adding: 0x" << to_string<VA>(relo_addr, hex) << " as target because its relo-able and internal\n";
-                funcs.push(relo_addr);
-            } else {
-                out << "Could not relocate addr for local call at: ";
-                out << to_string<VA>(curAddr, hex) << "\n";
-            }
-        }
+      }
+
         break;
 
       case X86::CALL32m:
