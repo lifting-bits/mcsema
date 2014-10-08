@@ -175,6 +175,11 @@ NativeModulePtr makeNativeModule( ExecutableContainer *exc,
     }
   }
 
+  ::uint64_t file_ep;
+  if(exc->getEntryPoint(file_ep)) {
+      entryPoints.push_back(file_ep);
+  }
+
   if(entryPoints.size() == 0) {
     throw LErr(__LINE__, __FILE__, "No good entry points found or supplied");
   }
@@ -261,13 +266,6 @@ int main(int argc, char *argv[]) {
   llvm::InitializeAllAsmParsers();
   llvm::InitializeAllDisassemblers();
 
-  //sanity
-  if(EntrySymbol.size() == 0 && EntryPoint.size() == 0) {
-    //One of these must be set
-    llvm::errs() << "Must specify at least one entry point via -entry-symbol or -e\n";
-    return -1;
-  }
-
   ExternalFunctionMap funcs(TargetTriple);
   try {
 
@@ -315,6 +313,19 @@ int main(int argc, char *argv[]) {
       errs() << "Could not open: " << InputFilename << "\n";
       return -1;
   }
+
+  //sanity
+  if(EntrySymbol.size() == 0 && EntryPoint.size() == 0) {
+      ::uint64_t file_ep;
+      // maybe this file format specifies an entry point?
+      if(false == exc->getEntryPoint(file_ep)) {
+          //We don't know which entry point to use!
+          llvm::errs() << "Could not identify an entry point for: [" << InputFilename << "].\n";
+          llvm::errs() << "You must manually specify at least one entry point. Use either -entry-symbol or -e.\n";
+          return -1;
+      }
+  }
+
 
   if(exc->is_open()) {
     //convert to native CFG

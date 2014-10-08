@@ -1,0 +1,3 @@
+__libc_start_main 7 C Y
+__printf_chk 2 C N
+__gmon_start__ 0 C N

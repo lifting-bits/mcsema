@@ -364,3 +364,13 @@ int PeTarget::readByte(::uint64_t addr, uint8_t *byte) const {
   return -1;
 }
 
+bool PeTarget::getEntryPoint(::uint64_t &entry) const {
+  VA ep;
+  bool did_it = GetEntryPoint(this->pe, ep);
+
+  if( did_it ) {
+      entry = static_cast< ::uint64_t >(ep);
+  }
+
+  return did_it;
+}

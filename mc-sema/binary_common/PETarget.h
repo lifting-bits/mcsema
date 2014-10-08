@@ -53,6 +53,7 @@ public:
   virtual ::uint64_t getBase(void) const;
   virtual ::uint64_t getExtent(void) const;
   virtual int readByte(::uint64_t, uint8_t *) const;
+  virtual bool getEntryPoint(::uint64_t &ep) const;
 };
 
 #endif

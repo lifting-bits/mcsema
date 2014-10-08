@@ -215,8 +215,8 @@ static bool getRelocForAddr(llvm::object::SectionRef    &sr,
 
             e = rr.getAddress((::uint64_t &)addr);
             LASSERT(!e, "Can't get address for relocation ref");
-            //llvm::dbgs() << "\t" << __FUNCTION__ << ": Testing " << to_string<VA>(address, hex) 
-            //           << " vs. " << to_string<VA>(addr+off, hex) << "\n";
+            llvm::dbgs() << "\t" << __FUNCTION__ << ": Testing " << to_string<VA>(address, hex) 
+                       << " vs. " << to_string<VA>(addr+off, hex) << "\n";
 
             if( address == (addr+off) ) {
                 return true;
@@ -274,20 +274,20 @@ string getSymForRelocAddr(llvm::object::SectionRef      &sr,
     
       llvm::object::RelocationRef   rref;
       if(!getRelocForAddr(sr, off, address, rref)) {
+          
           return "";
       }
 
     return getSymForReloc(rref, onlyFuncs);
 }
 
-static
-bool getSectionForAddr(vector<LLVMObjectTarget::secT> &secs, 
+bool getSectionForAddr(const vector<LLVMObjectTarget::secT> &secs, 
         uint32_t addr, 
         object::SectionRef &secref,
         uint32_t &offt) 
 {
   //get the offset for this address
-  for(vector<LLVMObjectTarget::secT>::iterator it = secs.begin(), en = secs.end();
+  for(vector<LLVMObjectTarget::secT>::const_iterator it = secs.begin(), en = secs.end();
       it != en;
       ++it)
   {
@@ -734,4 +734,8 @@ int LLVMObjectTarget::readByte(::uint64_t addr, uint8_t *byte) const {
   }
 
   return -1;
+}
+
+bool LLVMObjectTarget::getEntryPoint(::uint64_t &entry) const {
+    return false; // assume this is not supported by object format
 }

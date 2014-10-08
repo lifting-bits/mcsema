@@ -88,6 +88,6 @@ void IterSec(parsed_pe *pe, iterSec cb, void *cbd);
 bool ReadByteAtVA(parsed_pe *pe, VA v, boost::uint8_t &b);
 
 //get entry point into PE
-bool GetEntryPoint(parsed_pe *pe, VA &v);
+bool GetEntryPoint(const parsed_pe *pe, VA &v);
 
 #endif

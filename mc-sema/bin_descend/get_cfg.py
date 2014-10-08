@@ -90,12 +90,16 @@ def DEBUG(s):
     if _DEBUG:
         sys.stdout.write(s)
 
+def isLinkedElf():
+    return idc.GetLongPrm(INF_FILETYPE) == idc.FT_ELF and \
+        idc.BeginEA() !=0xffffffffL 
+
 def fixExternalName(fn):
     
     if fn in EMAP:
         return fn
 
-    if fn[0] == '_':
+    if not isLinkedElf() and fn[0] == '_':
         return fn[1:]
 
     return fn
@@ -117,9 +121,13 @@ def doesNotReturn(fname):
         if ret == "Y":
             return True
     except KeyError, ke:
-        raise Exception("Unkown external: " + fname)
+        raise Exception("Unknown external: " + fname)
     
     return False
+
+def isHlt(ea):
+    insn_t = idautils.DecodeInstruction(ea)
+    return insn_t.itype in [idaapi.NN_hlt]
 
 def isJmpTable(ea):
     insn_t = idautils.DecodeInstruction(ea)
@@ -199,6 +207,7 @@ def isInternalCode(ea):
 
 def isExternalReference(ea):
     # see if this is in an internal or external code ref
+    DEBUG("Testing {0:x} for externality\n".format(ea))
     ext_types = [idc.SEG_XTRN]
     seg = idc.SegStart(ea)
     if seg == idc.BADADDR:
@@ -264,20 +273,22 @@ def findRelocOffset(ea, size):
     return -1
 
 def handleExternalRef(fn):
-    if fn.startswith("__imp_"):
-        fn = fn[6:]
+    # Don't mangle symbols for fully linked ELFs... yet
+    if not isLinkedElf():
+        if fn.startswith("__imp_"):
+            fn = fn[6:]
 
-    if fn.endswith("_0"):
-        fn = fn[:-2]
+        if fn.endswith("_0"):
+            fn = fn[:-2]
 
-    if fn.startswith("_") and fn not in EMAP:
-        fn = fn[1:]
+        if fn.startswith("_") and fn not in EMAP:
+            fn = fn[1:]
 
-    if fn.startswith("@") and fn not in EMAP:
-        fn = fn[1:]
+        if fn.startswith("@") and fn not in EMAP:
+            fn = fn[1:]
 
-    if '@' in fn:
-        fn = fn[:fn.find('@')]
+        if '@' in fn:
+            fn = fn[:fn.find('@')]
 
     EXTERNALS.add(fn)
     return fn
@@ -333,6 +344,24 @@ def handleJmpTable(I, inst, new_eas):
         i += 1
         je = idc.GetFixupTgtOff(jstart+i*jsize)
 
+def isElfThunk(ea):
+    if not isLinkedElf():
+        return False, None
+
+
+    if isUnconditionalJump(ea):
+        have_ext_ref = False
+        for cref in idautils.CodeRefsFrom(ea, 0):
+            if isExternalReference(cref):
+                have_ext_ref = True
+                break
+
+        if have_ext_ref:
+            fn = getFunctionName(cref)
+            return True, fn
+
+    return False, None
+
 def instructionHandler(M, B, inst, new_eas):
     insn_t = idautils.DecodeInstruction(inst)
     if not insn_t:
@@ -342,6 +371,10 @@ def instructionHandler(M, B, inst, new_eas):
             return I, True
         else:
             raise Exception("Cannot read instruction at: {0:x}".format(inst))
+
+    # skip HLTs -- they are privileged, and are used in ELFs after a noreturn call
+    if isHlt(inst):
+        return None, False
 
     DEBUG("\t\tinst: {0}\n".format(idc.GetDisasm(inst)))
     inst_bytes = readInstructionBytes(inst)
@@ -359,7 +392,12 @@ def instructionHandler(M, B, inst, new_eas):
         crefs.append(cref)
         fn = getFunctionName(cref)
         if isCall(inst):
-            if isExternalReference(cref):
+
+            elfy, fn_replace = isElfThunk(cref) 
+            if elfy:
+                fn = fn_replace
+
+            if isExternalReference(cref) or elfy:
                 fn = handleExternalRef(fn)
                 I.ext_call_name = fn 
                 DEBUG("EXTERNAL CALL: {0}\n".format(fn))
@@ -380,6 +418,7 @@ def instructionHandler(M, B, inst, new_eas):
                 DEBUG("EXTERNAL JMP: {0}\n".format(fn))
 
                 if doesNotReturn(fn):
+                    DEBUG("Nonreturn JMP\n")
                     return I, True
             else:
                 DEBUG("INTERNAL JMP: {0:x}\n".format(cref))
@@ -533,27 +572,27 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
         fn = getFunctionName(i)
         DEBUG("{0:x} Found reloc to: {1:x}\n".format(i, pointsto))
 
-        pf = idc.GetFlags(pointsto)
+        if not isExternalReference(pointsto):
+            pf = idc.GetFlags(pointsto)
 
-        DS = D.symbols.add()
-        DS.base_address = i+seg_offset
+            DS = D.symbols.add()
+            DS.base_address = i+seg_offset
 
-        if idc.isCode(pf):
+            if idc.isCode(pf):
+                DS.symbol_name = "sub_"+hex(pointsto)
+                DEBUG("Code Ref: {0:x}!\n".format(pointsto))
 
-            DS.symbol_name = "sub_"+hex(pointsto)
-            DEBUG("Code Ref!\n")
+                if pointsto not in RECOVERED_EAS:
+                    new_eas.add(pointsto)
 
-            if pointsto not in RECOVERED_EAS:
-                new_eas.add(pointsto)
-
-        elif idc.isData(pf):
-            pointsto = handleDataRelocation(M, pointsto, new_eas)
-            DS.symbol_name = "dta_"+hex(pointsto)
-            DEBUG("Data Ref!\n")
-        else:
-            pointsto = handleDataRelocation(M, pointsto, new_eas)
-            DS.symbol_name = "dta_"+hex(pointsto)
-            DEBUG("UNKNOWN Ref, assuming data\n")
+            elif idc.isData(pf):
+                pointsto = handleDataRelocation(M, pointsto, new_eas)
+                DS.symbol_name = "dta_"+hex(pointsto)
+                DEBUG("Data Ref!\n")
+            else:
+                pointsto = handleDataRelocation(M, pointsto, new_eas)
+                DS.symbol_name = "dta_"+hex(pointsto)
+                DEBUG("UNKNOWN Ref, assuming data\n")
 
 
         i = idc.GetNextFixupEA(i)

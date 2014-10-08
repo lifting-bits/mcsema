@@ -67,6 +67,9 @@ private:
   std::map<std::string,ValueElement>  external_map;  
 protected:
   std::string triple;
+  std::string manglePESymbol(std::string inSym, CallingConvention &conv, int &rNumParams);
+  std::string mangleELFSymbol(std::string inSym, CallingConvention &conv, int &rNumParams);
+
 
 public:
   ExternalFunctionMap(void); // default constructor

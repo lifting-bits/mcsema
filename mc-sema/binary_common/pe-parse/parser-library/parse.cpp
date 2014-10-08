@@ -875,10 +875,10 @@ bool ReadByteAtVA(parsed_pe *pe, VA v, ::uint8_t &b) {
   return readByte(s.sectionData, off, b);
 }
 
-bool GetEntryPoint(parsed_pe *pe, VA &v) {
+bool GetEntryPoint(const parsed_pe *pe, VA &v) {
 
   if(pe != NULL) {
-    nt_header_32  *nthdr = &pe->peHeader.nt;
+    const nt_header_32  *nthdr = &pe->peHeader.nt;
 
     v = nthdr->OptionalHeader.AddressOfEntryPoint + nthdr->OptionalHeader.ImageBase;
 

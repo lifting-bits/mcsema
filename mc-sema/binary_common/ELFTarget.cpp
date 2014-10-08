@@ -30,7 +30,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <boost/filesystem.hpp> 
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/Endian.h"
+#include "llvm/Support/Debug.h"
 #include "ELFTarget.h"
+#include "../common/to_string.h"
 
 using namespace std;
 using namespace llvm;
@@ -43,8 +45,108 @@ ElfTarget* ElfTarget::CreateElfTarget(string f, const Target *T)
     LASSERT(!ec, ec.message());
 
     std::string mn = filesystem::path(f).stem().string();
-    llvm::object::ObjectFile *objf = 
-        new llvm::object::ELFObjectFile<support::little, false> (buff.take(), ec);
 
-    return new ElfTarget(mn, objf);
+    return new ElfTarget(
+            mn, 
+            new llvm::object::ELFObjectFile<support::little, false> (buff.take(), ec)
+            );
+}
+
+bool ElfTarget::getEntryPoint(::uint64_t &ep) const
+{
+    llvm::error_code ec;
+    ec = this->elf_obj->getEntryPoint(ep);
+    return ec == object::object_error::success;
+}
+
+
+bool ElfTarget::find_import_name(uint32_t addrToFind, std::string &import_name)
+{
+    LASSERT(this->elf_obj != NULL, "ELF Object File not initialized");
+    ::uint64_t sym_addr;
+    llvm::error_code ec;
+
+    uint32_t  offt;
+    VA        dummy;
+    object::SectionRef section;
+
+    bool      found_offt = getSectionForAddr(this->secs, addrToFind, section, offt);
+
+
+    uint32_t final_target = addrToFind;
+    if(this->isLinked()) {
+        llvm::dbgs() << __FUNCTION__ << "Doing extra deref" << "\n";
+        // one more level of indirection for fully linked binaries
+        uint8_t *ft_ptr = (uint8_t*)&final_target;
+        this->readByte(addrToFind+0, ft_ptr+0);
+        this->readByte(addrToFind+1, ft_ptr+1);
+        this->readByte(addrToFind+2, ft_ptr+2);
+        this->readByte(addrToFind+3, ft_ptr+3);
+    }
+
+
+    LASSERT(found_offt, "Address "+to_string<uint32_t>(final_target, hex) + " not found");
+
+    llvm::object::relocation_iterator rit = section.begin_relocations();
+    while( rit != section.end_relocations() ) {
+        llvm::object::SymbolRef       symref;
+        VA                            addr = 0;
+
+        ec = rit->getAddress((::uint64_t &)addr);
+        LASSERT(!ec, "Can't get address for relocation ref");
+        llvm::dbgs() << "\t" << __FUNCTION__ << ": Testing " << to_string<VA>(final_target, hex) 
+            << " vs. " << to_string<VA>(addr+offt, hex) << "\n";
+
+        if( final_target == (addr+offt) ) {
+
+            llvm::object::SymbolRef       symref;
+            ec = rit->getSymbol(symref);
+            LASSERT(!ec, "Can't get Symbol for relocation ref");
+
+            llvm::StringRef strr;
+            ec = symref.getName(strr);
+            LASSERT(!ec, "Can't get name for symbol ref");
+
+            import_name = strr.str();
+
+            llvm::dbgs() << "Found symbol named: " << import_name << "\n";
+
+            return true;
+        }
+
+        rit.increment(ec);
+        if( ec ) {
+            break;
+        }
+    }
+
+
+    return false;
+
+}
+
+bool ElfTarget::isLinked() const {
+    // partially linked objects have no entry point
+    ::uint64_t dummy;
+    return true == this->getEntryPoint(dummy);
+}
+
+bool ElfTarget::is_in_code(VA addr) const {
+
+    uint32_t offt;
+    uint32_t addr32 = (uint32_t)(addr);
+    object::SectionRef section;
+
+    bool      found_offt = getSectionForAddr(this->secs, addr32, section, offt);
+    if (false == found_offt) {
+        return false;
+    }
+
+    llvm::error_code e;
+    bool is_text_ref;
+    e = section.isText(is_text_ref);
+
+    LASSERT(!e, e.message());
+
+    return is_text_ref;
 }
