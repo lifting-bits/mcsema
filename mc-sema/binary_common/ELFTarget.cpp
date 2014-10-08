@@ -41,7 +41,7 @@ using namespace boost;
 ElfTarget* ElfTarget::CreateElfTarget(string f, const Target *T) 
 {
     OwningPtr<MemoryBuffer>	buff;
-    error_code			ec = MemoryBuffer::getFile(f, buff);
+    llvm::error_code			ec = MemoryBuffer::getFile(f, buff);
     LASSERT(!ec, ec.message());
 
     std::string mn = filesystem::path(f).stem().string();
@@ -54,7 +54,7 @@ ElfTarget* ElfTarget::CreateElfTarget(string f, const Target *T)
 
 bool ElfTarget::getEntryPoint(::uint64_t &ep) const
 {
-    error_code ec;
+    llvm::error_code ec;
     ec = this->elf_obj->getEntryPoint(ep);
     return ec == object::object_error::success;
 }
@@ -64,7 +64,7 @@ bool ElfTarget::find_import_name(uint32_t addrToFind, std::string &import_name)
 {
     LASSERT(this->elf_obj != NULL, "ELF Object File not initialized");
     ::uint64_t sym_addr;
-    error_code ec;
+    llvm::error_code ec;
 
     uint32_t  offt;
     VA        dummy;
