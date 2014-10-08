@@ -33,11 +33,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Helpers.h"
 #include "x86Instrs_flagops.h"
 #include "x86Instrs_Misc.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
 
 static InstTransResult doNoop(BasicBlock *b) {
   //isn't this exciting
+  return ContinueBlock;
+}
+
+static InstTransResult doHlt(BasicBlock *b) {
+  //isn't this exciting
+  llvm::dbgs() << "WARNING: Treating HLT as no-op, but HLT is normally privileged\n";
   return ContinueBlock;
 }
 
@@ -442,6 +449,7 @@ static InstTransResult doCwd(BasicBlock *b) {
 GENERIC_TRANSLATION(CDQ, doCdq(block))
 GENERIC_TRANSLATION(INT3, doInt3(block))
 GENERIC_TRANSLATION(NOOP, doNoop(block))
+GENERIC_TRANSLATION(HLT, doHlt(block))
 
 GENERIC_TRANSLATION(BSWAP32r, doBswapR<32>(ip, block, OP(0)))
 
@@ -482,6 +490,7 @@ void Misc_populateDispatchMap(DispatchMap &m) {
     m[X86::CDQ] = translate_CDQ;
     m[X86::INT3] = translate_INT3;
     m[X86::NOOP] = translate_NOOP;
+    m[X86::HLT] = translate_HLT;
     m[X86::LOCK_PREFIX] = translate_NOOP;
     m[X86::PAUSE] = translate_NOOP;
     m[X86::RDTSC] = translate_RDTSC;
