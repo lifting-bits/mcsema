@@ -90,12 +90,16 @@ def DEBUG(s):
     if _DEBUG:
         sys.stdout.write(s)
 
+def isLinkedElf():
+    return idc.GetLongPrm(INF_FILETYPE) == idc.FT_ELF and \
+        idc.BeginEA() !=0xffffffffL 
+
 def fixExternalName(fn):
     
     if fn in EMAP:
         return fn
 
-    if fn[0] == '_':
+    if not isLinkedElf() and fn[0] == '_':
         return fn[1:]
 
     return fn
@@ -117,7 +121,7 @@ def doesNotReturn(fname):
         if ret == "Y":
             return True
     except KeyError, ke:
-        raise Exception("Unkown external: " + fname)
+        raise Exception("Unknown external: " + fname)
     
     return False
 
@@ -264,20 +268,22 @@ def findRelocOffset(ea, size):
     return -1
 
 def handleExternalRef(fn):
-    if fn.startswith("__imp_"):
-        fn = fn[6:]
+    # Don't mangle symbols for fully linked ELFs... yet
+    if not isLinkedElf():
+        if fn.startswith("__imp_"):
+            fn = fn[6:]
 
-    if fn.endswith("_0"):
-        fn = fn[:-2]
+        if fn.endswith("_0"):
+            fn = fn[:-2]
 
-    if fn.startswith("_") and fn not in EMAP:
-        fn = fn[1:]
+        if fn.startswith("_") and fn not in EMAP:
+            fn = fn[1:]
 
-    if fn.startswith("@") and fn not in EMAP:
-        fn = fn[1:]
+        if fn.startswith("@") and fn not in EMAP:
+            fn = fn[1:]
 
-    if '@' in fn:
-        fn = fn[:fn.find('@')]
+        if '@' in fn:
+            fn = fn[:fn.find('@')]
 
     EXTERNALS.add(fn)
     return fn
