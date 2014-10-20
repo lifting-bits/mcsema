@@ -107,18 +107,19 @@ message Annotated_Instruction {
 	optional string label = 3; 
 	}
 
-    enum Operand_Type {
-    	 unknown = 0; 
-      	 immediate = 1;
-      	 register = 2;
-      	 memory = 3;
-	 address = 4;
-	 }
+//    enum Operand_Type {
+//    	 unknown = 0; 
+//      	 immediate = 1;
+//      	 register = 2;
+//      	 memory = 3;
+//	 address = 4;
+//	 }
+
 
     message Operand {
         required int32 pos = 1;	
 	required string value = 2;
-	optional Operand_Type type = 3 [default = unknown];
+//	optional Operand_Type type = 3 [default = unknown];
 	}
 
     repeated Edge target_to = 9; 
