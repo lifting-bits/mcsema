@@ -649,6 +649,7 @@ static bool handleJump(ExecutableContainer *c,
     out << "Heristic jumptable processing couldn't parse jumptable\n";
     out << "pointing to: 0x" << to_string<VA>(curAddr, hex) << "\n";
     out << jmpinst->printInst() << "\n";
+    out << c->hash << "\n";
   }
   return did_jmptable;
 
