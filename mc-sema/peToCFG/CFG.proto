@@ -89,3 +89,44 @@ message Module {
     repeated    EntrySymbol         entries = 5;
     repeated    ExternalData        external_data = 6;
 }
+
+message Annotated_Instruction {
+    required string instr_name = 1;
+    required string instr_string = 2;
+    required int64  inst_addr = 3;
+    required string inst_addr_hex = 4;
+    required int32  inst_len = 5; 
+    required int32  op_count = 6; 
+
+    required bool   is_branch_instruction = 7; 
+    optional bool   is_resolved = 8; 
+
+    message Edge {
+        required int64 inst_addr = 1;
+    	required string kind = 2;
+	optional string label = 3; 
+	}
+
+    enum Operand_Type {
+    	 unknown = 0; 
+      	 immediate = 1;
+      	 register = 2;
+      	 memory = 3;
+	 address = 4;
+	 }
+
+    message Operand {
+        required int32 pos = 1;	
+	required string value = 2;
+	optional Operand_Type type = 3 [default = unknown];
+	}
+
+    repeated Edge target_to = 9; 
+    repeated Edge referered_from = 10; 
+    repeated Operand argument = 11;
+}
+
+
+message Disassembly {
+    repeated Annotated_Instruction instr = 1;
+}
