@@ -52,6 +52,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/system_error.h"
+#include "llvm/ADT/SmallString.h"
 #include <string>
 #include <list>
 #include <boost/cstdint.hpp>
@@ -97,6 +98,7 @@ public:
   virtual bool get_sections(std::vector<SectionDesc>  &) = 0;
 
   virtual std::string name(void) = 0;
+  std::string hash;
 
   virtual uint64_t getBase() const = 0;
   virtual uint64_t getExtent() const = 0;
