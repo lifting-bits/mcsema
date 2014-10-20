@@ -49,6 +49,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/Support/Debug.h"
+
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/MD5.h"
+
+
+
+
 #include "cfg_recover.h"
 #include <bincomm.h>
 #include <peToCFG.h>
@@ -306,6 +314,7 @@ int main(int argc, char *argv[]) {
   //open the binary input file
   ExecutableContainer *exc = NULL;
   
+  
   try {
       exc = ExecutableContainer::open(InputFilename, x86Target);
   } catch (LErr &l) {
@@ -315,7 +324,6 @@ int main(int argc, char *argv[]) {
       errs() << "Could not open: " << InputFilename << "\n";
       return -1;
   }
-
   if(exc->is_open()) {
     //convert to native CFG
     NativeModulePtr m;
