@@ -631,6 +631,29 @@ static bool handlePossibleJumpTable(ExecutableContainer *c,
     return true;
 
 }
+
+
+static bool handleJump(ExecutableContainer *c,
+        NativeBlockPtr B,
+        InstPtr jmpinst, 
+        VA curAddr, 
+        stack<VA> &funcs,
+        stack<VA> &blockChildren,
+        raw_ostream &out) {
+
+  // this is an internal jmp. probably a jump table.
+  out << "Found a possible jump table!\n";
+  bool did_jmptable = handlePossibleJumpTable(c, B, jmpinst, curAddr, funcs, blockChildren, out); 
+
+  if(!did_jmptable) {
+    out << "Heristic jumptable processing couldn't parse jumptable\n";
+    out << "pointing to: 0x" << to_string<VA>(curAddr, hex) << "\n";
+    out << jmpinst->printInst() << "\n";
+  }
+  return did_jmptable;
+
+}
+
 /*
  *
 static void addDataEntryPointsFromSection(
@@ -827,6 +850,7 @@ do
       case X86::JMP32m:
           {
             string  thunkSym;
+	    bool did_jmp = false; 
             bool r = c->find_import_name(curAddr+2, thunkSym);
             if(r) {
                 // this goes to an external API call
@@ -835,12 +859,10 @@ do
                 I->set_ext_call_target(p);
                 has_follow = false;
             } else {
-                // this is an internal jmp. probably a jump table.
-                out << "Found a possible jump table!\n";
-                bool did_jmptable = handlePossibleJumpTable(c, B, I, curAddr, funcs, blockChildren, out); 
 
-                LASSERT(did_jmptable, "JMP32m processing aborted: couldn't parse jumptable");
-            }
+                did_jmp = handleJump(c, B, I, curAddr, funcs, blockChildren, out); 
+		LASSERT(did_jmp, "Unable to resolve jump.");
+		}
           }
           break;
       case X86::CALLpcrel32:
