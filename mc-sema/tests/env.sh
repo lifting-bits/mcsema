@@ -5,3 +5,4 @@ IDA_PATH=$(<./IDA_PATH.linux)
 GET_CFG_PY=${BIN_DESCEND_PATH}/get_cfg.py
 STD_DEFS="../std_defs/std_defs.txt"
 CC=clang
+CXX=clang++
