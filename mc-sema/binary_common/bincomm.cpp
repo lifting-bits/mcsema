@@ -73,6 +73,7 @@ namespace {
   Hash.final(MD5Res);
   SmallString<32> Res;
   MD5::stringifyResult(MD5Res, Res);
+  fclose(inFile);
   return Res.str();
   }
 }
