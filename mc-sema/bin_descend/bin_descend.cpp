@@ -49,11 +49,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/Support/Debug.h"
+
 #include "cfg_recover.h"
+#include "CFG.pb.h"
 #include <bincomm.h>
 #include <peToCFG.h>
 #include <LExcn.h>
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <boost/filesystem.hpp>
 #include "../common/to_string.h"
@@ -67,6 +70,9 @@ using namespace llvm;
 //command line options 
 cl::opt<string>
 InputFilename("i", cl::desc("Input filename"), cl::value_desc("filename"));
+
+cl::opt<string>
+PriorKnowledge("p", cl::desc("Proto buffer containing prior knowldege"), cl::value_desc("filename"));
 
 cl::opt<int>
 Verbosity("v", cl::desc("Verbosity level"), cl::value_desc("level"));
@@ -302,6 +308,19 @@ int main(int argc, char *argv[]) {
       errs() << "Invalid arguments.\nUse :'" << argv[0] << " -help' for help\n";
       return -1;
   }
+
+  if(PriorKnowledge == "") {
+      outs() << "Disassembly not guided by outside facts.\nUse :'" << argv[0] << "-p <protobuff>' to feed information to guide the disassembly\n";
+  }
+  else {
+      Disassembly disasm;
+    fstream input(PriorKnowledge.c_str(), ios::in | ios::binary);
+    if (!disasm.ParseFromIstream(&input)) {
+      errs() << "Failed to parse facts." << "\n";
+      return -1;
+    }
+  }
+
 
   //open the binary input file
   ExecutableContainer *exc = NULL;
