@@ -4,7 +4,9 @@ include_directories( ${CMAKE_CURRENT_BINARY_DIR}/../../llvm-3.2/lib/Target/X86
   ${CMAKE_CURRENT_SOURCE_DIR}/../cfgToLLVM 
   ${CMAKE_CURRENT_SOURCE_DIR}/../binary_common )
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR} ${PROTOBUF_INCLUDE_DIR})
+
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${PROTOBUF_INCLUDE_DIR} ${PROTO_SRCS} ${PROTO_HDRS})
+
 
 link_directories(${CMAKE_CURRENT_BINARY_DIR}/../../lib)
 add_executable(bin_descend bin_descend.cpp cfg_recover.cpp ExternalFuncMap.cpp) 
