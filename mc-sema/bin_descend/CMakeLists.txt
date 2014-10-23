@@ -4,7 +4,6 @@ include_directories( ${CMAKE_CURRENT_BINARY_DIR}/../../llvm-3.2/lib/Target/X86
   ${CMAKE_CURRENT_SOURCE_DIR}/../cfgToLLVM 
   ${CMAKE_CURRENT_SOURCE_DIR}/../binary_common )
 
-PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS CFG.proto)
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${PROTOBUF_INCLUDE_DIR})
 
 link_directories(${CMAKE_CURRENT_BINARY_DIR}/../../lib)

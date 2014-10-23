@@ -29,6 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "bincomm.h"
 #include <LExcn.h>
 #include <stdio.h>
+#include <iostream>
+#include <fstream>
 
 #include "llvm/ADT/StringSwitch.h"
 #include <boost/filesystem.hpp> 
@@ -93,7 +95,7 @@ UnderlyingTarget targetFromExtension(string extension) {
   return t;
 }
 
-ExecutableContainer *ExecutableContainer::open(string f, const Target *T) {
+ExecutableContainer *ExecutableContainer::open(string f, const Target *T, string PK) {
   filesystem::path  p(f);
   p = filesystem::canonical(p);
   filesystem::path  extPath = p.extension();
@@ -105,28 +107,42 @@ ExecutableContainer *ExecutableContainer::open(string f, const Target *T) {
   switch(t) {
     case PE_TGT:
       exc = new PeTarget(p.string(), T);
-      exc->hash = hash;
-      return exc;
       break;
 
     case COFF_TGT:
       exc = CoffTarget::CreateCoffTarget(p.string(), T);
-      exc->hash = hash;
-      return exc;
       break;
 
     case ELF_TGT:
       exc = ElfTarget::CreateElfTarget(p.string(), T);
-      exc->hash = hash;
-      return exc;
       break;
 
     case UNK_TGT:
     case RAW_TGT:
       throw LErr(__LINE__, __FILE__, "Unsupported format, NIY");
       break;
+  default:
+    return NULL;
   }
 
-  return NULL;
+  exc->hash = hash;
+
+  if(PK == "") {
+      outs() << "Disassembly not guided by outside facts.\nUse: -p <protobuff>' to feed information to guide the disassembly\n";
+  exc->disassembly = NULL;
+  }
+
+  else {
+  Disassembly disasm;
+  fstream input(PK.c_str(), ios::in | ios::binary);
+  if (!disasm.ParseFromIstream(&input)) {
+    throw LErr(__LINE__, __FILE__, "Failed to parse facts.");
+  }
+  exc->disassembly = &disasm;
+ }
+
+
+
+  return exc;
 }
 

@@ -49,9 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/Support/Debug.h"
-
 #include "cfg_recover.h"
-#include "CFG.pb.h"
 #include <bincomm.h>
 #include <peToCFG.h>
 #include <LExcn.h>
@@ -60,7 +58,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sstream>
 #include <boost/filesystem.hpp>
 #include "../common/to_string.h"
-
 #include "../common/Defaults.h"
 
 using namespace std;
@@ -312,14 +309,7 @@ int main(int argc, char *argv[]) {
   if(PriorKnowledge == "") {
       outs() << "Disassembly not guided by outside facts.\nUse :'" << argv[0] << "-p <protobuff>' to feed information to guide the disassembly\n";
   }
-  else {
-      Disassembly disasm;
-    fstream input(PriorKnowledge.c_str(), ios::in | ios::binary);
-    if (!disasm.ParseFromIstream(&input)) {
-      errs() << "Failed to parse facts." << "\n";
-      return -1;
-    }
-  }
+
 
 
   //open the binary input file
@@ -327,7 +317,7 @@ int main(int argc, char *argv[]) {
   
   
   try {
-      exc = ExecutableContainer::open(InputFilename, x86Target);
+    exc = ExecutableContainer::open(InputFilename, x86Target, PriorKnowledge);
   } catch (LErr &l) {
       errs() << "Could not open: " << InputFilename << ", reason: " << l.what() << "\n";
       return -1;
