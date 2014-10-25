@@ -56,7 +56,7 @@ bool ElfTarget::getEntryPoint(::uint64_t &ep) const
 {
     llvm::error_code ec;
     ec = this->elf_obj->getEntryPoint(ep);
-    return ec == object::object_error::success;
+    return ec == object::object_error::success && ep != 0;
 }
 
 
