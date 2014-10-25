@@ -54,10 +54,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <peToCFG.h>
 #include <LExcn.h>
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <boost/filesystem.hpp>
 #include "../common/to_string.h"
-
 #include "../common/Defaults.h"
 
 using namespace std;
@@ -67,6 +67,9 @@ using namespace llvm;
 //command line options 
 cl::opt<string>
 InputFilename("i", cl::desc("Input filename"), cl::value_desc("filename"));
+
+cl::opt<string>
+PriorKnowledge("p", cl::desc("Proto buffer containing prior knowldege"), cl::value_desc("filename"));
 
 cl::opt<int>
 Verbosity("v", cl::desc("Verbosity level"), cl::value_desc("level"));
@@ -301,11 +304,18 @@ int main(int argc, char *argv[]) {
       return -1;
   }
 
+  if(PriorKnowledge == "") {
+      outs() << "Disassembly not guided by outside facts.\nUse :'" << argv[0] << "-p <protobuff>' to feed information to guide the disassembly\n";
+  }
+
+
+
   //open the binary input file
   ExecutableContainer *exc = NULL;
   
+  
   try {
-      exc = ExecutableContainer::open(InputFilename, x86Target);
+    exc = ExecutableContainer::open(InputFilename, x86Target, PriorKnowledge);
   } catch (LErr &l) {
       errs() << "Could not open: " << InputFilename << ", reason: " << l.what() << "\n";
       return -1;

@@ -28,6 +28,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "bincomm.h"
 #include <LExcn.h>
+#include <stdio.h>
+#include <iostream>
+#include <fstream>
+
 #include "llvm/ADT/StringSwitch.h"
 #include <boost/filesystem.hpp> 
 
@@ -38,6 +42,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "PETarget.h"
 #include "COFFTarget.h"
 #include "ELFTarget.h"
+
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/MD5.h"
 
 using namespace std;
 using namespace llvm;
@@ -51,6 +59,26 @@ enum UnderlyingTarget {
   UNK_TGT
 };
 
+namespace {
+  string MD5File(string filename) {
+  int i;
+  FILE *inFile = fopen (filename.c_str(), "rb");
+  MD5 Hash;
+  MD5::MD5Result MD5Res;
+  int bytes;
+  unsigned char data[1024];
+
+  LASSERT(inFile, "Can't open file for hashing\n");
+
+  while ((bytes = fread (data, 1, 1024, inFile)) != 0)
+    Hash.update(data);
+  Hash.final(MD5Res);
+  SmallString<32> Res;
+  MD5::stringifyResult(MD5Res, Res);
+  fclose(inFile);
+  return Res.str();
+  }
+}
 
 UnderlyingTarget targetFromExtension(string extension) {
   UnderlyingTarget  t = StringSwitch<UnderlyingTarget>(extension)
@@ -68,31 +96,54 @@ UnderlyingTarget targetFromExtension(string extension) {
   return t;
 }
 
-ExecutableContainer *ExecutableContainer::open(string f, const Target *T) {
+ExecutableContainer *ExecutableContainer::open(string f, const Target *T, string PK) {
   filesystem::path  p(f);
   p = filesystem::canonical(p);
   filesystem::path  extPath = p.extension();
 
   UnderlyingTarget t = targetFromExtension(extPath.string());
+  string hash = MD5File(f);
+  ExecutableContainer *exc = NULL;
 
   switch(t) {
     case PE_TGT:
-      return new PeTarget(p.string(), T);
+      exc = new PeTarget(p.string(), T);
       break;
 
     case COFF_TGT:
-      return CoffTarget::CreateCoffTarget(p.string(), T);
+      exc = CoffTarget::CreateCoffTarget(p.string(), T);
       break;
 
     case ELF_TGT:
-      return ElfTarget::CreateElfTarget(p.string(), T);
+      exc = ElfTarget::CreateElfTarget(p.string(), T);
       break;
 
     case UNK_TGT:
     case RAW_TGT:
       throw LErr(__LINE__, __FILE__, "Unsupported format, NIY");
       break;
+  default:
+    return NULL;
   }
 
-  return NULL;
+  exc->hash = hash;
+
+  if(PK == "") {
+      outs() << "Disassembly not guided by outside facts.\nUse: -p <protobuff>' to feed information to guide the disassembly\n";
+  exc->disassembly = NULL;
+  }
+
+  else {
+  Disassembly disasm;
+  fstream input(PK.c_str(), ios::in | ios::binary);
+  if (!disasm.ParseFromIstream(&input)) {
+    throw LErr(__LINE__, __FILE__, "Failed to parse facts.");
+  }
+  exc->disassembly = &disasm;
+ }
+
+
+
+  return exc;
 }
+

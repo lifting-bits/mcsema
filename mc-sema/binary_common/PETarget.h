@@ -36,12 +36,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "bincomm.h"
 //PE file headers
 #include "pe-parse/parser-library/parse.h"
+#include "llvm/ADT/SmallString.h"
 
 class PeTarget : public ExecutableContainer {
   parsed_pe *pe;
   std::string    mod_name;
 public:
   PeTarget(std::string f, const llvm::Target *T);
+
   virtual ~PeTarget(void);
   virtual bool is_open(void);
   virtual bool find_import_name(uint32_t, std::string &);
@@ -49,11 +51,12 @@ public:
   virtual bool is_addr_relocated(uint32_t);
   virtual bool relocate_addr(VA, VA&);
   virtual bool get_sections(std::vector<SectionDesc>  &);
-  virtual std::string name(void) { return this->mod_name; }
+  virtual std::string name(void) { return this->mod_name; } 
   virtual ::uint64_t getBase(void) const;
   virtual ::uint64_t getExtent(void) const;
   virtual int readByte(::uint64_t, uint8_t *) const;
   virtual bool getEntryPoint(::uint64_t &ep) const;
+  std::string hash;
 };
 
 #endif

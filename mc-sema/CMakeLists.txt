@@ -92,5 +92,6 @@ IF(WIN32)
 ENDIF(WIN32)
 
 add_subdirectory(bitcode_from_cfg)
-add_subdirectory(bin_descend)
 add_subdirectory(binary_common)
+add_subdirectory(bin_descend)
+

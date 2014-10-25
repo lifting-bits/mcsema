@@ -35,6 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "bincomm.h"
 
+
 class LLVMObjectTarget : public ExecutableContainer {
   std::string                    mod_name;
   //(a, b) -- a is offset to apply to base of secT to get its real base
@@ -54,12 +55,15 @@ public:
   virtual bool relocate_addr(VA, VA &);
   virtual bool get_sections(std::vector<SectionDesc>  &);
   virtual std::string name(void) { return this->mod_name; }
+
+
   virtual ::uint64_t getBase(void) const;
   virtual ::uint64_t getExtent(void) const;
   virtual int readByte(::uint64_t, uint8_t *) const;
   virtual bool getEntryPoint(::uint64_t &ep) const;
 protected:
   std::vector<secT>              secs;
+  std::string                    hash;
 
   LLVMObjectTarget(const std::string &modname, llvm::object::ObjectFile *of);
 
