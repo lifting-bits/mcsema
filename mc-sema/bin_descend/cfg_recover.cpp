@@ -134,6 +134,8 @@ DataSection processDataSection( ExecutableContainer *c,
         // fix address from section relative to absolute
         addr = base+*reloc_itr;
 
+        dbgs() << "\tFound relocation at: " << to_string<VA>(addr, hex) << "\n";
+
         if(addr < min_limit || addr > max_limit) {
             dbgs() << __FUNCTION__ << ": Address outside limits: " << to_string<VA>(addr ,hex) << "\n";
             continue;
@@ -709,6 +711,43 @@ bool dataInCodeHeuristic(
 
 }
 
+// assume the immediate references code if:
+// * we are dealing with a fully linked ELF
+// * The immediate is in the range of a valid code or data section
+static bool setHeuristicRef(ExecutableContainer *c, 
+        InstPtr I, 
+        int opnum, 
+        stack<VA> &funcs, 
+        raw_ostream &out, 
+        const std::string whichInst) 
+{
+    MCOperand op;
+    std::string imp_name;
+    ElfTarget *elft = dynamic_cast<ElfTarget*>(c);
+    op = I->get_inst().getOperand(opnum);
+    LASSERT(op.isImm(), "No immediate operand for " + whichInst);
+    VA imm = op.getImm();
+
+
+    if(elft && elft->isLinked()) {
+       if (elft->is_in_code(imm)) {
+            // this instruction references code
+            I->set_call_tgt(imm);               
+            // make sure we disassemble at this new address
+            funcs.push(imm);
+            out << "Found new function entry from " << whichInst << ": " << to_string<VA>(imm, hex) << "\n";
+            return true;
+       } else if (elft->is_in_data(imm)) {
+            out << "Adding local data ref to: " << to_string<VA>(imm, hex) << "\n";
+            I->set_data_offset(imm);
+       } else if (c->find_import_name(imm, imp_name)) {
+           out << "Import name is: " << imp_name << "\n";
+       }
+    }
+
+    return false;
+}
+
 NativeBlockPtr decodeBlock( ExecutableContainer *c, 
                             ExternalFunctionMap &f,
                             LLVMByteDecoder     &d,
@@ -849,21 +888,11 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
         MCOperand op;
         string  imp;
         switch(I->get_inst().getOpcode()) {
+            case X86::LEA32r:
+                setHeuristicRef(c, I, 4, funcs, out, "LEA32r");
+                break;
             case X86::PUSHi32:
-                // only applies for fully linked ELFs
-                {
-                    ElfTarget *elft = dynamic_cast<ElfTarget*>(c);
-                    op = I->get_inst().getOperand(0);
-                    LASSERT(op.isImm(), "No immediate operand for PUSHi32");
-                    VA imm = op.getImm();
-                    if(elft && elft->is_in_code(imm)) {
-                        // this instruction references code
-                        I->set_call_tgt(imm);               
-                        // make sure we disassemble at this new address
-                        funcs.push(imm);
-                        out << "Found new function entry from PUSH: " << to_string<VA>(imm, hex) << "\n";
-                    }
-                }
+                setHeuristicRef(c, I, 0, funcs, out, "PUSHi32");
                 break;
 
             case X86::JMP32m:
