@@ -162,26 +162,27 @@ NativeModulePtr makeNativeModule( ExecutableContainer *exc,
   }
 
   if(IgnoreNativeEntryPoints == false) {
-    //get entry points from the file too
-    list<pair<string, boost::uint64_t> > tmp;
-    exc->get_exports(tmp);
+      //get entry points from the file too
+      list<pair<string, boost::uint64_t> > tmp;
+      exc->get_exports(tmp);
 
-    for(list<pair<string, boost::uint64_t> >::iterator it = tmp.begin(), e = tmp.end();
-        it != e;
-        ++it)
-    {
-      entrySymbols.push_back(
-              NativeModule::EntrySymbol(
-                  it->first,
-                  it->second));
-      entryPoints.push_back(it->second);
-    }
+      for(list<pair<string, boost::uint64_t> >::iterator it = tmp.begin(), e = tmp.end();
+              it != e;
+              ++it)
+      {
+          entrySymbols.push_back(
+                  NativeModule::EntrySymbol(
+                      it->first,
+                      it->second));
+          entryPoints.push_back(it->second);
+      }
+
+      ::uint64_t file_ep;
+      if(exc->getEntryPoint(file_ep)) {
+          entryPoints.push_back(file_ep);
+      }
   }
 
-  ::uint64_t file_ep;
-  if(exc->getEntryPoint(file_ep)) {
-      entryPoints.push_back(file_ep);
-  }
 
   if(entryPoints.size() == 0) {
     throw LErr(__LINE__, __FILE__, "No good entry points found or supplied");
@@ -196,6 +197,8 @@ NativeModulePtr makeNativeModule( ExecutableContainer *exc,
   set<VA> visited;
   //now, get functions for these entry points with this executable 
   //context
+  outs() << "We have " << entryPoints.size() << " entry points\n";
+
   for(list<boost::uint64_t>::iterator it = entryPoints.begin(), e = entryPoints.end();
       it != e;
       ++it)
