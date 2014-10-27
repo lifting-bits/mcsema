@@ -108,10 +108,29 @@ bool ElfTarget::find_import_name(uint32_t addrToFind, std::string &import_name)
             LASSERT(!ec, "Can't get name for symbol ref");
 
             import_name = strr.str();
-
             llvm::dbgs() << "Found symbol named: " << import_name << "\n";
 
-            return true;
+            ::uint64_t sym_addr;
+            ec = symref.getAddress(sym_addr);
+            if(ec) { 
+                llvm::dbgs() << "Could not get address of symbol: " << import_name << "\n";
+            } else {
+                llvm::dbgs() << "Address for " << import_name
+                             << " is: " << to_string< ::uint64_t >(sym_addr, hex) << "\n";
+            }
+
+            llvm::object::SymbolRef::Type symtype;
+            ec = symref.getType(symtype);
+            switch(symtype) {
+                case llvm::object::SymbolRef::ST_Unknown:
+                case llvm::object::SymbolRef::ST_Data:
+                case llvm::object::SymbolRef::ST_Function:
+                    if( sym_addr == (::uint64_t)(-1) ) {
+                        return true;
+                    }
+                default:
+                    llvm::dbgs() << "Skipping symbol since its probably not an import!" << "\n";
+            }
         }
 
         rit.increment(ec);

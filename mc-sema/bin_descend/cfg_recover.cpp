@@ -717,261 +717,261 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                             stack<VA>           &funcs,
                             raw_ostream         &out)
 {
-  NativeBlockPtr  B = NativeBlockPtr(new NativeBlock(e, d.getPrinter()));
-  VA              curAddr = e;
-  bool            has_follow = true;
+    NativeBlockPtr  B = NativeBlockPtr(new NativeBlock(e, d.getPrinter()));
+    VA              curAddr = e;
+    bool            has_follow = true;
 
-out << "Processing block: " << B->get_name() << "\n";
-do
-  {
-    InstPtr I = d.getInstFromBuff(curAddr, c);
+    out << "Processing block: " << B->get_name() << "\n";
+    do
+    {
+        InstPtr I = d.getInstFromBuff(curAddr, c);
 
-    //I, if a terminator, will have true and false targets 
-    //filled in. I could be an indirect branch of some kind,
-    //we will deal with that here. we will also deal with the 
-    //instruction if it is a data instruction with relocation
-   
-    out << to_string<VA>(I->get_loc(), hex) << ":";
-    out << I->printInst() << "\n";
+        //I, if a terminator, will have true and false targets 
+        //filled in. I could be an indirect branch of some kind,
+        //we will deal with that here. we will also deal with the 
+        //instruction if it is a data instruction with relocation
 
-    if(I->get_tr() != 0) {
-      B->add_follow(I->get_tr());
-      has_follow = false;
-      out << "Adding block: " << to_string<VA>(I->get_tr(), hex) << "\n";
-      blockChildren.push(I->get_tr());
-    }
+        out << to_string<VA>(I->get_loc(), hex) << ":";
+        out << I->printInst() << "\n";
 
-    if(I->get_fa() != 0) {
-      B->add_follow(I->get_fa());
-      has_follow = false;
-      out << "Adding block: " << to_string<VA>(I->get_fa(), hex) << "\n";
-      blockChildren.push(I->get_fa());
-    }
+        if(I->get_tr() != 0) {
+            B->add_follow(I->get_tr());
+            has_follow = false;
+            out << "Adding block: " << to_string<VA>(I->get_tr(), hex) << "\n";
+            blockChildren.push(I->get_tr());
+        }
 
-    if(I->terminator()) {
-      has_follow = false;
-    }
+        if(I->get_fa() != 0) {
+            B->add_follow(I->get_fa());
+            has_follow = false;
+            out << "Adding block: " << to_string<VA>(I->get_fa(), hex) << "\n";
+            blockChildren.push(I->get_fa());
+        }
 
-    //do we need to add a data reference to this instruction?
-    //again, because there is no offset information in the 
-    //instruction decoder, for now we just ask if every addr
-    //in the inst is relocated
-    for(uint32_t i = 0; i < I->get_len(); i++) {
-      VA addrInInst = curAddr+i;
-      if(c->is_addr_relocated(addrInInst)) {
-        VA  addr = 0;
-        std::string has_imp;
+        if(I->terminator()) {
+            has_follow = false;
+        }
 
-        // this instruction has a relocation
-        // save the relocation offset for later
-        I->set_reloc_offset(i);
+        //do we need to add a data reference to this instruction?
+        //again, because there is no offset information in the 
+        //instruction decoder, for now we just ask if every addr
+        //in the inst is relocated
+        for(uint32_t i = 0; i < I->get_len(); i++) {
+            VA addrInInst = curAddr+i;
+            if(c->is_addr_relocated(addrInInst)) {
+                VA  addr = 0;
+                std::string has_imp;
 
-        //get the offset for this address
-        //add it as a data offset to the instruction
-        if (c->find_import_name(addrInInst, has_imp) )  {
+                // this instruction has a relocation
+                // save the relocation offset for later
+                I->set_reloc_offset(i);
 
-            if(f.is_data(has_imp)) 
-            {
-                ExternalDataRefPtr data_p = makeExtDataRefFromString(has_imp, f);
-                out << "Adding external data ref: " << has_imp << "\n";
-                I->set_ext_data_ref(data_p);
-            }
-            else
-            {
-                ExternalCodeRefPtr code_p = makeExtCodeRefFromString(has_imp, f);
-                LASSERT(code_p, "Failed to get ext call from map for symbol: "+has_imp);
-                //maybe, this call doesn't return, in which case, 
-                //we should kill the decoding of this flow
-                if(code_p->getReturnType() == ExternalCodeRef::NoReturn) {
-                    has_follow = false;
-                }
-                out << "Adding external code ref: " << has_imp << "\n";
-                I->set_ext_call_target(code_p);
-            }
-                    
-        } else if(c->relocate_addr(addrInInst, addr)) {
-            bool can_ref_code = canInstructionReferenceCode(I);
-            bool is_reloc_code = isAddrOfType(c, addr, ExecutableContainer::CodeSection);
-            bool is_reloc_data = isAddrOfType(c, addr, ExecutableContainer::DataSection);
-            unsigned opc = I->get_inst().getOpcode();
+                //get the offset for this address
+                //add it as a data offset to the instruction
+                if (c->find_import_name(addrInInst, has_imp) )  {
 
-            out << "Found a relocation at: 0x" << to_string<VA>(addrInInst, hex) 
-                << ", pointing to: 0x" << to_string<VA>(addr, hex) << "\n";
-
-            if(isBranchViaMemory(I)) {
-                out << "Detect branch via memory, relocation handled later\n";      
-            }
-            // this instruction can reference code and does
-            // reference code
-            // so we assume the code points to a function
-            else if( can_ref_code && is_reloc_code ) {
-                list<VA> new_funcs;
-                if(dataInCodeHeuristic(c, I, addr, new_funcs)) {
-                    // add new functions to our functions list
-                    for(list<VA>::const_iterator nfi = new_funcs.begin();
-                            nfi != new_funcs.end();
-                            nfi++)
+                    if(f.is_data(has_imp)) 
                     {
-                        out << "Adding: 0x" << to_string<VA>(addr, hex) << " as target because of DataInCode heuristic\n";
-                        funcs.push(*nfi);
+                        ExternalDataRefPtr data_p = makeExtDataRefFromString(has_imp, f);
+                        out << "Adding external data ref: " << has_imp << "\n";
+                        I->set_ext_data_ref(data_p);
+                    }
+                    else
+                    {
+                        ExternalCodeRefPtr code_p = makeExtCodeRefFromString(has_imp, f);
+                        LASSERT(code_p, "Failed to get ext call from map for symbol: "+has_imp);
+                        //maybe, this call doesn't return, in which case, 
+                        //we should kill the decoding of this flow
+                        if(code_p->getReturnType() == ExternalCodeRef::NoReturn) {
+                            has_follow = false;
+                        }
+                        out << "Adding external code ref: " << has_imp << "\n";
+                        I->set_ext_call_target(code_p);
                     }
 
-                    I->set_data_offset(addr);
+                } else if(c->relocate_addr(addrInInst, addr)) {
+                    bool can_ref_code = canInstructionReferenceCode(I);
+                    bool is_reloc_code = isAddrOfType(c, addr, ExecutableContainer::CodeSection);
+                    bool is_reloc_data = isAddrOfType(c, addr, ExecutableContainer::DataSection);
+                    unsigned opc = I->get_inst().getOpcode();
+
+                    out << "Found a relocation at: 0x" << to_string<VA>(addrInInst, hex) 
+                        << ", pointing to: 0x" << to_string<VA>(addr, hex) << "\n";
+
+                    if(isBranchViaMemory(I)) {
+                        out << "Detect branch via memory, relocation handled later\n";      
+                    }
+                    // this instruction can reference code and does
+                    // reference code
+                    // so we assume the code points to a function
+                    else if( can_ref_code && is_reloc_code ) {
+                        list<VA> new_funcs;
+                        if(dataInCodeHeuristic(c, I, addr, new_funcs)) {
+                            // add new functions to our functions list
+                            for(list<VA>::const_iterator nfi = new_funcs.begin();
+                                    nfi != new_funcs.end();
+                                    nfi++)
+                            {
+                                out << "Adding: 0x" << to_string<VA>(addr, hex) << " as target because of DataInCode heuristic\n";
+                                funcs.push(*nfi);
+                            }
+
+                            I->set_data_offset(addr);
+                        } else {
+                            I->set_call_tgt(addr);
+                            out << "Adding: 0x" << to_string<VA>(addr, hex) << " as target\n";
+                            funcs.push(addr);
+                        }
+                    } 
+                    // this instruction can't reference code and points to .text
+                    // or references data. Treat as data element
+                    // TODO: extract this from .text and shove into .data?
+                    else if(( !can_ref_code && is_reloc_code) || is_reloc_data )
+                    {
+                        out << "Adding data reference to 0x" << to_string<VA>(addr, hex) << "\n";
+                        I->set_data_offset(addr);
+                    } else {
+                        out << "WARNING: relocation points to neither code nor data:" << to_string<VA>(addr, hex) << "\n";
+                    }
+
                 } else {
-                    I->set_call_tgt(addr);
-                    out << "Adding: 0x" << to_string<VA>(addr, hex) << " as target\n";
-                    funcs.push(addr);
+                    out << "*NOT* Relocating relocatable addr:" << to_string<uint32_t>(addrInInst, hex) << "\n";
                 }
-            } 
-            // this instruction can't reference code and points to .text
-            // or references data. Treat as data element
-            // TODO: extract this from .text and shove into .data?
-            else if(( !can_ref_code && is_reloc_code) || is_reloc_data )
-            {
-                out << "Adding data reference to 0x" << to_string<VA>(addr, hex) << "\n";
-              I->set_data_offset(addr);
-            } else {
-              out << "WARNING: relocation points to neither code nor data:" << to_string<VA>(addr, hex) << "\n";
+                break;
             }
-
-        } else {
-            out << "*NOT* Relocating relocatable addr:" << to_string<uint32_t>(addrInInst, hex) << "\n";
         }
-        break;
-      }
-    }
 
-    //is this instruction an external call?
-    //in a COFF binary, the pcrel call can refer to an 
-    //external symbol that has been relocated
-    //so, get the string that corresponds, and 
-    //provide the translation using the function map
-    MCOperand op;
-    string  imp;
-    switch(I->get_inst().getOpcode()) {
-      case X86::PUSHi32:
-          // only applies for fully linked ELFs
-          {
-              ElfTarget *elft = dynamic_cast<ElfTarget*>(c);
-              op = I->get_inst().getOperand(0);
-              LASSERT(op.isImm(), "No immediate operand for PUSHi32");
-              VA imm = op.getImm();
-              if(elft && elft->is_in_code(imm)) {
-                // this instruction references code
-                I->set_call_tgt(imm);               
-                // make sure we disassemble at this new address
-                funcs.push(imm);
-                out << "Found new function entry from PUSH: " << to_string<VA>(imm, hex) << "\n";
-              }
-          }
-          break;
-         
-      case X86::JMP32m:
-          {
-            string  thunkSym;
-	    bool did_jmp = false; 
-            bool r = c->find_import_name(curAddr+2, thunkSym);
-            if(r) {
-                // this goes to an external API call
-                out << "Adding external code ref via JMP: " << thunkSym << "\n";
-                ExternalCodeRefPtr p = makeExtCodeRefFromString(thunkSym, f);
-                I->set_ext_call_target(p);
-                has_follow = false;
-            } else {
+        //is this instruction an external call?
+        //in a COFF binary, the pcrel call can refer to an 
+        //external symbol that has been relocated
+        //so, get the string that corresponds, and 
+        //provide the translation using the function map
+        MCOperand op;
+        string  imp;
+        switch(I->get_inst().getOpcode()) {
+            case X86::PUSHi32:
+                // only applies for fully linked ELFs
+                {
+                    ElfTarget *elft = dynamic_cast<ElfTarget*>(c);
+                    op = I->get_inst().getOperand(0);
+                    LASSERT(op.isImm(), "No immediate operand for PUSHi32");
+                    VA imm = op.getImm();
+                    if(elft && elft->is_in_code(imm)) {
+                        // this instruction references code
+                        I->set_call_tgt(imm);               
+                        // make sure we disassemble at this new address
+                        funcs.push(imm);
+                        out << "Found new function entry from PUSH: " << to_string<VA>(imm, hex) << "\n";
+                    }
+                }
+                break;
 
-                did_jmp = handleJump(c, B, I, curAddr, funcs, blockChildren, out); 
-		LASSERT(did_jmp, "Unable to resolve jump.");
-		}
-          }
-          break;
-      case X86::CALLpcrel32:
-      {
-          //this could be an external call in COFF, or not
-          op = I->get_inst().getOperand(0);
-          LASSERT(op.isImm(), "Nonsense for CALLpcrel32");
+            case X86::JMP32m:
+                {
+                    string  thunkSym;
+                    bool did_jmp = false; 
+                    bool r = c->find_import_name(curAddr+2, thunkSym);
+                    if(r) {
+                        // this goes to an external API call
+                        out << "Adding external code ref via JMP: " << thunkSym << "\n";
+                        ExternalCodeRefPtr p = makeExtCodeRefFromString(thunkSym, f);
+                        I->set_ext_call_target(p);
+                        has_follow = false;
+                    } else {
 
-          //check to see if this is an external call...
-          if(I->has_ext_call_target()) {
-              out << "External call to: " << I->get_ext_call_target()->getSymbolName() << "\n";
-              break;
-          }
+                        did_jmp = handleJump(c, B, I, curAddr, funcs, blockChildren, out); 
+                        LASSERT(did_jmp, "Unable to resolve jump.");
+                    }
+                }
+                break;
+            case X86::CALLpcrel32:
+                {
+                    //this could be an external call in COFF, or not
+                    op = I->get_inst().getOperand(0);
+                    LASSERT(op.isImm(), "Nonsense for CALLpcrel32");
 
-          bool is_extcall = false;
+                    //check to see if this is an external call...
+                    if(I->has_ext_call_target()) {
+                        out << "External call to: " << I->get_ext_call_target()->getSymbolName() << "\n";
+                        break;
+                    }
 
-          if(op.getImm() !=0 && ((uint32_t)op.getImm()) != 0xFFFFFFFC) {
-              VA    callTgt = curAddr+op.getImm()+I->get_len();
-              bool  foldFunc = false;
-              //speculate about callTgt
-              InstPtr spec = d.getInstFromBuff(callTgt, c);
-              if(spec->terminator() && spec->get_inst().getOpcode() == X86::JMP32m) {
-                  string  thunkSym;
+                    bool is_extcall = false;
 
-                  bool r = c->find_import_name(callTgt+2, thunkSym);
-                  if(r) {
-                      is_extcall = true;
+                    if(op.getImm() !=0 && ((uint32_t)op.getImm()) != 0xFFFFFFFC) {
+                        VA    callTgt = curAddr+op.getImm()+I->get_len();
+                        bool  foldFunc = false;
+                        //speculate about callTgt
+                        InstPtr spec = d.getInstFromBuff(callTgt, c);
+                        if(spec->terminator() && spec->get_inst().getOpcode() == X86::JMP32m) {
+                            string  thunkSym;
 
-                      ExternalCodeRefPtr p = makeExtCodeRefFromString(thunkSym, f);
-                      I->set_ext_call_target(p);
-                      foldFunc = true;
-                      if(p->getReturnType() == ExternalCodeRef::NoReturn) {
-                          has_follow = false;
-                      }
-                  }
+                            bool r = c->find_import_name(callTgt+2, thunkSym);
+                            if(r) {
+                                is_extcall = true;
+
+                                ExternalCodeRefPtr p = makeExtCodeRefFromString(thunkSym, f);
+                                I->set_ext_call_target(p);
+                                foldFunc = true;
+                                if(p->getReturnType() == ExternalCodeRef::NoReturn) {
+                                    has_follow = false;
+                                }
+                            }
 
 
-              }
-              if(foldFunc == false) {
-                  //add this to our list of funcs to search
-                  out << "Adding: 0x" << to_string<VA>(callTgt, hex) << " as target because its a call target\n";
-                  funcs.push(callTgt);
-              }
-          }
+                        }
+                        if(foldFunc == false) {
+                            //add this to our list of funcs to search
+                            out << "Adding: 0x" << to_string<VA>(callTgt, hex) << " as target because its a call target\n";
+                            funcs.push(callTgt);
+                        }
+                    }
 
-          if(is_extcall == false) {
-              // may be a local call
-              VA addr=curAddr+1, relo_addr=0;
-              out << "Symbol not found, maybe a local call\n";
-              if(c->relocate_addr(addr, relo_addr)){
-                  out << "Found local call to: " << to_string<VA>(relo_addr, hex) << "\n";
-                  I->set_call_tgt(relo_addr);
-                  out << "Adding: 0x" << to_string<VA>(relo_addr, hex) << " as target because its relo-able and internal\n";
-                  funcs.push(relo_addr);
-              } else {
-                  out << "Could not relocate addr for local call at: ";
-                  out << to_string<VA>(curAddr, hex) << "\n";
-              }
-          }
-      }
+                    if(is_extcall == false) {
+                        // may be a local call
+                        VA addr=curAddr+1, relo_addr=0;
+                        out << "Symbol not found, maybe a local call\n";
+                        if(c->relocate_addr(addr, relo_addr)){
+                            out << "Found local call to: " << to_string<VA>(relo_addr, hex) << "\n";
+                            I->set_call_tgt(relo_addr);
+                            out << "Adding: 0x" << to_string<VA>(relo_addr, hex) << " as target because its relo-able and internal\n";
+                            funcs.push(relo_addr);
+                        } else {
+                            out << "Could not relocate addr for local call at: ";
+                            out << to_string<VA>(curAddr, hex) << "\n";
+                        }
+                    }
+                }
 
-        break;
+                break;
 
-      case X86::CALL32m:
-        //this should be a call to an external, or we have no idea
-        //so we need to try and look up the symbol that we're calling at this address...
-        if(c->find_import_name(curAddr+2, imp)) {
-          ExternalCodeRefPtr p = makeExtCodeRefFromString(imp, f);
-          LASSERT(p, "Failed to get ext call from map for symbol"+imp);
-          
-          out << "Calling symbol: " << p->getSymbolName() << "\n";
-          if(p->getReturnType() == ExternalCodeRef::NoReturn) {
-            has_follow = false;
-          }
-          I->set_ext_call_target(p);
-        } else {
-          out << "Cannot find symbol at address ";
-          out << to_string<VA>(curAddr, hex) << "\n";
+            case X86::CALL32m:
+                //this should be a call to an external, or we have no idea
+                //so we need to try and look up the symbol that we're calling at this address...
+                if(c->find_import_name(curAddr+2, imp)) {
+                    ExternalCodeRefPtr p = makeExtCodeRefFromString(imp, f);
+                    LASSERT(p, "Failed to get ext call from map for symbol"+imp);
+
+                    out << "Calling symbol: " << p->getSymbolName() << "\n";
+                    if(p->getReturnType() == ExternalCodeRef::NoReturn) {
+                        has_follow = false;
+                    }
+                    I->set_ext_call_target(p);
+                } else {
+                    out << "Cannot find symbol at address ";
+                    out << to_string<VA>(curAddr, hex) << "\n";
+                }
+                break;
         }
-        break;
-    }
 
-    B->add_inst(I);
-    curAddr += I->get_len();
-  } while(has_follow);
+        B->add_inst(I);
+        curAddr += I->get_len();
+    } while(has_follow);
 
-  //we have built a basic block, it might contain
-  //multiple calls, but it only has one terminator
-  //which is either a ret or a branch
-  return B;
+    //we have built a basic block, it might contain
+    //multiple calls, but it only has one terminator
+    //which is either a ret or a branch
+    return B;
 }
 
 NativeFunctionPtr getFunc(ExecutableContainer *c, 
