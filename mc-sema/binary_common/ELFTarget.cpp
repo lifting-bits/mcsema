@@ -130,7 +130,9 @@ bool ElfTarget::find_import_name(uint32_t addrToFind, std::string &import_name)
     object::SectionRef section;
 
     bool      found_offt = getSectionForAddr(this->secs, addrToFind, section, offt);
-
+    if (false == found_offt) {
+        return false;
+    }
 
     uint32_t final_target = addrToFind;
 
