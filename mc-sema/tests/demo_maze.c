@@ -1,4 +1,4 @@
-// The maze demo is taken from Felipe Andres Manzan's blog:
+// The maze demo is taken from Felipe Andres Manzano's blog:
 // http://feliam.wordpress.com/2010/10/07/the-symbolic-maze/
 //
 //
