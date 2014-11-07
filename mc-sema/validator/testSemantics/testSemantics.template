@@ -18,6 +18,7 @@
 #pragma fenv_access(on)
 #else
 #include <sys/mman.h>
+#include <dlfcn.h>
 #ifndef __APPLE__
 #ifndef __MACH__
 #include <asm/mman.h>
@@ -487,8 +488,17 @@ static void* JITFunctionCreator(const std::string &s) {
     return proc;
 
 #else
-    assert( !"Please implement " __FUNCTION__ " for non-Win32 platforms");
-    return NULL;
+    printf("WARNING: JITted code references library function: %s\n", s.c_str());
+
+    void *sym_addr = dlsym(RTLD_DEFAULT, s.c_str());
+    char *error = dlerror();
+    if(sym_addr == NULL && error != NULL) {
+        printf("ERROR: %s\n", error);
+        return NULL;
+    }
+
+    return sym_addr;
+
 #endif
 }
 

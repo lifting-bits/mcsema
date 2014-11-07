@@ -36,6 +36,7 @@
 PIN_KIT=$(PIN_HOME)
 KIT=1
 TESTAPP=$(OBJDIR)cp-pin.exe
+TARGET=ia32
 
 TARGET_COMPILER?=gnu
 ifdef OS
@@ -46,7 +47,7 @@ endif
 
 ifeq ($(TARGET_COMPILER),gnu)
     include $(PIN_HOME)/source/tools/makefile.gnu.config
-    CXXFLAGS ?= -Wall -Werror -Wno-unknown-pragmas $(DBG) $(OPT)
+    CXXFLAGS ?= -std=c++11 -Wall -Werror -Wno-unknown-pragmas $(DBG) $(OPT)
     PIN=$(PIN_HOME)/pin
 endif
 
