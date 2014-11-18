@@ -80,6 +80,22 @@ static Value *doSetsV(InstPtr ip, BasicBlock *&b)
     return ext_to_set;
 }
 
+// set if CF==0
+static Value *doSetaeV(InstPtr ip, BasicBlock *&b)
+{
+    //read CF
+    Value *cf_val = F_READ(b, "CF");
+
+    //compare to 0
+    Value *cmp_res = 
+      new ICmpInst(*b, CmpInst::ICMP_EQ, cf_val, CONST_V<1>(b,0));
+
+    //extend result to 8 bits
+    Value *res = new ZExtInst(cmp_res, Type::getInt8Ty(b->getContext()), "", b);
+
+    return res;
+}
+
 static Value *doSetneV(InstPtr ip, BasicBlock *&b)
 {
     //read ZF
@@ -92,7 +108,6 @@ static Value *doSetneV(InstPtr ip, BasicBlock *&b)
     //extend result to 8 bits
     Value *res = new ZExtInst(cmp_res, Type::getInt8Ty(b->getContext()), "", b);
 
-    //return
     return res;
 }
 
@@ -108,7 +123,6 @@ static Value *doSeteV(InstPtr ip, BasicBlock *&b)
     //extend result to 8 bits
     Value *res = new ZExtInst(cmp_res, Type::getInt8Ty(b->getContext()), "", b);
 
-    //return
     return res;
 }
 
@@ -125,7 +139,6 @@ static Value *doSetgeV(InstPtr ip, BasicBlock *&b)
     //extend result to 8 bits
     Value *res = new ZExtInst(cmp_res, Type::getInt8Ty(b->getContext()), "", b);
 
-    //return
     return res;
 }
 
@@ -152,7 +165,6 @@ static Value *doSetgV(InstPtr ip, BasicBlock *&b)
     //extend result to 8 bits
     Value *res = new ZExtInst(cmp_res, Type::getInt8Ty(b->getContext()), "", b);
 
-    //return
     return res;
 }
 
@@ -176,7 +188,6 @@ static Value *doSetleV(InstPtr ip, BasicBlock *&b)
     //extend result to 8 bits
     Value *res = new ZExtInst(cmp_res, Type::getInt8Ty(b->getContext()), "", b);
 
-    //return
     return res;
 }
 
@@ -193,9 +204,60 @@ static Value *doSetlV(InstPtr ip, BasicBlock *&b)
     //extend result to 8 bits
     Value *res = new ZExtInst(cmp_res, Type::getInt8Ty(b->getContext()), "", b);
 
-    //return
     return res;
 }
+
+
+//setbe: cf==1 or zf==1
+static Value *doSetbeV(InstPtr ip, BasicBlock *&b)
+{
+    Value *cf_val = F_READ(b, "CF");
+    Value *zf_val = F_READ(b, "ZF");
+
+    // final result:
+    // result = cf | zf
+    Value   *cmp_res = 
+        BinaryOperator::CreateOr(cf_val, zf_val, "", b);
+
+
+    //extend result to 8 bits
+    Value *res = new ZExtInst(cmp_res, Type::getInt8Ty(b->getContext()), "", b);
+
+    return res;
+}
+
+// set if pf == 0
+static Value *doSetnpV(InstPtr ip, BasicBlock *&b)
+{
+    //read PF
+    Value *pf_val = F_READ(b, "PF");
+
+    //compare to 0
+    Value *cmp_res = 
+      new ICmpInst(*b, CmpInst::ICMP_EQ, pf_val, CONST_V<1>(b,0));
+
+    //extend result to 8 bits
+    Value *res = new ZExtInst(cmp_res, Type::getInt8Ty(b->getContext()), "", b);
+
+    return res;
+}
+
+// set if sf == 0
+static Value *doSetnsV(InstPtr ip, BasicBlock *&b)
+{
+    //read SF
+    Value *sf_val = F_READ(b, "SF");
+
+    //compare to 0
+    Value *cmp_res = 
+      new ICmpInst(*b, CmpInst::ICMP_EQ, sf_val, CONST_V<1>(b,0));
+
+    //extend result to 8 bits
+    Value *res = new ZExtInst(cmp_res, Type::getInt8Ty(b->getContext()), "", b);
+
+    return res;
+}
+
 
 // SETcc always operate on 8bit quantities
 #define DO_SETCC_OP_REG(NAME)  static InstTransResult do ## NAME ## R(InstPtr ip, BasicBlock *&b, const MCOperand &reg) \
@@ -232,6 +294,14 @@ DO_SETCC_OP_REG(Setle)
 DO_SETCC_OP_MEM(Setle)
 DO_SETCC_OP_REG(Sets)
 DO_SETCC_OP_MEM(Sets)
+DO_SETCC_OP_REG(Setae)
+DO_SETCC_OP_MEM(Setae)
+DO_SETCC_OP_REG(Setbe)
+DO_SETCC_OP_MEM(Setbe)
+DO_SETCC_OP_REG(Setnp)
+DO_SETCC_OP_MEM(Setnp)
+DO_SETCC_OP_REG(Setns)
+DO_SETCC_OP_MEM(Setns)
 
 GENERIC_TRANSLATION_MEM(SETAm, 
 	doSetaM(ip, block, ADDR(0)),
@@ -269,6 +339,22 @@ GENERIC_TRANSLATION(SETSr, doSetsR(ip, block, OP(0)))
 GENERIC_TRANSLATION_MEM(SETSm,
   doSetsM(ip, block, ADDR(0)),
   doSetsM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION(SETAEr, doSetaeR(ip, block, OP(0)))
+GENERIC_TRANSLATION_MEM(SETAEm,
+  doSetaeM(ip, block, ADDR(0)),
+  doSetaeM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION(SETBEr, doSetbeR(ip, block, OP(0)))
+GENERIC_TRANSLATION_MEM(SETBEm,
+  doSetbeM(ip, block, ADDR(0)),
+  doSetbeM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION(SETNPr, doSetnpR(ip, block, OP(0)))
+GENERIC_TRANSLATION_MEM(SETNPm,
+  doSetnpM(ip, block, ADDR(0)),
+  doSetnpM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION(SETNSr, doSetnsR(ip, block, OP(0)))
+GENERIC_TRANSLATION_MEM(SETNSm,
+  doSetnsM(ip, block, ADDR(0)),
+  doSetnsM(ip, block, STD_GLOBAL_OP(0)))
 
 void SETcc_populateDispatchMap(DispatchMap &m) {
         m[X86::SETAm] = translate_SETAm;
@@ -289,4 +375,16 @@ void SETcc_populateDispatchMap(DispatchMap &m) {
         m[X86::SETGm] = translate_SETGm;
         m[X86::SETSr] = translate_SETSr;
         m[X86::SETSm] = translate_SETSm;
+
+        m[X86::SETAEr] = translate_SETAEr;
+        m[X86::SETAEm] = translate_SETAEm;
+
+        m[X86::SETBEr] = translate_SETBEr;
+        m[X86::SETBEm] = translate_SETBEm;
+
+        m[X86::SETNPr] = translate_SETNPr;
+        m[X86::SETNPm] = translate_SETNPm;
+
+        m[X86::SETNSr] = translate_SETNSr;
+        m[X86::SETNSm] = translate_SETNSm;
 }
