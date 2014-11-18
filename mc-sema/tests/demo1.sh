@@ -19,5 +19,5 @@ ${CFG_TO_BC_PATH}/cfg_to_bc -i demo_test1.cfg -driver=demo1_entry,start,raw,retu
 
 ${LLVM_PATH}/opt -O3 -o demo_test1_opt.bc demo_test1.bc
 ${LLVM_PATH}/llc -filetype=obj -o demo_test1_mine.o demo_test1_opt.bc
-gcc -m32 -o demo_driver1.exe demo_driver1.c demo_test1_mine.o
+${CC} -m32 -o demo_driver1.exe demo_driver1.c demo_test1_mine.o
 ./demo_driver1.exe
