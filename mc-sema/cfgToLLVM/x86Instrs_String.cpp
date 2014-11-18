@@ -555,6 +555,8 @@ GENERIC_TRANSLATION(STOSB, doStos<8>(block))
         case Inst::RepNePrefix: \
             ret = doRepNeScas<WIDTH>(block); \
             break; \
+        default: \
+            throw TErr(__LINE__, __FILE__, "NIY"); \
     } \
     return ret ;\
 }
@@ -573,6 +575,8 @@ GENERIC_TRANSLATION(STOSB, doStos<8>(block))
         case Inst::RepNePrefix: \
             ret = doRepNeCmps<WIDTH>(block); \
             break; \
+        default: \
+            throw TErr(__LINE__, __FILE__, "NIY"); \
     } \
     return ret ;\
 }

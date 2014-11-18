@@ -446,6 +446,24 @@ static InstTransResult doCwd(BasicBlock *b) {
     return ContinueBlock;
 
 }
+
+static InstTransResult translate_SAHF(NativeModulePtr natM, BasicBlock *&block,
+    InstPtr ip, MCInst &inst)
+{
+    Value *ah_val = R_READ<8>(block, X86::AH);
+   
+    SHR_SET_FLAG<8,1>(block, ah_val, "CF", 0); 
+    // bit 1 is reserved
+    SHR_SET_FLAG<8,1>(block, ah_val, "PF", 2); 
+    // bit 3 is reserved
+    SHR_SET_FLAG<8,1>(block, ah_val, "AF", 4); 
+    // bit 5 is reserved
+    SHR_SET_FLAG<8,1>(block, ah_val, "ZF", 6); 
+    SHR_SET_FLAG<8,1>(block, ah_val, "SF", 7); 
+
+    return ContinueBlock;
+}
+
 GENERIC_TRANSLATION(CDQ, doCdq(block))
 GENERIC_TRANSLATION(INT3, doInt3(block))
 GENERIC_TRANSLATION(NOOP, doNoop(block))
@@ -496,4 +514,5 @@ void Misc_populateDispatchMap(DispatchMap &m) {
     m[X86::RDTSC] = translate_RDTSC;
     m[X86::CWD] = translate_CWD;
     m[X86::CWDE] = translate_CWDE;
+    m[X86::SAHF] = translate_SAHF;
 }

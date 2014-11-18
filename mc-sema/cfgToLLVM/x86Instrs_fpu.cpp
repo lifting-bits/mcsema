@@ -47,36 +47,29 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 
-template <int width, int maskbits>
-static void SHR_SET_FLAG(llvm::BasicBlock *block, Value *val,
-    std::string flag, int shrbits)
+static Value* ADDR_TO_POINTER_V(BasicBlock *b, Value *memAddr, Type *ptrType)
 {
-    Value *shr = llvm::BinaryOperator::CreateLShr(
-        val, CONST_V<width>(block, shrbits), "", block);
-    Value *mask_pre = CONST_V<maskbits>(block, 0);
-    Value *mask = llvm::BinaryOperator::CreateNot(mask_pre, "", block);
-    Value *shr_trunc = new llvm::TruncInst(shr, 
-            Type::getIntNTy(block->getContext(), maskbits), "", block);
-
-    Value *anded = llvm::BinaryOperator::CreateAnd(shr_trunc, mask, "", block);
-
-    F_WRITE(block, flag, anded);
-
+    if (memAddr->getType()->isPointerTy() == false)
+    {
+        // its an integer, make it a pointer
+        return new llvm::IntToPtrInst(memAddr, ptrType , "", b); 
+    }
+    else if (memAddr->getType() != ptrType)
+    {
+        // its a pointer, but of the wrong type
+        return CastInst::CreatePointerCast(memAddr, ptrType, "", b);
+    } else {
+        // already correct ptr type
+        return memAddr;
+    }
 }
 
 template <int width>
-static Value *SHL_NOTXOR_FLAG(llvm::BasicBlock *block, Value *val,
-    std::string flag, int shlbits)
+static Value* ADDR_TO_POINTER(BasicBlock *b, Value *memAddr)
 {
-    Value *fv = F_READ(block, flag);
-    Value *nfv = llvm::BinaryOperator::CreateNot(fv, "", block);
-    Value *nzfv = new llvm::ZExtInst(nfv,
-        llvm::Type::getIntNTy(block->getContext(), width), "", block);
-    Value *shl = llvm::BinaryOperator::CreateShl(
-        nzfv, CONST_V<width>(block, shlbits), "", block);
-    Value *anded = llvm::BinaryOperator::CreateXor(shl, val, "", block);
-
-    return anded;
+    NASSERT(memAddr != NULL);
+    llvm::Type *ptrType = Type::getIntNPtrTy(b->getContext(), width);
+    return ADDR_TO_POINTER_V(b, memAddr, ptrType);
 }
 
 template <int width>
@@ -93,6 +86,15 @@ static Value *SHL_NOTXOR_V(llvm::BasicBlock *block, Value *val,
 
     return anded;
 }
+
+template <int width>
+static Value *SHL_NOTXOR_FLAG(llvm::BasicBlock *block, Value *val,
+    std::string flag, int shlbits)
+{
+    Value *fv = F_READ(block, flag);
+    return SHL_NOTXOR_V<width>(block, val, fv, shlbits);
+}
+
 
 static void SET_FPU_FOPCODE(BasicBlock *&b, uint8_t opcode[4])
 {
@@ -568,16 +570,7 @@ static Value *FPUM_READ(InstPtr ip, int memwidth, llvm::BasicBlock *&b, Value *a
             break;
     }
 
-    if (addr->getType()->isPointerTy() == false)
-    {
-        readLoc = new llvm::IntToPtrInst(addr, ptrTy, "", b); 
-    }
-    else if (addr->getType() != ptrTy)
-    {
-        // We need to bitcast the pointer value to a pointer type of the
-        // appropriate width.
-        readLoc = llvm::CastInst::CreatePointerCast(addr, ptrTy, "", b);
-    }
+    readLoc = ADDR_TO_POINTER_V(b, addr, ptrTy);
 
     Value *read = new llvm::LoadInst(readLoc, "", b);
 
@@ -763,20 +756,7 @@ static InstTransResult doFOpPRR(InstPtr ip, BasicBlock *&b,
 
 static InstTransResult doFldcw(InstPtr ip, BasicBlock *&b, Value *memAddr)
 {
-    Value *memPtr;
-    llvm::Type *int16ptr = llvm::Type::getIntNPtrTy(b->getContext(), 16);
-
-    NASSERT(memAddr != NULL);
-
-    if (memAddr->getType()->isPointerTy() == false)
-    {
-        memPtr = new llvm::IntToPtrInst(memAddr, int16ptr , "", b); 
-    }
-    else if (memAddr->getType() != int16ptr)
-    {
-        memPtr = llvm::CastInst::CreatePointerCast(
-            memAddr, llvm::Type::getIntNPtrTy(b->getContext(), 16), "", b);
-    }
+    Value *memPtr = ADDR_TO_POINTER<16>(b, memAddr);
 
     Value *memVal = M_READ<16>(ip, b, memPtr);
 
@@ -795,20 +775,7 @@ static InstTransResult doFldcw(InstPtr ip, BasicBlock *&b, Value *memAddr)
 
 static InstTransResult doFstcw(InstPtr ip, BasicBlock *&b, Value *memAddr)
 {
-    Value *memPtr;
-    llvm::Type *int16ptr = llvm::Type::getIntNPtrTy(b->getContext(), 16);
-
-    NASSERT(memAddr != NULL);
-
-    if (memAddr->getType()->isPointerTy() == false)
-    {
-        memPtr = new llvm::IntToPtrInst(memAddr, int16ptr , "", b); 
-    }
-    else if (memAddr->getType() != int16ptr)
-    {
-        memPtr = llvm::CastInst::CreatePointerCast(
-            memAddr, llvm::Type::getIntNPtrTy(b->getContext(), 16), "", b);
-    }
+    Value *memPtr = ADDR_TO_POINTER<16>(b, memAddr);
 
     // Pre-clear reserved FPU bits.
     Value *cw = CONST_V<16>(b, 0x1F7F);
@@ -830,20 +797,7 @@ static InstTransResult doFstcw(InstPtr ip, BasicBlock *&b, Value *memAddr)
 
 static InstTransResult doFstenv(InstPtr ip, BasicBlock *&b, Value *memAddr)
 {
-    Value *memPtr;
-    llvm::Type *int8ptr = llvm::Type::getIntNPtrTy(b->getContext(), 8);
-
-    NASSERT(memAddr != NULL);
-
-    if (memAddr->getType()->isPointerTy() == false)
-    {
-        memPtr = new llvm::IntToPtrInst(memAddr, int8ptr , "", b); 
-    }
-    else if (memAddr->getType() != int8ptr)
-    {
-        memPtr = llvm::CastInst::CreatePointerCast(
-            memAddr, llvm::Type::getIntNPtrTy(b->getContext(), 8), "", b);
-    }
+    Value *memPtr = ADDR_TO_POINTER<8>(b, memAddr);
 
     // Pre-clear reserved FPU bits.
     Value *cw = CONST_V<32>(b, 0xFFFF1F7F);
@@ -1143,7 +1097,99 @@ static InstTransResult doFsin(InstPtr ip, BasicBlock *&b, unsigned reg)
     FPUR_WRITE(b, reg, fsin_val);
 
     return ContinueBlock;
+}
 
+static InstTransResult doFxch(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+    // Check num operands.
+    // No operands implies ST1
+    unsigned src_reg = X86::ST1;
+    if(inst.getNumOperands() > 0) {
+        src_reg = inst.getOperand(0).getReg();
+    }
+
+    Value *src_val = FPUR_READ(b, src_reg);
+    Value *st0_val = FPUR_READ(b, X86::ST0);
+
+    FPUR_WRITE(b, X86::ST0, src_val);
+    FPUR_WRITE(b, src_reg, st0_val);
+
+    return ContinueBlock;
+}
+
+static InstTransResult doFucom(
+        InstPtr ip, 
+        BasicBlock *&b, 
+        unsigned reg,
+        unsigned int stackPops)
+{
+    Value *st0_val = FPUR_READ(b, X86::ST0);
+    Value *sti_val = FPUR_READ(b, reg);
+
+    // TODO: Make sure these treat negative zero and positive zero
+    // as the same value.
+    Value *is_lt = new FCmpInst(*b, FCmpInst::FCMP_ULT, st0_val, sti_val);
+    Value *is_eq = new FCmpInst(*b, FCmpInst::FCMP_UEQ, st0_val, sti_val);
+
+    // if BOTH the equql AND less than is true
+    // it means that one of the ops is a QNaN
+    
+    Value *lt_and_eq = BinaryOperator::CreateAnd(is_lt, is_eq, "", b);
+
+    F_WRITE(b, "FPU_C0", is_lt);        // C0 is 1 if either is QNaN or op1 < op2
+    F_WRITE(b, "FPU_C3", is_eq);        // C3 is 1 if either is QNaN or op1 == op2
+    F_WRITE(b, "FPU_C2", lt_and_eq);    // C2 is 1 if either op is a QNaN
+
+    while(stackPops > 0) {
+        FPU_POP(b);
+        stackPops -= 1;
+    }
+
+    return ContinueBlock;
+}
+
+
+static Value* doFstsV(BasicBlock *&b)
+{
+
+    Value *sw = CONST_V<16>(b, 0xFFFF);
+
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_IE",  0);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_DE",  1);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_ZE",  2);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_OE",  3);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_UE",  4);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_PE",  5);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_SF",  6);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_ES",  7);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_C0",  8);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_C1",  9);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_C2", 10);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_TOP",11);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_C3", 14);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_B",  15);
+
+    return sw;
+}
+
+static InstTransResult doFstswm(InstPtr ip, BasicBlock *&b, Value *memAddr)
+{ 
+    Value *memPtr = ADDR_TO_POINTER<16>(b, memAddr);
+
+    Value *status_word = doFstsV(b);
+
+    M_WRITE<16>(ip, b, memPtr, status_word);
+
+    return ContinueBlock;
+}
+
+static InstTransResult doFstswr(InstPtr ip, BasicBlock *&b)
+{ 
+    Value *status_word = doFstsV(b);
+
+    R_WRITE<16>(b, X86::AX, status_word);
+
+    return ContinueBlock;
 }
 
 #define FPU_TRANSLATION(NAME, SETPTR, SETDATA, SETFOPCODE, ACCESSMEM, THECALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst)\
@@ -1337,6 +1383,21 @@ FPU_TRANSLATION(IST_FP32m, true, true, true, true,
 FPU_TRANSLATION(IST_FP64m, true, true, true, true,
         doFistpM<64>(ip, block, mem_src))
 
+FPU_TRANSLATION(XCH_F, true, false, true, false,
+        doFxch(inst, ip, block))
+
+FPU_TRANSLATION(UCOM_FPPr, true, false, true, false,
+        doFucom(ip, block, X86::ST1, 2))
+FPU_TRANSLATION(UCOM_FPr, true, false, true, false,
+        doFucom(ip, block, OP(0).getReg(), 1))
+FPU_TRANSLATION(UCOM_Fr, true, false, true, false,
+        doFucom(ip, block, OP(0).getReg(), 0))
+
+FPU_TRANSLATION(FNSTSW16r, false, false, true, false,
+        doFstswr(ip, block))
+FPU_TRANSLATION(FNSTSWm, false, false, true, true,
+        doFstswm(ip, block, mem_src))
+
 static InstTransResult translate_WAIT(NativeModulePtr natM, BasicBlock *&block,
     InstPtr ip, MCInst &inst)
 {
@@ -1418,4 +1479,12 @@ void FPU_populateDispatchMap(DispatchMap &m)
     m[X86::ILD_F64m] = translate_ILD_F64m;
     m[X86::FNSTCW16m] = translate_FNSTCW16m;
     m[X86::FLDCW16m] = translate_FLDCW16m;
+
+    m[X86::UCOM_FPPr] = translate_UCOM_FPPr;
+    m[X86::UCOM_FPr] = translate_UCOM_FPr;
+    m[X86::UCOM_Fr] = translate_UCOM_Fr;
+
+    m[X86::FNSTSW16r] = translate_FNSTSW16r;
+    m[X86::FNSTSWm] = translate_FNSTSWm;
+
 }
