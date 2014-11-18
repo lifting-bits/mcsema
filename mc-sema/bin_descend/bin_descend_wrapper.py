@@ -1,12 +1,19 @@
+#!/usr/bin/env python
+
 import sys
 import subprocess
-from os.path import join, dirname
+from os.path import join, dirname, splitext
 import os
 
 
 ida_env = os.getenv("IDA_PATH")
 if ida_env:
-    ida_env = join(ida_env, "idaq.exe")
+    if os.name is "posix":
+        ida_name = "idal"
+    else:
+        ida_name = "idaq.exe"
+
+    ida_env = join(ida_env, ida_name)
 
 IDA_EXE = ida_env or r"C:\Program Files\IDA 6.5\idaq.exe"
 
@@ -85,7 +92,8 @@ if __name__ == "__main__":
         sys.stderr.write("An input file is required. Specify via -i\n")
         sys.exit(-2)
 
-    output_file = input_file[:-3] + "cfg"
+    in_fname, in_ext = splitext(input_file)
+    output_file = in_fname + ".cfg"
 
     new_args.extend(['--output', output_file])
 
