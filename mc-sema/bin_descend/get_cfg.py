@@ -15,6 +15,7 @@ import CFG_pb2
 from os import path
 import os
 import argparse
+import struct
 
 _DEBUG = False
 
@@ -559,6 +560,17 @@ def handleDataRelocation(M, dref, new_eas):
     else:
         return dref
 
+def resolveRelocation(ea):
+    rtype = idc.GetFixupTgtType(ea) 
+    if rtype == idc.FIXUP_OFF32:
+        bytestr = readBytesSlowly(ea, ea+4);
+        relocVal = struct.unpack("<L", bytestr)[0]
+        return relocVal
+    elif rtype == -1:
+        raise Exception("No relocation type at ea: {:x}".format(ea))
+    else:
+        return idc.GetFixupTgtOff(ea)
+
 def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
 
     if start == 0:
@@ -568,7 +580,7 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
 
     while i < end and i != idc.BADADDR:
 
-        pointsto = idc.GetFixupTgtOff(i)
+        pointsto = resolveRelocation(i)
         fn = getFunctionName(i)
         DEBUG("{0:x} Found reloc to: {1:x}\n".format(i, pointsto))
 
@@ -917,6 +929,9 @@ def parseTypeString(typestr, ea):
         conv = CFG_pb2.ExternalFunction.CallerCleanup
     elif "__fastcall" in typestr:
         conv = CFG_pb2.ExternalFunction.FastCall
+    elif "__usercall" in typestr:
+        # do not handle this for now
+        return (0, CFG_pb2.ExternalFunction.CalleeCleanup, "N")
     else:
         raise Exception("Could not parse function type:"+typestr)
 
@@ -931,10 +946,11 @@ def parseTypeString(typestr, ea):
 
 def getExportType(name, ep):
     try:
+        DEBUG("Processing export name: {} at: {:x}\n".format(name, ep))
         args, conv, ret = getFromEMAP(name)
     except KeyError as ke:
         tp = idc.GetType(ep);
-        if tp is None: 
+        if tp is None or "__" not in tp: 
             #raise Exception("Cannot determine type of function: {0} at: {1:x}".format(name, ep))
             sys.stdout.write("WARNING: Cannot determine type of function: {0} at: {1:x}".format(name, ep))
             return (0, CFG_pb2.ExternalFunction.CalleeCleanup, "N")
