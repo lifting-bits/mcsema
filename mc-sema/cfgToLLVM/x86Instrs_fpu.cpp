@@ -1480,11 +1480,14 @@ void FPU_populateDispatchMap(DispatchMap &m)
     m[X86::FNSTCW16m] = translate_FNSTCW16m;
     m[X86::FLDCW16m] = translate_FLDCW16m;
 
+    m[X86::XCH_F] = translate_XCH_F;
+
     m[X86::UCOM_FPPr] = translate_UCOM_FPPr;
     m[X86::UCOM_FPr] = translate_UCOM_FPr;
     m[X86::UCOM_Fr] = translate_UCOM_Fr;
 
     m[X86::FNSTSW16r] = translate_FNSTSW16r;
     m[X86::FNSTSWm] = translate_FNSTSWm;
+
 
 }
