@@ -523,11 +523,16 @@ static InstTransResult doBsrr(
 
     F_WRITE(b, "ZF", is_zero);
 
+    Value *fix_index = BinaryOperator::CreateSub(
+                    index_of_first_1,
+                    CONST_V<width>(b, 1),
+                    "", b);
+
     // See if we write to register
     Value *save_index = SelectInst::Create(
             is_zero, // check if the source was zero
             src_val, // if it was, do not change contents
-            index_of_first_1,  // if it was not, set index
+            fix_index,  // if it was not, set index
             "", b);
 
     R_WRITE<width>(b, dst.getReg(), save_index);
