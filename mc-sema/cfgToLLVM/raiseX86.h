@@ -344,12 +344,13 @@ void dataSectionToTypesContents(
 
 extern bool ignoreUnsupportedInsts;
 
+
 template <int width, int maskbits>
-static void SHR_SET_FLAG(llvm::BasicBlock *block, llvm::Value *val,
-    std::string flag, int shrbits)
+static void SHR_SET_FLAG_V(llvm::BasicBlock *block, llvm::Value *val,
+    std::string flag, llvm::Value *shrbit_val)
 {
     llvm::Value *shr = llvm::BinaryOperator::CreateLShr(
-        val, CONST_V<width>(block, shrbits), "", block);
+        val, shrbit_val, "", block);
     llvm::Value *mask_pre = CONST_V<maskbits>(block, 0);
     llvm::Value *mask = llvm::BinaryOperator::CreateNot(mask_pre, "", block);
     llvm::Value *shr_trunc = new llvm::TruncInst(shr, 
@@ -358,5 +359,17 @@ static void SHR_SET_FLAG(llvm::BasicBlock *block, llvm::Value *val,
     llvm::Value *anded = llvm::BinaryOperator::CreateAnd(shr_trunc, mask, "", block);
 
     F_WRITE(block, flag, anded);
+}
+
+template <int width, int maskbits>
+static void SHR_SET_FLAG(llvm::BasicBlock *block, llvm::Value *val,
+    std::string flag, int shrbits)
+{
+    SHR_SET_FLAG_V<width, maskbits>(
+            block, 
+            val, 
+            flag, 
+            CONST_V<width>(block, shrbits) 
+    );
 }
 

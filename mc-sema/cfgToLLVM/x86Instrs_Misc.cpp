@@ -464,6 +464,77 @@ static InstTransResult translate_SAHF(NativeModulePtr natM, BasicBlock *&block,
     return ContinueBlock;
 }
 
+template<int width>
+static InstTransResult doBtrr(
+        BasicBlock *&b, 
+        const MCOperand &base,
+        const MCOperand &index)
+{
+
+    TASSERT(base.isReg(), "operand must be register");
+    TASSERT(index.isReg(), "operand must be register");
+
+    Value *base_val  = R_READ<width>(b, base.getReg());
+    Value *index_val = R_READ<width>(b, index.getReg());
+
+    // modulo the index by register size
+    Value *index_mod = BinaryOperator::CreateURem(
+            index_val, 
+            CONST_V<width>(b, width), 
+            "", b);
+
+   SHR_SET_FLAG_V<width,1>(b, base_val, "CF", index_mod);
+
+   return ContinueBlock;
+}
+
+template<int width>
+static InstTransResult doBsrr(
+        BasicBlock *&b, 
+        const MCOperand &dst,
+        const MCOperand &src)
+{
+
+    TASSERT(dst.isReg(), "operand must be register");
+    TASSERT(src.isReg(), "operand must be register");
+
+    Value *src_val = R_READ<width>(b, src.getReg());
+
+    Type *s[1] = { Type::getIntNTy(b->getContext(), width) };
+    Function *ctlzFn = Intrinsic::getDeclaration(b->getParent()->getParent(), Intrinsic::ctlz, s);
+
+    TASSERT(ctlzFn != NULL, "Could not find ctlz intrinsic");
+
+    vector<Value*>  ctlzArgs;
+    ctlzArgs.push_back(src_val);
+    ctlzArgs.push_back(CONST_V<1>(b, 0));
+    Value *ctlz = CallInst::Create(ctlzFn, ctlzArgs, "", b);
+
+    Value *index_of_first_1 = BinaryOperator::CreateSub(
+                CONST_V<width>(b, width),
+                ctlz,
+                "", b);
+
+    Value *is_zero = new ICmpInst(
+            *b,
+            CmpInst::ICMP_EQ,
+            CONST_V<width>(b, 0),
+            index_of_first_1);
+
+    F_WRITE(b, "ZF", is_zero);
+
+    // See if we write to register
+    Value *save_index = SelectInst::Create(
+            is_zero, // check if the source was zero
+            src_val, // if it was, do not change contents
+            index_of_first_1,  // if it was not, set index
+            "", b);
+
+    R_WRITE<width>(b, dst.getReg(), save_index);
+
+    return ContinueBlock;
+}
+
 GENERIC_TRANSLATION(CDQ, doCdq(block))
 GENERIC_TRANSLATION(INT3, doInt3(block))
 GENERIC_TRANSLATION(NOOP, doNoop(block))
@@ -492,6 +563,12 @@ GENERIC_TRANSLATION(RDTSC, doRdtsc(block))
 GENERIC_TRANSLATION(CWD, doCwd<16>(block))
 GENERIC_TRANSLATION(CWDE, doCwd<32>(block))
 
+GENERIC_TRANSLATION(BT32rr, doBtrr<32>(block, OP(0), OP(1)))
+GENERIC_TRANSLATION(BT16rr, doBtrr<16>(block, OP(0), OP(1)))
+
+GENERIC_TRANSLATION(BSR32rr, doBsrr<32>(block, OP(0), OP(1)))
+GENERIC_TRANSLATION(BSR16rr, doBsrr<32>(block, OP(0), OP(1)))
+
 void Misc_populateDispatchMap(DispatchMap &m) {
     m[X86::AAA] = translate_AAA;
     m[X86::AAS] = translate_AAS;
@@ -515,4 +592,8 @@ void Misc_populateDispatchMap(DispatchMap &m) {
     m[X86::CWD] = translate_CWD;
     m[X86::CWDE] = translate_CWDE;
     m[X86::SAHF] = translate_SAHF;
+    m[X86::BT32rr] = translate_BT32rr;
+    m[X86::BT16rr] = translate_BT16rr;
+    m[X86::BSR32rr] = translate_BSR32rr;
+    m[X86::BSR16rr] = translate_BSR16rr;
 }
