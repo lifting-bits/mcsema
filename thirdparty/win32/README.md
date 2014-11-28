@@ -1,12 +1,9 @@
 Third-Party Tools
 =================
 
-MC-Semantics requires Intel PIN 2.10 to build the testing infrastructure. The translation portion will still work without it, but if you want the unit tests, INtel PIN is required.
+MC-Semantics requires Intel PIN 2.10 to build the testing infrastructure. The translation portion will still work without it, but if you want the unit tests, Intel PIN is required.
 
-Download Intel Pin 2.10 (Revision 45467) for VS2010 from Intel's site:
-https://software.intel.com/en-us/articles/pintool-downloads
-
-Direct Link: (http://software.intel.com/sites/landingpage/pintool/downloads/pin-2.10-45467-msvc10-ia32_intel64-windows.zip)[http://software.intel.com/sites/landingpage/pintool/downloads/pin-2.10-45467-msvc10-ia32_intel64-windows.zip]
+Download Intel Pin 2.10 (Revision 45467) for VS2010 from [Intel's site](https://software.intel.com/en-us/articles/pintool-downloads). Direct Link: [http://software.intel.com/sites/landingpage/pintool/downloads/pin-2.10-45467-msvc10-ia32_intel64-windows.zip](http://software.intel.com/sites/landingpage/pintool/downloads/pin-2.10-45467-msvc10-ia32_intel64-windows.zip)
 
 Extract PIN to the "pin" directory.
 
