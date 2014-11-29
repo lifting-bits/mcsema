@@ -1,5 +1,6 @@
 language: cpp
 script: mkdir build && cd build && cmake .. && make
+after_script: ./package.sh
 compiler:
   - gcc
 - gcc
