@@ -12,6 +12,7 @@ Required:
 * Python 2.7
 * CMake
 * git
+* nasm
 * mcsema source
 * development tools (e.g. the `build-essential` package)
 * 32-bit development libraries (`libc6:i386`, `gcc-multilib`)
@@ -27,11 +28,11 @@ Clone the source from Git. If you are reading this, odds are you know where the 
 ## Building
 
 Ubuntu 14.04 - i386
-* sudo apt-get install git gcc-multilib build-essential cmake
+* sudo apt-get install git gcc-multilib g++-multilib build-essential cmake nasm
 
 Ubuntu 14.04 - x86_64
 
-* sudo apt-get install git gcc-multilib build-essential cmake libc6-i386
+* sudo apt-get install git gcc-multilib g++-multilib build-essential cmake libc6-i386 nasm
 
 
 The following examples assume the source has already been cloned from git into a directory called `mcsema`.

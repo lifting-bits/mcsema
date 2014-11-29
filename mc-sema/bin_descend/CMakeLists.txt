@@ -16,7 +16,7 @@ target_link_libraries(bin_descend binary_common pe-parser-library cfgToLLVM peTo
     LLVMSelectionDAG LLVMAsmPrinter LLVMX86Desc LLVMX86Info
       LLVMX86AsmPrinter LLVMX86Utils ${Boost_LIBRARIES} libprotobuf)
 
-add_dependencies(bin_descend binary_common peToCFG bitreader asmparser bitwriter instrumentation scalaropts ipo)
+add_dependencies(bin_descend binary_common peToCFG bitreader asmparser bitwriter instrumentation scalaropts ipo LLVMX86CodeGen)
 
 get_target_property(BIN_DESCEND_EXECUTABLE bin_descend LOCATION)
 get_filename_component(BIN_DESCEND_PATH ${BIN_DESCEND_EXECUTABLE} PATH)
