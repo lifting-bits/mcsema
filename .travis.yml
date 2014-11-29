@@ -3,14 +3,10 @@ script: mkdir build && cd build && cmake .. && make -j2
 before_deploy: cd .. && bash package.sh
 compiler:
 - gcc
-
-# addons:
-#   artifacts:
-#     key:
-#       secure: MOvT+qlftmvCnO74/BWF+wzI2I+D5aiChX38xtUMTFUes0m+YGoURqIOy9SnzYPtsLJLePFm47UsxhwiY/DWe3iv7mnJJulN7h/CeXqh6IT2AGBX7IG3w5e+mqSvTzGr8j+rM8eyifzq3prE6J/dVS8ZJ9DkZlt/cYOsIF+s1u0=
-#     secret:
-#       secure: gTZxf7uGUrM9Hu+LvnlNVULWTcxDKfnAnchGFJQx3gKxEZIAw04Wd49FO7CAFPzvbCmC2dlycPIlDY7r6ftvizLWgRlFuZzCO1RWKPf0sGDyICA3CLR46daYmY3pz3aCsvrg+em4GHFaLSkH8TwUWwDbVU1yax2iFriPjuq+sQ8=
-#     bucket: mcsema-builds
+- clang
+matrix:
+  allow_failures:
+    - compiler: clang
 
 deploy:
   - provider: releases
@@ -26,9 +22,9 @@ deploy:
 
   - provider: s3
     access_key_id:
-      secure: MOvT+qlftmvCnO74/BWF+wzI2I+D5aiChX38xtUMTFUes0m+YGoURqIOy9SnzYPtsLJLePFm47UsxhwiY/DWe3iv7mnJJulN7h/CeXqh6IT2AGBX7IG3w5e+mqSvTzGr8j+rM8eyifzq3prE6J/dVS8ZJ9DkZlt/cYOsIF+s1u0=
+      secure: "CTq0vTUIQHMQm+mjpBcOmD+2/NXmPM2zXUu3SHTbwmlFmI4OXX3Cv/Nic1MAlzr4GddXrBZTD40kXadzQqj2qHK9aWiLtW3+vayx6VwmR0dV9D2a9M1IDbVgUmeSenSXHRY3QT9IEm/+QOeak8H0POwHtjSTYhA/ZK3Xk5YcPos="
     secret_access_key:
-      secure: gTZxf7uGUrM9Hu+LvnlNVULWTcxDKfnAnchGFJQx3gKxEZIAw04Wd49FO7CAFPzvbCmC2dlycPIlDY7r6ftvizLWgRlFuZzCO1RWKPf0sGDyICA3CLR46daYmY3pz3aCsvrg+em4GHFaLSkH8TwUWwDbVU1yax2iFriPjuq+sQ8=
+      secure: "QVc0RERI7NSqFwG12KopbJ+Jg9j4dIVVd3nddRsomh2uV8AIK0ZIIg44K+7MQxXnFLNw1kdaKrlnl9y/IaYPlwv0EZ/esQ9hFRFj2xrhdbdfvQ0XEVK0jJMvsLAuoEmkwMCPonkwAYo1qvpC9tGZNT5Pyt3nQ8NUjSQygPi0cBI="
     bucket: mcsema-builds
     skip_cleanup: true
     detect_encoding: true
