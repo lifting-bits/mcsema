@@ -1,9 +1,9 @@
 language: cpp
-script: mkdir build && cd build && cmake .. && make
-after_script: ./package.sh
+script: mkdir build && cd build && cmake .. && make -j2
+before_deploy: ./package.sh
 compiler:
 - gcc
-# - clang
+
 # addons:
 #   artifacts:
 #     key:
@@ -11,12 +11,29 @@ compiler:
 #     secret:
 #       secure: gTZxf7uGUrM9Hu+LvnlNVULWTcxDKfnAnchGFJQx3gKxEZIAw04Wd49FO7CAFPzvbCmC2dlycPIlDY7r6ftvizLWgRlFuZzCO1RWKPf0sGDyICA3CLR46daYmY3pz3aCsvrg+em4GHFaLSkH8TwUWwDbVU1yax2iFriPjuq+sQ8=
 #     bucket: mcsema-builds
+
 deploy:
-  provider: releases
-  api_key:
-    secure: ZNUTHn1z0wIHjjzueFfEvjWUjO+z26DjsoffUz+hm+Qfc0Iyu2VtgX8nH1KhYT5t4+7PrNVbvOVFJQzl3wbJdrrDURFG43Rm9paIUTjdXhFcxfEk1J1kS7zDd5wHtt0sCsRezNDeBlTvpMCJ41e5/YSU0bJR58gv7X9NLKEJ5xo=
-  file: deb-build/mcsema-*.deb
-  skip_cleanup: true
-  on:
-    repo: trailofbits/mcsema
-    all_branches: true
+  - provider: releases
+    api_key:
+      secure: ZNUTHn1z0wIHjjzueFfEvjWUjO+z26DjsoffUz+hm+Qfc0Iyu2VtgX8nH1KhYT5t4+7PrNVbvOVFJQzl3wbJdrrDURFG43Rm9paIUTjdXhFcxfEk1J1kS7zDd5wHtt0sCsRezNDeBlTvpMCJ41e5/YSU0bJR58gv7X9NLKEJ5xo=
+    file: deb-build/mcsema-*.deb
+    skip_cleanup: true
+    on:
+      repo: trailofbits/mcsema
+	  tags: true
+      all_branches: true
+      condition: $CC = gcc
+
+  - provider: s3
+    key:
+      secure: MOvT+qlftmvCnO74/BWF+wzI2I+D5aiChX38xtUMTFUes0m+YGoURqIOy9SnzYPtsLJLePFm47UsxhwiY/DWe3iv7mnJJulN7h/CeXqh6IT2AGBX7IG3w5e+mqSvTzGr8j+rM8eyifzq3prE6J/dVS8ZJ9DkZlt/cYOsIF+s1u0=
+    secret:
+      secure: gTZxf7uGUrM9Hu+LvnlNVULWTcxDKfnAnchGFJQx3gKxEZIAw04Wd49FO7CAFPzvbCmC2dlycPIlDY7r6ftvizLWgRlFuZzCO1RWKPf0sGDyICA3CLR46daYmY3pz3aCsvrg+em4GHFaLSkH8TwUWwDbVU1yax2iFriPjuq+sQ8=
+    bucket: mcsema-builds
+    skip_cleanup: true
+    detect_encoding: true
+    file: deb-build/mcsema-*.deb
+    on:
+      repo: trailofbits/mcsema
+      all_branches: true
+      condition: $CC = gcc
