@@ -25,9 +25,9 @@ deploy:
       condition: $CC = gcc
 
   - provider: s3
-    key:
+    access_key_id:
       secure: MOvT+qlftmvCnO74/BWF+wzI2I+D5aiChX38xtUMTFUes0m+YGoURqIOy9SnzYPtsLJLePFm47UsxhwiY/DWe3iv7mnJJulN7h/CeXqh6IT2AGBX7IG3w5e+mqSvTzGr8j+rM8eyifzq3prE6J/dVS8ZJ9DkZlt/cYOsIF+s1u0=
-    secret:
+    secret_access_key:
       secure: gTZxf7uGUrM9Hu+LvnlNVULWTcxDKfnAnchGFJQx3gKxEZIAw04Wd49FO7CAFPzvbCmC2dlycPIlDY7r6ftvizLWgRlFuZzCO1RWKPf0sGDyICA3CLR46daYmY3pz3aCsvrg+em4GHFaLSkH8TwUWwDbVU1yax2iFriPjuq+sQ8=
     bucket: mcsema-builds
     skip_cleanup: true
