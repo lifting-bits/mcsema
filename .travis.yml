@@ -20,7 +20,7 @@ deploy:
     skip_cleanup: true
     on:
       repo: trailofbits/mcsema
-	  tags: true
+      tags: true
       all_branches: true
       condition: $CC = gcc
 
@@ -34,6 +34,5 @@ deploy:
     detect_encoding: true
     file: deb-build/mcsema-*.deb
     on:
-      repo: trailofbits/mcsema
       all_branches: true
       condition: $CC = gcc
