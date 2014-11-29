@@ -3,7 +3,6 @@ script: mkdir build && cd build && cmake .. && make
 after_script: ./package.sh
 compiler:
 - gcc
-- clang
 addons:
   artifacts:
     key:
