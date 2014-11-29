@@ -39,5 +39,4 @@ deploy:
 
 notifications:
   webhooks:
-    urls:
-      - secure: "YpcRle8sKhLLlqUHDzK3c8BXmbnIs4gtNFSeuNj1fEW/Yy3VG+Swlysrue9X/Bt/5M1ArW4nVXuFTsKNSvUUSZI8d/5cL7v6ymkXLXyMAYkuaYBMhSg04MRSZbF9hXUW0mEs6hhK4IZRVa3jtyK7nbckSUEAcnU1gFmcZZxe4PU=" 
+    secure: "YpcRle8sKhLLlqUHDzK3c8BXmbnIs4gtNFSeuNj1fEW/Yy3VG+Swlysrue9X/Bt/5M1ArW4nVXuFTsKNSvUUSZI8d/5cL7v6ymkXLXyMAYkuaYBMhSg04MRSZbF9hXUW0mEs6hhK4IZRVa3jtyK7nbckSUEAcnU1gFmcZZxe4PU="
