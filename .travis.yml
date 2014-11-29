@@ -1,6 +1,6 @@
 language: cpp
 script: mkdir build && cd build && cmake .. && make -j2
-before_deploy: ./package.sh
+before_deploy: bash package.sh
 compiler:
 - gcc
 
