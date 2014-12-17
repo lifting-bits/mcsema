@@ -4,6 +4,7 @@ before_deploy: cd .. && bash package.sh
 compiler:
 - gcc
 - clang
+sudo: false
 matrix:
   allow_failures:
     - compiler: clang
@@ -28,7 +29,7 @@ deploy:
     bucket: mcsema-builds
     skip_cleanup: true
     detect_encoding: true
-    file: deb-build/mcsema-*.deb
+    local-dir: deb-build
     on:
       all_branches: true
       condition: $CC = gcc
