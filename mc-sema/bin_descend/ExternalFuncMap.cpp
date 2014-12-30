@@ -227,11 +227,11 @@ void ExternalFunctionMap::parseMap(string fileName)
       char  k = vtok[2][0];
       switch(k) {
         case 'C':
-          conv = CallerCleanup;
+          conv = CallerCleanup; // cdecl
           break;
 
         case 'E':
-          conv = CalleeCleanup;
+          conv = CalleeCleanup; // stdcall
           break;
 
         case 'F':
