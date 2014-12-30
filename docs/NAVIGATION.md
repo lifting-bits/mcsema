@@ -69,7 +69,7 @@ The protobuf format is defined in `peToCFG/CFG.proto`, and described in more det
 
 ## Translation
 
-Instruction translation begins life in the cfg_to_bc executable, which takes a serialized Google protocol buffer CFG, and converts it to LLVM bitcode. The high-level actions of translation are defined in `bitcode_from_cfg/cfg_to_bc.cpp`:`main` and described in this section.
+Instruction translation begins life in the cfg_to_bc executable, which takes a serialized Google protocol buffer CFG, and converts it to LLVM bitcode. The high-level actions of translation are defined in `cfg_to_bc/cfg_to_bc.cpp`:`main` and described in this section.
 
 First, the CFG it re-serialized via a call to `peToCFG/peToCFG.cpp`:`readModule`, which will in turn de-serialze the protocol buffer file via `readProtobuf`. The CFG is then transformed into an `llvm::Module`, with some initial data structures populated.
 

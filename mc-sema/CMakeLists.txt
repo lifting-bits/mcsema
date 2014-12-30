@@ -89,7 +89,7 @@ if(PIN_FOUND)
     add_subdirectory(validator)
 endif(PIN_FOUND)
 
-add_subdirectory(bitcode_from_cfg)
+add_subdirectory(cfg_to_bc)
 add_subdirectory(binary_common)
 add_subdirectory(bin_descend)
 
