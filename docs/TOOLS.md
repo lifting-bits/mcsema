@@ -198,7 +198,7 @@ While many x86 instructions are supported, there are still those which are not s
 * `-m`: Output the control flow graph of every function in the module in graphviz (aka dot) format. This is useful for visualizing the translated code to locate any translation errors.  
 * `-mc-x86-disable-arith-relaxation`: 
 * `-mtriple=<target triple>`: Specify the target triple (e.g. i686-pc-win32, i686-pc-linux-gnu) of the input file. This option should be used when processing Windows object files on Linux, or vice versa.
-* `-o=<filename>: The output filename. This file will contain LLVM bitcode.
+* `-o=<filename>`: The output filename. This file will contain LLVM bitcode.
 * `-x86-asm-syntax`: Chose whether assembly output will use ATT or Intel syntax.
 
 ### Examples
@@ -209,7 +209,7 @@ Convert the control flow graph in `demo_test1.cfg` into bitcode stored in `demo_
 
 `cfg_to_bc.exe -i demo_test1.cfg -driver=demo1_entry,start,raw,return,C -o demo_test1.bc`
 
-Convert the control flow graph in `demo_test3.cfg` into bitcode stored in `demo_test3.bc`. Specify that the driver name will be `demo3_entry`, that it will point to the `_entry` entry point, and that it will have `2` arguments that are pushed onto the stack.
+Convert the control flow graph in `demo_test3.cfg` into bitcode stored in `demo_test3.bc`. Specify that the driver name will be `demo3_entry`, that it will point to the `_demo3` entry point, and that it will have `2` arguments that are pushed onto the stack.
 
 `cfg_to_bc.exe -i demo_test3.cfg -driver=demo3_entry,_demo3,2,return,C -o demo_test3.bc`
 
