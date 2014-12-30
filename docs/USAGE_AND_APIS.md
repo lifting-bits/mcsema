@@ -190,7 +190,7 @@ The Module message represents all the recovered information about the input prog
 
 ### External Calls
 
-Since external calls (e.g. calls to APIs or other compilation units) are not translated by mcsema, their semantics must be accurately known to reference them from translated code. The information needed about external calls is external name, calling convention, number of arguments, and whether or not the call returns. The `cfg_to_bc` tool identifies information about external calls from a definition file specified by the `-func-map` argument. A default mapping, that includes the vast majority of the Windows API, is provided in `mc-sema/tests/std_defs.txt`.
+Since external calls (e.g. calls to APIs or other compilation units) are not translated by mcsema, their semantics must be accurately known to reference them from translated code. The information needed about external calls is external name, calling convention, number of arguments, and whether or not the call returns. The `bin_descend` tool identifies information about external calls from a definition file specified by the `-func-map` argument. A default mapping, that includes the vast majority of the Windows API, is provided in `mc-sema/std_defs/std_defs.txt`.
 
 ## Translation
 
