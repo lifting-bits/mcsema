@@ -53,4 +53,4 @@ mcsema uses Intel Pin 2.10 which has not been included in this source release, b
 
 ## Contact
 
-For any questions, contact mcsema@trailofbits.com.
+For any questions, join our mailing list at [mcsema-dev@googlegroups.com](https://groups.google.com/forum/?hl=en#!forum/mcsema-dev) or email us privately at mcsema@trailofbits.com.
