@@ -3,19 +3,15 @@ MC-Semantics
 
 [![Build Status](https://travis-ci.org/trailofbits/mcsema.svg?branch=master)](https://travis-ci.org/trailofbits/mcsema)
 
-MC-Semantics (or mcsema, pronounced 'em see se ma') is a library to translate the semantics of native code to LLVM IR. The MC-Semantics project is separated into a few sub-projects: 
-  * Control Flow Recovery
-  * Instruction Semantics
-  * Binary File Parsing
-  * Semantics Testing
+MC-Semantics (or mcsema, pronounced 'em see se ma') is a library for translating the semantics of native code to LLVM IR. McSema support translation of x86 machine code, including integer, floating point, and SSE instructions. Control flow recovery is separated from translation, permitting the use of custom control flow recovery front-ends. Code for McSema is open-source and licensed under BSD3.
 
-We hope that this library is useful to the program analysis and reverse engineering community. Currently it supports the translation of semantics for x86 programs and supports subsets of integer arithmetic, floating point, and vector operations. Work is in progress, and additional semantics are constantly being added.
+At a high level, McSema is organized into subprojects for:
+* Control Flow Recovery
+* Instruction Semantics
+* Binary File Parsing
+* Semantics Testing
 
-Patches are welcome. 
-
-## News
-
-09/01/2014: MC-Semantics now builds on Linux and supports ELF object files. Linux support is not as well tested as Windows, and currently assumes all indirect branches and callbacks are to translated code. 
+We hope that this library is useful to the program analysis and reverse engineering community. Work is in progress, and additional semantics are constantly being added. [Patches are welcome](https://github.com/trailofbits/mcsema/issues).
 
 ## Separation of Components
 
@@ -31,7 +27,7 @@ The problems of instruction semantics and control flow recovery are separated. A
 
 ## Documentation
 
-Detailed design and usage information can be found in the docs directory.
+Detailed design and usage information can be found in the [docs](docs/) directory.
 
 ### Building
 
@@ -49,15 +45,12 @@ The layout of the source code is described in [docs/NAVIGATION.md](docs/NAVIGATI
 
 ## External Code
 mcsema uses external code which has been included in this source release:
- * LLVM 3.2
+ * LLVM
  * Google Protocol Buffers
  * Boost
 
-mcsema also uses external code which has **not** been included in this source release, but is freely available:
- * Intel Pin 2.10
+mcsema uses Intel Pin 2.10 which has not been included in this source release, but is freely available. Pin is used only for testing of instruction semantics and is not required to use the library.
 
 ## Contact
 
-For any questions, contact opensource@trailofbits.com.
-
-There is a mailing list dedicated to mcsema: mcsema-dev@googlegroups.com. It can also be accessed via web at: https://groups.google.com/forum/?hl=en#!forum/mcsema-dev
+For any questions, contact mcsema@trailofbits.com.
