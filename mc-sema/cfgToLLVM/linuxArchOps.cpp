@@ -3,12 +3,12 @@
 #include <iostream>
 
 
-#include "llvm/Module.h"
-#include "llvm/BasicBlock.h"
-#include "llvm/Type.h"
-#include "llvm/Constants.h"
-#include "llvm/DerivedTypes.h"
-#include "llvm/Instructions.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Instructions.h"
 
 #include "raiseX86.h"
 #include "X86.h"
@@ -222,7 +222,7 @@ void linuxAddCallValue(Module *M) {
                 /*Linkage=*/GlobalValue::InternalLinkage,
                 /*Name=*/"do_call_value", M); 
         func_do_call_value->setCallingConv(CallingConv::C);
-        func_do_call_value->addFnAttr(Attributes::AlwaysInline);
+        func_do_call_value->addFnAttr(Attribute::AlwaysInline);
     }
 
     // Function Definitions

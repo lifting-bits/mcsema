@@ -10,4 +10,3 @@ BITS 32
     ;TEST_BEGIN_RECORDING
     setne al
     ;TEST_END_RECORDING
-

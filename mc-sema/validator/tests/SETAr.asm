@@ -1,0 +1,12 @@
+BITS 32
+;TEST_FILE_META_BEGIN
+;TEST_TYPE=TEST_F
+;TEST_IGNOREFLAGS=
+;TEST_FILE_META_END
+    ; SETA
+    mov ecx, 0x100
+    mov ebx, 0x0F0
+    cmp ecx, ebx
+    ;TEST_BEGIN_RECORDING
+    seta al
+    ;TEST_END_RECORDING 

@@ -1,9 +1,9 @@
 #ifndef WIN32ARCHOPS_H
 #define WIN32ARCHOPS_H
 
-#include "llvm/Value.h"
-#include "llvm/Module.h"
-#include "llvm/BasicBlock.h"
+#include "llvm/IR/Value.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/BasicBlock.h"
 
 #include <boost/cstdint.hpp>
 typedef boost::uint64_t VA;

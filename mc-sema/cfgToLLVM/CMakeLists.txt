@@ -1,4 +1,4 @@
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../llvm-3.2/lib/Target/X86 ${CMAKE_CURRENT_SOURCE_DIR}/../../llvm-3.2/lib/Target/X86 ${CMAKE_CURRENT_SOURCE_DIR}/../peToCFG)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../llvm-3.5/lib/Target/X86 ${CMAKE_CURRENT_SOURCE_DIR}/../../llvm-3.5/lib/Target/X86 ${CMAKE_CURRENT_SOURCE_DIR}/../peToCFG)
 
 add_library(cfgToLLVM x86Helpers.cpp x86Instrs.cpp x86Instrs_MOV.cpp
   x86Instrs_SETcc.cpp x86Instrs_Branches.cpp x86Instrs_Stack.cpp

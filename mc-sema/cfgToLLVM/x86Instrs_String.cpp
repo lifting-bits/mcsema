@@ -590,21 +590,21 @@ CMPS_TRANSLATION(CMPS16, 16)
 CMPS_TRANSLATION(CMPS32, 32)
 
 void String_populateDispatchMap(DispatchMap &m) {
-        m[X86::MOVSD] = translate_MOVSD;
+        m[X86::MOVSL] = translate_MOVSD;
         m[X86::REP_MOVSD_32] = translate_REP_MOVSD_32;
         m[X86::MOVSW] = translate_MOVSW;
         m[X86::REP_MOVSW_32] = translate_REP_MOVSW_32;
         m[X86::MOVSB] = translate_MOVSB;
         m[X86::REP_MOVSB_32] = translate_REP_MOVSB_32;
 
-        m[X86::STOSD] = translate_STOSD;
+        m[X86::STOSL] = translate_STOSD;
         m[X86::STOSW] = translate_STOSW;
         m[X86::STOSB] = translate_STOSB;
 
-        m[X86::SCAS16] = translate_SCAS16;
-        m[X86::SCAS32] = translate_SCAS32;
-        m[X86::SCAS8] = translate_SCAS8;
-        m[X86::CMPS8] = translate_CMPS8;
-        m[X86::CMPS16] = translate_CMPS16;
-        m[X86::CMPS32] = translate_CMPS32;
+        m[X86::SCASW] = translate_SCAS16;
+        m[X86::SCASL] = translate_SCAS32;
+        m[X86::SCASB] = translate_SCAS8;
+        m[X86::CMPSB] = translate_CMPS8;
+        m[X86::CMPSW] = translate_CMPS16;
+        m[X86::CMPSL] = translate_CMPS32;
 }

@@ -14,6 +14,9 @@
 #define PACKED 
 #endif
 
+#ifdef __cplusplus
+namespace mcsema {
+#endif
 // struct to handle native
 // x87 FPU 80-bit types.
 // aka X86_Fp80Ty
@@ -115,7 +118,7 @@ typedef struct _nativefpu {
 #pragma pack(push, 1)
 #endif
 typedef struct _segmentoffset{
-    uint32_t seg;
+    uint16_t seg;
     uint32_t off;
 } PACKED segmentoffset; // 6 bytes
 #ifdef _WIN32
@@ -200,6 +203,14 @@ typedef struct _xmmregstate {
 				this->tag[14] == other.tag[14] &&
 				this->tag[15] == other.tag[15]);
     }
+
+    std::string printMe(void) const {
+        std::stringstream oss;
+        for(unsigned  i = 0; i < 16; i++) {
+            oss << " 0x" << std::hex << (boost::int32_t) this->tag[i];
+        }
+        return oss.str();
+    }
 #endif
 } PACKED xmmregstate;
 #ifdef _WIN32
@@ -234,20 +245,20 @@ typedef struct _fpuregs {
 #pragma pack(push, 1)
 #endif
 typedef struct _fpuflags {
-    uint32_t BUSY;
-    uint32_t C3;
-    uint32_t TOP;
-    uint32_t C2;
-    uint32_t C1;
-    uint32_t C0;
-    uint32_t ES;
-    uint32_t SF;
-    uint32_t PE;
-    uint32_t UE;
-    uint32_t OE;
-    uint32_t ZE;
-    uint32_t DE;
-    uint32_t IE;
+    uint8_t BUSY;
+    uint8_t C3;
+    uint8_t TOP;
+    uint8_t C2;
+    uint8_t C1;
+    uint8_t C0;
+    uint8_t ES;
+    uint8_t SF;
+    uint8_t PE;
+    uint8_t UE;
+    uint8_t OE;
+    uint8_t ZE;
+    uint8_t DE;
+    uint8_t IE;
 
 #ifdef __cplusplus
 	bool operator==(const _fpuflags &other ) const {
@@ -267,7 +278,7 @@ typedef struct _fpuflags {
 				this->IE == other.IE);
     }
 #endif
-} PACKED fpuflags; // 56 bytes
+} PACKED fpuflags; // 14 bytes
 #ifdef _WIN32
 #pragma pack(pop)
 #endif
@@ -276,15 +287,15 @@ typedef struct _fpuflags {
 #pragma pack(push, 1)
 #endif
 typedef struct _fpucontrol {
-    uint32_t X;
-    uint32_t RC;
-    uint32_t PC;
-    uint32_t PM;
-    uint32_t UM;
-    uint32_t OM;
-    uint32_t ZM;
-    uint32_t DM;
-    uint32_t IM;
+    uint8_t X;
+    uint8_t RC;
+    uint8_t PC;
+    uint8_t PM;
+    uint8_t UM;
+    uint8_t OM;
+    uint8_t ZM;
+    uint8_t DM;
+    uint8_t IM;
 
 #ifdef __cplusplus
 	bool operator==(const _fpucontrol &other) const {
@@ -299,7 +310,7 @@ typedef struct _fpucontrol {
                 this->IM == other.IM);
     }
 #endif
-} PACKED fpucontrol; // 36 bytes
+} PACKED fpucontrol; // 9 bytes
 #ifdef _WIN32
 #pragma pack(pop)
 #endif
@@ -309,31 +320,31 @@ typedef struct _fpucontrol {
 #endif
 //structure for register state
 typedef struct _RegState {
-	//the big registers
-	uint32_t	EAX;
-	uint32_t	EBX;
-	uint32_t	ECX;
-	uint32_t	EDX;
-	uint32_t	ESI;
-	uint32_t	EDI;
-	uint32_t	ESP;
-	uint32_t	EBP; // 32 bytes
+    //the big registers
+    uint32_t	EAX;
+    uint32_t	EBX;
+    uint32_t	ECX;
+    uint32_t	EDX;
+    uint32_t	ESI;
+    uint32_t	EDI;
+    uint32_t	ESP;
+    uint32_t	EBP; // 32 bytes
 
-	//the flags
-	uint32_t	CF;
-	uint32_t	PF;
-	uint32_t	AF;
-	uint32_t	ZF;
-	uint32_t	SF;
-	uint32_t	OF;
-	uint32_t	DF; // 28 bytes
+    //the flags
+    uint8_t	CF;
+    uint8_t	PF;
+    uint8_t	AF;
+    uint8_t	ZF;
+    uint8_t	SF;
+    uint8_t	OF;
+    uint8_t	DF; // 7 bytes
     fpuregs     ST_regs; //  96 bytes
-    fpuflags    FPU_FLAGS; // 56 bytes
-    fpucontrol  FPU_CONTROL; // 36 bytes
+    fpuflags    FPU_FLAGS; // 14 bytes
+    fpucontrol  FPU_CONTROL; // 9 bytes
     fputag      FPU_TAG; // 8 bytes
     segmentoffset FPU_LASTIP; // 8 bytes 
     segmentoffset FPU_LASTDATA; // 8 bytes 
-    uint32_t    FPU_FOPCODE; // 4 bytes
+    uint16_t    FPU_FOPCODE; // 2 bytes
 
     //xmm registers
     xmmregstate      XMM0;
@@ -482,3 +493,7 @@ void LD_TO_NATIVEFPU(long double ld, nativefpu *nf)
 	memcpy(nf, &ld, sizeof(*nf));
 #endif
 }
+
+#ifdef __cplusplus
+} // namespace mcsema
+#endif

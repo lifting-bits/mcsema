@@ -33,7 +33,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCInstPrinter.h"
 #include "llvm/MC/MCSubtargetInfo.h"
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -43,15 +42,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Module.h"
-#include "llvm/Function.h"
-#include "llvm/LLVMContext.h"
-#include "llvm/Type.h"
-#include "llvm/DerivedTypes.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/system_error.h"
 
 #include <stack>
 #include <set>
@@ -88,11 +86,11 @@ typedef boost::shared_ptr<Inst> InstPtr;
 
 #include "../cfgToLLVM/Externals.h"
 
-class JumpTable;
+class MCSJumpTable;
 class JumpIndexTable;
 typedef boost::shared_ptr<ExternalCodeRef> ExternalCodeRefPtr;
 typedef boost::shared_ptr<ExternalDataRef> ExternalDataRefPtr;
-typedef boost::shared_ptr<JumpTable> JumpTablePtr;
+typedef boost::shared_ptr<MCSJumpTable> MCSJumpTablePtr;
 typedef boost::shared_ptr<JumpIndexTable> JumpIndexTablePtr;
 
 class BufferMemoryObject : public llvm::MemoryObject {
@@ -147,7 +145,7 @@ class Inst {
     ExternalCodeRefPtr   extCallTgt;
     ExternalDataRefPtr   extDataRef;
 
-    JumpTablePtr        jumpTable;
+    MCSJumpTablePtr        jumpTable;
     bool                jump_table;
     JumpIndexTablePtr   jumpIndexTable;
     bool                jump_index_table;
@@ -166,6 +164,11 @@ class Inst {
     // instruction
     uint8_t         reloc_offset;
 
+    //  if this instruction is a system call, its system call number
+    //  otherwise, -1
+    int system_call_number;
+    bool local_noreturn;
+
     public:
     std::vector<boost::uint8_t> get_bytes(void) { return this->instBytes; }
     std::string printInst(void) { 
@@ -174,6 +177,24 @@ class Inst {
 
     bool terminator(void) { return this->is_terminator; }
     void set_terminator(void) { this->is_terminator = true; }
+
+    void set_system_call_number(int cn) {
+        this->system_call_number = cn;
+    }
+    int get_system_call_number() {
+        return this->system_call_number;
+    }
+    bool has_system_call_number() {
+        return this->system_call_number != -1;
+    }
+
+    void set_local_noreturn() {
+        this->local_noreturn = true;
+    }
+
+    bool has_local_noreturn() {
+        return this->local_noreturn;
+    }
 
     uint8_t get_reloc_offset() {
         return this->reloc_offset;
@@ -239,11 +260,11 @@ class Inst {
     }
 
     // accessors for JumpTable
-    void set_jump_table(JumpTablePtr p) {
+    void set_jump_table(MCSJumpTablePtr p) {
         this->jump_table = true;
         this->jumpTable = p;
     }
-    JumpTablePtr get_jump_table(void) {
+    MCSJumpTablePtr get_jump_table(void) {
         return this->jumpTable;
     }
     bool has_jump_table(void) {
@@ -299,7 +320,9 @@ class Inst {
         reloc_offset(0),
         jump_table(false),
         jump_index_table(false),
-        ext_data_ref(false)
+        ext_data_ref(false),
+        system_call_number(-1),
+        local_noreturn(false)
        { }
 };
 

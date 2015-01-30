@@ -168,7 +168,7 @@ static Value *doSetgV(InstPtr ip, BasicBlock *&b)
     return res;
 }
 
-// setle: of != sf && ZF==1
+// setle: of != sf || ZF==1
 static Value *doSetleV(InstPtr ip, BasicBlock *&b)
 {
     Value *sf_val = F_READ(b, "SF");
@@ -180,9 +180,9 @@ static Value *doSetleV(InstPtr ip, BasicBlock *&b)
       new ICmpInst(*b, CmpInst::ICMP_NE, sf_val, of_val);
 
     // final result:
-    // (sf!=of) & (zf)
+    // (sf!=of) | (zf)
     Value   *cmp_res = 
-        BinaryOperator::CreateAnd(cmp0_res, zf_val, "", b);
+        BinaryOperator::CreateOr(cmp0_res, zf_val, "", b);
 
 
     //extend result to 8 bits

@@ -27,8 +27,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "InstructionDispatch.h"
-#include "llvm/Value.h"
-#include "llvm/BasicBlock.h"
+#include "llvm/IR/Value.h"
+#include "llvm/IR/BasicBlock.h"
 
 void Bitops_populateDispatchMap(DispatchMap &m);
 llvm::Value *doAndVV32(llvm::BasicBlock *&b, llvm::Value *o1, llvm::Value *o2);

@@ -25,6 +25,7 @@ THE SOFTWARE.
 #ifndef _PARSE_H
 #define _PARSE_H
 #include <string>
+#include <cstdint>
 #include <boost/cstdint.hpp>
 
 #include "nt-headers.h"

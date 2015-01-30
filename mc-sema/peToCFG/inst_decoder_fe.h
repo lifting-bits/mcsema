@@ -30,6 +30,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define _INST_FE_H
 
 #include "LExcn.h"
+#include "llvm/MC/MCContext.h"
+
+#include "X86RegisterInfo.h"
+#include "X86InstrBuilder.h"
+#include "X86MachineFunctionInfo.h"
+#include "X86Subtarget.h"
+#include "X86TargetMachine.h"
 
 class LLVMByteDecoder {
 private:
@@ -61,8 +68,8 @@ public:
     LASSERT( target != NULL, "target != NULL" );
 
     this->STI = target->createMCSubtargetInfo( "i386-unknown-unknown", "", "");
-    this->AsmInfo = target->createMCAsmInfo("i386-unknown-unknown");
     MRI = target->createMCRegInfo("i386-unknown-unknown");
+    this->AsmInfo = target->createMCAsmInfo(*MRI, "i386-unknown-unknown");
 
     LASSERT( this->STI, "this->STI" );
     LASSERT( this->AsmInfo, "this->AsmInfo" );
@@ -77,7 +84,8 @@ public:
                                       *STI);
     LASSERT( this->IP, "this->IP" );
 
-    this->DisAsm = target->createMCDisassembler(*this->STI);
+    llvm::MCContext *Ctx = new llvm::MCContext(AsmInfo, MRI, nullptr);
+    this->DisAsm = target->createMCDisassembler(*this->STI, *Ctx );
 
     LASSERT( this->DisAsm, "this->DisAsm" );
 

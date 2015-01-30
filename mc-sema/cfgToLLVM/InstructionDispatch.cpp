@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "InstructionDispatch.h"
 #include "llvm/MC/MCInst.h"
-#include "llvm/Intrinsics.h"
+#include "llvm/IR/Intrinsics.h"
 #include "x86Instrs_fpu.h"
 #include "x86Instrs_MOV.h"
 #include "x86Instrs_CMOV.h"

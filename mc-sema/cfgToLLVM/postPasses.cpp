@@ -34,13 +34,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "win32cb.h"
 
 #include <llvm/Object/COFF.h>
-#include <llvm/Constants.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/ADT/StringSwitch.h>
-#include "llvm/LLVMContext.h"
-#include "llvm/DataLayout.h"
-#include "llvm/DebugInfo.h"
-#include "llvm/Module.h"
-#include "llvm/PassManager.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/LinkAllPasses.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"

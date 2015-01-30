@@ -32,11 +32,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <vector>
 
 #include "TransExcn.h"
-#include "llvm/BasicBlock.h"
+#include "llvm/IR/BasicBlock.h"
 #include "peToCFG.h"
 #include "toModule.h"
-#include <llvm/Constants.h>
-#include "X86.h"
+#include <llvm/IR/Constants.h>
+//#include "X86.h"
 
 enum InstTransResult {
     ContinueBlock,
@@ -158,16 +158,22 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
         } else if( width < 128) {
             llvm::Value *zeros_128 = CONST_V<128>(b, 0);
             llvm::Value *all_ones = llvm::BinaryOperator::CreateNot(zeros_128, "", b);
+            // shift 128 bits of 1s to the right 
             llvm::Value *shift_right = llvm::BinaryOperator::CreateLShr(
                     all_ones, 
                     CONST_V<128>(b, 128-width), 
                     "", b);
+            // invert the mask, so that only the part we are writing is cleared
             llvm::Value *and_mask = llvm::BinaryOperator::CreateNot(shift_right, "", b);
             llvm::Value *fullReg = R_READ<128>(b, reg);
 
+            // mask the value so the parts of the register we don't write
+            // is preserved
             llvm::Value *remove_bits = llvm::BinaryOperator::CreateAnd(fullReg, and_mask, "", b);
             llvm::Value	*write_z = new llvm::ZExtInst(write, regWidthType, "", b);
+            // or the original value with our new parts
             llvm::Value *final_val = llvm::BinaryOperator::CreateOr(remove_bits, write_z, "", b);
+            // do the write
             llvm::Value *v = new llvm::StoreInst(final_val, localRegVar, b);
         }
     } else if( width <= 32 && regwidth == 32) {

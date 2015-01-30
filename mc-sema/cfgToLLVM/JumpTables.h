@@ -46,14 +46,14 @@ protected:
     virtual std::vector<T>& getTable(void) { return this->m_table; }
 };
 
-class JumpTable : public Table<VA> {
+class MCSJumpTable : public Table<VA> {
 
 public:
-    JumpTable(const std::vector<VA> &table, int entry): 
+    MCSJumpTable(const std::vector<VA> &table, int entry): 
         Table<VA>::Table(table, entry) {};
     virtual const std::vector<VA>& getJumpTable(void) const { return this->getTable(); }
     virtual std::vector<VA>& getJumpTable(void) { return this->getTable(); }
-    virtual ~JumpTable() {};
+    virtual ~MCSJumpTable() {};
 
 };
 
@@ -68,14 +68,14 @@ public:
 };
 
 
-typedef boost::shared_ptr<JumpTable> JumpTablePtr;
+typedef boost::shared_ptr<MCSJumpTable> MCSJumpTablePtr;
 typedef boost::shared_ptr<JumpIndexTable> JumpIndexTablePtr;
 
 
 bool addJumpTableDataSection(NativeModulePtr natMod, 
         llvm::Module *M, 
         VA  &newVA, 
-        const JumpTable& table);
+        const MCSJumpTable& table);
 
 bool addJumpIndexTableDataSection(NativeModulePtr natMod, 
         llvm::Module *M, 

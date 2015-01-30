@@ -14,6 +14,8 @@ else()
   if( SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG )
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility-inlines-hidden")
   endif()
+
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 add_subdirectory(protobuf-cmake)
 
@@ -78,8 +80,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/common)
 set(PROTOBUF_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/protobuf-2.5.0/src)
 
 add_definitions(-D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../llvm-3.2/include)
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/../llvm-3.2/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../llvm-3.5/include)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/../llvm-3.5/include)
 
 add_subdirectory(cfgToLLVM)
 add_subdirectory(peToCFG)

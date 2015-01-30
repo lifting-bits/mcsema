@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Helpers.h"
 #include "Externals.h"
 #include "ArchOps.h"
-#include <llvm/Attributes.h>
+#include <llvm/IR/Attributes.h>
 
 #define NASSERT(cond) TASSERT(cond, "")
 
@@ -537,7 +537,7 @@ void Stack_populateDispatchMap(DispatchMap &m) {
         m[X86::POP32r] = translate_POP32r;
         m[X86::PUSH16r] = translate_PUSH16r;
         m[X86::PUSH32r] = translate_PUSH32r;
-        m[X86::PUSHi8] = translate_PUSHi8;
+        m[X86::PUSH32i8] = translate_PUSHi8;
         m[X86::PUSHi16] = translate_PUSHi16;
         m[X86::PUSHi32] = translate_PUSHi32;
         m[X86::PUSH32rmm] = translate_PUSH32rmm;

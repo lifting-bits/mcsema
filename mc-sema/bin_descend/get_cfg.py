@@ -26,6 +26,10 @@ RECOVERED_EAS = set()
 EMAP = {}
 EMAP_DATA = {}
 
+SPECIAL_REP_HANDLING = [ 
+        [0xC3],
+        ]
+
 TRAPS = [ 
         idaapi.NN_int3,
         idaapi.NN_icebp,
@@ -102,6 +106,11 @@ def fixExternalName(fn):
 
     if not isLinkedElf() and fn[0] == '_':
         return fn[1:]
+
+    if fn.endswith("_0"):
+        newfn = fn[:-2]
+        if newfn in EMAP:
+            return newfn
 
     return fn
 
@@ -206,6 +215,11 @@ def isInternalCode(ea):
     pf = idc.GetFlags(ea)
     return idc.isCode(pf) and not idc.isData(pf)
 
+def isNotCode(ea):
+
+    pf = idc.GetFlags(ea)
+    return not idc.isCode(pf)
+
 def isExternalReference(ea):
     # see if this is in an internal or external code ref
     DEBUG("Testing {0:x} for externality\n".format(ea))
@@ -236,11 +250,25 @@ def addInst(block, addr, inst_bytes, true_target=None, false_target=None):
         addr += 1
         inst_bytes = inst_bytes[1:]
 
+    if insn_t is not None and (insn_t.auxpref & 0x3) == 0x2:
+        DEBUG("REP Prefix at: 0x{0:x}\n".format(addr))
+        # special handling of certain REP pairs
+        rest_bytes = inst_bytes[1:]
+        if rest_bytes in SPECIAL_REP_HANDLING:
+            # generate a separate REP_PREFIX instruction
+            i_rep = block.insts.add()
+            i_rep.inst_addr = addr
+            i_rep.inst_bytes = chr(inst_bytes[0])
+            i_rep.inst_len = 1
+            addr += 1
+            inst_bytes = inst_bytes[1:]
+
     inst = block.insts.add()
     inst.inst_addr = addr
     str_val = "".join([chr(b) for b in inst_bytes])
     inst.inst_bytes = str_val
     inst.inst_len = len(inst_bytes)
+    
     if true_target != None: inst.true_target = true_target
     if false_target != None: inst.false_target = false_target
 
@@ -291,8 +319,10 @@ def handleExternalRef(fn):
         if '@' in fn:
             fn = fn[:fn.find('@')]
 
-    EXTERNALS.add(fn)
-    return fn
+    fixfn = fixExternalName(fn)
+
+    EXTERNALS.add(fixfn)
+    return fixfn
 
 def isInData(start_ea, end_ea):
     for (start,end) in DATA_SEGMENTS:
@@ -387,12 +417,35 @@ def instructionHandler(M, B, inst, new_eas):
         handleJmpTable(I, inst, new_eas)
         return I, False
 
+    crefs_from_here = idautils.CodeRefsFrom(inst, 0)
+
     #check for code refs from here
     crefs = []
-    for cref in idautils.CodeRefsFrom(inst, 0):
-        crefs.append(cref)
+
+    # pull code refs from generator into a list
+    for cref_i in crefs_from_here:
+        crefs.append(cref_i)
+
+    is_call = isCall(inst)
+    isize = idautils.DecodeInstruction(inst).size
+    next_ea = inst+isize
+ 
+    # this is a call $+5, needs special handling
+    if len(crefs) == 0 and is_call and isize == 5:
+        selfCallEA = next_ea
+        DEBUG("INTERNAL CALL $+5: {0:x}\n".format(selfCallEA))
+        sys.stdout.write("LOCAL NORETURN CALL!\n")
+        I.local_noreturn = True
+
+        if selfCallEA not in RECOVERED_EAS:
+            DEBUG("Adding new EA: {0:x}\n".format(selfCallEA))
+            new_eas.add(selfCallEA)
+            I.call_target = selfCallEA
+            return I, True
+    
+    for cref in crefs:
         fn = getFunctionName(cref)
-        if isCall(inst):
+        if is_call:
 
             elfy, fn_replace = isElfThunk(cref) 
             if elfy:
@@ -431,6 +484,11 @@ def instructionHandler(M, B, inst, new_eas):
         I.true_target = crefs[0]
         I.false_target = inst+len(inst_bytes)
         return I, False
+
+    if is_call and isNotCode(next_ea):
+        sys.stdout.write("LOCAL NORETURN CALL!\n")
+        I.local_noreturn = True
+        return I, True
 
     relo_off = findRelocOffset(inst, len(inst_bytes))
     if relo_off != -1:
@@ -531,14 +589,14 @@ def processExternals(M):
 
     for fn in EXTERNALS:
 
-        fn = fixExternalName(fn)
+        fixedn = fixExternalName(fn)
 
-        if nameInMap(EMAP, fn):
-            processExternalFunction(M, fn)
-        elif nameInMap(EMAP_DATA, fn):
-            processExternalData(M, fn)
+        if nameInMap(EMAP, fixedn):
+            processExternalFunction(M, fixedn)
+        elif nameInMap(EMAP_DATA, fixedn):
+            processExternalData(M, fixedn)
         else:
-            sys.stderr.write("UNKNOWN API: {0}\n".format(fn))
+            sys.stderr.write("UNKNOWN API: {0}\n".format(fixedn))
 
 def readBytesSlowly(start, end):
     bytestr = ""
@@ -676,6 +734,10 @@ def processDataSegments(M, new_eas):
             end = idc.SegEnd(ea)
             addDataSegment(M, start, end, new_eas)
 
+def getInstructionSize(ea):
+    insn = idautils.DecodeInstruction(ea)
+    return insn.size
+
 def recoverFunctionFromSet(M, F, blockset, new_eas):
     processed_blocks = set()
 
@@ -691,12 +753,19 @@ def recoverFunctionFromSet(M, F, blockset, new_eas):
         processed_blocks.add(block.startEA)
 
         B = basicBlockHandler(F, block, blockset, processed_blocks)
+        prevHead = block.startEA
+        DEBUG("Starting insn at: {0:x}\n".format(prevHead))
         for head in idautils.Heads(block.startEA, block.endEA):
+            # we ended the function on a call
+
             I, endBlock = instructionHandler(M, B, head, new_eas)
             # sometimes there is junk after a terminator due to off-by-ones in
             # IDAPython. Ignore them.
             if endBlock or isRet(head) or isUnconditionalJump(head) or isTrap(head):
                 break
+            prevHead = head
+
+        DEBUG("Ending insn at: {0:x}\n".format(prevHead))
 
 def recoverFunction(M, F, fnea, new_eas):
     blockset = getFunctionBlocks(fnea)
@@ -1070,8 +1139,8 @@ if __name__ == "__main__":
         default=None,
         help="The output control flow graph recovered from this file")
 
-    parser.add_argument("-s", "--std-defs", nargs='*', type=argparse.FileType('r'),
-        default=None,
+    parser.add_argument("-s", "--std-defs", action='append', type=argparse.FileType('r'),
+        default=[],
         help="std_defs file: definitions and calling conventions of imported functions and data"
         )
     
@@ -1111,7 +1180,7 @@ if __name__ == "__main__":
     EMAP = {}
     EMAP_DATA = {}
 
-    if args.std_defs:
+    if len(args.std_defs) > 0:
         for defsfile in args.std_defs:
             sys.stdout.write("Loading Standard Definitions file: {0}\n".format(defsfile.name))
             em_update, emd_update = parseDefsFile(defsfile)

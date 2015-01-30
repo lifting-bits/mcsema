@@ -33,8 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "toLLVM.h"
 #include "raiseX86.h"
 
-#include <llvm/Constants.h>
-#include <llvm/Instructions.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/Instructions.h>
 #include "../common/to_string.h"
 #include "x86Helpers.h"
 #include "InstructionDispatch.h"
@@ -45,7 +45,7 @@ using namespace llvm;
 extern llvm::PointerType *g_PRegStruct;
 
 // convert a jump table to a data section of symbols
-static DataSection* tableToDataSection(VA new_base, const JumpTable& jt) {
+static DataSection* tableToDataSection(VA new_base, const MCSJumpTable& jt) {
     DataSection *ds = new DataSection();
     
     const vector<VA>& entries = jt.getJumpTable();
@@ -135,9 +135,9 @@ static bool addTableDataSection(NativeModulePtr natMod,
 bool addJumpTableDataSection(NativeModulePtr natMod,
         Module *M,
         VA &newVA,
-        const JumpTable& table)
+        const MCSJumpTable& table)
 {
-    return addTableDataSection<JumpTable>(natMod, M, newVA, table);
+    return addTableDataSection<MCSJumpTable>(natMod, M, newVA, table);
 }
 
 bool addJumpIndexTableDataSection(NativeModulePtr natMod,
@@ -209,7 +209,7 @@ void doJumpTableViaSwitch(
     TASSERT(index.isReg(), "Conformant jump tables need index to be a register");
     TASSERT(scale.isImm() && scale.getImm() == 4, "Conformant jump tables have scale == 4");
 
-    JumpTablePtr jmpptr = ip->get_jump_table();
+    MCSJumpTablePtr jmpptr = ip->get_jump_table();
 
     // to ensure no negative entries
     Value *adjustment = CONST_V<32>(block, jmpptr->getInitialEntry());

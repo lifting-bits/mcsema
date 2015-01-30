@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <vector>
 #include <string>
 #include <list>
+#include <map>
 
 #include "bincomm.h"
 
@@ -61,14 +62,18 @@ public:
   virtual ::uint64_t getExtent(void) const;
   virtual int readByte(::uint64_t, uint8_t *) const;
   virtual bool getEntryPoint(::uint64_t &ep) const;
+  virtual llvm::object::SectionRef fixRelocationSection(const llvm::object::SectionRef &sec);
+
 protected:
   std::vector<secT>              secs;
   std::string                    hash;
+  std::map<llvm::object::SectionRef, llvm::object::SectionRef> wheres_my_relo;
 
   LLVMObjectTarget(const std::string &modname, llvm::object::ObjectFile *of);
 
 private:
     LLVMObjectTarget();
+    void populateReloMap(const llvm::object::SectionRef &sr);
 
 };
 

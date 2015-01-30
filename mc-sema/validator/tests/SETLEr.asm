@@ -1,0 +1,12 @@
+BITS 32
+;TEST_FILE_META_BEGIN
+;TEST_TYPE=TEST_F
+;TEST_IGNOREFLAGS=
+;TEST_FILE_META_END
+    ; SETLE
+    mov ecx, 0x111
+    mov ebx, 0x111
+    cmp ecx, ebx
+    ;TEST_BEGIN_RECORDING
+    setle al
+    ;TEST_END_RECORDING 

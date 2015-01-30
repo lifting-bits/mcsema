@@ -601,8 +601,8 @@ static bool handlePossibleJumpTable(ExecutableContainer *c,
     out << "Added: " << to_string<int>(new_funs, dec) << " functions to jmptable\n";
 
     // associate instruction with jump table
-    JumpTable *jt = new JumpTable(jmptable_entries, original_zero);
-    jmpinst->set_jump_table(JumpTablePtr(jt));
+    MCSJumpTable *jt = new MCSJumpTable(jmptable_entries, original_zero);
+    jmpinst->set_jump_table(MCSJumpTablePtr(jt));
 
     stack<VA> *toPush = NULL;
 
@@ -801,6 +801,8 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                 VA  addr = 0;
                 std::string has_imp;
 
+                out << __FUNCTION__ << ": have reloc at: " << to_string<VA>(addrInInst, hex) << "\n";
+
                 // this instruction has a relocation
                 // save the relocation offset for later
                 I->set_reloc_offset(i);
@@ -968,6 +970,12 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                         } else {
                             out << "Could not relocate addr for local call at: ";
                             out << to_string<VA>(curAddr, hex) << "\n";
+                            out << "Assuming address should not be relocated\n";
+                            VA  local_call_tgt = curAddr+op.getImm()+I->get_len();
+                            out << "Found local call to: " << to_string<VA>(local_call_tgt, hex) << "\n";
+                            I->set_call_tgt(local_call_tgt);
+                            out << "Adding: 0x" << to_string<VA>(local_call_tgt, hex) << " as target because its a non-relocateable internal call\n";
+                            funcs.push(local_call_tgt);
                         }
                     }
                 }
@@ -1057,13 +1065,8 @@ void addDataEntryPoints( ExecutableContainer  *c,
 
     if(!c->get_sections(secs)) throw LErr(__LINE__, __FILE__, "Sections");
 
-    for(vector<ExecutableContainer::SectionDesc>::iterator it = secs.begin(),
-            e = secs.end();
-            it != e;
-            ++it)
+    for(auto s : secs)
     {
-        ExecutableContainer::SectionDesc  s = *it;
-
         if(s.type != ExecutableContainer::DataSection) {
             out << __FUNCTION__ << ": skipping non-data section: " << s.secName << "\n";
             continue;

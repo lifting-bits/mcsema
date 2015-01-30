@@ -27,8 +27,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "InstructionDispatch.h"
-#include "llvm/BasicBlock.h"
-#include "llvm/Value.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Value.h"
 
 
 void ShiftRoll_populateDispatchMap(DispatchMap &m);

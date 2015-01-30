@@ -238,6 +238,6 @@ void deleteBuffer(bounded_buffer *b) {
   return;
 }
 
-uint64_t bufLen(bounded_buffer *b) {
+boost::uint64_t bufLen(bounded_buffer *b) {
   return b->bufLen;
 }

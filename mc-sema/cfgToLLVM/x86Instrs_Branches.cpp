@@ -36,10 +36,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "Externals.h"
 #include "../common/to_string.h"
 #include "JumpTables.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
 
-static InstTransResult doRet(BasicBlock    *b) {
+static InstTransResult doRet(InstPtr ip, BasicBlock    *b) {
     //do a read from the location pointed to by ESP
     Value       *rESP = R_READ<32>(b, X86::ESP);
     Value       *nESP =
@@ -53,6 +54,9 @@ static InstTransResult doRet(BasicBlock    *b) {
 
     ReturnInst::Create(b->getContext(), b);
     
+    //can be useful for debugging
+    //llvm::dbgs() << "Have a ret at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
+
     return EndCFG;
 }
 
@@ -214,7 +218,7 @@ static void doCallM(BasicBlock       *&block,
 }
 
 
-static InstTransResult doCallPC(BasicBlock *&b, VA tgtAddr) {
+static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr) {
 	Module		*M = b->getParent()->getParent();
 	Function	*ourF = b->getParent();
     //insert a call to the call function
@@ -246,6 +250,15 @@ static InstTransResult doCallPC(BasicBlock *&b, VA tgtAddr) {
 
 	CallInst *c = CallInst::Create(F, subArgs, "", b);
 	c->setCallingConv(F->getCallingConv());
+
+    if ( ip->has_local_noreturn() ) {
+        // noreturn functions just hit unreachable
+        std::cout << __FUNCTION__ << ": Adding Unreachable Instruction to local noreturn" << std::endl;
+        c->setDoesNotReturn();
+        c->setTailCall();
+        Value *unreachable = new UnreachableInst(b->getContext(), b);
+        return EndBlock;
+    }
 
 	//spill our context back
 	writeContextToLocals(b, 32);
@@ -295,13 +308,14 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
         Function::ArgumentListType::iterator  end =
                         externFunction->getArgumentList().end();
         AttrBuilder B;
-        B.addAttribute(Attributes::InReg);
+        B.addAttribute(Attribute::InReg);
 
         if(paramCount && it != end) {
             Value *r_ecx = R_READ<32>(b, X86::ECX);
             arguments.push_back(r_ecx);
             --paramCount;
-            it->addAttr(Attributes::get(it->getContext(), B));
+            // set argument 1's attribute: make it in a register
+            it->addAttr(AttributeSet::get(it->getContext(), 1,  B));
             ++it;
         }
 
@@ -309,7 +323,8 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
             Value *r_edx = R_READ<32>(b, X86::EDX);
             arguments.push_back(r_edx);
             --paramCount;
-            it->addAttr(Attributes::get(it->getContext(), B));
+            // set argument 2's attribute: make it in a register
+            it->addAttr(AttributeSet::get(it->getContext(), 2, B));
             ++it;
         }
     }
@@ -389,7 +404,7 @@ static InstTransResult translate_JMP32m(NativeModulePtr natM, BasicBlock *& bloc
         std::string  s = ip->get_ext_call_target()->getSymbolName();
         ret = doCallPCExtern(block, s, true);
         if (ret != EndBlock) {
-            return doRet(block);
+            return doRet(ip, block);
         } else {
             // noreturn api calls don't need to fix stack
             return ret;
@@ -400,7 +415,7 @@ static InstTransResult translate_JMP32m(NativeModulePtr natM, BasicBlock *& bloc
         doJumpTableViaData(natM, block, ip, inst);
         // return a "ret", since the jmp is simulated
         // as a call/ret pair
-        return doRet(block);
+        return doRet(ip, block);
 
     } else if(ip->has_jump_table()) {
         // this is a conformant jump table
@@ -428,11 +443,11 @@ static InstTransResult translate_CALLpcrel32(NativeModulePtr natM, BasicBlock *&
     }
     else if (ip->has_call_tgt() ) {
         int64_t off = (int64_t) ip->get_call_tgt(0);
-        ret = doCallPC(block, off);
+        ret = doCallPC(ip, block, off);
     }
     else {
         int64_t off = (int64_t) OP(0).getImm();
-        ret = doCallPC(block, ip->get_loc()+ip->get_len()+off);
+        ret = doCallPC(ip, block, ip->get_loc()+ip->get_len()+off);
     }
 
     return ret;
@@ -453,7 +468,7 @@ static InstTransResult translate_CALL32m(
         ret = doCallPCExtern(block, s);
     // not external call, but some weird way of calling local function?
     } else if( ip->has_call_tgt() ) {
-        ret = doCallPC(block, ip->get_call_tgt(0));
+        ret = doCallPC(ip, block, ip->get_call_tgt(0));
     }
     // is this referencing global data?
     else if( ip->is_data_offset() ) {
@@ -510,7 +525,7 @@ static InstTransResult translate_JMP32r(NativeModulePtr  natM,
   // translate the JMP32r as a call/ret
   doCallV(block, ip, fromReg);
 
-  return doRet(block);
+  return doRet(ip, block);
 }
 
 #define BLOCKNAMES_TRANSLATION(NAME, THECALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {\
@@ -528,7 +543,7 @@ static InstTransResult translate_JMP32r(NativeModulePtr  natM,
 BLOCKNAMES_TRANSLATION(LOOP, doLoop(block, ifTrue, ifFalse))
 BLOCKNAMES_TRANSLATION(LOOPE, doLoopE(block, ifTrue, ifFalse))
 BLOCKNAMES_TRANSLATION(LOOPNE, doLoopNE(block, ifTrue, ifFalse))
-GENERIC_TRANSLATION(RET, doRet(block))
+GENERIC_TRANSLATION(RET, doRet(ip, block))
 GENERIC_TRANSLATION(RETI, doRetI(block, OP(0)))
 BLOCKNAMES_TRANSLATION(JMP_4, doNonCondBranch(block, ifTrue))
 BLOCKNAMES_TRANSLATION(JMP_1, doNonCondBranch(block, ifTrue))
@@ -544,6 +559,6 @@ void Branches_populateDispatchMap(DispatchMap &m) {
     m[X86::LOOP] = translate_LOOP;
     m[X86::LOOPE] = translate_LOOPE;
     m[X86::LOOPNE] = translate_LOOPNE;
-    m[X86::RET] = translate_RET;
-    m[X86::RETI] = translate_RETI;
+    m[X86::RETL] = translate_RET;
+    m[X86::RETIL] = translate_RETI;
 }

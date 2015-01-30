@@ -31,7 +31,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCInstPrinter.h"
 #include "llvm/MC/MCSubtargetInfo.h"
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -44,9 +43,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/system_error.h"
 #include "llvm/Support/TargetSelect.h"
-#include "llvm/Analysis/Verifier.h"
+#include "llvm/IR/Verifier.h"
 
 #include <peToCFG.h>
 #include <toLLVM.h>
@@ -427,12 +425,19 @@ int main(int argc, char *argv[])
           string                  errorInfo;
           llvm::tool_output_file  Out(OutputFilename.c_str(),
                   errorInfo,
-                  llvm::raw_fd_ostream::F_Binary);
+                  sys::fs::F_None);
 
 		  doPostAnalysis(mod, M);
 
           // will abort if verification fails
-          llvm::verifyModule(*M, AbortProcessAction);
+          if(llvm::verifyModule(*M, &errs())) {
+              cerr << "Could not verify module!\n";
+              return -1;
+          }
+
+          M->addModuleFlag(Module::Error, "Debug Info Version", DEBUG_METADATA_VERSION);
+          M->addModuleFlag(Module::Error, "Dwarf Version", 3);
+
 
           WriteBitcodeToFile(M, Out.os());
           Out.keep(); 

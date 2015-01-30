@@ -2,7 +2,7 @@
 call env.bat
 
 del /q demo_fpu1.obj demo_fpu1_mine.obj demo_fpu1.cfg demo_fpu1.bc demo_fpu1_opt.bc demo_driver_fpu1.exe
-cl /nologo /c demo_fpu1.c
+cl /nologo /arch:IA32 /c demo_fpu1.c
 
 if exist "%IDA_PATH%\idaq.exe" (
     echo Using IDA to recover CFG

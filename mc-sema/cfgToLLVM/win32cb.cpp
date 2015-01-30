@@ -31,22 +31,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <llvm/Pass.h>
 #include <llvm/PassManager.h>
 #include <llvm/ADT/SmallVector.h>
-#include <llvm/Analysis/Verifier.h>
-#include <llvm/Assembly/PrintModulePass.h>
-#include <llvm/BasicBlock.h>
-#include <llvm/CallingConv.h>
-#include <llvm/Constants.h>
-#include <llvm/DerivedTypes.h>
-#include <llvm/Function.h>
-#include <llvm/GlobalVariable.h>
-#include <llvm/InlineAsm.h>
-#include <llvm/Instructions.h>
-#include <llvm/Attributes.h>
-#include <llvm/LLVMContext.h>
-#include <llvm/Module.h>
+#include <llvm/IR/Verifier.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/CallingConv.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/InlineAsm.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <llvm/Support/FormattedStream.h>
 #include <llvm/Support/MathExtras.h>
-#include <llvm/DataLayout.h>
+#include <llvm/IR/DataLayout.h>
 #include <algorithm>
 using namespace llvm;
 
@@ -116,7 +115,7 @@ Value* win32CallVirtualFree(Value *addr_to_free, BasicBlock *b) {
     if (!func_VirtualFree) {
         func_VirtualFree = Function::Create(
                 /*Type=*/vfree_ty,
-                /*Linkage=*/GlobalValue::DLLImportLinkage,
+                /*Linkage=*/GlobalValue::ExternalLinkage,
                 /*Name=*/"VirtualFree", mod); // (external, no body)
         func_VirtualFree->setCallingConv(CallingConv::X86_StdCall);
     }
@@ -336,7 +335,7 @@ Value *win32CallVirtualAlloc(Value *size, BasicBlock *b) {
     if (!func_VirtualAlloc) {
         func_VirtualAlloc = Function::Create(
                 /*Type=*/valloc_ty,
-                /*Linkage=*/GlobalValue::DLLImportLinkage,
+                /*Linkage=*/GlobalValue::ExternalLinkage,
                 /*Name=*/"VirtualAlloc", mod); // (external, no body)
         func_VirtualAlloc->setCallingConv(CallingConv::X86_StdCall);
     }
@@ -720,28 +719,11 @@ Module* addWin32CallbacksToModule(Module *mod) {
   /*Name=*/"FPU_GET_REG", mod); 
  func_FPU_GET_REG->setCallingConv(CallingConv::C);
  }
- AttrListPtr func_FPU_GET_REG_PAL;
- {
-  SmallVector<AttributeWithIndex, 4> Attrs;
-  Attributes PAS;
-   {
-    AttrBuilder B;
-    B.addAttribute(Attributes::StructRet);
-    B.addAttribute(Attributes::NoAlias);
-    PAS = Attributes::get(mod->getContext(), B);
-   }
-  
-  Attrs.push_back(AttributeWithIndex::get(1U, PAS));
-  {
-   AttrBuilder B;
-   B.addAttribute(Attributes::NoUnwind);
-   PAS = Attributes::get(mod->getContext(), B);
-  }
+ AttributeSet func_FPU_GET_REG_PAL;
+ func_FPU_GET_REG_PAL = func_FPU_GET_REG_PAL.addAttribute(mod->getContext(), 1U, Attribute::StructRet);
+ func_FPU_GET_REG_PAL = func_FPU_GET_REG_PAL.addAttribute(mod->getContext(), 1U, Attribute::NoAlias);
+ func_FPU_GET_REG_PAL = func_FPU_GET_REG_PAL.addAttribute(mod->getContext(), ~0U, Attribute::NoUnwind);
  
- Attrs.push_back(AttributeWithIndex::get(~0U, PAS));
- func_FPU_GET_REG_PAL = AttrListPtr::get(mod->getContext(), Attrs);
- 
-}
 func_FPU_GET_REG->setAttributes(func_FPU_GET_REG_PAL);
 
 Function* func__wassert = mod->getFunction("_wassert");
@@ -761,34 +743,16 @@ func_llvm_memcpy_p0i8_p0i8_i32 = Function::Create(
  /*Name=*/"llvm.memcpy.p0i8.p0i8.i32", mod); // (external, no body)
 func_llvm_memcpy_p0i8_p0i8_i32->setCallingConv(CallingConv::C);
 }
-AttrListPtr func_llvm_memcpy_p0i8_p0i8_i32_PAL;
-{
- SmallVector<AttributeWithIndex, 4> Attrs;
- Attributes PAS;
-  {
-   AttrBuilder B;
-   B.addAttribute(Attributes::NoCapture);
-   PAS = Attributes::get(mod->getContext(), B);
-  }
- 
- Attrs.push_back(AttributeWithIndex::get(1U, PAS));
- {
-  AttrBuilder B;
-  B.addAttribute(Attributes::NoCapture);
-  PAS = Attributes::get(mod->getContext(), B);
- }
+AttributeSet func_llvm_memcpy_p0i8_p0i8_i32_PAL;
+func_llvm_memcpy_p0i8_p0i8_i32_PAL = func_llvm_memcpy_p0i8_p0i8_i32_PAL.addAttribute(
+        mod->getContext(), 1U, Attribute::NoCapture);
 
-Attrs.push_back(AttributeWithIndex::get(2U, PAS));
-{
- AttrBuilder B;
- B.addAttribute(Attributes::NoUnwind);
- PAS = Attributes::get(mod->getContext(), B);
-}
+func_llvm_memcpy_p0i8_p0i8_i32_PAL = func_llvm_memcpy_p0i8_p0i8_i32_PAL.addAttribute(
+        mod->getContext(), 2U, Attribute::NoCapture);
 
-Attrs.push_back(AttributeWithIndex::get(~0U, PAS));
-func_llvm_memcpy_p0i8_p0i8_i32_PAL = AttrListPtr::get(mod->getContext(), Attrs);
+func_llvm_memcpy_p0i8_p0i8_i32_PAL = func_llvm_memcpy_p0i8_p0i8_i32_PAL.addAttribute(
+        mod->getContext(), ~0U, Attribute::NoUnwind);
 
-}
 func_llvm_memcpy_p0i8_p0i8_i32->setAttributes(func_llvm_memcpy_p0i8_p0i8_i32_PAL);
 
 Function* func_FPU_SET_REG = mod->getFunction("FPU_SET_REG");
@@ -799,27 +763,10 @@ func_FPU_SET_REG = Function::Create(
  /*Name=*/"FPU_SET_REG", mod); 
 func_FPU_SET_REG->setCallingConv(CallingConv::C);
 }
-AttrListPtr func_FPU_SET_REG_PAL;
-{
- SmallVector<AttributeWithIndex, 4> Attrs;
- Attributes PAS;
-  {
-   AttrBuilder B;
-   B.addAttribute(Attributes::ByVal);
-   PAS = Attributes::get(mod->getContext(), B);
-  }
- 
- Attrs.push_back(AttributeWithIndex::get(3U, PAS));
- {
-  AttrBuilder B;
-  B.addAttribute(Attributes::NoUnwind);
-  PAS = Attributes::get(mod->getContext(), B);
- }
+AttributeSet func_FPU_SET_REG_PAL;
+func_FPU_SET_REG_PAL = func_FPU_SET_REG_PAL.addAttribute(mod->getContext(), 3U, Attribute::ByVal);
+func_FPU_SET_REG_PAL = func_FPU_SET_REG_PAL.addAttribute(mod->getContext(), ~0U, Attribute::NoUnwind);
 
-Attrs.push_back(AttributeWithIndex::get(~0U, PAS));
-func_FPU_SET_REG_PAL = AttrListPtr::get(mod->getContext(), Attrs);
-
-}
 func_FPU_SET_REG->setAttributes(func_FPU_SET_REG_PAL);
 
 Function* func_NATIVEFPU_TO_LD = mod->getFunction("NATIVEFPU_TO_LD");
@@ -830,20 +777,8 @@ func_NATIVEFPU_TO_LD = Function::Create(
  /*Name=*/"NATIVEFPU_TO_LD", mod); 
 func_NATIVEFPU_TO_LD->setCallingConv(CallingConv::C);
 }
-AttrListPtr func_NATIVEFPU_TO_LD_PAL;
-{
- SmallVector<AttributeWithIndex, 4> Attrs;
- Attributes PAS;
-  {
-   AttrBuilder B;
-   B.addAttribute(Attributes::NoUnwind);
-   PAS = Attributes::get(mod->getContext(), B);
-  }
- 
- Attrs.push_back(AttributeWithIndex::get(~0U, PAS));
- func_NATIVEFPU_TO_LD_PAL = AttrListPtr::get(mod->getContext(), Attrs);
- 
-}
+AttributeSet func_NATIVEFPU_TO_LD_PAL;
+func_NATIVEFPU_TO_LD_PAL = func_NATIVEFPU_TO_LD_PAL.addAttribute(mod->getContext(), ~0U, Attribute::NoUnwind);
 func_NATIVEFPU_TO_LD->setAttributes(func_NATIVEFPU_TO_LD_PAL);
 
 Function* func_LD_TO_NATIVEFPU = mod->getFunction("LD_TO_NATIVEFPU");
@@ -854,20 +789,8 @@ func_LD_TO_NATIVEFPU = Function::Create(
  /*Name=*/"LD_TO_NATIVEFPU", mod); 
 func_LD_TO_NATIVEFPU->setCallingConv(CallingConv::C);
 }
-AttrListPtr func_LD_TO_NATIVEFPU_PAL;
-{
- SmallVector<AttributeWithIndex, 4> Attrs;
- Attributes PAS;
-  {
-   AttrBuilder B;
-   B.addAttribute(Attributes::NoUnwind);
-   PAS = Attributes::get(mod->getContext(), B);
-  }
- 
- Attrs.push_back(AttributeWithIndex::get(~0U, PAS));
- func_LD_TO_NATIVEFPU_PAL = AttrListPtr::get(mod->getContext(), Attrs);
- 
-}
+AttributeSet func_LD_TO_NATIVEFPU_PAL;
+func_LD_TO_NATIVEFPU_PAL = func_LD_TO_NATIVEFPU_PAL.addAttribute(mod->getContext(), ~0U, Attribute::NoUnwind);
 func_LD_TO_NATIVEFPU->setAttributes(func_LD_TO_NATIVEFPU_PAL);
 
 Function* func_callback_adapter_prologue_internal = mod->getFunction("callback_adapter_prologue_internal");
@@ -878,20 +801,11 @@ func_callback_adapter_prologue_internal = Function::Create(
  /*Name=*/"callback_adapter_prologue_internal", mod); 
 func_callback_adapter_prologue_internal->setCallingConv(CallingConv::X86_StdCall);
 }
-AttrListPtr func_callback_adapter_prologue_internal_PAL;
-{
- SmallVector<AttributeWithIndex, 4> Attrs;
- Attributes PAS;
-  {
-   AttrBuilder B;
-   B.addAttribute(Attributes::NoUnwind);
-   PAS = Attributes::get(mod->getContext(), B);
-  }
- 
- Attrs.push_back(AttributeWithIndex::get(~0U, PAS));
- func_callback_adapter_prologue_internal_PAL = AttrListPtr::get(mod->getContext(), Attrs);
- 
-}
+AttributeSet func_callback_adapter_prologue_internal_PAL;
+func_callback_adapter_prologue_internal_PAL = func_callback_adapter_prologue_internal_PAL.addAttribute(
+    mod->getContext(),
+    ~0U, 
+    Attribute::NoUnwind);
 func_callback_adapter_prologue_internal->setAttributes(func_callback_adapter_prologue_internal_PAL);
 
 Function* func_callback_adapter_epilogue = mod->getFunction("callback_adapter_epilogue");
@@ -903,20 +817,13 @@ func_callback_adapter_epilogue = Function::Create(
  /*Name=*/"callback_adapter_epilogue", mod); 
 func_callback_adapter_epilogue->setCallingConv(CallingConv::X86_StdCall);
 }
-AttrListPtr func_callback_adapter_epilogue_PAL;
-{
- SmallVector<AttributeWithIndex, 4> Attrs;
- Attributes PAS;
-  {
-   AttrBuilder B;
-   B.addAttribute(Attributes::NoUnwind);
-   PAS = Attributes::get(mod->getContext(), B);
-  }
- 
- Attrs.push_back(AttributeWithIndex::get(~0U, PAS));
- func_callback_adapter_epilogue_PAL = AttrListPtr::get(mod->getContext(), Attrs);
- 
-}
+
+AttributeSet func_callback_adapter_epilogue_PAL;
+func_callback_adapter_epilogue_PAL = func_callback_adapter_epilogue_PAL.addAttribute(
+    mod->getContext(),
+    ~0U, 
+    Attribute::NoUnwind);
+
 func_callback_adapter_epilogue->setAttributes(func_callback_adapter_epilogue_PAL);
 
 
@@ -1158,8 +1065,6 @@ gvar_array__str3->setInitializer(const_array_82);
  CallInst* void_165 = CallInst::Create(func__wassert, void_165_params, "", label_149);
  void_165->setCallingConv(CallingConv::C);
  void_165->setTailCall(false);
- AttrListPtr void_165_PAL;
- void_165->setAttributes(void_165_PAL);
  
  BranchInst::Create(label_150, label_149);
  
@@ -1201,8 +1106,6 @@ gvar_array__str3->setInitializer(const_array_82);
  CallInst* void_179 = CallInst::Create(func_llvm_memcpy_p0i8_p0i8_i32, void_179_params, "", label_150);
  void_179->setCallingConv(CallingConv::C);
  void_179->setTailCall(false);
- AttrListPtr void_179_PAL;
- void_179->setAttributes(void_179_PAL);
  
  ReturnInst::Create(mod->getContext(), label_150);
  
@@ -1263,8 +1166,6 @@ gvar_array__str3->setInitializer(const_array_82);
  CallInst* void_201 = CallInst::Create(func__wassert, void_201_params, "", label_184);
  void_201->setCallingConv(CallingConv::C);
  void_201->setTailCall(false);
- AttrListPtr void_201_PAL;
- void_201->setAttributes(void_201_PAL);
  
  BranchInst::Create(label_185, label_184);
  
@@ -1306,8 +1207,6 @@ gvar_array__str3->setInitializer(const_array_82);
  CallInst* void_215 = CallInst::Create(func_llvm_memcpy_p0i8_p0i8_i32, void_215_params, "", label_185);
  void_215->setCallingConv(CallingConv::C);
  void_215->setTailCall(false);
- AttrListPtr void_215_PAL;
- void_215->setAttributes(void_215_PAL);
  
  ReturnInst::Create(mod->getContext(), label_185);
  
@@ -1334,20 +1233,8 @@ gvar_array__str3->setInitializer(const_array_82);
  CallInst* void_220 = CallInst::Create(ptr_221, void_220_params, "", label_217);
  void_220->setCallingConv(CallingConv::C);
  void_220->setTailCall(false);
- AttrListPtr void_220_PAL;
- {
-  SmallVector<AttributeWithIndex, 4> Attrs;
-  Attributes PAS;
-   {
-    AttrBuilder B;
-    B.addAttribute(Attributes::NoUnwind);
-    PAS = Attributes::get(mod->getContext(), B);
-   }
-  
-  Attrs.push_back(AttributeWithIndex::get(~0U, PAS));
-  void_220_PAL = AttrListPtr::get(mod->getContext(), Attrs);
-  
- }
+ AttributeSet void_220_PAL;
+ void_220_PAL = void_220_PAL.addAttribute(mod->getContext(), ~0U, Attribute::NoUnwind);
  void_220->setAttributes(void_220_PAL);
  
  LoadInst* double_222 = new LoadInst(ptr_ld, "", false, label_217);
@@ -1381,20 +1268,8 @@ gvar_array__str3->setInitializer(const_array_82);
  CallInst* void_230 = CallInst::Create(ptr_231, void_230_params, "", label_225);
  void_230->setCallingConv(CallingConv::C);
  void_230->setTailCall(false);
- AttrListPtr void_230_PAL;
- {
-  SmallVector<AttributeWithIndex, 4> Attrs;
-  Attributes PAS;
-   {
-    AttrBuilder B;
-    B.addAttribute(Attributes::NoUnwind);
-    PAS = Attributes::get(mod->getContext(), B);
-   }
-  
-  Attrs.push_back(AttributeWithIndex::get(~0U, PAS));
-  void_230_PAL = AttrListPtr::get(mod->getContext(), Attrs);
-  
- }
+ AttributeSet void_230_PAL;
+ void_230_PAL = void_230_PAL.addAttribute(mod->getContext(), ~0U, Attribute::NoUnwind);
  void_230->setAttributes(void_230_PAL);
  
  ReturnInst::Create(mod->getContext(), label_225);
@@ -1594,8 +1469,6 @@ gvar_array__str3->setInitializer(const_array_82);
  CallInst* void_308 = CallInst::Create(func_free, ptr_307, "", label_295);
  void_308->setCallingConv(CallingConv::C);
  void_308->setTailCall(false);
- AttrListPtr void_308_PAL;
- void_308->setAttributes(void_308_PAL);
  
  LoadInst* int32_309 = new LoadInst(ptr_EAX, "", false, label_295);
  int32_309->setAlignment(4);

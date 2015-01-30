@@ -1099,24 +1099,6 @@ static InstTransResult doFsin(InstPtr ip, BasicBlock *&b, unsigned reg)
     return ContinueBlock;
 }
 
-static InstTransResult doFxch(MCInst &inst, InstPtr ip, BasicBlock *&b)
-{
-    // Check num operands.
-    // No operands implies ST1
-    unsigned src_reg = X86::ST1;
-    if(inst.getNumOperands() > 0) {
-        src_reg = inst.getOperand(0).getReg();
-    }
-
-    Value *src_val = FPUR_READ(b, src_reg);
-    Value *st0_val = FPUR_READ(b, X86::ST0);
-
-    FPUR_WRITE(b, X86::ST0, src_val);
-    FPUR_WRITE(b, src_reg, st0_val);
-
-    return ContinueBlock;
-}
-
 static InstTransResult doFucom(
         InstPtr ip, 
         BasicBlock *&b, 
@@ -1191,6 +1173,211 @@ static InstTransResult doFstswr(InstPtr ip, BasicBlock *&b)
 
     return ContinueBlock;
 }
+
+static InstTransResult doFxch(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+    // Check num operands.
+    // No operands implies ST1
+    unsigned src_reg = X86::ST1;
+    if(inst.getNumOperands() > 0) {
+        src_reg = inst.getOperand(0).getReg();
+    }
+
+    Value *src_val = FPUR_READ(b, src_reg); 
+    Value *st0_val = FPUR_READ(b, X86::ST0);
+
+    FPUR_WRITE(b, X86::ST0, src_val);
+    FPUR_WRITE(b, src_reg, st0_val);
+
+    return ContinueBlock;
+}
+
+static InstTransResult doF2XM1(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+
+	/*
+     * Computes (2**st0)-1 and stores in ST0
+	 */
+
+	Value *st0_val = FPUR_READ(b, X86::ST0);
+
+	Module *M = b->getParent()->getParent();
+
+	Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
+	Function *exp_func = Intrinsic::getDeclaration(M, Intrinsic::exp2, t);
+	NASSERT(exp_func != nullptr);
+
+	std::vector<Value*> args;
+
+    args.push_back(st0_val);
+
+	Value *exp2_val = CallInst::Create(exp_func, args, "", b);
+
+    Value *one = CONSTFP_V(b, 1.0);
+
+    Value *exp2_m_1 = BinaryOperator::Create(llvm::Instruction::FSub, exp2_val, one, "", b);
+
+	// store return in reg
+	FPUR_WRITE(b, X86::ST0, exp2_m_1);
+
+	return ContinueBlock;
+}
+
+static InstTransResult doFSCALE(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+
+	/*
+     * st0 = st0 * (2 ** RoundToZero(st1))
+	 */
+
+	Module *M = b->getParent()->getParent();
+
+	Value *st0_val = FPUR_READ(b, X86::ST0);
+	Value *st1_val = FPUR_READ(b, X86::ST0);
+
+
+	Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
+
+	Function *exp_func = Intrinsic::getDeclaration(M, Intrinsic::exp2, t);
+	Function *trunc_func = Intrinsic::getDeclaration(M, Intrinsic::trunc, t);
+
+	NASSERT(exp_func != nullptr);
+	NASSERT(trunc_func != nullptr);
+
+    // round st1 to zero
+	std::vector<Value*> args;
+    args.push_back(st1_val);
+	Value *trunc_st1_val = CallInst::Create(trunc_func, args, "", b);
+
+    // calculate 2^st1
+    std::vector<Value*> exp_args;
+    exp_args.push_back(trunc_st1_val);
+	Value *exp2_val = CallInst::Create(exp_func, exp_args, "", b);
+
+    // st0 * 2*st1
+    Value *scaled_val = BinaryOperator::Create(
+            llvm::Instruction::FMul, st0_val, exp2_val, "", b);
+     
+	// store return in reg
+	FPUR_WRITE(b, X86::ST0, scaled_val);
+
+	return ContinueBlock;
+}
+
+
+template<bool p>
+static InstTransResult doFYL2Xx(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+
+	/*
+	 * Computes (ST(1) ∗ log2(ST(0))), stores the result in ST(1), and pops the x87 register stack. The value
+	 * in ST(0) must be greater than zero.
+	 * If the zero-divide-exception mask (ZM) bit in the x87 control word is set to 1 and ST(0) contains ±zero, the instruction returns ∞ with the opposite sign of the value in register ST(1).
+	 */
+
+	Value *st0_val = FPUR_READ(b, X86::ST0);
+	Value *st1_val = FPUR_READ(b, X86::ST1);
+
+	Module *M = b->getParent()->getParent();
+	Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
+	Function *flog2_func = Intrinsic::getDeclaration(M, Intrinsic::log2, t);
+
+	NASSERT(flog2_func != NULL);
+
+	std::vector<Value*> args;
+
+	if (p) // FYLX2P1 case
+	{
+		llvm::Constant *one = llvm::ConstantFP::get(llvm::Type::getX86_FP80Ty(b->getContext()), 1.0);
+
+		Value *st0_plus_one = BinaryOperator::Create(llvm::Instruction::FAdd, st0_val, one, "", b);
+		args.push_back(st0_plus_one);
+	} else {
+		args.push_back(st0_val);
+	}
+
+	Value *flog2_val = CallInst::Create(flog2_func, args, "", b);
+
+	Value *result = BinaryOperator::Create(llvm::Instruction::FMul, flog2_val, st1_val, "", b);
+
+	// store return in reg
+	FPUR_WRITE(b, X86::ST1, result);
+
+	FPU_POP(b);
+
+	return ContinueBlock;
+}
+
+static InstTransResult doFRNDINT(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+    Module *M = b->getParent()->getParent();
+
+    Value *regVal = FPUR_READ(b, X86::ST0);
+	Type *fpTy = llvm::Type::getX86_FP80Ty(b->getContext());
+    
+    // get our intrinsics
+    /// nearest
+	Function *round_nearest = Intrinsic::getDeclaration(M, Intrinsic::nearbyint, fpTy);
+    NASSERT(round_nearest != NULL);
+    // round will round away from zero
+	Function *round_down = Intrinsic::getDeclaration(M, Intrinsic::round, fpTy);
+    NASSERT(round_down != NULL);
+    // round will round away from zero
+	Function *round_up = Intrinsic::getDeclaration(M, Intrinsic::round, fpTy);
+    NASSERT(round_up != NULL);
+    // truncate
+	Function *round_zero = Intrinsic::getDeclaration(M, Intrinsic::trunc, fpTy);
+    NASSERT(round_zero != NULL);
+
+    CREATE_BLOCK(nearest, b);
+    CREATE_BLOCK(down, b);
+    CREATE_BLOCK(up, b);
+    CREATE_BLOCK(zero, b);
+    CREATE_BLOCK(finished, b);
+
+    // switch on Rounding control
+    Value *rc = F_READ(b, "FPU_RC");
+    SwitchInst *rcSwitch = SwitchInst::Create(rc, block_nearest, 4, b);
+    rcSwitch->addCase(CONST_V<2>(b, 0), block_nearest);
+    rcSwitch->addCase(CONST_V<2>(b, 1), block_down);
+    rcSwitch->addCase(CONST_V<2>(b, 2), block_up);
+    rcSwitch->addCase(CONST_V<2>(b, 3), block_zero);
+
+    std::vector<Value*> args;
+    args.push_back(regVal);
+
+	Value *nearest_val = CallInst::Create(round_nearest, args, "", block_nearest);
+    BranchInst::Create(block_finished, block_nearest);
+
+	Value *down_val = CallInst::Create(round_down, args, "", block_down);
+    BranchInst::Create(block_finished, block_down);
+
+	Value *up_val = CallInst::Create(round_up, args, "", block_up);
+    BranchInst::Create(block_finished, block_up);
+
+	Value *zero_val = CallInst::Create(round_zero, args, "", block_zero);
+    BranchInst::Create(block_finished, block_zero);
+
+    // adjust to whichever branch we did
+    PHINode *roundedVal =
+        PHINode::Create(Type::getX86_FP80Ty(block_finished->getContext()),
+                        4,
+                        "fpu_round",
+                        block_finished);
+
+    roundedVal->addIncoming(nearest_val, block_nearest);
+    roundedVal->addIncoming(down_val, block_down);
+    roundedVal->addIncoming(up_val, block_up);
+    roundedVal->addIncoming(zero_val, block_zero);
+
+    b = block_finished;
+
+    // write it back
+    FPUR_WRITE(b, X86::ST0, roundedVal);
+
+    return ContinueBlock;
+}
+
 
 #define FPU_TRANSLATION(NAME, SETPTR, SETDATA, SETFOPCODE, ACCESSMEM, THECALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst)\
 {\
@@ -1386,6 +1573,11 @@ FPU_TRANSLATION(IST_FP64m, true, true, true, true,
 FPU_TRANSLATION(XCH_F, true, false, true, false,
         doFxch(inst, ip, block))
 
+FPU_TRANSLATION(FYL2X, true, false, true, false,
+        doFYL2Xx<false>(inst, ip, block))
+FPU_TRANSLATION(FYL2XP1, true, false, true, false,
+        doFYL2Xx<true>(inst, ip, block))
+
 FPU_TRANSLATION(UCOM_FPPr, true, false, true, false,
         doFucom(ip, block, X86::ST1, 2))
 FPU_TRANSLATION(UCOM_FPr, true, false, true, false,
@@ -1397,6 +1589,15 @@ FPU_TRANSLATION(FNSTSW16r, false, false, true, false,
         doFstswr(ip, block))
 FPU_TRANSLATION(FNSTSWm, false, false, true, true,
         doFstswm(ip, block, mem_src))
+
+FPU_TRANSLATION(FRNDINT, true, false, true, false,
+        doFRNDINT(inst, ip, block))
+
+FPU_TRANSLATION(F2XM1, true, false, true, false,
+        doF2XM1(inst, ip, block))
+
+FPU_TRANSLATION(FSCALE, true, false, true, false,
+        doFSCALE(inst, ip, block))
 
 static InstTransResult translate_WAIT(NativeModulePtr natM, BasicBlock *&block,
     InstPtr ip, MCInst &inst)
@@ -1482,6 +1683,9 @@ void FPU_populateDispatchMap(DispatchMap &m)
 
     m[X86::XCH_F] = translate_XCH_F;
 
+	m[X86::FYL2X] = translate_FYL2X;
+	m[X86::FYL2XP1] = translate_FYL2XP1;
+
     m[X86::UCOM_FPPr] = translate_UCOM_FPPr;
     m[X86::UCOM_FPr] = translate_UCOM_FPr;
     m[X86::UCOM_Fr] = translate_UCOM_Fr;
@@ -1489,5 +1693,8 @@ void FPU_populateDispatchMap(DispatchMap &m)
     m[X86::FNSTSW16r] = translate_FNSTSW16r;
     m[X86::FNSTSWm] = translate_FNSTSWm;
 
-
+    m[X86::FRNDINT] = translate_FRNDINT;
+    m[X86::F2XM1] = translate_F2XM1;
+    m[X86::FSCALE] = translate_FSCALE;
 }
+

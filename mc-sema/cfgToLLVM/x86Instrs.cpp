@@ -36,7 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Instrs_fpu.h"
 #include "x86Instrs_MOV.h"
 #include "InstructionDispatch.h"
-#include "llvm/DataLayout.h"
+#include "llvm/IR/DataLayout.h"
 #include "x86Instrs_flagops.h"
 #include "../common/to_string.h"
 
@@ -143,7 +143,9 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits)
             Value   *st = new StoreInst(loadedVal, GEP, B); \
             TASSERT(st != NULL, "" ); \
         }
-#define STORE_F(nm) { \
+#define STORE_F(nm) STORE_SAMEWIDTH(nm)
+/*
+{ \
             Value   *localVal = lookupLocalByName(F, nm+"_val"); \
             if( localVal == NULL ) \
               throw TErr(__LINE__, __FILE__, "Could not find val"+nm); \
@@ -154,10 +156,13 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits)
             Instruction *GEP = GetElementPtrInst::CreateInBounds(arg, \
                 GEPV, nm, B); \
             Value   *loadedVal = F_READ(B, nm); \
-            Value   *extendedVal = new ZExtInst(loadedVal, Type::getInt32Ty(B->getContext()), "", B); \
-            Value   *st = new StoreInst(extendedVal, GEP, B); \
+            Value   *st = new StoreInst(loadedVal, GEP, B); \
             TASSERT(st != NULL, "" ); \
         }
+// Value   *extendedVal = new ZExtInst(loadedVal, Type::getInt32Ty(B->getContext()), "", B); \
+    //Value   *st = new StoreInst(extendedVal, GEP, B); \
+*/
+
             STORE_F(string("CF"));
             STORE_F(string("PF"));
             STORE_F(string("AF"));
@@ -438,7 +443,7 @@ static void preprocessInstruction(
     if(ip->has_jump_table() && !isConformantJumpInst(ip)) {
 
         VA tbl_va;
-        JumpTablePtr jmptbl = ip->get_jump_table();
+        MCSJumpTablePtr jmptbl = ip->get_jump_table();
 
         bool ok = addJumpTableDataSection(
                 natM,

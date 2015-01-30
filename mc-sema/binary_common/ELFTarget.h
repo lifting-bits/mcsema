@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <string>
 #include "LLVMObjectTarget.h"
-#include "llvm/Object/ELF.h"
+#include "llvm/Object/ELFObjectFile.h"
 
 
 class ElfTarget : public LLVMObjectTarget {
@@ -49,8 +49,8 @@ private:
     ElfTarget();
 
 protected:
-  llvm::object::ELFObjectFile<llvm::support::little, false> *elf_obj;
-  ElfTarget(const std::string &modname, llvm::object::ELFObjectFile<llvm::support::little, false> *of): LLVMObjectTarget(modname, of), elf_obj(of)
+  llvm::object::ELF32LEObjectFile *elf_obj;
+  ElfTarget(const std::string &modname, llvm::object::ELF32LEObjectFile *of): LLVMObjectTarget(modname, of), elf_obj(of)
     {
     };
 

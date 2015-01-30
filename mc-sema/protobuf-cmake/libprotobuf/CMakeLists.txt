@@ -38,10 +38,10 @@ set(SOURCES
   ${PROTOBUF_ROOT}/src/google/protobuf/wire_format_lite.cc
 )
 
-if( CMAKE_COMPILER_IS_GNUCXX  )
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 list(APPEND SOURCES
   ${PROTOBUF_ROOT}/src/google/protobuf/stubs/atomicops_internals_x86_gcc.cc)
-endif( CMAKE_COMPILER_IS_GNUCXX  )
+endif( CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang" )
 
 if( MSVC ) 
 list(APPEND SOURCES

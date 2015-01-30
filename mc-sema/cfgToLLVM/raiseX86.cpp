@@ -34,22 +34,27 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ArchOps.h"
 
 #include <llvm/Object/COFF.h>
-#include <llvm/Constants.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/ADT/StringSwitch.h>
-#include "llvm/LLVMContext.h"
-#include "llvm/DataLayout.h"
-#include "llvm/DebugInfo.h"
-#include "llvm/Module.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/DIBuilder.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/LinkAllPasses.h"
 
+
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Metadata.h"
 #include "postPasses.h"
 #include <boost/graph/breadth_first_search.hpp>
 #include "Externals.h"
 #include "../common/to_string.h"
+#include "../common/Defaults.h"
 
 #include <vector>
-#include <llvm/InlineAsm.h>
+#include <llvm/IR/InlineAsm.h>
 
 using namespace llvm;
 using namespace std;
@@ -591,32 +596,6 @@ BasicBlock *bbFromStrName(string n, Function *F) {
     return found;
 }
 
-static void addAnnotation( BasicBlock  *block,
-                    InstPtr     ip,
-                    Function    *F,
-                    MCInstPrinter   *IP)
-{
-    string              outS;
-    raw_string_ostream  strOut(outS);
-    MCInst              inst = ip->get_inst();
-
-    IP->printInst(&inst, strOut, "");
-    //create the string name of the annotation
-    string  tmp = strOut.str();
-
-    replace(tmp.begin(), tmp.end(), '\x09', ' ');
-    string annotVal =   "inst_0x" + 
-                        to_string<VA>(ip->get_loc(), hex) + 
-                        " " + tmp;
-
-
-    //create an assignment to a constant
-    BinaryOperator::Create( Instruction::Add,
-                    CONST_V<32>(block, 0),
-                    CONST_V<32>(block, 0),
-                    annotVal,
-                    block); 
-}
 
 InstTransResult disInstr(   InstPtr             ip, 
                             BasicBlock          *&block, 
@@ -625,12 +604,16 @@ InstTransResult disInstr(   InstPtr             ip,
                             NativeFunctionPtr   natF,
                             NativeModulePtr     natM) 
 {
+
+    size_t bsize_pre = block->size();
+
     //add a string representation of this instruction to the CFG
     //this string representation should be removed by optimizations
-    addAnnotation(block, ip, F, nb->get_printer());
-
+    
     //in the future, we could have different target decoders here
-    return disInstrX86(ip, block, nb, F, natF, natM);
+    InstTransResult disInst_result = disInstrX86(ip, block, nb, F, natF, natM);
+
+    return disInst_result; 
 }
 
 template <typename Vertex, typename Graph>
@@ -712,6 +695,7 @@ static bool insertFunctionIntoModule(NativeModulePtr mod, NativeFunctionPtr func
         cout << "\tReturning current function instead" << std::endl;
         return true;
     }
+
     
     //create the entry block for the function
     //this block will alloca cells on the 'stack' for every register in the 
@@ -893,7 +877,7 @@ bool addEntryPointDriver(Module *M,
     Function::ArgumentListType::iterator  fwd_end = 
       driverF->getArgumentList().end();
     AttrBuilder B;
-    B.addAttribute(Attributes::InReg);
+    B.addAttribute(Attribute::InReg);
 
     if (cconv == ExternalCodeRef::FastCall) 
     {
@@ -908,7 +892,7 @@ bool addEntryPointDriver(Module *M,
             };
 
             // make driver take this from register
-            fwd_it->addAttr(Attributes::get(fwd_it->getContext(), B));
+            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
 
             Value *ecxP = 
                 GetElementPtrInst::CreateInBounds(aCtx, ecxFieldGEPV, "", driverBB);
@@ -926,7 +910,7 @@ bool addEntryPointDriver(Module *M,
             };
 
             // make driver take this from register
-            fwd_it->addAttr(Attributes::get(fwd_it->getContext(), B));
+            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 2, B));
 
             Value *edxP = 
                 GetElementPtrInst::CreateInBounds(aCtx, edxFieldGEPV, "", driverBB);
@@ -1030,7 +1014,7 @@ bool addEntryPointDriver(Module *M,
     Value *dflagP = 
       GetElementPtrInst::CreateInBounds(aCtx, dflagGEPV, "", driverBB);
 
-    new StoreInst(CONST_V<32>(driverBB, 0), dflagP, driverBB);
+    new StoreInst(CONST_V<1>(driverBB, 0), dflagP, driverBB);
 
 
     Value *j = new StoreInst(stackPosInt, spValP, driverBB);
@@ -1109,7 +1093,7 @@ static GlobalVariable* getSectionForDataAddr(
         if(data_addr >= start && data_addr < end) {
             std::string gvar_name = "data_0x" + to_string<VA>(start, hex);//+"_ptr";
             section_base = start;
-            return M->getNamedGlobal(gvar_name); 
+     
         }
         
     }
@@ -1346,7 +1330,14 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
 
         GlobalValue *gv = dyn_cast<GlobalValue>(M->getOrInsertGlobal(symname, extType));
         TASSERT(gv != NULL, "Could not make global value!");
-        gv->setLinkage(GlobalValue::DLLImportLinkage);
+        gv->setLinkage(GlobalValue::AvailableExternallyLinkage);
+
+        const std::string &triple = M->getTargetTriple();
+
+        if(triple == WINDOWS_TRIPLE) {
+            // this only makes sense for win32
+            gv->setDLLStorageClass(GlobalValue::DLLImportStorageClass);
+        }
     }
 
     //iterate over the list of external functions and insert them as 

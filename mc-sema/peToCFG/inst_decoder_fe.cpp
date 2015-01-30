@@ -53,7 +53,7 @@ InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
   Inst::Prefix    pfx = Inst::NoPrefix;
   if(s == llvm::MCDisassembler::Success) {
 
-    if( mcInst.getOpcode() == llvm::X86::MOVSD && mcInst.hasPrefix(0xF3) ) {
+    if( mcInst.getOpcode() == llvm::X86::MOVSL && mcInst.hasPrefix(0xF3) ) {
         mcInst.setOpcode(llvm::X86::REP_MOVSD_32);
     } else if( mcInst.hasPrefix(0xF2) ) {
         pfx = Inst::RepNePrefix;
@@ -93,8 +93,8 @@ InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
         break;
         //throw LErr(__LINE__, __FILE__, "Branch through register not okay yet");
         //break;
-      case X86::RET:
-      case X86::RETI:
+      case X86::RETL:
+      case X86::RETIL:
       case X86::RETIW: 
         inst->set_terminator();
         break;

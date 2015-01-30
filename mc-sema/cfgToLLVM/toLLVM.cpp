@@ -28,12 +28,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "toLLVM.h"
 #include "raiseX86.h"
-#include "X86.h"
 #include "InstructionDispatch.h"
 #include "ArchOps.h"
-#include <llvm/InlineAsm.h>
-#include <llvm/BasicBlock.h>
-#include <llvm/InstrTypes.h>
+#include <llvm/IR/InlineAsm.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/InstrTypes.h>
 #include <cstdio>
 
 using namespace llvm;
@@ -77,13 +76,13 @@ void doGlobalInit(Module *M) {
                                                                 // 32 bytes
 
     //flags
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // CF // 8
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // PF // 9
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // AF // 10
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // ZF // 11
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // SF // 12
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // OF // 13
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // DF // 14
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // CF // 8
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // PF // 9
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // AF // 10
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // ZF // 11
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // SF // 12
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // OF // 13
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // DF // 14
                                                                    // 28 bytes
 
     // FPU
@@ -91,45 +90,45 @@ void doGlobalInit(Module *M) {
     regFields.push_back(fpu_regs);                                 // 80 bytes // 15
     
     // FPU Status Word
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // FPU BUSY // 16
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Condition Code C3 // 17
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // TOP OF STACK // 18
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Condition Code C2 // 19
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Condition Code C1 // 20
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Condition Code C0 // 21
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Error Summary Status // 22
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Stack Fault // 23
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Precision Flag // 24 
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Underflow Flag // 25
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Overflow Flag // 26
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // ZeroDivide Flag // 27
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Denormalized Operand Flag // 28
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Invalid Operation Flag // 29
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU BUSY // 16
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C3 // 17
+    regFields.push_back(IntegerType::get(M->getContext(), 3)); // TOP OF STACK // 18
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C2 // 19
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C1 // 20
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C0 // 21
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Error Summary Status // 22
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Stack Fault // 23
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Precision Flag // 24 
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Underflow Flag // 25
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Overflow Flag // 26
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // ZeroDivide Flag // 27
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Denormalized Operand Flag // 28
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Invalid Operation Flag // 29
                                                                    // 56 bytes
 
     // 80 + 56 + 28 + 32 = 196 bytes
 
     
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // FPU Infinity Flag // 30
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // FPU Rounding Control // 31
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // FPU Precision Control // 32
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // FPU Precision Mask // 33
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // FPU Underflow Mask // 34
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // FPU Overflow Mask // 35
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // FPU Zero Divide Mask // 36
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // FPU Denormal Operand Mask // 37
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // FPU Invalid Operation Mask // 38
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Infinity Flag // 30
+    regFields.push_back(IntegerType::get(M->getContext(), 2)); // FPU Rounding Control // 31
+    regFields.push_back(IntegerType::get(M->getContext(), 2)); // FPU Precision Control // 32
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Precision Mask // 33
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Underflow Mask // 34
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Overflow Mask // 35
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Zero Divide Mask // 36
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Denormal Operand Mask // 37
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Invalid Operation Mask // 38
 
     // FPU tag word; 8 element array of 2-bit entries
     ArrayType  *fpu_tag_word = ArrayType::get(Type::getIntNTy(M->getContext(), 8), 8);
     regFields.push_back(fpu_tag_word);                                 // 80 bytes // 39
 
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Last Instruction Ptr Segment 40
+    regFields.push_back(IntegerType::getInt16Ty(M->getContext())); // Last Instruction Ptr Segment 40
     regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Last Instruction Ptr Offset 41
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Last Data Ptr Segment 42
+    regFields.push_back(IntegerType::getInt16Ty(M->getContext())); // Last Data Ptr Segment 42
     regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Last Data Ptr Offset 43
     
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // FPU FOPCODE 44
+    regFields.push_back(IntegerType::get(M->getContext(), 11)); // FPU FOPCODE 44
 
     // vector registers
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM0 45

@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "X86.h"
 #include "x86Instrs.h"
 #include "x86Helpers.h"
-#include "llvm/BasicBlock.h"
+#include "llvm/IR/BasicBlock.h"
 #include "x86Instrs_ShiftRoll.h"
 #include "x86Instrs_bitops.h"
 

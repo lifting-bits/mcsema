@@ -40,21 +40,21 @@ using namespace boost;
 
 ElfTarget* ElfTarget::CreateElfTarget(string f, const Target *T) 
 {
-    OwningPtr<MemoryBuffer>	buff;
-    llvm::error_code			ec = MemoryBuffer::getFile(f, buff);
-    LASSERT(!ec, ec.message());
+    auto err_or_buff = MemoryBuffer::getFile(f);
+    std::error_code ec = err_or_buff.getError();
+    LASSERT(!ec, "Can't get memory buffer");
 
     std::string mn = filesystem::path(f).stem().string();
 
     return new ElfTarget(
             mn, 
-            new llvm::object::ELFObjectFile<support::little, false> (buff.take(), ec)
+            new llvm::object::ELF32LEObjectFile (std::move(err_or_buff.get()), ec)
             );
 }
 
 bool ElfTarget::getEntryPoint(::uint64_t &ep) const
 {
-    llvm::error_code ec;
+    std::error_code ec;
     ec = this->elf_obj->getEntryPoint(ep);
     return ec == object::object_error::success && ep != 0;
 }
@@ -62,10 +62,10 @@ bool ElfTarget::getEntryPoint(::uint64_t &ep) const
 
 static bool find_import_for_addr(object::SectionRef section, uint32_t offt, uint32_t target, std::string &import_name) {
 
-    llvm::object::relocation_iterator rit = section.begin_relocations();
-    llvm::error_code ec;
+    llvm::object::relocation_iterator rit = section.relocation_begin();
+    std::error_code ec;
 
-    while( rit != section.end_relocations() ) {
+    while( rit != section.relocation_end() ) {
         llvm::object::SymbolRef       symref;
         VA                            addr = 0;
 
@@ -77,8 +77,7 @@ static bool find_import_for_addr(object::SectionRef section, uint32_t offt, uint
         if( target == (addr+offt) ) {
 
             llvm::object::SymbolRef       symref;
-            ec = rit->getSymbol(symref);
-            LASSERT(!ec, "Can't get Symbol for relocation ref");
+            symref = *rit->getSymbol();
 
             llvm::StringRef strr;
             ec = symref.getName(strr);
@@ -112,10 +111,7 @@ static bool find_import_for_addr(object::SectionRef section, uint32_t offt, uint
             }
         }
 
-        rit.increment(ec);
-        if( ec ) {
-            break;
-        }
+        ++rit;
     }
 
 
@@ -136,6 +132,7 @@ bool ElfTarget::find_import_name(uint32_t addrToFind, std::string &import_name)
 
     uint32_t final_target = addrToFind;
 
+    section = this->fixRelocationSection(section);
 
     if(find_import_for_addr(section, offt, final_target, import_name)) {
         return true;
@@ -176,7 +173,7 @@ bool ElfTarget::is_in_code(VA addr) const {
         return false;
     }
 
-    llvm::error_code e;
+    std::error_code e;
     bool is_text_ref;
     e = section.isText(is_text_ref);
 
@@ -196,7 +193,7 @@ bool ElfTarget::is_in_data(VA addr) const {
         return false;
     }
 
-    llvm::error_code e;
+    std::error_code e;
     bool is_data, is_bss;
     e = section.isData(is_data);
     LASSERT(!e, e.message());

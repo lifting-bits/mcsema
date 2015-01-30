@@ -37,8 +37,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 
-static InstTransResult doNoop(BasicBlock *b) {
+static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
   //isn't this exciting
+  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
+  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
+  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
   return ContinueBlock;
 }
 
@@ -542,7 +545,7 @@ static InstTransResult doBsrr(
 
 GENERIC_TRANSLATION(CDQ, doCdq(block))
 GENERIC_TRANSLATION(INT3, doInt3(block))
-GENERIC_TRANSLATION(NOOP, doNoop(block))
+GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
 GENERIC_TRANSLATION(HLT, doHlt(block))
 
 GENERIC_TRANSLATION(BSWAP32r, doBswapR<32>(ip, block, OP(0)))
@@ -590,8 +593,11 @@ void Misc_populateDispatchMap(DispatchMap &m) {
     m[X86::CDQ] = translate_CDQ;
     m[X86::INT3] = translate_INT3;
     m[X86::NOOP] = translate_NOOP;
+    m[X86::NOOPW] = translate_NOOP;
+    m[X86::NOOPL] = translate_NOOP;
     m[X86::HLT] = translate_HLT;
     m[X86::LOCK_PREFIX] = translate_NOOP;
+    m[X86::REP_PREFIX] = translate_NOOP;
     m[X86::PAUSE] = translate_NOOP;
     m[X86::RDTSC] = translate_RDTSC;
     m[X86::CWD] = translate_CWD;

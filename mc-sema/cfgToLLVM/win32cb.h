@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef WIN32CB_H
 #define WIN32CB_H
 
-#include <llvm/Module.h>
+#include <llvm/IR/Module.h>
 
 llvm::Module* addWin32CallbacksToModule(llvm::Module *mod);
 llvm::Value* win32CallVirtualAlloc(llvm::Value *size, llvm::BasicBlock *b);

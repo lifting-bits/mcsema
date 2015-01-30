@@ -40,12 +40,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 
-string ExternalFunctionMap::mangleELFSymbol(string inSym, CallingConvention &conv, int &rNumParams)
+string ExternalFunctionMap::mangleELFSymbol(string inSym, CallingConvention &conv, int &rNumParams) 
 {
     return inSym;
 }
 
-string ExternalFunctionMap::manglePESymbol(string inSym, CallingConvention &conv, int &rNumParams)
+string ExternalFunctionMap::manglePESymbol(string inSym, CallingConvention &conv, int &rNumParams) 
 {
     string outSym = inSym;
 
@@ -53,14 +53,14 @@ string ExternalFunctionMap::manglePESymbol(string inSym, CallingConvention &conv
     if( outSym.substr(0, strlen("__imp__")) == "__imp__" )
     {
         outSym = outSym.substr(strlen("__imp__"));
-    }
+    } 
     /* OR this */
     if( outSym.substr(0, strlen("__imp_")) == "__imp_" )
     {
         outSym = outSym.substr(strlen("__imp_"));
-    }
+    } 
 
-    /* maybe we can learn something about this symbol as is */
+    /* maybe we can learn something about this symbol as is */ 
     else if( outSym.substr(0, strlen("_")) == "_")
     {
         outSym = outSym.substr(strlen("_"));
@@ -68,7 +68,7 @@ string ExternalFunctionMap::manglePESymbol(string inSym, CallingConvention &conv
         if (outSym.substr(1, strlen("_")) != "_" ) {
             conv = CalleeCleanup;
         }
-    }
+    } 
     else if (outSym.substr(0, strlen("@")) == "@")
     {
         outSym = outSym.substr(strlen("@"));
@@ -112,9 +112,9 @@ string ExternalFunctionMap::sym_sym(string inSym)
       // already done!
       return outSym;
   }
+ 
 
-
-  bool is_coff_pe = this->triple.find("win32") != string::npos ||
+  bool is_coff_pe = this->triple.find("win32") != string::npos || 
                  this->triple.find("mingw32") != string::npos;
 
   CallingConvention conv =  CallerCleanup;
@@ -174,7 +174,7 @@ void ExternalFunctionMap::parseMap(string fileName)
     boost::tokenizer<boost::char_separator<char> >  toks(line, sep);
     vector<string>  vtok;
     BOOST_FOREACH(const string &t, toks) { vtok.push_back(t); }
-
+    
     if(vtok.size() >= 3 && vtok[0][0] != '#')
     {
       string            funcName;
@@ -206,10 +206,10 @@ void ExternalFunctionMap::parseMap(string fileName)
       {
         /* split around the ':' character */
         int atPos = funcName.find(':');
-
+        
         LASSERT(atPos >= 0, "Malformed line in file");
 
-        realName = funcName.substr(atPos+1, funcName.size());
+        realName = funcName.substr(atPos+1, funcName.size()); 
 
         // ensure dll name is capitalized for correct matching
         // as DLLs are case insensitive on windows
@@ -218,7 +218,7 @@ void ExternalFunctionMap::parseMap(string fileName)
       }
 
       /* read argument count */
-      istringstream(vtok[1]) >> argCount;
+      istringstream(vtok[1]) >> argCount;  
       if(argCount < 0) {
           throw LErr(__LINE__, __FILE__, "Could not parse arg count from: " + vtok[1]);
       }
@@ -227,11 +227,11 @@ void ExternalFunctionMap::parseMap(string fileName)
       char  k = vtok[2][0];
       switch(k) {
         case 'C':
-          conv = CallerCleanup; // cdecl
+          conv = CallerCleanup;
           break;
 
         case 'E':
-          conv = CalleeCleanup; // stdcall
+          conv = CalleeCleanup;
           break;
 
         case 'F':
@@ -294,7 +294,7 @@ ExternalFunctionMap::get_calling_convention(string funcName, CallingConvention &
 
 bool
 ExternalFunctionMap::get_noreturn(string funcName, bool &r)
-{
+{  
   map<string,ValueElement>::iterator  it = this->external_map.find(funcName);
 
   if(it != this->external_map.end() && !it->second.is_data) {
@@ -307,7 +307,7 @@ ExternalFunctionMap::get_noreturn(string funcName, bool &r)
 
 bool
 ExternalFunctionMap::get_num_stack_params(string  funcName, int &r)
-{
+{  
   map<string,ValueElement>::iterator  it = this->external_map.find(funcName);
 
   if(it != this->external_map.end() && !it->second.is_data) {

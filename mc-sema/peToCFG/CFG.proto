@@ -21,6 +21,8 @@ message Instruction {
     optional    JumpTbl           jump_table = 10;
     optional    JumpIndexTbl      jump_index_table = 11;
     optional    string            ext_data_name = 12;
+    optional    int32             system_call_number = 13;
+    optional    bool              local_noreturn = 14;
 }
 
 message Block {

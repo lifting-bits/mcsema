@@ -163,15 +163,17 @@ static InstTransResult doCmpxchgRM(InstPtr ip,    BasicBlock      *&b,
             acc, 
             srcReg_v, 
             llvm::SequentiallyConsistent,
+            llvm::SequentiallyConsistent,
             llvm::CrossThread, 
             b);
     cmpx->setVolatile(true);
 
-    // needed for flags settings
-    doCmpVV<width>(ip, b, acc, cmpx);
+    Value *cmpx_val = ExtractValueInst::Create(cmpx, 0, "cmpxchg_cmpx_val", b);
+    Value *was_eq = ExtractValueInst::Create(cmpx, 1, "cmpxchg_was_eq", b);
 
-    Value   *Cmp = new ICmpInst(*b, CmpInst::ICMP_EQ, cmpx, acc);
-    BranchInst::Create(AccEQDest, AccNEDest, Cmp, b);
+    doCmpVV<width>(ip, b, acc, cmpx_val);
+
+    BranchInst::Create(AccEQDest, AccNEDest, was_eq, b);
 
     // Acc == Dst
     F_SET(AccEQDest, "ZF");
@@ -182,13 +184,13 @@ static InstTransResult doCmpxchgRM(InstPtr ip,    BasicBlock      *&b,
     F_CLEAR(AccNEDest, "ZF");
     switch(width) {
         case 8:
-            R_WRITE<width>(AccNEDest, X86::AL, cmpx);
+            R_WRITE<width>(AccNEDest, X86::AL, cmpx_val);
             break;
         case 16:
-            R_WRITE<width>(AccNEDest, X86::AX, cmpx);
+            R_WRITE<width>(AccNEDest, X86::AX, cmpx_val);
             break;
         case 32:
-            R_WRITE<width>(AccNEDest, X86::EAX, cmpx);
+            R_WRITE<width>(AccNEDest, X86::EAX, cmpx_val);
             break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");

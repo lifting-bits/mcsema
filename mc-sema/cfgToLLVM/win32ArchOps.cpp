@@ -5,13 +5,13 @@
 #include "win32cb.h"
 #include "win32ArchOps.h"
 
-#include "llvm/Module.h"
-#include "llvm/BasicBlock.h"
-#include "llvm/Type.h"
-#include "llvm/Constants.h"
-#include "llvm/DerivedTypes.h"
-#include "llvm/Instructions.h"
-#include "llvm/InlineAsm.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/InlineAsm.h"
 
 #include "TransExcn.h"
 #include "raiseX86.h"
@@ -112,7 +112,6 @@ static Function *win32MakeCallbackInternal(Module *M, VA local_target) {
     TASSERT( F != NULL, "" );
     F->setLinkage(GlobalValue::InternalLinkage);
     F->setCallingConv(CallingConv::C);
-    //F->addFnAttr(Attributes::Naked);
 
     // get reference to function arguments
     Function::arg_iterator args = F->arg_begin();
@@ -199,6 +198,8 @@ static Function *win32MakeCallbackInternal(Module *M, VA local_target) {
     // return value = eax
     llvm::ReturnInst::Create(F->getContext(), eax_val, driver_block);
 
+    return F;
+
 }
 
 static Function *win32MakeCallbackStub(Module *M, VA local_target) {
@@ -220,7 +221,7 @@ static Function *win32MakeCallbackStub(Module *M, VA local_target) {
     Function *F = dynamic_cast<Function*>(M->getOrInsertFunction(fname, callbackTy));
     TASSERT( F != NULL, "Cannot create callback stub" );
     F->setLinkage(GlobalValue::InternalLinkage);
-    F->addFnAttr(Attributes::Naked);
+    F->addFnAttr(Attribute::Naked);
 
     // add code to driver
     BasicBlock *driver_block = BasicBlock::Create(
@@ -434,7 +435,7 @@ void win32AddCallValue(Module *mod) {
                 /*Linkage=*/GlobalValue::InternalLinkage,
                 /*Name=*/"do_call_value", mod); 
         func_do_call_value->setCallingConv(CallingConv::C);
-        func_do_call_value->addFnAttr(Attributes::AlwaysInline);
+        func_do_call_value->addFnAttr(Attribute::AlwaysInline);
     }
 
     // Function Definitions

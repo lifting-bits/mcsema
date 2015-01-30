@@ -46,8 +46,11 @@ def do_entry_symbol(arg):
     return return_args
 
 def do_func_map(arg):
-    return_args = ['--std-defs']
-    return_args.extend(decommafy(arg))
+    return_args = []
+
+    for entry in decommafy(arg):
+        return_args.extend(['--std-defs', entry])
+
     return return_args
 
 

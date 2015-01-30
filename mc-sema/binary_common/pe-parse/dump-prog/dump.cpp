@@ -96,8 +96,8 @@ int printSecs(void                  *N,
               bounded_buffer        *data) 
 {
   cout << "Sec Name: " << secName << endl;
-  cout << "Sec Base: " << to_string<uint64_t>(secBase, hex) << endl;
-  cout << "Sec Size: " << to_string<uint64_t>(data->bufLen, dec) << endl;
+  cout << "Sec Base: " << to_string<VA>(secBase, hex) << endl;
+  cout << "Sec Size: " << to_string<VA>(data->bufLen, dec) << endl;
   return 0;
 }
 
