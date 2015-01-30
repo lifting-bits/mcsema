@@ -4,6 +4,10 @@ compiler:
 - gcc
 - clang
 
+# for packaging
+install:
+- gem install fpm
+
 before_script:
 
 # repos
@@ -14,7 +18,8 @@ before_script:
 - sudo apt-get -qq update
 
 # cmake-2.8.8+ is required
-- sudo apt-get install -qq cmake nasm g++-4.8-multilib
+# rpm and ruby-dev are for packaging scripts
+- sudo apt-get install -qq cmake nasm g++-4.8-multilib rpm ruby-dev
 
 # gcc-4.8
 - if [ "$CXX" = "g++" ]; then sudo apt-get install -qq g++-4.8; fi
@@ -27,7 +32,7 @@ before_script:
 - if [ "$CXX" = "clang++" ]; then sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.5 90; fi
 - if [ "$CXX" = "clang++" ]; then sudo rm /usr/local/clang-3.4/bin/clang++; fi
 
-script: mkdir build && cd build && cmake .. && make -j2
+script: mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j2
 
 before_deploy: cd .. && bash package.sh
 
@@ -36,7 +41,7 @@ deploy:
 - provider: releases
   api_key:
     secure: ZNUTHn1z0wIHjjzueFfEvjWUjO+z26DjsoffUz+hm+Qfc0Iyu2VtgX8nH1KhYT5t4+7PrNVbvOVFJQzl3wbJdrrDURFG43Rm9paIUTjdXhFcxfEk1J1kS7zDd5wHtt0sCsRezNDeBlTvpMCJ41e5/YSU0bJR58gv7X9NLKEJ5xo=
-  file: deb-build/mcsema-*.deb
+  file: mcsema-*.deb
   skip_cleanup: true
   on:
     repo: trailofbits/mcsema
@@ -52,7 +57,7 @@ deploy:
   bucket: mcsema-builds
   skip_cleanup: true
   detect_encoding: true
-  local-dir: deb-build
+  local-dir: package
   on:
     all_branches: true
     condition: "$CC = gcc"

@@ -1,7 +1,0 @@
-Package: mcsema
-Section: devel
-Priority: optional
-Architecture: amd64
-Maintainer: Artem Dinaburg <artem@trailofbits.com>
-Description: An x86 to LLVM translator
- MC-Semantics (or mcsema) is an x86 to LLVM binary translator. 
