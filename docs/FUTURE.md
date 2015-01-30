@@ -3,6 +3,7 @@
 The following items are on the agenda for future development of `mc-sema`.
 
 ## Additional Instruction Translation
+
 This is both the easiest and most obvious enhancement. The easiest to accomplish would be completing the integer instructions and floating point instructions.
 
 ## Specify Instruction Semantics directly in C

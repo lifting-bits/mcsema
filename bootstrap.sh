@@ -10,7 +10,7 @@ else
 fi
 
 echo "[x] Installing dependencies via apt-get"
-sudo apt-get install gcc-multilib build-essential cmake
+sudo apt-get install gcc-multilib build-essential cmake nasm
 
 if [ `getconf LONG_BIT` = "64" ]
 then
