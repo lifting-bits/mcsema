@@ -25,7 +25,7 @@ do
 done
 
 echo "Building .deb file..."
-fpm -s dir -t deb --name mcsema --version ${VERSION} --maintainer "<mcsema@trailofbits.com>" --url "https://github.com/trailofbits/mcsema --vendor "Trail of Bits --prefix "/usr/local/bin" -C ./package .
+fpm -s dir -t deb --name mcsema --version ${VERSION} --maintainer "<mcsema@trailofbits.com>" --url "https://github.com/trailofbits/mcsema" --vendor "Trail of Bits" --prefix "/usr/local/bin" -C ./package .
 
 echo "Building .rpm file..."
-fpm -s dir -t rpm --name mcsema --version ${VERSION} --maintainer "<mcsema@trailofbits.com>" --url "https://github.com/trailofbits/mcsema --vendor "Trail of Bits --prefix "/usr/local/bin" -C ./package .
+fpm -s dir -t rpm --name mcsema --version ${VERSION} --maintainer "<mcsema@trailofbits.com>" --url "https://github.com/trailofbits/mcsema" --vendor "Trail of Bits" --prefix "/usr/local/bin" -C ./package .
