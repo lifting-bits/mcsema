@@ -81,7 +81,7 @@ To verify functionality, try running the demos (in `mc-sema/tests`). For example
 
 # Building on Windows
 
-Due to integration with LLVM 3.5, mcsema now requires C++11. Please build with Visual Studio 2012 or later.
+mcsema now requires C++11 due to integration with LLVM 3.5. Please build with Visual Studio 2012 or later.
 
 ## Prerequisites
 General Packages:
@@ -100,7 +100,7 @@ Build Environment:
 
 If using Visual Studio Express 2013 the Desktop Edition is **ABSOLUTELY REQUIRED**. The build will fail without it.
 
-Do **not** install Intel PIN. It wont link correctly. Semantics tests will not be available, but everything else will work.
+Do **not** install Intel PIN. It won't link correctly. Semantics tests will not be available, but everything else will work.
 
 ## Get The Source
 

@@ -47,7 +47,7 @@ deploy:
     repo: trailofbits/mcsema
     tags: true
     all_branches: true
-    condition: "$CC = gcc"
+    condition: "$CXX = g++"
     
 - provider: s3
   access_key_id:
@@ -60,7 +60,7 @@ deploy:
   local-dir: package
   on:
     all_branches: true
-    condition: "$CC = gcc"
+    condition: "$CXX = g++"
     
 notifications:
   slack:
