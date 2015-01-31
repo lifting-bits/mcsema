@@ -38,7 +38,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <cassert>
 #include <limits>
 #include <cstring>
-#include <cstdint>
+#if !defined(__APPLE__)
+	#include <cstdint>
+#endif
 
 using namespace std;
 
@@ -289,6 +291,17 @@ string dumpRegisterState(const CONTEXT *ctx) {
 	    }
 
 	    res += "ST"+decstr(i)+":"+ss.str() + "\n";
+    }
+    
+    for(unsigned i = 0;
+        i < ARRAYSIZE(fpu_regs.XMM);
+    i++) {
+        stringstream ss;
+        for(unsigned j = 0; j < sizeof(fpu_regs.XMM[0]); j++) {
+        ss << std::setw(2) << std::setfill('0') << std::hex << (unsigned)fpu_regs.XMM[i].pad[j] << " ";
+        }
+
+        res += "XMM"+decstr(i)+":"+ss.str() + "\n";
     }
 
     //dump EFLAGS seperately

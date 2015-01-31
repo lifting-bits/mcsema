@@ -7,8 +7,15 @@ execute_process(
 	WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
 	)
 else(WIN32)
-execute_process(
-	COMMAND make -f makefile
-	WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-	)
+	if(APPLE)
+		execute_process(
+			COMMAND make -f Makefile.osx
+			WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+			)
+	else(APPLE)
+		execute_process(
+			COMMAND make -f Makefile.linux
+			WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+			)
+	endif(APPLE)
 endif(WIN32)

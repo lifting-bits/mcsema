@@ -7,3 +7,5 @@ add_custom_target(pin_validate ALL
 	WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
 	COMMENT Building PIN tool for Win32...
 	)
+
+add_dependencies(pin_validate Pin)

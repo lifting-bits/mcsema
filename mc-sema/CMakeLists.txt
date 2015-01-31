@@ -85,13 +85,40 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/../llvm-3.5/include)
 
 add_subdirectory(cfgToLLVM)
 add_subdirectory(peToCFG)
-
-find_package(Pin)
-if(PIN_FOUND)
-    add_subdirectory(validator)
-endif(PIN_FOUND)
-
 add_subdirectory(bitcode_from_cfg)
 add_subdirectory(binary_common)
 add_subdirectory(bin_descend)
 
+
+find_package(Pin)
+if(NOT PIN_FOUND AND NOT WIN32)
+
+	if(UNIX)
+		set(PIN_DOWNLOAD_URL http://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-67254-gcc.4.4.7-linux.tar.gz)
+		set(PIN_DOWNLOAD_HASH 4499cfed383f362a0c74560a3ee66a5f117bea95f40067224ddf3c2606c77006)
+	endif(UNIX)
+
+	if(APPLE)
+		set(PIN_DOWNLOAD_URL http://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-67254-clang.5.1-mac.tar.gz)
+		set(PIN_DOWNLOAD_HASH b715d995bac010fd04c5c33c8efdcd6e2e42db8568a42071cd9a90d9a989e337)
+	endif(APPLE)
+
+	ExternalProject_add(Pin
+		URL ${PIN_DOWNLOAD_URL}
+		URL_HASH SHA256=${PIN_DOWNLOAD_HASH}
+		CONFIGURE_COMMAND ""
+		BUILD_COMMAND ""
+		SOURCE_DIR pin
+		INSTALL_COMMAND ""
+	)
+
+	set(PIN_PATH ${CMAKE_CURRENT_BINARY_DIR}/pin)
+	set(PIN_EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pin/pin)
+
+	add_subdirectory(validator)
+	
+endif(NOT PIN_FOUND AND NOT WIN32)
+
+if(WIN32 AND PIN_FOUND)
+	add_subdirectory(validator)
+endif(WIN32 AND PIN_FOUND)

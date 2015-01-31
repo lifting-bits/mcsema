@@ -1,5 +1,4 @@
 find_package(Nasm REQUIRED)
-
 include_directories(${LLVM_MAIN_SRC_DIR}/utils/unittest/googletest/include 
                     ${CMAKE_CURRENT_SOURCE_DIR}/../../peToCFG 
                     ${CMAKE_CURRENT_SOURCE_DIR}/../../cfgToLLVM 
@@ -33,8 +32,15 @@ IF(UNIX)
     target_link_libraries(testSemantics ${DL_LIB})
 endif(UNIX)
 
-add_dependencies(testSemantics peToCFG bitreader asmparser bitwriter instrumentation scalaropts ipo pin_validator gtest)
+add_dependencies(testSemantics peToCFG bitreader asmparser bitwriter instrumentation scalaropts ipo pin_validator gtest tests.out)
 
 IF(APPLE)
     SET_TARGET_PROPERTIES(testSemantics PROPERTIES LINK_FLAGS "-pagezero_size 1000")
 endif(APPLE)
+
+if(UNIX)
+add_custom_target(run_testSemantics ALL
+	COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/../valTest && ../testSemantics/testSemantics || echo # this echo shouldn't be here. It lets the build continue
+	DEPENDS testSemantics testSemantics.auto.cpp
+	)
+endif(UNIX)

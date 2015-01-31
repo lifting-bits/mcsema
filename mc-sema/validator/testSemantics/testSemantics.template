@@ -746,7 +746,7 @@ Function *ModuleTest::getFunctionForBuffer(string nm, uint8_t *b, size_t l) {
                          curBlock, 
                          testFn, 
                          testF, 
-                         NativeModulePtr()); 
+                         NativeModulePtr());
 
             if (t == TranslateError || t == TranslateErrorUnsupported) {
                 broken = true;
