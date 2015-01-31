@@ -17,3 +17,4 @@ Jan 30 2015:
 --------------
 
   - Upgrade from LLVM 3.2 to LLVM 3.5
+  - Many new instructions
