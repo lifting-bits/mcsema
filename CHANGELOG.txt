@@ -1,0 +1,20 @@
+=========
+ChangeLog
+=========
+
+  This is the list of all noteworthy changes made in every public release of
+  the tool. See README for the general instruction manual.
+
+----------------
+Staying informed
+----------------
+
+Want to stay in the loop on major new features? Join our mailing list by
+sending a mail to <mcsema-dev+subscribe@googlegroups.com>.
+
+--------------
+Jan 30 2015:
+--------------
+
+  - Upgrade from LLVM 3.2 to LLVM 3.5
+  - Many new instructions

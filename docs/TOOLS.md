@@ -233,7 +233,7 @@ By default the `tests.out` file is in `<mc-sema code>\build\mc-sema\validator\va
 
 ### Examples
 
-This is the output of testSemantics as of July 2014. Not all instructuction tests complete successfully; the floating point tests are there for when the instructions are implemented in the translator.
+This is the output of testSemantics as of July 2014. Not all instruction tests complete successfully; the floating point tests are there for when the instructions are implemented in the translator.
 
     C:\git\llvm-lift\build\mc-sema\validator\valTest\Debug>..\..\testSemantics\Debug\testSemantics.exe
 
