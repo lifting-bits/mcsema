@@ -4,9 +4,9 @@ compiler:
 - gcc
 - clang
 
-# for packaging
-install:
-- gem install fpm
+# for packaging only
+#install:
+#- gem install fpm
 
 before_script:
 
@@ -18,8 +18,9 @@ before_script:
 - sudo apt-get -qq update
 
 # cmake-2.8.8+ is required
-# rpm and ruby-dev are for packaging scripts
-- sudo apt-get install -qq cmake nasm g++-4.8-multilib rpm ruby-dev
+- sudo apt-get install -qq cmake nasm g++-4.8-multilib
+# for packaging only
+# - sudo apt-get install rpm ruby-dev
 
 # gcc-4.8
 - if [ "$CXX" = "g++" ]; then sudo apt-get install -qq g++-4.8; fi
@@ -34,34 +35,6 @@ before_script:
 
 script: mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j2
 
-before_deploy: cd .. && bash package.sh
-
-deploy:
-
-- provider: releases
-  api_key:
-    secure: ZNUTHn1z0wIHjjzueFfEvjWUjO+z26DjsoffUz+hm+Qfc0Iyu2VtgX8nH1KhYT5t4+7PrNVbvOVFJQzl3wbJdrrDURFG43Rm9paIUTjdXhFcxfEk1J1kS7zDd5wHtt0sCsRezNDeBlTvpMCJ41e5/YSU0bJR58gv7X9NLKEJ5xo=
-  file: mcsema-*.deb
-  skip_cleanup: true
-  on:
-    repo: trailofbits/mcsema
-    tags: true
-    all_branches: true
-    condition: "$CXX = g++"
-    
-- provider: s3
-  access_key_id:
-    secure: CTq0vTUIQHMQm+mjpBcOmD+2/NXmPM2zXUu3SHTbwmlFmI4OXX3Cv/Nic1MAlzr4GddXrBZTD40kXadzQqj2qHK9aWiLtW3+vayx6VwmR0dV9D2a9M1IDbVgUmeSenSXHRY3QT9IEm/+QOeak8H0POwHtjSTYhA/ZK3Xk5YcPos=
-  secret_access_key:
-    secure: QVc0RERI7NSqFwG12KopbJ+Jg9j4dIVVd3nddRsomh2uV8AIK0ZIIg44K+7MQxXnFLNw1kdaKrlnl9y/IaYPlwv0EZ/esQ9hFRFj2xrhdbdfvQ0XEVK0jJMvsLAuoEmkwMCPonkwAYo1qvpC9tGZNT5Pyt3nQ8NUjSQygPi0cBI=
-  bucket: mcsema-builds
-  skip_cleanup: true
-  detect_encoding: true
-  local-dir: package
-  on:
-    all_branches: true
-    condition: "$CXX = g++"
-    
 notifications:
   slack:
     secure: gg6IfwUAM+3Ih2aoxq9EfOdR4RAc9or4O2b01L4HNX4Qq4erud6VIeanwS696qR9/v7jQXqqEOwhGa2FnUBPAK7DDSwSqYOhEFclRKfea4zEGnAsZu1yFDVE17KjQNgBUpDHC+n3TCfYC4MSzSs9T6zQhwi0mNCuAtnHjjktR+4=
