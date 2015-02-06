@@ -4,10 +4,6 @@ compiler:
 - gcc
 - clang
 
-# for packaging only
-#install:
-#- gem install fpm
-
 before_script:
 
 # repos
@@ -19,8 +15,6 @@ before_script:
 
 # cmake-2.8.8+ is required
 - sudo apt-get install -qq cmake nasm g++-4.8-multilib
-# for packaging only
-# - sudo apt-get install rpm ruby-dev
 
 # gcc-4.8
 - if [ "$CXX" = "g++" ]; then sudo apt-get install -qq g++-4.8; fi
@@ -50,4 +44,4 @@ addons:
     notification_email: dan@trailofbits.com
     build_command_prepend: "mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .."
     build_command: "make -j2"
-    branch_pattern: master
+    branch_pattern: coverity_scan

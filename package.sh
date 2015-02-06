@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# gem install fpm
+# sudo apt-get install rpm ruby-dev
+
 echo "This script packages mcsema into deb and rpm packages"
 
 echo "Cleaning old directory"
