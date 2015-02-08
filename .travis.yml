@@ -32,16 +32,3 @@ script: mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -
 notifications:
   slack:
     secure: gg6IfwUAM+3Ih2aoxq9EfOdR4RAc9or4O2b01L4HNX4Qq4erud6VIeanwS696qR9/v7jQXqqEOwhGa2FnUBPAK7DDSwSqYOhEFclRKfea4zEGnAsZu1yFDVE17KjQNgBUpDHC+n3TCfYC4MSzSs9T6zQhwi0mNCuAtnHjjktR+4=
-
-env:
-  global:
-  - secure: "EqeaUi97HPVQJtbUsaJwCp3nzcRnMlt+CDcXygNBNz1CFIHxte+CqLhTKi270PVCBmp0s5oomx2/TUY1aIIXkcBdbXT28xkTRJ83wjcd5lkwCHPo8KP+azhL5DqHDAw6RbpWoXRi1HL1+K0acCf9ZIUfs2mQmyKdW8L/GgJZHgg="
-addons:
-  coverity_scan:
-    project:
-      name: "trailofbits/mcsema"
-      description: "x86 to machine code translation framework"
-    notification_email: dan@trailofbits.com
-    build_command_prepend: "mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .."
-    build_command: "make -j2"
-    branch_pattern: coverity_scan
