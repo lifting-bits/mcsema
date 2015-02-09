@@ -69,14 +69,14 @@ add_custom_target(tests.out ALL
 		-t "${CMAKE_CURRENT_SOURCE_DIR}/../valTool/obj-ia32/val.dll" -- "${VALTEST_EXECUTABLE}"
 	WORKING_DIRECTORY "${VALTEST_PATH}"
 	COMMENT Running PIN to generate ground truth for semantics tests
-	DEPENDS valTest
+	DEPENDS valTest pin_validate
 	)
 else(WIN32)
 add_custom_target(tests.out ALL
 	${PIN_EXECUTABLE} "-injection" "child" -t "${CMAKE_CURRENT_SOURCE_DIR}/../valTool/val.so" -- "${VALTEST_EXECUTABLE}"
 	WORKING_DIRECTORY "${VALTEST_PATH}"
 	COMMENT Running PIN to generate ground truth for semantics tests
-	DEPENDS valTest
+	DEPENDS valTest pin_validate
 	)
 endif(WIN32)
 

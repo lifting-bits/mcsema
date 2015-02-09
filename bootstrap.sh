@@ -10,11 +10,11 @@ else
 fi
 
 echo "[x] Installing dependencies via apt-get"
-sudo apt-get install gcc-multilib build-essential cmake nasm
+sudo apt-get install -y gcc-multilib build-essential cmake nasm g++-multilib
 
 if [ `getconf LONG_BIT` = "64" ]
 then
-    sudo apt-get install libc6-i386
+    sudo apt-get install -y libc6-i386 libstdc++6:i386 lib32stdc++6
 fi
 echo "[x] Creating build directory"
 
