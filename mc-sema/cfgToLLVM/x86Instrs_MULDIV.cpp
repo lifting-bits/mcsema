@@ -232,9 +232,11 @@ static InstTransResult doIMulM(InstPtr ip,     BasicBlock      *&b,
         case 16:
             R_WRITE<width>(b, X86::DX, wrDX);
             R_WRITE<width>(b, X86::AX, wrAX);
+            break;
         case 32:
             R_WRITE<width>(b, X86::EDX, wrDX);
             R_WRITE<width>(b, X86::EAX, wrAX);
+            break;
         default:
             throw new TErr(__LINE__, __FILE__, "Not supported width");
     }
