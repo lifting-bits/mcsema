@@ -218,7 +218,7 @@ class Inst {
     void set_is_call_external(void) { this->is_call_external = true; }
 
     llvm::MCInst get_inst(void) { return this->NativeInst; }
-	void set_inst(llvm::MCInst i) { this->NativeInst = i; }
+	void set_inst(const llvm::MCInst &i) { this->NativeInst = i; }
 	void set_inst_rep(std::string s) { this->instRep = s; }
 
     VA get_loc(void) { return this->loc; }
@@ -301,7 +301,7 @@ class Inst {
 
     Inst( VA      v, 
           uint8_t l, 
-          llvm::MCInst inst, 
+          const llvm::MCInst &inst, 
           std::string instR, 
           Prefix k,
           std::vector<boost::uint8_t> bytes) : 
@@ -322,7 +322,8 @@ class Inst {
         jump_index_table(false),
         ext_data_ref(false),
         system_call_number(-1),
-        local_noreturn(false)
+        local_noreturn(false),
+        data_offset(0)
        { }
 };
 
@@ -363,7 +364,7 @@ typedef boost::shared_ptr<NativeBlock> NativeBlockPtr;
 
 class NativeFunction {
     public:
-    NativeFunction(VA b) : funcEntryVA(b),nextBlockID(0) { }
+    NativeFunction(VA b) : funcEntryVA(b), nextBlockID(0), graph(nullptr) { }
     void add_block(NativeBlockPtr );
     VA get_start(void) { return this->funcEntryVA; }
     boost::uint64_t num_blocks(void) { return this->IDtoBlock.size(); }
@@ -503,9 +504,13 @@ class NativeModule {
             ExternalCodeRef::CallingConvention cconv;
             
         public:
-            EntrySymbol(const std::string &name, 
-                        VA  addr): name(name), addr(addr), has_extra(false) {}
-            EntrySymbol(VA addr) : addr(addr), has_extra(false)
+            EntrySymbol(const std::string &name, VA  addr): 
+                name(name), addr(addr), has_extra(false), 
+                argc(0), does_return(false), cconv(ExternalCodeRef::CallerCleanup)  {}
+
+            EntrySymbol(VA addr) : addr(addr), has_extra(false),
+                                   argc(0), does_return(false), 
+                                   cconv(ExternalCodeRef::CallerCleanup)
                 {
                     this->name = "sub_"+to_string<VA>(this->addr, std::hex);
                 }
@@ -563,9 +568,6 @@ class NativeModule {
     CFG                             callGraph;
     FuncID                          nextID;
     std::string                     nameStr;
-    const llvm::Target              *MyTarget;
-    const llvm::MCAsmInfo           *MyAsmInfo;
-    const llvm::MCSubtargetInfo     *MySubtargetInfo;
     llvm::MCInstPrinter             *MyPrinter;
 
     std::list<DataSection>          dataSecs;

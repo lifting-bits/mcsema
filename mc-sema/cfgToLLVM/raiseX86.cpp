@@ -245,12 +245,10 @@ string mapPlatRegToStr(unsigned reg) {
          case X86::XMM7:
             return "XMM7";
             break;
- 
         default:
             throw TErr(__LINE__, __FILE__, "Reg type "+to_string<unsigned>(reg, dec)+" is unknown");
+            return "";
     }
-
-    return "";
 }
 
 int mapStrToFloatOff(std::string regName)

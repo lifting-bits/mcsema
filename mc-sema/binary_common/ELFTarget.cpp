@@ -106,6 +106,7 @@ static bool find_import_for_addr(object::SectionRef section, uint32_t offt, uint
                     } else {
                         llvm::dbgs() << "Skipping symbol due to address\n";
                     }
+                    break;
                 default:
                     llvm::dbgs() << "Skipping symbol since its probably not an import!" << "\n";
             }

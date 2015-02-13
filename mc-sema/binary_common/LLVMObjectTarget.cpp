@@ -67,7 +67,7 @@ void LLVMObjectTarget::populateReloMap(const llvm::object::SectionRef &sr) {
     // end populate relocation section map
 }
 
-LLVMObjectTarget::LLVMObjectTarget(const std::string &modname, llvm::object::ObjectFile *of) : mod_name(modname)
+LLVMObjectTarget::LLVMObjectTarget(const std::string &modname, llvm::object::ObjectFile *of) : mod_name(modname), baseAddr(0), extent(0)
 {
     //build up a list of section objects and their 
     //adjusted base addresses
@@ -389,7 +389,7 @@ bool isAddrRelocated(const object::SectionRef &sr, uint32_t offt, VA address) {
 
 
         bool t1 = (t == llvm::object::SymbolRef::ST_Data);
-        bool t2 = 0 != (flag | llvm::object::SymbolRef::SF_Global);
+        bool t2 = (0 != (flag | llvm::object::SymbolRef::SF_Global));
 
         if( (t1 && t2) || 
             (t == llvm::object::SymbolRef::ST_Other) ||
