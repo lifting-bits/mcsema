@@ -95,6 +95,11 @@ def DEBUG(s):
     if _DEBUG:
         sys.stdout.write(s)
 
+def readDword(ea):
+    bytestr = readBytesSlowly(ea, ea+4);
+    dword = struct.unpack("<L", bytestr)[0]
+    return dword
+
 def isLinkedElf():
     return idc.GetLongPrm(INF_FILETYPE) == idc.FT_ELF and \
         idc.BeginEA() !=0xffffffffL 
@@ -366,14 +371,22 @@ def handleJmpTable(I, inst, new_eas):
     DEBUG("\tJMPTable Start: {0:x}\n".format(jstart))
     I.jump_table.zero_offset = 0
     i = 0
-    je = idc.GetFixupTgtOff(jstart+i*jsize)
-    while je != -1:
+    entries = si.ncases
+    for i in xrange(entries):
+        je = readDword(jstart+i*jsize)
         I.jump_table.table_entries.append(je)
         if je not in RECOVERED_EAS: 
             new_eas.add(je)
-        DEBUG("\t\tAdding JMPTable {0}: {1:x}\n".format( i, je))
-        i += 1
-        je = idc.GetFixupTgtOff(jstart+i*jsize)
+        DEBUG("\t\tAdding JMPTable {0}: {1:x}\n".format(i, je))
+
+    #je = idc.GetFixupTgtOff(jstart+i*jsize)
+    #while je != -1:
+    #    I.jump_table.table_entries.append(je)
+    #    if je not in RECOVERED_EAS: 
+    #        new_eas.add(je)
+    #    DEBUG("\t\tAdding JMPTable {0}: {1:x}\n".format( i, je))
+    #    i += 1
+    #    je = idc.GetFixupTgtOff(jstart+i*jsize)
 
 def isElfThunk(ea):
     if not isLinkedElf():
@@ -621,8 +634,7 @@ def handleDataRelocation(M, dref, new_eas):
 def resolveRelocation(ea):
     rtype = idc.GetFixupTgtType(ea) 
     if rtype == idc.FIXUP_OFF32:
-        bytestr = readBytesSlowly(ea, ea+4);
-        relocVal = struct.unpack("<L", bytestr)[0]
+        relocVal = readDword(ea)
         return relocVal
     elif rtype == -1:
         raise Exception("No relocation type at ea: {:x}".format(ea))
