@@ -88,6 +88,10 @@ static bool isConformantJumpInst(InstPtr jmpinst) {
 
     const llvm::MCInst &inst = jmpinst->get_inst();
 
+    // check that operands exist before using them
+    if (inst.getNumOperands() < 4) {
+        return false;
+    }
     const llvm::MCOperand& scale = inst.getOperand(1);
     const llvm::MCOperand& index = inst.getOperand(2);
     const llvm::MCOperand& disp = inst.getOperand(3);
