@@ -1120,6 +1120,12 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::XORPDrr] = translate_XORPSrr;
     m[X86::XORPDrm] = translate_XORPSrm;
 
+    // these should be identical
+    m[X86::ORPDrr] = translate_PORrr;
+    m[X86::ORPDrm] = translate_PORrm;
+    m[X86::ORPSrr] = translate_PORrr;
+    m[X86::ORPSrm] = translate_PORrm;
+
     m[X86::CVTSI2SSrr] = translate_CVTSI2SSrr;
     m[X86::CVTSI2SSrm] = translate_CVTSI2SSrm;
 
