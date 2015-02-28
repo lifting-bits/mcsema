@@ -56,6 +56,9 @@ cl::opt<string>
 InputFilename("i", cl::desc("Input filename"), cl::value_desc("filename"));
 
 cl::opt<string>
+OutputFilename("o", cl::desc("Output filename"), cl::value_desc("filename"));
+
+cl::opt<string>
 PriorKnowledge("p", cl::desc("Proto buffer containing prior knowldege"), cl::value_desc("filename"));
 
 cl::opt<int>
@@ -341,12 +344,18 @@ int main(int argc, char *argv[]) {
       //write out to protobuf 
       string  outS = dumpProtoBuf(m);
       if(outS.size() > 0) {
-        //write out to file, but, make the file name 
-        //the same as the input file name with the ext
-        //removed and replaced with .cfg
-        filesystem::path  p = filesystem::path(string(InputFilename));
-        p = p.replace_extension(".cfg");
-        
+        filesystem::path p;
+        if (OutputFilename == "") {
+            //write out to file, but, make the file name
+            //the same as the input file name with the ext
+            //removed and replaced with .cfg
+            p = filesystem::path(string(InputFilename));
+            p = p.replace_extension(".cfg");
+        }
+        else {
+            p = filesystem::path(string(OutputFilename));
+        }
+
         FILE  *out = fopen(p.string().c_str(), "wb");
         if(out) {
           fwrite(outS.c_str(), 1, outS.size(), out);
