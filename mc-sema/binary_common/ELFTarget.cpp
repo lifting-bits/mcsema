@@ -59,8 +59,8 @@ bool ElfTarget::getEntryPoint(::uint64_t &ep) const
     return ec == object::object_error::success && ep != 0;
 }
 
-
-static bool find_import_for_addr(object::SectionRef section, uint32_t offt, uint32_t target, std::string &import_name) {
+static bool find_import_for_addr(object::SectionRef section, uint32_t offt, uint32_t target, 
+        std::string &import_name) {
 
     llvm::object::relocation_iterator rit = section.relocation_begin();
     std::error_code ec;
@@ -119,6 +119,21 @@ static bool find_import_for_addr(object::SectionRef section, uint32_t offt, uint
     return false;
 }
 
+bool ElfTarget::find_in_any_section(uint32_t target, std::string &import_name)
+{
+      for(vector<secT>::iterator it = this->secs.begin(), en = this->secs.end();
+          it != en;
+          ++it)
+      {
+          object::SectionRef  sec = (*it).second;
+          StringRef sr;
+          sec.getName(sr);
+          if(find_import_for_addr(sec, 0, target, import_name)) {
+              return true;
+          }
+      }
+}
+
 bool ElfTarget::find_import_name(uint32_t addrToFind, std::string &import_name)
 {
     LASSERT(this->elf_obj != NULL, "ELF Object File not initialized");
@@ -140,6 +155,11 @@ bool ElfTarget::find_import_name(uint32_t addrToFind, std::string &import_name)
     }
 
     if(this->isLinked()) {
+
+        if(find_in_any_section(final_target, import_name)) {
+            return true;
+        }
+
         llvm::dbgs() << __FUNCTION__ << ": Doing extra deref" << "\n";
         // one more level of indirection for fully linked binaries
         uint8_t *ft_ptr = (uint8_t*)&final_target;
@@ -148,6 +168,10 @@ bool ElfTarget::find_import_name(uint32_t addrToFind, std::string &import_name)
         this->readByte(addrToFind+2, ft_ptr+2);
         this->readByte(addrToFind+3, ft_ptr+3);
         if(find_import_for_addr(section, offt, final_target, import_name)) {
+            return true;
+        }
+
+        if(find_in_any_section(final_target, import_name)) {
             return true;
         }
     }

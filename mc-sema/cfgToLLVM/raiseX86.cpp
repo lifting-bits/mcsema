@@ -1091,7 +1091,7 @@ static GlobalVariable* getSectionForDataAddr(
         if(data_addr >= start && data_addr < end) {
             std::string gvar_name = "data_0x" + to_string<VA>(start, hex);//+"_ptr";
             section_base = start;
-     
+            return M->getNamedGlobal(gvar_name);
         }
         
     }
