@@ -37,7 +37,7 @@ template <int width>
 static void WriteZF(BasicBlock *b, Value *w) {
     //set ZF
     //ZF is set if the result is 0 and clear otherwise
-    F_WRITE(b, "ZF", new ICmpInst(*b, CmpInst::ICMP_EQ, w, CONST_V<width>(b, 0)));
+    F_WRITE(b, ZF, new ICmpInst(*b, CmpInst::ICMP_EQ, w, CONST_V<width>(b, 0)));
     return;
 }
 
@@ -53,7 +53,7 @@ static void WriteCFShiftR(BasicBlock *b, Value *val, Value *shiftAmt) {
     Value   *v = 
         BinaryOperator::CreateLShr(val, 
             BinaryOperator::CreateSub(shiftAmt, CONST_V<width>(b, 1), "", b), "", b);
-    F_WRITE(b, "CF", new TruncInst( v,
+    F_WRITE(b, CF, new TruncInst( v,
                                     Type::getInt1Ty(b->getContext()),
                                     "",
                                     b));
@@ -70,7 +70,7 @@ static void WriteAFAddSub(BasicBlock *b, Value *res, Value *o1, Value *o2) {
 
     Value   *c = new ICmpInst(*b, CmpInst::ICMP_NE, v3, CONST_V<width>(b, 0));
 
-    F_WRITE(b, "AF", c);
+    F_WRITE(b, AF, c);
 
     return;
 }
@@ -87,7 +87,7 @@ static void WriteAF2(BasicBlock *b, Value *r, Value *lhs, Value *rhs) {
     Value   *cr = 
         new ICmpInst(*b, CmpInst::ICMP_NE, t3, CONST_V<32>(b, 0));
 
-    F_WRITE(b, "AF", cr);
+    F_WRITE(b, AF, cr);
     return;
 }
 
@@ -96,7 +96,7 @@ static void WriteCFAdd(BasicBlock *b, Value *res, Value *argL) {
     //cf = res < argL
     Value   *cmpRes = new ICmpInst(*b, CmpInst::ICMP_ULT, res, argL);
 
-    F_WRITE(b, "CF", cmpRes);
+    F_WRITE(b, CF, cmpRes);
 
     return;
 }
@@ -104,14 +104,7 @@ static void WriteCFAdd(BasicBlock *b, Value *res, Value *argL) {
 static void WriteCFSub(BasicBlock *b, Value *argL, Value *argR) {
     Value   *cmpRes = new ICmpInst(*b, CmpInst::ICMP_ULT, argL, argR);
 
-    F_WRITE(b, "CF", cmpRes);
-    return;
-}
-
-template <int width>
-static void WriteOF1(BasicBlock *b, Value *written, Value *o1, Value *o2) {
-    // of = lshift((o1 ^ o2) & (o1 ^ written), 12 - width) & 0x800
-
+    F_WRITE(b, CF, cmpRes);
     return;
 }
 
@@ -126,25 +119,19 @@ static void WriteOFSub(BasicBlock *b, Value *res, Value *lhs, Value *rhs) {
     Value  *anded = BinaryOperator::CreateAnd(xor1, xor2, "", b);
 
     Value   *shifted = NULL;
-    // shifts corrected to always place the OF bit
-    // in the bit 0 posision. This way it works for
-    // all sized ints
+    // extract sign bit
     switch(width) {
         case 8:
-            //lshift by 4
             shifted = 
-                BinaryOperator::CreateLShr(anded, CONST_V<width>(b, 11-4), "", b);
+                BinaryOperator::CreateLShr(anded, CONST_V<width>(b, 7), "", b);
             break;
-        //in these two cases, we rshift instead
         case 16:
-            //rshift by 4
             shifted = 
-                BinaryOperator::CreateLShr(anded, CONST_V<width>(b, 11+4), "", b);
+                BinaryOperator::CreateLShr(anded, CONST_V<width>(b, 15), "", b);
             break;
         case 32:
-            //rshift by 20
             shifted = 
-                BinaryOperator::CreateLShr(anded, CONST_V<width>(b, 11+20), "", b);
+                BinaryOperator::CreateLShr(anded, CONST_V<width>(b, 31), "", b);
             break;
 
         default:
@@ -153,16 +140,12 @@ static void WriteOFSub(BasicBlock *b, Value *res, Value *lhs, Value *rhs) {
 
     TASSERT(shifted != NULL, "");
 
-    //and by 1
-    Value   *anded1 = 
-        BinaryOperator::CreateAnd(shifted, CONST_V<width>(b, 1), "", b);
-
     //truncate anded1
     Value   *trunced = 
-        new TruncInst(anded1, Type::getInt1Ty(b->getContext()), "", b);
+        new TruncInst(shifted, Type::getInt1Ty(b->getContext()), "", b);
 
     //write to OF
-    F_WRITE(b, "OF", trunced);
+    F_WRITE(b, OF, trunced);
 
     return;
 }
@@ -216,7 +199,7 @@ static void WriteOFAdd(BasicBlock *b, Value *res, Value *lhs, Value *rhs) {
         new TruncInst(anded1, Type::getInt1Ty(b->getContext()), "", b);
 
     //write to OF
-    F_WRITE(b, "OF", trunced);
+    F_WRITE(b, OF, trunced);
 
     return;
 }
@@ -244,7 +227,7 @@ static void WritePF(BasicBlock *b, Value *written) {
 
     countArgs.push_back(lsb);
 
-    Value       *count = CallInst::Create(popCntFun, countArgs, "", b);
+    Value       *count = (Value*) noAliasMCSemaScope(CallInst::Create(popCntFun, countArgs, "", b));
 
     //truncate the count to a bit
     Type    *ty = Type::getInt1Ty(b->getContext());
@@ -255,17 +238,21 @@ static void WritePF(BasicBlock *b, Value *written) {
         BinaryOperator::CreateXor( countTrunc, CONST_V<1>(b, 1), "", b);
 
     //write that bit to PF
-    F_WRITE(b, "PF", neg);
+    F_WRITE(b, PF, neg);
     return;
 }
 
 template <int width>
 static void WriteSF(BasicBlock *b, Value *written) {
     //%1 = SIGNED CMP %written < 0
-    Value   *scmp = new ICmpInst(   *b,
-                                    ICmpInst::ICMP_SLT,
-                                    written,
-                                    CONST_V<width>(b, 0));
-    F_WRITE(b, "SF", scmp);
+    //Value   *scmp = new ICmpInst(   *b,
+    //                                ICmpInst::ICMP_SLT,
+    //                                written,
+    //                                CONST_V<width>(b, 0));
+
+    // extract sign bit
+    Value *signBit = BinaryOperator::CreateLShr(written, CONST_V<width>(b, width-1), "", b);
+    Value *trunc = new TruncInst(signBit, Type::getInt1Ty(b->getContext()), "", b);
+    F_WRITE(b, SF, trunc);
     return;
 }

@@ -36,245 +36,181 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 
-template <int width>
-static Value *doShrVV(InstPtr ip, BasicBlock *&b, Value *src, Value *count) {
-    //let's encode this the way that it's encoded in the manual
-    Function    *F = b->getParent();
+template <int width> 
+static Value *getBit(BasicBlock *b, Value *val, int which)
+{
+    TASSERT(which < width, "Bit width too big for getBit!");
+    uint64_t mask_value = 1 << which;
+    Value *mask = CONST_V<width>(b, mask_value);
+    Value *sigbyte = BinaryOperator::CreateAnd(val, mask, "", b);
+    Value *is_set = new ICmpInst(*b, CmpInst::ICMP_NE,
+                                sigbyte, CONST_V<width>(b, 0));
+    return is_set;
+}
 
-    //AND the count value, do this in the initial block context
+template <int width, Instruction::BinaryOps shift_op>
+static Value *doShiftOp(InstPtr ip, 
+        BasicBlock *b, 
+        Value *src, 
+        Value *count) 
+{
+
+    // get the masked count variable
     Value   *tempCOUNT = 
         BinaryOperator::CreateAnd(count, CONST_V<width>(b, 0x1F), "", b);
 
-    BasicBlock  *loopHeader = 
-        BasicBlock::Create(b->getContext(), "ShrLH", F);
-    BasicBlock  *body = 
-        BasicBlock::Create(b->getContext(), "ShrBody", F);
-    BasicBlock  *loopEnd =
-        BasicBlock::Create(b->getContext(), "ShrEnd", F);
-
-    BranchInst::Create(loopHeader, b);
-    //define DEST as a PHI
-    PHINode   *DEST = PHINode::Create(Type::getIntNTy(b->getContext(), width),
-                                    2,
-                                    "",
-                                    loopHeader);
-    //add the first incoming now
-    DEST->addIncoming(src, b);
-
-    PHINode     *tempCOUNT0 = PHINode::Create(  Type::getIntNTy(b->getContext(), width),
-                                            2,
-                                            "",
-                                            loopHeader);
-    //the first incoming is from the initial 
-    tempCOUNT0->addIncoming(tempCOUNT, b);
-
-    //the test to see if the tempCOUNT crossed the line 
-    Value   *loopCheck = new ICmpInst(  *loopHeader, 
-                                        CmpInst::ICMP_NE,
-                                        tempCOUNT0,
-                                        CONST_V<width>(b, 0));
-    BranchInst::Create(body, loopEnd, loopCheck, loopHeader); 
-
-    //populate the body
-    Value   *lowBit = 
-        BinaryOperator::CreateAnd(DEST, CONST_V<width>(b, 1), "", body);
-    Value   *toSet = new ICmpInst(  *body, 
-                                    CmpInst::ICMP_NE, 
-                                    lowBit, 
-                                    CONST_V<width>(b, 0));
-    Value   *bitSet = 
-        SelectInst::Create( toSet, 
-                            CONST_V<1>(b, 1), 
-                            CONST_V<1>(b, 0), 
+    // first time we'll shift count -1
+    // so we can get the lsb/msb
+    Value   *count_minus = 
+        BinaryOperator::CreateSub(count, CONST_V<width>(b, 1), "", b);
+    
+    Value   *count_not_zero = new ICmpInst(*b,
+                                CmpInst::ICMP_NE,
+                                tempCOUNT,
+                                CONST_V<width>(b, 0));
+    // how much to shift the first time
+    Value   *whichShift1 =
+        SelectInst::Create( count_not_zero, 
+                            count_minus,
+                            CONST_V<width>(b, 0),
                             "",
-                            body);
-    F_WRITE(body, "CF", bitSet);
-    //signed division operation
-    Value   *divRes = 
-        BinaryOperator::CreateUDiv(DEST, CONST_V<width>(b, 2), "", body);
-    Value   *newCount = 
-        BinaryOperator::CreateSub(tempCOUNT0, CONST_V<width>(b, 1), "", body);
-    DEST->addIncoming(divRes, body);
-    tempCOUNT0->addIncoming(newCount, body);
+                            b);
+    // how much to shift a second time 
+    // this is either 1 or 0 bits
+    Value   *whichShift2 = 
+        SelectInst::Create( count_not_zero, 
+                            CONST_V<width>(b, 1),
+                            CONST_V<width>(b, 0),
+                            "",
+                            b);
 
-    //loop body always branches back to the loop header
-    BranchInst::Create(loopHeader, body);
+    // shift to count -1 bytes so we can extract
+    // lsb or msb before its shifted out
+    Value *shift_first = BinaryOperator::Create(
+        shift_op,
+        src,
+        whichShift1,
+        "",
+        b);
 
-    //set the SF, ZF, and PF flags according to the result, 
-    //but only if the tempCOUNT value is non-zero 
-    BasicBlock  *ifCountGreaterZero = 
-        BasicBlock::Create(b->getContext(), "ifCountGreaterZero", F);
-    BasicBlock  *ifCountOne = 
-        BasicBlock::Create(b->getContext(), "ifCountOne", F);
-    BasicBlock  *ifCountTwoOrMore = 
-        BasicBlock::Create(b->getContext(), "ifCountTwoOrMore", F);
-    BasicBlock  *done = 
-        BasicBlock::Create(b->getContext(), "done", F);
-    
-    // See if the count was 0
-    Value   *isCountZ = 
-        new ICmpInst(   *loopEnd,
-                        CmpInst::ICMP_UGT,
-                        tempCOUNT,
-                        CONST_V<width>(b, 0));
-    BranchInst::Create(ifCountGreaterZero, done, isCountZ, loopEnd);
-    
-    // If the count was one, handle OF, AF undefinted, and others set according to result
-    Value   *isCountOne = 
-        new ICmpInst(   *ifCountGreaterZero,
-                        CmpInst::ICMP_EQ,
-                        tempCOUNT,
-                        CONST_V<width>(b, 1));
-    BranchInst::Create(ifCountOne, ifCountTwoOrMore, isCountOne, ifCountGreaterZero);
 
-    // OF Flag
-    Value   *msb = 
-        new TruncInst(  BinaryOperator::CreateLShr(src, CONST_V<width>(b, width-1), "", ifCountOne), 
-                        Type::getInt1Ty(b->getContext()), "", ifCountOne);
-    F_WRITE(ifCountOne, "OF", msb);
+    int mask_value = 1;
+    switch(shift_op) {
+        case Instruction::LShr:
+        case Instruction::AShr:
+            mask_value = 1;
+            break;
+        case Instruction::Shl:
+            mask_value = 1 << (width-1);
+            break;
+        default:
+            // assert;
+            TASSERT(false, "Unknown operation given to doShiftOp");
+            break;
+    }
 
-    // Handle the other flags
-    WriteSF<width>(ifCountOne, DEST);
-    WriteZF<width>(ifCountOne, DEST);
-    WritePF<width>(ifCountOne, DEST);
-    F_ZAP(ifCountOne, "AF");
-    
-    BranchInst::Create(done, ifCountOne);
+    // extract lsb or msb
+    Value *mask = CONST_V<width>(b, mask_value);
+    Value *sigbyte = BinaryOperator::CreateAnd(shift_first, mask, "", b);
 
-    // If the count was greater than one, OF and AF undefined, others set according to result
-    WriteSF<width>(ifCountTwoOrMore, DEST);
-    WriteZF<width>(ifCountTwoOrMore, DEST);
-    WritePF<width>(ifCountTwoOrMore, DEST);
-    F_ZAP(ifCountTwoOrMore, "AF");
-    F_ZAP(ifCountTwoOrMore, "OF");
-    BranchInst::Create(done, ifCountTwoOrMore);
+    // if sigbyte is nonzero, then LSB or MSB is 1
+    // else it is zero
+    Value *maybe_CF = new ICmpInst(*b, 
+            CmpInst::ICMP_NE,
+            sigbyte, 
+            CONST_V<width>(b, 0));
+    Value *old_CF = F_READ(b, CF);
+    Value *new_CF = SelectInst::Create(count_not_zero, 
+            maybe_CF,
+            old_CF,"", b);
 
-    //update our parents concept of what the current block is
-    b = done;
+    // shift out lsb or msb to complete the shift op
+    Value *shift_second = BinaryOperator::Create(
+        shift_op,
+        shift_first,
+        whichShift2,
+        "",
+        b);
 
-    //the result is in DEST
-    return DEST;
+
+    // OF RULES
+    // COUNT == 1 and LEFT: OF = MSB(result) XOR CF
+    // COUNT == 1 and SAR:  OF = 0
+    // COUNT == 1 and SHR:  OF = MSB(OriginalDEST)
+    // COUNT == 0:          UNCHANGED
+    // COUNT  > 1:          OF = UNDEFINED
+    //
+    Value   *count_is_one = new ICmpInst(*b,
+                                CmpInst::ICMP_EQ,
+                                tempCOUNT,
+                                CONST_V<width>(b, 1));
+    Value *new_OF = nullptr;
+    Value *old_OF = F_READ(b, OF);
+    switch(shift_op) {
+        case Instruction::Shl:
+            {
+                Value *v1 = getBit<width>(b, shift_second, width-1);
+                Value *maybeOF = BinaryOperator::CreateXor(v1, new_CF, "", b);
+                new_OF = SelectInst::Create(count_is_one, maybeOF, old_OF,"", b);
+            }
+            break;
+        case Instruction::AShr:
+            {
+                Value *maybeOF = CONST_V<1>(b, 0);
+                new_OF = SelectInst::Create(count_is_one, maybeOF, old_OF,"", b);
+            }
+            break;
+        case Instruction::LShr:
+            {
+                Value *maybeOF = getBit<width>(b, src, width-1);
+                new_OF = SelectInst::Create(count_is_one, maybeOF, old_OF,"", b);
+            }
+            break;
+        default:
+            // assert;
+            TASSERT(false, "Unknown operation given to doShiftOp");
+            break;
+    }
+
+    if(new_OF != nullptr) {
+        F_WRITE(b, OF, new_OF);
+    }
+
+
+    F_WRITE(b, CF, new_CF);
+
+    Value *old_ZF = F_READ(b, ZF);
+    Value *maybe_ZF = new ICmpInst(*b, CmpInst::ICMP_EQ, shift_second, CONST_V<width>(b, 0));
+    Value *new_ZF = SelectInst::Create(count_not_zero,
+            maybe_ZF,
+            old_ZF,"", b);
+    F_WRITE(b, ZF, new_ZF);
+
+    Value *old_SF = F_READ(b, SF);
+    Value *maybe_SF = new ICmpInst(*b,
+            ICmpInst::ICMP_SLT,
+            shift_second,
+            CONST_V<width>(b, 0));
+    Value *new_SF = SelectInst::Create(count_not_zero,
+            maybe_SF,
+            old_SF,"", b);
+    F_WRITE(b, SF, new_SF);
+
+    Value *old_PF = F_READ(b, PF);
+    WritePF<width>(b, shift_second);
+    Value *maybe_PF = F_READ(b, PF);
+    Value *new_PF = SelectInst::Create(count_not_zero,
+            maybe_PF,
+            old_PF,"", b);
+    F_WRITE(b, PF, new_PF);
+
+    return shift_second;
 }
 
 Value *doShrVV32(BasicBlock *&b, Value *src, Value *count) 
 {
-    return doShrVV<32>( InstPtr ((Inst*)(NULL)), b, src, count);
+    return doShiftOp<32, Instruction::LShr>(InstPtr ((Inst*)(nullptr)), b, src, count);
 }
-
-template <int width>
-static Value *doShlVV(InstPtr ip, BasicBlock *&b, Value *src, Value *count) {
-    //let's encode this the way that it's encoded in the manual
-    Function    *F = b->getParent();
-
-    //AND the count value, do this in the initial block context
-    Value   *tempCOUNT = 
-        BinaryOperator::CreateAnd(count, CONST_V<width>(b, 0x1F), "", b);
-
-    BasicBlock  *loopHeader = 
-        BasicBlock::Create(b->getContext(), "ShlLH", F);
-    BasicBlock  *body = 
-        BasicBlock::Create(b->getContext(), "ShlBody", F);
-    BasicBlock  *loopEnd =
-        BasicBlock::Create(b->getContext(), "ShlEnd", F);
-
-    BranchInst::Create(loopHeader, b);
-    //define DEST as a PHI
-    PHINode   *DEST = PHINode::Create(Type::getIntNTy(b->getContext(), width),
-                                    2,
-                                    "",
-                                    loopHeader);
-    //add the first incoming now
-    DEST->addIncoming(src, b);
-
-    PHINode     *tempCOUNT0 = PHINode::Create(  Type::getIntNTy(b->getContext(), width),
-                                            2,
-                                            "",
-                                            loopHeader);
-    //the first incoming is from the initial 
-    tempCOUNT0->addIncoming(tempCOUNT, b);
-
-    //the test to see if the tempCOUNT crossed the line 
-    Value   *loopCheck = new ICmpInst(  *loopHeader, 
-                                        CmpInst::ICMP_NE,
-                                        tempCOUNT0,
-                                        CONST_V<width>(b, 0));
-    BranchInst::Create(body, loopEnd, loopCheck, loopHeader); 
-
-    //populate the body
-    Value   *highBit = 
-        new TruncInst(  BinaryOperator::CreateLShr(DEST, CONST_V<width>(b, width-1), "", body), 
-                        Type::getInt1Ty(b->getContext()), "", body);
-    F_WRITE(body, "CF", highBit);
-
-    //DEST = DEST*2
-    Value   *mulRes = 
-        BinaryOperator::CreateMul(DEST, CONST_V<width>(b, 2), "", body);
-    Value   *newCount = 
-        BinaryOperator::CreateSub(tempCOUNT0, CONST_V<width>(b, 1), "", body);
-    DEST->addIncoming(mulRes, body);
-    tempCOUNT0->addIncoming(newCount, body);
-
-    //loop body always branches back to the loop header
-    BranchInst::Create(loopHeader, body);
-
-    //set the SF, ZF, and PF flags according to the result, 
-    //but only if the tempCOUNT value is non-zero 
-    BasicBlock  *ifCountGreaterZero = 
-        BasicBlock::Create(b->getContext(), "ifCountGreaterZero", F);
-    BasicBlock  *ifCountOne = 
-        BasicBlock::Create(b->getContext(), "ifCountOne", F);
-    BasicBlock  *ifCountTwoOrMore = 
-        BasicBlock::Create(b->getContext(), "ifCountTwoOrMore", F);
-    BasicBlock  *done = 
-        BasicBlock::Create(b->getContext(), "done", F);
-    
-    // See if the count was 0
-    Value   *isCountZ = 
-        new ICmpInst(   *loopEnd,
-                        CmpInst::ICMP_UGT,
-                        tempCOUNT,
-                        CONST_V<width>(b, 0));
-    BranchInst::Create(ifCountGreaterZero, done, isCountZ, loopEnd);
-    
-    // If the count was one, handle OF, AF undefinted, and others set according to result
-    Value   *isCountOne = 
-        new ICmpInst(   *ifCountGreaterZero,
-                        CmpInst::ICMP_EQ,
-                        tempCOUNT,
-                        CONST_V<width>(b, 1));
-    BranchInst::Create(ifCountOne, ifCountTwoOrMore, isCountOne, ifCountGreaterZero);
-
-    // OF Flag
-    Value   *msb = 
-        new TruncInst(  BinaryOperator::CreateLShr(DEST, CONST_V<width>(b, width-1), "", ifCountOne), 
-                        Type::getInt1Ty(b->getContext()), "", ifCountOne);
-    Value   *cf = F_READ(ifCountOne, "CF");
-    Value   *xorRes = BinaryOperator::CreateXor(msb, cf, "", ifCountOne);
-    F_WRITE(ifCountOne, "OF", xorRes);
-
-    // Handle the other flags
-    WriteSF<width>(ifCountOne, DEST);
-    WriteZF<width>(ifCountOne, DEST);
-    WritePF<width>(ifCountOne, DEST);
-    F_ZAP(ifCountOne, "AF");
-    
-    BranchInst::Create(done, ifCountOne);
-
-    // If the count was greater than one, OF and AF undefined, others set according to result
-    WriteSF<width>(ifCountTwoOrMore, DEST);
-    WriteZF<width>(ifCountTwoOrMore, DEST);
-    WritePF<width>(ifCountTwoOrMore, DEST);
-    F_ZAP(ifCountTwoOrMore, "AF");
-    F_ZAP(ifCountTwoOrMore, "OF");
-    BranchInst::Create(done, ifCountTwoOrMore);
-
-    //update our parents concept of what the current block is
-    b = done;
-
-    //the result is in DEST
-    return DEST;
-}
-
 
 template <int width>
 static Value *doShldVV(InstPtr ip,
@@ -314,7 +250,7 @@ static Value *doShldVV(InstPtr ip,
 
 
     // do the shift
-    Value   *shift_res = doShlVV<width*2>(ip, b, from, imm);
+    Value *shift_res = doShiftOp<width*2, Instruction::Shl>(ip, b, from, imm);
 
     Value   *fix_it = BinaryOperator::CreateLShr(shift_res, CONST_V<width*2>(b, width), "", b);
 
@@ -367,7 +303,7 @@ static Value *doShrdVV(InstPtr ip,
 
 
     // do the shift
-    Value   *shift_res = doShrVV<width*2>(ip, b, from, imm);
+    Value *shift_res = doShiftOp<width*2, Instruction::LShr>(ip, b, from, imm);
 
     // truncate result to width type
     Value *reg_val = new TruncInst( shift_res, 
@@ -488,7 +424,7 @@ static InstTransResult doShrRI(InstPtr ip, BasicBlock *&b,
     Value   *fromReg = R_READ<width>(b, src1.getReg());
     Value   *imm = CONST_V<width>(b, src2.getImm());
 
-    Value   *res = doShrVV<width>(ip, b, fromReg, imm);
+    Value *res = doShiftOp<width, Instruction::LShr>(ip, b, fromReg, imm);
 
     R_WRITE<width>(b, dst.getReg(), res);
 
@@ -504,7 +440,7 @@ static InstTransResult doShrR1(InstPtr ip, BasicBlock *&b,
     Value   *fromReg = R_READ<width>(b, reg.getReg());
     Value   *count = CONST_V<width>(b, 1);
 
-    Value   *res = doShrVV<width>(ip, b, fromReg, count);
+    Value *res = doShiftOp<width, Instruction::LShr>(ip, b, fromReg, count);
 
     R_WRITE<width>(b, reg.getReg(), res);
 
@@ -520,7 +456,7 @@ static InstTransResult doShrRCL(InstPtr ip, BasicBlock *&b,
     Value   *fromReg = R_READ<width>(b, reg.getReg());
     Value   *count = R_READ<width>(b, X86::CL);
 
-    Value   *res = doShrVV<width>(ip, b, fromReg, count);
+    Value *res = doShiftOp<width, Instruction::LShr>(ip, b, fromReg, count);
 
     R_WRITE<width>(b, reg.getReg(), res);
 
@@ -538,7 +474,7 @@ static InstTransResult doShrMI(InstPtr ip, BasicBlock *&b,
     Value   *dst = M_READ<width>(ip, b, addr);
     Value   *count = CONST_V<width>(b, imm.getImm());
 
-    Value   *res = doShrVV<width>(ip, b, dst, count);
+    Value *res = doShiftOp<width, Instruction::LShr>(ip, b, dst, count);
 
     M_WRITE<width>(ip, b, addr, res);
 
@@ -555,7 +491,7 @@ static InstTransResult doShrMV(InstPtr ip, BasicBlock *&b,
 
     Value   *dst = M_READ<width>(ip, b, addr);
 
-    Value   *res = doShrVV<width>(ip, b, dst, rhs);
+    Value *res = doShiftOp<width, Instruction::LShr>(ip, b, dst, rhs);
 
     M_WRITE<width>(ip, b, addr, res);
 
@@ -571,7 +507,7 @@ static InstTransResult doShrM1(InstPtr ip, BasicBlock *&b,
     Value   *dst = M_READ<width>(ip, b, addr);
     Value   *count = CONST_V<width>(b, 1);
 
-    Value   *res = doShrVV<width>(ip, b, dst, count);
+    Value *res = doShiftOp<width, Instruction::LShr>(ip, b, dst, count);
 
     M_WRITE<width>(ip, b, addr, res);
 
@@ -587,7 +523,7 @@ static InstTransResult doShrMCL(InstPtr ip, BasicBlock *&b,
     Value   *dst = M_READ<width>(ip, b, addr);
     Value   *count = R_READ<width>(b, X86::CL);
 
-    Value   *res = doShrVV<width>(ip, b, dst, count);
+    Value *res = doShiftOp<width, Instruction::LShr>(ip, b, dst, count);
 
     M_WRITE<width>(ip, b, addr, res);
 
@@ -607,7 +543,7 @@ static InstTransResult doShlRI(InstPtr ip, BasicBlock *&b,
     Value   *fromReg = R_READ<width>(b, src1.getReg());
     Value   *imm = CONST_V<width>(b, src2.getImm());
 
-    Value   *res = doShlVV<width>(ip, b, fromReg, imm);
+    Value *res = doShiftOp<width, Instruction::Shl>(ip, b, fromReg, imm);
 
     R_WRITE<width>(b, dst.getReg(), res);
 
@@ -623,7 +559,7 @@ static InstTransResult doShlR1(InstPtr ip, BasicBlock *&b,
     Value   *fromReg = R_READ<width>(b, reg.getReg());
     Value   *count = CONST_V<width>(b, 1);
 
-    Value   *res = doShlVV<width>(ip, b, fromReg, count);
+    Value *res = doShiftOp<width, Instruction::Shl>(ip, b, fromReg, count);
 
     R_WRITE<width>(b, reg.getReg(), res);
 
@@ -639,7 +575,7 @@ static InstTransResult doShlRCL(InstPtr ip, BasicBlock *&b,
     Value   *fromReg = R_READ<width>(b, reg.getReg());
     Value   *count = R_READ<width>(b, X86::CL);
 
-    Value   *res = doShlVV<width>(ip, b, fromReg, count);
+    Value *res = doShiftOp<width, Instruction::Shl>(ip, b, fromReg, count);
 
     R_WRITE<width>(b, reg.getReg(), res);
 
@@ -657,7 +593,7 @@ static InstTransResult doShlMI(InstPtr ip, BasicBlock *&b,
     Value   *dst = M_READ<width>(ip, b, addr);
     Value   *count = CONST_V<width>(b, imm.getImm());
 
-    Value   *res = doShlVV<width>(ip, b, dst, count);
+    Value *res = doShiftOp<width, Instruction::Shl>(ip, b, dst, count);
 
     M_WRITE<width>(ip, b, addr, res);
 
@@ -674,7 +610,7 @@ static InstTransResult doShlMV(InstPtr ip, BasicBlock *&b,
 
     Value   *dst = M_READ<width>(ip, b, addr);
 
-    Value   *res = doShlVV<width>(ip, b, dst, rhs);
+    Value *res = doShiftOp<width, Instruction::Shl>(ip, b, dst, rhs);
 
     M_WRITE<width>(ip, b, addr, res);
 
@@ -690,7 +626,7 @@ static InstTransResult doShlM1(InstPtr ip, BasicBlock *&b,
     Value   *dst = M_READ<width>(ip, b, addr);
     Value   *count = CONST_V<width>(b, 1);
 
-    Value   *res = doShlVV<width>(ip, b, dst, count);
+    Value *res = doShiftOp<width, Instruction::Shl>(ip, b, dst, count);
 
     M_WRITE<width>(ip, b, addr, res);
 
@@ -706,130 +642,11 @@ static InstTransResult doShlMCL(InstPtr ip, BasicBlock *&b,
     Value   *dst = M_READ<width>(ip, b, addr);
     Value   *count = R_READ<width>(b, X86::CL);
 
-    Value   *res = doShlVV<width>(ip, b, dst, count);
+    Value *res = doShiftOp<width, Instruction::Shl>(ip, b, dst, count);
 
     M_WRITE<width>(ip, b, addr, res);
 
     return ContinueBlock;
-}
-
-
-
-template <int width>
-static Value *doSarVV(InstPtr ip, BasicBlock *&b, Value *src, Value *count) {
-    //let's encode this the way that it's encoded in the manual
-    Function    *F = b->getParent();
-
-    //AND the count value, do this in the initial block context
-    Value   *tempCOUNT = 
-        BinaryOperator::CreateAnd(count, CONST_V<width>(b, 0x1F), "", b);
-
-    BasicBlock  *loopHeader = 
-        BasicBlock::Create(b->getContext(), "SarLH", F);
-    BasicBlock  *body = 
-        BasicBlock::Create(b->getContext(), "SarBody", F);
-    BasicBlock  *loopEnd =
-        BasicBlock::Create(b->getContext(), "SarEnd", F);
-
-    BranchInst::Create(loopHeader, b);
-    //define DEST as a PHI
-    PHINode   *DEST = PHINode::Create(Type::getIntNTy(b->getContext(), width),
-                                    2,
-                                    "",
-                                    loopHeader);
-    //add the first incoming now
-    DEST->addIncoming(src, b);
-
-    PHINode     *tempCOUNT0 = PHINode::Create(  Type::getIntNTy(b->getContext(), width),
-                                            2,
-                                            "",
-                                            loopHeader);
-    //the first incoming is from the initial 
-    tempCOUNT0->addIncoming(tempCOUNT, b);
-
-    //the test to see if the tempCOUNT crossed the line 
-    Value   *loopCheck = new ICmpInst(  *loopHeader, 
-                                        CmpInst::ICMP_NE,
-                                        tempCOUNT0,
-                                        CONST_V<width>(b, 0));
-    BranchInst::Create(body, loopEnd, loopCheck, loopHeader); 
-
-    //populate the body
-    Value   *lowBit = 
-        BinaryOperator::CreateAnd(DEST, CONST_V<width>(b, 1), "", body);
-    Value   *toSet = new ICmpInst(  *body, 
-                                    CmpInst::ICMP_NE, 
-                                    lowBit, 
-                                    CONST_V<width>(b, 0));
-    Value   *bitSet = 
-        SelectInst::Create( toSet, 
-                            CONST_V<1>(b, 1), 
-                            CONST_V<1>(b, 0), 
-                            "",
-                            body);
-    F_WRITE(body, "CF", bitSet);
-    //signed division operation
-    Value   *divRes = 
-        BinaryOperator::CreateSDiv(DEST, CONST_V<width>(b, 2), "", body);
-    Value   *newCount = 
-        BinaryOperator::CreateSub(tempCOUNT0, CONST_V<width>(b, 1), "", body);
-    DEST->addIncoming(divRes, body);
-    tempCOUNT0->addIncoming(newCount, body);
-
-    //loop body always branches back to the loop header
-    BranchInst::Create(loopHeader, body);
-
-    //set the SF, ZF, and PF flags according to the result, 
-    //but only if the tempCOUNT value is non-zero 
-    BasicBlock  *ifCountGreaterZero = 
-        BasicBlock::Create(b->getContext(), "ifCountGreaterZero", F);
-    BasicBlock  *ifCountOne = 
-        BasicBlock::Create(b->getContext(), "ifCountOne", F);
-    BasicBlock  *ifCountTwoOrMore = 
-        BasicBlock::Create(b->getContext(), "ifCountTwoOrMore", F);
-    BasicBlock  *done = 
-        BasicBlock::Create(b->getContext(), "done", F);
-    
-    // See if the count was 0
-    Value   *isCountZ = 
-        new ICmpInst(   *loopEnd,
-                        CmpInst::ICMP_UGT,
-                        tempCOUNT,
-                        CONST_V<width>(b, 0));
-    BranchInst::Create(ifCountGreaterZero, done, isCountZ, loopEnd);
-    
-    // If the count was one, handle OF, AF undefinted, and others set according to result
-    Value   *isCountOne = 
-        new ICmpInst(   *ifCountGreaterZero,
-                        CmpInst::ICMP_EQ,
-                        tempCOUNT,
-                        CONST_V<width>(b, 1));
-    BranchInst::Create(ifCountOne, ifCountTwoOrMore, isCountOne, ifCountGreaterZero);
-
-    // OF Flag
-    F_CLEAR(ifCountOne, "OF");
-
-    // Handle the other flags
-    WriteSF<width>(ifCountOne, DEST);
-    WriteZF<width>(ifCountOne, DEST);
-    WritePF<width>(ifCountOne, DEST);
-    F_ZAP(ifCountOne, "AF");
-    
-    BranchInst::Create(done, ifCountOne);
-
-    // If the count was greater than one, OF and AF undefined, others set according to result
-    WriteSF<width>(ifCountTwoOrMore, DEST);
-    WriteZF<width>(ifCountTwoOrMore, DEST);
-    WritePF<width>(ifCountTwoOrMore, DEST);
-    F_ZAP(ifCountTwoOrMore, "AF");
-    F_ZAP(ifCountTwoOrMore, "OF");
-    BranchInst::Create(done, ifCountTwoOrMore);
-
-    //update our parents concept of what the current block is
-    b = done;
-
-    //the result is in DEST
-    return DEST;
 }
 
 template <int width>
@@ -845,7 +662,7 @@ static InstTransResult doSarRI(InstPtr ip, BasicBlock *&b,
     Value   *fromReg = R_READ<width>(b, src1.getReg());
     Value   *imm = CONST_V<width>(b, src2.getImm());
 
-    Value   *res = doSarVV<width>(ip, b, fromReg, imm);
+    Value *res = doShiftOp<width, Instruction::AShr>(ip, b, fromReg, imm);
 
     R_WRITE<width>(b, dst.getReg(), res);
 
@@ -861,7 +678,7 @@ static InstTransResult doSarR1(InstPtr ip, BasicBlock *&b,
     Value   *fromReg = R_READ<width>(b, reg.getReg());
     Value   *count = CONST_V<width>(b, 1);
 
-    Value   *res = doSarVV<width>(ip, b, fromReg, count);
+    Value *res = doShiftOp<width, Instruction::AShr>(ip, b, fromReg, count);
 
     R_WRITE<width>(b, reg.getReg(), res);
 
@@ -877,7 +694,7 @@ static InstTransResult doSarRCL(InstPtr ip, BasicBlock *&b,
     Value   *fromReg = R_READ<width>(b, reg.getReg());
     Value   *count = R_READ<width>(b, X86::CL);
 
-    Value   *res = doSarVV<width>(ip, b, fromReg, count);
+    Value *res = doShiftOp<width, Instruction::AShr>(ip, b, fromReg, count);
 
     R_WRITE<width>(b, reg.getReg(), res);
 
@@ -895,7 +712,7 @@ static InstTransResult doSarMI(InstPtr ip, BasicBlock *&b,
     Value   *dst = M_READ<width>(ip, b, addr);
     Value   *count = CONST_V<width>(b, imm.getImm());
 
-    Value   *res = doSarVV<width>(ip, b, dst, count);
+    Value *res = doShiftOp<width, Instruction::AShr>(ip, b, dst, count);
 
     M_WRITE<width>(ip, b, addr, res);
 
@@ -912,7 +729,7 @@ static InstTransResult doSarMV(InstPtr ip, BasicBlock *&b,
 
     Value   *dst = M_READ<width>(ip, b, addr);
 
-    Value   *res = doSarVV<width>(ip, b, dst, rhs);
+    Value *res = doShiftOp<width, Instruction::AShr>(ip, b, dst, rhs);
 
     M_WRITE<width>(ip, b, addr, res);
 
@@ -928,7 +745,7 @@ static InstTransResult doSarM1(InstPtr ip, BasicBlock *&b,
     Value   *dst = M_READ<width>(ip, b, addr);
     Value   *count = CONST_V<width>(b, 1);
 
-    Value   *res = doSarVV<width>(ip, b, dst, count);
+    Value *res = doShiftOp<width, Instruction::AShr>(ip, b, dst, count);
 
     M_WRITE<width>(ip, b, addr, res);
 
@@ -944,7 +761,7 @@ static InstTransResult doSarMCL(InstPtr ip, BasicBlock *&b,
     Value   *dst = M_READ<width>(ip, b, addr);
     Value   *count = R_READ<width>(b, X86::CL);
 
-    Value   *res = doSarVV<width>(ip, b, dst, count);
+    Value *res = doShiftOp<width, Instruction::AShr>(ip, b, dst, count);
 
     M_WRITE<width>(ip, b, addr, res);
 
@@ -1034,13 +851,13 @@ static Value *doRclVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
 
     //dst = (dst*2) + tempCF
     Value   *tempDst = BinaryOperator::Create(Instruction::Mul, dst_phi, CONST_V<width>(b, 2), "", whileBody);
-    Value   *cf_bit = F_READ(whileBody, "CF");
+    Value   *cf_bit = F_READ(whileBody, CF);
     Value   *cf_zx = new ZExtInst(cf_bit, t, "", whileBody);
     Value   *newDst = BinaryOperator::CreateAdd(tempDst, cf_zx, "", whileBody);
 
     //CF = tempCF
     Value   *tempCF_trunc = new TruncInst(tempCF, Type::getInt1Ty(b->getContext()), "", whileBody);
-    F_WRITE(whileBody, "CF", tempCF_trunc);
+    F_WRITE(whileBody, CF, tempCF_trunc);
 
     //tempCount -= 1
     Value   *newCount = BinaryOperator::CreateSub(tempCount_phi, CONST_V<width>(b, 1), "", whileBody);
@@ -1060,14 +877,14 @@ static Value *doRclVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
                                     Type::getInt1Ty(b->getContext()), 
                                     "", 
                                     singleBit);
-    Value   *cf = F_READ(singleBit, "CF");
+    Value   *cf = F_READ(singleBit, CF);
     Value   *xorRes = BinaryOperator::CreateXor(msb, cf, "", singleBit);
-    F_WRITE(singleBit, "OF", xorRes);
+    F_WRITE(singleBit, OF, xorRes);
     BranchInst::Create(rest, singleBit);
 
     //if it is not single bit, zap OF
-    //F_ZAP(nonSingleBit, "OF");
-    F_SET(nonSingleBit, "OF"); //OF Set to match testSemantics
+    //F_ZAP(nonSingleBit, OF);
+    F_SET(nonSingleBit, OF); //OF Set to match testSemantics
     BranchInst::Create(rest, nonSingleBit);
 
     b = rest;
@@ -1237,13 +1054,13 @@ static Value *doRcrVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
                                     Type::getInt1Ty(b->getContext()), 
                                     "", 
                                     singleBit);
-    Value   *cf = F_READ(singleBit, "CF");
-    F_WRITE(singleBit, "OF", BinaryOperator::CreateXor(msb, cf, "", singleBit));
+    Value   *cf = F_READ(singleBit, CF);
+    F_WRITE(singleBit, OF, BinaryOperator::CreateXor(msb, cf, "", singleBit));
     BranchInst::Create(preHeader, singleBit);
 
     //non-single rotate condition
-    //F_ZAP(nonSingleBit, "OF");
-    F_SET(nonSingleBit, "OF"); //OF Set to match testSemantics
+    //F_ZAP(nonSingleBit, OF);
+    F_SET(nonSingleBit, OF); //OF Set to match testSemantics
     BranchInst::Create(preHeader, nonSingleBit);
 
     Value   *tempCount;
@@ -1301,14 +1118,14 @@ static Value *doRcrVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
 
     //dst = (dst/2) + (CF*2^width)
     Value   *tempDst = BinaryOperator::CreateLShr(dst_phi, CONST_V<width>(b, 1), "", whileBody);
-    Value   *cf_bit = F_READ(whileBody, "CF");
+    Value   *cf_bit = F_READ(whileBody, CF);
     Value   *cf_zx = new ZExtInst(cf_bit, t, "", whileBody);
     Value   *multiplier = BinaryOperator::CreateShl(cf_zx, CONST_V<width>(b, width-1), "", whileBody);
     Value   *newDst = BinaryOperator::CreateAdd(tempDst, multiplier, "", whileBody);
 
     //CF = tempCF
     Value   *tempCF_trunc = new TruncInst(tempCF, Type::getInt1Ty(b->getContext()), "", whileBody);
-    F_WRITE(whileBody, "CF", tempCF_trunc);
+    F_WRITE(whileBody, CF, tempCF_trunc);
 
     //tempCount -= 1
     Value   *newCount = BinaryOperator::CreateSub(tempCount_phi, CONST_V<width>(b, 1), "", whileBody);
@@ -1531,7 +1348,7 @@ static Value *doRolVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
                                     Type::getInt1Ty(b->getContext()), 
                                     "", 
                                     afterWhile);
-    F_WRITE(afterWhile, "CF", lsb);
+    F_WRITE(afterWhile, CF, lsb);
 
     Value   *rotateType = new ICmpInst(*afterWhile, CmpInst::ICMP_EQ, andRes, CONST_V<width>(b, 1));
     BranchInst::Create(singleBit, nonSingleBit, rotateType, afterWhile);
@@ -1542,12 +1359,12 @@ static Value *doRolVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
                                     "", 
                                     singleBit);
     Value   *xorRes = BinaryOperator::CreateXor(msb, lsb, "", singleBit);
-    F_WRITE(singleBit, "OF", xorRes);
+    F_WRITE(singleBit, OF, xorRes);
     BranchInst::Create(rest, singleBit);
 
     //if it is not single bit, zap OF
-    //F_ZAP(nonSingleBit, "OF");
-    F_SET(nonSingleBit, "OF"); //OF Set to match testSemantics
+    //F_ZAP(nonSingleBit, OF);
+    F_SET(nonSingleBit, OF); //OF Set to match testSemantics
     BranchInst::Create(rest, nonSingleBit);
 
     b = rest;
@@ -1759,7 +1576,7 @@ static Value *doRorVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
                                     Type::getInt1Ty(b->getContext()), 
                                     "", 
                                     afterWhile);
-    F_WRITE(afterWhile, "CF", msb);
+    F_WRITE(afterWhile, CF, msb);
 
     Value   *rotateType = new ICmpInst(*afterWhile, CmpInst::ICMP_EQ, andRes, CONST_V<width>(b, 1));
     BranchInst::Create(singleBit, nonSingleBit, rotateType, afterWhile);
@@ -1770,12 +1587,12 @@ static Value *doRorVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
                                     "", 
                                     singleBit);
     Value   *xorRes = BinaryOperator::CreateXor(msb, msb_1, "", singleBit);
-    F_WRITE(singleBit, "OF", xorRes);
+    F_WRITE(singleBit, OF, xorRes);
     BranchInst::Create(rest, singleBit);
 
     //if it is not single bit, zap OF
-    F_ZAP(nonSingleBit, "OF");
-    //F_SET(nonSingleBit, "OF"); //OF Set to match testSemantics
+    F_ZAP(nonSingleBit, OF);
+    //F_SET(nonSingleBit, OF); //OF Set to match testSemantics
     BranchInst::Create(rest, nonSingleBit);
 
     b = rest;

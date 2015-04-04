@@ -292,12 +292,11 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
         ret = doMIMovV<32>(ip, block, ADDR(0), addrInt);
-    }
-    else if( ip->is_data_offset() ) {
+    } else if( ip->is_data_offset() ) {
         if( ip->get_reloc_offset() < OP(5).getOffset() ) {
-            doMIMov<32>(ip,   block, STD_GLOBAL_OP(0), OP(5));
-        } else {
             doMIMovV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip));
+        } else {
+            doMIMov<32>(ip,   block, STD_GLOBAL_OP(0), OP(5));
         } 
         ret = ContinueBlock;
     } else { 
@@ -305,7 +304,6 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
     }
     return ret;
 }
-
 
 GENERIC_TRANSLATION_MEM(MOV8mr, 
 	doMRMov<8>(ip,    block, ADDR(0), OP(5)),

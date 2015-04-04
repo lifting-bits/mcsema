@@ -11,11 +11,14 @@ import idautils
 import idaapi
 import idc
 import sys
-import CFG_pb2
 from os import path
 import os
 import argparse
 import struct
+
+#hack for IDAPython to see google protobuf lib
+sys.path.append('/usr/lib/python2.7/dist-packages')
+import CFG_pb2
 
 _DEBUG = False
 
@@ -23,6 +26,8 @@ EXTERNALS = set()
 DATA_SEGMENTS = []
 
 RECOVERED_EAS = set()
+ACCESSED_VIA_JMP = set()
+
 EMAP = {}
 EMAP_DATA = {}
 
@@ -273,7 +278,7 @@ def addInst(block, addr, inst_bytes, true_target=None, false_target=None):
     str_val = "".join([chr(b) for b in inst_bytes])
     inst.inst_bytes = str_val
     inst.inst_len = len(inst_bytes)
-    
+
     if true_target != None: inst.true_target = true_target
     if false_target != None: inst.false_target = false_target
 
@@ -369,16 +374,21 @@ def handleJmpTable(I, inst, new_eas):
         return
 
     DEBUG("\tJMPTable Start: {0:x}\n".format(jstart))
+    seg_start = idc.SegStart(jstart)
+
+    if seg_start != idc.BADADDR:
+        I.jump_table.offset_from_data = jstart - seg_start
+        DEBUG("\tJMPTable offset from data: {:x}\n".format(I.jump_table.offset_from_data))
+
     I.jump_table.zero_offset = 0
     i = 0
-    entries = si.ncases
+    entries = si.get_jtable_size()
     for i in xrange(entries):
         je = readDword(jstart+i*jsize)
         I.jump_table.table_entries.append(je)
-        if je not in RECOVERED_EAS: 
+        if je not in RECOVERED_EAS and isStartOfFunction(je):
             new_eas.add(je)
         DEBUG("\t\tAdding JMPTable {0}: {1:x}\n".format(i, je))
-
     #je = idc.GetFixupTgtOff(jstart+i*jsize)
     #while je != -1:
     #    I.jump_table.table_entries.append(je)
@@ -405,6 +415,31 @@ def isElfThunk(ea):
             return True, fn
 
     return False, None
+
+def addDataReference(M, I, inst, dref, new_eas):
+    if inValidSegment(dref): 
+        if isExternalReference(dref):
+            fn = getFunctionName(dref)
+
+            fn = handleExternalRef(fn)
+            if isExternalData(fn):
+                I.ext_data_name = fn
+                sys.stdout.write("EXTERNAL DATA REF FROM {0:x} to {1}\n".format(inst, fn))
+            else:
+                I.ext_call_name = fn 
+                sys.stdout.write("EXTERNAL CODE REF FROM {0:x} to {1}\n".format(inst, fn))
+
+        elif isInternalCode(dref):
+            I.call_target = dref
+            if dref not in RECOVERED_EAS: 
+                new_eas.add(dref)
+        else:
+            dref_size = idc.ItemSize(dref)
+            DEBUG("\t\tData Ref: {0:x}, size: {1}\n".format(
+                dref, dref_size))
+            I.data_offset = handleDataRelocation(M, dref, new_eas)
+    else:
+        DEBUG("WARNING: Data not in valid segment {0:x}\n".format(dref))
 
 def instructionHandler(M, B, inst, new_eas):
     insn_t = idautils.DecodeInstruction(inst)
@@ -440,8 +475,10 @@ def instructionHandler(M, B, inst, new_eas):
         crefs.append(cref_i)
 
     is_call = isCall(inst)
-    isize = idautils.DecodeInstruction(inst).size
+    isize = insn_t.size
     next_ea = inst+isize
+
+    had_refs = False
  
     # this is a call $+5, needs special handling
     if len(crefs) == 0 and is_call and isize == 5:
@@ -457,6 +494,7 @@ def instructionHandler(M, B, inst, new_eas):
             return I, True
     
     for cref in crefs:
+        had_refs = True
         fn = getFunctionName(cref)
         if is_call:
 
@@ -508,33 +546,22 @@ def instructionHandler(M, B, inst, new_eas):
         I.reloc_offset = relo_off
 
     for dref in idautils.DataRefsFrom(inst):
+        had_refs = True
         if dref in crefs:
             continue
+        addDataReference(M, I, inst, dref, new_eas)
 
-        if inValidSegment(dref): 
-            if isExternalReference(dref):
-                fn = getFunctionName(dref)
-
-                fn = handleExternalRef(fn)
-                if isExternalData(fn):
-                    I.ext_data_name = fn
-                    sys.stdout.write("EXTERNAL DATA REF FROM {0:x} to {1}\n".format(inst, fn))
-                else:
-                    I.ext_call_name = fn 
-                    sys.stdout.write("EXTERNAL CODE REF FROM {0:x} to {1}\n".format(inst, fn))
-
-            elif isInternalCode(dref):
-                I.call_target = dref
-                if dref not in RECOVERED_EAS: 
-                    new_eas.add(dref)
-            else:
-                dref_size = idc.ItemSize(dref)
-                DEBUG("\t\tData Ref: {0:x}, size: {1}\n".format(
-                    dref, dref_size))
-                I.data_offset = handleDataRelocation(M, dref, new_eas)
-        else:
-            DEBUG("Data not in valid segment {0:x}\n".format(dref))
-
+    if not had_refs and isLinkedElf():
+        for op in insn_t.Operands:
+            if op.type == idc.o_imm:
+                # we have an immedaite.. check if its in a code or data section
+                begin_a = op.value
+                end_a = begin_a + idc.ItemSize(begin_a)
+                if isInData(begin_a, end_a):
+                    # add data reference
+                    addDataReference(M, I, inst, begin_a, new_eas)
+                #elif isInCode(begin_a, end_a):
+                # add code ref
 
     return I, False
 
@@ -641,6 +668,117 @@ def resolveRelocation(ea):
     else:
         return idc.GetFixupTgtOff(ea)
 
+def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
+    pf = idc.GetFlags(reloc_dest)
+
+    DS = D.symbols.add()
+    DS.base_address = offset+seg_offset
+
+    if idc.isCode(pf):
+        DS.symbol_name = "sub_"+hex(reloc_dest)
+        DEBUG("Code Ref: {0:x}!\n".format(reloc_dest))
+
+        if reloc_dest not in RECOVERED_EAS:
+            new_eas.add(reloc_dest)
+
+    elif idc.isData(pf):
+        reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
+        DS.symbol_name = "dta_"+hex(reloc_dest)
+        DEBUG("Data Ref!\n")
+    else:
+        reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
+        DS.symbol_name = "dta_"+hex(reloc_dest)
+        DEBUG("UNKNOWN Ref, assuming data\n")
+
+def isStartOfFunction(ea):
+    fname = idc.GetFunctionName(ea)
+    return ea == idc.LocByName(fname)
+
+def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
+    i = start
+    while i < end:
+        more_dref = [d for d in idautils.DataRefsFrom(i)]
+        dref_size = idc.ItemSize(i) or 1
+        if len(more_dref) == 0 and dref_size == 1:
+            dword = readDword(i)
+            DEBUG("Testing address: {0:x}... ".format(i))
+            # check for unmakred references
+            if isInData(dword, dword+1):
+                idc.MakeDword(i)
+                idc.add_dref(i, dword, idc.XREF_USER|idc.dr_O)
+                DEBUG("making New Data Reference at: {0:x} => {1:x}\n".format(i, dword))
+                dref_size = 4
+            elif isInternalCode(dword):
+                idc.MakeDword(i)
+                idc.AddCodeXref(i, dword, idc.XREF_USER|idc.fl_F)
+                DEBUG("making New Code Reference at: {0:x} => {1:x}\n".format(i, dword))
+                dref_size = 4
+            else:
+                DEBUG("not code or data ref\n")
+
+        i += dref_size
+
+    def insertReference(M, D, ea, pointsto, seg_offset, new_eas):
+        # do not make code references for mid-function code accessed via a JMP -- 
+        # they will be found via the jumptable code. This prevents the insertion
+        # of lots of extra code, but could be wrong for some cases
+        if ea in ACCESSED_VIA_JMP and not isStartOfFunction(pointsto):
+            # bail only if we are access via JMP and not the start
+            # of a function
+            DEBUG("\t\tNOT ADDING REF: {:08x} -> {:08x}\n".format(ea, pointsto))
+            return
+
+        DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}\n".format(ea, pointsto))
+        real_size = idc.ItemSize(pointsto)
+        DEBUG("\t\tReal Ref: {0:x}, size: {1}\n".format(pointsto, real_size))
+        insertRelocatedSymbol(M, D, pointsto, ea, seg_offset, new_eas)
+
+    def checkIfJumpData(ea, size):
+        """
+        Loop through ea to ea+size, and if 
+        every dword there points to code, this is a jump data section
+
+        returns true or false and list of recovered ea => destination mappings
+        """
+        table_map = {}
+        for jea in xrange(ea, ea+size, 4):
+            dword = readDword(jea)
+            if not isInternalCode(dword):
+                DEBUG("Dword {:x} does not point to code, not a table\n".format(dword))
+                return False, table_map
+
+            table_map[jea] = dword
+
+        return True, table_map
+
+    i = start
+    while i < end:
+        DEBUG("Checking address: {:x}\n".format(i))
+        dref_size = idc.ItemSize(i) or 1
+        if dref_size > 4 and dref_size % 4 == 0:
+            DEBUG("Possible table data at {:x}; size: {:x}\n".format(i, dref_size))
+            (is_table, addrs) = checkIfJumpData(i, dref_size)
+            if is_table:
+                DEBUG("Its a table, adding {} references\n".format(len(addrs)));
+                for ta in sorted(addrs.keys()):
+                    insertReference(M, D, ta, addrs[ta], seg_offset, new_eas)
+            else:
+                DEBUG("Its not a table\n");
+
+        elif dref_size == 4:
+            more_cref = [c for c in idautils.CodeRefsFrom(i,0)]
+            more_dref = [d for d in idautils.DataRefsFrom(i)]
+            more_dref.extend(more_cref)
+            if len(more_dref) > 0:
+                DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}\n".format(i, more_dref[0]))
+                if len(more_dref) == 1:
+                    insertReference(M, D, i, more_dref[0], seg_offset, new_eas)
+                else: 
+                    DEBUG("\t\tWARNING: Possible data ref problem\n");
+                    insertReference(M, D, i, more_dref[0], seg_offset, new_eas)
+
+        i += dref_size
+
 def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
 
     if start == 0:
@@ -648,36 +786,23 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
 
     i = idc.GetNextFixupEA(start-1)
 
-    while i < end and i != idc.BADADDR:
+    DEBUG("Looking for relocations in {:x} - {:x}\n".format(start, end))
 
-        pointsto = resolveRelocation(i)
-        fn = getFunctionName(i)
-        DEBUG("{0:x} Found reloc to: {1:x}\n".format(i, pointsto))
+    if i == idc.BADADDR:
+        DEBUG("No relocations in binary, scanning for data references\n");
+        # no fixups, do manual reloc searching
+        scanDataForRelocs(M, D, start, end, new_eas, seg_offset)
+    else:
+        DEBUG("Found relocations in binary..\n")
+        while i < end and i != idc.BADADDR:
+            pointsto = resolveRelocation(i)
+            fn = getFunctionName(i)
+            DEBUG("{0:x} Found reloc to: {1:x}\n".format(i, pointsto))
 
-        if not isExternalReference(pointsto):
-            pf = idc.GetFlags(pointsto)
+            if not isExternalReference(pointsto):
+                insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas)
 
-            DS = D.symbols.add()
-            DS.base_address = i+seg_offset
-
-            if idc.isCode(pf):
-                DS.symbol_name = "sub_"+hex(pointsto)
-                DEBUG("Code Ref: {0:x}!\n".format(pointsto))
-
-                if pointsto not in RECOVERED_EAS:
-                    new_eas.add(pointsto)
-
-            elif idc.isData(pf):
-                pointsto = handleDataRelocation(M, pointsto, new_eas)
-                DS.symbol_name = "dta_"+hex(pointsto)
-                DEBUG("Data Ref!\n")
-            else:
-                pointsto = handleDataRelocation(M, pointsto, new_eas)
-                DS.symbol_name = "dta_"+hex(pointsto)
-                DEBUG("UNKNOWN Ref, assuming data\n")
-
-
-        i = idc.GetNextFixupEA(i)
+            i = idc.GetNextFixupEA(i)
 
 def inValidSegment(ea):
     if idc.SegStart(ea) == idc.BADADDR:
@@ -804,6 +929,7 @@ def recoverBlock(startEA):
                 b.endEA = curEA
                 return b
 
+        # find EA of next inst
         nextEA = curEA+insn_t.size
 
         crefs = idautils.CodeRefsFrom(curEA, 1)
@@ -838,6 +964,20 @@ def recoverBlock(startEA):
                     b.succs.append(f)
             return b
 
+        # right now we know this block has one follows
+        # ...but does something else go there? 
+        # we may need to split the block anyway
+        orefs = idautils.CodeRefsTo(nextEA, 0)
+        # who else calls us?
+
+        orefs_list = [oref for oref in orefs]
+        if len(orefs_list) > 0:
+            b.endEA = nextEA
+            b.succs.append(nextEA)
+            return b
+
+        # else continue with instruction
+
 def getFunctionBlocks(startea):
     to_recover = [startea]
     
@@ -862,6 +1002,26 @@ def getFunctionBlocks(startea):
 
     return rv
 
+def preprocessBinary():
+    # loop through every instruction and
+    # keep a list of jump tables references in the
+    # data section. These are used so we can
+    # avoid generating unwanted function entry points
+    for seg_ea in idautils.Segments():
+        for head in idautils.Heads(seg_ea, idc.SegEnd(seg_ea)):
+            if idc.isCode(idc.GetFlags(head)):
+                si = idaapi.get_switch_info_ex(head)
+                if si is not None and isUnconditionalJump(head):
+                    DEBUG("Found a jmp based switch at: {0:x}\n".format(head))
+                    esize = si.get_jtable_element_size()
+                    base = si.jumps
+                    count = si.get_jtable_size()
+                    for i in xrange(count):
+                        fulladdr = base+i*esize
+                        DEBUG("Address accessed via JMP: {:x}\n".format(fulladdr))
+                        ACCESSED_VIA_JMP.add(fulladdr)
+
+
 def recoverCfg(to_recover, outf, exports_are_apis=False):
     M = CFG_pb2.Module()
     M.module_name = idc.GetInputFile()
@@ -874,6 +1034,9 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
         exports[exp_name] = exp_ea
         
     new_eas = set()
+
+    preprocessBinary()
+
     processDataSegments(M, new_eas)
 
     for name in to_recover:

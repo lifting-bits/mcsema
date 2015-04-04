@@ -35,12 +35,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <vector>
 #include "Externals.h"
 #include "../common/to_string.h"
+#include "../common/Defaults.h"
 #include "JumpTables.h"
 #include "llvm/Support/Debug.h"
 
 using namespace llvm;
 
-static InstTransResult doRet(InstPtr ip, BasicBlock    *b) {
+static InstTransResult doRet(BasicBlock    *b) {
     //do a read from the location pointed to by ESP
     Value       *rESP = R_READ<32>(b, X86::ESP);
     Value       *nESP =
@@ -50,13 +51,10 @@ static InstTransResult doRet(InstPtr ip, BasicBlock    *b) {
     R_WRITE<32>(b, X86::ESP, nESP); 
 
     //spill all locals into the structure
-    writeLocalsToContext(b, 32);
+    writeLocalsToContext(b, 32, ABIRetStore);
 
     ReturnInst::Create(b->getContext(), b);
     
-    //can be useful for debugging
-    //llvm::dbgs() << "Have a ret at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
-
     return EndCFG;
 }
 
@@ -80,7 +78,7 @@ static InstTransResult doRetI(BasicBlock *&b, const MCOperand &o) {
     R_WRITE<32>(b, X86::ESP, nESP); 
 
     //spill all locals into the structure
-    writeLocalsToContext(b, 32);
+    writeLocalsToContext(b, 32, ABIRetStore);
     ReturnInst::Create(b->getContext(), b); 
     return EndCFG;
 }
@@ -138,7 +136,7 @@ static InstTransResult doLoopE(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
         new ICmpInst(*b, CmpInst::ICMP_NE, count_dec, CONST_V<32>(b, 0));
 
     //also test and see if ZF is 1
-    Value   *zf = F_READ(b, "ZF");
+    Value   *zf = F_READ(b, ZF);
     Value   *zfRes = 
         new ICmpInst(*b, CmpInst::ICMP_EQ, zf, CONST_V<1>(b, 1));
     
@@ -167,7 +165,7 @@ static InstTransResult doLoopNE(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
         new ICmpInst(*b, CmpInst::ICMP_NE, count_dec, CONST_V<32>(b, 0));
 
     //test and see if ZF is 0
-    Value   *zf = F_READ(b, "ZF");
+    Value   *zf = F_READ(b, ZF);
     Value   *zfRes = 
         new ICmpInst(*b, CmpInst::ICMP_EQ, zf, CONST_V<1>(b, 0));
     
@@ -179,6 +177,14 @@ static InstTransResult doLoopNE(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
     return EndBlock;
 }
 
+
+static void writeFakeReturnAddr(BasicBlock *block) {
+  Value   *espOld = R_READ<32>(block, X86::ESP);
+  Value   *espSub = 
+      BinaryOperator::CreateSub(espOld, CONST_V<32>(block, 4), "", block);
+  M_WRITE_0<32>(block, espSub, CONST_V<32>(block, 0xbadf00d0));
+  R_WRITE<32>(block, X86::ESP, espSub);
+}
 
 static void doCallV(BasicBlock       *&block,
                     InstPtr ip,
@@ -199,13 +205,13 @@ static void doCallV(BasicBlock       *&block,
   args.push_back(call_addr);
 
   //sink context 
-  writeLocalsToContext(block, 32);
+  writeLocalsToContext(block, 32, ABICallStore);
   
   //insert the call
   CallInst::Create(doCallVal, args, "", block);
 
   //restore context
-  writeContextToLocals(block, 32);
+  writeContextToLocals(block, 32, ABIRetSpill);
 }
 
 template <int width>
@@ -214,6 +220,13 @@ static void doCallM(BasicBlock       *&block,
                     Value *mem_addr)
 {
     Value *call_addr = M_READ<width>(ip, block, mem_addr);
+
+    Module *M = block->getParent()->getParent();
+    const std::string &triple = M->getTargetTriple();
+    if(triple != WINDOWS_TRIPLE) {
+        writeFakeReturnAddr(block);
+    }
+
     return doCallV(block, ip, call_addr);
 }
 
@@ -231,14 +244,10 @@ static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr) {
 
     TASSERT( F != NULL, "Could not find function: " + fname );
 
-    Value   *espOld = R_READ<32>(b, X86::ESP);
-    Value   *espSub = 
-        BinaryOperator::CreateSub(espOld, CONST_V<32>(b, 4), "", b);
-    M_WRITE_0<32>(b, espSub, CONST_V<32>(b, 0xbadf00d0));
-    R_WRITE<32>(b, X86::ESP, espSub);
+    writeFakeReturnAddr(b);
 
 	//we need to wrap up our current context
-	writeLocalsToContext(b, 32);
+	writeLocalsToContext(b, 32, ABICallStore);
 
 	//make the call, the only argument should be our parents arguments
 	TASSERT(ourF->arg_size() == 1, "");
@@ -261,7 +270,7 @@ static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr) {
     }
 
 	//spill our context back
-	writeContextToLocals(b, 32);
+	writeContextToLocals(b, 32, ABIRetSpill);
 
 	//and we can continue to run the old code
 
@@ -352,6 +361,8 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
 
     CallInst    *callR = CallInst::Create(externFunction, arguments, "", b);
     callR->setCallingConv(externFunction->getCallingConv());
+   
+    noAliasMCSemaScope(callR); 
 
     if ( externFunction->doesNotReturn() ) {
         // noreturn functions just hit unreachable
@@ -370,7 +381,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
     // we returned from an extern: assume it cleared the direction flag
     // which is standard for MS calling conventions
     //
-    F_CLEAR(b, "DF");
+    F_CLEAR(b, DF);
    
     //if our convention says to keep the call result alive then do it
     //really, we could always keep the call result alive...
@@ -404,7 +415,7 @@ static InstTransResult translate_JMP32m(NativeModulePtr natM, BasicBlock *& bloc
         std::string  s = ip->get_ext_call_target()->getSymbolName();
         ret = doCallPCExtern(block, s, true);
         if (ret != EndBlock) {
-            return doRet(ip, block);
+            return doRet(block);
         } else {
             // noreturn api calls don't need to fix stack
             return ret;
@@ -415,7 +426,7 @@ static InstTransResult translate_JMP32m(NativeModulePtr natM, BasicBlock *& bloc
         doJumpTableViaData(natM, block, ip, inst);
         // return a "ret", since the jmp is simulated
         // as a call/ret pair
-        return doRet(ip, block);
+        return doRet(block);
 
     } else if(ip->has_jump_table()) {
         // this is a conformant jump table
@@ -494,15 +505,18 @@ static InstTransResult translate_CALL32r(NativeModulePtr  natM,
   //register, then make a call to the external procedure. 
   //the external procedure has a signature of
   // void do_call_value(Value *loc, struct regs *r); 
-  
-  //NIY("do_call_value needs inlined implementation, not finished yet");
-
 
   TASSERT(inst.getNumOperands() == 1, "");
   TASSERT(tgtOp.isReg(), "");
 
   //read the register
   Value *fromReg = R_READ<32>(block, tgtOp.getReg());
+
+  Module *M = block->getParent()->getParent();
+  const std::string &triple = M->getTargetTriple();
+  if(triple != WINDOWS_TRIPLE) {
+      writeFakeReturnAddr(block);
+  }
 
   doCallV(block, ip, fromReg);
 
@@ -514,18 +528,33 @@ static InstTransResult translate_JMP32r(NativeModulePtr  natM,
                                          InstPtr          ip,
                                          MCInst           &inst)
 {
-  const MCOperand &tgtOp = inst.getOperand(0);
+    const MCOperand &tgtOp = inst.getOperand(0);
 
-  TASSERT(inst.getNumOperands() == 1, "");
-  TASSERT(tgtOp.isReg(), "");
+    TASSERT(inst.getNumOperands() == 1, "");
+    TASSERT(tgtOp.isReg(), "");
 
-  //read the register
-  Value *fromReg = R_READ<32>(block, tgtOp.getReg());
+    //read the register
+    Value *fromReg = R_READ<32>(block, tgtOp.getReg());
 
-  // translate the JMP32r as a call/ret
-  doCallV(block, ip, fromReg);
+    if (ip->has_jump_table()) {
+        // this is a jump table that got converted
+        // into a table in the data section
+        llvm::dbgs() << __FUNCTION__ << ": jump table via register: " << to_string<VA>(ip->get_loc(), std::hex) << "\n";
 
-  return doRet(ip, block);
+        BasicBlock *defaultb = nullptr;
+        
+        doJumpTableViaSwitchReg(block, ip, fromReg, defaultb);
+        TASSERT(defaultb != nullptr, "Default block has to exit");
+        // fallback to doing do_call_value
+        doCallV(defaultb, ip, fromReg);
+        return doRet(defaultb);
+
+    } else {
+        // translate the JMP32r as a call/ret
+        llvm::dbgs() << __FUNCTION__ << ": regular jump via register: " << to_string<VA>(ip->get_loc(), std::hex) << "\n";
+        doCallV(block, ip, fromReg);
+        return doRet(block);
+    }
 }
 
 #define BLOCKNAMES_TRANSLATION(NAME, THECALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {\
@@ -543,7 +572,7 @@ static InstTransResult translate_JMP32r(NativeModulePtr  natM,
 BLOCKNAMES_TRANSLATION(LOOP, doLoop(block, ifTrue, ifFalse))
 BLOCKNAMES_TRANSLATION(LOOPE, doLoopE(block, ifTrue, ifFalse))
 BLOCKNAMES_TRANSLATION(LOOPNE, doLoopNE(block, ifTrue, ifFalse))
-GENERIC_TRANSLATION(RET, doRet(ip, block))
+GENERIC_TRANSLATION(RET, doRet(block))
 GENERIC_TRANSLATION(RETI, doRetI(block, OP(0)))
 BLOCKNAMES_TRANSLATION(JMP_4, doNonCondBranch(block, ifTrue))
 BLOCKNAMES_TRANSLATION(JMP_1, doNonCondBranch(block, ifTrue))

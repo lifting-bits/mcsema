@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Instrs.h"
 #include "x86Helpers.h"
 #include "ArchOps.h"
+#include "RegisterUsage.h"
 
 #include <llvm/Object/COFF.h>
 #include <llvm/IR/Constants.h>
@@ -40,13 +41,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/DIBuilder.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/LinkAllPasses.h"
 
 
 #include "llvm/IR/Type.h"
-#include "llvm/IR/Metadata.h"
 #include "postPasses.h"
 #include <boost/graph/breadth_first_search.hpp>
 #include "Externals.h"
@@ -55,12 +54,24 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <vector>
 #include <llvm/IR/InlineAsm.h>
+#include <llvm/IR/MDBuilder.h>
 
 using namespace llvm;
 using namespace std;
 
 bool ignoreUnsupportedInsts = false;
 
+#include <llvm/ADT/SmallVector.h>
+
+Instruction *noAliasMCSemaScope(Instruction *inst) {
+    //TODO this requires newer version of LLVM
+    return inst;
+}
+
+Instruction *aliasMCSemaScope(Instruction *inst) {
+    //TODO this requires newer version of LLVM
+    return inst;
+}
 
 CallingConv::ID getLLVMCC(ExternalCodeRef::CallingConvention cc) {
     switch(cc) {
@@ -93,7 +104,7 @@ void M_WRITE_T(InstPtr ip, llvm::BasicBlock *b, llvm::Value *addr, llvm::Value *
 		writeLoc = llvm::CastInst::CreatePointerCast(addr, ptrtype, "", b);
 	}
 
-    llvm::Value   *written = new llvm::StoreInst(data, writeLoc, b);
+    llvm::Instruction   *written = noAliasMCSemaScope(new llvm::StoreInst(data, writeLoc, b));
     TASSERT(written != NULL, "Failed to create StoreInst");
 
     return;
@@ -154,196 +165,6 @@ int mapPlatRegToOffset(unsigned reg) {
     return -1;
 }
 
-string mapPlatRegToStr(unsigned reg) {
-    //UPDATEREGS
-    switch(reg) {
-        case X86::AX:
-        case X86::AH:
-        case X86::AL:
-        case X86::EAX:
-            return "EAX";
-            break;
-        case X86::BX:
-        case X86::BH:
-        case X86::BL:
-        case X86::EBX:
-            return "EBX";
-            break;
-        case X86::CX:
-        case X86::CH:
-        case X86::CL:
-        case X86::ECX:
-            return "ECX";
-            break;
-        case X86::DX:
-        case X86::DH:
-        case X86::DL:
-        case X86::EDX:
-            return "EDX";
-            break;
-        case X86::SI:
-        case X86::ESI:
-            return "ESI";
-            break;
-        case X86::DI:
-        case X86::EDI:
-            return "EDI";
-            break;
-        case X86::SP:
-        case X86::ESP:
-            return "ESP";
-            break;
-        case X86::BP:
-        case X86::EBP:
-            return "EBP";
-            break;
-        case X86::ST0:
-            return "ST0";
-            break;
-        case X86::ST1:
-            return "ST1";
-            break;
-        case X86::ST2:
-            return "ST2";
-            break;
-        case X86::ST3:
-            return "ST3";
-            break;
-        case X86::ST4:
-            return "ST4";
-            break;
-        case X86::ST5:
-            return "ST5";
-            break;
-        case X86::ST6:
-            return "ST6";
-            break;
-        case X86::ST7:
-            return "ST7";
-            break;
-        case X86::XMM0:
-            return "XMM0";
-            break;
-        case X86::XMM1:
-            return "XMM1";
-            break;
-         case X86::XMM2:
-            return "XMM2";
-            break;
-         case X86::XMM3:
-            return "XMM3";
-            break;
-         case X86::XMM4:
-            return "XMM4";
-            break;
-         case X86::XMM5:
-            return "XMM5";
-            break;
-         case X86::XMM6:
-            return "XMM6";
-            break;
-         case X86::XMM7:
-            return "XMM7";
-            break;
-        default:
-            throw TErr(__LINE__, __FILE__, "Reg type "+to_string<unsigned>(reg, dec)+" is unknown");
-            return "";
-    }
-}
-
-int mapStrToFloatOff(std::string regName)
-{
-    int off = StringSwitch<int>(regName)
-        .Case("ST0", 0) // NOT A MISTAKE. These
-        .Case("ST1", 1) // are in a separate structure
-        .Case("ST2", 2)
-        .Case("ST3", 3)
-        .Case("ST4", 4)
-        .Case("ST5", 5)
-        .Case("ST6", 6)
-        .Case("ST7", 7)
-        .Default(-1);
-   
-    if( off == -1 )
-      throw  TErr(__LINE__, __FILE__, "Float reg name "+regName+" unknown");
-
-    return off;
-}
-
-int mapStrToGEPOff(string regName) {
-    int off = StringSwitch<int>(regName)
-        //UPDATEREGS
-        .Case("EAX", 0)
-        .Case("EBX", 1)
-        .Case("ECX", 2)
-        .Case("EDX", 3)
-        .Case("ESI", 4)
-        .Case("EDI", 5)
-        .Case("ESP", 6)
-        .Case("EBP", 7)
-        .Case("CF", 8)
-        .Case("PF", 9)
-        .Case("AF", 10)
-        .Case("ZF", 11)
-        .Case("SF", 12)
-        .Case("OF", 13)
-        .Case("DF", 14)
-        .Case("ST0", 15) // NOT A MISTAKE. These
-        .Case("ST1", 15) // are in a separate structure
-        .Case("ST2", 15)
-        .Case("ST3", 15)
-        .Case("ST4", 15)
-        .Case("ST5", 15)
-        .Case("ST6", 15)
-        .Case("ST7", 15)
-        .Case("FPU_B",  16)
-        .Case("FPU_C3", 17)
-        .Case("FPU_TOP",18)
-        .Case("FPU_C2", 19)
-        .Case("FPU_C1", 20)
-        .Case("FPU_C0", 21)
-        .Case("FPU_ES", 22)
-        .Case("FPU_SF", 23)
-        .Case("FPU_PE", 24)
-        .Case("FPU_UE", 25)
-        .Case("FPU_OE", 26)
-        .Case("FPU_ZE", 27)
-        .Case("FPU_DE", 28)
-        .Case("FPU_IE", 29)
-        .Case("FPU_X" ,  30)
-        .Case("FPU_RC", 31)
-        .Case("FPU_PC", 32)
-        .Case("FPU_PM", 33)
-        .Case("FPU_UM", 34)
-        .Case("FPU_OM", 35)
-        .Case("FPU_ZM", 36)
-        .Case("FPU_DM", 37)
-        .Case("FPU_IM", 38)
-        .Case("FPU_TAG", 39)
-		.Case("FPU_LASTIP_SEG", 40)
-		.Case("FPU_LASTIP_OFF", 41)
-		.Case("FPU_LASTDATA_SEG", 42)
-		.Case("FPU_LASTDATA_OFF", 43)
-		.Case("FPU_FOPCODE", 44)
-		.Case("XMM0", 45)
-		.Case("XMM1", 46)
-		.Case("XMM2", 47)
-		.Case("XMM3", 48)
-		.Case("XMM4", 49)
-		.Case("XMM5", 50)
-		.Case("XMM6", 51)
-		.Case("XMM7", 52)
-		.Case("STACK_BASE", 53)
-		.Case("STACK_LIMIT", 54)
-        .Default(-1);
-        
-        
-    if( off == -1 )
-      throw  TErr(__LINE__, __FILE__, "Float reg name "+regName+" unknown");
-
-    return off;
-}
-
 class bfs_cfg_visitor : public boost::default_bfs_visitor {
 private:
     NativeFunctionPtr   natFun;
@@ -361,6 +182,7 @@ Value *lookupLocalByName(Function *F, string localName) {
     BasicBlock  *entry = &F->getEntryBlock();
     BasicBlock::iterator    it = entry->begin(); 
 
+    localName += "_val";
     while(it != entry->end() ) {
         Value   *v = it;
         
@@ -377,46 +199,84 @@ Value *lookupLocalByName(Function *F, string localName) {
 }
 
 Value *MCRegToValue(BasicBlock *b, unsigned reg) {
-    string      regValName = mapPlatRegToStr(reg);
+    unsigned realReg = reg;
+    switch(reg)
+    {
+        case X86::AX:
+        case X86::AH:
+        case X86::AL:
+            realReg = X86::EAX;
+            break;
+        case X86::BX:
+        case X86::BH:
+        case X86::BL:
+            realReg = X86::EBX;
+            break;
+        case X86::CX:
+        case X86::CH:
+        case X86::CL:
+            realReg = X86::ECX;
+            break;
+        case X86::DX:
+        case X86::DH:
+        case X86::DL:
+            realReg = X86::EDX;
+            break;
+        case X86::SI:
+            realReg = X86::ESI;
+            break;
+        case X86::DI:
+            realReg = X86::EDI;
+            break;
+        case X86::SP:
+            realReg = X86::ESP;
+            break;
+        case X86::BP:
+            realReg = X86::EBP;
+            break;
+        default:
+            break;
+    }
     Function    *F = b->getParent();
 
-    return lookupLocalByName(F, regValName+"_val");
+    return lookupLocal(F, (MCSemaRegs)realReg);
 }
 
-Value *GENERIC_READREG(BasicBlock *b, string regname) {
-    Value       *localRegVar = lookupLocalByName(b->getParent(), regname+"_val");
-    Instruction *readFlag = new LoadInst(localRegVar, "", b);
+Value *GENERIC_READREG(BasicBlock *b, MCSemaRegs reg) {
+    Value       *localRegVar = lookupLocal(b->getParent(), reg);
+    Instruction *readFlag = noAliasMCSemaScope(new LoadInst(localRegVar, "", b));
     return readFlag;
 }
 
-Value *F_READ(BasicBlock *b, string flag) {
+Value *F_READ(BasicBlock *b, MCSemaRegs flag) {
     return GENERIC_READREG(b, flag);
 }
 
-void GENERIC_WRITEREG(BasicBlock *b, string regname, Value *v) {
-    Value   *localRegVar = lookupLocalByName(b->getParent(), regname+"_val");
+void GENERIC_WRITEREG(BasicBlock *b, MCSemaRegs reg, Value *v) {
+    Value   *localRegVar = lookupLocal(b->getParent(), reg);
+    std::string regName = getRegisterName(reg);
     if(localRegVar == NULL)
-      throw TErr(__LINE__, __FILE__, "regname "+regname+" not found");
-    Value   *st = new StoreInst(v, localRegVar, b);
+      throw TErr(__LINE__, __FILE__, "regname "+regName+" not found");
+    Instruction   *st = noAliasMCSemaScope(new StoreInst(v, localRegVar, b));
     TASSERT(st != NULL, "");
     return;
 }
 
-void F_WRITE(BasicBlock *b, string flag, Value *v) {
+void F_WRITE(BasicBlock *b, MCSemaRegs flag, Value *v) {
     return GENERIC_WRITEREG(b, flag, v);
 }
 
-void F_ZAP(BasicBlock *b, string flag) { 
+void F_ZAP(BasicBlock *b, MCSemaRegs flag) { 
     F_WRITE(b, flag, UndefValue::get(Type::getInt1Ty(b->getContext())));
     return;
 }
 
-void F_SET(BasicBlock *b, string flag) {
+void F_SET(BasicBlock *b, MCSemaRegs flag) {
     F_WRITE(b, flag, CONST_V<1>(b, 1));
     return;
 }
 
-void F_CLEAR(BasicBlock *b, string flag) {
+void F_CLEAR(BasicBlock *b, MCSemaRegs flag) {
     F_WRITE(b, flag, CONST_V<1>(b, 0));
     return;
 }
@@ -600,8 +460,13 @@ InstTransResult disInstr(   InstPtr             ip,
                             NativeBlockPtr      nb,
                             Function            *F,
                             NativeFunctionPtr   natF,
-                            NativeModulePtr     natM) 
+                            NativeModulePtr     natM,
+			    bool doAnnot) 
 {
+    //Instruction *begin_marker = *(block->rbegin()); // llvm3.4
+    //BasicBlock::iterator begin_marker = block->getFirstInsertionPt();
+    
+    BasicBlock *ob = block;
 
     size_t bsize_pre = block->size();
 
@@ -610,6 +475,22 @@ InstTransResult disInstr(   InstPtr             ip,
     
     //in the future, we could have different target decoders here
     InstTransResult disInst_result = disInstrX86(ip, block, nb, F, natF, natM);
+
+    if(block == ob) {
+
+        BasicBlock::iterator begin_marker = block->begin();
+        for(int i = bsize_pre; i > 0; i--) {
+            ++begin_marker;
+        }
+
+    } else {
+        llvm::outs() << "Not annotating an instruction since it emits more than one block\n";
+    }
+
+    //add source annotation information to the CFG
+    //info will be added to every llvm inst, so any prettyprinters
+    //should trim off the excess. we add the annotation to every line
+    //in case optimizations remove llvm insts. 
 
     return disInst_result; 
 }
@@ -662,7 +543,7 @@ void bfs_cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
         InstPtr inst = *it;
 
         InstTransResult r = 
-            disInstr(inst, curLLVMBlock, curBlock, this->F, this->natFun, this->natMod);
+            disInstr(inst, curLLVMBlock, curBlock, this->F, this->natFun, this->natMod, true);
 
         if( r == TranslateError ) {
             this->didError = true;
@@ -672,6 +553,18 @@ void bfs_cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
             this->didError = true;
             break;
         }
+    }
+
+    // we may need to insert a branch inst to the successor
+    // if the block ended on a non-terminator (this happens since we
+    // may split blocks in cfg recovery to avoid code duplication)
+    if(follows.size() == 1 && curLLVMBlock->getTerminator() == nullptr) 
+    {
+        VA blockBase = *(follows.begin());
+        std::string  bbName = "block_0x"+to_string<VA>(blockBase, std::hex);
+        BasicBlock   *nextBB = bbFromStrName(bbName, this->F);
+
+        BranchInst::Create(nextBB, curLLVMBlock);
     }
 
     return;
@@ -693,7 +586,6 @@ static bool insertFunctionIntoModule(NativeModulePtr mod, NativeFunctionPtr func
         cout << "\tReturning current function instead" << std::endl;
         return true;
     }
-
     
     //create the entry block for the function
     //this block will alloca cells on the 'stack' for every register in the 
@@ -705,7 +597,8 @@ static bool insertFunctionIntoModule(NativeModulePtr mod, NativeFunctionPtr func
 
     allocateLocals(F, 32);
     //and at the beginning of the function, we spill all the context
-    writeContextToLocals(entryBlock, 32);
+    writeContextToLocals(entryBlock, 32, ABICallSpill);
+    //writeContextToLocals(entryBlock, 32, AllRegs);
 
     //then we put an unconditional branch from the 'entry' block to the first
     //block, and we create the first block
@@ -746,8 +639,10 @@ bool doPostAnalysis(NativeModulePtr N, Module *M) {
   FunctionPassManager functionPasses(M);
   PassManagerBuilder  builder;
 
+  llvm::errs() << "in : " << __FUNCTION__ << "\n";
+
   builder.OptLevel = 1;
-  builder.SizeLevel = 0;
+  builder.SizeLevel = 2;
 
   //register our specific analyses
   registerPostPasses(builder);
@@ -883,7 +778,7 @@ bool addEntryPointDriver(Module *M,
         // set ecx to arg[0]
         if(fwd_it != fwd_end) {
 
-            int   k = mapStrToGEPOff("ECX");
+            int   k = getRegisterOffset(ECX);
             Value *ecxFieldGEPV[] = {
                 CONST_V<32>(driverBB, 0),
                 CONST_V<32>(driverBB, k)
@@ -895,13 +790,13 @@ bool addEntryPointDriver(Module *M,
             Value *ecxP = 
                 GetElementPtrInst::CreateInBounds(aCtx, ecxFieldGEPV, "", driverBB);
             Argument  *curArg = &(*fwd_it);
-            new StoreInst(curArg, ecxP, driverBB);
+            aliasMCSemaScope(new StoreInst(curArg, ecxP, driverBB));
         }
         // make __fastcall functions work:
         // set edx to arg[1]
         ++fwd_it;
         if(fwd_it != fwd_end) {
-            int   k = mapStrToGEPOff("EDX");
+            int   k = getRegisterOffset(EDX);
             Value *edxFieldGEPV[] = {
                 CONST_V<32>(driverBB, 0),
                 CONST_V<32>(driverBB, k)
@@ -915,7 +810,7 @@ bool addEntryPointDriver(Module *M,
             
 
             Argument  *curArg = &(*fwd_it);
-            new StoreInst(curArg, edxP, driverBB);
+            aliasMCSemaScope(new StoreInst(curArg, edxP, driverBB));
         }
     } // fastcall
 
@@ -962,9 +857,9 @@ bool addEntryPointDriver(Module *M,
     {
       Argument  *curArg = &(*it);
       // convert to int32 ptr
-      Value *stackPosPtr = new IntToPtrInst(stackPosInt, int32PtrTy, "", driverBB );
+      Value *stackPosPtr = noAliasMCSemaScope(new IntToPtrInst(stackPosInt, int32PtrTy, "", driverBB ));
       // write argument
-      Value *k = new StoreInst(curArg, stackPosPtr, driverBB);
+      Instruction *k = noAliasMCSemaScope(new StoreInst(curArg, stackPosPtr, driverBB));
       // decrement stack
       stackPosInt = BinaryOperator::Create(BinaryOperator::Sub,
                 stackPosInt, CONST_V<32>(driverBB, 4), "", driverBB);
@@ -972,17 +867,17 @@ bool addEntryPointDriver(Module *M,
       --args_to_push;
     }
 
-    int   k = mapStrToGEPOff("ESP");
+    int   k = getRegisterOffset(ESP);
     Value *spFieldGEPV[] = {
       CONST_V<32>(driverBB, 0),
       CONST_V<32>(driverBB, k)
     };
-    k = mapStrToGEPOff("STACK_BASE");
+    k = getRegisterOffset(STACK_BASE);
     Value *stackBaseGEPV[] = {
       CONST_V<32>(driverBB, 0),
       CONST_V<32>(driverBB, k)
     };
-    k = mapStrToGEPOff("STACK_LIMIT");
+    k = getRegisterOffset(STACK_LIMIT);
     Value *stackLimitGEPV[] = {
       CONST_V<32>(driverBB, 0),
       CONST_V<32>(driverBB, k)
@@ -998,12 +893,12 @@ bool addEntryPointDriver(Module *M,
       GetElementPtrInst::CreateInBounds(aCtx, stackLimitGEPV, "", driverBB);
 
     // stack limit = start of allocation (stack grows down);
-    new StoreInst(aStack, sLimitValP, driverBB);
+    Instruction *tmp1 = aliasMCSemaScope(new StoreInst(aStack, sLimitValP, driverBB));
     // stack base = stack alloc start + stack size
-    new StoreInst(stackBaseInt, sBaseValP, driverBB);
+    Instruction *tmp2 = aliasMCSemaScope(new StoreInst(stackBaseInt, sBaseValP, driverBB));
 
     // all functions assume DF is clear on entry
-    k = mapStrToGEPOff("DF");
+    k = getRegisterOffset(DF);
     Value *dflagGEPV[] = {
       CONST_V<32>(driverBB, 0),
       CONST_V<32>(driverBB, k)
@@ -1012,10 +907,10 @@ bool addEntryPointDriver(Module *M,
     Value *dflagP = 
       GetElementPtrInst::CreateInBounds(aCtx, dflagGEPV, "", driverBB);
 
-    new StoreInst(CONST_V<1>(driverBB, 0), dflagP, driverBB);
+    Instruction *tmp3 = aliasMCSemaScope(new StoreInst(CONST_V<1>(driverBB, 0), dflagP, driverBB));
 
 
-    Value *j = new StoreInst(stackPosInt, spValP, driverBB);
+    Instruction *j = aliasMCSemaScope(new StoreInst(stackPosInt, spValP, driverBB));
     TASSERT(j != NULL, "Could not write stack value to ESP");
 
     //call the sub function with register struct as argument
@@ -1031,7 +926,7 @@ bool addEntryPointDriver(Module *M,
     //if we are requested, return the EAX value, else return void
     if(ret) {
       //do a GEP and load for the EAX register in the reg structure 
-      int j = mapStrToGEPOff("EAX");
+      int j = getRegisterOffset(EAX);
       Value *eaxGEPV[] = {
         CONST_V<32>(driverBB, 0), 
         CONST_V<32>(driverBB, j)
@@ -1039,7 +934,7 @@ bool addEntryPointDriver(Module *M,
 
       Value *eaxVP = 
         GetElementPtrInst::CreateInBounds(aCtx, eaxGEPV, "", driverBB);
-      Value *eaxV = new LoadInst(eaxVP, "", driverBB);
+      Instruction *eaxV = aliasMCSemaScope(new LoadInst(eaxVP, "", driverBB));
 
       //return that value 
       ReturnInst::Create(driverF->getContext(), eaxV, driverBB);
@@ -1091,7 +986,7 @@ static GlobalVariable* getSectionForDataAddr(
         if(data_addr >= start && data_addr < end) {
             std::string gvar_name = "data_0x" + to_string<VA>(start, hex);//+"_ptr";
             section_base = start;
-            return M->getNamedGlobal(gvar_name);
+            return M->getNamedGlobal(gvar_name); 
         }
         
     }
@@ -1261,9 +1156,8 @@ static bool insertDataSections(NativeModulePtr natMod, Module *M, raw_ostream &r
         // create an initializer list using the now filled in opaque
         // structure type
         Constant *cst = ConstantStruct::get(st_opaque, secContents);
-        // byte aligned since we are not sure what kind of pointer arithmetic
-        // has taken place
-        g->setAlignment(1);
+        // align on 32-byte boundary, max needed by SSE instructions
+        g->setAlignment(32);
         g->setInitializer(cst);
 
         git++;

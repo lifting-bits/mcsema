@@ -322,7 +322,14 @@ InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder)
           table_entries.push_back(jmp_tbl.table_entries(i));
       }
       
-      MCSJumpTable *jmp = new MCSJumpTable(table_entries, jmp_tbl.zero_offset());
+      VA data_offset = (VA)(-1);
+      if (jmp_tbl.has_offset_from_data()) {
+          data_offset = jmp_tbl.offset_from_data();
+      }
+      MCSJumpTable *jmp = new MCSJumpTable(
+              table_entries, 
+              jmp_tbl.zero_offset(),
+              data_offset);
       ip->set_jump_table(MCSJumpTablePtr(jmp));
   }
 

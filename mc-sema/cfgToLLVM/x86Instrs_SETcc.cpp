@@ -40,8 +40,8 @@ static Value *doSetaV(InstPtr ip, BasicBlock *&b)
 
     // set 1 if CF==0 && ZF==0
     // else, set 0
-    Value *cf_val = F_READ(b, "CF");
-    Value *zf_val = F_READ(b, "ZF");
+    Value *cf_val = F_READ(b, CF);
+    Value *zf_val = F_READ(b, ZF);
 
     // cf|zf == 0 iff cf == 0 && zf == 0
     Value   *f_or = 
@@ -60,7 +60,7 @@ static Value *doSetbV(InstPtr ip, BasicBlock *&b)
 {
     // setb == set if cf == 1
     // essentially, read CF
-    Value *cf_val = F_READ(b, "CF");
+    Value *cf_val = F_READ(b, CF);
 
     // zero extend to desired width
     Value   *ext_to_set = new ZExtInst(cf_val, Type::getIntNTy(b->getContext(), 8), "", b);
@@ -72,7 +72,7 @@ static Value *doSetsV(InstPtr ip, BasicBlock *&b)
 {
     // sets == set if sf == 1
     // essentially, read SF
-    Value *sf_val = F_READ(b, "SF");
+    Value *sf_val = F_READ(b, SF);
 
     // zero extend to desired width
     Value   *ext_to_set = new ZExtInst(sf_val, Type::getIntNTy(b->getContext(), 8), "", b);
@@ -84,7 +84,7 @@ static Value *doSetsV(InstPtr ip, BasicBlock *&b)
 static Value *doSetaeV(InstPtr ip, BasicBlock *&b)
 {
     //read CF
-    Value *cf_val = F_READ(b, "CF");
+    Value *cf_val = F_READ(b, CF);
 
     //compare to 0
     Value *cmp_res = 
@@ -99,7 +99,7 @@ static Value *doSetaeV(InstPtr ip, BasicBlock *&b)
 static Value *doSetneV(InstPtr ip, BasicBlock *&b)
 {
     //read ZF
-    Value *zf_val = F_READ(b, "ZF");
+    Value *zf_val = F_READ(b, ZF);
 
     //compare to 0
     Value *cmp_res = 
@@ -114,7 +114,7 @@ static Value *doSetneV(InstPtr ip, BasicBlock *&b)
 static Value *doSeteV(InstPtr ip, BasicBlock *&b)
 {
     //read ZF
-    Value *zf_val = F_READ(b, "ZF");
+    Value *zf_val = F_READ(b, ZF);
 
     //compare to not 0
     Value *cmp_res = 
@@ -129,8 +129,8 @@ static Value *doSeteV(InstPtr ip, BasicBlock *&b)
 // setge: of == sf
 static Value *doSetgeV(InstPtr ip, BasicBlock *&b)
 {
-    Value *sf_val = F_READ(b, "SF");
-    Value *of_val = F_READ(b, "OF");
+    Value *sf_val = F_READ(b, SF);
+    Value *of_val = F_READ(b, OF);
 
     //compare of == sf
     Value *cmp_res = 
@@ -145,9 +145,9 @@ static Value *doSetgeV(InstPtr ip, BasicBlock *&b)
 // setg: of == sf && ZF==0
 static Value *doSetgV(InstPtr ip, BasicBlock *&b)
 {
-    Value *sf_val = F_READ(b, "SF");
-    Value *of_val = F_READ(b, "OF");
-    Value *zf_val = F_READ(b, "ZF");
+    Value *sf_val = F_READ(b, SF);
+    Value *of_val = F_READ(b, OF);
+    Value *zf_val = F_READ(b, ZF);
 
     //compare of == sf
     Value *cmp0_res = 
@@ -171,9 +171,9 @@ static Value *doSetgV(InstPtr ip, BasicBlock *&b)
 // setle: of != sf || ZF==1
 static Value *doSetleV(InstPtr ip, BasicBlock *&b)
 {
-    Value *sf_val = F_READ(b, "SF");
-    Value *of_val = F_READ(b, "OF");
-    Value *zf_val = F_READ(b, "ZF");
+    Value *sf_val = F_READ(b, SF);
+    Value *of_val = F_READ(b, OF);
+    Value *zf_val = F_READ(b, ZF);
 
     //compare of == sf
     Value *cmp0_res = 
@@ -194,8 +194,8 @@ static Value *doSetleV(InstPtr ip, BasicBlock *&b)
 // setge: of != sf
 static Value *doSetlV(InstPtr ip, BasicBlock *&b)
 {
-    Value *sf_val = F_READ(b, "SF");
-    Value *of_val = F_READ(b, "OF");
+    Value *sf_val = F_READ(b, SF);
+    Value *of_val = F_READ(b, OF);
 
     //compare of != sf
     Value *cmp_res = 
@@ -211,8 +211,8 @@ static Value *doSetlV(InstPtr ip, BasicBlock *&b)
 //setbe: cf==1 or zf==1
 static Value *doSetbeV(InstPtr ip, BasicBlock *&b)
 {
-    Value *cf_val = F_READ(b, "CF");
-    Value *zf_val = F_READ(b, "ZF");
+    Value *cf_val = F_READ(b, CF);
+    Value *zf_val = F_READ(b, ZF);
 
     // final result:
     // result = cf | zf
@@ -230,7 +230,7 @@ static Value *doSetbeV(InstPtr ip, BasicBlock *&b)
 static Value *doSetnpV(InstPtr ip, BasicBlock *&b)
 {
     //read PF
-    Value *pf_val = F_READ(b, "PF");
+    Value *pf_val = F_READ(b, PF);
 
     //compare to 0
     Value *cmp_res = 
@@ -246,7 +246,7 @@ static Value *doSetnpV(InstPtr ip, BasicBlock *&b)
 static Value *doSetnsV(InstPtr ip, BasicBlock *&b)
 {
     //read SF
-    Value *sf_val = F_READ(b, "SF");
+    Value *sf_val = F_READ(b, SF);
 
     //compare to 0
     Value *cmp_res = 

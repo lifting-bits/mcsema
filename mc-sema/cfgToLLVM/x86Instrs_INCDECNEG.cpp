@@ -40,35 +40,18 @@ using namespace llvm;
 
 template <int width>
 static Value *doNegV(InstPtr ip, BasicBlock *&b, Value *v) {
-    Function    *F = b->getParent();
-
-    //create basic blocks to define the branching behavior 
-    BasicBlock  *ifTrue = BasicBlock::Create(F->getContext(), "", F);
-    BasicBlock  *ifFalse = BasicBlock::Create(F->getContext(), "", F);
-    BasicBlock  *rest = BasicBlock::Create(F->getContext(), "", F);
-
     //compare dest to 0
     Value   *cmpRes = 
-        new ICmpInst(*b, CmpInst::ICMP_EQ, v, CONST_V<width>(b, 0));
-    BranchInst::Create(ifTrue, ifFalse, cmpRes, b);
+        new ICmpInst(*b, CmpInst::ICMP_NE, v, CONST_V<width>(b, 0));
 
-    //populate ifTrue
-    F_CLEAR(ifTrue, "CF");
-    BranchInst::Create(rest, ifTrue);
-
-    //populate ifFalse;
-    F_SET(ifFalse, "CF");
-    BranchInst::Create(rest, ifFalse);
-
+    F_WRITE(b, CF, cmpRes);
     //perform a signed subtraction
-    Value *res = BinaryOperator::CreateSub(CONST_V<width>(rest, 0), v, "", rest);
-    //populate the rest of the flags
-    WriteSF<width>(rest, res);
-    WritePF<width>(rest, res);
-    WriteZF<width>(rest, res);
-    WriteOFSub<width>(rest, res, CONST_V<width>(rest, 0), v);
-
-    b = rest;
+    Value *res = BinaryOperator::CreateSub(CONST_V<width>(b, 0), v, "", b);
+    //populate the b of the flags
+    WriteSF<width>(b, res);
+    WritePF<width>(b, res);
+    WriteZF<width>(b, res);
+    WriteOFSub<width>(b, res, CONST_V<width>(b, 0), v);
 
     return res;
 }

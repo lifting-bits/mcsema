@@ -145,47 +145,34 @@ static InstTransResult doCmpMV(InstPtr ip, BasicBlock *&b,
 
 template <int width>
 static void doTestVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs) {
-	Function	*F = b->getParent();
 
 	Value	*temp = BinaryOperator::CreateAnd(lhs, rhs, "", b);
 
-	//create 3 new blocks
-	BasicBlock	*ifTrue = BasicBlock::Create(b->getContext(), "", F);
-	BasicBlock	*ifFalse = BasicBlock::Create(b->getContext(), "", F);
-	BasicBlock	*merge = BasicBlock::Create(b->getContext(), "", F);
 
 	//test to see if temp is 0
 	Value	*cmpRes = new ICmpInst(*b, CmpInst::ICMP_EQ, temp, CONST_V<width>(b, 0));
 	NASSERT(cmpRes != NULL);
-	BranchInst::Create(ifTrue, ifFalse, cmpRes, b);
 
-	F_SET(ifTrue, "ZF");
-	BranchInst::Create(merge, ifTrue);
-
-	F_CLEAR(ifFalse, "ZF");
-	BranchInst::Create(merge, ifFalse);
+    F_WRITE(b, ZF, cmpRes);
 
 	//set SF here
 	Value	*msb = 
-		new TruncInst(	BinaryOperator::CreateLShr(temp, CONST_V<width>(merge, width-1),"",merge), 
-						Type::getInt1Ty(b->getContext()), "", merge);
-	F_WRITE(merge, "SF", msb);
+		new TruncInst(	BinaryOperator::CreateLShr(temp, CONST_V<width>(b, width-1),"",b), 
+						Type::getInt1Ty(b->getContext()), "", b);
+	F_WRITE(b, SF, msb);
 
 
-    WritePF<width>(merge, temp);
+    WritePF<width>(b, temp);
 
-    Value   *pfVal = F_READ(merge, "PF");
+    Value   *pfVal = F_READ(b, PF);
     Value   *xV = 
-        BinaryOperator::CreateXor(CONST_V<1>(merge, 0), pfVal, "", merge);
+        BinaryOperator::CreateXor(CONST_V<1>(b, 0), pfVal, "", b);
     Value   *aV = 
-        BinaryOperator::CreateAnd(CONST_V<1>(merge, 1), xV, "", merge);
-    F_WRITE(merge, "PF", aV);
+        BinaryOperator::CreateAnd(CONST_V<1>(b, 1), xV, "", b);
+    F_WRITE(b, PF, aV);
 
-	F_ZAP(merge, "AF");
-	F_CLEAR(merge, "CF");
-	F_CLEAR(merge, "OF");
-
-	b = merge;
+	F_CLEAR(b, CF);
+	F_CLEAR(b, OF);
 
 	return;
 }

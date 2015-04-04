@@ -115,7 +115,7 @@ Value* win32CallVirtualFree(Value *addr_to_free, BasicBlock *b) {
     if (!func_VirtualFree) {
         func_VirtualFree = Function::Create(
                 /*Type=*/vfree_ty,
-                /*Linkage=*/GlobalValue::ExternalLinkage,
+                /*Linkage=*/GlobalValue::AvailableExternallyLinkage,
                 /*Name=*/"VirtualFree", mod); // (external, no body)
         func_VirtualFree->setCallingConv(CallingConv::X86_StdCall);
     }
@@ -335,7 +335,7 @@ Value *win32CallVirtualAlloc(Value *size, BasicBlock *b) {
     if (!func_VirtualAlloc) {
         func_VirtualAlloc = Function::Create(
                 /*Type=*/valloc_ty,
-                /*Linkage=*/GlobalValue::ExternalLinkage,
+                /*Linkage=*/GlobalValue::AvailableExternallyLinkage,
                 /*Name=*/"VirtualAlloc", mod); // (external, no body)
         func_VirtualAlloc->setCallingConv(CallingConv::X86_StdCall);
     }

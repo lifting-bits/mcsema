@@ -1,6 +1,7 @@
 message JumpTbl {
     repeated    int64       table_entries = 1;
     required    int32       zero_offset = 2;
+    optional    int64       offset_from_data = 3;
 }
 
 message JumpIndexTbl {

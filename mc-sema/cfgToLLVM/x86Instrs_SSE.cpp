@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Helpers.h"
 #include "x86Instrs_SSE.h"
 #include "x86Instrs_MOV.h"
+#include "llvm/Support/Debug.h"
 
 #include <tuple>
 
@@ -611,13 +612,13 @@ static InstTransResult doUCOMISvv(BasicBlock *& block, Value *op1, Value *op2)
     // it means that one of the ops is a QNaN
     Value *is_qnan = BinaryOperator::CreateAnd(is_lt, is_eq, "", block);
 
-    F_WRITE(block, "ZF", is_eq);            // ZF is 1 if either is QNaN or op1 == op2
-    F_WRITE(block, "PF", is_qnan);          // PF is 1 if either op is a QNaN
-    F_WRITE(block, "CF", is_lt);            // CF is 1 if either is QNaN or op1 < op2
+    F_WRITE(block, ZF, is_eq);            // ZF is 1 if either is QNaN or op1 == op2
+    F_WRITE(block, PF, is_qnan);          // PF is 1 if either op is a QNaN
+    F_WRITE(block, CF, is_lt);            // CF is 1 if either is QNaN or op1 < op2
 
-    F_WRITE(block, "OF", CONST_V<1>(block, 0));
-    F_WRITE(block, "SF", CONST_V<1>(block, 0));
-    F_WRITE(block, "AF", CONST_V<1>(block, 0));
+    F_WRITE(block, OF, CONST_V<1>(block, 0));
+    F_WRITE(block, SF, CONST_V<1>(block, 0));
+    F_WRITE(block, AF, CONST_V<1>(block, 0));
 
 
     return ContinueBlock;
@@ -653,23 +654,37 @@ static InstTransResult doUCOMISrm(InstPtr ip, BasicBlock *&b, const MCOperand &o
     return doUCOMISvv(b, fp1_val, fp2_val);
 }
 
-
 template <int elementwidth, Instruction::BinaryOps bin_op>
-static InstTransResult doShiftOp(BasicBlock *&b, 
+static InstTransResult doNewShift(BasicBlock *&b, 
         const MCOperand &dst, 
-        Value *shift_count, 
-        Value *fallback)
+        Value *shift_count,
+        Value *fallback = nullptr)
 {
     NASSERT(dst.isReg());
     NASSERT(128 % elementwidth == 0);
 
+    Value *max_count = CONST_V<64>(b, elementwidth-1);
 
-    Value *max_count = CONST_V<128>(b, elementwidth);
-    Value *isOver = new ICmpInst(  *b, 
-                                    CmpInst::ICMP_ULT, 
+    shift_count = new TruncInst( 
+            shift_count, 
+            Type::getIntNTy(b->getContext(), 64), 
+            "",
+            b);
+
+    // check if our shift count is over the 
+    // allowable limit
+    Value *countOverLimit = new ICmpInst(  *b, 
+                                    CmpInst::ICMP_UGT, 
                                     shift_count, 
                                     max_count);
 
+    // max the shift count at elementwidth
+    // real_count = over limit ? max count : original count
+    Value *real_count = SelectInst::Create(countOverLimit,
+            max_count,
+            shift_count,
+            "",
+            b);
 
     Type *elem_ty;
     VectorType *vt;
@@ -680,52 +695,63 @@ static InstTransResult doShiftOp(BasicBlock *&b,
     Value *to_shift = R_READ<128>(b, dst.getReg());
     Value *vecValue = INT_AS_VECTOR<128, elementwidth>(b, to_shift); 
 
-    // limit shifts to 15 or 31 bits
-    // otherwise the operator is undefined
-    Value *bounded_shift = BinaryOperator::CreateAnd(
-            shift_count, 
-            CONST_V<128>(b, elementwidth-1), 
-            "", b);
-
+    // truncate shift count to element size since we
+    // need to shove it in a vector
     Value *trunc_shift = new TruncInst( 
-            bounded_shift, 
+            real_count, 
             elem_ty, 
             "",
             b);
 
     Value *vecShiftPtr = new AllocaInst(vt, nullptr, "", b);
-    Value *vecShift = new LoadInst(vecShiftPtr, "", b);
-
-    Value *which_to_put = SelectInst::Create(
-                    isOver, 
-                    trunc_shift,
-                    fallback,
-                    "",
-                    b);
+    Value *shiftVector = noAliasMCSemaScope(new LoadInst(vecShiftPtr, "", b));
 
     int elem_count = 128/elementwidth;
+    llvm::dbgs() << "Inserting: " << elem_count << " elements\n";
+
+    // build a shift vector of elem_count
+    // entries of trunc_shift
     for(int i = 0; i < elem_count; i++) {
-        InsertElementInst::Create(
-                vecShift, 
-                which_to_put, 
+        shiftVector = InsertElementInst::Create(
+                shiftVector,
+                trunc_shift, 
                 CONST_V<32>(b, i), 
                 "", 
                 b );
     }
 
-    // shift each vector 
-    Value *shifted = BinaryOperator::Create(bin_op, vecValue, vecShift, "", b);
+    // shift each element of the vector
+    Value *shifted = BinaryOperator::Create(bin_op, vecValue, shiftVector, "", b);
 
     // convert value back to a 128bit int
     Value *back_to_int = CastInst::Create(
             Instruction::BitCast,
-            vecValue,
+            shifted,
             Type::getIntNTy(b->getContext(), 128),
             "",
             b);
 
     // write back to register
-    R_WRITE<128>(b, dst.getReg(), back_to_int);
+    Value *final_to_write = back_to_int;
+
+    // if this is an instruction that needs
+    // a special case for shifts of 
+    // count >= width, then check for the fallback
+    // option
+    if( fallback != nullptr ) {
+        // yes,. this means all th work above was not
+        // necessary. Ideally the optimizer will only
+        // keep the fallback case. And this way
+        // we don't need to generate multiple BBs
+        final_to_write = SelectInst::Create(
+                countOverLimit,
+                fallback,
+                back_to_int,
+                "",
+                b);
+    }
+            
+    R_WRITE<128>(b, dst.getReg(), final_to_write);
 
     return ContinueBlock;
 }
@@ -736,20 +762,16 @@ static InstTransResult doPSRArr(BasicBlock *&b, const MCOperand &dst, const MCOp
     NASSERT(src.isReg());
 
     Value *shift_count = R_READ<128>(b, src.getReg());
-    Value *fb_pre = CONST_V<width>(b, 0);
-    Value *fallback = llvm::BinaryOperator::CreateNot(fb_pre, "", b);
 
-    return doShiftOp<width, Instruction::AShr>(b, dst, shift_count, fallback);
+    return doNewShift<width, Instruction::AShr>(b, dst, shift_count, nullptr);
 }
 
 template <int width>
 static InstTransResult doPSRArm(InstPtr ip, BasicBlock *&b, const MCOperand &dst, Value *memAddr)
 {
     Value *shift_count = M_READ<128>(ip, b, memAddr);
-    Value *fb_pre = CONST_V<width>(b, 0);
-    Value *fallback = llvm::BinaryOperator::CreateNot(fb_pre, "", b);
 
-    return doShiftOp<width, Instruction::AShr>(b, dst, shift_count, fallback);
+    return doNewShift<width, Instruction::AShr>(b, dst, shift_count, nullptr);
 }
 
 template <int width>
@@ -758,10 +780,8 @@ static InstTransResult doPSRAri(BasicBlock *&b, const MCOperand &dst, const MCOp
     NASSERT(src.isImm());
 
     Value *shift_count = CONST_V<128>(b, src.getImm());
-    Value *fb_pre = CONST_V<width>(b, 0);
-    Value *fallback = llvm::BinaryOperator::CreateNot(fb_pre, "", b);
 
-    return doShiftOp<width, Instruction::AShr>(b, dst, shift_count, fallback);
+    return doNewShift<width, Instruction::AShr>(b, dst, shift_count, nullptr);
 }
 
 template <int width>
@@ -771,7 +791,7 @@ static InstTransResult doPSLLrr(BasicBlock *&b, const MCOperand &dst, const MCOp
 
     Value *shift_count = R_READ<128>(b, src.getReg());
 
-    return doShiftOp<width, Instruction::Shl>(b, dst, shift_count, CONST_V<width>(b, 0));
+    return doNewShift<width, Instruction::Shl>(b, dst, shift_count, CONST_V<128>(b, 0));
 }
 
 template <int width>
@@ -779,7 +799,7 @@ static InstTransResult doPSLLrm(InstPtr ip, BasicBlock *&b, const MCOperand &dst
 {
     Value *shift_count = M_READ<128>(ip, b, memAddr);
 
-    return doShiftOp<width, Instruction::Shl>(b, dst, shift_count, CONST_V<width>(b, 0));
+    return doNewShift<width, Instruction::Shl>(b, dst, shift_count, CONST_V<128>(b, 0));
 }
 
 template <int width>
@@ -789,7 +809,7 @@ static InstTransResult doPSLLri(BasicBlock *&b, const MCOperand &dst, const MCOp
 
     Value *shift_count = CONST_V<128>(b, src.getImm());
 
-    return doShiftOp<width, Instruction::Shl>(b, dst, shift_count, CONST_V<width>(b, 0));
+    return doNewShift<width, Instruction::Shl>(b, dst, shift_count, CONST_V<128>(b, 0));
 }
 
 
@@ -955,6 +975,155 @@ static InstTransResult doPEXTRWmr(InstPtr ip, BasicBlock *&b, Value *memAddr, co
     return ContinueBlock;
 }
 
+template <int width, int elemwidth>
+static Value* doUnpack(BasicBlock *&b, Value *v1, Value *v2)
+{
+    NASSERT(width % elemwidth == 0);
+
+    int elem_count = width/elemwidth;
+
+    Type *elem_ty;
+    VectorType *vt;
+
+    std::tie(vt, elem_ty) = getIntVectorTypes(b, elemwidth, elem_count);
+
+    Value *vecInput1 = INT_AS_VECTOR<width,elemwidth>(b, v1);
+    Value *vecInput2 = INT_AS_VECTOR<width,elemwidth>(b, v2);
+
+    std::vector<Constant*> shuffle_vec;
+
+    for(int i = 0; i < elem_count/2; i++) {
+            shuffle_vec.push_back(CONST_V<32>(b, i + elem_count));
+            shuffle_vec.push_back(CONST_V<32>(b, i));
+    }
+    Value *vecShuffle = ConstantVector::get(shuffle_vec);
+
+    // do the shuffle
+    Value *shuffled = new ShuffleVectorInst(
+           vecInput1,
+           vecInput2,
+           vecShuffle,
+           "",
+           b);
+
+    // convert the output back to an integer
+    Value *intOutput = CastInst::Create(
+            Instruction::BitCast,
+            shuffled,
+            Type::getIntNTy(b->getContext(), width),
+            "",
+            b);
+
+    return intOutput;
+}
+
+template <int width, int slice_width>
+static InstTransResult doPUNPCKVV(
+        BasicBlock *&b, 
+        const MCOperand &dst, 
+        Value *v1, Value *v2)
+{
+    
+    NASSERT(dst.isReg());
+
+    Value *shuffled = doUnpack<width, slice_width>(b, v1, v2);
+
+    R_WRITE<width>(b, dst.getReg(), shuffled);
+    return ContinueBlock;
+}
+
+template <int width, int slice_width>
+static InstTransResult doPUNPCKrr(
+        BasicBlock *&b, 
+        const MCOperand &dst, 
+        const MCOperand &src)
+{
+    NASSERT(dst.isReg());
+    NASSERT(src.isReg());
+
+    Value *srcVal = R_READ<width>(b, src.getReg());
+    Value *dstVal = R_READ<width>(b, dst.getReg());
+
+    return doPUNPCKVV<width, slice_width>(b, dst, srcVal, dstVal);
+}
+
+template <int width, int slice_width>
+static InstTransResult doPUNPCKrm(
+        InstPtr ip, 
+        BasicBlock *&b, 
+        const MCOperand &dst, 
+        Value *memAddr)
+{
+    NASSERT(dst.isReg());
+    NASSERT(memAddr != nullptr);
+
+    Value *srcVal = M_READ<width>(ip, b, memAddr);
+    Value *dstVal = R_READ<width>(b, dst.getReg());
+
+    return doPUNPCKVV<width, slice_width>(b, dst, srcVal, dstVal);
+}
+
+template <int width, int elemwidth, Instruction::BinaryOps bin_op>
+static InstTransResult do_SSE_VECTOR_OP(const MCOperand &dst, BasicBlock *&b, Value *v1, Value *v2)
+{
+    NASSERT(width % elemwidth == 0);
+
+    int elem_count = width/elemwidth;
+
+    Type *elem_ty;
+    VectorType *vt;
+
+    std::tie(vt, elem_ty) = getIntVectorTypes(b, elemwidth, elem_count);
+
+    Value *vecInput1 = INT_AS_VECTOR<width,elemwidth>(b, v1);
+    Value *vecInput2 = INT_AS_VECTOR<width,elemwidth>(b, v2);
+
+    Value *op_out = BinaryOperator::Create(
+        bin_op,
+        vecInput1,
+        vecInput2,
+        "",
+        b);
+
+    // convert the output back to an integer
+    Value *intOutput = CastInst::Create(
+            Instruction::BitCast,
+            op_out,
+            Type::getIntNTy(b->getContext(), width),
+            "",
+            b);
+
+    R_WRITE<width>(b, dst.getReg(), intOutput);
+    return ContinueBlock;
+}
+
+template <int width, int elem_width, Instruction::BinaryOps bin_op>
+static InstTransResult do_SSE_VECTOR_RM(InstPtr ip, BasicBlock *& block,
+                                const MCOperand &o1,
+                                Value *addr)
+{
+    NASSERT(o1.isReg());
+
+    Value *opVal1 = R_READ<width>(block, o1.getReg());
+    Value *opVal2 = M_READ<width>(ip, block, addr);
+
+    return do_SSE_VECTOR_OP<width, elem_width, bin_op>(o1, block, opVal1, opVal2);
+}
+
+template <int width, int elem_width, Instruction::BinaryOps bin_op>
+static InstTransResult do_SSE_VECTOR_RR(InstPtr ip, BasicBlock *& block, 
+                                const MCOperand &o1,
+                                const MCOperand &o2)
+{
+    NASSERT(o1.isReg());
+    NASSERT(o2.isReg());
+
+    Value *opVal1 = R_READ<width>(block, o1.getReg());
+    Value *opVal2 = R_READ<width>(block, o2.getReg());
+
+    return do_SSE_VECTOR_OP<width, elem_width, bin_op>(o1, block, opVal1, opVal2);
+}
+
 GENERIC_TRANSLATION(PORrr, 
         (do_SSE_INT_RR<128,Instruction::Or>(ip, block, OP(1), OP(2))) )
 GENERIC_TRANSLATION_MEM(PORrm, 
@@ -1101,6 +1270,72 @@ GENERIC_TRANSLATION_MEM(PEXTRWmr,
         (doPEXTRWmr(ip, block, ADDR(0), OP(5), OP(6))),
         (doPEXTRWmr(ip, block, STD_GLOBAL_OP(0), OP(5), OP(6))) )
 
+GENERIC_TRANSLATION(PUNPCKLBWrr, 
+        (doPUNPCKrr<128,8>(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_MEM(PUNPCKLBWrm, 
+        (doPUNPCKrm<128,8>(ip, block, OP(1), ADDR(2))),
+        (doPUNPCKrm<128,8>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+
+GENERIC_TRANSLATION(PUNPCKLWDrr, 
+        (doPUNPCKrr<128,16>(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_MEM(PUNPCKLWDrm, 
+        (doPUNPCKrm<128,16>(ip, block, OP(1), ADDR(2))),
+        (doPUNPCKrm<128,16>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+
+GENERIC_TRANSLATION(PUNPCKLDQrr, 
+        (doPUNPCKrr<128,32>(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_MEM(PUNPCKLDQrm, 
+        (doPUNPCKrm<128,32>(ip, block, OP(1), ADDR(2))),
+        (doPUNPCKrm<128,32>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+
+GENERIC_TRANSLATION(PUNPCKLQDQrr, 
+        (doPUNPCKrr<128,64>(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_MEM(PUNPCKLQDQrm, 
+        (doPUNPCKrm<128,64>(ip, block, OP(1), ADDR(2))),
+        (doPUNPCKrm<128,64>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+
+GENERIC_TRANSLATION(PADDBrr, 
+        (do_SSE_VECTOR_RR<128,8,Instruction::Add>(ip, block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_MEM(PADDBrm, 
+        (do_SSE_VECTOR_RM<128,8,Instruction::Add>(ip, block, OP(1), ADDR(2))),
+        (do_SSE_VECTOR_RM<128,8,Instruction::Add>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION(PADDWrr, 
+        (do_SSE_VECTOR_RR<128,16,Instruction::Add>(ip, block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_MEM(PADDWrm, 
+        (do_SSE_VECTOR_RM<128,16,Instruction::Add>(ip, block, OP(1), ADDR(2))),
+        (do_SSE_VECTOR_RM<128,16,Instruction::Add>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION(PADDDrr, 
+        (do_SSE_VECTOR_RR<128,32,Instruction::Add>(ip, block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_MEM(PADDDrm, 
+        (do_SSE_VECTOR_RM<128,32,Instruction::Add>(ip, block, OP(1), ADDR(2))),
+        (do_SSE_VECTOR_RM<128,32,Instruction::Add>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION(PADDQrr, 
+        (do_SSE_VECTOR_RR<128,64,Instruction::Add>(ip, block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_MEM(PADDQrm, 
+        (do_SSE_VECTOR_RM<128,64,Instruction::Add>(ip, block, OP(1), ADDR(2))),
+        (do_SSE_VECTOR_RM<128,64,Instruction::Add>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+
+GENERIC_TRANSLATION(PSUBBrr, 
+        (do_SSE_VECTOR_RR<128,8,Instruction::Sub>(ip, block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_MEM(PSUBBrm, 
+        (do_SSE_VECTOR_RM<128,8,Instruction::Sub>(ip, block, OP(1), ADDR(2))),
+        (do_SSE_VECTOR_RM<128,8,Instruction::Sub>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION(PSUBWrr, 
+        (do_SSE_VECTOR_RR<128,16,Instruction::Sub>(ip, block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_MEM(PSUBWrm, 
+        (do_SSE_VECTOR_RM<128,16,Instruction::Sub>(ip, block, OP(1), ADDR(2))),
+        (do_SSE_VECTOR_RM<128,16,Instruction::Sub>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION(PSUBDrr, 
+        (do_SSE_VECTOR_RR<128,32,Instruction::Sub>(ip, block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_MEM(PSUBDrm, 
+        (do_SSE_VECTOR_RM<128,32,Instruction::Sub>(ip, block, OP(1), ADDR(2))),
+        (do_SSE_VECTOR_RM<128,32,Instruction::Sub>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION(PSUBQrr, 
+        (do_SSE_VECTOR_RR<128,64,Instruction::Sub>(ip, block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_MEM(PSUBQrm, 
+        (do_SSE_VECTOR_RM<128,64,Instruction::Sub>(ip, block, OP(1), ADDR(2))),
+        (do_SSE_VECTOR_RM<128,64,Instruction::Sub>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+
 void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::MOVSDrm] = (doMOVSrm<64>);
     m[X86::MOVSDmr] = (doMOVSmr<64>);
@@ -1218,4 +1453,30 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::PEXTRWri] = translate_PEXTRWri;
     m[X86::PEXTRWmr] = translate_PEXTRWmr;
 
+    m[X86::PUNPCKLBWrr] = translate_PUNPCKLBWrr;
+    m[X86::PUNPCKLBWrm] = translate_PUNPCKLBWrm;
+    m[X86::PUNPCKLWDrr] = translate_PUNPCKLWDrr;
+    m[X86::PUNPCKLWDrm] = translate_PUNPCKLWDrm;
+    m[X86::PUNPCKLDQrr] = translate_PUNPCKLDQrr;
+    m[X86::PUNPCKLDQrm] = translate_PUNPCKLDQrm;
+    m[X86::PUNPCKLQDQrr] = translate_PUNPCKLQDQrr;
+    m[X86::PUNPCKLQDQrm] = translate_PUNPCKLQDQrm;
+
+    m[X86::PADDBrr] = translate_PADDBrr;
+    m[X86::PADDBrm] = translate_PADDBrm;
+    m[X86::PADDWrr] = translate_PADDWrr;
+    m[X86::PADDWrm] = translate_PADDWrm;
+    m[X86::PADDDrr] = translate_PADDDrr;
+    m[X86::PADDDrm] = translate_PADDDrm;
+    m[X86::PADDQrr] = translate_PADDQrr;
+    m[X86::PADDQrm] = translate_PADDQrm;
+
+    m[X86::PSUBBrr] = translate_PSUBBrr;
+    m[X86::PSUBBrm] = translate_PSUBBrm;
+    m[X86::PSUBWrr] = translate_PSUBWrr;
+    m[X86::PSUBWrm] = translate_PSUBWrm;
+    m[X86::PSUBDrr] = translate_PSUBDrr;
+    m[X86::PSUBDrm] = translate_PSUBDrm;
+    m[X86::PSUBQrr] = translate_PSUBQrr;
+    m[X86::PSUBQrm] = translate_PSUBQrm;
 }

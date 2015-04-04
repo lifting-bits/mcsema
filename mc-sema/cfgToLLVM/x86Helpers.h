@@ -45,9 +45,9 @@ llvm::Value *concatInts(llvm::BasicBlock *b, llvm::Value *a1, llvm::Value *a2) {
                                                 b);
 
     //add a2 to the result, after zero-extending a2
-    llvm::Value   *a2Larger = new llvm::ZExtInst(a2, typeTo, "", b);
+    llvm::Value   *a2Larger = new llvm::SExtInst(a2, typeTo, "", b);
     llvm::Value *addRes = 
-        llvm::BinaryOperator::CreateAdd(tlShifted, a2Larger, "", b);
+        llvm::BinaryOperator::CreateOr(tlShifted, a2Larger, "", b);
 
     return addRes;
 }
@@ -90,5 +90,5 @@ llvm::Value *GLOBAL(llvm::BasicBlock *B,
         uint32_t which);
 
 // emit an llvm memcpy intrinsic
-void callMemcpy(llvm::BasicBlock *B, llvm::Value *dest, llvm::Value *src, uint32_t size, 
+llvm::Instruction* callMemcpy(llvm::BasicBlock *B, llvm::Value *dest, llvm::Value *src, uint32_t size, 
         uint32_t align=4, bool isVolatile=false);

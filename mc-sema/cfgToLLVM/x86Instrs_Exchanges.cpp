@@ -44,13 +44,6 @@ static InstTransResult doCmpxchgRR(InstPtr ip,    BasicBlock      *&b,
     NASSERT(dstReg.isReg());
     NASSERT(srcReg.isReg());
 
-    Function    *F = b->getParent();
-    BasicBlock  *AccEQDest = 
-        BasicBlock::Create(b->getContext(), "AccEQDest", F);
-    BasicBlock  *AccNEDest = 
-        BasicBlock::Create(b->getContext(), "AccNEDest", F);
-    BasicBlock  *done = 
-        BasicBlock::Create(b->getContext(), "done", F);
 
     Value   *acc;
 
@@ -74,31 +67,32 @@ static InstTransResult doCmpxchgRR(InstPtr ip,    BasicBlock      *&b,
     doCmpVV<width>(ip, b, acc, dstReg_v);
 
     Value   *Cmp = new ICmpInst(*b, CmpInst::ICMP_EQ, acc, dstReg_v);
-    BranchInst::Create(AccEQDest, AccNEDest, Cmp, b);
 
-    // Acc == Dst
-    F_SET(AccEQDest, "ZF");
-    R_WRITE<width>(AccEQDest, dstReg.getReg(), srcReg_v);
-    BranchInst::Create(done, AccEQDest);
+    F_WRITE(b, ZF, Cmp);
 
-    // Acc != Dst
-    F_CLEAR(AccNEDest, "ZF");
+    ///
+    // ZF = Acc == DST
+    // acc = select(ZF, acc, dst)
+    // dst = select(ZF, src, dst)
+    Value *new_acc = SelectInst::Create(Cmp, acc, dstReg_v, "", b);
+    Value *new_dst = SelectInst::Create(Cmp, srcReg_v, dstReg_v, "", b); 
+
+    R_WRITE<width>(b, dstReg.getReg(), new_dst);
+
     switch(width) {
         case 8:
-            R_WRITE<width>(AccNEDest, X86::AL, dstReg_v);
+            R_WRITE<width>(b, X86::AL, new_acc);
             break;
         case 16:
-            R_WRITE<width>(AccNEDest, X86::AX, dstReg_v);
+            R_WRITE<width>(b, X86::AX, new_acc);
             break;
         case 32:
-            R_WRITE<width>(AccNEDest, X86::EAX, dstReg_v);
+            R_WRITE<width>(b, X86::EAX, new_acc);
             break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");
     }
-    BranchInst::Create(done, AccNEDest);
 
-    b = done;
 
     return ContinueBlock;
 }
@@ -111,13 +105,6 @@ static InstTransResult doCmpxchgRM(InstPtr ip,    BasicBlock      *&b,
     NASSERT(dstAddr != NULL);
     NASSERT(srcReg.isReg());
 
-    Function    *F = b->getParent();
-    BasicBlock  *AccEQDest = 
-        BasicBlock::Create(b->getContext(), "AccEQDest", F);
-    BasicBlock  *AccNEDest = 
-        BasicBlock::Create(b->getContext(), "AccNEDest", F);
-    BasicBlock  *done = 
-        BasicBlock::Create(b->getContext(), "done", F);
 
     Value   *acc;
 
@@ -173,31 +160,25 @@ static InstTransResult doCmpxchgRM(InstPtr ip,    BasicBlock      *&b,
 
     doCmpVV<width>(ip, b, acc, cmpx_val);
 
-    BranchInst::Create(AccEQDest, AccNEDest, was_eq, b);
 
-    // Acc == Dst
-    F_SET(AccEQDest, "ZF");
-    //M_WRITE<width>(ip, AccEQDest, dstAddr, srcReg_v);
-    BranchInst::Create(done, AccEQDest);
+    F_WRITE(b, ZF, was_eq);
 
-    // Acc != Dst
-    F_CLEAR(AccNEDest, "ZF");
+    Value *new_acc = SelectInst::Create(was_eq, acc, cmpx_val, "", b);
+
     switch(width) {
         case 8:
-            R_WRITE<width>(AccNEDest, X86::AL, cmpx_val);
+            R_WRITE<width>(b, X86::AL, new_acc);
             break;
         case 16:
-            R_WRITE<width>(AccNEDest, X86::AX, cmpx_val);
+            R_WRITE<width>(b, X86::AX, new_acc);
             break;
         case 32:
-            R_WRITE<width>(AccNEDest, X86::EAX, cmpx_val);
+            R_WRITE<width>(b, X86::EAX, new_acc);
             break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");
     }
-    BranchInst::Create(done, AccNEDest);
 
-    b = done;
 
     return ContinueBlock;
 }

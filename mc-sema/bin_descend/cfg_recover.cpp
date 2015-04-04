@@ -601,7 +601,7 @@ static bool handlePossibleJumpTable(ExecutableContainer *c,
     out << "Added: " << to_string<int>(new_funs, dec) << " functions to jmptable\n";
 
     // associate instruction with jump table
-    MCSJumpTable *jt = new MCSJumpTable(jmptable_entries, original_zero);
+    MCSJumpTable *jt = new MCSJumpTable(jmptable_entries, original_zero, (VA)(-1));
     jmpinst->set_jump_table(MCSJumpTablePtr(jt));
 
     stack<VA> *toPush = NULL;

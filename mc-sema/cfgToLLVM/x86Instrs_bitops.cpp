@@ -46,9 +46,9 @@ static Value * doAndVV(BasicBlock *&b, Value *o1, Value *o2)
     WriteSF<width>(b, result);
     WriteZF<width>(b, result);
     WritePF<width>(b, result);
-    F_CLEAR(b, "OF");
-    F_CLEAR(b, "CF");
-    F_ZAP(b, "AF");
+    F_CLEAR(b, OF);
+    F_CLEAR(b, CF);
+    F_ZAP(b, AF);
 
     return result;
 }
@@ -236,9 +236,9 @@ static Value * doOrVV(InstPtr ip, BasicBlock *&b, Value *o1, Value *o2)
     Value *result = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
 
     // Set flags.
-    F_ZAP(b, "AF");
-    F_CLEAR(b, "OF");
-    F_CLEAR(b, "CF");
+    F_ZAP(b, AF);
+    F_CLEAR(b, OF);
+    F_CLEAR(b, CF);
     WriteSF<width>(b, result);
     WriteZF<width>(b, result);
     WritePF<width>(b, result);
@@ -359,8 +359,8 @@ static Value * doXorVV(InstPtr ip, BasicBlock *&b, Value *o1, Value *o2)
     Value *xoredVal = BinaryOperator::Create(Instruction::Xor, o1, o2, "", b);
 
     // Clear CF and OF.
-    F_CLEAR(b, "CF");
-    F_CLEAR(b, "OF");
+    F_CLEAR(b, CF);
+    F_CLEAR(b, OF);
 
     // Set SF, ZF, and PF.
     WriteSF<width>(b, xoredVal);
@@ -368,7 +368,7 @@ static Value * doXorVV(InstPtr ip, BasicBlock *&b, Value *o1, Value *o2)
     WritePF<width>(b, xoredVal);
 
     // Undefine AF.
-    F_ZAP(b, "AF");
+    F_ZAP(b, AF);
 
     return xoredVal;
 }

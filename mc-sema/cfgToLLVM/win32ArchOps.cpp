@@ -1,31 +1,3 @@
-/*
-Copyright (c) 2014, Trail of Bits
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
-  Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-  Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
-  other materials provided with the distribution.
-
-  Neither the name of the {organization} nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
 #include <string>
 #include <iostream>
 #include <vector>
@@ -43,6 +15,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "TransExcn.h"
 #include "raiseX86.h"
+#include "RegisterUsage.h"
 
 #include "../common/to_string.h"
 
@@ -72,7 +45,7 @@ Value *win32FreeStack(Value *stackAlloc, BasicBlock *&driverBB) {
 
 // GEP to get a reg from pro_int_call return
 #define READ_REG_OPAQUE(varname, reg, opaque) do {  \
-        int   reg_off = mapStrToGEPOff(reg);        \
+        int   reg_off = getRegisterOffset(reg);        \
         Value *reg_GEPV[] = {                       \
           CONST_V<32>(driver_block, 0),             \
           CONST_V<32>(driver_block, reg_off)        \
@@ -174,7 +147,7 @@ static Function *win32MakeCallbackInternal(Module *M, VA local_target) {
     // old_esp = rs->ESP
     // GEP to get ESP from pro_int_call return
     Value *rs_esp;
-    READ_REG_OPAQUE(rs_esp, "ESP", pro_int_call);
+    READ_REG_OPAQUE(rs_esp, ESP, pro_int_call);
 
     LoadInst* orig_ESP = new LoadInst(rs_esp, "", false, driver_block);
     
@@ -198,13 +171,13 @@ static Function *win32MakeCallbackInternal(Module *M, VA local_target) {
 
     // retv = rs->EAX;
     Value *rs_eax;
-    READ_REG_OPAQUE(rs_eax, "EAX", gpreg_struct);
+    READ_REG_OPAQUE(rs_eax, EAX, gpreg_struct);
     LoadInst *eax_val = new LoadInst(rs_eax, "", false, driver_block);
 
 
     // *esp_diff = orig_esp - rs->ESP;
     Value *rs_esp_new;
-    READ_REG_OPAQUE(rs_esp_new, "ESP", gpreg_struct);
+    READ_REG_OPAQUE(rs_esp_new, ESP, gpreg_struct);
     LoadInst* new_esp_val = new LoadInst(rs_esp_new, "", false, driver_block);
     Value *esp_diff = BinaryOperator::Create(
             Instruction::Sub, 
@@ -392,13 +365,13 @@ static void call_with_alt_stack(Module* M,
 
 
     // real thread base = context thread base
-    Value *new_sbase = GENERIC_READREG(B, "STACK_BASE");
+    Value *new_sbase = GENERIC_READREG(B, STACK_BASE);
     win32SetStackBase(tib, B, new_sbase);
 
     // real thread limit = context thread limit
     // also to avoid complexity, make commit size == reserve size
     // and hence allocation base == stack limit
-    Value *new_slimit = GENERIC_READREG(B, "STACK_LIMIT");
+    Value *new_slimit = GENERIC_READREG(B, STACK_LIMIT);
     win32SetStackLimit(tib, B, new_slimit);
     win32SetAllocationBase(tib, B, new_slimit);
 
@@ -411,7 +384,7 @@ static void call_with_alt_stack(Module* M,
 
     // assume all calls clear the direction flag
     // which is normal microsoft calling convention assumption
-    F_CLEAR(B, "DF");
+    F_CLEAR(B, DF);
 }
 
 // this function is partially adapted from
@@ -485,7 +458,7 @@ void win32AddCallValue(Module *mod) {
         // spill locals and get all registers from
         // struct.regs
         allocateLocals(func_do_call_value, 32);
-        writeContextToLocals(main_block, 32);
+        writeContextToLocals(main_block, 32, ABICallSpill);
 
         // create a pointer from the register value that would
         // have been passed in here. 
@@ -500,6 +473,7 @@ void win32AddCallValue(Module *mod) {
         vector<Value*> get_esp_args;
         get_esp_args.push_back(temp_var);
         CallInst* ignored_value = CallInst::Create(get_esp_asm, get_esp_args, "", main_block);
+        ignored_value->setCallingConv(CallingConv::X86_StdCall);
 
 
         //////////////////////////////////////////////////////////////////////////////
@@ -515,13 +489,13 @@ void win32AddCallValue(Module *mod) {
 
 
         // real thread base = context thread base
-        Value *new_sbase = GENERIC_READREG(main_block, "STACK_BASE");
+        Value *new_sbase = GENERIC_READREG(main_block, STACK_BASE);
         win32SetStackBase(tib, main_block, new_sbase);
 
         // real thread limit = context thread limit
         // also to avoid complexity, make commit size == reserve size
         // and hence allocation base == stack limit
-        Value *new_slimit = GENERIC_READREG(main_block, "STACK_LIMIT");
+        Value *new_slimit = GENERIC_READREG(main_block, STACK_LIMIT);
         win32SetStackLimit(tib, main_block, new_slimit);
         win32SetAllocationBase(tib, main_block, new_slimit);
         /////////////////////////////////////////////////////////////////////////////
@@ -560,7 +534,7 @@ void win32AddCallValue(Module *mod) {
         /////////////////////////////////////////////////////
 
 
-        writeLocalsToContext(main_block, 32);
+        writeLocalsToContext(main_block, 32, ABIRetStore);
 
         // return
         ReturnInst::Create(mod->getContext(), main_block);

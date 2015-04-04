@@ -48,11 +48,14 @@ protected:
 
 class MCSJumpTable : public Table<VA> {
 
+protected:
+    VA m_offset_from_data;
 public:
-    MCSJumpTable(const std::vector<VA> &table, int entry): 
-        Table<VA>::Table(table, entry) {};
+    MCSJumpTable(const std::vector<VA> &table, int entry, VA data_offset): 
+        Table<VA>::Table(table, entry), m_offset_from_data(data_offset) {};
     virtual const std::vector<VA>& getJumpTable(void) const { return this->getTable(); }
     virtual std::vector<VA>& getJumpTable(void) { return this->getTable(); }
+    virtual VA getOffsetFromData() const {return this->m_offset_from_data; }
     virtual ~MCSJumpTable() {};
 
 };
@@ -88,8 +91,13 @@ static bool isConformantJumpInst(InstPtr jmpinst) {
 
     const llvm::MCInst &inst = jmpinst->get_inst();
 
-    // check that operands exist before using them
+    // these are now done via switch()
+    if(inst.getOpcode() == llvm::X86::JMP32r) {
+        return true;
+    }
+
     if (inst.getNumOperands() < 4) {
+
         return false;
     }
     const llvm::MCOperand& scale = inst.getOperand(1);
@@ -99,9 +107,8 @@ static bool isConformantJumpInst(InstPtr jmpinst) {
     if(scale.isImm() &&             // scale:
        scale.getImm() == 4 &&       // must be an immediate and be 4
        index.isReg() &&             // index must be a register
-       disp.isImm() &&              // displacement must be an imm32
-       disp.getImm() == 0) {        // and be 0, since its relocated
-
+       disp.isImm()) 
+    {        
         return true;
     }
 
@@ -114,11 +121,21 @@ void doJumpTableViaData(
         InstPtr ip, 
         llvm::MCInst &inst);
 
+void doJumpTableViaData(
+        llvm::BasicBlock *& block, 
+        llvm::Value *val);
+
 void doJumpTableViaSwitch(
         NativeModulePtr natM, 
         llvm::BasicBlock *& block, 
         InstPtr ip, 
         llvm::MCInst &inst);
+
+void doJumpTableViaSwitchReg(
+        llvm::BasicBlock *& block, 
+        InstPtr ip, 
+        llvm::Value *regVal,
+        llvm::BasicBlock *&default_block);
 
 void doJumpIndexTableViaSwitch(
         llvm::BasicBlock *& block, 

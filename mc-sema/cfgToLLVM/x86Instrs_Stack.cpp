@@ -470,13 +470,13 @@ static InstTransResult doPushF(InstPtr ip, BasicBlock *b) {
     //
     Type    *toT = Type::getIntNTy(b->getContext(), width);
 
-    Value *cf = new ZExtInst(F_READ(b, "CF"), toT, "", b);
-    Value *pf = new ZExtInst(F_READ(b, "PF"), toT, "", b);
-    Value *af = new ZExtInst(F_READ(b, "AF"), toT, "", b);
-    Value *zf = new ZExtInst(F_READ(b, "ZF"), toT, "", b);
-    Value *sf = new ZExtInst(F_READ(b, "SF"), toT, "", b);
-    Value *df = new ZExtInst(F_READ(b, "DF"), toT, "", b);
-    Value *of = new ZExtInst(F_READ(b, "OF"), toT, "", b);
+    Value *cf = new ZExtInst(F_READ(b, CF), toT, "", b);
+    Value *pf = new ZExtInst(F_READ(b, PF), toT, "", b);
+    Value *af = new ZExtInst(F_READ(b, AF), toT, "", b);
+    Value *zf = new ZExtInst(F_READ(b, ZF), toT, "", b);
+    Value *sf = new ZExtInst(F_READ(b, SF), toT, "", b);
+    Value *df = new ZExtInst(F_READ(b, DF), toT, "", b);
+    Value *of = new ZExtInst(F_READ(b, OF), toT, "", b);
 
     Value *eflags_base = CONST_V<width>(b, 0x202);
 

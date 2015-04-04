@@ -33,6 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Helpers.h"
 #include "x86Instrs_fpu.h"
 #include "InstructionDispatch.h"
+#include "RegisterUsage.h"
+
 #include <vector>
 #include <cmath>
 
@@ -89,7 +91,7 @@ static Value *SHL_NOTXOR_V(llvm::BasicBlock *block, Value *val,
 
 template <int width>
 static Value *SHL_NOTXOR_FLAG(llvm::BasicBlock *block, Value *val,
-    std::string flag, int shlbits)
+    MCSemaRegs flag, int shlbits)
 {
     Value *fv = F_READ(block, flag);
     return SHL_NOTXOR_V<width>(block, val, fv, shlbits);
@@ -98,16 +100,20 @@ static Value *SHL_NOTXOR_FLAG(llvm::BasicBlock *block, Value *val,
 
 static void SET_FPU_FOPCODE(BasicBlock *&b, uint8_t opcode[4])
 {
-    uint16_t op = MAKE_FOPCODE(opcode[0], opcode[1]);
-    Value *op_v = CONST_V<11>(b, op);
-    F_WRITE(b, "FPU_FOPCODE", op_v);
+    //assume we will never set fopcode
+    //uint16_t op = MAKE_FOPCODE(opcode[0], opcode[1]);
+    //Value *op_v = CONST_V<11>(b, op);
+    //F_WRITE(b, FPU_FOPCODE, op_v);
+    return;
 }
 
 static void setFpuDataPtr(BasicBlock *&b, Value *dataptr)
 {
-    Value *addrInt = new PtrToIntInst(
-        dataptr, llvm::Type::getInt32Ty(b->getContext()), "", b);
-    F_WRITE(b, "FPU_LASTDATA_OFF", addrInt);
+    // assume no FPU data
+    //Value *addrInt = new PtrToIntInst(
+    //    dataptr, llvm::Type::getInt32Ty(b->getContext()), "", b);
+    //F_WRITE(b, FPU_LASTDATA_OFF, addrInt);
+    return;
 }
 
 static void setFpuInstPtr(llvm::BasicBlock *&b, llvm::BasicBlock *addr_to_take)
@@ -123,8 +129,10 @@ static void setFpuInstPtr(llvm::BasicBlock *&b, llvm::BasicBlock *addr_to_take)
 
     // For now we store a constant 0 until a solution is found to store the
     // real value.
-    Value *addrInt = CONST_V<32>(b, 0);
-    F_WRITE(b, "FPU_LASTIP_OFF", addrInt);
+    //Value *addrInt = CONST_V<32>(b, 0);
+    //F_WRITE(b, FPU_LASTIP_OFF, addrInt);
+    // assume no fpu last ip
+    return;
 }
 
 static void setFpuInstPtr(llvm::BasicBlock *b)
@@ -132,7 +140,7 @@ static void setFpuInstPtr(llvm::BasicBlock *b)
     return setFpuInstPtr(b, b);
 }
 
-#if 0
+#if 1
 static Value* adjustFpuPrecision(BasicBlock *&b, Value *fpuval)
 {
     return fpuval;
@@ -150,7 +158,7 @@ static Value* adjustFpuPrecision(BasicBlock *&b, Value *fpuval)
     // case 2: double precision
     // default: double extended (native x86)
 
-    Value *pc = F_READ(b, "FPU_PC");
+    Value *pc = F_READ(b, FPU_PC);
 
     CREATE_BLOCK(native_precision, b);
     CREATE_BLOCK(single_precision, b);
@@ -200,15 +208,15 @@ static Value* adjustFpuPrecision(BasicBlock *&b, Value *fpuval)
 }
 #endif
 
-static void FPUF_SET(BasicBlock *&b, std::string flag)
+static void FPUF_SET(BasicBlock *&b, MCSemaRegs reg)
 {
-    F_WRITE(b, "FPU_"+flag, CONST_V<1>(b, 1));
+    F_WRITE(b, reg, CONST_V<1>(b, 1));
     return;
 }
 
-static void FPUF_CLEAR(BasicBlock *&b, std::string flag)
+static void FPUF_CLEAR(BasicBlock *&b, MCSemaRegs reg)
 {
-    F_WRITE(b, "FPU_"+flag, CONST_V<1>(b, 0));
+    F_WRITE(b, reg, CONST_V<1>(b, 0));
     return;
 }
 
@@ -218,7 +226,7 @@ static Value * CONSTFP_V(BasicBlock *&b, long double val)
     return ConstantFP::get(bTy, val);
 }
 
-static Value *doGEPV(BasicBlock *&b, Value *gepindex, std::string localregname)
+static Value *doGEPV(BasicBlock *&b, Value *gepindex, MCSemaRegs reg)
 {
     llvm::Type *gepindex_type = gepindex->getType();
 
@@ -238,7 +246,7 @@ static Value *doGEPV(BasicBlock *&b, Value *gepindex, std::string localregname)
         CONST_V<32>(b, 0),
         gep_ext };
 
-    Value* localgepreg = lookupLocalByName(b->getParent(), localregname);
+    Value* localgepreg = lookupLocal(b->getParent(), reg);
 
     // Get actual register.
     Instruction *gepreg = GetElementPtrInst::CreateInBounds(localgepreg, stGEPV, "", b);
@@ -248,13 +256,13 @@ static Value *doGEPV(BasicBlock *&b, Value *gepindex, std::string localregname)
 
 static Value *GetFPUTagPtrV(BasicBlock *&b, Value *tagval)
 {
-    return doGEPV(b, tagval, "FPU_TAG_val");
+    return doGEPV(b, tagval, FPU_TAG);
 }
 
 static Value *GetFPUTagV(BasicBlock *&b, Value *tagval)
 {
-    Value *tagptr = doGEPV(b, tagval, "FPU_TAG_val");
-    Value *load = new LoadInst(tagptr, "", b);
+    Value *tagptr = doGEPV(b, tagval, FPU_TAG);
+    Value *load = noAliasMCSemaScope(new LoadInst(tagptr, "", b));
 
     return load;
 }
@@ -262,7 +270,7 @@ static Value *GetFPUTagV(BasicBlock *&b, Value *tagval)
 static Value *GetFPURegV(BasicBlock *&b, Value *fpureg)
 {
     // Create GEP array to get local value of ST(regslot).
-    return doGEPV(b, fpureg, "STi_val");
+    return doGEPV(b, fpureg, ST0);
 }
 
 // Map fpreg (a value from the enum of X86::ST0 - X86::ST7 to register slot in
@@ -278,7 +286,7 @@ static Value *GetSlotForFPUReg(BasicBlock *&b, unsigned fpreg)
     if(offset_from_st0 >= NUM_FPU_REGS)
       throw TErr(__LINE__, __FILE__, "Trying to write to non-existant FPU register");
 
-    Value *topval = F_READ(b, "FPU_TOP");
+    Value *topval = F_READ(b, FPU_TOP);
     // Add should overflow automatically.
     Value   *regslot = BinaryOperator::CreateAdd(
                 topval, 
@@ -293,14 +301,14 @@ static Value *GetSlotForFPUReg(BasicBlock *&b, unsigned fpreg)
 static Value* DECREMENT_FPU_TOP(BasicBlock *&b)
 {
     // Read TOP.
-    Value   *topval = F_READ(b, "FPU_TOP");
+    Value   *topval = F_READ(b, FPU_TOP);
 
     Value   *dectop = BinaryOperator::CreateSub(topval, CONST_V<3>(b, 1), "", b);
 
     // Checking for range removed due to operations on 3-bit integers and
     // automatic overflow.
 
-    F_WRITE(b, "FPU_TOP", dectop);
+    F_WRITE(b, FPU_TOP, dectop);
 
     return dectop;
 }
@@ -309,12 +317,12 @@ static Value* DECREMENT_FPU_TOP(BasicBlock *&b)
 static Value* INCREMENT_FPU_TOP(BasicBlock *&b)
 {
     // Read TOP.
-    Value *topval = F_READ(b, "FPU_TOP");
+    Value *topval = F_READ(b, FPU_TOP);
 
     // Increment TOP.
     Value *inctop = BinaryOperator::CreateAdd(topval, CONST_V<3>(b, 1), "", b);
 
-    F_WRITE(b, "FPU_TOP", inctop);
+    F_WRITE(b, FPU_TOP, inctop);
 
     return inctop;
 }
@@ -353,10 +361,10 @@ static Value   *FPUR_READV(BasicBlock *&b, Value *regslot)
     //tagSwitch->addCase(CONST_V<2>(b, 3), read_empty_block);
 
     Value *streg = GetFPURegV(read_normal_block, regslot);
-    Value *loadVal = new LoadInst(streg, "", read_normal_block);
+    Instruction *loadVal = noAliasMCSemaScope(new LoadInst(streg, "", read_normal_block));
 
     // C1 is set load needs to round up and cleared otherwise.
-    FPUF_CLEAR(read_normal_block, "C1");
+    FPUF_CLEAR(read_normal_block, FPU_C1);
     BranchInst::Create(fpu_read_continue, read_normal_block);
 
     // Populate read zero block.
@@ -386,7 +394,7 @@ static Value   *FPUR_READV(BasicBlock *&b, Value *regslot)
     // For now, just branch to fpu_read_continue and clear C1 to indicate stack
     // underflow.
     // TODO: Throw an exception.
-    FPUF_CLEAR(read_empty_block, "C1");
+    FPUF_CLEAR(read_empty_block, FPU_C1);
     Value *zval = CONSTFP_V(read_empty_block, 0.0);
     BranchInst::Create(fpu_read_continue, read_empty_block);
 
@@ -441,7 +449,7 @@ static void FPUR_WRITEV(BasicBlock *&b, Value *regslot, Value *val)
     // Get ptr to FPU register.
     Value *streg = GetFPURegV(b, regslot);
     Value *tagReg = GetFPUTagPtrV(b, regslot);
-    Value *tagVal = new LoadInst(tagReg, "", b);
+    Instruction *tagVal = noAliasMCSemaScope(new LoadInst(tagReg, "", b));
 
     // If tag != empty, then throw exception.
     Value *cmp_inst = new ICmpInst(*b, ICmpInst::ICMP_EQ, tagVal, CONST_V<2>(b, FPU_TAG_EMPTY));
@@ -451,16 +459,17 @@ static void FPUR_WRITEV(BasicBlock *&b, Value *regslot, Value *val)
     // Set up block_fpu_exception.
     // TODO: real exception throwing.
     // For now, just set C1 and branch to write anyway.
-    FPUF_SET(block_fpu_exception, "C1");
+    FPUF_SET(block_fpu_exception, FPU_C1);
     BranchInst::Create(block_fpu_write, block_fpu_exception);
 
     // Default block is now block_fpu_write.
     b = block_fpu_write;
 
     // Write 0 to tagReg.
-    FPUF_CLEAR(b, "C1");
-    Value *storeVal_normal = new StoreInst(
-        CONST_V<2>(b, FPU_TAG_VALID), tagReg, b);
+    FPUF_CLEAR(b, FPU_C1);
+    Instruction *storeVal_normal = noAliasMCSemaScope(new StoreInst(
+        CONST_V<2>(b, FPU_TAG_VALID), tagReg, b));
+
     NASSERT(storeVal_normal != NULL);
 
     // This is used later, but is needed now so things can branch to it.
@@ -470,15 +479,15 @@ static void FPUR_WRITEV(BasicBlock *&b, Value *regslot, Value *val)
     
     // Write 1 to tagReg.
     //CREATE_BLOCK(fpu_write_zero, b);
-    //Value *storeVal_zero = new StoreInst(
-    //    CONST_V<2>(block_fpu_write_zero, 1), tagReg, block_fpu_write_zero);
+    //Value *storeVal_zero = noAliasMCSemaScope(new StoreInst(
+    //    CONST_V<2>(block_fpu_write_zero, 1), tagReg, block_fpu_write_zero));
     //NASSERT(storeVal_zero != NULL);
     //BranchInst::Create(block_fpu_write_exit, block_fpu_write_zero);
 
     // Write 2 to tagReg.
     //CREATE_BLOCK(fpu_write_special, b);
-    //Value *storeVal_special = new StoreInst(CONST_V<2>(
-    //    block_fpu_write_special, 2), tagReg, block_fpu_write_special);
+    //Value *storeVal_special = noAliasMCSemaScope(new StoreInst(CONST_V<2>(
+    //    block_fpu_write_special, 2), tagReg, block_fpu_write_special));
     //NASSERT(storeVal_special != NULL);
 
     //BranchInst::Create(block_fpu_write_exit, block_fpu_write_special);
@@ -507,7 +516,7 @@ static void FPUR_WRITEV(BasicBlock *&b, Value *regslot, Value *val)
     b = block_fpu_write_exit;
     Value *precision_adjusted = adjustFpuPrecision(b, val);
     // Store value into local ST register array.
-    Value   *storeVal = new StoreInst(precision_adjusted, streg, b);
+    Instruction   *storeVal = noAliasMCSemaScope(new StoreInst(precision_adjusted, streg, b));
 
     NASSERT(storeVal != NULL);
 }
@@ -537,8 +546,8 @@ static void FPU_POP(BasicBlock *&b)
     Value *tagReg = GetFPUTagPtrV(b, topslot);
     // Should an exception be thrown if an empty FPU value is popped without
     // being used?
-    Value *empty_the_tag = new StoreInst(
-        CONST_V<2>(b, FPU_TAG_EMPTY), tagReg, b);
+    Value *empty_the_tag = noAliasMCSemaScope(new StoreInst(
+        CONST_V<2>(b, FPU_TAG_EMPTY), tagReg, b));
 
     NASSERT(empty_the_tag != NULL);
 
@@ -572,7 +581,7 @@ static Value *FPUM_READ(InstPtr ip, int memwidth, llvm::BasicBlock *&b, Value *a
 
     readLoc = ADDR_TO_POINTER_V(b, addr, ptrTy);
 
-    Value *read = new llvm::LoadInst(readLoc, "", b);
+    Value *read = noAliasMCSemaScope(new llvm::LoadInst(readLoc, "", b));
 
     // Convert precision - this is here for cases like FPU compares where the
     // compare would fail unless both precisions were adjusted.
@@ -645,7 +654,7 @@ static BasicBlock * createNewFpuBlock(BasicBlock *&b, std::string instName)
         CONST_V<32>(b, 0),\
         CONST_V<32>(b, index) };\
     Instruction *gepreg = GetElementPtrInst::CreateInBounds(st, stGEPV, "", b);\
-    Value *storeIt = new StoreInst(member, gepreg, b);\
+    Value *storeIt = noAliasMCSemaScope(new StoreInst(member, gepreg, b));\
     NASSERT(storeIt != NULL);\
     } while(0);
 
@@ -733,7 +742,7 @@ static InstTransResult doFOpRR(InstPtr ip, BasicBlock *&b,
     FPUR_WRITE(b, dstReg, result);
 
     // Set if result is rounded up, clear otherwise.
-    FPUF_CLEAR(b, "C1");
+    FPUF_CLEAR(b, FPU_C1);
 
     // Next instruction.
     return ContinueBlock;
@@ -760,15 +769,15 @@ static InstTransResult doFldcw(InstPtr ip, BasicBlock *&b, Value *memAddr)
 
     Value *memVal = M_READ<16>(ip, b, memPtr);
 
-    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_IM", 0 );
-    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_DM", 1 );
-    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_ZM", 2 );
-    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_OM", 3 );
-    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_UM", 4 );
-    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_PM", 5 );
-    SHR_SET_FLAG<16, 2>(b, memVal, "FPU_PC", 8 );
-    SHR_SET_FLAG<16, 2>(b, memVal, "FPU_RC", 10);
-    SHR_SET_FLAG<16, 1>(b, memVal, "FPU_X",  12);
+    SHR_SET_FLAG<16, 1>(b, memVal, FPU_IM, 0 );
+    SHR_SET_FLAG<16, 1>(b, memVal, FPU_DM, 1 );
+    SHR_SET_FLAG<16, 1>(b, memVal, FPU_ZM, 2 );
+    SHR_SET_FLAG<16, 1>(b, memVal, FPU_OM, 3 );
+    SHR_SET_FLAG<16, 1>(b, memVal, FPU_UM, 4 );
+    SHR_SET_FLAG<16, 1>(b, memVal, FPU_PM, 5 );
+    SHR_SET_FLAG<16, 2>(b, memVal, FPU_PC, 8 );
+    SHR_SET_FLAG<16, 2>(b, memVal, FPU_RC, 10);
+    SHR_SET_FLAG<16, 1>(b, memVal, FPU_X,  12);
 
     return ContinueBlock; 
 }
@@ -780,17 +789,17 @@ static InstTransResult doFstcw(InstPtr ip, BasicBlock *&b, Value *memAddr)
     // Pre-clear reserved FPU bits.
     Value *cw = CONST_V<16>(b, 0x1F7F);
 
-    cw = SHL_NOTXOR_FLAG<16>(b, cw, "FPU_IM", 0);
-    cw = SHL_NOTXOR_FLAG<16>(b, cw, "FPU_DM", 1);
-    cw = SHL_NOTXOR_FLAG<16>(b, cw, "FPU_ZM", 2);
-    cw = SHL_NOTXOR_FLAG<16>(b, cw, "FPU_OM", 3);
-    cw = SHL_NOTXOR_FLAG<16>(b, cw, "FPU_UM", 4);
-    cw = SHL_NOTXOR_FLAG<16>(b, cw, "FPU_PM", 5);
-    cw = SHL_NOTXOR_FLAG<16>(b, cw, "FPU_PC", 8);
-    cw = SHL_NOTXOR_FLAG<16>(b, cw, "FPU_RC", 10);
-    cw = SHL_NOTXOR_FLAG<16>(b, cw, "FPU_X", 12);
+    cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_IM, 0);
+    cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_DM, 1);
+    cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_ZM, 2);
+    cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_OM, 3);
+    cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_UM, 4);
+    cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_PM, 5);
+    cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_PC, 8);
+    cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_RC, 10);
+    cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_X, 12);
 
-    Value *store = new StoreInst(cw, memPtr, b);
+    Value *store = noAliasMCSemaScope(new StoreInst(cw, memPtr, b));
 
     return ContinueBlock; 
 }
@@ -802,32 +811,32 @@ static InstTransResult doFstenv(InstPtr ip, BasicBlock *&b, Value *memAddr)
     // Pre-clear reserved FPU bits.
     Value *cw = CONST_V<32>(b, 0xFFFF1F7F);
 
-    cw = SHL_NOTXOR_FLAG<32>(b, cw, "FPU_IM", 0);
-    cw = SHL_NOTXOR_FLAG<32>(b, cw, "FPU_DM", 1);
-    cw = SHL_NOTXOR_FLAG<32>(b, cw, "FPU_ZM", 2);
-    cw = SHL_NOTXOR_FLAG<32>(b, cw, "FPU_OM", 3);
-    cw = SHL_NOTXOR_FLAG<32>(b, cw, "FPU_UM", 4);
-    cw = SHL_NOTXOR_FLAG<32>(b, cw, "FPU_PM", 5);
-    cw = SHL_NOTXOR_FLAG<32>(b, cw, "FPU_PC", 8);
-    cw = SHL_NOTXOR_FLAG<32>(b, cw, "FPU_RC", 10);
-    cw = SHL_NOTXOR_FLAG<32>(b, cw, "FPU_X", 12);
+    cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_IM, 0);
+    cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_DM, 1);
+    cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_ZM, 2);
+    cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_OM, 3);
+    cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_UM, 4);
+    cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_PM, 5);
+    cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_PC, 8);
+    cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_RC, 10);
+    cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_X, 12);
 
     Value *sw = CONST_V<32>(b, 0xFFFFFFFF);
 
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_IE", 0);
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_DE", 1);
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_ZE", 2);
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_OE", 3);
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_UE", 4);
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_PE", 5);
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_SF", 6);
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_ES", 7);
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_C0", 8);
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_C1", 9);
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_C2", 10);
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_TOP", 11);
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_C3", 14);
-    sw = SHL_NOTXOR_FLAG<32>(b, sw, "FPU_B", 15);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_IE, 0);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_DE, 1);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_ZE, 2);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_OE, 3);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_UE, 4);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_PE, 5);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_SF, 6);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_ES, 7);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_C0, 8);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_C1, 9);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_C2, 10);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_TOP, 11);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_C3, 14);
+    sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_B, 15);
 
     Value *tw = CONST_V<32>(b, 0xFFFFFFFF);
 
@@ -840,14 +849,14 @@ static InstTransResult doFstenv(InstPtr ip, BasicBlock *&b, Value *memAddr)
     tw = SHL_NOTXOR_V<32>(b, tw, GetFPUTagV(b, CONST_V<32>(b, 6)), 12);
     tw = SHL_NOTXOR_V<32>(b, tw, GetFPUTagV(b, CONST_V<32>(b, 7)), 14);
 
-    Value *fpu_ip = F_READ(b, "FPU_LASTIP_OFF");
+    Value *fpu_ip = F_READ(b, FPU_LASTIP_OFF);
     Value *fpu_seg_op = CONST_V<32>(b, 0x0);
-    fpu_seg_op = SHL_NOTXOR_V<32>(b, fpu_seg_op, F_READ(b, "FPU_LASTIP_SEG"), 0);
-    fpu_seg_op = SHL_NOTXOR_V<32>(b, fpu_seg_op, F_READ(b, "FPU_FOPCODE"), 16);
+    fpu_seg_op = SHL_NOTXOR_V<32>(b, fpu_seg_op, F_READ(b, FPU_LASTIP_SEG), 0);
+    fpu_seg_op = SHL_NOTXOR_V<32>(b, fpu_seg_op, F_READ(b, FPU_FOPCODE), 16);
 
-    Value *fpu_dp_o = F_READ(b, "FPU_LASTDATA_OFF");
+    Value *fpu_dp_o = F_READ(b, FPU_LASTDATA_OFF);
     Value *fpu_dp_s = CONST_V<32>(b, 0xFFFFFFFF);
-    fpu_dp_s = SHL_NOTXOR_V<32>(b, fpu_dp_s, F_READ(b, "FPU_LASTDATA_SEG"), 0);
+    fpu_dp_s = SHL_NOTXOR_V<32>(b, fpu_dp_s, F_READ(b, FPU_LASTDATA_SEG), 0);
     StructType *fpuenv_t = StructType::create(b->getContext(), "struct.fpuenv");
     std::vector<Type *>  envfields;
     envfields.push_back(Type::getInt32Ty(b->getContext()));
@@ -1118,9 +1127,9 @@ static InstTransResult doFucom(
     
     Value *lt_and_eq = BinaryOperator::CreateAnd(is_lt, is_eq, "", b);
 
-    F_WRITE(b, "FPU_C0", is_lt);        // C0 is 1 if either is QNaN or op1 < op2
-    F_WRITE(b, "FPU_C3", is_eq);        // C3 is 1 if either is QNaN or op1 == op2
-    F_WRITE(b, "FPU_C2", lt_and_eq);    // C2 is 1 if either op is a QNaN
+    F_WRITE(b, FPU_C0, is_lt);        // C0 is 1 if either is QNaN or op1 < op2
+    F_WRITE(b, FPU_C3, is_eq);        // C3 is 1 if either is QNaN or op1 == op2
+    F_WRITE(b, FPU_C2, lt_and_eq);    // C2 is 1 if either op is a QNaN
 
     while(stackPops > 0) {
         FPU_POP(b);
@@ -1136,20 +1145,20 @@ static Value* doFstsV(BasicBlock *&b)
 
     Value *sw = CONST_V<16>(b, 0xFFFF);
 
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_IE",  0);
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_DE",  1);
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_ZE",  2);
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_OE",  3);
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_UE",  4);
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_PE",  5);
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_SF",  6);
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_ES",  7);
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_C0",  8);
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_C1",  9);
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_C2", 10);
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_TOP",11);
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_C3", 14);
-    sw = SHL_NOTXOR_FLAG<16>(b, sw, "FPU_B",  15);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_IE,  0);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_DE,  1);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_ZE,  2);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_OE,  3);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_UE,  4);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_PE,  5);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_SF,  6);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_ES,  7);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_C0,  8);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_C1,  9);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_C2, 10);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_TOP,11);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_C3, 14);
+    sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_B,  15);
 
     return sw;
 }
@@ -1239,7 +1248,8 @@ static InstTransResult doFSCALE(MCInst &inst, InstPtr ip, BasicBlock *&b)
 	Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
 
 	Function *exp_func = Intrinsic::getDeclaration(M, Intrinsic::exp2, t);
-	Function *trunc_func = Intrinsic::getDeclaration(M, Intrinsic::trunc, t);
+
+    Function *trunc_func = Intrinsic::getDeclaration(M, Intrinsic::trunc, t);
 
 	NASSERT(exp_func != nullptr);
 	NASSERT(trunc_func != nullptr);
@@ -1326,6 +1336,7 @@ static InstTransResult doFRNDINT(MCInst &inst, InstPtr ip, BasicBlock *&b)
 	Function *round_up = Intrinsic::getDeclaration(M, Intrinsic::round, fpTy);
     NASSERT(round_up != NULL);
     // truncate
+    //
 	Function *round_zero = Intrinsic::getDeclaration(M, Intrinsic::trunc, fpTy);
     NASSERT(round_zero != NULL);
 
@@ -1336,7 +1347,7 @@ static InstTransResult doFRNDINT(MCInst &inst, InstPtr ip, BasicBlock *&b)
     CREATE_BLOCK(finished, b);
 
     // switch on Rounding control
-    Value *rc = F_READ(b, "FPU_RC");
+    Value *rc = F_READ(b, FPU_RC);
     SwitchInst *rcSwitch = SwitchInst::Create(rc, block_nearest, 4, b);
     rcSwitch->addCase(CONST_V<2>(b, 0), block_nearest);
     rcSwitch->addCase(CONST_V<2>(b, 1), block_down);
@@ -1378,6 +1389,134 @@ static InstTransResult doFRNDINT(MCInst &inst, InstPtr ip, BasicBlock *&b)
     return ContinueBlock;
 }
 
+static InstTransResult doFABS(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+
+	Value *st0_val = FPUR_READ(b, X86::ST0);
+
+	Module *M = b->getParent()->getParent();
+	Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
+	Function *func = Intrinsic::getDeclaration(M, Intrinsic::fabs, t);
+
+	NASSERT(func != NULL);
+
+	std::vector<Value*> args;
+	args.push_back(st0_val);
+
+	Value *result = CallInst::Create(func, args, "", b);
+
+	// store return in reg
+	FPUR_WRITE(b, X86::ST0, result);
+
+
+	return ContinueBlock;
+}
+
+static InstTransResult doFSQRT(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+
+	Value *st0_val = FPUR_READ(b, X86::ST0);
+
+	Module *M = b->getParent()->getParent();
+	Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
+	Function *func = Intrinsic::getDeclaration(M, Intrinsic::sqrt, t);
+
+	NASSERT(func != NULL);
+
+	std::vector<Value*> args;
+	args.push_back(st0_val);
+
+	Value *result = CallInst::Create(func, args, "", b);
+
+	// store return in reg
+	FPUR_WRITE(b, X86::ST0, result);
+
+
+	return ContinueBlock;
+}
+
+static InstTransResult doFCOS(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+
+	Value *st0_val = FPUR_READ(b, X86::ST0);
+
+	Module *M = b->getParent()->getParent();
+	Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
+	Function *func = Intrinsic::getDeclaration(M, Intrinsic::cos, t);
+
+	NASSERT(func != NULL);
+
+	std::vector<Value*> args;
+	args.push_back(st0_val);
+
+	Value *result = CallInst::Create(func, args, "", b);
+
+	// store return in reg
+	FPUR_WRITE(b, X86::ST0, result);
+
+	/* XXX: If the radian value lies outside the valid range of –263 
+	 *  to +263 radians, the instruction sets the C2 flag in the x87 
+	 *  status word to 1 to indicate the value is out of range and 
+	 *  does not change the value in ST(0).
+	 */
+
+
+	return ContinueBlock;
+}
+static InstTransResult doFSINCOS(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+
+	/*
+	 * Computes the sine and cosine of the value in ST(0), stores the sine in ST(0), 
+	 *   and pushes the cosine onto the x87 register stack. The source value must be 
+	 *   in the range –263 to +263 radians.
+	 */
+
+	Value *st0_val = FPUR_READ(b, X86::ST0);
+
+	Module *M = b->getParent()->getParent();
+	Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
+
+	Function *sin = Intrinsic::getDeclaration(M, Intrinsic::sin, t);
+	Function *cos = Intrinsic::getDeclaration(M, Intrinsic::cos, t);
+
+	NASSERT(sin != NULL);
+	NASSERT(cos != NULL);
+
+	// Compute the sin of st(0)
+	std::vector<Value*> args;
+	args.push_back(st0_val);
+	Value *sin_result = CallInst::Create(sin, args, "", b);
+
+	// store the result of the sin call back into st(0)
+	FPUR_WRITE(b, X86::ST0, sin_result);
+
+	// Compute the cos of st(0)
+	args.clear();
+	args.push_back(st0_val);
+	Value *cos_result = CallInst::Create(cos, args, "", b);
+
+	// Push the result of the cos on the register stack
+	FPU_PUSHV(b, cos_result);
+
+	return ContinueBlock;
+}
+
+static InstTransResult doFINCSTP(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+
+	INCREMENT_FPU_TOP(b);
+
+	return ContinueBlock;
+}
+
+static InstTransResult doFDECSTP(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+
+	DECREMENT_FPU_TOP(b);
+
+	return ContinueBlock;
+}
 
 #define FPU_TRANSLATION(NAME, SETPTR, SETDATA, SETFOPCODE, ACCESSMEM, THECALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst)\
 {\
@@ -1388,7 +1527,7 @@ static InstTransResult doFRNDINT(MCInst &inst, InstPtr ip, BasicBlock *&b)
     if (ACCESSMEM) {\
         if( ip->is_data_offset() ) {\
             mem_src =  GLOBAL_DATA_OFFSET(block, natM, ip);\
-            if (SETDATA) { F_WRITE(block, "FPU_LASTDATA_OFF", mem_src);}\
+            if (SETDATA) { F_WRITE(block, FPU_LASTDATA_OFF, mem_src);}\
         } else {\
             mem_src = ADDR(0);\
             if (SETDATA) { setFpuDataPtr(block, mem_src); }\
@@ -1599,6 +1738,20 @@ FPU_TRANSLATION(F2XM1, true, false, true, false,
 FPU_TRANSLATION(FSCALE, true, false, true, false,
         doFSCALE(inst, ip, block))
 
+FPU_TRANSLATION(FABS, true, false, true, false,
+        doFABS(inst, ip, block))
+FPU_TRANSLATION(FSQRT, true, false, true, false,
+        doFSQRT(inst, ip, block))
+FPU_TRANSLATION(FCOS, true, false, true, false,
+        doFCOS(inst, ip, block))
+FPU_TRANSLATION(FSINCOS, true, false, true, false,
+        doFSINCOS(inst, ip, block))
+
+FPU_TRANSLATION(FINCSTP, true, false, true, false,
+        doFINCSTP(inst, ip, block))
+FPU_TRANSLATION(FDECSTP, true, false, true, false,
+        doFDECSTP(inst, ip, block))
+
 static InstTransResult translate_WAIT(NativeModulePtr natM, BasicBlock *&block,
     InstPtr ip, MCInst &inst)
 {
@@ -1696,5 +1849,13 @@ void FPU_populateDispatchMap(DispatchMap &m)
     m[X86::FRNDINT] = translate_FRNDINT;
     m[X86::F2XM1] = translate_F2XM1;
     m[X86::FSCALE] = translate_FSCALE;
+
+	m[X86::ABS_F] = translate_FABS;
+	m[X86::SQRT_F] = translate_FSQRT;
+	m[X86::COS_F] = translate_FCOS;
+	m[X86::FSINCOS] = translate_FSINCOS;
+
+	m[X86::FDECSTP] = translate_FDECSTP;
+	m[X86::FINCSTP] = translate_FINCSTP;
 }
 

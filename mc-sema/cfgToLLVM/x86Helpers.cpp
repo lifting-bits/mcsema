@@ -268,7 +268,7 @@ Value *GLOBAL(BasicBlock *B,
 }
 
 
-void callMemcpy(BasicBlock *B, Value *dest, Value *src, uint32_t size, 
+Instruction*  callMemcpy(BasicBlock *B, Value *dest, Value *src, uint32_t size, 
         uint32_t align, bool isVolatile)
 {
     Value *copySize = CONST_V<32>(B, size);
@@ -296,6 +296,6 @@ void callMemcpy(BasicBlock *B, Value *dest, Value *src, uint32_t size,
     };
 
     // actually call llvm.memcpy
-    CallInst::Create(doMemCpy, callArgs, "", B);
+    return CallInst::Create(doMemCpy, callArgs, "", B);
 }
 

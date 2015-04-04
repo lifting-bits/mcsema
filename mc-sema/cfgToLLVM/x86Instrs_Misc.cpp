@@ -34,14 +34,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Instrs_flagops.h"
 #include "x86Instrs_Misc.h"
 #include "llvm/Support/Debug.h"
+#include "ArchOps.h"
 
 using namespace llvm;
 
-static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
+static InstTransResult doNoop(BasicBlock *b) {
   //isn't this exciting
-  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
-  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
-  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
   return ContinueBlock;
 }
 
@@ -71,25 +69,24 @@ static InstTransResult doCdq( BasicBlock   *b ) {
     //read EAX
     Value   *EAX_v = R_READ<32>(b, X86::EAX);
 
-    //shift EAX_v to the right by 31
-    Value   *c = CONST_V<32>(b, 31);
-    Value   *EAX_sh = BinaryOperator::Create(Instruction::LShr, EAX_v, c, "", b);
+    Value *sign_bit = CONST_V<32>(b, 1<<31);
 
-    //truncate EAX_sh to 1 bit
-    Value   *EAX_1 = new TruncInst( EAX_sh, 
-                                    Type::getInt1Ty(b->getContext()), 
-                                    "", 
-                                    b);
-    
-    //sign-extend EAX_1 to a 32-bit value 
-    Value   *EAX_sx = new SExtInst( EAX_1,
-                                    Type::getInt32Ty(b->getContext()),
-                                    "",
-                                    b);
+    Value   *test_bit = 
+        BinaryOperator::CreateAnd(EAX_v, sign_bit, "", b);
+
+
+    Value   *is_zero = new ICmpInst(*b,
+                                    CmpInst::ICMP_EQ,
+                                    test_bit,
+                                    CONST_V<32>(b, 0));
+    Value *edx_val = SelectInst::Create(
+            is_zero,
+            CONST_V<32>(b, 0),
+            CONST_V<32>(b, 0xFFFFFFFF),
+            "", b);
+
     //write this value to EDX
-    R_WRITE<32>(b, X86::EDX, EAX_sx);
-
-    //no flags are affected
+    R_WRITE<32>(b, X86::EDX, edx_val);
 
     return ContinueBlock;
 }
@@ -137,11 +134,11 @@ static InstTransResult doLAHF(BasicBlock *b) {
     //flags, shift and OR them, and then write them into AH
 
     Type    *t = Type::getInt8Ty(b->getContext());
-    Value   *cf = new ZExtInst(F_READ(b, "CF"), t, "", b);
-    Value   *af = new ZExtInst(F_READ(b, "AF"), t, "", b);
-    Value   *pf = new ZExtInst(F_READ(b, "PF"), t, "", b);
-    Value   *zf = new ZExtInst(F_READ(b, "ZF"), t, "", b);
-    Value   *sf = new ZExtInst(F_READ(b, "SF"), t, "", b);
+    Value   *cf = new ZExtInst(F_READ(b, CF), t, "", b);
+    Value   *af = new ZExtInst(F_READ(b, AF), t, "", b);
+    Value   *pf = new ZExtInst(F_READ(b, PF), t, "", b);
+    Value   *zf = new ZExtInst(F_READ(b, ZF), t, "", b);
+    Value   *sf = new ZExtInst(F_READ(b, SF), t, "", b);
 
     //shift everything
     Value   *p_0 = cf;
@@ -182,32 +179,42 @@ static InstTransResult doLAHF(BasicBlock *b) {
 
 static InstTransResult doStd(BasicBlock *b) {
 
-    F_SET(b, "DF");
+    F_SET(b, DF);
 
     return ContinueBlock;
 }
 
 static InstTransResult doCld(BasicBlock *b) {
 
-    F_CLEAR(b, "DF");
+    F_CLEAR(b, DF);
 
     return ContinueBlock;
 }
 
 static InstTransResult doStc(BasicBlock *b) {
 
-    F_SET(b, "CF");
+    F_SET(b, CF);
 
     return ContinueBlock;
 }
 
 static InstTransResult doClc(BasicBlock *b) {
 
-    F_CLEAR(b, "CF");
+    F_CLEAR(b, CF);
 
     return ContinueBlock;
 }
 
+template<int width>
+static InstTransResult doLeaV(BasicBlock *&b, 
+                        const MCOperand &dst,
+                        Value *addrInt)
+
+{
+    //write the address into the register
+    R_WRITE<width>(b, dst.getReg(), addrInt);
+    return ContinueBlock;
+}
 
 template<int width>
 static InstTransResult doLea(InstPtr ip,   BasicBlock *&b, 
@@ -222,10 +229,7 @@ static InstTransResult doLea(InstPtr ip,   BasicBlock *&b,
     Type    *ty = Type::getIntNTy(b->getContext(), width);
     Value   *addrInt = new PtrToIntInst(addr, ty, "", b);
 
-    //write the address into the register
-    R_WRITE<width>(b, dst.getReg(), addrInt);
-
-    return ContinueBlock;
+    return doLeaV<width>(b, dst, addrInt); 
 }
 
 static InstTransResult doRdtsc(BasicBlock *b) {
@@ -252,7 +256,7 @@ static InstTransResult doAAA(BasicBlock *b) {
     Value   *af;
 
     al = R_READ<8>(b, X86::AL);
-    af = F_READ(b, "AF");
+    af = F_READ(b, AF);
 
     // AL & 0x0F 
     Value   *andRes = BinaryOperator::CreateAnd(al, CONST_V<8>(b, 0x0F), "", b);
@@ -274,8 +278,8 @@ static InstTransResult doAAA(BasicBlock *b) {
     Value   *ahRes = BinaryOperator::CreateAdd(R_READ<8>(trueBlock, X86::AH), CONST_V<8>(trueBlock, 1), "", trueBlock);
     R_WRITE<8>(trueBlock, X86::AH, ahRes);
 
-    F_SET(trueBlock, "AF");
-    F_SET(trueBlock, "CF");
+    F_SET(trueBlock, AF);
+    F_SET(trueBlock, CF);
 
     alRes = BinaryOperator::CreateAnd(alRes, CONST_V<8>(trueBlock, 0x0F), "", trueBlock);
     R_WRITE<8>(trueBlock, X86::AL, alRes);
@@ -283,18 +287,18 @@ static InstTransResult doAAA(BasicBlock *b) {
     BranchInst::Create(endBlock, trueBlock);
 
     //False Block Statements
-    F_CLEAR(falseBlock, "AF");
-    F_CLEAR(falseBlock, "CF");
+    F_CLEAR(falseBlock, AF);
+    F_CLEAR(falseBlock, CF);
 
     alRes = BinaryOperator::CreateAnd(al, CONST_V<8>(trueBlock, 0x0F), "", falseBlock);
     R_WRITE<8>(falseBlock, X86::AL, alRes);
 
     BranchInst::Create(endBlock, falseBlock);
 
-    F_ZAP(endBlock, "OF");
-    F_ZAP(endBlock, "SF");
-    F_ZAP(endBlock, "ZF");
-    F_ZAP(endBlock, "PF");
+    F_ZAP(endBlock, OF);
+    F_ZAP(endBlock, SF);
+    F_ZAP(endBlock, ZF);
+    F_ZAP(endBlock, PF);
 
     //update our parents concept of what the current block is
     b = endBlock;
@@ -314,7 +318,7 @@ static InstTransResult doAAS(BasicBlock *b) {
     Value   *af;
 
     al = R_READ<8>(b, X86::AL);
-    af = F_READ(b, "AF");
+    af = F_READ(b, AF);
 
     // AL & 0x0F 
     Value   *andRes = BinaryOperator::CreateAnd(al, CONST_V<8>(b, 0x0F), "", b);
@@ -336,8 +340,8 @@ static InstTransResult doAAS(BasicBlock *b) {
     Value   *ahRes = BinaryOperator::CreateSub(R_READ<8>(trueBlock, X86::AH), CONST_V<8>(trueBlock, 1), "", trueBlock);
     R_WRITE<8>(trueBlock, X86::AH, ahRes);
 
-    F_SET(trueBlock, "AF");
-    F_SET(trueBlock, "CF");
+    F_SET(trueBlock, AF);
+    F_SET(trueBlock, CF);
 
     alRes = BinaryOperator::CreateAnd(alRes, CONST_V<8>(trueBlock, 0x0F), "", trueBlock);
     R_WRITE<8>(trueBlock, X86::AL, alRes);
@@ -345,18 +349,18 @@ static InstTransResult doAAS(BasicBlock *b) {
     BranchInst::Create(endBlock, trueBlock);
 
     //False Block Statements
-    F_CLEAR(falseBlock, "AF");
-    F_CLEAR(falseBlock, "CF");
+    F_CLEAR(falseBlock, AF);
+    F_CLEAR(falseBlock, CF);
 
     alRes = BinaryOperator::CreateAnd(al, CONST_V<8>(trueBlock, 0x0F), "", falseBlock);
     R_WRITE<8>(falseBlock, X86::AL, alRes);
 
     BranchInst::Create(endBlock, falseBlock);
 
-    F_ZAP(endBlock, "OF");
-    F_ZAP(endBlock, "SF");
-    F_ZAP(endBlock, "ZF");
-    F_ZAP(endBlock, "PF");
+    F_ZAP(endBlock, OF);
+    F_ZAP(endBlock, SF);
+    F_ZAP(endBlock, ZF);
+    F_ZAP(endBlock, PF);
 
     //update our parents concept of what the current block is
     b = endBlock;
@@ -379,9 +383,9 @@ static InstTransResult doAAM(BasicBlock *b) {
     WriteSF<8>(b, mod);
     WriteZF<8>(b, mod);
     WritePF<8>(b, mod);
-    F_ZAP(b, "OF");
-    F_ZAP(b, "AF");
-    F_ZAP(b, "CF");
+    F_ZAP(b, OF);
+    F_ZAP(b, AF);
+    F_ZAP(b, CF);
 
     return ContinueBlock;
 }
@@ -404,9 +408,9 @@ static InstTransResult doAAD(BasicBlock *b) {
     WriteSF<8>(b, tmp);
     WriteZF<8>(b, tmp);
     WritePF<8>(b, tmp);
-    F_ZAP(b, "OF");
-    F_ZAP(b, "AF");
-    F_ZAP(b, "CF");
+    F_ZAP(b, OF);
+    F_ZAP(b, AF);
+    F_ZAP(b, CF);
 
     return ContinueBlock;
 }
@@ -455,14 +459,14 @@ static InstTransResult translate_SAHF(NativeModulePtr natM, BasicBlock *&block,
 {
     Value *ah_val = R_READ<8>(block, X86::AH);
    
-    SHR_SET_FLAG<8,1>(block, ah_val, "CF", 0); 
+    SHR_SET_FLAG<8,1>(block, ah_val, CF, 0); 
     // bit 1 is reserved
-    SHR_SET_FLAG<8,1>(block, ah_val, "PF", 2); 
+    SHR_SET_FLAG<8,1>(block, ah_val, PF, 2); 
     // bit 3 is reserved
-    SHR_SET_FLAG<8,1>(block, ah_val, "AF", 4); 
+    SHR_SET_FLAG<8,1>(block, ah_val, AF, 4); 
     // bit 5 is reserved
-    SHR_SET_FLAG<8,1>(block, ah_val, "ZF", 6); 
-    SHR_SET_FLAG<8,1>(block, ah_val, "SF", 7); 
+    SHR_SET_FLAG<8,1>(block, ah_val, ZF, 6); 
+    SHR_SET_FLAG<8,1>(block, ah_val, SF, 7); 
 
     return ContinueBlock;
 }
@@ -486,7 +490,7 @@ static InstTransResult doBtrr(
             CONST_V<width>(b, width), 
             "", b);
 
-   SHR_SET_FLAG_V<width,1>(b, base_val, "CF", index_mod);
+   SHR_SET_FLAG_V<width,1>(b, base_val, CF, index_mod);
 
    return ContinueBlock;
 }
@@ -524,7 +528,7 @@ static InstTransResult doBsrr(
             CONST_V<width>(b, 0),
             index_of_first_1);
 
-    F_WRITE(b, "ZF", is_zero);
+    F_WRITE(b, ZF, is_zero);
 
     Value *fix_index = BinaryOperator::CreateSub(
                     index_of_first_1,
@@ -545,7 +549,7 @@ static InstTransResult doBsrr(
 
 GENERIC_TRANSLATION(CDQ, doCdq(block))
 GENERIC_TRANSLATION(INT3, doInt3(block))
-GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
+GENERIC_TRANSLATION(NOOP, doNoop(block))
 GENERIC_TRANSLATION(HLT, doHlt(block))
 
 GENERIC_TRANSLATION(BSWAP32r, doBswapR<32>(ip, block, OP(0)))
@@ -559,9 +563,28 @@ GENERIC_TRANSLATION(CLC, doClc(block))
 GENERIC_TRANSLATION_MEM(LEA16r, 
 	doLea<16>(ip, block, ADDR(1), OP(0)),
 	doLea<16>(ip, block, STD_GLOBAL_OP(1), OP(0))) 
-GENERIC_TRANSLATION_MEM(LEA32r, 
-	doLea<32>(ip, block, ADDR(1), OP(0)),
-	doLea<32>(ip, block, STD_GLOBAL_OP(1), OP(0))) 
+
+static InstTransResult translate_LEA32r(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
+    InstTransResult ret;
+    Function *F = block->getParent();
+    if( ip->has_call_tgt() ) {
+        Value *callback_fn = archMakeCallbackForLocalFunction(
+                block->getParent()->getParent(), 
+                ip->get_call_tgt(0));
+        Value *addrInt = new PtrToIntInst(
+            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+        ret = doLeaV<32>(block, OP(0), addrInt);
+    } else if( ip->is_data_offset() ) {
+        ret = doLea<32>(ip, block, STD_GLOBAL_OP(1), OP(0));
+    } else { 
+        ret = doLea<32>(ip, block, ADDR(1), OP(0));
+    }
+    return ret;
+}
+
+//GENERIC_TRANSLATION_MEM(LEA32r, 
+//	doLea<32>(ip, block, ADDR(1), OP(0)),
+//	doLea<32>(ip, block, STD_GLOBAL_OP(1), OP(0))) 
 
 GENERIC_TRANSLATION(AAA, doAAA(block))
 GENERIC_TRANSLATION(AAS, doAAS(block))
@@ -575,7 +598,7 @@ GENERIC_TRANSLATION(BT32rr, doBtrr<32>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BT16rr, doBtrr<16>(block, OP(0), OP(1)))
 
 GENERIC_TRANSLATION(BSR32rr, doBsrr<32>(block, OP(0), OP(1)))
-GENERIC_TRANSLATION(BSR16rr, doBsrr<32>(block, OP(0), OP(1)))
+GENERIC_TRANSLATION(BSR16rr, doBsrr<16>(block, OP(0), OP(1)))
 
 void Misc_populateDispatchMap(DispatchMap &m) {
     m[X86::AAA] = translate_AAA;

@@ -57,108 +57,108 @@ Value *emitTestCode(BasicBlock *&b, unsigned opCode) {
     Value       *emittedInsn = NULL;
     #define ONE CONST_V<1>(b, 1)
     #define ZERO CONST_V<1>(b, 0)
-    #define OF F_READ(b, "OF")
-    #define CF F_READ(b, "CF")
-    #define PF F_READ(b, "PF")
-    #define AF F_READ(b, "AF")
-    #define ZF F_READ(b, "ZF")
-    #define SF F_READ(b, "SF")
+    #define OF_F F_READ(b, OF)
+    #define CF_F F_READ(b, CF)
+    #define PF_F F_READ(b, PF)
+    #define AF_F F_READ(b, AF)
+    #define ZF_F F_READ(b, ZF)
+    #define SF_F F_READ(b, SF)
 
     switch(opCode) {
         case X86::JO_4:
         case X86::JO_1:
             // OF == 1 
-            emittedInsn = CMP(b, OF, ONE);
+            emittedInsn = CMP(b, OF_F, ONE);
             break;
 
         case X86::JNO_4:
         case X86::JNO_1:
             // OF == 0
-            emittedInsn = CMP(b, OF, ZERO); 
+            emittedInsn = CMP(b, OF_F, ZERO); 
             break;
 
         case X86::JB_4:
         case X86::JB_1:
             // CF == 1 
-            emittedInsn = CMP(b, CF, ONE);
+            emittedInsn = CMP(b, CF_F, ONE);
             break;
 
         case X86::JAE_4:
         case X86::JAE_1:
             // CF == 0
-            emittedInsn = CMP(b, CF, ZERO); 
+            emittedInsn = CMP(b, CF_F, ZERO); 
             break;
 
         case X86::JE_4:
         case X86::JE_1:
             //ZF == 1
-            emittedInsn = CMP(b, ZF, ONE);
+            emittedInsn = CMP(b, ZF_F, ONE);
             break;
 
         case X86::JNE_4:
         case X86::JNE_1:
             //ZF == 0
-            emittedInsn = CMP(b, ZF, ZERO);
+            emittedInsn = CMP(b, ZF_F, ZERO);
             break;
 
         case X86::JBE_4:
         case X86::JBE_1:
             //CF = 1 or ZF = 1
-            emittedInsn = OR(b, CMP(b, CF, ONE), CMP(b, ZF, ONE));
+            emittedInsn = OR(b, CMP(b, CF_F, ONE), CMP(b, ZF_F, ONE));
             break;
 
         case X86::JA_4:
         case X86::JA_1:
             //CF = 0 and ZF = 0 
-            emittedInsn = AND(b, CMP(b, CF, ZERO), CMP(b, ZF, ZERO));
+            emittedInsn = AND(b, CMP(b, CF_F, ZERO), CMP(b, ZF_F, ZERO));
             break;
 
         case X86::JS_4:
         case X86::JS_1:
             //SF = 1
-            emittedInsn = CMP(b, SF, ONE);
+            emittedInsn = CMP(b, SF_F, ONE);
             break;
 
         case X86::JNS_4:
         case X86::JNS_1:
             //SF = 0
-            emittedInsn = CMP(b, SF, ZERO);
+            emittedInsn = CMP(b, SF_F, ZERO);
             break;
 
         case X86::JP_4:
         case X86::JP_1:
             //PF = 1
-            emittedInsn = CMP(b, PF, ONE);
+            emittedInsn = CMP(b, PF_F, ONE);
             break;
 
         case X86::JNP_4:
         case X86::JNP_1:
             //PF = 0
-            emittedInsn = CMP(b, PF, ZERO);
+            emittedInsn = CMP(b, PF_F, ZERO);
             break;
 
         case X86::JL_4:
         case X86::JL_1:
             //SF!=OF
-            emittedInsn = CMP(b, CMP(b, SF, OF), ZERO);
+            emittedInsn = CMP(b, CMP(b, SF_F, OF_F), ZERO);
             break;
 
         case X86::JGE_4:
         case X86::JGE_1:
             //SF=OF
-            emittedInsn = CMP(b, SF, OF);
+            emittedInsn = CMP(b, SF_F, OF_F);
             break;
 
         case X86::JLE_4:
         case X86::JLE_1:
             //ZF=1 or SF != OF
-            emittedInsn = OR(b, CMP(b, ZF, ONE), CMP(b, CMP(b, SF, OF), ZERO));
+            emittedInsn = OR(b, CMP(b, ZF_F, ONE), CMP(b, CMP(b, SF_F, OF_F), ZERO));
             break;
 
         case X86::JG_4:
         case X86::JG_1:
             //ZF=0 and SF=OF
-            emittedInsn = AND(b, CMP(b, ZF, ZERO), CMP(b, SF, OF));
+            emittedInsn = AND(b, CMP(b, ZF_F, ZERO), CMP(b, SF_F, OF_F));
             break;
 
         case X86::JCXZ:
@@ -177,12 +177,12 @@ Value *emitTestCode(BasicBlock *&b, unsigned opCode) {
 
     #undef ONE
     #undef ZERO
-    #undef OF 
-    #undef CF 
-    #undef PF 
-    #undef AF 
-    #undef ZF 
-    #undef SF 
+    #undef OF_F 
+    #undef CF_F 
+    #undef PF_F 
+    #undef AF_F 
+    #undef ZF_F 
+    #undef SF_F 
 
     NASSERT(emittedInsn != NULL );
 

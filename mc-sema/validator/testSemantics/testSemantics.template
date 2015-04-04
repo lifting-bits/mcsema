@@ -99,7 +99,7 @@ Function *initTestFunction(string testName, Module *M) {
     assert(entryBlock != NULL);
 
     allocateLocals(F, 32);
-    writeContextToLocals(entryBlock, 32);
+    writeContextToLocals(entryBlock, 32, AllRegs);
 
     return F;
 }
@@ -107,7 +107,7 @@ Function *initTestFunction(string testName, Module *M) {
 void finiTestFunction(BasicBlock *e) {
 
     // Spill the locals back to the context.
-    writeLocalsToContext(e, 32);
+    writeLocalsToContext(e, 32, AllRegs);
 
     // Return from the function.
     ReturnInst::Create(e->getContext(), e);
@@ -746,7 +746,8 @@ Function *ModuleTest::getFunctionForBuffer(string nm, uint8_t *b, size_t l) {
                          curBlock, 
                          testFn, 
                          testF, 
-                         NativeModulePtr());
+                         NativeModulePtr(),
+			 false); 
 
             if (t == TranslateError || t == TranslateErrorUnsupported) {
                 broken = true;

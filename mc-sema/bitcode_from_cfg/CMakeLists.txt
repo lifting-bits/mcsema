@@ -11,4 +11,4 @@ target_link_libraries(cfg_to_bc cfgToLLVM peToCFG LLVMBitReader LLVMBitWriter
     LLVMX86AsmPrinter LLVMX86Utils LLVMipo LLVMTransformUtils LLVMScalarOpts
     LLVMInstrumentation LLVMObjCARCOpts ${Boost_LIBRARIES} libprotobuf)
 
-add_dependencies(cfg_to_bc peToCFG bitreader asmparser bitwriter instrumentation scalaropts ipo)
+add_dependencies(cfg_to_bc peToCFG)

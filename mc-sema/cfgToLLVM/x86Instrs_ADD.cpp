@@ -225,7 +225,7 @@ static Value * doAdcVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *src)
             throw TErr(__LINE__, __FILE__, "Width not supported");
     }
 
-    Value *cf = new ZExtInst(F_READ(b, "CF"), t, "", b);
+    Value *cf = new ZExtInst(F_READ(b, CF), t, "", b);
 
     Value *srcRes = BinaryOperator::Create(Instruction::Add, cf, src, "", b);
     Value *addRes = BinaryOperator::Create(Instruction::Add, srcRes, dst, "", b);

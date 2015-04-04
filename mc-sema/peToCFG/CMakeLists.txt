@@ -7,4 +7,4 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR} ${PROTOBUF_INCLUDE_DIR})
 
 add_library(peToCFG ${PROTO_SRCS} ${PROTO_HDRS} peToCFG.cpp inst_decoder_fe.cpp)
 
-add_dependencies(peToCFG LLVM LLVMX86CodeGen)
+add_dependencies(peToCFG LLVMX86CodeGen)

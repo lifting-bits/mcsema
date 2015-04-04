@@ -43,7 +43,6 @@ public:
     virtual bool find_import_name(uint32_t, std::string &);
     virtual bool is_in_code(VA addr) const;
     virtual bool is_in_data(VA addr) const;
-    virtual bool find_in_any_section(uint32_t target, std::string &import_name);
     bool isLinked() const;
 
 private:

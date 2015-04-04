@@ -109,23 +109,6 @@ static Value *doIMulV(InstPtr ip,  BasicBlock  *&b,
             throw TErr(__LINE__, __FILE__, "Not supported width");
     }
 
-    Function    *F = b->getParent();
-    string      bn = b->getName();
-
-    //make the follow-on basic blocks
-    BasicBlock  *lhs_b = BasicBlock::Create(b->getContext(), "IMulLHS", F);
-    BasicBlock  *rhs_b = BasicBlock::Create(b->getContext(), "IMulRHS", F);
-    BasicBlock  *cont_b = BasicBlock::Create(b->getContext(), bn+"_cont", F);
-
-    //insert the sets and jumps into lhs and rhs 
-    F_SET(lhs_b, "CF");
-    F_SET(lhs_b, "OF");
-    BranchInst::Create(cont_b, lhs_b);
-
-    F_CLEAR(rhs_b, "CF");
-    F_CLEAR(rhs_b, "OF");
-    BranchInst::Create(cont_b, rhs_b);
-
     //model the semantics of the signed multiply
     Value   *a1 = lhs;
     Value   *a2 = rhs;
@@ -138,21 +121,11 @@ static Value *doIMulV(InstPtr ip,  BasicBlock  *&b,
    
     //R_WRITE<width>(b, dst.getReg(), dest);
 
-    //zap SF, ZF, AF, and PF 
-    //F_ZAP(cont_b, "SF");
-    F_ZAP(cont_b, "ZF");
-    F_ZAP(cont_b, "AF");
-    F_ZAP(cont_b, "PF");
-
-    // set to one to mimic behavoir from testSemantics
-    F_WRITE(cont_b, "SF", CONST_V<1>(b, 1));
-
     Value   *dest_x = new SExtInst(dest, dt, "", b);
     Value   *r = new ICmpInst(*b, CmpInst::ICMP_NE, dest_x, tmp);
-    BranchInst::Create(lhs_b, rhs_b, r, b);
 
-    //tell our caller that we have moved blocks
-    b = cont_b;
+    F_WRITE(b, CF, r);
+    F_WRITE(b, OF, r);
 
     return tmp;
 }
@@ -249,23 +222,6 @@ static Value *doIMulVV(InstPtr ip,     BasicBlock  *&b,
                 Value       *lhs,
                 Value       *rhs)
 {
-    Function    *F = b->getParent();
-    string      bn = b->getName();
-
-    //make the follow-on basic blocks
-    BasicBlock  *lhs_b = BasicBlock::Create(b->getContext(), "IMulLHS", F);
-    BasicBlock  *rhs_b = BasicBlock::Create(b->getContext(), "IMulRHS", F);
-    BasicBlock  *cont_b = BasicBlock::Create(b->getContext(), bn+"_cont", F);
-
-    //insert the sets and jumps into lhs and rhs 
-    F_SET(lhs_b, "CF");
-    F_SET(lhs_b, "OF");
-    BranchInst::Create(cont_b, lhs_b);
-
-    F_CLEAR(rhs_b, "CF");
-    F_CLEAR(rhs_b, "OF");
-    BranchInst::Create(cont_b, rhs_b);
-
     //model the semantics of the signed multiply
     Value   *a1 = lhs;
     Value   *a2 = rhs;
@@ -276,23 +232,12 @@ static Value *doIMulVV(InstPtr ip,     BasicBlock  *&b,
     Value   *tmp = BinaryOperator::Create(Instruction::Mul, a1_x, a2_x, "", b);
     Value   *dest = BinaryOperator::Create(Instruction::Mul, a1, a2, "", b);
    
-    //R_WRITE<width>(b, dst.getReg(), dest);
-
-    //zap SF, ZF, AF, and PF 
-    F_ZAP(cont_b, "SF");
-    F_ZAP(cont_b, "ZF");
-    F_ZAP(cont_b, "AF");
-    //F_ZAP(cont_b, "PF");
-
-    // set to 1 to mimic behavior from testSemantics
-    F_WRITE(cont_b, "PF", CONST_V<1>(b, 1));
 
     Value   *dest_x = new SExtInst(dest, dt, "", b);
     Value   *r = new ICmpInst(*b, CmpInst::ICMP_NE, dest_x, tmp);
-    BranchInst::Create(lhs_b, rhs_b, r, b);
 
-    //tell our caller that we have moved blocks
-    b = cont_b;
+    F_WRITE(b, SF, r);
+    F_WRITE(b, OF, r);
 
     return dest;
 }
@@ -342,23 +287,6 @@ static Value *doIMulVVV(InstPtr ip,    BasicBlock  *&b,
                 Value       *lhs,
                 Value       *rhs)
 {
-    Function    *F = b->getParent();
-    string      bn = b->getName();
-
-    //make the follow-on basic blocks
-    BasicBlock  *lhs_b = BasicBlock::Create(b->getContext(), "IMulLHS", F);
-    BasicBlock  *rhs_b = BasicBlock::Create(b->getContext(), "IMulRHS", F);
-    BasicBlock  *cont_b = BasicBlock::Create(b->getContext(), bn+"_cont", F);
-
-    //insert the sets and jumps into lhs and rhs 
-    F_SET(lhs_b, "CF");
-    F_SET(lhs_b, "OF");
-    BranchInst::Create(cont_b, lhs_b);
-
-    F_CLEAR(rhs_b, "CF");
-    F_CLEAR(rhs_b, "OF");
-    BranchInst::Create(cont_b, rhs_b);
-
     //model the semantics of the signed multiply
     Value   *a1 = lhs;
     Value   *a2 = rhs;
@@ -371,21 +299,11 @@ static Value *doIMulVVV(InstPtr ip,    BasicBlock  *&b,
    
     //R_WRITE<width>(b, dst.getReg(), dest);
 
-    //zap SF, ZF, AF, and PF 
-    F_ZAP(cont_b, "SF");
-    F_ZAP(cont_b, "ZF");
-    F_ZAP(cont_b, "AF");
-    //F_ZAP(cont_b, "PF");
-
-    // set to 1 to mimic behavior from testSemantics
-    F_WRITE(cont_b, "PF", CONST_V<1>(b, 1));
-
     Value   *dest_x = new SExtInst(dest, dt, "", b);
     Value   *r = new ICmpInst(*b, CmpInst::ICMP_NE, dest_x, tmp);
-    BranchInst::Create(lhs_b, rhs_b, r, b);
 
-    //tell our caller that we have moved blocks
-    b = cont_b;
+    F_WRITE(b, SF, r);
+    F_WRITE(b, OF, r);
 
     return dest;
 }
@@ -479,7 +397,7 @@ static InstTransResult doIMulRRI8(InstPtr ip,  BasicBlock      *&b,
 }
 
 template <int width>
-static InstTransResult doDivV(InstPtr ip, BasicBlock *&b, Value *valToDiv, 
+static InstTransResult doDivV(InstPtr ip, BasicBlock *&b, Value *divisor, 
         llvm::Instruction::BinaryOps whichdiv) {
 
     //read in EDX and EAX
@@ -503,13 +421,13 @@ static InstTransResult doDivV(InstPtr ip, BasicBlock *&b, Value *valToDiv,
             throw TErr(__LINE__, __FILE__, "Not supported width");
     }
 
-    Value   *doubleSize = concatInts<width>(b, dx, ax);
+    Value   *dividend = concatInts<width>(b, dx, ax);
 
-    // tmp <- EDX:EAX / valToDiv 
-    // but first, extend valToDiv
+    // tmp <- EDX:EAX / divisor 
+    // but first, extend divisor
     Type    *text = Type::getIntNTy(b->getContext(), width*2);
     Type    *t = Type::getIntNTy(b->getContext(), width);
-    Value   *valToDivext = new ZExtInst(valToDiv, text, "", b);
+    Value   *divisorext = new SExtInst(divisor, text, "", b);
 
     //EAX <- tmp
     Value   *res;
@@ -526,11 +444,11 @@ static InstTransResult doDivV(InstPtr ip, BasicBlock *&b, Value *valToDiv,
             throw TErr(__LINE__, __FILE__, "Invalid operation given to doDivV");
     };
     res = 
-      BinaryOperator::Create(whichdiv, doubleSize, valToDivext, "", b);
+      BinaryOperator::Create(whichdiv, dividend, divisorext, "", b);
 
-    //EDX <- EDX:EAX mod valToDiv
+    //EDX <- EDX:EAX mod divisor
     mod = 
-      BinaryOperator::Create(modop, doubleSize, valToDivext, "", b);
+      BinaryOperator::Create(modop, dividend, divisorext, "", b);
 
     Value   *wrDx = new TruncInst(mod, t, "", b);
     Value   *wrAx = new TruncInst(res, t, "", b);
@@ -551,18 +469,6 @@ static InstTransResult doDivV(InstPtr ip, BasicBlock *&b, Value *valToDiv,
         default:
             throw TErr(__LINE__, __FILE__, "Not supported width");
     }
-
-    F_ZAP(b, "CF");
-    F_ZAP(b, "OF");
-    //F_ZAP(b, "SF");
-    F_ZAP(b, "ZF");
-    F_ZAP(b, "AF");
-    //F_ZAP(b, "PF");
-
-    // These flags should be zapped according to the intel manual, but set to 1
-    // to mimic behavior from testSemantics
-    F_WRITE(b, "SF", CONST_V<1>(b, 1));
-    F_WRITE(b, "PF", CONST_V<1>(b, 1));
 
     return ContinueBlock;
 }

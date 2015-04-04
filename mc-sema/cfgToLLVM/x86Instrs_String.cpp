@@ -61,7 +61,7 @@ static BasicBlock *doCmpsV(BasicBlock *pred) {
 
     CREATE_BLOCK(post_write, pred);
 
-    Value *df = F_READ(pred, "DF");
+    Value *df = F_READ(pred, DF);
     SwitchInst *dfSwitch = SwitchInst::Create(df, block_df_zero, 2, pred);
     dfSwitch->addCase(CONST_V<1>(pred, 0), block_df_zero);
     dfSwitch->addCase(CONST_V<1>(pred, 1), block_df_one);
@@ -143,7 +143,7 @@ static BasicBlock *doStosV(BasicBlock *pred) {
     //compare DF against 0
     Value   *cmpRes = new ICmpInst( *pred, 
                                     CmpInst::ICMP_EQ, 
-                                    F_READ(pred, "DF"), 
+                                    F_READ(pred, DF), 
                                     CONST_V<1>(pred, 0), 
                                     "");
 
@@ -235,7 +235,7 @@ static BasicBlock *doScasV(BasicBlock *pred) {
     //compare DF against 0
     Value   *cmpRes = new ICmpInst( *pred, 
                                     CmpInst::ICMP_EQ, 
-                                    F_READ(pred, "DF"), 
+                                    F_READ(pred, DF), 
                                     CONST_V<1>(pred, 0), 
                                     "");
 
@@ -309,7 +309,7 @@ static BasicBlock *doMovsV(BasicBlock *pred) {
 	//compare DF against 0
 	Value	*cmpRes = new ICmpInst(	*pred, 
 									CmpInst::ICMP_EQ, 
-									F_READ(pred, "DF"), 
+									F_READ(pred, DF), 
 									CONST_V<1>(pred, 0), 
 									"");
 
@@ -449,7 +449,7 @@ static BasicBlock *doRepCondition(BasicBlock *&b, BasicBlock *bodyB, BasicBlock 
                                 cTmpDec,
                                 CONST_V<32>(bodyE, 0));
 
-    Value   *zf = F_READ(bodyE, "ZF");
+    Value   *zf = F_READ(bodyE, ZF);
     Value   *zfCmp = new ICmpInst(  *bodyE,
                                     condition,
                                     zf, CONST_V<1>(bodyE, 0));

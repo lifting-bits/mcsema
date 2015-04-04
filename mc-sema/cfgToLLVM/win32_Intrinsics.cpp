@@ -60,7 +60,7 @@ Value* emit_aullshr(BasicBlock *&b, BasicBlock *nextb) {
 
     BasicBlock *ifFalse = BasicBlock::Create(b->getContext(), "aullshr_ifFalse", b->getParent());
     //  je    L1
-    Value *ZF_val = F_READ(b, "ZF");
+    Value *ZF_val = F_READ(b, ZF);
     BranchInst::Create(contBlock, ifFalse, ZF_val, b);
     //  movl  %edx, %eax
     r_EDX = R_READ<32>(ifFalse, X86::EDX);

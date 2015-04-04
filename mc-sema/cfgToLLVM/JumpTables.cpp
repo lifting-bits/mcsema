@@ -27,6 +27,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include <vector>
+#include <unordered_set>
 #include <string>
 #include "peToCFG.h"
 #include "JumpTables.h"
@@ -38,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "../common/to_string.h"
 #include "x86Helpers.h"
 #include "InstructionDispatch.h"
+#include "llvm/Support/Debug.h"
 
 using namespace std;
 using namespace llvm;
@@ -149,16 +151,50 @@ bool addJumpIndexTableDataSection(NativeModulePtr natMod,
 }
 
 void doJumpTableViaData(
+        BasicBlock *& block, 
+        Value *fptr)
+{
+    Function *ourF = block->getParent();
+	//make the call, the only argument should be our parents arguments
+	TASSERT(ourF->arg_size() == 1, "");
+
+
+    if(!fptr->getType()->isPtrOrPtrVectorTy()) {
+        Module *M = ourF->getParent();
+        // get mem address
+        std::vector<Type *>  args;
+        args.push_back(g_PRegStruct);
+        Type  *returnTy = Type::getVoidTy(M->getContext());
+        FunctionType *FT = FunctionType::get(returnTy, args, false);
+
+        PointerType *FptrTy = PointerType::get(FT, 0);
+        fptr = new IntToPtrInst(fptr, FptrTy, "", block);
+    }
+
+	//we need to wrap up our current context
+	writeLocalsToContext(block, 32, ABICallStore);
+
+    std::vector<Value*>	subArgs;
+	subArgs.push_back(ourF->arg_begin());
+	CallInst *c = CallInst::Create(fptr, subArgs, "", block);
+
+	//spill our context back
+	writeContextToLocals(block, 32, ABIRetSpill);
+}
+
+void doJumpTableViaData(
         NativeModulePtr natM, 
         BasicBlock *& block, 
         InstPtr ip, 
         MCInst &inst)
 {
+    Value *addr = STD_GLOBAL_OP(0); 
+    doJumpTableViaData(block, addr);
+
+    llvm::dbgs() << __FUNCTION__ << ": Doing jump table via data\n";
     Function *ourF = block->getParent();
     Module *M = ourF->getParent();
     // get mem address
-    Value *addr = STD_GLOBAL_OP(0); 
-    // cast it to function pointer
     std::vector<Type *>  args;
     args.push_back(g_PRegStruct);
     Type  *returnTy = Type::getVoidTy(M->getContext());
@@ -170,24 +206,10 @@ void doJumpTableViaData(
     Value *func_addr = CastInst::CreatePointerCast(addr, Fptr2Ty, "", block);
 
     // read in entry from table
-    Value *new_func = new LoadInst(func_addr, "", block);
+    Instruction *new_func = noAliasMCSemaScope(new LoadInst(func_addr, "", block));
 
-	//we need to wrap up our current context
-	writeLocalsToContext(block, 32);
 
-	//make the call, the only argument should be our parents arguments
-	TASSERT(ourF->arg_size() == 1, "");
-
-    std::vector<Value*>	subArgs;
-	subArgs.push_back(ourF->arg_begin());
-	CallInst *c = CallInst::Create(new_func, subArgs, "", block);
-
-	//spill our context back
-	writeContextToLocals(block, 32);
-
-	//and we can continue to run the old code
-
-    return;
+    doJumpTableViaData(block, new_func);
 }
 
 void doJumpTableViaSwitch(
@@ -197,6 +219,7 @@ void doJumpTableViaSwitch(
         MCInst &inst)
 {
 
+    llvm::dbgs() << __FUNCTION__ << ": Doing jumpt table via switch\n";
     Function *F = block->getParent();
     Module *M = F->getParent();
     // we know this conforms to
@@ -245,6 +268,47 @@ void doJumpTableViaSwitch(
         TASSERT(toBlock != NULL, "Could not find block: "+bbname);
         theSwitch->addCase(CONST_V<32>(block, myindex), toBlock);
         ++myindex;
+    }
+
+}
+
+void doJumpTableViaSwitchReg(
+        BasicBlock *& block, 
+        InstPtr ip, 
+        Value *regVal,
+        BasicBlock *&default_block)
+{
+
+    llvm::dbgs() << __FUNCTION__ << ": Doing jumpt table via switch(reg)\n";
+    Function *F = block->getParent();
+    Module *M = F->getParent();
+    
+
+    MCSJumpTablePtr jmpptr = ip->get_jump_table();
+
+    // create a default block that just traps
+    default_block = 
+        BasicBlock::Create(block->getContext(), "", block->getParent(), 0);
+    // end default block
+
+    const std::vector<VA> &jmpblocks = jmpptr->getJumpTable();
+    std::unordered_set<VA> uniq_blocks(jmpblocks.begin(), jmpblocks.end());
+
+    // create a switch inst
+    SwitchInst *theSwitch = SwitchInst::Create(
+            regVal, 
+            default_block,
+            uniq_blocks.size(),
+            block);
+
+    // populate switch
+    for(auto blockVA : uniq_blocks) 
+    {
+        std::string  bbname = "block_0x"+to_string<VA>(blockVA, std::hex);
+        BasicBlock *toBlock = bbFromStrName(bbname, F);
+        llvm::dbgs() << __FUNCTION__ << ": Mapping from " << to_string<VA>(blockVA, std::hex) << " => " << bbname << "\n";
+        TASSERT(toBlock != NULL, "Could not find block: "+bbname);
+        theSwitch->addCase(CONST_V<32>(block, blockVA), toBlock);
     }
 
 }

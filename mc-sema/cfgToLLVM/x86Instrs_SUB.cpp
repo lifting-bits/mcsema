@@ -179,7 +179,7 @@ static Value * doSbbVV(InstPtr ip, BasicBlock *&b, Value *o1, Value *o2)
     NASSERT(o1 != NULL);
     NASSERT(o2 != NULL);
 
-    Value *cf = F_READ(b, "CF");
+    Value *cf = F_READ(b, CF);
     Value *cf_ex = new ZExtInst(cf, Type::getIntNTy(
         b->getContext(), width), "", b);
 
