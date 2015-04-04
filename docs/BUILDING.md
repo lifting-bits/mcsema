@@ -81,18 +81,18 @@ To verify functionality, try running the demos (in `mc-sema/tests`). For example
 
 # Building on Windows
 
-mcsema now requires C++11 due to integration with LLVM 3.5. Please build with Visual Studio 2012 or later.
+mcsema now requires C++11 due to integration with LLVM 3.5. Please build with Visual Studio 2013 or later.
 
 ## Prerequisites
 General Packages:
-* CMake (version 2.8.12.2 is required for VS2013 support).
+* CMake (version 3.1.3 is required for VS2013 support).
 * mcsema source
 * git
 * Python 2.7
 
 Build Environment:
 
-* Visual Studio 2012 or later
+* Visual Studio 2013 or later
 
 ## Install Prerequisites
 

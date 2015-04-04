@@ -50,7 +50,7 @@ mcsema uses external code which has been included in this source release:
  * Google Protocol Buffers
  * Boost
 
-mcsema uses Intel Pin 2.10 which has not been included in this source release, but is freely available. Pin is used only for testing of instruction semantics and is not required to use the library.
+mcsema uses Intel Pin, which has not been included in this source release, but is freely available. Pin is used only for testing of instruction semantics and is not required to use the library.
 
 ## Contact
 
