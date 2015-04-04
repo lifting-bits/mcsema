@@ -98,7 +98,11 @@ LLVMObjectTarget::LLVMObjectTarget(const std::string &modname, llvm::object::Obj
         
       this->populateReloMap(sr);
 
-      if( (isText == false && isData == false && isBSS == false) || isRequired == false) {
+      bool has_relos = sr.relocation_begin() != sr.relocation_end();
+      if( (has_relos == false && 
+           isText == false && 
+           isData == false && 
+           isBSS == false) || isRequired == false) {
         continue;
       }       
       e = sr.getAddress((::uint64_t &)low);
