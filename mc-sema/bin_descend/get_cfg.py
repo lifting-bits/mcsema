@@ -236,7 +236,8 @@ def isExternalReference(ea):
     ext_types = [idc.SEG_XTRN]
     seg = idc.SegStart(ea)
     if seg == idc.BADADDR:
-        raise Exception("Could not get segment addr for: {0:x}\n".format(ea))
+        DEBUG("WARNING: Could not get segment addr for: {0:x}\n".format(ea))
+        return False
 
     segtype = idc.GetSegmentAttr(seg, idc.SEGATTR_TYPE)
     if segtype in ext_types:
@@ -337,7 +338,8 @@ def handleExternalRef(fn):
 def isInData(start_ea, end_ea):
     for (start,end) in DATA_SEGMENTS:
         if start_ea >= start and start_ea < end:
-            DEBUG("{0:x} > {1:x}\n".format(start_ea, start))
+            DEBUG("Data Range: {0:x} <= {1:x} < {2:x}\n".format(start, start_ea, end))
+            DEBUG("Data Range: {:x} - {:x}\n".format(start_ea, end_ea))
             if end_ea <= end:
                 return True
             else:
@@ -660,7 +662,7 @@ def handleDataRelocation(M, dref, new_eas):
 
 def resolveRelocation(ea):
     rtype = idc.GetFixupTgtType(ea) 
-    if rtype == idc.FIXUP_OFF32:
+    if rtype == idc.FIXUP_OFF32 and isLinkedElf():
         relocVal = readDword(ea)
         return relocVal
     elif rtype == -1:
@@ -789,9 +791,12 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
     DEBUG("Looking for relocations in {:x} - {:x}\n".format(start, end))
 
     if i == idc.BADADDR:
-        DEBUG("No relocations in binary, scanning for data references\n");
-        # no fixups, do manual reloc searching
-        scanDataForRelocs(M, D, start, end, new_eas, seg_offset)
+        if isLinkedElf():
+            DEBUG("No relocations in binary, scanning for data references\n");
+            # no fixups, do manual reloc searching
+            scanDataForRelocs(M, D, start, end, new_eas, seg_offset)
+        else:
+            DEBUG("Not scanning data sections of object file for pointer-alikes")
     else:
         DEBUG("Found relocations in binary..\n")
         while i < end and i != idc.BADADDR:

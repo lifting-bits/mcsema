@@ -9,7 +9,7 @@ ${CC} -ggdb -m32 -c -o demo_test13.o demo_test13.c
 if [ -e "${IDA_PATH}/idaq" ]
 then
     echo "Using IDA to recover CFG"
-    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -func-map="demo13_map.txt" -entry-symbol=switches -i=demo_test13.o 
+    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -func-map="demo13_map.txt" -entry-symbol=switches -i=demo_test13.o >> /dev/null
 else
     echo "Using bin_descend to recover CFG"
     ${BIN_DESCEND_PATH}/bin_descend -d -func-map="demo13_map.txt" -entry-symbol=switches -i=demo_test13.o
