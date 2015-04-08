@@ -97,9 +97,9 @@ static InstTransResult  doCMOV(
 #define EMIT_CMOV_RM(width, condition) [] (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst)->InstTransResult {\
     BasicBlock *b = block;\
     if( ip->is_data_offset() ) {\
-        doCMOV<width>(block, OP(0), condition, M_READ<width>(ip, b, STD_GLOBAL_OP(2)));\
+        return doCMOV<width>(block, OP(0), condition, M_READ<width>(ip, b, STD_GLOBAL_OP(2)));\
     }else {\
-        doCMOV<width>(block, OP(0), condition, M_READ<width>(ip, b, ADDR(2)));\
+        return doCMOV<width>(block, OP(0), condition, M_READ<width>(ip, b, ADDR(2)));\
     }\
 }
 
