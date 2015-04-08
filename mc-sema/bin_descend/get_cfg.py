@@ -662,7 +662,7 @@ def handleDataRelocation(M, dref, new_eas):
 
 def resolveRelocation(ea):
     rtype = idc.GetFixupTgtType(ea) 
-    if rtype == idc.FIXUP_OFF32 and isLinkedElf():
+    if rtype == idc.FIXUP_OFF32:
         relocVal = readDword(ea)
         return relocVal
     elif rtype == -1:
@@ -801,7 +801,6 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
         DEBUG("Found relocations in binary..\n")
         while i < end and i != idc.BADADDR:
             pointsto = resolveRelocation(i)
-            fn = getFunctionName(i)
             DEBUG("{0:x} Found reloc to: {1:x}\n".format(i, pointsto))
 
             if not isExternalReference(pointsto):
