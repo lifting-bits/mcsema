@@ -31,4 +31,4 @@ script: mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -
 
 notifications:
   slack:
-    secure: gg6IfwUAM+3Ih2aoxq9EfOdR4RAc9or4O2b01L4HNX4Qq4erud6VIeanwS696qR9/v7jQXqqEOwhGa2FnUBPAK7DDSwSqYOhEFclRKfea4zEGnAsZu1yFDVE17KjQNgBUpDHC+n3TCfYC4MSzSs9T6zQhwi0mNCuAtnHjjktR+4=
+    secure: g1Nm7C7TYKg4RjDJ5cwuEcgKXfOAmVOu51adTPLBLGzZcCbCrkwQgI39ZycsalaACSnC8iNvqSCbRfZIA5mkDZ7VADaiZgLoWjq3RQzJmWgwGhhtyRkbtiicBnowTL5hIEiMOv6RnKlbB7M2OwzRiS07+FQXrK24hz+qm6zPptw=
