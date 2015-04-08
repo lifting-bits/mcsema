@@ -57,5 +57,5 @@ mcsema uses Intel Pin 2.10 which has not been included in this source release, b
 
 For any questions:
 * Join our mailing list at [mcsema-dev@googlegroups.com](https://groups.google.com/forum/?hl=en#!forum/mcsema-dev)
-* Join our public Slack chat [#mcsema-public](https://mcsema-chat.herokuapp.com/)
+* Join our public Slack chat [#mcsema-public](https://pwning.herokuapp.com/)
 * or email us privately at mcsema@trailofbits.com
