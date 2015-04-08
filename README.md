@@ -3,7 +3,7 @@ MC-Semantics
 
 [![Build Status](https://travis-ci.org/trailofbits/mcsema.svg?branch=master)](https://travis-ci.org/trailofbits/mcsema)
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/4144/badge.svg)](https://scan.coverity.com/projects/4144)
-[![Slack Chat](http://mcsema-chat.herokuapp.com/badge.svg)](https://mcsema-chat.herokuapp.com/)
+[![Slack Chat](http://pwning.herokuapp.com/badge.svg)](https://pwning.herokuapp.com/)
 
 MC-Semantics (or mcsema, pronounced 'em see se ma') is a library for translating the semantics of native code to LLVM IR. McSema support translation of x86 machine code, including integer, floating point, and SSE instructions. Control flow recovery is separated from translation, permitting the use of custom control flow recovery front-ends. Code for McSema is open-source and licensed under BSD3.
 
