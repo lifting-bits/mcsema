@@ -56,6 +56,14 @@ FunctionType    *getBaseFunctionType(Module *M) {
     return funcTy;
 }
 
+Triple *getTargetTriple(const llvm::Target *T) {
+    if(T->getName() == "x86")
+        return new Triple("i386", "unknown", "unknown");
+    else if(T->getName() == "x86-64")
+        return new Triple("x86_64", "unknown", "unknown");
+}
+
+namespace x86 {
 void doGlobalInit(Module *M) {
     //create the "reg" struct type
     StructType  *regs = StructType::create(M->getContext(), "struct.regs");
@@ -179,4 +187,140 @@ void doGlobalInit(Module *M) {
     archAddCallValue(M);
 
     return;
+}
+}
+
+namespace x86_64 {
+void doGlobalInit(Module *M) {
+    //create the "reg" struct type
+    StructType  *regs = StructType::create(M->getContext(), "struct.regs");
+    vector<Type *>  regFields;
+
+    initInstructionDispatch();
+
+    //UPDATEREGS -- when we add something to 'regs', add it here
+    //GPRs 
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // RAX // 0
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // RBX // 1
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // RCX // 2
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // RDX // 3
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // RSI // 4
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // RDI // 5
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // RSP // 6
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // RBP // 7
+	regFields.push_back(IntegerType::get(M->getContext(), 64)); // R8  // 8
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // R9  // 9
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // R10 // 10
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // R11 // 11
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // R12 // 12
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // R13 // 13
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // R14 // 14
+    regFields.push_back(IntegerType::get(M->getContext(), 64)); // R15 // 15
+                                                                // 128 bytes
+
+    //flags
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // CF // 16
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // PF // 17
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // AF // 18
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // ZF // 19
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // SF // 20
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // OF // 21
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // DF // 22
+                                                                   // 56 bytes
+
+    // FPU
+    ArrayType  *fpu_regs = ArrayType::get(Type::getX86_FP80Ty(M->getContext()), 8);
+    regFields.push_back(fpu_regs);                                 // 80 bytes // 23
+    
+    // FPU Status Word
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU BUSY // 24
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C3 // 25
+    regFields.push_back(IntegerType::get(M->getContext(), 3)); // TOP OF STACK // 26
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C2 // 27
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C1 // 28
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C0 // 29
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Error Summary Status // 30
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Stack Fault // 31
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Precision Flag // 32 
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Underflow Flag // 33
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Overflow Flag // 34
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // ZeroDivide Flag // 35
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Denormalized Operand Flag // 36
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Invalid Operation Flag // 37
+                                                                   // 112 bytes
+
+    
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Infinity Flag // 30
+    regFields.push_back(IntegerType::get(M->getContext(), 2)); // FPU Rounding Control // 31
+    regFields.push_back(IntegerType::get(M->getContext(), 2)); // FPU Precision Control // 32
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Precision Mask // 33
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Underflow Mask // 34
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Overflow Mask // 35
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Zero Divide Mask // 36
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Denormal Operand Mask // 37
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Invalid Operation Mask // 38
+
+    // FPU tag word; 8 element array of 2-bit entries
+    ArrayType  *fpu_tag_word = ArrayType::get(Type::getIntNTy(M->getContext(), 8), 8);
+    regFields.push_back(fpu_tag_word);                                 // 80 bytes // 39
+
+	// check this for 64 bit system
+    regFields.push_back(IntegerType::getInt16Ty(M->getContext())); // Last Instruction Ptr Segment 40
+    regFields.push_back(IntegerType::getInt64Ty(M->getContext())); // Last Instruction Ptr Offset 41
+    regFields.push_back(IntegerType::getInt16Ty(M->getContext())); // Last Data Ptr Segment 42
+    regFields.push_back(IntegerType::getInt64Ty(M->getContext())); // Last Data Ptr Offset 43
+    
+    regFields.push_back(IntegerType::get(M->getContext(), 11)); // FPU FOPCODE 44
+
+    // vector registers
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM0 45
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM1 46
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM2 47
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM3 48
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM4 49
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM5 50
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM6 51
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM7 52
+
+    // non-register values in structRegs
+    regFields.push_back(IntegerType::getInt64Ty(M->getContext())); // 53: stack base (biggest value)
+    regFields.push_back(IntegerType::getInt64Ty(M->getContext())); // 54: stack limit (smallest value)
+    
+
+    PointerType *ptrToRegs = PointerType::get(regs, 0);
+    regs->setBody(regFields, true);
+
+    vector<Type*> callValArgs;
+    callValArgs.push_back(Type::getInt64Ty(M->getContext()));
+    callValArgs.push_back(ptrToRegs);
+
+    FunctionType  *callVal = FunctionType::get(
+                                      Type::getVoidTy(M->getContext()),
+                                      callValArgs,
+                                      false);
+
+    //GlobalVariable* g_StateBackup = 
+    //    new GlobalVariable(*M, regs, false, GlobalValue::ExternalLinkage, 0, "state.backup");
+    Type *int32ty = IntegerType::getInt64Ty(M->getContext());
+    g_StateBackup = new GlobalVariable(*M, int32ty, 
+                false, 
+                GlobalValue::PrivateLinkage, 
+                0, 
+                "state.backup");
+    g_StateBackup->setThreadLocalMode(GlobalVariable::GeneralDynamicTLSModel);
+
+
+    Constant *zero = ConstantInt::get(int32ty, 0, false);
+    g_StateBackup->setInitializer(zero);
+    
+
+
+    g_RegStruct = regs;
+    g_PRegStruct = ptrToRegs;
+
+    archAddCallValue(M);
+
+    return;
+}	
+
 }

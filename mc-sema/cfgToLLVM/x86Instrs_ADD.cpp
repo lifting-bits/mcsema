@@ -33,8 +33,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Helpers.h"
 #include "x86Instrs_flagops.h"
 #include "x86Instrs_ADD.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
+
+static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
+  //isn't this exciting
+  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
+  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
+  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
+  return ContinueBlock;
+}
+
+GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
 
 template <int width>
 static Value * doAddVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs)
@@ -122,14 +133,25 @@ static InstTransResult doAddRI(InstPtr ip, BasicBlock *&b,
     TASSERT(src2.isImm(), "");
     TASSERT(dst.isReg(), "");
 
-    // Read from src1.
-    Value *srcReg = R_READ<width>(b, src1.getReg());
+	llvm::Module *M = b->getParent()->getParent();
+    llvm::dbgs() << "doAddRI " << width;
+    llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
 
+    Value *srcReg = NULL;
+
+	std::cout << "Integer type " << to_string<VA>((VA)IntegerType::get(M->getContext(), 32), hex) << "\n";
+	std::cout << "Integer type " << to_string<VA>((VA)IntegerType::get(M->getContext(), 64), hex) << "\n";
+
+	std::cout.flush();
+		
+    // Read from src1.
+	srcReg = R_READ<width>(b, src1.getReg());
+    
     // Constant.
     Value *constPart = CONST_V<width>(b, src2.getImm());
 
-    R_WRITE<width>(b, dst.getReg(), doAddVV<width>(ip, b, srcReg, constPart));
-    
+	R_WRITE<width>(b, dst.getReg(), doAddVV<width>(ip, b, srcReg, constPart));
+
     return ContinueBlock;
 }
 
@@ -149,11 +171,11 @@ static InstTransResult doAddRM(InstPtr ip, BasicBlock *&b,
     // Read from o1.
     Value *v2 = R_READ<width>(b, o1.getReg());
 
-    // Do add.
-    Value *res = doAddVV<width>(ip, b, v1, v2);
+	// Do add.
+	Value *res = doAddVV<width>(ip, b, v1, v2);
 
-    // Write to o2.
-    R_WRITE<width>(b, o2.getReg(), res);
+	// Write to o2.
+	R_WRITE<width>(b, o2.getReg(), res);
 
     return ContinueBlock;
 }
@@ -169,13 +191,13 @@ static InstTransResult doAddRV(InstPtr ip, BasicBlock *&b,
     TASSERT(addr != NULL, "");
 
     // Read from o1.
-    Value *v2 = R_READ<width>(b, o1.getReg());
+	Value *v2 = R_READ<width>(b, o1.getReg());
 
-    // Do add.
-    Value *res = doAddVV<width>(ip, b, addr, v2);
+	// Do add.
+	Value *res = doAddVV<width>(ip, b, addr, v2);
 
-    // Write to o2.
-    R_WRITE<width>(b, o2.getReg(), res);
+	// Write to o2.
+	R_WRITE<width>(b, o2.getReg(), res);
 
     return ContinueBlock;
 }
@@ -190,17 +212,17 @@ static InstTransResult doAddRR(InstPtr ip, BasicBlock *&b,
     TASSERT(dst.isReg(), "");
     TASSERT(o1.isReg(), "");
     TASSERT(o2.isReg(), "");
-    
-    // Read from srcReg.
-    Value *srcReg_v = R_READ<width>(b, o1.getReg());
 
-    // Read from dstReg.
-    Value *dstReg_v = R_READ<width>(b, o2.getReg());
+	// Read from srcReg.
+	Value *srcReg_v = R_READ<width>(b, o1.getReg());
 
-    Value *addRes = doAddVV<width>(ip, b, srcReg_v, dstReg_v);
-    
-    // Store the result in dst.
-    R_WRITE<width>(b, dst.getReg(), addRes);
+	// Read from dstReg.
+	Value *dstReg_v = R_READ<width>(b, o2.getReg());
+
+	Value *addRes = doAddVV<width>(ip, b, srcReg_v, dstReg_v);
+
+	// Store the result in dst.
+	R_WRITE<width>(b, dst.getReg(), addRes);
 
     return ContinueBlock;
 }
@@ -260,6 +282,9 @@ static InstTransResult doAdcI(InstPtr ip, BasicBlock *&b, const MCOperand &src)
         case 32:
             dst = R_READ<width>(b, X86::EAX);
             break;
+		case 64:
+			dst = R_READ<width>(b, X86::RAX);
+			break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");
     }
@@ -276,6 +301,9 @@ static InstTransResult doAdcI(InstPtr ip, BasicBlock *&b, const MCOperand &src)
             break;
         case 32:
             R_WRITE<width>(b, X86::EAX, res);
+            break;
+		case 64:
+            R_WRITE<width>(b, X86::RAX, res);
             break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");
@@ -481,7 +509,11 @@ GENERIC_TRANSLATION_MEM(ADD32i32,
         doAddRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
         doAddRV<32>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
 
-GENERIC_TRANSLATION_32MI(ADD32mi, 
+GENERIC_TRANSLATION_MEM(ADD64i32,
+        doAddRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
+        doAddRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
+
+GENERIC_TRANSLATION_32MI(ADD32mi,
         doAddMI<32>(ip, block, ADDR(0), OP(5)),
         doAddMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
         doAddMV<32>(ip, block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip)))
@@ -499,6 +531,9 @@ GENERIC_TRANSLATION(ADD32ri, doAddRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD32ri8, doAddRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD32ri8_DB, doAddRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD32ri_DB, doAddRI<32>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(ADD64ri8, doAddRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(ADD64ri16, doAddRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(ADD64ri32, doAddRI<64>(ip, block, OP(0), OP(1), OP(2)))
 
 GENERIC_TRANSLATION_MEM(ADD32rm, 
         doAddRM<32>(ip, block, ADDR(2), OP(0), OP(1)),
@@ -649,4 +684,11 @@ void ADD_populateDispatchMap(DispatchMap &m)
     m[X86::ADC8rm] = translate_ADC8rm;
     m[X86::ADC8rr] = translate_ADC8rr;
     m[X86::ADC8rr_REV] = translate_ADC8rr_REV;
+
+    m[X86::ADD64ri8] = translate_ADD64ri8;
+    m[X86::ADD64ri8_DB] = translate_ADD64ri8;
+    m[X86::ADD64ri32] = translate_ADD64ri32;
+    m[X86::ADD64ri32_DB] = translate_ADD64ri32;
+    m[X86::ADD64i32] = translate_ADD64i32;
+    m[X86::ADD64mi8] = translate_NOOP;
 }

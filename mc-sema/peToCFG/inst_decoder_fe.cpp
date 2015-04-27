@@ -30,16 +30,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "X86.h"
 #include <LExcn.h>
 #include "../common/to_string.h"
+#include "llvm/Support/Debug.h"
 
 using namespace std;
 using namespace boost;
 using namespace llvm;
+
 
 InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
   InstPtr           inst;
   llvm::MCInst      mcInst;
   ::uint64_t    insLen;
   VA                nextVA = addr;
+  ::uint32_t        arch_type;
+
+  if(std::string(target->getName()) == "x86"){
+      arch_type = Inst::X86;
+  } else {
+      arch_type = Inst::X86_64;
+  }
 
   llvm::MCDisassembler::DecodeStatus  s;
 
@@ -83,19 +92,24 @@ InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
                               mcInst,
                               osOut.str(),
                               pfx,
-                              bytes));
+                              bytes,
+                              arch_type));
 
     //ask if this is a jmp, and figure out what the true / false follows are
     switch(mcInst.getOpcode()) {
       case X86::JMP32m:
       case X86::JMP32r:
+      case X86::JMP64m:
+      case X86::JMP64r:
         inst->set_terminator();
         break;
         //throw LErr(__LINE__, __FILE__, "Branch through register not okay yet");
         //break;
       case X86::RETL:
       case X86::RETIL:
-      case X86::RETIW: 
+      case X86::RETIQ:
+      case X86::RETIW:
+      case X86::RETQ:
         inst->set_terminator();
         break;
       case X86::JMP_4:
@@ -149,7 +163,7 @@ InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
         oper = mcInst.getOperand(0);
         LASSERT(oper.isImm(), "Should not be of this type");
         inst->set_tr(addr + oper.getImm() + insLen);
-        inst->set_fa(addr + insLen); 
+        inst->set_fa(addr + insLen);
         break;
     }
 

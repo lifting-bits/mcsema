@@ -238,6 +238,10 @@ void ExternalFunctionMap::parseMap(string fileName)
           conv = FastCall;
           break;
 
+        case 'S':
+          conv = X86_64_SysV;
+          break;
+
         default:
           throw LErr(__LINE__, __FILE__, "Unknown calling convention specification in "+vtok[2]);
       }

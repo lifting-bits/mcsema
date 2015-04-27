@@ -100,8 +100,8 @@ void addDataSymbol(   DataSection &ds,
 
 DataSection processDataSection( ExecutableContainer *c,
                                 const ExecutableContainer::SectionDesc &sec,
-                                VA min_limit = 0,
-                                VA max_limit = 0xFFFFFFFFFFFFFFFF)
+                                VA min_limit = 0x0ULL,
+                                VA max_limit = 0xFFFFFFFFFFFFFFFFULL)
 {
 
     VA base = sec.base;
@@ -304,6 +304,9 @@ ExternalCodeRefPtr makeExtCodeRefFromString(string callName, ExternalFunctionMap
   case ExternalFunctionMap::FastCall:
     c = ExternalCodeRef::FastCall;
     break;
+  case ExternalFunctionMap::X86_64_SysV:
+    c = ExternalCodeRef::X86_64_SysV;
+    break;
   default:
     assert(!"Invalid calling convention for external call!");
     
@@ -358,7 +361,9 @@ static bool isBranchViaMemory(InstPtr inst) {
 
     switch(inst->get_inst().getOpcode()) {
         case X86::JMP32m:
+        case X86::JMP64m:
         case X86::CALL32m:
+        case X86::CALL64m:
             return true;
         default:
             return false;
@@ -916,6 +921,7 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                 }
                 break;
             case X86::CALLpcrel32:
+            case X86::CALL64pcrel32:
                 {
                     //this could be an external call in COFF, or not
                     op = I->get_inst().getOperand(0);
@@ -983,6 +989,7 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                 break;
 
             case X86::CALL32m:
+            case X86::CALL64m:
                 //this should be a call to an external, or we have no idea
                 //so we need to try and look up the symbol that we're calling at this address...
                 if(c->find_import_name(curAddr+2, imp)) {

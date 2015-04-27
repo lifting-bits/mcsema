@@ -134,6 +134,11 @@ class Inst {
         GSPrefix
     };
 
+    enum ArchType {
+        X86,
+        X86_64
+    };
+
     private:
     std::vector<VA>   targets;
     std::vector<boost::uint8_t> instBytes;
@@ -163,7 +168,7 @@ class Inst {
     // Zero if there is no relocation that occurs in the bytes of this
     // instruction
     uint8_t         reloc_offset;
-
+    uint32_t        arch;
     //  if this instruction is a system call, its system call number
     //  otherwise, -1
     int system_call_number;
@@ -296,6 +301,9 @@ class Inst {
         }
     }
 
+    unsigned int get_opcode(void) {return this->NativeInst.getOpcode();}
+    unsigned int get_arch(void) {return this->arch;}
+
     ExternalCodeRefPtr get_ext_call_target(void) { return this->extCallTgt; }
     ExternalDataRefPtr get_ext_data_ref(void) { return this->extDataRef; }
 
@@ -304,7 +312,8 @@ class Inst {
           const llvm::MCInst &inst, 
           std::string instR, 
           Prefix k,
-          std::vector<boost::uint8_t> bytes) : 
+          std::vector<boost::uint8_t> bytes,
+          uint32_t arch_type = Inst::X86) :
         instBytes(bytes),
         tgtIfTrue(0),
         tgtIfFalse(0),
@@ -323,7 +332,8 @@ class Inst {
         ext_data_ref(false),
         system_call_number(-1),
         local_noreturn(false),
-        data_offset(0)
+        data_offset(0),
+        arch(arch_type)
        { }
 };
 
@@ -561,6 +571,20 @@ class NativeModule {
         this->entries.push_back(ep);
     }
 
+    void setTarget(const llvm::Target *T){
+        this->target = T;
+    }
+	
+	void setTargetTriple(llvm::Triple *t){
+		this->triple = t;
+	}
+
+    bool is64Bit(void){
+        if(std::string(target->getName()) == "x86-64"){
+            return true;
+        }
+        return false;
+    }
 
     private:
     std::list<NativeFunctionPtr>          funcs;
@@ -569,6 +593,8 @@ class NativeModule {
     FuncID                          nextID;
     std::string                     nameStr;
     llvm::MCInstPrinter             *MyPrinter;
+    const llvm::Target              *target;
+	llvm::Triple					*triple;
 
     std::list<DataSection>          dataSecs;
     std::list<ExternalCodeRefPtr>   extCalls;
@@ -586,7 +612,7 @@ enum ModuleInputFormat {
 };
 
 const llvm::Target *findDisTarget(std::string );
-NativeModulePtr readModule(std::string, ModuleInputFormat, std::list<VA>);
+NativeModulePtr readModule(std::string, ModuleInputFormat, std::list<VA>, const llvm::Target*);
 
 // used in testSemantics.cpp via funcFromBuff
 NativeBlockPtr blockFromBuff( VA, 

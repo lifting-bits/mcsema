@@ -246,7 +246,7 @@ static Value *doGEPV(BasicBlock *&b, Value *gepindex, MCSemaRegs reg)
         CONST_V<32>(b, 0),
         gep_ext };
 
-    Value* localgepreg = lookupLocal(b->getParent(), reg);
+    Value* localgepreg = x86::lookupLocal(b->getParent(), reg);
 
     // Get actual register.
     Instruction *gepreg = GetElementPtrInst::CreateInBounds(localgepreg, stGEPV, "", b);

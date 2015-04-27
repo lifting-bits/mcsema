@@ -33,10 +33,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Helpers.h"
 #include "x86Instrs_flagops.h"
 #include "x86Instrs_SUB.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
 
 #define NASSERT(cond) TASSERT(cond, "")
+
+static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
+  //isn't this exciting
+  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
+  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
+  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
+  return ContinueBlock;
+}
+
+GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
 
 template <int width>
 static Value * doSubVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs)
@@ -118,17 +129,31 @@ static InstTransResult doSubRI(InstPtr ip, BasicBlock *&b,
     NASSERT(src2.isImm());
     NASSERT(dst.isReg());
 
-    // Read from src1.
-    Value *srcReg = R_READ<width>(b, src1.getReg());
+    if(ip->get_arch() == Inst::X86){
+        // Read from src1.
+        Value *srcReg = x86::R_READ<width>(b, src1.getReg());
 
-    // Create the constant value.
-    Value *c = CONST_V<width>(b, src2.getImm());
+        // Create the constant value.
+        Value *c = CONST_V<width>(b, src2.getImm());
 
-    // Do the operation.
-    Value *subRes = doSubVV<width>(ip, b, srcReg, c);
-    
-    // Store the result in dst.
-    R_WRITE<width>(b, dst.getReg(), subRes);
+        // Do the operation.
+        Value *subRes = doSubVV<width>(ip, b, srcReg, c);
+
+        // Store the result in dst.
+        x86::R_WRITE<width>(b, dst.getReg(), subRes);
+    } else {
+        // Read from src1.
+        Value *srcReg = x86_64::R_READ<width>(b, src1.getReg());
+
+        // Create the constant value.
+        Value *c = CONST_V<width>(b, src2.getImm());
+
+        // Do the operation.
+        Value *subRes = doSubVV<width>(ip, b, srcReg, c);
+
+        // Store the result in dst.
+        x86_64::R_WRITE<width>(b, dst.getReg(), subRes);
+    }
 
     return ContinueBlock;
 }
@@ -342,7 +367,9 @@ GENERIC_TRANSLATION_MEM(SUB32mr,
 	doSubMR<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
 GENERIC_TRANSLATION(SUB32ri, doSubRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(SUB32ri8, doSubRI<32>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(SUB32rm, 
+GENERIC_TRANSLATION(SUB64ri8, doSubRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(SUB64ri32, doSubRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION_MEM(SUB32rm,
 	doSubRM<32>(ip, block, ADDR(2), OP(0), OP(1)),
 	doSubRM<32>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(SUB32rr, doSubRR<32>(ip, block, OP(0), OP(1), OP(2)))
@@ -462,4 +489,9 @@ void SUB_populateDispatchMap(DispatchMap &m)
         m[X86::SBB8rm] = translate_SBB8rm;
         m[X86::SBB8rr] = translate_SBB8rr;
         m[X86::SBB8rr_REV] = translate_SBB8rr_REV;
+
+        m[X86::SUB64ri8] = translate_SUB64ri8;
+        //m[X86::SUB64ri16] = translate_NOOP;
+        m[X86::SUB64ri32] = translate_SUB64ri32;
+      //  m[X86::SUB64ri] = translate_NOOP;
 }

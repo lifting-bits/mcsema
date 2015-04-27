@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Instrs_CMPTEST.h"
 #include "x86Instrs_Exchanges.h"
 
+
 #define NASSERT(cond) TASSERT(cond, "")
 
 template <int width>

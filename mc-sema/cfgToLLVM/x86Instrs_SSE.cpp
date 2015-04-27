@@ -40,7 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define NASSERT(cond) TASSERT(cond, "")
 
 using namespace llvm;
-
+//using namespace x86;
 static std::tuple<VectorType*, Type*> getIntVectorTypes(BasicBlock *b, int ewidth, int count) {
     Type *elem_ty = Type::getIntNTy(b->getContext(), ewidth);
     VectorType *vt = VectorType::get(

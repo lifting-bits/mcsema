@@ -43,6 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace std;
 using namespace llvm;
+//using namespace x86;
 
 extern llvm::PointerType *g_PRegStruct;
 

@@ -69,8 +69,9 @@ class ExternalCodeRef : public ExternalRef {
 public:
     enum CallingConvention {
         CallerCleanup,
-        CalleeCleanup, 
-        FastCall
+        CalleeCleanup,
+        FastCall,
+        X86_64_SysV
     };
 
     enum ReturnType {

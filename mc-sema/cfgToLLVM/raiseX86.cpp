@@ -110,6 +110,7 @@ void M_WRITE_T(InstPtr ip, llvm::BasicBlock *b, llvm::Value *addr, llvm::Value *
     return;
 }
 
+namespace x86 {
 int mapPlatRegToOffset(unsigned reg) {
     switch(reg) {
         case X86::DH:
@@ -165,6 +166,74 @@ int mapPlatRegToOffset(unsigned reg) {
     return -1;
 }
 
+}
+
+namespace x86_64 {
+int mapPlatRegToOffset(unsigned reg) {
+    switch(reg) {
+        case X86::DH:
+        case X86::CH:
+        case X86::BH:
+        case X86::AH:
+            return 8;
+            break;
+        case X86::AX:
+        case X86::AL:
+        case X86::EAX:
+		case X86::RAX:
+        case X86::BX:
+        case X86::BL:
+        case X86::EBX:
+		case X86::RBX:
+        case X86::CX:
+        case X86::CL:
+        case X86::ECX:
+		case X86::RCX:
+        case X86::DX:
+        case X86::DL:
+        case X86::EDX:
+		case X86::RDX:
+        case X86::SI:
+        case X86::ESI:
+		case X86::RSI:
+        case X86::DI:
+        case X86::EDI:
+		case X86::RDI:
+        case X86::SP:
+        case X86::ESP:
+		case X86::RSP:
+        case X86::BP:
+        case X86::EBP:
+		case X86::RBP:
+
+        case X86::ST0:
+        case X86::ST1:
+        case X86::ST2:
+        case X86::ST3:
+        case X86::ST4:
+        case X86::ST5:
+        case X86::ST6:
+        case X86::ST7:
+
+        case X86::XMM0:
+        case X86::XMM1:
+        case X86::XMM2:
+        case X86::XMM3:
+        case X86::XMM4:
+        case X86::XMM5:
+        case X86::XMM6:
+        case X86::XMM7:
+            return 0;
+            break;
+        default:
+            throw TErr(__LINE__, __FILE__, "Reg type "+to_string<unsigned>(reg, dec)+" is unknown");
+    }
+    
+    return -1;
+}
+
+}
+
 class bfs_cfg_visitor : public boost::default_bfs_visitor {
 private:
     NativeFunctionPtr   natFun;
@@ -198,6 +267,7 @@ Value *lookupLocalByName(Function *F, string localName) {
     return NULL;
 }
 
+namespace x86 {
 Value *MCRegToValue(BasicBlock *b, unsigned reg) {
     unsigned realReg = reg;
     switch(reg)
@@ -241,9 +311,73 @@ Value *MCRegToValue(BasicBlock *b, unsigned reg) {
 
     return lookupLocal(F, (MCSemaRegs)realReg);
 }
+}
 
-Value *GENERIC_READREG(BasicBlock *b, MCSemaRegs reg) {
-    Value       *localRegVar = lookupLocal(b->getParent(), reg);
+namespace x86_64 {
+Value *MCRegToValue(BasicBlock *b, unsigned reg) {
+    unsigned realReg = reg;
+    switch(reg)
+    {
+        case X86::AX:
+        case X86::AH:
+        case X86::AL:
+            realReg = X86::RAX;
+            break;
+        case X86::BX:
+        case X86::BH:
+        case X86::BL:
+            realReg = X86::RBX;
+            break;
+        case X86::CX:
+        case X86::CH:
+        case X86::CL:
+            realReg = X86::RCX;
+            break;
+        case X86::DX:
+        case X86::DH:
+        case X86::DL:
+            realReg = X86::RDX;
+            break;
+        case X86::SI:
+            realReg = X86::RSI;
+            break;
+        case X86::DI:
+            realReg = X86::RDI;
+            break;
+        case X86::SP:
+            realReg = X86::RSP;
+            break;
+        case X86::BP:
+            realReg = X86::RBP;
+            break;
+        default:
+            break;
+    }
+    Function    *F = b->getParent();
+
+    return lookupLocal(F, (MCSemaRegs)realReg);
+}
+}
+
+Value *MCRegToValue(BasicBlock *b, unsigned reg) { 
+	Module *M = b->getParent()->getParent();
+	
+	if(getPointerSize(M) == Pointer32){
+		return x86::MCRegToValue(b, reg);
+	} else {
+		return x86_64::MCRegToValue(b, reg);
+	}
+}
+Value *GENERIC_READREG(BasicBlock *b, MCSemaRegs reg)
+ {
+	Module *M = b->getParent()->getParent();
+	Value       *localRegVar;
+	
+	if(getPointerSize(M) == Pointer32){
+		localRegVar = x86::lookupLocal(b->getParent(), reg);
+	} else {
+		localRegVar = x86_64::lookupLocal(b->getParent(), reg);
+	}
     Instruction *readFlag = noAliasMCSemaScope(new LoadInst(localRegVar, "", b));
     return readFlag;
 }
@@ -253,8 +387,17 @@ Value *F_READ(BasicBlock *b, MCSemaRegs flag) {
 }
 
 void GENERIC_WRITEREG(BasicBlock *b, MCSemaRegs reg, Value *v) {
-    Value   *localRegVar = lookupLocal(b->getParent(), reg);
-    std::string regName = getRegisterName(reg);
+    Module *M = b->getParent()->getParent();
+	Value *localRegVar;
+	std::string regName;
+	
+	if(getPointerSize(M) == Pointer32){
+		localRegVar = x86::lookupLocal(b->getParent(), reg);
+		regName = x86::getRegisterName(reg);
+	} else {
+		localRegVar = x86_64::lookupLocal(b->getParent(), reg);
+		regName = x86_64::getRegisterName(reg);
+	}
     if(localRegVar == NULL)
       throw TErr(__LINE__, __FILE__, "regname "+regName+" not found");
     Instruction   *st = noAliasMCSemaScope(new StoreInst(v, localRegVar, b));
@@ -429,7 +572,145 @@ void allocateLocals(Function *F, int bits) {
             break;
 
         case 64:
-            throw TErr(__LINE__, __FILE__, "64-bit not supported yet");
+		{
+			//create 64-bit width general purpose registers
+            Type    *uintTy = Type::getInt64Ty(F->getContext());
+            Instruction *raxA = new AllocaInst(uintTy, "RAX_val", begin);
+            Instruction *rbxA = new AllocaInst(uintTy, "RBX_val", raxA);
+            Instruction *rcxA = new AllocaInst(uintTy, "RCX_val", rbxA);
+            Instruction *rdxA = new AllocaInst(uintTy, "RDX_val", rcxA);
+            Instruction *rsiA = new AllocaInst(uintTy, "RSI_val", rdxA);
+            Instruction *rdiA = new AllocaInst(uintTy, "RDI_val", rsiA);
+            Instruction *rbpA = new AllocaInst(uintTy, "RBP_val", rdiA);
+            Instruction *rspA = new AllocaInst(uintTy, "RSP_val", rbpA);
+
+            Instruction *r8A = new AllocaInst(uintTy, "R8_val", rspA);
+            Instruction *r9A = new AllocaInst(uintTy, "R9_val", r8A);
+            Instruction *r10A = new AllocaInst(uintTy, "R10_val", r9A);
+            Instruction *r11A = new AllocaInst(uintTy, "R11_val", r10A);
+            Instruction *r12A = new AllocaInst(uintTy, "R12_val", r11A);
+            Instruction *r13A = new AllocaInst(uintTy, "R13_val", r12A);
+            Instruction *r14A = new AllocaInst(uintTy, "R14_val", r13A);
+            Instruction *r15A = new AllocaInst(uintTy, "R15_val", r14A);
+            //create other fields for flags
+
+            Type    *boolTy = Type::getInt1Ty(F->getContext());
+            Instruction *zfA = new AllocaInst(boolTy, "ZF_val", r15A);
+            Instruction *sfA = new AllocaInst(boolTy, "PF_val", zfA);
+            Instruction *ofA = new AllocaInst(boolTy, "AF_val", sfA);
+            Instruction *cfA = new AllocaInst(boolTy, "CF_val", ofA);
+            Instruction *pfA = new AllocaInst(boolTy, "SF_val", cfA);
+            Instruction *afA = new AllocaInst(boolTy, "OF_val", pfA);
+            Instruction *dfA = new AllocaInst(boolTy, "DF_val", afA);
+            TASSERT(dfA != NULL, "");
+
+            // FPU STACK
+            Type    *floatTy = Type::getX86_FP80Ty(F->getContext());
+            // 8 float values make up the ST registers
+            Type    *floatArrayTy = ArrayType::get(floatTy, 8);
+            Instruction *stRegs = new AllocaInst(floatArrayTy, "STi_val", dfA);
+
+            // sanity check
+            TASSERT(stRegs != NULL, "");
+
+            // FPU FLAGS
+            Instruction *fpu_B = new AllocaInst(boolTy,  "FPU_B_val", stRegs);
+            Instruction *fpu_C3 = new AllocaInst(boolTy, "FPU_C3_val", fpu_B);
+
+            // TOP of stack from FPU flags
+            // really a 3-bit integer
+            Type    *topTy = Type::getIntNTy(F->getContext(), 3);
+            Instruction *fpu_TOP = new AllocaInst(topTy, "FPU_TOP_val", fpu_C3);
+            TASSERT(fpu_TOP != NULL, "");
+
+            Instruction *fpu_C2 = new AllocaInst(boolTy, "FPU_C2_val", fpu_TOP);
+            Instruction *fpu_C1 = new AllocaInst(boolTy, "FPU_C1_val", fpu_C2);
+            Instruction *fpu_C0 = new AllocaInst(boolTy, "FPU_C0_val", fpu_C1);
+            Instruction *fpu_ES = new AllocaInst(boolTy, "FPU_ES_val", fpu_C0);
+            Instruction *fpu_SF = new AllocaInst(boolTy, "FPU_SF_val", fpu_ES);
+            Instruction *fpu_PE = new AllocaInst(boolTy, "FPU_PE_val", fpu_SF);
+            Instruction *fpu_UE = new AllocaInst(boolTy, "FPU_UE_val", fpu_PE);
+            Instruction *fpu_OE = new AllocaInst(boolTy, "FPU_OE_val", fpu_UE);
+            Instruction *fpu_ZE = new AllocaInst(boolTy, "FPU_ZE_val", fpu_OE);
+            Instruction *fpu_DE = new AllocaInst(boolTy, "FPU_DE_val", fpu_ZE);
+            Instruction *fpu_IE = new AllocaInst(boolTy, "FPU_IE_val", fpu_DE);
+
+            // sanity check
+            TASSERT(fpu_IE != NULL, "");
+
+            // FPU CONTROL FLAGS
+            Type    *int2Ty = Type::getIntNTy(F->getContext(), 2);
+            Instruction *fpu_X =  new AllocaInst(boolTy, "FPU_X_val",  fpu_IE);
+            Instruction *fpu_RC = new AllocaInst(int2Ty, "FPU_RC_val", fpu_X);
+            Instruction *fpu_PC = new AllocaInst(int2Ty, "FPU_PC_val", fpu_RC);
+            Instruction *fpu_PM = new AllocaInst(boolTy, "FPU_PM_val", fpu_PC);
+            Instruction *fpu_UM = new AllocaInst(boolTy, "FPU_UM_val", fpu_PM);
+            Instruction *fpu_OM = new AllocaInst(boolTy, "FPU_OM_val", fpu_UM);
+            Instruction *fpu_ZM = new AllocaInst(boolTy, "FPU_ZM_val", fpu_OM);
+            Instruction *fpu_DM = new AllocaInst(boolTy, "FPU_DM_val", fpu_ZM);
+            Instruction *fpu_IM = new AllocaInst(boolTy, "FPU_IM_val", fpu_DM);
+
+            TASSERT(fpu_IM != NULL, "");
+
+            // FPU TAG WORD
+            // 8 2-bit values. One for each ST register
+            Type    *tagArrayType = ArrayType::get(int2Ty, 8);
+            Instruction *fpu_TagWord = new AllocaInst(tagArrayType, "FPU_TAG_val", fpu_IM);
+
+            TASSERT(fpu_TagWord != NULL, "");
+
+            Instruction *fpu_LASTIP_SEG = new AllocaInst(Type::getInt16Ty(F->getContext()),   "FPU_LASTIP_SEG_val"  , fpu_TagWord);
+            Instruction *fpu_LASTIP_OFF = new AllocaInst(Type::getInt64Ty(F->getContext()),   "FPU_LASTIP_OFF_val"  , fpu_LASTIP_SEG);
+            Instruction *fpu_LASTDATA_SEG = new AllocaInst(Type::getInt16Ty(F->getContext()), "FPU_LASTDATA_SEG_val", fpu_LASTIP_OFF);
+            Instruction *fpu_LASTDATA_OFF = new AllocaInst(Type::getInt64Ty(F->getContext()), "FPU_LASTDATA_OFF_val", fpu_LASTDATA_SEG);
+
+            Instruction *fpu_FOPCODE = new AllocaInst(Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE_val", fpu_LASTDATA_OFF);
+            TASSERT(fpu_FOPCODE != NULL, "");
+
+            //vector registers
+            Instruction *vec_xmm0 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM0_val",
+                                fpu_FOPCODE);
+            Instruction *vec_xmm1 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM1_val",
+                                vec_xmm0);
+            Instruction *vec_xmm2 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM2_val",
+                                vec_xmm1);
+            Instruction *vec_xmm3 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM3_val",
+                                vec_xmm2);
+            Instruction *vec_xmm4 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM4_val",
+                                vec_xmm3);
+            Instruction *vec_xmm5 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM5_val",
+                                vec_xmm4);
+            Instruction *vec_xmm6 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM6_val",
+                                vec_xmm5);
+            Instruction *vec_xmm7 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM7_val",
+                                vec_xmm6);
+
+            // stack base and limit
+            Instruction *stack_base =
+                new AllocaInst( Type::getInt64Ty(F->getContext()),
+                                "STACK_BASE_val",
+                                vec_xmm7);
+            Instruction *stack_limit =
+                new AllocaInst( Type::getInt64Ty(F->getContext()),
+                                "STACK_LIMIT_val",
+                                stack_base);
+		}
             break;
 
         default:
@@ -595,9 +876,10 @@ static bool insertFunctionIntoModule(NativeModulePtr mod, NativeFunctionPtr func
                                                     F);
     TASSERT(entryBlock != NULL, "" );
 
-    allocateLocals(F, 32);
+    allocateLocals(F, getPointerSize(M)*8);
     //and at the beginning of the function, we spill all the context
-    writeContextToLocals(entryBlock, 32, ABICallSpill);
+
+    writeContextToLocals(entryBlock, getPointerSize(M)*8, ABICallSpill);
     //writeContextToLocals(entryBlock, 32, AllRegs);
 
     //then we put an unconditional branch from the 'entry' block to the first
@@ -661,7 +943,7 @@ bool doPostAnalysis(NativeModulePtr N, Module *M) {
   return true;
 }
 
-
+namespace x86 {
 bool addEntryPointDriverRaw(Module *M, string name, VA entry) {
     string  s("sub_"+to_string<VA>(entry, hex));
     Function  *F = M->getFunction(s);
@@ -778,7 +1060,7 @@ bool addEntryPointDriver(Module *M,
         // set ecx to arg[0]
         if(fwd_it != fwd_end) {
 
-            int   k = getRegisterOffset(ECX);
+            int   k = x86::getRegisterOffset(ECX);
             Value *ecxFieldGEPV[] = {
                 CONST_V<32>(driverBB, 0),
                 CONST_V<32>(driverBB, k)
@@ -796,7 +1078,7 @@ bool addEntryPointDriver(Module *M,
         // set edx to arg[1]
         ++fwd_it;
         if(fwd_it != fwd_end) {
-            int   k = getRegisterOffset(EDX);
+            int   k = x86::getRegisterOffset(EDX);
             Value *edxFieldGEPV[] = {
                 CONST_V<32>(driverBB, 0),
                 CONST_V<32>(driverBB, k)
@@ -867,17 +1149,17 @@ bool addEntryPointDriver(Module *M,
       --args_to_push;
     }
 
-    int   k = getRegisterOffset(ESP);
+    int   k = x86::getRegisterOffset(ESP);
     Value *spFieldGEPV[] = {
       CONST_V<32>(driverBB, 0),
       CONST_V<32>(driverBB, k)
     };
-    k = getRegisterOffset(STACK_BASE);
+    k = x86::getRegisterOffset(STACK_BASE);
     Value *stackBaseGEPV[] = {
       CONST_V<32>(driverBB, 0),
       CONST_V<32>(driverBB, k)
     };
-    k = getRegisterOffset(STACK_LIMIT);
+    k = x86::getRegisterOffset(STACK_LIMIT);
     Value *stackLimitGEPV[] = {
       CONST_V<32>(driverBB, 0),
       CONST_V<32>(driverBB, k)
@@ -898,7 +1180,7 @@ bool addEntryPointDriver(Module *M,
     Instruction *tmp2 = aliasMCSemaScope(new StoreInst(stackBaseInt, sBaseValP, driverBB));
 
     // all functions assume DF is clear on entry
-    k = getRegisterOffset(DF);
+    k = x86::getRegisterOffset(DF);
     Value *dflagGEPV[] = {
       CONST_V<32>(driverBB, 0),
       CONST_V<32>(driverBB, k)
@@ -926,7 +1208,7 @@ bool addEntryPointDriver(Module *M,
     //if we are requested, return the EAX value, else return void
     if(ret) {
       //do a GEP and load for the EAX register in the reg structure 
-      int j = getRegisterOffset(EAX);
+      int j = x86::getRegisterOffset(EAX);
       Value *eaxGEPV[] = {
         CONST_V<32>(driverBB, 0), 
         CONST_V<32>(driverBB, j)
@@ -948,6 +1230,344 @@ bool addEntryPointDriver(Module *M,
   }
 
   return true;
+}
+}
+
+namespace x86_64 {
+bool addEntryPointDriverRaw(Module *M, string name, VA entry) {
+    string  s("sub_"+to_string<VA>(entry, hex));
+    Function  *F = M->getFunction(s);
+
+    if( F != NULL ) {
+        vector<Type *>  args;
+        vector<Value*>  subArg;
+        args.push_back(g_PRegStruct);
+        Type  *returnTy = Type::getVoidTy(M->getContext());
+        FunctionType *FT = FunctionType::get(returnTy, args, false);
+
+        // check if driver name already exists.. maybe its the name of an 
+        // extcall and we will have a serious conflict?
+
+        Function *driverF = M->getFunction(name);
+        if(driverF == NULL) {
+            // function does not exist. this is good.
+            // insert the function prototype
+            driverF = (Function *) M->getOrInsertFunction(name, FT); 
+        } else {
+            throw TErr(__LINE__, __FILE__, "Cannot insert driver. Function "+name+" already exists.");
+        }
+        
+
+        if( driverF == NULL ) {
+          throw TErr(__LINE__, __FILE__, "Could not get or insert function "+name);
+        }
+
+        //insert the function logical body
+        //insert a primary BB
+        BasicBlock  *driverBB = BasicBlock::Create( driverF->getContext(),
+                "driverBlockRaw",
+                driverF);
+
+        Function::ArgumentListType::iterator  it = 
+            driverF->getArgumentList().begin();
+        Function::ArgumentListType::iterator  end = 
+            driverF->getArgumentList().end();
+
+        while(it != end) {
+            Argument  *curArg = it;
+            subArg.push_back(curArg);
+            it++;
+        }
+
+        CallInst* ci = CallInst::Create(F, subArg, "", driverBB);
+        ci->setCallingConv(CallingConv::X86_64_SysV);
+        ReturnInst::Create(driverF->getContext(), driverBB);
+        return true;
+    }
+
+    return false;
+}
+
+bool addEntryPointDriver(Module *M, 
+        string name, 
+        VA entry, 
+        int np, 
+        bool ret, 
+        raw_ostream &report,
+        ExternalCodeRef::CallingConvention cconv) 
+{
+  //convert the VA into a string name of a function, try and look it up
+  string  s("sub_"+to_string<VA>(entry, hex));
+  Function  *F = M->getFunction(s);
+  Type *int64ty = Type::getInt64Ty(M->getContext());
+  Type *int64PtrTy = PointerType::get(int64ty, 0);
+
+  if( F != NULL ) {
+    //build function prototype from name and numParms
+    vector<Type *>  args;
+
+    for(int i = 0; i < np; i++) {
+      args.push_back(Type::getInt64Ty(M->getContext()));
+    }
+
+    Type  *returnTy = NULL;
+    if(ret) {
+      returnTy = Type::getInt64Ty(M->getContext());
+    } else{
+      returnTy = Type::getVoidTy(M->getContext());
+    }
+
+    FunctionType *FT = FunctionType::get(returnTy, args, false);
+	std::cout << __FUNCTION__ << "\n";
+	cout.flush();
+    //insert the function prototype
+    Function  *driverF = (Function *) M->getOrInsertFunction(name, FT); 
+    // set drivers calling convention to match user specification
+    driverF->setCallingConv(CallingConv::X86_64_SysV);
+
+    TASSERT(driverF != NULL, "");
+
+    //insert the function logical body
+    //insert a primary BB
+    BasicBlock  *driverBB = BasicBlock::Create( driverF->getContext(),
+                                                "driverBlock",
+                                                driverF);
+
+    //insert an alloca for the register context structure
+    Instruction *aCtx = new AllocaInst(g_RegStruct, "", driverBB);
+    TASSERT(aCtx != NULL, "Could not allocate register context!");
+
+    //write the parameters into the stack 
+    Function::ArgumentListType::iterator  fwd_it = 
+      driverF->getArgumentList().begin();
+    Function::ArgumentListType::iterator  fwd_end = 
+      driverF->getArgumentList().end();
+    AttrBuilder B;
+    B.addAttribute(Attribute::InReg);
+	
+	if(fwd_it != fwd_end) {
+		int   k = x86_64::getRegisterOffset(RDI);
+		Value *rdiFieldGEPV[] = {
+                CONST_V<64>(driverBB, 0),
+                CONST_V<32>(driverBB, k)
+            };
+
+        // make driver take this from register
+        fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
+
+        Value *rdiP = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
+		Argument  *curArg = &(*fwd_it);
+		aliasMCSemaScope(new StoreInst(curArg, rdiP, driverBB));
+	}
+
+	// set rsi to arg[1]
+	++fwd_it;
+	if(fwd_it != fwd_end) {
+		int   k = x86_64::getRegisterOffset(RSI);
+		Value *rsiFieldGEPV[] = {
+				CONST_V<64>(driverBB, 0),
+				CONST_V<32>(driverBB, k)
+		};
+
+		// make driver take this from register
+		fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 2, B));
+
+		Value *rsiP = GetElementPtrInst::CreateInBounds(aCtx, rsiFieldGEPV, "", driverBB);
+		Argument  *curArg = &(*fwd_it);
+		aliasMCSemaScope(new StoreInst(curArg, rsiP, driverBB));
+	}
+
+	// set rdx to arg[2]
+	++fwd_it;
+	if(fwd_it != fwd_end) {
+		int   k = x86_64::getRegisterOffset(RDX);
+		Value *rdxFieldGEPV[] = {
+				CONST_V<64>(driverBB, 0),
+				CONST_V<32>(driverBB, k)
+		};
+
+		fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 3, B));
+
+        Value *rdxP = GetElementPtrInst::CreateInBounds(aCtx, rdxFieldGEPV, "", driverBB);
+
+		Argument  *curArg = &(*fwd_it);
+		aliasMCSemaScope(new StoreInst(curArg, rdxP, driverBB));
+	}
+
+	//set rcx to arg[3]
+	++fwd_it;
+	if(fwd_it != fwd_end) {
+        int   k = x86_64::getRegisterOffset(RCX);
+		Value *rcxFieldGEPV[] = {
+                CONST_V<64>(driverBB, 0),
+				CONST_V<32>(driverBB, k)
+		};
+
+        fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 4, B));
+        Value *rcxP = GetElementPtrInst::CreateInBounds(aCtx, rcxFieldGEPV, "", driverBB);
+        Argument  *curArg = &(*fwd_it);
+		aliasMCSemaScope(new StoreInst(curArg, rcxP, driverBB));
+	}
+
+	//set r8 to arg[4]
+	++fwd_it;
+	if(fwd_it != fwd_end) {
+		int   k = x86_64::getRegisterOffset(R8);
+		Value *r8FieldGEPV[] = {
+				CONST_V<64>(driverBB, 0),
+                CONST_V<32>(driverBB, k)
+		};
+
+		fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 5, B));
+
+		Value *r8P = GetElementPtrInst::CreateInBounds(aCtx, r8FieldGEPV, "", driverBB);
+        Argument  *curArg = &(*fwd_it);
+		new StoreInst(curArg, r8P, driverBB);
+	}
+
+	//set r9 to arg[5]
+	++fwd_it;
+	if(fwd_it != fwd_end) {
+		int   k = x86_64::getRegisterOffset(R9);
+		Value *r9FieldGEPV[] = {
+				CONST_V<64>(driverBB, 0),
+				CONST_V<32>(driverBB, k)
+		};
+			 
+		fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 6, B));
+
+		Value *r9P = GetElementPtrInst::CreateInBounds(aCtx, r9FieldGEPV, "", driverBB);
+		Argument  *curArg = &(*fwd_it);
+		aliasMCSemaScope(new StoreInst(curArg, r9P, driverBB));
+	}
+
+	// rest of the arguments are passed on stack
+	Function::ArgumentListType::reverse_iterator it = driverF->getArgumentList().rbegin();
+	Function::ArgumentListType::reverse_iterator end = driverF->getArgumentList().rend();
+
+    Value *stackSize = archGetStackSize(M, driverBB);
+    Value *aStack = archAllocateStack(M, stackSize, driverBB);
+
+    // position pointer to end of stack
+    Value *stackBaseInt = BinaryOperator::Create(BinaryOperator::Add,
+            aStack, stackSize, "", driverBB);
+    Value *stackPosInt = stackBaseInt;
+
+    // decrement stackPtr to leave some slack space on the stack.
+    // our current implementation of varargs functions just passes
+    // a big number of arguments to the destination function. 
+    // This works because they are declared cdecl and the caller cleans up
+    // ... BUT 
+    // if there is not enough stack for all these args, we may dereference
+    // unallocated memory. Leave some slack so this doesn't happen.
+    stackPosInt = BinaryOperator::Create(BinaryOperator::Sub,
+                    stackPosInt, CONST_V<64>(driverBB, 8*12), "", driverBB);
+
+    // decrement stackPtr once to have a slot for
+    // "return address", even if there are no arguments
+    stackPosInt = BinaryOperator::Create(BinaryOperator::Sub,
+                    stackPosInt, CONST_V<64>(driverBB, 8), "", driverBB);
+	
+	// number of arguments to be pushed on stack
+	int args_to_push = driverF->getArgumentList().size() - 6;
+
+    // save arguments on the stack
+    while(args_to_push > 0)
+    {
+      Argument  *curArg = &(*it);
+      // convert to int64 ptr
+      Value *stackPosPtr = noAliasMCSemaScope(new IntToPtrInst(stackPosInt, int64PtrTy, "", driverBB ));
+      // write argument
+      Instruction *k = noAliasMCSemaScope(new StoreInst(curArg, stackPosPtr, driverBB));
+      // decrement stack
+      stackPosInt = BinaryOperator::Create(BinaryOperator::Sub,
+                stackPosInt, CONST_V<64>(driverBB, 8), "", driverBB);
+      ++it;
+      --args_to_push;
+    }
+
+    int   k = x86_64::getRegisterOffset(RSP);
+    Value *spFieldGEPV[] = {
+      CONST_V<64>(driverBB, 0),
+      CONST_V<32>(driverBB, k)
+    };
+    k = x86_64::getRegisterOffset(STACK_BASE);
+    Value *stackBaseGEPV[] = {
+      CONST_V<64>(driverBB, 0),
+      CONST_V<32>(driverBB, k)
+    };
+    k = x86_64::getRegisterOffset(STACK_LIMIT);
+    Value *stackLimitGEPV[] = {
+      CONST_V<64>(driverBB, 0),
+      CONST_V<32>(driverBB, k)
+    };
+
+    Value *spValP = 
+      GetElementPtrInst::CreateInBounds(aCtx, spFieldGEPV, "", driverBB);
+
+    Value *sBaseValP = 
+      GetElementPtrInst::CreateInBounds(aCtx, stackBaseGEPV, "", driverBB);
+
+    Value *sLimitValP = 
+      GetElementPtrInst::CreateInBounds(aCtx, stackLimitGEPV, "", driverBB);
+
+    // stack limit = start of allocation (stack grows down);
+    Instruction *tmp1 = aliasMCSemaScope(new StoreInst(aStack, sLimitValP, driverBB));
+    // stack base = stack alloc start + stack size
+    Instruction *tmp2 = aliasMCSemaScope(new StoreInst(stackBaseInt, sBaseValP, driverBB));
+
+    // all functions assume DF is clear on entry
+    k = x86_64::getRegisterOffset(DF);
+    Value *dflagGEPV[] = {
+      CONST_V<64>(driverBB, 0),
+      CONST_V<32>(driverBB, k)
+    };
+
+    Value *dflagP = 
+      GetElementPtrInst::CreateInBounds(aCtx, dflagGEPV, "", driverBB);
+
+    Instruction *tmp3 = aliasMCSemaScope(new StoreInst(CONST_V<1>(driverBB, 0), dflagP, driverBB));
+
+    Instruction *j = aliasMCSemaScope(new StoreInst(stackPosInt, spValP, driverBB));
+    TASSERT(j != NULL, "Could not write stack value to RSP");
+
+    //call the sub function with register struct as argument
+    vector<Value*>  subArg;
+
+    subArg.push_back(aCtx);
+
+    CallInst* ci = CallInst::Create(F, subArg, "", driverBB);
+    ci->setCallingConv(CallingConv::X86_64_SysV);
+
+    archFreeStack(M, aStack, driverBB);
+
+    //if we are requested, return the EAX value, else return void
+    if(ret) {
+      //do a GEP and load for the EAX register in the reg structure 
+      int j = x86_64::getRegisterOffset(RAX);
+      Value *raxGEPV[] = {
+        CONST_V<64>(driverBB, 0), 
+        CONST_V<32>(driverBB, j)
+      };
+
+      Value *raxVP = 
+        GetElementPtrInst::CreateInBounds(aCtx, raxGEPV, "", driverBB);
+      Instruction *raxV = aliasMCSemaScope(new LoadInst(raxVP, "", driverBB));
+
+      //return that value 
+      ReturnInst::Create(driverF->getContext(), raxV, driverBB);
+    } else {
+      ReturnInst::Create(driverF->getContext(), driverBB);
+    }
+
+  } else {
+      report << "Could not find entry point function\n";
+    return false;
+  }
+
+  return true;
+}
+
 }
 
 static Constant* makeConstantBlob(LLVMContext &ctx, const vector<uint8_t> &blob) {
@@ -1190,7 +1810,12 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
             TASSERT(F != NULL, "Could not insert function into module");
 
             // default to stdcall
-            F->setCallingConv(CallingConv::X86_StdCall);
+            if(natMod->is64Bit()){
+                F->setCallingConv(CallingConv::X86_64_SysV);
+            } else {
+                F->setCallingConv(CallingConv::X86_StdCall);
+            }
+
             // make local functions 'static'
             F->setLinkage(GlobalValue::InternalLinkage);
             cout << "Inserted function: " << fname << std::endl;
@@ -1251,7 +1876,11 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
 
             //create arguments 
             for( int i = 0; i < argCount; i++ ) {
-                arguments.push_back(Type::getInt32Ty(M->getContext()));
+                if(natMod->is64Bit()){
+                    arguments.push_back(Type::getInt64Ty(M->getContext()));
+                } else {
+                    arguments.push_back(Type::getInt32Ty(M->getContext()));
+                }
             }
 
             //create function type
@@ -1263,7 +1892,11 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
 
                 case ExternalCodeRef::Unknown:
                 case ExternalCodeRef::IntTy:
-                    returnType = Type::getInt32Ty(M->getContext());
+                    if(natMod->is64Bit()){
+                        returnType = Type::getInt64Ty(M->getContext());
+                    } else {
+                        returnType = Type::getInt32Ty(M->getContext());
+                    }
                     break;
                 default:
                     throw TErr(__LINE__, __FILE__, 
@@ -1282,10 +1915,13 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
             }
 
             //set calling convention
-            f->setCallingConv(getLLVMCC(conv));
+            if(natMod->is64Bit()){
+                f->setCallingConv(CallingConv::X86_64_SysV);
+            } else {
+                f->setCallingConv(getLLVMCC(conv));
+            }
         }
     }
-
     // populate functions
     i = funcs.begin();
     while( i != funcs.end() ) {

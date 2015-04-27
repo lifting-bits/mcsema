@@ -15,4 +15,11 @@ llvm::Module* archAddCallbacksToModule(llvm::Module *M);
 llvm::Value *archMakeCallbackForLocalFunction(llvm::Module *M, VA local_target);
 void archAddCallValue(llvm::Module *M);
 
+namespace x86_64 {
+llvm::Value* linuxAllocateStack(llvm::Module *M, llvm::Value *stackSize, llvm::BasicBlock *&driverBB);
+llvm::Value *linuxFreeStack(llvm::Module *M, llvm::Value *stackAlloc, llvm::BasicBlock *&driverBB);
+llvm::Value *linuxGetStackSize(llvm::Module *M, llvm::BasicBlock *&driverBB);
+}
+
+
 #endif

@@ -58,6 +58,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <boost/foreach.hpp>
 #include <boost/algorithm/string.hpp>
 
+class doGlobalInit;
 using namespace llvm;
 using namespace std;
 
@@ -67,6 +68,9 @@ OutputFilename("o", cl::desc("Output filename"), cl::init("-"),
 
 static cl::opt<string>
 InputFilename("i", cl::desc("Input filename"), cl::value_desc("<filename>"), cl::Required);
+
+static cl::opt<string>
+SystemArch("march", cl::desc("System Architecture"), cl::value_desc("<x86|x86_64>"), cl::Required);
 
 static cl::opt<string>
 TargetTriple("mtriple", cl::desc("Target Triple"), cl::value_desc("target triple"), cl::init(DEFAULT_TRIPLE));
@@ -136,17 +140,25 @@ string dtLayout = "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:
 #else
 // i386-linux-gnu
 string dtLayout = "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32-S128";
+// x86_64-linux-gnu
+string dtLayout64 = "e-m:e-i64:64-f80:128-n8:16:32:64-S128";
 #endif
 
 
-llvm::Module  *getLLVMModule(string name)
+
+llvm::Module  *getLLVMModule(string name, const Target *T)
 {
   llvm::Module  *M = new Module(name, llvm::getGlobalContext());
 
-  M->setDataLayout(dtLayout);
-  M->setTargetTriple(TargetTriple);
-
-  doGlobalInit(M);
+  if(string(T->getName()) == "x86-64") {
+      M->setDataLayout(dtLayout64);
+      M->setTargetTriple("x86_64-unknown-unknown");
+	  x86_64::doGlobalInit(M);
+  } else{
+      M->setDataLayout(dtLayout);
+      M->setTargetTriple(TargetTriple);
+	  x86::doGlobalInit(M);
+  }
 
   return M;
 }
@@ -296,6 +308,7 @@ int main(int argc, char *argv[])
 {
   cl::SetVersionPrinter(printVersion);
   cl::ParseCommandLineOptions(argc, argv, "CFG to LLVM");
+  llvm::Triple *triple;
 
   InitializeAllTargetInfos();
   InitializeAllTargetMCs();
@@ -306,6 +319,19 @@ int main(int argc, char *argv[])
       return -1;
 
   vector<DriverEntry> drivers;
+
+  const Target  *x86Target = NULL;
+  for(TargetRegistry::iterator it = TargetRegistry::begin(),
+        e = TargetRegistry::end();
+      it != e;
+      ++it)
+  {
+    const Target  &t = *it;
+    if(string(t.getName()) == SystemArch) {
+      x86Target = &t;
+      break;
+    }
+  }
 
   try {
       for(unsigned i = 0; i < Drivers.size(); i++) {
@@ -322,13 +348,16 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-
   //reproduce NativeModule from CFG input argument
-  NativeModulePtr mod = readModule(InputFilename, ProtoBuff, list<VA>());
+  NativeModulePtr mod = readModule(InputFilename, ProtoBuff, list<VA>(), x86Target);
   if(mod == NULL) {
       cerr << "Could not process input module: " << InputFilename << std::endl;
       return -2;
   }
+
+  // set native module target
+  mod->setTarget(x86Target);
+  mod->setTargetTriple(getTargetTriple(x86Target));
 
   const std::vector<NativeModule::EntrySymbol>& native_eps = mod->getEntryPoints();
   std::vector<NativeModule::EntrySymbol>::const_iterator natep_it;
@@ -351,6 +380,7 @@ int main(int argc, char *argv[])
       }
   }
 
+
   if(drivers.size() == 0) {
       cout << "At least one driver must be specified. Please use the -driver option\n";
       return -1;
@@ -368,8 +398,8 @@ int main(int argc, char *argv[])
       ignoreUnsupportedInsts = true;
   }
 
-  //now, convert it to an LLVM module 
-  llvm::Module  *M = getLLVMModule(mod->name());
+  //now, convert it to an LLVM module
+  llvm::Module  *M = getLLVMModule(mod->name(), x86Target);
 
   if(!M) 
   {
@@ -417,11 +447,14 @@ int main(int argc, char *argv[])
 
               if(itr->is_raw == true)
               {
-                  addEntryPointDriverRaw(M, itr->name, ep);
+                  if(mod->is64Bit()) x86_64::addEntryPointDriverRaw(M, itr->name, ep);
+                  else x86::addEntryPointDriverRaw(M, itr->name, ep);
               }
               else 
               {
-                  addEntryPointDriver(M, itr->name, ep, itr->argc, itr->returns, outs(), itr->cconv);
+                  if(mod->is64Bit()) x86_64::addEntryPointDriver(M, itr->name, ep, itr->argc, itr->returns, outs(), itr->cconv);
+                  else x86::addEntryPointDriver(M, itr->name, ep, itr->argc, itr->returns, outs(), itr->cconv);
+
               }
           } // for vector<DriverEntry>
 

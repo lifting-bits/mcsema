@@ -523,11 +523,11 @@ void deserializeData(const ::Data &d, DataSection &ds)
 
 }
 
-NativeModulePtr readProtoBuf(std::string fName) {
+NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
   NativeModulePtr m;
   ::Module        serializedMod;
   ifstream        inStream(fName.c_str(), ios::binary);
-  LLVMByteDecoder decode;
+  LLVMByteDecoder decode(std::string(T->getName()));
 
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
@@ -573,6 +573,8 @@ NativeModulePtr readProtoBuf(std::string fName) {
     //create the module 
     m = NativeModulePtr(
           new NativeModule(serializedMod.module_name(), foundFuncs, NULL));
+
+    m->setTarget(T);
 
     //populate the module with externals calls
     for(list<ExternalCodeRefPtr>::iterator it = externFuncs.begin();
@@ -621,7 +623,8 @@ NativeModulePtr readProtoBuf(std::string fName) {
 
 NativeModulePtr readModule( std::string         fName, 
                             ModuleInputFormat   inf,
-                            list<VA>            entries) 
+                            list<VA>            entries,
+                            const llvm::Target *T)
 {
     NativeModulePtr m;
 
@@ -631,7 +634,7 @@ NativeModulePtr readModule( std::string         fName,
             throw LErr(__LINE__, __FILE__, "Please use bin_descend instead");
             break;
         case ProtoBuff:
-            m = readProtoBuf(fName);
+            m = readProtoBuf(fName, T);
             break;
         default:
             LASSERT(false, "NOT IMPLEMENTED");

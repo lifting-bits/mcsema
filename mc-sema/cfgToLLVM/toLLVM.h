@@ -60,8 +60,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stack>
 
 llvm::FunctionType *getBaseFunctionType(llvm::Module *M);
+llvm::Triple *getTargetTriple(const llvm::Target *T);
 
 extern llvm::StructType  *g_RegStruct;
 extern llvm::PointerType *g_PRegStruct;
 
+namespace x86 {
 void doGlobalInit(llvm::Module *);
+}
+
+namespace x86_64 {
+void doGlobalInit(llvm::Module *);
+}

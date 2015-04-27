@@ -2,6 +2,7 @@
 #define COMMON_DEFAULTS_H
 
     #define LINUX_TRIPLE        "i686-pc-linux-gnu"
+	#define LINUX_TRIPLE_X86_64	"x86_64-unknown-unknown"
     #define WINDOWS_TRIPLE      "i686-pc-win32"
 
     #ifdef __linux__

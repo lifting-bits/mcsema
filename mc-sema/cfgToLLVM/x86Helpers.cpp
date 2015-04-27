@@ -36,12 +36,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 using namespace std;
-
+//using namespace x86;
 // check if addr falls into a data section, and is at least minAddr.
 // the minAddr check exists for times when we are not sure if an address
 // is a data reference or an immediate value; in some cases data is mapped
 // at 0x0 and determining this could be tricky
-static
+
 bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr = 0x0 ) {
     list<DataSection>  &sections = m->getData();
     list<DataSection>::iterator it = sections.begin();
@@ -77,6 +77,7 @@ bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr = 0x0 ) {
 // If the expression references global data, use
 // that in the computation instead of assuming values
 // are opaque immediates
+namespace x86 {
 Value *getAddrFromExpr( BasicBlock      *b,
                         NativeModulePtr mod,
                         const MCOperand &Obase,
@@ -183,6 +184,113 @@ Value *getAddrFromExpr( BasicBlock      *b,
     
     return dispPtr;
 }
+}
+
+namespace x86_64 {
+	
+Value *getAddrFromExpr( BasicBlock      *b,
+                        NativeModulePtr mod,
+                        const MCOperand &Obase,
+                        const MCOperand &Oscale,
+                        const MCOperand &Oindex,
+                        const int64_t Odisp,
+                        const MCOperand &Oseg,
+                        bool dataOffset) 
+{
+    TASSERT(Obase.isReg(), "");
+    TASSERT(Oscale.isImm(), "");
+    TASSERT(Oindex.isReg(), "");
+    TASSERT(Oseg.isReg(), "");
+
+    unsigned    baseReg = Obase.getReg();
+    int64_t     disp = Odisp;
+	
+	// specific function for 64 bit
+    Value       *d = NULL;
+    IntegerType *iTy = IntegerType::getInt64Ty(b->getContext());
+
+    if( dataOffset ||  
+        (mod && disp && baseReg != X86::RBP && baseReg!= X86::RSP) ) 
+    {
+        VA  baseGlobal;
+        if( addrIsInData(disp, mod, baseGlobal, dataOffset ? 0 : 0x1000) ) {
+            //we should be able to find a reference to this in global data 
+            Module  *M = b->getParent()->getParent();
+            string  sn = "data_0x" + to_string<VA>(baseGlobal, hex);
+
+            GlobalVariable *gData = M->getNamedGlobal(sn);
+
+            //if we thought it was a global, we should be able to
+            //pin it to a global array we made during module setup
+            if( gData == NULL) 
+              throw TErr(__LINE__, __FILE__, "Global variable not found");
+
+            // since globals are now a structure 
+            // we cannot simply slice into them.
+            // Need to get ptr and then add integer displacement to ptr
+            Value   *globalGEPV[] =  
+                {   ConstantInt::get(Type::getInt64Ty(b->getContext()), 0), 
+                    ConstantInt::get(Type::getInt32Ty(b->getContext()), 0)};
+            Instruction *globalGEP = 
+                GetElementPtrInst::Create(gData,  globalGEPV, "", b);
+            Type    *ty = Type::getInt64Ty(b->getContext());
+            Value   *intVal = new PtrToIntInst(globalGEP, ty, "", b);
+            uint32_t addr_offset = disp-baseGlobal;
+            Value   *int_adjusted = 
+                BinaryOperator::CreateAdd(intVal, CONST_V<64>(b, addr_offset), "", b);
+            //then, assign this to the outer 'd' so that the rest of the 
+            //logic picks up on that address instead of another address 
+            d = int_adjusted;
+        } 
+    } else {
+        //there is no disp value, or its relative to esp/ebp in which case
+        //we might not want to do anything
+    }
+
+    if( d == NULL ) {
+        //create a constant integer out of the raw displacement
+        //we were unable to assign the displacement to an address
+        d = ConstantInt::getSigned(iTy, disp);
+    }
+
+    Value   *rVal = NULL;
+
+    //read the base register (if given)
+    if( baseReg != X86::NoRegister ) {
+        rVal = R_READ<64>(b, baseReg);
+    } else {
+        //if the base is not present, just use 0
+        rVal = CONST_V<64>(b, 0);
+    }
+
+    Value   *dispComp;
+    dispComp = 
+        BinaryOperator::Create( Instruction::Add, rVal, d, "", b);
+
+    //add the index amount, if present
+	if( Oindex.getReg() != X86::NoRegister ) {
+		Value       *index = R_READ<64>(b, Oindex.getReg());
+        
+        int64_t scaleAmt = Oscale.getImm();
+        if( scaleAmt > 1 ) {
+            index = 
+                BinaryOperator::CreateMul(index,CONST_V<64>(b, scaleAmt),"",b);
+        }
+
+		dispComp = 
+			BinaryOperator::CreateAdd(dispComp, index, "", b);
+        
+    }
+
+    //convert the resulting integer into a pointer type
+    PointerType *piTy = Type::getInt64PtrTy(b->getContext());
+    Value       *dispPtr = new IntToPtrInst(dispComp, piTy, "", b);
+    
+    return dispPtr;
+}
+
+}
+
 
 Value *getAddrFromExpr( BasicBlock      *b,
                         NativeModulePtr mod,
@@ -206,16 +314,29 @@ Value *getAddrFromExpr( BasicBlock      *b,
     // or if the immediate should be used at face value
     bool has_offset = ip->is_data_offset();
     int64_t real_disp= has_offset ? ip->get_data_offset() : disp.getImm();
+	llvm::Module *M = b->getParent()->getParent();
+	
+	if(getPointerSize(M) == Pointer32) {
 
-
-    return getAddrFromExpr(b, 
-            mod, 
-            base, 
-            scale,
-            index, 
-            real_disp, 
-            seg,
-            has_offset);
+		return x86::getAddrFromExpr(b, 
+				mod, 
+				base, 
+				scale,
+				index, 
+				real_disp, 
+				seg,
+				has_offset);
+			
+	} else {
+		return x86_64::getAddrFromExpr(b, 
+				mod, 
+				base, 
+				scale,
+				index, 
+				real_disp, 
+				seg,
+				has_offset);
+	}
 
 
 }
@@ -223,6 +344,9 @@ Value *getAddrFromExpr( BasicBlock      *b,
 Value* GLOBAL_DATA_OFFSET(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
 {
     VA  baseGlobal;
+	llvm::Module *M = b->getParent()->getParent();
+	int regWidth = getPointerSize(M)*8;
+	
     uint64_t off = ip->get_data_offset();
     if( addrIsInData(off, mod, baseGlobal, 0) ) {
         //we should be able to find a reference to this in global data 
@@ -240,15 +364,22 @@ Value* GLOBAL_DATA_OFFSET(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
         // we cannot simply slice into them.
         // Need to get ptr and then add integer displacement to ptr
         Value   *globalGEPV[] =  
-        {   ConstantInt::get(Type::getInt32Ty(b->getContext()), 0), 
+        {   ConstantInt::get(Type::getIntNTy(b->getContext(), regWidth), 0), 
             ConstantInt::get(Type::getInt32Ty(b->getContext()), 0)};
         Instruction *globalGEP = 
             GetElementPtrInst::Create(gData,  globalGEPV, "", b);
-        Type    *ty = Type::getInt32Ty(b->getContext());
+			
+        Type    *ty = Type::getIntNTy(b->getContext(), regWidth);
         Value   *intVal = new PtrToIntInst(globalGEP, ty, "", b);
         uint32_t addr_offset = off-baseGlobal;
-        Value   *int_adjusted = 
-            BinaryOperator::CreateAdd(intVal, CONST_V<32>(b, addr_offset), "", b);
+        Value   *int_adjusted;
+		if(regWidth== x86::REG_SIZE){
+			int_adjusted = 
+				BinaryOperator::CreateAdd(intVal, CONST_V<32>(b, addr_offset), "", b);
+		} else {
+			int_adjusted = 
+				BinaryOperator::CreateAdd(intVal, CONST_V<64>(b, addr_offset), "", b);
+		}
         //then, assign this to the outer 'd' so that the rest of the 
         //logic picks up on that address instead of another address 
         return int_adjusted;

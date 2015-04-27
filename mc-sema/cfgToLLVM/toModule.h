@@ -32,7 +32,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 //translate a NativeModule into an LLVM Module
 bool natModToModule(NativeModulePtr, llvm::Module *, llvm::raw_ostream &);
+namespace x86 {
 bool addEntryPointDriver(llvm::Module *, std::string, VA, int, bool, llvm::raw_ostream &, ExternalCodeRef::CallingConvention cconv);
 bool addEntryPointDriverRaw(llvm::Module *M, std::string name, VA entry);
+}
+
+namespace x86_64 {
+bool addEntryPointDriver(llvm::Module *, std::string, VA, int, bool, llvm::raw_ostream &, ExternalCodeRef::CallingConvention cconv);
+bool addEntryPointDriverRaw(llvm::Module *M, std::string name, VA entry);
+}
 bool doPostAnalysis(NativeModulePtr N, llvm::Module *M);
 #endif

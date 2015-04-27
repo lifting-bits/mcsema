@@ -45,7 +45,7 @@ Value *win32FreeStack(Value *stackAlloc, BasicBlock *&driverBB) {
 
 // GEP to get a reg from pro_int_call return
 #define READ_REG_OPAQUE(varname, reg, opaque) do {  \
-        int   reg_off = getRegisterOffset(reg);        \
+        int   reg_off = x86::getRegisterOffset(reg);        \
         Value *reg_GEPV[] = {                       \
           CONST_V<32>(driver_block, 0),             \
           CONST_V<32>(driver_block, reg_off)        \

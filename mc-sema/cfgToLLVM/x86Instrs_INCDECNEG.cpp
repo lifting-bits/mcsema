@@ -74,18 +74,18 @@ static InstTransResult doNegR(InstPtr ip,  BasicBlock      *&b,
     NASSERT(dst.isReg());
 
     // Cache a full width read of the register.
-    Value *reg_f_v = R_READ<32>(b, dst.getReg());
+    Value *reg_f_v = x86::R_READ<32>(b, dst.getReg());
     
     // Do a read of the register.
-    Value *reg_v = R_READ<width>(b, dst.getReg());
+    Value *reg_v = x86::R_READ<width>(b, dst.getReg());
 
     Value *result = doNegV<width>(ip, b, reg_v);
 
     // Write it back out.
-    R_WRITE<width>(b, dst.getReg(), result);
+    x86::R_WRITE<width>(b, dst.getReg(), result);
 
     // Update AF with the result from the register.
-    WriteAF2(b, reg_f_v, R_READ<32>(b, dst.getReg()), CONST_V<32>(b, 1));
+    WriteAF2(b, reg_f_v, x86::R_READ<32>(b, dst.getReg()), CONST_V<32>(b, 1));
 
     return ContinueBlock;
 }
@@ -113,18 +113,18 @@ static InstTransResult doIncR(InstPtr ip,  BasicBlock      *&b,
     NASSERT(dst.isReg());
 
     // Cache a full width read of the register.
-    Value *reg_f_v = R_READ<32>(b, dst.getReg());
+    Value *reg_f_v = x86::R_READ<32>(b, dst.getReg());
     
     // Do a read of the register.
-    Value *reg_v = R_READ<width>(b, dst.getReg());
+    Value *reg_v = x86::R_READ<width>(b, dst.getReg());
 
     Value *result = doIncV<width>(ip, b, reg_v);
 
     // Write it back out.
-    R_WRITE<width>(b, dst.getReg(), result);
+    x86::R_WRITE<width>(b, dst.getReg(), result);
 
     // Update AF with the result from the register.
-    WriteAF2(b, reg_f_v, R_READ<32>(b, dst.getReg()), CONST_V<32>(b, 1));
+    WriteAF2(b, reg_f_v, x86::R_READ<32>(b, dst.getReg()), CONST_V<32>(b, 1));
 
     return ContinueBlock;
 }
@@ -166,18 +166,18 @@ static InstTransResult doDecR(InstPtr ip,  BasicBlock      *&b,
     NASSERT(dst.isReg());
 
     // Cache a full width read of the register.
-    Value *reg_f_v = R_READ<32>(b, dst.getReg());
+    Value *reg_f_v = x86::R_READ<32>(b, dst.getReg());
     
     // Do a read of the register.
-    Value *reg_v = R_READ<width>(b, dst.getReg());
+    Value *reg_v = x86::R_READ<width>(b, dst.getReg());
 
     Value *result = doDecV<width>(ip, b, reg_v);
 
     // Write it back out.
-    R_WRITE<width>(b, dst.getReg(), result);
+    x86::R_WRITE<width>(b, dst.getReg(), result);
 
     // Update AF with the result from the register.
-    WriteAF2(b, reg_f_v, R_READ<32>(b, dst.getReg()), CONST_V<32>(b, 1));
+    WriteAF2(b, reg_f_v, x86::R_READ<32>(b, dst.getReg()), CONST_V<32>(b, 1));
 
     return ContinueBlock;
 }

@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Instrs_Jcc.h"
 #include <string>
 #include "../common/to_string.h"
+#include "llvm/Support/Debug.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
 
@@ -208,6 +209,10 @@ static InstTransResult doCondBranch(InstPtr ip,   BasicBlock *&b,
 static InstTransResult translate_Jcc(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
 
     Function *F = block->getParent();
+    uint32_t target = ip->get_arch();
+    llvm::dbgs() << "MOV64rm " << " 64";
+    llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
+
     std::string  trueStrName = "block_0x"+to_string<VA>(ip->get_tr(), std::hex);
     std::string  falseStrName = "block_0x"+to_string<VA>(ip->get_fa(), std::hex);
 

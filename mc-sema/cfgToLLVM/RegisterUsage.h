@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Function.h>
 #include <map>
+#include "RegisterUsage.h"
 
 
 enum MCSemaRegs {
@@ -43,6 +44,22 @@ enum MCSemaRegs {
     EDI = llvm::X86::EDI,
     ESP = llvm::X86::ESP,
     EBP = llvm::X86::EBP,
+	RAX = llvm::X86::RAX,
+	RBX = llvm::X86::RBX,
+	RCX = llvm::X86::RCX,
+	RDX = llvm::X86::RDX,
+	RDI = llvm::X86::RDI,
+	RSI = llvm::X86::RSI,
+	RSP = llvm::X86::RSP,
+	RBP = llvm::X86::RBP,
+	R8	= llvm::X86::R8,
+	R9 = llvm::X86::R9,
+	R10 = llvm::X86::R10,
+	R11 = llvm::X86::R11,
+	R12 = llvm::X86::R12,
+	R13 = llvm::X86::R13,
+	R14 = llvm::X86::R14,
+	R15 = llvm::X86::R15,
     CF = llvm::X86::NUM_TARGET_REGS+1,
     PF = llvm::X86::NUM_TARGET_REGS+2,
     AF = llvm::X86::NUM_TARGET_REGS+3,
@@ -105,8 +122,18 @@ struct RegInfo {
     llvm::StringRef name;
 };
 
+namespace x86 {
 extern std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP;
 
 llvm::StringRef getRegisterName(MCSemaRegs reg);
 int getRegisterOffset(MCSemaRegs reg);
 llvm::Value *lookupLocal(llvm::Function *F, MCSemaRegs reg);
+}
+
+namespace x86_64 {
+extern std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP;
+
+llvm::StringRef getRegisterName(MCSemaRegs reg);
+int getRegisterOffset(MCSemaRegs reg);
+llvm::Value *lookupLocal(llvm::Function *F, MCSemaRegs reg);
+}

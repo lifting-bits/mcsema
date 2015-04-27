@@ -41,17 +41,52 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 
+static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
+  //isn't this exciting
+  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
+  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
+  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
+  return ContinueBlock;
+}
+
+
+GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
+
 static InstTransResult doRet(BasicBlock    *b) {
     //do a read from the location pointed to by ESP
-    Value       *rESP = R_READ<32>(b, X86::ESP);
+    llvm::dbgs() << __FUNCTION__;
+    llvm::dbgs() << "\tRepresentation: "  << "\n";
+    
+	Value       *rESP = R_READ<32>(b, X86::ESP);
     Value       *nESP =
-        BinaryOperator::CreateAdd(rESP, CONST_V<32>(b, 4), "", b);
+    
+    BinaryOperator::CreateAdd(rESP, CONST_V<32>(b, 4), "", b);
 
     //write back to ESP
     R_WRITE<32>(b, X86::ESP, nESP); 
 
     //spill all locals into the structure
     writeLocalsToContext(b, 32, ABIRetStore);
+
+    ReturnInst::Create(b->getContext(), b);
+    
+    return EndCFG;
+}
+
+static InstTransResult doRetQ(BasicBlock    *b) {
+    //do a read from the location pointed to by RSP
+	llvm::dbgs() << __FUNCTION__;
+    llvm::dbgs() << "\tRepresentation: "  << "\n";
+	
+    Value       *rRSP = R_READ<x86_64::REG_SIZE>(b, X86::RSP);
+    Value       *nRSP =
+        BinaryOperator::CreateAdd(rRSP, CONST_V<x86_64::REG_SIZE>(b, 8), "", b);
+
+    //write back to RSP
+    R_WRITE<x86_64::REG_SIZE>(b, X86::RSP, nRSP); 
+
+    //spill all locals into the structure
+    writeLocalsToContext(b, x86_64::REG_SIZE, ABIRetStore);
 
     ReturnInst::Create(b->getContext(), b);
     
@@ -75,10 +110,35 @@ static InstTransResult doRetI(BasicBlock *&b, const MCOperand &o) {
         BinaryOperator::CreateAdd(rESP_1, CONST_V<32>(b, 4), "", b);
 
     //write back to ESP
-    R_WRITE<32>(b, X86::ESP, nESP); 
+    R_WRITE<32>(b, X86::ESP, nESP);
 
     //spill all locals into the structure
     writeLocalsToContext(b, 32, ABIRetStore);
+    ReturnInst::Create(b->getContext(), b); 
+    return EndCFG;
+}
+
+static InstTransResult doRetIQ(BasicBlock *&b, const MCOperand &o) {
+    TASSERT(o.isImm(), "Operand not immediate");
+
+    Value   *c = CONST_V<64>(b, o.getImm());
+    Value   *rRSP = R_READ<64>(b, X86::RSP);
+    Value       *fromStack = M_READ_0<64>(b, rRSP);
+    TASSERT(fromStack != NULL, "Could not read value from stack");
+
+    //add the immediate to ESP
+    Value       *rRSP_1 = 
+        BinaryOperator::CreateAdd(rRSP, c, "", b);
+
+    //add pointer width to ESP
+    Value       *nRSP =
+        BinaryOperator::CreateAdd(rRSP_1, CONST_V<64>(b, 8), "", b);
+
+    //write back to ESP
+    R_WRITE<64>(b, X86::RSP, nRSP);
+
+    //spill all locals into the structure
+    writeLocalsToContext(b, 64, ABIRetStore);
     ReturnInst::Create(b->getContext(), b); 
     return EndCFG;
 }
@@ -102,12 +162,12 @@ static InstTransResult doLoop(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
     TASSERT(F != NULL, "False block is NULL");
 
     //retrieve ECX
-    Value   *count = R_READ<32>(b, X86::ECX);
+    Value   *count = x86::R_READ<32>(b, X86::ECX);
     //decrement ECX
     Value   *count_dec = 
         BinaryOperator::CreateSub(count, CONST_V<32>(b, 1), "", b);
     //write ECX back into the register
-    R_WRITE<32>(b, X86::ECX, count_dec);
+    x86::R_WRITE<32>(b, X86::ECX, count_dec);
 
     //test and see if ECX is 0
     Value   *testRes = 
@@ -124,12 +184,12 @@ static InstTransResult doLoopE(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
     TASSERT(F != NULL, "");
     
     //retrieve ECX
-    Value   *count = R_READ<32>(b, X86::ECX);
+    Value   *count = x86::R_READ<32>(b, X86::ECX);
     //decrement ECX
     Value   *count_dec = 
         BinaryOperator::CreateSub(count, CONST_V<32>(b, 1), "", b);
     //write ECX back into the register
-    R_WRITE<32>(b, X86::ECX, count_dec);
+    x86::R_WRITE<32>(b, X86::ECX, count_dec);
 
     //test and see if ECX is 0
     Value   *testRes = 
@@ -153,12 +213,12 @@ static InstTransResult doLoopNE(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
     TASSERT(F != NULL, "");
     
     //retrieve ECX
-    Value   *count = R_READ<32>(b, X86::ECX);
+    Value   *count = x86::R_READ<32>(b, X86::ECX);
     //decrement ECX
     Value   *count_dec = 
         BinaryOperator::CreateSub(count, CONST_V<32>(b, 1), "", b);
     //write ECX back into the register
-    R_WRITE<32>(b, X86::ECX, count_dec);
+    x86::R_WRITE<32>(b, X86::ECX, count_dec);
 
     //test and see if ECX is 0
     Value   *testRes = 
@@ -179,11 +239,11 @@ static InstTransResult doLoopNE(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
 
 
 static void writeFakeReturnAddr(BasicBlock *block) {
-  Value   *espOld = R_READ<32>(block, X86::ESP);
+  Value   *espOld = x86::R_READ<32>(block, X86::ESP);
   Value   *espSub = 
       BinaryOperator::CreateSub(espOld, CONST_V<32>(block, 4), "", block);
   M_WRITE_0<32>(block, espSub, CONST_V<32>(block, 0xbadf00d0));
-  R_WRITE<32>(block, X86::ESP, espSub);
+  x86::R_WRITE<32>(block, X86::ESP, espSub);
 }
 
 static void doCallV(BasicBlock       *&block,
@@ -282,8 +342,8 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
     Module      *M = b->getParent()->getParent();
     
     //write it into the location pointer to by ESP-4
-    Value   *espOld = R_READ<32>(b, X86::ESP);
-    //Value   *espSub = 
+    Value   *espOld = x86::R_READ<32>(b, X86::ESP);
+    //Value   *espSub =
     //    BinaryOperator::CreateSub(espOld, CONST_V<32>(b, 4), "", b);
     //M_WRITE_0<32>(b, espSub, CONST_V<32>(b, 0));
     //R_WRITE<32>(b, X86::ESP, espSub);
@@ -320,7 +380,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
         B.addAttribute(Attribute::InReg);
 
         if(paramCount && it != end) {
-            Value *r_ecx = R_READ<32>(b, X86::ECX);
+            Value *r_ecx = x86::R_READ<32>(b, X86::ECX);
             arguments.push_back(r_ecx);
             --paramCount;
             // set argument 1's attribute: make it in a register
@@ -329,7 +389,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
         }
 
         if(paramCount && it != end) {
-            Value *r_edx = R_READ<32>(b, X86::EDX);
+            Value *r_edx = x86::R_READ<32>(b, X86::EDX);
             arguments.push_back(r_edx);
             --paramCount;
             // set argument 2's attribute: make it in a register
@@ -341,7 +401,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
 
 
     if( paramCount ) {
-        baseEspVal = R_READ<32>(b, X86::ESP);
+        baseEspVal = x86::R_READ<32>(b, X86::ESP);
         if(esp_adjust) {
             baseEspVal = 
                 BinaryOperator::CreateAdd(baseEspVal, CONST_V<32>(b, 4), "", b);
@@ -386,7 +446,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
     //if our convention says to keep the call result alive then do it
     //really, we could always keep the call result alive...
     if( rType == Type::getInt32Ty(M->getContext()) ) {
-        R_WRITE<32>(b, X86::EAX, callR);
+        x86::R_WRITE<32>(b, X86::EAX, callR);
     }
 
 
@@ -399,10 +459,193 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
         Value *espFix =
             BinaryOperator::CreateAdd(espOld, ESP_adjust, "", b);
 
-        R_WRITE<32>(b, X86::ESP, espFix);
+        x86::R_WRITE<32>(b, X86::ESP, espFix);
     }
 
     return ContinueBlock;
+}
+
+namespace x86_64 {
+static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr) {
+    Module      *M = b->getParent()->getParent();
+    Function    *ourF = b->getParent();
+
+    //We should be able to look it up in our module.
+    std::cout << __FUNCTION__ << "target address : " << to_string<VA>(tgtAddr, std::hex) << "\n";
+    std::string         fname = "sub_"+to_string<VA>(tgtAddr, std::hex);
+    Function        *F = M->getFunction(fname);
+
+    TASSERT( F != NULL, "Could not find function: " + fname );
+
+    Value   *rspOld = x86_64::R_READ<64>(b, X86::RSP);
+    Value   *rspSub =
+        BinaryOperator::CreateSub(rspOld, CONST_V<64>(b, 8), "", b);
+		
+    M_WRITE_0<64>(b, rspSub, CONST_V<64>(b, 0xbadf00d0));
+    x86_64::R_WRITE<64>(b, X86::RSP, rspSub);
+
+    //we need to wrap up our current context
+    writeLocalsToContext(b, 64, ABIRetStore);
+
+    //make the call, the only argument should be our parents arguments
+    TASSERT(ourF->arg_size() == 1, "");
+
+    std::vector<Value*> subArgs;
+
+    subArgs.push_back(ourF->arg_begin());
+
+
+    CallInst *c = CallInst::Create(F, subArgs, "", b);
+    c->setCallingConv(CallingConv::X86_64_SysV);
+
+    if ( ip->has_local_noreturn() ) {
+        // noreturn functions just hit unreachable
+        std::cout << __FUNCTION__ << ": Adding Unreachable Instruction to local noreturn" << std::endl;
+        c->setDoesNotReturn();
+        c->setTailCall();
+        Value *unreachable = new UnreachableInst(b->getContext(), b);
+        return EndBlock;
+    }
+
+    //spill our context back
+    writeContextToLocals(b, 64, ABIRetSpill);
+
+    //and we can continue to run the old code
+
+    return ContinueBlock;
+}
+
+static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool esp_adjust = false) {
+    Module      *M = b->getParent()->getParent();
+
+    std::cout << __FUNCTION__ << " : " << target << "\n";
+    Value   *rspOld = x86_64::R_READ<64>(b, X86::RSP);
+
+    //lookup the function in the module
+    Function    *externFunction = M->getFunction(target);
+    TASSERT(externFunction != NULL, "Coult not find external function: "+target);
+    FunctionType    *externFunctionTy = externFunction->getFunctionType();
+    Type            *rType = externFunction->getReturnType();
+    int        paramCount = externFunctionTy->getNumParams();
+	
+    std::cout << __FUNCTION__ << " paramCount  : " <<  paramCount << "\n";
+    std::cout << externFunctionTy->getNumParams() << " : " << to_string<VA>((VA)externFunctionTy->getParamType(0), std::hex) <<"\n";
+    std::cout.flush();
+
+    //now we need to do a series of reads off the stack, essentially
+    //a series of POPs but without writing anything back to ESP
+    Value   *baseRspVal=NULL;
+    std::vector<Value *> arguments;
+
+    // on x86_64 platform all calls will be x86_64_SysV
+    Function::ArgumentListType::iterator  it = externFunction->getArgumentList().begin();
+    Function::ArgumentListType::iterator  end = externFunction->getArgumentList().end();
+    AttrBuilder B;
+    B.addAttribute(Attribute::InReg);
+
+    if(paramCount && it != end) {
+        // fix it by updating the value type
+        Value *reg_rdi = x86_64::R_READ<64>(b, X86::RDI);
+        arguments.push_back(reg_rdi);
+        --paramCount;
+        it->addAttr(AttributeSet::get(it->getContext(), 1,  B));
+        ++it;
+
+        std::cout << "Integer type " << to_string<VA>((VA)IntegerType::get(M->getContext(), 32), std::hex) << "\n";
+        std::cout << "Integer type " << to_string<VA>((VA)IntegerType::get(M->getContext(), 64), std::hex) << "\n";
+        std::cout << "Param type " << to_string<VA>((VA)reg_rdi->getType(), std::hex) << "\n";
+    }
+
+    if(paramCount && it != end) {
+        Value *reg_rsi = x86_64::R_READ<64>(b, X86::RSI);
+        arguments.push_back(reg_rsi);
+        --paramCount;
+        it->addAttr(AttributeSet::get(it->getContext(), 2, B));
+        ++it;
+    }
+
+    if(paramCount && it != end) {
+        Value *reg_rdx = x86_64::R_READ<64>(b, X86::RDX);
+        arguments.push_back(reg_rdx);
+        --paramCount;
+        it->addAttr(AttributeSet::get(it->getContext(), 3, B));
+        ++it;
+    }
+
+    if(paramCount && it != end) {
+        Value *reg_rcx = x86_64::R_READ<64>(b, X86::RCX);
+        arguments.push_back(reg_rcx);
+        --paramCount;
+        it->addAttr(AttributeSet::get(it->getContext(), 4, B));
+        ++it;
+    }
+
+    if(paramCount && it != end) {
+        Value *reg_r8 = x86_64::R_READ<64>(b, X86::R8);
+        arguments.push_back(reg_r8);
+        --paramCount;
+        it->addAttr(AttributeSet::get(it->getContext(), 5, B));
+        ++it;
+    }
+
+    if(paramCount && it != end) {
+        Value *reg_r9 = x86_64::R_READ<64>(b, X86::R9);
+        arguments.push_back(reg_r9);
+        --paramCount;
+        it->addAttr(AttributeSet::get(it->getContext(), 6, B));
+        ++it;
+    }
+
+
+    if( paramCount ) {
+        // rest of the arguments are passed over stack
+        // adjust the stack pointer if required
+        baseRspVal = x86_64::R_READ<64>(b, X86::RSP);
+        if(esp_adjust) {
+            baseRspVal =
+                BinaryOperator::CreateAdd(baseRspVal, CONST_V<64>(b, 8), "", b);
+        }
+    }
+
+    for( int i = 0; i < paramCount; i++ ) {
+        Value   *vFromStack = M_READ_0<64>(b, baseRspVal);
+
+        arguments.push_back(vFromStack);
+
+        if( i+1 != paramCount ) {
+            baseRspVal =
+                BinaryOperator::CreateAdd(baseRspVal, CONST_V<64>(b, 8), "", b);
+        }
+    }
+
+    CallInst    *callR = CallInst::Create(externFunction, arguments, "", b);
+    callR->setCallingConv(CallingConv::X86_64_SysV);
+
+    if ( externFunction->doesNotReturn() ) {
+        // noreturn functions just hit unreachable
+        std::cout << __FUNCTION__ << ": Adding Unreachable Instruction" << std::endl;
+        callR->setDoesNotReturn();
+        callR->setTailCall();
+        Value *unreachable = new UnreachableInst(b->getContext(), b);
+        return EndBlock;
+    }
+
+    //if our convention says to keep the call result alive then do it
+    //really, we could always keep the call result alive...
+    if( rType == Type::getInt64Ty(M->getContext()) ) {
+        x86_64::R_WRITE<64>(b, X86::RAX, callR);
+    }
+
+
+    // adjust REG_RSP accordingly since callee changed it
+    Value *RSP_adjust = CONST_V<64>(b, 8*paramCount);
+    Value *rspFix = BinaryOperator::CreateAdd(rspOld, RSP_adjust, "", b);
+
+    x86_64::R_WRITE<64>(b, X86::RSP, rspFix);
+
+    return ContinueBlock;
+}
+
 }
 
 
@@ -464,6 +707,25 @@ static InstTransResult translate_CALLpcrel32(NativeModulePtr natM, BasicBlock *&
     return ret;
 }
 
+static InstTransResult translate_CALL64pcrel32(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+    InstTransResult ret;
+
+    if( ip->has_ext_call_target() ) {
+        std::string  s = ip->get_ext_call_target()->getSymbolName();
+        ret = x86_64::doCallPCExtern(block, s);
+    }
+    else if (ip->has_call_tgt() ) {
+        int64_t off = (int64_t) ip->get_call_tgt(0);
+        ret = x86_64::doCallPC(ip, block, off);
+    }
+    else {
+        int64_t off = (int64_t) OP(0).getImm();
+        ret = x86_64::doCallPC(ip, block, ip->get_loc()+ip->get_len()+off);
+    }
+
+    return ret;
+}
+
 static InstTransResult translate_CALL32m(
     NativeModulePtr natM, 
     BasicBlock *& block, 
@@ -510,7 +772,7 @@ static InstTransResult translate_CALL32r(NativeModulePtr  natM,
   TASSERT(tgtOp.isReg(), "");
 
   //read the register
-  Value *fromReg = R_READ<32>(block, tgtOp.getReg());
+  Value *fromReg = x86::R_READ<32>(block, tgtOp.getReg());
 
   Module *M = block->getParent()->getParent();
   const std::string &triple = M->getTargetTriple();
@@ -534,7 +796,7 @@ static InstTransResult translate_JMP32r(NativeModulePtr  natM,
     TASSERT(tgtOp.isReg(), "");
 
     //read the register
-    Value *fromReg = R_READ<32>(block, tgtOp.getReg());
+    Value *fromReg = x86::R_READ<32>(block, tgtOp.getReg());
 
     if (ip->has_jump_table()) {
         // this is a jump table that got converted
@@ -557,6 +819,40 @@ static InstTransResult translate_JMP32r(NativeModulePtr  natM,
     }
 }
 
+static InstTransResult translate_JMP64r(NativeModulePtr  natM,
+                                         BasicBlock       *&block,
+                                         InstPtr          ip,
+                                         MCInst           &inst)
+{
+  const MCOperand &tgtOp = inst.getOperand(0);
+
+  TASSERT(inst.getNumOperands() == 1, "");
+  TASSERT(tgtOp.isReg(), "");
+  
+  //read the register
+  Value *fromReg = x86_64::R_READ<64>(block, tgtOp.getReg());
+
+    if (ip->has_jump_table()) {
+        // this is a jump table that got converted
+        // into a table in the data section
+        llvm::dbgs() << __FUNCTION__ << ": jump table via register: " << to_string<VA>(ip->get_loc(), std::hex) << "\n";
+
+        BasicBlock *defaultb = nullptr;
+        
+        doJumpTableViaSwitchReg(block, ip, fromReg, defaultb);
+        TASSERT(defaultb != nullptr, "Default block has to exit");
+        // fallback to doing do_call_value
+        doCallV(defaultb, ip, fromReg);
+        return doRet(defaultb);
+
+    } else {
+        // translate the JMP32r as a call/ret
+        llvm::dbgs() << __FUNCTION__ << ": regular jump via register: " << to_string<VA>(ip->get_loc(), std::hex) << "\n";
+        doCallV(block, ip, fromReg);
+        return doRet(block);
+    } 
+}
+
 #define BLOCKNAMES_TRANSLATION(NAME, THECALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {\
     Function *F = block->getParent(); \
     std::string  trueStrName = "block_0x"+to_string<VA>(ip->get_tr(), std::hex); \
@@ -573,21 +869,33 @@ BLOCKNAMES_TRANSLATION(LOOP, doLoop(block, ifTrue, ifFalse))
 BLOCKNAMES_TRANSLATION(LOOPE, doLoopE(block, ifTrue, ifFalse))
 BLOCKNAMES_TRANSLATION(LOOPNE, doLoopNE(block, ifTrue, ifFalse))
 GENERIC_TRANSLATION(RET, doRet(block))
+GENERIC_TRANSLATION(RETQ, doRetQ(block))
 GENERIC_TRANSLATION(RETI, doRetI(block, OP(0)))
+//GENERIC_TRANSLATION(RETIQ, doRetIQ(block, OP(0)))
 BLOCKNAMES_TRANSLATION(JMP_4, doNonCondBranch(block, ifTrue))
+BLOCKNAMES_TRANSLATION(JMP_2, doNonCondBranch(block, ifTrue))
 BLOCKNAMES_TRANSLATION(JMP_1, doNonCondBranch(block, ifTrue))
 
 void Branches_populateDispatchMap(DispatchMap &m) {
     m[X86::JMP32r] = translate_JMP32r;
     m[X86::JMP32m] = translate_JMP32m;
+    m[X86::JMP64r] = translate_JMP64r;
+//    m[X86::JMP64m] = translate_JMP64m;
     m[X86::JMP_4] = translate_JMP_4;
+    m[X86::JMP_2] = translate_JMP_2;
     m[X86::JMP_1] = translate_JMP_1;
     m[X86::CALLpcrel32] = translate_CALLpcrel32;
+    m[X86::CALL64pcrel32] = translate_CALL64pcrel32;
     m[X86::CALL32m] = translate_CALL32m;
+//    m[X86::CALL64m] = translate_CALL64m;
     m[X86::CALL32r] = translate_CALL32r;
+//    m[X86::CALL64r] = translate_NOOP;
     m[X86::LOOP] = translate_LOOP;
     m[X86::LOOPE] = translate_LOOPE;
     m[X86::LOOPNE] = translate_LOOPNE;
     m[X86::RETL] = translate_RET;
     m[X86::RETIL] = translate_RETI;
+    m[X86::RETQ] = translate_RETQ;
+    //m[X86::RETIQ] = translate_RETIQ;
+    m[X86::RETIW] = translate_RET;
 }

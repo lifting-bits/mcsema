@@ -387,7 +387,10 @@ bool isAddrRelocated(const object::SectionRef &sr, uint32_t offt, VA address) {
         // shortcut for ELF relocations by type
         // TODO: move this to ELF speific code
         if(relocType == "R_386_32" ||
-           relocType == "R_386_PC32") {
+           relocType == "R_386_PC32" ||
+           relocType == "R_X86_64_PC32" ||
+           relocType == "R_X86_64_32S" ||
+           relocType == "R_X86_64_64") {
             return true;
         }
 
@@ -565,8 +568,9 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
 
   llvm::dbgs() << __FUNCTION__ << ": Looking at relocation type: " << relocType << "\n";
 
-  if(relocType == "R_386_32") {
-      // these are absolute relocations and they are relative to 
+  if(relocType == "R_386_32" ||
+     relocType == "R_X86_64_64") {
+      // these are absolute relocations and they are relative to
       // the original bytes in the file. Lets read those bytes
       StringRef secContents;
       e = section.getContents(secContents);

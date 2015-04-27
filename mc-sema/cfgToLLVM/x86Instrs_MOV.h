@@ -28,10 +28,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "raiseX86.h"
 #include "InstructionDispatch.h"
+#include "llvm/Support/Debug.h"
 
+#define INSTR_DEBUG(ip) llvm::dbgs() << __FUNCTION__ << "\tRepresentation: " << ip->printInst() << "\n"
+
+//class INSTR_DEBUG;
 void MOV_populateDispatchMap(DispatchMap &m);
 
-template <int width>
+template <int width, SystemArchType arch>
 InstTransResult doMRMov(InstPtr ip, llvm::BasicBlock *&b,
                         llvm::Value           *dstAddr,
                         const llvm::MCOperand &src)
@@ -45,6 +49,35 @@ InstTransResult doMRMov(InstPtr ip, llvm::BasicBlock *&b,
     return ContinueBlock;
 }
 
+template <int width>
+InstTransResult doMRMov(InstPtr ip, llvm::BasicBlock *&b,
+                        llvm::Value           *dstAddr,
+                        const llvm::MCOperand &src)
+{
+    //MOV <mem>, <r>
+    TASSERT(src.isReg(), "src is not a register");
+    TASSERT(dstAddr != NULL, "Destination addr can't be null");
+	INSTR_DEBUG(ip);
+	
+	M_WRITE<width>(ip, b, dstAddr, R_READ<width>(b, src.getReg()));
+
+    return ContinueBlock;
+}
+
+
+template <int width, SystemArchType arch>
+InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b,
+                        const llvm::MCOperand &dst,
+                        const llvm::MCOperand &src)
+{
+    //MOV <r>, <r>
+    TASSERT(src.isReg(), "");
+    TASSERT(dst.isReg(), "");
+
+    R_WRITE<width, arch>(b, dst.getReg(), R_READ<width>(b, src.getReg()));
+
+    return ContinueBlock;
+}
 
 template <int width>
 InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b, 
@@ -54,11 +87,11 @@ InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b,
     //MOV <r>, <r>
     TASSERT(src.isReg(), "");
     TASSERT(dst.isReg(), "");
-    
+    INSTR_DEBUG(ip);
     //pretty straightforward
 
     R_WRITE<width>(b, dst.getReg(), R_READ<width>(b, src.getReg()));
-        
+
     return ContinueBlock;
 }
 
@@ -70,8 +103,9 @@ InstTransResult doRMMov(InstPtr ip, llvm::BasicBlock      *b,
     //MOV <r>, <mem>
     TASSERT(dst.isReg(), "");
     TASSERT(srcAddr != NULL, "");
-
-    R_WRITE<width>(b, dst.getReg(), M_READ<width>(ip, b, srcAddr));
+	INSTR_DEBUG(ip);
+    
+	R_WRITE<width>(b, dst.getReg(), M_READ<width>(ip, b, srcAddr));
 
     return ContinueBlock;
 }

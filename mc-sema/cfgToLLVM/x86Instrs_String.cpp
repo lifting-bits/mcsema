@@ -38,10 +38,10 @@ using namespace llvm;
 
 template <int width>
 static BasicBlock *doCmpsV(BasicBlock *pred) {
-    Value   *lhsRegVal = R_READ<32>(pred, X86::ESI);
+    Value   *lhsRegVal = x86::R_READ<32>(pred, X86::ESI);
     Value   *lhsFromMem = M_READ_0<width>(pred, lhsRegVal);
 
-    Value   *rhsRegVal = R_READ<32>(pred, X86::EDI);
+    Value   *rhsRegVal = x86::R_READ<32>(pred, X86::EDI);
     Value   *rhsFromMem = M_READ_0<width>(pred, rhsRegVal);
 
     //perform a subtraction
@@ -97,8 +97,8 @@ static BasicBlock *doCmpsV(BasicBlock *pred) {
                                     "", 
                                     block_df_zero);
 
-    R_WRITE<32>(block_df_zero, X86::ESI, add_lhs);
-    R_WRITE<32>(block_df_zero, X86::EDI, add_rhs);
+    x86::R_WRITE<32>(block_df_zero, X86::ESI, add_lhs);
+    x86::R_WRITE<32>(block_df_zero, X86::EDI, add_rhs);
     // return to a single block, to which we will add new instructions
     BranchInst::Create(block_post_write, block_df_zero);
 
@@ -115,8 +115,8 @@ static BasicBlock *doCmpsV(BasicBlock *pred) {
                                     "", 
                                     block_df_one);
 
-    R_WRITE<32>(block_df_one, X86::ESI, sub_lhs);
-    R_WRITE<32>(block_df_one, X86::EDI, sub_rhs);
+    x86::R_WRITE<32>(block_df_one, X86::ESI, sub_lhs);
+    x86::R_WRITE<32>(block_df_one, X86::EDI, sub_rhs);
     // return to a single block, to which we will add new instructions
     BranchInst::Create(block_post_write, block_df_one);
 
@@ -126,8 +126,8 @@ static BasicBlock *doCmpsV(BasicBlock *pred) {
 template <int width>
 static BasicBlock *doStosV(BasicBlock *pred) {
     //write EAX to [EDI]
-    Value   *dstRegVal = R_READ<32>(pred, X86::EDI);
-    Value   *fromEax = R_READ<width>(pred, X86::EAX);
+    Value   *dstRegVal = x86::R_READ<32>(pred, X86::EDI);
+    Value   *fromEax = x86::R_READ<width>(pred, X86::EAX);
 
     // store EAX in [EDI]
     M_WRITE_0<width>(pred, dstRegVal, fromEax);
@@ -193,7 +193,7 @@ static BasicBlock *doStosV(BasicBlock *pred) {
     newDst->addIncoming(zeroDst, isZero);
     newDst->addIncoming(oneDst, isOne);
 
-    R_WRITE<32>(doWrite, X86::EDI, newDst);
+    x86::R_WRITE<32>(doWrite, X86::EDI, newDst);
 
     return doWrite;
 }
@@ -207,10 +207,10 @@ static InstTransResult doStos(BasicBlock *&b) {
 template <int width>
 static BasicBlock *doScasV(BasicBlock *pred) {
     //do a read from the memory pointed to by EDI
-    Value   *dstRegVal = R_READ<32>(pred, X86::EDI);
+    Value   *dstRegVal = x86::R_READ<32>(pred, X86::EDI);
     Value   *fromMem = M_READ_0<width>(pred, dstRegVal);
     //read the value in EAX
-    Value   *fromEax = R_READ<width>(pred, X86::EAX);
+    Value   *fromEax = x86::R_READ<width>(pred, X86::EAX);
 
     //perform a subtraction
     Value   *res = BinaryOperator::CreateSub(fromEax, fromMem, "", pred);
@@ -285,15 +285,15 @@ static BasicBlock *doScasV(BasicBlock *pred) {
     newDst->addIncoming(zeroDst, isZero);
     newDst->addIncoming(oneDst, isOne);
 
-    R_WRITE<32>(doWrite, X86::EDI, newDst);
+    x86::R_WRITE<32>(doWrite, X86::EDI, newDst);
 
     return doWrite;
 }
 
 template <int width>
 static BasicBlock *doMovsV(BasicBlock *pred) {
-	Value	*dstRegVal = R_READ<32>(pred, X86::EDI);
-	Value	*srcRegVal = R_READ<32>(pred, X86::ESI);
+	Value	*dstRegVal = x86::R_READ<32>(pred, X86::EDI);
+	Value	*srcRegVal = x86::R_READ<32>(pred, X86::ESI);
 
 	//do the actual move
 	M_WRITE_0<width>(pred, dstRegVal, M_READ_0<width>(	pred, srcRegVal));
@@ -376,8 +376,8 @@ static BasicBlock *doMovsV(BasicBlock *pred) {
 	newSrc->addIncoming(oneSrc, isOne);
 	newDst->addIncoming(oneDst, isOne);
 
-	R_WRITE<32>(doWrite, X86::ESI, newSrc);
-	R_WRITE<32>(doWrite, X86::EDI, newDst);
+	x86::R_WRITE<32>(doWrite, X86::ESI, newSrc);
+	x86::R_WRITE<32>(doWrite, X86::EDI, newDst);
 
 	return doWrite;
 }
@@ -392,18 +392,18 @@ static BasicBlock *doRep(BasicBlock *&b, BasicBlock *bodyB, BasicBlock *bodyE) {
     BranchInst::Create(loopHeader, b);
 
     // check if ECX == 0; if so, bail
-    Value   *counter_entry = R_READ<32>(loopHeader, X86::ECX);
-    Value   *cmp_entry = new ICmpInst(*loopHeader, 
+    Value   *counter_entry = x86::R_READ<32>(loopHeader, X86::ECX);
+    Value   *cmp_entry = new ICmpInst(*loopHeader,
                                 CmpInst::ICMP_NE,
                                 counter_entry,
                                 CONST_V<32>(loopHeader, 0));
     BranchInst::Create(bodyB, rest, cmp_entry, loopHeader);
 
     //subtract 1 from the counter at the end
-    Value   *cTmp = R_READ<32>(bodyE, X86::ECX);
-    Value   *cTmpDec = 
+    Value   *cTmp = x86::R_READ<32>(bodyE, X86::ECX);
+    Value   *cTmpDec =
         BinaryOperator::CreateSub(cTmp, CONST_V<32>(bodyE, 1), "", bodyE);
-    R_WRITE<32>(bodyE, X86::ECX, cTmpDec);
+    x86::R_WRITE<32>(bodyE, X86::ECX, cTmpDec);
 
     //do a test in the loop header based off of the counter to see if the
     //counter is zero and if ZF <condition> 0 
@@ -429,18 +429,18 @@ static BasicBlock *doRepCondition(BasicBlock *&b, BasicBlock *bodyB, BasicBlock 
     BranchInst::Create(loopHeader, b);
 
     // check if ECX == 0; if so, bail
-    Value   *counter_entry = R_READ<32>(loopHeader, X86::ECX);
-    Value   *cmp_entry = new ICmpInst(*loopHeader, 
+    Value   *counter_entry = x86::R_READ<32>(loopHeader, X86::ECX);
+    Value   *cmp_entry = new ICmpInst(*loopHeader,
                                 CmpInst::ICMP_NE,
                                 counter_entry,
                                 CONST_V<32>(loopHeader, 0));
     BranchInst::Create(bodyB, rest, cmp_entry, loopHeader);
 
     //subtract 1 from the counter at the end
-    Value   *cTmp = R_READ<32>(bodyE, X86::ECX);
-    Value   *cTmpDec = 
+    Value   *cTmp = x86::R_READ<32>(bodyE, X86::ECX);
+    Value   *cTmpDec =
         BinaryOperator::CreateSub(cTmp, CONST_V<32>(bodyE, 1), "", bodyE);
-    R_WRITE<32>(bodyE, X86::ECX, cTmpDec);
+    x86::R_WRITE<32>(bodyE, X86::ECX, cTmpDec);
 
     //do a test in the loop header based off of the counter to see if the
     //counter is zero and if ZF <condition> 0 

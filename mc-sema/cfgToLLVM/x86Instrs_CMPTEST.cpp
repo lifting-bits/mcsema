@@ -32,10 +32,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "raiseX86.h"
 #include "x86Helpers.h"
 #include "x86Instrs_CMPTEST.h"
+#include "llvm/Support/Debug.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
+#define INSTR_DEBUG(ip) llvm::dbgs() << __FUNCTION__ << "\tRepresentation: " << ip->printInst() << "\n"
 
 using namespace llvm;
+
+static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
+  //isn't this exciting
+  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
+  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
+  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
+  return ContinueBlock;
+}
+
+GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
 
 
 template <int width>
@@ -61,6 +73,7 @@ static InstTransResult doCmpRI(InstPtr ip, BasicBlock *&b,
 {
     NASSERT(lhs.isReg());
     NASSERT(rhs.isImm());
+	INSTR_DEBUG(ip);
 
     Value   *lhs_v = R_READ<width>(b, lhs.getReg());
     Value   *rhs_v = CONST_V<width>(b, rhs.getImm());
@@ -258,17 +271,25 @@ GENERIC_TRANSLATION(CMP16rr_REV, doCmpRR<16>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP16ri, doCmpRI<16>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP16ri8, doCmpRI<16>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP32i32, doCmpRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(CMP64i32, doCmpRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), OP(0)))
 GENERIC_TRANSLATION(CMP16i16, doCmpRI<16>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION(CMP32rr_REV, doCmpRR<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP32rr, doCmpRR<32>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION(CMP64rr, doCmpRR<64>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP32ri, doCmpRI<32>(ip, block, OP(0), OP(1)))
+//GENERIC_TRANSLATION(CMP64ri, doCmpRI<64>(ip, block, OP(0), OP(1)))
 
 GENERIC_TRANSLATION(CMP8ri, doCmpRI<8>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP8i8, doCmpRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION(CMP8rr_REV, doCmpRR<8>(ip, block, OP(0), OP(1)))
 
 GENERIC_TRANSLATION(CMP32ri8, doCmpRI<32>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION_MEM(CMP32mi8, 
+GENERIC_TRANSLATION(CMP64ri32, doCmpRI<64>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION(CMP64ri8, doCmpRI<64>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION_MEM(CMP64mi32,
+    doCmpMI<64>(ip,   block, ADDR(0), OP(5)),
+    doCmpMI<64>(ip,   block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_MEM(CMP32mi8,
 	doCmpMI<32>(ip,   block, ADDR(0), OP(5)),
 	doCmpMI<32>(ip,   block, STD_GLOBAL_OP(0), OP(5)))
 GENERIC_TRANSLATION_MEM(CMP8mi, 
@@ -283,7 +304,7 @@ GENERIC_TRANSLATION_MEM(CMP16mi8,
 GENERIC_TRANSLATION_32MI(CMP32mi, 
 	doCmpMI<32>(ip,   block, ADDR(0), OP(5)),
 	doCmpMI<32>(ip,   block, STD_GLOBAL_OP(0), OP(5)),
-    doCmpMV<32>(ip,   block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip))) 
+    doCmpMV<32>(ip,   block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip)))
 
 GENERIC_TRANSLATION_MEM(CMP8rm, 
 	doCmpRM<8>(ip,    block, OP(0), ADDR(1)),
@@ -322,7 +343,7 @@ GENERIC_TRANSLATION(TEST16rr, doTestRR<16>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION_32MI(TEST32mi, 
 	doTestMI<32>(ip, block, ADDR(0), OP(5)),
 	doTestMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
-    doTestMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip)))
+    doTestMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip)))
 
 GENERIC_TRANSLATION_MEM(TEST32rm, 
 	doTestRM<32>(ip,  block, OP(0), ADDR(1)),
@@ -341,21 +362,26 @@ GENERIC_TRANSLATION(TEST8rr, doTestRR<8>(ip, block, OP(0), OP(1)))
 void CMPTEST_populateDispatchMap(DispatchMap &m) {
 
     m[X86::CMP8rr] = translate_CMP8rr;
+    m[X86::CMP8rr_REV] = translate_CMP8rr_REV;
     m[X86::CMP16rr] = translate_CMP16rr;
     m[X86::CMP16rr_REV] = translate_CMP16rr_REV;
+    m[X86::CMP32rr_REV] = translate_CMP32rr_REV;
+    m[X86::CMP32rr] = translate_CMP32rr;
+    m[X86::CMP64rr] = translate_CMP64rr;
+
+    m[X86::CMP8ri] = translate_CMP8ri;
+    m[X86::CMP8i8] = translate_CMP8i8;
     m[X86::CMP16ri] = translate_CMP16ri;
     m[X86::CMP16ri8] = translate_CMP16ri8;
     m[X86::CMP16i16] = translate_CMP16i16;
     m[X86::CMP32i32] = translate_CMP32i32;
-    m[X86::CMP32rr_REV] = translate_CMP32rr_REV;
-    m[X86::CMP32rr] = translate_CMP32rr;
     m[X86::CMP32ri] = translate_CMP32ri;
-
-    m[X86::CMP8ri] = translate_CMP8ri;
-    m[X86::CMP8i8] = translate_CMP8i8;
-    m[X86::CMP8rr_REV] = translate_CMP8rr_REV;
-
+  //  m[X86::CMP64ri] = translate_CMP64ri;
     m[X86::CMP32ri8] = translate_CMP32ri8;
+    m[X86::CMP64ri32] = translate_CMP64ri32;
+    m[X86::CMP64ri8] = translate_CMP64ri8;
+    m[X86::CMP64i32] = translate_CMP64i32;
+
     m[X86::CMP32mi8] = translate_CMP32mi8;
     m[X86::CMP8mi] = translate_CMP8mi;
     m[X86::CMP16mi] = translate_CMP16mi;
@@ -367,6 +393,9 @@ void CMPTEST_populateDispatchMap(DispatchMap &m) {
     m[X86::CMP16mr] = translate_CMP16mr;
     m[X86::CMP32mr] = translate_CMP32mr;
     m[X86::CMP16mi8] = translate_CMP16mi8;
+
+    m[X86::CMP64mi8] = translate_NOOP;
+    m[X86::CMP64mi32] = translate_CMP64mi32;
 
     m[X86::TEST32rr] = translate_TEST32rr;
     m[X86::TEST32i32] = translate_TEST32i32;

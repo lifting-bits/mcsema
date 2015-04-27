@@ -33,8 +33,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Helpers.h"
 #include "x86Instrs_flagops.h"
 #include "x86Instrs_bitops.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
+
+#define INSTR_DEBUG(ip) llvm::dbgs() << __FUNCTION__ << "\tRepresentation: " << ip->printInst() << "\n"
 
 template <int width>
 static Value * doAndVV(BasicBlock *&b, Value *o1, Value *o2)
@@ -191,6 +194,10 @@ static Value * doNotV(InstPtr ip, BasicBlock *&b, Value *v)
         case 32:
             highest = CONST_V<width>(b, 0xFFFFFFFF);
             break;
+			
+		case 64:
+			highest = CONST_V<width>(b, 0xFFFFFFFFFFFFFFFFULL);
+			break;
     }
     
     // We can do this by 0xffff - v in the two's complement machine.
@@ -467,14 +474,15 @@ static InstTransResult doXorRR(InstPtr ip, BasicBlock *&b,
     TASSERT(dst.isReg(), "");
     TASSERT(o1.isReg(), "");
     TASSERT(o2.isReg(), "");
-
+	INSTR_DEBUG(ip);
+	
     // Read the sources.
     Value *o1_v = R_READ<width>(b, o1.getReg());
     Value *o2_v = R_READ<width>(b, o2.getReg());
 
-    // Do the operation.
-    R_WRITE<width>(b, dst.getReg(), doXorVV<width>(ip, b, o1_v, o2_v));
-    
+	// Do the operation.
+	R_WRITE<width>(b, dst.getReg(), doXorVV<width>(ip, b, o1_v, o2_v));
+
     return ContinueBlock;
 }
 
@@ -638,6 +646,8 @@ GENERIC_TRANSLATION_MEM(XOR8rm,
 GENERIC_TRANSLATION(XOR8rr, doXorRR<8>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR8rr_REV, doXorRR<8>(ip, block, OP(0), OP(1), OP(2)))
 
+GENERIC_TRANSLATION(XOR64rr, doXorRR<64>(ip, block, OP(0), OP(1), OP(2)))
+
 void Bitops_populateDispatchMap(DispatchMap &m)
 {
     m[X86::AND16i16] = translate_AND16i16;
@@ -721,4 +731,6 @@ void Bitops_populateDispatchMap(DispatchMap &m)
     m[X86::XOR8rm] = translate_XOR8rm;
     m[X86::XOR8rr] = translate_XOR8rr;
     m[X86::XOR8rr_REV] = translate_XOR8rr_REV;
+
+    m[X86::XOR64rr] = translate_XOR64rr;
 }

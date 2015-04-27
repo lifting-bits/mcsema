@@ -25,6 +25,8 @@ Value* archAllocateStack(Module *M, Value *stackSize, BasicBlock *&driverBB) {
 
     if(triple == LINUX_TRIPLE) {
         stackAlloc = linuxAllocateStack(M, stackSize, driverBB);
+    } else if(triple == LINUX_TRIPLE_X86_64){
+        stackAlloc = x86_64::linuxAllocateStack(M, stackSize, driverBB);
     } else if(triple == WINDOWS_TRIPLE) {
         stackAlloc = win32AllocateStack(M, stackSize, driverBB);
     } else { 
@@ -45,6 +47,8 @@ Value *archFreeStack(Module *M, Value *stackAlloc, BasicBlock *&driverBB) {
 
     if(triple == LINUX_TRIPLE) {
         stackFree = linuxFreeStack(M, stackAlloc, driverBB);
+    } else if (triple == LINUX_TRIPLE_X86_64){
+        stackFree = x86_64::linuxFreeStack(M, stackAlloc, driverBB);
     } else if(triple == WINDOWS_TRIPLE) {
         // free our allocated stack
         stackFree = win32FreeStack(stackAlloc, driverBB);
@@ -71,7 +75,7 @@ llvm::Value *archMakeCallbackForLocalFunction(Module *M, VA local_target)
 {
 
     const std::string &triple = M->getTargetTriple();
-    if(triple == LINUX_TRIPLE) {
+    if(triple == LINUX_TRIPLE || triple == LINUX_TRIPLE_X86_64) {
         return linuxMakeCallbackForLocalFunction(M, local_target);
     } else if(triple == WINDOWS_TRIPLE) {
         return win32MakeCallbackForLocalFunction(M, local_target);
@@ -86,6 +90,8 @@ void archAddCallValue(Module *M) {
 
     if(triple == LINUX_TRIPLE) {
         return linuxAddCallValue(M);
+    } else if(triple == LINUX_TRIPLE_X86_64){
+        return x86_64::linuxAddCallValue(M);
     } else if(triple == WINDOWS_TRIPLE) {
         // free our allocated stack
         return win32AddCallValue(M);
@@ -100,6 +106,8 @@ Value* archGetStackSize(Module *M, BasicBlock *&driverBB) {
 
     if(triple == LINUX_TRIPLE) {
         stackSize = linuxGetStackSize(M, driverBB);
+    } else if(triple == LINUX_TRIPLE_X86_64){
+        stackSize = x86_64::linuxGetStackSize(M, driverBB);
     } else if(triple == WINDOWS_TRIPLE) {
         stackSize = win32GetStackSize(M, driverBB);
     } else { 
