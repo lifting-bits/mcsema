@@ -467,7 +467,7 @@ static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& blo
     }
     else if( ip->is_data_offset() ) {
         ret = doRIMovV<32>(ip, block, 
-                GLOBAL_DATA_OFFSET(block, natM, ip), 
+                GLOBAL_DATA_OFFSET<32>(block, natM, ip), 
                 OP(0) );
     } else { 
         ret = doRIMov<32>(ip, block, OP(1), OP(0)) ;

@@ -217,7 +217,8 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
             // mask the value so the parts of the register we don't write
             // is preserved
             llvm::Value *remove_bits = llvm::BinaryOperator::CreateAnd(fullReg, and_mask, "", b);
-            llvm::Value	*write_z = new llvm::ZExtInst(write, regWidthType, "", b);
+            assert(write->getType()->getScalarSizeInBits() < regWidthType->getScalarSizeInBits());
+			llvm::Value	*write_z = new llvm::ZExtInst(write, regWidthType, "", b);
             // or the original value with our new parts
             llvm::Value *final_val = llvm::BinaryOperator::CreateOr(remove_bits, write_z, "", b);
             // do the write
@@ -232,6 +233,8 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
             int		writeOff = mapPlatRegToOffset(reg);
             llvm::Value	*maskVal;
             llvm::Value	*addVal;
+			assert(write->getType()->getScalarSizeInBits() < llvm::Type::getInt32Ty(b->getContext())->getScalarSizeInBits());
+
             llvm::Value	*write_z = 
                 new llvm::ZExtInst(write, llvm::Type::getInt32Ty(b->getContext()), "", b);
 
@@ -387,7 +390,8 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
             // mask the value so the parts of the register we don't write
             // is preserved
             llvm::Value *remove_bits = llvm::BinaryOperator::CreateAnd(fullReg, and_mask, "", b);
-            llvm::Value	*write_z = new llvm::ZExtInst(write, regWidthType, "", b);
+            assert(write->getType()->getScalarSizeInBits() < regWidthType->getScalarSizeInBits());
+			llvm::Value	*write_z = new llvm::ZExtInst(write, regWidthType, "", b);
             // or the original value with our new parts
             llvm::Value *final_val = llvm::BinaryOperator::CreateOr(remove_bits, write_z, "", b);
             // do the write
@@ -402,6 +406,7 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
             int		writeOff = mapPlatRegToOffset(reg);
             llvm::Value	*maskVal;
             llvm::Value	*addVal;
+			assert(write->getType()->getScalarSizeInBits() < llvm::Type::getInt64Ty(b->getContext())->getScalarSizeInBits());
             llvm::Value	*write_z = 
                 new llvm::ZExtInst(write, llvm::Type::getInt64Ty(b->getContext()), "", b);
 

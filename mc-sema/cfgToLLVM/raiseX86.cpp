@@ -1319,7 +1319,6 @@ bool addEntryPointDriver(Module *M,
 
     FunctionType *FT = FunctionType::get(returnTy, args, false);
 	std::cout << __FUNCTION__ << "\n";
-	cout.flush();
     //insert the function prototype
     Function  *driverF = (Function *) M->getOrInsertFunction(name, FT); 
     // set drivers calling convention to match user specification
@@ -1667,7 +1666,8 @@ void dataSectionToTypesContents(
 
                 secContents.push_back(func);
                 data_section_types.push_back(func->getType());
-            } else {
+            } 
+			else {
                 // data symbol
                 // get the base of the data section for this symobol
                 // then compute the offset from base of data 
@@ -1686,9 +1686,9 @@ void dataSectionToTypesContents(
                 VA addr_diff = func_addr - section_base;
 
                 Constant *int_val = ConstantExpr::getPtrToInt(g_ref,
-                        Type::getInt32Ty(M->getContext()) );
+                        Type::getInt64Ty(M->getContext()) );
                 Constant *final_val = ConstantExpr::getAdd(
-                        int_val, CONST_V_INT<32>(M->getContext(), addr_diff));
+                        int_val, CONST_V_INT<64>(M->getContext(), addr_diff));
                 secContents.push_back(final_val);
                 data_section_types.push_back(final_val->getType());
             }

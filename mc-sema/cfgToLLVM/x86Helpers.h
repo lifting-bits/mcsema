@@ -36,6 +36,7 @@ llvm::Value *concatInts(llvm::BasicBlock *b, llvm::Value *a1, llvm::Value *a2) {
     
     TASSERT(typeTo != NULL, "");
     //bitcast a to twice width
+	assert(a1->getType()->getScalarSizeInBits() < typeTo->getScalarSizeInBits());
     llvm::Value   *twiceLarger = new llvm::ZExtInst(a1, typeTo, "", b);
     //shift twiceL to the left by width
     llvm::Value   *tlShifted = llvm::BinaryOperator::Create(llvm::Instruction::Shl, 

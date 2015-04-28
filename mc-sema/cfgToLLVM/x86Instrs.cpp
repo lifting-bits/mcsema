@@ -897,6 +897,7 @@ InstTransResult disInstrX86(    InstPtr           ip,
         errs() << inst.getOpcode() << "\n";
         itr = TranslateErrorUnsupported;
     }
+	cout.flush();
     return itr;
 }
  

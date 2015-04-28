@@ -145,7 +145,7 @@ DataSection processDataSection( ExecutableContainer *c,
         // see if this address points to a symbol
         VA new_addr;
         if(c->relocate_addr(addr, new_addr) ) {
-            
+        
             if(addr > prev) {
                 addDataBlob(ds, base, bytes, prev, addr);
             }
@@ -166,8 +166,8 @@ DataSection processDataSection( ExecutableContainer *c,
                 assert(!"address in unsupported section type!");
             }
             // assume 4 byte pointers
-            prev += 4;
-
+            prev += 8;
+			
         } else {
             llvm::dbgs() << __FUNCTION__<< ": WARNING: relocation at address (0x" << to_string<VA>(addr, hex) << ") but no symbol found!\n";
         }

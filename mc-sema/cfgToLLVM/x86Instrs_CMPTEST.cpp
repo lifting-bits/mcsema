@@ -277,7 +277,7 @@ GENERIC_TRANSLATION(CMP32rr_REV, doCmpRR<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP32rr, doCmpRR<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP64rr, doCmpRR<64>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP32ri, doCmpRI<32>(ip, block, OP(0), OP(1)))
-//GENERIC_TRANSLATION(CMP64ri, doCmpRI<64>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION(CMP64ri, doCmpRI<64>(ip, block, OP(0), OP(1)))
 
 GENERIC_TRANSLATION(CMP8ri, doCmpRI<8>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP8i8, doCmpRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
@@ -376,7 +376,7 @@ void CMPTEST_populateDispatchMap(DispatchMap &m) {
     m[X86::CMP16i16] = translate_CMP16i16;
     m[X86::CMP32i32] = translate_CMP32i32;
     m[X86::CMP32ri] = translate_CMP32ri;
-  //  m[X86::CMP64ri] = translate_CMP64ri;
+	
     m[X86::CMP32ri8] = translate_CMP32ri8;
     m[X86::CMP64ri32] = translate_CMP64ri32;
     m[X86::CMP64ri8] = translate_CMP64ri8;
