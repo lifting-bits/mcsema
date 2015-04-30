@@ -1572,6 +1572,8 @@ bool addEntryPointDriver(Module *M,
 static Constant* makeConstantBlob(LLVMContext &ctx, const vector<uint8_t> &blob) {
 
     Type        *charTy = Type::getInt8Ty(ctx);
+	cout << blob.size() << "\n";
+	cout.flush();
     ArrayType   *arrT = ArrayType::get(charTy, blob.size());
     vector<uint8_t>::const_iterator     it = blob.begin();
     vector<Constant*> array_elements;
@@ -1644,6 +1646,7 @@ void dataSectionToTypesContents(
             dsec_itr++)
     {
         string sym_name;
+		cout << __FUNCTION__ << " : " << to_string<VA>(dsec_itr->getBase(), hex) << " " << to_string<VA>(dsec_itr->getSize(), hex) << "\n";
         if(dsec_itr->getSymbol(sym_name)) {
             const char *func_addr_str = sym_name.c_str()+4;
             VA func_addr = strtol(func_addr_str, NULL, 16);
@@ -1684,17 +1687,28 @@ void dataSectionToTypesContents(
                 // and add its offset from the base of data
                 // to the new data section pointer
                 VA addr_diff = func_addr - section_base;
-
-                Constant *int_val = ConstantExpr::getPtrToInt(g_ref,
-                        Type::getInt64Ty(M->getContext()) );
-                Constant *final_val = ConstantExpr::getAdd(
-                        int_val, CONST_V_INT<64>(M->getContext(), addr_diff));
+				Constant *final_val;
+				cout <<" Symbol name : " << string(func_addr_str) << " : " << to_string<VA>(func_addr, hex) << " : " << to_string<VA>(section_base,hex) << "\n";
+				cout.flush();
+				if(getPointerSize(M) == Pointer32){
+					Constant *int_val = ConstantExpr::getPtrToInt(g_ref,
+							Type::getInt32Ty(M->getContext()) );
+					final_val = ConstantExpr::getAdd(
+							int_val, CONST_V_INT<32>(M->getContext(), addr_diff));
+				} else {
+					Constant *int_val = ConstantExpr::getPtrToInt(g_ref,
+							Type::getInt64Ty(M->getContext()) );
+					final_val = ConstantExpr::getAdd(
+							int_val, CONST_V_INT<64>(M->getContext(), addr_diff));
+				}
                 secContents.push_back(final_val);
                 data_section_types.push_back(final_val->getType());
             }
         } else {
             // add array
             // this holds opaque data in a byte array
+			cout << "Opaque data :  "  << "\n";
+			cout.flush();
             Constant *arr = 
                 makeConstantBlob(M->getContext(), dsec_itr->getBytes());
             secContents.push_back(arr);
@@ -1777,7 +1791,7 @@ static bool insertDataSections(NativeModulePtr natMod, Module *M, raw_ostream &r
         // structure type
         Constant *cst = ConstantStruct::get(st_opaque, secContents);
         // align on 32-byte boundary, max needed by SSE instructions
-        g->setAlignment(32);
+        g->setAlignment(32/*getPointerSize(M)*8*/);
         g->setInitializer(cst);
 
         git++;

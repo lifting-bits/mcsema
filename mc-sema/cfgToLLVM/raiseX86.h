@@ -432,15 +432,16 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
                 //simply compute the mask and add values 
                 switch(width) {
 					case 32:
-						maskVal = CONST_V<64>(b, ~0xFFFFFFFF);
+						maskVal = CONST_V<64>(b, ~0xFFFFFFFFULL);
 						addVal = write_z;
+						break;
                     case 16:
-                        maskVal = CONST_V<64>(b, ~0xFFFF);
+                        maskVal = CONST_V<64>(b, ~0xFFFFULL);
                         addVal = write_z;
                         break;
 
                     case 8:
-                        maskVal = CONST_V<64>(b, ~0xFF);
+                        maskVal = CONST_V<64>(b, ~0xFFULL);
                         addVal = write_z;
                         break;
 

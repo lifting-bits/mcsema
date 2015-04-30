@@ -258,7 +258,6 @@ void NativeModule::addDataSection(VA base, std::vector<uint8_t> &bytes)
     
   DataSection ds;
   DataSectionEntry dse(base, bytes);
-
   ds.addEntry(dse);
     
   this->dataSecs.push_back(ds);
@@ -494,14 +493,14 @@ void deserializeData(const ::Data &d, DataSection &ds)
             ds.addEntry(dse_sym);
 
             // assume symbols are 4 bytes
-            cur_pos = dse_base+4;
+            cur_pos = dse_base+dse_sym.getSize();
             
         }
         // symbols next to each other
         else if (dse_base == cur_pos) {
             ds.addEntry(dse_sym);
             // assume symbols are 4 bytes
-            cur_pos = dse_base+4;
+            cur_pos = dse_base+dse_sym.getSize();
             string sym_name;
             dse_sym.getSymbol(sym_name);
         } else {

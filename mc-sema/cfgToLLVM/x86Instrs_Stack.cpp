@@ -83,7 +83,8 @@ template <int width>
 static void doPushV(InstPtr ip, BasicBlock *&b, Value *v) {
     //ESP <- ESP - 4
     //Memory[ESP] = v
-    if(ip->get_arch() == Inst::X86){
+	llvm::Module *M = b->getParent()->getParent();
+    if(getPointerSize(M) == Pointer32){
         Value *oldESP = x86::R_READ<32>(b, X86::ESP);
         Value *newESP =
                 BinaryOperator::CreateSub(oldESP, CONST_V<32>(b, (width / 8)), "", b);
@@ -338,11 +339,12 @@ template <int width>
 static InstTransResult doPushR(InstPtr ip, BasicBlock *&b, const MCOperand &src) {
     //PUSH <r>
     NASSERT(src.isReg());
+
     //first, read from <r> into a temp
     llvm::dbgs() << "pushR " << width << " "<< to_string<VA>(ip->get_opcode(), std::hex)<< "\n";
 
-    Value *TMP = R_READ<width>(b, src.getReg());
-
+	Value *TMP = R_READ<width>(b, src.getReg());
+		
 	doPushV<width>(ip, b, TMP);
 
     return ContinueBlock;

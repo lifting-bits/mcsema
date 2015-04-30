@@ -44,12 +44,6 @@ InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
   VA                nextVA = addr;
   ::uint32_t        arch_type;
 
-  if(std::string(target->getName()) == "x86"){
-      arch_type = Inst::X86;
-  } else {
-      arch_type = Inst::X86_64;
-  }
-
   llvm::MCDisassembler::DecodeStatus  s;
 
   s = DisAsm->getInstruction( mcInst,
@@ -92,9 +86,11 @@ InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
                               mcInst,
                               osOut.str(),
                               pfx,
-                              bytes,
-                              arch_type));
+                              bytes));
 
+	cout << __FUNCTION__ << " : opcode   " << mcInst.getOpcode() << "\n";
+	cout.flush();
+	
     //ask if this is a jmp, and figure out what the true / false follows are
     switch(mcInst.getOpcode()) {
       case X86::JMP32m:

@@ -186,6 +186,7 @@ static InstTransResult doMIMov(InstPtr ip, BasicBlock *&b,
                         Value           *dstAddr,
                         const MCOperand &src)
 {
+	INSTR_DEBUG(ip);
     //MOV <m>, <imm>
     //store the constant in src into dstAddr
     NASSERT(dstAddr != NULL);
@@ -203,7 +204,7 @@ static InstTransResult doMIMov(InstPtr ip, BasicBlock *&b,
     //store the constant in src into dstAddr
     NASSERT(dstAddr != NULL);
     NASSERT(src.isImm());
-
+	INSTR_DEBUG(ip);
     return doMIMovV<dstWidth>(ip, b, dstAddr, CONST_V<srcWidth>(b, src.getImm()));
 }
 
@@ -214,6 +215,7 @@ static InstTransResult doMovZXRR(InstPtr ip,   BasicBlock *&b,
 {
     NASSERT(dst.isReg());
     NASSERT(src.isReg());
+	INSTR_DEBUG(ip);
 
     //do a read from src of the appropriate width
     Value   *fromSrc = R_READ<srcWidth>(b, src.getReg());
@@ -235,7 +237,7 @@ static InstTransResult doMovZXRM(InstPtr ip,   BasicBlock *&b,
 {
     NASSERT(dst.isReg());
 	NASSERT(src != NULL);
-
+	INSTR_DEBUG(ip);
     if( dstWidth == 32 && 
         srcWidth == 8 && 
         ip->has_jump_index_table()) 
@@ -264,7 +266,7 @@ static InstTransResult doMovSXRR(InstPtr ip, 	BasicBlock *&b,
 {
 	NASSERT(dst.isReg());
 	NASSERT(src.isReg());
-
+	INSTR_DEBUG(ip);
 	Value *regOp;
 
 	regOp = R_READ<srcWidth>(b, src.getReg());
@@ -283,7 +285,7 @@ static InstTransResult doMovSXRM(InstPtr ip, 	BasicBlock *&b,
 {
 	NASSERT(dst.isReg());
 	NASSERT(src != NULL);
-
+	INSTR_DEBUG(ip);
 	Value	*r = doMovSXV<dstWidth>(ip, b, M_READ<srcWidth>(ip, b, src));
 
 	R_WRITE<dstWidth>(b, dst.getReg(), r);
@@ -334,6 +336,7 @@ GENERIC_TRANSLATION_MEM(MOV16mi,
 static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
+	INSTR_DEBUG(ip);
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(), 
@@ -359,6 +362,7 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
 static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
+	INSTR_DEBUG(ip);
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(),
@@ -448,12 +452,13 @@ GENERIC_TRANSLATION_MEM(MOVSX64rm16,
 	(doMovSXRM<64,16>(ip,   block, OP(0), ADDR(1))),
 	(doMovSXRM<64,16>(ip,   block, OP(0), STD_GLOBAL_OP(1))) )
 GENERIC_TRANSLATION_MEM(MOVSX64rm32,
-    (doMovSXRM<64,32>(ip,   block, OP(0), ADDR(1))),
-    (doMovSXRM<64,32>(ip,   block, OP(0), STD_GLOBAL_OP(1))) )
+    (doMovSXRM<64, 32>(ip,   block, OP(0), ADDR(1))),
+    (doMovSXRM<64, 32>(ip,   block, OP(0), STD_GLOBAL_OP(1))) )
 
 static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
+	INSTR_DEBUG(ip);
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(), 
@@ -475,10 +480,37 @@ static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& blo
     return ret ;
 }
 
+static InstTransResult translate_MOV64ri(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+    InstTransResult ret;
+    Function *F = block->getParent();
+	INSTR_DEBUG(ip);
+    if( ip->has_call_tgt() ) {
+        Value *callback_fn = archMakeCallbackForLocalFunction(
+                block->getParent()->getParent(), 
+                ip->get_call_tgt(0)
+            );
+        Value *addrInt = new PtrToIntInst(
+            callback_fn, llvm::Type::getInt64Ty(block->getContext()), "", block);
+        ret = doRIMovV<64>(ip, block, 
+                addrInt,
+                OP(0) );
+    }
+    else if( ip->is_data_offset() ) {
+        ret = doRIMovV<64>(ip, block, 
+                GLOBAL_DATA_OFFSET<64>(block, natM, ip), 
+                OP(0) );
+    } else { 
+        ret = doRIMov<64>(ip, block, OP(1), OP(0)) ;
+    }
+    return ret ;
+}
+
+
 //write to memory
 template <int width>
 static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
+	INSTR_DEBUG(ip);
     Function *F = block->getParent();
     if( ip->is_data_offset() ) {
         ret = doMRMov<width>(ip, block,
@@ -496,6 +528,7 @@ template <int width>
 static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
+	INSTR_DEBUG(ip);
     // loading functions only available if its a 32-bit offset
     if( ip->has_external_ref() && width == 32) {
         Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
@@ -526,6 +559,7 @@ static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& bloc
 
 static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) 
 {
+	INSTR_DEBUG(ip);
     InstTransResult ret;
     Function *F = block->getParent();
     if( ip->has_external_ref()) {
@@ -536,17 +570,18 @@ static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& blo
         return ContinueBlock;
     }
     else if( ip->is_data_offset() ) {
-        ret = doRMMov<32>(ip, block, 
-                GLOBAL( block, natM, inst, ip, 1 ),
-                OP(0) );
+		ret = doRMMov<32>(ip, block, 
+				GLOBAL( block, natM, inst, ip, 1 ),
+				OP(0) );
     } else {
-        ret = doRMMov<32>(ip, block, ADDR(1), OP(0));
+		ret = doRMMov<32>(ip, block, ADDR(1), OP(0));	
     }
     return ret ;
 }
 
 static InstTransResult translate_MOV32mr(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) 
 {
+	INSTR_DEBUG(ip);
     InstTransResult ret;
     Function *F = block->getParent();
     if( ip->has_external_ref()) {
@@ -623,8 +658,8 @@ void MOV_populateDispatchMap(DispatchMap &m) {
     m[X86::MOV16o16a] = translate_MOVoa<16>;
     m[X86::MOV8o8a] = translate_MOVoa<8>;
     m[X86::MOV32ri] = translate_MOV32ri;
-    m[X86::MOV64ri] = translate_MOV32ri;
-    m[X86::MOV64ri32] = translate_MOV32ri;
+    m[X86::MOV64ri] = translate_MOV64ri;
+    m[X86::MOV64ri32] = translate_MOV64ri;
 
     m[X86::MOV8mi] = translate_MOV8mi;
     m[X86::MOV16mi] = translate_MOV16mi;

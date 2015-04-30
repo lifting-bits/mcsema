@@ -134,11 +134,6 @@ class Inst {
         GSPrefix
     };
 
-    enum ArchType {
-        X86,
-        X86_64
-    };
-
     private:
     std::vector<VA>   targets;
     std::vector<boost::uint8_t> instBytes;
@@ -302,7 +297,6 @@ class Inst {
     }
 
     unsigned int get_opcode(void) {return this->NativeInst.getOpcode();}
-    unsigned int get_arch(void) {return this->arch;}
 
     ExternalCodeRefPtr get_ext_call_target(void) { return this->extCallTgt; }
     ExternalDataRefPtr get_ext_data_ref(void) { return this->extDataRef; }
@@ -312,8 +306,7 @@ class Inst {
           const llvm::MCInst &inst, 
           std::string instR, 
           Prefix k,
-          std::vector<boost::uint8_t> bytes,
-          uint32_t arch_type = Inst::X86) :
+          std::vector<boost::uint8_t> bytes) :
         instBytes(bytes),
         tgtIfTrue(0),
         tgtIfFalse(0),
@@ -332,8 +325,7 @@ class Inst {
         ext_data_ref(false),
         system_call_number(-1),
         local_noreturn(false),
-        data_offset(0),
-        arch(arch_type)
+        data_offset(0)
        { }
 };
 
@@ -412,8 +404,12 @@ public:
         base(base), sym_name(sname), is_symbol(true) 
     {
         // initialize bytes to null
+		this->bytes.push_back(0x0);
         this->bytes.push_back(0x0);
         this->bytes.push_back(0x0);
+        this->bytes.push_back(0x0);
+        this->bytes.push_back(0x0);
+		this->bytes.push_back(0x0);
         this->bytes.push_back(0x0);
         this->bytes.push_back(0x0);
     }

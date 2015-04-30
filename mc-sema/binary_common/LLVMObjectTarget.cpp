@@ -583,11 +583,11 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
 
       const uint8_t *data = (const uint8_t*)secContents.data();
     
-      offt_from_sym = (VA)  
-          (((uint32_t)data[relo_offt+3] << 24) | 
-           ((uint32_t)data[relo_offt+2] << 16) | 
-           ((uint32_t)data[relo_offt+1] <<  8) | 
-           ((uint32_t)data[relo_offt+0] <<  0));
+      offt_from_sym = (VA) 
+			(((::uint64_t)data[relo_offt+3] << 24) | 
+           ((::uint64_t)data[relo_offt+2] << 16) | 
+           ((::uint64_t)data[relo_offt+1] <<  8) | 
+           ((::uint64_t)data[relo_offt+0] <<  0));
 
       llvm::dbgs() << __FUNCTION__ << ": Original bytes are: " << to_string<VA>(offt_from_sym, hex) << "\n";
   }

@@ -86,6 +86,7 @@ void addDataBlob(   DataSection &ds,
             bytes.begin() + (end-base));
 
     DataSectionEntry dse(start, subrange);
+
     ds.addEntry(dse);
 }
 
@@ -95,6 +96,7 @@ void addDataSymbol(   DataSection &ds,
                 const std::string &symbol)
 {
     DataSectionEntry dse(base, symbol);
+
     ds.addEntry(dse);
 }
 

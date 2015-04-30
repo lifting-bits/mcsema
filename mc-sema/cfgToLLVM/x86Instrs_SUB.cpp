@@ -37,7 +37,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 
+
 #define NASSERT(cond) TASSERT(cond, "")
+#define INSTR_DEBUG(ip) llvm::dbgs() << __FUNCTION__ << "\tRepresentation: " << ip->printInst() << "\n"
+
 
 static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
   //isn't this exciting
@@ -129,31 +132,44 @@ static InstTransResult doSubRI(InstPtr ip, BasicBlock *&b,
     NASSERT(src2.isImm());
     NASSERT(dst.isReg());
 
-    if(ip->get_arch() == Inst::X86){
-        // Read from src1.
-        Value *srcReg = x86::R_READ<width>(b, src1.getReg());
+	// Read from src1.
+    Value *srcReg = R_READ<width>(b, src1.getReg());
 
-        // Create the constant value.
-        Value *c = CONST_V<width>(b, src2.getImm());
+	// Create the constant value.
+	Value *c = CONST_V<width>(b, src2.getImm());
 
-        // Do the operation.
-        Value *subRes = doSubVV<width>(ip, b, srcReg, c);
+	// Do the operation.
+	Value *subRes = doSubVV<width>(ip, b, srcReg, c);
 
-        // Store the result in dst.
-        x86::R_WRITE<width>(b, dst.getReg(), subRes);
-    } else {
-        // Read from src1.
-        Value *srcReg = x86_64::R_READ<width>(b, src1.getReg());
+	// Store the result in dst.
+	R_WRITE<width>(b, dst.getReg(), subRes);
 
-        // Create the constant value.
-        Value *c = CONST_V<width>(b, src2.getImm());
+    return ContinueBlock;
+}
 
-        // Do the operation.
-        Value *subRes = doSubVV<width>(ip, b, srcReg, c);
+template <int dstWidth, int srcWidth>
+static InstTransResult doSubRI(InstPtr ip, BasicBlock *&b,
+                               const MCOperand &dst,
+                               const MCOperand &src1,
+                               const MCOperand &src2)
+{
+    NASSERT(src1.isReg());
+    NASSERT(src2.isImm());
+    NASSERT(dst.isReg());
 
-        // Store the result in dst.
-        x86_64::R_WRITE<width>(b, dst.getReg(), subRes);
-    }
+	// Read from src1.
+    Value *srcReg = R_READ<dstWidth>(b, src1.getReg());
+
+	// Create the constant value.
+	Value *c = CONST_V<srcWidth>(b, src2.getImm());
+	
+	CastInst *cInst = CastInst::CreateIntegerCast(c, srcReg->getType(), true, "", b);  
+	
+	// Do the operation.
+	Value *subRes = doSubVV<dstWidth>(ip, b, srcReg, cInst);
+
+	// Store the result in dst.
+	R_WRITE<dstWidth>(b, dst.getReg(), subRes);
 
     return ContinueBlock;
 }
@@ -367,7 +383,7 @@ GENERIC_TRANSLATION_MEM(SUB32mr,
 	doSubMR<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
 GENERIC_TRANSLATION(SUB32ri, doSubRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(SUB32ri8, doSubRI<32>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(SUB64ri8, doSubRI<64>(ip, block, OP(0), OP(1), OP(2)))
+//GENERIC_TRANSLATION(SUB64ri8, doSubRI<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(SUB64ri32, doSubRI<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_MEM(SUB32rm,
 	doSubRM<32>(ip, block, ADDR(2), OP(0), OP(1)),
@@ -437,6 +453,13 @@ GENERIC_TRANSLATION_MEM(SBB8rm,
 GENERIC_TRANSLATION(SBB8rr, doSbbRR<8>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SBB8rr_REV, doSbbRR<8>(ip, block, OP(1), OP(2), OP(0)))
 
+static InstTransResult translate_SUB64ri8(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
+	InstTransResult ret;
+	INSTR_DEBUG(ip);
+	ret = doSubRI<64, 8>(ip, block, OP(0), OP(1), OP(2));
+	return ret;
+}
+
 void SUB_populateDispatchMap(DispatchMap &m)
 {
         m[X86::SUB16i16] = translate_SUB16i16;
@@ -492,6 +515,6 @@ void SUB_populateDispatchMap(DispatchMap &m)
 
         m[X86::SUB64ri8] = translate_SUB64ri8;
         //m[X86::SUB64ri16] = translate_NOOP;
-        m[X86::SUB64ri32] = translate_SUB64ri32;
+        //m[X86::SUB64ri32] = translate_SUB64ri32;
       //  m[X86::SUB64ri] = translate_NOOP;
 }
