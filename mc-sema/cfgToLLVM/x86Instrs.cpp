@@ -363,75 +363,9 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             STORE_F(OF);
             STORE_F(DF);
 
-            //use llvm.memcpy to copy locals to context
-            // SOURCE: get pointer to FPU locals
-            Value *localFPU = x86_64::getLocalFPURegsAsPtr(B);
-            // DEST: get pointer to FPU globals
-            Value *globalFPU = x86_64::getGlobalFPURegsAsPtr(B);
-            // SIZE: 8 FPU regs * sizeof(x86_FP80Ty)
-            // ALIGN = 4
-            // Volatile = FALSE
-            DataLayout  td(static_cast<Module*>(F->getParent()));
-            uint32_t fpu_arr_size =
-                (uint32_t)td.getTypeAllocSize(
-                        Type::getX86_FP80Ty(B->getContext())) * NUM_FPU_REGS;
-
-            callMemcpy(B, globalFPU, localFPU, fpu_arr_size, 4, false);
-
-            STORE_F(FPU_B);
-            STORE_F(FPU_C3);
-            // TOP is a 3-bit integer and not
-            // a one bit flag, but STORE_F
-            // just zero-extends and writes to
-            // a 32-bit integer.
-            /*STORE_F(string("FPU_TOP"));
-            STORE_F(string("FPU_C2"));
-            STORE_F(string("FPU_C1"));
-            STORE_F(string("FPU_C0"));
-            STORE_F(string("FPU_ES"));
-            STORE_F(string("FPU_SF"));
-            STORE_F(string("FPU_PE"));
-            STORE_F(string("FPU_UE"));
-            STORE_F(string("FPU_OE"));
-            STORE_F(string("FPU_ZE"));
-            STORE_F(string("FPU_DE"));
-            STORE_F(string("FPU_IE"));
-
-            // FPU CONTROL FLAGS
-            STORE_F(string("FPU_X" ));
-            STORE_F(string("FPU_RC"));
-            STORE_F(string("FPU_PC"));
-            STORE_F(string("FPU_PM"));
-            STORE_F(string("FPU_UM"));
-            STORE_F(string("FPU_OM"));
-            STORE_F(string("FPU_ZM"));
-            STORE_F(string("FPU_DM"));
-            STORE_F(string("FPU_IM"));
-
-            // SOURCE: get pointer to local tag word
-            Value *localTag = getLocalRegAsPtr(B, "FPU_TAG_val");
-            // DEST: get pointer to FPU globals
-            Value *globalTag = getGlobalRegAsPtr(B, "FPU_TAG");
-            // SIZE: 8 entries * sizeof(Int2Ty)
-            // ALIGN = 4
-            // Volatile = FALSE
-            uint32_t tags_arr_size =
-                (uint32_t)td.getTypeAllocSize(
-                        Type::getIntNTy(B->getContext(), 2)) * NUM_FPU_REGS;
-
-            callMemcpy(B, globalTag, localTag, tags_arr_size, 4, false);
-
-            // last IP segment is a 16-bit value
-            STORE_F(string("FPU_LASTIP_SEG"));
-            // 32-bit register not in X86 Namespace
-            STORE_SAMEWIDTH(string("FPU_LASTIP_OFF"));
-            // last data segment is a 16-bit value
-            STORE_F(string("FPU_LASTDATA_SEG"));
-            // 32-bit register not in X86 Namespace
-            STORE_SAMEWIDTH(string("FPU_LASTDATA_OFF"));
-
-            STORE_F(string("FPU_FOPCODE"));
-*/
+			// FPU registers are generally avoided on 64bit system
+			// Instead XMM registers are used for floating point operations
+			
             //vector instrs
             STORE_SAMEWIDTH(XMM0);
             STORE_SAMEWIDTH(XMM1);
@@ -441,6 +375,15 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             STORE_SAMEWIDTH(XMM5);
             STORE_SAMEWIDTH(XMM6);
             STORE_SAMEWIDTH(XMM7);
+			STORE_SAMEWIDTH(XMM8);
+			STORE_SAMEWIDTH(XMM9);
+			STORE_SAMEWIDTH(XMM10);
+			STORE_SAMEWIDTH(XMM11);
+			STORE_SAMEWIDTH(XMM12);
+			STORE_SAMEWIDTH(XMM13);
+			STORE_SAMEWIDTH(XMM14);
+			STORE_SAMEWIDTH(XMM15);
+			
 
             // stack base and limit
             STORE_SAMEWIDTH(STACK_BASE);
@@ -666,71 +609,8 @@ std::string regnm = x86_64::getRegisterName(nm); \
             SPILL_F(OF);
             SPILL_F(DF);
 
-            //use llvm.memcpy to copy locals to context
-            // SOURCE: get pointer to FPU globals
-            Value *globalFPU = x86_64::getGlobalFPURegsAsPtr(B);
-            // DEST: get pointer to FPU locals
-            Value *localFPU = x86_64::getLocalFPURegsAsPtr(B);
-            // SIZE: 8 registers sizeof(fp type)
-            // ALIGN = 4
-            // Volatile = FALSE
-            DataLayout  td(F->getParent());
-            uint32_t fpu_arr_size =
-                (uint32_t)td.getTypeAllocSize(Type::getX86_FP80Ty(B->getContext())) * NUM_FPU_REGS;
-
-            callMemcpy(B, localFPU, globalFPU, fpu_arr_size, 8, false);
-
-            // time for FPU Flags
-            SPILL_F(FPU_B);
-            SPILL_F(FPU_C3);
-            // TOP is a 3-bit integer and not
-            // a one bit flag
-       //     SPILL_F_N(string("FPU_TOP"), 3);
-            SPILL_F(FPU_C2);
-            SPILL_F(FPU_C1);
-            SPILL_F(FPU_C0);
-            SPILL_F(FPU_ES);
-            SPILL_F(FPU_SF);
-            SPILL_F(FPU_PE);
-            SPILL_F(FPU_UE);
-            SPILL_F(FPU_OE);
-            SPILL_F(FPU_ZE);
-            SPILL_F(FPU_DE);
-            SPILL_F(FPU_IE);
-
-            // FPU CONTROL WORD
-            SPILL_F(FPU_X);
-            //SPILL_F_N(string("FPU_RC"), 2);
-            //SPILL_F_N(string("FPU_PC"), 2);
-            SPILL_F(FPU_PM);
-            SPILL_F(FPU_UM);
-            SPILL_F(FPU_OM);
-            SPILL_F(FPU_ZM);
-            SPILL_F(FPU_DM);
-            SPILL_F(FPU_IM);
-
-            // DEST: get pointer to local tag word
-            //Value *localTag = getLocalRegAsPtr(B, "FPU_TAG_val");
-            // SRC: get pointer to FPU globals
-            //Value *globalTag = getGlobalRegAsPtr(B, "FPU_TAG");
-            // SIZE: 8 entries * sizeof(Int2Ty)
-            // ALIGN = 4
-            // Volatile = FALSE
-            /*uint32_t tags_arr_size =
-                (uint32_t)td.getTypeAllocSize(
-                        Type::getIntNTy(B->getContext(), 2)) * NUM_FPU_REGS;
-
-            callMemcpy(B, localTag, globalTag, tags_arr_size, 8, false);
-*/
-            // fpu last instruction ptr
-         //   SPILL_F_N(string("FPU_LASTIP_SEG"), 16);
-            SPILL(FPU_LASTIP_OFF);
-            // fpu last data ptr
-         //   SPILL_F_N(string("FPU_LASTDATA_SEG"), 16);
-         //   SPILL(string("FPU_LASTDATA_OFF"));
-
-            // last FPU opcode
-           // SPILL_F_N(string("FPU_FOPCODE"), 11);
+            // FPU registers doesn't get used on 64bit platform;
+			// we are not spilling them
 
             //write vector regs out
             SPILL_F_N(XMM0, 128);
@@ -741,6 +621,14 @@ std::string regnm = x86_64::getRegisterName(nm); \
             SPILL_F_N(XMM5, 128);
             SPILL_F_N(XMM6, 128);
             SPILL_F_N(XMM7, 128);
+			SPILL_F_N(XMM8, 128);
+			SPILL_F_N(XMM9, 128);
+			SPILL_F_N(XMM10, 128);
+			SPILL_F_N(XMM11, 128);
+			SPILL_F_N(XMM12, 128);
+			SPILL_F_N(XMM13, 128);
+			SPILL_F_N(XMM14, 128);
+			SPILL_F_N(XMM15, 128);
 
             // stack base and limit
             SPILL(STACK_BASE);

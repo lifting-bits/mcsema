@@ -65,9 +65,11 @@ typedef enum _SystemArchType {
 
 enum PointerSize {
 	PointerAnySize =0,
-	Pointer32 = 4,
-	Pointer64 = 8
+	Pointer32 = 32,
+	Pointer64 = 64
 };
+
+#define BYTE_SIZE 	8
 
 //setup code in the first block of the function that defines all of the
 //registers via alloca and then copies into them from the structure argument
@@ -121,6 +123,12 @@ llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t val) {
     return llvm::ConstantInt::get(bTy, val);
 }
 
+static llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t width, uint64_t val) {
+    llvm::IntegerType *bTy = llvm::Type::getIntNTy(b->getContext(), width);
+    return llvm::ConstantInt::get(bTy, val);
+}
+
+
 // Architecture specific register read/write operations defined under namespace;
 
 namespace x86 {
@@ -130,7 +138,7 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
     //we should return the pointer to the Value object that represents the 
     //value read. we'll truncate that value to the width specified by 
     //the width parameter.
-	assert(0);
+	
     //lookup the value that defines the cell that stores the current register
 	llvm::Value	*localRegVar = x86::MCRegToValue(b, reg);
     if(localRegVar == NULL)
@@ -185,7 +193,7 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
 template <int width>
 void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
     //we don't return anything as this becomes a store
-	assert(0);
+	
     //lookup the 'stack' local for the register we want to write
     llvm::Value   *localRegVar = MCRegToValue(b, reg);
     if(localRegVar == NULL)
@@ -390,7 +398,7 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
             // mask the value so the parts of the register we don't write
             // is preserved
             llvm::Value *remove_bits = llvm::BinaryOperator::CreateAnd(fullReg, and_mask, "", b);
-            assert(write->getType()->getScalarSizeInBits() < regWidthType->getScalarSizeInBits());
+            //assert(write->getType()->getScalarSizeInBits() < regWidthType->getScalarSizeInBits());
 			llvm::Value	*write_z = new llvm::ZExtInst(write, regWidthType, "", b);
             // or the original value with our new parts
             llvm::Value *final_val = llvm::BinaryOperator::CreateOr(remove_bits, write_z, "", b);
@@ -406,7 +414,7 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
             int		writeOff = mapPlatRegToOffset(reg);
             llvm::Value	*maskVal;
             llvm::Value	*addVal;
-			assert(write->getType()->getScalarSizeInBits() < llvm::Type::getInt64Ty(b->getContext())->getScalarSizeInBits());
+			//assert(write->getType()->getScalarSizeInBits() < llvm::Type::getInt64Ty(b->getContext())->getScalarSizeInBits());
             llvm::Value	*write_z = 
                 new llvm::ZExtInst(write, llvm::Type::getInt64Ty(b->getContext()), "", b);
 
@@ -473,7 +481,7 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
 
 static unsigned getPointerSize(llvm::Module *M){
 	const llvm::DataLayout *DL = M->getDataLayout();
-	return DL->getPointerSize(0);
+	return DL->getPointerSize(0)*BYTE_SIZE;
 }
 
 llvm::Value *MCRegToValue(llvm::BasicBlock *b, unsigned reg);

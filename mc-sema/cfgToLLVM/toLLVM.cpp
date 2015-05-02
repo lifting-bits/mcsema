@@ -227,51 +227,8 @@ void doGlobalInit(Module *M) {
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // OF // 21
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // DF // 22
                                                                    // 56 bytes
-
-    // FPU
-    ArrayType  *fpu_regs = ArrayType::get(Type::getX86_FP80Ty(M->getContext()), 8);
-    regFields.push_back(fpu_regs);                                 // 80 bytes // 23
-    
-    // FPU Status Word
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU BUSY // 24
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C3 // 25
-    regFields.push_back(IntegerType::get(M->getContext(), 3)); // TOP OF STACK // 26
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C2 // 27
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C1 // 28
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C0 // 29
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Error Summary Status // 30
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Stack Fault // 31
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Precision Flag // 32 
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Underflow Flag // 33
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Overflow Flag // 34
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // ZeroDivide Flag // 35
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Denormalized Operand Flag // 36
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Invalid Operation Flag // 37
-                                                                   // 112 bytes
-
-    
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Infinity Flag // 30
-    regFields.push_back(IntegerType::get(M->getContext(), 2)); // FPU Rounding Control // 31
-    regFields.push_back(IntegerType::get(M->getContext(), 2)); // FPU Precision Control // 32
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Precision Mask // 33
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Underflow Mask // 34
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Overflow Mask // 35
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Zero Divide Mask // 36
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Denormal Operand Mask // 37
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Invalid Operation Mask // 38
-
-    // FPU tag word; 8 element array of 2-bit entries
-    ArrayType  *fpu_tag_word = ArrayType::get(Type::getIntNTy(M->getContext(), 8), 8);
-    regFields.push_back(fpu_tag_word);                                 // 80 bytes // 39
-
-	// check this for 64 bit system
-    regFields.push_back(IntegerType::getInt16Ty(M->getContext())); // Last Instruction Ptr Segment 40
-    regFields.push_back(IntegerType::getInt64Ty(M->getContext())); // Last Instruction Ptr Offset 41
-    regFields.push_back(IntegerType::getInt16Ty(M->getContext())); // Last Data Ptr Segment 42
-    regFields.push_back(IntegerType::getInt64Ty(M->getContext())); // Last Data Ptr Offset 43
-    
-    regFields.push_back(IntegerType::get(M->getContext(), 11)); // FPU FOPCODE 44
-
+    // no support for FPU registers 
+	
     // vector registers
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM0 45
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM1 46
@@ -281,10 +238,18 @@ void doGlobalInit(Module *M) {
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM5 50
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM6 51
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM7 52
+	regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM8 53
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM9 54
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM10 55
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM11 56
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM12 57
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM13 58
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM14 59
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM15 60
 
     // non-register values in structRegs
-    regFields.push_back(IntegerType::getInt64Ty(M->getContext())); // 53: stack base (biggest value)
-    regFields.push_back(IntegerType::getInt64Ty(M->getContext())); // 54: stack limit (smallest value)
+    regFields.push_back(IntegerType::getInt64Ty(M->getContext())); // 61: stack base (biggest value)
+    regFields.push_back(IntegerType::getInt64Ty(M->getContext())); // 62: stack limit (smallest value)
     
 
     PointerType *ptrToRegs = PointerType::get(regs, 0);

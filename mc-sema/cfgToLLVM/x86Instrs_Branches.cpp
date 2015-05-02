@@ -253,6 +253,7 @@ static void doCallV(BasicBlock       *&block,
 
   Function *F = block->getParent();
   Module    *mod = F->getParent();
+  uint32_t bitWidth = getPointerSize(mod);
   Function  *doCallVal = mod->getFunction("do_call_value");
 
   TASSERT(doCallVal != NULL, "Could not insert do_call_value function");
@@ -265,13 +266,13 @@ static void doCallV(BasicBlock       *&block,
   args.push_back(call_addr);
 
   //sink context 
-  writeLocalsToContext(block, 32, ABICallStore);
+  writeLocalsToContext(block, bitWidth, ABICallStore);
   
   //insert the call
   CallInst::Create(doCallVal, args, "", block);
 
   //restore context
-  writeContextToLocals(block, 32, ABIRetSpill);
+  writeContextToLocals(block, bitWidth, ABIRetSpill);
 }
 
 template <int width>
@@ -843,13 +844,13 @@ static InstTransResult translate_JMP64r(NativeModulePtr  natM,
         TASSERT(defaultb != nullptr, "Default block has to exit");
         // fallback to doing do_call_value
         doCallV(defaultb, ip, fromReg);
-        return doRet(defaultb);
+        return doRetQ(defaultb);
 
     } else {
-        // translate the JMP32r as a call/ret
+        // translate the JMP64r as a call/ret
         llvm::dbgs() << __FUNCTION__ << ": regular jump via register: " << to_string<VA>(ip->get_loc(), std::hex) << "\n";
         doCallV(block, ip, fromReg);
-        return doRet(block);
+        return doRetQ(block);
     } 
 }
 

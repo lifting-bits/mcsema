@@ -33,8 +33,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Helpers.h"
 #include "x86Instrs_flagops.h"
 #include "x86Instrs_ShiftRoll.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
+
+static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
+  //isn't this exciting
+  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
+  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
+  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
+  return ContinueBlock;
+}
+
+GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
 
 template <int width> 
 static Value *getBit(BasicBlock *b, Value *val, int which)
@@ -1981,8 +1992,11 @@ GENERIC_TRANSLATION_32MI(SHR32mi,
     doShrMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip)))
 
 GENERIC_TRANSLATION(SHR32r1, doShrR1<32>(ip, block, OP(0)))
+GENERIC_TRANSLATION(SHR64r1, doShrR1<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHR32rCL, doShrRCL<32>(ip, block, OP(0)))
+GENERIC_TRANSLATION(SHR64rCL, doShrRCL<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHR32ri, doShrRI<32>(ip, block, OP(1), OP(2), OP(0)))
+GENERIC_TRANSLATION(SHR64ri, doShrRI<64>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION_MEM(SHR8m1, 
 	doShrM1<8>(ip, block, ADDR(0)),
 	doShrM1<8>(ip, block, STD_GLOBAL_OP(0)))
@@ -2134,4 +2148,8 @@ void ShiftRoll_populateDispatchMap(DispatchMap &m) {
         m[X86::SHRD32rrCL] = translate_SHRD32rrCL;
         m[X86::SHLD32rrCL] = translate_SHLD32rrCL;
         m[X86::SHLD32rri8] = translate_SHLD32rri8;
+		
+		m[X86::SHR64ri] = translate_SHR64ri;
+		m[X86::SHR64r1] = translate_SHR64r1;
+		m[X86::SHR64rCL] = translate_SHR64rCL;
 }

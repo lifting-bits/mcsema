@@ -72,21 +72,28 @@ static InstTransResult doNegR(InstPtr ip,  BasicBlock      *&b,
                         const MCOperand &dst)
 {
     NASSERT(dst.isReg());
+	llvm::Module *M = b->getParent()->getParent();
+	uint32_t regWidth = getPointerSize(M);
 
     // Cache a full width read of the register.
-    Value *reg_f_v = x86::R_READ<32>(b, dst.getReg());
+    Value *reg_f_v = (regWidth == x86::REG_SIZE)?
+						x86::R_READ<32>(b, dst.getReg()) :
+						x86_64::R_READ<64>(b, dst.getReg());
     
     // Do a read of the register.
-    Value *reg_v = x86::R_READ<width>(b, dst.getReg());
+    Value *reg_v = R_READ<width>(b, dst.getReg());
 
     Value *result = doNegV<width>(ip, b, reg_v);
 
     // Write it back out.
-    x86::R_WRITE<width>(b, dst.getReg(), result);
+    R_WRITE<width>(b, dst.getReg(), result);
 
     // Update AF with the result from the register.
-    WriteAF2(b, reg_f_v, x86::R_READ<32>(b, dst.getReg()), CONST_V<32>(b, 1));
-
+    if(regWidth == x86::REG_SIZE)
+		WriteAF2<32>(b, reg_f_v, x86::R_READ<32>(b, dst.getReg()), CONST_V<32>(b, 1));
+	else
+		WriteAF2<64>(b, reg_f_v, x86_64::R_READ<64>(b, dst.getReg()), CONST_V<64>(b, 1));
+		
     return ContinueBlock;
 }
 
@@ -111,20 +118,28 @@ static InstTransResult doIncR(InstPtr ip,  BasicBlock      *&b,
                         const MCOperand &dst)
 {
     NASSERT(dst.isReg());
+	llvm::Module *M = b->getParent()->getParent();
+	
+	uint64_t regWidth = getPointerSize(M); 
 
     // Cache a full width read of the register.
-    Value *reg_f_v = x86::R_READ<32>(b, dst.getReg());
+    Value *reg_f_v = (regWidth == x86::REG_SIZE) ? 
+						x86::R_READ<32>(b, dst.getReg()) :
+						x86_64::R_READ<64>(b, dst.getReg());
     
     // Do a read of the register.
-    Value *reg_v = x86::R_READ<width>(b, dst.getReg());
+    Value *reg_v = R_READ<width>(b, dst.getReg());
 
     Value *result = doIncV<width>(ip, b, reg_v);
 
     // Write it back out.
-    x86::R_WRITE<width>(b, dst.getReg(), result);
+    R_WRITE<width>(b, dst.getReg(), result);
 
     // Update AF with the result from the register.
-    WriteAF2(b, reg_f_v, x86::R_READ<32>(b, dst.getReg()), CONST_V<32>(b, 1));
+	if(regWidth == x86::REG_SIZE)
+		WriteAF2<32>(b, reg_f_v, R_READ<32>(b, dst.getReg()), CONST_V<32>(b, 1));
+	else
+		WriteAF2<64>(b, reg_f_v, R_READ<64>(b, dst.getReg()), CONST_V<64>(b, 1));
 
     return ContinueBlock;
 }
@@ -164,20 +179,27 @@ static InstTransResult doDecR(InstPtr ip,  BasicBlock      *&b,
                         const MCOperand &dst)
 {
     NASSERT(dst.isReg());
-
+	llvm::Module *M = b->getParent()->getParent();
+	uint32_t regWidth = getPointerSize(M);
+	
     // Cache a full width read of the register.
-    Value *reg_f_v = x86::R_READ<32>(b, dst.getReg());
+    Value *reg_f_v = (regWidth == x86::REG_SIZE? 
+						x86::R_READ<32>(b, dst.getReg()) :
+						x86_64::R_READ<64>(b, dst.getReg()));
     
     // Do a read of the register.
-    Value *reg_v = x86::R_READ<width>(b, dst.getReg());
+    Value *reg_v = R_READ<width>(b, dst.getReg());
 
     Value *result = doDecV<width>(ip, b, reg_v);
 
     // Write it back out.
-    x86::R_WRITE<width>(b, dst.getReg(), result);
+    R_WRITE<width>(b, dst.getReg(), result);
 
     // Update AF with the result from the register.
-    WriteAF2(b, reg_f_v, x86::R_READ<32>(b, dst.getReg()), CONST_V<32>(b, 1));
+    if(regWidth == x86::REG_SIZE)
+		WriteAF2<32>(b, reg_f_v, x86::R_READ<32>(b, dst.getReg()), CONST_V<32>(b, 1));
+	else
+		WriteAF2<64>(b, reg_f_v, x86::R_READ<64>(b, dst.getReg()), CONST_V<64>(b, 1));
 
     return ContinueBlock;
 }
@@ -195,6 +217,7 @@ static InstTransResult doDecM(InstPtr ip, BasicBlock *&b, Value *m) {
     return ContinueBlock;
 }
 
+GENERIC_TRANSLATION(DEC64r, doDecR<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION(DEC16r, doDecR<16>(ip, block, OP(0)))
 GENERIC_TRANSLATION(DEC8r, doDecR<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION_MEM(DEC16m, 
@@ -216,9 +239,86 @@ GENERIC_TRANSLATION_MEM(INC32m,
 GENERIC_TRANSLATION_MEM(INC8m, 
 	doIncM<8>(ip, block, ADDR(0)),
 	doIncM<8>(ip, block, STD_GLOBAL_OP(0)))
+	
+GENERIC_TRANSLATION_MEM(INC64m,
+	doIncM<64>(ip, block, ADDR(0)),
+	doIncM<64>(ip, block, STD_GLOBAL_OP(0)))
+	
 GENERIC_TRANSLATION(INC16r, doIncR<16>(ip, block, OP(0)))
 GENERIC_TRANSLATION(INC8r, doIncR<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(INC32r, doIncR<32>(ip, block, OP(0)))
+
+static InstTransResult 
+translate_INC64r(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
+	const MCOperand &dst = inst.getOperand(0);
+
+	// Do I need a check for REX prefix for accessing 64bit registers?
+	//
+    // Do a read of full width register 
+    Value *reg_v = x86_64::R_READ<64>(block, dst.getReg());
+    Value *result = doIncV<64>(ip, block, reg_v);
+
+	// write results into registers
+    R_WRITE<64>(block, dst.getReg(), result);
+
+	// Unlike ADD, INC doesn't affect CF 
+    // Update AF with the result from the register.
+	WriteAF2<64>(block, reg_v, R_READ<64>(block, dst.getReg()), CONST_V<64>(block, 1));
+
+    return ContinueBlock;
+}
+
+static InstTransResult 
+translate_INC64_32r(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
+	
+	// OpSize 32 bit
+	const MCOperand &dst = inst.getOperand(0);
+
+	// Do I need a check for REX prefix for accessing 64bit registers?
+	//
+    // Do a read of full width register 
+    Value *reg_v_f = x86_64::R_READ<64>(block, dst.getReg());
+	
+	// read register of size 32
+	Value *reg_v = x86_64::R_READ<32>(block, dst.getReg());
+	
+    Value *result = doIncV<32>(ip, block, reg_v);
+
+	// write results into registers
+    R_WRITE<32>(block, dst.getReg(), result);
+
+    // Update AF with the result from the register.
+	WriteAF2<64>(block, reg_v_f, R_READ<64>(block, dst.getReg()), CONST_V<64>(block, 1));
+
+    return ContinueBlock;
+}
+
+static InstTransResult 
+translate_INC64_16r(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
+	
+	// OpSize 16 bit
+	const MCOperand &dst = inst.getOperand(0);
+
+	// Do I need a check for REX prefix for accessing 64bit registers?
+	//
+    // Do a read of full width register 
+    Value *reg_v_f = x86_64::R_READ<64>(block, dst.getReg());
+	
+	// read register of size 32
+	Value *reg_v = x86_64::R_READ<16>(block, dst.getReg());
+	
+    Value *result = doIncV<16>(ip, block, reg_v);
+
+	// write results into registers
+    R_WRITE<16>(block, dst.getReg(), result);
+
+    // Update AF with the result from the register.
+	WriteAF2<64>(block, reg_v_f, R_READ<64>(block, dst.getReg()), CONST_V<64>(block, 1));
+
+    return ContinueBlock;
+}
+
+//GENERIC_TRANSLATION(INC64r, doIncR<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION_MEM(NEG16m, 
 	doNegM<16>(ip, block, ADDR(0)),
 	doNegM<16>(ip, block, STD_GLOBAL_OP(0)))
@@ -239,12 +339,29 @@ void INCDECNEG_populateDispatchMap(DispatchMap &m) {
         m[X86::DEC32m] = translate_DEC32m;
         m[X86::DEC8m] = translate_DEC8m;
         m[X86::DEC32r] = translate_DEC32r;
+		m[X86::DEC64r] = translate_DEC64r;
+		
         m[X86::INC16m] = translate_INC16m;
         m[X86::INC32m] = translate_INC32m;
-        m[X86::INC8m] = translate_INC8m;
+		
+		// On 64bit r/m8 can't be encoded if REX prefix is used 
+		m[X86::INC8m] = translate_INC8m;
+		m[X86::INC8r] = translate_INC8r;
+		
+		// On 64bit INC16r/INC32r can't be encoded
         m[X86::INC16r] = translate_INC16r;
-        m[X86::INC8r] = translate_INC8r;
         m[X86::INC32r] = translate_INC32r;
+		
+		// Is it required to have check for REX prefix to check register premissions?
+		// uses check for REX.W for 64 bit access.
+		m[X86::INC64r] = translate_INC64r;
+		m[X86::INC64_32r] = translate_INC64_32r;
+		m[X86::INC64_16r] = translate_INC64_16r;
+		
+		m[X86::INC64m] = translate_INC64m;
+		m[X86::INC64_32m] = translate_INC32m;
+		m[X86::INC64_16m] = translate_INC16m;
+		
         m[X86::NEG16m] = translate_NEG16m;
         m[X86::NEG16r] = translate_NEG16r;
         m[X86::NEG32m] = translate_NEG32m;

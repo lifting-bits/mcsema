@@ -223,6 +223,14 @@ int mapPlatRegToOffset(unsigned reg) {
         case X86::XMM5:
         case X86::XMM6:
         case X86::XMM7:
+		case X86::XMM8:
+		case X86::XMM9:
+		case X86::XMM10:
+		case X86::XMM11:
+		case X86::XMM12:
+		case X86::XMM13:
+		case X86::XMM14:
+		case X86::XMM15:
             return 0;
             break;
         default:
@@ -603,7 +611,7 @@ void allocateLocals(Function *F, int bits) {
             Instruction *afA = new AllocaInst(boolTy, "OF_val", pfA);
             Instruction *dfA = new AllocaInst(boolTy, "DF_val", afA);
             TASSERT(dfA != NULL, "");
-
+#if 0
             // FPU STACK
             Type    *floatTy = Type::getX86_FP80Ty(F->getContext());
             // 8 float values make up the ST registers
@@ -666,12 +674,12 @@ void allocateLocals(Function *F, int bits) {
 
             Instruction *fpu_FOPCODE = new AllocaInst(Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE_val", fpu_LASTDATA_OFF);
             TASSERT(fpu_FOPCODE != NULL, "");
-
+#endif
             //vector registers
             Instruction *vec_xmm0 =
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM0_val",
-                                fpu_FOPCODE);
+                                dfA);
             Instruction *vec_xmm1 =
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM1_val",
@@ -700,12 +708,44 @@ void allocateLocals(Function *F, int bits) {
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM7_val",
                                 vec_xmm6);
-
+            Instruction *vec_xmm8 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM8_val",
+                                vec_xmm7);
+            Instruction *vec_xmm9 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM9_val",
+                                vec_xmm8);
+            Instruction *vec_xmm10 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM10_val",
+                                vec_xmm9);
+            Instruction *vec_xmm11 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM11_val",
+                                vec_xmm10);
+            Instruction *vec_xmm12 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM12_val",
+                                vec_xmm11);
+            Instruction *vec_xmm13 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM13_val",
+                                vec_xmm12);
+            Instruction *vec_xmm14 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM14_val",
+                                vec_xmm13);
+            Instruction *vec_xmm15 =
+                new AllocaInst( Type::getIntNTy(F->getContext(), 128),
+                                "XMM15_val",
+                                vec_xmm14);
+								
             // stack base and limit
             Instruction *stack_base =
                 new AllocaInst( Type::getInt64Ty(F->getContext()),
                                 "STACK_BASE_val",
-                                vec_xmm7);
+                                vec_xmm15);
             Instruction *stack_limit =
                 new AllocaInst( Type::getInt64Ty(F->getContext()),
                                 "STACK_LIMIT_val",
@@ -876,10 +916,10 @@ static bool insertFunctionIntoModule(NativeModulePtr mod, NativeFunctionPtr func
                                                     F);
     TASSERT(entryBlock != NULL, "" );
 
-    allocateLocals(F, getPointerSize(M)*8);
+    allocateLocals(F, getPointerSize(M));
     //and at the beginning of the function, we spill all the context
 
-    writeContextToLocals(entryBlock, getPointerSize(M)*8, ABICallSpill);
+    writeContextToLocals(entryBlock, getPointerSize(M), ABICallSpill);
     //writeContextToLocals(entryBlock, 32, AllRegs);
 
     //then we put an unconditional branch from the 'entry' block to the first

@@ -345,7 +345,7 @@ Value* GLOBAL_DATA_OFFSET(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
 {
     VA  baseGlobal;
 	llvm::Module *M = b->getParent()->getParent();
-	int regWidth = getPointerSize(M)*8;
+	int regWidth = getPointerSize(M);
 	
     uint64_t off = ip->get_data_offset();
     if( addrIsInData(off, mod, baseGlobal, 0) ) {

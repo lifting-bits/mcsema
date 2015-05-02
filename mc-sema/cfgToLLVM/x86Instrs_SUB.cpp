@@ -515,6 +515,6 @@ void SUB_populateDispatchMap(DispatchMap &m)
 
         m[X86::SUB64ri8] = translate_SUB64ri8;
         //m[X86::SUB64ri16] = translate_NOOP;
-        //m[X86::SUB64ri32] = translate_SUB64ri32;
+        m[X86::SUB64ri32] = translate_SUB64ri32;
       //  m[X86::SUB64ri] = translate_NOOP;
 }

@@ -165,7 +165,7 @@ std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP {
     {ZF, {19, "ZF"}},
     {SF, {20, "SF"}},
     {OF, {21, "OF"}},
-    {DF, {22, "DF"}},
+    {DF, {22, "DF"}},/*
     {ST0, {23, "STi"}}, // NOT A MISTAKE. These},
     {ST1, {23, "STi"}}, // are in a separate structure},
     {ST2, {23, "STi"}},
@@ -202,17 +202,25 @@ std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP {
     {FPU_LASTIP_OFF, {49, "FPU_LASTIP_OFF"}},
     {FPU_LASTDATA_SEG, {50, "FPU_LASTDATA_SEG"}},
     {FPU_LASTDATA_OFF, {51, "FPU_LASTDATA_OFF"}},
-    {FPU_FOPCODE, {52, "FPU_FOPCODE"}},
-    {XMM0, {53, "XMM0"}},
-    {XMM1, {54, "XMM1"}},
-    {XMM2, {55, "XMM2"}},
-    {XMM3, {56, "XMM3"}},
-    {XMM4, {57, "XMM4"}},
-    {XMM5, {58, "XMM5"}},
-    {XMM6, {59, "XMM6"}},
-    {XMM7, {60, "XMM7"}},
-    {STACK_BASE, {61, "STACK_BASE"}},
-    {STACK_LIMIT, {62, "STACK_LIMIT"}}
+    {FPU_FOPCODE, {52, "FPU_FOPCODE"}},*/
+    {XMM0, {23, "XMM0"}},
+    {XMM1, {24, "XMM1"}},
+    {XMM2, {25, "XMM2"}},
+    {XMM3, {26, "XMM3"}},
+    {XMM4, {27, "XMM4"}},
+    {XMM5, {28, "XMM5"}},
+    {XMM6, {29, "XMM6"}},
+    {XMM7, {30, "XMM7"}},
+	{XMM8, {31, "XMM8"}},
+    {XMM9, {32, "XMM9"}},
+    {XMM10, {33, "XMM10"}},
+    {XMM11, {34, "XMM11"}},
+    {XMM12, {35, "XMM12"}},
+    {XMM13, {36, "XMM13"}},
+    {XMM14, {37, "XMM14"}},
+    {XMM15, {38, "XMM15"}},
+    {STACK_BASE, {39, "STACK_BASE"}},
+    {STACK_LIMIT, {40, "STACK_LIMIT"}}
 };
 
 StringRef getRegisterName(MCSemaRegs reg) {
@@ -225,7 +233,7 @@ int getRegisterOffset(MCSemaRegs reg) {
 Value *lookupLocal(Function *F, MCSemaRegs reg) {
     BasicBlock  *entry = &F->getEntryBlock();
     BasicBlock::iterator    it = entry->begin(); 
-
+	
     std::string localName = std::string(x86_64::getRegisterName(reg))+"_val";
     while(it != entry->end() ) {
         Value   *v = it;
