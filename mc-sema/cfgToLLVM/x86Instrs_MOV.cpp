@@ -51,7 +51,6 @@ static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
 
 GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
 
-
 template <int width>
 static Value* getSegmentValue(BasicBlock *&b, unsigned sreg) {
 
@@ -186,7 +185,6 @@ static InstTransResult doMIMov(InstPtr ip, BasicBlock *&b,
                         Value           *dstAddr,
                         const MCOperand &src)
 {
-	INSTR_DEBUG(ip);
     //MOV <m>, <imm>
     //store the constant in src into dstAddr
     NASSERT(dstAddr != NULL);
@@ -237,7 +235,7 @@ static InstTransResult doMovZXRM(InstPtr ip,   BasicBlock *&b,
 {
     NASSERT(dst.isReg());
 	NASSERT(src != NULL);
-	INSTR_DEBUG(ip);
+
     if( dstWidth == 32 && 
         srcWidth == 8 && 
         ip->has_jump_index_table()) 
@@ -266,7 +264,7 @@ static InstTransResult doMovSXRR(InstPtr ip, 	BasicBlock *&b,
 {
 	NASSERT(dst.isReg());
 	NASSERT(src.isReg());
-	INSTR_DEBUG(ip);
+
 	Value *regOp;
 
 	regOp = R_READ<srcWidth>(b, src.getReg());
@@ -285,7 +283,7 @@ static InstTransResult doMovSXRM(InstPtr ip, 	BasicBlock *&b,
 {
 	NASSERT(dst.isReg());
 	NASSERT(src != NULL);
-	INSTR_DEBUG(ip);
+
 	Value	*r = doMovSXV<dstWidth>(ip, b, M_READ<srcWidth>(ip, b, src));
 
 	R_WRITE<dstWidth>(b, dst.getReg(), r);
@@ -336,7 +334,7 @@ GENERIC_TRANSLATION_MEM(MOV16mi,
 static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
-	INSTR_DEBUG(ip);
+
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(), 
@@ -362,7 +360,7 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
 static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
-	INSTR_DEBUG(ip);
+	
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(),
@@ -458,7 +456,7 @@ GENERIC_TRANSLATION_MEM(MOVSX64rm32,
 static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
-	INSTR_DEBUG(ip);
+
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(), 
@@ -483,7 +481,7 @@ static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& blo
 static InstTransResult translate_MOV64ri(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
-	INSTR_DEBUG(ip);
+
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(), 
@@ -510,7 +508,7 @@ static InstTransResult translate_MOV64ri(NativeModulePtr natM, BasicBlock *& blo
 template <int width>
 static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
-	INSTR_DEBUG(ip);
+
     Function *F = block->getParent();
     if( ip->is_data_offset() ) {
         ret = doMRMov<width>(ip, block,
@@ -528,7 +526,7 @@ template <int width>
 static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
-	INSTR_DEBUG(ip);
+
     // loading functions only available if its a 32-bit offset
     if( ip->has_external_ref() && width == 32) {
         Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
@@ -559,7 +557,7 @@ static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& bloc
 
 static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) 
 {
-	INSTR_DEBUG(ip);
+
     InstTransResult ret;
     Function *F = block->getParent();
     if( ip->has_external_ref()) {
@@ -581,7 +579,6 @@ static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& blo
 
 static InstTransResult translate_MOV32mr(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) 
 {
-	INSTR_DEBUG(ip);
     InstTransResult ret;
     Function *F = block->getParent();
     if( ip->has_external_ref()) {
@@ -600,7 +597,6 @@ static InstTransResult translate_MOV32mr(NativeModulePtr natM, BasicBlock *& blo
 
 static InstTransResult translate_MOV64rm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst)
 {
-    INSTR_DEBUG(ip);
     InstTransResult ret;
     Function *F = block->getParent();
     if( ip->has_external_ref()) {
@@ -622,7 +618,6 @@ static InstTransResult translate_MOV64rm(NativeModulePtr natM, BasicBlock *& blo
 
 static InstTransResult translate_MOV64mr(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst)
 {
-    INSTR_DEBUG(ip);
     InstTransResult ret;
     Function *F = block->getParent();
     if( ip->has_external_ref()) {

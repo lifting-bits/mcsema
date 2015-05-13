@@ -33,7 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <LExcn.h>
 #include <algorithm>
 #include <boost/filesystem.hpp> 
-
+#include "llvm/Object/ELFObjectFile.h"
+#include "llvm/Object/SymbolicFile.h"
 #include "llvm/Support/TargetRegistry.h"
 
 #include "bincomm.h"
@@ -52,6 +53,8 @@ void LLVMObjectTarget::populateReloMap(const llvm::object::SectionRef &sr) {
     // populate relocation section map
     StringRef srName, relosrName;
     sr.getName(srName);
+	
+	std::cout << __FUNCTION__ << srName.str() << "\n";
 
     if(has_relo != this->objectfile->section_end()) {
         // this section is the relocation section for someone
@@ -61,8 +64,9 @@ void LLVMObjectTarget::populateReloMap(const llvm::object::SectionRef &sr) {
         // relocations in .text, we loop through .rel.text
         has_relo->getName(relosrName);
 
-        llvm::dbgs() << __FUNCTION__ << ": Relo mapping: [" << relosrName << "] -> [" << srName << "]\n";
-        this->wheres_my_relo[*has_relo] = sr;
+        /*llvm::dbgs()*/ std::cout << __FUNCTION__ << ": Relo mapping: [" << relosrName.str() << "] -> [" << srName.str() << "]\n";
+        std::cout.flush();
+		this->wheres_my_relo[*has_relo] = sr;
     }
     // end populate relocation section map
 }
@@ -113,6 +117,8 @@ LLVMObjectTarget::LLVMObjectTarget(const std::string &modname, llvm::object::Obj
       high += low;
 
       ::uint64_t  m1 = low,m2 = high;
+	  /*llvm::dbgs()*/ std::cout << "low : " << to_string<VA>(m1, std::hex) << " high : " << to_string<VA>(m2, std::hex) << "\n";
+	  std::cout.flush();
       //does this overlap with something already in secs
       ::uint64_t  overlapAdj = 0;
       for(vector<secT>::iterator it = this->secs.begin(), en = this->secs.end();
@@ -135,29 +141,30 @@ LLVMObjectTarget::LLVMObjectTarget(const std::string &modname, llvm::object::Obj
         //does overlap?
         if(containedSecLow < m2 && m1 < containedSecHigh) {
           //how much to add to containedSecLow to make it not overlap?
-          overlapAdj = (containedSecHigh-low);
-          m1 += overlapAdj;
-          m2 += overlapAdj;
+          overlapAdj = (containedSecHigh/*- low*/);
+          m1 = overlapAdj+low;
+          m2 = overlapAdj+high;
         } 
       }
 
+	  llvm::dbgs() << "low : " << to_string<VA>(m1, std::hex) << " high : " << to_string<VA>(m2, std::hex) << "\n";
       if(setBase == false) {
-        this->baseAddr = low+overlapAdj;
+        this->baseAddr = /*m1*/ low+overlapAdj;
       } else {
-        if(this->baseAddr > low+overlapAdj) {
-          this->baseAddr = low+overlapAdj;
+        if(this->baseAddr > /*m1*/low+overlapAdj) {
+          this->baseAddr = /*m2*/ low+overlapAdj;
         }
       }
 
       if(setExtent == false) {
-        this->extent = high+overlapAdj;
+        this->extent = /*m2*/high+overlapAdj;
       } else {
-        if(this->extent < high+overlapAdj) {
-          this->extent = high+overlapAdj;
+        if(this->extent < /*m2*/high+overlapAdj) {
+          this->extent = /*m2*/high+overlapAdj;
         }
       }
 
-      this->secs.push_back(secT(overlapAdj, sr));
+      this->secs.push_back(secT(overlapAdj/*m1*/, sr));
 
     }
 }
@@ -202,7 +209,9 @@ bool LLVMObjectTarget::get_exports(list<pair<string,VA> >  &l) {
         e = sr.containsSymbol(sym, res);
 
         LASSERT(!e, e.message());
-
+		//e = sym.getName(str);
+		//dbgs() << " Looking for symbol: " << str << " in " << secName << "\n";
+		
         if(res) {
             VA        addr;
             e = sym.getName(str);
@@ -227,10 +236,21 @@ static bool getRelocForAddr(llvm::object::SectionRef    &sr,
                             llvm::object::RelocationRef &rr)
 {
         std::error_code            e;
+		StringRef secName;
+		sr.getName(secName);
+		llvm::dbgs() << __FUNCTION__ << ": Relocation lives in: " << secName.str() << "\n";
+		
+		for (auto rr_i : sr.relocations() ) {
+			llvm::object::SymbolRef       symref;
+			symref = *rr_i.getSymbol();
+			symref.getName(secName);
+			llvm::dbgs() << __FUNCTION__ << ": Symbol : " << secName.str() << "\n";
+		}
+
         for (auto rr_i : sr.relocations() ) {
             llvm::object::SymbolRef       symref;
             VA                            addr = 0;
-
+			
             e = rr_i.getAddress((::uint64_t &)addr);
             LASSERT(!e, "Can't get address for relocation ref");
             llvm::dbgs() << "\t" << __FUNCTION__ << ": Testing " << to_string<VA>(address, hex) 
@@ -267,13 +287,14 @@ string getSymForReloc(llvm::object::RelocationRef &rref,
         //it's a function (really an import..) if the type is UNK
         if(symType == llvm::object::SymbolRef::ST_Unknown ||
                 symType == llvm::object::SymbolRef::ST_Other ||
-                symType == llvm::object::SymbolRef::ST_Function ) {
+			symType == llvm::object::SymbolRef::ST_Function ) {
             rt = strr.str();
         }
     } else {
         rt = strr.str();
     }
 
+	llvm::dbgs() << rt << "\n";
     return rt;
 }
 
@@ -509,6 +530,180 @@ static
   return -1;
 }
 
+::int64_t getAddend64LE(llvm::object::RelocationRef R) {
+    const llvm::object::ELF64LEObjectFile *Obj = cast<llvm::object::ELF64LEObjectFile>(R.getObjectFile());
+
+    llvm::object::DataRefImpl DRI = R.getRawDataRefImpl();
+    ::int64_t Addend;
+    Obj->getRelocationAddend(DRI, Addend);
+    return Addend;
+  }
+
+#if 0
+bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
+
+  LASSERT(this->objectfile != NULL, "Object File not initialized");
+
+  // this is messy.
+  // First, we need to figure out which section this VA is in.
+  // This isn't easy because some file VAs may overlap
+  // 
+  // The relocation entry will point to a symbol. We will then
+  // need to find the symbol's address in whatever section it may be.
+  // There is a similar problem of overlaps.
+  //
+  // Finally, some relocation types are relative to the original data
+  // at the point of the relocation. So we need to read section data
+  // and manually add it to the resolved symbol address
+
+  uint32_t  offt;
+  llvm::object::SectionRef section;
+  std::error_code    e;
+
+  // step 1: find which section this address lives in. This can be kind of hard when multiple things
+  // map at address 0x0, which happens sometimes. Store (addr - [base of section]) in offt
+  bool      found_offt = getSectionForAddr(this->secs, addr, section, offt);
+
+  if (found_offt == false) 
+  {
+      // its not in a section. this is bad.
+      llvm::dbgs() << __FUNCTION__ << ": Could not find section for: " 
+                   << to_string<VA>(addr, hex) << "\n";
+      return false;
+  } else {
+      StringRef secName;
+      section.getName(secName);
+      llvm::dbgs() << __FUNCTION__ << ": Relocation lives in: " << secName.str() << "\n";
+      llvm::dbgs() << __FUNCTION__ << ": Offset is: " << to_string<VA>(offt, hex) << "\n";
+  }
+
+  // get a relocation reference for this address. this is how we
+  // will find the relocation type and also the offset of the
+  // relocation from its section base
+  
+  llvm::object::SectionRef relocSection(this->fixRelocationSection(section));
+
+  StringRef secName;
+  relocSection.getName(secName);
+  llvm::dbgs() << __FUNCTION__ << ": Relocation lives in: " << secName.str() << "\n";
+
+  llvm::object::RelocationRef rref;
+  if(!getRelocForAddr(relocSection, offt, addr, rref)) {
+      llvm::dbgs() << __FUNCTION__ << ": Could not find reloc ref for: " 
+                   << to_string<VA>(addr, hex) << "\n";
+      return false;
+  }
+
+  // lets find out what kind of relocation we have
+  SmallString<32> relocType;
+  e = rref.getTypeName(relocType);
+  LASSERT(!e, e.message());
+
+  VA offt_from_sym = 0;
+
+  llvm::dbgs() << __FUNCTION__ << ": Looking at relocation type: " << relocType << "\n";
+
+  if(relocType == "R_386_32") {
+      // these are absolute relocations and they are relative to
+      // the original bytes in the file. Lets read those bytes
+      StringRef secContents;
+      e = section.getContents(secContents);
+      LASSERT(!e, "Can't get section data");
+
+      ::uint64_t relo_offt;
+      e = rref.getOffset(relo_offt);
+      LASSERT(!e, "Can't get relocation offset");
+
+      const uint8_t *data = (const uint8_t*)secContents.data();
+    
+	  offt_from_sym = (VA) 
+			(((::uint64_t)data[relo_offt+3] << 24) | 
+           ((::uint64_t)data[relo_offt+2] << 16) | 
+           ((::uint64_t)data[relo_offt+1] <<  8) | 
+           ((::uint64_t)data[relo_offt+0] <<  0));
+
+      llvm::dbgs() << __FUNCTION__ << ": Original bytes are: " << to_string<VA>(offt_from_sym, hex) << "\n";
+  } else if(relocType == "R_X86_64_64" ||
+			relocType == "R_X86_64_32" ||
+			relocType == "R_X86_64_32S") {
+	  StringRef secContents;
+	 llvm::object::SymbolRef symref;
+	  ::uint64_t sym_addr;
+	  ::int64_t addend = 0;
+	  symref = *rref.getSymbol();
+	  e = symref.getAddress((::uint64_t &)sym_addr);
+	  
+	  ::uint64_t relo_offt;
+      e = rref.getOffset(relo_offt);
+	  e = section.getContents(secContents);
+	  LASSERT(!e, "Can't get section data");
+	  
+	  // get addend 
+	  e = getELFRelocationAddend(rref, addend);
+	  const uint8_t *data = ((const uint8_t*)secContents.data());
+	   llvm::dbgs() << __FUNCTION__ << ": Addend: " << to_string<VA>(addend, hex) << "\n";
+
+	  offt_from_sym = (VA) 
+			(((::uint64_t)data[relo_offt+3] << 24) | 
+           ((::uint64_t)data[relo_offt+2] << 16) | 
+           ((::uint64_t)data[relo_offt+1] <<  8) | 
+           ((::uint64_t)data[relo_offt+0] <<  0));
+	  
+	  offt_from_sym = sym_addr + addend;
+	  
+	  llvm::dbgs() << __FUNCTION__ << ": Original bytes are: " << to_string<VA>(offt_from_sym, hex) << "\n";
+	  
+  }
+
+  // find what symbol name this relocation points to. 
+  string  s = getSymForReloc(rref, false);
+  if (s == "") {
+    // Reloc is not bound to a symbol
+    return false;
+  }
+
+  llvm::dbgs() << __FUNCTION__ << ": Relocation symbol is: " << s << "\n";
+
+  llvm::object::section_iterator sym_sec = this->objectfile->section_end();
+  // get the address of the symbol name. No, we couldn't directly
+  // get it from the SymbolRef that is attached to the RelocationRef.
+  // Life is complicated.
+  ::int64_t found = getAddressForString(*this->objectfile, s, sym_sec);
+  llvm::dbgs() << __FUNCTION__ << ": Address of symbol is: " << to_string<VA>(found, hex) << "\n";
+
+  if(found == -1) {
+    return false;
+  }
+
+  // check if this symbol is in a section
+  if(sym_sec != this->objectfile->section_end()) {
+      ::uint64_t sec_offt;
+      // get offset for the section *the symbol points to*,
+      // *NOT* the offset of the section the symbol is in
+      if(true == getOffsetForSection(this->secs, /**sym_sec*/ section, sec_offt))
+      {
+          StringRef sn;
+          /*sym_sec*/section.getName(sn);
+          // symbol address is :
+          // destination section base + symbol address
+          llvm::dbgs() << __FUNCTION__ << ": Symbol is in: [" << sn << "], base is: " << to_string< ::uint64_t>(sec_offt, hex) << "\n";
+          found += sec_offt;
+      } else {
+          return false;
+      }
+  }
+
+  // if this is an absolute relocation
+  // add the original file bytes to the destination addr
+  found += offt_from_sym;
+
+  llvm::dbgs() << __FUNCTION__ << ": Final addr is: " << to_string<VA>(found, hex) << "\n";
+
+  toAddr = (VA)found;
+
+  return true;
+}
+#else
 bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
 
   LASSERT(this->objectfile != NULL, "Object File not initialized");
@@ -568,9 +763,7 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
 
   llvm::dbgs() << __FUNCTION__ << ": Looking at relocation type: " << relocType << "\n";
 
-  if(relocType == "R_386_32" ||
-     relocType == "R_X86_64_64" ||
-	 relocType == "R_X86_64_32S") {
+  if(relocType == "R_386_32") {
       // these are absolute relocations and they are relative to
       // the original bytes in the file. Lets read those bytes
       StringRef secContents;
@@ -583,16 +776,47 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
 
       const uint8_t *data = (const uint8_t*)secContents.data();
     
-      offt_from_sym = (VA) 
+	  offt_from_sym = (VA) 
 			(((::uint64_t)data[relo_offt+3] << 24) | 
            ((::uint64_t)data[relo_offt+2] << 16) | 
            ((::uint64_t)data[relo_offt+1] <<  8) | 
            ((::uint64_t)data[relo_offt+0] <<  0));
 
       llvm::dbgs() << __FUNCTION__ << ": Original bytes are: " << to_string<VA>(offt_from_sym, hex) << "\n";
+  } else if(relocType == "R_X86_64_64" ||
+			relocType == "R_X86_64_32" ||
+			relocType == "R_X86_64_32S") {
+	  StringRef secContents;
+	 llvm::object::SymbolRef symref;
+	  ::uint64_t sym_addr;
+	  ::int64_t addend = 0;
+	  symref = *rref.getSymbol();
+	  e = symref.getAddress((::uint64_t &)sym_addr);
+	  
+	  ::uint64_t relo_offt;
+      e = rref.getOffset(relo_offt);
+	  e = section.getContents(secContents);
+	  LASSERT(!e, "Can't get section data");
+	  
+	  // get addend 
+	  e = getELFRelocationAddend(rref, addend);
+	  const uint8_t *data = ((const uint8_t*)secContents.data());
+	   llvm::dbgs() << __FUNCTION__ << ": Addend: " << to_string<VA>(addend, hex) << "\n";
+
+	  offt_from_sym = (VA) 
+			(((::uint64_t)data[relo_offt+3] << 24) | 
+           ((::uint64_t)data[relo_offt+2] << 16) | 
+           ((::uint64_t)data[relo_offt+1] <<  8) | 
+           ((::uint64_t)data[relo_offt+0] <<  0));
+	  
+	  offt_from_sym = sym_addr + addend;
+	  
+	  llvm::dbgs() << __FUNCTION__ << ": Original bytes are: " << to_string<VA>(offt_from_sym, hex) << "\n";
+	  
   }
 
   // find what symbol name this relocation points to. 
+  // the reloc sysm name is not always correct
   string  s = getSymForReloc(rref, false);
   if (s == "") {
     // Reloc is not bound to a symbol
@@ -617,10 +841,10 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
       ::uint64_t sec_offt;
       // get offset for the section *the symbol points to*,
       // *NOT* the offset of the section the symbol is in
-      if(true == getOffsetForSection(this->secs, *sym_sec, sec_offt))
+      if(true == getOffsetForSection(this->secs, /**sym_sec*/ section, sec_offt))
       {
           StringRef sn;
-          sym_sec->getName(sn);
+          /*sym_sec*/section.getName(sn);
           // symbol address is :
           // destination section base + symbol address
           llvm::dbgs() << __FUNCTION__ << ": Symbol is in: [" << sn << "], base is: " << to_string< ::uint64_t>(sec_offt, hex) << "\n";
@@ -640,6 +864,7 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
 
   return true;
 }
+#endif
 
 bool LLVMObjectTarget::get_sections(vector<ExecutableContainer::SectionDesc>  &secs) {
 

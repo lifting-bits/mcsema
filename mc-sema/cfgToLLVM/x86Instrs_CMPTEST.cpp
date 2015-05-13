@@ -376,7 +376,6 @@ void CMPTEST_populateDispatchMap(DispatchMap &m) {
     m[X86::CMP16i16] = translate_CMP16i16;
     m[X86::CMP32i32] = translate_CMP32i32;
     m[X86::CMP32ri] = translate_CMP32ri;
-	
     m[X86::CMP32ri8] = translate_CMP32ri8;
     m[X86::CMP64ri32] = translate_CMP64ri32;
     m[X86::CMP64ri8] = translate_CMP64ri8;
@@ -393,10 +392,14 @@ void CMPTEST_populateDispatchMap(DispatchMap &m) {
     m[X86::CMP16mr] = translate_CMP16mr;
     m[X86::CMP32mr] = translate_CMP32mr;
     m[X86::CMP16mi8] = translate_CMP16mi8;
-
     m[X86::CMP64mi8] = translate_NOOP;
     m[X86::CMP64mi32] = translate_CMP64mi32;
 
+
+	m[X86::TEST64ri32] = translate_NOOP;
+	m[X86::TEST64i32] = translate_NOOP;
+	m[X86::TEST64rm] = translate_NOOP;
+	m[X86::TEST64rr] = translate_NOOP;
     m[X86::TEST32rr] = translate_TEST32rr;
     m[X86::TEST32i32] = translate_TEST32i32;
     m[X86::TEST32ri] = translate_TEST32ri;

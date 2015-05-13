@@ -103,6 +103,11 @@ static bool find_import_for_addr(object::SectionRef section, uint32_t offt, uint
 
             ::uint64_t sym_addr;
             ec = symref.getAddress(sym_addr);
+			
+			//::int64_t addend;
+			//ec = getELFRelocationAddend(*rit, addend);
+			//sym_addr += addend;
+			
             if(ec) { 
                 llvm::dbgs() << "Could not get address of symbol: " << import_name << "\n";
             } else {
@@ -122,8 +127,11 @@ static bool find_import_for_addr(object::SectionRef section, uint32_t offt, uint
                         llvm::dbgs() << "Skipping symbol due to address\n";
                     }
                     break;
+				//case llvm::object::SymbolRef::ST_Debug:
+					//return true;
+					//break;
                 default:
-                    llvm::dbgs() << "Skipping symbol since its probably not an import!" << "\n";
+                    llvm::dbgs() << "Skipping symbol since its probably not an import! " <<symtype << "\n";
             }
         }
 

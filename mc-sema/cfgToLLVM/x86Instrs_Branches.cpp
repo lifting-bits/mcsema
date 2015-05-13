@@ -49,13 +49,10 @@ static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
   return ContinueBlock;
 }
 
-
 GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
 
 static InstTransResult doRet(BasicBlock    *b) {
     //do a read from the location pointed to by ESP
-    llvm::dbgs() << __FUNCTION__;
-    llvm::dbgs() << "\tRepresentation: "  << "\n";
     
 	Value       *rESP = R_READ<32>(b, X86::ESP);
     Value       *nESP =
@@ -75,8 +72,6 @@ static InstTransResult doRet(BasicBlock    *b) {
 
 static InstTransResult doRetQ(BasicBlock    *b) {
     //do a read from the location pointed to by RSP
-	llvm::dbgs() << __FUNCTION__;
-    llvm::dbgs() << "\tRepresentation: "  << "\n";
 	
     Value       *rRSP = R_READ<x86_64::REG_SIZE>(b, X86::RSP);
     Value       *nRSP =
@@ -519,7 +514,6 @@ static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr) {
 static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool esp_adjust = false) {
     Module      *M = b->getParent()->getParent();
 
-    std::cout << __FUNCTION__ << " : " << target << "\n";
     Value   *rspOld = x86_64::R_READ<64>(b, X86::RSP);
 
     //lookup the function in the module
@@ -881,22 +875,25 @@ void Branches_populateDispatchMap(DispatchMap &m) {
     m[X86::JMP32r] = translate_JMP32r;
     m[X86::JMP32m] = translate_JMP32m;
     m[X86::JMP64r] = translate_JMP64r;
-//    m[X86::JMP64m] = translate_JMP64m;
-    m[X86::JMP_4] = translate_JMP_4;
+    m[X86::JMP64m] = translate_JMP64r;//JMP64m;
+    
+	m[X86::JMP_4] = translate_JMP_4;
     m[X86::JMP_2] = translate_JMP_2;
     m[X86::JMP_1] = translate_JMP_1;
-    m[X86::CALLpcrel32] = translate_CALLpcrel32;
+    
+	m[X86::CALLpcrel32] = translate_CALLpcrel32;
     m[X86::CALL64pcrel32] = translate_CALL64pcrel32;
     m[X86::CALL32m] = translate_CALL32m;
-//    m[X86::CALL64m] = translate_CALL64m;
+	m[X86::CALL64m] = translate_NOOP;//CALL64m;
     m[X86::CALL32r] = translate_CALL32r;
-//    m[X86::CALL64r] = translate_NOOP;
-    m[X86::LOOP] = translate_LOOP;
+	m[X86::CALL64r] = translate_NOOP;
+    
+	m[X86::LOOP] = translate_LOOP;
     m[X86::LOOPE] = translate_LOOPE;
     m[X86::LOOPNE] = translate_LOOPNE;
     m[X86::RETL] = translate_RET;
     m[X86::RETIL] = translate_RETI;
     m[X86::RETQ] = translate_RETQ;
-    //m[X86::RETIQ] = translate_RETIQ;
+    m[X86::RETIQ] = translate_NOOP;//RETIQ;
     m[X86::RETIW] = translate_RET;
 }

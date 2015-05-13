@@ -1,0 +1,4 @@
+open 2 C N
+close 1 C N
+CloseHandle 1 E N
+CreateFileA 7 E N

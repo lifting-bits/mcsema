@@ -691,4 +691,9 @@ void ADD_populateDispatchMap(DispatchMap &m)
     m[X86::ADD64ri32_DB] = translate_ADD64ri32;
     m[X86::ADD64i32] = translate_ADD64i32;
     m[X86::ADD64mi8] = translate_NOOP;
+	m[X86::ADD64mi32] = translate_NOOP;
+	m[X86::ADD64rr_DB] = translate_NOOP;
+	m[X86::ADD64rr] = translate_NOOP;
+	m[X86::ADD64rm] = translate_NOOP;
+	m[X86::ADD64mr] = translate_NOOP;
 }

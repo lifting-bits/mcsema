@@ -1747,8 +1747,6 @@ void dataSectionToTypesContents(
         } else {
             // add array
             // this holds opaque data in a byte array
-			cout << "Opaque data :  "  << "\n";
-			cout.flush();
             Constant *arr = 
                 makeConstantBlob(M->getContext(), dsec_itr->getBytes());
             secContents.push_back(arr);

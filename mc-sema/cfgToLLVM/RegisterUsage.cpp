@@ -105,12 +105,10 @@ std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP {
 };
 
 StringRef getRegisterName(MCSemaRegs reg) {
-   assert(0);
    return REG_TO_OFFSET_MAP.at(reg).name; 
 }
 
 int getRegisterOffset(MCSemaRegs reg) {
-    assert(0);
 	return REG_TO_OFFSET_MAP.at(reg).position;
 }
 Value *lookupLocal(Function *F, MCSemaRegs reg) {
@@ -244,6 +242,8 @@ Value *lookupLocal(Function *F, MCSemaRegs reg) {
 
         ++it;
     }
+	std::cout << localName << std::endl;
+	std::cout.flush();
     assert(0);
     //throw TErr (__LINE__, __FILE__, "localname: "+localName+" is not found");
     return nullptr;

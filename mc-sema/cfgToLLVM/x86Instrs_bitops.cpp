@@ -39,6 +39,16 @@ using namespace llvm;
 
 #define INSTR_DEBUG(ip) llvm::dbgs() << __FUNCTION__ << "\tRepresentation: " << ip->printInst() << "\n"
 
+static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
+  //isn't this exciting
+  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
+  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
+  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
+  return ContinueBlock;
+}
+
+GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
+
 template <int width>
 static Value * doAndVV(BasicBlock *&b, Value *o1, Value *o2)
 {
@@ -675,12 +685,24 @@ void Bitops_populateDispatchMap(DispatchMap &m)
     m[X86::AND8rm] = translate_AND8rm;
     m[X86::AND8rr] = translate_AND8rr;
     m[X86::AND8rr_REV] = translate_AND8rr_REV;
+	m[X86::AND64ri32] = translate_NOOP;
+	m[X86::AND64rr] = translate_NOOP;
+	m[X86::AND64rm] = translate_NOOP;
+	m[X86::AND64ri8] = translate_NOOP;
+	m[X86::AND64i32] = translate_NOOP;
+	m[X86::AND64mr] = translate_NOOP;
+	m[X86::AND64mi8] = translate_NOOP;
+	m[X86::AND64mi32] = translate_NOOP;
+	
     m[X86::NOT16m] = translate_NOT16m;
     m[X86::NOT16r] = translate_NOT16r;
     m[X86::NOT32m] = translate_NOT32m;
     m[X86::NOT32r] = translate_NOT32r;
     m[X86::NOT8m] = translate_NOT8m;
     m[X86::NOT8r] = translate_NOT8r;
+	m[X86::NOT64r] = translate_NOOP;
+	m[X86::NOT64m] = translate_NOOP;
+	
     m[X86::OR16i16] = translate_OR16i16;
     m[X86::OR16mi] = translate_OR16mi;
     m[X86::OR16mi8] = translate_OR16mi8;

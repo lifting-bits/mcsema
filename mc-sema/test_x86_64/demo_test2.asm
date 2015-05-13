@@ -1,4 +1,4 @@
-BITS 32
+BITS 64
 SEGMENT .text
 
 filler: db 0x00

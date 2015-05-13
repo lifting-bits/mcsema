@@ -92,7 +92,8 @@ static bool isConformantJumpInst(InstPtr jmpinst) {
     const llvm::MCInst &inst = jmpinst->get_inst();
 
     // these are now done via switch()
-    if(inst.getOpcode() == llvm::X86::JMP32r) {
+    if(inst.getOpcode() == llvm::X86::JMP32r ||
+	   inst.getOpcode() == llvm::X86::JMP64r) {
         return true;
     }
 

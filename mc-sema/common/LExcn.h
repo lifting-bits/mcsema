@@ -25,4 +25,6 @@ public:
 
 #define LASSERT(cond, msg) if(!(cond)) throw LErr(__LINE__, __FILE__, msg); 
 
+#define D(X)
+
 #endif //_L_EXCN_H
