@@ -1,0 +1,14 @@
+BITS 64
+;TEST_FILE_META_BEGIN
+;TEST_TYPE=TEST_F
+;TEST_IGNOREFLAGS=
+;TEST_FILE_META_END
+
+;TEST_BEGIN_RECORDING
+lea rdi, [rsp-0xc]
+mov word [rdi], 0x4
+fild word [rdi]
+mov edi, 0
+FSQRT
+;TEST_END_RECORDING
+
