@@ -611,7 +611,7 @@ void allocateLocals(Function *F, int bits) {
             Instruction *afA = new AllocaInst(boolTy, "OF_val", pfA);
             Instruction *dfA = new AllocaInst(boolTy, "DF_val", afA);
             TASSERT(dfA != NULL, "");
-#if 0
+			
             // FPU STACK
             Type    *floatTy = Type::getX86_FP80Ty(F->getContext());
             // 8 float values make up the ST registers
@@ -668,18 +668,18 @@ void allocateLocals(Function *F, int bits) {
             TASSERT(fpu_TagWord != NULL, "");
 
             Instruction *fpu_LASTIP_SEG = new AllocaInst(Type::getInt16Ty(F->getContext()),   "FPU_LASTIP_SEG_val"  , fpu_TagWord);
-            Instruction *fpu_LASTIP_OFF = new AllocaInst(Type::getInt64Ty(F->getContext()),   "FPU_LASTIP_OFF_val"  , fpu_LASTIP_SEG);
+            Instruction *fpu_LASTIP_OFF = new AllocaInst(Type::getInt32Ty(F->getContext()),   "FPU_LASTIP_OFF_val"  , fpu_LASTIP_SEG);
             Instruction *fpu_LASTDATA_SEG = new AllocaInst(Type::getInt16Ty(F->getContext()), "FPU_LASTDATA_SEG_val", fpu_LASTIP_OFF);
-            Instruction *fpu_LASTDATA_OFF = new AllocaInst(Type::getInt64Ty(F->getContext()), "FPU_LASTDATA_OFF_val", fpu_LASTDATA_SEG);
+            Instruction *fpu_LASTDATA_OFF = new AllocaInst(Type::getInt32Ty(F->getContext()), "FPU_LASTDATA_OFF_val", fpu_LASTDATA_SEG);
 
             Instruction *fpu_FOPCODE = new AllocaInst(Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE_val", fpu_LASTDATA_OFF);
             TASSERT(fpu_FOPCODE != NULL, "");
-#endif
+			
             //vector registers
             Instruction *vec_xmm0 =
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM0_val",
-                                dfA);
+                                fpu_FOPCODE);
             Instruction *vec_xmm1 =
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM1_val",

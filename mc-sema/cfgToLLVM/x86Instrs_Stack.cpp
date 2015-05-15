@@ -587,7 +587,7 @@ GENERIC_TRANSLATION_MEM(POP32rmm,
         doPopM<32>(ip, block, STD_GLOBAL_OP(0)));
 
 void Stack_populateDispatchMap(DispatchMap &m) {
-        m[X86::ENTER] = translate_ENTER;
+        m[X86::ENTER] = translate_NOOP;//ENTER;
         m[X86::LEAVE] = translate_LEAVE;
         m[X86::POP16r] = translate_POP16r;
         m[X86::POP32r] = translate_POP32r;

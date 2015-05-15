@@ -888,7 +888,7 @@ void Branches_populateDispatchMap(DispatchMap &m) {
     m[X86::CALL32r] = translate_CALL32r;
 	m[X86::CALL64r] = translate_NOOP;
     
-	m[X86::LOOP] = translate_LOOP;
+	//m[X86::LOOP] = translate_LOOP;
     m[X86::LOOPE] = translate_LOOPE;
     m[X86::LOOPNE] = translate_LOOPNE;
     m[X86::RETL] = translate_RET;

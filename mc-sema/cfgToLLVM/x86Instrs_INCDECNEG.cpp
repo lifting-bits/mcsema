@@ -199,7 +199,7 @@ static InstTransResult doDecR(InstPtr ip,  BasicBlock      *&b,
     if(regWidth == x86::REG_SIZE)
 		WriteAF2<32>(b, reg_f_v, x86::R_READ<32>(b, dst.getReg()), CONST_V<32>(b, 1));
 	else
-		WriteAF2<64>(b, reg_f_v, x86::R_READ<64>(b, dst.getReg()), CONST_V<64>(b, 1));
+		WriteAF2<64>(b, reg_f_v, x86_64::R_READ<64>(b, dst.getReg()), CONST_V<64>(b, 1));
 
     return ContinueBlock;
 }

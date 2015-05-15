@@ -14,6 +14,8 @@
 #define PACKED 
 #endif
 
+//#define __x86_64__
+
 #ifdef __cplusplus
 namespace mcsema {
 #endif
@@ -321,14 +323,48 @@ typedef struct _fpucontrol {
 //structure for register state
 typedef struct _RegState {
     //the big registers
-    uint32_t	EAX;
-    uint32_t	EBX;
-    uint32_t	ECX;
-    uint32_t	EDX;
-    uint32_t	ESI;
-    uint32_t	EDI;
-    uint32_t	ESP;
-    uint32_t	EBP; // 32 bytes
+	union {
+		uint32_t	EAX;
+		uint64_t 	RAX;
+	};
+	union {
+		uint32_t	EBX;
+		uint64_t	RBX;
+	};
+	union {
+		uint32_t	ECX;
+		uint64_t	RCX;
+	};
+	union {
+		uint32_t	EDX;
+		uint64_t	RDX;
+	};
+	union {
+		uint32_t	ESI;
+		uint64_t	RSI;
+	};
+	union {
+		uint32_t	EDI;
+		uint64_t	RDI;
+	};
+	union {
+		uint32_t	ESP;
+		uint64_t 	RSP;
+	};
+	union {
+		uint32_t	EBP; // 32 bytes
+		uint64_t	RBP;
+	};
+#ifdef __x86_64__
+	uint64_t 	R8;
+	uint64_t	R9;
+	uint64_t	R10;
+	uint64_t	R11;
+	uint64_t	R12;
+	uint64_t	R13;
+	uint64_t	R14;
+	uint64_t	R15;
+#endif
 
     //the flags
     uint8_t	CF;
@@ -355,13 +391,27 @@ typedef struct _RegState {
     xmmregstate      XMM5;
     xmmregstate      XMM6;
     xmmregstate      XMM7;
+#ifdef __x86_64__
+	xmmregstate      XMM8;
+    xmmregstate      XMM9;
+    xmmregstate      XMM10;
+    xmmregstate      XMM11;
+    xmmregstate      XMM12;
+    xmmregstate      XMM13;
+    xmmregstate      XMM14;
+    xmmregstate      XMM15;
+#endif
 
 
     // not registers, but necessary to support calls
     // via register/memory
+#ifdef __x86_64__
+	uint64_t stack_base; // biggest number ESP can be
+    uint64_t stack_limit; // smallest number ESP can be
+#else
     uint32_t stack_base; // biggest number ESP can be
     uint32_t stack_limit; // smallest number ESP can be
-
+#endif
 #ifdef __cplusplus
     void printMe(const std::string &name) const {
 #ifdef DEBUG
@@ -403,6 +453,35 @@ typedef struct _RegState {
 
 #ifdef __cplusplus
 	bool operator==(const _RegState &other ) const {
+#ifdef __x86_64__
+		return (this->RAX == other.RAX &&
+				this->RBX == other.RBX &&
+				this->RCX == other.RCX &&
+				this->RDX == other.RDX &&
+				this->RDI == other.RDI &&
+				this->RSI == other.RSI &&
+				this->RBP == other.RBP &&
+				this->RSP == other.RSP &&
+				this->R8 == other.R8 &&
+				this->R9 == other.R9 &&
+				this->R10 == other.R10 &&
+				this->R11 == other.R11 &&
+				this->R12 == other.R12 && 
+				this->R13 == other.R13 &&
+				this->R14 == other.R14 &&
+				this->R15 == other.R15 &&
+				this->CF == other.CF &&
+				this->PF == other.PF &&
+				this->AF == other.AF &&
+				this->SF == other.SF &&
+				this->OF == other.OF &&
+				this->DF == other.DF &&
+				this->ST_regs == other.ST_regs &&
+                this->FPU_FLAGS == other.FPU_FLAGS &&
+                this->FPU_CONTROL == other.FPU_CONTROL &&
+                this->FPU_FOPCODE == other.FPU_FOPCODE &&
+                this->FPU_TAG == other.FPU_TAG);
+#else
 		return (this->EAX == other.EAX &&
 				this->EBX == other.EBX &&
 				this->ECX == other.ECX &&
@@ -421,6 +500,7 @@ typedef struct _RegState {
                 this->FPU_CONTROL == other.FPU_CONTROL &&
                 this->FPU_FOPCODE == other.FPU_FOPCODE &&
                 this->FPU_TAG == other.FPU_TAG);
+#endif
 	}
 #endif
 

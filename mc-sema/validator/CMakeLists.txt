@@ -1,3 +1,2 @@
-add_subdirectory(valTool)
-add_subdirectory(valTest)
-add_subdirectory(testSemantics)
+#add_subdirectory(x86)
+add_subdirectory(x86_64)
