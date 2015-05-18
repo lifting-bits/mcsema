@@ -204,6 +204,30 @@ static InstTransResult doDecR(InstPtr ip,  BasicBlock      *&b,
     return ContinueBlock;
 }
 
+template <int width, int regWidth>
+static InstTransResult doDecR(InstPtr ip,  BasicBlock      *&b,
+                        const MCOperand &dst)
+{
+    NASSERT(dst.isReg());
+
+    // Cache a full width read of the register.
+    Value *reg_f_v = R_READ<regWidth>(b, dst.getReg());
+
+    // Do a read of the register.
+    Value *reg_v = R_READ<width>(b, dst.getReg());
+
+    Value *result = doDecV<width>(ip, b, reg_v);
+
+    // Write it back out.
+    R_WRITE<width>(b, dst.getReg(), result);
+
+    // Update AF with the result from the register.
+
+	WriteAF2<regWidth>(b, reg_f_v, R_READ<regWidth>(b, dst.getReg()), CONST_V<regWidth>(b, 1));
+
+    return ContinueBlock;
+}
+
 template <int width>
 static InstTransResult doDecM(InstPtr ip, BasicBlock *&b, Value *m) {
     NASSERT(m != NULL);
@@ -217,7 +241,9 @@ static InstTransResult doDecM(InstPtr ip, BasicBlock *&b, Value *m) {
     return ContinueBlock;
 }
 
-GENERIC_TRANSLATION(DEC64r, doDecR<64>(ip, block, OP(0)))
+GENERIC_TRANSLATION(DEC64_16r, (doDecR<16, 64>(ip, block, OP(0))))
+GENERIC_TRANSLATION(DEC64_32r, (doDecR<32, 64>(ip, block, OP(0))))
+GENERIC_TRANSLATION(DEC64r, (doDecR<64, 64>(ip, block, OP(0))))
 GENERIC_TRANSLATION(DEC16r, doDecR<16>(ip, block, OP(0)))
 GENERIC_TRANSLATION(DEC8r, doDecR<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION_MEM(DEC16m, 
@@ -339,8 +365,11 @@ void INCDECNEG_populateDispatchMap(DispatchMap &m) {
         m[X86::DEC32m] = translate_DEC32m;
         m[X86::DEC8m] = translate_DEC8m;
         m[X86::DEC32r] = translate_DEC32r;
-		m[X86::DEC64r] = translate_DEC64r;
 		
+		m[X86::DEC64_16r] = translate_DEC64_16r;
+		m[X86::DEC64_32r] = translate_DEC64_32r;
+		m[X86::DEC64r] = translate_DEC64r;
+
         m[X86::INC16m] = translate_INC16m;
         m[X86::INC32m] = translate_INC32m;
 		

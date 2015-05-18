@@ -14,7 +14,7 @@
 #define PACKED 
 #endif
 
-//#define __x86_64__
+//#define DEBUG
 
 #ifdef __cplusplus
 namespace mcsema {
@@ -323,39 +323,25 @@ typedef struct _fpucontrol {
 //structure for register state
 typedef struct _RegState {
     //the big registers
-	union {
-		uint32_t	EAX;
-		uint64_t 	RAX;
-	};
-	union {
-		uint32_t	EBX;
-		uint64_t	RBX;
-	};
-	union {
-		uint32_t	ECX;
-		uint64_t	RCX;
-	};
-	union {
-		uint32_t	EDX;
-		uint64_t	RDX;
-	};
-	union {
-		uint32_t	ESI;
-		uint64_t	RSI;
-	};
-	union {
-		uint32_t	EDI;
-		uint64_t	RDI;
-	};
-	union {
-		uint32_t	ESP;
-		uint64_t 	RSP;
-	};
-	union {
-		uint32_t	EBP; // 32 bytes
-		uint64_t	RBP;
-	};
-#ifdef __x86_64__
+#ifndef __x86_64__
+	uint32_t	EAX;
+	uint32_t	EBX;
+	uint32_t	ECX;
+	uint32_t	ECX;
+	uint32_t 	EDX;
+	uint32_t	ESI;
+	uint32_t	EDI;
+	uint32_t	ESP;
+	uint32_t	EBP;
+#else
+	uint64_t 	RAX;
+	uint64_t 	RBX;
+	uint64_t 	RCX;
+	uint64_t 	RDX;
+	uint64_t	RSI;
+	uint64_t 	RDI;
+	uint64_t 	RSP;
+	uint64_t 	RBP;
 	uint64_t 	R8;
 	uint64_t	R9;
 	uint64_t	R10;
@@ -417,14 +403,14 @@ typedef struct _RegState {
 #ifdef DEBUG
         const char *cstr = name.c_str();
         printf("\n");
-        printf("%s: EAX=0x%08x\n", cstr, this->EAX);
-        printf("%s: EBX=0x%08x\n", cstr, this->EBX);
-        printf("%s: ECX=0x%08x\n", cstr, this->ECX);
-        printf("%s: EDX=0x%08x\n", cstr, this->EDX);
-        printf("%s: ESI=0x%08x\n", cstr, this->ESI);
-        printf("%s: EDI=0x%08x\n", cstr, this->EDI);
-        printf("%s: ESP=0x%08x\n", cstr, this->ESP);
-        printf("%s: EBP=0x%08x\n", cstr, this->EBP);
+        printf("%s: EAX=0x%16x\n", cstr, this->RAX);
+        printf("%s: EBX=0x%16x\n", cstr, this->RBX);
+        printf("%s: ECX=0x%16x\n", cstr, this->RCX);
+        printf("%s: EDX=0x%16x\n", cstr, this->RDX);
+        printf("%s: ESI=0x%16x\n", cstr, this->RSI);
+        printf("%s: EDI=0x%16x\n", cstr, this->RDI);
+        printf("%s: ESP=0x%16x\n", cstr, this->RSP);
+        printf("%s: EBP=0x%16x\n", cstr, this->RBP);
         printf("%s: CF: %d PF: %d AF: %d ZF: %d SF: %d OF: %d DF: %d\n",
                 cstr, this->CF, this->PF, this->AF, this->ZF, this->SF, this->OF, this->DF);
 
@@ -459,7 +445,6 @@ typedef struct _RegState {
 				this->RCX == other.RCX &&
 				this->RDX == other.RDX &&
 				this->RDI == other.RDI &&
-				this->RSI == other.RSI &&
 				this->RBP == other.RBP &&
 				this->RSP == other.RSP &&
 				this->R8 == other.R8 &&

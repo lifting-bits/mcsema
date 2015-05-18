@@ -228,7 +228,8 @@ void doGlobalInit(Module *M) {
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // DF // 22
                                                                    // 56 bytes
     // FPU registers 
-	ArrayType  *fpu_regs = ArrayType::get(Type::getX86_FP80Ty(M->getContext()), 8);
+	ArrayType  *fpu_regs = ArrayType::get(IntegerType::get(M->getContext(), 128)
+										/*Type::getX86_FP80Ty(M->getContext())*/, 8);
     regFields.push_back(fpu_regs);                                 // 80 bytes // 23
 	
 	// FPU Status Word

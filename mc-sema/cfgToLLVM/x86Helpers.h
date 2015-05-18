@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 template <int width>
 llvm::Value *concatInts(llvm::BasicBlock *b, llvm::Value *a1, llvm::Value *a2) {
-    TASSERT(width == 8 || width == 16 || width == 32, "");
+    TASSERT(width == 8 || width == 16 || width == 32 || width == 64, "");
     llvm::Type    *typeTo = llvm::Type::getIntNTy(b->getContext(), width*2);
     
     TASSERT(typeTo != NULL, "");

@@ -243,6 +243,9 @@ static Value * doAdcVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *src)
         case 32:
             t = Type::getInt32Ty(b->getContext());
             break;
+        case 64:
+        	t = Type::getInt64Ty(b->getContext());
+        	break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");
     }
@@ -539,6 +542,7 @@ GENERIC_TRANSLATION_MEM(ADD32rm,
         doAddRM<32>(ip, block, ADDR(2), OP(0), OP(1)),
         doAddRM<32>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
 
+GENERIC_TRANSLATION(ADD64rr, doAddRR<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD32rr, doAddRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD32rr_DB, doAddRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD32rr_REV, doAddRR<32>(ip, block, OP(0), OP(1), OP(2)))
@@ -585,6 +589,8 @@ GENERIC_TRANSLATION(ADC16rr, doAdcRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADC16rr_REV, doAdcRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADC32i32, doAdcI<32>(ip, block, OP(0)))
 
+GENERIC_TRANSLATION(ADC64i32, doAdcI<32>(ip, block, OP(0)))
+
 GENERIC_TRANSLATION_32MI(ADC32mi, 
         doAdcMI<32>(ip, block, ADDR(0), OP(5)),
         doAdcMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
@@ -598,6 +604,8 @@ GENERIC_TRANSLATION_MEM(ADC32mr,
         doAdcMR<32>(ip, block, ADDR(0), OP(5)),
         doAdcMR<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
 
+GENERIC_TRANSLATION(ADC64ri32, doAdcRI<32>(ip, block, OP(0), OP(1), OP(2)))
+
 GENERIC_TRANSLATION(ADC32ri, doAdcRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADC32ri8, doAdcRI8<32>(ip, block, OP(0), OP(1), OP(2)))
 
@@ -605,6 +613,7 @@ GENERIC_TRANSLATION_MEM(ADC32rm,
         doAdcRM<32>(ip, block, ADDR(2), OP(0), OP(1)),
         doAdcRM<32>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
 
+GENERIC_TRANSLATION(ADC64rr, doAdcRR<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADC32rr, doAdcRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADC32rr_REV, doAdcRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADC8i8, doAdcI<8>(ip, block, OP(0)))
@@ -692,8 +701,12 @@ void ADD_populateDispatchMap(DispatchMap &m)
     m[X86::ADD64i32] = translate_ADD64i32;
     m[X86::ADD64mi8] = translate_NOOP;
 	m[X86::ADD64mi32] = translate_NOOP;
-	m[X86::ADD64rr_DB] = translate_NOOP;
-	m[X86::ADD64rr] = translate_NOOP;
+	m[X86::ADD64rr_DB] = translate_ADD64rr;
+	m[X86::ADD64rr] = translate_ADD64rr;
 	m[X86::ADD64rm] = translate_NOOP;
 	m[X86::ADD64mr] = translate_NOOP;
+
+	m[X86::ADC64i32] = translate_ADC64i32;
+	m[X86::ADC64ri32] = translate_ADC64ri32;
+	m[X86::ADC64rr] = translate_ADC64rr;
 }

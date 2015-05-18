@@ -314,6 +314,8 @@ GENERIC_TRANSLATION_MEM(XCHG16rm,
 	doXchgRM<16>(ip,  block, OP(0), STD_GLOBAL_OP(2)))        
 GENERIC_TRANSLATION(XCHG16rr, doXchgRR<16>(ip, block, OP(1), OP(2)))
 GENERIC_TRANSLATION(XCHG32ar, doXchgRR<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(XCHG32ar64, doXchgRR<64>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(XCHG64ar, doXchgRR<64>(ip, block, MCOperand::CreateReg(X86::RAX), OP(0)))
 GENERIC_TRANSLATION_MEM(XCHG32rm, 
 	doXchgRM<32>(ip,  block, OP(0), ADDR(2)),
 	doXchgRM<32>(ip,  block, OP(0), STD_GLOBAL_OP(2)))
@@ -341,6 +343,8 @@ void Exchanges_populateDispatchMap(DispatchMap &m) {
         m[X86::XCHG16rm] = translate_XCHG16rm;
         m[X86::XCHG16rr] = translate_XCHG16rr;
         m[X86::XCHG32ar] = translate_XCHG32ar;
+        m[X86::XCHG32ar64] = translate_XCHG32ar64;
+        m[X86::XCHG64ar] = translate_XCHG64ar;
         m[X86::XCHG32rm] = translate_XCHG32rm;
         m[X86::XCHG32rr] = translate_XCHG32rr;
         m[X86::XCHG8rm] = translate_XCHG8rm;

@@ -102,11 +102,9 @@ Function *initTestFunction(string testName, Module *M) {
     assert(entryBlock != NULL);
 
     if(getPointerSize(M) == Pointer32){
-        cout << "pointer size " << getPointerSize(M) << "\n";
         allocateLocals(F, 32);
         writeContextToLocals(entryBlock, 32, AllRegs);
     } else {
-        cout << "pointer size 1 " << getPointerSize(M) << "\n";
         allocateLocals(F, 64);
         writeContextToLocals(entryBlock, 64, AllRegs);
     }
@@ -370,6 +368,7 @@ void getValueWriteToState(const string &line, mcsema::RegState &state)
             cerr << "could not parse " << v << " as a uint32_t\n";
             throw e;
         }
+        cout << regName << " : " << regVal <<"\n";
         writeToState<uint64_t>(regName, regVal, &state);
     }
 }
@@ -634,7 +633,7 @@ void ModuleTest::getStatesForTest(mcsema::RegState *inState, mcsema::RegState *o
 #endif
     *inState = states.first;
     *outState = states.second;
-
+    printf("RBP -> %ld\n", outState->RBP);
     return;
 }
 
@@ -1062,17 +1061,36 @@ void release_low_addr(void *v, uint32_t len) {
 void fixStatesForStack(mcsema::RegState *inState, mcsema::RegState *outState, void *stack) {
     // Compute deltas for EBP and ESP.
 #ifdef __x86_64__
+    std::cout << "RBP -> "<< outState->RBP << "\n";
+
+    int64_t espebpDelta =  ((int64_t)inState->RBP) - ((int64_t)inState->RSP);
     int64_t espDelta = ((int64_t)inState->RSP) - ((int64_t)outState->RSP);
     int64_t ebpDelta = ((int64_t)inState->RBP) - ((int64_t)outState->RBP);
 
-    inState->RSP = (uint64_t)((ptrdiff_t)stack - 64);
-    outState->RSP = (uint64_t)((ptrdiff_t)stack - 64);
+    if(espebpDelta > 0){
+        inState->RBP = (uint64_t)((ptrdiff_t)stack - 32);
+        outState->RBP = (uint64_t)((ptrdiff_t)stack - 32);
 
-    inState->RBP = (uint64_t)((ptrdiff_t)stack);
-    outState->RBP = (uint64_t)((ptrdiff_t)stack);
+        inState->RSP = (uint64_t)((ptrdiff_t)stack - 32) - espebpDelta;
+        outState->RSP = (uint64_t)((ptrdiff_t)stack - 32) - espebpDelta;
+    } else {
+        inState->RSP = (uint64_t)((ptrdiff_t)stack - 32);
+        outState->RSP = (uint64_t)((ptrdiff_t)stack - 32);
+
+        inState->RBP = (uint64_t)((ptrdiff_t)stack - 32) + espebpDelta;
+        outState->RBP = (uint64_t)((ptrdiff_t)stack - 32) + espebpDelta;
+    }
+
+
+    //inState->RSP = (uint64_t)((ptrdiff_t)stack);
+    //outState->RSP = (uint64_t)((ptrdiff_t)stack);
+
+    //inState->RBP = (uint64_t)((ptrdiff_t)stack) + (espebpDelta);
+    //outState->RBP = (uint64_t)((ptrdiff_t)stack) + (espebpDelta);
 
     outState->RSP -= espDelta;
     outState->RBP -= ebpDelta;
+
 #else
     int32_t espDelta = ((int32_t)inState->ESP) - ((int32_t)outState->ESP);
     int32_t ebpDelta = ((int32_t)inState->EBP) - ((int32_t)outState->EBP);
@@ -1182,7 +1200,7 @@ void printXMM(mcsema::RegState *in)
         this->getStatesForTest(&inputState, &outputState, testName);\
         void *b = get_low_addr(STACK_LEN);\
         assert(b != NULL);\
-        fixStatesForStack(&inputState, &outputState, (void*)((ptrdiff_t)b + (STACK_LEN - 4)));\
+        fixStatesForStack(&inputState, &outputState, (void*)((ptrdiff_t)b + (STACK_LEN - 8)));\
         fromTopRelative(inputState);\
         inputState.printMe(testName "_PRE_INPUT");\
         outputState.printMe(testName "_PRE_OUTPUT");\
