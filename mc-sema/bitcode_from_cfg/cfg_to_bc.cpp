@@ -153,11 +153,11 @@ llvm::Module  *getLLVMModule(string name, const Target *T)
   if(string(T->getName()) == "x86-64") {
       M->setDataLayout(dtLayout64);
       M->setTargetTriple("x86_64-unknown-unknown");
-	  x86_64::doGlobalInit(M);
+	  doGlobalInit(M);
   } else{
       M->setDataLayout(dtLayout);
       M->setTargetTriple(TargetTriple);
-	  x86::doGlobalInit(M);
+	  doGlobalInit(M);
   }
 
   return M;

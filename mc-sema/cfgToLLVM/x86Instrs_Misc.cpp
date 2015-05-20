@@ -593,12 +593,30 @@ static InstTransResult translate_LEA64r(NativeModulePtr natM, BasicBlock *&block
                 block->getParent()->getParent(), 
                 ip->get_call_tgt(0));
         Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+            callback_fn, llvm::Type::getInt64Ty(block->getContext()), "", block);
         ret = doLeaV<64>(block, OP(0), addrInt);
     } else if( ip->is_data_offset() ) {
         ret = doLea<64>(ip, block, STD_GLOBAL_OP(1), OP(0));
     } else { 
         ret = doLea<64>(ip, block, ADDR(1), OP(0));
+    }
+    return ret;
+}
+
+static InstTransResult translate_LEA64_32r(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
+    InstTransResult ret;
+    Function *F = block->getParent();
+    if( ip->has_call_tgt() ) {
+        Value *callback_fn = archMakeCallbackForLocalFunction(
+                block->getParent()->getParent(),
+                ip->get_call_tgt(0));
+        Value *addrInt = new PtrToIntInst(
+            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+        ret = doLeaV<32>(block, OP(0), addrInt);
+    } else if( ip->is_data_offset() ) {
+        ret = doLea<32>(ip, block, STD_GLOBAL_OP(1), OP(0));
+    } else {
+        ret = doLea<32>(ip, block, ADDR(1), OP(0));
     }
     return ret;
 }
@@ -629,6 +647,7 @@ void Misc_populateDispatchMap(DispatchMap &m) {
     m[X86::AAD8i8] = translate_AAD8i8;
     m[X86::LEA16r] = translate_LEA16r;
     m[X86::LEA32r] = translate_LEA32r;
+	m[X86::LEA64_32r] = translate_LEA64_32r;
 	m[X86::LEA64r] = translate_LEA64r;
     m[X86::LAHF] = translate_LAHF;
     m[X86::STD] = translate_STD;

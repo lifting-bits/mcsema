@@ -209,7 +209,7 @@ static InstTransResult doCondBranch(InstPtr ip,   BasicBlock *&b,
 static InstTransResult translate_Jcc(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
 
     Function *F = block->getParent();
-    llvm::dbgs() << __FUNCTION__ << "\tRepresentation: " << ip->printInst() << "\n";
+   // llvm::dbgs() << __FUNCTION__ << "\tRepresentation: " << ip->printInst() << "\n";
 
     std::string  trueStrName = "block_0x"+to_string<VA>(ip->get_tr(), std::hex);
     std::string  falseStrName = "block_0x"+to_string<VA>(ip->get_fa(), std::hex);

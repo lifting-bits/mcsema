@@ -502,8 +502,6 @@ static InstTransResult doPushR(InstPtr ip, BasicBlock *&b, const MCOperand &src)
     NASSERT(src.isReg());
 
     //first, read from <r> into a temp
-    llvm::dbgs() << "pushR " << width << " "<< to_string<VA>(ip->get_opcode(), std::hex)<< "\n";
-
 	Value *TMP = R_READ<width>(b, src.getReg());
 		
 	doPushV<width>(ip, b, TMP);

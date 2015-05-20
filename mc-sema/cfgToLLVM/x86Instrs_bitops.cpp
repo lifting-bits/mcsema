@@ -484,7 +484,6 @@ static InstTransResult doXorRR(InstPtr ip, BasicBlock *&b,
     TASSERT(dst.isReg(), "");
     TASSERT(o1.isReg(), "");
     TASSERT(o2.isReg(), "");
-	INSTR_DEBUG(ip);
 	
     // Read the sources.
     Value *o1_v = R_READ<width>(b, o1.getReg());
@@ -527,6 +526,10 @@ GENERIC_TRANSLATION_MEM(AND32mr,
 	doAndMR<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
 GENERIC_TRANSLATION(AND32ri, doAndRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND32ri8, doAndRI<32>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(AND64ri8, doAndRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(AND64ri32, doAndRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(AND64i32, doAndRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)))
+
 GENERIC_TRANSLATION_MEM(AND32rm, 
 	doAndRM<32>(ip, block, ADDR(2), OP(0), OP(1)),
 	doAndRM<32>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
@@ -685,11 +688,11 @@ void Bitops_populateDispatchMap(DispatchMap &m)
     m[X86::AND8rm] = translate_AND8rm;
     m[X86::AND8rr] = translate_AND8rr;
     m[X86::AND8rr_REV] = translate_AND8rr_REV;
-	m[X86::AND64ri32] = translate_NOOP;
+	m[X86::AND64ri32] = translate_AND64ri32;
 	m[X86::AND64rr] = translate_NOOP;
 	m[X86::AND64rm] = translate_NOOP;
-	m[X86::AND64ri8] = translate_NOOP;
-	m[X86::AND64i32] = translate_NOOP;
+	m[X86::AND64ri8] = translate_AND64ri8;
+	m[X86::AND64i32] = translate_AND64i32;
 	m[X86::AND64mr] = translate_NOOP;
 	m[X86::AND64mi8] = translate_NOOP;
 	m[X86::AND64mi32] = translate_NOOP;

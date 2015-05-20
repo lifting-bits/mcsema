@@ -484,6 +484,17 @@ static unsigned getPointerSize(llvm::Module *M){
 	return DL->getPointerSize(0)*BYTE_SIZE;
 }
 
+static unsigned getSystemArch(llvm::Module *M){
+	if(getPointerSize(M) == Pointer32){
+		return _X86_;
+	} else if(getPointerSize(M) == Pointer64){
+		return _X86_64_;
+	} else {
+		throw TErr(__LINE__, __FILE__, "Unsupported pointer size");
+	}
+}
+
+
 llvm::Value *MCRegToValue(llvm::BasicBlock *b, unsigned reg);
 
 template <int width>

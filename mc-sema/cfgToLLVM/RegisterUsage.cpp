@@ -36,6 +36,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "RegisterUsage.h"
 #include "TransExcn.h"
 
+#include "../common/to_string.h"
+
+using namespace std;
 using namespace llvm;
 
 namespace x86 {
@@ -128,6 +131,105 @@ Value *lookupLocal(Function *F, MCSemaRegs reg) {
     assert(0);
     throw TErr (__LINE__, __FILE__, "localname: "+localName+" is not found");
     return nullptr;
+}
+
+int mapPlatRegToOffset(unsigned reg) {
+    switch(reg) {
+        case X86::DH:
+        case X86::CH:
+        case X86::BH:
+        case X86::AH:
+            return 8;
+            break;
+        case X86::AX:
+        case X86::AL:
+        case X86::EAX:
+        case X86::BX:
+        case X86::BL:
+        case X86::EBX:
+        case X86::CX:
+        case X86::CL:
+        case X86::ECX:
+        case X86::DX:
+        case X86::DL:
+        case X86::EDX:
+        case X86::SI:
+        case X86::ESI:
+        case X86::DI:
+        case X86::EDI:
+        case X86::SP:
+        case X86::ESP:
+        case X86::BP:
+        case X86::EBP:
+
+        case X86::ST0:
+        case X86::ST1:
+        case X86::ST2:
+        case X86::ST3:
+        case X86::ST4:
+        case X86::ST5:
+        case X86::ST6:
+        case X86::ST7:
+
+        case X86::XMM0:
+        case X86::XMM1:
+        case X86::XMM2:
+        case X86::XMM3:
+        case X86::XMM4:
+        case X86::XMM5:
+        case X86::XMM6:
+        case X86::XMM7:
+            return 0;
+            break;
+        default:
+            throw TErr(__LINE__, __FILE__, "Reg type "+to_string<unsigned>(reg, dec)+" is unknown");
+    }
+
+    return -1;
+}
+
+Value *MCRegToValue(BasicBlock *b, unsigned reg) {
+    unsigned realReg = reg;
+    switch(reg)
+    {
+        case X86::AX:
+        case X86::AH:
+        case X86::AL:
+            realReg = X86::EAX;
+            break;
+        case X86::BX:
+        case X86::BH:
+        case X86::BL:
+            realReg = X86::EBX;
+            break;
+        case X86::CX:
+        case X86::CH:
+        case X86::CL:
+            realReg = X86::ECX;
+            break;
+        case X86::DX:
+        case X86::DH:
+        case X86::DL:
+            realReg = X86::EDX;
+            break;
+        case X86::SI:
+            realReg = X86::ESI;
+            break;
+        case X86::DI:
+            realReg = X86::EDI;
+            break;
+        case X86::SP:
+            realReg = X86::ESP;
+            break;
+        case X86::BP:
+            realReg = X86::EBP;
+            break;
+        default:
+            break;
+    }
+    Function    *F = b->getParent();
+
+    return lookupLocal(F, (MCSemaRegs)realReg);
 }
 }
 
@@ -245,9 +347,125 @@ Value *lookupLocal(Function *F, MCSemaRegs reg) {
 	std::cout << localName << std::endl;
 	std::cout.flush();
     assert(0);
-    //throw TErr (__LINE__, __FILE__, "localname: "+localName+" is not found");
+    throw TErr (__LINE__, __FILE__, "localname: "+localName+" is not found");
     return nullptr;
 }
+
+int mapPlatRegToOffset(unsigned reg) {
+    switch(reg) {
+        case X86::DH:
+        case X86::CH:
+        case X86::BH:
+        case X86::AH:
+            return 8;
+            break;
+        case X86::AX:
+        case X86::AL:
+        case X86::EAX:
+		case X86::RAX:
+        case X86::BX:
+        case X86::BL:
+        case X86::EBX:
+		case X86::RBX:
+        case X86::CX:
+        case X86::CL:
+        case X86::ECX:
+		case X86::RCX:
+        case X86::DX:
+        case X86::DL:
+        case X86::EDX:
+		case X86::RDX:
+        case X86::SI:
+        case X86::ESI:
+		case X86::RSI:
+        case X86::DI:
+        case X86::EDI:
+		case X86::RDI:
+        case X86::SP:
+        case X86::ESP:
+		case X86::RSP:
+        case X86::BP:
+        case X86::EBP:
+		case X86::RBP:
+
+        case X86::ST0:
+        case X86::ST1:
+        case X86::ST2:
+        case X86::ST3:
+        case X86::ST4:
+        case X86::ST5:
+        case X86::ST6:
+        case X86::ST7:
+
+        case X86::XMM0:
+        case X86::XMM1:
+        case X86::XMM2:
+        case X86::XMM3:
+        case X86::XMM4:
+        case X86::XMM5:
+        case X86::XMM6:
+        case X86::XMM7:
+		case X86::XMM8:
+		case X86::XMM9:
+		case X86::XMM10:
+		case X86::XMM11:
+		case X86::XMM12:
+		case X86::XMM13:
+		case X86::XMM14:
+		case X86::XMM15:
+            return 0;
+            break;
+        default:
+            throw TErr(__LINE__, __FILE__, "Reg type "+to_string<unsigned>(reg, dec)+" is unknown");
+    }
+
+    return -1;
+}
+
+Value *MCRegToValue(BasicBlock *b, unsigned reg) {
+    unsigned realReg = reg;
+    switch(reg)
+    {
+        case X86::AX:
+        case X86::AH:
+        case X86::AL:
+            realReg = X86::RAX;
+            break;
+        case X86::BX:
+        case X86::BH:
+        case X86::BL:
+            realReg = X86::RBX;
+            break;
+        case X86::CX:
+        case X86::CH:
+        case X86::CL:
+            realReg = X86::RCX;
+            break;
+        case X86::DX:
+        case X86::DH:
+        case X86::DL:
+            realReg = X86::RDX;
+            break;
+        case X86::SI:
+            realReg = X86::RSI;
+            break;
+        case X86::DI:
+            realReg = X86::RDI;
+            break;
+        case X86::SP:
+            realReg = X86::RSP;
+            break;
+        case X86::BP:
+            realReg = X86::RBP;
+            break;
+        default:
+            break;
+    }
+    Function    *F = b->getParent();
+
+    return lookupLocal(F, (MCSemaRegs)realReg);
+}
+
 }
 
 

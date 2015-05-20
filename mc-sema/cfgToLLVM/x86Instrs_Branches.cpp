@@ -546,9 +546,6 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
         it->addAttr(AttributeSet::get(it->getContext(), 1,  B));
         ++it;
 
-        std::cout << "Integer type " << to_string<VA>((VA)IntegerType::get(M->getContext(), 32), std::hex) << "\n";
-        std::cout << "Integer type " << to_string<VA>((VA)IntegerType::get(M->getContext(), 64), std::hex) << "\n";
-        std::cout << "Param type " << to_string<VA>((VA)reg_rdi->getType(), std::hex) << "\n";
     }
 
     if(paramCount && it != end) {

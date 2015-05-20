@@ -88,8 +88,7 @@ InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
                               pfx,
                               bytes));
 
-	cout << __FUNCTION__ << " : opcode   " << mcInst.getOpcode() << "\n";
-	cout.flush();
+	D(cout << __FUNCTION__ << " : opcode   " << mcInst.getOpcode() << "\n"; cout.flush())
 	
     //ask if this is a jmp, and figure out what the true / false follows are
     switch(mcInst.getOpcode()) {

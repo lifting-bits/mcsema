@@ -507,12 +507,12 @@ protected:
         t = findDisTarget("x86-64");
         this->M->setDataLayout(
             "e-m:e-i64:64-f80:128-n8:16:32:64-S128");
-        x86_64::doGlobalInit(this->M);
+        doGlobalInit(this->M);
 #else
         t = findDisTarget("x86");
         this->M->setDataLayout(
             "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-f80:128:128-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32-S32");
-        x86::doGlobalInit(this->M);
+        doGlobalInit(this->M);
 #endif
 
         assert(t != NULL);
@@ -633,7 +633,6 @@ void ModuleTest::getStatesForTest(mcsema::RegState *inState, mcsema::RegState *o
 #endif
     *inState = states.first;
     *outState = states.second;
-    printf("RBP -> %ld\n", outState->RBP);
     return;
 }
 
@@ -1061,8 +1060,6 @@ void release_low_addr(void *v, uint32_t len) {
 void fixStatesForStack(mcsema::RegState *inState, mcsema::RegState *outState, void *stack) {
     // Compute deltas for EBP and ESP.
 #ifdef __x86_64__
-    std::cout << "RBP -> "<< outState->RBP << "\n";
-
     int64_t espebpDelta =  ((int64_t)inState->RBP) - ((int64_t)inState->RSP);
     int64_t espDelta = ((int64_t)inState->RSP) - ((int64_t)outState->RSP);
     int64_t ebpDelta = ((int64_t)inState->RBP) - ((int64_t)outState->RBP);

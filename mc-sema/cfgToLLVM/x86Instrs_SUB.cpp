@@ -455,7 +455,7 @@ GENERIC_TRANSLATION(SBB8rr_REV, doSbbRR<8>(ip, block, OP(1), OP(2), OP(0)))
 
 static InstTransResult translate_SUB64ri8(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
 	InstTransResult ret;
-	INSTR_DEBUG(ip);
+	//INSTR_DEBUG(ip);
 	ret = doSubRI<64, 8>(ip, block, OP(0), OP(1), OP(2));
 	return ret;
 }

@@ -57,7 +57,7 @@ InstTransResult doMRMov(InstPtr ip, llvm::BasicBlock *&b,
     //MOV <mem>, <r>
     TASSERT(src.isReg(), "src is not a register");
     TASSERT(dstAddr != NULL, "Destination addr can't be null");
-	INSTR_DEBUG(ip);
+//	INSTR_DEBUG(ip);
 	
 	M_WRITE<width>(ip, b, dstAddr, R_READ<width>(b, src.getReg()));
 
@@ -87,7 +87,7 @@ InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b,
     //MOV <r>, <r>
     TASSERT(src.isReg(), "");
     TASSERT(dst.isReg(), "");
-    INSTR_DEBUG(ip);
+ //   INSTR_DEBUG(ip);
     //pretty straightforward
 
     R_WRITE<width>(b, dst.getReg(), R_READ<width>(b, src.getReg()));
@@ -103,7 +103,7 @@ InstTransResult doRMMov(InstPtr ip, llvm::BasicBlock      *b,
     //MOV <r>, <mem>
     TASSERT(dst.isReg(), "");
     TASSERT(srcAddr != NULL, "");
-	INSTR_DEBUG(ip);
+//	INSTR_DEBUG(ip);
     
 	R_WRITE<width>(b, dst.getReg(), M_READ<width>(ip, b, srcAddr));
 

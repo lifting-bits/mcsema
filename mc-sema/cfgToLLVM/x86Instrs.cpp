@@ -46,16 +46,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using namespace std;
 using namespace llvm;
 
-namespace x86 {
+
 Value* getGlobalRegAsPtr(BasicBlock *B, MCSemaRegs reg)
 {
     Function *F = B->getParent();
+    Module *M = F->getParent();
+    unsigned int regWidth = getPointerSize(M);
+
     Value *arg = F->arg_begin();
-    int globalRegsOff = getRegisterOffset(reg); 
+
+    int globalRegsOff = getSystemArch(M) == _X86_?
+    		x86::getRegisterOffset(reg) : x86_64::getRegisterOffset(reg);
+
     Value *globalGlobalGEPV[] = {
-        CONST_V<32>(B, 0),
+        CONST_V(B, regWidth, 0),
         CONST_V<32>(B, globalRegsOff),
-        CONST_V<32>(B, 0) };
+        CONST_V(B, regWidth, 0) };
 
     // Get element pointer.
     Instruction *gGlobalPtr = aliasMCSemaScope(GetElementPtrInst::CreateInBounds(arg, globalGlobalGEPV, "", B));
@@ -74,12 +80,16 @@ Value* getGlobalFPURegsAsPtr(BasicBlock *B)
 Value* getLocalRegAsPtr(BasicBlock *B, MCSemaRegs reg)
 {
     Function *F = B->getParent();
+    Module *M = F->getParent();
 
-    Value *localReg = lookupLocal(F, reg);
+    unsigned int regWidth = getPointerSize(M);
+
+    Value *localReg = getSystemArch(M) == _X86_?
+    		x86::lookupLocal(F, reg) : x86_64::lookupLocal(F, reg);
 
     // Need to get pointer to array[0] via GEP.
     Value *localGEP[] = {
-        CONST_V<32>(B, 0),
+        CONST_V(B, regWidth, 0),
         CONST_V<32>(B, 0)};
     Instruction *localPtr = noAliasMCSemaScope(GetElementPtrInst::CreateInBounds(
         localReg, localGEP, "", B));
@@ -94,59 +104,6 @@ Value* getLocalRegAsPtr(BasicBlock *B, MCSemaRegs reg)
 Value* getLocalFPURegsAsPtr(BasicBlock *B)
 {
     return getLocalRegAsPtr(B, ST0);
-}
-
-}
-
-namespace x86_64 {
-Value* getGlobalRegAsPtr(BasicBlock *B, MCSemaRegs reg)
-{
-    Function *F = B->getParent();
-    Value *arg = F->arg_begin();
-    int globalRegsOff = getRegisterOffset(reg); 
-    Value *globalGlobalGEPV[] = {
-        CONST_V<64>(B, 0),
-        CONST_V<32>(B, globalRegsOff),
-        CONST_V<64>(B, 0) };
-
-    // Get element pointer.
-    Instruction *gGlobalPtr = aliasMCSemaScope(GetElementPtrInst::CreateInBounds(arg, globalGlobalGEPV, "", B));
-    // Cast pointer to int8* for use with memcpy.
-    Instruction *globalCastPtr = aliasMCSemaScope(CastInst::CreatePointerCast(
-        gGlobalPtr, Type::getInt8PtrTy(B->getContext()), "", B));
-
-    return globalCastPtr;
-}
-
-Value* getGlobalFPURegsAsPtr(BasicBlock *B)
-{
-    return getGlobalRegAsPtr(B, ST0);
-}
-
-Value* getLocalRegAsPtr(BasicBlock *B, MCSemaRegs reg)
-{
-    Function *F = B->getParent();
-
-    Value *localReg = lookupLocal(F, reg);
-
-    // Need to get pointer to array[0] via GEP.
-    Value *localGEP[] = {
-        CONST_V<64>(B, 0),
-        CONST_V<32>(B, 0)};
-    Instruction *localPtr = noAliasMCSemaScope(GetElementPtrInst::CreateInBounds(
-        localReg, localGEP, "", B));
-
-    // Cast pointer to an Int8* for use with memcpy.
-    Instruction *localCastPtr = noAliasMCSemaScope(CastInst::CreatePointerCast(
-            localPtr, Type::getInt8PtrTy(B->getContext()), "", B));
-
-    return localCastPtr;
-}
-
-Value* getLocalFPURegsAsPtr(BasicBlock *B)
-{
-    return getLocalRegAsPtr(B, ST0);
-}
 }
 
 void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs)
@@ -217,9 +174,9 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
 
             //use llvm.memcpy to copy locals to context
             // SOURCE: get pointer to FPU locals
-            Value *localFPU = x86::getLocalFPURegsAsPtr(B);
+            Value *localFPU = getLocalFPURegsAsPtr(B);
             // DEST: get pointer to FPU globals
-            Value *globalFPU = x86::getGlobalFPURegsAsPtr(B);
+            Value *globalFPU = getGlobalFPURegsAsPtr(B);
             // SIZE: 8 FPU regs * sizeof(x86_FP80Ty)
             // ALIGN = 4
             // Volatile = FALSE
@@ -260,9 +217,9 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             STORE_F(FPU_IM);
 
             // SOURCE: get pointer to local tag word
-            Value *localTag = x86::getLocalRegAsPtr(B, FPU_TAG);
+            Value *localTag = getLocalRegAsPtr(B, FPU_TAG);
             // DEST: get pointer to FPU globals
-            Value *globalTag = x86::getGlobalRegAsPtr(B, FPU_TAG);
+            Value *globalTag = getGlobalRegAsPtr(B, FPU_TAG);
             // SIZE: 8 entries * sizeof(Int2Ty)
             // ALIGN = 4
             // Volatile = FALSE
@@ -365,17 +322,14 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
 
 			// FPU registers are generally avoided on 64bit system
 		    // SOURCE: get pointer to FPU locals
-            Value *localFPU = x86_64::getLocalFPURegsAsPtr(B);
+            Value *localFPU = getLocalFPURegsAsPtr(B);
             // DEST: get pointer to FPU globals
-            Value *globalFPU = x86_64::getGlobalFPURegsAsPtr(B);
+            Value *globalFPU = getGlobalFPURegsAsPtr(B);
 			
 			DataLayout  td(static_cast<Module*>(F->getParent()));
             uint32_t fpu_arr_size = 
                 (uint32_t)td.getTypeAllocSize(
                         Type::getX86_FP80Ty(B->getContext())) * NUM_FPU_REGS;
-			
-			std::cout <<  "ST size " << fpu_arr_size <<"\n";
-			std::cout.flush();
 			
 			Instruction *mcp_fpu = aliasMCSemaScope(callMemcpy(B, globalFPU, localFPU, fpu_arr_size, 8, false));
 
@@ -410,18 +364,15 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             STORE_F(FPU_IM);
 			
 			            // SOURCE: get pointer to local tag word
-            Value *localTag = x86_64::getLocalRegAsPtr(B, FPU_TAG);
+            Value *localTag = getLocalRegAsPtr(B, FPU_TAG);
             // DEST: get pointer to FPU globals
-            Value *globalTag = x86_64::getGlobalRegAsPtr(B, FPU_TAG);
+            Value *globalTag = getGlobalRegAsPtr(B, FPU_TAG);
             // SIZE: 8 entries * sizeof(Int2Ty)
             // Volatile = FALSE
             uint32_t tags_arr_size = 
                 (uint32_t)td.getTypeAllocSize(
                         Type::getIntNTy(B->getContext(), 2)) * NUM_FPU_REGS;
 						
-			cout << "FPU_TAG Size " << tags_arr_size << "\n";
-			cout.flush();
-
 			Instruction *mcp = aliasMCSemaScope(callMemcpy(B, globalTag, localTag, tags_arr_size, 4, false));
 
 			// last IP segment is a 16-bit value
@@ -535,9 +486,9 @@ void writeContextToLocals(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
 
             //use llvm.memcpy to copy locals to context
             // SOURCE: get pointer to FPU globals
-            Value *globalFPU = x86::getGlobalFPURegsAsPtr(B);
+            Value *globalFPU = getGlobalFPURegsAsPtr(B);
             // DEST: get pointer to FPU locals
-            Value *localFPU = x86::getLocalFPURegsAsPtr(B);
+            Value *localFPU = getLocalFPURegsAsPtr(B);
             // SIZE: 8 registers sizeof(fp type)
             // ALIGN = 4
             // Volatile = FALSE
@@ -545,7 +496,7 @@ void writeContextToLocals(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             uint32_t fpu_arr_size = 
                 (uint32_t)td.getTypeAllocSize(Type::getX86_FP80Ty(B->getContext())) * NUM_FPU_REGS;
 
-            Instruction *mcp_fpu = aliasMCSemaScope(callMemcpy(B, localFPU, globalFPU, fpu_arr_size, 4, false));
+            Instruction *mcp_fpu = aliasMCSemaScope(callMemcpy(B, localFPU, globalFPU, fpu_arr_size, 8, false));
 
             // time for FPU Flags
             SPILL_F(FPU_B);
@@ -577,9 +528,9 @@ void writeContextToLocals(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             SPILL_F(FPU_IM);
 
             // DEST: get pointer to local tag word
-            Value *localTag = x86::getLocalRegAsPtr(B, FPU_TAG);
+            Value *localTag = getLocalRegAsPtr(B, FPU_TAG);
             // SRC: get pointer to FPU globals
-            Value *globalTag = x86::getGlobalRegAsPtr(B, FPU_TAG);
+            Value *globalTag = getGlobalRegAsPtr(B, FPU_TAG);
             // SIZE: 8 entries * sizeof(Int2Ty)
             // ALIGN = 4
             // Volatile = FALSE
@@ -682,9 +633,9 @@ std::string regnm = x86_64::getRegisterName(nm); \
 			// we are not spilling them
 			
 			            // SOURCE: get pointer to FPU globals
-            Value *globalFPU = x86_64::getGlobalFPURegsAsPtr(B);
+            Value *globalFPU = getGlobalFPURegsAsPtr(B);
             // DEST: get pointer to FPU locals
-            Value *localFPU = x86_64::getLocalFPURegsAsPtr(B);
+            Value *localFPU = getLocalFPURegsAsPtr(B);
             // Volatile = FALSE
             DataLayout  td(F->getParent());
             uint32_t fpu_arr_size = 
@@ -721,9 +672,9 @@ std::string regnm = x86_64::getRegisterName(nm); \
             SPILL_F(FPU_IM);
 			
             // DEST: get pointer to local tag word
-            Value *localTag = x86_64::getLocalRegAsPtr(B, FPU_TAG);
+            Value *localTag = getLocalRegAsPtr(B, FPU_TAG);
             // SRC: get pointer to FPU globals
-            Value *globalTag = x86_64::getGlobalRegAsPtr(B, FPU_TAG);
+            Value *globalTag = getGlobalRegAsPtr(B, FPU_TAG);
             // SIZE: 8 entries * sizeof(Int2Ty)
             // ALIGN = 4
             // Volatile = FALSE

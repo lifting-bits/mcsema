@@ -134,15 +134,9 @@ static InstTransResult doAddRI(InstPtr ip, BasicBlock *&b,
     TASSERT(dst.isReg(), "");
 
 	llvm::Module *M = b->getParent()->getParent();
-    llvm::dbgs() << "doAddRI " << width;
-    llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
 
     Value *srcReg = NULL;
 
-	std::cout << "Integer type " << to_string<VA>((VA)IntegerType::get(M->getContext(), 32), hex) << "\n";
-	std::cout << "Integer type " << to_string<VA>((VA)IntegerType::get(M->getContext(), 64), hex) << "\n";
-
-	std::cout.flush();
 		
     // Read from src1.
 	srcReg = R_READ<width>(b, src1.getReg());
