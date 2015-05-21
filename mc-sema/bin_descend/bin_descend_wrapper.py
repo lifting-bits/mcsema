@@ -9,7 +9,7 @@ import os
 ida_env = os.getenv("IDA_PATH")
 if ida_env:
     if os.name is "posix":
-        ida_name = "idal"
+        ida_name = "idal64"
     else:
         ida_name = "idaq.exe"
 

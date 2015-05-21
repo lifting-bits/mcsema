@@ -662,13 +662,20 @@ def handleDataRelocation(M, dref, new_eas):
 
 def resolveRelocation(ea):
     rtype = idc.GetFixupTgtType(ea) 
-    if rtype == idc.FIXUP_OFF32:
-        relocVal = readDword(ea)
-        return relocVal
-    elif rtype == -1:
-        raise Exception("No relocation type at ea: {:x}".format(ea))
+    if idc.__EA64__ is True:
+        if rtype == -1:
+            raise Exception("No relocation type at ea: {:x}".format(ea))
+
+        DEBUG("rtype : {0}, {1}, {1}".format(rtype, idc.GetFixupTgtOff(ea), idc.GetFixupTgtDispl(ea)))
+        return idc.GetFixupTgtDispl(ea) +  idc.GetFixupTgtOff(ea)
     else:
-        return idc.GetFixupTgtOff(ea)
+        if rtype == idc.FIXUP_OFF32:
+            relocVal = readDword(ea)
+            return relocVal
+        elif rtype == -1:
+            raise Exception("No relocation type at ea: {:x}".format(ea))
+        else:
+            return idc.GetFixupTgtOff(ea)
 
 def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
     pf = idc.GetFlags(reloc_dest)
@@ -821,7 +828,7 @@ def findFreeData():
         if end > max_end:
             max_end = end
 
-    return max_end+4
+    return max_end+8
 
 def addDataSegment(M, start, end, new_eas):
     if end < start:
@@ -1042,7 +1049,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
     preprocessBinary()
 
     processDataSegments(M, new_eas)
-
+    
     for name in to_recover:
 
         if name in exports:
@@ -1106,6 +1113,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
 
     sys.stdout.write("Recovered {0} functions.\n".format(recovered_fns))
     sys.stdout.write("Saving to: {0}\n".format(outf.name))
+
 
 def isFwdExport(iname, ea):
     l = ea
