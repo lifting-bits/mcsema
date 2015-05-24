@@ -142,9 +142,9 @@ void doGlobalInit(Module *M) {
     regFields.push_back(fpu_tag_word);                                 // 80 bytes // 47
 
     regFields.push_back(IntegerType::getInt16Ty(M->getContext())); // Last Instruction Ptr Segment 48
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Last Instruction Ptr Offset 49
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), regWidth)); // Last Instruction Ptr Offset 49
     regFields.push_back(IntegerType::getInt16Ty(M->getContext())); // Last Data Ptr Segment 50
-    regFields.push_back(IntegerType::getInt32Ty(M->getContext())); // Last Data Ptr Offset 51
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), regWidth)); // Last Data Ptr Offset 51
     
     regFields.push_back(IntegerType::get(M->getContext(), 11)); // FPU FOPCODE 52
 

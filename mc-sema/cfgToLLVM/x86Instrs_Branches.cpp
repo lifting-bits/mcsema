@@ -872,7 +872,7 @@ void Branches_populateDispatchMap(DispatchMap &m) {
     m[X86::JMP32r] = translate_JMP32r;
     m[X86::JMP32m] = translate_JMP32m;
     m[X86::JMP64r] = translate_JMP64r;
-    m[X86::JMP64m] = translate_JMP64r;//JMP64m;
+    m[X86::JMP64m] = translate_NOOP;//JMP64m;
     
 	m[X86::JMP_4] = translate_JMP_4;
     m[X86::JMP_2] = translate_JMP_2;

@@ -73,7 +73,6 @@ static InstTransResult doCmpRI(InstPtr ip, BasicBlock *&b,
 {
     NASSERT(lhs.isReg());
     NASSERT(rhs.isImm());
-	INSTR_DEBUG(ip);
 
     Value   *lhs_v = R_READ<width>(b, lhs.getReg());
     Value   *rhs_v = CONST_V<width>(b, rhs.getImm());

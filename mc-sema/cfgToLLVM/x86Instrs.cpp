@@ -686,10 +686,10 @@ std::string regnm = x86_64::getRegisterName(nm); \
 
 			// fpu last instruction ptr
             SPILL_F_N(FPU_LASTIP_SEG, 16);
-            SPILL_F_N(FPU_LASTIP_OFF, 32);
+            SPILL_F_N(FPU_LASTIP_OFF, 64);
             // fpu last data ptr
 			SPILL_F_N(FPU_LASTDATA_SEG, 16);
-			SPILL_F_N(FPU_LASTDATA_OFF, 32);
+			SPILL_F_N(FPU_LASTDATA_OFF, 64);
 
             // last FPU opcode
 			SPILL_F_N(FPU_FOPCODE, 11);

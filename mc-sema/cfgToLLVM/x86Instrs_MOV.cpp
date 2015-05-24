@@ -213,7 +213,6 @@ static InstTransResult doMovZXRR(InstPtr ip,   BasicBlock *&b,
 {
     NASSERT(dst.isReg());
     NASSERT(src.isReg());
-	INSTR_DEBUG(ip);
 
     //do a read from src of the appropriate width
     Value   *fromSrc = R_READ<srcWidth>(b, src.getReg());

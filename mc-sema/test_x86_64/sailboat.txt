@@ -1,0 +1,4 @@
+to_byte 1 C N
+read_bytes 3 C N
+print 1 C N
+strlen 1 C N

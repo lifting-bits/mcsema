@@ -121,7 +121,7 @@ typedef struct _nativefpu {
 #endif
 typedef struct _segmentoffset{
     uint16_t seg;
-    uint32_t off;
+    uint64_t off;
 } PACKED segmentoffset; // 6 bytes
 #ifdef _WIN32
 #pragma pack(pop)
