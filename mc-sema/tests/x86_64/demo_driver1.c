@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
-
-#include "../common/RegisterState.h"
+#define TARGET_IA64
+#include "../../common/RegisterState.h"
 
 extern void demo1_entry(RegState *);
 
@@ -16,12 +16,12 @@ int doDemo1(int k) {
     memset(&rState, 0, sizeof(rState));
 
     //set up the stack 
-    rState.ESP = (unsigned long) &stack[4096*9];
-    rState.EAX = k;
+    rState.RSP = (unsigned long) &stack[4096*9];
+    rState.RAX = k;
 
     demo1_entry(&rState);
 
-    return rState.EAX;
+    return rState.RAX;
 }
 
 int main(int argc, char *argv[]) {

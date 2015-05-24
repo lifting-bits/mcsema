@@ -79,6 +79,11 @@ find_package(Threads REQUIRED)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/common)
 set(PROTOBUF_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/protobuf-2.5.0/src)
 
+set(TARGET "X86_64")
+if("${TARGET}" STREQUAL "X86_64")
+  add_definitions(-DTARGET_IA64)
+endif()
+
 add_definitions(-D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../llvm-3.5/include)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/../llvm-3.5/include)
@@ -88,6 +93,7 @@ add_subdirectory(peToCFG)
 add_subdirectory(bitcode_from_cfg)
 add_subdirectory(binary_common)
 add_subdirectory(bin_descend)
+
 
 
 find_package(Pin)

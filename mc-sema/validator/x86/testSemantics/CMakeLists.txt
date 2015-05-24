@@ -1,10 +1,10 @@
 find_package(Nasm REQUIRED)
 include_directories(${LLVM_MAIN_SRC_DIR}/utils/unittest/googletest/include 
-                    ${CMAKE_CURRENT_SOURCE_DIR}/../../peToCFG 
-                    ${CMAKE_CURRENT_SOURCE_DIR}/../../cfgToLLVM 
-                    ${CMAKE_CURRENT_SOURCE_DIR}/../../../llvm-3.5/utils/unittest/googletest/include
-                    ${CMAKE_CURRENT_SOURCE_DIR}/../../../llvm-3.5/lib/Target/X86
-                    ${CMAKE_CURRENT_BINARY_DIR}/../../../llvm-3.5/lib/Target/X86)
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../../peToCFG 
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../../cfgToLLVM 
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../llvm-3.5/utils/unittest/googletest/include
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../llvm-3.5/lib/Target/X86
+                    ${CMAKE_CURRENT_BINARY_DIR}/../../../../llvm-3.5/lib/Target/X86)
 
 SET_SOURCE_FILES_PROPERTIES( "${CMAKE_CURRENT_SOURCE_DIR}/testSemantics.auto.cpp" 
 	PROPERTIES
@@ -18,7 +18,7 @@ add_custom_target(testSemantics.auto.cpp ALL
 add_executable(testSemantics "${CMAKE_CURRENT_SOURCE_DIR}/testSemantics.auto.cpp" )
 add_dependencies(testSemantics testSemantics.auto.cpp )
 
-link_directories(${CMAKE_CURRENT_BINARY_DIR}/../../../lib)
+link_directories(${CMAKE_CURRENT_BINARY_DIR}/../../../../lib)
 
 target_link_libraries(testSemantics peToCFG cfgToLLVM 
   LLVMInterpreter LLVMipo LLVMInstrumentation

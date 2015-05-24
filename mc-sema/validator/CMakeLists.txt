@@ -1,2 +1,5 @@
-#add_subdirectory(x86)
-add_subdirectory(x86_64)
+if("${TARGET}" STREQUAL "X86_64")
+   add_subdirectory(x86_64)
+else()
+  add_subdirectory(x86)
+endif("${TARGET}" STREQUAL "X86_64")

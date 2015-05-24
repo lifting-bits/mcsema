@@ -15,7 +15,6 @@ int switches(int input)
         case 4: 
             printf("Input was four\n");
             break;
-#if 0
         case 6: 
             printf("Input was six\n");
             break;
@@ -61,7 +60,6 @@ int switches(int input)
         case 0x12393:
             printf("Really big input:  0x12393\n");
             break;
-     #endif
 	default:
             printf("Unknown input: %d\n", input);
     }

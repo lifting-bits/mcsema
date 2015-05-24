@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
-#include "../common/RegisterState.h"
+#define TARGET_IA64
+#include "../../common/RegisterState.h"
 
 extern void demo_fpu1_entry(RegState *);
 
