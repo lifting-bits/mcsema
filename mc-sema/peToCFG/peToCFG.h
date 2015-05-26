@@ -120,7 +120,7 @@ public:
  *  - they have some sane calling convention
  *  - they take a defined number of arguments
  *  - they either return no values and have no effects on local
-      registers, or, they return a single integer value and 
+      registers, or, they return a single integer value and
       assign that value to the EAX register
  */
 
@@ -171,7 +171,7 @@ class Inst {
 
     public:
     std::vector<boost::uint8_t> get_bytes(void) { return this->instBytes; }
-    std::string printInst(void) { 
+    std::string printInst(void) {
         return this->instRep;
     }
 
@@ -204,7 +204,7 @@ class Inst {
         this->reloc_offset = ro;
     }
 
-    void set_data_offset(boost::uint32_t d) { 
+    void set_data_offset(boost::uint32_t d) {
         this->has_data_offset = true;
         this->data_offset = d;
         return;
@@ -235,16 +235,16 @@ class Inst {
     bool has_call_tgt() { return !this->targets.empty(); }
     VA get_call_tgt(int index) { return this->targets.at(index); }
 
-    void set_ext_call_target(ExternalCodeRefPtr t) { 
-        this->extCallTgt = t; 
+    void set_ext_call_target(ExternalCodeRefPtr t) {
+        this->extCallTgt = t;
         this->ext_call_target = true;
-        return; 
+        return;
     }
 
-    void set_ext_data_ref(ExternalDataRefPtr t) { 
+    void set_ext_data_ref(ExternalDataRefPtr t) {
         this->extDataRef = t;
         this->ext_data_ref = true;
-        return; 
+        return;
     }
 
     bool has_ext_data_ref(void) {
@@ -282,9 +282,9 @@ class Inst {
     bool has_jump_index_table(void) {
         return this->jump_index_table;
     }
-    
+
     Prefix get_prefix(void) { return this->pfx; }
-    unsigned int get_addr_space(void) { 
+    unsigned int get_addr_space(void) {
 
         switch(this->pfx) {
             case GSPrefix:
@@ -301,16 +301,16 @@ class Inst {
     ExternalCodeRefPtr get_ext_call_target(void) { return this->extCallTgt; }
     ExternalDataRefPtr get_ext_data_ref(void) { return this->extDataRef; }
 
-    Inst( VA      v, 
-          uint8_t l, 
-          const llvm::MCInst &inst, 
-          std::string instR, 
+    Inst( VA      v,
+          uint8_t l,
+          const llvm::MCInst &inst,
+          std::string instR,
           Prefix k,
           std::vector<boost::uint8_t> bytes) :
         instBytes(bytes),
         tgtIfTrue(0),
         tgtIfFalse(0),
-        loc(v), 
+        loc(v),
         NativeInst(inst),
         instRep(instR),
         pfx(k),
@@ -394,24 +394,26 @@ typedef boost::shared_ptr<NativeFunction>   NativeFunctionPtr;
 
 class DataSectionEntry {
 public:
-    DataSectionEntry(uint64_t base, const std::vector<uint8_t>& b) : 
-        base(base), bytes(b), is_symbol(false) 
+    DataSectionEntry(uint64_t base, const std::vector<uint8_t>& b) :
+        base(base), bytes(b), is_symbol(false)
     {
         //empty
     }
 
     DataSectionEntry(uint64_t base, const std::string& sname) :
-        base(base), sym_name(sname), is_symbol(true) 
+        base(base), sym_name(sname), is_symbol(true)
     {
         // initialize bytes to null
 		this->bytes.push_back(0x0);
         this->bytes.push_back(0x0);
         this->bytes.push_back(0x0);
         this->bytes.push_back(0x0);
+#ifdef TARGET_IA64
         this->bytes.push_back(0x0);
 		this->bytes.push_back(0x0);
         this->bytes.push_back(0x0);
         this->bytes.push_back(0x0);
+#endif
     }
 
     uint64_t getBase() const { return this->base; }
@@ -419,7 +421,7 @@ public:
     std::vector<uint8_t> getBytes() const {return this->bytes; }
 
     bool getSymbol(std::string &sname) const
-    { 
+    {
         if(this->is_symbol) {
             sname = this->sym_name;
             return true;
@@ -437,13 +439,13 @@ protected:
     std::string sym_name;
 };
 
-class DataSection 
+class DataSection
 {
 protected:
     std::list<DataSectionEntry> entries;
     uint64_t base;
     bool read_only;
-    
+
 
 public:
     static const uint64_t NO_BASE = (uint64_t)(-1);
@@ -461,14 +463,14 @@ public:
         return this->entries;
     }
 
-    void addEntry(const DataSectionEntry &dse) 
+    void addEntry(const DataSectionEntry &dse)
     {
         this->entries.push_back(dse);
         if(this->base == NO_BASE ||
-            this->base > dse.getBase() ) 
+            this->base > dse.getBase() )
         {
             this->base = dse.getBase();
-        } 
+        }
     }
 
     uint64_t getSize() const
@@ -476,9 +478,9 @@ public:
         uint64_t size_sum=0;
         for(std::list<DataSectionEntry>::const_iterator itr = entries.begin();
                 itr != entries.end();
-                itr++) 
+                itr++)
         {
-           size_sum += itr->getSize(); 
+           size_sum += itr->getSize();
         }
 
         return size_sum;
@@ -488,7 +490,7 @@ public:
         std::vector<uint8_t> all_bytes;
         for(std::list<DataSectionEntry>::const_iterator itr = entries.begin();
                 itr != entries.end();
-                itr++) 
+                itr++)
         {
            std::vector<uint8_t> vec = itr->getBytes();
            all_bytes.insert(all_bytes.end(), vec.begin(), vec.end());
@@ -508,14 +510,14 @@ class NativeModule {
             int         argc;
             bool        does_return;
             ExternalCodeRef::CallingConvention cconv;
-            
+
         public:
-            EntrySymbol(const std::string &name, VA  addr): 
-                name(name), addr(addr), has_extra(false), 
+            EntrySymbol(const std::string &name, VA  addr):
+                name(name), addr(addr), has_extra(false),
                 argc(0), does_return(false), cconv(ExternalCodeRef::CallerCleanup)  {}
 
             EntrySymbol(VA addr) : addr(addr), has_extra(false),
-                                   argc(0), does_return(false), 
+                                   argc(0), does_return(false),
                                    cconv(ExternalCodeRef::CallerCleanup)
                 {
                     this->name = "sub_"+to_string<VA>(this->addr, std::hex);
@@ -528,9 +530,9 @@ class NativeModule {
             bool                doesReturn() const { return this->does_return; }
             ExternalCodeRef::CallingConvention getConv() const { return this->cconv; }
 
-            void                setExtra(int argc, 
-                                        bool does_ret, 
-                                        ExternalCodeRef::CallingConvention conv) 
+            void                setExtra(int argc,
+                                        bool does_ret,
+                                        ExternalCodeRef::CallingConvention conv)
             {
                 this->argc = argc;
                 this->does_return = does_ret;
@@ -559,7 +561,7 @@ class NativeModule {
     //external data ref
     void addExtDataRef(ExternalDataRefPtr p) { this->extData.push_back(p); return; }
     std::list<ExternalDataRefPtr> getExtDataRefs(void) {return this->extData; }
-    
+
     std::vector<EntrySymbol> entries;
 
     const std::vector<EntrySymbol>& getEntryPoints() const { return this->entries; }
@@ -570,7 +572,7 @@ class NativeModule {
     void setTarget(const llvm::Target *T){
         this->target = T;
     }
-	
+
 	void setTargetTriple(llvm::Triple *t){
 		this->triple = t;
 	}
@@ -611,18 +613,18 @@ const llvm::Target *findDisTarget(std::string );
 NativeModulePtr readModule(std::string, ModuleInputFormat, std::list<VA>, const llvm::Target*);
 
 // used in testSemantics.cpp via funcFromBuff
-NativeBlockPtr blockFromBuff( VA, 
-                              BufferMemoryObject &, 
-                              const llvm::MCDisassembler *, 
+NativeBlockPtr blockFromBuff( VA,
+                              BufferMemoryObject &,
+                              const llvm::MCDisassembler *,
                               llvm::MCInstPrinter *);
 
 // used in testSemantics.cpp
-NativeFunctionPtr funcFromBuff( VA, 
-                                BufferMemoryObject &, 
-                                const llvm::MCDisassembler *, 
+NativeFunctionPtr funcFromBuff( VA,
+                                BufferMemoryObject &,
+                                const llvm::MCDisassembler *,
                                 llvm::MCInstPrinter *);
 
-void addExterns(std::list<NativeFunctionPtr>, NativeModulePtr); 
+void addExterns(std::list<NativeFunctionPtr>, NativeModulePtr);
 
 std::string dumpProtoBuf(NativeModulePtr);
 

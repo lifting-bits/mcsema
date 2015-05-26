@@ -77,11 +77,7 @@ public:
   ExternalFunctionMap(void); // default constructor
   ExternalFunctionMap(std::string); // only target triple
   ExternalFunctionMap(std::string, std::string); // function map, target triple
-  /*ExternalFunctionMap(llvm::Triple *p_triple) // initialize with target triple;
-  {
-    t_triple = t_triple;
-  }
-*/
+
   bool get_calling_convention(std::string, CallingConvention &);
 
   bool get_noreturn(std::string, bool &);

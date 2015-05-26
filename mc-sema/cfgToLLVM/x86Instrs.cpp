@@ -113,7 +113,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
     TASSERT(F->arg_size() >= 1, "need at least one argument to write locals to context");
     Value       *arg = F->arg_begin();
 
-    // There are a few occasions where we have to take the entirety of a 
+    // There are a few occasions where we have to take the entirety of a
     // context structure and 'spill' them to locally allocated values.
     switch(bits) {
         case 32:
@@ -181,7 +181,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             // ALIGN = 4
             // Volatile = FALSE
             DataLayout  td(static_cast<Module*>(F->getParent()));
-            uint32_t fpu_arr_size = 
+            uint32_t fpu_arr_size =
                 (uint32_t)td.getTypeAllocSize(
                         Type::getX86_FP80Ty(B->getContext())) * NUM_FPU_REGS;
             Instruction *mcp_fpu = aliasMCSemaScope(callMemcpy(B, globalFPU, localFPU, fpu_arr_size, 4, false));
@@ -223,7 +223,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             // SIZE: 8 entries * sizeof(Int2Ty)
             // ALIGN = 4
             // Volatile = FALSE
-            uint32_t tags_arr_size = 
+            uint32_t tags_arr_size =
                 (uint32_t)td.getTypeAllocSize(
                         Type::getIntNTy(B->getContext(), 2)) * NUM_FPU_REGS;
 
@@ -255,7 +255,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             STORE_SAMEWIDTH(STACK_LIMIT);
         }
         break;
-#undef STORE		
+#undef STORE
 #undef STORE_F
 #undef STORE_SAMEWIDTH
 		case 64:
@@ -292,6 +292,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             STORE(R13, X86::R13);
             STORE(R14, X86::R14);
             STORE(R15, X86::R15);
+            STORE(RIP, X86::RIP);
 
 #define STORE_SAMEWIDTH(nm) { \
             std::string regnm = x86_64::getRegisterName(nm);\
@@ -325,12 +326,12 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             Value *localFPU = getLocalFPURegsAsPtr(B);
             // DEST: get pointer to FPU globals
             Value *globalFPU = getGlobalFPURegsAsPtr(B);
-			
+
 			DataLayout  td(static_cast<Module*>(F->getParent()));
-            uint32_t fpu_arr_size = 
+            uint32_t fpu_arr_size =
                 (uint32_t)td.getTypeAllocSize(
                         Type::getX86_FP80Ty(B->getContext())) * NUM_FPU_REGS;
-			
+
 			Instruction *mcp_fpu = aliasMCSemaScope(callMemcpy(B, globalFPU, localFPU, fpu_arr_size, 8, false));
 
             STORE_F(FPU_B);
@@ -362,17 +363,17 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             STORE_F(FPU_ZM);
             STORE_F(FPU_DM);
             STORE_F(FPU_IM);
-			
+
 			            // SOURCE: get pointer to local tag word
             Value *localTag = getLocalRegAsPtr(B, FPU_TAG);
             // DEST: get pointer to FPU globals
             Value *globalTag = getGlobalRegAsPtr(B, FPU_TAG);
             // SIZE: 8 entries * sizeof(Int2Ty)
             // Volatile = FALSE
-            uint32_t tags_arr_size = 
+            uint32_t tags_arr_size =
                 (uint32_t)td.getTypeAllocSize(
                         Type::getIntNTy(B->getContext(), 2)) * NUM_FPU_REGS;
-						
+
 			Instruction *mcp = aliasMCSemaScope(callMemcpy(B, globalTag, localTag, tags_arr_size, 4, false));
 
 			// last IP segment is a 16-bit value
@@ -385,7 +386,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             STORE_SAMEWIDTH(FPU_LASTDATA_OFF);
 
            // STORE_F(FPU_FOPCODE);
-			
+
             //vector instrs
             STORE_SAMEWIDTH(XMM0);
             STORE_SAMEWIDTH(XMM1);
@@ -403,7 +404,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
 			STORE_SAMEWIDTH(XMM13);
 			STORE_SAMEWIDTH(XMM14);
 			STORE_SAMEWIDTH(XMM15);
-			
+
 
             // stack base and limit
             STORE_SAMEWIDTH(STACK_BASE);
@@ -414,7 +415,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
         default:
           throw TErr(__LINE__, __FILE__, to_string<unsigned>(bits, dec)+"-bit not implemented yet");
     }
- 
+
     return;
 }
 
@@ -424,7 +425,7 @@ void writeContextToLocals(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
     TASSERT(F->arg_size() >= 1, "need at least one argument to write context to locals");
     Value       *arg = F->arg_begin();
 
-    //there are a few occasions where we have to take the entirety of a 
+    //there are a few occasions where we have to take the entirety of a
     //context structure and 'spill' them to locally allocated values
     switch(bits) {
         case 32:
@@ -432,7 +433,7 @@ void writeContextToLocals(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             //UPDATEREGS -- when we add something to the 'regs' struct change
             //here to reflect that
             //do a GEP on the 'regs' structure for the appropriate field offset
-            //then do a 'load' from that GEP into a temp and then a 
+            //then do a 'load' from that GEP into a temp and then a
             //'store' into the appropriate value
 #define SPILL_F_N(nm, nbits) { \
         std::string regnm = x86::getRegisterName(nm);\
@@ -493,7 +494,7 @@ void writeContextToLocals(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             // ALIGN = 4
             // Volatile = FALSE
             DataLayout  td(F->getParent());
-            uint32_t fpu_arr_size = 
+            uint32_t fpu_arr_size =
                 (uint32_t)td.getTypeAllocSize(Type::getX86_FP80Ty(B->getContext())) * NUM_FPU_REGS;
 
             Instruction *mcp_fpu = aliasMCSemaScope(callMemcpy(B, localFPU, globalFPU, fpu_arr_size, 8, false));
@@ -502,7 +503,7 @@ void writeContextToLocals(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             SPILL_F(FPU_B);
             SPILL_F(FPU_C3);
             // TOP is a 3-bit integer and not
-            // a one bit flag 
+            // a one bit flag
             SPILL_F_N(FPU_TOP, 3);
             SPILL_F(FPU_C2);
             SPILL_F(FPU_C1);
@@ -534,7 +535,7 @@ void writeContextToLocals(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             // SIZE: 8 entries * sizeof(Int2Ty)
             // ALIGN = 4
             // Volatile = FALSE
-            uint32_t tags_arr_size = 
+            uint32_t tags_arr_size =
                 (uint32_t)td.getTypeAllocSize(
                         Type::getIntNTy(B->getContext(), 2)) * NUM_FPU_REGS;
 
@@ -599,7 +600,7 @@ std::string regnm = x86_64::getRegisterName(nm); \
 		Instruction *W = aliasMCSemaScope(new StoreInst(truncI, localVal, B)); \
 		TASSERT( W != NULL, "" ); \
 		}
-		
+
 #define SPILL_F(nm) SPILL_F_N(nm, 1)
 #define SPILL(nm) SPILL_F_N(nm, 64)
 
@@ -611,7 +612,7 @@ std::string regnm = x86_64::getRegisterName(nm); \
             SPILL(RDI);
             SPILL(RSP);
             SPILL(RBP);
-			
+
             SPILL(R8);
             SPILL(R9);
             SPILL(R10);
@@ -620,6 +621,7 @@ std::string regnm = x86_64::getRegisterName(nm); \
             SPILL(R13);
             SPILL(R14);
             SPILL(R15);
+            SPILL(RIP);
 
             SPILL_F(CF);
             SPILL_F(PF);
@@ -631,14 +633,14 @@ std::string regnm = x86_64::getRegisterName(nm); \
 
             // FPU registers doesn't get used on 64bit platform;
 			// we are not spilling them
-			
+
 			            // SOURCE: get pointer to FPU globals
             Value *globalFPU = getGlobalFPURegsAsPtr(B);
             // DEST: get pointer to FPU locals
             Value *localFPU = getLocalFPURegsAsPtr(B);
             // Volatile = FALSE
             DataLayout  td(F->getParent());
-            uint32_t fpu_arr_size = 
+            uint32_t fpu_arr_size =
                 (uint32_t)td.getTypeAllocSize(Type::getX86_FP80Ty(B->getContext())) * NUM_FPU_REGS;
 
             Instruction *mcp_fpu = aliasMCSemaScope(callMemcpy(B, localFPU, globalFPU, fpu_arr_size, 4, false));
@@ -646,7 +648,7 @@ std::string regnm = x86_64::getRegisterName(nm); \
             SPILL_F(FPU_B);
             SPILL_F(FPU_C3);
             // TOP is a 3-bit integer and not
-            // a one bit flag 
+            // a one bit flag
             SPILL_F_N(FPU_TOP, 3);
             SPILL_F(FPU_C2);
             SPILL_F(FPU_C1);
@@ -659,7 +661,7 @@ std::string regnm = x86_64::getRegisterName(nm); \
             SPILL_F(FPU_ZE);
             SPILL_F(FPU_DE);
             SPILL_F(FPU_IE);
-			
+
 			// FPU CONTROL WORD
             SPILL_F(FPU_X);
             SPILL_F_N(FPU_RC, 2);
@@ -670,7 +672,7 @@ std::string regnm = x86_64::getRegisterName(nm); \
             SPILL_F(FPU_ZM);
             SPILL_F(FPU_DM);
             SPILL_F(FPU_IM);
-			
+
             // DEST: get pointer to local tag word
             Value *localTag = getLocalRegAsPtr(B, FPU_TAG);
             // SRC: get pointer to FPU globals
@@ -678,7 +680,7 @@ std::string regnm = x86_64::getRegisterName(nm); \
             // SIZE: 8 entries * sizeof(Int2Ty)
             // ALIGN = 4
             // Volatile = FALSE
-            uint32_t tags_arr_size = 
+            uint32_t tags_arr_size =
                 (uint32_t)td.getTypeAllocSize(
                         Type::getIntNTy(B->getContext(), 2)) * NUM_FPU_REGS;
 
@@ -693,7 +695,7 @@ std::string regnm = x86_64::getRegisterName(nm); \
 
             // last FPU opcode
 			SPILL_F_N(FPU_FOPCODE, 11);
-			
+
             //write vector regs out
             SPILL_F_N(XMM0, 128);
             SPILL_F_N(XMM1, 128);
@@ -742,15 +744,15 @@ static void preprocessInstruction(
         NativeModulePtr   natM,
         BasicBlock        *&block,
         InstPtr           ip,
-        MCInst            &inst 
-        ) 
+        MCInst            &inst
+        )
 {
 
     // only add data sections for non-conformant jump tables
     //
     // the conformant tables are handled in the instruction
     // translator via switch()
-    if(ip->has_jump_table() ) 
+    if(ip->has_jump_table() )
     {
         if(!isConformantJumpInst(ip)) {
             {
@@ -769,18 +771,18 @@ static void preprocessInstruction(
 
                 TASSERT(ok, "Could not add jump table data section!\n");
 
-                uint32_t data_ref_va = 
+                uint32_t data_ref_va =
                     static_cast<uint32_t>(tbl_va + 4*jmptbl->getInitialEntry());
 
                 ip->set_data_offset(data_ref_va);
             }
 
-        } 
+        }
     }
     // only add data references for unknown jump index table
     // reads
-    else if(ip->has_jump_index_table() && 
-            inst.getOpcode() != X86::MOVZX32rm8) 
+    else if(ip->has_jump_index_table() &&
+            inst.getOpcode() != X86::MOVZX32rm8)
     {
 
         VA idx_va;
@@ -794,7 +796,7 @@ static void preprocessInstruction(
 
         TASSERT(ok, "Could not add jump index table data section!\n");
 
-        uint32_t data_ref_va = 
+        uint32_t data_ref_va =
             static_cast<uint32_t>(idx_va + idxtbl->getInitialEntry());
 
         ip->set_data_offset(data_ref_va);
@@ -817,28 +819,28 @@ static void preprocessInstruction(
 //        there are templated functions for dealing with mnemonic / operand
 //        pairs, parameterized around operand width
 //     2. next by operand type. Within each parameterized wrapper, we
-//        'unrwrap' by extracting each operand and producing input values 
+//        'unrwrap' by extracting each operand and producing input values
 //        to the instructions
 //     3. finally, in an inner step, we define the instruction semantics
 //        entirely in terms of LLVM Value objects. This is where the 'meat'
-//        of semantic modeling takes places. 
+//        of semantic modeling takes places.
 //     The breakdown looks something like this:
-//  
+//
 //     X86::CMP8rr -> [1] -> doCmpRR<8> -> [2] doCmpVV<8> -> [3]
 //
-//     The innermost is where most of the intelligent decisions happen. 
-//     
-InstTransResult disInstrX86(    InstPtr           ip, 
-                                BasicBlock        *&block, 
+//     The innermost is where most of the intelligent decisions happen.
+//
+InstTransResult disInstrX86(    InstPtr           ip,
+                                BasicBlock        *&block,
                                 NativeBlockPtr    nb,
                                 Function          *F,
                                 NativeFunctionPtr natF,
-                                NativeModulePtr   natM) 
+                                NativeModulePtr   natM)
 {
     MCInst              inst = ip->get_inst();
     InstTransResult     itr = ContinueBlock;
     string              outS;
-    raw_string_ostream  strOut(outS); 
+    raw_string_ostream  strOut(outS);
     MCInstPrinter       *IP = nb->get_printer();
 
     if (IP == NULL)
@@ -871,5 +873,5 @@ InstTransResult disInstrX86(    InstPtr           ip,
 	cout.flush();)
     return itr;
 }
- 
+
 #undef OP

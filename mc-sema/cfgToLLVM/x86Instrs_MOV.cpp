@@ -417,7 +417,7 @@ GENERIC_TRANSLATION_MEM(MOV32ms,
 GENERIC_TRANSLATION_MEM(MOV16ms,
 	doMSMov<16>(ip,    block, ADDR(0), OP(5)),
 	doMSMov<16>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
-    
+
 GENERIC_TRANSLATION_MEM(MOVZX16rm8, 
 	(doMovZXRM<16,8>(ip, block, OP(0), ADDR(1))),
 	(doMovZXRM<16,8>(ip, block, OP(0), STD_GLOBAL_OP(1))) ) 
@@ -451,6 +451,26 @@ GENERIC_TRANSLATION_MEM(MOVSX64rm16,
 GENERIC_TRANSLATION_MEM(MOVSX64rm32,
     (doMovSXRM<64, 32>(ip,   block, OP(0), ADDR(1))),
     (doMovSXRM<64, 32>(ip,   block, OP(0), STD_GLOBAL_OP(1))) )
+
+GENERIC_TRANSLATION_MEM(MOVBE16rm,
+	doMRMovBE<16>(ip,    block, ADDR(0), OP(5)),
+	doMRMovBE<16>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_MEM(MOVBE32rm,
+	doMRMovBE<32>(ip,    block, ADDR(0), OP(5)),
+	doMRMovBE<32>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_MEM(MOVBE64rm,
+	doMRMovBE<64>(ip,    block, ADDR(0), OP(5)),
+	doMRMovBE<64>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+
+GENERIC_TRANSLATION_MEM(MOVBE16mr,
+	doRMMovBE<16>(ip,    block, ADDR(0), OP(5)),
+	doRMMovBE<16>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_MEM(MOVBE32mr,
+	doRMMovBE<32>(ip,    block, ADDR(0), OP(5)),
+	doRMMovBE<32>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_MEM(MOVBE64mr,
+	doRMMovBE<64>(ip,    block, ADDR(0), OP(5)),
+	doRMMovBE<64>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
 
 static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
@@ -704,17 +724,17 @@ void MOV_populateDispatchMap(DispatchMap &m) {
     m[X86::MOV32sr] = translate_MOV32rs;
     m[X86::MOV64sr] = translate_MOV32rs;
 
- //   m[X86::MOV16sm] = translate_MOV16sm;
- //   m[X86::MOV32sm] = translate_MOV32sm;
-    m[X86::MOV64sm] = translate_MOV64sm;
+    //m[X86::MOV16sm] = translate_MOV16sm;
+   // m[X86::MOV32sm] = translate_MOV32sm;
+   // m[X86::MOV64sm] = translate_MOV64sm;
 
-    m[X86::MOVBE16rm] = translate_NOOP;
-    m[X86::MOVBE32rm] = translate_NOOP;
-    m[X86::MOVBE64rm] = translate_NOOP;
+    m[X86::MOVBE16rm] = translate_MOVBE16rm;
+    m[X86::MOVBE32rm] = translate_MOVBE32rm;
+    m[X86::MOVBE64rm] = translate_MOVBE64rm;
 
-    m[X86::MOVBE16mr] = translate_NOOP;
-    m[X86::MOVBE32mr] = translate_NOOP;
-    m[X86::MOVBE64mr] = translate_NOOP;
+    m[X86::MOVBE16mr] = translate_MOVBE16mr;
+    m[X86::MOVBE32mr] = translate_MOVBE32mr;
+    m[X86::MOVBE64mr] = translate_MOVBE64mr;
 
 }
 

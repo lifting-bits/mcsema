@@ -82,7 +82,7 @@ CallingConv::ID getLLVMCC(ExternalCodeRef::CallingConvention cc) {
         case ExternalCodeRef::FastCall:
             return CallingConv::X86_FastCall;
         default:
-            throw TErr(__LINE__, __FILE__, 
+            throw TErr(__LINE__, __FILE__,
                     "Unknown calling convention!");
             break;
     }
@@ -96,10 +96,10 @@ void M_WRITE_T(InstPtr ip, llvm::BasicBlock *b, llvm::Value *addr, llvm::Value *
     llvm::Value   *writeLoc = addr;
     unsigned addrspace = ip->get_addr_space();
     //however, if the incoming 'addr' location is not a pointer, we must
-    //first turn it into an addr 
+    //first turn it into an addr
 
     if( addr->getType()->isPointerTy() == false ) {
-        writeLoc = new llvm::IntToPtrInst(addr, ptrtype, "", b); 
+        writeLoc = new llvm::IntToPtrInst(addr, ptrtype, "", b);
 	} else if( addr->getType() != ptrtype ) {
 		writeLoc = llvm::CastInst::CreatePointerCast(addr, ptrtype, "", b);
 	}
@@ -117,7 +117,7 @@ private:
     NativeModulePtr     natMod;
     bool                &didError;
 public:
-    bfs_cfg_visitor(NativeFunctionPtr n, NativeModulePtr m, Function *F_, bool &e) : 
+    bfs_cfg_visitor(NativeFunctionPtr n, NativeModulePtr m, Function *F_, bool &e) :
         natFun(n), F(F_),natMod(m),didError(e) { }
     template < typename Vertex, typename Graph >
     void discover_vertex(Vertex u, const Graph & g) const;
@@ -125,27 +125,27 @@ public:
 
 Value *lookupLocalByName(Function *F, string localName) {
     BasicBlock  *entry = &F->getEntryBlock();
-    BasicBlock::iterator    it = entry->begin(); 
+    BasicBlock::iterator    it = entry->begin();
 
     localName += "_val";
     while(it != entry->end() ) {
         Value   *v = it;
-        
+
         if( v->getName() == localName ) {
             return v;
         }
 
         ++it;
     }
-    
-    
+
+
     throw TErr (__LINE__, __FILE__, "localname: "+localName+" is not found");
     return NULL;
 }
 
-Value *MCRegToValue(BasicBlock *b, unsigned reg) { 
+Value *MCRegToValue(BasicBlock *b, unsigned reg) {
 	Module *M = b->getParent()->getParent();
-	
+
 	if(getPointerSize(M) == Pointer32){
 		return x86::MCRegToValue(b, reg);
 	} else {
@@ -156,7 +156,7 @@ Value *GENERIC_READREG(BasicBlock *b, MCSemaRegs reg)
  {
 	Module *M = b->getParent()->getParent();
 	Value       *localRegVar;
-	
+
 	if(getPointerSize(M) == Pointer32){
 		localRegVar = x86::lookupLocal(b->getParent(), reg);
 	} else {
@@ -174,7 +174,7 @@ void GENERIC_WRITEREG(BasicBlock *b, MCSemaRegs reg, Value *v) {
     Module *M = b->getParent()->getParent();
 	Value *localRegVar;
 	std::string regName;
-	
+
 	if(getPointerSize(M) == Pointer32){
 		localRegVar = x86::lookupLocal(b->getParent(), reg);
 		regName = x86::getRegisterName(reg);
@@ -193,7 +193,7 @@ void F_WRITE(BasicBlock *b, MCSemaRegs flag, Value *v) {
     return GENERIC_WRITEREG(b, flag, v);
 }
 
-void F_ZAP(BasicBlock *b, MCSemaRegs flag) { 
+void F_ZAP(BasicBlock *b, MCSemaRegs flag) {
     F_WRITE(b, flag, UndefValue::get(Type::getInt1Ty(b->getContext())));
     return;
 }
@@ -210,7 +210,7 @@ void F_CLEAR(BasicBlock *b, MCSemaRegs flag) {
 
 //
 // common case for arithmetic instructions
-// some instructions, like inc and dec, do not need to do this 
+// some instructions, like inc and dec, do not need to do this
 //
 
 void allocateLocals(Function *F, int bits) {
@@ -235,7 +235,7 @@ void allocateLocals(Function *F, int bits) {
             Instruction *ebpA = new AllocaInst(uintTy, "EBP_val", ediA);
             Instruction *espA = new AllocaInst(uintTy, "ESP_val", ebpA);
             //create other fields for flags
-            
+
             Type    *boolTy = Type::getInt1Ty(F->getContext());
             Instruction *zfA = new AllocaInst(boolTy, "ZF_val", espA);
             Instruction *sfA = new AllocaInst(boolTy, "PF_val", zfA);
@@ -310,45 +310,45 @@ void allocateLocals(Function *F, int bits) {
             TASSERT(fpu_FOPCODE != NULL, "");
 
             //vector registers
-            Instruction *vec_xmm0 = 
+            Instruction *vec_xmm0 =
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM0_val",
-                                fpu_FOPCODE); 
-            Instruction *vec_xmm1 = 
+                                fpu_FOPCODE);
+            Instruction *vec_xmm1 =
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM1_val",
-                                vec_xmm0); 
-            Instruction *vec_xmm2 = 
+                                vec_xmm0);
+            Instruction *vec_xmm2 =
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM2_val",
                                 vec_xmm1);
-            Instruction *vec_xmm3 = 
+            Instruction *vec_xmm3 =
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM3_val",
                                 vec_xmm2);
-            Instruction *vec_xmm4 = 
+            Instruction *vec_xmm4 =
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM4_val",
                                 vec_xmm3);
-            Instruction *vec_xmm5 = 
+            Instruction *vec_xmm5 =
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM5_val",
                                 vec_xmm4);
-            Instruction *vec_xmm6 = 
+            Instruction *vec_xmm6 =
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM6_val",
                                 vec_xmm5);
-            Instruction *vec_xmm7 = 
+            Instruction *vec_xmm7 =
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM7_val",
                                 vec_xmm6);
 
             // stack base and limit
-            Instruction *stack_base = 
+            Instruction *stack_base =
                 new AllocaInst( Type::getInt32Ty(F->getContext()),
                                 "STACK_BASE_val",
                                 vec_xmm7);
-            Instruction *stack_limit = 
+            Instruction *stack_limit =
                 new AllocaInst( Type::getInt32Ty(F->getContext()),
                                 "STACK_LIMIT_val",
                                 stack_base);
@@ -376,10 +376,12 @@ void allocateLocals(Function *F, int bits) {
             Instruction *r13A = new AllocaInst(uintTy, "R13_val", r12A);
             Instruction *r14A = new AllocaInst(uintTy, "R14_val", r13A);
             Instruction *r15A = new AllocaInst(uintTy, "R15_val", r14A);
+
+            Instruction *ripA = new AllocaInst(uintTy, "RIP_val", r14A);
             //create other fields for flags
 
             Type    *boolTy = Type::getInt1Ty(F->getContext());
-            Instruction *zfA = new AllocaInst(boolTy, "ZF_val", r15A);
+            Instruction *zfA = new AllocaInst(boolTy, "ZF_val", ripA);
             Instruction *sfA = new AllocaInst(boolTy, "PF_val", zfA);
             Instruction *ofA = new AllocaInst(boolTy, "AF_val", sfA);
             Instruction *cfA = new AllocaInst(boolTy, "CF_val", ofA);
@@ -387,7 +389,7 @@ void allocateLocals(Function *F, int bits) {
             Instruction *afA = new AllocaInst(boolTy, "OF_val", pfA);
             Instruction *dfA = new AllocaInst(boolTy, "DF_val", afA);
             TASSERT(dfA != NULL, "");
-			
+
             // FPU STACK
             Type    *floatTy = Type::getX86_FP80Ty(F->getContext());
             // 8 float values make up the ST registers
@@ -450,7 +452,7 @@ void allocateLocals(Function *F, int bits) {
 
             Instruction *fpu_FOPCODE = new AllocaInst(Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE_val", fpu_LASTDATA_OFF);
             TASSERT(fpu_FOPCODE != NULL, "");
-			
+
             //vector registers
             Instruction *vec_xmm0 =
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
@@ -516,7 +518,7 @@ void allocateLocals(Function *F, int bits) {
                 new AllocaInst( Type::getIntNTy(F->getContext(), 128),
                                 "XMM15_val",
                                 vec_xmm14);
-								
+
             // stack base and limit
             Instruction *stack_base =
                 new AllocaInst( Type::getInt64Ty(F->getContext()),
@@ -541,7 +543,7 @@ BasicBlock *bbFromStrName(string n, Function *F) {
 
     for( Function::iterator it = F->begin(); it != F->end(); ++it ) {
         BasicBlock  *b = it;
-        
+
         if( b->getName() == n ) {
             found = b;
             break;
@@ -552,24 +554,24 @@ BasicBlock *bbFromStrName(string n, Function *F) {
 }
 
 
-InstTransResult disInstr(   InstPtr             ip, 
-                            BasicBlock          *&block, 
+InstTransResult disInstr(   InstPtr             ip,
+                            BasicBlock          *&block,
                             NativeBlockPtr      nb,
                             Function            *F,
                             NativeFunctionPtr   natF,
                             NativeModulePtr     natM,
-			    bool doAnnot) 
+			    bool doAnnot)
 {
     //Instruction *begin_marker = *(block->rbegin()); // llvm3.4
     //BasicBlock::iterator begin_marker = block->getFirstInsertionPt();
-    
+
     BasicBlock *ob = block;
 
     size_t bsize_pre = block->size();
 
     //add a string representation of this instruction to the CFG
     //this string representation should be removed by optimizations
-    
+
     //in the future, we could have different target decoders here
     InstTransResult disInst_result = disInstrX86(ip, block, nb, F, natF, natM);
 
@@ -587,26 +589,26 @@ InstTransResult disInstr(   InstPtr             ip,
     //add source annotation information to the CFG
     //info will be added to every llvm inst, so any prettyprinters
     //should trim off the excess. we add the annotation to every line
-    //in case optimizations remove llvm insts. 
+    //in case optimizations remove llvm insts.
 
-    return disInst_result; 
+    return disInst_result;
 }
 
 template <typename Vertex, typename Graph>
 void bfs_cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
     NativeBlockPtr  curBlock = this->natFun->block_from_id(u);
     BasicBlock      *curLLVMBlock = NULL;
-  
+
     if( curBlock == NULL )
       throw TErr(__LINE__, __FILE__, "Could not look up block "+to_string<Vertex>(u, dec));
 
-    //first, either create or look up the LLVM basic block for this native 
-    //block. we are either creating it for the first time, or, we are 
+    //first, either create or look up the LLVM basic block for this native
+    //block. we are either creating it for the first time, or, we are
     //going to look up a blank block
     curLLVMBlock = bbFromStrName(curBlock->get_name(), this->F);
 
     if( curLLVMBlock == NULL ) {
-        //we need to create the block, so do that 
+        //we need to create the block, so do that
         curLLVMBlock = BasicBlock::Create(  this->F->getContext(),
                                             curBlock->get_name(),
                                             this->F);
@@ -621,7 +623,7 @@ void bfs_cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
         //try and look up a block that has this blocks name
         NativeBlockPtr followNat = this->natFun->block_from_base(blockBase);
         string followName = followNat->get_name();
-        
+
         BasicBlock  *fBB = bbFromStrName(followName, this->F);
 
         if( fBB == NULL ) {
@@ -635,11 +637,11 @@ void bfs_cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
     //now, go through each statement and translate it into LLVM IR
     //statements that branch SHOULD be the last statement in a block
     list<InstPtr>   stmts = curBlock->get_insts();
-    
+
     for( list<InstPtr>::iterator it = stmts.begin(); it != stmts.end(); ++it) {
         InstPtr inst = *it;
 
-        InstTransResult r = 
+        InstTransResult r =
             disInstr(inst, curLLVMBlock, curBlock, this->F, this->natFun, this->natMod, true);
 
         if( r == TranslateError ) {
@@ -655,7 +657,7 @@ void bfs_cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
     // we may need to insert a branch inst to the successor
     // if the block ended on a non-terminator (this happens since we
     // may split blocks in cfg recovery to avoid code duplication)
-    if(follows.size() == 1 && curLLVMBlock->getTerminator() == nullptr) 
+    if(follows.size() == 1 && curLLVMBlock->getTerminator() == nullptr)
     {
         VA blockBase = *(follows.begin());
         std::string  bbName = "block_0x"+to_string<VA>(blockBase, std::hex);
@@ -683,12 +685,12 @@ static bool insertFunctionIntoModule(NativeModulePtr mod, NativeFunctionPtr func
         cout << "\tReturning current function instead" << std::endl;
         return true;
     }
-    
+
     //create the entry block for the function
-    //this block will alloca cells on the 'stack' for every register in the 
-    //register member structure 
+    //this block will alloca cells on the 'stack' for every register in the
+    //register member structure
     BasicBlock  *entryBlock = BasicBlock::Create(   F->getContext(),
-                                                    "entry", 
+                                                    "entry",
                                                     F);
     TASSERT(entryBlock != NULL, "" );
 
@@ -716,8 +718,8 @@ static bool insertFunctionIntoModule(NativeModulePtr mod, NativeFunctionPtr func
     //visit every vertex in the graph, starting from the entry block, which
     //always should be block 0
     //this traversal wil build us the LLVM graph from the native graph
-    boost::breadth_first_search(funcGraph, 
-                                boost::vertex(func->entry_block_id(), funcGraph), 
+    boost::breadth_first_search(funcGraph,
+                                boost::vertex(func->entry_block_id(), funcGraph),
                                 boost::visitor(v));
 
     //check that the function we created is valid
@@ -771,18 +773,18 @@ bool addEntryPointDriverRaw(Module *M, string name, VA entry) {
         Type  *returnTy = Type::getVoidTy(M->getContext());
         FunctionType *FT = FunctionType::get(returnTy, args, false);
 
-        // check if driver name already exists.. maybe its the name of an 
+        // check if driver name already exists.. maybe its the name of an
         // extcall and we will have a serious conflict?
 
         Function *driverF = M->getFunction(name);
         if(driverF == NULL) {
             // function does not exist. this is good.
             // insert the function prototype
-            driverF = (Function *) M->getOrInsertFunction(name, FT); 
+            driverF = (Function *) M->getOrInsertFunction(name, FT);
         } else {
             throw TErr(__LINE__, __FILE__, "Cannot insert driver. Function "+name+" already exists.");
         }
-        
+
 
         if( driverF == NULL ) {
           throw TErr(__LINE__, __FILE__, "Could not get or insert function "+name);
@@ -794,9 +796,9 @@ bool addEntryPointDriverRaw(Module *M, string name, VA entry) {
                 "driverBlockRaw",
                 driverF);
 
-        Function::ArgumentListType::iterator  it = 
+        Function::ArgumentListType::iterator  it =
             driverF->getArgumentList().begin();
-        Function::ArgumentListType::iterator  end = 
+        Function::ArgumentListType::iterator  end =
             driverF->getArgumentList().end();
 
         while(it != end) {
@@ -814,13 +816,13 @@ bool addEntryPointDriverRaw(Module *M, string name, VA entry) {
     return false;
 }
 
-bool addEntryPointDriver(Module *M, 
-        string name, 
-        VA entry, 
-        int np, 
-        bool ret, 
+bool addEntryPointDriver(Module *M,
+        string name,
+        VA entry,
+        int np,
+        bool ret,
         raw_ostream &report,
-        ExternalCodeRef::CallingConvention cconv) 
+        ExternalCodeRef::CallingConvention cconv)
 {
   //convert the VA into a string name of a function, try and look it up
   string  s("sub_"+to_string<VA>(entry, hex));
@@ -846,7 +848,7 @@ bool addEntryPointDriver(Module *M,
     FunctionType *FT = FunctionType::get(returnTy, args, false);
 
     //insert the function prototype
-    Function  *driverF = (Function *) M->getOrInsertFunction(name, FT); 
+    Function  *driverF = (Function *) M->getOrInsertFunction(name, FT);
     // set drivers calling convention to match user specification
     driverF->setCallingConv(getLLVMCC(cconv));
 
@@ -862,15 +864,15 @@ bool addEntryPointDriver(Module *M,
     Instruction *aCtx = new AllocaInst(g_RegStruct, "", driverBB);
     TASSERT(aCtx != NULL, "Could not allocate register context!");
 
-    //write the parameters into the stack 
-    Function::ArgumentListType::iterator  fwd_it = 
+    //write the parameters into the stack
+    Function::ArgumentListType::iterator  fwd_it =
       driverF->getArgumentList().begin();
-    Function::ArgumentListType::iterator  fwd_end = 
+    Function::ArgumentListType::iterator  fwd_end =
       driverF->getArgumentList().end();
     AttrBuilder B;
     B.addAttribute(Attribute::InReg);
 
-    if (cconv == ExternalCodeRef::FastCall) 
+    if (cconv == ExternalCodeRef::FastCall)
     {
         // make __fastcall functions work:
         // set ecx to arg[0]
@@ -885,7 +887,7 @@ bool addEntryPointDriver(Module *M,
             // make driver take this from register
             fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
 
-            Value *ecxP = 
+            Value *ecxP =
                 GetElementPtrInst::CreateInBounds(aCtx, ecxFieldGEPV, "", driverBB);
             Argument  *curArg = &(*fwd_it);
             aliasMCSemaScope(new StoreInst(curArg, ecxP, driverBB));
@@ -903,19 +905,19 @@ bool addEntryPointDriver(Module *M,
             // make driver take this from register
             fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 2, B));
 
-            Value *edxP = 
+            Value *edxP =
                 GetElementPtrInst::CreateInBounds(aCtx, edxFieldGEPV, "", driverBB);
-            
+
 
             Argument  *curArg = &(*fwd_it);
             aliasMCSemaScope(new StoreInst(curArg, edxP, driverBB));
         }
     } // fastcall
 
-    //write the parameters into the stack 
-    Function::ArgumentListType::reverse_iterator  it = 
+    //write the parameters into the stack
+    Function::ArgumentListType::reverse_iterator  it =
       driverF->getArgumentList().rbegin();
-    Function::ArgumentListType::reverse_iterator  end = 
+    Function::ArgumentListType::reverse_iterator  end =
       driverF->getArgumentList().rend();
 
     Value *stackSize = archGetStackSize(M, driverBB);
@@ -928,9 +930,9 @@ bool addEntryPointDriver(Module *M,
 
     // decrement stackPtr to leave some slack space on the stack.
     // our current implementation of varargs functions just passes
-    // a big number of arguments to the destination function. 
+    // a big number of arguments to the destination function.
     // This works because they are declared cdecl and the caller cleans up
-    // ... BUT 
+    // ... BUT
     // if there is not enough stack for all these args, we may dereference
     // unallocated memory. Leave some slack so this doesn't happen.
     stackPosInt = BinaryOperator::Create(BinaryOperator::Sub,
@@ -981,13 +983,13 @@ bool addEntryPointDriver(Module *M,
       CONST_V<32>(driverBB, k)
     };
 
-    Value *spValP = 
+    Value *spValP =
       GetElementPtrInst::CreateInBounds(aCtx, spFieldGEPV, "", driverBB);
 
-    Value *sBaseValP = 
+    Value *sBaseValP =
       GetElementPtrInst::CreateInBounds(aCtx, stackBaseGEPV, "", driverBB);
 
-    Value *sLimitValP = 
+    Value *sLimitValP =
       GetElementPtrInst::CreateInBounds(aCtx, stackLimitGEPV, "", driverBB);
 
     // stack limit = start of allocation (stack grows down);
@@ -1002,7 +1004,7 @@ bool addEntryPointDriver(Module *M,
       CONST_V<32>(driverBB, k)
     };
 
-    Value *dflagP = 
+    Value *dflagP =
       GetElementPtrInst::CreateInBounds(aCtx, dflagGEPV, "", driverBB);
 
     Instruction *tmp3 = aliasMCSemaScope(new StoreInst(CONST_V<1>(driverBB, 0), dflagP, driverBB));
@@ -1023,18 +1025,18 @@ bool addEntryPointDriver(Module *M,
 
     //if we are requested, return the EAX value, else return void
     if(ret) {
-      //do a GEP and load for the EAX register in the reg structure 
+      //do a GEP and load for the EAX register in the reg structure
       int j = x86::getRegisterOffset(EAX);
       Value *eaxGEPV[] = {
-        CONST_V<32>(driverBB, 0), 
+        CONST_V<32>(driverBB, 0),
         CONST_V<32>(driverBB, j)
       };
 
-      Value *eaxVP = 
+      Value *eaxVP =
         GetElementPtrInst::CreateInBounds(aCtx, eaxGEPV, "", driverBB);
       Instruction *eaxV = aliasMCSemaScope(new LoadInst(eaxVP, "", driverBB));
 
-      //return that value 
+      //return that value
       ReturnInst::Create(driverF->getContext(), eaxV, driverBB);
     } else {
       ReturnInst::Create(driverF->getContext(), driverBB);
@@ -1058,7 +1060,7 @@ static Constant* makeConstantBlob(LLVMContext &ctx, const vector<uint8_t> &blob)
     vector<uint8_t>::const_iterator     it = blob.begin();
     vector<Constant*> array_elements;
     while( it != blob.end() ) {
-        uint8_t     cur = *it; 
+        uint8_t     cur = *it;
         IntegerType *ty = Type::getInt8Ty(ctx);
         Constant    *c = ConstantInt::get(ty, cur);
 
@@ -1070,12 +1072,12 @@ static Constant* makeConstantBlob(LLVMContext &ctx, const vector<uint8_t> &blob)
 }
 
 static GlobalVariable* getSectionForDataAddr(
-        const list<DataSection>  &dataSecs, 
-        Module *M, 
-        VA data_addr, 
+        const list<DataSection>  &dataSecs,
+        Module *M,
+        VA data_addr,
         VA &section_base)
 {
-    
+
     for(list<DataSection>::const_iterator git = dataSecs.begin();
         git != dataSecs.end();
         git++)
@@ -1087,9 +1089,9 @@ static GlobalVariable* getSectionForDataAddr(
         if(data_addr >= start && data_addr < end) {
             std::string gvar_name = "data_0x" + to_string<VA>(start, hex);//+"_ptr";
             section_base = start;
-            return M->getNamedGlobal(gvar_name); 
+            return M->getNamedGlobal(gvar_name);
         }
-        
+
     }
 
     return NULL;
@@ -1097,12 +1099,12 @@ static GlobalVariable* getSectionForDataAddr(
 }
 
 void dataSectionToTypesContents(
-        const list<DataSection>  &globaldata, 
-        DataSection& ds, 
+        const list<DataSection>  &globaldata,
+        DataSection& ds,
         Module *M,
         vector<Constant*>&    secContents,
         vector<Type*>& data_section_types,
-        bool convert_to_callback) 
+        bool convert_to_callback)
 {
     // find what elements will be needed for this data section
     // There are three main types:
@@ -1149,17 +1151,17 @@ void dataSectionToTypesContents(
 
                 secContents.push_back(func);
                 data_section_types.push_back(func->getType());
-            } 
+            }
 			else {
                 // data symbol
                 // get the base of the data section for this symobol
-                // then compute the offset from base of data 
+                // then compute the offset from base of data
                 // and store as integer value of (base+offset)
                 VA section_base;
                 GlobalVariable *g_ref = getSectionForDataAddr(
-                        globaldata, 
-                        M, 
-                        func_addr, 
+                        globaldata,
+                        M,
+                        func_addr,
                         section_base);
                 TASSERT(g_ref != NULL, "Could not get data addr for:"+string(func_addr_str));
                 // instead of referencing an element directly
@@ -1187,7 +1189,7 @@ void dataSectionToTypesContents(
         } else {
             // add array
             // this holds opaque data in a byte array
-            Constant *arr = 
+            Constant *arr =
                 makeConstantBlob(M->getContext(), dsec_itr->getBytes());
             secContents.push_back(arr);
             data_section_types.push_back(arr->getType());
@@ -1207,19 +1209,19 @@ static bool insertDataSections(NativeModulePtr natMod, Module *M, raw_ostream &r
     // pre-create references to all data sections
     // as later we may have data references that are
     // from one section into another
-    
+
     while( git != globaldata.end() ) {
         DataSection         &dt = *git;
         string          bufferName;
         bufferName = "data_0x" + to_string<VA>(dt.getBase(), hex);
-        //report << "inserting global data section named "; 
+        //report << "inserting global data section named ";
         //report << bufferName << "\n";
-        std::cout << "inserting global data section named "; 
+        std::cout << "inserting global data section named ";
         std::cout << bufferName << std::endl;
 
         StructType *st_opaque = StructType::create(M->getContext());
         GlobalVariable *g = new GlobalVariable(*M,
-                                st_opaque, 
+                                st_opaque,
                                 dt.isReadOnly(),
                                 // Used to be PrivateLinkage, but that emitted
                                 // .objs that would not link with MSVC
@@ -1241,7 +1243,7 @@ static bool insertDataSections(NativeModulePtr natMod, Module *M, raw_ostream &r
         // secContents is the actual values we will be inserting
         vector<Constant*>    secContents;
         // data_section_types is their types, which are needed to initialize
-        // the global variable 
+        // the global variable
         vector<Type*> data_section_types;
 
 
@@ -1249,17 +1251,17 @@ static bool insertDataSections(NativeModulePtr natMod, Module *M, raw_ostream &r
         // create an opaque structure so we can create an opaque global
         // variable.
         // The opaque variable currently serves as a base for self-
-        // referential data. 
+        // referential data.
         StructType *st_opaque = gvit->first;
         GlobalVariable *g = gvit->second;
 
 
         dataSectionToTypesContents(
-                globaldata, 
-                dt, 
-                M, 
-                secContents, 
-                data_section_types, 
+                globaldata,
+                dt,
+                M,
+                secContents,
+                data_section_types,
                 true);
 
         // fill in the opaqure structure with actual members
@@ -1295,7 +1297,7 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
 
         Function *F = M->getFunction(fname);
 
-        if(F == NULL) { 
+        if(F == NULL) {
             Constant *FC = M->getOrInsertFunction(fname, getBaseFunctionType(M));
             F = dyn_cast<Function>(FC);
 
@@ -1349,13 +1351,13 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
         }
     }
 
-    //iterate over the list of external functions and insert them as 
+    //iterate over the list of external functions and insert them as
     //global functions
     list<ExternalCodeRefPtr> extCalls = natMod->getExtCalls();
     list<ExternalCodeRefPtr>::iterator it = extCalls.begin();
     for( ; it != extCalls.end(); ++it ) {
         ExternalCodeRefPtr   e = *it;
-        
+
         ExternalCodeRef::CallingConvention   conv = e->getCallingConvention();
         int8_t                          argCount = e->getNumArgs();
         string                          symName = e->getSymbolName();
@@ -1366,7 +1368,7 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
             vector<Type*>   arguments;
             Type            *returnType = NULL;
 
-            //create arguments 
+            //create arguments
             for( int i = 0; i < argCount; i++ ) {
                 if(natMod->is64Bit()){
                     arguments.push_back(Type::getInt64Ty(M->getContext()));
@@ -1391,15 +1393,15 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
                     }
                     break;
                 default:
-                    throw TErr(__LINE__, __FILE__, 
+                    throw TErr(__LINE__, __FILE__,
                               "Encountered an unknown return type while translating function");
             }
             FunctionType    *ft = FunctionType::get(returnType,
                                                     arguments,
                                                     false);
-            f = Function::Create(   ft, 
-                GlobalValue::ExternalLinkage, 
-                symName, 
+            f = Function::Create(   ft,
+                GlobalValue::ExternalLinkage,
+                symName,
                 M);
 
             if(e->getReturnType() == ExternalCodeRef::NoReturn) {

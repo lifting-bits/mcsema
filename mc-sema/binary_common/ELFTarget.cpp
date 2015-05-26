@@ -27,7 +27,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include <LExcn.h>
-#include <boost/filesystem.hpp> 
+#include <boost/filesystem.hpp>
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/Debug.h"
@@ -38,7 +38,7 @@ using namespace std;
 using namespace llvm;
 using namespace boost;
 
-ElfTarget* ElfTarget::CreateElfTarget(string f, const Target *T) 
+ElfTarget* ElfTarget::CreateElfTarget(string f, const Target *T)
 {
     auto err_or_buff = MemoryBuffer::getFile(f);
     std::error_code ec = err_or_buff.getError();
@@ -74,7 +74,7 @@ bool ElfTarget::getEntryPoint(::uint64_t &ep) const
     return ec == object::object_error::success && ep != 0;
 }
 
-static bool find_import_for_addr(object::SectionRef section, uint32_t offt, uint32_t target, 
+static bool find_import_for_addr(object::SectionRef section, uint32_t offt, uint32_t target,
         std::string &import_name) {
 
     llvm::object::relocation_iterator rit = section.relocation_begin();
@@ -86,7 +86,7 @@ static bool find_import_for_addr(object::SectionRef section, uint32_t offt, uint
 
         ec = rit->getAddress((::uint64_t &)addr);
         LASSERT(!ec, "Can't get address for relocation ref");
-        llvm::dbgs() << "\t" << __FUNCTION__ << ": Testing " << to_string<VA>(target, hex) 
+        llvm::dbgs() << "\t" << __FUNCTION__ << ": Testing " << to_string<VA>(target, hex)
             << " vs. " << to_string<VA>(addr+offt, hex) << "\n";
 
         if( target == (addr+offt) ) {
@@ -103,12 +103,12 @@ static bool find_import_for_addr(object::SectionRef section, uint32_t offt, uint
 
             ::uint64_t sym_addr;
             ec = symref.getAddress(sym_addr);
-			
+
 			//::int64_t addend;
 			//ec = getELFRelocationAddend(*rit, addend);
 			//sym_addr += addend;
-			
-            if(ec) { 
+
+            if(ec) {
                 llvm::dbgs() << "Could not get address of symbol: " << import_name << "\n";
             } else {
                 llvm::dbgs() << "Address for " << import_name
@@ -159,7 +159,7 @@ bool ElfTarget::find_in_any_section(uint32_t target, std::string &import_name)
 
 bool ElfTarget::find_import_name(uint32_t addrToFind, std::string &import_name)
 {
-    if(T.compare("x86-64")){
+    if(!T.compare("x86-64")){
         LASSERT(this->elf_obj != NULL, "ELF Object File not initialized");
     } else {
         LASSERT(this->elf_obj32 != NULL, "ELF Object File not initialized");

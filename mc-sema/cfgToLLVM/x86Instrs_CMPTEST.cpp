@@ -285,6 +285,9 @@ GENERIC_TRANSLATION(CMP8rr_REV, doCmpRR<8>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP32ri8, doCmpRI<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP64ri32, doCmpRI<64>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP64ri8, doCmpRI<64>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION_MEM(CMP64mi8,
+    doCmpMI<64>(ip,   block, ADDR(0), OP(5)),
+    doCmpMI<64>(ip,   block, STD_GLOBAL_OP(0), OP(5)))
 GENERIC_TRANSLATION_MEM(CMP64mi32,
     doCmpMI<64>(ip,   block, ADDR(0), OP(5)),
     doCmpMI<64>(ip,   block, STD_GLOBAL_OP(0), OP(5)))
@@ -325,9 +328,12 @@ GENERIC_TRANSLATION_MEM(CMP32mr,
 	doCmpMR<32>(ip,   block, STD_GLOBAL_OP(0), OP(5)))
 
 GENERIC_TRANSLATION(TEST32rr, doTestRR<32>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION(TEST64rr, doTestRR<64>(ip, block, OP(0), OP(1)))
 //there is a form of the encoding where the EAX operand is 
 //implicit
+GENERIC_TRANSLATION(TEST64i32, doTestRI<64>(ip,  block, MCOperand::CreateReg(X86::RAX), OP(0)))
 GENERIC_TRANSLATION(TEST32i32, doTestRI<32>(ip,  block, MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(TEST64ri32, doTestRI<64>(ip,  block, OP(0), OP(1)))
 GENERIC_TRANSLATION(TEST32ri, doTestRI<32>(ip,  block, OP(0), OP(1)))
 GENERIC_TRANSLATION(TEST16i16, doTestRI<16>(ip,  block, MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION_MEM(TEST16mi, 
@@ -343,6 +349,10 @@ GENERIC_TRANSLATION_32MI(TEST32mi,
 	doTestMI<32>(ip, block, ADDR(0), OP(5)),
 	doTestMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
     doTestMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip)))
+
+GENERIC_TRANSLATION_MEM(TEST64rm,
+	doTestRM<64>(ip,  block, OP(0), ADDR(1)),
+	doTestRM<64>(ip,  block, OP(0), STD_GLOBAL_OP(1)))
 
 GENERIC_TRANSLATION_MEM(TEST32rm, 
 	doTestRM<32>(ip,  block, OP(0), ADDR(1)),
@@ -391,14 +401,14 @@ void CMPTEST_populateDispatchMap(DispatchMap &m) {
     m[X86::CMP16mr] = translate_CMP16mr;
     m[X86::CMP32mr] = translate_CMP32mr;
     m[X86::CMP16mi8] = translate_CMP16mi8;
-    m[X86::CMP64mi8] = translate_NOOP;
+    m[X86::CMP64mi8] = translate_CMP64mi8;
     m[X86::CMP64mi32] = translate_CMP64mi32;
 
 
-	m[X86::TEST64ri32] = translate_NOOP;
-	m[X86::TEST64i32] = translate_NOOP;
-	m[X86::TEST64rm] = translate_NOOP;
-	m[X86::TEST64rr] = translate_NOOP;
+	m[X86::TEST64ri32] = translate_TEST64ri32;
+	m[X86::TEST64i32] = translate_TEST64i32;
+	m[X86::TEST64rm] = translate_TEST64rm;
+	m[X86::TEST64rr] = translate_TEST64rr;
     m[X86::TEST32rr] = translate_TEST32rr;
     m[X86::TEST32i32] = translate_TEST32i32;
     m[X86::TEST32ri] = translate_TEST32ri;

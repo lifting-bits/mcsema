@@ -135,10 +135,10 @@ namespace x86 {
 
 template <int width>
 llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
-    //we should return the pointer to the Value object that represents the 
-    //value read. we'll truncate that value to the width specified by 
+    //we should return the pointer to the Value object that represents the
+    //value read. we'll truncate that value to the width specified by
     //the width parameter.
-	
+
     //lookup the value that defines the cell that stores the current register
 	llvm::Value	*localRegVar = x86::MCRegToValue(b, reg);
     if(localRegVar == NULL)
@@ -149,11 +149,11 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
 
     //do a load from this value into a temporary
     llvm::Instruction   *tmpVal = noAliasMCSemaScope(new llvm::LoadInst(localRegVar, "", b));
-    
+
     TASSERT(tmpVal != NULL, "Could not read from register");
 
 	llvm::Value	*readVal;
-    //if the width requested is less than the native bitwidth, 
+    //if the width requested is less than the native bitwidth,
     //then we need to truncate the read
 	int regwidth = x86::REG_SIZE;
     if(reg >= llvm::X86::XMM0 && reg <= llvm::X86::XMM7) {
@@ -163,7 +163,7 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
     if( width < regwidth ) {
         llvm::Value   *shiftedVal = NULL;
 		int readOff = x86::mapPlatRegToOffset(reg);
-		
+
         if( readOff ) {
             //if we are reading from a subreg that is a non-zero
             //offset, we need to do some bitshifting
@@ -178,9 +178,9 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
         }
 
 		//then, truncate the shifted value to the appropriate width
-		readVal = new llvm::TruncInst(shiftedVal, 
-								llvm::Type::getIntNTy(b->getContext(), width), 
-								"", 
+		readVal = new llvm::TruncInst(shiftedVal,
+								llvm::Type::getIntNTy(b->getContext(), width),
+								"",
 								b);
     } else {
 		readVal = tmpVal;
@@ -193,7 +193,7 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
 template <int width>
 void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
     //we don't return anything as this becomes a store
-	
+
     //lookup the 'stack' local for the register we want to write
     llvm::Value   *localRegVar = MCRegToValue(b, reg);
     if(localRegVar == NULL)
@@ -213,10 +213,10 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
         } else if( width < 128) {
             llvm::Value *zeros_128 = CONST_V<128>(b, 0);
             llvm::Value *all_ones = llvm::BinaryOperator::CreateNot(zeros_128, "", b);
-            // shift 128 bits of 1s to the right 
+            // shift 128 bits of 1s to the right
             llvm::Value *shift_right = llvm::BinaryOperator::CreateLShr(
-                    all_ones, 
-                    CONST_V<128>(b, 128-width), 
+                    all_ones,
+                    CONST_V<128>(b, 128-width),
                     "", b);
             // invert the mask, so that only the part we are writing is cleared
             llvm::Value *and_mask = llvm::BinaryOperator::CreateNot(shift_right, "", b);
@@ -225,7 +225,6 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
             // mask the value so the parts of the register we don't write
             // is preserved
             llvm::Value *remove_bits = llvm::BinaryOperator::CreateAnd(fullReg, and_mask, "", b);
-            assert(write->getType()->getScalarSizeInBits() < regWidthType->getScalarSizeInBits());
 			llvm::Value	*write_z = new llvm::ZExtInst(write, regWidthType, "", b);
             // or the original value with our new parts
             llvm::Value *final_val = llvm::BinaryOperator::CreateOr(remove_bits, write_z, "", b);
@@ -241,22 +240,21 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
             int		writeOff = mapPlatRegToOffset(reg);
             llvm::Value	*maskVal;
             llvm::Value	*addVal;
-			assert(write->getType()->getScalarSizeInBits() < llvm::Type::getInt32Ty(b->getContext())->getScalarSizeInBits());
 
-            llvm::Value	*write_z = 
+            llvm::Value	*write_z =
                 new llvm::ZExtInst(write, llvm::Type::getInt32Ty(b->getContext()), "", b);
 
             //maskVal will be whatever the appropriate mask is
             //addVal will be the value in 'write', shifted appropriately
             if( writeOff ) {
-                //this is a write to a high offset + some width, so, 
+                //this is a write to a high offset + some width, so,
                 //shift the mask and add values to the left by writeOff
                 switch(width) {
                     case 8:
                         maskVal = CONST_V<32>(b, ~0xFF00);
-                        addVal = llvm::BinaryOperator::CreateShl(	write_z, 
-                                CONST_V<32>(b, writeOff), 
-                                "", 
+                        addVal = llvm::BinaryOperator::CreateShl(	write_z,
+                                CONST_V<32>(b, writeOff),
+                                "",
                                 b);
                         break;
 
@@ -265,7 +263,7 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
                 }
             } else {
                 //this is a write to the base + some width
-                //simply compute the mask and add values 
+                //simply compute the mask and add values
                 switch(width) {
                     case 16:
                         maskVal = CONST_V<32>(b, ~0xFFFF);
@@ -290,7 +288,7 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
                 llvm::BinaryOperator::CreateAnd(fullReg, maskVal, "", b);
 
             //ADD the addVal to the resulting value
-            llvm::Value	*addedVal = 
+            llvm::Value	*addedVal =
                 llvm::BinaryOperator::CreateAdd(andedVal, addVal, "", b);
 
             //write this value back into the full-width local
@@ -305,13 +303,13 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
 }
 
 namespace x86_64 {
-	
+
 template <int width>
 llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
-    //we should return the pointer to the Value object that represents the 
-    //value read. we'll truncate that value to the width specified by 
+    //we should return the pointer to the Value object that represents the
+    //value read. we'll truncate that value to the width specified by
     //the width parameter.
-	
+
     //lookup the value that defines the cell that stores the current register
 	llvm::Value	*localRegVar = MCRegToValue(b, reg);
     if(localRegVar == NULL)
@@ -322,11 +320,11 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
 
     //do a load from this value into a temporary
     llvm::Instruction   *tmpVal = noAliasMCSemaScope(new llvm::LoadInst(localRegVar, "", b));
-    
+
     TASSERT(tmpVal != NULL, "Could not read from register");
 
 	llvm::Value	*readVal;
-    //if the width requested is less than the native bitwidth, 
+    //if the width requested is less than the native bitwidth,
     //then we need to truncate the read
 	int regwidth = x86_64::REG_SIZE;
     if(reg >= llvm::X86::XMM0 && reg <= llvm::X86::XMM7) {
@@ -336,7 +334,7 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
     if( width < regwidth ) {
         llvm::Value   *shiftedVal = NULL;
 		int readOff = mapPlatRegToOffset(reg);
-		
+
         if( readOff ) {
             //if we are reading from a subreg that is a non-zero
             //offset, we need to do some bitshifting
@@ -351,9 +349,9 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
         }
 
 		//then, truncate the shifted value to the appropriate width
-		readVal = new llvm::TruncInst(shiftedVal, 
-								llvm::Type::getIntNTy(b->getContext(), width), 
-								"", 
+		readVal = new llvm::TruncInst(shiftedVal,
+								llvm::Type::getIntNTy(b->getContext(), width),
+								"",
 								b);
     } else {
 		readVal = tmpVal;
@@ -386,10 +384,10 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
         } else if( width < 128) {
             llvm::Value *zeros_128 = CONST_V<128>(b, 0);
             llvm::Value *all_ones = llvm::BinaryOperator::CreateNot(zeros_128, "", b);
-            // shift 128 bits of 1s to the right 
+            // shift 128 bits of 1s to the right
             llvm::Value *shift_right = llvm::BinaryOperator::CreateLShr(
-                    all_ones, 
-                    CONST_V<128>(b, 128-width), 
+                    all_ones,
+                    CONST_V<128>(b, 128-width),
                     "", b);
             // invert the mask, so that only the part we are writing is cleared
             llvm::Value *and_mask = llvm::BinaryOperator::CreateNot(shift_right, "", b);
@@ -415,20 +413,20 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
             llvm::Value	*maskVal;
             llvm::Value	*addVal;
 			//assert(write->getType()->getScalarSizeInBits() < llvm::Type::getInt64Ty(b->getContext())->getScalarSizeInBits());
-            llvm::Value	*write_z = 
+            llvm::Value	*write_z =
                 new llvm::ZExtInst(write, llvm::Type::getInt64Ty(b->getContext()), "", b);
 
             //maskVal will be whatever the appropriate mask is
             //addVal will be the value in 'write', shifted appropriately
             if( writeOff ) {
-                //this is a write to a high offset + some width, so, 
+                //this is a write to a high offset + some width, so,
                 //shift the mask and add values to the left by writeOff
                 switch(width) {
                     case 8:
                         maskVal = CONST_V<64>(b, ~0xFF00);
-                        addVal = llvm::BinaryOperator::CreateShl(	write_z, 
-                                CONST_V<64>(b, writeOff), 
-                                "", 
+                        addVal = llvm::BinaryOperator::CreateShl(	write_z,
+                                CONST_V<64>(b, writeOff),
+                                "",
                                 b);
                         break;
 
@@ -437,7 +435,7 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
                 }
             } else {
                 //this is a write to the base + some width
-                //simply compute the mask and add values 
+                //simply compute the mask and add values
                 switch(width) {
 					case 32:
 						maskVal = CONST_V<64>(b, ~0xFFFFFFFFULL);
@@ -466,7 +464,7 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
                 llvm::BinaryOperator::CreateAnd(fullReg, maskVal, "", b);
 
             //ADD the addVal to the resulting value
-            llvm::Value	*addedVal = 
+            llvm::Value	*addedVal =
                 llvm::BinaryOperator::CreateAdd(andedVal, addVal, "", b);
 
             //write this value back into the full-width local
@@ -524,7 +522,7 @@ llvm::Value *INTERNAL_M_READ(unsigned addrspace, llvm::BasicBlock *b, llvm::Valu
 
     if( addr->getType()->isPointerTy() == false ) {
 		llvm::Type    *ptrTy = llvm::Type::getIntNPtrTy(b->getContext(), width, addrspace);
-        readLoc = new llvm::IntToPtrInst(addr, ptrTy, "", b); 
+        readLoc = new llvm::IntToPtrInst(addr, ptrTy, "", b);
 	} else if( addr->getType() != llvm::Type::getIntNPtrTy(b->getContext(), width, addrspace) ) {
 		//we need to bitcast the pointer value to a pointer type of the appropriate width
 		readLoc = llvm::CastInst::CreatePointerCast(addr, llvm::Type::getIntNPtrTy(b->getContext(), width, addrspace), "", b);
@@ -556,11 +554,11 @@ void INTERNAL_M_WRITE(unsigned addrspace, llvm::BasicBlock *b, llvm::Value *addr
     //this is also straightforward
     llvm::Value   *writeLoc = addr;
     //however, if the incoming 'addr' location is not a pointer, we must
-    //first turn it into an addr 
+    //first turn it into an addr
 
     if( addr->getType()->isPointerTy() == false ) {
         llvm::Type    *ptrTy = llvm::Type::getIntNPtrTy(b->getContext(), width, addrspace);
-        writeLoc = new llvm::IntToPtrInst(addr, ptrTy, "", b); 
+        writeLoc = new llvm::IntToPtrInst(addr, ptrTy, "", b);
 	} else if( addr->getType() != llvm::Type::getIntNPtrTy(b->getContext(), width, addrspace) ) {
 		writeLoc = llvm::CastInst::CreatePointerCast(addr, llvm::Type::getIntNPtrTy(b->getContext(), width, addrspace), "", b);
 	}
@@ -606,8 +604,8 @@ llvm::BasicBlock *bbFromStrName(std::string, llvm::Function *);
 // API usage functions
 ///////////////////////////////////////////////////////////////////////////////
 
-InstTransResult disInstr(   InstPtr             ip, 
-                            llvm::BasicBlock          *&block, 
+InstTransResult disInstr(   InstPtr             ip,
+                            llvm::BasicBlock          *&block,
                             NativeBlockPtr      nb,
                             llvm::Function            *F,
                             NativeFunctionPtr   natF,
@@ -618,8 +616,8 @@ InstTransResult disInstr(   InstPtr             ip,
 llvm::Value *makeCallbackForLocalFunction(llvm::Module *M, VA local_target);
 
 void dataSectionToTypesContents(
-        const std::list<DataSection>  &globaldata, 
-        DataSection& ds, 
+        const std::list<DataSection>  &globaldata,
+        DataSection& ds,
         llvm::Module *M,
         std::vector<llvm::Constant*>&    secContents,
         std::vector<llvm::Type*>& data_section_types,
@@ -636,7 +634,7 @@ static void SHR_SET_FLAG_V(llvm::BasicBlock *block, llvm::Value *val,
         val, shrbit_val, "", block);
     llvm::Value *mask_pre = CONST_V<maskbits>(block, 0);
     llvm::Value *mask = llvm::BinaryOperator::CreateNot(mask_pre, "", block);
-    llvm::Value *shr_trunc = new llvm::TruncInst(shr, 
+    llvm::Value *shr_trunc = new llvm::TruncInst(shr,
             llvm::Type::getIntNTy(block->getContext(), maskbits), "", block);
 
     llvm::Value *anded = llvm::BinaryOperator::CreateAnd(shr_trunc, mask, "", block);
@@ -649,9 +647,9 @@ static void SHR_SET_FLAG(llvm::BasicBlock *block, llvm::Value *val,
     MCSemaRegs flag, int shrbits)
 {
     SHR_SET_FLAG_V<width, maskbits>(
-            block, 
-            val, 
-            flag, 
-            CONST_V<width>(block, shrbits) 
+            block,
+            val,
+            flag,
+            CONST_V<width>(block, shrbits)
     );
 }

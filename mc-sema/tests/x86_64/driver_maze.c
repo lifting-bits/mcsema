@@ -1,5 +1,6 @@
 #include <stdlib.h>
-#include "../common/RegisterState.h"
+#define TARGET_IA64
+#include "../../common/RegisterState.h"
 
 extern int mcsema_main(RegState *);
 
@@ -13,11 +14,11 @@ int maze_driver(int argc, const char* argv[])
     //set up the stack 
     stack[(4096*9)+1] = (uint32_t)argc;
     stack[(4096*9)+2] = (uint32_t)argv;
-    rState.ESP = (unsigned long) &stack[4096*9];
+    rState.RSP = (unsigned long) &stack[4096*9];
 
     mcsema_main(&rState);
 
-    return rState.EAX;
+    return rState.RAX;
 }
 
 int main(int argc, const char *argv[]) {

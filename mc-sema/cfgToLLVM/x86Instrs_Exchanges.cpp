@@ -40,7 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 template <int width>
 static InstTransResult doCmpxchgRR(InstPtr ip,    BasicBlock      *&b,
                             const MCOperand &dstReg,
-                            const MCOperand &srcReg) 
+                            const MCOperand &srcReg)
 {
     NASSERT(dstReg.isReg());
     NASSERT(srcReg.isReg());
@@ -57,6 +57,9 @@ static InstTransResult doCmpxchgRR(InstPtr ip,    BasicBlock      *&b,
             break;
         case 32:
             acc = R_READ<width>(b, X86::EAX);
+            break;
+        case 64:
+            acc = R_READ<width>(b, X86::RAX);
             break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");
@@ -76,7 +79,7 @@ static InstTransResult doCmpxchgRR(InstPtr ip,    BasicBlock      *&b,
     // acc = select(ZF, acc, dst)
     // dst = select(ZF, src, dst)
     Value *new_acc = SelectInst::Create(Cmp, acc, dstReg_v, "", b);
-    Value *new_dst = SelectInst::Create(Cmp, srcReg_v, dstReg_v, "", b); 
+    Value *new_dst = SelectInst::Create(Cmp, srcReg_v, dstReg_v, "", b);
 
     R_WRITE<width>(b, dstReg.getReg(), new_dst);
 
@@ -90,6 +93,9 @@ static InstTransResult doCmpxchgRR(InstPtr ip,    BasicBlock      *&b,
         case 32:
             R_WRITE<width>(b, X86::EAX, new_acc);
             break;
+        case 64:
+            R_WRITE<width>(b, X86::RAX, new_acc);
+            break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");
     }
@@ -101,7 +107,7 @@ static InstTransResult doCmpxchgRR(InstPtr ip,    BasicBlock      *&b,
 template <int width>
 static InstTransResult doCmpxchgRM(InstPtr ip,    BasicBlock      *&b,
                             Value           *dstAddr,
-                            const MCOperand &srcReg) 
+                            const MCOperand &srcReg)
 {
     NASSERT(dstAddr != NULL);
     NASSERT(srcReg.isReg());
@@ -119,6 +125,9 @@ static InstTransResult doCmpxchgRM(InstPtr ip,    BasicBlock      *&b,
         case 32:
             acc = R_READ<width>(b, X86::EAX);
             break;
+        case 64:
+            acc = R_READ<width>(b, X86::RAX);
+            break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");
     }
@@ -129,15 +138,15 @@ static InstTransResult doCmpxchgRM(InstPtr ip,    BasicBlock      *&b,
     unsigned addrspace = ip->get_addr_space();
 
     if( dstAddr->getType()->isPointerTy() == false ) {
-		llvm::Type    *ptrTy = 
+		llvm::Type    *ptrTy =
             Type::getIntNPtrTy(b->getContext(), width, addrspace);
-        m_addr = new llvm::IntToPtrInst(dstAddr, ptrTy, "", b); 
-	} 
+        m_addr = new llvm::IntToPtrInst(dstAddr, ptrTy, "", b);
+	}
     else if( dstAddr->getType() != Type::getIntNPtrTy(
-                b->getContext(), width, addrspace) ) 
+                b->getContext(), width, addrspace) )
     {
 		//we need to bitcast the pointer value to a pointer type of the appropriate width
-		m_addr = CastInst::CreatePointerCast(dstAddr, 
+		m_addr = CastInst::CreatePointerCast(dstAddr,
                 Type::getIntNPtrTy(b->getContext(), width, addrspace), "", b);
 	} else {
         m_addr = dstAddr;
@@ -147,12 +156,12 @@ static InstTransResult doCmpxchgRM(InstPtr ip,    BasicBlock      *&b,
 
 
     AtomicCmpXchgInst *cmpx = new AtomicCmpXchgInst(
-            m_addr, 
-            acc, 
-            srcReg_v, 
+            m_addr,
+            acc,
+            srcReg_v,
             llvm::SequentiallyConsistent,
             llvm::SequentiallyConsistent,
-            llvm::CrossThread, 
+            llvm::CrossThread,
             b);
     cmpx->setVolatile(true);
 
@@ -176,6 +185,9 @@ static InstTransResult doCmpxchgRM(InstPtr ip,    BasicBlock      *&b,
         case 32:
             R_WRITE<width>(b, X86::EAX, new_acc);
             break;
+        case 64:
+            R_WRITE<width>(b, X86::RAX, new_acc);
+            break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");
     }
@@ -187,7 +199,7 @@ static InstTransResult doCmpxchgRM(InstPtr ip,    BasicBlock      *&b,
 template <int width>
 static InstTransResult doXaddRM(InstPtr ip,    BasicBlock *&b,
                             const MCOperand &srcReg,
-                            Value           *dstAddr) 
+                            Value           *dstAddr)
 {
     NASSERT(srcReg.isReg());
     NASSERT(dstAddr != NULL);
@@ -220,7 +232,7 @@ static InstTransResult doXaddRM(InstPtr ip,    BasicBlock *&b,
 template <int width>
 static InstTransResult doXaddRR(InstPtr ip,    BasicBlock *&b,
                             const MCOperand &dstReg,
-                            const MCOperand &srcReg) 
+                            const MCOperand &srcReg)
 {
     NASSERT(dstReg.isReg());
     NASSERT(srcReg.isReg());
@@ -251,7 +263,7 @@ static InstTransResult doXaddRR(InstPtr ip,    BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doXchgRR(InstPtr ip,    BasicBlock *&b, 
+static InstTransResult doXchgRR(InstPtr ip,    BasicBlock *&b,
                             const MCOperand &o1,
                             const MCOperand &o2)
 {
@@ -284,43 +296,52 @@ static InstTransResult doXchgRM(InstPtr ip,    BasicBlock *&b,
     return ContinueBlock;
 }
 
-GENERIC_TRANSLATION_MEM(CMPXCHG16rm, 
+GENERIC_TRANSLATION_MEM(CMPXCHG16rm,
 	doCmpxchgRM<16>(ip, block, ADDR(0), OP(5)),
 	doCmpxchgRM<16>(ip, block, STD_GLOBAL_OP(0), OP(5)))
 GENERIC_TRANSLATION(CMPXCHG16rr, doCmpxchgRR<16>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION_MEM(CMPXCHG32rm, 
+GENERIC_TRANSLATION_MEM(CMPXCHG32rm,
 	doCmpxchgRM<32>(ip, block, ADDR(0), OP(5)),
 	doCmpxchgRM<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_MEM(CMPXCHG64rm,
+	doCmpxchgRM<64>(ip, block, ADDR(0), OP(5)),
+	doCmpxchgRM<64>(ip, block, STD_GLOBAL_OP(0), OP(5)))
 GENERIC_TRANSLATION(CMPXCHG32rr, doCmpxchgRR<32>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION_MEM(CMPXCHG8rm, 
+GENERIC_TRANSLATION(CMPXCHG64rr, doCmpxchgRR<64>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION_MEM(CMPXCHG8rm,
 	doCmpxchgRM<8>(ip, block, ADDR(0), OP(5)),
 	doCmpxchgRM<8>(ip, block, STD_GLOBAL_OP(0), OP(5)))
 GENERIC_TRANSLATION(CMPXCHG8rr, doCmpxchgRR<8>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION_MEM(XADD16rm, 
+GENERIC_TRANSLATION_MEM(XADD16rm,
 	doXaddRM<16>(ip, block, OP(5), ADDR(0)),
 	doXaddRM<16>(ip, block, OP(5), STD_GLOBAL_OP(0)))
 GENERIC_TRANSLATION(XADD16rr, doXaddRR<16>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION_MEM(XADD32rm, 
+GENERIC_TRANSLATION_MEM(XADD32rm,
 	doXaddRM<32>(ip, block, OP(5), ADDR(0)),
 	doXaddRM<32>(ip, block, OP(5), STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_MEM(XADD64rm,
+	 doXaddRM<64>(ip, block, OP(5), ADDR(0)),
+	 doXaddRM<64>(ip, block, OP(5), STD_GLOBAL_OP(0)))
 GENERIC_TRANSLATION(XADD32rr, doXaddRR<32>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION_MEM(XADD8rm, 
+GENERIC_TRANSLATION(XADD64rr, doXaddRR<64>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION_MEM(XADD8rm,
 	doXaddRM<8>(ip, block, OP(5), ADDR(0)),
 	doXaddRM<8>(ip, block, OP(5), STD_GLOBAL_OP(0)))
 GENERIC_TRANSLATION(XADD8rr, doXaddRR<8>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(XCHG16ar, doXchgRR<16>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
-GENERIC_TRANSLATION_MEM(XCHG16rm, 
+GENERIC_TRANSLATION_MEM(XCHG16rm,
 	doXchgRM<16>(ip,  block, OP(0), ADDR(2)),
-	doXchgRM<16>(ip,  block, OP(0), STD_GLOBAL_OP(2)))        
+	doXchgRM<16>(ip,  block, OP(0), STD_GLOBAL_OP(2)))
 GENERIC_TRANSLATION(XCHG16rr, doXchgRR<16>(ip, block, OP(1), OP(2)))
 GENERIC_TRANSLATION(XCHG32ar, doXchgRR<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION(XCHG32ar64, doXchgRR<64>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION(XCHG64ar, doXchgRR<64>(ip, block, MCOperand::CreateReg(X86::RAX), OP(0)))
-GENERIC_TRANSLATION_MEM(XCHG32rm, 
+GENERIC_TRANSLATION_MEM(XCHG32rm,
 	doXchgRM<32>(ip,  block, OP(0), ADDR(2)),
 	doXchgRM<32>(ip,  block, OP(0), STD_GLOBAL_OP(2)))
 GENERIC_TRANSLATION(XCHG32rr, doXchgRR<32>(ip, block, OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(XCHG8rm, 
+GENERIC_TRANSLATION(XCHG64rr, doXchgRR<64>(ip, block, OP(1), OP(2)))
+GENERIC_TRANSLATION_MEM(XCHG8rm,
 	doXchgRM<8>(ip,   block, OP(0), ADDR(2)),
 	doXchgRM<8>(ip,   block, OP(0), STD_GLOBAL_OP(2)))
 GENERIC_TRANSLATION(XCHG8rr, doXchgRR<8>(ip, block, OP(1), OP(2)))
@@ -330,13 +351,17 @@ void Exchanges_populateDispatchMap(DispatchMap &m) {
         m[X86::CMPXCHG16rm] = translate_CMPXCHG16rm;
         m[X86::CMPXCHG16rr] = translate_CMPXCHG16rr;
         m[X86::CMPXCHG32rm] = translate_CMPXCHG32rm;
+        m[X86::CMPXCHG64rm] = translate_CMPXCHG64rm;
         m[X86::CMPXCHG32rr] = translate_CMPXCHG32rr;
+        m[X86::CMPXCHG64rr] = translate_CMPXCHG64rr;
         m[X86::CMPXCHG8rm] = translate_CMPXCHG8rm;
         m[X86::CMPXCHG8rr] = translate_CMPXCHG8rr;
         m[X86::XADD16rm] = translate_XADD16rm;
         m[X86::XADD16rr] = translate_XADD16rr;
         m[X86::XADD32rm] = translate_XADD32rm;
+        m[X86::XADD64rm] = translate_XADD64rm;
         m[X86::XADD32rr] = translate_XADD32rr;
+        m[X86::XADD64rr] = translate_XADD64rr;
         m[X86::XADD8rm] = translate_XADD8rm;
         m[X86::XADD8rr] = translate_XADD8rr;
         m[X86::XCHG16ar] = translate_XCHG16ar;
@@ -346,6 +371,7 @@ void Exchanges_populateDispatchMap(DispatchMap &m) {
         m[X86::XCHG32ar64] = translate_XCHG32ar64;
         m[X86::XCHG64ar] = translate_XCHG64ar;
         m[X86::XCHG32rm] = translate_XCHG32rm;
+        m[X86::XCHG64rr] = translate_XCHG64rr;
         m[X86::XCHG32rr] = translate_XCHG32rr;
         m[X86::XCHG8rm] = translate_XCHG8rm;
         m[X86::XCHG8rr] = translate_XCHG8rr;

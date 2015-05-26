@@ -108,7 +108,7 @@ std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP {
 };
 
 StringRef getRegisterName(MCSemaRegs reg) {
-   return REG_TO_OFFSET_MAP.at(reg).name; 
+   return REG_TO_OFFSET_MAP.at(reg).name;
 }
 
 int getRegisterOffset(MCSemaRegs reg) {
@@ -116,12 +116,12 @@ int getRegisterOffset(MCSemaRegs reg) {
 }
 Value *lookupLocal(Function *F, MCSemaRegs reg) {
     BasicBlock  *entry = &F->getEntryBlock();
-    BasicBlock::iterator    it = entry->begin(); 
+    BasicBlock::iterator    it = entry->begin();
 
     std::string localName = std::string(x86::getRegisterName(reg))+"_val";
     while(it != entry->end() ) {
         Value   *v = it;
-        
+
         if( v->getName() == localName ) {
             return v;
         }
@@ -243,9 +243,11 @@ std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP {
     {RCX, {2, "RCX"}},
 	{EDX, {3, "RDX"}},
     {RDX, {3, "RDX"}},
+    {SIL, {4, "RSI"}},
 	{ESI, {4, "RSI"}},
     {RSI, {4, "RSI"}},
-	{EDI, {4, "RDI"}},
+    {DIL, {5, "RDI"}},
+	{EDI, {5, "RDI"}},
     {RDI, {5, "RDI"}},
 	{ESP, {6, "RSP"}},
     {RSP, {6, "RSP"}},
@@ -259,72 +261,73 @@ std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP {
 	{R13, {13, "R13"}},
 	{R14, {14, "R14"}},
 	{R15, {15, "R15"}},
-    {CF, {16, "CF"}},
-    {PF, {17, "PF"}},
-    {AF, {18, "AF"}},
-    {ZF, {19, "ZF"}},
-    {SF, {20, "SF"}},
-    {OF, {21, "OF"}},
-    {DF, {22, "DF"}},
-    {ST0, {23, "STi"}}, 
-    {ST1, {23, "STi"}}, 
-    {ST2, {23, "STi"}},
-    {ST3, {23, "STi"}},
-    {ST4, {23, "STi"}},
-    {ST5, {23, "STi"}},
-    {ST6, {23, "STi"}},
-    {ST7, {23, "STi"}},
-    {FPU_B, {24, "FPU_B"}},
-    {FPU_C3, {25, "FPU_C3"}},
-    {FPU_TOP, {26, "FPU_TOP"}},
-    {FPU_C2, {27, "FPU_C2"}},
-    {FPU_C1, {28, "FPU_C1"}},
-    {FPU_C0, {29, "FPU_C0"}},
-    {FPU_ES, {30, "FPU_ES"}},
-    {FPU_SF, {31, "FPU_SF"}},
-    {FPU_PE, {32, "FPU_PE"}},
-    {FPU_UE, {33, "FPU_UE"}},
-    {FPU_OE, {34, "FPU_OE"}},
-    {FPU_ZE, {35, "FPU_ZE"}},
-    {FPU_DE, {36, "FPU_DE"}},
-    {FPU_IE, {37, "FPU_IE"}},
-    {FPU_X, {38, "FPU_X"}},
-    {FPU_RC, {39, "FPU_RC"}},
-    {FPU_PC, {40, "FPU_PC"}},
-    {FPU_PM, {41, "FPU_PM"}},
-    {FPU_UM, {42, "FPU_UM"}},
-    {FPU_OM, {43, "FPU_OM"}},
-    {FPU_ZM, {44, "FPU_ZM"}},
-    {FPU_DM, {45, "FPU_DM"}},
-    {FPU_IM, {46, "FPU_IM"}},
-    {FPU_TAG, {47, "FPU_TAG"}},
-    {FPU_LASTIP_SEG, {48, "FPU_LASTIP_SEG"}},
-    {FPU_LASTIP_OFF, {49, "FPU_LASTIP_OFF"}},
-    {FPU_LASTDATA_SEG, {50, "FPU_LASTDATA_SEG"}},
-    {FPU_LASTDATA_OFF, {51, "FPU_LASTDATA_OFF"}},
-    {FPU_FOPCODE, {52, "FPU_FOPCODE"}},
-    {XMM0, {53, "XMM0"}},
-    {XMM1, {54, "XMM1"}},
-    {XMM2, {55, "XMM2"}},
-    {XMM3, {56, "XMM3"}},
-    {XMM4, {57, "XMM4"}},
-    {XMM5, {58, "XMM5"}},
-    {XMM6, {59, "XMM6"}},
-    {XMM7, {60, "XMM7"}},
-	{XMM8, {61, "XMM8"}},
-    {XMM9, {62, "XMM9"}},
-    {XMM10, {63, "XMM10"}},
-    {XMM11, {64, "XMM11"}},
-    {XMM12, {65, "XMM12"}},
-    {XMM13, {66, "XMM13"}},
-    {XMM14, {67, "XMM14"}},
-    {XMM15, {68, "XMM15"}},
-    {STACK_BASE, {69, "STACK_BASE"}},
-    {STACK_LIMIT, {70, "STACK_LIMIT"}}
+	{RIP, {16, "RIP"}},
+    {CF, {17, "CF"}},
+    {PF, {18, "PF"}},
+    {AF, {19, "AF"}},
+    {ZF, {20, "ZF"}},
+    {SF, {21, "SF"}},
+    {OF, {22, "OF"}},
+    {DF, {23, "DF"}},
+    {ST0, {24, "STi"}},
+    {ST1, {24, "STi"}},
+    {ST2, {24, "STi"}},
+    {ST3, {24, "STi"}},
+    {ST4, {24, "STi"}},
+    {ST5, {24, "STi"}},
+    {ST6, {24, "STi"}},
+    {ST7, {24, "STi"}},
+    {FPU_B, {25, "FPU_B"}},
+    {FPU_C3, {26, "FPU_C3"}},
+    {FPU_TOP, {27, "FPU_TOP"}},
+    {FPU_C2, {28, "FPU_C2"}},
+    {FPU_C1, {29, "FPU_C1"}},
+    {FPU_C0, {30, "FPU_C0"}},
+    {FPU_ES, {31, "FPU_ES"}},
+    {FPU_SF, {32, "FPU_SF"}},
+    {FPU_PE, {33, "FPU_PE"}},
+    {FPU_UE, {34, "FPU_UE"}},
+    {FPU_OE, {35, "FPU_OE"}},
+    {FPU_ZE, {36, "FPU_ZE"}},
+    {FPU_DE, {37, "FPU_DE"}},
+    {FPU_IE, {38, "FPU_IE"}},
+    {FPU_X, {39, "FPU_X"}},
+    {FPU_RC, {40, "FPU_RC"}},
+    {FPU_PC, {41, "FPU_PC"}},
+    {FPU_PM, {42, "FPU_PM"}},
+    {FPU_UM, {43, "FPU_UM"}},
+    {FPU_OM, {44, "FPU_OM"}},
+    {FPU_ZM, {45, "FPU_ZM"}},
+    {FPU_DM, {46, "FPU_DM"}},
+    {FPU_IM, {47, "FPU_IM"}},
+    {FPU_TAG, {48, "FPU_TAG"}},
+    {FPU_LASTIP_SEG, {49, "FPU_LASTIP_SEG"}},
+    {FPU_LASTIP_OFF, {50, "FPU_LASTIP_OFF"}},
+    {FPU_LASTDATA_SEG, {51, "FPU_LASTDATA_SEG"}},
+    {FPU_LASTDATA_OFF, {52, "FPU_LASTDATA_OFF"}},
+    {FPU_FOPCODE, {53, "FPU_FOPCODE"}},
+    {XMM0, {54, "XMM0"}},
+    {XMM1, {55, "XMM1"}},
+    {XMM2, {56, "XMM2"}},
+    {XMM3, {57, "XMM3"}},
+    {XMM4, {58, "XMM4"}},
+    {XMM5, {59, "XMM5"}},
+    {XMM6, {60, "XMM6"}},
+    {XMM7, {61, "XMM7"}},
+	{XMM8, {62, "XMM8"}},
+    {XMM9, {63, "XMM9"}},
+    {XMM10, {64, "XMM10"}},
+    {XMM11, {65, "XMM11"}},
+    {XMM12, {66, "XMM12"}},
+    {XMM13, {67, "XMM13"}},
+    {XMM14, {68, "XMM14"}},
+    {XMM15, {69, "XMM15"}},
+    {STACK_BASE, {70, "STACK_BASE"}},
+    {STACK_LIMIT, {71, "STACK_LIMIT"}}
 };
 
 StringRef getRegisterName(MCSemaRegs reg) {
-    return REG_TO_OFFSET_MAP.at(reg).name; 
+    return REG_TO_OFFSET_MAP.at(reg).name;
 }
 
 int getRegisterOffset(MCSemaRegs reg) {
@@ -332,12 +335,12 @@ int getRegisterOffset(MCSemaRegs reg) {
 }
 Value *lookupLocal(Function *F, MCSemaRegs reg) {
     BasicBlock  *entry = &F->getEntryBlock();
-    BasicBlock::iterator    it = entry->begin(); 
-	
+    BasicBlock::iterator    it = entry->begin();
+
     std::string localName = std::string(x86_64::getRegisterName(reg))+"_val";
     while(it != entry->end() ) {
         Value   *v = it;
-        
+
         if( v->getName() == localName ) {
             return v;
         }
@@ -375,15 +378,18 @@ int mapPlatRegToOffset(unsigned reg) {
         case X86::DL:
         case X86::EDX:
 		case X86::RDX:
+		case X86::SIL:
         case X86::SI:
         case X86::ESI:
 		case X86::RSI:
+		case X86::DIL:
         case X86::DI:
         case X86::EDI:
 		case X86::RDI:
         case X86::SP:
         case X86::ESP:
 		case X86::RSP:
+		case X86::BPL:
         case X86::BP:
         case X86::EBP:
 		case X86::RBP:
@@ -446,15 +452,18 @@ Value *MCRegToValue(BasicBlock *b, unsigned reg) {
         case X86::DL:
             realReg = X86::RDX;
             break;
+        case X86::SIL:
         case X86::SI:
             realReg = X86::RSI;
             break;
+        case X86::DIL:
         case X86::DI:
             realReg = X86::RDI;
             break;
         case X86::SP:
             realReg = X86::RSP;
             break;
+        case X86::BPL:
         case X86::BP:
             realReg = X86::RBP;
             break;

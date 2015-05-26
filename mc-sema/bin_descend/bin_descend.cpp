@@ -276,13 +276,18 @@ int main(int argc, char *argv[]) {
     const Target  &t = *it;
     if(string(t.getName()) == SystemArch) {
       x86Target = &t;
-      triple = new Triple(t.getName(), "unknown", "unknown");
       break;
     }
   }  
 
-  ExternalFunctionMap funcs("x86_64-unknown-unknown");
-  //ExternalFunctionMap funcs(triple->normalize());
+  if(!SystemArch.compare("x86-64")){
+	  triple = new Triple("x86_64", "unknown", "unknown");
+  } else {
+	  triple = new Triple("x86", "unknown", "unknown");
+  }
+
+  ExternalFunctionMap funcs(triple->getTriple());
+
   try {
 
       if(FuncMap.size()) {

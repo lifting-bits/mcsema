@@ -64,7 +64,7 @@ Triple *getTargetTriple(const llvm::Target *T) {
 }
 
 void doGlobalInit(Module *M) {
-	
+
 	unsigned int regWidth = getPointerSize(M);
 
     //create the "reg" struct type
@@ -74,7 +74,7 @@ void doGlobalInit(Module *M) {
     initInstructionDispatch();
 
     //UPDATEREGS -- when we add something to 'regs', add it here
-    //GPRs 
+    //GPRs
     regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // RAX // 0
     regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // RBX // 1
     regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // RCX // 2
@@ -83,7 +83,7 @@ void doGlobalInit(Module *M) {
     regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // RDI // 5
     regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // RSP // 6
     regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // RBP // 7
-	
+
 	if(getSystemArch(M) == _X86_64_){
 		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R8  // 8
 		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R9  // 9
@@ -93,6 +93,10 @@ void doGlobalInit(Module *M) {
 		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R13 // 13
 		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R14 // 14
 		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R15 // 15
+
+		// RIP for rip relative instructions
+		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // RIP // 16
+
 	}
                                                                 // 128 bytes
 
@@ -105,11 +109,16 @@ void doGlobalInit(Module *M) {
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // OF // 21
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // DF // 22
                                                                    // 56 bytes
-    // FPU registers 
-	ArrayType  *fpu_regs = ArrayType::get(IntegerType::get(M->getContext(), 128)
+    // FPU registers
+    if(getSystemArch(M) == _X86_64_){
+        ArrayType  *fpu_regs = ArrayType::get(IntegerType::get(M->getContext(), 128)
 										/*Type::getX86_FP80Ty(M->getContext())*/, 8);
-    regFields.push_back(fpu_regs);                                 // 80 bytes // 23
-	
+        regFields.push_back(fpu_regs);
+    } else {
+        ArrayType  *fpu_regs = ArrayType::get(Type::getX86_FP80Ty(M->getContext()), 8);
+          regFields.push_back(fpu_regs);                            // 80 bytes 23
+    }
+
 	// FPU Status Word
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU BUSY // 24
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C3 // 25
@@ -119,14 +128,14 @@ void doGlobalInit(Module *M) {
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C0 // 29
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Error Summary Status // 30
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Stack Fault // 31
-    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Precision Flag // 32 
+    regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Precision Flag // 32
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Underflow Flag // 33
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Overflow Flag // 34
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // ZeroDivide Flag // 35
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Denormalized Operand Flag // 36
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Invalid Operation Flag // 37
-	
-	    
+
+
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Infinity Flag // 38
     regFields.push_back(IntegerType::get(M->getContext(), 2)); // FPU Rounding Control // 39
     regFields.push_back(IntegerType::get(M->getContext(), 2)); // FPU Precision Control // 40
@@ -136,19 +145,19 @@ void doGlobalInit(Module *M) {
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Zero Divide Mask // 44
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Denormal Operand Mask // 45
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Invalid Operation Mask // 46
-	
+
 	// FPU tag word; 8 element array of 2-bit entries
     ArrayType  *fpu_tag_word = ArrayType::get(Type::getIntNTy(M->getContext(), 8), 8);
-    regFields.push_back(fpu_tag_word);                                 // 80 bytes // 47
+    regFields.push_back(fpu_tag_word);                                               // 47
 
     regFields.push_back(IntegerType::getInt16Ty(M->getContext())); // Last Instruction Ptr Segment 48
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), regWidth)); // Last Instruction Ptr Offset 49
     regFields.push_back(IntegerType::getInt16Ty(M->getContext())); // Last Data Ptr Segment 50
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), regWidth)); // Last Data Ptr Offset 51
-    
+
     regFields.push_back(IntegerType::get(M->getContext(), 11)); // FPU FOPCODE 52
 
-	
+
     // vector registers
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM0 53
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM1 54
@@ -158,7 +167,7 @@ void doGlobalInit(Module *M) {
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM5 58
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM6 59
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM7 60
-	
+
 	if(getSystemArch(M) == _X86_64_){
 		regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM8 61
 		regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM9 62
@@ -173,7 +182,7 @@ void doGlobalInit(Module *M) {
     // non-register values in structRegs
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), regWidth)); // 69: stack base (biggest value)
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), regWidth)); // 70: stack limit (smallest value)
-    
+
 
     PointerType *ptrToRegs = PointerType::get(regs, 0);
     regs->setBody(regFields, true);
@@ -187,20 +196,20 @@ void doGlobalInit(Module *M) {
                                       callValArgs,
                                       false);
 
-    //GlobalVariable* g_StateBackup = 
+    //GlobalVariable* g_StateBackup =
     //    new GlobalVariable(*M, regs, false, GlobalValue::ExternalLinkage, 0, "state.backup");
     Type *intType = IntegerType::getIntNTy(M->getContext(), regWidth);
-    g_StateBackup = new GlobalVariable(*M, intType, 
-                false, 
-                GlobalValue::PrivateLinkage, 
-                0, 
+    g_StateBackup = new GlobalVariable(*M, intType,
+                false,
+                GlobalValue::PrivateLinkage,
+                0,
                 "state.backup");
     g_StateBackup->setThreadLocalMode(GlobalVariable::GeneralDynamicTLSModel);
 
 
     Constant *zero = ConstantInt::get(intType, 0, false);
     g_StateBackup->setInitializer(zero);
-    
+
 
 
     g_RegStruct = regs;
@@ -209,4 +218,4 @@ void doGlobalInit(Module *M) {
     archAddCallValue(M);
 
     return;
-}	
+}
