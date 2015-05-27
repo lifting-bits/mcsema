@@ -806,6 +806,9 @@ static InstTransResult doFstcw(InstPtr ip, BasicBlock *&b, Value *memAddr)
 
 static InstTransResult doFstenv(InstPtr ip, BasicBlock *&b, Value *memAddr)
 {
+    llvm::Module *M = b->getParent()->getParent();
+    unsigned int bitWidth = getPointerSize(M);
+
     Value *memPtr = ADDR_TO_POINTER<8>(b, memAddr);
 
     // Pre-clear reserved FPU bits.
@@ -862,9 +865,9 @@ static InstTransResult doFstenv(InstPtr ip, BasicBlock *&b, Value *memAddr)
     envfields.push_back(Type::getInt32Ty(b->getContext()));
     envfields.push_back(Type::getInt32Ty(b->getContext()));
     envfields.push_back(Type::getInt32Ty(b->getContext()));
+    envfields.push_back(Type::getIntNTy(b->getContext(), bitWidth));
     envfields.push_back(Type::getInt32Ty(b->getContext()));
-    envfields.push_back(Type::getInt32Ty(b->getContext()));
-    envfields.push_back(Type::getInt32Ty(b->getContext()));
+    envfields.push_back(Type::getIntNTy(b->getContext(), bitWidth));
     envfields.push_back(Type::getInt32Ty(b->getContext()));
 
     fpuenv_t->setBody(envfields, true);
@@ -1781,7 +1784,7 @@ void FPU_populateDispatchMap(DispatchMap &m)
     m[X86::DIV_FPrST0] = translate_DIV_FPrST0;
     m[X86::DIV_FST0r] = translate_DIV_FST0r;
     m[X86::DIV_FrST0] = translate_DIV_FrST0;
-    //m[X86::FSTENVm] = translate_FSTENVm;
+    m[X86::FSTENVm] = translate_FSTENVm;
     m[X86::LD_F32m] = translate_LD_F32m;
     m[X86::LD_F64m] = translate_LD_F64m;
     m[X86::LD_F80m] = translate_LD_F80m;

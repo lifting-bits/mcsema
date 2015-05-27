@@ -153,12 +153,12 @@ llvm::Module  *getLLVMModule(string name, const Target *T)
   if(string(T->getName()) == "x86-64") {
       M->setDataLayout(dtLayout64);
       M->setTargetTriple("x86_64-unknown-unknown");
-	  doGlobalInit(M);
   } else{
       M->setDataLayout(dtLayout);
       M->setTargetTriple(TargetTriple);
-	  doGlobalInit(M);
   }
+
+  doGlobalInit(M);
 
   return M;
 }
@@ -308,7 +308,6 @@ int main(int argc, char *argv[])
 {
   cl::SetVersionPrinter(printVersion);
   cl::ParseCommandLineOptions(argc, argv, "CFG to LLVM");
-  llvm::Triple *triple;
 
   InitializeAllTargetInfos();
   InitializeAllTargetMCs();

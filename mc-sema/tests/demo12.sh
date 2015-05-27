@@ -12,10 +12,10 @@ then
     ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -entry-symbol=start -i=demo_test12.o >> /dev/null
 else
     echo "Using bin_descend to recover CFG"
-    ${BIN_DESCEND_PATH}/bin_descend -d -entry-symbol=start -i=demo_test12.o
+    ${BIN_DESCEND_PATH}/bin_descend -march=x86 -d -entry-symbol=start -i=demo_test12.o
 fi
 
-${CFG_TO_BC_PATH}/cfg_to_bc -i demo_test12.cfg -driver=demo12_entry,start,raw,return,C -o demo_test12.bc
+${CFG_TO_BC_PATH}/cfg_to_bc -march=x86 -i demo_test12.cfg -driver=demo12_entry,start,raw,return,C -o demo_test12.bc
 
 ${LLVM_PATH}/opt -O3 -o demo_test12_opt.bc demo_test12.bc
 ${LLVM_PATH}/llc -filetype=obj -o demo_test12_mine.o demo_test12_opt.bc

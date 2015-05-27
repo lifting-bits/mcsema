@@ -53,7 +53,7 @@ namespace mcsema {
 typedef struct _nativefpu {
   uint8_t b[12];
 //only on 64-bit platforms, the JIT emits this struct as 16-byte aligned
-#ifdef TARGET_IA64  //__x86_64__
+#ifdef __x86_64__
   uint8_t pad[4];
 #endif
 #ifdef __cplusplus
@@ -121,7 +121,11 @@ typedef struct _nativefpu {
 #endif
 typedef struct _segmentoffset{
     uint16_t seg;
+#ifdef TARGET_IA64
     uint64_t off;
+#else
+    uint32_t off;
+#endif
 } PACKED segmentoffset; // 6 bytes
 #ifdef _WIN32
 #pragma pack(pop)

@@ -12,10 +12,10 @@ then
     ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -d -entry-symbol=timespi -i=demo_fpu1.o>> /dev/null
 else
     echo "Using bin_descend to recover CFG"
-    ${BIN_DESCEND_PATH}/bin_descend -d -entry-symbol=timespi -i=demo_fpu1.o
+    ${BIN_DESCEND_PATH}/bin_descend -d -march=x86 -entry-symbol=timespi -i=demo_fpu1.o
 fi
 
-${CFG_TO_BC_PATH}/cfg_to_bc -i demo_fpu1.cfg -driver=demo_fpu1_entry,timespi,raw,return,C -o demo_fpu1.bc
+${CFG_TO_BC_PATH}/cfg_to_bc -march=x86 -i demo_fpu1.cfg -driver=demo_fpu1_entry,timespi,raw,return,C -o demo_fpu1.bc
 
 ${LLVM_PATH}/opt -O3 -o demo_fpu1_opt.bc demo_fpu1.bc
 ${LLVM_PATH}/llc -filetype=obj -o demo_fpu1_mine.o demo_fpu1_opt.bc

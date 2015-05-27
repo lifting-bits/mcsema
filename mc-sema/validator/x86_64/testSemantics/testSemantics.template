@@ -1270,17 +1270,17 @@ TEST_F(ModuleTest, StructureLayout) {
   PATTERN_TO_OFF(6129, 64, 5);
   PATTERN_TO_OFF(5981, 64, 6);
   PATTERN_TO_OFF(4129, 64, 7);
-#if 0
-  PATTERN_TO_OFF(1, 1, 8);
-  PATTERN_TO_OFF(0, 1, 9);
-  PATTERN_TO_OFF(1, 1, 10);
-  PATTERN_TO_OFF(0, 1, 11);
-  PATTERN_TO_OFF(1, 1, 12);
-  PATTERN_TO_OFF(0, 1, 13);
-  PATTERN_TO_OFF(1, 1, 14);
 
-  PATTERN_TO_OFF(0, 1, 16);
-#endif
+  PATTERN_TO_OFF(1, 1, 17);
+  PATTERN_TO_OFF(0, 1, 18);
+  PATTERN_TO_OFF(1, 1, 19);
+  PATTERN_TO_OFF(0, 1, 20);
+  PATTERN_TO_OFF(1, 1, 21);
+  PATTERN_TO_OFF(0, 1, 22);
+  PATTERN_TO_OFF(1, 1, 23);
+
+  PATTERN_TO_OFF(0, 1, 25);
+
   ReturnInst::Create(block->getContext(), block);
 
 #undef PATTERN_TO_OFF
