@@ -828,7 +828,10 @@ def findFreeData():
         if end > max_end:
             max_end = end
 
-    return max_end+8
+    if idc.__EA64__ is True:
+        return max_end+8
+    else:
+        return max_end+4
 
 def addDataSegment(M, start, end, new_eas):
     if end < start:
