@@ -115,9 +115,7 @@ DataSection processDataSection( ExecutableContainer *c,
     VA prev = base;
 
     // ensure our limits are sane for this section
-    if(min_limit < base) {
-        min_limit = base;
-    }
+    if(min_limit < base) {  min_limit = base;}
     if(max_limit > size) {
         max_limit = size;
     }
@@ -130,8 +128,8 @@ DataSection processDataSection( ExecutableContainer *c,
     LASSERT(min_limit <= max_limit, "Minimum must be greater than maximum");
 
     for(vector<VA>::const_iterator reloc_itr = sec.reloc_addrs.begin();
-        reloc_itr != sec.reloc_addrs.end();
-        reloc_itr++)
+            reloc_itr != sec.reloc_addrs.end();
+            reloc_itr++)
     {
         // fix address from section relative to absolute
         addr = base+*reloc_itr;
@@ -904,6 +902,10 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
             case X86::PUSHi32:
                 setHeuristicRef(c, I, 0, funcs, out, "PUSHi32");
                 break;
+            case X86::MOV64ri32:
+            case X86::MOV64ri:
+                setHeuristicRef(c, I, 1, funcs, out, "MOV64ri32");
+                break;
 
             case X86::JMP32m:
             case X86::JMP64m:
@@ -945,10 +947,18 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                         bool  foldFunc = false;
                         //speculate about callTgt
                         InstPtr spec = d.getInstFromBuff(callTgt, c);
-                        if(spec->terminator() && spec->get_inst().getOpcode() == X86::JMP32m) {
+                        if(spec->terminator() && (spec->get_inst().getOpcode() == X86::JMP32m
+                                || spec->get_inst().getOpcode() == X86::JMP64m)) {
                             string  thunkSym;
+                            bool r;
 
-                            bool r = c->find_import_name(callTgt+2, thunkSym);
+                            if(spec->has_rip_relative()){
+                                r = c->find_import_name(spec->get_rip_relative(), thunkSym);
+                            } else {
+                                r = c->find_import_name(callTgt+2, thunkSym);
+                            }
+
+                           // bool r = c->find_import_name(callTgt+2, thunkSym);
                             if(r) {
                                 is_extcall = true;
 

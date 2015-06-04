@@ -169,6 +169,8 @@ class Inst {
     int system_call_number;
     bool local_noreturn;
 
+    VA rip_target;
+    bool hasRIP;
     public:
     std::vector<boost::uint8_t> get_bytes(void) { return this->instBytes; }
     std::string printInst(void) {
@@ -259,6 +261,25 @@ class Inst {
         return this->has_ext_call_target() || this->has_ext_data_ref();
     }
 
+    bool has_rip_relative(void) {
+        return this->hasRIP;
+    }
+
+    VA get_rip_relative(void) {
+        return this->rip_target;
+    }
+
+    void set_rip_relative(unsigned i){
+        const llvm::MCOperand &base = NativeInst.getOperand(i+0);
+        const llvm::MCOperand &scale = NativeInst.getOperand(i+1);
+        const llvm::MCOperand &index = NativeInst.getOperand(i+2);
+        const llvm::MCOperand &disp = NativeInst.getOperand(i+3);
+
+        rip_target = loc+len+disp.getImm();
+        //const
+        this->hasRIP = true;
+    }
+
     // accessors for JumpTable
     void set_jump_table(MCSJumpTablePtr p) {
         this->jump_table = true;
@@ -295,6 +316,7 @@ class Inst {
                 return 0;
         }
     }
+
 
     unsigned int get_opcode(void) {return this->NativeInst.getOpcode();}
 

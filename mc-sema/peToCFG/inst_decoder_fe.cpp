@@ -88,8 +88,14 @@ InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
                               pfx,
                               bytes));
 
-	D(cout << __FUNCTION__ << " : opcode   " << mcInst.getOpcode() << "\n"; cout.flush())
-	
+    for (unsigned i = 0; i < mcInst.getNumOperands(); ++i) {
+        const MCOperand &Op = mcInst.getOperand(i);
+
+        if (Op.isReg() && Op.getReg() == X86::RIP)
+            inst->set_rip_relative(i);
+    }
+
+
     //ask if this is a jmp, and figure out what the true / false follows are
     switch(mcInst.getOpcode()) {
       case X86::JMP32m:
