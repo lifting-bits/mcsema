@@ -1271,8 +1271,8 @@ static bool insertDataSections(NativeModulePtr natMod, Module *M, raw_ostream &r
         // create an initializer list using the now filled in opaque
         // structure type
         Constant *cst = ConstantStruct::get(st_opaque, secContents);
-        // align on 32-byte boundary, max needed by SSE instructions
-        g->setAlignment(32/*getPointerSize(M)*8*/);
+        // align on pointer size boundary, max needed by SSE instructions
+        g->setAlignment(getPointerSize(M));
         g->setInitializer(cst);
 
         git++;

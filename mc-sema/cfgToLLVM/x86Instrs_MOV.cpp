@@ -163,7 +163,7 @@ static InstTransResult doRIMov(InstPtr ip, BasicBlock *&b,
 
     //write the constant into the supplied register
 	R_WRITE<width>(b, dst.getReg(), CONST_V<width>(b, src.getImm()));
-	
+
     return ContinueBlock;
 }
 
@@ -217,7 +217,7 @@ static InstTransResult doMovZXRR(InstPtr ip,   BasicBlock *&b,
     //do a read from src of the appropriate width
     Value   *fromSrc = R_READ<srcWidth>(b, src.getReg());
 
-    //extend 
+    //extend
     Type    *toT = Type::getIntNTy(b->getContext(), dstWidth);
     Value   *xt = new ZExtInst(fromSrc, toT, "", b);
 
@@ -235,18 +235,18 @@ static InstTransResult doMovZXRM(InstPtr ip,   BasicBlock *&b,
     NASSERT(dst.isReg());
 	NASSERT(src != NULL);
 
-    if( dstWidth == 32 && 
-        srcWidth == 8 && 
-        ip->has_jump_index_table()) 
+    if( dstWidth == 32 &&
+        srcWidth == 8 &&
+        ip->has_jump_index_table())
     {
-       doJumpIndexTableViaSwitch(b, ip); 
+       doJumpIndexTableViaSwitch(b, ip);
        return ContinueBlock;
     }
 
     //do a read from src of the appropriate width
     Value   *fromSrc = M_READ<srcWidth>(ip, b, src);
 
-    //extend 
+    //extend
     Type    *toT = Type::getIntNTy(b->getContext(), dstWidth);
     Value   *xt = new ZExtInst(fromSrc, toT, "", b);
 
@@ -316,15 +316,15 @@ GENERIC_TRANSLATION(MOV64rr_REV, doRRMov<64>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(MOV8ri, doRIMov<8>(ip, block, OP(1), OP(0)))
 GENERIC_TRANSLATION(MOV16ri, doRIMov<16>(ip, block, OP(1), OP(0)))
 
-GENERIC_TRANSLATION_MEM(MOV8mi, 
+GENERIC_TRANSLATION_MEM(MOV8mi,
 	doMIMov<8>(ip,    block, ADDR(0), OP(5)),
 	doMIMov<8>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
 
-GENERIC_TRANSLATION_MEM(MOV16mi, 
+GENERIC_TRANSLATION_MEM(MOV16mi,
 	doMIMov<16>(ip,   block, ADDR(0), OP(5)),
 	doMIMov<16>(ip,   block, STD_GLOBAL_OP(0), OP(5)))
 
-//GENERIC_TRANSLATION_32MI(MOV32mi, 
+//GENERIC_TRANSLATION_32MI(MOV32mi,
 //	doMIMov<32>(ip,   block, ADDR(0), OP(5)),
 //	doMIMov<32>(ip,   block, STD_GLOBAL_OP(0), OP(5)),
 //    doMIMovV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip))
@@ -336,7 +336,7 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
 
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(), 
+                block->getParent()->getParent(),
                 ip->get_call_tgt(0)
             );
         Value *addrInt = new PtrToIntInst(
@@ -350,7 +350,7 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
             doMIMovV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip));
         }
         ret = ContinueBlock;
-    } else { 
+    } else {
         ret = doMIMov<32>(ip,   block, ADDR(0), OP(5));
     }
     return ret;
@@ -359,7 +359,7 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
 static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
-	
+
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(),
@@ -382,19 +382,19 @@ static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&bl
     return ret;
 }
 
-GENERIC_TRANSLATION_MEM(MOV8mr, 
+GENERIC_TRANSLATION_MEM(MOV8mr,
 	doMRMov<8>(ip,    block, ADDR(0), OP(5)),
 	doMRMov<8>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(MOV16mr, 
+GENERIC_TRANSLATION_MEM(MOV16mr,
 	doMRMov<16>(ip,   block, ADDR(0), OP(5)),
 	doMRMov<16>(ip,   block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(MOV8rm, 
+GENERIC_TRANSLATION_MEM(MOV8rm,
 	doRMMov<8>(ip,   block, ADDR(1), OP(0)),
 	doRMMov<8>(ip,   block, STD_GLOBAL_OP(1), OP(0)))
-GENERIC_TRANSLATION_MEM(MOV16rm, 
+GENERIC_TRANSLATION_MEM(MOV16rm,
 	doRMMov<16>(ip,   block, ADDR(1), OP(0)),
 	doRMMov<16>(ip,   block, STD_GLOBAL_OP(1), OP(0)))
-GENERIC_TRANSLATION(MOVZX16rr8, (doMovZXRR<16,8>(ip, block, OP(0), OP(1))) ) 
+GENERIC_TRANSLATION(MOVZX16rr8, (doMovZXRR<16,8>(ip, block, OP(0), OP(1))) )
 GENERIC_TRANSLATION(MOVZX32rr8, (doMovZXRR<32,8>(ip, block, OP(0), OP(1))) )
 GENERIC_TRANSLATION(MOVZX32rr16,( doMovZXRR<32,16>(ip, block, OP(0), OP(1))) )
 
@@ -418,13 +418,13 @@ GENERIC_TRANSLATION_MEM(MOV16ms,
 	doMSMov<16>(ip,    block, ADDR(0), OP(5)),
 	doMSMov<16>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
 
-GENERIC_TRANSLATION_MEM(MOVZX16rm8, 
+GENERIC_TRANSLATION_MEM(MOVZX16rm8,
 	(doMovZXRM<16,8>(ip, block, OP(0), ADDR(1))),
-	(doMovZXRM<16,8>(ip, block, OP(0), STD_GLOBAL_OP(1))) ) 
+	(doMovZXRM<16,8>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
 GENERIC_TRANSLATION_MEM(MOVZX32rm8,
 	(doMovZXRM<32,8>(ip, block, OP(0), ADDR(1))),
 	(doMovZXRM<32,8>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
-GENERIC_TRANSLATION_MEM(MOVZX32rm16, 
+GENERIC_TRANSLATION_MEM(MOVZX32rm16,
 	(doMovZXRM<32,16>(ip, block, OP(0), ADDR(1))),
 	(doMovZXRM<32,16>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
 
@@ -438,7 +438,7 @@ GENERIC_TRANSLATION_MEM(MOVSX16rm8,
 GENERIC_TRANSLATION_MEM(MOVSX32rm8,
 	(doMovSXRM<32,8>(ip, 	block, OP(0), ADDR(1))),
 	(doMovSXRM<32,8>(ip, 	block, OP(0), STD_GLOBAL_OP(1))) )
-GENERIC_TRANSLATION_MEM(MOVSX32rm16, 
+GENERIC_TRANSLATION_MEM(MOVSX32rm16,
 	(doMovSXRM<32,16>(ip, 	block, OP(0), ADDR(1))),
 	(doMovSXRM<32,16>(ip, 	block, OP(0), STD_GLOBAL_OP(1))) )
 
@@ -478,20 +478,20 @@ static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& blo
 
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(), 
+                block->getParent()->getParent(),
                 ip->get_call_tgt(0)
             );
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
-        ret = doRIMovV<32>(ip, block, 
+        ret = doRIMovV<32>(ip, block,
                 addrInt,
                 OP(0) );
     }
     else if( ip->is_data_offset() ) {
-        ret = doRIMovV<32>(ip, block, 
-                GLOBAL_DATA_OFFSET<32>(block, natM, ip), 
+        ret = doRIMovV<32>(ip, block,
+                GLOBAL_DATA_OFFSET<32>(block, natM, ip),
                 OP(0) );
-    } else { 
+    } else {
         ret = doRIMov<32>(ip, block, OP(1), OP(0)) ;
     }
     return ret ;
@@ -503,20 +503,20 @@ static InstTransResult translate_MOV64ri(NativeModulePtr natM, BasicBlock *& blo
 
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(), 
+                block->getParent()->getParent(),
                 ip->get_call_tgt(0)
             );
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt64Ty(block->getContext()), "", block);
-        ret = doRIMovV<64>(ip, block, 
+        ret = doRIMovV<64>(ip, block,
                 addrInt,
                 OP(0) );
     }
     else if( ip->is_data_offset() ) {
-        ret = doRIMovV<64>(ip, block, 
-                GLOBAL_DATA_OFFSET<64>(block, natM, ip), 
+        ret = doRIMovV<64>(ip, block,
+                GLOBAL_DATA_OFFSET<64>(block, natM, ip),
                 OP(0) );
-    } else { 
+    } else {
         ret = doRIMov<64>(ip, block, OP(1), OP(0)) ;
     }
     return ret ;
@@ -537,7 +537,7 @@ static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& bloc
         Value *addrv = CONST_V<width>(block, OP(0).getImm());
         ret = doMRMov<width>(ip, block, addrv, MCOperand::CreateReg(X86::EAX)) ;
     }
-    return ret ; 
+    return ret ;
 }
 
 //write to EAX
@@ -556,7 +556,7 @@ static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& bloc
     }
     else if( ip->has_call_tgt() && width == 32 ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(), 
+                block->getParent()->getParent(),
                 ip->get_call_tgt(0)
             );
         Value *addrInt = new PtrToIntInst(
@@ -571,10 +571,10 @@ static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& bloc
         Value *addrv = CONST_V<width>(block, OP(0).getImm());
         ret = doRMMov<width>(ip, block, addrv, MCOperand::CreateReg(X86::EAX)) ;
     }
-    return ret ; 
+    return ret ;
 }
 
-static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) 
+static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst)
 {
 
     InstTransResult ret;
@@ -587,16 +587,16 @@ static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& blo
         return ContinueBlock;
     }
     else if( ip->is_data_offset() ) {
-		ret = doRMMov<32>(ip, block, 
+		ret = doRMMov<32>(ip, block,
 				GLOBAL( block, natM, inst, ip, 1 ),
 				OP(0) );
     } else {
-		ret = doRMMov<32>(ip, block, ADDR(1), OP(0));	
+		ret = doRMMov<32>(ip, block, ADDR(1), OP(0));
     }
     return ret ;
 }
 
-static InstTransResult translate_MOV32mr(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) 
+static InstTransResult translate_MOV32mr(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst)
 {
     InstTransResult ret;
     Function *F = block->getParent();
@@ -607,10 +607,10 @@ static InstTransResult translate_MOV32mr(NativeModulePtr natM, BasicBlock *& blo
     }
     else if( ip->is_data_offset() ) {
         ret = doMRMov<32>(ip, block, GLOBAL( block, natM, inst, ip, 0), OP(5) );
-    } else { 
-        ret = doMRMov<32>(ip, block, ADDR(0), OP(5)) ; 
+    } else {
+        ret = doMRMov<32>(ip, block, ADDR(0), OP(5)) ;
     }
-    return ret ; 
+    return ret ;
 }
 
 
@@ -651,6 +651,19 @@ static InstTransResult translate_MOV64mr(NativeModulePtr natM, BasicBlock *& blo
     }
     return ret ;
 }
+
+// sign extend %eax to %rax
+static InstTransResult translate_CDQE(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst)
+{
+    InstTransResult ret = ContinueBlock;
+    llvm::Value *eax = R_READ<32>(block, X86::EAX);
+    llvm::Value	*rax = new llvm::SExtInst(eax,
+    		llvm::Type::getInt64Ty(block->getContext()), "", block);
+    R_WRITE<64>(block, X86::RAX, rax);
+    return ret ;
+}
+
+
 
 
 void MOV_populateDispatchMap(DispatchMap &m) {
@@ -711,7 +724,7 @@ void MOV_populateDispatchMap(DispatchMap &m) {
     m[X86::MOVSX64rm8] = translate_MOVSX64rm8;
     m[X86::MOVSX64rm16] = translate_MOVSX64rm16;
     m[X86::MOVSX64rm32] = translate_MOVSX64rm32;
-	
+
     m[X86::MOV16rs] = translate_MOV16rs;
     m[X86::MOV32rs] = translate_MOV32rs;
     m[X86::MOV64rs] = translate_MOV64rs;
@@ -735,6 +748,8 @@ void MOV_populateDispatchMap(DispatchMap &m) {
     m[X86::MOVBE16mr] = translate_MOVBE16mr;
     m[X86::MOVBE32mr] = translate_MOVBE32mr;
     m[X86::MOVBE64mr] = translate_MOVBE64mr;
+
+    m[X86::CDQE] = translate_CDQE;
 
 }
 

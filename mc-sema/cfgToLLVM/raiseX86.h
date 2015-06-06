@@ -407,12 +407,22 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
         if (regwidth == width) {
             llvm::Instruction   *v = noAliasMCSemaScope(new llvm::StoreInst(write, localRegVar, b));
             TASSERT(v != NULL, "Cannot make storage instruction")
-        } else if( width < x86_64::REG_SIZE) {
+        } else if(width == x86::REG_SIZE){
+
+        	// write to r32 of r64, zero extend the r32 value and write to 64 bit reg.
+        	//
+            llvm::Value	*write_z =
+                new llvm::ZExtInst(write, llvm::Type::getInt64Ty(b->getContext()), "", b);
+
+            llvm::Instruction   *v = noAliasMCSemaScope(new llvm::StoreInst(write_z, localRegVar, b));
+            TASSERT(v != NULL, "Cannot make storage instruction")
+        }
+        else if( width < x86::REG_SIZE) {
             //we need to model this as a write of a specific offset and width
             int		writeOff = mapPlatRegToOffset(reg);
             llvm::Value	*maskVal;
             llvm::Value	*addVal;
-			//assert(write->getType()->getScalarSizeInBits() < llvm::Type::getInt64Ty(b->getContext())->getScalarSizeInBits());
+
             llvm::Value	*write_z =
                 new llvm::ZExtInst(write, llvm::Type::getInt64Ty(b->getContext()), "", b);
 
@@ -437,10 +447,6 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
                 //this is a write to the base + some width
                 //simply compute the mask and add values
                 switch(width) {
-					case 32:
-						maskVal = CONST_V<64>(b, ~0xFFFFFFFFULL);
-						addVal = write_z;
-						break;
                     case 16:
                         maskVal = CONST_V<64>(b, ~0xFFFFULL);
                         addVal = write_z;

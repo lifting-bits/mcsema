@@ -958,7 +958,7 @@ static InstTransResult translate_JMP64m(NativeModulePtr natM, BasicBlock *& bloc
 
     if( ip->has_ext_call_target() ) {
         std::string  s = ip->get_ext_call_target()->getSymbolName();
-        ret = doCallPCExtern(block, s, true);
+        ret = x86_64::doCallPCExtern(block, s, true);
         if (ret != EndBlock) {
             return doRetQ(block);
         } else {

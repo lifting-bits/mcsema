@@ -912,7 +912,13 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                 {
                     string  thunkSym;
                     bool did_jmp = false;
-                    bool r = c->find_import_name(curAddr+2, thunkSym);
+                    //bool r = c->find_import_name(curAddr+2, thunkSym);
+                    bool r;
+                    if(I->has_rip_relative()){
+                        r = c->find_import_name(I->get_rip_relative(), thunkSym);
+                    } else {
+                        r = c->find_import_name(curAddr+2, thunkSym);
+                    }
                     if(r) {
                         // this goes to an external API call
                         out << "Adding external code ref via JMP: " << thunkSym << "\n";

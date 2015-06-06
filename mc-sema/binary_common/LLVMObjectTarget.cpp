@@ -397,6 +397,7 @@ bool isAddrRelocated(const object::SectionRef &sr, uint32_t offt, VA address) {
            relocType == "R_386_PC32" ||
            relocType == "R_X86_64_PC32" ||
            relocType == "R_X86_64_32S" ||
+		   relocType == "R_X86_64_32" ||
            relocType == "R_X86_64_64") {
             return true;
         }

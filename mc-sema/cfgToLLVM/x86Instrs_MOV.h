@@ -160,7 +160,6 @@ InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b,
     //MOV <r>, <r>
     TASSERT(src.isReg(), "");
     TASSERT(dst.isReg(), "");
- //   INSTR_DEBUG(ip);
     //pretty straightforward
 
     R_WRITE<width>(b, dst.getReg(), R_READ<width>(b, src.getReg()));
