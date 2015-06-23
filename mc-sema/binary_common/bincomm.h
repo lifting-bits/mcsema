@@ -75,7 +75,7 @@ public:
   virtual bool is_addr_relocated(uint32_t) = 0;
 
   //get the relocated value of an address
-  virtual bool relocate_addr(VA, VA &) = 0;
+  virtual bool relocate_addr(VA, VA &, VA &) = 0;
 
   //get a list of exports and symbols
   virtual bool get_exports(std::list<std::pair<std::string, VA> >  &) = 0;

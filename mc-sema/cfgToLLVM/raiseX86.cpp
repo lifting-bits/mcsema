@@ -1152,6 +1152,7 @@ void dataSectionToTypesContents(
 
                 secContents.push_back(func);
                 data_section_types.push_back(func->getType());
+
             }
 			else {
                 // data symbol
@@ -1306,7 +1307,11 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
 
             // default to stdcall
             if(natMod->is64Bit()){
+#ifdef _WIN64
+                F->setCallingConv(CallingConv::X86_64_Win64);
+#else
                 F->setCallingConv(CallingConv::X86_64_SysV);
+#endif
             } else {
                 F->setCallingConv(CallingConv::X86_StdCall);
             }
@@ -1362,6 +1367,7 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
         ExternalCodeRef::CallingConvention   conv = e->getCallingConvention();
         int8_t                          argCount = e->getNumArgs();
         string                          symName = e->getSymbolName();
+		string 							funcSign = e->getFunctionSignature();
 
         //create the function if it is not already there
         Function    *f = M->getFunction(symName);
@@ -1371,11 +1377,19 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
 
             //create arguments
             for( int i = 0; i < argCount; i++ ) {
+#ifdef _WIN64
+				if(funcSign.c_str()[i] == 'f'){
+					arguments.push_back(Type::getDoubleTy(M->getContext()));
+				} else {
+					arguments.push_back(Type::getIntNTy(M->getContext(), 64));
+				}
+#else
                 if(natMod->is64Bit()){
                     arguments.push_back(Type::getInt64Ty(M->getContext()));
                 } else {
                     arguments.push_back(Type::getInt32Ty(M->getContext()));
                 }
+#endif
             }
 
             //create function type
@@ -1411,7 +1425,11 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
 
             //set calling convention
             if(natMod->is64Bit()){
+#ifdef _WIN64
+                f->setCallingConv(CallingConv::X86_64_Win64);
+#else
                 f->setCallingConv(CallingConv::X86_64_SysV);
+#endif
             } else {
                 f->setCallingConv(getLLVMCC(conv));
             }

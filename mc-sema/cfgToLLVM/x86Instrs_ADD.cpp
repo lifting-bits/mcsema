@@ -662,6 +662,22 @@ void ADD_populateDispatchMap(DispatchMap &m)
     m[X86::ADD8rm] = translate_ADD8rm;
     m[X86::ADD8rr] = translate_ADD8rr;
     m[X86::ADD8rr_REV] = translate_ADD8rr_REV;
+
+    m[X86::ADD64ri8] = translate_ADD64ri8;
+    m[X86::ADD64ri8_DB] = translate_ADD64ri8;
+    m[X86::ADD64ri32] = translate_ADD64ri32;
+    m[X86::ADD64ri32_DB] = translate_ADD64ri32;
+    m[X86::ADD64i32] = translate_ADD64i32;
+    m[X86::ADD64mi8] = translate_NOOP;
+	m[X86::ADD64mi32] = translate_NOOP;
+
+	m[X86::ADD64rr_DB] = translate_ADD64rr;
+	m[X86::ADD64rr] = translate_ADD64rr;
+	m[X86::ADD64rr_REV] = translate_ADD64rr;
+	m[X86::ADD64rm] = translate_NOOP;
+	m[X86::ADD64mr] = translate_NOOP;
+
+
     m[X86::ADC16i16] = translate_ADC16i16;
     m[X86::ADC16mi] = translate_ADC16mi;
     m[X86::ADC16mi8] = translate_ADC16mi8;
@@ -687,18 +703,6 @@ void ADD_populateDispatchMap(DispatchMap &m)
     m[X86::ADC8rm] = translate_ADC8rm;
     m[X86::ADC8rr] = translate_ADC8rr;
     m[X86::ADC8rr_REV] = translate_ADC8rr_REV;
-
-    m[X86::ADD64ri8] = translate_ADD64ri8;
-    m[X86::ADD64ri8_DB] = translate_ADD64ri8;
-    m[X86::ADD64ri32] = translate_ADD64ri32;
-    m[X86::ADD64ri32_DB] = translate_ADD64ri32;
-    m[X86::ADD64i32] = translate_ADD64i32;
-    m[X86::ADD64mi8] = translate_NOOP;
-	m[X86::ADD64mi32] = translate_NOOP;
-	m[X86::ADD64rr_DB] = translate_ADD64rr;
-	m[X86::ADD64rr] = translate_ADD64rr;
-	m[X86::ADD64rm] = translate_NOOP;
-	m[X86::ADD64mr] = translate_NOOP;
 
 	m[X86::ADC64i32] = translate_ADC64i32;
 	m[X86::ADC64ri32] = translate_ADC64ri32;

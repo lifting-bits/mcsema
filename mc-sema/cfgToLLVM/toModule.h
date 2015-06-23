@@ -38,7 +38,7 @@ bool addEntryPointDriverRaw(llvm::Module *M, std::string name, VA entry);
 }
 
 namespace x86_64 {
-bool addEntryPointDriver(llvm::Module *, std::string, VA, int, bool, llvm::raw_ostream &, ExternalCodeRef::CallingConvention cconv);
+bool addEntryPointDriver(llvm::Module *, std::string, VA, int, bool, llvm::raw_ostream &, ExternalCodeRef::CallingConvention cconv, std::string funcSign);
 bool addEntryPointDriverRaw(llvm::Module *M, std::string name, VA entry);
 }
 bool doPostAnalysis(NativeModulePtr N, llvm::Module *M);

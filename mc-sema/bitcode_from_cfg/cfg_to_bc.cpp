@@ -137,6 +137,7 @@ void doPrintModule(NativeModulePtr m) {
 
 #ifdef WIN32
 string dtLayout = "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-f80:128:128-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32-S32";
+string dtLayout64 = "e-m:e-i64:64-f80:128-n8:16:32:64-S128" ;
 #else
 // i386-linux-gnu
 string dtLayout = "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32-S128";
@@ -152,7 +153,7 @@ llvm::Module  *getLLVMModule(string name, const Target *T)
 
   if(string(T->getName()) == "x86-64") {
       M->setDataLayout(dtLayout64);
-      M->setTargetTriple("x86_64-unknown-unknown");
+      M->setTargetTriple(DEFAULT_TRIPLE_X64);
   } else{
       M->setDataLayout(dtLayout);
       M->setTargetTriple(TargetTriple);
@@ -170,6 +171,7 @@ struct DriverEntry
     int  argc;
     string name;
     string sym;
+	string sign;
     VA ep;
     ExternalCodeRef::CallingConvention cconv;
 };
@@ -199,10 +201,9 @@ static bool driverArgsToDriver(const string &args, DriverEntry &new_d) {
         vtok.push_back(t); 
     }
 
-    if(vtok.size() != 5) {
+    if(vtok.size() >= 7) {
         return false;
     }
-
 
     // take name as is
     new_d.name = vtok[0];
@@ -246,9 +247,20 @@ static bool driverArgsToDriver(const string &args, DriverEntry &new_d) {
     } else if(vtok[4] == "E") {
         // default to stdcall
         new_d.cconv = ExternalCodeRef::CalleeCleanup;
-    } else {
+    } else if(vtok[4] == "S") {
+        // default to stdcall
+        new_d.cconv = ExternalCodeRef::X86_64_SysV;
+    } else if(vtok[4] == "W") {
+		new_d.cconv = ExternalCodeRef::X86_64_Win64;
+	}
+	else {
         return false;
     }
+
+	if(vtok.size() >= 6){
+		 boost::algorithm::to_upper(vtok[5]);
+		 new_d.sign = vtok[5];
+	}
 
     return true;
 }
@@ -451,10 +463,11 @@ int main(int argc, char *argv[])
               }
               else 
               {
-                  if(mod->is64Bit()) x86_64::addEntryPointDriver(M, itr->name, ep, itr->argc, itr->returns, outs(), itr->cconv);
+                  if(mod->is64Bit()) x86_64::addEntryPointDriver(M, itr->name, ep, itr->argc, itr->returns, outs(), itr->cconv, itr->sign);
                   else x86::addEntryPointDriver(M, itr->name, ep, itr->argc, itr->returns, outs(), itr->cconv);
 
               }
+
           } // for vector<DriverEntry>
 
           string                  errorInfo;

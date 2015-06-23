@@ -728,6 +728,13 @@ _EXTERNALFUNCTION = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='signature', full_name='ExternalFunction.signature', index=5,
+      number=6, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -796,6 +803,13 @@ _DATASYMBOL = _descriptor.Descriptor(
       name='symbol_name', full_name='DataSymbol.symbol_name', index=1,
       number=2, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='symbol_size', full_name='DataSymbol.symbol_size', index=2,
+      number=3, type=3, cpp_type=2, label=2,
+      has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),

@@ -41,7 +41,6 @@ Value *getAddrFromExpr( BasicBlock      *b,
             //we should be able to find a reference to this in global data 
             Module  *M = b->getParent()->getParent();
             string  sn = "data_0x" + to_string<VA>(baseGlobal, hex);
-
             GlobalVariable *gData = M->getNamedGlobal(sn);
 
             //if we thought it was a global, we should be able to
@@ -67,6 +66,7 @@ Value *getAddrFromExpr( BasicBlock      *b,
             d = int_adjusted;
         } 
     } else {
+
         //there is no disp value, or its relative to esp/ebp in which case
         //we might not want to do anything
     }
@@ -80,12 +80,13 @@ Value *getAddrFromExpr( BasicBlock      *b,
     Value   *rVal = NULL;
 
     //read the base register (if given)
-    if( baseReg != X86::NoRegister ) {
+    if( baseReg != X86::NoRegister && baseReg != X86::RIP) {
         rVal = R_READ<64>(b, baseReg);
     } else {
         //if the base is not present, just use 0
         rVal = CONST_V<64>(b, 0);
     }
+
 
     Value   *dispComp;
     dispComp = 

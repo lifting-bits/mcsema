@@ -540,7 +540,11 @@ static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr) {
 
 
     CallInst *c = CallInst::Create(F, subArgs, "", b);
+#ifdef _WIN64
+    c->setCallingConv(CallingConv::X86_64_Win64);
+#else
     c->setCallingConv(CallingConv::X86_64_SysV);
+#endif
 
     if ( ip->has_local_noreturn() ) {
         // noreturn functions just hit unreachable
@@ -570,8 +574,9 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
     FunctionType    *externFunctionTy = externFunction->getFunctionType();
     Type            *rType = externFunction->getReturnType();
     int        paramCount = externFunctionTy->getNumParams();
+	//std::string 	funcSign = externFunction->getSignature();
 
-    std::cout << __FUNCTION__ << " paramCount  : " <<  paramCount << "\n";
+    std::cout << __FUNCTION__ << " paramCount  : " <<  paramCount << " : " << target << "\n";
     std::cout << externFunctionTy->getNumParams() << " : " << to_string<VA>((VA)externFunctionTy->getParamType(0), std::hex) <<"\n";
     std::cout.flush();
 
@@ -586,6 +591,69 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
     AttrBuilder B;
     B.addAttribute(Attribute::InReg);
 
+#ifdef _WIN64
+    if(paramCount && it != end) {
+		Type *T = it->getType();
+        Value *arg1;
+		if(T->isDoubleTy()){
+			Value *V = x86_64::R_READ<128>(b, X86::XMM0);
+			Instruction::CastOps opcode = CastInst::getCastOpcode(V, false,  T, false);
+			arg1 = BitCastInst::Create(opcode, x86_64::R_READ<128>(b, X86::XMM0), T, "");
+			printf("Argument is XMM0\n"), fflush(stdout);
+		}
+		else{
+			printf("Argument is RCX\n"), fflush(stdout);
+			arg1 = x86_64::R_READ<64>(b, X86::RCX);
+		}
+		
+        arguments.push_back(arg1);
+        --paramCount;
+        it->addAttr(AttributeSet::get(it->getContext(), 1, B));
+        ++it;
+    }
+
+    if(paramCount && it != end) {
+		Type *T = it->getType();
+        Value *arg2;
+		if(T->getIntegerBitWidth() == 128)
+			arg2 = x86_64::R_READ<128>(b, X86::XMM1);
+		else
+			arg2 = x86_64::R_READ<64>(b, X86::RDX);
+		
+        arguments.push_back(arg2);
+        --paramCount;
+        it->addAttr(AttributeSet::get(it->getContext(), 2, B));
+        ++it;
+    }
+
+    if(paramCount && it != end) {
+		Type *T = it->getType();
+        Value *arg3;
+		if(T->getIntegerBitWidth() == 128)
+			arg3 = x86_64::R_READ<128>(b, X86::XMM2);
+		else
+        	arg3 = x86_64::R_READ<64>(b, X86::R8);
+		
+        arguments.push_back(arg3);
+        --paramCount;
+        it->addAttr(AttributeSet::get(it->getContext(), 3, B));
+        ++it;
+    }
+
+    if(paramCount && it != end) {
+		Type *T = it->getType();
+        Value *arg4;
+		if(T->getIntegerBitWidth() == 128)
+			arg4 = x86_64::R_READ<128>(b, X86::XMM3);
+		else
+        	arg4 = x86_64::R_READ<64>(b, X86::R9);
+		
+        arguments.push_back(arg4);
+        --paramCount;
+        it->addAttr(AttributeSet::get(it->getContext(), 4, B));
+        ++it;
+    }
+#else
     if(paramCount && it != end) {
         // fix it by updating the value type
         Value *reg_rdi = x86_64::R_READ<64>(b, X86::RDI);
@@ -635,7 +703,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
         it->addAttr(AttributeSet::get(it->getContext(), 6, B));
         ++it;
     }
-
+#endif
 
     if( paramCount ) {
         // rest of the arguments are passed over stack
@@ -659,7 +727,11 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
     }
 
     CallInst    *callR = CallInst::Create(externFunction, arguments, "", b);
+#ifdef _WIN64
+    callR->setCallingConv(CallingConv::X86_64_Win64);
+#else
     callR->setCallingConv(CallingConv::X86_64_SysV);
+#endif
 
     if ( externFunction->doesNotReturn() ) {
         // noreturn functions just hit unreachable

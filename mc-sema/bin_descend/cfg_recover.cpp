@@ -93,9 +93,10 @@ void addDataBlob(   DataSection &ds,
 static
 void addDataSymbol(   DataSection &ds,
                 VA base,
-                const std::string &symbol)
+                const std::string &symbol,
+                VA symbol_size)
 {
-    DataSectionEntry dse(base, symbol);
+    DataSectionEntry dse(base, symbol, symbol_size);
 
     ds.addEntry(dse);
 }
@@ -144,7 +145,8 @@ DataSection processDataSection( ExecutableContainer *c,
         std::string symname;
         // see if this address points to a symbol
         VA new_addr;
-        if(c->relocate_addr(addr, new_addr) ) {
+		VA reloc_size = 0;
+        if(c->relocate_addr(addr, new_addr, reloc_size) ) {
 
             if(addr > prev) {
                 addDataBlob(ds, base, bytes, prev, addr);
@@ -157,20 +159,21 @@ DataSection processDataSection( ExecutableContainer *c,
             {
                 string new_sym = "sub_" + to_string<VA>(new_addr, hex);
                 llvm::outs() << __FUNCTION__ << ": Recovered function symbol from data section: " << new_sym << "\n";
-                addDataSymbol(ds, addr, new_sym);
+                addDataSymbol(ds, addr, new_sym, reloc_size);
             } else if ( isAddrOfType(c, new_addr, ExecutableContainer::DataSection)) {
                 string new_sym = "dta_" + to_string<VA>(new_addr, hex);
                 llvm::outs() << __FUNCTION__ << ": Recovered data symbol from data section: " << new_sym << "\n";
-                addDataSymbol(ds, addr, new_sym);
+                addDataSymbol(ds, addr, new_sym, reloc_size);
             } else {
                 assert(!"address in unsupported section type!");
             }
-            // assume 4 byte pointers
-            prev += c->getPointerSizeByte();
+
+            prev += reloc_size;
 
         } else {
             llvm::dbgs() << __FUNCTION__<< ": WARNING: relocation at address (0x" << to_string<VA>(addr, hex) << ") but no symbol found!\n";
         }
+
     }
 
     addDataBlob(ds, base, bytes, prev, size);
@@ -231,8 +234,9 @@ static void addDataEntryPointsFromSection(
         }
 
         VA  new_addr;
+		VA 	symbol_size;
         out << __FUNCTION__ << ": Looking at relocation at: " << to_string<VA>(addr, hex) << "\n";
-        if(c->relocate_addr(addr, new_addr )) {
+        if(c->relocate_addr(addr, new_addr, symbol_size )) {
             if( isAddrOfType(c, new_addr, ExecutableContainer::CodeSection))
             {
                 out << __FUNCTION__ << ": Adding data entry point for: sub_"
@@ -307,6 +311,8 @@ ExternalCodeRefPtr makeExtCodeRefFromString(string callName, ExternalFunctionMap
   case ExternalFunctionMap::X86_64_SysV:
     c = ExternalCodeRef::X86_64_SysV;
     break;
+  case ExternalFunctionMap::X86_64_Win64:
+  	c = ExternalCodeRef::X86_64_Win64;
   default:
     assert(!"Invalid calling convention for external call!");
 
@@ -316,8 +322,16 @@ ExternalCodeRefPtr makeExtCodeRefFromString(string callName, ExternalFunctionMap
     rty = ExternalCodeRef::NoReturn;
   }
 
-  ExternalCodeRef  *t = new ExternalCodeRef(s, numParams, c, rty);
+  std::string funcSign;
+  bool sign = f.get_function_sign(s, funcSign);
 
+  ExternalCodeRef  *t = NULL;
+
+  if(sign){
+  	t = new ExternalCodeRef(s, numParams, c, rty, funcSign);
+  } else {
+ 	t = new ExternalCodeRef(s, numParams, c, rty);
+  }
   return ExternalCodeRefPtr(t);
 }
 
@@ -381,9 +395,10 @@ static int addJmpTableEntries(ExecutableContainer *c,
     while(true) {
 
         VA  someFunction;
+		VA  size;
         curAddr += increment;
 
-        if(!c->relocate_addr(curAddr, someFunction)) {
+        if(!c->relocate_addr(curAddr, someFunction, size)) {
             // could not relocate the default jump table entry.
             // not good
             out << "Jump table search ending, can't relocate address: " << to_string<VA>(curAddr, hex) << "\n";
@@ -451,7 +466,8 @@ static bool parseJumpIndexTable(ExecutableContainer *c,
 
     VA  addrInInst = index_insn->get_loc() + reloc_offset;
     VA  indexTableEntry;
-    if(!c->relocate_addr(addrInInst, indexTableEntry)) {
+	VA  symbolSize;
+    if(!c->relocate_addr(addrInInst, indexTableEntry, symbolSize)) {
         out << "Not a jump index table: can't relocate relocation in index insn\n";
         // can't relocate, something bad happened
         return false;
@@ -560,13 +576,14 @@ static bool handlePossibleJumpTable(ExecutableContainer *c,
 
     VA addrInInst = curAddr + reloc_offset;
     VA jmpTableEntry, someFunction;
-    if(!c->relocate_addr(addrInInst, jmpTableEntry)) {
+	VA symbolSize;
+    if(!c->relocate_addr(addrInInst, jmpTableEntry, symbolSize)) {
         out << "Not a jump table: can't relocate relocation in JMP32m\n";
         // can't relocate, something bad happened
        return false;
     }
 
-    if(!c->relocate_addr(jmpTableEntry, someFunction)) {
+    if(!c->relocate_addr(jmpTableEntry, someFunction, symbolSize)) {
         // could not relocate the default jump table entry.
         // not good
         out << "Not a jump table: can't relocate first jump table entry\n";
@@ -805,6 +822,7 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
             VA addrInInst = curAddr+i;
             if(c->is_addr_relocated(addrInInst)) {
                 VA  addr = 0;
+				VA  relocSize;
                 std::string has_imp;
 
                 out << __FUNCTION__ << ": have reloc at: " << to_string<VA>(addrInInst, hex) << "\n";
@@ -836,7 +854,7 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                         I->set_ext_call_target(code_p);
                     }
 
-                } else if(c->relocate_addr(addrInInst, addr)) {
+                } else if(c->relocate_addr(addrInInst, addr, relocSize)) {
                     bool can_ref_code = canInstructionReferenceCode(I);
                     bool is_reloc_code = isAddrOfType(c, addr, ExecutableContainer::CodeSection);
                     bool is_reloc_data = isAddrOfType(c, addr, ExecutableContainer::DataSection);
@@ -987,9 +1005,9 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
 
                     if(is_extcall == false) {
                         // may be a local call
-                        VA addr=curAddr+1, relo_addr=0;
+                        VA addr=curAddr+1, relo_addr=0, reloc_size = 0;
                         out << "Symbol not found, maybe a local call\n";
-                        if(c->relocate_addr(addr, relo_addr)){
+                        if(c->relocate_addr(addr, relo_addr, reloc_size)){
                             out << "Found local call to: " << to_string<VA>(relo_addr, hex) << "\n";
                             I->set_call_tgt(relo_addr);
                             out << "Adding: 0x" << to_string<VA>(relo_addr, hex) << " as target because its relo-able and internal\n";

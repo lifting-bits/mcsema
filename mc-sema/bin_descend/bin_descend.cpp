@@ -281,9 +281,9 @@ int main(int argc, char *argv[]) {
   }  
 
   if(!SystemArch.compare("x86-64")){
-	  triple = new Triple("x86_64", "unknown", "unknown");
+	  triple = new Triple(DEFAULT_TRIPLE_X64);
   } else {
-	  triple = new Triple("x86", "unknown", "unknown");
+	  triple = new Triple(DEFAULT_TRIPLE);
   }
 
   ExternalFunctionMap funcs(triple->getTriple());
@@ -374,9 +374,10 @@ int main(int argc, char *argv[]) {
         }
       }
     }
+
   } else {
     outs() << "Could not open executable module " << InputFilename << "\n";
   }
-  
+
   return 0;
 }

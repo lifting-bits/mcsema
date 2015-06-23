@@ -168,6 +168,22 @@ InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b,
 }
 
 template <int width>
+InstTransResult doRRMovD(InstPtr ip, llvm::BasicBlock *b,
+                        const llvm::MCOperand &dst,
+                        const llvm::MCOperand &src)
+{
+    //MOV <r>, <r>
+    TASSERT(src.isReg(), "");
+    TASSERT(dst.isReg(), "");
+    //pretty straightforward
+
+    R_WRITE<width>(b, dst.getReg(), R_READ<width>(b, src.getReg()));
+
+    return ContinueBlock;
+}
+
+
+template <int width>
 InstTransResult doRMMovBE(InstPtr ip, llvm::BasicBlock *&b,
 						llvm::Value           *srcAddr,
                         const llvm::MCOperand &dst)

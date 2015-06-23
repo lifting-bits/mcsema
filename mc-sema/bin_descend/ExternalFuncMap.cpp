@@ -179,6 +179,7 @@ void ExternalFunctionMap::parseMap(string fileName)
     {
       string            funcName;
       string            realName;
+      string 			funcSign = "";
       int               argCount;
       bool              nret = false;
 
@@ -241,6 +242,9 @@ void ExternalFunctionMap::parseMap(string fileName)
         case 'S':
           conv = X86_64_SysV;
           break;
+        case 'W':
+          conv = X86_64_Win64;
+          break;
 
         default:
           throw LErr(__LINE__, __FILE__, "Unknown calling convention specification in "+vtok[2]);
@@ -252,8 +256,15 @@ void ExternalFunctionMap::parseMap(string fileName)
           nret = true;
       }
 
+      /* function signature (optional)*/
+      if(vtok.size() >=5){
+    	  funcSign = vtok[4][0];
+          printf("function name : %s signature : %s\n", realName.c_str(), funcSign.c_str()), fflush(stdout);
+      }
+
+
       /* populate map data */
-      ExternalFunctionMap::ValueElement vk(nret, argCount, conv, realName);
+      ExternalFunctionMap::ValueElement vk(nret, argCount, conv, realName, funcSign);
       this->external_map.insert(
         pair<string, ExternalFunctionMap::ValueElement>(funcName, vk));
       if(realName.size() != 0)
@@ -345,4 +356,18 @@ ExternalFunctionMap::get_data_size(const std::string &dn, int &sz)
     }
 
     return false;
+}
+
+bool 
+ExternalFunctionMap::get_function_sign(std::string funcName, std::string &funcSign)
+{
+  map<string,ValueElement>::iterator  it = this->external_map.find(funcName);
+
+  if(it != this->external_map.end() && !it->second.is_data)
+  {
+    funcSign = (*it).second.funcSign;
+    return true;
+  }
+
+  return false;
 }

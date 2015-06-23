@@ -344,12 +344,13 @@ bool LLVMObjectTarget::find_import_name(uint32_t lookupAddr, std::string &symnam
   uint32_t  offt;
   VA        dummy;
   object::SectionRef section;
+  VA 		relocSize;
   bool      found_offt = getSectionForAddr(this->secs, lookupAddr, section, offt);
   LASSERT(found_offt, "Address "+to_string<uint32_t>(lookupAddr, hex) + " not found");
 
   symname = getSymForRelocAddr(section, offt, lookupAddr, true);
 
-  bool can_reloc = this->relocate_addr(((VA)lookupAddr), dummy);
+  bool can_reloc = this->relocate_addr(((VA)lookupAddr), dummy, relocSize);
 
   llvm::dbgs() << __FUNCTION__ << ": " << can_reloc << ", " << symname.size() << "\n";
 
@@ -528,7 +529,7 @@ static
   }
 
 
-bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
+bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr, VA &relocSize) {
 
   LASSERT(this->objectfile != NULL, "Object File not initialized");
 
@@ -551,7 +552,6 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
   // step 1: find which section this address lives in. This can be kind of hard when multiple things
   // map at address 0x0, which happens sometimes. Store (addr - [base of section]) in offt
   bool      found_offt = getSectionForAddr(this->secs, addr, section, offt);
-
   if (found_offt == false)
   {
       // its not in a section. this is bad.
@@ -568,7 +568,6 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
   // get a relocation reference for this address. this is how we
   // will find the relocation type and also the offset of the
   // relocation from its section base
-
   llvm::object::SectionRef relocSection(this->fixRelocationSection(section));
 
   StringRef secName;
@@ -581,7 +580,6 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
                    << to_string<VA>(addr, hex) << "\n";
       return false;
   }
-
   // lets find out what kind of relocation we have
   SmallString<32> relocType;
   e = rref.getTypeName(relocType);
@@ -610,17 +608,12 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
            ((::uint64_t)data[relo_offt+1] <<  8) |
            ((::uint64_t)data[relo_offt+0] <<  0));
 
+	  relocSize = 4;
       llvm::dbgs() << __FUNCTION__ << ": Original bytes are: " << to_string<VA>(offt_from_sym, hex) << "\n";
   } else if(relocType == "R_X86_64_64" ||
 			relocType == "R_X86_64_32" ||
 			relocType == "R_X86_64_32S") {
 	  StringRef secContents;
-	 llvm::object::SymbolRef symref;
-	  ::uint64_t sym_addr;
-	  ::int64_t addend = 0;
-	  symref = *rref.getSymbol();
-	  e = symref.getAddress((::uint64_t &)sym_addr);
-
 	  ::uint64_t relo_offt;
       e = rref.getOffset(relo_offt);
 	  e = section.getContents(secContents);
@@ -629,13 +622,20 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
 	  // get addend
 	  e = getELFRelocationAddend(rref, addend);
 	  const uint8_t *data = ((const uint8_t*)secContents.data());
-	   llvm::dbgs() << __FUNCTION__ << ": Addend: " << to_string<VA>(addend, hex) << "\n";
 
-	  offt_from_sym = sym_addr + addend;
+	  offt_from_sym = addend;
 
 	  llvm::dbgs() << __FUNCTION__ << ": Original bytes are: " << to_string<VA>(offt_from_sym, hex) << "\n";
 
-  }
+	  if(relocType == "R_X86_64_64")
+	      relocSize = 8;
+	  else
+	      relocSize = 4;
+    } else if (relocType == "IMAGE_REL_AMD64_ADDR32NB"){
+      relocSize = 4;
+    } else if(relocType == "IMAGE_REL_AMD64_ADDR64"){
+		relocSize = 8;
+	}
 
   // find what symbol name this relocation points to.
   string  s = getSymForReloc(rref, false);
@@ -656,7 +656,6 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
   if(found == -1) {
     return false;
   }
-
   // check if this symbol is in a section
   if(sym_sec != this->objectfile->section_end()) {
       ::uint64_t sec_offt;
@@ -682,7 +681,6 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr) {
   llvm::dbgs() << __FUNCTION__ << ": Final addr is: " << to_string<VA>(found, hex) << "\n";
 
   toAddr = (VA)found;
-
   return true;
 }
 

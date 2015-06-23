@@ -122,11 +122,12 @@ public:
 
 
     TT->setVendor(llvm::Triple::UnknownVendor);
+#ifdef _WIN64
+    TT->setOS(llvm::Triple::Win32);
+#else
     TT->setOS(llvm::Triple::UnknownOS);
-
+#endif
     if(!T.compare("x86-64")){
-        // get Triple name
- //       Triple TT =
         TT->setArch(llvm::Triple::x86_64);
         std::cout << " TT " <<target->getName() << " : " << TT->str() << " \n";
         this->STI = target->createMCSubtargetInfo(TT->getTriple(), "", "");

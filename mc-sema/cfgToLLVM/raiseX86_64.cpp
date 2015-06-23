@@ -76,7 +76,11 @@ bool addEntryPointDriverRaw(Module *M, string name, VA entry) {
         }
 
         CallInst* ci = CallInst::Create(F, subArg, "", driverBB);
+#ifdef _WIN64
+		ci->setCallingConv(CallingConv::X86_64_Win64);
+#else
         ci->setCallingConv(CallingConv::X86_64_SysV);
+#endif
         ReturnInst::Create(driverF->getContext(), driverBB);
         return true;
     }
@@ -90,7 +94,8 @@ bool addEntryPointDriver(Module *M,
         int np,
         bool ret,
         raw_ostream &report,
-        ExternalCodeRef::CallingConvention cconv)
+        ExternalCodeRef::CallingConvention cconv,
+        string funcSign)
 {
   //convert the VA into a string name of a function, try and look it up
   string  s("sub_"+to_string<VA>(entry, hex));
@@ -98,12 +103,18 @@ bool addEntryPointDriver(Module *M,
   Type *int64ty = Type::getInt64Ty(M->getContext());
   Type *int64PtrTy = PointerType::get(int64ty, 0);
 
+
   if( F != NULL ) {
     //build function prototype from name and numParms
     vector<Type *>  args;
 
     for(int i = 0; i < np; i++) {
-      args.push_back(Type::getInt64Ty(M->getContext()));
+		if(funcSign.c_str()[i] == 'F'){
+      		args.push_back(Type::getIntNTy(M->getContext(), 128));
+		}
+		else{
+			args.push_back(Type::getIntNTy(M->getContext(), 64));
+		}
     }
 
     Type  *returnTy = NULL;
@@ -118,7 +129,11 @@ bool addEntryPointDriver(Module *M,
     //insert the function prototype
     Function  *driverF = (Function *) M->getOrInsertFunction(name, FT);
     // set drivers calling convention to match user specification
+ #ifdef _WIN64
+     driverF->setCallingConv(CallingConv::X86_64_Win64);
+ #else
     driverF->setCallingConv(CallingConv::X86_64_SysV);
+#endif
 
     TASSERT(driverF != NULL, "");
 
@@ -137,9 +152,127 @@ bool addEntryPointDriver(Module *M,
       driverF->getArgumentList().begin();
     Function::ArgumentListType::iterator  fwd_end =
       driverF->getArgumentList().end();
+
     AttrBuilder B;
     B.addAttribute(Attribute::InReg);
 
+#ifdef _WIN64
+	if(fwd_it != fwd_end) {
+		Type *T = fwd_it->getType();
+        Value *arg1;
+		if(T->getIntegerBitWidth() == 128){
+			int   k = x86_64::getRegisterOffset(XMM0);
+			Value *rdiFieldGEPV[] = {
+            	    CONST_V<64>(driverBB, 0),
+               		CONST_V<32>(driverBB, k)
+            };
+        	// make driver take this from register
+        	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
+
+        	arg1 = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
+		 } else {
+			int   k = x86_64::getRegisterOffset(RCX);
+			Value *rdiFieldGEPV[] = {
+            	    CONST_V<64>(driverBB, 0),
+               		CONST_V<32>(driverBB, k)
+            };
+        	// make driver take this from register
+        	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
+
+        	arg1 = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
+		 }
+		 
+		Argument  *curArg = &(*fwd_it);
+		aliasMCSemaScope(new StoreInst(curArg, arg1, driverBB));
+	}
+
+	++fwd_it;
+	if(fwd_it != fwd_end) {
+		Type *T = fwd_it->getType();
+        Value *arg2;
+		if(T->getIntegerBitWidth() == 128){
+			int   k = x86_64::getRegisterOffset(XMM1);
+			Value *rdiFieldGEPV[] = {
+            	    CONST_V<64>(driverBB, 0),
+               		CONST_V<32>(driverBB, k)
+            };
+        	// make driver take this from register
+        	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
+
+        	arg2 = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
+		 } else {
+			int   k = x86_64::getRegisterOffset(RDX);
+			Value *rsiFieldGEPV[] = {
+					CONST_V<64>(driverBB, 0),
+					CONST_V<32>(driverBB, k)
+			};
+			// make driver take this from register
+			fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 2, B));
+
+			arg2 = GetElementPtrInst::CreateInBounds(aCtx, rsiFieldGEPV, "", driverBB);
+		 }
+		Argument  *curArg = &(*fwd_it);
+		aliasMCSemaScope(new StoreInst(curArg, arg2, driverBB));
+	}
+
+	++fwd_it;
+	if(fwd_it != fwd_end) {
+		Type *T = fwd_it->getType();
+        Value *arg3;
+		if(T->getIntegerBitWidth() == 128){
+			int   k = x86_64::getRegisterOffset(XMM1);
+			Value *rdiFieldGEPV[] = {
+            	    CONST_V<128>(driverBB, 0),
+               		CONST_V<32>(driverBB, k)
+            };
+        	// make driver take this from register
+        	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
+
+        	arg3 = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
+		 } else {
+			int   k = x86_64::getRegisterOffset(R8);
+			Value *r8FieldGEPV[] = {
+					CONST_V<64>(driverBB, 0),
+                	CONST_V<32>(driverBB, k)
+			};
+
+			fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 3, B));
+
+			arg3 = GetElementPtrInst::CreateInBounds(aCtx, r8FieldGEPV, "", driverBB);
+		 	}
+        Argument  *curArg = &(*fwd_it);
+		new StoreInst(curArg, arg3, driverBB);
+	}
+
+	++fwd_it;
+	if(fwd_it != fwd_end) {
+		Type *T = fwd_it->getType();
+        Value *arg4;
+		if(T->getIntegerBitWidth() == 128){
+			int   k = x86_64::getRegisterOffset(XMM1);
+			Value *rdiFieldGEPV[] = {
+            	    CONST_V<128>(driverBB, 0),
+               		CONST_V<32>(driverBB, k)
+            };
+        	// make driver take this from register
+        	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
+
+        	arg4 = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
+		 } else {
+			int   k = x86_64::getRegisterOffset(R9);
+			Value *r9FieldGEPV[] = {
+					CONST_V<64>(driverBB, 0),
+					CONST_V<32>(driverBB, k)
+			};
+
+			fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 4, B));
+
+			arg4 = GetElementPtrInst::CreateInBounds(aCtx, r9FieldGEPV, "", driverBB);
+		 	}
+		Argument  *curArg = &(*fwd_it);
+		aliasMCSemaScope(new StoreInst(curArg, arg4, driverBB));
+	}
+#else
 	if(fwd_it != fwd_end) {
 		int   k = x86_64::getRegisterOffset(RDI);
 		Value *rdiFieldGEPV[] = {
@@ -235,7 +368,7 @@ bool addEntryPointDriver(Module *M,
 		Argument  *curArg = &(*fwd_it);
 		aliasMCSemaScope(new StoreInst(curArg, r9P, driverBB));
 	}
-
+#endif
 	// rest of the arguments are passed on stack
 	Function::ArgumentListType::reverse_iterator it = driverF->getArgumentList().rbegin();
 	Function::ArgumentListType::reverse_iterator end = driverF->getArgumentList().rend();
@@ -332,8 +465,11 @@ bool addEntryPointDriver(Module *M,
     subArg.push_back(aCtx);
 
     CallInst* ci = CallInst::Create(F, subArg, "", driverBB);
+#ifdef _WIN64
+	ci->setCallingConv(CallingConv::X86_64_Win64);
+#else
     ci->setCallingConv(CallingConv::X86_64_SysV);
-
+#endif
     archFreeStack(M, aStack, driverBB);
 
     //if we are requested, return the EAX value, else return void

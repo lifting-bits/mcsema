@@ -422,20 +422,24 @@ public:
         //empty
     }
 
-    DataSectionEntry(uint64_t base, const std::string& sname) :
+
+	DataSectionEntry(uint64_t base, const std::string& sname) :
+		base(base), sym_name(sname), is_symbol(true)
+	{
+
+		this->bytes.push_back(0x0);
+		this->bytes.push_back(0x0);
+		this->bytes.push_back(0x0);
+		this->bytes.push_back(0x0);
+			}
+
+    DataSectionEntry(uint64_t base, const std::string& sname, uint64_t symbol_size) :
         base(base), sym_name(sname), is_symbol(true)
     {
-        // initialize bytes to null
-		this->bytes.push_back(0x0);
-        this->bytes.push_back(0x0);
-        this->bytes.push_back(0x0);
-        this->bytes.push_back(0x0);
-#ifdef TARGET_IA64
-        this->bytes.push_back(0x0);
-		this->bytes.push_back(0x0);
-        this->bytes.push_back(0x0);
-        this->bytes.push_back(0x0);
-#endif
+            // initialize bytes to null
+    	for(unsigned int i = 0; i < symbol_size; i++){
+			this->bytes.push_back(0x0);
+		}
     }
 
     uint64_t getBase() const { return this->base; }
@@ -577,7 +581,7 @@ class NativeModule {
     std::list<DataSection> &getData(void) { return this->dataSecs; }
 
     //add an external reference
-    void addExtCall(ExternalCodeRefPtr p) { this->extCalls.push_back(p); return; }
+    void addExtCall(ExternalCodeRefPtr p) { this->extCalls.push_back(p);  return; }
     std::list<ExternalCodeRefPtr> getExtCalls(void) { return this->extCalls; }
 
     //external data ref

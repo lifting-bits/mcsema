@@ -525,8 +525,8 @@ long double NATIVEFPU_TO_LD(const nativefpu *nf)
 {
 #ifdef _WIN32
 	// sanity check
-	long double ld;
-
+	long double ld = 0;
+#ifndef _WIN64
 	_asm {
 		MOV eax, dword ptr nf
 		_emit 0xDB
@@ -535,7 +535,10 @@ long double NATIVEFPU_TO_LD(const nativefpu *nf)
 		LEA eax, dword ptr ld		; get address of ld
 		FSTP qword ptr [eax]	; store 64-bits into ld
 	}
-
+#else
+	assert(sizeof(nf) == sizeof(ld));
+	memcpy(&ld, nf, sizeof(ld));
+#endif
 	return ld;
 #else
 	long double ld;
@@ -548,6 +551,7 @@ long double NATIVEFPU_TO_LD(const nativefpu *nf)
 void LD_TO_NATIVEFPU(long double ld, nativefpu *nf)
 {
 #ifdef _WIN32
+#ifndef _WIN64
 	_asm {
 		LEA  eax, dword ptr ld		; get address of ld
 		FLD  qword ptr [eax]	; load 64bits into fpu
@@ -555,8 +559,9 @@ void LD_TO_NATIVEFPU(long double ld, nativefpu *nf)
 		_emit 0xDB
 		_emit 0x38
 		;FSTP tbyte ptr [eax]	; store 80-bits into nf
-
 	}
+#else
+#endif
 #else
 	assert(sizeof(ld) == sizeof(*nf));
 	memcpy(nf, &ld, sizeof(*nf));

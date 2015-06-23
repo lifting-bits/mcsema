@@ -40,13 +40,13 @@ using namespace llvm;
 using namespace std;
 
 
-NativeModule::NativeModule(string modName, list<NativeFunctionPtr> f, llvm::MCInstPrinter *p) :   
-                                                        funcs(f), 
-                                                        callGraph(f.size()), 
+NativeModule::NativeModule(string modName, list<NativeFunctionPtr> f, llvm::MCInstPrinter *p) :
+                                                        funcs(f),
+                                                        callGraph(f.size()),
                                                         nextID(0),
                                                         nameStr(modName),
                                                         MyPrinter(p)
-{ 
+{
 
     return;
 }
@@ -102,7 +102,7 @@ void NativeFunction::compute_graph(void) {
     for(map<uint64_t, NativeBlockPtr>::iterator it = this->IDtoBlock.begin();
         it != this->IDtoBlock.end();
         ++it)
-    {   
+    {
         uint64_t        blockId = (*it).first;
         NativeBlockPtr  block = (*it).second;
         list<VA>        &blockFollows = block->get_follows();
@@ -111,7 +111,7 @@ void NativeFunction::compute_graph(void) {
         for(list<VA>::iterator fit = blockFollows.begin();
             fit != blockFollows.end();
             ++fit)
-        {   
+        {
             uint64_t    fVA = *fit;
             uint64_t    fBID;
 
@@ -176,7 +176,7 @@ const llvm::Target *findDisTarget(string arch) {
         ie = llvm::TargetRegistry::end();
         it != ie;
         ++it)
-    {  
+    {
         if( arch == it->getName() ) {
             tgt = &*it;
             break;
@@ -191,7 +191,7 @@ private:
     NativeFunctionPtr   natFun;
     NativeModulePtr     natMod;
 public:
-    cfg_visitor(NativeFunctionPtr n, NativeModulePtr m) : 
+    cfg_visitor(NativeFunctionPtr n, NativeModulePtr m) :
         natFun(n), natMod(m) { }
 
     template < typename Vertex, typename Graph >
@@ -201,14 +201,14 @@ public:
 template <typename Vertex, typename Graph>
 void cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
     NativeBlockPtr  curBlock = this->natFun->block_from_id(u);
-   
+
     LASSERT( curBlock, "");
 
     list<InstPtr>   stmts = curBlock->get_insts();
-    
-    for(list<InstPtr>::iterator it = stmts.begin(); 
-        it != stmts.end(); 
-        ++it) 
+
+    for(list<InstPtr>::iterator it = stmts.begin();
+        it != stmts.end();
+        ++it)
     {
         InstPtr inst = *it;
 
@@ -223,13 +223,13 @@ void cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
 
             this->natMod->addExtDataRef(ex);
         }
-    } 
+    }
 
     return;
 }
 
 void addExterns(list<NativeFunctionPtr> funcs, NativeModulePtr mod) {
-    for(list<NativeFunctionPtr>::iterator fit = funcs.begin(); 
+    for(list<NativeFunctionPtr>::iterator fit = funcs.begin();
         fit != funcs.end();
         ++fit)
     {
@@ -237,8 +237,8 @@ void addExterns(list<NativeFunctionPtr> funcs, NativeModulePtr mod) {
         cfg_visitor         visitor(fun, mod);
         CFG                 funcGraph = fun->get_cfg();
 
-        boost::breadth_first_search(funcGraph, 
-                                boost::vertex(0, funcGraph), 
+        boost::breadth_first_search(funcGraph,
+                                boost::vertex(0, funcGraph),
                                 boost::visitor(visitor));
     }
 
@@ -255,16 +255,16 @@ string NativeBlock::get_name(void) {
 
 void NativeModule::addDataSection(VA base, std::vector<uint8_t> &bytes)
 {
-    
+
   DataSection ds;
   DataSectionEntry dse(base, bytes);
   ds.addEntry(dse);
-    
+
   this->dataSecs.push_back(ds);
 }
 
 void NativeModule::addDataSection(const DataSection &d)
-{ 
+{
     this->dataSecs.push_back(d);
 }
 
@@ -296,13 +296,13 @@ InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder)
     ip->set_ext_call_target(p);
   }
 
-  if(inst.has_ext_data_name()) 
+  if(inst.has_ext_data_name())
   {
     ExternalDataRefPtr p(new ExternalDataRef(inst.ext_data_name()));
     ip->set_ext_data_ref(p);
   }
 
-  if(inst.has_call_target()) 
+  if(inst.has_call_target())
   {
       ip->set_call_tgt(inst.call_target());
   }
@@ -320,13 +320,13 @@ InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder)
       for(int i = 0; i < jmp_tbl.table_entries_size(); i++) {
           table_entries.push_back(jmp_tbl.table_entries(i));
       }
-      
+
       VA data_offset = (VA)(-1);
       if (jmp_tbl.has_offset_from_data()) {
           data_offset = jmp_tbl.offset_from_data();
       }
       MCSJumpTable *jmp = new MCSJumpTable(
-              table_entries, 
+              table_entries,
               jmp_tbl.zero_offset(),
               data_offset);
       ip->set_jump_table(MCSJumpTablePtr(jmp));
@@ -338,7 +338,7 @@ InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder)
       const ::JumpIndexTbl &idx_tbl = inst.jump_index_table();
       const string& serialized_tbl = idx_tbl.table_entries();
       vector<uint8_t> tbl_bytes(serialized_tbl.begin(), serialized_tbl.end());
-      
+
       JumpIndexTable *idx = new JumpIndexTable(tbl_bytes, idx_tbl.zero_offset());
       ip->set_jump_index_table(JumpIndexTablePtr(idx));
   }
@@ -357,7 +357,7 @@ InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder)
 NativeBlockPtr  deserializeBlock( const ::Block   &block,
                                   LLVMByteDecoder &decoder)
 {
-  NativeBlockPtr  natB = 
+  NativeBlockPtr  natB =
     NativeBlockPtr(new NativeBlock(block.base_address(), decoder.getPrinter()));
   /* read all the instructions in */
   for(int i = 0; i < block.insts_size(); i++)
@@ -373,7 +373,7 @@ NativeBlockPtr  deserializeBlock( const ::Block   &block,
 NativeFunctionPtr deserializeFunction(const ::Function  &func,
                                       LLVMByteDecoder   &decoder)
 {
-  NativeFunctionPtr natF = 
+  NativeFunctionPtr natF =
     NativeFunctionPtr(new NativeFunction(func.entry_address()));
 
   //read all the blocks from this function
@@ -388,12 +388,12 @@ NativeFunctionPtr deserializeFunction(const ::Function  &func,
 
 ExternalCodeRef::CallingConvention deserCC(::ExternalFunction::CallingConvention k)
 {
-  switch(k) 
+  switch(k)
   {
     case ::ExternalFunction::CallerCleanup:
       return ExternalCodeRef::CallerCleanup;
       break;
-    
+
     case ::ExternalFunction::CalleeCleanup:
       return ExternalCodeRef::CalleeCleanup;
       break;
@@ -401,13 +401,13 @@ ExternalCodeRef::CallingConvention deserCC(::ExternalFunction::CallingConvention
     case ::ExternalFunction::FastCall:
       return ExternalCodeRef::FastCall;
       break;
-    
+
     default:
       throw LErr(__LINE__, __FILE__, "Unsupported CC");
   }
 }
 
-ExternalCodeRefPtr deserializeExt(const ::ExternalFunction &f) 
+ExternalCodeRefPtr deserializeExt(const ::ExternalFunction &f)
 {
   ExternalCodeRef::CallingConvention c = deserCC(f.calling_convention());
   string                        symName = f.symbol_name();
@@ -428,29 +428,29 @@ ExternalCodeRefPtr deserializeExt(const ::ExternalFunction &f)
     retTy = ExternalCodeRef::NoReturn;
   }
 
-  ExternalCodeRefPtr ext = 
+  ExternalCodeRefPtr ext =
     ExternalCodeRefPtr(new ExternalCodeRef(symName, argCount, c, retTy));
 
   return ext;
 }
 
-ExternalDataRefPtr deserializeExtData(const ::ExternalData &ed) 
+ExternalDataRefPtr deserializeExtData(const ::ExternalData &ed)
 {
   string                        symName = ed.symbol_name();
   uint32_t                      data_size = ed.data_size();
 
-  ExternalDataRefPtr ext = 
+  ExternalDataRefPtr ext =
     ExternalDataRefPtr(new ExternalDataRef(symName, data_size));
 
   return ext;
 }
 
 static DataSectionEntry deserializeDataSymbol(const ::DataSymbol &ds) {
-    return DataSectionEntry(ds.base_address(), ds.symbol_name());
+    return DataSectionEntry(ds.base_address(), ds.symbol_name(), ds.symbol_size());
 }
 
 static DataSectionEntry makeDSEBlob(
-        const vector<uint8_t> &bytes, 
+        const vector<uint8_t> &bytes,
         uint64_t start, // offset in bytes vector
         uint64_t end, // offset in bytes vector
         uint64_t base_va)  // virtual address these bytes are based at
@@ -464,7 +464,7 @@ static DataSectionEntry makeDSEBlob(
 }
 
 static
-void deserializeData(const ::Data &d, DataSection &ds) 
+void deserializeData(const ::Data &d, DataSection &ds)
 {
   string            dt = d.data();
   vector<uint8_t>   bytes(dt.begin(), dt.end());
@@ -485,7 +485,7 @@ void deserializeData(const ::Data &d, DataSection &ds)
         // symbol next to blob
         if(dse_base > cur_pos) {
             ds.addEntry(makeDSEBlob(
-                        bytes, 
+                        bytes,
                         cur_pos-base_address,
                         dse_base-base_address,
                         cur_pos)
@@ -494,7 +494,7 @@ void deserializeData(const ::Data &d, DataSection &ds)
 
             // assume symbols are 4 bytes
             cur_pos = dse_base+dse_sym.getSize();
-            
+
         }
         // symbols next to each other
         else if (dse_base == cur_pos) {
@@ -512,7 +512,7 @@ void deserializeData(const ::Data &d, DataSection &ds)
   // or there are no symbols
   if(cur_pos < base_address+bytes.size()) {
      ds.addEntry(makeDSEBlob(
-                 bytes, 
+                 bytes,
                  cur_pos-base_address,
                  bytes.size(),
                  cur_pos)
@@ -535,15 +535,15 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     return m;
   }
 
-  //read the protobuf object in 
+  //read the protobuf object in
   if(serializedMod.ParseFromIstream(&inStream)) {
-    //now, make everything we need to build a NativeModulePtr 
+    //now, make everything we need to build a NativeModulePtr
     list<NativeFunctionPtr> foundFuncs;
     list<ExternalCodeRefPtr>     externFuncs;
     list<ExternalDataRefPtr>     externData;
     list<DataSection>              dataSecs;
 
-    //iterate over every function 
+    //iterate over every function
     for(int i = 0; i < serializedMod.internal_funcs_size(); i++) {
       const ::Function  &f = serializedMod.internal_funcs(i);
       foundFuncs.push_back(deserializeFunction(f, decode));
@@ -560,16 +560,16 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     //iterate over every external function definition
     for(int i = 0; i < serializedMod.external_funcs_size(); i++) {
       const ::ExternalFunction  &f = serializedMod.external_funcs(i);
-      externFuncs.push_back(deserializeExt(f)); 
+      externFuncs.push_back(deserializeExt(f));
     }
 
     //iterate over every external data definition
     for(int i = 0; i < serializedMod.external_data_size(); i++) {
       const ::ExternalData  &ed = serializedMod.external_data(i);
-      externData.push_back(deserializeExtData(ed)); 
+      externData.push_back(deserializeExtData(ed));
     }
 
-    //create the module 
+    //create the module
     m = NativeModulePtr(
           new NativeModule(serializedMod.module_name(), foundFuncs, NULL));
 
@@ -592,7 +592,7 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     }
 
     //populate the module with internal data
-    for(list<DataSection>::iterator it = dataSecs.begin(); 
+    for(list<DataSection>::iterator it = dataSecs.begin();
         it != dataSecs.end();
         ++it)
     {
@@ -602,13 +602,13 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     // set entry points for the module
     for(int i = 0; i < serializedMod.entries_size(); i++) {
         const ::EntrySymbol &es = serializedMod.entries(i);
-        
+
         NativeModule::EntrySymbol native_es(es.entry_name(), es.entry_address());
         if(es.has_entry_extra()) {
             const ::EntrySymbolExtra &ese = es.entry_extra();
             ExternalCodeRef::CallingConvention c = deserCC(ese.entry_cconv());
             native_es.setExtra(ese.entry_argc(), ese.does_return(), c);
-        } 
+        }
         m->addEntryPoint(native_es);
     }
 
@@ -616,11 +616,10 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     cout << "Failed to deserialize protobuf module" << endl;
   }
 
-
   return m;
 }
 
-NativeModulePtr readModule( std::string         fName, 
+NativeModulePtr readModule( std::string         fName,
                             ModuleInputFormat   inf,
                             list<VA>            entries,
                             const llvm::Target *T)
@@ -643,29 +642,29 @@ NativeModulePtr readModule( std::string         fName,
 }
 
 NativeBlockPtr blockFromBuff(   VA                      startVA,
-                                BufferMemoryObject      &bmo, 
+                                BufferMemoryObject      &bmo,
                                 const MCDisassembler    *D,
                                 MCInstPrinter           *P) {
-    NativeBlockPtr    curBlock = 
+    NativeBlockPtr    curBlock =
         NativeBlockPtr(new NativeBlock(startVA, P));
     VA  curVA = startVA;
     VA  nextVA;
     bool has_follow = true;
     while( curVA < bmo.getExtent() ) {
         uint64_t    insLen;
-        MCInst      inst;      
+        MCInst      inst;
         llvm::MCDisassembler::DecodeStatus  s;
         MCOperand oper;
 
         nextVA = curVA;
-        
+
         s = D->getInstruction(  inst,
                                 insLen,
                                 bmo,
                                 (uint64_t)curVA,
                                 llvm::nulls(),
                                 llvm::nulls());
-        
+
         LASSERT( llvm::MCDisassembler::Success ==  s, "" );
 
         string                      outS;
@@ -673,7 +672,7 @@ NativeBlockPtr blockFromBuff(   VA                      startVA,
         P->printInst(&inst, osOut, "");
         vector<boost::uint8_t>  bytes;
         InstPtr             p = InstPtr(new Inst(   curVA,
-                                                    insLen, 
+                                                    insLen,
                                                     inst,
                                                     osOut.str(),
                                                     Inst::NoPrefix,
@@ -704,29 +703,29 @@ NativeBlockPtr blockFromBuff(   VA                      startVA,
             case X86::JAE_4:
             case X86::JAE_1:
             case X86::JE_4:
-            case X86::JE_1:  
-            case X86::JNE_4: 
+            case X86::JE_1:
+            case X86::JNE_4:
             case X86::JNE_1:
-            case X86::JBE_4: 
+            case X86::JBE_4:
             case X86::JBE_1:
-            case X86::JA_4: 
-            case X86::JA_1: 
-            case X86::JS_4: 
-            case X86::JS_1: 
-            case X86::JNS_4: 
-            case X86::JNS_1: 
-            case X86::JP_4: 
-            case X86::JP_1: 
-            case X86::JNP_4: 
-            case X86::JNP_1: 
-            case X86::JL_4: 
-            case X86::JL_1: 
-            case X86::JGE_4: 
-            case X86::JGE_1: 
-            case X86::JLE_4: 
-            case X86::JLE_1: 
-            case X86::JG_4: 
-            case X86::JG_1: 
+            case X86::JA_4:
+            case X86::JA_1:
+            case X86::JS_4:
+            case X86::JS_1:
+            case X86::JNS_4:
+            case X86::JNS_1:
+            case X86::JP_4:
+            case X86::JP_1:
+            case X86::JNP_4:
+            case X86::JNP_1:
+            case X86::JL_4:
+            case X86::JL_1:
+            case X86::JGE_4:
+            case X86::JGE_1:
+            case X86::JLE_4:
+            case X86::JLE_1:
+            case X86::JG_4:
+            case X86::JG_1:
             case X86::JCXZ:
             case X86::JECXZ_32:
             case X86::JRCXZ:
@@ -757,10 +756,10 @@ NativeBlockPtr blockFromBuff(   VA                      startVA,
     return curBlock;
 }
 
-NativeFunctionPtr funcFromBuff( VA                      startVA, 
-                                BufferMemoryObject      &bmo, 
-                                const MCDisassembler    *D, 
-                                MCInstPrinter           *P) 
+NativeFunctionPtr funcFromBuff( VA                      startVA,
+                                BufferMemoryObject      &bmo,
+                                const MCDisassembler    *D,
+                                MCInstPrinter           *P)
 {
     NativeFunctionPtr   curF = NativeFunctionPtr(new NativeFunction(startVA));
     VA                  curVA = 0;
@@ -789,7 +788,7 @@ static void instFromNatInst(InstPtr i, ::Instruction *protoInst) {
     protoInst->set_true_target(i->get_tr());
   else
     protoInst->set_true_target(-1);
-  
+
   if(i->get_fa() != 0)
     protoInst->set_false_target(i->get_fa());
   else
@@ -824,7 +823,7 @@ static void instFromNatInst(InstPtr i, ::Instruction *protoInst) {
       const vector<VA>& the_table = native_jmp->getJumpTable();
 
       vector<VA>::const_iterator  it = the_table.begin();
-      while(it != the_table.end()) 
+      while(it != the_table.end())
       {
         proto_jmp->add_table_entries(*it);
         ++it;
@@ -852,7 +851,7 @@ static void blockFromNatBlock(NativeBlockPtr b, ::Block *protoBlock) {
   /* add the block follows */
   list<VA>  &follows = b->get_follows();
   list<VA>::iterator  it = follows.begin();
-  while(it != follows.end()) 
+  while(it != follows.end())
   {
     protoBlock->add_block_follows(*it);
     ++it;
@@ -883,13 +882,13 @@ static ExternalFunction::CallingConvention serializeCC(ExternalCodeRef::CallingC
     case ExternalCodeRef::FastCall:
       return ExternalFunction::FastCall;
       break;
-    
+
     default:
       throw LErr(__LINE__, __FILE__, "Unknown case");
   }
 }
 
-static void extFuncFromNat(ExternalCodeRefPtr e, ::ExternalFunction *protoExt) 
+static void extFuncFromNat(ExternalCodeRefPtr e, ::ExternalFunction *protoExt)
 {
   protoExt->set_symbol_name(e->getSymbolName());
   protoExt->set_argument_count(e->getNumArgs());
@@ -898,13 +897,13 @@ static void extFuncFromNat(ExternalCodeRefPtr e, ::ExternalFunction *protoExt)
   {
       protoExt->set_no_return(true);
   }
-  else 
+  else
   {
       protoExt->set_no_return(false);
 
   }
 
-  if(e->getReturnType() != ExternalCodeRef::VoidTy) 
+  if(e->getReturnType() != ExternalCodeRef::VoidTy)
   {
       protoExt->set_has_return(true);
   }
@@ -912,13 +911,15 @@ static void extFuncFromNat(ExternalCodeRefPtr e, ::ExternalFunction *protoExt)
   {
       protoExt->set_has_return(false);
   }
- 
-  protoExt->set_calling_convention(serializeCC(e->getCallingConvention()));
 
+  protoExt->set_calling_convention(serializeCC(e->getCallingConvention()));
+ // protoExt->set_signature(e->getFunctionSignature());
+
+  //printf("%s : %s\n", (e->getSymbolName()).c_str(), (e->getFunctionSignature()).c_str()), fflush(stdout);
   return;
 }
 
-static void extDataRefFromNat(ExternalDataRefPtr dr, ::ExternalData *protoExt) 
+static void extDataRefFromNat(ExternalDataRefPtr dr, ::ExternalData *protoExt)
 {
     std::string sym = dr->getSymbolName();
     protoExt->set_symbol_name(sym);
@@ -933,10 +934,10 @@ static void funcFromNat(NativeFunctionPtr f, ::Function *fProto) {
   /* iterate over the blocks and add them */
   CFG funcCFG = f->get_cfg();
 
-  pair<boost::graph_traits<CFG>::vertex_iterator, 
-        boost::graph_traits<CFG>::vertex_iterator>  
+  pair<boost::graph_traits<CFG>::vertex_iterator,
+        boost::graph_traits<CFG>::vertex_iterator>
           vitp = boost::vertices(funcCFG);
-  
+
   boost::graph_traits<CFG>::vertex_iterator vit = vitp.first;
   boost::graph_traits<CFG>::vertex_iterator end = vitp.second;
 
@@ -962,10 +963,12 @@ static void dumpData(DataSection &d, ::Data *protoData)
   {
     string sym_name;
     if(deitr->getSymbol(sym_name)) {
-        // is a symbol 
+        // is a symbol
         ::DataSymbol *ds = protoData->add_symbols();
         ds->set_base_address(deitr->getBase());
         ds->set_symbol_name(sym_name);
+		ds->set_symbol_size(deitr->getSize());
+		printf("dumpData : base %x, size, %d\n", deitr->getBase(), deitr->getSize());
     }
   }
 
@@ -984,7 +987,7 @@ string dumpProtoBuf(NativeModulePtr  m) {
   /* dump all the functions and external functions */
   list<ExternalCodeRefPtr> extCalls = m->getExtCalls();
   list<ExternalCodeRefPtr>::iterator it = extCalls.begin();
-  while(it != extCalls.end()) 
+  while(it != extCalls.end())
   {
     extFuncFromNat(*it, protoMod.add_external_funcs());
     ++it;
@@ -992,7 +995,7 @@ string dumpProtoBuf(NativeModulePtr  m) {
 
   list<ExternalDataRefPtr> extDataRefs = m->getExtDataRefs();
   list<ExternalDataRefPtr>::iterator dref_it = extDataRefs.begin();
-  while(dref_it != extDataRefs.end()) 
+  while(dref_it != extDataRefs.end())
   {
     extDataRefFromNat(*dref_it, protoMod.add_external_data());
     ++dref_it;
@@ -1011,9 +1014,9 @@ string dumpProtoBuf(NativeModulePtr  m) {
   /* then dump data references */
   list<DataSection>  &dataSegs = m->getData();
   list<DataSection>::iterator  dit = dataSegs.begin();
-  while(dit != dataSegs.end()) 
+  while(dit != dataSegs.end())
   {
-    dumpData(*dit, protoMod.add_internal_data());
+   	dumpData(*dit, protoMod.add_internal_data());
     ++dit;
   }
 

@@ -182,7 +182,7 @@ bool PeTarget::is_addr_relocated(uint32_t addr) {
   return c.found;
 }
 
-bool PeTarget::relocate_addr(VA addr, VA &toaddr) {
+bool PeTarget::relocate_addr(VA addr, VA &toaddr, VA &relocSize) {
   //doesn't really need to do anything...
   if(!this->is_addr_relocated(addr)) {
       return false;

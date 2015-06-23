@@ -1,4 +1,5 @@
 #processing C runtime
+print_double 1 C N f
 memset 3 C N
 free 1 C N
 memcpy 3 C N
@@ -28939,6 +28940,7 @@ CreateSocketHandle 0 E N
 GetProcessUserModeExceptionPolicy 1 E N
 SetProcessUserModeExceptionPolicy 1 E N
 DATA: NlsMbCodePageTag 1
+DATA: __ImageBase 1
 __CppXcptFilter 2 C N
 _unlock 1 C N
 CopyExtendedContext 3 E N

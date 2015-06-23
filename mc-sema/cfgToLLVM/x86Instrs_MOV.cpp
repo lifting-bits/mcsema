@@ -313,6 +313,9 @@ GENERIC_TRANSLATION(MOV32rr_REV, doRRMov<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(MOV64rr, doRRMov<64>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(MOV64rr_REV, doRRMov<64>(ip, block, OP(0), OP(1)))
 
+//MOVPQIto64rr
+GENERIC_TRANSLATION(MOVPQIto64rr, doRRMovD<64>(ip, block, OP(0), OP(1)))
+
 GENERIC_TRANSLATION(MOV8ri, doRIMov<8>(ip, block, OP(1), OP(0)))
 GENERIC_TRANSLATION(MOV16ri, doRIMov<16>(ip, block, OP(1), OP(0)))
 
@@ -662,9 +665,6 @@ static InstTransResult translate_CDQE(NativeModulePtr natM, BasicBlock *& block,
     R_WRITE<64>(block, X86::RAX, rax);
     return ret ;
 }
-
-
-
 
 void MOV_populateDispatchMap(DispatchMap &m) {
     m[X86::MOV8rr] = translate_MOV8rr;
