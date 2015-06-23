@@ -615,6 +615,7 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr, VA &relocSize) {
 			relocType == "R_X86_64_32S") {
 	  StringRef secContents;
 	  ::uint64_t relo_offt;
+	  ::int64_t addend;
       e = rref.getOffset(relo_offt);
 	  e = section.getContents(secContents);
 	  LASSERT(!e, "Can't get section data");
