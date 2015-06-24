@@ -110,10 +110,10 @@ bool addEntryPointDriver(Module *M,
 
     for(int i = 0; i < np; i++) {
 		if(funcSign.c_str()[i] == 'F'){
-      		args.push_back(Type::getIntNTy(M->getContext(), 128));
+      		args.push_back(Type::getDoubleTy(M->getContext()));
 		}
 		else{
-			args.push_back(Type::getIntNTy(M->getContext(), 64));
+			args.push_back(Type::getInt64Ty(M->getContext()));
 		}
     }
 
@@ -160,26 +160,36 @@ bool addEntryPointDriver(Module *M,
 	if(fwd_it != fwd_end) {
 		Type *T = fwd_it->getType();
         Value *arg1;
-		if(T->getIntegerBitWidth() == 128){
+		if(T->isDoubleTy()){
 			int   k = x86_64::getRegisterOffset(XMM0);
-			Value *rdiFieldGEPV[] = {
+			Value *argFieldGEPV[] = {
             	    CONST_V<64>(driverBB, 0),
                		CONST_V<32>(driverBB, k)
             };
         	// make driver take this from register
         	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
 
-        	arg1 = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
+        	Instruction *ptr128 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
+
+			arg1 = CastInst::CreatePointerCast(ptr128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "arg0", driverBB);
+#if 0
+			Value *readVal = new llvm::TruncInst(ptr,
+								llvm::Type::getInt64Ty(M->getContext()),
+								"",
+								driverBB);
+
+			arg1 = CastInst::Create(Instruction::SIToFP, readVal, Type::getDoubleTy(M->getContext()), "arg0", driverBB); 
+	#endif		
 		 } else {
 			int   k = x86_64::getRegisterOffset(RCX);
-			Value *rdiFieldGEPV[] = {
+			Value *argFieldGEPV[] = {
             	    CONST_V<64>(driverBB, 0),
                		CONST_V<32>(driverBB, k)
             };
         	// make driver take this from register
         	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
 
-        	arg1 = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
+        	arg1 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
 		 }
 		 
 		Argument  *curArg = &(*fwd_it);
@@ -190,26 +200,28 @@ bool addEntryPointDriver(Module *M,
 	if(fwd_it != fwd_end) {
 		Type *T = fwd_it->getType();
         Value *arg2;
-		if(T->getIntegerBitWidth() == 128){
+		if(T->isDoubleTy()){
 			int   k = x86_64::getRegisterOffset(XMM1);
-			Value *rdiFieldGEPV[] = {
+			Value *argFieldGEPV[] = {
             	    CONST_V<64>(driverBB, 0),
                		CONST_V<32>(driverBB, k)
             };
         	// make driver take this from register
         	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
 
-        	arg2 = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
+        	Instruction *ptr128 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
+
+			arg2 = CastInst::CreatePointerCast(ptr128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "arg1", driverBB);
 		 } else {
 			int   k = x86_64::getRegisterOffset(RDX);
-			Value *rsiFieldGEPV[] = {
+			Value *argFieldGEPV[] = {
 					CONST_V<64>(driverBB, 0),
 					CONST_V<32>(driverBB, k)
 			};
 			// make driver take this from register
 			fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 2, B));
 
-			arg2 = GetElementPtrInst::CreateInBounds(aCtx, rsiFieldGEPV, "", driverBB);
+			arg2 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
 		 }
 		Argument  *curArg = &(*fwd_it);
 		aliasMCSemaScope(new StoreInst(curArg, arg2, driverBB));
@@ -219,16 +231,18 @@ bool addEntryPointDriver(Module *M,
 	if(fwd_it != fwd_end) {
 		Type *T = fwd_it->getType();
         Value *arg3;
-		if(T->getIntegerBitWidth() == 128){
-			int   k = x86_64::getRegisterOffset(XMM1);
-			Value *rdiFieldGEPV[] = {
-            	    CONST_V<128>(driverBB, 0),
+		if(T->isDoubleTy()){
+			int   k = x86_64::getRegisterOffset(XMM2);
+			Value *argFieldGEPV[] = {
+            	    CONST_V<64>(driverBB, 0),
                		CONST_V<32>(driverBB, k)
             };
         	// make driver take this from register
-        	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
+        	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 3, B));
 
-        	arg3 = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
+        	Instruction *ptr128 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
+
+			arg3 = CastInst::CreatePointerCast(ptr128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "arg3", driverBB);
 		 } else {
 			int   k = x86_64::getRegisterOffset(R8);
 			Value *r8FieldGEPV[] = {
@@ -248,16 +262,17 @@ bool addEntryPointDriver(Module *M,
 	if(fwd_it != fwd_end) {
 		Type *T = fwd_it->getType();
         Value *arg4;
-		if(T->getIntegerBitWidth() == 128){
-			int   k = x86_64::getRegisterOffset(XMM1);
-			Value *rdiFieldGEPV[] = {
-            	    CONST_V<128>(driverBB, 0),
+		if(T->isDoubleTy()){
+			int   k = x86_64::getRegisterOffset(XMM3);
+			Value *argFieldGEPV[] = {
+            	    CONST_V<64>(driverBB, 0),
                		CONST_V<32>(driverBB, k)
             };
         	// make driver take this from register
         	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
 
-        	arg4 = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
+        	Instruction *ptr128 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
+			arg4 = CastInst::CreatePointerCast(ptr128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "arg3", driverBB);
 		 } else {
 			int   k = x86_64::getRegisterOffset(R9);
 			Value *r9FieldGEPV[] = {

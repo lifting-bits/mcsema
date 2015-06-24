@@ -596,9 +596,16 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
 		Type *T = it->getType();
         Value *arg1;
 		if(T->isDoubleTy()){
-			Value *V = x86_64::R_READ<128>(b, X86::XMM0);
-			Instruction::CastOps opcode = CastInst::getCastOpcode(V, false,  T, false);
-			arg1 = BitCastInst::Create(opcode, x86_64::R_READ<128>(b, X86::XMM0), T, "");
+			int   k = x86_64::getRegisterOffset(XMM0);
+			Value *arg1FieldGEPV[] = {
+            	    CONST_V<64>(b, 0),
+               		CONST_V<32>(b, k)
+            };
+
+        	Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg1FieldGEPV, "XMM0_val", b);
+			Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv0", b);
+			arg1 = new LoadInst(GEP_double, "", b); 
+
 			printf("Argument is XMM0\n"), fflush(stdout);
 		}
 		else{
@@ -615,8 +622,18 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
     if(paramCount && it != end) {
 		Type *T = it->getType();
         Value *arg2;
-		if(T->getIntegerBitWidth() == 128)
-			arg2 = x86_64::R_READ<128>(b, X86::XMM1);
+		if(T->isDoubleTy()){
+			int   k = x86_64::getRegisterOffset(XMM1);
+			Value *arg2FieldGEPV[] = {
+            	    CONST_V<64>(b, 0),
+               		CONST_V<32>(b, k)
+            };
+
+        	Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg2FieldGEPV, "XMM1_val", b);
+			Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv1", b);
+			arg2 = new LoadInst(GEP_double, "", b); 
+			printf("Argument is XMM1\n"), fflush(stdout);
+		}
 		else
 			arg2 = x86_64::R_READ<64>(b, X86::RDX);
 		
@@ -629,8 +646,19 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
     if(paramCount && it != end) {
 		Type *T = it->getType();
         Value *arg3;
-		if(T->getIntegerBitWidth() == 128)
-			arg3 = x86_64::R_READ<128>(b, X86::XMM2);
+		if(T->isDoubleTy()){
+			int   k = x86_64::getRegisterOffset(XMM2);
+			Value *arg3FieldGEPV[] = {
+					CONST_V<64>(b, 0),
+					CONST_V<32>(b, k)
+			};
+			
+			Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg3FieldGEPV, "XMM2_val", b);
+			Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv2", b);
+			arg3 = new LoadInst(GEP_double, "", b); 
+			printf("Argument is XMM2\n"), fflush(stdout);
+		}
+
 		else
         	arg3 = x86_64::R_READ<64>(b, X86::R8);
 		
@@ -643,8 +671,18 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
     if(paramCount && it != end) {
 		Type *T = it->getType();
         Value *arg4;
-		if(T->getIntegerBitWidth() == 128)
-			arg4 = x86_64::R_READ<128>(b, X86::XMM3);
+		if(T->isDoubleTy()){
+			int   k = x86_64::getRegisterOffset(XMM3);
+			Value *arg4FieldGEPV[] = {
+            	    CONST_V<64>(b, 0),
+               		CONST_V<32>(b, k)
+            };
+
+        	Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg4FieldGEPV, "XMM3_val", b);
+			Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv3", b);
+			arg4 = new LoadInst(GEP_double, "", b); 
+			printf("Argument is XMM3\n"), fflush(stdout);
+		}
 		else
         	arg4 = x86_64::R_READ<64>(b, X86::R9);
 		
