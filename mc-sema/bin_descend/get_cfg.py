@@ -552,6 +552,20 @@ def instructionHandler(M, B, inst, new_eas):
         if dref in crefs:
             continue
         addDataReference(M, I, inst, dref, new_eas)
+        DEBUG("instr refering data")
+        if isUnconditionalJump(inst):
+        	xdrefs = DataRefsFrom(dref)
+        	for xref in xdrefs:
+        		DEBUG("xref : {0:x}\n".format(xref))
+        		# check if it refers to come instructions; link Control flow
+        		if isExternalReference(xref):
+        			fn = getFunctionName(xref)
+        			fn = handleExternalRef(fn)
+        			I.ext_call_name = fn
+        			DEBUG("EXTERNAL CALL : {0}\n".format(fn))
+
+		 
+
 
     if not had_refs and isLinkedElf():
         for op in insn_t.Operands:
@@ -685,6 +699,7 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
 
     if idc.isCode(pf):
         DS.symbol_name = "sub_"+hex(reloc_dest)
+        DS.symbol_size = int(8)
         DEBUG("Code Ref: {0:x}!\n".format(reloc_dest))
 
         if reloc_dest not in RECOVERED_EAS:
@@ -693,10 +708,12 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
     elif idc.isData(pf):
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
+	DS.symbol_size = int(8)
         DEBUG("Data Ref!\n")
     else:
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
+	DS.symbol_size = int(8)
         DEBUG("UNKNOWN Ref, assuming data\n")
 
 def isStartOfFunction(ea):
