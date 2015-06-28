@@ -604,15 +604,14 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
 
         	Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg1FieldGEPV, "XMM0_val", b);
 			Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv0", b);
-			arg1 = new LoadInst(GEP_double, "", b); 
+			arg1 = new LoadInst(GEP_double, "", b);
 
-			printf("Argument is XMM0\n"), fflush(stdout);
 		}
 		else{
 			printf("Argument is RCX\n"), fflush(stdout);
 			arg1 = x86_64::R_READ<64>(b, X86::RCX);
 		}
-		
+
         arguments.push_back(arg1);
         --paramCount;
         it->addAttr(AttributeSet::get(it->getContext(), 1, B));
@@ -631,12 +630,11 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
 
         	Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg2FieldGEPV, "XMM1_val", b);
 			Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv1", b);
-			arg2 = new LoadInst(GEP_double, "", b); 
-			printf("Argument is XMM1\n"), fflush(stdout);
+			arg2 = new LoadInst(GEP_double, "", b);
 		}
 		else
 			arg2 = x86_64::R_READ<64>(b, X86::RDX);
-		
+
         arguments.push_back(arg2);
         --paramCount;
         it->addAttr(AttributeSet::get(it->getContext(), 2, B));
@@ -652,16 +650,15 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
 					CONST_V<64>(b, 0),
 					CONST_V<32>(b, k)
 			};
-			
+
 			Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg3FieldGEPV, "XMM2_val", b);
 			Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv2", b);
-			arg3 = new LoadInst(GEP_double, "", b); 
-			printf("Argument is XMM2\n"), fflush(stdout);
+			arg3 = new LoadInst(GEP_double, "", b);
 		}
 
 		else
         	arg3 = x86_64::R_READ<64>(b, X86::R8);
-		
+
         arguments.push_back(arg3);
         --paramCount;
         it->addAttr(AttributeSet::get(it->getContext(), 3, B));
@@ -680,12 +677,11 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
 
         	Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg4FieldGEPV, "XMM3_val", b);
 			Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv3", b);
-			arg4 = new LoadInst(GEP_double, "", b); 
-			printf("Argument is XMM3\n"), fflush(stdout);
+			arg4 = new LoadInst(GEP_double, "", b);
 		}
 		else
         	arg4 = x86_64::R_READ<64>(b, X86::R9);
-		
+
         arguments.push_back(arg4);
         --paramCount;
         it->addAttr(AttributeSet::get(it->getContext(), 4, B));
@@ -785,13 +781,6 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
     if( rType == Type::getInt64Ty(M->getContext()) ) {
         x86_64::R_WRITE<64>(b, X86::RAX, callR);
     }
-
-
-    // adjust REG_RSP accordingly since callee changed it
-    Value *RSP_adjust = CONST_V<64>(b, 8*paramCount);
-    Value *rspFix = BinaryOperator::CreateAdd(rspOld, RSP_adjust, "", b);
-
-    x86_64::R_WRITE<64>(b, X86::RSP, rspFix);
 
     return ContinueBlock;
 }

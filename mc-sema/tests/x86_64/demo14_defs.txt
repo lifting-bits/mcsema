@@ -1,3 +1,0 @@
-threeArgs 3 F N
-twoArgs 2 F N
-oneArg 1 F N
