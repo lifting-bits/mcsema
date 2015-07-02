@@ -100,6 +100,14 @@ def DEBUG(s):
     if _DEBUG:
         sys.stdout.write(s)
 
+def getPointerSize():
+    if (idaapi.ph.flag & idaapi.PR_USE64) != 0:
+        # support 64-bit addressing
+        return 8
+    else:
+        # no support for 64-bit, assume 32-bit
+        return 4
+
 def readDword(ea):
     bytestr = readBytesSlowly(ea, ea+4);
     dword = struct.unpack("<L", bytestr)[0]
@@ -699,7 +707,7 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
 
     if idc.isCode(pf):
         DS.symbol_name = "sub_"+hex(reloc_dest)
-        DS.symbol_size = int(8)
+        DS.symbol_size = getPointerSize()
         DEBUG("Code Ref: {0:x}!\n".format(reloc_dest))
 
         if reloc_dest not in RECOVERED_EAS:
@@ -708,12 +716,12 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
     elif idc.isData(pf):
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
-	DS.symbol_size = int(8)
+	DS.symbol_size = getPointerSize()
         DEBUG("Data Ref!\n")
     else:
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
-	DS.symbol_size = int(8)
+	DS.symbol_size = getPointerSize()
         DEBUG("UNKNOWN Ref, assuming data\n")
 
 def isStartOfFunction(ea):
