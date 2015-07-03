@@ -9,7 +9,7 @@ ${CC} -ggdb -m64 -c -o demo_fpu1.o demo_fpu1.c
 if [ -e "${IDA_PATH}/idaq" ]
 then
     echo "Using IDA to recover CFG"
-    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -d -entry-symbol=timespi -i=demo_fpu1.o>> /dev/null
+    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -march=x86-64 -d -entry-symbol=timespi -i=demo_fpu1.o>> /dev/null
 else
     echo "Using bin_descend to recover CFG"
     ${BIN_DESCEND_PATH}/bin_descend -march=x86-64 -d -entry-symbol=timespi -i=demo_fpu1.o

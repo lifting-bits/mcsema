@@ -9,7 +9,7 @@ ${CC} -ggdb -m64 -o linked_elf linked_elf.c
 if [ -e "${IDA_PATH}/idaq" ]
 then
     echo "Using IDA to recover CFG"
-    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -d -func-map=linux_map.txt -i=linked_elf -entry-symbol=main >> /dev/null
+    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -march=x86-64 -d -func-map=linux_map.txt -i=linked_elf -entry-symbol=main >> /dev/null
 else
     echo "Using bin_descend to recover CFG"
     ${BIN_DESCEND_PATH}/bin_descend -d -march=x86-64 -func-map=linux_map.txt -i=linked_elf -entry-symbol=main

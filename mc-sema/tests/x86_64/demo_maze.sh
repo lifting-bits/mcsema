@@ -9,7 +9,7 @@ ${CC} -ggdb -m64 -o demo_maze demo_maze.c
 if [ -e "${IDA_PATH}/idaq" ]
 then
     echo "Using IDA to recover CFG"
-    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -d -func-map=maze_map.txt -i=demo_maze -entry-symbol=main>> /dev/null
+    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -march=x86-64 -d -func-map=maze_map.txt -i=demo_maze -entry-symbol=main>> /dev/null
 else
     echo "Using bin_descend to recover CFG"
     ${BIN_DESCEND_PATH}/bin_descend -march=x86-64 -d -func-map=maze_map.txt -i=demo_maze -entry-symbol=main
