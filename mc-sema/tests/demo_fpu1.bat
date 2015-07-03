@@ -6,13 +6,13 @@ cl /nologo /arch:IA32 /c demo_fpu1.c
 
 if exist "%IDA_PATH%\idaq.exe" (
     echo Using IDA to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend_wrapper.py -d -entry-symbol=_timespi -i=demo_fpu1.obj
+    %BIN_DESCEND_PATH%\bin_descend_wrapper.py -march=x86 -d -entry-symbol=_timespi -i=demo_fpu1.obj
 ) else (
     echo Using bin_descend to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend.exe -d -entry-symbol=_timespi -i=demo_fpu1.obj
+    %BIN_DESCEND_PATH%\bin_descend.exe -march=x86 -d -entry-symbol=_timespi -i=demo_fpu1.obj
 )
 
-%CFG_TO_BC_PATH%\cfg_to_bc.exe -i demo_fpu1.cfg -driver=demo_fpu1_entry,_timespi,raw,return,C -o demo_fpu1.bc
+%CFG_TO_BC_PATH%\cfg_to_bc.exe -march=x86 -i demo_fpu1.cfg -driver=demo_fpu1_entry,_timespi,raw,return,C -o demo_fpu1.bc
 
 %LLVM_PATH%\opt.exe -O3 -o demo_fpu1_opt.bc demo_fpu1.bc
 %LLVM_PATH%\llc.exe -filetype=obj -o demo_fpu1_mine.obj demo_fpu1_opt.bc

@@ -56,6 +56,15 @@ using namespace llvm;
 extern llvm::PointerType *g_PRegStruct;
 extern llvm::StructType *g_RegStruct;
 
+
+static CallingConv::ID getCallingConv(Module *M){
+	if(getSystemArch(M) == _X86_){
+		return CallingConv::X86_StdCall;
+	} else {
+		return CallingConv::X86_64_Win64;
+	}
+}
+
 static PointerType* getTibPtrTy(Module *mod) {
 	PointerType* Int8PtrTy = PointerType::get(IntegerType::get(mod->getContext(), 8), 0);
 	StructType *StructTy_struct__NT_TIB = mod->getTypeByName("struct._NT_TIB");
@@ -123,7 +132,7 @@ Value* win32CallVirtualFree(Value *addr_to_free, BasicBlock *b) {
 				/*Type=*/vfree_ty,
 				/*Linkage=*//*GlobalValue::AvailableExternallyLinkage*/GlobalValue::ExternalLinkage,
 				/*Name=*/"VirtualFree", mod); // (external, no body)
-		func_VirtualFree->setCallingConv(/*CallingConv::X86_StdCall*/CallingConv::X86_64_Win64);
+		func_VirtualFree->setCallingConv(/*CallingConv::X86_StdCall*/getCallingConv(mod));
 	}
 
 	std::vector<Value*> vfree_call_params;
@@ -135,7 +144,7 @@ Value* win32CallVirtualFree(Value *addr_to_free, BasicBlock *b) {
 			vfree_call_params,
 			"",
 			b);
-	vfree_call->setCallingConv(/*CallingConv::X86_StdCall*/CallingConv::X86_64_Win64);
+	vfree_call->setCallingConv(/*CallingConv::X86_StdCall*/getCallingConv(mod));
 	vfree_call->setTailCall(false);
 	return vfree_call;
 }
@@ -363,7 +372,7 @@ Value *win32CallVirtualAlloc(Value *size, BasicBlock *b) {
 				/*Type=*/valloc_ty,
 				/*Linkage=*//*GlobalValue::AvailableExternallyLinkage*/ GlobalValue::ExternalLinkage,
 				/*Name=*/"VirtualAlloc", mod); // (external, no body)
-		func_VirtualAlloc->setCallingConv(/*CallingConv::X86_StdCall*/CallingConv::X86_64_Win64);
+		func_VirtualAlloc->setCallingConv(/*CallingConv::X86_StdCall*/getCallingConv(mod));
 	}
 
 
@@ -376,7 +385,7 @@ Value *win32CallVirtualAlloc(Value *size, BasicBlock *b) {
 
 	// allocate the new stack
 	CallInst* valloc_result = CallInst::Create(func_VirtualAlloc, valloc_params, "", b);
-	valloc_result->setCallingConv(/*CallingConv::X86_StdCall*/CallingConv::X86_64_Win64);
+	valloc_result->setCallingConv(/*CallingConv::X86_StdCall*/getCallingConv(mod));
 	valloc_result->setTailCall(false);
 
 	return valloc_result;
@@ -828,7 +837,7 @@ Module* addWin32CallbacksToModule(Module *mod) {
 				/*Type=*/FuncTy_39,
 				/*Linkage=*/GlobalValue::InternalLinkage,
 				/*Name=*/"callback_adapter_prologue_internal", mod);
-		func_callback_adapter_prologue_internal->setCallingConv(CallingConv::X86_StdCall);
+		func_callback_adapter_prologue_internal->setCallingConv(/*CallingConv::X86_StdCall*/ getCallingConv(mod));
 	}
 	AttributeSet func_callback_adapter_prologue_internal_PAL;
 	func_callback_adapter_prologue_internal_PAL = func_callback_adapter_prologue_internal_PAL.addAttribute(
@@ -844,7 +853,7 @@ Module* addWin32CallbacksToModule(Module *mod) {
 				getEpilogueType(mod),
 				/*Linkage=*/GlobalValue::InternalLinkage,
 				/*Name=*/"callback_adapter_epilogue", mod);
-		func_callback_adapter_epilogue->setCallingConv(CallingConv::X86_StdCall);
+		func_callback_adapter_epilogue->setCallingConv(/*CallingConv::X86_StdCall*/getCallingConv(mod));
 	}
 
 	AttributeSet func_callback_adapter_epilogue_PAL;
