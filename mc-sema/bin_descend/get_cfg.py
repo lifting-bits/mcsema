@@ -137,7 +137,7 @@ def getFromEMAP(fname):
 
 def doesNotReturn(fname):
     try:
-        args, conv, ret = getFromEMAP(fname)
+        args, conv, ret, sign = getFromEMAP(fname)
         if ret == "Y":
             return True
     except KeyError, ke:
@@ -181,7 +181,7 @@ def entryPointHandler(M, ep, name, args_from_stddef=False):
     # calling ocnvention, and return type from std_defs?
     if args_from_stddef:
         try:
-            (argc, conv, ret) = getFromEMAP(name)
+            (argc, conv, ret, sign) = getFromEMAP(name)
             have_edata = True
         except KeyError as ke:
             pass
@@ -596,8 +596,11 @@ def parseDefsFile(df):
             (marker, symname, dsize) = l.split()
             emap_data[symname] = int(dsize)
         else:
-
-            (fname, args, conv, ret) = l.split()
+            fname = args = conv = ret = sign = None
+            if len(l.split()) == 4:
+                (fname, args, conv, ret) = l.split()
+            elif len(l.split()) == 5:
+                (fname, args, conv, ret, sign) = l.split()
 
             if conv == "C":
                 realconv = CFG_pb2.ExternalFunction.CallerCleanup
@@ -611,7 +614,7 @@ def parseDefsFile(df):
             if ret not in ['Y', 'N']:
                 raise Exception("Unknown return type:"+ret)
 
-            emap[fname] = (int(args), realconv, ret)
+            emap[fname] = (int(args), realconv, ret, sign)
 
     
     df.close()
@@ -620,7 +623,7 @@ def parseDefsFile(df):
 
 def processExternalFunction(M, fn):
 
-    args, conv, ret = getFromEMAP(fn)
+    args, conv, ret, sign = getFromEMAP(fn)
 
     extfn = M.external_funcs.add()
     extfn.symbol_name = fn
@@ -699,7 +702,7 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
 
     if idc.isCode(pf):
         DS.symbol_name = "sub_"+hex(reloc_dest)
-        DS.symbol_size = int(8)
+        DS.symbol_size = int(idc.ItemSize(offset))
         DEBUG("Code Ref: {0:x}!\n".format(reloc_dest))
 
         if reloc_dest not in RECOVERED_EAS:
@@ -708,13 +711,16 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
     elif idc.isData(pf):
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
-	DS.symbol_size = int(8)
-        DEBUG("Data Ref!\n")
+	# check if using item size is correct!!!
+        #DS.symbol_size = int(idc.ItemSize(offset))
+        DS.symbol_size = int(8)
+        DEBUG("Data Ref, {0}!\n".format(idc.ItemSize(offset)))
     else:
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
-	DS.symbol_size = int(8)
-        DEBUG("UNKNOWN Ref, assuming data\n")
+        DS.symbol_size = int(idc.ItemSize(offset))
+        #DS.symbol_size = int(8)
+        DEBUG("UNKNOWN Ref,  {0} assuming data\n".format(idc.ItemSize(offset)))
 
 def isStartOfFunction(ea):
     fname = idc.GetFunctionName(ea)
@@ -1223,7 +1229,7 @@ def parseTypeString(typestr, ea):
 def getExportType(name, ep):
     try:
         DEBUG("Processing export name: {} at: {:x}\n".format(name, ep))
-        args, conv, ret = getFromEMAP(name)
+        args, conv, ret, sign = getFromEMAP(name)
     except KeyError as ke:
         tp = idc.GetType(ep);
         if tp is None or "__" not in tp: 
@@ -1268,7 +1274,7 @@ def generateDefFile(defname, eps):
 def makeArgStr(name, declaration):
 
     argstr = "void"
-    args, conv, ret = getFromEMAP(name)
+    args, conv, ret, sign = getFromEMAP(name)
 
     # return blank string for void calls
     if not declaration and args == 0:
