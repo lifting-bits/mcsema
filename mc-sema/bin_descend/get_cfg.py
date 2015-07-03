@@ -100,14 +100,6 @@ def DEBUG(s):
     if _DEBUG:
         sys.stdout.write(s)
 
-def getPointerSize():
-    if (idaapi.ph.flag & idaapi.PR_USE64) != 0:
-        # support 64-bit addressing
-        return 8
-    else:
-        # no support for 64-bit, assume 32-bit
-        return 4
-
 def readDword(ea):
     bytestr = readBytesSlowly(ea, ea+4);
     dword = struct.unpack("<L", bytestr)[0]
@@ -145,7 +137,7 @@ def getFromEMAP(fname):
 
 def doesNotReturn(fname):
     try:
-        args, conv, ret = getFromEMAP(fname)
+        args, conv, ret, sign = getFromEMAP(fname)
         if ret == "Y":
             return True
     except KeyError, ke:
@@ -189,7 +181,7 @@ def entryPointHandler(M, ep, name, args_from_stddef=False):
     # calling ocnvention, and return type from std_defs?
     if args_from_stddef:
         try:
-            (argc, conv, ret) = getFromEMAP(name)
+            (argc, conv, ret, sign) = getFromEMAP(name)
             have_edata = True
         except KeyError as ke:
             pass
@@ -604,8 +596,11 @@ def parseDefsFile(df):
             (marker, symname, dsize) = l.split()
             emap_data[symname] = int(dsize)
         else:
-
-            (fname, args, conv, ret) = l.split()
+            fname = args = conv = ret = sign = None
+            if len(l.split()) == 4:
+                (fname, args, conv, ret) = l.split()
+            elif len(l.split()) == 5:
+                (fname, args, conv, ret, sign) = l.split()
 
             if conv == "C":
                 realconv = CFG_pb2.ExternalFunction.CallerCleanup
@@ -619,7 +614,7 @@ def parseDefsFile(df):
             if ret not in ['Y', 'N']:
                 raise Exception("Unknown return type:"+ret)
 
-            emap[fname] = (int(args), realconv, ret)
+            emap[fname] = (int(args), realconv, ret, sign)
 
     
     df.close()
@@ -628,7 +623,7 @@ def parseDefsFile(df):
 
 def processExternalFunction(M, fn):
 
-    args, conv, ret = getFromEMAP(fn)
+    args, conv, ret, sign = getFromEMAP(fn)
 
     extfn = M.external_funcs.add()
     extfn.symbol_name = fn
@@ -1231,7 +1226,7 @@ def parseTypeString(typestr, ea):
 def getExportType(name, ep):
     try:
         DEBUG("Processing export name: {} at: {:x}\n".format(name, ep))
-        args, conv, ret = getFromEMAP(name)
+        args, conv, ret, sign = getFromEMAP(name)
     except KeyError as ke:
         tp = idc.GetType(ep);
         if tp is None or "__" not in tp: 
@@ -1276,7 +1271,7 @@ def generateDefFile(defname, eps):
 def makeArgStr(name, declaration):
 
     argstr = "void"
-    args, conv, ret = getFromEMAP(name)
+    args, conv, ret, sign = getFromEMAP(name)
 
     # return blank string for void calls
     if not declaration and args == 0:

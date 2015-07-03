@@ -7,7 +7,7 @@ cl /nologo /c demo_test6.c
 
 if exist "%IDA_PATH%\idaq.exe" (
     echo Using IDA to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend_wrapper.py -d -func-map="%STD_DEFS%" -entry-symbol=_doWork -i=demo_test6.obj
+    %BIN_DESCEND_PATH%\bin_descend_wrapper.py -d -func-map="%STD_DEFS%" -entry-symbol=doWork -i=demo_test6.obj
 ) else (
     echo Using bin_descend to recover CFG
     %BIN_DESCEND_PATH%\bin_descend.exe -march=x86-64 -d -func-map="%STD_DEFS%"  -entry-symbol=doWork -i=demo_test6.obj
