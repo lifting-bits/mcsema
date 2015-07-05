@@ -15,6 +15,6 @@ if exist "%IDA_PATH%\idaq.exe" (
 
 %LLVM_PATH%\opt.exe -O3 -o sailboat_opt.bc sailboat.bc
 %LLVM_PATH%\llc.exe -filetype=obj -o sailboat_mine.obj sailboat_opt.bc
-cl /Zi /nologo sailboat_run.c sailboat_mine.obj
+"%VCINSTALLDIR%\bin\cl.exe" /Zi /nologo sailboat_run.c sailboat_mine.obj
 sailboat_run.exe "key{d9dd1cb9dc13ebc3dc3780d76123ee34}"
 

@@ -599,12 +599,12 @@ class NativeModule {
         this->target = T;
     }
 
-	void setTargetTriple(llvm::Triple *t){
-		this->triple = t;
-	}
+    void setTargetTriple(const std::string &triple) {
+        this->triple = llvm::Triple(triple);
+    }
 
-    bool is64Bit(void){
-        if(std::string(target->getName()) == "x86-64"){
+    bool is64Bit(void) {
+        if(std::string(target->getName()) == "x86-64") {
             return true;
         }
         return false;
@@ -618,7 +618,7 @@ class NativeModule {
     std::string                     nameStr;
     llvm::MCInstPrinter             *MyPrinter;
     const llvm::Target              *target;
-	llvm::Triple					*triple;
+    llvm::Triple                    triple;
 
     std::list<DataSection>          dataSecs;
     std::list<ExternalCodeRefPtr>   extCalls;

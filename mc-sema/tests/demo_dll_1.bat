@@ -26,7 +26,7 @@ REM Optimize LLVM
 %LLVM_PATH%\llc.exe -filetype=obj -o demo_dll_1_lifted.obj demo_dll_1_opt.bc
 
 REM Compiling driver
-cl /nologo /Zi demo_driver_dll_1.c demo_dll_1_lifted.obj user32.lib
+"%VCINSTALLDIR%\bin\cl.exe" /nologo /Zi demo_driver_dll_1.c demo_dll_1_lifted.obj user32.lib
 
 REM Running application
 demo_driver_dll_1.exe

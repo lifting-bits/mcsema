@@ -1305,17 +1305,7 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
 
             TASSERT(F != NULL, "Could not insert function into module");
 
-            // default to stdcall
-            if(natMod->is64Bit()){
-#ifdef _WIN64
-                F->setCallingConv(CallingConv::X86_64_Win64);
-#else
-                F->setCallingConv(CallingConv::X86_64_SysV);
-#endif
-            } else {
-                F->setCallingConv(CallingConv::X86_StdCall);
-            }
-
+            archSetCallingConv(M, F);
             // make local functions 'static'
             F->setLinkage(GlobalValue::InternalLinkage);
             cout << "Inserted function: " << fname << std::endl;
@@ -1377,19 +1367,23 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
 
             //create arguments
             for( int i = 0; i < argCount; i++ ) {
-#ifdef _WIN64
-				if(funcSign.c_str()[i] == 'f'){
-					arguments.push_back(Type::getDoubleTy(M->getContext()));
-				} else {
-					arguments.push_back(Type::getIntNTy(M->getContext(), 64));
-				}
-#else
-                if(natMod->is64Bit()){
-                    arguments.push_back(Type::getInt64Ty(M->getContext()));
+                if(getSystemArch(M) == _X86_64_ ) {
+                    if(getSystemOS(M) == llvm::Triple::Win32 ) {
+
+                        if(funcSign.c_str()[i] == 'f'){
+                            arguments.push_back(Type::getDoubleTy(M->getContext()));
+                        } else {
+                            arguments.push_back(Type::getIntNTy(M->getContext(), 64));
+                        }
+                    } else if (getSystemOS(M) == llvm::Triple::Linux ) {
+                        arguments.push_back(Type::getInt64Ty(M->getContext()));
+
+                    } else {
+                        TASSERT(false, "Unknown OS Type!");
+                    }
                 } else {
                     arguments.push_back(Type::getInt32Ty(M->getContext()));
                 }
-#endif
             }
 
             //create function type
@@ -1424,12 +1418,8 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
             }
 
             //set calling convention
-            if(natMod->is64Bit()){
-#ifdef _WIN64
-                f->setCallingConv(CallingConv::X86_64_Win64);
-#else
-                f->setCallingConv(CallingConv::X86_64_SysV);
-#endif
+            if(natMod->is64Bit()) {
+                archSetCallingConv(M, f);
             } else {
                 f->setCallingConv(getLLVMCC(conv));
             }

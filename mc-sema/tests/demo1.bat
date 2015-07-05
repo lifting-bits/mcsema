@@ -14,9 +14,9 @@ if exist "%IDA_PATH%\idaq.exe" (
     %BIN_DESCEND_PATH%\bin_descend.exe -march=x86 -d -entry-symbol=start -i=demo_test1.obj
 )
 
-%CFG_TO_BC_PATH%\cfg_to_bc.exe -march=x86 -i demo_test1.cfg -driver=demo1_entry,start,raw,return,C -o demo_test1.bc
+%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=i386-pc-win32 -i demo_test1.cfg -driver=demo1_entry,start,raw,return,C -o demo_test1.bc
 
 %LLVM_PATH%\opt.exe -O3 -o demo_test1_opt.bc demo_test1.bc
 %LLVM_PATH%\llc.exe -filetype=obj -o demo_test1_mine.obj demo_test1_opt.bc
-cl /Zi /nologo demo_driver1.c demo_test1_mine.obj
+"%VCINSTALLDIR%\bin\cl.exe" /Zi /nologo demo_driver1.c demo_test1_mine.obj
 demo_driver1.exe

@@ -446,6 +446,11 @@ ExternalDataRefPtr deserializeExtData(const ::ExternalData &ed)
 }
 
 static DataSectionEntry deserializeDataSymbol(const ::DataSymbol &ds) {
+    cout << "Deserializing symbol at: " 
+         << to_string<VA>(ds.base_address(), hex) << ", "
+         << ds.symbol_name() << ", "
+         << to_string<VA>(ds.symbol_size(), hex) << endl;
+
     return DataSectionEntry(ds.base_address(), ds.symbol_name(), ds.symbol_size());
 }
 
@@ -483,6 +488,8 @@ void deserializeData(const ::Data &d, DataSection &ds)
         dse_sym.getSymbol(sym_name);
         uint64_t dse_base = dse_sym.getBase();
         // symbol next to blob
+        cout << "cur_pos: " << to_string<VA>(cur_pos, hex) << endl;
+        cout << "dse_base: " << to_string<VA>(dse_base, hex) << endl;
         if(dse_base > cur_pos) {
             ds.addEntry(makeDSEBlob(
                         bytes,
@@ -492,15 +499,16 @@ void deserializeData(const ::Data &d, DataSection &ds)
                     );
             ds.addEntry(dse_sym);
 
-            // assume symbols are 4 bytes
             cur_pos = dse_base+dse_sym.getSize();
+            cout << "new_cur_pos: " << to_string<VA>(cur_pos, hex) << endl;
 
         }
         // symbols next to each other
         else if (dse_base == cur_pos) {
             ds.addEntry(dse_sym);
-            // assume symbols are 4 bytes
+
             cur_pos = dse_base+dse_sym.getSize();
+            cout << "new_cur_pos2: " << to_string<VA>(cur_pos, hex) << endl;
             string sym_name;
             dse_sym.getSymbol(sym_name);
         } else {
@@ -546,6 +554,7 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     //iterate over every function
     for(int i = 0; i < serializedMod.internal_funcs_size(); i++) {
       const ::Function  &f = serializedMod.internal_funcs(i);
+      cout << "Deserializing functions..." << endl;
       foundFuncs.push_back(deserializeFunction(f, decode));
     }
 
@@ -553,6 +562,7 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     for(int i = 0; i < serializedMod.internal_data_size(); i++) {
       const ::Data  &d = serializedMod.internal_data(i);
       DataSection ds;
+      cout << "Deserializing data..." << endl;
       deserializeData(d, ds);
       dataSecs.push_back(ds);
     }
@@ -560,22 +570,28 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     //iterate over every external function definition
     for(int i = 0; i < serializedMod.external_funcs_size(); i++) {
       const ::ExternalFunction  &f = serializedMod.external_funcs(i);
+      cout << "Deserializing externs..." << endl;
       externFuncs.push_back(deserializeExt(f));
     }
 
     //iterate over every external data definition
     for(int i = 0; i < serializedMod.external_data_size(); i++) {
       const ::ExternalData  &ed = serializedMod.external_data(i);
+      cout << "Deserializing external data..." << endl;
       externData.push_back(deserializeExtData(ed));
     }
 
     //create the module
+    cout << "Creating module..." << endl;
     m = NativeModulePtr(
           new NativeModule(serializedMod.module_name(), foundFuncs, NULL));
 
+    cout << "Setting target..." << endl;
     m->setTarget(T);
+    cout << "Done setting target" << endl;
 
     //populate the module with externals calls
+    cout << "Adding external funcs..." << endl;
     for(list<ExternalCodeRefPtr>::iterator it = externFuncs.begin();
         it != externFuncs.end();
         ++it)
@@ -584,6 +600,7 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     }
 
     //populate the module with externals data
+    cout << "Adding external data..." << endl;
     for(list<ExternalDataRefPtr>::iterator it = externData.begin();
         it != externData.end();
         ++it)
@@ -592,6 +609,7 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     }
 
     //populate the module with internal data
+    cout << "Adding internal data..." << endl;
     for(list<DataSection>::iterator it = dataSecs.begin();
         it != dataSecs.end();
         ++it)
@@ -600,6 +618,7 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     }
 
     // set entry points for the module
+    cout << "Adding entry points..." << endl;
     for(int i = 0; i < serializedMod.entries_size(); i++) {
         const ::EntrySymbol &es = serializedMod.entries(i);
 
@@ -616,6 +635,7 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     cout << "Failed to deserialize protobuf module" << endl;
   }
 
+  cout << "Returning modue..." << endl;
   return m;
 }
 

@@ -254,17 +254,22 @@ Value* win32GetTib(BasicBlock *b) {
 			/*isVarArg=*/false);
 
 	// READ The TIB
-#ifdef _WIN64
-	InlineAsm* ptr_249 = InlineAsm::get(FuncTy_52,
-			"movq %gs:0x30, $0", "={rax},~{rax}",
-			true,
-			false, InlineAsm::AD_ATT);
-#else
-	InlineAsm* ptr_249 = InlineAsm::get(FuncTy_52,
-			"movl %fs:0x18, $0", "={eax},~{eax}",
-			true,
-			false, InlineAsm::AD_ATT);
-#endif
+        InlineAsm* ptr_249 = nullptr;
+        if( getSystemArch(mod) == _X86_64_) {
+            ptr_249 = InlineAsm::get(FuncTy_52,
+                    "movq %gs:0x30, $0", "={rax},~{rax}",
+                    true,
+                    false, InlineAsm::AD_ATT);
+        } else if (getSystemArch(mod) == _X86_) {
+            ptr_249 = InlineAsm::get(FuncTy_52,
+                    "movl %fs:0x18, $0", "={eax},~{eax}",
+                    true,
+                    false, InlineAsm::AD_ATT);
+        } else {
+           std::cerr << "Unknown architecture in triple" << std::endl; 
+           TASSERT(false, "Unknown architecture in triple");
+        }
+
 	std::vector<Value*> f52_params;
 	CallInst* teb_ptr = CallInst::Create(ptr_249, f52_params, "", b);
 	CastInst* teb_to_tib = new BitCastInst(teb_ptr, getTibPtrTy(mod), "", b);
@@ -876,17 +881,17 @@ Module* addWin32CallbacksToModule(Module *mod) {
 
 
 	Function* func_malloc = mod->getFunction("malloc");
-	if (!func_malloc) {
-		func_malloc = Function::Create(
-				/*Type=*/FuncTy_56,
-				/*Linkage=*/GlobalValue::ExternalLinkage,
-				/*Name=*/"malloc", mod); // (external, no body)
-#ifdef _WIN64
-		func_malloc->setCallingConv(CallingConv::X86_64_Win64);
-#else
-		func_malloc->setCallingConv(CallingConv::C);
-#endif
-	}
+        if (!func_malloc) {
+            func_malloc = Function::Create(
+                    /*Type=*/FuncTy_56,
+                    /*Linkage=*/GlobalValue::ExternalLinkage,
+                    /*Name=*/"malloc", mod); // (external, no body)
+            if( getSystemArch(mod) == _X86_64_) {
+                func_malloc->setCallingConv(CallingConv::X86_64_Win64);
+            } else {
+                func_malloc->setCallingConv(CallingConv::C);
+            }
+        }
 
 	// Global Variable Declarations
 
@@ -1485,11 +1490,14 @@ Module* addWin32CallbacksToModule(Module *mod) {
 		ptr_296->setAlignment(4);
 		AllocaInst* ptr_297 = new AllocaInst(Int8PtrTy, "", label_295);
 		ptr_297->setAlignment(4);
-#ifdef _WIN64
-		AllocaInst* ptr_EAX = new AllocaInst(IntegerType::get(mod->getContext(), 64), "RAX", label_295);
-#else
-		AllocaInst* ptr_EAX = new AllocaInst(IntegerType::get(mod->getContext(), 32), "EAX", label_295);
-#endif
+
+                AllocaInst* ptr_EAX  = nullptr;
+                if( getSystemArch(mod) == _X86_64_) {
+                    ptr_EAX = new AllocaInst(IntegerType::get(mod->getContext(), 64), "RAX", label_295);
+                } else {
+                    ptr_EAX = new AllocaInst(IntegerType::get(mod->getContext(), 32), "EAX", label_295);
+                }
+
 		ptr_EAX->setAlignment(4);
 		StoreInst* void_298 = new StoreInst(ptr_rs_294, ptr_296, false, label_295);
 		void_298->setAlignment(4);

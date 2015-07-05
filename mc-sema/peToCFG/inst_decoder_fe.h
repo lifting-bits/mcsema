@@ -122,24 +122,18 @@ public:
 
 
     TT->setVendor(llvm::Triple::UnknownVendor);
-#ifdef _WIN64
-    TT->setOS(llvm::Triple::Win32);
-#else
     TT->setOS(llvm::Triple::UnknownOS);
-#endif
-    if(!T.compare("x86-64")){
+
+    if(0 == T.compare("x86-64")) {
         TT->setArch(llvm::Triple::x86_64);
-        std::cout << " TT " <<target->getName() << " : " << TT->str() << " \n";
-        this->STI = target->createMCSubtargetInfo(TT->getTriple(), "", "");
-        MRI = target->createMCRegInfo(TT->getTriple());
-        this->AsmInfo = target->createMCAsmInfo(*MRI, TT->getTriple());
     } else {
         TT->setArch(llvm::Triple::x86);
-        std::cout << " TT1 " <<target->getName() <<" : " << TT->str() << " \n";
-        this->STI = target->createMCSubtargetInfo( TT->getTriple(), "", "");
-        MRI = target->createMCRegInfo(TT->getTriple());
-        this->AsmInfo = target->createMCAsmInfo(*MRI, TT->getTriple());
     }
+
+    std::cout << " TT " <<target->getName() <<" : " << TT->str() << " \n";
+    this->STI = target->createMCSubtargetInfo( TT->getTriple(), "", "");
+    MRI = target->createMCRegInfo(TT->getTriple());
+    this->AsmInfo = target->createMCAsmInfo(*MRI, TT->getTriple());
 
     std::cout.flush();
     LASSERT( this->STI, "this->STI" );

@@ -699,10 +699,11 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
 
     DS = D.symbols.add()
     DS.base_address = offset+seg_offset
+    DEBUG("Reloc Base Address: {0:x}\n".format(DS.base_address))
 
     if idc.isCode(pf):
         DS.symbol_name = "sub_"+hex(reloc_dest)
-        DS.symbol_size = getPointerSize()
+        DS.symbol_size = int(idc.ItemSize(offset))
         DEBUG("Code Ref: {0:x}!\n".format(reloc_dest))
 
         if reloc_dest not in RECOVERED_EAS:
@@ -711,12 +712,12 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
     elif idc.isData(pf):
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
-	DS.symbol_size = getPointerSize()
+	DS.symbol_size = int(idc.ItemSize(offset))
         DEBUG("Data Ref!\n")
     else:
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
-	DS.symbol_size = getPointerSize()
+	DS.symbol_size = int(idc.ItemSize(offset))
         DEBUG("UNKNOWN Ref, assuming data\n")
 
 def isStartOfFunction(ea):

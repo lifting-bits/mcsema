@@ -38,6 +38,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <llvm/IR/Constants.h>
 #include "RegisterUsage.h"
 #include "llvm/IR/Module.h"
+#include "llvm/ADT/Triple.h"
+#include "ArchOps.h"
 
 enum InstTransResult {
     ContinueBlock,
@@ -58,18 +60,6 @@ enum StoreSpillType {
 //type that maps registers to their Value defn in a flow
 typedef std::vector<llvm::Value*>   regDefT;
 
-typedef enum _SystemArchType {
-    _X86_,
-    _X86_64_
-} SystemArchType;
-
-enum PointerSize {
-	PointerAnySize =0,
-	Pointer32 = 32,
-	Pointer64 = 64
-};
-
-#define BYTE_SIZE 	8
 
 //setup code in the first block of the function that defines all of the
 //registers via alloca and then copies into them from the structure argument
@@ -483,28 +473,13 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
 }
 }
 
-static unsigned getPointerSize(llvm::Module *M){
-	const llvm::DataLayout *DL = M->getDataLayout();
-	return DL->getPointerSize(0)*BYTE_SIZE;
-}
-
-static unsigned getSystemArch(llvm::Module *M){
-	if(getPointerSize(M) == Pointer32){
-		return _X86_;
-	} else if(getPointerSize(M) == Pointer64){
-		return _X86_64_;
-	} else {
-		throw TErr(__LINE__, __FILE__, "Unsupported pointer size");
-	}
-}
-
 
 llvm::Value *MCRegToValue(llvm::BasicBlock *b, unsigned reg);
 
 template <int width>
 void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
-	llvm::Module *M = b->getParent()->getParent();
-	if(getPointerSize(M) == Pointer32) {
+    llvm::Module *M = b->getParent()->getParent();
+    if(getPointerSize(M) == Pointer32) {
         x86::R_WRITE<width>(b, reg, write);
     } else {
         x86_64::R_WRITE<width>(b, reg, write);
@@ -513,12 +488,12 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
 
 template <int width>
 llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
-	llvm::Module *M = b->getParent()->getParent();
-	if(getPointerSize(M) == Pointer32) {
+    llvm::Module *M = b->getParent()->getParent();
+    if(getPointerSize(M) == Pointer32) {
         return x86::R_READ<width>(b, reg);
     } else {
         return x86_64::R_READ<width>(b, reg);
-	}
+    }
 }
 
 template <int width>

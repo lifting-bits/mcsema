@@ -26,6 +26,7 @@
 #include <vector>
 #include <llvm/IR/InlineAsm.h>
 #include <llvm/IR/MDBuilder.h>
+#include "ArchOps.h"
 
 using namespace llvm;
 using namespace std;
@@ -76,11 +77,7 @@ bool addEntryPointDriverRaw(Module *M, string name, VA entry) {
         }
 
         CallInst* ci = CallInst::Create(F, subArg, "", driverBB);
-#ifdef _WIN64
-		ci->setCallingConv(CallingConv::X86_64_Win64);
-#else
-        ci->setCallingConv(CallingConv::X86_64_SysV);
-#endif
+        archSetCallingConv(M, ci);
         ReturnInst::Create(driverF->getContext(), driverBB);
         return true;
     }
@@ -129,11 +126,7 @@ bool addEntryPointDriver(Module *M,
     //insert the function prototype
     Function  *driverF = (Function *) M->getOrInsertFunction(name, FT);
     // set drivers calling convention to match user specification
- #ifdef _WIN64
-     driverF->setCallingConv(CallingConv::X86_64_Win64);
- #else
-    driverF->setCallingConv(CallingConv::X86_64_SysV);
-#endif
+    archSetCallingConv(M, driverF);
 
     TASSERT(driverF != NULL, "");
 
@@ -156,237 +149,233 @@ bool addEntryPointDriver(Module *M,
     AttrBuilder B;
     B.addAttribute(Attribute::InReg);
 
-#ifdef _WIN64
-	if(fwd_it != fwd_end) {
-		Type *T = fwd_it->getType();
-        Value *arg1;
-		if(T->isDoubleTy()){
-			int   k = x86_64::getRegisterOffset(XMM0);
-			Value *argFieldGEPV[] = {
-            	    CONST_V<64>(driverBB, 0),
-               		CONST_V<32>(driverBB, k)
-            };
-        	// make driver take this from register
-        	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
+    if(getSystemOS(M) == llvm::Triple::Win32) {
+        if(fwd_it != fwd_end) {
+            Type *T = fwd_it->getType();
+            Value *arg1;
+            if(T->isDoubleTy()){
+                int   k = x86_64::getRegisterOffset(XMM0);
+                Value *argFieldGEPV[] = {
+                    CONST_V<64>(driverBB, 0),
+                    CONST_V<32>(driverBB, k)
+                };
+                // make driver take this from register
+                fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
 
-        	Instruction *ptr128 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
+                Instruction *ptr128 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
 
-			arg1 = CastInst::CreatePointerCast(ptr128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "arg0", driverBB);
-#if 0
-			Value *readVal = new llvm::TruncInst(ptr,
-								llvm::Type::getInt64Ty(M->getContext()),
-								"",
-								driverBB);
+                arg1 = CastInst::CreatePointerCast(ptr128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "arg0", driverBB);
+            } else {
+                int   k = x86_64::getRegisterOffset(RCX);
+                Value *argFieldGEPV[] = {
+                    CONST_V<64>(driverBB, 0),
+                    CONST_V<32>(driverBB, k)
+                };
+                // make driver take this from register
+                fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
 
-			arg1 = CastInst::Create(Instruction::SIToFP, readVal, Type::getDoubleTy(M->getContext()), "arg0", driverBB); 
-	#endif		
-		 } else {
-			int   k = x86_64::getRegisterOffset(RCX);
-			Value *argFieldGEPV[] = {
-            	    CONST_V<64>(driverBB, 0),
-               		CONST_V<32>(driverBB, k)
-            };
-        	// make driver take this from register
-        	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
+                arg1 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
+            }
 
-        	arg1 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
-		 }
-		 
-		Argument  *curArg = &(*fwd_it);
-		aliasMCSemaScope(new StoreInst(curArg, arg1, driverBB));
-	}
+            Argument  *curArg = &(*fwd_it);
+            aliasMCSemaScope(new StoreInst(curArg, arg1, driverBB));
+        }
 
-	++fwd_it;
-	if(fwd_it != fwd_end) {
-		Type *T = fwd_it->getType();
-        Value *arg2;
-		if(T->isDoubleTy()){
-			int   k = x86_64::getRegisterOffset(XMM1);
-			Value *argFieldGEPV[] = {
-            	    CONST_V<64>(driverBB, 0),
-               		CONST_V<32>(driverBB, k)
-            };
-        	// make driver take this from register
-        	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
+        ++fwd_it;
+        if(fwd_it != fwd_end) {
+            Type *T = fwd_it->getType();
+            Value *arg2;
+            if(T->isDoubleTy()){
+                int   k = x86_64::getRegisterOffset(XMM1);
+                Value *argFieldGEPV[] = {
+                    CONST_V<64>(driverBB, 0),
+                    CONST_V<32>(driverBB, k)
+                };
+                // make driver take this from register
+                fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
 
-        	Instruction *ptr128 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
+                Instruction *ptr128 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
 
-			arg2 = CastInst::CreatePointerCast(ptr128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "arg1", driverBB);
-		 } else {
-			int   k = x86_64::getRegisterOffset(RDX);
-			Value *argFieldGEPV[] = {
-					CONST_V<64>(driverBB, 0),
-					CONST_V<32>(driverBB, k)
-			};
-			// make driver take this from register
-			fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 2, B));
+                arg2 = CastInst::CreatePointerCast(ptr128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "arg1", driverBB);
+            } else {
+                int   k = x86_64::getRegisterOffset(RDX);
+                Value *argFieldGEPV[] = {
+                    CONST_V<64>(driverBB, 0),
+                    CONST_V<32>(driverBB, k)
+                };
+                // make driver take this from register
+                fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 2, B));
 
-			arg2 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
-		 }
-		Argument  *curArg = &(*fwd_it);
-		aliasMCSemaScope(new StoreInst(curArg, arg2, driverBB));
-	}
+                arg2 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
+            }
+            Argument  *curArg = &(*fwd_it);
+            aliasMCSemaScope(new StoreInst(curArg, arg2, driverBB));
+        }
 
-	++fwd_it;
-	if(fwd_it != fwd_end) {
-		Type *T = fwd_it->getType();
-        Value *arg3;
-		if(T->isDoubleTy()){
-			int   k = x86_64::getRegisterOffset(XMM2);
-			Value *argFieldGEPV[] = {
-            	    CONST_V<64>(driverBB, 0),
-               		CONST_V<32>(driverBB, k)
-            };
-        	// make driver take this from register
-        	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 3, B));
+        ++fwd_it;
+        if(fwd_it != fwd_end) {
+            Type *T = fwd_it->getType();
+            Value *arg3;
+            if(T->isDoubleTy()){
+                int   k = x86_64::getRegisterOffset(XMM2);
+                Value *argFieldGEPV[] = {
+                    CONST_V<64>(driverBB, 0),
+                    CONST_V<32>(driverBB, k)
+                };
+                // make driver take this from register
+                fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 3, B));
 
-        	Instruction *ptr128 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
+                Instruction *ptr128 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
 
-			arg3 = CastInst::CreatePointerCast(ptr128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "arg3", driverBB);
-		 } else {
-			int   k = x86_64::getRegisterOffset(R8);
-			Value *r8FieldGEPV[] = {
-					CONST_V<64>(driverBB, 0),
-                	CONST_V<32>(driverBB, k)
-			};
+                arg3 = CastInst::CreatePointerCast(ptr128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "arg3", driverBB);
+            } else {
+                int   k = x86_64::getRegisterOffset(R8);
+                Value *r8FieldGEPV[] = {
+                    CONST_V<64>(driverBB, 0),
+                    CONST_V<32>(driverBB, k)
+                };
 
-			fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 3, B));
+                fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 3, B));
 
-			arg3 = GetElementPtrInst::CreateInBounds(aCtx, r8FieldGEPV, "", driverBB);
-		 	}
-        Argument  *curArg = &(*fwd_it);
-		new StoreInst(curArg, arg3, driverBB);
-	}
+                arg3 = GetElementPtrInst::CreateInBounds(aCtx, r8FieldGEPV, "", driverBB);
+            }
+            Argument  *curArg = &(*fwd_it);
+            new StoreInst(curArg, arg3, driverBB);
+        }
 
-	++fwd_it;
-	if(fwd_it != fwd_end) {
-		Type *T = fwd_it->getType();
-        Value *arg4;
-		if(T->isDoubleTy()){
-			int   k = x86_64::getRegisterOffset(XMM3);
-			Value *argFieldGEPV[] = {
-            	    CONST_V<64>(driverBB, 0),
-               		CONST_V<32>(driverBB, k)
-            };
-        	// make driver take this from register
-        	fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
+        ++fwd_it;
+        if(fwd_it != fwd_end) {
+            Type *T = fwd_it->getType();
+            Value *arg4;
+            if(T->isDoubleTy()){
+                int   k = x86_64::getRegisterOffset(XMM3);
+                Value *argFieldGEPV[] = {
+                    CONST_V<64>(driverBB, 0),
+                    CONST_V<32>(driverBB, k)
+                };
+                // make driver take this from register
+                fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
 
-        	Instruction *ptr128 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
-			arg4 = CastInst::CreatePointerCast(ptr128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "arg3", driverBB);
-		 } else {
-			int   k = x86_64::getRegisterOffset(R9);
-			Value *r9FieldGEPV[] = {
-					CONST_V<64>(driverBB, 0),
-					CONST_V<32>(driverBB, k)
-			};
+                Instruction *ptr128 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
+                arg4 = CastInst::CreatePointerCast(ptr128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "arg3", driverBB);
+            } else {
+                int   k = x86_64::getRegisterOffset(R9);
+                Value *r9FieldGEPV[] = {
+                    CONST_V<64>(driverBB, 0),
+                    CONST_V<32>(driverBB, k)
+                };
 
-			fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 4, B));
+                fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 4, B));
 
-			arg4 = GetElementPtrInst::CreateInBounds(aCtx, r9FieldGEPV, "", driverBB);
-		 	}
-		Argument  *curArg = &(*fwd_it);
-		aliasMCSemaScope(new StoreInst(curArg, arg4, driverBB));
-	}
-#else
-	if(fwd_it != fwd_end) {
-		int   k = x86_64::getRegisterOffset(RDI);
-		Value *rdiFieldGEPV[] = {
+                arg4 = GetElementPtrInst::CreateInBounds(aCtx, r9FieldGEPV, "", driverBB);
+            }
+            Argument  *curArg = &(*fwd_it);
+            aliasMCSemaScope(new StoreInst(curArg, arg4, driverBB));
+        }
+    } else if (getSystemOS(M) == llvm::Triple::Linux) {
+        //#else
+        if(fwd_it != fwd_end) {
+            int   k = x86_64::getRegisterOffset(RDI);
+            Value *rdiFieldGEPV[] = {
                 CONST_V<64>(driverBB, 0),
                 CONST_V<32>(driverBB, k)
             };
 
-        // make driver take this from register
-        fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
+            // make driver take this from register
+            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
 
-        Value *rdiP = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
-		Argument  *curArg = &(*fwd_it);
-		aliasMCSemaScope(new StoreInst(curArg, rdiP, driverBB));
-	}
+            Value *rdiP = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
+            Argument  *curArg = &(*fwd_it);
+            aliasMCSemaScope(new StoreInst(curArg, rdiP, driverBB));
+        }
 
-	// set rsi to arg[1]
-	++fwd_it;
-	if(fwd_it != fwd_end) {
-		int   k = x86_64::getRegisterOffset(RSI);
-		Value *rsiFieldGEPV[] = {
-				CONST_V<64>(driverBB, 0),
-				CONST_V<32>(driverBB, k)
-		};
-
-		// make driver take this from register
-		fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 2, B));
-
-		Value *rsiP = GetElementPtrInst::CreateInBounds(aCtx, rsiFieldGEPV, "", driverBB);
-		Argument  *curArg = &(*fwd_it);
-		aliasMCSemaScope(new StoreInst(curArg, rsiP, driverBB));
-	}
-
-	// set rdx to arg[2]
-	++fwd_it;
-	if(fwd_it != fwd_end) {
-		int   k = x86_64::getRegisterOffset(RDX);
-		Value *rdxFieldGEPV[] = {
-				CONST_V<64>(driverBB, 0),
-				CONST_V<32>(driverBB, k)
-		};
-
-		fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 3, B));
-
-        Value *rdxP = GetElementPtrInst::CreateInBounds(aCtx, rdxFieldGEPV, "", driverBB);
-
-		Argument  *curArg = &(*fwd_it);
-		aliasMCSemaScope(new StoreInst(curArg, rdxP, driverBB));
-	}
-
-	//set rcx to arg[3]
-	++fwd_it;
-	if(fwd_it != fwd_end) {
-        int   k = x86_64::getRegisterOffset(RCX);
-		Value *rcxFieldGEPV[] = {
+        // set rsi to arg[1]
+        ++fwd_it;
+        if(fwd_it != fwd_end) {
+            int   k = x86_64::getRegisterOffset(RSI);
+            Value *rsiFieldGEPV[] = {
                 CONST_V<64>(driverBB, 0),
-				CONST_V<32>(driverBB, k)
-		};
-
-        fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 4, B));
-        Value *rcxP = GetElementPtrInst::CreateInBounds(aCtx, rcxFieldGEPV, "", driverBB);
-        Argument  *curArg = &(*fwd_it);
-		aliasMCSemaScope(new StoreInst(curArg, rcxP, driverBB));
-	}
-
-	//set r8 to arg[4]
-	++fwd_it;
-	if(fwd_it != fwd_end) {
-		int   k = x86_64::getRegisterOffset(R8);
-		Value *r8FieldGEPV[] = {
-				CONST_V<64>(driverBB, 0),
                 CONST_V<32>(driverBB, k)
-		};
+            };
 
-		fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 5, B));
+            // make driver take this from register
+            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 2, B));
 
-		Value *r8P = GetElementPtrInst::CreateInBounds(aCtx, r8FieldGEPV, "", driverBB);
-        Argument  *curArg = &(*fwd_it);
-		new StoreInst(curArg, r8P, driverBB);
-	}
+            Value *rsiP = GetElementPtrInst::CreateInBounds(aCtx, rsiFieldGEPV, "", driverBB);
+            Argument  *curArg = &(*fwd_it);
+            aliasMCSemaScope(new StoreInst(curArg, rsiP, driverBB));
+        }
 
-	//set r9 to arg[5]
-	++fwd_it;
-	if(fwd_it != fwd_end) {
-		int   k = x86_64::getRegisterOffset(R9);
-		Value *r9FieldGEPV[] = {
-				CONST_V<64>(driverBB, 0),
-				CONST_V<32>(driverBB, k)
-		};
+        // set rdx to arg[2]
+        ++fwd_it;
+        if(fwd_it != fwd_end) {
+            int   k = x86_64::getRegisterOffset(RDX);
+            Value *rdxFieldGEPV[] = {
+                CONST_V<64>(driverBB, 0),
+                CONST_V<32>(driverBB, k)
+            };
 
-		fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 6, B));
+            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 3, B));
 
-		Value *r9P = GetElementPtrInst::CreateInBounds(aCtx, r9FieldGEPV, "", driverBB);
-		Argument  *curArg = &(*fwd_it);
-		aliasMCSemaScope(new StoreInst(curArg, r9P, driverBB));
-	}
-#endif
-	// rest of the arguments are passed on stack
-	Function::ArgumentListType::reverse_iterator it = driverF->getArgumentList().rbegin();
-	Function::ArgumentListType::reverse_iterator end = driverF->getArgumentList().rend();
+            Value *rdxP = GetElementPtrInst::CreateInBounds(aCtx, rdxFieldGEPV, "", driverBB);
+
+            Argument  *curArg = &(*fwd_it);
+            aliasMCSemaScope(new StoreInst(curArg, rdxP, driverBB));
+        }
+
+        //set rcx to arg[3]
+        ++fwd_it;
+        if(fwd_it != fwd_end) {
+            int   k = x86_64::getRegisterOffset(RCX);
+            Value *rcxFieldGEPV[] = {
+                CONST_V<64>(driverBB, 0),
+                CONST_V<32>(driverBB, k)
+            };
+
+            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 4, B));
+            Value *rcxP = GetElementPtrInst::CreateInBounds(aCtx, rcxFieldGEPV, "", driverBB);
+            Argument  *curArg = &(*fwd_it);
+            aliasMCSemaScope(new StoreInst(curArg, rcxP, driverBB));
+        }
+
+        //set r8 to arg[4]
+        ++fwd_it;
+        if(fwd_it != fwd_end) {
+            int   k = x86_64::getRegisterOffset(R8);
+            Value *r8FieldGEPV[] = {
+                CONST_V<64>(driverBB, 0),
+                CONST_V<32>(driverBB, k)
+            };
+
+            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 5, B));
+
+            Value *r8P = GetElementPtrInst::CreateInBounds(aCtx, r8FieldGEPV, "", driverBB);
+            Argument  *curArg = &(*fwd_it);
+            new StoreInst(curArg, r8P, driverBB);
+        }
+
+        //set r9 to arg[5]
+        ++fwd_it;
+        if(fwd_it != fwd_end) {
+            int   k = x86_64::getRegisterOffset(R9);
+            Value *r9FieldGEPV[] = {
+                CONST_V<64>(driverBB, 0),
+                CONST_V<32>(driverBB, k)
+            };
+
+            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 6, B));
+
+            Value *r9P = GetElementPtrInst::CreateInBounds(aCtx, r9FieldGEPV, "", driverBB);
+            Argument  *curArg = &(*fwd_it);
+            aliasMCSemaScope(new StoreInst(curArg, r9P, driverBB));
+        }
+    } else { 
+        TASSERT(false, "Unsupported OS!");
+    }
+//#endif
+    // rest of the arguments are passed on stack
+    Function::ArgumentListType::reverse_iterator it = driverF->getArgumentList().rbegin();
+    Function::ArgumentListType::reverse_iterator end = driverF->getArgumentList().rend();
 
     Value *stackSize = archGetStackSize(M, driverBB);
     Value *aStack = archAllocateStack(M, stackSize, driverBB);
@@ -480,11 +469,7 @@ bool addEntryPointDriver(Module *M,
     subArg.push_back(aCtx);
 
     CallInst* ci = CallInst::Create(F, subArg, "", driverBB);
-#ifdef _WIN64
-	ci->setCallingConv(CallingConv::X86_64_Win64);
-#else
-    ci->setCallingConv(CallingConv::X86_64_SysV);
-#endif
+    archSetCallingConv(M, ci);
     archFreeStack(M, aStack, driverBB);
 
     //if we are requested, return the EAX value, else return void

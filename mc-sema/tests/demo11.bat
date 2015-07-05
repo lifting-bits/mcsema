@@ -12,9 +12,9 @@ if exist "%IDA_PATH%\idaq.exe" (
     %BIN_DESCEND_PATH%\bin_descend.exe -march=x86 -d -func-map=%STD_DEFS% -entry-symbol=_printdata -i=demo_test11.obj
 )
 
-%CFG_TO_BC_PATH%\cfg_to_bc.exe -march=x86 -i demo_test11.cfg -driver=demo11_entry,_printdata,0,return,C -o demo_test11.bc
+%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=i386-pc-win32 -i demo_test11.cfg -driver=demo11_entry,_printdata,0,return,C -o demo_test11.bc
 
 %LLVM_PATH%\opt.exe -O3 -o demo_test11_opt.bc demo_test11.bc
 %LLVM_PATH%\llc.exe -filetype=obj -o demo_test11_mine.obj demo_test11_opt.bc
-cl /Zi /nologo demo_driver11.c demo_test11_mine.obj
+"%VCINSTALLDIR%\bin\cl.exe" /Zi /nologo demo_driver11.c demo_test11_mine.obj
 demo_driver11.exe

@@ -12,9 +12,9 @@ if exist "%IDA_PATH%\idaq.exe" (
     %BIN_DESCEND_PATH%\bin_descend.exe -march=x86 -d -func-map=%STD_DEFS% -entry-symbol=_imcdecl,_imstdcall@8,@imfastcall@8 -i=demo_test15.obj
 )
 
-%CFG_TO_BC_PATH%\cfg_to_bc.exe -march=x86 -i demo_test15.cfg -driver=imcdecl,_imcdecl,2,return,C -driver=imstdcall,_imstdcall@8,2,return,E -driver=imfastcall,@imfastcall@8,2,return,F -o demo_test15.bc
+%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=i386-pc-win32 -i demo_test15.cfg -driver=imcdecl,_imcdecl,2,return,C -driver=imstdcall,_imstdcall@8,2,return,E -driver=imfastcall,@imfastcall@8,2,return,F -o demo_test15.bc
 
 %LLVM_PATH%\opt.exe -O1 -o demo_test15_opt.bc demo_test15.bc
 %LLVM_PATH%\llc.exe -filetype=obj -o demo_test15_lifted.obj demo_test15_opt.bc
-cl /Zi /nologo demo_driver15.c demo_test15_lifted.obj
+"%VCINSTALLDIR%\bin\cl.exe" /Zi /nologo demo_driver15.c demo_test15_lifted.obj
 demo_driver15.exe

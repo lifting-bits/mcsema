@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "../common/Defaults.h"
 #include "JumpTables.h"
 #include "llvm/Support/Debug.h"
+#include "ArchOps.h"
 
 using namespace llvm;
 
@@ -540,11 +541,7 @@ static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr) {
 
 
     CallInst *c = CallInst::Create(F, subArgs, "", b);
-#ifdef _WIN64
-    c->setCallingConv(CallingConv::X86_64_Win64);
-#else
-    c->setCallingConv(CallingConv::X86_64_SysV);
-#endif
+    archSetCallingConv(M, c);
 
     if ( ip->has_local_noreturn() ) {
         // noreturn functions just hit unreachable
@@ -591,153 +588,153 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
     AttrBuilder B;
     B.addAttribute(Attribute::InReg);
 
-#ifdef _WIN64
-    if(paramCount && it != end) {
-		Type *T = it->getType();
-        Value *arg1;
-		if(T->isDoubleTy()){
-			int   k = x86_64::getRegisterOffset(XMM0);
-			Value *arg1FieldGEPV[] = {
-            	    CONST_V<64>(b, 0),
-               		CONST_V<32>(b, k)
-            };
+    if(getSystemOS(M) == llvm::Triple::Win32) {
+        if(paramCount && it != end) {
+            Type *T = it->getType();
+            Value *arg1;
+            if(T->isDoubleTy()){
+                int   k = x86_64::getRegisterOffset(XMM0);
+                Value *arg1FieldGEPV[] = {
+                    CONST_V<64>(b, 0),
+                    CONST_V<32>(b, k)
+                };
 
-        	Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg1FieldGEPV, "XMM0_val", b);
-			Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv0", b);
-			arg1 = new LoadInst(GEP_double, "", b);
+                Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg1FieldGEPV, "XMM0_val", b);
+                Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv0", b);
+                arg1 = new LoadInst(GEP_double, "", b);
 
-		}
-		else{
-			printf("Argument is RCX\n"), fflush(stdout);
-			arg1 = x86_64::R_READ<64>(b, X86::RCX);
-		}
+            }
+            else{
+                printf("Argument is RCX\n"), fflush(stdout);
+                arg1 = x86_64::R_READ<64>(b, X86::RCX);
+            }
 
-        arguments.push_back(arg1);
-        --paramCount;
-        it->addAttr(AttributeSet::get(it->getContext(), 1, B));
-        ++it;
+            arguments.push_back(arg1);
+            --paramCount;
+            it->addAttr(AttributeSet::get(it->getContext(), 1, B));
+            ++it;
+        }
+
+        if(paramCount && it != end) {
+            Type *T = it->getType();
+            Value *arg2;
+            if(T->isDoubleTy()){
+                int   k = x86_64::getRegisterOffset(XMM1);
+                Value *arg2FieldGEPV[] = {
+                    CONST_V<64>(b, 0),
+                    CONST_V<32>(b, k)
+                };
+
+                Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg2FieldGEPV, "XMM1_val", b);
+                Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv1", b);
+                arg2 = new LoadInst(GEP_double, "", b);
+            }
+            else
+                arg2 = x86_64::R_READ<64>(b, X86::RDX);
+
+            arguments.push_back(arg2);
+            --paramCount;
+            it->addAttr(AttributeSet::get(it->getContext(), 2, B));
+            ++it;
+        }
+
+        if(paramCount && it != end) {
+            Type *T = it->getType();
+            Value *arg3;
+            if(T->isDoubleTy()){
+                int   k = x86_64::getRegisterOffset(XMM2);
+                Value *arg3FieldGEPV[] = {
+                    CONST_V<64>(b, 0),
+                    CONST_V<32>(b, k)
+                };
+
+                Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg3FieldGEPV, "XMM2_val", b);
+                Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv2", b);
+                arg3 = new LoadInst(GEP_double, "", b);
+            }
+
+            else
+                arg3 = x86_64::R_READ<64>(b, X86::R8);
+
+            arguments.push_back(arg3);
+            --paramCount;
+            it->addAttr(AttributeSet::get(it->getContext(), 3, B));
+            ++it;
+        }
+
+        if(paramCount && it != end) {
+            Type *T = it->getType();
+            Value *arg4;
+            if(T->isDoubleTy()){
+                int   k = x86_64::getRegisterOffset(XMM3);
+                Value *arg4FieldGEPV[] = {
+                    CONST_V<64>(b, 0),
+                    CONST_V<32>(b, k)
+                };
+
+                Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg4FieldGEPV, "XMM3_val", b);
+                Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv3", b);
+                arg4 = new LoadInst(GEP_double, "", b);
+            }
+            else
+                arg4 = x86_64::R_READ<64>(b, X86::R9);
+
+            arguments.push_back(arg4);
+            --paramCount;
+            it->addAttr(AttributeSet::get(it->getContext(), 4, B));
+            ++it;
+        }
+    } else {
+        if(paramCount && it != end) {
+            // fix it by updating the value type
+            Value *reg_rdi = x86_64::R_READ<64>(b, X86::RDI);
+            arguments.push_back(reg_rdi);
+            --paramCount;
+            it->addAttr(AttributeSet::get(it->getContext(), 1,  B));
+            ++it;
+
+        }
+
+        if(paramCount && it != end) {
+            Value *reg_rsi = x86_64::R_READ<64>(b, X86::RSI);
+            arguments.push_back(reg_rsi);
+            --paramCount;
+            it->addAttr(AttributeSet::get(it->getContext(), 2, B));
+            ++it;
+        }
+
+        if(paramCount && it != end) {
+            Value *reg_rdx = x86_64::R_READ<64>(b, X86::RDX);
+            arguments.push_back(reg_rdx);
+            --paramCount;
+            it->addAttr(AttributeSet::get(it->getContext(), 3, B));
+            ++it;
+        }
+
+        if(paramCount && it != end) {
+            Value *reg_rcx = x86_64::R_READ<64>(b, X86::RCX);
+            arguments.push_back(reg_rcx);
+            --paramCount;
+            it->addAttr(AttributeSet::get(it->getContext(), 4, B));
+            ++it;
+        }
+
+        if(paramCount && it != end) {
+            Value *reg_r8 = x86_64::R_READ<64>(b, X86::R8);
+            arguments.push_back(reg_r8);
+            --paramCount;
+            it->addAttr(AttributeSet::get(it->getContext(), 5, B));
+            ++it;
+        }
+
+        if(paramCount && it != end) {
+            Value *reg_r9 = x86_64::R_READ<64>(b, X86::R9);
+            arguments.push_back(reg_r9);
+            --paramCount;
+            it->addAttr(AttributeSet::get(it->getContext(), 6, B));
+            ++it;
+        }
     }
-
-    if(paramCount && it != end) {
-		Type *T = it->getType();
-        Value *arg2;
-		if(T->isDoubleTy()){
-			int   k = x86_64::getRegisterOffset(XMM1);
-			Value *arg2FieldGEPV[] = {
-            	    CONST_V<64>(b, 0),
-               		CONST_V<32>(b, k)
-            };
-
-        	Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg2FieldGEPV, "XMM1_val", b);
-			Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv1", b);
-			arg2 = new LoadInst(GEP_double, "", b);
-		}
-		else
-			arg2 = x86_64::R_READ<64>(b, X86::RDX);
-
-        arguments.push_back(arg2);
-        --paramCount;
-        it->addAttr(AttributeSet::get(it->getContext(), 2, B));
-        ++it;
-    }
-
-    if(paramCount && it != end) {
-		Type *T = it->getType();
-        Value *arg3;
-		if(T->isDoubleTy()){
-			int   k = x86_64::getRegisterOffset(XMM2);
-			Value *arg3FieldGEPV[] = {
-					CONST_V<64>(b, 0),
-					CONST_V<32>(b, k)
-			};
-
-			Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg3FieldGEPV, "XMM2_val", b);
-			Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv2", b);
-			arg3 = new LoadInst(GEP_double, "", b);
-		}
-
-		else
-        	arg3 = x86_64::R_READ<64>(b, X86::R8);
-
-        arguments.push_back(arg3);
-        --paramCount;
-        it->addAttr(AttributeSet::get(it->getContext(), 3, B));
-        ++it;
-    }
-
-    if(paramCount && it != end) {
-		Type *T = it->getType();
-        Value *arg4;
-		if(T->isDoubleTy()){
-			int   k = x86_64::getRegisterOffset(XMM3);
-			Value *arg4FieldGEPV[] = {
-            	    CONST_V<64>(b, 0),
-               		CONST_V<32>(b, k)
-            };
-
-        	Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(b->getParent()->arg_begin(), arg4FieldGEPV, "XMM3_val", b);
-			Instruction *GEP_double = CastInst::CreatePointerCast(GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "conv3", b);
-			arg4 = new LoadInst(GEP_double, "", b);
-		}
-		else
-        	arg4 = x86_64::R_READ<64>(b, X86::R9);
-
-        arguments.push_back(arg4);
-        --paramCount;
-        it->addAttr(AttributeSet::get(it->getContext(), 4, B));
-        ++it;
-    }
-#else
-    if(paramCount && it != end) {
-        // fix it by updating the value type
-        Value *reg_rdi = x86_64::R_READ<64>(b, X86::RDI);
-        arguments.push_back(reg_rdi);
-        --paramCount;
-        it->addAttr(AttributeSet::get(it->getContext(), 1,  B));
-        ++it;
-
-    }
-
-    if(paramCount && it != end) {
-        Value *reg_rsi = x86_64::R_READ<64>(b, X86::RSI);
-        arguments.push_back(reg_rsi);
-        --paramCount;
-        it->addAttr(AttributeSet::get(it->getContext(), 2, B));
-        ++it;
-    }
-
-    if(paramCount && it != end) {
-        Value *reg_rdx = x86_64::R_READ<64>(b, X86::RDX);
-        arguments.push_back(reg_rdx);
-        --paramCount;
-        it->addAttr(AttributeSet::get(it->getContext(), 3, B));
-        ++it;
-    }
-
-    if(paramCount && it != end) {
-        Value *reg_rcx = x86_64::R_READ<64>(b, X86::RCX);
-        arguments.push_back(reg_rcx);
-        --paramCount;
-        it->addAttr(AttributeSet::get(it->getContext(), 4, B));
-        ++it;
-    }
-
-    if(paramCount && it != end) {
-        Value *reg_r8 = x86_64::R_READ<64>(b, X86::R8);
-        arguments.push_back(reg_r8);
-        --paramCount;
-        it->addAttr(AttributeSet::get(it->getContext(), 5, B));
-        ++it;
-    }
-
-    if(paramCount && it != end) {
-        Value *reg_r9 = x86_64::R_READ<64>(b, X86::R9);
-        arguments.push_back(reg_r9);
-        --paramCount;
-        it->addAttr(AttributeSet::get(it->getContext(), 6, B));
-        ++it;
-    }
-#endif
 
     if( paramCount ) {
         // rest of the arguments are passed over stack
@@ -761,11 +758,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
     }
 
     CallInst    *callR = CallInst::Create(externFunction, arguments, "", b);
-#ifdef _WIN64
-    callR->setCallingConv(CallingConv::X86_64_Win64);
-#else
-    callR->setCallingConv(CallingConv::X86_64_SysV);
-#endif
+    archSetCallingConv(M, callR);
 
     if ( externFunction->doesNotReturn() ) {
         // noreturn functions just hit unreachable
