@@ -512,6 +512,8 @@ void deserializeData(const ::Data &d, DataSection &ds)
             string sym_name;
             dse_sym.getSymbol(sym_name);
         } else {
+            cerr << __FILE__ << ":" << __LINE__ << endl;
+            cerr << "Deserialized an out-of-order symbol!" << endl;
             throw LErr(__LINE__, __FILE__, "Deserialized an out-of-order symbol!");
         }
   }

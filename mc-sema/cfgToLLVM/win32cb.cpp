@@ -284,7 +284,15 @@ static Value *getAllocationBasePtr(Value *tib_ptr, BasicBlock *b) {
 
 	IntegerType* IntegerTy = IntegerType::get(mod->getContext(), regWidth);
 	PointerType* IntegerPtrTy = PointerType::get(IntegerTy, 0);
-	ConstantInt* const_val_E0C = ConstantInt::get(IntegerTy, 0xE0C, false);
+
+	ConstantInt* DeallocationStack = nullptr;
+        
+        if(regWidth == 32) {
+            DeallocationStack = ConstantInt::get(IntegerTy, 0xE0C, false);
+        } else {
+            DeallocationStack = ConstantInt::get(IntegerTy, 0x1478, false);
+        }
+
 	CastInst* intOfTebPtr = new PtrToIntInst(tib_ptr,
 			IntegerType::get(mod->getContext(), regWidth),
 			"",
@@ -292,7 +300,7 @@ static Value *getAllocationBasePtr(Value *tib_ptr, BasicBlock *b) {
 	BinaryOperator* moveTebInt =
 			BinaryOperator::Create(Instruction::Add,
 					intOfTebPtr,
-					const_val_E0C,
+					DeallocationStack,
 					"",
 					b);
 
@@ -397,16 +405,20 @@ Value *win32CallVirtualAlloc(Value *size, BasicBlock *b) {
 }
 
 FunctionType *getEpilogueType(Module *M) {
+
+	unsigned regWidth = getPointerSize(M);
+
 	Type *voidstar = PointerType::get(
 			Type::getInt8Ty(M->getContext()),
 			0);
 	SmallVector<Type*, 4> epi_args;
 	epi_args.push_back(g_PRegStruct);
 	epi_args.push_back(voidstar);
-	FunctionType    *funcTy =
-			FunctionType::get(Type::getInt32Ty(M->getContext()),
-					epi_args,
-					false);
+	FunctionType    *funcTy = FunctionType::get(
+            Type::getIntNTy(M->getContext(), regWidth),
+            epi_args,
+            false);
+
 	return funcTy;
 }
 
@@ -421,27 +433,6 @@ Module* addWin32CallbacksToModule(Module *mod) {
 	ArrayType* ArrayTy_2 = ArrayType::get(IntegerType::get(mod->getContext(), 16), 28);
 	PointerType* PointerTy_3 = PointerType::get(ArrayTy_2, 0);
 
-	std::vector<Type*>FuncTy_4_args;
-	FuncTy_4_args.push_back(IntegerType::get(mod->getContext(), 64));
-	FuncTy_4_args.push_back(IntegerType::get(mod->getContext(), 32));
-	FunctionType* FuncTy_4 = FunctionType::get(
-			/*Result=*/IntegerType::get(mod->getContext(), 64),
-			/*Params=*/FuncTy_4_args,
-			/*isVarArg=*/false);
-
-	PointerType* PointerTy_5 = PointerType::get(IntegerType::get(mod->getContext(), 64), 0);
-	PointerType* PointerTy_6 = PointerType::get(IntegerType::get(mod->getContext(), 32), 0);
-
-	std::vector<Type*>FuncTy_8_args;
-	FuncTy_8_args.push_back(PointerTy_6);
-	FuncTy_8_args.push_back(PointerTy_5);
-	FuncTy_8_args.push_back(PointerTy_5);
-	FunctionType* FuncTy_8 = FunctionType::get(
-			/*Result=*/Type::getVoidTy(mod->getContext()),
-			/*Params=*/FuncTy_8_args,
-			/*isVarArg=*/false);
-
-	PointerType* PointerTy_7 = PointerType::get(FuncTy_8, 0);
 
 	std::vector<Type*>FuncTy_9_args;
 	StructType *StructTy_struct__nativefpu = mod->getTypeByName("struct._nativefpu");

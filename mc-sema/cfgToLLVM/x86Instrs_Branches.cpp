@@ -55,7 +55,7 @@ GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
 static InstTransResult doRet(BasicBlock    *b) {
     //do a read from the location pointed to by ESP
 
-	Value       *rESP = R_READ<32>(b, X86::ESP);
+    Value       *rESP = R_READ<32>(b, X86::ESP);
     Value       *nESP =
 
     BinaryOperator::CreateAdd(rESP, CONST_V<32>(b, 4), "", b);
@@ -798,7 +798,7 @@ static InstTransResult translate_JMP32m(NativeModulePtr natM, BasicBlock *& bloc
     } else if (ip->has_jump_table() && ip->is_data_offset()) {
         // this is a jump table that got converted
         // into a table in the data section
-        doJumpTableViaData(natM, block, ip, inst);
+        doJumpTableViaData(natM, block, ip, inst, 32);
         // return a "ret", since the jmp is simulated
         // as a call/ret pair
         return doRet(block);
@@ -806,7 +806,7 @@ static InstTransResult translate_JMP32m(NativeModulePtr natM, BasicBlock *& bloc
     } else if(ip->has_jump_table()) {
         // this is a conformant jump table
         // emit an llvm switch
-        doJumpTableViaSwitch(natM, block, ip, inst);
+        doJumpTableViaSwitch(natM, block, ip, inst, 32);
         return EndBlock;
 
     } else {
@@ -937,7 +937,7 @@ static InstTransResult translate_JMP32r(NativeModulePtr  natM,
 
         BasicBlock *defaultb = nullptr;
 
-        doJumpTableViaSwitchReg(block, ip, fromReg, defaultb);
+        doJumpTableViaSwitchReg(block, ip, fromReg, defaultb, 32);
         TASSERT(defaultb != nullptr, "Default block has to exit");
         // fallback to doing do_call_value
         doCallV(defaultb, ip, fromReg);
@@ -971,7 +971,7 @@ static InstTransResult translate_JMP64r(NativeModulePtr  natM,
 
         BasicBlock *defaultb = nullptr;
 
-        doJumpTableViaSwitchReg(block, ip, fromReg, defaultb);
+        doJumpTableViaSwitchReg(block, ip, fromReg, defaultb, 64);
         TASSERT(defaultb != nullptr, "Default block has to exit");
         // fallback to doing do_call_value
         doCallV(defaultb, ip, fromReg);
@@ -1060,7 +1060,7 @@ static InstTransResult translate_JMP64m(NativeModulePtr natM, BasicBlock *& bloc
     } else if (ip->has_jump_table() && ip->is_data_offset()) {
         // this is a jump table that got converted
         // into a table in the data section
-        doJumpTableViaData(natM, block, ip, inst);
+        doJumpTableViaData(natM, block, ip, inst, 64);
         // return a "ret", since the jmp is simulated
         // as a call/ret pair
         return doRetQ(block);
@@ -1068,7 +1068,7 @@ static InstTransResult translate_JMP64m(NativeModulePtr natM, BasicBlock *& bloc
     } else if(ip->has_jump_table()) {
         // this is a conformant jump table
         // emit an llvm switch
-        doJumpTableViaSwitch(natM, block, ip, inst);
+        doJumpTableViaSwitch(natM, block, ip, inst, 64);
         return EndBlock;
 
     } else if(ip->is_data_offset()) {

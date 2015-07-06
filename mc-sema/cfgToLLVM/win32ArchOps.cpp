@@ -102,7 +102,6 @@ static FunctionType    *GetCBInternalFnTy(Module *M) {
 
 	unsigned regWidth = getPointerSize(M);
     Type *intTy = Type::getIntNTy(M->getContext(), regWidth);
-    Type *int32Ty = Type::getInt32Ty(M->getContext());
     Type *intPtrTy = PointerType::get(IntegerType::get(M->getContext(), regWidth), 0);
     Type *voidstar = PointerType::get(
             Type::getInt8Ty(M->getContext()), 
@@ -279,19 +278,17 @@ static Function *win32MakeCallbackStub(Module *M, VA local_target) {
     InlineAsm* func_body = nullptr;
     if(getSystemArch(M) == _X86_64_) {
         func_body = InlineAsm::get(FuncTy_CBStub,
-                "movl	%rsp, %rax\n"
-                "subl	$$4, %rsp\n"
-                "pushl	%rbp\n"
-                "pushl	%rax\n"
-                "subl	$$4, %rax\n"
-                "pushl	%rax\n"
-                "calll	$1\n"
-                "addl   $$12, %rsp\n"
-                "movl	(%rsp), %rcx\n"
-                "addl	$$4, %rsp\n"
-                "subl	%rcx, %rsp\n"
-                "jmpl	*(%rsp,%rcx)\n",
-                "={rax},*imr,~{rax},~{rcx},~{dirflag},~{fpsr},~{flags}",
+                "movq	%rsp, %rdx\n"
+                "subq	$$8, %rsp\n"
+                "movq   %rbp, %r9\n"
+                "movq	%rsp, %rax\n"
+                "subq	$$8, %rax\n"
+                "movq   %rax, %rcx\n"
+                "call	${1:P}\n"
+                "movq	(%rsp), %rcx\n"
+                "subq	%rcx, %rsp\n"
+                "jmpq	*(%rsp,%rcx)\n",
+                "={rax},*imr,~{rax},~{rcx},~{rdx},~{r9},~{dirflag},~{fpsr},~{flags}",
                 true);
     } else {
         func_body = InlineAsm::get(FuncTy_CBStub, 
@@ -392,15 +389,15 @@ static void call_with_alt_stack(Module* M,
     InlineAsm* ptr_26 = nullptr;
     if(getSystemArch(M) == _X86_64_) {
         ptr_26 = InlineAsm::get(SetEspTy,
-                "movl $0, %rsp\n" // real esp = translator esp
-                "calll *$1\n"     // call the unkown function
-                "pushl %rax\n"    // save return value
-                "movl %rsp, %rax\n" // save pointer to return value and the esp val
-                "movl $2, %rsp\n" // restore orignal esp
-                "movl (%rax), %rcx\n"
-                "movl %rcx, $3\n" // get the return value
-                "leal 4(%rax), %rcx\n" // get original esp value (before push eax)
-                "movl %rcx, $4\n",
+                "movq $0, %rsp\n" // real esp = translator esp
+                "callq *$1\n"     // call the unkown function
+                "pushq %rax\n"    // save return value
+                "movq %rsp, %rax\n" // save pointer to return value and the esp val
+                "movq $2, %rsp\n" // restore orignal esp
+                "movq (%rax), %rcx\n"
+                "movq %rcx, $3\n" // get the return value
+                "leaq 8(%rax), %rcx\n" // get original esp value (before push eax)
+                "movq %rcx, $4\n",
                 // eax, ecx, edx, can be clobbered by stdcall and cdecl functions
                 "mr,r,r,*mr,*mr,~{rax},~{rcx},~{rdx},~{dirflag},~{fpsr},~{flags}",
                 true);
@@ -549,7 +546,7 @@ void win32AddCallValue(Module *mod) {
         // read ESP/RSP value
         InlineAsm* get_esp_asm = nullptr;
         if (getSystemArch(mod) == _X86_64_) {
-            get_esp_asm = InlineAsm::get(GetEspTy, "movl %rsp, $0", "=*imr,~{dirflag},~{fpsr},~{flags}",false);
+            get_esp_asm = InlineAsm::get(GetEspTy, "movq %rsp, $0", "=*imr,~{dirflag},~{fpsr},~{flags}",false);
         } else if (getSystemArch(mod) == _X86_) {
             get_esp_asm = InlineAsm::get(GetEspTy, "movl %esp, $0", "=*imr,~{dirflag},~{fpsr},~{flags}",false);
         } else {

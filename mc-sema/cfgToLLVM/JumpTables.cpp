@@ -153,11 +153,12 @@ bool addJumpIndexTableDataSection(NativeModulePtr natMod,
 
 void doJumpTableViaData(
         BasicBlock *& block, 
-        Value *fptr)
+        Value *fptr,
+        const int bitness)
 {
     Function *ourF = block->getParent();
-	//make the call, the only argument should be our parents arguments
-	TASSERT(ourF->arg_size() == 1, "");
+    //make the call, the only argument should be our parents arguments
+    TASSERT(ourF->arg_size() == 1, "");
 
 
     if(!fptr->getType()->isPtrOrPtrVectorTy()) {
@@ -172,25 +173,26 @@ void doJumpTableViaData(
         fptr = new IntToPtrInst(fptr, FptrTy, "", block);
     }
 
-	//we need to wrap up our current context
-	writeLocalsToContext(block, 32, ABICallStore);
+    //we need to wrap up our current context
+    writeLocalsToContext(block, bitness, ABICallStore);
 
     std::vector<Value*>	subArgs;
-	subArgs.push_back(ourF->arg_begin());
-	CallInst *c = CallInst::Create(fptr, subArgs, "", block);
+    subArgs.push_back(ourF->arg_begin());
+    CallInst *c = CallInst::Create(fptr, subArgs, "", block);
 
-	//spill our context back
-	writeContextToLocals(block, 32, ABIRetSpill);
+    //spill our context back
+    writeContextToLocals(block, bitness, ABIRetSpill);
 }
 
 void doJumpTableViaData(
         NativeModulePtr natM, 
         BasicBlock *& block, 
         InstPtr ip, 
-        MCInst &inst)
+        MCInst &inst,
+        const int bitness)
 {
     Value *addr = STD_GLOBAL_OP(0); 
-    doJumpTableViaData(block, addr);
+    //doJumpTableViaData(block, addr, bitness);
 
     llvm::dbgs() << __FUNCTION__ << ": Doing jump table via data\n";
     Function *ourF = block->getParent();
@@ -209,11 +211,11 @@ void doJumpTableViaData(
     // read in entry from table
     Instruction *new_func = noAliasMCSemaScope(new LoadInst(func_addr, "", block));
 
-
-    doJumpTableViaData(block, new_func);
+    doJumpTableViaData(block, new_func, bitness);
 }
 
-void doJumpTableViaSwitch(
+template <int bitness>
+static void doJumpTableViaSwitch(
         NativeModulePtr natM, 
         BasicBlock *& block, 
         InstPtr ip, 
@@ -231,13 +233,13 @@ void doJumpTableViaSwitch(
     const MCOperand& index = OP(2);
 
     TASSERT(index.isReg(), "Conformant jump tables need index to be a register");
-    TASSERT(scale.isImm() && scale.getImm() == 4, "Conformant jump tables have scale == 4");
+    TASSERT(scale.isImm() && scale.getImm() == (bitness/8), "Conformant jump tables have scale == 4");
 
     MCSJumpTablePtr jmpptr = ip->get_jump_table();
 
     // to ensure no negative entries
-    Value *adjustment = CONST_V<32>(block, jmpptr->getInitialEntry());
-    Value *reg_val = R_READ<32>(block, index.getReg());
+    Value *adjustment = CONST_V<bitness>(block, jmpptr->getInitialEntry());
+    Value *reg_val = R_READ<bitness>(block, index.getReg());
     Value *real_index = 
         BinaryOperator::Create(Instruction::Add, adjustment, reg_val, "", block);
    
@@ -267,13 +269,34 @@ void doJumpTableViaSwitch(
         std::string  bbname = "block_0x"+to_string<VA>(*itr, std::hex);
         BasicBlock *toBlock = bbFromStrName(bbname, F);
         TASSERT(toBlock != NULL, "Could not find block: "+bbname);
-        theSwitch->addCase(CONST_V<32>(block, myindex), toBlock);
+        theSwitch->addCase(CONST_V<bitness>(block, myindex), toBlock);
         ++myindex;
     }
 
 }
 
-void doJumpTableViaSwitchReg(
+void doJumpTableViaSwitch(
+        NativeModulePtr natM, 
+        BasicBlock *& block, 
+        InstPtr ip, 
+        MCInst &inst,
+        const int bitness)
+{
+    switch(bitness)
+    {
+        case 32:
+            return doJumpTableViaSwitch<32>(natM, block, ip, inst);
+        case 64:
+            return doJumpTableViaSwitch<64>(natM, block, ip, inst);
+        default:
+            TASSERT(false, "Invalid bitness!");
+    }
+
+}
+
+
+template <int bitness>
+static void doJumpTableViaSwitchReg(
         BasicBlock *& block, 
         InstPtr ip, 
         Value *regVal,
@@ -309,9 +332,27 @@ void doJumpTableViaSwitchReg(
         BasicBlock *toBlock = bbFromStrName(bbname, F);
         llvm::dbgs() << __FUNCTION__ << ": Mapping from " << to_string<VA>(blockVA, std::hex) << " => " << bbname << "\n";
         TASSERT(toBlock != NULL, "Could not find block: "+bbname);
-        theSwitch->addCase(CONST_V<32>(block, blockVA), toBlock);
+        theSwitch->addCase(CONST_V<bitness>(block, blockVA), toBlock);
     }
 
+}
+
+void doJumpTableViaSwitchReg(
+        BasicBlock *& block, 
+        InstPtr ip, 
+        Value *regVal,
+        BasicBlock *&default_block,
+        const int bitness)
+{
+    switch(bitness)
+    {
+        case 32:
+            return doJumpTableViaSwitchReg<32>(block, ip, regVal, default_block);
+        case 64:
+            return doJumpTableViaSwitchReg<64>(block, ip, regVal, default_block);
+        default:
+            TASSERT(false, "Invalid bitness!");
+    }
 }
 
 static BasicBlock *emitJumpIndexWrite(
