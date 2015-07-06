@@ -10,7 +10,7 @@ int doDemo12(int k) {
     unsigned long   stack[4096*10];
 
     //set up the stack 
-    rState.RSP = (unsigned long) &stack[4096*9];
+    rState.RSP = (uint64_t) &stack[4096*9];
     rState.RAX = k;
 
     demo12_entry(&rState);

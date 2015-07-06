@@ -12,7 +12,7 @@ long double DoDemoFpu1(long double k) {
 
     //set up the stack 
     memcpy(&stack[0x8ff5], &k, sizeof(k));
-    rState.RSP = (unsigned long) &stack[0x8ff4];
+    rState.RSP = (uint64_t) &stack[0x8ff4];
 
     demo_fpu1_entry(&rState);
 
