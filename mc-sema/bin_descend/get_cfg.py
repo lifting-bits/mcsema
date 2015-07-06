@@ -677,33 +677,82 @@ def handleDataRelocation(M, dref, new_eas):
     else:
         return dref
 
+def getBitness():
+    if (idaapi.ph.flag & idaapi.PR_USE64) != 0:
+        # support 64-bit addressing
+        return 64
+    else:
+        # no support for 64-bit, assume 32-bit
+        return 32
+
+def relocationSize(reloc_type):
+    
+    varsize = getBitness() / 8
+    
+    size_map = {
+        idc.FIXUP_MASK : 1,
+        idc.FIXUP_OFF8 : 1,
+        idc.FIXUP_BYTE : 1,
+        idc.FIXUP_OFF16 : 2,
+        idc.FIXUP_SEG16 : 2,
+        idc.FIXUP_PTR32 : 4,
+        idc.FIXUP_OFF32 : 4,
+        idc.FIXUP_PTR48 : 8,
+        idc.FIXUP_HI8 : 1,
+        idc.FIXUP_HI16 : 2,
+        idc.FIXUP_LOW8 : 1,
+        idc.FIXUP_LOW16 : 2,
+        idc.FIXUP_REL : varsize,
+        idc.FIXUP_SELFREL : 4,
+        idc.FIXUP_EXTDEF : -1,
+        idc.FIXUP_UNUSED : -1,
+        idc.FIXUP_CREATED : -1,}
+
+    reloc_size = size_map.get(reloc_type, -1)
+    return reloc_size
+
+
 def resolveRelocation(ea):
     rtype = idc.GetFixupTgtType(ea) 
-    if idc.__EA64__ is True:
+
+    relocSize = -1
+    relocVal = -1
+
+    if getBitness() == 64:
         if rtype == -1:
             raise Exception("No relocation type at ea: {:x}".format(ea))
 
-        DEBUG("rtype : {0}, {1}, {1}".format(rtype, idc.GetFixupTgtOff(ea), idc.GetFixupTgtDispl(ea)))
-        return idc.GetFixupTgtDispl(ea) +  idc.GetFixupTgtOff(ea)
+        DEBUG("rtype : {0:x}, {1:x}, {2:x}\n".format(rtype, idc.GetFixupTgtOff(ea), idc.GetFixupTgtDispl(ea)))
+        relocVal = idc.GetFixupTgtDispl(ea) +  idc.GetFixupTgtOff(ea)
     else:
         if rtype == idc.FIXUP_OFF32:
             relocVal = readDword(ea)
-            return relocVal
         elif rtype == -1:
             raise Exception("No relocation type at ea: {:x}".format(ea))
         else:
-            return idc.GetFixupTgtOff(ea)
+            relocVal = idc.GetFixupTgtOff(ea)
 
-def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
+    relocSize = relocationSize(rtype)
+    return relocVal, relocSize
+
+def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas, itemsize=-1):
     pf = idc.GetFlags(reloc_dest)
 
     DS = D.symbols.add()
     DS.base_address = offset+seg_offset
+
+    itemsize = int(itemsize)
+    if itemsize == -1:
+        itemsize = int(idc.ItemSize(offset))
+
+    DEBUG("Offset: {0:x}, seg_offset: {1:x}\n".format(offset, seg_offset))
     DEBUG("Reloc Base Address: {0:x}\n".format(DS.base_address))
+    DEBUG("Reloc offset: {0:x}\n".format(offset))
+    DEBUG("Reloc size: {0:x}\n".format(itemsize))
 
     if idc.isCode(pf):
         DS.symbol_name = "sub_"+hex(reloc_dest)
-        DS.symbol_size = int(idc.ItemSize(offset))
+        DS.symbol_size = itemsize
         DEBUG("Code Ref: {0:x}!\n".format(reloc_dest))
 
         if reloc_dest not in RECOVERED_EAS:
@@ -712,12 +761,12 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
     elif idc.isData(pf):
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
-	DS.symbol_size = int(idc.ItemSize(offset))
+	DS.symbol_size = itemsize
         DEBUG("Data Ref!\n")
     else:
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
-	DS.symbol_size = int(idc.ItemSize(offset))
+	DS.symbol_size = itemsize
         DEBUG("UNKNOWN Ref, assuming data\n")
 
 def isStartOfFunction(ea):
@@ -761,7 +810,7 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
         DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}\n".format(ea, pointsto))
         real_size = idc.ItemSize(pointsto)
         DEBUG("\t\tReal Ref: {0:x}, size: {1}\n".format(pointsto, real_size))
-        insertRelocatedSymbol(M, D, pointsto, ea, seg_offset, new_eas)
+        insertRelocatedSymbol(M, D, pointsto, ea, seg_offset, new_eas, real_size)
 
     def checkIfJumpData(ea, size):
         """
@@ -828,11 +877,11 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
     else:
         DEBUG("Found relocations in binary..\n")
         while i < end and i != idc.BADADDR:
-            pointsto = resolveRelocation(i)
-            DEBUG("{0:x} Found reloc to: {1:x}\n".format(i, pointsto))
+            pointsto, itemsize = resolveRelocation(i)
+            DEBUG("{0:x} Found reloc to: {1:x} (size: {2:x})\n".format(i, pointsto, itemsize))
 
             if not isExternalReference(pointsto):
-                insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas)
+                insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas, itemsize)
 
             i = idc.GetNextFixupEA(i)
 
