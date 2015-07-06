@@ -632,10 +632,10 @@ bool LLVMObjectTarget::relocate_addr(VA addr, VA &toAddr, VA &relocSize) {
 	      relocSize = 8;
 	  else
 	      relocSize = 4;
-    } else if (relocType == "IMAGE_REL_AMD64_ADDR32NB"){
-      relocSize = 4;
     } else if(relocType == "IMAGE_REL_AMD64_ADDR64"){
 		relocSize = 8;
+	} else {
+		relocSize = 4;
 	}
 
   // find what symbol name this relocation points to.

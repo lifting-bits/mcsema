@@ -347,7 +347,9 @@ class Inst {
         ext_data_ref(false),
         system_call_number(-1),
         local_noreturn(false),
-        data_offset(0)
+        data_offset(0),
+		hasRIP(false),
+		rip_target(0)
        { }
 };
 
