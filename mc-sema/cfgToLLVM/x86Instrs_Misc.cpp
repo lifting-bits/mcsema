@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "X86.h"
 #include "raiseX86.h"
 #include "x86Helpers.h"
+#include "x86Instrs_MOV.h"
 #include "x86Instrs_flagops.h"
 #include "x86Instrs_Misc.h"
 #include "llvm/Support/Debug.h"
@@ -41,8 +42,8 @@ using namespace llvm;
 static InstTransResult doNoop(BasicBlock *b) {
   //isn't this exciting
  // llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
- // llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
- // llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
+//  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
+//  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
   return ContinueBlock;
 }
 
@@ -216,6 +217,7 @@ static InstTransResult doLeaV(BasicBlock *&b,
 {
     //write the address into the register
     R_WRITE<width>(b, dst.getReg(), addrInt);
+
     return ContinueBlock;
 }
 
@@ -595,7 +597,11 @@ static InstTransResult translate_LEA64r(NativeModulePtr natM, BasicBlock *&block
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt64Ty(block->getContext()), "", block);
         ret = doLeaV<64>(block, OP(0), addrInt);
-    } else if( ip->is_data_offset() ) {
+    } else if(ip->has_external_ref()){
+    	Value *addrInt = getValueForExternal<64>(F->getParent(), ip, block);
+    	ret = doLeaV<64>(block, OP(0), addrInt);
+    }
+    else if( ip->is_data_offset() ) {
         ret = doLea<64>(ip, block, STD_GLOBAL_OP(1), OP(0));
     } else { 
         ret = doLea<64>(ip, block, ADDR(1), OP(0));

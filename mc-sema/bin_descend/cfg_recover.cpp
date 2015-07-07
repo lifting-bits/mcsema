@@ -357,6 +357,12 @@ static bool canInstructionReferenceCode( InstPtr inst) {
         case X86::MOV32ri:      // writes imm32 to register, could be code
         case X86::PUSHi32:      // push an imm32, which could be code
 
+        case X86::MOV64mi32:
+        case X86::MOV64mr:
+        case X86::MOV32mr:
+	case X86::MOV64rm:
+	case X86::LEA64r:
+
         // need to check if mem references are valid here
         case X86::MOV32rm:      // writes mem to register, mem could be code?
         case X86::PUSH32rmm:    // push mem, which could be/have code
@@ -713,7 +719,8 @@ bool dataInCodeHeuristic(
         ExecutableContainer *c,
         InstPtr             I,
         uint32_t            addr,
-        list<VA>           &funcs)
+        list<VA>           &funcs,
+		uint32_t 			relocSize)
 {
     // detect SEH handler
    if(I->get_inst().getOpcode() == X86::PUSHi32) {
@@ -728,6 +735,8 @@ bool dataInCodeHeuristic(
                << to_string<VA>(addr, hex) << "\n";
            return treatCodeAsData(c, addr, 0x28, funcs);
        }
+   } else {
+	   return treatCodeAsData(c, addr, relocSize, funcs);
    }
 
    return false;
@@ -871,7 +880,7 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                     // so we assume the code points to a function
                     else if( can_ref_code && is_reloc_code ) {
                         list<VA> new_funcs;
-                        if(dataInCodeHeuristic(c, I, addr, new_funcs)) {
+                        if(dataInCodeHeuristic(c, I, addr, new_funcs, relocSize)) {
                             // add new functions to our functions list
                             for(list<VA>::const_iterator nfi = new_funcs.begin();
                                     nfi != new_funcs.end();

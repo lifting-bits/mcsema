@@ -1337,7 +1337,7 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
 
         GlobalValue *gv = dyn_cast<GlobalValue>(M->getOrInsertGlobal(symname, extType));
         TASSERT(gv != NULL, "Could not make global value!");
-        gv->setLinkage(GlobalValue::AvailableExternallyLinkage);
+        gv->setLinkage(/*GlobalValue::AvailableExternallyLinkage*/GlobalValue::ExternalLinkage);
 
         const std::string &triple = M->getTargetTriple();
 
