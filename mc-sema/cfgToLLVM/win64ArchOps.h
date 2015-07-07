@@ -6,6 +6,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/IR/InstrTypes.h"
 #include "ArchOps.h"
 
 bool shouldSubtractImageBase(llvm::Module *M);
@@ -34,7 +35,7 @@ static llvm::Value* doSubtractImageBase(
         "", block);
 
     // do the subtraction
-    llvm::Value *data_v = BinaryOperator::CreateSub(
+    llvm::Value *data_v = llvm::BinaryOperator::CreateSub(
         original_int, 
         ImageBase_int, 
         "", block);
