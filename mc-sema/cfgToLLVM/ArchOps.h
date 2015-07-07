@@ -18,6 +18,7 @@ llvm::Value *archMakeCallbackForLocalFunction(llvm::Module *M, VA local_target);
 void archAddCallValue(llvm::Module *M);
 void archSetCallingConv(llvm::Module *M, llvm::CallInst *ci);
 void archSetCallingConv(llvm::Module *M, llvm::Function *F);
+llvm::GlobalVariable *archGetImageBase(llvm::Module *M);
 unsigned getSystemArch(llvm::Module *M);
 llvm::Triple::OSType getSystemOS(llvm::Module *M);
 unsigned getPointerSize(llvm::Module *M);

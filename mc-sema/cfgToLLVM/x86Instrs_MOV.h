@@ -278,14 +278,11 @@ llvm::Value *getValueForExternal(llvm::Module *M, InstPtr ip, llvm::BasicBlock *
     llvm::Value *addrInt = NULL;
 
     if( ip->has_ext_call_target() ) {
-        if (width != 32) {
-            throw TErr(__LINE__, __FILE__, "NIY: non 32-bit width for external calls");
-        }
         std::string target = ip->get_ext_call_target()->getSymbolName();
         llvm::Value *ext_fn = M->getFunction(target);
         TASSERT(ext_fn != NULL, "Could not find external: " + target);
         llvm::Value *addrInt = new llvm::PtrToIntInst(
-                ext_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+                ext_fn, llvm::Type::getIntNTy(block->getContext(), width), "", block);
 
         return addrInt;
     } else if (ip->has_ext_data_ref() ) {

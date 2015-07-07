@@ -170,3 +170,11 @@ Value* archGetStackSize(Module *M, BasicBlock *&driverBB) {
     TASSERT(stackSize != NULL, "Could not allocate stack!");
     return stackSize;
 }
+
+GlobalVariable *archGetImageBase(Module *M) {
+
+   // WILL ONLY WORK FOR windows/x86_64 
+   GlobalVariable *gv = M->getNamedGlobal("__ImageBase");
+   return gv;
+
+}

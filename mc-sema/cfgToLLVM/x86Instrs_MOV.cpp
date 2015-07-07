@@ -35,11 +35,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "JumpTables.h"
 #include "Externals.h"
 #include "ArchOps.h"
+#include "win64ArchOps.h"
 #include "llvm/Support/Debug.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
 
 using namespace llvm;
+
 
 static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
   //isn't this exciting
@@ -335,7 +337,9 @@ GENERIC_TRANSLATION_MEM(MOV16mi,
 //
 static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
+    
     Function *F = block->getParent();
+    Module *M = F->getParent();
 
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
@@ -348,9 +352,23 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
     }
     else if( ip->is_data_offset() ) {
         if( ip->get_reloc_offset() < OP(5).getOffset() ) {
+            llvm::errs() << __FUNCTION__ << ": Other reloc\n";
             doMIMov<32>(ip,   block, STD_GLOBAL_OP(0), OP(5));
         } else {
-            doMIMovV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip));
+            Value *data_v = nullptr;
+            if(shouldSubtractImageBase(M)) {
+                // if we're here, then
+                // * archGetImageBase is defined
+                // * we are on win64
+               
+                data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
+                data_v = doSubtractImageBase<32>(data_v, block);
+                llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
+            } else {
+                data_v = GLOBAL_DATA_OFFSET<32>(block, natM, ip);
+            }
+
+            doMIMovV<32>(ip,  block, ADDR_NOREF(0), data_v);
         }
         ret = ContinueBlock;
     } else {
@@ -362,6 +380,7 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
 static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
+    Module *M = F->getParent();
 
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
@@ -374,9 +393,20 @@ static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&bl
     }
     else if( ip->is_data_offset() ) {
         if( ip->get_reloc_offset() < OP(5).getOffset() ) {
+            llvm::errs() << __FUNCTION__ << ": Other reloc\n";
             doMIMov<64>(ip,   block, STD_GLOBAL_OP(0), OP(5));
         } else {
-            doMIMovV<64>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<64>(block, natM, ip));
+            Value *data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
+            if(shouldSubtractImageBase(M)) {
+                // if we're here, then
+                // * archGetImageBase is defined
+                // * we are on win64
+               
+                data_v = doSubtractImageBase<64>(data_v, block);
+                llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
+            }
+
+            doMIMovV<64>(ip,  block, ADDR_NOREF(0), data_v);
         }
         ret = ContinueBlock;
     } else {
@@ -478,6 +508,7 @@ GENERIC_TRANSLATION_MEM(MOVBE64mr,
 static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
+    Module *M = F->getParent();
 
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
@@ -491,9 +522,21 @@ static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& blo
                 OP(0) );
     }
     else if( ip->is_data_offset() ) {
-        ret = doRIMovV<32>(ip, block,
-                GLOBAL_DATA_OFFSET<32>(block, natM, ip),
-                OP(0) );
+        Value *data_v = nullptr;
+        if(shouldSubtractImageBase(M)) {
+            // if we're here, then
+            // * archGetImageBase is defined
+            // * we are on win64
+           
+            data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
+            data_v = doSubtractImageBase<32>(data_v, block);
+            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
+        } else {
+            data_v = GLOBAL_DATA_OFFSET<32>(block, natM, ip);
+        }
+
+        ret = doRIMovV<32>(ip, block, data_v, OP(0) );
+
     } else {
         ret = doRIMov<32>(ip, block, OP(1), OP(0)) ;
     }
@@ -503,6 +546,7 @@ static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& blo
 static InstTransResult translate_MOV64ri(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
+    Module *M = F->getParent();
 
     if( ip->has_call_tgt() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
@@ -516,9 +560,19 @@ static InstTransResult translate_MOV64ri(NativeModulePtr natM, BasicBlock *& blo
                 OP(0) );
     }
     else if( ip->is_data_offset() ) {
-        ret = doRIMovV<64>(ip, block,
-                GLOBAL_DATA_OFFSET<64>(block, natM, ip),
-                OP(0) );
+
+
+        Value *data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
+        if(shouldSubtractImageBase(M)) {
+            // if we're here, then
+            // * archGetImageBase is defined
+            // * we are on win64
+           
+            data_v = doSubtractImageBase<64>(data_v, block);
+            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
+        }
+
+        ret = doRIMovV<64>(ip, block, data_v, OP(0) );
     } else {
         ret = doRIMov<64>(ip, block, OP(1), OP(0)) ;
     }
@@ -532,9 +586,24 @@ static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& bloc
     InstTransResult ret;
 
     Function *F = block->getParent();
+    Module *M = F->getParent();
+
     if( ip->is_data_offset() ) {
-        ret = doMRMov<width>(ip, block,
-                GLOBAL_DATA_OFFSET<32>(block, natM, ip),
+        
+        Value *data_v = nullptr;
+        if(width == 32 && shouldSubtractImageBase(M)) {
+            // if we're here, then
+            // * archGetImageBase is defined
+            // * we are on win64
+           
+            data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
+            data_v = doSubtractImageBase<32>(data_v, block);
+            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
+        } else {
+            data_v = GLOBAL_DATA_OFFSET<width>(block, natM, ip);
+        }
+
+        ret = doMRMov<width>(ip, block, data_v,
                 MCOperand::CreateReg(X86::EAX) );
     } else {
         Value *addrv = CONST_V<width>(block, OP(0).getImm());
@@ -548,6 +617,7 @@ template <int width>
 static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
+    Module *M = F->getParent();
 
     // loading functions only available if its a 32-bit offset
     if( ip->has_external_ref() && width == 32) {
@@ -567,8 +637,20 @@ static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& bloc
         ret = doRMMov<32>(ip, block, addrInt, MCOperand::CreateReg(X86::EAX)) ;
     }
     else if( ip->is_data_offset() ) {
+            Value *data_v = nullptr;
+            if(width == 32 && shouldSubtractImageBase(M)) {
+                // if we're here, then
+                // * archGetImageBase is defined
+                // * we are on win64
+               
+                data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
+                data_v = doSubtractImageBase<32>(data_v, block);
+                llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
+            } else {
+                data_v = GLOBAL_DATA_OFFSET<width>(block, natM, ip);
+            }
         ret = doRMMov<width>(ip, block,
-                GLOBAL_DATA_OFFSET<width>(block, natM, ip),
+                data_v,
                 MCOperand::CreateReg(X86::EAX) );
     } else {
         Value *addrv = CONST_V<width>(block, OP(0).getImm());
@@ -582,6 +664,8 @@ static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& blo
 
     InstTransResult ret;
     Function *F = block->getParent();
+    Module *M = F->getParent();
+
     if( ip->has_external_ref()) {
         Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
         //ret = doRMMov<32>(ip, block, addrInt, OP(0) );
@@ -590,9 +674,21 @@ static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& blo
         return ContinueBlock;
     }
     else if( ip->is_data_offset() ) {
-		ret = doRMMov<32>(ip, block,
-				GLOBAL( block, natM, inst, ip, 1 ),
-				OP(0) );
+
+        Value *data_v = nullptr;
+        if(shouldSubtractImageBase(M)) {
+            // if we're here, then
+            // * archGetImageBase is defined
+            // * we are on win64
+
+            data_v = GLOBAL( block, natM, inst, ip, 1 );
+            data_v = doSubtractImageBase<32>(data_v, block);
+            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
+        } else {
+            data_v = GLOBAL( block, natM, inst, ip, 1 );
+        }
+
+        ret = doRMMov<32>(ip, block, data_v, OP(0) );
     } else {
 		ret = doRMMov<32>(ip, block, ADDR(1), OP(0));
     }
@@ -621,6 +717,8 @@ static InstTransResult translate_MOV64rm(NativeModulePtr natM, BasicBlock *& blo
 {
     InstTransResult ret;
     Function *F = block->getParent();
+    Module *M = F->getParent();
+
     if( ip->has_external_ref()) {
         Value *addrInt = getValueForExternal<64>(F->getParent(), ip, block);
         //ret = doRMMov<32>(ip, block, addrInt, OP(0) );
@@ -629,9 +727,19 @@ static InstTransResult translate_MOV64rm(NativeModulePtr natM, BasicBlock *& blo
         return ContinueBlock;
     }
     else if( ip->is_data_offset() ) {
-        ret = doRMMov<64>(ip, block,
-                GLOBAL( block, natM, inst, ip, 1 ),
-                OP(0) );
+        Value *data_v = nullptr;
+        if(shouldSubtractImageBase(M)) {
+            // if we're here, then
+            // * archGetImageBase is defined
+            // * we are on win64
+
+            data_v = GLOBAL( block, natM, inst, ip, 1 );
+            data_v = doSubtractImageBase<64>(data_v, block);
+            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
+        } else {
+            data_v = GLOBAL( block, natM, inst, ip, 1 );
+        }
+        ret = doRMMov<64>(ip, block, data_v, OP(0) );
     } else {
         ret = doRMMov<64>(ip, block, ADDR(1), OP(0));
     }
@@ -718,9 +826,9 @@ void MOV_populateDispatchMap(DispatchMap &m) {
     m[X86::MOVSX64rr16] = translate_MOVSX32rr8;
     m[X86::MOVSX64rr32] = translate_MOVSX64rr32;
 
-	m[X86::MOVSX16rm8] = translate_MOVSX16rm8;
+    m[X86::MOVSX16rm8] = translate_MOVSX16rm8;
     m[X86::MOVSX32rm8] = translate_MOVSX32rm8;
-	m[X86::MOVSX32rm16] = translate_MOVSX32rm16;
+    m[X86::MOVSX32rm16] = translate_MOVSX32rm16;
     m[X86::MOVSX64rm8] = translate_MOVSX64rm8;
     m[X86::MOVSX64rm16] = translate_MOVSX64rm16;
     m[X86::MOVSX64rm32] = translate_MOVSX64rm32;

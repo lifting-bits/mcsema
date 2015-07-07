@@ -88,9 +88,9 @@ public:
 
     void setReturnType(ReturnType r) { this->ret = r; }
 
-	std::string getFunctionSignature(void) { return this->funcSign; }
+    std::string getFunctionSignature(void) { return this->funcSign; }
 
-	ExternalCodeRef(const std::string &fn, int8_t d, CallingConvention c, ReturnType r, const std::string &sign) :
+    ExternalCodeRef(const std::string &fn, int8_t d, CallingConvention c, ReturnType r, const std::string &sign) :
                                             numArgs(d),
                                             conv(c),
                                             ret(r), ExternalRef(fn), funcSign(sign) { }
@@ -118,7 +118,7 @@ protected:
     int8_t              numArgs;
     CallingConvention   conv;
     ReturnType          ret;
-	std::string 		funcSign;
+    std::string         funcSign;
 };
 
 typedef boost::shared_ptr<ExternalCodeRef> ExternalCodeRefPtr;

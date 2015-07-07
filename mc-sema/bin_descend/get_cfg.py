@@ -114,6 +114,9 @@ def fixExternalName(fn):
     if fn in EMAP:
         return fn
 
+    if fn in EMAP_DATA:
+        return fn
+
     if not isLinkedElf() and fn[0] == '_':
         return fn[1:]
 
@@ -314,6 +317,7 @@ def findRelocOffset(ea, size):
 
 def handleExternalRef(fn):
     # Don't mangle symbols for fully linked ELFs... yet
+    in_a_map = fn in EMAP or fn in EMAP_DATA
     if not isLinkedElf():
         if fn.startswith("__imp_"):
             fn = fn[6:]
@@ -321,10 +325,10 @@ def handleExternalRef(fn):
         if fn.endswith("_0"):
             fn = fn[:-2]
 
-        if fn.startswith("_") and fn not in EMAP:
+        if fn.startswith("_") and not in_a_map:
             fn = fn[1:]
 
-        if fn.startswith("@") and fn not in EMAP:
+        if fn.startswith("@") and not in_a_map:
             fn = fn[1:]
 
         if '@' in fn:
@@ -881,7 +885,14 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
             DEBUG("{0:x} Found reloc to: {1:x} (size: {2:x})\n".format(i, pointsto, itemsize))
 
             if not isExternalReference(pointsto):
-                insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas, itemsize)
+                # do not add references in jump tables....
+                # MAY BREAK EXTERNAL API CALLS
+                if i in ACCESSED_VIA_JMP and not isStartOfFunction(pointsto):
+                    # bail only if we are access via JMP and not the start
+                    # of a function
+                    DEBUG("\t\tNOT ADDING REF: {:08x} -> {:08x}\n".format(i, pointsto))
+                else:
+                    insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas, itemsize)
 
             i = idc.GetNextFixupEA(i)
 

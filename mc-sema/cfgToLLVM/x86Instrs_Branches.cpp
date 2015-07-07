@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "JumpTables.h"
 #include "llvm/Support/Debug.h"
 #include "ArchOps.h"
+#include "win64ArchOps.h"
 
 using namespace llvm;
 
@@ -971,7 +972,12 @@ static InstTransResult translate_JMP64r(NativeModulePtr  natM,
 
         BasicBlock *defaultb = nullptr;
 
-        doJumpTableViaSwitchReg(block, ip, fromReg, defaultb, 64);
+        // Terrible HACK
+        // Subtract image base since we assume win64 adds it for jump
+        // tables. This may not always be true.
+        Value *minus_base = doSubtractImageBaseInt(fromReg, block);
+        // end terrible HACK
+        doJumpTableViaSwitchReg(block, ip, minus_base, defaultb, 64);
         TASSERT(defaultb != nullptr, "Default block has to exit");
         // fallback to doing do_call_value
         doCallV(defaultb, ip, fromReg);

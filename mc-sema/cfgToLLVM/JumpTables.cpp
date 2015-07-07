@@ -194,7 +194,7 @@ void doJumpTableViaData(
     Value *addr = STD_GLOBAL_OP(0); 
     //doJumpTableViaData(block, addr, bitness);
 
-    llvm::dbgs() << __FUNCTION__ << ": Doing jump table via data\n";
+    llvm::errs() << __FUNCTION__ << ": Doing jump table via data\n";
     Function *ourF = block->getParent();
     Module *M = ourF->getParent();
     // get mem address
@@ -222,7 +222,7 @@ static void doJumpTableViaSwitch(
         MCInst &inst)
 {
 
-    llvm::dbgs() << __FUNCTION__ << ": Doing jumpt table via switch\n";
+    llvm::errs() << __FUNCTION__ << ": Doing jumpt table via switch\n";
     Function *F = block->getParent();
     Module *M = F->getParent();
     // we know this conforms to
@@ -303,7 +303,7 @@ static void doJumpTableViaSwitchReg(
         BasicBlock *&default_block)
 {
 
-    llvm::dbgs() << __FUNCTION__ << ": Doing jumpt table via switch(reg)\n";
+    llvm::errs() << __FUNCTION__ << ": Doing jumpt table via switch(reg)\n";
     Function *F = block->getParent();
     Module *M = F->getParent();
     
@@ -330,9 +330,14 @@ static void doJumpTableViaSwitchReg(
     {
         std::string  bbname = "block_0x"+to_string<VA>(blockVA, std::hex);
         BasicBlock *toBlock = bbFromStrName(bbname, F);
-        llvm::dbgs() << __FUNCTION__ << ": Mapping from " << to_string<VA>(blockVA, std::hex) << " => " << bbname << "\n";
+        llvm::errs() << __FUNCTION__ << ": Mapping from " << to_string<VA>(blockVA, std::hex) << " => " << bbname << "\n";
         TASSERT(toBlock != NULL, "Could not find block: "+bbname);
-        theSwitch->addCase(CONST_V<bitness>(block, blockVA), toBlock);
+
+        ConstantInt *thecase = CONST_V<bitness>(block, blockVA);
+
+        theSwitch->addCase(
+                thecase,
+                toBlock);
     }
 
 }
