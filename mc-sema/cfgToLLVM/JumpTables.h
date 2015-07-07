@@ -120,23 +120,27 @@ void doJumpTableViaData(
         NativeModulePtr natM, 
         llvm::BasicBlock *& block, 
         InstPtr ip, 
-        llvm::MCInst &inst);
+        llvm::MCInst &inst,
+        const int bitness);
 
 void doJumpTableViaData(
         llvm::BasicBlock *& block, 
-        llvm::Value *val);
+        llvm::Value *val,
+        const int bitness);
 
 void doJumpTableViaSwitch(
         NativeModulePtr natM, 
         llvm::BasicBlock *& block, 
         InstPtr ip, 
-        llvm::MCInst &inst);
+        llvm::MCInst &inst,
+        const int bitness);
 
 void doJumpTableViaSwitchReg(
         llvm::BasicBlock *& block, 
         InstPtr ip, 
         llvm::Value *regVal,
-        llvm::BasicBlock *&default_block);
+        llvm::BasicBlock *&default_block,
+        const int bitness);
 
 void doJumpIndexTableViaSwitch(
         llvm::BasicBlock *& block, 
