@@ -691,10 +691,8 @@ def getBitness():
 
 def relocationSize(reloc_type):
     
-    varsize = getBitness() / 8
-    
+    reloc_type = reloc_type & idc.FIXUP_MASK
     size_map = {
-        idc.FIXUP_MASK : 1,
         idc.FIXUP_OFF8 : 1,
         idc.FIXUP_BYTE : 1,
         idc.FIXUP_OFF16 : 2,
@@ -705,12 +703,7 @@ def relocationSize(reloc_type):
         idc.FIXUP_HI8 : 1,
         idc.FIXUP_HI16 : 2,
         idc.FIXUP_LOW8 : 1,
-        idc.FIXUP_LOW16 : 2,
-        idc.FIXUP_REL : varsize,
-        idc.FIXUP_SELFREL : 4,
-        idc.FIXUP_EXTDEF : -1,
-        idc.FIXUP_UNUSED : -1,
-        idc.FIXUP_CREATED : -1,}
+        idc.FIXUP_LOW16 : 2,}
 
     reloc_size = size_map.get(reloc_type, -1)
     return reloc_size
