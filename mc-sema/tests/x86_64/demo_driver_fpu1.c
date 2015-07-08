@@ -6,6 +6,23 @@
 
 extern void demo_fpu1_entry(RegState *);
 
+#ifdef __linux__
+long double DoDemoFpu1(long double k) {
+    RegState            rState = {0};
+    unsigned long   stack[4096*10];
+    nativefpu n;
+
+    //set up the stack 
+    memcpy(&stack[0x8ff5], &k, sizeof(k));
+    rState.RSP = (unsigned long) &stack[0x8ff4];
+
+    demo_fpu1_entry(&rState);
+
+    // read ST(0)
+    n = FPU_GET_REG(&rState, 0);
+    return NATIVEFPU_TO_LD(&n);
+}
+#else
 long double DoDemoFpu1(long double k) {
     __m128d foo;
     RegState            rState = {0};
@@ -22,6 +39,7 @@ long double DoDemoFpu1(long double k) {
     //return NATIVEFPU_TO_LD((nativefpu*)(rState.XMM0.tag));
     return bar;
 }
+#endif
 
 int main(int argc, char *argv[]) {
 
