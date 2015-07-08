@@ -15,7 +15,7 @@ else
     ${BIN_DESCEND_PATH}/bin_descend -march=x86 -d -entry-symbol=start -i=demo_test2.o
 fi
 
-${CFG_TO_BC_PATH}/cfg_to_bc -march=x86 -i demo_test2.cfg -driver=demo2_entry,start,raw,return,C -o demo_test2.bc
+${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=i686-pc-linux-gnu -i demo_test2.cfg -driver=demo2_entry,start,raw,return,C -o demo_test2.bc
 
 ${LLVM_PATH}/opt -march=x86 -O3 -o demo_test2_opt.bc demo_test2.bc
 ${LLVM_PATH}/llc -filetype=obj -o demo_test2_mine.o demo_test2_opt.bc

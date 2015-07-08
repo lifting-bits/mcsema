@@ -15,7 +15,7 @@ else
     ${BIN_DESCEND_PATH}/bin_descend -d -march=x86 -entry-symbol=timespi -i=demo_fpu1.o
 fi
 
-${CFG_TO_BC_PATH}/cfg_to_bc -march=x86 -i demo_fpu1.cfg -driver=demo_fpu1_entry,timespi,raw,return,C -o demo_fpu1.bc
+${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=i686-pc-linux-gnu -i demo_fpu1.cfg -driver=demo_fpu1_entry,timespi,raw,return,C -o demo_fpu1.bc
 
 ${LLVM_PATH}/opt -O3 -o demo_fpu1_opt.bc demo_fpu1.bc
 ${LLVM_PATH}/llc -filetype=obj -o demo_fpu1_mine.o demo_fpu1_opt.bc

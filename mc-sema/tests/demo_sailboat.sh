@@ -15,7 +15,7 @@ else
     ${BIN_DESCEND_PATH}/bin_descend -march=x86 -func-map=sailboat.txt -entry-symbol=keycomp -i=sailboat.o
 fi
 
-${CFG_TO_BC_PATH}/cfg_to_bc -march=x86 -i sailboat.cfg -driver=sailboat,keycomp,1,return,C -o sailboat.bc
+${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=i686-pc-linux-gnu -i sailboat.cfg -driver=sailboat,keycomp,1,return,C -o sailboat.bc
 
 ${LLVM_PATH}/opt -O3 -o sailboat_opt.bc sailboat.bc
 ${LLVM_PATH}/llc -filetype=obj -o sailboat_mine.o sailboat_opt.bc
