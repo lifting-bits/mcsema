@@ -15,7 +15,7 @@ else
     ${BIN_DESCEND_PATH}/bin_descend -march=x86-64 -d -func-map=maze_map.txt -i=demo_maze -entry-symbol=main
 fi
 
-${CFG_TO_BC_PATH}/cfg_to_bc -march=x86-64 -i demo_maze.cfg -driver=mcsema_main,main,raw,return,C -o demo_maze.bc
+${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=x86_64-pc-linux-gnu -i demo_maze.cfg -driver=mcsema_main,main,raw,return,C -o demo_maze.bc
 ${LLVM_PATH}/opt -march=x86-64 -O3 -o demo_maze_opt.bc demo_maze.bc
 ${LLVM_PATH}/llc -filetype=obj -o demo_maze.o demo_maze_opt.bc
 

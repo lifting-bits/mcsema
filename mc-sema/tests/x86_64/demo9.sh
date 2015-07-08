@@ -15,7 +15,7 @@ else
     ${BIN_DESCEND_PATH}/bin_descend -march=x86-64 -d -func-map="demo9_map.txt" -entry-symbol=printit -i=demo_test9.o
 fi
 
-${CFG_TO_BC_PATH}/cfg_to_bc -march=x86-64 -i demo_test9.cfg -driver=demo9_entry,printit,1,return,C -o demo_test9.bc
+${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=x86_64-pc-linux-gnu -i demo_test9.cfg -driver=demo9_entry,printit,1,return,C -o demo_test9.bc
 
 ${LLVM_PATH}/opt -O3 -o demo_test9_opt.bc demo_test9.bc
 ${LLVM_PATH}/llc -march=x86-64 -filetype=obj -o demo_test9_mine.o demo_test9_opt.bc
