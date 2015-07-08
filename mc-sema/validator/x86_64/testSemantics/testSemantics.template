@@ -41,9 +41,21 @@ using namespace llvm;
 using namespace std;
 
 #ifdef __x86_64__
-#define TRIPLE "x86_64-unknown-unknown"
+    #ifdef __linux__
+        #define TRIPLE "x86_64-pc-linux-gnu"
+    #elif defined(_WIN32)
+        #define TRIPLE "x86_64-pc-win32"
+    #else
+        #error Building on an unsupported OS
+    #endif
 #else
-#define TRIPLE "i386-unknown-unknown"
+    #ifdef __linux__
+        #define TRIPLE "i386-pc-linux-gnu"
+    #elif defined(_WIN32)
+        #define TRIPLE "i386-pc-win32"
+    #else
+        #error Building on an unsupported OS
+    #endif
 #endif
 
 #define STACK_LEN 40960
