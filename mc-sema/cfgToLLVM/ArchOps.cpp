@@ -101,13 +101,13 @@ Value *archFreeStack(Module *M, Value *stackAlloc, BasicBlock *&driverBB) {
     const std::string &triple = M->getTargetTriple();
     Value *stackFree = NULL;
 
-    if(triple == LINUX_TRIPLE || triple == LINUX_TRIPLE_X64) {
+    if( getSystemOS(M) == llvm::Triple::Linux ) {
         stackFree = linuxFreeStack(M, stackAlloc, driverBB);
-    } else if(triple == WINDOWS_TRIPLE || triple == WINDOWS_TRIPLE_X64) {
+    } else if( getSystemOS(M) == llvm::Triple::Win32 ) {
         // free our allocated stack
         stackFree = win32FreeStack(stackAlloc, driverBB);
     } else { 
-        stackFree = win32FreeStack(stackAlloc, driverBB);
+        TASSERT(false, "Unknown OS in Triple!");
     }
 
     TASSERT(stackFree != NULL, "Could not free stack!");
@@ -116,12 +116,12 @@ Value *archFreeStack(Module *M, Value *stackAlloc, BasicBlock *&driverBB) {
 
 Module* archAddCallbacksToModule(Module *M) {
     const std::string &triple = M->getTargetTriple();
-    if(triple == LINUX_TRIPLE || triple == LINUX_TRIPLE_X64) {
+    if( getSystemOS(M) == llvm::Triple::Linux ) {
         return M;
-    } else if(triple == WINDOWS_TRIPLE || triple == WINDOWS_TRIPLE_X64) {
+    } else if( getSystemOS(M) == llvm::Triple::Win32 ) {
         return addWin32CallbacksToModule(M);
     } else { 
-        return addWin32CallbacksToModule(M);
+        TASSERT(false, "Unknown OS in Triple!");
     }
 }
 
@@ -129,12 +129,12 @@ llvm::Value *archMakeCallbackForLocalFunction(Module *M, VA local_target)
 {
 
     const std::string &triple = M->getTargetTriple();
-    if(triple == LINUX_TRIPLE || triple == LINUX_TRIPLE_X64) {
+    if( getSystemOS(M) == llvm::Triple::Linux ) {
         return linuxMakeCallbackForLocalFunction(M, local_target);
-    } else if(triple == WINDOWS_TRIPLE || triple == WINDOWS_TRIPLE_X64) {
+    } else if( getSystemOS(M) == llvm::Triple::Win32 ) {
         return win32MakeCallbackForLocalFunction(M, local_target);
     } else { 
-        return win32MakeCallbackForLocalFunction(M, local_target);
+        TASSERT(false, "Unknown OS in Triple!");
     }
 
 }
@@ -142,13 +142,13 @@ llvm::Value *archMakeCallbackForLocalFunction(Module *M, VA local_target)
 void archAddCallValue(Module *M) {
     const std::string &triple = M->getTargetTriple();
 
-    if(triple == LINUX_TRIPLE || triple == LINUX_TRIPLE_X64) {
+    if( getSystemOS(M) == llvm::Triple::Linux ) {
         return linuxAddCallValue(M);
-    } else if(triple == WINDOWS_TRIPLE || triple == WINDOWS_TRIPLE_X64) {
+    } else if( getSystemOS(M) == llvm::Triple::Win32 ) {
         // free our allocated stack
         return win32AddCallValue(M);
     } else { 
-        return win32AddCallValue(M);
+        TASSERT(false, "Unknown OS in Triple!");
     }
 }
 
