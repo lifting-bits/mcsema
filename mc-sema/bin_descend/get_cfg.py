@@ -703,7 +703,8 @@ def relocationSize(reloc_type):
         idc.FIXUP_HI8 : 1,
         idc.FIXUP_HI16 : 2,
         idc.FIXUP_LOW8 : 1,
-        idc.FIXUP_LOW16 : 2,}
+        idc.FIXUP_LOW16 : 2,
+        12: 8,}
 
     reloc_size = size_map.get(reloc_type, -1)
     return reloc_size
