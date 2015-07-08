@@ -1,3 +1,5 @@
-add_subdirectory(valTool)
-add_subdirectory(valTest)
-add_subdirectory(testSemantics)
+if("${TARGET}" STREQUAL "X86_64")
+   add_subdirectory(x86_64)
+else()
+  add_subdirectory(x86)
+endif("${TARGET}" STREQUAL "X86_64")

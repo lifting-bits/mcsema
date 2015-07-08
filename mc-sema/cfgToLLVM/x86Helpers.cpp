@@ -36,12 +36,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 using namespace std;
-
+//using namespace x86;
 // check if addr falls into a data section, and is at least minAddr.
 // the minAddr check exists for times when we are not sure if an address
 // is a data reference or an immediate value; in some cases data is mapped
 // at 0x0 and determining this could be tricky
-static
+
 bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr = 0x0 ) {
     list<DataSection>  &sections = m->getData();
     list<DataSection>::iterator it = sections.begin();
@@ -77,6 +77,7 @@ bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr = 0x0 ) {
 // If the expression references global data, use
 // that in the computation instead of assuming values
 // are opaque immediates
+namespace x86 {
 Value *getAddrFromExpr( BasicBlock      *b,
                         NativeModulePtr mod,
                         const MCOperand &Obase,
@@ -183,6 +184,8 @@ Value *getAddrFromExpr( BasicBlock      *b,
     
     return dispPtr;
 }
+}
+
 
 Value *getAddrFromExpr( BasicBlock      *b,
                         NativeModulePtr mod,
@@ -206,16 +209,29 @@ Value *getAddrFromExpr( BasicBlock      *b,
     // or if the immediate should be used at face value
     bool has_offset = ip->is_data_offset();
     int64_t real_disp= has_offset ? ip->get_data_offset() : disp.getImm();
+	llvm::Module *M = b->getParent()->getParent();
+	
+	if(getPointerSize(M) == Pointer32) {
 
-
-    return getAddrFromExpr(b, 
-            mod, 
-            base, 
-            scale,
-            index, 
-            real_disp, 
-            seg,
-            has_offset);
+		return x86::getAddrFromExpr(b, 
+				mod, 
+				base, 
+				scale,
+				index, 
+				real_disp, 
+				seg,
+				has_offset);
+			
+	} else {
+		return x86_64::getAddrFromExpr(b, 
+				mod, 
+				base, 
+				scale,
+				index, 
+				real_disp, 
+				seg,
+				has_offset);
+	}
 
 
 }
@@ -223,6 +239,9 @@ Value *getAddrFromExpr( BasicBlock      *b,
 Value* GLOBAL_DATA_OFFSET(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
 {
     VA  baseGlobal;
+	llvm::Module *M = b->getParent()->getParent();
+	int regWidth = getPointerSize(M);
+	
     uint64_t off = ip->get_data_offset();
     if( addrIsInData(off, mod, baseGlobal, 0) ) {
         //we should be able to find a reference to this in global data 
@@ -240,15 +259,22 @@ Value* GLOBAL_DATA_OFFSET(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
         // we cannot simply slice into them.
         // Need to get ptr and then add integer displacement to ptr
         Value   *globalGEPV[] =  
-        {   ConstantInt::get(Type::getInt32Ty(b->getContext()), 0), 
+        {   ConstantInt::get(Type::getIntNTy(b->getContext(), regWidth), 0), 
             ConstantInt::get(Type::getInt32Ty(b->getContext()), 0)};
         Instruction *globalGEP = 
             GetElementPtrInst::Create(gData,  globalGEPV, "", b);
-        Type    *ty = Type::getInt32Ty(b->getContext());
+			
+        Type    *ty = Type::getIntNTy(b->getContext(), regWidth);
         Value   *intVal = new PtrToIntInst(globalGEP, ty, "", b);
         uint32_t addr_offset = off-baseGlobal;
-        Value   *int_adjusted = 
-            BinaryOperator::CreateAdd(intVal, CONST_V<32>(b, addr_offset), "", b);
+        Value   *int_adjusted;
+		if(regWidth== x86::REG_SIZE){
+			int_adjusted = 
+				BinaryOperator::CreateAdd(intVal, CONST_V<32>(b, addr_offset), "", b);
+		} else {
+			int_adjusted = 
+				BinaryOperator::CreateAdd(intVal, CONST_V<64>(b, addr_offset), "", b);
+		}
         //then, assign this to the outer 'd' so that the rest of the 
         //logic picks up on that address instead of another address 
         return int_adjusted;
@@ -298,4 +324,3 @@ Instruction*  callMemcpy(BasicBlock *B, Value *dest, Value *src, uint32_t size,
     // actually call llvm.memcpy
     return CallInst::Create(doMemCpy, callArgs, "", B);
 }
-

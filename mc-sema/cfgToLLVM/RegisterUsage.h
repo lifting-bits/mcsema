@@ -32,9 +32,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Function.h>
 #include <map>
+#include "RegisterUsage.h"
 
 
 enum MCSemaRegs {
+    SIL = llvm::X86::SIL,
+    DIL = llvm::X86::DIL,
     EAX = llvm::X86::EAX,
     EBX = llvm::X86::EBX,
     ECX = llvm::X86::ECX,
@@ -43,6 +46,23 @@ enum MCSemaRegs {
     EDI = llvm::X86::EDI,
     ESP = llvm::X86::ESP,
     EBP = llvm::X86::EBP,
+	RAX = llvm::X86::RAX,
+	RBX = llvm::X86::RBX,
+	RCX = llvm::X86::RCX,
+	RDX = llvm::X86::RDX,
+	RDI = llvm::X86::RDI,
+	RSI = llvm::X86::RSI,
+	RSP = llvm::X86::RSP,
+	RBP = llvm::X86::RBP,
+	R8	= llvm::X86::R8,
+	R9 = llvm::X86::R9,
+	R10 = llvm::X86::R10,
+	R11 = llvm::X86::R11,
+	R12 = llvm::X86::R12,
+	R13 = llvm::X86::R13,
+	R14 = llvm::X86::R14,
+	R15 = llvm::X86::R15,
+	RIP = llvm::X86::RIP,
     CF = llvm::X86::NUM_TARGET_REGS+1,
     PF = llvm::X86::NUM_TARGET_REGS+2,
     AF = llvm::X86::NUM_TARGET_REGS+3,
@@ -50,8 +70,8 @@ enum MCSemaRegs {
     SF = llvm::X86::NUM_TARGET_REGS+5,
     OF = llvm::X86::NUM_TARGET_REGS+6,
     DF = llvm::X86::NUM_TARGET_REGS+7,
-    ST0 = llvm::X86::ST0, 
-    ST1 = llvm::X86::ST1, 
+    ST0 = llvm::X86::ST0,
+    ST1 = llvm::X86::ST1,
     ST2 = llvm::X86::ST2,
     ST3 = llvm::X86::ST3,
     ST4 = llvm::X86::ST4,
@@ -72,7 +92,7 @@ enum MCSemaRegs {
     FPU_ZE = llvm::X86::NUM_TARGET_REGS+19,
     FPU_DE = llvm::X86::NUM_TARGET_REGS+20,
     FPU_IE = llvm::X86::NUM_TARGET_REGS+21,
-    FPU_X = llvm::X86::NUM_TARGET_REGS+ 22, 
+    FPU_X = llvm::X86::NUM_TARGET_REGS+ 22,
     FPU_RC = llvm::X86::NUM_TARGET_REGS+23,
     FPU_PC = llvm::X86::NUM_TARGET_REGS+24,
     FPU_PM = llvm::X86::NUM_TARGET_REGS+25,
@@ -82,8 +102,8 @@ enum MCSemaRegs {
     FPU_DM = llvm::X86::NUM_TARGET_REGS+29,
     FPU_IM = llvm::X86::NUM_TARGET_REGS+30,
     FPU_TAG = llvm::X86::NUM_TARGET_REGS+31,
-    FPU_LASTIP_SEG = llvm::X86::NUM_TARGET_REGS+32, 
-    FPU_LASTIP_OFF = llvm::X86::NUM_TARGET_REGS+33, 
+    FPU_LASTIP_SEG = llvm::X86::NUM_TARGET_REGS+32,
+    FPU_LASTIP_OFF = llvm::X86::NUM_TARGET_REGS+33,
     FPU_LASTDATA_SEG = llvm::X86::NUM_TARGET_REGS+34,
     FPU_LASTDATA_OFF = llvm::X86::NUM_TARGET_REGS+35,
     FPU_FOPCODE = llvm::X86::NUM_TARGET_REGS+36,
@@ -95,6 +115,14 @@ enum MCSemaRegs {
     XMM5 = llvm::X86::XMM5,
     XMM6 = llvm::X86::XMM6,
     XMM7 = llvm::X86::XMM7,
+	XMM8 = llvm::X86::XMM8,
+	XMM9 = llvm::X86::XMM9,
+	XMM10 = llvm::X86::XMM10,
+	XMM11 = llvm::X86::XMM11,
+	XMM12 = llvm::X86::XMM12,
+	XMM13 = llvm::X86::XMM13,
+	XMM14 = llvm::X86::XMM14,
+	XMM15 = llvm::X86::XMM15,
     STACK_BASE = llvm::X86::NUM_TARGET_REGS+37,
     STACK_LIMIT = llvm::X86::NUM_TARGET_REGS+38,
     MCSEMA_REGS_MAX = STACK_LIMIT+1
@@ -105,8 +133,18 @@ struct RegInfo {
     llvm::StringRef name;
 };
 
+namespace x86 {
 extern std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP;
 
 llvm::StringRef getRegisterName(MCSemaRegs reg);
 int getRegisterOffset(MCSemaRegs reg);
 llvm::Value *lookupLocal(llvm::Function *F, MCSemaRegs reg);
+}
+
+namespace x86_64 {
+extern std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP;
+
+llvm::StringRef getRegisterName(MCSemaRegs reg);
+int getRegisterOffset(MCSemaRegs reg);
+llvm::Value *lookupLocal(llvm::Function *F, MCSemaRegs reg);
+}

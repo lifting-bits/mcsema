@@ -75,6 +75,7 @@ static void WriteAFAddSub(BasicBlock *b, Value *res, Value *o1, Value *o2) {
     return;
 }
 
+template <int width>
 static void WriteAF2(BasicBlock *b, Value *r, Value *lhs, Value *rhs) {
     //this will implement the (r ^ lhs ^ rhs) & 0x10 approach used by VEX
     //but it will also assume that the values as input are full width
@@ -83,9 +84,9 @@ static void WriteAF2(BasicBlock *b, Value *r, Value *lhs, Value *rhs) {
     Value   *t2 =
         BinaryOperator::CreateXor(t1, rhs, "", b);
     Value   *t3 = 
-        BinaryOperator::CreateAnd(t2, CONST_V<32>(b, 0x10), "", b);
+        BinaryOperator::CreateAnd(t2, CONST_V<width>(b, 0x10), "", b);
     Value   *cr = 
-        new ICmpInst(*b, CmpInst::ICMP_NE, t3, CONST_V<32>(b, 0));
+        new ICmpInst(*b, CmpInst::ICMP_NE, t3, CONST_V<width>(b, 0));
 
     F_WRITE(b, AF, cr);
     return;
@@ -133,6 +134,10 @@ static void WriteOFSub(BasicBlock *b, Value *res, Value *lhs, Value *rhs) {
             shifted = 
                 BinaryOperator::CreateLShr(anded, CONST_V<width>(b, 31), "", b);
             break;
+		case 64:
+			shifted = 
+				BinaryOperator::CreateLShr(anded, CONST_V<width>(b, width-1), "", b);
+			break;
 
         default:
             throw TErr(__LINE__, __FILE__, "Invalid bitwidth");
@@ -182,6 +187,11 @@ static void WriteOFAdd(BasicBlock *b, Value *res, Value *lhs, Value *rhs) {
             //rshift by 20
             shifted = 
                 BinaryOperator::CreateLShr(anded, CONST_V<width>(b, 11+20), "", b);
+            break;
+		case 64:
+			//rshift by 52
+			shifted = 
+                BinaryOperator::CreateLShr(anded, CONST_V<width>(b, 11+52), "", b);
             break;
 
         default:

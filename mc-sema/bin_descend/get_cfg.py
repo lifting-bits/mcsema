@@ -114,6 +114,9 @@ def fixExternalName(fn):
     if fn in EMAP:
         return fn
 
+    if fn in EMAP_DATA:
+        return fn
+
     if not isLinkedElf() and fn[0] == '_':
         return fn[1:]
 
@@ -137,7 +140,7 @@ def getFromEMAP(fname):
 
 def doesNotReturn(fname):
     try:
-        args, conv, ret = getFromEMAP(fname)
+        args, conv, ret, sign = getFromEMAP(fname)
         if ret == "Y":
             return True
     except KeyError, ke:
@@ -181,7 +184,7 @@ def entryPointHandler(M, ep, name, args_from_stddef=False):
     # calling ocnvention, and return type from std_defs?
     if args_from_stddef:
         try:
-            (argc, conv, ret) = getFromEMAP(name)
+            (argc, conv, ret, sign) = getFromEMAP(name)
             have_edata = True
         except KeyError as ke:
             pass
@@ -314,6 +317,7 @@ def findRelocOffset(ea, size):
 
 def handleExternalRef(fn):
     # Don't mangle symbols for fully linked ELFs... yet
+    in_a_map = fn in EMAP or fn in EMAP_DATA
     if not isLinkedElf():
         if fn.startswith("__imp_"):
             fn = fn[6:]
@@ -321,10 +325,10 @@ def handleExternalRef(fn):
         if fn.endswith("_0"):
             fn = fn[:-2]
 
-        if fn.startswith("_") and fn not in EMAP:
+        if fn.startswith("_") and not in_a_map:
             fn = fn[1:]
 
-        if fn.startswith("@") and fn not in EMAP:
+        if fn.startswith("@") and not in_a_map:
             fn = fn[1:]
 
         if '@' in fn:
@@ -552,6 +556,20 @@ def instructionHandler(M, B, inst, new_eas):
         if dref in crefs:
             continue
         addDataReference(M, I, inst, dref, new_eas)
+        DEBUG("instr refering data")
+        if isUnconditionalJump(inst):
+        	xdrefs = DataRefsFrom(dref)
+        	for xref in xdrefs:
+        		DEBUG("xref : {0:x}\n".format(xref))
+        		# check if it refers to come instructions; link Control flow
+        		if isExternalReference(xref):
+        			fn = getFunctionName(xref)
+        			fn = handleExternalRef(fn)
+        			I.ext_call_name = fn
+        			DEBUG("EXTERNAL CALL : {0}\n".format(fn))
+
+		 
+
 
     if not had_refs and isLinkedElf():
         for op in insn_t.Operands:
@@ -582,8 +600,11 @@ def parseDefsFile(df):
             (marker, symname, dsize) = l.split()
             emap_data[symname] = int(dsize)
         else:
-
-            (fname, args, conv, ret) = l.split()
+            fname = args = conv = ret = sign = None
+            if len(l.split()) == 4:
+                (fname, args, conv, ret) = l.split()
+            elif len(l.split()) == 5:
+                (fname, args, conv, ret, sign) = l.split()
 
             if conv == "C":
                 realconv = CFG_pb2.ExternalFunction.CallerCleanup
@@ -597,7 +618,7 @@ def parseDefsFile(df):
             if ret not in ['Y', 'N']:
                 raise Exception("Unknown return type:"+ret)
 
-            emap[fname] = (int(args), realconv, ret)
+            emap[fname] = (int(args), realconv, ret, sign)
 
     
     df.close()
@@ -606,7 +627,7 @@ def parseDefsFile(df):
 
 def processExternalFunction(M, fn):
 
-    args, conv, ret = getFromEMAP(fn)
+    args, conv, ret, sign = getFromEMAP(fn)
 
     extfn = M.external_funcs.add()
     extfn.symbol_name = fn
@@ -660,24 +681,76 @@ def handleDataRelocation(M, dref, new_eas):
     else:
         return dref
 
+def getBitness():
+    if (idaapi.ph.flag & idaapi.PR_USE64) != 0:
+        # support 64-bit addressing
+        return 64
+    else:
+        # no support for 64-bit, assume 32-bit
+        return 32
+
+def relocationSize(reloc_type):
+    
+    reloc_type = reloc_type & idc.FIXUP_MASK
+    size_map = {
+        idc.FIXUP_OFF8 : 1,
+        idc.FIXUP_BYTE : 1,
+        idc.FIXUP_OFF16 : 2,
+        idc.FIXUP_SEG16 : 2,
+        idc.FIXUP_PTR32 : 4,
+        idc.FIXUP_OFF32 : 4,
+        idc.FIXUP_PTR48 : 8,
+        idc.FIXUP_HI8 : 1,
+        idc.FIXUP_HI16 : 2,
+        idc.FIXUP_LOW8 : 1,
+        idc.FIXUP_LOW16 : 2,
+        12: 8,}
+
+    reloc_size = size_map.get(reloc_type, -1)
+    return reloc_size
+
+
 def resolveRelocation(ea):
     rtype = idc.GetFixupTgtType(ea) 
-    if rtype == idc.FIXUP_OFF32:
-        relocVal = readDword(ea)
-        return relocVal
-    elif rtype == -1:
-        raise Exception("No relocation type at ea: {:x}".format(ea))
-    else:
-        return idc.GetFixupTgtOff(ea)
 
-def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
+    relocSize = -1
+    relocVal = -1
+
+    if getBitness() == 64:
+        if rtype == -1:
+            raise Exception("No relocation type at ea: {:x}".format(ea))
+
+        DEBUG("rtype : {0:x}, {1:x}, {2:x}\n".format(rtype, idc.GetFixupTgtOff(ea), idc.GetFixupTgtDispl(ea)))
+        relocVal = idc.GetFixupTgtDispl(ea) +  idc.GetFixupTgtOff(ea)
+    else:
+        if rtype == idc.FIXUP_OFF32:
+            relocVal = readDword(ea)
+        elif rtype == -1:
+            raise Exception("No relocation type at ea: {:x}".format(ea))
+        else:
+            relocVal = idc.GetFixupTgtOff(ea)
+
+    relocSize = relocationSize(rtype)
+    return relocVal, relocSize
+
+def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas, itemsize=-1):
     pf = idc.GetFlags(reloc_dest)
 
     DS = D.symbols.add()
     DS.base_address = offset+seg_offset
 
+    itemsize = int(itemsize)
+    if itemsize == -1:
+        itemsize = int(idc.ItemSize(offset))
+
+    DEBUG("Offset: {0:x}, seg_offset: {1:x}\n".format(offset, seg_offset))
+    DEBUG("Reloc Base Address: {0:x}\n".format(DS.base_address))
+    DEBUG("Reloc offset: {0:x}\n".format(offset))
+    DEBUG("Reloc size: {0:x}\n".format(itemsize))
+
     if idc.isCode(pf):
         DS.symbol_name = "sub_"+hex(reloc_dest)
+        DS.symbol_size = itemsize
         DEBUG("Code Ref: {0:x}!\n".format(reloc_dest))
 
         if reloc_dest not in RECOVERED_EAS:
@@ -686,10 +759,12 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas):
     elif idc.isData(pf):
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
+	DS.symbol_size = itemsize
         DEBUG("Data Ref!\n")
     else:
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
+	DS.symbol_size = itemsize
         DEBUG("UNKNOWN Ref, assuming data\n")
 
 def isStartOfFunction(ea):
@@ -733,7 +808,7 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
         DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}\n".format(ea, pointsto))
         real_size = idc.ItemSize(pointsto)
         DEBUG("\t\tReal Ref: {0:x}, size: {1}\n".format(pointsto, real_size))
-        insertRelocatedSymbol(M, D, pointsto, ea, seg_offset, new_eas)
+        insertRelocatedSymbol(M, D, pointsto, ea, seg_offset, new_eas, real_size)
 
     def checkIfJumpData(ea, size):
         """
@@ -800,11 +875,18 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
     else:
         DEBUG("Found relocations in binary..\n")
         while i < end and i != idc.BADADDR:
-            pointsto = resolveRelocation(i)
-            DEBUG("{0:x} Found reloc to: {1:x}\n".format(i, pointsto))
+            pointsto, itemsize = resolveRelocation(i)
+            DEBUG("{0:x} Found reloc to: {1:x} (size: {2:x})\n".format(i, pointsto, itemsize))
 
             if not isExternalReference(pointsto):
-                insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas)
+                # do not add references in jump tables....
+                # MAY BREAK EXTERNAL API CALLS
+                if i in ACCESSED_VIA_JMP and not isStartOfFunction(pointsto):
+                    # bail only if we are access via JMP and not the start
+                    # of a function
+                    DEBUG("\t\tNOT ADDING REF: {:08x} -> {:08x}\n".format(i, pointsto))
+                else:
+                    insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas, itemsize)
 
             i = idc.GetNextFixupEA(i)
 
@@ -821,7 +903,10 @@ def findFreeData():
         if end > max_end:
             max_end = end
 
-    return max_end+4
+    if idc.__EA64__ is True:
+        return max_end+8
+    else:
+        return max_end+4
 
 def addDataSegment(M, start, end, new_eas):
     if end < start:
@@ -1042,7 +1127,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
     preprocessBinary()
 
     processDataSegments(M, new_eas)
-
+    
     for name in to_recover:
 
         if name in exports:
@@ -1106,6 +1191,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
 
     sys.stdout.write("Recovered {0} functions.\n".format(recovered_fns))
     sys.stdout.write("Saving to: {0}\n".format(outf.name))
+
 
 def isFwdExport(iname, ea):
     l = ea
@@ -1195,7 +1281,7 @@ def parseTypeString(typestr, ea):
 def getExportType(name, ep):
     try:
         DEBUG("Processing export name: {} at: {:x}\n".format(name, ep))
-        args, conv, ret = getFromEMAP(name)
+        args, conv, ret, sign = getFromEMAP(name)
     except KeyError as ke:
         tp = idc.GetType(ep);
         if tp is None or "__" not in tp: 
@@ -1240,7 +1326,7 @@ def generateDefFile(defname, eps):
 def makeArgStr(name, declaration):
 
     argstr = "void"
-    args, conv, ret = getFromEMAP(name)
+    args, conv, ret, sign = getFromEMAP(name)
 
     # return blank string for void calls
     if not declaration and args == 0:

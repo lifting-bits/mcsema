@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Instrs_bitops.h"
 
 using namespace llvm;
+//using namespace x86;
 
 Value* emit_aullshr(BasicBlock *&b, BasicBlock *nextb) {
 

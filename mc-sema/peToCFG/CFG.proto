@@ -52,6 +52,7 @@ message ExternalFunction {
     required    bool              has_return = 3;
     required    bool              no_return = 4;
     required    int32             argument_count = 5;
+    optional 	string 			  signature = 6;
 }
 
 message ExternalData {
@@ -63,6 +64,7 @@ message ExternalData {
 message DataSymbol {
     required int64 base_address = 1;
     required string symbol_name = 2;
+    required int32 symbol_size = 3;
 }
 
 message Data {

@@ -16,6 +16,7 @@
 #include "TransExcn.h"
 #include "raiseX86.h"
 #include "RegisterUsage.h"
+#include "ArchOps.h"
 
 #include "../common/to_string.h"
 
@@ -26,6 +27,15 @@ extern llvm::GlobalVariable* g_StateBackup;
 extern llvm::PointerType *g_PRegStruct;
 
 static bool added_callbacks = false;
+
+static CallingConv::ID getCallingConv(Module *M){
+	if(getSystemArch(M) == _X86_){
+		return CallingConv::C;
+	} else {
+		return CallingConv::X86_64_Win64;
+	}
+}
+
 
 Value* win32GetStackSize(Module *M, BasicBlock *&driverBB) {
     Value *pTEB = win32GetTib(driverBB);
@@ -44,8 +54,22 @@ Value *win32FreeStack(Value *stackAlloc, BasicBlock *&driverBB) {
 }
 
 // GEP to get a reg from pro_int_call return
+#define READ_REG_OPAQUE64(varname, reg, opaque) do {  \
+        int   reg_off = x86_64::getRegisterOffset(reg);        \
+        Value *reg_GEPV[] = {                       \
+          CONST_V<64>(driver_block, 0),             \
+          CONST_V<32>(driver_block, reg_off)        \
+        };                                          \
+        varname = GetElementPtrInst::Create(        \
+                 opaque,                            \
+                 reg_GEPV,                          \
+                 "",                                \
+                 driver_block);                     \
+    } while(0);
+
+// GEP to get a reg from pro_int_call return
 #define READ_REG_OPAQUE(varname, reg, opaque) do {  \
-        int   reg_off = getRegisterOffset(reg);        \
+        int   reg_off = x86::getRegisterOffset(reg);        \
         Value *reg_GEPV[] = {                       \
           CONST_V<32>(driver_block, 0),             \
           CONST_V<32>(driver_block, reg_off)        \
@@ -56,7 +80,6 @@ Value *win32FreeStack(Value *stackAlloc, BasicBlock *&driverBB) {
                  "",                                \
                  driver_block);                     \
     } while(0);                                     
-
 
 static Function *getCallbackPrologueInternal(Module *M) {
 
@@ -77,18 +100,19 @@ static Function *getCallbackEpilogue(Module *M) {
 // type of internal callback handler
 static FunctionType    *GetCBInternalFnTy(Module *M) {
 
-    Type *int32ty = Type::getInt32Ty(M->getContext());
-    Type *int32PtrTy = PointerType::get(int32ty, 0);
+	unsigned regWidth = getPointerSize(M);
+    Type *intTy = Type::getIntNTy(M->getContext(), regWidth);
+    Type *intPtrTy = PointerType::get(IntegerType::get(M->getContext(), regWidth), 0);
     Type *voidstar = PointerType::get(
             Type::getInt8Ty(M->getContext()), 
             0);
 
     std::vector<Type*>	cb_internal_args;
-    cb_internal_args.push_back(int32PtrTy);     // int *retv
+    cb_internal_args.push_back(intPtrTy);     // int *retv
     cb_internal_args.push_back(voidstar);       // void* esp
-    cb_internal_args.push_back(int32ty);        // int ebp
+    cb_internal_args.push_back(intTy);        // int ebp
     FunctionType    *FuncTy_CBInternal = 
-        FunctionType::get(int32ty,
+        FunctionType::get(intTy,
                 cb_internal_args,
                 false);
 
@@ -106,7 +130,7 @@ static Function *win32MakeCallbackInternal(Module *M, VA local_target) {
             0);
     Function *Fpro_internal = getCallbackPrologueInternal(M);
     Function *Fepi = getCallbackEpilogue(M);
-    Type *int32ty = Type::getInt32Ty(M->getContext());
+    //Type *int32ty = Type::getInt32Ty(M->getContext());
 
 
     Function *F = dynamic_cast<Function*>(M->getOrInsertFunction(fname, callbackTy));
@@ -137,8 +161,8 @@ static Function *win32MakeCallbackInternal(Module *M, VA local_target) {
     pro_args.push_back(new_stack);  // void**
 
     // call callback_adapter_internal
-	CallInst *pro_int_call = CallInst::Create(Fpro_internal, pro_args, "", driver_block);
-	pro_int_call->setCallingConv(CallingConv::X86_StdCall);
+    CallInst *pro_int_call = CallInst::Create(Fpro_internal, pro_args, "", driver_block);
+    pro_int_call->setCallingConv(CallingConv::X86_StdCall);
 
 
     // cast to g_pRegState?
@@ -147,7 +171,12 @@ static Function *win32MakeCallbackInternal(Module *M, VA local_target) {
     // old_esp = rs->ESP
     // GEP to get ESP from pro_int_call return
     Value *rs_esp;
-    READ_REG_OPAQUE(rs_esp, ESP, pro_int_call);
+
+    if(getSystemArch(M) == _X86_64_) {
+        READ_REG_OPAQUE64(rs_esp, RSP, pro_int_call);
+    } else {
+        READ_REG_OPAQUE(rs_esp, ESP, pro_int_call);
+    }
 
     LoadInst* orig_ESP = new LoadInst(rs_esp, "", false, driver_block);
     
@@ -161,23 +190,32 @@ static Function *win32MakeCallbackInternal(Module *M, VA local_target) {
             g_PRegStruct, 
             "", 
             driver_block);
-
+#if 0
     std::vector<Value*>	realArgs;
     realArgs.push_back(gpreg_struct);
 
 	CallInst *real_call = CallInst::Create(Freal, realArgs, "", driver_block);
     real_call->setCallingConv(CallingConv::X86_StdCall);
     real_call->setIsNoInline();
-
+#endif
     // retv = rs->EAX;
     Value *rs_eax;
-    READ_REG_OPAQUE(rs_eax, EAX, gpreg_struct);
+    if(getSystemArch(M) == _X86_64_) {
+        READ_REG_OPAQUE64(rs_eax, RAX, gpreg_struct);
+    } else {
+        READ_REG_OPAQUE(rs_eax, EAX, gpreg_struct);
+    }
     LoadInst *eax_val = new LoadInst(rs_eax, "", false, driver_block);
 
 
     // *esp_diff = orig_esp - rs->ESP;
     Value *rs_esp_new;
-    READ_REG_OPAQUE(rs_esp_new, ESP, gpreg_struct);
+    if(getSystemArch(M) == _X86_64_) {
+        READ_REG_OPAQUE64(rs_esp_new, RSP, gpreg_struct);
+    } else {
+        READ_REG_OPAQUE(rs_esp_new, ESP, gpreg_struct);
+    }
+
     LoadInst* new_esp_val = new LoadInst(rs_esp_new, "", false, driver_block);
     Value *esp_diff = BinaryOperator::Create(
             Instruction::Sub, 
@@ -206,6 +244,8 @@ static Function *win32MakeCallbackInternal(Module *M, VA local_target) {
 static Function *win32MakeCallbackStub(Module *M, VA local_target) {
 
     //lookup local function in the module
+	unsigned regWidth = getPointerSize(M);
+
     std::string			fname = "callback_sub_"+to_string<VA>(local_target, std::hex);
 
     std::string			call_tgt_name = "callback_sub_"+
@@ -217,7 +257,7 @@ static Function *win32MakeCallbackStub(Module *M, VA local_target) {
 
     // no driver, make one
     FunctionType    *callbackTy = 
-        FunctionType::get( Type::getInt32Ty(M->getContext()), false );
+        FunctionType::get( Type::getIntNTy(M->getContext(), regWidth), false );
 
     Function *F = dynamic_cast<Function*>(M->getOrInsertFunction(fname, callbackTy));
     TASSERT( F != NULL, "Cannot create callback stub" );
@@ -232,26 +272,41 @@ static Function *win32MakeCallbackStub(Module *M, VA local_target) {
     cb_args.push_back(PointerType::get(GetCBInternalFnTy(M), 0));
     FunctionType    *FuncTy_CBStub = FunctionType::get(
                 // int32 return since the function needs this prototype
-                Type::getInt32Ty(M->getContext()),
+                Type::getIntNTy(M->getContext(), regWidth),
                 cb_args,
                 false);
-
-    InlineAsm* func_body = InlineAsm::get(FuncTy_CBStub, 
-            "movl	%esp, %eax\n"
-            "subl	$$4, %esp\n"
-            "pushl	%ebp\n"
-            "pushl	%eax\n"
-            "subl	$$4, %eax\n"
-            "pushl	%eax\n"
-            "calll	$1\n"
-            "addl   $$12, %esp\n"
-            "movl	(%esp), %ecx\n"
-            "addl	$$4, %esp\n"
-            "subl	%ecx, %esp\n"
-            "jmpl	*(%esp,%ecx)\n",
-            "={eax},*imr,~{eax},~{ecx},~{dirflag},~{fpsr},~{flags}",
-            true);
-
+    InlineAsm* func_body = nullptr;
+    if(getSystemArch(M) == _X86_64_) {
+        func_body = InlineAsm::get(FuncTy_CBStub,
+                "movq	%rsp, %rdx\n"
+                "subq	$$8, %rsp\n"
+                "movq   %rbp, %r9\n"
+                "movq	%rsp, %rax\n"
+                "subq	$$8, %rax\n"
+                "movq   %rax, %rcx\n"
+                "call	${1:P}\n"
+                "movq	(%rsp), %rcx\n"
+                "subq	%rcx, %rsp\n"
+                "jmpq	*(%rsp,%rcx)\n",
+                "={rax},*imr,~{rax},~{rcx},~{rdx},~{r9},~{dirflag},~{fpsr},~{flags}",
+                true);
+    } else {
+        func_body = InlineAsm::get(FuncTy_CBStub, 
+                "movl	%esp, %eax\n"
+                "subl	$$4, %esp\n"
+                "pushl	%ebp\n"
+                "pushl	%eax\n"
+                "subl	$$4, %eax\n"
+                "pushl	%eax\n"
+                "calll	$1\n"
+                "addl   $$12, %esp\n"
+                "movl	(%esp), %ecx\n"
+                "addl	$$4, %esp\n"
+                "subl	%ecx, %esp\n"
+                "jmpl	*(%esp,%ecx)\n",
+                "={eax},*imr,~{eax},~{ecx},~{dirflag},~{fpsr},~{flags}",
+                true);
+    }
     std::vector<Value*> asm_args;
     asm_args.push_back(call_tgt);
 
@@ -297,7 +352,9 @@ static void call_with_alt_stack(Module* M,
                                 BasicBlock *B) 
 {
     std::vector<Type*>SetEspTy_args;
-    Type *int32ty = IntegerType::getInt32Ty(M->getContext());
+    unsigned regWidth = getPointerSize(M);
+
+    Type *int32ty = IntegerType::getIntNTy(M->getContext(), regWidth);
     PointerType* int32ty_ptr = PointerType::get(int32ty, 0);
 
     std::vector<Type*>NoArgFuncTy_args;
@@ -329,21 +386,36 @@ static void call_with_alt_stack(Module* M,
             /*Result=*/Type::getVoidTy(M->getContext()),
             /*Params=*/SetEspTy_args,
             /*isVarArg=*/false);
-
-    InlineAsm* ptr_26 = InlineAsm::get(SetEspTy, 
-            "movl $0, %esp\n" // real esp = translator esp
-            "calll *$1\n"     // call the unkown function
-            "pushl %eax\n"    // save return value
-            "movl %esp, %eax\n" // save pointer to return value and the esp val
-            "movl $2, %esp\n" // restore orignal esp
-            "movl (%eax), %ecx\n"
-            "movl %ecx, $3\n" // get the return value
-            "leal 4(%eax), %ecx\n" // get original esp value (before push eax)
-            "movl %ecx, $4\n",
-            // eax, ecx, edx, can be clobbered by stdcall and cdecl functions
-            "mr,r,r,*mr,*mr,~{eax},~{ecx},~{edx},~{dirflag},~{fpsr},~{flags}",
-            true);
-
+    InlineAsm* ptr_26 = nullptr;
+    if(getSystemArch(M) == _X86_64_) {
+        ptr_26 = InlineAsm::get(SetEspTy,
+                "movq $0, %rsp\n" // real esp = translator esp
+                "callq *$1\n"     // call the unkown function
+                "pushq %rax\n"    // save return value
+                "movq %rsp, %rax\n" // save pointer to return value and the esp val
+                "movq $2, %rsp\n" // restore orignal esp
+                "movq (%rax), %rcx\n"
+                "movq %rcx, $3\n" // get the return value
+                "leaq 8(%rax), %rcx\n" // get original esp value (before push eax)
+                "movq %rcx, $4\n",
+                // eax, ecx, edx, can be clobbered by stdcall and cdecl functions
+                "mr,r,r,*mr,*mr,~{rax},~{rcx},~{rdx},~{dirflag},~{fpsr},~{flags}",
+                true);
+    } else {
+        ptr_26 = InlineAsm::get(SetEspTy, 
+                "movl $0, %esp\n" // real esp = translator esp
+                "calll *$1\n"     // call the unkown function
+                "pushl %eax\n"    // save return value
+                "movl %esp, %eax\n" // save pointer to return value and the esp val
+                "movl $2, %esp\n" // restore orignal esp
+                "movl (%eax), %ecx\n"
+                "movl %ecx, $3\n" // get the return value
+                "leal 4(%eax), %ecx\n" // get original esp value (before push eax)
+                "movl %ecx, $4\n",
+                // eax, ecx, edx, can be clobbered by stdcall and cdecl functions
+                "mr,r,r,*mr,*mr,~{eax},~{ecx},~{edx},~{dirflag},~{fpsr},~{flags}",
+                true);
+    }
     vector<Value*> set_esp_args;
     set_esp_args.push_back(new_esp);
     set_esp_args.push_back(target_fn);
@@ -391,16 +463,19 @@ static void call_with_alt_stack(Module* M,
 // CPPBackend output. 
 void win32AddCallValue(Module *mod) {
 
+    unsigned regWidth = getPointerSize(mod);
+
+
     // Type Definitions
     PointerType* Int8PtrTy = PointerType::get(IntegerType::get(mod->getContext(), 8), 0);
 
     std::vector<Type*>FuncCallValueTy_args;
 
-    Type *int32ty = IntegerType::getInt32Ty(mod->getContext());
-    PointerType* int32ty_ptr = PointerType::get(int32ty, 0);
+    Type *integerTy = IntegerType::getIntNTy(mod->getContext(), regWidth);
+    PointerType* integerTy_ptr = PointerType::get(integerTy, 0);
 
     FuncCallValueTy_args.push_back(g_PRegStruct);
-    FuncCallValueTy_args.push_back(int32ty);
+    FuncCallValueTy_args.push_back(integerTy);
 
     FunctionType* FuncCallValueTy = FunctionType::get(
             /*Result=*/Type::getVoidTy(mod->getContext()),
@@ -408,7 +483,7 @@ void win32AddCallValue(Module *mod) {
             /*isVarArg=*/false);
 
     std::vector<Type*>GetEspTy_args;
-    GetEspTy_args.push_back(int32ty_ptr);
+    GetEspTy_args.push_back(integerTy_ptr);
     FunctionType* GetEspTy = FunctionType::get(
             /*Result=*/Type::getVoidTy(mod->getContext()),
             /*Params=*/GetEspTy_args,
@@ -435,7 +510,7 @@ void win32AddCallValue(Module *mod) {
                 /*Type=*/FuncCallValueTy,
                 /*Linkage=*/GlobalValue::InternalLinkage,
                 /*Name=*/"do_call_value", mod); 
-        func_do_call_value->setCallingConv(CallingConv::C);
+        func_do_call_value->setCallingConv(getCallingConv(mod)/*CallingConv::C*/);
         func_do_call_value->addFnAttr(Attribute::AlwaysInline);
     }
 
@@ -457,19 +532,28 @@ void win32AddCallValue(Module *mod) {
 
         // spill locals and get all registers from
         // struct.regs
-        allocateLocals(func_do_call_value, 32);
-        writeContextToLocals(main_block, 32, ABICallSpill);
+        allocateLocals(func_do_call_value, regWidth);
+        writeContextToLocals(main_block, regWidth, ABICallSpill);
 
         // create a pointer from the register value that would
         // have been passed in here. 
         // We can't call an int32, need to call a function pointer
         Value *target_fn = new llvm::IntToPtrInst(arg1, NoArgFuncPtrTy, "", main_block);
 
-        // temporarily hold the current ESP value
-        AllocaInst* temp_var = new AllocaInst(int32ty, "", main_block);
+        // temporarily hold the current ESP/RSP value
+        AllocaInst* temp_var = new AllocaInst(integerTy, "", main_block);
 
-        // read ESP value
-        InlineAsm* get_esp_asm = InlineAsm::get(GetEspTy, "movl %esp, $0", "=*imr,~{dirflag},~{fpsr},~{flags}",false);
+        // read ESP/RSP value
+        InlineAsm* get_esp_asm = nullptr;
+        if (getSystemArch(mod) == _X86_64_) {
+            get_esp_asm = InlineAsm::get(GetEspTy, "movq %rsp, $0", "=*imr,~{dirflag},~{fpsr},~{flags}",false);
+        } else if (getSystemArch(mod) == _X86_) {
+            get_esp_asm = InlineAsm::get(GetEspTy, "movl %esp, $0", "=*imr,~{dirflag},~{fpsr},~{flags}",false);
+        } else {
+            // unsupported arch
+            TASSERT(false, "Unsupported architecturen in target triple");
+        }
+
         vector<Value*> get_esp_args;
         get_esp_args.push_back(temp_var);
         CallInst* ignored_value = CallInst::Create(get_esp_asm, get_esp_args, "", main_block);
@@ -506,7 +590,16 @@ void win32AddCallValue(Module *mod) {
         StoreInst* save_esp = new StoreInst(int_esp_val, g_StateBackup, true, main_block);
 
         // read the esp value in struct.regs
-        Value *reg_esp = R_READ<32>(main_block, X86::ESP);
+        Value *reg_esp = nullptr;
+        if (getSystemArch(mod) == _X86_64_) {
+            reg_esp = R_READ<64>(main_block, X86::RSP);
+        } else if (getSystemArch(mod) == _X86_) {
+            reg_esp = R_READ<32>(main_block, X86::ESP);
+        } else {
+            // unsupported arch
+            TASSERT(false, "Unsupported architecturen in target triple");
+        }
+
         Value *old_esp = new LoadInst(g_StateBackup ,"", main_block);
         //Value *reg_esp = reg_read_custom(arg0, "ESP", main_block);
 
@@ -514,8 +607,8 @@ void win32AddCallValue(Module *mod) {
         // call target_fn
         // restore esp to old_esp
         // save EAX in retv
-        Value *retv = new AllocaInst(int32ty, "", main_block);
-        Value *new_esp = new AllocaInst(int32ty, "", main_block);
+        Value *retv = new AllocaInst(integerTy, "", main_block);
+        Value *new_esp = new AllocaInst(integerTy, "", main_block);
 
 
         call_with_alt_stack(mod, reg_esp, target_fn, old_esp, retv, new_esp, main_block);
@@ -523,9 +616,16 @@ void win32AddCallValue(Module *mod) {
         // write eax to register context
         LoadInst *retv_val = new LoadInst(retv, "", main_block);
         LoadInst *new_esp_val = new LoadInst(new_esp, "", main_block);
-        R_WRITE<32>(main_block, X86::EAX, retv_val);
-        R_WRITE<32>(main_block, X86::ESP, new_esp_val);
-
+        if (getSystemArch(mod) == _X86_64_) {
+            R_WRITE<64>(main_block, X86::RAX, retv_val);
+            R_WRITE<64>(main_block, X86::RSP, new_esp_val);
+        } else if (getSystemArch(mod) == _X86_) {
+            R_WRITE<32>(main_block, X86::EAX, retv_val);
+            R_WRITE<32>(main_block, X86::ESP, new_esp_val);
+        } else {
+            // unsupported arch
+            TASSERT(false, "Unsupported architecturen in target triple");
+        }
         //////////////////////////////////////////////////////
         // restore original thread's stack information
         win32SetStackBase(tib,main_block, sbase);
@@ -533,8 +633,7 @@ void win32AddCallValue(Module *mod) {
         win32SetAllocationBase(tib,main_block, abase);
         /////////////////////////////////////////////////////
 
-
-        writeLocalsToContext(main_block, 32, ABIRetStore);
+        writeLocalsToContext(main_block, regWidth, ABIRetStore);
 
         // return
         ReturnInst::Create(mod->getContext(), main_block);

@@ -9,13 +9,13 @@ ${CC} -O2 -ggdb -m32 -c -o sailboat.o sailboat.c
 if [ -e "${IDA_PATH}/idaq" ]
 then
     echo "Using IDA to recover CFG"
-    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -func-map=sailboat.txt -entry-symbol=keycomp -i=sailboat.o>> /dev/null
+    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -march=x86 -func-map=sailboat.txt -entry-symbol=keycomp -i=sailboat.o>> /dev/null
 else
     echo "Using bin_descend to recover CFG"
-    ${BIN_DESCEND_PATH}/bin_descend -func-map=sailboat.txt -entry-symbol=keycomp -i=sailboat.o
+    ${BIN_DESCEND_PATH}/bin_descend -march=x86 -func-map=sailboat.txt -entry-symbol=keycomp -i=sailboat.o
 fi
 
-${CFG_TO_BC_PATH}/cfg_to_bc -i sailboat.cfg -driver=sailboat,keycomp,1,return,C -o sailboat.bc
+${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=i686-pc-linux-gnu -i sailboat.cfg -driver=sailboat,keycomp,1,return,C -o sailboat.bc
 
 ${LLVM_PATH}/opt -O3 -o sailboat_opt.bc sailboat.bc
 ${LLVM_PATH}/llc -filetype=obj -o sailboat_mine.o sailboat_opt.bc

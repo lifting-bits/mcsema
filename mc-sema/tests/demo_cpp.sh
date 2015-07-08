@@ -13,13 +13,13 @@ ${CXX} -ggdb -m32 -o demo_cpp demo_cpp.cpp
 if [ -e "${IDA_PATH}/idaq" ]
 then
     echo "Using IDA to recover CFG"
-    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -ignore-native-entry-points -d -func-map=linux_map.txt -i=demo_cpp -entry-symbol=main>> /dev/null
+    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -march=x86 -ignore-native-entry-points -d -func-map=linux_map.txt -i=demo_cpp -entry-symbol=main>> /dev/null
 else
     echo "Using bin_descend to recover CFG"
-    ${BIN_DESCEND_PATH}/bin_descend -ignore-native-entry-points -d -func-map=linux_map.txt -i=demo_cpp -entry-symbol=main
+    ${BIN_DESCEND_PATH}/bin_descend -march=x86 -ignore-native-entry-points -d -func-map=linux_map.txt -i=demo_cpp -entry-symbol=main
 fi
 
-${CFG_TO_BC_PATH}/cfg_to_bc -i demo_cpp.cfg -driver=mcsema_main,main,2,return,C -o demo_cpp.bc
+${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=i686-pc-linux-gnu -i demo_cpp.cfg -driver=mcsema_main,main,2,return,C -o demo_cpp.bc
 
 ${LLVM_PATH}/opt -O3 -o demo_cpp_opt.bc demo_cpp.bc 
 ${LLVM_PATH}/llc -filetype=obj -o demo_cpp.o demo_cpp_opt.bc

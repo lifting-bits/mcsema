@@ -35,23 +35,46 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "Externals.h"
 #include "ArchOps.h"
 #include <llvm/IR/Attributes.h>
+#include "llvm/Support/Debug.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
 
 using namespace llvm;
 
+static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
+  //isn't this exciting
+  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
+  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
+  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
+  return ContinueBlock;
+}
+
+GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
+
 template <int width>
 static void doPushVT(InstPtr ip, BasicBlock *&b, Value *v) {
     //ESP <- ESP - 4
     //Memory[ESP] = v
-    Value *oldESP = R_READ<32>(b, X86::ESP);
-    Value *newESP =
-        BinaryOperator::CreateSub(oldESP, CONST_V<32>(b, (width / 8)), "", b);
+    if(getPointerSize(b->getParent()->getParent())){
+		Value *oldESP = R_READ<32>(b, X86::ESP);
+		Value *newESP =
+			BinaryOperator::CreateSub(oldESP, CONST_V<32>(b, (width / 8)), "", b);
 
-    Value *intVal = CastInst::CreatePointerCast(v, Type::getInt32Ty(b->getContext()), "", b);
+		Value *intVal = CastInst::CreatePointerCast(v, Type::getInt32Ty(b->getContext()), "", b);
 
-    M_WRITE_0<width>(b, newESP, intVal);
-    R_WRITE<32>(b, X86::ESP, newESP);
+		M_WRITE_0<width>(b, newESP, intVal);
+		R_WRITE<32>(b, X86::ESP, newESP);
+	} else {
+
+		Value *oldESP = R_READ<64>(b, X86::RSP);
+		Value *newESP =
+			BinaryOperator::CreateSub(oldESP, CONST_V<64>(b, (width / 8)), "", b);
+
+		Value *intVal = CastInst::CreatePointerCast(v, Type::getInt64Ty(b->getContext()), "", b);
+
+		M_WRITE_0<width>(b, newESP, intVal);
+		R_WRITE<64>(b, X86::RSP, newESP);
+	}
 
     return;
 }
@@ -60,12 +83,22 @@ template <int width>
 static void doPushV(InstPtr ip, BasicBlock *&b, Value *v) {
     //ESP <- ESP - 4
     //Memory[ESP] = v
-    Value *oldESP = R_READ<32>(b, X86::ESP);
-    Value *newESP =
-        BinaryOperator::CreateSub(oldESP, CONST_V<32>(b, (width / 8)), "", b);
+	llvm::Module *M = b->getParent()->getParent();
+    if(getPointerSize(M) == Pointer32){
+        Value *oldESP = x86::R_READ<32>(b, X86::ESP);
+        Value *newESP =
+                BinaryOperator::CreateSub(oldESP, CONST_V<32>(b, (width / 8)), "", b);
 
-    M_WRITE_0<width>(b, newESP, v);
-    R_WRITE<32>(b, X86::ESP, newESP);
+        M_WRITE_0<width>(b, newESP, v);
+        x86::R_WRITE<32>(b, X86::ESP, newESP);
+    } else {
+        Value *oldRSP = x86_64::R_READ<64>(b, X86::RSP);
+        Value *newRSP =
+                BinaryOperator::CreateSub(oldRSP, CONST_V<64>(b, (width / 8)), "", b);
+
+        M_WRITE_0<width>(b, newRSP, v);
+        x86_64::R_WRITE<64>(b, X86::RSP, newRSP);
+    }
 
     return;
 }
@@ -81,7 +114,7 @@ static InstTransResult doPushAV(InstPtr ip, BasicBlock *b) {
   // Push(EBP);
   // Push(ESI);
   // Push(EDI);
-  Value *Temp = R_READ<width>(b, X86::ESP); 
+  Value *Temp = R_READ<width>(b, X86::ESP);
 
   doPushV<width>(ip, b, R_READ<width>(b, X86::EAX));
   doPushV<width>(ip, b, R_READ<width>(b, X86::ECX));
@@ -95,9 +128,10 @@ static InstTransResult doPushAV(InstPtr ip, BasicBlock *b) {
   return ContinueBlock;
 }
 
-static InstTransResult doEnter(InstPtr ip, BasicBlock      *&b, 
+namespace x86 {
+static InstTransResult doEnter(InstPtr ip, BasicBlock      *&b,
                         const MCOperand &frameSize,
-                        const MCOperand &nestingLevel) 
+                        const MCOperand &nestingLevel)
 {
     Function    *F = b->getParent();
     NASSERT(frameSize.isImm());
@@ -107,38 +141,38 @@ static InstTransResult doEnter(InstPtr ip, BasicBlock      *&b,
     Value   *vNestingLevel = CONST_V<32>(b, nestingLevel.getImm());
 
     //Push EBP
-    doPushV<32>(ip, b, R_READ<32>(b, X86::EBP));
+    doPushV<32>(ip, b, x86::R_READ<32>(b, X86::EBP));
 
     //set FrameTemp equal to the current value in ESP
-    Value   *frameTemp = R_READ<32>(b, X86::ESP);
+    Value   *frameTemp = x86::R_READ<32>(b, X86::ESP);
 
-    //we'll need some blocks for - 
+    //we'll need some blocks for -
     //  * the loop header
-    //  * the loop body 
+    //  * the loop body
     //  * the end of the loop
-    BasicBlock  *loopHeader = 
+    BasicBlock  *loopHeader =
         BasicBlock::Create(b->getContext(), "loopHeader", F);
-    BasicBlock  *loopBody = 
+    BasicBlock  *loopBody =
         BasicBlock::Create(b->getContext(), "loopBody", F);
-    BasicBlock  *loopEnd = 
+    BasicBlock  *loopEnd =
         BasicBlock::Create(b->getContext(), "loopEnd", F);
     BasicBlock  *cont =
         BasicBlock::Create(b->getContext(), "continue", F);
-    BasicBlock  *preLoop = 
+    BasicBlock  *preLoop =
         BasicBlock::Create(b->getContext(), "preLoop", F);
-    BasicBlock  *loopSetup = 
+    BasicBlock  *loopSetup =
         BasicBlock::Create(b->getContext(), "loopSetup", F);
 
     //test to see if NestingLevel is 0
-    Value   *isNestZ = 
-        new ICmpInst(   *b, 
-                        CmpInst::ICMP_EQ, 
+    Value   *isNestZ =
+        new ICmpInst(   *b,
+                        CmpInst::ICMP_EQ,
                         vNestingLevel,
                         CONST_V<32>(b, 0));
     BranchInst::Create(cont, preLoop, isNestZ, b);
 
     //test to see if NestingLevel is greater than 1
-    Value   *testRes = 
+    Value   *testRes =
         new ICmpInst(   *preLoop,
                         CmpInst::ICMP_UGT,
                         vNestingLevel,
@@ -150,14 +184,14 @@ static InstTransResult doEnter(InstPtr ip, BasicBlock      *&b,
     BranchInst::Create(loopHeader, loopSetup);
 
     //the counter is a PHI instruction
-    PHINode *i = 
+    PHINode *i =
         PHINode::Create(Type::getInt32Ty(F->getContext()),
                         2,
                         "",
                         loopHeader);
     i->addIncoming(i_init, loopSetup);
-    //test and see if we should leave 
-    Value   *leaveLoop = 
+    //test and see if we should leave
+    Value   *leaveLoop =
         new ICmpInst(   *loopHeader,
                         CmpInst::ICMP_ULT,
                         i,
@@ -165,14 +199,14 @@ static InstTransResult doEnter(InstPtr ip, BasicBlock      *&b,
     BranchInst::Create(loopBody, loopEnd, leaveLoop, loopHeader);
 
     //subtract 4 from EBP
-    Value   *oEBP = R_READ<32>(loopBody, X86::EBP);
-    Value   *nEBP = 
+    Value   *oEBP = x86::R_READ<32>(loopBody, X86::EBP);
+    Value   *nEBP =
         BinaryOperator::CreateSub(oEBP, CONST_V<32>(loopBody, 4), "", loopBody);
-    R_WRITE<32>(loopBody, X86::EBP, nEBP);
+    x86::R_WRITE<32>(loopBody, X86::EBP, nEBP);
     doPushV<32>(ip, loopBody, nEBP);
 
     //add to the counter
-    Value   *i_inc = 
+    Value   *i_inc =
         BinaryOperator::CreateAdd(i, CONST_V<32>(loopBody, 1), "", loopBody);
     i->addIncoming(i_inc, loopBody);
     BranchInst::Create(loopHeader, loopBody);
@@ -182,40 +216,200 @@ static InstTransResult doEnter(InstPtr ip, BasicBlock      *&b,
     BranchInst::Create(cont, loopEnd);
 
     //write the frame temp into EBP
-    R_WRITE<32>(cont, X86::EBP, frameTemp);
+    x86::R_WRITE<32>(cont, X86::EBP, frameTemp);
     //Subtract the size from ESP
-    Value   *oESP = R_READ<32>(cont, X86::ESP);
-    Value   *nESP = 
+    Value   *oESP = x86::R_READ<32>(cont, X86::ESP);
+    Value   *nESP =
         BinaryOperator::CreateSub(oESP, vFrameSize, "", cont);
-    R_WRITE<32>(cont, X86::ESP, nESP);
+    x86::R_WRITE<32>(cont, X86::ESP, nESP);
 
-    //update our caller to use the 'continue' block as the place to continue 
+    //update our caller to use the 'continue' block as the place to continue
     //sticking instructions
     b = cont;
 
     return ContinueBlock;
 }
+}
+
+namespace x86_64 {
+static InstTransResult doEnter(InstPtr ip, BasicBlock      *&b,
+                        const MCOperand &frameSize,
+                        const MCOperand &nestingLevel)
+{
+    Function    *F = b->getParent();
+    NASSERT(frameSize.isImm());
+    NASSERT(nestingLevel.isImm());
+
+    Value   *vFrameSize = CONST_V<64>(b, frameSize.getImm());
+    Value   *vNestingLevel = CONST_V<64>(b, nestingLevel.getImm());
+
+    //Push EBP
+    doPushV<64>(ip, b, R_READ<64>(b, X86::RBP));
+
+    //set FrameTemp equal to the current value in ESP
+    Value   *frameTemp = R_READ<64>(b, X86::RSP);
+
+    //we'll need some blocks for -
+    //  * the loop header
+    //  * the loop body
+    //  * the end of the loop
+    BasicBlock  *loopHeader =
+        BasicBlock::Create(b->getContext(), "loopHeader", F);
+    BasicBlock  *loopBody =
+        BasicBlock::Create(b->getContext(), "loopBody", F);
+    BasicBlock  *loopEnd =
+        BasicBlock::Create(b->getContext(), "loopEnd", F);
+    BasicBlock  *cont =
+        BasicBlock::Create(b->getContext(), "continue", F);
+    BasicBlock  *preLoop =
+        BasicBlock::Create(b->getContext(), "preLoop", F);
+    BasicBlock  *loopSetup =
+        BasicBlock::Create(b->getContext(), "loopSetup", F);
+
+    //test to see if NestingLevel is 0
+    Value   *isNestZ =
+        new ICmpInst(   *b,
+                        CmpInst::ICMP_EQ,
+                        vNestingLevel,
+                        CONST_V<64>(b, 0));
+
+    BranchInst::Create(cont, preLoop, isNestZ, b);
+
+    //test to see if NestingLevel is greater than 1
+    Value   *testRes =
+        new ICmpInst(   *preLoop,
+                        CmpInst::ICMP_UGT,
+                        vNestingLevel,
+                        CONST_V<64>(b, 1));
+    BranchInst::Create(loopSetup, loopEnd, testRes, preLoop);
+
+    //initialize i to 1
+    Value   *i_init = CONST_V<64>(loopSetup, 1);
+    BranchInst::Create(loopHeader, loopSetup);
+
+    //the counter is a PHI instruction
+    PHINode *i =
+        PHINode::Create(Type::getInt64Ty(F->getContext()),
+                        2,
+                        "",
+                        loopHeader);
+    i->addIncoming(i_init, loopSetup);
+    //test and see if we should leave
+    Value   *leaveLoop =
+        new ICmpInst(   *loopHeader,
+                        CmpInst::ICMP_ULT,
+                        i,
+                        vNestingLevel);
+    BranchInst::Create(loopBody, loopEnd, leaveLoop, loopHeader);
+
+    //subtract 8 from EBP
+    Value   *oEBP = R_READ<64>(loopBody, X86::RBP);
+    Value   *nEBP =
+        BinaryOperator::CreateSub(oEBP, CONST_V<64>(loopBody, 8), "", loopBody);
+    R_WRITE<64>(loopBody, X86::RBP, nEBP);
+    doPushV<64>(ip, loopBody, nEBP);
+
+    //add to the counter
+    Value   *i_inc =
+        BinaryOperator::CreateAdd(i, CONST_V<64>(loopBody, 1), "", loopBody);
+    i->addIncoming(i_inc, loopBody);
+    BranchInst::Create(loopHeader, loopBody);
+
+    //now at the end of the loop, push the frame temp
+    doPushV<64>(ip, loopEnd, frameTemp);
+    BranchInst::Create(cont, loopEnd);
+
+    //write the frame temp into EBP
+    R_WRITE<64>(cont, X86::RBP, frameTemp);
+    //Subtract the size from ESP
+    Value   *oESP = R_READ<64>(cont, X86::RSP);
+    Value   *nESP =
+        BinaryOperator::CreateSub(oESP, vFrameSize, "", cont);
+    R_WRITE<64>(cont, X86::RSP, nESP);
+    //update our caller to use the 'continue' block as the place to continue
+    //sticking instructions
+    b = cont;
+
+    return ContinueBlock;
+}
+}
+
+static InstTransResult doEnter(InstPtr ip, BasicBlock      *&b,
+                        const MCOperand &frameSize,
+                        const MCOperand &nestingLevel)
+{
+	llvm::Module *M = b->getParent()->getParent();
+	if(getPointerSize(M) == Pointer32){
+		return x86::doEnter(ip, b, frameSize, nestingLevel);
+	} else {
+		return x86_64::doEnter(ip, b, frameSize, nestingLevel);
+	}
+}
 
 static InstTransResult doLeave(InstPtr ip,  BasicBlock      *b ) {
     // LEAVE
+	llvm::Module *M = b->getParent()->getParent();
 
-    // read EBP
-    Value   *vEBP = R_READ<32>(b, X86::EBP);
+	if(getPointerSize(M) == Pointer32){
+		// read EBP
+		Value   *vEBP = x86::R_READ<32>(b, X86::EBP);
 
-    //write this to ESP
-    R_WRITE<32>(b, X86::ESP, vEBP);
+		//write this to ESP
+		x86::R_WRITE<32>(b, X86::ESP, vEBP);
 
-    //do a pop into EBP
-    //read from memory at the top of the stack
-    Value   *vESP = R_READ<32>(b, X86::ESP);
-    Value   *atTop = M_READ<32>(ip, b, vESP);
+		//do a pop into EBP
+		//read from memory at the top of the stack
+		Value   *vESP = x86::R_READ<32>(b, X86::ESP);
+		Value   *atTop = M_READ<32>(ip, b, vESP);
 
-    //write this value into EBP
-    R_WRITE<32>(b, X86::EBP, atTop);
+		//write this value into EBP
+		x86::R_WRITE<32>(b, X86::EBP, atTop);
 
-    //add 4 to the stack pointer
-    Value   *updt = BinaryOperator::CreateAdd(vESP, CONST_V<32>(b, 4), "", b);
-    R_WRITE<32>(b, X86::ESP, updt);
+		//add 4 to the stack pointer
+		Value   *updt = BinaryOperator::CreateAdd(vESP, CONST_V<32>(b, 4), "", b);
+		x86::R_WRITE<32>(b, X86::ESP, updt);
+	} else {
+		Value   *vEBP = x86_64::R_READ<64>(b, X86::RBP);
+
+		//write this to ESP
+		x86_64::R_WRITE<64>(b, X86::RSP, vEBP);
+
+		//do a pop into EBP
+		//read from memory at the top of the stack
+		Value   *vESP = x86_64::R_READ<64>(b, X86::RSP);
+		Value   *atTop = M_READ<64>(ip, b, vESP);
+
+		//write this value into EBP
+		x86_64::R_WRITE<64>(b, X86::RBP, atTop);
+
+		//add 4 to the stack pointer
+		Value   *updt = BinaryOperator::CreateAdd(vESP, CONST_V<64>(b, 8), "", b);
+		x86_64::R_WRITE<64>(b, X86::RSP, updt);
+	}
+
+    return ContinueBlock;
+}
+
+static InstTransResult doLeave64(InstPtr ip,  BasicBlock      *b ) {
+    // LEAVE
+
+	// read RBP
+	Value   *vRBP = x86_64::R_READ<64>(b, X86::RBP);
+
+	//write this to RSP
+	x86_64::R_WRITE<64>(b, X86::RSP, vRBP);
+
+	//do a pop into EBP
+	//read from memory at the top of the stack
+	Value   *vRSP = x86_64::R_READ<64>(b, X86::RSP);
+	Value   *atTop = M_READ<64>(ip, b, vRSP);
+
+	//write this value into EBP
+	x86_64::R_WRITE<64>(b, X86::RBP, atTop);
+
+	//add 8 to the stack pointer
+	Value   *updt = BinaryOperator::CreateAdd(vRSP, CONST_V<64>(b, 8), "", b);
+	x86_64::R_WRITE<64>(b, X86::RSP, updt);
 
     return ContinueBlock;
 }
@@ -223,21 +417,37 @@ static InstTransResult doLeave(InstPtr ip,  BasicBlock      *b ) {
 template <int width>
 static InstTransResult doPopR(InstPtr ip, BasicBlock *&b, const MCOperand &dst) {
     NASSERT(dst.isReg());
-    //read the stack pointer
-    Value *oldESP = R_READ<32>(b, X86::ESP);
+    llvm::Module *M = b->getParent()->getParent();
+
+	//read the stack pointer
+    Value *oldRSP;
+
+	if(getPointerSize(M) == Pointer32){
+		oldRSP= x86::R_READ<32>(b, X86::ESP);
+	} else {
+		oldRSP= x86_64::R_READ<64>(b, X86::RSP);
+	}
 
     //read the value from the memory at the stack pointer address
-    Value *m = M_READ_0<width>(b, oldESP);
+    Value *m = M_READ_0<width>(b, oldRSP);
 
     //write that value into dst
     R_WRITE<width>(b, dst.getReg(), m);
 
     //add to the stack pointer
-    Value *newESP =
-        BinaryOperator::CreateAdd(oldESP, CONST_V<32>(b, (width / 8)), "", b);
+	if(getPointerSize(M) == Pointer32){
+		Value *newESP =
+			BinaryOperator::CreateAdd(oldRSP, CONST_V<32>(b, (width / 8)), "", b);
 
-    //update the stack pointer register
-    R_WRITE<32>(b, X86::ESP, newESP);
+		//update the stack pointer register
+		x86::R_WRITE<32>(b, X86::ESP, newESP);
+	} else {
+		Value *newRSP =
+			BinaryOperator::CreateAdd(oldRSP, CONST_V<64>(b, (width / 8)), "", b);
+
+		//update the stack pointer register
+		x86_64::R_WRITE<64>(b, X86::RSP, newRSP);
+	}
 
     return ContinueBlock;
 }
@@ -247,7 +457,7 @@ static InstTransResult doPopD(InstPtr ip, BasicBlock *b) {
     //read the stack pointer
     Value *oldESP = R_READ<32>(b, X86::ESP);
 
-    //read the value from the memory at the stack pointer address, 
+    //read the value from the memory at the stack pointer address,
     //and throw it away
     Value *m = M_READ_0<width>(b, oldESP);
     NASSERT(m != NULL);
@@ -273,7 +483,7 @@ static InstTransResult doPopAV(InstPtr ip, BasicBlock *b) {
   // EDX := Pop();
   // ECX := Pop();
   // EAX := Pop();
-  
+
   doPopR<width>(ip, b, MCOperand::CreateReg(X86::EDI));
   doPopR<width>(ip, b, MCOperand::CreateReg(X86::ESI));
   doPopR<width>(ip, b, MCOperand::CreateReg(X86::EBP));
@@ -290,10 +500,11 @@ template <int width>
 static InstTransResult doPushR(InstPtr ip, BasicBlock *&b, const MCOperand &src) {
     //PUSH <r>
     NASSERT(src.isReg());
-    //first, read from <r> into a temp
-    Value *TMP = R_READ<width>(b, src.getReg());
 
-    doPushV<width>(ip, b, TMP);
+    //first, read from <r> into a temp
+	Value *TMP = R_READ<width>(b, src.getReg());
+
+	doPushV<width>(ip, b, TMP);
 
     return ContinueBlock;
 }
@@ -309,13 +520,13 @@ static InstTransResult doPushI(InstPtr ip, BasicBlock *&b, const MCOperand &src)
     Value *SExt_Val = OrigIMM;
 
     // PUSHi8 is extended to operand size, which is 32
-    if( width == 8 ) 
+    if( width == 8 )
     {
-        SExt_Val = new SExtInst(OrigIMM, 
+        SExt_Val = new SExtInst(OrigIMM,
                 Type::getInt32Ty(b->getContext()),
                 "", b);
         doPushV<32>(ip, b, SExt_Val);
-    } 
+    }
     else
     {
         if( width == 32 && ip->has_ext_call_target() ) {
@@ -379,7 +590,7 @@ static Value *getValueForExternal(Module *M, InstPtr ip, BasicBlock *block) {
 
         TASSERT(gvar != NULL, "Could not find external data: " + target);
 
-        
+
         if(gvar->getType()->isPointerTy()) {
             addrInt = new PtrToIntInst(
                     gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
@@ -390,7 +601,7 @@ static Value *getValueForExternal(Module *M, InstPtr ip, BasicBlock *block) {
                 throw TErr(__LINE__, __FILE__, "NIY: non-integer external data");
             }
             else if(int_t->getBitWidth() < width) {
-                addrInt = new ZExtInst(gvar, 
+                addrInt = new ZExtInst(gvar,
                         Type::getIntNTy(block->getContext(), width),
                         "",
                         block);
@@ -421,7 +632,7 @@ static InstTransResult doPushRMM(InstPtr ip, BasicBlock *&b, Value *addr) {
   return ContinueBlock;
 }
 
-static InstTransResult translate_PUSH32rmm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) 
+static InstTransResult translate_PUSH32rmm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst)
 {
     InstTransResult ret;
     Function *F = block->getParent();
@@ -433,10 +644,10 @@ static InstTransResult translate_PUSH32rmm(NativeModulePtr natM, BasicBlock *& b
     }
     else if( ip->is_data_offset() ) {
         ret = doPushRMM<32>(ip, block, GLOBAL( block, natM, inst, ip, 0) );
-    } else { 
+    } else {
         ret = doPushRMM<32>(ip, block, ADDR(0) );
     }
-    return ret ; 
+    return ret ;
 }
 
 static InstTransResult translate_PUSHi32(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
@@ -485,7 +696,7 @@ static InstTransResult doPushF(InstPtr ip, BasicBlock *b) {
     // bit 1: 1 (reserved)
     // bit 2: PF
     EMIT_SHL_OR(cur_flags, pf, 2);
-    // bit 3: 0    
+    // bit 3: 0
     // bit 4: AF
     EMIT_SHL_OR(cur_flags, af, 4);
     // bit 5: 0
@@ -507,32 +718,39 @@ static InstTransResult doPushF(InstPtr ip, BasicBlock *b) {
     return ContinueBlock;
 }
 
+GENERIC_TRANSLATION(PUSHF64, doPushF<64>(ip, block))
 GENERIC_TRANSLATION(PUSHF32, doPushF<32>(ip, block))
 //GENERIC_TRANSLATION(PUSHF16, doPushF<16>(ip, block))
 GENERIC_TRANSLATION(ENTER, doEnter(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(LEAVE, doLeave(ip, block))
+GENERIC_TRANSLATION(LEAVE64, doLeave64(ip, block))
 GENERIC_TRANSLATION(POP16r, doPopR<16>(ip, block, OP(0)))
 GENERIC_TRANSLATION(POP32r, doPopR<32>(ip, block, OP(0)))
+
+GENERIC_TRANSLATION(POP64r, doPopR<64>(ip, block, OP(0)))
+
 GENERIC_TRANSLATION(PUSH16r, doPushR<16>(ip, block, OP(0)))
 GENERIC_TRANSLATION(PUSH32r, doPushR<32>(ip, block, OP(0)))
+GENERIC_TRANSLATION(PUSH64r, doPushR<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION(POPA32, doPopAV<32>(ip, block));
 GENERIC_TRANSLATION(PUSHA32, doPushAV<32>(ip, block));
-//GENERIC_TRANSLATION_MEM(PUSH32rmm, 
+//GENERIC_TRANSLATION_MEM(PUSH32rmm,
 //        doPushRMM<32>(ip, block, ADDR(0)),
 //        doPushRMM<32>(ip, block, STD_GLOBAL_OP(0)));
-GENERIC_TRANSLATION_MEM(PUSHi8, 
+GENERIC_TRANSLATION_MEM(PUSHi8,
         doPushI<8>(ip, block, OP(0)),
         doPushV<8>(ip, block, STD_GLOBAL_OP(0) ))
-GENERIC_TRANSLATION_MEM(PUSHi16, 
+GENERIC_TRANSLATION_MEM(PUSHi16,
         doPushI<16>(ip, block, OP(0)),
         doPushV<16>(ip, block, STD_GLOBAL_OP(0) ))
-GENERIC_TRANSLATION_MEM(POP32rmm, 
+GENERIC_TRANSLATION_MEM(POP32rmm,
         doPopM<32>(ip, block, ADDR(0)),
         doPopM<32>(ip, block, STD_GLOBAL_OP(0)));
 
 void Stack_populateDispatchMap(DispatchMap &m) {
         m[X86::ENTER] = translate_ENTER;
         m[X86::LEAVE] = translate_LEAVE;
+		m[X86::LEAVE64] = translate_LEAVE64;
         m[X86::POP16r] = translate_POP16r;
         m[X86::POP32r] = translate_POP32r;
         m[X86::PUSH16r] = translate_PUSH16r;
@@ -545,4 +763,8 @@ void Stack_populateDispatchMap(DispatchMap &m) {
         m[X86::PUSHA32] = translate_PUSHA32;
         m[X86::PUSHF32] = translate_PUSHF32;
         m[X86::POP32rmm] = translate_POP32rmm;
+
+        m[X86::PUSH64r] = translate_PUSH64r;
+        m[X86::POP64r] = translate_POP64r;
+        m[X86::PUSHF64] = translate_PUSHF64;
 }

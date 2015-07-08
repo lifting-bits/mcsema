@@ -6,16 +6,8 @@ from os.path import join, dirname, splitext
 import os
 
 
-ida_env = os.getenv("IDA_PATH")
-if ida_env:
-    if os.name is "posix":
-        ida_name = "idal"
-    else:
-        ida_name = "idaq.exe"
-
-    ida_env = join(ida_env, ida_name)
-
-IDA_EXE = ida_env or r"C:\Program Files\IDA 6.5\idaq.exe"
+IDA_ENV = os.getenv("IDA_PATH")
+IDA_ARCH = "x86"
 
 cfg_py_env = os.getenv("GET_CFG_PY")
 
@@ -31,6 +23,24 @@ ARGS_TO_SKIP = ('-mc-x86-disable-arith-relaxation',
 
 UNSUPPORTED_ARGS = ('-e=',)
 
+def set_ida_name(arch):
+    valid_arches = ['x86', 'x86-64']
+    if arch not in valid_arches:
+        sys.stderr.write("Invalid architecture: {}. Expected one of: {}\n".format(arch, valid_arches))
+        sys.exit(-3)
+
+    if arch == 'x86-64':
+        arch_suffix = "64"
+    else:
+        arch_suffix = ""
+
+    if os.name == "posix":
+        ida_name = "idal"
+    else:
+        ida_name = "idaq"
+
+    return "".join([ida_name, arch_suffix])
+
 
 def decommafy(arg):
     (argname, argval) = arg.split('=')
@@ -38,6 +48,15 @@ def decommafy(arg):
 
     return argvals
 
+def set_ida_arch(arg):
+    global IDA_ARCH
+    argn, val = arg.split('=')
+    val_low = val.lower()
+    IDA_ARCH = val_low
+
+    # we only set global vars, no need to extend 
+    # the args we pass on to ida itself
+    return False
 
 def do_entry_symbol(arg):
     return_args = ['--entry-symbol']
@@ -63,6 +82,7 @@ if __name__ == "__main__":
                     lambda x: x.startswith('-func-map=') : do_func_map,
                     lambda x: x == '-help': lambda  y: ['--help'],
                     lambda x: x == '-d': lambda y: ['--debug'],
+                    lambda x: x.startswith("-march=") : set_ida_arch,
                   }
 
     input_file = None
@@ -87,7 +107,9 @@ if __name__ == "__main__":
         # process other args
         for k,v in argproc_map.iteritems():
             if k(arg):
-                new_args.extend(v(arg))
+                more_args = v(arg)
+                if(more_args):
+                    new_args.extend(more_args)
 
 
     # post-processing
@@ -104,7 +126,13 @@ if __name__ == "__main__":
     internal_args.extend(new_args)
 
     argstr = " ".join(internal_args)
+    
+    if IDA_ENV is None:
+        sys.stderr.write("Please Set IDA_PATH before calling this script\n")
+        sys.exit(-4)
 
+    exename = set_ida_name(IDA_ARCH)
+    IDA_EXE = join(IDA_ENV, exename)
     external_args = [IDA_EXE, "-B", "-S"+argstr, input_file]
 
     sys.stdout.write("Executing: {0}\n".format(str(external_args)))

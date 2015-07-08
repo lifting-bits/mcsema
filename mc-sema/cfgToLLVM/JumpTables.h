@@ -92,7 +92,8 @@ static bool isConformantJumpInst(InstPtr jmpinst) {
     const llvm::MCInst &inst = jmpinst->get_inst();
 
     // these are now done via switch()
-    if(inst.getOpcode() == llvm::X86::JMP32r) {
+    if(inst.getOpcode() == llvm::X86::JMP32r ||
+	   inst.getOpcode() == llvm::X86::JMP64r) {
         return true;
     }
 
@@ -119,23 +120,27 @@ void doJumpTableViaData(
         NativeModulePtr natM, 
         llvm::BasicBlock *& block, 
         InstPtr ip, 
-        llvm::MCInst &inst);
+        llvm::MCInst &inst,
+        const int bitness);
 
 void doJumpTableViaData(
         llvm::BasicBlock *& block, 
-        llvm::Value *val);
+        llvm::Value *val,
+        const int bitness);
 
 void doJumpTableViaSwitch(
         NativeModulePtr natM, 
         llvm::BasicBlock *& block, 
         InstPtr ip, 
-        llvm::MCInst &inst);
+        llvm::MCInst &inst,
+        const int bitness);
 
 void doJumpTableViaSwitchReg(
         llvm::BasicBlock *& block, 
         InstPtr ip, 
         llvm::Value *regVal,
-        llvm::BasicBlock *&default_block);
+        llvm::BasicBlock *&default_block,
+        const int bitness);
 
 void doJumpIndexTableViaSwitch(
         llvm::BasicBlock *& block, 

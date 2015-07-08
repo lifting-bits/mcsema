@@ -417,6 +417,10 @@ static InstTransResult doDivV(InstPtr ip, BasicBlock *&b, Value *divisor,
             ax = R_READ<32>(b, X86::EAX);
             dx = R_READ<32>(b, X86::EDX);
             break;
+        case 64:
+        	ax = R_READ<64>(b, X86::RAX);
+        	dx = R_READ<64>(b, X86::RDX);
+        	break;
         default:
             throw TErr(__LINE__, __FILE__, "Not supported width");
     }
@@ -465,6 +469,10 @@ static InstTransResult doDivV(InstPtr ip, BasicBlock *&b, Value *divisor,
         case 32:
             R_WRITE<32>(b, X86::EDX, wrDx);
             R_WRITE<32>(b, X86::EAX, wrAx);
+            break;
+        case 64:
+            R_WRITE<64>(b, X86::RDX, wrDx);
+            R_WRITE<64>(b, X86::RAX, wrAx);
             break;
         default:
             throw TErr(__LINE__, __FILE__, "Not supported width");
@@ -544,6 +552,7 @@ GENERIC_TRANSLATION_MEM(IMUL32m,
 	doIMulM<32>(ip, block, ADDR(0)),
 	doIMulM<32>(ip, block, STD_GLOBAL_OP(0)))
 GENERIC_TRANSLATION(IMUL32rr, doIMulRR<32>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(IMUL64rr, doIMulRR<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL16rr, doIMulRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_MEM(IMUL16rmi, 
 	doIMulRMI<16>(ip, block, OP(0), ADDR(1), OP(6)),
@@ -561,10 +570,13 @@ GENERIC_TRANSLATION_MEM(IMUL32rmi8,
 	doIMulRMI8<32>(ip, block, OP(0), STD_GLOBAL_OP(1), OP(6)))
 GENERIC_TRANSLATION(IMUL32rri, doIMulRRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL32rri8, doIMulRRI<32>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(IMUL64rri8, doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(IMUL64rri32, doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)))
 /* END GOOD */
 GENERIC_TRANSLATION(IDIV8r, doIDivR<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(IDIV16r, doIDivR<16>(ip, block, OP(0)))
 GENERIC_TRANSLATION(IDIV32r, doIDivR<32>(ip, block, OP(0)))
+GENERIC_TRANSLATION(IDIV64r, doIDivR<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION_MEM(IDIV8m, 
 	doIDivM<8>(ip,    block, ADDR(0)),
 	doIDivM<8>(ip,    block, STD_GLOBAL_OP(0)))
@@ -609,9 +621,14 @@ void MULDIV_populateDispatchMap(DispatchMap &m) {
     m[X86::IMUL32rmi8] = translate_IMUL32rmi8;
     m[X86::IMUL32rri] = translate_IMUL32rri;
     m[X86::IMUL32rri8] = translate_IMUL32rri8;
+    m[X86::IMUL64rri8] = translate_IMUL64rri8;
+    m[X86::IMUL64rri32] = translate_IMUL64rri32;
+    m[X86::IMUL64rr] = translate_IMUL64rr;
+
     m[X86::IDIV8r] = translate_IDIV8r;
     m[X86::IDIV16r] = translate_IDIV16r;
     m[X86::IDIV32r] = translate_IDIV32r;
+    m[X86::IDIV64r] = translate_IDIV64r;
     m[X86::IDIV8m] = translate_IDIV8m;
     m[X86::IDIV16m] = translate_IDIV16m;
     m[X86::IDIV32m] = translate_IDIV32m;

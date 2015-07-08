@@ -10,5 +10,4 @@ llvm::Value *linuxMakeCallbackForLocalFunction(llvm::Module *M , VA local_target
 llvm::Value *linuxGetStackSize(llvm::Module *M, llvm::BasicBlock *&driverBB);
 void linuxAddCallValue(llvm::Module *M);
 
-
 #endif

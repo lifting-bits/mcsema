@@ -27,7 +27,7 @@ REM %LLVM_PATH%\opt.exe -disable-opt -o demo_dll_4_opt.bc demo_dll_4.bc
 %LLVM_PATH%\llc.exe -filetype=obj -o demo_dll_4_lifted.obj demo_dll_4_opt.bc
 
 REM Compiling driver
-cl /Ox /nologo /Zi demo_driver_dll_4.c demo_dll_4_lifted.obj user32.lib kernel32.lib
+"%VCINSTALLDIR%\bin\cl.exe" /Ox /nologo /Zi demo_driver_dll_4.c demo_dll_4_lifted.obj user32.lib kernel32.lib
 
 REM Running application
 demo_driver_dll_4.exe

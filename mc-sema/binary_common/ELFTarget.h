@@ -50,11 +50,21 @@ private:
     ElfTarget();
 
 protected:
-  llvm::object::ELF32LEObjectFile *elf_obj;
-  ElfTarget(const std::string &modname, llvm::object::ELF32LEObjectFile *of): LLVMObjectTarget(modname, of), elf_obj(of)
-    {
+    union {
+        llvm::object::ELF64LEObjectFile *elf_obj;
+        llvm::object::ELF32LEObjectFile *elf_obj32;
     };
 
-}; 
+    std::string T;
+
+    ElfTarget(const std::string &modname, llvm::object::ELF64LEObjectFile *of, std::string &target):
+        LLVMObjectTarget(modname, of), elf_obj(of), T(target)
+      {
+      };
+    ElfTarget(const std::string &modname, llvm::object::ELF32LEObjectFile *of, std::string &target):
+        LLVMObjectTarget(modname, of), elf_obj32(of), T(target)
+      {
+      };
+};
 
 #endif

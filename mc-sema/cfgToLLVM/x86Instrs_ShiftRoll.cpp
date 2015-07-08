@@ -33,8 +33,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Helpers.h"
 #include "x86Instrs_flagops.h"
 #include "x86Instrs_ShiftRoll.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
+
+static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
+  //isn't this exciting
+  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
+  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
+  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
+  return ContinueBlock;
+}
+
+GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
 
 template <int width> 
 static Value *getBit(BasicBlock *b, Value *val, int which)
@@ -1761,7 +1772,7 @@ GENERIC_TRANSLATION_MEM(RCL32mCL,
 GENERIC_TRANSLATION_32MI(RCL32mi, 
 	doRclMI<32>(ip, block, ADDR(0), OP(5)),
 	doRclMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
-    doRclMV<32>(ip, block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip)))
+    doRclMV<32>(ip, block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip)))
 
 GENERIC_TRANSLATION(RCL32r1, doRclR1<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(RCL32rCL, doRclRCL<32>(ip, block, OP(0)))
@@ -1799,7 +1810,7 @@ GENERIC_TRANSLATION_MEM(RCR32mCL,
 GENERIC_TRANSLATION_32MI(RCR32mi, 
 	doRcrMI<32>(ip, block, ADDR(0), OP(5)),
 	doRcrMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
-    doRcrMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip)))
+    doRcrMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip)))
 
 GENERIC_TRANSLATION(RCR32r1, doRcrR1<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(RCR32rCL, doRcrRCL<32>(ip, block, OP(0)))
@@ -1837,7 +1848,7 @@ GENERIC_TRANSLATION_MEM(ROL32mCL,
 GENERIC_TRANSLATION_32MI(ROL32mi, 
 	doRolMI<32>(ip, block, ADDR(0), OP(5)),
 	doRolMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
-    doRolMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip)))
+    doRolMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip)))
 
 GENERIC_TRANSLATION(ROL32r1, doRolR1<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(ROL32rCL, doRolRCL<32>(ip, block, OP(0)))
@@ -1875,7 +1886,7 @@ GENERIC_TRANSLATION_MEM(ROR32mCL,
 GENERIC_TRANSLATION_32MI(ROR32mi, 
 	doRorMI<32>(ip, block, ADDR(0), OP(5)),
 	doRorMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
-    doRorMV<32>(ip, block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip)))
+    doRorMV<32>(ip, block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip)))
 
 GENERIC_TRANSLATION(ROR32r1, doRorR1<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(ROR32rCL, doRorRCL<32>(ip, block, OP(0)))
@@ -1901,7 +1912,7 @@ GENERIC_TRANSLATION_MEM(SAR32mCL,
 GENERIC_TRANSLATION_32MI(SAR32mi, 
 	doSarMI<32>(ip, block, ADDR(0), OP(1)),
 	doSarMI<32>(ip, block, STD_GLOBAL_OP(0), OP(1)),
-    doSarMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip)))
+    doSarMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip)))
 
 GENERIC_TRANSLATION(SAR32r1, doSarR1<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SAR32rCL, doSarRCL<32>(ip, block, OP(0)))
@@ -1939,12 +1950,13 @@ GENERIC_TRANSLATION_MEM(SHL32mCL,
 GENERIC_TRANSLATION_32MI(SHL32mi, 
 	doShlMI<32>(ip, block, ADDR(0), OP(5)),
 	doShlMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
-    doShlMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip)))
+    doShlMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip)))
 
 GENERIC_TRANSLATION(SHL32r1, doShlR1<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHL32rCL, doShlRCL<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHL32ri, doShlRI<32>(ip, block, OP(1), OP(2), OP(0)))
-GENERIC_TRANSLATION_MEM(SHL8m1, 
+GENERIC_TRANSLATION(SHL64ri, doShlRI<64>(ip, block, OP(1), OP(2), OP(0)))
+GENERIC_TRANSLATION_MEM(SHL8m1,
 	doShlM1<8>(ip, block, ADDR(0)),
 	doShlM1<8>(ip, block, STD_GLOBAL_OP(0)))
 GENERIC_TRANSLATION_MEM(SHL8mCL, 
@@ -1977,11 +1989,14 @@ GENERIC_TRANSLATION_MEM(SHR32mCL,
 GENERIC_TRANSLATION_32MI(SHR32mi, 
 	doShrMI<32>(ip, block, ADDR(0), OP(5)),
 	doShrMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
-    doShrMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip)))
+    doShrMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip)))
 
 GENERIC_TRANSLATION(SHR32r1, doShrR1<32>(ip, block, OP(0)))
+GENERIC_TRANSLATION(SHR64r1, doShrR1<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHR32rCL, doShrRCL<32>(ip, block, OP(0)))
+GENERIC_TRANSLATION(SHR64rCL, doShrRCL<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHR32ri, doShrRI<32>(ip, block, OP(1), OP(2), OP(0)))
+GENERIC_TRANSLATION(SHR64ri, doShrRI<64>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION_MEM(SHR8m1, 
 	doShrM1<8>(ip, block, ADDR(0)),
 	doShrM1<8>(ip, block, STD_GLOBAL_OP(0)))
@@ -2102,6 +2117,9 @@ void ShiftRoll_populateDispatchMap(DispatchMap &m) {
         m[X86::SHL32r1] = translate_SHL32r1;
         m[X86::SHL32rCL] = translate_SHL32rCL;
         m[X86::SHL32ri] = translate_SHL32ri;
+
+        m[X86::SHL64ri] = translate_SHL64ri;
+
         m[X86::SHL8m1] = translate_SHL8m1;
         m[X86::SHL8mCL] = translate_SHL8mCL;
         m[X86::SHL8mi] = translate_SHL8mi;
@@ -2130,4 +2148,8 @@ void ShiftRoll_populateDispatchMap(DispatchMap &m) {
         m[X86::SHRD32rrCL] = translate_SHRD32rrCL;
         m[X86::SHLD32rrCL] = translate_SHLD32rrCL;
         m[X86::SHLD32rri8] = translate_SHLD32rri8;
+		
+		m[X86::SHR64ri] = translate_SHR64ri;
+		m[X86::SHR64r1] = translate_SHR64r1;
+		m[X86::SHR64rCL] = translate_SHR64rCL;
 }

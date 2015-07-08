@@ -1,0 +1,4 @@
+#checkFn 1 C N
+#doStuff 2 C N
+malloc 1 C N
+strlen 1 C N

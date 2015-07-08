@@ -44,11 +44,13 @@ private:
   const llvm::MCAsmInfo       *AsmInfo;
   llvm::MCInstPrinter         *IP;
   const llvm::MCDisassembler  *DisAsm;
+  llvm::Triple                 *TT;
+  const llvm::Target           *target;
 
 public:
   LLVMByteDecoder(void)
   {
-    const llvm::Target          *target = NULL;
+    this->target = NULL;
     llvm::MCRegisterInfo        *MRI = NULL;
     const llvm::MCInstrInfo     *MCII = NULL;
 
@@ -67,10 +69,73 @@ public:
 
     LASSERT( target != NULL, "target != NULL" );
 
+    TT = new llvm::Triple();
+    TT->setArch(llvm::Triple::x86);
+    TT->setVendor(llvm::Triple::UnknownVendor);
+    TT->setOS(llvm::Triple::UnknownOS);
+
     this->STI = target->createMCSubtargetInfo( "i386-unknown-unknown", "", "");
     MRI = target->createMCRegInfo("i386-unknown-unknown");
     this->AsmInfo = target->createMCAsmInfo(*MRI, "i386-unknown-unknown");
+    LASSERT( this->STI, "this->STI" );
+    LASSERT( this->AsmInfo, "this->AsmInfo" );
 
+    //get an inst printer
+    int AsmPrinterVariant = AsmInfo->getAssemblerDialect();
+    MCII = target->createMCInstrInfo();
+    this->IP = target->createMCInstPrinter(AsmPrinterVariant,
+                                      *AsmInfo,
+                                      *MCII,
+                                      *MRI,
+                                      *STI);
+    LASSERT( this->IP, "this->IP" );
+
+    llvm::MCContext *Ctx = new llvm::MCContext(AsmInfo, MRI, nullptr);
+    this->DisAsm = target->createMCDisassembler(*this->STI, *Ctx );
+
+    LASSERT( this->DisAsm, "this->DisAsm" );
+
+    return;
+  }
+
+  LLVMByteDecoder(std::string T)
+  {
+    this->target = NULL;
+
+    llvm::MCRegisterInfo        *MRI = NULL;
+    const llvm::MCInstrInfo     *MCII = NULL;
+    TT = new llvm::Triple();
+
+    for(llvm::TargetRegistry::iterator it = llvm::TargetRegistry::begin(),
+          e = llvm::TargetRegistry::end();
+        it != e;
+        ++it)
+    {
+      const llvm::Target  &t = *it;
+
+      if(!T.compare(t.getName())) {
+        target= &t;
+        break;
+      }
+    }
+    LASSERT( target != NULL, "target != NULL" );
+
+
+    TT->setVendor(llvm::Triple::UnknownVendor);
+    TT->setOS(llvm::Triple::UnknownOS);
+
+    if(0 == T.compare("x86-64")) {
+        TT->setArch(llvm::Triple::x86_64);
+    } else {
+        TT->setArch(llvm::Triple::x86);
+    }
+
+    std::cout << " TT " <<target->getName() <<" : " << TT->str() << " \n";
+    this->STI = target->createMCSubtargetInfo( TT->getTriple(), "", "");
+    MRI = target->createMCRegInfo(TT->getTriple());
+    this->AsmInfo = target->createMCAsmInfo(*MRI, TT->getTriple());
+
+    std::cout.flush();
     LASSERT( this->STI, "this->STI" );
     LASSERT( this->AsmInfo, "this->AsmInfo" );
 

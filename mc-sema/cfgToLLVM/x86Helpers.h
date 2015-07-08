@@ -31,11 +31,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 template <int width>
 llvm::Value *concatInts(llvm::BasicBlock *b, llvm::Value *a1, llvm::Value *a2) {
-    TASSERT(width == 8 || width == 16 || width == 32, "");
+    TASSERT(width == 8 || width == 16 || width == 32 || width == 64, "");
     llvm::Type    *typeTo = llvm::Type::getIntNTy(b->getContext(), width*2);
     
     TASSERT(typeTo != NULL, "");
     //bitcast a to twice width
+	assert(a1->getType()->getScalarSizeInBits() < typeTo->getScalarSizeInBits());
     llvm::Value   *twiceLarger = new llvm::ZExtInst(a1, typeTo, "", b);
     //shift twiceL to the left by width
     llvm::Value   *tlShifted = llvm::BinaryOperator::Create(llvm::Instruction::Shl, 
@@ -63,6 +64,7 @@ llvm::Value *getAddrFromExpr(
         uint32_t which);
 
 // same as the simpler form, see above
+namespace x86 {
 llvm::Value *getAddrFromExpr( llvm::BasicBlock      *b,
         NativeModulePtr mod,
         const llvm::MCOperand &Obase,
@@ -71,7 +73,18 @@ llvm::Value *getAddrFromExpr( llvm::BasicBlock      *b,
         const int64_t Odisp,
         const llvm::MCOperand &Oseg,
         bool dataOffset);
+}
 
+namespace x86_64 {
+llvm::Value *getAddrFromExpr( llvm::BasicBlock      *b,
+        NativeModulePtr mod,
+        const llvm::MCOperand &Obase,
+        const llvm::MCOperand &Oscale,
+        const llvm::MCOperand &Oindex,
+        const int64_t Odisp,
+        const llvm::MCOperand &Oseg,
+        bool dataOffset);
+}
 // Convert the number to a constant in LLVM IR
 llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t val);
 
@@ -92,3 +105,52 @@ llvm::Value *GLOBAL(llvm::BasicBlock *B,
 // emit an llvm memcpy intrinsic
 llvm::Instruction* callMemcpy(llvm::BasicBlock *B, llvm::Value *dest, llvm::Value *src, uint32_t size, 
         uint32_t align=4, bool isVolatile=false);
+
+
+using namespace llvm;
+using namespace std;
+
+bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr);
+
+// return a computed pointer to that data reference for 32/64 bit architecture
+template <int width>
+llvm::Value* GLOBAL_DATA_OFFSET(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
+{
+    VA  baseGlobal;
+    uint64_t off = ip->get_data_offset();
+
+    if( addrIsInData(off, mod, baseGlobal, 0) ) {
+        //we should be able to find a reference to this in global data
+        Module  *M = b->getParent()->getParent();
+        string  sn = "data_0x" + to_string<VA>(baseGlobal, hex);
+        Value   *int_adjusted;
+        GlobalVariable *gData = M->getNamedGlobal(sn);
+
+        //if we thought it was a global, we should be able to
+        //pin it to a global variable we made during module setup
+        if( gData == NULL)
+            throw TErr(__LINE__, __FILE__, "Global variable not found");
+
+        // since globals are now a structure
+        // we cannot simply slice into them.
+        // Need to get ptr and then add integer displacement to ptr
+
+        Value   *globalGEPV[] =
+            {   ConstantInt::get(Type::getIntNTy(b->getContext(), width), 0),
+                ConstantInt::get(Type::getInt32Ty(b->getContext()), 0)};
+        Instruction *globalGEP =
+            GetElementPtrInst::Create(gData,  globalGEPV, "", b);
+        Type    *ty = Type::getIntNTy(b->getContext(), width);
+        Value   *intVal = new PtrToIntInst(globalGEP, ty, "", b);
+        uint32_t addr_offset = off-baseGlobal;
+        int_adjusted = BinaryOperator::CreateAdd(intVal,
+                        CONST_V<width>(b, addr_offset), "", b);
+        //then, assign this to the outer 'd' so that the rest of the
+        //logic picks up on that address instead of another address
+
+        return int_adjusted;
+    } else {
+        throw TErr(__LINE__, __FILE__, "Address not in data");
+        return NULL;
+    }
+}

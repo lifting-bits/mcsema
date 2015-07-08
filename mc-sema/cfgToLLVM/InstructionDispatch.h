@@ -49,7 +49,11 @@ bool initInstructionDispatch();
 
 #define OP(x) inst.getOperand(x)
 #define ADDR(x) getAddrFromExpr(block, natM, inst, ip, x)
-#define ADDR_NOREF(x) getAddrFromExpr(block, natM, OP(x+0), OP(x+1), OP(x+2), OP(x+3).getImm(), OP(x+4), false)
+#define ADDR_NOREF(x) \
+	getPointerSize(block->getParent()->getParent()) == Pointer32 ?	\
+		x86::getAddrFromExpr(block, natM, OP(x+0), OP(x+1), OP(x+2), OP(x+3).getImm(), OP(x+4), false) :\
+		x86_64::getAddrFromExpr(block, natM, OP(x+0), OP(x+1), OP(x+2), OP(x+3).getImm(), OP(x+4), false)
+		
 #define CREATE_BLOCK(nm, b) BasicBlock *block_ ## nm = BasicBlock::Create((b)->getContext(), #nm, (b)->getParent())
 #define STD_GLOBAL_OP(which) GLOBAL(block, natM, inst, ip, which)
 

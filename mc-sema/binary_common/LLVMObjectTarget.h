@@ -53,7 +53,7 @@ public:
   virtual bool get_exports(std::list<std::pair<std::string, VA> > &);
   virtual bool find_import_name(uint32_t, std::string &);
   virtual bool is_addr_relocated(uint32_t);
-  virtual bool relocate_addr(VA, VA &);
+  virtual bool relocate_addr(VA, VA &, VA &);
   virtual bool get_sections(std::vector<SectionDesc>  &);
   virtual std::string name(void) { return this->mod_name; }
 

@@ -44,9 +44,9 @@ using namespace boost;
 using namespace llvm;
 
 static bool isAddrOfType(
-        ExecutableContainer *c, 
-        VA addr, 
-        ExecutableContainer::SectionType st) 
+        ExecutableContainer *c,
+        VA addr,
+        ExecutableContainer::SectionType st)
 {
 
     vector<ExecutableContainer::SectionDesc>  secs;
@@ -60,17 +60,17 @@ static bool isAddrOfType(
     {
         if(it->type == st &&
            addr >= it->base &&
-           addr < it->base+it->contents.size()) 
+           addr < it->base+it->contents.size())
         {
             return true;
         }
-        
+
     }
 
     return false;
 }
 
-static 
+static
 void addDataBlob(   DataSection &ds,
                 VA base,
                 const vector<uint8_t> &bytes,
@@ -86,22 +86,25 @@ void addDataBlob(   DataSection &ds,
             bytes.begin() + (end-base));
 
     DataSectionEntry dse(start, subrange);
+
     ds.addEntry(dse);
 }
 
-static 
+static
 void addDataSymbol(   DataSection &ds,
                 VA base,
-                const std::string &symbol)
+                const std::string &symbol,
+                VA symbol_size)
 {
-    DataSectionEntry dse(base, symbol);
+    DataSectionEntry dse(base, symbol, symbol_size);
+
     ds.addEntry(dse);
 }
 
 DataSection processDataSection( ExecutableContainer *c,
                                 const ExecutableContainer::SectionDesc &sec,
-                                VA min_limit = 0,
-                                VA max_limit = 0xFFFFFFFFFFFFFFFF)
+                                VA min_limit = 0x0ULL,
+                                VA max_limit = 0xFFFFFFFFFFFFFFFFULL)
 {
 
     VA base = sec.base;
@@ -113,9 +116,7 @@ DataSection processDataSection( ExecutableContainer *c,
     VA prev = base;
 
     // ensure our limits are sane for this section
-    if(min_limit < base) {
-        min_limit = base;
-    }
+    if(min_limit < base) {  min_limit = base;}
     if(max_limit > size) {
         max_limit = size;
     }
@@ -128,8 +129,8 @@ DataSection processDataSection( ExecutableContainer *c,
     LASSERT(min_limit <= max_limit, "Minimum must be greater than maximum");
 
     for(vector<VA>::const_iterator reloc_itr = sec.reloc_addrs.begin();
-        reloc_itr != sec.reloc_addrs.end();
-        reloc_itr++) 
+            reloc_itr != sec.reloc_addrs.end();
+            reloc_itr++)
     {
         // fix address from section relative to absolute
         addr = base+*reloc_itr;
@@ -140,12 +141,13 @@ DataSection processDataSection( ExecutableContainer *c,
             dbgs() << __FUNCTION__ << ": Address outside limits: " << to_string<VA>(addr ,hex) << "\n";
             continue;
         }
-    
+
         std::string symname;
         // see if this address points to a symbol
         VA new_addr;
-        if(c->relocate_addr(addr, new_addr) ) {
-            
+		VA reloc_size = 0;
+        if(c->relocate_addr(addr, new_addr, reloc_size) ) {
+
             if(addr > prev) {
                 addDataBlob(ds, base, bytes, prev, addr);
             }
@@ -153,24 +155,25 @@ DataSection processDataSection( ExecutableContainer *c,
             prev = addr;
 
 
-            if(isAddrOfType(c, new_addr, ExecutableContainer::CodeSection)) 
+            if(isAddrOfType(c, new_addr, ExecutableContainer::CodeSection))
             {
                 string new_sym = "sub_" + to_string<VA>(new_addr, hex);
                 llvm::outs() << __FUNCTION__ << ": Recovered function symbol from data section: " << new_sym << "\n";
-                addDataSymbol(ds, addr, new_sym);
+                addDataSymbol(ds, addr, new_sym, reloc_size);
             } else if ( isAddrOfType(c, new_addr, ExecutableContainer::DataSection)) {
                 string new_sym = "dta_" + to_string<VA>(new_addr, hex);
                 llvm::outs() << __FUNCTION__ << ": Recovered data symbol from data section: " << new_sym << "\n";
-                addDataSymbol(ds, addr, new_sym);
+                addDataSymbol(ds, addr, new_sym, reloc_size);
             } else {
                 assert(!"address in unsupported section type!");
             }
-            // assume 4 byte pointers
-            prev += 4;
+
+            prev += reloc_size;
 
         } else {
             llvm::dbgs() << __FUNCTION__<< ": WARNING: relocation at address (0x" << to_string<VA>(addr, hex) << ") but no symbol found!\n";
         }
+
     }
 
     addDataBlob(ds, base, bytes, prev, size);
@@ -178,8 +181,8 @@ DataSection processDataSection( ExecutableContainer *c,
     return ds;
 }
 
-bool getSectionForAddr( 
-        ExecutableContainer *c, 
+bool getSectionForAddr(
+        ExecutableContainer *c,
         VA addr,
         ExecutableContainer::SectionDesc &sd)
 {
@@ -206,21 +209,21 @@ bool getSectionForAddr(
 }
 
 static void addDataEntryPointsFromSection(
-        ExecutableContainer *c, 
+        ExecutableContainer *c,
         ExecutableContainer::SectionDesc  &s,
         list<VA>      &entryPoints,
         VA lower_limit,
         VA upper_limit,
-        raw_ostream         &out) 
+        raw_ostream         &out)
 {
     VA addr;
 
-    out << __FUNCTION__ << "Bounds are: " << to_string<VA>(lower_limit, hex)  
+    out << __FUNCTION__ << "Bounds are: " << to_string<VA>(lower_limit, hex)
                         << " to " << to_string<VA>(upper_limit, hex) << "\n";
 
     for(vector<VA>::const_iterator reloc_itr = s.reloc_addrs.begin();
             reloc_itr != s.reloc_addrs.end();
-            reloc_itr++) 
+            reloc_itr++)
     {
         addr = s.base+*reloc_itr;
 
@@ -231,23 +234,24 @@ static void addDataEntryPointsFromSection(
         }
 
         VA  new_addr;
+		VA 	symbol_size;
         out << __FUNCTION__ << ": Looking at relocation at: " << to_string<VA>(addr, hex) << "\n";
-        if(c->relocate_addr(addr, new_addr )) {
-            if( isAddrOfType(c, new_addr, ExecutableContainer::CodeSection))  
+        if(c->relocate_addr(addr, new_addr, symbol_size )) {
+            if( isAddrOfType(c, new_addr, ExecutableContainer::CodeSection))
             {
-                out << __FUNCTION__ << ": Adding data entry point for: sub_" 
+                out << __FUNCTION__ << ": Adding data entry point for: sub_"
                     << to_string<VA>(new_addr, hex) << "\n";
-                if(find( entryPoints.begin(), entryPoints.end(), new_addr) 
-                        == entryPoints.end()) 
+                if(find( entryPoints.begin(), entryPoints.end(), new_addr)
+                        == entryPoints.end())
                 {
                     entryPoints.push_back(new_addr);
                 }
             } else {
-                out << __FUNCTION__ << ": Relocation does not point to code: " 
+                out << __FUNCTION__ << ": Relocation does not point to code: "
                     << to_string<VA>(new_addr, hex) << "\n";
             }
-        } else { 
-                out << __FUNCTION__ << ": Could not process reloc at: " 
+        } else {
+                out << __FUNCTION__ << ": Could not process reloc at: "
                     << to_string<VA>(addr, hex) << "\n";
          }
     }
@@ -261,9 +265,9 @@ ExternalDataRefPtr makeExtDataRefFromString(const string &dataName, ExternalFunc
   int dataSize;
   bool res;
 
-  res = f.get_data_size(dataName, dataSize); 
+  res = f.get_data_size(dataName, dataSize);
   LASSERT(res, "Could not get data size for:"+dataName);
-  
+
   ExternalDataRef  *t = new ExternalDataRef(dataName, dataSize);
 
   return ExternalDataRefPtr(t);
@@ -281,7 +285,7 @@ ExternalCodeRefPtr makeExtCodeRefFromString(string callName, ExternalFunctionMap
   //lookup call name in function map
   string  s = f.sym_sym(callName);
   LASSERT(s.size() != 0, "Failure with sym_sym for symbol "+callName);
- 
+
   res = f.get_calling_convention(s, conv);
   LASSERT(res, "Could not find calling convention for "+s);
   res = f.get_noreturn(s, isNoReturn);
@@ -304,17 +308,30 @@ ExternalCodeRefPtr makeExtCodeRefFromString(string callName, ExternalFunctionMap
   case ExternalFunctionMap::FastCall:
     c = ExternalCodeRef::FastCall;
     break;
+  case ExternalFunctionMap::X86_64_SysV:
+    c = ExternalCodeRef::X86_64_SysV;
+    break;
+  case ExternalFunctionMap::X86_64_Win64:
+  	c = ExternalCodeRef::X86_64_Win64;
   default:
     assert(!"Invalid calling convention for external call!");
-    
+
   }
 
   if(isNoReturn) {
     rty = ExternalCodeRef::NoReturn;
   }
-  
-  ExternalCodeRef  *t = new ExternalCodeRef(s, numParams, c, rty);
 
+  std::string funcSign;
+  bool sign = f.get_function_sign(s, funcSign);
+
+  ExternalCodeRef  *t = NULL;
+
+  if(sign){
+  	t = new ExternalCodeRef(s, numParams, c, rty, funcSign);
+  } else {
+ 	t = new ExternalCodeRef(s, numParams, c, rty);
+  }
   return ExternalCodeRefPtr(t);
 }
 
@@ -340,6 +357,12 @@ static bool canInstructionReferenceCode( InstPtr inst) {
         case X86::MOV32ri:      // writes imm32 to register, could be code
         case X86::PUSHi32:      // push an imm32, which could be code
 
+        case X86::MOV64mi32:
+        case X86::MOV64mr:
+        case X86::MOV32mr:
+	case X86::MOV64rm:
+	case X86::LEA64r:
+
         // need to check if mem references are valid here
         case X86::MOV32rm:      // writes mem to register, mem could be code?
         case X86::PUSH32rmm:    // push mem, which could be/have code
@@ -358,34 +381,37 @@ static bool isBranchViaMemory(InstPtr inst) {
 
     switch(inst->get_inst().getOpcode()) {
         case X86::JMP32m:
+        case X86::JMP64m:
         case X86::CALL32m:
+        case X86::CALL64m:
             return true;
         default:
             return false;
     }
 }
 
-static int addJmpTableEntries(ExecutableContainer *c, 
+static int addJmpTableEntries(ExecutableContainer *c,
         vector<VA> &new_funcs,
-        VA curAddr, 
+        VA curAddr,
         int increment,
         raw_ostream &out) {
 
     int num_funcs_added = 0;
 
     while(true) {
-         
+
         VA  someFunction;
+		VA  size;
         curAddr += increment;
 
-        if(!c->relocate_addr(curAddr, someFunction)) {
+        if(!c->relocate_addr(curAddr, someFunction, size)) {
             // could not relocate the default jump table entry.
             // not good
             out << "Jump table search ending, can't relocate address: " << to_string<VA>(curAddr, hex) << "\n";
             break;
         }
 
-        bool is_reloc_code = isAddrOfType(c, someFunction, 
+        bool is_reloc_code = isAddrOfType(c, someFunction,
                 ExecutableContainer::CodeSection);
 
         if(!is_reloc_code) {
@@ -395,7 +421,7 @@ static int addJmpTableEntries(ExecutableContainer *c,
         }
 
         num_funcs_added += 1;
-        out << "Added JMPTABLE entry [" << to_string<VA>(curAddr, hex) 
+        out << "Added JMPTABLE entry [" << to_string<VA>(curAddr, hex)
             << "] => " << to_string<VA>(someFunction, hex)  << "\n";
         new_funcs.push_back(someFunction);
 
@@ -420,7 +446,7 @@ static int regFromInst(const MCInst &inst) {
 // this should check if the given instruction writes
 // to register 'reg'. Right now it just checks if the
 // instruction uses the register 'reg'.
-static int writesToReg(const MCInst &inst, unsigned reg) 
+static int writesToReg(const MCInst &inst, unsigned reg)
 {
     for(int i = 0; i < inst.getNumOperands(); i++) {
         const MCOperand &op = inst.getOperand(i);
@@ -435,7 +461,7 @@ static int writesToReg(const MCInst &inst, unsigned reg)
 static bool parseJumpIndexTable(ExecutableContainer *c,
         InstPtr index_insn,
         const vector<VA> &jmptable_entries,
-        raw_ostream &out) 
+        raw_ostream &out)
 {
     VA reloc_offset = index_insn->get_reloc_offset();
     if (reloc_offset == 0)  {
@@ -446,16 +472,17 @@ static bool parseJumpIndexTable(ExecutableContainer *c,
 
     VA  addrInInst = index_insn->get_loc() + reloc_offset;
     VA  indexTableEntry;
-    if(!c->relocate_addr(addrInInst, indexTableEntry)) {
+	VA  symbolSize;
+    if(!c->relocate_addr(addrInInst, indexTableEntry, symbolSize)) {
         out << "Not a jump index table: can't relocate relocation in index insn\n";
         // can't relocate, something bad happened
-        return false; 
+        return false;
     }
 
     // assume we always index the start of the index table
     // ... might not be correct
-    
-    // this means we set initial entry to zero, the first element 
+
+    // this means we set initial entry to zero, the first element
     int initial_entry = 0;
 
     uint8_t b;
@@ -465,7 +492,7 @@ static bool parseJumpIndexTable(ExecutableContainer *c,
 
     while( (indexTableEntry+bindex) < c->getExtent() ) {
         c->readByte(indexTableEntry+bindex, &b);
-        if (b > jmptable_entries.size()) 
+        if (b > jmptable_entries.size())
         {
             break;
         }
@@ -486,9 +513,9 @@ static bool processJumpIndexTable(ExecutableContainer *c,
         NativeBlockPtr B,
         InstPtr jmpinst,
         const vector<VA> &jmptable_entries,
-        raw_ostream &out) 
+        raw_ostream &out)
 {
-    // first, find which operand was the index 
+    // first, find which operand was the index
     // register in jmpinst
     //
     const MCInst &inst = jmpinst->get_inst();
@@ -498,7 +525,7 @@ static bool processJumpIndexTable(ExecutableContainer *c,
         return false;
     }
 
-    // loop backwards through block looking for 
+    // loop backwards through block looking for
     // instructions that write to this register
     const std::list<InstPtr> &block_insts = B->get_insts();
     InstPtr write_reg_insn;
@@ -508,7 +535,7 @@ static bool processJumpIndexTable(ExecutableContainer *c,
     {
         // check if we 'write to a register'
         if(writesToReg((*itr)->get_inst(), index_reg)) {
-            write_reg_insn = *itr; 
+            write_reg_insn = *itr;
             break;
         }
     }
@@ -518,9 +545,9 @@ static bool processJumpIndexTable(ExecutableContainer *c,
         return false;
     }
 
-    out << "Found register index write instruction:\n"; 
+    out << "Found register index write instruction:\n";
 
-    if(!parseJumpIndexTable(c, write_reg_insn, 
+    if(!parseJumpIndexTable(c, write_reg_insn,
             jmptable_entries, out)) {
         out << "Could not parse jump index table, aborting\n";
         return false;
@@ -532,14 +559,15 @@ static bool processJumpIndexTable(ExecutableContainer *c,
 
 static bool handlePossibleJumpTable(ExecutableContainer *c,
         NativeBlockPtr B,
-        InstPtr jmpinst, 
-        VA curAddr, 
+        InstPtr jmpinst,
+        VA curAddr,
         stack<VA> &funcs,
         stack<VA> &blockChildren,
         raw_ostream &out) {
 
-    LASSERT(jmpinst->get_inst().getOpcode() == X86::JMP32m, 
-            "handlePossibleJumpTable needs a JMP32m opcode"  );
+    LASSERT(jmpinst->get_inst().getOpcode() == X86::JMP32m ||
+            jmpinst->get_inst().getOpcode() == X86::JMP64m,
+            "handlePossibleJumpTable needs a JMP32m/JMP64m opcode"  );
 
     // is this a jump table, step 0
     // does this instruction have a relocation?
@@ -554,13 +582,14 @@ static bool handlePossibleJumpTable(ExecutableContainer *c,
 
     VA addrInInst = curAddr + reloc_offset;
     VA jmpTableEntry, someFunction;
-    if(!c->relocate_addr(addrInInst, jmpTableEntry)) {
+	VA symbolSize;
+    if(!c->relocate_addr(addrInInst, jmpTableEntry, symbolSize)) {
         out << "Not a jump table: can't relocate relocation in JMP32m\n";
         // can't relocate, something bad happened
-       return false; 
+       return false;
     }
 
-    if(!c->relocate_addr(jmpTableEntry, someFunction)) {
+    if(!c->relocate_addr(jmpTableEntry, someFunction, symbolSize)) {
         // could not relocate the default jump table entry.
         // not good
         out << "Not a jump table: can't relocate first jump table entry\n";
@@ -573,11 +602,11 @@ static bool handlePossibleJumpTable(ExecutableContainer *c,
         out << "Not a jump table: first entry doesn't point to code\n";
         return false;
     }
-     
+
 
     // read jump table entries and add them as new function
     // entry points
-    vector<VA> jmptable_entries; 
+    vector<VA> jmptable_entries;
     int new_funs;
     int original_zero;
 
@@ -593,7 +622,7 @@ static bool handlePossibleJumpTable(ExecutableContainer *c,
 
     // add original entry at the zero position
     jmptable_entries.push_back(someFunction);
-    out << "Added JMPTABLE entry [" << to_string<uint32_t>(jmpTableEntry, hex) 
+    out << "Added JMPTABLE entry [" << to_string<uint32_t>(jmpTableEntry, hex)
         << "] => " << to_string<uint32_t>(someFunction, hex)  << "\n";
 
     // add the positive table entries
@@ -620,7 +649,7 @@ static bool handlePossibleJumpTable(ExecutableContainer *c,
     // add these jump table entries as new entry points
     for(std::vector<VA>::const_iterator itr = jmptable_entries.begin();
             itr != jmptable_entries.end();
-            itr++) 
+            itr++)
     {
         out << "Adding block via jmptable: " << to_string<VA>(*itr, hex) << "\n";
         toPush->push(*itr);
@@ -638,15 +667,15 @@ static bool handlePossibleJumpTable(ExecutableContainer *c,
 
 static bool handleJump(ExecutableContainer *c,
         NativeBlockPtr B,
-        InstPtr jmpinst, 
-        VA curAddr, 
+        InstPtr jmpinst,
+        VA curAddr,
         stack<VA> &funcs,
         stack<VA> &blockChildren,
         raw_ostream &out) {
 
   // this is an internal jmp. probably a jump table.
   out << "Found a possible jump table!\n";
-  bool did_jmptable = handlePossibleJumpTable(c, B, jmpinst, curAddr, funcs, blockChildren, out); 
+  bool did_jmptable = handlePossibleJumpTable(c, B, jmpinst, curAddr, funcs, blockChildren, out);
 
   if(!did_jmptable) {
     out << "Heristic jumptable processing couldn't parse jumptable\n";
@@ -661,14 +690,14 @@ static bool handleJump(ExecutableContainer *c,
 /*
  *
 static void addDataEntryPointsFromSection(
-        ExecutableContainer *c, 
+        ExecutableContainer *c,
         ExecutableContainer::SectionDesc  &s,
         list<uint64_t>      &entryPoints,
         VA lower_limit,
         VA upper_limit,
-        raw_ostream         &out) 
+        raw_ostream         &out)
         */
-bool treatCodeAsData( ExecutableContainer *c, 
+bool treatCodeAsData( ExecutableContainer *c,
         uint32_t            addr,
         uint32_t            size,
         list<VA>           &funcs) {
@@ -687,10 +716,11 @@ bool treatCodeAsData( ExecutableContainer *c,
 }
 
 bool dataInCodeHeuristic(
-        ExecutableContainer *c, 
+        ExecutableContainer *c,
         InstPtr             I,
         uint32_t            addr,
-        list<VA>           &funcs)
+        list<VA>           &funcs,
+		uint32_t 			relocSize)
 {
     // detect SEH handler
    if(I->get_inst().getOpcode() == X86::PUSHi32) {
@@ -705,6 +735,8 @@ bool dataInCodeHeuristic(
                << to_string<VA>(addr, hex) << "\n";
            return treatCodeAsData(c, addr, 0x28, funcs);
        }
+   } else {
+	   return treatCodeAsData(c, addr, relocSize, funcs);
    }
 
    return false;
@@ -714,12 +746,12 @@ bool dataInCodeHeuristic(
 // assume the immediate references code if:
 // * we are dealing with a fully linked ELF
 // * The immediate is in the range of a valid code or data section
-static bool setHeuristicRef(ExecutableContainer *c, 
-        InstPtr I, 
-        int opnum, 
-        stack<VA> &funcs, 
-        raw_ostream &out, 
-        const std::string whichInst) 
+static bool setHeuristicRef(ExecutableContainer *c,
+        InstPtr I,
+        int opnum,
+        stack<VA> &funcs,
+        raw_ostream &out,
+        const std::string whichInst)
 {
     MCOperand op;
     std::string imp_name;
@@ -732,7 +764,7 @@ static bool setHeuristicRef(ExecutableContainer *c,
     if(elft && elft->isLinked()) {
        if (elft->is_in_code(imm)) {
             // this instruction references code
-            I->set_call_tgt(imm);               
+            I->set_call_tgt(imm);
             // make sure we disassemble at this new address
             funcs.push(imm);
             out << "Found new function entry from " << whichInst << ": " << to_string<VA>(imm, hex) << "\n";
@@ -748,7 +780,7 @@ static bool setHeuristicRef(ExecutableContainer *c,
     return false;
 }
 
-NativeBlockPtr decodeBlock( ExecutableContainer *c, 
+NativeBlockPtr decodeBlock( ExecutableContainer *c,
                             ExternalFunctionMap &f,
                             LLVMByteDecoder     &d,
                             stack<VA>           &blockChildren,
@@ -765,9 +797,9 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
     {
         InstPtr I = d.getInstFromBuff(curAddr, c);
 
-        //I, if a terminator, will have true and false targets 
+        //I, if a terminator, will have true and false targets
         //filled in. I could be an indirect branch of some kind,
-        //we will deal with that here. we will also deal with the 
+        //we will deal with that here. we will also deal with the
         //instruction if it is a data instruction with relocation
 
         out << to_string<VA>(I->get_loc(), hex) << ":";
@@ -792,13 +824,14 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
         }
 
         //do we need to add a data reference to this instruction?
-        //again, because there is no offset information in the 
+        //again, because there is no offset information in the
         //instruction decoder, for now we just ask if every addr
         //in the inst is relocated
         for(uint32_t i = 0; i < I->get_len(); i++) {
             VA addrInInst = curAddr+i;
             if(c->is_addr_relocated(addrInInst)) {
                 VA  addr = 0;
+				VA  relocSize;
                 std::string has_imp;
 
                 out << __FUNCTION__ << ": have reloc at: " << to_string<VA>(addrInInst, hex) << "\n";
@@ -811,7 +844,7 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                 //add it as a data offset to the instruction
                 if (c->find_import_name(addrInInst, has_imp) )  {
 
-                    if(f.is_data(has_imp)) 
+                    if(f.is_data(has_imp))
                     {
                         ExternalDataRefPtr data_p = makeExtDataRefFromString(has_imp, f);
                         out << "Adding external data ref: " << has_imp << "\n";
@@ -821,7 +854,7 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                     {
                         ExternalCodeRefPtr code_p = makeExtCodeRefFromString(has_imp, f);
                         LASSERT(code_p, "Failed to get ext call from map for symbol: "+has_imp);
-                        //maybe, this call doesn't return, in which case, 
+                        //maybe, this call doesn't return, in which case,
                         //we should kill the decoding of this flow
                         if(code_p->getReturnType() == ExternalCodeRef::NoReturn) {
                             has_follow = false;
@@ -830,24 +863,24 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                         I->set_ext_call_target(code_p);
                     }
 
-                } else if(c->relocate_addr(addrInInst, addr)) {
+                } else if(c->relocate_addr(addrInInst, addr, relocSize)) {
                     bool can_ref_code = canInstructionReferenceCode(I);
                     bool is_reloc_code = isAddrOfType(c, addr, ExecutableContainer::CodeSection);
                     bool is_reloc_data = isAddrOfType(c, addr, ExecutableContainer::DataSection);
                     unsigned opc = I->get_inst().getOpcode();
 
-                    out << "Found a relocation at: 0x" << to_string<VA>(addrInInst, hex) 
+                    out << "Found a relocation at: 0x" << to_string<VA>(addrInInst, hex)
                         << ", pointing to: 0x" << to_string<VA>(addr, hex) << "\n";
 
                     if(isBranchViaMemory(I)) {
-                        out << "Detect branch via memory, relocation handled later\n";      
+                        out << "Detect branch via memory, relocation handled later\n";
                     }
                     // this instruction can reference code and does
                     // reference code
                     // so we assume the code points to a function
                     else if( can_ref_code && is_reloc_code ) {
                         list<VA> new_funcs;
-                        if(dataInCodeHeuristic(c, I, addr, new_funcs)) {
+                        if(dataInCodeHeuristic(c, I, addr, new_funcs, relocSize)) {
                             // add new functions to our functions list
                             for(list<VA>::const_iterator nfi = new_funcs.begin();
                                     nfi != new_funcs.end();
@@ -863,7 +896,7 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                             out << "Adding: 0x" << to_string<VA>(addr, hex) << " as target\n";
                             funcs.push(addr);
                         }
-                    } 
+                    }
                     // this instruction can't reference code and points to .text
                     // or references data. Treat as data element
                     // TODO: extract this from .text and shove into .data?
@@ -883,9 +916,9 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
         }
 
         //is this instruction an external call?
-        //in a COFF binary, the pcrel call can refer to an 
+        //in a COFF binary, the pcrel call can refer to an
         //external symbol that has been relocated
-        //so, get the string that corresponds, and 
+        //so, get the string that corresponds, and
         //provide the translation using the function map
         MCOperand op;
         string  imp;
@@ -896,12 +929,23 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
             case X86::PUSHi32:
                 setHeuristicRef(c, I, 0, funcs, out, "PUSHi32");
                 break;
+            case X86::MOV64ri32:
+            case X86::MOV64ri:
+                setHeuristicRef(c, I, 1, funcs, out, "MOV64ri32");
+                break;
 
             case X86::JMP32m:
+            case X86::JMP64m:
                 {
                     string  thunkSym;
-                    bool did_jmp = false; 
-                    bool r = c->find_import_name(curAddr+2, thunkSym);
+                    bool did_jmp = false;
+                    //bool r = c->find_import_name(curAddr+2, thunkSym);
+                    bool r;
+                    if(I->has_rip_relative()){
+                        r = c->find_import_name(I->get_rip_relative(), thunkSym);
+                    } else {
+                        r = c->find_import_name(curAddr+2, thunkSym);
+                    }
                     if(r) {
                         // this goes to an external API call
                         out << "Adding external code ref via JMP: " << thunkSym << "\n";
@@ -910,13 +954,15 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                         has_follow = false;
                     } else {
 
-                        did_jmp = handleJump(c, B, I, curAddr, funcs, blockChildren, out); 
+                        did_jmp = handleJump(c, B, I, curAddr, funcs, blockChildren, out);
                         LASSERT(did_jmp, "Unable to resolve jump.");
                     }
                 }
                 break;
             case X86::CALLpcrel32:
+            case X86::CALL64pcrel32:
                 {
+                    printf("DEBUG : %s, callpcrel\n", __FUNCTION__), fflush(stdout);
                     //this could be an external call in COFF, or not
                     op = I->get_inst().getOperand(0);
                     LASSERT(op.isImm(), "Nonsense for CALLpcrel32");
@@ -934,10 +980,18 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                         bool  foldFunc = false;
                         //speculate about callTgt
                         InstPtr spec = d.getInstFromBuff(callTgt, c);
-                        if(spec->terminator() && spec->get_inst().getOpcode() == X86::JMP32m) {
+                        if(spec->terminator() && (spec->get_inst().getOpcode() == X86::JMP32m
+                                || spec->get_inst().getOpcode() == X86::JMP64m)) {
                             string  thunkSym;
+                            bool r;
 
-                            bool r = c->find_import_name(callTgt+2, thunkSym);
+                            if(spec->has_rip_relative()){
+                                r = c->find_import_name(spec->get_rip_relative(), thunkSym);
+                            } else {
+                                r = c->find_import_name(callTgt+2, thunkSym);
+                            }
+
+                           // bool r = c->find_import_name(callTgt+2, thunkSym);
                             if(r) {
                                 is_extcall = true;
 
@@ -960,9 +1014,9 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
 
                     if(is_extcall == false) {
                         // may be a local call
-                        VA addr=curAddr+1, relo_addr=0;
+                        VA addr=curAddr+1, relo_addr=0, reloc_size = 0;
                         out << "Symbol not found, maybe a local call\n";
-                        if(c->relocate_addr(addr, relo_addr)){
+                        if(c->relocate_addr(addr, relo_addr, reloc_size)){
                             out << "Found local call to: " << to_string<VA>(relo_addr, hex) << "\n";
                             I->set_call_tgt(relo_addr);
                             out << "Adding: 0x" << to_string<VA>(relo_addr, hex) << " as target because its relo-able and internal\n";
@@ -983,8 +1037,10 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                 break;
 
             case X86::CALL32m:
+            case X86::CALL64m:
                 //this should be a call to an external, or we have no idea
                 //so we need to try and look up the symbol that we're calling at this address...
+                printf("DEBUG : %s, CALL\n", __FUNCTION__), fflush(stdout);
                 if(c->find_import_name(curAddr+2, imp)) {
                     ExternalCodeRefPtr p = makeExtCodeRefFromString(imp, f);
                     LASSERT(p, "Failed to get ext call from map for symbol"+imp);
@@ -1011,12 +1067,12 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
     return B;
 }
 
-NativeFunctionPtr getFunc(ExecutableContainer *c, 
-                          LLVMByteDecoder     &d, 
+NativeFunctionPtr getFunc(ExecutableContainer *c,
+                          LLVMByteDecoder     &d,
                           stack<VA>           &funcs,
                           ExternalFunctionMap &f,
                           VA                  e,
-                          raw_ostream         &out) 
+                          raw_ostream         &out)
 {
   NativeFunctionPtr F = NativeFunctionPtr(new NativeFunction(e));
   stack<VA>         toVisit;
@@ -1039,11 +1095,11 @@ NativeFunctionPtr getFunc(ExecutableContainer *c,
 
     // funcs is new functions to visit later
     // toVisit is basic blocks of *this* function to visit now
-    NativeBlockPtr  B = decodeBlock(c, 
-                                    f, 
-                                    d, 
-                                    toVisit, 
-                                    curBlockHeader, 
+    NativeBlockPtr  B = decodeBlock(c,
+                                    f,
+                                    d,
+                                    toVisit,
+                                    curBlockHeader,
                                     funcs,
                                     out);
 
@@ -1057,9 +1113,9 @@ NativeFunctionPtr getFunc(ExecutableContainer *c,
   return F;
 }
 
-void addDataEntryPoints( ExecutableContainer  *c, 
+void addDataEntryPoints( ExecutableContainer  *c,
                          list<VA>             &entryPoints,
-                         raw_ostream          &out) 
+                         raw_ostream          &out)
 {
     vector<ExecutableContainer::SectionDesc>  secs;
 
@@ -1074,20 +1130,20 @@ void addDataEntryPoints( ExecutableContainer  *c,
             out << __FUNCTION__ << ": looking for entry points in: " << s.secName << "\n";
         }
 
-        addDataEntryPointsFromSection(c, s, entryPoints, 
-                s.base, 
+        addDataEntryPointsFromSection(c, s, entryPoints,
+                s.base,
                 s.base+s.contents.size(),
                 out);
 
     }
 }
 
-list<NativeFunctionPtr> getFuncs( ExecutableContainer *c, 
-                                  LLVMByteDecoder     &dec, 
+list<NativeFunctionPtr> getFuncs( ExecutableContainer *c,
+                                  LLVMByteDecoder     &dec,
                                   set<VA>             &visited,
                                   VA                  e,
                                   ExternalFunctionMap &funcMap,
-                                  raw_ostream         &out) 
+                                  raw_ostream         &out)
 {
   list<NativeFunctionPtr> funcs;
   stack<VA>               toVisit;

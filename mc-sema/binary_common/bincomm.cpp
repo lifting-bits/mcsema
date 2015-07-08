@@ -127,6 +127,7 @@ ExecutableContainer *ExecutableContainer::open(string f, const Target *T, string
   }
 
   exc->hash = hash;
+  exc->target = std::string(T->getName());
 
   if(PK == "") {
       outs() << "Disassembly not guided by outside facts.\nUse: -p <protobuff>' to feed information to guide the disassembly\n";

@@ -28,10 +28,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "raiseX86.h"
 #include "InstructionDispatch.h"
+#include "llvm/Support/Debug.h"
 
+using namespace llvm;
+
+#define INSTR_DEBUG(ip) llvm::dbgs() << __FUNCTION__ << "\tRepresentation: " << ip->printInst() << "\n"
+
+//class INSTR_DEBUG;
 void MOV_populateDispatchMap(DispatchMap &m);
 
-template <int width>
+template <int width, SystemArchType arch>
 InstTransResult doMRMov(InstPtr ip, llvm::BasicBlock *&b,
                         llvm::Value           *dstAddr,
                         const llvm::MCOperand &src)
@@ -45,22 +51,212 @@ InstTransResult doMRMov(InstPtr ip, llvm::BasicBlock *&b,
     return ContinueBlock;
 }
 
+template <int width>
+InstTransResult doMRMovBE(InstPtr ip, llvm::BasicBlock *&b,
+                        llvm::Value           *dstAddr,
+                        const llvm::MCOperand &src)
+{
+    //MOV <mem>, <r>
+    TASSERT(src.isReg(), "src is not a register");
+    TASSERT(dstAddr != NULL, "Destination addr can't be null");
+
+    llvm::Value *srcReg = R_READ<width>(b, src.getReg());
+
+    switch(width){
+    case 16:
+    {
+    	llvm::Value *o1 = BinaryOperator::CreateLShr(srcReg, CONST_V<width>(b, width/2), "", b);
+    	llvm::Value *o2 = BinaryOperator::CreateShl(srcReg, CONST_V<width>(b, width/2), "", b);
+    	srcReg = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
+    }
+    break;
+
+    case 32:
+    {
+    	llvm::Value *o1 = BinaryOperator::CreateLShr(srcReg, CONST_V<width>(b, 8), "", b);
+    	o1 = BinaryOperator::Create(Instruction::And, o1, CONST_V<width>(b, 0xFF00FF), "", b);
+
+    	llvm::Value *o2 = BinaryOperator::CreateShl(srcReg, CONST_V<width>(b, 8), "", b);
+    	o2 = BinaryOperator::Create(Instruction::And, o2, CONST_V<width>(b, 0xFF00FF00), "", b);
+
+    	llvm::Value *val = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
+
+    	llvm::Value *val1 = BinaryOperator::CreateLShr(val, CONST_V<width>(b, 16), "", b);
+    	llvm::Value *val2 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 16), "", b);
+
+    	srcReg = BinaryOperator::Create(Instruction::Or, val1, val2, "", b);
+    }
+    	break;
+    case 64:
+    {
+    	llvm::Value *o1 = BinaryOperator::CreateLShr(srcReg, CONST_V<width>(b, 8), "", b);
+    	o1 = BinaryOperator::Create(Instruction::And, o1, CONST_V<width>(b, 0x00FF00FF00FF00FF), "", b);
+
+    	llvm::Value *o2 = BinaryOperator::CreateShl(srcReg, CONST_V<width>(b, 8), "", b);
+    	o2 = BinaryOperator::Create(Instruction::And, o2, CONST_V<width>(b, 0xFF00FF00FF00FF00), "", b);
+
+    	llvm::Value *val = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
+
+    	llvm::Value *o3 = BinaryOperator::CreateLShr(val, CONST_V<width>(b, 16), "", b);
+    	o3 = BinaryOperator::Create(Instruction::And, o3, CONST_V<width>(b, 0x0000FFFF0000FFFF), "", b);
+
+    	llvm::Value *o4 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 16), "", b);
+    	o4 = BinaryOperator::Create(Instruction::And, o3, CONST_V<width>(b, 0xFFFF0000FFFF0000), "", b);
+
+    	llvm::Value *val1 = BinaryOperator::Create(Instruction::Or, o3, o4, "", b);
+
+    	srcReg = BinaryOperator::Create(Instruction::Or,
+    	            BinaryOperator::CreateLShr(val1, CONST_V<width>(b, 32), "", b),
+    	            BinaryOperator::CreateShl(val, CONST_V<width>(b, 32), "", b),
+    	            "", b);
+    }
+    	break;
+    default:
+        throw TErr(__LINE__, __FILE__, "Unknown width!");
+    	break;
+    }
+
+    // Does not affect any flags
+
+    M_WRITE<width>(ip, b, dstAddr, srcReg);
+
+    return ContinueBlock;
+}
 
 template <int width>
-InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b, 
-                        const llvm::MCOperand &dst, 
-                        const llvm::MCOperand &src) 
+InstTransResult doMRMov(InstPtr ip, llvm::BasicBlock *&b,
+                        llvm::Value           *dstAddr,
+                        const llvm::MCOperand &src)
+{
+    //MOV <mem>, <r>
+    TASSERT(src.isReg(), "src is not a register");
+    TASSERT(dstAddr != NULL, "Destination addr can't be null");
+
+	M_WRITE<width>(ip, b, dstAddr, R_READ<width>(b, src.getReg()));
+
+    return ContinueBlock;
+}
+
+
+template <int width, SystemArchType arch>
+InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b,
+                        const llvm::MCOperand &dst,
+                        const llvm::MCOperand &src)
 {
     //MOV <r>, <r>
     TASSERT(src.isReg(), "");
     TASSERT(dst.isReg(), "");
-    
+
+    R_WRITE<width, arch>(b, dst.getReg(), R_READ<width>(b, src.getReg()));
+
+    return ContinueBlock;
+}
+
+template <int width>
+InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b,
+                        const llvm::MCOperand &dst,
+                        const llvm::MCOperand &src)
+{
+    //MOV <r>, <r>
+    TASSERT(src.isReg(), "");
+    TASSERT(dst.isReg(), "");
     //pretty straightforward
 
     R_WRITE<width>(b, dst.getReg(), R_READ<width>(b, src.getReg()));
-        
+
     return ContinueBlock;
 }
+
+template <int width>
+InstTransResult doRRMovD(InstPtr ip, llvm::BasicBlock *b,
+                        const llvm::MCOperand &dst,
+                        const llvm::MCOperand &src)
+{
+    //MOV <r>, <r>
+    TASSERT(src.isReg(), "");
+    TASSERT(dst.isReg(), "");
+    //pretty straightforward
+
+    R_WRITE<width>(b, dst.getReg(), R_READ<width>(b, src.getReg()));
+
+    return ContinueBlock;
+}
+
+
+template <int width>
+InstTransResult doRMMovBE(InstPtr ip, llvm::BasicBlock *&b,
+						llvm::Value           *srcAddr,
+                        const llvm::MCOperand &dst)
+{
+    //MOV <r>, <mem>
+    TASSERT(dst.isReg(), "dst is not a register");
+    TASSERT(srcAddr != NULL, "Destination addr can't be null");
+
+    llvm::Value *srcVal = M_READ<width>(ip, b, srcAddr);
+
+
+    switch(width){
+    case 16:
+    {
+    	llvm::Value *o1 = BinaryOperator::CreateLShr(srcVal, CONST_V<width>(b, width/2), "", b);
+    	llvm::Value *o2 = BinaryOperator::CreateShl(srcVal, CONST_V<width>(b, width/2), "", b);
+    	srcVal = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
+    }
+    	break;
+
+    case 32:
+    {
+    	llvm::Value *o1 = BinaryOperator::CreateLShr(srcVal, CONST_V<width>(b, 8), "", b);
+    	o1 = BinaryOperator::Create(Instruction::And, o1, CONST_V<width>(b, 0xFF00FF), "", b);
+
+    	llvm::Value *o2 = BinaryOperator::CreateShl(srcVal, CONST_V<width>(b, 8), "", b);
+    	o2 = BinaryOperator::Create(Instruction::And, o2, CONST_V<width>(b, 0xFF00FF00), "", b);
+
+    	llvm::Value *val = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
+
+    	llvm::Value *val1 = BinaryOperator::CreateLShr(val, CONST_V<width>(b, 16), "", b);
+    	llvm::Value *val2 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 16), "", b);
+
+    	srcVal = BinaryOperator::Create(Instruction::Or, val1, val2, "", b);
+    }
+    	break;
+    case 64:
+    {
+    	llvm::Value *o1 = BinaryOperator::CreateLShr(srcVal, CONST_V<width>(b, 8), "", b);
+    	o1 = BinaryOperator::Create(Instruction::And, o1, CONST_V<width>(b, 0x00FF00FF00FF00FF), "", b);
+
+    	llvm::Value *o2 = BinaryOperator::CreateShl(srcVal, CONST_V<width>(b, 8), "", b);
+    	o2 = BinaryOperator::Create(Instruction::And, o2, CONST_V<width>(b, 0xFF00FF00FF00FF00), "", b);
+
+    	llvm::Value *val = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
+
+    	llvm::Value *o3 = BinaryOperator::CreateLShr(val, CONST_V<width>(b, 16), "", b);
+    	o3 = BinaryOperator::Create(Instruction::And, o3, CONST_V<width>(b, 0x0000FFFF0000FFFF), "", b);
+
+    	llvm::Value *o4 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 16), "", b);
+    	o4 = BinaryOperator::Create(Instruction::And, o3, CONST_V<width>(b, 0xFFFF0000FFFF0000), "", b);
+
+    	llvm::Value *val1 = BinaryOperator::Create(Instruction::Or, o3, o4, "", b);
+
+    	llvm::Value *o5 = BinaryOperator::CreateLShr(val1, CONST_V<width>(b, 32), "", b);
+
+    	llvm::Value *o6 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 32), "", b);
+
+    	srcVal = BinaryOperator::Create(Instruction::Or, o5, o6, "", b);
+    }
+    	break;
+    default:
+        throw TErr(__LINE__, __FILE__, "Unknown width!");
+    	break;
+    }
+
+    // Does not affect any flags
+
+    R_WRITE<width>(b, dst.getReg(), srcVal);
+
+    return ContinueBlock;
+}
+
 
 template <int width>
 InstTransResult doRMMov(InstPtr ip, llvm::BasicBlock      *b,
@@ -71,7 +267,7 @@ InstTransResult doRMMov(InstPtr ip, llvm::BasicBlock      *b,
     TASSERT(dst.isReg(), "");
     TASSERT(srcAddr != NULL, "");
 
-    R_WRITE<width>(b, dst.getReg(), M_READ<width>(ip, b, srcAddr));
+	R_WRITE<width>(b, dst.getReg(), M_READ<width>(ip, b, srcAddr));
 
     return ContinueBlock;
 }
@@ -82,14 +278,11 @@ llvm::Value *getValueForExternal(llvm::Module *M, InstPtr ip, llvm::BasicBlock *
     llvm::Value *addrInt = NULL;
 
     if( ip->has_ext_call_target() ) {
-        if (width != 32) {
-            throw TErr(__LINE__, __FILE__, "NIY: non 32-bit width for external calls");
-        }
         std::string target = ip->get_ext_call_target()->getSymbolName();
         llvm::Value *ext_fn = M->getFunction(target);
         TASSERT(ext_fn != NULL, "Could not find external: " + target);
         llvm::Value *addrInt = new llvm::PtrToIntInst(
-                ext_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+                ext_fn, llvm::Type::getIntNTy(block->getContext(), width), "", block);
 
         return addrInt;
     } else if (ip->has_ext_data_ref() ) {
@@ -98,7 +291,7 @@ llvm::Value *getValueForExternal(llvm::Module *M, InstPtr ip, llvm::BasicBlock *
 
         TASSERT(gvar != NULL, "Could not find external data: " + target);
 
-        
+
         if(gvar->getType()->isPointerTy()) {
             addrInt = new llvm::PtrToIntInst(
                     gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
@@ -109,7 +302,7 @@ llvm::Value *getValueForExternal(llvm::Module *M, InstPtr ip, llvm::BasicBlock *
                 throw TErr(__LINE__, __FILE__, "NIY: non-integer external data");
             }
             else if(int_t->getBitWidth() < width) {
-                addrInt = new llvm::ZExtInst(gvar, 
+                addrInt = new llvm::ZExtInst(gvar,
                         llvm::Type::getIntNTy(block->getContext(), width),
                         "",
                         block);

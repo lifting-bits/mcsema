@@ -131,24 +131,45 @@ void doPrintModule(NativeModulePtr m) {
     return;
 }
 
-#ifdef WIN32
-string dtLayout = "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-f80:128:128-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32-S32";
-#else
-// i386-linux-gnu
-string dtLayout = "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32-S128";
-#endif
 
-
-llvm::Module  *getLLVMModule(string name)
+llvm::Module  *getLLVMModule(string name, const std::string &triple)
 {
-  llvm::Module  *M = new Module(name, llvm::getGlobalContext());
+    llvm::Module  *M = new Module(name, llvm::getGlobalContext());
+    llvm::Triple TT = llvm::Triple(triple);
+    M->setTargetTriple(triple);
+    
 
-  M->setDataLayout(dtLayout);
-  M->setTargetTriple(TargetTriple);
+    std::string layout;
 
-  doGlobalInit(M);
+    if(TT.getOS() == llvm::Triple::Win32) {
+        if(TT.getArch() == llvm::Triple::x86) {
+            layout = "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-f80:128:128-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32-S32";
+        } else if(TT.getArch() == llvm::Triple::x86_64) {
+            layout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128" ;
+        } else {
+            std::cerr << "Unsupported arch in triple: " << triple << "\n";
+            return nullptr;
+        }
+    } else if (TT.getOS() == llvm::Triple::Linux) {
+        if(TT.getArch() == llvm::Triple::x86) {
+            layout = "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32-S128";
+        } else if(TT.getArch() == llvm::Triple::x86_64) {
+            // x86_64-linux-gnu
+            layout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128";
+        } else {
+            std::cerr << "Unsupported arch in triple: " << triple << "\n";
+            return nullptr;
+        }
+    } else {
+        std::cerr << "Unsupported OS in triple: " << triple << "\n";
+        return nullptr;
+    }
 
-  return M;
+    M->setDataLayout(layout);
+
+    doGlobalInit(M);
+
+    return M;
 }
 
 struct DriverEntry 
@@ -158,6 +179,7 @@ struct DriverEntry
     int  argc;
     string name;
     string sym;
+	string sign;
     VA ep;
     ExternalCodeRef::CallingConvention cconv;
 };
@@ -187,10 +209,9 @@ static bool driverArgsToDriver(const string &args, DriverEntry &new_d) {
         vtok.push_back(t); 
     }
 
-    if(vtok.size() != 5) {
+    if(vtok.size() >= 7) {
         return false;
     }
-
 
     // take name as is
     new_d.name = vtok[0];
@@ -234,9 +255,20 @@ static bool driverArgsToDriver(const string &args, DriverEntry &new_d) {
     } else if(vtok[4] == "E") {
         // default to stdcall
         new_d.cconv = ExternalCodeRef::CalleeCleanup;
-    } else {
+    } else if(vtok[4] == "S") {
+        // default to stdcall
+        new_d.cconv = ExternalCodeRef::X86_64_SysV;
+    } else if(vtok[4] == "W") {
+		new_d.cconv = ExternalCodeRef::X86_64_Win64;
+	}
+	else {
         return false;
     }
+
+	if(vtok.size() >= 6){
+		 boost::algorithm::to_upper(vtok[5]);
+		 new_d.sign = vtok[5];
+	}
 
     return true;
 }
@@ -307,6 +339,17 @@ int main(int argc, char *argv[])
 
   vector<DriverEntry> drivers;
 
+  std::string errstr;
+  cout << "Looking up target..." << endl;
+  const Target  *x86Target = 
+      TargetRegistry::lookupTarget(TargetTriple, errstr);
+
+  if(x86Target == nullptr) {
+    std::cerr << "Could not find target triple: " << TargetTriple << "\n";
+    std::cerr << "Error: " << errstr << "\n";
+    return -1;
+  }
+
   try {
       for(unsigned i = 0; i < Drivers.size(); i++) {
           string driverArgs = Drivers[i];
@@ -322,16 +365,22 @@ int main(int argc, char *argv[])
     return -1;
   }
 
-
   //reproduce NativeModule from CFG input argument
-  NativeModulePtr mod = readModule(InputFilename, ProtoBuff, list<VA>());
+  cout << "Reading module ..." << endl;
+  NativeModulePtr mod = readModule(InputFilename, ProtoBuff, list<VA>(), x86Target);
   if(mod == NULL) {
       cerr << "Could not process input module: " << InputFilename << std::endl;
       return -2;
   }
 
+  // set native module target
+  cout << "Setting initial triples..." << endl;
+  mod->setTarget(x86Target);
+  mod->setTargetTriple(TargetTriple);
+
   const std::vector<NativeModule::EntrySymbol>& native_eps = mod->getEntryPoints();
   std::vector<NativeModule::EntrySymbol>::const_iterator natep_it;
+  cout << "Looking at entry points..."  << endl;
   for( natep_it = native_eps.begin();
           natep_it != native_eps.end();
           natep_it++) 
@@ -351,6 +400,7 @@ int main(int argc, char *argv[])
       }
   }
 
+
   if(drivers.size() == 0) {
       cout << "At least one driver must be specified. Please use the -driver option\n";
       return -1;
@@ -368,8 +418,9 @@ int main(int argc, char *argv[])
       ignoreUnsupportedInsts = true;
   }
 
-  //now, convert it to an LLVM module 
-  llvm::Module  *M = getLLVMModule(mod->name());
+  //now, convert it to an LLVM module
+  cout << "Getting LLVM module..."  << endl;
+  llvm::Module  *M = getLLVMModule(mod->name(), TargetTriple);
 
   if(!M) 
   {
@@ -380,6 +431,7 @@ int main(int argc, char *argv[])
   bool  modResult = false;
 
   try {
+    cout << "Converting to LLVM..."  << endl;
     modResult = natModToModule(mod, M, outs());
   } catch(std::exception &e) {
     cout << "error: " << endl << e.what() << endl;
@@ -417,12 +469,16 @@ int main(int argc, char *argv[])
 
               if(itr->is_raw == true)
               {
-                  addEntryPointDriverRaw(M, itr->name, ep);
+                  if(mod->is64Bit()) x86_64::addEntryPointDriverRaw(M, itr->name, ep);
+                  else x86::addEntryPointDriverRaw(M, itr->name, ep);
               }
               else 
               {
-                  addEntryPointDriver(M, itr->name, ep, itr->argc, itr->returns, outs(), itr->cconv);
+                  if(mod->is64Bit()) x86_64::addEntryPointDriver(M, itr->name, ep, itr->argc, itr->returns, outs(), itr->cconv, itr->sign);
+                  else x86::addEntryPointDriver(M, itr->name, ep, itr->argc, itr->returns, outs(), itr->cconv);
+
               }
+
           } // for vector<DriverEntry>
 
           string                  errorInfo;

@@ -64,7 +64,7 @@ public:
   static ExecutableContainer *open(std::string, const llvm::Target *, std::string);
 
   virtual ~ExecutableContainer(void)  { };
-  
+
   //did constructor work (ugh)
   virtual bool is_open(void) = 0;
 
@@ -75,9 +75,9 @@ public:
   virtual bool is_addr_relocated(uint32_t) = 0;
 
   //get the relocated value of an address
-  virtual bool relocate_addr(VA, VA &) = 0;
+  virtual bool relocate_addr(VA, VA &, VA &) = 0;
 
-  //get a list of exports and symbols 
+  //get a list of exports and symbols
   virtual bool get_exports(std::list<std::pair<std::string, VA> >  &) = 0;
 
   enum SectionType {
@@ -98,11 +98,20 @@ public:
   virtual std::string name(void) = 0;
   std::string hash;
   Disassembly *disassembly;
+  std::string target;
 
   virtual uint64_t getBase() const = 0;
   virtual uint64_t getExtent() const = 0;
   virtual int readByte(uint64_t addr, uint8_t *b) const = 0;
   virtual bool getEntryPoint(uint64_t &ep) const = 0;
+
+  unsigned int getPointerSizeByte(void){
+      if(!target.compare("x86-64")){
+          return 8;
+      } else {
+          return 4;
+      }
+  }
 };
 
 #endif //BINCOMM_H

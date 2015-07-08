@@ -61,6 +61,9 @@ OutputFilename("o", cl::desc("Output filename"), cl::value_desc("filename"));
 cl::opt<string>
 PriorKnowledge("p", cl::desc("Proto buffer containing prior knowldege"), cl::value_desc("filename"));
 
+cl::opt<string>
+SystemArch("march", cl::desc("Target description"), cl::value_desc("architecture"));
+
 cl::opt<int>
 Verbosity("v", cl::desc("Verbosity level"), cl::value_desc("level"));
 
@@ -104,7 +107,7 @@ NativeModulePtr makeNativeModule( ExecutableContainer *exc,
   vector<NativeModule::EntrySymbol>     entrySymbols;
 
   list<NativeFunctionPtr> recoveredFuncs;
-  LLVMByteDecoder         byteDec;
+  LLVMByteDecoder         byteDec(exc->target);
 
   if(EntryPoint.size()) {
       for(unsigned i = 0; i < EntryPoint.size(); i++) {
@@ -261,12 +264,33 @@ int main(int argc, char *argv[]) {
   llvm::InitializeAllTargetMCs();
   llvm::InitializeAllAsmParsers();
   llvm::InitializeAllDisassemblers();
+  llvm::Triple *triple;
 
-  ExternalFunctionMap funcs(TargetTriple);
+  //make an LLVM target that is appropriate
+  const Target  *x86Target = NULL;
+  for(TargetRegistry::iterator it = TargetRegistry::begin(),
+        e = TargetRegistry::end();
+      it != e;
+      ++it)
+  {
+    const Target  &t = *it;
+    if(string(t.getName()) == SystemArch) {
+      x86Target = &t;
+      break;
+    }
+  }  
+
+  if(!SystemArch.compare("x86-64")){
+	  triple = new Triple(DEFAULT_TRIPLE_X64);
+  } else {
+	  triple = new Triple(DEFAULT_TRIPLE);
+  }
+
+  ExternalFunctionMap funcs(triple->getTriple());
+
   try {
 
       if(FuncMap.size()) {
-
           for(unsigned i = 0; i < FuncMap.size(); ++i) {
               funcs.parseMap(FuncMap[i]);
           }
@@ -277,21 +301,6 @@ int main(int argc, char *argv[]) {
       return -2;
   }
 
-  //make an LLVM target that is appropriate
-  const Target  *x86Target = NULL;
-  for(TargetRegistry::iterator it = TargetRegistry::begin(),
-        e = TargetRegistry::end();
-      it != e;
-      ++it)
-  {
-    const Target  &t = *it;
-
-    if(string(t.getName()) == "x86") {
-      x86Target = &t;
-      break;
-    }
-  }
-
   if(InputFilename == "") {
       errs() << "Invalid arguments.\nUse :'" << argv[0] << " -help' for help\n";
       return -1;
@@ -300,7 +309,6 @@ int main(int argc, char *argv[]) {
   if(PriorKnowledge == "") {
       outs() << "Disassembly not guided by outside facts.\nUse :'" << argv[0] << "-p <protobuff>' to feed information to guide the disassembly\n";
   }
-
 
 
   //open the binary input file
@@ -366,9 +374,10 @@ int main(int argc, char *argv[]) {
         }
       }
     }
+
   } else {
     outs() << "Could not open executable module " << InputFilename << "\n";
   }
-  
+
   return 0;
 }

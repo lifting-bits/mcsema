@@ -326,18 +326,28 @@ class JumpTbl : public ::google::protobuf::Message {
   inline ::google::protobuf::int32 zero_offset() const;
   inline void set_zero_offset(::google::protobuf::int32 value);
 
+  // optional int64 offset_from_data = 3;
+  inline bool has_offset_from_data() const;
+  inline void clear_offset_from_data();
+  static const int kOffsetFromDataFieldNumber = 3;
+  inline ::google::protobuf::int64 offset_from_data() const;
+  inline void set_offset_from_data(::google::protobuf::int64 value);
+
   // @@protoc_insertion_point(class_scope:JumpTbl)
  private:
   inline void set_has_zero_offset();
   inline void clear_has_zero_offset();
+  inline void set_has_offset_from_data();
+  inline void clear_has_offset_from_data();
 
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
   ::google::protobuf::RepeatedField< ::google::protobuf::int64 > table_entries_;
+  ::google::protobuf::int64 offset_from_data_;
   ::google::protobuf::int32 zero_offset_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(2 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(3 + 31) / 32];
 
   friend void  protobuf_AddDesc_CFG_2eproto();
   friend void protobuf_AssignDesc_CFG_2eproto();
@@ -602,6 +612,20 @@ class Instruction : public ::google::protobuf::Message {
   inline ::std::string* release_ext_data_name();
   inline void set_allocated_ext_data_name(::std::string* ext_data_name);
 
+  // optional int32 system_call_number = 13;
+  inline bool has_system_call_number() const;
+  inline void clear_system_call_number();
+  static const int kSystemCallNumberFieldNumber = 13;
+  inline ::google::protobuf::int32 system_call_number() const;
+  inline void set_system_call_number(::google::protobuf::int32 value);
+
+  // optional bool local_noreturn = 14;
+  inline bool has_local_noreturn() const;
+  inline void clear_local_noreturn();
+  static const int kLocalNoreturnFieldNumber = 14;
+  inline bool local_noreturn() const;
+  inline void set_local_noreturn(bool value);
+
   // @@protoc_insertion_point(class_scope:Instruction)
  private:
   inline void set_has_inst_bytes();
@@ -628,6 +652,10 @@ class Instruction : public ::google::protobuf::Message {
   inline void clear_has_jump_index_table();
   inline void set_has_ext_data_name();
   inline void clear_has_ext_data_name();
+  inline void set_has_system_call_number();
+  inline void clear_has_system_call_number();
+  inline void set_has_local_noreturn();
+  inline void clear_has_local_noreturn();
 
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
@@ -643,9 +671,11 @@ class Instruction : public ::google::protobuf::Message {
   ::JumpTbl* jump_table_;
   ::JumpIndexTbl* jump_index_table_;
   ::std::string* ext_data_name_;
+  ::google::protobuf::int32 system_call_number_;
+  bool local_noreturn_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(12 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(14 + 31) / 32];
 
   friend void  protobuf_AddDesc_CFG_2eproto();
   friend void protobuf_AssignDesc_CFG_2eproto();
@@ -978,6 +1008,18 @@ class ExternalFunction : public ::google::protobuf::Message {
   inline ::google::protobuf::int32 argument_count() const;
   inline void set_argument_count(::google::protobuf::int32 value);
 
+  // required string signature = 6;
+  inline bool has_signature() const;
+  inline void clear_signature();
+  static const int kSignatureFieldNumber = 6;
+  inline const ::std::string& signature() const;
+  inline void set_signature(const ::std::string& value);
+  inline void set_signature(const char* value);
+  inline void set_signature(const char* value, size_t size);
+  inline ::std::string* mutable_signature();
+  inline ::std::string* release_signature();
+  inline void set_allocated_signature(::std::string* signature);
+
   // @@protoc_insertion_point(class_scope:ExternalFunction)
  private:
   inline void set_has_symbol_name();
@@ -990,6 +1032,8 @@ class ExternalFunction : public ::google::protobuf::Message {
   inline void clear_has_no_return();
   inline void set_has_argument_count();
   inline void clear_has_argument_count();
+  inline void set_has_signature();
+  inline void clear_has_signature();
 
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
@@ -997,10 +1041,11 @@ class ExternalFunction : public ::google::protobuf::Message {
   int calling_convention_;
   bool has_return_;
   bool no_return_;
+  ::std::string* signature_;
   ::google::protobuf::int32 argument_count_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(5 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(6 + 31) / 32];
 
   friend void  protobuf_AddDesc_CFG_2eproto();
   friend void protobuf_AssignDesc_CFG_2eproto();
@@ -1181,20 +1226,30 @@ class DataSymbol : public ::google::protobuf::Message {
   inline ::std::string* release_symbol_name();
   inline void set_allocated_symbol_name(::std::string* symbol_name);
 
+  // required int32 symbol_size = 3;
+  inline bool has_symbol_size() const;
+  inline void clear_symbol_size();
+  static const int kSymbolSizeFieldNumber = 3;
+  inline ::google::protobuf::int32 symbol_size() const;
+  inline void set_symbol_size(::google::protobuf::int32 value);
+
   // @@protoc_insertion_point(class_scope:DataSymbol)
  private:
   inline void set_has_base_address();
   inline void clear_has_base_address();
   inline void set_has_symbol_name();
   inline void clear_has_symbol_name();
+  inline void set_has_symbol_size();
+  inline void clear_has_symbol_size();
 
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
   ::google::protobuf::int64 base_address_;
   ::std::string* symbol_name_;
+  ::google::protobuf::int32 symbol_size_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(2 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(3 + 31) / 32];
 
   friend void  protobuf_AddDesc_CFG_2eproto();
   friend void protobuf_AssignDesc_CFG_2eproto();
@@ -3411,6 +3466,28 @@ inline void JumpTbl::set_zero_offset(::google::protobuf::int32 value) {
   zero_offset_ = value;
 }
 
+// optional int64 offset_from_data = 3;
+inline bool JumpTbl::has_offset_from_data() const {
+  return (_has_bits_[0] & 0x00000004u) != 0;
+}
+inline void JumpTbl::set_has_offset_from_data() {
+  _has_bits_[0] |= 0x00000004u;
+}
+inline void JumpTbl::clear_has_offset_from_data() {
+  _has_bits_[0] &= ~0x00000004u;
+}
+inline void JumpTbl::clear_offset_from_data() {
+  offset_from_data_ = GOOGLE_LONGLONG(0);
+  clear_has_offset_from_data();
+}
+inline ::google::protobuf::int64 JumpTbl::offset_from_data() const {
+  return offset_from_data_;
+}
+inline void JumpTbl::set_offset_from_data(::google::protobuf::int64 value) {
+  set_has_offset_from_data();
+  offset_from_data_ = value;
+}
+
 // -------------------------------------------------------------------
 
 // JumpIndexTbl
@@ -3951,6 +4028,50 @@ inline void Instruction::set_allocated_ext_data_name(::std::string* ext_data_nam
   }
 }
 
+// optional int32 system_call_number = 13;
+inline bool Instruction::has_system_call_number() const {
+  return (_has_bits_[0] & 0x00001000u) != 0;
+}
+inline void Instruction::set_has_system_call_number() {
+  _has_bits_[0] |= 0x00001000u;
+}
+inline void Instruction::clear_has_system_call_number() {
+  _has_bits_[0] &= ~0x00001000u;
+}
+inline void Instruction::clear_system_call_number() {
+  system_call_number_ = 0;
+  clear_has_system_call_number();
+}
+inline ::google::protobuf::int32 Instruction::system_call_number() const {
+  return system_call_number_;
+}
+inline void Instruction::set_system_call_number(::google::protobuf::int32 value) {
+  set_has_system_call_number();
+  system_call_number_ = value;
+}
+
+// optional bool local_noreturn = 14;
+inline bool Instruction::has_local_noreturn() const {
+  return (_has_bits_[0] & 0x00002000u) != 0;
+}
+inline void Instruction::set_has_local_noreturn() {
+  _has_bits_[0] |= 0x00002000u;
+}
+inline void Instruction::clear_has_local_noreturn() {
+  _has_bits_[0] &= ~0x00002000u;
+}
+inline void Instruction::clear_local_noreturn() {
+  local_noreturn_ = false;
+  clear_has_local_noreturn();
+}
+inline bool Instruction::local_noreturn() const {
+  return local_noreturn_;
+}
+inline void Instruction::set_local_noreturn(bool value) {
+  set_has_local_noreturn();
+  local_noreturn_ = value;
+}
+
 // -------------------------------------------------------------------
 
 // Block
@@ -4241,6 +4362,76 @@ inline void ExternalFunction::set_argument_count(::google::protobuf::int32 value
   argument_count_ = value;
 }
 
+// required string signature = 6;
+inline bool ExternalFunction::has_signature() const {
+  return (_has_bits_[0] & 0x00000020u) != 0;
+}
+inline void ExternalFunction::set_has_signature() {
+  _has_bits_[0] |= 0x00000020u;
+}
+inline void ExternalFunction::clear_has_signature() {
+  _has_bits_[0] &= ~0x00000020u;
+}
+inline void ExternalFunction::clear_signature() {
+  if (signature_ != &::google::protobuf::internal::kEmptyString) {
+    signature_->clear();
+  }
+  clear_has_signature();
+}
+inline const ::std::string& ExternalFunction::signature() const {
+  return *signature_;
+}
+inline void ExternalFunction::set_signature(const ::std::string& value) {
+  set_has_signature();
+  if (signature_ == &::google::protobuf::internal::kEmptyString) {
+    signature_ = new ::std::string;
+  }
+  signature_->assign(value);
+}
+inline void ExternalFunction::set_signature(const char* value) {
+  set_has_signature();
+  if (signature_ == &::google::protobuf::internal::kEmptyString) {
+    signature_ = new ::std::string;
+  }
+  signature_->assign(value);
+}
+inline void ExternalFunction::set_signature(const char* value, size_t size) {
+  set_has_signature();
+  if (signature_ == &::google::protobuf::internal::kEmptyString) {
+    signature_ = new ::std::string;
+  }
+  signature_->assign(reinterpret_cast<const char*>(value), size);
+}
+inline ::std::string* ExternalFunction::mutable_signature() {
+  set_has_signature();
+  if (signature_ == &::google::protobuf::internal::kEmptyString) {
+    signature_ = new ::std::string;
+  }
+  return signature_;
+}
+inline ::std::string* ExternalFunction::release_signature() {
+  clear_has_signature();
+  if (signature_ == &::google::protobuf::internal::kEmptyString) {
+    return NULL;
+  } else {
+    ::std::string* temp = signature_;
+    signature_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+    return temp;
+  }
+}
+inline void ExternalFunction::set_allocated_signature(::std::string* signature) {
+  if (signature_ != &::google::protobuf::internal::kEmptyString) {
+    delete signature_;
+  }
+  if (signature) {
+    set_has_signature();
+    signature_ = signature;
+  } else {
+    clear_has_signature();
+    signature_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  }
+}
+
 // -------------------------------------------------------------------
 
 // ExternalData
@@ -4431,6 +4622,28 @@ inline void DataSymbol::set_allocated_symbol_name(::std::string* symbol_name) {
     clear_has_symbol_name();
     symbol_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   }
+}
+
+// required int32 symbol_size = 3;
+inline bool DataSymbol::has_symbol_size() const {
+  return (_has_bits_[0] & 0x00000004u) != 0;
+}
+inline void DataSymbol::set_has_symbol_size() {
+  _has_bits_[0] |= 0x00000004u;
+}
+inline void DataSymbol::clear_has_symbol_size() {
+  _has_bits_[0] &= ~0x00000004u;
+}
+inline void DataSymbol::clear_symbol_size() {
+  symbol_size_ = 0;
+  clear_has_symbol_size();
+}
+inline ::google::protobuf::int32 DataSymbol::symbol_size() const {
+  return symbol_size_;
+}
+inline void DataSymbol::set_symbol_size(::google::protobuf::int32 value) {
+  set_has_symbol_size();
+  symbol_size_ = value;
 }
 
 // -------------------------------------------------------------------

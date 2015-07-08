@@ -69,8 +69,10 @@ class ExternalCodeRef : public ExternalRef {
 public:
     enum CallingConvention {
         CallerCleanup,
-        CalleeCleanup, 
-        FastCall
+        CalleeCleanup,
+        FastCall,
+        X86_64_SysV,
+        X86_64_Win64
     };
 
     enum ReturnType {
@@ -86,29 +88,37 @@ public:
 
     void setReturnType(ReturnType r) { this->ret = r; }
 
+    std::string getFunctionSignature(void) { return this->funcSign; }
+
+    ExternalCodeRef(const std::string &fn, int8_t d, CallingConvention c, ReturnType r, const std::string &sign) :
+                                            numArgs(d),
+                                            conv(c),
+                                            ret(r), ExternalRef(fn), funcSign(sign) { }
+
     ExternalCodeRef(const std::string &fn, int8_t d, CallingConvention c, ReturnType r) :
                                             numArgs(d),
                                             conv(c),
-                                            ret(r), ExternalRef(fn) { }
+                                            ret(r), ExternalRef(fn), funcSign("") { }
 
     ExternalCodeRef(const std::string &fn, int8_t d, CallingConvention c) :  
                                             numArgs(d),
                                             conv(c),
-                                            ret(Unknown), ExternalRef(fn) { }
+                                            ret(Unknown), ExternalRef(fn), funcSign("") { }
 
     ExternalCodeRef(const std::string &fn, int8_t d) :  numArgs(d),
                                             conv(CallerCleanup),
-                                            ret(Unknown), ExternalRef(fn) { }
+                                            ret(Unknown), ExternalRef(fn), funcSign("") { }
 
     ExternalCodeRef(const std::string &fn) :    numArgs(-1),
                                     conv(CallerCleanup),
-                                    ret(Unknown), ExternalRef(fn) { }
+                                    ret(Unknown), ExternalRef(fn), funcSign("") { }
 
 protected:
 
     int8_t              numArgs;
     CallingConvention   conv;
     ReturnType          ret;
+    std::string         funcSign;
 };
 
 typedef boost::shared_ptr<ExternalCodeRef> ExternalCodeRefPtr;

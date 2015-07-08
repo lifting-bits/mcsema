@@ -8,11 +8,17 @@
 #define PACKED  __attribute__((packed))
 #elif defined(_WIN32)
 #define STDCALL __stdcall
-#define PACKED 
+#define PACKED
 #else
 #define STDCALL
-#define PACKED 
+#define PACKED
 #endif
+
+#ifdef _WIN64
+#define __x86_64__
+#endif
+
+//#define DEBUG
 
 #ifdef __cplusplus
 namespace mcsema {
@@ -79,7 +85,7 @@ typedef struct _nativefpu {
 
   std::string printMe(void) const {
     std::ostringstream  oss;
-   
+
     boost::int32_t  k = this->b[0];
     oss << "0x" << std::hex << k;
     k = this->b[1];
@@ -119,7 +125,11 @@ typedef struct _nativefpu {
 #endif
 typedef struct _segmentoffset{
     uint16_t seg;
+#ifdef __x86_64__
+    uint64_t off;
+#else
     uint32_t off;
+#endif
 } PACKED segmentoffset; // 6 bytes
 #ifdef _WIN32
 #pragma pack(pop)
@@ -151,7 +161,7 @@ typedef struct _fputag {
 
   std::string printMe(void) const {
     std::ostringstream  oss;
-   
+
     boost::int32_t  k = this->tag[0];
     oss << "0x" << std::hex << k;
     k = this->tag[1];
@@ -321,14 +331,34 @@ typedef struct _fpucontrol {
 //structure for register state
 typedef struct _RegState {
     //the big registers
-    uint32_t	EAX;
-    uint32_t	EBX;
-    uint32_t	ECX;
-    uint32_t	EDX;
-    uint32_t	ESI;
-    uint32_t	EDI;
-    uint32_t	ESP;
-    uint32_t	EBP; // 32 bytes
+#ifndef __x86_64__ 
+	uint32_t	EAX;
+	uint32_t	EBX;
+	uint32_t	ECX;
+	uint32_t 	EDX;
+	uint32_t	ESI;
+	uint32_t	EDI;
+	uint32_t	ESP;
+	uint32_t	EBP;
+#else
+	uint64_t 	RAX;
+	uint64_t 	RBX;
+	uint64_t 	RCX;
+	uint64_t 	RDX;
+	uint64_t	RSI;
+	uint64_t 	RDI;
+	uint64_t 	RSP;
+	uint64_t 	RBP;
+	uint64_t 	R8;
+	uint64_t	R9;
+	uint64_t	R10;
+	uint64_t	R11;
+	uint64_t	R12;
+	uint64_t	R13;
+	uint64_t	R14;
+	uint64_t	R15;
+	uint64_t    RIP;
+#endif
 
     //the flags
     uint8_t	CF;
@@ -342,8 +372,8 @@ typedef struct _RegState {
     fpuflags    FPU_FLAGS; // 14 bytes
     fpucontrol  FPU_CONTROL; // 9 bytes
     fputag      FPU_TAG; // 8 bytes
-    segmentoffset FPU_LASTIP; // 8 bytes 
-    segmentoffset FPU_LASTDATA; // 8 bytes 
+    segmentoffset FPU_LASTIP; // 8 bytes
+    segmentoffset FPU_LASTDATA; // 8 bytes
     uint16_t    FPU_FOPCODE; // 2 bytes
 
     //xmm registers
@@ -355,26 +385,40 @@ typedef struct _RegState {
     xmmregstate      XMM5;
     xmmregstate      XMM6;
     xmmregstate      XMM7;
+#ifdef __x86_64__
+    xmmregstate      XMM8;
+    xmmregstate      XMM9;
+    xmmregstate      XMM10;
+    xmmregstate      XMM11;
+    xmmregstate      XMM12;
+    xmmregstate      XMM13;
+    xmmregstate      XMM14;
+    xmmregstate      XMM15;
+#endif
 
 
     // not registers, but necessary to support calls
     // via register/memory
+#ifdef __x86_64__
+    uint64_t stack_base; // biggest number ESP can be
+    uint64_t stack_limit; // smallest number ESP can be
+#else
     uint32_t stack_base; // biggest number ESP can be
     uint32_t stack_limit; // smallest number ESP can be
-
+#endif
 #ifdef __cplusplus
     void printMe(const std::string &name) const {
 #ifdef DEBUG
         const char *cstr = name.c_str();
         printf("\n");
-        printf("%s: EAX=0x%08x\n", cstr, this->EAX);
-        printf("%s: EBX=0x%08x\n", cstr, this->EBX);
-        printf("%s: ECX=0x%08x\n", cstr, this->ECX);
-        printf("%s: EDX=0x%08x\n", cstr, this->EDX);
-        printf("%s: ESI=0x%08x\n", cstr, this->ESI);
-        printf("%s: EDI=0x%08x\n", cstr, this->EDI);
-        printf("%s: ESP=0x%08x\n", cstr, this->ESP);
-        printf("%s: EBP=0x%08x\n", cstr, this->EBP);
+        printf("%s: EAX=0x%16x\n", cstr, this->RAX);
+        printf("%s: EBX=0x%16x\n", cstr, this->RBX);
+        printf("%s: ECX=0x%16x\n", cstr, this->RCX);
+        printf("%s: EDX=0x%16x\n", cstr, this->RDX);
+        printf("%s: ESI=0x%16x\n", cstr, this->RSI);
+        printf("%s: EDI=0x%16x\n", cstr, this->RDI);
+        printf("%s: ESP=0x%16x\n", cstr, this->RSP);
+        printf("%s: EBP=0x%16x\n", cstr, this->RBP);
         printf("%s: CF: %d PF: %d AF: %d ZF: %d SF: %d OF: %d DF: %d\n",
                 cstr, this->CF, this->PF, this->AF, this->ZF, this->SF, this->OF, this->DF);
 
@@ -385,12 +429,12 @@ typedef struct _RegState {
         printf("%s: B: %d C3: %d TOP: %d C2: %d C1: %d C0: %d ES: %d SF: %d\n"
                "%s: PE: %d UE: %d OE: %d ZE: %d DE %d IE: %d\n",
                cstr, this->FPU_FLAGS.BUSY, this->FPU_FLAGS.C3, this->FPU_FLAGS.TOP,
-               this->FPU_FLAGS.C2, this->FPU_FLAGS.C1, this->FPU_FLAGS.C0, 
-               this->FPU_FLAGS.ES, this->FPU_FLAGS.SF, cstr, this->FPU_FLAGS.PE, 
+               this->FPU_FLAGS.C2, this->FPU_FLAGS.C1, this->FPU_FLAGS.C0,
+               this->FPU_FLAGS.ES, this->FPU_FLAGS.SF, cstr, this->FPU_FLAGS.PE,
                this->FPU_FLAGS.UE, this->FPU_FLAGS.OE, this->FPU_FLAGS.ZE,
                this->FPU_FLAGS.DE, this->FPU_FLAGS.IE);
         printf("%s: X: %d RC: %d PC: %d PM: %d UM: %d OM: %d ZM: %d DM: %d IM: %d\n",
-                cstr, this->FPU_CONTROL.X, this->FPU_CONTROL.RC, 
+                cstr, this->FPU_CONTROL.X, this->FPU_CONTROL.RC,
                 this->FPU_CONTROL.PC, this->FPU_CONTROL.PM, this->FPU_CONTROL.UM,
                 this->FPU_CONTROL.OM, this->FPU_CONTROL.ZM, this->FPU_CONTROL.DM,
                 this->FPU_CONTROL.IM);
@@ -403,6 +447,34 @@ typedef struct _RegState {
 
 #ifdef __cplusplus
 	bool operator==(const _RegState &other ) const {
+#ifdef __x86_64__
+		return (this->RAX == other.RAX &&
+				this->RBX == other.RBX &&
+				this->RCX == other.RCX &&
+				this->RDX == other.RDX &&
+				this->RDI == other.RDI &&
+				this->RBP == other.RBP &&
+				this->RSP == other.RSP &&
+				this->R8 == other.R8 &&
+				this->R9 == other.R9 &&
+				this->R10 == other.R10 &&
+				this->R11 == other.R11 &&
+				this->R12 == other.R12 &&
+				this->R13 == other.R13 &&
+				this->R14 == other.R14 &&
+				this->R15 == other.R15 &&
+				this->CF == other.CF &&
+				this->PF == other.PF &&
+				this->AF == other.AF &&
+				this->SF == other.SF &&
+				this->OF == other.OF &&
+				this->DF == other.DF &&
+				this->ST_regs == other.ST_regs &&
+                this->FPU_FLAGS == other.FPU_FLAGS &&
+                this->FPU_CONTROL == other.FPU_CONTROL &&
+                this->FPU_FOPCODE == other.FPU_FOPCODE &&
+                this->FPU_TAG == other.FPU_TAG);
+#else
 		return (this->EAX == other.EAX &&
 				this->EBX == other.EBX &&
 				this->ECX == other.ECX &&
@@ -421,6 +493,7 @@ typedef struct _RegState {
                 this->FPU_CONTROL == other.FPU_CONTROL &&
                 this->FPU_FOPCODE == other.FPU_FOPCODE &&
                 this->FPU_TAG == other.FPU_TAG);
+#endif
 	}
 #endif
 
@@ -443,7 +516,7 @@ nativefpu FPU_GET_REG(RegState *state, unsigned reg_index)
 // set the value of st(reg_index)
 void FPU_SET_REG(RegState *state, unsigned reg_index, nativefpu val)
 {
-    
+
     unsigned rnum = state->FPU_FLAGS.TOP + reg_index;
 
     assert(reg_index < STREGS_MAX);
@@ -456,8 +529,8 @@ long double NATIVEFPU_TO_LD(const nativefpu *nf)
 {
 #ifdef _WIN32
 	// sanity check
-	long double ld;
-
+	long double ld = 0;
+#ifndef _WIN64
 	_asm {
 		MOV eax, dword ptr nf
 		_emit 0xDB
@@ -466,9 +539,12 @@ long double NATIVEFPU_TO_LD(const nativefpu *nf)
 		LEA eax, dword ptr ld		; get address of ld
 		FSTP qword ptr [eax]	; store 64-bits into ld
 	}
-
+#else
+	assert(sizeof(nf) == sizeof(ld));
+	memcpy(&ld, nf, sizeof(ld));
+#endif
 	return ld;
-#else 
+#else
 	long double ld;
 	assert(sizeof(*nf) == sizeof(ld));
 	memcpy(&ld, nf, sizeof(ld));
@@ -479,6 +555,7 @@ long double NATIVEFPU_TO_LD(const nativefpu *nf)
 void LD_TO_NATIVEFPU(long double ld, nativefpu *nf)
 {
 #ifdef _WIN32
+#ifndef _WIN64
 	_asm {
 		LEA  eax, dword ptr ld		; get address of ld
 		FLD  qword ptr [eax]	; load 64bits into fpu
@@ -486,8 +563,9 @@ void LD_TO_NATIVEFPU(long double ld, nativefpu *nf)
 		_emit 0xDB
 		_emit 0x38
 		;FSTP tbyte ptr [eax]	; store 80-bits into nf
-		
 	}
+#else
+#endif
 #else
 	assert(sizeof(ld) == sizeof(*nf));
 	memcpy(nf, &ld, sizeof(*nf));

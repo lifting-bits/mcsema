@@ -44,7 +44,9 @@ public:
 enum CallingConvention {
   CallerCleanup,
   CalleeCleanup,
-  FastCall
+  FastCall,
+  X86_64_SysV,
+  X86_64_Win64
 };
 
 private:
@@ -53,19 +55,26 @@ private:
     int               numParams;
     CallingConvention conv;
     std::string       realName;
+    std::string 	  funcSign;
     bool              is_data;
     int               data_size;
 
+    ValueElement(bool b, int n, CallingConvention c, std::string rn, std::string sign) :
+      isNoReturn(b), numParams(n), conv(c), realName(rn), is_data(false), data_size(0), funcSign(sign){ }
+
     ValueElement(bool b, int n, CallingConvention c, std::string rn) :
       isNoReturn(b), numParams(n), conv(c), realName(rn), is_data(false), data_size(0) { }
+
     ValueElement() : 
         isNoReturn(false), numParams(-1), is_data(false), data_size(0) { }
+
     ValueElement(const std::string &rn, int sz) :
         realName(rn), isNoReturn(false), numParams(-1), is_data(true), data_size(sz) { }
   };
 
   std::map<std::string,ValueElement>  external_map;  
 protected:
+  //llvm::Triple *t_triple;
   std::string triple;
   std::string manglePESymbol(std::string inSym, CallingConvention &conv, int &rNumParams);
   std::string mangleELFSymbol(std::string inSym, CallingConvention &conv, int &rNumParams);
@@ -86,5 +95,7 @@ public:
   bool is_data(const std::string& en);
   bool get_data_size(const std::string& en, int &sz);
   void parseMap(std::string filename);
+
+  bool get_function_sign(std::string, std::string &);
 };
 #endif //_EXTERNAL_FUNC_MAP_H
