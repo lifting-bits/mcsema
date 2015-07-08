@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include <stdio.h>
-#define TARGET_IA64
 #include "../../common/RegisterState.h"
 
 extern void demo2_entry(RegState *);

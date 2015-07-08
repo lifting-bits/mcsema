@@ -14,6 +14,10 @@
 #define PACKED
 #endif
 
+#ifdef _WIN64
+#define __x86_64__
+#endif
+
 //#define DEBUG
 
 #ifdef __cplusplus
@@ -121,7 +125,7 @@ typedef struct _nativefpu {
 #endif
 typedef struct _segmentoffset{
     uint16_t seg;
-#ifdef TARGET_IA64
+#ifdef __x86_64__
     uint64_t off;
 #else
     uint32_t off;
@@ -327,7 +331,7 @@ typedef struct _fpucontrol {
 //structure for register state
 typedef struct _RegState {
     //the big registers
-#ifndef TARGET_IA64
+#ifndef __x86_64__ 
 	uint32_t	EAX;
 	uint32_t	EBX;
 	uint32_t	ECX;
@@ -381,8 +385,8 @@ typedef struct _RegState {
     xmmregstate      XMM5;
     xmmregstate      XMM6;
     xmmregstate      XMM7;
-#ifdef TARGET_IA64//__x86_64__
-	xmmregstate      XMM8;
+#ifdef __x86_64__
+    xmmregstate      XMM8;
     xmmregstate      XMM9;
     xmmregstate      XMM10;
     xmmregstate      XMM11;
@@ -395,8 +399,8 @@ typedef struct _RegState {
 
     // not registers, but necessary to support calls
     // via register/memory
-#ifdef TARGET_IA64//__x86_64__
-	uint64_t stack_base; // biggest number ESP can be
+#ifdef __x86_64__
+    uint64_t stack_base; // biggest number ESP can be
     uint64_t stack_limit; // smallest number ESP can be
 #else
     uint32_t stack_base; // biggest number ESP can be
@@ -443,7 +447,7 @@ typedef struct _RegState {
 
 #ifdef __cplusplus
 	bool operator==(const _RegState &other ) const {
-#ifdef TARGET_IA64  //__x86_64__
+#ifdef __x86_64__
 		return (this->RAX == other.RAX &&
 				this->RBX == other.RBX &&
 				this->RCX == other.RCX &&
