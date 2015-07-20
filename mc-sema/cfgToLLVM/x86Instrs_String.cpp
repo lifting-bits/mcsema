@@ -205,10 +205,14 @@ template <int width>
 static InstTransResult doStos(BasicBlock *&b) {
 	llvm::Module *M = b->getParent()->getParent();
 	int bitWidth = getPointerSize(M);
-	if(bitWidth = x86::REG_SIZE)
+	if(bitWidth == Pointer32)
+    {
 		b = doStosV<width, x86::REG_SIZE>(b);
+    }
 	else
+    {
 		b = doStosV<width, x86_64::REG_SIZE>(b);
+    }
 	return ContinueBlock;
 }
 
