@@ -40,7 +40,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
+#define M_LN2 0.693147180559945309417
+#define M_LOG10E 0.434294481903251827651
+#define M_LOG2E 1.44269504088896340736
 #endif
+
+#define M_FLDLG2 0.301029995663981195214
 
 #define NASSERT(cond) TASSERT(cond, "")
 
@@ -1047,6 +1052,21 @@ static InstTransResult doFstpM(InstPtr ip, BasicBlock *&b, Value *memAddr)
     return ContinueBlock;
 }
 
+// TODO: This is like FISTP, but FISTTP does not check rounding mode and
+// always rounds to zero. 
+template<int width>
+static InstTransResult doFistTpM(InstPtr ip, BasicBlock *&b, Value *memAddr)
+{
+    // Do the FST.
+    doFistM<width>(ip, b, memAddr);
+
+    // Pop the stack.
+    FPU_POP(b);
+
+    // Next instruction.
+    return ContinueBlock;
+}
+
 template<int width>
 static InstTransResult doFistpM(InstPtr ip, BasicBlock *&b, Value *memAddr)
 {
@@ -1521,6 +1541,50 @@ static InstTransResult doFDECSTP(MCInst &inst, InstPtr ip, BasicBlock *&b)
 	return ContinueBlock;
 }
 
+static InstTransResult doFPTAN(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+	Module *M = b->getParent()->getParent();
+    Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
+	Function *sin = Intrinsic::getDeclaration(M, Intrinsic::sin, t);
+	Function *cos = Intrinsic::getDeclaration(M, Intrinsic::cos, t);
+
+	NASSERT(sin != NULL);
+	NASSERT(cos != NULL);
+
+	Value *st0_val = FPUR_READ(b, X86::ST0);
+
+	// Compute the sin of st(0)
+	std::vector<Value*> args;
+	args.push_back(st0_val);
+	Value *sin_result = CallInst::Create(sin, args, "", b);
+
+	// Compute the cos of st(0)
+	args.clear();
+	args.push_back(st0_val);
+	Value *cos_result = CallInst::Create(cos, args, "", b);
+
+    // tan = sin/cos
+    
+    Value *tan_result = BinaryOperator::Create(llvm::Instruction::FDiv, sin_result, cos_result, "", b);
+
+	FPUR_WRITE(b, X86::ST0, tan_result);
+    Value *one = CONSTFP_V(b, 1.0);
+    FPU_PUSHV(b, one);
+    return ContinueBlock;
+}
+
+static InstTransResult doCHS(MCInst &inst, InstPtr ip, BasicBlock *&b)
+{
+	Value *st0_val = FPUR_READ(b, X86::ST0);
+
+    Value *negone = CONSTFP_V(b, -1.0);
+    Value *signchange = BinaryOperator::Create(llvm::Instruction::FMul, st0_val, negone, "", b);
+
+	FPUR_WRITE(b, X86::ST0, signchange);
+    return ContinueBlock;
+}
+
+
 #define FPU_TRANSLATION(NAME, SETPTR, SETDATA, SETFOPCODE, ACCESSMEM, THECALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst)\
 {\
     InstTransResult ret;\
@@ -1680,6 +1744,12 @@ FPU_TRANSLATION(SUB_FST0r, true, false, true, false,
 FPU_TRANSLATION(SUB_FrST0, true, false, true, false,
     doFOpRR<false>(ip, block, X86::ST0, OP(0).getReg(), X86::SUB_FrST0, llvm::Instruction::FSub))
 
+    // take the remainder of ( DST_VAL[st0] / SRC_VAL[st1]), store in st0
+FPU_TRANSLATION(FPREM, true, false, true, false,
+    doFOpRR<true>(ip, block, X86::ST1, X86::ST0, X86::FPREM, llvm::Instruction::FRem))
+FPU_TRANSLATION(FPREM1, true, false, true, false,
+    doFOpRR<true>(ip, block, X86::ST1, X86::ST0, X86::FPREM1, llvm::Instruction::FRem))
+
 FPU_TRANSLATION(SIN_F, true, false, true, false, doFsin(ip, block, X86::ST0))
 
 FPU_TRANSLATION(LD_F0, true, false, true, false,
@@ -1689,6 +1759,14 @@ FPU_TRANSLATION(LD_F1, true, false, true, false,
 
 FPU_TRANSLATION(FLDPI, true, false, true, false,
         doFldC(ip, block, M_PI))
+FPU_TRANSLATION(FLDLN2, true, false, true, false,
+        doFldC(ip, block, M_LN2))
+
+FPU_TRANSLATION(FLDL2E, true, false, true, false,
+        doFldC(ip, block, M_LOG2E))
+
+FPU_TRANSLATION(FLDLG2, true, false, true, false,
+        doFldC(ip, block, M_FLDLG2))
 
 FPU_TRANSLATION(ILD_F16m, true, true, true, true,
         doFildM<16>(ip, block, mem_src))
@@ -1712,6 +1790,13 @@ FPU_TRANSLATION(IST_FP32m, true, true, true, true,
 FPU_TRANSLATION(IST_FP64m, true, true, true, true,
         doFistpM<64>(ip, block, mem_src))
 
+FPU_TRANSLATION(ISTT_FP64m, true, true, true, true,
+        doFistTpM<64>(ip, block, mem_src))
+FPU_TRANSLATION(ISTT_FP32m, true, true, true, true,
+        doFistTpM<32>(ip, block, mem_src))
+FPU_TRANSLATION(ISTT_FP16m, true, true, true, true,
+        doFistTpM<16>(ip, block, mem_src))
+
 FPU_TRANSLATION(XCH_F, true, false, true, false,
         doFxch(inst, ip, block))
 
@@ -1726,6 +1811,11 @@ FPU_TRANSLATION(UCOM_FPr, true, false, true, false,
         doFucom(ip, block, OP(0).getReg(), 1))
 FPU_TRANSLATION(UCOM_Fr, true, false, true, false,
         doFucom(ip, block, OP(0).getReg(), 0))
+
+FPU_TRANSLATION(UCOM_FIPr, true, false, true, false,
+        doFucomi(ip, block, OP(0).getReg(), 1))
+FPU_TRANSLATION(UCOM_FIr, true, false, true, false,
+        doFucomi(ip, block, OP(0).getReg(), 0))
 
 FPU_TRANSLATION(FNSTSW16r, false, false, true, false,
         doFstswr(ip, block))
@@ -1754,6 +1844,12 @@ FPU_TRANSLATION(FINCSTP, true, false, true, false,
         doFINCSTP(inst, ip, block))
 FPU_TRANSLATION(FDECSTP, true, false, true, false,
         doFDECSTP(inst, ip, block))
+
+FPU_TRANSLATION(FPTAN, true, false, true, false,
+        doFPTAN(inst, ip, block))
+
+FPU_TRANSLATION(CHS_F, true, false, true, false,
+        doCHS(inst, ip, block))
 
 static InstTransResult translate_WAIT(NativeModulePtr natM, BasicBlock *&block,
     InstPtr ip, MCInst &inst)
@@ -1805,6 +1901,10 @@ void FPU_populateDispatchMap(DispatchMap &m)
     m[X86::IST_F16m] = translate_IST_F16m;
     m[X86::IST_FP16m] = translate_IST_FP16m;
 
+    m[X86::ISTT_FP64m] = translate_ISTT_FP64m;
+    m[X86::ISTT_FP32m] = translate_ISTT_FP32m;
+    m[X86::ISTT_FP16m] = translate_ISTT_FP16m;
+
     m[X86::ST_FP32m] = translate_ST_FP32m;
     m[X86::ST_FP64m] = translate_ST_FP64m;
     m[X86::ST_FP80m] = translate_ST_FP80m;
@@ -1830,6 +1930,9 @@ void FPU_populateDispatchMap(DispatchMap &m)
     m[X86::LD_F0] = translate_LD_F0;
     m[X86::LD_F1] = translate_LD_F1;
     m[X86::FLDPI] = translate_FLDPI;
+    m[X86::FLDLN2] = translate_FLDLN2;
+    m[X86::FLDL2E] = translate_FLDL2E;
+    m[X86::FLDLG2] = translate_FLDLG2;
 
     m[X86::ILD_F16m] = translate_ILD_F16m;
     m[X86::ILD_F32m] = translate_ILD_F32m;
@@ -1846,6 +1949,9 @@ void FPU_populateDispatchMap(DispatchMap &m)
     m[X86::UCOM_FPr] = translate_UCOM_FPr;
     m[X86::UCOM_Fr] = translate_UCOM_Fr;
 
+    m[X86::UCOM_FIPr] = translate_UCOM_FIPr;
+    m[X86::UCOM_FIr] = translate_UCOM_FIr;
+
     m[X86::FNSTSW16r] = translate_FNSTSW16r;
     m[X86::FNSTSWm] = translate_FNSTSWm;
 
@@ -1856,9 +1962,15 @@ void FPU_populateDispatchMap(DispatchMap &m)
 	m[X86::ABS_F] = translate_FABS;
 	m[X86::SQRT_F] = translate_FSQRT;
 	m[X86::COS_F] = translate_FCOS;
+	m[X86::FPTAN] = translate_FPTAN;
 	m[X86::FSINCOS] = translate_FSINCOS;
 
 	m[X86::FDECSTP] = translate_FDECSTP;
 	m[X86::FINCSTP] = translate_FINCSTP;
+
+	m[X86::FPREM] = translate_FPREM;
+	m[X86::FPREM1] = translate_FPREM1;
+
+	m[X86::CHS_F] = translate_CHS_F;
 }
 
