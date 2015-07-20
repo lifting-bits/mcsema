@@ -69,6 +69,12 @@ static void doMulV(InstPtr ip,  BasicBlock  *&b,
     Value   *wrAX = new TruncInst(tmp, t, "", b);
     Value   *wrDX = new TruncInst(res_sh, t, "", b);
 
+    // set clear CF and OF if DX is clear, set if DX is set
+    Value   *r = new ICmpInst(*b, CmpInst::ICMP_NE, wrDX, CONST_V<width>(b, 0));
+
+    F_WRITE(b, CF, r);
+    F_WRITE(b, OF, r);
+
     switch(width) {
         case 8:
             R_WRITE<width>(b, X86::AH, wrDX);
@@ -431,7 +437,19 @@ static InstTransResult doDivV(InstPtr ip, BasicBlock *&b, Value *divisor,
     // but first, extend divisor
     Type    *text = Type::getIntNTy(b->getContext(), width*2);
     Type    *t = Type::getIntNTy(b->getContext(), width);
-    Value   *divisorext = new SExtInst(divisor, text, "", b);
+
+    Value   *divisorext = nullptr;
+    switch(whichdiv) {
+
+        case Instruction::SDiv:
+            divisorext = new SExtInst(divisor, text, "", b);
+            break;
+        case Instruction::UDiv:
+            divisorext = new ZExtInst(divisor, text, "", b);
+            break;
+        default:
+            throw TErr(__LINE__, __FILE__, "Invalid operation given to doDivV");
+    }
 
     //EAX <- tmp
     Value   *res;
@@ -548,6 +566,14 @@ GENERIC_TRANSLATION(MUL32r, doMulR<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION_MEM(MUL32m, 
 	doMulM<32>(ip, block, ADDR(0)),
 	doMulM<32>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION(MUL16r, doMulR<16>(ip, block, OP(0)))
+GENERIC_TRANSLATION_MEM(MUL16m, 
+	doMulM<16>(ip, block, ADDR(0)),
+	doMulM<16>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION(MUL8r, doMulR<8>(ip, block, OP(0)))
+GENERIC_TRANSLATION_MEM(MUL8m, 
+	doMulM<8>(ip, block, ADDR(0)),
+	doMulM<8>(ip, block, STD_GLOBAL_OP(0)))
 GENERIC_TRANSLATION_MEM(IMUL32m, 
 	doIMulM<32>(ip, block, ADDR(0)),
 	doIMulM<32>(ip, block, STD_GLOBAL_OP(0)))
@@ -609,6 +635,10 @@ void MULDIV_populateDispatchMap(DispatchMap &m) {
     m[X86::IMUL16m] = translate_IMUL16m;
     m[X86::MUL32r] = translate_MUL32r;
     m[X86::MUL32m] = translate_MUL32m;
+    m[X86::MUL16r] = translate_MUL16r;
+    m[X86::MUL16m] = translate_MUL16m;
+    m[X86::MUL8r] = translate_MUL8r;
+    m[X86::MUL8m] = translate_MUL8m;
     m[X86::IMUL32r] = translate_IMUL32r;
     m[X86::IMUL32m] = translate_IMUL32m;
     m[X86::IMUL32rr] = translate_IMUL32rr;
