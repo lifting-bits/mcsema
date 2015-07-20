@@ -42,17 +42,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 
-
-static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
-  //isn't this exciting
-  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
-  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
-  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
-  return ContinueBlock;
-}
-
-GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
-
 template <int width>
 static Value* getSegmentValue(BasicBlock *&b, unsigned sreg) {
 

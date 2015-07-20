@@ -41,9 +41,6 @@ using namespace llvm;
 
 static InstTransResult doNoop(BasicBlock *b) {
   //isn't this exciting
- // llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
-//  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
-//  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
   return ContinueBlock;
 }
 
@@ -552,6 +549,91 @@ static InstTransResult doBsrr(
     return ContinueBlock;
 }
 
+template<int width>
+static InstTransResult doBsfrm(InstPtr ip, BasicBlock *&b, const MCOperand &dst, Value *memAddr)
+{
+
+    TASSERT(dst.isReg(), "operand must be register");
+
+    Value *src_val = M_READ<width>(ip, b, memAddr);
+
+    Type *s[1] = { Type::getIntNTy(b->getContext(), width) };
+    Function *cttzFn = Intrinsic::getDeclaration(b->getParent()->getParent(), Intrinsic::cttz, s);
+
+    TASSERT(cttzFn != NULL, "Could not find cttz intrinsic");
+
+    vector<Value*>  cttzArgs;
+    cttzArgs.push_back(src_val);
+    cttzArgs.push_back(CONST_V<1>(b, 0));
+    Value *cttz = CallInst::Create(cttzFn, cttzArgs, "", b);
+
+
+    Value *is_zero = new ICmpInst(
+            *b,
+            CmpInst::ICMP_EQ,
+            CONST_V<width>(b, width),
+            cttz);
+
+    F_WRITE(b, ZF, is_zero);
+
+
+    // See if we write to register
+    Value *save_index = SelectInst::Create(
+            is_zero, // check if the source was zero
+            src_val, // if it was, do not change contents
+            cttz,  // if it was not, set index
+            "", b);
+
+    R_WRITE<width>(b, dst.getReg(), save_index);
+
+    return ContinueBlock;
+}
+
+template<int width>
+static InstTransResult doBsfr(
+        BasicBlock *&b, 
+        const MCOperand &dst,
+        const MCOperand &src)
+{
+
+    TASSERT(dst.isReg(), "operand must be register");
+    TASSERT(src.isReg(), "operand must be register");
+
+    Value *src_val = R_READ<width>(b, src.getReg());
+
+    Type *s[1] = { Type::getIntNTy(b->getContext(), width) };
+    Function *cttzFn = Intrinsic::getDeclaration(b->getParent()->getParent(), Intrinsic::cttz, s);
+
+    TASSERT(cttzFn != NULL, "Could not find cttz intrinsic");
+
+    vector<Value*>  cttzArgs;
+    cttzArgs.push_back(src_val);
+    cttzArgs.push_back(CONST_V<1>(b, 0));
+    Value *cttz = CallInst::Create(cttzFn, cttzArgs, "", b);
+
+
+    Value *is_zero = new ICmpInst(
+            *b,
+            CmpInst::ICMP_EQ,
+            CONST_V<width>(b, width),
+            cttz);
+
+    F_WRITE(b, ZF, is_zero);
+
+
+    // See if we write to register
+    Value *save_index = SelectInst::Create(
+            is_zero, // check if the source was zero
+            src_val, // if it was, do not change contents
+            cttz,  // if it was not, set index
+            "", b);
+
+    R_WRITE<width>(b, dst.getReg(), save_index);
+
+    return ContinueBlock;
+}
+
+
 GENERIC_TRANSLATION(CDQ, doCdq(block))
 GENERIC_TRANSLATION(INT3, doInt3(block))
 GENERIC_TRANSLATION(NOOP, doNoop(block))
@@ -645,6 +727,11 @@ GENERIC_TRANSLATION(BT16rr, doBtrr<16>(block, OP(0), OP(1)))
 
 GENERIC_TRANSLATION(BSR32rr, doBsrr<32>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BSR16rr, doBsrr<16>(block, OP(0), OP(1)))
+GENERIC_TRANSLATION(BSF32rr, doBsfr<32>(block, OP(0), OP(1)))
+GENERIC_TRANSLATION_MEM(BSF32rm,
+        (doBsfrm<32>(ip, block, OP(0), ADDR(1))),
+        (doBsfrm<32>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION(BSF16rr, doBsfr<16>(block, OP(0), OP(1)))
 
 void Misc_populateDispatchMap(DispatchMap &m) {
     m[X86::AAA] = translate_AAA;
@@ -678,4 +765,7 @@ void Misc_populateDispatchMap(DispatchMap &m) {
     m[X86::BT16rr] = translate_BT16rr;
     m[X86::BSR32rr] = translate_BSR32rr;
     m[X86::BSR16rr] = translate_BSR16rr;
+    m[X86::BSF32rr] = translate_BSF32rr;
+    m[X86::BSF32rm] = translate_BSF32rm;
+    m[X86::BSF16rr] = translate_BSF16rr;
 }
