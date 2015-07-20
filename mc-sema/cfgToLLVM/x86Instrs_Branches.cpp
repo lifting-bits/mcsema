@@ -43,16 +43,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 
-static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
-  //isn't this exciting
-  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
-  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
-  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
-  return ContinueBlock;
-}
-
-GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
-
 static InstTransResult doRet(BasicBlock    *b) {
     //do a read from the location pointed to by ESP
 
@@ -1127,7 +1117,7 @@ void Branches_populateDispatchMap(DispatchMap &m) {
 
 	m[X86::LOOP] = translate_LOOP;
     m[X86::LOOPE] = translate_LOOPE;
-    //m[X86::LOOPNE] = translate_LOOPNE;
+    m[X86::LOOPNE] = translate_LOOPNE;
     m[X86::RETL] = translate_RET;
     m[X86::RETIL] = translate_RETI;
     m[X86::RETQ] = translate_RETQ;
