@@ -242,6 +242,22 @@ static Value *doSetnpV(InstPtr ip, BasicBlock *&b)
     return res;
 }
 
+// set if pf == 1
+static Value *doSetpV(InstPtr ip, BasicBlock *&b)
+{
+    //read PF
+    Value *pf_val = F_READ(b, PF);
+
+    //compare to 0
+    Value *cmp_res = 
+      new ICmpInst(*b, CmpInst::ICMP_EQ, pf_val, CONST_V<1>(b,1));
+
+    //extend result to 8 bits
+    Value *res = new ZExtInst(cmp_res, Type::getInt8Ty(b->getContext()), "", b);
+
+    return res;
+}
+
 // set if sf == 0
 static Value *doSetnsV(InstPtr ip, BasicBlock *&b)
 {
@@ -302,6 +318,8 @@ DO_SETCC_OP_REG(Setnp)
 DO_SETCC_OP_MEM(Setnp)
 DO_SETCC_OP_REG(Setns)
 DO_SETCC_OP_MEM(Setns)
+DO_SETCC_OP_REG(Setp)
+DO_SETCC_OP_MEM(Setp)
 
 GENERIC_TRANSLATION_MEM(SETAm, 
 	doSetaM(ip, block, ADDR(0)),
@@ -355,6 +373,10 @@ GENERIC_TRANSLATION(SETNSr, doSetnsR(ip, block, OP(0)))
 GENERIC_TRANSLATION_MEM(SETNSm,
   doSetnsM(ip, block, ADDR(0)),
   doSetnsM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION(SETPr, doSetpR(ip, block, OP(0)))
+GENERIC_TRANSLATION_MEM(SETPm,
+  doSetpM(ip, block, ADDR(0)),
+  doSetpM(ip, block, STD_GLOBAL_OP(0)))
 
 void SETcc_populateDispatchMap(DispatchMap &m) {
         m[X86::SETAm] = translate_SETAm;
@@ -384,6 +406,9 @@ void SETcc_populateDispatchMap(DispatchMap &m) {
 
         m[X86::SETNPr] = translate_SETNPr;
         m[X86::SETNPm] = translate_SETNPm;
+
+        m[X86::SETPr] = translate_SETPr;
+        m[X86::SETPm] = translate_SETPm;
 
         m[X86::SETNSr] = translate_SETNSr;
         m[X86::SETNSm] = translate_SETNSm;
