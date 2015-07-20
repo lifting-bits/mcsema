@@ -37,15 +37,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 
-static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
+static InstTransResult doNoop(BasicBlock *b) {
   //isn't this exciting
-  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
-  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
-  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
   return ContinueBlock;
 }
 
-GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
+GENERIC_TRANSLATION(NOOP, doNoop(block))
 
 template <int width>
 static Value * doAddVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs)
@@ -206,17 +203,17 @@ static InstTransResult doAddRR(InstPtr ip, BasicBlock *&b,
     TASSERT(dst.isReg(), "");
     TASSERT(o1.isReg(), "");
     TASSERT(o2.isReg(), "");
+    
+    // Read from srcReg.
+    Value *srcReg_v = R_READ<width>(b, o1.getReg());
 
-	// Read from srcReg.
-	Value *srcReg_v = R_READ<width>(b, o1.getReg());
+    // Read from dstReg.
+    Value *dstReg_v = R_READ<width>(b, o2.getReg());
 
-	// Read from dstReg.
-	Value *dstReg_v = R_READ<width>(b, o2.getReg());
-
-	Value *addRes = doAddVV<width>(ip, b, srcReg_v, dstReg_v);
-
-	// Store the result in dst.
-	R_WRITE<width>(b, dst.getReg(), addRes);
+    Value *addRes = doAddVV<width>(ip, b, srcReg_v, dstReg_v);
+    
+    // Store the result in dst.
+    R_WRITE<width>(b, dst.getReg(), addRes);
 
     return ContinueBlock;
 }

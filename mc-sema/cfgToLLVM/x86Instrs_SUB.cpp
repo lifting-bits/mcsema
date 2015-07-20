@@ -39,18 +39,6 @@ using namespace llvm;
 
 
 #define NASSERT(cond) TASSERT(cond, "")
-#define INSTR_DEBUG(ip) llvm::dbgs() << __FUNCTION__ << "\tRepresentation: " << ip->printInst() << "\n"
-
-
-static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
-  //isn't this exciting
-  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
-  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
-  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
-  return ContinueBlock;
-}
-
-GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
 
 template <int width>
 static Value * doSubVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs)
@@ -455,7 +443,6 @@ GENERIC_TRANSLATION(SBB8rr_REV, doSbbRR<8>(ip, block, OP(1), OP(2), OP(0)))
 
 static InstTransResult translate_SUB64ri8(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
 	InstTransResult ret;
-	//INSTR_DEBUG(ip);
 	ret = doSubRI<64, 8>(ip, block, OP(0), OP(1), OP(2));
 	return ret;
 }
@@ -514,7 +501,5 @@ void SUB_populateDispatchMap(DispatchMap &m)
         m[X86::SBB8rr_REV] = translate_SBB8rr_REV;
 
         m[X86::SUB64ri8] = translate_SUB64ri8;
-        //m[X86::SUB64ri16] = translate_NOOP;
         m[X86::SUB64ri32] = translate_SUB64ri32;
-      //  m[X86::SUB64ri] = translate_NOOP;
 }
