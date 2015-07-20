@@ -37,16 +37,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 
-static InstTransResult doNoop(InstPtr ip, BasicBlock *b) {
-  //isn't this exciting
-  llvm::dbgs() << "Have a no-op at: 0x" << to_string<VA>(ip->get_loc(), std::hex) << "\n";
-  llvm::dbgs() << "\tInstruction is: " << (uint32_t)(ip->get_len()) << " bytes long\n";
-  llvm::dbgs() << "\tRepresentation: " << ip->printInst() << "\n";
-  return ContinueBlock;
-}
-
-GENERIC_TRANSLATION(NOOP, doNoop(ip, block))
-
 template <int width> 
 static Value *getBit(BasicBlock *b, Value *val, int which)
 {
@@ -226,7 +216,7 @@ Value *doShrVV32(BasicBlock *&b, Value *src, Value *count)
 template <int width>
 static Value *doShldVV(InstPtr ip,
         BasicBlock *&b,
-        unsigned dstReg,
+        Value* addr,
         unsigned srcReg1,
         //unsigned shiftBy)
         Value* shiftBy)
@@ -234,10 +224,8 @@ static Value *doShldVV(InstPtr ip,
     Type* widthTy = Type::getIntNTy(b->getContext(), width); 
     Type* doubleTy = Type::getIntNTy(b->getContext(), width*2); 
 
-    // read left part
-    Value   *from_left = R_READ<width>(b, dstReg);
     // and extend it to double width
-    Value   *le = new ZExtInst(from_left, doubleTy, "", b);
+    Value   *le = new ZExtInst(addr, doubleTy, "", b);
 
     // read right part
     Value   *from_right = R_READ<width>(b, srcReg1);
@@ -270,10 +258,35 @@ static Value *doShldVV(InstPtr ip,
                                     widthTy,
                                     "", 
                                     b);
+    return reg_val;
+}
 
-    // save result
+template <int width>
+static Value *doShldRV(InstPtr ip,
+        BasicBlock *&b,
+        unsigned dstReg,
+        unsigned srcReg1,
+        Value* shiftBy)
+{
+    Value *from_left = R_READ<width>(b, dstReg);
+    Value *reg_val = doShldVV<width>(ip, b, from_left, srcReg1, shiftBy);
+
     R_WRITE<width>(b, dstReg, reg_val);
     return reg_val;
+}
+
+template <int width>
+static Value *doShldMV(InstPtr ip,
+        BasicBlock *&b,
+        Value *addr,
+        unsigned srcReg1,
+        Value *shiftBy)
+{
+    Value *from_left = M_READ<width>(ip, b, addr);
+    Value *mem_val = doShldVV<width>(ip, b, from_left, srcReg1, shiftBy);
+
+    M_WRITE<width>(ip, b, addr, mem_val);
+    return mem_val;
 }
 
 template <int width>
@@ -370,12 +383,23 @@ static InstTransResult doShldRI(InstPtr ip, BasicBlock *&b,
     TASSERT(src1.isReg(), "");
     TASSERT(dst.isReg(), "");
 
-    doShldVV<width>(ip, b, 
+    doShldRV<width>(ip, b, 
             dst.getReg(), 
             src1.getReg(), 
             CONST_V<width*2>(b, src2.getImm()));
     
     return ContinueBlock;
+}
+
+template <int width>
+static Value *getShifyByValueFromCLRegister(BasicBlock *&b)  
+{
+    Type* doubleTy = Type::getIntNTy(b->getContext(), width*2);
+
+    Value   *count = R_READ<width>(b, X86::CL);
+    // ShrdVV needs a 64-bit count
+    Value   *extCount = new ZExtInst(count, doubleTy, "", b);
+    return extCount;
 }
 
 template <int width>
@@ -386,17 +410,28 @@ static InstTransResult doShldRCL(InstPtr ip, BasicBlock *&b,
     TASSERT(src1.isReg(), "");
     TASSERT(dst.isReg(), "");
 
-    Type* doubleTy = Type::getIntNTy(b->getContext(), width*2); 
-
-    Value   *count = R_READ<width>(b, X86::CL);
-    // ShrdVV needs a 64-bit count
-    Value   *extCount = new ZExtInst(count, doubleTy, "", b);
-
-    doShldVV<width>(ip, b, 
+    Value   *extCount = getShifyByValueFromCLRegister<width>(b);
+    doShldRV<width>(ip, b, 
             dst.getReg(), 
             src1.getReg(), 
             extCount);
     
+    return ContinueBlock;
+}
+
+template <int width>
+static InstTransResult doShldMCL(InstPtr ip, BasicBlock *&b,
+                        Value           *addr,
+                        const MCOperand &src1)
+{
+    TASSERT(src1.isReg(), "");
+    
+    Value  *extCount = getShifyByValueFromCLRegister<width>(b);
+    doShldMV<width>(ip, b,
+            addr,
+            src1.getReg(),
+            extCount);
+
     return ContinueBlock;
 }
 
@@ -408,12 +443,7 @@ static InstTransResult doShrdRCL(InstPtr ip, BasicBlock *&b,
     TASSERT(src1.isReg(), "");
     TASSERT(dst.isReg(), "");
 
-    Type* doubleTy = Type::getIntNTy(b->getContext(), width*2); 
-
-    Value   *count = R_READ<width>(b, X86::CL);
-    // ShrdVV needs a 64-bit count
-    Value   *extCount = new ZExtInst(count, doubleTy, "", b);
-
+    Value   *extCount = getShifyByValueFromCLRegister<width>(b);
     doShrdVV<width>(ip, b, 
             dst.getReg(), 
             src1.getReg(), 
@@ -2013,6 +2043,9 @@ GENERIC_TRANSLATION(SHRD32rri8, doShrdRI<32>(ip, block, OP(1), OP(2), OP(3)))
 GENERIC_TRANSLATION(SHLD32rri8, doShldRI<32>(ip, block, OP(1), OP(2), OP(3)))
 GENERIC_TRANSLATION(SHRD32rrCL, doShrdRCL<32>(ip, block, OP(1), OP(2)))
 GENERIC_TRANSLATION(SHLD32rrCL, doShldRCL<32>(ip, block, OP(1), OP(2)))
+GENERIC_TRANSLATION_MEM(SHLD32mrCL,
+    doShldMCL<32>(ip, block, ADDR(0), OP(5)),
+    doShldMCL<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
 
 void ShiftRoll_populateDispatchMap(DispatchMap &m) {
         m[X86::RCL8m1] = translate_RCL8m1;
@@ -2147,6 +2180,7 @@ void ShiftRoll_populateDispatchMap(DispatchMap &m) {
         m[X86::SHRD32rri8] = translate_SHRD32rri8;
         m[X86::SHRD32rrCL] = translate_SHRD32rrCL;
         m[X86::SHLD32rrCL] = translate_SHLD32rrCL;
+        m[X86::SHLD32mrCL] = translate_SHLD32mrCL;
         m[X86::SHLD32rri8] = translate_SHLD32rri8;
 		
 		m[X86::SHR64ri] = translate_SHR64ri;
