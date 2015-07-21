@@ -51,10 +51,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "Externals.h"
 #include "../common/to_string.h"
 #include "../common/Defaults.h"
+#include "Annotation.h"
 
 #include <vector>
 #include <llvm/IR/InlineAsm.h>
 #include <llvm/IR/MDBuilder.h>
+#include "llvm/IR/InstIterator.h"
 
 using namespace llvm;
 using namespace std;
@@ -555,44 +557,37 @@ BasicBlock *bbFromStrName(string n, Function *F) {
 }
 
 
-InstTransResult disInstr(   InstPtr             ip,
-                            BasicBlock          *&block,
+InstTransResult disInstr(   InstPtr             ip, 
+                            BasicBlock          *&block, 
                             NativeBlockPtr      nb,
                             Function            *F,
                             NativeFunctionPtr   natF,
                             NativeModulePtr     natM,
-			    bool doAnnot)
+                            bool doAnnotation) 
 {
-    //Instruction *begin_marker = *(block->rbegin()); // llvm3.4
-    //BasicBlock::iterator begin_marker = block->getFirstInsertionPt();
-
-    BasicBlock *ob = block;
-
-    size_t bsize_pre = block->size();
 
     //add a string representation of this instruction to the CFG
     //this string representation should be removed by optimizations
-
+    
     //in the future, we could have different target decoders here
     InstTransResult disInst_result = disInstrX86(ip, block, nb, F, natF, natM);
 
-    if(block == ob) {
 
-        BasicBlock::iterator begin_marker = block->begin();
-        for(int i = bsize_pre; i > 0; i--) {
-            ++begin_marker;
+    if(doAnnotation) {
+        // we need to loop over this function and find any un-annotated instructions.
+        // then we annotate each instruction
+        for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I)
+        {
+            VA inst_eip;
+            bool had_md;
+            had_md = getAnnotation(&(*I), inst_eip);
+            if(false == had_md) {
+                addAnnotation(&(*I), ip->get_loc());
+            }
         }
-
-    } else {
-        llvm::outs() << "Not annotating an instruction since it emits more than one block\n";
     }
 
-    //add source annotation information to the CFG
-    //info will be added to every llvm inst, so any prettyprinters
-    //should trim off the excess. we add the annotation to every line
-    //in case optimizations remove llvm insts.
-
-    return disInst_result;
+    return disInst_result; 
 }
 
 template <typename Vertex, typename Graph>
