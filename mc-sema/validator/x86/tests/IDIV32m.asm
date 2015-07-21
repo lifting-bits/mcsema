@@ -4,10 +4,16 @@ BITS 32
 ;TEST_IGNOREFLAGS=FLAG_CF|FLAG_OF|FLAG_SF|FLAG_ZF|FLAG_AF|FLAG_PF
 ;TEST_FILE_META_END
     ; IDIV32r
-    mov eax, 0x819EDB32
-    mov ebx, 0xD6C5DA4C
-    mov edx, 0xFFFFFFFF
+    ;-437706355 % -1674145647
     ;TEST_BEGIN_RECORDING
-    idiv ebx
+    lea edi, [esp-0x4]
+    mov DWORD [edi], 0x63c96f6f
+    mov eax, 0xE5E9218D
+    mov edx, 0
+    cdq
+    idiv DWORD [edi]
+    mov edi, 0
     ;TEST_END_RECORDING
+
+
 

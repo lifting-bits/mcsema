@@ -4,16 +4,16 @@ BITS 32
 ;TEST_IGNOREFLAGS=
 ;TEST_FILE_META_END
 
-; put 2 into ecx for future load into xmm0
-mov ecx, 2
+mov ecx, 0xFFFFFF00
 cvtsi2ss xmm0, ecx
-mov ecx, 0
+mov ecx, 10
 cvtsi2ss xmm1, ecx
+
 ;TEST_BEGIN_RECORDING
-lea ecx, [esp-4]
-movss [ecx], xmm1
-ucomiss xmm0, [ecx]
-mov ecx, 0
+minss xmm0, xmm1
 ;TEST_END_RECORDING
+
+xor ecx, ecx
 cvtsi2ss xmm0, ecx
 cvtsi2ss xmm1, ecx
+

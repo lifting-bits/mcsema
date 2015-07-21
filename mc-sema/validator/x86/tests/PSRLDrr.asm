@@ -13,13 +13,13 @@ mov dword [ecx+0x0C], 0x10
 ;set up ecx to be 8
 movdqu xmm1, [ecx]
 
-mov dword [ecx+0x00], 0x80FFF001
-mov dword [ecx+0x04], 0x10FFF000
-mov dword [ecx+0x08], 0xF0FFF010
-mov dword [ecx+0x0C], 0x10FFF010
+mov dword [ecx+0x00], 0x00FFF000
+mov dword [ecx+0x04], 0x00FFF000
+mov dword [ecx+0x08], 0x00FFF000
+mov dword [ecx+0x0C], 0x00FFF000
 movdqu xmm0, [ecx]
 
-psrad xmm0, xmm1
+psrld xmm0, xmm1
 mov ecx, 0
 ;TEST_END_RECORDING
 

@@ -5,15 +5,12 @@ BITS 32
 ;TEST_FILE_META_END
 
 ; put 2 into ecx for future load into xmm0
-mov ecx, 2
-cvtsi2ss xmm0, ecx
-mov ecx, 0
-cvtsi2ss xmm1, ecx
+mov ecx, 0x223e2081
+cvtsi2sd xmm0, ecx
+
 ;TEST_BEGIN_RECORDING
-lea ecx, [esp-4]
-movss [ecx], xmm1
-ucomiss xmm0, [ecx]
-mov ecx, 0
+cvttps2dq xmm1, xmm0
 ;TEST_END_RECORDING
-cvtsi2ss xmm0, ecx
-cvtsi2ss xmm1, ecx
+
+xor ecx, ecx
+cvtsi2sd xmm0, ecx

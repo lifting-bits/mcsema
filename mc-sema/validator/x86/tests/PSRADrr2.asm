@@ -14,12 +14,12 @@ mov dword [ecx+0x0C], 0xFF
 movdqu xmm1, [ecx]
 
 mov dword [ecx+0x00], 0xF0FFF000
-mov dword [ecx+0x04], 0xF0FFF000
-mov dword [ecx+0x08], 0xF0FFF000
+mov dword [ecx+0x04], 0x00FFF000
+mov dword [ecx+0x08], 0xF0FFF001
 mov dword [ecx+0x0C], 0xF0FFF000
 movdqu xmm0, [ecx]
 
-psraw xmm0, xmm1
+psrad xmm0, xmm1
 mov ecx, 0
 ;TEST_END_RECORDING
 

@@ -1162,6 +1162,36 @@ static InstTransResult doFucom(
     return ContinueBlock;
 }
 
+static InstTransResult doFucomi(
+        InstPtr ip, 
+        BasicBlock *&b, 
+        unsigned reg,
+        unsigned int stackPops)
+{
+    Value *st0_val = FPUR_READ(b, X86::ST0);
+    Value *sti_val = FPUR_READ(b, reg);
+
+    // TODO: Make sure these treat negative zero and positive zero
+    // as the same value.
+    Value *is_lt = new FCmpInst(*b, FCmpInst::FCMP_ULT, st0_val, sti_val);
+    Value *is_eq = new FCmpInst(*b, FCmpInst::FCMP_UEQ, st0_val, sti_val);
+
+    // if BOTH the equql AND less than is true
+    // it means that one of the ops is a QNaN
+    
+    Value *lt_and_eq = BinaryOperator::CreateAnd(is_lt, is_eq, "", b);
+
+    F_WRITE(b, CF, is_lt);        // C0 is 1 if either is QNaN or op1 < op2
+    F_WRITE(b, ZF, is_eq);        // C3 is 1 if either is QNaN or op1 == op2
+    F_WRITE(b, PF, lt_and_eq);    // C2 is 1 if either op is a QNaN
+
+    while(stackPops > 0) {
+        FPU_POP(b);
+        stackPops -= 1;
+    }
+
+    return ContinueBlock;
+}
 
 static Value* doFstsV(BasicBlock *&b)
 {

@@ -6,20 +6,20 @@ BITS 32
 
 ;TEST_BEGIN_RECORDING
 lea ecx, [esp-0x10]
-mov dword [ecx+0x00], 0x0
+mov dword [ecx+0x00], 0x8
 mov dword [ecx+0x04], 0x0
 mov dword [ecx+0x08], 0x0
-mov dword [ecx+0x0C], 0x10
+mov dword [ecx+0x0C], 0x0
 ;set up ecx to be 8
 movdqu xmm1, [ecx]
 
-mov dword [ecx+0x00], 0x80FFF001
-mov dword [ecx+0x04], 0x10FFF000
-mov dword [ecx+0x08], 0xF0FFF010
-mov dword [ecx+0x0C], 0x10FFF010
+mov dword [ecx+0x00], 0xF0F0F0F0
+mov dword [ecx+0x04], 0xF0F0F0F0
+mov dword [ecx+0x08], 0xF0F0F0F0
+mov dword [ecx+0x0C], 0xF0F0F0F0
 movdqu xmm0, [ecx]
 
-psrad xmm0, xmm1
+psraw xmm0, xmm1
 mov ecx, 0
 ;TEST_END_RECORDING
 

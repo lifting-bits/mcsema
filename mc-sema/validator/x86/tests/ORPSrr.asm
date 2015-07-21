@@ -30,4 +30,3 @@ orps xmm0, xmm1
 xor ecx, ecx
 cvtsi2sd xmm0, ecx
 cvtsi2sd xmm1, ecx
-

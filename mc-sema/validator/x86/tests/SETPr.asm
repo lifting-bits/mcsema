@@ -3,10 +3,10 @@ BITS 32
 ;TEST_TYPE=TEST_F
 ;TEST_IGNOREFLAGS=
 ;TEST_FILE_META_END
-    ; CDQ
+    mov ecx, 0x0
+    mov ebx, 0x222
+    cmp ecx, ebx
     ;TEST_BEGIN_RECORDING
-    MOV eax, 0x819EDB32
-    MOV edx, 0
-    cdq
-    ;TEST_END_RECORDING
+    setp al
+    ;TEST_END_RECORDING 
 

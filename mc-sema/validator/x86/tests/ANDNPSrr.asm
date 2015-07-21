@@ -24,9 +24,11 @@ mov DWORD [ecx+12], 0x0e0e0e0e
 movaps xmm1, [ecx]
 
 ;TEST_BEGIN_RECORDING
-por xmm0, xmm1
+andnps xmm0, xmm1
 ;TEST_END_RECORDING
 
 xor ecx, ecx
 cvtsi2sd xmm0, ecx
 cvtsi2sd xmm1, ecx
+
+
