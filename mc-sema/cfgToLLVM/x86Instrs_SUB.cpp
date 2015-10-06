@@ -442,6 +442,17 @@ GENERIC_TRANSLATION_MEM(SBB32rm,
 	doSbbRM<32>(ip, block, OP(1), STD_GLOBAL_OP(2), OP(0)))
 GENERIC_TRANSLATION(SBB32rr, doSbbRR<32>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SBB32rr_REV, doSbbRR<32>(ip, block, OP(1), OP(2), OP(0)))
+
+
+GENERIC_TRANSLATION_MEM(SBB64mr, 
+	doSbbMR<64>(ip, block, ADDR(0), OP(5)),
+	doSbbMR<64>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_MEM(SBB64rm, 
+	doSbbRM<64>(ip, block, OP(1), ADDR(2), OP(0)),
+	doSbbRM<64>(ip, block, OP(1), STD_GLOBAL_OP(2), OP(0)))
+GENERIC_TRANSLATION(SBB64rr, doSbbRR<64>(ip, block, OP(1), OP(2), OP(0)))
+GENERIC_TRANSLATION(SBB64rr_REV, doSbbRR<64>(ip, block, OP(1), OP(2), OP(0)))
+
 GENERIC_TRANSLATION(SBB8i8, doSbbRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0), MCOperand::CreateReg(X86::EAX)))
 GENERIC_TRANSLATION(SBB8ri, doSbbRI<8>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION_MEM(SBB8mi, 
@@ -510,12 +521,21 @@ void SUB_populateDispatchMap(DispatchMap &m)
         m[X86::SBB32i32] = translate_SBB32i32;
         m[X86::SBB32mi] = translate_SBB32mi;
         m[X86::SBB32mi8] = translate_SBB32mi8;
+
         m[X86::SBB32mr] = translate_SBB32mr;
+        m[X86::SBB64mr] = translate_SBB64mr;
+
         m[X86::SBB32ri] = translate_SBB32ri;
         m[X86::SBB32ri8] = translate_SBB32ri8;
+
         m[X86::SBB32rm] = translate_SBB32rm;
         m[X86::SBB32rr] = translate_SBB32rr;
         m[X86::SBB32rr_REV] = translate_SBB32rr_REV;
+
+        m[X86::SBB64rm] = translate_SBB64rm;
+        m[X86::SBB64rr] = translate_SBB64rr;
+        m[X86::SBB64rr_REV] = translate_SBB64rr_REV;
+
         m[X86::SBB8i8] = translate_SBB8i8;
         m[X86::SBB8mi] = translate_SBB8mi;
         m[X86::SBB8mr] = translate_SBB8mr;
