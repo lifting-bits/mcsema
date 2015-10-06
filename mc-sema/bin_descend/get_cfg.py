@@ -598,11 +598,11 @@ def parseDefsFile(df):
     emap = {}
     emap_data = {}
     for l in df.readlines():
-        #skip comments
-        if l[0] == "#":
-            continue
-         
+        #skip comments / empty lines
         l = l.strip()
+        if not l or l[0] == "#":
+            continue
+
         
         if l.startswith('DATA:') :
             # process as data
@@ -622,7 +622,7 @@ def parseDefsFile(df):
             elif conv == "F":
                 realconv = CFG_pb2.ExternalFunction.FastCall
             else:
-                raise Exception("Unknown calling convention:"+conv)
+                raise Exception("Unknown calling convention:"+str(conv))
 
             if ret not in ['Y', 'N']:
                 raise Exception("Unknown return type:"+ret)
