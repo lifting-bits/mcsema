@@ -369,15 +369,30 @@ GENERIC_TRANSLATION_MEM(SUB32mi8,
 GENERIC_TRANSLATION_MEM(SUB32mr, 
 	doSubMR<32>(ip, block, ADDR(0), OP(5)),
 	doSubMR<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+
+
+GENERIC_TRANSLATION_MEM(SUB64mr, 
+	doSubMR<64>(ip, block, ADDR(0), OP(5)),
+	doSubMR<64>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+
 GENERIC_TRANSLATION(SUB32ri, doSubRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(SUB32ri8, doSubRI<32>(ip, block, OP(0), OP(1), OP(2)))
 //GENERIC_TRANSLATION(SUB64ri8, doSubRI<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(SUB64ri32, doSubRI<64>(ip, block, OP(0), OP(1), OP(2)))
+
 GENERIC_TRANSLATION_MEM(SUB32rm,
 	doSubRM<32>(ip, block, ADDR(2), OP(0), OP(1)),
 	doSubRM<32>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(SUB32rr, doSubRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(SUB32rr_REV, doSubRR<32>(ip, block, OP(0), OP(1), OP(2)))
+
+GENERIC_TRANSLATION_MEM(SUB64rm,
+	doSubRM<64>(ip, block, ADDR(2), OP(0), OP(1)),
+	doSubRM<64>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
+GENERIC_TRANSLATION(SUB64rr, doSubRR<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(SUB64rr_REV, doSubRR<64>(ip, block, OP(0), OP(1), OP(2)))
+
+
 GENERIC_TRANSLATION(SUB8i8, doSubRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION_MEM(SUB8mi, 
 	doSubMI<8>(ip, block, ADDR(0), OP(5)),
@@ -462,11 +477,20 @@ void SUB_populateDispatchMap(DispatchMap &m)
         m[X86::SUB32mi] = translate_SUB32mi;
         m[X86::SUB32mi8] = translate_SUB32mi8;
         m[X86::SUB32mr] = translate_SUB32mr;
+
+        m[X86::SUB64mr] = translate_SUB64mr;
+
         m[X86::SUB32ri] = translate_SUB32ri;
         m[X86::SUB32ri8] = translate_SUB32ri8;
         m[X86::SUB32rm] = translate_SUB32rm;
         m[X86::SUB32rr] = translate_SUB32rr;
         m[X86::SUB32rr_REV] = translate_SUB32rr_REV;
+
+        m[X86::SUB64rm] = translate_SUB64rm;
+        m[X86::SUB64rr] = translate_SUB64rr;
+        m[X86::SUB64rr_REV] = translate_SUB64rr_REV;
+
+
         m[X86::SUB8i8] = translate_SUB8i8;
         m[X86::SUB8mi] = translate_SUB8mi;
         m[X86::SUB8mr] = translate_SUB8mr;
