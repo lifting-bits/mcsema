@@ -106,7 +106,8 @@ static bool isConformantJumpInst(InstPtr jmpinst) {
     const llvm::MCOperand& disp = inst.getOperand(3);
 
     if(scale.isImm() &&             // scale:
-       scale.getImm() == 4 &&       // must be an immediate and be 4
+                                   // can be 4 (32-bit) or 8 (64-bit)
+       (scale.getImm() == 4 || scale.getImm() == 8) &&
        index.isReg() &&             // index must be a register
        disp.isImm()) 
     {        
