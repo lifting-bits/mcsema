@@ -105,6 +105,11 @@ def readDword(ea):
     dword = struct.unpack("<L", bytestr)[0]
     return dword
 
+def readQword(ea):
+    bytestr = readBytesSlowly(ea, ea+8);
+    qword = struct.unpack("<Q", bytestr)[0]
+    return qword
+
 def isLinkedElf():
     return idc.GetLongPrm(INF_FILETYPE) == idc.FT_ELF and \
         idc.BeginEA() !=0xffffffffL 
@@ -374,9 +379,13 @@ def handleJmpTable(I, inst, new_eas):
     jsize = si.get_jtable_element_size()
     jstart = si.jumps
 
-    # only handle size 4 cases
-    if jsize != 4:
-        raise Exception("Jump table size not 4!")
+    # accept 32-bit jump tables in 64-bit, for now
+    valid_sizes = [4, getBitness()/8]
+    readers = { 4: readDword,
+                8: readQword }
+
+    if jsize not in valid_sizes:
+        raise Exception("Jump table is not a valid size: {}".format(jsize))
         return
 
     DEBUG("\tJMPTable Start: {0:x}\n".format(jstart))
@@ -390,7 +399,7 @@ def handleJmpTable(I, inst, new_eas):
     i = 0
     entries = si.get_jtable_size()
     for i in xrange(entries):
-        je = readDword(jstart+i*jsize)
+        je = readers[jsize](jstart+i*jsize)
         I.jump_table.table_entries.append(je)
         if je not in RECOVERED_EAS and isStartOfFunction(je):
             new_eas.add(je)
