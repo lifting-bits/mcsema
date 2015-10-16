@@ -6,7 +6,8 @@ compiler:
 - gcc
 - clang
 before_script:
-- sudo apt-get install -qq nasm
+- apt-get update -qq
+- apt-get install -qq nasm
 script:
 - mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j2
 notifications:
