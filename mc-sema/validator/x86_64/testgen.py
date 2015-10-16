@@ -254,12 +254,25 @@ if __name__ == "__main__":
     data = None
 
     # create test_a.auto.asm
-    test_asm = """BITS 64
+    test_asm = ""
+    
+    # osx needs a to change relative addressing and an extra _ for the symbol name to keep nasm happy
+    if sys.platform == 'darwin':
+        test_asm += """BITS 64
+DEFAULT REL
+section .text
+
+global _doTest
+_doTest:"""
+
+    else:
+        test_asm = """BITS 64
 section .text
 
 global doTest
-doTest:
+doTest:"""
 
+    test_asm += """
 mov qword [internal_saveregs+0x00], rax
 mov qword [internal_saveregs+0x08], rcx
 mov qword [internal_saveregs+0x10], rdx

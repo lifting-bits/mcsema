@@ -31,7 +31,7 @@ else(WIN32)
 	if(APPLE)
 		add_custom_target(test_a.auto.obj ALL
 			COMMAND ${NASM_EXECUTABLE} 
-				-f macho32
+				-f macho64
 				-o "${CMAKE_CURRENT_BINARY_DIR}/test_a.auto.obj"
 				"${CMAKE_CURRENT_SOURCE_DIR}/test_a.auto.asm"
 			DEPENDS test_a.auto.asm
@@ -66,14 +66,14 @@ get_filename_component(VALTEST_PATH ${VALTEST_EXECUTABLE} PATH)
 if(WIN32)
 add_custom_target(tests.out ALL
 	${PIN_EXECUTABLE}
-		-t "${CMAKE_CURRENT_SOURCE_DIR}/../valTool/obj-intel64/val.dll" -- "${VALTEST_EXECUTABLE}"
+    -t "${CMAKE_CURRENT_SOURCE_DIR}/../valTool/obj-intel64/val.dll" -- "${VALTEST_EXECUTABLE}"
 	WORKING_DIRECTORY "${VALTEST_PATH}"
 	COMMENT Running PIN to generate ground truth for semantics tests
 	DEPENDS valTest
 	)
 else(WIN32)
 add_custom_target(tests.out ALL
-	${PIN_EXECUTABLE} "-injection" "child" -t "${CMAKE_CURRENT_SOURCE_DIR}/../valTool/val.so" -- "${VALTEST_EXECUTABLE}"
+    ${PIN_EXECUTABLE} "-injection" "child" -t "${CMAKE_CURRENT_SOURCE_DIR}/../valTool/val.so" -- "${VALTEST_EXECUTABLE}"
 	WORKING_DIRECTORY "${VALTEST_PATH}"
 	COMMENT Running PIN to generate ground truth for semantics tests
 	DEPENDS valTest
@@ -81,5 +81,5 @@ add_custom_target(tests.out ALL
 endif(WIN32)
 
 IF(APPLE)
-    SET_TARGET_PROPERTIES(valTest PROPERTIES LINK_FLAGS "-pagezero_size 1000 -arch i386")
+    SET_TARGET_PROPERTIES(valTest PROPERTIES LINK_FLAGS "-pagezero_size 1000 -arch x86_64")
 endif(APPLE)

@@ -81,5 +81,5 @@ add_custom_target(tests.out ALL
 endif(WIN32)
 
 IF(APPLE)
-    SET_TARGET_PROPERTIES(valTest PROPERTIES LINK_FLAGS "-pagezero_size 1000 -arch i386")
+    SET_TARGET_PROPERTIES(valTest PROPERTIES LINK_FLAGS "-pagezero_size 1000 -arch x86_64")
 endif(APPLE)

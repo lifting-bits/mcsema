@@ -8,6 +8,7 @@
 #include "ArchOps.h"
 #include "win32ArchOps.h"
 #include "linuxArchOps.h"
+#include "osxArchOps.h"
 
 #include "../common/to_string.h"
 #include "../common/Defaults.h"
@@ -51,6 +52,8 @@ void archSetCallingConv(llvm::Module *M, llvm::CallInst *ci) {
             ci->setCallingConv(CallingConv::X86_64_Win64);
         } else if (getSystemOS(M) == llvm::Triple::Linux ) {
             ci->setCallingConv(CallingConv::X86_64_SysV);
+        } else if (getSystemOS(M) == llvm::Triple::MacOSX ) {
+            ci->setCallingConv(CallingConv::X86_64_SysV);
         } else {
             TASSERT(false, "Unsupported OS");
         }
@@ -64,6 +67,8 @@ void archSetCallingConv(llvm::Module *M, llvm::Function *F) {
         if( getSystemOS(M) == llvm::Triple::Win32 ) {
             F->setCallingConv(CallingConv::X86_64_Win64);
         } else if (getSystemOS(M) == llvm::Triple::Linux ) {
+            F->setCallingConv(CallingConv::X86_64_SysV);
+        } else if (getSystemOS(M) == llvm::Triple::MacOSX ) {
             F->setCallingConv(CallingConv::X86_64_SysV);
         } else {
             TASSERT(false, "Unsupported OS");
@@ -82,6 +87,8 @@ Value* archAllocateStack(Module *M, Value *stackSize, BasicBlock *&driverBB) {
 
     if( getSystemOS(M) == llvm::Triple::Linux ) {
         stackAlloc = linuxAllocateStack(M, stackSize, driverBB);
+    } else if(getSystemOS(M) == llvm::Triple::MacOSX) {
+        stackAlloc = osxAllocateStack(M, stackSize, driverBB);
     } else if(getSystemOS(M) == llvm::Triple::Win32) {
         stackAlloc = win32AllocateStack(M, stackSize, driverBB);
     } else { 
@@ -103,6 +110,8 @@ Value *archFreeStack(Module *M, Value *stackAlloc, BasicBlock *&driverBB) {
 
     if( getSystemOS(M) == llvm::Triple::Linux ) {
         stackFree = linuxFreeStack(M, stackAlloc, driverBB);
+    } else if( getSystemOS(M) == llvm::Triple::MacOSX ) {
+        stackFree = osxFreeStack(M, stackAlloc, driverBB);
     } else if( getSystemOS(M) == llvm::Triple::Win32 ) {
         // free our allocated stack
         stackFree = win32FreeStack(stackAlloc, driverBB);
@@ -118,6 +127,8 @@ Module* archAddCallbacksToModule(Module *M) {
     const std::string &triple = M->getTargetTriple();
     if( getSystemOS(M) == llvm::Triple::Linux ) {
         return M;
+    } else if( getSystemOS(M) == llvm::Triple::MacOSX ) {
+        return M;
     } else if( getSystemOS(M) == llvm::Triple::Win32 ) {
         return addWin32CallbacksToModule(M);
     } else { 
@@ -131,6 +142,8 @@ llvm::Value *archMakeCallbackForLocalFunction(Module *M, VA local_target)
     const std::string &triple = M->getTargetTriple();
     if( getSystemOS(M) == llvm::Triple::Linux ) {
         return linuxMakeCallbackForLocalFunction(M, local_target);
+    } else if( getSystemOS(M) == llvm::Triple::MacOSX ) {
+        return osxMakeCallbackForLocalFunction(M, local_target);
     } else if( getSystemOS(M) == llvm::Triple::Win32 ) {
         return win32MakeCallbackForLocalFunction(M, local_target);
     } else { 
@@ -144,6 +157,8 @@ void archAddCallValue(Module *M) {
 
     if( getSystemOS(M) == llvm::Triple::Linux ) {
         return linuxAddCallValue(M);
+    } else if( getSystemOS(M) == llvm::Triple::MacOSX || getSystemOS(M) == llvm::Triple::Darwin) {
+        return osxAddCallValue(M);
     } else if( getSystemOS(M) == llvm::Triple::Win32 ) {
         // free our allocated stack
         return win32AddCallValue(M);
@@ -158,6 +173,8 @@ Value* archGetStackSize(Module *M, BasicBlock *&driverBB) {
 
     if( getSystemOS(M) == llvm::Triple::Linux ) {
         stackSize = linuxGetStackSize(M, driverBB);
+    } else if(getSystemOS(M) == llvm::Triple::MacOSX ) {
+        stackSize = osxGetStackSize(M, driverBB);
     } else if(getSystemOS(M) == llvm::Triple::Win32) {
         stackSize = win32GetStackSize(M, driverBB);
     } else { 

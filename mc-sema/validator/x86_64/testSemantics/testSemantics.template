@@ -45,6 +45,8 @@ using namespace std;
         #define TRIPLE "x86_64-pc-linux-gnu"
     #elif defined(_WIN32)
         #define TRIPLE "x86_64-pc-win32"
+    #elif defined(__APPLE__)
+        #define TRIPLE "x86_64-apple-darwin"
     #else
         #error Building on an unsupported OS
     #endif
@@ -53,6 +55,8 @@ using namespace std;
         #define TRIPLE "i386-pc-linux-gnu"
     #elif defined(_WIN32)
         #define TRIPLE "i386-pc-win32"
+    #elif defined(__APPLE__)
+        #define TRIPLE "i386-apple-darwin"
     #else
         #error Building on an unsupported OS
     #endif

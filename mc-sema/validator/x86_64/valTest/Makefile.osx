@@ -1,13 +1,17 @@
+all: test tests.out
+
 tests.out:
-	pin -t $$PWD/../valTool/obj-ia32/val.so -- ./test
+	pin -t $$PWD/../valTool/obj-intel64/val.so -- ./test
 
 test: test_a.o test.o
-	gcc -m32 -o test test.o test_a.o
+	cc -m64 -o test test.o test_a.o
 
 test_a.o: test_a.asm
-	nasm -f macho -o test_a.o test_a.asm
+	nasm -f macho64 -o test_a.o test_a.asm
 
 test.o: test.c
-	gcc -m32 -c -o test.o test.c
+	cc -m64 -c -o test.o test.c
 
-all: test tests.out
+
+clean:
+	rm -f *.o tests.out
