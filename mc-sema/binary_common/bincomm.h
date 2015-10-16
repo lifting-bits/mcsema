@@ -57,7 +57,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <BaseBMO.h>
 #include "CFG.pb.h"
 
-typedef boost::uint64_t VA;
+typedef uint64_t VA;
 
 class ExecutableContainer : public llvm::MemoryObject {
 public:

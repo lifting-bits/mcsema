@@ -1,8 +1,7 @@
 #ifndef LINUXARCHOPS_H
 #define LINUXARCHOPS_H
 
-#include <boost/cstdint.hpp>
-typedef boost::uint64_t VA;
+typedef uint64_t VA;
 
 llvm::Value* linuxAllocateStack(llvm::Module *M, llvm::Value *stackSize, llvm::BasicBlock *&driverBB);
 llvm::Value *linuxFreeStack(llvm::Module *M, llvm::Value *stackAlloc, llvm::BasicBlock *&driverBB);

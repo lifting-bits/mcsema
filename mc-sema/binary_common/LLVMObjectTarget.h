@@ -46,7 +46,7 @@ class LLVMObjectTarget : public ExecutableContainer {
   VA                        baseAddr;
   VA                        extent;
 public:
-  typedef std::pair<boost::uint64_t, llvm::object::SectionRef>  secT;
+  typedef std::pair<uint64_t, llvm::object::SectionRef>  secT;
 
   virtual ~LLVMObjectTarget(void);
   virtual bool is_open(void);

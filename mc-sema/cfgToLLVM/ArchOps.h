@@ -8,7 +8,7 @@
 #include "llvm/ADT/Triple.h"
 
 #include <boost/cstdint.hpp>
-typedef boost::uint64_t VA;
+typedef uint64_t VA;
 
 llvm::Value* archAllocateStack(llvm::Module *M, llvm::Value *stackSize, llvm::BasicBlock *&driverBB);
 llvm::Value* archGetStackSize(llvm::Module *M, llvm::BasicBlock *&driverBB);

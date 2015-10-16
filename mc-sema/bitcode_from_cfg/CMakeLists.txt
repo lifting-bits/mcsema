@@ -5,7 +5,7 @@ link_directories(${CMAKE_CURRENT_BINARY_DIR}/../../lib)
 
 add_executable(cfg_to_bc cfg_to_bc.cpp ) 
 
-target_link_libraries(cfg_to_bc cfgToLLVM peToCFG LLVMBitReader LLVMBitWriter
+target_link_libraries(cfg_to_bc pe-parser-library cfgToLLVM peToCFG LLVMBitReader LLVMBitWriter
   LLVMMCDisassembler LLVMX86Disassembler LLVMX86AsmParser LLVMX86CodeGen
     LLVMSelectionDAG LLVMAsmPrinter LLVMX86Desc LLVMX86Info
     LLVMX86AsmPrinter LLVMX86Utils LLVMipo LLVMTransformUtils LLVMScalarOpts

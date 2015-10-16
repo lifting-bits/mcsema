@@ -38,7 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 std::list<NativeFunctionPtr> getFuncs(ExecutableContainer *, 
         LLVMByteDecoder &, 
         std::set<VA> &, 
-        boost::uint64_t, 
+        uint64_t, 
         ExternalFunctionMap &, 
         llvm::raw_ostream &);
 

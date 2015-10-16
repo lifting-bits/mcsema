@@ -35,7 +35,6 @@ THE SOFTWARE.
 #include <fcntl.h>
 #endif
 
-using namespace boost;
 using namespace std;
 
 struct buffer_detail {
@@ -238,6 +237,6 @@ void deleteBuffer(bounded_buffer *b) {
   return;
 }
 
-boost::uint64_t bufLen(bounded_buffer *b) {
+uint64_t bufLen(bounded_buffer *b) {
   return b->bufLen;
 }

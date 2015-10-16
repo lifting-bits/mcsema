@@ -32,7 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "llvm/IR/Function.h"
 #include <boost/shared_ptr.hpp>
 #include <boost/cstdint.hpp>
-typedef boost::uint64_t VA;
+typedef uint64_t VA;
 
 void addAnnotation(llvm::Instruction *inst, VA addr);
 bool getAnnotation(llvm::Instruction *inst, VA &its_eip);

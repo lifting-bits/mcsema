@@ -17,11 +17,11 @@
 
 class BaseBufferMemoryObject : public llvm::MemoryObject {
 private:
-    std::vector<boost::uint8_t>  Bytes;
-    boost::uint64_t              Base;
+    std::vector<uint8_t>  Bytes;
+    uint64_t              Base;
 public:
-    BaseBufferMemoryObject( std::vector<boost::uint8_t>  bytes,
-                            boost::uint64_t              baseAddr) :
+    BaseBufferMemoryObject( std::vector<uint8_t>  bytes,
+                            uint64_t              baseAddr) :
                             Bytes(bytes), Base(baseAddr) {
         return;
     }

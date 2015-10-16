@@ -156,10 +156,10 @@ NativeModulePtr makeNativeModule( ExecutableContainer *exc,
 
   if(IgnoreNativeEntryPoints == false) {
       //get entry points from the file too
-      list<pair<string, boost::uint64_t> > tmp;
+      list<pair<string, std::uint64_t> > tmp;
       exc->get_exports(tmp);
 
-      for(list<pair<string, boost::uint64_t> >::iterator it = tmp.begin(), e = tmp.end();
+      for(list<pair<string, std::uint64_t> >::iterator it = tmp.begin(), e = tmp.end();
               it != e;
               ++it)
       {
@@ -192,7 +192,7 @@ NativeModulePtr makeNativeModule( ExecutableContainer *exc,
   //context
   outs() << "We have " << entryPoints.size() << " entry points\n";
 
-  for(list<boost::uint64_t>::iterator it = entryPoints.begin(), e = entryPoints.end();
+  for(list<std::uint64_t>::iterator it = entryPoints.begin(), e = entryPoints.end();
       it != e;
       ++it)
   {

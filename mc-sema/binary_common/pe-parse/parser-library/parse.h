@@ -26,30 +26,29 @@ THE SOFTWARE.
 #define _PARSE_H
 #include <string>
 #include <cstdint>
-#include <boost/cstdint.hpp>
 
 #include "nt-headers.h"
 
-typedef boost::uint32_t RVA;
-typedef boost::uint64_t VA;
+typedef uint32_t RVA;
+typedef uint64_t VA;
 
 struct buffer_detail;
 
 typedef struct _bounded_buffer {
-  boost::uint8_t  *buf;
-  boost::uint32_t bufLen;
+  uint8_t  *buf;
+  uint32_t bufLen;
   bool            copy;
   buffer_detail   *detail;
 } bounded_buffer;
 
-bool readByte(bounded_buffer *b, boost::uint32_t offset, boost::uint8_t &out);
-bool readWord(bounded_buffer *b, boost::uint32_t offset, boost::uint16_t &out);
-bool readDword(bounded_buffer *b, boost::uint32_t offset, boost::uint32_t &out);
+bool readByte(bounded_buffer *b, uint32_t offset, uint8_t &out);
+bool readWord(bounded_buffer *b, uint32_t offset, uint16_t &out);
+bool readDword(bounded_buffer *b, uint32_t offset, uint32_t &out);
 
 bounded_buffer *readFileToFileBuffer(const char *filePath);
-bounded_buffer *splitBuffer(bounded_buffer *b, boost::uint32_t from, boost::uint32_t to);
+bounded_buffer *splitBuffer(bounded_buffer *b, uint32_t from, uint32_t to);
 void deleteBuffer(bounded_buffer *b);
-boost::uint64_t bufLen(bounded_buffer *b);
+uint64_t bufLen(bounded_buffer *b);
 
 struct parsed_pe_internal;
 
@@ -86,7 +85,7 @@ typedef int (*iterSec)(void *, VA secBase, std::string &, image_section_header, 
 void IterSec(parsed_pe *pe, iterSec cb, void *cbd);
 
 //get byte at VA in PE
-bool ReadByteAtVA(parsed_pe *pe, VA v, boost::uint8_t &b);
+bool ReadByteAtVA(parsed_pe *pe, VA v, uint8_t &b);
 
 //get entry point into PE
 bool GetEntryPoint(const parsed_pe *pe, VA &v);

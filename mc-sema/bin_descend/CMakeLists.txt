@@ -11,7 +11,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR} ${PROTOBUF_INCLUDE_DIR} ${PROTO_
 link_directories(${CMAKE_CURRENT_BINARY_DIR}/../../lib)
 add_executable(bin_descend bin_descend.cpp cfg_recover.cpp ExternalFuncMap.cpp) 
 
-target_link_libraries(bin_descend binary_common pe-parser-library cfgToLLVM peToCFG LLVMBitReader LLVMBitWriter
+target_link_libraries(bin_descend binary_common cfgToLLVM peToCFG LLVMBitReader LLVMBitWriter
   LLVMMCDisassembler LLVMX86Disassembler LLVMX86AsmParser LLVMX86CodeGen
     LLVMSelectionDAG LLVMAsmPrinter LLVMX86Desc LLVMX86Info
       LLVMX86AsmPrinter LLVMX86Utils ${Boost_LIBRARIES} libprotobuf)

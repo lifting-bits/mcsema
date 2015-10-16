@@ -73,8 +73,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <boost/graph/adjacency_matrix.hpp>
 
 typedef boost::adjacency_matrix<boost::directedS> CFG;
-typedef boost::uint64_t FuncID;
-typedef boost::uint64_t VA;
+typedef uint64_t FuncID;
+typedef uint64_t VA;
 
 class Inst;
 typedef boost::shared_ptr<Inst> InstPtr;
@@ -136,7 +136,7 @@ class Inst {
 
     private:
     std::vector<VA>   targets;
-    std::vector<boost::uint8_t> instBytes;
+    std::vector<uint8_t> instBytes;
     VA              tgtIfTrue;
     VA              tgtIfFalse;
     VA              loc;
@@ -154,7 +154,7 @@ class Inst {
     bool            ext_call_target;
     bool            ext_data_ref;
     bool            is_call_external;
-    boost::uint32_t data_offset;
+    uint32_t data_offset;
     bool            has_data_offset;
     uint8_t         len;
     bool            is_terminator;
@@ -172,7 +172,7 @@ class Inst {
     VA rip_target;
     bool hasRIP;
     public:
-    std::vector<boost::uint8_t> get_bytes(void) { return this->instBytes; }
+    std::vector<uint8_t> get_bytes(void) { return this->instBytes; }
     std::string printInst(void) {
         return this->instRep;
     }
@@ -206,7 +206,7 @@ class Inst {
         this->reloc_offset = ro;
     }
 
-    void set_data_offset(boost::uint32_t d) {
+    void set_data_offset(uint32_t d) {
         this->has_data_offset = true;
         this->data_offset = d;
         return;
@@ -214,7 +214,7 @@ class Inst {
 
     bool is_data_offset(void) { return this->has_data_offset; }
 
-    boost::uint32_t get_data_offset(void) { return this->data_offset; }
+    uint32_t get_data_offset(void) { return this->data_offset; }
 
     bool get_is_call_external(void) { return this->is_call_external; }
     void set_is_call_external(void) { this->is_call_external = true; }
@@ -328,7 +328,7 @@ class Inst {
           const llvm::MCInst &inst,
           std::string instR,
           Prefix k,
-          std::vector<boost::uint8_t> bytes) :
+          std::vector<uint8_t> bytes) :
         instBytes(bytes),
         tgtIfTrue(0),
         tgtIfFalse(0),
@@ -393,10 +393,10 @@ class NativeFunction {
     NativeFunction(VA b) : funcEntryVA(b), nextBlockID(0), graph(nullptr) { }
     void add_block(NativeBlockPtr );
     VA get_start(void) { return this->funcEntryVA; }
-    boost::uint64_t num_blocks(void) { return this->IDtoBlock.size(); }
+    uint64_t num_blocks(void) { return this->IDtoBlock.size(); }
     NativeBlockPtr block_from_id(uint64_t);
     NativeBlockPtr block_from_base(VA);
-    boost::uint64_t entry_block_id() const;
+    uint64_t entry_block_id() const;
     void compute_graph(void);
     CFG get_cfg(void) { return *this->graph; }
     std::string get_name(void);

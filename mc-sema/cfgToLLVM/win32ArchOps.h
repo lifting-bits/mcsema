@@ -5,8 +5,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/BasicBlock.h"
 
-#include <boost/cstdint.hpp>
-typedef boost::uint64_t VA;
+typedef uint64_t VA;
 
 llvm::Value *win32GetStackSize(llvm::Module *M, llvm::BasicBlock *&driverBB);
 llvm::Value *win32AllocateStack(llvm::Module *M, llvm::Value *stackSize, llvm::BasicBlock *&driverBB);

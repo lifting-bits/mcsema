@@ -69,7 +69,7 @@ NativeBlockPtr NativeFunction::block_from_id(uint64_t id) {
     return b;
 }
 
-boost::uint64_t NativeFunction::entry_block_id() const {
+uint64_t NativeFunction::entry_block_id() const {
 
     map<VA, uint64_t>::const_iterator   it = this->baseToID.find(this->funcEntryVA);
     LASSERT(it != this->baseToID.end(), "Block not found");
@@ -273,9 +273,9 @@ InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder)
   VA                      addr = inst.inst_addr();
   boost::int64_t          tr_tgt = inst.true_target();
   boost::int64_t          fa_tgt = inst.false_target();
-  //boost::uint32_t         len = inst.inst_len();
+  //uint32_t         len = inst.inst_len();
   string                  instData = inst.inst_bytes();
-  vector<boost::uint8_t>  bytes(instData.begin(), instData.end());
+  vector<uint8_t>  bytes(instData.begin(), instData.end());
   BaseBufferMemoryObject  bbmo(bytes, addr);
 
   //produce an MCInst from the instruction buffer using the ByteDecoder
@@ -692,7 +692,7 @@ NativeBlockPtr blockFromBuff(   VA                      startVA,
         string                      outS;
         llvm::raw_string_ostream    osOut(outS);
         P->printInst(&inst, osOut, "");
-        vector<boost::uint8_t>  bytes;
+        vector<uint8_t>  bytes;
         InstPtr             p = InstPtr(new Inst(   curVA,
                                                     insLen,
                                                     inst,
@@ -799,7 +799,7 @@ NativeFunctionPtr funcFromBuff( VA                      startVA,
 
 static void instFromNatInst(InstPtr i, ::Instruction *protoInst) {
   /* add the raw bytes for an instruction */
-  vector<boost::uint8_t>  bytes = i->get_bytes();
+  vector<uint8_t>  bytes = i->get_bytes();
   protoInst->set_inst_bytes(string(bytes.begin(), bytes.end()));
 
   /* add the instruction address */
