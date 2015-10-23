@@ -8,9 +8,14 @@ os:
 compiler:
 - gcc
 - clang
+matrix:
+  allow_failures:
+  - os: osx
+  exclude:
+  - compiler: gcc
+    os: osx
 before_script:
-- sudo apt-get update -qq
-- sudo apt-get install -qq -y nasm cmake git gcc-multilib g++-multilib build-essential libc6-i386 zlib1g gzip
+- if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get update && sudo apt-get install -qq -y nasm cmake git gcc-multilib g++-multilib build-essential libc6-i386 zlib1g gzip ; fi
 script:
 - mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j2
 notifications:
