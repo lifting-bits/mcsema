@@ -3,7 +3,6 @@ dist: trusty
 language: cpp
 cache: apt
 os:
-- linux
 - osx
 compiler:
 - gcc
@@ -16,6 +15,7 @@ matrix:
     os: osx
 before_script:
 - if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get update && sudo apt-get install -qq -y nasm cmake git gcc-multilib g++-multilib build-essential libc6-i386 zlib1g gzip ; fi
+- if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew update && brew install nasm; fi
 script:
 - mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j2
 notifications:
