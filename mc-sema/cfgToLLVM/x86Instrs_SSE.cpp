@@ -528,6 +528,32 @@ static InstTransResult translate_CVTSI2SSrm(NativeModulePtr natM, BasicBlock *& 
 
 }
 
+// convert signed integer (register) to single precision float (xmm register)
+static InstTransResult translate_CVTSI2SS64rr(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+    const MCOperand &dst = OP(0);
+    const MCOperand &src = OP(1);
+
+    NASSERT(dst.isReg());
+    NASSERT(src.isReg());
+
+    Value *src_val = R_READ<64>(block, src.getReg());
+
+    return doCVTSI2SrV<64>(natM, block, ip, inst, src_val, dst);
+}
+
+// convert signed integer (memory) to single precision float (xmm register)
+static InstTransResult translate_CVTSI2SS64rm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+    const MCOperand &dst = OP(0);
+    Value *mem_addr = ADDR(1);
+
+    NASSERT(dst.isReg());
+
+    Value *src_val = M_READ<64>(ip, block, mem_addr);
+
+    return doCVTSI2SrV<64>(natM, block, ip, inst, src_val, dst);
+
+}
+
 
 template <int width>
 static InstTransResult doCVTTS2SIrV(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst, Value *src, const MCOperand &dst)
@@ -2081,6 +2107,79 @@ static InstTransResult doPSHUFLWmi(InstPtr ip, BasicBlock *&b, const MCOperand &
     return ContinueBlock;
 }
 
+static Value *doUNPCKLPSvv(BasicBlock *b, Value *dest, Value *src)
+{
+    Value *vecSrc = INT_AS_VECTOR<128,32>(b, src);
+    Value *vecDst = INT_AS_VECTOR<128,32>(b, dest);
+
+    Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "", b);
+    Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "", b);
+
+    Value *dst1 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 0), "", b);
+    Value *dst2 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 1), "", b);
+
+    Value *res1 = InsertElementInst::Create(vecDst, dst1, CONST_V<32>(b, 0), "", b);
+    Value *res2 = InsertElementInst::Create(res1, src1, CONST_V<32>(b, 1), "", b);
+    Value *res3 = InsertElementInst::Create(res2, dst2, CONST_V<32>(b, 2), "", b);
+    Value *res4 = InsertElementInst::Create(res3, src2, CONST_V<32>(b, 3), "", b);
+
+    // convert the output back to an integer
+    return VECTOR_AS_INT<128>(b, res4);
+}
+
+static InstTransResult doUNPCKLPSrr(BasicBlock *b, const MCOperand &dest, const MCOperand &src)
+{
+    R_WRITE<128>(b, dest.getReg(),
+                 doUNPCKLPSvv(b, R_READ<128>(b, dest.getReg()),
+                                 R_READ<128>(b, src.getReg())));
+    return ContinueBlock;
+}
+
+static InstTransResult doUNPCKLPSrm(InstPtr ip, BasicBlock *b, const MCOperand &dest, Value *src)
+{
+    R_WRITE<128>(b, dest.getReg(),
+               doUNPCKLPSvv(b, R_READ<128>(b, dest.getReg()),
+                               M_READ<128>(ip, b, src)));
+    return ContinueBlock;
+}
+
+
+Value *doCVTPS2PDvv(BasicBlock *&b, Value *dest, Value *src) {
+  Type *DoubleTy = Type::getDoubleTy(b->getContext());
+
+  Value *vecSrc = INT_AS_FPVECTOR<128,32>(b, src);
+  Value *vecDst = INT_AS_FPVECTOR<128,64>(b, dest);
+
+  Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "", b);
+  Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "", b);
+
+  Value *src1_ext = CastInst::Create(Instruction::FPExt, src1, DoubleTy, "", b);
+  Value *src2_ext = CastInst::Create(Instruction::FPExt, src2, DoubleTy, "", b);
+
+  Value *res1 = InsertElementInst::Create(vecDst, src1_ext, CONST_V<32>(b, 0), "", b);
+  Value *res2 = InsertElementInst::Create(res1, src2_ext, CONST_V<32>(b, 1), "", b);
+
+  // convert the output back to an integer
+  return VECTOR_AS_INT<128>(b, res2);
+}
+
+
+static InstTransResult doCVTPS2PDrr(BasicBlock *b, const MCOperand &dest, const MCOperand &src)
+{
+    R_WRITE<128>(b, dest.getReg(),
+                 doCVTPS2PDvv(b, R_READ<128>(b, dest.getReg()),
+                                 R_READ<128>(b, src.getReg())));
+    return ContinueBlock;
+}
+
+static InstTransResult doCVTPS2PDrm(InstPtr ip, BasicBlock *b, const MCOperand &dest, Value *src)
+{
+    R_WRITE<128>(b, dest.getReg(),
+                 doCVTPS2PDvv(b, R_READ<128>(b, dest.getReg()),
+                                 M_READ<128>(ip, b, src)));
+    return ContinueBlock;
+}
+
 GENERIC_TRANSLATION(MOVHLPSrr,
         (doMOVHLPSrr<128>(ip, block, OP(1), OP(2))) )
 
@@ -2506,6 +2605,18 @@ GENERIC_TRANSLATION_MEM(SHUFPSrmi,
         (doSHUFPSrmi(ip, block, OP(1), ADDR(2), OP(7))),
         (doSHUFPSrmi(ip, block, OP(1), STD_GLOBAL_OP(2), OP(7))) )
 
+GENERIC_TRANSLATION(UNPCKLPSrr,
+        (doUNPCKLPSrr(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_MEM(UNPCKLPSrm,
+        (doUNPCKLPSrm(ip, block, OP(1), ADDR(2))),
+        (doUNPCKLPSrm(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+
+GENERIC_TRANSLATION(CVTPS2PDrr,
+        (doCVTPS2PDrr(block, OP(0), OP(1))) )
+GENERIC_TRANSLATION_MEM(CVTPS2PDrm,
+        (doCVTPS2PDrm(ip, block, OP(0), ADDR(1))),
+        (doCVTPS2PDrm(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+
 void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::MOVSDrm] = (doMOVSrm<64>);
     m[X86::MOVSDmr] = (doMOVSmr<64>);
@@ -2535,6 +2646,9 @@ void SSE_populateDispatchMap(DispatchMap &m) {
 
     m[X86::CVTSI2SSrr] = translate_CVTSI2SSrr;
     m[X86::CVTSI2SSrm] = translate_CVTSI2SSrm;
+
+    m[X86::CVTSI2SS64rr] = translate_CVTSI2SS64rr;
+    m[X86::CVTSI2SS64rm] = translate_CVTSI2SS64rm;
 
     m[X86::CVTTSD2SIrm] = translate_CVTTSD2SIrm;
     m[X86::CVTTSD2SIrr] = translate_CVTTSD2SIrr;
@@ -2763,5 +2877,9 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::PSHUFLWri] = translate_PSHUFLWri;
     m[X86::PSHUFLWmi] = translate_PSHUFLWmi;
 
+    m[X86::UNPCKLPSrm] = translate_UNPCKLPSrm;
+    m[X86::UNPCKLPSrr] = translate_UNPCKLPSrr;
 
+    m[X86::CVTPS2PDrm] = translate_CVTPS2PDrm;
+    m[X86::CVTPS2PDrr] = translate_CVTPS2PDrr;
 }

@@ -678,7 +678,7 @@ void protobuf_AddDesc_CFG_2eproto() {
     "\001 \002(\t\022\?\n\022calling_convention\030\002 \002(\0162#.Exte"
     "rnalFunction.CallingConvention\022\022\n\nhas_re"
     "turn\030\003 \002(\010\022\021\n\tno_return\030\004 \002(\010\022\026\n\016argumen"
-    "t_count\030\005 \002(\005\022\021\n\tsignature\030\006 \002(\t\"G\n\021Call"
+    "t_count\030\005 \002(\005\022\021\n\tsignature\030\006 \001(\t\"G\n\021Call"
     "ingConvention\022\021\n\rCallerCleanup\020\000\022\021\n\rCall"
     "eeCleanup\020\001\022\014\n\010FastCall\020\002\"6\n\014ExternalDat"
     "a\022\023\n\013symbol_name\030\001 \002(\t\022\021\n\tdata_size\030\002 \002("
@@ -2927,7 +2927,7 @@ bool ExternalFunction::MergePartialFromCodedStream(
         break;
       }
 
-      // required string signature = 6;
+      // optional string signature = 6;
       case 6: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
@@ -2992,7 +2992,7 @@ void ExternalFunction::SerializeWithCachedSizes(
     ::google::protobuf::internal::WireFormatLite::WriteInt32(5, this->argument_count(), output);
   }
 
-  // required string signature = 6;
+  // optional string signature = 6;
   if (has_signature()) {
     ::google::protobuf::internal::WireFormat::VerifyUTF8String(
       this->signature().data(), this->signature().length(),
@@ -3040,7 +3040,7 @@ void ExternalFunction::SerializeWithCachedSizes(
     target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(5, this->argument_count(), target);
   }
 
-  // required string signature = 6;
+  // optional string signature = 6;
   if (has_signature()) {
     ::google::protobuf::internal::WireFormat::VerifyUTF8String(
       this->signature().data(), this->signature().length(),
@@ -3091,7 +3091,7 @@ int ExternalFunction::ByteSize() const {
           this->argument_count());
     }
 
-    // required string signature = 6;
+    // optional string signature = 6;
     if (has_signature()) {
       total_size += 1 +
         ::google::protobuf::internal::WireFormatLite::StringSize(
@@ -3160,7 +3160,7 @@ void ExternalFunction::CopyFrom(const ExternalFunction& from) {
 }
 
 bool ExternalFunction::IsInitialized() const {
-  if ((_has_bits_[0] & 0x0000003f) != 0x0000003f) return false;
+  if ((_has_bits_[0] & 0x0000001f) != 0x0000001f) return false;
 
   return true;
 }

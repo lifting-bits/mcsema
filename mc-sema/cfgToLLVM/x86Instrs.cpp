@@ -867,10 +867,14 @@ InstTransResult disInstrX86(    InstPtr           ip,
         IP->printInst(&inst, strOut, "");
         errs() << strOut.str() << "\n";
         errs() << inst.getOpcode() << "\n";
-        itr = TranslateErrorUnsupported;
+        if (X86::REP_PREFIX != opcode && X86::REPNE_PREFIX != opcode) {
+            itr = TranslateErrorUnsupported;
+        } else {
+            errs() << "Unsupported instruction is a rep/repne, trying to skip to next instr.\n";
+        }
     }
-	D(cout << __FUNCTION__ << " : " << opcode << "\n";
-	cout.flush();)
+    //D(cout << __FUNCTION__ << " : " << opcode << "\n";
+    //cout.flush();)
     return itr;
 }
 

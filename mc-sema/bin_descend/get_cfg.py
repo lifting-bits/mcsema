@@ -15,10 +15,20 @@ from os import path
 import os
 import argparse
 import struct
+import syslog
+import traceback
+
+import itertools
 
 #hack for IDAPython to see google protobuf lib
 sys.path.append('/usr/lib/python2.7/dist-packages')
 import CFG_pb2
+
+def xrange(begin, end=None, step=1):
+    if end:
+        return iter(itertools.count(begin, step).next, end)
+    else:
+        return iter(itertools.count().next, begin)
 
 _DEBUG = False
 
@@ -98,7 +108,7 @@ UCOND_BRANCHES = [\
 
 def DEBUG(s):
     if _DEBUG:
-        sys.stdout.write(s)
+        syslog.syslog(str(s))
 
 def readDword(ea):
     bytestr = readBytesSlowly(ea, ea+4);
@@ -173,7 +183,6 @@ def isJmpTable(ea):
 def addFunction(M, ep):
     F = M.internal_funcs.add()
     F.entry_address = ep
-
     return F
 
 def entryPointHandler(M, ep, name, args_from_stddef=False):
@@ -439,10 +448,10 @@ def addDataReference(M, I, inst, dref, new_eas):
             fn = handleExternalRef(fn)
             if isExternalData(fn):
                 I.ext_data_name = fn
-                sys.stdout.write("EXTERNAL DATA REF FROM {0:x} to {1}\n".format(inst, fn))
+                DEBUG("EXTERNAL DATA REF FROM {0:x} to {1}\n".format(inst, fn))
             else:
                 I.ext_call_name = fn 
-                sys.stdout.write("EXTERNAL CODE REF FROM {0:x} to {1}\n".format(inst, fn))
+                DEBUG("EXTERNAL CODE REF FROM {0:x} to {1}\n".format(inst, fn))
 
         elif isInternalCode(dref):
             I.call_target = dref
@@ -499,7 +508,7 @@ def instructionHandler(M, B, inst, new_eas):
     if len(crefs) == 0 and is_call and isize == 5:
         selfCallEA = next_ea
         DEBUG("INTERNAL CALL $+5: {0:x}\n".format(selfCallEA))
-        sys.stdout.write("LOCAL NORETURN CALL!\n")
+        DEBUG("LOCAL NORETURN CALL!\n")
         I.local_noreturn = True
 
         if selfCallEA not in RECOVERED_EAS:
@@ -552,7 +561,7 @@ def instructionHandler(M, B, inst, new_eas):
         return I, False
 
     if is_call and isNotCode(next_ea):
-        sys.stdout.write("LOCAL NORETURN CALL!\n")
+        DEBUG("LOCAL NORETURN CALL!\n")
         I.local_noreturn = True
         return I, True
 
@@ -660,15 +669,13 @@ def processExternalData(M, dt):
 def processExternals(M):
 
     for fn in EXTERNALS:
-
         fixedn = fixExternalName(fn)
-
         if nameInMap(EMAP, fixedn):
             processExternalFunction(M, fixedn)
         elif nameInMap(EMAP_DATA, fixedn):
             processExternalData(M, fixedn)
         else:
-            sys.stderr.write("UNKNOWN API: {0}\n".format(fixedn))
+            syslog.syslog("UNKNOWN API: {0}\n".format(fixedn))
 
 def readBytesSlowly(start, end):
     bytestr = ""
@@ -980,7 +987,7 @@ def recoverFunctionFromSet(M, F, blockset, new_eas):
         block = blockset.pop()
 
         if block.startEA == block.endEA:
-            sys.stdout.write("Zero sized block: {0:x}\n".format(block.startEA))
+            DEBUG("Zero sized block: {0:x}\n".format(block.startEA))
 
         if block.startEA in processed_blocks:
             raise Exception("Attempting to add same block twice: {0:x}".format(block.startEA))
@@ -1023,7 +1030,7 @@ def recoverBlock(startEA):
                 b.endEA = curEA+1
                 return b
             else:
-                sys.stdout.write("WARNING: Couldn't decode insn at: {0:x}. Ending block.\n".format(curEA))
+                DEBUG("WARNING: Couldn't decode insn at: {0:x}. Ending block.\n".format(curEA))
                 b.endEA = curEA
                 return b
 
@@ -1149,11 +1156,11 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
         fwdname = isFwdExport(name, ea)
 
         if fwdname is not None:
-            sys.stdout.write("Skipping fwd export {0} : {1}\n".format(name, fwdname))
+            DEBUG("Skipping fwd export {0} : {1}\n".format(name, fwdname))
             continue
 
         if not isInternalCode(ea):
-            sys.stdout.write("Export {0} does not point to code; skipping\n".format(name))
+            DEBUG("Export {0} at {1} does not point to code; skipping\n".format(name, hex(ea)))
             continue
             
         our_entries.append( (name, ea) )
@@ -1163,7 +1170,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
     # process main entry points
     for fname, fea in our_entries:
 
-        sys.stdout.write("Recovering: {0}\n".format(fname))
+        DEBUG("Recovering: {0}\n".format(fname))
 
         F = entryPointHandler(M, fea, fname, exports_are_apis)
 
@@ -1181,7 +1188,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
             raise Exception("Function EA not code: {0:x}".format(cur_ea))
 
         F = addFunction(M, cur_ea)
-        sys.stdout.write("Recovering: {0}\n".format(hex(cur_ea)))
+        DEBUG("Recovering: {0}\n".format(hex(cur_ea)))
         RECOVERED_EAS.add(cur_ea)
 
         recoverFunction(M, F, cur_ea, new_eas)
@@ -1189,7 +1196,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
         recovered_fns += 1
 
     if recovered_fns == 0:
-        sys.stderr.write("COULD NOT RECOVER ANY FUNCTIONS\n")
+        syslog.syslog("COULD NOT RECOVER ANY FUNCTIONS\n")
         return
 
     mypath = path.dirname(__file__)
@@ -1198,8 +1205,8 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
     outf.write(M.SerializeToString())
     outf.close()
 
-    sys.stdout.write("Recovered {0} functions.\n".format(recovered_fns))
-    sys.stdout.write("Saving to: {0}\n".format(outf.name))
+    DEBUG("Recovered {0} functions.\n".format(recovered_fns))
+    DEBUG("Saving to: {0}\n".format(outf.name))
 
 
 def isFwdExport(iname, ea):
@@ -1295,7 +1302,7 @@ def getExportType(name, ep):
         tp = idc.GetType(ep);
         if tp is None or "__" not in tp: 
             #raise Exception("Cannot determine type of function: {0} at: {1:x}".format(name, ep))
-            sys.stdout.write("WARNING: Cannot determine type of function: {0} at: {1:x}".format(name, ep))
+            DEBUG("WARNING: Cannot determine type of function: {0} at: {1:x}".format(name, ep))
             return (0, CFG_pb2.ExternalFunction.CalleeCleanup, "N")
 
         return parseTypeString(tp, ep)
@@ -1398,6 +1405,21 @@ def getAllExports() :
 
     return to_recover 
 
+# Mark an address as containing code.
+def mark_as_code(address):
+  if not idc.isCode(idc.GetFlags(address)):
+    idc.MakeCode(address)
+    idaapi.autoWait()
+
+
+# Mark an address as being the beginning of a function.
+def try_mark_as_function(address):
+  if not idaapi.add_func(address, idc.BADADDR):
+    DEBUG("Unable to convert code to function: {}".format(address))
+    return False
+  idaapi.autoWait()
+  return True
+
     
 if __name__ == "__main__":
 
@@ -1434,7 +1456,11 @@ if __name__ == "__main__":
         default=False,
         help="Enable verbose debugging mode"
         )
-                        
+    
+    parser.add_argument("-z", "--syms", type=argparse.FileType('r'), default=None,
+        help="File containing <name> <address> pairs of symbols to pre-define."
+        )
+
     args = parser.parse_args(args=idc.ARGV[1:])
 
     if args.debug:
@@ -1448,73 +1474,88 @@ if __name__ == "__main__":
         idc.SetShortPrm(idc.INF_START_AF, analysis_flags)
         idaapi.autoWait()
 
-    myname = idc.GetInputFile()
-    mypath = path.dirname(__file__)
-
-    EMAP = {}
-    EMAP_DATA = {}
-
-    if len(args.std_defs) > 0:
-        for defsfile in args.std_defs:
-            sys.stdout.write("Loading Standard Definitions file: {0}\n".format(defsfile.name))
-            em_update, emd_update = parseDefsFile(defsfile)
-            EMAP.update(em_update)
-            EMAP_DATA.update(emd_update)
-
-    if args.output:
-        outpath = os.path.dirname(args.output.name)
-    else:
-        outpath =  os.path.join(mypath, myname)
-        try:
-            os.mkdir(outpath)
-        except:
-            pass
-
-    eps = []
     try:
-        if args.exports_to_lift: 
-            eps = args.exports_to_lift.readlines()
-        elif args.entry_symbol is None:
-            eps = getAllExports()
+        # Pre-define a bunch of symbol names and their addresses. Useful when reading
+        # a core dump.
+        if args.syms:
+            for line in args.syms:
+                name, ea_str = line.strip().split(" ")
+                ea = int(ea_str, base=16)
+                if not isInternalCode(ea):
+                    mark_as_code(ea)
+                try_mark_as_function(ea)
+                idc.MakeName(ea, name)
 
-        eps = [ep.strip() for ep in eps]
+        myname = idc.GetInputFile()
+        mypath = path.dirname(__file__)
 
-    except IOError as e:
-        sys.stdout.write("Could not open file of exports to lift. See source for details\n")
-        sys.exit(-1)
+        EMAP = {}
+        EMAP_DATA = {}
 
-    if args.entry_symbol:
-        eps.extend(args.entry_symbol)
+        if len(args.std_defs) > 0:
+            for defsfile in args.std_defs:
+                DEBUG("Loading Standard Definitions file: {0}\n".format(defsfile.name))
+                em_update, emd_update = parseDefsFile(defsfile)
+                EMAP.update(em_update)
+                EMAP_DATA.update(emd_update)
 
-    assert len(eps) > 0, "Need to have at least one entry point to lift"
+        if args.output:
+            outpath = os.path.dirname(args.output.name)
+        else:
+            outpath =  os.path.join(mypath, myname)
+            try:
+                os.mkdir(outpath)
+            except:
+                pass
 
-    sys.stdout.write("Will lift {0} exports\n".format(len(eps)))
-    if args.make_export_stubs:
-        sys.stdout.write("Generating export stubs...\n");
+        eps = []
+        try:
+            if args.exports_to_lift: 
+                eps = args.exports_to_lift.readlines()
+            elif args.entry_symbol is None:
+                eps = getAllExports()
 
-        outdef = path.join(outpath, "{0}.def".format(myname))
-        sys.stdout.write("Output .DEF file: {0}\n".format(outdef))
-        generateDefFile(outdef, eps)
+            eps = [ep.strip() for ep in eps]
 
-        outstub = path.join(outpath, "{0}_exportstub.c".format(myname))
-        sys.stdout.write("Output export stub file: {0}\n".format(outstub))
-        generateExportStub(outstub, eps)
+        except IOError as e:
+            DEBUG("Could not open file of exports to lift. See source for details\n")
+            idc.Exit(-1)
 
-        outbat = path.join(outpath, "{0}.bat".format(myname))
-        sys.stdout.write("Output build .BAT: {0}\n".format(outbat))
-        generateBatFile(outbat, eps)
+        if args.entry_symbol:
+            eps.extend(args.entry_symbol)
+
+        assert len(eps) > 0, "Need to have at least one entry point to lift"
+
+        DEBUG("Will lift {0} exports\n".format(len(eps)))
+        if args.make_export_stubs:
+            DEBUG("Generating export stubs...\n");
+
+            outdef = path.join(outpath, "{0}.def".format(myname))
+            DEBUG("Output .DEF file: {0}\n".format(outdef))
+            generateDefFile(outdef, eps)
+
+            outstub = path.join(outpath, "{0}_exportstub.c".format(myname))
+            DEBUG("Output export stub file: {0}\n".format(outstub))
+            generateExportStub(outstub, eps)
+
+            outbat = path.join(outpath, "{0}.bat".format(myname))
+            DEBUG("Output build .BAT: {0}\n".format(outbat))
+            generateBatFile(outbat, eps)
 
 
-    if args.output:
-        outf = args.output
-    else:
-        cfgname = path.join(outpath, myname + "_ida.cfg")
-        cfgpath = path.join(outpath, cfgname)
-        outf = open(cfgpath, 'wb')
+        if args.output:
+            outf = args.output
+        else:
+            cfgname = path.join(outpath, myname + "_ida.cfg")
+            cfgpath = path.join(outpath, cfgname)
+            outf = open(cfgpath, 'wb')
 
-    sys.stdout.write("CFG Output File file: {0}\n".format(outf.name))
-    recoverCfg(eps, outf, args.exports_are_apis)
+        DEBUG("CFG Output File file: {0}\n".format(outf.name))
 
+        recoverCfg(eps, outf, args.exports_are_apis)
+    except:
+        DEBUG(traceback.format_exc())
+    
     #for batch mode: exit IDA when done
     if args.batch:
         idc.Exit(0)

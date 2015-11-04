@@ -426,6 +426,7 @@ GENERIC_TRANSLATION(SBB16rr_REV, doSbbRR<16>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SBB32i32, doSbbRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0), MCOperand::CreateReg(X86::EAX)))
 GENERIC_TRANSLATION(SBB32ri, doSbbRI<32>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SBB32ri8, doSbbRI<32>(ip, block, OP(1), OP(2), OP(0)))
+GENERIC_TRANSLATION(SBB64ri8, doSbbRI<64>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION_32MI(SBB32mi, 
 	doSbbMI<32>(ip, block, ADDR(0), OP(5)),
 	doSbbMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
@@ -527,6 +528,8 @@ void SUB_populateDispatchMap(DispatchMap &m)
 
         m[X86::SBB32ri] = translate_SBB32ri;
         m[X86::SBB32ri8] = translate_SBB32ri8;
+
+        m[X86::SBB64ri8] = translate_SBB64ri8;
 
         m[X86::SBB32rm] = translate_SBB32rm;
         m[X86::SBB32rr] = translate_SBB32rr;

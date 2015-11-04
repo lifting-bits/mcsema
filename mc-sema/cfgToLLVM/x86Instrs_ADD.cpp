@@ -235,8 +235,8 @@ static Value * doAdcVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *src)
             t = Type::getInt32Ty(b->getContext());
             break;
         case 64:
-        	t = Type::getInt64Ty(b->getContext());
-        	break;
+            t = Type::getInt64Ty(b->getContext());
+            break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");
     }
@@ -276,9 +276,9 @@ static InstTransResult doAdcI(InstPtr ip, BasicBlock *&b, const MCOperand &src)
         case 32:
             dst = R_READ<width>(b, X86::EAX);
             break;
-		case 64:
-			dst = R_READ<width>(b, X86::RAX);
-			break;
+        case 64:
+            dst = R_READ<width>(b, X86::RAX);
+            break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");
     }
@@ -296,7 +296,7 @@ static InstTransResult doAdcI(InstPtr ip, BasicBlock *&b, const MCOperand &src)
         case 32:
             R_WRITE<width>(b, X86::EAX, res);
             break;
-		case 64:
+        case 64:
             R_WRITE<width>(b, X86::RAX, res);
             break;
         default:

@@ -391,7 +391,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
 
     //lookup the function in the module
     Function    *externFunction = M->getFunction(target);
-    TASSERT(externFunction != NULL, "Coult not find external function: "+target);
+    TASSERT(externFunction != NULL, "Could not find external function: "+target);
     FunctionType    *externFunctionTy = externFunction->getFunctionType();
     Type            *rType = externFunction->getReturnType();
     int        paramCount = externFunctionTy->getNumParams();
@@ -558,7 +558,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool e
 
     //lookup the function in the module
     Function    *externFunction = M->getFunction(target);
-    TASSERT(externFunction != NULL, "Coult not find external function: "+target);
+    TASSERT(externFunction != NULL, "Could not find external function: "+target);
     FunctionType    *externFunctionTy = externFunction->getFunctionType();
     Type            *rType = externFunction->getReturnType();
     int        paramCount = externFunctionTy->getNumParams();
