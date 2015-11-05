@@ -4,10 +4,7 @@ DIR=$(dirname $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd ))
 IDA=`locate idal64`
 
 # Copy the binary to a temporary file.
-BIN=`mktemp --tmpdir=/tmp bin_XXXXXXXXXX`
-cp $1 $BIN
-chmod a+x $BIN
-
+BIN=$1
 # Extract the CFG file. This will use the produced name->address mapping to symbolize
 # the code.
 $IDA -B -S"${DIR}/mc-sema/bin_descend/get_cfg.py --std-defs=${DIR}/mc-sema/std_defs/std_defs.txt --batch --entry-symbol main --output=${BIN}.cfg" ${BIN}
