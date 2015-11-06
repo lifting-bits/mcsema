@@ -4,6 +4,7 @@ language: cpp
 cache: apt
 osx_image: xcode7.1
 os:
+- linux
 - osx
 compiler:
 - gcc
