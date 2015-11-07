@@ -86,7 +86,7 @@ typedef struct _nativefpu {
   std::string printMe(void) const {
     std::ostringstream  oss;
 
-    boost::int32_t  k = this->b[0];
+    int32_t  k = this->b[0];
     oss << "0x" << std::hex << k;
     k = this->b[1];
     oss << " 0x" << std::hex << k;
@@ -162,7 +162,7 @@ typedef struct _fputag {
   std::string printMe(void) const {
     std::ostringstream  oss;
 
-    boost::int32_t  k = this->tag[0];
+    int32_t  k = this->tag[0];
     oss << "0x" << std::hex << k;
     k = this->tag[1];
     oss << " 0x" << std::hex << k;
@@ -217,7 +217,7 @@ typedef struct _xmmregstate {
     std::string printMe(void) const {
         std::stringstream oss;
         for(unsigned  i = 0; i < 16; i++) {
-            oss << " 0x" << std::hex << (boost::int32_t) this->tag[i];
+            oss << " 0x" << std::hex << (int32_t) this->tag[i];
         }
         return oss.str();
     }

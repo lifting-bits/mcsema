@@ -12,4 +12,4 @@ $IDA -B -S"${DIR}/mc-sema/bin_descend/get_cfg.py --std-defs=${DIR}/mc-sema/std_d
 #$DIR/mc-sema/bin_descend/bin_descend_wrapper.py -i=$1 -func-map=$DIR/mc-sema/std_defs/std_defs.txt -entry-symbol=main
 #$DIR/build/mc-sema/bitcode_from_cfg/cfg_to_bc -i $1.cfg -driver=mcsema_main,main,raw,noreturn,C -o $1.ll
 
-echo "Saved CFG to ${BIN}.cfg"
+echo "Decoded"
