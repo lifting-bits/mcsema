@@ -6,7 +6,7 @@
 #include "mc-sema/common/RegisterState.h"
 
 struct alignas(128) Stack {
-  char data[1UL << 21U];
+  char data[1UL << 22U];
 };
 
 static __thread mcsema::RegState tRegState;
