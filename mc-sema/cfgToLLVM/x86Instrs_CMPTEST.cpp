@@ -317,6 +317,15 @@ GENERIC_TRANSLATION_MEM(CMP32mr,
 	doCmpMR<32>(ip,   block, ADDR(0), OP(5)),
 	doCmpMR<32>(ip,   block, STD_GLOBAL_OP(0), OP(5)))
 
+GENERIC_TRANSLATION_MEM(CMP64rm,
+  doCmpRM<64>(ip,   block, OP(0), ADDR(1)),
+  doCmpRM<64>(ip,   block, OP(0), STD_GLOBAL_OP(1)))
+
+GENERIC_TRANSLATION_MEM(CMP64mr,
+  doCmpMR<64>(ip,   block, ADDR(0), OP(5)),
+  doCmpMR<64>(ip,   block, STD_GLOBAL_OP(0), OP(5)))
+
+
 GENERIC_TRANSLATION(TEST32rr, doTestRR<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(TEST64rr, doTestRR<64>(ip, block, OP(0), OP(1)))
 //there is a form of the encoding where the EAX operand is 
@@ -391,9 +400,11 @@ void CMPTEST_populateDispatchMap(DispatchMap &m) {
     m[X86::CMP16mr] = translate_CMP16mr;
     m[X86::CMP32mr] = translate_CMP32mr;
     m[X86::CMP16mi8] = translate_CMP16mi8;
+
     m[X86::CMP64mi8] = translate_CMP64mi8;
     m[X86::CMP64mi32] = translate_CMP64mi32;
-
+    m[X86::CMP64rm] = translate_CMP64rm;
+    m[X86::CMP64mr] = translate_CMP64mr;
 
 	m[X86::TEST64ri32] = translate_TEST64ri32;
 	m[X86::TEST64i32] = translate_TEST64i32;

@@ -353,48 +353,54 @@ GENERIC_TRANSLATION_MEM(NEG32m,
 	doNegM<32>(ip, block, ADDR(0)),
 	doNegM<32>(ip, block, STD_GLOBAL_OP(0)))
 GENERIC_TRANSLATION(NEG32r, doNegR<32>(ip, block, OP(0)))
+GENERIC_TRANSLATION_MEM(NEG64m,
+  doNegM<64>(ip, block, ADDR(0)),
+  doNegM<64>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION(NEG64r, doNegR<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION_MEM(NEG8m, 
 	doNegM<8>(ip, block, ADDR(0)),
 	doNegM<8>(ip, block, STD_GLOBAL_OP(0)))
 GENERIC_TRANSLATION(NEG8r, doNegR<8>(ip, block, OP(0)))
 
 void INCDECNEG_populateDispatchMap(DispatchMap &m) {
-        m[X86::DEC16r] = translate_DEC16r;
-        m[X86::DEC8r] = translate_DEC8r;
-        m[X86::DEC16m] = translate_DEC16m;
-        m[X86::DEC32m] = translate_DEC32m;
-        m[X86::DEC8m] = translate_DEC8m;
-        m[X86::DEC32r] = translate_DEC32r;
-		
-		m[X86::DEC64_16r] = translate_DEC64_16r;
-		m[X86::DEC64_32r] = translate_DEC64_32r;
-		m[X86::DEC64r] = translate_DEC64r;
+    m[X86::DEC16r] = translate_DEC16r;
+    m[X86::DEC8r] = translate_DEC8r;
+    m[X86::DEC16m] = translate_DEC16m;
+    m[X86::DEC32m] = translate_DEC32m;
+    m[X86::DEC8m] = translate_DEC8m;
+    m[X86::DEC32r] = translate_DEC32r;
 
-        m[X86::INC16m] = translate_INC16m;
-        m[X86::INC32m] = translate_INC32m;
-		
-		// On 64bit r/m8 can't be encoded if REX prefix is used 
-		m[X86::INC8m] = translate_INC8m;
-		m[X86::INC8r] = translate_INC8r;
-		
-		// On 64bit INC16r/INC32r can't be encoded
-        m[X86::INC16r] = translate_INC16r;
-        m[X86::INC32r] = translate_INC32r;
-		
-		// Is it required to have check for REX prefix to check register premissions?
-		// uses check for REX.W for 64 bit access.
-		m[X86::INC64r] = translate_INC64r;
-		m[X86::INC64_32r] = translate_INC64_32r;
-		m[X86::INC64_16r] = translate_INC64_16r;
-		
-		m[X86::INC64m] = translate_INC64m;
-		m[X86::INC64_32m] = translate_INC32m;
-		m[X86::INC64_16m] = translate_INC16m;
-		
-        m[X86::NEG16m] = translate_NEG16m;
-        m[X86::NEG16r] = translate_NEG16r;
-        m[X86::NEG32m] = translate_NEG32m;
-        m[X86::NEG32r] = translate_NEG32r;
-        m[X86::NEG8m] = translate_NEG8m;
-        m[X86::NEG8r] = translate_NEG8r;
+    m[X86::DEC64_16r] = translate_DEC64_16r;
+    m[X86::DEC64_32r] = translate_DEC64_32r;
+    m[X86::DEC64r] = translate_DEC64r;
+
+    m[X86::INC16m] = translate_INC16m;
+    m[X86::INC32m] = translate_INC32m;
+
+    // On 64bit r/m8 can't be encoded if REX prefix is used
+    m[X86::INC8m] = translate_INC8m;
+    m[X86::INC8r] = translate_INC8r;
+
+    // On 64bit INC16r/INC32r can't be encoded
+    m[X86::INC16r] = translate_INC16r;
+    m[X86::INC32r] = translate_INC32r;
+
+    // Is it required to have check for REX prefix to check register premissions?
+    // uses check for REX.W for 64 bit access.
+    m[X86::INC64r] = translate_INC64r;
+    m[X86::INC64_32r] = translate_INC64_32r;
+    m[X86::INC64_16r] = translate_INC64_16r;
+
+    m[X86::INC64m] = translate_INC64m;
+    m[X86::INC64_32m] = translate_INC32m;
+    m[X86::INC64_16m] = translate_INC16m;
+
+    m[X86::NEG16m] = translate_NEG16m;
+    m[X86::NEG16r] = translate_NEG16r;
+    m[X86::NEG32m] = translate_NEG32m;
+    m[X86::NEG32r] = translate_NEG32r;
+    m[X86::NEG64m] = translate_NEG64m;
+    m[X86::NEG64r] = translate_NEG64r;
+    m[X86::NEG8m] = translate_NEG8m;
+    m[X86::NEG8r] = translate_NEG8r;
 }

@@ -55,6 +55,9 @@ static void doMulV(InstPtr ip,  BasicBlock  *&b,
         case 32:
             lhs = R_READ<32>(b, X86::EAX);
             break;
+        case 64:
+            lhs = R_READ<64>(b, X86::RAX);
+            break;
         default:
             throw TErr(__LINE__, __FILE__, "Not supported width");
     }
@@ -88,6 +91,10 @@ static void doMulV(InstPtr ip,  BasicBlock  *&b,
             R_WRITE<width>(b, X86::EDX, wrDX);
             R_WRITE<width>(b, X86::EAX, wrAX);
             break;
+        case 64:
+            R_WRITE<width>(b, X86::RDX, wrDX);
+            R_WRITE<width>(b, X86::RAX, wrAX);
+            break;
         default:
             throw TErr(__LINE__, __FILE__, "Not supported width");
     }
@@ -110,6 +117,9 @@ static Value *doIMulV(InstPtr ip,  BasicBlock  *&b,
             break;
         case 32:
             lhs = R_READ<32>(b, X86::EAX);
+            break;
+        case 64:
+            lhs = R_READ<64>(b, X86::RAX);
             break;
         default:
             throw TErr(__LINE__, __FILE__, "Not supported width");
@@ -184,6 +194,10 @@ static InstTransResult doIMulR(InstPtr ip,    BasicBlock *&b,
             R_WRITE<width>(b, X86::EDX, wrDX);
             R_WRITE<width>(b, X86::EAX, wrAX);
             break;
+        case 64:
+            R_WRITE<width>(b, X86::RDX, wrDX);
+            R_WRITE<width>(b, X86::RAX, wrAX);
+            break;
         default:
             throw TErr(__LINE__, __FILE__, "Not supported width");
     }
@@ -215,6 +229,10 @@ static InstTransResult doIMulM(InstPtr ip,     BasicBlock      *&b,
         case 32:
             R_WRITE<width>(b, X86::EDX, wrDX);
             R_WRITE<width>(b, X86::EAX, wrAX);
+            break;
+        case 64:
+            R_WRITE<width>(b, X86::RDX, wrDX);
+            R_WRITE<width>(b, X86::RAX, wrAX);
             break;
         default:
             throw new TErr(__LINE__, __FILE__, "Not supported width");
@@ -424,9 +442,9 @@ static InstTransResult doDivV(InstPtr ip, BasicBlock *&b, Value *divisor,
             dx = R_READ<32>(b, X86::EDX);
             break;
         case 64:
-        	ax = R_READ<64>(b, X86::RAX);
-        	dx = R_READ<64>(b, X86::RDX);
-        	break;
+            ax = R_READ<64>(b, X86::RAX);
+            dx = R_READ<64>(b, X86::RDX);
+            break;
         default:
             throw TErr(__LINE__, __FILE__, "Not supported width");
     }
@@ -579,6 +597,7 @@ GENERIC_TRANSLATION_MEM(IMUL32m,
 	doIMulM<32>(ip, block, STD_GLOBAL_OP(0)))
 GENERIC_TRANSLATION(IMUL32rr, doIMulRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL64rr, doIMulRR<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(IMUL64r, doIMulR<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION(IMUL16rr, doIMulRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_MEM(IMUL16rmi, 
 	doIMulRMI<16>(ip, block, OP(0), ADDR(1), OP(6)),
@@ -612,6 +631,10 @@ GENERIC_TRANSLATION_MEM(IDIV16m,
 GENERIC_TRANSLATION_MEM(IDIV32m, 
 	doIDivM<32>(ip,   block, ADDR(0)),
 	doIDivM<32>(ip,   block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_MEM(IDIV64m,
+  doIDivM<64>(ip,   block, ADDR(0)),
+  doIDivM<64>(ip,   block, STD_GLOBAL_OP(0)))
+
 GENERIC_TRANSLATION(DIV8r, doDivR<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(DIV16r, doDivR<16>(ip, block, OP(0)))
 GENERIC_TRANSLATION(DIV32r, doDivR<32>(ip, block, OP(0)))
@@ -654,6 +677,7 @@ void MULDIV_populateDispatchMap(DispatchMap &m) {
     m[X86::IMUL64rri8] = translate_IMUL64rri8;
     m[X86::IMUL64rri32] = translate_IMUL64rri32;
     m[X86::IMUL64rr] = translate_IMUL64rr;
+    m[X86::IMUL64r] = translate_IMUL64r;
 
     m[X86::IDIV8r] = translate_IDIV8r;
     m[X86::IDIV16r] = translate_IDIV16r;
@@ -662,6 +686,7 @@ void MULDIV_populateDispatchMap(DispatchMap &m) {
     m[X86::IDIV8m] = translate_IDIV8m;
     m[X86::IDIV16m] = translate_IDIV16m;
     m[X86::IDIV32m] = translate_IDIV32m;
+    m[X86::IDIV64m] = translate_IDIV64m;
     m[X86::DIV8r] = translate_DIV8r;
     m[X86::DIV16r] = translate_DIV16r;
     m[X86::DIV32r] = translate_DIV32r;

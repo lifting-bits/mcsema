@@ -1008,7 +1008,7 @@ class ExternalFunction : public ::google::protobuf::Message {
   inline ::google::protobuf::int32 argument_count() const;
   inline void set_argument_count(::google::protobuf::int32 value);
 
-  // required string signature = 6;
+  // optional string signature = 6;
   inline bool has_signature() const;
   inline void clear_signature();
   static const int kSignatureFieldNumber = 6;
@@ -4362,7 +4362,7 @@ inline void ExternalFunction::set_argument_count(::google::protobuf::int32 value
   argument_count_ = value;
 }
 
-// required string signature = 6;
+// optional string signature = 6;
 inline bool ExternalFunction::has_signature() const {
   return (_has_bits_[0] & 0x00000020u) != 0;
 }

@@ -825,13 +825,10 @@ static Value *doRclVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
 
     switch(width) {
         case 8:
-            t = Type::getInt8Ty(b->getContext());
-            break;
         case 16:
-            t = Type::getInt16Ty(b->getContext());
-            break;
         case 32:
-            t = Type::getInt32Ty(b->getContext());
+        case 64:
+            t = Type::getIntNTy(b->getContext(), width);
             break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");
@@ -1075,13 +1072,10 @@ static Value *doRcrVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
 
     switch(width) {
         case 8:
-            t = Type::getInt8Ty(b->getContext());
-            break;
         case 16:
-            t = Type::getInt16Ty(b->getContext());
-            break;
         case 32:
-            t = Type::getInt32Ty(b->getContext());
+        case 64:
+            t = Type::getIntNTy(b->getContext(), width);
             break;
         default:
             throw TErr(__LINE__, __FILE__, "Width not supported");
@@ -1947,6 +1941,23 @@ GENERIC_TRANSLATION_32MI(SAR32mi,
 GENERIC_TRANSLATION(SAR32r1, doSarR1<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SAR32rCL, doSarRCL<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SAR32ri, doSarRI<32>(ip, block, OP(1), OP(2), OP(0)))
+
+GENERIC_TRANSLATION_MEM(SAR64m1,
+  doSarM1<64>(ip, block, ADDR(0)),
+  doSarM1<64>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_MEM(SAR64mCL,
+  doSarMCL<64>(ip, block, ADDR(0)),
+  doSarMCL<64>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_32MI(SAR64mi,
+  doSarMI<64>(ip, block, ADDR(0), OP(1)),
+  doSarMI<64>(ip, block, STD_GLOBAL_OP(0), OP(1)),
+    doSarMV<64>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip)))
+
+GENERIC_TRANSLATION(SAR64r1, doSarR1<64>(ip, block, OP(0)))
+GENERIC_TRANSLATION(SAR64rCL, doSarRCL<64>(ip, block, OP(0)))
+GENERIC_TRANSLATION(SAR64ri, doSarRI<64>(ip, block, OP(1), OP(2), OP(0)))
+
+
 GENERIC_TRANSLATION_MEM(SAR8m1, 
 	doSarM1<8>(ip, block, ADDR(0)),
 	doSarM1<8>(ip, block, STD_GLOBAL_OP(0)))
@@ -2132,6 +2143,14 @@ void ShiftRoll_populateDispatchMap(DispatchMap &m) {
         m[X86::SAR32r1] = translate_SAR32r1;
         m[X86::SAR32rCL] = translate_SAR32rCL;
         m[X86::SAR32ri] = translate_SAR32ri;
+
+        m[X86::SAR64m1] = translate_SAR64m1;
+        m[X86::SAR64mCL] = translate_SAR64mCL;
+        m[X86::SAR64mi] = translate_SAR64mi;
+        m[X86::SAR64r1] = translate_SAR64r1;
+        m[X86::SAR64rCL] = translate_SAR64rCL;
+        m[X86::SAR64ri] = translate_SAR64ri;
+
         m[X86::SAR8m1] = translate_SAR8m1;
         m[X86::SAR8mCL] = translate_SAR8mCL;
         m[X86::SAR8mi] = translate_SAR8mi;

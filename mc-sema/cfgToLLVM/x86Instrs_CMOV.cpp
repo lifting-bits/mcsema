@@ -112,8 +112,8 @@ static InstTransResult  doCMOV(
         m[which ## 16rr] = EMIT_CMOV_RR(16, condition);\
         m[which ## 32rm] = EMIT_CMOV_RM(32, condition);\
         m[which ## 32rr] = EMIT_CMOV_RR(32, condition);\
-        m[which ## 64rm] = EMIT_CMOV_RM(32, condition);\
-        m[which ## 64rr] = EMIT_CMOV_RR(32, condition);
+        m[which ## 64rm] = EMIT_CMOV_RM(64, condition);\
+        m[which ## 64rr] = EMIT_CMOV_RR(64, condition);
 
 void CMOV_populateDispatchMap(DispatchMap &m) {
         EMIT_CMOV(X86::CMOVA,   AND(b, NOT(b, CF), NOT(b, ZF)));

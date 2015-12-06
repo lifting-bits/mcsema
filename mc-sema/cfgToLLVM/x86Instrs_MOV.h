@@ -86,7 +86,8 @@ InstTransResult doMRMovBE(InstPtr ip, llvm::BasicBlock *&b,
 
     	srcReg = BinaryOperator::Create(Instruction::Or, val1, val2, "", b);
     }
-    	break;
+    break;
+
     case 64:
     {
     	llvm::Value *o1 = BinaryOperator::CreateLShr(srcReg, CONST_V<width>(b, 8), "", b);
@@ -219,7 +220,8 @@ InstTransResult doRMMovBE(InstPtr ip, llvm::BasicBlock *&b,
 
     	srcVal = BinaryOperator::Create(Instruction::Or, val1, val2, "", b);
     }
-    	break;
+    break;
+
     case 64:
     {
     	llvm::Value *o1 = BinaryOperator::CreateLShr(srcVal, CONST_V<width>(b, 8), "", b);

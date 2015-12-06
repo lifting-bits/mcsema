@@ -161,9 +161,9 @@ static BasicBlock *doStosV(BasicBlock *pred) {
         case 32:
             disp = 4;
             break;
-		case 64:
-			disp = 8;
-			break;
+        case 64:
+            disp = 8;
+            break;
         default:
             throw TErr(__LINE__, __FILE__, "Invalid width");
     }
@@ -265,6 +265,9 @@ static BasicBlock *doScasV(BasicBlock *pred) {
         case 32:
             disp = 4;
             break;
+        case 64:
+            disp = 8;
+            break;
         default:
             throw TErr(__LINE__, __FILE__, "Invalid width");
     }
@@ -339,22 +342,22 @@ static BasicBlock *doMovsV(BasicBlock *pred) {
     BranchInst::Create(isZero, isOne, cmpRes, pred);
 
 	uint64_t	disp;
-	switch(width) {
-		case 8:
-			disp = 1;
-			break;
-		case 16:
-			disp = 2;
-			break;
-		case 32:
-			disp = 4;
-			break;
-		case 64:
-			disp = 8;
-			break;
-		default:
+  switch (width) {
+    case 8:
+      disp = 1;
+      break;
+    case 16:
+      disp = 2;
+      break;
+    case 32:
+      disp = 4;
+      break;
+    case 64:
+      disp = 8;
+      break;
+    default:
       throw TErr(__LINE__, __FILE__, "Invalid width");
-	}
+  }
 
 	//populate the isZero branch
 	//if zero, then add to src and dst registers

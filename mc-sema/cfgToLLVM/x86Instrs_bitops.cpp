@@ -182,20 +182,20 @@ static Value * doNotV(InstPtr ip, BasicBlock *&b, Value *v)
     switch (width)
     {
         case 8:
-            highest = CONST_V<width>(b, 0xFF);
+            highest = CONST_V<width>(b, 0xFFU);
             break;
 
         case 16:
-            highest = CONST_V<width>(b, 0xFFFF);
+            highest = CONST_V<width>(b, 0xFFFFU);
             break;
 
         case 32:
-            highest = CONST_V<width>(b, 0xFFFFFFFF);
+            highest = CONST_V<width>(b, 0xFFFFFFFFUL);
             break;
 
-		case 64:
-			highest = CONST_V<width>(b, 0xFFFFFFFFFFFFFFFFULL);
-			break;
+        case 64:
+            highest = CONST_V<width>(b, 0xFFFFFFFFFFFFFFFFULL);
+            break;
     }
 
     // We can do this by 0xffff - v in the two's complement machine.
@@ -605,6 +605,14 @@ GENERIC_TRANSLATION_MEM(OR32rm,
 	doOrRM<32>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(OR32rr, doOrRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(OR32rr_REV, doOrRR<32>(ip, block, OP(0), OP(1), OP(2)))
+
+GENERIC_TRANSLATION(OR64ri8, doOrRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION_MEM(OR64rm,
+  doOrRM<64>(ip, block, ADDR(2), OP(0), OP(1)),
+  doOrRM<64>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
+GENERIC_TRANSLATION(OR64rr, doOrRR<64>(ip, block, OP(0), OP(1), OP(2)))
+
+
 GENERIC_TRANSLATION(OR8i8, doOrRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION_MEM(OR8mi,
 	doOrMI<8>(ip, block, ADDR(0), OP(5)),
@@ -654,6 +662,13 @@ GENERIC_TRANSLATION_MEM(XOR32rm,
 	doXorRM<32>(ip, block, OP(0), OP(1), STD_GLOBAL_OP(2)))
 GENERIC_TRANSLATION(XOR32rr, doXorRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR32rr_REV, doXorRR<32>(ip, block, OP(0), OP(1), OP(2)))
+
+GENERIC_TRANSLATION_MEM(XOR64rm,
+  doXorRM<64>(ip, block, OP(0), OP(1), ADDR(2)),
+  doXorRM<64>(ip, block, OP(0), OP(1), STD_GLOBAL_OP(2)))
+GENERIC_TRANSLATION(XOR64rr, doXorRR<64>(ip, block, OP(0), OP(1), OP(2)))
+
+
 GENERIC_TRANSLATION(XOR8i8, doXorRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION_MEM(XOR8mi,
 	doXorMI<8>(ip, block, ADDR(0), OP(5)),
@@ -667,8 +682,6 @@ GENERIC_TRANSLATION_MEM(XOR8rm,
 	doXorRM<8>(ip, block, OP(0), OP(1), STD_GLOBAL_OP(2)))
 GENERIC_TRANSLATION(XOR8rr, doXorRR<8>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR8rr_REV, doXorRR<8>(ip, block, OP(0), OP(1), OP(2)))
-
-GENERIC_TRANSLATION(XOR64rr, doXorRR<64>(ip, block, OP(0), OP(1), OP(2)))
 
 void Bitops_populateDispatchMap(DispatchMap &m)
 {
@@ -733,6 +746,11 @@ void Bitops_populateDispatchMap(DispatchMap &m)
     m[X86::OR32rm] = translate_OR32rm;
     m[X86::OR32rr] = translate_OR32rr;
     m[X86::OR32rr_REV] = translate_OR32rr_REV;
+
+    m[X86::OR64ri8] = translate_OR64ri8;
+    m[X86::OR64rm] = translate_OR64rm;
+    m[X86::OR64rr] = translate_OR64rr;
+
     m[X86::OR8i8] = translate_OR8i8;
     m[X86::OR8mi] = translate_OR8mi;
     m[X86::OR8mr] = translate_OR8mr;
@@ -758,6 +776,8 @@ void Bitops_populateDispatchMap(DispatchMap &m)
     m[X86::XOR32rm] = translate_XOR32rm;
     m[X86::XOR32rr] = translate_XOR32rr;
     m[X86::XOR32rr_REV] = translate_XOR32rr_REV;
+    m[X86::XOR64rm] = translate_XOR64rm;
+    m[X86::XOR64rr] = translate_XOR64rr;
     m[X86::XOR8i8] = translate_XOR8i8;
     m[X86::XOR8mi] = translate_XOR8mi;
     m[X86::XOR8mr] = translate_XOR8mr;
@@ -765,6 +785,4 @@ void Bitops_populateDispatchMap(DispatchMap &m)
     m[X86::XOR8rm] = translate_XOR8rm;
     m[X86::XOR8rr] = translate_XOR8rr;
     m[X86::XOR8rr_REV] = translate_XOR8rr_REV;
-
-    m[X86::XOR64rr] = translate_XOR64rr;
 }

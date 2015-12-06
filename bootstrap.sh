@@ -22,6 +22,6 @@ mkdir build
 cd build
 echo "[x] Creating Makefiles"
 
-cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
+CFLAGS="-g3 -O0" CXXFLAGS="-g3 -O0" cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
 
 make 
