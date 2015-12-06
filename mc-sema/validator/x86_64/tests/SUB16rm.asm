@@ -10,5 +10,5 @@ BITS 64
     mov rdx, 0x3
     sub dx, WORD [rcx]
     mov edx, DWORD [rcx]
+    mov rcx, 0
     ;TEST_END_RECORDING
-
