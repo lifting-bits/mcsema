@@ -657,6 +657,8 @@ GENERIC_TRANSLATION_MEM(XOR32mr,
 	doXorMR<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
 GENERIC_TRANSLATION(XOR32ri, doXorRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR32ri8, doXorRI<32>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(XOR64ri8, doXorRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(XOR64ri32, doXorRI<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_MEM(XOR32rm,
 	doXorRM<32>(ip, block, OP(0), OP(1), ADDR(2)),
 	doXorRM<32>(ip, block, OP(0), OP(1), STD_GLOBAL_OP(2)))
@@ -773,6 +775,8 @@ void Bitops_populateDispatchMap(DispatchMap &m)
     m[X86::XOR32mr] = translate_XOR32mr;
     m[X86::XOR32ri] = translate_XOR32ri;
     m[X86::XOR32ri8] = translate_XOR32ri8;
+    m[X86::XOR64ri8] = translate_XOR64ri8;
+    m[X86::XOR64ri32] = translate_XOR64ri32;
     m[X86::XOR32rm] = translate_XOR32rm;
     m[X86::XOR32rr] = translate_XOR32rr;
     m[X86::XOR32rr_REV] = translate_XOR32rr_REV;

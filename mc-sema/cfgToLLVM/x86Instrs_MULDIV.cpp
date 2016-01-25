@@ -613,6 +613,9 @@ GENERIC_TRANSLATION_MEM(IMUL32rmi,
 GENERIC_TRANSLATION_MEM(IMUL32rmi8, 
 	doIMulRMI8<32>(ip, block, OP(0), ADDR(1), OP(6)),
 	doIMulRMI8<32>(ip, block, OP(0), STD_GLOBAL_OP(1), OP(6)))
+GENERIC_TRANSLATION_MEM(IMUL64rmi8, 
+	doIMulRMI8<64>(ip, block, OP(0), ADDR(1), OP(6)),
+	doIMulRMI8<64>(ip, block, OP(0), STD_GLOBAL_OP(1), OP(6)))
 GENERIC_TRANSLATION(IMUL32rri, doIMulRRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL32rri8, doIMulRRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL64rri8, doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)))
@@ -672,6 +675,7 @@ void MULDIV_populateDispatchMap(DispatchMap &m) {
     m[X86::IMUL16rri8] = translate_IMUL16rri8;
     m[X86::IMUL32rmi] = translate_IMUL32rmi;
     m[X86::IMUL32rmi8] = translate_IMUL32rmi8;
+    m[X86::IMUL64rmi8] = translate_IMUL64rmi8;
     m[X86::IMUL32rri] = translate_IMUL32rri;
     m[X86::IMUL32rri8] = translate_IMUL32rri8;
     m[X86::IMUL64rri8] = translate_IMUL64rri8;
