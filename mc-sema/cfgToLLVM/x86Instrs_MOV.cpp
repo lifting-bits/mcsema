@@ -204,6 +204,7 @@ static InstTransResult doMovZXRR(InstPtr ip,   BasicBlock *&b,
 {
     NASSERT(dst.isReg());
     NASSERT(src.isReg());
+    TASSERT(dstWidth > srcWidth, "Must ZExt to a greater bitwidth")
 
     //do a read from src of the appropriate width
     Value   *fromSrc = R_READ<srcWidth>(b, src.getReg());
@@ -234,6 +235,7 @@ static InstTransResult doMovZXRM(InstPtr ip,   BasicBlock *&b,
        return ContinueBlock;
     }
 
+    TASSERT(dstWidth > srcWidth, "Must ZExt to a greater bitwidth")
     //do a read from src of the appropriate width
     Value   *fromSrc = M_READ<srcWidth>(ip, b, src);
 

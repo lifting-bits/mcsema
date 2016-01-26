@@ -109,6 +109,7 @@ UCOND_BRANCHES = [\
 def DEBUG(s):
     if _DEBUG:
         syslog.syslog(str(s))
+        sys.stdout.write(str(s))
 
 def readDword(ea):
     bytestr = readBytesSlowly(ea, ea+4);
@@ -676,6 +677,7 @@ def processExternals(M):
             processExternalData(M, fixedn)
         else:
             syslog.syslog("UNKNOWN API: {0}\n".format(fixedn))
+            sys.stdout.write("UNKNOWN API: {0}\n".format(fixedn))
 
 def readBytesSlowly(start, end):
     bytestr = ""
@@ -759,9 +761,8 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas, itemsiz
     if itemsize == -1:
         itemsize = int(idc.ItemSize(offset))
 
-    DEBUG("Offset: {0:x}, seg_offset: {1:x}\n".format(offset, seg_offset))
+    DEBUG("Offset: {0:x}, seg_offset: {1:x} => {2:x}\n".format(offset, seg_offset, reloc_dest))
     DEBUG("Reloc Base Address: {0:x}\n".format(DS.base_address))
-    DEBUG("Reloc offset: {0:x}\n".format(offset))
     DEBUG("Reloc size: {0:x}\n".format(itemsize))
 
     if idc.isCode(pf):
@@ -823,8 +824,9 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
 
         DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}\n".format(ea, pointsto))
         real_size = idc.ItemSize(pointsto)
-        DEBUG("\t\tReal Ref: {0:x}, size: {1}\n".format(pointsto, real_size))
-        insertRelocatedSymbol(M, D, pointsto, ea, seg_offset, new_eas, real_size)
+        reloc_size = idc.ItemSize(ea)
+        DEBUG("\t\tReal Ref: {0:x}, reloc size: {2}, ref size: {1}\n".format(pointsto, real_size, reloc_size))
+        insertRelocatedSymbol(M, D, pointsto, ea, seg_offset, new_eas, reloc_size)
 
     def checkIfJumpData(ea, size):
         """
@@ -1197,6 +1199,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
 
     if recovered_fns == 0:
         syslog.syslog("COULD NOT RECOVER ANY FUNCTIONS\n")
+        sys.stdout.write("COULD NOT RECOVER ANY FUNCTIONS\n")
         return
 
     mypath = path.dirname(__file__)

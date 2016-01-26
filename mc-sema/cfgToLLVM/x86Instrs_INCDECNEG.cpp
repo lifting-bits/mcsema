@@ -241,11 +241,13 @@ static InstTransResult doDecM(InstPtr ip, BasicBlock *&b, Value *m) {
 
     Value   *result = doDecV<width>(ip, b, from_mem);
 
-    if(width < regWidth) {
-        result = new TruncInst(result, Type::getIntNTy(b->getContext(), width), "", b);
+    M_WRITE<width>(ip, b, m, result);
+
+    if(regWidth > width) {
+        result = new ZExtInst(result, Type::getIntNTy(b->getContext(), regWidth), "", b);
     }
 
-    M_WRITE<width>(ip, b, m, result);
+	WriteAF2<regWidth>(b, from_mem_fv, result, CONST_V<regWidth>(b, 1));
 
     return ContinueBlock;
 }

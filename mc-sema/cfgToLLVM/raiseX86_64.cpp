@@ -465,10 +465,11 @@ bool addEntryPointDriver(Module *M,
 
     //call the sub function with register struct as argument
     vector<Value*>  subArg;
-
     subArg.push_back(aCtx);
 
+    F->dump();
     CallInst* ci = CallInst::Create(F, subArg, "", driverBB);
+    ci->dump();
     archSetCallingConv(M, ci);
     archFreeStack(M, aStack, driverBB);
 
