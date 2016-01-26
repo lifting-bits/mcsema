@@ -106,6 +106,11 @@ UCOND_BRANCHES = [\
     idaapi.NN_jmpni,\
     idaapi.NN_jmpshort]
 
+
+EXTERNAL_NAMES = [
+        "@@GLIBC_",\
+        ]
+
 def DEBUG(s):
     if _DEBUG:
         syslog.syslog(str(s))
@@ -140,6 +145,9 @@ def fixExternalName(fn):
         newfn = fn[:-2]
         if newfn in EMAP:
             return newfn
+
+    if "@@GLIBC" in fn:
+        fn = fn[:fn.find('@@GLIBC')]
 
     return fn
 
@@ -260,6 +268,13 @@ def isExternalReference(ea):
     segtype = idc.GetSegmentAttr(seg, idc.SEGATTR_TYPE)
     if segtype in ext_types:
         return True
+
+    if isLinkedElf():
+        fn = getFunctionName(ea)
+        for extsign in EXTERNAL_NAMES:
+            if extsign in fn:
+                DEBUG("Assuming external reference because: {} in {}\n".format(extsign, fn))
+                return True
 
     return False
 
@@ -587,9 +602,6 @@ def instructionHandler(M, B, inst, new_eas):
         			I.ext_call_name = fn
         			DEBUG("EXTERNAL CALL : {0}\n".format(fn))
 
-		 
-
-
     if not had_refs and isLinkedElf():
         for op in insn_t.Operands:
             if op.type == idc.o_imm:
@@ -706,6 +718,9 @@ def getBitness():
     else:
         # no support for 64-bit, assume 32-bit
         return 32
+
+def getPointerSize():
+    return getBitness() / 8
 
 def relocationSize(reloc_type):
     
@@ -850,7 +865,7 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
     while i < end:
         DEBUG("Checking address: {:x}\n".format(i))
         dref_size = idc.ItemSize(i) or 1
-        if dref_size > 4 and dref_size % 4 == 0:
+        if dref_size > getPointerSize() and dref_size % 4 == 0:
             DEBUG("Possible table data at {:x}; size: {:x}\n".format(i, dref_size))
             (is_table, addrs) = checkIfJumpData(i, dref_size)
             if is_table:
@@ -860,7 +875,7 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
             else:
                 DEBUG("Its not a table\n");
 
-        elif dref_size == 4:
+        elif dref_size == getPointerSize():
             more_cref = [c for c in idautils.CodeRefsFrom(i,0)]
             more_dref = [d for d in idautils.DataRefsFrom(i)]
             more_dref.extend(more_cref)
