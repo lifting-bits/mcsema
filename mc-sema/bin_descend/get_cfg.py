@@ -456,8 +456,32 @@ def isElfThunk(ea):
 
     return False, None
 
+def manualRelocOffset(I, inst, dref):
+    insn_t = idautils.DecodeInstruction(inst)
+
+    if insn_t is None:
+        return
+
+    saw_displ = False
+    for op in insn_t.Operands:
+        
+        if op.type == idaapi.o_displ:
+            saw_displ = True
+        # only do this if we see an immediate operand following
+        # a displacement operand
+        if saw_displ and op.type == idaapi.o_imm:
+            # and the immediate is the data reference
+            if op.value == dref:
+                DEBUG("Manually setting reloc offset for IMM32 value at {0:x} to {1:x}\n".format(inst, inst+op.offb))
+                # fake a relocation offset so that we know the immediate 
+                # is a reference and not a constant
+                I.reloc_offset = inst + op.offb
+
 def addDataReference(M, I, inst, dref, new_eas):
     if inValidSegment(dref): 
+
+        manualRelocOffset(I, inst, dref)
+
         if isExternalReference(dref):
             fn = getFunctionName(dref)
 
