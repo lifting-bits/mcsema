@@ -502,6 +502,8 @@ typedef struct _RegState {
 #pragma pack(pop)
 #endif
 
+
+#ifndef ONLY_STRUCT
 // get the value of st(reg_index)
 nativefpu FPU_GET_REG(RegState *state, unsigned reg_index)
 {
@@ -571,6 +573,8 @@ void LD_TO_NATIVEFPU(long double ld, nativefpu *nf)
 	memcpy(nf, &ld, sizeof(*nf));
 #endif
 }
+
+#endif
 
 #ifdef __cplusplus
 } // namespace mcsema
