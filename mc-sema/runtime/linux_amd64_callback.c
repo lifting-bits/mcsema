@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include <stddef.h>
 
 // build with 
 // clang -std=gnu99 -m64 -emit-llvm -c -o linux_amd64_callback.bc linux_amd64_callback.c
@@ -34,7 +35,7 @@ void __mcsema_free_alt_stack(size_t stack_size) {
     }
 }
 
-// RDI, RSI, RDX, RCX, R8, R9, XMM0–7, RBX, RBP, RSP, R12, R13, R14, R15 
+// RDI, RSI, RDX, RCX, R8, R9, XMM0–7, RBX, RBP, (maybe: RSP), R12, R13, R14, R15 
 // are all preserved
 __attribute__((naked)) int __mcsema_inception()
 {
@@ -53,6 +54,7 @@ __attribute__((naked)) int __mcsema_inception()
     __asm__ volatile("movq %%r13, %0\n": "=m"(__mcsema_callback_state.R13) );
     __asm__ volatile("movq %%r14, %0\n": "=m"(__mcsema_callback_state.R14) );
     __asm__ volatile("movq %%r15, %0\n": "=m"(__mcsema_callback_state.R15) );
+    __asm__ volatile("movq %%rbp, %0\n": "=m"(__mcsema_callback_state.RBP) );
 
     // save XMM
     __asm__ volatile("movups %%xmm0, %0\n": "=m"(__mcsema_callback_state.XMM0) );
@@ -96,6 +98,7 @@ __attribute__((naked)) int __mcsema_inception()
     __asm__ volatile("movq %0, %%r13\n": : "m"(__mcsema_callback_state.R13) );
     __asm__ volatile("movq %0, %%r14\n": : "m"(__mcsema_callback_state.R14) );
     __asm__ volatile("movq %0, %%r15\n": : "m"(__mcsema_callback_state.R15) );
+    __asm__ volatile("movq %0, %%rbp\n": : "m"(__mcsema_callback_state.RBP) );
     // *do not* restore RSP, although this may be a bug
 
     // restore XMM
@@ -112,4 +115,88 @@ __attribute__((naked)) int __mcsema_inception()
     __asm__ volatile("movq %0, %%rax\n": : "m"(__mcsema_callback_state.RAX) );
 
     __asm__ volatile("retq\n");
+}
+
+__thread uint64_t __mcsema_real_rsp;
+__thread uint64_t __mcsema_saved_rax;
+void do_call_value(void *state, uint64_t value)
+{
+    // spill argument registers from state to native
+    __asm__ volatile(
+            "movq %0, %%rax\n" 
+            "movq %1, %%r10\n" 
+            : : "r"(state), "r"(value) : "rax","r10");
+
+    // preserve things we will need later
+    __asm__ volatile("pushq %rbp\n");
+    __asm__ volatile("pushq %rax\n");
+
+    // save reg state ptr
+    __asm__ volatile("movq %c[offt](%%rax), %%rdi\n": : [offt]"e"(offsetof(RegState, RDI)) );
+    __asm__ volatile("movq %c[offt](%%rax), %%rsi\n": : [offt]"e"(offsetof(RegState, RSI)) );
+    __asm__ volatile("movq %c[offt](%%rax), %%rdx\n": : [offt]"e"(offsetof(RegState, RDX)) );
+    __asm__ volatile("movq %c[offt](%%rax), %%rcx\n": : [offt]"e"(offsetof(RegState, RCX)) );
+    __asm__ volatile("movq %c[offt](%%rax), %%r8\n": :  [offt]"e"(offsetof(RegState, R8)) );
+    __asm__ volatile("movq %c[offt](%%rax), %%r9\n": :  [offt]"e"(offsetof(RegState, R9)) );
+    __asm__ volatile("movq %c[offt](%%rax), %%r12\n": : [offt]"e"(offsetof(RegState, R12)) );
+    __asm__ volatile("movq %c[offt](%%rax), %%r13\n": : [offt]"e"(offsetof(RegState, R13)) );
+    __asm__ volatile("movq %c[offt](%%rax), %%r14\n": : [offt]"e"(offsetof(RegState, R14)) );
+    __asm__ volatile("movq %c[offt](%%rax), %%r15\n": : [offt]"e"(offsetof(RegState, R15)) );
+    __asm__ volatile("movq %c[offt](%%rbp), %%rbp\n": : [offt]"e"(offsetof(RegState, R15)) );
+
+    __asm__ volatile("movups %c[offt](%%rax), %%xmm0\n": : [offt]"e"(offsetof(RegState, XMM0)) );
+    __asm__ volatile("movups %c[offt](%%rax), %%xmm1\n": : [offt]"e"(offsetof(RegState, XMM1)) );
+    __asm__ volatile("movups %c[offt](%%rax), %%xmm2\n": : [offt]"e"(offsetof(RegState, XMM2)) );
+    __asm__ volatile("movups %c[offt](%%rax), %%xmm3\n": : [offt]"e"(offsetof(RegState, XMM3)) );
+    __asm__ volatile("movups %c[offt](%%rax), %%xmm4\n": : [offt]"e"(offsetof(RegState, XMM4)) );
+    __asm__ volatile("movups %c[offt](%%rax), %%xmm5\n": : [offt]"e"(offsetof(RegState, XMM5)) );
+    __asm__ volatile("movups %c[offt](%%rax), %%xmm6\n": : [offt]"e"(offsetof(RegState, XMM6)) );
+    __asm__ volatile("movups %c[offt](%%rax), %%xmm7\n": : [offt]"e"(offsetof(RegState, XMM7)) );
+
+
+    // save "real" rsp
+    __asm__ volatile("movq %%rsp, %0\n": "=m"(__mcsema_real_rsp) );
+    
+    // switch rsp to translator rsp
+    __asm__ volatile("movq %c[offt](%%rax), %%rsp\n": : [offt]"e"(offsetof(RegState, RSP)));
+
+    // call value
+    __asm__ volatile("callq *%r10\n");
+    
+    // save rax for later
+    __asm__ volatile("movq %%rax, %0\n": "=m"(__mcsema_saved_rax) );
+
+    // revert RSP
+    __asm__ volatile("movq %0, %%rsp\n": : "m"(__mcsema_real_rsp) );
+
+    // restore previously saved rax pointer
+    __asm__ volatile("popq %rax\n");
+    // save rbp in case it was changed
+    __asm__ volatile("movq %%rbp, %c[offt](%%rax)\n": : [offt]"e"(offsetof(RegState, RBP)) );
+    // pop back real rbp
+    __asm__ volatile("popq %rbp\n");
+    
+    // native regs -> regs
+    __asm__ volatile("movq  %%rdi, %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, RDI)) );
+    __asm__ volatile("movq  %%rsi, %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, RSI)) );
+    __asm__ volatile("movq  %%rdx, %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, RDX)) );
+    __asm__ volatile("movq  %%rcx, %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, RCX)) );
+    __asm__ volatile("movq  %%r8 , %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, R8 )) );
+    __asm__ volatile("movq  %%r9 , %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, R9 )) );
+    __asm__ volatile("movq  %%r12, %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, R12)) );
+    __asm__ volatile("movq  %%r13, %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, R13)) );
+    __asm__ volatile("movq  %%r14, %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, R14)) );
+    __asm__ volatile("movq  %%r15, %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, R15)) );
+
+    __asm__ volatile("movups %%xmm0, %c[offt](%%rax)\n": : [offt]"e"(offsetof(RegState, XMM0)) );
+    __asm__ volatile("movups %%xmm1, %c[offt](%%rax)\n": : [offt]"e"(offsetof(RegState, XMM1)) );
+    __asm__ volatile("movups %%xmm2, %c[offt](%%rax)\n": : [offt]"e"(offsetof(RegState, XMM2)) );
+    __asm__ volatile("movups %%xmm3, %c[offt](%%rax)\n": : [offt]"e"(offsetof(RegState, XMM3)) );
+    __asm__ volatile("movups %%xmm4, %c[offt](%%rax)\n": : [offt]"e"(offsetof(RegState, XMM4)) );
+    __asm__ volatile("movups %%xmm5, %c[offt](%%rax)\n": : [offt]"e"(offsetof(RegState, XMM5)) );
+    __asm__ volatile("movups %%xmm6, %c[offt](%%rax)\n": : [offt]"e"(offsetof(RegState, XMM6)) );
+    __asm__ volatile("movups %%xmm7, %c[offt](%%rax)\n": : [offt]"e"(offsetof(RegState, XMM7)) );
+
+    __asm__ volatile("movq %0, %%r10\n": : "m"(__mcsema_saved_rax));
+    __asm__ volatile("movq %%r10, %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, RAX)) );
 }
