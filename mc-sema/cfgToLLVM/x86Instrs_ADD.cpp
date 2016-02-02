@@ -626,7 +626,7 @@ GENERIC_TRANSLATION(ADC32i32, doAdcI<32>(ip, block, OP(0)))
 
 //GENERIC_TRANSLATION(ADC64i32, doAdcI<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION_MEM(ADC64i32,
-        doAdcRI<64>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
+        doAdcRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
         doAdcRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
 
 GENERIC_TRANSLATION_32MI(ADC32mi, 

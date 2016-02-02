@@ -266,28 +266,34 @@ static void writeFakeReturnAddr(BasicBlock *block) {
 
 static void doCallV(BasicBlock *&block, InstPtr ip, Value *call_addr) {
 
-  Function *F = block->getParent();
-  Module *mod = F->getParent();
-  uint32_t bitWidth = getPointerSize(mod);
-  Function *doCallVal = mod->getFunction("do_call_value");
+    Function *F = block->getParent();
+    Module *mod = F->getParent();
+    uint32_t bitWidth = getPointerSize(mod);
+    Function *doCallVal = mod->getFunction("do_call_value");
 
-  TASSERT(doCallVal != NULL, "Could not insert do_call_value function");
+    TASSERT(doCallVal != NULL, "Could not insert do_call_value function");
 
-  std::vector<Value *> args;
+    std::vector<Value *> args;
 
-  // first argument of this function is a pointer to struct.regs
-  TASSERT(F->arg_size() == 1, "Function must have at least one argument");
-  args.push_back(F->arg_begin());
-  args.push_back(call_addr);
+    // first argument of this function is a pointer to struct.regs
+    TASSERT(F->arg_size() == 1, "Function must have at least one argument");
 
-  //sink context
-  writeLocalsToContext(block, bitWidth, ABICallStore);
+    Instruction *voidPtr = CastInst::CreatePointerCast(
+            F->arg_begin(), 
+            getVoidPtrType(F->getContext()), 
+            "", block);
 
-  //insert the call
-  CallInst::Create(doCallVal, args, "", block);
+    args.push_back(voidPtr);
+    args.push_back(call_addr);
 
-  //restore context
-  writeContextToLocals(block, bitWidth, ABIRetSpill);
+    //sink context
+    writeLocalsToContext(block, bitWidth, ABICallStore);
+
+    //insert the call
+    CallInst::Create(doCallVal, args, "", block);
+
+    //restore context
+    writeContextToLocals(block, bitWidth, ABIRetSpill);
 }
 
 template<int width>

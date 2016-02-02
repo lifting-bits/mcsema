@@ -11,6 +11,7 @@
 #include "llvm/IR/Instructions.h"
 
 #include "raiseX86.h"
+#include "x86Helpers.h"
 #include "X86.h"
 
 #include "../common/to_string.h"
@@ -320,12 +321,6 @@ llvm::Value *linuxMakeCallbackForLocalFunction(Module *M , VA local_target) {
 
         return call_tgt;
     }
-}
-
-static inline
-PointerType * getVoidPtrType (LLVMContext & C) {
-    Type * Int8Type  = IntegerType::getInt8Ty(C);
-    return PointerType::getUnqual(Int8Type);
 }
 
 void linuxAddCallValue(Module *M) {
