@@ -4,7 +4,7 @@ __strdup 1 C N
 __strcpy_chk 3 C N
 __vsnprintf_chk 6 C N
 __isoc99_sscanf 12 C N
-__syslog_chk 3 C N
+__syslog_chk 12 C N
 __memmove_chk 4 C N
 __snprintf_chk 5 C N
 
