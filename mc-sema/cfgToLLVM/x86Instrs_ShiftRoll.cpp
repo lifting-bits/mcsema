@@ -57,8 +57,10 @@ static Value *doShiftOp(InstPtr ip,
 {
 
     // get the masked count variable
+    int count_max = (width == 64) ? 63 : 31;
+
     Value   *tempCOUNT = 
-        BinaryOperator::CreateAnd(count, CONST_V<width>(b, 0x1F), "", b);
+        BinaryOperator::CreateAnd(count, CONST_V<width>(b, count_max), "", b);
 
     // first time we'll shift count -1
     // so we can get the lsb/msb
@@ -1951,7 +1953,7 @@ GENERIC_TRANSLATION_MEM(SAR64mCL,
 GENERIC_TRANSLATION_32MI(SAR64mi,
   doSarMI<64>(ip, block, ADDR(0), OP(1)),
   doSarMI<64>(ip, block, STD_GLOBAL_OP(0), OP(1)),
-    doSarMV<64>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<32>(block, natM, ip)))
+  doSarMV<64>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET<64>(block, natM, ip)))
 
 GENERIC_TRANSLATION(SAR64r1, doSarR1<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SAR64rCL, doSarRCL<64>(ip, block, OP(0)))

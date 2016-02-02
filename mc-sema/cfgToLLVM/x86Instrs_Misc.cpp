@@ -762,6 +762,7 @@ void Misc_populateDispatchMap(DispatchMap &m) {
     m[X86::HLT] = translate_HLT;
     m[X86::LOCK_PREFIX] = translate_NOOP;
     m[X86::REP_PREFIX] = translate_NOOP;
+    m[X86::REPNE_PREFIX] = translate_NOOP;
     m[X86::PAUSE] = translate_NOOP;
     m[X86::RDTSC] = translate_RDTSC;
     m[X86::CWD] = translate_CWD;

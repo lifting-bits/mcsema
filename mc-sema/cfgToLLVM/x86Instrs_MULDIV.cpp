@@ -373,6 +373,26 @@ static InstTransResult doIMulRRI(InstPtr ip,   BasicBlock      *&b,
 }
 
 template <int width>
+static InstTransResult doIMulRRV(InstPtr ip,   BasicBlock      *&b,
+                            Value *addr,
+                            const MCOperand &lhs,
+                            const MCOperand &dst)
+{
+    NASSERT(dst.isReg());
+    NASSERT(lhs.isReg());
+
+    Value   *res = 
+        doIMulVVV<width>(ip, b,
+                        R_READ<width>(b, lhs.getReg()),
+                        addr);
+
+    R_WRITE<width>(b, dst.getReg(), res);
+
+    return ContinueBlock;
+}
+
+
+template <int width>
 static InstTransResult doIMulRMI8(InstPtr ip,  BasicBlock      *&b,
                             const MCOperand &dst,
                             Value           *lhs,
@@ -619,7 +639,10 @@ GENERIC_TRANSLATION_MEM(IMUL64rmi8,
 GENERIC_TRANSLATION(IMUL32rri, doIMulRRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL32rri8, doIMulRRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL64rri8, doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(IMUL64rri32, doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)))
+//GENERIC_TRANSLATION(IMUL64rri32, doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION_MEM(IMUL64rri32,
+        doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)),
+        doIMulRRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), OP(0), OP(1)))
 /* END GOOD */
 GENERIC_TRANSLATION(IDIV8r, doIDivR<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(IDIV16r, doIDivR<16>(ip, block, OP(0)))

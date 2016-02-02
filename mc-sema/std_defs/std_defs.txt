@@ -1067,8 +1067,6 @@ wait4 4 C N
 closelog 0 C N
 openlog 3 C N
 setlogmask 1 C N
-syslog 2 C N
-vsyslog 3 C N
 cfgetospeed 1 C N
 cfgetispeed 1 C N
 cfsetospeed 2 C N
