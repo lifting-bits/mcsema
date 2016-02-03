@@ -378,10 +378,13 @@ static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&bl
             );
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+        llvm::errs() << "Doing MOV64mi with call_tgt at: " << to_string<VA>(ip->get_loc(), hex) << ", imm32: " << (int)(OP(5).getImm()) << "\n";
         ret = doMIMovV<64>(ip, block, ADDR(0), addrInt);
     }
     else if( ip->is_data_offset() ) {
         if( ip->get_reloc_offset() < OP(5).getOffset() ) {
+            llvm::errs() << "Doing MOV64mi with data and reloc<OP5 at: " << to_string<VA>(ip->get_loc(), hex) << ", imm32: " << (int)(OP(5).getImm()) << "\n";
+            llvm::errs() << "Doing MOV64mi ro: " << (int)ip->get_reloc_offset() << ", OP5.off: " << (int)OP(5).getOffset() << "\n";
             doMIMov<64>(ip,   block, STD_GLOBAL_OP(0), OP(5));
         } else {
             Value *data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
@@ -393,10 +396,12 @@ static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&bl
                 data_v = doSubtractImageBase<64>(data_v, block);
             }
 
+            llvm::errs() << "Doing MOV64mi with data and reloc at: " << to_string<VA>(ip->get_loc(), hex) << ", imm32: " << (int)(OP(5).getImm()) << "\n";
             doMIMovV<64>(ip,  block, ADDR_NOREF(0), data_v);
         }
         ret = ContinueBlock;
     } else {
+        llvm::errs() << "Doing MOV64mi with data and default at: " << to_string<VA>(ip->get_loc(), hex) << ", imm32: " << (int)(OP(5).getImm()) << "\n";
         ret = doMIMov<64>(ip,   block, ADDR(0), OP(5));
     }
     return ret;

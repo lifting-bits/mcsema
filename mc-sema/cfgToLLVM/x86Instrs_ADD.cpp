@@ -134,9 +134,6 @@ static InstTransResult doAddRI(InstPtr ip, BasicBlock *&b,
 
     Value *srcReg = NULL;
 
-    llvm::errs() << "Doing AddRI at: " << to_string<VA>(ip->get_loc(), hex) << ", imm32: " << (int)(src2.getImm()) << "\n";
-
-		
     // Read from src1.
 	srcReg = R_READ<width>(b, src1.getReg());
     

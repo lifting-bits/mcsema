@@ -465,7 +465,7 @@ def manualRelocOffset(I, inst, dref):
     saw_displ = False
     for op in insn_t.Operands:
         
-        if op.type == idaapi.o_displ:
+        if op.type in [idaapi.o_displ, idaapi.o_phrase]:
             saw_displ = True
         # only do this if we see an immediate operand following
         # a displacement operand
