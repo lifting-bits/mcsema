@@ -124,7 +124,7 @@ __thread uint64_t reg_state[15];
 
 void do_call_value(void *state, uint64_t value)
 {
-    // spill argument registers from state to native
+    // preserve current reg state
     __asm__ volatile("movq %%rax, %0\n": "=m"(reg_state[ 0]));
     __asm__ volatile("movq %%rbx, %0\n": "=m"(reg_state[ 1]));
     __asm__ volatile("movq %%rcx, %0\n": "=m"(reg_state[ 2]));
@@ -142,18 +142,17 @@ void do_call_value(void *state, uint64_t value)
     __asm__ volatile("movq %%r14, %0\n": "=m"(reg_state[13]));
     __asm__ volatile("movq %%r15, %0\n": "=m"(reg_state[14]));
 
+    // save xmm state
     __asm__ volatile("fxsave %0\n" : "=m"(sse_state));
 
+    // we'll need these values later
     __asm__ volatile(
             "movq %0, %%rax\n" 
             "movq %1, %%r10\n" 
             : : "r"(state), "r"(value) : "rax","r10");
-
-    // preserve things we will need later
-    __asm__ volatile("pushq %rbp\n");
     __asm__ volatile("pushq %rax\n");
 
-    // save reg state ptr
+    // spill reg state to native regs
     __asm__ volatile("movq %c[offt](%%rax), %%rdi\n": : [offt]"e"(offsetof(RegState, RDI)) );
     __asm__ volatile("movq %c[offt](%%rax), %%rsi\n": : [offt]"e"(offsetof(RegState, RSI)) );
     __asm__ volatile("movq %c[offt](%%rax), %%rdx\n": : [offt]"e"(offsetof(RegState, RDX)) );
@@ -164,7 +163,7 @@ void do_call_value(void *state, uint64_t value)
     __asm__ volatile("movq %c[offt](%%rax), %%r13\n": : [offt]"e"(offsetof(RegState, R13)) );
     __asm__ volatile("movq %c[offt](%%rax), %%r14\n": : [offt]"e"(offsetof(RegState, R14)) );
     __asm__ volatile("movq %c[offt](%%rax), %%r15\n": : [offt]"e"(offsetof(RegState, R15)) );
-    __asm__ volatile("movq %c[offt](%%rbp), %%rbp\n": : [offt]"e"(offsetof(RegState, R15)) );
+    __asm__ volatile("movq %c[offt](%%rax), %%rbp\n": : [offt]"e"(offsetof(RegState, RBP)) );
 
     __asm__ volatile("movups %c[offt](%%rax), %%xmm0\n": : [offt]"e"(offsetof(RegState, XMM0)) );
     __asm__ volatile("movups %c[offt](%%rax), %%xmm1\n": : [offt]"e"(offsetof(RegState, XMM1)) );
@@ -182,30 +181,31 @@ void do_call_value(void *state, uint64_t value)
     // switch rsp to translator rsp
     __asm__ volatile("movq %c[offt](%%rax), %%rsp\n": : [offt]"e"(offsetof(RegState, RSP)));
 
+    // undo push of the 'fake' return address
+    __asm__ volatile("addq $8, %rsp\n");
+
     // call value
     __asm__ volatile("callq *%r10\n");
 
     // save rax for later
     __asm__ volatile("movq %%rax, %0\n": "=m"(__mcsema_saved_rax) );
 
+    // save old RSP since we'll need to shove it into struct regs
     __asm__ volatile("movq %rsp, %rax\n");
-
-    // 'pop' the fake return addr
-    __asm__ volatile("addq $8, %rax\n");
 
     // revert RSP
     __asm__ volatile("movq %0, %%rsp\n": : "m"(__mcsema_real_rsp) );
 
     // restore previously saved rax pointer
     __asm__ volatile("popq %r10\n");
-    __asm__ volatile("movq %%rax, %c[offt](%%r10)\n": : [offt]"e"(offsetof(RegState, RSP)) );
-
-    __asm__ volatile("movq %r10, %rax\n");
-    // save rbp in case it was changed
-    __asm__ volatile("movq %%rbp, %c[offt](%%rax)\n": : [offt]"e"(offsetof(RegState, RBP)) );
-    // pop back real rbp
-    __asm__ volatile("popq %rbp\n");
     
+    // populate state->RSP
+    __asm__ volatile("movq %%rax, %c[offt](%%r10)\n": : [offt]"e"(offsetof(RegState, RSP)) );
+    __asm__ volatile("movq %r10, %rax\n");
+
+    // populate state->RBP
+    __asm__ volatile("movq %%rbp, %c[offt](%%rax)\n": : [offt]"e"(offsetof(RegState, RBP)) );
+
     // native regs -> regs
     __asm__ volatile("movq  %%rdi, %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, RDI)) );
     __asm__ volatile("movq  %%rsi, %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, RSI)) );

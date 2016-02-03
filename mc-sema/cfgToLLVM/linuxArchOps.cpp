@@ -301,7 +301,7 @@ llvm::Value *linuxMakeCallbackForLocalFunction(Module *M , VA local_target) {
                 /*isVarArg=*/false);
 
         InlineAsm* ptr_15 = InlineAsm::get(call_inception_ty, 
-                "movq $0, %r10\ncallq *%r10\nretq\n", "imr,~{dirflag},~{fpsr},~{flags}",true);
+                "movq $0, %r10\njmpq *%r10\n", "imr,~{dirflag},~{fpsr},~{flags}",true);
         CallInst* void_14 = CallInst::Create(ptr_15, inception, "", block);
         void_14->setCallingConv(CallingConv::C);
         void_14->setTailCall(false);
