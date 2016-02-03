@@ -73,9 +73,20 @@ __attribute__((naked)) int __mcsema_inception()
     __asm__ volatile("movq %0, %%rcx\n": : "i"(MIN_STACK_SIZE) );
     __asm__ volatile("movq %rsp, %rsi\n");
     __asm__ volatile("movq %0, %%rdi\n": : "m"(__mcsema_alt_stack));
+    
+    // force stack alignment to alignment of RSP
+    __asm__ volatile("movq %rsp, %r10\n");
+    __asm__ volatile("andq $0xF, %r10\n");
+    __asm__ volatile("subq $0x10, %rdi\n");
+    __asm__ volatile("addq %r10, %rdi\n");
+
+    // reserve space
     __asm__ volatile("subq %0, %%rdi\n": : "i"(MIN_STACK_SIZE) );
+
     // set RSP to the alt stack rsp
     __asm__ volatile("movq %%rdi, %0\n": "=m"(__mcsema_callback_state.RSP) );
+
+    // do memcpy
     __asm__ volatile("cld\n");
     __asm__ volatile("rep; movsb\n");
 
