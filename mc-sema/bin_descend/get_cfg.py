@@ -472,10 +472,10 @@ def manualRelocOffset(I, inst, dref):
         if saw_displ and op.type == idaapi.o_imm:
             # and the immediate is the data reference
             if op.value == dref:
-                DEBUG("Manually setting reloc offset for IMM32 value at {0:x} to {1:x}\n".format(inst, inst+op.offb))
+                DEBUG("Manually setting reloc offset for IMM32 value at {0:x} to {1:x}\n".format(inst, op.offb))
                 # fake a relocation offset so that we know the immediate 
                 # is a reference and not a constant
-                I.reloc_offset = inst + op.offb
+                I.reloc_offset = op.offb
 
 def addDataReference(M, I, inst, dref, new_eas):
     if inValidSegment(dref): 
@@ -606,7 +606,9 @@ def instructionHandler(M, B, inst, new_eas):
         return I, True
 
     relo_off = findRelocOffset(inst, len(inst_bytes))
-    if relo_off != -1:
+    # don't re-set reloc offset if we already set it somewhere
+    if relo_off != -1 and not I.HasField("reloc_offset"):
+        DEBUG("findRelocOffset setting reloc offset at {0:x} to {1:x}\n".format(inst, relo_off))
         I.reloc_offset = relo_off
 
     for dref in idautils.DataRefsFrom(inst):
