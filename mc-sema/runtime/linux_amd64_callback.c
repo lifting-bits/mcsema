@@ -98,13 +98,13 @@ __attribute__((naked)) int __mcsema_inception()
     __asm__ volatile("leaq (%rdi,%r10,1), %rdi\n");
     
     // align stack for call
-    __asm__ volatile("subq $8, $rsp\n");
+    __asm__ volatile("subq $8, %rsp\n");
 
     // call
     __asm__ volatile("callq *%rax\n");
 
     // undo align
-    __asm__ volatile("addq $8, $rsp\n");
+    __asm__ volatile("addq $8, %rsp\n");
 
     // restore registers
     __asm__ volatile("movq %0, %%rdi\n": : "m"(__mcsema_callback_state.RDI) );
