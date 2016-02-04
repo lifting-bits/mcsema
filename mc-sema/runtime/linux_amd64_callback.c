@@ -48,6 +48,7 @@ __attribute__((naked)) int __mcsema_inception()
     __asm__ volatile("movq %%rsi, %0\n": "=m"(__mcsema_callback_state.RSI) );
     __asm__ volatile("movq %%rdx, %0\n": "=m"(__mcsema_callback_state.RDX) );
     __asm__ volatile("movq %%rcx, %0\n": "=m"(__mcsema_callback_state.RCX) );
+    __asm__ volatile("movq %%rbx, %0\n": "=m"(__mcsema_callback_state.RBX) );
     __asm__ volatile("movq %%r8,  %0\n": "=m"(__mcsema_callback_state.R8) );
     __asm__ volatile("movq %%r9,  %0\n": "=m"(__mcsema_callback_state.R9) );
     __asm__ volatile("movq %%r12, %0\n": "=m"(__mcsema_callback_state.R12) );
@@ -111,6 +112,7 @@ __attribute__((naked)) int __mcsema_inception()
     __asm__ volatile("movq %0, %%rsi\n": : "m"(__mcsema_callback_state.RSI) );
     __asm__ volatile("movq %0, %%rdx\n": : "m"(__mcsema_callback_state.RDX) );
     __asm__ volatile("movq %0, %%rcx\n": : "m"(__mcsema_callback_state.RCX) );
+    __asm__ volatile("movq %0, %%rbx\n": : "m"(__mcsema_callback_state.RBX) );
     __asm__ volatile("movq %0, %%r8\n": : "m"(__mcsema_callback_state.R8) );
     __asm__ volatile("movq %0, %%r9\n": : "m"(__mcsema_callback_state.R9) );
     __asm__ volatile("movq %0, %%r12\n": : "m"(__mcsema_callback_state.R12) );
