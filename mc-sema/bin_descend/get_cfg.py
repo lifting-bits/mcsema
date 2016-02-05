@@ -106,9 +106,15 @@ UCOND_BRANCHES = [\
     idaapi.NN_jmpni,\
     idaapi.NN_jmpshort]
 
+
+EXTERNAL_NAMES = [
+        "@@GLIBC_",\
+        ]
+
 def DEBUG(s):
     if _DEBUG:
         syslog.syslog(str(s))
+        sys.stdout.write(str(s))
 
 def readDword(ea):
     bytestr = readBytesSlowly(ea, ea+4);
@@ -139,6 +145,9 @@ def fixExternalName(fn):
         newfn = fn[:-2]
         if newfn in EMAP:
             return newfn
+
+    if "@@GLIBC" in fn:
+        fn = fn[:fn.find('@@GLIBC')]
 
     return fn
 
@@ -259,6 +268,13 @@ def isExternalReference(ea):
     segtype = idc.GetSegmentAttr(seg, idc.SEGATTR_TYPE)
     if segtype in ext_types:
         return True
+
+    if isLinkedElf():
+        fn = getFunctionName(ea)
+        for extsign in EXTERNAL_NAMES:
+            if extsign in fn:
+                DEBUG("Assuming external reference because: {} in {}\n".format(extsign, fn))
+                return True
 
     return False
 
@@ -440,8 +456,32 @@ def isElfThunk(ea):
 
     return False, None
 
+def manualRelocOffset(I, inst, dref):
+    insn_t = idautils.DecodeInstruction(inst)
+
+    if insn_t is None:
+        return
+
+    saw_displ = False
+    for op in insn_t.Operands:
+        
+        if op.type in [idaapi.o_displ, idaapi.o_phrase]:
+            saw_displ = True
+        # only do this if we see an immediate operand following
+        # a displacement operand
+        if saw_displ and op.type == idaapi.o_imm:
+            # and the immediate is the data reference
+            if op.value == dref:
+                DEBUG("Manually setting reloc offset for IMM32 value at {0:x} to {1:x}\n".format(inst, op.offb))
+                # fake a relocation offset so that we know the immediate 
+                # is a reference and not a constant
+                I.reloc_offset = op.offb
+
 def addDataReference(M, I, inst, dref, new_eas):
     if inValidSegment(dref): 
+
+        manualRelocOffset(I, inst, dref)
+
         if isExternalReference(dref):
             fn = getFunctionName(dref)
 
@@ -566,7 +606,9 @@ def instructionHandler(M, B, inst, new_eas):
         return I, True
 
     relo_off = findRelocOffset(inst, len(inst_bytes))
-    if relo_off != -1:
+    # don't re-set reloc offset if we already set it somewhere
+    if relo_off != -1 and not I.HasField("reloc_offset"):
+        DEBUG("findRelocOffset setting reloc offset at {0:x} to {1:x}\n".format(inst, relo_off))
         I.reloc_offset = relo_off
 
     for dref in idautils.DataRefsFrom(inst):
@@ -585,9 +627,6 @@ def instructionHandler(M, B, inst, new_eas):
         			fn = handleExternalRef(fn)
         			I.ext_call_name = fn
         			DEBUG("EXTERNAL CALL : {0}\n".format(fn))
-
-		 
-
 
     if not had_refs and isLinkedElf():
         for op in insn_t.Operands:
@@ -676,6 +715,7 @@ def processExternals(M):
             processExternalData(M, fixedn)
         else:
             syslog.syslog("UNKNOWN API: {0}\n".format(fixedn))
+            sys.stdout.write("UNKNOWN API: {0}\n".format(fixedn))
 
 def readBytesSlowly(start, end):
     bytestr = ""
@@ -704,6 +744,9 @@ def getBitness():
     else:
         # no support for 64-bit, assume 32-bit
         return 32
+
+def getPointerSize():
+    return getBitness() / 8
 
 def relocationSize(reloc_type):
     
@@ -759,9 +802,8 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas, itemsiz
     if itemsize == -1:
         itemsize = int(idc.ItemSize(offset))
 
-    DEBUG("Offset: {0:x}, seg_offset: {1:x}\n".format(offset, seg_offset))
+    DEBUG("Offset: {0:x}, seg_offset: {1:x} => {2:x}\n".format(offset, seg_offset, reloc_dest))
     DEBUG("Reloc Base Address: {0:x}\n".format(DS.base_address))
-    DEBUG("Reloc offset: {0:x}\n".format(offset))
     DEBUG("Reloc size: {0:x}\n".format(itemsize))
 
     if idc.isCode(pf):
@@ -823,8 +865,9 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
 
         DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}\n".format(ea, pointsto))
         real_size = idc.ItemSize(pointsto)
-        DEBUG("\t\tReal Ref: {0:x}, size: {1}\n".format(pointsto, real_size))
-        insertRelocatedSymbol(M, D, pointsto, ea, seg_offset, new_eas, real_size)
+        reloc_size = idc.ItemSize(ea)
+        DEBUG("\t\tReal Ref: {0:x}, reloc size: {2}, ref size: {1}\n".format(pointsto, real_size, reloc_size))
+        insertRelocatedSymbol(M, D, pointsto, ea, seg_offset, new_eas, reloc_size)
 
     def checkIfJumpData(ea, size):
         """
@@ -848,7 +891,7 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
     while i < end:
         DEBUG("Checking address: {:x}\n".format(i))
         dref_size = idc.ItemSize(i) or 1
-        if dref_size > 4 and dref_size % 4 == 0:
+        if dref_size > getPointerSize() and dref_size % 4 == 0:
             DEBUG("Possible table data at {:x}; size: {:x}\n".format(i, dref_size))
             (is_table, addrs) = checkIfJumpData(i, dref_size)
             if is_table:
@@ -858,7 +901,7 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
             else:
                 DEBUG("Its not a table\n");
 
-        elif dref_size == 4:
+        elif dref_size == getPointerSize():
             more_cref = [c for c in idautils.CodeRefsFrom(i,0)]
             more_dref = [d for d in idautils.DataRefsFrom(i)]
             more_dref.extend(more_cref)
@@ -1197,6 +1240,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
 
     if recovered_fns == 0:
         syslog.syslog("COULD NOT RECOVER ANY FUNCTIONS\n")
+        sys.stdout.write("COULD NOT RECOVER ANY FUNCTIONS\n")
         return
 
     mypath = path.dirname(__file__)

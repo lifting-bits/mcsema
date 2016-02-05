@@ -6,6 +6,7 @@ GET_CFG_PY=${BIN_DESCEND_PATH}/get_cfg.py
 STD_DEFS="../std_defs/std_defs.txt"
 CC=clang
 CXX=clang++
+RUNTIME_PATH=$(<./RUNTIME_PATH.linux)
 export TVHEADLESS=1
-export IDALOG=/dev/null
+export IDALOG=logfile.txt
 export IDA_PATH

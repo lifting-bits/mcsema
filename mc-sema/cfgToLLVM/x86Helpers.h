@@ -154,3 +154,8 @@ llvm::Value* GLOBAL_DATA_OFFSET(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
         return NULL;
     }
 }
+
+inline llvm::PointerType *getVoidPtrType (llvm::LLVMContext & C) {
+    llvm::Type * Int8Type  = llvm::IntegerType::getInt8Ty(C);
+    return llvm::PointerType::getUnqual(Int8Type);
+}

@@ -474,8 +474,11 @@ int main(int argc, char *argv[])
               }
               else 
               {
-                  if(mod->is64Bit()) x86_64::addEntryPointDriver(M, itr->name, ep, itr->argc, itr->returns, outs(), itr->cconv, itr->sign);
-                  else x86::addEntryPointDriver(M, itr->name, ep, itr->argc, itr->returns, outs(), itr->cconv);
+                  if(mod->is64Bit()) {
+                      x86_64::addEntryPointDriver(M, itr->name, ep, itr->argc, itr->returns, outs(), itr->cconv, itr->sign);
+                  } else {
+                      x86::addEntryPointDriver(M, itr->name, ep, itr->argc, itr->returns, outs(), itr->cconv);
+                  }
 
               }
 

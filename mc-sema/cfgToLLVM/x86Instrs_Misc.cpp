@@ -727,6 +727,7 @@ GENERIC_TRANSLATION(CWD, doCwd<16>(block))
 GENERIC_TRANSLATION(CWDE, doCwd<32>(block))
 GENERIC_TRANSLATION(CQO, doCwd<64>(block));
 
+GENERIC_TRANSLATION(BT64rr, doBtrr<64>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BT32rr, doBtrr<32>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BT16rr, doBtrr<16>(block, OP(0), OP(1)))
 
@@ -761,6 +762,7 @@ void Misc_populateDispatchMap(DispatchMap &m) {
     m[X86::HLT] = translate_HLT;
     m[X86::LOCK_PREFIX] = translate_NOOP;
     m[X86::REP_PREFIX] = translate_NOOP;
+    m[X86::REPNE_PREFIX] = translate_NOOP;
     m[X86::PAUSE] = translate_NOOP;
     m[X86::RDTSC] = translate_RDTSC;
     m[X86::CWD] = translate_CWD;
@@ -768,6 +770,7 @@ void Misc_populateDispatchMap(DispatchMap &m) {
     m[X86::CQO] = translate_CQO;
     m[X86::CDQ] = translate_CDQ;
     m[X86::SAHF] = translate_SAHF;
+    m[X86::BT64rr] = translate_BT64rr;
     m[X86::BT32rr] = translate_BT32rr;
     m[X86::BT16rr] = translate_BT16rr;
     m[X86::BSR32rr] = translate_BSR32rr;

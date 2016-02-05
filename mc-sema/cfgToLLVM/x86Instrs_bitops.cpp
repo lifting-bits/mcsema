@@ -137,6 +137,22 @@ static InstTransResult doAndRI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
+static InstTransResult doAndRV(InstPtr ip, BasicBlock *&b,
+                               Value *addr,
+                               const MCOperand &o1,
+                               const MCOperand &o2)
+{
+    TASSERT(o2.isReg(), "");
+    TASSERT(o1.isReg(), "");
+
+    Value *o1_v = R_READ<width>(b, o1.getReg());
+
+    R_WRITE<width>(b, o2.getReg(), doAndVV<width>(ip, b, o1_v, addr));
+
+    return ContinueBlock;
+}
+
+template <int width>
 static InstTransResult doAndRM(InstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &o1,
@@ -323,6 +339,22 @@ static InstTransResult doOrRI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
+static InstTransResult doOrRV(InstPtr ip, BasicBlock *&b,
+                              Value *addr,
+                              const MCOperand &o1,
+                              const MCOperand &o2)
+{
+    TASSERT(o2.isReg(), "");
+    TASSERT(o1.isReg(), "");
+
+    Value *o1_v = R_READ<width>(b, o1.getReg());
+
+    R_WRITE<width>(b, o2.getReg(), doOrVV<width>(ip, b, o1_v, addr));
+
+    return ContinueBlock;
+}
+
+template <int width>
 static InstTransResult doOrRM(InstPtr ip, BasicBlock *&b,
                               Value           *addr,
                               const MCOperand &o1,
@@ -446,6 +478,22 @@ static InstTransResult doXorRI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
+static InstTransResult doXorRV(InstPtr ip, BasicBlock *&b,
+                               Value *addr,
+                               const MCOperand &o1,
+                               const MCOperand &o2)
+{
+    TASSERT(o1.isReg(), "");
+    TASSERT(o2.isReg(), "");
+
+    Value *o1_v = R_READ<width>(b, o1.getReg());
+
+    R_WRITE<width>(b, o2.getReg(), doXorVV<width>(ip, b, o1_v, addr));
+
+    return ContinueBlock;
+}
+
+template <int width>
 static InstTransResult doXorRM(InstPtr ip, BasicBlock *&b,
                                const MCOperand &dst,
                                const MCOperand &src1,
@@ -500,7 +548,11 @@ GENERIC_TRANSLATION_MEM(AND16rm,
 	doAndRM<16>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(AND16rr, doAndRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND16rr_REV, doAndRR<16>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(AND32i32, doAndRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+//GENERIC_TRANSLATION(AND32i32, doAndRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION_MEM(AND32i32, 
+        doAndRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
+        doAndRV<32>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+
 GENERIC_TRANSLATION_32MI(AND32mi,
 	doAndMI<32>(ip, block, ADDR(0), OP(5)),
 	doAndMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
@@ -526,8 +578,14 @@ GENERIC_TRANSLATION_MEM(AND64mr,
 GENERIC_TRANSLATION(AND32ri, doAndRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND32ri8, doAndRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND64ri8, doAndRI<64>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(AND64ri32, doAndRI<64>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(AND64i32, doAndRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)))
+//GENERIC_TRANSLATION(AND64ri32, doAndRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION_MEM(AND64ri32, 
+        doAndRI<64>(ip, block, OP(0), OP(1), OP(2)),
+        doAndRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), OP(0), OP(1)))
+//GENERIC_TRANSLATION(AND64i32, doAndRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)))
+GENERIC_TRANSLATION_MEM(AND64i32, 
+        doAndRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
+        doAndRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
 
 GENERIC_TRANSLATION_MEM(AND32rm,
 	doAndRM<32>(ip, block, ADDR(2), OP(0), OP(1)),
@@ -586,7 +644,17 @@ GENERIC_TRANSLATION_MEM(OR16rm,
 	doOrRM<16>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(OR16rr, doOrRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(OR16rr_REV, doOrRR<16>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(OR32i32, doOrRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+//GENERIC_TRANSLATION(OR32i32, doOrRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION_MEM(OR32i32, 
+        doOrRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
+        doOrRV<32>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+GENERIC_TRANSLATION_MEM(OR64i32, 
+        doOrRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
+        doOrRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
+GENERIC_TRANSLATION_MEM(OR64ri32, 
+        doOrRI<64>(ip, block, OP(0), OP(1), OP(2)),
+        doOrRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), OP(0), OP(1)))
+
 GENERIC_TRANSLATION_32MI(OR32mi,
 	doOrMI<32>(ip, block, ADDR(0), OP(5)),
 	doOrMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
@@ -643,7 +711,6 @@ GENERIC_TRANSLATION_MEM(XOR16rm,
 	doXorRM<16>(ip, block, OP(0), OP(1), STD_GLOBAL_OP(2)))
 GENERIC_TRANSLATION(XOR16rr, doXorRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR16rr_REV, doXorRR<16>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(XOR32i32, doXorRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION_32MI(XOR32mi,
 	doXorMI<32>(ip, block, ADDR(0), OP(5)),
 	doXorMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
@@ -657,6 +724,17 @@ GENERIC_TRANSLATION_MEM(XOR32mr,
 	doXorMR<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
 GENERIC_TRANSLATION(XOR32ri, doXorRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR32ri8, doXorRI<32>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(XOR64ri8, doXorRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION_MEM(XOR32i32, 
+        doXorRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
+        doXorRV<32>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+GENERIC_TRANSLATION_MEM(XOR64i32, 
+        doXorRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
+        doXorRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
+GENERIC_TRANSLATION_MEM(XOR64ri32, 
+        doXorRI<64>(ip, block, OP(0), OP(1), OP(2)),
+        doXorRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), OP(0), OP(1)))
+
 GENERIC_TRANSLATION_MEM(XOR32rm,
 	doXorRM<32>(ip, block, OP(0), OP(1), ADDR(2)),
 	doXorRM<32>(ip, block, OP(0), OP(1), STD_GLOBAL_OP(2)))
@@ -738,6 +816,8 @@ void Bitops_populateDispatchMap(DispatchMap &m)
     m[X86::OR16rr] = translate_OR16rr;
     m[X86::OR16rr_REV] = translate_OR16rr_REV;
     m[X86::OR32i32] = translate_OR32i32;
+    m[X86::OR64i32] = translate_OR64i32;
+    m[X86::OR64ri32] = translate_OR64ri32;
     m[X86::OR32mi] = translate_OR32mi;
     m[X86::OR32mi8] = translate_OR32mi8;
     m[X86::OR32mr] = translate_OR32mr;
@@ -773,6 +853,8 @@ void Bitops_populateDispatchMap(DispatchMap &m)
     m[X86::XOR32mr] = translate_XOR32mr;
     m[X86::XOR32ri] = translate_XOR32ri;
     m[X86::XOR32ri8] = translate_XOR32ri8;
+    m[X86::XOR64ri8] = translate_XOR64ri8;
+    m[X86::XOR64ri32] = translate_XOR64ri32;
     m[X86::XOR32rm] = translate_XOR32rm;
     m[X86::XOR32rr] = translate_XOR32rr;
     m[X86::XOR32rr_REV] = translate_XOR32rr_REV;

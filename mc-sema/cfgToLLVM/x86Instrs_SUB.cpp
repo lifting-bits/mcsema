@@ -135,6 +135,28 @@ static InstTransResult doSubRI(InstPtr ip, BasicBlock *&b,
     return ContinueBlock;
 }
 
+template <int width>
+static InstTransResult doSubRV(InstPtr ip, BasicBlock *&b,
+                               Value *addr,
+                               const MCOperand &dst,
+                               const MCOperand &src1)
+{
+    NASSERT(src1.isReg());
+    NASSERT(dst.isReg());
+    TASSERT(addr != NULL, "");
+
+	// Read from src1.
+    Value *srcReg = R_READ<width>(b, src1.getReg());
+
+	// Do the operation.
+	Value *subRes = doSubVV<width>(ip, b, srcReg, addr);
+
+	// Store the result in dst.
+	R_WRITE<width>(b, dst.getReg(), subRes);
+
+    return ContinueBlock;
+}
+
 template <int dstWidth, int srcWidth>
 static InstTransResult doSubRI(InstPtr ip, BasicBlock *&b,
                                const MCOperand &dst,
@@ -357,7 +379,11 @@ GENERIC_TRANSLATION_MEM(SUB16rm,
 	doSubRM<16>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(SUB16rr, doSubRR<16>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SUB16rr_REV, doSubRR<16>(ip, block, OP(1), OP(2), OP(0)))
-GENERIC_TRANSLATION(SUB32i32, doSubRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+//GENERIC_TRANSLATION(SUB32i32, doSubRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION_MEM(SUB32i32,
+        doSubRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
+        doSubRV<32>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+
 GENERIC_TRANSLATION_32MI(SUB32mi, 
 	doSubMI<32>(ip, block, ADDR(0), OP(5)),
 	doSubMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
@@ -377,8 +403,10 @@ GENERIC_TRANSLATION_MEM(SUB64mr,
 
 GENERIC_TRANSLATION(SUB32ri, doSubRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(SUB32ri8, doSubRI<32>(ip, block, OP(0), OP(1), OP(2)))
-//GENERIC_TRANSLATION(SUB64ri8, doSubRI<64>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(SUB64ri32, doSubRI<64>(ip, block, OP(0), OP(1), OP(2)))
+//GENERIC_TRANSLATION(SUB64ri32, doSubRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION_MEM(SUB64ri32,
+        doSubRI<64>(ip, block, OP(0), OP(1), OP(2)),
+        doSubRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), OP(0), OP(1)))
 
 GENERIC_TRANSLATION_MEM(SUB32rm,
 	doSubRM<32>(ip, block, ADDR(2), OP(0), OP(1)),

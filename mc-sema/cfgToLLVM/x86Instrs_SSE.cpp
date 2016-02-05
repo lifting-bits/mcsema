@@ -157,10 +157,17 @@ static InstTransResult MOVAndZextRV(BasicBlock *& block, const MCOperand &dst, V
 
     NASSERT(dst.isReg());
 
-    Value *zext = new llvm::ZExtInst(src, 
-                        llvm::Type::getIntNTy(block->getContext(), 128),
-                        "",
-                        block);
+    Value *zext = src;
+
+    if(width < 128) {
+        zext = new llvm::ZExtInst(src, 
+                llvm::Type::getIntNTy(block->getContext(), 128),
+                "",
+                block);
+    } else if (width > 128) {
+        TASSERT(false, "Invalid width");
+    }
+
     R_WRITE<128>(block, dst.getReg(), zext);
     return ContinueBlock;
 }
@@ -739,7 +746,7 @@ static InstTransResult doNewShift(BasicBlock *&b,
     Value *max_count = CONST_V<64>(b, elementwidth-1);
 
     IntegerType *int_t = dyn_cast<IntegerType>(shift_count->getType());
-    if (int_t->getBitWidth() != 64) {
+    if (int_t->getBitWidth() > 64) {
         shift_count = new TruncInst( 
                 shift_count, 
                 Type::getIntNTy(b->getContext(), 64), 
@@ -775,7 +782,7 @@ static InstTransResult doNewShift(BasicBlock *&b,
     int_t = dyn_cast<IntegerType>(real_count->getType());
     IntegerType *elem_int_t = dyn_cast<IntegerType>(elem_ty);
     Value *trunc_shift = nullptr;
-    if(elem_int_t->getBitWidth() != int_t->getBitWidth()) {
+    if(elem_int_t->getBitWidth() < int_t->getBitWidth()) {
         trunc_shift = new TruncInst( 
                 real_count, 
                 elem_ty, 
@@ -1655,6 +1662,7 @@ static InstTransResult do_SSE_EXTEND_OP(const MCOperand &dst, BasicBlock *&b, Va
 {
     NASSERT(width % srcelem == 0);
     NASSERT(width % dstelem == 0);
+    TASSERT(dstelem > srcelem, "Must use SSE extend to a bigger element size");
 
     int src_elem_count = width/srcelem;
     int dst_elem_count = width/dstelem;
@@ -1724,6 +1732,7 @@ static InstTransResult do_SSE_EXTEND_RM(InstPtr ip, BasicBlock *& block,
     // memory operands are weird -- its the minimum
     // bytes needed to unpack to width / dstelem
     const int count = width / dstelem * srcelem;
+    TASSERT(count < width, "Must SSE extend to greater size");
     llvm::dbgs() << "Reading: " << count << " bytes\n";
     Value *opVal1 = M_READ<count>(ip, block, addr);
     
@@ -1803,6 +1812,8 @@ static InstTransResult doMOVLHPSrr(InstPtr ip, BasicBlock *b, const MCOperand &d
             r_src, 
             CONST_V<width>(b, width/2),
             "", b);
+
+    TASSERT(width < 64, "Can't truncate from smaller width");
 
     Value* bottom_part = new TruncInst( 
             r_dest, 

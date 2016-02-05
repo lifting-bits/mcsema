@@ -4,9 +4,9 @@ __strdup 1 C N
 __strcpy_chk 3 C N
 __vsnprintf_chk 6 C N
 __isoc99_sscanf 12 C N
-__syslog_chk 3 C N
+__syslog_chk 12 C N
 __memmove_chk 4 C N
-__snprintf_chk 5 C N
+__snprintf_chk 12 C N
 
 # SELinux
 freecon 1 C N
@@ -955,6 +955,7 @@ memrchr 3 C N
 strcpy 2 C N
 strncpy 3 C N
 strcat 2 C N
+__strcat_chk 3 C N
 strncat 3 C N
 strcmp 2 C N
 strncmp 3 C N
@@ -1067,8 +1068,6 @@ wait4 4 C N
 closelog 0 C N
 openlog 3 C N
 setlogmask 1 C N
-syslog 2 C N
-vsyslog 3 C N
 cfgetospeed 1 C N
 cfgetispeed 1 C N
 cfsetospeed 2 C N
@@ -6466,9 +6465,9 @@ __fsetlocking 2 C N
 _flushlbf 0 C N
 __fpurge 1 C N
 
-__printf_chk 2 C N
-__fprintf_chk 3 C N
-__sprintf_chk 4 C N
+__printf_chk 12 C N
+__fprintf_chk 12 C N
+__sprintf_chk 12 C N
 __mempcpy_chk 3 C N
 __memcpy_chk 3 C N
 

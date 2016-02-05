@@ -295,8 +295,17 @@ llvm::Value *getValueForExternal(llvm::Module *M, InstPtr ip, llvm::BasicBlock *
 
 
         if(gvar->getType()->isPointerTy()) {
-            addrInt = new llvm::PtrToIntInst(
-                    gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
+            Type *ut = gvar->getType()->getPointerElementType();
+            if(ut->isIntegerTy(width)) {
+                // pointer to loadable integer width... was probably a pointer
+                // just load it, instead of doing addrof
+                addrInt = noAliasMCSemaScope(new LoadInst(gvar, "", block));
+                //llvm::errs() << "Loading pointer for: " << target << "\n";
+            } else {
+                addrInt = new PtrToIntInst(
+                        gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
+                //llvm::errs() << "Converting pointer to int for: " << target << "\n";
+            }
         } else {
 
             llvm::IntegerType *int_t = llvm::dyn_cast<llvm::IntegerType>(gvar->getType());

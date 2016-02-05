@@ -452,7 +452,7 @@ void writeContextToLocals(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
                 }\
                 Instruction   *T = aliasMCSemaScope(li); \
                 Value   *truncI  = NULL; \
-                if(! T->getType()->isIntegerTy(nbits)) \
+                if(!T->getType()->isIntegerTy(nbits)) \
                 { \
                     truncI = new TruncInst(T, Type::getIntNTy(B->getContext(), nbits), "", B); \
                 } \
@@ -589,7 +589,7 @@ std::string regnm = x86_64::getRegisterName(nm); \
 		}\
 		Instruction   *T = aliasMCSemaScope(li); \
 		Value   *truncI  = NULL; \
-		if(! T->getType()->isIntegerTy(nbits)) \
+		if(!T->getType()->isIntegerTy(nbits)) \
 		{ \
 			truncI = new TruncInst(T, Type::getIntNTy(B->getContext(), nbits), "", B); \
 		} \

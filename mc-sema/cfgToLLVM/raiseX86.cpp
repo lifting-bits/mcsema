@@ -1395,8 +1395,10 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
     NativeFunctionPtr f = *i;
 
     if (insertFunctionIntoModule(natMod, f, M) == false) {
-      result = false;
-      break;
+        std::string fname = f->get_name();
+        cerr << "Could not insert function: " << fname << " into the LLVM module\n";
+        result = false;
+        break;
     }
     ++i;
   }

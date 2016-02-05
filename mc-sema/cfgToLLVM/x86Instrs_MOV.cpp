@@ -204,6 +204,7 @@ static InstTransResult doMovZXRR(InstPtr ip,   BasicBlock *&b,
 {
     NASSERT(dst.isReg());
     NASSERT(src.isReg());
+    TASSERT(dstWidth > srcWidth, "Must ZExt to a greater bitwidth")
 
     //do a read from src of the appropriate width
     Value   *fromSrc = R_READ<srcWidth>(b, src.getReg());
@@ -234,6 +235,7 @@ static InstTransResult doMovZXRM(InstPtr ip,   BasicBlock *&b,
        return ContinueBlock;
     }
 
+    TASSERT(dstWidth > srcWidth, "Must ZExt to a greater bitwidth")
     //do a read from src of the appropriate width
     Value   *fromSrc = M_READ<srcWidth>(ip, b, src);
 
@@ -341,7 +343,6 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
     }
     else if( ip->is_data_offset() ) {
         if( ip->get_reloc_offset() < OP(5).getOffset() ) {
-            llvm::errs() << __FUNCTION__ << ": Other reloc\n";
             doMIMov<32>(ip,   block, STD_GLOBAL_OP(0), OP(5));
         } else {
             Value *data_v = nullptr;
@@ -352,7 +353,6 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
                
                 data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
                 data_v = doSubtractImageBase<32>(data_v, block);
-                llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
             } else {
                 data_v = GLOBAL_DATA_OFFSET<32>(block, natM, ip);
             }
@@ -378,11 +378,13 @@ static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&bl
             );
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+        llvm::errs() << "Doing MOV64mi with call_tgt at: " << to_string<VA>(ip->get_loc(), hex) << ", imm32: " << (int)(OP(5).getImm()) << "\n";
         ret = doMIMovV<64>(ip, block, ADDR(0), addrInt);
     }
     else if( ip->is_data_offset() ) {
         if( ip->get_reloc_offset() < OP(5).getOffset() ) {
-            llvm::errs() << __FUNCTION__ << ": Other reloc\n";
+            llvm::errs() << "Doing MOV64mi with data and reloc<OP5 at: " << to_string<VA>(ip->get_loc(), hex) << ", imm32: " << (int)(OP(5).getImm()) << "\n";
+            llvm::errs() << "Doing MOV64mi ro: " << (int)ip->get_reloc_offset() << ", OP5.off: " << (int)OP(5).getOffset() << "\n";
             doMIMov<64>(ip,   block, STD_GLOBAL_OP(0), OP(5));
         } else {
             Value *data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
@@ -392,13 +394,14 @@ static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&bl
                 // * we are on win64
                
                 data_v = doSubtractImageBase<64>(data_v, block);
-                llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
             }
 
+            llvm::errs() << "Doing MOV64mi with data and reloc at: " << to_string<VA>(ip->get_loc(), hex) << ", imm32: " << (int)(OP(5).getImm()) << "\n";
             doMIMovV<64>(ip,  block, ADDR_NOREF(0), data_v);
         }
         ret = ContinueBlock;
     } else {
+        llvm::errs() << "Doing MOV64mi with data and default at: " << to_string<VA>(ip->get_loc(), hex) << ", imm32: " << (int)(OP(5).getImm()) << "\n";
         ret = doMIMov<64>(ip,   block, ADDR(0), OP(5));
     }
     return ret;
@@ -519,7 +522,6 @@ static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& blo
            
             data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
             data_v = doSubtractImageBase<32>(data_v, block);
-            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
         } else {
             data_v = GLOBAL_DATA_OFFSET<32>(block, natM, ip);
         }
@@ -549,8 +551,6 @@ static InstTransResult translate_MOV64ri(NativeModulePtr natM, BasicBlock *& blo
                 OP(0) );
     }
     else if( ip->is_data_offset() ) {
-
-
         Value *data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
         if(shouldSubtractImageBase(M)) {
             // if we're here, then
@@ -558,7 +558,6 @@ static InstTransResult translate_MOV64ri(NativeModulePtr natM, BasicBlock *& blo
             // * we are on win64
            
             data_v = doSubtractImageBase<64>(data_v, block);
-            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
         }
 
         ret = doRIMovV<64>(ip, block, data_v, OP(0) );
@@ -587,7 +586,6 @@ static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& bloc
            
             data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
             data_v = doSubtractImageBase<32>(data_v, block);
-            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
         } else {
             data_v = GLOBAL_DATA_OFFSET<width>(block, natM, ip);
         }
@@ -634,7 +632,6 @@ static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& bloc
                
                 data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
                 data_v = doSubtractImageBase<32>(data_v, block);
-                llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
             } else {
                 data_v = GLOBAL_DATA_OFFSET<width>(block, natM, ip);
             }
@@ -672,7 +669,6 @@ static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& blo
 
             data_v = GLOBAL( block, natM, inst, ip, 1 );
             data_v = doSubtractImageBase<32>(data_v, block);
-            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
         } else {
             data_v = GLOBAL( block, natM, inst, ip, 1 );
         }
@@ -724,7 +720,6 @@ static InstTransResult translate_MOV64rm(NativeModulePtr natM, BasicBlock *& blo
 
             data_v = GLOBAL( block, natM, inst, ip, 1 );
             data_v = doSubtractImageBase<64>(data_v, block);
-            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
         } else {
             data_v = GLOBAL( block, natM, inst, ip, 1 );
         }

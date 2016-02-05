@@ -73,6 +73,22 @@ static InstTransResult doCmpRI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
+static InstTransResult doCmpRV(InstPtr ip, BasicBlock *&b,
+                        const MCOperand &lhs,
+                        llvm::Value *rhs)
+{
+    NASSERT(lhs.isReg());
+
+    Value   *lhs_v = R_READ<width>(b, lhs.getReg());
+    Value   *rhs_v = rhs;
+
+    doCmpVV<width>(ip, b, lhs_v, rhs_v);
+
+    return ContinueBlock;
+}
+
+
+template <int width>
 static InstTransResult doCmpMR(InstPtr ip, BasicBlock *&b,
                         Value           *mem,
                         const MCOperand &reg)
@@ -254,13 +270,36 @@ static InstTransResult doTestRI(InstPtr ip,    BasicBlock          *&b,
     return EndBlock;
 }
 
+template <int width>
+static InstTransResult doTestRV(InstPtr ip,    BasicBlock          *&b,
+                            const MCOperand     &lhs,
+                            llvm::Value     *rhs)
+{
+    NASSERT(lhs.isReg());
+
+    doTestVV<width>(ip, b,
+                    R_READ<width>(b, lhs.getReg()),
+                    rhs);
+
+    return EndBlock;
+}
+
 GENERIC_TRANSLATION(CMP8rr, doCmpRR<8>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP16rr, doCmpRR<16>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP16rr_REV, doCmpRR<16>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP16ri, doCmpRI<16>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP16ri8, doCmpRI<16>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION(CMP32i32, doCmpRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
-GENERIC_TRANSLATION(CMP64i32, doCmpRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), OP(0)))
+
+//GENERIC_TRANSLATION(CMP32i32, doCmpRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION_MEM(CMP32i32,
+    doCmpRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)),
+    doCmpRV<32>(ip, block, MCOperand::CreateReg(X86::EAX), GLOBAL_DATA_OFFSET(block, natM, ip)));
+
+//GENERIC_TRANSLATION(CMP64i32, doCmpRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), OP(0)))
+GENERIC_TRANSLATION_MEM(CMP64i32,
+    doCmpRI<64>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)),
+    doCmpRV<64>(ip, block, MCOperand::CreateReg(X86::EAX), GLOBAL_DATA_OFFSET(block, natM, ip)));
+
 GENERIC_TRANSLATION(CMP16i16, doCmpRI<16>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION(CMP32rr_REV, doCmpRR<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP32rr, doCmpRR<32>(ip, block, OP(0), OP(1)))
@@ -273,7 +312,12 @@ GENERIC_TRANSLATION(CMP8i8, doCmpRI<8>(ip, block, MCOperand::CreateReg(X86::EAX)
 GENERIC_TRANSLATION(CMP8rr_REV, doCmpRR<8>(ip, block, OP(0), OP(1)))
 
 GENERIC_TRANSLATION(CMP32ri8, doCmpRI<32>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION(CMP64ri32, doCmpRI<64>(ip, block, OP(0), OP(1)))
+
+//GENERIC_TRANSLATION(CMP64ri32, doCmpRI<64>(ip, block, OP(0), OP(1)))
+GENERIC_TRANSLATION_MEM(CMP64ri32,
+    doCmpRI<64>(ip, block, OP(0), OP(1)),
+    doCmpRV<64>(ip, block, OP(0), GLOBAL_DATA_OFFSET(block, natM, ip)));
+
 GENERIC_TRANSLATION(CMP64ri8, doCmpRI<64>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION_MEM(CMP64mi8,
     doCmpMI<64>(ip,   block, ADDR(0), OP(5)),
@@ -330,9 +374,21 @@ GENERIC_TRANSLATION(TEST32rr, doTestRR<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(TEST64rr, doTestRR<64>(ip, block, OP(0), OP(1)))
 //there is a form of the encoding where the EAX operand is 
 //implicit
-GENERIC_TRANSLATION(TEST64i32, doTestRI<64>(ip,  block, MCOperand::CreateReg(X86::RAX), OP(0)))
-GENERIC_TRANSLATION(TEST32i32, doTestRI<32>(ip,  block, MCOperand::CreateReg(X86::EAX), OP(0)))
-GENERIC_TRANSLATION(TEST64ri32, doTestRI<64>(ip,  block, OP(0), OP(1)))
+//GENERIC_TRANSLATION(TEST64i32, doTestRI<64>(ip,  block, MCOperand::CreateReg(X86::RAX), OP(0)))
+GENERIC_TRANSLATION_MEM(TEST64i32,
+    doTestRI<64>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)),
+    doTestRV<64>(ip, block, MCOperand::CreateReg(X86::EAX), GLOBAL_DATA_OFFSET(block, natM, ip)));
+
+//GENERIC_TRANSLATION(TEST32i32, doTestRI<32>(ip,  block, MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION_MEM(TEST32i32,
+    doTestRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)),
+    doTestRV<32>(ip, block, MCOperand::CreateReg(X86::EAX), GLOBAL_DATA_OFFSET(block, natM, ip)));
+
+//GENERIC_TRANSLATION(TEST64ri32, doTestRI<64>(ip,  block, OP(0), OP(1)))
+GENERIC_TRANSLATION_MEM(TEST64ri32,
+    doTestRI<64>(ip, block, OP(0), OP(1)),
+    doTestRV<64>(ip, block, OP(0), GLOBAL_DATA_OFFSET(block, natM, ip)));
+
 GENERIC_TRANSLATION(TEST32ri, doTestRI<32>(ip,  block, OP(0), OP(1)))
 GENERIC_TRANSLATION(TEST16i16, doTestRI<16>(ip,  block, MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION_MEM(TEST16mi, 
