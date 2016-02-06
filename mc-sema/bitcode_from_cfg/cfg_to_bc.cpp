@@ -85,6 +85,9 @@ IgnoreUnsupported("ignore-unsupported", cl::desc("Ignore unsupported instruction
 static cl::opt<bool>
 EnablePostAnalysis("post-analysis", cl::desc("Enable post analysis and optimizations"), cl::init(true));
 
+static cl::opt<bool>
+ShouldVerify("should-verify", cl::desc("Verify module after bitcode emission?"), cl::init(true));
+
 void printVersion(void) {
     cout << "0.6" << endl;
     return;
@@ -497,7 +500,7 @@ int main(int argc, char *argv[])
           }
 
           // will abort if verification fails
-          if(llvm::verifyModule(*M, &errs())) {
+          if(ShouldVerify && llvm::verifyModule(*M, &errs())) {
               cerr << "Could not verify module!\n";
               return -1;
           }

@@ -990,7 +990,7 @@ static void dumpData(DataSection &d, ::Data *protoData)
         ds->set_base_address(deitr->getBase());
         ds->set_symbol_name(sym_name);
 		ds->set_symbol_size(deitr->getSize());
-		printf("dumpData : base %x, size, %d\n", deitr->getBase(), deitr->getSize());
+		printf("dumpData : base %lx, size, %ld\n", deitr->getBase(), deitr->getSize());
     }
   }
 

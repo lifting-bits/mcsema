@@ -44,14 +44,56 @@ InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
   VA                nextVA = addr;
   ::uint32_t        arch_type;
 
+  uint8_t prefixes[0x100] = {0};
+
   llvm::MCDisassembler::DecodeStatus  s;
 
-  s = DisAsm->getInstruction( mcInst,
-                              insLen,
-                              *bmo,
-                              ((::uint64_t)nextVA),
-                              llvm::nulls(),
-                              llvm::nulls());
+
+  bool have_prefix = true;
+  size_t bmo_size = bmo->getExtent() - bmo->getBase();
+  while(have_prefix)
+  {
+      insLen = 0;
+      s = DisAsm->getInstruction( mcInst,
+                                  insLen,
+                                  *bmo,
+                                  ((::uint64_t)nextVA),
+                                  llvm::nulls(),
+                                  llvm::nulls());
+
+      if(s == llvm::MCDisassembler::Success && bmo_size > 1)
+      {
+          switch(mcInst.getOpcode()) {
+              case llvm::X86::REP_PREFIX:
+                  prefixes[0xF3] = 1;
+                  break;
+              case llvm::X86::REPNE_PREFIX:
+                  prefixes[0xF2] = 1;
+                  break;
+              case llvm::X86::LOCK_PREFIX:
+                  prefixes[0xF0] = 1;
+                  break;
+              default:
+                  have_prefix = false;
+          }
+
+      } else {
+          have_prefix = false;
+          break;
+      }
+
+      if(have_prefix) {
+          nextVA += 1;
+      } else {
+          for(int i = 0; i < 0x100; i++) {
+              if(prefixes[i] == 1) {
+                  mcInst.prefixPresent[i] = 1;
+              }
+          }
+          break;
+          // set prefixes
+      }
+  }
 
   Inst::Prefix    pfx = Inst::NoPrefix;
   if(s == llvm::MCDisassembler::Success) {
