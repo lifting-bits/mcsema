@@ -757,25 +757,6 @@ setbuf 2 C N
 setvbuf 4 C N
 setbuffer 3 C N
 setlinebuf 1 C N
-fprintf 2 C N
-printf 1 C N
-sprintf 2 C N
-vfprintf 3 C N
-vprintf 2 C N
-vsprintf 3 C N
-snprintf 3 C N
-vsnprintf 4 C N
-vasprintf 3 C N
-__asprintf 2 C N
-asprintf 2 C N
-vdprintf 3 C N
-dprintf 2 C N
-fscanf 2 C N
-scanf 1 C N
-sscanf 2 C N
-vfscanf 3 C N
-vscanf 2 C N
-vsscanf 3 C N
 fgetc 1 C N
 getc 1 C N
 getchar 0 C N
@@ -827,8 +808,6 @@ popen 2 C N
 pclose 1 C N
 ctermid 1 C N
 cuserid 1 C N
-obstack_printf 2 C N
-obstack_vprintf 3 C N
 flockfile 1 C N
 ftrylockfile 1 C N
 funlockfile 1 C N
@@ -1277,12 +1256,6 @@ wcpcpy 2 C N
 wcpncpy 3 C N
 open_wmemstream 2 C N
 fwide 2 C N
-fwprintf 2 C N
-wprintf 1 C N
-swprintf 3 C N
-vfwprintf 3 C N
-vwprintf 2 C N
-vswprintf 4 C N
 fwscanf 2 C N
 wscanf 1 C N
 swscanf 2 C N
@@ -6484,3 +6457,11 @@ _ITM_deregisterTMCloneTable 1 C N
 _obstack_begin 5 C Y
 _obstack_newchunk 2 C Y
 
+#inet
+inet_aton 2 C N
+inet_addr 1 C N
+inet_network 1 C N
+inet_ntoa 1 C N
+inet_makeaddr 2 C N
+inet_lnaof 2 C N
+inet_netof 2 C N
