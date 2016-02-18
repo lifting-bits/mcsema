@@ -905,7 +905,9 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
             more_cref = [c for c in idautils.CodeRefsFrom(i,0)]
             more_dref = [d for d in idautils.DataRefsFrom(i)]
             more_dref.extend(more_cref)
-            if len(more_dref) > 0:
+            # do this check since IDA is crazy and sometimes returns data
+            # references > 0xff00000000000000
+            if len(more_dref) > 0 and more_dref[0] < 0xff00000000000000:
                 DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}\n".format(i, more_dref[0]))
                 if len(more_dref) == 1:
                     insertReference(M, D, i, more_dref[0], seg_offset, new_eas)
