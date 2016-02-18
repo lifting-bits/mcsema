@@ -408,6 +408,10 @@ GENERIC_TRANSLATION_MEM(SUB64ri32,
         doSubRI<64>(ip, block, OP(0), OP(1), OP(2)),
         doSubRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), OP(0), OP(1)))
 
+GENERIC_TRANSLATION_MEM(SUB64i32,
+        doSubRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
+        doSubRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
+
 GENERIC_TRANSLATION_MEM(SUB32rm,
 	doSubRM<32>(ip, block, ADDR(2), OP(0), OP(1)),
 	doSubRM<32>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
@@ -577,4 +581,5 @@ void SUB_populateDispatchMap(DispatchMap &m)
 
         m[X86::SUB64ri8] = translate_SUB64ri8;
         m[X86::SUB64ri32] = translate_SUB64ri32;
+        m[X86::SUB64i32] = translate_SUB64i32;
 }

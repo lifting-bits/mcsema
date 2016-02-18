@@ -601,9 +601,13 @@ GENERIC_TRANSLATION_MEM(IMUL16m,
     doIMulM<16>(ip, block, STD_GLOBAL_OP(0)))
 GENERIC_TRANSLATION(IMUL32r, doIMulR<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(MUL32r, doMulR<32>(ip, block, OP(0)))
+GENERIC_TRANSLATION(MUL64r, doMulR<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION_MEM(MUL32m, 
     doMulM<32>(ip, block, ADDR(0)),
     doMulM<32>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_MEM(MUL64m, 
+    doMulM<64>(ip, block, ADDR(0)),
+    doMulM<64>(ip, block, STD_GLOBAL_OP(0)))
 GENERIC_TRANSLATION(MUL16r, doMulR<16>(ip, block, OP(0)))
 GENERIC_TRANSLATION_MEM(MUL16m, 
     doMulM<16>(ip, block, ADDR(0)),
@@ -615,6 +619,9 @@ GENERIC_TRANSLATION_MEM(MUL8m,
 GENERIC_TRANSLATION_MEM(IMUL32m, 
     doIMulM<32>(ip, block, ADDR(0)),
     doIMulM<32>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_MEM(IMUL64m, 
+    doIMulM<64>(ip, block, ADDR(0)),
+    doIMulM<64>(ip, block, STD_GLOBAL_OP(0)))
 GENERIC_TRANSLATION(IMUL32rr, doIMulRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL64rr, doIMulRR<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL64r, doIMulR<64>(ip, block, OP(0)))
@@ -664,6 +671,7 @@ GENERIC_TRANSLATION_MEM(IDIV64m,
 GENERIC_TRANSLATION(DIV8r, doDivR<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(DIV16r, doDivR<16>(ip, block, OP(0)))
 GENERIC_TRANSLATION(DIV32r, doDivR<32>(ip, block, OP(0)))
+GENERIC_TRANSLATION(DIV64r, doDivR<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION_MEM(DIV8m, 
     doDivM<8>(ip,    block, ADDR(0)),
     doDivM<8>(ip,    block, STD_GLOBAL_OP(0)))
@@ -673,6 +681,9 @@ GENERIC_TRANSLATION_MEM(DIV16m,
 GENERIC_TRANSLATION_MEM(DIV32m, 
     doDivM<32>(ip,   block, ADDR(0)),
     doDivM<32>(ip,   block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_MEM(DIV64m, 
+    doDivM<64>(ip,   block, ADDR(0)),
+    doDivM<64>(ip,   block, STD_GLOBAL_OP(0)))
 
 void MULDIV_populateDispatchMap(DispatchMap &m) {
 
@@ -683,13 +694,16 @@ void MULDIV_populateDispatchMap(DispatchMap &m) {
     m[X86::IMUL16r] = translate_IMUL16r;
     m[X86::IMUL16m] = translate_IMUL16m;
     m[X86::MUL32r] = translate_MUL32r;
+    m[X86::MUL64r] = translate_MUL64r;
     m[X86::MUL32m] = translate_MUL32m;
+    m[X86::MUL64m] = translate_MUL64m;
     m[X86::MUL16r] = translate_MUL16r;
     m[X86::MUL16m] = translate_MUL16m;
     m[X86::MUL8r] = translate_MUL8r;
     m[X86::MUL8m] = translate_MUL8m;
     m[X86::IMUL32r] = translate_IMUL32r;
     m[X86::IMUL32m] = translate_IMUL32m;
+    m[X86::IMUL64m] = translate_IMUL64m;
     m[X86::IMUL32rr] = translate_IMUL32rr;
     m[X86::IMUL16rr] = translate_IMUL16rr;
     m[X86::IMUL16rmi] = translate_IMUL16rmi;
@@ -717,7 +731,9 @@ void MULDIV_populateDispatchMap(DispatchMap &m) {
     m[X86::DIV8r] = translate_DIV8r;
     m[X86::DIV16r] = translate_DIV16r;
     m[X86::DIV32r] = translate_DIV32r;
+    m[X86::DIV64r] = translate_DIV64r;
     m[X86::DIV8m] = translate_DIV8m;
     m[X86::DIV16m] = translate_DIV16m;
     m[X86::DIV32m] = translate_DIV32m;
+    m[X86::DIV64m] = translate_DIV64m;
 }
