@@ -873,4 +873,5 @@ void Bitops_populateDispatchMap(DispatchMap &m)
     m[X86::XOR8rr] = translate_XOR8rr;
     m[X86::XOR8rr_REV] = translate_XOR8rr_REV;
 	m[X86::XOR64mi8] = translate_XOR64mi8;
+    m[X86::XOR64i32] = translate_XOR64i32;
 }
