@@ -377,7 +377,7 @@ static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&bl
                 ip->get_call_tgt(0)
             );
         Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+            callback_fn, llvm::Type::getInt64Ty(block->getContext()), "", block);
         llvm::errs() << "Doing MOV64mi with call_tgt at: " << to_string<VA>(ip->get_loc(), hex) << ", imm32: " << (int)(OP(5).getImm()) << "\n";
         ret = doMIMovV<64>(ip, block, ADDR(0), addrInt);
     }
