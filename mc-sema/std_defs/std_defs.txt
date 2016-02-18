@@ -951,6 +951,7 @@ memset 3 C N
 memcmp 3 C N
 memchr 3 C N
 rawmemchr 2 C N
+__rawmemchr 2 C N
 memrchr 3 C N
 strcpy 2 C N
 strncpy 3 C N
