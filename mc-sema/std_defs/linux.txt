@@ -6467,3 +6467,12 @@ inet_ntoa 1 C N
 inet_makeaddr 2 C N
 inet_lnaof 2 C N
 inet_netof 2 C N
+
+DATA: stderr 8
+DATA: stdout 8
+DATA: stdin 8
+
+__libc_start_main 7 C Y
+_ZStlsISt11char_traitsIcEERSt13basic_ostreamIcT_ES5_PKc 3 C N
+_ZNSolsEPFRSoS_E 2 C N
+_ZSt4endlIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_ 2 C N
