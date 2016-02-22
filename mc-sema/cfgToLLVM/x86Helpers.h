@@ -90,13 +90,23 @@ llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t val);
 
 // Assume the instruction has a data reference, and
 // return a computed pointer to that data reference
-llvm::Value* GLOBAL_DATA_OFFSET(llvm::BasicBlock *b, 
+llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *b, 
         NativeModulePtr mod, 
-        InstPtr ip);
+        InstPtr ip)
+{
+    
+	llvm::Module *M = b->getParent()->getParent();
+	int regWidth = getPointerSize(M);
+    if(regWidth == x86::REG_SIZE){
+        return IMM_AS_DATA_REF<32>(b, mod, ip);
+    } else {
+        return IMM_AS_DATA_REF<64>(b, mod, ip);
+    }
+}
  
 // this is an alias for getAddressFromExpr, but used when
 // we expect the address computation to contain a data reference
-llvm::Value *GLOBAL(llvm::BasicBlock *B, 
+llvm::Value *MEM_AS_DATA_REF(llvm::BasicBlock *B, 
         NativeModulePtr natM, 
         const llvm::MCInst &inst, 
         InstPtr ip,
@@ -114,10 +124,14 @@ bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr);
 
 // return a computed pointer to that data reference for 32/64 bit architecture
 template <int width>
-llvm::Value* GLOBAL_DATA_OFFSET(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
+llvm::Value* IMM_AS_DATA_REF(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
 {
     VA  baseGlobal;
-    uint64_t off = ip->get_data_offset();
+    // off is the displacement part of a memory reference
+    if(false == ip->has_imm_reference) {
+        throw TErr(__LINE__, __FILE__, "Want to use IMM as data ref but have no IMM reference");
+    }
+    uint64_t off = ip->get_reference(Inst::IMMRef);
 
     if( addrIsInData(off, mod, baseGlobal, 0) ) {
         //we should be able to find a reference to this in global data
