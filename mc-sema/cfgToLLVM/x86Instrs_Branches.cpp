@@ -771,7 +771,7 @@ static InstTransResult translate_JMP32m(NativeModulePtr natM,
       // noreturn api calls don't need to fix stack
       return ret;
     }
-  } else if (ip->has_jump_table() && ip->is_data_offset()) {
+  } else if (ip->has_jump_table() && ip->has_mem_reference) {
     // this is a jump table that got converted
     // into a table in the data section
     doJumpTableViaData(natM, block, ip, inst, 32);
@@ -805,8 +805,8 @@ static InstTransResult translate_CALLpcrel32(NativeModulePtr natM,
   if (ip->has_ext_call_target()) {
     std::string s = ip->get_ext_call_target()->getSymbolName();
     ret = doCallPCExtern(block, s);
-  } else if (ip->has_call_tgt()) {
-    int64_t off = (int64_t) ip->get_call_tgt(0);
+  } else if (ip->has_code_ref()) {
+    int64_t off = (int64_t) ip->get_reference(Inst::IMMRef);
     ret = doCallPC(ip, block, off);
   } else {
     int64_t off = (int64_t) OP(0).getImm();
@@ -824,8 +824,8 @@ static InstTransResult translate_CALL64pcrel32(NativeModulePtr natM,
   if (ip->has_ext_call_target()) {
     std::string s = ip->get_ext_call_target()->getSymbolName();
     ret = x86_64::doCallPCExtern(block, s);
-  } else if (ip->has_call_tgt()) {
-    int64_t off = (int64_t) ip->get_call_tgt(0);
+  } else if (ip->has_code_ref()) {
+    int64_t off = (int64_t) ip->get_reference(Inst::IMMRef);
     ret = x86_64::doCallPC(ip, block, off);
   } else {
     int64_t off = (int64_t) OP(0).getImm();
@@ -846,16 +846,16 @@ static InstTransResult translate_CALL32m(NativeModulePtr natM,
     std::string s = ip->get_ext_call_target()->getSymbolName();
     ret = doCallPCExtern(block, s);
     // not external call, but some weird way of calling local function?
-  } else if (ip->has_call_tgt()) {
-    ret = doCallPC(ip, block, ip->get_call_tgt(0));
+  } else if (ip->has_code_ref()) {
+    ret = doCallPC(ip, block, ip->get_reference(Inst::MEMRef));
   }
   // is this referencing global data?
-  else if (ip->is_data_offset()) {
-    doCallM<32>(block, ip, STD_GLOBAL_OP(0));
+  else if (ip->has_mem_reference) {
+    doCallM<32>(block, ip, MEM_REFERENCE(0));
     ret = ContinueBlock;
     // is this a simple address computation?
   } else {
-    doCallM<32>(block, ip, ADDR(0));
+    doCallM<32>(block, ip, ADDR_NOREF(0));
     ret = ContinueBlock;
   }
 
@@ -973,16 +973,16 @@ static InstTransResult translate_CALL64m(NativeModulePtr natM,
     ret = x86_64::doCallPCExtern(block, s);
 
     // not external call, but some weird way of calling local function?
-  } else if (ip->has_call_tgt()) {
-    ret = x86_64::doCallPC(ip, block, ip->get_call_tgt(0));
+  } else if (ip->has_code_ref()) {
+    ret = x86_64::doCallPC(ip, block, ip->get_reference(Inst::MEMRef));
   }
   // is this referencing global data?
-  else if (ip->is_data_offset()) {
-    doCallM<64>(block, ip, STD_GLOBAL_OP(0));
+  else if (ip->has_mem_reference) {
+    doCallM<64>(block, ip, MEM_REFERENCE(0));
     ret = ContinueBlock;
     // is this a simple address computation?
   } else {
-    doCallM<64>(block, ip, ADDR(0));
+    doCallM<64>(block, ip, ADDR_NOREF(0));
     ret = ContinueBlock;
   }
 
@@ -1033,7 +1033,7 @@ static InstTransResult translate_JMP64m(NativeModulePtr natM,
       // noreturn api calls don't need to fix stack
       return ret;
     }
-  } else if (ip->has_jump_table() && ip->is_data_offset()) {
+  } else if (ip->has_jump_table() && ip->has_mem_reference) {
     // this is a jump table that got converted
     // into a table in the data section
     doJumpTableViaData(natM, block, ip, inst, 64);
@@ -1047,8 +1047,8 @@ static InstTransResult translate_JMP64m(NativeModulePtr natM,
     doJumpTableViaSwitch(natM, block, ip, inst, 64);
     return EndBlock;
 
-  } else if (ip->is_data_offset()) {
-    doCallM<64>(block, ip, STD_GLOBAL_OP(0));
+  } else if (ip->has_mem_reference) {
+    doCallM<64>(block, ip, MEM_REFERENCE(0));
     // clear stack
     return doRetQ(block);
   }

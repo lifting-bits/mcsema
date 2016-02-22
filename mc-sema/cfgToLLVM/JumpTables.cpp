@@ -191,7 +191,7 @@ void doJumpTableViaData(
         MCInst &inst,
         const int bitness)
 {
-    Value *addr = STD_GLOBAL_OP(0); 
+    Value *addr = MEM_REFERENCE(0); 
     //doJumpTableViaData(block, addr, bitness);
 
     llvm::errs() << __FUNCTION__ << ": Doing jump table via data\n";

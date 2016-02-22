@@ -651,24 +651,24 @@ GENERIC_TRANSLATION(CLD, doCld(block))
 GENERIC_TRANSLATION(STC, doStc(block))
 GENERIC_TRANSLATION(CLC, doClc(block))
 
-GENERIC_TRANSLATION_MEM(LEA16r, 
-	doLea<16>(ip, block, ADDR(1), OP(0)),
-	doLea<16>(ip, block, STD_GLOBAL_OP(1), OP(0))) 
+GENERIC_TRANSLATION_REF(LEA16r, 
+	doLea<16>(ip, block, ADDR_NOREF(1), OP(0)),
+	doLea<16>(ip, block, MEM_REFERENCE(1), OP(0))) 
 
 static InstTransResult translate_LEA32r(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
-    if( ip->has_call_tgt() ) {
+    if( ip->has_code_ref() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(), 
-                ip->get_call_tgt(0));
+                ip->get_reference(Inst::MEMRef));
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
         ret = doLeaV<32>(block, OP(0), addrInt);
-    } else if( ip->is_data_offset() ) {
-        ret = doLea<32>(ip, block, STD_GLOBAL_OP(1), OP(0));
+    } else if( ip->has_mem_reference ) {
+        ret = doLea<32>(ip, block, MEM_REFERENCE(1), OP(0));
     } else { 
-        ret = doLea<32>(ip, block, ADDR(1), OP(0));
+        ret = doLea<32>(ip, block, ADDR_NOREF(1), OP(0));
     }
     return ret;
 }
@@ -676,10 +676,10 @@ static InstTransResult translate_LEA32r(NativeModulePtr natM, BasicBlock *&block
 static InstTransResult translate_LEA64r(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
-    if( ip->has_call_tgt() ) {
+    if( ip->has_code_ref() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(), 
-                ip->get_call_tgt(0));
+                ip->get_reference(Inst::MEMRef));
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt64Ty(block->getContext()), "", block);
         ret = doLeaV<64>(block, OP(0), addrInt);
@@ -687,10 +687,10 @@ static InstTransResult translate_LEA64r(NativeModulePtr natM, BasicBlock *&block
     	Value *addrInt = getValueForExternal<64>(F->getParent(), ip, block);
     	ret = doLeaV<64>(block, OP(0), addrInt);
     }
-    else if( ip->is_data_offset() ) {
-        ret = doLea<64>(ip, block, STD_GLOBAL_OP(1), OP(0));
+    else if( ip->has_mem_reference ) {
+        ret = doLea<64>(ip, block, MEM_REFERENCE(1), OP(0));
     } else { 
-        ret = doLea<64>(ip, block, ADDR(1), OP(0));
+        ret = doLea<64>(ip, block, ADDR_NOREF(1), OP(0));
     }
     return ret;
 }
@@ -698,25 +698,25 @@ static InstTransResult translate_LEA64r(NativeModulePtr natM, BasicBlock *&block
 static InstTransResult translate_LEA64_32r(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
-    if( ip->has_call_tgt() ) {
+    if( ip->has_code_ref() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(),
-                ip->get_call_tgt(0));
+                ip->get_reference(Inst::MEMRef));
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
         ret = doLeaV<32>(block, OP(0), addrInt);
-    } else if( ip->is_data_offset() ) {
-        ret = doLea<32>(ip, block, STD_GLOBAL_OP(1), OP(0));
+    } else if( ip->has_mem_reference ) {
+        ret = doLea<32>(ip, block, MEM_REFERENCE(1), OP(0));
     } else {
-        ret = doLea<32>(ip, block, ADDR(1), OP(0));
+        ret = doLea<32>(ip, block, ADDR_NOREF(1), OP(0));
     }
     return ret;
 }
 
 
-//GENERIC_TRANSLATION_MEM(LEA32r, 
-//	doLea<32>(ip, block, ADDR(1), OP(0)),
-//	doLea<32>(ip, block, STD_GLOBAL_OP(1), OP(0))) 
+//GENERIC_TRANSLATION_REF(LEA32r, 
+//	doLea<32>(ip, block, ADDR_NOREF(1), OP(0)),
+//	doLea<32>(ip, block, MEM_REFERENCE(1), OP(0))) 
 
 GENERIC_TRANSLATION(AAA, doAAA(block))
 GENERIC_TRANSLATION(AAS, doAAS(block))
@@ -734,9 +734,9 @@ GENERIC_TRANSLATION(BT16rr, doBtrr<16>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BSR32rr, doBsrr<32>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BSR16rr, doBsrr<16>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BSF32rr, doBsfr<32>(block, OP(0), OP(1)))
-GENERIC_TRANSLATION_MEM(BSF32rm,
-        (doBsfrm<32>(ip, block, OP(0), ADDR(1))),
-        (doBsfrm<32>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(BSF32rm,
+        (doBsfrm<32>(ip, block, OP(0), ADDR_NOREF(1))),
+        (doBsfrm<32>(ip, block, OP(0), MEM_REFERENCE(1))) )
 GENERIC_TRANSLATION(BSF16rr, doBsfr<16>(block, OP(0), OP(1)))
 
 void Misc_populateDispatchMap(DispatchMap &m) {

@@ -256,36 +256,36 @@ GENERIC_TRANSLATION(DEC64_16r, (doDecR<16, 64>(ip, block, OP(0))))
 GENERIC_TRANSLATION(DEC64_32r, (doDecR<32, 64>(ip, block, OP(0))))
 GENERIC_TRANSLATION(DEC16r, (doDecR<16, 16>(ip, block, OP(0))))
 GENERIC_TRANSLATION(DEC8r, (doDecR<8, 8>(ip, block, OP(0))))
-GENERIC_TRANSLATION_MEM(DEC16m, 
-	(doDecM<16,16>(ip, block, ADDR(0))),
-	(doDecM<16,16>(ip, block, STD_GLOBAL_OP(0))) )
-GENERIC_TRANSLATION_MEM(DEC32m, 
-	(doDecM<32,32>(ip, block, ADDR(0))),
-	(doDecM<32,32>(ip, block, STD_GLOBAL_OP(0))) )
-GENERIC_TRANSLATION_MEM(DEC64m, 
-	(doDecM<64,64>(ip, block, ADDR(0))),
-	(doDecM<64,64>(ip, block, STD_GLOBAL_OP(0))) )
-GENERIC_TRANSLATION_MEM(DEC8m, 
-	(doDecM<8,8>(ip, block, ADDR(0))) ,
-	(doDecM<8,8>(ip, block, STD_GLOBAL_OP(0))) )
-GENERIC_TRANSLATION_MEM(DEC64_32m, 
-	(doDecM<32,64>(ip, block, ADDR(0))) ,
-	(doDecM<32,64>(ip, block, STD_GLOBAL_OP(0))) )
+GENERIC_TRANSLATION_REF(DEC16m, 
+	(doDecM<16,16>(ip, block, ADDR_NOREF(0))),
+	(doDecM<16,16>(ip, block, MEM_REFERENCE(0))) )
+GENERIC_TRANSLATION_REF(DEC32m, 
+	(doDecM<32,32>(ip, block, ADDR_NOREF(0))),
+	(doDecM<32,32>(ip, block, MEM_REFERENCE(0))) )
+GENERIC_TRANSLATION_REF(DEC64m, 
+	(doDecM<64,64>(ip, block, ADDR_NOREF(0))),
+	(doDecM<64,64>(ip, block, MEM_REFERENCE(0))) )
+GENERIC_TRANSLATION_REF(DEC8m, 
+	(doDecM<8,8>(ip, block, ADDR_NOREF(0))) ,
+	(doDecM<8,8>(ip, block, MEM_REFERENCE(0))) )
+GENERIC_TRANSLATION_REF(DEC64_32m, 
+	(doDecM<32,64>(ip, block, ADDR_NOREF(0))) ,
+	(doDecM<32,64>(ip, block, MEM_REFERENCE(0))) )
 GENERIC_TRANSLATION(DEC32r, (doDecR<32,32>(ip, block, OP(0))) )
 GENERIC_TRANSLATION(DEC64r, (doDecR<64,64>(ip, block, OP(0))) )
-GENERIC_TRANSLATION_MEM(INC16m, 
-	doIncM<16>(ip, block, ADDR(0)),
-	doIncM<16>(ip, block, STD_GLOBAL_OP(0)))
-GENERIC_TRANSLATION_MEM(INC32m, 
-	doIncM<32>(ip, block, ADDR(0)),
-	doIncM<32>(ip, block, STD_GLOBAL_OP(0)))
-GENERIC_TRANSLATION_MEM(INC8m, 
-	doIncM<8>(ip, block, ADDR(0)),
-	doIncM<8>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(INC16m, 
+	doIncM<16>(ip, block, ADDR_NOREF(0)),
+	doIncM<16>(ip, block, MEM_REFERENCE(0)))
+GENERIC_TRANSLATION_REF(INC32m, 
+	doIncM<32>(ip, block, ADDR_NOREF(0)),
+	doIncM<32>(ip, block, MEM_REFERENCE(0)))
+GENERIC_TRANSLATION_REF(INC8m, 
+	doIncM<8>(ip, block, ADDR_NOREF(0)),
+	doIncM<8>(ip, block, MEM_REFERENCE(0)))
 	
-GENERIC_TRANSLATION_MEM(INC64m,
-	doIncM<64>(ip, block, ADDR(0)),
-	doIncM<64>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(INC64m,
+	doIncM<64>(ip, block, ADDR_NOREF(0)),
+	doIncM<64>(ip, block, MEM_REFERENCE(0)))
 	
 GENERIC_TRANSLATION(INC16r, doIncR<16>(ip, block, OP(0)))
 GENERIC_TRANSLATION(INC8r, doIncR<8>(ip, block, OP(0)))
@@ -362,21 +362,21 @@ translate_INC64_16r(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst
 }
 
 //GENERIC_TRANSLATION(INC64r, doIncR<64>(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(NEG16m, 
-	doNegM<16>(ip, block, ADDR(0)),
-	doNegM<16>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(NEG16m, 
+	doNegM<16>(ip, block, ADDR_NOREF(0)),
+	doNegM<16>(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(NEG16r, doNegR<16>(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(NEG32m, 
-	doNegM<32>(ip, block, ADDR(0)),
-	doNegM<32>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(NEG32m, 
+	doNegM<32>(ip, block, ADDR_NOREF(0)),
+	doNegM<32>(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(NEG32r, doNegR<32>(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(NEG64m,
-  doNegM<64>(ip, block, ADDR(0)),
-  doNegM<64>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(NEG64m,
+  doNegM<64>(ip, block, ADDR_NOREF(0)),
+  doNegM<64>(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(NEG64r, doNegR<64>(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(NEG8m, 
-	doNegM<8>(ip, block, ADDR(0)),
-	doNegM<8>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(NEG8m, 
+	doNegM<8>(ip, block, ADDR_NOREF(0)),
+	doNegM<8>(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(NEG8r, doNegR<8>(ip, block, OP(0)))
 
 void INCDECNEG_populateDispatchMap(DispatchMap &m) {

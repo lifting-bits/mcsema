@@ -532,236 +532,239 @@ static InstTransResult doXorRR(InstPtr ip, BasicBlock *&b,
 }
 
 GENERIC_TRANSLATION(AND16i16, doAndRI<16>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
-GENERIC_TRANSLATION_MEM(AND16mi,
-	doAndMI<16>(ip, block, ADDR(0), OP(5)),
-	doAndMI<16>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(AND16mi8,
-	doAndMI<16>(ip, block, ADDR(0), OP(5)),
-	doAndMI<16>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(AND16mr,
-	doAndMR<16>(ip, block, ADDR(0), OP(5)),
-	doAndMR<16>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(AND16mi,
+	doAndMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
+	doAndMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(AND16mi8,
+	doAndMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
+	doAndMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(AND16mr,
+	doAndMR<16>(ip, block, ADDR_NOREF(0), OP(5)),
+	doAndMR<16>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION(AND16ri, doAndRI<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND16ri8, doAndRI<16>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(AND16rm,
-	doAndRM<16>(ip, block, ADDR(2), OP(0), OP(1)),
-	doAndRM<16>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
+GENERIC_TRANSLATION_REF(AND16rm,
+	doAndRM<16>(ip, block, ADDR_NOREF(2), OP(0), OP(1)),
+	doAndRM<16>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(AND16rr, doAndRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND16rr_REV, doAndRR<16>(ip, block, OP(0), OP(1), OP(2)))
 //GENERIC_TRANSLATION(AND32i32, doAndRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
-GENERIC_TRANSLATION_MEM(AND32i32, 
+GENERIC_TRANSLATION_REF(AND32i32, 
         doAndRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
-        doAndRV<32>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+        doAndRV<32>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
 
-GENERIC_TRANSLATION_32MI(AND32mi,
-	doAndMI<32>(ip, block, ADDR(0), OP(5)),
-	doAndMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
-    doAndMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip)))
+GENERIC_TRANSLATION_MI(AND32mi,
+	doAndMI<32>(ip, block, ADDR_NOREF(0), OP(5)),
+	doAndMI<32>(ip, block, MEM_REFERENCE(0), OP(5)),
+    doAndMV<32>(ip, block, ADDR_NOREF(0), IMM_AS_DATA_REF(block, natM, ip)),
+    doAndMV<32>(ip, block, MEM_REFERENCE(0), IMM_AS_DATA_REF(block, natM, ip)))
 
-GENERIC_TRANSLATION_MEM(AND64mi8,
-     doAndMI<64>(ip, block, ADDR(0), OP(5)),
-     doAndMI<64>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(AND64mi32,
-      doAndMI<64>(ip, block, ADDR(0), OP(5)),
-      doAndMI<64>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(AND64mi8,
+     doAndMI<64>(ip, block, ADDR_NOREF(0), OP(5)),
+     doAndMI<64>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(AND64mi32,
+      doAndMI<64>(ip, block, ADDR_NOREF(0), OP(5)),
+      doAndMI<64>(ip, block, MEM_REFERENCE(0), OP(5)))
 
-GENERIC_TRANSLATION_MEM(AND32mi8,
-	doAndMI<32>(ip, block, ADDR(0), OP(5)),
-	doAndMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(AND32mr,
-	doAndMR<32>(ip, block, ADDR(0), OP(5)),
-	doAndMR<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(AND64mr,
-	doAndMR<64>(ip, block, ADDR(0), OP(5)),
-	doAndMR<64>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(AND32mi8,
+	doAndMI<32>(ip, block, ADDR_NOREF(0), OP(5)),
+	doAndMI<32>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(AND32mr,
+	doAndMR<32>(ip, block, ADDR_NOREF(0), OP(5)),
+	doAndMR<32>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(AND64mr,
+	doAndMR<64>(ip, block, ADDR_NOREF(0), OP(5)),
+	doAndMR<64>(ip, block, MEM_REFERENCE(0), OP(5)))
 
 GENERIC_TRANSLATION(AND32ri, doAndRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND32ri8, doAndRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND64ri8, doAndRI<64>(ip, block, OP(0), OP(1), OP(2)))
 //GENERIC_TRANSLATION(AND64ri32, doAndRI<64>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(AND64ri32, 
+GENERIC_TRANSLATION_REF(AND64ri32, 
         doAndRI<64>(ip, block, OP(0), OP(1), OP(2)),
-        doAndRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), OP(0), OP(1)))
+        doAndRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), OP(0), OP(1)))
 //GENERIC_TRANSLATION(AND64i32, doAndRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)))
-GENERIC_TRANSLATION_MEM(AND64i32, 
+GENERIC_TRANSLATION_REF(AND64i32, 
         doAndRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
-        doAndRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
+        doAndRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
 
-GENERIC_TRANSLATION_MEM(AND32rm,
-	doAndRM<32>(ip, block, ADDR(2), OP(0), OP(1)),
-	doAndRM<32>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
-GENERIC_TRANSLATION_MEM(AND64rm,
-	doAndRM<64>(ip, block, ADDR(2), OP(0), OP(1)),
-	doAndRM<64>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
+GENERIC_TRANSLATION_REF(AND32rm,
+	doAndRM<32>(ip, block, ADDR_NOREF(2), OP(0), OP(1)),
+	doAndRM<32>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
+GENERIC_TRANSLATION_REF(AND64rm,
+	doAndRM<64>(ip, block, ADDR_NOREF(2), OP(0), OP(1)),
+	doAndRM<64>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
 
 GENERIC_TRANSLATION(AND64rr, doAndRR<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND32rr, doAndRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND32rr_REV, doAndRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND8i8, doAndRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
-GENERIC_TRANSLATION_MEM(AND8mi,
-	doAndMI<8>(ip, block, ADDR(0), OP(5)),
-	doAndMI<8>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(AND8mr,
-	doAndMR<8>(ip, block, ADDR(0), OP(5)),
-	doAndMR<8>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(AND8mi,
+	doAndMI<8>(ip, block, ADDR_NOREF(0), OP(5)),
+	doAndMI<8>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(AND8mr,
+	doAndMR<8>(ip, block, ADDR_NOREF(0), OP(5)),
+	doAndMR<8>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION(AND8ri, doAndRI<8>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(AND8rm,
-	doAndRM<8>(ip, block, ADDR(2), OP(0), OP(1)),
-	doAndRM<8>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
+GENERIC_TRANSLATION_REF(AND8rm,
+	doAndRM<8>(ip, block, ADDR_NOREF(2), OP(0), OP(1)),
+	doAndRM<8>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(AND8rr, doAndRR<8>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND8rr_REV, doAndRR<8>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(NOT16m,
-	doNotM<16>(ip, block, ADDR(0)),
-	doNotM<16>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(NOT16m,
+	doNotM<16>(ip, block, ADDR_NOREF(0)),
+	doNotM<16>(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(NOT16r, doNotR<16>(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(NOT32m,
-	doNotM<32>(ip, block, ADDR(0)),
-	doNotM<32>(ip, block, STD_GLOBAL_OP(0)))
-GENERIC_TRANSLATION_MEM(NOT64m,
-	doNotM<64>(ip, block, ADDR(0)),
-	doNotM<64>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(NOT32m,
+	doNotM<32>(ip, block, ADDR_NOREF(0)),
+	doNotM<32>(ip, block, MEM_REFERENCE(0)))
+GENERIC_TRANSLATION_REF(NOT64m,
+	doNotM<64>(ip, block, ADDR_NOREF(0)),
+	doNotM<64>(ip, block, MEM_REFERENCE(0)))
 
 GENERIC_TRANSLATION(NOT32r, doNotR<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(NOT64r, doNotR<64>(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(NOT8m,
-	doNotM<8>(ip, block, ADDR(0)),
-	doNotM<8>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(NOT8m,
+	doNotM<8>(ip, block, ADDR_NOREF(0)),
+	doNotM<8>(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(NOT8r, doNotR<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(OR16i16, doOrRI<16>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
-GENERIC_TRANSLATION_MEM(OR16mi,
-	doOrMI<16>(ip, block, ADDR(0), OP(5)),
-	doOrMI<16>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(OR16mi8,
-	doOrMI<16>(ip, block, ADDR(0), OP(5)),
-	doOrMI<16>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(OR16mr,
-	doOrMR<16>(ip, block, ADDR(0), OP(5)),
-	doOrMR<16>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(OR16mi,
+	doOrMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
+	doOrMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(OR16mi8,
+	doOrMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
+	doOrMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(OR16mr,
+	doOrMR<16>(ip, block, ADDR_NOREF(0), OP(5)),
+	doOrMR<16>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION(OR16ri, doOrRI<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(OR16ri8, doOrRI<16>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(OR16rm,
-	doOrRM<16>(ip, block, ADDR(2), OP(0), OP(1)),
-	doOrRM<16>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
+GENERIC_TRANSLATION_REF(OR16rm,
+	doOrRM<16>(ip, block, ADDR_NOREF(2), OP(0), OP(1)),
+	doOrRM<16>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(OR16rr, doOrRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(OR16rr_REV, doOrRR<16>(ip, block, OP(0), OP(1), OP(2)))
 //GENERIC_TRANSLATION(OR32i32, doOrRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
-GENERIC_TRANSLATION_MEM(OR32i32, 
+GENERIC_TRANSLATION_REF(OR32i32, 
         doOrRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
-        doOrRV<32>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
-GENERIC_TRANSLATION_MEM(OR64i32, 
+        doOrRV<32>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+GENERIC_TRANSLATION_REF(OR64i32, 
         doOrRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
-        doOrRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
-GENERIC_TRANSLATION_MEM(OR64ri32, 
+        doOrRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
+GENERIC_TRANSLATION_REF(OR64ri32, 
         doOrRI<64>(ip, block, OP(0), OP(1), OP(2)),
-        doOrRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), OP(0), OP(1)))
+        doOrRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), OP(0), OP(1)))
 
-GENERIC_TRANSLATION_32MI(OR32mi,
-	doOrMI<32>(ip, block, ADDR(0), OP(5)),
-	doOrMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
-    doOrMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip)))
+GENERIC_TRANSLATION_MI(OR32mi,
+	doOrMI<32>(ip, block, ADDR_NOREF(0), OP(5)),
+	doOrMI<32>(ip, block, MEM_REFERENCE(0), OP(5)),
+    doOrMV<32>(ip,  block, ADDR_NOREF(0), IMM_AS_DATA_REF(block, natM, ip)),
+    doOrMV<32>(ip,  block, MEM_REFERENCE(0), IMM_AS_DATA_REF(block, natM, ip)))
 
-GENERIC_TRANSLATION_MEM(OR32mi8,
-	doOrMI<32>(ip, block, ADDR(0), OP(5)),
-	doOrMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(OR32mr,
-	doOrMR<32>(ip, block, ADDR(0), OP(5)),
-	doOrMR<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(OR32mi8,
+	doOrMI<32>(ip, block, ADDR_NOREF(0), OP(5)),
+	doOrMI<32>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(OR32mr,
+	doOrMR<32>(ip, block, ADDR_NOREF(0), OP(5)),
+	doOrMR<32>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION(OR32ri, doOrRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(OR32ri8, doOrRI<32>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(OR32rm,
-	doOrRM<32>(ip, block, ADDR(2), OP(0), OP(1)),
-	doOrRM<32>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
+GENERIC_TRANSLATION_REF(OR32rm,
+	doOrRM<32>(ip, block, ADDR_NOREF(2), OP(0), OP(1)),
+	doOrRM<32>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(OR32rr, doOrRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(OR32rr_REV, doOrRR<32>(ip, block, OP(0), OP(1), OP(2)))
 
 GENERIC_TRANSLATION(OR64ri8, doOrRI<64>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(OR64rm,
-  doOrRM<64>(ip, block, ADDR(2), OP(0), OP(1)),
-  doOrRM<64>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
+GENERIC_TRANSLATION_REF(OR64rm,
+  doOrRM<64>(ip, block, ADDR_NOREF(2), OP(0), OP(1)),
+  doOrRM<64>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(OR64rr, doOrRR<64>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(OR64mi8,
-     doOrMI<64>(ip, block, ADDR(0), OP(5)),
-     doOrMI<64>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(OR64mi8,
+     doOrMI<64>(ip, block, ADDR_NOREF(0), OP(5)),
+     doOrMI<64>(ip, block, MEM_REFERENCE(0), OP(5)))
 
 GENERIC_TRANSLATION(OR8i8, doOrRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
-GENERIC_TRANSLATION_MEM(OR8mi,
-	doOrMI<8>(ip, block, ADDR(0), OP(5)),
-	doOrMI<8>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(OR8mr,
-	doOrMR<8>(ip, block, ADDR(0), OP(5)),
-	doOrMR<8>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(OR8mi,
+	doOrMI<8>(ip, block, ADDR_NOREF(0), OP(5)),
+	doOrMI<8>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(OR8mr,
+	doOrMR<8>(ip, block, ADDR_NOREF(0), OP(5)),
+	doOrMR<8>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION(OR8ri, doOrRI<8>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(OR8rm,
-	doOrRM<8>(ip, block, ADDR(2), OP(0), OP(1)),
-	doOrRM<8>(ip, block, STD_GLOBAL_OP(2), OP(0), OP(1)))
+GENERIC_TRANSLATION_REF(OR8rm,
+	doOrRM<8>(ip, block, ADDR_NOREF(2), OP(0), OP(1)),
+	doOrRM<8>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(OR8rr, doOrRR<8>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(OR8rr_REV, doOrRR<8>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR16i16, doXorRI<16>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
-GENERIC_TRANSLATION_MEM(XOR16mi,
-	doXorMI<16>(ip, block, ADDR(0), OP(5)),
-	doXorMI<16>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(XOR16mi8,
-	doXorMI<16>(ip, block, ADDR(0), OP(5)),
-	doXorMI<16>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(XOR16mr,
-	doXorMR<16>(ip, block, ADDR(0), OP(5)),
-	doXorMR<16>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(XOR16mi,
+	doXorMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
+	doXorMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(XOR16mi8,
+	doXorMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
+	doXorMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(XOR16mr,
+	doXorMR<16>(ip, block, ADDR_NOREF(0), OP(5)),
+	doXorMR<16>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION(XOR16ri, doXorRI<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR16ri8, doXorRI<16>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(XOR16rm,
-	doXorRM<16>(ip, block, OP(0), OP(1), ADDR(2)),
-	doXorRM<16>(ip, block, OP(0), OP(1), STD_GLOBAL_OP(2)))
+GENERIC_TRANSLATION_REF(XOR16rm,
+	doXorRM<16>(ip, block, OP(0), OP(1), ADDR_NOREF(2)),
+	doXorRM<16>(ip, block, OP(0), OP(1), MEM_REFERENCE(2)))
 GENERIC_TRANSLATION(XOR16rr, doXorRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR16rr_REV, doXorRR<16>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_32MI(XOR32mi,
-	doXorMI<32>(ip, block, ADDR(0), OP(5)),
-	doXorMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)),
-    doXorMV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip)))
+GENERIC_TRANSLATION_MI(XOR32mi,
+	doXorMI<32>(ip, block, ADDR_NOREF(0), OP(5)),
+	doXorMI<32>(ip, block, MEM_REFERENCE(0), OP(5)),
+    doXorMV<32>(ip,  block, ADDR_NOREF(0), IMM_AS_DATA_REF(block, natM, ip)),
+    doXorMV<32>(ip,  block, MEM_REFERENCE(0), IMM_AS_DATA_REF(block, natM, ip)))
 
-GENERIC_TRANSLATION_MEM(XOR32mi8,
-	doXorMI<32>(ip, block, ADDR(0), OP(5)),
-	doXorMI<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(XOR32mr,
-	doXorMR<32>(ip, block, ADDR(0), OP(5)),
-	doXorMR<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(XOR32mi8,
+	doXorMI<32>(ip, block, ADDR_NOREF(0), OP(5)),
+	doXorMI<32>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(XOR32mr,
+	doXorMR<32>(ip, block, ADDR_NOREF(0), OP(5)),
+	doXorMR<32>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION(XOR32ri, doXorRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR32ri8, doXorRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR64ri8, doXorRI<64>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(XOR32i32, 
+GENERIC_TRANSLATION_REF(XOR32i32, 
         doXorRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
-        doXorRV<32>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
-GENERIC_TRANSLATION_MEM(XOR64i32, 
+        doXorRV<32>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+GENERIC_TRANSLATION_REF(XOR64i32, 
         doXorRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
-        doXorRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
-GENERIC_TRANSLATION_MEM(XOR64ri32, 
+        doXorRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
+GENERIC_TRANSLATION_REF(XOR64ri32, 
         doXorRI<64>(ip, block, OP(0), OP(1), OP(2)),
-        doXorRV<64>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip), OP(0), OP(1)))
+        doXorRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), OP(0), OP(1)))
 
-GENERIC_TRANSLATION_MEM(XOR32rm,
-	doXorRM<32>(ip, block, OP(0), OP(1), ADDR(2)),
-	doXorRM<32>(ip, block, OP(0), OP(1), STD_GLOBAL_OP(2)))
+GENERIC_TRANSLATION_REF(XOR32rm,
+	doXorRM<32>(ip, block, OP(0), OP(1), ADDR_NOREF(2)),
+	doXorRM<32>(ip, block, OP(0), OP(1), MEM_REFERENCE(2)))
 GENERIC_TRANSLATION(XOR32rr, doXorRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR32rr_REV, doXorRR<32>(ip, block, OP(0), OP(1), OP(2)))
 
-GENERIC_TRANSLATION_MEM(XOR64rm,
-  doXorRM<64>(ip, block, OP(0), OP(1), ADDR(2)),
-  doXorRM<64>(ip, block, OP(0), OP(1), STD_GLOBAL_OP(2)))
+GENERIC_TRANSLATION_REF(XOR64rm,
+  doXorRM<64>(ip, block, OP(0), OP(1), ADDR_NOREF(2)),
+  doXorRM<64>(ip, block, OP(0), OP(1), MEM_REFERENCE(2)))
 GENERIC_TRANSLATION(XOR64rr, doXorRR<64>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(XOR64mi8,
-     doXorMI<64>(ip, block, ADDR(0), OP(5)),
-     doXorMI<64>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(XOR64mi8,
+     doXorMI<64>(ip, block, ADDR_NOREF(0), OP(5)),
+     doXorMI<64>(ip, block, MEM_REFERENCE(0), OP(5)))
 
 GENERIC_TRANSLATION(XOR8i8, doXorRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
-GENERIC_TRANSLATION_MEM(XOR8mi,
-	doXorMI<8>(ip, block, ADDR(0), OP(5)),
-	doXorMI<8>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(XOR8mr,
-	doXorMR<8>(ip, block, ADDR(0), OP(5)),
-	doXorMR<8>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(XOR8mi,
+	doXorMI<8>(ip, block, ADDR_NOREF(0), OP(5)),
+	doXorMI<8>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(XOR8mr,
+	doXorMR<8>(ip, block, ADDR_NOREF(0), OP(5)),
+	doXorMR<8>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION(XOR8ri, doXorRI<8>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(XOR8rm,
-	doXorRM<8>(ip, block, OP(0), OP(1), ADDR(2)),
-	doXorRM<8>(ip, block, OP(0), OP(1), STD_GLOBAL_OP(2)))
+GENERIC_TRANSLATION_REF(XOR8rm,
+	doXorRM<8>(ip, block, OP(0), OP(1), ADDR_NOREF(2)),
+	doXorRM<8>(ip, block, OP(0), OP(1), MEM_REFERENCE(2)))
 GENERIC_TRANSLATION(XOR8rr, doXorRR<8>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR8rr_REV, doXorRR<8>(ip, block, OP(0), OP(1), OP(2)))
 

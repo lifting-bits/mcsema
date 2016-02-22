@@ -206,12 +206,12 @@ static InstTransResult doMOVSrm(NativeModulePtr natM, BasicBlock *& block, InstP
         R_WRITE<width>(block, OP(0).getReg(), addrInt);
         return ContinueBlock;
     }
-    else if( ip->is_data_offset() ) {
+    else if( ip->has_mem_reference ) {
         ret = doRMMov<width>(ip, block, 
-                GLOBAL( block, natM, inst, ip, 1 ),
+                MEM_AS_DATA_REF( block, natM, inst, ip, 1 ),
                 OP(0) );
     } else {
-        ret = doRMMov<width>(ip, block, ADDR(1), OP(0));
+        ret = doRMMov<width>(ip, block, ADDR_NOREF(1), OP(0));
     }
     return ret ;
 
@@ -227,10 +227,10 @@ static InstTransResult doMOVSmr(NativeModulePtr natM, BasicBlock *& block, InstP
         TASSERT(addrInt != NULL, "Could not get address for external");
         return doMRMov<width>(ip, block, addrInt, OP(5) );
     }
-    else if( ip->is_data_offset() ) {
-        ret = doMRMov<width>(ip, block, GLOBAL( block, natM, inst, ip, 0), OP(5) );
+    else if( ip->has_mem_reference ) {
+        ret = doMRMov<width>(ip, block, MEM_AS_DATA_REF( block, natM, inst, ip, 0), OP(5) );
     } else { 
-        ret = doMRMov<width>(ip, block, ADDR(0), OP(5)) ; 
+        ret = doMRMov<width>(ip, block, ADDR_NOREF(0), OP(5)) ; 
     }
     return ret ; 
 }
@@ -332,7 +332,7 @@ static InstTransResult translate_CVTSI2SDrm(NativeModulePtr natM, BasicBlock *& 
     const MCOperand &dst = OP(0);
     NASSERT(dst.isReg()); 
 
-    Value *src = ADDR(1);
+    Value *src = ADDR_NOREF(1);
 
     // read 32 bits from memory
     Value *mval = M_READ<32>(ip, block, src);
@@ -384,7 +384,7 @@ static InstTransResult translate_CVTSD2SSrm(NativeModulePtr natM, BasicBlock *& 
     const MCOperand &dst = OP(0);
     NASSERT(dst.isReg()); 
 
-    Value *mem = ADDR(1);
+    Value *mem = ADDR_NOREF(1);
 
     Value *double_val = M_READ<64>(ip, block, mem);
 
@@ -449,7 +449,7 @@ static InstTransResult translate_CVTSS2SDrm(NativeModulePtr natM, BasicBlock *& 
     const MCOperand &dst = OP(0);
     NASSERT(dst.isReg()); 
 
-	Value *mem = ADDR(1);
+	Value *mem = ADDR_NOREF(1);
 
 	// read 32 bits from mem
 	Value *single_val = M_READ<32>(ip, block, mem);
@@ -525,7 +525,7 @@ static InstTransResult translate_CVTSI2SSrr(NativeModulePtr natM, BasicBlock *& 
 // convert signed integer (memory) to single precision float (xmm register)
 static InstTransResult translate_CVTSI2SSrm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     const MCOperand &dst = OP(0);
-    Value *mem_addr = ADDR(1);
+    Value *mem_addr = ADDR_NOREF(1);
 
     NASSERT(dst.isReg()); 
 
@@ -551,7 +551,7 @@ static InstTransResult translate_CVTSI2SS64rr(NativeModulePtr natM, BasicBlock *
 // convert signed integer (memory) to single precision float (xmm register)
 static InstTransResult translate_CVTSI2SS64rm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     const MCOperand &dst = OP(0);
-    Value *mem_addr = ADDR(1);
+    Value *mem_addr = ADDR_NOREF(1);
 
     NASSERT(dst.isReg());
 
@@ -584,7 +584,7 @@ static InstTransResult doCVTTS2SIrV(NativeModulePtr natM, BasicBlock *& block, I
 static InstTransResult translate_CVTTSD2SIrm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
 
     const MCOperand &dst = OP(0);
-    Value *mem_addr = ADDR(1);
+    Value *mem_addr = ADDR_NOREF(1);
 
     NASSERT(dst.isReg());
     
@@ -613,7 +613,7 @@ static InstTransResult translate_CVTTSD2SIrr(NativeModulePtr natM, BasicBlock *&
 static InstTransResult translate_CVTTSS2SIrm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
 
     const MCOperand &dst = OP(0);
-    Value *mem_addr = ADDR(1);
+    Value *mem_addr = ADDR_NOREF(1);
 
     NASSERT(dst.isReg());
     
@@ -2199,434 +2199,434 @@ GENERIC_TRANSLATION(MOVLHPSrr,
 
 GENERIC_TRANSLATION(PMOVSXBWrr,
         (do_SSE_EXTEND_RR<128,8,16,SEXT>(ip, block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(PMOVSXBWrm,
-        (do_SSE_EXTEND_RM<128,8,16,SEXT>(ip, block, OP(0), ADDR(1))),
-        (do_SSE_EXTEND_RM<128,8,16,SEXT>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(PMOVSXBWrm,
+        (do_SSE_EXTEND_RM<128,8,16,SEXT>(ip, block, OP(0), ADDR_NOREF(1))),
+        (do_SSE_EXTEND_RM<128,8,16,SEXT>(ip, block, OP(0), MEM_REFERENCE(1))) )
 GENERIC_TRANSLATION(PMOVSXBDrr,
         (do_SSE_EXTEND_RR<128,8,32,SEXT>(ip, block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(PMOVSXBDrm,
-        (do_SSE_EXTEND_RM<128,8,32,SEXT>(ip, block, OP(0), ADDR(1))),
-        (do_SSE_EXTEND_RM<128,8,32,SEXT>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(PMOVSXBDrm,
+        (do_SSE_EXTEND_RM<128,8,32,SEXT>(ip, block, OP(0), ADDR_NOREF(1))),
+        (do_SSE_EXTEND_RM<128,8,32,SEXT>(ip, block, OP(0), MEM_REFERENCE(1))) )
 GENERIC_TRANSLATION(PMOVSXBQrr,
         (do_SSE_EXTEND_RR<128,8,64,SEXT>(ip, block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(PMOVSXBQrm,
-        (do_SSE_EXTEND_RM<128,8,64,SEXT>(ip, block, OP(0), ADDR(1))),
-        (do_SSE_EXTEND_RM<128,8,64,SEXT>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(PMOVSXBQrm,
+        (do_SSE_EXTEND_RM<128,8,64,SEXT>(ip, block, OP(0), ADDR_NOREF(1))),
+        (do_SSE_EXTEND_RM<128,8,64,SEXT>(ip, block, OP(0), MEM_REFERENCE(1))) )
 GENERIC_TRANSLATION(PMOVSXWDrr,
         (do_SSE_EXTEND_RR<128,16,32,SEXT>(ip, block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(PMOVSXWDrm,
-        (do_SSE_EXTEND_RM<128,16,32,SEXT>(ip, block, OP(0), ADDR(1))),
-        (do_SSE_EXTEND_RM<128,16,32,SEXT>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(PMOVSXWDrm,
+        (do_SSE_EXTEND_RM<128,16,32,SEXT>(ip, block, OP(0), ADDR_NOREF(1))),
+        (do_SSE_EXTEND_RM<128,16,32,SEXT>(ip, block, OP(0), MEM_REFERENCE(1))) )
 GENERIC_TRANSLATION(PMOVSXWQrr,
         (do_SSE_EXTEND_RR<128,16,64,SEXT>(ip, block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(PMOVSXWQrm,
-        (do_SSE_EXTEND_RM<128,16,64,SEXT>(ip, block, OP(0), ADDR(1))),
-        (do_SSE_EXTEND_RM<128,16,64,SEXT>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(PMOVSXWQrm,
+        (do_SSE_EXTEND_RM<128,16,64,SEXT>(ip, block, OP(0), ADDR_NOREF(1))),
+        (do_SSE_EXTEND_RM<128,16,64,SEXT>(ip, block, OP(0), MEM_REFERENCE(1))) )
 GENERIC_TRANSLATION(PMOVSXDQrr,
         (do_SSE_EXTEND_RR<128,32,64,SEXT>(ip, block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(PMOVSXDQrm,
-        (do_SSE_EXTEND_RM<128,32,64,SEXT>(ip, block, OP(0), ADDR(1))),
-        (do_SSE_EXTEND_RM<128,32,64,SEXT>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(PMOVSXDQrm,
+        (do_SSE_EXTEND_RM<128,32,64,SEXT>(ip, block, OP(0), ADDR_NOREF(1))),
+        (do_SSE_EXTEND_RM<128,32,64,SEXT>(ip, block, OP(0), MEM_REFERENCE(1))) )
 
 GENERIC_TRANSLATION(PMOVZXBWrr,
         (do_SSE_EXTEND_RR<128,8,16,ZEXT>(ip, block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(PMOVZXBWrm,
-        (do_SSE_EXTEND_RM<128,8,16,ZEXT>(ip, block, OP(0), ADDR(1))),
-        (do_SSE_EXTEND_RM<128,8,16,ZEXT>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(PMOVZXBWrm,
+        (do_SSE_EXTEND_RM<128,8,16,ZEXT>(ip, block, OP(0), ADDR_NOREF(1))),
+        (do_SSE_EXTEND_RM<128,8,16,ZEXT>(ip, block, OP(0), MEM_REFERENCE(1))) )
 GENERIC_TRANSLATION(PMOVZXBDrr,
         (do_SSE_EXTEND_RR<128,8,32,ZEXT>(ip, block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(PMOVZXBDrm,
-        (do_SSE_EXTEND_RM<128,8,32,ZEXT>(ip, block, OP(0), ADDR(1))),
-        (do_SSE_EXTEND_RM<128,8,32,ZEXT>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(PMOVZXBDrm,
+        (do_SSE_EXTEND_RM<128,8,32,ZEXT>(ip, block, OP(0), ADDR_NOREF(1))),
+        (do_SSE_EXTEND_RM<128,8,32,ZEXT>(ip, block, OP(0), MEM_REFERENCE(1))) )
 GENERIC_TRANSLATION(PMOVZXBQrr,
         (do_SSE_EXTEND_RR<128,8,64,ZEXT>(ip, block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(PMOVZXBQrm,
-        (do_SSE_EXTEND_RM<128,8,64,ZEXT>(ip, block, OP(0), ADDR(1))),
-        (do_SSE_EXTEND_RM<128,8,64,ZEXT>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(PMOVZXBQrm,
+        (do_SSE_EXTEND_RM<128,8,64,ZEXT>(ip, block, OP(0), ADDR_NOREF(1))),
+        (do_SSE_EXTEND_RM<128,8,64,ZEXT>(ip, block, OP(0), MEM_REFERENCE(1))) )
 GENERIC_TRANSLATION(PMOVZXWDrr,
         (do_SSE_EXTEND_RR<128,16,32,ZEXT>(ip, block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(PMOVZXWDrm,
-        (do_SSE_EXTEND_RM<128,16,32,ZEXT>(ip, block, OP(0), ADDR(1))),
-        (do_SSE_EXTEND_RM<128,16,32,ZEXT>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(PMOVZXWDrm,
+        (do_SSE_EXTEND_RM<128,16,32,ZEXT>(ip, block, OP(0), ADDR_NOREF(1))),
+        (do_SSE_EXTEND_RM<128,16,32,ZEXT>(ip, block, OP(0), MEM_REFERENCE(1))) )
 GENERIC_TRANSLATION(PMOVZXWQrr,
         (do_SSE_EXTEND_RR<128,16,64,ZEXT>(ip, block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(PMOVZXWQrm,
-        (do_SSE_EXTEND_RM<128,16,64,ZEXT>(ip, block, OP(0), ADDR(1))),
-        (do_SSE_EXTEND_RM<128,16,64,ZEXT>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(PMOVZXWQrm,
+        (do_SSE_EXTEND_RM<128,16,64,ZEXT>(ip, block, OP(0), ADDR_NOREF(1))),
+        (do_SSE_EXTEND_RM<128,16,64,ZEXT>(ip, block, OP(0), MEM_REFERENCE(1))) )
 GENERIC_TRANSLATION(PMOVZXDQrr,
         (do_SSE_EXTEND_RR<128,32,64,ZEXT>(ip, block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(PMOVZXDQrm,
-        (do_SSE_EXTEND_RM<128,32,64,ZEXT>(ip, block, OP(0), ADDR(1))),
-        (do_SSE_EXTEND_RM<128,32,64,ZEXT>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(PMOVZXDQrm,
+        (do_SSE_EXTEND_RM<128,32,64,ZEXT>(ip, block, OP(0), ADDR_NOREF(1))),
+        (do_SSE_EXTEND_RM<128,32,64,ZEXT>(ip, block, OP(0), MEM_REFERENCE(1))) )
 
 
 GENERIC_TRANSLATION(PANDNrr, 
         (do_PANDNrr<128>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PANDNrm, 
-        (do_PANDNrm<128>(ip, block, OP(1), ADDR(2))),
-        (do_PANDNrm<128>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PANDNrm, 
+        (do_PANDNrm<128>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_PANDNrm<128>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PANDrr, 
         (do_SSE_INT_RR<128,Instruction::And>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PANDrm, 
-        (do_SSE_INT_RM<128,Instruction::And>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_INT_RM<128,Instruction::And>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PANDrm, 
+        (do_SSE_INT_RM<128,Instruction::And>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_INT_RM<128,Instruction::And>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PORrr, 
         (do_SSE_INT_RR<128,Instruction::Or>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PORrm, 
-        (do_SSE_INT_RM<128,Instruction::Or>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_INT_RM<128,Instruction::Or>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PORrm, 
+        (do_SSE_INT_RM<128,Instruction::Or>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_INT_RM<128,Instruction::Or>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(MMX_PORirr,
         (do_SSE_INT_RR<64,Instruction::Or>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(MMX_PORirm,
-        (do_SSE_INT_RM<64,Instruction::Or>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_INT_RM<64,Instruction::Or>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(MMX_PORirm,
+        (do_SSE_INT_RM<64,Instruction::Or>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_INT_RM<64,Instruction::Or>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(XORPSrr, 
         (do_SSE_INT_RR<128,Instruction::Xor>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(XORPSrm, 
-        (do_SSE_INT_RM<128,Instruction::Xor>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_INT_RM<128,Instruction::Xor>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(XORPSrm, 
+        (do_SSE_INT_RM<128,Instruction::Xor>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_INT_RM<128,Instruction::Xor>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(ADDSDrr, 
         (do_SSE_RR<64,Instruction::FAdd>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(ADDSDrm, 
-        (do_SSE_RM<64,Instruction::FAdd>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_RM<64,Instruction::FAdd>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(ADDSDrm, 
+        (do_SSE_RM<64,Instruction::FAdd>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_RM<64,Instruction::FAdd>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(ADDSSrr, 
         (do_SSE_RR<32,Instruction::FAdd>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(ADDSSrm, 
-        (do_SSE_RM<32,Instruction::FAdd>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_RM<32,Instruction::FAdd>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(ADDSSrm, 
+        (do_SSE_RM<32,Instruction::FAdd>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_RM<32,Instruction::FAdd>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(SUBSDrr, 
         (do_SSE_RR<64,Instruction::FSub>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(SUBSDrm, 
-        (do_SSE_RM<64,Instruction::FSub>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_RM<64,Instruction::FSub>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(SUBSDrm, 
+        (do_SSE_RM<64,Instruction::FSub>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_RM<64,Instruction::FSub>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(SUBSSrr, 
         (do_SSE_RR<32,Instruction::FSub>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(SUBSSrm, 
-        (do_SSE_RM<32,Instruction::FSub>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_RM<32,Instruction::FSub>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(SUBSSrm, 
+        (do_SSE_RM<32,Instruction::FSub>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_RM<32,Instruction::FSub>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(DIVSDrr, 
         (do_SSE_RR<64,Instruction::FDiv>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(DIVSDrm, 
-        (do_SSE_RM<64,Instruction::FDiv>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_RM<64,Instruction::FDiv>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(DIVSDrm, 
+        (do_SSE_RM<64,Instruction::FDiv>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_RM<64,Instruction::FDiv>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(DIVSSrr, 
         (do_SSE_RR<32,Instruction::FDiv>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(DIVSSrm, 
-        (do_SSE_RM<32,Instruction::FDiv>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_RM<32,Instruction::FDiv>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(DIVSSrm, 
+        (do_SSE_RM<32,Instruction::FDiv>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_RM<32,Instruction::FDiv>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(MULSDrr, 
         (do_SSE_RR<64,Instruction::FMul>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(MULSDrm, 
-        (do_SSE_RM<64,Instruction::FMul>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_RM<64,Instruction::FMul>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(MULSDrm, 
+        (do_SSE_RM<64,Instruction::FMul>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_RM<64,Instruction::FMul>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(MULSSrr, 
         (do_SSE_RR<32,Instruction::FMul>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(MULSSrm, 
-        (do_SSE_RM<32,Instruction::FMul>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_RM<32,Instruction::FMul>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(MULSSrm, 
+        (do_SSE_RM<32,Instruction::FMul>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_RM<32,Instruction::FMul>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 
 GENERIC_TRANSLATION(MOVDI2PDIrr, 
         (MOVAndZextRR<32>(block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(MOVDI2PDIrm, 
-        (MOVAndZextRM<32>(ip, block, OP(0), ADDR(1))),
-        (MOVAndZextRM<32>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(MOVDI2PDIrm, 
+        (MOVAndZextRM<32>(ip, block, OP(0), ADDR_NOREF(1))),
+        (MOVAndZextRM<32>(ip, block, OP(0), MEM_REFERENCE(1))) )
 
 GENERIC_TRANSLATION(MOVSS2DIrr, 
         (doRRMov<32>(ip, block, OP(1), OP(2))) )
 
 GENERIC_TRANSLATION(UCOMISSrr, 
         (doUCOMISrr<32>(block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(UCOMISSrm, 
-        (doUCOMISrm<32>(ip, block, OP(0), ADDR(1))),
-        (doUCOMISrm<32>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(UCOMISSrm, 
+        (doUCOMISrm<32>(ip, block, OP(0), ADDR_NOREF(1))),
+        (doUCOMISrm<32>(ip, block, OP(0), MEM_REFERENCE(1))) )
 
 GENERIC_TRANSLATION(UCOMISDrr, 
         (doUCOMISrr<64>(block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(UCOMISDrm, 
-        (doUCOMISrm<64>(ip, block, OP(0), ADDR(1))),
-        (doUCOMISrm<64>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(UCOMISDrm, 
+        (doUCOMISrm<64>(ip, block, OP(0), ADDR_NOREF(1))),
+        (doUCOMISrm<64>(ip, block, OP(0), MEM_REFERENCE(1))) )
 
 GENERIC_TRANSLATION(PSRAWrr, 
         (doPSRArr<16>(block, OP(1), OP(2))) )
 GENERIC_TRANSLATION(PSRAWri, 
         (doPSRAri<16>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSRAWrm, 
-        (doPSRArm<16>(ip, block, OP(1), ADDR(2))),
-        (doPSRArm<16>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PSRAWrm, 
+        (doPSRArm<16>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPSRArm<16>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PSRADrr, 
         (doPSRArr<32>(block, OP(1), OP(2))) )
 GENERIC_TRANSLATION(PSRADri, 
         (doPSRAri<32>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSRADrm, 
-        (doPSRArm<32>(ip, block, OP(1), ADDR(2))),
-        (doPSRArm<32>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PSRADrm, 
+        (doPSRArm<32>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPSRArm<32>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PSLLDrr, 
         (doPSLLrr<32>(block, OP(1), OP(2))) )
 GENERIC_TRANSLATION(PSLLDri, 
         (doPSLLri<32>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSLLDrm, 
-        (doPSLLrm<32>(ip, block, OP(1), ADDR(2))),
-        (doPSLLrm<32>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PSLLDrm, 
+        (doPSLLrm<32>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPSLLrm<32>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PSRLWrr, 
         (doPSRLrr<16>(block, OP(1), OP(2))) )
 GENERIC_TRANSLATION(PSRLWri, 
         (doPSRLri<16>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSRLWrm, 
-        (doPSRLrm<16>(ip, block, OP(1), ADDR(2))),
-        (doPSRLrm<16>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PSRLWrm, 
+        (doPSRLrm<16>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPSRLrm<16>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PSRLDrr, 
         (doPSRLrr<32>(block, OP(1), OP(2))) )
 GENERIC_TRANSLATION(PSRLDri, 
         (doPSRLri<32>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSRLDrm, 
-        (doPSRLrm<32>(ip, block, OP(1), ADDR(2))),
-        (doPSRLrm<32>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PSRLDrm, 
+        (doPSRLrm<32>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPSRLrm<32>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PSRLQrr, 
         (doPSRLrr<64>(block, OP(1), OP(2))) )
 GENERIC_TRANSLATION(PSRLQri, 
         (doPSRLri<64>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSRLQrm, 
-        (doPSRLrm<64>(ip, block, OP(1), ADDR(2))),
-        (doPSRLrm<64>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PSRLQrm, 
+        (doPSRLrm<64>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPSRLrm<64>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PSLLWrr, 
         (doPSLLrr<16>(block, OP(1), OP(2))) )
 GENERIC_TRANSLATION(PSLLWri, 
         (doPSLLri<16>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSLLWrm, 
-        (doPSLLrm<16>(ip, block, OP(1), ADDR(2))),
-        (doPSLLrm<16>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PSLLWrm, 
+        (doPSLLrm<16>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPSLLrm<16>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PSLLQrr, 
         (doPSLLrr<64>(block, OP(1), OP(2))) )
 GENERIC_TRANSLATION(PSLLQri, 
         (doPSLLri<64>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSLLQrm, 
-        (doPSLLrm<64>(ip, block, OP(1), ADDR(2))),
-        (doPSLLrm<64>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PSLLQrm, 
+        (doPSLLrm<64>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPSLLrm<64>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PSHUFDri,
         (doPSHUFDri(block, OP(0), OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSHUFDmi,
-        (doPSHUFDmi(ip, block, OP(0), ADDR(1), OP(6))),
-        (doPSHUFDmi(ip, block, OP(0), STD_GLOBAL_OP(1), OP(6))) )
+GENERIC_TRANSLATION_REF(PSHUFDmi,
+        (doPSHUFDmi(ip, block, OP(0), ADDR_NOREF(1), OP(6))),
+        (doPSHUFDmi(ip, block, OP(0), MEM_REFERENCE(1), OP(6))) )
 
 GENERIC_TRANSLATION(PSHUFBrr,
         (doPSHUFBrr<128>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSHUFBrm, 
-        (doPSHUFBrm<128>(ip, block, OP(1), ADDR(2))),
-        (doPSHUFBrm<128>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PSHUFBrm, 
+        (doPSHUFBrm<128>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPSHUFBrm<128>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PSHUFLWri,
         (doPSHUFLWri(block, OP(0), OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSHUFLWmi, 
-        (doPSHUFLWmi(ip, block, OP(0), ADDR(1), OP(6))),
-        (doPSHUFLWmi(ip, block, OP(0), STD_GLOBAL_OP(1), OP(6))) )
+GENERIC_TRANSLATION_REF(PSHUFLWmi, 
+        (doPSHUFLWmi(ip, block, OP(0), ADDR_NOREF(1), OP(6))),
+        (doPSHUFLWmi(ip, block, OP(0), MEM_REFERENCE(1), OP(6))) )
 
 GENERIC_TRANSLATION(PINSRWrri,
         (doPINSRWrri(block, OP(1), OP(2), OP(3))) )
-GENERIC_TRANSLATION_MEM(PINSRWrmi,
-        (doPINSRWrmi(ip, block, OP(1), ADDR(2), OP(7))),
-        (doPINSRWrmi(ip, block, OP(1), STD_GLOBAL_OP(2), OP(7))) )
+GENERIC_TRANSLATION_REF(PINSRWrmi,
+        (doPINSRWrmi(ip, block, OP(1), ADDR_NOREF(2), OP(7))),
+        (doPINSRWrmi(ip, block, OP(1), MEM_REFERENCE(2), OP(7))) )
     
 GENERIC_TRANSLATION(PEXTRWri,
         (doPEXTRWri(block, OP(0), OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PEXTRWmr,
-        (doPEXTRWmr(ip, block, ADDR(0), OP(5), OP(6))),
-        (doPEXTRWmr(ip, block, STD_GLOBAL_OP(0), OP(5), OP(6))) )
+GENERIC_TRANSLATION_REF(PEXTRWmr,
+        (doPEXTRWmr(ip, block, ADDR_NOREF(0), OP(5), OP(6))),
+        (doPEXTRWmr(ip, block, MEM_REFERENCE(0), OP(5), OP(6))) )
 
 GENERIC_TRANSLATION(PUNPCKLBWrr, 
         (doPUNPCKrr<128,8>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PUNPCKLBWrm, 
-        (doPUNPCKrm<128,8>(ip, block, OP(1), ADDR(2))),
-        (doPUNPCKrm<128,8>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PUNPCKLBWrm, 
+        (doPUNPCKrm<128,8>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPUNPCKrm<128,8>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PUNPCKLWDrr, 
         (doPUNPCKrr<128,16>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PUNPCKLWDrm, 
-        (doPUNPCKrm<128,16>(ip, block, OP(1), ADDR(2))),
-        (doPUNPCKrm<128,16>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PUNPCKLWDrm, 
+        (doPUNPCKrm<128,16>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPUNPCKrm<128,16>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PUNPCKLDQrr, 
         (doPUNPCKrr<128,32>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PUNPCKLDQrm, 
-        (doPUNPCKrm<128,32>(ip, block, OP(1), ADDR(2))),
-        (doPUNPCKrm<128,32>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PUNPCKLDQrm, 
+        (doPUNPCKrm<128,32>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPUNPCKrm<128,32>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PUNPCKLQDQrr, 
         (doPUNPCKrr<128,64>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PUNPCKLQDQrm, 
-        (doPUNPCKrm<128,64>(ip, block, OP(1), ADDR(2))),
-        (doPUNPCKrm<128,64>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PUNPCKLQDQrm, 
+        (doPUNPCKrm<128,64>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPUNPCKrm<128,64>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 
 GENERIC_TRANSLATION(PCMPGTBrr,
         (do_SSE_COMPARE_RR<128,8,ICmpInst::ICMP_SGT>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PCMPGTBrm,
-        (do_SSE_COMPARE_RM<128,8,ICmpInst::ICMP_SGT>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_COMPARE_RM<128,8,ICmpInst::ICMP_SGT>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PCMPGTBrm,
+        (do_SSE_COMPARE_RM<128,8,ICmpInst::ICMP_SGT>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_COMPARE_RM<128,8,ICmpInst::ICMP_SGT>(ip, block, OP(1), MEM_REFERENCE(2))) )
 GENERIC_TRANSLATION(PCMPGTWrr,
         (do_SSE_COMPARE_RR<128,16,ICmpInst::ICMP_SGT>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PCMPGTWrm,
-        (do_SSE_COMPARE_RM<128,16,ICmpInst::ICMP_SGT>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_COMPARE_RM<128,16,ICmpInst::ICMP_SGT>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PCMPGTWrm,
+        (do_SSE_COMPARE_RM<128,16,ICmpInst::ICMP_SGT>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_COMPARE_RM<128,16,ICmpInst::ICMP_SGT>(ip, block, OP(1), MEM_REFERENCE(2))) )
 GENERIC_TRANSLATION(PCMPGTDrr,
         (do_SSE_COMPARE_RR<128,32,ICmpInst::ICMP_SGT>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PCMPGTDrm,
-        (do_SSE_COMPARE_RM<128,32,ICmpInst::ICMP_SGT>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_COMPARE_RM<128,32,ICmpInst::ICMP_SGT>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PCMPGTDrm,
+        (do_SSE_COMPARE_RM<128,32,ICmpInst::ICMP_SGT>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_COMPARE_RM<128,32,ICmpInst::ICMP_SGT>(ip, block, OP(1), MEM_REFERENCE(2))) )
 GENERIC_TRANSLATION(PCMPGTQrr,
         (do_SSE_COMPARE_RR<128,64,ICmpInst::ICMP_SGT>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PCMPGTQrm,
-        (do_SSE_COMPARE_RM<128,64,ICmpInst::ICMP_SGT>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_COMPARE_RM<128,64,ICmpInst::ICMP_SGT>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PCMPGTQrm,
+        (do_SSE_COMPARE_RM<128,64,ICmpInst::ICMP_SGT>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_COMPARE_RM<128,64,ICmpInst::ICMP_SGT>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 
 GENERIC_TRANSLATION(PCMPEQBrr,
         (do_SSE_COMPARE_RR<128,8,ICmpInst::ICMP_EQ>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PCMPEQBrm,
-        (do_SSE_COMPARE_RM<128,8,ICmpInst::ICMP_EQ>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_COMPARE_RM<128,8,ICmpInst::ICMP_EQ>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PCMPEQBrm,
+        (do_SSE_COMPARE_RM<128,8,ICmpInst::ICMP_EQ>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_COMPARE_RM<128,8,ICmpInst::ICMP_EQ>(ip, block, OP(1), MEM_REFERENCE(2))) )
 GENERIC_TRANSLATION(PCMPEQWrr,
         (do_SSE_COMPARE_RR<128,16,ICmpInst::ICMP_EQ>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PCMPEQWrm,
-        (do_SSE_COMPARE_RM<128,16,ICmpInst::ICMP_EQ>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_COMPARE_RM<128,16,ICmpInst::ICMP_EQ>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PCMPEQWrm,
+        (do_SSE_COMPARE_RM<128,16,ICmpInst::ICMP_EQ>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_COMPARE_RM<128,16,ICmpInst::ICMP_EQ>(ip, block, OP(1), MEM_REFERENCE(2))) )
 GENERIC_TRANSLATION(PCMPEQDrr,
         (do_SSE_COMPARE_RR<128,32,ICmpInst::ICMP_EQ>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PCMPEQDrm,
-        (do_SSE_COMPARE_RM<128,32,ICmpInst::ICMP_EQ>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_COMPARE_RM<128,32,ICmpInst::ICMP_EQ>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PCMPEQDrm,
+        (do_SSE_COMPARE_RM<128,32,ICmpInst::ICMP_EQ>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_COMPARE_RM<128,32,ICmpInst::ICMP_EQ>(ip, block, OP(1), MEM_REFERENCE(2))) )
 GENERIC_TRANSLATION(PCMPEQQrr,
         (do_SSE_COMPARE_RR<128,64,ICmpInst::ICMP_EQ>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PCMPEQQrm,
-        (do_SSE_COMPARE_RM<128,64,ICmpInst::ICMP_EQ>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_COMPARE_RM<128,64,ICmpInst::ICMP_EQ>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PCMPEQQrm,
+        (do_SSE_COMPARE_RM<128,64,ICmpInst::ICMP_EQ>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_COMPARE_RM<128,64,ICmpInst::ICMP_EQ>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PADDBrr, 
         (do_SSE_VECTOR_RR<128,8,Instruction::Add>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PADDBrm, 
-        (do_SSE_VECTOR_RM<128,8,Instruction::Add>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_VECTOR_RM<128,8,Instruction::Add>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PADDBrm, 
+        (do_SSE_VECTOR_RM<128,8,Instruction::Add>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_VECTOR_RM<128,8,Instruction::Add>(ip, block, OP(1), MEM_REFERENCE(2))) )
 GENERIC_TRANSLATION(PADDWrr, 
         (do_SSE_VECTOR_RR<128,16,Instruction::Add>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PADDWrm, 
-        (do_SSE_VECTOR_RM<128,16,Instruction::Add>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_VECTOR_RM<128,16,Instruction::Add>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PADDWrm, 
+        (do_SSE_VECTOR_RM<128,16,Instruction::Add>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_VECTOR_RM<128,16,Instruction::Add>(ip, block, OP(1), MEM_REFERENCE(2))) )
 GENERIC_TRANSLATION(PADDDrr, 
         (do_SSE_VECTOR_RR<128,32,Instruction::Add>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PADDDrm, 
-        (do_SSE_VECTOR_RM<128,32,Instruction::Add>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_VECTOR_RM<128,32,Instruction::Add>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PADDDrm, 
+        (do_SSE_VECTOR_RM<128,32,Instruction::Add>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_VECTOR_RM<128,32,Instruction::Add>(ip, block, OP(1), MEM_REFERENCE(2))) )
 GENERIC_TRANSLATION(PADDQrr, 
         (do_SSE_VECTOR_RR<128,64,Instruction::Add>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PADDQrm, 
-        (do_SSE_VECTOR_RM<128,64,Instruction::Add>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_VECTOR_RM<128,64,Instruction::Add>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PADDQrm, 
+        (do_SSE_VECTOR_RM<128,64,Instruction::Add>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_VECTOR_RM<128,64,Instruction::Add>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PSUBBrr, 
         (do_SSE_VECTOR_RR<128,8,Instruction::Sub>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSUBBrm, 
-        (do_SSE_VECTOR_RM<128,8,Instruction::Sub>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_VECTOR_RM<128,8,Instruction::Sub>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PSUBBrm, 
+        (do_SSE_VECTOR_RM<128,8,Instruction::Sub>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_VECTOR_RM<128,8,Instruction::Sub>(ip, block, OP(1), MEM_REFERENCE(2))) )
 GENERIC_TRANSLATION(PSUBWrr, 
         (do_SSE_VECTOR_RR<128,16,Instruction::Sub>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSUBWrm, 
-        (do_SSE_VECTOR_RM<128,16,Instruction::Sub>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_VECTOR_RM<128,16,Instruction::Sub>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PSUBWrm, 
+        (do_SSE_VECTOR_RM<128,16,Instruction::Sub>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_VECTOR_RM<128,16,Instruction::Sub>(ip, block, OP(1), MEM_REFERENCE(2))) )
 GENERIC_TRANSLATION(PSUBDrr, 
         (do_SSE_VECTOR_RR<128,32,Instruction::Sub>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSUBDrm, 
-        (do_SSE_VECTOR_RM<128,32,Instruction::Sub>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_VECTOR_RM<128,32,Instruction::Sub>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PSUBDrm, 
+        (do_SSE_VECTOR_RM<128,32,Instruction::Sub>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_VECTOR_RM<128,32,Instruction::Sub>(ip, block, OP(1), MEM_REFERENCE(2))) )
 GENERIC_TRANSLATION(PSUBQrr, 
         (do_SSE_VECTOR_RR<128,64,Instruction::Sub>(ip, block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PSUBQrm, 
-        (do_SSE_VECTOR_RM<128,64,Instruction::Sub>(ip, block, OP(1), ADDR(2))),
-        (do_SSE_VECTOR_RM<128,64,Instruction::Sub>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PSUBQrm, 
+        (do_SSE_VECTOR_RM<128,64,Instruction::Sub>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_VECTOR_RM<128,64,Instruction::Sub>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(MAXSSrr,
         (doMAXMINrr<32, FCmpInst::FCMP_UGT>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(MAXSSrm,
-        (doMAXMINrm<32, FCmpInst::FCMP_UGT>(ip, block, OP(1), ADDR(2))),
-        (doMAXMINrm<32, FCmpInst::FCMP_UGT>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(MAXSSrm,
+        (doMAXMINrm<32, FCmpInst::FCMP_UGT>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doMAXMINrm<32, FCmpInst::FCMP_UGT>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(MAXSDrr,
         (doMAXMINrr<64, FCmpInst::FCMP_UGT>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(MAXSDrm,
-        (doMAXMINrm<64, FCmpInst::FCMP_UGT>(ip, block, OP(1), ADDR(2))),
-        (doMAXMINrm<64, FCmpInst::FCMP_UGT>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(MAXSDrm,
+        (doMAXMINrm<64, FCmpInst::FCMP_UGT>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doMAXMINrm<64, FCmpInst::FCMP_UGT>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(MINSSrr,
         (doMAXMINrr<32, FCmpInst::FCMP_ULT>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(MINSSrm,
-        (doMAXMINrm<32, FCmpInst::FCMP_ULT>(ip, block, OP(1), ADDR(2))),
-        (doMAXMINrm<32, FCmpInst::FCMP_ULT>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(MINSSrm,
+        (doMAXMINrm<32, FCmpInst::FCMP_ULT>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doMAXMINrm<32, FCmpInst::FCMP_ULT>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(MINSDrr,
         (doMAXMINrr<64, FCmpInst::FCMP_ULT>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(MINSDrm,
-        (doMAXMINrm<64, FCmpInst::FCMP_ULT>(ip, block, OP(1), ADDR(2))),
-        (doMAXMINrm<64, FCmpInst::FCMP_ULT>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(MINSDrm,
+        (doMAXMINrm<64, FCmpInst::FCMP_ULT>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doMAXMINrm<64, FCmpInst::FCMP_ULT>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PBLENDVBrr0,
         (doBLENDVBrr<128>(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(PBLENDVBrm0, 
-        (doBLENDVBrm<128>(ip, block, OP(1), ADDR(2))),
-        (doBLENDVBrm<128>(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PBLENDVBrm0, 
+        (doBLENDVBrm<128>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doBLENDVBrm<128>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PMULUDQrr, 
         (doPMULUDQrr(block, OP(1), OP(2))))
-GENERIC_TRANSLATION_MEM(PMULUDQrm, 
-        (doPMULUDQrm(ip, block, OP(1), ADDR(2))),
-        (doPMULUDQrm(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(PMULUDQrm, 
+        (doPMULUDQrm(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPMULUDQrm(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(CVTTPS2DQrr, 
         (doCVTTPS2DQrr(block, OP(0), OP(1))))
-GENERIC_TRANSLATION_MEM(CVTTPS2DQrm, 
-        (doCVTTPS2DQrm(ip, block, OP(0), ADDR(1))),
-        (doCVTTPS2DQrm(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(CVTTPS2DQrm, 
+        (doCVTTPS2DQrm(ip, block, OP(0), ADDR_NOREF(1))),
+        (doCVTTPS2DQrm(ip, block, OP(0), MEM_REFERENCE(1))) )
 
-GENERIC_TRANSLATION_MEM(MOVLPDrm, 
-        (doMOVLPDrm(ip, block, OP(1), ADDR(2))),
-        (doMOVLPDrm(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(MOVLPDrm, 
+        (doMOVLPDrm(ip, block, OP(1), ADDR_NOREF(2))),
+        (doMOVLPDrm(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(SHUFPSrri,
         (doSHUFPSrri(block, OP(1), OP(2), OP(3))) )
-GENERIC_TRANSLATION_MEM(SHUFPSrmi,
-        (doSHUFPSrmi(ip, block, OP(1), ADDR(2), OP(7))),
-        (doSHUFPSrmi(ip, block, OP(1), STD_GLOBAL_OP(2), OP(7))) )
+GENERIC_TRANSLATION_REF(SHUFPSrmi,
+        (doSHUFPSrmi(ip, block, OP(1), ADDR_NOREF(2), OP(7))),
+        (doSHUFPSrmi(ip, block, OP(1), MEM_REFERENCE(2), OP(7))) )
 
 GENERIC_TRANSLATION(UNPCKLPSrr,
         (doUNPCKLPSrr(block, OP(1), OP(2))) )
-GENERIC_TRANSLATION_MEM(UNPCKLPSrm,
-        (doUNPCKLPSrm(ip, block, OP(1), ADDR(2))),
-        (doUNPCKLPSrm(ip, block, OP(1), STD_GLOBAL_OP(2))) )
+GENERIC_TRANSLATION_REF(UNPCKLPSrm,
+        (doUNPCKLPSrm(ip, block, OP(1), ADDR_NOREF(2))),
+        (doUNPCKLPSrm(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(CVTPS2PDrr,
         (doCVTPS2PDrr(block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(CVTPS2PDrm,
-        (doCVTPS2PDrm(ip, block, OP(0), ADDR(1))),
-        (doCVTPS2PDrm(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(CVTPS2PDrm,
+        (doCVTPS2PDrm(ip, block, OP(0), ADDR_NOREF(1))),
+        (doCVTPS2PDrm(ip, block, OP(0), MEM_REFERENCE(1))) )
 
 void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::MOVSDrm] = (doMOVSrm<64>);
