@@ -460,7 +460,7 @@ def manualRelocOffset(I, inst, dref):
     insn_t = idautils.DecodeInstruction(inst)
 
     if insn_t is None:
-        return
+        return None
 
     saw_displ = False
     for op in insn_t.Operands:
@@ -475,12 +475,42 @@ def manualRelocOffset(I, inst, dref):
                 DEBUG("Manually setting reloc offset for IMM32 value at {0:x} to {1:x}\n".format(inst, op.offb))
                 # fake a relocation offset so that we know the immediate 
                 # is a reference and not a constant
-                I.reloc_offset = op.offb
+                I.imm_reloc_offset = op.offb
+                return "IMM"
+    return "MEM"
+
+def opAtOffset(insn_t, off)
+
+    if insn_t is None:
+        return None
+
+    for op in insn_t.Operands:
+        
+        if op.offb == off:
+            if op.type in [idaapi.o_displ, idaapi.o_phrase]:
+                return "MEM"
+
+            if op.type == idaapi.o_imm:
+                return "IMM"
+
+            DEBUG("ERROR: Unknown op type {}, assuming MEM\n".format(op.type))
+            return "MEM"
+
+    return None
+
+def setReference(I, optype, reftype, ref):
+    if "IMM" == optype:
+        I.imm_reference = ref
+        I.imm_ref_type = reftype
+    elif "MEM" == optype:
+        I.mem_reference = cref
+        I.mem_ref_type = reftype
+    else:
+        DEBUG("ERROR: Unknown ref type: {}\n".format(which_op))
 
 def addDataReference(M, I, inst, dref, new_eas):
     if inValidSegment(dref): 
 
-        manualRelocOffset(I, inst, dref)
 
         if isExternalReference(dref):
             fn = getFunctionName(dref)
@@ -493,15 +523,29 @@ def addDataReference(M, I, inst, dref, new_eas):
                 I.ext_call_name = fn 
                 DEBUG("EXTERNAL CODE REF FROM {0:x} to {1}\n".format(inst, fn))
 
-        elif isInternalCode(dref):
-            I.call_target = dref
+            return
+
+        which_op = manualRelocOffset(I, inst, dref)
+        if which_op is None:
+            DEBUG("ERROR: could not decode instruction at {:x}\n".format(inst))
+            return
+
+        ref = None
+        reftype = None
+        if isInternalCode(dref):
+            ref = dref
+            reftype = CFG_pb2.Instruction.CodeRef
             if dref not in RECOVERED_EAS: 
                 new_eas.add(dref)
         else:
             dref_size = idc.ItemSize(dref)
             DEBUG("\t\tData Ref: {0:x}, size: {1}\n".format(
                 dref, dref_size))
-            I.data_offset = handleDataRelocation(M, dref, new_eas)
+            ref = handleDataRelocation(M, dref, new_eas)
+            reftype = CFG_pb2.Instruction.DataRef
+
+        setReference(I, which_op, reftype, ref)
+
     else:
         DEBUG("WARNING: Data not in valid segment {0:x}\n".format(dref))
 
@@ -554,7 +598,9 @@ def instructionHandler(M, B, inst, new_eas):
         if selfCallEA not in RECOVERED_EAS:
             DEBUG("Adding new EA: {0:x}\n".format(selfCallEA))
             new_eas.add(selfCallEA)
-            I.call_target = selfCallEA
+            I.imm_reference = selfCallEA
+            I.imm_ref_type = CFG_pb2.Instruction.CodeRef
+
             return I, True
     
     for cref in crefs:
@@ -574,7 +620,8 @@ def instructionHandler(M, B, inst, new_eas):
                 if doesNotReturn(fn):
                     return I, True
             else:
-                I.call_target = cref
+                which_op = manualRelocOffset(I, inst, cref);
+                setReference(I, which_op, CFG_pb2.Instruction.CodeRef, cref)
 
                 if cref not in RECOVERED_EAS: 
                     new_eas.add(cref)
@@ -607,9 +654,18 @@ def instructionHandler(M, B, inst, new_eas):
 
     relo_off = findRelocOffset(inst, len(inst_bytes))
     # don't re-set reloc offset if we already set it somewhere
-    if relo_off != -1 and not I.HasField("reloc_offset"):
-        DEBUG("findRelocOffset setting reloc offset at {0:x} to {1:x}\n".format(inst, relo_off))
-        I.reloc_offset = relo_off
+    if relo_off != -1
+        # check which operand this would be the offset for
+        which_op = opAtOffset(insn_t, relo_off)
+
+        # don't overwrite an offset set by other means
+        if "IMM" == which_op and not I.HasField("imm_reloc_offset"):
+            DEBUG("findRelocOffset setting imm reloc offset at {0:x} to {1:x}\n".format(inst, relo_off))
+            I.imm_reloc_offset = relo_off
+        
+        if "MEM" == which_op and not I.HasField("mem_reloc_offset"):
+            DEBUG("findRelocOffset setting mem reloc offset at {0:x} to {1:x}\n".format(inst, relo_off))
+            I.mem_reloc_offset = relo_off
 
     for dref in idautils.DataRefsFrom(inst):
         had_refs = True
