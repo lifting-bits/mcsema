@@ -340,7 +340,11 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
                 ip->get_reference(Inst::IMMRef));
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
-        ret = doMIMovV<32>(ip, block, MEM_REFERENCE(0), addrInt);
+        if( ip->has_mem_reference) {
+            ret = doMIMovV<32>(ip, block, MEM_REFERENCE(0), addrInt);
+        } else {
+            ret = doMIMovV<32>(ip, block, ADDR_NOREF(0), addrInt);
+        }
     }
     else
     {
@@ -393,7 +397,11 @@ static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&bl
                 ip->get_reference(Inst::IMMRef));
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt64Ty(block->getContext()), "", block);
-        ret = doMIMovV<64>(ip, block, MEM_REFERENCE(0), addrInt);
+        if (ip->has_mem_reference) {
+            ret = doMIMovV<64>(ip, block, MEM_REFERENCE(0), addrInt);
+        } else {
+            ret = doMIMovV<64>(ip, block, ADDR_NOREF(0), addrInt);
+        }
     } else {
         if(ip->has_mem_reference && ip->has_imm_reference) {
             Value *data_v = IMM_AS_DATA_REF<64>(block, natM, ip);
