@@ -675,7 +675,8 @@ def instructionHandler(M, B, inst, new_eas):
             DEBUG("findRelocOffset setting mem reloc offset at {0:x} to {1:x}\n".format(inst, relo_off))
             I.mem_reloc_offset = relo_off
 
-    for dref in idautils.DataRefsFrom(inst):
+    drefs_from_here = idautils.DataRefsFrom(inst)
+    for dref in drefs_from_here:
         had_refs = True
         if dref in crefs:
             continue
@@ -691,9 +692,11 @@ def instructionHandler(M, B, inst, new_eas):
         			I.ext_call_name = fn
         			DEBUG("EXTERNAL CALL : {0}\n".format(fn))
 
-    if not had_refs and isLinkedElf():
+    if isLinkedElf():
         for op in insn_t.Operands:
             if op.type == idc.o_imm:
+                if op.value in drefs_from_here:
+                    continue
                 # we have an immedaite.. check if its in a code or data section
                 begin_a = op.value
                 end_a = begin_a + idc.ItemSize(begin_a)
