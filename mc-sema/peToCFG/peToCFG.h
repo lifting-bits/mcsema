@@ -175,12 +175,16 @@ class Inst {
     uint64_t        imm_reloc_offset;
     uint64_t        imm_reference;
     CFGRefType      imm_ref_type;
+public:
     bool            has_imm_reference;
+private:
 
     uint64_t        mem_reloc_offset;
     uint64_t        mem_reference;
     CFGRefType      mem_ref_type;
+public:
     bool            has_mem_reference;
+private:
 
     uint32_t        arch;
     //  if this instruction is a system call, its system call number
@@ -233,7 +237,7 @@ class Inst {
         } else if (op == IMMRef) {
             this->imm_reloc_offset = ro;
         } else {
-            return -1;
+            //
         }
     }
 
@@ -261,9 +265,13 @@ class Inst {
 
     void set_ref_reloc_type(CFGOpType op, uint64_t ref, uint64_t ro, CFGRefType rt)
     {
+        const char *ops = op == MEMRef ? "MEM" : "IMM";
+        const char *rts = rt == CFGCodeRef ? "CODE" : "DATA";
+
+        std::cout << __FUNCTION__ << ": Adding  ref: " << ops << ", to: " << std::hex << ref << ", ro: " << ro << ", rt: " << rts << std::endl;
         this->set_reference(op, ref);
-        this->set_reloc_offset(r, ro);
-        this->set_ref_type(r, rt);
+        this->set_reloc_offset(op, ro);
+        this->set_ref_type(op, rt);
     }
 
     bool has_reference(CFGOpType op) {
@@ -292,7 +300,9 @@ class Inst {
         } else if (op == IMMRef) {
             return this->imm_ref_type;
         } else {
-            return -1;
+            //TODO throw exception?
+            //return -1;
+            return this->mem_ref_type;
         }
     }
 

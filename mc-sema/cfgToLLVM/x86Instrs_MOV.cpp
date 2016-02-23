@@ -337,8 +337,7 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
         // this one has to be in the IMM32 field
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(),
-                ip->get_reference(Inst::IMMRef),
-            );
+                ip->get_reference(Inst::IMMRef));
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
         ret = doMIMovV<32>(ip, block, MEM_REFERENCE(0), addrInt);
@@ -409,7 +408,7 @@ static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&bl
                 data_v = doSubtractImageBase<64>(data_v, block);
             }
             doMIMovV<64>(ip,  block, ADDR_NOREF(0), data_v);
-        } else if (ip->has_mem_refernce) {
+        } else if (ip->has_mem_reference) {
             doMIMov<64>(ip,   block, MEM_REFERENCE(0), OP(5));
         } else {
             ret = doMIMov<64>(ip,   block, ADDR_NOREF(0), OP(5));
@@ -518,8 +517,7 @@ static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& blo
     if( ip->has_code_ref() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(),
-                ip->get_reference(Inst::IMMRef);
-            );
+                ip->get_reference(Inst::IMMRef));
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
         ret = doRIMovV<32>(ip, block, addrInt, OP(0) );

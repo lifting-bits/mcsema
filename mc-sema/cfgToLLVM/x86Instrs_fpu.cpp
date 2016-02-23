@@ -1624,7 +1624,7 @@ static InstTransResult doCHS(MCInst &inst, InstPtr ip, BasicBlock *&b)
     Value *mem_src = NULL;\
     if (ACCESSMEM) {\
         if( ip->has_mem_reference ) {\
-            mem_src =  MEMORY_REFERENCE(0);\
+            mem_src =  MEM_REFERENCE(0);\
             if (SETDATA) { F_WRITE(block, FPU_LASTDATA_OFF, mem_src);}\
         } else {\
             mem_src = ADDR_NOREF(0);\

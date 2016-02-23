@@ -774,7 +774,8 @@ static void preprocessInstruction(
                 uint32_t data_ref_va =
                     static_cast<uint32_t>(tbl_va + 4*jmptbl->getInitialEntry());
 
-                ip->set_data_offset(data_ref_va);
+                ip->set_reference(Inst::MEMRef, data_ref_va);
+                ip->set_ref_type(Inst::MEMRef, Inst::CFGDataRef);
             }
 
         }
@@ -799,7 +800,8 @@ static void preprocessInstruction(
         uint32_t data_ref_va =
             static_cast<uint32_t>(idx_va + idxtbl->getInitialEntry());
 
-        ip->set_data_offset(data_ref_va);
+        ip->set_reference(Inst::MEMRef, data_ref_va);
+        ip->set_ref_type(Inst::MEMRef, Inst::CFGDataRef);
     }
 
 }

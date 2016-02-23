@@ -220,7 +220,7 @@ Value *getAddrFromExpr( BasicBlock      *b,
 				index, 
 				real_disp, 
 				seg,
-				has_offset);
+				has_ref);
 			
 	} else {
 		return x86_64::getAddrFromExpr(b, 
@@ -230,7 +230,7 @@ Value *getAddrFromExpr( BasicBlock      *b,
 				index, 
 				real_disp, 
 				seg,
-				has_offset);
+				has_ref);
 	}
 
 

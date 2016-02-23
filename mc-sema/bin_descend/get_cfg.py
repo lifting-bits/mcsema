@@ -479,7 +479,7 @@ def manualRelocOffset(I, inst, dref):
                 return "IMM"
     return "MEM"
 
-def opAtOffset(insn_t, off)
+def opAtOffset(insn_t, off):
 
     if insn_t is None:
         return None
@@ -503,10 +503,10 @@ def setReference(I, optype, reftype, ref):
         I.imm_reference = ref
         I.imm_ref_type = reftype
     elif "MEM" == optype:
-        I.mem_reference = cref
+        I.mem_reference = ref
         I.mem_ref_type = reftype
     else:
-        DEBUG("ERROR: Unknown ref type: {}\n".format(which_op))
+        DEBUG("ERROR: Unknown ref type: {}\n".format(optype))
 
 def addDataReference(M, I, inst, dref, new_eas):
     if inValidSegment(dref): 
@@ -654,7 +654,7 @@ def instructionHandler(M, B, inst, new_eas):
 
     relo_off = findRelocOffset(inst, len(inst_bytes))
     # don't re-set reloc offset if we already set it somewhere
-    if relo_off != -1
+    if relo_off != -1:
         # check which operand this would be the offset for
         which_op = opAtOffset(insn_t, relo_off)
 
@@ -674,7 +674,7 @@ def instructionHandler(M, B, inst, new_eas):
         addDataReference(M, I, inst, dref, new_eas)
         DEBUG("instr refering data")
         if isUnconditionalJump(inst):
-        	xdrefs = DataRefsFrom(dref)
+        	xdrefs = idautils.DataRefsFrom(dref)
         	for xref in xdrefs:
         		DEBUG("xref : {0:x}\n".format(xref))
         		# check if it refers to come instructions; link Control flow

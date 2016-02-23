@@ -88,22 +88,6 @@ llvm::Value *getAddrFromExpr( llvm::BasicBlock      *b,
 // Convert the number to a constant in LLVM IR
 llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t val);
 
-// Assume the instruction has a data reference, and
-// return a computed pointer to that data reference
-llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *b, 
-        NativeModulePtr mod, 
-        InstPtr ip)
-{
-    
-	llvm::Module *M = b->getParent()->getParent();
-	int regWidth = getPointerSize(M);
-    if(regWidth == x86::REG_SIZE){
-        return IMM_AS_DATA_REF<32>(b, mod, ip);
-    } else {
-        return IMM_AS_DATA_REF<64>(b, mod, ip);
-    }
-}
- 
 // this is an alias for getAddressFromExpr, but used when
 // we expect the address computation to contain a data reference
 llvm::Value *MEM_AS_DATA_REF(llvm::BasicBlock *B, 
@@ -166,6 +150,22 @@ llvm::Value* IMM_AS_DATA_REF(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
     } else {
         throw TErr(__LINE__, __FILE__, "Address not in data");
         return NULL;
+    }
+}
+
+// Assume the instruction has a data reference, and
+// return a computed pointer to that data reference
+static inline llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *b, 
+        NativeModulePtr mod, 
+        InstPtr ip)
+{
+    
+	llvm::Module *M = b->getParent()->getParent();
+	int regWidth = getPointerSize(M);
+    if(regWidth == x86::REG_SIZE) {
+        return IMM_AS_DATA_REF<32>(b, mod, ip);
+    } else {
+        return IMM_AS_DATA_REF<64>(b, mod, ip);
     }
 }
 

@@ -806,7 +806,7 @@ static InstTransResult translate_CALLpcrel32(NativeModulePtr natM,
     std::string s = ip->get_ext_call_target()->getSymbolName();
     ret = doCallPCExtern(block, s);
   } else if (ip->has_code_ref()) {
-    int64_t off = (int64_t) ip->get_reference(Inst::IMMRef);
+    int64_t off = (int64_t) ip->get_reference(Inst::MEMRef);
     ret = doCallPC(ip, block, off);
   } else {
     int64_t off = (int64_t) OP(0).getImm();
@@ -825,10 +825,12 @@ static InstTransResult translate_CALL64pcrel32(NativeModulePtr natM,
     std::string s = ip->get_ext_call_target()->getSymbolName();
     ret = x86_64::doCallPCExtern(block, s);
   } else if (ip->has_code_ref()) {
-    int64_t off = (int64_t) ip->get_reference(Inst::IMMRef);
+    int64_t off = (int64_t) ip->get_reference(Inst::MEMRef);
+    cout << __FUNCTION__ << ":" << __LINE__ << ": doing call" << std::endl;
     ret = x86_64::doCallPC(ip, block, off);
   } else {
     int64_t off = (int64_t) OP(0).getImm();
+    cout << __FUNCTION__ << ":" << __LINE__ << ": doing call" << std::endl;
     ret = x86_64::doCallPC(ip, block, ip->get_loc() + ip->get_len() + off);
   }
 
@@ -974,6 +976,7 @@ static InstTransResult translate_CALL64m(NativeModulePtr natM,
 
     // not external call, but some weird way of calling local function?
   } else if (ip->has_code_ref()) {
+    cout << __FUNCTION__ << ":" << __LINE__ << ": doing call" << std::endl;
     ret = x86_64::doCallPC(ip, block, ip->get_reference(Inst::MEMRef));
   }
   // is this referencing global data?

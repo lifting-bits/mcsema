@@ -591,7 +591,7 @@ static InstTransResult translate_PUSH32rmm(NativeModulePtr natM, BasicBlock *& b
 static InstTransResult translate_PUSHi32(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
-    if( ip->has_code_ref ) {
+    if( ip->has_code_ref() ) {
         Value *callback_fn = archMakeCallbackForLocalFunction(block->getParent()->getParent(), 
                 ip->get_reference(Inst::IMMRef));
         Value *addrInt = new PtrToIntInst(

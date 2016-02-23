@@ -312,11 +312,6 @@ InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder)
     ip->set_ext_data_ref(p);
   }
 
-  if(inst.has_call_target())
-  {
-      ip->set_call_tgt(inst.call_target());
-  }
-
   if(inst.has_imm_reference()) {
       uint64_t ref = inst.mem_reference();
       uint64_t ro = 0;
@@ -327,7 +322,7 @@ InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder)
       }
 
       if(inst.has_imm_ref_type()) {
-          rt = deserRefType(inst.get_imm_ref_type());
+          rt = deserRefType(inst.imm_ref_type());
       }
 
       ip->set_ref_reloc_type(Inst::IMMRef, ref, ro, rt);
@@ -343,7 +338,7 @@ InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder)
       }
 
       if(inst.has_mem_ref_type()) {
-          rt = deserRefType(inst.get_mem_ref_type());
+          rt = deserRefType(inst.mem_ref_type());
       }
 
       ip->set_ref_reloc_type(Inst::MEMRef, ref, ro, rt);
@@ -865,10 +860,6 @@ static void instFromNatInst(InstPtr i, ::Instruction *protoInst) {
 
     string  s = i->get_ext_data_ref()->getSymbolName();
     protoInst->set_ext_data_name(s);
-  }
-
-  if(i->has_call_tgt()) {
-      protoInst->set_call_target(i->get_call_tgt(0));
   }
 
   if(i->has_jump_table()) {

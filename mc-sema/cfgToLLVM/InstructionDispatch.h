@@ -81,7 +81,7 @@ bool initInstructionDispatch();
     } else {\
         NOREFS;\
     }\
-    return ContinueBLock;\
+    return ContinueBlock;\
 }
 
 #define GENERIC_TRANSLATION(NAME, NOREFS) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {\
