@@ -313,7 +313,7 @@ InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder)
   }
 
   if(inst.has_imm_reference()) {
-      uint64_t ref = inst.mem_reference();
+      uint64_t ref = inst.imm_reference();
       uint64_t ro = 0;
       Inst::CFGRefType rt;
 

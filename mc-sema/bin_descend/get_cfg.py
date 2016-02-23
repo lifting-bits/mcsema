@@ -113,8 +113,16 @@ EXTERNAL_NAMES = [
 
 def DEBUG(s):
     if _DEBUG:
-        syslog.syslog(str(s))
+        #syslog.syslog(str(s))
         sys.stdout.write(str(s))
+
+def ReftypeString(rt):
+    if rt == CFG_pb2.Instruction.DataRef:
+        return "DATA"
+    elif rt == CFG_pb2.Instruction.CodeRef:
+        return "CODE"
+    else:
+        return "UNKNOWN!"
 
 def readDword(ea):
     bytestr = readBytesSlowly(ea, ea+4);
@@ -128,7 +136,7 @@ def readQword(ea):
 
 def isLinkedElf():
     return idc.GetLongPrm(INF_FILETYPE) == idc.FT_ELF and \
-        idc.BeginEA() !=0xffffffffL 
+        idc.BeginEA() not in [0xffffffffL, 0xffffffffffffffffL]
 
 def fixExternalName(fn):
     
@@ -465,18 +473,15 @@ def manualRelocOffset(I, inst, dref):
     saw_displ = False
     for op in insn_t.Operands:
         
-        if op.type in [idaapi.o_displ, idaapi.o_phrase]:
-            saw_displ = True
-        # only do this if we see an immediate operand following
-        # a displacement operand
-        if saw_displ and op.type == idaapi.o_imm:
-            # and the immediate is the data reference
-            if op.value == dref:
-                DEBUG("Manually setting reloc offset for IMM32 value at {0:x} to {1:x}\n".format(inst, op.offb))
-                # fake a relocation offset so that we know the immediate 
-                # is a reference and not a constant
+        if op.value == dref:
+            if op.type in [idaapi.o_displ, idaapi.o_phrase]:
+                I.mem_reloc_offset = op.offb
+                return "MEM"
+
+            if op.type in [idaapi.o_imm, idaapi.o_mem, idaapi.o_near, idaapi.o_far]:
                 I.imm_reloc_offset = op.offb
                 return "IMM"
+
     return "MEM"
 
 def opAtOffset(insn_t, off):
@@ -490,7 +495,7 @@ def opAtOffset(insn_t, off):
             if op.type in [idaapi.o_displ, idaapi.o_phrase]:
                 return "MEM"
 
-            if op.type == idaapi.o_imm:
+            if op.type in [idaapi.o_imm, idaapi.o_mem, idaapi.o_near, idaapi.o_far]:
                 return "IMM"
 
             DEBUG("ERROR: Unknown op type {}, assuming MEM\n".format(op.type))
@@ -544,6 +549,9 @@ def addDataReference(M, I, inst, dref, new_eas):
             ref = handleDataRelocation(M, dref, new_eas)
             reftype = CFG_pb2.Instruction.DataRef
 
+        
+        DEBUG("\t\tSetting {} ref at {:x}: to {:x} type: {}\n".format(
+            which_op, inst, ref, ReftypeString(reftype)))
         setReference(I, which_op, reftype, ref)
 
     else:
@@ -672,7 +680,6 @@ def instructionHandler(M, B, inst, new_eas):
         if dref in crefs:
             continue
         addDataReference(M, I, inst, dref, new_eas)
-        DEBUG("instr refering data")
         if isUnconditionalJump(inst):
         	xdrefs = idautils.DataRefsFrom(dref)
         	for xref in xdrefs:

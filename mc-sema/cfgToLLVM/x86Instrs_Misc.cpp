@@ -655,68 +655,48 @@ GENERIC_TRANSLATION_REF(LEA16r,
 	doLea<16>(ip, block, ADDR_NOREF(1), OP(0)),
 	doLea<16>(ip, block, MEM_REFERENCE(1), OP(0))) 
 
-static InstTransResult translate_LEA32r(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
+template <int width>
+static InstTransResult doLeaRef(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
     if( ip->has_code_ref() ) {
+        Inst::CFGOpType optype;
+
+        if(ip->has_mem_reference) {
+            optype = Inst::MEMRef;
+        } else if (ip->has_imm_reference) {
+            optype = Inst::IMMRef;
+        } else {
+            throw TErr(__LINE__, __FILE__, "Have code ref but no reference");
+        }
+
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 block->getParent()->getParent(), 
-                ip->get_reference(Inst::MEMRef));
+                ip->get_reference(optype));
         Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
-        ret = doLeaV<32>(block, OP(0), addrInt);
+            callback_fn, llvm::Type::getIntNTy(block->getContext(), width), "", block);
+        ret = doLeaV<width>(block, OP(0), addrInt);
     } else if( ip->has_mem_reference ) {
-        ret = doLea<32>(ip, block, MEM_REFERENCE(1), OP(0));
+        ret = doLea<width>(ip, block, MEM_REFERENCE(1), OP(0));
+    }
+    else if( ip->has_imm_reference ) {
+        ret = doLea<width>(ip, block, IMM_AS_DATA_REF<width>(block, natM, ip), OP(0));
     } else { 
-        ret = doLea<32>(ip, block, ADDR_NOREF(1), OP(0));
+        ret = doLea<width>(ip, block, ADDR_NOREF(1), OP(0));
     }
     return ret;
+}
+static InstTransResult translate_LEA32r(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
+    return doLeaRef<32>(natM, block, ip, inst);
 }
 
 static InstTransResult translate_LEA64r(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
-    InstTransResult ret;
-    Function *F = block->getParent();
-    if( ip->has_code_ref() ) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(), 
-                ip->get_reference(Inst::MEMRef));
-        Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt64Ty(block->getContext()), "", block);
-        ret = doLeaV<64>(block, OP(0), addrInt);
-    } else if(ip->has_external_ref()){
-    	Value *addrInt = getValueForExternal<64>(F->getParent(), ip, block);
-    	ret = doLeaV<64>(block, OP(0), addrInt);
-    }
-    else if( ip->has_mem_reference ) {
-        ret = doLea<64>(ip, block, MEM_REFERENCE(1), OP(0));
-    } else { 
-        ret = doLea<64>(ip, block, ADDR_NOREF(1), OP(0));
-    }
-    return ret;
+    return doLeaRef<64>(natM, block, ip, inst);
 }
 
 static InstTransResult translate_LEA64_32r(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
-    InstTransResult ret;
-    Function *F = block->getParent();
-    if( ip->has_code_ref() ) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(),
-                ip->get_reference(Inst::MEMRef));
-        Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
-        ret = doLeaV<32>(block, OP(0), addrInt);
-    } else if( ip->has_mem_reference ) {
-        ret = doLea<32>(ip, block, MEM_REFERENCE(1), OP(0));
-    } else {
-        ret = doLea<32>(ip, block, ADDR_NOREF(1), OP(0));
-    }
-    return ret;
+    return doLeaRef<32>(natM, block, ip, inst);
 }
-
-
-//GENERIC_TRANSLATION_REF(LEA32r, 
-//	doLea<32>(ip, block, ADDR_NOREF(1), OP(0)),
-//	doLea<32>(ip, block, MEM_REFERENCE(1), OP(0))) 
 
 GENERIC_TRANSLATION(AAA, doAAA(block))
 GENERIC_TRANSLATION(AAS, doAAS(block))
