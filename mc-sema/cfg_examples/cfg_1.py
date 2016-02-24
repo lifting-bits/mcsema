@@ -19,7 +19,6 @@ M = CFG_pb2.Module()
 
 #set up module metadata
 M.module_name = u'insertion_sort'
-M.entry_address = 0x0804843C
 
 #create a function to insert into the module
 F = M.internal_funcs.add()
