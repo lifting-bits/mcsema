@@ -914,14 +914,18 @@ static InstTransResult translate_JMP32r(NativeModulePtr natM,
     TASSERT(defaultb != nullptr, "Default block has to exit");
     // fallback to doing do_call_value
     doCallV(defaultb, ip, fromReg);
-    return doRet(defaultb);
+    writeLocalsToContext(defaultb, x86::REG_SIZE, ABIRetStore);
+    ReturnInst::Create(defaultb->getContext(), defaultb);
+    return EndCFG;
 
   } else {
     // translate the JMP32r as a call/ret
     llvm::dbgs() << __FUNCTION__ << ": regular jump via register: "
                  << to_string<VA>(ip->get_loc(), std::hex) << "\n";
     doCallV(block, ip, fromReg);
-    return doRet(block);
+    writeLocalsToContext(block, x86::REG_SIZE, ABIRetStore);
+    ReturnInst::Create(block->getContext(), block);
+    return EndCFG;
   }
 }
 
@@ -953,14 +957,18 @@ static InstTransResult translate_JMP64r(NativeModulePtr natM,
     TASSERT(defaultb != nullptr, "Default block has to exit");
     // fallback to doing do_call_value
     doCallV(defaultb, ip, fromReg);
-    return doRetQ(defaultb);
+    writeLocalsToContext(defaultb, x86_64::REG_SIZE, ABIRetStore);
+    ReturnInst::Create(defaultb->getContext(), defaultb);
+    return EndCFG;
 
   } else {
     // translate the JMP64r as a call/ret
     llvm::dbgs() << __FUNCTION__ << ": regular jump via register: "
                  << to_string<VA>(ip->get_loc(), std::hex) << "\n";
     doCallV(block, ip, fromReg);
-    return doRetQ(block);
+    writeLocalsToContext(block, x86_64::REG_SIZE, ABIRetStore);
+    ReturnInst::Create(block->getContext(), block);
+    return EndCFG;
   }
 }
 
