@@ -215,21 +215,6 @@ static BasicBlock *doStosV(BasicBlock *pred) {
     return doWrite;
 }
 
-template <int width>
-static InstTransResult doStos(BasicBlock *&b) {
-	llvm::Module *M = b->getParent()->getParent();
-	int bitWidth = getPointerSize(M);
-	if(bitWidth == Pointer32)
-    {
-		b = doStosV<width, x86::REG_SIZE>(b);
-    }
-	else
-    {
-		b = doStosV<width, x86_64::REG_SIZE>(b);
-    }
-	return ContinueBlock;
-}
-
 template <int width, int regWidth>
 static BasicBlock *doScasV(BasicBlock *pred) {
     //do a read from the memory pointed to by EDI
@@ -497,14 +482,6 @@ static BasicBlock *doRepNe(BasicBlock *b, BasicBlock *bodyB, BasicBlock *bodyE) 
 
 }
 
-template <int width>
-static InstTransResult doMovs(BasicBlock *&b) {
-	//we will just kind of paste a new block into the end
-	//here so that we have less duplicated logic
-	b = doMovsV<width>(b);
-
-	return ContinueBlock;
-}
 // repe == rep
 #define DO_REP_CALL(CALL, NAME) template <int opSize> static InstTransResult doRep ## NAME (BasicBlock *&b) {\
 	BasicBlock	*bodyBegin =  \
@@ -561,6 +538,29 @@ static InstTransResult doRepMovs(BasicBlock *&b) {
     return ContinueBlock;
 }
 
+template <int width>
+static InstTransResult doMovs(BasicBlock *&b, InstPtr ip) {
+	//we will just kind of paste a new block into the end
+	//here so that we have less duplicated logic
+	llvm::Module *M = b->getParent()->getParent();
+	int bitWidth = getPointerSize(M);
+    Inst::Prefix pfx = ip->get_prefix();
+    if(pfx == Inst::RepPrefix) {
+        if(bitWidth == Pointer32)
+        {
+            doRepMovs<width, x86::REG_SIZE>(b);
+        }
+        else
+        {
+            doRepMovs<width, x86_64::REG_SIZE>(b);
+        }
+    } else {
+        b = doMovsV<width>(b);
+    }
+
+	return ContinueBlock;
+}
+
 template <int opSize, int bitWidth>
 static InstTransResult doRepStos(BasicBlock *&b) {
 
@@ -573,24 +573,50 @@ static InstTransResult doRepStos(BasicBlock *&b) {
     return ContinueBlock;
 }
 
+template <int width>
+static InstTransResult doStos(BasicBlock *&b, InstPtr ip) {
+	llvm::Module *M = b->getParent()->getParent();
+	int bitWidth = getPointerSize(M);
+    Inst::Prefix pfx = ip->get_prefix();
+	if(bitWidth == Pointer32)
+    {
+        if(pfx == Inst::RepPrefix) {
+            doRepStos<width, x86::REG_SIZE>(b);
+        } else {
+            b = doStosV<width, x86::REG_SIZE>(b);
+        }
+    }
+	else
+    {
+        if(pfx == Inst::RepPrefix) {
+            doRepStos<width, x86_64::REG_SIZE>(b);
+        } else {
 
-GENERIC_TRANSLATION(MOVSD, doMovs<32>(block))
+            b = doStosV<width, x86_64::REG_SIZE>(b);
+        }
+    }
+	return ContinueBlock;
+}
+
+
+
+GENERIC_TRANSLATION(MOVSD, doMovs<32>(block, ip))
 GENERIC_TRANSLATION(REP_MOVSD_32, (doRepMovs<32, 32>(block)))
-GENERIC_TRANSLATION(MOVSW, doMovs<16>(block))
+GENERIC_TRANSLATION(MOVSW, doMovs<16>(block, ip))
 GENERIC_TRANSLATION(REP_MOVSW_32, (doRepMovs<16, 32>(block)))
-GENERIC_TRANSLATION(MOVSB, doMovs<8>(block))
+GENERIC_TRANSLATION(MOVSB, doMovs<8>(block, ip))
 GENERIC_TRANSLATION(REP_MOVSB_32, (doRepMovs<8, 32>(block)))
 
-GENERIC_TRANSLATION(MOVSQ, doMovs<64>(block))
+GENERIC_TRANSLATION(MOVSQ, doMovs<64>(block, ip))
 GENERIC_TRANSLATION(REP_MOVSB_64, (doRepMovs<8, 64>(block)))
 GENERIC_TRANSLATION(REP_MOVSW_64, (doRepMovs<16, 64>(block)))
 GENERIC_TRANSLATION(REP_MOVSD_64, (doRepMovs<32, 64>(block)))
 GENERIC_TRANSLATION(REP_MOVSQ_64, (doRepMovs<64, 64>(block)))
 
-GENERIC_TRANSLATION(STOSQ, doStos<64>(block))
-GENERIC_TRANSLATION(STOSD, doStos<32>(block))
-GENERIC_TRANSLATION(STOSW, doStos<16>(block))
-GENERIC_TRANSLATION(STOSB, doStos<8>(block))
+GENERIC_TRANSLATION(STOSQ, doStos<64>(block, ip))
+GENERIC_TRANSLATION(STOSD, doStos<32>(block, ip))
+GENERIC_TRANSLATION(STOSW, doStos<16>(block, ip))
+GENERIC_TRANSLATION(STOSB, doStos<8>(block, ip))
 
 GENERIC_TRANSLATION(REP_STOSB_64, (doRepStos<8, 64>(block)))
 GENERIC_TRANSLATION(REP_STOSW_64, (doRepStos<16, 64>(block)))
