@@ -6444,8 +6444,8 @@ __fpurge 1 C N
 __printf_chk 16 C N
 __fprintf_chk 16 C N
 __sprintf_chk 16 C N
-__mempcpy_chk 3 C N
-__memcpy_chk 3 C N
+__mempcpy_chk 4 C N
+__memcpy_chk 4 C N
 
 __ctype_get_mb_cur_max 0 C N
 __ctype_toupper_loc 0 C N
