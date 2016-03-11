@@ -992,7 +992,7 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
 
     DEBUG("Looking for relocations in {:x} - {:x}\n".format(start, end))
 
-    if i == idc.BADADDR:
+    if i == idc.BADADDR or i > end:
         if isLinkedElf():
             DEBUG("No relocations in binary, scanning for data references\n");
             # no fixups, do manual reloc searching
@@ -1000,7 +1000,7 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
         else:
             DEBUG("Not scanning data sections of object file for pointer-alikes")
     else:
-        DEBUG("Found relocations in binary..\n")
+        DEBUG("Found relocations in binary: ({:x})..\n".format(i))
         while i < end and i != idc.BADADDR:
             pointsto, itemsize = resolveRelocation(i)
             DEBUG("{0:x} Found reloc to: {1:x} (size: {2:x})\n".format(i, pointsto, itemsize))
