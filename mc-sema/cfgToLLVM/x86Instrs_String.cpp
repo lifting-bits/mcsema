@@ -428,8 +428,8 @@ static BasicBlock *doMovsV(BasicBlock *pred) {
 	return doWrite;
 }
 
-template <int opSize, int bitWidth>
-static BasicBlock *doRep(BasicBlock *b, BasicBlock *bodyB, BasicBlock *bodyE, CmpInst::Predicate condition) {
+template <int opSize, int bitWidth, bool use_condition>
+static BasicBlock *doRep(BasicBlock *b, BasicBlock *bodyB, BasicBlock *bodyE, CmpInst::Predicate check_op) {
     Function    *F = b->getParent();
     //WHILE countReg != 0 do 'body'
     BasicBlock  *loopHeader = BasicBlock::Create(F->getContext(), "", F);
@@ -455,43 +455,71 @@ static BasicBlock *doRep(BasicBlock *b, BasicBlock *bodyB, BasicBlock *bodyE, Cm
         BinaryOperator::CreateSub(cTmp, CONST_V<bitWidth>(bodyE, 1), "", bodyE);
     R_WRITE<bitWidth>(bodyE, X86::RCX, cTmpDec);
 
-    //do a test on the REP condition
+    // check if ECX == 0
     Value   *cmp = new ICmpInst(*bodyE,
-                                condition,
+                                CmpInst::ICMP_EQ,
                                 cTmpDec,
                                 CONST_V<bitWidth>(bodyE, 0));
 
-    //if cmp is true, then branch to body beginning, otherwise, return to the final block
-    BranchInst::Create(bodyB, rest, cmp, bodyE);
+    Value *final_condition =  nullptr;
+
+    if(use_condition) {
+        //do a test on the REP condition
+        Value *zf_val = F_READ(bodyE, ZF);
+        // ICMP_EQ ==  "terminate if ZF == 0"
+        // ICMP_NE ==  "temrinate if ZF == 1"
+        Value *rep_condition = new ICmpInst(*bodyE,
+                check_op,
+                zf_val,
+                CONST_V<1>(bodyE, 0));
+
+        final_condition =  BinaryOperator::Create(Instruction::Or, cmp, rep_condition, "", bodyE);
+
+    } else {
+        final_condition = cmp;
+    }
+
+    //if either_cond is true, exit; otherwise, redo loop
+    BranchInst::Create(rest, // exit block
+            bodyB, // redo loop block
+            final_condition, // test condition
+            bodyE // where to insert this check
+            );
 
     // this is the final return block
     return rest;
 } 
 
 template <int opSize, int bitWidth>
+static BasicBlock *doRepN(BasicBlock *b, BasicBlock *bodyB, BasicBlock *bodyE) {
+
+    return doRep<opSize, bitWidth, false>(b, bodyB, bodyE, CmpInst::ICMP_EQ);
+
+}
+
+template <int opSize, int bitWidth>
 static BasicBlock *doRepe(BasicBlock *b, BasicBlock *bodyB, BasicBlock *bodyE) {
 
-    return doRep<opSize, bitWidth>(b, bodyB, bodyE, CmpInst::ICMP_NE);
+    return doRep<opSize, bitWidth, true>(b, bodyB, bodyE, CmpInst::ICMP_EQ);
 
 }
 
 template <int opSize, int bitWidth>
 static BasicBlock *doRepNe(BasicBlock *b, BasicBlock *bodyB, BasicBlock *bodyE) {
 
-    return doRep<opSize, bitWidth>(b, bodyB, bodyE, CmpInst::ICMP_EQ);
+    return doRep<opSize, bitWidth, true>(b, bodyB, bodyE, CmpInst::ICMP_NE);
 
 }
 
-// repe == rep
 #define DO_REP_CALL(CALL, NAME) template <int opSize> static InstTransResult doRep ## NAME (BasicBlock *&b) {\
 	BasicBlock	*bodyBegin =  \
 		BasicBlock::Create(b->getContext(), "", b->getParent()); \
 	BasicBlock	*bodyEnd = (CALL); \
     Module *M = b->getParent()->getParent();\
     if(getPointerSize(M) == Pointer32) {\
-	b = doRepe<opSize,32>(b, bodyBegin, bodyEnd); \
+	b = doRepN<opSize,32>(b, bodyBegin, bodyEnd); \
     } else {\
-	b = doRepe<opSize,64>(b, bodyBegin, bodyEnd); \
+	b = doRepN<opSize,64>(b, bodyBegin, bodyEnd); \
     }\
 	return ContinueBlock; \
 }
@@ -533,7 +561,7 @@ static InstTransResult doRepMovs(BasicBlock *&b) {
         BasicBlock::Create(b->getContext(), "", b->getParent());
     BasicBlock	*bodyEnd = doMovsV<opSize>(bodyBegin);
 
-    b = doRepe<opSize, bitWidth>(b, bodyBegin, bodyEnd);
+    b = doRepN<opSize, bitWidth>(b, bodyBegin, bodyEnd);
 
     return ContinueBlock;
 }
@@ -568,7 +596,7 @@ static InstTransResult doRepStos(BasicBlock *&b) {
         BasicBlock::Create(b->getContext(), "", b->getParent());
     BasicBlock	*bodyEnd = doStosV<opSize, bitWidth>(bodyBegin);
 
-    b = doRepe<opSize, bitWidth>(b, bodyBegin, bodyEnd);
+    b = doRepN<opSize, bitWidth>(b, bodyBegin, bodyEnd);
 
     return ContinueBlock;
 }
