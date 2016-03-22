@@ -2004,6 +2004,7 @@ GENERIC_TRANSLATION_MI(SHL32mi,
 
 GENERIC_TRANSLATION(SHL32r1, doShlR1<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHL32rCL, doShlRCL<32>(ip, block, OP(0)))
+GENERIC_TRANSLATION(SHL64rCL, doShlRCL<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHL32ri, doShlRI<32>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SHL64ri, doShlRI<64>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION_REF(SHL8m1,
@@ -2178,6 +2179,7 @@ void ShiftRoll_populateDispatchMap(DispatchMap &m) {
         m[X86::SHL32mi] = translate_SHL32mi;
         m[X86::SHL32r1] = translate_SHL32r1;
         m[X86::SHL32rCL] = translate_SHL32rCL;
+        m[X86::SHL64rCL] = translate_SHL64rCL;
         m[X86::SHL32ri] = translate_SHL32ri;
 
         m[X86::SHL64ri] = translate_SHL64ri;
@@ -2199,6 +2201,7 @@ void ShiftRoll_populateDispatchMap(DispatchMap &m) {
         m[X86::SHR32mi] = translate_SHR32mi;
         m[X86::SHR32r1] = translate_SHR32r1;
         m[X86::SHR32rCL] = translate_SHR32rCL;
+        m[X86::SHR64rCL] = translate_SHR64rCL;
         m[X86::SHR32ri] = translate_SHR32ri;
         m[X86::SHR8m1] = translate_SHR8m1;
         m[X86::SHR8mCL] = translate_SHR8mCL;
