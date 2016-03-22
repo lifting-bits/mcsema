@@ -940,6 +940,8 @@ static InstTransResult translate_JMP64r(NativeModulePtr natM,
   //read the register
   Value *fromReg = x86_64::R_READ<64>(block, tgtOp.getReg());
 
+  Module *M = block->getParent()->getParent();
+
   if (ip->has_jump_table()) {
     // this is a jump table that got converted
     // into a table in the data section
@@ -951,7 +953,12 @@ static InstTransResult translate_JMP64r(NativeModulePtr natM,
     // Terrible HACK
     // Subtract image base since we assume win64 adds it for jump
     // tables. This may not always be true.
-    Value *minus_base = doSubtractImageBaseInt(fromReg, block);
+    Value *minus_base = nullptr;
+    if(shouldSubtractImageBase(M)) {
+        minus_base = doSubtractImageBaseInt(fromReg, block);
+    } else {
+        minus_base = fromReg;
+    }
     // end terrible HACK
     doJumpTableViaSwitchReg(block, ip, minus_base, defaultb, 64);
     TASSERT(defaultb != nullptr, "Default block has to exit");
