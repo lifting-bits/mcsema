@@ -312,7 +312,8 @@ static InstTransResult doCVTSI2SrV(NativeModulePtr natM, BasicBlock *& block, In
 // Converts a signed doubleword integer (or signed quadword integer if operand size is 64 bits) 
 // in the second source operand to a double-precision floating-point value in the destination operand. 
 // The result is stored in the low quad- word of the destination operand, and the high quadword left unchanged. 
-//
+
+template <int width>
 static InstTransResult translate_CVTSI2SDrr(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) 
 {
     const MCOperand &dst = OP(0);
@@ -321,12 +322,13 @@ static InstTransResult translate_CVTSI2SDrr(NativeModulePtr natM, BasicBlock *& 
     NASSERT(src.isReg()); 
     NASSERT(dst.isReg()); 
 
-    // read 32 bits from source
-    Value *rval = R_READ<32>(block, src.getReg());
+    // read reg from source
+    Value *rval = R_READ<width>(block, src.getReg());
 
     return doCVTSI2SrV<64>(natM, block, ip, inst, rval, dst);
 }
 
+template <int width>
 static InstTransResult translate_CVTSI2SDrm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) 
 {
     const MCOperand &dst = OP(0);
@@ -335,7 +337,7 @@ static InstTransResult translate_CVTSI2SDrm(NativeModulePtr natM, BasicBlock *& 
     Value *src = ADDR_NOREF(1);
 
     // read 32 bits from memory
-    Value *mval = M_READ<32>(ip, block, src);
+    Value *mval = M_READ<width>(ip, block, src);
 
     return doCVTSI2SrV<64>(natM, block, ip, inst, mval, dst);
 }
@@ -562,7 +564,7 @@ static InstTransResult translate_CVTSI2SS64rm(NativeModulePtr natM, BasicBlock *
 }
 
 
-template <int width>
+template <int width, int regwidth>
 static InstTransResult doCVTTS2SIrV(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst, Value *src, const MCOperand &dst)
 {
     Value *final_v = NULL;
@@ -570,61 +572,34 @@ static InstTransResult doCVTTS2SIrV(NativeModulePtr natM, BasicBlock *& block, I
     Value *to_int = CastInst::Create(
             Instruction::FPToSI,
             INT_AS_FP<width>(block, src),
-            Type::getIntNTy(block->getContext(), 32),
+            Type::getIntNTy(block->getContext(), regwidth),
             "",
             block);
 
-    R_WRITE<32>(block, dst.getReg(), to_int);
+    R_WRITE<regwidth>(block, dst.getReg(), to_int);
 
     return ContinueBlock;
 
 }
 
-// convert w/ trunaction scalar double-precision fp value to signed integer
-static InstTransResult translate_CVTTSD2SIrm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
-
-    const MCOperand &dst = OP(0);
-    Value *mem_addr = ADDR_NOREF(1);
-
-    NASSERT(dst.isReg());
-    
-    Value *src_val = M_READ<64>(ip, block, mem_addr);
-    
-    return doCVTTS2SIrV<64>(natM, block, ip, inst, src_val, dst);
-
-}
-
-// convert w/ trunaction scalar double-precision fp value (xmm reg) to signed integer
-static InstTransResult translate_CVTTSD2SIrr(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
-
-    const MCOperand &dst = OP(0);
-    const MCOperand &src = OP(1);
-
-    NASSERT(dst.isReg());
-    NASSERT(src.isReg());
-    
-    Value *src_val = R_READ<64>(block, src.getReg());
-    
-    return doCVTTS2SIrV<64>(natM, block, ip, inst, src_val, dst);
-
-}
-
 // convert w/ truncation scalar single-precision fp value to dword integer
-static InstTransResult translate_CVTTSS2SIrm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+template <int fpwidth, int regwidth>
+static InstTransResult doCVTT_to_SI_rm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
 
     const MCOperand &dst = OP(0);
     Value *mem_addr = ADDR_NOREF(1);
 
     NASSERT(dst.isReg());
     
-    Value *src_val = M_READ<32>(ip, block, mem_addr);
+    Value *src_val = M_READ<fpwidth>(ip, block, mem_addr);
     
-    return doCVTTS2SIrV<32>(natM, block, ip, inst, src_val, dst);
+    return doCVTTS2SIrV<fpwidth, regwidth>(natM, block, ip, inst, src_val, dst);
 
 }
 
 // convert w/ truncation scalar single-precision fp value (xmm reg) to dword integer
-static InstTransResult translate_CVTTSS2SIrr(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+template <int fpwidth, int regwidth>
+static InstTransResult doCVTT_to_SI_rr(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
 
     const MCOperand &dst = OP(0);
     const MCOperand &src = OP(1);
@@ -632,9 +607,9 @@ static InstTransResult translate_CVTTSS2SIrr(NativeModulePtr natM, BasicBlock *&
     NASSERT(dst.isReg());
     NASSERT(src.isReg());
     
-    Value *src_val = R_READ<32>(block, src.getReg());
+    Value *src_val = R_READ<fpwidth>(block, src.getReg());
     
-    return doCVTTS2SIrV<32>(natM, block, ip, inst, src_val, dst);
+    return doCVTTS2SIrV<fpwidth,regwidth>(natM, block, ip, inst, src_val, dst);
 
 }
 
@@ -2138,6 +2113,21 @@ static Value *doUNPCKLPSvv(BasicBlock *b, Value *dest, Value *src)
     return VECTOR_AS_INT<128>(b, res4);
 }
 
+static Value *doUNPCKLPDvv(BasicBlock *b, Value *dest, Value *src)
+{
+    Value *vecSrc = INT_AS_VECTOR<128,64>(b, src);
+    Value *vecDst = INT_AS_VECTOR<128,64>(b, dest);
+
+    Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "", b);
+    Value *dst1 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 0), "", b);
+
+    Value *res1 = InsertElementInst::Create(vecDst, dst1, CONST_V<32>(b, 0), "", b);
+    Value *res2 = InsertElementInst::Create(res1, src1, CONST_V<32>(b, 1), "", b);
+
+    // convert the output back to an integer
+    return VECTOR_AS_INT<128>(b, res2);
+}
+
 static InstTransResult doUNPCKLPSrr(BasicBlock *b, const MCOperand &dest, const MCOperand &src)
 {
     R_WRITE<128>(b, dest.getReg(),
@@ -2154,6 +2144,21 @@ static InstTransResult doUNPCKLPSrm(InstPtr ip, BasicBlock *b, const MCOperand &
     return ContinueBlock;
 }
 
+static InstTransResult doUNPCKLPDrr(BasicBlock *b, const MCOperand &dest, const MCOperand &src)
+{
+    R_WRITE<128>(b, dest.getReg(),
+                 doUNPCKLPDvv(b, R_READ<128>(b, dest.getReg()),
+                                 R_READ<128>(b, src.getReg())));
+    return ContinueBlock;
+}
+
+static InstTransResult doUNPCKLPDrm(InstPtr ip, BasicBlock *b, const MCOperand &dest, Value *src)
+{
+    R_WRITE<128>(b, dest.getReg(),
+               doUNPCKLPDvv(b, R_READ<128>(b, dest.getReg()),
+                               M_READ<128>(ip, b, src)));
+    return ContinueBlock;
+}
 
 Value *doCVTPS2PDvv(BasicBlock *&b, Value *dest, Value *src) {
   Type *DoubleTy = Type::getDoubleTy(b->getContext());
@@ -2174,6 +2179,31 @@ Value *doCVTPS2PDvv(BasicBlock *&b, Value *dest, Value *src) {
   return VECTOR_AS_INT<128>(b, res2);
 }
 
+Value *doCVTPD2PSvv(BasicBlock *&b, Value *dest, Value *src) {
+  Type *FloatTy = Type::getFloatTy(b->getContext());
+
+  Value *vecSrc = INT_AS_FPVECTOR<128,64>(b, src);
+  Value *vecDst = INT_AS_FPVECTOR<128,32>(b, dest);
+
+  Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "", b);
+  Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "", b);
+
+  Value *src1_trunc = new FPTruncInst(src1, FloatTy, "", b);
+  Value *src2_trunc = new FPTruncInst(src2, FloatTy, "", b);
+
+  Value *zero = CONST_V<32>(b, 0);
+      
+  Value *zero_as_fp = CastInst::Create(Instruction::BitCast, zero, FloatTy, "", b);
+
+  Value *res1 = InsertElementInst::Create(vecDst, src1_trunc, CONST_V<32>(b, 0), "", b);
+  Value *res2 = InsertElementInst::Create(res1, src2_trunc, CONST_V<32>(b, 1), "", b);
+  Value *res3 = InsertElementInst::Create(res2, zero_as_fp, CONST_V<32>(b, 2), "", b);
+  Value *res4 = InsertElementInst::Create(res3, zero_as_fp, CONST_V<32>(b, 3), "", b);
+
+  // convert the output back to an integer
+  return VECTOR_AS_INT<128>(b, res4);
+}
+
 
 static InstTransResult doCVTPS2PDrr(BasicBlock *b, const MCOperand &dest, const MCOperand &src)
 {
@@ -2187,6 +2217,22 @@ static InstTransResult doCVTPS2PDrm(InstPtr ip, BasicBlock *b, const MCOperand &
 {
     R_WRITE<128>(b, dest.getReg(),
                  doCVTPS2PDvv(b, R_READ<128>(b, dest.getReg()),
+                                 M_READ<128>(ip, b, src)));
+    return ContinueBlock;
+}
+
+static InstTransResult doCVTPD2PSrr(BasicBlock *b, const MCOperand &dest, const MCOperand &src)
+{
+    R_WRITE<128>(b, dest.getReg(),
+                 doCVTPD2PSvv(b, R_READ<128>(b, dest.getReg()),
+                                 R_READ<128>(b, src.getReg())));
+    return ContinueBlock;
+}
+
+static InstTransResult doCVTPD2PSrm(InstPtr ip, BasicBlock *b, const MCOperand &dest, Value *src)
+{
+    R_WRITE<128>(b, dest.getReg(),
+                 doCVTPD2PSvv(b, R_READ<128>(b, dest.getReg()),
                                  M_READ<128>(ip, b, src)));
     return ContinueBlock;
 }
@@ -2621,18 +2667,33 @@ GENERIC_TRANSLATION(UNPCKLPSrr,
 GENERIC_TRANSLATION_REF(UNPCKLPSrm,
         (doUNPCKLPSrm(ip, block, OP(1), ADDR_NOREF(2))),
         (doUNPCKLPSrm(ip, block, OP(1), MEM_REFERENCE(2))) )
+GENERIC_TRANSLATION(UNPCKLPDrr,
+        (doUNPCKLPDrr(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_REF(UNPCKLPDrm,
+        (doUNPCKLPDrm(ip, block, OP(1), ADDR_NOREF(2))),
+        (doUNPCKLPDrm(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(CVTPS2PDrr,
         (doCVTPS2PDrr(block, OP(0), OP(1))) )
 GENERIC_TRANSLATION_REF(CVTPS2PDrm,
         (doCVTPS2PDrm(ip, block, OP(0), ADDR_NOREF(1))),
         (doCVTPS2PDrm(ip, block, OP(0), MEM_REFERENCE(1))) )
+GENERIC_TRANSLATION(CVTPD2PSrr,
+        (doCVTPD2PSrr(block, OP(0), OP(1))) )
+GENERIC_TRANSLATION_REF(CVTPD2PSrm,
+        (doCVTPD2PSrm(ip, block, OP(0), ADDR_NOREF(1))),
+        (doCVTPD2PSrm(ip, block, OP(0), MEM_REFERENCE(1))) )
 
 void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::MOVSDrm] = (doMOVSrm<64>);
     m[X86::MOVSDmr] = (doMOVSmr<64>);
-    m[X86::CVTSI2SDrr] = translate_CVTSI2SDrr;
-    m[X86::CVTSI2SDrm] = translate_CVTSI2SDrm;
+
+    m[X86::CVTSI2SDrr] = (translate_CVTSI2SDrr<32>);
+    m[X86::CVTSI2SDrm] = (translate_CVTSI2SDrm<32>);
+    m[X86::CVTSI2SD64rr] = (translate_CVTSI2SDrr<64>);
+    m[X86::CVTSI2SD64rm] = (translate_CVTSI2SDrm<64>);
+
+
     m[X86::CVTSD2SSrm] = translate_CVTSD2SSrm;
     m[X86::CVTSD2SSrr] = translate_CVTSD2SSrr;
     m[X86::CVTSS2SDrm] = translate_CVTSS2SDrm;
@@ -2661,10 +2722,15 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::CVTSI2SS64rr] = translate_CVTSI2SS64rr;
     m[X86::CVTSI2SS64rm] = translate_CVTSI2SS64rm;
 
-    m[X86::CVTTSD2SIrm] = translate_CVTTSD2SIrm;
-    m[X86::CVTTSD2SIrr] = translate_CVTTSD2SIrr;
-    m[X86::CVTTSS2SIrm] = translate_CVTTSS2SIrm;
-    m[X86::CVTTSS2SIrr] = translate_CVTTSS2SIrr;
+    m[X86::CVTTSD2SIrm] = (doCVTT_to_SI_rm<64,32>);
+    m[X86::CVTTSD2SIrr] = (doCVTT_to_SI_rr<64,32>);
+    m[X86::CVTTSS2SIrm] = (doCVTT_to_SI_rm<32,32>);
+    m[X86::CVTTSS2SIrr] = (doCVTT_to_SI_rr<32,32>);
+
+    m[X86::CVTTSD2SI64rm] = (doCVTT_to_SI_rm<64,64>);
+    m[X86::CVTTSD2SI64rr] = (doCVTT_to_SI_rr<64,64>);
+    m[X86::CVTTSS2SI64rm] = (doCVTT_to_SI_rm<32,64>);
+    m[X86::CVTTSS2SI64rr] = (doCVTT_to_SI_rr<32,64>);
 
     m[X86::ADDSDrr] = translate_ADDSDrr;
     m[X86::ADDSDrm] = translate_ADDSDrm;
@@ -2890,7 +2956,12 @@ void SSE_populateDispatchMap(DispatchMap &m) {
 
     m[X86::UNPCKLPSrm] = translate_UNPCKLPSrm;
     m[X86::UNPCKLPSrr] = translate_UNPCKLPSrr;
+    m[X86::UNPCKLPDrm] = translate_UNPCKLPDrm;
+    m[X86::UNPCKLPDrr] = translate_UNPCKLPDrr;
 
     m[X86::CVTPS2PDrm] = translate_CVTPS2PDrm;
     m[X86::CVTPS2PDrr] = translate_CVTPS2PDrr;
+
+    m[X86::CVTPD2PSrm] = translate_CVTPD2PSrm;
+    m[X86::CVTPD2PSrr] = translate_CVTPD2PSrr;
 }
