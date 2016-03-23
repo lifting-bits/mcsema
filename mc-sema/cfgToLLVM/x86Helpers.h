@@ -28,6 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #pragma once
 #include <string>
+#include "ArchOps.h"
 
 template <int width>
 llvm::Value *concatInts(llvm::BasicBlock *b, llvm::Value *a1, llvm::Value *a2) {
@@ -117,7 +118,14 @@ llvm::Value* IMM_AS_DATA_REF(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
     }
     uint64_t off = ip->get_reference(Inst::IMMRef);
 
-    if( addrIsInData(off, mod, baseGlobal, 0) ) {
+    if(ip->has_code_ref()) {
+        Value *callback_fn = archMakeCallbackForLocalFunction(
+                b->getParent()->getParent(),
+                ip->get_reference(Inst::IMMRef));
+        Value *addrInt = new PtrToIntInst(
+            callback_fn, llvm::Type::getIntNTy(b->getContext(), width), "", b);
+        return addrInt;
+    } else if( addrIsInData(off, mod, baseGlobal, 0) ) {
         //we should be able to find a reference to this in global data
         Module  *M = b->getParent()->getParent();
         string  sn = "data_0x" + to_string<VA>(baseGlobal, hex);

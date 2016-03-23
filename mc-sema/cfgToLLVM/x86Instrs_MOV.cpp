@@ -333,13 +333,7 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
     Module *M = F->getParent();
 
     if( ip->has_code_ref() ) {
-        // only one code ref per instruciton;
-        // this one has to be in the IMM32 field
-        Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(),
-                ip->get_reference(Inst::IMMRef));
-        Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+        Value *addrInt = IMM_AS_DATA_REF<32>(block, natM, ip);
         if( ip->has_mem_reference) {
             ret = doMIMovV<32>(ip, block, MEM_REFERENCE(0), addrInt);
         } else {
@@ -392,11 +386,7 @@ static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&bl
     Module *M = F->getParent();
 
     if( ip->has_code_ref() ) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(),
-                ip->get_reference(Inst::IMMRef));
-        Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt64Ty(block->getContext()), "", block);
+        Value *addrInt = IMM_AS_DATA_REF<64>(block, natM, ip);
         if (ip->has_mem_reference) {
             ret = doMIMovV<64>(ip, block, MEM_REFERENCE(0), addrInt);
         } else {
@@ -523,11 +513,7 @@ static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& blo
     Module *M = F->getParent();
 
     if( ip->has_code_ref() ) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(),
-                ip->get_reference(Inst::IMMRef));
-        Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+        Value *addrInt = IMM_AS_DATA_REF<32>(block, natM, ip);
         ret = doRIMovV<32>(ip, block, addrInt, OP(0) );
     } else {
         if( ip->has_imm_reference) {
@@ -558,11 +544,7 @@ static InstTransResult translate_MOV64ri(NativeModulePtr natM, BasicBlock *& blo
     Module *M = F->getParent();
 
     if( ip->has_code_ref() ) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(),
-                ip->get_reference(Inst::IMMRef));
-        Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt64Ty(block->getContext()), "", block);
+        Value *addrInt = IMM_AS_DATA_REF<64>(block, natM, ip);
         ret = doRIMovV<64>(ip, block, addrInt, OP(0) );
     }
     else if( ip->has_imm_reference ) {
@@ -634,18 +616,8 @@ static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& bloc
 
 
     if( ip->has_code_ref() ) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(),
-                ip->get_reference(Inst::IMMRef));
-        if(width == 32) {
-            Value *addrInt = new PtrToIntInst(
-                    callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
-            ret = doRMMov<32>(ip, block, addrInt, MCOperand::CreateReg(eaxReg)) ;
-        } else {
-            Value *addrInt = new PtrToIntInst(
-                    callback_fn, llvm::Type::getInt64Ty(block->getContext()), "", block);
-            ret = doRMMov<64>(ip, block, addrInt, MCOperand::CreateReg(eaxReg)) ;
-        }
+        Value *addrInt = IMM_AS_DATA_REF<width>(block, natM, ip);
+        ret = doRMMov<width>(ip, block, addrInt, MCOperand::CreateReg(eaxReg)) ;
     } else {
         if( ip->has_imm_reference ) {
             Value *data_v = nullptr;

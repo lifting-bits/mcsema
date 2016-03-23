@@ -322,9 +322,11 @@ GENERIC_TRANSLATION(CMP64ri8, doCmpRI<64>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION_REF(CMP64mi8,
     doCmpMI<64>(ip,   block, ADDR_NOREF(0), OP(5)),
     doCmpMI<64>(ip,   block, MEM_REFERENCE(0), OP(5)))
-GENERIC_TRANSLATION_REF(CMP64mi32,
-    doCmpMI<64>(ip,   block, ADDR_NOREF(0), OP(5)),
-    doCmpMI<64>(ip,   block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_MI(CMP64mi32, 
+	doCmpMI<64>(ip,   block, ADDR_NOREF(0), OP(5)),
+	doCmpMI<64>(ip,   block, MEM_REFERENCE(0), OP(5)),
+    doCmpMV<64>(ip,   block, ADDR_NOREF(0), IMM_AS_DATA_REF<64>(block, natM, ip)),
+    doCmpMV<64>(ip,   block, MEM_REFERENCE(0), IMM_AS_DATA_REF<64>(block, natM, ip)))
 GENERIC_TRANSLATION_REF(CMP32mi8,
 	doCmpMI<32>(ip,   block, ADDR_NOREF(0), OP(5)),
 	doCmpMI<32>(ip,   block, MEM_REFERENCE(0), OP(5)))
