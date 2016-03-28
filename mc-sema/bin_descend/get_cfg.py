@@ -33,7 +33,7 @@ def xrange(begin, end=None, step=1):
 _DEBUG = False
 
 EXTERNALS = set()
-DATA_SEGMENTS = []
+DATA_SEGMENTS = {}
 
 RECOVERED_EAS = set()
 ACCESSED_VIA_JMP = set()
@@ -378,7 +378,7 @@ def handleExternalRef(fn):
     return fixfn
 
 def isInData(start_ea, end_ea):
-    for (start,end) in DATA_SEGMENTS:
+    for (start,end) in DATA_SEGMENTS.values():
         if start_ea >= start and start_ea < end:
             DEBUG("Data Range: {0:x} <= {1:x} < {2:x}\n".format(start, start_ea, end))
             DEBUG("Data Range: {:x} - {:x}\n".format(start_ea, end_ea))
@@ -682,15 +682,15 @@ def instructionHandler(M, B, inst, new_eas):
             continue
         addDataReference(M, I, inst, dref, new_eas)
         if isUnconditionalJump(inst):
-        	xdrefs = idautils.DataRefsFrom(dref)
-        	for xref in xdrefs:
-        		DEBUG("xref : {0:x}\n".format(xref))
-        		# check if it refers to come instructions; link Control flow
-        		if isExternalReference(xref):
-        			fn = getFunctionName(xref)
-        			fn = handleExternalRef(fn)
-        			I.ext_call_name = fn
-        			DEBUG("EXTERNAL CALL : {0}\n".format(fn))
+            xdrefs = idautils.DataRefsFrom(dref)
+            for xref in xdrefs:
+                DEBUG("xref : {0:x}\n".format(xref))
+                # check if it refers to come instructions; link Control flow
+                if isExternalReference(xref):
+                   fn = getFunctionName(xref)
+                   fn = handleExternalRef(fn)
+                   I.ext_call_name = fn
+                   DEBUG("EXTERNAL CALL : {0}\n".format(fn))
 
     if isLinkedElf():
         for op in insn_t.Operands:
@@ -799,7 +799,8 @@ def readBytesSlowly(start, end):
 def handleDataRelocation(M, dref, new_eas):
     dref_size = idc.ItemSize(dref)
     if not isInData(dref, dref+dref_size):
-        return dref + addDataSegment(M, dref, dref+dref_size, new_eas)
+        addDataSegment(dref, dref+dref_size)
+        return dref + populateDataSegment(M, dref, dref+dref_size, new_eas)
     else:
         return dref
 
@@ -883,12 +884,12 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas, itemsiz
     elif idc.isData(pf):
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
-	DS.symbol_size = itemsize
+        DS.symbol_size = itemsize
         DEBUG("Data Ref!\n")
     else:
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "dta_"+hex(reloc_dest)
-	DS.symbol_size = itemsize
+        DS.symbol_size = itemsize
         DEBUG("UNKNOWN Ref, assuming data\n")
 
 def isStartOfFunction(ea):
@@ -967,7 +968,7 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
             else:
                 DEBUG("Its not a table\n");
 
-        elif dref_size == getPointerSize():
+        elif dref_size == getPointerSize() or dref_size == 4:
             more_cref = [c for c in idautils.CodeRefsFrom(i,0)]
             more_dref = [d for d in idautils.DataRefsFrom(i)]
             more_dref.extend(more_cref)
@@ -1026,7 +1027,7 @@ def inValidSegment(ea):
 def findFreeData():
 
     max_end = 0
-    for (start, end) in DATA_SEGMENTS:
+    for (start, end) in DATA_SEGMENTS.values():
         if end > max_end:
             max_end = end
 
@@ -1035,7 +1036,7 @@ def findFreeData():
     else:
         return max_end+4
 
-def addDataSegment(M, start, end, new_eas):
+def addDataSegment(start, end):
     if end < start:
         raise Exception("Start must be before end")
 
@@ -1043,7 +1044,7 @@ def addDataSegment(M, start, end, new_eas):
 
     if not seg:
         raise Exception("Data must be in a valid segment")
-
+    
     # if this is in an executalbe region,
     # move it to a data section
     seg_offset = 0
@@ -1053,27 +1054,43 @@ def addDataSegment(M, start, end, new_eas):
         seg_offset = free_data - start
         DEBUG("Data Segment {0:x} moved to: {1:x}\n".format(start, start+seg_offset))
 
-    D = M.internal_data.add()
-    D.base_address = start+seg_offset
-
-    SEGPERM_WRITE = 2
-    
-    if (seg.perm & SEGPERM_WRITE) == 0:
-        D.read_only = True
-    else:
-        D.read_only = False
-
-    #D.data = idaapi.get_many_bytes(start, end-start)
-    D.data = readBytesSlowly(start, end)
-
-    DATA_SEGMENTS.append( (start+seg_offset,end+seg_offset) )
-
-    processRelocationsInData(M, D, start, end, new_eas, seg_offset)
+    DATA_SEGMENTS[ (start, end,) ] = (start+seg_offset, end+seg_offset,)
 
     DEBUG("Adding data seg: {0}: {1}-{2}\n".format( 
         idc.SegName(start),
         hex(start+seg_offset),
         hex(end+seg_offset)))
+
+    return seg_offset
+
+def populateDataSegment(M, start, end, new_eas):
+
+    (new_start, new_end) = DATA_SEGMENTS.get( (start, end,), (-1,-1) )
+
+    if (new_start, new_end) == (-1,-1):
+        raise Exception("Requested segment ({}, {}) not found".format(start, end))
+
+    seg_offset = new_start - start
+
+    D = M.internal_data.add()
+    D.base_address = new_start
+
+    SEGPERM_WRITE = 2
+    
+    seg = idaapi.getseg(start)
+    if (seg.perm & SEGPERM_WRITE) == 0:
+        D.read_only = True
+    else:
+        D.read_only = False
+
+    D.data = readBytesSlowly(start, end)
+
+    processRelocationsInData(M, D, start, end, new_eas, seg_offset)
+
+    DEBUG("Adding data seg: {0}: {1}-{2}\n".format( 
+        idc.SegName(start),
+        hex(new_start),
+        hex(new_end)))
 
     return seg_offset
 
@@ -1085,7 +1102,7 @@ def processDataSegments(M, new_eas):
         if segtype in [idc.SEG_DATA, idc.SEG_BSS]:
             start = idc.SegStart(ea)
             end = idc.SegEnd(ea)
-            addDataSegment(M, start, end, new_eas)
+            populateDataSegment(M, start, end, new_eas)
 
 def getInstructionSize(ea):
     insn = idautils.DecodeInstruction(ea)
@@ -1224,6 +1241,10 @@ def preprocessBinary():
     # data section. These are used so we can
     # avoid generating unwanted function entry points
     for seg_ea in idautils.Segments():
+        segtype = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
+        if segtype in [idc.SEG_DATA, idc.SEG_BSS]:
+            addDataSegment(seg_ea, idc.SegEnd(seg_ea))
+
         for head in idautils.Heads(seg_ea, idc.SegEnd(seg_ea)):
             if idc.isCode(idc.GetFlags(head)):
                 si = idaapi.get_switch_info_ex(head)
