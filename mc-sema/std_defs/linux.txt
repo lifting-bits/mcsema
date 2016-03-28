@@ -1,3 +1,5 @@
+prctl 5 C N
+
 #ABI Definitions
 __read_chk 4 C N
 __strdup 1 C N
