@@ -1080,6 +1080,29 @@ static GlobalVariable* getSectionForDataAddr(const list<DataSection> &dataSecs,
 
 }
 
+static Constant* getPtrSizedValue(Module *M, Constant *v, int valsize) {
+        Constant *final_val = v;
+
+        if(getPointerSize(M) == Pointer32) {
+            TASSERT( valsize == 4, "Invalid size of pointer ref")
+        } else  if(getPointerSize(M) == Pointer64) {
+            TASSERT( valsize == 8, "Invalid size of pointer ref")
+        }
+
+        //// this doesn't work since LLVM is broken :(
+        //
+        //if ( (getPointerSize(M) == Pointer32 && valsize == 4) ||
+        //        (getPointerSize(M) == Pointer64 && valsize == 8) ) {
+        //    final_val = v;
+        //} else if (getPointerSize(M) == Pointer64 && valsize == 4)  {
+        //  Constant *int_val = ConstantExpr::getPtrToInt(
+        //      v, Type::getInt64Ty(M->getContext()));
+        //  final_val = ConstantExpr::getTrunc(int_val, Type::getInt32Ty(M->getContext()));
+        //}
+
+        return final_val;
+}
+
 void dataSectionToTypesContents(const list<DataSection> &globaldata,
                                 DataSection& ds, Module *M,
                                 vector<Constant*>& secContents,
@@ -1105,13 +1128,22 @@ void dataSectionToTypesContents(const list<DataSection> &globaldata,
   for (list<DataSectionEntry>::const_iterator dsec_itr = ds_entries.begin();
       dsec_itr != ds_entries.end(); dsec_itr++) {
     string sym_name;
-    cout << __FUNCTION__ << " : " << to_string<VA>(dsec_itr->getBase(), hex)
-         << " " << to_string<VA>(dsec_itr->getSize(), hex) << "\n";
+    //cout << __FUNCTION__ << " : " << to_string<VA>(dsec_itr->getBase(), hex)
+    //     << " " << to_string<VA>(dsec_itr->getSize(), hex) << "\n";
     if (dsec_itr->getSymbol(sym_name)) {
       const char *func_addr_str = sym_name.c_str() + 4;
       VA func_addr = strtol(func_addr_str, NULL, 16);
 
-      if (sym_name.find("sub_") == 0) {
+      if (sym_name.find("ext_") == 0) {
+
+        Function *f = M->getFunction(func_addr_str);
+        TASSERT(f != NULL, "Could not find external: " + sym_name);
+
+        Constant *final_val = getPtrSizedValue(M, f, dsec_itr->getSize());
+        secContents.push_back(final_val);
+        data_section_types.push_back(final_val->getType());
+
+      } else if (sym_name.find("sub_") == 0) {
         // add function pointer to data section
         // to do this, create a callback driver for
         // it first (since it may be called externally)
@@ -1127,8 +1159,9 @@ void dataSectionToTypesContents(const list<DataSection> &globaldata,
           TASSERT(func != NULL, "Could not find function: " + sym_name);
         }
 
-        secContents.push_back(func);
-        data_section_types.push_back(func->getType());
+        Constant *final_val = getPtrSizedValue(M, func, dsec_itr->getSize());
+        secContents.push_back(final_val);
+        data_section_types.push_back(final_val->getType());
 
       } else {
         // data symbol
@@ -1146,10 +1179,10 @@ void dataSectionToTypesContents(const list<DataSection> &globaldata,
         // to the new data section pointer
         VA addr_diff = func_addr - section_base;
         Constant *final_val;
-        cout << " Symbol name : " << string(func_addr_str) << " : "
-             << to_string<VA>(func_addr, hex) << " : "
-             << to_string<VA>(section_base, hex) << "\n";
-        cout.flush();
+        //cout << " Symbol name : " << string(func_addr_str) << " : "
+        //     << to_string<VA>(func_addr, hex) << " : "
+        //     << to_string<VA>(section_base, hex) << "\n";
+        //cout.flush();
         if (getPointerSize(M) == Pointer32) {
           Constant *int_val = ConstantExpr::getPtrToInt(
               g_ref, Type::getInt32Ty(M->getContext()));
@@ -1284,9 +1317,6 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
     ++i;
   }
 
-  // insert data after functions -- data may have function references
-  insertDataSections(natMod, M, report);
-
   list<ExternalDataRefPtr> extDataRefs = natMod->getExtDataRefs();
   list<ExternalDataRefPtr>::iterator data_it = extDataRefs.begin();
 
@@ -1389,6 +1419,10 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
       }
     }
   }
+
+  // insert data after functions -- data may have function references
+  insertDataSections(natMod, M, report);
+
   // populate functions
   i = funcs.begin();
   while (i != funcs.end()) {

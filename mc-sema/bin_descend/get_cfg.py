@@ -873,7 +873,13 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas, itemsiz
     DEBUG("Reloc Base Address: {0:x}\n".format(DS.base_address))
     DEBUG("Reloc size: {0:x}\n".format(itemsize))
 
-    if idc.isCode(pf):
+    if isExternalReference(reloc_dest):
+        ext_fn = getFunctionName(reloc_dest)
+        ext_fn = handleExternalRef(ext_fn)
+        DEBUG("External ref from data at {:x} => {}\n".format(reloc_dest, ext_fn))
+        DS.symbol_name = "ext_"+ext_fn
+        DS.symbol_size = itemsize
+    elif idc.isCode(pf):
         DS.symbol_name = "sub_"+hex(reloc_dest)
         DS.symbol_size = itemsize
         DEBUG("Code Ref: {0:x}!\n".format(reloc_dest))
@@ -969,6 +975,19 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
                 DEBUG("Its not a table\n");
 
         elif dref_size == getPointerSize() or dref_size == 4:
+            if dref_size == 4 and getBitness() == 64:
+                # check if IDA missed a qword data reference
+                dw = readDword(i+4)
+                if dw == 0:
+                    DEBUG("Making qword from 32-bit dref at {:x}\n".format(i))
+                    idc.MakeQword(i)
+                    dref_size = 8
+                else:
+                    DEBUG("WARNING: could not make qword from 32-bit dref at {:x}, ignoring\n".format(i))
+                    dref_size += 4
+                    i += dref_size
+                    continue
+
             more_cref = [c for c in idautils.CodeRefsFrom(i,0)]
             more_dref = [d for d in idautils.DataRefsFrom(i)]
             more_dref.extend(more_cref)
