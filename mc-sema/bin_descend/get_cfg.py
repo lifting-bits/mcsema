@@ -111,10 +111,18 @@ EXTERNAL_NAMES = [
         "@@GLIBC_",\
         ]
 
+EXTERNAL_DATA_COMMENTS = [
+        "Copy of shared data",
+        ]
+
 def DEBUG(s):
     if _DEBUG:
         #syslog.syslog(str(s))
         sys.stdout.write(str(s))
+
+def hasExternalDataComment(ea):
+    cmt = idc.GetCommentEx(ea, 0)
+    return cmt in EXTERNAL_DATA_COMMENTS
 
 def ReftypeString(rt):
     if rt == CFG_pb2.Instruction.DataRef:
@@ -283,6 +291,12 @@ def isExternalReference(ea):
             if extsign in fn:
                 DEBUG("Assuming external reference because: {} in {}\n".format(extsign, fn))
                 return True
+
+        if isExternalData(fn):
+            if hasExternalDataComment(ea):
+                return True
+            else:
+                DEBUG("WARNING: May have missed external data ref {} at {:x}".format(fn, ea))
 
     return False
 

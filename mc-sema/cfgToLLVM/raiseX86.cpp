@@ -1324,12 +1324,13 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
     ExternalDataRefPtr dr = *data_it;
     int dsize = dr->getDataSize();
     std::string symname = dr->getSymbolName();
-    if (dsize > 16) {
-      throw TErr(__LINE__, __FILE__, "Unsupported external data size!");
-    }
+    //if (dsize > 16) {
+    //  throw TErr(__LINE__, __FILE__, "Unsupported external data size!");
+    //}
 
-    // for now, just use integer types
-    Type *extType = Type::getIntNTy(M->getContext(), dsize * 8);
+    //Type *extType = Type::getIntNTy(M->getContext(), dsize * 8);
+    Type *extType = ArrayType::get(Type::getInt8Ty(M->getContext()), 
+            dsize);
 
     GlobalValue *gv = dyn_cast<GlobalValue>(
         M->getOrInsertGlobal(symname, extType));
