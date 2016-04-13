@@ -1041,8 +1041,8 @@ static Constant* makeConstantBlob(LLVMContext &ctx,
                                   const vector<uint8_t> &blob) {
 
   Type *charTy = Type::getInt8Ty(ctx);
-  cout << blob.size() << "\n";
-  cout.flush();
+  //cout << blob.size() << "\n";
+  //cout.flush();
   ArrayType *arrT = ArrayType::get(charTy, blob.size());
   vector<uint8_t>::const_iterator it = blob.begin();
   vector<Constant*> array_elements;
@@ -1128,18 +1128,32 @@ void dataSectionToTypesContents(const list<DataSection> &globaldata,
   for (list<DataSectionEntry>::const_iterator dsec_itr = ds_entries.begin();
       dsec_itr != ds_entries.end(); dsec_itr++) {
     string sym_name;
-    //cout << __FUNCTION__ << " : " << to_string<VA>(dsec_itr->getBase(), hex)
-    //     << " " << to_string<VA>(dsec_itr->getSize(), hex) << "\n";
+
     if (dsec_itr->getSymbol(sym_name)) {
       const char *func_addr_str = sym_name.c_str() + 4;
       VA func_addr = strtol(func_addr_str, NULL, 16);
 
+      cout << __FUNCTION__ << ": Found symbol: " << sym_name << "\n";
+
       if (sym_name.find("ext_") == 0) {
 
-        Function *f = M->getFunction(func_addr_str);
-        TASSERT(f != NULL, "Could not find external: " + sym_name);
+        Constant *final_val  = nullptr;
 
-        Constant *final_val = getPtrSizedValue(M, f, dsec_itr->getSize());
+        GlobalVariable *ext_v = M->getNamedGlobal(func_addr_str);
+
+        if(ext_v != nullptr && isa<Function>(ext_v)) {
+            final_val = getPtrSizedValue(M, ext_v, dsec_itr->getSize());
+            //cout << "External function" << sym_name << " has type: " << final_val->getType() << "\n";
+        } else if(ext_v != nullptr) {
+            final_val = getPtrSizedValue(M, ext_v, dsec_itr->getSize());
+            //cout << "External data" << sym_name << " has type: " << final_val->getType() << "\n";
+            // assume ext data
+        } else {
+            TASSERT(ext_v != nullptr, "Could not find external: " + sym_name);
+            //cout << "External fail" << sym_name << " has type: " << final_val->getType() << "\n";
+        }
+
+
         secContents.push_back(final_val);
         data_section_types.push_back(final_val->getType());
 
