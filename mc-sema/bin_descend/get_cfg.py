@@ -999,9 +999,12 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
                 # check if IDA missed a qword data reference
                 dw = readDword(i+4)
                 if dw == 0:
-                    DEBUG("Making qword from 32-bit dref at {:x}\n".format(i))
-                    idc.MakeQword(i)
-                    dref_size = 8
+                    if idc.MakeQword(i):
+                        DEBUG("Making qword from 32-bit dref at {:x}\n".format(i))
+                        dref_size = 8
+                    else:
+                        DEBUG("Failed at make qword, dref still 32-bit at {:x}\n".format(i))
+
                 else:
                     DEBUG("WARNING: could not make qword from 32-bit dref at {:x}, ignoring\n".format(i))
                     dref_size += 4
