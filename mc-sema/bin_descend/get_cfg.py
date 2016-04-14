@@ -925,16 +925,22 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
             dword = readDword(i)
             DEBUG("Testing address: {0:x}... ".format(i))
             # check for unmakred references
-            if isInData(dword, dword+1):
-                idc.MakeDword(i)
-                idc.add_dref(i, dword, idc.XREF_USER|idc.dr_O)
-                DEBUG("making New Data Reference at: {0:x} => {1:x}\n".format(i, dword))
-                dref_size = 4
-            elif isInternalCode(dword):
-                idc.MakeDword(i)
-                idc.AddCodeXref(i, dword, idc.XREF_USER|idc.fl_F)
-                DEBUG("making New Code Reference at: {0:x} => {1:x}\n".format(i, dword))
-                dref_size = 4
+            # that point to the beginning of an item
+            if isInData(dword, dword+1) and idc.ItemHead(dword) == dword:
+                if idc.MakeDword(i):
+                    idc.add_dref(i, dword, idc.XREF_USER|idc.dr_O)
+                    DEBUG("making New Data Reference at: {0:x} => {1:x}\n".format(i, dword))
+                    dref_size = 4
+                else:
+                    DEBUG("WARNING: Could not make reference at {:x}\n".format(i))
+            # check if code and points to the beginning of an instruction
+            elif isInternalCode(dword) and idc.ItemHead(dword) == dword:
+                if idc.MakeDword(i):
+                    idc.AddCodeXref(i, dword, idc.XREF_USER|idc.fl_F)
+                    DEBUG("making New Code Reference at: {0:x} => {1:x}\n".format(i, dword))
+                    dref_size = 4
+                else:
+                    DEBUG("WARNING: Could not make reference at {:x}\n".format(i))
             else:
                 DEBUG("not code or data ref\n")
 
