@@ -1009,7 +1009,7 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
 
                 else:
                     DEBUG("WARNING: could not make qword from 32-bit dref at {:x}, ignoring\n".format(i))
-                    dref_size += 4
+                    dref_size = 4
                     i += dref_size
                     continue
 
