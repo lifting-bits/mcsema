@@ -162,8 +162,10 @@ def fixExternalName(fn):
         if newfn in EMAP:
             return newfn
 
-    if "@@GLIBC" in fn:
-        fn = fn[:fn.find('@@GLIBC')]
+    for en in EXTERNAL_NAMES:
+        if en in fn:
+            fn = fn[:fn.find(en)]
+            break
 
     return fn
 
