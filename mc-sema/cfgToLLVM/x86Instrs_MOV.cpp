@@ -609,9 +609,8 @@ static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& bloc
     if( ip->has_external_ref() && width == 32) {
         Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
         TASSERT(addrInt != 0, "Could not get external data reference");
-        R_WRITE<width>(block, eaxReg, addrInt);
+        doRMMov<width>(ip, block, addrInt, MCOperand::CreateReg(eaxReg));
         return ContinueBlock;
-        //ret = doRMMov<32>(ip, block, addrInt, MCOperand::CreateReg(X86::EAX)) ;
     }
 
 
@@ -651,9 +650,8 @@ static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& blo
 
     if( ip->has_external_ref()) {
         Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
-        //ret = doRMMov<32>(ip, block, addrInt, OP(0) );
+        ret = doRMMov<32>(ip, block, addrInt, OP(0) );
         TASSERT(addrInt != NULL, "Could not get address for external");
-		R_WRITE<32>(block, OP(0).getReg(), addrInt);
         return ContinueBlock;
     }
     else if( ip->has_mem_reference ) {
@@ -703,9 +701,8 @@ static InstTransResult translate_MOV64rm(NativeModulePtr natM, BasicBlock *& blo
 
     if( ip->has_external_ref()) {
         Value *addrInt = getValueForExternal<64>(F->getParent(), ip, block);
-        //ret = doRMMov<32>(ip, block, addrInt, OP(0) );
         TASSERT(addrInt != NULL, "Could not get address for external");
-        R_WRITE<64>(block, OP(0).getReg(), addrInt);
+        doRMMov<64>(ip, block, addrInt, OP(0) );
         return ContinueBlock;
     }
     else if( ip->has_mem_reference ) {

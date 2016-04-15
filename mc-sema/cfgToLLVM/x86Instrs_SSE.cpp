@@ -203,7 +203,9 @@ static InstTransResult doMOVSrm(NativeModulePtr natM, BasicBlock *& block, InstP
     if( ip->has_external_ref()) {
         Value *addrInt = getValueForExternal<width>(F->getParent(), ip, block);
         TASSERT(addrInt != NULL, "Could not get address for external");
-        R_WRITE<width>(block, OP(0).getReg(), addrInt);
+        ret = doRMMov<width>(ip, block, 
+                addrInt,
+                OP(0) );
         return ContinueBlock;
     }
     else if( ip->has_mem_reference ) {
