@@ -90,7 +90,7 @@ The output file is named `<input name without extension>.cfg`. That is, an input
 When recovering control flow, bin_descend uses certain heuristics to attempt accurate control flow recovery:
 
 * Relocated immediate values in code (e.g. PUSH imm32) that point to the code section are assumed to be function pointers. These will be added to the list of entry points from which to recover control flow.
-* Relocated values in the data section that point to the code seciton are assumed to be function pointers. These will be added to the list of entry points from which to recover control flow.
+* Relocated values in the data section that point to the code section are assumed to be function pointers. These will be added to the list of entry points from which to recover control flow.
 * Additinally, relocated function pointers in the data section are assumed to be used as callbacks. A tunk that takes current register state and transforms it into a translator specific register context will automatically be created for these functions, and used in place of the function when it referenced not by a direct call.
 * Relocated immediate values in code (e.g. PUSH imm32) that point to the data section are assumed to be data values.
 * Relocated immediate values in the data section that point to the data section are assumed to be data values.
