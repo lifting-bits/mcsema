@@ -20,12 +20,12 @@ M = CFG_pb2.Module()
 
 #set up module metadata
 M.module_name = u'bigger'
-M.entry_address = 0x08000000
 
 #add a data section of 4-bytes, 0-initted
 Data = M.internal_data.add()
 Data.base_address = 0x08000028
 Data.data = "\x00\x00\x00\x00"
+Data.read_only = False
 
 #create a function to insert into the module
 F = M.internal_funcs.add()
