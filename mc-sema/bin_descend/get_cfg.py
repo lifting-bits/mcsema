@@ -1005,15 +1005,22 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
                         DEBUG("Making qword from 32-bit dref at {:x}\n".format(i))
                         dref_size = 8
                     else:
-                        DEBUG("Failed at make qword, dref still 32-bit at {:x}\n".format(i))
+                        DEBUG("WARNING: Failed at make qword at {:x}, ignoring ref\n".format(i))
+                        dref_size = 4
+                        i += dref_size
+                        continue
 
                 else:
-                    DEBUG("WARNING: could not make qword from 32-bit dref at {:x}, ignoring\n".format(i))
+                    DEBUG("WARNING: could not make qword from 32-bit dref at {:x}, ignoring ref\n".format(i))
                     dref_size = 4
                     i += dref_size
                     continue
 
             more_cref = [c for c in idautils.CodeRefsFrom(i,0)]
+
+            # sanity check IDA
+            more_cref = filter(lambda x: idc.ItemHead(x) == x, more_cref)
+
             more_dref = [d for d in idautils.DataRefsFrom(i)]
             more_dref.extend(more_cref)
             # do this check since IDA is crazy and sometimes returns data
