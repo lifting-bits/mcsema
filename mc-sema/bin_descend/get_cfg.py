@@ -133,18 +133,24 @@ def ReftypeString(rt):
         return "UNKNOWN!"
 
 def readDword(ea):
-    bytestr = readBytesSlowly(ea, ea+4);
+    bytestr = readBytesSlowly(ea, ea+4)
     dword = struct.unpack("<L", bytestr)[0]
     return dword
 
 def readQword(ea):
-    bytestr = readBytesSlowly(ea, ea+8);
+    bytestr = readBytesSlowly(ea, ea+8)
     qword = struct.unpack("<Q", bytestr)[0]
     return qword
 
 def isLinkedElf():
     return idc.GetLongPrm(INF_FILETYPE) == idc.FT_ELF and \
         idc.BeginEA() not in [0xffffffffL, 0xffffffffffffffffL]
+
+def IsString(ea):
+    return idc.isASCII(idaapi.getFlags(ea))
+
+def IsStruct(ea):
+    return idc.isStruct(idaapi.getFlags(ea))
 
 def fixExternalName(fn):
     
@@ -918,6 +924,157 @@ def isStartOfFunction(ea):
     fname = idc.GetFunctionName(ea)
     return ea == idc.LocByName(fname)
 
+def isSaneReference(ea):
+    if isInternalCode(ea) and idc.ItemHead(ea) == ea:
+        return True
+    elif isInData(ea, ea+1) and idc.ItemHead(ea) == ea:
+        return True
+    else:
+        return False
+
+def processTable(ea, size):
+    """
+    Loop through a possible table of pointers
+    with an occasional NULL entry permitted
+
+    Returns True, dictionary of pointer->destination, pointer size if its a pointer table
+    Returns False, {}, _ if its not a valid pointer table
+    """
+
+    def scan_table(start, end, readsize):
+        table_map = {}
+
+        read_option = {4 : readDword,
+                       8 : readQword}[readsize]
+
+        # sanity check for xrange
+        if (end - start) % readsize != 0:
+            return False, table_map, readsize
+
+        for jea in xrange(start, end, readsize):
+            pword = read_option(jea)
+            if isSaneReference(pword): 
+                DEBUG("Sane table entry at: {:x}\n".format(pword))
+            elif pword == 0:
+                DEBUG("Ignoring NULL entry in possible table: {:x}\n".format(jea))
+            else:
+                DEBUG("NOT a table entry at {:x}\n".format(jea))
+                return False, table_map, readsize 
+
+            table_map[jea] = pword
+
+        return True, table_map, readsize
+
+    did_find, table, readsz = scan_table(ea, ea+size, getPointerSize())
+    if did_find == False and getPointerSize() == 8:
+        DEBUG("Failed to find a table, trying with smaller pointer size\n")
+        did_find, table, readsz = scan_table(ea, ea+size, 4)
+
+    return did_find, table, readsz
+
+def parseSingleStruct(ea, idastruct):
+    DEBUG("Parsing idastruct at {:x}\n".format(ea))
+    # get first member offset
+    first_off = idc.GetFirstMember(idastruct.tid);
+
+    # get last member offset
+    last_off = idc.GetLastMember(idastruct.tid)
+
+    # get starting offests of all members
+    ptrs = {}
+    members = set()
+
+    read_size = getPointerSize()
+    read_option = {4 : readDword,
+                   8 : readQword}[read_size]
+
+    for i in xrange(first_off, last_off+1):
+        mn = idc.GetMemberName(idastruct.tid, i)
+        # skip padding bytes
+        if mn is not None:
+            members.add(mn)
+
+    for member in members:
+        DEBUG("Checking idastruct member: {}\n".format(member))
+        member_off = idc.GetMemberOffset(idastruct.tid, member)
+        assert member_off != -1
+        # get element size
+        member_sz = idc.GetMemberSize(idastruct.tid, member_off)
+        assert member_sz > 0
+        
+        #if its pointer size, check for ptr
+        if member_sz == read_size:
+            DEBUG("\tit is pointer sized\n")
+            # check if points to sanity
+            member_ea = ea+member_off
+            pword = read_option(member_ea)
+            if isSaneReference(pword):
+                DEBUG("\tAdding reference from {:x} => {:x}\n".format(member_ea, pword))
+                ptrs[member_ea] = pword
+            else:
+                DEBUG("\tNot a sane reference ({:x})\n".format(pword))
+
+
+    return len(ptrs) != 0, ptrs, getPointerSize()
+
+def getStructType(ea):
+    """ 
+    Get type information from an ea. Used to get the structure type id
+    """
+
+    flags = idaapi.getFlags(ea)
+    ti = idaapi.opinfo_t()
+    oi = idaapi.get_opinfo(ea, 0, flags, ti)
+    if oi is not None:
+        return ti
+    else:
+        return None
+
+def processStruct(ea, size):
+    """
+    Find pointers in a structure type
+    """
+    # get struct size
+    idastruct = getStructType(ea)
+    if idastruct is None:
+        DEBUG("Could not get structure size at: {:x}\n".format(ea))
+        return False, {}, 0
+
+    struct_size = idc.GetStrucSize(idastruct.tid)
+    
+    #check if this is an array of structs
+    assert size % struct_size == 0
+
+    all_ptrs = {}
+
+    num_iters = size / struct_size
+    for i in xrange(num_iters):
+        # parse a single struct
+        start_ea = ea + (i * struct_size)
+        worked, ptrs, ptrsize = parseSingleStruct(ea, idastruct)
+        if worked:
+            all_ptrs.update(ptrs)
+
+    return True, all_ptrs, getPointerSize()
+
+def processDataChunk(ea, size):
+    """
+    Determine if a data chunk has some pointers in it
+    """
+
+    # Get chunk type
+    # if its a string, skip it
+    if IsString(ea):
+        DEBUG("Found a string at {:x}\n".format(ea))
+        return False, {}, 0
+    elif IsStruct(ea):
+        DEBUG("Found a struct at {:x}\n".format(ea))
+        return processStruct(ea, size)
+    else:
+        DEBUG("Found an unknown blob at {:x}, treating as table\n".format(ea))
+        return processTable(ea, size)
+
+
 def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
     i = start
     while i < end:
@@ -948,7 +1105,7 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
 
         i += dref_size
 
-    def insertReference(M, D, ea, pointsto, seg_offset, new_eas):
+    def insertReference(M, D, ea, pointsto, seg_offset, new_eas, force_size=None):
         # do not make code references for mid-function code accessed via a JMP -- 
         # they will be found via the jumptable code. This prevents the insertion
         # of lots of extra code, but could be wrong for some cases
@@ -960,41 +1117,28 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
 
         DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}\n".format(ea, pointsto))
         real_size = idc.ItemSize(pointsto)
-        reloc_size = idc.ItemSize(ea)
+        if force_size is None:
+            reloc_size = idc.ItemSize(ea)
+        else:
+            reloc_size = force_size
         DEBUG("\t\tReal Ref: {0:x}, reloc size: {2}, ref size: {1}\n".format(pointsto, real_size, reloc_size))
         insertRelocatedSymbol(M, D, pointsto, ea, seg_offset, new_eas, reloc_size)
 
-    def checkIfJumpData(ea, size):
-        """
-        Loop through ea to ea+size, and if 
-        every dword there points to code, this is a jump data section
-
-        returns true or false and list of recovered ea => destination mappings
-        """
-        table_map = {}
-        for jea in xrange(ea, ea+size, 4):
-            dword = readDword(jea)
-            if not isInternalCode(dword):
-                DEBUG("Dword {:x} does not point to code, not a table\n".format(dword))
-                return False, table_map
-
-            table_map[jea] = dword
-
-        return True, table_map
 
     i = start
     while i < end:
         DEBUG("Checking address: {:x}\n".format(i))
         dref_size = idc.ItemSize(i) or 1
-        if dref_size > getPointerSize() and dref_size % 4 == 0:
-            DEBUG("Possible table data at {:x}; size: {:x}\n".format(i, dref_size))
-            (is_table, addrs) = checkIfJumpData(i, dref_size)
-            if is_table:
-                DEBUG("Its a table, adding {} references\n".format(len(addrs)));
+        if dref_size > getPointerSize():
+            DEBUG("Possible table/struct data at {:x}; size: {:x}\n".format(i, dref_size))
+            (found, addrs, entry_size) = processDataChunk(i, dref_size)
+            if found:
+                DEBUG("Its a table/struct, adding {} references\n".format(len(addrs)))
                 for ta in sorted(addrs.keys()):
-                    insertReference(M, D, ta, addrs[ta], seg_offset, new_eas)
+                    if addrs[ta] != 0:
+                        insertReference(M, D, ta, addrs[ta], seg_offset, new_eas, force_size=entry_size)
             else:
-                DEBUG("Its not a table\n");
+                DEBUG("Not a stable/struct, skipping\n")
 
         elif dref_size == getPointerSize() or dref_size == 4:
             if dref_size == 4 and getBitness() == 64:
