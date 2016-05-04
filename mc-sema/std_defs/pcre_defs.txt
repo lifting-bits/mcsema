@@ -47,3 +47,10 @@ pcre_jit_stack_free 1 C N
 pcre16_jit_stack_free 1 C N
 pcre_assign_jit_stack 3 C N
 pcre16_assign_jit_stack 3 C N
+#exported function pointers
+DATA: pcre_free 8
+DATA: pcre_malloc 8
+DATA: pcre_stack_malloc 8
+DATA: pcre_stack_free 8
+DATA: pcre_callout 8
+DATA: pcre_stack_guard 8
