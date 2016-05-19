@@ -4,7 +4,7 @@ set -e
 set -u
 
 WHICHBIN=$1
-DIR=$(dirname $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd ))
+DIR=$(dirname ${0})
 source ${DIR}/mcsema_common.sh
 source ${DIR}/env.sh
 
