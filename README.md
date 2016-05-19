@@ -37,9 +37,13 @@ Detailed build instructions for Windows and Linux are at [docs/BUILDING.md](docs
 
 ### Usage
 
+
+IDA Pro is highly recommended for CFG recovery. The guide for setting up IDA is at [docs/IDA.md](docs/IDA.md).
+
 Usage instructions, with examples, are at [docs/TOOLS.md](docs/TOOLS.md). For more examples, see the demos described in [docs/DEMOS.md](docs/DEMOS.md).
 
 Most of the documentation uses Windows-based examples, but pretty much everything should be cross-platform.
+
 
 ### Source Code Information 
 
