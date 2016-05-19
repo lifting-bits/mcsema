@@ -13,7 +13,9 @@ rm -rf ${PKGDIR}
 
 # get a version number
 GIT_HASH=$(git rev-parse --short HEAD)
-VERSION=0.2-${GIT_HASH}
+GIT_DATE=$(git log -n 1 --format="%ai")
+DATE=$(date --utc --date="${GIT_DATE}" +%Y%m%d%H%M)
+VERSION=0.2-${DATE}-${GIT_HASH}
 echo "MCSEMA Version is: ${VERSION}"
 
 # collect the mcsema bins
