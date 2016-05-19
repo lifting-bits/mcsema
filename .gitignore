@@ -32,7 +32,10 @@ boost/tools/build/CMake/install_me/BoostConfigVersionAgnostic.cmake
 #==============================================================================#
 # Directories to ignore (do not add trailing '/'s, they skip symlinks).
 #==============================================================================#
-./build
-./deb-build
-./mc-sema/validator/valTool/obj-ia32
+build
+package
+deb-build
+mc-sema/validator/valTool/obj-ia32
+*.deb
+*.rpm
 # Clang, which is tracked independently.
