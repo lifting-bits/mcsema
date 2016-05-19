@@ -36,7 +36,7 @@ link_amd64_callback ${WORKSPACE}/${TARGET}_opt.bc ${WORKSPACE}/${TARGET}_linked.
 call_llc ${WORKSPACE}/${TARGET}_linked.bc ${WORKSPACE}/${TARGET}.o 
 
 echo "Relinking with dependent libraries (${WORKSPACE}/${TARGET}_out.exe)"
-${CC} -m64 -ggdb -o ${WORKSPACE}/${TARGET}_out.exe ${DRIVER_PATH}/httpd_linux_amd64.c ${WORKSPACE}/${TARGET}.o -lcrypt
+${CC} -I${DRIVER_PATH} -m64 -ggdb -o ${WORKSPACE}/${TARGET}_out.exe ${DRIVER_PATH}/httpd_linux_amd64.c ${WORKSPACE}/${TARGET}.o -lcrypt
 
 echo "Run with:"
 echo "${WORKSPACE}/${TARGET}_out.exe"

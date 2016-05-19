@@ -38,7 +38,7 @@ call_llc ${WORKSPACE}/${TARGET}_linked.bc ${WORKSPACE}/${TARGET}.o
 LIBDIR=$(dirname ${WHICHBIN})/../lib
 
 echo "Relinking with dependent libraries (${WORKSPACE}/${TARGET}_out.exe) (libs: ${LIBDIR})"
-${CC} -L${LIBDIR} -m64 -ggdb -o ${WORKSPACE}/${TARGET}_out.exe ${DRIVER_PATH}/httpd_linux_amd64.c ${WORKSPACE}/${TARGET}.o -lcrypt -lapr-1 -laprutil-1 -lpcre
+${CC} -I${DRIVER_PATH} -L${LIBDIR} -m64 -ggdb -o ${WORKSPACE}/${TARGET}_out.exe ${DRIVER_PATH}/httpd_linux_amd64.c ${WORKSPACE}/${TARGET}.o -lcrypt -lapr-1 -laprutil-1 -lpcre
 
 echo "Run with:"
 echo "LD_PRELOAD=${LIBDIR} ${WORKSPACE}/${TARGET}_out.exe"

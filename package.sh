@@ -55,6 +55,9 @@ cp -vR ./mc-sema/std_defs/* ${PKGDIR}/stddefs/
 echo "Packaging drivers"
 cp -vR ./drivers/* ${PKGDIR}/drivers/
 
+echo "Packaging RegisterState.h"
+cp -v ./mc-sema/common/RegisterState.h ${PKGDIR}/drivers/
+
 echo "Packaging scripts"
 cp -vR ./scripts/* ${PKGDIR}/scripts/
 

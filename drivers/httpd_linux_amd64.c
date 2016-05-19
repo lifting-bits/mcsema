@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "../../common/RegisterState.h"
+#include "RegisterState.h"
 
 extern int mcsema_main(RegState *);
 extern void* __mcsema_create_alt_stack(size_t stack_size);
