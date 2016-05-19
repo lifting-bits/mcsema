@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MYDIR=$(dirname ${0})
+MYDIR=$(dirname ${0})/..
 LLVM_PATH=${MYDIR}/bin
 CFG_TO_BC_PATH=${MYDIR}/bin
 BIN_DESCEND_PATH=${MYDIR}/bin
