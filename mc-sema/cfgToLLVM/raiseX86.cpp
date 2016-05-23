@@ -1083,22 +1083,23 @@ static GlobalVariable* getSectionForDataAddr(const list<DataSection> &dataSecs,
 static Constant* getPtrSizedValue(Module *M, Constant *v, int valsize) {
         Constant *final_val = v;
 
-        if(getPointerSize(M) == Pointer32) {
-            TASSERT( valsize == 4, "Invalid size of pointer ref")
-        } else  if(getPointerSize(M) == Pointer64) {
-            TASSERT( valsize == 8, "Invalid size of pointer ref")
-        }
-
-        //// this doesn't work since LLVM is broken :(
-        //
-        //if ( (getPointerSize(M) == Pointer32 && valsize == 4) ||
-        //        (getPointerSize(M) == Pointer64 && valsize == 8) ) {
-        //    final_val = v;
-        //} else if (getPointerSize(M) == Pointer64 && valsize == 4)  {
-        //  Constant *int_val = ConstantExpr::getPtrToInt(
-        //      v, Type::getInt64Ty(M->getContext()));
-        //  final_val = ConstantExpr::getTrunc(int_val, Type::getInt32Ty(M->getContext()));
+        //if(getPointerSize(M) == Pointer32) {
+        //    TASSERT( valsize == 4, "Invalid size of pointer ref")
+        //} else  if(getPointerSize(M) == Pointer64) {
+        //    TASSERT( valsize == 8, "Invalid size of pointer ref")
         //}
+
+        // 
+        // this sometimes doesn't work since LLVM assembler is broken :(
+        //
+        if ( (getPointerSize(M) == Pointer32 && valsize == 4) ||
+                (getPointerSize(M) == Pointer64 && valsize == 8) ) {
+            final_val = v;
+        } else if (getPointerSize(M) == Pointer64 && valsize == 4)  {
+          Constant *int_val = ConstantExpr::getPtrToInt(
+              v, Type::getInt64Ty(M->getContext()));
+          final_val = ConstantExpr::getTrunc(int_val, Type::getInt32Ty(M->getContext()));
+        }
 
         return final_val;
 }
