@@ -17,7 +17,6 @@ fi
 
 ${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=x86_64-pc-linux-gnu -i linked_elf.cfg -driver=mcsema_main,main,2,return,C -o linked_elf.bc
 ${LLVM_PATH}/opt -O3 -o linked_elf_opt.bc linked_elf.bc
-${LLVM_PATH}/llc -filetype=asm -o linked_elf.asm linked_elf_opt.bc
 ${LLVM_PATH}/llc -filetype=obj -o linked_elf.o linked_elf_opt.bc
 
 ${CC} -m64 -ggdb -o linked_elf_out.exe driver_linked_elf.c linked_elf.o
