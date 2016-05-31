@@ -36,107 +36,79 @@ void __mcsema_free_alt_stack(size_t stack_size) {
     }
 }
 
-// RDI, RSI, RDX, RCX, R8, R9, XMM0–7, RBX, RBP, (maybe: RSP), R12, R13, R14, R15 
-// are all preserved
+// this expects the function to jump to is loaded into EAX
+// as a corollary, we canot inception a callback that should 
+// preserve EAX or expect arguments in EAX
+// For most ABIs, this should not be a problem
 __attribute__((naked)) int __mcsema_inception()
 {
-//    // for debugging; rax is assumed to be clobbered so we can do this
-//    __asm__ volatile("movq $0xAABBCCDD, %r10\n");
-//    __asm__ volatile("movq %%r10, %0\n": "=m"(__mcsema_do_call_state.RAX) );
-//
-//    // save preserved registers in struct regs
-//    __asm__ volatile("movq %%rdi, %0\n": "=m"(__mcsema_do_call_state.RDI) );
-//    __asm__ volatile("movq %%rsi, %0\n": "=m"(__mcsema_do_call_state.RSI) );
-//    __asm__ volatile("movq %%rdx, %0\n": "=m"(__mcsema_do_call_state.RDX) );
-//    __asm__ volatile("movq %%rcx, %0\n": "=m"(__mcsema_do_call_state.RCX) );
-//    __asm__ volatile("movq %%rbx, %0\n": "=m"(__mcsema_do_call_state.RBX) );
-//    __asm__ volatile("movq %%r8,  %0\n": "=m"(__mcsema_do_call_state.R8) );
-//    __asm__ volatile("movq %%r9,  %0\n": "=m"(__mcsema_do_call_state.R9) );
-//    __asm__ volatile("movq %%r12, %0\n": "=m"(__mcsema_do_call_state.R12) );
-//    __asm__ volatile("movq %%r13, %0\n": "=m"(__mcsema_do_call_state.R13) );
-//    __asm__ volatile("movq %%r14, %0\n": "=m"(__mcsema_do_call_state.R14) );
-//    __asm__ volatile("movq %%r15, %0\n": "=m"(__mcsema_do_call_state.R15) );
-//    __asm__ volatile("movq %%rbp, %0\n": "=m"(__mcsema_do_call_state.RBP) );
-//
-//    // save XMM
-//    __asm__ volatile("movups %%xmm0, %0\n": "=m"(__mcsema_do_call_state.XMM0) );
-//    __asm__ volatile("movups %%xmm1, %0\n": "=m"(__mcsema_do_call_state.XMM1) );
-//    __asm__ volatile("movups %%xmm2, %0\n": "=m"(__mcsema_do_call_state.XMM2) );
-//    __asm__ volatile("movups %%xmm3, %0\n": "=m"(__mcsema_do_call_state.XMM3) );
-//    __asm__ volatile("movups %%xmm4, %0\n": "=m"(__mcsema_do_call_state.XMM4) );
-//    __asm__ volatile("movups %%xmm5, %0\n": "=m"(__mcsema_do_call_state.XMM5) );
-//    __asm__ volatile("movups %%xmm6, %0\n": "=m"(__mcsema_do_call_state.XMM6) );
-//    __asm__ volatile("movups %%xmm7, %0\n": "=m"(__mcsema_do_call_state.XMM7) );
-//
-//
-//    // copy over MIN_STACK_SIZE bytes of stack
-//    // at this point we saved all the registers, so we can clobber at will
-//    // since they are restored on function exit
-//    __asm__ volatile("movq %0, %%rcx\n": : "i"(MIN_STACK_SIZE) );
-//    __asm__ volatile("movq %rsp, %rsi\n");
-//    __asm__ volatile("movq %0, %%rdi\n": : "m"(__mcsema_alt_stack));
-//    
-//    // force stack alignment to alignment of RSP
-//    __asm__ volatile("movq %rsp, %r10\n");
-//    __asm__ volatile("andq $0xF, %r10\n");
-//    __asm__ volatile("subq $0x10, %rdi\n");
-//    __asm__ volatile("addq %r10, %rdi\n");
-//
-//    // reserve space
-//    __asm__ volatile("subq %0, %%rdi\n": : "i"(MIN_STACK_SIZE) );
-//
-//    // set RSP to the alt stack rsp
-//    __asm__ volatile("movq %%rdi, %0\n": "=m"(__mcsema_do_call_state.RSP) );
-//
-//    // do memcpy
-//    __asm__ volatile("cld\n");
-//    __asm__ volatile("rep; movsb\n");
-//
-//    // call translated_function(reg_state);
-//    __asm__ volatile("leaq %0, %%r10\n": : "m"(__mcsema_do_call_state) );
-//    __asm__ volatile("leaq %fs:0, %r11\n");
-//    __asm__ volatile("subq %r11, %r10\n");
-//    __asm__ volatile("movq %fs:0, %rdi\n");
-//    __asm__ volatile("leaq (%rdi,%r10,1), %rdi\n");
-//    
-//    // align stack for call
-//    __asm__ volatile("subq $8, %rsp\n");
-//
-//    // call
-//    __asm__ volatile("callq *%rax\n");
-//
-//    // undo align
-//    __asm__ volatile("addq $8, %rsp\n");
-//
-//    // restore registers
-//    __asm__ volatile("movq %0, %%rdi\n": : "m"(__mcsema_do_call_state.RDI) );
-//    __asm__ volatile("movq %0, %%rsi\n": : "m"(__mcsema_do_call_state.RSI) );
-//    __asm__ volatile("movq %0, %%rdx\n": : "m"(__mcsema_do_call_state.RDX) );
-//    __asm__ volatile("movq %0, %%rcx\n": : "m"(__mcsema_do_call_state.RCX) );
-//    __asm__ volatile("movq %0, %%rbx\n": : "m"(__mcsema_do_call_state.RBX) );
-//    __asm__ volatile("movq %0, %%r8\n": : "m"(__mcsema_do_call_state.R8) );
-//    __asm__ volatile("movq %0, %%r9\n": : "m"(__mcsema_do_call_state.R9) );
-//    __asm__ volatile("movq %0, %%r12\n": : "m"(__mcsema_do_call_state.R12) );
-//    __asm__ volatile("movq %0, %%r13\n": : "m"(__mcsema_do_call_state.R13) );
-//    __asm__ volatile("movq %0, %%r14\n": : "m"(__mcsema_do_call_state.R14) );
-//    __asm__ volatile("movq %0, %%r15\n": : "m"(__mcsema_do_call_state.R15) );
-//    __asm__ volatile("movq %0, %%rbp\n": : "m"(__mcsema_do_call_state.RBP) );
-//    // *do not* restore RSP, although this may be a bug
-//
-//    // restore XMM
-//    __asm__ volatile("movups %0, %%xmm0\n": : "m"(__mcsema_do_call_state.XMM0) );
-//    __asm__ volatile("movups %0, %%xmm1\n": : "m"(__mcsema_do_call_state.XMM1) );
-//    __asm__ volatile("movups %0, %%xmm2\n": : "m"(__mcsema_do_call_state.XMM2) );
-//    __asm__ volatile("movups %0, %%xmm3\n": : "m"(__mcsema_do_call_state.XMM3) );
-//    __asm__ volatile("movups %0, %%xmm4\n": : "m"(__mcsema_do_call_state.XMM4) );
-//    __asm__ volatile("movups %0, %%xmm5\n": : "m"(__mcsema_do_call_state.XMM5) );
-//    __asm__ volatile("movups %0, %%xmm6\n": : "m"(__mcsema_do_call_state.XMM6) );
-//    __asm__ volatile("movups %0, %%xmm7\n": : "m"(__mcsema_do_call_state.XMM7) );
-//
-//    // save return value into rax
-//    __asm__ volatile("movq %0, %%rax\n": : "m"(__mcsema_do_call_state.RAX) );
-//
-//    __asm__ volatile("retq\n");
+
+    // save preserved registers in struct regs
+    //__asm__ volatile("movl $0xAABBCCDD, %eax\n");
+    //__asm__ volatile("movl %%eax, %0\n": "=m"(__mcsema_do_call_state.EAX) );
+    __asm__ volatile("movl $0xAABBCCDD, %0\n": "=m"(__mcsema_do_call_state.EAX) );
+    __asm__ volatile("movl %%ebx, %0\n": "=m"(__mcsema_do_call_state.EBX) );
+    __asm__ volatile("movl %%ecx, %0\n": "=m"(__mcsema_do_call_state.ECX) );
+    __asm__ volatile("movl %%edx, %0\n": "=m"(__mcsema_do_call_state.EDX) );
+    __asm__ volatile("movl %%esi, %0\n": "=m"(__mcsema_do_call_state.ESI) );
+    __asm__ volatile("movl %%edi, %0\n": "=m"(__mcsema_do_call_state.EDI) );
+    __asm__ volatile("movl %%ebp, %0\n": "=m"(__mcsema_do_call_state.EBP) );
+
+    // save XMM
+    __asm__ volatile("movups %%xmm0, %0\n": "=m"(__mcsema_do_call_state.XMM0) );
+    __asm__ volatile("movups %%xmm1, %0\n": "=m"(__mcsema_do_call_state.XMM1) );
+    __asm__ volatile("movups %%xmm2, %0\n": "=m"(__mcsema_do_call_state.XMM2) );
+    __asm__ volatile("movups %%xmm3, %0\n": "=m"(__mcsema_do_call_state.XMM3) );
+    __asm__ volatile("movups %%xmm4, %0\n": "=m"(__mcsema_do_call_state.XMM4) );
+    __asm__ volatile("movups %%xmm5, %0\n": "=m"(__mcsema_do_call_state.XMM5) );
+    __asm__ volatile("movups %%xmm6, %0\n": "=m"(__mcsema_do_call_state.XMM6) );
+    __asm__ volatile("movups %%xmm7, %0\n": "=m"(__mcsema_do_call_state.XMM7) );
+
+
+    // copy over MIN_STACK_SIZE bytes of stack
+    // at this point we saved all the registers, so we can clobber at will
+    // since they are restored on function exit
+    __asm__ volatile("movl %0, %%ecx\n": : "i"(MIN_STACK_SIZE) );
+    __asm__ volatile("movl %esp, %esi\n");
+    __asm__ volatile("movl %0, %%edi\n": : "m"(__mcsema_alt_stack));
+
+    // reserve space
+    __asm__ volatile("subl %0, %%edi\n": : "i"(MIN_STACK_SIZE) );
+
+    // set RSP to the alt stack rsp
+    __asm__ volatile("movl %%edi, %0\n": "=m"(__mcsema_do_call_state.ESP) );
+
+    // do memcpy
+    __asm__ volatile("cld\n");
+    __asm__ volatile("rep; movsb\n");
+
+    // call translated_function(reg_state);
+    __asm__ volatile("pushl %0\n": : "m"(__mcsema_do_call_state) );
+    __asm__ volatile("call *%eax\n");
+
+    // restore registers
+    __asm__ volatile("movl %0, %%ebx\n": : "m"(__mcsema_do_call_state.EBX) );
+    __asm__ volatile("movl %0, %%ecx\n": : "m"(__mcsema_do_call_state.ECX) );
+    __asm__ volatile("movl %0, %%edx\n": : "m"(__mcsema_do_call_state.EDX) );
+    __asm__ volatile("movl %0, %%esi\n": : "m"(__mcsema_do_call_state.ESI) );
+    __asm__ volatile("movl %0, %%edi\n": : "m"(__mcsema_do_call_state.EDI) );
+    __asm__ volatile("movl %0, %%ebp\n": : "m"(__mcsema_do_call_state.EBP) );
+    // *do not* restore ESP, although this may be a bug
+
+    // restore XMM
+    __asm__ volatile("movups %0, %%xmm0\n": : "m"(__mcsema_do_call_state.XMM0) );
+    __asm__ volatile("movups %0, %%xmm1\n": : "m"(__mcsema_do_call_state.XMM1) );
+    __asm__ volatile("movups %0, %%xmm2\n": : "m"(__mcsema_do_call_state.XMM2) );
+    __asm__ volatile("movups %0, %%xmm3\n": : "m"(__mcsema_do_call_state.XMM3) );
+    __asm__ volatile("movups %0, %%xmm4\n": : "m"(__mcsema_do_call_state.XMM4) );
+    __asm__ volatile("movups %0, %%xmm5\n": : "m"(__mcsema_do_call_state.XMM5) );
+    __asm__ volatile("movups %0, %%xmm6\n": : "m"(__mcsema_do_call_state.XMM6) );
+    __asm__ volatile("movups %0, %%xmm7\n": : "m"(__mcsema_do_call_state.XMM7) );
+
+    // save return value into rax
+    __asm__ volatile("movl %0, %%eax\n": : "m"(__mcsema_do_call_state.EAX) );
+
+    __asm__ volatile("retl\n");
 }
 
 typedef struct _do_call_state_t {
