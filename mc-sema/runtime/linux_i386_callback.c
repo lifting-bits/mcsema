@@ -135,7 +135,6 @@ void do_call_value(void *state, uint32_t value)
     do_call_state_t *cs = &(do_call_state[cur_do_call_frame]);
     call_frame_counter = 0;
     cs->__mcsema_jmp_count = NUM_DO_CALL_FRAMES - cur_do_call_frame - 1;
-    //uint32_t reg_state[] = cs->reg_state;
 
     __asm__ volatile(
             "pusha\n" // save all regs just so we don't have bother keeping track of what we saved
@@ -686,7 +685,8 @@ void do_call_value(void *state, uint32_t value)
             "pushl %%esi\n" // save temp reg
             "movl %1, %%eax\n" // get our recursion depth
             "imull %c[struct_size], %%eax\n" // see where we need to index into the save state array
-            "addl %5, %%eax\n" // eax now points to our old saved state
+            "leal %5, %%esi\n" // get address of array base
+            "addl %%esi, %%eax\n" // eax now points to our old saved state (array base + index * element size)
             "leal %c[reg_state](%%eax), %%esi\n" // get reg state offset
             "movl %%ebx, %c[state_ebx](%%esi)\n" // convert native state to struct regs
             "movl %%ecx, %c[state_ecx](%%esi)\n" // convert native state to struct regs
