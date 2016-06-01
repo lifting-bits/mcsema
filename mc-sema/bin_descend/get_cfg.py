@@ -492,7 +492,6 @@ def manualRelocOffset(I, inst, dref):
     if insn_t is None:
         return None
 
-    saw_displ = False
     for op in insn_t.Operands:
         
         if op.value == dref:
