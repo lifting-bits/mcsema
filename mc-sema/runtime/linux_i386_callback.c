@@ -122,6 +122,12 @@ __thread do_call_state_t do_call_state[NUM_DO_CALL_FRAMES];
 __thread int32_t cur_do_call_frame = -1; /* XXX */
 __thread uint32_t call_frame_counter = 0; /* XXX */
 
+
+#define COUNT_LEVEL(N) \
+  ".align 8, 0x90\n" \
+  #N ":" \
+  "incl %1\n"
+
 void do_call_value(void *state, uint32_t value)
 {
     // get a clean frame to store state
@@ -152,530 +158,530 @@ void do_call_value(void *state, uint32_t value)
             "leal %c[real_esp_off](%%esi), %%esi\n" // where will we save the "real" esp?
             "movl %%esp, (%%esi)\n" // save our esp since we will switch to mcsema esp later
             "movl %c[state_esp](%%eax), %%esp\n" // switch to mcsema stack
-            "addl $4, %%esp\n" // we pushed a fake return addr before, undo it
+            "addl $4, %%esp\n" // we pushed a fake return addr in the CALL{r,m} definitions 
+                               // in x86Instrs_Branches.cpp, undo it
             "movl %%ecx, -4(%%esp)\n" // use that slot to store jump destination
             "movl %c[jmp_count](%%esi), %%ecx\n" // save recursion count into ecx
-            "imull $7, %%ecx, %%ecx\n" //use that to calc how many INC instructions to skip
+            "shll $3, %%ecx\n" // multiply recursion count by 8 to get offset (mul 8 = shl 3)
             "leal 0f, %%esi\n" // base return addr
             "addl %%ecx, %%esi\n" // calculate return addr
             "pushl %%esi\n" // push return addr
             "movl %c[state_ecx](%%eax), %%ecx\n" // complete struct regs spill
-            "movl %c[state_esi](%%eax), %%esi\n"
-            "movl %c[state_eax](%%eax), %%eax\n"
+            "movl %c[state_esi](%%eax), %%esi\n" // complete struct regs spill
+            "movl %c[state_eax](%%eax), %%eax\n" // complete struct regs spill
             "jmpl *-4(%%esp)\n"
-            "0:\n"
-            "incl %1\n" // set of jump locations that increment the call frame counter
-            "incl %1\n" // the amount of these hit depends on the recursion depth
-            "incl %1\n" // at depth 0, none are hit, at depth 1, there is 1, etc.
-            "incl %1\n" // there are 512 incl entries
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
-            "incl %1\n"
+            COUNT_LEVEL(0) // set of jump locations that increment the call frame counter
+            COUNT_LEVEL(1) // the amount of these hit depends on the recursion depth
+            COUNT_LEVEL(2) // at depth 0, none are hit, at depth 1, there is 1, etc.
+            COUNT_LEVEL(3) // there are 512 incl entries
+            COUNT_LEVEL(4)
+            COUNT_LEVEL(5)
+            COUNT_LEVEL(6)
+            COUNT_LEVEL(7)
+            COUNT_LEVEL(8)
+            COUNT_LEVEL(9)
+            COUNT_LEVEL(10)
+            COUNT_LEVEL(11)
+            COUNT_LEVEL(12)
+            COUNT_LEVEL(13)
+            COUNT_LEVEL(14)
+            COUNT_LEVEL(15)
+            COUNT_LEVEL(16)
+            COUNT_LEVEL(17)
+            COUNT_LEVEL(18)
+            COUNT_LEVEL(19)
+            COUNT_LEVEL(20)
+            COUNT_LEVEL(21)
+            COUNT_LEVEL(22)
+            COUNT_LEVEL(23)
+            COUNT_LEVEL(24)
+            COUNT_LEVEL(25)
+            COUNT_LEVEL(26)
+            COUNT_LEVEL(27)
+            COUNT_LEVEL(28)
+            COUNT_LEVEL(29)
+            COUNT_LEVEL(30)
+            COUNT_LEVEL(31)
+            COUNT_LEVEL(32)
+            COUNT_LEVEL(33)
+            COUNT_LEVEL(34)
+            COUNT_LEVEL(35)
+            COUNT_LEVEL(36)
+            COUNT_LEVEL(37)
+            COUNT_LEVEL(38)
+            COUNT_LEVEL(39)
+            COUNT_LEVEL(40)
+            COUNT_LEVEL(41)
+            COUNT_LEVEL(42)
+            COUNT_LEVEL(43)
+            COUNT_LEVEL(44)
+            COUNT_LEVEL(45)
+            COUNT_LEVEL(46)
+            COUNT_LEVEL(47)
+            COUNT_LEVEL(48)
+            COUNT_LEVEL(49)
+            COUNT_LEVEL(50)
+            COUNT_LEVEL(51)
+            COUNT_LEVEL(52)
+            COUNT_LEVEL(53)
+            COUNT_LEVEL(54)
+            COUNT_LEVEL(55)
+            COUNT_LEVEL(56)
+            COUNT_LEVEL(57)
+            COUNT_LEVEL(58)
+            COUNT_LEVEL(59)
+            COUNT_LEVEL(60)
+            COUNT_LEVEL(61)
+            COUNT_LEVEL(62)
+            COUNT_LEVEL(63)
+            COUNT_LEVEL(64)
+            COUNT_LEVEL(65)
+            COUNT_LEVEL(66)
+            COUNT_LEVEL(67)
+            COUNT_LEVEL(68)
+            COUNT_LEVEL(69)
+            COUNT_LEVEL(70)
+            COUNT_LEVEL(71)
+            COUNT_LEVEL(72)
+            COUNT_LEVEL(73)
+            COUNT_LEVEL(74)
+            COUNT_LEVEL(75)
+            COUNT_LEVEL(76)
+            COUNT_LEVEL(77)
+            COUNT_LEVEL(78)
+            COUNT_LEVEL(79)
+            COUNT_LEVEL(80)
+            COUNT_LEVEL(81)
+            COUNT_LEVEL(82)
+            COUNT_LEVEL(83)
+            COUNT_LEVEL(84)
+            COUNT_LEVEL(85)
+            COUNT_LEVEL(86)
+            COUNT_LEVEL(87)
+            COUNT_LEVEL(88)
+            COUNT_LEVEL(89)
+            COUNT_LEVEL(90)
+            COUNT_LEVEL(91)
+            COUNT_LEVEL(92)
+            COUNT_LEVEL(93)
+            COUNT_LEVEL(94)
+            COUNT_LEVEL(95)
+            COUNT_LEVEL(96)
+            COUNT_LEVEL(97)
+            COUNT_LEVEL(98)
+            COUNT_LEVEL(99)
+            COUNT_LEVEL(100)
+            COUNT_LEVEL(101)
+            COUNT_LEVEL(102)
+            COUNT_LEVEL(103)
+            COUNT_LEVEL(104)
+            COUNT_LEVEL(105)
+            COUNT_LEVEL(106)
+            COUNT_LEVEL(107)
+            COUNT_LEVEL(108)
+            COUNT_LEVEL(109)
+            COUNT_LEVEL(110)
+            COUNT_LEVEL(111)
+            COUNT_LEVEL(112)
+            COUNT_LEVEL(113)
+            COUNT_LEVEL(114)
+            COUNT_LEVEL(115)
+            COUNT_LEVEL(116)
+            COUNT_LEVEL(117)
+            COUNT_LEVEL(118)
+            COUNT_LEVEL(119)
+            COUNT_LEVEL(120)
+            COUNT_LEVEL(121)
+            COUNT_LEVEL(122)
+            COUNT_LEVEL(123)
+            COUNT_LEVEL(124)
+            COUNT_LEVEL(125)
+            COUNT_LEVEL(126)
+            COUNT_LEVEL(127)
+            COUNT_LEVEL(128)
+            COUNT_LEVEL(129)
+            COUNT_LEVEL(130)
+            COUNT_LEVEL(131)
+            COUNT_LEVEL(132)
+            COUNT_LEVEL(133)
+            COUNT_LEVEL(134)
+            COUNT_LEVEL(135)
+            COUNT_LEVEL(136)
+            COUNT_LEVEL(137)
+            COUNT_LEVEL(138)
+            COUNT_LEVEL(139)
+            COUNT_LEVEL(140)
+            COUNT_LEVEL(141)
+            COUNT_LEVEL(142)
+            COUNT_LEVEL(143)
+            COUNT_LEVEL(144)
+            COUNT_LEVEL(145)
+            COUNT_LEVEL(146)
+            COUNT_LEVEL(147)
+            COUNT_LEVEL(148)
+            COUNT_LEVEL(149)
+            COUNT_LEVEL(150)
+            COUNT_LEVEL(151)
+            COUNT_LEVEL(152)
+            COUNT_LEVEL(153)
+            COUNT_LEVEL(154)
+            COUNT_LEVEL(155)
+            COUNT_LEVEL(156)
+            COUNT_LEVEL(157)
+            COUNT_LEVEL(158)
+            COUNT_LEVEL(159)
+            COUNT_LEVEL(160)
+            COUNT_LEVEL(161)
+            COUNT_LEVEL(162)
+            COUNT_LEVEL(163)
+            COUNT_LEVEL(164)
+            COUNT_LEVEL(165)
+            COUNT_LEVEL(166)
+            COUNT_LEVEL(167)
+            COUNT_LEVEL(168)
+            COUNT_LEVEL(169)
+            COUNT_LEVEL(170)
+            COUNT_LEVEL(171)
+            COUNT_LEVEL(172)
+            COUNT_LEVEL(173)
+            COUNT_LEVEL(174)
+            COUNT_LEVEL(175)
+            COUNT_LEVEL(176)
+            COUNT_LEVEL(177)
+            COUNT_LEVEL(178)
+            COUNT_LEVEL(179)
+            COUNT_LEVEL(180)
+            COUNT_LEVEL(181)
+            COUNT_LEVEL(182)
+            COUNT_LEVEL(183)
+            COUNT_LEVEL(184)
+            COUNT_LEVEL(185)
+            COUNT_LEVEL(186)
+            COUNT_LEVEL(187)
+            COUNT_LEVEL(188)
+            COUNT_LEVEL(189)
+            COUNT_LEVEL(190)
+            COUNT_LEVEL(191)
+            COUNT_LEVEL(192)
+            COUNT_LEVEL(193)
+            COUNT_LEVEL(194)
+            COUNT_LEVEL(195)
+            COUNT_LEVEL(196)
+            COUNT_LEVEL(197)
+            COUNT_LEVEL(198)
+            COUNT_LEVEL(199)
+            COUNT_LEVEL(200)
+            COUNT_LEVEL(201)
+            COUNT_LEVEL(202)
+            COUNT_LEVEL(203)
+            COUNT_LEVEL(204)
+            COUNT_LEVEL(205)
+            COUNT_LEVEL(206)
+            COUNT_LEVEL(207)
+            COUNT_LEVEL(208)
+            COUNT_LEVEL(209)
+            COUNT_LEVEL(210)
+            COUNT_LEVEL(211)
+            COUNT_LEVEL(212)
+            COUNT_LEVEL(213)
+            COUNT_LEVEL(214)
+            COUNT_LEVEL(215)
+            COUNT_LEVEL(216)
+            COUNT_LEVEL(217)
+            COUNT_LEVEL(218)
+            COUNT_LEVEL(219)
+            COUNT_LEVEL(220)
+            COUNT_LEVEL(221)
+            COUNT_LEVEL(222)
+            COUNT_LEVEL(223)
+            COUNT_LEVEL(224)
+            COUNT_LEVEL(225)
+            COUNT_LEVEL(226)
+            COUNT_LEVEL(227)
+            COUNT_LEVEL(228)
+            COUNT_LEVEL(229)
+            COUNT_LEVEL(230)
+            COUNT_LEVEL(231)
+            COUNT_LEVEL(232)
+            COUNT_LEVEL(233)
+            COUNT_LEVEL(234)
+            COUNT_LEVEL(235)
+            COUNT_LEVEL(236)
+            COUNT_LEVEL(237)
+            COUNT_LEVEL(238)
+            COUNT_LEVEL(239)
+            COUNT_LEVEL(240)
+            COUNT_LEVEL(241)
+            COUNT_LEVEL(242)
+            COUNT_LEVEL(243)
+            COUNT_LEVEL(244)
+            COUNT_LEVEL(245)
+            COUNT_LEVEL(246)
+            COUNT_LEVEL(247)
+            COUNT_LEVEL(248)
+            COUNT_LEVEL(249)
+            COUNT_LEVEL(250)
+            COUNT_LEVEL(251)
+            COUNT_LEVEL(252)
+            COUNT_LEVEL(253)
+            COUNT_LEVEL(254)
+            COUNT_LEVEL(255)
+            COUNT_LEVEL(256)
+            COUNT_LEVEL(257)
+            COUNT_LEVEL(258)
+            COUNT_LEVEL(259)
+            COUNT_LEVEL(260)
+            COUNT_LEVEL(261)
+            COUNT_LEVEL(262)
+            COUNT_LEVEL(263)
+            COUNT_LEVEL(264)
+            COUNT_LEVEL(265)
+            COUNT_LEVEL(266)
+            COUNT_LEVEL(267)
+            COUNT_LEVEL(268)
+            COUNT_LEVEL(269)
+            COUNT_LEVEL(270)
+            COUNT_LEVEL(271)
+            COUNT_LEVEL(272)
+            COUNT_LEVEL(273)
+            COUNT_LEVEL(274)
+            COUNT_LEVEL(275)
+            COUNT_LEVEL(276)
+            COUNT_LEVEL(277)
+            COUNT_LEVEL(278)
+            COUNT_LEVEL(279)
+            COUNT_LEVEL(280)
+            COUNT_LEVEL(281)
+            COUNT_LEVEL(282)
+            COUNT_LEVEL(283)
+            COUNT_LEVEL(284)
+            COUNT_LEVEL(285)
+            COUNT_LEVEL(286)
+            COUNT_LEVEL(287)
+            COUNT_LEVEL(288)
+            COUNT_LEVEL(289)
+            COUNT_LEVEL(290)
+            COUNT_LEVEL(291)
+            COUNT_LEVEL(292)
+            COUNT_LEVEL(293)
+            COUNT_LEVEL(294)
+            COUNT_LEVEL(295)
+            COUNT_LEVEL(296)
+            COUNT_LEVEL(297)
+            COUNT_LEVEL(298)
+            COUNT_LEVEL(299)
+            COUNT_LEVEL(300)
+            COUNT_LEVEL(301)
+            COUNT_LEVEL(302)
+            COUNT_LEVEL(303)
+            COUNT_LEVEL(304)
+            COUNT_LEVEL(305)
+            COUNT_LEVEL(306)
+            COUNT_LEVEL(307)
+            COUNT_LEVEL(308)
+            COUNT_LEVEL(309)
+            COUNT_LEVEL(310)
+            COUNT_LEVEL(311)
+            COUNT_LEVEL(312)
+            COUNT_LEVEL(313)
+            COUNT_LEVEL(314)
+            COUNT_LEVEL(315)
+            COUNT_LEVEL(316)
+            COUNT_LEVEL(317)
+            COUNT_LEVEL(318)
+            COUNT_LEVEL(319)
+            COUNT_LEVEL(320)
+            COUNT_LEVEL(321)
+            COUNT_LEVEL(322)
+            COUNT_LEVEL(323)
+            COUNT_LEVEL(324)
+            COUNT_LEVEL(325)
+            COUNT_LEVEL(326)
+            COUNT_LEVEL(327)
+            COUNT_LEVEL(328)
+            COUNT_LEVEL(329)
+            COUNT_LEVEL(330)
+            COUNT_LEVEL(331)
+            COUNT_LEVEL(332)
+            COUNT_LEVEL(333)
+            COUNT_LEVEL(334)
+            COUNT_LEVEL(335)
+            COUNT_LEVEL(336)
+            COUNT_LEVEL(337)
+            COUNT_LEVEL(338)
+            COUNT_LEVEL(339)
+            COUNT_LEVEL(340)
+            COUNT_LEVEL(341)
+            COUNT_LEVEL(342)
+            COUNT_LEVEL(343)
+            COUNT_LEVEL(344)
+            COUNT_LEVEL(345)
+            COUNT_LEVEL(346)
+            COUNT_LEVEL(347)
+            COUNT_LEVEL(348)
+            COUNT_LEVEL(349)
+            COUNT_LEVEL(350)
+            COUNT_LEVEL(351)
+            COUNT_LEVEL(352)
+            COUNT_LEVEL(353)
+            COUNT_LEVEL(354)
+            COUNT_LEVEL(355)
+            COUNT_LEVEL(356)
+            COUNT_LEVEL(357)
+            COUNT_LEVEL(358)
+            COUNT_LEVEL(359)
+            COUNT_LEVEL(360)
+            COUNT_LEVEL(361)
+            COUNT_LEVEL(362)
+            COUNT_LEVEL(363)
+            COUNT_LEVEL(364)
+            COUNT_LEVEL(365)
+            COUNT_LEVEL(366)
+            COUNT_LEVEL(367)
+            COUNT_LEVEL(368)
+            COUNT_LEVEL(369)
+            COUNT_LEVEL(370)
+            COUNT_LEVEL(371)
+            COUNT_LEVEL(372)
+            COUNT_LEVEL(373)
+            COUNT_LEVEL(374)
+            COUNT_LEVEL(375)
+            COUNT_LEVEL(376)
+            COUNT_LEVEL(377)
+            COUNT_LEVEL(378)
+            COUNT_LEVEL(379)
+            COUNT_LEVEL(380)
+            COUNT_LEVEL(381)
+            COUNT_LEVEL(382)
+            COUNT_LEVEL(383)
+            COUNT_LEVEL(384)
+            COUNT_LEVEL(385)
+            COUNT_LEVEL(386)
+            COUNT_LEVEL(387)
+            COUNT_LEVEL(388)
+            COUNT_LEVEL(389)
+            COUNT_LEVEL(390)
+            COUNT_LEVEL(391)
+            COUNT_LEVEL(392)
+            COUNT_LEVEL(393)
+            COUNT_LEVEL(394)
+            COUNT_LEVEL(395)
+            COUNT_LEVEL(396)
+            COUNT_LEVEL(397)
+            COUNT_LEVEL(398)
+            COUNT_LEVEL(399)
+            COUNT_LEVEL(400)
+            COUNT_LEVEL(401)
+            COUNT_LEVEL(402)
+            COUNT_LEVEL(403)
+            COUNT_LEVEL(404)
+            COUNT_LEVEL(405)
+            COUNT_LEVEL(406)
+            COUNT_LEVEL(407)
+            COUNT_LEVEL(408)
+            COUNT_LEVEL(409)
+            COUNT_LEVEL(410)
+            COUNT_LEVEL(411)
+            COUNT_LEVEL(412)
+            COUNT_LEVEL(413)
+            COUNT_LEVEL(414)
+            COUNT_LEVEL(415)
+            COUNT_LEVEL(416)
+            COUNT_LEVEL(417)
+            COUNT_LEVEL(418)
+            COUNT_LEVEL(419)
+            COUNT_LEVEL(420)
+            COUNT_LEVEL(421)
+            COUNT_LEVEL(422)
+            COUNT_LEVEL(423)
+            COUNT_LEVEL(424)
+            COUNT_LEVEL(425)
+            COUNT_LEVEL(426)
+            COUNT_LEVEL(427)
+            COUNT_LEVEL(428)
+            COUNT_LEVEL(429)
+            COUNT_LEVEL(430)
+            COUNT_LEVEL(431)
+            COUNT_LEVEL(432)
+            COUNT_LEVEL(433)
+            COUNT_LEVEL(434)
+            COUNT_LEVEL(435)
+            COUNT_LEVEL(436)
+            COUNT_LEVEL(437)
+            COUNT_LEVEL(438)
+            COUNT_LEVEL(439)
+            COUNT_LEVEL(440)
+            COUNT_LEVEL(441)
+            COUNT_LEVEL(442)
+            COUNT_LEVEL(443)
+            COUNT_LEVEL(444)
+            COUNT_LEVEL(445)
+            COUNT_LEVEL(446)
+            COUNT_LEVEL(447)
+            COUNT_LEVEL(448)
+            COUNT_LEVEL(449)
+            COUNT_LEVEL(450)
+            COUNT_LEVEL(451)
+            COUNT_LEVEL(452)
+            COUNT_LEVEL(453)
+            COUNT_LEVEL(454)
+            COUNT_LEVEL(455)
+            COUNT_LEVEL(456)
+            COUNT_LEVEL(457)
+            COUNT_LEVEL(458)
+            COUNT_LEVEL(459)
+            COUNT_LEVEL(460)
+            COUNT_LEVEL(461)
+            COUNT_LEVEL(462)
+            COUNT_LEVEL(463)
+            COUNT_LEVEL(464)
+            COUNT_LEVEL(465)
+            COUNT_LEVEL(466)
+            COUNT_LEVEL(467)
+            COUNT_LEVEL(468)
+            COUNT_LEVEL(469)
+            COUNT_LEVEL(470)
+            COUNT_LEVEL(471)
+            COUNT_LEVEL(472)
+            COUNT_LEVEL(473)
+            COUNT_LEVEL(474)
+            COUNT_LEVEL(475)
+            COUNT_LEVEL(476)
+            COUNT_LEVEL(477)
+            COUNT_LEVEL(478)
+            COUNT_LEVEL(479)
+            COUNT_LEVEL(480)
+            COUNT_LEVEL(481)
+            COUNT_LEVEL(482)
+            COUNT_LEVEL(483)
+            COUNT_LEVEL(484)
+            COUNT_LEVEL(485)
+            COUNT_LEVEL(486)
+            COUNT_LEVEL(487)
+            COUNT_LEVEL(488)
+            COUNT_LEVEL(489)
+            COUNT_LEVEL(490)
+            COUNT_LEVEL(491)
+            COUNT_LEVEL(492)
+            COUNT_LEVEL(493)
+            COUNT_LEVEL(494)
+            COUNT_LEVEL(495)
+            COUNT_LEVEL(496)
+            COUNT_LEVEL(497)
+            COUNT_LEVEL(498)
+            COUNT_LEVEL(499)
+            COUNT_LEVEL(500)
+            COUNT_LEVEL(501)
+            COUNT_LEVEL(502)
+            COUNT_LEVEL(503)
+            COUNT_LEVEL(504)
+            COUNT_LEVEL(505)
+            COUNT_LEVEL(506)
+            COUNT_LEVEL(507)
+            COUNT_LEVEL(508)
+            COUNT_LEVEL(509)
+            COUNT_LEVEL(510)
+            COUNT_LEVEL(511)
             "pushl %%eax\n" // save return value
             "pushl %%esi\n" // save temp reg
             "movl %1, %%eax\n" // get our recursion depth
