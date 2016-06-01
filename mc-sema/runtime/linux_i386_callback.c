@@ -125,7 +125,7 @@ __thread uint32_t call_frame_counter = 0; /* XXX */
 void do_call_value(void *state, uint32_t value)
 {
     // get a clean frame to store state
-    ++cur_do_call_frame;
+    int32_t prev_call_frame = cur_do_call_frame++;
     do_call_state_t *cs = &(do_call_state[cur_do_call_frame]);
     call_frame_counter = 0;
     cs->__mcsema_jmp_count = NUM_DO_CALL_FRAMES - cur_do_call_frame - 1;
@@ -156,7 +156,7 @@ void do_call_value(void *state, uint32_t value)
             "movl %%ecx, -4(%%esp)\n" // use that slot to store jump destination
             "movl %c[jmp_count](%%esi), %%ecx\n" // save recursion count into ecx
             "imull $7, %%ecx, %%ecx\n" //use that to calc how many INC instructions to skip
-            "movl 0f, %%esi\n" // base return addr
+            "leal 0f, %%esi\n" // base return addr
             "addl %%ecx, %%esi\n" // calculate return addr
             "pushl %%esi\n" // push return addr
             "movl %c[state_ecx](%%eax), %%ecx\n" // complete struct regs spill
@@ -723,6 +723,6 @@ void do_call_value(void *state, uint32_t value)
                     [struct_size]"e"(sizeof(do_call_state_t))
             : "memory", "eax", "ecx", "esi" );
     
-    cur_do_call_frame--;
+    cur_do_call_frame = prev_call_frame;
     call_frame_counter = 0;
 }
