@@ -573,6 +573,14 @@ static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& bloc
     Function *F = block->getParent();
     Module *M = F->getParent();
 
+    // this is awful, but sometimes IDA detects the immediate
+    // as a memory reference. However, this instruction can only
+    // have an immediate, so this is safe
+    if( ip->has_imm_reference || ip->has_mem_reference ) {
+        ip->has_imm_reference = true;
+        ip->set_reference(Inst::IMMRef, ip->get_reference(Inst::MEMRef));
+    }
+
     if( ip->has_imm_reference ) {
         
         Value *data_v = nullptr;
@@ -613,6 +621,13 @@ static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& bloc
         return ContinueBlock;
     }
 
+    // this is awful, but sometimes IDA detects the immediate
+    // as a memory reference. However, this instruction can only
+    // have an immediate, so this is safe
+    if( ip->has_imm_reference || ip->has_mem_reference ) {
+        ip->has_imm_reference = true;
+        ip->set_reference(Inst::IMMRef, ip->get_reference(Inst::MEMRef));
+    }
 
     if( ip->has_code_ref() ) {
         Value *addrInt = IMM_AS_DATA_REF<width>(block, natM, ip);
