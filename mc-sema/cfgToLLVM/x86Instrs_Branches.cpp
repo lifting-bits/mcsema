@@ -48,11 +48,11 @@ static InstTransResult doRet(BasicBlock *b) {
   //do a read from the location pointed to by ESP
 
   TASSERT(width == 32 || width == 64, "Invalid reg width for RET");
-  Value *rESP = R_READ<width>(b, X86::RSP);
+  Value *rESP = R_READ<width>(b, X86::ESP);
   Value *nESP = BinaryOperator::CreateAdd(rESP, CONST_V<width>(b, width/8), "", b);
 
   //write back to ESP
-  R_WRITE<width>(b, X86::RSP, nESP);
+  R_WRITE<width>(b, X86::ESP, nESP);
 
   //spill all locals into the structure
   writeLocalsToContext(b, width, ABIRetStore);
@@ -68,7 +68,7 @@ static InstTransResult doRetI(BasicBlock *&b, const MCOperand &o) {
   TASSERT(o.isImm(), "Operand not immediate");
 
   Value *c = CONST_V<width>(b, o.getImm());
-  Value *rESP = R_READ<width>(b, X86::RSP);
+  Value *rESP = R_READ<width>(b, X86::ESP);
   Value *fromStack = M_READ_0<width>(b, rESP);
   TASSERT(fromStack != NULL, "Could not read value from stack");
 
@@ -79,7 +79,7 @@ static InstTransResult doRetI(BasicBlock *&b, const MCOperand &o) {
   Value *nESP = BinaryOperator::CreateAdd(rESP_1, CONST_V<width>(b, width/8), "", b);
 
   //write back to ESP
-  R_WRITE<64>(b, X86::RSP, nESP);
+  R_WRITE<64>(b, X86::ESP, nESP);
 
   //spill all locals into the structure
   writeLocalsToContext(b, width, ABIRetStore);
