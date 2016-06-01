@@ -70,7 +70,7 @@ __attribute__((naked)) int __mcsema_inception()
     // since they are restored on function exit
     __asm__ volatile("movl %0, %%ecx\n": : "i"(MIN_STACK_SIZE) );
     __asm__ volatile("movl %esp, %esi\n");
-    __asm__ volatile("movl %0, %%edi\n": : "m"(__mcsema_alt_stack));
+    __asm__ volatile("leal %0, %%edi\n": : "m"(__mcsema_alt_stack));
 
     // reserve space
     __asm__ volatile("subl %0, %%edi\n": : "i"(MIN_STACK_SIZE) );
@@ -83,7 +83,8 @@ __attribute__((naked)) int __mcsema_inception()
     __asm__ volatile("rep; movsb\n");
 
     // call translated_function(reg_state);
-    __asm__ volatile("pushl %0\n": : "m"(__mcsema_do_call_state) );
+    __asm__ volatile("leal %0, %%esi\n": : "m"(__mcsema_do_call_state) );
+    __asm__ volatile("pushl %esi\n");
     __asm__ volatile("call *%eax\n");
 
     // restore registers
@@ -157,9 +158,9 @@ void do_call_value(void *state, uint32_t value)
             "leal %c[real_esp_off](%%esi), %%esi\n" // where will we save the "real" esp?
             "movl %%esp, (%%esi)\n" // save our esp since we will switch to mcsema esp later
             "movl %c[state_esp](%%eax), %%esp\n" // switch to mcsema stack
-            "addl $4, %%esp\n" // we pushed a fake return addr in the CALL{r,m} definitions 
+            //"addl $4, %%esp\n" // we pushed a fake return addr in the CALL{r,m} definitions 
                                // in x86Instrs_Branches.cpp, undo it
-            "movl %%ecx, -4(%%esp)\n" // use that slot to store jump destination
+            "movl %%ecx, 0(%%esp)\n" // use that slot to store jump destination
             "movl %c[jmp_count](%%esi), %%ecx\n" // save recursion count into ecx
             "shll $3, %%ecx\n" // multiply recursion count by 8 to get offset (mul 8 = shl 3)
             "leal 0f, %%esi\n" // base return addr
@@ -168,7 +169,7 @@ void do_call_value(void *state, uint32_t value)
             "movl %c[state_ecx](%%eax), %%ecx\n" // complete struct regs spill
             "movl %c[state_esi](%%eax), %%esi\n" // complete struct regs spill
             "movl %c[state_eax](%%eax), %%eax\n" // complete struct regs spill
-            "jmpl *-4(%%esp)\n"
+            "jmpl *4(%%esp)\n"
             COUNT_LEVEL(0) // set of jump locations that increment the call frame counter
             COUNT_LEVEL(1) // the amount of these hit depends on the recursion depth
             COUNT_LEVEL(2) // at depth 0, none are hit, at depth 1, there is 1, etc.
