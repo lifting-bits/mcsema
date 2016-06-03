@@ -44,9 +44,10 @@ __attribute__((naked)) int __mcsema_inception()
 {
 
     // save preserved registers in struct regs
-    //__asm__ volatile("movl $0xAABBCCDD, %eax\n");
-    //__asm__ volatile("movl %%eax, %0\n": "=m"(__mcsema_do_call_state.EAX) );
-    __asm__ volatile("movl $0xAABBCCDD, %0\n": "=m"(__mcsema_do_call_state.EAX) );
+    __asm__ volatile("movl %%eax, %0\n": "=m"(__mcsema_do_call_state.EAX) );
+    __asm__ volatile("popl %eax\n"); // put translated destination into eax
+                                      // it was pushed in the stub that calls __mcsema_inception
+                                      // see linuxArchOps.cpp
     __asm__ volatile("movl %%ebx, %0\n": "=m"(__mcsema_do_call_state.EBX) );
     __asm__ volatile("movl %%ecx, %0\n": "=m"(__mcsema_do_call_state.ECX) );
     __asm__ volatile("movl %%edx, %0\n": "=m"(__mcsema_do_call_state.EDX) );
@@ -75,7 +76,7 @@ __attribute__((naked)) int __mcsema_inception()
     // reserve space
     __asm__ volatile("subl %0, %%edi\n": : "i"(MIN_STACK_SIZE) );
 
-    // set RSP to the alt stack rsp
+    // set ESP to the alt stack
     __asm__ volatile("movl %%edi, %0\n": "=m"(__mcsema_do_call_state.ESP) );
 
     // do memcpy
@@ -106,7 +107,7 @@ __attribute__((naked)) int __mcsema_inception()
     __asm__ volatile("movups %0, %%xmm6\n": : "m"(__mcsema_do_call_state.XMM6) );
     __asm__ volatile("movups %0, %%xmm7\n": : "m"(__mcsema_do_call_state.XMM7) );
 
-    // save return value into rax
+    // save return value into eax
     __asm__ volatile("movl %0, %%eax\n": : "m"(__mcsema_do_call_state.EAX) );
 
     __asm__ volatile("retl\n");

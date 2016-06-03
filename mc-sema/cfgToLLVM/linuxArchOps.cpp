@@ -289,7 +289,7 @@ llvm::Value *linuxMakeCallbackForLocalFunction(Module *M , VA local_target) {
         void_12->setCallingConv(CallingConv::C);
         void_12->setTailCall(false);
     } else {
-        InlineAsm* ptr_13 = InlineAsm::get(FuncTy_9, "movl $0, %eax\n", "imr,~{dirflag},~{fpsr},~{flags}",true);
+        InlineAsm* ptr_13 = InlineAsm::get(FuncTy_9, "pushl $0\n", "imr,~{dirflag},~{fpsr},~{flags}",true);
         CallInst* void_12 = CallInst::Create(ptr_13, call_tgt, "", block);
         void_12->setCallingConv(CallingConv::C);
         void_12->setTailCall(false);
