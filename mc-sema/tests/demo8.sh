@@ -10,7 +10,9 @@ ${CC} -ggdb -m32 -c -o demo_test8.o demo_test8.c
 if [ -e "${IDA_PATH}/idaq" ]
 then
     echo "Using IDA to recover CFG"
-    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -march=x86 -entry-symbol=doOp -i=demo_test8.o >> /dev/null
+    export IDALOG=logfile_demo8.txt
+    rm -f ${IDALOG}
+    ${BIN_DESCEND_PATH}/bin_descend_wrapper.py -d -march=x86 -entry-symbol=doOp -i=demo_test8.o >> ${IDALOG}
 else
     echo "Using bin_descend to recover CFG"
     ${BIN_DESCEND_PATH}/bin_descend -march=x86 -d -entry-symbol=doOp -i=demo_test8.o
