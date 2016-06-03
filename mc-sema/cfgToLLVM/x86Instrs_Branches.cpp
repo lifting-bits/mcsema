@@ -79,7 +79,7 @@ static InstTransResult doRetI(BasicBlock *&b, const MCOperand &o) {
   Value *nESP = BinaryOperator::CreateAdd(rESP_1, CONST_V<width>(b, width/8), "", b);
 
   //write back to ESP
-  R_WRITE<64>(b, X86::ESP, nESP);
+  R_WRITE<width>(b, X86::ESP, nESP);
 
   //spill all locals into the structure
   writeLocalsToContext(b, width, ABIRetStore);
