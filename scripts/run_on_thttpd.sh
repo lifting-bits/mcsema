@@ -8,6 +8,14 @@ DIR=$(dirname ${0})
 source ${DIR}/mcsema_common.sh
 source ${DIR}/env.sh
 
+BCONLY=0
+
+if [ "$1" == "--bitcode_only" ]
+then
+    BCONLY=1
+    shift
+fi
+
 sanity_check
 
 export TVHEADLESS=1
@@ -33,10 +41,15 @@ optimize_bc ${WORKSPACE}/${TARGET}.bc ${WORKSPACE}/${TARGET}_opt.bc
 
 link_amd64_callback ${WORKSPACE}/${TARGET}_opt.bc ${WORKSPACE}/${TARGET}_linked.bc
 
-call_llc ${WORKSPACE}/${TARGET}_linked.bc ${WORKSPACE}/${TARGET}.o 
+if [ ${BCONLY} == 1 ]
+then
+    echo "Final bitcode saved to: ${WORKSPACE}/${TARGET}_linked.bc"
+else
+    call_llc ${WORKSPACE}/${TARGET}_linked.bc ${WORKSPACE}/${TARGET}.o 
 
-echo "Relinking with dependent libraries (${WORKSPACE}/${TARGET}_out.exe)"
-${CC} -I${DRIVER_PATH} -m64 -ggdb -o ${WORKSPACE}/${TARGET}_out.exe ${DRIVER_PATH}/httpd_linux_amd64.c ${WORKSPACE}/${TARGET}.o -lcrypt
+    echo "Relinking with dependent libraries (${WORKSPACE}/${TARGET}_out.exe)"
+    ${CC} -I${DRIVER_PATH} -m64 -ggdb -o ${WORKSPACE}/${TARGET}_out.exe ${DRIVER_PATH}/httpd_linux_amd64.c ${WORKSPACE}/${TARGET}.o -lcrypt
 
-echo "Run with:"
-echo "${WORKSPACE}/${TARGET}_out.exe"
+    echo "Run with:"
+    echo "${WORKSPACE}/${TARGET}_out.exe"
+fi

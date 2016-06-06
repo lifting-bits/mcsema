@@ -3,6 +3,14 @@
 set -e
 set -u
 
+BCONLY=0
+
+if [ "$1" == "--bitcode_only" ]
+then
+    BCONLY=1
+    shift
+fi
+
 WHICHBIN=$1
 DIR=$(dirname ${0})
 source ${DIR}/mcsema_common.sh
@@ -33,12 +41,17 @@ optimize_bc ${WORKSPACE}/${TARGET}.bc ${WORKSPACE}/${TARGET}_opt.bc
 
 link_amd64_callback ${WORKSPACE}/${TARGET}_opt.bc ${WORKSPACE}/${TARGET}_linked.bc
 
-call_llc ${WORKSPACE}/${TARGET}_linked.bc ${WORKSPACE}/${TARGET}.o 
+if [ ${BCONLY} == 1 ]
+then
+    echo "Final bitcode saved to: ${WORKSPACE}/${TARGET}_linked.bc"
+else
+    call_llc ${WORKSPACE}/${TARGET}_linked.bc ${WORKSPACE}/${TARGET}.o 
 
-LIBDIR=$(dirname ${WHICHBIN})/../lib
+    LIBDIR=$(dirname ${WHICHBIN})/../lib
 
-echo "Relinking with dependent libraries (${WORKSPACE}/${TARGET}_out.exe) (libs: ${LIBDIR})"
-${CC} -I${DRIVER_PATH} -L${LIBDIR} -m64 -ggdb -o ${WORKSPACE}/${TARGET}_out.exe ${DRIVER_PATH}/httpd_linux_amd64.c ${WORKSPACE}/${TARGET}.o -lcrypt -lapr-1 -laprutil-1 -lpcre
+    echo "Relinking with dependent libraries (${WORKSPACE}/${TARGET}_out.exe) (libs: ${LIBDIR})"
+    ${CC} -I${DRIVER_PATH} -L${LIBDIR} -m64 -ggdb -o ${WORKSPACE}/${TARGET}_out.exe ${DRIVER_PATH}/httpd_linux_amd64.c ${WORKSPACE}/${TARGET}.o -lcrypt -lapr-1 -laprutil-1 -lpcre
 
-echo "Run with:"
-echo "LD_PRELOAD=${LIBDIR} ${WORKSPACE}/${TARGET}_out.exe"
+    echo "Run with:"
+    echo "LD_PRELOAD=${LIBDIR} ${WORKSPACE}/${TARGET}_out.exe"
+fi
