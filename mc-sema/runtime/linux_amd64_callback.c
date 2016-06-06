@@ -208,8 +208,11 @@ void do_call_value(void *state, uint64_t value)
 
     // save "real" rsp
     //__asm__ volatile("movq %%rsp, %0\n": "=m"(__mcsema_real_rsp) );
-    __asm__ volatile("movq %%rsp, %0\n": "=m"(do_call_state[cur_do_call_frame].__mcsema_real_rsp) );
+    uint64_t *__tmp_mcsema_real_rsp = do_call_state[cur_do_call_frame]->__mcsema_real_rsp;
+    //__asm__ volatile("movq %%rsp, %0\n": "=m"(do_call_state[cur_do_call_frame].__mcsema_real_rsp) );
+    __asm__ volatile("movq %%rsp, %0\n": "=m"(__tmp_mcsema_real_rsp) );
     
+
     // switch rsp to translator rsp
     __asm__ volatile("movq %c[offt](%%rax), %%rsp\n": : [offt]"e"(offsetof(RegState, RSP)));
 
@@ -221,14 +224,17 @@ void do_call_value(void *state, uint64_t value)
 
     // save rax for later
     //__asm__ volatile("movq %%rax, %0\n": "=m"(__mcsema_saved_rax) );
-    __asm__ volatile("movq %%rax, %0\n": "=m"(do_call_state[cur_do_call_frame].__mcsema_saved_rax) );
+    uint64_t *__tmp_mcsema_saved_rax = do_call_state[cur_do_call_frame]->__mcsema_saved_rax;
+    //__asm__ volatile("movq %%rax, %0\n": "=m"(do_call_state[cur_do_call_frame].__mcsema_saved_rax) );
+    __asm__ volatile("movq %%rax, %0\n": "=m"(__tmp_mcsema_saved_rax) );
 
     // save old RSP since we'll need to shove it into struct regs
     __asm__ volatile("movq %rsp, %rax\n");
 
     // revert RSP
     //__asm__ volatile("movq %0, %%rsp\n": : "m"(__mcsema_real_rsp) );
-    __asm__ volatile("movq %0, %%rsp\n": : "m"(do_call_state[cur_do_call_frame].__mcsema_real_rsp) );
+    //__asm__ volatile("movq %0, %%rsp\n": : "m"(do_call_state[cur_do_call_frame].__mcsema_real_rsp) );
+    __asm__ volatile("movq %0, %%rsp\n": : "m"(__tmp_mcsema_real_rsp) );
 
     // restore previously saved rax pointer
     __asm__ volatile("popq %r10\n");
@@ -261,7 +267,8 @@ void do_call_value(void *state, uint64_t value)
     __asm__ volatile("movups %%xmm6, %c[offt](%%rax)\n": : [offt]"e"(offsetof(RegState, XMM6)) );
     __asm__ volatile("movups %%xmm7, %c[offt](%%rax)\n": : [offt]"e"(offsetof(RegState, XMM7)) );
 
-    __asm__ volatile("movq %0, %%r10\n": : "m"(do_call_state[cur_do_call_frame].__mcsema_saved_rax));
+    //
+    __asm__ volatile("movq %0, %%r10\n": : "m"(__tmp_mcsema_saved_rax));
     __asm__ volatile("movq %%r10, %c[offt](%%rax)\n": :[offt]"e"(offsetof(RegState, RAX)) );
 
     __asm__ volatile("movq %0, %%rax\n": : "m"(reg_state[ 0]));
@@ -280,7 +287,10 @@ void do_call_value(void *state, uint64_t value)
     __asm__ volatile("movq %0, %%r13\n":  : "m"(reg_state[12]));
     __asm__ volatile("movq %0, %%r14\n":  : "m"(reg_state[13]));
     __asm__ volatile("movq %0, %%r15\n":  : "m"(reg_state[14]));
-    __asm__ volatile("fxrstor %0\n" : "=m"(do_call_state[cur_do_call_frame].sse_state));
+    //
+    char __tmp_sse_state[512] = do_call_state[cur_do_call_Frame]->sse_state;
+    //__asm__ volatile("fxrstor %0\n" : "=m"(do_call_state[cur_do_call_frame].sse_state));
+    __asm__ volatile("fxrstor %0\n" : "=m"(__tmp_sse_state));
     
     cur_do_call_frame--;
 }
