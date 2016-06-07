@@ -18,7 +18,7 @@ sanity_check() {
     COMP=$(which ${CC})
     if [ ! -e "${COMP}" ]
     then
-        echo "Could not find a C compiler. Looked for ${COMP}"
+        echo "Could not find a C compiler. Looked for ${CC}"
         exit 1
     fi
 }
