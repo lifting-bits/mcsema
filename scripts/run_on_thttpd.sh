@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -e
 set -u
 
 WHICHBIN=$1
