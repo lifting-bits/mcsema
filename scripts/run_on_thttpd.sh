@@ -2,11 +2,6 @@
 
 set -u
 
-WHICHBIN=$1
-DIR=$(dirname ${0})
-source ${DIR}/mcsema_common.sh
-source ${DIR}/env.sh
-
 BCONLY=0
 
 if [ "$1" == "--bitcode_only" ]
@@ -15,12 +10,17 @@ then
     shift
 fi
 
+WHICHBIN=$1
+DIR=$(dirname ${0})
+source ${DIR}/mcsema_common.sh
+source ${DIR}/env.sh
+
 sanity_check
 
 export TVHEADLESS=1
 TARGET=thttpd
 
-WORKSPACE=$(mktemp -d --tmpdir=./ ${TARGET}_XXXX)
+WORKSPACE=$(mktemp -d --tmpdir=`pwd` ${TARGET}_XXXX)
 export IDALOG=${WORKSPACE}/logfile_${TARGET}.txt
 rm -f ${IDALOG} ${WHICHBIN}_out.exe ${WHICHBIN}.cfg ${WHICHBIN}.bc ${WHICHBIN}_opt.bc
 
@@ -32,6 +32,8 @@ echo ""
 echo "Workspace directory: ${WORKSPACE}" 
 echo "IDA Log: ${IDALOG}"
 
+cp ${WHICHBIN} ${WORKSPACE}/${TARGET}
+WHICHBIN=${WORKSPACE}/${TARGET}
 recover_cfg ${WHICHBIN} ${WORKSPACE}/${TARGET}.cfg
 
 convert_to_bc ${WORKSPACE}/${TARGET}.cfg ${WORKSPACE}/${TARGET}.bc

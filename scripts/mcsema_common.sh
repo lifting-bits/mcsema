@@ -1,6 +1,12 @@
 #!/bin/bash
 
 sanity_check() {
+    if [ ! -e "${WHICHBIN}" ]
+    then
+        echo "Could not find binary to translate: ${WHICHBIN}"
+        exit 1
+    fi
+
     if [ ! -e "${IDA}" ]
     then
         echo "Could not find IDA at ${IDA}."
@@ -30,6 +36,11 @@ recover_cfg () {
         ${IDA} -B -S"${GET_CFG_PY} --batch  --std-defs=${STD_DEFS}/linux.txt --std-defs=${STD_DEFS}/apr_defs.txt --std-defs=${STD_DEFS}/pcre_defs.txt --entry-symbol main --output=${2}" ${1} >> /dev/null
     else
         echo "Could not find IDA at ${IDA}"
+        exit 1
+    fi
+    if [ ! -e "${2}" ]
+    then
+        echo "Could not find output CFG (${2}). Assuming CFG recovery failed"
         exit 1
     fi
 }

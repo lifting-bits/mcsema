@@ -1,11 +1,24 @@
 #!/bin/bash
 
-# gem install fpm
 # sudo apt-get install rpm ruby-dev
+# gem install fpm
 
 set -u
 
 echo "This script packages mcsema into deb and rpm packages"
+
+FPM=$(which fpm)
+if [ ! -e "${FPM}" ]
+then
+    echo "Could not find fpm."
+    echo "Please install via:"
+    echo ""
+    echo "$ sudo apt-get install rpm ruby-dev"
+    echo "$ sudo gem install fpm"
+
+    exit 1
+fi
+
 
 echo "Cleaning old directory"
 PKGDIR=./package/mcsema
