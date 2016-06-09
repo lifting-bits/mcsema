@@ -91,13 +91,13 @@ When recovering control flow, bin_descend uses certain heuristics to attempt acc
 
 * Relocated immediate values in code (e.g. PUSH imm32) that point to the code section are assumed to be function pointers. These will be added to the list of entry points from which to recover control flow.
 * Relocated values in the data section that point to the code section are assumed to be function pointers. These will be added to the list of entry points from which to recover control flow.
-* Additinally, relocated function pointers in the data section are assumed to be used as callbacks. A tunk that takes current register state and transforms it into a translator specific register context will automatically be created for these functions, and used in place of the function when it referenced not by a direct call.
+* Additionally, relocated function pointers in the data section are assumed to be used as callbacks. A thunk that takes current register state and transforms it into a translator specific register context will automatically be created for these functions, and used in place of the function when it referenced not by a direct call.
 * Relocated immediate values in code (e.g. PUSH imm32) that point to the data section are assumed to be data values.
 * Relocated immediate values in the data section that point to the data section are assumed to be data values.
 
 ### Limitations
 
-COFF files will have several sections based at address zero. As there is no specification for how to assign addresses, we will assign addresses to sections in the order in which they are processed. . This usually matches the address what other tools (e.g. IDA Pro)  select, but not always. It is recommended that the entry point for COFF object should be specified by `-entry-symbol` and not `-e`.
+COFF files will have several sections based at address zero. As there is no specification for how to assign addresses, we will assign addresses to sections in the order in which they are processed. This usually matches the address what other tools (e.g. IDA Pro)  select, but not always. It is recommended that the entry point for COFF object should be specified by `-entry-symbol` and not `-e`.
 
 ### Usage
 
@@ -191,7 +191,7 @@ While many x86 instructions are supported, there are still those which are not s
         =att                                                                                                                              -   Emit AT&T-style assembly
         =intel                                                                                                                            -   Emit Intel-style assembly
 
-* `-driver`: This describes an externally visible entry point in the final bitcode. The `-driver` commandline may be repated for multiple entry points into the bitcode. Each invocation rquires a `driver name`, an exported `symbol or entry point address` to bind to, an `argument count` or `'raw'` if the driver has an esoteric calling convention, whether the driver returns or does not return, and a calling convention for the driver function. This option is best understood by looking at the examples.
+* `-driver`: This describes an externally visible entry point in the final bitcode. The `-driver` commandline may be repeated for multiple entry points into the bitcode. Each invocation rquires a `driver name`, an exported `symbol or entry point address` to bind to, an `argument count` or `'raw'` if the driver has an esoteric calling convention, whether the driver returns or does not return, and a calling convention for the driver function. This option is best understood by looking at the examples.
 * `-help`: display the help screen.
 * `-i=<<filename>>`: Specify the control flow graph used that will be translated to llvm bitcode. The CFG must be in serialized Google protocol buffer format, with the protocol specified in `CFG.proto`.
 * `-ignore-unsupported`: Don't stop when encountering an unsupported instruction, but output a message, ignore it, and keep translating.
