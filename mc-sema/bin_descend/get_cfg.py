@@ -1193,7 +1193,7 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
             # no fixups, do manual reloc searching
             scanDataForRelocs(M, D, start, end, new_eas, seg_offset)
         else:
-            DEBUG("Not scanning data sections of object file for pointer-alikes")
+            DEBUG("Not scanning data sections of object file for pointer-alikes\n")
     else:
         DEBUG("Found relocations in binary: ({:x})..\n".format(i))
         while i < end and i != idc.BADADDR:
