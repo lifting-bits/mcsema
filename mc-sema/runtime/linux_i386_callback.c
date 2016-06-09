@@ -71,7 +71,7 @@ __attribute__((naked)) int __mcsema_inception()
     // since they are restored on function exit
     __asm__ volatile("movl %0, %%ecx\n": : "i"(MIN_STACK_SIZE) );
     __asm__ volatile("movl %esp, %esi\n");
-    __asm__ volatile("leal %0, %%edi\n": : "m"(__mcsema_alt_stack));
+    __asm__ volatile("movl %0, %%edi\n": : "m"(__mcsema_alt_stack));
 
     // reserve space
     __asm__ volatile("subl %0, %%edi\n": : "i"(MIN_STACK_SIZE) );
@@ -84,9 +84,30 @@ __attribute__((naked)) int __mcsema_inception()
     __asm__ volatile("rep; movsb\n");
 
     // call translated_function(reg_state);
-    __asm__ volatile("leal %0, %%esi\n": : "m"(__mcsema_do_call_state) );
-    __asm__ volatile("pushl %esi\n");
-    __asm__ volatile("call *%eax\n");
+    __asm__ volatile("leal %[call_state], %%esi\n"
+                     "movl $%c[reg_size], %%ecx\n"
+                     "subl %%ecx, %%esp\n"
+                     "movl %%esp, %%edi\n"
+                     "0:\n"
+                     "movb %%gs:(%%esi), %%dl\n"
+                     "movb %%dl, (%%edi)\n"
+                     "inc %%esi\n"
+                     "inc %%edi\n"
+                     "loop 0b\n"
+                     "pushl %%esp\n"
+                     "call *%%eax\n" // stdcall on x86, caller cleans up
+                     "movl $%c[reg_size], %%ecx\n"
+                     "leal %[call_state], %%edi\n"
+                     "1:\n"
+                     "movb (%%esp), %%dl\n"
+                     "movb %%dl, %%gs:(%%edi)\n"
+                     "inc %%esp\n"
+                     "inc %%edi\n"
+                     "loop 1b\n"
+                     :
+                     : [reg_size]"e"(sizeof(RegState)), [call_state]"m"(__mcsema_do_call_state)
+                     );
+
 
     // restore registers
     __asm__ volatile("movl %0, %%ebx\n": : "m"(__mcsema_do_call_state.EBX) );
@@ -686,7 +707,7 @@ void do_call_value(void *state, uint32_t value)
             "pushl %%eax\n" // save return value
             "pushl %%esi\n" // save temp reg
             "movl %1, %%eax\n" // get our recursion depth
-            "imull %c[struct_size], %%eax\n" // see where we need to index into the save state array
+            "imull $%c[struct_size], %%eax\n" // see where we need to index into the save state array
             "leal %5, %%esi\n" // get address of array base
             "addl %%esi, %%eax\n" // eax now points to our old saved state (array base + index * element size)
             "leal %c[reg_state](%%eax), %%esi\n" // get reg state offset
