@@ -88,17 +88,17 @@ __attribute__((naked)) int __mcsema_inception()
                      "movl $%c[reg_size], %%ecx\n"
                      "subl %%ecx, %%esp\n"
                      "movl %%esp, %%edi\n"
-                     "0:\n"
-                     "movb %%gs:(%%esi), %%dl\n"
-                     "movb %%dl, (%%edi)\n"
-                     "inc %%esi\n"
+                     "0:\n"                         // this is a loop verus rep movsd
+                     "movb %%gs:(%%esi), %%dl\n"    // since we need to reference the 
+                     "movb %%dl, (%%edi)\n"         // gs segment, so its hand coded.
+                     "inc %%esi\n"                  // copy reg state from %gs to stack
                      "inc %%edi\n"
                      "loop 0b\n"
                      "pushl %%esp\n"
                      "call *%%eax\n" // stdcall on x86, caller cleans up
                      "movl $%c[reg_size], %%ecx\n"
                      "leal %[call_state], %%edi\n"
-                     "1:\n"
+                     "1:\n"                         // same as above
                      "movb (%%esp), %%dl\n"
                      "movb %%dl, %%gs:(%%edi)\n"
                      "inc %%esp\n"
@@ -136,14 +136,26 @@ __attribute__((naked)) int __mcsema_inception()
 
 typedef struct _do_call_state_t {
     uint32_t __mcsema_real_esp;
+    // used to hold how many COUNT_LEVEL blocks we will jump over
+    // when calculating return addresses in do_call_value
     uint32_t __mcsema_jmp_count;
     char sse_state[512] __attribute__((aligned (16)));
     uint32_t reg_state[15];
 } do_call_state_t;
 
+// hold recursive call states
 __thread do_call_state_t do_call_state[NUM_DO_CALL_FRAMES];
+// this is used to hold a pointer to the base of the do_call_state
+// array, so we can avoid doing complex TLS math via inline assembly
+__thread do_call_state_t* __csptr = NULL;
+
+// count of current call frames
 __thread int32_t cur_do_call_frame = -1; /* XXX */
-__thread uint32_t call_frame_counter = 0; /* XXX */
+
+// used to count how many call frames deep this recursion goes
+// only one is needed since it is initialized to the same value on entry
+// and only used after exit from a call, so it can be re-initialized repeatedly
+__thread uint32_t call_frame_counter = -1;
 
 
 #define COUNT_LEVEL(N) \
@@ -153,19 +165,24 @@ __thread uint32_t call_frame_counter = 0; /* XXX */
 
 void do_call_value(void *state, uint32_t value)
 {
+    // get a pointer to base of call state array
+    __csptr = &(do_call_state[0]);
     // get a clean frame to store state
     int32_t prev_call_frame = cur_do_call_frame++;
+    // get a pointer to current call state
     do_call_state_t *cs = &(do_call_state[cur_do_call_frame]);
-    call_frame_counter = 0;
+    // reset frame counter to -1 (it will always increment at least once)
+    call_frame_counter = -1;
+
+    // how many COUNT_LEVEL blocks will we jump over?
     cs->__mcsema_jmp_count = NUM_DO_CALL_FRAMES - cur_do_call_frame - 1;
 
     __asm__ volatile(
-            "pusha\n" // save all regs just so we don't have bother keeping track of what we saved
             "fxsave %0\n" // save sse state
+            "pusha\n" // save all regs just so we don't have bother keeping track of what we saved
             "movl %3, %%eax\n"  // capture "state" arg (mcsema regstate)
             "movl %4, %%ecx\n"  // capture "value" arg (call destination)
             "movl %2, %%esi\n" // pointer to TLS area where we save state
-            "movl %c[state_edi](%%eax), %%edi\n" // dump struct regs to state
             "movl %c[state_edx](%%eax), %%edx\n"
             "movl %c[state_ebx](%%eax), %%ebx\n"
             "movl %c[state_ebp](%%eax), %%ebp\n"
@@ -177,17 +194,17 @@ void do_call_value(void *state, uint32_t value)
             "movups %c[state_xmm5](%%eax), %%xmm5\n"
             "movups %c[state_xmm6](%%eax), %%xmm6\n"
             "movups %c[state_xmm7](%%eax), %%xmm7\n"
-            "leal %c[real_esp_off](%%esi), %%esi\n" // where will we save the "real" esp?
-            "movl %%esp, (%%esi)\n" // save our esp since we will switch to mcsema esp later
+            "leal %c[real_esp_off](%%esi), %%edi\n" // where will we save the "real" esp?
+            "movl %%esp, (%%edi)\n" // save our esp since we will switch to mcsema esp later
             "movl %c[state_esp](%%eax), %%esp\n" // switch to mcsema stack
-            //"addl $4, %%esp\n" // we pushed a fake return addr in the CALL{r,m} definitions 
-                               // in x86Instrs_Branches.cpp, undo it
             "movl %%ecx, 0(%%esp)\n" // use that slot to store jump destination
-            "movl %c[jmp_count](%%esi), %%ecx\n" // save recursion count into ecx
+            "leal %c[jmp_count](%%esi), %%edi\n" // save recursion count into ecx
+            "movl (%%edi), %%ecx\n" // save recursion count into ecx
             "shll $3, %%ecx\n" // multiply recursion count by 8 to get offset (mul 8 = shl 3)
             "leal 0f, %%esi\n" // base return addr
             "addl %%ecx, %%esi\n" // calculate return addr
             "pushl %%esi\n" // push return addr
+            "movl %c[state_edi](%%eax), %%edi\n" // dump struct regs to state
             "movl %c[state_ecx](%%eax), %%ecx\n" // complete struct regs spill
             "movl %c[state_esi](%%eax), %%esi\n" // complete struct regs spill
             "movl %c[state_eax](%%eax), %%eax\n" // complete struct regs spill
@@ -708,7 +725,7 @@ void do_call_value(void *state, uint32_t value)
             "pushl %%esi\n" // save temp reg
             "movl %1, %%eax\n" // get our recursion depth
             "imull $%c[struct_size], %%eax\n" // see where we need to index into the save state array
-            "leal %5, %%esi\n" // get address of array base
+            "movl %5, %%esi\n" // get address of array base
             "addl %%esi, %%eax\n" // eax now points to our old saved state (array base + index * element size)
             "leal %c[reg_state](%%eax), %%esi\n" // get reg state offset
             "movl %%ebx, %c[state_ebx](%%esi)\n" // convert native state to struct regs
@@ -725,10 +742,10 @@ void do_call_value(void *state, uint32_t value)
             "movl %%esp, %c[state_esp](%%ecx)\n" // convert native state to struct regs
             "leal %c[real_esp_off](%%ebx), %%esi\n" // location of old native esp
             "movl (%%esi), %%esp\n" // return original stack
-            "fxrstor %0\n"
             "popa\n"
+            "fxrstor %0\n"
             : "=m"(cs->sse_state), "=m"(call_frame_counter)
-            : "m"(cs), "m"(state), "m"(value), "m"(do_call_state[0]),
+            : "m"(cs), "m"(state), "m"(value), "m"(__csptr),
                     [state_eax]"e"(offsetof(RegState, EAX)),
                     [state_ebx]"e"(offsetof(RegState, EBX)),
                     [state_ecx]"e"(offsetof(RegState, ECX)),
@@ -752,6 +769,8 @@ void do_call_value(void *state, uint32_t value)
                     [struct_size]"e"(sizeof(do_call_state_t))
             : "memory", "eax", "ecx", "esi" );
     
+    // reset call frame depth
     cur_do_call_frame = prev_call_frame;
-    call_frame_counter = 0;
+    // reset call frame counter
+    call_frame_counter = -1;
 }
