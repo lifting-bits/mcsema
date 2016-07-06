@@ -1,18 +1,12 @@
-#include <stdio.h>
+#include <stdlib.h>
 
-extern int demo13_entry(int);
+extern int mcsema_main(int argc, const char *argv[]);
 extern void* __mcsema_create_alt_stack(size_t stack_size);
 extern void* __mcsema_free_alt_stack(size_t stack_size);
 
-int main(int argc, char *argv[]) {
+int main(int argc, const char *argv[]) {
     __mcsema_create_alt_stack(4096*2);
-
-    int i = 0;
-
-    for(i = 0; i <= 255; i++) {
-        demo13_entry(i);
-    }
-
+    int rv =  mcsema_main(argc, argv);
     __mcsema_free_alt_stack(4096*2);
-    return 0;
+    return rv;
 }
