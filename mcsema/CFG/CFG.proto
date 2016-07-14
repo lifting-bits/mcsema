@@ -58,10 +58,49 @@ message Block {
     repeated    int64       block_follows = 3;
 }
 
+message Variable {
+
+    // not sure this is what we want here, just throwing it in for now 
+    enum Type {
+        Int = 0;
+        Ptr = 1;
+        Char = 2;
+    }
+    enum OtherType {
+        Array = 0;
+        Struc = 1;
+    }
+
+    required    string  name = 1;
+    required    int64   size = 2;
+    required    Type    type = 3; // ???
+    optional    OtherType othertype = 4; // ???
+
+    // instructions referring to this variable
+    // have run into issues with protobuf format before trying to make this
+    // work, so it'll need some kind of data format massaging i think.
+    // we need some kind of correlation between list vars and the insns
+    // that reference them, but i was having trouble getting ahold of insn
+    // references at the protobuf level last time i tried this. i might
+    // have just started using the instruction addresses instead and
+    // assuming i'd match them up in the next phase. (inst_addr in Instruction)
+    repeated    Instruction inst_refs = 5;
+
+    // we probably want some kind of 'address' information here? but i'm not
+    // sure. we're only doing stack vars for now so it's not as important as
+    // when we start including e.g. globals...
+}
+
+message StackVar {
+    required Variable   var = 1;
+    required int64      sp_offset = 2;
+}
+
 message Function {
-    repeated    Block   blocks = 1;
-    required    int64   entry_address = 2;
-    optional    string  symbol_name = 3;
+    repeated    Block      blocks = 1;
+    required    int64      entry_address = 2;
+    optional    string     symbol_name = 3;
+    repeated    StackVar   stackvars = 4;
 }
 
 message ExternalFunction {
