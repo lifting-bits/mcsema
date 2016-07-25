@@ -284,7 +284,7 @@ llvm::Value *linuxMakeCallbackForLocalFunction(Module *M , VA local_target) {
 
     if(getSystemArch(M) == _X86_64_) {
 
-        InlineAsm* ptr_13 = InlineAsm::get(FuncTy_9, "movq $0, %rax\n", "imr,~{dirflag},~{fpsr},~{flags}",true);
+        InlineAsm* ptr_13 = InlineAsm::get(FuncTy_9, "pushq $0\n", "imr,~{dirflag},~{fpsr},~{flags}",true);
         CallInst* void_12 = CallInst::Create(ptr_13, call_tgt, "", block);
         void_12->setCallingConv(CallingConv::C);
         void_12->setTailCall(false);
@@ -307,7 +307,7 @@ llvm::Value *linuxMakeCallbackForLocalFunction(Module *M , VA local_target) {
     if(getSystemArch(M) == _X86_64_) {
 
         InlineAsm* ptr_15 = InlineAsm::get(call_inception_ty, 
-                "movq $0, %r10\njmpq *%r10\n", "imr,~{dirflag},~{fpsr},~{flags}",true);
+                "pushq $0; ret\n", "imr,~{dirflag},~{fpsr},~{flags}",true);
         CallInst* void_14 = CallInst::Create(ptr_15, inception, "", block);
         void_14->setCallingConv(CallingConv::C);
         void_14->setTailCall(false);
