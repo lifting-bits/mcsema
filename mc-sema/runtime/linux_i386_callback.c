@@ -36,10 +36,6 @@ void __mcsema_free_alt_stack(size_t stack_size) {
     }
 }
 
-// this expects the function to jump to is loaded into EAX
-// as a corollary, we canot inception a callback that should 
-// preserve EAX or expect arguments in EAX
-// For most ABIs, this should not be a problem
 __attribute__((naked)) int __mcsema_inception()
 {
 
