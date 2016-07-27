@@ -13,133 +13,250 @@
 
 // this is a terrible hack to be compatible with some mcsema definitions. please don't judge
 extern uint64_t mmap(uint64_t addr, uint64_t length, uint32_t prot, uint32_t flags, uint32_t fd, uint32_t offset);
-extern uint64_t munmap(uint64_t addr, uint64_t length);
+//extern uint64_t munmap(uint64_t addr, uint64_t length);
 
 // callback state
-__thread RegState __mcsema_callback_state;
+__thread RegState __mcsema_callback_state[NUM_DO_CALL_FRAMES];
 // "pointer" to alternate stack
-__thread uint64_t __mcsema_alt_stack = 0;
+__thread uint64_t __mcsema_alt_stack[NUM_DO_CALL_FRAMES] = {0};
+__thread uint64_t __mcsema_inception_depth = -1;
+__thread RegState* __rsptr = NULL;
+__thread uint64_t* __altstackptr = NULL;
 
 void* __mcsema_create_alt_stack(size_t stack_size)
 {
+    // we need some place to set this, and this function
+    // will get called before these are used
+    __rsptr = &__mcsema_callback_state[0];
+    __altstackptr = &__mcsema_alt_stack[0];
+    
     // half for old stack to copy, half for stack to use in function
     if(stack_size < MIN_STACK_SIZE*2) {
         stack_size = MIN_STACK_SIZE*2;
     }
-    __mcsema_alt_stack = mmap(0, stack_size, 3, 0x20022, -1, 0) + stack_size;
-    return (void*)(__mcsema_alt_stack);
+    void* r = (void*)mmap(0, stack_size, 3, 0x20022, -1, 0) + stack_size;
+    return r;
 }
 
-void __mcsema_free_alt_stack(size_t stack_size) {
-    if(__mcsema_alt_stack != 0) {
-        munmap(__mcsema_alt_stack-stack_size, stack_size);
-    }
-}
-
-// RDI, RSI, RDX, RCX, R8, R9, XMM0–7, RBX, RBP, (maybe: RSP), R12, R13, R14, R15 
-// are all preserved
+// assumes call destination is pushed on the stack by a stub
+// takes native state and shoves it into struct RegState
+// TODO: FPU
 __attribute__((naked)) int __mcsema_inception()
 {
-    __asm__ volatile("movq %%rax, %0\n"
-                     "popq %%rax\n" : "=m"(__mcsema_callback_state.RAX) );
+    // save all registers; we will need to shove
+    // them into context state later
+    __asm__ volatile(
+            "pushq %r15\n"
+            "pushq %r14\n"
+            "pushq %r13\n"
+            "pushq %r12\n"
+            "pushq %r11\n"
+            "pushq %r10\n"
+            "pushq %r9\n"
+            "pushq %r8\n"
+            "pushq %rbp\n"
+            "pushq %rdi\n"
+            "pushq %rsi\n"
+            "pushq %rdx\n"
+            "pushq %rcx\n"
+            "pushq %rbx\n"
+            "pushq %rax\n");
 
-    // save preserved registers in struct regs
-    __asm__ volatile("movq %%rbx, %0\n": "=m"(__mcsema_callback_state.RBX) );
-    __asm__ volatile("movq %%rcx, %0\n": "=m"(__mcsema_callback_state.RCX) );
-    __asm__ volatile("movq %%rdx, %0\n": "=m"(__mcsema_callback_state.RDX) );
-    __asm__ volatile("movq %%rdi, %0\n": "=m"(__mcsema_callback_state.RDI) );
-    __asm__ volatile("movq %%rsi, %0\n": "=m"(__mcsema_callback_state.RSI) );
-    __asm__ volatile("movq %%rbp, %0\n": "=m"(__mcsema_callback_state.RBP) );
-    __asm__ volatile("movq %%r8,  %0\n": "=m"(__mcsema_callback_state.R8) );
-    __asm__ volatile("movq %%r9,  %0\n": "=m"(__mcsema_callback_state.R9) );
-    __asm__ volatile("movq %%r10, %0\n": "=m"(__mcsema_callback_state.R10) );
-    __asm__ volatile("movq %%r11, %0\n": "=m"(__mcsema_callback_state.R11) );
-    __asm__ volatile("movq %%r12, %0\n": "=m"(__mcsema_callback_state.R12) );
-    __asm__ volatile("movq %%r13, %0\n": "=m"(__mcsema_callback_state.R13) );
-    __asm__ volatile("movq %%r14, %0\n": "=m"(__mcsema_callback_state.R14) );
-    __asm__ volatile("movq %%r15, %0\n": "=m"(__mcsema_callback_state.R15) );
+    //++__mcsema_inception_depth;
+    __asm__ volatile ("incq %0\n" :: "m"(__mcsema_inception_depth));
 
-    // save XMM
-    __asm__ volatile("movups %%xmm0, %0\n": "=m"(__mcsema_callback_state.XMM0) );
-    __asm__ volatile("movups %%xmm1, %0\n": "=m"(__mcsema_callback_state.XMM1) );
-    __asm__ volatile("movups %%xmm2, %0\n": "=m"(__mcsema_callback_state.XMM2) );
-    __asm__ volatile("movups %%xmm3, %0\n": "=m"(__mcsema_callback_state.XMM3) );
-    __asm__ volatile("movups %%xmm4, %0\n": "=m"(__mcsema_callback_state.XMM4) );
-    __asm__ volatile("movups %%xmm5, %0\n": "=m"(__mcsema_callback_state.XMM5) );
-    __asm__ volatile("movups %%xmm6, %0\n": "=m"(__mcsema_callback_state.XMM6) );
-    __asm__ volatile("movups %%xmm7, %0\n": "=m"(__mcsema_callback_state.XMM7) );
-
-
-    // copy over MIN_STACK_SIZE bytes of stack
-    // at this point we saved all the registers, so we can clobber at will
-    // since they are restored on function exit
-    __asm__ volatile("movq %0, %%rcx\n": : "i"(MIN_STACK_SIZE) );
-    __asm__ volatile("movq %rsp, %rsi\n");
-    __asm__ volatile("movq %0, %%rdi\n": : "m"(__mcsema_alt_stack));
+    // check if we have an alt stack allocated for this depth level
+    // if not, allocate it
+    __asm__ volatile (
+            // offset of altstack from fs:0
+            "leaq %[altstack], %%rax\n"
+            // offset of fs:0
+            "movq %%fs:0, %%rbx\n"
+            // base + offset = location of test
+            "addq %%rbx, %%rax\n"
+            // check if we have an alt stack
+            "cmpq $0, (%%rax)\n"
+            "jne 0f\n"
+            // no alt stack, call create alt stack
+            "pushq %%rax\n" // align
+            "pushq %%rax\n"
+            "mov $%c[min_stack], %%rdi\n"
+            "callq %P[createalt]\n"
+            "movq %%rax, %%rbx\n"
+            "popq %%rax\n" // align
+            "popq %%rax\n"
+            // store result into __mcsema_alt_stack array
+            "movq %%rbx, (%%rax)\n"
+            "0:\n"
+            : [altstack]"=m"(__mcsema_alt_stack[__mcsema_inception_depth])
+            : [createalt]"i"(__mcsema_create_alt_stack), 
+              [min_stack]"i"(MIN_STACK_SIZE));
     
-    // force stack alignment to alignment of RSP
-    __asm__ volatile("movq %rsp, %r10\n");
-    __asm__ volatile("andq $0xF, %r10\n");
-    __asm__ volatile("subq $0x10, %rdi\n");
-    __asm__ volatile("addq %r10, %rdi\n");
+    __asm__ volatile(
+            // get base of reg state array
+            "movq %0, %%rsi\n"
+            // get call depth
+            "movq %1, %%rax\n"
+            // see where we need to index into the save state array
+            "imulq $%c[struct_size], %%rax\n"
+            // new write point == array base + index
+            "addq %%rax, %%rsi\n"
 
-    // reserve space
-    __asm__ volatile("subq %0, %%rdi\n": : "i"(MIN_STACK_SIZE) );
+            "popq %%rax\n" // restore rax from saved stack
+            "movq %%rax, %c[state_rax](%%rsi)\n" // convert native state to struct regs
+            "movq %%rsi, %%rax\n" // we wrote rax to reg state, now use it as scratch
+            // save all other registers to register context
+            "popq %%rbx\n"
+            "movq %%rbx, %c[state_rbx](%%rax)\n" // convert native state to struct regs
+            "popq %%rcx\n"
+            "movq %%rcx, %c[state_rcx](%%rax)\n" // convert native state to struct regs
+            "popq %%rdx\n"
+            "movq %%rdx, %c[state_rdx](%%rax)\n" // convert native state to struct regs
+            "popq %%rsi\n"
+            "movq %%rsi, %c[state_rsi](%%rax)\n" // convert native state to struct regs
+            "popq %%rdi\n"
+            "movq %%rdi, %c[state_rdi](%%rax)\n" // convert native state to struct regs
+            "popq %%rbp\n"
+            "movq %%rbp, %c[state_rbp](%%rax)\n" // convert native state to struct regs
+            "popq %%r8\n"
+            "movq %%r8,  %c[state_r8](%%rax)\n" // convert native state to struct regs
+            "popq %%r9\n"
+            "movq %%r9,  %c[state_r9](%%rax)\n" // convert native state to struct regs
+            "popq %%r10\n"
+            "movq %%r10, %c[state_r10](%%rax)\n" // convert native state to struct regs
+            "popq %%r11\n"
+            "movq %%r11, %c[state_r11](%%rax)\n" // convert native state to struct regs
+            "popq %%r12\n"
+            "movq %%r12, %c[state_r12](%%rax)\n" // convert native state to struct regs
+            "popq %%r13\n"
+            "movq %%r13, %c[state_r13](%%rax)\n" // convert native state to struct regs
+            "popq %%r14\n"
+            "movq %%r14, %c[state_r14](%%rax)\n" // convert native state to struct regs
+            "popq %%r15\n"
+            "movq %%r15, %c[state_r15](%%rax)\n" // convert native state to struct regs
+            "movups %%xmm0, %c[state_xmm0](%%rax)\n"
+            "movups %%xmm1, %c[state_xmm1](%%rax)\n"
+            "movups %%xmm2, %c[state_xmm2](%%rax)\n"
+            "movups %%xmm3, %c[state_xmm3](%%rax)\n"
+            "movups %%xmm4, %c[state_xmm4](%%rax)\n"
+            "movups %%xmm5, %c[state_xmm5](%%rax)\n"
+            "movups %%xmm6, %c[state_xmm6](%%rax)\n"
+            "movups %%xmm7, %c[state_xmm7](%%rax)\n"
 
-    // set RSP to the alt stack rsp
-    __asm__ volatile("movq %%rdi, %0\n": "=m"(__mcsema_callback_state.RSP) );
-
-    // do memcpy
-    __asm__ volatile("cld\n");
-    __asm__ volatile("rep; movsb\n");
-
-    // call translated_function(reg_state);
-    __asm__ volatile("leaq %0, %%r10\n": : "m"(__mcsema_callback_state) );
-    __asm__ volatile("leaq %fs:0, %r11\n");
-    __asm__ volatile("subq %r11, %r10\n");
-    __asm__ volatile("movq %fs:0, %rdi\n");
-    __asm__ volatile("leaq (%rdi,%r10,1), %rdi\n");
+            // copy over MIN_STACK_SIZE bytes of stack (we may need to fetch stuff from it)
+            // at this point we saved all the registers, so we can clobber at will
+            // since they are restored on function exit
+            "movq $%c[min_stack], %%rcx\n"
+            "movq %%rsp, %%rsi\n"
+            // get altstack base
+            "movq %[alt_stack_base], %%rdi\n"
+            // get altstack offset
+            "movq %1, %%rbx\n"
+            "imulq $8, %%rbx\n"
+            // add base + offset
+            "addq %%rbx, %%rdi\n"
+            // read value in alt stack array
+            "movq (%%rdi), %%rdi\n"
     
-    // align stack for call
-    __asm__ volatile("subq $8, %rsp\n");
+            // fetch call destination from stack
+            "popq %%r8\n" // put translated destination into r8
+                          // it was pushed in the stub that calls __mcsema_inception
+                          // see linuxArchOps.cpp
+                          //
+            // align stack
+            "movq %%rsp, %%r10\n"
+            "andq $0xF, %%r10\n"
+            "subq $0x10, %%rdi\n"
+            "addq %%r10, %%rdi\n"
+            "subq $%c[min_stack], %%rdi\n"
 
-    // call
-    __asm__ volatile("callq *%rax\n");
+            // set RSP to the alt stack rsp
+            "movq %%rdi, %c[state_rsp](%%rax)\n" // convert native state to struct regs
+            // do memcpy
+            "cld\n"
+            "rep; movsb\n"
 
-    // undo align
-    __asm__ volatile("addq $8, %rsp\n");
+            // call translated_function(reg_state);
+            // arg0 = rax
+            "movq %%rax, %%rdi\n"
+            // align stack for call
+            "subq $8, %%rsp\n"
+            // do the call
+            "callq *%%r8\n"
 
-    // restore registers
-    __asm__ volatile("movq %0, %%rbx\n": : "m"(__mcsema_callback_state.RBX) );
-    __asm__ volatile("movq %0, %%rcx\n": : "m"(__mcsema_callback_state.RCX) );
-    __asm__ volatile("movq %0, %%rdx\n": : "m"(__mcsema_callback_state.RDX) );
-    __asm__ volatile("movq %0, %%rsi\n": : "m"(__mcsema_callback_state.RSI) );
-    __asm__ volatile("movq %0, %%rdi\n": : "m"(__mcsema_callback_state.RDI) );
-    __asm__ volatile("movq %0, %%rbp\n": : "m"(__mcsema_callback_state.RBP) );
-    __asm__ volatile("movq %0, %%r8\n": : "m"(__mcsema_callback_state.R8) );
-    __asm__ volatile("movq %0, %%r9\n": : "m"(__mcsema_callback_state.R9) );
-    __asm__ volatile("movq %0, %%r10\n": : "m"(__mcsema_callback_state.R10) );
-    __asm__ volatile("movq %0, %%r11\n": : "m"(__mcsema_callback_state.R11) );
-    __asm__ volatile("movq %0, %%r12\n": : "m"(__mcsema_callback_state.R12) );
-    __asm__ volatile("movq %0, %%r13\n": : "m"(__mcsema_callback_state.R13) );
-    __asm__ volatile("movq %0, %%r14\n": : "m"(__mcsema_callback_state.R14) );
-    __asm__ volatile("movq %0, %%r15\n": : "m"(__mcsema_callback_state.R15) );
-    // *do not* restore RSP, although this may be a bug
+            // assume things got clobbered
+            // undo align
+            "addq $8, %%rsp\n"
+            // get base of reg states array
+            "movq %0, %%rsi\n"
+            // get depth count
+            "movq %1, %%rax\n"
+            // see where we need to index into the save state array
+            "imulq $%c[struct_size], %%rax\n" 
+            // new read point == base + size
+            "addq %%rax, %%rsi\n"
 
-    // restore XMM
-    __asm__ volatile("movups %0, %%xmm0\n": : "m"(__mcsema_callback_state.XMM0) );
-    __asm__ volatile("movups %0, %%xmm1\n": : "m"(__mcsema_callback_state.XMM1) );
-    __asm__ volatile("movups %0, %%xmm2\n": : "m"(__mcsema_callback_state.XMM2) );
-    __asm__ volatile("movups %0, %%xmm3\n": : "m"(__mcsema_callback_state.XMM3) );
-    __asm__ volatile("movups %0, %%xmm4\n": : "m"(__mcsema_callback_state.XMM4) );
-    __asm__ volatile("movups %0, %%xmm5\n": : "m"(__mcsema_callback_state.XMM5) );
-    __asm__ volatile("movups %0, %%xmm6\n": : "m"(__mcsema_callback_state.XMM6) );
-    __asm__ volatile("movups %0, %%xmm7\n": : "m"(__mcsema_callback_state.XMM7) );
+            // restore state to native state
+            "movq %c[state_rax](%%rsi), %%rax\n"
+            "movq %c[state_rbx](%%rsi), %%rbx\n"
+            "movq %c[state_rcx](%%rsi), %%rcx\n"
+            "movq %c[state_rdx](%%rsi), %%rdx\n"
+            "movq %c[state_rdi](%%rsi), %%rdi\n"
+            "movq %c[state_rbp](%%rsi), %%rbp\n"
+            "movq %c[state_r8](%%rsi), %%r8\n"
+            "movq %c[state_r9](%%rsi), %%r9\n"
+            "movq %c[state_r10](%%rsi), %%r10\n"
+            "movq %c[state_r11](%%rsi), %%r11\n"
+            "movq %c[state_r12](%%rsi), %%r12\n"
+            "movq %c[state_r13](%%rsi), %%r13\n"
+            "movq %c[state_r14](%%rsi), %%r14\n"
+            "movq %c[state_r15](%%rsi), %%r15\n"
 
-    // save return value into rax
-    __asm__ volatile("movq %0, %%rax\n": : "m"(__mcsema_callback_state.RAX) );
+            "movups %c[state_xmm0](%%rsi), %%xmm0\n"
+            "movups %c[state_xmm1](%%rsi), %%xmm1\n"
+            "movups %c[state_xmm2](%%rsi), %%xmm2\n"
+            "movups %c[state_xmm3](%%rsi), %%xmm3\n"
+            "movups %c[state_xmm4](%%rsi), %%xmm4\n"
+            "movups %c[state_xmm5](%%rsi), %%xmm5\n"
+            "movups %c[state_xmm6](%%rsi), %%xmm6\n"
+            "movups %c[state_xmm7](%%rsi), %%xmm7\n"
 
-    __asm__ volatile("retq\n");
+            // TODO adjust for RSP offset?
+
+            "movq %c[state_rsi](%%rsi), %%rsi\n"
+            : : "m"(__rsptr), "m"(__mcsema_inception_depth), 
+              [state_rax]"e"(offsetof(RegState, RAX)),
+              [state_rbx]"e"(offsetof(RegState, RBX)),
+              [state_rcx]"e"(offsetof(RegState, RCX)),
+              [state_rdx]"e"(offsetof(RegState, RDX)),
+              [state_rdi]"e"(offsetof(RegState, RDI)),
+              [state_rsi]"e"(offsetof(RegState, RSI)),
+              [state_rbp]"e"(offsetof(RegState, RBP)),
+              [state_rsp]"e"(offsetof(RegState, RSP)),
+              [state_r8]"e"(offsetof(RegState, R8)),
+              [state_r9]"e"(offsetof(RegState, R9)),
+              [state_r10]"e"(offsetof(RegState, R10)),
+              [state_r11]"e"(offsetof(RegState, R11)),
+              [state_r12]"e"(offsetof(RegState, R12)),
+              [state_r13]"e"(offsetof(RegState, R13)),
+              [state_r14]"e"(offsetof(RegState, R14)),
+              [state_r15]"e"(offsetof(RegState, R15)),
+              [state_xmm0]"e"(offsetof(RegState, XMM0)),
+              [state_xmm1]"e"(offsetof(RegState, XMM1)),
+              [state_xmm2]"e"(offsetof(RegState, XMM2)),
+              [state_xmm3]"e"(offsetof(RegState, XMM3)),
+              [state_xmm4]"e"(offsetof(RegState, XMM4)),
+              [state_xmm5]"e"(offsetof(RegState, XMM5)),
+              [state_xmm6]"e"(offsetof(RegState, XMM6)),
+              [state_xmm7]"e"(offsetof(RegState, XMM7)),
+              [struct_size]"e"(sizeof(RegState)),
+              [min_stack]"i"(MIN_STACK_SIZE),
+              [alt_stack_base]"m"(__altstackptr)
+              );
+
+    // --__mcsema_inception_depth;
+    __asm__ volatile ("decl %0\n" :: "m"(__mcsema_inception_depth));
+    __asm__ volatile ("retq\n");
 }
 
 typedef struct _do_call_state_t {
@@ -246,514 +363,63 @@ void do_call_value(void *state, uint64_t value)
             COUNT_LEVEL(1) // the amount of these hit depends on the recursion depth
             COUNT_LEVEL(2) // at depth 0, none are hit, at depth 1, there is 1, etc.
             COUNT_LEVEL(3) // there are 512 incl entries
-            COUNT_LEVEL(4)
-            COUNT_LEVEL(5)
-            COUNT_LEVEL(6)
-            COUNT_LEVEL(7)
-            COUNT_LEVEL(8)
-            COUNT_LEVEL(9)
-            COUNT_LEVEL(10)
-            COUNT_LEVEL(11)
-            COUNT_LEVEL(12)
-            COUNT_LEVEL(13)
-            COUNT_LEVEL(14)
-            COUNT_LEVEL(15)
-            COUNT_LEVEL(16)
-            COUNT_LEVEL(17)
-            COUNT_LEVEL(18)
-            COUNT_LEVEL(19)
-            COUNT_LEVEL(20)
-            COUNT_LEVEL(21)
-            COUNT_LEVEL(22)
-            COUNT_LEVEL(23)
-            COUNT_LEVEL(24)
-            COUNT_LEVEL(25)
-            COUNT_LEVEL(26)
-            COUNT_LEVEL(27)
-            COUNT_LEVEL(28)
-            COUNT_LEVEL(29)
-            COUNT_LEVEL(30)
-            COUNT_LEVEL(31)
-            COUNT_LEVEL(32)
-            COUNT_LEVEL(33)
-            COUNT_LEVEL(34)
-            COUNT_LEVEL(35)
-            COUNT_LEVEL(36)
-            COUNT_LEVEL(37)
-            COUNT_LEVEL(38)
-            COUNT_LEVEL(39)
-            COUNT_LEVEL(40)
-            COUNT_LEVEL(41)
-            COUNT_LEVEL(42)
-            COUNT_LEVEL(43)
-            COUNT_LEVEL(44)
-            COUNT_LEVEL(45)
-            COUNT_LEVEL(46)
-            COUNT_LEVEL(47)
-            COUNT_LEVEL(48)
-            COUNT_LEVEL(49)
-            COUNT_LEVEL(50)
-            COUNT_LEVEL(51)
-            COUNT_LEVEL(52)
-            COUNT_LEVEL(53)
-            COUNT_LEVEL(54)
-            COUNT_LEVEL(55)
-            COUNT_LEVEL(56)
-            COUNT_LEVEL(57)
-            COUNT_LEVEL(58)
-            COUNT_LEVEL(59)
-            COUNT_LEVEL(60)
-            COUNT_LEVEL(61)
-            COUNT_LEVEL(62)
-            COUNT_LEVEL(63)
-            COUNT_LEVEL(64)
-            COUNT_LEVEL(65)
-            COUNT_LEVEL(66)
-            COUNT_LEVEL(67)
-            COUNT_LEVEL(68)
-            COUNT_LEVEL(69)
-            COUNT_LEVEL(70)
-            COUNT_LEVEL(71)
-            COUNT_LEVEL(72)
-            COUNT_LEVEL(73)
-            COUNT_LEVEL(74)
-            COUNT_LEVEL(75)
-            COUNT_LEVEL(76)
-            COUNT_LEVEL(77)
-            COUNT_LEVEL(78)
-            COUNT_LEVEL(79)
-            COUNT_LEVEL(80)
-            COUNT_LEVEL(81)
-            COUNT_LEVEL(82)
-            COUNT_LEVEL(83)
-            COUNT_LEVEL(84)
-            COUNT_LEVEL(85)
-            COUNT_LEVEL(86)
-            COUNT_LEVEL(87)
-            COUNT_LEVEL(88)
-            COUNT_LEVEL(89)
-            COUNT_LEVEL(90)
-            COUNT_LEVEL(91)
-            COUNT_LEVEL(92)
-            COUNT_LEVEL(93)
-            COUNT_LEVEL(94)
-            COUNT_LEVEL(95)
-            COUNT_LEVEL(96)
-            COUNT_LEVEL(97)
-            COUNT_LEVEL(98)
-            COUNT_LEVEL(99)
-            COUNT_LEVEL(100)
-            COUNT_LEVEL(101)
-            COUNT_LEVEL(102)
-            COUNT_LEVEL(103)
-            COUNT_LEVEL(104)
-            COUNT_LEVEL(105)
-            COUNT_LEVEL(106)
-            COUNT_LEVEL(107)
-            COUNT_LEVEL(108)
-            COUNT_LEVEL(109)
-            COUNT_LEVEL(110)
-            COUNT_LEVEL(111)
-            COUNT_LEVEL(112)
-            COUNT_LEVEL(113)
-            COUNT_LEVEL(114)
-            COUNT_LEVEL(115)
-            COUNT_LEVEL(116)
-            COUNT_LEVEL(117)
-            COUNT_LEVEL(118)
-            COUNT_LEVEL(119)
-            COUNT_LEVEL(120)
-            COUNT_LEVEL(121)
-            COUNT_LEVEL(122)
-            COUNT_LEVEL(123)
-            COUNT_LEVEL(124)
-            COUNT_LEVEL(125)
-            COUNT_LEVEL(126)
-            COUNT_LEVEL(127)
-            COUNT_LEVEL(128)
-            COUNT_LEVEL(129)
-            COUNT_LEVEL(130)
-            COUNT_LEVEL(131)
-            COUNT_LEVEL(132)
-            COUNT_LEVEL(133)
-            COUNT_LEVEL(134)
-            COUNT_LEVEL(135)
-            COUNT_LEVEL(136)
-            COUNT_LEVEL(137)
-            COUNT_LEVEL(138)
-            COUNT_LEVEL(139)
-            COUNT_LEVEL(140)
-            COUNT_LEVEL(141)
-            COUNT_LEVEL(142)
-            COUNT_LEVEL(143)
-            COUNT_LEVEL(144)
-            COUNT_LEVEL(145)
-            COUNT_LEVEL(146)
-            COUNT_LEVEL(147)
-            COUNT_LEVEL(148)
-            COUNT_LEVEL(149)
-            COUNT_LEVEL(150)
-            COUNT_LEVEL(151)
-            COUNT_LEVEL(152)
-            COUNT_LEVEL(153)
-            COUNT_LEVEL(154)
-            COUNT_LEVEL(155)
-            COUNT_LEVEL(156)
-            COUNT_LEVEL(157)
-            COUNT_LEVEL(158)
-            COUNT_LEVEL(159)
-            COUNT_LEVEL(160)
-            COUNT_LEVEL(161)
-            COUNT_LEVEL(162)
-            COUNT_LEVEL(163)
-            COUNT_LEVEL(164)
-            COUNT_LEVEL(165)
-            COUNT_LEVEL(166)
-            COUNT_LEVEL(167)
-            COUNT_LEVEL(168)
-            COUNT_LEVEL(169)
-            COUNT_LEVEL(170)
-            COUNT_LEVEL(171)
-            COUNT_LEVEL(172)
-            COUNT_LEVEL(173)
-            COUNT_LEVEL(174)
-            COUNT_LEVEL(175)
-            COUNT_LEVEL(176)
-            COUNT_LEVEL(177)
-            COUNT_LEVEL(178)
-            COUNT_LEVEL(179)
-            COUNT_LEVEL(180)
-            COUNT_LEVEL(181)
-            COUNT_LEVEL(182)
-            COUNT_LEVEL(183)
-            COUNT_LEVEL(184)
-            COUNT_LEVEL(185)
-            COUNT_LEVEL(186)
-            COUNT_LEVEL(187)
-            COUNT_LEVEL(188)
-            COUNT_LEVEL(189)
-            COUNT_LEVEL(190)
-            COUNT_LEVEL(191)
-            COUNT_LEVEL(192)
-            COUNT_LEVEL(193)
-            COUNT_LEVEL(194)
-            COUNT_LEVEL(195)
-            COUNT_LEVEL(196)
-            COUNT_LEVEL(197)
-            COUNT_LEVEL(198)
-            COUNT_LEVEL(199)
-            COUNT_LEVEL(200)
-            COUNT_LEVEL(201)
-            COUNT_LEVEL(202)
-            COUNT_LEVEL(203)
-            COUNT_LEVEL(204)
-            COUNT_LEVEL(205)
-            COUNT_LEVEL(206)
-            COUNT_LEVEL(207)
-            COUNT_LEVEL(208)
-            COUNT_LEVEL(209)
-            COUNT_LEVEL(210)
-            COUNT_LEVEL(211)
-            COUNT_LEVEL(212)
-            COUNT_LEVEL(213)
-            COUNT_LEVEL(214)
-            COUNT_LEVEL(215)
-            COUNT_LEVEL(216)
-            COUNT_LEVEL(217)
-            COUNT_LEVEL(218)
-            COUNT_LEVEL(219)
-            COUNT_LEVEL(220)
-            COUNT_LEVEL(221)
-            COUNT_LEVEL(222)
-            COUNT_LEVEL(223)
-            COUNT_LEVEL(224)
-            COUNT_LEVEL(225)
-            COUNT_LEVEL(226)
-            COUNT_LEVEL(227)
-            COUNT_LEVEL(228)
-            COUNT_LEVEL(229)
-            COUNT_LEVEL(230)
-            COUNT_LEVEL(231)
-            COUNT_LEVEL(232)
-            COUNT_LEVEL(233)
-            COUNT_LEVEL(234)
-            COUNT_LEVEL(235)
-            COUNT_LEVEL(236)
-            COUNT_LEVEL(237)
-            COUNT_LEVEL(238)
-            COUNT_LEVEL(239)
-            COUNT_LEVEL(240)
-            COUNT_LEVEL(241)
-            COUNT_LEVEL(242)
-            COUNT_LEVEL(243)
-            COUNT_LEVEL(244)
-            COUNT_LEVEL(245)
-            COUNT_LEVEL(246)
-            COUNT_LEVEL(247)
-            COUNT_LEVEL(248)
-            COUNT_LEVEL(249)
-            COUNT_LEVEL(250)
-            COUNT_LEVEL(251)
-            COUNT_LEVEL(252)
-            COUNT_LEVEL(253)
-            COUNT_LEVEL(254)
-            COUNT_LEVEL(255)
-            COUNT_LEVEL(256)
-            COUNT_LEVEL(257)
-            COUNT_LEVEL(258)
-            COUNT_LEVEL(259)
-            COUNT_LEVEL(260)
-            COUNT_LEVEL(261)
-            COUNT_LEVEL(262)
-            COUNT_LEVEL(263)
-            COUNT_LEVEL(264)
-            COUNT_LEVEL(265)
-            COUNT_LEVEL(266)
-            COUNT_LEVEL(267)
-            COUNT_LEVEL(268)
-            COUNT_LEVEL(269)
-            COUNT_LEVEL(270)
-            COUNT_LEVEL(271)
-            COUNT_LEVEL(272)
-            COUNT_LEVEL(273)
-            COUNT_LEVEL(274)
-            COUNT_LEVEL(275)
-            COUNT_LEVEL(276)
-            COUNT_LEVEL(277)
-            COUNT_LEVEL(278)
-            COUNT_LEVEL(279)
-            COUNT_LEVEL(280)
-            COUNT_LEVEL(281)
-            COUNT_LEVEL(282)
-            COUNT_LEVEL(283)
-            COUNT_LEVEL(284)
-            COUNT_LEVEL(285)
-            COUNT_LEVEL(286)
-            COUNT_LEVEL(287)
-            COUNT_LEVEL(288)
-            COUNT_LEVEL(289)
-            COUNT_LEVEL(290)
-            COUNT_LEVEL(291)
-            COUNT_LEVEL(292)
-            COUNT_LEVEL(293)
-            COUNT_LEVEL(294)
-            COUNT_LEVEL(295)
-            COUNT_LEVEL(296)
-            COUNT_LEVEL(297)
-            COUNT_LEVEL(298)
-            COUNT_LEVEL(299)
-            COUNT_LEVEL(300)
-            COUNT_LEVEL(301)
-            COUNT_LEVEL(302)
-            COUNT_LEVEL(303)
-            COUNT_LEVEL(304)
-            COUNT_LEVEL(305)
-            COUNT_LEVEL(306)
-            COUNT_LEVEL(307)
-            COUNT_LEVEL(308)
-            COUNT_LEVEL(309)
-            COUNT_LEVEL(310)
-            COUNT_LEVEL(311)
-            COUNT_LEVEL(312)
-            COUNT_LEVEL(313)
-            COUNT_LEVEL(314)
-            COUNT_LEVEL(315)
-            COUNT_LEVEL(316)
-            COUNT_LEVEL(317)
-            COUNT_LEVEL(318)
-            COUNT_LEVEL(319)
-            COUNT_LEVEL(320)
-            COUNT_LEVEL(321)
-            COUNT_LEVEL(322)
-            COUNT_LEVEL(323)
-            COUNT_LEVEL(324)
-            COUNT_LEVEL(325)
-            COUNT_LEVEL(326)
-            COUNT_LEVEL(327)
-            COUNT_LEVEL(328)
-            COUNT_LEVEL(329)
-            COUNT_LEVEL(330)
-            COUNT_LEVEL(331)
-            COUNT_LEVEL(332)
-            COUNT_LEVEL(333)
-            COUNT_LEVEL(334)
-            COUNT_LEVEL(335)
-            COUNT_LEVEL(336)
-            COUNT_LEVEL(337)
-            COUNT_LEVEL(338)
-            COUNT_LEVEL(339)
-            COUNT_LEVEL(340)
-            COUNT_LEVEL(341)
-            COUNT_LEVEL(342)
-            COUNT_LEVEL(343)
-            COUNT_LEVEL(344)
-            COUNT_LEVEL(345)
-            COUNT_LEVEL(346)
-            COUNT_LEVEL(347)
-            COUNT_LEVEL(348)
-            COUNT_LEVEL(349)
-            COUNT_LEVEL(350)
-            COUNT_LEVEL(351)
-            COUNT_LEVEL(352)
-            COUNT_LEVEL(353)
-            COUNT_LEVEL(354)
-            COUNT_LEVEL(355)
-            COUNT_LEVEL(356)
-            COUNT_LEVEL(357)
-            COUNT_LEVEL(358)
-            COUNT_LEVEL(359)
-            COUNT_LEVEL(360)
-            COUNT_LEVEL(361)
-            COUNT_LEVEL(362)
-            COUNT_LEVEL(363)
-            COUNT_LEVEL(364)
-            COUNT_LEVEL(365)
-            COUNT_LEVEL(366)
-            COUNT_LEVEL(367)
-            COUNT_LEVEL(368)
-            COUNT_LEVEL(369)
-            COUNT_LEVEL(370)
-            COUNT_LEVEL(371)
-            COUNT_LEVEL(372)
-            COUNT_LEVEL(373)
-            COUNT_LEVEL(374)
-            COUNT_LEVEL(375)
-            COUNT_LEVEL(376)
-            COUNT_LEVEL(377)
-            COUNT_LEVEL(378)
-            COUNT_LEVEL(379)
-            COUNT_LEVEL(380)
-            COUNT_LEVEL(381)
-            COUNT_LEVEL(382)
-            COUNT_LEVEL(383)
-            COUNT_LEVEL(384)
-            COUNT_LEVEL(385)
-            COUNT_LEVEL(386)
-            COUNT_LEVEL(387)
-            COUNT_LEVEL(388)
-            COUNT_LEVEL(389)
-            COUNT_LEVEL(390)
-            COUNT_LEVEL(391)
-            COUNT_LEVEL(392)
-            COUNT_LEVEL(393)
-            COUNT_LEVEL(394)
-            COUNT_LEVEL(395)
-            COUNT_LEVEL(396)
-            COUNT_LEVEL(397)
-            COUNT_LEVEL(398)
-            COUNT_LEVEL(399)
-            COUNT_LEVEL(400)
-            COUNT_LEVEL(401)
-            COUNT_LEVEL(402)
-            COUNT_LEVEL(403)
-            COUNT_LEVEL(404)
-            COUNT_LEVEL(405)
-            COUNT_LEVEL(406)
-            COUNT_LEVEL(407)
-            COUNT_LEVEL(408)
-            COUNT_LEVEL(409)
-            COUNT_LEVEL(410)
-            COUNT_LEVEL(411)
-            COUNT_LEVEL(412)
-            COUNT_LEVEL(413)
-            COUNT_LEVEL(414)
-            COUNT_LEVEL(415)
-            COUNT_LEVEL(416)
-            COUNT_LEVEL(417)
-            COUNT_LEVEL(418)
-            COUNT_LEVEL(419)
-            COUNT_LEVEL(420)
-            COUNT_LEVEL(421)
-            COUNT_LEVEL(422)
-            COUNT_LEVEL(423)
-            COUNT_LEVEL(424)
-            COUNT_LEVEL(425)
-            COUNT_LEVEL(426)
-            COUNT_LEVEL(427)
-            COUNT_LEVEL(428)
-            COUNT_LEVEL(429)
-            COUNT_LEVEL(430)
-            COUNT_LEVEL(431)
-            COUNT_LEVEL(432)
-            COUNT_LEVEL(433)
-            COUNT_LEVEL(434)
-            COUNT_LEVEL(435)
-            COUNT_LEVEL(436)
-            COUNT_LEVEL(437)
-            COUNT_LEVEL(438)
-            COUNT_LEVEL(439)
-            COUNT_LEVEL(440)
-            COUNT_LEVEL(441)
-            COUNT_LEVEL(442)
-            COUNT_LEVEL(443)
-            COUNT_LEVEL(444)
-            COUNT_LEVEL(445)
-            COUNT_LEVEL(446)
-            COUNT_LEVEL(447)
-            COUNT_LEVEL(448)
-            COUNT_LEVEL(449)
-            COUNT_LEVEL(450)
-            COUNT_LEVEL(451)
-            COUNT_LEVEL(452)
-            COUNT_LEVEL(453)
-            COUNT_LEVEL(454)
-            COUNT_LEVEL(455)
-            COUNT_LEVEL(456)
-            COUNT_LEVEL(457)
-            COUNT_LEVEL(458)
-            COUNT_LEVEL(459)
-            COUNT_LEVEL(460)
-            COUNT_LEVEL(461)
-            COUNT_LEVEL(462)
-            COUNT_LEVEL(463)
-            COUNT_LEVEL(464)
-            COUNT_LEVEL(465)
-            COUNT_LEVEL(466)
-            COUNT_LEVEL(467)
-            COUNT_LEVEL(468)
-            COUNT_LEVEL(469)
-            COUNT_LEVEL(470)
-            COUNT_LEVEL(471)
-            COUNT_LEVEL(472)
-            COUNT_LEVEL(473)
-            COUNT_LEVEL(474)
-            COUNT_LEVEL(475)
-            COUNT_LEVEL(476)
-            COUNT_LEVEL(477)
-            COUNT_LEVEL(478)
-            COUNT_LEVEL(479)
-            COUNT_LEVEL(480)
-            COUNT_LEVEL(481)
-            COUNT_LEVEL(482)
-            COUNT_LEVEL(483)
-            COUNT_LEVEL(484)
-            COUNT_LEVEL(485)
-            COUNT_LEVEL(486)
-            COUNT_LEVEL(487)
-            COUNT_LEVEL(488)
-            COUNT_LEVEL(489)
-            COUNT_LEVEL(490)
-            COUNT_LEVEL(491)
-            COUNT_LEVEL(492)
-            COUNT_LEVEL(493)
-            COUNT_LEVEL(494)
-            COUNT_LEVEL(495)
-            COUNT_LEVEL(496)
-            COUNT_LEVEL(497)
-            COUNT_LEVEL(498)
-            COUNT_LEVEL(499)
-            COUNT_LEVEL(500)
-            COUNT_LEVEL(501)
-            COUNT_LEVEL(502)
-            COUNT_LEVEL(503)
-            COUNT_LEVEL(504)
-            COUNT_LEVEL(505)
-            COUNT_LEVEL(506)
-            COUNT_LEVEL(507)
-            COUNT_LEVEL(508)
-            COUNT_LEVEL(509)
-            COUNT_LEVEL(510)
-            COUNT_LEVEL(511)
+            COUNT_LEVEL(4) COUNT_LEVEL(5) COUNT_LEVEL(6) COUNT_LEVEL(7) COUNT_LEVEL(8) COUNT_LEVEL(9) COUNT_LEVEL(10) COUNT_LEVEL(11) COUNT_LEVEL(12)
+            COUNT_LEVEL(13) COUNT_LEVEL(14) COUNT_LEVEL(15) COUNT_LEVEL(16) COUNT_LEVEL(17) COUNT_LEVEL(18) COUNT_LEVEL(19) COUNT_LEVEL(20) COUNT_LEVEL(21)
+            COUNT_LEVEL(22) COUNT_LEVEL(23) COUNT_LEVEL(24) COUNT_LEVEL(25) COUNT_LEVEL(26) COUNT_LEVEL(27) COUNT_LEVEL(28) COUNT_LEVEL(29) COUNT_LEVEL(30)
+            COUNT_LEVEL(31) COUNT_LEVEL(32) COUNT_LEVEL(33) COUNT_LEVEL(34) COUNT_LEVEL(35) COUNT_LEVEL(36) COUNT_LEVEL(37) COUNT_LEVEL(38) COUNT_LEVEL(39)
+            COUNT_LEVEL(40) COUNT_LEVEL(41) COUNT_LEVEL(42) COUNT_LEVEL(43) COUNT_LEVEL(44) COUNT_LEVEL(45) COUNT_LEVEL(46) COUNT_LEVEL(47) COUNT_LEVEL(48)
+            COUNT_LEVEL(49) COUNT_LEVEL(50) COUNT_LEVEL(51) COUNT_LEVEL(52) COUNT_LEVEL(53) COUNT_LEVEL(54) COUNT_LEVEL(55) COUNT_LEVEL(56) COUNT_LEVEL(57)
+            COUNT_LEVEL(58) COUNT_LEVEL(59) COUNT_LEVEL(60) COUNT_LEVEL(61) COUNT_LEVEL(62) COUNT_LEVEL(63) COUNT_LEVEL(64) COUNT_LEVEL(65) COUNT_LEVEL(66)
+            COUNT_LEVEL(67) COUNT_LEVEL(68) COUNT_LEVEL(69) COUNT_LEVEL(70) COUNT_LEVEL(71) COUNT_LEVEL(72) COUNT_LEVEL(73) COUNT_LEVEL(74) COUNT_LEVEL(75)
+            COUNT_LEVEL(76) COUNT_LEVEL(77) COUNT_LEVEL(78) COUNT_LEVEL(79) COUNT_LEVEL(80) COUNT_LEVEL(81) COUNT_LEVEL(82) COUNT_LEVEL(83) COUNT_LEVEL(84)
+            COUNT_LEVEL(85) COUNT_LEVEL(86) COUNT_LEVEL(87) COUNT_LEVEL(88) COUNT_LEVEL(89) COUNT_LEVEL(90) COUNT_LEVEL(91) COUNT_LEVEL(92) COUNT_LEVEL(93)
+            COUNT_LEVEL(94) COUNT_LEVEL(95) COUNT_LEVEL(96) COUNT_LEVEL(97) COUNT_LEVEL(98) COUNT_LEVEL(99) COUNT_LEVEL(100) COUNT_LEVEL(101) COUNT_LEVEL(102)
+            COUNT_LEVEL(103) COUNT_LEVEL(104) COUNT_LEVEL(105) COUNT_LEVEL(106) COUNT_LEVEL(107) COUNT_LEVEL(108) COUNT_LEVEL(109) COUNT_LEVEL(110) COUNT_LEVEL(111)
+            COUNT_LEVEL(112) COUNT_LEVEL(113) COUNT_LEVEL(114) COUNT_LEVEL(115) COUNT_LEVEL(116) COUNT_LEVEL(117) COUNT_LEVEL(118) COUNT_LEVEL(119) COUNT_LEVEL(120)
+            COUNT_LEVEL(121) COUNT_LEVEL(122) COUNT_LEVEL(123) COUNT_LEVEL(124) COUNT_LEVEL(125) COUNT_LEVEL(126) COUNT_LEVEL(127) COUNT_LEVEL(128) COUNT_LEVEL(129)
+            COUNT_LEVEL(130) COUNT_LEVEL(131) COUNT_LEVEL(132) COUNT_LEVEL(133) COUNT_LEVEL(134) COUNT_LEVEL(135) COUNT_LEVEL(136) COUNT_LEVEL(137) COUNT_LEVEL(138)
+            COUNT_LEVEL(139) COUNT_LEVEL(140) COUNT_LEVEL(141) COUNT_LEVEL(142) COUNT_LEVEL(143) COUNT_LEVEL(144) COUNT_LEVEL(145) COUNT_LEVEL(146) COUNT_LEVEL(147)
+            COUNT_LEVEL(148) COUNT_LEVEL(149) COUNT_LEVEL(150) COUNT_LEVEL(151) COUNT_LEVEL(152) COUNT_LEVEL(153) COUNT_LEVEL(154) COUNT_LEVEL(155) COUNT_LEVEL(156)
+            COUNT_LEVEL(157) COUNT_LEVEL(158) COUNT_LEVEL(159) COUNT_LEVEL(160) COUNT_LEVEL(161) COUNT_LEVEL(162) COUNT_LEVEL(163) COUNT_LEVEL(164) COUNT_LEVEL(165)
+            COUNT_LEVEL(166) COUNT_LEVEL(167) COUNT_LEVEL(168) COUNT_LEVEL(169) COUNT_LEVEL(170) COUNT_LEVEL(171) COUNT_LEVEL(172) COUNT_LEVEL(173) COUNT_LEVEL(174)
+            COUNT_LEVEL(175) COUNT_LEVEL(176) COUNT_LEVEL(177) COUNT_LEVEL(178) COUNT_LEVEL(179) COUNT_LEVEL(180) COUNT_LEVEL(181) COUNT_LEVEL(182) COUNT_LEVEL(183)
+            COUNT_LEVEL(184) COUNT_LEVEL(185) COUNT_LEVEL(186) COUNT_LEVEL(187) COUNT_LEVEL(188) COUNT_LEVEL(189) COUNT_LEVEL(190) COUNT_LEVEL(191) COUNT_LEVEL(192)
+            COUNT_LEVEL(193) COUNT_LEVEL(194) COUNT_LEVEL(195) COUNT_LEVEL(196) COUNT_LEVEL(197) COUNT_LEVEL(198) COUNT_LEVEL(199) COUNT_LEVEL(200) COUNT_LEVEL(201)
+            COUNT_LEVEL(202) COUNT_LEVEL(203) COUNT_LEVEL(204) COUNT_LEVEL(205) COUNT_LEVEL(206) COUNT_LEVEL(207) COUNT_LEVEL(208) COUNT_LEVEL(209) COUNT_LEVEL(210)
+            COUNT_LEVEL(211) COUNT_LEVEL(212) COUNT_LEVEL(213) COUNT_LEVEL(214) COUNT_LEVEL(215) COUNT_LEVEL(216) COUNT_LEVEL(217) COUNT_LEVEL(218) COUNT_LEVEL(219)
+            COUNT_LEVEL(220) COUNT_LEVEL(221) COUNT_LEVEL(222) COUNT_LEVEL(223) COUNT_LEVEL(224) COUNT_LEVEL(225) COUNT_LEVEL(226) COUNT_LEVEL(227) COUNT_LEVEL(228)
+            COUNT_LEVEL(229) COUNT_LEVEL(230) COUNT_LEVEL(231) COUNT_LEVEL(232) COUNT_LEVEL(233) COUNT_LEVEL(234) COUNT_LEVEL(235) COUNT_LEVEL(236) COUNT_LEVEL(237)
+            COUNT_LEVEL(238) COUNT_LEVEL(239) COUNT_LEVEL(240) COUNT_LEVEL(241) COUNT_LEVEL(242) COUNT_LEVEL(243) COUNT_LEVEL(244) COUNT_LEVEL(245) COUNT_LEVEL(246)
+            COUNT_LEVEL(247) COUNT_LEVEL(248) COUNT_LEVEL(249) COUNT_LEVEL(250) COUNT_LEVEL(251) COUNT_LEVEL(252) COUNT_LEVEL(253) COUNT_LEVEL(254) COUNT_LEVEL(255)
+            COUNT_LEVEL(256) COUNT_LEVEL(257) COUNT_LEVEL(258) COUNT_LEVEL(259) COUNT_LEVEL(260) COUNT_LEVEL(261) COUNT_LEVEL(262) COUNT_LEVEL(263) COUNT_LEVEL(264)
+            COUNT_LEVEL(265) COUNT_LEVEL(266) COUNT_LEVEL(267) COUNT_LEVEL(268) COUNT_LEVEL(269) COUNT_LEVEL(270) COUNT_LEVEL(271) COUNT_LEVEL(272) COUNT_LEVEL(273)
+            COUNT_LEVEL(274) COUNT_LEVEL(275) COUNT_LEVEL(276) COUNT_LEVEL(277) COUNT_LEVEL(278) COUNT_LEVEL(279) COUNT_LEVEL(280) COUNT_LEVEL(281) COUNT_LEVEL(282)
+            COUNT_LEVEL(283) COUNT_LEVEL(284) COUNT_LEVEL(285) COUNT_LEVEL(286) COUNT_LEVEL(287) COUNT_LEVEL(288) COUNT_LEVEL(289) COUNT_LEVEL(290) COUNT_LEVEL(291)
+            COUNT_LEVEL(292) COUNT_LEVEL(293) COUNT_LEVEL(294) COUNT_LEVEL(295) COUNT_LEVEL(296) COUNT_LEVEL(297) COUNT_LEVEL(298) COUNT_LEVEL(299) COUNT_LEVEL(300)
+            COUNT_LEVEL(301) COUNT_LEVEL(302) COUNT_LEVEL(303) COUNT_LEVEL(304) COUNT_LEVEL(305) COUNT_LEVEL(306) COUNT_LEVEL(307) COUNT_LEVEL(308) COUNT_LEVEL(309)
+            COUNT_LEVEL(310) COUNT_LEVEL(311) COUNT_LEVEL(312) COUNT_LEVEL(313) COUNT_LEVEL(314) COUNT_LEVEL(315) COUNT_LEVEL(316) COUNT_LEVEL(317) COUNT_LEVEL(318)
+            COUNT_LEVEL(319) COUNT_LEVEL(320) COUNT_LEVEL(321) COUNT_LEVEL(322) COUNT_LEVEL(323) COUNT_LEVEL(324) COUNT_LEVEL(325) COUNT_LEVEL(326) COUNT_LEVEL(327)
+            COUNT_LEVEL(328) COUNT_LEVEL(329) COUNT_LEVEL(330) COUNT_LEVEL(331) COUNT_LEVEL(332) COUNT_LEVEL(333) COUNT_LEVEL(334) COUNT_LEVEL(335) COUNT_LEVEL(336)
+            COUNT_LEVEL(337) COUNT_LEVEL(338) COUNT_LEVEL(339) COUNT_LEVEL(340) COUNT_LEVEL(341) COUNT_LEVEL(342) COUNT_LEVEL(343) COUNT_LEVEL(344) COUNT_LEVEL(345)
+            COUNT_LEVEL(346) COUNT_LEVEL(347) COUNT_LEVEL(348) COUNT_LEVEL(349) COUNT_LEVEL(350) COUNT_LEVEL(351) COUNT_LEVEL(352) COUNT_LEVEL(353) COUNT_LEVEL(354)
+            COUNT_LEVEL(355) COUNT_LEVEL(356) COUNT_LEVEL(357) COUNT_LEVEL(358) COUNT_LEVEL(359) COUNT_LEVEL(360) COUNT_LEVEL(361) COUNT_LEVEL(362) COUNT_LEVEL(363)
+            COUNT_LEVEL(364) COUNT_LEVEL(365) COUNT_LEVEL(366) COUNT_LEVEL(367) COUNT_LEVEL(368) COUNT_LEVEL(369) COUNT_LEVEL(370) COUNT_LEVEL(371) COUNT_LEVEL(372)
+            COUNT_LEVEL(373) COUNT_LEVEL(374) COUNT_LEVEL(375) COUNT_LEVEL(376) COUNT_LEVEL(377) COUNT_LEVEL(378) COUNT_LEVEL(379) COUNT_LEVEL(380) COUNT_LEVEL(381)
+            COUNT_LEVEL(382) COUNT_LEVEL(383) COUNT_LEVEL(384) COUNT_LEVEL(385) COUNT_LEVEL(386) COUNT_LEVEL(387) COUNT_LEVEL(388) COUNT_LEVEL(389) COUNT_LEVEL(390)
+            COUNT_LEVEL(391) COUNT_LEVEL(392) COUNT_LEVEL(393) COUNT_LEVEL(394) COUNT_LEVEL(395) COUNT_LEVEL(396) COUNT_LEVEL(397) COUNT_LEVEL(398) COUNT_LEVEL(399)
+            COUNT_LEVEL(400) COUNT_LEVEL(401) COUNT_LEVEL(402) COUNT_LEVEL(403) COUNT_LEVEL(404) COUNT_LEVEL(405) COUNT_LEVEL(406) COUNT_LEVEL(407) COUNT_LEVEL(408)
+            COUNT_LEVEL(409) COUNT_LEVEL(410) COUNT_LEVEL(411) COUNT_LEVEL(412) COUNT_LEVEL(413) COUNT_LEVEL(414) COUNT_LEVEL(415) COUNT_LEVEL(416) COUNT_LEVEL(417)
+            COUNT_LEVEL(418) COUNT_LEVEL(419) COUNT_LEVEL(420) COUNT_LEVEL(421) COUNT_LEVEL(422) COUNT_LEVEL(423) COUNT_LEVEL(424) COUNT_LEVEL(425) COUNT_LEVEL(426)
+            COUNT_LEVEL(427) COUNT_LEVEL(428) COUNT_LEVEL(429) COUNT_LEVEL(430) COUNT_LEVEL(431) COUNT_LEVEL(432) COUNT_LEVEL(433) COUNT_LEVEL(434) COUNT_LEVEL(435)
+            COUNT_LEVEL(436) COUNT_LEVEL(437) COUNT_LEVEL(438) COUNT_LEVEL(439) COUNT_LEVEL(440) COUNT_LEVEL(441) COUNT_LEVEL(442) COUNT_LEVEL(443) COUNT_LEVEL(444)
+            COUNT_LEVEL(445) COUNT_LEVEL(446) COUNT_LEVEL(447) COUNT_LEVEL(448) COUNT_LEVEL(449) COUNT_LEVEL(450) COUNT_LEVEL(451) COUNT_LEVEL(452) COUNT_LEVEL(453)
+            COUNT_LEVEL(454) COUNT_LEVEL(455) COUNT_LEVEL(456) COUNT_LEVEL(457) COUNT_LEVEL(458) COUNT_LEVEL(459) COUNT_LEVEL(460) COUNT_LEVEL(461) COUNT_LEVEL(462)
+            COUNT_LEVEL(463) COUNT_LEVEL(464) COUNT_LEVEL(465) COUNT_LEVEL(466) COUNT_LEVEL(467) COUNT_LEVEL(468) COUNT_LEVEL(469) COUNT_LEVEL(470) COUNT_LEVEL(471)
+            COUNT_LEVEL(472) COUNT_LEVEL(473) COUNT_LEVEL(474) COUNT_LEVEL(475) COUNT_LEVEL(476) COUNT_LEVEL(477) COUNT_LEVEL(478) COUNT_LEVEL(479) COUNT_LEVEL(480)
+            COUNT_LEVEL(481) COUNT_LEVEL(482) COUNT_LEVEL(483) COUNT_LEVEL(484) COUNT_LEVEL(485) COUNT_LEVEL(486) COUNT_LEVEL(487) COUNT_LEVEL(488) COUNT_LEVEL(489)
+            COUNT_LEVEL(490) COUNT_LEVEL(491) COUNT_LEVEL(492) COUNT_LEVEL(493) COUNT_LEVEL(494) COUNT_LEVEL(495) COUNT_LEVEL(496) COUNT_LEVEL(497) COUNT_LEVEL(498)
+            COUNT_LEVEL(499) COUNT_LEVEL(500) COUNT_LEVEL(501) COUNT_LEVEL(502) COUNT_LEVEL(503) COUNT_LEVEL(504) COUNT_LEVEL(505) COUNT_LEVEL(506) COUNT_LEVEL(507)
+            COUNT_LEVEL(508) COUNT_LEVEL(509) COUNT_LEVEL(510) COUNT_LEVEL(511)
             "addq $8, %%rsp\n"
             "pushq %%rax\n" // save return value
             "pushq %%rsi\n" // save temp reg
@@ -775,6 +441,14 @@ void do_call_value(void *state, uint64_t value)
             "movq %%r13, %c[state_r13](%%rsi)\n" // convert native state to struct regs
             "movq %%r14, %c[state_r14](%%rsi)\n" // convert native state to struct regs
             "movq %%r15, %c[state_r15](%%rsi)\n" // convert native state to struct regs
+            "movups %%xmm0, %c[state_xmm0](%%rsi)\n"
+            "movups %%xmm1, %c[state_xmm1](%%rsi)\n"
+            "movups %%xmm2, %c[state_xmm2](%%rsi)\n"
+            "movups %%xmm3, %c[state_xmm3](%%rsi)\n"
+            "movups %%xmm4, %c[state_xmm4](%%rsi)\n"
+            "movups %%xmm5, %c[state_xmm5](%%rsi)\n"
+            "movups %%xmm6, %c[state_xmm6](%%rsi)\n"
+            "movups %%xmm7, %c[state_xmm7](%%rsi)\n"
             "movq %%rax, %%rbx\n" // already saved rbx, so lets use it as temp reg
             "movq %%rsi, %%rcx\n" // already saved rcx, so lets use it as temp reg
             "popq %%rsi\n" // get rsi from function return
@@ -803,35 +477,35 @@ void do_call_value(void *state, uint64_t value)
             "addq $128, %%rsp\n"
             : "=m"(cs->sse_state), "=m"(call_frame_counter)
             : "m"(cs), "m"(state), "m"(value), "m"(__csptr),
-                    [state_rax]"e"(offsetof(RegState, RAX)),
-                    [state_rbx]"e"(offsetof(RegState, RBX)),
-                    [state_rcx]"e"(offsetof(RegState, RCX)),
-                    [state_rdx]"e"(offsetof(RegState, RDX)),
-                    [state_rdi]"e"(offsetof(RegState, RDI)),
-                    [state_rsi]"e"(offsetof(RegState, RSI)),
-                    [state_rbp]"e"(offsetof(RegState, RBP)),
-                    [state_rsp]"e"(offsetof(RegState, RSP)),
-                    [state_r8]"e"(offsetof(RegState, R8)),
-                    [state_r9]"e"(offsetof(RegState, R9)),
-                    [state_r10]"e"(offsetof(RegState, R10)),
-                    [state_r11]"e"(offsetof(RegState, R11)),
-                    [state_r12]"e"(offsetof(RegState, R12)),
-                    [state_r13]"e"(offsetof(RegState, R13)),
-                    [state_r14]"e"(offsetof(RegState, R14)),
-                    [state_r15]"e"(offsetof(RegState, R15)),
-                    [state_xmm0]"e"(offsetof(RegState, XMM0)),
-                    [state_xmm1]"e"(offsetof(RegState, XMM1)),
-                    [state_xmm2]"e"(offsetof(RegState, XMM2)),
-                    [state_xmm3]"e"(offsetof(RegState, XMM3)),
-                    [state_xmm4]"e"(offsetof(RegState, XMM4)),
-                    [state_xmm5]"e"(offsetof(RegState, XMM5)),
-                    [state_xmm6]"e"(offsetof(RegState, XMM6)),
-                    [state_xmm7]"e"(offsetof(RegState, XMM7)),
-                    [real_rsp_off]"e"(offsetof(do_call_state_t, __mcsema_real_rsp)),
-                    [jmp_count]"e"(offsetof(do_call_state_t, __mcsema_jmp_count)),
-                    [reg_state]"e"(offsetof(do_call_state_t, reg_state)),
-                    [sse_state]"e"(offsetof(do_call_state_t, sse_state)),
-                    [struct_size]"e"(sizeof(do_call_state_t))
+                [state_rax]"e"(offsetof(RegState, RAX)),
+                [state_rbx]"e"(offsetof(RegState, RBX)),
+                [state_rcx]"e"(offsetof(RegState, RCX)),
+                [state_rdx]"e"(offsetof(RegState, RDX)),
+                [state_rdi]"e"(offsetof(RegState, RDI)),
+                [state_rsi]"e"(offsetof(RegState, RSI)),
+                [state_rbp]"e"(offsetof(RegState, RBP)),
+                [state_rsp]"e"(offsetof(RegState, RSP)),
+                [state_r8]"e"(offsetof(RegState, R8)),
+                [state_r9]"e"(offsetof(RegState, R9)),
+                [state_r10]"e"(offsetof(RegState, R10)),
+                [state_r11]"e"(offsetof(RegState, R11)),
+                [state_r12]"e"(offsetof(RegState, R12)),
+                [state_r13]"e"(offsetof(RegState, R13)),
+                [state_r14]"e"(offsetof(RegState, R14)),
+                [state_r15]"e"(offsetof(RegState, R15)),
+                [state_xmm0]"e"(offsetof(RegState, XMM0)),
+                [state_xmm1]"e"(offsetof(RegState, XMM1)),
+                [state_xmm2]"e"(offsetof(RegState, XMM2)),
+                [state_xmm3]"e"(offsetof(RegState, XMM3)),
+                [state_xmm4]"e"(offsetof(RegState, XMM4)),
+                [state_xmm5]"e"(offsetof(RegState, XMM5)),
+                [state_xmm6]"e"(offsetof(RegState, XMM6)),
+                [state_xmm7]"e"(offsetof(RegState, XMM7)),
+                [real_rsp_off]"e"(offsetof(do_call_state_t, __mcsema_real_rsp)),
+                [jmp_count]"e"(offsetof(do_call_state_t, __mcsema_jmp_count)),
+                [reg_state]"e"(offsetof(do_call_state_t, reg_state)),
+                [sse_state]"e"(offsetof(do_call_state_t, sse_state)),
+                [struct_size]"e"(sizeof(do_call_state_t))
             : "memory", "rax", "rcx", "rsi" );
     
     // reset call frame depth

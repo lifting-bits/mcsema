@@ -41,7 +41,7 @@ __attribute__((naked)) int __mcsema_inception()
 
     // save preserved registers in struct regs
     __asm__ volatile("movl %%eax, %0\n": "=m"(__mcsema_do_call_state.EAX) );
-    __asm__ volatile("popl %eax\n"); // put translated destination into eax
+    __asm__ volatile("popl %eax\n");  // put translated destination into eax
                                       // it was pushed in the stub that calls __mcsema_inception
                                       // see linuxArchOps.cpp
     __asm__ volatile("movl %%ebx, %0\n": "=m"(__mcsema_do_call_state.EBX) );
