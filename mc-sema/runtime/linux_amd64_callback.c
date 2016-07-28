@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 // build with 
-// clang -std=gnu99 -m64 -emit-llvm -c -o linux_amd64_callback.bc linux_amd64_callback.c
+// clang-3.5 -std=gnu99 -m64 -emit-llvm -c -o linux_amd64_callback.bc linux_amd64_callback.c
 
 #define ONLY_STRUCT
 #include "../common/RegisterState.h"
@@ -255,7 +255,7 @@ __attribute__((naked)) int __mcsema_inception()
               );
 
     // --__mcsema_inception_depth;
-    __asm__ volatile ("decl %0\n" :: "m"(__mcsema_inception_depth));
+    __asm__ volatile ("decq %0\n" :: "m"(__mcsema_inception_depth));
     __asm__ volatile ("retq\n");
 }
 
@@ -303,7 +303,7 @@ void do_call_value(void *state, uint64_t value)
     cs->__mcsema_jmp_count = NUM_DO_CALL_FRAMES - cur_do_call_frame - 1;
 
     __asm__ volatile(
-            "subq $128, %%rsp\n"
+            "subq $128, %%rsp\n" // -128
             "fxsave %0\n" // save sse state
             "pushq %%rax\n"
             "pushq %%rbx\n"
@@ -319,7 +319,7 @@ void do_call_value(void *state, uint64_t value)
             "pushq %%r12\n"
             "pushq %%r13\n"
             "pushq %%r14\n"
-            "pushq %%r15\n"
+            "pushq %%r15\n" // -128 - 15*8
 
             "movq %3, %%rax\n"  // capture "state" arg (mcsema regstate)
             "movq %4, %%rcx\n"  // capture "value" arg (call destination)
@@ -346,19 +346,20 @@ void do_call_value(void *state, uint64_t value)
             "leaq %c[real_rsp_off](%%rsi), %%rdi\n" // where will we save the "real" esp?
             "movq %%rsp, (%%rdi)\n" // save our esp since we will switch to mcsema esp later
             "movq %c[state_rsp](%%rax), %%rsp\n" // switch to mcsema stack
-            "subq $8, %%rsp\n"
-            "movq %%rcx, 0(%%rsp)\n" // use that slot to store jump destination
-            "leaq %c[jmp_count](%%rsi), %%rdi\n" // save recursion count into ecx
-            "movq (%%rdi), %%rcx\n" // save recursion count into ecx
+            //"subq $8, %%rsp\n"
+            "movq %%rcx, %%rdi\n" // use that slot to store jump destination
+            "leaq %c[jmp_count](%%rsi), %%rsi\n" // save recursion count into rsi
+            "movq (%%rsi), %%rcx\n" // save recursion count into ecx
             "shlq $4, %%rcx\n" // multiply recursion count by 16 to get offset (mul 16 = shl 4)
             "leaq 0f, %%rsi\n" // base return addr
             "addq %%rcx, %%rsi\n" // calculate return addr
             "pushq %%rsi\n" // push return addr
+            "pushq %%rdi\n" // push jump destination (we call via push/ret)
             "movq %c[state_rdi](%%rax), %%rdi\n" // dump struct regs to state
             "movq %c[state_rcx](%%rax), %%rcx\n" // complete struct regs spill
             "movq %c[state_rsi](%%rax), %%rsi\n" // complete struct regs spill
             "movq %c[state_rax](%%rax), %%rax\n" // complete struct regs spill
-            "jmpq *0x8(%%rsp)\n"
+            "retq\n"
             COUNT_LEVEL(0) // set of jump locations that increment the call frame counter
             COUNT_LEVEL(1) // the amount of these hit depends on the recursion depth
             COUNT_LEVEL(2) // at depth 0, none are hit, at depth 1, there is 1, etc.
@@ -420,7 +421,7 @@ void do_call_value(void *state, uint64_t value)
             COUNT_LEVEL(490) COUNT_LEVEL(491) COUNT_LEVEL(492) COUNT_LEVEL(493) COUNT_LEVEL(494) COUNT_LEVEL(495) COUNT_LEVEL(496) COUNT_LEVEL(497) COUNT_LEVEL(498)
             COUNT_LEVEL(499) COUNT_LEVEL(500) COUNT_LEVEL(501) COUNT_LEVEL(502) COUNT_LEVEL(503) COUNT_LEVEL(504) COUNT_LEVEL(505) COUNT_LEVEL(506) COUNT_LEVEL(507)
             COUNT_LEVEL(508) COUNT_LEVEL(509) COUNT_LEVEL(510) COUNT_LEVEL(511)
-            "addq $8, %%rsp\n"
+            //"addq $8, %%rsp\n"
             "pushq %%rax\n" // save return value
             "pushq %%rsi\n" // save temp reg
             "movq %1, %%rax\n" // get our recursion depth

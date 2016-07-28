@@ -263,12 +263,6 @@ static void doCallM(BasicBlock *&block, InstPtr ip, Value *mem_addr) {
 
   Module *M = block->getParent()->getParent();
   const std::string &triple = M->getTargetTriple();
-  if (triple != WINDOWS_TRIPLE) {
-    if (getPointerSize(M) == Pointer32)
-      x86::writeFakeReturnAddr(block);
-    else
-      x86_64::writeFakeReturnAddr(block);
-  }
 
   return doCallV(block, ip, call_addr);
 }
@@ -846,13 +840,6 @@ static InstTransResult translate_CALLr(NativeModulePtr natM,
 
   Module *M = block->getParent()->getParent();
   const std::string &triple = M->getTargetTriple();
-  if (triple != WINDOWS_TRIPLE) {
-      if(width == 64) {
-        x86_64::writeFakeReturnAddr(block);
-      } else {
-        x86::writeFakeReturnAddr(block);
-      }
-  }
 
   doCallV(block, ip, fromReg);
 
