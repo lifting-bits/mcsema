@@ -38,8 +38,10 @@ int main(int argc, const char* argv[]) {
         c = f2;
     }
 
-    c(a1, a2, a3, a4, a5, a6);
-    printf("done with c: %08x, %08x, %08x, %08x, %08x, %08x\n", a1, a2, a3, a4, a5, a6);
+    for(int i = 0; i < 10; i++) {
+        c(a1, a2, a3, a4, a5, a6);
+        printf("done with c[%d]: %08x, %08x, %08x, %08x, %08x, %08x\n", i, a1, a2, a3, a4, a5, a6);
+    }
     
     return 0;
 }
