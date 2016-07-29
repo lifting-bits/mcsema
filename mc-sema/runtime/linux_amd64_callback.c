@@ -265,7 +265,7 @@ typedef struct _do_call_state_t {
     // when calculating return addresses in do_call_value
     uint64_t __mcsema_jmp_count;
     char sse_state[512] __attribute__((aligned (16)));
-    uint64_t reg_state[15];
+    void *saved_state;
 } do_call_state_t;
 
 // hold recursive call states
@@ -343,6 +343,8 @@ void do_call_value(void *state, uint64_t value)
             "movups %c[state_xmm5](%%rax), %%xmm5\n"
             "movups %c[state_xmm6](%%rax), %%xmm6\n"
             "movups %c[state_xmm7](%%rax), %%xmm7\n"
+            "leaq %c[saved_state](%%rsi), %%rdi\n" // where will we save the reg state arg
+            "movq %%rax, (%%rdi)\n" // save reg state arg
             "leaq %c[real_rsp_off](%%rsi), %%rdi\n" // where will we save the "real" esp?
             "movq %%rsp, (%%rdi)\n" // save our esp since we will switch to mcsema esp later
             "movq %c[state_rsp](%%rax), %%rsp\n" // switch to mcsema stack
@@ -428,7 +430,7 @@ void do_call_value(void *state, uint64_t value)
             "imulq $%c[struct_size], %%rax\n" // see where we need to index into the save state array
             "movq %5, %%rsi\n" // get address of array base
             "addq %%rsi, %%rax\n" // rax now points to our old saved state (array base + index * element size)
-            "leaq %c[reg_state](%%rax), %%rsi\n" // get reg state offset
+            "movq %c[saved_state](%%rax), %%rsi\n" // get original mcsema state arg so we can write to it
             "movq %%rbx, %c[state_rbx](%%rsi)\n" // convert native state to struct regs
             "movq %%rcx, %c[state_rcx](%%rsi)\n" // convert native state to struct regs
             "movq %%rdx, %c[state_rdx](%%rsi)\n" // convert native state to struct regs
@@ -504,7 +506,7 @@ void do_call_value(void *state, uint64_t value)
                 [state_xmm7]"e"(offsetof(RegState, XMM7)),
                 [real_rsp_off]"e"(offsetof(do_call_state_t, __mcsema_real_rsp)),
                 [jmp_count]"e"(offsetof(do_call_state_t, __mcsema_jmp_count)),
-                [reg_state]"e"(offsetof(do_call_state_t, reg_state)),
+                [saved_state]"e"(offsetof(do_call_state_t, saved_state)),
                 [sse_state]"e"(offsetof(do_call_state_t, sse_state)),
                 [struct_size]"e"(sizeof(do_call_state_t))
             : "memory", "rax", "rcx", "rsi" );
