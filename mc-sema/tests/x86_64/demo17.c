@@ -4,7 +4,7 @@ typedef int (*callback)(int a1, int a2, int a3, int a4, int a5, int a6);
 
 int f1(int a1, int a2, int a3, int a4, int a5, int a6) {
     printf("in f1: %08x, %08x, %08x, %08x, %08x, %08x\n", a1, a2, a3, a4, a5, a6);
-    return 1;
+    return 0xABCDEF0;
 }
 
 int f2(int a1, int a2, int a3, int a4, int a5, int a6) {
@@ -20,10 +20,10 @@ int f2(int a1, int a2, int a3, int a4, int a5, int a6) {
     }
     //
     //// invokes recursive do_call_value in mcsema
-    c2(a1, a2, a3, a4, a5, a6);
-    puts("done with c2");
+    int rv = c2(a1, a2, a3, a4, a5, a6);
+    printf("done with c2: %08x\n", rv);
     printf("done with f1: %08x,\n", a1);
-    return 2;
+    return 0x1badf00d;
 }
 
 int main(int argc, const char* argv[]) {
@@ -39,8 +39,9 @@ int main(int argc, const char* argv[]) {
     }
 
     for(int i = 0; i < 10; i++) {
-        c(a1, a2, a3, a4, a5, a6);
+        int rv = c(a1, a2, a3, a4, a5, a6);
         printf("done with c[%d]: %08x, %08x, %08x, %08x, %08x, %08x\n", i, a1, a2, a3, a4, a5, a6);
+        printf("rv = %08x\n", rv);
     }
     
     return 0;
