@@ -9,7 +9,9 @@
 #include "../common/RegisterState.h"
 
 #define MIN_STACK_SIZE 4096
+#define STACK_ALLOC_SIZE (MIN_STACK_SIZE * 10)
 #define NUM_DO_CALL_FRAMES 512 /* XXX what is reasonable here? */
+#define STACK_MAX 0x7ffffffff000
 
 // this is a terrible hack to be compatible with some mcsema definitions. please don't judge
 extern uint64_t mmap(uint64_t addr, uint64_t length, uint32_t prot, uint32_t flags, uint32_t fd, uint32_t offset);
@@ -80,7 +82,7 @@ __attribute__((naked)) int __mcsema_inception()
             // no alt stack, call create alt stack
             "pushq %%rax\n" // align
             "pushq %%rax\n"
-            "mov $%c[min_stack], %%rdi\n"
+            "mov $%c[stack_alloc_size], %%rdi\n"
             "callq %P[createalt]\n"
             "movq %%rax, %%rbx\n"
             "popq %%rax\n" // align
@@ -90,7 +92,7 @@ __attribute__((naked)) int __mcsema_inception()
             "0:\n"
             : [altstack]"=m"(__mcsema_alt_stack[__mcsema_inception_depth])
             : [createalt]"i"(__mcsema_create_alt_stack), 
-              [min_stack]"i"(MIN_STACK_SIZE));
+              [stack_alloc_size]"i"(STACK_ALLOC_SIZE));
     
     __asm__ volatile(
             // get base of reg state array
@@ -143,11 +145,20 @@ __attribute__((naked)) int __mcsema_inception()
             "movups %%xmm6, %c[state_xmm6](%%rax)\n"
             "movups %%xmm7, %c[state_xmm7](%%rax)\n"
 
-            // copy over MIN_STACK_SIZE bytes of stack (we may need to fetch stuff from it)
+            // copy over stack_alloc_size_SIZE bytes of stack (we may need to fetch stuff from it)
             // at this point we saved all the registers, so we can clobber at will
             // since they are restored on function exit
-            "movq $%c[min_stack], %%rcx\n"
-            "movq %%rsp, %%rsi\n"
+            // be careful not to try to copy past stack_max, or we will hit unmapped memory
+            // rcx will contain amount of bytes to copy
+            "movq $%c[half_stack_size], %%rcx\n" // attempted copy size
+            "movq %%rsp, %%rsi\n" // base of copy
+            "leaq (%%rsi, %%rcx, 1), %%rdi\n" // extent
+            "movabs $%c[stack_max], %%r14\n" // max allowed
+            "movq %%r14, %%r13\n"
+            "subq %%rsi, %%r13\n" // copy size if extent is > max
+            "cmpq %%r14, %%rdi\n" // compare extent and max
+            "cmovaq %%r13, %%rcx\n" // if extent > max, copy only to max
+            
             // get altstack base
             "movq %[alt_stack_base], %%rdi\n"
             // get altstack offset
@@ -168,7 +179,7 @@ __attribute__((naked)) int __mcsema_inception()
             "andq $0xF, %%r10\n"
             "subq $0x10, %%rdi\n"
             "addq %%r10, %%rdi\n"
-            "subq $%c[min_stack], %%rdi\n"
+            "subq $%c[half_stack_size], %%rdi\n"
 
             // set RSP to the alt stack rsp
             "movq %%rdi, %c[state_rsp](%%rax)\n" // convert native state to struct regs
@@ -250,7 +261,9 @@ __attribute__((naked)) int __mcsema_inception()
               [state_xmm6]"e"(offsetof(RegState, XMM6)),
               [state_xmm7]"e"(offsetof(RegState, XMM7)),
               [struct_size]"e"(sizeof(RegState)),
-              [min_stack]"i"(MIN_STACK_SIZE),
+              [stack_alloc_size]"i"(STACK_ALLOC_SIZE),
+              [half_stack_size]"i"(STACK_ALLOC_SIZE/2),
+              [stack_max]"i"(STACK_MAX),
               [alt_stack_base]"m"(__altstackptr)
               );
 
