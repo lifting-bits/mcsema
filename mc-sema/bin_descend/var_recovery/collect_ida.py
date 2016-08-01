@@ -1,3 +1,10 @@
+import idautils
+import idc
+
+def DEBUG(s):
+    #syslog.syslog(str(s))
+    sys.stdout.write(str(s))
+
 def _get_flags_from_bits(flag):
     '''
     Translates the flag field in structures (and elsewhere?) into a human readable
@@ -92,40 +99,47 @@ def _collect_func_vars():
     variable_flags is a string with flag names.
     '''
     functions = list()
-    funcs = Functions()
+    funcs = idautils.Functions()
     for f in funcs:
-        name = Name(f)
-        end = GetFunctionAttr(f, FUNCATTR_END)
-        _locals = GetFunctionAttr(f, FUNCATTR_FRSIZE)
-        frame = GetFrame(f)
+        name = idc.Name(f)
+        end = idc.GetFunctionAttr(f, idc.FUNCATTR_END)
+        _locals = idc.GetFunctionAttr(f, idc.FUNCATTR_FRSIZE)
+        frame = idc.GetFrame(f)
         if frame is None:
             continue
         stackArgs = list()
-        offset = GetFirstMember(frame)
+        offset = idc.GetFirstMember(frame)
         while offset != 0xffffffff and offset != 0xffffffffffffffff:
-            memberName = GetMemberName(frame, offset)
+            memberName = idc.GetMemberName(frame, offset)
             if memberName is None: 
                 #gaps in stack usage are fine, but generate trash output
                 #gaps also could indicate a buffer that IDA doesn't recognize
-                offset = GetStrucNextOff(frame, offset)
+                offset = idc.GetStrucNextOff(frame, offset)
                 continue
             if (memberName == " r" or memberName == " s"):
                 #the return pointer and start pointer, who cares
-                offset = GetStrucNextOff(frame, offset)
+                offset = idc.GetStrucNextOff(frame, offset)
                 continue
-            memberSize = GetMemberSize(frame, offset)
-            memberFlag = GetMemberFlag(frame, offset)
+            memberSize = idc.GetMemberSize(frame, offset)
+            memberFlag = idc.GetMemberFlag(frame, offset)
             #TODO: handle the case where a struct is encountered (FF_STRU flag)
             flag_str = _get_flags_from_bits(memberFlag)
             stackArgs.append((offset, memberName, memberSize, flag_str))
-            offset = GetStrucNextOff(frame, offset)
+            offset = idc.GetStrucNextOff(frame, offset)
         functions.append({"name":name, "stackArgs":stackArgs})
     return functions
 
 if __name__ == "__main__":
+    print_func_vars()
+
+def print_func_vars():
+    print
+    print "Stack Vars:"
     func_list = _collect_func_vars()
     for entry in func_list:
         print "{} {{".format(entry['name'])
         for var in entry['stackArgs']:
             print "  {}".format(var)
     print "}"
+    print
+    print "End Stack Vars"

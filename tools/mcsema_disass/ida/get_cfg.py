@@ -22,7 +22,6 @@ import traceback
 
 import itertools
 
-
 #hack for IDAPython to see google protobuf lib
 if os.path.isdir('/usr/lib/python2.7/dist-packages'):
     sys.path.append('/usr/lib/python2.7/dist-packages')
@@ -1856,7 +1855,7 @@ def preprocessBinary():
                             idaapi.del_cref(head, op.value, False)
 
 
-def recoverCfg(to_recover, outf, exports_are_apis=False):
+def recoverCfg(to_recover, outf, exports_are_apis=False, stack_vars=False):
     global EMAP
     M = CFG_pb2.Module()
     M.module_name = idc.GetInputFile()
@@ -2203,6 +2202,11 @@ if __name__ == "__main__":
     parser.add_argument("--pie-mode", action="store_true", default=False,
         help="Assume all immediate values are constants (useful for ELFs built with -fPIE")
 
+    parser.add_argument("--stack_vars", action="store_true",
+        default=False,
+        help="Attempt to recover local stack varible information"
+        )
+
     args = parser.parse_args(args=idc.ARGV[1:])
 
     if args.log_file != os.devnull:
@@ -2280,6 +2284,11 @@ if __name__ == "__main__":
         if args.entrypoint:
             eps.extend(args.entrypoint)
 
+        if args.stack_vars:
+            DEBUG("Attempting to recover stack variable information...")
+            from var_recovery import collect_ida
+            collect_ida.print_func_vars()
+
         assert len(eps) > 0, "Need to have at least one entry point to lift"
 
         DEBUG("Will lift {0} exports".format(len(eps)))
@@ -2301,7 +2310,7 @@ if __name__ == "__main__":
         outf = args.output
         DEBUG("CFG Output File file: {0}".format(outf.name))
 
-        recoverCfg(eps, outf, args.exports_are_apis)
+        recoverCfg(eps, outf, args.exports_are_apis, args.stack_vars)
     except Exception as e:
         DEBUG(str(e))
         DEBUG(traceback.format_exc())
