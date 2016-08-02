@@ -89,10 +89,46 @@ def _get_flags_from_bits(flag):
             output = output + " | " + val
     return output
 
-def _collect_func_vars():
+def collect_func_vars(F):
+    '''
+    Collect stack variable data from a single function F.
+    Returns a list of stack variables 'stackArgs'.
+    The 'stackArgs' value is a list of (offset, variable_name, variable_size, variable_flags) tuples.
+    Skips stack arguments without names, as well as the special arguments with names " s" and " r".
+    variable_flags is a string with flag names.
+    '''
+    f = F.entry_address
+    end = idc.GetFunctionAttr(f, idc.FUNCATTR_END)
+    _locals = idc.GetFunctionAttr(f, idc.FUNCATTR_FRSIZE)
+    frame = idc.GetFrame(f)
+    if frame is None:
+        return []
+    stackArgs = list()
+    offset = idc.GetFirstMember(frame)
+    while offset != 0xffffffff and offset != 0xffffffffffffffff:
+        memberName = idc.GetMemberName(frame, offset)
+        if memberName is None: 
+            #gaps in stack usage are fine, but generate trash output
+            #gaps also could indicate a buffer that IDA doesn't recognize
+            offset = idc.GetStrucNextOff(frame, offset)
+            continue
+        if (memberName == " r" or memberName == " s"):
+            #the return pointer and start pointer, who cares
+            offset = idc.GetStrucNextOff(frame, offset)
+            continue
+        memberSize = idc.GetMemberSize(frame, offset)
+        memberFlag = idc.GetMemberFlag(frame, offset)
+        #TODO: handle the case where a struct is encountered (FF_STRU flag)
+        flag_str = _get_flags_from_bits(memberFlag)
+        stackArgs.append((offset, memberName, memberSize, flag_str))
+        offset = idc.GetStrucNextOff(frame, offset)
+    #functions.append({"name":name, "stackArgs":stackArgs})
+    return stackArgs 
+
+def collect_func_vars_all():
     '''
     Collects stack variable data from all functions in the database.
-    Returns a list of dictionaries with keys 'name' and 'stackArgs'.
+    Returns a list of dictionaries with keys 'ea' and 'stackArgs'.
     The 'stackArgs' value is a list of (offset, variable_name, variable_size, variable_flags) tuples.
     Skips stack arguments without names, as well as the special arguments with names " s" and " r".
     Skips functions without frames.
@@ -101,32 +137,10 @@ def _collect_func_vars():
     functions = list()
     funcs = idautils.Functions()
     for f in funcs:
-        name = idc.Name(f)
-        end = idc.GetFunctionAttr(f, idc.FUNCATTR_END)
-        _locals = idc.GetFunctionAttr(f, idc.FUNCATTR_FRSIZE)
-        frame = idc.GetFrame(f)
-        if frame is None:
-            continue
-        stackArgs = list()
-        offset = idc.GetFirstMember(frame)
-        while offset != 0xffffffff and offset != 0xffffffffffffffff:
-            memberName = idc.GetMemberName(frame, offset)
-            if memberName is None: 
-                #gaps in stack usage are fine, but generate trash output
-                #gaps also could indicate a buffer that IDA doesn't recognize
-                offset = idc.GetStrucNextOff(frame, offset)
-                continue
-            if (memberName == " r" or memberName == " s"):
-                #the return pointer and start pointer, who cares
-                offset = idc.GetStrucNextOff(frame, offset)
-                continue
-            memberSize = idc.GetMemberSize(frame, offset)
-            memberFlag = idc.GetMemberFlag(frame, offset)
-            #TODO: handle the case where a struct is encountered (FF_STRU flag)
-            flag_str = _get_flags_from_bits(memberFlag)
-            stackArgs.append((offset, memberName, memberSize, flag_str))
-            offset = idc.GetStrucNextOff(frame, offset)
-        functions.append({"name":name, "stackArgs":stackArgs})
+        #name = idc.Name(f)
+        f_ea = idc.GetFunctionAttr(f, idc.FUNCATTR_START)
+        f_vars = collect_func_vars(f)
+        functions.append({"ea":f_ea, "stackArgs":f_vars})
     return functions
 
 if __name__ == "__main__":
@@ -135,7 +149,7 @@ if __name__ == "__main__":
 def print_func_vars():
     print
     print "Stack Vars:"
-    func_list = _collect_func_vars()
+    func_list = collect_func_vars()
     for entry in func_list:
         print "{} {{".format(entry['name'])
         for var in entry['stackArgs']:

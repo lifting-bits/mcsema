@@ -1673,8 +1673,25 @@ def getInstructionSize(ea):
     insn = idautils.DecodeInstruction(ea)
     return insn.size
 
+def recoverStackVars(M, F):
+    from var_recovery import collect_ida
+
+    # pull info from IDA
+    stack_locals = collect_ida.collect_func_vars(F) 
+    # jam into M
+    for (var_offset, var_name, var_size, var_flags) in stack_locals:
+        # mash
+        var = F.stackvars.add() 
+        var.sp_offset = var_offset
+        var.var.name = var_name
+        var.var.size = var_size
+        var.var.ida_type = var_flags
+
 def recoverFunctionFromSet(M, F, blockset, new_eas):
     processed_blocks = set()
+
+    # TODO predicated on cmd flag
+    recoverStackVars(M, F)
 
     while len(blockset) > 0:
         block = blockset.pop()
