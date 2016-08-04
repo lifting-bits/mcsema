@@ -97,8 +97,28 @@ def _collect_func_vars():
     for f in funcs:
         func_var_data = _collect_individual_func_vars(f)
         if func_var_data is not None:
+            _find_local_references(f, func_var_data)
             functions.append(func_var_data)
     return functions
+
+def _signed_from_unsigned64(val):
+    if val & 0x8000000000000000:
+        return -0x10000000000000000 + val
+    return val
+
+def _signed_from_unsigned32(val):
+    if val & 0x80000000:
+        return -0x100000000 + val
+    return val
+
+if idaapi.get_inf_structure().is_64bit():
+    _signed_from_unsigned = _signed_from_unsigned64
+    _base_ptr = "rbp"
+    _stack_ptr = "rsp"
+elif idaapi.get_inf_structure().is_32bit():
+    _signed_from_unsigned = _signed_from_unsigned32
+    _base_ptr = "ebp"
+    _stack_ptr = "esp"
 
 def _collect_individual_func_vars(f):
     name = Name(f)
@@ -107,10 +127,18 @@ def _collect_individual_func_vars(f):
     frame = GetFrame(f)
     if frame is None:
         return None
-    stackArgs = list()
+    stackArgs = dict()
+    #grab the offset of the stored frame pointer, so that
+    #we can correlate offsets correctly in referant code
+    # e.g., EBP+(-0x4) will match up to the -0x4 offset
+    delta = GetMemberOffset(frame, " s")
+    if -1 == delta:
+        #indicates that it wasn't found. Unsure exactly what to do 
+        # in that case, punting for now
+        delta = 0
     offset = GetFirstMember(frame)
     #TODO: the following line should check the binary's address size as appropriate
-    while offset != 0xffffffff and offset != 0xffffffffffffffff:
+    while -1 != _signed_from_unsigned(offset):
         memberName = GetMemberName(frame, offset)
         if memberName is None:
             #gaps in stack usage are fine, but generate trash output
@@ -125,12 +153,14 @@ def _collect_individual_func_vars(f):
         memberFlag = GetMemberFlag(frame, offset)
         #TODO: handle the case where a struct is encountered (FF_STRU flag)
         flag_str = _get_flags_from_bits(memberFlag)
-        stackArgs.append((offset, memberName, memberSize, flag_str))
+        stackArgs[offset-delta] = [memberName, memberSize, flag_str]
         offset = GetStrucNextOff(frame, offset)
     return {"name":name, "stackArgs":stackArgs}
 
-def _find_local_references(func):
+def _find_local_references(func, func_var_data):
     #naive approach at first
+    base_ptr_format = "[{}+".format(_base_ptr)
+    stack_ptr_format = "[{}+".format(_stack_ptr)
     frame = GetFrame(func)
     if frame is None:
         return
@@ -138,22 +168,23 @@ def _find_local_references(func):
     referers = set()
     for addr in FuncItems(func.startEA):
         if "lea"==GetMnem(addr):
-            if "ebp" in GetOpnd(addr, 1):
+            if base_ptr_format in GetOpnd(addr, 1) or stack_ptr_format in GetOpnd(addr, 1):
                 #right now just capture that it's a local reference, not its referant
                 referers.add(GetOpnd(addr, 0))
         if "mov"==GetMnem(addr):
             if GetOpnd(addr, 1) in referers:
                 target_op = GetOpnd(addr, 0)
-                if "[ebp+" in target_op:
-                    target_offset = target_op[5:target_op.index(']')]
-                    #TODO: correlate the offset back with the stack vars instead of just printing it
-                    print target_offset
+                if base_ptr_format in target_op:
+                    target_offset = target_op[len(base_ptr_format):target_op.index(']')]
+                    offset = _signed_from_unsigned(GetOperandValue(addr, 0))
+                    if offset in func_var_data["stackArgs"].keys():
+                        func_var_data["stackArgs"][offset][2] += " | LOCAL_REFERER"
             elif GetOpnd(addr, 0) in referers:
                 referers.remove(GetOpnd(addr, 0))
 
-_find_local_references(idaapi.get_func(here()))
 entry = _collect_individual_func_vars(idaapi.get_func(here()).startEA)
+_find_local_references(idaapi.get_func(here()), entry)
 print "{} {{".format(entry['name'])
-for var in entry['stackArgs']:
-    print "  {}".format(var)
+for offset, data in entry['stackArgs'].iteritems():
+    print "  {} {}".format(offset, data)
 print "}"
