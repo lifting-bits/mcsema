@@ -1,3 +1,5 @@
+import idaapi
+
 def _get_flags_from_bits(flag):
     '''
     Translates the flag field in structures (and elsewhere?) into a human readable
@@ -70,7 +72,6 @@ def _get_flags_from_bits(flag):
       2952790016:'FF_ALIGN',
     }
 
-    output = ""
     output = cls[cls['MASK']&flag]
     
     for category in [comm, _0type, _1type, datatype]:
@@ -94,37 +95,65 @@ def _collect_func_vars():
     functions = list()
     funcs = Functions()
     for f in funcs:
-        name = Name(f)
-        end = GetFunctionAttr(f, FUNCATTR_END)
-        _locals = GetFunctionAttr(f, FUNCATTR_FRSIZE)
-        frame = GetFrame(f)
-        if frame is None:
-            continue
-        stackArgs = list()
-        offset = GetFirstMember(frame)
-        while offset != 0xffffffff and offset != 0xffffffffffffffff:
-            memberName = GetMemberName(frame, offset)
-            if memberName is None: 
-                #gaps in stack usage are fine, but generate trash output
-                #gaps also could indicate a buffer that IDA doesn't recognize
-                offset = GetStrucNextOff(frame, offset)
-                continue
-            if (memberName == " r" or memberName == " s"):
-                #the return pointer and start pointer, who cares
-                offset = GetStrucNextOff(frame, offset)
-                continue
-            memberSize = GetMemberSize(frame, offset)
-            memberFlag = GetMemberFlag(frame, offset)
-            #TODO: handle the case where a struct is encountered (FF_STRU flag)
-            flag_str = _get_flags_from_bits(memberFlag)
-            stackArgs.append((offset, memberName, memberSize, flag_str))
-            offset = GetStrucNextOff(frame, offset)
-        functions.append({"name":name, "stackArgs":stackArgs})
+        func_var_data = _collect_individual_func_vars(f)
+        if func_var_data is not None:
+            functions.append(func_var_data)
     return functions
 
-func_list = _collect_func_vars()
-for entry in func_list:
-    print "{} {{".format(entry['name'])
-    for var in entry['stackArgs']:
-        print "  {}".format(var)
-    print "}"
+def _collect_individual_func_vars(f):
+    name = Name(f)
+    end = GetFunctionAttr(f, FUNCATTR_END)
+    _locals = GetFunctionAttr(f, FUNCATTR_FRSIZE)
+    frame = GetFrame(f)
+    if frame is None:
+        return None
+    stackArgs = list()
+    offset = GetFirstMember(frame)
+    #TODO: the following line should check the binary's address size as appropriate
+    while offset != 0xffffffff and offset != 0xffffffffffffffff:
+        memberName = GetMemberName(frame, offset)
+        if memberName is None:
+            #gaps in stack usage are fine, but generate trash output
+            #gaps also could indicate a buffer that IDA doesn't recognize
+            offset = GetStrucNextOff(frame, offset)
+            continue
+        if (memberName == " r" or memberName == " s"):
+            #the return pointer and saved registers, skip them
+            offset = GetStrucNextOff(frame, offset)
+            continue
+        memberSize = GetMemberSize(frame, offset)
+        memberFlag = GetMemberFlag(frame, offset)
+        #TODO: handle the case where a struct is encountered (FF_STRU flag)
+        flag_str = _get_flags_from_bits(memberFlag)
+        stackArgs.append((offset, memberName, memberSize, flag_str))
+        offset = GetStrucNextOff(frame, offset)
+    return {"name":name, "stackArgs":stackArgs}
+
+def _find_local_references(func):
+    #naive approach at first
+    frame = GetFrame(func)
+    if frame is None:
+        return
+    regs = dict()
+    referers = set()
+    for addr in FuncItems(func.startEA):
+        if "lea"==GetMnem(addr):
+            if "ebp" in GetOpnd(addr, 1):
+                #right now just capture that it's a local reference, not its referant
+                referers.add(GetOpnd(addr, 0))
+        if "mov"==GetMnem(addr):
+            if GetOpnd(addr, 1) in referers:
+                target_op = GetOpnd(addr, 0)
+                if "[ebp+" in target_op:
+                    target_offset = target_op[5:target_op.index(']')]
+                    #TODO: correlate the offset back with the stack vars instead of just printing it
+                    print target_offset
+            elif GetOpnd(addr, 0) in referers:
+                referers.remove(GetOpnd(addr, 0))
+
+_find_local_references(idaapi.get_func(here()))
+entry = _collect_individual_func_vars(idaapi.get_func(here()).startEA)
+print "{} {{".format(entry['name'])
+for var in entry['stackArgs']:
+    print "  {}".format(var)
+print "}"
