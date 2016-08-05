@@ -165,13 +165,16 @@ def _find_local_references(func, func_var_data):
     if frame is None:
         return
     regs = dict()
-    referers = set()
-    for addr in FuncItems(func.startEA):
+    referers = set() #members of this set contain the address of an element on the stack
+    dereferences = dict() #members of this collection contain the data of an element on the stack
+    for addr in FuncItems(func):
         if "lea"==GetMnem(addr):
             if base_ptr_format in GetOpnd(addr, 1) or stack_ptr_format in GetOpnd(addr, 1):
                 #right now just capture that it's a local reference, not its referant
                 referers.add(GetOpnd(addr, 0))
         if "mov"==GetMnem(addr):
+            referers.discard(GetOpnd(addr, 0))
+            dereferences.pop(GetOpnd(addr, 0), None)
             if GetOpnd(addr, 1) in referers:
                 target_op = GetOpnd(addr, 0)
                 if base_ptr_format in target_op:
@@ -179,12 +182,36 @@ def _find_local_references(func, func_var_data):
                     offset = _signed_from_unsigned(GetOperandValue(addr, 0))
                     if offset in func_var_data["stackArgs"].keys():
                         func_var_data["stackArgs"][offset][2] += " | LOCAL_REFERER"
-            elif GetOpnd(addr, 0) in referers:
-                referers.remove(GetOpnd(addr, 0))
+                else:
+                    # lea eax, [ebp-8]
+                    # mov ebx, eax
+                    # mov [ebp-4], ebx
+                    referers.add(target_op)
+            elif base_ptr_format in GetOpnd(addr, 1) or stack_ptr_format in GetOpnd(addr, 1):
+                offset = _signed_from_unsigned(GetOperandValue(addr, 1))
+                if offset in func_var_data["stackArgs"].keys():
+                    dereferences[GetOpnd(addr, 0)] = offset
+        if "call"== GetMnem(addr):
+            target_op = GetOpnd(addr, 0)
+            if target_op in referers:
+                pass
+            if target_op in dereferences:
+                # mov eax, [ebp+4]
+                # call eax
+                func_var_data["stackArgs"][dereferences[target_op]][2] += " | CODE_PTR"
+            #clear the referers and dereferences?
 
-entry = _collect_individual_func_vars(idaapi.get_func(here()).startEA)
-_find_local_references(idaapi.get_func(here()), entry)
-print "{} {{".format(entry['name'])
-for offset, data in entry['stackArgs'].iteritems():
-    print "  {} {}".format(offset, data)
-print "}"
+#entry = _collect_individual_func_vars(idaapi.get_func(here()).startEA)
+#_find_local_references(idaapi.get_func(here()), entry)
+#print "{} {{".format(entry['name'])
+#for offset, data in entry['stackArgs'].iteritems():
+#    print "  {} {}".format(offset, data)
+#print "}"
+
+var_data = _collect_func_vars()
+for entry in var_data:
+    print "{} {{".format(entry['name'])
+    for offset, data in entry['stackArgs'].iteritems():
+        print "  {} {}".format(offset, data)
+    print "}"
+
