@@ -27,7 +27,7 @@ def _get_flags_from_bits(flag):
       524288:'FF_VAR',
       49152:'FF_ANYNAME',
     }
- 
+
     _0type = {
       'MASK':15728640,
       1048576:'FF_0NUMH',
@@ -73,7 +73,7 @@ def _get_flags_from_bits(flag):
     }
 
     output = cls[cls['MASK']&flag]
-    
+
     for category in [comm, _0type, _1type, datatype]:
         #the ida docs define, for example, a FF_0VOID = 0 constant in with the rest
         #  of the 0type constants, but I _think_ that just means
@@ -133,7 +133,7 @@ def _collect_individual_func_vars(f):
     # e.g., EBP+(-0x4) will match up to the -0x4 offset
     delta = GetMemberOffset(frame, " s")
     if -1 == delta:
-        #indicates that it wasn't found. Unsure exactly what to do 
+        #indicates that it wasn't found. Unsure exactly what to do
         # in that case, punting for now
         delta = 0
     offset = GetFirstMember(frame)
@@ -201,17 +201,9 @@ def _find_local_references(func, func_var_data):
                 func_var_data["stackArgs"][dereferences[target_op]][2] += " | CODE_PTR"
             #clear the referers and dereferences?
 
-#entry = _collect_individual_func_vars(idaapi.get_func(here()).startEA)
-#_find_local_references(idaapi.get_func(here()), entry)
-#print "{} {{".format(entry['name'])
-#for offset, data in entry['stackArgs'].iteritems():
-#    print "  {} {}".format(offset, data)
-#print "}"
-
 var_data = _collect_func_vars()
 for entry in var_data:
     print "{} {{".format(entry['name'])
     for offset, data in entry['stackArgs'].iteritems():
         print "  {} {}".format(offset, data)
     print "}"
-
