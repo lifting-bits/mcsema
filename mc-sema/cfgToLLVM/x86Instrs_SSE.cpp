@@ -1772,6 +1772,7 @@ static InstTransResult doMOVHLPSrr(InstPtr ip, BasicBlock *b, const MCOperand &d
             "", b);
 
     R_WRITE<width>(b, dest.getReg(), res);
+    return ContinueBlock;
 }
 
 template <int width>
@@ -1811,6 +1812,7 @@ static InstTransResult doMOVLHPSrr(InstPtr ip, BasicBlock *b, const MCOperand &d
             "", b);
 
     R_WRITE<width>(b, dest.getReg(), res);
+    return ContinueBlock;
 }
 
 static Value *doPMULUDQVV(BasicBlock *b, Value *dest, Value *src)

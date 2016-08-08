@@ -305,7 +305,7 @@ void allocateLocals(Function *F, int bits) {
       TASSERT(dfA != NULL, "");
 
       // FPU STACK
-      Type *floatTy = Type::getX86_FP80Ty(F->getContext());
+      Type *floatTy = Type::getDoubleTy(F->getContext());
       // 8 float values make up the ST registers
       Type *floatArrayTy = ArrayType::get(floatTy, 8);
       Instruction *stRegs = new AllocaInst(floatArrayTy, "STi_val", dfA);
@@ -439,7 +439,7 @@ void allocateLocals(Function *F, int bits) {
 
       // FPU STACK
       //Type    *floatTy =  IntegerType::get(F->getContext(), 128);
-      Type *floatTy = Type::getX86_FP80Ty(F->getContext());
+      Type *floatTy = Type::getDoubleTy(F->getContext());
       // 8 float values make up the ST registers
       Type *floatArrayTy = ArrayType::get(floatTy, 8);
       Instruction *stRegs = new AllocaInst(floatArrayTy, "STi_val", dfA);

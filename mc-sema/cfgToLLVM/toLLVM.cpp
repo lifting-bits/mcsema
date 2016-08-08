@@ -107,7 +107,7 @@ void doGlobalInit(Module *M) {
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // OF // 22
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // DF // 23
 
-    ArrayType  *fpu_regs = ArrayType::get(Type::getX86_FP80Ty(M->getContext()), 8);
+    ArrayType  *fpu_regs = ArrayType::get(Type::getDoubleTy(M->getContext()), 8);
     regFields.push_back(fpu_regs);                            // 80 bytes 24
 
 

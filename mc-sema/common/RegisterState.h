@@ -33,19 +33,7 @@ namespace mcsema {
 // who knew?
 // see email thread:
 // http://lists.cs.uiuc.edu/pipermail/llvm-commits/Week-of-Mon-20070924/054064.html
-/*typedef struct _nativefpu {
-    uint8_t b0;
-    uint8_t b1;
-    uint8_t b2;
-    uint8_t b3;
-    uint8_t b4;
-    uint8_t b5;
-    uint8_t b6;
-    uint8_t b7;
-    uint8_t b8;
-    uint8_t b9;
-} __attribute ((packed)) nativefpu; // 80 bit  aka 10 bytes
-*/
+
 
 // nativefpu = long double
 // = 96 bits of storage and
@@ -232,7 +220,7 @@ typedef struct _xmmregstate {
 #pragma pack(push, 1)
 #endif
 typedef struct _fpuregs {
-    nativefpu st[STREGS_MAX];
+    double st[STREGS_MAX];
 
 #ifdef __cplusplus
 	bool operator==(const _fpuregs &other ) const {
@@ -504,6 +492,21 @@ typedef struct _RegState {
 
 
 #ifndef ONLY_STRUCT
+
+double NATIVEFPU_TO_LD(const nativefpu *nf)
+{
+	long double x;
+	x = *((long double *) nf);
+	return (double) x;
+}
+
+void LD_TO_NATIVEFPU(double ld, nativefpu *nf)
+{
+	uint8_t bytes[12] = {0};
+	*((long double *) &(bytes[0])) = (long double) ld;
+	*nf = *((nativefpu *) &(bytes[0]));
+}
+
 // get the value of st(reg_index)
 nativefpu FPU_GET_REG(RegState *state, unsigned reg_index)
 {
@@ -511,8 +514,10 @@ nativefpu FPU_GET_REG(RegState *state, unsigned reg_index)
 
     assert(reg_index < STREGS_MAX);
     rnum %= STREGS_MAX;
-
-    return state->ST_regs.st[rnum];
+	
+	nativefpu ret;
+    LD_TO_NATIVEFPU(state->ST_regs.st[rnum], &ret);
+	return ret;
 }
 
 // set the value of st(reg_index)
@@ -524,54 +529,7 @@ void FPU_SET_REG(RegState *state, unsigned reg_index, nativefpu val)
     assert(reg_index < STREGS_MAX);
     rnum %= STREGS_MAX;
 
-    state->ST_regs.st[rnum] = val;
-}
-
-long double NATIVEFPU_TO_LD(const nativefpu *nf)
-{
-#ifdef _WIN32
-	// sanity check
-	long double ld = 0;
-#ifndef _WIN64
-	_asm {
-		MOV eax, dword ptr nf
-		_emit 0xDB
-		_emit 0x28
-		;FLD tbyte ptr [eax]	; load 80bits into fpu
-		LEA eax, dword ptr ld		; get address of ld
-		FSTP qword ptr [eax]	; store 64-bits into ld
-	}
-#else
-	assert(sizeof(nf) == sizeof(ld));
-	memcpy(&ld, nf, sizeof(ld));
-#endif
-	return ld;
-#else
-	long double ld;
-	assert(sizeof(*nf) == sizeof(ld));
-	memcpy(&ld, nf, sizeof(ld));
-	return ld;
-#endif
-}
-
-void LD_TO_NATIVEFPU(long double ld, nativefpu *nf)
-{
-#ifdef _WIN32
-#ifndef _WIN64
-	_asm {
-		LEA  eax, dword ptr ld		; get address of ld
-		FLD  qword ptr [eax]	; load 64bits into fpu
-		MOV eax, dword ptr nf
-		_emit 0xDB
-		_emit 0x38
-		;FSTP tbyte ptr [eax]	; store 80-bits into nf
-	}
-#else
-#endif
-#else
-	assert(sizeof(ld) == sizeof(*nf));
-	memcpy(nf, &ld, sizeof(*nf));
-#endif
+    state->ST_regs.st[rnum] = NATIVEFPU_TO_LD(&val);
 }
 
 #endif

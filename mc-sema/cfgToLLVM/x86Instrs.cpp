@@ -183,7 +183,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             DataLayout  td(static_cast<Module*>(F->getParent()));
             uint32_t fpu_arr_size =
                 (uint32_t)td.getTypeAllocSize(
-                        Type::getX86_FP80Ty(B->getContext())) * NUM_FPU_REGS;
+                        Type::getDoubleTy(B->getContext())) * NUM_FPU_REGS;
             Instruction *mcp_fpu = aliasMCSemaScope(callMemcpy(B, globalFPU, localFPU, fpu_arr_size, 4, false));
 
             STORE_F(FPU_B);
@@ -330,7 +330,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
 			DataLayout  td(static_cast<Module*>(F->getParent()));
             uint32_t fpu_arr_size =
                 (uint32_t)td.getTypeAllocSize(
-                        Type::getX86_FP80Ty(B->getContext())) * NUM_FPU_REGS;
+                        Type::getDoubleTy(B->getContext())) * NUM_FPU_REGS;
 
 			Instruction *mcp_fpu = aliasMCSemaScope(callMemcpy(B, globalFPU, localFPU, fpu_arr_size, 8, false));
 
@@ -495,7 +495,7 @@ void writeContextToLocals(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             // Volatile = FALSE
             DataLayout  td(F->getParent());
             uint32_t fpu_arr_size =
-                (uint32_t)td.getTypeAllocSize(Type::getX86_FP80Ty(B->getContext())) * NUM_FPU_REGS;
+                (uint32_t)td.getTypeAllocSize(Type::getDoubleTy(B->getContext())) * NUM_FPU_REGS;
 
             Instruction *mcp_fpu = aliasMCSemaScope(callMemcpy(B, localFPU, globalFPU, fpu_arr_size, 8, false));
 
@@ -641,7 +641,7 @@ std::string regnm = x86_64::getRegisterName(nm); \
             // Volatile = FALSE
             DataLayout  td(F->getParent());
             uint32_t fpu_arr_size =
-                (uint32_t)td.getTypeAllocSize(Type::getX86_FP80Ty(B->getContext())) * NUM_FPU_REGS;
+                (uint32_t)td.getTypeAllocSize(Type::getDoubleTy(B->getContext())) * NUM_FPU_REGS;
 
             Instruction *mcp_fpu = aliasMCSemaScope(callMemcpy(B, localFPU, globalFPU, fpu_arr_size, 4, false));
 
