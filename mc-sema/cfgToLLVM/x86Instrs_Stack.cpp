@@ -31,11 +31,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "X86.h"
 #include "raiseX86.h"
 #include "x86Instrs_Stack.h"
+#include "x86Instrs_MOV.h"
 #include "x86Helpers.h"
 #include "Externals.h"
 #include "ArchOps.h"
 #include <llvm/IR/Attributes.h>
 #include "llvm/Support/Debug.h"
+#include <iostream>
 
 #define NASSERT(cond) TASSERT(cond, "")
 
@@ -559,60 +561,6 @@ static InstTransResult doPopM(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template <int width>
-static Value *getValueForExternal(Module *M, InstPtr ip, BasicBlock *block) {
-
-    Value *addrInt = NULL;
-
-    if( ip->has_ext_call_target() ) {
-        if (width != 32) {
-            throw TErr(__LINE__, __FILE__, "NIY: non 32-bit width for external calls");
-        }
-        std::string target = ip->get_ext_call_target()->getSymbolName();
-        Value *ext_fn = M->getFunction(target);
-        TASSERT(ext_fn != NULL, "Could not find external: " + target);
-        Value *addrInt = new PtrToIntInst(
-                ext_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
-
-        return addrInt;
-    } else if (ip->has_ext_data_ref() ) {
-        std::string target = ip->get_ext_data_ref()->getSymbolName();
-        Value *gvar = M->getGlobalVariable(target);
-
-        TASSERT(gvar != NULL, "Could not find external data: " + target);
-
-
-        if(gvar->getType()->isPointerTy()) {
-            addrInt = new PtrToIntInst(
-                    gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
-        } else {
-
-            IntegerType *int_t = dyn_cast<IntegerType>(gvar->getType());
-            if( int_t == NULL) {
-                throw TErr(__LINE__, __FILE__, "NIY: non-integer external data");
-            }
-            else if(int_t->getBitWidth() < width) {
-                addrInt = new ZExtInst(gvar,
-                        Type::getIntNTy(block->getContext(), width),
-                        "",
-                        block);
-            }
-            else if(int_t->getBitWidth() == width) {
-                addrInt = gvar;
-            }
-            else {
-                throw TErr(__LINE__, __FILE__, "NIY: external type > width");
-            }
-        }
-
-    } else {
-        throw TErr(__LINE__, __FILE__, "No external refernce to get value for!");
-    }
-
-    return addrInt;
-
-}
-
-template <int width>
 static InstTransResult doPushRMM(InstPtr ip, BasicBlock *&b, Value *addr) {
   NASSERT(addr != NULL);
 
@@ -632,10 +580,10 @@ static InstTransResult translate_PUSH32rmm(NativeModulePtr natM, BasicBlock *& b
         doPushV<32>(ip, block, addrInt );
         return ContinueBlock;
     }
-    else if( ip->is_data_offset() ) {
-        ret = doPushRMM<32>(ip, block, GLOBAL( block, natM, inst, ip, 0) );
+    else if( ip->has_mem_reference ) {
+        ret = doPushRMM<32>(ip, block, MEM_AS_DATA_REF( block, natM, inst, ip, 0) );
     } else {
-        ret = doPushRMM<32>(ip, block, ADDR(0) );
+        ret = doPushRMM<32>(ip, block, ADDR_NOREF(0) );
     }
     return ret ;
 }
@@ -643,15 +591,16 @@ static InstTransResult translate_PUSH32rmm(NativeModulePtr natM, BasicBlock *& b
 static InstTransResult translate_PUSHi32(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
-    if( ip->has_call_tgt() ) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(block->getParent()->getParent(), ip->get_call_tgt(0));
+    if( ip->has_code_ref() ) {
+        Value *callback_fn = archMakeCallbackForLocalFunction(block->getParent()->getParent(), 
+                ip->get_reference(Inst::IMMRef));
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
         doPushV<32>(ip, block, addrInt );
         ret = ContinueBlock;
     }
-    else if( ip->is_data_offset() ) {
-         doPushV<32>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip) );
+    else if( ip->has_imm_reference ) {
+         doPushV<32>(ip, block, IMM_AS_DATA_REF(block, natM, ip) );
         ret = ContinueBlock;
     } else {
         ret = doPushI<32>(ip, block, OP(0));
@@ -724,18 +673,18 @@ GENERIC_TRANSLATION(PUSH32r, doPushR<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(PUSH64r, doPushR<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION(POPA32, doPopAV<32>(ip, block));
 GENERIC_TRANSLATION(PUSHA32, doPushAV<32>(ip, block));
-//GENERIC_TRANSLATION_MEM(PUSH32rmm,
-//        doPushRMM<32>(ip, block, ADDR(0)),
-//        doPushRMM<32>(ip, block, STD_GLOBAL_OP(0)));
-GENERIC_TRANSLATION_MEM(PUSHi8,
+//GENERIC_TRANSLATION_REF(PUSH32rmm,
+//        doPushRMM<32>(ip, block, ADDR_NOREF(0)),
+//        doPushRMM<32>(ip, block, MEM_REFERENCE(0)));
+GENERIC_TRANSLATION_REF(PUSHi8,
         doPushI<8>(ip, block, OP(0)),
-        doPushV<8>(ip, block, STD_GLOBAL_OP(0) ))
-GENERIC_TRANSLATION_MEM(PUSHi16,
+        doPushV<8>(ip, block, MEM_REFERENCE(0) ))
+GENERIC_TRANSLATION_REF(PUSHi16,
         doPushI<16>(ip, block, OP(0)),
-        doPushV<16>(ip, block, STD_GLOBAL_OP(0) ))
-GENERIC_TRANSLATION_MEM(POP32rmm,
-        doPopM<32>(ip, block, ADDR(0)),
-        doPopM<32>(ip, block, STD_GLOBAL_OP(0)));
+        doPushV<16>(ip, block, MEM_REFERENCE(0) ))
+GENERIC_TRANSLATION_REF(POP32rmm,
+        doPopM<32>(ip, block, ADDR_NOREF(0)),
+        doPopM<32>(ip, block, MEM_REFERENCE(0)));
 
 void Stack_populateDispatchMap(DispatchMap &m) {
         m[X86::ENTER] = translate_ENTER;

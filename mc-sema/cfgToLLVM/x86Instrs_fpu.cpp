@@ -1614,6 +1614,7 @@ static InstTransResult doCHS(MCInst &inst, InstPtr ip, BasicBlock *&b)
     return ContinueBlock;
 }
 
+            //mem_src =  IMM_AS_DATA_REF(block, natM, ip);\
 
 #define FPU_TRANSLATION(NAME, SETPTR, SETDATA, SETFOPCODE, ACCESSMEM, THECALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst)\
 {\
@@ -1622,11 +1623,11 @@ static InstTransResult doCHS(MCInst &inst, InstPtr ip, BasicBlock *&b)
     Function *F = block->getParent();\
     Value *mem_src = NULL;\
     if (ACCESSMEM) {\
-        if( ip->is_data_offset() ) {\
-            mem_src =  GLOBAL_DATA_OFFSET(block, natM, ip);\
-            if (SETDATA) { F_WRITE(block, FPU_LASTDATA_OFF, mem_src);}\
+        if( ip->has_mem_reference ) {\
+            mem_src =  MEM_REFERENCE(0);\
+            if (SETDATA) { setFpuDataPtr(block, mem_src); }\
         } else {\
-            mem_src = ADDR(0);\
+            mem_src = ADDR_NOREF(0);\
             if (SETDATA) { setFpuDataPtr(block, mem_src); }\
         }\
     }\

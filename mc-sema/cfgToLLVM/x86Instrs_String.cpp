@@ -36,12 +36,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 
-template <int width>
+template <int width, int regWidth>
 static BasicBlock *doCmpsV(BasicBlock *pred) {
-    Value   *lhsRegVal = x86::R_READ<32>(pred, X86::ESI);
+    Value   *lhsRegVal = R_READ<regWidth>(pred, X86::RSI);
     Value   *lhsFromMem = M_READ_0<width>(pred, lhsRegVal);
 
-    Value   *rhsRegVal = x86::R_READ<32>(pred, X86::EDI);
+    Value   *rhsRegVal = R_READ<regWidth>(pred, X86::RDI);
     Value   *rhsFromMem = M_READ_0<width>(pred, rhsRegVal);
 
     //perform a subtraction
@@ -87,40 +87,54 @@ static BasicBlock *doCmpsV(BasicBlock *pred) {
     //if zero, then add to src and dst registers
     Value   *add_lhs = 
         BinaryOperator::CreateAdd(  lhsRegVal,
-                                    CONST_V<32>(block_df_zero, disp), 
+                                    CONST_V<regWidth>(block_df_zero, disp), 
                                     "", 
                                     block_df_zero);
 
     Value   *add_rhs = 
         BinaryOperator::CreateAdd(  rhsRegVal,
-                                    CONST_V<32>(block_df_zero, disp), 
+                                    CONST_V<regWidth>(block_df_zero, disp), 
                                     "", 
                                     block_df_zero);
 
-    x86::R_WRITE<32>(block_df_zero, X86::ESI, add_lhs);
-    x86::R_WRITE<32>(block_df_zero, X86::EDI, add_rhs);
+    R_WRITE<regWidth>(block_df_zero, X86::RSI, add_lhs);
+    R_WRITE<regWidth>(block_df_zero, X86::RDI, add_rhs);
     // return to a single block, to which we will add new instructions
     BranchInst::Create(block_post_write, block_df_zero);
 
     //if one, then sub to src and dst registers
     Value   *sub_lhs = 
         BinaryOperator::CreateSub(  lhsRegVal,
-                                    CONST_V<32>(block_df_one, disp), 
+                                    CONST_V<regWidth>(block_df_one, disp), 
                                     "", 
                                     block_df_one);
 
     Value   *sub_rhs = 
         BinaryOperator::CreateSub(  rhsRegVal,
-                                    CONST_V<32>(block_df_one, disp), 
+                                    CONST_V<regWidth>(block_df_one, disp), 
                                     "", 
                                     block_df_one);
 
-    x86::R_WRITE<32>(block_df_one, X86::ESI, sub_lhs);
-    x86::R_WRITE<32>(block_df_one, X86::EDI, sub_rhs);
+    R_WRITE<regWidth>(block_df_one, X86::RSI, sub_lhs);
+    R_WRITE<regWidth>(block_df_one, X86::RDI, sub_rhs);
     // return to a single block, to which we will add new instructions
     BranchInst::Create(block_post_write, block_df_one);
 
     return block_post_write;
+}
+
+template <int width>
+static BasicBlock* doCmps(BasicBlock *b) {
+	llvm::Module *M = b->getParent()->getParent();
+	int bitWidth = getPointerSize(M);
+	if(bitWidth == Pointer32)
+    {
+		return doCmpsV<width, x86::REG_SIZE>(b);
+    }
+	else
+    {
+		return doCmpsV<width, x86_64::REG_SIZE>(b);
+    }
 }
 
 template <int opSize, int bitWidth>
@@ -201,28 +215,13 @@ static BasicBlock *doStosV(BasicBlock *pred) {
     return doWrite;
 }
 
-template <int width>
-static InstTransResult doStos(BasicBlock *&b) {
-	llvm::Module *M = b->getParent()->getParent();
-	int bitWidth = getPointerSize(M);
-	if(bitWidth == Pointer32)
-    {
-		b = doStosV<width, x86::REG_SIZE>(b);
-    }
-	else
-    {
-		b = doStosV<width, x86_64::REG_SIZE>(b);
-    }
-	return ContinueBlock;
-}
-
-template <int width>
+template <int width, int regWidth>
 static BasicBlock *doScasV(BasicBlock *pred) {
     //do a read from the memory pointed to by EDI
-    Value   *dstRegVal = x86::R_READ<32>(pred, X86::EDI);
+    Value   *dstRegVal = R_READ<regWidth>(pred, X86::RDI);
     Value   *fromMem = M_READ_0<width>(pred, dstRegVal);
     //read the value in EAX
-    Value   *fromEax = x86::R_READ<width>(pred, X86::EAX);
+    Value   *fromEax = R_READ<width>(pred, X86::RAX);
 
     //perform a subtraction
     Value   *res = BinaryOperator::CreateSub(fromEax, fromMem, "", pred);
@@ -276,7 +275,7 @@ static BasicBlock *doScasV(BasicBlock *pred) {
     //if zero, then add to src and dst registers
     Value   *zeroDst = 
         BinaryOperator::CreateAdd(  dstRegVal, 
-                                    CONST_V<32>(isZero, disp), 
+                                    CONST_V<regWidth>(isZero, disp), 
                                     "", 
                                     isZero);
     BranchInst::Create(doWrite, isZero);
@@ -285,14 +284,14 @@ static BasicBlock *doScasV(BasicBlock *pred) {
     //if one, then sub from src and dst registers
     Value   *oneDst = 
         BinaryOperator::CreateSub(  dstRegVal, 
-                                    CONST_V<32>(isOne, disp), 
+                                    CONST_V<regWidth>(isOne, disp), 
                                     "", 
                                     isOne);
     BranchInst::Create(doWrite, isOne);
 
     //populate the update of the source/dest registers
     PHINode *newDst = 
-        PHINode::Create(Type::getIntNTy(pred->getContext(), 32), 
+        PHINode::Create(Type::getIntNTy(pred->getContext(), regWidth), 
                         2, 
                         "", 
                         doWrite);
@@ -300,9 +299,23 @@ static BasicBlock *doScasV(BasicBlock *pred) {
     newDst->addIncoming(zeroDst, isZero);
     newDst->addIncoming(oneDst, isOne);
 
-    x86::R_WRITE<32>(doWrite, X86::EDI, newDst);
+    R_WRITE<regWidth>(doWrite, X86::RDI, newDst);
 
     return doWrite;
+}
+
+template <int width>
+static BasicBlock* doScas(BasicBlock *b) {
+	llvm::Module *M = b->getParent()->getParent();
+	int bitWidth = getPointerSize(M);
+	if(bitWidth == Pointer32)
+    {
+		return doScasV<width, x86::REG_SIZE>(b);
+    }
+	else
+    {
+		return doScasV<width, x86_64::REG_SIZE>(b);
+    }
 }
 
 // Uses RDI & RSI registers 
@@ -415,12 +428,15 @@ static BasicBlock *doMovsV(BasicBlock *pred) {
 	return doWrite;
 }
 
-template <int opSize, int bitWidth>
-static BasicBlock *doRep(BasicBlock *&b, BasicBlock *bodyB, BasicBlock *bodyE) {
+template <int opSize, int bitWidth, bool use_condition>
+static BasicBlock *doRep(BasicBlock *b, BasicBlock *bodyB, BasicBlock *bodyE, CmpInst::Predicate check_op) {
     Function    *F = b->getParent();
     //WHILE countReg != 0 do 'body'
     BasicBlock  *loopHeader = BasicBlock::Create(F->getContext(), "", F);
+
+    // final exit block
     BasicBlock  *rest = BasicBlock::Create(F->getContext(), "", F);
+
     //create a branch in the beginning block to the loop header
     BranchInst::Create(loopHeader, b);
 
@@ -430,127 +446,113 @@ static BasicBlock *doRep(BasicBlock *&b, BasicBlock *bodyB, BasicBlock *bodyE) {
                                 CmpInst::ICMP_NE,
                                 counter_entry,
                                 CONST_V<bitWidth>(loopHeader, 0));
+    // branch either to the body of the loop, or to the final exit block
     BranchInst::Create(bodyB, rest, cmp_entry, loopHeader);
 
-    //subtract 1 from the counter at the end
+    //Add REP code to the end of the body implementation
     Value   *cTmp = R_READ<bitWidth>(bodyE, X86::RCX);
     Value   *cTmpDec =
         BinaryOperator::CreateSub(cTmp, CONST_V<bitWidth>(bodyE, 1), "", bodyE);
     R_WRITE<bitWidth>(bodyE, X86::RCX, cTmpDec);
 
-    //do a test in the loop header based off of the counter to see if the
-    //counter is zero and if ZF <condition> 0 
+    // check if ECX == 0
     Value   *cmp = new ICmpInst(*bodyE,
-                                CmpInst::ICMP_NE,
+                                CmpInst::ICMP_EQ,
                                 cTmpDec,
                                 CONST_V<bitWidth>(bodyE, 0));
 
-    //if cmp is true, then branch to begin
-    BranchInst::Create(bodyB, rest, cmp, bodyE);
+    Value *final_condition =  nullptr;
 
+    if(use_condition) {
+        //do a test on the REP condition
+        Value *zf_val = F_READ(bodyE, ZF);
+        // ICMP_EQ ==  "terminate if ZF == 0"
+        // ICMP_NE ==  "temrinate if ZF == 1"
+        Value *rep_condition = new ICmpInst(*bodyE,
+                check_op,
+                zf_val,
+                CONST_V<1>(bodyE, 0));
+
+        final_condition =  BinaryOperator::Create(Instruction::Or, cmp, rep_condition, "", bodyE);
+
+    } else {
+        final_condition = cmp;
+    }
+
+    //if either_cond is true, exit; otherwise, redo loop
+    BranchInst::Create(rest, // exit block
+            bodyB, // redo loop block
+            final_condition, // test condition
+            bodyE // where to insert this check
+            );
+
+    // this is the final return block
     return rest;
-}
+} 
 
+template <int opSize, int bitWidth>
+static BasicBlock *doRepN(BasicBlock *b, BasicBlock *bodyB, BasicBlock *bodyE) {
 
-template <int width>
-static BasicBlock *doRepCondition(BasicBlock *&b, BasicBlock *bodyB, BasicBlock *bodyE, CmpInst::Predicate condition) {
-    Function    *F = b->getParent();
-    //WHILE countReg != 0 && ZF <condition> 0, do 'body'
-    BasicBlock  *loopHeader = BasicBlock::Create(F->getContext(), "", F);
-    BasicBlock  *rest = BasicBlock::Create(F->getContext(), "", F);
-    //create a branch in the beginning block to the loop header
-    BranchInst::Create(loopHeader, b);
-
-    // check if ECX == 0; if so, bail
-    Value   *counter_entry = x86::R_READ<32>(loopHeader, X86::ECX);
-    Value   *cmp_entry = new ICmpInst(*loopHeader,
-                                CmpInst::ICMP_NE,
-                                counter_entry,
-                                CONST_V<32>(loopHeader, 0));
-    BranchInst::Create(bodyB, rest, cmp_entry, loopHeader);
-
-    //subtract 1 from the counter at the end
-    Value   *cTmp = x86::R_READ<32>(bodyE, X86::ECX);
-    Value   *cTmpDec =
-        BinaryOperator::CreateSub(cTmp, CONST_V<32>(bodyE, 1), "", bodyE);
-    x86::R_WRITE<32>(bodyE, X86::ECX, cTmpDec);
-
-    //do a test in the loop header based off of the counter to see if the
-    //counter is zero and if ZF <condition> 0 
-    Value   *cmp = new ICmpInst(*bodyE,
-                                CmpInst::ICMP_NE,
-                                cTmpDec,
-                                CONST_V<32>(bodyE, 0));
-
-    Value   *zf = F_READ(bodyE, ZF);
-    Value   *zfCmp = new ICmpInst(  *bodyE,
-                                    condition,
-                                    zf, CONST_V<1>(bodyE, 0));
-    Value   *counterAndZf = 
-        BinaryOperator::CreateAnd(cmp, zfCmp, "", bodyE);
-    //if cmp is true, then branch to begin
-    BranchInst::Create(bodyB, rest, counterAndZf, bodyE);
-
-    return rest;
-}
-
-
-template <int width>
-static BasicBlock *doRepe(BasicBlock *&b, BasicBlock *bodyB, BasicBlock *bodyE) {
-
-    return doRepCondition<width>(b, bodyB, bodyE, CmpInst::ICMP_NE);
+    return doRep<opSize, bitWidth, false>(b, bodyB, bodyE, CmpInst::ICMP_EQ);
 
 }
 
-template <int width>
-static BasicBlock *doRepNe(BasicBlock *&b, BasicBlock *bodyB, BasicBlock *bodyE) {
+template <int opSize, int bitWidth>
+static BasicBlock *doRepe(BasicBlock *b, BasicBlock *bodyB, BasicBlock *bodyE) {
 
-    return doRepCondition<width>(b, bodyB, bodyE, CmpInst::ICMP_EQ);
+    return doRep<opSize, bitWidth, true>(b, bodyB, bodyE, CmpInst::ICMP_EQ);
 
 }
 
-template <int width>
-static InstTransResult doMovs(BasicBlock *&b) {
-	//we will just kind of paste a new block into the end
-	//here so that we have less duplicated logic
-	b = doMovsV<width>(b);
+template <int opSize, int bitWidth>
+static BasicBlock *doRepNe(BasicBlock *b, BasicBlock *bodyB, BasicBlock *bodyE) {
 
-	return ContinueBlock;
+    return doRep<opSize, bitWidth, true>(b, bodyB, bodyE, CmpInst::ICMP_NE);
+
 }
-#define DO_REP_CALL(CALL, NAME) template <int width> static InstTransResult doRep ## NAME (BasicBlock *&b) {\
+
+#define DO_REP_CALL(CALL, NAME) template <int opSize> static InstTransResult doRep ## NAME (BasicBlock *&b) {\
 	BasicBlock	*bodyBegin =  \
 		BasicBlock::Create(b->getContext(), "", b->getParent()); \
 	BasicBlock	*bodyEnd = (CALL); \
-	b = doRep<width>(b, bodyBegin, bodyEnd); \
+    Module *M = b->getParent()->getParent();\
+    if(getPointerSize(M) == Pointer32) {\
+	b = doRepN<opSize,32>(b, bodyBegin, bodyEnd); \
+    } else {\
+	b = doRepN<opSize,64>(b, bodyBegin, bodyEnd); \
+    }\
 	return ContinueBlock; \
 }
 
-#define DO_REPE_CALL(CALL, NAME) template <int width> static InstTransResult doRepe ## NAME (BasicBlock *&b) {\
+#define DO_REPE_CALL(CALL, NAME) template <int opSize> static InstTransResult doRepe ## NAME (BasicBlock *&b) {\
 	BasicBlock	*bodyBegin =  \
 		BasicBlock::Create(b->getContext(), "", b->getParent()); \
 	BasicBlock	*bodyEnd = (CALL); \
-	b = doRepe<width>(b, bodyBegin, bodyEnd); \
+    Module *M = b->getParent()->getParent();\
+    if(getPointerSize(M) == Pointer32) {\
+	b = doRepe<opSize,32>(b, bodyBegin, bodyEnd); \
+    } else {\
+	b = doRepe<opSize,64>(b, bodyBegin, bodyEnd); \
+    }\
 	return ContinueBlock; \
 }
 
-#define DO_REPNE_CALL(CALL, NAME) template <int width> static InstTransResult doRepNe ## NAME (BasicBlock *&b) {\
+#define DO_REPNE_CALL(CALL, NAME) template <int opSize> static InstTransResult doRepNe ## NAME (BasicBlock *&b) {\
 	BasicBlock	*bodyBegin =  \
 		BasicBlock::Create(b->getContext(), "", b->getParent()); \
 	BasicBlock	*bodyEnd = (CALL); \
-	b = doRepNe<width>(b, bodyBegin, bodyEnd); \
-	return ContinueBlock; \
+    Module *M = b->getParent()->getParent();\
+    if(getPointerSize(M) == Pointer32) {\
+	b = doRepNe<opSize,32>(b, bodyBegin, bodyEnd); \
+    } else {\
+	b = doRepNe<opSize,64>(b, bodyBegin, bodyEnd); \
+    }\
+    return ContinueBlock; \
 }
 
-DO_REPE_CALL(doCmpsV<width>(bodyBegin), Cmps)
-DO_REPNE_CALL(doCmpsV<width>(bodyBegin), Cmps)
-
-DO_REPE_CALL(doStos<width>(bodyBegin), Stos)
-DO_REPNE_CALL(doStos<width>(bodyBegin), Stos)
-
-DO_REPNE_CALL(doScasV<width>(bodyBegin), Scas)
-
-
-DO_REP_CALL(doStosV<width>(bodyBegin), Stos)
+DO_REPE_CALL(doCmps<opSize>(bodyBegin), Cmps)
+DO_REPNE_CALL(doCmps<opSize>(bodyBegin), Cmps)
+DO_REPNE_CALL(doScas<opSize>(bodyBegin), Scas)
 
 template <int opSize, int bitWidth>
 static InstTransResult doRepMovs(BasicBlock *&b) {
@@ -559,9 +561,32 @@ static InstTransResult doRepMovs(BasicBlock *&b) {
         BasicBlock::Create(b->getContext(), "", b->getParent());
     BasicBlock	*bodyEnd = doMovsV<opSize>(bodyBegin);
 
-    b = doRep<opSize, bitWidth>(b, bodyBegin, bodyEnd);
+    b = doRepN<opSize, bitWidth>(b, bodyBegin, bodyEnd);
 
     return ContinueBlock;
+}
+
+template <int width>
+static InstTransResult doMovs(BasicBlock *&b, InstPtr ip) {
+	//we will just kind of paste a new block into the end
+	//here so that we have less duplicated logic
+	llvm::Module *M = b->getParent()->getParent();
+	int bitWidth = getPointerSize(M);
+    Inst::Prefix pfx = ip->get_prefix();
+    if(pfx == Inst::RepPrefix) {
+        if(bitWidth == Pointer32)
+        {
+            doRepMovs<width, x86::REG_SIZE>(b);
+        }
+        else
+        {
+            doRepMovs<width, x86_64::REG_SIZE>(b);
+        }
+    } else {
+        b = doMovsV<width>(b);
+    }
+
+	return ContinueBlock;
 }
 
 template <int opSize, int bitWidth>
@@ -571,29 +596,55 @@ static InstTransResult doRepStos(BasicBlock *&b) {
         BasicBlock::Create(b->getContext(), "", b->getParent());
     BasicBlock	*bodyEnd = doStosV<opSize, bitWidth>(bodyBegin);
 
-    b = doRep<opSize, bitWidth>(b, bodyBegin, bodyEnd);
+    b = doRepN<opSize, bitWidth>(b, bodyBegin, bodyEnd);
 
     return ContinueBlock;
 }
 
+template <int width>
+static InstTransResult doStos(BasicBlock *&b, InstPtr ip) {
+	llvm::Module *M = b->getParent()->getParent();
+	int bitWidth = getPointerSize(M);
+    Inst::Prefix pfx = ip->get_prefix();
+	if(bitWidth == Pointer32)
+    {
+        if(pfx == Inst::RepPrefix) {
+            doRepStos<width, x86::REG_SIZE>(b);
+        } else {
+            b = doStosV<width, x86::REG_SIZE>(b);
+        }
+    }
+	else
+    {
+        if(pfx == Inst::RepPrefix) {
+            doRepStos<width, x86_64::REG_SIZE>(b);
+        } else {
 
-GENERIC_TRANSLATION(MOVSD, doMovs<32>(block))
+            b = doStosV<width, x86_64::REG_SIZE>(b);
+        }
+    }
+	return ContinueBlock;
+}
+
+
+
+GENERIC_TRANSLATION(MOVSD, doMovs<32>(block, ip))
 GENERIC_TRANSLATION(REP_MOVSD_32, (doRepMovs<32, 32>(block)))
-GENERIC_TRANSLATION(MOVSW, doMovs<16>(block))
+GENERIC_TRANSLATION(MOVSW, doMovs<16>(block, ip))
 GENERIC_TRANSLATION(REP_MOVSW_32, (doRepMovs<16, 32>(block)))
-GENERIC_TRANSLATION(MOVSB, doMovs<8>(block))
+GENERIC_TRANSLATION(MOVSB, doMovs<8>(block, ip))
 GENERIC_TRANSLATION(REP_MOVSB_32, (doRepMovs<8, 32>(block)))
 
-GENERIC_TRANSLATION(MOVSQ, doMovs<64>(block))
+GENERIC_TRANSLATION(MOVSQ, doMovs<64>(block, ip))
 GENERIC_TRANSLATION(REP_MOVSB_64, (doRepMovs<8, 64>(block)))
 GENERIC_TRANSLATION(REP_MOVSW_64, (doRepMovs<16, 64>(block)))
 GENERIC_TRANSLATION(REP_MOVSD_64, (doRepMovs<32, 64>(block)))
 GENERIC_TRANSLATION(REP_MOVSQ_64, (doRepMovs<64, 64>(block)))
 
-GENERIC_TRANSLATION(STOSQ, doStos<64>(block))
-GENERIC_TRANSLATION(STOSD, doStos<32>(block))
-GENERIC_TRANSLATION(STOSW, doStos<16>(block))
-GENERIC_TRANSLATION(STOSB, doStos<8>(block))
+GENERIC_TRANSLATION(STOSQ, doStos<64>(block, ip))
+GENERIC_TRANSLATION(STOSD, doStos<32>(block, ip))
+GENERIC_TRANSLATION(STOSW, doStos<16>(block, ip))
+GENERIC_TRANSLATION(STOSB, doStos<8>(block, ip))
 
 GENERIC_TRANSLATION(REP_STOSB_64, (doRepStos<8, 64>(block)))
 GENERIC_TRANSLATION(REP_STOSW_64, (doRepStos<16, 64>(block)))
@@ -624,7 +675,7 @@ GENERIC_TRANSLATION(REP_STOSQ_64, (doRepStos<64, 64>(block)))
     Inst::Prefix        pfx = ip->get_prefix();\
     switch(pfx) { \
         case Inst::NoPrefix: \
-            block = doCmpsV<WIDTH>(block); \
+            block = doCmps<WIDTH>(block); \
             ret = ContinueBlock; \
             break; \
         case Inst::RepPrefix: \
@@ -667,9 +718,9 @@ void String_populateDispatchMap(DispatchMap &m) {
 		
 		m[X86::STOSQ] = translate_STOSQ;
 		m[X86::REP_STOSB_64] = translate_REP_STOSB_64;
-		//m[X86::REP_STOSW_64] = translate_REP_STOSW_64;
-		//m[X86::REP_STOSD_64] = translate_REP_STOSD_64;
-		//m[X86::REP_STOSQ_64] = translate_REP_STOSQ_64;
+		m[X86::REP_STOSW_64] = translate_REP_STOSW_64;
+		m[X86::REP_STOSD_64] = translate_REP_STOSD_64;
+		m[X86::REP_STOSQ_64] = translate_REP_STOSQ_64;
 		
 
         m[X86::SCASW] = translate_SCAS16;

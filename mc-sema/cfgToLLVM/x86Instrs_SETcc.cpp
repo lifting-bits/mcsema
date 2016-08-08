@@ -321,62 +321,62 @@ DO_SETCC_OP_MEM(Setns)
 DO_SETCC_OP_REG(Setp)
 DO_SETCC_OP_MEM(Setp)
 
-GENERIC_TRANSLATION_MEM(SETAm, 
-	doSetaM(ip, block, ADDR(0)),
-	doSetaM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETAm, 
+	doSetaM(ip, block, ADDR_NOREF(0)),
+	doSetaM(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(SETAr, doSetaR(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(SETBm, 
-	doSetbM(ip, block, ADDR(0)),
-	doSetbM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETBm, 
+	doSetbM(ip, block, ADDR_NOREF(0)),
+	doSetbM(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(SETBr, doSetbR(ip, block, OP(0)))
 GENERIC_TRANSLATION(SETNEr, doSetneR(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(SETNEm, 
-	doSetneM(ip, block, ADDR(0)),
-	doSetneM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETNEm, 
+	doSetneM(ip, block, ADDR_NOREF(0)),
+	doSetneM(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(SETEr, doSeteR(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(SETEm,
-  doSeteM(ip, block, ADDR(0)),
-  doSeteM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETEm,
+  doSeteM(ip, block, ADDR_NOREF(0)),
+  doSeteM(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(SETGEr, doSetgeR(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(SETGEm,
-  doSetgeM(ip, block, ADDR(0)),
-  doSetgeM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETGEm,
+  doSetgeM(ip, block, ADDR_NOREF(0)),
+  doSetgeM(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(SETGr, doSetgR(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(SETGm,
-  doSetgM(ip, block, ADDR(0)),
-  doSetgM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETGm,
+  doSetgM(ip, block, ADDR_NOREF(0)),
+  doSetgM(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(SETLr, doSetlR(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(SETLm,
-  doSetlM(ip, block, ADDR(0)),
-  doSetlM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETLm,
+  doSetlM(ip, block, ADDR_NOREF(0)),
+  doSetlM(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(SETLEr, doSetleR(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(SETLEm,
-  doSetleM(ip, block, ADDR(0)),
-  doSetleM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETLEm,
+  doSetleM(ip, block, ADDR_NOREF(0)),
+  doSetleM(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(SETSr, doSetsR(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(SETSm,
-  doSetsM(ip, block, ADDR(0)),
-  doSetsM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETSm,
+  doSetsM(ip, block, ADDR_NOREF(0)),
+  doSetsM(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(SETAEr, doSetaeR(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(SETAEm,
-  doSetaeM(ip, block, ADDR(0)),
-  doSetaeM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETAEm,
+  doSetaeM(ip, block, ADDR_NOREF(0)),
+  doSetaeM(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(SETBEr, doSetbeR(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(SETBEm,
-  doSetbeM(ip, block, ADDR(0)),
-  doSetbeM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETBEm,
+  doSetbeM(ip, block, ADDR_NOREF(0)),
+  doSetbeM(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(SETNPr, doSetnpR(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(SETNPm,
-  doSetnpM(ip, block, ADDR(0)),
-  doSetnpM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETNPm,
+  doSetnpM(ip, block, ADDR_NOREF(0)),
+  doSetnpM(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(SETNSr, doSetnsR(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(SETNSm,
-  doSetnsM(ip, block, ADDR(0)),
-  doSetnsM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETNSm,
+  doSetnsM(ip, block, ADDR_NOREF(0)),
+  doSetnsM(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(SETPr, doSetpR(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(SETPm,
-  doSetpM(ip, block, ADDR(0)),
-  doSetpM(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(SETPm,
+  doSetpM(ip, block, ADDR_NOREF(0)),
+  doSetpM(ip, block, MEM_REFERENCE(0)))
 
 void SETcc_populateDispatchMap(DispatchMap &m) {
         m[X86::SETAm] = translate_SETAm;

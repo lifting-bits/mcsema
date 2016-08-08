@@ -463,7 +463,7 @@ static bool parseJumpIndexTable(ExecutableContainer *c,
         const vector<VA> &jmptable_entries,
         raw_ostream &out)
 {
-    VA reloc_offset = index_insn->get_reloc_offset();
+    VA reloc_offset = index_insn->get_reloc_offset(Inst::MEMRef);
     if (reloc_offset == 0)  {
         out << "Unsupported jump index write; no relocation\n";
         // this jump index probably doesn't use a table
@@ -571,7 +571,7 @@ static bool handlePossibleJumpTable(ExecutableContainer *c,
 
     // is this a jump table, step 0
     // does this instruction have a relocation?
-    VA reloc_offset = jmpinst->get_reloc_offset();
+    VA reloc_offset = jmpinst->get_reloc_offset(Inst::MEMRef);
     if (reloc_offset == 0)  {
         out << "Not a jump table: no relocation in JMP32m\n";
         // bail, this is not a jump table
@@ -764,14 +764,16 @@ static bool setHeuristicRef(ExecutableContainer *c,
     if(elft && elft->isLinked()) {
        if (elft->is_in_code(imm)) {
             // this instruction references code
-            I->set_call_tgt(imm);
+            I->set_reference(Inst::IMMRef, imm);
+            I->set_ref_type(Inst::IMMRef, Inst::CFGCodeRef);
             // make sure we disassemble at this new address
             funcs.push(imm);
             out << "Found new function entry from " << whichInst << ": " << to_string<VA>(imm, hex) << "\n";
             return true;
        } else if (elft->is_in_data(imm)) {
             out << "Adding local data ref to: " << to_string<VA>(imm, hex) << "\n";
-            I->set_data_offset(imm);
+            I->set_reference(Inst::IMMRef, imm);
+            I->set_ref_type(Inst::IMMRef, Inst::CFGDataRef);
        } else if (c->find_import_name(imm, imp_name)) {
            out << "Import name is: " << imp_name << "\n";
        }
@@ -838,7 +840,7 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
 
                 // this instruction has a relocation
                 // save the relocation offset for later
-                I->set_reloc_offset(i);
+                I->set_reloc_offset(Inst::MEMRef, i);
 
                 //get the offset for this address
                 //add it as a data offset to the instruction
@@ -890,9 +892,11 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                                 funcs.push(*nfi);
                             }
 
-                            I->set_data_offset(addr);
+                            I->set_reference(Inst::MEMRef, addr);
+                            I->set_ref_type(Inst::MEMRef, Inst::CFGDataRef);
                         } else {
-                            I->set_call_tgt(addr);
+                            I->set_reference(Inst::MEMRef, addr);
+                            I->set_ref_type(Inst::MEMRef, Inst::CFGCodeRef);
                             out << "Adding: 0x" << to_string<VA>(addr, hex) << " as target\n";
                             funcs.push(addr);
                         }
@@ -903,7 +907,8 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                     else if(( !can_ref_code && is_reloc_code) || is_reloc_data )
                     {
                         out << "Adding data reference to 0x" << to_string<VA>(addr, hex) << "\n";
-                        I->set_data_offset(addr);
+                        I->set_reference(Inst::MEMRef, addr);
+                        I->set_ref_type(Inst::MEMRef, Inst::CFGDataRef);
                     } else {
                         out << "WARNING: relocation points to neither code nor data:" << to_string<VA>(addr, hex) << "\n";
                     }
@@ -1018,7 +1023,8 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                         out << "Symbol not found, maybe a local call\n";
                         if(c->relocate_addr(addr, relo_addr, reloc_size)){
                             out << "Found local call to: " << to_string<VA>(relo_addr, hex) << "\n";
-                            I->set_call_tgt(relo_addr);
+                            I->set_reference(Inst::MEMRef, relo_addr);
+                            I->set_ref_type(Inst::MEMRef, Inst::CFGCodeRef);
                             out << "Adding: 0x" << to_string<VA>(relo_addr, hex) << " as target because its relo-able and internal\n";
                             funcs.push(relo_addr);
                         } else {
@@ -1027,7 +1033,8 @@ NativeBlockPtr decodeBlock( ExecutableContainer *c,
                             out << "Assuming address should not be relocated\n";
                             VA  local_call_tgt = curAddr+op.getImm()+I->get_len();
                             out << "Found local call to: " << to_string<VA>(local_call_tgt, hex) << "\n";
-                            I->set_call_tgt(local_call_tgt);
+                            I->set_reference(Inst::IMMRef, local_call_tgt);
+                            I->set_ref_type(Inst::IMMRef, Inst::CFGCodeRef);
                             out << "Adding: 0x" << to_string<VA>(local_call_tgt, hex) << " as target because its a non-relocateable internal call\n";
                             funcs.push(local_call_tgt);
                         }

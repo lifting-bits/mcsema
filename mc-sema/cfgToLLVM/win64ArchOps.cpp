@@ -9,13 +9,13 @@ bool shouldSubtractImageBase(Module *M) {
 
     // we are on windows
     if(getSystemOS(M) != Triple::Win32) {
-        llvm::errs() << __FUNCTION__ << ": Not on Win32\n";
+        //llvm::errs() << __FUNCTION__ << ": Not on Win32\n";
         return false;
     }
 
     // and we are on amd64
     if(getSystemArch(M) != _X86_64_) {
-        llvm::errs() << __FUNCTION__ << ": Not on amd64\n";
+        //llvm::errs() << __FUNCTION__ << ": Not on amd64\n";
         return false;
     }
 

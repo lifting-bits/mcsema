@@ -1,0 +1,56 @@
+pcre_compile 5 C N
+pcre16_compile 5 C N
+pcre_compile2 6 C N
+pcre16_compile2 6 C N
+pcre_config 2 C N
+pcre16_config 2 C N
+pcre_copy_named_substring 7 C N
+pcre16_copy_named_substring 7 C N
+pcre_copy_substring 6 C N
+pcre16_copy_substring 6 C N
+pcre_dfa_exec 10 C N
+pcre16_dfa_exec 10 C N
+pcre_exec 8 C N
+pcre16_exec 8 C N
+pcre_free_substring 1 C N
+pcre16_free_substring 1 C N
+pcre_free_substring_list 1 C N
+pcre16_free_substring_list 1 C N
+pcre_fullinfo 4 C N
+pcre16_fullinfo 4 C N
+pcre_get_named_substring 6 C N
+pcre16_get_named_substring 6 C N
+pcre_get_stringnumber 2 C N
+pcre16_get_stringnumber 2 C N
+pcre_get_stringtable_entries 4 C N
+pcre16_get_stringtable_entries 4 C N
+pcre_get_substring 5 C N
+pcre16_get_substring 5 C N
+pcre_get_substring_list 4 C N
+pcre16_get_substring_list 4 C N
+pcre_maketables 0 C N
+pcre16_maketables 0 C N
+pcre_refcount 2 C N
+pcre16_refcount 2 C N
+pcre_study 3 C N
+pcre16_study 3 C N
+pcre_free_study 1 C N
+pcre16_free_study 1 C N
+pcre_version 0 C N
+pcre16_version 0 C N
+pcre_pattern_to_host_byte_order 3 C N
+pcre16_pattern_to_host_byte_order 3 C N
+pcre16_utf16_to_host_byte_order 5 C N
+pcre_jit_stack_alloc 2 C N
+pcre16_jit_stack_alloc 2 C N
+pcre_jit_stack_free 1 C N
+pcre16_jit_stack_free 1 C N
+pcre_assign_jit_stack 3 C N
+pcre16_assign_jit_stack 3 C N
+#exported function pointers
+DATA: pcre_free 8
+DATA: pcre_malloc 8
+DATA: pcre_stack_malloc 8
+DATA: pcre_stack_free 8
+DATA: pcre_callout 8
+DATA: pcre_stack_guard 8
