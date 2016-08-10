@@ -9,7 +9,7 @@ int foo(int first, int *second, short(*third)(short))
 	return bar;
 }
 
-short bar(short m)
+short bim(short m)
 {
 	short rval;
 	rval = m ^ 0xCCCC;
@@ -21,6 +21,6 @@ int main(int argc, char **argv)
 {
 	int m,n ;
 	n = 5;
-	m = foo(4, &n, &bar);
+	m = foo(4, &n, &bim);
 	return 0;
 }
