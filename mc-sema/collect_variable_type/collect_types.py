@@ -202,8 +202,8 @@ def _find_local_references(func, func_var_data):
             #clear the referers and dereferences?
 
 var_data = _collect_func_vars()
-for entry in var_data:
+for entry in sorted(var_data, key=lambda x:x['name']):
     print "{} {{".format(entry['name'])
-    for offset, data in entry['stackArgs'].iteritems():
-        print "  {} {}".format(offset, data)
+    for offset in sorted(entry['stackArgs'].keys())
+        print "  {} {}".format(offset, entry['stackArgs'][offset])
     print "}"
