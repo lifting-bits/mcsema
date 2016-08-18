@@ -145,7 +145,7 @@ __attribute__((naked)) int __mcsema_inception()
             "movups %%xmm6, %c[state_xmm6](%%rax)\n"
             "movups %%xmm7, %c[state_xmm7](%%rax)\n"
 
-            // copy over stack_alloc_size_SIZE bytes of stack (we may need to fetch stuff from it)
+            // copy over STACK_SIZE/2 bytes of stack (we may need to fetch stuff from it)
             // at this point we saved all the registers, so we can clobber at will
             // since they are restored on function exit
             // be careful not to try to copy past stack_max, or we will hit unmapped memory
