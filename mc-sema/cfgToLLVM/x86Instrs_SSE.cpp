@@ -1339,7 +1339,8 @@ static InstTransResult doPEXTRWmr(InstPtr ip, BasicBlock *&b, Value *memAddr, co
     return ContinueBlock;
 }
 
-template <int width, int elemwidth>
+enum UnpackType {UNPACK_LOW, UNPACK_HIGH};
+template <int width, int elemwidth, UnpackType upt>
 static Value* doUnpack(BasicBlock *&b, Value *v1, Value *v2)
 {
     NASSERT(width % elemwidth == 0);
@@ -1356,9 +1357,14 @@ static Value* doUnpack(BasicBlock *&b, Value *v1, Value *v2)
 
     std::vector<Constant*> shuffle_vec;
 
+    int elem_start = 0;
+    if(upt == UNPACK_HIGH) {
+        elem_start = elem_count/2;
+    }
+
     for(int i = 0; i < elem_count/2; i++) {
-            shuffle_vec.push_back(CONST_V<32>(b, i + elem_count));
-            shuffle_vec.push_back(CONST_V<32>(b, i));
+            shuffle_vec.push_back(CONST_V<32>(b, elem_start + i + elem_count));
+            shuffle_vec.push_back(CONST_V<32>(b, elem_start + i));
     }
     Value *vecShuffle = ConstantVector::get(shuffle_vec);
 
@@ -1381,7 +1387,7 @@ static Value* doUnpack(BasicBlock *&b, Value *v1, Value *v2)
     return intOutput;
 }
 
-template <int width, int slice_width>
+template <int width, int slice_width, UnpackType upt>
 static InstTransResult doPUNPCKVV(
         BasicBlock *&b, 
         const MCOperand &dst, 
@@ -1390,13 +1396,13 @@ static InstTransResult doPUNPCKVV(
     
     NASSERT(dst.isReg());
 
-    Value *shuffled = doUnpack<width, slice_width>(b, v1, v2);
+    Value *shuffled = doUnpack<width, slice_width, upt>(b, v1, v2);
 
     R_WRITE<width>(b, dst.getReg(), shuffled);
     return ContinueBlock;
 }
 
-template <int width, int slice_width>
+template <int width, int slice_width, UnpackType upt>
 static InstTransResult doPUNPCKrr(
         BasicBlock *&b, 
         const MCOperand &dst, 
@@ -1408,10 +1414,10 @@ static InstTransResult doPUNPCKrr(
     Value *srcVal = R_READ<width>(b, src.getReg());
     Value *dstVal = R_READ<width>(b, dst.getReg());
 
-    return doPUNPCKVV<width, slice_width>(b, dst, srcVal, dstVal);
+    return doPUNPCKVV<width, slice_width, upt>(b, dst, srcVal, dstVal);
 }
 
-template <int width, int slice_width>
+template <int width, int slice_width, UnpackType upt>
 static InstTransResult doPUNPCKrm(
         InstPtr ip, 
         BasicBlock *&b, 
@@ -1424,7 +1430,7 @@ static InstTransResult doPUNPCKrm(
     Value *srcVal = M_READ<width>(ip, b, memAddr);
     Value *dstVal = R_READ<width>(b, dst.getReg());
 
-    return doPUNPCKVV<width, slice_width>(b, dst, srcVal, dstVal);
+    return doPUNPCKVV<width, slice_width, upt>(b, dst, srcVal, dstVal);
 }
 
 template <int width, int elemwidth, CmpInst::Predicate cmp_op>
@@ -1790,7 +1796,7 @@ static InstTransResult doMOVLHPSrr(InstPtr ip, BasicBlock *b, const MCOperand &d
             CONST_V<width>(b, width/2),
             "", b);
 
-    TASSERT(width < 64, "Can't truncate from smaller width");
+    TASSERT( width >= 64 , "Can't truncate from smaller width");
 
     Value* bottom_part = new TruncInst( 
             r_dest, 
@@ -2503,29 +2509,52 @@ GENERIC_TRANSLATION_REF(PEXTRWmr,
         (doPEXTRWmr(ip, block, MEM_REFERENCE(0), OP(5), OP(6))) )
 
 GENERIC_TRANSLATION(PUNPCKLBWrr, 
-        (doPUNPCKrr<128,8>(block, OP(1), OP(2))) )
+        (doPUNPCKrr<128,8,UNPACK_LOW>(block, OP(1), OP(2))) )
 GENERIC_TRANSLATION_REF(PUNPCKLBWrm, 
-        (doPUNPCKrm<128,8>(ip, block, OP(1), ADDR_NOREF(2))),
-        (doPUNPCKrm<128,8>(ip, block, OP(1), MEM_REFERENCE(2))) )
+        (doPUNPCKrm<128,8,UNPACK_LOW>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPUNPCKrm<128,8,UNPACK_LOW>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PUNPCKLWDrr, 
-        (doPUNPCKrr<128,16>(block, OP(1), OP(2))) )
+        (doPUNPCKrr<128,16,UNPACK_LOW>(block, OP(1), OP(2))) )
 GENERIC_TRANSLATION_REF(PUNPCKLWDrm, 
-        (doPUNPCKrm<128,16>(ip, block, OP(1), ADDR_NOREF(2))),
-        (doPUNPCKrm<128,16>(ip, block, OP(1), MEM_REFERENCE(2))) )
+        (doPUNPCKrm<128,16,UNPACK_LOW>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPUNPCKrm<128,16,UNPACK_LOW>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PUNPCKLDQrr, 
-        (doPUNPCKrr<128,32>(block, OP(1), OP(2))) )
+        (doPUNPCKrr<128,32,UNPACK_LOW>(block, OP(1), OP(2))) )
 GENERIC_TRANSLATION_REF(PUNPCKLDQrm, 
-        (doPUNPCKrm<128,32>(ip, block, OP(1), ADDR_NOREF(2))),
-        (doPUNPCKrm<128,32>(ip, block, OP(1), MEM_REFERENCE(2))) )
+        (doPUNPCKrm<128,32,UNPACK_LOW>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPUNPCKrm<128,32,UNPACK_LOW>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PUNPCKLQDQrr, 
-        (doPUNPCKrr<128,64>(block, OP(1), OP(2))) )
+        (doPUNPCKrr<128,64,UNPACK_LOW>(block, OP(1), OP(2))) )
 GENERIC_TRANSLATION_REF(PUNPCKLQDQrm, 
-        (doPUNPCKrm<128,64>(ip, block, OP(1), ADDR_NOREF(2))),
-        (doPUNPCKrm<128,64>(ip, block, OP(1), MEM_REFERENCE(2))) )
+        (doPUNPCKrm<128,64,UNPACK_LOW>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPUNPCKrm<128,64,UNPACK_LOW>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
+GENERIC_TRANSLATION(PUNPCKHBWrr, 
+        (doPUNPCKrr<128,8,UNPACK_HIGH>(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_REF(PUNPCKHBWrm, 
+        (doPUNPCKrm<128,8,UNPACK_HIGH>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPUNPCKrm<128,8,UNPACK_HIGH>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION(PUNPCKHWDrr, 
+        (doPUNPCKrr<128,16,UNPACK_HIGH>(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_REF(PUNPCKHWDrm, 
+        (doPUNPCKrm<128,16,UNPACK_HIGH>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPUNPCKrm<128,16,UNPACK_HIGH>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION(PUNPCKHDQrr, 
+        (doPUNPCKrr<128,32,UNPACK_HIGH>(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_REF(PUNPCKHDQrm, 
+        (doPUNPCKrm<128,32,UNPACK_HIGH>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPUNPCKrm<128,32,UNPACK_HIGH>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION(PUNPCKHQDQrr, 
+        (doPUNPCKrr<128,64,UNPACK_HIGH>(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_REF(PUNPCKHQDQrm, 
+        (doPUNPCKrm<128,64,UNPACK_HIGH>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doPUNPCKrm<128,64,UNPACK_HIGH>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(PCMPGTBrr,
         (do_SSE_COMPARE_RR<128,8,ICmpInst::ICMP_SGT>(ip, block, OP(1), OP(2))) )
@@ -2685,6 +2714,15 @@ GENERIC_TRANSLATION(CVTPD2PSrr,
 GENERIC_TRANSLATION_REF(CVTPD2PSrm,
         (doCVTPD2PSrm(ip, block, OP(0), ADDR_NOREF(1))),
         (doCVTPD2PSrm(ip, block, OP(0), MEM_REFERENCE(1))) )
+
+GENERIC_TRANSLATION(MOV64toPQIrr, 
+        (MOVAndZextRR<64>(block, OP(0), OP(1))) )
+GENERIC_TRANSLATION_REF(MOV64toSDrm, 
+        (MOVAndZextRM<64>(ip, block, OP(0), ADDR_NOREF(1))),
+        (MOVAndZextRM<64>(ip, block, OP(0), MEM_REFERENCE(1))) )
+GENERIC_TRANSLATION_REF(MOVQI2PQIrm,
+        (MOVAndZextRM<64>(ip, block, OP(0), ADDR_NOREF(1))),
+        (MOVAndZextRM<64>(ip, block, OP(0), MEM_REFERENCE(1))) )
 
 void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::MOVSDrm] = (doMOVSrm<64>);
@@ -2847,6 +2885,15 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::PUNPCKLQDQrr] = translate_PUNPCKLQDQrr;
     m[X86::PUNPCKLQDQrm] = translate_PUNPCKLQDQrm;
 
+    m[X86::PUNPCKHBWrr] = translate_PUNPCKHBWrr;
+    m[X86::PUNPCKHBWrm] = translate_PUNPCKHBWrm;
+    m[X86::PUNPCKHWDrr] = translate_PUNPCKHWDrr;
+    m[X86::PUNPCKHWDrm] = translate_PUNPCKHWDrm;
+    m[X86::PUNPCKHDQrr] = translate_PUNPCKHDQrr;
+    m[X86::PUNPCKHDQrm] = translate_PUNPCKHDQrm;
+    m[X86::PUNPCKHQDQrr] = translate_PUNPCKHQDQrr;
+    m[X86::PUNPCKHQDQrm] = translate_PUNPCKHQDQrm;
+
     m[X86::PADDBrr] = translate_PADDBrr;
     m[X86::PADDBrm] = translate_PADDBrm;
     m[X86::PADDWrr] = translate_PADDWrr;
@@ -2966,4 +3013,9 @@ void SSE_populateDispatchMap(DispatchMap &m) {
 
     m[X86::CVTPD2PSrm] = translate_CVTPD2PSrm;
     m[X86::CVTPD2PSrr] = translate_CVTPD2PSrr;
+
+    m[X86::MOV64toPQIrr] = translate_MOV64toPQIrr;
+    m[X86::MOVPQIto64rr] = (doMOVSrr<64, 0, 1>);
+    m[X86::MOV64toSDrm]  = translate_MOV64toSDrm;
+    m[X86::MOVQI2PQIrm]  = translate_MOVQI2PQIrm;
 }
