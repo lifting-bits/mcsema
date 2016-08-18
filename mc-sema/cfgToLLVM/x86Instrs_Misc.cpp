@@ -63,6 +63,13 @@ static InstTransResult doInt3(BasicBlock *b) {
 	return ContinueBlock;
 }
 
+static InstTransResult doTrap(BasicBlock *b) {
+	Module	*M = b->getParent()->getParent();
+	Function	*trapIntrin = Intrinsic::getDeclaration(M, Intrinsic::trap);
+	CallInst::Create(trapIntrin, "", b);
+    Value *unreachable = new UnreachableInst(b->getContext(), b);
+	return ContinueBlock;
+}
 
 static InstTransResult doCdq( BasicBlock   *b ) {
     // EDX <- SEXT(EAX)
@@ -229,7 +236,10 @@ static InstTransResult doLea(InstPtr ip,   BasicBlock *&b,
 
     //addr is an address, so, convert it to an integer value to write
     Type    *ty = Type::getIntNTy(b->getContext(), width);
-    Value   *addrInt = new PtrToIntInst(addr, ty, "", b);
+    Value *addrInt = addr;
+    if(addr->getType()->isPointerTy()) {
+        addrInt = new PtrToIntInst(addr, ty, "", b);
+    }
 
     return doLeaV<width>(b, dst, addrInt); 
 }
@@ -640,6 +650,7 @@ static InstTransResult doBsfr(
 
 GENERIC_TRANSLATION(CDQ, doCdq(block))
 GENERIC_TRANSLATION(INT3, doInt3(block))
+GENERIC_TRANSLATION(TRAP, doTrap(block))
 GENERIC_TRANSLATION(NOOP, doNoop(block))
 GENERIC_TRANSLATION(HLT, doHlt(block))
 
@@ -758,4 +769,5 @@ void Misc_populateDispatchMap(DispatchMap &m) {
     m[X86::BSF32rr] = translate_BSF32rr;
     m[X86::BSF32rm] = translate_BSF32rm;
     m[X86::BSF16rr] = translate_BSF16rr;
+    m[X86::TRAP] = translate_TRAP;
 }
