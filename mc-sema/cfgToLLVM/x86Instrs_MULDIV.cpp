@@ -588,6 +588,9 @@ static InstTransResult doDivM(InstPtr ip, BasicBlock *&b, Value *memLoc) {
 GENERIC_TRANSLATION_REF(IMUL32rm, 
     doIMulRM<32>(ip,  block, OP(0), OP(1), ADDR_NOREF(2)),
     doIMulRM<32>(ip,  block, OP(0), OP(1), MEM_REFERENCE(2)))
+GENERIC_TRANSLATION_REF(IMUL64rm,
+    doIMulRM<64>(ip,  block, OP(0), OP(1), ADDR_NOREF(2)),
+    doIMulRM<64>(ip,  block, OP(0), OP(1), MEM_REFERENCE(2)))
 GENERIC_TRANSLATION_REF(IMUL16rm, 
     doIMulRM<16>(ip,  block, OP(0), OP(1), ADDR_NOREF(2)),
     doIMulRM<16>(ip,  block, OP(0), OP(1), MEM_REFERENCE(2)))
@@ -688,6 +691,7 @@ GENERIC_TRANSLATION_REF(DIV64m,
 void MULDIV_populateDispatchMap(DispatchMap &m) {
 
     m[X86::IMUL32rm] = translate_IMUL32rm;
+    m[X86::IMUL64rm] = translate_IMUL64rm;
     m[X86::IMUL16rm] = translate_IMUL16rm;
     m[X86::IMUL8r] = translate_IMUL8r;
     m[X86::IMUL8m] = translate_IMUL8m;
