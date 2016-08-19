@@ -104,38 +104,23 @@ __attribute__((naked)) int __mcsema_inception()
             // new write point == array base + index
             "addq %%rax, %%rsi\n"
 
-            "popq %%rax\n" // restore rax from saved stack
-            "movq %%rax, %c[state_rax](%%rsi)\n" // convert native state to struct regs
+            "popq %c[state_rax](%%rsi)\n" // restore rax from saved stack
             "movq %%rsi, %%rax\n" // we wrote rax to reg state, now use it as scratch
             // save all other registers to register context
-            "popq %%rbx\n"
-            "movq %%rbx, %c[state_rbx](%%rax)\n" // convert native state to struct regs
-            "popq %%rcx\n"
-            "movq %%rcx, %c[state_rcx](%%rax)\n" // convert native state to struct regs
-            "popq %%rdx\n"
-            "movq %%rdx, %c[state_rdx](%%rax)\n" // convert native state to struct regs
-            "popq %%rsi\n"
-            "movq %%rsi, %c[state_rsi](%%rax)\n" // convert native state to struct regs
-            "popq %%rdi\n"
-            "movq %%rdi, %c[state_rdi](%%rax)\n" // convert native state to struct regs
-            "popq %%rbp\n"
-            "movq %%rbp, %c[state_rbp](%%rax)\n" // convert native state to struct regs
-            "popq %%r8\n"
-            "movq %%r8,  %c[state_r8](%%rax)\n" // convert native state to struct regs
-            "popq %%r9\n"
-            "movq %%r9,  %c[state_r9](%%rax)\n" // convert native state to struct regs
-            "popq %%r10\n"
-            "movq %%r10, %c[state_r10](%%rax)\n" // convert native state to struct regs
-            "popq %%r11\n"
-            "movq %%r11, %c[state_r11](%%rax)\n" // convert native state to struct regs
-            "popq %%r12\n"
-            "movq %%r12, %c[state_r12](%%rax)\n" // convert native state to struct regs
-            "popq %%r13\n"
-            "movq %%r13, %c[state_r13](%%rax)\n" // convert native state to struct regs
-            "popq %%r14\n"
-            "movq %%r14, %c[state_r14](%%rax)\n" // convert native state to struct regs
-            "popq %%r15\n"
-            "movq %%r15, %c[state_r15](%%rax)\n" // convert native state to struct regs
+            "popq %c[state_rbx](%%rax)\n"
+            "popq %c[state_rcx](%%rax)\n"
+            "popq %c[state_rdx](%%rax)\n"
+            "popq %c[state_rsi](%%rax)\n"
+            "popq %c[state_rdi](%%rax)\n"
+            "popq %c[state_rbp](%%rax)\n"
+            "popq %c[state_r8](%%rax)\n"
+            "popq %c[state_r9](%%rax)\n"
+            "popq %c[state_r10](%%rax)\n"
+            "popq %c[state_r11](%%rax)\n"
+            "popq %c[state_r12](%%rax)\n"
+            "popq %c[state_r13](%%rax)\n"
+            "popq %c[state_r14](%%rax)\n"
+            "popq %c[state_r15](%%rax)\n"
             "movups %%xmm0, %c[state_xmm0](%%rax)\n"
             "movups %%xmm1, %c[state_xmm1](%%rax)\n"
             "movups %%xmm2, %c[state_xmm2](%%rax)\n"
@@ -467,10 +452,8 @@ void do_call_value(void *state, uint64_t value)
             "movups %%xmm7, %c[state_xmm7](%%rsi)\n"
             "movq %%rax, %%rbx\n" // already saved rbx, so lets use it as temp reg
             "movq %%rsi, %%rcx\n" // already saved rcx, so lets use it as temp reg
-            "popq %%rsi\n" // get rsi from function return
-            "popq %%rax\n" // get rax from function return
-            "movq %%rax, %c[state_rax](%%rcx)\n" // convert native state to struct regs
-            "movq %%rsi, %c[state_rsi](%%rcx)\n" // convert native state to struct regs
+            "popq %c[state_rsi](%%rcx)\n" // get rsi from function return
+            "popq %c[state_rax](%%rcx)\n" // get rax from function return
             "movq %%rsp, %c[state_rsp](%%rcx)\n" // convert native state to struct regs
             "leaq %c[real_rsp_off](%%rbx), %%rsi\n" // location of old native rsp
             "movq (%%rsi), %%rsp\n" // return original stack
