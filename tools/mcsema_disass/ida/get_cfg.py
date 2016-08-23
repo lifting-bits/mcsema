@@ -1675,12 +1675,16 @@ def getInstructionSize(ea):
 
 def recoverStackVars(M, F):
     from var_recovery import collect_ida
+    from var_recovery import parse_ida_types
 
     # pull info from IDA
-    stack_locals = collect_ida.collect_func_vars(F) 
-    # jam into M
+    stack_locals = collect_ida.collect_func_vars(F)
+    
+    # TODO: parse/recover type info
+    stack_locals_typed = map(parse_ida_types.parse_type, stack_locals)
+
+    # add to M
     for (var_offset, var_name, var_size, var_flags) in stack_locals:
-        # mash
         var = F.stackvars.add() 
         var.sp_offset = var_offset
         var.var.name = var_name

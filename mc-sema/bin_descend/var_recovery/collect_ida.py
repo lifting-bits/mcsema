@@ -1,9 +1,20 @@
+import idaapi
 import idautils
 import idc
 
 def DEBUG(s):
     #syslog.syslog(str(s))
     sys.stdout.write(str(s))
+
+def _signed_from_unsigned64(val):
+    if val & 0x8000000000000000:
+        return -0x10000000000000000 + val
+    return val
+
+def _signed_from_unsigned32(val):
+    if val & 0x80000000:
+        return -0x100000000 + val
+    return val
 
 def _get_flags_from_bits(flag):
     '''
@@ -123,6 +134,9 @@ def collect_func_vars(F):
         stackArgs.append((offset, memberName, memberSize, flag_str))
         offset = idc.GetStrucNextOff(frame, offset)
     #functions.append({"name":name, "stackArgs":stackArgs})
+    if stackArgs is not None:
+      _find_local_references(f, stackArgs)
+    
     return stackArgs 
 
 def collect_func_vars_all():
@@ -142,6 +156,69 @@ def collect_func_vars_all():
         f_vars = collect_func_vars(f)
         functions.append({"ea":f_ea, "stackArgs":f_vars})
     return functions
+
+def _find_local_references(func, func_var_data):
+    if idaapi.get_inf_structure().is_64bit():
+      _signed_from_unsigned = _signed_from_unsigned64
+      _base_ptr = "rbp"
+      _stack_ptr = "rsp"
+    elif idaapi.get_inf_structure().is_32bit():
+      _signed_from_unsigned = _signed_from_unsigned32
+      _base_ptr = "ebp"
+      _stack_ptr = "esp"
+    
+    # naive approach at first
+    base_ptr_format = "[{}+".format(_base_ptr)
+    stack_ptr_format = "[{}+".format(_stack_ptr)
+    frame = idc.GetFrame(func)
+    if frame is None:
+        return
+    regs = dict()
+    referers = set() # members of this set contain the address of an element on the stack
+    dereferences = dict() # members of this collection contain the data of an element on the stack
+    for addr in idautils.FuncItems(func):
+        if "lea" == idc.GetMnem(addr):
+            if base_ptr_format in idc.GetOpnd(addr, 1) or stack_ptr_format in idc.GetOpnd(addr, 1):
+                # right now just capture that it's a local reference, not its referant
+                referers.add(idc.GetOpnd(addr, 0))
+        if "mov" == idc.GetMnem(addr):
+            referers.discard(idc.GetOpnd(addr, 0))
+            dereferences.pop(idc.GetOpnd(addr, 0), None)
+            if idc.GetOpnd(addr, 1) in referers:
+                target_op = idc.GetOpnd(addr, 0)
+                if base_ptr_format in target_op:
+                    target_offset = target_op[len(base_ptr_format):target_op.index(']')]
+                    offset = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
+                    for v in func_var_data:
+                      (o,n,s,f) = v
+                      if offset == o:
+                        func_var_data.remove(v)
+                        func_var_data.append((o,n,s,f + " | LOCAL_REFERER"))
+                    #if offset in func_var_data["stackArgs"].keys():
+                    #    func_var_data["stackArgs"][offset][2] += " | LOCAL_REFERER"
+                else:
+                    # lea eax, [ebp-8]
+                    # mov ebx, eax
+                    # mov [ebp-4], ebx
+                    referers.add(target_op)
+            elif base_ptr_format in idc.GetOpnd(addr, 1) or stack_ptr_format in idc.GetOpnd(addr, 1):
+                offset = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
+                for v in func_var_data:
+                  (o,n,s,f) = v
+                  if offset == o:
+                    dereferences[idc.GetOpnd(addr, 0)] = offset
+                #if offset in func_var_data["stackArgs"].keys():
+                #    dereferences[idc.GetOpnd(addr, 0)] = offset
+        if "call" == idc.GetMnem(addr):
+            target_op = idc.GetOpnd(addr, 0)
+            if target_op in referers:
+                pass
+            if target_op in dereferences:
+                # mov eax, [ebp+4]
+                # call eax
+                func_var_data["stackArgs"][dereferences[target_op]][2] += " | CODE_PTR"
+            # clear the referers and dereferences?
+
 
 if __name__ == "__main__":
     print_func_vars()
