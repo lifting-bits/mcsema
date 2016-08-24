@@ -64,9 +64,9 @@ void* __mcsema_create_alt_stack(size_t stack_size)
 {
     // we need some place to set this, and this function
     // will get called before these are used
-    __mcsema_alt_stack[0] = __mcsema_stack_max - (STACK_ALLOC_SIZE);
-    __rsptr = &__mcsema_callback_state[1];
-    __altstackptr = &__mcsema_alt_stack[1];
+    __mcsema_alt_stack[0] = __mcsema_stack_max;
+    __rsptr = &__mcsema_callback_state[0];
+    __altstackptr = &__mcsema_alt_stack[0];
     
     // half for old stack to copy, half for stack to use in function
     if(stack_size < MIN_STACK_SIZE*2) {
