@@ -1351,7 +1351,7 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
         M->getOrInsertGlobal(symname, extType));
     TASSERT(gv != NULL, "Could not make global value!");
     gv->setLinkage(
-        /*GlobalValue::AvailableExternallyLinkage*/GlobalValue::ExternalLinkage);
+        /*GlobalValue::AvailableExternallyLinkage*/GlobalValue::ExternalWeakLinkage);
 
     const std::string &triple = M->getTargetTriple();
 
@@ -1421,7 +1421,7 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
               "Encountered an unknown return type while translating function");
       }
       FunctionType *ft = FunctionType::get(returnType, arguments, false);
-      f = Function::Create(ft, GlobalValue::ExternalLinkage, symName, M);
+      f = Function::Create(ft, GlobalValue::ExternalWeakLinkage, symName, M);
 
       if (e->getReturnType() == ExternalCodeRef::NoReturn) {
         f->setDoesNotReturn();
