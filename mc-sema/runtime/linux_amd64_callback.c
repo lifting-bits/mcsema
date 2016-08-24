@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -11,7 +12,7 @@
 #define MIN_STACK_SIZE 4096
 #define STACK_ALLOC_SIZE (MIN_STACK_SIZE * 10)
 #define NUM_DO_CALL_FRAMES 512 /* XXX what is reasonable here? */
-#define STACK_MAX 0x7ffffffff000ULL
+#define DEFAULT_STACK_MAX 0x7ffffffff000ULL
 
 // this is a terrible hack to be compatible with some mcsema definitions. please don't judge
 extern uint64_t mmap(uint64_t addr, uint64_t length, uint32_t prot, uint32_t flags, uint32_t fd, uint32_t offset);
@@ -24,12 +25,46 @@ __thread uint64_t __mcsema_alt_stack[NUM_DO_CALL_FRAMES] = {0};
 __thread uint64_t __mcsema_inception_depth = 0;
 __thread RegState* __rsptr = NULL;
 __thread uint64_t* __altstackptr = NULL;
+uint64_t __mcsema_stack_max = DEFAULT_STACK_MAX;
+
+uint64_t __mcsema_get_max_stack() {
+    FILE *p = fopen("/proc/self/maps", "r");
+    if(p == NULL) {
+        return 0;
+    }
+
+    char line[1024] = {0};
+    uint64_t start;
+    uint64_t end;
+    while( fgets(line, sizeof(line), p) != NULL ) {
+        if(NULL != strstr(line, "[stack]")) {
+            if(sscanf(line, "%lx-%lx", &start, &end) == 2) {
+                fclose(p);
+                return end;
+            } else {
+                fclose(p);
+                return 0;
+            }
+        }
+    }
+
+    fclose(p);
+
+    return 0;
+}
+
+void __mcsema_init(void) {
+    __mcsema_stack_max = __mcsema_get_max_stack();
+    if (__mcsema_stack_max == 0) {
+        __mcsema_stack_max = DEFAULT_STACK_MAX;
+    }
+}
 
 void* __mcsema_create_alt_stack(size_t stack_size)
 {
     // we need some place to set this, and this function
     // will get called before these are used
-    __mcsema_alt_stack[0] = (STACK_MAX) - (STACK_ALLOC_SIZE);
+    __mcsema_alt_stack[0] = __mcsema_stack_max - (STACK_ALLOC_SIZE);
     __rsptr = &__mcsema_callback_state[1];
     __altstackptr = &__mcsema_alt_stack[1];
     
@@ -262,7 +297,7 @@ __attribute__((naked)) int __mcsema_inception()
               [struct_size]"e"(sizeof(RegState)),
               [stack_alloc_size]"i"(STACK_ALLOC_SIZE),
               [half_stack_size]"i"(STACK_ALLOC_SIZE/2),
-              [stack_max]"i"(STACK_MAX),
+              //[stack_max]"i"(STACK_MAX),
               [alt_stack_base]"m"(__altstackptr)
               );
 
