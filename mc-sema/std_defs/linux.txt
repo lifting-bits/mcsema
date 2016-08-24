@@ -6424,6 +6424,7 @@ __xstat64 3 C N
 __lxstat64 3 C N
 __fxstat64 3 C N
 __cxa_atexit 3 C N
+__cxa_finalize 1 C N
 __errno_location 0 C N
 __uflow 1 C N
 __overflow 2 C N

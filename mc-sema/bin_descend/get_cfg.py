@@ -773,6 +773,7 @@ def processExternalFunction(M, fn):
 
     args, conv, ret, sign = getFromEMAP(fn)
 
+    DEBUG("Program will reference external: {}\n".format(fn))
     extfn = M.external_funcs.add()
     extfn.symbol_name = fn
     extfn.calling_convention = conv
@@ -1209,6 +1210,9 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
                     DEBUG("\t\tNOT ADDING REF: {:08x} -> {:08x}\n".format(i, pointsto))
                 else:
                     insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas, itemsize)
+            else:
+                DEBUG("{:x} is an external reference\n".format(i))
+                insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas, itemsize)
 
             i = idc.GetNextFixupEA(i)
 

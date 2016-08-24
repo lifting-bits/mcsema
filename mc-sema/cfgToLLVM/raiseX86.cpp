@@ -1140,7 +1140,7 @@ void dataSectionToTypesContents(const list<DataSection> &globaldata,
 
         Constant *final_val  = nullptr;
 
-        GlobalVariable *ext_v = M->getNamedGlobal(func_addr_str);
+        GlobalValue *ext_v = M->getNamedValue(func_addr_str);
 
         if(ext_v != nullptr && isa<Function>(ext_v)) {
             final_val = getPtrSizedValue(M, ext_v, dsec_itr->getSize());
@@ -1150,7 +1150,7 @@ void dataSectionToTypesContents(const list<DataSection> &globaldata,
             //cout << "External data" << sym_name << " has type: " << final_val->getType() << "\n";
             // assume ext data
         } else {
-            TASSERT(ext_v != nullptr, "Could not find external: " + sym_name);
+            TASSERT(ext_v != nullptr, "Could not find external: " + string(func_addr_str));
             //cout << "External fail" << sym_name << " has type: " << final_val->getType() << "\n";
         }
 
