@@ -627,8 +627,8 @@ def instructionHandler(M, B, inst, new_eas):
         if selfCallEA not in RECOVERED_EAS:
             DEBUG("Adding new EA: {0:x}\n".format(selfCallEA))
             new_eas.add(selfCallEA)
-            I.imm_reference = selfCallEA
-            I.imm_ref_type = CFG_pb2.Instruction.CodeRef
+            I.mem_reference = selfCallEA
+            I.mem_ref_type = CFG_pb2.Instruction.CodeRef
 
             return I, True
     
@@ -773,6 +773,7 @@ def processExternalFunction(M, fn):
 
     args, conv, ret, sign = getFromEMAP(fn)
 
+    DEBUG("Program will reference external: {}\n".format(fn))
     extfn = M.external_funcs.add()
     extfn.symbol_name = fn
     extfn.calling_convention = conv
@@ -1209,6 +1210,9 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
                     DEBUG("\t\tNOT ADDING REF: {:08x} -> {:08x}\n".format(i, pointsto))
                 else:
                     insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas, itemsize)
+            else:
+                DEBUG("{:x} is an external reference\n".format(i))
+                insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas, itemsize)
 
             i = idc.GetNextFixupEA(i)
 
@@ -1325,7 +1329,8 @@ def recoverFunctionFromSet(M, F, blockset, new_eas):
             I, endBlock = instructionHandler(M, B, head, new_eas)
             # sometimes there is junk after a terminator due to off-by-ones in
             # IDAPython. Ignore them.
-            if endBlock or isRet(head) or isUnconditionalJump(head) or isTrap(head):
+            #if endBlock or isRet(head) or isUnconditionalJump(head) or isTrap(head):
+            if endBlock or isRet(head) or isTrap(head):
                 break
             prevHead = head
 
@@ -1375,7 +1380,8 @@ def recoverBlock(startEA):
                         b.succs.append(f)
                 return b
 
-            # if its not JMP 0, add next instruction to current block
+            # if its not JMP 0 or call 0, 
+            # add next instruction to current block
             curEA = nextEA
         # check if we need to make a new block
         elif len(follows) == 0:

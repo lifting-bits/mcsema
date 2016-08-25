@@ -3,8 +3,7 @@
 #include "RegisterState.h"
 
 extern int mcsema_main(RegState *);
-extern void* __mcsema_create_alt_stack(size_t stack_size);
-extern void* __mcsema_free_alt_stack(size_t stack_size);
+extern void __mcsema_init(void);
 
 struct Stack {
   char data[1UL << 22U];
@@ -18,7 +17,6 @@ int httpd_driver(int argc, const char* argv[])
 
     memset(&rState, 0, sizeof(rState));
     memset(&tStack, 0, sizeof(tStack));
-    __mcsema_create_alt_stack(4096*2);
 
     //set up the stack 
     rState.RSP = (uint64_t)(&tStack+1)-4096-8;
@@ -29,11 +27,11 @@ int httpd_driver(int argc, const char* argv[])
     rState.RCX = 0;
 
     mcsema_main(&rState);
-    __mcsema_free_alt_stack(4096*2);
 
     return rState.RAX;
 }
 
 int main(int argc, const char *argv[]) {
+    __mcsema_init();
 	return httpd_driver(argc, argv);
 }

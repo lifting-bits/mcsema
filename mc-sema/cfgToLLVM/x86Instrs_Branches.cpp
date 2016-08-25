@@ -261,15 +261,6 @@ template<int width>
 static void doCallM(BasicBlock *&block, InstPtr ip, Value *mem_addr) {
   Value *call_addr = M_READ<width>(ip, block, mem_addr);
 
-  Module *M = block->getParent()->getParent();
-  const std::string &triple = M->getTargetTriple();
-  if (triple != WINDOWS_TRIPLE) {
-    if (getPointerSize(M) == Pointer32)
-      x86::writeFakeReturnAddr(block);
-    else
-      x86_64::writeFakeReturnAddr(block);
-  }
-
   return doCallV(block, ip, call_addr);
 }
 
@@ -697,6 +688,21 @@ static InstTransResult translate_JMPm(NativeModulePtr natM,
       // noreturn api calls don't need to fix stack
       return ret;
     }
+  } else if (ip->has_ext_data_ref()) {
+      Module *M = block->getParent()->getParent();
+
+      std::string target = ip->get_ext_data_ref()->getSymbolName();
+      llvm::Value *gvar = M->getGlobalVariable(target);
+
+      TASSERT(gvar != NULL, "Could not find data ref: " + target);
+
+      Value *addrInt = new llvm::PtrToIntInst(
+            gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
+
+      doCallM<width>(block, ip, addrInt);
+      // clear stack
+      return doRet<width>(block);
+
   } else if (ip->has_jump_table() && ip->has_mem_reference) {
     // this is a jump table that got converted
     // into a table in the data section
@@ -713,6 +719,11 @@ static InstTransResult translate_JMPm(NativeModulePtr natM,
 
   } else if (ip->has_mem_reference) {
     doCallM<width>(block, ip, MEM_REFERENCE(0));
+    // clear stack
+    return doRet<width>(block);
+  } else {
+    // normal jump by memory (e.g. jmp [reg+offset] )
+    doCallM<width>(block, ip, ADDR_NOREF(0));
     // clear stack
     return doRet<width>(block);
   }
@@ -846,13 +857,6 @@ static InstTransResult translate_CALLr(NativeModulePtr natM,
 
   Module *M = block->getParent()->getParent();
   const std::string &triple = M->getTargetTriple();
-  if (triple != WINDOWS_TRIPLE) {
-      if(width == 64) {
-        x86_64::writeFakeReturnAddr(block);
-      } else {
-        x86::writeFakeReturnAddr(block);
-      }
-  }
 
   doCallV(block, ip, fromReg);
 
