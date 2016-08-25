@@ -772,12 +772,15 @@ def parseDefsFile(df):
 def processExternalFunction(M, fn):
 
     args, conv, ret, sign = getFromEMAP(fn)
+    ea = idc.LocByName(fn)
+    is_weak = idaapi.is_weak_name(ea)
 
-    DEBUG("Program will reference external: {}\n".format(fn))
+    DEBUG("Program will reference external{}: {}\n".format(" (weak)" if is_weak else "", fn))
     extfn = M.external_funcs.add()
     extfn.symbol_name = fn
     extfn.calling_convention = conv
     extfn.argument_count = args
+    extfn.is_weak = is_weak
     if ret == 'N':
         extfn.has_return = True
         extfn.no_return = False
@@ -788,10 +791,15 @@ def processExternalFunction(M, fn):
 def processExternalData(M, dt):
 
     data_size = EMAP_DATA[dt]
+    ea = idc.LocByName(dt)
+    is_weak = idaapi.is_weak_name(ea)
+    
+    DEBUG("Program will reference external{}: {}\n".format(" (weak)" if is_weak else "", dt))
 
     extdt = M.external_data.add()
-    extdt.symbol_name = dt 
+    extdt.symbol_name = dt
     extdt.data_size = data_size
+    extdt.is_weak = is_weak
 
 def processExternals(M):
 

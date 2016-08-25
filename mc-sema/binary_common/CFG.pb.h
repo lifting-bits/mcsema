@@ -1081,10 +1081,17 @@ class ExternalFunction : public ::google::protobuf::Message {
   inline ::google::protobuf::int32 argument_count() const;
   inline void set_argument_count(::google::protobuf::int32 value);
 
-  // optional string signature = 6;
+  // required bool is_weak = 6;
+  inline bool has_is_weak() const;
+  inline void clear_is_weak();
+  static const int kIsWeakFieldNumber = 6;
+  inline bool is_weak() const;
+  inline void set_is_weak(bool value);
+
+  // optional string signature = 7;
   inline bool has_signature() const;
   inline void clear_signature();
-  static const int kSignatureFieldNumber = 6;
+  static const int kSignatureFieldNumber = 7;
   inline const ::std::string& signature() const;
   inline void set_signature(const ::std::string& value);
   inline void set_signature(const char* value);
@@ -1105,6 +1112,8 @@ class ExternalFunction : public ::google::protobuf::Message {
   inline void clear_has_no_return();
   inline void set_has_argument_count();
   inline void clear_has_argument_count();
+  inline void set_has_is_weak();
+  inline void clear_has_is_weak();
   inline void set_has_signature();
   inline void clear_has_signature();
 
@@ -1114,11 +1123,12 @@ class ExternalFunction : public ::google::protobuf::Message {
   int calling_convention_;
   bool has_return_;
   bool no_return_;
+  bool is_weak_;
   ::std::string* signature_;
   ::google::protobuf::int32 argument_count_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(6 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(7 + 31) / 32];
 
   friend void  protobuf_AddDesc_CFG_2eproto();
   friend void protobuf_AssignDesc_CFG_2eproto();
@@ -1202,20 +1212,30 @@ class ExternalData : public ::google::protobuf::Message {
   inline ::google::protobuf::int32 data_size() const;
   inline void set_data_size(::google::protobuf::int32 value);
 
+  // required bool is_weak = 3;
+  inline bool has_is_weak() const;
+  inline void clear_is_weak();
+  static const int kIsWeakFieldNumber = 3;
+  inline bool is_weak() const;
+  inline void set_is_weak(bool value);
+
   // @@protoc_insertion_point(class_scope:ExternalData)
  private:
   inline void set_has_symbol_name();
   inline void clear_has_symbol_name();
   inline void set_has_data_size();
   inline void clear_has_data_size();
+  inline void set_has_is_weak();
+  inline void clear_has_is_weak();
 
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
   ::std::string* symbol_name_;
   ::google::protobuf::int32 data_size_;
+  bool is_weak_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(2 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(3 + 31) / 32];
 
   friend void  protobuf_AddDesc_CFG_2eproto();
   friend void protobuf_AssignDesc_CFG_2eproto();
@@ -4503,15 +4523,37 @@ inline void ExternalFunction::set_argument_count(::google::protobuf::int32 value
   argument_count_ = value;
 }
 
-// optional string signature = 6;
-inline bool ExternalFunction::has_signature() const {
+// required bool is_weak = 6;
+inline bool ExternalFunction::has_is_weak() const {
   return (_has_bits_[0] & 0x00000020u) != 0;
 }
-inline void ExternalFunction::set_has_signature() {
+inline void ExternalFunction::set_has_is_weak() {
   _has_bits_[0] |= 0x00000020u;
 }
-inline void ExternalFunction::clear_has_signature() {
+inline void ExternalFunction::clear_has_is_weak() {
   _has_bits_[0] &= ~0x00000020u;
+}
+inline void ExternalFunction::clear_is_weak() {
+  is_weak_ = false;
+  clear_has_is_weak();
+}
+inline bool ExternalFunction::is_weak() const {
+  return is_weak_;
+}
+inline void ExternalFunction::set_is_weak(bool value) {
+  set_has_is_weak();
+  is_weak_ = value;
+}
+
+// optional string signature = 7;
+inline bool ExternalFunction::has_signature() const {
+  return (_has_bits_[0] & 0x00000040u) != 0;
+}
+inline void ExternalFunction::set_has_signature() {
+  _has_bits_[0] |= 0x00000040u;
+}
+inline void ExternalFunction::clear_has_signature() {
+  _has_bits_[0] &= ~0x00000040u;
 }
 inline void ExternalFunction::clear_signature() {
   if (signature_ != &::google::protobuf::internal::kEmptyString) {
@@ -4667,6 +4709,28 @@ inline ::google::protobuf::int32 ExternalData::data_size() const {
 inline void ExternalData::set_data_size(::google::protobuf::int32 value) {
   set_has_data_size();
   data_size_ = value;
+}
+
+// required bool is_weak = 3;
+inline bool ExternalData::has_is_weak() const {
+  return (_has_bits_[0] & 0x00000004u) != 0;
+}
+inline void ExternalData::set_has_is_weak() {
+  _has_bits_[0] |= 0x00000004u;
+}
+inline void ExternalData::clear_has_is_weak() {
+  _has_bits_[0] &= ~0x00000004u;
+}
+inline void ExternalData::clear_is_weak() {
+  is_weak_ = false;
+  clear_has_is_weak();
+}
+inline bool ExternalData::is_weak() const {
+  return is_weak_;
+}
+inline void ExternalData::set_is_weak(bool value) {
+  set_has_is_weak();
+  is_weak_ = value;
 }
 
 // -------------------------------------------------------------------

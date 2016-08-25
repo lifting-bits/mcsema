@@ -38,10 +38,13 @@ class ExternalRef {
 public:
     ExternalRef(const std::string &sn): symbolName(sn) {};
     virtual std::string getSymbolName(void) { return this->symbolName; }
+    virtual void setWeak(bool w) { this->weak = w; }
+    virtual bool isWeak(void) { return this->weak; }
     virtual ~ExternalRef() {};
 
 protected:
     std::string symbolName;
+    bool        weak;
 };
 
 class ExternalDataRef : public ExternalRef {
