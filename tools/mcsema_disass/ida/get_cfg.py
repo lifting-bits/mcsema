@@ -1678,20 +1678,23 @@ def recoverStackVars(M, F):
     from var_recovery import parse_ida_types
 
     # pull info from IDA
-    (stack_locals, ref) = collect_ida.collect_func_vars(F)
-    DEBUG("refs:")
-    DEBUG("{}".format(ref))
+    stack_locals = collect_ida.collect_func_vars(F)
 
-    # TODO: parse/recover type info
-    stack_locals_typed = map(parse_ida_types.parse_type, stack_locals)
+    # TODO: convert flags/type info
+    #stack_locals_typed = map(parse_ida_types.parse_type, stack_locals)
 
     # add to M
-    for (var_offset, var_name, var_size, var_flags, _) in stack_locals:
-        var = F.stackvars.add() 
-        var.sp_offset = var_offset
-        var.var.name = var_name
-        var.var.size = var_size
-        var.var.ida_type = var_flags
+    for offset in stack_locals.keys():
+      var = F.stackvars.add()
+      var.sp_offset = offset
+      var.var.name = stack_locals[offset]["name"]
+      var.var.size = stack_locals[offset]["size"] 
+      var.var.ida_type = stack_locals[offset]["flags"]
+      # add refs... 
+      for i in stack_locals[offset]["instructions"]:
+        r = var.var.ref_eas.add()
+        r.inst_addr = i
+        r.opd_idx = -1 
 
 def recoverFunctionFromSet(M, F, blockset, new_eas):
     processed_blocks = set()

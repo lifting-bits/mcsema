@@ -112,13 +112,11 @@ def _get_flags_from_bits(flag):
 def collect_func_vars(F):
     '''
     Collect stack variable data from a single function F.
-    Returns a list of stack variables 'stackArgs'.
-    The 'stackArgs' value is a list of (offset, variable_name, variable_size, variable_flags) tuples.
+    Returns a dict of stack variables 'stackArgs'.
     Skips stack arguments without names, as well as the special arguments with names " s" and " r".
     variable_flags is a string with flag names.
     '''
-    stackArgs = list()
-    stackArgs_ref = dict()
+    stackArgs = dict()
     
     f = F.entry_address
     name = idc.Name(f)
@@ -126,7 +124,7 @@ def collect_func_vars(F):
     _locals = idc.GetFunctionAttr(f, idc.FUNCATTR_FRSIZE)
     frame = idc.GetFrame(f)
     if frame is None:
-        return (stackArgs, stackArgs_ref)
+        return stackArgs
     
     #grab the offset of the stored frame pointer, so that
     #we can correlate offsets correctly in referant code
@@ -153,16 +151,13 @@ def collect_func_vars(F):
         memberFlag = idc.GetMemberFlag(frame, offset)
         #TODO: handle the case where a struct is encountered (FF_STRU flag)
         flag_str = _get_flags_from_bits(memberFlag)
-        stackArgs.append((offset-delta, memberName, memberSize, flag_str, set()))
-        stackArgs_ref[offset-delta] = {"name":memberName, "size":memberSize, "flags":flag_str, "instructions":set()}
+        stackArgs[offset-delta] = {"name":memberName, "size":memberSize, "flags":flag_str, "instructions":set()}
         offset = idc.GetStrucNextOff(frame, offset)
     #functions.append({"name":name, "stackArgs":stackArgs})
-    if stackArgs is not None:
-      _find_local_references(f, {"name":name, "stackArgs":stackArgs_ref})
+    if len(stackArgs) > 0:
+      _find_local_references(f, {"name":name, "stackArgs":stackArgs})
     
-    # TODO combine infos
-
-    return (stackArgs, stackArgs_ref)
+    return stackArgs
 
 def collect_func_vars_all():
     '''
