@@ -138,7 +138,6 @@ def collect_func_vars(F):
         delta = 0
     
     offset = idc.GetFirstMember(frame)
-    #TODO: the following line should check the binary's address size as appropriate
     while -1 != _signed_from_unsigned(offset):
         memberName = idc.GetMemberName(frame, offset)
         if memberName is None: 
@@ -154,8 +153,8 @@ def collect_func_vars(F):
         memberFlag = idc.GetMemberFlag(frame, offset)
         #TODO: handle the case where a struct is encountered (FF_STRU flag)
         flag_str = _get_flags_from_bits(memberFlag)
-        stackArgs.append((offset-delta, memberName, memberSize, flag_str))
-        stackArgs_ref[offset-delta] = [memberName, memberSize, flag_str]
+        stackArgs.append((offset-delta, memberName, memberSize, flag_str, set()))
+        stackArgs_ref[offset-delta] = {"name":memberName, "size":memberSize, "flags":flag_str, "instructions":set()]
         offset = idc.GetStrucNextOff(frame, offset)
     #functions.append({"name":name, "stackArgs":stackArgs})
     if stackArgs is not None:
@@ -183,6 +182,43 @@ def collect_func_vars_all():
         functions.append({"ea":f_ea, "stackArgs":f_vars})
     return functions
 
+def _process_mov_inst(addr, referers, dereferences, func_var_data):
+    '''
+    - type data regarding the target operand is discarded
+    - if the source operand contains an address of a stack variable:
+        if the target is a reg, just update the target as tainted with the address
+        if the target is a stack var, flag it as a local reference
+    - if the target operand is a stack var, add the EA of the inst to that var's operators
+    '''
+    referers.discard(idc.GetOpnd(addr, 0))
+    dereferences.pop(idc.GetOpnd(addr, 0), None)
+
+    target_op = idc.GetOpnd(addr, 0)
+
+    if idc.GetOpnd(addr, 1) in referers:
+        if base_ptr_format in target_op:
+            target_offset = target_op[len(base_ptr_format):target_op.index(']')]
+            offset = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
+            if offset in func_var_data["stackArgs"].keys():
+                func_var_data["stackArgs"][offset]["flags"] += " | LOCAL_REFERER"
+        else:
+            # lea eax, [ebp-8]
+            # mov ebx, eax
+            # mov [ebp-4], ebx
+            referers.add(target_op)
+    elif base_ptr_format in idc.GetOpnd(addr, 1) or stack_ptr_format in idc.GetOpnd(addr, 1):
+        offset = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
+        if offset in func_var_data["stackArgs"].keys():
+            dereferences[idc.GetOpnd(addr, 0)] = offset
+
+    ''' collect EAs of instructions that write to stack variables'''
+    if base_ptr_format in target_op:
+        target_offset = target_op[len(base_ptr_format):target_op.index(']')]
+        offset = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
+        if offset in func_var_data["stackArgs"].keys():
+            func_var_data["stackArgs"][offset]["instructions"].add(addr)
+
+
 def _find_local_references(func, func_var_data):
     # naive approach at first
     base_ptr_format = "[{}+".format(_base_ptr)
@@ -199,24 +235,7 @@ def _find_local_references(func, func_var_data):
                 # right now just capture that it's a local reference, not its referant
                 referers.add(idc.GetOpnd(addr, 0))
         if "mov" == idc.GetMnem(addr):
-            referers.discard(idc.GetOpnd(addr, 0))
-            dereferences.pop(idc.GetOpnd(addr, 0), None)
-            if idc.GetOpnd(addr, 1) in referers:
-                target_op = idc.GetOpnd(addr, 0)
-                if base_ptr_format in target_op:
-                    target_offset = target_op[len(base_ptr_format):target_op.index(']')]
-                    offset = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
-                    if offset in func_var_data["stackArgs"].keys():
-                        func_var_data["stackArgs"][offset][2] += " | LOCAL_REFERER"
-                else:
-                    # lea eax, [ebp-8]
-                    # mov ebx, eax
-                    # mov [ebp-4], ebx
-                    referers.add(target_op)
-            elif base_ptr_format in idc.GetOpnd(addr, 1) or stack_ptr_format in idc.GetOpnd(addr, 1):
-                offset = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
-                if offset in func_var_data["stackArgs"].keys():
-                    dereferences[idc.GetOpnd(addr, 0)] = offset
+            _process_mov_inst(addr, referers, dereferences, fun_var_data)
         if "call" == idc.GetMnem(addr):
             target_op = idc.GetOpnd(addr, 0)
             if target_op in referers:
