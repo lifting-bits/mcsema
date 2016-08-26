@@ -154,7 +154,7 @@ def collect_func_vars(F):
         #TODO: handle the case where a struct is encountered (FF_STRU flag)
         flag_str = _get_flags_from_bits(memberFlag)
         stackArgs.append((offset-delta, memberName, memberSize, flag_str, set()))
-        stackArgs_ref[offset-delta] = {"name":memberName, "size":memberSize, "flags":flag_str, "instructions":set()]
+        stackArgs_ref[offset-delta] = {"name":memberName, "size":memberSize, "flags":flag_str, "instructions":set()}
         offset = idc.GetStrucNextOff(frame, offset)
     #functions.append({"name":name, "stackArgs":stackArgs})
     if stackArgs is not None:
@@ -190,6 +190,8 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data):
         if the target is a stack var, flag it as a local reference
     - if the target operand is a stack var, add the EA of the inst to that var's operators
     '''
+    base_ptr_format = "[{}+".format(_base_ptr)
+    stack_ptr_format = "[{}+".format(_stack_ptr)
     referers.discard(idc.GetOpnd(addr, 0))
     dereferences.pop(idc.GetOpnd(addr, 0), None)
 
@@ -235,7 +237,7 @@ def _find_local_references(func, func_var_data):
                 # right now just capture that it's a local reference, not its referant
                 referers.add(idc.GetOpnd(addr, 0))
         if "mov" == idc.GetMnem(addr):
-            _process_mov_inst(addr, referers, dereferences, fun_var_data)
+            _process_mov_inst(addr, referers, dereferences, func_var_data)
         if "call" == idc.GetMnem(addr):
             target_op = idc.GetOpnd(addr, 0)
             if target_op in referers:
