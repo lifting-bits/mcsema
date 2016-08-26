@@ -27,7 +27,7 @@ __thread RegState* __rsptr = NULL;
 __thread uint64_t* __altstackptr = NULL;
 uint64_t __mcsema_stack_max = DEFAULT_STACK_MAX;
 
-uint64_t __mcsema_get_max_stack() {
+uint64_t __mcsema_get_range_max(uint64_t val) {
     FILE *p = fopen("/proc/self/maps", "r");
     if(p == NULL) {
         return 0;
@@ -37,20 +37,25 @@ uint64_t __mcsema_get_max_stack() {
     uint64_t start;
     uint64_t end;
     while( fgets(line, sizeof(line), p) != NULL ) {
-        if(NULL != strstr(line, "[stack]")) {
-            if(sscanf(line, "%lx-%lx", &start, &end) == 2) {
+        if(sscanf(line, "%lx-%lx", &start, &end) == 2) {
+            if(start <= val  && val <= end)  {
                 fclose(p);
                 return end;
-            } else {
-                fclose(p);
-                return 0;
             }
+        } else {
+            break;
         }
     }
 
     fclose(p);
-
     return 0;
+}
+
+uint64_t __mcsema_get_max_stack() {
+    uint64_t rsp;
+    __asm__ volatile ("movq %%rsp, %0\n" : "=r"(rsp));
+
+    return __mcsema_get_range_max(rsp);
 }
 
 void __mcsema_init(void) {
@@ -107,7 +112,11 @@ __attribute__((naked)) int __mcsema_inception()
     // if not, allocate it
     __asm__ volatile (
             // offset of altstack from fs:0
-            "leaq %[altstack], %%rax\n"
+            "leaq %[altstack], %%rbp\n"
+            // get extent of RSP
+            "callq %P[get_stack_max]\n"
+            "movq %%rax, %%r14\n"
+            "movq %%rbp, %%rax\n"
             // offset of fs:0
             "movq %%fs:0, %%rbx\n"
             // base + offset = location of test
@@ -128,6 +137,7 @@ __attribute__((naked)) int __mcsema_inception()
             "0:\n"
             : [altstack]"=m"(__mcsema_alt_stack[__mcsema_inception_depth])
             : [createalt]"i"(__mcsema_create_alt_stack), 
+              [get_stack_max]"i"(__mcsema_get_max_stack), 
               [stack_alloc_size]"i"(STACK_ALLOC_SIZE));
     
     __asm__ volatile(
@@ -166,7 +176,6 @@ __attribute__((naked)) int __mcsema_inception()
             "movups %%xmm6, %c[state_xmm6](%%rax)\n"
             "movups %%xmm7, %c[state_xmm7](%%rax)\n"
 
-
             // figure out the max stack extent of our parent frame
             // and figur out where our new stack will be (current frame)
             // 
@@ -182,7 +191,7 @@ __attribute__((naked)) int __mcsema_inception()
             "addq %%rbx, %%rdi\n"
             // read value at __mcseema_alt_stack[depth-1]
             // this is the old stack extent
-            "movq -8(%%rdi), %%r14\n"
+            //"movq -8(%%rdi), %%r14\n"
             // read value at __mcseema_alt_stack[depth]
             // this is the new stack extent
             "movq (%%rdi), %%r15\n"
