@@ -41,6 +41,8 @@ ACCESSED_VIA_JMP = set()
 EMAP = {}
 EMAP_DATA = {}
 
+PIE_MODE = False
+
 SPECIAL_REP_HANDLING = [ 
         [0xC3],
         ]
@@ -701,6 +703,7 @@ def instructionHandler(M, B, inst, new_eas):
         had_refs = True
         if dref in crefs:
             continue
+        DEBUG("Adding reference because of data refs from {:x}\n".format(inst))
         addDataReference(M, I, inst, dref, new_eas)
         if isUnconditionalJump(inst):
             xdrefs = idautils.DataRefsFrom(dref)
@@ -713,7 +716,7 @@ def instructionHandler(M, B, inst, new_eas):
                    I.ext_call_name = fn
                    DEBUG("EXTERNAL CALL : {0}\n".format(fn))
 
-    if isLinkedElf():
+    if isLinkedElf() and not PIE_MODE:
         for op in insn_t.Operands:
             if op.type == idc.o_imm:
                 if op.value in drefs_from_here:
@@ -723,6 +726,7 @@ def instructionHandler(M, B, inst, new_eas):
                 end_a = begin_a + idc.ItemSize(begin_a)
                 if isInData(begin_a, end_a):
                     # add data reference
+                    DEBUG("Adding reference because we fixed IMM value\n")
                     addDataReference(M, I, inst, begin_a, new_eas)
                 #elif isInCode(begin_a, end_a):
                 # add code ref
@@ -1088,7 +1092,7 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
     while i < end:
         more_dref = [d for d in idautils.DataRefsFrom(i)]
         dref_size = idc.ItemSize(i) or 1
-        if len(more_dref) == 0 and dref_size == 1:
+        if len(more_dref) == 0 and dref_size == 1 and not PIE_MODE:
             dword = readDword(i)
             DEBUG("Testing address: {0:x}... ".format(i))
             # check for unmakred references
@@ -1465,6 +1469,19 @@ def preprocessBinary():
                         fulladdr = base+i*esize
                         DEBUG("Address accessed via JMP: {:x}\n".format(fulladdr))
                         ACCESSED_VIA_JMP.add(fulladdr)
+            if PIE_MODE:
+                # convert all immediate operand location references to numbers
+                inslen = idaapi.decode_insn(head)
+                if inslen > 0:
+                    # check every op
+                    for i in range(len(idaapi.cmd.Operands)):
+                        # is this op an immediate?
+                        op = idaapi.cmd.Operands[i]
+                        if op.type == idc.o_imm:
+                            # ensure this is operand is a number, not reference
+                            idaapi.op_num(head, i)
+                            idaapi.del_dref(head, op.value)
+                            idaapi.del_cref(head, op.value, False)
 
 
 def recoverCfg(to_recover, outf, exports_are_apis=False):
@@ -1802,10 +1819,16 @@ if __name__ == "__main__":
         help="File containing <name> <address> pairs of symbols to pre-define."
         )
 
+    parser.add_argument("--pie-mode", action="store_true", default=False,
+            help="Assume all immediate values are constants (useul for ELFs built with -fPIE")
+
     args = parser.parse_args(args=idc.ARGV[1:])
 
     if args.debug:
         _DEBUG = True
+
+    if args.pie_mode:
+        PIE_MODE = True
 
     # for batch mode: ensure IDA is done processing
     if args.batch:
