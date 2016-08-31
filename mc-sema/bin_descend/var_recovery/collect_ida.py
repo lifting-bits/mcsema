@@ -109,7 +109,7 @@ def _get_flags_from_bits(flag):
             output = output + " | " + val
     return output
 
-def collect_func_vars(f):
+def collect_func_vars(F):
     '''
     Collect stack variable data from a single function F.
     Returns a dict of stack variables 'stackArgs'.
@@ -117,7 +117,8 @@ def collect_func_vars(f):
     variable_flags is a string with flag names.
     '''
     stackArgs = dict()
-
+    
+    f = F.entry_address
     name = idc.Name(f)
     end = idc.GetFunctionAttr(f, idc.FUNCATTR_END)
     _locals = idc.GetFunctionAttr(f, idc.FUNCATTR_FRSIZE)
