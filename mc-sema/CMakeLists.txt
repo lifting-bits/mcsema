@@ -99,12 +99,12 @@ find_package(Pin)
 if(NOT PIN_FOUND AND NOT WIN32)
 
 	if(UNIX)
-		set(PIN_DOWNLOAD_URL http://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-67254-gcc.4.4.7-linux.tar.gz)
+		set(PIN_DOWNLOAD_URL https://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-67254-gcc.4.4.7-linux.tar.gz)
 		set(PIN_DOWNLOAD_HASH 4499cfed383f362a0c74560a3ee66a5f117bea95f40067224ddf3c2606c77006)
 	endif(UNIX)
 
 	if(APPLE)
-		set(PIN_DOWNLOAD_URL http://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-67254-clang.5.1-mac.tar.gz)
+		set(PIN_DOWNLOAD_URL https://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-67254-clang.5.1-mac.tar.gz)
 		set(PIN_DOWNLOAD_HASH b715d995bac010fd04c5c33c8efdcd6e2e42db8568a42071cd9a90d9a989e337)
 	endif(APPLE)
 
