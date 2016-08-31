@@ -80,7 +80,7 @@ bool initInstructionDispatch();
 #define GENERIC_TRANSLATION_REF(NAME, NOREFS, HASREF) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {\
     InstTransResult ret;\
     Function *F = block->getParent(); \
-    if( ip->has_mem_reference || ip->has_imm_reference) {\
+    if( ip->has_mem_reference || ip->has_imm_reference || ip->has_external_ref() ) {\
         HASREF;\
     } else {\
         NOREFS;\
