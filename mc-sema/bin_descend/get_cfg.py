@@ -1820,7 +1820,7 @@ if __name__ == "__main__":
         )
 
     parser.add_argument("--pie-mode", action="store_true", default=False,
-            help="Assume all immediate values are constants (useul for ELFs built with -fPIE")
+            help="Assume all immediate values are constants (useful for ELFs built with -fPIE")
 
     args = parser.parse_args(args=idc.ARGV[1:])
 
