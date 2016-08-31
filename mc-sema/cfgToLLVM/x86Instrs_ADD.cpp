@@ -556,14 +556,17 @@ GENERIC_TRANSLATION_REF(ADD64mr,
         doAddMR<64>(ip, block, ADDR_NOREF(0), OP(5)),
         doAddMR<64>(ip, block, MEM_REFERENCE(0), OP(5)))
 
+GENERIC_TRANSLATION_REF(ADD32ri,
+        doAddRI<32>(ip, block, OP(0), OP(1), OP(2)),
+        doAddRV<32>(ip, block, IMM_AS_DATA_REF(block, natM, ip), OP(0), OP(1)))
+GENERIC_TRANSLATION_REF(ADD32ri_DB,
+        doAddRI<32>(ip, block, OP(0), OP(1), OP(2)),
+        doAddRV<32>(ip, block, IMM_AS_DATA_REF(block, natM, ip), OP(0), OP(1)))
 
-GENERIC_TRANSLATION(ADD32ri, doAddRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD32ri8, doAddRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD32ri8_DB, doAddRI<32>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(ADD32ri_DB, doAddRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD64ri8, doAddRI<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD64ri16, doAddRI<64>(ip, block, OP(0), OP(1), OP(2)))
-//GENERIC_TRANSLATION(ADD64ri32, doAddRI<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_REF(ADD64ri32,
         doAddRI<64>(ip, block, OP(0), OP(1), OP(2)),
         doAddRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), OP(0), OP(1)))
@@ -622,7 +625,6 @@ GENERIC_TRANSLATION(ADC16rr, doAdcRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADC16rr_REV, doAdcRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADC32i32, doAdcI<32>(ip, block, OP(0)))
 
-//GENERIC_TRANSLATION(ADC64i32, doAdcI<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION_REF(ADC64i32,
         doAdcRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
         doAdcRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
@@ -641,7 +643,6 @@ GENERIC_TRANSLATION_REF(ADC32mr,
         doAdcMR<32>(ip, block, ADDR_NOREF(0), OP(5)),
         doAdcMR<32>(ip, block, MEM_REFERENCE(0), OP(5)))
 
-//GENERIC_TRANSLATION(ADC64ri32, doAdcRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_REF(ADC64ri32,
         doAdcRI<64>(ip, block, OP(0), OP(1), OP(2)),
         doAdcRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), OP(0), OP(1)))

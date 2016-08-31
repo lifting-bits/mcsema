@@ -31,6 +31,59 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ArchOps.h"
 
 template <int width>
+llvm::Value *getValueForExternal(llvm::Module *M, InstPtr ip, llvm::BasicBlock *block) {
+
+    llvm::Value *addrInt = NULL;
+
+    if( ip->has_ext_call_target() ) {
+        std::string target = ip->get_ext_call_target()->getSymbolName();
+        llvm::Value *ext_fn = M->getFunction(target);
+        TASSERT(ext_fn != NULL, "Could not find external: " + target);
+        addrInt = new llvm::PtrToIntInst(
+                ext_fn, llvm::Type::getIntNTy(block->getContext(), width), "", block);
+    } else if (ip->has_ext_data_ref() ) {
+        std::string target = ip->get_ext_data_ref()->getSymbolName();
+        llvm::Value *gvar = M->getGlobalVariable(target);
+
+        TASSERT(gvar != NULL, "Could not find external data: " + target);
+
+        std::cout << __FUNCTION__ << ": Found external data ref to: " << target << "\n";
+
+        addrInt = new llvm::PtrToIntInst(
+                gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
+        //if(gvar->getType()->isPointerTy()) {
+        //    addrInt = getLoadableValue<width>(gvar, block);
+        //    TASSERT(addrInt != nullptr, "data ref is of an unloadable pointer type");
+        //} else {
+        //    llvm::IntegerType *int_t = llvm::dyn_cast<llvm::IntegerType>(gvar->getType());
+        //    if( int_t == NULL) {
+        //        throw TErr(__LINE__, __FILE__, "NIY: non-integer, non-pointer external data");
+        //    }
+        //    else if(int_t->getBitWidth() < width) {
+        //        addrInt = new llvm::ZExtInst(gvar,
+        //                llvm::Type::getIntNTy(block->getContext(), width),
+        //                "",
+        //                block);
+        //    }
+        //    else if(int_t->getBitWidth() == width) {
+        //        addrInt = gvar;
+        //    }
+        //    else {
+        //        throw TErr(__LINE__, __FILE__, "NIY: external type > width");
+        //    }
+        //}
+
+    } else {
+        throw TErr(__LINE__, __FILE__, "No external refernce to get value for!");
+    }
+
+    return addrInt;
+
+}
+
+
+
+template <int width>
 llvm::Value *concatInts(llvm::BasicBlock *b, llvm::Value *a1, llvm::Value *a2) {
     TASSERT(width == 8 || width == 16 || width == 32 || width == 64, "");
     llvm::Type    *typeTo = llvm::Type::getIntNTy(b->getContext(), width*2);
@@ -113,11 +166,19 @@ llvm::Value* IMM_AS_DATA_REF(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
 {
     VA  baseGlobal;
     // off is the displacement part of a memory reference
+
+    if( ip->has_external_ref()) {
+        Function *F = b->getParent();
+        Value *addrInt = getValueForExternal<width>(F->getParent(), ip, b);
+        TASSERT(addrInt != 0, "Could not get external data reference");
+        return addrInt;
+    }
+
     if(false == ip->has_imm_reference) {
         throw TErr(__LINE__, __FILE__, "Want to use IMM as data ref but have no IMM reference");
     }
     uint64_t off = ip->get_reference(Inst::IMMRef);
-
+    
     if(ip->has_code_ref()) {
         Value *callback_fn = archMakeCallbackForLocalFunction(
                 b->getParent()->getParent(),
@@ -181,58 +242,6 @@ inline llvm::PointerType *getVoidPtrType (llvm::LLVMContext & C) {
     llvm::Type * Int8Type  = llvm::IntegerType::getInt8Ty(C);
     return llvm::PointerType::getUnqual(Int8Type);
 }
-
-template <int width>
-llvm::Value *getValueForExternal(llvm::Module *M, InstPtr ip, llvm::BasicBlock *block) {
-
-    llvm::Value *addrInt = NULL;
-
-    if( ip->has_ext_call_target() ) {
-        std::string target = ip->get_ext_call_target()->getSymbolName();
-        llvm::Value *ext_fn = M->getFunction(target);
-        TASSERT(ext_fn != NULL, "Could not find external: " + target);
-        addrInt = new llvm::PtrToIntInst(
-                ext_fn, llvm::Type::getIntNTy(block->getContext(), width), "", block);
-    } else if (ip->has_ext_data_ref() ) {
-        std::string target = ip->get_ext_data_ref()->getSymbolName();
-        llvm::Value *gvar = M->getGlobalVariable(target);
-
-        TASSERT(gvar != NULL, "Could not find external data: " + target);
-
-        std::cout << __FUNCTION__ << ": Found external data ref to: " << target << "\n";
-
-        addrInt = new llvm::PtrToIntInst(
-                gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
-        //if(gvar->getType()->isPointerTy()) {
-        //    addrInt = getLoadableValue<width>(gvar, block);
-        //    TASSERT(addrInt != nullptr, "data ref is of an unloadable pointer type");
-        //} else {
-        //    llvm::IntegerType *int_t = llvm::dyn_cast<llvm::IntegerType>(gvar->getType());
-        //    if( int_t == NULL) {
-        //        throw TErr(__LINE__, __FILE__, "NIY: non-integer, non-pointer external data");
-        //    }
-        //    else if(int_t->getBitWidth() < width) {
-        //        addrInt = new llvm::ZExtInst(gvar,
-        //                llvm::Type::getIntNTy(block->getContext(), width),
-        //                "",
-        //                block);
-        //    }
-        //    else if(int_t->getBitWidth() == width) {
-        //        addrInt = gvar;
-        //    }
-        //    else {
-        //        throw TErr(__LINE__, __FILE__, "NIY: external type > width");
-        //    }
-        //}
-
-    } else {
-        throw TErr(__LINE__, __FILE__, "No external refernce to get value for!");
-    }
-
-    return addrInt;
-
-}
-
 
 template <int width>
 static inline Value *ADDR_NOREF_IMPL(NativeModulePtr natM, llvm::BasicBlock *b, int x, InstPtr ip, const llvm::MCInst &inst) {

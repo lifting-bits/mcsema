@@ -10,7 +10,7 @@
 #include "../common/RegisterState.h"
 
 #define MIN_STACK_SIZE 4096
-#define STACK_ALLOC_SIZE (MIN_STACK_SIZE * 10)
+#define STACK_ALLOC_SIZE (MIN_STACK_SIZE * 20)
 #define NUM_DO_CALL_FRAMES 512 /* XXX what is reasonable here? */
 #define DEFAULT_STACK_MAX 0x7ffffffff000ULL
 
