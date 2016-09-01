@@ -24,6 +24,8 @@ elif idaapi.get_inf_structure().is_32bit():
     _signed_from_unsigned = _signed_from_unsigned32
     _base_ptr = "ebp"
     _stack_ptr = "esp"
+_base_ptr_format = "[{}+".format(_base_ptr)
+_stack_ptr_format = "[{}+".format(_stack_ptr)
 
 def _get_flags_from_bits(flag):
     '''
@@ -97,8 +99,8 @@ def _get_flags_from_bits(flag):
       2952790016:'FF_ALIGN',
     }
 
-    output = ""
-    output = cls[cls['MASK']&flag]
+    flags = set()
+    flags.add(cls[cls['MASK']&flag])
 
     for category in [comm, _0type, _1type, datatype]:
         #the ida docs define, for example, a FF_0VOID = 0 constant in with the rest
@@ -106,8 +108,22 @@ def _get_flags_from_bits(flag):
         #  the field is unused, rather than being specific data
         val = category.get(category['MASK']&flag, None)
         if val:
-            output = output + " | " + val
-    return output
+            flags.add(val)
+    return flags
+
+def BlockItems(BB):
+    '''
+    Return a list of items in a basic block
+
+    @param BB: basic block object
+
+    @return: ea of each item in block
+    '''
+    fii = idaapi.func_item_iterator_t()
+    ok = fii.set_range(BB.startEA, BB.endEA)
+    while ok:
+        yield fii.current()
+        ok = fii.next_code()
 
 def collect_func_vars(F):
     '''
@@ -117,7 +133,7 @@ def collect_func_vars(F):
     variable_flags is a string with flag names.
     '''
     stackArgs = dict()
-    
+
     f = F.entry_address
     name = idc.Name(f)
     end = idc.GetFunctionAttr(f, idc.FUNCATTR_END)
@@ -168,12 +184,16 @@ def collect_func_vars_all():
     Skips functions without frames.
     variable_flags is a string with flag names.
     '''
+    class functionWrapper(object):
+        def __init__(self, addr):
+            self.entry_address = addr
+
     functions = list()
     funcs = idautils.Functions()
     for f in funcs:
         #name = idc.Name(f)
         f_ea = idc.GetFunctionAttr(f, idc.FUNCATTR_START)
-        f_vars = collect_func_vars(f)
+        f_vars = collect_func_vars(functionWrapper(f))
         functions.append({"ea":f_ea, "stackArgs":f_vars, "name":idc.Name(f)})
     return functions
 
@@ -185,8 +205,6 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data):
         if the target is a stack var, flag it as a local reference
     - if the target operand is a stack var, add the EA of the inst to that var's operators
     '''
-    base_ptr_format = "[{}+".format(_base_ptr)
-    stack_ptr_format = "[{}+".format(_stack_ptr)
 
     #remove the target operand from the taint collections
     referers.pop(idc.GetOpnd(addr, 0), None)
@@ -201,41 +219,36 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data):
         #   mov ebx, eax  # copying referent data around
         #   mov [ebp-4], ebx   # copying referent data into a stack variable (i.e., moving an address into a pointer)
 
-        if base_ptr_format in target_op:
+        if _base_ptr_format in target_op:
             #moving referent data into a stack variable (i.e., moving an address into a pointer)
             offset = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
             if offset in func_var_data["stackArgs"].keys():
-                func_var_data["stackArgs"][offset]["flags"] += " | LOCAL_REFERER"
+                func_var_data["stackArgs"][offset]["flags"].add("LOCAL_REFERER")
                 # collect which stack variable offset this variable points to
                 func_var_data["stackArgs"][offset]["referent"].add(referers[idc.GetOpnd(addr, 1)])
         else:
             #moving referent data around
             referers[target_op] = referers[idc.GetOpnd(addr, 1)]
-    elif base_ptr_format in idc.GetOpnd(addr, 1) or stack_ptr_format in idc.GetOpnd(addr, 1):
+    elif _base_ptr_format in idc.GetOpnd(addr, 1) or _stack_ptr_format in idc.GetOpnd(addr, 1):
         # mov eax, [ebp-4]  //eax now tainted with stack var data
         offset = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
         if offset in func_var_data["stackArgs"].keys():
             dereferences[idc.GetOpnd(addr, 0)] = offset
 
     ''' collect EAs of instructions that write to stack variables'''
-    if base_ptr_format in target_op or stack_ptr_format in target_op:
+    if _base_ptr_format in target_op or _stack_ptr_format in target_op:
+        # mov [ebp-4], eax
         offset = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
         if offset in func_var_data["stackArgs"].keys():
             func_var_data["stackArgs"][offset]["instructions"].add(addr)
 
-
-def _find_local_references(func, func_var_data):
-    # naive approach at first
-    base_ptr_format = "[{}+".format(_base_ptr)
-    stack_ptr_format = "[{}+".format(_stack_ptr)
-    frame = idc.GetFrame(func)
-    if frame is None:
+def _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb):
+    if BB.startEA in visited_bb:
         return
-    referers = dict() # members of this collection contain the address of an element on the stack. keys are operands, values are stack offset
-    dereferences = dict() # members of this collection contain the data of an element on the stack
-    for addr in idautils.FuncItems(func):
+    visited_bb.add(BB.startEA)
+    for addr in BlockItems(BB):
         if "lea" == idc.GetMnem(addr):
-            if base_ptr_format in idc.GetOpnd(addr, 1) or stack_ptr_format in idc.GetOpnd(addr, 1):
+            if _base_ptr_format in idc.GetOpnd(addr, 1) or _stack_ptr_format in idc.GetOpnd(addr, 1):
                 #referers[operand] = offset
                 referers[idc.GetOpnd(addr, 0)] = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
         if "mov" == idc.GetMnem(addr):
@@ -248,9 +261,24 @@ def _find_local_references(func, func_var_data):
             if target_op in dereferences:
                 # mov eax, [ebp+4]
                 # call eax
-                func_var_data["stackArgs"][dereferences[target_op]]["flags"] += " | CODE_PTR"
+                func_var_data["stackArgs"][dereferences[target_op]]["flags"].add("CODE_PTR")
             # clear the referers and dereferences?
 
+    for block in BB.succs():
+        _process_basic_block(block, func_var_data, referers.copy(), dereferences.copy(), visited_bb)
+
+def _find_local_references(func, func_var_data):
+    frame = idc.GetFrame(func)
+    if frame is None:
+        return
+    referers = dict() # members of this collection contain the address of an element on the stack. keys are operands, values are stack offset
+    dereferences = dict() # members of this collection contain the data of an element on the stack
+    visited_bb = set()
+    next_bb = list()
+
+    #build the dict of addr->basicblock objects
+    fc = idaapi.FlowChart(idaapi.get_func(func))
+    _process_basic_block(fc[0], func_var_data, referers, dereferences, visited_bb)
 
 def print_func_vars():
     print

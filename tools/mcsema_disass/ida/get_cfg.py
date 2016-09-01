@@ -1689,7 +1689,7 @@ def recoverStackVars(M, F):
       var.sp_offset = offset
       var.var.name = stack_locals[offset]["name"]
       var.var.size = stack_locals[offset]["size"] 
-      var.var.ida_type = stack_locals[offset]["flags"]
+      var.var.ida_type = " | ".join(stack_locals[offset]["flags"])
       # add refs... 
       for i in stack_locals[offset]["instructions"]:
         r = var.var.ref_eas.add()
