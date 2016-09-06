@@ -167,7 +167,12 @@ def collect_func_vars(F):
         memberFlag = idc.GetMemberFlag(frame, offset)
         #TODO: handle the case where a struct is encountered (FF_STRU flag)
         flag_str = _get_flags_from_bits(memberFlag)
-        stackArgs[offset-delta] = {"name":memberName, "size":memberSize, "flags":flag_str, "instructions":set(), "referent":set()}
+        stackArgs[offset-delta] = {"name":memberName,
+                                   "size":memberSize,
+                                   "flags":flag_str,
+                                   "writes":set(),
+                                   "referent":set(),
+                                   "reads":set()}
         offset = idc.GetStrucNextOff(frame, offset)
     #functions.append({"name":name, "stackArgs":stackArgs})
     if len(stackArgs) > 0:
@@ -211,7 +216,7 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data):
     dereferences.pop(idc.GetOpnd(addr, 0), None)
 
     target_op = idc.GetOpnd(addr, 0)
-
+    read_op = idc.GetOpnd(addr, 1)
 
     if idc.GetOpnd(addr, 1) in referers:
         # handling the two following mov cases in this block:
@@ -240,29 +245,52 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data):
         # mov [ebp-4], eax
         offset = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
         if offset in func_var_data["stackArgs"].keys():
-            func_var_data["stackArgs"][offset]["instructions"].add(addr)
+            func_var_data["stackArgs"][offset]["writes"].add(addr)
+
+    ''' collect EAs of instructions that read from stack variables'''
+    if _base_ptr_format in read_op or _stack_ptr_format in read_op:
+        # mov eax, [ebp-4]
+        offset = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
+        if offset in func_var_data["stackArgs"].keys():
+            func_var_data["stackArgs"][offset]["reads"].add(addr)
+
+def _process_lea_inst(addr, referers, dereferences, func_var_data):
+    if _base_ptr_format in idc.GetOpnd(addr, 1) or _stack_ptr_format in idc.GetOpnd(addr, 1):
+        #referers[operand] = offset
+        referers[idc.GetOpnd(addr, 0)] = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
+
+def _process_call_inst(addr, referers, dereferences, func_var_data):
+    target_op = idc.GetOpnd(addr, 0)
+    if target_op in referers:
+        #maybe do something here? explicitly calling to the stack. Hrm.
+        pass
+    if target_op in dereferences:
+        # mov eax, [ebp+4]
+        # call eax
+        func_var_data["stackArgs"][dereferences[target_op]]["flags"].add("CODE_PTR")
+    # clear the referers and dereferences?
 
 def _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb):
     if BB.startEA in visited_bb:
         return
     visited_bb.add(BB.startEA)
     for addr in BlockItems(BB):
-        if "lea" == idc.GetMnem(addr):
-            if _base_ptr_format in idc.GetOpnd(addr, 1) or _stack_ptr_format in idc.GetOpnd(addr, 1):
-                #referers[operand] = offset
-                referers[idc.GetOpnd(addr, 0)] = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
-        if "mov" == idc.GetMnem(addr):
-            _process_mov_inst(addr, referers, dereferences, func_var_data)
-        if "call" == idc.GetMnem(addr):
-            target_op = idc.GetOpnd(addr, 0)
-            if target_op in referers:
-                #maybe do something here? explicitly calling to the stack. Hrm.
-                pass
-            if target_op in dereferences:
-                # mov eax, [ebp+4]
-                # call eax
-                func_var_data["stackArgs"][dereferences[target_op]]["flags"].add("CODE_PTR")
-            # clear the referers and dereferences?
+        _funcs = {"lea":_process_lea_inst,
+                  "mov":_process_mov_inst,
+                  "call":_process_call_inst}
+        func = _funcs.get(idc.GetMnem(addr), None)
+        if func:
+            func(addr, referers, dereferences, func_var_data)
+        else:
+            #check for reads from stack var
+            read_op = idc.GetOpnd(addr, 1)
+            if _base_ptr_format in read_op or _stack_ptr_format in read_op:
+                offset = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
+                if offset in func_var_data["stackArgs"].keys():
+                    func_var_data["stackArgs"][offset]["reads"].add(addr)
+                else:
+                    pass # Hmmm. Unsure what just happened.
+                    #print "offset {} not found at address {}".format(hex(offset), hex(addr))
 
     for block in BB.succs():
         _process_basic_block(block, func_var_data, referers.copy(), dereferences.copy(), visited_bb)
