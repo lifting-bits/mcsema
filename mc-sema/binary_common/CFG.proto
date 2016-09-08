@@ -1,3 +1,9 @@
+message OffsetTable {
+    required int64 start_addr = 1;
+    repeated int64 table_offsets = 2;
+    repeated int64 destinations = 3;
+}
+
 message JumpTbl {
     repeated    int64       table_entries = 1;
     required    int32       zero_offset = 2;
@@ -39,6 +45,7 @@ message Instruction {
     optional    string            ext_data_name = 12;
     optional    int32             system_call_number = 13;
     optional    bool              local_noreturn = 14;
+    optional    int64             offset_table_addr = 19;
 }
 
 message Block {
@@ -110,6 +117,7 @@ message Module {
     required    string              module_name = 4;
     repeated    EntrySymbol         entries = 5;
     repeated    ExternalData        external_data = 6;
+    repeated    OffsetTable         offset_tables = 7;
 }
 
 // The following information is used to guide the disassembley process. 

@@ -55,6 +55,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <set>
 #include <map>
 #include <list>
+#include <unordered_map>
 
 #include <stdio.h>
 #include <assert.h>
@@ -88,10 +89,12 @@ typedef boost::shared_ptr<Inst> InstPtr;
 
 class MCSJumpTable;
 class JumpIndexTable;
+class MCSOffsetTable;
 typedef boost::shared_ptr<ExternalCodeRef> ExternalCodeRefPtr;
 typedef boost::shared_ptr<ExternalDataRef> ExternalDataRefPtr;
 typedef boost::shared_ptr<MCSJumpTable> MCSJumpTablePtr;
 typedef boost::shared_ptr<JumpIndexTable> JumpIndexTablePtr;
+typedef boost::shared_ptr<MCSOffsetTable> MCSOffsetTablePtr;
 
 class BufferMemoryObject : public llvm::MemoryObject {
 private:
@@ -195,6 +198,7 @@ private:
     VA rip_target;
     bool hasRIP;
     public:
+    VA offset_table;
     std::vector<uint8_t> get_bytes(void) { return this->instBytes; }
     std::string printInst(void) {
         return this->instRep;
@@ -458,7 +462,8 @@ private:
         system_call_number(-1),
         local_noreturn(false),
 		hasRIP(false),
-		rip_target(0)
+		rip_target(0),
+        offset_table(-1)
        { }
 };
 
@@ -721,6 +726,8 @@ class NativeModule {
         return false;
     }
 
+    void addOffsetTables(const std::list<MCSOffsetTablePtr> & tables); 
+
     private:
     std::list<NativeFunctionPtr>          funcs;
     std::map<FuncID, NativeFunctionPtr>   IDtoFunc;
@@ -734,6 +741,9 @@ class NativeModule {
     std::list<DataSection>          dataSecs;
     std::list<ExternalCodeRefPtr>   extCalls;
     std::list<ExternalDataRefPtr>   extData;
+
+    public:
+    std::unordered_map<VA,MCSOffsetTablePtr>          offsetTables;
 
 };
 

@@ -117,6 +117,48 @@ llvm::Value *getAddrFromExpr(
         InstPtr ip,
         uint32_t which);
 
+bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr);
+
+template <int width>
+llvm::Value* getGlobalFromOriginalAddr(
+        VA original_addr, NativeModulePtr mod, 
+        VA addr_start, llvm::BasicBlock *b)
+{
+    VA  baseGlobal;
+    if( addrIsInData(original_addr, mod, baseGlobal, addr_start) ) {
+        //we should be able to find a reference to this in global data 
+        llvm::Module  *M = b->getParent()->getParent();
+        std::string  sn = "data_0x" + to_string<VA>(baseGlobal, std::hex);
+
+        llvm::GlobalVariable *gData = M->getNamedGlobal(sn);
+
+        //if we thought it was a global, we should be able to
+        //pin it to a global array we made during module setup
+        if( gData == NULL) 
+            throw TErr(__LINE__, __FILE__, "Global variable not found");
+
+        // since globals are now a structure 
+        // we cannot simply slice into them.
+        // Need to get ptr and then add integer displacement to ptr
+        //
+        llvm::Type *int_ty = llvm::Type::getIntNTy(b->getContext(), width);
+        llvm::Value   *globalGEPV[] =  
+        {   llvm::ConstantInt::get(int_ty, 0), 
+            llvm::ConstantInt::get(llvm::Type::getInt32Ty(b->getContext()), 0)
+        };
+        llvm::Instruction *globalGEP = 
+            llvm::GetElementPtrInst::Create(gData, globalGEPV, "", b);
+        llvm::Value   *intVal = new llvm::PtrToIntInst(globalGEP, int_ty, "", b);
+        uint64_t addr_offset = original_addr-baseGlobal;
+        llvm::Value   *int_adjusted = 
+            llvm::BinaryOperator::CreateAdd(intVal, CONST_V<width>(b, addr_offset), "", b);
+        return int_adjusted;
+    } else {
+        return nullptr;
+    }
+}
+
+
 // same as the simpler form, see above
 namespace x86 {
 llvm::Value *getAddrFromExpr( llvm::BasicBlock      *b,
@@ -157,8 +199,6 @@ llvm::Instruction* callMemcpy(llvm::BasicBlock *B, llvm::Value *dest, llvm::Valu
 
 using namespace llvm;
 using namespace std;
-
-bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr);
 
 // return a computed pointer to that data reference for 32/64 bit architecture
 template <int width>

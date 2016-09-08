@@ -36,35 +36,9 @@ Value *getAddrFromExpr( BasicBlock      *b,
     if( dataOffset ||  
         (mod && disp && baseReg != X86::RBP && baseReg!= X86::RSP) ) 
     {
-        VA  baseGlobal;
-        if( addrIsInData(disp, mod, baseGlobal, dataOffset ? 0 : 0x1000) ) {
-            //we should be able to find a reference to this in global data 
-            Module  *M = b->getParent()->getParent();
-            string  sn = "data_0x" + to_string<VA>(baseGlobal, hex);
-            GlobalVariable *gData = M->getNamedGlobal(sn);
-
-            //if we thought it was a global, we should be able to
-            //pin it to a global array we made during module setup
-            if( gData == NULL) 
-              throw TErr(__LINE__, __FILE__, "Global variable not found");
-
-            // since globals are now a structure 
-            // we cannot simply slice into them.
-            // Need to get ptr and then add integer displacement to ptr
-            Value   *globalGEPV[] =  
-                {   ConstantInt::get(Type::getInt64Ty(b->getContext()), 0), 
-                    ConstantInt::get(Type::getInt32Ty(b->getContext()), 0)};
-            Instruction *globalGEP = 
-                GetElementPtrInst::Create(gData,  globalGEPV, "", b);
-            Type    *ty = Type::getInt64Ty(b->getContext());
-            Value   *intVal = new PtrToIntInst(globalGEP, ty, "", b);
-            uint32_t addr_offset = disp-baseGlobal;
-            Value   *int_adjusted = 
-                BinaryOperator::CreateAdd(intVal, CONST_V<64>(b, addr_offset), "", b);
-            //then, assign this to the outer 'd' so that the rest of the 
-            //logic picks up on that address instead of another address 
-            d = int_adjusted;
-        } 
+        Value *int_val = getGlobalFromOriginalAddr<64>(
+                disp, mod, dataOffset ? 0 : 0x1000, b);
+        d = int_val;
     } else {
 
         //there is no disp value, or its relative to esp/ebp in which case

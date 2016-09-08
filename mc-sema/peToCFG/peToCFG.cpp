@@ -35,6 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "../cfgToLLVM/JumpTables.h"
 #include "../common/to_string.h"
 #include "LExcn.h"
+#include <utility>
 
 using namespace llvm;
 using namespace std;
@@ -268,6 +269,14 @@ void NativeModule::addDataSection(const DataSection &d)
     this->dataSecs.push_back(d);
 }
 
+void NativeModule::addOffsetTables(const std::list<MCSOffsetTablePtr> & tables) {
+
+    for(const auto &table : tables ) {
+        cout << "Adding offset table at " << std::hex << table->getStartAddr() << std::endl;
+        this->offsetTables.insert( { table->getStartAddr(), table } );
+    }
+}
+
 Inst::CFGRefType deserRefType(::Instruction::RefType k)
 {
   switch(k)
@@ -382,6 +391,10 @@ InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder)
 
   if(inst.has_local_noreturn()) {
       ip->set_local_noreturn();
+  }
+
+  if(inst.has_offset_table_addr()) {
+      ip->offset_table = inst.offset_table_addr();
   }
 
   return ip;
@@ -587,6 +600,7 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     list<ExternalCodeRefPtr>     externFuncs;
     list<ExternalDataRefPtr>     externData;
     list<DataSection>              dataSecs;
+    list<MCSOffsetTablePtr>          offsetTables;
 
     //iterate over every function
     for(int i = 0; i < serializedMod.internal_funcs_size(); i++) {
@@ -616,6 +630,20 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
       const ::ExternalData  &ed = serializedMod.external_data(i);
       cout << "Deserializing external data..." << endl;
       externData.push_back(deserializeExtData(ed));
+    }
+
+    for(int i = 0; i < serializedMod.offset_tables_size(); i++) {
+        const ::OffsetTable &ot = serializedMod.offset_tables(i);
+
+        std::vector< std::pair<VA,VA> > v;
+
+        for( int j = 0; j < ot.table_offsets_size(); j++) {
+            v.push_back( std::pair<VA,VA> ( ot.table_offsets(j), ot.destinations(j) ) );
+        }
+
+        MCSOffsetTablePtr t(new MCSOffsetTable(v, 0, ot.start_addr()));
+        offsetTables.push_back(t);
+
     }
 
     //create the module
@@ -653,6 +681,9 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     {
       m->addDataSection(*it);
     }
+
+    cout << "Adding Offset Tables..." << endl;
+    m->addOffsetTables(offsetTables);
 
     // set entry points for the module
     cout << "Adding entry points..." << endl;
