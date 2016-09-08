@@ -492,16 +492,24 @@ def isElfThunk(ea):
     if not isLinkedElf():
         return False, None
 
-
     if isUnconditionalJump(ea):
-        have_ext_ref = False
+        real_ext_ref = None
+
         for cref in idautils.CodeRefsFrom(ea, 0):
             if isExternalReference(cref):
-                have_ext_ref = True
+                real_ext_ref = cref
                 break
 
-        if have_ext_ref:
-            fn = getFunctionName(cref)
+        if real_ext_ref is None:
+            for dref in idautils.DataRefsFrom(ea):
+                if idc.SegName(dref) in [".got.plt"]:
+                    # this is an external call after all
+                    for extref in idautils.DataRefsFrom(dref):
+                        if isExternalReference(extref):
+                            real_ext_ref = extref
+ 
+        if real_ext_ref is not None:
+            fn = getFunctionName(real_ext_ref)
             return True, fn
 
     return False, None
@@ -668,6 +676,7 @@ def instructionHandler(M, B, inst, new_eas):
             elfy, fn_replace = isElfThunk(cref) 
             if elfy:
                 fn = fn_replace
+                DEBUG("Found external call via ELF thunk {:x} => {}\n".format(cref, fn_replace))
 
             if isExternalReference(cref) or elfy:
                 fn = handleExternalRef(fn)
@@ -1237,8 +1246,8 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
                     DEBUG("\t{:08x}\n".format(e))
                     # these may be the only references to certain
                     # code islands. Make sure we recover them
-                    if e not in RECOVERED_EAS:
-                        new_eas.add(e)
+                    #if e not in RECOVERED_EAS:
+                    #    new_eas.add(e)
 
                 refs = createOffsetTable(M, i, entries)
                 for ref in refs:
@@ -1246,7 +1255,7 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
                         DEBUG("Adding Offset Table XREF {} => {}\n".format(ref, e))
                         idc.AddCodeXref(ref, e, idc.XREF_USER|idc.fl_F)
 
-                i += 4 * ecount
+                i += (4 * ecount) - 1
 
         more_dref = [d for d in idautils.DataRefsFrom(i)]
         dref_size = idc.ItemSize(i) or 1
