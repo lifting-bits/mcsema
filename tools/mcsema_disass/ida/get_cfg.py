@@ -125,6 +125,10 @@ EXTERNAL_DATA_COMMENTS = [
         "Copy of shared data",
         ]
 
+TO_RECOVER = {
+  "stack_vars" : False
+}
+
 def DEBUG(s):
     global _DEBUG, _DEBUG_FILE
     if _DEBUG:
@@ -1703,8 +1707,8 @@ def recoverStackVars(M, F):
 def recoverFunctionFromSet(M, F, blockset, new_eas):
     processed_blocks = set()
 
-    # TODO predicated on cmd flag
-    recoverStackVars(M, F)
+    if TO_RECOVER["stack_vars"]:
+      recoverStackVars(M, F)
 
     while len(blockset) > 0:
         block = blockset.pop()
@@ -1885,7 +1889,7 @@ def preprocessBinary():
                             idaapi.del_cref(head, op.value, False)
 
 
-def recoverCfg(to_recover, outf, exports_are_apis=False, stack_vars=False):
+def recoverCfg(to_recover, outf, exports_are_apis=False):
     global EMAP
     M = CFG_pb2.Module()
     M.module_name = idc.GetInputFile()
@@ -2232,7 +2236,7 @@ if __name__ == "__main__":
     parser.add_argument("--pie-mode", action="store_true", default=False,
         help="Assume all immediate values are constants (useful for ELFs built with -fPIE")
 
-    parser.add_argument("--stack_vars", action="store_true",
+    parser.add_argument("--stack-vars", action="store_true",
         default=False,
         help="Attempt to recover local stack varible information"
         )
@@ -2285,6 +2289,9 @@ if __name__ == "__main__":
     except IOError as e:
         DEBUG("Could not open file of exports to lift. See source for details")
         idc.Exit(-1)
+
+    if args.stack_vars:
+      TO_RECOVER["stack_vars"] = True
 
     # for batch mode: ensure IDA is done processing
     DEBUG("Using Batch mode.")
@@ -2340,7 +2347,7 @@ if __name__ == "__main__":
         outf = args.output
         DEBUG("CFG Output File file: {0}".format(outf.name))
 
-        recoverCfg(eps, outf, args.exports_are_apis, args.stack_vars)
+        recoverCfg(eps, outf, args.exports_are_apis)
     except Exception as e:
         DEBUG(str(e))
         DEBUG(traceback.format_exc())
