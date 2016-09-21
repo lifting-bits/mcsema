@@ -467,9 +467,7 @@ bool addEntryPointDriver(Module *M,
     vector<Value*>  subArg;
     subArg.push_back(aCtx);
 
-    F->dump();
     CallInst* ci = CallInst::Create(F, subArg, "", driverBB);
-    ci->dump();
     archSetCallingConv(M, ci);
     archFreeStack(M, aStack, driverBB);
 
