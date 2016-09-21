@@ -1164,10 +1164,17 @@ def checkIfOffsetTable(ea):
     entrycount = 0
     entries = []
     while True:
-        entry = readDword(ea+entrycount*4)
+        entry_va = ea+entrycount*4
+        entry = readDword(entry_va)
         # no null entries
         if entry == 0:
             break
+
+        if entrycount > 0:
+            refs_to_entry = list(idautils.DataRefsTo(entry_va))
+            if len(refs_to_entry) > 0:
+                DEBUG("\tfound other references {} to table entry {} (@ {:x}).".format(refs_to_entry, entrycount, entry_va))
+                break
 
         dest_guess = ea + sign_extend(entry, 64)
         dest_guess &= 0xFFFFFFFFL

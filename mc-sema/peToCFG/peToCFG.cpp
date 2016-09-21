@@ -272,7 +272,7 @@ void NativeModule::addDataSection(const DataSection &d)
 void NativeModule::addOffsetTables(const std::list<MCSOffsetTablePtr> & tables) {
 
     for(const auto &table : tables ) {
-        cout << "Adding offset table at " << std::hex << table->getStartAddr() << std::endl;
+        llvm::errs() << "Adding offset table at " << std::hex << table->getStartAddr() << std::endl;
         this->offsetTables.insert( { table->getStartAddr(), table } );
     }
 }

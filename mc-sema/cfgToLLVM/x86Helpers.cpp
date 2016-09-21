@@ -116,7 +116,7 @@ Value *getAddrFromExpr( BasicBlock      *b,
         //we might not want to do anything
     }
 
-    if( d == nullptr ) {
+    if( nullptr == d ) {
         //create a constant integer out of the raw displacement
         //we were unable to assign the displacement to an address
         d = ConstantInt::getSigned(iTy, disp);
