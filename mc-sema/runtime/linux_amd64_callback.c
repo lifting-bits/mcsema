@@ -53,9 +53,7 @@ uint64_t __mcsema_get_range_max(uint64_t val) {
 
 uint64_t __mcsema_get_max_stack() {
     uint64_t rsp;
-    __asm__ volatile ("movq %%rsp, %0\n" : "=r"(rsp));
-
-    return __mcsema_get_range_max(rsp);
+    return __mcsema_get_range_max((uint64_t)&rsp);
 }
 
 void __mcsema_init(void) {
