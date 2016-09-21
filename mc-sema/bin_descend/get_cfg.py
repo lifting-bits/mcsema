@@ -15,7 +15,7 @@ from os import path
 import os
 import argparse
 import struct
-import syslog
+#import syslog
 import traceback
 
 import itertools
@@ -122,7 +122,7 @@ EXTERNAL_DATA_COMMENTS = [
 def DEBUG(s):
     if _DEBUG:
         #syslog.syslog(str(s))
-        sys.stdout.write(str(s))
+        sys.stderr.write(str(s))
 
 def hasExternalDataComment(ea):
     cmt = idc.GetCommentEx(ea, 0)
@@ -849,8 +849,7 @@ def processExternals(M):
         elif nameInMap(EMAP_DATA, fixedn):
             processExternalData(M, fixedn)
         else:
-            syslog.syslog("UNKNOWN API: {0}\n".format(fixedn))
-            sys.stdout.write("UNKNOWN API: {0}\n".format(fixedn))
+            DEBUG("UNKNOWN API: {0}\n".format(fixedn))
 
 def readBytesSlowly(start, end):
     bytestr = ""
@@ -1728,8 +1727,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
         recovered_fns += 1
 
     if recovered_fns == 0:
-        syslog.syslog("COULD NOT RECOVER ANY FUNCTIONS\n")
-        sys.stdout.write("COULD NOT RECOVER ANY FUNCTIONS\n")
+        DEBUG("COULD NOT RECOVER ANY FUNCTIONS\n")
         return
 
     mypath = path.dirname(__file__)
@@ -2099,4 +2097,3 @@ if __name__ == "__main__":
     #for batch mode: exit IDA when done
     if args.batch:
         idc.Exit(0)
-    
