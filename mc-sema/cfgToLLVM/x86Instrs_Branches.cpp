@@ -743,6 +743,43 @@ static InstTransResult translate_JMPr(NativeModulePtr natM,
 
   Module *M = block->getParent()->getParent();
 
+  VA ot_addr = ip->offset_table;
+
+  // does this inst have an offset table?
+  if(ot_addr != -1 ) {
+      auto ot_value = natM->offsetTables.find(ot_addr);
+      TASSERT(ot_value != natM->offsetTables.end(), 
+              "Could not find offset table for addr:" + to_string<VA>(ot_addr, std::hex));
+      if(ot_value != natM->offsetTables.end()) {
+          llvm::dbgs() << __FUNCTION__ << ": We have an offset table for: " 
+              << to_string<VA>(ip->get_loc(), std::hex) << " at: " 
+              << to_string<VA>(ot_addr, std::hex) << "\n";
+
+          VA data_section = 0;
+          MCSOffsetTablePtr ot = ot_value->second;
+          VA old_table_addr = ot->getStartAddr();
+          Value *global_v = getGlobalFromOriginalAddr<width>(old_table_addr, natM, 0, block);
+          TASSERT(global_v != nullptr,
+                  "Could not find global for addr:" + to_string<VA>(old_table_addr, std::hex));
+
+          if(global_v != nullptr) {
+              BasicBlock *defaultb = nullptr;
+              doJumpOffsetTableViaSwitchReg(
+                      block,
+                      ip, 
+                      fromReg,
+                      defaultb,
+                      global_v,
+                      ot);
+              // add trap to default block
+              Function	*trapIntrin = Intrinsic::getDeclaration(M, Intrinsic::trap);
+              CallInst::Create(trapIntrin, "", defaultb);
+              Value *unreachable = new UnreachableInst(defaultb->getContext(), defaultb);
+              return EndCFG;
+          }
+      }
+  }
+
   if (ip->has_jump_table()) {
     // this is a jump table that got converted
     // into a table in the data section
