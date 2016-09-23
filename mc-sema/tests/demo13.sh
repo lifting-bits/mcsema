@@ -17,7 +17,8 @@ fi
 
 ${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=i686-pc-linux-gnu -i demo_test13.cfg -driver=demo13_entry,switches,1,return,C -o demo_test13.bc
 
-${LLVM_PATH}/opt -O3 -o demo_test13_opt.bc demo_test13.bc
-${LLVM_PATH}/llc -filetype=obj -o demo_test13_mine.o demo_test13_opt.bc
+${LLVM_PATH}/opt -mtriple=i686-pc-linux-gnu -O3 -o demo_test13_opt.bc demo_test13.bc
+${LLVM_PATH}/llvm-link ${RUNTIME_PATH}/linux_i386_callback.bc demo_test13_opt.bc > demo_test13_linked.bc
+${LLVM_PATH}/llc -mtriple=i686-pc-linux-gnu -filetype=obj -o demo_test13_mine.o demo_test13_linked.bc
 ${CC} -ggdb -m32 -o demo_driver13.exe demo_driver13.c demo_test13_mine.o
 ./demo_driver13.exe

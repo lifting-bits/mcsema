@@ -11,15 +11,64 @@
 #include "llvm/IR/Instructions.h"
 
 #include "raiseX86.h"
+#include "x86Helpers.h"
 #include "X86.h"
 
 #include "../common/to_string.h"
 #include "../common/Defaults.h"
 
+static bool added_callbacks = false;
+
 extern llvm::PointerType *g_PRegStruct;
 
 using namespace llvm;
 using namespace std;
+
+static Module* linuxAddCallbacksToModule(Module *mod) {
+
+    // add definition for:
+    //   1 extern __attribute__((naked)) int __mcsema_inception();
+    std::vector<Type*>FuncTy_6_args;
+    FunctionType* FuncTy_6 = FunctionType::get(
+            /*Result=*/IntegerType::get(mod->getContext(), 32),
+            /*Params=*/FuncTy_6_args,
+            /*isVarArg=*/false);
+    Function* func___mcsema_inception = mod->getFunction("__mcsema_inception");
+    if (!func___mcsema_inception) {
+        func___mcsema_inception = Function::Create(
+                /*Type=*/FuncTy_6,
+                /*Linkage=*/GlobalValue::ExternalLinkage,
+                /*Name=*/"__mcsema_inception", mod); // (external, no body)
+        func___mcsema_inception->setCallingConv(CallingConv::C);
+    }
+    AttributeSet func___mcsema_inception_PAL;
+    {
+        SmallVector<AttributeSet, 4> Attrs;
+        AttributeSet PAS;
+        {
+            AttrBuilder B;
+            PAS = AttributeSet::get(mod->getContext(), ~0U, B);
+        }
+
+        Attrs.push_back(PAS);
+        func___mcsema_inception_PAL = AttributeSet::get(mod->getContext(), Attrs);
+
+    }
+    func___mcsema_inception->setAttributes(func___mcsema_inception_PAL);
+
+    return mod;
+}
+
+static Function *linuxGetInceptionFunction(Module *M) {
+    if(!added_callbacks) {
+        std::cout << __FUNCTION__ << ": Adding Callbacks to Module!" << std::endl;
+        linuxAddCallbacksToModule(M);
+        added_callbacks = true;
+    }
+
+    return M->getFunction("__mcsema_inception");
+}
+
 
 static CallingConv::ID getCallingConv(Module *M){
 	if(getSystemArch(M) == _X86_){
@@ -197,15 +246,83 @@ Value *linuxFreeStack(Module *M, Value *stackAlloc, BasicBlock *&driverBB) {
 }
 
 llvm::Value *linuxMakeCallbackForLocalFunction(Module *M , VA local_target) {
-    std::string			call_tgt_name = "sub_" + to_string<VA>(local_target, std::hex);
 
-    Function        *call_tgt = M->getFunction(call_tgt_name);
-    TASSERT(call_tgt != NULL, "Cannot find call target function in callback stub: "+call_tgt_name);
+    std::string	call_tgt_name = "sub_" + to_string<VA>(local_target, std::hex);
+    std::string	callback_name = "callback_sub_" + to_string<VA>(local_target, std::hex);
 
-    std::cout << "!!!WARNING WARNING WARNING!!!" << "\n";
-    std::cout << "\tAssuming all callbacks are to translated code!!!\n";
+    Function *call_tgt = M->getFunction(call_tgt_name);
+    TASSERT( call_tgt != NULL, "Cannot find target for callback");
 
-    return call_tgt;
+    Function *callback = M->getFunction(callback_name);
+
+    // already have a callback
+    if(callback != nullptr) {
+        return callback;
+    }
+
+    unsigned regWidth = getPointerSize(M);
+
+    // no driver, make one
+    FunctionType    *callbackTy = 
+        FunctionType::get( Type::getIntNTy(M->getContext(), regWidth), false );
+
+    Function *F = dynamic_cast<Function*>(M->getOrInsertFunction(callback_name, callbackTy));
+    TASSERT( F != NULL, "Cannot create callback stub" );
+    F->setLinkage(GlobalValue::InternalLinkage);
+    F->addFnAttr(Attribute::Naked);
+
+    // add code to driver
+    BasicBlock *block = BasicBlock::Create(
+            F->getContext(), "", F);
+
+    std::vector<Type*>FuncTy_9_args;
+    FuncTy_9_args.push_back(call_tgt->getType());
+    FunctionType* FuncTy_9 = FunctionType::get(
+            /*Result=*/Type::getVoidTy(M->getContext()),
+            /*Params=*/FuncTy_9_args,
+            /*isVarArg=*/false);
+
+    if(getSystemArch(M) == _X86_64_) {
+
+        InlineAsm* ptr_13 = InlineAsm::get(FuncTy_9, "pushq $0\n", "imr,~{dirflag},~{fpsr},~{flags}",true);
+        CallInst* void_12 = CallInst::Create(ptr_13, call_tgt, "", block);
+        void_12->setCallingConv(CallingConv::C);
+        void_12->setTailCall(false);
+    } else {
+        InlineAsm* ptr_13 = InlineAsm::get(FuncTy_9, "pushl $0\n", "imr,~{dirflag},~{fpsr},~{flags}",true);
+        CallInst* void_12 = CallInst::Create(ptr_13, call_tgt, "", block);
+        void_12->setCallingConv(CallingConv::C);
+        void_12->setTailCall(false);
+    }
+
+    Function *inception = linuxGetInceptionFunction(M);
+
+    std::vector<Type*>call_inception_args;
+    call_inception_args.push_back(inception->getType());
+    FunctionType* call_inception_ty = FunctionType::get(
+            /*Result=*/Type::getVoidTy(M->getContext()),
+            /*Params=*/call_inception_args,
+            /*isVarArg=*/false);
+
+    if(getSystemArch(M) == _X86_64_) {
+
+        InlineAsm* ptr_15 = InlineAsm::get(call_inception_ty, 
+                "pushq $0; ret\n", "imr,~{dirflag},~{fpsr},~{flags}",true);
+        CallInst* void_14 = CallInst::Create(ptr_15, inception, "", block);
+        void_14->setCallingConv(CallingConv::C);
+        void_14->setTailCall(false);
+    } else {
+        InlineAsm* ptr_15 = InlineAsm::get(call_inception_ty, 
+                "pushl $0; ret\n", "i,~{dirflag},~{fpsr},~{flags}",true);
+        CallInst* void_14 = CallInst::Create(ptr_15, inception, "", block);
+        void_14->setCallingConv(CallingConv::C);
+        void_14->setTailCall(false);
+    }
+
+    new UnreachableInst(M->getContext(), block);
+
+    return F;
+
 }
 
 void linuxAddCallValue(Module *M) {
@@ -213,9 +330,8 @@ void linuxAddCallValue(Module *M) {
     unsigned int regWidth = getPointerSize(M);
 
     Type *intType = IntegerType::get(M->getContext(), regWidth);
-    PointerType* intType_ptr = PointerType::get(intType, 0);
 
-    FuncCallValueTy_args.push_back(g_PRegStruct);
+    FuncCallValueTy_args.push_back(getVoidPtrType(M->getContext()));
     FuncCallValueTy_args.push_back(intType);
 
     FunctionType* FuncCallValueTy = FunctionType::get(
@@ -223,51 +339,16 @@ void linuxAddCallValue(Module *M) {
             /*Params=*/FuncCallValueTy_args,
             /*isVarArg=*/false);
 
-    vector<Type *>  xlated_func_args;
-    xlated_func_args.push_back(g_PRegStruct);
-    Type  *xlated_func_returnTy = Type::getVoidTy(M->getContext());
-    FunctionType *xlatedFuncTy = FunctionType::get(xlated_func_returnTy, xlated_func_args, false);
-
-    PointerType* xlatedFuncPtrTy = PointerType::get(xlatedFuncTy, 0);
-
     // if do_call_value has not already been added to this module,
     // then create it
     Function* func_do_call_value = M->getFunction("do_call_value");
     if (!func_do_call_value) {
         func_do_call_value = Function::Create(
                 /*Type=*/FuncCallValueTy,
-                /*Linkage=*/GlobalValue::InternalLinkage,
+                /*Linkage=*/GlobalValue::ExternalLinkage,
                 /*Name=*/"do_call_value", M); 
         func_do_call_value->setCallingConv(CallingConv::C);
         func_do_call_value->addFnAttr(Attribute::AlwaysInline);
     }
 
-    // Function Definitions
-    // Function: do_call_value (func_do_call_value)
-    {
-        // get pointers to the two function arguments.
-        // the first argument is a pointer to the global
-        // struct.regs instance
-        // the second is a pointer to the function that we will be calling
-        Function::arg_iterator args = func_do_call_value->arg_begin();
-        Value* arg0 = args++;
-        arg0->setName("reg_context");
-        Value* arg1 = args++;
-        arg1->setName("ptr");
-
-
-        BasicBlock* main_block = BasicBlock::Create(M->getContext(), "", func_do_call_value, 0);
-
-        // ASSUME TARGET FUNCTION IS TRANSLATED CODE
-        // JUST CALL target_function(context)
-        // ASSUME TARGET FUNCTION IS TRANSLATED CODE
-        //
-        Value *target_fn = new llvm::IntToPtrInst(arg1, xlatedFuncPtrTy, "", main_block);
-
-        vector<Value*> context_arg;
-        context_arg.push_back(arg0);
-        CallInst* ignored_value = CallInst::Create(target_fn, context_arg, "", main_block);
-        ignored_value->setCallingConv(getCallingConv(M)/*CallingConv::X86_StdCall*/);
-        ReturnInst::Create(M->getContext(), main_block);
-    }
-}
+} 

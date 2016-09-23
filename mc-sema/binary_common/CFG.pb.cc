@@ -27,6 +27,7 @@ const ::google::protobuf::internal::GeneratedMessageReflection*
 const ::google::protobuf::Descriptor* Instruction_descriptor_ = NULL;
 const ::google::protobuf::internal::GeneratedMessageReflection*
   Instruction_reflection_ = NULL;
+const ::google::protobuf::EnumDescriptor* Instruction_RefType_descriptor_ = NULL;
 const ::google::protobuf::Descriptor* Block_descriptor_ = NULL;
 const ::google::protobuf::internal::GeneratedMessageReflection*
   Block_reflection_ = NULL;
@@ -138,16 +139,19 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(JumpIndexTbl));
   Instruction_descriptor_ = file->message_type(2);
-  static const int Instruction_offsets_[14] = {
+  static const int Instruction_offsets_[17] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, inst_bytes_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, inst_addr_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, true_target_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, false_target_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, inst_len_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, data_offset_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, imm_reference_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, imm_reloc_offset_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, imm_ref_type_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, mem_reference_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, mem_reloc_offset_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, mem_ref_type_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, ext_call_name_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, call_target_),
-    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, reloc_offset_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, jump_table_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, jump_index_table_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, ext_data_name_),
@@ -165,6 +169,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Instruction));
+  Instruction_RefType_descriptor_ = Instruction_descriptor_->enum_type(0);
   Block_descriptor_ = file->message_type(3);
   static const int Block_offsets_[3] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Block, insts_),
@@ -199,12 +204,13 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Function));
   ExternalFunction_descriptor_ = file->message_type(5);
-  static const int ExternalFunction_offsets_[6] = {
+  static const int ExternalFunction_offsets_[7] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalFunction, symbol_name_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalFunction, calling_convention_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalFunction, has_return_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalFunction, no_return_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalFunction, argument_count_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalFunction, is_weak_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalFunction, signature_),
   };
   ExternalFunction_reflection_ =
@@ -220,9 +226,10 @@ void protobuf_AssignDesc_CFG_2eproto() {
       sizeof(ExternalFunction));
   ExternalFunction_CallingConvention_descriptor_ = ExternalFunction_descriptor_->enum_type(0);
   ExternalData_descriptor_ = file->message_type(6);
-  static const int ExternalData_offsets_[2] = {
+  static const int ExternalData_offsets_[3] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalData, symbol_name_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalData, data_size_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalData, is_weak_),
   };
   ExternalData_reflection_ =
     new ::google::protobuf::internal::GeneratedMessageReflection(
@@ -661,107 +668,112 @@ void protobuf_AddDesc_CFG_2eproto() {
     "\n\tCFG.proto\"O\n\007JumpTbl\022\025\n\rtable_entries\030"
     "\001 \003(\003\022\023\n\013zero_offset\030\002 \002(\005\022\030\n\020offset_fro"
     "m_data\030\003 \001(\003\":\n\014JumpIndexTbl\022\025\n\rtable_en"
-    "tries\030\001 \002(\014\022\023\n\013zero_offset\030\002 \002(\005\"\332\002\n\013Ins"
+    "tries\030\001 \002(\014\022\023\n\013zero_offset\030\002 \002(\005\"\371\003\n\013Ins"
     "truction\022\022\n\ninst_bytes\030\001 \002(\014\022\021\n\tinst_add"
     "r\030\002 \002(\003\022\023\n\013true_target\030\003 \001(\003\022\024\n\014false_ta"
-    "rget\030\004 \001(\003\022\020\n\010inst_len\030\005 \002(\005\022\023\n\013data_off"
-    "set\030\006 \001(\003\022\025\n\rext_call_name\030\007 \001(\t\022\023\n\013call"
-    "_target\030\010 \001(\003\022\024\n\014reloc_offset\030\t \001(\005\022\034\n\nj"
-    "ump_table\030\n \001(\0132\010.JumpTbl\022\'\n\020jump_index_"
-    "table\030\013 \001(\0132\r.JumpIndexTbl\022\025\n\rext_data_n"
-    "ame\030\014 \001(\t\022\032\n\022system_call_number\030\r \001(\005\022\026\n"
-    "\016local_noreturn\030\016 \001(\010\"Q\n\005Block\022\033\n\005insts\030"
-    "\001 \003(\0132\014.Instruction\022\024\n\014base_address\030\002 \002("
-    "\003\022\025\n\rblock_follows\030\003 \003(\003\"9\n\010Function\022\026\n\006"
-    "blocks\030\001 \003(\0132\006.Block\022\025\n\rentry_address\030\002 "
-    "\002(\003\"\203\002\n\020ExternalFunction\022\023\n\013symbol_name\030"
-    "\001 \002(\t\022\?\n\022calling_convention\030\002 \002(\0162#.Exte"
-    "rnalFunction.CallingConvention\022\022\n\nhas_re"
-    "turn\030\003 \002(\010\022\021\n\tno_return\030\004 \002(\010\022\026\n\016argumen"
-    "t_count\030\005 \002(\005\022\021\n\tsignature\030\006 \001(\t\"G\n\021Call"
-    "ingConvention\022\021\n\rCallerCleanup\020\000\022\021\n\rCall"
-    "eeCleanup\020\001\022\014\n\010FastCall\020\002\"6\n\014ExternalDat"
-    "a\022\023\n\013symbol_name\030\001 \002(\t\022\021\n\tdata_size\030\002 \002("
-    "\005\"L\n\nDataSymbol\022\024\n\014base_address\030\001 \002(\003\022\023\n"
-    "\013symbol_name\030\002 \002(\t\022\023\n\013symbol_size\030\003 \002(\005\""
-    "[\n\004Data\022\024\n\014base_address\030\001 \002(\003\022\014\n\004data\030\002 "
-    "\002(\014\022\034\n\007symbols\030\003 \003(\0132\013.DataSymbol\022\021\n\trea"
-    "d_only\030\004 \002(\010\"u\n\020EntrySymbolExtra\022\022\n\nentr"
-    "y_argc\030\001 \002(\005\0228\n\013entry_cconv\030\002 \002(\0162#.Exte"
-    "rnalFunction.CallingConvention\022\023\n\013does_r"
-    "eturn\030\003 \002(\010\"`\n\013EntrySymbol\022\022\n\nentry_name"
-    "\030\001 \002(\t\022\025\n\rentry_address\030\002 \002(\003\022&\n\013entry_e"
-    "xtra\030\003 \001(\0132\021.EntrySymbolExtra\"\316\001\n\006Module"
-    "\022!\n\016internal_funcs\030\001 \003(\0132\t.Function\022)\n\016e"
-    "xternal_funcs\030\002 \003(\0132\021.ExternalFunction\022\034"
-    "\n\rinternal_data\030\003 \003(\0132\005.Data\022\023\n\013module_n"
-    "ame\030\004 \002(\t\022\035\n\007entries\030\005 \003(\0132\014.EntrySymbol"
-    "\022$\n\rexternal_data\030\006 \003(\0132\r.ExternalData\"l"
-    "\n\007Edge_64\022\r\n\005value\030\001 \002(\003\022\033\n\004kind\030\002 \002(\0162\r"
-    ".Edge_64.Kind\022\r\n\005label\030\003 \001(\010\"&\n\004Kind\022\013\n\007"
-    "Unknown\020\000\022\007\n\003May\020\001\022\010\n\004Must\020\002\"l\n\007Edge_32\022"
-    "\r\n\005value\030\001 \002(\005\022\033\n\004kind\030\002 \002(\0162\r.Edge_32.K"
-    "ind\022\r\n\005label\030\003 \001(\010\"&\n\004Kind\022\013\n\007Unknown\020\000\022"
-    "\007\n\003May\020\001\022\010\n\004Must\020\002\"\205\004\n\034Annotated_Branch_"
-    "Instruction\022\?\n\021branch_instr_name\030\001 \002(\0162$"
-    ".Annotated_Branch_Instruction.Branch\022\023\n\013"
-    "is_resolved\030\002 \002(\010\022\023\n\013is_indirect\030\003 \002(\010\022\026"
-    "\n\016is_conditional\030\004 \002(\010\022\017\n\007is_leaf\030\005 \002(\010\022"
-    "\033\n\ttarget_to\030\006 \003(\0132\010.Edge_64\022%\n\005instr\030\007 "
-    "\002(\0132\026.Annotated_Instruction\022\033\n\023abstract_"
-    "expression\030\010 \001(\t\"\357\001\n\006Branch\022\013\n\007Unknown\020\000"
-    "\022\007\n\003jmp\020\001\022\010\n\004ljmp\020\002\022\006\n\002jo\020\003\022\007\n\003jno\020\004\022\006\n\002"
-    "jb\020\005\022\007\n\003jae\020\006\022\006\n\002je\020\007\022\007\n\003jne\020\010\022\007\n\003jbe\020\t\022"
-    "\006\n\002ja\020\n\022\006\n\002js\020\013\022\007\n\003jns\020\014\022\006\n\002jp\020\r\022\007\n\003jnp\020"
-    "\016\022\006\n\002jl\020\017\022\007\n\003jge\020\020\022\007\n\003jle\020\021\022\006\n\002jg\020\022\022\n\n\006l"
-    "oopne\020\023\022\t\n\005loope\020\024\022\010\n\004loop\020\025\022\t\n\005jCcxz\020\026\022"
-    "\007\n\003ret\020\027\022\010\n\004call\020\030\"\270\003\n\025Annotated_Instruc"
-    "tion\022\022\n\ninstr_name\030\001 \002(\t\022\024\n\014instr_string"
-    "\030\002 \002(\t\022\021\n\tinst_addr\030\003 \002(\003\022\020\n\010inst_len\030\004 "
-    "\002(\005\022\020\n\010op_count\030\005 \002(\005\022\025\n\rinst_addr_hex\030\006"
-    " \001(\t\022\035\n\025is_branch_instruction\030\007 \002(\010\0220\n\010a"
-    "rgument\030\010 \003(\0132\036.Annotated_Instruction.Op"
-    "erand\022 \n\016referered_from\030\t \003(\0132\010.Edge_64\032"
-    "\263\001\n\007Operand\022\013\n\003pos\030\001 \002(\005\0229\n\004type\030\002 \002(\0162+"
-    ".Annotated_Instruction.Operand.Operand_T"
-    "ype\022\r\n\005value\030\003 \001(\t\"Q\n\014Operand_Type\022\013\n\007Un"
-    "known\020\000\022\r\n\tImmediate\020\001\022\014\n\010Register\020\002\022\n\n\006"
-    "Memory\020\003\022\013\n\007Address\020\004\"\251\003\n\025Annotated_Regi"
-    "ster_32\022-\n\004name\030\001 \002(\0162\037.Annotated_Regist"
-    "er_32.Register\022\024\n\014used_at_addr\030\002 \002(\003\022\030\n\020"
-    "used_at_addr_hex\030\003 \001(\t\022\027\n\005value\030\007 \003(\0132\010."
-    "Edge_32\022-\n\004fact\030\010 \002(\0132\037.Annotated_Regist"
-    "er_32.Property\022\033\n\023abstract_expression\030\t "
-    "\001(\t\032*\n\010Property\022\017\n\007Unknown\030\001 \002(\010\022\r\n\005Aliv"
-    "e\030\002 \001(\010\"\237\001\n\010Register\022\013\n\007Unknown\020\000\022\007\n\003eax"
-    "\020\001\022\007\n\003ecx\020\002\022\007\n\003edx\020\003\022\007\n\003ebx\020\004\022\007\n\003esp\020\005\022\007"
-    "\n\003ebp\020\006\022\007\n\003esi\020\007\022\007\n\003edi\020\010\022\007\n\003eip\020\t\022\013\n\007fs"
-    "_base\020\n\022\013\n\007gs_base\020\013\022\007\n\003gtd\020\014\022\007\n\003ldt\020\r\022\t"
-    "\n\005mxcsr\020\016\"\344\003\n\025Annotated_Register_64\022-\n\004n"
-    "ame\030\001 \002(\0162\037.Annotated_Register_64.Regist"
-    "er\022\024\n\014used_at_addr\030\002 \002(\003\022\030\n\020used_at_addr"
-    "_hex\030\003 \001(\t\022\027\n\005value\030\004 \003(\0132\010.Edge_64\022-\n\004f"
-    "act\030\005 \002(\0132\037.Annotated_Register_64.Proper"
-    "ty\022\033\n\023abstract_expression\030\006 \001(\t\032*\n\010Prope"
-    "rty\022\017\n\007Unknown\030\001 \002(\010\022\r\n\005Alive\030\002 \001(\010\"\332\001\n\010"
-    "Register\022\013\n\007Unknown\020\000\022\007\n\003rax\020\n\022\007\n\003rcx\020\013\022"
-    "\007\n\003rdx\020\014\022\007\n\003rbx\020\r\022\007\n\003rsp\020\016\022\007\n\003rbp\020\017\022\007\n\003r"
-    "si\020\020\022\007\n\003rdi\020\021\022\007\n\003rip\020\022\022\006\n\002r8\020\023\022\006\n\002r9\020\024\022\007"
-    "\n\003r10\020\025\022\007\n\003r11\020\026\022\007\n\003r12\020\027\022\007\n\003r13\020\030\022\007\n\003r1"
-    "4\020\031\022\007\n\003r15\020\032\022\013\n\007fs_base\020\033\022\013\n\007gs_base\020\034\022\007"
-    "\n\003gdt\020\035\022\007\n\003ldt\020\036\"\215\002\n\022Annotated_Function\022"
-    "\014\n\004name\030\001 \002(\t\022\025\n\rstart_at_addr\030\002 \002(\003\022\031\n\021"
-    "start_at_addr_hex\030\003 \001(\t\022\023\n\013end_at_addr\030\004"
-    " \001(\003\022\027\n\017end_at_addr_hex\030\005 \001(\t\022&\n\006prolog\030"
-    "\006 \003(\0132\026.Annotated_Instruction\022&\n\006epilog\030"
-    "\007 \003(\0132\026.Annotated_Instruction\022 \n\016referer"
-    "ed_from\030\010 \003(\0132\010.Edge_64\022\027\n\005calls\030\t \003(\0132\010"
-    ".Edge_64\"\334\001\n\013Disassembly\022%\n\005instr\030\001 \003(\0132"
-    "\026.Annotated_Instruction\0223\n\014branch_instr\030"
-    "\002 \003(\0132\035.Annotated_Branch_Instruction\022&\n\006"
-    "reg_32\030\003 \003(\0132\026.Annotated_Register_32\022&\n\006"
-    "reg_64\030\004 \003(\0132\026.Annotated_Register_64\022!\n\004"
-    "func\030\005 \003(\0132\023.Annotated_Function", 4151);
+    "rget\030\004 \001(\003\022\020\n\010inst_len\030\005 \002(\005\022\025\n\rimm_refe"
+    "rence\030\006 \001(\003\022\030\n\020imm_reloc_offset\030\017 \001(\003\022*\n"
+    "\014imm_ref_type\030\020 \001(\0162\024.Instruction.RefTyp"
+    "e\022\025\n\rmem_reference\030\010 \001(\003\022\030\n\020mem_reloc_of"
+    "fset\030\t \001(\003\022*\n\014mem_ref_type\030\022 \001(\0162\024.Instr"
+    "uction.RefType\022\025\n\rext_call_name\030\007 \001(\t\022\034\n"
+    "\njump_table\030\n \001(\0132\010.JumpTbl\022\'\n\020jump_inde"
+    "x_table\030\013 \001(\0132\r.JumpIndexTbl\022\025\n\rext_data"
+    "_name\030\014 \001(\t\022\032\n\022system_call_number\030\r \001(\005\022"
+    "\026\n\016local_noreturn\030\016 \001(\010\"#\n\007RefType\022\013\n\007Co"
+    "deRef\020\000\022\013\n\007DataRef\020\001\"Q\n\005Block\022\033\n\005insts\030\001"
+    " \003(\0132\014.Instruction\022\024\n\014base_address\030\002 \002(\003"
+    "\022\025\n\rblock_follows\030\003 \003(\003\"9\n\010Function\022\026\n\006b"
+    "locks\030\001 \003(\0132\006.Block\022\025\n\rentry_address\030\002 \002"
+    "(\003\"\224\002\n\020ExternalFunction\022\023\n\013symbol_name\030\001"
+    " \002(\t\022\?\n\022calling_convention\030\002 \002(\0162#.Exter"
+    "nalFunction.CallingConvention\022\022\n\nhas_ret"
+    "urn\030\003 \002(\010\022\021\n\tno_return\030\004 \002(\010\022\026\n\016argument"
+    "_count\030\005 \002(\005\022\017\n\007is_weak\030\006 \002(\010\022\021\n\tsignatu"
+    "re\030\007 \001(\t\"G\n\021CallingConvention\022\021\n\rCallerC"
+    "leanup\020\000\022\021\n\rCalleeCleanup\020\001\022\014\n\010FastCall\020"
+    "\002\"G\n\014ExternalData\022\023\n\013symbol_name\030\001 \002(\t\022\021"
+    "\n\tdata_size\030\002 \002(\005\022\017\n\007is_weak\030\003 \002(\010\"L\n\nDa"
+    "taSymbol\022\024\n\014base_address\030\001 \002(\003\022\023\n\013symbol"
+    "_name\030\002 \002(\t\022\023\n\013symbol_size\030\003 \002(\005\"[\n\004Data"
+    "\022\024\n\014base_address\030\001 \002(\003\022\014\n\004data\030\002 \002(\014\022\034\n\007"
+    "symbols\030\003 \003(\0132\013.DataSymbol\022\021\n\tread_only\030"
+    "\004 \002(\010\"u\n\020EntrySymbolExtra\022\022\n\nentry_argc\030"
+    "\001 \002(\005\0228\n\013entry_cconv\030\002 \002(\0162#.ExternalFun"
+    "ction.CallingConvention\022\023\n\013does_return\030\003"
+    " \002(\010\"`\n\013EntrySymbol\022\022\n\nentry_name\030\001 \002(\t\022"
+    "\025\n\rentry_address\030\002 \002(\003\022&\n\013entry_extra\030\003 "
+    "\001(\0132\021.EntrySymbolExtra\"\316\001\n\006Module\022!\n\016int"
+    "ernal_funcs\030\001 \003(\0132\t.Function\022)\n\016external"
+    "_funcs\030\002 \003(\0132\021.ExternalFunction\022\034\n\rinter"
+    "nal_data\030\003 \003(\0132\005.Data\022\023\n\013module_name\030\004 \002"
+    "(\t\022\035\n\007entries\030\005 \003(\0132\014.EntrySymbol\022$\n\rext"
+    "ernal_data\030\006 \003(\0132\r.ExternalData\"l\n\007Edge_"
+    "64\022\r\n\005value\030\001 \002(\003\022\033\n\004kind\030\002 \002(\0162\r.Edge_6"
+    "4.Kind\022\r\n\005label\030\003 \001(\010\"&\n\004Kind\022\013\n\007Unknown"
+    "\020\000\022\007\n\003May\020\001\022\010\n\004Must\020\002\"l\n\007Edge_32\022\r\n\005valu"
+    "e\030\001 \002(\005\022\033\n\004kind\030\002 \002(\0162\r.Edge_32.Kind\022\r\n\005"
+    "label\030\003 \001(\010\"&\n\004Kind\022\013\n\007Unknown\020\000\022\007\n\003May\020"
+    "\001\022\010\n\004Must\020\002\"\205\004\n\034Annotated_Branch_Instruc"
+    "tion\022\?\n\021branch_instr_name\030\001 \002(\0162$.Annota"
+    "ted_Branch_Instruction.Branch\022\023\n\013is_reso"
+    "lved\030\002 \002(\010\022\023\n\013is_indirect\030\003 \002(\010\022\026\n\016is_co"
+    "nditional\030\004 \002(\010\022\017\n\007is_leaf\030\005 \002(\010\022\033\n\ttarg"
+    "et_to\030\006 \003(\0132\010.Edge_64\022%\n\005instr\030\007 \002(\0132\026.A"
+    "nnotated_Instruction\022\033\n\023abstract_express"
+    "ion\030\010 \001(\t\"\357\001\n\006Branch\022\013\n\007Unknown\020\000\022\007\n\003jmp"
+    "\020\001\022\010\n\004ljmp\020\002\022\006\n\002jo\020\003\022\007\n\003jno\020\004\022\006\n\002jb\020\005\022\007\n"
+    "\003jae\020\006\022\006\n\002je\020\007\022\007\n\003jne\020\010\022\007\n\003jbe\020\t\022\006\n\002ja\020\n"
+    "\022\006\n\002js\020\013\022\007\n\003jns\020\014\022\006\n\002jp\020\r\022\007\n\003jnp\020\016\022\006\n\002jl"
+    "\020\017\022\007\n\003jge\020\020\022\007\n\003jle\020\021\022\006\n\002jg\020\022\022\n\n\006loopne\020\023"
+    "\022\t\n\005loope\020\024\022\010\n\004loop\020\025\022\t\n\005jCcxz\020\026\022\007\n\003ret\020"
+    "\027\022\010\n\004call\020\030\"\270\003\n\025Annotated_Instruction\022\022\n"
+    "\ninstr_name\030\001 \002(\t\022\024\n\014instr_string\030\002 \002(\t\022"
+    "\021\n\tinst_addr\030\003 \002(\003\022\020\n\010inst_len\030\004 \002(\005\022\020\n\010"
+    "op_count\030\005 \002(\005\022\025\n\rinst_addr_hex\030\006 \001(\t\022\035\n"
+    "\025is_branch_instruction\030\007 \002(\010\0220\n\010argument"
+    "\030\010 \003(\0132\036.Annotated_Instruction.Operand\022 "
+    "\n\016referered_from\030\t \003(\0132\010.Edge_64\032\263\001\n\007Ope"
+    "rand\022\013\n\003pos\030\001 \002(\005\0229\n\004type\030\002 \002(\0162+.Annota"
+    "ted_Instruction.Operand.Operand_Type\022\r\n\005"
+    "value\030\003 \001(\t\"Q\n\014Operand_Type\022\013\n\007Unknown\020\000"
+    "\022\r\n\tImmediate\020\001\022\014\n\010Register\020\002\022\n\n\006Memory\020"
+    "\003\022\013\n\007Address\020\004\"\251\003\n\025Annotated_Register_32"
+    "\022-\n\004name\030\001 \002(\0162\037.Annotated_Register_32.R"
+    "egister\022\024\n\014used_at_addr\030\002 \002(\003\022\030\n\020used_at"
+    "_addr_hex\030\003 \001(\t\022\027\n\005value\030\007 \003(\0132\010.Edge_32"
+    "\022-\n\004fact\030\010 \002(\0132\037.Annotated_Register_32.P"
+    "roperty\022\033\n\023abstract_expression\030\t \001(\t\032*\n\010"
+    "Property\022\017\n\007Unknown\030\001 \002(\010\022\r\n\005Alive\030\002 \001(\010"
+    "\"\237\001\n\010Register\022\013\n\007Unknown\020\000\022\007\n\003eax\020\001\022\007\n\003e"
+    "cx\020\002\022\007\n\003edx\020\003\022\007\n\003ebx\020\004\022\007\n\003esp\020\005\022\007\n\003ebp\020\006"
+    "\022\007\n\003esi\020\007\022\007\n\003edi\020\010\022\007\n\003eip\020\t\022\013\n\007fs_base\020\n"
+    "\022\013\n\007gs_base\020\013\022\007\n\003gtd\020\014\022\007\n\003ldt\020\r\022\t\n\005mxcsr"
+    "\020\016\"\344\003\n\025Annotated_Register_64\022-\n\004name\030\001 \002"
+    "(\0162\037.Annotated_Register_64.Register\022\024\n\014u"
+    "sed_at_addr\030\002 \002(\003\022\030\n\020used_at_addr_hex\030\003 "
+    "\001(\t\022\027\n\005value\030\004 \003(\0132\010.Edge_64\022-\n\004fact\030\005 \002"
+    "(\0132\037.Annotated_Register_64.Property\022\033\n\023a"
+    "bstract_expression\030\006 \001(\t\032*\n\010Property\022\017\n\007"
+    "Unknown\030\001 \002(\010\022\r\n\005Alive\030\002 \001(\010\"\332\001\n\010Registe"
+    "r\022\013\n\007Unknown\020\000\022\007\n\003rax\020\n\022\007\n\003rcx\020\013\022\007\n\003rdx\020"
+    "\014\022\007\n\003rbx\020\r\022\007\n\003rsp\020\016\022\007\n\003rbp\020\017\022\007\n\003rsi\020\020\022\007\n"
+    "\003rdi\020\021\022\007\n\003rip\020\022\022\006\n\002r8\020\023\022\006\n\002r9\020\024\022\007\n\003r10\020\025"
+    "\022\007\n\003r11\020\026\022\007\n\003r12\020\027\022\007\n\003r13\020\030\022\007\n\003r14\020\031\022\007\n\003"
+    "r15\020\032\022\013\n\007fs_base\020\033\022\013\n\007gs_base\020\034\022\007\n\003gdt\020\035"
+    "\022\007\n\003ldt\020\036\"\215\002\n\022Annotated_Function\022\014\n\004name"
+    "\030\001 \002(\t\022\025\n\rstart_at_addr\030\002 \002(\003\022\031\n\021start_a"
+    "t_addr_hex\030\003 \001(\t\022\023\n\013end_at_addr\030\004 \001(\003\022\027\n"
+    "\017end_at_addr_hex\030\005 \001(\t\022&\n\006prolog\030\006 \003(\0132\026"
+    ".Annotated_Instruction\022&\n\006epilog\030\007 \003(\0132\026"
+    ".Annotated_Instruction\022 \n\016referered_from"
+    "\030\010 \003(\0132\010.Edge_64\022\027\n\005calls\030\t \003(\0132\010.Edge_6"
+    "4\"\334\001\n\013Disassembly\022%\n\005instr\030\001 \003(\0132\026.Annot"
+    "ated_Instruction\0223\n\014branch_instr\030\002 \003(\0132\035"
+    ".Annotated_Branch_Instruction\022&\n\006reg_32\030"
+    "\003 \003(\0132\026.Annotated_Register_32\022&\n\006reg_64\030"
+    "\004 \003(\0132\026.Annotated_Register_64\022!\n\004func\030\005 "
+    "\003(\0132\023.Annotated_Function", 4344);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "CFG.proto", &protobuf_RegisterTypes);
   JumpTbl::default_instance_ = new JumpTbl();
@@ -1377,16 +1389,40 @@ void JumpIndexTbl::Swap(JumpIndexTbl* other) {
 
 // ===================================================================
 
+const ::google::protobuf::EnumDescriptor* Instruction_RefType_descriptor() {
+  protobuf_AssignDescriptorsOnce();
+  return Instruction_RefType_descriptor_;
+}
+bool Instruction_RefType_IsValid(int value) {
+  switch(value) {
+    case 0:
+    case 1:
+      return true;
+    default:
+      return false;
+  }
+}
+
+#ifndef _MSC_VER
+const Instruction_RefType Instruction::CodeRef;
+const Instruction_RefType Instruction::DataRef;
+const Instruction_RefType Instruction::RefType_MIN;
+const Instruction_RefType Instruction::RefType_MAX;
+const int Instruction::RefType_ARRAYSIZE;
+#endif  // _MSC_VER
 #ifndef _MSC_VER
 const int Instruction::kInstBytesFieldNumber;
 const int Instruction::kInstAddrFieldNumber;
 const int Instruction::kTrueTargetFieldNumber;
 const int Instruction::kFalseTargetFieldNumber;
 const int Instruction::kInstLenFieldNumber;
-const int Instruction::kDataOffsetFieldNumber;
+const int Instruction::kImmReferenceFieldNumber;
+const int Instruction::kImmRelocOffsetFieldNumber;
+const int Instruction::kImmRefTypeFieldNumber;
+const int Instruction::kMemReferenceFieldNumber;
+const int Instruction::kMemRelocOffsetFieldNumber;
+const int Instruction::kMemRefTypeFieldNumber;
 const int Instruction::kExtCallNameFieldNumber;
-const int Instruction::kCallTargetFieldNumber;
-const int Instruction::kRelocOffsetFieldNumber;
 const int Instruction::kJumpTableFieldNumber;
 const int Instruction::kJumpIndexTableFieldNumber;
 const int Instruction::kExtDataNameFieldNumber;
@@ -1417,10 +1453,13 @@ void Instruction::SharedCtor() {
   true_target_ = GOOGLE_LONGLONG(0);
   false_target_ = GOOGLE_LONGLONG(0);
   inst_len_ = 0;
-  data_offset_ = GOOGLE_LONGLONG(0);
+  imm_reference_ = GOOGLE_LONGLONG(0);
+  imm_reloc_offset_ = GOOGLE_LONGLONG(0);
+  imm_ref_type_ = 0;
+  mem_reference_ = GOOGLE_LONGLONG(0);
+  mem_reloc_offset_ = GOOGLE_LONGLONG(0);
+  mem_ref_type_ = 0;
   ext_call_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
-  call_target_ = GOOGLE_LONGLONG(0);
-  reloc_offset_ = 0;
   jump_table_ = NULL;
   jump_index_table_ = NULL;
   ext_data_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
@@ -1481,16 +1520,19 @@ void Instruction::Clear() {
     true_target_ = GOOGLE_LONGLONG(0);
     false_target_ = GOOGLE_LONGLONG(0);
     inst_len_ = 0;
-    data_offset_ = GOOGLE_LONGLONG(0);
+    imm_reference_ = GOOGLE_LONGLONG(0);
+    imm_reloc_offset_ = GOOGLE_LONGLONG(0);
+    imm_ref_type_ = 0;
+  }
+  if (_has_bits_[8 / 32] & (0xffu << (8 % 32))) {
+    mem_reference_ = GOOGLE_LONGLONG(0);
+    mem_reloc_offset_ = GOOGLE_LONGLONG(0);
+    mem_ref_type_ = 0;
     if (has_ext_call_name()) {
       if (ext_call_name_ != &::google::protobuf::internal::kEmptyString) {
         ext_call_name_->clear();
       }
     }
-    call_target_ = GOOGLE_LONGLONG(0);
-  }
-  if (_has_bits_[8 / 32] & (0xffu << (8 % 32))) {
-    reloc_offset_ = 0;
     if (has_jump_table()) {
       if (jump_table_ != NULL) jump_table_->::JumpTbl::Clear();
     }
@@ -1503,6 +1545,8 @@ void Instruction::Clear() {
       }
     }
     system_call_number_ = 0;
+  }
+  if (_has_bits_[16 / 32] & (0xffu << (16 % 32))) {
     local_noreturn_ = false;
   }
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
@@ -1588,19 +1632,19 @@ bool Instruction::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
-        if (input->ExpectTag(48)) goto parse_data_offset;
+        if (input->ExpectTag(48)) goto parse_imm_reference;
         break;
       }
 
-      // optional int64 data_offset = 6;
+      // optional int64 imm_reference = 6;
       case 6: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_data_offset:
+         parse_imm_reference:
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::int64, ::google::protobuf::internal::WireFormatLite::TYPE_INT64>(
-                 input, &data_offset_)));
-          set_has_data_offset();
+                 input, &imm_reference_)));
+          set_has_imm_reference();
         } else {
           goto handle_uninterpreted;
         }
@@ -1621,35 +1665,35 @@ bool Instruction::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
-        if (input->ExpectTag(64)) goto parse_call_target;
+        if (input->ExpectTag(64)) goto parse_mem_reference;
         break;
       }
 
-      // optional int64 call_target = 8;
+      // optional int64 mem_reference = 8;
       case 8: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_call_target:
+         parse_mem_reference:
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::int64, ::google::protobuf::internal::WireFormatLite::TYPE_INT64>(
-                 input, &call_target_)));
-          set_has_call_target();
+                 input, &mem_reference_)));
+          set_has_mem_reference();
         } else {
           goto handle_uninterpreted;
         }
-        if (input->ExpectTag(72)) goto parse_reloc_offset;
+        if (input->ExpectTag(72)) goto parse_mem_reloc_offset;
         break;
       }
 
-      // optional int32 reloc_offset = 9;
+      // optional int64 mem_reloc_offset = 9;
       case 9: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
-         parse_reloc_offset:
+         parse_mem_reloc_offset:
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
-                   ::google::protobuf::int32, ::google::protobuf::internal::WireFormatLite::TYPE_INT32>(
-                 input, &reloc_offset_)));
-          set_has_reloc_offset();
+                   ::google::protobuf::int64, ::google::protobuf::internal::WireFormatLite::TYPE_INT64>(
+                 input, &mem_reloc_offset_)));
+          set_has_mem_reloc_offset();
         } else {
           goto handle_uninterpreted;
         }
@@ -1730,6 +1774,64 @@ bool Instruction::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
+        if (input->ExpectTag(120)) goto parse_imm_reloc_offset;
+        break;
+      }
+
+      // optional int64 imm_reloc_offset = 15;
+      case 15: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_imm_reloc_offset:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   ::google::protobuf::int64, ::google::protobuf::internal::WireFormatLite::TYPE_INT64>(
+                 input, &imm_reloc_offset_)));
+          set_has_imm_reloc_offset();
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(128)) goto parse_imm_ref_type;
+        break;
+      }
+
+      // optional .Instruction.RefType imm_ref_type = 16;
+      case 16: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_imm_ref_type:
+          int value;
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   int, ::google::protobuf::internal::WireFormatLite::TYPE_ENUM>(
+                 input, &value)));
+          if (::Instruction_RefType_IsValid(value)) {
+            set_imm_ref_type(static_cast< ::Instruction_RefType >(value));
+          } else {
+            mutable_unknown_fields()->AddVarint(16, value);
+          }
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(144)) goto parse_mem_ref_type;
+        break;
+      }
+
+      // optional .Instruction.RefType mem_ref_type = 18;
+      case 18: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_mem_ref_type:
+          int value;
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   int, ::google::protobuf::internal::WireFormatLite::TYPE_ENUM>(
+                 input, &value)));
+          if (::Instruction_RefType_IsValid(value)) {
+            set_mem_ref_type(static_cast< ::Instruction_RefType >(value));
+          } else {
+            mutable_unknown_fields()->AddVarint(18, value);
+          }
+        } else {
+          goto handle_uninterpreted;
+        }
         if (input->ExpectAtEnd()) return true;
         break;
       }
@@ -1778,9 +1880,9 @@ void Instruction::SerializeWithCachedSizes(
     ::google::protobuf::internal::WireFormatLite::WriteInt32(5, this->inst_len(), output);
   }
 
-  // optional int64 data_offset = 6;
-  if (has_data_offset()) {
-    ::google::protobuf::internal::WireFormatLite::WriteInt64(6, this->data_offset(), output);
+  // optional int64 imm_reference = 6;
+  if (has_imm_reference()) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt64(6, this->imm_reference(), output);
   }
 
   // optional string ext_call_name = 7;
@@ -1792,14 +1894,14 @@ void Instruction::SerializeWithCachedSizes(
       7, this->ext_call_name(), output);
   }
 
-  // optional int64 call_target = 8;
-  if (has_call_target()) {
-    ::google::protobuf::internal::WireFormatLite::WriteInt64(8, this->call_target(), output);
+  // optional int64 mem_reference = 8;
+  if (has_mem_reference()) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt64(8, this->mem_reference(), output);
   }
 
-  // optional int32 reloc_offset = 9;
-  if (has_reloc_offset()) {
-    ::google::protobuf::internal::WireFormatLite::WriteInt32(9, this->reloc_offset(), output);
+  // optional int64 mem_reloc_offset = 9;
+  if (has_mem_reloc_offset()) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt64(9, this->mem_reloc_offset(), output);
   }
 
   // optional .JumpTbl jump_table = 10;
@@ -1831,6 +1933,23 @@ void Instruction::SerializeWithCachedSizes(
   // optional bool local_noreturn = 14;
   if (has_local_noreturn()) {
     ::google::protobuf::internal::WireFormatLite::WriteBool(14, this->local_noreturn(), output);
+  }
+
+  // optional int64 imm_reloc_offset = 15;
+  if (has_imm_reloc_offset()) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt64(15, this->imm_reloc_offset(), output);
+  }
+
+  // optional .Instruction.RefType imm_ref_type = 16;
+  if (has_imm_ref_type()) {
+    ::google::protobuf::internal::WireFormatLite::WriteEnum(
+      16, this->imm_ref_type(), output);
+  }
+
+  // optional .Instruction.RefType mem_ref_type = 18;
+  if (has_mem_ref_type()) {
+    ::google::protobuf::internal::WireFormatLite::WriteEnum(
+      18, this->mem_ref_type(), output);
   }
 
   if (!unknown_fields().empty()) {
@@ -1868,9 +1987,9 @@ void Instruction::SerializeWithCachedSizes(
     target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(5, this->inst_len(), target);
   }
 
-  // optional int64 data_offset = 6;
-  if (has_data_offset()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteInt64ToArray(6, this->data_offset(), target);
+  // optional int64 imm_reference = 6;
+  if (has_imm_reference()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteInt64ToArray(6, this->imm_reference(), target);
   }
 
   // optional string ext_call_name = 7;
@@ -1883,14 +2002,14 @@ void Instruction::SerializeWithCachedSizes(
         7, this->ext_call_name(), target);
   }
 
-  // optional int64 call_target = 8;
-  if (has_call_target()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteInt64ToArray(8, this->call_target(), target);
+  // optional int64 mem_reference = 8;
+  if (has_mem_reference()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteInt64ToArray(8, this->mem_reference(), target);
   }
 
-  // optional int32 reloc_offset = 9;
-  if (has_reloc_offset()) {
-    target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(9, this->reloc_offset(), target);
+  // optional int64 mem_reloc_offset = 9;
+  if (has_mem_reloc_offset()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteInt64ToArray(9, this->mem_reloc_offset(), target);
   }
 
   // optional .JumpTbl jump_table = 10;
@@ -1925,6 +2044,23 @@ void Instruction::SerializeWithCachedSizes(
   // optional bool local_noreturn = 14;
   if (has_local_noreturn()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(14, this->local_noreturn(), target);
+  }
+
+  // optional int64 imm_reloc_offset = 15;
+  if (has_imm_reloc_offset()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteInt64ToArray(15, this->imm_reloc_offset(), target);
+  }
+
+  // optional .Instruction.RefType imm_ref_type = 16;
+  if (has_imm_ref_type()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteEnumToArray(
+      16, this->imm_ref_type(), target);
+  }
+
+  // optional .Instruction.RefType mem_ref_type = 18;
+  if (has_mem_ref_type()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteEnumToArray(
+      18, this->mem_ref_type(), target);
   }
 
   if (!unknown_fields().empty()) {
@@ -1973,11 +2109,46 @@ int Instruction::ByteSize() const {
           this->inst_len());
     }
 
-    // optional int64 data_offset = 6;
-    if (has_data_offset()) {
+    // optional int64 imm_reference = 6;
+    if (has_imm_reference()) {
       total_size += 1 +
         ::google::protobuf::internal::WireFormatLite::Int64Size(
-          this->data_offset());
+          this->imm_reference());
+    }
+
+    // optional int64 imm_reloc_offset = 15;
+    if (has_imm_reloc_offset()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::Int64Size(
+          this->imm_reloc_offset());
+    }
+
+    // optional .Instruction.RefType imm_ref_type = 16;
+    if (has_imm_ref_type()) {
+      total_size += 2 +
+        ::google::protobuf::internal::WireFormatLite::EnumSize(this->imm_ref_type());
+    }
+
+  }
+  if (_has_bits_[8 / 32] & (0xffu << (8 % 32))) {
+    // optional int64 mem_reference = 8;
+    if (has_mem_reference()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::Int64Size(
+          this->mem_reference());
+    }
+
+    // optional int64 mem_reloc_offset = 9;
+    if (has_mem_reloc_offset()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::Int64Size(
+          this->mem_reloc_offset());
+    }
+
+    // optional .Instruction.RefType mem_ref_type = 18;
+    if (has_mem_ref_type()) {
+      total_size += 2 +
+        ::google::protobuf::internal::WireFormatLite::EnumSize(this->mem_ref_type());
     }
 
     // optional string ext_call_name = 7;
@@ -1985,22 +2156,6 @@ int Instruction::ByteSize() const {
       total_size += 1 +
         ::google::protobuf::internal::WireFormatLite::StringSize(
           this->ext_call_name());
-    }
-
-    // optional int64 call_target = 8;
-    if (has_call_target()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::Int64Size(
-          this->call_target());
-    }
-
-  }
-  if (_has_bits_[8 / 32] & (0xffu << (8 % 32))) {
-    // optional int32 reloc_offset = 9;
-    if (has_reloc_offset()) {
-      total_size += 1 +
-        ::google::protobuf::internal::WireFormatLite::Int32Size(
-          this->reloc_offset());
     }
 
     // optional .JumpTbl jump_table = 10;
@@ -2031,6 +2186,8 @@ int Instruction::ByteSize() const {
           this->system_call_number());
     }
 
+  }
+  if (_has_bits_[16 / 32] & (0xffu << (16 % 32))) {
     // optional bool local_noreturn = 14;
     if (has_local_noreturn()) {
       total_size += 1 + 1;
@@ -2078,19 +2235,28 @@ void Instruction::MergeFrom(const Instruction& from) {
     if (from.has_inst_len()) {
       set_inst_len(from.inst_len());
     }
-    if (from.has_data_offset()) {
-      set_data_offset(from.data_offset());
+    if (from.has_imm_reference()) {
+      set_imm_reference(from.imm_reference());
     }
-    if (from.has_ext_call_name()) {
-      set_ext_call_name(from.ext_call_name());
+    if (from.has_imm_reloc_offset()) {
+      set_imm_reloc_offset(from.imm_reloc_offset());
     }
-    if (from.has_call_target()) {
-      set_call_target(from.call_target());
+    if (from.has_imm_ref_type()) {
+      set_imm_ref_type(from.imm_ref_type());
     }
   }
   if (from._has_bits_[8 / 32] & (0xffu << (8 % 32))) {
-    if (from.has_reloc_offset()) {
-      set_reloc_offset(from.reloc_offset());
+    if (from.has_mem_reference()) {
+      set_mem_reference(from.mem_reference());
+    }
+    if (from.has_mem_reloc_offset()) {
+      set_mem_reloc_offset(from.mem_reloc_offset());
+    }
+    if (from.has_mem_ref_type()) {
+      set_mem_ref_type(from.mem_ref_type());
+    }
+    if (from.has_ext_call_name()) {
+      set_ext_call_name(from.ext_call_name());
     }
     if (from.has_jump_table()) {
       mutable_jump_table()->::JumpTbl::MergeFrom(from.jump_table());
@@ -2104,6 +2270,8 @@ void Instruction::MergeFrom(const Instruction& from) {
     if (from.has_system_call_number()) {
       set_system_call_number(from.system_call_number());
     }
+  }
+  if (from._has_bits_[16 / 32] & (0xffu << (16 % 32))) {
     if (from.has_local_noreturn()) {
       set_local_noreturn(from.local_noreturn());
     }
@@ -2142,10 +2310,13 @@ void Instruction::Swap(Instruction* other) {
     std::swap(true_target_, other->true_target_);
     std::swap(false_target_, other->false_target_);
     std::swap(inst_len_, other->inst_len_);
-    std::swap(data_offset_, other->data_offset_);
+    std::swap(imm_reference_, other->imm_reference_);
+    std::swap(imm_reloc_offset_, other->imm_reloc_offset_);
+    std::swap(imm_ref_type_, other->imm_ref_type_);
+    std::swap(mem_reference_, other->mem_reference_);
+    std::swap(mem_reloc_offset_, other->mem_reloc_offset_);
+    std::swap(mem_ref_type_, other->mem_ref_type_);
     std::swap(ext_call_name_, other->ext_call_name_);
-    std::swap(call_target_, other->call_target_);
-    std::swap(reloc_offset_, other->reloc_offset_);
     std::swap(jump_table_, other->jump_table_);
     std::swap(jump_index_table_, other->jump_index_table_);
     std::swap(ext_data_name_, other->ext_data_name_);
@@ -2751,6 +2922,7 @@ const int ExternalFunction::kCallingConventionFieldNumber;
 const int ExternalFunction::kHasReturnFieldNumber;
 const int ExternalFunction::kNoReturnFieldNumber;
 const int ExternalFunction::kArgumentCountFieldNumber;
+const int ExternalFunction::kIsWeakFieldNumber;
 const int ExternalFunction::kSignatureFieldNumber;
 #endif  // !_MSC_VER
 
@@ -2775,6 +2947,7 @@ void ExternalFunction::SharedCtor() {
   has_return_ = false;
   no_return_ = false;
   argument_count_ = 0;
+  is_weak_ = false;
   signature_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
@@ -2826,6 +2999,7 @@ void ExternalFunction::Clear() {
     has_return_ = false;
     no_return_ = false;
     argument_count_ = 0;
+    is_weak_ = false;
     if (has_signature()) {
       if (signature_ != &::google::protobuf::internal::kEmptyString) {
         signature_->clear();
@@ -2923,12 +3097,28 @@ bool ExternalFunction::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
-        if (input->ExpectTag(50)) goto parse_signature;
+        if (input->ExpectTag(48)) goto parse_is_weak;
         break;
       }
 
-      // optional string signature = 6;
+      // required bool is_weak = 6;
       case 6: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_is_weak:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
+                 input, &is_weak_)));
+          set_has_is_weak();
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(58)) goto parse_signature;
+        break;
+      }
+
+      // optional string signature = 7;
+      case 7: {
         if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
             ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
          parse_signature:
@@ -2992,13 +3182,18 @@ void ExternalFunction::SerializeWithCachedSizes(
     ::google::protobuf::internal::WireFormatLite::WriteInt32(5, this->argument_count(), output);
   }
 
-  // optional string signature = 6;
+  // required bool is_weak = 6;
+  if (has_is_weak()) {
+    ::google::protobuf::internal::WireFormatLite::WriteBool(6, this->is_weak(), output);
+  }
+
+  // optional string signature = 7;
   if (has_signature()) {
     ::google::protobuf::internal::WireFormat::VerifyUTF8String(
       this->signature().data(), this->signature().length(),
       ::google::protobuf::internal::WireFormat::SERIALIZE);
     ::google::protobuf::internal::WireFormatLite::WriteString(
-      6, this->signature(), output);
+      7, this->signature(), output);
   }
 
   if (!unknown_fields().empty()) {
@@ -3040,14 +3235,19 @@ void ExternalFunction::SerializeWithCachedSizes(
     target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(5, this->argument_count(), target);
   }
 
-  // optional string signature = 6;
+  // required bool is_weak = 6;
+  if (has_is_weak()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(6, this->is_weak(), target);
+  }
+
+  // optional string signature = 7;
   if (has_signature()) {
     ::google::protobuf::internal::WireFormat::VerifyUTF8String(
       this->signature().data(), this->signature().length(),
       ::google::protobuf::internal::WireFormat::SERIALIZE);
     target =
       ::google::protobuf::internal::WireFormatLite::WriteStringToArray(
-        6, this->signature(), target);
+        7, this->signature(), target);
   }
 
   if (!unknown_fields().empty()) {
@@ -3091,7 +3291,12 @@ int ExternalFunction::ByteSize() const {
           this->argument_count());
     }
 
-    // optional string signature = 6;
+    // required bool is_weak = 6;
+    if (has_is_weak()) {
+      total_size += 1 + 1;
+    }
+
+    // optional string signature = 7;
     if (has_signature()) {
       total_size += 1 +
         ::google::protobuf::internal::WireFormatLite::StringSize(
@@ -3140,6 +3345,9 @@ void ExternalFunction::MergeFrom(const ExternalFunction& from) {
     if (from.has_argument_count()) {
       set_argument_count(from.argument_count());
     }
+    if (from.has_is_weak()) {
+      set_is_weak(from.is_weak());
+    }
     if (from.has_signature()) {
       set_signature(from.signature());
     }
@@ -3160,7 +3368,7 @@ void ExternalFunction::CopyFrom(const ExternalFunction& from) {
 }
 
 bool ExternalFunction::IsInitialized() const {
-  if ((_has_bits_[0] & 0x0000001f) != 0x0000001f) return false;
+  if ((_has_bits_[0] & 0x0000003f) != 0x0000003f) return false;
 
   return true;
 }
@@ -3172,6 +3380,7 @@ void ExternalFunction::Swap(ExternalFunction* other) {
     std::swap(has_return_, other->has_return_);
     std::swap(no_return_, other->no_return_);
     std::swap(argument_count_, other->argument_count_);
+    std::swap(is_weak_, other->is_weak_);
     std::swap(signature_, other->signature_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);
@@ -3193,6 +3402,7 @@ void ExternalFunction::Swap(ExternalFunction* other) {
 #ifndef _MSC_VER
 const int ExternalData::kSymbolNameFieldNumber;
 const int ExternalData::kDataSizeFieldNumber;
+const int ExternalData::kIsWeakFieldNumber;
 #endif  // !_MSC_VER
 
 ExternalData::ExternalData()
@@ -3213,6 +3423,7 @@ void ExternalData::SharedCtor() {
   _cached_size_ = 0;
   symbol_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   data_size_ = 0;
+  is_weak_ = false;
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -3257,6 +3468,7 @@ void ExternalData::Clear() {
       }
     }
     data_size_ = 0;
+    is_weak_ = false;
   }
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
   mutable_unknown_fields()->Clear();
@@ -3296,6 +3508,22 @@ bool ExternalData::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
+        if (input->ExpectTag(24)) goto parse_is_weak;
+        break;
+      }
+
+      // required bool is_weak = 3;
+      case 3: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_is_weak:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   bool, ::google::protobuf::internal::WireFormatLite::TYPE_BOOL>(
+                 input, &is_weak_)));
+          set_has_is_weak();
+        } else {
+          goto handle_uninterpreted;
+        }
         if (input->ExpectAtEnd()) return true;
         break;
       }
@@ -3332,6 +3560,11 @@ void ExternalData::SerializeWithCachedSizes(
     ::google::protobuf::internal::WireFormatLite::WriteInt32(2, this->data_size(), output);
   }
 
+  // required bool is_weak = 3;
+  if (has_is_weak()) {
+    ::google::protobuf::internal::WireFormatLite::WriteBool(3, this->is_weak(), output);
+  }
+
   if (!unknown_fields().empty()) {
     ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
         unknown_fields(), output);
@@ -3353,6 +3586,11 @@ void ExternalData::SerializeWithCachedSizes(
   // required int32 data_size = 2;
   if (has_data_size()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(2, this->data_size(), target);
+  }
+
+  // required bool is_weak = 3;
+  if (has_is_weak()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteBoolToArray(3, this->is_weak(), target);
   }
 
   if (!unknown_fields().empty()) {
@@ -3378,6 +3616,11 @@ int ExternalData::ByteSize() const {
       total_size += 1 +
         ::google::protobuf::internal::WireFormatLite::Int32Size(
           this->data_size());
+    }
+
+    // required bool is_weak = 3;
+    if (has_is_weak()) {
+      total_size += 1 + 1;
     }
 
   }
@@ -3413,6 +3656,9 @@ void ExternalData::MergeFrom(const ExternalData& from) {
     if (from.has_data_size()) {
       set_data_size(from.data_size());
     }
+    if (from.has_is_weak()) {
+      set_is_weak(from.is_weak());
+    }
   }
   mutable_unknown_fields()->MergeFrom(from.unknown_fields());
 }
@@ -3430,7 +3676,7 @@ void ExternalData::CopyFrom(const ExternalData& from) {
 }
 
 bool ExternalData::IsInitialized() const {
-  if ((_has_bits_[0] & 0x00000003) != 0x00000003) return false;
+  if ((_has_bits_[0] & 0x00000007) != 0x00000007) return false;
 
   return true;
 }
@@ -3439,6 +3685,7 @@ void ExternalData::Swap(ExternalData* other) {
   if (other != this) {
     std::swap(symbol_name_, other->symbol_name_);
     std::swap(data_size_, other->data_size_);
+    std::swap(is_weak_, other->is_weak_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);
     std::swap(_cached_size_, other->_cached_size_);

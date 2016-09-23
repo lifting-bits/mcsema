@@ -32,18 +32,31 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <boost/cstdint.hpp>
 #include <string>
 #include <vector>
+#include <utility>
 
 template <class T> class Table {
 public:
     Table(const std::vector<T> &table, int entry): m_table(table), m_entry(entry) {};
     virtual int getInitialEntry() const { return this->m_entry; }
     virtual ~Table() {};
+    virtual const std::vector<T>& getTable(void) const { return this->m_table; }
+    virtual const std::vector<T>& getConstTable(void) const { return this->m_table; }
 
 protected:
     std::vector<T> m_table;
     int m_entry;
-    virtual const std::vector<T>& getTable(void) const { return this->m_table; }
     virtual std::vector<T>& getTable(void) { return this->m_table; }
+};
+
+class MCSOffsetTable : public Table< std::pair<VA,VA> > {
+    protected:
+        VA m_start_addr;
+    public:
+        MCSOffsetTable(const std::vector< std::pair<VA,VA> > &table, int entry, VA start): 
+            Table< std::pair <VA,VA>>::Table(table, entry), m_start_addr(start) {};
+        virtual ~MCSOffsetTable() {};
+
+        virtual VA getStartAddr() const {return this->m_start_addr;}
 };
 
 class MCSJumpTable : public Table<VA> {
@@ -146,5 +159,13 @@ void doJumpTableViaSwitchReg(
 void doJumpIndexTableViaSwitch(
         llvm::BasicBlock *& block, 
         InstPtr ip);
+
+void doJumpOffsetTableViaSwitchReg(
+        llvm::BasicBlock *& block, 
+        InstPtr ip, 
+        llvm::Value *regVal,
+        llvm::BasicBlock *&default_block,
+        llvm::Value *data_location,
+        MCSOffsetTablePtr ot_ptr);
 
 #endif

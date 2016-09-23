@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 DIR=$(dirname $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd ))
-IDA=`locate idal64`
+IDA=`locate idal64 | head -n1`
 
 # Copy the binary to a temporary file.
 BIN=$1

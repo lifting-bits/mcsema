@@ -1,3 +1,9 @@
+message OffsetTable {
+    required int64 start_addr = 1;
+    repeated int64 table_offsets = 2;
+    repeated int64 destinations = 3;
+}
+
 message JumpTbl {
     repeated    int64       table_entries = 1;
     required    int32       zero_offset = 2;
@@ -10,20 +16,36 @@ message JumpIndexTbl {
 }
 
 message Instruction {
+
+    enum RefType {
+      CodeRef = 0;
+      DataRef = 1;
+    }
+
     required    bytes             inst_bytes = 1;
     required    int64             inst_addr = 2;
     optional    int64             true_target = 3;
     optional    int64             false_target = 4;
     required    int32             inst_len = 5;
-    optional    int64             data_offset = 6;
+
+    optional    int64             imm_reference = 6;
+    optional    int64             imm_reloc_offset = 15;
+    optional    RefType           imm_ref_type = 16;
+
+    optional    int64             mem_reference = 8;
+    optional    int64             mem_reloc_offset = 9;
+    optional    RefType           mem_ref_type = 18;
+
+    //optional    int64             call_target = 8;
+
     optional    string            ext_call_name = 7;
-    optional    int64             call_target = 8;
-    optional    int32             reloc_offset = 9;
+    //optional    int32             reloc_offset = 9;
     optional    JumpTbl           jump_table = 10;
     optional    JumpIndexTbl      jump_index_table = 11;
     optional    string            ext_data_name = 12;
     optional    int32             system_call_number = 13;
     optional    bool              local_noreturn = 14;
+    optional    int64             offset_table_addr = 19;
 }
 
 message Block {
@@ -52,12 +74,14 @@ message ExternalFunction {
     required    bool              has_return = 3;
     required    bool              no_return = 4;
     required    int32             argument_count = 5;
-    optional     string               signature = 6;
+    required    bool              is_weak = 6;
+    optional    string            signature = 7;
 }
 
 message ExternalData {
     required    string      symbol_name = 1;
     required    int32       data_size = 2;
+    required    bool        is_weak = 3;
 }
 
 
@@ -93,6 +117,7 @@ message Module {
     required    string              module_name = 4;
     repeated    EntrySymbol         entries = 5;
     repeated    ExternalData        external_data = 6;
+    repeated    OffsetTable         offset_tables = 7;
 }
 
 // The following information is used to guide the disassembley process. 

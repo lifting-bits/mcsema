@@ -372,18 +372,37 @@ static InstTransResult doIMulRRI(InstPtr ip,   BasicBlock      *&b,
     return ContinueBlock;
 }
 
-template <int width, int imm_width=8>
-static InstTransResult doIMulRMIn(InstPtr         ip,
-                                  BasicBlock      *&b,
-                                  const MCOperand &dst,
-                                  Value           *lhs,
-                                  const MCOperand &rhs)
+template <int width>
+static InstTransResult doIMulRRV(InstPtr ip,   BasicBlock      *&b,
+                            Value *addr,
+                            const MCOperand &lhs,
+                            const MCOperand &dst)
+{
+    NASSERT(dst.isReg());
+    NASSERT(lhs.isReg());
+
+    Value   *res = 
+        doIMulVVV<width>(ip, b,
+                        R_READ<width>(b, lhs.getReg()),
+                        addr);
+
+    R_WRITE<width>(b, dst.getReg(), res);
+
+    return ContinueBlock;
+}
+
+
+template <int width>
+static InstTransResult doIMulRMI8(InstPtr ip,  BasicBlock      *&b,
+                            const MCOperand &dst,
+                            Value           *lhs,
+                            const MCOperand &rhs)
 {
     NASSERT(dst.isReg());
     NASSERT(lhs != NULL);
     NASSERT(rhs.isImm());
 
-    Value   *vRhs = CONST_V<imm_width>(b, rhs.getImm());
+    Value   *vRhs = CONST_V<8>(b, rhs.getImm());
     Type    *sx = Type::getIntNTy(b->getContext(), width);
     Value   *vRhs_x = new SExtInst(vRhs, sx, "", b); 
 
@@ -566,150 +585,144 @@ static InstTransResult doDivM(InstPtr ip, BasicBlock *&b, Value *memLoc) {
     return ContinueBlock;
 }
 /* GOOD */
-GENERIC_TRANSLATION_MEM(IMUL32rm, 
-	doIMulRM<32>(ip,  block, OP(0), OP(1), ADDR(2)),
-	doIMulRM<32>(ip,  block, OP(0), OP(1), STD_GLOBAL_OP(2)))
-GENERIC_TRANSLATION_MEM(IMUL64rm,
-  doIMulRM<64>(ip,  block, OP(0), OP(1), ADDR(2)),
-  doIMulRM<64>(ip,  block, OP(0), OP(1), STD_GLOBAL_OP(2)))
-GENERIC_TRANSLATION_MEM(IMUL16rm, 
-	doIMulRM<16>(ip,  block, OP(0), OP(1), ADDR(2)),
-	doIMulRM<16>(ip,  block, OP(0), OP(1), STD_GLOBAL_OP(2)))
+GENERIC_TRANSLATION_REF(IMUL32rm, 
+    doIMulRM<32>(ip,  block, OP(0), OP(1), ADDR_NOREF(2)),
+    doIMulRM<32>(ip,  block, OP(0), OP(1), MEM_REFERENCE(2)))
+GENERIC_TRANSLATION_REF(IMUL64rm,
+    doIMulRM<64>(ip,  block, OP(0), OP(1), ADDR_NOREF(2)),
+    doIMulRM<64>(ip,  block, OP(0), OP(1), MEM_REFERENCE(2)))
+GENERIC_TRANSLATION_REF(IMUL16rm, 
+    doIMulRM<16>(ip,  block, OP(0), OP(1), ADDR_NOREF(2)),
+    doIMulRM<16>(ip,  block, OP(0), OP(1), MEM_REFERENCE(2)))
 GENERIC_TRANSLATION(IMUL8r, doIMulR<8>(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(IMUL8m, 
-	doIMulM<8>(ip, block, ADDR(0)),
-	doIMulM<8>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(IMUL8m, 
+    doIMulM<8>(ip, block, ADDR_NOREF(0)),
+    doIMulM<8>(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(IMUL16r, doIMulR<16>(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(IMUL16m, 
-	doIMulM<16>(ip, block, ADDR(0)),
-	doIMulM<16>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(IMUL16m, 
+    doIMulM<16>(ip, block, ADDR_NOREF(0)),
+    doIMulM<16>(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(IMUL32r, doIMulR<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(MUL32r, doMulR<32>(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(MUL32m, 
-	doMulM<32>(ip, block, ADDR(0)),
-	doMulM<32>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION(MUL64r, doMulR<64>(ip, block, OP(0)))
+GENERIC_TRANSLATION_REF(MUL32m, 
+    doMulM<32>(ip, block, ADDR_NOREF(0)),
+    doMulM<32>(ip, block, MEM_REFERENCE(0)))
+GENERIC_TRANSLATION_REF(MUL64m, 
+    doMulM<64>(ip, block, ADDR_NOREF(0)),
+    doMulM<64>(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(MUL16r, doMulR<16>(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(MUL16m, 
-	doMulM<16>(ip, block, ADDR(0)),
-	doMulM<16>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(MUL16m, 
+    doMulM<16>(ip, block, ADDR_NOREF(0)),
+    doMulM<16>(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(MUL8r, doMulR<8>(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(MUL8m, 
-	doMulM<8>(ip, block, ADDR(0)),
-	doMulM<8>(ip, block, STD_GLOBAL_OP(0)))
-GENERIC_TRANSLATION_MEM(IMUL32m, 
-	doIMulM<32>(ip, block, ADDR(0)),
-	doIMulM<32>(ip, block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(MUL8m, 
+    doMulM<8>(ip, block, ADDR_NOREF(0)),
+    doMulM<8>(ip, block, MEM_REFERENCE(0)))
+GENERIC_TRANSLATION_REF(IMUL32m, 
+    doIMulM<32>(ip, block, ADDR_NOREF(0)),
+    doIMulM<32>(ip, block, MEM_REFERENCE(0)))
+GENERIC_TRANSLATION_REF(IMUL64m, 
+    doIMulM<64>(ip, block, ADDR_NOREF(0)),
+    doIMulM<64>(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(IMUL32rr, doIMulRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL64rr, doIMulRR<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL64r, doIMulR<64>(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(IMUL64m,
-  doIMulM<64>(ip, block, ADDR(0)),
-  doIMulM<64>(ip, block, STD_GLOBAL_OP(0)))
 GENERIC_TRANSLATION(IMUL16rr, doIMulRR<16>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(IMUL16rmi, 
-	doIMulRMI<16>(ip, block, OP(0), ADDR(1), OP(6)),
-	doIMulRMI<16>(ip, block, OP(0), STD_GLOBAL_OP(1), OP(6)))
-GENERIC_TRANSLATION_MEM(IMUL16rmi8, 
-	doIMulRMIn<16>(ip, block, OP(0), ADDR(1), OP(6)),
-	doIMulRMIn<16>(ip, block, OP(0), STD_GLOBAL_OP(1), OP(6)))
+GENERIC_TRANSLATION_REF(IMUL16rmi, 
+    doIMulRMI<16>(ip, block, OP(0), ADDR_NOREF(1), OP(6)),
+    doIMulRMI<16>(ip, block, OP(0), MEM_REFERENCE(1), OP(6)))
+GENERIC_TRANSLATION_REF(IMUL16rmi8, 
+    doIMulRMI8<16>(ip, block, OP(0), ADDR_NOREF(1), OP(6)),
+    doIMulRMI8<16>(ip, block, OP(0), MEM_REFERENCE(1), OP(6)))
 GENERIC_TRANSLATION(IMUL16rri, doIMulRRI<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL16rri8, doIMulRRI<16>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(IMUL32rmi, 
-	doIMulRMI<32>(ip, block, OP(0), ADDR(1), OP(6)),
-	doIMulRMI<32>(ip, block, OP(0), STD_GLOBAL_OP(1), OP(6)))
-GENERIC_TRANSLATION_MEM(IMUL32rmi8, 
-	doIMulRMIn<32>(ip, block, OP(0), ADDR(1), OP(6)),
-	doIMulRMIn<32>(ip, block, OP(0), STD_GLOBAL_OP(1), OP(6)))
+GENERIC_TRANSLATION_REF(IMUL32rmi, 
+    doIMulRMI<32>(ip, block, OP(0), ADDR_NOREF(1), OP(6)),
+    doIMulRMI<32>(ip, block, OP(0), MEM_REFERENCE(1), OP(6)))
+GENERIC_TRANSLATION_REF(IMUL32rmi8, 
+    doIMulRMI8<32>(ip, block, OP(0), ADDR_NOREF(1), OP(6)),
+    doIMulRMI8<32>(ip, block, OP(0), MEM_REFERENCE(1), OP(6)))
+GENERIC_TRANSLATION_REF(IMUL64rmi8, 
+    doIMulRMI8<64>(ip, block, OP(0), ADDR_NOREF(1), OP(6)),
+    doIMulRMI8<64>(ip, block, OP(0), MEM_REFERENCE(1), OP(6)))
 GENERIC_TRANSLATION(IMUL32rri, doIMulRRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL32rri8, doIMulRRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL64rri8, doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(IMUL64rri32, doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)))
+//GENERIC_TRANSLATION(IMUL64rri32, doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION_REF(IMUL64rri32,
+        doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)),
+        doIMulRRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), OP(0), OP(1)))
 /* END GOOD */
 GENERIC_TRANSLATION(IDIV8r, doIDivR<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(IDIV16r, doIDivR<16>(ip, block, OP(0)))
 GENERIC_TRANSLATION(IDIV32r, doIDivR<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(IDIV64r, doIDivR<64>(ip, block, OP(0)))
-
-
-GENERIC_TRANSLATION_MEM(IMUL64rmi8,
-  doIMulRMIn<64>(ip, block, OP(0), ADDR(1), OP(6)),
-  doIMulRMIn<64>(ip, block, OP(0), STD_GLOBAL_OP(1), OP(6)))
-
-
-GENERIC_TRANSLATION_MEM(IMUL64rmi32,
-  (doIMulRMIn<64, 32>(ip, block, OP(0), ADDR(1), OP(6))),
-  (doIMulRMIn<64, 32>(ip, block, OP(0), STD_GLOBAL_OP(1), OP(6))))
-
-GENERIC_TRANSLATION_MEM(IDIV8m, 
-	doIDivM<8>(ip,    block, ADDR(0)),
-	doIDivM<8>(ip,    block, STD_GLOBAL_OP(0)))
-
-GENERIC_TRANSLATION_MEM(IDIV16m, 
-	doIDivM<16>(ip,   block, ADDR(0)),
-	doIDivM<16>(ip,   block, STD_GLOBAL_OP(0)))
-GENERIC_TRANSLATION_MEM(IDIV32m, 
-	doIDivM<32>(ip,   block, ADDR(0)),
-	doIDivM<32>(ip,   block, STD_GLOBAL_OP(0)))
-GENERIC_TRANSLATION_MEM(IDIV64m,
-  doIDivM<64>(ip,   block, ADDR(0)),
-  doIDivM<64>(ip,   block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(IDIV8m, 
+    doIDivM<8>(ip,    block, ADDR_NOREF(0)),
+    doIDivM<8>(ip,    block, MEM_REFERENCE(0)))
+GENERIC_TRANSLATION_REF(IDIV16m, 
+    doIDivM<16>(ip,   block, ADDR_NOREF(0)),
+    doIDivM<16>(ip,   block, MEM_REFERENCE(0)))
+GENERIC_TRANSLATION_REF(IDIV32m, 
+    doIDivM<32>(ip,   block, ADDR_NOREF(0)),
+    doIDivM<32>(ip,   block, MEM_REFERENCE(0)))
+GENERIC_TRANSLATION_REF(IDIV64m,
+  doIDivM<64>(ip,   block, ADDR_NOREF(0)),
+  doIDivM<64>(ip,   block, MEM_REFERENCE(0)))
 
 GENERIC_TRANSLATION(DIV8r, doDivR<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(DIV16r, doDivR<16>(ip, block, OP(0)))
 GENERIC_TRANSLATION(DIV32r, doDivR<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(DIV64r, doDivR<64>(ip, block, OP(0)))
-GENERIC_TRANSLATION_MEM(DIV8m, 
-	doDivM<8>(ip,    block, ADDR(0)),
-	doDivM<8>(ip,    block, STD_GLOBAL_OP(0)))
-GENERIC_TRANSLATION_MEM(DIV16m, 
-	doDivM<16>(ip,   block, ADDR(0)),
-	doDivM<16>(ip,   block, STD_GLOBAL_OP(0)))
-GENERIC_TRANSLATION_MEM(DIV32m, 
-	doDivM<32>(ip,   block, ADDR(0)),
-	doDivM<32>(ip,   block, STD_GLOBAL_OP(0)))
-GENERIC_TRANSLATION_MEM(DIV64m, 
-	doDivM<64>(ip,   block, ADDR(0)),
-	doDivM<64>(ip,   block, STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(DIV8m, 
+    doDivM<8>(ip,    block, ADDR_NOREF(0)),
+    doDivM<8>(ip,    block, MEM_REFERENCE(0)))
+GENERIC_TRANSLATION_REF(DIV16m, 
+    doDivM<16>(ip,   block, ADDR_NOREF(0)),
+    doDivM<16>(ip,   block, MEM_REFERENCE(0)))
+GENERIC_TRANSLATION_REF(DIV32m, 
+    doDivM<32>(ip,   block, ADDR_NOREF(0)),
+    doDivM<32>(ip,   block, MEM_REFERENCE(0)))
+GENERIC_TRANSLATION_REF(DIV64m, 
+    doDivM<64>(ip,   block, ADDR_NOREF(0)),
+    doDivM<64>(ip,   block, MEM_REFERENCE(0)))
 
 void MULDIV_populateDispatchMap(DispatchMap &m) {
 
-    m[X86::MUL8r] = translate_MUL8r;
-    m[X86::MUL8m] = translate_MUL8m;
-
-    m[X86::MUL32r] = translate_MUL32r;
-    m[X86::MUL32m] = translate_MUL32m;
-    m[X86::MUL16r] = translate_MUL16r;
-    m[X86::MUL16m] = translate_MUL16m;
-
+    m[X86::IMUL32rm] = translate_IMUL32rm;
+    m[X86::IMUL64rm] = translate_IMUL64rm;
+    m[X86::IMUL16rm] = translate_IMUL16rm;
     m[X86::IMUL8r] = translate_IMUL8r;
     m[X86::IMUL8m] = translate_IMUL8m;
-
     m[X86::IMUL16r] = translate_IMUL16r;
     m[X86::IMUL16m] = translate_IMUL16m;
+    m[X86::MUL32r] = translate_MUL32r;
+    m[X86::MUL64r] = translate_MUL64r;
+    m[X86::MUL32m] = translate_MUL32m;
+    m[X86::MUL64m] = translate_MUL64m;
+    m[X86::MUL16r] = translate_MUL16r;
+    m[X86::MUL16m] = translate_MUL16m;
+    m[X86::MUL8r] = translate_MUL8r;
+    m[X86::MUL8m] = translate_MUL8m;
+    m[X86::IMUL32r] = translate_IMUL32r;
+    m[X86::IMUL32m] = translate_IMUL32m;
+    m[X86::IMUL64m] = translate_IMUL64m;
+    m[X86::IMUL32rr] = translate_IMUL32rr;
     m[X86::IMUL16rr] = translate_IMUL16rr;
     m[X86::IMUL16rmi] = translate_IMUL16rmi;
     m[X86::IMUL16rmi8] = translate_IMUL16rmi8;
     m[X86::IMUL16rri] = translate_IMUL16rri;
     m[X86::IMUL16rri8] = translate_IMUL16rri8;
-
-    m[X86::IMUL32r] = translate_IMUL32r;
-    m[X86::IMUL32m] = translate_IMUL32m;
-    m[X86::IMUL32rr] = translate_IMUL32rr;
-    m[X86::IMUL32rm] = translate_IMUL32rm;
-    m[X86::IMUL16rm] = translate_IMUL16rm;
     m[X86::IMUL32rmi] = translate_IMUL32rmi;
     m[X86::IMUL32rmi8] = translate_IMUL32rmi8;
+    m[X86::IMUL64rmi8] = translate_IMUL64rmi8;
     m[X86::IMUL32rri] = translate_IMUL32rri;
     m[X86::IMUL32rri8] = translate_IMUL32rri8;
-
-    m[X86::IMUL64m] = translate_IMUL64m;
-    m[X86::IMUL64r] = translate_IMUL64r;
-    m[X86::IMUL64rm] = translate_IMUL64rm;
-    m[X86::IMUL64rmi32] = nullptr;
-    m[X86::IMUL64rmi8] = translate_IMUL64rmi8;
-    m[X86::IMUL64rr] = translate_IMUL64rr;
-    m[X86::IMUL64rri32] = translate_IMUL64rri32;
     m[X86::IMUL64rri8] = translate_IMUL64rri8;
+    m[X86::IMUL64rri32] = translate_IMUL64rri32;
+    m[X86::IMUL64rr] = translate_IMUL64rr;
+    m[X86::IMUL64r] = translate_IMUL64r;
 
     m[X86::IDIV8r] = translate_IDIV8r;
     m[X86::IDIV16r] = translate_IDIV16r;

@@ -296,54 +296,54 @@ static InstTransResult doXchgRM(InstPtr ip,    BasicBlock *&b,
     return ContinueBlock;
 }
 
-GENERIC_TRANSLATION_MEM(CMPXCHG16rm,
-	doCmpxchgRM<16>(ip, block, ADDR(0), OP(5)),
-	doCmpxchgRM<16>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(CMPXCHG16rm,
+	doCmpxchgRM<16>(ip, block, ADDR_NOREF(0), OP(5)),
+	doCmpxchgRM<16>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION(CMPXCHG16rr, doCmpxchgRR<16>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION_MEM(CMPXCHG32rm,
-	doCmpxchgRM<32>(ip, block, ADDR(0), OP(5)),
-	doCmpxchgRM<32>(ip, block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(CMPXCHG64rm,
-	doCmpxchgRM<64>(ip, block, ADDR(0), OP(5)),
-	doCmpxchgRM<64>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(CMPXCHG32rm,
+	doCmpxchgRM<32>(ip, block, ADDR_NOREF(0), OP(5)),
+	doCmpxchgRM<32>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(CMPXCHG64rm,
+	doCmpxchgRM<64>(ip, block, ADDR_NOREF(0), OP(5)),
+	doCmpxchgRM<64>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION(CMPXCHG32rr, doCmpxchgRR<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMPXCHG64rr, doCmpxchgRR<64>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION_MEM(CMPXCHG8rm,
-	doCmpxchgRM<8>(ip, block, ADDR(0), OP(5)),
-	doCmpxchgRM<8>(ip, block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(CMPXCHG8rm,
+	doCmpxchgRM<8>(ip, block, ADDR_NOREF(0), OP(5)),
+	doCmpxchgRM<8>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION(CMPXCHG8rr, doCmpxchgRR<8>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION_MEM(XADD16rm,
-	doXaddRM<16>(ip, block, OP(5), ADDR(0)),
-	doXaddRM<16>(ip, block, OP(5), STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(XADD16rm,
+	doXaddRM<16>(ip, block, OP(5), ADDR_NOREF(0)),
+	doXaddRM<16>(ip, block, OP(5), MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(XADD16rr, doXaddRR<16>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION_MEM(XADD32rm,
-	doXaddRM<32>(ip, block, OP(5), ADDR(0)),
-	doXaddRM<32>(ip, block, OP(5), STD_GLOBAL_OP(0)))
-GENERIC_TRANSLATION_MEM(XADD64rm,
-	 doXaddRM<64>(ip, block, OP(5), ADDR(0)),
-	 doXaddRM<64>(ip, block, OP(5), STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(XADD32rm,
+	doXaddRM<32>(ip, block, OP(5), ADDR_NOREF(0)),
+	doXaddRM<32>(ip, block, OP(5), MEM_REFERENCE(0)))
+GENERIC_TRANSLATION_REF(XADD64rm,
+	 doXaddRM<64>(ip, block, OP(5), ADDR_NOREF(0)),
+	 doXaddRM<64>(ip, block, OP(5), MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(XADD32rr, doXaddRR<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(XADD64rr, doXaddRR<64>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION_MEM(XADD8rm,
-	doXaddRM<8>(ip, block, OP(5), ADDR(0)),
-	doXaddRM<8>(ip, block, OP(5), STD_GLOBAL_OP(0)))
+GENERIC_TRANSLATION_REF(XADD8rm,
+	doXaddRM<8>(ip, block, OP(5), ADDR_NOREF(0)),
+	doXaddRM<8>(ip, block, OP(5), MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(XADD8rr, doXaddRR<8>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(XCHG16ar, doXchgRR<16>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
-GENERIC_TRANSLATION_MEM(XCHG16rm,
-	doXchgRM<16>(ip,  block, OP(0), ADDR(2)),
-	doXchgRM<16>(ip,  block, OP(0), STD_GLOBAL_OP(2)))
+GENERIC_TRANSLATION_REF(XCHG16rm,
+	doXchgRM<16>(ip,  block, OP(0), ADDR_NOREF(2)),
+	doXchgRM<16>(ip,  block, OP(0), MEM_REFERENCE(2)))
 GENERIC_TRANSLATION(XCHG16rr, doXchgRR<16>(ip, block, OP(1), OP(2)))
 GENERIC_TRANSLATION(XCHG32ar, doXchgRR<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION(XCHG32ar64, doXchgRR<64>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION(XCHG64ar, doXchgRR<64>(ip, block, MCOperand::CreateReg(X86::RAX), OP(0)))
-GENERIC_TRANSLATION_MEM(XCHG32rm,
-	doXchgRM<32>(ip,  block, OP(0), ADDR(2)),
-	doXchgRM<32>(ip,  block, OP(0), STD_GLOBAL_OP(2)))
+GENERIC_TRANSLATION_REF(XCHG32rm,
+	doXchgRM<32>(ip,  block, OP(0), ADDR_NOREF(2)),
+	doXchgRM<32>(ip,  block, OP(0), MEM_REFERENCE(2)))
 GENERIC_TRANSLATION(XCHG32rr, doXchgRR<32>(ip, block, OP(1), OP(2)))
 GENERIC_TRANSLATION(XCHG64rr, doXchgRR<64>(ip, block, OP(1), OP(2)))
-GENERIC_TRANSLATION_MEM(XCHG8rm,
-	doXchgRM<8>(ip,   block, OP(0), ADDR(2)),
-	doXchgRM<8>(ip,   block, OP(0), STD_GLOBAL_OP(2)))
+GENERIC_TRANSLATION_REF(XCHG8rm,
+	doXchgRM<8>(ip,   block, OP(0), ADDR_NOREF(2)),
+	doXchgRM<8>(ip,   block, OP(0), MEM_REFERENCE(2)))
 GENERIC_TRANSLATION(XCHG8rr, doXchgRR<8>(ip, block, OP(1), OP(2)))
 
 void Exchanges_populateDispatchMap(DispatchMap &m) {

@@ -35,6 +35,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "X86Subtarget.h"
 #include "RegisterUsage.h"
 #include "TransExcn.h"
+#include <stdexcept>
+#include <iostream>
 
 #include "../common/to_string.h"
 
@@ -108,12 +110,25 @@ std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP {
 };
 
 StringRef getRegisterName(MCSemaRegs reg) {
-   return REG_TO_OFFSET_MAP.at(reg).name;
+    try {
+        return REG_TO_OFFSET_MAP.at(reg).name;
+    } catch (const std::out_of_range &oor) {
+        std::cerr << __FILE__ << ":" << __LINE__ << ": Could not find register name for: " << reg << std::endl;
+        std::cerr <<  oor.what() << std::endl;
+        throw;
+    }
 }
 
 int getRegisterOffset(MCSemaRegs reg) {
-	return REG_TO_OFFSET_MAP.at(reg).position;
+    try {
+        return REG_TO_OFFSET_MAP.at(reg).position;
+    } catch (const std::out_of_range &oor) {
+        std::cerr << __FILE__ << ":" << __LINE__ << ": Could not find register offset for: " << reg << std::endl;
+        std::cerr <<  oor.what() << std::endl;
+        throw;
+    }
 }
+
 Value *lookupLocal(Function *F, MCSemaRegs reg) {
     BasicBlock  *entry = &F->getEntryBlock();
     BasicBlock::iterator    it = entry->begin();
@@ -327,12 +342,25 @@ std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP {
 };
 
 StringRef getRegisterName(MCSemaRegs reg) {
-    return REG_TO_OFFSET_MAP.at(reg).name;
+    try {
+        return REG_TO_OFFSET_MAP.at(reg).name;
+    } catch (const std::out_of_range &oor) {
+        std::cerr << __FILE__ << ":" << __LINE__ << ": Could not find register name for: " << reg << std::endl;
+        std::cerr <<  oor.what() << std::endl;
+        throw;
+    }
 }
 
 int getRegisterOffset(MCSemaRegs reg) {
-    return REG_TO_OFFSET_MAP.at(reg).position;
+    try {
+        return REG_TO_OFFSET_MAP.at(reg).position;
+    } catch (const std::out_of_range &oor) {
+        std::cerr << __FILE__ << ":" << __LINE__ << ": Could not find register offset for: " << reg << std::endl;
+        std::cerr <<  oor.what() << std::endl;
+        throw;
+    }
 }
+
 Value *lookupLocal(Function *F, MCSemaRegs reg) {
     BasicBlock  *entry = &F->getEntryBlock();
     BasicBlock::iterator    it = entry->begin();

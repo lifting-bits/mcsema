@@ -274,54 +274,87 @@ InstTransResult doRMMov(InstPtr ip, llvm::BasicBlock      *b,
     return ContinueBlock;
 }
 
+// given a pointer, attempt to load its value into a
+// <width> sized integer. 
+//
+// Will check for pointers to integers and pointers to 
+// arrays of size <= width.
 template <int width>
-llvm::Value *getValueForExternal(llvm::Module *M, InstPtr ip, llvm::BasicBlock *block) {
-
-    llvm::Value *addrInt = NULL;
-
-    if( ip->has_ext_call_target() ) {
-        std::string target = ip->get_ext_call_target()->getSymbolName();
-        llvm::Value *ext_fn = M->getFunction(target);
-        TASSERT(ext_fn != NULL, "Could not find external: " + target);
-        llvm::Value *addrInt = new llvm::PtrToIntInst(
-                ext_fn, llvm::Type::getIntNTy(block->getContext(), width), "", block);
-
-        return addrInt;
-    } else if (ip->has_ext_data_ref() ) {
-        std::string target = ip->get_ext_data_ref()->getSymbolName();
-        llvm::Value *gvar = M->getGlobalVariable(target);
-
-        TASSERT(gvar != NULL, "Could not find external data: " + target);
-
-
-        if(gvar->getType()->isPointerTy()) {
-            addrInt = new llvm::PtrToIntInst(
-                    gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
-        } else {
-
-            llvm::IntegerType *int_t = llvm::dyn_cast<llvm::IntegerType>(gvar->getType());
-            if( int_t == NULL) {
-                throw TErr(__LINE__, __FILE__, "NIY: non-integer external data");
-            }
-            else if(int_t->getBitWidth() < width) {
-                addrInt = new llvm::ZExtInst(gvar,
-                        llvm::Type::getIntNTy(block->getContext(), width),
-                        "",
-                        block);
-            }
-            else if(int_t->getBitWidth() == width) {
-                addrInt = gvar;
-            }
-            else {
-                throw TErr(__LINE__, __FILE__, "NIY: external type > width");
-            }
-        }
-
-    } else {
-        throw TErr(__LINE__, __FILE__, "No external refernce to get value for!");
+static Value* getLoadableValue(Value *ptr, BasicBlock *block) {
+    if (! ptr->getType()->isPointerTy()) {
+        // not a pointer, can't load it
+        std::cout << __FUNCTION__ << ": Can't load value, not a pointer type" << std::endl;
+        return nullptr;
     }
 
-    return addrInt;
+    PointerType* ptr_ty = dyn_cast<PointerType>(ptr->getType());
 
+    Type *ut = ptr_ty->getPointerElementType();
+
+    if(ut->isFloatingPointTy()) {
+        throw TErr(__LINE__, __FILE__, "NIY: Floating point externs not yet supported");
+    }
+    
+    // check if its an integer of acceptable width
+    if(IntegerType *it = dyn_cast<IntegerType>(ut)) {
+        unsigned bw = it->getIntegerBitWidth();
+
+        if(bw == width) {
+            return  noAliasMCSemaScope(new LoadInst(ptr, "", block));
+        } else if(bw < width) {
+            Value *to_ext =  noAliasMCSemaScope(new LoadInst(ptr, "", block));
+            return  new llvm::ZExtInst(to_ext,
+                    llvm::Type::getIntNTy(block->getContext(), width),
+                    "",
+                    block);
+        } else {
+            // can't load this -- its bigger than register width
+            std::cout << __FUNCTION__ << ": Integer bigger than bitwidth (" << bw << " > " << width << ")" << std::endl;
+            return nullptr;
+        }
+    }
+
+    // check if its an array that we can bitcast as an acceptable integer
+    if(ArrayType *arrt = dyn_cast<ArrayType>(ut)) {
+        uint64_t elements = arrt->getNumElements();
+        Type *elem_t = arrt->getElementType();
+
+        unsigned elem_size = elem_t->getPrimitiveSizeInBits();
+
+        uint64_t total_size = elem_size * elements;
+
+        if (total_size == 0) {
+            // not an array of primitives. can't deal with this yet
+            std::cout << __FUNCTION__ << ": array has no elements" << std::endl;
+            return nullptr;
+        } else if (total_size <= width) {
+
+            Type *new_int_ty = 
+                    Type::getIntNTy(block->getContext(), total_size);
+            Type *new_ptr_ty = PointerType::get(new_int_ty, ptr_ty->getAddressSpace());
+            Value *int_ptr = CastInst::CreatePointerCast(ptr, new_ptr_ty, "", block);
+            Value *as_int =  noAliasMCSemaScope(new LoadInst(int_ptr, "", block));
+            // bitcast to integer
+            TASSERT(as_int != NULL, "Can't load pointer");
+
+            if(total_size == width) {
+                return as_int;
+            }
+
+            // and then zext if its less than width
+            return  new llvm::ZExtInst(as_int,
+                    llvm::Type::getIntNTy(block->getContext(), width),
+                    "",
+                    block);
+
+
+        } else {
+            // too big to load
+            std::cout << __FUNCTION__ << ": total array size bigger than bitwidth (" << total_size << " > " << width << ")" << std::endl;
+            return nullptr;
+        }
+    }
+
+    throw TErr(__LINE__, __FILE__, "NIY: Unknown external data type");
+    return nullptr;
 }
-

@@ -1,6 +1,6 @@
 # Architecture
 
-The translator is broken into two components: control flow recovery and translation. These components are two separate appliactions and can operate independently of each other. In typical usage, a program's control flow graph (CFG) is recovered and then the CFG is immediately transcribed into LLVM. The generated LLVM preserves the semantics of the source instructions with regards to their effects on memory, registers, and flags. 
+The translator is broken into two components: control flow recovery and translation. These components are two separate applications and can operate independently of each other. In typical usage, a program's control flow graph (CFG) is recovered and then the CFG is immediately transcribed into LLVM. The generated LLVM preserves the semantics of the source instructions with regards to their effects on memory, registers, and flags. 
      
 ## Control Flow Recovery
 

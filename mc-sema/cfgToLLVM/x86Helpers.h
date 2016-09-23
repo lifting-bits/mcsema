@@ -28,6 +28,60 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #pragma once
 #include <string>
+#include "ArchOps.h"
+
+template <int width>
+llvm::Value *getValueForExternal(llvm::Module *M, InstPtr ip, llvm::BasicBlock *block) {
+
+    llvm::Value *addrInt = NULL;
+
+    if( ip->has_ext_call_target() ) {
+        std::string target = ip->get_ext_call_target()->getSymbolName();
+        llvm::Value *ext_fn = M->getFunction(target);
+        TASSERT(ext_fn != NULL, "Could not find external: " + target);
+        addrInt = new llvm::PtrToIntInst(
+                ext_fn, llvm::Type::getIntNTy(block->getContext(), width), "", block);
+    } else if (ip->has_ext_data_ref() ) {
+        std::string target = ip->get_ext_data_ref()->getSymbolName();
+        llvm::Value *gvar = M->getGlobalVariable(target);
+
+        TASSERT(gvar != NULL, "Could not find external data: " + target);
+
+        std::cout << __FUNCTION__ << ": Found external data ref to: " << target << "\n";
+
+        addrInt = new llvm::PtrToIntInst(
+                gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
+        //if(gvar->getType()->isPointerTy()) {
+        //    addrInt = getLoadableValue<width>(gvar, block);
+        //    TASSERT(addrInt != nullptr, "data ref is of an unloadable pointer type");
+        //} else {
+        //    llvm::IntegerType *int_t = llvm::dyn_cast<llvm::IntegerType>(gvar->getType());
+        //    if( int_t == NULL) {
+        //        throw TErr(__LINE__, __FILE__, "NIY: non-integer, non-pointer external data");
+        //    }
+        //    else if(int_t->getBitWidth() < width) {
+        //        addrInt = new llvm::ZExtInst(gvar,
+        //                llvm::Type::getIntNTy(block->getContext(), width),
+        //                "",
+        //                block);
+        //    }
+        //    else if(int_t->getBitWidth() == width) {
+        //        addrInt = gvar;
+        //    }
+        //    else {
+        //        throw TErr(__LINE__, __FILE__, "NIY: external type > width");
+        //    }
+        //}
+
+    } else {
+        throw TErr(__LINE__, __FILE__, "No external refernce to get value for!");
+    }
+
+    return addrInt;
+
+}
+
+
 
 template <int width>
 llvm::Value *concatInts(llvm::BasicBlock *b, llvm::Value *a1, llvm::Value *a2) {
@@ -63,6 +117,48 @@ llvm::Value *getAddrFromExpr(
         InstPtr ip,
         uint32_t which);
 
+bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr);
+
+template <int width>
+llvm::Value* getGlobalFromOriginalAddr(
+        VA original_addr, NativeModulePtr mod, 
+        VA addr_start, llvm::BasicBlock *b)
+{
+    VA  baseGlobal;
+    if( addrIsInData(original_addr, mod, baseGlobal, addr_start) ) {
+        //we should be able to find a reference to this in global data 
+        llvm::Module  *M = b->getParent()->getParent();
+        std::string  sn = "data_0x" + to_string<VA>(baseGlobal, std::hex);
+
+        llvm::GlobalVariable *gData = M->getNamedGlobal(sn);
+
+        //if we thought it was a global, we should be able to
+        //pin it to a global array we made during module setup
+        if( gData == NULL) 
+            throw TErr(__LINE__, __FILE__, "Global variable not found");
+
+        // since globals are now a structure 
+        // we cannot simply slice into them.
+        // Need to get ptr and then add integer displacement to ptr
+        //
+        llvm::Type *int_ty = llvm::Type::getIntNTy(b->getContext(), width);
+        llvm::Value   *globalGEPV[] =  
+        {   llvm::ConstantInt::get(int_ty, 0), 
+            llvm::ConstantInt::get(llvm::Type::getInt32Ty(b->getContext()), 0)
+        };
+        llvm::Instruction *globalGEP = 
+            llvm::GetElementPtrInst::Create(gData, globalGEPV, "", b);
+        llvm::Value   *intVal = new llvm::PtrToIntInst(globalGEP, int_ty, "", b);
+        uint64_t addr_offset = original_addr-baseGlobal;
+        llvm::Value   *int_adjusted = 
+            llvm::BinaryOperator::CreateAdd(intVal, CONST_V<width>(b, addr_offset), "", b);
+        return int_adjusted;
+    } else {
+        return nullptr;
+    }
+}
+
+
 // same as the simpler form, see above
 namespace x86 {
 llvm::Value *getAddrFromExpr( llvm::BasicBlock      *b,
@@ -88,15 +184,9 @@ llvm::Value *getAddrFromExpr( llvm::BasicBlock      *b,
 // Convert the number to a constant in LLVM IR
 llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t val);
 
-// Assume the instruction has a data reference, and
-// return a computed pointer to that data reference
-llvm::Value* GLOBAL_DATA_OFFSET(llvm::BasicBlock *b, 
-        NativeModulePtr mod, 
-        InstPtr ip);
- 
 // this is an alias for getAddressFromExpr, but used when
 // we expect the address computation to contain a data reference
-llvm::Value *GLOBAL(llvm::BasicBlock *B, 
+llvm::Value *MEM_AS_DATA_REF(llvm::BasicBlock *B, 
         NativeModulePtr natM, 
         const llvm::MCInst &inst, 
         InstPtr ip,
@@ -110,16 +200,33 @@ llvm::Instruction* callMemcpy(llvm::BasicBlock *B, llvm::Value *dest, llvm::Valu
 using namespace llvm;
 using namespace std;
 
-bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr);
-
 // return a computed pointer to that data reference for 32/64 bit architecture
 template <int width>
-llvm::Value* GLOBAL_DATA_OFFSET(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
+llvm::Value* IMM_AS_DATA_REF(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
 {
     VA  baseGlobal;
-    uint64_t off = ip->get_data_offset();
+    // off is the displacement part of a memory reference
 
-    if( addrIsInData(off, mod, baseGlobal, 0) ) {
+    if( ip->has_external_ref()) {
+        Function *F = b->getParent();
+        Value *addrInt = getValueForExternal<width>(F->getParent(), ip, b);
+        TASSERT(addrInt != 0, "Could not get external data reference");
+        return addrInt;
+    }
+
+    if(false == ip->has_imm_reference) {
+        throw TErr(__LINE__, __FILE__, "Want to use IMM as data ref but have no IMM reference");
+    }
+    uint64_t off = ip->get_reference(Inst::IMMRef);
+    
+    if(ip->has_code_ref()) {
+        Value *callback_fn = archMakeCallbackForLocalFunction(
+                b->getParent()->getParent(),
+                ip->get_reference(Inst::IMMRef));
+        Value *addrInt = new PtrToIntInst(
+            callback_fn, llvm::Type::getIntNTy(b->getContext(), width), "", b);
+        return addrInt;
+    } else if( addrIsInData(off, mod, baseGlobal, 0) ) {
         //we should be able to find a reference to this in global data
         Module  *M = b->getParent()->getParent();
         string  sn = "data_0x" + to_string<VA>(baseGlobal, hex);
@@ -153,4 +260,49 @@ llvm::Value* GLOBAL_DATA_OFFSET(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
         throw TErr(__LINE__, __FILE__, "Address not in data");
         return NULL;
     }
+}
+
+// Assume the instruction has a data reference, and
+// return a computed pointer to that data reference
+static inline llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *b, 
+        NativeModulePtr mod, 
+        InstPtr ip)
+{
+    
+	llvm::Module *M = b->getParent()->getParent();
+	int regWidth = getPointerSize(M);
+    if(regWidth == x86::REG_SIZE) {
+        return IMM_AS_DATA_REF<32>(b, mod, ip);
+    } else {
+        return IMM_AS_DATA_REF<64>(b, mod, ip);
+    }
+}
+
+inline llvm::PointerType *getVoidPtrType (llvm::LLVMContext & C) {
+    llvm::Type * Int8Type  = llvm::IntegerType::getInt8Ty(C);
+    return llvm::PointerType::getUnqual(Int8Type);
+}
+
+template <int width>
+static inline Value *ADDR_NOREF_IMPL(NativeModulePtr natM, llvm::BasicBlock *b, int x, InstPtr ip, const llvm::MCInst &inst) {
+//#define ADDR_NOREF(x) \
+//	getPointerSize(block->getParent()->getParent()) == Pointer32 ?	\
+//		x86::getAddrFromExpr(block, natM, OP(x+0), OP(x+1), OP(x+2), OP(x+3).getImm(), OP(x+4), false) :\
+//		x86_64::getAddrFromExpr(block, natM, OP(x+0), OP(x+1), OP(x+2), OP(x+3).getImm(), OP(x+4), false)
+//
+
+    // Turns out this function name is a lie. This case can ref external data
+    llvm::Module *M = b->getParent()->getParent();
+    if(ip->has_external_ref()) {
+        llvm::Value *addrInt = getValueForExternal<width>(M, ip, b);
+        TASSERT(addrInt != NULL, "Could not get address for external");
+        return addrInt;
+    }
+
+    if(getPointerSize(M) == Pointer32) {
+		return x86::getAddrFromExpr(b, natM, inst.getOperand(x+0), inst.getOperand(x+1), inst.getOperand(x+2), inst.getOperand(x+3).getImm(), inst.getOperand(x+4), false);
+    } else {
+		return x86_64::getAddrFromExpr(b, natM, inst.getOperand(x+0), inst.getOperand(x+1), inst.getOperand(x+2), inst.getOperand(x+3).getImm(), inst.getOperand(x+4), false);
+    }
+
 }

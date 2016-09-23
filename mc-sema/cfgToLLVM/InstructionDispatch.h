@@ -48,47 +48,49 @@ extern DispatchMap translationDispatchMap;
 bool initInstructionDispatch();
 
 #define OP(x) inst.getOperand(x)
-#define ADDR(x) getAddrFromExpr(block, natM, inst, ip, x)
-#define ADDR_NOREF(x) \
-	getPointerSize(block->getParent()->getParent()) == Pointer32 ?	\
-		x86::getAddrFromExpr(block, natM, OP(x+0), OP(x+1), OP(x+2), OP(x+3).getImm(), OP(x+4), false) :\
-		x86_64::getAddrFromExpr(block, natM, OP(x+0), OP(x+1), OP(x+2), OP(x+3).getImm(), OP(x+4), false)
-		
+//#define ADDR(x) getAddrFromExpr(block, natM, inst, ip, x)
+//#define ADDR_NOREF(x) \
+//	getPointerSize(block->getParent()->getParent()) == Pointer32 ?	\
+//		x86::getAddrFromExpr(block, natM, OP(x+0), OP(x+1), OP(x+2), OP(x+3).getImm(), OP(x+4), false) :\
+//		x86_64::getAddrFromExpr(block, natM, OP(x+0), OP(x+1), OP(x+2), OP(x+3).getImm(), OP(x+4), false)
+
+#define ADDR_NOREF(x) getPointerSize(block->getParent()->getParent()) == Pointer32 ? \
+    ADDR_NOREF_IMPL<32>(natM, block, x, ip, inst) :\
+    ADDR_NOREF_IMPL<64>(natM, block, x, ip, inst)
+
 #define CREATE_BLOCK(nm, b) BasicBlock *block_ ## nm = BasicBlock::Create((b)->getContext(), #nm, (b)->getParent())
-#define STD_GLOBAL_OP(which) GLOBAL(block, natM, inst, ip, which)
+#define MEM_REFERENCE(which) MEM_AS_DATA_REF(block, natM, inst, ip, which)
 
-#define GENERIC_TRANSLATION_32MI(NAME, THECALL, GLOBALCALL, GLOBALIMMCALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {\
+#define GENERIC_TRANSLATION_MI(NAME, NOREFS, MEMREF, IMMREF, TWOREFS) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {\
     InstTransResult ret;\
     Function *F = block->getParent(); \
-    if( ip->is_data_offset() ) { \
-        if( ip->get_reloc_offset() < OP(5).getOffset() ) { \
-            GLOBALCALL; \
-        } else { \
-            GLOBALIMMCALL; \
-        } \
-        ret = ContinueBlock; \
+    if( ip->has_mem_reference && ip->has_imm_reference) {\
+        TWOREFS; \
+    } else if( ip->has_mem_reference ) { \
+        MEMREF; \
+    } else if( ip->has_imm_reference ) { \
+        IMMREF; \
     } else { \
-        ret = THECALL; \
-    }\
-    return ret;\
+        NOREFS; \
+    } \
+    return ContinueBlock;\
 }
 
 
-#define GENERIC_TRANSLATION_MEM(NAME, THECALL, GLOBALCALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {\
+#define GENERIC_TRANSLATION_REF(NAME, NOREFS, HASREF) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {\
     InstTransResult ret;\
     Function *F = block->getParent(); \
-    if( ip->is_data_offset() ) {\
-        GLOBALCALL;\
-        ret = ContinueBlock;\
+    if( ip->has_mem_reference || ip->has_imm_reference || ip->has_external_ref() ) {\
+        HASREF;\
     } else {\
-        ret = THECALL;\
+        NOREFS;\
     }\
-    return ret;\
+    return ContinueBlock;\
 }
 
-#define GENERIC_TRANSLATION(NAME, THECALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {\
+#define GENERIC_TRANSLATION(NAME, NOREFS) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {\
     InstTransResult ret;\
-    ret = THECALL;\
+    ret = NOREFS;\
     return ret;\
 }
 #endif

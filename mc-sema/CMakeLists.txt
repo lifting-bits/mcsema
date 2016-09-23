@@ -93,8 +93,7 @@ add_subdirectory(peToCFG)
 add_subdirectory(bitcode_from_cfg)
 add_subdirectory(binary_common)
 add_subdirectory(bin_descend)
-
-
+add_subdirectory(runtime)
 
 find_package(Pin)
 if(NOT PIN_FOUND AND NOT WIN32)

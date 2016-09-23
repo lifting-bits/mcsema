@@ -31,11 +31,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "X86.h"
 #include "raiseX86.h"
 #include "x86Instrs_Stack.h"
+#include "x86Instrs_MOV.h"
 #include "x86Helpers.h"
 #include "Externals.h"
 #include "ArchOps.h"
 #include <llvm/IR/Attributes.h>
 #include "llvm/Support/Debug.h"
+#include <iostream>
 
 #define NASSERT(cond) TASSERT(cond, "")
 
@@ -443,9 +445,9 @@ static InstTransResult doPopR(InstPtr ip, BasicBlock *&b, const MCOperand &dst) 
 }
 
 template <int width>
-static InstTransResult doPopD(InstPtr ip, BasicBlock *b) {
+static InstTransResult doPopD(BasicBlock *b) {
     //read the stack pointer
-    Value *oldESP = R_READ<32>(b, X86::ESP);
+    Value *oldESP = R_READ<width>(b, X86::ESP);
 
     //read the value from the memory at the stack pointer address,
     //and throw it away
@@ -454,10 +456,10 @@ static InstTransResult doPopD(InstPtr ip, BasicBlock *b) {
 
     //add to the stack pointer
     Value *newESP =
-        BinaryOperator::CreateAdd(oldESP, CONST_V<32>(b, (width / 8)), "", b);
+        BinaryOperator::CreateAdd(oldESP, CONST_V<width>(b, (width / 8)), "", b);
 
     //update the stack pointer register
-    R_WRITE<32>(b, X86::ESP, newESP);
+    R_WRITE<width>(b, X86::ESP, newESP);
 
     return ContinueBlock;
 }
@@ -477,7 +479,7 @@ static InstTransResult doPopAV(InstPtr ip, BasicBlock *b) {
   doPopR<width>(ip, b, MCOperand::CreateReg(X86::EDI));
   doPopR<width>(ip, b, MCOperand::CreateReg(X86::ESI));
   doPopR<width>(ip, b, MCOperand::CreateReg(X86::EBP));
-  doPopD<width>(ip, b);
+  doPopD<width>(b);
   doPopR<width>(ip, b, MCOperand::CreateReg(X86::EBX));
   doPopR<width>(ip, b, MCOperand::CreateReg(X86::EDX));
   doPopR<width>(ip, b, MCOperand::CreateReg(X86::ECX));
@@ -559,60 +561,6 @@ static InstTransResult doPopM(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template <int width>
-static Value *getValueForExternal(Module *M, InstPtr ip, BasicBlock *block) {
-
-    Value *addrInt = NULL;
-
-    if( ip->has_ext_call_target() ) {
-        if (width != 32) {
-            throw TErr(__LINE__, __FILE__, "NIY: non 32-bit width for external calls");
-        }
-        std::string target = ip->get_ext_call_target()->getSymbolName();
-        Value *ext_fn = M->getFunction(target);
-        TASSERT(ext_fn != NULL, "Could not find external: " + target);
-        Value *addrInt = new PtrToIntInst(
-                ext_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
-
-        return addrInt;
-    } else if (ip->has_ext_data_ref() ) {
-        std::string target = ip->get_ext_data_ref()->getSymbolName();
-        Value *gvar = M->getGlobalVariable(target);
-
-        TASSERT(gvar != NULL, "Could not find external data: " + target);
-
-
-        if(gvar->getType()->isPointerTy()) {
-            addrInt = new PtrToIntInst(
-                    gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
-        } else {
-
-            IntegerType *int_t = dyn_cast<IntegerType>(gvar->getType());
-            if( int_t == NULL) {
-                throw TErr(__LINE__, __FILE__, "NIY: non-integer external data");
-            }
-            else if(int_t->getBitWidth() < width) {
-                addrInt = new ZExtInst(gvar,
-                        Type::getIntNTy(block->getContext(), width),
-                        "",
-                        block);
-            }
-            else if(int_t->getBitWidth() == width) {
-                addrInt = gvar;
-            }
-            else {
-                throw TErr(__LINE__, __FILE__, "NIY: external type > width");
-            }
-        }
-
-    } else {
-        throw TErr(__LINE__, __FILE__, "No external refernce to get value for!");
-    }
-
-    return addrInt;
-
-}
-
-template <int width>
 static InstTransResult doPushRMM(InstPtr ip, BasicBlock *&b, Value *addr) {
   NASSERT(addr != NULL);
 
@@ -632,10 +580,10 @@ static InstTransResult translate_PUSH32rmm(NativeModulePtr natM, BasicBlock *& b
         doPushV<32>(ip, block, addrInt );
         return ContinueBlock;
     }
-    else if( ip->is_data_offset() ) {
-        ret = doPushRMM<32>(ip, block, GLOBAL( block, natM, inst, ip, 0) );
+    else if( ip->has_mem_reference ) {
+        ret = doPushRMM<32>(ip, block, MEM_AS_DATA_REF( block, natM, inst, ip, 0) );
     } else {
-        ret = doPushRMM<32>(ip, block, ADDR(0) );
+        ret = doPushRMM<32>(ip, block, ADDR_NOREF(0) );
     }
     return ret ;
 }
@@ -643,15 +591,16 @@ static InstTransResult translate_PUSH32rmm(NativeModulePtr natM, BasicBlock *& b
 static InstTransResult translate_PUSHi32(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
-    if( ip->has_call_tgt() ) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(block->getParent()->getParent(), ip->get_call_tgt(0));
+    if( ip->has_code_ref() ) {
+        Value *callback_fn = archMakeCallbackForLocalFunction(block->getParent()->getParent(), 
+                ip->get_reference(Inst::IMMRef));
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
         doPushV<32>(ip, block, addrInt );
         ret = ContinueBlock;
     }
-    else if( ip->is_data_offset() ) {
-         doPushV<32>(ip, block, GLOBAL_DATA_OFFSET(block, natM, ip) );
+    else if( ip->has_imm_reference ) {
+         doPushV<32>(ip, block, IMM_AS_DATA_REF(block, natM, ip) );
         ret = ContinueBlock;
     } else {
         ret = doPushI<32>(ip, block, OP(0));
@@ -663,6 +612,49 @@ static InstTransResult translate_PUSHi32(NativeModulePtr natM, BasicBlock *&bloc
     Value *tmp = BinaryOperator::CreateShl(inval, CONST_V<width>(b, shiftcount), "", b); \
     destval = BinaryOperator::CreateOr(destval, tmp, "", b); \
     } while (0)
+
+#define EMIT_SHR_AND(destval, inval, shiftcount) do {\
+    Value *tmp = BinaryOperator::CreateLShr(inval, CONST_V<width>(b, shiftcount), "", b); \
+    destval = BinaryOperator::CreateAnd(destval, tmp, "", b); \
+    } while (0)
+
+template <int width>
+static Value * checkIfBitSet(Value *field, int bit, BasicBlock *b) {
+    
+    Value *tmp = BinaryOperator::CreateAnd(field, CONST_V<width>(b, 1<<bit), "", b);
+    Value *res = new ICmpInst(*b, CmpInst::ICMP_NE, tmp, CONST_V<width>(b, 0));
+
+    return res;
+}
+
+template <int width>
+static InstTransResult doPopF(InstPtr ip, BasicBlock *b) {
+    Value *newFlags = R_READ<width>(b, X86::ESP);
+    doPopD<width>(b);
+
+    // bit 0: CF
+    F_WRITE(b, CF, checkIfBitSet<width>(newFlags, 0, b));
+    // bit 1: 1 (reserved)
+    // bit 2: PF
+    F_WRITE(b, PF, checkIfBitSet<width>(newFlags, 2, b));
+    // bit 3: 0
+    // bit 4: AF
+    F_WRITE(b, AF, checkIfBitSet<width>(newFlags, 4, b));
+    // bit 5: 0
+    // bit 6: ZF
+    F_WRITE(b, ZF, checkIfBitSet<width>(newFlags, 6, b));
+    // bit 7: SF
+    F_WRITE(b, SF, checkIfBitSet<width>(newFlags, 7, b));
+    // bit 8: TF (set to zero)
+    // bit 9: IF (set to 1)
+    // bit 10: DF
+    F_WRITE(b, DF, checkIfBitSet<width>(newFlags, 10, b));
+    // bit 11: OF
+    F_WRITE(b, OF, checkIfBitSet<width>(newFlags, 11, b));
+
+    return ContinueBlock;
+
+}
 
 template <int width>
 static InstTransResult doPushF(InstPtr ip, BasicBlock *b) {
@@ -710,6 +702,8 @@ static InstTransResult doPushF(InstPtr ip, BasicBlock *b) {
 
 GENERIC_TRANSLATION(PUSHF64, doPushF<64>(ip, block))
 GENERIC_TRANSLATION(PUSHF32, doPushF<32>(ip, block))
+GENERIC_TRANSLATION(POPF64, doPopF<64>(ip, block))
+GENERIC_TRANSLATION(POPF32, doPopF<32>(ip, block))
 //GENERIC_TRANSLATION(PUSHF16, doPushF<16>(ip, block))
 GENERIC_TRANSLATION(ENTER, doEnter(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(LEAVE, doLeave(ip, block))
@@ -724,18 +718,18 @@ GENERIC_TRANSLATION(PUSH32r, doPushR<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(PUSH64r, doPushR<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION(POPA32, doPopAV<32>(ip, block));
 GENERIC_TRANSLATION(PUSHA32, doPushAV<32>(ip, block));
-//GENERIC_TRANSLATION_MEM(PUSH32rmm,
-//        doPushRMM<32>(ip, block, ADDR(0)),
-//        doPushRMM<32>(ip, block, STD_GLOBAL_OP(0)));
-GENERIC_TRANSLATION_MEM(PUSHi8,
+//GENERIC_TRANSLATION_REF(PUSH32rmm,
+//        doPushRMM<32>(ip, block, ADDR_NOREF(0)),
+//        doPushRMM<32>(ip, block, MEM_REFERENCE(0)));
+GENERIC_TRANSLATION_REF(PUSHi8,
         doPushI<8>(ip, block, OP(0)),
-        doPushV<8>(ip, block, STD_GLOBAL_OP(0) ))
-GENERIC_TRANSLATION_MEM(PUSHi16,
+        doPushV<8>(ip, block, MEM_REFERENCE(0) ))
+GENERIC_TRANSLATION_REF(PUSHi16,
         doPushI<16>(ip, block, OP(0)),
-        doPushV<16>(ip, block, STD_GLOBAL_OP(0) ))
-GENERIC_TRANSLATION_MEM(POP32rmm,
-        doPopM<32>(ip, block, ADDR(0)),
-        doPopM<32>(ip, block, STD_GLOBAL_OP(0)));
+        doPushV<16>(ip, block, MEM_REFERENCE(0) ))
+GENERIC_TRANSLATION_REF(POP32rmm,
+        doPopM<32>(ip, block, ADDR_NOREF(0)),
+        doPopM<32>(ip, block, MEM_REFERENCE(0)));
 
 void Stack_populateDispatchMap(DispatchMap &m) {
         m[X86::ENTER] = translate_ENTER;
@@ -752,9 +746,11 @@ void Stack_populateDispatchMap(DispatchMap &m) {
         m[X86::POPA32] = translate_POPA32;
         m[X86::PUSHA32] = translate_PUSHA32;
         m[X86::PUSHF32] = translate_PUSHF32;
+        m[X86::PUSHF64] = translate_PUSHF64;
         m[X86::POP32rmm] = translate_POP32rmm;
 
         m[X86::PUSH64r] = translate_PUSH64r;
         m[X86::POP64r] = translate_POP64r;
-        m[X86::PUSHF64] = translate_PUSHF64;
+        m[X86::POPF64] = translate_POPF64;
+        m[X86::POPF32] = translate_POPF32;
 }

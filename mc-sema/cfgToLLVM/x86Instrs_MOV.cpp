@@ -204,6 +204,7 @@ static InstTransResult doMovZXRR(InstPtr ip,   BasicBlock *&b,
 {
     NASSERT(dst.isReg());
     NASSERT(src.isReg());
+    TASSERT(dstWidth > srcWidth, "Must ZExt to a greater bitwidth")
 
     //do a read from src of the appropriate width
     Value   *fromSrc = R_READ<srcWidth>(b, src.getReg());
@@ -234,6 +235,7 @@ static InstTransResult doMovZXRM(InstPtr ip,   BasicBlock *&b,
        return ContinueBlock;
     }
 
+    TASSERT(dstWidth > srcWidth, "Must ZExt to a greater bitwidth")
     //do a read from src of the appropriate width
     Value   *fromSrc = M_READ<srcWidth>(ip, b, src);
 
@@ -310,18 +312,18 @@ GENERIC_TRANSLATION(MOVPQIto64rr, doRRMovD<64>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(MOV8ri, doRIMov<8>(ip, block, OP(1), OP(0)))
 GENERIC_TRANSLATION(MOV16ri, doRIMov<16>(ip, block, OP(1), OP(0)))
 
-GENERIC_TRANSLATION_MEM(MOV8mi,
-	doMIMov<8>(ip,    block, ADDR(0), OP(5)),
-	doMIMov<8>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOV8mi,
+	doMIMov<8>(ip,    block, ADDR_NOREF(0), OP(5)),
+	doMIMov<8>(ip,    block, MEM_REFERENCE(0), OP(5)))
 
-GENERIC_TRANSLATION_MEM(MOV16mi,
-	doMIMov<16>(ip,   block, ADDR(0), OP(5)),
-	doMIMov<16>(ip,   block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOV16mi,
+	doMIMov<16>(ip,   block, ADDR_NOREF(0), OP(5)),
+	doMIMov<16>(ip,   block, MEM_REFERENCE(0), OP(5)))
 
 //GENERIC_TRANSLATION_32MI(MOV32mi,
-//	doMIMov<32>(ip,   block, ADDR(0), OP(5)),
-//	doMIMov<32>(ip,   block, STD_GLOBAL_OP(0), OP(5)),
-//    doMIMovV<32>(ip,  block, ADDR_NOREF(0), GLOBAL_DATA_OFFSET(block, natM, ip))
+//	doMIMov<32>(ip,   block, ADDR_NOREF(0), OP(5)),
+//	doMIMov<32>(ip,   block, MEM_REFERENCE(0), OP(5)),
+//    doMIMovV<32>(ip,  block, ADDR_NOREF(0), IMM_AS_DATA_REF(block, natM, ip))
 //    )
 //
 static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
@@ -330,39 +332,51 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
     Function *F = block->getParent();
     Module *M = F->getParent();
 
-    if( ip->has_call_tgt() ) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(),
-                ip->get_call_tgt(0)
-            );
-        Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
-        ret = doMIMovV<32>(ip, block, ADDR(0), addrInt);
-    }
-    else if( ip->is_data_offset() ) {
-        if( ip->get_reloc_offset() < OP(5).getOffset() ) {
-            llvm::errs() << __FUNCTION__ << ": Other reloc\n";
-            doMIMov<32>(ip,   block, STD_GLOBAL_OP(0), OP(5));
+    if( ip->has_code_ref() ) {
+        Value *addrInt = IMM_AS_DATA_REF<32>(block, natM, ip);
+        if( ip->has_mem_reference) {
+            ret = doMIMovV<32>(ip, block, MEM_REFERENCE(0), addrInt);
         } else {
+            ret = doMIMovV<32>(ip, block, ADDR_NOREF(0), addrInt);
+        }
+    }
+    else
+    {
+        if( ip->has_mem_reference && ip->has_imm_reference) {
             Value *data_v = nullptr;
             if(shouldSubtractImageBase(M)) {
                 // if we're here, then
                 // * archGetImageBase is defined
                 // * we are on win64
-               
-                data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
+
+                data_v = IMM_AS_DATA_REF<64>(block, natM, ip);
                 data_v = doSubtractImageBase<32>(data_v, block);
-                llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
             } else {
-                data_v = GLOBAL_DATA_OFFSET<32>(block, natM, ip);
+                data_v = IMM_AS_DATA_REF<32>(block, natM, ip);
+            }
+            doMIMovV<32>(ip,  block, MEM_REFERENCE(0), data_v);
+        } else if (ip->has_mem_reference) {
+            doMIMov<32>(ip,   block, MEM_REFERENCE(0), OP(5));
+        } else if (ip->has_imm_reference) {
+            Value *data_v = nullptr;
+            if(shouldSubtractImageBase(M)) {
+                // if we're here, then
+                // * archGetImageBase is defined
+                // * we are on win64
+
+                data_v = IMM_AS_DATA_REF<64>(block, natM, ip);
+                data_v = doSubtractImageBase<32>(data_v, block);
+            } else {
+                data_v = IMM_AS_DATA_REF<32>(block, natM, ip);
             }
 
             doMIMovV<32>(ip,  block, ADDR_NOREF(0), data_v);
+        } else {
+            // no references
+            doMIMov<32>(ip,   block, ADDR_NOREF(0), OP(5));
         }
-        ret = ContinueBlock;
-    } else {
-        ret = doMIMov<32>(ip,   block, ADDR(0), OP(5));
     }
+    ret = ContinueBlock;
     return ret;
 }
 
@@ -371,51 +385,50 @@ static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&bl
     Function *F = block->getParent();
     Module *M = F->getParent();
 
-    if( ip->has_call_tgt() ) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(),
-                ip->get_call_tgt(0)
-            );
-        Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
-        ret = doMIMovV<64>(ip, block, ADDR(0), addrInt);
-    }
-    else if( ip->is_data_offset() ) {
-        if( ip->get_reloc_offset() < OP(5).getOffset() ) {
-            llvm::errs() << __FUNCTION__ << ": Other reloc\n";
-            doMIMov<64>(ip,   block, STD_GLOBAL_OP(0), OP(5));
+    if( ip->has_code_ref() ) {
+        Value *addrInt = IMM_AS_DATA_REF<64>(block, natM, ip);
+        if (ip->has_mem_reference) {
+            ret = doMIMovV<64>(ip, block, MEM_REFERENCE(0), addrInt);
         } else {
-            Value *data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
-            if(shouldSubtractImageBase(M)) {
-                // if we're here, then
-                // * archGetImageBase is defined
-                // * we are on win64
-               
-                data_v = doSubtractImageBase<64>(data_v, block);
-                llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
-            }
-
-            doMIMovV<64>(ip,  block, ADDR_NOREF(0), data_v);
+            ret = doMIMovV<64>(ip, block, ADDR_NOREF(0), addrInt);
         }
-        ret = ContinueBlock;
     } else {
-        ret = doMIMov<64>(ip,   block, ADDR(0), OP(5));
+        if(ip->has_mem_reference && ip->has_imm_reference) {
+            Value *data_v = IMM_AS_DATA_REF<64>(block, natM, ip);
+            if(shouldSubtractImageBase(M)) {
+                data_v = doSubtractImageBase<64>(data_v, block);
+            }
+            doMIMovV<64>(ip,  block, MEM_REFERENCE(0), data_v);
+
+        } else if (ip->has_imm_reference) {
+            Value *data_v = IMM_AS_DATA_REF<64>(block, natM, ip);
+            if(shouldSubtractImageBase(M)) {
+                data_v = doSubtractImageBase<64>(data_v, block);
+            }
+            doMIMovV<64>(ip,  block, ADDR_NOREF(0), data_v);
+        } else if (ip->has_mem_reference) {
+            doMIMov<64>(ip,   block, MEM_REFERENCE(0), OP(5));
+        } else {
+            ret = doMIMov<64>(ip,   block, ADDR_NOREF(0), OP(5));
+        }
+
     }
+    ret = ContinueBlock;
     return ret;
 }
 
-GENERIC_TRANSLATION_MEM(MOV8mr,
-	doMRMov<8>(ip,    block, ADDR(0), OP(5)),
-	doMRMov<8>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(MOV16mr,
-	doMRMov<16>(ip,   block, ADDR(0), OP(5)),
-	doMRMov<16>(ip,   block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(MOV8rm,
-	doRMMov<8>(ip,   block, ADDR(1), OP(0)),
-	doRMMov<8>(ip,   block, STD_GLOBAL_OP(1), OP(0)))
-GENERIC_TRANSLATION_MEM(MOV16rm,
-	doRMMov<16>(ip,   block, ADDR(1), OP(0)),
-	doRMMov<16>(ip,   block, STD_GLOBAL_OP(1), OP(0)))
+GENERIC_TRANSLATION_REF(MOV8mr,
+	doMRMov<8>(ip,    block, ADDR_NOREF(0), OP(5)),
+	doMRMov<8>(ip,    block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOV16mr,
+	doMRMov<16>(ip,   block, ADDR_NOREF(0), OP(5)),
+	doMRMov<16>(ip,   block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOV8rm,
+	doRMMov<8>(ip,   block, ADDR_NOREF(1), OP(0)),
+	doRMMov<8>(ip,   block, MEM_REFERENCE(1), OP(0)))
+GENERIC_TRANSLATION_REF(MOV16rm,
+	doRMMov<16>(ip,   block, ADDR_NOREF(1), OP(0)),
+	doRMMov<16>(ip,   block, MEM_REFERENCE(1), OP(0)))
 GENERIC_TRANSLATION(MOVZX16rr8, (doMovZXRR<16,8>(ip, block, OP(0), OP(1))) )
 GENERIC_TRANSLATION(MOVZX32rr8, (doMovZXRR<32,8>(ip, block, OP(0), OP(1))) )
 GENERIC_TRANSLATION(MOVZX32rr16,( doMovZXRR<32,16>(ip, block, OP(0), OP(1))) )
@@ -424,110 +437,103 @@ GENERIC_TRANSLATION(MOV16rs, doRSMov<16>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(MOV32rs, doRSMov<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(MOV64rs, doRSMov<64>(ip, block, OP(0), OP(1)))
 
-GENERIC_TRANSLATION_MEM(MOV64ms,
-	doMSMov<64>(ip,    block, ADDR(0), OP(5)),
-	doMSMov<64>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOV64ms,
+	doMSMov<64>(ip,    block, ADDR_NOREF(0), OP(5)),
+	doMSMov<64>(ip,    block, MEM_REFERENCE(0), OP(5)))
 
-GENERIC_TRANSLATION_MEM(MOV64sm,
-	    doSMMov<64>(ip,    block, ADDR(0), OP(5)),
-	    doSMMov<64>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOV64sm,
+	    doSMMov<64>(ip,    block, ADDR_NOREF(0), OP(5)),
+	    doSMMov<64>(ip,    block, MEM_REFERENCE(0), OP(5)))
 
-GENERIC_TRANSLATION_MEM(MOV32ms,
-    doMSMov<32>(ip,    block, ADDR(0), OP(5)),
-    doMSMov<32>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOV32ms,
+    doMSMov<32>(ip,    block, ADDR_NOREF(0), OP(5)),
+    doMSMov<32>(ip,    block, MEM_REFERENCE(0), OP(5)))
 
-GENERIC_TRANSLATION_MEM(MOV16ms,
-	doMSMov<16>(ip,    block, ADDR(0), OP(5)),
-	doMSMov<16>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOV16ms,
+	doMSMov<16>(ip,    block, ADDR_NOREF(0), OP(5)),
+	doMSMov<16>(ip,    block, MEM_REFERENCE(0), OP(5)))
 
-GENERIC_TRANSLATION_MEM(MOVZX16rm8,
-	(doMovZXRM<16,8>(ip, block, OP(0), ADDR(1))),
-	(doMovZXRM<16,8>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
-GENERIC_TRANSLATION_MEM(MOVZX32rm8,
-	(doMovZXRM<32,8>(ip, block, OP(0), ADDR(1))),
-	(doMovZXRM<32,8>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
-GENERIC_TRANSLATION_MEM(MOVZX32rm16,
-	(doMovZXRM<32,16>(ip, block, OP(0), ADDR(1))),
-	(doMovZXRM<32,16>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(MOVZX16rm8,
+	(doMovZXRM<16,8>(ip, block, OP(0), ADDR_NOREF(1))),
+	(doMovZXRM<16,8>(ip, block, OP(0), MEM_REFERENCE(1))) )
+GENERIC_TRANSLATION_REF(MOVZX32rm8,
+	(doMovZXRM<32,8>(ip, block, OP(0), ADDR_NOREF(1))),
+	(doMovZXRM<32,8>(ip, block, OP(0), MEM_REFERENCE(1))) )
+GENERIC_TRANSLATION_REF(MOVZX32rm16,
+	(doMovZXRM<32,16>(ip, block, OP(0), ADDR_NOREF(1))),
+	(doMovZXRM<32,16>(ip, block, OP(0), MEM_REFERENCE(1))) )
 
 GENERIC_TRANSLATION(MOVSX16rr8, (doMovSXRR<16,8>(ip, block, OP(0), OP(1))) )
 GENERIC_TRANSLATION(MOVSX32rr16,( doMovSXRR<32,16>(ip, block, OP(0), OP(1))) )
 GENERIC_TRANSLATION(MOVSX32rr8, (doMovSXRR<32,8>(ip, block, OP(0), OP(1))) )
 GENERIC_TRANSLATION(MOVSX64rr32, (doMovSXRR<64,32>(ip, block, OP(0), OP(1))) )
-GENERIC_TRANSLATION_MEM(MOVSX16rm8,
-	(doMovSXRM<16,8>(ip, block, OP(0), ADDR(1))),
-	(doMovSXRM<16,8>(ip, block, OP(0), STD_GLOBAL_OP(1))) )
-GENERIC_TRANSLATION_MEM(MOVSX32rm8,
-	(doMovSXRM<32,8>(ip, 	block, OP(0), ADDR(1))),
-	(doMovSXRM<32,8>(ip, 	block, OP(0), STD_GLOBAL_OP(1))) )
-GENERIC_TRANSLATION_MEM(MOVSX32rm16,
-	(doMovSXRM<32,16>(ip, 	block, OP(0), ADDR(1))),
-	(doMovSXRM<32,16>(ip, 	block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(MOVSX16rm8,
+	(doMovSXRM<16,8>(ip, block, OP(0), ADDR_NOREF(1))),
+	(doMovSXRM<16,8>(ip, block, OP(0), MEM_REFERENCE(1))) )
+GENERIC_TRANSLATION_REF(MOVSX32rm8,
+	(doMovSXRM<32,8>(ip, 	block, OP(0), ADDR_NOREF(1))),
+	(doMovSXRM<32,8>(ip, 	block, OP(0), MEM_REFERENCE(1))) )
+GENERIC_TRANSLATION_REF(MOVSX32rm16,
+	(doMovSXRM<32,16>(ip, 	block, OP(0), ADDR_NOREF(1))),
+	(doMovSXRM<32,16>(ip, 	block, OP(0), MEM_REFERENCE(1))) )
 
-GENERIC_TRANSLATION_MEM(MOVSX64rm8,
-    (doMovSXRM<64,8>(ip,   block, OP(0), ADDR(1))),
-	(doMovSXRM<64,8>(ip,   block, OP(0), STD_GLOBAL_OP(1))) )
-GENERIC_TRANSLATION_MEM(MOVSX64rm16,
-	(doMovSXRM<64,16>(ip,   block, OP(0), ADDR(1))),
-	(doMovSXRM<64,16>(ip,   block, OP(0), STD_GLOBAL_OP(1))) )
-GENERIC_TRANSLATION_MEM(MOVSX64rm32,
-    (doMovSXRM<64, 32>(ip,   block, OP(0), ADDR(1))),
-    (doMovSXRM<64, 32>(ip,   block, OP(0), STD_GLOBAL_OP(1))) )
+GENERIC_TRANSLATION_REF(MOVSX64rm8,
+    (doMovSXRM<64,8>(ip,   block, OP(0), ADDR_NOREF(1))),
+	(doMovSXRM<64,8>(ip,   block, OP(0), MEM_REFERENCE(1))) )
+GENERIC_TRANSLATION_REF(MOVSX64rm16,
+	(doMovSXRM<64,16>(ip,   block, OP(0), ADDR_NOREF(1))),
+	(doMovSXRM<64,16>(ip,   block, OP(0), MEM_REFERENCE(1))) )
+GENERIC_TRANSLATION_REF(MOVSX64rm32,
+    (doMovSXRM<64, 32>(ip,   block, OP(0), ADDR_NOREF(1))),
+    (doMovSXRM<64, 32>(ip,   block, OP(0), MEM_REFERENCE(1))) )
 
-GENERIC_TRANSLATION_MEM(MOVBE16rm,
-	doMRMovBE<16>(ip,    block, ADDR(0), OP(5)),
-	doMRMovBE<16>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(MOVBE32rm,
-	doMRMovBE<32>(ip,    block, ADDR(0), OP(5)),
-	doMRMovBE<32>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(MOVBE64rm,
-	doMRMovBE<64>(ip,    block, ADDR(0), OP(5)),
-	doMRMovBE<64>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOVBE16rm,
+	doMRMovBE<16>(ip,    block, ADDR_NOREF(0), OP(5)),
+	doMRMovBE<16>(ip,    block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOVBE32rm,
+	doMRMovBE<32>(ip,    block, ADDR_NOREF(0), OP(5)),
+	doMRMovBE<32>(ip,    block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOVBE64rm,
+	doMRMovBE<64>(ip,    block, ADDR_NOREF(0), OP(5)),
+	doMRMovBE<64>(ip,    block, MEM_REFERENCE(0), OP(5)))
 
-GENERIC_TRANSLATION_MEM(MOVBE16mr,
-	doRMMovBE<16>(ip,    block, ADDR(0), OP(5)),
-	doRMMovBE<16>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(MOVBE32mr,
-	doRMMovBE<32>(ip,    block, ADDR(0), OP(5)),
-	doRMMovBE<32>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
-GENERIC_TRANSLATION_MEM(MOVBE64mr,
-	doRMMovBE<64>(ip,    block, ADDR(0), OP(5)),
-	doRMMovBE<64>(ip,    block, STD_GLOBAL_OP(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOVBE16mr,
+	doRMMovBE<16>(ip,    block, ADDR_NOREF(0), OP(5)),
+	doRMMovBE<16>(ip,    block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOVBE32mr,
+	doRMMovBE<32>(ip,    block, ADDR_NOREF(0), OP(5)),
+	doRMMovBE<32>(ip,    block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(MOVBE64mr,
+	doRMMovBE<64>(ip,    block, ADDR_NOREF(0), OP(5)),
+	doRMMovBE<64>(ip,    block, MEM_REFERENCE(0), OP(5)))
 
 static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
     Module *M = F->getParent();
 
-    if( ip->has_call_tgt() ) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(),
-                ip->get_call_tgt(0)
-            );
-        Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
-        ret = doRIMovV<32>(ip, block,
-                addrInt,
-                OP(0) );
-    }
-    else if( ip->is_data_offset() ) {
-        Value *data_v = nullptr;
-        if(shouldSubtractImageBase(M)) {
-            // if we're here, then
-            // * archGetImageBase is defined
-            // * we are on win64
-           
-            data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
-            data_v = doSubtractImageBase<32>(data_v, block);
-            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
-        } else {
-            data_v = GLOBAL_DATA_OFFSET<32>(block, natM, ip);
-        }
-
-        ret = doRIMovV<32>(ip, block, data_v, OP(0) );
-
+    if( ip->has_code_ref() ) {
+        Value *addrInt = IMM_AS_DATA_REF<32>(block, natM, ip);
+        ret = doRIMovV<32>(ip, block, addrInt, OP(0) );
     } else {
-        ret = doRIMov<32>(ip, block, OP(1), OP(0)) ;
+        if( ip->has_imm_reference) {
+            Value *data_v = nullptr;
+            if(shouldSubtractImageBase(M)) {
+                // if we're here, then
+                // * archGetImageBase is defined
+                // * we are on win64
+
+                data_v = IMM_AS_DATA_REF<64>(block, natM, ip);
+                data_v = doSubtractImageBase<32>(data_v, block);
+            } else {
+                data_v = IMM_AS_DATA_REF<32>(block, natM, ip);
+            }
+
+            ret = doRIMovV<32>(ip, block, data_v, OP(0) );
+
+        } else {
+            ret = doRIMov<32>(ip, block, OP(1), OP(0)) ;
+        }
     }
     return ret ;
 }
@@ -537,28 +543,18 @@ static InstTransResult translate_MOV64ri(NativeModulePtr natM, BasicBlock *& blo
     Function *F = block->getParent();
     Module *M = F->getParent();
 
-    if( ip->has_call_tgt() ) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(),
-                ip->get_call_tgt(0)
-            );
-        Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt64Ty(block->getContext()), "", block);
-        ret = doRIMovV<64>(ip, block,
-                addrInt,
-                OP(0) );
+    if( ip->has_code_ref() ) {
+        Value *addrInt = IMM_AS_DATA_REF<64>(block, natM, ip);
+        ret = doRIMovV<64>(ip, block, addrInt, OP(0) );
     }
-    else if( ip->is_data_offset() ) {
-
-
-        Value *data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
+    else if( ip->has_imm_reference ) {
+        Value *data_v = IMM_AS_DATA_REF<64>(block, natM, ip);
         if(shouldSubtractImageBase(M)) {
             // if we're here, then
             // * archGetImageBase is defined
             // * we are on win64
            
             data_v = doSubtractImageBase<64>(data_v, block);
-            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
         }
 
         ret = doRIMovV<64>(ip, block, data_v, OP(0) );
@@ -577,7 +573,15 @@ static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& bloc
     Function *F = block->getParent();
     Module *M = F->getParent();
 
-    if( ip->is_data_offset() ) {
+    // this is awful, but sometimes IDA detects the immediate
+    // as a memory reference. However, this instruction can only
+    // have an immediate, so this is safe
+    if( ip->has_imm_reference || ip->has_mem_reference ) {
+        ip->has_imm_reference = true;
+        ip->set_reference(Inst::IMMRef, ip->get_reference(Inst::MEMRef));
+    }
+
+    if( ip->has_imm_reference ) {
         
         Value *data_v = nullptr;
         if(width == 32 && shouldSubtractImageBase(M)) {
@@ -585,11 +589,10 @@ static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& bloc
             // * archGetImageBase is defined
             // * we are on win64
            
-            data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
+            data_v = IMM_AS_DATA_REF<64>(block, natM, ip);
             data_v = doSubtractImageBase<32>(data_v, block);
-            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
         } else {
-            data_v = GLOBAL_DATA_OFFSET<width>(block, natM, ip);
+            data_v = IMM_AS_DATA_REF<width>(block, natM, ip);
         }
 
         ret = doMRMov<width>(ip, block, data_v,
@@ -608,42 +611,47 @@ static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& bloc
     Function *F = block->getParent();
     Module *M = F->getParent();
 
+    unsigned eaxReg = width == 32 ? X86::EAX : X86::RAX;
+
     // loading functions only available if its a 32-bit offset
     if( ip->has_external_ref() && width == 32) {
         Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
         TASSERT(addrInt != 0, "Could not get external data reference");
-        R_WRITE<width>(block, X86::EAX, addrInt);
+        doRMMov<width>(ip, block, addrInt, MCOperand::CreateReg(eaxReg));
         return ContinueBlock;
-        //ret = doRMMov<32>(ip, block, addrInt, MCOperand::CreateReg(X86::EAX)) ;
     }
-    else if( ip->has_call_tgt() && width == 32 ) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(
-                block->getParent()->getParent(),
-                ip->get_call_tgt(0)
-            );
-        Value *addrInt = new PtrToIntInst(
-            callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
-        ret = doRMMov<32>(ip, block, addrInt, MCOperand::CreateReg(X86::EAX)) ;
+
+    // this is awful, but sometimes IDA detects the immediate
+    // as a memory reference. However, this instruction can only
+    // have an immediate, so this is safe
+    if( ip->has_imm_reference || ip->has_mem_reference ) {
+        ip->has_imm_reference = true;
+        ip->set_reference(Inst::IMMRef, ip->get_reference(Inst::MEMRef));
     }
-    else if( ip->is_data_offset() ) {
+
+    if( ip->has_code_ref() ) {
+        Value *addrInt = IMM_AS_DATA_REF<width>(block, natM, ip);
+        ret = doRMMov<width>(ip, block, addrInt, MCOperand::CreateReg(eaxReg)) ;
+    } else {
+        if( ip->has_imm_reference ) {
             Value *data_v = nullptr;
             if(width == 32 && shouldSubtractImageBase(M)) {
                 // if we're here, then
                 // * archGetImageBase is defined
                 // * we are on win64
-               
-                data_v = GLOBAL_DATA_OFFSET<64>(block, natM, ip);
+
+                data_v = IMM_AS_DATA_REF<64>(block, natM, ip);
                 data_v = doSubtractImageBase<32>(data_v, block);
-                llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
             } else {
-                data_v = GLOBAL_DATA_OFFSET<width>(block, natM, ip);
+                data_v = IMM_AS_DATA_REF<width>(block, natM, ip);
             }
-        ret = doRMMov<width>(ip, block,
-                data_v,
-                MCOperand::CreateReg(X86::EAX) );
-    } else {
-        Value *addrv = CONST_V<width>(block, OP(0).getImm());
-        ret = doRMMov<width>(ip, block, addrv, MCOperand::CreateReg(X86::EAX)) ;
+            ret = doRMMov<width>(ip, block,
+                    data_v,
+                    MCOperand::CreateReg(eaxReg) );
+        } else {
+            Value *addrv = CONST_V<width>(block, OP(0).getImm());
+            ret = doRMMov<width>(ip, block, addrv, MCOperand::CreateReg(eaxReg)) ;
+        }
     }
     return ret ;
 }
@@ -657,12 +665,11 @@ static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& blo
 
     if( ip->has_external_ref()) {
         Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
-        //ret = doRMMov<32>(ip, block, addrInt, OP(0) );
+        ret = doRMMov<32>(ip, block, addrInt, OP(0) );
         TASSERT(addrInt != NULL, "Could not get address for external");
-		R_WRITE<32>(block, OP(0).getReg(), addrInt);
         return ContinueBlock;
     }
-    else if( ip->is_data_offset() ) {
+    else if( ip->has_mem_reference ) {
 
         Value *data_v = nullptr;
         if(shouldSubtractImageBase(M)) {
@@ -670,16 +677,15 @@ static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& blo
             // * archGetImageBase is defined
             // * we are on win64
 
-            data_v = GLOBAL( block, natM, inst, ip, 1 );
+            data_v = MEM_AS_DATA_REF( block, natM, inst, ip, 1 );
             data_v = doSubtractImageBase<32>(data_v, block);
-            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
         } else {
-            data_v = GLOBAL( block, natM, inst, ip, 1 );
+            data_v = MEM_AS_DATA_REF( block, natM, inst, ip, 1 );
         }
 
         ret = doRMMov<32>(ip, block, data_v, OP(0) );
     } else {
-		ret = doRMMov<32>(ip, block, ADDR(1), OP(0));
+		ret = doRMMov<32>(ip, block, ADDR_NOREF(1), OP(0));
     }
     return ret ;
 }
@@ -693,10 +699,10 @@ static InstTransResult translate_MOV32mr(NativeModulePtr natM, BasicBlock *& blo
         TASSERT(addrInt != NULL, "Could not get address for external");
         return doMRMov<32>(ip, block, addrInt, OP(5) );
     }
-    else if( ip->is_data_offset() ) {
-        ret = doMRMov<32>(ip, block, GLOBAL( block, natM, inst, ip, 0), OP(5) );
+    else if( ip->has_mem_reference ) {
+        ret = doMRMov<32>(ip, block, MEM_AS_DATA_REF( block, natM, inst, ip, 0), OP(5) );
     } else {
-        ret = doMRMov<32>(ip, block, ADDR(0), OP(5)) ;
+        ret = doMRMov<32>(ip, block, ADDR_NOREF(0), OP(5)) ;
     }
     return ret ;
 }
@@ -710,27 +716,25 @@ static InstTransResult translate_MOV64rm(NativeModulePtr natM, BasicBlock *& blo
 
     if( ip->has_external_ref()) {
         Value *addrInt = getValueForExternal<64>(F->getParent(), ip, block);
-        //ret = doRMMov<32>(ip, block, addrInt, OP(0) );
         TASSERT(addrInt != NULL, "Could not get address for external");
-        R_WRITE<64>(block, OP(0).getReg(), addrInt);
+        doRMMov<64>(ip, block, addrInt, OP(0) );
         return ContinueBlock;
     }
-    else if( ip->is_data_offset() ) {
+    else if( ip->has_mem_reference ) {
         Value *data_v = nullptr;
         if(shouldSubtractImageBase(M)) {
             // if we're here, then
             // * archGetImageBase is defined
             // * we are on win64
 
-            data_v = GLOBAL( block, natM, inst, ip, 1 );
+            data_v = MEM_AS_DATA_REF( block, natM, inst, ip, 1 );
             data_v = doSubtractImageBase<64>(data_v, block);
-            llvm::errs() << __FUNCTION__ << ": Subtracting ImageBase\n";
         } else {
-            data_v = GLOBAL( block, natM, inst, ip, 1 );
+            data_v = MEM_AS_DATA_REF( block, natM, inst, ip, 1 );
         }
         ret = doRMMov<64>(ip, block, data_v, OP(0) );
     } else {
-        ret = doRMMov<64>(ip, block, ADDR(1), OP(0));
+        ret = doRMMov<64>(ip, block, ADDR_NOREF(1), OP(0));
     }
     return ret ;
 }
@@ -744,10 +748,10 @@ static InstTransResult translate_MOV64mr(NativeModulePtr natM, BasicBlock *& blo
         TASSERT(addrInt != NULL, "Could not get address for external");
         return doMRMov<64>(ip, block, addrInt, OP(5) );
     }
-    else if( ip->is_data_offset() ) {
-        ret = doMRMov<64>(ip, block, GLOBAL( block, natM, inst, ip, 0), OP(5) );
+    else if( ip->has_mem_reference ) {
+        ret = doMRMov<64>(ip, block, MEM_AS_DATA_REF( block, natM, inst, ip, 0), OP(5) );
     } else {
-        ret = doMRMov<64>(ip, block, ADDR(0), OP(5)) ;
+        ret = doMRMov<64>(ip, block, ADDR_NOREF(0), OP(5)) ;
     }
     return ret ;
 }

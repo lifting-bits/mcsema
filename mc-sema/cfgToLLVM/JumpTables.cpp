@@ -191,7 +191,7 @@ void doJumpTableViaData(
         MCInst &inst,
         const int bitness)
 {
-    Value *addr = STD_GLOBAL_OP(0); 
+    Value *addr = MEM_REFERENCE(0); 
     //doJumpTableViaData(block, addr, bitness);
 
     llvm::errs() << __FUNCTION__ << ": Doing jump table via data\n";
@@ -334,6 +334,57 @@ static void doJumpTableViaSwitchReg(
         TASSERT(toBlock != NULL, "Could not find block: "+bbname);
 
         ConstantInt *thecase = CONST_V<bitness>(block, blockVA);
+
+        theSwitch->addCase(
+                thecase,
+                toBlock);
+    }
+
+}
+
+void doJumpOffsetTableViaSwitchReg(
+        BasicBlock *& block, 
+        InstPtr ip, 
+        Value *regVal,
+        BasicBlock *&default_block,
+        Value *data_location,
+        MCSOffsetTablePtr ot_ptr)
+{
+
+    llvm::errs() << __FUNCTION__ << ": Doing jump offset table via switch(reg)\n";
+    Function *F = block->getParent();
+    
+
+    // create a default block that just traps
+    default_block = 
+        BasicBlock::Create(block->getContext(), "", block->getParent(), 0);
+    // end default block
+
+    const std::vector< std::pair<VA,VA> > &offset_dest = ot_ptr->getConstTable();
+    std::unordered_map<VA,VA> uniq_blocks;
+    for (auto const & blockpair : offset_dest) {
+        uniq_blocks[blockpair.first] = blockpair.second;
+    }
+
+    // switch on the offset, not the memory value
+    Value *switch_val = BinaryOperator::CreateSub(regVal, data_location, "", block);
+    switch_val = BinaryOperator::CreateAnd(switch_val, CONST_V<64>(block, 0xFFFFFFFF), "", block);
+    // create a switch inst
+    SwitchInst *theSwitch = SwitchInst::Create(
+            switch_val, 
+            default_block,
+            uniq_blocks.size(),
+            block);
+
+    // populate switch
+    for(const auto & entry : uniq_blocks) 
+    {
+        std::string  bbname = "block_0x"+to_string<VA>(entry.second, std::hex);
+        BasicBlock *toBlock = bbFromStrName(bbname, F);
+        llvm::errs() << __FUNCTION__ << ": Mapping from " << to_string<VA>(entry.first, std::hex) << " => " << bbname << "\n";
+        TASSERT(toBlock != NULL, "Could not find block: "+bbname);
+
+        ConstantInt *thecase = CONST_V<64>(block, entry.first);
 
         theSwitch->addCase(
                 thecase,

@@ -465,7 +465,6 @@ bool addEntryPointDriver(Module *M,
 
     //call the sub function with register struct as argument
     vector<Value*>  subArg;
-
     subArg.push_back(aCtx);
 
     CallInst* ci = CallInst::Create(F, subArg, "", driverBB);

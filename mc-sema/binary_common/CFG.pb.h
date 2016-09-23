@@ -56,6 +56,25 @@ class Annotated_Register_64_Property;
 class Annotated_Function;
 class Disassembly;
 
+enum Instruction_RefType {
+  Instruction_RefType_CodeRef = 0,
+  Instruction_RefType_DataRef = 1
+};
+bool Instruction_RefType_IsValid(int value);
+const Instruction_RefType Instruction_RefType_RefType_MIN = Instruction_RefType_CodeRef;
+const Instruction_RefType Instruction_RefType_RefType_MAX = Instruction_RefType_DataRef;
+const int Instruction_RefType_RefType_ARRAYSIZE = Instruction_RefType_RefType_MAX + 1;
+
+const ::google::protobuf::EnumDescriptor* Instruction_RefType_descriptor();
+inline const ::std::string& Instruction_RefType_Name(Instruction_RefType value) {
+  return ::google::protobuf::internal::NameOfEnum(
+    Instruction_RefType_descriptor(), value);
+}
+inline bool Instruction_RefType_Parse(
+    const ::std::string& name, Instruction_RefType* value) {
+  return ::google::protobuf::internal::ParseNamedEnum<Instruction_RefType>(
+    Instruction_RefType_descriptor(), name, value);
+}
 enum ExternalFunction_CallingConvention {
   ExternalFunction_CallingConvention_CallerCleanup = 0,
   ExternalFunction_CallingConvention_CalleeCleanup = 1,
@@ -507,6 +526,30 @@ class Instruction : public ::google::protobuf::Message {
 
   // nested types ----------------------------------------------------
 
+  typedef Instruction_RefType RefType;
+  static const RefType CodeRef = Instruction_RefType_CodeRef;
+  static const RefType DataRef = Instruction_RefType_DataRef;
+  static inline bool RefType_IsValid(int value) {
+    return Instruction_RefType_IsValid(value);
+  }
+  static const RefType RefType_MIN =
+    Instruction_RefType_RefType_MIN;
+  static const RefType RefType_MAX =
+    Instruction_RefType_RefType_MAX;
+  static const int RefType_ARRAYSIZE =
+    Instruction_RefType_RefType_ARRAYSIZE;
+  static inline const ::google::protobuf::EnumDescriptor*
+  RefType_descriptor() {
+    return Instruction_RefType_descriptor();
+  }
+  static inline const ::std::string& RefType_Name(RefType value) {
+    return Instruction_RefType_Name(value);
+  }
+  static inline bool RefType_Parse(const ::std::string& name,
+      RefType* value) {
+    return Instruction_RefType_Parse(name, value);
+  }
+
   // accessors -------------------------------------------------------
 
   // required bytes inst_bytes = 1;
@@ -549,12 +592,47 @@ class Instruction : public ::google::protobuf::Message {
   inline ::google::protobuf::int32 inst_len() const;
   inline void set_inst_len(::google::protobuf::int32 value);
 
-  // optional int64 data_offset = 6;
-  inline bool has_data_offset() const;
-  inline void clear_data_offset();
-  static const int kDataOffsetFieldNumber = 6;
-  inline ::google::protobuf::int64 data_offset() const;
-  inline void set_data_offset(::google::protobuf::int64 value);
+  // optional int64 imm_reference = 6;
+  inline bool has_imm_reference() const;
+  inline void clear_imm_reference();
+  static const int kImmReferenceFieldNumber = 6;
+  inline ::google::protobuf::int64 imm_reference() const;
+  inline void set_imm_reference(::google::protobuf::int64 value);
+
+  // optional int64 imm_reloc_offset = 15;
+  inline bool has_imm_reloc_offset() const;
+  inline void clear_imm_reloc_offset();
+  static const int kImmRelocOffsetFieldNumber = 15;
+  inline ::google::protobuf::int64 imm_reloc_offset() const;
+  inline void set_imm_reloc_offset(::google::protobuf::int64 value);
+
+  // optional .Instruction.RefType imm_ref_type = 16;
+  inline bool has_imm_ref_type() const;
+  inline void clear_imm_ref_type();
+  static const int kImmRefTypeFieldNumber = 16;
+  inline ::Instruction_RefType imm_ref_type() const;
+  inline void set_imm_ref_type(::Instruction_RefType value);
+
+  // optional int64 mem_reference = 8;
+  inline bool has_mem_reference() const;
+  inline void clear_mem_reference();
+  static const int kMemReferenceFieldNumber = 8;
+  inline ::google::protobuf::int64 mem_reference() const;
+  inline void set_mem_reference(::google::protobuf::int64 value);
+
+  // optional int64 mem_reloc_offset = 9;
+  inline bool has_mem_reloc_offset() const;
+  inline void clear_mem_reloc_offset();
+  static const int kMemRelocOffsetFieldNumber = 9;
+  inline ::google::protobuf::int64 mem_reloc_offset() const;
+  inline void set_mem_reloc_offset(::google::protobuf::int64 value);
+
+  // optional .Instruction.RefType mem_ref_type = 18;
+  inline bool has_mem_ref_type() const;
+  inline void clear_mem_ref_type();
+  static const int kMemRefTypeFieldNumber = 18;
+  inline ::Instruction_RefType mem_ref_type() const;
+  inline void set_mem_ref_type(::Instruction_RefType value);
 
   // optional string ext_call_name = 7;
   inline bool has_ext_call_name() const;
@@ -567,20 +645,6 @@ class Instruction : public ::google::protobuf::Message {
   inline ::std::string* mutable_ext_call_name();
   inline ::std::string* release_ext_call_name();
   inline void set_allocated_ext_call_name(::std::string* ext_call_name);
-
-  // optional int64 call_target = 8;
-  inline bool has_call_target() const;
-  inline void clear_call_target();
-  static const int kCallTargetFieldNumber = 8;
-  inline ::google::protobuf::int64 call_target() const;
-  inline void set_call_target(::google::protobuf::int64 value);
-
-  // optional int32 reloc_offset = 9;
-  inline bool has_reloc_offset() const;
-  inline void clear_reloc_offset();
-  static const int kRelocOffsetFieldNumber = 9;
-  inline ::google::protobuf::int32 reloc_offset() const;
-  inline void set_reloc_offset(::google::protobuf::int32 value);
 
   // optional .JumpTbl jump_table = 10;
   inline bool has_jump_table() const;
@@ -638,14 +702,20 @@ class Instruction : public ::google::protobuf::Message {
   inline void clear_has_false_target();
   inline void set_has_inst_len();
   inline void clear_has_inst_len();
-  inline void set_has_data_offset();
-  inline void clear_has_data_offset();
+  inline void set_has_imm_reference();
+  inline void clear_has_imm_reference();
+  inline void set_has_imm_reloc_offset();
+  inline void clear_has_imm_reloc_offset();
+  inline void set_has_imm_ref_type();
+  inline void clear_has_imm_ref_type();
+  inline void set_has_mem_reference();
+  inline void clear_has_mem_reference();
+  inline void set_has_mem_reloc_offset();
+  inline void clear_has_mem_reloc_offset();
+  inline void set_has_mem_ref_type();
+  inline void clear_has_mem_ref_type();
   inline void set_has_ext_call_name();
   inline void clear_has_ext_call_name();
-  inline void set_has_call_target();
-  inline void clear_has_call_target();
-  inline void set_has_reloc_offset();
-  inline void clear_has_reloc_offset();
   inline void set_has_jump_table();
   inline void clear_has_jump_table();
   inline void set_has_jump_index_table();
@@ -663,19 +733,22 @@ class Instruction : public ::google::protobuf::Message {
   ::google::protobuf::int64 inst_addr_;
   ::google::protobuf::int64 true_target_;
   ::google::protobuf::int64 false_target_;
-  ::google::protobuf::int64 data_offset_;
-  ::std::string* ext_call_name_;
+  ::google::protobuf::int64 imm_reference_;
   ::google::protobuf::int32 inst_len_;
-  ::google::protobuf::int32 reloc_offset_;
-  ::google::protobuf::int64 call_target_;
+  int imm_ref_type_;
+  ::google::protobuf::int64 imm_reloc_offset_;
+  ::google::protobuf::int64 mem_reference_;
+  ::google::protobuf::int64 mem_reloc_offset_;
+  ::std::string* ext_call_name_;
   ::JumpTbl* jump_table_;
+  int mem_ref_type_;
+  ::google::protobuf::int32 system_call_number_;
   ::JumpIndexTbl* jump_index_table_;
   ::std::string* ext_data_name_;
-  ::google::protobuf::int32 system_call_number_;
   bool local_noreturn_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(14 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(17 + 31) / 32];
 
   friend void  protobuf_AddDesc_CFG_2eproto();
   friend void protobuf_AssignDesc_CFG_2eproto();
@@ -1008,10 +1081,17 @@ class ExternalFunction : public ::google::protobuf::Message {
   inline ::google::protobuf::int32 argument_count() const;
   inline void set_argument_count(::google::protobuf::int32 value);
 
-  // optional string signature = 6;
+  // required bool is_weak = 6;
+  inline bool has_is_weak() const;
+  inline void clear_is_weak();
+  static const int kIsWeakFieldNumber = 6;
+  inline bool is_weak() const;
+  inline void set_is_weak(bool value);
+
+  // optional string signature = 7;
   inline bool has_signature() const;
   inline void clear_signature();
-  static const int kSignatureFieldNumber = 6;
+  static const int kSignatureFieldNumber = 7;
   inline const ::std::string& signature() const;
   inline void set_signature(const ::std::string& value);
   inline void set_signature(const char* value);
@@ -1032,6 +1112,8 @@ class ExternalFunction : public ::google::protobuf::Message {
   inline void clear_has_no_return();
   inline void set_has_argument_count();
   inline void clear_has_argument_count();
+  inline void set_has_is_weak();
+  inline void clear_has_is_weak();
   inline void set_has_signature();
   inline void clear_has_signature();
 
@@ -1041,11 +1123,12 @@ class ExternalFunction : public ::google::protobuf::Message {
   int calling_convention_;
   bool has_return_;
   bool no_return_;
+  bool is_weak_;
   ::std::string* signature_;
   ::google::protobuf::int32 argument_count_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(6 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(7 + 31) / 32];
 
   friend void  protobuf_AddDesc_CFG_2eproto();
   friend void protobuf_AssignDesc_CFG_2eproto();
@@ -1129,20 +1212,30 @@ class ExternalData : public ::google::protobuf::Message {
   inline ::google::protobuf::int32 data_size() const;
   inline void set_data_size(::google::protobuf::int32 value);
 
+  // required bool is_weak = 3;
+  inline bool has_is_weak() const;
+  inline void clear_is_weak();
+  static const int kIsWeakFieldNumber = 3;
+  inline bool is_weak() const;
+  inline void set_is_weak(bool value);
+
   // @@protoc_insertion_point(class_scope:ExternalData)
  private:
   inline void set_has_symbol_name();
   inline void clear_has_symbol_name();
   inline void set_has_data_size();
   inline void clear_has_data_size();
+  inline void set_has_is_weak();
+  inline void clear_has_is_weak();
 
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
   ::std::string* symbol_name_;
   ::google::protobuf::int32 data_size_;
+  bool is_weak_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(2 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(3 + 31) / 32];
 
   friend void  protobuf_AddDesc_CFG_2eproto();
   friend void protobuf_AssignDesc_CFG_2eproto();
@@ -3746,37 +3839,149 @@ inline void Instruction::set_inst_len(::google::protobuf::int32 value) {
   inst_len_ = value;
 }
 
-// optional int64 data_offset = 6;
-inline bool Instruction::has_data_offset() const {
+// optional int64 imm_reference = 6;
+inline bool Instruction::has_imm_reference() const {
   return (_has_bits_[0] & 0x00000020u) != 0;
 }
-inline void Instruction::set_has_data_offset() {
+inline void Instruction::set_has_imm_reference() {
   _has_bits_[0] |= 0x00000020u;
 }
-inline void Instruction::clear_has_data_offset() {
+inline void Instruction::clear_has_imm_reference() {
   _has_bits_[0] &= ~0x00000020u;
 }
-inline void Instruction::clear_data_offset() {
-  data_offset_ = GOOGLE_LONGLONG(0);
-  clear_has_data_offset();
+inline void Instruction::clear_imm_reference() {
+  imm_reference_ = GOOGLE_LONGLONG(0);
+  clear_has_imm_reference();
 }
-inline ::google::protobuf::int64 Instruction::data_offset() const {
-  return data_offset_;
+inline ::google::protobuf::int64 Instruction::imm_reference() const {
+  return imm_reference_;
 }
-inline void Instruction::set_data_offset(::google::protobuf::int64 value) {
-  set_has_data_offset();
-  data_offset_ = value;
+inline void Instruction::set_imm_reference(::google::protobuf::int64 value) {
+  set_has_imm_reference();
+  imm_reference_ = value;
+}
+
+// optional int64 imm_reloc_offset = 15;
+inline bool Instruction::has_imm_reloc_offset() const {
+  return (_has_bits_[0] & 0x00000040u) != 0;
+}
+inline void Instruction::set_has_imm_reloc_offset() {
+  _has_bits_[0] |= 0x00000040u;
+}
+inline void Instruction::clear_has_imm_reloc_offset() {
+  _has_bits_[0] &= ~0x00000040u;
+}
+inline void Instruction::clear_imm_reloc_offset() {
+  imm_reloc_offset_ = GOOGLE_LONGLONG(0);
+  clear_has_imm_reloc_offset();
+}
+inline ::google::protobuf::int64 Instruction::imm_reloc_offset() const {
+  return imm_reloc_offset_;
+}
+inline void Instruction::set_imm_reloc_offset(::google::protobuf::int64 value) {
+  set_has_imm_reloc_offset();
+  imm_reloc_offset_ = value;
+}
+
+// optional .Instruction.RefType imm_ref_type = 16;
+inline bool Instruction::has_imm_ref_type() const {
+  return (_has_bits_[0] & 0x00000080u) != 0;
+}
+inline void Instruction::set_has_imm_ref_type() {
+  _has_bits_[0] |= 0x00000080u;
+}
+inline void Instruction::clear_has_imm_ref_type() {
+  _has_bits_[0] &= ~0x00000080u;
+}
+inline void Instruction::clear_imm_ref_type() {
+  imm_ref_type_ = 0;
+  clear_has_imm_ref_type();
+}
+inline ::Instruction_RefType Instruction::imm_ref_type() const {
+  return static_cast< ::Instruction_RefType >(imm_ref_type_);
+}
+inline void Instruction::set_imm_ref_type(::Instruction_RefType value) {
+  assert(::Instruction_RefType_IsValid(value));
+  set_has_imm_ref_type();
+  imm_ref_type_ = value;
+}
+
+// optional int64 mem_reference = 8;
+inline bool Instruction::has_mem_reference() const {
+  return (_has_bits_[0] & 0x00000100u) != 0;
+}
+inline void Instruction::set_has_mem_reference() {
+  _has_bits_[0] |= 0x00000100u;
+}
+inline void Instruction::clear_has_mem_reference() {
+  _has_bits_[0] &= ~0x00000100u;
+}
+inline void Instruction::clear_mem_reference() {
+  mem_reference_ = GOOGLE_LONGLONG(0);
+  clear_has_mem_reference();
+}
+inline ::google::protobuf::int64 Instruction::mem_reference() const {
+  return mem_reference_;
+}
+inline void Instruction::set_mem_reference(::google::protobuf::int64 value) {
+  set_has_mem_reference();
+  mem_reference_ = value;
+}
+
+// optional int64 mem_reloc_offset = 9;
+inline bool Instruction::has_mem_reloc_offset() const {
+  return (_has_bits_[0] & 0x00000200u) != 0;
+}
+inline void Instruction::set_has_mem_reloc_offset() {
+  _has_bits_[0] |= 0x00000200u;
+}
+inline void Instruction::clear_has_mem_reloc_offset() {
+  _has_bits_[0] &= ~0x00000200u;
+}
+inline void Instruction::clear_mem_reloc_offset() {
+  mem_reloc_offset_ = GOOGLE_LONGLONG(0);
+  clear_has_mem_reloc_offset();
+}
+inline ::google::protobuf::int64 Instruction::mem_reloc_offset() const {
+  return mem_reloc_offset_;
+}
+inline void Instruction::set_mem_reloc_offset(::google::protobuf::int64 value) {
+  set_has_mem_reloc_offset();
+  mem_reloc_offset_ = value;
+}
+
+// optional .Instruction.RefType mem_ref_type = 18;
+inline bool Instruction::has_mem_ref_type() const {
+  return (_has_bits_[0] & 0x00000400u) != 0;
+}
+inline void Instruction::set_has_mem_ref_type() {
+  _has_bits_[0] |= 0x00000400u;
+}
+inline void Instruction::clear_has_mem_ref_type() {
+  _has_bits_[0] &= ~0x00000400u;
+}
+inline void Instruction::clear_mem_ref_type() {
+  mem_ref_type_ = 0;
+  clear_has_mem_ref_type();
+}
+inline ::Instruction_RefType Instruction::mem_ref_type() const {
+  return static_cast< ::Instruction_RefType >(mem_ref_type_);
+}
+inline void Instruction::set_mem_ref_type(::Instruction_RefType value) {
+  assert(::Instruction_RefType_IsValid(value));
+  set_has_mem_ref_type();
+  mem_ref_type_ = value;
 }
 
 // optional string ext_call_name = 7;
 inline bool Instruction::has_ext_call_name() const {
-  return (_has_bits_[0] & 0x00000040u) != 0;
+  return (_has_bits_[0] & 0x00000800u) != 0;
 }
 inline void Instruction::set_has_ext_call_name() {
-  _has_bits_[0] |= 0x00000040u;
+  _has_bits_[0] |= 0x00000800u;
 }
 inline void Instruction::clear_has_ext_call_name() {
-  _has_bits_[0] &= ~0x00000040u;
+  _has_bits_[0] &= ~0x00000800u;
 }
 inline void Instruction::clear_ext_call_name() {
   if (ext_call_name_ != &::google::protobuf::internal::kEmptyString) {
@@ -3838,59 +4043,15 @@ inline void Instruction::set_allocated_ext_call_name(::std::string* ext_call_nam
   }
 }
 
-// optional int64 call_target = 8;
-inline bool Instruction::has_call_target() const {
-  return (_has_bits_[0] & 0x00000080u) != 0;
-}
-inline void Instruction::set_has_call_target() {
-  _has_bits_[0] |= 0x00000080u;
-}
-inline void Instruction::clear_has_call_target() {
-  _has_bits_[0] &= ~0x00000080u;
-}
-inline void Instruction::clear_call_target() {
-  call_target_ = GOOGLE_LONGLONG(0);
-  clear_has_call_target();
-}
-inline ::google::protobuf::int64 Instruction::call_target() const {
-  return call_target_;
-}
-inline void Instruction::set_call_target(::google::protobuf::int64 value) {
-  set_has_call_target();
-  call_target_ = value;
-}
-
-// optional int32 reloc_offset = 9;
-inline bool Instruction::has_reloc_offset() const {
-  return (_has_bits_[0] & 0x00000100u) != 0;
-}
-inline void Instruction::set_has_reloc_offset() {
-  _has_bits_[0] |= 0x00000100u;
-}
-inline void Instruction::clear_has_reloc_offset() {
-  _has_bits_[0] &= ~0x00000100u;
-}
-inline void Instruction::clear_reloc_offset() {
-  reloc_offset_ = 0;
-  clear_has_reloc_offset();
-}
-inline ::google::protobuf::int32 Instruction::reloc_offset() const {
-  return reloc_offset_;
-}
-inline void Instruction::set_reloc_offset(::google::protobuf::int32 value) {
-  set_has_reloc_offset();
-  reloc_offset_ = value;
-}
-
 // optional .JumpTbl jump_table = 10;
 inline bool Instruction::has_jump_table() const {
-  return (_has_bits_[0] & 0x00000200u) != 0;
+  return (_has_bits_[0] & 0x00001000u) != 0;
 }
 inline void Instruction::set_has_jump_table() {
-  _has_bits_[0] |= 0x00000200u;
+  _has_bits_[0] |= 0x00001000u;
 }
 inline void Instruction::clear_has_jump_table() {
-  _has_bits_[0] &= ~0x00000200u;
+  _has_bits_[0] &= ~0x00001000u;
 }
 inline void Instruction::clear_jump_table() {
   if (jump_table_ != NULL) jump_table_->::JumpTbl::Clear();
@@ -3922,13 +4083,13 @@ inline void Instruction::set_allocated_jump_table(::JumpTbl* jump_table) {
 
 // optional .JumpIndexTbl jump_index_table = 11;
 inline bool Instruction::has_jump_index_table() const {
-  return (_has_bits_[0] & 0x00000400u) != 0;
+  return (_has_bits_[0] & 0x00002000u) != 0;
 }
 inline void Instruction::set_has_jump_index_table() {
-  _has_bits_[0] |= 0x00000400u;
+  _has_bits_[0] |= 0x00002000u;
 }
 inline void Instruction::clear_has_jump_index_table() {
-  _has_bits_[0] &= ~0x00000400u;
+  _has_bits_[0] &= ~0x00002000u;
 }
 inline void Instruction::clear_jump_index_table() {
   if (jump_index_table_ != NULL) jump_index_table_->::JumpIndexTbl::Clear();
@@ -3960,13 +4121,13 @@ inline void Instruction::set_allocated_jump_index_table(::JumpIndexTbl* jump_ind
 
 // optional string ext_data_name = 12;
 inline bool Instruction::has_ext_data_name() const {
-  return (_has_bits_[0] & 0x00000800u) != 0;
+  return (_has_bits_[0] & 0x00004000u) != 0;
 }
 inline void Instruction::set_has_ext_data_name() {
-  _has_bits_[0] |= 0x00000800u;
+  _has_bits_[0] |= 0x00004000u;
 }
 inline void Instruction::clear_has_ext_data_name() {
-  _has_bits_[0] &= ~0x00000800u;
+  _has_bits_[0] &= ~0x00004000u;
 }
 inline void Instruction::clear_ext_data_name() {
   if (ext_data_name_ != &::google::protobuf::internal::kEmptyString) {
@@ -4030,13 +4191,13 @@ inline void Instruction::set_allocated_ext_data_name(::std::string* ext_data_nam
 
 // optional int32 system_call_number = 13;
 inline bool Instruction::has_system_call_number() const {
-  return (_has_bits_[0] & 0x00001000u) != 0;
+  return (_has_bits_[0] & 0x00008000u) != 0;
 }
 inline void Instruction::set_has_system_call_number() {
-  _has_bits_[0] |= 0x00001000u;
+  _has_bits_[0] |= 0x00008000u;
 }
 inline void Instruction::clear_has_system_call_number() {
-  _has_bits_[0] &= ~0x00001000u;
+  _has_bits_[0] &= ~0x00008000u;
 }
 inline void Instruction::clear_system_call_number() {
   system_call_number_ = 0;
@@ -4052,13 +4213,13 @@ inline void Instruction::set_system_call_number(::google::protobuf::int32 value)
 
 // optional bool local_noreturn = 14;
 inline bool Instruction::has_local_noreturn() const {
-  return (_has_bits_[0] & 0x00002000u) != 0;
+  return (_has_bits_[0] & 0x00010000u) != 0;
 }
 inline void Instruction::set_has_local_noreturn() {
-  _has_bits_[0] |= 0x00002000u;
+  _has_bits_[0] |= 0x00010000u;
 }
 inline void Instruction::clear_has_local_noreturn() {
-  _has_bits_[0] &= ~0x00002000u;
+  _has_bits_[0] &= ~0x00010000u;
 }
 inline void Instruction::clear_local_noreturn() {
   local_noreturn_ = false;
@@ -4362,15 +4523,37 @@ inline void ExternalFunction::set_argument_count(::google::protobuf::int32 value
   argument_count_ = value;
 }
 
-// optional string signature = 6;
-inline bool ExternalFunction::has_signature() const {
+// required bool is_weak = 6;
+inline bool ExternalFunction::has_is_weak() const {
   return (_has_bits_[0] & 0x00000020u) != 0;
 }
-inline void ExternalFunction::set_has_signature() {
+inline void ExternalFunction::set_has_is_weak() {
   _has_bits_[0] |= 0x00000020u;
 }
-inline void ExternalFunction::clear_has_signature() {
+inline void ExternalFunction::clear_has_is_weak() {
   _has_bits_[0] &= ~0x00000020u;
+}
+inline void ExternalFunction::clear_is_weak() {
+  is_weak_ = false;
+  clear_has_is_weak();
+}
+inline bool ExternalFunction::is_weak() const {
+  return is_weak_;
+}
+inline void ExternalFunction::set_is_weak(bool value) {
+  set_has_is_weak();
+  is_weak_ = value;
+}
+
+// optional string signature = 7;
+inline bool ExternalFunction::has_signature() const {
+  return (_has_bits_[0] & 0x00000040u) != 0;
+}
+inline void ExternalFunction::set_has_signature() {
+  _has_bits_[0] |= 0x00000040u;
+}
+inline void ExternalFunction::clear_has_signature() {
+  _has_bits_[0] &= ~0x00000040u;
 }
 inline void ExternalFunction::clear_signature() {
   if (signature_ != &::google::protobuf::internal::kEmptyString) {
@@ -4526,6 +4709,28 @@ inline ::google::protobuf::int32 ExternalData::data_size() const {
 inline void ExternalData::set_data_size(::google::protobuf::int32 value) {
   set_has_data_size();
   data_size_ = value;
+}
+
+// required bool is_weak = 3;
+inline bool ExternalData::has_is_weak() const {
+  return (_has_bits_[0] & 0x00000004u) != 0;
+}
+inline void ExternalData::set_has_is_weak() {
+  _has_bits_[0] |= 0x00000004u;
+}
+inline void ExternalData::clear_has_is_weak() {
+  _has_bits_[0] &= ~0x00000004u;
+}
+inline void ExternalData::clear_is_weak() {
+  is_weak_ = false;
+  clear_has_is_weak();
+}
+inline bool ExternalData::is_weak() const {
+  return is_weak_;
+}
+inline void ExternalData::set_is_weak(bool value) {
+  set_has_is_weak();
+  is_weak_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -7148,6 +7353,10 @@ Disassembly::mutable_func() {
 namespace google {
 namespace protobuf {
 
+template <>
+inline const EnumDescriptor* GetEnumDescriptor< ::Instruction_RefType>() {
+  return ::Instruction_RefType_descriptor();
+}
 template <>
 inline const EnumDescriptor* GetEnumDescriptor< ::ExternalFunction_CallingConvention>() {
   return ::ExternalFunction_CallingConvention_descriptor();
