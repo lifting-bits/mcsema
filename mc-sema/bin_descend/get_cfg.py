@@ -450,6 +450,54 @@ def isExternalData(fn):
         return False
 
 
+def sanityCheckJumpTableSize(table_ea, ecount):
+    """ IDA doesn't correctly calculate some  jump table sizes """
+    if not isLinkedElf():
+        return ecount
+
+    if getBitness() != 64:
+        return ecount
+
+    table_insn = idautils.DecodeInstruction(table_ea)
+    if table_insn is None:
+        DEBUG("Could not decode instruction at {:x}\n".format(table_insn))
+        return ecount
+
+    if table_insn.Operands[0].type != idc.o_reg:
+        return ecount
+
+    DEBUG("Sanity checking table at {:x}\n".format(table_ea))
+
+    # get register we jump with
+    jmp_reg = table_insn.Operands[0].value
+
+    inst_ea = table_ea
+    # walk back up to 5 instructions
+    for i in xrange(5):
+        # walk back a few instructions until we find a cmp
+        inst_ea = idc.PrevHead(inst_ea)
+        if inst_ea == idc.BADADDR:
+            return ecount
+        inst = idautils.DecodeInstruction(inst_ea)
+        if inst is None:
+            return ecount
+        if inst.itype == idaapi.NN_cmp and inst.Operands[0].type == idc.o_reg:
+            # check if reg in cmp == reg we jump with
+            if jmp_reg == inst.Operands[0].value:
+                # check if the CMP is with an immediate
+                if inst.Operands[1].type == idc.o_imm:
+                    # the immediate is our new count
+                    # the comaprison is vs the max case#, but the cases start at 0, so add 1
+                    # to get case count
+                    new_count = 1 + inst.Operands[1].value
+                    # compare to ecount. Take the bigger value.
+                    if new_count > ecount:
+                        DEBUG("Overriding old JMP count of {} with {} for table at {:x}\n".format(ecount, new_count, table_ea))
+                        return new_count
+            return ecount
+
+    return ecount
+
 def handleJmpTable(I, inst, new_eas):
     si = idaapi.get_switch_info_ex(inst)
     jsize = si.get_jtable_element_size()
@@ -474,6 +522,7 @@ def handleJmpTable(I, inst, new_eas):
     I.jump_table.zero_offset = 0
     i = 0
     entries = si.get_jtable_size()
+    entires = sanityCheckJumpTableSize(inst, entries)
     for i in xrange(entries):
         je = readers[jsize](jstart+i*jsize)
         I.jump_table.table_entries.append(je)
@@ -1642,6 +1691,7 @@ def preprocessBinary():
                     esize = si.get_jtable_element_size()
                     base = si.jumps
                     count = si.get_jtable_size()
+                    count = sanityCheckJumpTableSize(head, count)
                     for i in xrange(count):
                         fulladdr = base+i*esize
                         DEBUG("Address accessed via JMP: {:x}\n".format(fulladdr))
