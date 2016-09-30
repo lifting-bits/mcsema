@@ -528,6 +528,7 @@ def handleJmpTable(I, inst, new_eas):
         I.jump_table.table_entries.append(je)
         if je not in RECOVERED_EAS and isStartOfFunction(je):
             new_eas.add(je)
+
         DEBUG("\t\tAdding JMPTable {0}: {1:x}\n".format(i, je))
     #je = idc.GetFixupTgtOff(jstart+i*jsize)
     #while je != -1:
@@ -1689,13 +1690,22 @@ def preprocessBinary():
                 if si is not None and isUnconditionalJump(head):
                     DEBUG("Found a jmp based switch at: {0:x}\n".format(head))
                     esize = si.get_jtable_element_size()
+                    readers = { 4: readDword,
+                                8: readQword }
                     base = si.jumps
                     count = si.get_jtable_size()
                     count = sanityCheckJumpTableSize(head, count)
+                    jmp_refs = set(idautils.CodeRefsFrom(head, 1))
                     for i in xrange(count):
                         fulladdr = base+i*esize
                         DEBUG("Address accessed via JMP: {:x}\n".format(fulladdr))
                         ACCESSED_VIA_JMP.add(fulladdr)
+                        je = readers[esize](fulladdr)
+                        if je not in jmp_refs:
+                            jmp_refs.add(je)
+                            DEBUG("\t\tJMPTable entry not in original; adding ref {:x} => {:x}".format(head, je))
+                            idc.AddCodeXref(head, je, idc.XREF_USER|idc.fl_F)
+                            mark_as_code(je)
             if PIE_MODE:
                 # convert all immediate operand location references to numbers
                 inslen = idaapi.decode_insn(head)
