@@ -522,7 +522,7 @@ def handleJmpTable(I, inst, new_eas):
     I.jump_table.zero_offset = 0
     i = 0
     entries = si.get_jtable_size()
-    entires = sanityCheckJumpTableSize(inst, entries)
+    entries = sanityCheckJumpTableSize(inst, entries)
     for i in xrange(entries):
         je = readers[jsize](jstart+i*jsize)
         I.jump_table.table_entries.append(je)
