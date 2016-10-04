@@ -31,6 +31,7 @@ def xrange(begin, end=None, step=1):
         return iter(itertools.count().next, begin)
 
 _DEBUG = False
+_DEBUG_FILE = sys.stderr
 
 EXTERNALS = set()
 DATA_SEGMENTS = {}
@@ -120,9 +121,9 @@ EXTERNAL_DATA_COMMENTS = [
         ]
 
 def DEBUG(s):
+    global _DEBUG, _DEBUG_FILE
     if _DEBUG:
-        #syslog.syslog(str(s))
-        sys.stderr.write(str(s))
+        _DEBUG_FILE.write(str(s))
 
 def hasExternalDataComment(ea):
     cmt = idc.GetCommentEx(ea, 0)
@@ -152,7 +153,7 @@ def readQword(ea):
     return qword
 
 def isLinkedElf():
-    return idc.GetLongPrm(INF_FILETYPE) == idc.FT_ELF and \
+    return idc.GetLongPrm(idc.INF_FILETYPE) == idc.FT_ELF and \
         idc.BeginEA() not in [0xffffffffL, 0xffffffffffffffffL]
 
 def IsString(ea):
@@ -1988,6 +1989,10 @@ if __name__ == "__main__":
         default=False,
         help="Enable verbose debugging mode"
         )
+    parser.add_argument("--debug_output", type=argparse.FileType('w'),
+        default=sys.stderr,
+        help="Log to a specific file. Default is stderr."
+        )
     
     parser.add_argument("-z", "--syms", type=argparse.FileType('r'), default=None,
         help="File containing <name> <address> pairs of symbols to pre-define."
@@ -2000,18 +2005,23 @@ if __name__ == "__main__":
 
     if args.debug:
         _DEBUG = True
+        _DEBUG_FILE = args.debug_output
+        DEBUG("Debugging is enabled.")
 
     if args.pie_mode:
+        DEBUG("Using PIE mode.")
         PIE_MODE = True
 
     # for batch mode: ensure IDA is done processing
     if args.batch:
+        DEBUG("Using Batch mode.")
         analysis_flags = idc.GetShortPrm(idc.INF_START_AF)
         analysis_flags &= ~idc.AF_IMMOFF
         # turn off "automatically make offset" heuristic
         idc.SetShortPrm(idc.INF_START_AF, analysis_flags)
         idaapi.autoWait()
 
+    DEBUG("Starting analysis")
     try:
         # Pre-define a bunch of symbol names and their addresses. Useful when reading
         # a core dump.
