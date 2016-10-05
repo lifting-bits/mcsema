@@ -43,6 +43,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <cstdint>
 #include <boost/filesystem.hpp>
 #include "../common/to_string.h"
 #include "../common/Defaults.h"
@@ -112,7 +113,7 @@ NativeModulePtr makeNativeModule( ExecutableContainer *exc,
   if(EntryPoint.size()) {
       for(unsigned i = 0; i < EntryPoint.size(); i++) {
           //get the entry point from the command line 
-          ::uint64_t      tmp = 0;
+          std::uint64_t      tmp = 0;
           std::string ep = EntryPoint[i];
           stringstream  ss;
           if(ep.size() > 2 && ep[0] == '0' && ep[1] == 'x') {
@@ -170,7 +171,7 @@ NativeModulePtr makeNativeModule( ExecutableContainer *exc,
           entryPoints.push_back(it->second);
       }
 
-      ::uint64_t file_ep;
+      std::uint64_t file_ep;
       if(exc->getEntryPoint(file_ep)) {
           entryPoints.push_back(file_ep);
       }
@@ -327,7 +328,7 @@ int main(int argc, char *argv[]) {
 
   //sanity
   if(EntrySymbol.size() == 0 && EntryPoint.size() == 0) {
-      ::uint64_t file_ep;
+      std::uint64_t file_ep;
       // maybe this file format specifies an entry point?
       if(false == exc->getEntryPoint(file_ep)) {
           //We don't know which entry point to use!
