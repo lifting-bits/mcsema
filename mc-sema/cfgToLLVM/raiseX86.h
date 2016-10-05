@@ -318,7 +318,7 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
   //if the width requested is less than the native bitwidth,
   //then we need to truncate the read
   int regwidth = x86_64::REG_SIZE;
-  if (reg >= llvm::X86::XMM0 && reg <= llvm::X86::XMM7) {
+  if (reg >= llvm::X86::XMM0 && reg <= llvm::X86::XMM15) {
     regwidth = 128;
   }
 
@@ -358,7 +358,7 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
     throw TErr(__LINE__, __FILE__, "Could not find register");
 
   int regwidth = x86_64::REG_SIZE;
-  if (reg >= llvm::X86::XMM0 && reg <= llvm::X86::XMM7) {
+  if (reg >= llvm::X86::XMM0 && reg <= llvm::X86::XMM15) {
     regwidth = 128;
   }
 
