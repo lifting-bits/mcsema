@@ -56,7 +56,7 @@ Value* getGlobalRegAsPtr(BasicBlock *B, MCSemaRegs reg)
     Value *arg = F->arg_begin();
 
     int globalRegsOff = getSystemArch(M) == _X86_?
-    		x86::getRegisterOffset(reg) : x86_64::getRegisterOffset(reg);
+            x86::getRegisterOffset(reg) : x86_64::getRegisterOffset(reg);
 
     Value *globalGlobalGEPV[] = {
         CONST_V(B, regWidth, 0),
@@ -85,7 +85,7 @@ Value* getLocalRegAsPtr(BasicBlock *B, MCSemaRegs reg)
     unsigned int regWidth = getPointerSize(M);
 
     Value *localReg = getSystemArch(M) == _X86_?
-    		x86::lookupLocal(F, reg) : x86_64::lookupLocal(F, reg);
+            x86::lookupLocal(F, reg) : x86_64::lookupLocal(F, reg);
 
     // Need to get pointer to array[0] via GEP.
     Value *localGEP[] = {
@@ -249,6 +249,14 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             STORE_SAMEWIDTH(XMM5);
             STORE_SAMEWIDTH(XMM6);
             STORE_SAMEWIDTH(XMM7);
+            STORE_SAMEWIDTH(XMM8);
+            STORE_SAMEWIDTH(XMM9);
+            STORE_SAMEWIDTH(XMM10);
+            STORE_SAMEWIDTH(XMM11);
+            STORE_SAMEWIDTH(XMM12);
+            STORE_SAMEWIDTH(XMM13);
+            STORE_SAMEWIDTH(XMM14);
+            STORE_SAMEWIDTH(XMM15);
 
             // stack base and limit
             STORE_SAMEWIDTH(STACK_BASE);
@@ -258,7 +266,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
 #undef STORE
 #undef STORE_F
 #undef STORE_SAMEWIDTH
-		case 64:
+        case 64:
         {
 #define STORE(nm, nm_in) {\
             std::string regnm = x86_64::getRegisterName(nm);\
@@ -321,18 +329,18 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             STORE_F(OF);
             STORE_F(DF);
 
-			// FPU registers are generally avoided on 64bit system
-		    // SOURCE: get pointer to FPU locals
+            // FPU registers are generally avoided on 64bit system
+            // SOURCE: get pointer to FPU locals
             Value *localFPU = getLocalFPURegsAsPtr(B);
             // DEST: get pointer to FPU globals
             Value *globalFPU = getGlobalFPURegsAsPtr(B);
 
-			DataLayout  td(static_cast<Module*>(F->getParent()));
+            DataLayout  td(static_cast<Module*>(F->getParent()));
             uint32_t fpu_arr_size =
                 (uint32_t)td.getTypeAllocSize(
                         Type::getX86_FP80Ty(B->getContext())) * NUM_FPU_REGS;
 
-			Instruction *mcp_fpu = aliasMCSemaScope(callMemcpy(B, globalFPU, localFPU, fpu_arr_size, 8, false));
+            Instruction *mcp_fpu = aliasMCSemaScope(callMemcpy(B, globalFPU, localFPU, fpu_arr_size, 8, false));
 
             STORE_F(FPU_B);
             STORE_F(FPU_C3);
@@ -364,7 +372,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             STORE_F(FPU_DM);
             STORE_F(FPU_IM);
 
-			            // SOURCE: get pointer to local tag word
+                        // SOURCE: get pointer to local tag word
             Value *localTag = getLocalRegAsPtr(B, FPU_TAG);
             // DEST: get pointer to FPU globals
             Value *globalTag = getGlobalRegAsPtr(B, FPU_TAG);
@@ -374,9 +382,9 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
                 (uint32_t)td.getTypeAllocSize(
                         Type::getIntNTy(B->getContext(), 2)) * NUM_FPU_REGS;
 
-			Instruction *mcp = aliasMCSemaScope(callMemcpy(B, globalTag, localTag, tags_arr_size, 4, false));
+            Instruction *mcp = aliasMCSemaScope(callMemcpy(B, globalTag, localTag, tags_arr_size, 4, false));
 
-			// last IP segment is a 16-bit value
+            // last IP segment is a 16-bit value
             STORE_F(FPU_LASTIP_SEG);
             // 32-bit register not in X86 Namespace
             STORE_SAMEWIDTH(FPU_LASTIP_OFF);
@@ -385,7 +393,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             // 32-bit register not in X86 Namespace
             STORE_SAMEWIDTH(FPU_LASTDATA_OFF);
 
-           // STORE_F(FPU_FOPCODE);
+            STORE_F(FPU_FOPCODE);
 
             //vector instrs
             STORE_SAMEWIDTH(XMM0);
@@ -396,14 +404,14 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             STORE_SAMEWIDTH(XMM5);
             STORE_SAMEWIDTH(XMM6);
             STORE_SAMEWIDTH(XMM7);
-			STORE_SAMEWIDTH(XMM8);
-			STORE_SAMEWIDTH(XMM9);
-			STORE_SAMEWIDTH(XMM10);
-			STORE_SAMEWIDTH(XMM11);
-			STORE_SAMEWIDTH(XMM12);
-			STORE_SAMEWIDTH(XMM13);
-			STORE_SAMEWIDTH(XMM14);
-			STORE_SAMEWIDTH(XMM15);
+            STORE_SAMEWIDTH(XMM8);
+            STORE_SAMEWIDTH(XMM9);
+            STORE_SAMEWIDTH(XMM10);
+            STORE_SAMEWIDTH(XMM11);
+            STORE_SAMEWIDTH(XMM12);
+            STORE_SAMEWIDTH(XMM13);
+            STORE_SAMEWIDTH(XMM14);
+            STORE_SAMEWIDTH(XMM15);
 
 
             // stack base and limit
@@ -411,7 +419,7 @@ void writeLocalsToContext(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             STORE_SAMEWIDTH(STACK_LIMIT);
         }
 #undef STORE
-		break;
+        break;
         default:
           throw TErr(__LINE__, __FILE__, to_string<unsigned>(bits, dec)+"-bit not implemented yet");
     }
@@ -435,34 +443,37 @@ void writeContextToLocals(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             //do a GEP on the 'regs' structure for the appropriate field offset
             //then do a 'load' from that GEP into a temp and then a
             //'store' into the appropriate value
-#define SPILL_F_N(nm, nbits) { \
-        std::string regnm = x86::getRegisterName(nm);\
-		Value   *localVal = x86::lookupLocal(F, nm); \
-                 if( localVal == NULL ) \
-                  throw TErr(__LINE__, __FILE__, "Could not find val"+regnm); \
-                int     off = x86::getRegisterOffset(nm); \
-                Value   *GEPV[] =  \
-                    { ConstantInt::get(Type::getInt32Ty(B->getContext()), 0), \
-                    ConstantInt::get(Type::getInt32Ty(B->getContext()), off)}; \
-                Instruction *GEP = GetElementPtrInst::CreateInBounds(arg, \
-                    GEPV, regnm, B); \
-                LoadInst *li = new LoadInst(GEP, "", B);\
-                if(nbits != 32) {\
-                    li->setAlignment(1);\
-                }\
-                Instruction   *T = aliasMCSemaScope(li); \
-                Value   *truncI  = NULL; \
-                if(!T->getType()->isIntegerTy(nbits)) \
-                { \
-                    truncI = new TruncInst(T, Type::getIntNTy(B->getContext(), nbits), "", B); \
-                } \
-                else  \
-                { \
-                    truncI = T; \
-                }\
-                Instruction *W = aliasMCSemaScope(new StoreInst(truncI, localVal, B)); \
-                TASSERT( W != NULL, "" ); \
-            }
+#define SPILL_F_N(nm, nbits) \
+    do { \
+        std::string regnm = x86::getRegisterName(nm); \
+        Value *localVal = x86::lookupLocal(F, nm); \
+        if( localVal == NULL ) { \
+            throw TErr(__LINE__, __FILE__, "Could not find val"+regnm); \
+        } \
+        int off = x86::getRegisterOffset(nm); \
+        Value *GEPV[] = { \
+            ConstantInt::get(Type::getInt32Ty(B->getContext()), 0), \
+            ConstantInt::get(Type::getInt32Ty(B->getContext()), off) \
+        }; \
+        Instruction *GEP = GetElementPtrInst::CreateInBounds(arg, GEPV, regnm, B); \
+        LoadInst *li = new LoadInst(GEP, "", B); \
+        if(nbits != 32) { \
+            li->setAlignment(1); \
+        } \
+        Instruction *T = aliasMCSemaScope(li); \
+        Value *truncI  = NULL; \
+        DataLayout DL(F->getParent()); \
+        size_t alloc_size = DL.getTypeSizeInBits(T->getType()); \
+        if (alloc_size > nbits) { \
+            truncI = new TruncInst(T, Type::getIntNTy(B->getContext(), nbits), "", B); \
+        } else if (alloc_size < nbits) { \
+            truncI = new ZExtInst(T, Type::getIntNTy(B->getContext(), nbits), "", B); \
+        } else { \
+            truncI = T; \
+        } \
+        Instruction *W = aliasMCSemaScope(new StoreInst(truncI, localVal, B)); \
+        TASSERT( W != NULL, "" ); \
+    } while (false)
 
 #define SPILL_F(nm) SPILL_F_N(nm, 1)
 #define SPILL(nm) SPILL_F_N(nm, 32)
@@ -560,6 +571,14 @@ void writeContextToLocals(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
             SPILL_F_N(XMM5, 128);
             SPILL_F_N(XMM6, 128);
             SPILL_F_N(XMM7, 128);
+            SPILL_F_N(XMM8, 128);
+            SPILL_F_N(XMM9, 128);
+            SPILL_F_N(XMM10, 128);
+            SPILL_F_N(XMM11, 128);
+            SPILL_F_N(XMM12, 128);
+            SPILL_F_N(XMM13, 128);
+            SPILL_F_N(XMM14, 128);
+            SPILL_F_N(XMM15, 128);
 
             // stack base and limit
             SPILL(STACK_BASE);
@@ -571,35 +590,39 @@ void writeContextToLocals(BasicBlock *B, unsigned bits, StoreSpillType whichRegs
 #undef SPILL
 
         case 64:
-		{
-#define SPILL_F_N(nm, nbits) { \
-std::string regnm = x86_64::getRegisterName(nm); \
-		Value   *localVal = x86_64::lookupLocal(F, nm); \
-		if( localVal == NULL ) \
-			throw TErr(__LINE__, __FILE__, "Could not find val"+regnm); \
-		int     off = x86_64::getRegisterOffset(nm); \
-		Value   *GEPV[] =  \
-			{ ConstantInt::get(Type::getInt64Ty(B->getContext()), 0), \
-			ConstantInt::get(Type::getInt32Ty(B->getContext()), off)}; \
-		Instruction *GEP = GetElementPtrInst::CreateInBounds(arg, \
-                    GEPV, regnm, B); \
-		LoadInst *li = new LoadInst(GEP, "", B);\
-		if(nbits != 64) {\
-			li->setAlignment(1);\
-		}\
-		Instruction   *T = aliasMCSemaScope(li); \
-		Value   *truncI  = NULL; \
-		if(!T->getType()->isIntegerTy(nbits)) \
-		{ \
-			truncI = new TruncInst(T, Type::getIntNTy(B->getContext(), nbits), "", B); \
-		} \
-		else  \
-		{ \
-			truncI = T; \
-		}\
-		Instruction *W = aliasMCSemaScope(new StoreInst(truncI, localVal, B)); \
-		TASSERT( W != NULL, "" ); \
-		}
+        {
+
+#define SPILL_F_N(nm, nbits) \
+    do { \
+        std::string regnm = x86_64::getRegisterName(nm); \
+        Value *localVal = x86_64::lookupLocal(F, nm); \
+        if( localVal == NULL ) { \
+            throw TErr(__LINE__, __FILE__, "Could not find val"+regnm); \
+        } \
+        int off = x86_64::getRegisterOffset(nm); \
+        Value *GEPV[] = { \
+            ConstantInt::get(Type::getInt64Ty(B->getContext()), 0), \
+            ConstantInt::get(Type::getInt32Ty(B->getContext()), off) \
+        }; \
+        Instruction *GEP = GetElementPtrInst::CreateInBounds(arg, GEPV, regnm, B); \
+        LoadInst *li = new LoadInst(GEP, "", B); \
+        if(nbits != 64) { \
+            li->setAlignment(1); \
+        } \
+        Instruction *T = aliasMCSemaScope(li); \
+        Value *truncI = NULL; \
+        DataLayout DL(F->getParent()); \
+        size_t alloc_size = DL.getTypeSizeInBits(T->getType()); \
+        if (alloc_size > nbits) { \
+            truncI = new TruncInst(T, Type::getIntNTy(B->getContext(), nbits), "", B); \
+        } else if (alloc_size < nbits) { \
+            truncI = new ZExtInst(T, Type::getIntNTy(B->getContext(), nbits), "", B); \
+        } else { \
+            truncI = T; \
+        } \
+        Instruction *W = aliasMCSemaScope(new StoreInst(truncI, localVal, B)); \
+        TASSERT( W != NULL, "" ); \
+    } while (false)
 
 #define SPILL_F(nm) SPILL_F_N(nm, 1)
 #define SPILL(nm) SPILL_F_N(nm, 64)
@@ -632,9 +655,9 @@ std::string regnm = x86_64::getRegisterName(nm); \
             SPILL_F(DF);
 
             // FPU registers doesn't get used on 64bit platform;
-			// we are not spilling them
+            // we are not spilling them
 
-			            // SOURCE: get pointer to FPU globals
+                        // SOURCE: get pointer to FPU globals
             Value *globalFPU = getGlobalFPURegsAsPtr(B);
             // DEST: get pointer to FPU locals
             Value *localFPU = getLocalFPURegsAsPtr(B);
@@ -662,7 +685,7 @@ std::string regnm = x86_64::getRegisterName(nm); \
             SPILL_F(FPU_DE);
             SPILL_F(FPU_IE);
 
-			// FPU CONTROL WORD
+            // FPU CONTROL WORD
             SPILL_F(FPU_X);
             SPILL_F_N(FPU_RC, 2);
             SPILL_F_N(FPU_PC, 2);
@@ -686,15 +709,15 @@ std::string regnm = x86_64::getRegisterName(nm); \
 
             Instruction *mcp_tag = aliasMCSemaScope(callMemcpy(B, localTag, globalTag, tags_arr_size, 4, false));
 
-			// fpu last instruction ptr
+            // fpu last instruction ptr
             SPILL_F_N(FPU_LASTIP_SEG, 16);
             SPILL_F_N(FPU_LASTIP_OFF, 64);
             // fpu last data ptr
-			SPILL_F_N(FPU_LASTDATA_SEG, 16);
-			SPILL_F_N(FPU_LASTDATA_OFF, 64);
+            SPILL_F_N(FPU_LASTDATA_SEG, 16);
+            SPILL_F_N(FPU_LASTDATA_OFF, 64);
 
             // last FPU opcode
-			SPILL_F_N(FPU_FOPCODE, 11);
+            SPILL_F_N(FPU_FOPCODE, 11);
 
             //write vector regs out
             SPILL_F_N(XMM0, 128);
@@ -705,14 +728,14 @@ std::string regnm = x86_64::getRegisterName(nm); \
             SPILL_F_N(XMM5, 128);
             SPILL_F_N(XMM6, 128);
             SPILL_F_N(XMM7, 128);
-			SPILL_F_N(XMM8, 128);
-			SPILL_F_N(XMM9, 128);
-			SPILL_F_N(XMM10, 128);
-			SPILL_F_N(XMM11, 128);
-			SPILL_F_N(XMM12, 128);
-			SPILL_F_N(XMM13, 128);
-			SPILL_F_N(XMM14, 128);
-			SPILL_F_N(XMM15, 128);
+            SPILL_F_N(XMM8, 128);
+            SPILL_F_N(XMM9, 128);
+            SPILL_F_N(XMM10, 128);
+            SPILL_F_N(XMM11, 128);
+            SPILL_F_N(XMM12, 128);
+            SPILL_F_N(XMM13, 128);
+            SPILL_F_N(XMM14, 128);
+            SPILL_F_N(XMM15, 128);
 
             // stack base and limit
             SPILL(STACK_BASE);

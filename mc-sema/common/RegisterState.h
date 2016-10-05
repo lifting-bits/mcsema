@@ -385,7 +385,6 @@ typedef struct _RegState {
     xmmregstate      XMM5;
     xmmregstate      XMM6;
     xmmregstate      XMM7;
-#ifdef __x86_64__
     xmmregstate      XMM8;
     xmmregstate      XMM9;
     xmmregstate      XMM10;
@@ -394,8 +393,6 @@ typedef struct _RegState {
     xmmregstate      XMM13;
     xmmregstate      XMM14;
     xmmregstate      XMM15;
-#endif
-
 
     // not registers, but necessary to support calls
     // via register/memory

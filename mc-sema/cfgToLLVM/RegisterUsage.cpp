@@ -105,8 +105,16 @@ std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP {
     {XMM5, {50, "XMM5"}},
     {XMM6, {51, "XMM6"}},
     {XMM7, {52, "XMM7"}},
-    {STACK_BASE, {53, "STACK_BASE"}},
-    {STACK_LIMIT, {54, "STACK_LIMIT"}}
+    {XMM8, {53, "XMM8"}},
+    {XMM9, {54, "XMM9"}},
+    {XMM10, {55, "XMM10"}},
+    {XMM11, {56, "XMM11"}},
+    {XMM12, {57, "XMM12"}},
+    {XMM13, {58, "XMM13"}},
+    {XMM14, {59, "XMM14"}},
+    {XMM15, {60, "XMM15"}},
+    {STACK_BASE, {61, "STACK_BASE"}},
+    {STACK_LIMIT, {62, "STACK_LIMIT"}},
 };
 
 StringRef getRegisterName(MCSemaRegs reg) {
@@ -194,6 +202,14 @@ int mapPlatRegToOffset(unsigned reg) {
         case X86::XMM5:
         case X86::XMM6:
         case X86::XMM7:
+        case X86::XMM8:
+        case X86::XMM9:
+        case X86::XMM10:
+        case X86::XMM11:
+        case X86::XMM12:
+        case X86::XMM13:
+        case X86::XMM14:
+        case X86::XMM15:
             return 0;
             break;
         default:
@@ -239,6 +255,32 @@ Value *MCRegToValue(BasicBlock *b, unsigned reg) {
         case X86::BP:
             realReg = X86::EBP;
             break;
+        case X86::RAX:
+            realReg = X86::EAX;
+            break;
+        case X86::RBX:
+            realReg = X86::EBX;
+            break;
+        case X86::RCX:
+            realReg = X86::ECX;
+            break;
+        case X86::RDX:
+            realReg = X86::EDX;
+            break;
+        case X86::RDI:
+            realReg = X86::EDI;
+            break;
+        case X86::RSI:
+            realReg = X86::ESI;
+            break;
+        case X86::RBP:
+            realReg = X86::EBP;
+        case X86::RSP:
+            realReg = X86::ESP;
+            break;
+        case X86::RIP:
+            realReg = X86::EIP;
+            break;
         default:
             break;
     }
@@ -251,32 +293,32 @@ Value *MCRegToValue(BasicBlock *b, unsigned reg) {
 namespace x86_64 {
 std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP {
     {EAX, {0, "RAX"}},
-	{RAX, {0, "RAX"}},
-	{EBX, {1, "RBX"}},
+    {RAX, {0, "RAX"}},
+    {EBX, {1, "RBX"}},
     {RBX, {1, "RBX"}},
-	{ECX, {2, "RCX"}},
+    {ECX, {2, "RCX"}},
     {RCX, {2, "RCX"}},
-	{EDX, {3, "RDX"}},
+    {EDX, {3, "RDX"}},
     {RDX, {3, "RDX"}},
     {SIL, {4, "RSI"}},
-	{ESI, {4, "RSI"}},
+    {ESI, {4, "RSI"}},
     {RSI, {4, "RSI"}},
     {DIL, {5, "RDI"}},
-	{EDI, {5, "RDI"}},
+    {EDI, {5, "RDI"}},
     {RDI, {5, "RDI"}},
-	{ESP, {6, "RSP"}},
+    {ESP, {6, "RSP"}},
     {RSP, {6, "RSP"}},
-	{EBP, {7, "RBP"}},
+    {EBP, {7, "RBP"}},
     {RBP, {7, "RBP"}},
-	{R8,  {8, "R8"}},
-	{R9,  {9, "R9"}},
-	{R10, {10, "R10"}},
-	{R11, {11, "R11"}},
-	{R12, {12, "R12"}},
-	{R13, {13, "R13"}},
-	{R14, {14, "R14"}},
-	{R15, {15, "R15"}},
-	{RIP, {16, "RIP"}},
+    {R8,  {8, "R8"}},
+    {R9,  {9, "R9"}},
+    {R10, {10, "R10"}},
+    {R11, {11, "R11"}},
+    {R12, {12, "R12"}},
+    {R13, {13, "R13"}},
+    {R14, {14, "R14"}},
+    {R15, {15, "R15"}},
+    {RIP, {16, "RIP"}},
     {CF, {17, "CF"}},
     {PF, {18, "PF"}},
     {AF, {19, "AF"}},
@@ -329,7 +371,7 @@ std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP {
     {XMM5, {59, "XMM5"}},
     {XMM6, {60, "XMM6"}},
     {XMM7, {61, "XMM7"}},
-	{XMM8, {62, "XMM8"}},
+    {XMM8, {62, "XMM8"}},
     {XMM9, {63, "XMM9"}},
     {XMM10, {64, "XMM10"}},
     {XMM11, {65, "XMM11"}},
@@ -382,18 +424,18 @@ Value *lookupLocal(Function *F, MCSemaRegs reg) {
 
 int mapPlatRegToOffset(unsigned reg) {
     switch(reg) {
-        case X86::DH: 	case X86::CH:	case X86::BH: 	case X86::AH:
+        case X86::DH:     case X86::CH:    case X86::BH:     case X86::AH:
             return 8;
             break;
-        case X86::AX:	case X86::AL:	case X86::EAX:	case X86::RAX:
-        case X86::BX:	case X86::BL:	case X86::EBX:	case X86::RBX:
-        case X86::CX:   case X86::CL:   case X86::ECX:	case X86::RCX:
-        case X86::DX:	case X86::DL:	case X86::EDX:	case X86::RDX:
-		case X86::SIL:  case X86::SI:   case X86::ESI:	case X86::RSI:
-		case X86::DIL:  case X86::DI:   case X86::EDI:	case X86::RDI:
-		case X86::SPL:  case X86::SP:   case X86::ESP:	case X86::RSP:
-		case X86::BPL:  case X86::BP:   case X86::EBP:	case X86::RBP:
-		case X86::R8B:	case X86::R8W:	case X86::R8D:	case X86::R8:
+        case X86::AX:    case X86::AL:    case X86::EAX:    case X86::RAX:
+        case X86::BX:    case X86::BL:    case X86::EBX:    case X86::RBX:
+        case X86::CX:   case X86::CL:   case X86::ECX:    case X86::RCX:
+        case X86::DX:    case X86::DL:    case X86::EDX:    case X86::RDX:
+        case X86::SIL:  case X86::SI:   case X86::ESI:    case X86::RSI:
+        case X86::DIL:  case X86::DI:   case X86::EDI:    case X86::RDI:
+        case X86::SPL:  case X86::SP:   case X86::ESP:    case X86::RSP:
+        case X86::BPL:  case X86::BP:   case X86::EBP:    case X86::RBP:
+        case X86::R8B:    case X86::R8W:    case X86::R8D:    case X86::R8:
         case X86::R9B:  case X86::R9W:  case X86::R9D:  case X86::R9:
         case X86::R10B: case X86::R10W: case X86::R10D: case X86::R10:
         case X86::R11B: case X86::R11W: case X86::R11D: case X86::R11:
@@ -403,13 +445,13 @@ int mapPlatRegToOffset(unsigned reg) {
         case X86::R15B: case X86::R15W: case X86::R15D: case X86::R15:
 
 
-        case X86::ST0:	case X86::ST1:	case X86::ST2:	case X86::ST3:
-        case X86::ST4:	case X86::ST5:	case X86::ST6:	case X86::ST7:
+        case X86::ST0:    case X86::ST1:    case X86::ST2:    case X86::ST3:
+        case X86::ST4:    case X86::ST5:    case X86::ST6:    case X86::ST7:
 
-        case X86::XMM0:	case X86::XMM1:	case X86::XMM2:	case X86::XMM3:
+        case X86::XMM0:    case X86::XMM1:    case X86::XMM2:    case X86::XMM3:
         case X86::XMM4: case X86::XMM5: case X86::XMM6: case X86::XMM7:
-		case X86::XMM8:	case X86::XMM9:	case X86::XMM10:case X86::XMM11:
-		case X86::XMM12:case X86::XMM13:case X86::XMM14:case X86::XMM15:
+        case X86::XMM8:    case X86::XMM9:    case X86::XMM10:case X86::XMM11:
+        case X86::XMM12:case X86::XMM13:case X86::XMM14:case X86::XMM15:
             return 0;
             break;
         default:
@@ -423,54 +465,54 @@ Value *MCRegToValue(BasicBlock *b, unsigned reg) {
     unsigned realReg = reg;
     switch(reg)
     {
-        case X86::AX:	case X86::AH:	case X86::AL:	case X86::EAX:
+        case X86::AX:    case X86::AH:    case X86::AL:    case X86::EAX:
             realReg = X86::RAX;
             break;
-        case X86::BX:	case X86::BH:	case X86::BL:	case X86::EBX:
+        case X86::BX:    case X86::BH:    case X86::BL:    case X86::EBX:
             realReg = X86::RBX;
             break;
-        case X86::CX:	case X86::CH:	case X86::CL:	case X86::ECX:
+        case X86::CX:    case X86::CH:    case X86::CL:    case X86::ECX:
             realReg = X86::RCX;
             break;
-        case X86::DX:	case X86::DH:	case X86::DL:	case X86::EDX:
+        case X86::DX:    case X86::DH:    case X86::DL:    case X86::EDX:
             realReg = X86::RDX;
             break;
-        case X86::SIL:	case X86::SI:	case X86::ESI:
+        case X86::SIL:    case X86::SI:    case X86::ESI:
             realReg = X86::RSI;
             break;
-        case X86::DIL:	case X86::DI:	case X86::EDI:
+        case X86::DIL:    case X86::DI:    case X86::EDI:
             realReg = X86::RDI;
             break;
-        case X86::SPL:	case X86::SP:	case X86::ESP:
+        case X86::SPL:    case X86::SP:    case X86::ESP:
             realReg = X86::RSP;
             break;
-        case X86::BPL:	case X86::BP:	case X86::EBP:
+        case X86::BPL:    case X86::BP:    case X86::EBP:
             realReg = X86::RBP;
             break;
-        case X86::R8B:	case X86::R8W:	case X86::R8D:	case X86::R8:
-			realReg = X86::R8;
-        	break;
-        case X86::R9B:	case X86::R9W:	case X86::R9D:	case X86::R9:
-			realReg = X86::R9;
-        	break;
-        case X86::R10B:	case X86::R10W:	case X86::R10D:	case X86::R10:
-			realReg = X86::R10;
-        	break;
-        case X86::R11B:	case X86::R11W:	case X86::R11D:	case X86::R11:
-			realReg = X86::R11;
-        	break;
-        case X86::R12B:	case X86::R12W:	case X86::R12D:	case X86::R12:
-			realReg = X86::R12;
-        	break;
-        case X86::R13B:	case X86::R13W:	case X86::R13D:	case X86::R13:
-			realReg = X86::R13;
-        	break;
-        case X86::R14B:	case X86::R14W:	case X86::R14D:	case X86::R14:
-			realReg = X86::R14;
-        	break;
-        case X86::R15B:	case X86::R15W:	case X86::R15D:	case X86::R15:
-			realReg = X86::R15;
-        	break;
+        case X86::R8B:    case X86::R8W:    case X86::R8D:    case X86::R8:
+            realReg = X86::R8;
+            break;
+        case X86::R9B:    case X86::R9W:    case X86::R9D:    case X86::R9:
+            realReg = X86::R9;
+            break;
+        case X86::R10B:    case X86::R10W:    case X86::R10D:    case X86::R10:
+            realReg = X86::R10;
+            break;
+        case X86::R11B:    case X86::R11W:    case X86::R11D:    case X86::R11:
+            realReg = X86::R11;
+            break;
+        case X86::R12B:    case X86::R12W:    case X86::R12D:    case X86::R12:
+            realReg = X86::R12;
+            break;
+        case X86::R13B:    case X86::R13W:    case X86::R13D:    case X86::R13:
+            realReg = X86::R13;
+            break;
+        case X86::R14B:    case X86::R14W:    case X86::R14D:    case X86::R14:
+            realReg = X86::R14;
+            break;
+        case X86::R15B:    case X86::R15W:    case X86::R15D:    case X86::R15:
+            realReg = X86::R15;
+            break;
         default:
             break;
     }
