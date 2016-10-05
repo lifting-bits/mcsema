@@ -524,7 +524,7 @@ GENERIC_TRANSLATION(ADD16rr_DB, doAddRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD16rr_REV, doAddRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_REF(ADD32i32, 
         doAddRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
-        doAddRV<32>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+        doAddRV<32>(ip, block, IMM_AS_DATA_REF<32>(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
 
 GENERIC_TRANSLATION_REF(ADD64i32,
         doAddRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
@@ -627,7 +627,7 @@ GENERIC_TRANSLATION(ADC32i32, doAdcI<32>(ip, block, OP(0)))
 
 GENERIC_TRANSLATION_REF(ADC64i32,
         doAdcRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
-        doAdcRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
+        doAdcRV<64>(ip, block, IMM_AS_DATA_REF<32>(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
 
 GENERIC_TRANSLATION_MI(ADC32mi, 
         doAdcMI<32>(ip, block, ADDR_NOREF(0), OP(5)),

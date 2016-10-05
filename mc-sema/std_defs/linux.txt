@@ -36522,3 +36522,4 @@ ZZ_DestroyLink 1 C N
 ZZ_DestroyList 1 C N
 ZZ_NewLink 1 C N
 ZZ_NewList 0 C N
+__isoc99_fscanf 16 C N

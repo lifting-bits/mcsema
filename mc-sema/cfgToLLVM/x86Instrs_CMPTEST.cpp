@@ -293,7 +293,7 @@ GENERIC_TRANSLATION(CMP16ri8, doCmpRI<16>(ip, block, OP(0), OP(1)))
 //GENERIC_TRANSLATION(CMP32i32, doCmpRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION_REF(CMP32i32,
     doCmpRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)),
-    doCmpRV<32>(ip, block, MCOperand::CreateReg(X86::EAX), IMM_AS_DATA_REF(block, natM, ip)));
+    doCmpRV<32>(ip, block, MCOperand::CreateReg(X86::EAX), IMM_AS_DATA_REF<32>(block, natM, ip)));
 
 //GENERIC_TRANSLATION(CMP64i32, doCmpRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), OP(0)))
 GENERIC_TRANSLATION_REF(CMP64i32,
@@ -385,7 +385,7 @@ GENERIC_TRANSLATION_REF(TEST64i32,
 //GENERIC_TRANSLATION(TEST32i32, doTestRI<32>(ip,  block, MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION_REF(TEST32i32,
     doTestRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)),
-    doTestRV<32>(ip, block, MCOperand::CreateReg(X86::EAX), IMM_AS_DATA_REF(block, natM, ip)));
+    doTestRV<32>(ip, block, MCOperand::CreateReg(X86::EAX), IMM_AS_DATA_REF<32>(block, natM, ip)));
 
 //GENERIC_TRANSLATION(TEST64ri32, doTestRI<64>(ip,  block, OP(0), OP(1)))
 GENERIC_TRANSLATION_REF(TEST64ri32,
