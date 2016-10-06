@@ -451,7 +451,29 @@ def isExternalData(fn):
 
 
 def sanityCheckJumpTableSize(table_ea, ecount):
-    """ IDA doesn't correctly calculate some  jump table sizes """
+    """ IDA doesn't correctly calculate some  jump table sizes. Fix them.
+
+    This will look for the following jump tables:
+
+    ----
+    cmp eax, num_entries
+    ja bad_entry
+    fall_through:
+    mov rax, qword [index * ptr_size + table_base_address]
+    jmp rax
+    bad_entry:
+    ----
+
+
+    IDA will detect these as jump tables, but it sometimes
+    does not correctly calculate the "num_entries" properly,
+    which leads us to missing jump table cases.
+
+    Attempt to identify where 'num_entries' is compared, and
+    sanity check it vs. what IDA found.
+
+    """
+    
     if not isLinkedElf():
         return ecount
 
@@ -463,6 +485,10 @@ def sanityCheckJumpTableSize(table_ea, ecount):
         DEBUG("Could not decode instruction at {:x}\n".format(table_insn))
         return ecount
 
+    # This code is only reached if we *already know this is a jump table
+    # The goal is to sanity check the size
+
+    # First, Check to make sure that this is a "jmp reg" instruction. 
     if table_insn.Operands[0].type != idc.o_reg:
         return ecount
 
@@ -472,7 +498,17 @@ def sanityCheckJumpTableSize(table_ea, ecount):
     jmp_reg = table_insn.Operands[0].value
 
     inst_ea = table_ea
-    # walk back up to 5 instructions
+    # This will walk back up to 5 instructions looking for a 'cmp' against
+    # the jump register, and use the immediate value from the cmp as 
+    # the true jump table case count.
+
+    # This strategy has the potential for false positives, since it
+    # does not strictly check for the exact format of jump table instructions.
+    # For now that is intentional to allow some flexibility, because we are
+    # uncertain what the compiler will emit.
+
+    #TODO(artem): Make this loop strict check for the instructions we expect,
+    # if we find the current lax check causing false positives
     for i in xrange(5):
         # walk back a few instructions until we find a cmp
         inst_ea = idc.PrevHead(inst_ea)
