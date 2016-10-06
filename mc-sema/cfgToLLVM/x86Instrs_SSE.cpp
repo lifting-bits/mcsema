@@ -2245,6 +2245,33 @@ static InstTransResult doCVTPD2PSrm(InstPtr ip, BasicBlock *b, const MCOperand &
     return ContinueBlock;
 }
 
+static InstTransResult doMOVDDUPrr(BasicBlock *b, const MCOperand &dest, const MCOperand &src)
+{
+    Value *s = R_READ<128>(b, src.getReg());
+
+    Value* lower = new TruncInst( 
+            s, 
+            Type::getIntNTy(b->getContext(), 64), 
+            "", b);
+    Value *lower_ext = new llvm::ZExtInst(lower, 
+                        llvm::Type::getIntNTy(b->getContext(), 128),
+                        "", b);
+
+    // duplicate it in upper half
+    Value *top_half = BinaryOperator::Create(
+            Instruction::Shl, 
+            lower_ext, 
+            CONST_V<128>(b, 64),
+            "", b);
+
+    // combine the halves
+    Value *combined = BinaryOperator::CreateAnd(lower_ext, top_half, "", b);
+
+    R_WRITE<128>(b, dest.getReg(), combined);
+
+    return ContinueBlock;
+}
+
 GENERIC_TRANSLATION(MOVHLPSrr,
         (doMOVHLPSrr<128>(ip, block, OP(1), OP(2))) )
 
@@ -2723,6 +2750,8 @@ GENERIC_TRANSLATION_REF(MOV64toSDrm,
 GENERIC_TRANSLATION_REF(MOVQI2PQIrm,
         (MOVAndZextRM<64>(ip, block, OP(0), ADDR_NOREF(1))),
         (MOVAndZextRM<64>(ip, block, OP(0), MEM_REFERENCE(1))) )
+GENERIC_TRANSLATION(MOVDDUPrr,
+        (doMOVDDUPrr(block, OP(0), OP(1))) )
 
 void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::MOVSDrm] = (doMOVSrm<64>);
@@ -3018,4 +3047,7 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::MOVPQIto64rr] = (doMOVSrr<64, 0, 1>);
     m[X86::MOV64toSDrm]  = translate_MOV64toSDrm;
     m[X86::MOVQI2PQIrm]  = translate_MOVQI2PQIrm;
+    m[X86::MOVPQI2QImr]  = (doMOVSmr<64>);
+    
+    m[X86::MOVDDUPrr] = translate_MOVDDUPrr;
 }

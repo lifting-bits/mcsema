@@ -450,6 +450,90 @@ def isExternalData(fn):
         return False
 
 
+def sanityCheckJumpTableSize(table_ea, ecount):
+    """ IDA doesn't correctly calculate some  jump table sizes. Fix them.
+
+    This will look for the following jump tables:
+
+    ----
+    cmp eax, num_entries
+    ja bad_entry
+    fall_through:
+    mov rax, qword [index * ptr_size + table_base_address]
+    jmp rax
+    bad_entry:
+    ----
+
+
+    IDA will detect these as jump tables, but it sometimes
+    does not correctly calculate the "num_entries" properly,
+    which leads us to missing jump table cases.
+
+    Attempt to identify where 'num_entries' is compared, and
+    sanity check it vs. what IDA found.
+
+    """
+    
+    if not isLinkedElf():
+        return ecount
+
+    if getBitness() != 64:
+        return ecount
+
+    table_insn = idautils.DecodeInstruction(table_ea)
+    if table_insn is None:
+        DEBUG("Could not decode instruction at {:x}\n".format(table_insn))
+        return ecount
+
+    # This code is only reached if we *already know this is a jump table
+    # The goal is to sanity check the size
+
+    # First, Check to make sure that this is a "jmp reg" instruction. 
+    if table_insn.Operands[0].type != idc.o_reg:
+        return ecount
+
+    DEBUG("Sanity checking table at {:x}\n".format(table_ea))
+
+    # get register we jump with
+    jmp_reg = table_insn.Operands[0].value
+
+    inst_ea = table_ea
+    # This will walk back up to 5 instructions looking for a 'cmp' against
+    # the jump register, and use the immediate value from the cmp as 
+    # the true jump table case count.
+
+    # This strategy has the potential for false positives, since it
+    # does not strictly check for the exact format of jump table instructions.
+    # For now that is intentional to allow some flexibility, because we are
+    # uncertain what the compiler will emit.
+
+    #TODO(artem): Make this loop strict check for the instructions we expect,
+    # if we find the current lax check causing false positives
+    for i in xrange(5):
+        # walk back a few instructions until we find a cmp
+        inst_ea = idc.PrevHead(inst_ea)
+        if inst_ea == idc.BADADDR:
+            return ecount
+        inst = idautils.DecodeInstruction(inst_ea)
+        if inst is None:
+            return ecount
+        if inst.itype == idaapi.NN_cmp and inst.Operands[0].type == idc.o_reg:
+            # check if reg in cmp == reg we jump with
+            if jmp_reg == inst.Operands[0].value:
+                # check if the CMP is with an immediate
+                if inst.Operands[1].type == idc.o_imm:
+                    # the immediate is our new count
+                    # the comaprison is vs the max case#, but the cases start at 0, so add 1
+                    # to get case count
+                    new_count = 1 + inst.Operands[1].value
+                    # compare to ecount. Take the bigger value.
+                    if new_count > ecount:
+                        DEBUG("Overriding old JMP count of {} with {} for table at {:x}\n".format(ecount, new_count, table_ea))
+                        return new_count
+            return ecount
+
+    return ecount
+
 def handleJmpTable(I, inst, new_eas):
     si = idaapi.get_switch_info_ex(inst)
     jsize = si.get_jtable_element_size()
@@ -474,11 +558,13 @@ def handleJmpTable(I, inst, new_eas):
     I.jump_table.zero_offset = 0
     i = 0
     entries = si.get_jtable_size()
+    entries = sanityCheckJumpTableSize(inst, entries)
     for i in xrange(entries):
         je = readers[jsize](jstart+i*jsize)
         I.jump_table.table_entries.append(je)
         if je not in RECOVERED_EAS and isStartOfFunction(je):
             new_eas.add(je)
+
         DEBUG("\t\tAdding JMPTable {0}: {1:x}\n".format(i, je))
     #je = idc.GetFixupTgtOff(jstart+i*jsize)
     #while je != -1:
@@ -1640,12 +1726,22 @@ def preprocessBinary():
                 if si is not None and isUnconditionalJump(head):
                     DEBUG("Found a jmp based switch at: {0:x}\n".format(head))
                     esize = si.get_jtable_element_size()
+                    readers = { 4: readDword,
+                                8: readQword }
                     base = si.jumps
                     count = si.get_jtable_size()
+                    count = sanityCheckJumpTableSize(head, count)
+                    jmp_refs = set(idautils.CodeRefsFrom(head, 1))
                     for i in xrange(count):
                         fulladdr = base+i*esize
                         DEBUG("Address accessed via JMP: {:x}\n".format(fulladdr))
                         ACCESSED_VIA_JMP.add(fulladdr)
+                        je = readers[esize](fulladdr)
+                        if je not in jmp_refs:
+                            jmp_refs.add(je)
+                            DEBUG("\t\tJMPTable entry not in original; adding ref {:x} => {:x}".format(head, je))
+                            idc.AddCodeXref(head, je, idc.XREF_USER|idc.fl_F)
+                            mark_as_code(je)
             if PIE_MODE:
                 # convert all immediate operand location references to numbers
                 inslen = idaapi.decode_insn(head)

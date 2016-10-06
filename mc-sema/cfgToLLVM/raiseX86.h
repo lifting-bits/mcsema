@@ -124,6 +124,53 @@ static llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t width,
 
 namespace x86 {
 
+static int getBackingRegisterWidth(unsigned reg) {
+    // returns the size of the *backing* register for the register
+    // that we are writing. This means that when writing AX, we would
+    // return 32, since AX is backed by EAX, which is 32-bit.
+    switch (reg) {
+        case llvm::X86::XMM0:
+        case llvm::X86::XMM1:
+        case llvm::X86::XMM2:
+        case llvm::X86::XMM3:
+        case llvm::X86::XMM4:
+        case llvm::X86::XMM5:
+        case llvm::X86::XMM6:
+        case llvm::X86::XMM7:
+        case llvm::X86::XMM8:
+        case llvm::X86::XMM9:
+        case llvm::X86::XMM10:
+        case llvm::X86::XMM11:
+        case llvm::X86::XMM12:
+        case llvm::X86::XMM13:
+        case llvm::X86::XMM14:
+        case llvm::X86::XMM15:
+            return 128;
+
+        case llvm::X86::EAX: case llvm::X86::EBX: case llvm::X86::ECX: case llvm::X86::EDX:
+        case llvm::X86::EDI: case llvm::X86::ESI: case llvm::X86::EBP: case llvm::X86::ESP:
+
+        case llvm::X86::DH: case llvm::X86::CH:	case llvm::X86::BH: case llvm::X86::AH:
+        case llvm::X86::DL: case llvm::X86::CL:	case llvm::X86::BL: case llvm::X86::AL:
+        case llvm::X86::AX: case llvm::X86::BX: case llvm::X86::CX: case llvm::X86::DX:
+
+        case llvm::X86::SIL: case llvm::X86::SI: case llvm::X86::DIL: case llvm::X86::DI:
+        case llvm::X86::SPL: case llvm::X86::SP: case llvm::X86::BPL: case llvm::X86::BP:
+
+        case llvm::X86::EIP:
+
+            return x86::REG_SIZE;
+
+        default:
+            throw TErr(__LINE__, __FILE__, "Do not know size of register");
+    }
+
+    // assume this is currently unsupported xmm/ymm
+    // ideally we should never get here though due to 
+    // the previous default condition
+    return 128;
+}
+
 template<int width>
 llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
   //we should return the pointer to the Value object that represents the
@@ -144,13 +191,10 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
   TASSERT(tmpVal != NULL, "Could not read from register");
 
   llvm::Value *readVal;
-  //if the width requested is less than the native bitwidth,
-  //then we need to truncate the read
-  int regwidth = x86::REG_SIZE;
-  if (reg >= llvm::X86::XMM0 && reg <= llvm::X86::XMM7) {
-    regwidth = 128;
-  }
+  int regwidth = x86::getBackingRegisterWidth(reg);
 
+  //if the width requested is less than the backing register
+  //then we need to truncate the read
   if (width < regwidth) {
     llvm::Value *shiftedVal = NULL;
     int readOff = x86::mapPlatRegToOffset(reg);
@@ -186,10 +230,7 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
   if (localRegVar == NULL)
     throw TErr(__LINE__, __FILE__, "Could not find register");
 
-  int regwidth = 32;
-  if (reg >= llvm::X86::XMM0 && reg <= llvm::X86::XMM7) {
-    regwidth = 128;
-  }
+  int regwidth = x86::getBackingRegisterWidth(reg);
 
   llvm::Type *regWidthType = llvm::Type::getIntNTy(b->getContext(), regwidth);
 
@@ -295,6 +336,64 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
 
 namespace x86_64 {
 
+static int getBackingRegisterWidth(unsigned reg) {
+    // returns the size of the *backing* register for the register
+    // that we are writing. This means that when writing EAX, we would
+    // return 64, since EAX is backed by RAX, which is 64-bit.
+    switch (reg) {
+        case llvm::X86::XMM0:
+        case llvm::X86::XMM1:
+        case llvm::X86::XMM2:
+        case llvm::X86::XMM3:
+        case llvm::X86::XMM4:
+        case llvm::X86::XMM5:
+        case llvm::X86::XMM6:
+        case llvm::X86::XMM7:
+        case llvm::X86::XMM8:
+        case llvm::X86::XMM9:
+        case llvm::X86::XMM10:
+        case llvm::X86::XMM11:
+        case llvm::X86::XMM12:
+        case llvm::X86::XMM13:
+        case llvm::X86::XMM14:
+        case llvm::X86::XMM15:
+            return 128;
+
+        case llvm::X86::EAX: case llvm::X86::EBX: case llvm::X86::ECX: case llvm::X86::EDX:
+        case llvm::X86::EDI: case llvm::X86::ESI: case llvm::X86::EBP: case llvm::X86::ESP:
+
+        case llvm::X86::DH: case llvm::X86::CH: case llvm::X86::BH: case llvm::X86::AH:
+        case llvm::X86::DL: case llvm::X86::CL:	case llvm::X86::BL: case llvm::X86::AL:
+        case llvm::X86::AX: case llvm::X86::BX: case llvm::X86::CX: case llvm::X86::DX:
+
+        case llvm::X86::SIL: case llvm::X86::SI: case llvm::X86::DIL: case llvm::X86::DI:
+        case llvm::X86::SPL: case llvm::X86::SP: case llvm::X86::BPL: case llvm::X86::BP:
+        case llvm::X86::RAX: case llvm::X86::RBX: case llvm::X86::RCX: case llvm::X86::RDX:
+        case llvm::X86::RSI: case llvm::X86::RDI: case llvm::X86::RSP: case llvm::X86::RBP:
+        case llvm::X86::R8: case llvm::X86::R9: case llvm::X86::R10: case llvm::X86::R11:
+        case llvm::X86::R12: case llvm::X86::R13: case llvm::X86::R14: case llvm::X86::R15:
+
+        case llvm::X86::R8B: case llvm::X86::R8W: case llvm::X86::R8D: case llvm::X86::R9B:
+        case llvm::X86::R9W:  case llvm::X86::R9D: case llvm::X86::R10B: case llvm::X86::R10W:
+        case llvm::X86::R10D: case llvm::X86::R11B: case llvm::X86::R11W: case llvm::X86::R11D:
+        case llvm::X86::R12B: case llvm::X86::R12W: case llvm::X86::R12D: case llvm::X86::R13B:
+        case llvm::X86::R13W: case llvm::X86::R13D: case llvm::X86::R14B: case llvm::X86::R14W:
+        case llvm::X86::R14D: case llvm::X86::R15B: case llvm::X86::R15W: case llvm::X86::R15D:
+
+        case llvm::X86::RIP:
+
+            return x86_64::REG_SIZE;
+
+        default:
+            throw TErr(__LINE__, __FILE__, "Do not know size of register");
+    }
+
+    // assume this is currently unsupported xmm/ymm
+    // ideally we should never get here though due to 
+    // the previous default condition
+    return 128;
+}
+
 template<int width>
 llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
   //we should return the pointer to the Value object that represents the
@@ -317,10 +416,7 @@ llvm::Value *R_READ(llvm::BasicBlock *b, unsigned reg) {
   llvm::Value *readVal;
   //if the width requested is less than the native bitwidth,
   //then we need to truncate the read
-  int regwidth = x86_64::REG_SIZE;
-  if (reg >= llvm::X86::XMM0 && reg <= llvm::X86::XMM15) {
-    regwidth = 128;
-  }
+  int regwidth = x86_64::getBackingRegisterWidth(reg);
 
   if (width < regwidth) {
     llvm::Value *shiftedVal = NULL;
@@ -357,10 +453,7 @@ void R_WRITE(llvm::BasicBlock *b, unsigned reg, llvm::Value *write) {
   if (localRegVar == NULL)
     throw TErr(__LINE__, __FILE__, "Could not find register");
 
-  int regwidth = x86_64::REG_SIZE;
-  if (reg >= llvm::X86::XMM0 && reg <= llvm::X86::XMM15) {
-    regwidth = 128;
-  }
+  int regwidth = x86_64::getBackingRegisterWidth(reg);
 
   llvm::Type *regWidthType = llvm::Type::getIntNTy(b->getContext(), regwidth);
 

@@ -323,6 +323,28 @@ static InstTransResult doSbbRI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
+static InstTransResult doSbbRV(InstPtr ip, BasicBlock *&b,
+                               Value *addr,
+                               const MCOperand &dst,
+                               const MCOperand &src1)
+{
+    NASSERT(src1.isReg());
+    NASSERT(dst.isReg());
+    TASSERT(addr != NULL, "");
+
+	// Read from src1.
+    Value *srcReg = R_READ<width>(b, src1.getReg());
+
+	// Do the operation.
+	Value *subRes = doSbbVV<width>(ip, b, srcReg, addr);
+
+	// Store the result in dst.
+	R_WRITE<width>(b, dst.getReg(), subRes);
+
+    return ContinueBlock;
+}
+
+template <int width>
 static InstTransResult doSbbRM(InstPtr ip, BasicBlock *&b,
                                const MCOperand &o1,
                                Value           *addr,
@@ -379,10 +401,9 @@ GENERIC_TRANSLATION_REF(SUB16rm,
 	doSubRM<16>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(SUB16rr, doSubRR<16>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SUB16rr_REV, doSubRR<16>(ip, block, OP(1), OP(2), OP(0)))
-//GENERIC_TRANSLATION(SUB32i32, doSubRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION_REF(SUB32i32,
         doSubRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
-        doSubRV<32>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+        doSubRV<32>(ip, block, IMM_AS_DATA_REF<32>(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
 
 GENERIC_TRANSLATION_MI(SUB32mi, 
 	doSubMI<32>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -461,7 +482,9 @@ GENERIC_TRANSLATION_REF(SBB16rm,
 	doSbbRM<16>(ip, block, OP(1), MEM_REFERENCE(2), OP(0)))
 GENERIC_TRANSLATION(SBB16rr, doSbbRR<16>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SBB16rr_REV, doSbbRR<16>(ip, block, OP(1), OP(2), OP(0)))
-GENERIC_TRANSLATION(SBB32i32, doSbbRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0), MCOperand::CreateReg(X86::EAX)))
+GENERIC_TRANSLATION_REF(SBB32i32,
+        doSbbRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
+        doSbbRV<32>(ip, block, IMM_AS_DATA_REF<32>(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
 GENERIC_TRANSLATION(SBB32ri, doSbbRI<32>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SBB32ri8, doSbbRI<32>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SBB64ri8, doSbbRI<64>(ip, block, OP(1), OP(2), OP(0)))

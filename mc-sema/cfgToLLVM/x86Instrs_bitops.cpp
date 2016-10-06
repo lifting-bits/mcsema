@@ -551,7 +551,7 @@ GENERIC_TRANSLATION(AND16rr_REV, doAndRR<16>(ip, block, OP(0), OP(1), OP(2)))
 //GENERIC_TRANSLATION(AND32i32, doAndRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION_REF(AND32i32, 
         doAndRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
-        doAndRV<32>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+        doAndRV<32>(ip, block, IMM_AS_DATA_REF<32>(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
 
 GENERIC_TRANSLATION_MI(AND32mi,
 	doAndMI<32>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -648,7 +648,7 @@ GENERIC_TRANSLATION(OR16rr_REV, doOrRR<16>(ip, block, OP(0), OP(1), OP(2)))
 //GENERIC_TRANSLATION(OR32i32, doOrRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION_REF(OR32i32, 
         doOrRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
-        doOrRV<32>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+        doOrRV<32>(ip, block, IMM_AS_DATA_REF<32>(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
 GENERIC_TRANSLATION_REF(OR64i32, 
         doOrRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
         doOrRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
@@ -738,7 +738,7 @@ GENERIC_TRANSLATION(XOR32ri8, doXorRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR64ri8, doXorRI<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_REF(XOR32i32, 
         doXorRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
-        doXorRV<32>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+        doXorRV<32>(ip, block, IMM_AS_DATA_REF<32>(block, natM, ip), MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
 GENERIC_TRANSLATION_REF(XOR64i32, 
         doXorRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
         doXorRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
