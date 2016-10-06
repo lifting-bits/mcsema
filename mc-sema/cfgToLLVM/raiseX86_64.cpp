@@ -280,15 +280,19 @@ bool addEntryPointDriver(Module *M,
       //#else
       unsigned fp_reg_num = 0;
       unsigned notfp_reg_num = 0;
-      Value *args_fp[8];
-      Value *args_notfp[6];
-      int reg_offset_fp[8] = {x86_64::getRegisterOffset(XMM0), x86_64::getRegisterOffset(XMM1), x86_64::getRegisterOffset(XMM2), x86_64::getRegisterOffset(XMM3), x86_64::getRegisterOffset(XMM4), x86_64::getRegisterOffset(XMM5), x86_64::getRegisterOffset(XMM6), x86_64::getRegisterOffset(XMM7)};
-      int reg_offset_notfp[6] = {x86_64::getRegisterOffset(RDI), x86_64::getRegisterOffset(RSI), x86_64::getRegisterOffset(RDX), x86_64::getRegisterOffset(RCX), x86_64::getRegisterOffset(R8), x86_64::getRegisterOffset(R9)};
+      enum : size_t {
+        kNumFPRegs = 8,
+        kNumIntRegs = 6
+      };
+      Value *args_fp[kNumFPRegs];
+      Value *args_notfp[kNumIntRegs];
+      int reg_offset_fp[kNumFPRegs] = {x86_64::getRegisterOffset(XMM0), x86_64::getRegisterOffset(XMM1), x86_64::getRegisterOffset(XMM2), x86_64::getRegisterOffset(XMM3), x86_64::getRegisterOffset(XMM4), x86_64::getRegisterOffset(XMM5), x86_64::getRegisterOffset(XMM6), x86_64::getRegisterOffset(XMM7)};
+      int reg_offset_notfp[kNumIntRegs] = {x86_64::getRegisterOffset(RDI), x86_64::getRegisterOffset(RSI), x86_64::getRegisterOffset(RDX), x86_64::getRegisterOffset(RCX), x86_64::getRegisterOffset(R8), x86_64::getRegisterOffset(R9)};
 
       while(fwd_it != fwd_end) {
         Type *T = fwd_it->getType();
         if(T->isDoubleTy()){
-          if(fp_reg_num < 8){
+          if(fp_reg_num < kNumFPRegs){
             //xmm0-7
             Value *argFieldGEPV[] = {
               CONST_V<64>(driverBB, 0),
@@ -308,7 +312,7 @@ bool addEntryPointDriver(Module *M,
             ++fp_stack_num;
           }
         } else {
-          if(notfp_reg_num < 6){
+          if(notfp_reg_num < kNumIntRegs){
             //rdi,rsi,rdx,rcx,r8,r9
             Value *argFieldGEPV[] = {
               CONST_V<64>(driverBB, 0),
