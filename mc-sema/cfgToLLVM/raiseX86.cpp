@@ -394,10 +394,26 @@ void allocateLocals(Function *F, int bits) {
           Type::getIntNTy(F->getContext(), 128), "XMM6_val", vec_xmm5);
       Instruction *vec_xmm7 = new AllocaInst(
           Type::getIntNTy(F->getContext(), 128), "XMM7_val", vec_xmm6);
+      Instruction *vec_xmm8 = new AllocaInst(
+          Type::getIntNTy(F->getContext(), 128), "XMM8_val", vec_xmm7);
+      Instruction *vec_xmm9 = new AllocaInst(
+          Type::getIntNTy(F->getContext(), 128), "XMM9_val", vec_xmm8);
+      Instruction *vec_xmm10 = new AllocaInst(
+          Type::getIntNTy(F->getContext(), 128), "XMM10_val", vec_xmm9);
+      Instruction *vec_xmm11 = new AllocaInst(
+          Type::getIntNTy(F->getContext(), 128), "XMM11_val", vec_xmm10);
+      Instruction *vec_xmm12 = new AllocaInst(
+          Type::getIntNTy(F->getContext(), 128), "XMM12_val", vec_xmm11);
+      Instruction *vec_xmm13 = new AllocaInst(
+          Type::getIntNTy(F->getContext(), 128), "XMM13_val", vec_xmm12);
+      Instruction *vec_xmm14 = new AllocaInst(
+          Type::getIntNTy(F->getContext(), 128), "XMM14_val", vec_xmm13);
+      Instruction *vec_xmm15 = new AllocaInst(
+          Type::getIntNTy(F->getContext(), 128), "XMM15_val", vec_xmm14);
 
       // stack base and limit
       Instruction *stack_base = new AllocaInst(
-          Type::getInt32Ty(F->getContext()), "STACK_BASE_val", vec_xmm7);
+          Type::getInt32Ty(F->getContext()), "STACK_BASE_val", vec_xmm15);
       Instruction *stack_limit = new AllocaInst(
           Type::getInt32Ty(F->getContext()), "STACK_LIMIT_val", stack_base);
     }

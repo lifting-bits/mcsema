@@ -65,7 +65,7 @@ Triple *getTargetTriple(const llvm::Target *T) {
 
 void doGlobalInit(Module *M) {
 
-	unsigned int regWidth = getPointerSize(M);
+    unsigned int regWidth = getPointerSize(M);
 
     //create the "reg" struct type
     StructType  *regs = StructType::create(M->getContext(), "struct.regs");
@@ -84,19 +84,19 @@ void doGlobalInit(Module *M) {
     regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // RSP/ESP // 6
     regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // RBP/EBP // 7
 
-	if(getSystemArch(M) == _X86_64_){
-		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R8  // 8
-		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R9  // 9
-		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R10 // 10
-		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R11 // 11
-		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R12 // 12
-		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R13 // 13
-		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R14 // 14
-		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R15 // 15
+    if(getSystemArch(M) == _X86_64_){
+        regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R8  // 8
+        regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R9  // 9
+        regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R10 // 10
+        regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R11 // 11
+        regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R12 // 12
+        regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R13 // 13
+        regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R14 // 14
+        regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // R15 // 15
 
-		// RIP for rip relative instructions
-		regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // RIP // 16
-	}
+        // RIP for rip relative instructions
+        regFields.push_back(IntegerType::get(M->getContext(), regWidth)); // RIP // 16
+    }
 
     //flags
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // CF // 17
@@ -111,7 +111,7 @@ void doGlobalInit(Module *M) {
     regFields.push_back(fpu_regs);                            // 80 bytes 24
 
 
-	// FPU Status Word
+    // FPU Status Word
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU BUSY // 25
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // Condition Code C3 // 26
     regFields.push_back(IntegerType::get(M->getContext(), 3)); // TOP OF STACK // 27
@@ -138,7 +138,7 @@ void doGlobalInit(Module *M) {
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Denormal Operand Mask // 46
     regFields.push_back(IntegerType::getInt1Ty(M->getContext())); // FPU Invalid Operation Mask // 47
 
-	// FPU tag word; 8 element array of 2-bit entries
+    // FPU tag word; 8 element array of 2-bit entries
     ArrayType  *fpu_tag_word = ArrayType::get(Type::getIntNTy(M->getContext(), 8), 8);
     regFields.push_back(fpu_tag_word);                                               // 48
 
@@ -160,16 +160,14 @@ void doGlobalInit(Module *M) {
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM6 60
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM7 61
 
-	if(getSystemArch(M) == _X86_64_){
-		regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM8 62
-		regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM9 63
-		regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM10 64
-		regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM11 65
-		regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM12 66
-		regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM13 67
-		regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM14 68
-		regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM15 69
-	}
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM8 62
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM9 63
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM10 64
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM11 65
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM12 66
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM13 67
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM14 68
+    regFields.push_back(IntegerType::getIntNTy(M->getContext(), 128)); // XMM15 69
 
     // non-register values in structRegs
     regFields.push_back(IntegerType::getIntNTy(M->getContext(), regWidth)); // 70: stack base (biggest value)

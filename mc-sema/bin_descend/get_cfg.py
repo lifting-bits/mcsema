@@ -779,9 +779,11 @@ def parseDefsFile(df):
             continue
 
         
-        if l.startswith('DATA:') :
+        if l.startswith('DATA:'):
             # process as data
             (marker, symname, dsize) = l.split()
+            if 'PTR' in dsize:
+                dsize = getPointerSize()
             emap_data[symname] = int(dsize)
         else:
             fname = args = conv = ret = sign = None
@@ -797,7 +799,7 @@ def parseDefsFile(df):
             elif conv == "F":
                 realconv = CFG_pb2.ExternalFunction.FastCall
             else:
-                raise Exception("Unknown calling convention:"+str(conv))
+                raise Exception("Unknown calling convention:"+str(l))
 
             if ret not in ['Y', 'N']:
                 raise Exception("Unknown return type:"+ret)
@@ -2101,7 +2103,8 @@ if __name__ == "__main__":
         DEBUG("CFG Output File file: {0}\n".format(outf.name))
 
         recoverCfg(eps, outf, args.exports_are_apis)
-    except:
+    except Exception as e:
+        DEBUG(str(e))
         DEBUG(traceback.format_exc())
     
     #for batch mode: exit IDA when done
