@@ -107,12 +107,12 @@ bool addEntryPointDriver(Module *M,
     vector<Type *>  args;
 
     for(int i = 0; i < np; i++) {
-    if(funcSign.c_str()[i] == 'F'){
-      args.push_back(Type::getDoubleTy(M->getContext()));
-    }
-    else{
-      args.push_back(Type::getInt64Ty(M->getContext()));
-    }
+      if(funcSign.c_str()[i] == 'F'){
+        args.push_back(Type::getDoubleTy(M->getContext()));
+      }
+      else{
+        args.push_back(Type::getInt64Ty(M->getContext()));
+      }
     }
 
     Type  *returnTy = NULL;
