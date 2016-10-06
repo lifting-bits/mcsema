@@ -99,19 +99,20 @@ bool addEntryPointDriver(Module *M,
   Function  *F = M->getFunction(s);
   Type *int64ty = Type::getInt64Ty(M->getContext());
   Type *int64PtrTy = PointerType::get(int64ty, 0);
-
+  Type *doublety = Type::getDoubleTy(M->getContext());
+  Type *doublePtrTy = PointerType::get(doublety, 0);
 
   if( F != NULL ) {
     //build function prototype from name and numParms
     vector<Type *>  args;
 
     for(int i = 0; i < np; i++) {
-		if(funcSign.c_str()[i] == 'F'){
-      		args.push_back(Type::getDoubleTy(M->getContext()));
-		}
-		else{
-			args.push_back(Type::getInt64Ty(M->getContext()));
-		}
+      if(funcSign.c_str()[i] == 'F'){
+        args.push_back(Type::getDoubleTy(M->getContext()));
+      }
+      else{
+        args.push_back(Type::getInt64Ty(M->getContext()));
+      }
     }
 
     Type  *returnTy = NULL;
@@ -122,7 +123,7 @@ bool addEntryPointDriver(Module *M,
     }
 
     FunctionType *FT = FunctionType::get(returnTy, args, false);
-	std::cout << __FUNCTION__ << "\n";
+    std::cout << __FUNCTION__ << "\n";
     //insert the function prototype
     Function  *driverF = (Function *) M->getOrInsertFunction(name, FT);
     // set drivers calling convention to match user specification
@@ -148,6 +149,9 @@ bool addEntryPointDriver(Module *M,
 
     AttrBuilder B;
     B.addAttribute(Attribute::InReg);
+
+    unsigned fp_stack_num = 0;
+    unsigned notfp_stack_num = 0;
 
     if(getSystemOS(M) == llvm::Triple::Win32) {
         if(fwd_it != fwd_end) {
@@ -273,102 +277,62 @@ bool addEntryPointDriver(Module *M,
             aliasMCSemaScope(new StoreInst(curArg, arg4, driverBB));
         }
     } else if (getSystemOS(M) == llvm::Triple::Linux) {
-        //#else
-        if(fwd_it != fwd_end) {
-            int   k = x86_64::getRegisterOffset(RDI);
-            Value *rdiFieldGEPV[] = {
-                CONST_V<64>(driverBB, 0),
-                CONST_V<32>(driverBB, k)
+      //#else
+      unsigned fp_reg_num = 0;
+      unsigned notfp_reg_num = 0;
+      enum : size_t {
+        kNumFPRegs = 8,
+        kNumIntRegs = 6
+      };
+      Value *args_fp[kNumFPRegs];
+      Value *args_notfp[kNumIntRegs];
+      int reg_offset_fp[kNumFPRegs] = {x86_64::getRegisterOffset(XMM0), x86_64::getRegisterOffset(XMM1), x86_64::getRegisterOffset(XMM2), x86_64::getRegisterOffset(XMM3), x86_64::getRegisterOffset(XMM4), x86_64::getRegisterOffset(XMM5), x86_64::getRegisterOffset(XMM6), x86_64::getRegisterOffset(XMM7)};
+      int reg_offset_notfp[kNumIntRegs] = {x86_64::getRegisterOffset(RDI), x86_64::getRegisterOffset(RSI), x86_64::getRegisterOffset(RDX), x86_64::getRegisterOffset(RCX), x86_64::getRegisterOffset(R8), x86_64::getRegisterOffset(R9)};
+
+      while(fwd_it != fwd_end) {
+        Type *T = fwd_it->getType();
+        if(T->isDoubleTy()){
+          if(fp_reg_num < kNumFPRegs){
+            //xmm0-7
+            Value *argFieldGEPV[] = {
+              CONST_V<64>(driverBB, 0),
+              CONST_V<32>(driverBB, reg_offset_fp[fp_reg_num])
             };
 
             // make driver take this from register
-            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
+            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), fp_reg_num, B));
+            Instruction *ptr128 = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
+            args_fp[fp_reg_num] = CastInst::CreatePointerCast(ptr128, PointerType::get(Type::getDoubleTy(M->getContext()), 0), "", driverBB);
 
-            Value *rdiP = GetElementPtrInst::CreateInBounds(aCtx, rdiFieldGEPV, "", driverBB);
             Argument  *curArg = &(*fwd_it);
-            aliasMCSemaScope(new StoreInst(curArg, rdiP, driverBB));
-        }
+            new StoreInst(curArg, args_fp[fp_reg_num], driverBB);
 
-        // set rsi to arg[1]
-        ++fwd_it;
-        if(fwd_it != fwd_end) {
-            int   k = x86_64::getRegisterOffset(RSI);
-            Value *rsiFieldGEPV[] = {
-                CONST_V<64>(driverBB, 0),
-                CONST_V<32>(driverBB, k)
+            ++fp_reg_num;
+          } else {
+            ++fp_stack_num;
+          }
+        } else {
+          if(notfp_reg_num < kNumIntRegs){
+            //rdi,rsi,rdx,rcx,r8,r9
+            Value *argFieldGEPV[] = {
+              CONST_V<64>(driverBB, 0),
+              CONST_V<32>(driverBB, reg_offset_notfp[notfp_reg_num])
             };
 
-            // make driver take this from register
-            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 2, B));
+            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), notfp_reg_num, B));
+            args_notfp[notfp_reg_num] = GetElementPtrInst::CreateInBounds(aCtx, argFieldGEPV, "", driverBB);
 
-            Value *rsiP = GetElementPtrInst::CreateInBounds(aCtx, rsiFieldGEPV, "", driverBB);
             Argument  *curArg = &(*fwd_it);
-            aliasMCSemaScope(new StoreInst(curArg, rsiP, driverBB));
+            new StoreInst(curArg, args_notfp[notfp_reg_num], driverBB);
+
+            ++notfp_reg_num;
+          } else {
+            ++notfp_stack_num;
+          }
         }
 
-        // set rdx to arg[2]
         ++fwd_it;
-        if(fwd_it != fwd_end) {
-            int   k = x86_64::getRegisterOffset(RDX);
-            Value *rdxFieldGEPV[] = {
-                CONST_V<64>(driverBB, 0),
-                CONST_V<32>(driverBB, k)
-            };
-
-            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 3, B));
-
-            Value *rdxP = GetElementPtrInst::CreateInBounds(aCtx, rdxFieldGEPV, "", driverBB);
-
-            Argument  *curArg = &(*fwd_it);
-            aliasMCSemaScope(new StoreInst(curArg, rdxP, driverBB));
-        }
-
-        //set rcx to arg[3]
-        ++fwd_it;
-        if(fwd_it != fwd_end) {
-            int   k = x86_64::getRegisterOffset(RCX);
-            Value *rcxFieldGEPV[] = {
-                CONST_V<64>(driverBB, 0),
-                CONST_V<32>(driverBB, k)
-            };
-
-            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 4, B));
-            Value *rcxP = GetElementPtrInst::CreateInBounds(aCtx, rcxFieldGEPV, "", driverBB);
-            Argument  *curArg = &(*fwd_it);
-            aliasMCSemaScope(new StoreInst(curArg, rcxP, driverBB));
-        }
-
-        //set r8 to arg[4]
-        ++fwd_it;
-        if(fwd_it != fwd_end) {
-            int   k = x86_64::getRegisterOffset(R8);
-            Value *r8FieldGEPV[] = {
-                CONST_V<64>(driverBB, 0),
-                CONST_V<32>(driverBB, k)
-            };
-
-            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 5, B));
-
-            Value *r8P = GetElementPtrInst::CreateInBounds(aCtx, r8FieldGEPV, "", driverBB);
-            Argument  *curArg = &(*fwd_it);
-            new StoreInst(curArg, r8P, driverBB);
-        }
-
-        //set r9 to arg[5]
-        ++fwd_it;
-        if(fwd_it != fwd_end) {
-            int   k = x86_64::getRegisterOffset(R9);
-            Value *r9FieldGEPV[] = {
-                CONST_V<64>(driverBB, 0),
-                CONST_V<32>(driverBB, k)
-            };
-
-            fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 6, B));
-
-            Value *r9P = GetElementPtrInst::CreateInBounds(aCtx, r9FieldGEPV, "", driverBB);
-            Argument  *curArg = &(*fwd_it);
-            aliasMCSemaScope(new StoreInst(curArg, r9P, driverBB));
-        }
+      }
     } else { 
         TASSERT(false, "Unsupported OS!");
     }
@@ -400,22 +364,67 @@ bool addEntryPointDriver(Module *M,
     stackPosInt = BinaryOperator::Create(BinaryOperator::Sub,
                     stackPosInt, CONST_V<64>(driverBB, 8), "", driverBB);
 
-	// number of arguments to be pushed on stack
-	int args_to_push = driverF->getArgumentList().size() - 6;
+    // number of arguments to be pushed on stack
+    int args_to_push = driverF->getArgumentList().size() - 6;
 
     // save arguments on the stack
-    while(args_to_push > 0)
-    {
-      Argument  *curArg = &(*it);
-      // convert to int64 ptr
-      Value *stackPosPtr = noAliasMCSemaScope(new IntToPtrInst(stackPosInt, int64PtrTy, "", driverBB ));
-      // write argument
-      Instruction *k = noAliasMCSemaScope(new StoreInst(curArg, stackPosPtr, driverBB));
-      // decrement stack
-      stackPosInt = BinaryOperator::Create(BinaryOperator::Sub,
+    if(getSystemOS(M) == llvm::Triple::Win32) {
+       while(args_to_push > 0)
+      {
+        Argument  *curArg = &(*it);
+        // convert to int64 ptr
+        Value *stackPosPtr = noAliasMCSemaScope(new IntToPtrInst(stackPosInt, int64PtrTy, "", driverBB ));
+        // write argument
+        Instruction *k = noAliasMCSemaScope(new StoreInst(curArg, stackPosPtr, driverBB));
+        // decrement stack
+        stackPosInt = BinaryOperator::Create(BinaryOperator::Sub,
+                  stackPosInt, CONST_V<64>(driverBB, 8), "", driverBB);
+        ++it;
+        --args_to_push;
+      }
+    } else if (getSystemOS(M) == llvm::Triple::Linux) {
+      unsigned param_num = driverF->getFunctionType()->getNumParams() -1;
+      Argument *curArg;
+      Value *stackPosPtr;
+      Instruction *k;
+
+      while(fp_stack_num + notfp_stack_num > 0){
+        Type *param_type = driverF->getFunctionType()->getParamType(param_num);
+        if(param_type->isDoubleTy()){
+          //floating point num
+          if(fp_stack_num > 0){
+            curArg = &(*it);
+            // convert to int64 ptr
+            stackPosPtr = noAliasMCSemaScope(new IntToPtrInst(stackPosInt, doublePtrTy, "", driverBB ));
+            // write argument
+            k = noAliasMCSemaScope(new StoreInst(curArg, stackPosPtr, driverBB));
+            // decrement stack
+            stackPosInt = BinaryOperator::Create(BinaryOperator::Sub,
                 stackPosInt, CONST_V<64>(driverBB, 8), "", driverBB);
-      ++it;
-      --args_to_push;
+
+            --fp_stack_num;
+          }
+        } else {
+          //not floating point num
+          if(notfp_stack_num > 0){
+            curArg = &(*it);
+            // convert to int64 ptr
+            stackPosPtr = noAliasMCSemaScope(new IntToPtrInst(stackPosInt, int64PtrTy, "", driverBB ));
+            // write argument
+            k = noAliasMCSemaScope(new StoreInst(curArg, stackPosPtr, driverBB));
+            // decrement stack
+            stackPosInt = BinaryOperator::Create(BinaryOperator::Sub,
+                stackPosInt, CONST_V<64>(driverBB, 8), "", driverBB);
+
+            --notfp_stack_num;
+          }
+        }
+
+        ++it;
+        --param_num;
+      }
+    } else { 
+        TASSERT(false, "Unsupported OS!");
     }
 
     int   k = x86_64::getRegisterOffset(RSP);
