@@ -38,10 +38,13 @@ using namespace llvm;
 
 template <int width, int regWidth>
 static BasicBlock *doCmpsV(BasicBlock *pred) {
-    Value   *lhsRegVal = R_READ<regWidth>(pred, X86::RSI);
+    unsigned rsi = regWidth == 32 ? X86::ESI : X86::RSI;
+    unsigned rdi = regWidth == 32 ? X86::EDI : X86::RDI;
+
+    Value   *lhsRegVal = R_READ<regWidth>(pred, rsi);
     Value   *lhsFromMem = M_READ_0<width>(pred, lhsRegVal);
 
-    Value   *rhsRegVal = R_READ<regWidth>(pred, X86::RDI);
+    Value   *rhsRegVal = R_READ<regWidth>(pred, rdi);
     Value   *rhsFromMem = M_READ_0<width>(pred, rhsRegVal);
 
     //perform a subtraction
@@ -97,8 +100,8 @@ static BasicBlock *doCmpsV(BasicBlock *pred) {
                                     "", 
                                     block_df_zero);
 
-    R_WRITE<regWidth>(block_df_zero, X86::RSI, add_lhs);
-    R_WRITE<regWidth>(block_df_zero, X86::RDI, add_rhs);
+    R_WRITE<regWidth>(block_df_zero, rsi, add_lhs);
+    R_WRITE<regWidth>(block_df_zero, rdi, add_rhs);
     // return to a single block, to which we will add new instructions
     BranchInst::Create(block_post_write, block_df_zero);
 
@@ -115,8 +118,8 @@ static BasicBlock *doCmpsV(BasicBlock *pred) {
                                     "", 
                                     block_df_one);
 
-    R_WRITE<regWidth>(block_df_one, X86::RSI, sub_lhs);
-    R_WRITE<regWidth>(block_df_one, X86::RDI, sub_rhs);
+    R_WRITE<regWidth>(block_df_one, rsi, sub_lhs);
+    R_WRITE<regWidth>(block_df_one, rdi, sub_rhs);
     // return to a single block, to which we will add new instructions
     BranchInst::Create(block_post_write, block_df_one);
 
@@ -139,9 +142,12 @@ static BasicBlock* doCmps(BasicBlock *b) {
 
 template <int opSize, int bitWidth>
 static BasicBlock *doStosV(BasicBlock *pred) {
+    unsigned rdi = bitWidth == 32 ? X86::EDI : X86::RDI;
+    unsigned rax = bitWidth == 32 ? X86::EAX : X86::RAX;
     //write EAX to [EDI]
-    Value   *dstRegVal = R_READ<bitWidth>(pred, X86::RDI);
-    Value   *fromEax = R_READ<opSize>(pred, X86::RAX);
+    Value   *dstRegVal = R_READ<bitWidth>(pred, rdi);
+    Value   *fromEax = R_READ<opSize>(pred, rax);
+
 
     // store EAX in [EDI]
     M_WRITE_0<opSize>(pred, dstRegVal, fromEax);
@@ -210,18 +216,20 @@ static BasicBlock *doStosV(BasicBlock *pred) {
     newDst->addIncoming(zeroDst, isZero);
     newDst->addIncoming(oneDst, isOne);
 
-    R_WRITE<bitWidth>(doWrite, X86::RDI, newDst);
+    R_WRITE<bitWidth>(doWrite, rdi, newDst);
 
     return doWrite;
 }
 
 template <int width, int regWidth>
 static BasicBlock *doScasV(BasicBlock *pred) {
+    unsigned rdi = regWidth == 32 ? X86::EDI : X86::RDI;
+    unsigned rax = regWidth == 32 ? X86::EAX : X86::RAX;
     //do a read from the memory pointed to by EDI
-    Value   *dstRegVal = R_READ<regWidth>(pred, X86::RDI);
+    Value   *dstRegVal = R_READ<regWidth>(pred, rdi);
     Value   *fromMem = M_READ_0<width>(pred, dstRegVal);
     //read the value in EAX
-    Value   *fromEax = R_READ<width>(pred, X86::RAX);
+    Value   *fromEax = R_READ<width>(pred, rax);
 
     //perform a subtraction
     Value   *res = BinaryOperator::CreateSub(fromEax, fromMem, "", pred);
@@ -299,7 +307,7 @@ static BasicBlock *doScasV(BasicBlock *pred) {
     newDst->addIncoming(zeroDst, isZero);
     newDst->addIncoming(oneDst, isOne);
 
-    R_WRITE<regWidth>(doWrite, X86::RDI, newDst);
+    R_WRITE<regWidth>(doWrite, rdi, newDst);
 
     return doWrite;
 }
@@ -440,8 +448,10 @@ static BasicBlock *doRep(BasicBlock *b, BasicBlock *bodyB, BasicBlock *bodyE, Cm
     //create a branch in the beginning block to the loop header
     BranchInst::Create(loopHeader, b);
 
+    unsigned rcx = bitWidth == 32 ? X86::ECX : X86::RCX;
+
     // check if ECX == 0; if so, bail
-    Value   *counter_entry = R_READ<bitWidth>(loopHeader, X86::RCX);
+    Value   *counter_entry = R_READ<bitWidth>(loopHeader, rcx);
     Value   *cmp_entry = new ICmpInst(*loopHeader,
                                 CmpInst::ICMP_NE,
                                 counter_entry,
@@ -450,10 +460,10 @@ static BasicBlock *doRep(BasicBlock *b, BasicBlock *bodyB, BasicBlock *bodyE, Cm
     BranchInst::Create(bodyB, rest, cmp_entry, loopHeader);
 
     //Add REP code to the end of the body implementation
-    Value   *cTmp = R_READ<bitWidth>(bodyE, X86::RCX);
+    Value   *cTmp = R_READ<bitWidth>(bodyE, rcx);
     Value   *cTmpDec =
         BinaryOperator::CreateSub(cTmp, CONST_V<bitWidth>(bodyE, 1), "", bodyE);
-    R_WRITE<bitWidth>(bodyE, X86::RCX, cTmpDec);
+    R_WRITE<bitWidth>(bodyE, rcx, cTmpDec);
 
     // check if ECX == 0
     Value   *cmp = new ICmpInst(*bodyE,
