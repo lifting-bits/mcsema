@@ -561,6 +561,13 @@ def handleJmpTable(I, inst, new_eas):
     entries = sanityCheckJumpTableSize(inst, entries)
     for i in xrange(entries):
         je = readers[jsize](jstart+i*jsize)
+        # check if this is an offset based jump table
+        if si.flags & idaapi.SWI_ELBASE == idaapi.SWI_ELBASE:
+            # adjust jump target based on offset in table
+            # we only ever see these as 32-bit offsets, even
+            # when looking at 64-bit applications
+            je = 0xFFFFFFFF & (je + si.elbase)
+
         I.jump_table.table_entries.append(je)
         if je not in RECOVERED_EAS and isStartOfFunction(je):
             new_eas.add(je)
@@ -1737,9 +1744,14 @@ def preprocessBinary():
                         DEBUG("Address accessed via JMP: {:x}\n".format(fulladdr))
                         ACCESSED_VIA_JMP.add(fulladdr)
                         je = readers[esize](fulladdr)
+                        if si.flags & idaapi.SWI_ELBASE == idaapi.SWI_ELBASE:
+                            # adjust jump target based on offset in table
+                            # we only ever see these as 32-bit offsets, even
+                            # when looking at 64-bit applications
+                            je = 0xFFFFFFFF & (je + si.elbase)
                         if je not in jmp_refs:
                             jmp_refs.add(je)
-                            DEBUG("\t\tJMPTable entry not in original; adding ref {:x} => {:x}".format(head, je))
+                            DEBUG("\t\tJMPTable entry not in original; adding ref {:x} => {:x}\n".format(head, je))
                             idc.AddCodeXref(head, je, idc.XREF_USER|idc.fl_F)
                             mark_as_code(je)
             if PIE_MODE:
