@@ -141,7 +141,7 @@ Value *lookupLocal(Function *F, MCSemaRegs reg) {
     BasicBlock  *entry = &F->getEntryBlock();
     BasicBlock::iterator    it = entry->begin();
 
-    std::string localName = std::string(x86::getRegisterName(reg))+"_val";
+    std::string localName = std::string(x86::getRegisterName(reg));
     while(it != entry->end() ) {
         Value   *v = it;
 
@@ -407,7 +407,7 @@ Value *lookupLocal(Function *F, MCSemaRegs reg) {
     BasicBlock  *entry = &F->getEntryBlock();
     BasicBlock::iterator    it = entry->begin();
 
-    std::string localName = std::string(x86_64::getRegisterName(reg))+"_val";
+    std::string localName = std::string(x86_64::getRegisterName(reg));
     while(it != entry->end() ) {
         Value   *v = it;
 

@@ -496,7 +496,7 @@ static InstTransResult doAdcRR(InstPtr ip, BasicBlock *&b,
     return ContinueBlock;
 }
 
-GENERIC_TRANSLATION(ADD16i16, doAddRI<16>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(ADD16i16, doAddRI<16>(ip, block, MCOperand::CreateReg(X86::AX), MCOperand::CreateReg(X86::AX), OP(0)))
 
 GENERIC_TRANSLATION_REF(ADD16mi, 
         doAddMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -582,7 +582,7 @@ GENERIC_TRANSLATION(ADD64rr, doAddRR<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD32rr, doAddRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD32rr_DB, doAddRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADD32rr_REV, doAddRR<32>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(ADD8i8, doAddRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(ADD8i8, doAddRI<8>(ip, block, MCOperand::CreateReg(X86::AL), MCOperand::CreateReg(X86::AL), OP(0)))
 
 GENERIC_TRANSLATION_REF(ADD8mi, 
         doAddMI<8>(ip, block, ADDR_NOREF(0), OP(5)),
