@@ -10,29 +10,74 @@
 #include <boost/cstdint.hpp>
 typedef uint64_t VA;
 
-llvm::Value* archAllocateStack(llvm::Module *M, llvm::Value *stackSize, llvm::BasicBlock *&driverBB);
-llvm::Value* archGetStackSize(llvm::Module *M, llvm::BasicBlock *&driverBB);
-llvm::Value* archFreeStack(llvm::Module *M, llvm::Value *stackAlloc, llvm::BasicBlock *&driverBB);
+llvm::Function *addEntryPointDriver(llvm::Module *M, const std::string &name, VA entry);
+llvm::Function *getExitPointDriver(llvm::Function *F);
+
+
 llvm::Module* archAddCallbacksToModule(llvm::Module *M);
-llvm::Value *archMakeCallbackForLocalFunction(llvm::Module *M, VA local_target);
-void archAddCallValue(llvm::Module *M);
+llvm::Function *archMakeCallback(llvm::Module *M, llvm::Value *call_tgt,
+                                 std::string &callback_name);
+
+llvm::Function *archMakeCallbackForLocalFunction(llvm::Module *M,
+                                                 VA local_target);
+
 void archSetCallingConv(llvm::Module *M, llvm::CallInst *ci);
 void archSetCallingConv(llvm::Module *M, llvm::Function *F);
+
 llvm::GlobalVariable *archGetImageBase(llvm::Module *M);
 unsigned getSystemArch(llvm::Module *M);
 llvm::Triple::OSType getSystemOS(llvm::Module *M);
 unsigned getPointerSize(llvm::Module *M);
 
 typedef enum _SystemArchType {
-    _X86_,
-    _X86_64_
+  _X86_,
+  _X86_64_
 } SystemArchType;
 
 enum PointerSize {
-    PointerAnySize =0,
-    Pointer32 = 32,
-    Pointer64 = 64
+  PointerAnySize = 0,
+  Pointer32 = 32,
+  Pointer64 = 64
 };
 
+
+template <int width>
+static llvm::Value* doSubtractImageBase(
+    llvm::Value *original, llvm::BasicBlock *block) {
+
+    llvm::Module *M = block->getParent()->getParent();
+    llvm::Value *ImageBase = archGetImageBase(M);
+
+    llvm::Type *intWidthTy = llvm::Type::getIntNTy(
+        block->getContext(), width);
+    llvm::Type *ptrWidthTy = llvm::PointerType::get(intWidthTy, 0);
+
+    // convert original value pointer to int
+    llvm::Value *original_int = new llvm::PtrToIntInst(
+        original,
+        llvm::Type::getIntNTy(block->getContext(), 64),
+        "", block);
+
+    // convert image base pointer to int
+    llvm::Value *ImageBase_int = new llvm::PtrToIntInst(
+        ImageBase,
+        llvm::Type::getIntNTy(block->getContext(), 64),
+        "", block);
+
+    // do the subtraction
+    llvm::Value *data_v = llvm::BinaryOperator::CreateSub(
+        original_int,
+        ImageBase_int,
+        "", block);
+
+    // convert back to a pointer
+    llvm::Value *data_ptr = new llvm::IntToPtrInst(data_v, ptrWidthTy, "", block);
+
+    return data_ptr;
+}
+
+bool shouldSubtractImageBase(llvm::Module *M);
+llvm::Value* doSubtractImageBaseInt(llvm::Value *original,
+    llvm::BasicBlock *block);
 
 #endif

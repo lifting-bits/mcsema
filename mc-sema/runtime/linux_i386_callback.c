@@ -36,13 +36,13 @@ void __mcsema_free_alt_stack(size_t stack_size) {
     }
 }
 
-__attribute__((naked)) int __mcsema_inception()
+__attribute__((naked)) int __mcsema_attach_call()
 {
 
     // save preserved registers in struct regs
     __asm__ volatile("movl %%eax, %0\n": "=m"(__mcsema_do_call_state.EAX) );
     __asm__ volatile("popl %eax\n");  // put translated destination into eax
-                                      // it was pushed in the stub that calls __mcsema_inception
+                                      // it was pushed in the stub that calls __mcsema_attach_call
                                       // see linuxArchOps.cpp
     __asm__ volatile("movl %%ebx, %0\n": "=m"(__mcsema_do_call_state.EBX) );
     __asm__ volatile("movl %%ecx, %0\n": "=m"(__mcsema_do_call_state.ECX) );

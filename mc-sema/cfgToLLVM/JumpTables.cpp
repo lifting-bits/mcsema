@@ -172,16 +172,9 @@ void doJumpTableViaData(
         PointerType *FptrTy = PointerType::get(FT, 0);
         fptr = new IntToPtrInst(fptr, FptrTy, "", block);
     }
-
-    //we need to wrap up our current context
-    writeLocalsToContext(block, bitness, ABICallStore);
-
     std::vector<Value*>	subArgs;
     subArgs.push_back(ourF->arg_begin());
     CallInst *c = CallInst::Create(fptr, subArgs, "", block);
-
-    //spill our context back
-    writeContextToLocals(block, bitness, ABIRetSpill);
 }
 
 void doJumpTableViaData(

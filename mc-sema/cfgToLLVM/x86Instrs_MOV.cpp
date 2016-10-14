@@ -572,8 +572,10 @@ int GET_XAX() {
     return X86::EAX;
   } else if (16 == width) {
     return X86::AX;
-  } else {
+  } else if (8 == width) {
     return X86::AL;
+  } else {
+    throw TErr(__LINE__, __FILE__, "Unknown width!");
   }
 }
 

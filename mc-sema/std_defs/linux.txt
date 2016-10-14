@@ -5300,13 +5300,13 @@ DATA: apr_bucket_type_pipe 64
 DATA: apr_bucket_type_pool 64
 DATA: apr_bucket_type_socket 64
 DATA: apr_bucket_type_transient 64
-DATA: apr_current_hooking_module 8
+DATA: apr_current_hooking_module PTR
 DATA: apr_day_snames 32
-DATA: apr_debug_module_hooks 8
-DATA: apr_global_hook_pool 8
-DATA: apr_hook_debug_current 8
+DATA: apr_debug_module_hooks PTR
+DATA: apr_global_hook_pool PTR
+DATA: apr_hook_debug_current PTR
 DATA: apr_hook_debug_enabled 4
-DATA: apr_hook_global_pool 8
+DATA: apr_hook_global_pool PTR
 DATA: apr_month_snames 64
 data_behind 1 C N
 # data definitions
@@ -5315,6 +5315,8 @@ DATA: in6addr_any PTR
 DATA: stderr PTR
 DATA: stdin PTR
 DATA: stdout PTR
+DATA: __gmon_start___ptr PTR
+DATA: __imp___gmon_start__ PTR
 dc1394_bayer_decoding_16bit 7 C N
 dc1394_bayer_decoding_8bit 6 C N
 dc1394_camera_enumerate 2 C N

@@ -1,3 +1,4 @@
+#if 0
 /*
 Copyright (c) 2014, Trail of Bits
 All rights reserved.
@@ -1526,3 +1527,4 @@ Module* addWin32CallbacksToModule(Module *mod) {
 
 	return mod;
 }
+#endif

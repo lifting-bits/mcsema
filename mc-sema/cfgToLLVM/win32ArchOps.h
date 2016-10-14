@@ -7,10 +7,6 @@
 
 typedef uint64_t VA;
 
-llvm::Value *win32GetStackSize(llvm::Module *M, llvm::BasicBlock *&driverBB);
-llvm::Value *win32AllocateStack(llvm::Module *M, llvm::Value *stackSize, llvm::BasicBlock *&driverBB);
-llvm::Value *win32FreeStack(llvm::Value *stackAlloc, llvm::BasicBlock *&driverBB);
-llvm::Value *win32MakeCallbackForLocalFunction(llvm::Module *M, VA local_target);
-void win32AddCallValue(llvm::Module *mod);
+inline static llvm::Function *win32MakeCallbackForLocalFunction(llvm::Module *M, VA local_target) { return nullptr; }
 
 #endif

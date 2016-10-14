@@ -31,21 +31,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <llvm/IR/Module.h>
 
-llvm::Module* addWin32CallbacksToModule(llvm::Module *mod);
-llvm::Value* win32CallVirtualAlloc(llvm::Value *size, llvm::BasicBlock *b);
-llvm::Value* win32GetTib(llvm::BasicBlock *b);
-llvm::Value* win32GetStackSize(llvm::Value *ptr_tib, llvm::BasicBlock *b);
-llvm::Value* win32CallVirtualFree(llvm::Value *addr_to_free, llvm::BasicBlock *b);
-llvm::Value* win32SetAllocationBase(llvm::Value *tib_ptr, 
+inline static llvm::Module* addWin32CallbacksToModule(llvm::Module *mod) { return nullptr; }
+inline static llvm::Value* win32CallVirtualAlloc(llvm::Value *size, llvm::BasicBlock *b) { return nullptr; }
+inline static llvm::Value* win32GetTib(llvm::BasicBlock *b) { return nullptr; }
+inline static llvm::Value* win32GetStackSize(llvm::Value *ptr_tib, llvm::BasicBlock *b) { return nullptr; }
+inline static llvm::Value* win32CallVirtualFree(llvm::Value *addr_to_free, llvm::BasicBlock *b) { return nullptr; }
+inline static llvm::Value* win32SetAllocationBase(llvm::Value *tib_ptr, 
         llvm::BasicBlock *b, 
-        llvm::Value *new_base);
-llvm::Value *win32GetAllocationBase(llvm::Value *tib_ptr, llvm::BasicBlock *b);
-llvm::Value* win32SetStackLimit(llvm::Value *ptr_tib, 
+        llvm::Value *new_base) { return nullptr; }
+inline static llvm::Value *win32GetAllocationBase(llvm::Value *tib_ptr, llvm::BasicBlock *b) { return nullptr; }
+inline static llvm::Value* win32SetStackLimit(llvm::Value *ptr_tib, 
         llvm::BasicBlock *b, 
-        llvm::Value *new_limit);
-llvm::Value* win32GetStackLimit(llvm::Value *ptr_tib, llvm::BasicBlock *b);
-llvm::Value* win32SetStackBase(llvm::Value *ptr_tib, llvm::BasicBlock *b, 
-        llvm::Value *new_base);
-llvm::Value* win32GetStackBase(llvm::Value *ptr_tib, llvm::BasicBlock *b);
+        llvm::Value *new_limit) { return nullptr; }
+inline static llvm::Value* win32GetStackLimit(llvm::Value *ptr_tib, llvm::BasicBlock *b) { return nullptr; }
+inline static llvm::Value* win32SetStackBase(llvm::Value *ptr_tib, llvm::BasicBlock *b, 
+        llvm::Value *new_base) { return nullptr; }
+inline static llvm::Value* win32GetStackBase(llvm::Value *ptr_tib, llvm::BasicBlock *b) { return nullptr; }
 
 #endif

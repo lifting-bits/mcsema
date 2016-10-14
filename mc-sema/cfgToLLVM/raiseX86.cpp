@@ -8,7 +8,6 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
- Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
  Neither the name of the {organization} nor the names of its
@@ -90,21 +89,24 @@ CallingConv::ID getLLVMCC(ExternalCodeRef::CallingConvention cc) {
   return CallingConv::C;
 }
 
-llvm::Value *INTERNAL_M_READ(unsigned width, unsigned addrspace, llvm::BasicBlock *b,
-                             llvm::Value *addr) {
+llvm::Value *INTERNAL_M_READ(unsigned width, unsigned addrspace,
+                             llvm::BasicBlock *b, llvm::Value *addr) {
   llvm::Value *readLoc = addr;
   llvm::LLVMContext &C = b->getContext();
 
-  if (readLoc->getType()->isPointerTy()) {
-    const llvm::DataLayout *DL = b->getDataLayout();
-    llvm::Type *IntPtrTy =  DL->getIntPtrType(C, addrspace);
-    readLoc = new llvm::PtrToIntInst(readLoc, IntPtrTy, "", b);
-  }
-
-  TASSERT(readLoc->getType()->isIntegerTy(), "Expected integer type.");
-
+  auto readLocTy = readLoc->getType();
   llvm::Type *PtrTy = llvm::Type::getIntNPtrTy(C, width, addrspace);
-  readLoc = new llvm::IntToPtrInst(readLoc, PtrTy, "", b);
+
+  if (readLocTy != PtrTy) {
+    if (readLocTy->isPointerTy()) {
+      const llvm::DataLayout *DL = b->getDataLayout();
+      llvm::Type *IntPtrTy = DL->getIntPtrType(C, addrspace);
+      readLoc = new llvm::PtrToIntInst(readLoc, IntPtrTy, "", b);
+    }
+
+    TASSERT(readLoc->getType()->isIntegerTy(), "Expected integer type.");
+    readLoc = new llvm::IntToPtrInst(readLoc, PtrTy, "", b);
+  }
 
   bool is_volatile = addrspace != 0;
   llvm::Instruction *read = noAliasMCSemaScope(
@@ -119,17 +121,20 @@ void INTERNAL_M_WRITE(int width, unsigned addrspace, llvm::BasicBlock *b,
                       llvm::Value *addr, llvm::Value *data) {
   llvm::Value *writeLoc = addr;
   llvm::LLVMContext &C = b->getContext();
-
-  if (writeLoc->getType()->isPointerTy()) {
-    const llvm::DataLayout *DL = b->getDataLayout();
-    llvm::Type *IntPtrTy =  DL->getIntPtrType(C, addrspace);
-    writeLoc = new llvm::PtrToIntInst(writeLoc, IntPtrTy, "", b);
-  }
-
-  TASSERT(writeLoc->getType()->isIntegerTy(), "Expected integer type.");
-
+  auto writeLocTy = writeLoc->getType();
   llvm::Type *PtrTy = llvm::Type::getIntNPtrTy(C, width, addrspace);
-  writeLoc = new llvm::IntToPtrInst(writeLoc, PtrTy, "", b);
+
+  if (writeLocTy != PtrTy) {
+    if (writeLocTy->isPointerTy()) {
+      const llvm::DataLayout *DL = b->getDataLayout();
+      llvm::Type *IntPtrTy = DL->getIntPtrType(C, addrspace);
+      writeLoc = new llvm::PtrToIntInst(writeLoc, IntPtrTy, "", b);
+    }
+
+    TASSERT(writeLoc->getType()->isIntegerTy(), "Expected integer type.");
+
+    writeLoc = new llvm::IntToPtrInst(writeLoc, PtrTy, "", b);
+  }
 
   bool is_volatile = addrspace != 0;
 
@@ -184,25 +189,6 @@ class bfs_cfg_visitor : public boost::default_bfs_visitor {
   void discover_vertex(Vertex u, const Graph & g) const;
 };
 
-Value *lookupLocalByName(Function *F, string localName) {
-  BasicBlock *entry = &F->getEntryBlock();
-  BasicBlock::iterator it = entry->begin();
-
-  localName += "";
-  while (it != entry->end()) {
-    Value *v = it;
-
-    if (v->getName() == localName) {
-      return v;
-    }
-
-    ++it;
-  }
-
-  throw TErr(__LINE__, __FILE__, "localname: " + localName + " is not found");
-  return NULL;
-}
-
 Value *MCRegToValue(BasicBlock *b, unsigned reg) {
   Module *M = b->getParent()->getParent();
 
@@ -214,226 +200,419 @@ Value *MCRegToValue(BasicBlock *b, unsigned reg) {
 }
 
 static int accessOffset(int reg) {
-  switch(reg) {
-    case X86::DH: return 8;
-    case X86::CH: return 8;
-    case X86::BH: return 8;
-    case X86::AH: return 8;
-    default: return 0;
+  switch (reg) {
+    case X86::DH:
+      return 8;
+    case X86::CH:
+      return 8;
+    case X86::BH:
+      return 8;
+    case X86::AH:
+      return 8;
+    default:
+      return 0;
   }
 }
 
 static int readRegWidth(int reg) {
-  switch(reg) {
-    case X86::DH: return 8;
-    case X86::CH: return 8;
-    case X86::BH: return 8;
-    case X86::AH: return 8;
-    case X86::AX: return 16;
-    case X86::AL: return 8;
-    case X86::EAX: return 32;
-    case X86::RAX: return 64;
-    case X86::BX: return 16;
-    case X86::BL: return 8;
-    case X86::EBX: return 32;
-    case X86::RBX: return 64;
-    case X86::CX: return 16;
-    case X86::CL: return 8;
-    case X86::ECX: return 32;
-    case X86::RCX: return 64;
-    case X86::DX: return 16;
-    case X86::DL: return 8;
-    case X86::EDX: return 32;
-    case X86::RDX: return 64;
-    case X86::SIL: return 8;
-    case X86::SI: return 16;
-    case X86::ESI: return 32;
-    case X86::RSI: return 64;
-    case X86::DIL: return 8;
-    case X86::DI: return 16;
-    case X86::EDI: return 32;
-    case X86::RDI: return 64;
-    case X86::SPL: return 8;
-    case X86::SP: return 16;
-    case X86::ESP: return 32;
-    case X86::RSP: return 64;
-    case X86::BPL: return 8;
-    case X86::BP: return 16;
-    case X86::EBP: return 32;
-    case X86::RBP: return 64;
-    case X86::R8B: return 8;
-    case X86::R8W: return 16;
-    case X86::R8D: return 32;
-    case X86::R8: return 64;
-    case X86::R9B: return 8;
-    case X86::R9W: return 16;
-    case X86::R9D: return 32;
-    case X86::R9: return 64;
-    case X86::R10B: return 8;
-    case X86::R10W: return 16;
-    case X86::R10D: return 32;
-    case X86::R10: return 64;
-    case X86::R11B: return 8;
-    case X86::R11W: return 16;
-    case X86::R11D: return 32;
-    case X86::R11: return 64;
-    case X86::R12B: return 8;
-    case X86::R12W: return 16;
-    case X86::R12D: return 32;
-    case X86::R12: return 64;
-    case X86::R13B: return 8;
-    case X86::R13W: return 16;
-    case X86::R13D: return 32;
-    case X86::R13: return 64;
-    case X86::R14B: return 8;
-    case X86::R14W: return 16;
-    case X86::R14D: return 32;
-    case X86::R14: return 64;
-    case X86::R15B: return 8;
-    case X86::R15W: return 16;
-    case X86::R15D: return 32;
-    case X86::R15: return 64;
+  switch (reg) {
+    case X86::DH:
+      return 8;
+    case X86::CH:
+      return 8;
+    case X86::BH:
+      return 8;
+    case X86::AH:
+      return 8;
+    case X86::AX:
+      return 16;
+    case X86::AL:
+      return 8;
+    case X86::EAX:
+      return 32;
+    case X86::RAX:
+      return 64;
+    case X86::BX:
+      return 16;
+    case X86::BL:
+      return 8;
+    case X86::EBX:
+      return 32;
+    case X86::RBX:
+      return 64;
+    case X86::CX:
+      return 16;
+    case X86::CL:
+      return 8;
+    case X86::ECX:
+      return 32;
+    case X86::RCX:
+      return 64;
+    case X86::DX:
+      return 16;
+    case X86::DL:
+      return 8;
+    case X86::EDX:
+      return 32;
+    case X86::RDX:
+      return 64;
+    case X86::SIL:
+      return 8;
+    case X86::SI:
+      return 16;
+    case X86::ESI:
+      return 32;
+    case X86::RSI:
+      return 64;
+    case X86::DIL:
+      return 8;
+    case X86::DI:
+      return 16;
+    case X86::EDI:
+      return 32;
+    case X86::RDI:
+      return 64;
+    case X86::SPL:
+      return 8;
+    case X86::SP:
+      return 16;
+    case X86::ESP:
+      return 32;
+    case X86::RSP:
+      return 64;
+    case X86::BPL:
+      return 8;
+    case X86::BP:
+      return 16;
+    case X86::EBP:
+      return 32;
+    case X86::RBP:
+      return 64;
+    case X86::R8B:
+      return 8;
+    case X86::R8W:
+      return 16;
+    case X86::R8D:
+      return 32;
+    case X86::R8:
+      return 64;
+    case X86::R9B:
+      return 8;
+    case X86::R9W:
+      return 16;
+    case X86::R9D:
+      return 32;
+    case X86::R9:
+      return 64;
+    case X86::R10B:
+      return 8;
+    case X86::R10W:
+      return 16;
+    case X86::R10D:
+      return 32;
+    case X86::R10:
+      return 64;
+    case X86::R11B:
+      return 8;
+    case X86::R11W:
+      return 16;
+    case X86::R11D:
+      return 32;
+    case X86::R11:
+      return 64;
+    case X86::R12B:
+      return 8;
+    case X86::R12W:
+      return 16;
+    case X86::R12D:
+      return 32;
+    case X86::R12:
+      return 64;
+    case X86::R13B:
+      return 8;
+    case X86::R13W:
+      return 16;
+    case X86::R13D:
+      return 32;
+    case X86::R13:
+      return 64;
+    case X86::R14B:
+      return 8;
+    case X86::R14W:
+      return 16;
+    case X86::R14D:
+      return 32;
+    case X86::R14:
+      return 64;
+    case X86::R15B:
+      return 8;
+    case X86::R15W:
+      return 16;
+    case X86::R15D:
+      return 32;
+    case X86::R15:
+      return 64;
 
+    case X86::ST0:
+      return 80;
+    case X86::ST1:
+      return 80;
+    case X86::ST2:
+      return 80;
+    case X86::ST3:
+      return 80;
+    case X86::ST4:
+      return 80;
+    case X86::ST5:
+      return 80;
+    case X86::ST6:
+      return 80;
+    case X86::ST7:
+      return 80;
 
-    case X86::ST0: return 80;
-    case X86::ST1: return 80;
-    case X86::ST2: return 80;
-    case X86::ST3: return 80;
-    case X86::ST4: return 80;
-    case X86::ST5: return 80;
-    case X86::ST6: return 80;
-    case X86::ST7: return 80;
+    case X86::XMM0:
+      return 128;
+    case X86::XMM1:
+      return 128;
+    case X86::XMM2:
+      return 128;
+    case X86::XMM3:
+      return 128;
+    case X86::XMM4:
+      return 128;
+    case X86::XMM5:
+      return 128;
+    case X86::XMM6:
+      return 128;
+    case X86::XMM7:
+      return 128;
+    case X86::XMM8:
+      return 128;
+    case X86::XMM9:
+      return 128;
+    case X86::XMM10:
+      return 128;
+    case X86::XMM11:
+      return 128;
+    case X86::XMM12:
+      return 128;
+    case X86::XMM13:
+      return 128;
+    case X86::XMM14:
+      return 128;
+    case X86::XMM15:
+      return 128;
 
-    case X86::XMM0: return 128;
-    case X86::XMM1: return 128;
-    case X86::XMM2: return 128;
-    case X86::XMM3: return 128;
-    case X86::XMM4: return 128;
-    case X86::XMM5: return 128;
-    case X86::XMM6: return 128;
-    case X86::XMM7: return 128;
-    case X86::XMM8: return 128;
-    case X86::XMM9: return 128;
-    case X86::XMM10: return 128;
-    case X86::XMM11: return 128;
-    case X86::XMM12: return 128;
-    case X86::XMM13: return 128;
-    case X86::XMM14: return 128;
-    case X86::XMM15: return 128;
-
-    case X86::EIP: return 32;
-    case X86::RIP: return 64;
+    case X86::EIP:
+      return 32;
+    case X86::RIP:
+      return 64;
 
     default:
-      throw TErr(__LINE__, __FILE__, "Reg type "+to_string<unsigned>(reg, dec)+" is unknown");
+      throw TErr(__LINE__, __FILE__,
+                 "Reg type " + to_string<unsigned>(reg, dec) + " is unknown");
   }
 
   return -1;
 }
 
 static const char *regName(int reg) {
-  switch(reg) {
-    case X86::DH: return "DH";
-    case X86::CH: return "CH";
-    case X86::BH: return "BH";
-    case X86::AH: return "AH";
-    case X86::AX: return "AX";
-    case X86::AL: return "AL";
-    case X86::EAX: return "EAX";
-    case X86::RAX: return "RAX";
-    case X86::BX: return "BX";
-    case X86::BL: return "BL";
-    case X86::EBX: return "EBX";
-    case X86::RBX: return "RBX";
-    case X86::CX: return "CX";
-    case X86::CL: return "CL";
-    case X86::ECX: return "ECX";
-    case X86::RCX: return "RCX";
-    case X86::DX: return "DX";
-    case X86::DL: return "DL";
-    case X86::EDX: return "EDX";
-    case X86::RDX: return "RDX";
-    case X86::SIL: return "SIL";
-    case X86::SI: return "SI";
-    case X86::ESI: return "ESI";
-    case X86::RSI: return "RSI";
-    case X86::DIL: return "DIL";
-    case X86::DI: return "DI";
-    case X86::EDI: return "EDI";
-    case X86::RDI: return "RDI";
-    case X86::SPL: return "SPL";
-    case X86::SP: return "SP";
-    case X86::ESP: return "ESP";
-    case X86::RSP: return "RSP";
-    case X86::BPL: return "BPL";
-    case X86::BP: return "BP";
-    case X86::EBP: return "EBP";
-    case X86::RBP: return "RBP";
-    case X86::R8B: return "R8B";
-    case X86::R8W: return "R8W";
-    case X86::R8D: return "R8D";
-    case X86::R8: return "R8";
-    case X86::R9B: return "R9B";
-    case X86::R9W: return "R9W";
-    case X86::R9D: return "R9D";
-    case X86::R9: return "R9";
-    case X86::R10B: return "R10B";
-    case X86::R10W: return "R10W";
-    case X86::R10D: return "R10D";
-    case X86::R10: return "R10";
-    case X86::R11B: return "R11B";
-    case X86::R11W: return "R11W";
-    case X86::R11D: return "R11D";
-    case X86::R11: return "R11";
-    case X86::R12B: return "R12B";
-    case X86::R12W: return "R12W";
-    case X86::R12D: return "R12D";
-    case X86::R12: return "R12";
-    case X86::R13B: return "R13B";
-    case X86::R13W: return "R13W";
-    case X86::R13D: return "R13D";
-    case X86::R13: return "R13";
-    case X86::R14B: return "R14B";
-    case X86::R14W: return "R14W";
-    case X86::R14D: return "R14D";
-    case X86::R14: return "R14";
-    case X86::R15B: return "R15B";
-    case X86::R15W: return "R15W";
-    case X86::R15D: return "R15D";
-    case X86::R15: return "R15";
+  switch (reg) {
+    case X86::DH:
+      return "DH";
+    case X86::CH:
+      return "CH";
+    case X86::BH:
+      return "BH";
+    case X86::AH:
+      return "AH";
+    case X86::AX:
+      return "AX";
+    case X86::AL:
+      return "AL";
+    case X86::EAX:
+      return "EAX";
+    case X86::RAX:
+      return "RAX";
+    case X86::BX:
+      return "BX";
+    case X86::BL:
+      return "BL";
+    case X86::EBX:
+      return "EBX";
+    case X86::RBX:
+      return "RBX";
+    case X86::CX:
+      return "CX";
+    case X86::CL:
+      return "CL";
+    case X86::ECX:
+      return "ECX";
+    case X86::RCX:
+      return "RCX";
+    case X86::DX:
+      return "DX";
+    case X86::DL:
+      return "DL";
+    case X86::EDX:
+      return "EDX";
+    case X86::RDX:
+      return "RDX";
+    case X86::SIL:
+      return "SIL";
+    case X86::SI:
+      return "SI";
+    case X86::ESI:
+      return "ESI";
+    case X86::RSI:
+      return "RSI";
+    case X86::DIL:
+      return "DIL";
+    case X86::DI:
+      return "DI";
+    case X86::EDI:
+      return "EDI";
+    case X86::RDI:
+      return "RDI";
+    case X86::SPL:
+      return "SPL";
+    case X86::SP:
+      return "SP";
+    case X86::ESP:
+      return "ESP";
+    case X86::RSP:
+      return "RSP";
+    case X86::BPL:
+      return "BPL";
+    case X86::BP:
+      return "BP";
+    case X86::EBP:
+      return "EBP";
+    case X86::RBP:
+      return "RBP";
+    case X86::R8B:
+      return "R8B";
+    case X86::R8W:
+      return "R8W";
+    case X86::R8D:
+      return "R8D";
+    case X86::R8:
+      return "R8";
+    case X86::R9B:
+      return "R9B";
+    case X86::R9W:
+      return "R9W";
+    case X86::R9D:
+      return "R9D";
+    case X86::R9:
+      return "R9";
+    case X86::R10B:
+      return "R10B";
+    case X86::R10W:
+      return "R10W";
+    case X86::R10D:
+      return "R10D";
+    case X86::R10:
+      return "R10";
+    case X86::R11B:
+      return "R11B";
+    case X86::R11W:
+      return "R11W";
+    case X86::R11D:
+      return "R11D";
+    case X86::R11:
+      return "R11";
+    case X86::R12B:
+      return "R12B";
+    case X86::R12W:
+      return "R12W";
+    case X86::R12D:
+      return "R12D";
+    case X86::R12:
+      return "R12";
+    case X86::R13B:
+      return "R13B";
+    case X86::R13W:
+      return "R13W";
+    case X86::R13D:
+      return "R13D";
+    case X86::R13:
+      return "R13";
+    case X86::R14B:
+      return "R14B";
+    case X86::R14W:
+      return "R14W";
+    case X86::R14D:
+      return "R14D";
+    case X86::R14:
+      return "R14";
+    case X86::R15B:
+      return "R15B";
+    case X86::R15W:
+      return "R15W";
+    case X86::R15D:
+      return "R15D";
+    case X86::R15:
+      return "R15";
 
+    case X86::ST0:
+      return "ST0";
+    case X86::ST1:
+      return "ST1";
+    case X86::ST2:
+      return "ST2";
+    case X86::ST3:
+      return "ST3";
+    case X86::ST4:
+      return "ST4";
+    case X86::ST5:
+      return "ST5";
+    case X86::ST6:
+      return "ST6";
+    case X86::ST7:
+      return "ST7";
 
-    case X86::ST0: return "ST0";
-    case X86::ST1: return "ST1";
-    case X86::ST2: return "ST2";
-    case X86::ST3: return "ST3";
-    case X86::ST4: return "ST4";
-    case X86::ST5: return "ST5";
-    case X86::ST6: return "ST6";
-    case X86::ST7: return "ST7";
+    case X86::XMM0:
+      return "XMM0";
+    case X86::XMM1:
+      return "XMM1";
+    case X86::XMM2:
+      return "XMM2";
+    case X86::XMM3:
+      return "XMM3";
+    case X86::XMM4:
+      return "XMM4";
+    case X86::XMM5:
+      return "XMM5";
+    case X86::XMM6:
+      return "XMM6";
+    case X86::XMM7:
+      return "XMM7";
+    case X86::XMM8:
+      return "XMM8";
+    case X86::XMM9:
+      return "XMM9";
+    case X86::XMM10:
+      return "XMM10";
+    case X86::XMM11:
+      return "XMM11";
+    case X86::XMM12:
+      return "XMM12";
+    case X86::XMM13:
+      return "XMM13";
+    case X86::XMM14:
+      return "XMM14";
+    case X86::XMM15:
+      return "XMM15";
 
-    case X86::XMM0: return "XMM0";
-    case X86::XMM1: return "XMM1";
-    case X86::XMM2: return "XMM2";
-    case X86::XMM3: return "XMM3";
-    case X86::XMM4: return "XMM4";
-    case X86::XMM5: return "XMM5";
-    case X86::XMM6: return "XMM6";
-    case X86::XMM7: return "XMM7";
-    case X86::XMM8: return "XMM8";
-    case X86::XMM9: return "XMM9";
-    case X86::XMM10: return "XMM10";
-    case X86::XMM11: return "XMM11";
-    case X86::XMM12: return "XMM12";
-    case X86::XMM13: return "XMM13";
-    case X86::XMM14: return "XMM14";
-    case X86::XMM15: return "XMM15";
-
-    case X86::EIP: return "EIP";
-    case X86::RIP: return "RIP";
+    case X86::EIP:
+      return "EIP";
+    case X86::RIP:
+      return "RIP";
 
     default:
-      throw TErr(__LINE__, __FILE__, "Reg type "+to_string<unsigned>(reg, dec)+" is unknown");
+      throw TErr(__LINE__, __FILE__,
+                 "Reg type " + to_string<unsigned>(reg, dec) + " is unknown");
   }
 
   return nullptr;
@@ -453,11 +632,21 @@ static std::string regValName(int mc_reg) {
   return ss.str();
 }
 
+Type *BackingRegTy(llvm::Value *V) {
+  if (auto alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(V)) {
+    return alloca_inst->getAllocatedType();
+  } else if (auto gep_inst = llvm::dyn_cast<llvm::GetElementPtrInst>(V)) {
+    return gep_inst->getType()->getArrayElementType();
+  } else {
+    return nullptr;
+  }
+}
+
 void GENERIC_MC_WRITEREG(BasicBlock *b, int mc_reg, Value *v) {
   auto M = b->getParent()->getParent();
   auto &C = M->getContext();
-  auto backing_reg = llvm::dyn_cast<llvm::AllocaInst>(MCRegToValue(b, mc_reg));
-  auto backing_reg_ty = backing_reg->getAllocatedType();
+  auto backing_reg = MCRegToValue(b, mc_reg);
+  auto backing_reg_ty = BackingRegTy(backing_reg);
   auto size = readRegWidth(mc_reg);
   auto index_in_backing_reg = accessOffset(mc_reg) / 8;
   if (32 == size && Pointer64 == getPointerSize(M)) {
@@ -485,13 +674,19 @@ void GENERIC_MC_WRITEREG(BasicBlock *b, int mc_reg, Value *v) {
 
   auto value_ty = Type::getIntNTy(C, value_size);
   auto value_ptr_ty = PointerType::get(value_ty, 0);
-  auto i32_ty = Type::getInt32Ty(C);
-  auto zero = ConstantInt::get(i32_ty, 0, false);
-  auto index = ConstantInt::get(i32_ty, index_in_backing_reg, false);
-  auto cast = new llvm::BitCastInst(backing_reg, value_ptr_ty, "", b);
-  llvm::Value *index_list[] = {index};
-  auto addr = llvm::GetElementPtrInst::Create(
-      cast, index_list, regAddrName(mc_reg), b);
+  llvm::Value *addr = nullptr;
+
+  if (index_in_backing_reg) {
+    auto i32_ty = Type::getInt32Ty(C);
+    auto index = ConstantInt::get(i32_ty, index_in_backing_reg, false);
+    auto cast = new llvm::BitCastInst(backing_reg, value_ptr_ty, "", b);
+    llvm::Value *index_list[] = {index};
+    addr = llvm::GetElementPtrInst::Create(cast, index_list,
+                                           regAddrName(mc_reg), b);
+  } else {
+    addr = new llvm::BitCastInst(backing_reg, value_ptr_ty, regAddrName(mc_reg),
+                                 b);
+  }
 
   new llvm::StoreInst(v, addr, b);
 }
@@ -499,8 +694,8 @@ void GENERIC_MC_WRITEREG(BasicBlock *b, int mc_reg, Value *v) {
 Value *GENERIC_MC_READREG(BasicBlock *b, int mc_reg, int desired_size) {
   auto M = b->getParent()->getParent();
   auto &C = M->getContext();
-  auto backing_reg = llvm::dyn_cast<llvm::AllocaInst>(MCRegToValue(b, mc_reg));
-  auto backing_reg_ty = backing_reg->getAllocatedType();
+  auto backing_reg = MCRegToValue(b, mc_reg);
+  auto backing_reg_ty = BackingRegTy(backing_reg);
   auto desired_ty = llvm::Type::getIntNTy(C, desired_size);
   auto size = readRegWidth(mc_reg);
 
@@ -514,13 +709,20 @@ Value *GENERIC_MC_READREG(BasicBlock *b, int mc_reg, int desired_size) {
     auto index_in_backing_reg = accessOffset(mc_reg) / 8;
     auto dst_ty = Type::getIntNTy(C, size);
     auto dst_ptr_ty = PointerType::get(dst_ty, 0);
-    auto i32_ty = Type::getInt32Ty(C);
-    auto zero = ConstantInt::get(i32_ty, 0, false);
-    auto index = ConstantInt::get(i32_ty, index_in_backing_reg, false);
-    auto cast = new llvm::BitCastInst(backing_reg, dst_ptr_ty, "", b);
-    llvm::Value *index_list[] = {index};
-    auto addr = llvm::GetElementPtrInst::Create(
-        cast, index_list, regAddrName(mc_reg), b);
+
+    llvm::Value *addr = nullptr;
+    if (index_in_backing_reg) {
+      auto i32_ty = Type::getInt32Ty(C);
+      auto index = ConstantInt::get(i32_ty, index_in_backing_reg, false);
+      auto cast = new llvm::BitCastInst(backing_reg, dst_ptr_ty, "", b);
+      llvm::Value *index_list[] = {index};
+      addr = llvm::GetElementPtrInst::Create(cast, index_list,
+                                             regAddrName(mc_reg), b);
+    } else {
+      addr = new llvm::BitCastInst(backing_reg, dst_ptr_ty, regAddrName(mc_reg),
+                                   b);
+    }
+
     val = new llvm::LoadInst(addr, regValName(mc_reg), b);
   }
 
@@ -593,6 +795,66 @@ void F_CLEAR(BasicBlock *b, MCSemaRegs flag) {
 // some instructions, like inc and dec, do not need to do this
 //
 
+namespace x86 {
+static Instruction *GEPLocal(Type *Ty, const char *name, BasicBlock *B) {
+  auto reg = getRegisterFromName(name);
+  auto F = B->getParent();
+  auto &C = F->getContext();
+  auto i32_ty = Type::getInt32Ty(C);
+  llvm::Value *indexes[] = {ConstantInt::get(i32_ty, 0), ConstantInt::get(
+      i32_ty, getRegisterOffset(reg))};
+  auto state_ptr = & *F->arg_begin();
+  Instruction *ptr = GetElementPtrInst::Create(state_ptr, indexes, name, B);
+
+  // Round up to nearest byte size.
+  if (auto IntTy = dyn_cast<IntegerType>(Ty)) {
+    auto bit_width = (IntTy->getBitWidth() + 7) & ~7;
+    if (IntTy->getBitWidth() != bit_width) {
+      auto PtrIntTy = Type::getIntNPtrTy(C, IntTy->getBitWidth());
+
+      ptr->setName(ptr->getName() + "_full");
+      ptr = new BitCastInst(ptr, PtrIntTy, name, B);
+    }
+  }
+
+  return ptr;
+}
+static Instruction *GEPLocal(Type *Ty, const char *name, Instruction *I) {
+  return GEPLocal(Ty, name, I->getParent());
+}
+}  // namespace x86
+
+namespace x86_64 {
+static Instruction *GEPLocal(Type *Ty, const char *name, BasicBlock *B) {
+  auto reg = getRegisterFromName(name);
+  auto F = B->getParent();
+  auto &C = F->getContext();
+  auto i32_ty = Type::getInt32Ty(C);
+  llvm::Value *indexes[] = {ConstantInt::get(i32_ty, 0), ConstantInt::get(
+      i32_ty, getRegisterOffset(reg))};
+  auto state_ptr = & *F->arg_begin();
+  Instruction *ptr = GetElementPtrInst::Create(state_ptr, indexes, name, B);
+
+  // Round up to nearest byte size.
+  if (auto IntTy = dyn_cast<IntegerType>(Ty)) {
+    auto bit_width = (IntTy->getBitWidth() + 7) & ~7;
+    if (IntTy->getBitWidth() != bit_width) {
+      auto PtrIntTy = Type::getIntNPtrTy(C, IntTy->getBitWidth());
+
+      ptr->setName(ptr->getName() + "_full");
+      ptr = new BitCastInst(ptr, PtrIntTy, name, B);
+    }
+  }
+
+  return ptr;
+}
+
+static Instruction *GEPLocal(Type *Ty, const char *name, Instruction *I) {
+  return GEPLocal(Ty, name, I->getParent());
+}
+
+}  // namespace x86
+
 void allocateLocals(Function *F, int bits) {
   //always at the beginning of a function
   //we need to allocate local variables via alloca, these locals will
@@ -604,174 +866,160 @@ void allocateLocals(Function *F, int bits) {
       //UPDATEREGS -- when we add something to 'regs' struct change here
       //create a local for every member in the 'regs' struct
       //create 32-bit width general purpose registers
-      Type *uintTy = Type::getInt32Ty(F->getContext());
-      Instruction *eaxA = new AllocaInst(uintTy, "EAX", begin);
-      Instruction *ebxA = new AllocaInst(uintTy, "EBX", eaxA);
-      Instruction *ecxA = new AllocaInst(uintTy, "ECX", ebxA);
-      Instruction *edxA = new AllocaInst(uintTy, "EDX", ecxA);
-      Instruction *esiA = new AllocaInst(uintTy, "ESI", edxA);
-      Instruction *ediA = new AllocaInst(uintTy, "EDI", esiA);
-      Instruction *ebpA = new AllocaInst(uintTy, "EBP", ediA);
-      Instruction *espA = new AllocaInst(uintTy, "ESP", ebpA);
+      Type *RegTy = Type::getInt32Ty(F->getContext());
+
+      Instruction *eaxA = x86::GEPLocal(RegTy, "XAX", begin);
+      Instruction *ebxA = x86::GEPLocal(RegTy, "XBX", eaxA);
+      Instruction *ecxA = x86::GEPLocal(RegTy, "XCX", ebxA);
+      Instruction *edxA = x86::GEPLocal(RegTy, "XDX", ecxA);
+      Instruction *esiA = x86::GEPLocal(RegTy, "XSI", edxA);
+      Instruction *ediA = x86::GEPLocal(RegTy, "XDI", esiA);
+      Instruction *ebpA = x86::GEPLocal(RegTy, "XBP", ediA);
+      Instruction *espA = x86::GEPLocal(RegTy, "XSP", ebpA);
       //create other fields for flags
 
       Type *boolTy = Type::getInt1Ty(F->getContext());
-      Instruction *zfA = new AllocaInst(boolTy, "ZF", espA);
-      Instruction *sfA = new AllocaInst(boolTy, "PF", zfA);
-      Instruction *ofA = new AllocaInst(boolTy, "AF", sfA);
-      Instruction *cfA = new AllocaInst(boolTy, "CF", ofA);
-      Instruction *pfA = new AllocaInst(boolTy, "SF", cfA);
-      Instruction *afA = new AllocaInst(boolTy, "OF", pfA);
-      Instruction *dfA = new AllocaInst(boolTy, "DF", afA);
+      Instruction *zfA = x86::GEPLocal(boolTy, "ZF", espA);
+      Instruction *sfA = x86::GEPLocal(boolTy, "PF", zfA);
+      Instruction *ofA = x86::GEPLocal(boolTy, "AF", sfA);
+      Instruction *cfA = x86::GEPLocal(boolTy, "CF", ofA);
+      Instruction *pfA = x86::GEPLocal(boolTy, "SF", cfA);
+      Instruction *afA = x86::GEPLocal(boolTy, "OF", pfA);
+      Instruction *dfA = x86::GEPLocal(boolTy, "DF", afA);
       TASSERT(dfA != NULL, "");
 
       // FPU STACK
       Type *floatTy = Type::getX86_FP80Ty(F->getContext());
       // 8 float values make up the ST registers
       Type *floatArrayTy = ArrayType::get(floatTy, 8);
-      Instruction *stRegs = new AllocaInst(floatArrayTy, "STi", dfA);
+      Instruction *stRegs = x86::GEPLocal(floatArrayTy, "STi", afA);
 
-      // sanity check
-      TASSERT(stRegs != NULL, "");
 
       // FPU FLAGS
-      Instruction *fpu_B = new AllocaInst(boolTy, "FPU_B", stRegs);
-      Instruction *fpu_C3 = new AllocaInst(boolTy, "FPU_C3", fpu_B);
+      Instruction *fpu_B = x86::GEPLocal(boolTy, "FPU_FLAG_BUSY", stRegs);
+      Instruction *fpu_C3 = x86::GEPLocal(boolTy, "FPU_FLAG_C3", fpu_B);
 
       // TOP of stack from FPU flags
       // really a 3-bit integer
       Type *topTy = Type::getIntNTy(F->getContext(), 3);
-      Instruction *fpu_TOP = new AllocaInst(topTy, "FPU_TOP", fpu_C3);
+      Instruction *fpu_TOP = x86::GEPLocal(topTy, "FPU_FLAG_TOP", fpu_C3);
       TASSERT(fpu_TOP != NULL, "");
 
-      Instruction *fpu_C2 = new AllocaInst(boolTy, "FPU_C2", fpu_TOP);
-      Instruction *fpu_C1 = new AllocaInst(boolTy, "FPU_C1", fpu_C2);
-      Instruction *fpu_C0 = new AllocaInst(boolTy, "FPU_C0", fpu_C1);
-      Instruction *fpu_ES = new AllocaInst(boolTy, "FPU_ES", fpu_C0);
-      Instruction *fpu_SF = new AllocaInst(boolTy, "FPU_SF", fpu_ES);
-      Instruction *fpu_PE = new AllocaInst(boolTy, "FPU_PE", fpu_SF);
-      Instruction *fpu_UE = new AllocaInst(boolTy, "FPU_UE", fpu_PE);
-      Instruction *fpu_OE = new AllocaInst(boolTy, "FPU_OE", fpu_UE);
-      Instruction *fpu_ZE = new AllocaInst(boolTy, "FPU_ZE", fpu_OE);
-      Instruction *fpu_DE = new AllocaInst(boolTy, "FPU_DE", fpu_ZE);
-      Instruction *fpu_IE = new AllocaInst(boolTy, "FPU_IE", fpu_DE);
+      Instruction *fpu_C2 = x86::GEPLocal(boolTy, "FPU_FLAG_C2", fpu_TOP);
+      Instruction *fpu_C1 = x86::GEPLocal(boolTy, "FPU_FLAG_C1", fpu_C2);
+      Instruction *fpu_C0 = x86::GEPLocal(boolTy, "FPU_FLAG_C0", fpu_C1);
+      Instruction *fpu_ES = x86::GEPLocal(boolTy, "FPU_FLAG_ES", fpu_C0);
+      Instruction *fpu_SF = x86::GEPLocal(boolTy, "FPU_FLAG_SF", fpu_ES);
+      Instruction *fpu_PE = x86::GEPLocal(boolTy, "FPU_FLAG_PE", fpu_SF);
+      Instruction *fpu_UE = x86::GEPLocal(boolTy, "FPU_FLAG_UE", fpu_PE);
+      Instruction *fpu_OE = x86::GEPLocal(boolTy, "FPU_FLAG_OE", fpu_UE);
+      Instruction *fpu_ZE = x86::GEPLocal(boolTy, "FPU_FLAG_ZE", fpu_OE);
+      Instruction *fpu_DE = x86::GEPLocal(boolTy, "FPU_FLAG_DE", fpu_ZE);
+      Instruction *fpu_IE = x86::GEPLocal(boolTy, "FPU_FLAG_IE", fpu_DE);
 
       // sanity check
       TASSERT(fpu_IE != NULL, "");
 
       // FPU CONTROL FLAGS
       Type *int2Ty = Type::getIntNTy(F->getContext(), 2);
-      Instruction *fpu_X = new AllocaInst(boolTy, "FPU_X", fpu_IE);
-      Instruction *fpu_RC = new AllocaInst(int2Ty, "FPU_RC", fpu_X);
-      Instruction *fpu_PC = new AllocaInst(int2Ty, "FPU_PC", fpu_RC);
-      Instruction *fpu_PM = new AllocaInst(boolTy, "FPU_PM", fpu_PC);
-      Instruction *fpu_UM = new AllocaInst(boolTy, "FPU_UM", fpu_PM);
-      Instruction *fpu_OM = new AllocaInst(boolTy, "FPU_OM", fpu_UM);
-      Instruction *fpu_ZM = new AllocaInst(boolTy, "FPU_ZM", fpu_OM);
-      Instruction *fpu_DM = new AllocaInst(boolTy, "FPU_DM", fpu_ZM);
-      Instruction *fpu_IM = new AllocaInst(boolTy, "FPU_IM", fpu_DM);
+      Instruction *fpu_X = x86::GEPLocal(boolTy, "FPU_CONTROL_X", fpu_IE);
+      Instruction *fpu_RC = x86::GEPLocal(int2Ty, "FPU_CONTROL_RC", fpu_X);
+      Instruction *fpu_PC = x86::GEPLocal(int2Ty, "FPU_CONTROL_PC", fpu_RC);
+      Instruction *fpu_PM = x86::GEPLocal(boolTy, "FPU_CONTROL_PM", fpu_PC);
+      Instruction *fpu_UM = x86::GEPLocal(boolTy, "FPU_CONTROL_UM", fpu_PM);
+      Instruction *fpu_OM = x86::GEPLocal(boolTy, "FPU_CONTROL_OM", fpu_UM);
+      Instruction *fpu_ZM = x86::GEPLocal(boolTy, "FPU_CONTROL_ZM", fpu_OM);
+      Instruction *fpu_DM = x86::GEPLocal(boolTy, "FPU_CONTROL_DM", fpu_ZM);
+      Instruction *fpu_IM = x86::GEPLocal(boolTy, "FPU_CONTROL_IM", fpu_DM);
 
       TASSERT(fpu_IM != NULL, "");
 
       // FPU TAG WORD
       // 8 2-bit values. One for each ST register
       Type *tagArrayType = ArrayType::get(int2Ty, 8);
-      Instruction *fpu_TagWord = new AllocaInst(tagArrayType, "FPU_TAG",
-                                                fpu_IM);
+      Instruction *fpu_TagWord = x86::GEPLocal(
+          tagArrayType, "FPU_TAG", fpu_IM);
 
-      TASSERT(fpu_TagWord != NULL, "");
-
-      Instruction *fpu_LASTIP_SEG = new AllocaInst(
+      Instruction *fpu_LASTIP_SEG = x86::GEPLocal(
           Type::getInt16Ty(F->getContext()), "FPU_LASTIP_SEG", fpu_TagWord);
-      Instruction *fpu_LASTIP_OFF = new AllocaInst(
-          Type::getInt32Ty(F->getContext()), "FPU_LASTIP_OFF",
-          fpu_LASTIP_SEG);
-      Instruction *fpu_LASTDATA_SEG = new AllocaInst(
+      Instruction *fpu_LASTIP_OFF = x86::GEPLocal(
+          RegTy, "FPU_LASTIP_OFF", fpu_LASTIP_SEG);
+      Instruction *fpu_LASTDATA_SEG = x86::GEPLocal(
           Type::getInt16Ty(F->getContext()), "FPU_LASTDATA_SEG",
           fpu_LASTIP_OFF);
-      Instruction *fpu_LASTDATA_OFF = new AllocaInst(
-          Type::getInt32Ty(F->getContext()), "FPU_LASTDATA_OFF",
+      Instruction *fpu_LASTDATA_OFF = x86::GEPLocal(
+          RegTy, "FPU_LASTDATA_OFF",
           fpu_LASTDATA_SEG);
 
-      Instruction *fpu_FOPCODE = new AllocaInst(
+      Instruction *fpu_FOPCODE = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE",
           fpu_LASTDATA_OFF);
       TASSERT(fpu_FOPCODE != NULL, "");
 
       //vector registers
-      Instruction *vec_xmm0 = new AllocaInst(
+      Instruction *vec_xmm0 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM0", fpu_FOPCODE);
-      Instruction *vec_xmm1 = new AllocaInst(
+      Instruction *vec_xmm1 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM1", vec_xmm0);
-      Instruction *vec_xmm2 = new AllocaInst(
+      Instruction *vec_xmm2 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM2", vec_xmm1);
-      Instruction *vec_xmm3 = new AllocaInst(
+      Instruction *vec_xmm3 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM3", vec_xmm2);
-      Instruction *vec_xmm4 = new AllocaInst(
+      Instruction *vec_xmm4 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM4", vec_xmm3);
-      Instruction *vec_xmm5 = new AllocaInst(
+      Instruction *vec_xmm5 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM5", vec_xmm4);
-      Instruction *vec_xmm6 = new AllocaInst(
+      Instruction *vec_xmm6 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM6", vec_xmm5);
-      Instruction *vec_xmm7 = new AllocaInst(
+      Instruction *vec_xmm7 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM7", vec_xmm6);
-      Instruction *vec_xmm8 = new AllocaInst(
+      Instruction *vec_xmm8 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM8", vec_xmm7);
-      Instruction *vec_xmm9 = new AllocaInst(
+      Instruction *vec_xmm9 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM9", vec_xmm8);
-      Instruction *vec_xmm10 = new AllocaInst(
+      Instruction *vec_xmm10 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM10", vec_xmm9);
-      Instruction *vec_xmm11 = new AllocaInst(
+      Instruction *vec_xmm11 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM11", vec_xmm10);
-      Instruction *vec_xmm12 = new AllocaInst(
+      Instruction *vec_xmm12 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM12", vec_xmm11);
-      Instruction *vec_xmm13 = new AllocaInst(
+      Instruction *vec_xmm13 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM13", vec_xmm12);
-      Instruction *vec_xmm14 = new AllocaInst(
+      Instruction *vec_xmm14 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM14", vec_xmm13);
-      Instruction *vec_xmm15 = new AllocaInst(
+      Instruction *vec_xmm15 = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM15", vec_xmm14);
 
       // stack base and limit
-      Instruction *stack_base = new AllocaInst(
-          Type::getInt32Ty(F->getContext()), "STACK_BASE", vec_xmm15);
-      Instruction *stack_limit = new AllocaInst(
-          Type::getInt32Ty(F->getContext()), "STACK_LIMIT", stack_base);
-    }
+      Instruction *stack_base = x86::GEPLocal(
+          RegTy, "STACK_BASE", vec_xmm15);
+      Instruction *stack_limit = x86::GEPLocal(
+          RegTy, "STACK_LIMIT", stack_base);
       break;
+    }
 
     case 64: {
       //create 64-bit width general purpose registers
-      Type *uintTy = Type::getInt64Ty(F->getContext());
-      Instruction *raxA = new AllocaInst(uintTy, "RAX", begin);
-      Instruction *rbxA = new AllocaInst(uintTy, "RBX", raxA);
-      Instruction *rcxA = new AllocaInst(uintTy, "RCX", rbxA);
-      Instruction *rdxA = new AllocaInst(uintTy, "RDX", rcxA);
-      Instruction *rsiA = new AllocaInst(uintTy, "RSI", rdxA);
-      Instruction *rdiA = new AllocaInst(uintTy, "RDI", rsiA);
-      Instruction *rbpA = new AllocaInst(uintTy, "RBP", rdiA);
-      Instruction *rspA = new AllocaInst(uintTy, "RSP", rbpA);
+      Type *RegTy = Type::getInt64Ty(F->getContext());
+      Instruction *raxA = x86_64::GEPLocal(RegTy, "XAX", begin);
+      Instruction *rbxA = x86_64::GEPLocal(RegTy, "XBX", raxA);
+      Instruction *rcxA = x86_64::GEPLocal(RegTy, "XCX", rbxA);
+      Instruction *rdxA = x86_64::GEPLocal(RegTy, "XDX", rcxA);
+      Instruction *rsiA = x86_64::GEPLocal(RegTy, "XSI", rdxA);
+      Instruction *rdiA = x86_64::GEPLocal(RegTy, "XDI", rsiA);
+      Instruction *rbpA = x86_64::GEPLocal(RegTy, "XBP", rdiA);
+      Instruction *rspA = x86_64::GEPLocal(RegTy, "XSP", rbpA);
 
-      Instruction *r8A = new AllocaInst(uintTy, "R8", rspA);
-      Instruction *r9A = new AllocaInst(uintTy, "R9", r8A);
-      Instruction *r10A = new AllocaInst(uintTy, "R10", r9A);
-      Instruction *r11A = new AllocaInst(uintTy, "R11", r10A);
-      Instruction *r12A = new AllocaInst(uintTy, "R12", r11A);
-      Instruction *r13A = new AllocaInst(uintTy, "R13", r12A);
-      Instruction *r14A = new AllocaInst(uintTy, "R14", r13A);
-      Instruction *r15A = new AllocaInst(uintTy, "R15", r14A);
-
-      Instruction *ripA = new AllocaInst(uintTy, "RIP", r14A);
       //create other fields for flags
 
       Type *boolTy = Type::getInt1Ty(F->getContext());
-      Instruction *zfA = new AllocaInst(boolTy, "ZF", ripA);
-      Instruction *sfA = new AllocaInst(boolTy, "PF", zfA);
-      Instruction *ofA = new AllocaInst(boolTy, "AF", sfA);
-      Instruction *cfA = new AllocaInst(boolTy, "CF", ofA);
-      Instruction *pfA = new AllocaInst(boolTy, "SF", cfA);
-      Instruction *afA = new AllocaInst(boolTy, "OF", pfA);
-      Instruction *dfA = new AllocaInst(boolTy, "DF", afA);
+      Instruction *zfA = x86_64::GEPLocal(boolTy, "ZF", rspA);
+      Instruction *sfA = x86_64::GEPLocal(boolTy, "PF", zfA);
+      Instruction *ofA = x86_64::GEPLocal(boolTy, "AF", sfA);
+      Instruction *cfA = x86_64::GEPLocal(boolTy, "CF", ofA);
+      Instruction *pfA = x86_64::GEPLocal(boolTy, "SF", cfA);
+      Instruction *afA = x86_64::GEPLocal(boolTy, "OF", pfA);
+      Instruction *dfA = x86_64::GEPLocal(boolTy, "DF", afA);
       TASSERT(dfA != NULL, "");
 
       // FPU STACK
@@ -779,116 +1027,125 @@ void allocateLocals(Function *F, int bits) {
       Type *floatTy = Type::getX86_FP80Ty(F->getContext());
       // 8 float values make up the ST registers
       Type *floatArrayTy = ArrayType::get(floatTy, 8);
-      Instruction *stRegs = new AllocaInst(floatArrayTy, "STi", dfA);
+      Instruction *stRegs = x86_64::GEPLocal(floatArrayTy, "STi", dfA);
 
       // sanity check
       TASSERT(stRegs != NULL, "");
 
       // FPU FLAGS
-      Instruction *fpu_B = new AllocaInst(boolTy, "FPU_B", stRegs);
-      Instruction *fpu_C3 = new AllocaInst(boolTy, "FPU_C3", fpu_B);
+      Instruction *fpu_B = x86_64::GEPLocal(boolTy, "FPU_FLAG_BUSY", stRegs);
+      Instruction *fpu_C3 = x86_64::GEPLocal(boolTy, "FPU_FLAG_C3", fpu_B);
 
       // TOP of stack from FPU flags
       // really a 3-bit integer
       Type *topTy = Type::getIntNTy(F->getContext(), 3);
-      Instruction *fpu_TOP = new AllocaInst(topTy, "FPU_TOP", fpu_C3);
+      Instruction *fpu_TOP = x86_64::GEPLocal(topTy, "FPU_FLAG_TOP", fpu_C3);
       TASSERT(fpu_TOP != NULL, "");
 
-      Instruction *fpu_C2 = new AllocaInst(boolTy, "FPU_C2", fpu_TOP);
-      Instruction *fpu_C1 = new AllocaInst(boolTy, "FPU_C1", fpu_C2);
-      Instruction *fpu_C0 = new AllocaInst(boolTy, "FPU_C0", fpu_C1);
-      Instruction *fpu_ES = new AllocaInst(boolTy, "FPU_ES", fpu_C0);
-      Instruction *fpu_SF = new AllocaInst(boolTy, "FPU_SF", fpu_ES);
-      Instruction *fpu_PE = new AllocaInst(boolTy, "FPU_PE", fpu_SF);
-      Instruction *fpu_UE = new AllocaInst(boolTy, "FPU_UE", fpu_PE);
-      Instruction *fpu_OE = new AllocaInst(boolTy, "FPU_OE", fpu_UE);
-      Instruction *fpu_ZE = new AllocaInst(boolTy, "FPU_ZE", fpu_OE);
-      Instruction *fpu_DE = new AllocaInst(boolTy, "FPU_DE", fpu_ZE);
-      Instruction *fpu_IE = new AllocaInst(boolTy, "FPU_IE", fpu_DE);
+      Instruction *fpu_C2 = x86_64::GEPLocal(boolTy, "FPU_FLAG_C2", fpu_TOP);
+      Instruction *fpu_C1 = x86_64::GEPLocal(boolTy, "FPU_FLAG_C1", fpu_C2);
+      Instruction *fpu_C0 = x86_64::GEPLocal(boolTy, "FPU_FLAG_C0", fpu_C1);
+      Instruction *fpu_ES = x86_64::GEPLocal(boolTy, "FPU_FLAG_ES", fpu_C0);
+      Instruction *fpu_SF = x86_64::GEPLocal(boolTy, "FPU_FLAG_SF", fpu_ES);
+      Instruction *fpu_PE = x86_64::GEPLocal(boolTy, "FPU_FLAG_PE", fpu_SF);
+      Instruction *fpu_UE = x86_64::GEPLocal(boolTy, "FPU_FLAG_UE", fpu_PE);
+      Instruction *fpu_OE = x86_64::GEPLocal(boolTy, "FPU_FLAG_OE", fpu_UE);
+      Instruction *fpu_ZE = x86_64::GEPLocal(boolTy, "FPU_FLAG_ZE", fpu_OE);
+      Instruction *fpu_DE = x86_64::GEPLocal(boolTy, "FPU_FLAG_DE", fpu_ZE);
+      Instruction *fpu_IE = x86_64::GEPLocal(boolTy, "FPU_FLAG_IE", fpu_DE);
 
       // sanity check
       TASSERT(fpu_IE != NULL, "");
 
       // FPU CONTROL FLAGS
       Type *int2Ty = Type::getIntNTy(F->getContext(), 2);
-      Instruction *fpu_X = new AllocaInst(boolTy, "FPU_X", fpu_IE);
-      Instruction *fpu_RC = new AllocaInst(int2Ty, "FPU_RC", fpu_X);
-      Instruction *fpu_PC = new AllocaInst(int2Ty, "FPU_PC", fpu_RC);
-      Instruction *fpu_PM = new AllocaInst(boolTy, "FPU_PM", fpu_PC);
-      Instruction *fpu_UM = new AllocaInst(boolTy, "FPU_UM", fpu_PM);
-      Instruction *fpu_OM = new AllocaInst(boolTy, "FPU_OM", fpu_UM);
-      Instruction *fpu_ZM = new AllocaInst(boolTy, "FPU_ZM", fpu_OM);
-      Instruction *fpu_DM = new AllocaInst(boolTy, "FPU_DM", fpu_ZM);
-      Instruction *fpu_IM = new AllocaInst(boolTy, "FPU_IM", fpu_DM);
+      Instruction *fpu_X = x86_64::GEPLocal(boolTy, "FPU_CONTROL_X", fpu_IE);
+      Instruction *fpu_RC = x86_64::GEPLocal(int2Ty, "FPU_CONTROL_RC", fpu_X);
+      Instruction *fpu_PC = x86_64::GEPLocal(int2Ty, "FPU_CONTROL_PC", fpu_RC);
+      Instruction *fpu_PM = x86_64::GEPLocal(boolTy, "FPU_CONTROL_PM", fpu_PC);
+      Instruction *fpu_UM = x86_64::GEPLocal(boolTy, "FPU_CONTROL_UM", fpu_PM);
+      Instruction *fpu_OM = x86_64::GEPLocal(boolTy, "FPU_CONTROL_OM", fpu_UM);
+      Instruction *fpu_ZM = x86_64::GEPLocal(boolTy, "FPU_CONTROL_ZM", fpu_OM);
+      Instruction *fpu_DM = x86_64::GEPLocal(boolTy, "FPU_CONTROL_DM", fpu_ZM);
+      Instruction *fpu_IM = x86_64::GEPLocal(boolTy, "FPU_CONTROL_IM", fpu_DM);
 
       TASSERT(fpu_IM != NULL, "");
 
       // FPU TAG WORD
       // 8 2-bit values. One for each ST register
       Type *tagArrayType = ArrayType::get(int2Ty, 8);
-      Instruction *fpu_TagWord = new AllocaInst(tagArrayType, "FPU_TAG",
-                                                fpu_IM);
+      Instruction *fpu_TagWord = x86_64::GEPLocal(tagArrayType, "FPU_TAG",
+                                                  fpu_IM);
 
       TASSERT(fpu_TagWord != NULL, "");
 
-      Instruction *fpu_LASTIP_SEG = new AllocaInst(
+      Instruction *fpu_LASTIP_SEG = x86_64::GEPLocal(
           Type::getInt16Ty(F->getContext()), "FPU_LASTIP_SEG", fpu_TagWord);
-      Instruction *fpu_LASTIP_OFF = new AllocaInst(
-          Type::getInt64Ty(F->getContext()), "FPU_LASTIP_OFF",
-          fpu_LASTIP_SEG);
-      Instruction *fpu_LASTDATA_SEG = new AllocaInst(
+      Instruction *fpu_LASTIP_OFF = x86_64::GEPLocal(
+          RegTy, "FPU_LASTIP_OFF", fpu_LASTIP_SEG);
+      Instruction *fpu_LASTDATA_SEG = x86_64::GEPLocal(
           Type::getInt16Ty(F->getContext()), "FPU_LASTDATA_SEG",
           fpu_LASTIP_OFF);
-      Instruction *fpu_LASTDATA_OFF = new AllocaInst(
-          Type::getInt64Ty(F->getContext()), "FPU_LASTDATA_OFF",
+      Instruction *fpu_LASTDATA_OFF = x86_64::GEPLocal(
+          RegTy, "FPU_LASTDATA_OFF",
           fpu_LASTDATA_SEG);
 
-      Instruction *fpu_FOPCODE = new AllocaInst(
+      Instruction *fpu_FOPCODE = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE",
           fpu_LASTDATA_OFF);
       TASSERT(fpu_FOPCODE != NULL, "");
 
       //vector registers
-      Instruction *vec_xmm0 = new AllocaInst(
+      Instruction *vec_xmm0 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM0", fpu_FOPCODE);
-      Instruction *vec_xmm1 = new AllocaInst(
+      Instruction *vec_xmm1 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM1", vec_xmm0);
-      Instruction *vec_xmm2 = new AllocaInst(
+      Instruction *vec_xmm2 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM2", vec_xmm1);
-      Instruction *vec_xmm3 = new AllocaInst(
+      Instruction *vec_xmm3 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM3", vec_xmm2);
-      Instruction *vec_xmm4 = new AllocaInst(
+      Instruction *vec_xmm4 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM4", vec_xmm3);
-      Instruction *vec_xmm5 = new AllocaInst(
+      Instruction *vec_xmm5 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM5", vec_xmm4);
-      Instruction *vec_xmm6 = new AllocaInst(
+      Instruction *vec_xmm6 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM6", vec_xmm5);
-      Instruction *vec_xmm7 = new AllocaInst(
+      Instruction *vec_xmm7 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM7", vec_xmm6);
-      Instruction *vec_xmm8 = new AllocaInst(
+      Instruction *vec_xmm8 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM8", vec_xmm7);
-      Instruction *vec_xmm9 = new AllocaInst(
+      Instruction *vec_xmm9 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM9", vec_xmm8);
-      Instruction *vec_xmm10 = new AllocaInst(
+      Instruction *vec_xmm10 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM10", vec_xmm9);
-      Instruction *vec_xmm11 = new AllocaInst(
+      Instruction *vec_xmm11 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM11", vec_xmm10);
-      Instruction *vec_xmm12 = new AllocaInst(
+      Instruction *vec_xmm12 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM12", vec_xmm11);
-      Instruction *vec_xmm13 = new AllocaInst(
+      Instruction *vec_xmm13 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM13", vec_xmm12);
-      Instruction *vec_xmm14 = new AllocaInst(
+      Instruction *vec_xmm14 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM14", vec_xmm13);
-      Instruction *vec_xmm15 = new AllocaInst(
+      Instruction *vec_xmm15 = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 128), "XMM15", vec_xmm14);
 
       // stack base and limit
-      Instruction *stack_base = new AllocaInst(
-          Type::getInt64Ty(F->getContext()), "STACK_BASE", vec_xmm15);
-      Instruction *stack_limit = new AllocaInst(
-          Type::getInt64Ty(F->getContext()), "STACK_LIMIT", stack_base);
+      Instruction *stack_base = x86_64::GEPLocal(
+          RegTy, "STACK_BASE", vec_xmm15);
+      Instruction *stack_limit = x86_64::GEPLocal(
+          RegTy, "STACK_LIMIT", stack_base);
+
+      Instruction *r8A = x86_64::GEPLocal(RegTy, "R8", stack_limit);
+      Instruction *r9A = x86_64::GEPLocal(RegTy, "R9", r8A);
+      Instruction *r10A = x86_64::GEPLocal(RegTy, "R10", r9A);
+      Instruction *r11A = x86_64::GEPLocal(RegTy, "R11", r10A);
+      Instruction *r12A = x86_64::GEPLocal(RegTy, "R12", r11A);
+      Instruction *r13A = x86_64::GEPLocal(RegTy, "R13", r12A);
+      Instruction *r14A = x86_64::GEPLocal(RegTy, "R14", r13A);
+      Instruction *r15A = x86_64::GEPLocal(RegTy, "R15", r14A);
+      Instruction *ripA = x86_64::GEPLocal(RegTy, "RIP", r14A);
     }
-      break;
+    break;
 
     default:
       throw TErr(__LINE__, __FILE__,
@@ -917,10 +1174,13 @@ InstTransResult disInstr(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
                          Function *F, NativeFunctionPtr natF,
                          NativeModulePtr natM, bool doAnnotation) {
 
-  //add a string representation of this instruction to the CFG
-  //this string representation should be removed by optimizations
+  // Put each instruction into its own basic block.
+  std::stringstream ss;
+  ss << "instr_0x" << std::hex << ip->get_loc();
+  auto instr_block = BasicBlock::Create(F->getContext(), ss.str(), F);
+  BranchInst::Create(instr_block, block);
+  block = instr_block;
 
-  //in the future, we could have different target decoders here
   InstTransResult disInst_result = disInstrX86(ip, block, nb, F, natF, natM);
 
   if (doAnnotation) {
@@ -929,9 +1189,9 @@ InstTransResult disInstr(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
     for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I) {
       VA inst_eip;
       bool had_md;
-      had_md = getAnnotation(&(*I), inst_eip);
+      had_md = getAnnotation( &( *I), inst_eip);
       if (false == had_md) {
-        addAnnotation(&(*I), ip->get_loc());
+        addAnnotation( &( *I), ip->get_loc());
       }
     }
   }
@@ -1037,10 +1297,9 @@ static bool insertFunctionIntoModule(NativeModulePtr mod,
   TASSERT(entryBlock != NULL, "");
 
   allocateLocals(F, getPointerSize(M));
-  //and at the beginning of the function, we spill all the context
 
-  writeContextToLocals(entryBlock, getPointerSize(M), ABICallSpill);
-  //writeContextToLocals(entryBlock, 32, AllRegs);
+  // This is done lazily :-D
+  // writeFPUContextToLocals(entryBlock, getPointerSize(M), ABICallSpill);
 
   //then we put an unconditional branch from the 'entry' block to the first
   //block, and we create the first block
@@ -1093,285 +1352,28 @@ bool doPostAnalysis(NativeModulePtr N, Module *M) {
 
   functionPasses.doInitialization();
   for (Module::iterator i = M->begin(), e = M->end(); i != e; ++i) {
-    functionPasses.run(*i);
+    functionPasses.run( *i);
   }
   functionPasses.doFinalization();
 
-  modulePasses.run(*M);
+  modulePasses.run( *M);
 
   return true;
 }
 
-namespace x86 {
-bool addEntryPointDriverRaw(Module *M, string name, VA entry) {
-  string s("sub_" + to_string<VA>(entry, hex));
-  Function *F = M->getFunction(s);
-
-  if (F != NULL) {
-    vector<Type *> args;
-    vector<Value*> subArg;
-    args.push_back(g_PRegStruct);
-    Type *returnTy = Type::getVoidTy(M->getContext());
-    FunctionType *FT = FunctionType::get(returnTy, args, false);
-
-    // check if driver name already exists.. maybe its the name of an
-    // extcall and we will have a serious conflict?
-
-    Function *driverF = M->getFunction(name);
-    if (driverF == NULL) {
-      // function does not exist. this is good.
-      // insert the function prototype
-      driverF = (Function *) M->getOrInsertFunction(name, FT);
-    } else {
-      throw TErr(__LINE__, __FILE__,
-                 "Cannot insert driver. Function " + name + " already exists.");
-    }
-
-    if (driverF == NULL) {
-      throw TErr(__LINE__, __FILE__,
-                 "Could not get or insert function " + name);
-    }
-
-    //insert the function logical body
-    //insert a primary BB
-    BasicBlock *driverBB = BasicBlock::Create(driverF->getContext(),
-                                              "driverBlockRaw", driverF);
-
-    Function::ArgumentListType::iterator it =
-        driverF->getArgumentList().begin();
-    Function::ArgumentListType::iterator end = driverF->getArgumentList().end();
-
-    while (it != end) {
-      Argument *curArg = it;
-      subArg.push_back(curArg);
-      it++;
-    }
-
-    CallInst* ci = CallInst::Create(F, subArg, "", driverBB);
-    ci->setCallingConv(CallingConv::X86_StdCall);
-    ReturnInst::Create(driverF->getContext(), driverBB);
-    return true;
-  }
-
-  return false;
+static void initADFeatues(llvm::Constant *FC) {
+  auto F = llvm::dyn_cast<llvm::Function>(FC);
+  F->setLinkage(llvm::GlobalValue::ExternalLinkage);
+  F->addFnAttr(llvm::Attribute::Naked);
 }
 
-bool addEntryPointDriver(Module *M, string name, VA entry, int np, bool ret,
-                         raw_ostream &report,
-                         ExternalCodeRef::CallingConvention cconv) {
-  //convert the VA into a string name of a function, try and look it up
-  string s("sub_" + to_string<VA>(entry, hex));
-  Function *F = M->getFunction(s);
-  Type *int32ty = Type::getInt32Ty(M->getContext());
-  Type *int32PtrTy = PointerType::get(int32ty, 0);
-
-  if (F != NULL) {
-    //build function prototype from name and numParms
-    vector<Type *> args;
-
-    for (int i = 0; i < np; i++) {
-      args.push_back(Type::getInt32Ty(M->getContext()));
-    }
-
-    Type *returnTy = NULL;
-    if (ret) {
-      returnTy = Type::getInt32Ty(M->getContext());
-    } else {
-      returnTy = Type::getVoidTy(M->getContext());
-    }
-
-    FunctionType *FT = FunctionType::get(returnTy, args, false);
-
-    //insert the function prototype
-    Function *driverF = (Function *) M->getOrInsertFunction(name, FT);
-    // set drivers calling convention to match user specification
-    driverF->setCallingConv(getLLVMCC(cconv));
-
-    TASSERT(driverF != NULL, "");
-
-    //insert the function logical body
-    //insert a primary BB
-    BasicBlock *driverBB = BasicBlock::Create(driverF->getContext(),
-                                              "driverBlock", driverF);
-
-    //insert an alloca for the register context structure
-    Instruction *aCtx = new AllocaInst(g_RegStruct, "", driverBB);
-    TASSERT(aCtx != NULL, "Could not allocate register context!");
-
-    //write the parameters into the stack
-    Function::ArgumentListType::iterator fwd_it = driverF->getArgumentList()
-        .begin();
-    Function::ArgumentListType::iterator fwd_end = driverF->getArgumentList()
-        .end();
-    AttrBuilder B;
-    B.addAttribute(Attribute::InReg);
-
-    if (cconv == ExternalCodeRef::FastCall) {
-      // make __fastcall functions work:
-      // set ecx to arg[0]
-      if (fwd_it != fwd_end) {
-
-        int k = x86::getRegisterOffset(ECX);
-        Value *ecxFieldGEPV[] = { CONST_V<32>(driverBB, 0), CONST_V<32>(
-            driverBB, k) };
-
-        // make driver take this from register
-        fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 1, B));
-
-        Value *ecxP = GetElementPtrInst::CreateInBounds(aCtx, ecxFieldGEPV, "",
-                                                        driverBB);
-        Argument *curArg = &(*fwd_it);
-        aliasMCSemaScope(new StoreInst(curArg, ecxP, driverBB));
-      }
-      // make __fastcall functions work:
-      // set edx to arg[1]
-      ++fwd_it;
-      if (fwd_it != fwd_end) {
-        int k = x86::getRegisterOffset(EDX);
-        Value *edxFieldGEPV[] = { CONST_V<32>(driverBB, 0), CONST_V<32>(
-            driverBB, k) };
-
-        // make driver take this from register
-        fwd_it->addAttr(AttributeSet::get(fwd_it->getContext(), 2, B));
-
-        Value *edxP = GetElementPtrInst::CreateInBounds(aCtx, edxFieldGEPV, "",
-                                                        driverBB);
-
-        Argument *curArg = &(*fwd_it);
-        aliasMCSemaScope(new StoreInst(curArg, edxP, driverBB));
-      }
-    }  // fastcall
-
-    //write the parameters into the stack
-    Function::ArgumentListType::reverse_iterator it = driverF->getArgumentList()
-        .rbegin();
-    Function::ArgumentListType::reverse_iterator end =
-        driverF->getArgumentList().rend();
-
-    Value *stackSize = archGetStackSize(M, driverBB);
-    Value *aStack = archAllocateStack(M, stackSize, driverBB);
-
-    // position pointer to end of stack
-    Value *stackBaseInt = BinaryOperator::Create(BinaryOperator::Add, aStack,
-                                                 stackSize, "", driverBB);
-    Value *stackPosInt = stackBaseInt;
-
-    // decrement stackPtr to leave some slack space on the stack.
-    // our current implementation of varargs functions just passes
-    // a big number of arguments to the destination function.
-    // This works because they are declared cdecl and the caller cleans up
-    // ... BUT
-    // if there is not enough stack for all these args, we may dereference
-    // unallocated memory. Leave some slack so this doesn't happen.
-    stackPosInt = BinaryOperator::Create(BinaryOperator::Sub, stackPosInt,
-                                         CONST_V<32>(driverBB, 4 * 12), "",
-                                         driverBB);
-
-    // decrement stackPtr once to have a slot for
-    // "return address", even if there are no arguments
-    stackPosInt = BinaryOperator::Create(BinaryOperator::Sub, stackPosInt,
-                                         CONST_V<32>(driverBB, 4), "",
-                                         driverBB);
-
-    int args_to_push = driverF->getArgumentList().size();
-    if (cconv == ExternalCodeRef::FastCall) {
-      // these are already in registers
-      args_to_push -= 2;
-      if (args_to_push < 0) {
-        args_to_push = 0;
-      }
-    }
-
-    // save arguments on the stack
-    while (args_to_push > 0) {
-      Argument *curArg = &(*it);
-      // convert to int32 ptr
-      Value *stackPosPtr = noAliasMCSemaScope(
-          new IntToPtrInst(stackPosInt, int32PtrTy, "", driverBB));
-      // write argument
-      Instruction *k = noAliasMCSemaScope(
-          new StoreInst(curArg, stackPosPtr, driverBB));
-      // decrement stack
-      stackPosInt = BinaryOperator::Create(BinaryOperator::Sub, stackPosInt,
-                                           CONST_V<32>(driverBB, 4), "",
-                                           driverBB);
-      ++it;
-      --args_to_push;
-    }
-
-    int k = x86::getRegisterOffset(ESP);
-    Value *spFieldGEPV[] =
-        { CONST_V<32>(driverBB, 0), CONST_V<32>(driverBB, k) };
-    k = x86::getRegisterOffset(STACK_BASE);
-    Value *stackBaseGEPV[] = { CONST_V<32>(driverBB, 0), CONST_V<32>(driverBB,
-                                                                     k) };
-    k = x86::getRegisterOffset(STACK_LIMIT);
-    Value *stackLimitGEPV[] = { CONST_V<32>(driverBB, 0), CONST_V<32>(driverBB,
-                                                                      k) };
-
-    Value *spValP = GetElementPtrInst::CreateInBounds(aCtx, spFieldGEPV, "",
-                                                      driverBB);
-
-    Value *sBaseValP = GetElementPtrInst::CreateInBounds(aCtx, stackBaseGEPV,
-                                                         "", driverBB);
-
-    Value *sLimitValP = GetElementPtrInst::CreateInBounds(aCtx, stackLimitGEPV,
-                                                          "", driverBB);
-
-    // stack limit = start of allocation (stack grows down);
-    Instruction *tmp1 = aliasMCSemaScope(
-        new StoreInst(aStack, sLimitValP, driverBB));
-    // stack base = stack alloc start + stack size
-    Instruction *tmp2 = aliasMCSemaScope(
-        new StoreInst(stackBaseInt, sBaseValP, driverBB));
-
-    // all functions assume DF is clear on entry
-    k = x86::getRegisterOffset(DF);
-    Value *dflagGEPV[] = { CONST_V<32>(driverBB, 0), CONST_V<32>(driverBB, k) };
-
-    Value *dflagP = GetElementPtrInst::CreateInBounds(aCtx, dflagGEPV, "",
-                                                      driverBB);
-
-    Instruction *tmp3 = aliasMCSemaScope(
-        new StoreInst(CONST_V<1>(driverBB, 0), dflagP, driverBB));
-
-    Instruction *j = aliasMCSemaScope(
-        new StoreInst(stackPosInt, spValP, driverBB));
-    TASSERT(j != NULL, "Could not write stack value to ESP");
-
-    //call the sub function with register struct as argument
-    vector<Value*> subArg;
-
-    subArg.push_back(aCtx);
-
-    CallInst* ci = CallInst::Create(F, subArg, "", driverBB);
-    ci->setCallingConv(CallingConv::X86_StdCall);
-
-    archFreeStack(M, aStack, driverBB);
-
-    //if we are requested, return the EAX value, else return void
-    if (ret) {
-      //do a GEP and load for the EAX register in the reg structure
-      int j = x86::getRegisterOffset(EAX);
-      Value *eaxGEPV[] = { CONST_V<32>(driverBB, 0), CONST_V<32>(driverBB, j) };
-
-      Value *eaxVP = GetElementPtrInst::CreateInBounds(aCtx, eaxGEPV, "",
-                                                       driverBB);
-      Instruction *eaxV = aliasMCSemaScope(new LoadInst(eaxVP, "", driverBB));
-
-      //return that value
-      ReturnInst::Create(driverF->getContext(), eaxV, driverBB);
-    } else {
-      ReturnInst::Create(driverF->getContext(), driverBB);
-    }
-
-  } else {
-    report << "Could not find entry point function\n";
-    return false;
-  }
-
-  return true;
-}
+void initAttachDetach(llvm::Module *M) {
+  auto &C = M->getContext();
+  auto EPTy = llvm::FunctionType::get(llvm::Type::getVoidTy(C), false);
+  initADFeatues(M->getOrInsertFunction("__mcsema_attach_call", EPTy));
+  initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret", EPTy));
+  initADFeatues(M->getOrInsertFunction("__mcsema_detach_call", EPTy));
+  initADFeatues(M->getOrInsertFunction("__mcsema_detach_ret", EPTy));
 }
 
 static Constant* makeConstantBlob(LLVMContext &ctx,
@@ -1418,27 +1420,28 @@ static GlobalVariable* getSectionForDataAddr(const list<DataSection> &dataSecs,
 }
 
 static Constant* getPtrSizedValue(Module *M, Constant *v, int valsize) {
-        Constant *final_val = v;
+  Constant *final_val = v;
 
-        //if(getPointerSize(M) == Pointer32) {
-        //    TASSERT( valsize == 4, "Invalid size of pointer ref")
-        //} else  if(getPointerSize(M) == Pointer64) {
-        //    TASSERT( valsize == 8, "Invalid size of pointer ref")
-        //}
+  //if(getPointerSize(M) == Pointer32) {
+  //    TASSERT( valsize == 4, "Invalid size of pointer ref")
+  //} else  if(getPointerSize(M) == Pointer64) {
+  //    TASSERT( valsize == 8, "Invalid size of pointer ref")
+  //}
 
-        // 
-        // this sometimes doesn't work since LLVM assembler is broken :(
-        //
-        if ( (getPointerSize(M) == Pointer32 && valsize == 4) ||
-                (getPointerSize(M) == Pointer64 && valsize == 8) ) {
-            final_val = v;
-        } else if (getPointerSize(M) == Pointer64 && valsize == 4)  {
-          Constant *int_val = ConstantExpr::getPtrToInt(
-              v, Type::getInt64Ty(M->getContext()));
-          final_val = ConstantExpr::getTrunc(int_val, Type::getInt32Ty(M->getContext()));
-        }
+  //
+  // this sometimes doesn't work since LLVM assembler is broken :(
+  //
+  if ((getPointerSize(M) == Pointer32 && valsize == 4)
+      || (getPointerSize(M) == Pointer64 && valsize == 8)) {
+    final_val = v;
+  } else if (getPointerSize(M) == Pointer64 && valsize == 4) {
+    Constant *int_val = ConstantExpr::getPtrToInt(
+        v, Type::getInt64Ty(M->getContext()));
+    final_val = ConstantExpr::getTrunc(int_val,
+                                       Type::getInt32Ty(M->getContext()));
+  }
 
-        return final_val;
+  return final_val;
 }
 
 void dataSectionToTypesContents(const list<DataSection> &globaldata,
@@ -1475,22 +1478,22 @@ void dataSectionToTypesContents(const list<DataSection> &globaldata,
 
       if (sym_name.find("ext_") == 0) {
 
-        Constant *final_val  = nullptr;
+        Constant *final_val = nullptr;
 
         GlobalValue *ext_v = M->getNamedValue(func_addr_str);
 
-        if(ext_v != nullptr && isa<Function>(ext_v)) {
-            final_val = getPtrSizedValue(M, ext_v, dsec_itr->getSize());
-            //cout << "External function" << sym_name << " has type: " << final_val->getType() << "\n";
-        } else if(ext_v != nullptr) {
-            final_val = getPtrSizedValue(M, ext_v, dsec_itr->getSize());
-            //cout << "External data" << sym_name << " has type: " << final_val->getType() << "\n";
-            // assume ext data
+        if (ext_v != nullptr && isa<Function>(ext_v)) {
+          final_val = getPtrSizedValue(M, ext_v, dsec_itr->getSize());
+          //cout << "External function" << sym_name << " has type: " << final_val->getType() << "\n";
+        } else if (ext_v != nullptr) {
+          final_val = getPtrSizedValue(M, ext_v, dsec_itr->getSize());
+          //cout << "External data" << sym_name << " has type: " << final_val->getType() << "\n";
+          // assume ext data
         } else {
-            TASSERT(ext_v != nullptr, "Could not find external: " + string(func_addr_str));
-            //cout << "External fail" << sym_name << " has type: " << final_val->getType() << "\n";
+          TASSERT(ext_v != nullptr,
+                  "Could not find external: " + string(func_addr_str));
+          //cout << "External fail" << sym_name << " has type: " << final_val->getType() << "\n";
         }
-
 
         secContents.push_back(final_val);
         data_section_types.push_back(final_val->getType());
@@ -1583,7 +1586,7 @@ static bool insertDataSections(NativeModulePtr natMod, Module *M,
     std::cout << bufferName << std::endl;
 
     StructType *st_opaque = StructType::create(M->getContext());
-    GlobalVariable *g = new GlobalVariable(*M, st_opaque, dt.isReadOnly(),
+    GlobalVariable *g = new GlobalVariable( *M, st_opaque, dt.isReadOnly(),
     // Used to be PrivateLinkage, but that emitted
     // .objs that would not link with MSVC
                                            GlobalVariable::InternalLinkage,
@@ -1681,21 +1684,17 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
     //}
 
     //Type *extType = Type::getIntNTy(M->getContext(), dsize * 8);
-    Type *extType = ArrayType::get(Type::getInt8Ty(M->getContext()), 
-            dsize);
+    Type *extType = ArrayType::get(Type::getInt8Ty(M->getContext()), dsize);
 
     GlobalValue *gv = dyn_cast<GlobalValue>(
         M->getOrInsertGlobal(symname, extType));
     TASSERT(gv != NULL, "Could not make global value!");
-    if(dr->isWeak())
-    {
+    if (dr->isWeak()) {
       gv->setLinkage(
           /*GlobalValue::AvailableExternallyLinkage*/GlobalValue::ExternalWeakLinkage);
-    }
-    else
-    {
+    } else {
       gv->setLinkage(
-          /*GlobalValue::AvailableExternallyLinkage*/GlobalValue::ExternalLinkage);
+      /*GlobalValue::AvailableExternallyLinkage*/GlobalValue::ExternalLinkage);
     }
 
     const std::string &triple = M->getTargetTriple();
@@ -1766,12 +1765,9 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
               "Encountered an unknown return type while translating function");
       }
       FunctionType *ft = FunctionType::get(returnType, arguments, false);
-      if(e->isWeak())
-      {
+      if (e->isWeak()) {
         f = Function::Create(ft, GlobalValue::ExternalWeakLinkage, symName, M);
-      }
-      else
-      {
+      } else {
         f = Function::Create(ft, GlobalValue::ExternalLinkage, symName, M);
       }
 
@@ -1797,10 +1793,11 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
     NativeFunctionPtr f = *i;
 
     if (insertFunctionIntoModule(natMod, f, M) == false) {
-        std::string fname = f->get_name();
-        cerr << "Could not insert function: " << fname << " into the LLVM module\n";
-        result = false;
-        break;
+      std::string fname = f->get_name();
+      cerr << "Could not insert function: " << fname
+           << " into the LLVM module\n";
+      result = false;
+      break;
     }
     ++i;
   }

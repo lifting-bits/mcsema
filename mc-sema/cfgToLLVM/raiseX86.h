@@ -73,22 +73,12 @@ llvm::BasicBlock *bbFromStrName(std::string n, llvm::Function *F);
 llvm::Instruction * noAliasMCSemaScope(llvm::Instruction * inst);
 llvm::Instruction * aliasMCSemaScope(llvm::Instruction * inst);
 
-llvm::Value *lookupLocalByName(llvm::Function *F, std::string localName);
-void writeLocalsToContext(llvm::BasicBlock *B, unsigned bits,
-                          StoreSpillType whichRegs);
-void writeContextToLocals(llvm::BasicBlock *B, unsigned bits,
-                          StoreSpillType whichRegs);
-
 // Architecture specific utilities are under namespace
 namespace x86 {
 enum {
   REG_SIZE = 32,
 };
 llvm::Value *MCRegToValue(llvm::BasicBlock *b, unsigned reg);
-int mapPlatRegToOffset(unsigned reg);
-int mapStrToGEPOff(std::string regName);
-int mapStrToFloatOff(std::string regName);
-std::string mapPlatRegToStr(unsigned reg);
 }
 
 namespace x86_64 {
@@ -96,10 +86,6 @@ enum {
   REG_SIZE = 64,
 };
 llvm::Value *MCRegToValue(llvm::BasicBlock *b, unsigned reg);
-int mapPlatRegToOffset(unsigned reg);
-int mapStrToGEPOff(std::string regName);
-int mapStrToFloatOff(std::string regName);
-std::string mapPlatRegToStr(unsigned reg);
 }
 
 template<int width>

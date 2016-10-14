@@ -1,3 +1,4 @@
+#if 0
 /*
 Copyright (c) 2014, Trail of Bits
 All rights reserved.
@@ -77,3 +78,4 @@ Value* emit_aullshr(BasicBlock *&b, BasicBlock *nextb) {
     return retv;
 }
 
+#endif

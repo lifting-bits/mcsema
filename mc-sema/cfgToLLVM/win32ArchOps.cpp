@@ -1,3 +1,4 @@
+#if 0
 #include <string>
 #include <iostream>
 #include <vector>
@@ -34,23 +35,6 @@ static CallingConv::ID getCallingConv(Module *M){
 	} else {
 		return CallingConv::X86_64_Win64;
 	}
-}
-
-
-Value* win32GetStackSize(Module *M, BasicBlock *&driverBB) {
-    Value *pTEB = win32GetTib(driverBB);
-    Value *stackSize = win32GetStackSize(pTEB, driverBB);
-    return stackSize;
-}
-
-Value* win32AllocateStack(Module *M, Value *stackSize, BasicBlock *&driverBB) {
-    Value *aStack = win32CallVirtualAlloc(stackSize, driverBB);
-    return aStack;
-}
-
-Value *win32FreeStack(Value *stackAlloc, BasicBlock *&driverBB) {
-    Value *freeIt = win32CallVirtualFree(stackAlloc, driverBB);
-    return freeIt;
 }
 
 // GEP to get a reg from pro_int_call return
@@ -319,7 +303,7 @@ static Function *win32MakeCallbackStub(Module *M, VA local_target) {
     return F;
 }
 
-llvm::Value *win32MakeCallbackForLocalFunction(Module *M, VA local_target) {
+llvm::Function *win32MakeCallbackForLocalFunction(Module *M, VA local_target) {
     if(!added_callbacks) {
         std::cout << __FUNCTION__ << ": Adding Callbacks to Module!" << std::endl;
         addWin32CallbacksToModule(M);
@@ -642,3 +626,4 @@ void win32AddCallValue(Module *mod) {
 
 }
 
+#endif

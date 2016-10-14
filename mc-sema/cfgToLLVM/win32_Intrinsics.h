@@ -29,4 +29,4 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Value.h"
 
-llvm::Value *emit_aullshr(llvm::BasicBlock *&b, llvm::BasicBlock *nextb);
+inline static llvm::Value *emit_aullshr(llvm::BasicBlock *&b, llvm::BasicBlock *nextb) { return nullptr; }
