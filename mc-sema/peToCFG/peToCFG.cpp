@@ -250,6 +250,10 @@ string NativeFunction::get_name(void) {
     return string("sub_"+to_string<VA>(this->funcEntryVA, hex));
 }
 
+const std::string &NativeFunction::get_symbol_name(void) {
+    return this->funcSymName;
+}
+
 string NativeBlock::get_name(void) {
     return string("block_0x"+to_string<VA>(this->baseAddr, hex));
 }
@@ -419,8 +423,14 @@ NativeBlockPtr  deserializeBlock( const ::Block   &block,
 NativeFunctionPtr deserializeFunction(const ::Function  &func,
                                       LLVMByteDecoder   &decoder)
 {
-  NativeFunctionPtr natF =
-    NativeFunctionPtr(new NativeFunction(func.entry_address()));
+  NativeFunction *nf = nullptr;
+  if (func.has_symbol_name() && !func.symbol_name().empty()) {
+    nf = new NativeFunction(func.entry_address(), func.symbol_name());
+  } else {
+    nf = new NativeFunction(func.entry_address());
+  }
+
+  NativeFunctionPtr natF = NativeFunctionPtr(nf);
 
   //read all the blocks from this function
   for(int i = 0; i < func.blocks_size(); i++)

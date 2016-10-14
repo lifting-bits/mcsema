@@ -28,10 +28,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #ifndef _TO_MODULE_H
 #define _TO_MODULE_H
+
+#include <set>
+
 #include "Externals.h"
 
 //translate a NativeModule into an LLVM Module
-bool natModToModule(NativeModulePtr, llvm::Module *, llvm::raw_ostream &);
+void renameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
+                           const std::set<VA> &entry_point_pcs);
+bool liftNativeCodeIntoModule(NativeModulePtr, llvm::Module *, llvm::raw_ostream &);
 void initAttachDetach(llvm::Module *M);
 bool doPostAnalysis(NativeModulePtr N, llvm::Module *M);
 #endif

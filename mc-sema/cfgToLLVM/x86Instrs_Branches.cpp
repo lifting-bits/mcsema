@@ -227,57 +227,6 @@ static void writeReturnAddr(BasicBlock *B) {
 
 }
 
-static void addCallback(BasicBlock *block, Value *call_tgt) {
-  auto F = block->getParent();
-  auto M = F->getParent();
-
-  std::vector<Type*> FuncTy_9_args;
-  FuncTy_9_args.push_back(call_tgt->getType());
-  FunctionType* FuncTy_9 = FunctionType::get(
-  /*Result=*/Type::getVoidTy(M->getContext()),
-                                             /*Params=*/FuncTy_9_args,
-                                             /*isVarArg=*/false);
-
-  if (getSystemArch(M) == _X86_64_) {
-
-    InlineAsm* ptr_13 = InlineAsm::get(FuncTy_9, "pushq $0\n",
-                                       "imr,~{dirflag},~{fpsr},~{flags}", true);
-    CallInst* void_12 = CallInst::Create(ptr_13, call_tgt, "", block);
-    void_12->setCallingConv(CallingConv::C);
-    void_12->setTailCall(false);
-  } else {
-    InlineAsm* ptr_13 = InlineAsm::get(FuncTy_9, "pushl $0\n",
-                                       "imr,~{dirflag},~{fpsr},~{flags}", true);
-    CallInst* void_12 = CallInst::Create(ptr_13, call_tgt, "", block);
-    void_12->setCallingConv(CallingConv::C);
-    void_12->setTailCall(false);
-  }
-
-  Function *inception = M->getFunction("__mcsema_attach_call");
-
-  std::vector<Type*> call_inception_args;
-  call_inception_args.push_back(inception->getType());
-  FunctionType* call_inception_ty = FunctionType::get(
-      /*Result=*/Type::getVoidTy(M->getContext()),
-      /*Params=*/call_inception_args,
-      /*isVarArg=*/false);
-
-  if (getSystemArch(M) == _X86_64_) {
-
-    InlineAsm* ptr_15 = InlineAsm::get(call_inception_ty, "pushq $0; ret\n",
-                                       "imr,~{dirflag},~{fpsr},~{flags}", true);
-    CallInst* void_14 = CallInst::Create(ptr_15, inception, "", block);
-    void_14->setCallingConv(CallingConv::C);
-    void_14->setTailCall(false);
-  } else {
-    InlineAsm* ptr_15 = InlineAsm::get(call_inception_ty, "pushl $0; ret\n",
-                                       "i,~{dirflag},~{fpsr},~{flags}", true);
-    CallInst* void_14 = CallInst::Create(ptr_15, inception, "", block);
-    void_14->setCallingConv(CallingConv::C);
-    void_14->setTailCall(false);
-  }
-}
-
 static void doCallV(BasicBlock *&block, InstPtr ip, Value *call_addr) {
 
   Function *F = block->getParent();
@@ -285,7 +234,15 @@ static void doCallV(BasicBlock *&block, InstPtr ip, Value *call_addr) {
   auto &C = M->getContext();
   uint32_t bitWidth = getPointerSize(M);
 
-  addCallback(block, call_addr);
+  if (_X86_64_ == getSystemArch(M)) {
+    R_WRITE<64>(block, X86::RIP, call_addr);
+  } else {
+    R_WRITE<32>(block, X86::EIP, call_addr);
+  }
+
+  auto detach = M->getFunction("__mcsema_detach_call_value");
+  auto call_detach = CallInst::Create(detach, "", block);
+  call_detach->setCallingConv(CallingConv::C);
 }
 
 template<int width>

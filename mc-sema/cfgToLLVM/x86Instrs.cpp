@@ -239,9 +239,10 @@ InstTransResult disInstrX86(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
   raw_string_ostream strOut(outS);
   MCInstPrinter *IP = nb->get_printer();
 
-  if (IP == NULL)
+  if (IP == NULL) {
     throw TErr(__LINE__, __FILE__,
                "No instruction printer supplied with native block");
+  }
 
   // For conditional instructions, get the "true" and "false" targets.
   // This will also look up the target for nonconditional jumps.
@@ -256,12 +257,16 @@ InstTransResult disInstrX86(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
     translationPtr = translationDispatchMap[opcode];
     preprocessInstruction(natM, block, ip, inst);
     itr = translationPtr(natM, block, ip, inst);
+    if (TranslateError == itr || TranslateErrorUnsupported == itr) {
+      errs() << "Error translating!";
+      IP->printInst( &inst, errs(), to_string<VA>(ip->get_loc(), hex));
+      errs() << "\n";
+    }
   } else {
     // Instruction translation not defined.
     errs() << "Unsupported!\n";
     // Print out the unhandled opcode.
     errs() << to_string<VA>(ip->get_loc(), hex) << " ";
-    IP->printInst( &inst, strOut, "");
     errs() << strOut.str() << "\n";
     errs() << inst.getOpcode() << "\n";
     if (X86::REP_PREFIX != opcode && X86::REPNE_PREFIX != opcode) {
@@ -271,6 +276,7 @@ InstTransResult disInstrX86(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
           << "Unsupported instruction is a rep/repne, trying to skip to next instr.\n";
     }
   }
+
   //D(cout << __FUNCTION__ << " : " << opcode << "\n";
   //cout.flush();)
   return itr;

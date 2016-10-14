@@ -65,4 +65,4 @@ llvm::Triple *getTargetTriple(const llvm::Target *T);
 extern llvm::StructType  *g_RegStruct;
 extern llvm::PointerType *g_PRegStruct;
 
-void doGlobalInit(llvm::Module *);
+void initRegStateStruct(llvm::Module *);

@@ -26,6 +26,11 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <iostream>
+#include <string>
+#include <sstream>
+
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCDisassembler.h"
 #include "llvm/MC/MCInst.h"
@@ -50,6 +55,8 @@
 #include <toLLVM.h>
 #include <toModule.h>
 #include <raiseX86.h>
+#include <InstructionDispatch.h>
+
 #include "../common/to_string.h"
 #include "../common/LExcn.h"
 #include "../common/Defaults.h"
@@ -59,21 +66,20 @@
 #include <boost/algorithm/string.hpp>
 
 using namespace llvm;
-using namespace std;
 
-static cl::opt<string> OutputFilename("o", cl::desc("Output filename"),
+static cl::opt<std::string> OutputFilename("o", cl::desc("Output filename"),
                                       cl::init("-"),
                                       cl::value_desc("filename"));
 
-static cl::opt<string> InputFilename("i", cl::desc("Input filename"),
+static cl::opt<std::string> InputFilename("i", cl::desc("Input filename"),
                                      cl::value_desc("<filename>"),
                                      cl::Required);
 
-static cl::opt<string> TargetTriple("mtriple", cl::desc("Target Triple"),
+static cl::opt<std::string> TargetTriple("mtriple", cl::desc("Target Triple"),
                                     cl::value_desc("target triple"),
                                     cl::init(DEFAULT_TRIPLE));
 
-static cl::list<string> EntryPoints(
+static cl::list<std::string> EntryPoints(
     "entrypoint", cl::desc("Describe externally visible entry points"),
     cl::value_desc("<symbol | ep address>"));
 
@@ -90,9 +96,8 @@ static cl::opt<bool> ShouldVerify(
     "should-verify", cl::desc("Verify module after bitcode emission?"),
     cl::init(true));
 
-void printVersion(void) {
-  cout << "0.6" << endl;
-  return;
+static void printVersion(void) {
+  std::cout << "0.6" << std::endl;
 }
 
 class block_label_writer {
@@ -104,11 +109,11 @@ class block_label_writer {
     return;
   }
   template<class VertexOrEdge>
-  void operator()(ostream &out, const VertexOrEdge &v) const {
+  void operator()(std::ostream &out, const VertexOrEdge &v) const {
     NativeBlockPtr curB = this->func->block_from_id(v);
 
     if (curB) {
-      string blockS = curB->print_block();
+      std::string blockS = curB->print_block();
       out << "[label=\"" << blockS << "\"]";
     }
 
@@ -116,17 +121,17 @@ class block_label_writer {
   }
 };
 
-void doPrintModule(NativeModulePtr m) {
-  string pathBase = "./";
+static void doPrintModule(NativeModulePtr m) {
+  std::string pathBase = "./";
 
-  list<NativeFunctionPtr> mod_funcs = m->get_funcs();
-  list<NativeFunctionPtr>::iterator it = mod_funcs.begin();
+  std::list<NativeFunctionPtr> mod_funcs = m->get_funcs();
+  std::list<NativeFunctionPtr>::iterator it = mod_funcs.begin();
 
   for (; it != mod_funcs.end(); ++it) {
     NativeFunctionPtr f = *it;
-    string n = pathBase + to_string<uint64_t>(f->get_start(), hex) + ".dot";
+    std::string n = pathBase + to_string<uint64_t>(f->get_start(), std::hex) + ".dot";
 
-    ofstream out(n.c_str());
+    std::ofstream out(n.c_str());
 
     block_label_writer bgl(f);
     CFG g = f->get_cfg();
@@ -136,8 +141,8 @@ void doPrintModule(NativeModulePtr m) {
   return;
 }
 
-llvm::Module *getLLVMModule(string name, const std::string &triple) {
-  llvm::Module *M = new Module(name, llvm::getGlobalContext());
+llvm::Module *createModuleForArch(std::string name, const std::string &triple) {
+  llvm::Module *M = new llvm::Module(name, llvm::getGlobalContext());
   llvm::Triple TT = llvm::Triple(triple);
   M->setTargetTriple(triple);
 
@@ -170,164 +175,26 @@ llvm::Module *getLLVMModule(string name, const std::string &triple) {
   }
 
   M->setDataLayout(layout);
-
-  doGlobalInit(M);
-
   return M;
 }
 
-struct DriverEntry {
-  bool is_raw;
-  bool returns;
-  int argc;
-  string name;
-  string sym;
-  string sign;
-  VA ep;
-  ExternalCodeRef::CallingConvention cconv;
-};
-
-static VA string_to_int(const std::string &s) {
-  VA ret;
-  if (s.size() > 1 && (s[1] == 'x' || s[1] == 'X')) {
-    ret = strtol(s.c_str(), NULL, 16);
-  } else {
-    ret = strtol(s.c_str(), NULL, 10);
-  }
-
-  // sanity check
-  if (ret == 0 && s[0] != '0') {
-    throw LErr(__LINE__, __FILE__, "Could not convert string to int: " + s);
-  }
-
-  return ret;
-}
-
-static bool driverArgsToDriver(const string &args, DriverEntry &new_d) {
-
-  boost::char_separator<char> sep(",");
-  boost::tokenizer<boost::char_separator<char> > toks(args, sep);
-  vector<string> vtok;
-  BOOST_FOREACH(const string &t, toks){
-  vtok.push_back(t);
-}
-
-  if (vtok.size() >= 7) {
-    return false;
-  }
-
-  // take name as is
-  new_d.name = vtok[0];
-
-  string sym_or_ep = vtok[1];
-  char fl = sym_or_ep[0];
-  // if the first letter is 0-9, assume its entry address
-  if (fl >= '0' && fl <= '9') {
-    new_d.sym = "";
-    new_d.ep = string_to_int(sym_or_ep);
-  } else {
-    // if its not, assume entry symbol
-    new_d.ep = 0;
-    new_d.sym = sym_or_ep;
-  }
-
-  // check if this driver is raw
-  boost::algorithm::to_lower(vtok[2]);
-  if (vtok[2] == "raw") {
-    new_d.is_raw = true;
-  } else {
-    // if not, parse number of arguments
-    new_d.is_raw = false;
-    new_d.argc = (int) string_to_int(vtok[2]);
-  }
-
-  // check if this "returns" or "noreturns"
-  boost::algorithm::to_lower(vtok[3]);
-  if (vtok[3] == "return") {
-    new_d.returns = true;
-  } else if (vtok[3] == "noreturn") {
-    new_d.returns = false;
-  } else {
-    return false;
-  }
-
-  if (vtok[4] == "F") {
-    new_d.cconv = ExternalCodeRef::FastCall;
-  } else if (vtok[4] == "C") {
-    new_d.cconv = ExternalCodeRef::CallerCleanup;
-  } else if (vtok[4] == "E") {
-    // default to stdcall
-    new_d.cconv = ExternalCodeRef::CalleeCleanup;
-  } else if (vtok[4] == "S") {
-    // default to stdcall
-    new_d.cconv = ExternalCodeRef::X86_64_SysV;
-  } else if (vtok[4] == "W") {
-    new_d.cconv = ExternalCodeRef::X86_64_Win64;
-  } else {
-    return false;
-  }
-
-  if (vtok.size() >= 6) {
-    boost::algorithm::to_upper(vtok[5]);
-    new_d.sign = vtok[5];
-  }
-
-  return true;
-}
-
-static bool findSymInModule(NativeModulePtr mod, const std::string &sym,
-                            VA &ep) {
-  const vector<NativeModule::EntrySymbol> &syms = mod->getEntryPoints();
-  for (vector<NativeModule::EntrySymbol>::const_iterator itr = syms.begin();
-      itr != syms.end(); itr++) {
-    if (itr->getName() == sym) {
-      ep = itr->getAddr();
-      return true;
+static VA findSymInModule(NativeModulePtr mod, const std::string &sym_name) {
+  for (auto &sym : mod->getEntryPoints()) {
+    if (sym.getName() == sym_name) {
+      return sym.getAddr();
     }
   }
-
-  ep = 0;
-  return false;
-}
-
-// check if an entry point (to_find) is in the list of possible
-// entry points for this module
-static bool findEPInModule(NativeModulePtr mod, VA to_find, VA &ep) {
-  const vector<NativeModule::EntrySymbol> &syms = mod->getEntryPoints();
-  for (vector<NativeModule::EntrySymbol>::const_iterator itr = syms.begin();
-      itr != syms.end(); itr++) {
-    if (itr->getAddr() == to_find) {
-      ep = to_find;
-      return true;
-    }
-  }
-
-  ep = 0;
-  return false;
-}
-
-static bool haveDriverFor(const std::vector<DriverEntry> &drvs,
-                          const std::string &epname) {
-  for (std::vector<DriverEntry>::const_iterator it = drvs.begin();
-      it != drvs.end(); it++) {
-    // already have a driver for this entry point
-    if (epname == it->sym) {
-      cout << "Already have driver for: " << epname << std::endl;
-      return true;
-    }
-  }
-
-  return false;
+  return 0;
 }
 
 int main(int argc, char *argv[]) {
-  cl::SetVersionPrinter(printVersion);
-  cl::ParseCommandLineOptions(argc, argv, "CFG to LLVM");
+  llvm::cl::SetVersionPrinter(printVersion);
+  llvm::cl::ParseCommandLineOptions(argc, argv, "CFG to LLVM");
 
-  InitializeAllTargetInfos();
-  InitializeAllTargetMCs();
-  InitializeAllAsmParsers();
-  InitializeAllDisassemblers();
+  llvm::InitializeAllTargetInfos();
+  llvm::InitializeAllTargetMCs();
+  llvm::InitializeAllAsmParsers();
+  llvm::InitializeAllDisassemblers();
 
   if (InputFilename.empty() || OutputFilename.empty()) {
     std::cerr << "Must specify an input and output file";
@@ -335,8 +202,8 @@ int main(int argc, char *argv[]) {
   }
 
   std::string errstr;
-  std::cerr << "Looking up target..." << endl;
-  const Target *x86Target = TargetRegistry::lookupTarget(TargetTriple, errstr);
+  std::cerr << "Looking up target..." << std::endl;
+  auto x86Target = llvm::TargetRegistry::lookupTarget(TargetTriple, errstr);
 
   if (x86Target == nullptr) {
     std::cerr << "Could not find target triple: " << TargetTriple << std::endl
@@ -345,8 +212,8 @@ int main(int argc, char *argv[]) {
   }
 
   //reproduce NativeModule from CFG input argument
-  std::cerr << "Reading module ..." << endl;
-  NativeModulePtr mod = readModule(InputFilename, ProtoBuff, list<VA>(),
+  std::cerr << "Reading module ..." << std::endl;
+  NativeModulePtr mod = readModule(InputFilename, ProtoBuff, std::list<VA>(),
                                    x86Target);
   if (mod == NULL) {
     std::cerr << "Could not process input module: " << InputFilename
@@ -355,12 +222,12 @@ int main(int argc, char *argv[]) {
   }
 
   // set native module target
-  std::cerr << "Setting initial triples..." << endl;
+  std::cerr << "Setting initial triples..." << std::endl;
   mod->setTarget(x86Target);
   mod->setTargetTriple(TargetTriple);
 
   if ( !mod) {
-    std::cerr << "Unable to read module from CFG" << endl;
+    std::cerr << "Unable to read module from CFG" << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -373,32 +240,40 @@ int main(int argc, char *argv[]) {
   }
 
   //now, convert it to an LLVM module
-  std::cerr << "Getting LLVM module..." << endl;
-  llvm::Module *M = getLLVMModule(mod->name(), TargetTriple);
+  std::cerr << "Getting LLVM module..." << std::endl;
+  llvm::Module *M = createModuleForArch(mod->name(), TargetTriple);
 
   if (!M) {
-    std::cerr << "Unable to get LLVM module" << endl;
+    std::cerr << "Unable to get LLVM module" << std::endl;
     return EXIT_FAILURE;
   }
 
   try {
+    initRegStateStruct(M);
     initAttachDetach(M);
+    initInstructionDispatch();
 
-    std::cerr << "Converting to LLVM..." << endl;
-    if ( !natModToModule(mod, M, outs())) {
-      std::cerr << "Failure to convert to LLVM module!" << endl;
+    std::cerr << "Converting to LLVM..." << std::endl;
+    if (!liftNativeCodeIntoModule(mod, M, outs())) {
+      std::cerr << "Failure to convert to LLVM module!" << std::endl;
       return EXIT_FAILURE;
     }
 
+    std::set<VA> entry_point_pcs;
+
     for (const auto &entry_point_name : EntryPoints) {
-      VA ep = 0;
       std::cerr << "Adding entry point: " << entry_point_name << std::endl;
-      if (findSymInModule(mod, entry_point_name, ep)) {
-        std::cerr << entry_point_name << " is implemented by sub_" << std::hex << ep << std::endl;
-        if (!addEntryPointDriver(M, entry_point_name, ep)) {
+
+      if (auto entry_pc = findSymInModule(mod, entry_point_name)) {
+        std::cerr
+            << entry_point_name << " is implemented by sub_"
+            << std::hex << entry_pc << std::endl;
+
+        if (!addEntryPointDriver(M, entry_point_name, entry_pc)) {
           return EXIT_FAILURE;
         }
 
+        entry_point_pcs.insert(entry_pc);
       } else {
         llvm::errs() << "Could not find entry point: " << entry_point_name
                      << "; aborting\n";
@@ -406,7 +281,9 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    string errorInfo;
+    renameLiftedFunctions(mod, M, entry_point_pcs);
+
+    std::string errorInfo;
     llvm::tool_output_file Out(OutputFilename.c_str(), errorInfo,
                                sys::fs::F_None);
 
@@ -430,7 +307,7 @@ int main(int argc, char *argv[]) {
     WriteBitcodeToFile(M, Out.os());
     Out.keep();
   } catch (std::exception &e) {
-    std::cerr << "error: " << endl << e.what() << endl;
+    std::cerr << "error: " << std::endl << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;

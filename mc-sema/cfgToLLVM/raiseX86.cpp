@@ -52,7 +52,6 @@
 #include "Annotation.h"
 
 #include <vector>
-#include <llvm/IR/InlineAsm.h>
 #include <llvm/IR/MDBuilder.h>
 #include "llvm/IR/InstIterator.h"
 
@@ -868,7 +867,8 @@ void allocateLocals(Function *F, int bits) {
       //create 32-bit width general purpose registers
       Type *RegTy = Type::getInt32Ty(F->getContext());
 
-      Instruction *eaxA = x86::GEPLocal(RegTy, "XAX", begin);
+      Instruction *eipA = x86::GEPLocal(RegTy, "XIP", begin);
+      Instruction *eaxA = x86::GEPLocal(RegTy, "XAX", eipA);
       Instruction *ebxA = x86::GEPLocal(RegTy, "XBX", eaxA);
       Instruction *ecxA = x86::GEPLocal(RegTy, "XCX", ebxA);
       Instruction *edxA = x86::GEPLocal(RegTy, "XDX", ecxA);
@@ -1001,7 +1001,8 @@ void allocateLocals(Function *F, int bits) {
     case 64: {
       //create 64-bit width general purpose registers
       Type *RegTy = Type::getInt64Ty(F->getContext());
-      Instruction *raxA = x86_64::GEPLocal(RegTy, "XAX", begin);
+      Instruction *ripA = x86_64::GEPLocal(RegTy, "XIP", begin);
+      Instruction *raxA = x86_64::GEPLocal(RegTy, "XAX", ripA);
       Instruction *rbxA = x86_64::GEPLocal(RegTy, "XBX", raxA);
       Instruction *rcxA = x86_64::GEPLocal(RegTy, "XCX", rbxA);
       Instruction *rdxA = x86_64::GEPLocal(RegTy, "XDX", rcxA);
@@ -1143,7 +1144,6 @@ void allocateLocals(Function *F, int bits) {
       Instruction *r13A = x86_64::GEPLocal(RegTy, "R13", r12A);
       Instruction *r14A = x86_64::GEPLocal(RegTy, "R14", r13A);
       Instruction *r15A = x86_64::GEPLocal(RegTy, "R15", r14A);
-      Instruction *ripA = x86_64::GEPLocal(RegTy, "RIP", r14A);
     }
     break;
 
@@ -1177,9 +1177,24 @@ InstTransResult disInstr(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
   // Put each instruction into its own basic block.
   std::stringstream ss;
   ss << "instr_0x" << std::hex << ip->get_loc();
-  auto instr_block = BasicBlock::Create(F->getContext(), ss.str(), F);
+  auto &C = F->getContext();
+  auto instr_block = BasicBlock::Create(C, ss.str(), F);
   BranchInst::Create(instr_block, block);
   block = instr_block;
+
+  auto M = F->getParent();
+
+  // Write the instruction pointer into the register state. This makes
+  // debugging easier.
+  if (Pointer32 == getPointerSize(M)) {
+    R_WRITE<32>(
+        block, X86::EIP,
+        llvm::ConstantInt::get(llvm::Type::getInt32Ty(C), ip->get_loc()));
+  } else {
+    R_WRITE<64>(
+        block, X86::RIP,
+        llvm::ConstantInt::get(llvm::Type::getInt64Ty(C), ip->get_loc()));
+  }
 
   InstTransResult disInst_result = disInstrX86(ip, block, nb, F, natF, natM);
 
@@ -1280,9 +1295,10 @@ static bool insertFunctionIntoModule(NativeModulePtr mod,
   //first, get the LLVM function for this native function
   Function *F = M->getFunction(func->get_name());
 
-  if (F == NULL)
+  if (!F) {
     throw TErr(__LINE__, __FILE__, "Could not get func " + func->get_name());
-  //
+  }
+
   if (F->empty() == false) {
     cout << "WARNING: Asking to re-insert function: " << func->get_name()
          << std::endl;
@@ -1322,14 +1338,12 @@ static bool insertFunctionIntoModule(NativeModulePtr mod,
                               boost::vertex(func->entry_block_id(), funcGraph),
                               boost::visitor(v));
 
-  //check that the function we created is valid
+  // For ease of debugging generated code, don't allow lifted functions to
+  // be inlined. This will make lifted and native call graphs one-to-one.
+  F->addFnAttr(llvm::Attribute::NoInline);
 
   //we should be done, having inserted every block into the module
-  if (error) {
-    return false;
-  } else {
-    return true;
-  }
+  return !error;
 }
 
 bool doPostAnalysis(NativeModulePtr N, Module *M) {
@@ -1369,10 +1383,12 @@ static void initADFeatues(llvm::Constant *FC) {
 
 void initAttachDetach(llvm::Module *M) {
   auto &C = M->getContext();
-  auto EPTy = llvm::FunctionType::get(llvm::Type::getVoidTy(C), false);
+  auto VoidTy = llvm::Type::getVoidTy(C);
+  auto EPTy = llvm::FunctionType::get(VoidTy, false);
   initADFeatues(M->getOrInsertFunction("__mcsema_attach_call", EPTy));
   initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret", EPTy));
   initADFeatues(M->getOrInsertFunction("__mcsema_detach_call", EPTy));
+  initADFeatues(M->getOrInsertFunction("__mcsema_detach_call_value", EPTy));
   initADFeatues(M->getOrInsertFunction("__mcsema_detach_ret", EPTy));
 }
 
@@ -1640,7 +1656,29 @@ static bool insertDataSections(NativeModulePtr natMod, Module *M,
 
 }
 
-bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
+void renameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
+                           const std::set<VA> &entry_point_pcs) {
+  list<NativeFunctionPtr> funcs = natMod->get_funcs();
+
+  // Rename the functions to have their 'nice' names, where available.
+  for (auto f : funcs) {
+    if (entry_point_pcs.count(f->get_start())) {
+      continue;
+    }
+    auto sub_name = f->get_name();
+    auto F = M->getFunction(sub_name);
+    std::stringstream ss;
+    ss << "callback_" << sub_name;
+    if (!M->getFunction(ss.str())) {
+      auto &sym_name = f->get_symbol_name();
+      if (!sym_name.empty()) {
+        F->setName(sym_name);
+      }
+    }
+  }
+}
+
+bool liftNativeCodeIntoModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
   bool result = true;
 
   //iterate over every functions CFG we identified in natMod
@@ -1690,11 +1728,9 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
         M->getOrInsertGlobal(symname, extType));
     TASSERT(gv != NULL, "Could not make global value!");
     if (dr->isWeak()) {
-      gv->setLinkage(
-          /*GlobalValue::AvailableExternallyLinkage*/GlobalValue::ExternalWeakLinkage);
+      gv->setLinkage(GlobalValue::ExternalWeakLinkage);
     } else {
-      gv->setLinkage(
-      /*GlobalValue::AvailableExternallyLinkage*/GlobalValue::ExternalLinkage);
+      gv->setLinkage(GlobalValue::ExternalLinkage);
     }
 
     const std::string &triple = M->getTargetTriple();
@@ -1788,11 +1824,8 @@ bool natModToModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
   insertDataSections(natMod, M, report);
 
   // populate functions
-  i = funcs.begin();
-  while (i != funcs.end()) {
-    NativeFunctionPtr f = *i;
-
-    if (insertFunctionIntoModule(natMod, f, M) == false) {
+  for (auto f : funcs) {
+    if (!insertFunctionIntoModule(natMod, f, M)) {
       std::string fname = f->get_name();
       cerr << "Could not insert function: " << fname
            << " into the LLVM module\n";

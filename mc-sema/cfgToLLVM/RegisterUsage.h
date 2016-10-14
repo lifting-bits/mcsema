@@ -61,6 +61,7 @@ enum MCSemaRegs {
   R13 = llvm::X86::R13,
   R14 = llvm::X86::R14,
   R15 = llvm::X86::R15,
+  EIP = llvm::X86::EIP,
   RIP = llvm::X86::RIP,
   CF = llvm::X86::NUM_TARGET_REGS + 1,
   PF = llvm::X86::NUM_TARGET_REGS + 2,

@@ -13,11 +13,6 @@ typedef uint64_t VA;
 llvm::Function *addEntryPointDriver(llvm::Module *M, const std::string &name, VA entry);
 llvm::Function *getExitPointDriver(llvm::Function *F);
 
-
-llvm::Module* archAddCallbacksToModule(llvm::Module *M);
-llvm::Function *archMakeCallback(llvm::Module *M, llvm::Value *call_tgt,
-                                 std::string &callback_name);
-
 llvm::Function *archMakeCallbackForLocalFunction(llvm::Module *M,
                                                  VA local_target);
 

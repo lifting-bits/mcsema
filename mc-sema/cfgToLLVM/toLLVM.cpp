@@ -30,7 +30,6 @@
 #include "raiseX86.h"
 #include "InstructionDispatch.h"
 #include "ArchOps.h"
-#include <llvm/IR/InlineAsm.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/InstrTypes.h>
 #include <cstdio>
@@ -58,7 +57,7 @@ Triple *getTargetTriple(const llvm::Target *T) {
     return new Triple("x86_64", "unknown", "unknown");
 }
 
-void doGlobalInit(Module *M) {
+void initRegStateStruct(Module *M) {
 
   unsigned int regWidth = getPointerSize(M);
 
@@ -66,8 +65,6 @@ void doGlobalInit(Module *M) {
   auto &C = M->getContext();
   StructType *regs = StructType::create(C, "RegState");
   vector<Type *> regFields;
-
-  initInstructionDispatch();
 
   Type *RegTy = IntegerType::getIntNTy(C, regWidth);
   Type *XMMTy = IntegerType::getIntNTy(C, 128);

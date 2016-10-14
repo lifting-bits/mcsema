@@ -225,6 +225,7 @@ def isJmpTable(ea):
 def addFunction(M, ep):
     F = M.internal_funcs.add()
     F.entry_address = ep
+    F.symbol_name = getFunctionName(ep)
     return F
 
 def entryPointHandler(M, ep, name, args_from_stddef=False):

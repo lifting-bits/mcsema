@@ -505,6 +505,7 @@ typedef boost::shared_ptr<NativeBlock> NativeBlockPtr;
 class NativeFunction {
     public:
     NativeFunction(VA b) : funcEntryVA(b), nextBlockID(0), graph(nullptr) { }
+    NativeFunction(VA b, const std::string &sym) : funcEntryVA(b), funcSymName(sym), nextBlockID(0), graph(nullptr) { }
     void add_block(NativeBlockPtr );
     VA get_start(void) { return this->funcEntryVA; }
     uint64_t num_blocks(void) { return this->IDtoBlock.size(); }
@@ -514,6 +515,7 @@ class NativeFunction {
     void compute_graph(void);
     CFG get_cfg(void) { return *this->graph; }
     std::string get_name(void);
+    const std::string &get_symbol_name(void);
     private:
     //a graph of blocks
     CFG                         *graph;
@@ -523,6 +525,7 @@ class NativeFunction {
     std::map<uint64_t, NativeBlockPtr> IDtoBlock;
     //addr of function entry point
     VA                          funcEntryVA;
+    std::string                 funcSymName;
     //next available block ID
     uint64_t                    nextBlockID;
 };

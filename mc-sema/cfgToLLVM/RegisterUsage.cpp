@@ -43,8 +43,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using namespace std;
 using namespace llvm;
 
-
-
 llvm::Value *tryLookupName(llvm::Function *F, const std::string &name) {
   for (auto &I : F->front()) {
     if (I.getName() == name) {
@@ -61,6 +59,7 @@ namespace {
 #define STR(x) STR_(x)
 
 static std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP {
+    {EIP, {0, "XIP"}},
     {RIP, {0, "XIP"}},
 
     {EAX, {1, "XAX"}},
@@ -178,6 +177,7 @@ static std::map<MCSemaRegs, RegInfo> REG_TO_OFFSET_MAP {
 namespace x86 {
 
 static std::map<std::string, MCSemaRegs> NAME_TO_REG = {
+    {"XIP", EIP},
     {"XAX", EAX},
     {"XBX", EBX},
     {"XCX", ECX},
@@ -187,6 +187,7 @@ static std::map<std::string, MCSemaRegs> NAME_TO_REG = {
     {"XBP", EBP},
     {"XSP", ESP},
 
+    {"EIP", EIP},
     {"EAX", EAX},
     {"EBX", EBX},
     {"ECX", ECX},
@@ -370,6 +371,7 @@ Value *MCRegToValue(BasicBlock *b, unsigned reg) {
 namespace x86_64 {
 
 static std::map<std::string, MCSemaRegs> NAME_TO_REG = {
+    {"XIP", RIP},
     {"XAX", RAX},
     {"XBX", RBX},
     {"XCX", RCX},
@@ -378,8 +380,8 @@ static std::map<std::string, MCSemaRegs> NAME_TO_REG = {
     {"XSI", RSI},
     {"XBP", RBP},
     {"XSP", RSP},
-    {"XIP", RIP},
 
+    {"EIP", RIP},
     {"EAX", RAX},
     {"RAX", RAX},
     {"EBX", RBX},
@@ -611,5 +613,3 @@ Value *MCRegToValue(BasicBlock *b, unsigned reg) {
 }
 
 }
-
-

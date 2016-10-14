@@ -18,6 +18,9 @@
 
 namespace {
 
+const ::google::protobuf::Descriptor* OffsetTable_descriptor_ = NULL;
+const ::google::protobuf::internal::GeneratedMessageReflection*
+  OffsetTable_reflection_ = NULL;
 const ::google::protobuf::Descriptor* JumpTbl_descriptor_ = NULL;
 const ::google::protobuf::internal::GeneratedMessageReflection*
   JumpTbl_reflection_ = NULL;
@@ -105,7 +108,24 @@ void protobuf_AssignDesc_CFG_2eproto() {
     ::google::protobuf::DescriptorPool::generated_pool()->FindFileByName(
       "CFG.proto");
   GOOGLE_CHECK(file != NULL);
-  JumpTbl_descriptor_ = file->message_type(0);
+  OffsetTable_descriptor_ = file->message_type(0);
+  static const int OffsetTable_offsets_[3] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(OffsetTable, start_addr_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(OffsetTable, table_offsets_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(OffsetTable, destinations_),
+  };
+  OffsetTable_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      OffsetTable_descriptor_,
+      OffsetTable::default_instance_,
+      OffsetTable_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(OffsetTable, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(OffsetTable, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(OffsetTable));
+  JumpTbl_descriptor_ = file->message_type(1);
   static const int JumpTbl_offsets_[3] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(JumpTbl, table_entries_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(JumpTbl, zero_offset_),
@@ -122,7 +142,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(JumpTbl));
-  JumpIndexTbl_descriptor_ = file->message_type(1);
+  JumpIndexTbl_descriptor_ = file->message_type(2);
   static const int JumpIndexTbl_offsets_[2] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(JumpIndexTbl, table_entries_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(JumpIndexTbl, zero_offset_),
@@ -138,8 +158,8 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(JumpIndexTbl));
-  Instruction_descriptor_ = file->message_type(2);
-  static const int Instruction_offsets_[17] = {
+  Instruction_descriptor_ = file->message_type(3);
+  static const int Instruction_offsets_[18] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, inst_bytes_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, inst_addr_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, true_target_),
@@ -157,6 +177,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, ext_data_name_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, system_call_number_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, local_noreturn_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Instruction, offset_table_addr_),
   };
   Instruction_reflection_ =
     new ::google::protobuf::internal::GeneratedMessageReflection(
@@ -170,7 +191,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Instruction));
   Instruction_RefType_descriptor_ = Instruction_descriptor_->enum_type(0);
-  Block_descriptor_ = file->message_type(3);
+  Block_descriptor_ = file->message_type(4);
   static const int Block_offsets_[3] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Block, insts_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Block, base_address_),
@@ -187,10 +208,11 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Block));
-  Function_descriptor_ = file->message_type(4);
-  static const int Function_offsets_[2] = {
+  Function_descriptor_ = file->message_type(5);
+  static const int Function_offsets_[3] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Function, blocks_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Function, entry_address_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Function, symbol_name_),
   };
   Function_reflection_ =
     new ::google::protobuf::internal::GeneratedMessageReflection(
@@ -203,7 +225,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Function));
-  ExternalFunction_descriptor_ = file->message_type(5);
+  ExternalFunction_descriptor_ = file->message_type(6);
   static const int ExternalFunction_offsets_[7] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalFunction, symbol_name_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalFunction, calling_convention_),
@@ -225,7 +247,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(ExternalFunction));
   ExternalFunction_CallingConvention_descriptor_ = ExternalFunction_descriptor_->enum_type(0);
-  ExternalData_descriptor_ = file->message_type(6);
+  ExternalData_descriptor_ = file->message_type(7);
   static const int ExternalData_offsets_[3] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalData, symbol_name_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ExternalData, data_size_),
@@ -242,7 +264,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(ExternalData));
-  DataSymbol_descriptor_ = file->message_type(7);
+  DataSymbol_descriptor_ = file->message_type(8);
   static const int DataSymbol_offsets_[3] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(DataSymbol, base_address_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(DataSymbol, symbol_name_),
@@ -259,7 +281,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(DataSymbol));
-  Data_descriptor_ = file->message_type(8);
+  Data_descriptor_ = file->message_type(9);
   static const int Data_offsets_[4] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Data, base_address_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Data, data_),
@@ -277,7 +299,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Data));
-  EntrySymbolExtra_descriptor_ = file->message_type(9);
+  EntrySymbolExtra_descriptor_ = file->message_type(10);
   static const int EntrySymbolExtra_offsets_[3] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(EntrySymbolExtra, entry_argc_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(EntrySymbolExtra, entry_cconv_),
@@ -294,7 +316,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(EntrySymbolExtra));
-  EntrySymbol_descriptor_ = file->message_type(10);
+  EntrySymbol_descriptor_ = file->message_type(11);
   static const int EntrySymbol_offsets_[3] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(EntrySymbol, entry_name_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(EntrySymbol, entry_address_),
@@ -311,14 +333,15 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(EntrySymbol));
-  Module_descriptor_ = file->message_type(11);
-  static const int Module_offsets_[6] = {
+  Module_descriptor_ = file->message_type(12);
+  static const int Module_offsets_[7] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Module, internal_funcs_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Module, external_funcs_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Module, internal_data_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Module, module_name_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Module, entries_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Module, external_data_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Module, offset_tables_),
   };
   Module_reflection_ =
     new ::google::protobuf::internal::GeneratedMessageReflection(
@@ -331,7 +354,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Module));
-  Edge_64_descriptor_ = file->message_type(12);
+  Edge_64_descriptor_ = file->message_type(13);
   static const int Edge_64_offsets_[3] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Edge_64, value_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Edge_64, kind_),
@@ -349,7 +372,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Edge_64));
   Edge_64_Kind_descriptor_ = Edge_64_descriptor_->enum_type(0);
-  Edge_32_descriptor_ = file->message_type(13);
+  Edge_32_descriptor_ = file->message_type(14);
   static const int Edge_32_offsets_[3] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Edge_32, value_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Edge_32, kind_),
@@ -367,7 +390,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Edge_32));
   Edge_32_Kind_descriptor_ = Edge_32_descriptor_->enum_type(0);
-  Annotated_Branch_Instruction_descriptor_ = file->message_type(14);
+  Annotated_Branch_Instruction_descriptor_ = file->message_type(15);
   static const int Annotated_Branch_Instruction_offsets_[8] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Annotated_Branch_Instruction, branch_instr_name_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Annotated_Branch_Instruction, is_resolved_),
@@ -390,7 +413,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Annotated_Branch_Instruction));
   Annotated_Branch_Instruction_Branch_descriptor_ = Annotated_Branch_Instruction_descriptor_->enum_type(0);
-  Annotated_Instruction_descriptor_ = file->message_type(15);
+  Annotated_Instruction_descriptor_ = file->message_type(16);
   static const int Annotated_Instruction_offsets_[9] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Annotated_Instruction, instr_name_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Annotated_Instruction, instr_string_),
@@ -431,7 +454,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Annotated_Instruction_Operand));
   Annotated_Instruction_Operand_Operand_Type_descriptor_ = Annotated_Instruction_Operand_descriptor_->enum_type(0);
-  Annotated_Register_32_descriptor_ = file->message_type(16);
+  Annotated_Register_32_descriptor_ = file->message_type(17);
   static const int Annotated_Register_32_offsets_[6] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Annotated_Register_32, name_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Annotated_Register_32, used_at_addr_),
@@ -468,7 +491,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Annotated_Register_32_Property));
   Annotated_Register_32_Register_descriptor_ = Annotated_Register_32_descriptor_->enum_type(0);
-  Annotated_Register_64_descriptor_ = file->message_type(17);
+  Annotated_Register_64_descriptor_ = file->message_type(18);
   static const int Annotated_Register_64_offsets_[6] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Annotated_Register_64, name_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Annotated_Register_64, used_at_addr_),
@@ -505,7 +528,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Annotated_Register_64_Property));
   Annotated_Register_64_Register_descriptor_ = Annotated_Register_64_descriptor_->enum_type(0);
-  Annotated_Function_descriptor_ = file->message_type(18);
+  Annotated_Function_descriptor_ = file->message_type(19);
   static const int Annotated_Function_offsets_[9] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Annotated_Function, name_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Annotated_Function, start_at_addr_),
@@ -528,7 +551,7 @@ void protobuf_AssignDesc_CFG_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(Annotated_Function));
-  Disassembly_descriptor_ = file->message_type(19);
+  Disassembly_descriptor_ = file->message_type(20);
   static const int Disassembly_offsets_[5] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Disassembly, instr_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(Disassembly, branch_instr_),
@@ -559,6 +582,8 @@ inline void protobuf_AssignDescriptorsOnce() {
 
 void protobuf_RegisterTypes(const ::std::string&) {
   protobuf_AssignDescriptorsOnce();
+  ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
+    OffsetTable_descriptor_, &OffsetTable::default_instance());
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
     JumpTbl_descriptor_, &JumpTbl::default_instance());
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
@@ -610,6 +635,8 @@ void protobuf_RegisterTypes(const ::std::string&) {
 }  // namespace
 
 void protobuf_ShutdownFile_CFG_2eproto() {
+  delete OffsetTable::default_instance_;
+  delete OffsetTable_reflection_;
   delete JumpTbl::default_instance_;
   delete JumpTbl_reflection_;
   delete JumpIndexTbl::default_instance_;
@@ -665,10 +692,12 @@ void protobuf_AddDesc_CFG_2eproto() {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
   ::google::protobuf::DescriptorPool::InternalAddGeneratedFile(
-    "\n\tCFG.proto\"O\n\007JumpTbl\022\025\n\rtable_entries\030"
+    "\n\tCFG.proto\"N\n\013OffsetTable\022\022\n\nstart_addr"
+    "\030\001 \002(\003\022\025\n\rtable_offsets\030\002 \003(\003\022\024\n\014destina"
+    "tions\030\003 \003(\003\"O\n\007JumpTbl\022\025\n\rtable_entries\030"
     "\001 \003(\003\022\023\n\013zero_offset\030\002 \002(\005\022\030\n\020offset_fro"
     "m_data\030\003 \001(\003\":\n\014JumpIndexTbl\022\025\n\rtable_en"
-    "tries\030\001 \002(\014\022\023\n\013zero_offset\030\002 \002(\005\"\371\003\n\013Ins"
+    "tries\030\001 \002(\014\022\023\n\013zero_offset\030\002 \002(\005\"\224\004\n\013Ins"
     "truction\022\022\n\ninst_bytes\030\001 \002(\014\022\021\n\tinst_add"
     "r\030\002 \002(\003\022\023\n\013true_target\030\003 \001(\003\022\024\n\014false_ta"
     "rget\030\004 \001(\003\022\020\n\010inst_len\030\005 \002(\005\022\025\n\rimm_refe"
@@ -680,102 +709,105 @@ void protobuf_AddDesc_CFG_2eproto() {
     "\njump_table\030\n \001(\0132\010.JumpTbl\022\'\n\020jump_inde"
     "x_table\030\013 \001(\0132\r.JumpIndexTbl\022\025\n\rext_data"
     "_name\030\014 \001(\t\022\032\n\022system_call_number\030\r \001(\005\022"
-    "\026\n\016local_noreturn\030\016 \001(\010\"#\n\007RefType\022\013\n\007Co"
-    "deRef\020\000\022\013\n\007DataRef\020\001\"Q\n\005Block\022\033\n\005insts\030\001"
-    " \003(\0132\014.Instruction\022\024\n\014base_address\030\002 \002(\003"
-    "\022\025\n\rblock_follows\030\003 \003(\003\"9\n\010Function\022\026\n\006b"
-    "locks\030\001 \003(\0132\006.Block\022\025\n\rentry_address\030\002 \002"
-    "(\003\"\224\002\n\020ExternalFunction\022\023\n\013symbol_name\030\001"
-    " \002(\t\022\?\n\022calling_convention\030\002 \002(\0162#.Exter"
-    "nalFunction.CallingConvention\022\022\n\nhas_ret"
-    "urn\030\003 \002(\010\022\021\n\tno_return\030\004 \002(\010\022\026\n\016argument"
-    "_count\030\005 \002(\005\022\017\n\007is_weak\030\006 \002(\010\022\021\n\tsignatu"
-    "re\030\007 \001(\t\"G\n\021CallingConvention\022\021\n\rCallerC"
-    "leanup\020\000\022\021\n\rCalleeCleanup\020\001\022\014\n\010FastCall\020"
-    "\002\"G\n\014ExternalData\022\023\n\013symbol_name\030\001 \002(\t\022\021"
-    "\n\tdata_size\030\002 \002(\005\022\017\n\007is_weak\030\003 \002(\010\"L\n\nDa"
-    "taSymbol\022\024\n\014base_address\030\001 \002(\003\022\023\n\013symbol"
-    "_name\030\002 \002(\t\022\023\n\013symbol_size\030\003 \002(\005\"[\n\004Data"
-    "\022\024\n\014base_address\030\001 \002(\003\022\014\n\004data\030\002 \002(\014\022\034\n\007"
-    "symbols\030\003 \003(\0132\013.DataSymbol\022\021\n\tread_only\030"
-    "\004 \002(\010\"u\n\020EntrySymbolExtra\022\022\n\nentry_argc\030"
-    "\001 \002(\005\0228\n\013entry_cconv\030\002 \002(\0162#.ExternalFun"
-    "ction.CallingConvention\022\023\n\013does_return\030\003"
-    " \002(\010\"`\n\013EntrySymbol\022\022\n\nentry_name\030\001 \002(\t\022"
-    "\025\n\rentry_address\030\002 \002(\003\022&\n\013entry_extra\030\003 "
-    "\001(\0132\021.EntrySymbolExtra\"\316\001\n\006Module\022!\n\016int"
-    "ernal_funcs\030\001 \003(\0132\t.Function\022)\n\016external"
-    "_funcs\030\002 \003(\0132\021.ExternalFunction\022\034\n\rinter"
-    "nal_data\030\003 \003(\0132\005.Data\022\023\n\013module_name\030\004 \002"
-    "(\t\022\035\n\007entries\030\005 \003(\0132\014.EntrySymbol\022$\n\rext"
-    "ernal_data\030\006 \003(\0132\r.ExternalData\"l\n\007Edge_"
-    "64\022\r\n\005value\030\001 \002(\003\022\033\n\004kind\030\002 \002(\0162\r.Edge_6"
-    "4.Kind\022\r\n\005label\030\003 \001(\010\"&\n\004Kind\022\013\n\007Unknown"
-    "\020\000\022\007\n\003May\020\001\022\010\n\004Must\020\002\"l\n\007Edge_32\022\r\n\005valu"
-    "e\030\001 \002(\005\022\033\n\004kind\030\002 \002(\0162\r.Edge_32.Kind\022\r\n\005"
-    "label\030\003 \001(\010\"&\n\004Kind\022\013\n\007Unknown\020\000\022\007\n\003May\020"
-    "\001\022\010\n\004Must\020\002\"\205\004\n\034Annotated_Branch_Instruc"
-    "tion\022\?\n\021branch_instr_name\030\001 \002(\0162$.Annota"
-    "ted_Branch_Instruction.Branch\022\023\n\013is_reso"
-    "lved\030\002 \002(\010\022\023\n\013is_indirect\030\003 \002(\010\022\026\n\016is_co"
-    "nditional\030\004 \002(\010\022\017\n\007is_leaf\030\005 \002(\010\022\033\n\ttarg"
-    "et_to\030\006 \003(\0132\010.Edge_64\022%\n\005instr\030\007 \002(\0132\026.A"
-    "nnotated_Instruction\022\033\n\023abstract_express"
-    "ion\030\010 \001(\t\"\357\001\n\006Branch\022\013\n\007Unknown\020\000\022\007\n\003jmp"
-    "\020\001\022\010\n\004ljmp\020\002\022\006\n\002jo\020\003\022\007\n\003jno\020\004\022\006\n\002jb\020\005\022\007\n"
-    "\003jae\020\006\022\006\n\002je\020\007\022\007\n\003jne\020\010\022\007\n\003jbe\020\t\022\006\n\002ja\020\n"
-    "\022\006\n\002js\020\013\022\007\n\003jns\020\014\022\006\n\002jp\020\r\022\007\n\003jnp\020\016\022\006\n\002jl"
-    "\020\017\022\007\n\003jge\020\020\022\007\n\003jle\020\021\022\006\n\002jg\020\022\022\n\n\006loopne\020\023"
-    "\022\t\n\005loope\020\024\022\010\n\004loop\020\025\022\t\n\005jCcxz\020\026\022\007\n\003ret\020"
-    "\027\022\010\n\004call\020\030\"\270\003\n\025Annotated_Instruction\022\022\n"
-    "\ninstr_name\030\001 \002(\t\022\024\n\014instr_string\030\002 \002(\t\022"
-    "\021\n\tinst_addr\030\003 \002(\003\022\020\n\010inst_len\030\004 \002(\005\022\020\n\010"
-    "op_count\030\005 \002(\005\022\025\n\rinst_addr_hex\030\006 \001(\t\022\035\n"
-    "\025is_branch_instruction\030\007 \002(\010\0220\n\010argument"
-    "\030\010 \003(\0132\036.Annotated_Instruction.Operand\022 "
-    "\n\016referered_from\030\t \003(\0132\010.Edge_64\032\263\001\n\007Ope"
-    "rand\022\013\n\003pos\030\001 \002(\005\0229\n\004type\030\002 \002(\0162+.Annota"
-    "ted_Instruction.Operand.Operand_Type\022\r\n\005"
-    "value\030\003 \001(\t\"Q\n\014Operand_Type\022\013\n\007Unknown\020\000"
-    "\022\r\n\tImmediate\020\001\022\014\n\010Register\020\002\022\n\n\006Memory\020"
-    "\003\022\013\n\007Address\020\004\"\251\003\n\025Annotated_Register_32"
-    "\022-\n\004name\030\001 \002(\0162\037.Annotated_Register_32.R"
-    "egister\022\024\n\014used_at_addr\030\002 \002(\003\022\030\n\020used_at"
-    "_addr_hex\030\003 \001(\t\022\027\n\005value\030\007 \003(\0132\010.Edge_32"
-    "\022-\n\004fact\030\010 \002(\0132\037.Annotated_Register_32.P"
-    "roperty\022\033\n\023abstract_expression\030\t \001(\t\032*\n\010"
-    "Property\022\017\n\007Unknown\030\001 \002(\010\022\r\n\005Alive\030\002 \001(\010"
-    "\"\237\001\n\010Register\022\013\n\007Unknown\020\000\022\007\n\003eax\020\001\022\007\n\003e"
-    "cx\020\002\022\007\n\003edx\020\003\022\007\n\003ebx\020\004\022\007\n\003esp\020\005\022\007\n\003ebp\020\006"
-    "\022\007\n\003esi\020\007\022\007\n\003edi\020\010\022\007\n\003eip\020\t\022\013\n\007fs_base\020\n"
-    "\022\013\n\007gs_base\020\013\022\007\n\003gtd\020\014\022\007\n\003ldt\020\r\022\t\n\005mxcsr"
-    "\020\016\"\344\003\n\025Annotated_Register_64\022-\n\004name\030\001 \002"
-    "(\0162\037.Annotated_Register_64.Register\022\024\n\014u"
-    "sed_at_addr\030\002 \002(\003\022\030\n\020used_at_addr_hex\030\003 "
-    "\001(\t\022\027\n\005value\030\004 \003(\0132\010.Edge_64\022-\n\004fact\030\005 \002"
-    "(\0132\037.Annotated_Register_64.Property\022\033\n\023a"
-    "bstract_expression\030\006 \001(\t\032*\n\010Property\022\017\n\007"
-    "Unknown\030\001 \002(\010\022\r\n\005Alive\030\002 \001(\010\"\332\001\n\010Registe"
-    "r\022\013\n\007Unknown\020\000\022\007\n\003rax\020\n\022\007\n\003rcx\020\013\022\007\n\003rdx\020"
-    "\014\022\007\n\003rbx\020\r\022\007\n\003rsp\020\016\022\007\n\003rbp\020\017\022\007\n\003rsi\020\020\022\007\n"
-    "\003rdi\020\021\022\007\n\003rip\020\022\022\006\n\002r8\020\023\022\006\n\002r9\020\024\022\007\n\003r10\020\025"
-    "\022\007\n\003r11\020\026\022\007\n\003r12\020\027\022\007\n\003r13\020\030\022\007\n\003r14\020\031\022\007\n\003"
-    "r15\020\032\022\013\n\007fs_base\020\033\022\013\n\007gs_base\020\034\022\007\n\003gdt\020\035"
-    "\022\007\n\003ldt\020\036\"\215\002\n\022Annotated_Function\022\014\n\004name"
-    "\030\001 \002(\t\022\025\n\rstart_at_addr\030\002 \002(\003\022\031\n\021start_a"
-    "t_addr_hex\030\003 \001(\t\022\023\n\013end_at_addr\030\004 \001(\003\022\027\n"
-    "\017end_at_addr_hex\030\005 \001(\t\022&\n\006prolog\030\006 \003(\0132\026"
-    ".Annotated_Instruction\022&\n\006epilog\030\007 \003(\0132\026"
-    ".Annotated_Instruction\022 \n\016referered_from"
-    "\030\010 \003(\0132\010.Edge_64\022\027\n\005calls\030\t \003(\0132\010.Edge_6"
-    "4\"\334\001\n\013Disassembly\022%\n\005instr\030\001 \003(\0132\026.Annot"
-    "ated_Instruction\0223\n\014branch_instr\030\002 \003(\0132\035"
-    ".Annotated_Branch_Instruction\022&\n\006reg_32\030"
-    "\003 \003(\0132\026.Annotated_Register_32\022&\n\006reg_64\030"
-    "\004 \003(\0132\026.Annotated_Register_64\022!\n\004func\030\005 "
-    "\003(\0132\023.Annotated_Function", 4344);
+    "\026\n\016local_noreturn\030\016 \001(\010\022\031\n\021offset_table_"
+    "addr\030\023 \001(\003\"#\n\007RefType\022\013\n\007CodeRef\020\000\022\013\n\007Da"
+    "taRef\020\001\"Q\n\005Block\022\033\n\005insts\030\001 \003(\0132\014.Instru"
+    "ction\022\024\n\014base_address\030\002 \002(\003\022\025\n\rblock_fol"
+    "lows\030\003 \003(\003\"N\n\010Function\022\026\n\006blocks\030\001 \003(\0132\006"
+    ".Block\022\025\n\rentry_address\030\002 \002(\003\022\023\n\013symbol_"
+    "name\030\003 \001(\t\"\224\002\n\020ExternalFunction\022\023\n\013symbo"
+    "l_name\030\001 \002(\t\022\?\n\022calling_convention\030\002 \002(\016"
+    "2#.ExternalFunction.CallingConvention\022\022\n"
+    "\nhas_return\030\003 \002(\010\022\021\n\tno_return\030\004 \002(\010\022\026\n\016"
+    "argument_count\030\005 \002(\005\022\017\n\007is_weak\030\006 \002(\010\022\021\n"
+    "\tsignature\030\007 \001(\t\"G\n\021CallingConvention\022\021\n"
+    "\rCallerCleanup\020\000\022\021\n\rCalleeCleanup\020\001\022\014\n\010F"
+    "astCall\020\002\"G\n\014ExternalData\022\023\n\013symbol_name"
+    "\030\001 \002(\t\022\021\n\tdata_size\030\002 \002(\005\022\017\n\007is_weak\030\003 \002"
+    "(\010\"L\n\nDataSymbol\022\024\n\014base_address\030\001 \002(\003\022\023"
+    "\n\013symbol_name\030\002 \002(\t\022\023\n\013symbol_size\030\003 \002(\005"
+    "\"[\n\004Data\022\024\n\014base_address\030\001 \002(\003\022\014\n\004data\030\002"
+    " \002(\014\022\034\n\007symbols\030\003 \003(\0132\013.DataSymbol\022\021\n\tre"
+    "ad_only\030\004 \002(\010\"u\n\020EntrySymbolExtra\022\022\n\nent"
+    "ry_argc\030\001 \002(\005\0228\n\013entry_cconv\030\002 \002(\0162#.Ext"
+    "ernalFunction.CallingConvention\022\023\n\013does_"
+    "return\030\003 \002(\010\"`\n\013EntrySymbol\022\022\n\nentry_nam"
+    "e\030\001 \002(\t\022\025\n\rentry_address\030\002 \002(\003\022&\n\013entry_"
+    "extra\030\003 \001(\0132\021.EntrySymbolExtra\"\363\001\n\006Modul"
+    "e\022!\n\016internal_funcs\030\001 \003(\0132\t.Function\022)\n\016"
+    "external_funcs\030\002 \003(\0132\021.ExternalFunction\022"
+    "\034\n\rinternal_data\030\003 \003(\0132\005.Data\022\023\n\013module_"
+    "name\030\004 \002(\t\022\035\n\007entries\030\005 \003(\0132\014.EntrySymbo"
+    "l\022$\n\rexternal_data\030\006 \003(\0132\r.ExternalData\022"
+    "#\n\roffset_tables\030\007 \003(\0132\014.OffsetTable\"l\n\007"
+    "Edge_64\022\r\n\005value\030\001 \002(\003\022\033\n\004kind\030\002 \002(\0162\r.E"
+    "dge_64.Kind\022\r\n\005label\030\003 \001(\010\"&\n\004Kind\022\013\n\007Un"
+    "known\020\000\022\007\n\003May\020\001\022\010\n\004Must\020\002\"l\n\007Edge_32\022\r\n"
+    "\005value\030\001 \002(\005\022\033\n\004kind\030\002 \002(\0162\r.Edge_32.Kin"
+    "d\022\r\n\005label\030\003 \001(\010\"&\n\004Kind\022\013\n\007Unknown\020\000\022\007\n"
+    "\003May\020\001\022\010\n\004Must\020\002\"\205\004\n\034Annotated_Branch_In"
+    "struction\022\?\n\021branch_instr_name\030\001 \002(\0162$.A"
+    "nnotated_Branch_Instruction.Branch\022\023\n\013is"
+    "_resolved\030\002 \002(\010\022\023\n\013is_indirect\030\003 \002(\010\022\026\n\016"
+    "is_conditional\030\004 \002(\010\022\017\n\007is_leaf\030\005 \002(\010\022\033\n"
+    "\ttarget_to\030\006 \003(\0132\010.Edge_64\022%\n\005instr\030\007 \002("
+    "\0132\026.Annotated_Instruction\022\033\n\023abstract_ex"
+    "pression\030\010 \001(\t\"\357\001\n\006Branch\022\013\n\007Unknown\020\000\022\007"
+    "\n\003jmp\020\001\022\010\n\004ljmp\020\002\022\006\n\002jo\020\003\022\007\n\003jno\020\004\022\006\n\002jb"
+    "\020\005\022\007\n\003jae\020\006\022\006\n\002je\020\007\022\007\n\003jne\020\010\022\007\n\003jbe\020\t\022\006\n"
+    "\002ja\020\n\022\006\n\002js\020\013\022\007\n\003jns\020\014\022\006\n\002jp\020\r\022\007\n\003jnp\020\016\022"
+    "\006\n\002jl\020\017\022\007\n\003jge\020\020\022\007\n\003jle\020\021\022\006\n\002jg\020\022\022\n\n\006loo"
+    "pne\020\023\022\t\n\005loope\020\024\022\010\n\004loop\020\025\022\t\n\005jCcxz\020\026\022\007\n"
+    "\003ret\020\027\022\010\n\004call\020\030\"\270\003\n\025Annotated_Instructi"
+    "on\022\022\n\ninstr_name\030\001 \002(\t\022\024\n\014instr_string\030\002"
+    " \002(\t\022\021\n\tinst_addr\030\003 \002(\003\022\020\n\010inst_len\030\004 \002("
+    "\005\022\020\n\010op_count\030\005 \002(\005\022\025\n\rinst_addr_hex\030\006 \001"
+    "(\t\022\035\n\025is_branch_instruction\030\007 \002(\010\0220\n\010arg"
+    "ument\030\010 \003(\0132\036.Annotated_Instruction.Oper"
+    "and\022 \n\016referered_from\030\t \003(\0132\010.Edge_64\032\263\001"
+    "\n\007Operand\022\013\n\003pos\030\001 \002(\005\0229\n\004type\030\002 \002(\0162+.A"
+    "nnotated_Instruction.Operand.Operand_Typ"
+    "e\022\r\n\005value\030\003 \001(\t\"Q\n\014Operand_Type\022\013\n\007Unkn"
+    "own\020\000\022\r\n\tImmediate\020\001\022\014\n\010Register\020\002\022\n\n\006Me"
+    "mory\020\003\022\013\n\007Address\020\004\"\251\003\n\025Annotated_Regist"
+    "er_32\022-\n\004name\030\001 \002(\0162\037.Annotated_Register"
+    "_32.Register\022\024\n\014used_at_addr\030\002 \002(\003\022\030\n\020us"
+    "ed_at_addr_hex\030\003 \001(\t\022\027\n\005value\030\007 \003(\0132\010.Ed"
+    "ge_32\022-\n\004fact\030\010 \002(\0132\037.Annotated_Register"
+    "_32.Property\022\033\n\023abstract_expression\030\t \001("
+    "\t\032*\n\010Property\022\017\n\007Unknown\030\001 \002(\010\022\r\n\005Alive\030"
+    "\002 \001(\010\"\237\001\n\010Register\022\013\n\007Unknown\020\000\022\007\n\003eax\020\001"
+    "\022\007\n\003ecx\020\002\022\007\n\003edx\020\003\022\007\n\003ebx\020\004\022\007\n\003esp\020\005\022\007\n\003"
+    "ebp\020\006\022\007\n\003esi\020\007\022\007\n\003edi\020\010\022\007\n\003eip\020\t\022\013\n\007fs_b"
+    "ase\020\n\022\013\n\007gs_base\020\013\022\007\n\003gtd\020\014\022\007\n\003ldt\020\r\022\t\n\005"
+    "mxcsr\020\016\"\344\003\n\025Annotated_Register_64\022-\n\004nam"
+    "e\030\001 \002(\0162\037.Annotated_Register_64.Register"
+    "\022\024\n\014used_at_addr\030\002 \002(\003\022\030\n\020used_at_addr_h"
+    "ex\030\003 \001(\t\022\027\n\005value\030\004 \003(\0132\010.Edge_64\022-\n\004fac"
+    "t\030\005 \002(\0132\037.Annotated_Register_64.Property"
+    "\022\033\n\023abstract_expression\030\006 \001(\t\032*\n\010Propert"
+    "y\022\017\n\007Unknown\030\001 \002(\010\022\r\n\005Alive\030\002 \001(\010\"\332\001\n\010Re"
+    "gister\022\013\n\007Unknown\020\000\022\007\n\003rax\020\n\022\007\n\003rcx\020\013\022\007\n"
+    "\003rdx\020\014\022\007\n\003rbx\020\r\022\007\n\003rsp\020\016\022\007\n\003rbp\020\017\022\007\n\003rsi"
+    "\020\020\022\007\n\003rdi\020\021\022\007\n\003rip\020\022\022\006\n\002r8\020\023\022\006\n\002r9\020\024\022\007\n\003"
+    "r10\020\025\022\007\n\003r11\020\026\022\007\n\003r12\020\027\022\007\n\003r13\020\030\022\007\n\003r14\020"
+    "\031\022\007\n\003r15\020\032\022\013\n\007fs_base\020\033\022\013\n\007gs_base\020\034\022\007\n\003"
+    "gdt\020\035\022\007\n\003ldt\020\036\"\215\002\n\022Annotated_Function\022\014\n"
+    "\004name\030\001 \002(\t\022\025\n\rstart_at_addr\030\002 \002(\003\022\031\n\021st"
+    "art_at_addr_hex\030\003 \001(\t\022\023\n\013end_at_addr\030\004 \001"
+    "(\003\022\027\n\017end_at_addr_hex\030\005 \001(\t\022&\n\006prolog\030\006 "
+    "\003(\0132\026.Annotated_Instruction\022&\n\006epilog\030\007 "
+    "\003(\0132\026.Annotated_Instruction\022 \n\016referered"
+    "_from\030\010 \003(\0132\010.Edge_64\022\027\n\005calls\030\t \003(\0132\010.E"
+    "dge_64\"\334\001\n\013Disassembly\022%\n\005instr\030\001 \003(\0132\026."
+    "Annotated_Instruction\0223\n\014branch_instr\030\002 "
+    "\003(\0132\035.Annotated_Branch_Instruction\022&\n\006re"
+    "g_32\030\003 \003(\0132\026.Annotated_Register_32\022&\n\006re"
+    "g_64\030\004 \003(\0132\026.Annotated_Register_64\022!\n\004fu"
+    "nc\030\005 \003(\0132\023.Annotated_Function", 4509);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "CFG.proto", &protobuf_RegisterTypes);
+  OffsetTable::default_instance_ = new OffsetTable();
   JumpTbl::default_instance_ = new JumpTbl();
   JumpIndexTbl::default_instance_ = new JumpIndexTbl();
   Instruction::default_instance_ = new Instruction();
@@ -799,6 +831,7 @@ void protobuf_AddDesc_CFG_2eproto() {
   Annotated_Register_64_Property::default_instance_ = new Annotated_Register_64_Property();
   Annotated_Function::default_instance_ = new Annotated_Function();
   Disassembly::default_instance_ = new Disassembly();
+  OffsetTable::default_instance_->InitAsDefaultInstance();
   JumpTbl::default_instance_->InitAsDefaultInstance();
   JumpIndexTbl::default_instance_->InitAsDefaultInstance();
   Instruction::default_instance_->InitAsDefaultInstance();
@@ -831,6 +864,311 @@ struct StaticDescriptorInitializer_CFG_2eproto {
     protobuf_AddDesc_CFG_2eproto();
   }
 } static_descriptor_initializer_CFG_2eproto_;
+
+// ===================================================================
+
+#ifndef _MSC_VER
+const int OffsetTable::kStartAddrFieldNumber;
+const int OffsetTable::kTableOffsetsFieldNumber;
+const int OffsetTable::kDestinationsFieldNumber;
+#endif  // !_MSC_VER
+
+OffsetTable::OffsetTable()
+  : ::google::protobuf::Message() {
+  SharedCtor();
+}
+
+void OffsetTable::InitAsDefaultInstance() {
+}
+
+OffsetTable::OffsetTable(const OffsetTable& from)
+  : ::google::protobuf::Message() {
+  SharedCtor();
+  MergeFrom(from);
+}
+
+void OffsetTable::SharedCtor() {
+  _cached_size_ = 0;
+  start_addr_ = GOOGLE_LONGLONG(0);
+  ::memset(_has_bits_, 0, sizeof(_has_bits_));
+}
+
+OffsetTable::~OffsetTable() {
+  SharedDtor();
+}
+
+void OffsetTable::SharedDtor() {
+  if (this != default_instance_) {
+  }
+}
+
+void OffsetTable::SetCachedSize(int size) const {
+  GOOGLE_SAFE_CONCURRENT_WRITES_BEGIN();
+  _cached_size_ = size;
+  GOOGLE_SAFE_CONCURRENT_WRITES_END();
+}
+const ::google::protobuf::Descriptor* OffsetTable::descriptor() {
+  protobuf_AssignDescriptorsOnce();
+  return OffsetTable_descriptor_;
+}
+
+const OffsetTable& OffsetTable::default_instance() {
+  if (default_instance_ == NULL) protobuf_AddDesc_CFG_2eproto();
+  return *default_instance_;
+}
+
+OffsetTable* OffsetTable::default_instance_ = NULL;
+
+OffsetTable* OffsetTable::New() const {
+  return new OffsetTable;
+}
+
+void OffsetTable::Clear() {
+  if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    start_addr_ = GOOGLE_LONGLONG(0);
+  }
+  table_offsets_.Clear();
+  destinations_.Clear();
+  ::memset(_has_bits_, 0, sizeof(_has_bits_));
+  mutable_unknown_fields()->Clear();
+}
+
+bool OffsetTable::MergePartialFromCodedStream(
+    ::google::protobuf::io::CodedInputStream* input) {
+#define DO_(EXPRESSION) if (!(EXPRESSION)) return false
+  ::google::protobuf::uint32 tag;
+  while ((tag = input->ReadTag()) != 0) {
+    switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
+      // required int64 start_addr = 1;
+      case 1: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   ::google::protobuf::int64, ::google::protobuf::internal::WireFormatLite::TYPE_INT64>(
+                 input, &start_addr_)));
+          set_has_start_addr();
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(16)) goto parse_table_offsets;
+        break;
+      }
+
+      // repeated int64 table_offsets = 2;
+      case 2: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_table_offsets:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadRepeatedPrimitive<
+                   ::google::protobuf::int64, ::google::protobuf::internal::WireFormatLite::TYPE_INT64>(
+                 1, 16, input, this->mutable_table_offsets())));
+        } else if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag)
+                   == ::google::protobuf::internal::WireFormatLite::
+                      WIRETYPE_LENGTH_DELIMITED) {
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPackedPrimitiveNoInline<
+                   ::google::protobuf::int64, ::google::protobuf::internal::WireFormatLite::TYPE_INT64>(
+                 input, this->mutable_table_offsets())));
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(16)) goto parse_table_offsets;
+        if (input->ExpectTag(24)) goto parse_destinations;
+        break;
+      }
+
+      // repeated int64 destinations = 3;
+      case 3: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_destinations:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadRepeatedPrimitive<
+                   ::google::protobuf::int64, ::google::protobuf::internal::WireFormatLite::TYPE_INT64>(
+                 1, 24, input, this->mutable_destinations())));
+        } else if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag)
+                   == ::google::protobuf::internal::WireFormatLite::
+                      WIRETYPE_LENGTH_DELIMITED) {
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPackedPrimitiveNoInline<
+                   ::google::protobuf::int64, ::google::protobuf::internal::WireFormatLite::TYPE_INT64>(
+                 input, this->mutable_destinations())));
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(24)) goto parse_destinations;
+        if (input->ExpectAtEnd()) return true;
+        break;
+      }
+
+      default: {
+      handle_uninterpreted:
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_END_GROUP) {
+          return true;
+        }
+        DO_(::google::protobuf::internal::WireFormat::SkipField(
+              input, tag, mutable_unknown_fields()));
+        break;
+      }
+    }
+  }
+  return true;
+#undef DO_
+}
+
+void OffsetTable::SerializeWithCachedSizes(
+    ::google::protobuf::io::CodedOutputStream* output) const {
+  // required int64 start_addr = 1;
+  if (has_start_addr()) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt64(1, this->start_addr(), output);
+  }
+
+  // repeated int64 table_offsets = 2;
+  for (int i = 0; i < this->table_offsets_size(); i++) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt64(
+      2, this->table_offsets(i), output);
+  }
+
+  // repeated int64 destinations = 3;
+  for (int i = 0; i < this->destinations_size(); i++) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt64(
+      3, this->destinations(i), output);
+  }
+
+  if (!unknown_fields().empty()) {
+    ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
+        unknown_fields(), output);
+  }
+}
+
+::google::protobuf::uint8* OffsetTable::SerializeWithCachedSizesToArray(
+    ::google::protobuf::uint8* target) const {
+  // required int64 start_addr = 1;
+  if (has_start_addr()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteInt64ToArray(1, this->start_addr(), target);
+  }
+
+  // repeated int64 table_offsets = 2;
+  for (int i = 0; i < this->table_offsets_size(); i++) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteInt64ToArray(2, this->table_offsets(i), target);
+  }
+
+  // repeated int64 destinations = 3;
+  for (int i = 0; i < this->destinations_size(); i++) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteInt64ToArray(3, this->destinations(i), target);
+  }
+
+  if (!unknown_fields().empty()) {
+    target = ::google::protobuf::internal::WireFormat::SerializeUnknownFieldsToArray(
+        unknown_fields(), target);
+  }
+  return target;
+}
+
+int OffsetTable::ByteSize() const {
+  int total_size = 0;
+
+  if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    // required int64 start_addr = 1;
+    if (has_start_addr()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::Int64Size(
+          this->start_addr());
+    }
+
+  }
+  // repeated int64 table_offsets = 2;
+  {
+    int data_size = 0;
+    for (int i = 0; i < this->table_offsets_size(); i++) {
+      data_size += ::google::protobuf::internal::WireFormatLite::
+        Int64Size(this->table_offsets(i));
+    }
+    total_size += 1 * this->table_offsets_size() + data_size;
+  }
+
+  // repeated int64 destinations = 3;
+  {
+    int data_size = 0;
+    for (int i = 0; i < this->destinations_size(); i++) {
+      data_size += ::google::protobuf::internal::WireFormatLite::
+        Int64Size(this->destinations(i));
+    }
+    total_size += 1 * this->destinations_size() + data_size;
+  }
+
+  if (!unknown_fields().empty()) {
+    total_size +=
+      ::google::protobuf::internal::WireFormat::ComputeUnknownFieldsSize(
+        unknown_fields());
+  }
+  GOOGLE_SAFE_CONCURRENT_WRITES_BEGIN();
+  _cached_size_ = total_size;
+  GOOGLE_SAFE_CONCURRENT_WRITES_END();
+  return total_size;
+}
+
+void OffsetTable::MergeFrom(const ::google::protobuf::Message& from) {
+  GOOGLE_CHECK_NE(&from, this);
+  const OffsetTable* source =
+    ::google::protobuf::internal::dynamic_cast_if_available<const OffsetTable*>(
+      &from);
+  if (source == NULL) {
+    ::google::protobuf::internal::ReflectionOps::Merge(from, this);
+  } else {
+    MergeFrom(*source);
+  }
+}
+
+void OffsetTable::MergeFrom(const OffsetTable& from) {
+  GOOGLE_CHECK_NE(&from, this);
+  table_offsets_.MergeFrom(from.table_offsets_);
+  destinations_.MergeFrom(from.destinations_);
+  if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    if (from.has_start_addr()) {
+      set_start_addr(from.start_addr());
+    }
+  }
+  mutable_unknown_fields()->MergeFrom(from.unknown_fields());
+}
+
+void OffsetTable::CopyFrom(const ::google::protobuf::Message& from) {
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+void OffsetTable::CopyFrom(const OffsetTable& from) {
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool OffsetTable::IsInitialized() const {
+  if ((_has_bits_[0] & 0x00000001) != 0x00000001) return false;
+
+  return true;
+}
+
+void OffsetTable::Swap(OffsetTable* other) {
+  if (other != this) {
+    std::swap(start_addr_, other->start_addr_);
+    table_offsets_.Swap(&other->table_offsets_);
+    destinations_.Swap(&other->destinations_);
+    std::swap(_has_bits_[0], other->_has_bits_[0]);
+    _unknown_fields_.Swap(&other->_unknown_fields_);
+    std::swap(_cached_size_, other->_cached_size_);
+  }
+}
+
+::google::protobuf::Metadata OffsetTable::GetMetadata() const {
+  protobuf_AssignDescriptorsOnce();
+  ::google::protobuf::Metadata metadata;
+  metadata.descriptor = OffsetTable_descriptor_;
+  metadata.reflection = OffsetTable_reflection_;
+  return metadata;
+}
+
 
 // ===================================================================
 
@@ -1428,6 +1766,7 @@ const int Instruction::kJumpIndexTableFieldNumber;
 const int Instruction::kExtDataNameFieldNumber;
 const int Instruction::kSystemCallNumberFieldNumber;
 const int Instruction::kLocalNoreturnFieldNumber;
+const int Instruction::kOffsetTableAddrFieldNumber;
 #endif  // !_MSC_VER
 
 Instruction::Instruction()
@@ -1465,6 +1804,7 @@ void Instruction::SharedCtor() {
   ext_data_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   system_call_number_ = 0;
   local_noreturn_ = false;
+  offset_table_addr_ = GOOGLE_LONGLONG(0);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -1548,6 +1888,7 @@ void Instruction::Clear() {
   }
   if (_has_bits_[16 / 32] & (0xffu << (16 % 32))) {
     local_noreturn_ = false;
+    offset_table_addr_ = GOOGLE_LONGLONG(0);
   }
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
   mutable_unknown_fields()->Clear();
@@ -1832,6 +2173,22 @@ bool Instruction::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
+        if (input->ExpectTag(152)) goto parse_offset_table_addr;
+        break;
+      }
+
+      // optional int64 offset_table_addr = 19;
+      case 19: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_offset_table_addr:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   ::google::protobuf::int64, ::google::protobuf::internal::WireFormatLite::TYPE_INT64>(
+                 input, &offset_table_addr_)));
+          set_has_offset_table_addr();
+        } else {
+          goto handle_uninterpreted;
+        }
         if (input->ExpectAtEnd()) return true;
         break;
       }
@@ -1952,6 +2309,11 @@ void Instruction::SerializeWithCachedSizes(
       18, this->mem_ref_type(), output);
   }
 
+  // optional int64 offset_table_addr = 19;
+  if (has_offset_table_addr()) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt64(19, this->offset_table_addr(), output);
+  }
+
   if (!unknown_fields().empty()) {
     ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
         unknown_fields(), output);
@@ -2061,6 +2423,11 @@ void Instruction::SerializeWithCachedSizes(
   if (has_mem_ref_type()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteEnumToArray(
       18, this->mem_ref_type(), target);
+  }
+
+  // optional int64 offset_table_addr = 19;
+  if (has_offset_table_addr()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteInt64ToArray(19, this->offset_table_addr(), target);
   }
 
   if (!unknown_fields().empty()) {
@@ -2193,6 +2560,13 @@ int Instruction::ByteSize() const {
       total_size += 1 + 1;
     }
 
+    // optional int64 offset_table_addr = 19;
+    if (has_offset_table_addr()) {
+      total_size += 2 +
+        ::google::protobuf::internal::WireFormatLite::Int64Size(
+          this->offset_table_addr());
+    }
+
   }
   if (!unknown_fields().empty()) {
     total_size +=
@@ -2275,6 +2649,9 @@ void Instruction::MergeFrom(const Instruction& from) {
     if (from.has_local_noreturn()) {
       set_local_noreturn(from.local_noreturn());
     }
+    if (from.has_offset_table_addr()) {
+      set_offset_table_addr(from.offset_table_addr());
+    }
   }
   mutable_unknown_fields()->MergeFrom(from.unknown_fields());
 }
@@ -2322,6 +2699,7 @@ void Instruction::Swap(Instruction* other) {
     std::swap(ext_data_name_, other->ext_data_name_);
     std::swap(system_call_number_, other->system_call_number_);
     std::swap(local_noreturn_, other->local_noreturn_);
+    std::swap(offset_table_addr_, other->offset_table_addr_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);
     std::swap(_cached_size_, other->_cached_size_);
@@ -2643,6 +3021,7 @@ void Block::Swap(Block* other) {
 #ifndef _MSC_VER
 const int Function::kBlocksFieldNumber;
 const int Function::kEntryAddressFieldNumber;
+const int Function::kSymbolNameFieldNumber;
 #endif  // !_MSC_VER
 
 Function::Function()
@@ -2662,6 +3041,7 @@ Function::Function(const Function& from)
 void Function::SharedCtor() {
   _cached_size_ = 0;
   entry_address_ = GOOGLE_LONGLONG(0);
+  symbol_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -2670,6 +3050,9 @@ Function::~Function() {
 }
 
 void Function::SharedDtor() {
+  if (symbol_name_ != &::google::protobuf::internal::kEmptyString) {
+    delete symbol_name_;
+  }
   if (this != default_instance_) {
   }
 }
@@ -2698,6 +3081,11 @@ Function* Function::New() const {
 void Function::Clear() {
   if (_has_bits_[1 / 32] & (0xffu << (1 % 32))) {
     entry_address_ = GOOGLE_LONGLONG(0);
+    if (has_symbol_name()) {
+      if (symbol_name_ != &::google::protobuf::internal::kEmptyString) {
+        symbol_name_->clear();
+      }
+    }
   }
   blocks_.Clear();
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
@@ -2737,6 +3125,23 @@ bool Function::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
+        if (input->ExpectTag(26)) goto parse_symbol_name;
+        break;
+      }
+
+      // optional string symbol_name = 3;
+      case 3: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+         parse_symbol_name:
+          DO_(::google::protobuf::internal::WireFormatLite::ReadString(
+                input, this->mutable_symbol_name()));
+          ::google::protobuf::internal::WireFormat::VerifyUTF8String(
+            this->symbol_name().data(), this->symbol_name().length(),
+            ::google::protobuf::internal::WireFormat::PARSE);
+        } else {
+          goto handle_uninterpreted;
+        }
         if (input->ExpectAtEnd()) return true;
         break;
       }
@@ -2770,6 +3175,15 @@ void Function::SerializeWithCachedSizes(
     ::google::protobuf::internal::WireFormatLite::WriteInt64(2, this->entry_address(), output);
   }
 
+  // optional string symbol_name = 3;
+  if (has_symbol_name()) {
+    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
+      this->symbol_name().data(), this->symbol_name().length(),
+      ::google::protobuf::internal::WireFormat::SERIALIZE);
+    ::google::protobuf::internal::WireFormatLite::WriteString(
+      3, this->symbol_name(), output);
+  }
+
   if (!unknown_fields().empty()) {
     ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
         unknown_fields(), output);
@@ -2790,6 +3204,16 @@ void Function::SerializeWithCachedSizes(
     target = ::google::protobuf::internal::WireFormatLite::WriteInt64ToArray(2, this->entry_address(), target);
   }
 
+  // optional string symbol_name = 3;
+  if (has_symbol_name()) {
+    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
+      this->symbol_name().data(), this->symbol_name().length(),
+      ::google::protobuf::internal::WireFormat::SERIALIZE);
+    target =
+      ::google::protobuf::internal::WireFormatLite::WriteStringToArray(
+        3, this->symbol_name(), target);
+  }
+
   if (!unknown_fields().empty()) {
     target = ::google::protobuf::internal::WireFormat::SerializeUnknownFieldsToArray(
         unknown_fields(), target);
@@ -2806,6 +3230,13 @@ int Function::ByteSize() const {
       total_size += 1 +
         ::google::protobuf::internal::WireFormatLite::Int64Size(
           this->entry_address());
+    }
+
+    // optional string symbol_name = 3;
+    if (has_symbol_name()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::StringSize(
+          this->symbol_name());
     }
 
   }
@@ -2847,6 +3278,9 @@ void Function::MergeFrom(const Function& from) {
     if (from.has_entry_address()) {
       set_entry_address(from.entry_address());
     }
+    if (from.has_symbol_name()) {
+      set_symbol_name(from.symbol_name());
+    }
   }
   mutable_unknown_fields()->MergeFrom(from.unknown_fields());
 }
@@ -2876,6 +3310,7 @@ void Function::Swap(Function* other) {
   if (other != this) {
     blocks_.Swap(&other->blocks_);
     std::swap(entry_address_, other->entry_address_);
+    std::swap(symbol_name_, other->symbol_name_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);
     std::swap(_cached_size_, other->_cached_size_);
@@ -4961,6 +5396,7 @@ const int Module::kInternalDataFieldNumber;
 const int Module::kModuleNameFieldNumber;
 const int Module::kEntriesFieldNumber;
 const int Module::kExternalDataFieldNumber;
+const int Module::kOffsetTablesFieldNumber;
 #endif  // !_MSC_VER
 
 Module::Module()
@@ -5029,6 +5465,7 @@ void Module::Clear() {
   internal_data_.Clear();
   entries_.Clear();
   external_data_.Clear();
+  offset_tables_.Clear();
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
   mutable_unknown_fields()->Clear();
 }
@@ -5127,6 +5564,21 @@ bool Module::MergePartialFromCodedStream(
           goto handle_uninterpreted;
         }
         if (input->ExpectTag(50)) goto parse_external_data;
+        if (input->ExpectTag(58)) goto parse_offset_tables;
+        break;
+      }
+
+      // repeated .OffsetTable offset_tables = 7;
+      case 7: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+         parse_offset_tables:
+          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
+                input, add_offset_tables()));
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(58)) goto parse_offset_tables;
         if (input->ExpectAtEnd()) return true;
         break;
       }
@@ -5188,6 +5640,12 @@ void Module::SerializeWithCachedSizes(
       6, this->external_data(i), output);
   }
 
+  // repeated .OffsetTable offset_tables = 7;
+  for (int i = 0; i < this->offset_tables_size(); i++) {
+    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
+      7, this->offset_tables(i), output);
+  }
+
   if (!unknown_fields().empty()) {
     ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
         unknown_fields(), output);
@@ -5239,6 +5697,13 @@ void Module::SerializeWithCachedSizes(
     target = ::google::protobuf::internal::WireFormatLite::
       WriteMessageNoVirtualToArray(
         6, this->external_data(i), target);
+  }
+
+  // repeated .OffsetTable offset_tables = 7;
+  for (int i = 0; i < this->offset_tables_size(); i++) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteMessageNoVirtualToArray(
+        7, this->offset_tables(i), target);
   }
 
   if (!unknown_fields().empty()) {
@@ -5300,6 +5765,14 @@ int Module::ByteSize() const {
         this->external_data(i));
   }
 
+  // repeated .OffsetTable offset_tables = 7;
+  total_size += 1 * this->offset_tables_size();
+  for (int i = 0; i < this->offset_tables_size(); i++) {
+    total_size +=
+      ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
+        this->offset_tables(i));
+  }
+
   if (!unknown_fields().empty()) {
     total_size +=
       ::google::protobuf::internal::WireFormat::ComputeUnknownFieldsSize(
@@ -5330,6 +5803,7 @@ void Module::MergeFrom(const Module& from) {
   internal_data_.MergeFrom(from.internal_data_);
   entries_.MergeFrom(from.entries_);
   external_data_.MergeFrom(from.external_data_);
+  offset_tables_.MergeFrom(from.offset_tables_);
   if (from._has_bits_[3 / 32] & (0xffu << (3 % 32))) {
     if (from.has_module_name()) {
       set_module_name(from.module_name());
@@ -5368,6 +5842,9 @@ bool Module::IsInitialized() const {
   for (int i = 0; i < external_data_size(); i++) {
     if (!this->external_data(i).IsInitialized()) return false;
   }
+  for (int i = 0; i < offset_tables_size(); i++) {
+    if (!this->offset_tables(i).IsInitialized()) return false;
+  }
   return true;
 }
 
@@ -5379,6 +5856,7 @@ void Module::Swap(Module* other) {
     std::swap(module_name_, other->module_name_);
     entries_.Swap(&other->entries_);
     external_data_.Swap(&other->external_data_);
+    offset_tables_.Swap(&other->offset_tables_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);
     std::swap(_cached_size_, other->_cached_size_);

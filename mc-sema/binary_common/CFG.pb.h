@@ -32,6 +32,7 @@ void  protobuf_AddDesc_CFG_2eproto();
 void protobuf_AssignDesc_CFG_2eproto();
 void protobuf_ShutdownFile_CFG_2eproto();
 
+class OffsetTable;
 class JumpTbl;
 class JumpIndexTbl;
 class Instruction;
@@ -271,6 +272,114 @@ inline bool Annotated_Register_64_Register_Parse(
     Annotated_Register_64_Register_descriptor(), name, value);
 }
 // ===================================================================
+
+class OffsetTable : public ::google::protobuf::Message {
+ public:
+  OffsetTable();
+  virtual ~OffsetTable();
+
+  OffsetTable(const OffsetTable& from);
+
+  inline OffsetTable& operator=(const OffsetTable& from) {
+    CopyFrom(from);
+    return *this;
+  }
+
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const OffsetTable& default_instance();
+
+  void Swap(OffsetTable* other);
+
+  // implements Message ----------------------------------------------
+
+  OffsetTable* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const OffsetTable& from);
+  void MergeFrom(const OffsetTable& from);
+  void Clear();
+  bool IsInitialized() const;
+
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+
+  ::google::protobuf::Metadata GetMetadata() const;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  // required int64 start_addr = 1;
+  inline bool has_start_addr() const;
+  inline void clear_start_addr();
+  static const int kStartAddrFieldNumber = 1;
+  inline ::google::protobuf::int64 start_addr() const;
+  inline void set_start_addr(::google::protobuf::int64 value);
+
+  // repeated int64 table_offsets = 2;
+  inline int table_offsets_size() const;
+  inline void clear_table_offsets();
+  static const int kTableOffsetsFieldNumber = 2;
+  inline ::google::protobuf::int64 table_offsets(int index) const;
+  inline void set_table_offsets(int index, ::google::protobuf::int64 value);
+  inline void add_table_offsets(::google::protobuf::int64 value);
+  inline const ::google::protobuf::RepeatedField< ::google::protobuf::int64 >&
+      table_offsets() const;
+  inline ::google::protobuf::RepeatedField< ::google::protobuf::int64 >*
+      mutable_table_offsets();
+
+  // repeated int64 destinations = 3;
+  inline int destinations_size() const;
+  inline void clear_destinations();
+  static const int kDestinationsFieldNumber = 3;
+  inline ::google::protobuf::int64 destinations(int index) const;
+  inline void set_destinations(int index, ::google::protobuf::int64 value);
+  inline void add_destinations(::google::protobuf::int64 value);
+  inline const ::google::protobuf::RepeatedField< ::google::protobuf::int64 >&
+      destinations() const;
+  inline ::google::protobuf::RepeatedField< ::google::protobuf::int64 >*
+      mutable_destinations();
+
+  // @@protoc_insertion_point(class_scope:OffsetTable)
+ private:
+  inline void set_has_start_addr();
+  inline void clear_has_start_addr();
+
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+
+  ::google::protobuf::int64 start_addr_;
+  ::google::protobuf::RepeatedField< ::google::protobuf::int64 > table_offsets_;
+  ::google::protobuf::RepeatedField< ::google::protobuf::int64 > destinations_;
+
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(3 + 31) / 32];
+
+  friend void  protobuf_AddDesc_CFG_2eproto();
+  friend void protobuf_AssignDesc_CFG_2eproto();
+  friend void protobuf_ShutdownFile_CFG_2eproto();
+
+  void InitAsDefaultInstance();
+  static OffsetTable* default_instance_;
+};
+// -------------------------------------------------------------------
 
 class JumpTbl : public ::google::protobuf::Message {
  public:
@@ -690,6 +799,13 @@ class Instruction : public ::google::protobuf::Message {
   inline bool local_noreturn() const;
   inline void set_local_noreturn(bool value);
 
+  // optional int64 offset_table_addr = 19;
+  inline bool has_offset_table_addr() const;
+  inline void clear_offset_table_addr();
+  static const int kOffsetTableAddrFieldNumber = 19;
+  inline ::google::protobuf::int64 offset_table_addr() const;
+  inline void set_offset_table_addr(::google::protobuf::int64 value);
+
   // @@protoc_insertion_point(class_scope:Instruction)
  private:
   inline void set_has_inst_bytes();
@@ -726,6 +842,8 @@ class Instruction : public ::google::protobuf::Message {
   inline void clear_has_system_call_number();
   inline void set_has_local_noreturn();
   inline void clear_has_local_noreturn();
+  inline void set_has_offset_table_addr();
+  inline void clear_has_offset_table_addr();
 
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
@@ -745,10 +863,11 @@ class Instruction : public ::google::protobuf::Message {
   ::google::protobuf::int32 system_call_number_;
   ::JumpIndexTbl* jump_index_table_;
   ::std::string* ext_data_name_;
+  ::google::protobuf::int64 offset_table_addr_;
   bool local_noreturn_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(17 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(18 + 31) / 32];
 
   friend void  protobuf_AddDesc_CFG_2eproto();
   friend void protobuf_AssignDesc_CFG_2eproto();
@@ -940,18 +1059,33 @@ class Function : public ::google::protobuf::Message {
   inline ::google::protobuf::int64 entry_address() const;
   inline void set_entry_address(::google::protobuf::int64 value);
 
+  // optional string symbol_name = 3;
+  inline bool has_symbol_name() const;
+  inline void clear_symbol_name();
+  static const int kSymbolNameFieldNumber = 3;
+  inline const ::std::string& symbol_name() const;
+  inline void set_symbol_name(const ::std::string& value);
+  inline void set_symbol_name(const char* value);
+  inline void set_symbol_name(const char* value, size_t size);
+  inline ::std::string* mutable_symbol_name();
+  inline ::std::string* release_symbol_name();
+  inline void set_allocated_symbol_name(::std::string* symbol_name);
+
   // @@protoc_insertion_point(class_scope:Function)
  private:
   inline void set_has_entry_address();
   inline void clear_has_entry_address();
+  inline void set_has_symbol_name();
+  inline void clear_has_symbol_name();
 
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
   ::google::protobuf::RepeatedPtrField< ::Block > blocks_;
   ::google::protobuf::int64 entry_address_;
+  ::std::string* symbol_name_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(2 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(3 + 31) / 32];
 
   friend void  protobuf_AddDesc_CFG_2eproto();
   friend void protobuf_AssignDesc_CFG_2eproto();
@@ -1810,6 +1944,18 @@ class Module : public ::google::protobuf::Message {
   inline ::google::protobuf::RepeatedPtrField< ::ExternalData >*
       mutable_external_data();
 
+  // repeated .OffsetTable offset_tables = 7;
+  inline int offset_tables_size() const;
+  inline void clear_offset_tables();
+  static const int kOffsetTablesFieldNumber = 7;
+  inline const ::OffsetTable& offset_tables(int index) const;
+  inline ::OffsetTable* mutable_offset_tables(int index);
+  inline ::OffsetTable* add_offset_tables();
+  inline const ::google::protobuf::RepeatedPtrField< ::OffsetTable >&
+      offset_tables() const;
+  inline ::google::protobuf::RepeatedPtrField< ::OffsetTable >*
+      mutable_offset_tables();
+
   // @@protoc_insertion_point(class_scope:Module)
  private:
   inline void set_has_module_name();
@@ -1823,9 +1969,10 @@ class Module : public ::google::protobuf::Message {
   ::std::string* module_name_;
   ::google::protobuf::RepeatedPtrField< ::EntrySymbol > entries_;
   ::google::protobuf::RepeatedPtrField< ::ExternalData > external_data_;
+  ::google::protobuf::RepeatedPtrField< ::OffsetTable > offset_tables_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(6 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(7 + 31) / 32];
 
   friend void  protobuf_AddDesc_CFG_2eproto();
   friend void protobuf_AssignDesc_CFG_2eproto();
@@ -3510,6 +3657,82 @@ class Disassembly : public ::google::protobuf::Message {
 
 // ===================================================================
 
+// OffsetTable
+
+// required int64 start_addr = 1;
+inline bool OffsetTable::has_start_addr() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void OffsetTable::set_has_start_addr() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void OffsetTable::clear_has_start_addr() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void OffsetTable::clear_start_addr() {
+  start_addr_ = GOOGLE_LONGLONG(0);
+  clear_has_start_addr();
+}
+inline ::google::protobuf::int64 OffsetTable::start_addr() const {
+  return start_addr_;
+}
+inline void OffsetTable::set_start_addr(::google::protobuf::int64 value) {
+  set_has_start_addr();
+  start_addr_ = value;
+}
+
+// repeated int64 table_offsets = 2;
+inline int OffsetTable::table_offsets_size() const {
+  return table_offsets_.size();
+}
+inline void OffsetTable::clear_table_offsets() {
+  table_offsets_.Clear();
+}
+inline ::google::protobuf::int64 OffsetTable::table_offsets(int index) const {
+  return table_offsets_.Get(index);
+}
+inline void OffsetTable::set_table_offsets(int index, ::google::protobuf::int64 value) {
+  table_offsets_.Set(index, value);
+}
+inline void OffsetTable::add_table_offsets(::google::protobuf::int64 value) {
+  table_offsets_.Add(value);
+}
+inline const ::google::protobuf::RepeatedField< ::google::protobuf::int64 >&
+OffsetTable::table_offsets() const {
+  return table_offsets_;
+}
+inline ::google::protobuf::RepeatedField< ::google::protobuf::int64 >*
+OffsetTable::mutable_table_offsets() {
+  return &table_offsets_;
+}
+
+// repeated int64 destinations = 3;
+inline int OffsetTable::destinations_size() const {
+  return destinations_.size();
+}
+inline void OffsetTable::clear_destinations() {
+  destinations_.Clear();
+}
+inline ::google::protobuf::int64 OffsetTable::destinations(int index) const {
+  return destinations_.Get(index);
+}
+inline void OffsetTable::set_destinations(int index, ::google::protobuf::int64 value) {
+  destinations_.Set(index, value);
+}
+inline void OffsetTable::add_destinations(::google::protobuf::int64 value) {
+  destinations_.Add(value);
+}
+inline const ::google::protobuf::RepeatedField< ::google::protobuf::int64 >&
+OffsetTable::destinations() const {
+  return destinations_;
+}
+inline ::google::protobuf::RepeatedField< ::google::protobuf::int64 >*
+OffsetTable::mutable_destinations() {
+  return &destinations_;
+}
+
+// -------------------------------------------------------------------
+
 // JumpTbl
 
 // repeated int64 table_entries = 1;
@@ -4233,6 +4456,28 @@ inline void Instruction::set_local_noreturn(bool value) {
   local_noreturn_ = value;
 }
 
+// optional int64 offset_table_addr = 19;
+inline bool Instruction::has_offset_table_addr() const {
+  return (_has_bits_[0] & 0x00020000u) != 0;
+}
+inline void Instruction::set_has_offset_table_addr() {
+  _has_bits_[0] |= 0x00020000u;
+}
+inline void Instruction::clear_has_offset_table_addr() {
+  _has_bits_[0] &= ~0x00020000u;
+}
+inline void Instruction::clear_offset_table_addr() {
+  offset_table_addr_ = GOOGLE_LONGLONG(0);
+  clear_has_offset_table_addr();
+}
+inline ::google::protobuf::int64 Instruction::offset_table_addr() const {
+  return offset_table_addr_;
+}
+inline void Instruction::set_offset_table_addr(::google::protobuf::int64 value) {
+  set_has_offset_table_addr();
+  offset_table_addr_ = value;
+}
+
 // -------------------------------------------------------------------
 
 // Block
@@ -4358,6 +4603,76 @@ inline ::google::protobuf::int64 Function::entry_address() const {
 inline void Function::set_entry_address(::google::protobuf::int64 value) {
   set_has_entry_address();
   entry_address_ = value;
+}
+
+// optional string symbol_name = 3;
+inline bool Function::has_symbol_name() const {
+  return (_has_bits_[0] & 0x00000004u) != 0;
+}
+inline void Function::set_has_symbol_name() {
+  _has_bits_[0] |= 0x00000004u;
+}
+inline void Function::clear_has_symbol_name() {
+  _has_bits_[0] &= ~0x00000004u;
+}
+inline void Function::clear_symbol_name() {
+  if (symbol_name_ != &::google::protobuf::internal::kEmptyString) {
+    symbol_name_->clear();
+  }
+  clear_has_symbol_name();
+}
+inline const ::std::string& Function::symbol_name() const {
+  return *symbol_name_;
+}
+inline void Function::set_symbol_name(const ::std::string& value) {
+  set_has_symbol_name();
+  if (symbol_name_ == &::google::protobuf::internal::kEmptyString) {
+    symbol_name_ = new ::std::string;
+  }
+  symbol_name_->assign(value);
+}
+inline void Function::set_symbol_name(const char* value) {
+  set_has_symbol_name();
+  if (symbol_name_ == &::google::protobuf::internal::kEmptyString) {
+    symbol_name_ = new ::std::string;
+  }
+  symbol_name_->assign(value);
+}
+inline void Function::set_symbol_name(const char* value, size_t size) {
+  set_has_symbol_name();
+  if (symbol_name_ == &::google::protobuf::internal::kEmptyString) {
+    symbol_name_ = new ::std::string;
+  }
+  symbol_name_->assign(reinterpret_cast<const char*>(value), size);
+}
+inline ::std::string* Function::mutable_symbol_name() {
+  set_has_symbol_name();
+  if (symbol_name_ == &::google::protobuf::internal::kEmptyString) {
+    symbol_name_ = new ::std::string;
+  }
+  return symbol_name_;
+}
+inline ::std::string* Function::release_symbol_name() {
+  clear_has_symbol_name();
+  if (symbol_name_ == &::google::protobuf::internal::kEmptyString) {
+    return NULL;
+  } else {
+    ::std::string* temp = symbol_name_;
+    symbol_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+    return temp;
+  }
+}
+inline void Function::set_allocated_symbol_name(::std::string* symbol_name) {
+  if (symbol_name_ != &::google::protobuf::internal::kEmptyString) {
+    delete symbol_name_;
+  }
+  if (symbol_name) {
+    set_has_symbol_name();
+    symbol_name_ = symbol_name;
+  } else {
+    clear_has_symbol_name();
+    symbol_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  }
 }
 
 // -------------------------------------------------------------------
@@ -5396,6 +5711,31 @@ Module::external_data() const {
 inline ::google::protobuf::RepeatedPtrField< ::ExternalData >*
 Module::mutable_external_data() {
   return &external_data_;
+}
+
+// repeated .OffsetTable offset_tables = 7;
+inline int Module::offset_tables_size() const {
+  return offset_tables_.size();
+}
+inline void Module::clear_offset_tables() {
+  offset_tables_.Clear();
+}
+inline const ::OffsetTable& Module::offset_tables(int index) const {
+  return offset_tables_.Get(index);
+}
+inline ::OffsetTable* Module::mutable_offset_tables(int index) {
+  return offset_tables_.Mutable(index);
+}
+inline ::OffsetTable* Module::add_offset_tables() {
+  return offset_tables_.Add();
+}
+inline const ::google::protobuf::RepeatedPtrField< ::OffsetTable >&
+Module::offset_tables() const {
+  return offset_tables_;
+}
+inline ::google::protobuf::RepeatedPtrField< ::OffsetTable >*
+Module::mutable_offset_tables() {
+  return &offset_tables_;
 }
 
 // -------------------------------------------------------------------
