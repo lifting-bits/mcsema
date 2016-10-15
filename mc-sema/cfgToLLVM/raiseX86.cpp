@@ -1166,33 +1166,55 @@ BasicBlock *bbFromStrName(string n, Function *F) {
   return found;
 }
 
-InstTransResult disInstr(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
-                         Function *F, NativeFunctionPtr natF,
-                         NativeModulePtr natM, bool doAnnotation) {
+static void CreateDebugInstrCall(llvm::BasicBlock *B, VA pc) {
+  auto M = B->getParent()->getParent();
+  auto &C = M->getContext();
+
+  std::stringstream ss;
+  ss << "debug_loc_0x" << std::hex << pc;
+  auto instr_func_name = ss.str();
+
+  auto IFT = M->getFunction(instr_func_name);
+  if (!IFT) {
+    std::stringstream as;
+    as << "  .globl " << instr_func_name << "\n";
+    as << "  .type " << instr_func_name << ",@function\n";
+    as << instr_func_name << ":\n";
+    as << "  .cfi_startproc\n";
+    as << "  ret" << "\n";
+    as << "  .size " << instr_func_name << ",1\n";
+    as << "  .cfi_endproc\n";
+    as << "\n";
+    M->appendModuleInlineAsm(as.str());
+
+    auto VoidTy = llvm::Type::getVoidTy(M->getContext());
+    auto IFTy = llvm::FunctionType::get(VoidTy, false);
+    IFT = llvm::Function::Create(IFTy, llvm::GlobalValue::ExternalLinkage,
+                                 instr_func_name, M);
+  }
+
+  llvm::CallInst::Create(IFT, "", B);
+}
+
+InstTransResult liftInstr(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
+                          Function *F, NativeFunctionPtr natF,
+                          NativeModulePtr natM, bool doAnnotation) {
 
   // Put each instruction into its own basic block.
   std::stringstream ss;
-  ss << "instr_0x" << std::hex << ip->get_loc();
+  auto pc = ip->get_loc();
+  ss << "instr_0x" << std::hex << pc;
   auto &C = F->getContext();
   auto instr_block = BasicBlock::Create(C, ss.str(), F);
   BranchInst::Create(instr_block, block);
   block = instr_block;
 
-  auto M = F->getParent();
+  // At the beginning of the block, make a call to a dummy function with the
+  // same name as the block. This function call cannot be optimized away, and
+  // so it serves as a useful marker for where we are.
+  CreateDebugInstrCall(block, pc);
 
-  // Write the instruction pointer into the register state. This makes
-  // debugging easier.
-  if (Pointer32 == getPointerSize(M)) {
-    R_WRITE<32>(
-        block, X86::EIP,
-        llvm::ConstantInt::get(llvm::Type::getInt32Ty(C), ip->get_loc()));
-  } else {
-    R_WRITE<64>(
-        block, X86::RIP,
-        llvm::ConstantInt::get(llvm::Type::getInt64Ty(C), ip->get_loc()));
-  }
-
-  InstTransResult disInst_result = disInstrX86(ip, block, nb, F, natF, natM);
+  InstTransResult disInst_result = liftInstrImpl(ip, block, nb, F, natF, natM);
 
   // we need to loop over this function and find any un-annotated instructions.
   // then we annotate each instruction
@@ -1200,8 +1222,8 @@ InstTransResult disInstr(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
     for (auto &B : *F) {
       for (auto &I : B) {
         VA inst_eip;
-        if ( !getAnnotation( &I, inst_eip)) {
-          addAnnotation( &I, ip->get_loc());
+        if (!getAnnotation( &I, inst_eip)) {
+          addAnnotation( &I, pc);
         }
       }
     }
@@ -1250,7 +1272,7 @@ void bfs_cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
   //now, go through each statement and translate it into LLVM IR
   //statements that branch SHOULD be the last statement in a block
   for (InstPtr inst : curBlock->get_insts()) {
-    auto r = disInstr(inst, curLLVMBlock, curBlock, this->F, this->natFun,
+    auto r = liftInstr(inst, curLLVMBlock, curBlock, this->F, this->natFun,
                       this->natMod, true);
 
     if (r == TranslateError) {

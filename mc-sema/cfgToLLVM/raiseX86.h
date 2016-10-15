@@ -197,7 +197,7 @@ llvm::BasicBlock *bbFromStrName(std::string, llvm::Function *);
 // API usage functions
 ///////////////////////////////////////////////////////////////////////////////
 
-InstTransResult disInstr(InstPtr ip, llvm::BasicBlock *&block,
+InstTransResult liftInstr(InstPtr ip, llvm::BasicBlock *&block,
                          NativeBlockPtr nb, llvm::Function *F,
                          NativeFunctionPtr natF, NativeModulePtr natM,
                          bool doAnnotation);

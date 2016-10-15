@@ -230,7 +230,7 @@ static void preprocessInstruction(NativeModulePtr natM, BasicBlock *&block,
 //
 //     The innermost is where most of the intelligent decisions happen.
 //
-InstTransResult disInstrX86(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
+InstTransResult liftInstrImpl(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
                             Function *F, NativeFunctionPtr natF,
                             NativeModulePtr natM) {
   MCInst inst = ip->get_inst();
