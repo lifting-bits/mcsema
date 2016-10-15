@@ -894,7 +894,6 @@ void allocateLocals(Function *F, int bits) {
       Type *floatArrayTy = ArrayType::get(floatTy, 8);
       Instruction *stRegs = x86::GEPLocal(floatArrayTy, "STi", afA);
 
-
       // FPU FLAGS
       Instruction *fpu_B = x86::GEPLocal(boolTy, "FPU_FLAG_BUSY", stRegs);
       Instruction *fpu_C3 = x86::GEPLocal(boolTy, "FPU_FLAG_C3", fpu_B);
@@ -937,19 +936,17 @@ void allocateLocals(Function *F, int bits) {
       // FPU TAG WORD
       // 8 2-bit values. One for each ST register
       Type *tagArrayType = ArrayType::get(int2Ty, 8);
-      Instruction *fpu_TagWord = x86::GEPLocal(
-          tagArrayType, "FPU_TAG", fpu_IM);
+      Instruction *fpu_TagWord = x86::GEPLocal(tagArrayType, "FPU_TAG", fpu_IM);
 
       Instruction *fpu_LASTIP_SEG = x86::GEPLocal(
           Type::getInt16Ty(F->getContext()), "FPU_LASTIP_SEG", fpu_TagWord);
-      Instruction *fpu_LASTIP_OFF = x86::GEPLocal(
-          RegTy, "FPU_LASTIP_OFF", fpu_LASTIP_SEG);
+      Instruction *fpu_LASTIP_OFF = x86::GEPLocal(RegTy, "FPU_LASTIP_OFF",
+                                                  fpu_LASTIP_SEG);
       Instruction *fpu_LASTDATA_SEG = x86::GEPLocal(
           Type::getInt16Ty(F->getContext()), "FPU_LASTDATA_SEG",
           fpu_LASTIP_OFF);
-      Instruction *fpu_LASTDATA_OFF = x86::GEPLocal(
-          RegTy, "FPU_LASTDATA_OFF",
-          fpu_LASTDATA_SEG);
+      Instruction *fpu_LASTDATA_OFF = x86::GEPLocal(RegTy, "FPU_LASTDATA_OFF",
+                                                    fpu_LASTDATA_SEG);
 
       Instruction *fpu_FOPCODE = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE",
@@ -991,10 +988,9 @@ void allocateLocals(Function *F, int bits) {
           Type::getIntNTy(F->getContext(), 128), "XMM15", vec_xmm14);
 
       // stack base and limit
-      Instruction *stack_base = x86::GEPLocal(
-          RegTy, "STACK_BASE", vec_xmm15);
-      Instruction *stack_limit = x86::GEPLocal(
-          RegTy, "STACK_LIMIT", stack_base);
+      Instruction *stack_base = x86::GEPLocal(RegTy, "STACK_BASE", vec_xmm15);
+      Instruction *stack_limit = x86::GEPLocal(RegTy, "STACK_LIMIT",
+                                               stack_base);
       break;
     }
 
@@ -1082,14 +1078,14 @@ void allocateLocals(Function *F, int bits) {
 
       Instruction *fpu_LASTIP_SEG = x86_64::GEPLocal(
           Type::getInt16Ty(F->getContext()), "FPU_LASTIP_SEG", fpu_TagWord);
-      Instruction *fpu_LASTIP_OFF = x86_64::GEPLocal(
-          RegTy, "FPU_LASTIP_OFF", fpu_LASTIP_SEG);
+      Instruction *fpu_LASTIP_OFF = x86_64::GEPLocal(RegTy, "FPU_LASTIP_OFF",
+                                                     fpu_LASTIP_SEG);
       Instruction *fpu_LASTDATA_SEG = x86_64::GEPLocal(
           Type::getInt16Ty(F->getContext()), "FPU_LASTDATA_SEG",
           fpu_LASTIP_OFF);
-      Instruction *fpu_LASTDATA_OFF = x86_64::GEPLocal(
-          RegTy, "FPU_LASTDATA_OFF",
-          fpu_LASTDATA_SEG);
+      Instruction *fpu_LASTDATA_OFF = x86_64::GEPLocal(RegTy,
+                                                       "FPU_LASTDATA_OFF",
+                                                       fpu_LASTDATA_SEG);
 
       Instruction *fpu_FOPCODE = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE",
@@ -1131,10 +1127,10 @@ void allocateLocals(Function *F, int bits) {
           Type::getIntNTy(F->getContext(), 128), "XMM15", vec_xmm14);
 
       // stack base and limit
-      Instruction *stack_base = x86_64::GEPLocal(
-          RegTy, "STACK_BASE", vec_xmm15);
-      Instruction *stack_limit = x86_64::GEPLocal(
-          RegTy, "STACK_LIMIT", stack_base);
+      Instruction *stack_base = x86_64::GEPLocal(RegTy, "STACK_BASE",
+                                                 vec_xmm15);
+      Instruction *stack_limit = x86_64::GEPLocal(RegTy, "STACK_LIMIT",
+                                                  stack_base);
 
       Instruction *r8A = x86_64::GEPLocal(RegTy, "R8", stack_limit);
       Instruction *r9A = x86_64::GEPLocal(RegTy, "R9", r8A);
@@ -1145,7 +1141,7 @@ void allocateLocals(Function *F, int bits) {
       Instruction *r14A = x86_64::GEPLocal(RegTy, "R14", r13A);
       Instruction *r15A = x86_64::GEPLocal(RegTy, "R15", r14A);
     }
-    break;
+      break;
 
     default:
       throw TErr(__LINE__, __FILE__,
@@ -1198,15 +1194,15 @@ InstTransResult disInstr(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
 
   InstTransResult disInst_result = disInstrX86(ip, block, nb, F, natF, natM);
 
+  // we need to loop over this function and find any un-annotated instructions.
+  // then we annotate each instruction
   if (doAnnotation) {
-    // we need to loop over this function and find any un-annotated instructions.
-    // then we annotate each instruction
-    for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I) {
-      VA inst_eip;
-      bool had_md;
-      had_md = getAnnotation( &( *I), inst_eip);
-      if (false == had_md) {
-        addAnnotation( &( *I), ip->get_loc());
+    for (auto &B : *F) {
+      for (auto &I : B) {
+        VA inst_eip;
+        if ( !getAnnotation( &I, inst_eip)) {
+          addAnnotation( &I, ip->get_loc());
+        }
       }
     }
   }
@@ -1216,12 +1212,13 @@ InstTransResult disInstr(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
 
 template<typename Vertex, typename Graph>
 void bfs_cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
-  NativeBlockPtr curBlock = this->natFun->block_from_id(u);
-  BasicBlock *curLLVMBlock = NULL;
+  auto curBlock = this->natFun->block_from_id(u);
+  llvm::BasicBlock *curLLVMBlock = NULL;
 
-  if (curBlock == NULL)
+  if ( !curBlock) {
     throw TErr(__LINE__, __FILE__,
                "Could not look up block " + to_string<Vertex>(u, dec));
+  }
 
   //first, either create or look up the LLVM basic block for this native
   //block. we are either creating it for the first time, or, we are
@@ -1237,54 +1234,49 @@ void bfs_cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
 
   //then, create a basic block for every follow of this block, if we do not
   //already have that basic block in our LLVM CFG
-  list<VA> &follows = curBlock->get_follows();
-  for (list<VA>::iterator i = follows.begin(); i != follows.end(); ++i) {
-    VA blockBase = *i;
+  const auto &follows = curBlock->get_follows();
+  for (auto blockBase : follows) {
     //try and look up a block that has this blocks name
-    NativeBlockPtr followNat = this->natFun->block_from_base(blockBase);
-    string followName = followNat->get_name();
+    auto followNat = this->natFun->block_from_base(blockBase);
+    auto followName = followNat->get_name();
+    auto fBB = bbFromStrName(followName, this->F);
 
-    BasicBlock *fBB = bbFromStrName(followName, this->F);
-
-    if (fBB == NULL) {
+    if ( !fBB) {
       fBB = BasicBlock::Create(this->F->getContext(), followNat->get_name(),
                                this->F);
-      TASSERT(fBB != NULL, "");
     }
   }
 
   //now, go through each statement and translate it into LLVM IR
   //statements that branch SHOULD be the last statement in a block
-  list<InstPtr> stmts = curBlock->get_insts();
-
-  for (list<InstPtr>::iterator it = stmts.begin(); it != stmts.end(); ++it) {
-    InstPtr inst = *it;
-
-    InstTransResult r = disInstr(inst, curLLVMBlock, curBlock, this->F,
-                                 this->natFun, this->natMod, true);
+  for (InstPtr inst : curBlock->get_insts()) {
+    auto r = disInstr(inst, curLLVMBlock, curBlock, this->F, this->natFun,
+                      this->natMod, true);
 
     if (r == TranslateError) {
       this->didError = true;
       break;
-    }
-    if (r == TranslateErrorUnsupported && ignoreUnsupportedInsts == false) {
+    } else if (r == TranslateErrorUnsupported
+        && ignoreUnsupportedInsts == false) {
       this->didError = true;
       break;
     }
   }
 
+  if (curLLVMBlock->getTerminator()) {
+    return;
+  }
+
   // we may need to insert a branch inst to the successor
   // if the block ended on a non-terminator (this happens since we
   // may split blocks in cfg recovery to avoid code duplication)
-  if (follows.size() == 1 && curLLVMBlock->getTerminator() == nullptr) {
+  if (follows.size() == 1) {
     VA blockBase = *(follows.begin());
     std::string bbName = "block_0x" + to_string<VA>(blockBase, std::hex);
     BasicBlock *nextBB = bbFromStrName(bbName, this->F);
 
     BranchInst::Create(nextBB, curLLVMBlock);
   }
-
-  return;
 }
 
 static bool insertFunctionIntoModule(NativeModulePtr mod,
@@ -1295,7 +1287,7 @@ static bool insertFunctionIntoModule(NativeModulePtr mod,
   //first, get the LLVM function for this native function
   Function *F = M->getFunction(func->get_name());
 
-  if (!F) {
+  if ( !F) {
     throw TErr(__LINE__, __FILE__, "Could not get func " + func->get_name());
   }
 
@@ -1578,8 +1570,7 @@ void dataSectionToTypesContents(const list<DataSection> &globaldata,
   }  // for list
 }
 
-static bool insertDataSections(NativeModulePtr natMod, Module *M,
-                               raw_ostream &report) {
+static bool insertDataSections(NativeModulePtr natMod, Module *M) {
 
   list<DataSection> &globaldata = natMod->getData();
   list<DataSection>::iterator git = globaldata.begin();
@@ -1669,32 +1660,23 @@ void renameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
     auto F = M->getFunction(sub_name);
     std::stringstream ss;
     ss << "callback_" << sub_name;
-    if (!M->getFunction(ss.str())) {
+    if ( !M->getFunction(ss.str())) {
       auto &sym_name = f->get_symbol_name();
-      if (!sym_name.empty()) {
+      if ( !sym_name.empty()) {
         F->setName(sym_name);
       }
     }
   }
 }
 
-bool liftNativeCodeIntoModule(NativeModulePtr natMod, Module *M, raw_ostream &report) {
-  bool result = true;
+static void initLiftedFunctions(NativeModulePtr natMod, Module *M) {
+  for (auto f : natMod->get_funcs()) {
+    auto fname = f->get_name();
+    auto F = M->getFunction(fname);
 
-  //iterate over every functions CFG we identified in natMod
-  list<NativeFunctionPtr> funcs = natMod->get_funcs();
-  list<NativeFunctionPtr>::iterator i = funcs.begin();
-
-  // insert all functions (but not populate yet)
-  while (i != funcs.end()) {
-    NativeFunctionPtr f = *i;
-    std::string fname = f->get_name();
-
-    Function *F = M->getFunction(fname);
-
-    if (F == NULL) {
-      Constant *FC = M->getOrInsertFunction(fname, getBaseFunctionType(M));
-      F = dyn_cast<Function>(FC);
+    if ( !F) {
+      F = llvm::dyn_cast<llvm::Function>(
+          M->getOrInsertFunction(fname, getBaseFunctionType(M)));
 
       TASSERT(F != NULL, "Could not insert function into module");
 
@@ -1706,15 +1688,11 @@ bool liftNativeCodeIntoModule(NativeModulePtr natMod, Module *M, raw_ostream &re
       cout << "Already inserted function: " << fname << ", skipping."
            << std::endl;
     }
-
-    ++i;
   }
+}
 
-  list<ExternalDataRefPtr> extDataRefs = natMod->getExtDataRefs();
-  list<ExternalDataRefPtr>::iterator data_it = extDataRefs.begin();
-
-  for (; data_it != extDataRefs.end(); ++data_it) {
-    ExternalDataRefPtr dr = *data_it;
+static void initExternalData(NativeModulePtr natMod, Module *M) {
+  for (auto dr : natMod->getExtDataRefs()) {
     int dsize = dr->getDataSize();
     std::string symname = dr->getSymbolName();
     //if (dsize > 16) {
@@ -1740,100 +1718,107 @@ bool liftNativeCodeIntoModule(NativeModulePtr natMod, Module *M, raw_ostream &re
       gv->setDLLStorageClass(GlobalValue::DLLImportStorageClass);
     }
   }
+}
 
+static void initExternalCode(NativeModulePtr natMod, Module *M) {
   //iterate over the list of external functions and insert them as
   //global functions
-  list<ExternalCodeRefPtr> extCalls = natMod->getExtCalls();
-  list<ExternalCodeRefPtr>::iterator it = extCalls.begin();
-  for (; it != extCalls.end(); ++it) {
-    ExternalCodeRefPtr e = *it;
-
-    ExternalCodeRef::CallingConvention conv = e->getCallingConvention();
+  for (auto e : natMod->getExtCalls()) {
+    auto conv = e->getCallingConvention();
     int8_t argCount = e->getNumArgs();
-    string symName = e->getSymbolName();
-    string funcSign = e->getFunctionSignature();
+    auto symName = e->getSymbolName();
+    auto funcSign = e->getFunctionSignature();
 
     //create the function if it is not already there
-    Function *f = M->getFunction(symName);
-    if (f == NULL) {
-      vector<Type*> arguments;
-      Type *returnType = NULL;
+    auto F = M->getFunction(symName);
+    if (F) {
+      continue;
+    }
 
-      //create arguments
-      for (int i = 0; i < argCount; i++) {
-        if (getSystemArch(M) == _X86_64_) {
-          if (getSystemOS(M) == llvm::Triple::Win32) {
+    std::vector<llvm::Type*> arguments;
+    llvm::Type *returnType = NULL;
 
-            if (funcSign.c_str()[i] == 'f') {
-              arguments.push_back(Type::getDoubleTy(M->getContext()));
-            } else {
-              arguments.push_back(Type::getIntNTy(M->getContext(), 64));
-            }
-          } else if (getSystemOS(M) == llvm::Triple::Linux) {
-            arguments.push_back(Type::getInt64Ty(M->getContext()));
+    //create arguments
+    for (int i = 0; i < argCount; i++) {
+      if (getSystemArch(M) == _X86_64_) {
+        if (getSystemOS(M) == llvm::Triple::Win32) {
 
+          if (funcSign.c_str()[i] == 'F') {
+            arguments.push_back(Type::getDoubleTy(M->getContext()));
           } else {
-            TASSERT(false, "Unknown OS Type!");
+            arguments.push_back(Type::getIntNTy(M->getContext(), 64));
           }
+        } else if (getSystemOS(M) == llvm::Triple::Linux) {
+          arguments.push_back(Type::getInt64Ty(M->getContext()));
+
         } else {
-          arguments.push_back(Type::getInt32Ty(M->getContext()));
+          TASSERT(false, "Unknown OS Type!");
         }
-      }
-
-      //create function type
-      switch (e->getReturnType()) {
-        case ExternalCodeRef::NoReturn:
-        case ExternalCodeRef::VoidTy:
-          returnType = Type::getVoidTy(M->getContext());
-          break;
-
-        case ExternalCodeRef::Unknown:
-        case ExternalCodeRef::IntTy:
-          if (natMod->is64Bit()) {
-            returnType = Type::getInt64Ty(M->getContext());
-          } else {
-            returnType = Type::getInt32Ty(M->getContext());
-          }
-          break;
-        default:
-          throw TErr(
-              __LINE__, __FILE__,
-              "Encountered an unknown return type while translating function");
-      }
-      FunctionType *ft = FunctionType::get(returnType, arguments, false);
-      if (e->isWeak()) {
-        f = Function::Create(ft, GlobalValue::ExternalWeakLinkage, symName, M);
       } else {
-        f = Function::Create(ft, GlobalValue::ExternalLinkage, symName, M);
-      }
-
-      if (e->getReturnType() == ExternalCodeRef::NoReturn) {
-        f->setDoesNotReturn();
-      }
-
-      //set calling convention
-      if (natMod->is64Bit()) {
-        archSetCallingConv(M, f);
-      } else {
-        f->setCallingConv(getLLVMCC(conv));
+        arguments.push_back(Type::getInt32Ty(M->getContext()));
       }
     }
+
+    //create function type
+    switch (e->getReturnType()) {
+      case ExternalCodeRef::NoReturn:
+      case ExternalCodeRef::VoidTy:
+        returnType = Type::getVoidTy(M->getContext());
+        break;
+
+      case ExternalCodeRef::Unknown:
+      case ExternalCodeRef::IntTy:
+        if (natMod->is64Bit()) {
+          returnType = Type::getInt64Ty(M->getContext());
+        } else {
+          returnType = Type::getInt32Ty(M->getContext());
+        }
+        break;
+      default:
+        throw TErr(
+            __LINE__, __FILE__,
+            "Encountered an unknown return type while translating function");
+    }
+
+    auto FTy = FunctionType::get(returnType, arguments, false);
+    if (e->isWeak()) {
+      F = Function::Create(FTy, GlobalValue::ExternalWeakLinkage, symName, M);
+    } else {
+      F = Function::Create(FTy, GlobalValue::ExternalLinkage, symName, M);
+    }
+
+    if (e->getReturnType() == ExternalCodeRef::NoReturn) {
+      F->setDoesNotReturn();
+    }
+
+    //set calling convention
+    if (natMod->is64Bit()) {
+      archSetCallingConv(M, F);
+    } else {
+      F->setCallingConv(getLLVMCC(conv));
+    }
   }
+}
 
-  // insert data after functions -- data may have function references
-  insertDataSections(natMod, M, report);
-
+static bool liftFunctionsIntoModule(NativeModulePtr natMod, Module *M) {
   // populate functions
-  for (auto f : funcs) {
-    if (!insertFunctionIntoModule(natMod, f, M)) {
+  for (auto f : natMod->get_funcs()) {
+    if ( !insertFunctionIntoModule(natMod, f, M)) {
       std::string fname = f->get_name();
       cerr << "Could not insert function: " << fname
            << " into the LLVM module\n";
-      result = false;
+      return false;
       break;
     }
-    ++i;
   }
+  return true;
+}
 
-  return result;
+bool liftNativeCodeIntoModule(NativeModulePtr natMod, Module *M) {
+  bool result = true;
+  initLiftedFunctions(natMod, M);
+  initExternalData(natMod, M);
+  initExternalCode(natMod, M);
+  insertDataSections(natMod, M);
+  return liftFunctionsIntoModule(natMod, M);
 }

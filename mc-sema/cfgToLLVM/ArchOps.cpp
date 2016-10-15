@@ -127,6 +127,10 @@ llvm::Function *addEntryPointDriver(llvm::Module *M, const std::string &name,
 
     AddPushJumpStub(M, F, W, "__mcsema_attach_call");
     F->setLinkage(llvm::GlobalValue::ExternalLinkage);
+
+    if (F->doesNotReturn()) {
+      W->setDoesNotReturn();
+    }
   }
   return W;
 }
@@ -145,6 +149,10 @@ llvm::Function *getExitPointDriver(llvm::Function *F) {
     W->addFnAttr(llvm::Attribute::Naked);
     AddPushJumpStub(M, F, W, "__mcsema_detach_call");
     F->setLinkage(llvm::GlobalValue::ExternalLinkage);
+
+    if (F->doesNotReturn()) {
+      W->setDoesNotReturn();
+    }
   }
   return W;
 }

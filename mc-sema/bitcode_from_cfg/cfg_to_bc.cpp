@@ -68,16 +68,16 @@
 using namespace llvm;
 
 static cl::opt<std::string> OutputFilename("o", cl::desc("Output filename"),
-                                      cl::init("-"),
-                                      cl::value_desc("filename"));
+                                           cl::init("-"),
+                                           cl::value_desc("filename"));
 
 static cl::opt<std::string> InputFilename("i", cl::desc("Input filename"),
-                                     cl::value_desc("<filename>"),
-                                     cl::Required);
+                                          cl::value_desc("<filename>"),
+                                          cl::Required);
 
 static cl::opt<std::string> TargetTriple("mtriple", cl::desc("Target Triple"),
-                                    cl::value_desc("target triple"),
-                                    cl::init(DEFAULT_TRIPLE));
+                                         cl::value_desc("target triple"),
+                                         cl::init(DEFAULT_TRIPLE));
 
 static cl::list<std::string> EntryPoints(
     "entrypoint", cl::desc("Describe externally visible entry points"),
@@ -124,12 +124,9 @@ class block_label_writer {
 static void doPrintModule(NativeModulePtr m) {
   std::string pathBase = "./";
 
-  std::list<NativeFunctionPtr> mod_funcs = m->get_funcs();
-  std::list<NativeFunctionPtr>::iterator it = mod_funcs.begin();
-
-  for (; it != mod_funcs.end(); ++it) {
-    NativeFunctionPtr f = *it;
-    std::string n = pathBase + to_string<uint64_t>(f->get_start(), std::hex) + ".dot";
+  for (auto f : m->get_funcs()) {
+    std::string n = pathBase + to_string<uint64_t>(f->get_start(), std::hex)
+        + ".dot";
 
     std::ofstream out(n.c_str());
 
@@ -205,19 +202,19 @@ int main(int argc, char *argv[]) {
   std::cerr << "Looking up target..." << std::endl;
   auto x86Target = llvm::TargetRegistry::lookupTarget(TargetTriple, errstr);
 
-  if (x86Target == nullptr) {
-    std::cerr << "Could not find target triple: " << TargetTriple << std::endl
-              << "Error: " << errstr << "\n";
+  if (!x86Target) {
+    std::cerr
+      << "Could not find target triple: " << TargetTriple << std::endl
+      << "Error: " << errstr << "\n";
     return EXIT_FAILURE;
   }
 
   //reproduce NativeModule from CFG input argument
   std::cerr << "Reading module ..." << std::endl;
-  NativeModulePtr mod = readModule(InputFilename, ProtoBuff, std::list<VA>(),
-                                   x86Target);
-  if (mod == NULL) {
+  auto mod = readModule(InputFilename, ProtoBuff, std::list<VA>(), x86Target);
+  if (!mod) {
     std::cerr << "Could not process input module: " << InputFilename
-              << std::endl;
+        << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -241,9 +238,9 @@ int main(int argc, char *argv[]) {
 
   //now, convert it to an LLVM module
   std::cerr << "Getting LLVM module..." << std::endl;
-  llvm::Module *M = createModuleForArch(mod->name(), TargetTriple);
+  auto M = createModuleForArch(mod->name(), TargetTriple);
 
-  if (!M) {
+  if ( !M) {
     std::cerr << "Unable to get LLVM module" << std::endl;
     return EXIT_FAILURE;
   }
@@ -254,7 +251,7 @@ int main(int argc, char *argv[]) {
     initInstructionDispatch();
 
     std::cerr << "Converting to LLVM..." << std::endl;
-    if (!liftNativeCodeIntoModule(mod, M, outs())) {
+    if (!liftNativeCodeIntoModule(mod, M)) {
       std::cerr << "Failure to convert to LLVM module!" << std::endl;
       return EXIT_FAILURE;
     }
@@ -265,9 +262,8 @@ int main(int argc, char *argv[]) {
       std::cerr << "Adding entry point: " << entry_point_name << std::endl;
 
       if (auto entry_pc = findSymInModule(mod, entry_point_name)) {
-        std::cerr
-            << entry_point_name << " is implemented by sub_"
-            << std::hex << entry_pc << std::endl;
+        std::cerr << entry_point_name << " is implemented by sub_" << std::hex
+                  << entry_pc << std::endl;
 
         if (!addEntryPointDriver(M, entry_point_name, entry_pc)) {
           return EXIT_FAILURE;
@@ -282,10 +278,6 @@ int main(int argc, char *argv[]) {
     }
 
     renameLiftedFunctions(mod, M, entry_point_pcs);
-
-    std::string errorInfo;
-    llvm::tool_output_file Out(OutputFilename.c_str(), errorInfo,
-                               sys::fs::F_None);
 
     if (EnablePostAnalysis) {
       std::cerr << "Doing post analysis passes...\n";
@@ -304,6 +296,9 @@ int main(int argc, char *argv[]) {
                      DEBUG_METADATA_VERSION);
     M->addModuleFlag(Module::Error, "Dwarf Version", 3);
 
+    std::string errorInfo;
+    llvm::tool_output_file Out(OutputFilename.c_str(), errorInfo,
+                               sys::fs::F_None);
     WriteBitcodeToFile(M, Out.os());
     Out.keep();
   } catch (std::exception &e) {

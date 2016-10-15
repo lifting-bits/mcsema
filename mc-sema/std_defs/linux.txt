@@ -78,7 +78,7 @@ aa_text 1 C N
 aa_uninitkbd 1 C N
 aa_uninitmouse 1 C N
 #ABI Definitions
-abort 0 C N
+abort 0 C Y
 abs 1 C N
 accept 3 C N
 accept4 4 C N
@@ -26590,6 +26590,7 @@ st_locale_insensitive_strncasecmp 3 C N
 __stpcpy 2 C N
 stpcpy 2 C N
 __stpncpy 3 C N
+__stpncpy_check 3 C N
 stpncpy 3 C N
 str2ba 2 C N
 str2xed_address_width_enum_t 1 C N
@@ -26632,6 +26633,7 @@ strcoll 2 C N
 strcoll_l 3 C N
 strcpy 2 C N
 __strcpy_chk 3 C N
+__stpcpy_chk 3 C N
 strcspn 2 C N
 __strdup 1 C N
 strdup 1 C N

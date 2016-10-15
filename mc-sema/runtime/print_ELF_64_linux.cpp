@@ -121,6 +121,10 @@ int main(void) {
   printf("__mcsema_attach_ret:\n");
   printf("  .cfi_startproc\n");
 
+//  // Restore old stack alignment.
+//  printf("  pop rsp\n");
+
+  // Swap into the mcsema stack.
   printf("  xchg rsp, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RSP));
 
   // Return registers.
@@ -212,7 +216,6 @@ int main(void) {
   printf("\n");
 
 
-
   // Implements `__mcsema_detach_ret`. This goes from lifted code into native code.
   // The native code pointer is located at the native `[RegState::RSP - 8]`
   // address.
@@ -298,11 +301,12 @@ int main(void) {
   printf("  mov r14, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, R14));
   printf("  mov r15, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, R15));
 
+  // Swap onto the native stack.
   printf("  xchg fs:[__mcsema_reg_state@TPOFF + %lu], rsp\n", __builtin_offsetof(mcsema::RegState, RSP));
 
   // Set up a re-attach return address.
   printf("  lea rax, [rip + __mcsema_attach_ret]\n");
-  printf("  push rax\n");
+  printf("  mov [rsp], rax\n");
 
   printf("  jmp fs:[__mcsema_reg_state@TPOFF - %lu]\n", __builtin_offsetof(mcsema::RegState, RIP));
 
@@ -317,6 +321,8 @@ int main(void) {
   printf("  .type __mcsema_detach_call_value,@function\n");
   printf("__mcsema_detach_call_value:\n");
   printf("  .cfi_startproc\n");
+
+  // Note: the bitcode has already put the target address into `RegState::RIP`.
 
   // Stash the callee-saved registers.
   printf("  push rbx\n");
@@ -364,7 +370,7 @@ int main(void) {
 
   // Set up a re-attach return address.
   printf("  lea rax, [rip + __mcsema_attach_ret_value]\n");
-  printf("  push rax\n");
+  printf("  mov [rsp], rax\n");
 
   // Go native.
   printf("  jmp fs:[__mcsema_reg_state@TPOFF - %lu]\n", __builtin_offsetof(mcsema::RegState, RIP));
@@ -374,6 +380,29 @@ int main(void) {
   printf("  .cfi_endproc\n");
   printf("\n");
 
+  // Implements `__mcsema_debug_get_reg_state`. This is useful when debugging in
+  // gdb.
+  printf("  .globl __mcsema_debug_get_reg_state\n");
+  printf("  .type __mcsema_debug_get_reg_state,@function\n");
+  printf("__mcsema_debug_get_reg_state:\n");
+  printf("  .cfi_startproc\n");
+  printf("  mov rax, fs:[0]\n");
+  printf("  lea rax, [rax + __mcsema_reg_state@TPOFF]\n");
+  printf("  ret\n");
+  printf(".Lfunc_end6:\n");
+  printf("  .size __mcsema_debug_get_reg_state,.Lfunc_end6-__mcsema_debug_get_reg_state\n");
+  printf("  .cfi_endproc\n");
+  printf("\n");
   return 0;
 }
+
+
+//  // Align the stack.
+//  printf("  push rsp\n");
+//  printf("  push QWORD PTR [rsp]\n");
+//  printf("  and rsp, -16\n");
+
+//  // Restore stack alignment
+//  printf("  pop rsp\n");
+
 

@@ -36,7 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //translate a NativeModule into an LLVM Module
 void renameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
                            const std::set<VA> &entry_point_pcs);
-bool liftNativeCodeIntoModule(NativeModulePtr, llvm::Module *, llvm::raw_ostream &);
+bool liftNativeCodeIntoModule(NativeModulePtr, llvm::Module *);
 void initAttachDetach(llvm::Module *M);
 bool doPostAnalysis(NativeModulePtr N, llvm::Module *M);
 #endif

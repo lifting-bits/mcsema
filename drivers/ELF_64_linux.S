@@ -204,7 +204,7 @@ __mcsema_detach_call:
   mov r15, fs:[__mcsema_reg_state@TPOFF + 588]
   xchg fs:[__mcsema_reg_state@TPOFF + 56], rsp
   lea rax, [rip + __mcsema_attach_ret]
-  push rax
+  mov [rsp], rax
   jmp fs:[__mcsema_reg_state@TPOFF - 0]
 .Lfunc_end4:
   .size __mcsema_detach_call,.Lfunc_end4-__mcsema_detach_call
@@ -253,9 +253,20 @@ __mcsema_detach_call_value:
   movdqu xmm14, fs:[__mcsema_reg_state@TPOFF + 484]
   movdqu xmm15, fs:[__mcsema_reg_state@TPOFF + 500]
   lea rax, [rip + __mcsema_attach_ret_value]
-  push rax
+  mov [rsp], rax
   jmp fs:[__mcsema_reg_state@TPOFF - 0]
 .Lfunc_end5:
   .size __mcsema_detach_call_value,.Lfunc_end5-__mcsema_detach_call_value
+  .cfi_endproc
+
+  .globl __mcsema_debug_get_reg_state
+  .type __mcsema_debug_get_reg_state,@function
+__mcsema_debug_get_reg_state:
+  .cfi_startproc
+  mov rax, fs:[0]
+  lea rax, [rax + __mcsema_reg_state@TPOFF]
+  ret
+.Lfunc_end6:
+  .size __mcsema_debug_get_reg_state,.Lfunc_end6-__mcsema_debug_get_reg_state
   .cfi_endproc
 

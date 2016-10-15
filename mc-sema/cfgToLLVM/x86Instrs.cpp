@@ -264,7 +264,8 @@ InstTransResult disInstrX86(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
     }
   } else {
     // Instruction translation not defined.
-    errs() << "Unsupported!\n";
+    errs() << "Unsupported opcode " << opcode << "!";
+    IP->printInst( &inst, errs(), to_string<VA>(ip->get_loc(), hex));
     // Print out the unhandled opcode.
     errs() << to_string<VA>(ip->get_loc(), hex) << " ";
     errs() << strOut.str() << "\n";

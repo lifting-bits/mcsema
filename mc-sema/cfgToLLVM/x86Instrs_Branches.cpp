@@ -224,10 +224,21 @@ static void writeReturnAddr(BasicBlock *B) {
                                             B);
   M_WRITE_0<width>(B, espSub, CONST_V<width>(B, 0xbadf00d0badbeef0));
   R_WRITE<width>(B, xsp, espSub);
-
 }
 
-static void doCallV(BasicBlock *&block, InstPtr ip, Value *call_addr) {
+template<int width>
+static void writeDetachReturnAddr(BasicBlock *B) {
+  auto xsp = 32 == width ? X86::ESP : X86::RSP;
+  auto xip = 32 == width ? X86::EIP : X86::RIP;
+  Value *espOld = R_READ<width>(B, xsp);
+  Value *espSub = BinaryOperator::CreateSub(espOld,
+                                            CONST_V<width>(B, width / 8), "",
+                                            B);
+  M_WRITE_0<width>(B, espSub, CONST_V<width>(B, 0xde7accccde7acccc));
+  R_WRITE<width>(B, xsp, espSub);
+}
+
+static void doCallV(BasicBlock *&block, InstPtr ip, Value *call_addr, bool is_jump) {
 
   Function *F = block->getParent();
   Module *M = F->getParent();
@@ -236,8 +247,14 @@ static void doCallV(BasicBlock *&block, InstPtr ip, Value *call_addr) {
 
   if (_X86_64_ == getSystemArch(M)) {
     R_WRITE<64>(block, X86::RIP, call_addr);
+    if (!is_jump) {
+      writeDetachReturnAddr<64>(block);
+    }
   } else {
     R_WRITE<32>(block, X86::EIP, call_addr);
+    if (!is_jump) {
+      writeDetachReturnAddr<32>(block);
+    }
   }
 
   auto detach = M->getFunction("__mcsema_detach_call_value");
@@ -246,14 +263,13 @@ static void doCallV(BasicBlock *&block, InstPtr ip, Value *call_addr) {
 }
 
 template<int width>
-static void doCallM(BasicBlock *&block, InstPtr ip, Value *mem_addr) {
+static void doCallM(BasicBlock *&block, InstPtr ip, Value *mem_addr, bool is_jump) {
   Value *call_addr = M_READ<width>(ip, block, mem_addr);
-
-  return doCallV(block, ip, call_addr);
+  return doCallV(block, ip, call_addr, is_jump);
 }
 
 template<int width>
-static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr) {
+static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr, bool is_jump) {
   Module *M = b->getParent()->getParent();
   Function *ourF = b->getParent();
 
@@ -265,7 +281,9 @@ static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr) {
 
   TASSERT(F != NULL, "Could not find function: " + fname);
 
-  writeReturnAddr<width>(b);
+  if (!is_jump) {
+    writeReturnAddr<width>(b);
+  }
 
   //make the call, the only argument should be our parents arguments
   TASSERT(ourF->arg_size() == 1, "");
@@ -277,7 +295,7 @@ static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr) {
   CallInst *c = CallInst::Create(F, subArgs, "", b);
   archSetCallingConv(M, c);
 
-  if (ip->has_local_noreturn()) {
+  if (ip->has_local_noreturn() || F->doesNotReturn()) {
     // noreturn functions just hit unreachable
     std::cout << __FUNCTION__
               << ": Adding Unreachable Instruction to local noreturn"
@@ -293,8 +311,7 @@ static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr) {
 }
 
 namespace x86 {
-static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target,
-                                      bool esp_adjust = false) {
+static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool is_jump) {
   Module *M = b->getParent()->getParent();
 
   //write it into the location pointer to by ESP-4
@@ -354,10 +371,10 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target,
 
   if (paramCount) {
     baseEspVal = x86::R_READ<32>(b, X86::ESP);
-    if (esp_adjust) {
-      baseEspVal = BinaryOperator::CreateAdd(baseEspVal, CONST_V<32>(b, 4), "",
-                                             b);
-    }
+//    if (esp_adjust) {
+//      baseEspVal = BinaryOperator::CreateAdd(baseEspVal, CONST_V<32>(b, 4), "",
+//                                             b);
+//    }
   }
 
   for (int i = 0; i < paramCount; i++) {
@@ -371,6 +388,9 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target,
     }
   }
 
+  if (!is_jump) {
+    writeDetachReturnAddr<32>(b);
+  }
   CallInst *callR = CallInst::Create(getExitPointDriver(externFunction),
                                      arguments, "", b);
   callR->setCallingConv(externFunction->getCallingConv());
@@ -418,8 +438,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target,
 
 namespace x86_64 {
 
-static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target,
-                                      bool esp_adjust = false) {
+static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool is_jump) {
   Module *M = b->getParent()->getParent();
 
   Value *rspOld = x86_64::R_READ<64>(b, X86::RSP);
@@ -601,10 +620,10 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target,
     // rest of the arguments are passed over stack
     // adjust the stack pointer if required
     baseRspVal = x86_64::R_READ<64>(b, X86::RSP);
-    if (esp_adjust) {
-      baseRspVal = BinaryOperator::CreateAdd(baseRspVal, CONST_V<64>(b, 8), "",
-                                             b);
-    }
+//    if (esp_adjust) {
+//      baseRspVal = BinaryOperator::CreateAdd(baseRspVal, CONST_V<64>(b, 8), "",
+//                                             b);
+//    }
   }
 
   for (int i = 0; i < paramCount; i++) {
@@ -616,6 +635,10 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target,
       baseRspVal = BinaryOperator::CreateAdd(baseRspVal, CONST_V<64>(b, 8), "",
                                              b);
     }
+  }
+
+  if (!is_jump) {
+    writeDetachReturnAddr<64>(b);
   }
 
   CallInst *callR = CallInst::Create(getExitPointDriver(externFunction),
@@ -658,12 +681,8 @@ static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
     } else {
       ret = x86::doCallPCExtern(block, s, true);
     }
-    if (ret != EndBlock) {
-      return doRet<width>(block);
-    } else {
-      // noreturn api calls don't need to fix stack
-      return ret;
-    }
+    llvm::ReturnInst::Create(block->getContext(), block);
+    return EndBlock;
   } else if (ip->has_ext_data_ref()) {
     Module *M = block->getParent()->getParent();
 
@@ -675,17 +694,16 @@ static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
     Value *addrInt = new llvm::PtrToIntInst(
         gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
 
-    doCallM<width>(block, ip, addrInt);
-    // clear stack
-    return doRet<width>(block);
+    doCallM<width>(block, ip, addrInt, true);
+    llvm::ReturnInst::Create(block->getContext(), block);
+    return EndBlock;
 
   } else if (ip->has_jump_table() && ip->has_mem_reference) {
     // this is a jump table that got converted
     // into a table in the data section
     doJumpTableViaData(natM, block, ip, inst, width);
-    // return a "ret", since the jmp is simulated
-    // as a call/ret pair
-    return doRet<width>(block);
+    llvm::ReturnInst::Create(block->getContext(), block);
+    return EndBlock;
 
   } else if (ip->has_jump_table()) {
     // this is a conformant jump table
@@ -694,14 +712,14 @@ static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
     return EndBlock;
 
   } else if (ip->has_mem_reference) {
-    doCallM<width>(block, ip, MEM_REFERENCE(0));
-    // clear stack
-    return doRet<width>(block);
+    doCallM<width>(block, ip, MEM_REFERENCE(0), true);
+    llvm::ReturnInst::Create(block->getContext(), block);
+    return EndBlock;
   } else {
     // normal jump by memory (e.g. jmp [reg+offset] )
-    doCallM<width>(block, ip, ADDR_NOREF(0));
-    // clear stack
-    return doRet<width>(block);
+    doCallM<width>(block, ip, ADDR_NOREF(0), true);
+    llvm::ReturnInst::Create(block->getContext(), block);
+    return EndBlock;
   }
 }
 
@@ -777,7 +795,7 @@ static InstTransResult translate_JMPr(NativeModulePtr natM, BasicBlock *&block,
     doJumpTableViaSwitchReg(block, ip, minus_base, defaultb, width);
     TASSERT(defaultb != nullptr, "Default block has to exit");
     // fallback to doing do_call_value
-    doCallV(defaultb, ip, fromReg);
+    doCallV(defaultb, ip, fromReg, true);
     ReturnInst::Create(defaultb->getContext(), defaultb);
     return EndCFG;
 
@@ -785,7 +803,7 @@ static InstTransResult translate_JMPr(NativeModulePtr natM, BasicBlock *&block,
     // translate the JMP64r as a call/ret
     llvm::dbgs() << __FUNCTION__ << ": regular jump via register: "
                  << to_string<VA>(ip->get_loc(), std::hex) << "\n";
-    doCallV(block, ip, fromReg);
+    doCallV(block, ip, fromReg, true);
     ReturnInst::Create(block->getContext(), block);
     return EndCFG;
   }
@@ -800,16 +818,16 @@ static InstTransResult translate_CALLpcrel32(NativeModulePtr natM,
   if (ip->has_ext_call_target()) {
     std::string s = ip->get_ext_call_target()->getSymbolName();
     if (width == 64) {
-      ret = x86_64::doCallPCExtern(block, s);
+      ret = x86_64::doCallPCExtern(block, s, false);
     } else {
-      ret = x86::doCallPCExtern(block, s);
+      ret = x86::doCallPCExtern(block, s, false);
     }
   } else if (ip->has_code_ref()) {
     int64_t off = (int64_t) ip->get_reference(Inst::MEMRef);
-    ret = doCallPC<width>(ip, block, off);
+    ret = doCallPC<width>(ip, block, off, false);
   } else {
     int64_t off = (int64_t) OP(0).getImm();
-    ret = doCallPC<width>(ip, block, ip->get_loc() + ip->get_len() + off);
+    ret = doCallPC<width>(ip, block, ip->get_loc() + ip->get_len() + off, false);
   }
 
   return ret;
@@ -825,23 +843,23 @@ static InstTransResult translate_CALLm(NativeModulePtr natM,
   if (ip->has_ext_call_target()) {
     std::string s = ip->get_ext_call_target()->getSymbolName();
     if (width == 64) {
-      ret = x86_64::doCallPCExtern(block, s);
+      ret = x86_64::doCallPCExtern(block, s, false);
     } else {
-      ret = x86::doCallPCExtern(block, s);
+      ret = x86::doCallPCExtern(block, s, false);
     }
 
     // not external call, but some weird way of calling local function?
   } else if (ip->has_code_ref()) {
     cout << __FUNCTION__ << ":" << __LINE__ << ": doing call" << std::endl;
-    doCallPC<width>(ip, block, ip->get_reference(Inst::MEMRef));
+    doCallPC<width>(ip, block, ip->get_reference(Inst::MEMRef), false);
   }
   // is this referencing global data?
   else if (ip->has_mem_reference) {
-    doCallM<width>(block, ip, MEM_REFERENCE(0));
+    doCallM<width>(block, ip, MEM_REFERENCE(0), false);
     ret = ContinueBlock;
     // is this a simple address computation?
   } else {
-    doCallM<width>(block, ip, ADDR_NOREF(0));
+    doCallM<width>(block, ip, ADDR_NOREF(0), false);
     ret = ContinueBlock;
   }
 
@@ -867,7 +885,7 @@ static InstTransResult translate_CALLr(NativeModulePtr natM, BasicBlock *&block,
   Module *M = block->getParent()->getParent();
   const std::string &triple = M->getTargetTriple();
 
-  doCallV(block, ip, fromReg);
+  doCallV(block, ip, fromReg, false);
 
   return ContinueBlock;
 }
