@@ -33,7 +33,7 @@ namespace mcsema {
 // who knew?
 // see email thread:
 // http://lists.cs.uiuc.edu/pipermail/llvm-commits/Week-of-Mon-20070924/054064.html
-/*typedef struct _nativefpu {
+/*typedef struct _long double {
  uint8_t b0;
  uint8_t b1;
  uint8_t b2;
@@ -44,7 +44,7 @@ namespace mcsema {
  uint8_t b7;
  uint8_t b8;
  uint8_t b9;
- } __attribute ((packed)) nativefpu; // 80 bit  aka 10 bytes
+ } __attribute ((packed)) long double; // 80 bit  aka 10 bytes
  */
 
 // This is supposed to be eight 2-bit integers, but LLVM represents
@@ -184,75 +184,6 @@ typedef struct _RegState {
 }PACKED RegState;
 #ifdef _WIN32
 #pragma pack(pop)
-#endif
-
-#ifndef ONLY_STRUCT
-// get the value of st(reg_index)
-nativefpu FPU_GET_REG(RegState *state, unsigned reg_index) {
-  unsigned rnum = state->FPU_FLAGS.TOP + reg_index;
-
-  assert(reg_index < STREGS_MAX);
-  rnum %= STREGS_MAX;
-
-  return state->ST_regs.st[rnum];
-}
-
-// set the value of st(reg_index)
-void FPU_SET_REG(RegState *state, unsigned reg_index, nativefpu val) {
-
-  unsigned rnum = state->FPU_FLAGS.TOP + reg_index;
-
-  assert(reg_index < STREGS_MAX);
-  rnum %= STREGS_MAX;
-
-  state->ST_regs.st[rnum] = val;
-}
-
-long double NATIVEFPU_TO_LD(const nativefpu *nf) {
-#ifdef _WIN32
-  // sanity check
-  long double ld = 0;
-#ifndef _WIN64
-  _asm {
-    MOV eax, dword ptr nf
-    _emit 0xDB
-    _emit 0x28
-    ;FLD tbyte ptr [eax]; load 80bits into fpu
-    LEA eax, dword ptr ld; get address of ld
-    FSTP qword ptr [eax]; store 64-bits into ld
-  }
-#else
-  assert(sizeof(nf) == sizeof(ld));
-  memcpy(&ld, nf, sizeof(ld));
-#endif
-  return ld;
-#else
-  long double ld;
-  assert(sizeof( *nf) == sizeof(ld));
-  memcpy( &ld, nf, sizeof(ld));
-  return ld;
-#endif
-}
-
-void LD_TO_NATIVEFPU(long double ld, nativefpu *nf) {
-#ifdef _WIN32
-#ifndef _WIN64
-  _asm {
-    LEA eax, dword ptr ld; get address of ld
-    FLD qword ptr [eax]; load 64bits into fpu
-    MOV eax, dword ptr nf
-    _emit 0xDB
-    _emit 0x38
-    ;FSTP tbyte ptr [eax]; store 80-bits into nf
-  }
-#else
-#endif
-#else
-  assert(sizeof(ld) == sizeof( *nf));
-  memcpy(nf, &ld, sizeof( *nf));
-#endif
-}
-
 #endif
 
 #ifdef __cplusplus

@@ -2,11 +2,7 @@
 #include <string.h>
 #include "../../common/RegisterState.h"
 
-extern void demo1_entry(RegState *);
-
-unsigned long getNextPC(void) {
-    return 0;
-}
+extern void sub_1(RegState *);
 
 int doDemo1(int k) {
     RegState        rState;
@@ -18,7 +14,7 @@ int doDemo1(int k) {
     rState.RSP = (uint64_t) &stack[4096*9];
     rState.RAX = k;
 
-    demo1_entry(&rState);
+    sub_1(&rState);
 
     return rState.RAX;
 }
