@@ -1,12 +1,12 @@
 #include <stdio.h>
 
-extern int demo8_entry(int);
+extern int doOp(int);
 
 int main(int argc, char *argv[]) {
 
-    int i = demo8_entry(2);
-    int k = demo8_entry(4);
-    int j = demo8_entry(0);
+    int i = doOp(2);
+    int k = doOp(4);
+    int j = doOp(0);
 
     printf("i == %d\nk == %d\nj == %d\n", i, k, j);
 
