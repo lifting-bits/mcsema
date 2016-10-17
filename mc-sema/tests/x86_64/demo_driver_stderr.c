@@ -1,28 +1,10 @@
 #include <stdlib.h>
-#include "../../common/RegisterState.h"
 
-extern int stderr_entry(RegState *);
+extern int print_it(const char *words);
 
 int stderr_driver(const char* words)
 {
-    RegState        rState;
-    uint64_t        stack[4096*10];
-
-    memset(&rState, 0, sizeof(rState));
-
-    //set up the stack 
-    stack[(4096*9)+0] = 0;
-    stack[(4096*9)+1] = 0;
-    rState.RSP = (uint64_t) &stack[4096*9];
-    rState.RDI = (uint64_t)words;
-    rState.RSI = 0;
-    rState.RBP = 0;
-    rState.RBX = 0;
-    rState.RCX = 0;
-
-    stderr_entry(&rState);
-
-    return rState.RAX;
+    return print_it(words);
 }
 
 int main(int argc, const char *argv[]) {
