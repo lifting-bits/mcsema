@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include "../../common/RegisterState.h"
 
-extern void demo2_entry(RegState *);
+extern void sub_1(RegState *);
 
 int doDemo2(int k) {
     RegState            rState = {0};
@@ -12,7 +12,7 @@ int doDemo2(int k) {
     rState.RSP = (uint64_t) &stack[4096*9];
     rState.RAX = k;
 
-    demo2_entry(&rState);
+    sub_1(&rState);
 
     return rState.RAX;
 }

@@ -16,5 +16,5 @@ else
 fi
 
 ${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=x86_64-pc-linux-gnu -i demo_test1.cfg -entrypoint=start -o demo_test1.bc
-clang-3.5 -m64 -o demo_driver1.exe demo_driver1.c ../../../drivers/ELF_64_linux.S demo_test1.bc
+clang-3.5 -O3 -m64 -o demo_driver1.exe demo_driver1.c ../../../drivers/ELF_64_linux.S demo_test1.bc
 ./demo_driver1.exe
