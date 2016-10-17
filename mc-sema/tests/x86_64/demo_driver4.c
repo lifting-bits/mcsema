@@ -7,7 +7,7 @@
 #include <string.h>
 
 //extern void STDCALL sub_b(RegState *);
-extern char* demo4_entry(char *);
+extern char* doTrans(char *);
 
 int main(int argc, char *argv[]) {
     size_t  len = sizeof("/first/test/path");
@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
 
     strcpy(a, "/first/test/path");
 
-    b = demo4_entry(a);
+    b = doTrans(a);
 
     printf("%s -> %s\n", a, b);
 
