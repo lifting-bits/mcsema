@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-extern void demo6_entry(char**, int);
+extern void doWork(char**, int);
 
 int main(int argc, char *argv[]) {
     char    *foo[3];
@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
     printf("b == %s\n", b);
     printf("c == %s\n", c);
 
-    demo6_entry(foo, 3);
+    doWork(foo, 3);
 
     printf("a == %s\n", a);
     printf("b == %s\n", b);
