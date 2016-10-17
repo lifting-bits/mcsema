@@ -1,9 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
-#define TARGET_IA64
 #include "../../common/RegisterState.h"
 
-extern void demo12_entry(RegState *);
+extern void sub_1(RegState *);
 
 int doDemo12(int k) {
     RegState            rState = {0};
@@ -13,7 +12,7 @@ int doDemo12(int k) {
     rState.RSP = (uint64_t) &stack[4096*9];
     rState.RAX = k;
 
-    demo12_entry(&rState);
+    sub_1(&rState);
 
     return rState.RAX;
 }
