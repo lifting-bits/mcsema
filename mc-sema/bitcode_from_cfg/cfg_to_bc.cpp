@@ -181,7 +181,7 @@ static VA findSymInModule(NativeModulePtr mod, const std::string &sym_name) {
       return sym.getAddr();
     }
   }
-  return 0;
+  return (VA)(-1);
 }
 
 int main(int argc, char *argv[]) {
@@ -261,7 +261,8 @@ int main(int argc, char *argv[]) {
     for (const auto &entry_point_name : EntryPoints) {
       std::cerr << "Adding entry point: " << entry_point_name << std::endl;
 
-      if (auto entry_pc = findSymInModule(mod, entry_point_name)) {
+      auto entry_pc = findSymInModule(mod, entry_point_name);
+      if ((VA)(-1) != entry_pc) {
         std::cerr << entry_point_name << " is implemented by sub_" << std::hex
                   << entry_pc << std::endl;
 
