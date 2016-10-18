@@ -33,17 +33,25 @@
 #include "ArchOps.h"
 #include "RegisterUsage.h"
 
-#include <llvm/Object/COFF.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/ADT/StringSwitch.h>
-#include "llvm/IR/LLVMContext.h"
+#include "llvm/ADT/StringSwitch.h"
+
+#include "llvm/Bitcode/ReaderWriter.h"
+
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/InstIterator.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/IR/Type.h"
+
 #include "llvm/LinkAllPasses.h"
 
-#include "llvm/IR/Type.h"
+#include "llvm/Object/COFF.h"
+
+#include "llvm/Support/CommandLine.h"
+
 #include "postPasses.h"
 #include <boost/graph/breadth_first_search.hpp>
 #include "Externals.h"
@@ -52,13 +60,17 @@
 #include "Annotation.h"
 
 #include <vector>
-#include <llvm/IR/MDBuilder.h>
-#include "llvm/IR/InstIterator.h"
 
 using namespace llvm;
 using namespace std;
 
 bool ignoreUnsupportedInsts = false;
+
+static llvm::cl::opt<bool> AddBreakpoints(
+    "add-breakpoints",
+    llvm::cl::desc(
+        "Add debug breakpoint function calls before each lifted instruction."),
+    llvm::cl::init(false));
 
 #include <llvm/ADT/SmallVector.h>
 
@@ -200,13 +212,13 @@ Value *MCRegToValue(BasicBlock *b, unsigned reg) {
 
 static int accessOffset(int reg) {
   switch (reg) {
-    case X86::DH:
+    case llvm::X86::DH:
       return 8;
-    case X86::CH:
+    case llvm::X86::CH:
       return 8;
-    case X86::BH:
+    case llvm::X86::BH:
       return 8;
-    case X86::AH:
+    case llvm::X86::AH:
       return 8;
     default:
       return 0;
@@ -215,196 +227,196 @@ static int accessOffset(int reg) {
 
 static int readRegWidth(int reg) {
   switch (reg) {
-    case X86::DH:
+    case llvm::X86::DH:
       return 8;
-    case X86::CH:
+    case llvm::X86::CH:
       return 8;
-    case X86::BH:
+    case llvm::X86::BH:
       return 8;
-    case X86::AH:
+    case llvm::X86::AH:
       return 8;
-    case X86::AX:
+    case llvm::X86::AX:
       return 16;
-    case X86::AL:
+    case llvm::X86::AL:
       return 8;
-    case X86::EAX:
+    case llvm::X86::EAX:
       return 32;
-    case X86::RAX:
+    case llvm::X86::RAX:
       return 64;
-    case X86::BX:
+    case llvm::X86::BX:
       return 16;
-    case X86::BL:
+    case llvm::X86::BL:
       return 8;
-    case X86::EBX:
+    case llvm::X86::EBX:
       return 32;
-    case X86::RBX:
+    case llvm::X86::RBX:
       return 64;
-    case X86::CX:
+    case llvm::X86::CX:
       return 16;
-    case X86::CL:
+    case llvm::X86::CL:
       return 8;
-    case X86::ECX:
+    case llvm::X86::ECX:
       return 32;
-    case X86::RCX:
+    case llvm::X86::RCX:
       return 64;
-    case X86::DX:
+    case llvm::X86::DX:
       return 16;
-    case X86::DL:
+    case llvm::X86::DL:
       return 8;
-    case X86::EDX:
+    case llvm::X86::EDX:
       return 32;
-    case X86::RDX:
+    case llvm::X86::RDX:
       return 64;
-    case X86::SIL:
+    case llvm::X86::SIL:
       return 8;
-    case X86::SI:
+    case llvm::X86::SI:
       return 16;
-    case X86::ESI:
+    case llvm::X86::ESI:
       return 32;
-    case X86::RSI:
+    case llvm::X86::RSI:
       return 64;
-    case X86::DIL:
+    case llvm::X86::DIL:
       return 8;
-    case X86::DI:
+    case llvm::X86::DI:
       return 16;
-    case X86::EDI:
+    case llvm::X86::EDI:
       return 32;
-    case X86::RDI:
+    case llvm::X86::RDI:
       return 64;
-    case X86::SPL:
+    case llvm::X86::SPL:
       return 8;
-    case X86::SP:
+    case llvm::X86::SP:
       return 16;
-    case X86::ESP:
+    case llvm::X86::ESP:
       return 32;
-    case X86::RSP:
+    case llvm::X86::RSP:
       return 64;
-    case X86::BPL:
+    case llvm::X86::BPL:
       return 8;
-    case X86::BP:
+    case llvm::X86::BP:
       return 16;
-    case X86::EBP:
+    case llvm::X86::EBP:
       return 32;
-    case X86::RBP:
+    case llvm::X86::RBP:
       return 64;
-    case X86::R8B:
+    case llvm::X86::R8B:
       return 8;
-    case X86::R8W:
+    case llvm::X86::R8W:
       return 16;
-    case X86::R8D:
+    case llvm::X86::R8D:
       return 32;
-    case X86::R8:
+    case llvm::X86::R8:
       return 64;
-    case X86::R9B:
+    case llvm::X86::R9B:
       return 8;
-    case X86::R9W:
+    case llvm::X86::R9W:
       return 16;
-    case X86::R9D:
+    case llvm::X86::R9D:
       return 32;
-    case X86::R9:
+    case llvm::X86::R9:
       return 64;
-    case X86::R10B:
+    case llvm::X86::R10B:
       return 8;
-    case X86::R10W:
+    case llvm::X86::R10W:
       return 16;
-    case X86::R10D:
+    case llvm::X86::R10D:
       return 32;
-    case X86::R10:
+    case llvm::X86::R10:
       return 64;
-    case X86::R11B:
+    case llvm::X86::R11B:
       return 8;
-    case X86::R11W:
+    case llvm::X86::R11W:
       return 16;
-    case X86::R11D:
+    case llvm::X86::R11D:
       return 32;
-    case X86::R11:
+    case llvm::X86::R11:
       return 64;
-    case X86::R12B:
+    case llvm::X86::R12B:
       return 8;
-    case X86::R12W:
+    case llvm::X86::R12W:
       return 16;
-    case X86::R12D:
+    case llvm::X86::R12D:
       return 32;
-    case X86::R12:
+    case llvm::X86::R12:
       return 64;
-    case X86::R13B:
+    case llvm::X86::R13B:
       return 8;
-    case X86::R13W:
+    case llvm::X86::R13W:
       return 16;
-    case X86::R13D:
+    case llvm::X86::R13D:
       return 32;
-    case X86::R13:
+    case llvm::X86::R13:
       return 64;
-    case X86::R14B:
+    case llvm::X86::R14B:
       return 8;
-    case X86::R14W:
+    case llvm::X86::R14W:
       return 16;
-    case X86::R14D:
+    case llvm::X86::R14D:
       return 32;
-    case X86::R14:
+    case llvm::X86::R14:
       return 64;
-    case X86::R15B:
+    case llvm::X86::R15B:
       return 8;
-    case X86::R15W:
+    case llvm::X86::R15W:
       return 16;
-    case X86::R15D:
+    case llvm::X86::R15D:
       return 32;
-    case X86::R15:
+    case llvm::X86::R15:
       return 64;
 
-    case X86::ST0:
+    case llvm::X86::ST0:
       return 80;
-    case X86::ST1:
+    case llvm::X86::ST1:
       return 80;
-    case X86::ST2:
+    case llvm::X86::ST2:
       return 80;
-    case X86::ST3:
+    case llvm::X86::ST3:
       return 80;
-    case X86::ST4:
+    case llvm::X86::ST4:
       return 80;
-    case X86::ST5:
+    case llvm::X86::ST5:
       return 80;
-    case X86::ST6:
+    case llvm::X86::ST6:
       return 80;
-    case X86::ST7:
+    case llvm::X86::ST7:
       return 80;
 
-    case X86::XMM0:
+    case llvm::X86::XMM0:
       return 128;
-    case X86::XMM1:
+    case llvm::X86::XMM1:
       return 128;
-    case X86::XMM2:
+    case llvm::X86::XMM2:
       return 128;
-    case X86::XMM3:
+    case llvm::X86::XMM3:
       return 128;
-    case X86::XMM4:
+    case llvm::X86::XMM4:
       return 128;
-    case X86::XMM5:
+    case llvm::X86::XMM5:
       return 128;
-    case X86::XMM6:
+    case llvm::X86::XMM6:
       return 128;
-    case X86::XMM7:
+    case llvm::X86::XMM7:
       return 128;
-    case X86::XMM8:
+    case llvm::X86::XMM8:
       return 128;
-    case X86::XMM9:
+    case llvm::X86::XMM9:
       return 128;
-    case X86::XMM10:
+    case llvm::X86::XMM10:
       return 128;
-    case X86::XMM11:
+    case llvm::X86::XMM11:
       return 128;
-    case X86::XMM12:
+    case llvm::X86::XMM12:
       return 128;
-    case X86::XMM13:
+    case llvm::X86::XMM13:
       return 128;
-    case X86::XMM14:
+    case llvm::X86::XMM14:
       return 128;
-    case X86::XMM15:
+    case llvm::X86::XMM15:
       return 128;
 
-    case X86::EIP:
+    case llvm::X86::EIP:
       return 32;
-    case X86::RIP:
+    case llvm::X86::RIP:
       return 64;
 
     default:
@@ -417,196 +429,196 @@ static int readRegWidth(int reg) {
 
 static const char *regName(int reg) {
   switch (reg) {
-    case X86::DH:
+    case llvm::X86::DH:
       return "DH";
-    case X86::CH:
+    case llvm::X86::CH:
       return "CH";
-    case X86::BH:
+    case llvm::X86::BH:
       return "BH";
-    case X86::AH:
+    case llvm::X86::AH:
       return "AH";
-    case X86::AX:
+    case llvm::X86::AX:
       return "AX";
-    case X86::AL:
+    case llvm::X86::AL:
       return "AL";
-    case X86::EAX:
+    case llvm::X86::EAX:
       return "EAX";
-    case X86::RAX:
+    case llvm::X86::RAX:
       return "RAX";
-    case X86::BX:
+    case llvm::X86::BX:
       return "BX";
-    case X86::BL:
+    case llvm::X86::BL:
       return "BL";
-    case X86::EBX:
+    case llvm::X86::EBX:
       return "EBX";
-    case X86::RBX:
+    case llvm::X86::RBX:
       return "RBX";
-    case X86::CX:
+    case llvm::X86::CX:
       return "CX";
-    case X86::CL:
+    case llvm::X86::CL:
       return "CL";
-    case X86::ECX:
+    case llvm::X86::ECX:
       return "ECX";
-    case X86::RCX:
+    case llvm::X86::RCX:
       return "RCX";
-    case X86::DX:
+    case llvm::X86::DX:
       return "DX";
-    case X86::DL:
+    case llvm::X86::DL:
       return "DL";
-    case X86::EDX:
+    case llvm::X86::EDX:
       return "EDX";
-    case X86::RDX:
+    case llvm::X86::RDX:
       return "RDX";
-    case X86::SIL:
+    case llvm::X86::SIL:
       return "SIL";
-    case X86::SI:
+    case llvm::X86::SI:
       return "SI";
-    case X86::ESI:
+    case llvm::X86::ESI:
       return "ESI";
-    case X86::RSI:
+    case llvm::X86::RSI:
       return "RSI";
-    case X86::DIL:
+    case llvm::X86::DIL:
       return "DIL";
-    case X86::DI:
+    case llvm::X86::DI:
       return "DI";
-    case X86::EDI:
+    case llvm::X86::EDI:
       return "EDI";
-    case X86::RDI:
+    case llvm::X86::RDI:
       return "RDI";
-    case X86::SPL:
+    case llvm::X86::SPL:
       return "SPL";
-    case X86::SP:
+    case llvm::X86::SP:
       return "SP";
-    case X86::ESP:
+    case llvm::X86::ESP:
       return "ESP";
-    case X86::RSP:
+    case llvm::X86::RSP:
       return "RSP";
-    case X86::BPL:
+    case llvm::X86::BPL:
       return "BPL";
-    case X86::BP:
+    case llvm::X86::BP:
       return "BP";
-    case X86::EBP:
+    case llvm::X86::EBP:
       return "EBP";
-    case X86::RBP:
+    case llvm::X86::RBP:
       return "RBP";
-    case X86::R8B:
+    case llvm::X86::R8B:
       return "R8B";
-    case X86::R8W:
+    case llvm::X86::R8W:
       return "R8W";
-    case X86::R8D:
+    case llvm::X86::R8D:
       return "R8D";
-    case X86::R8:
+    case llvm::X86::R8:
       return "R8";
-    case X86::R9B:
+    case llvm::X86::R9B:
       return "R9B";
-    case X86::R9W:
+    case llvm::X86::R9W:
       return "R9W";
-    case X86::R9D:
+    case llvm::X86::R9D:
       return "R9D";
-    case X86::R9:
+    case llvm::X86::R9:
       return "R9";
-    case X86::R10B:
+    case llvm::X86::R10B:
       return "R10B";
-    case X86::R10W:
+    case llvm::X86::R10W:
       return "R10W";
-    case X86::R10D:
+    case llvm::X86::R10D:
       return "R10D";
-    case X86::R10:
+    case llvm::X86::R10:
       return "R10";
-    case X86::R11B:
+    case llvm::X86::R11B:
       return "R11B";
-    case X86::R11W:
+    case llvm::X86::R11W:
       return "R11W";
-    case X86::R11D:
+    case llvm::X86::R11D:
       return "R11D";
-    case X86::R11:
+    case llvm::X86::R11:
       return "R11";
-    case X86::R12B:
+    case llvm::X86::R12B:
       return "R12B";
-    case X86::R12W:
+    case llvm::X86::R12W:
       return "R12W";
-    case X86::R12D:
+    case llvm::X86::R12D:
       return "R12D";
-    case X86::R12:
+    case llvm::X86::R12:
       return "R12";
-    case X86::R13B:
+    case llvm::X86::R13B:
       return "R13B";
-    case X86::R13W:
+    case llvm::X86::R13W:
       return "R13W";
-    case X86::R13D:
+    case llvm::X86::R13D:
       return "R13D";
-    case X86::R13:
+    case llvm::X86::R13:
       return "R13";
-    case X86::R14B:
+    case llvm::X86::R14B:
       return "R14B";
-    case X86::R14W:
+    case llvm::X86::R14W:
       return "R14W";
-    case X86::R14D:
+    case llvm::X86::R14D:
       return "R14D";
-    case X86::R14:
+    case llvm::X86::R14:
       return "R14";
-    case X86::R15B:
+    case llvm::X86::R15B:
       return "R15B";
-    case X86::R15W:
+    case llvm::X86::R15W:
       return "R15W";
-    case X86::R15D:
+    case llvm::X86::R15D:
       return "R15D";
-    case X86::R15:
+    case llvm::X86::R15:
       return "R15";
 
-    case X86::ST0:
+    case llvm::X86::ST0:
       return "ST0";
-    case X86::ST1:
+    case llvm::X86::ST1:
       return "ST1";
-    case X86::ST2:
+    case llvm::X86::ST2:
       return "ST2";
-    case X86::ST3:
+    case llvm::X86::ST3:
       return "ST3";
-    case X86::ST4:
+    case llvm::X86::ST4:
       return "ST4";
-    case X86::ST5:
+    case llvm::X86::ST5:
       return "ST5";
-    case X86::ST6:
+    case llvm::X86::ST6:
       return "ST6";
-    case X86::ST7:
+    case llvm::X86::ST7:
       return "ST7";
 
-    case X86::XMM0:
+    case llvm::X86::XMM0:
       return "XMM0";
-    case X86::XMM1:
+    case llvm::X86::XMM1:
       return "XMM1";
-    case X86::XMM2:
+    case llvm::X86::XMM2:
       return "XMM2";
-    case X86::XMM3:
+    case llvm::X86::XMM3:
       return "XMM3";
-    case X86::XMM4:
+    case llvm::X86::XMM4:
       return "XMM4";
-    case X86::XMM5:
+    case llvm::X86::XMM5:
       return "XMM5";
-    case X86::XMM6:
+    case llvm::X86::XMM6:
       return "XMM6";
-    case X86::XMM7:
+    case llvm::X86::XMM7:
       return "XMM7";
-    case X86::XMM8:
+    case llvm::X86::XMM8:
       return "XMM8";
-    case X86::XMM9:
+    case llvm::X86::XMM9:
       return "XMM9";
-    case X86::XMM10:
+    case llvm::X86::XMM10:
       return "XMM10";
-    case X86::XMM11:
+    case llvm::X86::XMM11:
       return "XMM11";
-    case X86::XMM12:
+    case llvm::X86::XMM12:
       return "XMM12";
-    case X86::XMM13:
+    case llvm::X86::XMM13:
       return "XMM13";
-    case X86::XMM14:
+    case llvm::X86::XMM14:
       return "XMM14";
-    case X86::XMM15:
+    case llvm::X86::XMM15:
       return "XMM15";
 
-    case X86::EIP:
+    case llvm::X86::EIP:
       return "EIP";
-    case X86::RIP:
+    case llvm::X86::RIP:
       return "RIP";
 
     default:
@@ -1166,12 +1178,12 @@ BasicBlock *bbFromStrName(string n, Function *F) {
   return found;
 }
 
-static void CreateDebugInstrCall(llvm::BasicBlock *B, VA pc) {
+static void CreateInstrBreakpoint(llvm::BasicBlock *B, VA pc) {
   auto M = B->getParent()->getParent();
   auto &C = M->getContext();
 
   std::stringstream ss;
-  ss << "debug_loc_0x" << std::hex << pc;
+  ss << "breakpoint_0x" << std::hex << pc;
   auto instr_func_name = ss.str();
 
   auto IFT = M->getFunction(instr_func_name);
@@ -1212,7 +1224,9 @@ InstTransResult liftInstr(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
   // At the beginning of the block, make a call to a dummy function with the
   // same name as the block. This function call cannot be optimized away, and
   // so it serves as a useful marker for where we are.
-  CreateDebugInstrCall(block, pc);
+  if (AddBreakpoints) {
+    CreateInstrBreakpoint(block, pc);
+  }
 
   InstTransResult disInst_result = liftInstrImpl(ip, block, nb, F, natF, natM);
 
