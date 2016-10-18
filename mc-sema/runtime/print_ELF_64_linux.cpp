@@ -48,7 +48,7 @@ int main(void) {
 
   // Pop the target function into the `RegState` structure. This resets `RSP`
   // to what it should be on entry to `__mcsema_attach_call`.
-  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF - %lu]\n", __builtin_offsetof(mcsema::RegState, RIP));
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RIP));
 
   // General purpose registers.
   printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rax\n", __builtin_offsetof(mcsema::RegState, RAX));
@@ -107,7 +107,7 @@ int main(void) {
   // code functions.
   printf("  mov rdi, fs:[0]\n");
   printf("  lea rdi, [rdi + __mcsema_reg_state@TPOFF]\n");
-  printf("  jmp fs:[__mcsema_reg_state@TPOFF - %lu]\n", __builtin_offsetof(mcsema::RegState, RIP));
+  printf("  jmp fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RIP));
 
   printf(".Lfunc_end1:\n");
   printf("  .size __mcsema_attach_call,.Lfunc_end1-__mcsema_attach_call\n");
@@ -282,7 +282,7 @@ int main(void) {
 
   // Pop the target function into the `RegState` structure. This resets `RSP`
   // to what it should be on entry to `__mcsema_detach_call`.
-  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF - %lu]\n", __builtin_offsetof(mcsema::RegState, RIP));
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RIP));
 
   // Stash the callee-saved registers.
   printf("  push rbx\n");
@@ -308,7 +308,7 @@ int main(void) {
   printf("  lea rax, [rip + __mcsema_attach_ret]\n");
   printf("  mov [rsp], rax\n");
 
-  printf("  jmp fs:[__mcsema_reg_state@TPOFF - %lu]\n", __builtin_offsetof(mcsema::RegState, RIP));
+  printf("  jmp fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RIP));
 
   printf(".Lfunc_end4:\n");
   printf("  .size __mcsema_detach_call,.Lfunc_end4-__mcsema_detach_call\n");
@@ -373,7 +373,7 @@ int main(void) {
   printf("  mov [rsp], rax\n");
 
   // Go native.
-  printf("  jmp fs:[__mcsema_reg_state@TPOFF - %lu]\n", __builtin_offsetof(mcsema::RegState, RIP));
+  printf("  jmp fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RIP));
 
   printf(".Lfunc_end5:\n");
   printf("  .size __mcsema_detach_call_value,.Lfunc_end5-__mcsema_detach_call_value\n");
