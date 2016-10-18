@@ -2,25 +2,12 @@
 #include <string.h>
 #include <immintrin.h>
 #include <mmintrin.h>
-#include "../../common/RegisterState.h"
 
-extern void demo_fpu1_entry(RegState *);
+extern long double timespi(long double k);
 
 #ifdef __linux__
 long double DoDemoFpu1(long double k) {
-    RegState            rState = {0};
-    unsigned long   stack[4096*10];
-    nativefpu n;
-
-    //set up the stack 
-    memcpy(&stack[0x8ff5], &k, sizeof(k));
-    rState.RSP = (unsigned long) &stack[0x8ff4];
-
-    demo_fpu1_entry(&rState);
-
-    // read ST(0)
-    n = FPU_GET_REG(&rState, 0);
-    return NATIVEFPU_TO_LD(&n);
+    return timespi(k);
 }
 #else
 long double DoDemoFpu1(long double k) {
