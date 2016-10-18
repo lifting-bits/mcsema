@@ -31,25 +31,31 @@
 #include <string>
 #include <sstream>
 
+#include "llvm/ADT/Triple.h"
+#include "llvm/ADT/Twine.h"
+
+#include "llvm/Bitcode/ReaderWriter.h"
+
+#include "llvm/IR/Verifier.h"
+#include "llvm/IR/LLVMContext.h"
+
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCDisassembler.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCInstPrinter.h"
 #include "llvm/MC/MCSubtargetInfo.h"
-#include "llvm/ADT/Triple.h"
-#include "llvm/ADT/Twine.h"
+
+#include "llvm/Object/COFF.h"
+
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/MemoryObject.h"
-#include "llvm/Object/COFF.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/TargetSelect.h"
-#include "llvm/IR/Verifier.h"
 
 #include <peToCFG.h>
 #include <toLLVM.h>
