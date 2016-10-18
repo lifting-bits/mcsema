@@ -183,13 +183,14 @@ static Value *doGEPV(BasicBlock *&b, Value *gepindex, MCSemaRegs reg) {
 }
 
 static Value *GetFPUTagPtrV(BasicBlock *&b, Value *tagval) {
-  return doGEPV(b, tagval, FPU_TAG);
+  auto TagTy = llvm::Type::getIntNTy(b->getContext(), 2);
+  auto TagPtrTy = llvm::PointerType::get(TagTy, 0);
+  return new llvm::BitCastInst(doGEPV(b, tagval, FPU_TAG), TagPtrTy, "", b);
 }
 
 static Value *GetFPUTagV(BasicBlock *&b, Value *tagval) {
-  Value *tagptr = doGEPV(b, tagval, FPU_TAG);
+  Value *tagptr = GetFPUTagPtrV(b, tagval);
   Value *load = noAliasMCSemaScope(new LoadInst(tagptr, "", b));
-
   return load;
 }
 
