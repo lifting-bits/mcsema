@@ -316,15 +316,6 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
 
   //write it into the location pointer to by ESP-4
   Value *espOld = x86::R_READ<32>(b, X86::ESP);
-  //Value   *espSub =
-  //    BinaryOperator::CreateSub(espOld, CONST_V<32>(b, 4), "", b);
-  //M_WRITE_0<32>(b, espSub, CONST_V<32>(b, 0));
-  //R_WRITE<32>(b, X86::ESP, espSub);
-
-  //write the local values into the context register
-  //for now, we will stop doing this because we are not calling a wrapper
-  //that meaningfully understands the context structure
-  //writeLocalsToContext(b, 32);
 
   //lookup the function in the module
   Function *externFunction = M->getFunction(target);
@@ -371,10 +362,6 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
 
   if (paramCount) {
     baseEspVal = x86::R_READ<32>(b, X86::ESP);
-//    if (esp_adjust) {
-//      baseEspVal = BinaryOperator::CreateAdd(baseEspVal, CONST_V<32>(b, 4), "",
-//                                             b);
-//    }
   }
 
   for (int i = 0; i < paramCount; i++) {
@@ -406,10 +393,6 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
     Value *unreachable = new UnreachableInst(b->getContext(), b);
     return EndBlock;
   }
-
-  //then, put the registers back into the locals
-  //see above
-  //writeContextToLocals(b, 32);
 
   // we returned from an extern: assume it cleared the direction flag
   // which is standard for MS calling conventions

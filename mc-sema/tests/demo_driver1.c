@@ -1,13 +1,8 @@
 #include <stdio.h>
 #include <string.h>
-
 #include "../common/RegisterState.h"
 
-extern void demo1_entry(RegState *);
-
-unsigned long getNextPC(void) {
-    return 0;
-}
+extern void sub_8000001(RegState *);
 
 int doDemo1(int k) {
     RegState        rState;
@@ -16,10 +11,10 @@ int doDemo1(int k) {
     memset(&rState, 0, sizeof(rState));
 
     //set up the stack 
-    rState.ESP = (unsigned long) &stack[4096*9];
+    rState.ESP = (uint64_t) &stack[4096*9];
     rState.EAX = k;
 
-    demo1_entry(&rState);
+    sub_8000001(&rState);
 
     return rState.EAX;
 }

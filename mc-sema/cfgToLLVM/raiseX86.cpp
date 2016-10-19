@@ -1413,11 +1413,29 @@ void initAttachDetach(llvm::Module *M) {
   auto &C = M->getContext();
   auto VoidTy = llvm::Type::getVoidTy(C);
   auto EPTy = llvm::FunctionType::get(VoidTy, false);
-  initADFeatues(M->getOrInsertFunction("__mcsema_attach_call", EPTy));
-  initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret", EPTy));
-  initADFeatues(M->getOrInsertFunction("__mcsema_detach_call", EPTy));
-  initADFeatues(M->getOrInsertFunction("__mcsema_detach_call_value", EPTy));
-  initADFeatues(M->getOrInsertFunction("__mcsema_detach_ret", EPTy));
+
+  if (getSystemArch(M) == _X86_64_) {
+    if (getSystemOS(M) == llvm::Triple::Linux) {
+      initADFeatues(M->getOrInsertFunction("__mcsema_attach_call", EPTy));
+      initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret", EPTy));
+      initADFeatues(M->getOrInsertFunction("__mcsema_detach_call", EPTy));
+      initADFeatues(M->getOrInsertFunction("__mcsema_detach_call_value", EPTy));
+      initADFeatues(M->getOrInsertFunction("__mcsema_detach_ret", EPTy));
+    } else {
+      TASSERT(false, "Unknown OS Type!");
+    }
+  } else {
+    if (getSystemOS(M) == llvm::Triple::Linux) {
+      initADFeatues(M->getOrInsertFunction("__mcsema_attach_call_cdecl", EPTy));
+      initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret_cdecl", EPTy));
+      initADFeatues(M->getOrInsertFunction("__mcsema_detach_call_cdecl", EPTy));
+      initADFeatues(M->getOrInsertFunction("__mcsema_detach_ret_cdecl", EPTy));
+      initADFeatues(M->getOrInsertFunction("__mcsema_detach_call_value", EPTy));
+      initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret_value", EPTy));
+    } else {
+      TASSERT(false, "Unknown OS Type!");
+    }
+  }
 }
 
 static Constant* makeConstantBlob(LLVMContext &ctx,

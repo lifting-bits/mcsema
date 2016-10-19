@@ -61,7 +61,12 @@ void archSetCallingConv(llvm::Module *M, llvm::CallInst *ci) {
       TASSERT(false, "Unsupported OS");
     }
   } else {
-    ci->setCallingConv(CallingConv::X86_StdCall);
+    //TODO(artem): handle StdCall
+    if (getSystemOS(M) == llvm::Triple::Linux) {
+        ci->setCallingConv(CallingConv::C);
+    } else {
+      TASSERT(false, "Unsupported OS");
+    }
   }
 }
 
@@ -77,7 +82,12 @@ void archSetCallingConv(llvm::Module *M, llvm::Function *F) {
       TASSERT(false, "Unsupported OS");
     }
   } else {
-    F->setCallingConv(CallingConv::X86_StdCall);
+    //TODO(artem): handle StdCall
+    if (getSystemOS(M) == llvm::Triple::Linux) {
+        F->setCallingConv(CallingConv::C);
+    } else {
+      TASSERT(false, "Unsupported OS");
+    }
   }
 }
 
@@ -125,7 +135,15 @@ llvm::Function *addEntryPointDriver(llvm::Module *M, const std::string &name,
     W->addFnAttr(llvm::Attribute::NoInline);
     W->addFnAttr(llvm::Attribute::Naked);
 
-    AddPushJumpStub(M, F, W, "__mcsema_attach_call");
+    if (getSystemArch(M) == _X86_64_) {
+        AddPushJumpStub(M, F, W, "__mcsema_attach_call");
+    } else {
+        if (getSystemOS(M) == llvm::Triple::Linux) {
+            AddPushJumpStub(M, F, W, "__mcsema_attach_call_cdecl");
+        } else {
+          TASSERT(false, "Unsupported OS");
+        }
+    }
     F->setLinkage(llvm::GlobalValue::ExternalLinkage);
 
     if (F->doesNotReturn()) {
@@ -147,7 +165,15 @@ llvm::Function *getExitPointDriver(llvm::Function *F) {
         F->getFunctionType(), llvm::GlobalValue::ExternalLinkage, name, M);
     W->addFnAttr(llvm::Attribute::NoInline);
     W->addFnAttr(llvm::Attribute::Naked);
-    AddPushJumpStub(M, F, W, "__mcsema_detach_call");
+    if (getSystemArch(M) == _X86_64_) {
+        AddPushJumpStub(M, F, W, "__mcsema_detach_call");
+    } else {
+        if (getSystemOS(M) == llvm::Triple::Linux) {
+            AddPushJumpStub(M, F, W, "__mcsema_detach_call_cdecl");
+        } else {
+          TASSERT(false, "Unsupported OS");
+        }
+    }
     F->setLinkage(llvm::GlobalValue::ExternalLinkage);
 
     if (F->doesNotReturn()) {
