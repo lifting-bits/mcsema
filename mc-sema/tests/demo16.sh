@@ -15,9 +15,7 @@ else
     ${BIN_DESCEND_PATH}/bin_descend -d -march=x86 -entry-symbol=shiftit -i=demo_test16.o
 fi
 
-${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=i686-pc-linux-gnu -i demo_test16.cfg -driver=shiftit,shiftit,2,return,C -o demo_test16.bc
+${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=i686-pc-linux-gnu -i demo_test16.cfg -entrypoint=shiftit -o demo_test16.bc
+clang-3.5 -O3 -m32 -o demo_driver16.exe demo_driver16.c ../../drivers/ELF_32_linux.S demo_test16.bc
 
-${LLVM_PATH}/opt -O3 -o demo_test16_opt.bc demo_test16.bc
-${LLVM_PATH}/llc -filetype=obj -o demo_test16_mine.o demo_test16_opt.bc
-${CC} -ggdb -m32 -o demo_driver16.exe demo_driver16.c demo_test16_mine.o
 ./demo_driver16.exe
