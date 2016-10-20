@@ -73,6 +73,15 @@ int main(void) {
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(mcsema::RegState, ESI));
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(mcsema::RegState, EBP));
+
+
+  // copy posible stack args from native ESP into temporary holding area
+  //printf("  mov eax, gs:[0]\n");
+  //printf("  lea edi, [eax + __mcsema_stack_args@NTPOFF]\n");
+  //printf("  mov esi, esp\n");
+  //printf("  mov ecx, %u\n", kStackArgSize);
+  //printf("  rep movsb\n");
+
   printf("  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
 
   // XMM registers.
@@ -91,6 +100,27 @@ int main(void) {
   printf("  mov esp, DWORD PTR gs:[0]\n");
   printf("  lea esp, [esp + __mcsema_stack@NTPOFF + %u]\n", kStackSize);
   printf(".Lhave_stack:\n");
+
+  // copy posible stack args from holding area to mcsema stack
+  // allocate space for our arguments on stack
+  //printf("  sub esp, %u\n", kStackArgSize);
+  //// we need to save these 
+  //printf("  push esi\n");
+  //printf("  push edi\n");
+  //printf("  push ecx\n");
+  //// get the stack arg location
+  //printf("  lea edi, [esp + %u]\n", 4+4+4);
+  //// source is temp area
+  //printf("  mov eax, DWORD PTR gs:[0]\n");
+  //printf("  lea esi, [eax + __mcsema_stack_args@NTPOFF]\n");
+  //printf("  mov ecx, %u\n", kStackArgSize);
+  //// copy
+  //printf("  rep movsb\n");
+
+  //// restore saved regs
+  //printf("  pop ecx\n");
+  //printf("  pop edi\n");
+  //printf("  pop esi\n");
 
   // the state struture is the first and only arg to lifted functions
   printf("  mov eax, DWORD PTR gs:[0]\n");
@@ -135,7 +165,9 @@ int main(void) {
   // return stack to where it was before we pasted
   // some arguments to it, so the caller can clean
   // up as expected
-  printf("  add esp, %u\n", kStackArgSize);
+  //
+  // add an extra 4 bytes to compensate for the fake return address
+  printf("  add esp, %u\n", kStackArgSize+4);
   // Swap into the mcsema stack.
   printf("  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
 
@@ -280,10 +312,17 @@ int main(void) {
   // Marshal the callee-saved registers (of the emulated code) into the native
   // state. We don't touch the argument registers.
 
+  // Stash the callee-saved registers.
+  printf("  push edi\n");
+  printf("  push esi\n");
+  printf("  push ebx\n");
+  printf("  push ebp\n");
+  // assume we can clobber eax and ecx
+
   // copy posible stack args into temporary holding area
   printf("  mov eax, gs:[0]\n");
   printf("  lea edi, [eax + __mcsema_stack_args@NTPOFF]\n");
-  printf("  mov esi, esp\n");
+  printf("  lea esi, [esp + %u]\n", 4 + 4+4+4+4);
   printf("  mov ecx, %u\n", kStackArgSize);
   printf("  rep movsb\n");
 
@@ -291,12 +330,6 @@ int main(void) {
   printf("  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESI));
   printf("  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBX));
   printf("  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBP));
-
-  // Stash the callee-saved registers.
-  printf("  push edi\n");
-  printf("  push esi\n");
-  printf("  push ebx\n");
-  printf("  push ebp\n");
 
   // Swap onto the native stack.
   printf("  xchg DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u], esp\n", __builtin_offsetof(mcsema::RegState, ESP));

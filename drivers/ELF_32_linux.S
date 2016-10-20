@@ -66,7 +66,7 @@ __mcsema_attach_call_cdecl:
   .type __mcsema_attach_ret_cdecl,@function
 __mcsema_attach_ret_cdecl:
   .cfi_startproc
-  add esp, 256
+  add esp, 260
   xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 28]
   mov gs:[__mcsema_reg_state@NTPOFF + 4], eax
   mov gs:[__mcsema_reg_state@NTPOFF + 16], edx
@@ -145,19 +145,19 @@ __mcsema_detach_ret_cdecl:
 __mcsema_detach_call_cdecl:
   .cfi_startproc
   pop DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 0]
+  push edi
+  push esi
+  push ebx
+  push ebp
   mov eax, gs:[0]
   lea edi, [eax + __mcsema_stack_args@NTPOFF]
-  mov esi, esp
+  lea esi, [esp + 20]
   mov ecx, 256
   rep movsb
   mov edi, gs:[__mcsema_reg_state@NTPOFF + 24]
   mov esi, gs:[__mcsema_reg_state@NTPOFF + 20]
   mov ebx, gs:[__mcsema_reg_state@NTPOFF + 8]
   mov ebp, gs:[__mcsema_reg_state@NTPOFF + 32]
-  push edi
-  push esi
-  push ebx
-  push ebp
   xchg DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 28], esp
   sub esp, 256
   push esi
