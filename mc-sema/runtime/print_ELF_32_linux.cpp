@@ -63,34 +63,39 @@ int main(void) {
 
   // Pop the target function into the `RegState` structure. This resets `ESP`
   // to what it should be on entry to `__mcsema_attach_call`.
-  printf("  pop DWORD PTR gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EIP));
+  printf("  pop DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EIP));
 
   // General purpose registers.
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], eax\n", __builtin_offsetof(mcsema::RegState, EAX));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], ebx\n", __builtin_offsetof(mcsema::RegState, EBX));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], ecx\n", __builtin_offsetof(mcsema::RegState, ECX));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], edx\n", __builtin_offsetof(mcsema::RegState, EDX));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], esi\n", __builtin_offsetof(mcsema::RegState, ESI));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], ebp\n", __builtin_offsetof(mcsema::RegState, EBP));
-  printf("  xchg esp, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], eax\n", __builtin_offsetof(mcsema::RegState, EAX));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(mcsema::RegState, EBX));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ecx\n", __builtin_offsetof(mcsema::RegState, ECX));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(mcsema::RegState, EDX));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(mcsema::RegState, ESI));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(mcsema::RegState, EBP));
+  printf("  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
 
   // XMM registers.
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm0\n", __builtin_offsetof(mcsema::RegState, XMM0));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm1\n", __builtin_offsetof(mcsema::RegState, XMM1));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm2\n", __builtin_offsetof(mcsema::RegState, XMM2));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm3\n", __builtin_offsetof(mcsema::RegState, XMM3));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm4\n", __builtin_offsetof(mcsema::RegState, XMM4));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm5\n", __builtin_offsetof(mcsema::RegState, XMM5));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm6\n", __builtin_offsetof(mcsema::RegState, XMM6));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm7\n", __builtin_offsetof(mcsema::RegState, XMM7));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm0\n", __builtin_offsetof(mcsema::RegState, XMM0));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm1\n", __builtin_offsetof(mcsema::RegState, XMM1));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm2\n", __builtin_offsetof(mcsema::RegState, XMM2));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm3\n", __builtin_offsetof(mcsema::RegState, XMM3));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm4\n", __builtin_offsetof(mcsema::RegState, XMM4));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm5\n", __builtin_offsetof(mcsema::RegState, XMM5));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm6\n", __builtin_offsetof(mcsema::RegState, XMM6));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm7\n", __builtin_offsetof(mcsema::RegState, XMM7));
 
   // If `ESP` is null then we need to initialize it to our new stack.
   printf("  cmp esp, 0\n");
   printf("  jnz .Lhave_stack\n");
-  printf("  mov esp, gs:[0]\n");
-  printf("  lea esp, [esp + __mcsema_stack@TPOFF + %u]\n", kStackSize);
+  printf("  mov esp, DWORD PTR gs:[0]\n");
+  printf("  lea esp, [esp + __mcsema_stack@NTPOFF + %u]\n", kStackSize);
   printf(".Lhave_stack:\n");
+
+  // the state struture is the first and only arg to lifted functions
+  printf("  mov eax, DWORD PTR gs:[0]\n");
+  printf("  lea eax, [eax + __mcsema_reg_state@NTPOFF]\n");
+  printf("  push eax\n");
 
   // `esp` holds the address of the mcsema stack.
   //    1) Set up a return address on the mcsema stack.
@@ -98,17 +103,14 @@ int main(void) {
   //
   // Note:  When the lifted function returns, it will go to `__mcsema_detach_ret_cdecl`,
   //        which will return to native code.
-  //printf("  lea edi, [rip + __mcsema_detach_ret_cdecl]\n");
-  //printf("  push edi\n");
-  printf("  push __mcsema_detach_ret_cdecl\n");
+  //
 
-  // Last but not least, set up `EDI` to be the address of the state structure.
-  // A pointer to the state structure is passed as the first argument to lifted
-  // code functions.
-  //printf("  mov edi, gs:[0]\n");
-  //printf("  push edi\n");
-  printf("  push gs:[0]\n");
-  printf("  jmp gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EIP));
+  // do not push __mcsema_detach_ret_cdecl directly
+  // to work around llvm assembler bug that emits it
+  // as a 16-bit push
+  printf("  lea eax, __mcsema_detach_ret_cdecl\n");
+  printf("  push eax\n");
+  printf("  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EIP));
 
   printf(".Lfunc_end1:\n");
   printf("  .size __mcsema_attach_call_cdecl,.Lfunc_end1-__mcsema_attach_call_cdecl\n");
@@ -135,18 +137,18 @@ int main(void) {
   // up as expected
   printf("  add esp, %u\n", kStackArgSize);
   // Swap into the mcsema stack.
-  printf("  xchg esp, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
+  printf("  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
 
   // Return registers.
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], eax\n", __builtin_offsetof(mcsema::RegState, EAX));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], edx\n", __builtin_offsetof(mcsema::RegState, EDX));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm0\n", __builtin_offsetof(mcsema::RegState, XMM0));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], eax\n", __builtin_offsetof(mcsema::RegState, EAX));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(mcsema::RegState, EDX));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm0\n", __builtin_offsetof(mcsema::RegState, XMM0));
 
   // Callee-saved registers.
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], ebp\n", __builtin_offsetof(mcsema::RegState, EBP));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], ebx\n", __builtin_offsetof(mcsema::RegState, EBX));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], esi\n", __builtin_offsetof(mcsema::RegState, ESI));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(mcsema::RegState, EBP));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(mcsema::RegState, EBX));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(mcsema::RegState, ESI));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
 
   // Unstash the callee-saved registers.
   printf("  pop ebp\n");
@@ -175,29 +177,29 @@ int main(void) {
   printf("  .cfi_startproc\n");
 
   // General purpose registers.
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], eax\n", __builtin_offsetof(mcsema::RegState, EAX));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], ebx\n", __builtin_offsetof(mcsema::RegState, EBX));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], ecx\n", __builtin_offsetof(mcsema::RegState, ECX));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], edx\n", __builtin_offsetof(mcsema::RegState, EDX));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], esi\n", __builtin_offsetof(mcsema::RegState, ESI));
-  printf("  mov gs:[__mcsema_reg_state@TPOFF + %u], ebp\n", __builtin_offsetof(mcsema::RegState, EBP));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], eax\n", __builtin_offsetof(mcsema::RegState, EAX));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(mcsema::RegState, EBX));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ecx\n", __builtin_offsetof(mcsema::RegState, ECX));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(mcsema::RegState, EDX));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(mcsema::RegState, ESI));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(mcsema::RegState, EBP));
   // this may ony be valid for caller clenup?
   // TODO(artem): check if esp is changed from pre-call ESP;
   // if so, pop off some regs from mcsema's ESP, for callee cleanup
   printf("  add esp, %u\n", kStackArgSize);
 
-  printf("  xchg esp, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
+  printf("  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
 
   // XMM registers.
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm0\n", __builtin_offsetof(mcsema::RegState, XMM0));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm1\n", __builtin_offsetof(mcsema::RegState, XMM1));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm2\n", __builtin_offsetof(mcsema::RegState, XMM2));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm3\n", __builtin_offsetof(mcsema::RegState, XMM3));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm4\n", __builtin_offsetof(mcsema::RegState, XMM4));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm5\n", __builtin_offsetof(mcsema::RegState, XMM5));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm6\n", __builtin_offsetof(mcsema::RegState, XMM6));
-  printf("  movdqu gs:[__mcsema_reg_state@TPOFF + %u], xmm7\n", __builtin_offsetof(mcsema::RegState, XMM7));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm0\n", __builtin_offsetof(mcsema::RegState, XMM0));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm1\n", __builtin_offsetof(mcsema::RegState, XMM1));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm2\n", __builtin_offsetof(mcsema::RegState, XMM2));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm3\n", __builtin_offsetof(mcsema::RegState, XMM3));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm4\n", __builtin_offsetof(mcsema::RegState, XMM4));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm5\n", __builtin_offsetof(mcsema::RegState, XMM5));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm6\n", __builtin_offsetof(mcsema::RegState, XMM6));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm7\n", __builtin_offsetof(mcsema::RegState, XMM7));
 
   // Unstash the callee-saved registers.
   printf("  pop ebp\n");
@@ -230,26 +232,27 @@ int main(void) {
   // We "undo" that, then swap back to the native stack. When we swap, we
   // save into `RegState::ESP` where we are in the lifted stack, so that the
   // next attach can continue on where we left off.
-  printf("  sub DWORD PTR gs:[__mcsema_reg_state@TPOFF + %u], 4\n", __builtin_offsetof(mcsema::RegState, ESP));
+  printf("  sub DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u], 4\n", __builtin_offsetof(mcsema::RegState, ESP));
 
   // General purpose registers.
-  printf("  mov eax, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EAX));
-  printf("  mov ebx, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBX));
-  printf("  mov ecx, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ECX));
-  printf("  mov edx, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDX));
-  printf("  mov edi, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDI));
-  printf("  mov esi, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESI));
-  printf("  mov ebp, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBP));
+  printf("  mov eax, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EAX));
+  printf("  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBX));
+  printf("  mov ecx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ECX));
+  printf("  mov edx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDX));
+  printf("  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDI));
+  printf("  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESI));
+  printf("  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBP));
+  printf("  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
 
   // XMM registers.
-  printf("  movdqu xmm0, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM0));
-  printf("  movdqu xmm1, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM1));
-  printf("  movdqu xmm2, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM2));
-  printf("  movdqu xmm3, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM3));
-  printf("  movdqu xmm4, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM4));
-  printf("  movdqu xmm5, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM5));
-  printf("  movdqu xmm6, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM6));
-  printf("  movdqu xmm7, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM7));
+  printf("  movdqu xmm0, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM0));
+  printf("  movdqu xmm1, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM1));
+  printf("  movdqu xmm2, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM2));
+  printf("  movdqu xmm3, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM3));
+  printf("  movdqu xmm4, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM4));
+  printf("  movdqu xmm5, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM5));
+  printf("  movdqu xmm6, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM6));
+  printf("  movdqu xmm7, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM7));
 
   printf("  ret\n");
 
@@ -273,21 +276,21 @@ int main(void) {
 
   // Pop the target function into the `RegState` structure. This resets `EIP`
   // to what it should be on entry to `__mcsema_detach_call`.
-  printf("  pop DWORD PTR gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EIP));
+  printf("  pop DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EIP));
   // Marshal the callee-saved registers (of the emulated code) into the native
   // state. We don't touch the argument registers.
 
   // copy posible stack args into temporary holding area
   printf("  mov eax, gs:[0]\n");
-  printf("  lea edi, [eax + __mcsema_stack_args@TPOFF]\n");
+  printf("  lea edi, [eax + __mcsema_stack_args@NTPOFF]\n");
   printf("  mov esi, esp\n");
   printf("  mov ecx, %u\n", kStackArgSize);
   printf("  rep movsb\n");
 
-  printf("  mov edi, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDI));
-  printf("  mov esi, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESI));
-  printf("  mov ebx, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBX));
-  printf("  mov ebp, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBP));
+  printf("  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDI));
+  printf("  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESI));
+  printf("  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBX));
+  printf("  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBP));
 
   // Stash the callee-saved registers.
   printf("  push edi\n");
@@ -296,7 +299,7 @@ int main(void) {
   printf("  push ebp\n");
 
   // Swap onto the native stack.
-  printf("  xchg gs:[__mcsema_reg_state@TPOFF + %u], esp\n", __builtin_offsetof(mcsema::RegState, ESP));
+  printf("  xchg DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u], esp\n", __builtin_offsetof(mcsema::RegState, ESP));
 
   // copy posible stack args from holding area to native stack
   // allocate space for our arguments on stack
@@ -308,8 +311,8 @@ int main(void) {
   // get the stack arg location
   printf("  lea edi, [esp + %u]\n", 4+4+4);
   // source is temp area
-  printf("  mov eax, gs:[0]\n");
-  printf("  lea esi, [eax + __mcsema_stack_args@TPOFF]\n");
+  printf("  mov eax, DWORD PTR gs:[0]\n");
+  printf("  lea esi, [eax + __mcsema_stack_args@NTPOFF]\n");
   printf("  mov ecx, %u\n", kStackArgSize);
   // copy
   printf("  rep movsb\n");
@@ -320,9 +323,13 @@ int main(void) {
   printf("  pop esi\n");
 
   // Set up a re-attach return address.
-  printf("  push __mcsema_attach_ret_cdecl\n");
+  // do not push __mcsema_attach_ret_cdecl directly
+  // to work around llvm assembler bug that emits it
+  // as a 16-bit push
+  printf("  lea eax, __mcsema_attach_ret_cdecl\n");
+  printf("  push eax\n");
 
-  printf("  jmp gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EIP));
+  printf("  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EIP));
 
   printf(".Lfunc_end4:\n");
   printf("  .size __mcsema_detach_call_cdecl,.Lfunc_end4-__mcsema_detach_call_cdecl\n");
@@ -351,33 +358,33 @@ int main(void) {
   printf("  push ebp\n");
 
   // copy posible stack args into temporary holding area
-  printf("  mov eax, gs:[0]\n");
-  printf("  lea edi, [eax + __mcsema_stack_args@TPOFF]\n");
+  printf("  mov eax, DWORD PTR gs:[0]\n");
+  printf("  lea edi, [eax + __mcsema_stack_args@NTPOFF]\n");
   // this is not ESP since for do_call_value there is no spilling via an 
   // intermediate function
-  printf("  mov esi, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
+  printf("  mov esi, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
   printf("  mov ecx, %u\n", kStackArgSize);
   printf("  rep movsb\n");
 
   // General purpose registers.
-  printf("  mov eax, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EAX));
-  printf("  mov ebx, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBX));
-  printf("  mov ecx, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ECX));
-  printf("  mov edx, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDX));
-  printf("  mov edi, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDI));
-  printf("  mov esi, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESI));
-  printf("  mov ebp, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBP));
-  printf("  xchg gs:[__mcsema_reg_state@TPOFF + %u], esp\n", __builtin_offsetof(mcsema::RegState, ESP));
+  printf("  mov eax, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EAX));
+  printf("  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBX));
+  printf("  mov ecx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ECX));
+  printf("  mov edx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDX));
+  printf("  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDI));
+  printf("  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESI));
+  printf("  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBP));
+  printf("  xchg DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u], esp\n", __builtin_offsetof(mcsema::RegState, ESP));
 
   // XMM registers.
-  printf("  movdqu xmm0, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM0));
-  printf("  movdqu xmm1, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM1));
-  printf("  movdqu xmm2, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM2));
-  printf("  movdqu xmm3, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM3));
-  printf("  movdqu xmm4, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM4));
-  printf("  movdqu xmm5, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM5));
-  printf("  movdqu xmm6, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM6));
-  printf("  movdqu xmm7, gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM7));
+  printf("  movdqu xmm0, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM0));
+  printf("  movdqu xmm1, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM1));
+  printf("  movdqu xmm2, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM2));
+  printf("  movdqu xmm3, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM3));
+  printf("  movdqu xmm4, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM4));
+  printf("  movdqu xmm5, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM5));
+  printf("  movdqu xmm6, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM6));
+  printf("  movdqu xmm7, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, XMM7));
 
   // copy posible stack args from holding area to native stack
   // allocate space for our arguments on stack
@@ -389,8 +396,8 @@ int main(void) {
   // get the stack arg location
   printf("  lea edi, [esp + %u]\n", 4+4+4);
   // source is temp area
-  printf("  mov eax, gs:[0]\n");
-  printf("  lea esi, [eax + __mcsema_stack_args@TPOFF]\n");
+  printf("  mov eax, DWORD PTR gs:[0]\n");
+  printf("  lea esi, [eax + __mcsema_stack_args@NTPOFF]\n");
   printf("  mov ecx, %u\n", kStackArgSize);
   // copy
   printf("  rep movsb\n");
@@ -401,10 +408,15 @@ int main(void) {
   printf("  pop esi\n");
 
   // Set up a re-attach return address.
-  printf("  push __mcsema_attach_ret_value\n");
+  // Set up a re-attach return address.
+  // do not push __mcsema_attach_ret_value directly
+  // to work around llvm assembler bug that emits it
+  // as a 16-bit push
+  printf("  lea eax, __mcsema_attach_ret_value\n");
+  printf("  push eax\n");
 
   // Go native.
-  printf("  jmp gs:[__mcsema_reg_state@TPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EIP));
+  printf("  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EIP));
 
   printf(".Lfunc_end5:\n");
   printf("  .size __mcsema_detach_call_value,.Lfunc_end5-__mcsema_detach_call_value\n");
@@ -417,8 +429,8 @@ int main(void) {
   printf("  .type __mcsema_debug_get_reg_state,@function\n");
   printf("__mcsema_debug_get_reg_state:\n");
   printf("  .cfi_startproc\n");
-  printf("  mov eax, gs:[0]\n");
-  printf("  lea eax, [eax + __mcsema_reg_state@TPOFF]\n");
+  printf("  mov eax, DWORD PTR gs:[0]\n");
+  printf("  lea eax, [eax + __mcsema_reg_state@NTPOFF]\n");
   printf("  ret\n");
   printf(".Lfunc_end6:\n");
   printf("  .size __mcsema_debug_get_reg_state,.Lfunc_end6-__mcsema_debug_get_reg_state\n");
