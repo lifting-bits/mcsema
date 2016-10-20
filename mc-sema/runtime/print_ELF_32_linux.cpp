@@ -219,7 +219,8 @@ int main(void) {
   // this may ony be valid for caller clenup?
   // TODO(artem): check if esp is changed from pre-call ESP;
   // if so, pop off some regs from mcsema's ESP, for callee cleanup
-  printf("  add esp, %u\n", kStackArgSize);
+  // the +4 compensates for the fake return address we pushed earlier
+  printf("  add esp, %u\n", kStackArgSize+4);
 
   printf("  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
 

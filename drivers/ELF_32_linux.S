@@ -95,7 +95,7 @@ __mcsema_attach_ret_value:
   mov gs:[__mcsema_reg_state@NTPOFF + 24], edi
   mov gs:[__mcsema_reg_state@NTPOFF + 20], esi
   mov gs:[__mcsema_reg_state@NTPOFF + 32], ebp
-  add esp, 256
+  add esp, 260
   xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 28]
   movdqu gs:[__mcsema_reg_state@NTPOFF + 184], xmm0
   movdqu gs:[__mcsema_reg_state@NTPOFF + 200], xmm1
