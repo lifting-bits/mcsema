@@ -3,7 +3,7 @@
 
 #include "../common/RegisterState.h"
 
-extern void demo12_entry(RegState *);
+extern void sub_8000001(RegState *);
 
 int doDemo12(int k) {
     RegState            rState = {0};
@@ -13,7 +13,7 @@ int doDemo12(int k) {
     rState.ESP = (unsigned long) &stack[4096*9];
     rState.EAX = k;
 
-    demo12_entry(&rState);
+    sub_8000001(&rState);
 
     return rState.EAX;
 }
