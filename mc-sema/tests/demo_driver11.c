@@ -1,7 +1,7 @@
 #include <stdio.h>
 
-extern int demo11_entry(void);
+extern int printdata(void);
 
 int main(int argc, char *argv[]) {
-    return demo11_entry();
+    return printdata();
 }
