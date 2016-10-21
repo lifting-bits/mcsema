@@ -23,6 +23,23 @@ define print-reg-state-64
   dont-repeat
 end
 
+
+define print-reg-state-32
+  set $rptr = ((unsigned (*)(void))__mcsema_debug_get_reg_state)()
+  printf "         emulated           native\n"
+  printf "eip     0x%08x        0x%08x\n", *((unsigned *)($rptr + 0)), $eip
+  printf "eax     0x%08x        0x%08x\n", *((unsigned *)($rptr + 4)), $eax
+  printf "ebx     0x%08x        0x%08x\n", *((unsigned *)($rptr + 8)), $ebx
+  printf "ecx     0x%08x        0x%08x\n", *((unsigned *)($rptr + 12)), $ecx
+  printf "edx     0x%08x        0x%08x\n", *((unsigned *)($rptr + 16)), $edx
+  printf "edi     0x%08x        0x%08x\n", *((unsigned *)($rptr + 20)), $edi
+  printf "esi     0x%08x        0x%08x\n", *((unsigned *)($rptr + 24)), $esi
+  printf "ebp     0x%08x        0x%08x\n", *((unsigned *)($rptr + 28)), $ebp
+  printf "esp     0x%08x        0x%08x\n", *((unsigned *)($rptr + 32)), $esp
+  dont-repeat
+end
+
+
 define addr-of-rip
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
   printf "&(RegState::rip) = 0x%016x\n", $rptr + 0
