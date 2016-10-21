@@ -129,7 +129,6 @@ __mcsema_attach_ret_value:
   .type __mcsema_detach_ret_cdecl,@function
 __mcsema_detach_ret_cdecl:
   .cfi_startproc
-  sub DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 28], 4
   mov eax, gs:[__mcsema_reg_state@NTPOFF + 4]
   mov ebx, gs:[__mcsema_reg_state@NTPOFF + 8]
   mov ecx, gs:[__mcsema_reg_state@NTPOFF + 12]
@@ -146,7 +145,7 @@ __mcsema_detach_ret_cdecl:
   movdqu xmm5, gs:[__mcsema_reg_state@NTPOFF + 264]
   movdqu xmm6, gs:[__mcsema_reg_state@NTPOFF + 280]
   movdqu xmm7, gs:[__mcsema_reg_state@NTPOFF + 296]
-  ret
+  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 0]
 .Lfunc_end3:
   .size __mcsema_detach_ret_cdecl,.Lfunc_end3-__mcsema_detach_ret_cdecl
   .cfi_endproc

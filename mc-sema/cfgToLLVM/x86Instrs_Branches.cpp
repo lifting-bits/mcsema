@@ -53,6 +53,12 @@ static InstTransResult doRet(BasicBlock *b) {
   Value *nESP = BinaryOperator::CreateAdd(rESP, CONST_V<width>(b, width / 8),
                                           "", b);
 
+  auto xip = 32 == width ? X86::EIP : X86::RIP;
+  Value *ra = M_READ_0<width>(b, rESP);
+  // set EIP -- this is used by the asm stubs that
+  // connect translated code and native code
+  R_WRITE<width>(b, xip, ra);
+
   //write back to ESP
   R_WRITE<width>(b, xsp, nESP);
 
@@ -69,9 +75,13 @@ static InstTransResult doRetI(BasicBlock *&b, const MCOperand &o) {
   auto xsp = 32 == width ? X86::ESP : X86::RSP;
   Value *c = CONST_V<width>(b, o.getImm());
   Value *rESP = R_READ<width>(b, xsp);
-  Value *fromStack = M_READ_0<width>(b, rESP);
-  TASSERT(fromStack != NULL, "Could not read value from stack");
+  Value *ra = M_READ_0<width>(b, rESP);
+  TASSERT(ra != NULL, "Could not read value from stack");
 
+  auto xip = 32 == width ? X86::EIP : X86::RIP;
+  // set EIP -- this is used by the asm stubs that
+  // connect translated code and native code
+  R_WRITE<width>(b, xip, ra);
   //add the immediate to ESP
   Value *rESP_1 = BinaryOperator::CreateAdd(rESP, c, "", b);
 
@@ -903,6 +913,7 @@ BLOCKNAMES_TRANSLATION(LOOPE, doLoopE(block, ifTrue, ifFalse))
 BLOCKNAMES_TRANSLATION(LOOPNE, doLoopNE(block, ifTrue, ifFalse))
 GENERIC_TRANSLATION(RET, doRet<32>(block))
 GENERIC_TRANSLATION(RETI, doRetI<32>(block, OP(0)))
+GENERIC_TRANSLATION(RETIW, doRetI<16>(block, OP(0)))
 GENERIC_TRANSLATION(RETQ, doRet<64>(block))
 GENERIC_TRANSLATION(RETIQ, doRetI<64>(block, OP(0)))
 BLOCKNAMES_TRANSLATION(JMP_4, doNonCondBranch(block, ifTrue))
@@ -933,5 +944,5 @@ void Branches_populateDispatchMap(DispatchMap &m) {
   m[X86::RETIL] = translate_RETI;
   m[X86::RETQ] = translate_RETQ;
   m[X86::RETIQ] = translate_RETIQ;
-  m[X86::RETIW] = translate_RET;
+  m[X86::RETIW] = translate_RETIW;
 }

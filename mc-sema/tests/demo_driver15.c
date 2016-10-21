@@ -19,17 +19,17 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    //ret = imfastcall(ret,0x200);
-    //if(0x500 != ret) {
-    //    printf("Failed fastcall: %08x", ret);
-    //    return -2;
-    //}
+    ret = imfastcall(ret,0x200);
+    if(0x500 != ret) {
+        printf("Failed fastcall: %08x", ret);
+        return -2;
+    }
 
-    //ret = imcdecl(0x200, ret);
-    //if(0x700 != ret) {
-    //    printf("Failed cdecl: %08x", ret);
-    //    return -3;
-    //}
+    ret = imcdecl(0x200, ret);
+    if(0x700 != ret) {
+        printf("Failed cdecl: %08x", ret);
+        return -3;
+    }
 
     printf("Test Passed\n");
     return 0;
