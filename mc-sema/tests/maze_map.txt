@@ -2,3 +2,5 @@ exit 1 C N
 sleep 1 C N
 read 3 C N
 printf 2 C N 
+DATA: __gmon_start__ PTR
+DATA: __libc_start_main PTR
