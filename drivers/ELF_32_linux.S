@@ -101,6 +101,8 @@ __mcsema_attach_ret_value:
   mov gs:[__mcsema_reg_state@NTPOFF + 24], edi
   mov gs:[__mcsema_reg_state@NTPOFF + 20], esi
   mov gs:[__mcsema_reg_state@NTPOFF + 32], ebp
+  sub DWORD PTR gs:[__mcsema_stack_mark@NTPOFF], esp
+  mov ecx, DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]
   add esp, 260
   xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 28]
   movdqu gs:[__mcsema_reg_state@NTPOFF + 184], xmm0
@@ -115,7 +117,10 @@ __mcsema_attach_ret_value:
   pop ebx
   pop esi
   pop edi
-  ret
+  sub esp, ecx
+  add esp, 4
+  lea ecx, [esp+ecx]
+  jmp dword ptr [ecx-4]
 .Lfunc_end0:
   .size __mcsema_attach_ret_value,.Lfunc_end0-__mcsema_attach_ret_value
   .cfi_endproc
@@ -192,6 +197,7 @@ __mcsema_detach_call_value:
   push esi
   push ebx
   push ebp
+  push DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]
   mov eax, DWORD PTR gs:[0]
   lea edi, [eax + __mcsema_stack_args@NTPOFF]
   mov esi, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 28]
@@ -225,6 +231,7 @@ __mcsema_detach_call_value:
   pop ecx
   pop edi
   pop esi
+  mov DWORD PTR gs:[__mcsema_stack_mark@NTPOFF], esp
   lea eax, __mcsema_attach_ret_value
   push eax
   jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 0]

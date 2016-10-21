@@ -197,10 +197,12 @@ int main(void) {
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(mcsema::RegState, ESI));
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(mcsema::RegState, EBP));
-  // this may ony be valid for caller clenup?
-  // TODO(artem): check if esp is changed from pre-call ESP;
-  // if so, pop off some regs from mcsema's ESP, for callee cleanup
-  // the +4 compensates for the fake return address we pushed earlier
+
+  // if this function had no args, this will be zero, otherwise
+  // it will be -argcount*4 (esp is now > old esp, due to pops)
+  printf("  sub DWORD PTR gs:[__mcsema_stack_mark@NTPOFF], esp\n");
+  printf("  mov ecx, DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]\n");
+  // adjust for our copied stack args + fake return
   printf("  add esp, %u\n", kStackArgSize+4);
 
   printf("  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
@@ -221,7 +223,15 @@ int main(void) {
   printf("  pop esi\n");
   printf("  pop edi\n");
 
-  printf("  ret\n");
+  // adjust again for the poppped off arguments
+  // this emulates a "retn XX", but that
+  // only takes an immediate value
+  printf("  sub esp, ecx\n"); // this sub is an add since ecx is negative
+  printf("  add esp, 4\n"); // adjust for return address on stack
+
+  // we still need to transfer control to the return addr on stack
+  printf("  lea ecx, [esp+ecx]\n");
+  printf("  jmp dword ptr [ecx-4]\n");
 
   printf(".Lfunc_end0:\n");
   printf("  .size __mcsema_attach_ret_value,.Lfunc_end0-__mcsema_attach_ret_value\n");
@@ -372,6 +382,9 @@ int main(void) {
   printf("  push ebx\n");
   printf("  push ebp\n");
 
+  // save current stack mark
+  printf("  push DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]\n");
+
   // copy posible stack args into temporary holding area
   printf("  mov eax, DWORD PTR gs:[0]\n");
   printf("  lea edi, [eax + __mcsema_stack_args@NTPOFF]\n");
@@ -421,6 +434,10 @@ int main(void) {
   printf("  pop ecx\n");
   printf("  pop edi\n");
   printf("  pop esi\n");
+
+  // save current ESP so we know how many bytes
+  // the callee popped off the stack on return
+  printf("  mov DWORD PTR gs:[__mcsema_stack_mark@NTPOFF], esp\n");
 
   // Set up a re-attach return address.
   // Set up a re-attach return address.
@@ -597,13 +614,13 @@ int main(void) {
   printf("  pop esi\n");
   printf("  pop edi\n");
 
-  /// DO WE NEED TO RETURN w/ same convention as we were called with?
-  /////
-  
   // adjust again for the poppped off arguments
-  printf("  sub esp, ecx\n"); // add since ecx is negative
-  printf("  add esp, 4\n");
+  // this emulates a "retn XX", but that
+  // only takes an immediate value
+  printf("  sub esp, ecx\n"); // this sub is an add since ecx is negative
+  printf("  add esp, 4\n"); // adjust for return address on stack
 
+  // we still need to transfer control to the return addr on stack
   printf("  lea ecx, [esp+ecx]\n");
   printf("  jmp dword ptr [ecx-4]\n");
 
