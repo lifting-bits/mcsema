@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 
-extern int sailboat(const char*);
+extern int keycomp(const char*);
 
 // these are needed since we don't have libgcc
 uint64_t __udivmoddi4(uint64_t num, uint64_t den, uint64_t *rem_p)
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
     }
 
     key = argv[1]; //"key{d9dd1cb9dc13ebc3dc3780d76123ee34}";
-    ret = sailboat(key);
+    ret = keycomp(key);
     if(ret == 0) {
         printf("a winner is you!\n");
     } else {
