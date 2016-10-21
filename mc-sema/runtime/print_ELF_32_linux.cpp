@@ -36,8 +36,18 @@ int main(void) {
   printf("  .type __mcsema_stack_args,@object\n");
   printf("  .section .tbss,\"awT\",@nobits\n");
   printf("__mcsema_stack_args:\n");
-  printf("  .zero %u\n", kStackArgSize);  // 1 MiB.
+  printf("  .zero %u\n", kStackArgSize);
   printf("  .size __mcsema_stack_args, 100\n");
+  printf("\n");
+
+  // Thread-local variable structure, named by `__mcsema_stack_mark`
+  // used to store the expected stack location on return,
+  // so caller cleanup conventions can know how many bytes to pop off
+  printf("  .type __mcsema_stack_mark,@object\n");
+  printf("  .section .tbss,\"awT\",@nobits\n");
+  printf("__mcsema_stack_mark:\n");
+  printf("  .zero %u\n", 4);
+  printf("  .size __mcsema_stack_mark, 100\n");
   printf("\n");
 
   printf("  .text\n");
@@ -74,14 +84,6 @@ int main(void) {
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(mcsema::RegState, ESI));
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(mcsema::RegState, EBP));
 
-
-  // copy posible stack args from native ESP into temporary holding area
-  //printf("  mov eax, gs:[0]\n");
-  //printf("  lea edi, [eax + __mcsema_stack_args@NTPOFF]\n");
-  //printf("  mov esi, esp\n");
-  //printf("  mov ecx, %u\n", kStackArgSize);
-  //printf("  rep movsb\n");
-
   printf("  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
 
   // XMM registers.
@@ -100,27 +102,6 @@ int main(void) {
   printf("  mov esp, DWORD PTR gs:[0]\n");
   printf("  lea esp, [esp + __mcsema_stack@NTPOFF + %u]\n", kStackSize);
   printf(".Lhave_stack:\n");
-
-  // copy posible stack args from holding area to mcsema stack
-  // allocate space for our arguments on stack
-  //printf("  sub esp, %u\n", kStackArgSize);
-  //// we need to save these 
-  //printf("  push esi\n");
-  //printf("  push edi\n");
-  //printf("  push ecx\n");
-  //// get the stack arg location
-  //printf("  lea edi, [esp + %u]\n", 4+4+4);
-  //// source is temp area
-  //printf("  mov eax, DWORD PTR gs:[0]\n");
-  //printf("  lea esi, [eax + __mcsema_stack_args@NTPOFF]\n");
-  //printf("  mov ecx, %u\n", kStackArgSize);
-  //// copy
-  //printf("  rep movsb\n");
-
-  //// restore saved regs
-  //printf("  pop ecx\n");
-  //printf("  pop edi\n");
-  //printf("  pop esi\n");
 
   // the state struture is the first and only arg to lifted functions
   printf("  mov eax, DWORD PTR gs:[0]\n");
@@ -300,7 +281,7 @@ int main(void) {
   //
   ///////////////////////////////////////////////////////////////
 
-  // Implements `__mcsema_detach_call`. This partially goes from lifted code
+  // Implements `__mcsema_detach_call_cdecl`. This partially goes from lifted code
   // into native code.
   printf("  .globl __mcsema_detach_call_cdecl\n");
   printf("  .type __mcsema_detach_call_cdecl,@function\n");
@@ -308,7 +289,7 @@ int main(void) {
   printf("  .cfi_startproc\n");
 
   // Pop the target function into the `RegState` structure. This resets `EIP`
-  // to what it should be on entry to `__mcsema_detach_call`.
+  // to what it should be on entry to `__mcsema_detach_call_cdecl`.
   printf("  pop DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EIP));
   // Marshal the callee-saved registers (of the emulated code) into the native
   // state. We don't touch the argument registers.
@@ -470,6 +451,209 @@ int main(void) {
   printf("  .size __mcsema_debug_get_reg_state,.Lfunc_end6-__mcsema_debug_get_reg_state\n");
   printf("  .cfi_endproc\n");
   printf("\n");
+
+  ///////////////////////////////////////////////////////////////
+  //
+  //         __mcsema_detach_call_stdcall
+  //
+  ///////////////////////////////////////////////////////////////
+
+  // Implements `__mcsema_detach_call_stdcall`. This partially goes from lifted code
+  // into native code.
+  printf("  .globl __mcsema_detach_call_stdcall\n");
+  printf("  .type __mcsema_detach_call_stdcall,@function\n");
+  printf("__mcsema_detach_call_stdcall:\n");
+  printf("  .cfi_startproc\n");
+
+  // Pop the target function into the `RegState` structure. This resets `EIP`
+  // to what it should be on entry to `__mcsema_detach_call_stdcall`.
+  printf("  pop DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EIP));
+  // Marshal the callee-saved registers (of the emulated code) into the native
+  // state. We don't touch the argument registers.
+
+  // Stash the callee-saved registers.
+  printf("  push edi\n");
+  printf("  push esi\n");
+  printf("  push ebx\n");
+  printf("  push ebp\n");
+
+  // save current stack mark
+  printf("  push DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]\n");
+
+  // do not clobber fastcall args
+  printf("  push ecx\n");
+  printf("  push edx\n");
+
+
+  // copy posible stack args into temporary holding area
+  printf("  mov eax, gs:[0]\n");
+  printf("  lea edi, [eax + __mcsema_stack_args@NTPOFF]\n");
+  printf("  lea esi, [esp + %u]\n", 4 + 4 + 4+4 + 4+4+4+4);
+  printf("  mov ecx, %u\n", kStackArgSize);
+  printf("  rep movsb\n");
+
+  // do not clobber fastcall args
+  printf("  pop edx\n");
+  printf("  pop ecx\n");
+
+  printf("  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDI));
+  printf("  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESI));
+  printf("  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBX));
+  printf("  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBP));
+
+  // Swap onto the native stack.
+  printf("  xchg DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u], esp\n", __builtin_offsetof(mcsema::RegState, ESP));
+
+  // copy posible stack args from holding area to native stack
+  // allocate space for our arguments on stack
+  printf("  sub esp, %u\n", kStackArgSize);
+  // we need to save these 
+  printf("  push esi\n");
+  printf("  push edi\n");
+  printf("  push ecx\n");
+  // get the stack arg location
+  printf("  lea edi, [esp + %u]\n", 4+4+4);
+  // source is temp area
+  printf("  mov eax, DWORD PTR gs:[0]\n");
+  printf("  lea esi, [eax + __mcsema_stack_args@NTPOFF]\n");
+  printf("  mov ecx, %u\n", kStackArgSize);
+  // copy
+  printf("  rep movsb\n");
+
+  // restore saved regs
+  printf("  pop ecx\n");
+  printf("  pop edi\n");
+  printf("  pop esi\n");
+
+  // save current ESP so we know how many bytes
+  // the callee popped off the stack on return
+  printf("  mov DWORD PTR gs:[__mcsema_stack_mark@NTPOFF], esp\n");
+
+  // Set up a re-attach return address.
+  // do not push __mcsema_attach_ret_stdcall directly
+  // to work around llvm assembler bug that emits it
+  // as a 16-bit push
+  printf("  lea eax, __mcsema_attach_ret_stdcall\n");
+  printf("  push eax\n");
+
+  printf("  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EIP));
+
+  printf(".Lfunc_endA:\n");
+  printf("  .size __mcsema_detach_call_stdcall,.Lfunc_endA-__mcsema_detach_call_stdcall\n");
+  printf("  .cfi_endproc\n");
+  printf("\n");
+
+  ///////////////////////////////////////////////////////////////
+  //
+  //         __mcsema_attach_ret_stdcall
+  //
+  ///////////////////////////////////////////////////////////////
+
+
+  // Implements `__mcsema_attach_ret_stdcall`. This goes from native state into lifted code.
+  printf("  .globl __mcsema_attach_ret_stdcall\n");
+  printf("  .type __mcsema_attach_ret_stdcall,@function\n");
+  printf("__mcsema_attach_ret_stdcall:\n");
+  printf("  .cfi_startproc\n");
+
+  // this should be valid for stdcall:
+  // return stack to where it was before we pasted
+  // some arguments to it, so the caller can clean
+  // up as expected
+  //
+  // add an extra 4 bytes to compensate for the fake return address
+  //
+  // save current ESP so we know how many bytes
+  // the callee popped off the stack on return
+  //
+  
+  // if this function had no args, this will be zero, otherwise
+  // it will be -argcount*4 (esp is now > old esp, due to pops)
+  printf("  sub DWORD PTR gs:[__mcsema_stack_mark@NTPOFF], esp\n");
+  // adjust for our copied stack args + fake return
+  printf("  add esp, %u\n", kStackArgSize+4);
+  // adjust again for the poppped off arguments
+  printf("  add esp, DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]\n");
+  // Swap into the mcsema stack.
+  printf("  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
+
+  // Return registers.
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], eax\n", __builtin_offsetof(mcsema::RegState, EAX));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(mcsema::RegState, EDX));
+  printf("  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm0\n", __builtin_offsetof(mcsema::RegState, XMM0));
+
+  // Callee-saved registers.
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(mcsema::RegState, EBP));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(mcsema::RegState, EBX));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(mcsema::RegState, ESI));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
+
+  // Unstash the callee-saved registers.
+  // restore old stack mark
+  printf("  pop DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]\n");
+  printf("  pop ebp\n");
+  printf("  pop ebx\n");
+  printf("  pop esi\n");
+  printf("  pop edi\n");
+
+  printf("  ret\n");
+
+  printf(".Lfunc_end7:\n");
+  printf("  .size __mcsema_attach_ret_stdcall,.Lfunc_end7-__mcsema_attach_ret_stdcall\n");
+  printf("  .cfi_endproc\n");
+  printf("\n");
+
+  ///////////////////////////////////////////////////////////////
+  //
+  //         __mcsema_detach_call_fastcall
+  //
+  ///////////////////////////////////////////////////////////////
+
+  // Implements `__mcsema_detach_call_fastcall`. This partially goes from lifted code
+  // into native code.
+  printf("  .globl __mcsema_detach_call_fastcall\n");
+  printf("  .type __mcsema_detach_call_fastcall,@function\n");
+  printf("__mcsema_detach_call_fastcall:\n");
+  printf("  .cfi_startproc\n");
+
+  // stdcall takes care to save the fastcall regs, so these effectively become identical
+  printf("  lea eax, __mcsema_detach_call_stdcall\n");
+  printf("  jmp eax\n");
+
+  printf(".Lfunc_end8:\n");
+  printf("  .size __mcsema_detach_call_fastcall,.Lfunc_end8-__mcsema_detach_call_fastcall\n");
+  printf("  .cfi_endproc\n");
+  printf("\n");
+
+  ///////////////////////////////////////////////////////////////
+  //
+  //         __mcsema_attach_ret_fastcall
+  //
+  ///////////////////////////////////////////////////////////////
+
+
+  // Implements `__mcsema_attach_ret_fastcall`. This goes from native state into lifted code.
+  //
+  // ******************
+  // this may never get used if we keep using __mcsema_detach_call_stdcall for fastcall
+  // ******************
+  printf("  .globl __mcsema_attach_ret_fastcall\n");
+  printf("  .type __mcsema_attach_ret_fastcall,@function\n");
+  printf("__mcsema_attach_ret_fastcall:\n");
+  printf("  .cfi_startproc\n");
+
+  // awkwardly push/ret to __mcsema_attach_ret_stdcall
+  // since it should be compatible with fastcall
+  printf("  push eax\n");
+  printf("  lea eax, __mcsema_attach_ret_stdcall\n");
+  printf("  xchg eax, DWORD PTR [esp]\n");
+  printf("  ret\n");
+
+  printf(".Lfunc_end9:\n");
+  printf("  .size __mcsema_attach_ret_fastcall,.Lfunc_end9-__mcsema_attach_ret_fastcall\n");
+  printf("  .cfi_endproc\n");
+  printf("\n");
+
   return 0;
 }
 

@@ -21,6 +21,12 @@ __mcsema_stack_args:
   .zero 256
   .size __mcsema_stack_args, 100
 
+  .type __mcsema_stack_mark,@object
+  .section .tbss,"awT",@nobits
+__mcsema_stack_mark:
+  .zero 4
+  .size __mcsema_stack_mark, 100
+
   .text
 
   .globl mcsema_main
@@ -235,5 +241,96 @@ __mcsema_debug_get_reg_state:
   ret
 .Lfunc_end6:
   .size __mcsema_debug_get_reg_state,.Lfunc_end6-__mcsema_debug_get_reg_state
+  .cfi_endproc
+
+  .globl __mcsema_detach_call_stdcall
+  .type __mcsema_detach_call_stdcall,@function
+__mcsema_detach_call_stdcall:
+  .cfi_startproc
+  pop DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 0]
+  push edi
+  push esi
+  push ebx
+  push ebp
+  push DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]
+  push ecx
+  push edx
+  mov eax, gs:[0]
+  lea edi, [eax + __mcsema_stack_args@NTPOFF]
+  lea esi, [esp + 32]
+  mov ecx, 256
+  rep movsb
+  pop edx
+  pop ecx
+  mov edi, gs:[__mcsema_reg_state@NTPOFF + 24]
+  mov esi, gs:[__mcsema_reg_state@NTPOFF + 20]
+  mov ebx, gs:[__mcsema_reg_state@NTPOFF + 8]
+  mov ebp, gs:[__mcsema_reg_state@NTPOFF + 32]
+  xchg DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 28], esp
+  sub esp, 256
+  push esi
+  push edi
+  push ecx
+  lea edi, [esp + 12]
+  mov eax, DWORD PTR gs:[0]
+  lea esi, [eax + __mcsema_stack_args@NTPOFF]
+  mov ecx, 256
+  rep movsb
+  pop ecx
+  pop edi
+  pop esi
+  mov DWORD PTR gs:[__mcsema_stack_mark@NTPOFF], esp
+  lea eax, __mcsema_attach_ret_stdcall
+  push eax
+  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 0]
+.Lfunc_endA:
+  .size __mcsema_detach_call_stdcall,.Lfunc_endA-__mcsema_detach_call_stdcall
+  .cfi_endproc
+
+  .globl __mcsema_attach_ret_stdcall
+  .type __mcsema_attach_ret_stdcall,@function
+__mcsema_attach_ret_stdcall:
+  .cfi_startproc
+  sub DWORD PTR gs:[__mcsema_stack_mark@NTPOFF], esp
+  add esp, 260
+  add esp, DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]
+  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 28]
+  mov gs:[__mcsema_reg_state@NTPOFF + 4], eax
+  mov gs:[__mcsema_reg_state@NTPOFF + 16], edx
+  movdqu gs:[__mcsema_reg_state@NTPOFF + 184], xmm0
+  mov gs:[__mcsema_reg_state@NTPOFF + 32], ebp
+  mov gs:[__mcsema_reg_state@NTPOFF + 8], ebx
+  mov gs:[__mcsema_reg_state@NTPOFF + 20], esi
+  mov gs:[__mcsema_reg_state@NTPOFF + 24], edi
+  pop DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]
+  pop ebp
+  pop ebx
+  pop esi
+  pop edi
+  ret
+.Lfunc_end7:
+  .size __mcsema_attach_ret_stdcall,.Lfunc_end7-__mcsema_attach_ret_stdcall
+  .cfi_endproc
+
+  .globl __mcsema_detach_call_fastcall
+  .type __mcsema_detach_call_fastcall,@function
+__mcsema_detach_call_fastcall:
+  .cfi_startproc
+  lea eax, __mcsema_detach_call_stdcall
+  jmp eax
+.Lfunc_end8:
+  .size __mcsema_detach_call_fastcall,.Lfunc_end8-__mcsema_detach_call_fastcall
+  .cfi_endproc
+
+  .globl __mcsema_attach_ret_fastcall
+  .type __mcsema_attach_ret_fastcall,@function
+__mcsema_attach_ret_fastcall:
+  .cfi_startproc
+  push eax
+  lea eax, __mcsema_attach_ret_stdcall
+  xchg eax, DWORD PTR [esp]
+  ret
+.Lfunc_end9:
+  .size __mcsema_attach_ret_fastcall,.Lfunc_end9-__mcsema_attach_ret_fastcall
   .cfi_endproc
 

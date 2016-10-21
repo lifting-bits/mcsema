@@ -1432,6 +1432,11 @@ void initAttachDetach(llvm::Module *M) {
       initADFeatues(M->getOrInsertFunction("__mcsema_detach_ret_cdecl", EPTy));
       initADFeatues(M->getOrInsertFunction("__mcsema_detach_call_value", EPTy));
       initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret_value", EPTy));
+
+      initADFeatues(M->getOrInsertFunction("__mcsema_detach_call_stdcall", EPTy));
+      initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret_stdcall", EPTy));
+      initADFeatues(M->getOrInsertFunction("__mcsema_detach_call_fastcall", EPTy));
+      initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret_fastcall", EPTy));
     } else {
       TASSERT(false, "Unknown OS Type!");
     }

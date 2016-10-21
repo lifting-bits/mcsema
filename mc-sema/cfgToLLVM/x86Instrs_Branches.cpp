@@ -331,6 +331,9 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
 
   // in fastcall, the first two params are passed via register
   // only need to adjust stack if there are more than two args
+  //
+
+  Function *exit_point = getExitPointDriver(externFunction);
 
   if (externFunction->getCallingConv() == CallingConv::X86_FastCall) {
 
@@ -338,6 +341,12 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
         .begin();
     Function::ArgumentListType::iterator end = externFunction->getArgumentList()
         .end();
+
+    Function::ArgumentListType::iterator it_ep = exit_point->getArgumentList()
+        .begin();
+    Function::ArgumentListType::iterator end_ep = exit_point->getArgumentList()
+        .end();
+
     AttrBuilder B;
     B.addAttribute(Attribute::InReg);
 
@@ -347,7 +356,9 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
       --paramCount;
       // set argument 1's attribute: make it in a register
       it->addAttr(AttributeSet::get(it->getContext(), 1, B));
+      it_ep->addAttr(AttributeSet::get(it_ep->getContext(), 1, B));
       ++it;
+      ++it_ep;
     }
 
     if (paramCount && it != end) {
@@ -356,7 +367,9 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
       --paramCount;
       // set argument 2's attribute: make it in a register
       it->addAttr(AttributeSet::get(it->getContext(), 2, B));
+      it_ep->addAttr(AttributeSet::get(it_ep->getContext(), 2, B));
       ++it;
+      ++it_ep;
     }
   }
 
@@ -378,7 +391,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
   if (!is_jump) {
     writeDetachReturnAddr<32>(b);
   }
-  CallInst *callR = CallInst::Create(getExitPointDriver(externFunction),
+  CallInst *callR = CallInst::Create(exit_point,
                                      arguments, "", b);
   callR->setCallingConv(externFunction->getCallingConv());
 

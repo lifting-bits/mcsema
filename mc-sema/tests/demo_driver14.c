@@ -4,7 +4,7 @@
 #define __fastcall __attribute__((fastcall))
 #endif
 
-extern int demo14_entry(void);
+extern int printMessages(void);
 
 int __fastcall threeArgs(int a1, int a2, int a3) {
     printf("Three arg fastcall: %08x, %08x, %08x\n", a1, a2, a3);
@@ -23,7 +23,7 @@ int __fastcall oneArg(int a1) {
 
 int main(int argc, char *argv[]) {
     int ret;
-    ret = demo14_entry();
+    ret = printMessages();
     if(0 != ret) {
         printf("Failed: %d\n", ret);
     }

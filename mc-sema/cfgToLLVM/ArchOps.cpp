@@ -163,13 +163,31 @@ llvm::Function *getExitPointDriver(llvm::Function *F) {
   if (!W) {
     W = llvm::Function::Create(
         F->getFunctionType(), llvm::GlobalValue::ExternalLinkage, name, M);
+    W->setCallingConv(F->getCallingConv());
     W->addFnAttr(llvm::Attribute::NoInline);
     W->addFnAttr(llvm::Attribute::Naked);
     if (getSystemArch(M) == _X86_64_) {
-        AddPushJumpStub(M, F, W, "__mcsema_detach_call");
+        if (getSystemOS(M) == llvm::Triple::Linux) {
+            // only one calling conv for linux amd64
+            AddPushJumpStub(M, F, W, "__mcsema_detach_call");
+        } else {
+          TASSERT(false, "Unsupported OS");
+        }
     } else {
         if (getSystemOS(M) == llvm::Triple::Linux) {
-            AddPushJumpStub(M, F, W, "__mcsema_detach_call_cdecl");
+            switch(F->getCallingConv()) {
+                case CallingConv::C:
+                    AddPushJumpStub(M, F, W, "__mcsema_detach_call_cdecl");
+                    break;
+                case CallingConv::X86_StdCall:
+                    AddPushJumpStub(M, F, W, "__mcsema_detach_call_stdcall");
+                    break;
+                case CallingConv::X86_FastCall:
+                    AddPushJumpStub(M, F, W, "__mcsema_detach_call_fastcall");
+                    break;
+                default:
+                  TASSERT(false, "Unsupported OS and Calling Convention combination");
+            }
         } else {
           TASSERT(false, "Unsupported OS");
         }
