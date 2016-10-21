@@ -292,8 +292,8 @@ __mcsema_detach_call_stdcall:
 __mcsema_attach_ret_stdcall:
   .cfi_startproc
   sub DWORD PTR gs:[__mcsema_stack_mark@NTPOFF], esp
+  mov ecx, DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]
   add esp, 260
-  add esp, DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]
   xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + 28]
   mov gs:[__mcsema_reg_state@NTPOFF + 4], eax
   mov gs:[__mcsema_reg_state@NTPOFF + 16], edx
@@ -307,7 +307,10 @@ __mcsema_attach_ret_stdcall:
   pop ebx
   pop esi
   pop edi
-  ret
+  sub esp, ecx
+  add esp, 4
+  lea ecx, [esp+ecx]
+  jmp dword ptr [ecx-4]
 .Lfunc_end7:
   .size __mcsema_attach_ret_stdcall,.Lfunc_end7-__mcsema_attach_ret_stdcall
   .cfi_endproc

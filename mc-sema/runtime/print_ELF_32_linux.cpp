@@ -488,6 +488,7 @@ int main(void) {
   // copy posible stack args into temporary holding area
   printf("  mov eax, gs:[0]\n");
   printf("  lea edi, [eax + __mcsema_stack_args@NTPOFF]\n");
+  //  ra + stack_mark + (ecx + edx) +  (edi+esi+ebx+ebp)
   printf("  lea esi, [esp + %u]\n", 4 + 4 + 4+4 + 4+4+4+4);
   printf("  mov ecx, %u\n", kStackArgSize);
   printf("  rep movsb\n");
@@ -570,10 +571,9 @@ int main(void) {
   // if this function had no args, this will be zero, otherwise
   // it will be -argcount*4 (esp is now > old esp, due to pops)
   printf("  sub DWORD PTR gs:[__mcsema_stack_mark@NTPOFF], esp\n");
+  printf("  mov ecx, DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]\n");
   // adjust for our copied stack args + fake return
   printf("  add esp, %u\n", kStackArgSize+4);
-  // adjust again for the poppped off arguments
-  printf("  add esp, DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]\n");
   // Swap into the mcsema stack.
   printf("  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
 
@@ -591,12 +591,21 @@ int main(void) {
   // Unstash the callee-saved registers.
   // restore old stack mark
   printf("  pop DWORD PTR gs:[__mcsema_stack_mark@NTPOFF]\n");
+
   printf("  pop ebp\n");
   printf("  pop ebx\n");
   printf("  pop esi\n");
   printf("  pop edi\n");
 
-  printf("  ret\n");
+  /// DO WE NEED TO RETURN w/ same convention as we were called with?
+  /////
+  
+  // adjust again for the poppped off arguments
+  printf("  sub esp, ecx\n"); // add since ecx is negative
+  printf("  add esp, 4\n");
+
+  printf("  lea ecx, [esp+ecx]\n");
+  printf("  jmp dword ptr [ecx-4]\n");
 
   printf(".Lfunc_end7:\n");
   printf("  .size __mcsema_attach_ret_stdcall,.Lfunc_end7-__mcsema_attach_ret_stdcall\n");
