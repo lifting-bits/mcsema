@@ -80,8 +80,8 @@ int main(void) {
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(mcsema::RegState, EBX));
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ecx\n", __builtin_offsetof(mcsema::RegState, ECX));
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(mcsema::RegState, EDX));
-  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(mcsema::RegState, ESI));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(mcsema::RegState, EBP));
 
   printf("  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
@@ -194,8 +194,8 @@ int main(void) {
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(mcsema::RegState, EBX));
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ecx\n", __builtin_offsetof(mcsema::RegState, ECX));
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(mcsema::RegState, EDX));
-  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(mcsema::RegState, ESI));
+  printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
   printf("  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(mcsema::RegState, EBP));
 
   // if this function had no args, this will be zero, otherwise
@@ -263,8 +263,8 @@ int main(void) {
   printf("  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBX));
   printf("  mov ecx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ECX));
   printf("  mov edx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDX));
-  printf("  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDI));
   printf("  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESI));
+  printf("  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDI));
   printf("  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBP));
   printf("  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
 
@@ -318,8 +318,8 @@ int main(void) {
   printf("  mov ecx, %u\n", kStackArgSize);
   printf("  rep movsb\n");
 
-  printf("  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDI));
   printf("  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESI));
+  printf("  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDI));
   printf("  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBX));
   printf("  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBP));
 
@@ -399,8 +399,8 @@ int main(void) {
   printf("  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBX));
   printf("  mov ecx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ECX));
   printf("  mov edx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDX));
-  printf("  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDI));
   printf("  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, ESI));
+  printf("  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EDI));
   printf("  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(mcsema::RegState, EBP));
   printf("  xchg DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u], esp\n", __builtin_offsetof(mcsema::RegState, ESP));
 

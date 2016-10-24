@@ -55,8 +55,8 @@ int main(void) {
   printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rbx\n", __builtin_offsetof(mcsema::RegState, RBX));
   printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rcx\n", __builtin_offsetof(mcsema::RegState, RCX));
   printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rdx\n", __builtin_offsetof(mcsema::RegState, RDX));
-  printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rdi\n", __builtin_offsetof(mcsema::RegState, RDI));
   printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rsi\n", __builtin_offsetof(mcsema::RegState, RSI));
+  printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rdi\n", __builtin_offsetof(mcsema::RegState, RDI));
   printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rbp\n", __builtin_offsetof(mcsema::RegState, RBP));
   printf("  xchg rsp, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RSP));
   printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], r8\n", __builtin_offsetof(mcsema::RegState, R8));
@@ -168,8 +168,8 @@ int main(void) {
   printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rbx\n", __builtin_offsetof(mcsema::RegState, RBX));
   printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rcx\n", __builtin_offsetof(mcsema::RegState, RCX));
   printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rdx\n", __builtin_offsetof(mcsema::RegState, RDX));
-  printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rdi\n", __builtin_offsetof(mcsema::RegState, RDI));
   printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rsi\n", __builtin_offsetof(mcsema::RegState, RSI));
+  printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rdi\n", __builtin_offsetof(mcsema::RegState, RDI));
   printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rbp\n", __builtin_offsetof(mcsema::RegState, RBP));
   printf("  xchg rsp, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RSP));
   printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], r8\n", __builtin_offsetof(mcsema::RegState, R8));
@@ -235,8 +235,8 @@ int main(void) {
   printf("  mov rbx, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RBX));
   printf("  mov rcx, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RCX));
   printf("  mov rdx, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RDX));
-  printf("  mov rdi, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RDI));
   printf("  mov rsi, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RSI));
+  printf("  mov rdi, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RDI));
   printf("  mov rbp, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RBP));
   printf("  xchg fs:[__mcsema_reg_state@TPOFF + %lu], rsp\n", __builtin_offsetof(mcsema::RegState, RSP));
   printf("  mov r8, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, R8));
@@ -337,8 +337,8 @@ int main(void) {
   printf("  mov rbx, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RBX));
   printf("  mov rcx, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RCX));
   printf("  mov rdx, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RDX));
-  printf("  mov rdi, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RDI));
   printf("  mov rsi, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RSI));
+  printf("  mov rdi, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RDI));
   printf("  mov rbp, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RBP));
   printf("  xchg fs:[__mcsema_reg_state@TPOFF + %lu], rsp\n", __builtin_offsetof(mcsema::RegState, RSP));
   printf("  mov r8, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, R8));
