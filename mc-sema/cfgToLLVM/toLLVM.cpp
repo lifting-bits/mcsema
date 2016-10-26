@@ -59,7 +59,7 @@ Triple *getTargetTriple(const llvm::Target *T) {
 
 void initRegStateStruct(Module *M) {
 
-  unsigned int regWidth = getPointerSize(M);
+  unsigned int regWidth = ArchPointerSize(M);
 
   //create the "reg" struct type
   auto &C = M->getContext();

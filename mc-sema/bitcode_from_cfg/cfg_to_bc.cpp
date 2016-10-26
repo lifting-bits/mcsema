@@ -253,7 +253,7 @@ int main(int argc, char *argv[]) {
 
   try {
     initRegStateStruct(M);
-    initAttachDetach(M);
+    ArchInitAttachDetach(M);
     initInstructionDispatch();
 
     std::cerr << "Converting to LLVM..." << std::endl;
@@ -272,7 +272,7 @@ int main(int argc, char *argv[]) {
         std::cerr << entry_point_name << " is implemented by sub_" << std::hex
                   << entry_pc << std::endl;
 
-        if (!addEntryPointDriver(M, entry_point_name, entry_pc)) {
+        if (!ArchAddEntryPointDriver(M, entry_point_name, entry_pc)) {
           return EXIT_FAILURE;
         }
 

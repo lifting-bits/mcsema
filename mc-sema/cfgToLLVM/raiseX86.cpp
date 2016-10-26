@@ -123,7 +123,7 @@ llvm::Value *INTERNAL_M_READ(unsigned width, unsigned addrspace,
   llvm::Instruction *read = noAliasMCSemaScope(
       new llvm::LoadInst(readLoc, "", is_volatile, b));
 
-  TASSERT(read != NULL, "Could not create a LoadInst in M_READ");
+  TASSERT(read != nullptr, "Could not create a LoadInst in M_READ");
 
   return read;
 }
@@ -153,7 +153,7 @@ void INTERNAL_M_WRITE(int width, unsigned addrspace, llvm::BasicBlock *b,
       new llvm::StoreInst(data, writeLoc, is_volatile, b));
   noAliasMCSemaScope(written);
 
-  TASSERT(written != NULL, "");
+  TASSERT(written != nullptr, "");
 
   return;
 }
@@ -178,7 +178,7 @@ void M_WRITE_T(InstPtr ip, llvm::BasicBlock *b, llvm::Value *addr,
 
   llvm::Instruction *written = noAliasMCSemaScope(
       new llvm::StoreInst(data, writeLoc, b));
-  TASSERT(written != NULL, "Failed to create StoreInst");
+  TASSERT(written != nullptr, "Failed to create StoreInst");
 
   return;
 }
@@ -203,7 +203,7 @@ class bfs_cfg_visitor : public boost::default_bfs_visitor {
 Value *MCRegToValue(BasicBlock *b, unsigned reg) {
   Module *M = b->getParent()->getParent();
 
-  if (getPointerSize(M) == Pointer32) {
+  if (ArchPointerSize(M) == Pointer32) {
     return x86::MCRegToValue(b, reg);
   } else {
     return x86_64::MCRegToValue(b, reg);
@@ -660,7 +660,7 @@ void GENERIC_MC_WRITEREG(BasicBlock *b, int mc_reg, Value *v) {
   auto backing_reg_ty = BackingRegTy(backing_reg);
   auto size = readRegWidth(mc_reg);
   auto index_in_backing_reg = accessOffset(mc_reg) / 8;
-  if (32 == size && Pointer64 == getPointerSize(M)) {
+  if (32 == size && Pointer64 == ArchPointerSize(M)) {
     size = 64;
   }
 
@@ -750,7 +750,7 @@ Value *GENERIC_READREG(BasicBlock *b, MCSemaRegs reg) {
   Module *M = b->getParent()->getParent();
   Value *localRegVar;
 
-  if (getPointerSize(M) == Pointer32) {
+  if (ArchPointerSize(M) == Pointer32) {
     localRegVar = x86::lookupLocal(b->getParent(), reg);
   } else {
     localRegVar = x86_64::lookupLocal(b->getParent(), reg);
@@ -764,17 +764,17 @@ void GENERIC_WRITEREG(BasicBlock *b, MCSemaRegs reg, Value *v) {
   Value *localRegVar;
   std::string regName;
 
-  if (getPointerSize(M) == Pointer32) {
+  if (ArchPointerSize(M) == Pointer32) {
     localRegVar = x86::lookupLocal(b->getParent(), reg);
     regName = x86::getRegisterName(reg);
   } else {
     localRegVar = x86_64::lookupLocal(b->getParent(), reg);
     regName = x86_64::getRegisterName(reg);
   }
-  if (localRegVar == NULL)
+  if (localRegVar == nullptr)
     throw TErr(__LINE__, __FILE__, "regname " + regName + " not found");
   Instruction *st = noAliasMCSemaScope(new StoreInst(v, localRegVar, b));
-  TASSERT(st != NULL, "");
+  TASSERT(st != nullptr, "");
   return;
 }
 
@@ -898,7 +898,7 @@ void allocateLocals(Function *F, int bits) {
       Instruction *pfA = x86::GEPLocal(boolTy, "SF", cfA);
       Instruction *afA = x86::GEPLocal(boolTy, "OF", pfA);
       Instruction *dfA = x86::GEPLocal(boolTy, "DF", afA);
-      TASSERT(dfA != NULL, "");
+      TASSERT(dfA != nullptr, "");
 
       // FPU STACK
       Type *floatTy = Type::getX86_FP80Ty(F->getContext());
@@ -914,7 +914,7 @@ void allocateLocals(Function *F, int bits) {
       // really a 3-bit integer
       Type *topTy = Type::getIntNTy(F->getContext(), 3);
       Instruction *fpu_TOP = x86::GEPLocal(topTy, "FPU_FLAG_TOP", fpu_C3);
-      TASSERT(fpu_TOP != NULL, "");
+      TASSERT(fpu_TOP != nullptr, "");
 
       Instruction *fpu_C2 = x86::GEPLocal(boolTy, "FPU_FLAG_C2", fpu_TOP);
       Instruction *fpu_C1 = x86::GEPLocal(boolTy, "FPU_FLAG_C1", fpu_C2);
@@ -929,7 +929,7 @@ void allocateLocals(Function *F, int bits) {
       Instruction *fpu_IE = x86::GEPLocal(boolTy, "FPU_FLAG_IE", fpu_DE);
 
       // sanity check
-      TASSERT(fpu_IE != NULL, "");
+      TASSERT(fpu_IE != nullptr, "");
 
       // FPU CONTROL FLAGS
       Type *int2Ty = Type::getIntNTy(F->getContext(), 2);
@@ -943,7 +943,7 @@ void allocateLocals(Function *F, int bits) {
       Instruction *fpu_DM = x86::GEPLocal(boolTy, "FPU_CONTROL_DM", fpu_ZM);
       Instruction *fpu_IM = x86::GEPLocal(boolTy, "FPU_CONTROL_IM", fpu_DM);
 
-      TASSERT(fpu_IM != NULL, "");
+      TASSERT(fpu_IM != nullptr, "");
 
       // FPU TAG WORD
       // 8 2-bit values. One for each ST register
@@ -963,7 +963,7 @@ void allocateLocals(Function *F, int bits) {
       Instruction *fpu_FOPCODE = x86::GEPLocal(
           Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE",
           fpu_LASTDATA_OFF);
-      TASSERT(fpu_FOPCODE != NULL, "");
+      TASSERT(fpu_FOPCODE != nullptr, "");
 
       //vector registers
       Instruction *vec_xmm0 = x86::GEPLocal(
@@ -1029,7 +1029,7 @@ void allocateLocals(Function *F, int bits) {
       Instruction *pfA = x86_64::GEPLocal(boolTy, "SF", cfA);
       Instruction *afA = x86_64::GEPLocal(boolTy, "OF", pfA);
       Instruction *dfA = x86_64::GEPLocal(boolTy, "DF", afA);
-      TASSERT(dfA != NULL, "");
+      TASSERT(dfA != nullptr, "");
 
       // FPU STACK
       //Type    *floatTy =  IntegerType::get(F->getContext(), 128);
@@ -1039,7 +1039,7 @@ void allocateLocals(Function *F, int bits) {
       Instruction *stRegs = x86_64::GEPLocal(floatArrayTy, "STi", dfA);
 
       // sanity check
-      TASSERT(stRegs != NULL, "");
+      TASSERT(stRegs != nullptr, "");
 
       // FPU FLAGS
       Instruction *fpu_B = x86_64::GEPLocal(boolTy, "FPU_FLAG_BUSY", stRegs);
@@ -1049,7 +1049,7 @@ void allocateLocals(Function *F, int bits) {
       // really a 3-bit integer
       Type *topTy = Type::getIntNTy(F->getContext(), 3);
       Instruction *fpu_TOP = x86_64::GEPLocal(topTy, "FPU_FLAG_TOP", fpu_C3);
-      TASSERT(fpu_TOP != NULL, "");
+      TASSERT(fpu_TOP != nullptr, "");
 
       Instruction *fpu_C2 = x86_64::GEPLocal(boolTy, "FPU_FLAG_C2", fpu_TOP);
       Instruction *fpu_C1 = x86_64::GEPLocal(boolTy, "FPU_FLAG_C1", fpu_C2);
@@ -1064,7 +1064,7 @@ void allocateLocals(Function *F, int bits) {
       Instruction *fpu_IE = x86_64::GEPLocal(boolTy, "FPU_FLAG_IE", fpu_DE);
 
       // sanity check
-      TASSERT(fpu_IE != NULL, "");
+      TASSERT(fpu_IE != nullptr, "");
 
       // FPU CONTROL FLAGS
       Type *int2Ty = Type::getIntNTy(F->getContext(), 2);
@@ -1078,7 +1078,7 @@ void allocateLocals(Function *F, int bits) {
       Instruction *fpu_DM = x86_64::GEPLocal(boolTy, "FPU_CONTROL_DM", fpu_ZM);
       Instruction *fpu_IM = x86_64::GEPLocal(boolTy, "FPU_CONTROL_IM", fpu_DM);
 
-      TASSERT(fpu_IM != NULL, "");
+      TASSERT(fpu_IM != nullptr, "");
 
       // FPU TAG WORD
       // 8 2-bit values. One for each ST register
@@ -1086,7 +1086,7 @@ void allocateLocals(Function *F, int bits) {
       Instruction *fpu_TagWord = x86_64::GEPLocal(tagArrayType, "FPU_TAG",
                                                   fpu_IM);
 
-      TASSERT(fpu_TagWord != NULL, "");
+      TASSERT(fpu_TagWord != nullptr, "");
 
       Instruction *fpu_LASTIP_SEG = x86_64::GEPLocal(
           Type::getInt16Ty(F->getContext()), "FPU_LASTIP_SEG", fpu_TagWord);
@@ -1102,7 +1102,7 @@ void allocateLocals(Function *F, int bits) {
       Instruction *fpu_FOPCODE = x86_64::GEPLocal(
           Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE",
           fpu_LASTDATA_OFF);
-      TASSERT(fpu_FOPCODE != NULL, "");
+      TASSERT(fpu_FOPCODE != nullptr, "");
 
       //vector registers
       Instruction *vec_xmm0 = x86_64::GEPLocal(
@@ -1164,7 +1164,7 @@ void allocateLocals(Function *F, int bits) {
 }
 
 BasicBlock *bbFromStrName(string n, Function *F) {
-  BasicBlock *found = NULL;
+  BasicBlock *found = nullptr;
 
   for (Function::iterator it = F->begin(); it != F->end(); ++it) {
     BasicBlock *b = it;
@@ -1249,7 +1249,7 @@ InstTransResult liftInstr(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
 template<typename Vertex, typename Graph>
 void bfs_cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
   auto curBlock = this->natFun->block_from_id(u);
-  llvm::BasicBlock *curLLVMBlock = NULL;
+  llvm::BasicBlock *curLLVMBlock = nullptr;
 
   if ( !curBlock) {
     throw TErr(__LINE__, __FILE__,
@@ -1261,11 +1261,11 @@ void bfs_cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
   //going to look up a blank block
   curLLVMBlock = bbFromStrName(curBlock->get_name(), this->F);
 
-  if (curLLVMBlock == NULL) {
+  if (curLLVMBlock == nullptr) {
     //we need to create the block, so do that
     curLLVMBlock = BasicBlock::Create(this->F->getContext(),
                                       curBlock->get_name(), this->F);
-    TASSERT(curLLVMBlock != NULL, "");
+    TASSERT(curLLVMBlock != nullptr, "");
   }
 
   //then, create a basic block for every follow of this block, if we do not
@@ -1338,19 +1338,16 @@ static bool insertFunctionIntoModule(NativeModulePtr mod,
   //this block will alloca cells on the 'stack' for every register in the
   //register member structure
   BasicBlock *entryBlock = BasicBlock::Create(F->getContext(), "entry", F);
-  TASSERT(entryBlock != NULL, "");
+  TASSERT(entryBlock != nullptr, "");
 
-  allocateLocals(F, getPointerSize(M));
-
-  // This is done lazily :-D
-  // writeFPUContextToLocals(entryBlock, getPointerSize(M), ABICallSpill);
+  allocateLocals(F, ArchPointerSize(M));
 
   //then we put an unconditional branch from the 'entry' block to the first
   //block, and we create the first block
   NativeBlockPtr funcEntry = func->block_from_base(func->get_start());
   BasicBlock *firstBlock = BasicBlock::Create(F->getContext(),
                                               funcEntry->get_name(), F);
-  TASSERT(firstBlock != NULL, "");
+  TASSERT(firstBlock != nullptr, "");
   //create a branch from the end of the entry block to the first block
   BranchInst::Create(firstBlock, entryBlock);
 
@@ -1377,9 +1374,9 @@ static bool insertFunctionIntoModule(NativeModulePtr mod,
 bool doPostAnalysis(NativeModulePtr N, Module *M) {
   //first, we need to instantiate the pass manager and perform the mem2reg transform
   //on the module to lift it at least into SSA form
-  PassManager modulePasses;
-  FunctionPassManager functionPasses(M);
-  PassManagerBuilder builder;
+  llvm::PassManager modulePasses;
+  llvm::FunctionPassManager functionPasses(M);
+  llvm::PassManagerBuilder builder;
 
   llvm::errs() << "in : " << __FUNCTION__ << "\n";
 
@@ -1403,74 +1400,27 @@ bool doPostAnalysis(NativeModulePtr N, Module *M) {
   return true;
 }
 
-static void initADFeatues(llvm::Constant *FC) {
-  auto F = llvm::dyn_cast<llvm::Function>(FC);
-  F->setLinkage(llvm::GlobalValue::ExternalLinkage);
-  F->addFnAttr(llvm::Attribute::Naked);
-}
 
-void initAttachDetach(llvm::Module *M) {
-  auto &C = M->getContext();
-  auto VoidTy = llvm::Type::getVoidTy(C);
-  auto EPTy = llvm::FunctionType::get(VoidTy, false);
+static Constant* makeConstantBlob(llvm::LLVMContext &ctx,
+                                  const std::vector<uint8_t> &blob) {
 
-  if (getSystemArch(M) == _X86_64_) {
-    if (getSystemOS(M) == llvm::Triple::Linux) {
-      initADFeatues(M->getOrInsertFunction("__mcsema_attach_call", EPTy));
-      initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret", EPTy));
-      initADFeatues(M->getOrInsertFunction("__mcsema_detach_call", EPTy));
-      initADFeatues(M->getOrInsertFunction("__mcsema_detach_call_value", EPTy));
-      initADFeatues(M->getOrInsertFunction("__mcsema_detach_ret", EPTy));
-    } else {
-      TASSERT(false, "Unknown OS Type!");
-    }
-  } else {
-    if (getSystemOS(M) == llvm::Triple::Linux) {
-      initADFeatues(M->getOrInsertFunction("__mcsema_attach_call_cdecl", EPTy));
-      initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret_cdecl", EPTy));
-      initADFeatues(M->getOrInsertFunction("__mcsema_detach_call_cdecl", EPTy));
-      initADFeatues(M->getOrInsertFunction("__mcsema_detach_ret_cdecl", EPTy));
-      initADFeatues(M->getOrInsertFunction("__mcsema_detach_call_value", EPTy));
-      initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret_value", EPTy));
-
-      initADFeatues(M->getOrInsertFunction("__mcsema_detach_call_stdcall", EPTy));
-      initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret_stdcall", EPTy));
-      initADFeatues(M->getOrInsertFunction("__mcsema_detach_call_fastcall", EPTy));
-      initADFeatues(M->getOrInsertFunction("__mcsema_attach_ret_fastcall", EPTy));
-    } else {
-      TASSERT(false, "Unknown OS Type!");
-    }
-  }
-}
-
-static Constant* makeConstantBlob(LLVMContext &ctx,
-                                  const vector<uint8_t> &blob) {
-
-  Type *charTy = Type::getInt8Ty(ctx);
-  //cout << blob.size() << "\n";
-  //cout.flush();
-  ArrayType *arrT = ArrayType::get(charTy, blob.size());
-  vector<uint8_t>::const_iterator it = blob.begin();
-  vector<Constant*> array_elements;
-  while (it != blob.end()) {
-    uint8_t cur = *it;
-    IntegerType *ty = Type::getInt8Ty(ctx);
-    Constant *c = ConstantInt::get(ty, cur);
-
+  Type *charTy = llvm::Type::getInt8Ty(ctx);
+  auto arrT = llvm::ArrayType::get(charTy, blob.size());
+  std::vector<llvm::Constant *> array_elements;
+  for (auto cur : blob) {
+    auto ty = llvm::Type::getInt8Ty(ctx);
+    auto c = llvm::ConstantInt::get(ty, cur);
     array_elements.push_back(c);
-    ++it;
   }
 
-  return ConstantArray::get(arrT, array_elements);
+  return llvm::ConstantArray::get(arrT, array_elements);
 }
 
-static GlobalVariable* getSectionForDataAddr(const list<DataSection> &dataSecs,
-                                             Module *M, VA data_addr,
-                                             VA &section_base) {
+static llvm::GlobalVariable *getSectionForDataAddr(
+    const std::list<DataSection> &dataSecs, llvm::Module *M, VA data_addr,
+    VA &section_base) {
 
-  for (list<DataSection>::const_iterator git = dataSecs.begin();
-      git != dataSecs.end(); git++) {
-    const DataSection &dt = *git;
+  for (auto &dt : dataSecs) {
     VA start = dt.getBase();
     VA end = start + dt.getSize();
 
@@ -1482,39 +1432,34 @@ static GlobalVariable* getSectionForDataAddr(const list<DataSection> &dataSecs,
 
   }
 
-  return NULL;
+  return nullptr;
 
 }
 
-static Constant* getPtrSizedValue(Module *M, Constant *v, int valsize) {
-  Constant *final_val = v;
-
-  //if(getPointerSize(M) == Pointer32) {
-  //    TASSERT( valsize == 4, "Invalid size of pointer ref")
-  //} else  if(getPointerSize(M) == Pointer64) {
-  //    TASSERT( valsize == 8, "Invalid size of pointer ref")
-  //}
+static llvm::Constant* getPtrSizedValue(llvm::Module *M, llvm::Constant *v,
+                                        int valsize) {
+  auto final_val = v;
 
   //
   // this sometimes doesn't work since LLVM assembler is broken :(
   //
-  if ((getPointerSize(M) == Pointer32 && valsize == 4)
-      || (getPointerSize(M) == Pointer64 && valsize == 8)) {
+  if ((ArchPointerSize(M) == Pointer32 && valsize == 4)
+      || (ArchPointerSize(M) == Pointer64 && valsize == 8)) {
     final_val = v;
-  } else if (getPointerSize(M) == Pointer64 && valsize == 4) {
-    Constant *int_val = ConstantExpr::getPtrToInt(
-        v, Type::getInt64Ty(M->getContext()));
-    final_val = ConstantExpr::getTrunc(int_val,
-                                       Type::getInt32Ty(M->getContext()));
+  } else if (ArchPointerSize(M) == Pointer64 && valsize == 4) {
+    auto int_val = llvm::ConstantExpr::getPtrToInt(
+        v, llvm::Type::getInt64Ty(M->getContext()));
+    final_val = llvm::ConstantExpr::getTrunc(
+        int_val, llvm::Type::getInt32Ty(M->getContext()));
   }
 
   return final_val;
 }
 
-void dataSectionToTypesContents(const list<DataSection> &globaldata,
-                                DataSection& ds, Module *M,
-                                vector<Constant*>& secContents,
-                                vector<Type*>& data_section_types,
+void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
+                                DataSection& ds, llvm::Module *M,
+                                std::vector<llvm::Constant *> &secContents,
+                                std::vector<llvm::Type *> &data_section_types,
                                 bool convert_to_callback) {
   // find what elements will be needed for this data section
   // There are three main types:
@@ -1539,9 +1484,9 @@ void dataSectionToTypesContents(const list<DataSection> &globaldata,
 
     if (dsec_itr->getSymbol(sym_name)) {
       const char *func_addr_str = sym_name.c_str() + 4;
-      VA func_addr = strtol(func_addr_str, NULL, 16);
+      VA func_addr = strtol(func_addr_str, nullptr, 16);
 
-      cout << __FUNCTION__ << ": Found symbol: " << sym_name << "\n";
+      std::cout << __FUNCTION__ << ": Found symbol: " << sym_name << "\n";
 
       if (sym_name.find("ext_") == 0) {
 
@@ -1570,15 +1515,14 @@ void dataSectionToTypesContents(const list<DataSection> &globaldata,
         // to do this, create a callback driver for
         // it first (since it may be called externally)
 
-        Function *func = NULL;
+        Function *func = nullptr;
 
         if (convert_to_callback) {
-          func = dynamic_cast<Function*>(archMakeCallbackForLocalFunction(
-              M, func_addr));
-          TASSERT(func != NULL, "Could make callback for: " + sym_name);
+          func = ArchAddCallbackDriver(M, func_addr);
+          TASSERT(func != nullptr, "Could make callback for: " + sym_name);
         } else {
           func = M->getFunction(sym_name);
-          TASSERT(func != NULL, "Could not find function: " + sym_name);
+          TASSERT(func != nullptr, "Could not find function: " + sym_name);
         }
 
         Constant *final_val = getPtrSizedValue(M, func, dsec_itr->getSize());
@@ -1593,7 +1537,7 @@ void dataSectionToTypesContents(const list<DataSection> &globaldata,
         VA section_base;
         GlobalVariable *g_ref = getSectionForDataAddr(globaldata, M, func_addr,
                                                       section_base);
-        TASSERT(g_ref != NULL,
+        TASSERT(g_ref != nullptr,
                 "Could not get data addr for:" + string(func_addr_str));
         // instead of referencing an element directly
         // we just convert the pointer to an integer
@@ -1605,7 +1549,7 @@ void dataSectionToTypesContents(const list<DataSection> &globaldata,
         //     << to_string<VA>(func_addr, hex) << " : "
         //     << to_string<VA>(section_base, hex) << "\n";
         //cout.flush();
-        if (getPointerSize(M) == Pointer32) {
+        if (ArchPointerSize(M) == Pointer32) {
           Constant *int_val = ConstantExpr::getPtrToInt(
               g_ref, Type::getInt32Ty(M->getContext()));
           final_val = ConstantExpr::getAdd(
@@ -1629,6 +1573,12 @@ void dataSectionToTypesContents(const list<DataSection> &globaldata,
   }  // for list
 }
 
+struct DataSectionVar {
+  DataSection *section;
+  llvm::StructType *opaque_type;
+  llvm::GlobalVariable *var;
+};
+
 static bool insertDataSections(NativeModulePtr natMod, Module *M) {
 
   list<DataSection> &globaldata = natMod->getData();
@@ -1636,71 +1586,55 @@ static bool insertDataSections(NativeModulePtr natMod, Module *M) {
 
   //insert all global data before we insert the CFG
 
-  vector<pair<StructType*, GlobalVariable*> > gvars;
+  std::vector<DataSectionVar> gvars;
 
   // pre-create references to all data sections
   // as later we may have data references that are
   // from one section into another
 
-  while (git != globaldata.end()) {
-    DataSection &dt = *git;
-    string bufferName;
+  for (DataSection &dt : globaldata) {
+    std::string bufferName;
     bufferName = "data_0x" + to_string<VA>(dt.getBase(), hex);
     //report << "inserting global data section named ";
     //report << bufferName << "\n";
     std::cout << "inserting global data section named ";
     std::cout << bufferName << std::endl;
 
-    StructType *st_opaque = StructType::create(M->getContext());
-    GlobalVariable *g = new GlobalVariable( *M, st_opaque, dt.isReadOnly(),
+    auto st_opaque = llvm::StructType::create(M->getContext());
     // Used to be PrivateLinkage, but that emitted
     // .objs that would not link with MSVC
-                                           GlobalVariable::InternalLinkage,
-                                           NULL,
-                                           bufferName);
-    gvars.push_back(pair<StructType*, GlobalVariable*>(st_opaque, g));
-    git++;
+    auto g = new llvm::GlobalVariable(
+        *M, st_opaque, dt.isReadOnly(),
+        llvm::GlobalVariable::InternalLinkage,
+        nullptr, bufferName);
+    gvars.push_back({&dt, st_opaque, g});
   }
 
   // actually populate the data sections
-  git = globaldata.begin();
-  vector<pair<StructType*, GlobalVariable*> >::const_iterator gvit =
-      gvars.begin();
-  while (git != globaldata.end() && gvit != gvars.end()) {
-    //data from the native module
-    DataSection &dt = *git;
+  for (DataSectionVar &var : gvars) {
 
     //data we use to create LLVM values for this section
     // secContents is the actual values we will be inserting
-    vector<Constant*> secContents;
+    std::vector<llvm::Constant *> secContents;
     // data_section_types is their types, which are needed to initialize
     // the global variable
-    vector<Type*> data_section_types;
+    std::vector<llvm::Type *> data_section_types;
 
-    // create an opaque structure so we can create an opaque global
-    // variable.
-    // The opaque variable currently serves as a base for self-
-    // referential data.
-    StructType *st_opaque = gvit->first;
-    GlobalVariable *g = gvit->second;
 
-    dataSectionToTypesContents(globaldata, dt, M, secContents,
+    dataSectionToTypesContents(globaldata, *var.section, M, secContents,
                                data_section_types, true);
 
     // fill in the opaqure structure with actual members
-    st_opaque->setBody(data_section_types, true);
+    var.opaque_type->setBody(data_section_types, true);
 
     // create an initializer list using the now filled in opaque
     // structure type
-    Constant *cst = ConstantStruct::get(st_opaque, secContents);
+    auto cst = ConstantStruct::get(var.opaque_type, secContents);
     // align on pointer size boundary, max needed by SSE instructions
-    g->setAlignment(getPointerSize(M));
-    g->setInitializer(cst);
+    var.var->setAlignment(ArchPointerSize(M));
+    var.var->setInitializer(cst);
 
-    git++;
-    gvit++;
-
-  }  // while git != globaldata.end()
+  }
 
   return true;
 
@@ -1728,7 +1662,7 @@ void renameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
   }
 }
 
-static void initLiftedFunctions(NativeModulePtr natMod, Module *M) {
+static void initLiftedFunctions(NativeModulePtr natMod, llvm::Module *M) {
   for (auto f : natMod->get_funcs()) {
     auto fname = f->get_name();
     auto F = M->getFunction(fname);
@@ -1737,11 +1671,11 @@ static void initLiftedFunctions(NativeModulePtr natMod, Module *M) {
       F = llvm::dyn_cast<llvm::Function>(
           M->getOrInsertFunction(fname, getBaseFunctionType(M)));
 
-      TASSERT(F != NULL, "Could not insert function into module");
+      TASSERT(F != nullptr, "Could not insert function into module");
 
-      archSetCallingConv(M, F);
+      ArchSetCallingConv(M, F);
       // make local functions 'static'
-      F->setLinkage(GlobalValue::InternalLinkage);
+      F->setLinkage(llvm::GlobalValue::InternalLinkage);
       cout << "Inserted function: " << fname << std::endl;
     } else {
       cout << "Already inserted function: " << fname << ", skipping."
@@ -1750,71 +1684,68 @@ static void initLiftedFunctions(NativeModulePtr natMod, Module *M) {
   }
 }
 
-static void initExternalData(NativeModulePtr natMod, Module *M) {
+static void initExternalData(NativeModulePtr natMod, llvm::Module *M) {
   for (auto dr : natMod->getExtDataRefs()) {
-    int dsize = dr->getDataSize();
-    std::string symname = dr->getSymbolName();
-    //if (dsize > 16) {
-    //  throw TErr(__LINE__, __FILE__, "Unsupported external data size!");
-    //}
+    auto dsize = dr->getDataSize();
+    auto symname = dr->getSymbolName();
+    auto extType = llvm::ArrayType::get(llvm::Type::getInt8Ty(M->getContext()),
+                                        dsize);
 
-    //Type *extType = Type::getIntNTy(M->getContext(), dsize * 8);
-    Type *extType = ArrayType::get(Type::getInt8Ty(M->getContext()), dsize);
-
-    GlobalValue *gv = dyn_cast<GlobalValue>(
+    auto gv = llvm::dyn_cast<llvm::GlobalValue>(
         M->getOrInsertGlobal(symname, extType));
-    TASSERT(gv != NULL, "Could not make global value!");
+    TASSERT(gv != nullptr, "Could not make global value!");
     if (dr->isWeak()) {
-      gv->setLinkage(GlobalValue::ExternalWeakLinkage);
+      gv->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
     } else {
-      gv->setLinkage(GlobalValue::ExternalLinkage);
+      gv->setLinkage(llvm::GlobalValue::ExternalLinkage);
     }
 
-    const std::string &triple = M->getTargetTriple();
-
-    if (triple == WINDOWS_TRIPLE) {
+    const auto &triple = M->getTargetTriple();
+    if (WINDOWS_TRIPLE == triple) {
       // this only makes sense for win32
-      gv->setDLLStorageClass(GlobalValue::DLLImportStorageClass);
+      gv->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
     }
   }
 }
 
-static void initExternalCode(NativeModulePtr natMod, Module *M) {
-  //iterate over the list of external functions and insert them as
-  //global functions
+// Iterate over the list of external functions and insert them as
+// global functions.
+static void initExternalCode(NativeModulePtr natMod, llvm::Module *M) {
   for (auto e : natMod->getExtCalls()) {
     auto conv = e->getCallingConvention();
-    int8_t argCount = e->getNumArgs();
+    auto argCount = e->getNumArgs();
     auto symName = e->getSymbolName();
     auto funcSign = e->getFunctionSignature();
 
-    //create the function if it is not already there
+    // Create the function if it is not already there.
+    auto &C = M->getContext();
     auto F = M->getFunction(symName);
     if (F) {
       continue;
     }
 
     std::vector<llvm::Type*> arguments;
-    llvm::Type *returnType = NULL;
+    llvm::Type *returnType = nullptr;
 
-    //create arguments
-    for (int i = 0; i < argCount; i++) {
-      if (getSystemArch(M) == _X86_64_) {
-        if (getSystemOS(M) == llvm::Triple::Win32) {
-
+    // Create arguments.
+    const auto Arch = SystemArch(M);
+    const auto OS = SystemOS(M);
+    for (auto i = 0; i < argCount; i++) {
+      if (_X86_64_ == Arch) {
+        if (llvm::Triple::Win32 == OS) {
           if (funcSign.c_str()[i] == 'F') {
-            arguments.push_back(Type::getDoubleTy(M->getContext()));
+            arguments.push_back(llvm::Type::getDoubleTy(C));
           } else {
-            arguments.push_back(Type::getIntNTy(M->getContext(), 64));
+            arguments.push_back(llvm::Type::getInt64Ty(C));
           }
-        } else if (getSystemOS(M) == llvm::Triple::Linux) {
-          arguments.push_back(Type::getInt64Ty(M->getContext()));
+        } else if (llvm::Triple::Linux == OS) {
+          arguments.push_back(Type::getInt64Ty(C));
 
         } else {
           TASSERT(false, "Unknown OS Type!");
         }
       } else {
-        arguments.push_back(Type::getInt32Ty(M->getContext()));
+        arguments.push_back(llvm::Type::getInt32Ty(C));
       }
     }
 
@@ -1822,17 +1753,18 @@ static void initExternalCode(NativeModulePtr natMod, Module *M) {
     switch (e->getReturnType()) {
       case ExternalCodeRef::NoReturn:
       case ExternalCodeRef::VoidTy:
-        returnType = Type::getVoidTy(M->getContext());
+        returnType = llvm::Type::getVoidTy(C);
         break;
 
       case ExternalCodeRef::Unknown:
       case ExternalCodeRef::IntTy:
         if (natMod->is64Bit()) {
-          returnType = Type::getInt64Ty(M->getContext());
+          returnType = llvm::Type::getInt64Ty(C);
         } else {
-          returnType = Type::getInt32Ty(M->getContext());
+          returnType = llvm::Type::getInt32Ty(C);
         }
         break;
+
       default:
         throw TErr(
             __LINE__, __FILE__,
@@ -1841,9 +1773,11 @@ static void initExternalCode(NativeModulePtr natMod, Module *M) {
 
     auto FTy = FunctionType::get(returnType, arguments, false);
     if (e->isWeak()) {
-      F = Function::Create(FTy, GlobalValue::ExternalWeakLinkage, symName, M);
+      F = llvm::Function::Create(FTy, llvm::GlobalValue::ExternalWeakLinkage,
+                                 symName, M);
     } else {
-      F = Function::Create(FTy, GlobalValue::ExternalLinkage, symName, M);
+      F = llvm::Function::Create(FTy, llvm::GlobalValue::ExternalLinkage,
+                                 symName, M);
     }
 
     if (e->getReturnType() == ExternalCodeRef::NoReturn) {
@@ -1852,7 +1786,7 @@ static void initExternalCode(NativeModulePtr natMod, Module *M) {
 
     //set calling convention
     if (natMod->is64Bit()) {
-      archSetCallingConv(M, F);
+      ArchSetCallingConv(M, F);
     } else {
       F->setCallingConv(getLLVMCC(conv));
     }

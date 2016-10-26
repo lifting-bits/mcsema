@@ -1,5 +1,6 @@
+
 #include <string>
-#include <iostream>
+#include <sstream>
 
 #include "llvm/ADT/Triple.h"
 #include "llvm/IR/InlineAsm.h"
@@ -14,13 +15,12 @@
 #include "win32ArchOps.h"
 #include "linuxArchOps.h"
 
-#include "../common/to_string.h"
 #include "../common/Defaults.h"
 
 using namespace std;
 using namespace llvm;
 
-unsigned getSystemArch(llvm::Module *M) {
+SystemArchType SystemArch(llvm::Module *M) {
   llvm::Triple TT(M->getTargetTriple());
   llvm::Triple::ArchType arch = TT.getArch();
   if (arch == llvm::Triple::x86) {
@@ -32,12 +32,12 @@ unsigned getSystemArch(llvm::Module *M) {
   }
 }
 
-llvm::Triple::OSType getSystemOS(llvm::Module *M) {
+llvm::Triple::OSType SystemOS(llvm::Module *M) {
   llvm::Triple TT(M->getTargetTriple());
   return TT.getOS();
 }
 
-unsigned getPointerSize(llvm::Module *M) {
+PointerSize ArchPointerSize(llvm::Module *M) {
   llvm::Triple TT(M->getTargetTriple());
   llvm::Triple::ArchType arch = TT.getArch();
   if (arch == llvm::Triple::x86) {
@@ -49,54 +49,82 @@ unsigned getPointerSize(llvm::Module *M) {
   }
 }
 
-void archSetCallingConv(llvm::Module *M, llvm::CallInst *ci) {
-  if (getSystemArch(M) == _X86_64_) {
-    if (getSystemOS(M) == llvm::Triple::Win32) {
-      ci->setCallingConv(CallingConv::X86_64_Win64);
-    } else if (getSystemOS(M) == llvm::Triple::Linux) {
-      ci->setCallingConv(CallingConv::X86_64_SysV);
-    } else if (getSystemOS(M) == llvm::Triple::MacOSX) {
-      ci->setCallingConv(CallingConv::X86_64_SysV);
+llvm::CallingConv::ID ArchGetCallingConv(llvm::Module *M) {
+  const auto OS = SystemOS(M);
+  const auto Arch = SystemArch(M);
+  if (llvm::Triple::Win32 == OS) {
+    if (_X86_64_ == Arch) {
+      return CallingConv::X86_64_Win64;
     } else {
-      TASSERT(false, "Unsupported OS");
+      return CallingConv::X86_StdCall;
+    }
+  } else if (llvm::Triple::Linux == OS) {
+    if (_X86_64_ == Arch) {
+      return CallingConv::X86_64_SysV;
+    } else {
+      return CallingConv::C;
     }
   } else {
-    //TODO(artem): handle StdCall
-    if (getSystemOS(M) == llvm::Triple::Linux) {
-        ci->setCallingConv(CallingConv::C);
-    } else {
-      TASSERT(false, "Unsupported OS");
-    }
+    TASSERT(false, "Unsupported OS");
   }
 }
 
-void archSetCallingConv(llvm::Module *M, llvm::Function *F) {
-  if (getSystemArch(M) == _X86_64_) {
-    if (getSystemOS(M) == llvm::Triple::Win32) {
-      F->setCallingConv(CallingConv::X86_64_Win64);
-    } else if (getSystemOS(M) == llvm::Triple::Linux) {
-      F->setCallingConv(CallingConv::X86_64_SysV);
-    } else if (getSystemOS(M) == llvm::Triple::MacOSX) {
-      F->setCallingConv(CallingConv::X86_64_SysV);
+static void InitADFeatues(llvm::Module *M, const char *name,
+                          llvm::FunctionType *EPTy) {
+  auto FC = M->getOrInsertFunction(name, EPTy);
+  auto F = llvm::dyn_cast<llvm::Function>(FC);
+  F->setLinkage(llvm::GlobalValue::ExternalLinkage);
+  F->addFnAttr(llvm::Attribute::Naked);
+}
+
+void ArchInitAttachDetach(llvm::Module *M) {
+  auto &C = M->getContext();
+  auto VoidTy = llvm::Type::getVoidTy(C);
+  auto EPTy = llvm::FunctionType::get(VoidTy, false);
+  const auto OS = SystemOS(M);
+  const auto Arch = SystemArch(M);
+  if (llvm::Triple::Linux == OS) {
+    if (_X86_64_ == Arch) {
+      InitADFeatues(M, "__mcsema_attach_call", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
+      InitADFeatues(M, "__mcsema_detach_ret", EPTy);
+
     } else {
-      TASSERT(false, "Unsupported OS");
+      InitADFeatues(M, "__mcsema_attach_call_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_detach_ret_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_value", EPTy);
+
+      InitADFeatues(M, "__mcsema_detach_call_stdcall", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_stdcall", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_fastcall", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_fastcall", EPTy);
     }
+  } else if (llvm::Triple::Win32 == OS) {
+    llvm::errs() << "Initializing unsupported attach/detach code for Win32.\n";
+    InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
   } else {
-    //TODO(artem): handle StdCall
-    if (getSystemOS(M) == llvm::Triple::Linux) {
-        F->setCallingConv(CallingConv::C);
-    } else {
-      TASSERT(false, "Unsupported OS");
-    }
+    TASSERT(false, "Unknown OS Type!");
   }
 }
 
+void ArchSetCallingConv(llvm::Module *M, llvm::CallInst *ci) {
+  ci->setCallingConv(ArchGetCallingConv(M));
+}
 
-static void AddPushJumpStub(llvm::Module *M, llvm::Function *F,
-                            llvm::Function *W, const char *stub_handler) {
+void ArchSetCallingConv(llvm::Module *M, llvm::Function *F) {
+  F->setCallingConv(ArchGetCallingConv(M));
+}
+
+static void LinuxAddPushJumpStub(llvm::Module *M, llvm::Function *F,
+                                 llvm::Function *W, const char *stub_handler) {
   auto stub_name = W->getName().str();
   auto stubbed_func_name = F->getName().str();
-  const char *push = 32 == getPointerSize(M) ? "pushl" : "pushq";
+  const char *push = 32 == ArchPointerSize(M) ? "pushl" : "pushq";
 
   std::stringstream as;
   as << "  .globl " << stubbed_func_name << ";\n";
@@ -113,10 +141,15 @@ static void AddPushJumpStub(llvm::Module *M, llvm::Function *F,
   M->appendModuleInlineAsm(as.str());
 }
 
-llvm::Function *addEntryPointDriver(llvm::Module *M, const std::string &name,
-                                    VA entry) {
+// Add a function that can be used to transition from native code into lifted
+// code.
+llvm::Function *ArchAddEntryPointDriver(llvm::Module *M,
+                                        const std::string &name, VA entry) {
   //convert the VA into a string name of a function, try and look it up
-  std::string s("sub_" + to_string<VA>(entry, hex));
+  std::stringstream ss;
+  ss << "sub_" << std::hex << entry;
+
+  auto s = ss.str();
   llvm::Function *F = M->getFunction(s);
   if (!F) {
     llvm::errs() << "Could not find lifted function " << s
@@ -126,122 +159,137 @@ llvm::Function *addEntryPointDriver(llvm::Module *M, const std::string &name,
 
   auto &C = F->getContext();
   auto W = M->getFunction(name);
-  if (!W) {
-    auto VoidTy = llvm::Type::getVoidTy(C);
-    auto WTy = llvm::FunctionType::get(VoidTy, false);
-    W = llvm::Function::Create(
-        WTy, llvm::GlobalValue::ExternalLinkage, name, M);
-
-    W->addFnAttr(llvm::Attribute::NoInline);
-    W->addFnAttr(llvm::Attribute::Naked);
-
-    if (getSystemArch(M) == _X86_64_) {
-        AddPushJumpStub(M, F, W, "__mcsema_attach_call");
-    } else {
-        if (getSystemOS(M) == llvm::Triple::Linux) {
-            AddPushJumpStub(M, F, W, "__mcsema_attach_call_cdecl");
-        } else {
-          TASSERT(false, "Unsupported OS");
-        }
-    }
-    F->setLinkage(llvm::GlobalValue::ExternalLinkage);
-
-    if (F->doesNotReturn()) {
-      W->setDoesNotReturn();
-    }
+  if (W) {
+    return W;
   }
+
+  auto VoidTy = llvm::Type::getVoidTy(C);
+  auto WTy = llvm::FunctionType::get(VoidTy, false);
+  W = llvm::Function::Create(
+      WTy, llvm::GlobalValue::ExternalLinkage, name, M);
+
+  W->addFnAttr(llvm::Attribute::NoInline);
+  W->addFnAttr(llvm::Attribute::Naked);
+
+  const auto Arch = SystemArch(M);
+  const auto OS = SystemOS(M);
+
+  if (llvm::Triple::Linux == OS) {
+    if (_X86_64_ == Arch) {
+      LinuxAddPushJumpStub(M, F, W, "__mcsema_attach_call");
+    } else {
+      LinuxAddPushJumpStub(M, F, W, "__mcsema_attach_call_cdecl");
+    }
+  } else if (llvm::Triple::Win32 == OS) {
+    llvm::errs()
+        << "Win32 callback entrypoint driver for "
+        << s << " has no backing implementation\n";
+  } else {
+    TASSERT(false, "Unsupported OS for entry point driver.");
+  }
+
+  F->setLinkage(llvm::GlobalValue::ExternalLinkage);
+  if (F->doesNotReturn()) {
+    W->setDoesNotReturn();
+  }
+
   return W;
 }
 
-llvm::Function *getExitPointDriver(llvm::Function *F) {
+// Wrap `F` in a function that will transition from lifted code into native
+// code, where `F` is an external reference to a native function.
+llvm::Function *ArchAddExitPointDriver(llvm::Function *F) {
   std::stringstream ss;
   ss << "_" << F->getName().str();
   auto M = F->getParent();
   auto &C = M->getContext();
   auto name = ss.str();
   auto W = M->getFunction(name);
-  if (!W) {
-    W = llvm::Function::Create(
-        F->getFunctionType(), llvm::GlobalValue::ExternalLinkage, name, M);
-    W->setCallingConv(F->getCallingConv());
-    W->addFnAttr(llvm::Attribute::NoInline);
-    W->addFnAttr(llvm::Attribute::Naked);
-    if (getSystemArch(M) == _X86_64_) {
-        if (getSystemOS(M) == llvm::Triple::Linux) {
-            // only one calling conv for linux amd64
-            AddPushJumpStub(M, F, W, "__mcsema_detach_call");
-        } else {
-          TASSERT(false, "Unsupported OS");
-        }
-    } else {
-        if (getSystemOS(M) == llvm::Triple::Linux) {
-            switch(F->getCallingConv()) {
-                case CallingConv::C:
-                    AddPushJumpStub(M, F, W, "__mcsema_detach_call_cdecl");
-                    break;
-                case CallingConv::X86_StdCall:
-                    AddPushJumpStub(M, F, W, "__mcsema_detach_call_stdcall");
-                    break;
-                case CallingConv::X86_FastCall:
-                    AddPushJumpStub(M, F, W, "__mcsema_detach_call_fastcall");
-                    break;
-                default:
-                  TASSERT(false, "Unsupported OS and Calling Convention combination");
-            }
-        } else {
-          TASSERT(false, "Unsupported OS");
-        }
-    }
-    F->setLinkage(llvm::GlobalValue::ExternalLinkage);
+  if (W) {
+    return W;
+  }
 
-    if (F->doesNotReturn()) {
-      W->setDoesNotReturn();
+  W = llvm::Function::Create(F->getFunctionType(),
+                             llvm::GlobalValue::ExternalLinkage, name, M);
+  W->setCallingConv(F->getCallingConv());
+  W->addFnAttr(llvm::Attribute::NoInline);
+  W->addFnAttr(llvm::Attribute::Naked);
+
+  const auto Arch = SystemArch(M);
+  const auto OS = SystemOS(M);
+
+  if (llvm::Triple::Linux == OS) {
+    if (_X86_64_ == Arch) {
+      LinuxAddPushJumpStub(M, F, W, "__mcsema_detach_call");
+    } else {
+      switch (F->getCallingConv()) {
+        case CallingConv::C:
+          LinuxAddPushJumpStub(M, F, W, "__mcsema_detach_call_cdecl");
+          break;
+        case CallingConv::X86_StdCall:
+          LinuxAddPushJumpStub(M, F, W, "__mcsema_detach_call_stdcall");
+          break;
+        case CallingConv::X86_FastCall:
+          LinuxAddPushJumpStub(M, F, W, "__mcsema_detach_call_fastcall");
+          break;
+        default:
+          TASSERT(false, "Unsupported Calling Convention for 32-bit Linux");
+          break;
+      }
     }
+  } else if (llvm::Triple::Win32 == OS) {
+    llvm::errs()
+        << "Win32 exit point driver for " << F->getName()
+        << " has no backing implementation\n";
+
+  } else {
+    TASSERT(false, "Unsupported OS for exit point driver.");
+  }
+
+  F->setLinkage(llvm::GlobalValue::ExternalLinkage);  // TODO(artem): No-op?
+  if (F->doesNotReturn()) {
+    W->setDoesNotReturn();
   }
   return W;
 }
 
-
-llvm::Function *archMakeCallbackForLocalFunction(Module *M, VA local_target) {
+llvm::Function *ArchAddCallbackDriver(llvm::Module *M, VA local_target) {
   std::stringstream ss;
   ss << "callback_sub_" << std::hex << local_target;
   auto callback_name = ss.str();
-  return addEntryPointDriver(M, callback_name, local_target);
+  return ArchAddEntryPointDriver(M, callback_name, local_target);
 }
 
-GlobalVariable *archGetImageBase(Module *M) {
+llvm::GlobalVariable *archGetImageBase(llvm::Module *M) {
 
   // WILL ONLY WORK FOR windows/x86_64
-  GlobalVariable *gv = M->getNamedGlobal("__ImageBase");
-  return gv;
-
+  return M->getNamedGlobal("__ImageBase");
 }
 
-bool shouldSubtractImageBase(Module *M) {
+bool shouldSubtractImageBase(llvm::Module *M) {
 
   // we are on windows
-  if (getSystemOS(M) != Triple::Win32) {
+  if (llvm::Triple::Win32 == SystemOS(M)) {
     //llvm::errs() << __FUNCTION__ << ": Not on Win32\n";
     return false;
   }
 
   // and we are on amd64
-  if (getSystemArch(M) != _X86_64_) {
+  if (_X86_64_ != SystemArch(M)) {
     //llvm::errs() << __FUNCTION__ << ": Not on amd64\n";
     return false;
   }
 
   // and the __ImageBase symbol is defined
-  if (archGetImageBase(M) == nullptr) {
+  if (!archGetImageBase(M)) {
     llvm::errs() << __FUNCTION__ << ": No __ImageBase defined\n";
     return false;
   }
 
   return true;
-
 }
 
-llvm::Value* doSubtractImageBaseInt(llvm::Value *original,
+llvm::Value *doSubtractImageBaseInt(llvm::Value *original,
                                     llvm::BasicBlock *block) {
   llvm::Module *M = block->getParent()->getParent();
   llvm::Value *ImageBase = archGetImageBase(M);

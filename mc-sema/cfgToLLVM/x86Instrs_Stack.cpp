@@ -47,7 +47,7 @@ template<int width>
 static void doPushVT(InstPtr ip, BasicBlock *&b, Value *v) {
   //ESP <- ESP - 4
   //Memory[ESP] = v
-  if (getPointerSize(b->getParent()->getParent())) {
+  if (ArchPointerSize(b->getParent()->getParent())) {
     Value *oldESP = R_READ<32>(b, X86::ESP);
     Value *newESP = BinaryOperator::CreateSub(oldESP,
                                               CONST_V<32>(b, (width / 8)), "",
@@ -80,7 +80,7 @@ static void doPushV(InstPtr ip, BasicBlock *&b, Value *v) {
   //ESP <- ESP - 4
   //Memory[ESP] = v
   llvm::Module *M = b->getParent()->getParent();
-  if (getPointerSize(M) == Pointer32) {
+  if (ArchPointerSize(M) == Pointer32) {
     Value *oldESP = x86::R_READ<32>(b, X86::ESP);
     Value *newESP = BinaryOperator::CreateSub(oldESP,
                                               CONST_V<32>(b, (width / 8)), "",
@@ -296,7 +296,7 @@ static InstTransResult doEnter(InstPtr ip, BasicBlock *&b,
                                const MCOperand &frameSize,
                                const MCOperand &nestingLevel) {
   llvm::Module *M = b->getParent()->getParent();
-  if (getPointerSize(M) == Pointer32) {
+  if (ArchPointerSize(M) == Pointer32) {
     return x86::doEnter(ip, b, frameSize, nestingLevel);
   } else {
     return x86_64::doEnter(ip, b, frameSize, nestingLevel);
@@ -307,7 +307,7 @@ static InstTransResult doLeave(InstPtr ip, BasicBlock *b) {
   // LEAVE
   llvm::Module *M = b->getParent()->getParent();
 
-  if (getPointerSize(M) == Pointer32) {
+  if (ArchPointerSize(M) == Pointer32) {
     // read EBP
     Value *link_pointer = x86::R_READ<32>(b, X86::EBP);
     Value *base_pointer = M_READ<32>(ip, b, link_pointer);
@@ -369,7 +369,7 @@ static InstTransResult doPopR(InstPtr ip, BasicBlock *&b,
   //read the stack pointer
   Value *oldRSP;
 
-  if (getPointerSize(M) == Pointer32) {
+  if (ArchPointerSize(M) == Pointer32) {
     oldRSP = x86::R_READ<32>(b, X86::ESP);
   } else {
     oldRSP = x86_64::R_READ<64>(b, X86::RSP);
@@ -382,7 +382,7 @@ static InstTransResult doPopR(InstPtr ip, BasicBlock *&b,
   R_WRITE<width>(b, dst.getReg(), m);
 
   //add to the stack pointer
-  if (getPointerSize(M) == Pointer32) {
+  if (ArchPointerSize(M) == Pointer32) {
     Value *newESP = BinaryOperator::CreateAdd(oldRSP,
                                               CONST_V<32>(b, (width / 8)), "",
                                               b);
@@ -564,7 +564,7 @@ static InstTransResult translate_PUSHi32(NativeModulePtr natM,
   InstTransResult ret;
   Function *F = block->getParent();
   if (ip->has_code_ref()) {
-    Value *callback_fn = archMakeCallbackForLocalFunction(
+    Value *callback_fn = ArchAddCallbackDriver(
         block->getParent()->getParent(), ip->get_reference(Inst::IMMRef));
     Value *addrInt = new PtrToIntInst(
         callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);

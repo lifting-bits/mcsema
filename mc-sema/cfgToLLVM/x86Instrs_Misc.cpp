@@ -637,7 +637,7 @@ static InstTransResult doLeaRef(NativeModulePtr natM, BasicBlock *&block,
       throw TErr(__LINE__, __FILE__, "Have code ref but no reference");
     }
 
-    Value *callback_fn = archMakeCallbackForLocalFunction(
+    Value *callback_fn = ArchAddCallbackDriver(
         block->getParent()->getParent(), ip->get_reference(optype));
     Value *addrInt = new PtrToIntInst(
         callback_fn, llvm::Type::getIntNTy(block->getContext(), width), "",

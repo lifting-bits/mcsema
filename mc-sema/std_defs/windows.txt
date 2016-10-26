@@ -800,6 +800,7 @@ _msize_dbg 1 C N
 _malloc_dbg 1 C N
 _free_dbg 1 C N
 _calloc_dbg 2 C N
+calloc_crt 2 C N
 _expand_dbg 2 C N
 _aligned_offset_malloc_dbg 3 C N
 _aligned_offset_realloc_dbg 4 C N
@@ -28757,6 +28758,10 @@ GdiGetCharDimensions 3 E N
 GdiGetCodePage 1 E N
 allmul 4 C N
 _allmul 4 C N
+__allmul 4 C N
+aullshr 3 C N
+_aullshr 3 C N
+__aullshr 3 C N
 PolyPatBlt 5 E N
 GdiConvertAndCheckDC 1 E N
 GdiCreateLocalMetaFilePict 1 E N

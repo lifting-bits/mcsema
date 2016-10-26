@@ -220,7 +220,7 @@ llvm::Value* IMM_AS_DATA_REF(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
     uint64_t off = ip->get_reference(Inst::IMMRef);
     
     if(ip->has_code_ref()) {
-        Value *callback_fn = archMakeCallbackForLocalFunction(
+        Value *callback_fn = ArchAddCallbackDriver(
                 b->getParent()->getParent(),
                 ip->get_reference(Inst::IMMRef));
         Value *addrInt = new PtrToIntInst(
@@ -270,7 +270,7 @@ static inline llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *b,
 {
     
 	llvm::Module *M = b->getParent()->getParent();
-	int regWidth = getPointerSize(M);
+	int regWidth = ArchPointerSize(M);
     if(regWidth == x86::REG_SIZE) {
         return IMM_AS_DATA_REF<32>(b, mod, ip);
     } else {
@@ -285,11 +285,6 @@ inline llvm::PointerType *getVoidPtrType (llvm::LLVMContext & C) {
 
 template <int width>
 static inline Value *ADDR_NOREF_IMPL(NativeModulePtr natM, llvm::BasicBlock *b, int x, InstPtr ip, const llvm::MCInst &inst) {
-//#define ADDR_NOREF(x) \
-//	getPointerSize(block->getParent()->getParent()) == Pointer32 ?	\
-//		x86::getAddrFromExpr(block, natM, OP(x+0), OP(x+1), OP(x+2), OP(x+3).getImm(), OP(x+4), false) :\
-//		x86_64::getAddrFromExpr(block, natM, OP(x+0), OP(x+1), OP(x+2), OP(x+3).getImm(), OP(x+4), false)
-//
 
     // Turns out this function name is a lie. This case can ref external data
     llvm::Module *M = b->getParent()->getParent();
@@ -299,7 +294,7 @@ static inline Value *ADDR_NOREF_IMPL(NativeModulePtr natM, llvm::BasicBlock *b, 
         return addrInt;
     }
 
-    if(getPointerSize(M) == Pointer32) {
+    if(ArchPointerSize(M) == Pointer32) {
 		return x86::getAddrFromExpr(b, natM, inst.getOperand(x+0), inst.getOperand(x+1), inst.getOperand(x+2), inst.getOperand(x+3).getImm(), inst.getOperand(x+4), false);
     } else {
 		return x86_64::getAddrFromExpr(b, natM, inst.getOperand(x+0), inst.getOperand(x+1), inst.getOperand(x+2), inst.getOperand(x+3).getImm(), inst.getOperand(x+4), false);

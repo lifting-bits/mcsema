@@ -707,7 +707,7 @@ static InstTransResult doFstcw(InstPtr ip, BasicBlock *&b, Value *memAddr) {
 
 static InstTransResult doFstenv(InstPtr ip, BasicBlock *&b, Value *memAddr) {
   llvm::Module *M = b->getParent()->getParent();
-  unsigned int bitWidth = getPointerSize(M);
+  unsigned int bitWidth = ArchPointerSize(M);
 
   Value *memPtr = ADDR_TO_POINTER<8>(b, memAddr);
 

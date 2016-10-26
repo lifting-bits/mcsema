@@ -184,7 +184,7 @@ Value *getAddrFromExpr( BasicBlock      *b,
     int64_t real_disp = has_ref ? ip->get_reference(Inst::MEMRef) : disp.getImm();
 	llvm::Module *M = b->getParent()->getParent();
 	
-	if(getPointerSize(M) == Pointer32) {
+	if(ArchPointerSize(M) == Pointer32) {
 
 		return x86::getAddrFromExpr(b, 
 				mod, 

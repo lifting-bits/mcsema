@@ -197,7 +197,7 @@ static InstTransResult doLoopNEIMPL(BasicBlock *&b, BasicBlock *T,
 static InstTransResult doLoop(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
   llvm::Module *M = b->getParent()->getParent();
 
-  if (getPointerSize(M) == Pointer32) {
+  if (ArchPointerSize(M) == Pointer32) {
     return doLoopIMPL<32>(b, T, F);
   } else {
     return doLoopIMPL<64>(b, T, F);
@@ -207,7 +207,7 @@ static InstTransResult doLoop(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
 static InstTransResult doLoopE(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
   llvm::Module *M = b->getParent()->getParent();
 
-  if (getPointerSize(M) == Pointer32) {
+  if (ArchPointerSize(M) == Pointer32) {
     return doLoopEIMPL<32>(b, T, F);
   } else {
     return doLoopEIMPL<64>(b, T, F);
@@ -217,7 +217,7 @@ static InstTransResult doLoopE(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
 static InstTransResult doLoopNE(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
   llvm::Module *M = b->getParent()->getParent();
 
-  if (getPointerSize(M) == Pointer32) {
+  if (ArchPointerSize(M) == Pointer32) {
     return doLoopNEIMPL<32>(b, T, F);
   } else {
     return doLoopNEIMPL<64>(b, T, F);
@@ -253,9 +253,9 @@ static void doCallV(BasicBlock *&block, InstPtr ip, Value *call_addr, bool is_ju
   Function *F = block->getParent();
   Module *M = F->getParent();
   auto &C = M->getContext();
-  uint32_t bitWidth = getPointerSize(M);
+  uint32_t bitWidth = ArchPointerSize(M);
 
-  if (_X86_64_ == getSystemArch(M)) {
+  if (_X86_64_ == SystemArch(M)) {
     R_WRITE<64>(block, X86::RIP, call_addr);
     if (!is_jump) {
       writeDetachReturnAddr<64>(block);
@@ -303,7 +303,7 @@ static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr, bool is_
   subArgs.push_back(ourF->arg_begin());
 
   CallInst *c = CallInst::Create(F, subArgs, "", b);
-  archSetCallingConv(M, c);
+  ArchSetCallingConv(M, c);
 
   if (ip->has_local_noreturn() || F->doesNotReturn()) {
     // noreturn functions just hit unreachable
@@ -343,7 +343,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
   // only need to adjust stack if there are more than two args
   //
 
-  Function *exit_point = getExitPointDriver(externFunction);
+  Function *exit_point = ArchAddExitPointDriver(externFunction);
 
   if (externFunction->getCallingConv() == CallingConv::X86_FastCall) {
 
@@ -477,7 +477,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
   AttrBuilder B;
   B.addAttribute(Attribute::InReg);
 
-  if (getSystemOS(M) == llvm::Triple::Win32) {
+  if (SystemOS(M) == llvm::Triple::Win32) {
     if (paramCount && it != end) {
       Type *T = it->getType();
       Value *arg1;
@@ -647,9 +647,9 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
     writeDetachReturnAddr<64>(b);
   }
 
-  CallInst *callR = CallInst::Create(getExitPointDriver(externFunction),
+  CallInst *callR = CallInst::Create(ArchAddExitPointDriver(externFunction),
                                      arguments, "", b);
-  archSetCallingConv(M, callR);
+  ArchSetCallingConv(M, callR);
 
   if (externFunction->doesNotReturn()) {
     // noreturn functions just hit unreachable
