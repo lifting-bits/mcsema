@@ -2,7 +2,12 @@
 #include <string.h>
 #include "../common/RegisterState.h"
 
+#ifdef _WIN32
+extern void sub_1(RegState *);
+void sub_8000001(RegState *r) { sub_1(r); }
+#else
 extern void sub_8000001(RegState *);
+#endif
 
 int doDemo1(int k) {
     RegState        rState;
