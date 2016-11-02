@@ -20,12 +20,10 @@ if idaapi.get_inf_structure().is_64bit():
     _signed_from_unsigned = _signed_from_unsigned64
     _base_ptr = "rbp"
     _stack_ptr = "rsp"
-    _trashed_regs = ["rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"]
 elif idaapi.get_inf_structure().is_32bit():
     _signed_from_unsigned = _signed_from_unsigned32
     _base_ptr = "ebp"
     _stack_ptr = "esp"
-    _trashed_regs = ["eax", "ecx", "edx"]
 _base_ptr_format = "[{}+".format(_base_ptr)
 _stack_ptr_format = "[{}+".format(_stack_ptr)
 
@@ -127,34 +125,7 @@ def BlockItems(BB):
         yield fii.current()
         ok = fii.next_code()
 
-class ShadowMemory(object):
-    offset = 0
-    contents = {}
-    def __init__(self):
-        pass
-
-    def copy(self):
-        duplicate = ShadowMemory()
-        duplicate.offset = self.offset
-        duplicate.contents = self.contents.copy()
-        return duplicate
-
-    def get(self, index, default=None):
-        return contents.get(index+offset, default)
-
-    def set(self, index, value):
-        contents.set(index+offset, value)
-
-    def shift(self, delta):
-        self.offset = self.offset + delta
-
-    def getShift(self):
-        return self.offset
-
-    def setShift(self, newShift):
-        self.shift = newShift
-
-def collect_func_vars(F, memory):
+def collect_func_vars(F):
     '''
     Collect stack variable data from a single function F.
     Returns a dict of stack variables 'stackArgs'.
@@ -202,11 +173,10 @@ def collect_func_vars(F, memory):
                                    "writes":set(),
                                    "referent":set(),
                                    "reads":set()}
-        memory.set(offset-delta, stackArgs[offset-delta])
         offset = idc.GetStrucNextOff(frame, offset)
     #functions.append({"name":name, "stackArgs":stackArgs})
     if len(stackArgs) > 0:
-      _find_local_references(f, {"name":name, "stackArgs":stackArgs}, memory)
+      _find_local_references(f, {"name":name, "stackArgs":stackArgs})
 
     return stackArgs
 
@@ -232,7 +202,7 @@ def collect_func_vars_all():
         functions.append({"ea":f_ea, "stackArgs":f_vars, "name":idc.Name(f)})
     return functions
 
-def _process_mov_inst(addr, referers, dereferences, func_var_data, memory):
+def _process_mov_inst(addr, referers, dereferences, func_var_data):
     '''
     - type data regarding the target operand is discarded
     - if the source operand contains an address of a stack variable:
@@ -255,7 +225,7 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data, memory):
         #   mov [ebp-4], ebx   # copying referent data into a stack variable (i.e., moving an address into a pointer)
 
         if _base_ptr_format in target_op:
-            #moving referent data into a stack variable (i.e., moving an address into a memory location)
+            #moving referent data into a stack variable (i.e., moving an address into a pointer)
             offset = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
             if offset in func_var_data["stackArgs"].keys():
                 func_var_data["stackArgs"][offset]["flags"].add("LOCAL_REFERER")
@@ -284,12 +254,12 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data, memory):
         if offset in func_var_data["stackArgs"].keys():
             func_var_data["stackArgs"][offset]["reads"].add(addr)
 
-def _process_lea_inst(addr, referers, dereferences, func_var_data, memory):
+def _process_lea_inst(addr, referers, dereferences, func_var_data):
     if _base_ptr_format in idc.GetOpnd(addr, 1) or _stack_ptr_format in idc.GetOpnd(addr, 1):
         #referers[operand] = offset
         referers[idc.GetOpnd(addr, 0)] = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
 
-def _process_call_inst(addr, referers, dereferences, func_var_data, memory):
+def _process_call_inst(addr, referers, dereferences, func_var_data):
     target_op = idc.GetOpnd(addr, 0)
     if target_op in referers:
         #maybe do something here? explicitly calling to the stack. Hrm.
@@ -298,38 +268,19 @@ def _process_call_inst(addr, referers, dereferences, func_var_data, memory):
         # mov eax, [ebp+4]
         # call eax
         func_var_data["stackArgs"][dereferences[target_op]]["flags"].add("CODE_PTR")
+    # clear the referers and dereferences?
 
-    # TODO: here is where we would process the function, if capable
-
-    # clear reference data for non preserved regs
-    for reg in _trashed_regs:
-        dereferences.pop(reg, None)
-        referers.pop(reg, None)
-
-def _process_sub_inst(addr, referers, dereferences, func_var_data, memory):
-    target_op = idc.GetOpnd(addr, 0)
-    if target_op = _base_ptr or target_op = _stack_ptr:
-        delta = idc.GetOperandValue(addr, 1)
-        memory.shift(delta)
-
-def _process_pop_inst(addr, referers, dereferences, func_var_data, memory):
-    target_op = idc.GetOpnd(addr, 0)
-    if target_op = _base_ptr or target_op = _stack_ptr:
-        memory.pop
-
-def _process_basic_block(BB, func_var_data, memory, referers, dereferences, visited_bb):
+def _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb):
     if BB.startEA in visited_bb:
         return
     visited_bb.add(BB.startEA)
     for addr in BlockItems(BB):
         _funcs = {"lea":_process_lea_inst,
                   "mov":_process_mov_inst,
-                  "call":_process_call_inst,
-                  "sub":_process_sub_inst,
-                  "pop":_process_pop_inst}
+                  "call":_process_call_inst}
         func = _funcs.get(idc.GetMnem(addr), None)
         if func:
-            func(addr, referers, dereferences, func_var_data, memory)
+            func(addr, referers, dereferences, func_var_data)
         else:
             #check for reads from stack var
             read_op = idc.GetOpnd(addr, 1)
@@ -342,9 +293,9 @@ def _process_basic_block(BB, func_var_data, memory, referers, dereferences, visi
                     #print "offset {} not found at address {}".format(hex(offset), hex(addr))
 
     for block in BB.succs():
-        _process_basic_block(block, func_var_data, memory.copy(), referers.copy(), dereferences.copy(), visited_bb)
+        _process_basic_block(block, func_var_data, referers.copy(), dereferences.copy(), visited_bb)
 
-def _find_local_references(func, func_var_data, memory):
+def _find_local_references(func, func_var_data):
     frame = idc.GetFrame(func)
     if frame is None:
         return
@@ -353,8 +304,9 @@ def _find_local_references(func, func_var_data, memory):
     visited_bb = set()
     next_bb = list()
 
+    #build the dict of addr->basicblock objects
     fc = idaapi.FlowChart(idaapi.get_func(func))
-    _process_basic_block(fc[0], func_var_data, memory, referers, dereferences, visited_bb)
+    _process_basic_block(fc[0], func_var_data, referers, dereferences, visited_bb)
 
 def print_func_vars():
     print
