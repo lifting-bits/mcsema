@@ -63,7 +63,13 @@ typedef struct _fputag {
 #pragma pack(pop)
 #endif
 
+#ifdef _WIN32
+typedef struct __uint128_t {
+    char pad[16];
+    } PACKED uint128_t;
+#else
 typedef unsigned uint128_t __attribute__((mode(TI)));
+#endif
 
 #ifdef _WIN32
 #pragma pack(push, 1)

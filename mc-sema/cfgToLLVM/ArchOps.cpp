@@ -56,7 +56,7 @@ llvm::CallingConv::ID ArchGetCallingConv(llvm::Module *M) {
     if (_X86_64_ == Arch) {
       return CallingConv::X86_64_Win64;
     } else {
-      return CallingConv::X86_StdCall;
+      return CallingConv::C;
     }
   } else if (llvm::Triple::Linux == OS) {
     if (_X86_64_ == Arch) {
@@ -105,8 +105,21 @@ void ArchInitAttachDetach(llvm::Module *M) {
       InitADFeatues(M, "__mcsema_attach_ret_fastcall", EPTy);
     }
   } else if (llvm::Triple::Win32 == OS) {
-    llvm::errs() << "Initializing unsupported attach/detach code for Win32.\n";
-    InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
+    if (_X86_64_ == Arch) {
+      llvm::errs() << "Initializing unsupported attach/detach code for Win32.\n";
+    } else {
+      InitADFeatues(M, "__mcsema_attach_call_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_detach_ret_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_value", EPTy);
+
+      InitADFeatues(M, "__mcsema_detach_call_stdcall", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_stdcall", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_fastcall", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_fastcall", EPTy);
+    }
   } else {
     TASSERT(false, "Unknown OS Type!");
   }
@@ -136,6 +149,24 @@ static void LinuxAddPushJumpStub(llvm::Module *M, llvm::Function *F,
   as << "  jmp " << stub_handler << ";\n";
   as << "0:\n";
   as << "  .size " << stub_name << ",0b-" << stub_name << ";\n";
+  as << "  .cfi_endproc;\n";
+
+  M->appendModuleInlineAsm(as.str());
+}
+
+static void WindowsAddPushJumpStub(llvm::Module *M, llvm::Function *F,
+                                 llvm::Function *W, const char *stub_handler) {
+  auto stub_name = W->getName().str();
+  auto stubbed_func_name = F->getName().str();
+  const char *push = 32 == ArchPointerSize(M) ? "pushl" : "pushq";
+
+  std::stringstream as;
+  as << "  .globl _" << stubbed_func_name << ";\n";
+  as << "  .globl " << stub_name << ";\n";
+  as << stub_name << ":\n";
+  as << "  .cfi_startproc;\n";
+  as << "  " << push << " $_" << stubbed_func_name << ";\n";
+  as << "  jmp " << stub_handler << ";\n";
   as << "  .cfi_endproc;\n";
 
   M->appendModuleInlineAsm(as.str());
@@ -181,9 +212,13 @@ llvm::Function *ArchAddEntryPointDriver(llvm::Module *M,
       LinuxAddPushJumpStub(M, F, W, "__mcsema_attach_call_cdecl");
     }
   } else if (llvm::Triple::Win32 == OS) {
-    llvm::errs()
-        << "Win32 callback entrypoint driver for "
-        << s << " has no backing implementation\n";
+    if (_X86_64_ == Arch) {
+        llvm::errs()
+            << "Win32 callback entrypoint driver for "
+            << s << " has no backing implementation\n";
+    } else {
+      WindowsAddPushJumpStub(M, F, W, "__mcsema_attach_call_cdecl");
+    }
   } else {
     TASSERT(false, "Unsupported OS for entry point driver.");
   }
@@ -238,10 +273,26 @@ llvm::Function *ArchAddExitPointDriver(llvm::Function *F) {
       }
     }
   } else if (llvm::Triple::Win32 == OS) {
-    llvm::errs()
-        << "Win32 exit point driver for " << F->getName()
-        << " has no backing implementation\n";
 
+    if (_X86_64_ == Arch) {
+        llvm::errs() << "Win32 exit point driver for " << F->getName()
+                     << " has no backing implementation\n";
+    } else {
+      switch (F->getCallingConv()) {
+        case CallingConv::C:
+          WindowsAddPushJumpStub(M, F, W, "__mcsema_detach_call_cdecl");
+          break;
+        case CallingConv::X86_StdCall:
+          WindowsAddPushJumpStub(M, F, W, "__mcsema_detach_call_stdcall");
+          break;
+        case CallingConv::X86_FastCall:
+          WindowsAddPushJumpStub(M, F, W, "__mcsema_detach_call_fastcall");
+          break;
+        default:
+          TASSERT(false, "Unsupported Calling Convention for 32-bit Windows");
+          break;
+      }
+    }
   } else {
     TASSERT(false, "Unsupported OS for exit point driver.");
   }
