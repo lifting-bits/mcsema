@@ -154,18 +154,24 @@ static void LinuxAddPushJumpStub(llvm::Module *M, llvm::Function *F,
   M->appendModuleInlineAsm(as.str());
 }
 
-static void WindowsAddPushJumpStub(llvm::Module *M, llvm::Function *F,
+static void WindowsAddPushJumpStub(bool decorateStub, llvm::Module *M, llvm::Function *F,
                                  llvm::Function *W, const char *stub_handler) {
   auto stub_name = W->getName().str();
   auto stubbed_func_name = F->getName().str();
   const char *push = 32 == ArchPointerSize(M) ? "pushl" : "pushq";
 
   std::stringstream as;
-  as << "  .globl _" << stubbed_func_name << ";\n";
+  stubbed_func_name = "_" + stubbed_func_name;
+
+  if(decorateStub) {
+    stub_name = "_" + stub_name;
+  }
+
+  as << "  .globl " << stubbed_func_name << ";\n";
   as << "  .globl " << stub_name << ";\n";
   as << stub_name << ":\n";
   as << "  .cfi_startproc;\n";
-  as << "  " << push << " $_" << stubbed_func_name << ";\n";
+  as << "  " << push << " $" << stubbed_func_name << ";\n";
   as << "  jmp " << stub_handler << ";\n";
   as << "  .cfi_endproc;\n";
 
@@ -217,7 +223,7 @@ llvm::Function *ArchAddEntryPointDriver(llvm::Module *M,
             << "Win32 callback entrypoint driver for "
             << s << " has no backing implementation\n";
     } else {
-      WindowsAddPushJumpStub(M, F, W, "__mcsema_attach_call_cdecl");
+      WindowsAddPushJumpStub(false, M, F, W, "__mcsema_attach_call_cdecl");
     }
   } else {
     TASSERT(false, "Unsupported OS for entry point driver.");
@@ -235,8 +241,14 @@ llvm::Function *ArchAddEntryPointDriver(llvm::Module *M,
 // code, where `F` is an external reference to a native function.
 llvm::Function *ArchAddExitPointDriver(llvm::Function *F) {
   std::stringstream ss;
-  ss << "_" << F->getName().str();
   auto M = F->getParent();
+  const auto OS = SystemOS(M);
+
+  if(llvm::Triple::Win32 == OS) {
+      ss << "mcsema_" << F->getName().str();
+  } else {
+      ss << "_" << F->getName().str();
+  }
   auto &C = M->getContext();
   auto name = ss.str();
   auto W = M->getFunction(name);
@@ -251,7 +263,6 @@ llvm::Function *ArchAddExitPointDriver(llvm::Function *F) {
   W->addFnAttr(llvm::Attribute::Naked);
 
   const auto Arch = SystemArch(M);
-  const auto OS = SystemOS(M);
 
   if (llvm::Triple::Linux == OS) {
     if (_X86_64_ == Arch) {
@@ -280,13 +291,13 @@ llvm::Function *ArchAddExitPointDriver(llvm::Function *F) {
     } else {
       switch (F->getCallingConv()) {
         case CallingConv::C:
-          WindowsAddPushJumpStub(M, F, W, "__mcsema_detach_call_cdecl");
+          WindowsAddPushJumpStub(true, M, F, W, "__mcsema_detach_call_cdecl");
           break;
         case CallingConv::X86_StdCall:
-          WindowsAddPushJumpStub(M, F, W, "__mcsema_detach_call_stdcall");
+          WindowsAddPushJumpStub(true, M, F, W, "__mcsema_detach_call_stdcall");
           break;
         case CallingConv::X86_FastCall:
-          WindowsAddPushJumpStub(M, F, W, "__mcsema_detach_call_fastcall");
+          WindowsAddPushJumpStub(true, M, F, W, "__mcsema_detach_call_fastcall");
           break;
         default:
           TASSERT(false, "Unsupported Calling Convention for 32-bit Windows");

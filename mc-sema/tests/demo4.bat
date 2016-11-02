@@ -5,17 +5,19 @@ call env.bat
 del /q demo_test4.obj demo_test4_mine.obj demo_test4.cfg demo_test4.bc demo_test4_opt.bc demo_driver4.exe
 cl /nologo /c demo_test4.c
 
+set IDALOG=out.log
+set TVHEADLESS=1
 if exist "%IDA_PATH%\idaq.exe" (
     echo Using IDA to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend_wrapper.py -march=x86 -d -func-map="%STD_DEFS%" -entry-symbol=_doTrans -i=demo_test4.obj
+    %PYTHON% %BIN_DESCEND_PATH%\bin_descend_wrapper.py -march=x86 -d -func-map="%STD_DEFS%" -entry-symbol=_doTrans -i=demo_test4.obj >> %IDALOG%
 ) else (
-    echo Using bin_descend to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend.exe -march=x86 -d -func-map="%STD_DEFS%" -entry-symbol=_doTrans -i=demo_test4.obj
+    echo Bin_descend is no longer supported
+    exit 1
 )
 
-%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=i386-pc-win32 -i demo_test4.cfg -driver=demo4_entry,_doTrans,1,return,C -o demo_test4.bc
+%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=i386-pc-win32 -i demo_test4.cfg -entrypoint=_doTrans -o demo_test4.bc
 
-%LLVM_PATH%\opt.exe -O3 -o demo_test4_opt.bc demo_test4.bc
-%LLVM_PATH%\llc.exe -filetype=obj -o demo_test4_mine.obj demo_test4_opt.bc
-"%VCINSTALLDIR%\bin\cl.exe" /Zi /nologo demo_driver4.c demo_test4_mine.obj
+clang -O3 -m32 -c -o demo4_bc.obj demo_test4.bc
+clang -O3 -m32 -c -o demo4_asm.obj ..\..\drivers\PE_32_windows.asm
+cl /Zi /nologo demo_driver4.c demo4_bc.obj demo4_asm.obj
 demo_driver4.exe
