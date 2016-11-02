@@ -25,13 +25,13 @@ __mcsema_stack_mark:
 
   .text
 
-  .globl mcsema_main
   .globl __mcsema_detach_ret_cdecl
 
   .globl __mcsema_attach_call_cdecl
 __mcsema_attach_call_cdecl:
   .cfi_startproc
-  push ebp
+  push dword ptr [esp]
+  mov dword ptr [esp+4], ebp
 push edx
 mov ebp, dword ptr [__tls_index]
 mov edx, dword ptr fs:[44]

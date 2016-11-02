@@ -59,7 +59,6 @@ int main(void) {
   printf("\n");
 
   // Forward declarations.
-  printf("  .globl mcsema_main\n");
   printf("  .globl __mcsema_detach_ret_cdecl\n");
   printf("\n");
 
@@ -78,7 +77,8 @@ int main(void) {
   //*** assume we can clobber eax
 
   // save reg for use with TLS offsets
-  printf("  push ebp\n");
+  printf("  push dword ptr [esp]\n"); // dupliate last stack element (the jump-to EIP), so we can pop it
+  printf("  mov dword ptr [esp+4], ebp\n"); // save ebp, we will clobber it
   getTlsIndex("ebp");
 
   // Pop the target function into the `RegState` structure. This resets `ESP`
