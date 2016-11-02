@@ -24,13 +24,13 @@ __mcsema_stack:
   .type __mcsema_attach_call,@function
 __mcsema_attach_call:
   .cfi_startproc
-  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF - 0]
+  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + 0]
   mov fs:[__mcsema_reg_state@TPOFF + 8], rax
   mov fs:[__mcsema_reg_state@TPOFF + 16], rbx
   mov fs:[__mcsema_reg_state@TPOFF + 24], rcx
   mov fs:[__mcsema_reg_state@TPOFF + 32], rdx
-  mov fs:[__mcsema_reg_state@TPOFF + 48], rdi
   mov fs:[__mcsema_reg_state@TPOFF + 40], rsi
+  mov fs:[__mcsema_reg_state@TPOFF + 48], rdi
   mov fs:[__mcsema_reg_state@TPOFF + 64], rbp
   xchg rsp, fs:[__mcsema_reg_state@TPOFF + 56]
   mov fs:[__mcsema_reg_state@TPOFF + 532], r8
@@ -66,7 +66,7 @@ __mcsema_attach_call:
   push rdi
   mov rdi, fs:[0]
   lea rdi, [rdi + __mcsema_reg_state@TPOFF]
-  jmp fs:[__mcsema_reg_state@TPOFF - 0]
+  jmp fs:[__mcsema_reg_state@TPOFF + 0]
 .Lfunc_end1:
   .size __mcsema_attach_call,.Lfunc_end1-__mcsema_attach_call
   .cfi_endproc
@@ -104,8 +104,8 @@ __mcsema_attach_ret_value:
   mov fs:[__mcsema_reg_state@TPOFF + 16], rbx
   mov fs:[__mcsema_reg_state@TPOFF + 24], rcx
   mov fs:[__mcsema_reg_state@TPOFF + 32], rdx
-  mov fs:[__mcsema_reg_state@TPOFF + 48], rdi
   mov fs:[__mcsema_reg_state@TPOFF + 40], rsi
+  mov fs:[__mcsema_reg_state@TPOFF + 48], rdi
   mov fs:[__mcsema_reg_state@TPOFF + 64], rbp
   xchg rsp, fs:[__mcsema_reg_state@TPOFF + 56]
   mov fs:[__mcsema_reg_state@TPOFF + 532], r8
@@ -147,13 +147,13 @@ __mcsema_attach_ret_value:
   .type __mcsema_detach_ret,@function
 __mcsema_detach_ret:
   .cfi_startproc
-  sub fs:[__mcsema_reg_state@TPOFF + 56], 8
+  sub QWORD PTR fs:[__mcsema_reg_state@TPOFF + 56], 8
   mov rax, fs:[__mcsema_reg_state@TPOFF + 8]
   mov rbx, fs:[__mcsema_reg_state@TPOFF + 16]
   mov rcx, fs:[__mcsema_reg_state@TPOFF + 24]
   mov rdx, fs:[__mcsema_reg_state@TPOFF + 32]
-  mov rdi, fs:[__mcsema_reg_state@TPOFF + 48]
   mov rsi, fs:[__mcsema_reg_state@TPOFF + 40]
+  mov rdi, fs:[__mcsema_reg_state@TPOFF + 48]
   mov rbp, fs:[__mcsema_reg_state@TPOFF + 64]
   xchg fs:[__mcsema_reg_state@TPOFF + 56], rsp
   mov r8, fs:[__mcsema_reg_state@TPOFF + 532]
@@ -189,7 +189,7 @@ __mcsema_detach_ret:
   .type __mcsema_detach_call,@function
 __mcsema_detach_call:
   .cfi_startproc
-  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF - 0]
+  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + 0]
   push rbx
   push rbp
   push r12
@@ -205,7 +205,7 @@ __mcsema_detach_call:
   xchg fs:[__mcsema_reg_state@TPOFF + 56], rsp
   lea rax, [rip + __mcsema_attach_ret]
   mov [rsp], rax
-  jmp fs:[__mcsema_reg_state@TPOFF - 0]
+  jmp fs:[__mcsema_reg_state@TPOFF + 0]
 .Lfunc_end4:
   .size __mcsema_detach_call,.Lfunc_end4-__mcsema_detach_call
   .cfi_endproc
@@ -224,8 +224,8 @@ __mcsema_detach_call_value:
   mov rbx, fs:[__mcsema_reg_state@TPOFF + 16]
   mov rcx, fs:[__mcsema_reg_state@TPOFF + 24]
   mov rdx, fs:[__mcsema_reg_state@TPOFF + 32]
-  mov rdi, fs:[__mcsema_reg_state@TPOFF + 48]
   mov rsi, fs:[__mcsema_reg_state@TPOFF + 40]
+  mov rdi, fs:[__mcsema_reg_state@TPOFF + 48]
   mov rbp, fs:[__mcsema_reg_state@TPOFF + 64]
   xchg fs:[__mcsema_reg_state@TPOFF + 56], rsp
   mov r8, fs:[__mcsema_reg_state@TPOFF + 532]
@@ -254,7 +254,7 @@ __mcsema_detach_call_value:
   movdqu xmm15, fs:[__mcsema_reg_state@TPOFF + 500]
   lea rax, [rip + __mcsema_attach_ret_value]
   mov [rsp], rax
-  jmp fs:[__mcsema_reg_state@TPOFF - 0]
+  jmp fs:[__mcsema_reg_state@TPOFF + 0]
 .Lfunc_end5:
   .size __mcsema_detach_call_value,.Lfunc_end5-__mcsema_detach_call_value
   .cfi_endproc

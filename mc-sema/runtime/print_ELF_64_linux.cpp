@@ -228,7 +228,7 @@ int main(void) {
   // We "undo" that, then swap back to the native stack. When we swap, we
   // save into `RegState::RSP` where we are in the lifted stack, so that the
   // next attach can continue on where we left off.
-  printf("  sub fs:[__mcsema_reg_state@TPOFF + %lu], 8\n", __builtin_offsetof(mcsema::RegState, RSP));
+  printf("  sub QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu], 8\n", __builtin_offsetof(mcsema::RegState, RSP));
 
   // General purpose registers.
   printf("  mov rax, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(mcsema::RegState, RAX));
