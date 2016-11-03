@@ -374,12 +374,13 @@ pop edx
   mov [ecx + __mcsema_reg_state@SECREL32 + 8], ebx
   mov [ecx + __mcsema_reg_state@SECREL32 + 20], esi
   mov [ecx + __mcsema_reg_state@SECREL32 + 24], edi
-  pop DWORD PTR [ecx + __mcsema_stack_mark@SECREL32]
+  mov ebp, ecx
+  mov ecx, DWORD PTR [ecx + __mcsema_stack_mark@SECREL32]
+  pop DWORD PTR [ebp + __mcsema_stack_mark@SECREL32]
   pop ebp
   pop ebx
   pop esi
   pop edi
-  mov ecx, DWORD PTR [ecx + __mcsema_stack_mark@SECREL32]
   sub esp, ecx
   add esp, 4
   lea ecx, [esp+ecx]

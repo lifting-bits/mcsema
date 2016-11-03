@@ -154,6 +154,32 @@ static void LinuxAddPushJumpStub(llvm::Module *M, llvm::Function *F,
   M->appendModuleInlineAsm(as.str());
 }
 
+
+static std::string WindowsDecorateName(llvm::Function *F, const std::string &name) {
+
+    switch(F->getCallingConv())
+    {
+
+        case CallingConv::C:
+          return "_" + name;
+          break;
+        case CallingConv::X86_StdCall:
+          {
+            std::stringstream as;
+            int argc = F->arg_size();
+            as << "_" << name << "@" << argc*4;
+            return as.str();
+          }
+          break;
+        case CallingConv::X86_FastCall:
+          TASSERT(false, "TODO: X86_Fastcall");
+          break;
+        default:
+          TASSERT(false, "Unsupported Calling Convention for 32-bit Windows");
+          break;
+      }
+      return "";
+}
 static void WindowsAddPushJumpStub(bool decorateStub, llvm::Module *M, llvm::Function *F,
                                  llvm::Function *W, const char *stub_handler) {
   auto stub_name = W->getName().str();
@@ -161,10 +187,10 @@ static void WindowsAddPushJumpStub(bool decorateStub, llvm::Module *M, llvm::Fun
   const char *push = 32 == ArchPointerSize(M) ? "pushl" : "pushq";
 
   std::stringstream as;
-  stubbed_func_name = "_" + stubbed_func_name;
+  stubbed_func_name = WindowsDecorateName(F, stubbed_func_name);
 
   if(decorateStub) {
-    stub_name = "_" + stub_name;
+    stub_name = WindowsDecorateName(W, stub_name);
   }
 
   as << "  .globl " << stubbed_func_name << ";\n";

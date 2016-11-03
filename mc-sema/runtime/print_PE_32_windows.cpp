@@ -667,10 +667,13 @@ int main(void) {
   printf("  mov [ecx + __mcsema_reg_state@SECREL32 + %u], esi\n", __builtin_offsetof(mcsema::RegState, ESI));
   printf("  mov [ecx + __mcsema_reg_state@SECREL32 + %u], edi\n", __builtin_offsetof(mcsema::RegState, EDI));
 
-  // Unstash the callee-saved registers.
+  printf("  mov ebp, ecx\n");
+  // ecx is old stack mark we need for this function, to adjust stack after retn
+  printf("  mov ecx, DWORD PTR [ecx + __mcsema_stack_mark@SECREL32]\n");
   // restore old stack mark
-  printf("  pop DWORD PTR [ecx + __mcsema_stack_mark@SECREL32]\n");
+  printf("  pop DWORD PTR [ebp + __mcsema_stack_mark@SECREL32]\n");
 
+  // Unstash the callee-saved registers.
   printf("  pop ebp\n");
   printf("  pop ebx\n");
   printf("  pop esi\n");
@@ -679,7 +682,6 @@ int main(void) {
   // adjust again for the poppped off arguments
   // this emulates a "retn XX", but that
   // only takes an immediate value
-  printf("  mov ecx, DWORD PTR [ecx + __mcsema_stack_mark@SECREL32]\n");
   printf("  sub esp, ecx\n"); // this sub is an add since ecx is negative
   printf("  add esp, 4\n"); // adjust for return address on stack
 
