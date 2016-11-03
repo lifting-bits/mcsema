@@ -615,16 +615,20 @@ def manualRelocOffset(I, inst, dref):
     if insn_t is None:
         return None
 
+    # check for immediates first
+    # TODO(artem) special case things like 0x0 that see in COFF objects?
     for op in insn_t.Operands:
         
         if op.value == dref:
-            if op.type in [idaapi.o_displ, idaapi.o_phrase]:
-                I.mem_reloc_offset = op.offb
-                return "MEM"
-
             if op.type in [idaapi.o_imm, idaapi.o_mem, idaapi.o_near, idaapi.o_far]:
                 I.imm_reloc_offset = op.offb
                 return "IMM"
+
+    for op in insn_t.Operands:
+
+            if op.type in [idaapi.o_displ, idaapi.o_phrase]:
+                I.mem_reloc_offset = op.offb
+                return "MEM"
 
     return "MEM"
 
