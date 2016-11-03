@@ -172,7 +172,12 @@ static std::string WindowsDecorateName(llvm::Function *F, const std::string &nam
           }
           break;
         case CallingConv::X86_FastCall:
-          TASSERT(false, "TODO: X86_Fastcall");
+          {
+            std::stringstream as;
+            int argc = F->arg_size();
+            as << "@" << name << "@" << argc*4;
+            return as.str();
+          }
           break;
         default:
           TASSERT(false, "Unsupported Calling Convention for 32-bit Windows");
