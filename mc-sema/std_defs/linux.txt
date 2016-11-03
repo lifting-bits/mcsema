@@ -1100,10 +1100,6 @@ ares_timeout 3 C N
 ares_version 1 C N
 __argp_error 16 C N
 argp_error 16 C N
-__argp_error 16 C N
-argp_error 16 C N
-__argp_failure 16 C N
-argp_failure 16 C N
 __argp_failure 16 C N
 argp_failure 16 C N
 __argp_help 4 C N
@@ -1578,7 +1574,7 @@ attron 1 C N
 attr_on 2 C N
 attrset 1 C N
 attr_set 3 C N
-authdes_create 16 C N
+authdes_create 4 C N
 authdes_getucred 5 C N
 authdes_pk_create 5 C N
 _authenticate 2 C N
@@ -4586,7 +4582,7 @@ __clogf 1 C N
 clogf 1 C N
 __clogl 1 C N
 clogl 1 C N
-clone 16 C N
+clone 6 C N
 close 1 C N
 closedir 1 C N
 closefrom 1 C N
@@ -5297,86 +5293,83 @@ DATA: apr_month_snames 64
 data_behind 1 C N
 # data definitions
 DATA: environ PTR
+DATA: __gmon_start___ptr PTR
+DATA: __imp_abort PTR
+DATA: __imp_access PTR
+DATA: __imp_calloc PTR
+DATA: __imp_chdir PTR
+DATA: __imp_chown PTR
+DATA: __imp_chroot PTR
+DATA: __imp___ctype_b_loc PTR
+DATA: __imp___ctype_tolower_loc PTR
+DATA: __imp___ctype_toupper_loc PTR
+DATA: __imp___cxa_finalize PTR
+DATA: __imp___errno_location PTR
+DATA: __imp_exit PTR
+DATA: __imp___fprintf_chk PTR
+DATA: __imp_free PTR
+DATA: __imp_freopen PTR
+DATA: __imp_getenv PTR
+DATA: __imp_geteuid PTR
+DATA: __imp_getgrnam PTR
+DATA: __imp_getloadavg PTR
+DATA: __imp_getpgid PTR
+DATA: __imp_getpgrp PTR
+DATA: __imp_getpid PTR
+DATA: __imp_getpwnam PTR
+DATA: __imp_getpwuid PTR
+DATA: __imp_getrlimit PTR
+DATA: __imp___gmon_start__ PTR
+DATA: __imp_initgroups PTR
+DATA: __imp_kill PTR
+DATA: __imp___libc_start_main PTR
+DATA: __imp_malloc PTR
+DATA: __imp_memcmp PTR
+DATA: __imp_memcpy PTR
+DATA: __imp_memmove PTR
+DATA: __imp_memset PTR
+DATA: __imp_openlog PTR
+DATA: __imp_pcre_compile2 PTR
+DATA: __imp_pcre_exec PTR
+DATA: __imp_pcre_fullinfo PTR
+DATA: __imp_prctl PTR
+DATA: __imp___printf_chk PTR
+DATA: __imp_putchar PTR
+DATA: __imp_puts PTR
+DATA: __imp_qsort PTR
+DATA: __imp___rawmemchr PTR
+DATA: __imp_read PTR
+DATA: __imp_realloc PTR
+DATA: __imp_semctl PTR
+DATA: __imp_setenv PTR
+DATA: __imp_setgid PTR
+DATA: __imp_setsockopt PTR
+DATA: __imp_setuid PTR
+DATA: __imp_sigaction PTR
+DATA: __imp_sigemptyset PTR
+DATA: __imp_sscanf PTR
+DATA: __imp___stack_chk_fail PTR
+DATA: __imp_stpcpy PTR
+DATA: __imp_strcasecmp PTR
+DATA: __imp_strchr PTR
+DATA: __imp_strcmp PTR
+DATA: __imp_strcpy PTR
+DATA: __imp_strlen PTR
+DATA: __imp_strncasecmp PTR
+DATA: __imp_strncmp PTR
+DATA: __imp_strncpy PTR
+DATA: __imp_strrchr PTR
+DATA: __imp_strstr PTR
+DATA: __imp_strtol PTR
+DATA: __imp_syscall PTR
+DATA: __imp_sysconf PTR
+DATA: __imp___syslog_chk PTR
+DATA: __imp_times PTR
+DATA: __imp_write PTR
 DATA: in6addr_any PTR
 DATA: stderr PTR
 DATA: stdin PTR
 DATA: stdout PTR
-DATA: __gmon_start___ptr PTR
-DATA: __imp___gmon_start__ PTR
-DATA: __imp___ctype_toupper_loc PTR
-DATA: __imp_getenv PTR
-DATA: __imp_setenv PTR
-DATA: __imp_free PTR
-DATA: __imp_malloc PTR
-DATA: __imp_calloc PTR
-DATA: __imp_syscall PTR
-DATA: __imp_getpgrp PTR
-DATA: __imp_strstr PTR
-DATA: __imp___libc_start_main PTR
-DATA: __imp___fprintf_chk PTR
-DATA: __imp_chown PTR
-DATA: __imp___syslog_chk PTR
-DATA: __imp_access PTR
-DATA: __imp_puts PTR
-DATA: __imp_getpgid PTR
-DATA: __imp_getrlimit PTR
-DATA: __imp_pcre_exec PTR
-DATA: __imp___ctype_b_loc PTR
-DATA: __imp_realloc PTR
-DATA: __imp_strncmp PTR
-DATA: __imp_sscanf PTR
-DATA: __imp_sigemptyset PTR
-DATA: __imp_setsockopt PTR
-DATA: __imp_strrchr PTR
-DATA: __imp_strcasecmp PTR
-DATA: __imp___rawmemchr PTR
-DATA: __imp_strtol PTR
-DATA: __imp_times PTR
-DATA: __imp_getpwnam PTR
-DATA: __imp___ctype_tolower_loc PTR
-DATA: __imp_setgid PTR
-DATA: __imp_semctl PTR
-DATA: __imp_exit PTR
-DATA: __imp_stpcpy PTR
-DATA: __imp_memcmp PTR
-DATA: __imp_calloc PTR
-DATA: __imp_memcpy PTR
-DATA: __imp_chroot PTR
-DATA: __imp_pcre_fullinfo PTR
-DATA: __imp_sysconf PTR
-DATA: __imp_freopen PTR
-DATA: __imp_memmove PTR
-DATA: __imp_strncpy PTR
-DATA: __imp_getloadavg PTR
-DATA: __imp_geteuid PTR
-DATA: __imp___cxa_finalize PTR
-DATA: __imp_write PTR
-DATA: __imp_pcre_compile2 PTR
-DATA: __imp_qsort PTR
-DATA: __imp_read PTR
-DATA: __imp___printf_chk PTR
-DATA: __imp_memset PTR
-DATA: __imp_strlen PTR
-DATA: __imp_sigaction PTR
-DATA: __imp_initgroups PTR
-DATA: __imp_getpid PTR
-DATA: __imp_strchr PTR
-DATA: __imp___errno_location PTR
-DATA: __imp_strcmp PTR
-DATA: __imp_free PTR
-DATA: __imp_getpwuid PTR
-DATA: __imp_putchar PTR
-DATA: __imp_getgrnam PTR
-DATA: __imp_setuid PTR
-DATA: __imp_chdir PTR
-DATA: __imp_strncasecmp PTR
-DATA: __imp_abort PTR
-DATA: __imp_malloc PTR
-DATA: __imp_openlog PTR
-DATA: __imp_prctl PTR
-DATA: __imp_kill PTR
-DATA: __imp___stack_chk_fail PTR
-DATA: __imp_strcpy PTR
 dc1394_bayer_decoding_16bit 7 C N
 dc1394_bayer_decoding_8bit 6 C N
 dc1394_camera_enumerate 2 C N
@@ -7839,7 +7832,7 @@ FcNameRegisterObjectTypes 2 C N
 FcNameUnparse 1 C N
 FcNameUnregisterConstants 2 C N
 FcNameUnregisterObjectTypes 2 C N
-fcntl 16 C N
+fcntl 3 C N
 FcObjectSetAdd 2 C N
 FcObjectSetBuild 16 C N
 FcObjectSetCreate 0 C N
@@ -9509,9 +9502,9 @@ get_rfc3526_prime_8192 1 C N
 getrlimit 2 C N
 getrlimit64 2 C N
 get_rock_ridge_filename 3 C N
-getrpcbyname 16 C N
+getrpcbyname 1 C N
 getrpcbyname_r 5 C N
-getrpcbynumber 16 C N
+getrpcbynumber 1 C N
 getrpcbynumber_r 5 C N
 getrpcent 0 C N
 getrpcent 16 C N
@@ -18220,10 +18213,10 @@ OMX_GetRolesOfComponent 3 C N
 OMX_Init 0 C N
 OMX_SetupTunnel 4 C N
 on_exit 2 C N
-open 16 C N
-open64 16 C N
-openat 16 C N
-openat64 16 C N
+open 4 C N
+open64 4 C N
+openat 4 C N
+openat64 4 C N
 open_by_handle_at 3 C N
 opendir 1 C N
 openlog 3 C N
@@ -19976,7 +19969,7 @@ PR_CreateThreadPool 3 C N
 PR_CreateTrace 3 C N
 PR_CreateWaitGroup 1 C N
 PR_CSetOnMonitorRecycle 1 C N
-prctl 16 C N
+prctl 5 C N
 PR_CWait 2 C N
 PR_DecrementCounter 1 C N
 PR_Delete 1 C N
@@ -23212,13 +23205,13 @@ seekdir 2 C N
 select 5 C N
 # SELinux
 sem_close 1 C N
-semctl 16 C N
+semctl 4 C N
 sem_destroy 1 C N
 semget 3 C N
 sem_getvalue 2 C N
 sem_init 3 C N
 semop 3 C N
-sem_open 16 C N
+sem_open 4 C N
 sem_post 1 C N
 semtimedop 4 C N
 sem_timedwait 2 C N
@@ -23265,7 +23258,7 @@ set_field_opts 2 C N
 set_field_pad 2 C N
 set_field_status 2 C N
 set_field_term 2 C N
-set_field_type 16 C N
+set_field_type 5 C N
 set_fieldtype_arg 4 C N
 set_fieldtype_choice 3 C N
 set_field_userptr 2 C N
@@ -26533,9 +26526,10 @@ st_locale_insensitive_strcasecmp 2 C N
 st_locale_insensitive_strncasecmp 3 C N
 __stpcpy 2 C N
 stpcpy 2 C N
+__stpcpy_chk 3 C N
 __stpncpy 3 C N
-__stpncpy_check 3 C N
 stpncpy 3 C N
+__stpncpy_check 3 C N
 str2ba 2 C N
 str2xed_address_width_enum_t 1 C N
 str2xed_attribute_enum_t 1 C N
@@ -26577,7 +26571,6 @@ strcoll 2 C N
 strcoll_l 3 C N
 strcpy 2 C N
 __strcpy_chk 3 C N
-__stpcpy_chk 3 C N
 strcspn 2 C N
 __strdup 1 C N
 strdup 1 C N
@@ -26646,8 +26639,8 @@ strtol_l 4 C N
 strtoll_l 4 C N
 strtonum 4 C N
 strtoq 3 C N
-__strtoul_internal 3 C N
 strtoul 3 C N
+__strtoul_internal 3 C N
 strtoull 3 C N
 strtoul_l 4 C N
 strtoull_l 4 C N
@@ -28728,7 +28721,7 @@ UI_set_result 3 C N
 UI_UTIL_read_pw 5 C N
 UI_UTIL_read_pw_string 4 C N
 ulckpwdf 0 C N
-ulimit 16 C N
+ulimit 2 C N
 umask 1 C N
 umount 1 C N
 umount2 2 C N
@@ -29182,7 +29175,7 @@ v4l1_dup 1 C N
 v4l1_ioctl 16 C N
 v4l1_mmap 6 C N
 v4l1_munmap 2 C N
-v4l1_open 16 C N
+v4l1_open 4 C N
 v4l1_read 3 C N
 v4l2_close 1 C N
 v4l2_dup 1 C N
@@ -29212,7 +29205,7 @@ v4lconvert_enum_fmt 2 C N
 v4lconvert_enum_frameintervals 2 C N
 v4lconvert_enum_framesizes 2 C N
 v4lconvert_fixup_fmt 1 C N
-v4lconvert_get_default_dev_ops 16 C N
+v4lconvert_get_default_dev_ops 0 C N
 v4lconvert_get_error_message 1 C N
 v4lconvert_get_fps 1 C N
 v4lconvert_needs_conversion 3 C N
