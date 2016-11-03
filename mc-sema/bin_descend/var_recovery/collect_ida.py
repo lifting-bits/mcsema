@@ -16,14 +16,59 @@ def _signed_from_unsigned32(val):
         return -0x100000000 + val
     return val
 
+def _mark_function_args_ms64(referers, dereferences, func_var_data):
+    for reg in ["rcx", "rdx", "r8", "r9"]:
+        _mark_func_arg(reg, referers, dereferences, func_var_data)
+
+def _mark_function_args_sysv64(referers, dereferences, func_var_data):
+    for reg in ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]:
+        _mark_func_arg(reg, referers, dereferences, func_var_data)
+
+def _mark_function_args_x86(referers, dereferences, func_var_data):
+    pass #TODO. urgh.
+
+def _mark_func_arg(reg, referers, dereferences, func_var_data):
+    if reg in referers:
+        # lea rdi, [rbp+4]
+        # call rax
+        offset = referers[reg]
+        if offset in func_var_data["stackArgs"]:
+            func_var_data["stackArgs"][offset]["flags"].add("FUNC_ARG_REF")
+    if reg in dereferences:
+        # mov rdi, [rbp+4]
+        # call rax
+        offset = dereferences[reg]
+        if offset in func_var_data["stackArgs"]:
+            func_var_data["stackArgs"][offset]["flags"].add("FUNC_ARG_VALUE")
+
+def _translate_reg_32(reg):
+    return reg
+
+def _translate_reg_64(reg):
+    return {"edi":"rdi",
+            "esi":"rsi",
+            "eax":"rax",
+            "ebx":"rbx",
+            "ecx":"rcx",
+            "edx":"rdx",
+            "ebp":"rbp",
+            "esp":"rsp"}.get(reg, reg)
+
+
 if idaapi.get_inf_structure().is_64bit():
     _signed_from_unsigned = _signed_from_unsigned64
     _base_ptr = "rbp"
     _stack_ptr = "rsp"
+    _trashed_regs = ["rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"]
+    _mark_args = _mark_function_args_sysv64
+    _translate_reg = _translate_reg_64
 elif idaapi.get_inf_structure().is_32bit():
     _signed_from_unsigned = _signed_from_unsigned32
     _base_ptr = "ebp"
     _stack_ptr = "esp"
+    _trashed_regs = ["eax", "ecx", "edx"]
+    _mark_args = _mark_function_args_x86
+    _translate_reg = _translate_reg_32
 _base_ptr_format = "[{}+".format(_base_ptr)
 _stack_ptr_format = "[{}+".format(_stack_ptr)
 
@@ -132,12 +177,16 @@ def collect_func_vars(F):
     Skips stack arguments without names, as well as the special arguments with names " s" and " r".
     variable_flags is a string with flag names.
     '''
-    stackArgs = dict()
 
     f = F.entry_address
+    return collect_function_vars(f)
+
+def collect_function_vars(f):
+    stackArgs = dict()
     name = idc.Name(f)
     end = idc.GetFunctionAttr(f, idc.FUNCATTR_END)
     _locals = idc.GetFunctionAttr(f, idc.FUNCATTR_FRSIZE)
+    _uses_bp = 0 != (idc.GetFunctionFlags(f) & idc.FUNC_FRAME)
     frame = idc.GetFrame(f)
     if frame is None:
         return stackArgs
@@ -176,7 +225,7 @@ def collect_func_vars(F):
         offset = idc.GetStrucNextOff(frame, offset)
     #functions.append({"name":name, "stackArgs":stackArgs})
     if len(stackArgs) > 0:
-      _find_local_references(f, {"name":name, "stackArgs":stackArgs})
+        _find_local_references(f, {"name":name, "stackArgs":stackArgs, "uses_bp":_uses_bp})
 
     return stackArgs
 
@@ -212,55 +261,69 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data):
     '''
 
     #remove the target operand from the taint collections
-    referers.pop(idc.GetOpnd(addr, 0), None)
-    dereferences.pop(idc.GetOpnd(addr, 0), None)
+    target_op = _translate_reg(idc.GetOpnd(addr, 0))
+    read_op = _translate_reg(idc.GetOpnd(addr, 1))
+    target_on_stack = (_stack_ptr_format in target_op) or (func_var_data["uses_bp"] and (_base_ptr_format in target_op))
+    read_on_stack = (_stack_ptr_format in read_op) or (func_var_data["uses_bp"] and (_base_ptr_format in read_op))
 
-    target_op = idc.GetOpnd(addr, 0)
-    read_op = idc.GetOpnd(addr, 1)
+    referers.pop(target_op, None)
+    dereferences.pop(target_op, None)
 
-    if idc.GetOpnd(addr, 1) in referers:
+
+    if read_op in referers:
         # handling the two following mov cases in this block:
         #   lea eax, [ebp-8]  #collecting the address of a stack variable
         #   mov ebx, eax  # copying referent data around
         #   mov [ebp-4], ebx   # copying referent data into a stack variable (i.e., moving an address into a pointer)
 
-        if _base_ptr_format in target_op:
+        if target_on_stack:
             #moving referent data into a stack variable (i.e., moving an address into a pointer)
             offset = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
             if offset in func_var_data["stackArgs"].keys():
                 func_var_data["stackArgs"][offset]["flags"].add("LOCAL_REFERER")
                 # collect which stack variable offset this variable points to
-                func_var_data["stackArgs"][offset]["referent"].add(referers[idc.GetOpnd(addr, 1)])
+                func_var_data["stackArgs"][offset]["referent"].add(referers[read_op])
         else:
             #moving referent data around
-            referers[target_op] = referers[idc.GetOpnd(addr, 1)]
-    elif _base_ptr_format in idc.GetOpnd(addr, 1) or _stack_ptr_format in idc.GetOpnd(addr, 1):
+            referers[target_op] = referers[read_op]
+    elif read_op in dereferences:
+        if target_on_stack:
+            offset = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
+            if offset in func_var_data["stackArgs"].keys():
+                func_var_data["stackArgs"][offset]["flags"].add("LOCAL_COPY")
+        else:
+            #moving dereferenced data around
+            dereferences[target_op] = dereferences[read_op]
+    elif read_on_stack:
         # mov eax, [ebp-4]  //eax now tainted with stack var data
         offset = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
         if offset in func_var_data["stackArgs"].keys():
-            dereferences[idc.GetOpnd(addr, 0)] = offset
+            dereferences[target_op] = offset
 
     ''' collect EAs of instructions that write to stack variables'''
-    if _base_ptr_format in target_op or _stack_ptr_format in target_op:
+    if target_on_stack:
         # mov [ebp-4], eax
         offset = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
         if offset in func_var_data["stackArgs"].keys():
             func_var_data["stackArgs"][offset]["writes"].add(addr)
 
     ''' collect EAs of instructions that read from stack variables'''
-    if _base_ptr_format in read_op or _stack_ptr_format in read_op:
+    if read_on_stack:
         # mov eax, [ebp-4]
         offset = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
         if offset in func_var_data["stackArgs"].keys():
             func_var_data["stackArgs"][offset]["reads"].add(addr)
 
 def _process_lea_inst(addr, referers, dereferences, func_var_data):
-    if _base_ptr_format in idc.GetOpnd(addr, 1) or _stack_ptr_format in idc.GetOpnd(addr, 1):
+    read_op = _translate_reg(idc.GetOpnd(addr, 1))
+    target_op = _translate_reg(idc.GetOpnd(addr, 0))
+    read_on_stack = (_stack_ptr_format in read_op) or (func_var_data["uses_bp"] and (_base_ptr_format in read_op))
+    if read_on_stack:
         #referers[operand] = offset
-        referers[idc.GetOpnd(addr, 0)] = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
+        referers[target_op] = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
 
 def _process_call_inst(addr, referers, dereferences, func_var_data):
-    target_op = idc.GetOpnd(addr, 0)
+    target_op = _translate_reg(idc.GetOpnd(addr, 0))
     if target_op in referers:
         #maybe do something here? explicitly calling to the stack. Hrm.
         pass
@@ -268,7 +331,17 @@ def _process_call_inst(addr, referers, dereferences, func_var_data):
         # mov eax, [ebp+4]
         # call eax
         func_var_data["stackArgs"][dereferences[target_op]]["flags"].add("CODE_PTR")
-    # clear the referers and dereferences?
+
+    try:
+        _mark_args(referers, dereferences, func_var_data)
+    except KeyError as e:
+        print "Key Error at addr {:x}".format(addr)
+        raise
+
+    # clear reference data for non preserved regs
+    for reg in _trashed_regs:
+        dereferences.pop(reg, None)
+        referers.pop(reg, None)
 
 def _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb):
     if BB.startEA in visited_bb:
@@ -283,8 +356,9 @@ def _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb):
             func(addr, referers, dereferences, func_var_data)
         else:
             #check for reads from stack var
-            read_op = idc.GetOpnd(addr, 1)
-            if _base_ptr_format in read_op or _stack_ptr_format in read_op:
+            read_op = _translate_reg(idc.GetOpnd(addr, 1))
+            read_on_stack = (_stack_ptr_format in read_op) or (func_var_data["uses_bp"] and (_base_ptr_format in read_op))
+            if read_on_stack:
                 offset = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
                 if offset in func_var_data["stackArgs"].keys():
                     func_var_data["stackArgs"][offset]["reads"].add(addr)
@@ -321,4 +395,4 @@ def print_func_vars():
     print "End Stack Vars"
 
 if __name__ == "__main__":
-    print_func_vars()
+   print_func_vars()
