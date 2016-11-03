@@ -617,9 +617,17 @@ def manualRelocOffset(I, inst, dref):
 
     # check for immediates first
     # TODO(artem) special case things like 0x0 that see in COFF objects?
-    for op in insn_t.Operands:
+    for (idx, op) in enumerate(insn_t.Operands):
         
         if op.value == dref:
+            # IDA will do stupid things like say an immediate operand is a memory operand
+            # if it references memory. Try to work around this issue
+
+            # its the first operand (probably a destination) and IDA thinks its o_mem
+            # in this case, IDA is probaly right; don't mark it as an immediate
+            if idx == 0 and op.type == o_mem:
+                continue
+
             if op.type in [idaapi.o_imm, idaapi.o_mem, idaapi.o_near, idaapi.o_far]:
                 I.imm_reloc_offset = op.offb
                 return "IMM"
