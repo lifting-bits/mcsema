@@ -893,10 +893,21 @@ def parseDefsFile(df):
             emap_data[symname] = int(dsize)
         else:
             fname = args = conv = ret = sign = None
-            if len(l.split()) == 4:
-                (fname, args, conv, ret) = l.split()
-            elif len(l.split()) == 5:
-                (fname, args, conv, ret, sign) = l.split()
+            line_args = l.split()
+            if len(line_args) == 2:
+                fname, conv = line_args
+                if conv == "MCSEMA":
+                    DEBUG("Found mcsema internal function: {}\n".format(fname))
+                    realconv = CFG_pb2.ExternalFunction.McsemaCall
+                    emap[fname] = (1, realconv, 'N', None)
+                    continue
+                else:
+                    raise Exception("Unknown calling convention:"+str(conv))
+
+            if len(line_args) == 4:
+                (fname, args, conv, ret) = line_args
+            elif len(line_args) == 5:
+                (fname, args, conv, ret, sign) = line_args
 
             if conv == "C":
                 realconv = CFG_pb2.ExternalFunction.CallerCleanup

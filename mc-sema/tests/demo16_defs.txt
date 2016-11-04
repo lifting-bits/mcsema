@@ -1,1 +1,1 @@
-__aullshr 2 F N
+__aullshr MCSEMA

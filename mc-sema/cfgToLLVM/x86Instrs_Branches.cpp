@@ -278,32 +278,45 @@ static void doCallM(BasicBlock *&block, InstPtr ip, Value *mem_addr, bool is_jum
   return doCallV(block, ip, call_addr, is_jump);
 }
 
+
+template<int width>
+static llvm::CallInst* emitInternalCall(BasicBlock *&b, Module *M, const std::string &target_fn, bool is_jmp) {
+  // we need the parent function to get the regstate argument
+  Function *ourF = b->getParent();
+  TASSERT(ourF->arg_size() == 1, "");
+
+  // figure out who we are calling
+  Function *targetF = M->getFunction(target_fn);
+  
+  TASSERT(targetF != nullptr, "Could not find target function: "+target_fn);
+
+  // do we need to push a ret addr?
+  if (!is_jmp) {
+    writeReturnAddr<width>(b);
+  }
+
+
+  // emit: call target_fn(regstate);
+  std::vector<Value*> subArgs;
+  subArgs.push_back(ourF->arg_begin());
+  CallInst *c = CallInst::Create(targetF, subArgs, "", b);
+  ArchSetCallingConv(M, c);
+
+  // return ptr to this callinst
+  return c;
+}
+
 template<int width>
 static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr, bool is_jump) {
   Module *M = b->getParent()->getParent();
-  Function *ourF = b->getParent();
 
   //We should be able to look it up in our module.
   std::cout << __FUNCTION__ << "target address : "
             << to_string<VA>(tgtAddr, std::hex) << "\n";
   std::string fname = "sub_" + to_string<VA>(tgtAddr, std::hex);
-  Function *F = M->getFunction(fname);
 
-  TASSERT(F != NULL, "Could not find function: " + fname);
-
-  if (!is_jump) {
-    writeReturnAddr<width>(b);
-  }
-
-  //make the call, the only argument should be our parents arguments
-  TASSERT(ourF->arg_size() == 1, "");
-
-  std::vector<Value*> subArgs;
-
-  subArgs.push_back(ourF->arg_begin());
-
-  CallInst *c = CallInst::Create(F, subArgs, "", b);
-  ArchSetCallingConv(M, c);
+  CallInst *c = emitInternalCall<width>(b, M, fname, is_jump);
+  Function *F = c->getCalledFunction();
 
   if (ip->has_local_noreturn() || F->doesNotReturn()) {
     // noreturn functions just hit unreachable
@@ -682,6 +695,16 @@ static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
 
   if (ip->has_ext_call_target()) {
     std::string s = ip->get_ext_call_target()->getSymbolName();
+
+    // this is really an internal call; this calling convention
+    // is reserved for functions that we are going to implement internally
+    if(ip->get_ext_call_target()->getCallingConvention() == ExternalCodeRef::McsemaCall) {
+        Module *M = block->getParent()->getParent();
+        std::string target_fn = "__mcsema_" + s;
+        emitInternalCall<width>(block, M, target_fn, true);
+        return ContinueBlock;
+    }
+
     if (width == width) {
       ret = x86_64::doCallPCExtern(block, s, true);
     } else {
@@ -823,6 +846,15 @@ static InstTransResult translate_CALLpcrel32(NativeModulePtr natM,
 
   if (ip->has_ext_call_target()) {
     std::string s = ip->get_ext_call_target()->getSymbolName();
+    if(ip->get_ext_call_target()->getCallingConvention() == ExternalCodeRef::McsemaCall) {
+        Module *M = block->getParent()->getParent();
+        std::string target_fn = "__mcsema_" + s;
+        emitInternalCall<width>(block, M, target_fn, false);
+        return ContinueBlock;
+    } else {
+      llvm::dbgs() << __FUNCTION__ << ": function is: " << s << ", cc is: "
+                   << ip->get_ext_call_target()->getCallingConvention() << "\n";       
+    }
     if (width == 64) {
       ret = x86_64::doCallPCExtern(block, s, false);
     } else {
@@ -848,6 +880,16 @@ static InstTransResult translate_CALLm(NativeModulePtr natM,
   // is this an external call?
   if (ip->has_ext_call_target()) {
     std::string s = ip->get_ext_call_target()->getSymbolName();
+
+    // this is really an internal call; this calling convention
+    // is reserved for functions that we are going to implement internally
+    if(ip->get_ext_call_target()->getCallingConvention() == ExternalCodeRef::McsemaCall) {
+        Module *M = block->getParent()->getParent();
+        std::string target_fn = "__mcsema_" + s;
+        emitInternalCall<width>(block, M, target_fn, false);
+        return ContinueBlock;
+    }
+
     if (width == 64) {
       ret = x86_64::doCallPCExtern(block, s, false);
     } else {

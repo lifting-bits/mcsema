@@ -279,7 +279,19 @@ Inst::CFGRefType deserRefType(::Instruction::RefType k) {
   }
 }
 
-InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder) {
+static ExternalCodeRefPtr getExternal(const std::string &s, const list<ExternalCodeRefPtr> &extcode) {
+
+    for(auto e : extcode) {
+        if (s == e->getSymbolName()) {
+            return e;
+        }
+    }
+
+    return ExternalCodeRefPtr();
+}
+
+InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder,
+                                const list<ExternalCodeRefPtr> &extcode) {
   VA addr = inst.inst_addr();
   boost::int64_t tr_tgt = inst.true_target();
   boost::int64_t fa_tgt = inst.false_target();
@@ -298,7 +310,11 @@ InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder) {
     ip->set_fa(fa_tgt);
 
   if (inst.has_ext_call_name()) {
-    ExternalCodeRefPtr p(new ExternalCodeRef(inst.ext_call_name()));
+    
+    ExternalCodeRefPtr p = getExternal(inst.ext_call_name(), extcode);
+    if(p == nullptr) {
+      throw LErr(__LINE__, __FILE__, "Could not find external: " + inst.ext_call_name());
+    }
     ip->set_ext_call_target(p);
   }
 
@@ -385,12 +401,13 @@ InstPtr deserializeInst(const ::Instruction &inst, LLVMByteDecoder &decoder) {
 }
 
 NativeBlockPtr deserializeBlock(const ::Block &block,
-                                LLVMByteDecoder &decoder) {
+                                LLVMByteDecoder &decoder,
+                                const list<ExternalCodeRefPtr> &extcode) {
   NativeBlockPtr natB = NativeBlockPtr(
       new NativeBlock(block.base_address(), decoder.getPrinter()));
   /* read all the instructions in */
   for (int i = 0; i < block.insts_size(); i++)
-    natB->add_inst(deserializeInst(block.insts(i), decoder));
+    natB->add_inst(deserializeInst(block.insts(i), decoder, extcode));
 
   /* add the follows */
   for (int i = 0; i < block.block_follows_size(); i++)
@@ -400,7 +417,8 @@ NativeBlockPtr deserializeBlock(const ::Block &block,
 }
 
 NativeFunctionPtr deserializeFunction(const ::Function &func,
-                                      LLVMByteDecoder &decoder) {
+                                      LLVMByteDecoder &decoder,
+                                      const list<ExternalCodeRefPtr> &extcode) {
   NativeFunction *nf = nullptr;
   if (func.has_symbol_name() && !func.symbol_name().empty()) {
     nf = new NativeFunction(func.entry_address(), func.symbol_name());
@@ -412,7 +430,7 @@ NativeFunctionPtr deserializeFunction(const ::Function &func,
 
   //read all the blocks from this function
   for (int i = 0; i < func.blocks_size(); i++) {
-    natF->add_block(deserializeBlock(func.blocks(i), decoder));
+    natF->add_block(deserializeBlock(func.blocks(i), decoder, extcode));
   }
 
   natF->compute_graph();
@@ -432,6 +450,10 @@ ExternalCodeRef::CallingConvention deserCC(
 
     case ::ExternalFunction::FastCall:
       return ExternalCodeRef::FastCall;
+      break;
+
+    case ::ExternalFunction::McsemaCall:
+      return ExternalCodeRef::McsemaCall;
       break;
 
     default:
@@ -568,11 +590,18 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
     list<DataSection> dataSecs;
     list<MCSOffsetTablePtr> offsetTables;
 
+    //iterate over every external function definition
+    for (int i = 0; i < serializedMod.external_funcs_size(); i++) {
+      const ::ExternalFunction &f = serializedMod.external_funcs(i);
+      cout << "Deserializing externs..." << endl;
+      externFuncs.push_back(deserializeExt(f));
+    }
+
     //iterate over every function
     for (int i = 0; i < serializedMod.internal_funcs_size(); i++) {
       const ::Function &f = serializedMod.internal_funcs(i);
       cout << "Deserializing functions..." << endl;
-      foundFuncs.push_back(deserializeFunction(f, decode));
+      foundFuncs.push_back(deserializeFunction(f, decode, externFuncs));
     }
 
     //iterate over every data element
@@ -582,13 +611,6 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
       cout << "Deserializing data..." << endl;
       deserializeData(d, ds);
       dataSecs.push_back(ds);
-    }
-
-    //iterate over every external function definition
-    for (int i = 0; i < serializedMod.external_funcs_size(); i++) {
-      const ::ExternalFunction &f = serializedMod.external_funcs(i);
-      cout << "Deserializing externs..." << endl;
-      externFuncs.push_back(deserializeExt(f));
     }
 
     //iterate over every external data definition
@@ -895,6 +917,10 @@ static ExternalFunction::CallingConvention serializeCC(
 
     case ExternalCodeRef::FastCall:
       return ExternalFunction::FastCall;
+      break;
+
+    case ExternalCodeRef::McsemaCall:
+      return ExternalFunction::McsemaCall;
       break;
 
     default:

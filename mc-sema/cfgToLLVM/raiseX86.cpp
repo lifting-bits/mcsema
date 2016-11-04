@@ -92,6 +92,9 @@ CallingConv::ID getLLVMCC(ExternalCodeRef::CallingConvention cc) {
       return CallingConv::X86_StdCall;
     case ExternalCodeRef::FastCall:
       return CallingConv::X86_FastCall;
+    case ExternalCodeRef::McsemaCall:
+      // mcsema internal calls are cdecl with one argument
+      return CallingConv::C;
     default:
       throw TErr(__LINE__, __FILE__, "Unknown calling convention!");
       break;
@@ -1721,6 +1724,15 @@ static void initExternalCode(NativeModulePtr natMod, llvm::Module *M) {
     auto &C = M->getContext();
     auto F = M->getFunction(symName);
     if (F) {
+      continue;
+    }
+
+    if(conv == ExternalCodeRef::McsemaCall) {
+       // normal mcsema function prototypes
+      llvm::Function *newF = llvm::dyn_cast<llvm::Function>(
+            M->getOrInsertFunction("__mcsema_" + symName, getBaseFunctionType(M)));
+      ArchSetCallingConv(M, newF);
+      newF->setLinkage(llvm::GlobalValue::ExternalLinkage);
       continue;
     }
 

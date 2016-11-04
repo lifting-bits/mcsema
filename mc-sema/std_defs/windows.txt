@@ -28759,9 +28759,6 @@ GdiGetCodePage 1 E N
 allmul 4 C N
 _allmul 4 C N
 __allmul 4 C N
-aullshr 3 C N
-_aullshr 3 C N
-__aullshr 3 C N
 PolyPatBlt 5 E N
 GdiConvertAndCheckDC 1 E N
 GdiCreateLocalMetaFilePict 1 E N
@@ -28957,3 +28954,4 @@ NtWow64WriteVirtualMemory64 7 E N
 NtWow64ReadVirtualMemory64 7 E N
 RtlWow64LogMessageInEventLogger 3 E N
 NtWow64QueryInformationProcess64 5 E N
+__aullshr MCSEMA

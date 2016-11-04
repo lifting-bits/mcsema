@@ -75,7 +75,8 @@ public:
         CalleeCleanup,
         FastCall,
         X86_64_SysV,
-        X86_64_Win64
+        X86_64_Win64,
+        McsemaCall
     };
 
     enum ReturnType {

@@ -79,11 +79,12 @@ inline bool Instruction_RefType_Parse(
 enum ExternalFunction_CallingConvention {
   ExternalFunction_CallingConvention_CallerCleanup = 0,
   ExternalFunction_CallingConvention_CalleeCleanup = 1,
-  ExternalFunction_CallingConvention_FastCall = 2
+  ExternalFunction_CallingConvention_FastCall = 2,
+  ExternalFunction_CallingConvention_McsemaCall = 3
 };
 bool ExternalFunction_CallingConvention_IsValid(int value);
 const ExternalFunction_CallingConvention ExternalFunction_CallingConvention_CallingConvention_MIN = ExternalFunction_CallingConvention_CallerCleanup;
-const ExternalFunction_CallingConvention ExternalFunction_CallingConvention_CallingConvention_MAX = ExternalFunction_CallingConvention_FastCall;
+const ExternalFunction_CallingConvention ExternalFunction_CallingConvention_CallingConvention_MAX = ExternalFunction_CallingConvention_McsemaCall;
 const int ExternalFunction_CallingConvention_CallingConvention_ARRAYSIZE = ExternalFunction_CallingConvention_CallingConvention_MAX + 1;
 
 const ::google::protobuf::EnumDescriptor* ExternalFunction_CallingConvention_descriptor();
@@ -1152,6 +1153,7 @@ class ExternalFunction : public ::google::protobuf::Message {
   static const CallingConvention CallerCleanup = ExternalFunction_CallingConvention_CallerCleanup;
   static const CallingConvention CalleeCleanup = ExternalFunction_CallingConvention_CalleeCleanup;
   static const CallingConvention FastCall = ExternalFunction_CallingConvention_FastCall;
+  static const CallingConvention McsemaCall = ExternalFunction_CallingConvention_McsemaCall;
   static inline bool CallingConvention_IsValid(int value) {
     return ExternalFunction_CallingConvention_IsValid(value);
   }
