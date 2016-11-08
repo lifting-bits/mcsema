@@ -425,8 +425,15 @@ int main(void) {
 
   // Implements `__mcsema_detach_call_value`. This is a thin wrapper around
   // `__mcsema_detach_call`.
-  printf("  .globl __mcsema_detach_call_value\n");
-  printf("__mcsema_detach_call_value:\n");
+
+  // this function has three underscores (___):
+  // first _ : cdecl name mangling for Windodws
+  // following __: prefix indicating this is internal to mcsema
+  // the extra _ for the cdecl prefix is needed since this function is called from bitcode
+  // and not from other assembly code. The code generator will automatically mangle
+  // based on calling convention
+  printf("  .globl ___mcsema_detach_call_value\n");
+  printf("___mcsema_detach_call_value:\n");
   printf("  .cfi_startproc\n");
 
   // Note: the bitcode has already put the target address into `RegState::EIP`.

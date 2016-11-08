@@ -407,6 +407,9 @@ def handleExternalRef(fn):
         if fn.endswith("_0"):
             fn = fn[:-2]
 
+        # name could have been modified by the above tests
+        in_a_map = fn in EMAP or fn in EMAP_DATA
+
         if fn.startswith("_") and not in_a_map:
             fn = fn[1:]
 

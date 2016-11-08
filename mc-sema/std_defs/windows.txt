@@ -800,7 +800,7 @@ _msize_dbg 1 C N
 _malloc_dbg 1 C N
 _free_dbg 1 C N
 _calloc_dbg 2 C N
-calloc_crt 2 C N
+_calloc_crt 2 C N
 _expand_dbg 2 C N
 _aligned_offset_malloc_dbg 3 C N
 _aligned_offset_realloc_dbg 4 C N
@@ -28955,3 +28955,9 @@ NtWow64ReadVirtualMemory64 7 E N
 RtlWow64LogMessageInEventLogger 3 E N
 NtWow64QueryInformationProcess64 5 E N
 __aullshr MCSEMA
+__dllonexit 3 C N
+__crtUnhandledException 1 C N
+__clean_type_info_names_internal 1 C N
+_lock 1 C N
+_crt_debugger_hook 1 C N
+__crtTerminateProcess 1 C N

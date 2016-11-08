@@ -243,8 +243,8 @@ pop edx
 .Lfunc_end4:
   .cfi_endproc
 
-  .globl __mcsema_detach_call_value
-__mcsema_detach_call_value:
+  .globl ___mcsema_detach_call_value
+___mcsema_detach_call_value:
   .cfi_startproc
   push edi
   push esi
