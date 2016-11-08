@@ -700,12 +700,12 @@ static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
     // is reserved for functions that we are going to implement internally
     if(ip->get_ext_call_target()->getCallingConvention() == ExternalCodeRef::McsemaCall) {
         Module *M = block->getParent()->getParent();
-        std::string target_fn = "__mcsema_" + s;
+        std::string target_fn = ArchNameMcsemaCall(s);
         emitInternalCall<width>(block, M, target_fn, true);
         return ContinueBlock;
     }
 
-    if (width == width) {
+    if (64 == width) {
       ret = x86_64::doCallPCExtern(block, s, true);
     } else {
       ret = x86::doCallPCExtern(block, s, true);
@@ -848,7 +848,7 @@ static InstTransResult translate_CALLpcrel32(NativeModulePtr natM,
     std::string s = ip->get_ext_call_target()->getSymbolName();
     if(ip->get_ext_call_target()->getCallingConvention() == ExternalCodeRef::McsemaCall) {
         Module *M = block->getParent()->getParent();
-        std::string target_fn = "__mcsema_" + s;
+        std::string target_fn = ArchNameMcsemaCall(s);
         emitInternalCall<width>(block, M, target_fn, false);
         return ContinueBlock;
     } else {
@@ -885,7 +885,7 @@ static InstTransResult translate_CALLm(NativeModulePtr natM,
     // is reserved for functions that we are going to implement internally
     if(ip->get_ext_call_target()->getCallingConvention() == ExternalCodeRef::McsemaCall) {
         Module *M = block->getParent()->getParent();
-        std::string target_fn = "__mcsema_" + s;
+        std::string target_fn = ArchNameMcsemaCall(s);
         emitInternalCall<width>(block, M, target_fn, false);
         return ContinueBlock;
     }
