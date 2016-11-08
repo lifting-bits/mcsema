@@ -217,41 +217,41 @@ int main(int argc, char *argv[]) {
 
   //reproduce NativeModule from CFG input argument
   std::cerr << "Reading module ..." << std::endl;
-  auto mod = readModule(InputFilename, ProtoBuff, std::list<VA>(), x86Target);
-  if (!mod) {
-    std::cerr << "Could not process input module: " << InputFilename
-        << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  // set native module target
-  std::cerr << "Setting initial triples..." << std::endl;
-  mod->setTarget(x86Target);
-  mod->setTargetTriple(TargetTriple);
-
-  if ( !mod) {
-    std::cerr << "Unable to read module from CFG" << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  if (OutputModule) {
-    doPrintModule(mod);
-  }
-
-  if (IgnoreUnsupported) {
-    ignoreUnsupportedInsts = true;
-  }
-
-  //now, convert it to an LLVM module
-  std::cerr << "Getting LLVM module..." << std::endl;
-  auto M = createModuleForArch(mod->name(), TargetTriple);
-
-  if ( !M) {
-    std::cerr << "Unable to get LLVM module" << std::endl;
-    return EXIT_FAILURE;
-  }
-
   try {
+    auto mod = readModule(InputFilename, ProtoBuff, std::list<VA>(), x86Target);
+    if (!mod) {
+      std::cerr << "Could not process input module: " << InputFilename
+          << std::endl;
+      return EXIT_FAILURE;
+    }
+
+    // set native module target
+    std::cerr << "Setting initial triples..." << std::endl;
+    mod->setTarget(x86Target);
+    mod->setTargetTriple(TargetTriple);
+
+    if ( !mod) {
+      std::cerr << "Unable to read module from CFG" << std::endl;
+      return EXIT_FAILURE;
+    }
+
+    if (OutputModule) {
+      doPrintModule(mod);
+    }
+
+    if (IgnoreUnsupported) {
+      ignoreUnsupportedInsts = true;
+    }
+
+    //now, convert it to an LLVM module
+    std::cerr << "Getting LLVM module..." << std::endl;
+    auto M = createModuleForArch(mod->name(), TargetTriple);
+
+    if ( !M) {
+      std::cerr << "Unable to get LLVM module" << std::endl;
+      return EXIT_FAILURE;
+    }
+
     initRegStateStruct(M);
     ArchInitAttachDetach(M);
     initInstructionDispatch();
