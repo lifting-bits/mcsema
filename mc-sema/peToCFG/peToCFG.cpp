@@ -702,8 +702,7 @@ NativeModulePtr readModule(std::string fName, ModuleInputFormat inf,
       m = readProtoBuf(fName, T);
       break;
     default:
-      LASSERT(false, "NOT IMPLEMENTED")
-      ;
+      LASSERT(false, "NOT IMPLEMENTED");
   }
 
   return m;

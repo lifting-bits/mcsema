@@ -44,6 +44,8 @@ SystemArchType SystemArch(llvm::Module *M);
 
 PointerSize ArchPointerSize(llvm::Module *M);
 
+std::string ArchNameMcsemaCall(const std::string &name);
+
 
 template <int width>
 static llvm::Value* doSubtractImageBase(

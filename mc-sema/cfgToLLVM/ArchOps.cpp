@@ -154,6 +154,10 @@ static void LinuxAddPushJumpStub(llvm::Module *M, llvm::Function *F,
   M->appendModuleInlineAsm(as.str());
 }
 
+std::string ArchNameMcsemaCall(const std::string &name) {
+    return "__mcsema_" + name;
+}
+
 
 static std::string WindowsDecorateName(llvm::Function *F, const std::string &name) {
 
@@ -254,7 +258,7 @@ llvm::Function *ArchAddEntryPointDriver(llvm::Module *M,
             << "Win32 callback entrypoint driver for "
             << s << " has no backing implementation\n";
     } else {
-      WindowsAddPushJumpStub(false, M, F, W, "__mcsema_attach_call_cdecl");
+      WindowsAddPushJumpStub(true, M, F, W, "__mcsema_attach_call_cdecl");
     }
   } else {
     TASSERT(false, "Unsupported OS for entry point driver.");

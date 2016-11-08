@@ -1730,7 +1730,7 @@ static void initExternalCode(NativeModulePtr natMod, llvm::Module *M) {
     if(conv == ExternalCodeRef::McsemaCall) {
        // normal mcsema function prototypes
       llvm::Function *newF = llvm::dyn_cast<llvm::Function>(
-            M->getOrInsertFunction("__mcsema_" + symName, getBaseFunctionType(M)));
+            M->getOrInsertFunction(ArchNameMcsemaCall(symName), getBaseFunctionType(M)));
       ArchSetCallingConv(M, newF);
       newF->setLinkage(llvm::GlobalValue::ExternalLinkage);
       continue;
