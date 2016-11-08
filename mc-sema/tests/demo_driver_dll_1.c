@@ -1,10 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-extern int demo_dll_1_driver(void);
+extern int HelloWorld(void);
 
 int main(int argc, char *argv[]) {
     printf("About to do msgbox...\n");
-    demo_dll_1_driver();
+    HelloWorld();
     return 0;
 }
