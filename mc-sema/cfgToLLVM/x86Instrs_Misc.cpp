@@ -72,6 +72,29 @@ static InstTransResult doTrap(BasicBlock *b) {
   return ContinueBlock;
 }
 
+static InstTransResult doInt(BasicBlock *&b, const MCOperand &o) {
+  TASSERT(o.isImm(), "Operand not immediate");
+
+  Module *M = b->getParent()->getParent();
+
+  int interrupt_val = o.getImm();
+
+  auto os = SystemOS(M);
+
+  if(0x2e == interrupt_val && llvm::Triple::Win32 == os) {
+      TASSERT(false, "System call via interrupt is not supported!");
+  }
+
+  if(0x80 == interrupt_val && llvm::Triple::Linux == os) {
+      TASSERT(false, "System call via interrupt is not supported!");
+  }
+
+  llvm::dbgs()
+      << "WARNING: Treating INT " << interrupt_val << " as trap!\n";
+
+  return doTrap(b);
+}
+
 static InstTransResult doCdq(BasicBlock *b) {
   // EDX <- SEXT(EAX)
 
@@ -606,6 +629,7 @@ static InstTransResult doBsfr(BasicBlock *&b, const MCOperand &dst,
 
 GENERIC_TRANSLATION(CDQ, doCdq(block))
 GENERIC_TRANSLATION(INT3, doInt3(block))
+GENERIC_TRANSLATION(INT, doInt(block, OP(0)))
 GENERIC_TRANSLATION(TRAP, doTrap(block))
 GENERIC_TRANSLATION(NOOP, doNoop(block))
 GENERIC_TRANSLATION(HLT, doHlt(block))
@@ -850,6 +874,7 @@ void Misc_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::BSWAP32r] = translate_BSWAP32r;
   m[llvm::X86::CDQ] = translate_CDQ;
   m[llvm::X86::INT3] = translate_INT3;
+  m[llvm::X86::INT] = translate_INT;
   m[llvm::X86::NOOP] = translate_NOOP;
   m[llvm::X86::NOOPW] = translate_NOOP;
   m[llvm::X86::NOOPL] = translate_NOOP;
