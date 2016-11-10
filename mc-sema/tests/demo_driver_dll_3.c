@@ -2,14 +2,14 @@
 #include <stdio.h>
 #include <windows.h>
 
-extern HANDLE demo_dll_3_driver(void);
+extern HANDLE StartServer(void);
 
 int main(int argc, char *argv[]) {
     HANDLE hThread;
     DWORD dwRet;
 
     printf("About to create server thread...\n");
-    hThread = demo_dll_3_driver();
+    hThread = StartServer();
     printf("Created thead: %p\n", hThread);
 
     printf("Waiting for server thread to terminate...\n");

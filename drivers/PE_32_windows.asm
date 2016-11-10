@@ -366,6 +366,7 @@ mov ecx, dword ptr [edx + 4*ecx]
 pop edx
   sub DWORD PTR [ecx + __mcsema_stack_mark@SECREL32], esp
   add esp, 260
+  add esp, DWORD PTR [ecx + __mcsema_stack_mark@SECREL32]
   xchg esp, DWORD PTR [ecx + __mcsema_reg_state@SECREL32 + 28]
   mov [ecx + __mcsema_reg_state@SECREL32 + 4], eax
   mov [ecx + __mcsema_reg_state@SECREL32 + 16], edx

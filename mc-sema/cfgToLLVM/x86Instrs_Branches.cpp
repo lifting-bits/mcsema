@@ -446,16 +446,6 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
     x86::R_WRITE<32>(b, X86::EAX, callR);
   }
 
-  // stdcall and fastcall: callee changed ESP; adjust
-  // REG_ESP accordingly
-  if (externFunction->getCallingConv() == CallingConv::X86_StdCall
-      || externFunction->getCallingConv() == CallingConv::X86_FastCall) {
-    Value *ESP_adjust = CONST_V<32>(b, 4 * paramCount);
-    Value *espFix = BinaryOperator::CreateAdd(espOld, ESP_adjust, "", b);
-
-    x86::R_WRITE<32>(b, X86::ESP, espFix);
-  }
-
   return ContinueBlock;
 }
 }

@@ -660,6 +660,7 @@ int main(void) {
   printf("  sub DWORD PTR [ecx + __mcsema_stack_mark@SECREL32], esp\n");
   // adjust for our copied stack args + fake return
   printf("  add esp, %u\n", kStackArgSize+4);
+  printf("  add esp, DWORD PTR [ecx + __mcsema_stack_mark@SECREL32]\n");
   // Swap into the mcsema stack.
   printf("  xchg esp, DWORD PTR [ecx + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
 

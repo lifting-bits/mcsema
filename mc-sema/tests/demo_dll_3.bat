@@ -11,22 +11,20 @@ link /NODEFAULTLIB /DLL demo_dll_3.obj ws2_32.lib kernel32.lib msvcrt.lib
 REM recover CFG
 if exist "%IDA_PATH%\idaq.exe" (
     echo Using IDA to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend_wrapper.py -d -entry-symbol=StartServer -ignore-native-entry-points=true -i=demo_dll_3.dll -func-map="%STD_DEFS%"
+    %PYTHON% %BIN_DESCEND_PATH%\bin_descend_wrapper.py -d -entry-symbol=StartServer -ignore-native-entry-points=true -i=demo_dll_3.dll -func-map="%STD_DEFS%"
 ) else (
-    echo Using bin_descend to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend.exe -d -entry-symbol=StartServer -ignore-native-entry-points=true -i=demo_dll_3.dll -func-map="%STD_DEFS%"
+    echo Bin_descend is no longer supported
+    exit 1
 )
 
 REM Convert to LLVM
-%CFG_TO_BC_PATH%\cfg_to_bc.exe -i demo_dll_3.cfg -driver=demo_dll_3_driver,StartServer,0,return,C -o demo_dll_3.bc
-
-REM Optimize LLVM
-%LLVM_PATH%\opt.exe -O3 -o demo_dll_3_opt.bc demo_dll_3.bc
-
-%LLVM_PATH%\llc.exe -filetype=obj -o demo_dll_3_lifted.obj demo_dll_3_opt.bc
+%CFG_TO_BC_PATH%\cfg_to_bc.exe -post-analysis=false -mtriple=i686-pc-win32 -i demo_dll_3.cfg -entrypoint=StartServer -o demo_dll_3.bc
+clang -target i686-pc-win32 -O0 -m32 -c -o demo_dll_3_bc.obj demo_dll_3.bc
+clang -target i686-pc-win32 -O0 -m32 -c -o demo_dll_3_asm.obj ..\..\drivers\PE_32_windows.asm
 
 REM Compiling driver
-"%VCINSTALLDIR%\bin\cl.exe" /nologo /Zi demo_driver_dll_3.c demo_dll_3_lifted.obj user32.lib kernel32.lib ws2_32.lib
+"%VCINSTALLDIR%\bin\cl.exe" /nologo /Zi demo_driver_dll_3.c demo_dll_3_asm.obj demo_dll_3_bc.obj ws2_32.lib user32.lib kernel32.lib msvcrt.lib
+
 
 REM Running application
 demo_driver_dll_3.exe
