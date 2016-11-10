@@ -398,6 +398,11 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
 
   if (paramCount) {
     baseEspVal = x86::R_READ<32>(b, X86::ESP);
+    // if this is a JMP, there is already a fake return address
+    // on the stack. Skip it to read stack arguments
+    if(is_jump) {
+        baseEspVal = BinaryOperator::CreateAdd(baseEspVal, CONST_V<32>(b, 4), "", b);
+    }
   }
 
   for (int i = 0; i < paramCount; i++) {
@@ -459,8 +464,6 @@ namespace x86_64 {
 
 static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool is_jump) {
   Module *M = b->getParent()->getParent();
-
-  Value *rspOld = x86_64::R_READ<64>(b, X86::RSP);
 
   //lookup the function in the module
   Function *externFunction = M->getFunction(target);
@@ -639,10 +642,11 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
     // rest of the arguments are passed over stack
     // adjust the stack pointer if required
     baseRspVal = x86_64::R_READ<64>(b, X86::RSP);
-//    if (esp_adjust) {
-//      baseRspVal = BinaryOperator::CreateAdd(baseRspVal, CONST_V<64>(b, 8), "",
-//                                             b);
-//    }
+    // if this is a JMP, there is already a fake return address
+    // on the stack. Skip it to read stack arguments
+    if(is_jump) {
+        baseRspVal = BinaryOperator::CreateAdd(baseRspVal, CONST_V<64>(b, 8), "", b);
+    }
   }
 
   for (int i = 0; i < paramCount; i++) {
@@ -710,8 +714,14 @@ static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
     } else {
       ret = x86::doCallPCExtern(block, s, true);
     }
-    llvm::ReturnInst::Create(block->getContext(), block);
-    return EndBlock;
+    //llvm::ReturnInst::Create(block->getContext(), block);
+    if (ret != EndBlock) {
+        doRet<width>(block);
+        return EndBlock;
+    } else {
+        // the external was a call to donotreturn function
+        return ret;
+    }
   } else if (ip->has_ext_data_ref()) {
     Module *M = block->getParent()->getParent();
 
