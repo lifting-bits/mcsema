@@ -11,7 +11,10 @@ def print_vars(M):
         if len(f.stackvars):
             print "ea: 0x%016x" % (f.entry_address)
             print "vars:"
+            #print "refs:"
             for v in f.stackvars:
+                #for r in v.var.ref_eas:
+                #    print ("0x%08x" % r.inst_addr)
                 print v
     return
 
