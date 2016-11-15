@@ -1503,16 +1503,35 @@ template <int width, int elemwidth, Instruction::BinaryOps bin_op>
 static InstTransResult do_SSE_VECTOR_OP(const MCOperand &dst, BasicBlock *&b, Value *v1, Value *v2)
 {
     NASSERT(width % elemwidth == 0);
-
-    int elem_count = width/elemwidth;
-
-    Type *elem_ty;
-    VectorType *vt;
-
-    std::tie(vt, elem_ty) = getIntVectorTypes(b, elemwidth, elem_count);
-
     Value *vecInput1 = INT_AS_VECTOR<width,elemwidth>(b, v1);
     Value *vecInput2 = INT_AS_VECTOR<width,elemwidth>(b, v2);
+
+    Value *op_out = BinaryOperator::Create(
+        bin_op,
+        vecInput1,
+        vecInput2,
+        "",
+        b);
+
+    // convert the output back to an integer
+    Value *intOutput = CastInst::Create(
+            Instruction::BitCast,
+            op_out,
+            Type::getIntNTy(b->getContext(), width),
+            "",
+            b);
+
+    R_WRITE<width>(b, dst.getReg(), intOutput);
+    return ContinueBlock;
+}
+
+
+template <int width, int elemwidth, Instruction::BinaryOps bin_op>
+static InstTransResult do_SSE_FP_VECTOR_OP(const MCOperand &dst, BasicBlock *&b, Value *v1, Value *v2)
+{
+    NASSERT(width % elemwidth == 0);
+    Value *vecInput1 = INT_AS_FPVECTOR<width,elemwidth>(b, v1);
+    Value *vecInput2 = INT_AS_FPVECTOR<width,elemwidth>(b, v2);
 
     Value *op_out = BinaryOperator::Create(
         bin_op,
@@ -1558,6 +1577,33 @@ static InstTransResult do_SSE_VECTOR_RR(InstPtr ip, BasicBlock *& block,
     Value *opVal2 = R_READ<width>(block, o2.getReg());
 
     return do_SSE_VECTOR_OP<width, elem_width, bin_op>(o1, block, opVal1, opVal2);
+}
+
+template <int width, int elem_width, Instruction::BinaryOps bin_op>
+static InstTransResult do_SSE_FP_VECTOR_RM(InstPtr ip, BasicBlock *& block,
+                                const MCOperand &o1,
+                                Value *addr)
+{
+    NASSERT(o1.isReg());
+
+    Value *opVal1 = R_READ<width>(block, o1.getReg());
+    Value *opVal2 = M_READ<width>(ip, block, addr);
+
+    return do_SSE_FP_VECTOR_OP<width, elem_width, bin_op>(o1, block, opVal1, opVal2);
+}
+
+template <int width, int elem_width, Instruction::BinaryOps bin_op>
+static InstTransResult do_SSE_FP_VECTOR_RR(InstPtr ip, BasicBlock *& block,
+                                const MCOperand &o1,
+                                const MCOperand &o2)
+{
+    NASSERT(o1.isReg());
+    NASSERT(o2.isReg());
+
+    Value *opVal1 = R_READ<width>(block, o1.getReg());
+    Value *opVal2 = R_READ<width>(block, o2.getReg());
+
+    return do_SSE_FP_VECTOR_OP<width, elem_width, bin_op>(o1, block, opVal1, opVal2);
 }
 
 template <FCmpInst::Predicate binop>
@@ -2647,6 +2693,36 @@ GENERIC_TRANSLATION_REF(PADDQrm,
         (do_SSE_VECTOR_RM<128,64,Instruction::Add>(ip, block, OP(1), ADDR_NOREF(2))),
         (do_SSE_VECTOR_RM<128,64,Instruction::Add>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
+GENERIC_TRANSLATION(SUBPSrr,
+        (do_SSE_FP_VECTOR_RR<128,32,Instruction::FSub>(ip, block, OP(1), OP(2))) )
+
+GENERIC_TRANSLATION_REF(SUBPSrm,
+        (do_SSE_FP_VECTOR_RM<128,32,Instruction::FSub>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_FP_VECTOR_RM<128,32,Instruction::FSub>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION(SUBPDrr,
+        (do_SSE_FP_VECTOR_RR<128,64,Instruction::FSub>(ip, block, OP(1), OP(2))) )
+
+GENERIC_TRANSLATION_REF(SUBPDrm,
+        (do_SSE_FP_VECTOR_RM<128,64,Instruction::FSub>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_FP_VECTOR_RM<128,64,Instruction::FSub>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION(ADDPSrr,
+        (do_SSE_FP_VECTOR_RR<128,32,Instruction::FAdd>(ip, block, OP(1), OP(2))) )
+
+GENERIC_TRANSLATION_REF(ADDPSrm,
+        (do_SSE_FP_VECTOR_RM<128,32,Instruction::FAdd>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_FP_VECTOR_RM<128,32,Instruction::FAdd>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION(ADDPDrr,
+        (do_SSE_FP_VECTOR_RR<128,64,Instruction::FAdd>(ip, block, OP(1), OP(2))) )
+
+GENERIC_TRANSLATION_REF(ADDPDrm,
+        (do_SSE_FP_VECTOR_RM<128,64,Instruction::FAdd>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_FP_VECTOR_RM<128,64,Instruction::FAdd>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+
+
 GENERIC_TRANSLATION(PSUBBrr, 
         (do_SSE_VECTOR_RR<128,8,Instruction::Sub>(ip, block, OP(1), OP(2))) )
 GENERIC_TRANSLATION_REF(PSUBBrm, 
@@ -3050,4 +3126,16 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::MOVPQI2QImr]  = (doMOVSmr<64>);
     
     m[X86::MOVDDUPrr] = translate_MOVDDUPrr;
+
+    m[X86::SUBPDrr] = translate_SUBPDrr;
+    m[X86::SUBPDrm] = translate_SUBPDrm;
+
+    m[X86::SUBPSrr] = translate_SUBPSrr;
+    m[X86::SUBPSrm] = translate_SUBPSrm;
+
+    m[X86::ADDPDrr] = translate_ADDPDrr;
+    m[X86::ADDPDrm] = translate_ADDPDrm;
+
+    m[X86::ADDPSrr] = translate_ADDPSrr;
+    m[X86::ADDPSrm] = translate_ADDPSrm;
 }
