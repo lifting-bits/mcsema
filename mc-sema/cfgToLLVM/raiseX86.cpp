@@ -1315,6 +1315,8 @@ void bfs_cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
     BasicBlock *nextBB = bbFromStrName(bbName, this->F);
 
     BranchInst::Create(nextBB, curLLVMBlock);
+  } else {
+    new UnreachableInst(curLLVMBlock->getContext(), curLLVMBlock);
   }
 }
 

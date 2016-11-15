@@ -18275,6 +18275,12 @@ ReadClassStm 2 E N
 ReadClassStg 2 E N
 PropVariantCopy 2 E N
 PropVariantClear 1 E N
+VariantClear 1 E N
+VariantInit 1 E N
+VariantCopy 2 E N
+VariantCopyInd 2 E N
+VariantChangeTypeEx 5 E N
+SysAllocString 1 E N
 PropStgNameToFmtId 2 E N
 ProgIDFromCLSID 2 E N
 OpenOrCreateStream 3 E N
@@ -18938,6 +18944,19 @@ AccNotifyTouchInteraction 4 E N
 !ORDINAL_oleaut32.dll_4:SysAllocStringLen 2 E N
 !ORDINAL_oleaut32.dll_150:SysAllocStringByteLen 2 E N
 !ORDINAL_oleaut32.dll_2:SysAllocString 1 E N
+
+SysStringLen 1 E N
+SysStringByteLen 1 E N
+SysReAllocStringLen 3 E N
+SysReAllocString 2 E N
+SysFreeString 1 E N
+SysAllocStringLen 2 E N
+0:SysAllocStringByteLen 2 E N
+SysAllocString 1 E N
+
+chkstk 0 E N
+_chkstk 0 E N
+
 !ORDINAL_oleaut32.dll_325:SetVarConversionLocaleSetting 1 E N
 #Skipping unknown line: 327 _SetOaNoCache
 !ORDINAL_oleaut32.dll_201:SetErrorInfo 2 E N
