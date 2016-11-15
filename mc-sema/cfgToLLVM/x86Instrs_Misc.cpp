@@ -875,6 +875,7 @@ void Misc_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::CDQ] = translate_CDQ;
   m[llvm::X86::INT3] = translate_INT3;
   m[llvm::X86::INT] = translate_INT;
+  m[llvm::X86::MFENCE] = translate_NOOP;
   m[llvm::X86::NOOP] = translate_NOOP;
   m[llvm::X86::NOOPW] = translate_NOOP;
   m[llvm::X86::NOOPL] = translate_NOOP;
