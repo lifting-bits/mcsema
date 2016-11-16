@@ -72,6 +72,14 @@ static llvm::cl::opt<bool> AddBreakpoints(
         "Add debug breakpoint function calls before each lifted instruction."),
     llvm::cl::init(false));
 
+
+static llvm::cl::opt<bool> BlockPerInstr(
+    "put-instrs-in-blocks",
+    llvm::cl::desc(
+        "Add debug breakpoint function calls before each lifted instruction."),
+    llvm::cl::init(false));
+
+
 #include <llvm/ADT/SmallVector.h>
 
 Instruction *noAliasMCSemaScope(Instruction *inst) {
@@ -1215,14 +1223,17 @@ InstTransResult liftInstr(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
                           Function *F, NativeFunctionPtr natF,
                           NativeModulePtr natM, bool doAnnotation) {
 
-  // Put each instruction into its own basic block.
-  std::stringstream ss;
   auto pc = ip->get_loc();
-  ss << "instr_0x" << std::hex << pc;
-  auto &C = F->getContext();
-  auto instr_block = BasicBlock::Create(C, ss.str(), F);
-  BranchInst::Create(instr_block, block);
-  block = instr_block;
+
+  // Put each instruction into its own basic block.
+  if (BlockPerInstr) {
+    std::stringstream ss;
+    ss << "instr_0x" << std::hex << pc;
+    auto &C = F->getContext();
+    auto instr_block = BasicBlock::Create(C, ss.str(), F);
+    BranchInst::Create(instr_block, block);
+    block = instr_block;
+  }
 
   // At the beginning of the block, make a call to a dummy function with the
   // same name as the block. This function call cannot be optimized away, and
@@ -1240,7 +1251,7 @@ InstTransResult liftInstr(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
       for (auto &I : B) {
         VA inst_eip;
         if (!getAnnotation( &I, inst_eip)) {
-          addAnnotation( &I, pc);
+          addAnnotation(&I, pc);
         }
       }
     }
@@ -1315,6 +1326,8 @@ void bfs_cfg_visitor::discover_vertex(Vertex u, const Graph &g) const {
     BasicBlock *nextBB = bbFromStrName(bbName, this->F);
 
     BranchInst::Create(nextBB, curLLVMBlock);
+  } else {
+    new UnreachableInst(curLLVMBlock->getContext(), curLLVMBlock);
   }
 }
 

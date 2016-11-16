@@ -275,9 +275,9 @@ static Value *FPUR_READV(BasicBlock *&b, Value *regslot) {
 
   // The default case should never be hit. Use LLVM Switch Node.
   SwitchInst *tagSwitch = SwitchInst::Create(tagval, read_empty_block, 4, b);
-  tagSwitch->addCase(CONST_V<8>(b, FPU_TAG_VALID), read_normal_block);
-  tagSwitch->addCase(CONST_V<8>(b, FPU_TAG_ZERO), read_normal_block);
-  tagSwitch->addCase(CONST_V<8>(b, FPU_TAG_SPECIAL), read_normal_block);
+  tagSwitch->addCase(CONST_V<2>(b, FPU_TAG_VALID), read_normal_block);
+  tagSwitch->addCase(CONST_V<2>(b, FPU_TAG_ZERO), read_normal_block);
+  tagSwitch->addCase(CONST_V<2>(b, FPU_TAG_SPECIAL), read_normal_block);
   //tagSwitch->addCase(CONST_V<2>(b, 1), read_zero_block);
   //tagSwitch->addCase(CONST_V<2>(b, 2), read_special_block);
   //tagSwitch->addCase(CONST_V<2>(b, 3), read_empty_block);
@@ -370,7 +370,7 @@ static void FPUR_WRITEV(BasicBlock *&b, Value *regslot, Value *val) {
 
   // If tag != empty, then throw exception.
   Value *cmp_inst = new ICmpInst( *b, ICmpInst::ICMP_EQ, tagVal,
-                                 CONST_V<8>(b, FPU_TAG_EMPTY));
+                                 CONST_V<2>(b, FPU_TAG_EMPTY));
 
   BranchInst::Create(block_fpu_write, block_fpu_exception, cmp_inst, b);
 
@@ -386,7 +386,7 @@ static void FPUR_WRITEV(BasicBlock *&b, Value *regslot, Value *val) {
   // Write 0 to tagReg.
   FPUF_CLEAR(b, FPU_C1);
   Instruction *storeVal_normal = noAliasMCSemaScope(
-      new StoreInst(CONST_V<8>(b, FPU_TAG_VALID), tagReg, b));
+      new StoreInst(CONST_V<2>(b, FPU_TAG_VALID), tagReg, b));
 
   NASSERT(storeVal_normal != NULL);
 
@@ -464,7 +464,7 @@ static void FPU_POP(BasicBlock *&b) {
   // Should an exception be thrown if an empty FPU value is popped without
   // being used?
   Value *empty_the_tag = noAliasMCSemaScope(
-      new StoreInst(CONST_V<8>(b, FPU_TAG_EMPTY), tagReg, b));
+      new StoreInst(CONST_V<2>(b, FPU_TAG_EMPTY), tagReg, b));
 
   NASSERT(empty_the_tag != NULL);
 

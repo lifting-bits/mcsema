@@ -44,6 +44,30 @@
 using namespace llvm;
 
 template<int width>
+static InstTransResult doLRet(BasicBlock *b) {
+  //do a read from the location pointed to by ESP
+
+  TASSERT(width == 32 || width == 64, "Invalid reg width for RET");
+  auto xsp = 32 == width ? X86::ESP : X86::RSP;
+  Value *rESP = R_READ<width>(b, xsp);
+  Value *nESP = BinaryOperator::CreateAdd(rESP, CONST_V<width>(b, 2 * width / 8),
+                                          "", b);
+
+  auto xip = 32 == width ? X86::EIP : X86::RIP;
+  Value *ra = M_READ_0<width>(b, rESP);
+  // set EIP -- this is used by the asm stubs that
+  // connect translated code and native code
+  R_WRITE<width>(b, xip, ra);
+
+  //write back to ESP
+  R_WRITE<width>(b, xsp, nESP);
+
+  ReturnInst::Create(b->getContext(), b);
+
+  return EndCFG;
+}
+
+template<int width>
 static InstTransResult doRet(BasicBlock *b) {
   //do a read from the location pointed to by ESP
 
@@ -958,6 +982,10 @@ GENERIC_TRANSLATION(RETI, doRetI<32>(block, OP(0)))
 GENERIC_TRANSLATION(RETIW, doRetI<16>(block, OP(0)))
 GENERIC_TRANSLATION(RETQ, doRet<64>(block))
 GENERIC_TRANSLATION(RETIQ, doRetI<64>(block, OP(0)))
+
+GENERIC_TRANSLATION(LRET, doLRet<32>(block))
+
+
 BLOCKNAMES_TRANSLATION(JMP_4, doNonCondBranch(block, ifTrue))
 BLOCKNAMES_TRANSLATION(JMP_2, doNonCondBranch(block, ifTrue))
 BLOCKNAMES_TRANSLATION(JMP_1, doNonCondBranch(block, ifTrue))
@@ -987,4 +1015,7 @@ void Branches_populateDispatchMap(DispatchMap &m) {
   m[X86::RETQ] = translate_RETQ;
   m[X86::RETIQ] = translate_RETIQ;
   m[X86::RETIW] = translate_RETIW;
+
+
+  m[X86::LRETL] = translate_LRET;
 }
