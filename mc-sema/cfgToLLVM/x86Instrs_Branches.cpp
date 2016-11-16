@@ -704,9 +704,9 @@ static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
     } else {
       ret = x86::doCallPCExtern(block, s, true);
     }
-    //llvm::ReturnInst::Create(block->getContext(), block);
     if (ret != EndBlock) {
-        doRet<width>(block);
+        //doRet<width>(block);
+        llvm::ReturnInst::Create(block->getContext(), block);
         return EndBlock;
     } else {
         // the external was a call to donotreturn function

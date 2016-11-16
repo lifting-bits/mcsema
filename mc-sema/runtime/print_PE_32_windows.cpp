@@ -248,24 +248,18 @@ int main(void) {
 
   // adjust for our copied stack args + fake return
   printf("  add esp, %u\n", kStackArgSize+4);
+  printf("  add esp, ecx\n");
 
   printf("  xchg esp, DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
 
+  printf("  pop DWORD PTR [eax + __mcsema_stack_mark@SECREL32]\n");
   // Unstash the callee-saved registers.
   printf("  pop ebp\n");
   printf("  pop ebx\n");
   printf("  pop esi\n");
   printf("  pop edi\n");
 
-  // adjust again for the poppped off arguments
-  // this emulates a "retn XX", but that
-  // only takes an immediate value
-  printf("  sub esp, ecx\n"); // this sub is an add since ecx is negative
-  printf("  add esp, 4\n"); // adjust for return address on stack
-
-  // we still need to transfer control to the return addr on stack
-  printf("  lea ecx, [esp+ecx]\n");
-  printf("  jmp dword ptr [ecx-4]\n");
+  printf("  ret\n");
 
   printf(".Lfunc_end0:\n");
   printf("  .cfi_endproc\n");
@@ -284,7 +278,10 @@ int main(void) {
   printf("__mcsema_detach_ret_cdecl:\n");
   printf("  .cfi_startproc\n");
 
-  printf("  push ebp\n");
+  // the stack has the RegState structure argument on it. 
+  // we need to pop it off anyway due to caller cleanup, so 
+  // just re-use it as a place to stash `ebp`, which we pop later
+  printf("  mov [esp], ebp\n");
   getTlsIndex("ebp");
 
   // General purpose registers.
@@ -510,11 +507,9 @@ int main(void) {
   printf("  mov DWORD PTR [eax + __mcsema_stack_mark@SECREL32], esp\n");
 
   // Set up a re-attach return address.
-  // Set up a re-attach return address.
-  // do not push __mcsema_attach_ret_value directly
-  // to work around llvm assembler bug that emits it
-  // as a 16-bit push
-  printf("  push eax\n");
+  // clobber de7acccc on stack with attach by value RA
+  // preserve eax
+  printf("  mov [esp], eax\n");
   printf("  lea eax, __mcsema_attach_ret_value\n");
   printf("  xchg eax, [esp]\n");
 
@@ -660,7 +655,7 @@ int main(void) {
   printf("  sub DWORD PTR [ecx + __mcsema_stack_mark@SECREL32], esp\n");
   // adjust for our copied stack args + fake return
   printf("  add esp, %u\n", kStackArgSize+4);
-  printf("  add esp, DWORD PTR [ecx + __mcsema_stack_mark@SECREL32]\n");
+  //printf("  add esp, DWORD PTR [ecx + __mcsema_stack_mark@SECREL32]\n");
   // Swap into the mcsema stack.
   printf("  xchg esp, DWORD PTR [ecx + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(mcsema::RegState, ESP));
 

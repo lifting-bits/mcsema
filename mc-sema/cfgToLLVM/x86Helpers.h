@@ -51,27 +51,6 @@ llvm::Value *getValueForExternal(llvm::Module *M, InstPtr ip, llvm::BasicBlock *
 
         addrInt = new llvm::PtrToIntInst(
                 gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
-        //if(gvar->getType()->isPointerTy()) {
-        //    addrInt = getLoadableValue<width>(gvar, block);
-        //    TASSERT(addrInt != nullptr, "data ref is of an unloadable pointer type");
-        //} else {
-        //    llvm::IntegerType *int_t = llvm::dyn_cast<llvm::IntegerType>(gvar->getType());
-        //    if( int_t == NULL) {
-        //        throw TErr(__LINE__, __FILE__, "NIY: non-integer, non-pointer external data");
-        //    }
-        //    else if(int_t->getBitWidth() < width) {
-        //        addrInt = new llvm::ZExtInst(gvar,
-        //                llvm::Type::getIntNTy(block->getContext(), width),
-        //                "",
-        //                block);
-        //    }
-        //    else if(int_t->getBitWidth() == width) {
-        //        addrInt = gvar;
-        //    }
-        //    else {
-        //        throw TErr(__LINE__, __FILE__, "NIY: external type > width");
-        //    }
-        //}
 
     } else {
         throw TErr(__LINE__, __FILE__, "No external refernce to get value for!");
@@ -90,7 +69,7 @@ llvm::Value *concatInts(llvm::BasicBlock *b, llvm::Value *a1, llvm::Value *a2) {
     
     TASSERT(typeTo != NULL, "");
     //bitcast a to twice width
-	assert(a1->getType()->getScalarSizeInBits() < typeTo->getScalarSizeInBits());
+    assert(a1->getType()->getScalarSizeInBits() < typeTo->getScalarSizeInBits());
     llvm::Value   *twiceLarger = new llvm::ZExtInst(a1, typeTo, "", b);
     //shift twiceL to the left by width
     llvm::Value   *tlShifted = llvm::BinaryOperator::Create(llvm::Instruction::Shl, 
@@ -204,6 +183,7 @@ using namespace std;
 template <int width>
 llvm::Value* IMM_AS_DATA_REF(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
 {
+    TASSERT(width == 32 || width == 64, "Pointer size must be sane");
     VA  baseGlobal;
     // off is the displacement part of a memory reference
 
@@ -269,9 +249,9 @@ static inline llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *b,
         InstPtr ip)
 {
     
-	llvm::Module *M = b->getParent()->getParent();
-	int regWidth = ArchPointerSize(M);
-    if(regWidth == x86::REG_SIZE) {
+    llvm::Module *M = b->getParent()->getParent();
+    int regWidth = ArchPointerSize(M);
+    if(regWidth <= x86::REG_SIZE) {
         return IMM_AS_DATA_REF<32>(b, mod, ip);
     } else {
         return IMM_AS_DATA_REF<64>(b, mod, ip);
@@ -295,9 +275,9 @@ static inline Value *ADDR_NOREF_IMPL(NativeModulePtr natM, llvm::BasicBlock *b, 
     }
 
     if(ArchPointerSize(M) == Pointer32) {
-		return x86::getAddrFromExpr(b, natM, inst.getOperand(x+0), inst.getOperand(x+1), inst.getOperand(x+2), inst.getOperand(x+3).getImm(), inst.getOperand(x+4), false);
+        return x86::getAddrFromExpr(b, natM, inst.getOperand(x+0), inst.getOperand(x+1), inst.getOperand(x+2), inst.getOperand(x+3).getImm(), inst.getOperand(x+4), false);
     } else {
-		return x86_64::getAddrFromExpr(b, natM, inst.getOperand(x+0), inst.getOperand(x+1), inst.getOperand(x+2), inst.getOperand(x+3).getImm(), inst.getOperand(x+4), false);
+        return x86_64::getAddrFromExpr(b, natM, inst.getOperand(x+0), inst.getOperand(x+1), inst.getOperand(x+2), inst.getOperand(x+3).getImm(), inst.getOperand(x+4), false);
     }
 
 }

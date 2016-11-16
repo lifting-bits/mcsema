@@ -144,22 +144,21 @@ pop edx
   sub DWORD PTR [eax + __mcsema_stack_mark@SECREL32], esp
   mov ecx, DWORD PTR [eax + __mcsema_stack_mark@SECREL32]
   add esp, 260
+  add esp, ecx
   xchg esp, DWORD PTR [eax + __mcsema_reg_state@SECREL32 + 28]
+  pop DWORD PTR [eax + __mcsema_stack_mark@SECREL32]
   pop ebp
   pop ebx
   pop esi
   pop edi
-  sub esp, ecx
-  add esp, 4
-  lea ecx, [esp+ecx]
-  jmp dword ptr [ecx-4]
+  ret
 .Lfunc_end0:
   .cfi_endproc
 
   .globl __mcsema_detach_ret_cdecl
 __mcsema_detach_ret_cdecl:
   .cfi_startproc
-  push ebp
+  mov [esp], ebp
 push edx
 mov ebp, dword ptr [__tls_index]
 mov edx, dword ptr fs:[44]
@@ -290,7 +289,7 @@ pop edx
   pop edi
   pop esi
   mov DWORD PTR [eax + __mcsema_stack_mark@SECREL32], esp
-  push eax
+  mov [esp], eax
   lea eax, __mcsema_attach_ret_value
   xchg eax, [esp]
   jmp DWORD PTR [eax + __mcsema_reg_state@SECREL32 + 0]
@@ -366,7 +365,6 @@ mov ecx, dword ptr [edx + 4*ecx]
 pop edx
   sub DWORD PTR [ecx + __mcsema_stack_mark@SECREL32], esp
   add esp, 260
-  add esp, DWORD PTR [ecx + __mcsema_stack_mark@SECREL32]
   xchg esp, DWORD PTR [ecx + __mcsema_reg_state@SECREL32 + 28]
   mov [ecx + __mcsema_reg_state@SECREL32 + 4], eax
   mov [ecx + __mcsema_reg_state@SECREL32 + 16], edx

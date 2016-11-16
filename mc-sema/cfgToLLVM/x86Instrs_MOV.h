@@ -65,56 +65,56 @@ InstTransResult doMRMovBE(InstPtr ip, llvm::BasicBlock *&b,
     switch(width){
     case 16:
     {
-    	llvm::Value *o1 = BinaryOperator::CreateLShr(srcReg, CONST_V<width>(b, width/2), "", b);
-    	llvm::Value *o2 = BinaryOperator::CreateShl(srcReg, CONST_V<width>(b, width/2), "", b);
-    	srcReg = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
+        llvm::Value *o1 = BinaryOperator::CreateLShr(srcReg, CONST_V<width>(b, width/2), "", b);
+        llvm::Value *o2 = BinaryOperator::CreateShl(srcReg, CONST_V<width>(b, width/2), "", b);
+        srcReg = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
     }
     break;
 
     case 32:
     {
-    	llvm::Value *o1 = BinaryOperator::CreateLShr(srcReg, CONST_V<width>(b, 8), "", b);
-    	o1 = BinaryOperator::Create(Instruction::And, o1, CONST_V<width>(b, 0xFF00FF), "", b);
+        llvm::Value *o1 = BinaryOperator::CreateLShr(srcReg, CONST_V<width>(b, 8), "", b);
+        o1 = BinaryOperator::Create(Instruction::And, o1, CONST_V<width>(b, 0xFF00FF), "", b);
 
-    	llvm::Value *o2 = BinaryOperator::CreateShl(srcReg, CONST_V<width>(b, 8), "", b);
-    	o2 = BinaryOperator::Create(Instruction::And, o2, CONST_V<width>(b, 0xFF00FF00), "", b);
+        llvm::Value *o2 = BinaryOperator::CreateShl(srcReg, CONST_V<width>(b, 8), "", b);
+        o2 = BinaryOperator::Create(Instruction::And, o2, CONST_V<width>(b, 0xFF00FF00), "", b);
 
-    	llvm::Value *val = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
+        llvm::Value *val = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
 
-    	llvm::Value *val1 = BinaryOperator::CreateLShr(val, CONST_V<width>(b, 16), "", b);
-    	llvm::Value *val2 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 16), "", b);
+        llvm::Value *val1 = BinaryOperator::CreateLShr(val, CONST_V<width>(b, 16), "", b);
+        llvm::Value *val2 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 16), "", b);
 
-    	srcReg = BinaryOperator::Create(Instruction::Or, val1, val2, "", b);
+        srcReg = BinaryOperator::Create(Instruction::Or, val1, val2, "", b);
     }
     break;
 
     case 64:
     {
-    	llvm::Value *o1 = BinaryOperator::CreateLShr(srcReg, CONST_V<width>(b, 8), "", b);
-    	o1 = BinaryOperator::Create(Instruction::And, o1, CONST_V<width>(b, 0x00FF00FF00FF00FF), "", b);
+        llvm::Value *o1 = BinaryOperator::CreateLShr(srcReg, CONST_V<width>(b, 8), "", b);
+        o1 = BinaryOperator::Create(Instruction::And, o1, CONST_V<width>(b, 0x00FF00FF00FF00FF), "", b);
 
-    	llvm::Value *o2 = BinaryOperator::CreateShl(srcReg, CONST_V<width>(b, 8), "", b);
-    	o2 = BinaryOperator::Create(Instruction::And, o2, CONST_V<width>(b, 0xFF00FF00FF00FF00), "", b);
+        llvm::Value *o2 = BinaryOperator::CreateShl(srcReg, CONST_V<width>(b, 8), "", b);
+        o2 = BinaryOperator::Create(Instruction::And, o2, CONST_V<width>(b, 0xFF00FF00FF00FF00), "", b);
 
-    	llvm::Value *val = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
+        llvm::Value *val = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
 
-    	llvm::Value *o3 = BinaryOperator::CreateLShr(val, CONST_V<width>(b, 16), "", b);
-    	o3 = BinaryOperator::Create(Instruction::And, o3, CONST_V<width>(b, 0x0000FFFF0000FFFF), "", b);
+        llvm::Value *o3 = BinaryOperator::CreateLShr(val, CONST_V<width>(b, 16), "", b);
+        o3 = BinaryOperator::Create(Instruction::And, o3, CONST_V<width>(b, 0x0000FFFF0000FFFF), "", b);
 
-    	llvm::Value *o4 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 16), "", b);
-    	o4 = BinaryOperator::Create(Instruction::And, o3, CONST_V<width>(b, 0xFFFF0000FFFF0000), "", b);
+        llvm::Value *o4 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 16), "", b);
+        o4 = BinaryOperator::Create(Instruction::And, o3, CONST_V<width>(b, 0xFFFF0000FFFF0000), "", b);
 
-    	llvm::Value *val1 = BinaryOperator::Create(Instruction::Or, o3, o4, "", b);
+        llvm::Value *val1 = BinaryOperator::Create(Instruction::Or, o3, o4, "", b);
 
-    	srcReg = BinaryOperator::Create(Instruction::Or,
-    	            BinaryOperator::CreateLShr(val1, CONST_V<width>(b, 32), "", b),
-    	            BinaryOperator::CreateShl(val, CONST_V<width>(b, 32), "", b),
-    	            "", b);
+        srcReg = BinaryOperator::Create(Instruction::Or,
+                    BinaryOperator::CreateLShr(val1, CONST_V<width>(b, 32), "", b),
+                    BinaryOperator::CreateShl(val, CONST_V<width>(b, 32), "", b),
+                    "", b);
     }
-    	break;
+        break;
     default:
         throw TErr(__LINE__, __FILE__, "Unknown width!");
-    	break;
+        break;
     }
 
     // Does not affect any flags
@@ -133,7 +133,7 @@ InstTransResult doMRMov(InstPtr ip, llvm::BasicBlock *&b,
     TASSERT(src.isReg(), "src is not a register");
     TASSERT(dstAddr != NULL, "Destination addr can't be null");
 
-	M_WRITE<width>(ip, b, dstAddr, R_READ<width>(b, src.getReg()));
+    M_WRITE<width>(ip, b, dstAddr, R_READ<width>(b, src.getReg()));
 
     return ContinueBlock;
 }
@@ -186,7 +186,7 @@ InstTransResult doRRMovD(InstPtr ip, llvm::BasicBlock *b,
 
 template <int width>
 InstTransResult doRMMovBE(InstPtr ip, llvm::BasicBlock *&b,
-						llvm::Value           *srcAddr,
+                        llvm::Value           *srcAddr,
                         const llvm::MCOperand &dst)
 {
     //MOV <r>, <mem>
@@ -199,57 +199,57 @@ InstTransResult doRMMovBE(InstPtr ip, llvm::BasicBlock *&b,
     switch(width){
     case 16:
     {
-    	llvm::Value *o1 = BinaryOperator::CreateLShr(srcVal, CONST_V<width>(b, width/2), "", b);
-    	llvm::Value *o2 = BinaryOperator::CreateShl(srcVal, CONST_V<width>(b, width/2), "", b);
-    	srcVal = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
+        llvm::Value *o1 = BinaryOperator::CreateLShr(srcVal, CONST_V<width>(b, width/2), "", b);
+        llvm::Value *o2 = BinaryOperator::CreateShl(srcVal, CONST_V<width>(b, width/2), "", b);
+        srcVal = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
     }
-    	break;
+        break;
 
     case 32:
     {
-    	llvm::Value *o1 = BinaryOperator::CreateLShr(srcVal, CONST_V<width>(b, 8), "", b);
-    	o1 = BinaryOperator::Create(Instruction::And, o1, CONST_V<width>(b, 0xFF00FF), "", b);
+        llvm::Value *o1 = BinaryOperator::CreateLShr(srcVal, CONST_V<width>(b, 8), "", b);
+        o1 = BinaryOperator::Create(Instruction::And, o1, CONST_V<width>(b, 0xFF00FF), "", b);
 
-    	llvm::Value *o2 = BinaryOperator::CreateShl(srcVal, CONST_V<width>(b, 8), "", b);
-    	o2 = BinaryOperator::Create(Instruction::And, o2, CONST_V<width>(b, 0xFF00FF00), "", b);
+        llvm::Value *o2 = BinaryOperator::CreateShl(srcVal, CONST_V<width>(b, 8), "", b);
+        o2 = BinaryOperator::Create(Instruction::And, o2, CONST_V<width>(b, 0xFF00FF00), "", b);
 
-    	llvm::Value *val = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
+        llvm::Value *val = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
 
-    	llvm::Value *val1 = BinaryOperator::CreateLShr(val, CONST_V<width>(b, 16), "", b);
-    	llvm::Value *val2 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 16), "", b);
+        llvm::Value *val1 = BinaryOperator::CreateLShr(val, CONST_V<width>(b, 16), "", b);
+        llvm::Value *val2 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 16), "", b);
 
-    	srcVal = BinaryOperator::Create(Instruction::Or, val1, val2, "", b);
+        srcVal = BinaryOperator::Create(Instruction::Or, val1, val2, "", b);
     }
     break;
 
     case 64:
     {
-    	llvm::Value *o1 = BinaryOperator::CreateLShr(srcVal, CONST_V<width>(b, 8), "", b);
-    	o1 = BinaryOperator::Create(Instruction::And, o1, CONST_V<width>(b, 0x00FF00FF00FF00FF), "", b);
+        llvm::Value *o1 = BinaryOperator::CreateLShr(srcVal, CONST_V<width>(b, 8), "", b);
+        o1 = BinaryOperator::Create(Instruction::And, o1, CONST_V<width>(b, 0x00FF00FF00FF00FF), "", b);
 
-    	llvm::Value *o2 = BinaryOperator::CreateShl(srcVal, CONST_V<width>(b, 8), "", b);
-    	o2 = BinaryOperator::Create(Instruction::And, o2, CONST_V<width>(b, 0xFF00FF00FF00FF00), "", b);
+        llvm::Value *o2 = BinaryOperator::CreateShl(srcVal, CONST_V<width>(b, 8), "", b);
+        o2 = BinaryOperator::Create(Instruction::And, o2, CONST_V<width>(b, 0xFF00FF00FF00FF00), "", b);
 
-    	llvm::Value *val = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
+        llvm::Value *val = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
 
-    	llvm::Value *o3 = BinaryOperator::CreateLShr(val, CONST_V<width>(b, 16), "", b);
-    	o3 = BinaryOperator::Create(Instruction::And, o3, CONST_V<width>(b, 0x0000FFFF0000FFFF), "", b);
+        llvm::Value *o3 = BinaryOperator::CreateLShr(val, CONST_V<width>(b, 16), "", b);
+        o3 = BinaryOperator::Create(Instruction::And, o3, CONST_V<width>(b, 0x0000FFFF0000FFFF), "", b);
 
-    	llvm::Value *o4 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 16), "", b);
-    	o4 = BinaryOperator::Create(Instruction::And, o3, CONST_V<width>(b, 0xFFFF0000FFFF0000), "", b);
+        llvm::Value *o4 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 16), "", b);
+        o4 = BinaryOperator::Create(Instruction::And, o3, CONST_V<width>(b, 0xFFFF0000FFFF0000), "", b);
 
-    	llvm::Value *val1 = BinaryOperator::Create(Instruction::Or, o3, o4, "", b);
+        llvm::Value *val1 = BinaryOperator::Create(Instruction::Or, o3, o4, "", b);
 
-    	llvm::Value *o5 = BinaryOperator::CreateLShr(val1, CONST_V<width>(b, 32), "", b);
+        llvm::Value *o5 = BinaryOperator::CreateLShr(val1, CONST_V<width>(b, 32), "", b);
 
-    	llvm::Value *o6 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 32), "", b);
+        llvm::Value *o6 = BinaryOperator::CreateShl(val, CONST_V<width>(b, 32), "", b);
 
-    	srcVal = BinaryOperator::Create(Instruction::Or, o5, o6, "", b);
+        srcVal = BinaryOperator::Create(Instruction::Or, o5, o6, "", b);
     }
-    	break;
+        break;
     default:
         throw TErr(__LINE__, __FILE__, "Unknown width!");
-    	break;
+        break;
     }
 
     // Does not affect any flags
@@ -269,7 +269,7 @@ InstTransResult doRMMov(InstPtr ip, llvm::BasicBlock      *b,
     TASSERT(dst.isReg(), "");
     TASSERT(srcAddr != NULL, "");
 
-	R_WRITE<width>(b, dst.getReg(), M_READ<width>(ip, b, srcAddr));
+    R_WRITE<width>(b, dst.getReg(), M_READ<width>(ip, b, srcAddr));
 
     return ContinueBlock;
 }

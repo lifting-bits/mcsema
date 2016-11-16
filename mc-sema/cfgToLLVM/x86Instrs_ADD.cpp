@@ -130,17 +130,17 @@ static InstTransResult doAddRI(InstPtr ip, BasicBlock *&b,
     TASSERT(src2.isImm(), "");
     TASSERT(dst.isReg(), "");
 
-	llvm::Module *M = b->getParent()->getParent();
+    llvm::Module *M = b->getParent()->getParent();
 
     Value *srcReg = NULL;
 
     // Read from src1.
-	srcReg = R_READ<width>(b, src1.getReg());
+    srcReg = R_READ<width>(b, src1.getReg());
     
     // Constant.
     Value *constPart = CONST_V<width>(b, src2.getImm());
 
-	R_WRITE<width>(b, dst.getReg(), doAddVV<width>(ip, b, srcReg, constPart));
+    R_WRITE<width>(b, dst.getReg(), doAddVV<width>(ip, b, srcReg, constPart));
 
     return ContinueBlock;
 }
@@ -161,11 +161,11 @@ static InstTransResult doAddRM(InstPtr ip, BasicBlock *&b,
     // Read from o1.
     Value *v2 = R_READ<width>(b, o1.getReg());
 
-	// Do add.
-	Value *res = doAddVV<width>(ip, b, v1, v2);
+    // Do add.
+    Value *res = doAddVV<width>(ip, b, v1, v2);
 
-	// Write to o2.
-	R_WRITE<width>(b, o2.getReg(), res);
+    // Write to o2.
+    R_WRITE<width>(b, o2.getReg(), res);
 
     return ContinueBlock;
 }
@@ -183,13 +183,13 @@ static InstTransResult doAddRV(InstPtr ip, BasicBlock *&b,
     llvm::errs() << "Doing AddRV at: " << to_string<VA>(ip->get_loc(), hex) << "\n";
 
     // Read from o1.
-	Value *v2 = R_READ<width>(b, o1.getReg());
+    Value *v2 = R_READ<width>(b, o1.getReg());
 
-	// Do add.
-	Value *res = doAddVV<width>(ip, b, addr, v2);
+    // Do add.
+    Value *res = doAddVV<width>(ip, b, addr, v2);
 
-	// Write to o2.
-	R_WRITE<width>(b, o2.getReg(), res);
+    // Write to o2.
+    R_WRITE<width>(b, o2.getReg(), res);
 
     return ContinueBlock;
 }
@@ -269,13 +269,13 @@ static InstTransResult doAdcRV(InstPtr ip, BasicBlock *&b,
     TASSERT(addr != NULL, "");
 
     // Read from o1.
-	Value *v2 = R_READ<width>(b, o1.getReg());
+    Value *v2 = R_READ<width>(b, o1.getReg());
 
-	// Do add.
-	Value *res = doAdcVV<width>(ip, b, addr, v2);
+    // Do add.
+    Value *res = doAdcVV<width>(ip, b, addr, v2);
 
-	// Write to o2.
-	R_WRITE<width>(b, o2.getReg(), res);
+    // Write to o2.
+    R_WRITE<width>(b, o2.getReg(), res);
 
     return ContinueBlock;
 }
@@ -716,13 +716,13 @@ void ADD_populateDispatchMap(DispatchMap &m)
     m[X86::ADD64ri32_DB] = translate_ADD64ri32;
     m[X86::ADD64i32] = translate_ADD64i32;
     m[X86::ADD64mi8] = translate_ADD64mi8;;
-	m[X86::ADD64mi32] = translate_ADD64mi32;
+    m[X86::ADD64mi32] = translate_ADD64mi32;
 
-	m[X86::ADD64rr_DB] = translate_ADD64rr;
-	m[X86::ADD64rr] = translate_ADD64rr;
-	m[X86::ADD64rr_REV] = translate_ADD64rr;
-	m[X86::ADD64rm] = translate_ADD64rm;
-	m[X86::ADD64mr] = translate_ADD64mr;
+    m[X86::ADD64rr_DB] = translate_ADD64rr;
+    m[X86::ADD64rr] = translate_ADD64rr;
+    m[X86::ADD64rr_REV] = translate_ADD64rr;
+    m[X86::ADD64rm] = translate_ADD64rm;
+    m[X86::ADD64mr] = translate_ADD64mr;
 
 
     m[X86::ADC16i16] = translate_ADC16i16;
@@ -751,7 +751,7 @@ void ADD_populateDispatchMap(DispatchMap &m)
     m[X86::ADC8rr] = translate_ADC8rr;
     m[X86::ADC8rr_REV] = translate_ADC8rr_REV;
 
-	m[X86::ADC64i32] = translate_ADC64i32;
-	m[X86::ADC64ri32] = translate_ADC64ri32;
-	m[X86::ADC64rr] = translate_ADC64rr;
+    m[X86::ADC64i32] = translate_ADC64i32;
+    m[X86::ADC64ri32] = translate_ADC64ri32;
+    m[X86::ADC64rr] = translate_ADC64rr;
 }
