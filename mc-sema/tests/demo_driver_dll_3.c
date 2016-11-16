@@ -4,6 +4,16 @@
 
 extern HANDLE StartServer(void);
 
+//int WINAPI printString(const char *s, int d0, const char *s2, int d1) {
+//    printf("%s | %08x | %s | %08x\n", s, d0, s2, d1);
+//    return 0x80;
+//}
+//
+//int WINAPI printInt(int i, const char *s0, int d0, const char *s1) {
+//    printf("%08x | %s | %08x | %s\n", i, s0, d0, s1);
+//    return 0x20;
+//}
+
 int main(int argc, char *argv[]) {
     HANDLE hThread;
     DWORD dwRet;

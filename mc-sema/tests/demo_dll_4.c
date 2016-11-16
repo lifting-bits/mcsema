@@ -26,6 +26,7 @@ static int call_ptr_reg()
         PUSH eax
         MOV eax, p
         CALL eax
+        add esp, 4
         MOV retval, eax
         }
 
