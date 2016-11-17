@@ -571,7 +571,16 @@ static InstTransResult translate_PUSHi32(NativeModulePtr natM,
     doPushV<32>(ip, block, addrInt);
     ret = ContinueBlock;
   } else if (ip->has_imm_reference) {
-    doPushV<32>(ip, block, IMM_AS_DATA_REF(block, natM, ip));
+    Module *M = F->getParent();
+    Value *ref = IMM_AS_DATA_REF(block, natM, ip);
+
+    // this may fail catastrophically, but we can only push those 32-bits
+    // or we break the stack
+    if (Pointer64 == ArchPointerSize(M)) {
+        ref = new llvm::TruncInst(ref, llvm::Type::getInt32Ty(block->getContext()), "", block);
+    }
+
+    doPushV<32>(ip, block, ref);
     ret = ContinueBlock;
   } else {
     ret = doPushI<32>(ip, block, OP(0));
@@ -721,6 +730,7 @@ void Stack_populateDispatchMap(DispatchMap &m) {
   m[X86::PUSH64r] = translate_PUSH64r;
   m[X86::PUSH64rmm] = translate_PUSH64rmm;
   m[X86::PUSH64i8] = translate_PUSHi8;
+  m[X86::PUSH64i32] = translate_PUSHi32;
 
   m[X86::POP64r] = translate_POP64r;
   m[X86::POPF64] = translate_POPF64;
