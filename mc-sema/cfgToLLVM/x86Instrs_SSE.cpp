@@ -759,14 +759,22 @@ static InstTransResult doNewShift(BasicBlock *&b,
     int_t = dyn_cast<IntegerType>(real_count->getType());
     IntegerType *elem_int_t = dyn_cast<IntegerType>(elem_ty);
     Value *trunc_shift = nullptr;
+
+    // size of shift count has to be the size of the vector elements
     if(elem_int_t->getBitWidth() < int_t->getBitWidth()) {
         trunc_shift = new TruncInst( 
                 real_count, 
                 elem_ty, 
                 "",
                 b);
-    } else {
+    } else if (elem_int_t->getBitWidth() == int_t->getBitWidth()) {
         trunc_shift = real_count;
+    } else {
+        trunc_shift = new ZExtInst( 
+                real_count, 
+                elem_ty, 
+                "",
+                b);
     }
 
     Value *vecShiftPtr = new AllocaInst(vt, nullptr, "", b);
@@ -2551,6 +2559,9 @@ GENERIC_TRANSLATION_REF(PSLLQrm,
         (doPSLLrm<64>(ip, block, OP(1), ADDR_NOREF(2))),
         (doPSLLrm<64>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
+GENERIC_TRANSLATION(PSLLDQri, 
+        (doPSLLri<128>(block, OP(1), OP(2))) )
+
 GENERIC_TRANSLATION(PSHUFDri,
         (doPSHUFDri(block, OP(0), OP(1), OP(2))) )
 GENERIC_TRANSLATION_REF(PSHUFDmi,
@@ -2956,6 +2967,8 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::PSLLQrr] = translate_PSLLQrr;
     m[X86::PSLLQrm] = translate_PSLLQrm;
     m[X86::PSLLQri] = translate_PSLLQri;
+
+    m[X86::PSLLDQri] = translate_PSLLDQri;
 
     m[X86::PSRLWrr] = translate_PSRLWrr;
     m[X86::PSRLWrm] = translate_PSRLWrm;

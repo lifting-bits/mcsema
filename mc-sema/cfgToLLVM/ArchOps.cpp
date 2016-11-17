@@ -366,7 +366,7 @@ llvm::GlobalVariable *archGetImageBase(llvm::Module *M) {
 bool shouldSubtractImageBase(llvm::Module *M) {
 
   // we are on windows
-  if (llvm::Triple::Win32 == SystemOS(M)) {
+  if (llvm::Triple::Win32 != SystemOS(M)) {
     //llvm::errs() << __FUNCTION__ << ": Not on Win32\n";
     return false;
   }

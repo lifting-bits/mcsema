@@ -304,6 +304,20 @@ static InstTransResult doIMulRMI(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
+static InstTransResult doIMulRMV(InstPtr ip, BasicBlock *&b,
+                                 const MCOperand &dst, Value *lhs,
+                                 Value *rhs) {
+  NASSERT(dst.isReg());
+  NASSERT(lhs != NULL);
+
+  Value *res = doIMulVVV<width>(ip, b, M_READ<width>(ip, b, lhs), rhs);
+
+  R_WRITE<width>(b, dst.getReg(), res);
+
+  return ContinueBlock;
+}
+
+template<int width>
 static InstTransResult doIMulRRI(InstPtr ip, BasicBlock *&b,
                                  const MCOperand &dst, const MCOperand &lhs,
                                  const MCOperand &rhs) {
@@ -579,11 +593,14 @@ GENERIC_TRANSLATION_REF(IMUL64rmi8,
 GENERIC_TRANSLATION(IMUL32rri, doIMulRRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL32rri8, doIMulRRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(IMUL64rri8, doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)))
-//GENERIC_TRANSLATION(IMUL64rri32, doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_REF(IMUL64rri32,
         doIMulRRI<64>(ip, block, OP(0), OP(1), OP(2)),
         doIMulRRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), OP(0), OP(1)))
-/* END GOOD */
+GENERIC_TRANSLATION_MI(IMUL64rmi32,
+        doIMulRMI<64>(ip, block, OP(0), ADDR_NOREF(1), OP(2)),
+        doIMulRMI<64>(ip, block, OP(0), MEM_REFERENCE(1), OP(2)),
+        doIMulRMV<64>(ip, block, OP(0), ADDR_NOREF(1), IMM_AS_DATA_REF(block, natM, ip)),
+        doIMulRMV<64>(ip, block, OP(0), MEM_REFERENCE(1), IMM_AS_DATA_REF(block, natM, ip)))
 GENERIC_TRANSLATION(IDIV8r, doIDivR<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(IDIV16r, doIDivR<16>(ip, block, OP(0)))
 GENERIC_TRANSLATION(IDIV32r, doIDivR<32>(ip, block, OP(0)))
@@ -651,6 +668,7 @@ void MULDIV_populateDispatchMap(DispatchMap &m) {
     m[X86::IMUL32rri8] = translate_IMUL32rri8;
     m[X86::IMUL64rri8] = translate_IMUL64rri8;
     m[X86::IMUL64rri32] = translate_IMUL64rri32;
+    m[X86::IMUL64rmi32] = translate_IMUL64rmi32;
     m[X86::IMUL64rr] = translate_IMUL64rr;
     m[X86::IMUL64r] = translate_IMUL64r;
 
