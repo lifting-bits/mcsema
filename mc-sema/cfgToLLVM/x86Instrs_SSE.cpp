@@ -1442,6 +1442,91 @@ static InstTransResult doPUNPCKrm(
 }
 
 template <int width, int elemwidth, CmpInst::Predicate cmp_op>
+static llvm::Value* do_SATURATED_SUB(BasicBlock *&b, Value *v1, Value *v2)
+{
+    NASSERT(width % elemwidth == 0);
+    constexpr int elem_count = width/elemwidth;
+    Type *elem_ty;
+    VectorType *vt;
+    Type *int32ty = Type::getIntNTy(b->getContext(), 32);
+    VectorType *vt_int32ty = VectorType::get(int32ty, elem_count);
+
+    std::tie(vt, elem_ty) = getIntVectorTypes(b, elemwidth, elem_count);
+    Value *vecInput1 = INT_AS_VECTOR<width,elemwidth>(b, v1);
+    Value *vecInput2 = INT_AS_VECTOR<width,elemwidth>(b, v2);
+
+    // result = v1 - v2
+    Value *op_result = BinaryOperator::Create(
+        Instruction::Sub,
+        vecInput1,
+        vecInput2,
+        "",
+        b);
+
+    // if v1 is => v2, then we keep the original value (mask with 0xFF...)
+    // else, if v1 < v2, make it saturate to 0x00 (mask with 0x00...)
+    // The mask can be made as a sign extend of the (v1 => v2) vector op
+
+    Value *comparison = CmpInst::Create(
+            Instruction::ICmp,
+            cmp_op,
+            vecInput1,
+            vecInput2,
+            "",
+            b);
+    // values we should keep get sign extended to 0b11111...
+    // values we want to set to zero get sign extended to 0b000000...
+    Value *saturate_mask = new SExtInst(comparison, vt, "", b);
+
+    // mask result with the saturation mask
+    Value *saturated = BinaryOperator::Create(
+        Instruction::And, 
+        op_result,
+        saturate_mask,
+        "",
+        b);
+
+    Value *intOutput = CastInst::Create(
+        Instruction::BitCast,
+        saturated,
+        Type::getIntNTy(b->getContext(), width),
+        "",
+        b);
+    return intOutput;
+}
+
+template <int width, int elemwidth, CmpInst::Predicate cmp_op>
+static InstTransResult do_SATURATED_SUB_RR(InstPtr ip, BasicBlock *& block, 
+                                const MCOperand &o1,
+                                const MCOperand &o2)
+{
+    NASSERT(o1.isReg());
+    NASSERT(o2.isReg());
+
+    Value *opVal1 = R_READ<width>(block, o1.getReg());
+    Value *opVal2 = R_READ<width>(block, o2.getReg());
+
+    Value *result = do_SATURATED_SUB<width, elemwidth, cmp_op>(block, opVal1, opVal2);
+    R_WRITE<width>(block, o1.getReg(), result);
+    return ContinueBlock;
+}
+
+template <int width, int elemwidth, CmpInst::Predicate cmp_op>
+static InstTransResult do_SATURATED_SUB_RM(InstPtr ip, BasicBlock *& block,
+                                const MCOperand &o1,
+                                Value *addr)
+{
+    NASSERT(o1.isReg());
+
+    Value *opVal1 = R_READ<width>(block, o1.getReg());
+    Value *opVal2 = M_READ<width>(ip, block, addr);
+
+    Value *result = do_SATURATED_SUB<width, elemwidth, cmp_op>(block, opVal1, opVal2);
+    R_WRITE<width>(block, o1.getReg(), result);
+    return ContinueBlock;
+}
+
+template <int width, int elemwidth, CmpInst::Predicate cmp_op>
 static InstTransResult do_SSE_COMPARE(const MCOperand &dst, BasicBlock *&b, Value *v1, Value *v2)
 {
     NASSERT(width % elemwidth == 0);
@@ -2733,6 +2818,17 @@ GENERIC_TRANSLATION_REF(ADDPDrm,
         (do_SSE_FP_VECTOR_RM<128,64,Instruction::FAdd>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 
+GENERIC_TRANSLATION(PSUBUSBrr, 
+        (do_SATURATED_SUB_RR<128,8,ICmpInst::ICMP_UGE>(ip, block, OP(1), OP(2))))
+GENERIC_TRANSLATION_REF(PSUBUSBrm, 
+        (do_SATURATED_SUB_RM<128,8,ICmpInst::ICMP_UGE>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SATURATED_SUB_RM<128,8,ICmpInst::ICMP_UGE>(ip, block, OP(1), MEM_REFERENCE(2))))
+
+GENERIC_TRANSLATION(PSUBUSWrr, 
+        (do_SATURATED_SUB_RR<128,16,ICmpInst::ICMP_UGE>(ip, block, OP(1), OP(2))))
+GENERIC_TRANSLATION_REF(PSUBUSWrm, 
+        (do_SATURATED_SUB_RM<128,16,ICmpInst::ICMP_UGE>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SATURATED_SUB_RM<128,16,ICmpInst::ICMP_UGE>(ip, block, OP(1), MEM_REFERENCE(2))))
 
 GENERIC_TRANSLATION(PSUBBrr, 
         (do_SSE_VECTOR_RR<128,8,Instruction::Sub>(ip, block, OP(1), OP(2))) )
@@ -3021,6 +3117,12 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::PADDQrr] = translate_PADDQrr;
     m[X86::PADDQrm] = translate_PADDQrm;
 
+    m[X86::PSUBUSBrr] = translate_PSUBUSBrr;
+    m[X86::PSUBUSBrm] = translate_PSUBUSBrm;
+
+    m[X86::PSUBUSWrr] = translate_PSUBUSWrr;
+    m[X86::PSUBUSWrm] = translate_PSUBUSWrm;
+
     m[X86::PSUBBrr] = translate_PSUBBrr;
     m[X86::PSUBBrm] = translate_PSUBBrm;
     m[X86::PSUBWrr] = translate_PSUBWrr;
@@ -3114,6 +3216,11 @@ void SSE_populateDispatchMap(DispatchMap &m) {
 
     m[X86::MOVLPDrm] = translate_MOVLPDrm;
     m[X86::MOVLPDmr] = (doMOVSmr<64>);
+
+    // we don't care if its moving two single precision floats
+    // or a double precision float. 64 bits are 64 bits
+    m[X86::MOVLPSrm] = translate_MOVLPDrm;
+    m[X86::MOVLPSmr] = (doMOVSmr<64>);
 
     m[X86::SHUFPSrri] = translate_SHUFPSrri;
     m[X86::SHUFPSrmi] = translate_SHUFPSrmi;
