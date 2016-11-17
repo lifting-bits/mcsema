@@ -544,9 +544,11 @@ GENERIC_TRANSLATION_REF(ADD64mi8,
         doAddMI<64>(ip, block, ADDR_NOREF(0), OP(5)),
         doAddMI<64>(ip, block, MEM_REFERENCE(0), OP(5)))
 
-GENERIC_TRANSLATION_REF(ADD64mi32,
+GENERIC_TRANSLATION_MI(ADD64mi32,
       doAddMI<64>(ip, block, ADDR_NOREF(0), OP(5)),
-      doAddMI<64>(ip, block, MEM_REFERENCE(0), OP(5)))
+      doAddMI<64>(ip, block, MEM_REFERENCE(0), OP(5)),
+      doAddMV<64>(ip, block, ADDR_NOREF(0), IMM_AS_DATA_REF(block, natM, ip)),
+      doAddMV<64>(ip, block, MEM_REFERENCE(0), IMM_AS_DATA_REF(block, natM, ip)))
 
 GENERIC_TRANSLATION_REF(ADD32mr, 
         doAddMR<32>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -649,6 +651,7 @@ GENERIC_TRANSLATION_REF(ADC64ri32,
 
 GENERIC_TRANSLATION(ADC32ri, doAdcRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(ADC32ri8, doAdcRI8<32>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(ADC64ri8, doAdcRI8<64>(ip, block, OP(0), OP(1), OP(2)))
 
 GENERIC_TRANSLATION_REF(ADC32rm, 
         doAdcRM<32>(ip, block, ADDR_NOREF(2), OP(0), OP(1)),
@@ -740,6 +743,7 @@ void ADD_populateDispatchMap(DispatchMap &m)
     m[X86::ADC32mr] = translate_ADC32mr;
     m[X86::ADC32ri] = translate_ADC32ri;
     m[X86::ADC32ri8] = translate_ADC32ri8;
+    m[X86::ADC64ri8] = translate_ADC64ri8;
     m[X86::ADC32rm] = translate_ADC32rm;
     m[X86::ADC32rr] = translate_ADC32rr;
     m[X86::ADC32rr_REV] = translate_ADC32rr_REV;
