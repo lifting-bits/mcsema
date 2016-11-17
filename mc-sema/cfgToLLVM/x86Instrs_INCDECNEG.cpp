@@ -212,6 +212,9 @@ GENERIC_TRANSLATION_REF(DEC8m,
 GENERIC_TRANSLATION_REF(DEC64_32m, 
 	(doDecM<32,64>(ip, block, ADDR_NOREF(0))) ,
 	(doDecM<32,64>(ip, block, MEM_REFERENCE(0))) )
+GENERIC_TRANSLATION_REF(DEC64_16m, 
+	(doDecM<16,64>(ip, block, ADDR_NOREF(0))) ,
+	(doDecM<16,64>(ip, block, MEM_REFERENCE(0))) )
 GENERIC_TRANSLATION_REF(INC16m, 
 	doIncM<16>(ip, block, ADDR_NOREF(0)),
 	doIncM<16>(ip, block, MEM_REFERENCE(0)))
@@ -286,6 +289,7 @@ void INCDECNEG_populateDispatchMap(DispatchMap &m) {
     m[X86::DEC64_16r] = translate_DEC64_16r;
     m[X86::DEC64_32r] = translate_DEC64_32r;
     m[X86::DEC64_32m] = translate_DEC64_32m;
+    m[X86::DEC64_16m] = translate_DEC64_16m;
     m[X86::DEC64r] = translate_DEC64r;
 
     m[X86::INC16m] = translate_INC16m;
