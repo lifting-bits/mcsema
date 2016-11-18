@@ -1698,11 +1698,11 @@ def recoverStackVars(M, F):
       for i in stack_locals[offset]["writes"]:
         r = var.var.ref_eas.add()
         r.inst_addr = i
-        r.opd_idx = -1 
+        #r.opd_idx = -1
       for i in stack_locals[offset]["reads"]:
         r = var.var.ref_eas.add()
         r.inst_addr = i
-        r.opd_idx = -1
+        #r.opd_idx = -1
 
 def recoverFunctionFromSet(M, F, blockset, new_eas):
     processed_blocks = set()
