@@ -138,7 +138,7 @@ private:
 
 class VectorComparator {
 public:
-  bool operator()(const Vector &A, const Vector &B) {
+  bool operator()(const Vector &A, const Vector &B) const {
     if (A.Length < B.Length)
       return true;
     if (B.Length < A.Length)
@@ -386,7 +386,7 @@ private:
 
 class MatrixComparator {
 public:
-  bool operator()(const Matrix &A, const Matrix &B) {
+  bool operator()(const Matrix &A, const Matrix &B) const {
     if (A.Rows < B.Rows)
       return true;
     if (B.Rows < A.Rows)

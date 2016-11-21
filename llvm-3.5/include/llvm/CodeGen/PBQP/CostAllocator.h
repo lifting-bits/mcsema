@@ -87,10 +87,10 @@ private:
                !std::is_same<PoolEntry*,
                              typename std::remove_const<CostKeyT>::type>::value,
                bool>::type
-    operator()(const PoolEntry* a, const CostKeyT &b) {
+    operator()(const PoolEntry* a, const CostKeyT &b) const {
       return compare(a->getCost(), b);
     }
-    bool operator()(const PoolEntry* a, const PoolEntry* b) {
+    bool operator()(const PoolEntry* a, const PoolEntry* b) const {
       return compare(a->getCost(), b->getCost());
     }
   private:
