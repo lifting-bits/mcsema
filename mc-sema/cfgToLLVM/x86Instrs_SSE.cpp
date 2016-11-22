@@ -928,16 +928,26 @@ static Value* doDoubleShuffle(BasicBlock *&b, Value *input1, Value *input2, unsi
     Value *vecInput1 = INT_AS_VECTOR<width,elemwidth>(b, input1);
     Value *vecInput2 = INT_AS_VECTOR<width,elemwidth>(b, input2);
 
-    // take two from first vector, and two from second vector
-    Constant *shuffle_vec[4] = {
-        CONST_V<32>(b, (order >> 0) & 3),
-        CONST_V<32>(b, (order >> 2) & 3),
-        CONST_V<32>(b, elem_count + ((order >> 4) & 3)),
-        CONST_V<32>(b, elem_count + ((order >> 6) & 3)),
-    };
+    Value *vecShuffle;
+    if(32 == elemwidth) {
+      // take two from first vector, and two from second vector
+      Constant *shuffle_vec[4] = {
+          CONST_V<32>(b, (order >> 0) & 3),
+          CONST_V<32>(b, (order >> 2) & 3),
+          CONST_V<32>(b, elem_count + ((order >> 4) & 3)),
+          CONST_V<32>(b, elem_count + ((order >> 6) & 3)),
+      };
 
-    Value *vecShuffle = ConstantVector::get(shuffle_vec);
+      vecShuffle = ConstantVector::get(shuffle_vec);
+    } else if(64 == elemwidth) {
+      // take one from first vector, and next from second vector
+      Constant *shuffle_vec[2] = {
+          CONST_V<64>(b, (order >> 0) & 1),
+          CONST_V<64>(b, elem_count + ((order >> 1) & 1)),
+      };
 
+      vecShuffle = ConstantVector::get(shuffle_vec);
+    }
     // do the shuffle
     Value *shuffled = new ShuffleVectorInst(
            vecInput1,
@@ -1712,6 +1722,59 @@ static Value* doMAXMINvv(BasicBlock *&block, Value *op1, Value *op2)
     return which_op;
 }
 
+template <int width, int elemwidth, FCmpInst::Predicate binop>
+static InstTransResult doMAXMIN_FP_VECTOR_rr(BasicBlock *&b, const MCOperand &op1, const MCOperand &op2)
+{
+    NASSERT(op1.isReg());
+    NASSERT(op2.isReg());
+
+    Value *op1_val = R_READ<width>(b, op1.getReg());
+    Value *op2_val = R_READ<width>(b, op2.getReg());
+
+    NASSERT(width % elemwidth == 0);
+    Value *vecInput1 = INT_AS_FPVECTOR<width,elemwidth>(b, op1_val);
+    Value *vecInput2 = INT_AS_FPVECTOR<width,elemwidth>(b, op2_val);
+
+    Value *max = doMAXMINvv<binop>(b, vecInput1, vecInput2);
+
+    // convert the output back to an integer
+    Value *intOutput = CastInst::Create(
+            Instruction::BitCast,
+            max,
+            Type::getIntNTy(b->getContext(), width),
+            "",
+            b);
+
+    R_WRITE<width>(b, op1.getReg(), intOutput);
+    return ContinueBlock;
+}
+
+template <int width, int elemwidth, FCmpInst::Predicate binop>
+static InstTransResult doMAXMIN_FP_VECTOR_rm(InstPtr ip, BasicBlock *&b, const MCOperand &op1, Value *memAddr)
+{
+    NASSERT(op1.isReg());
+
+    Value *op1_val = R_READ<width>(b, op1.getReg());
+    Value *op2_val = M_READ<width>(ip, b, memAddr);
+    
+    NASSERT(width % elemwidth == 0);
+    Value *vecInput1 = INT_AS_FPVECTOR<width,elemwidth>(b, op1_val);
+    Value *vecInput2 = INT_AS_FPVECTOR<width,elemwidth>(b, op2_val);
+
+    Value *max = doMAXMINvv<binop>(b, vecInput1, vecInput2);
+
+    // convert the output back to an integer
+    Value *intOutput = CastInst::Create(
+            Instruction::BitCast,
+            max,
+            Type::getIntNTy(b->getContext(), width),
+            "",
+            b);
+
+    R_WRITE<width>(b, op1.getReg(), intOutput);
+    return ContinueBlock;
+}
+
 template <int width, FCmpInst::Predicate binop >
 static InstTransResult doMAXMINrr(BasicBlock *&b, const MCOperand &op1, const MCOperand &op2)
 {
@@ -2141,6 +2204,36 @@ static InstTransResult doCVTTPS2DQrr(
     return ContinueBlock;
 }
 
+static InstTransResult doSHUFPDrri(BasicBlock *&b, const MCOperand &dst, const MCOperand &src, const MCOperand &order)
+{
+    NASSERT(dst.isReg());
+    NASSERT(src.isReg());
+    NASSERT(order.isImm());
+
+    Value *input1 = R_READ<128>(b, src.getReg());
+    Value *input2 = R_READ<128>(b, dst.getReg());
+    
+    Value *shuffled = doDoubleShuffle<128,64>(b, input2, input1, order.getImm());
+
+    R_WRITE<128>(b, dst.getReg(), shuffled);
+    return ContinueBlock;
+}
+
+static InstTransResult doSHUFPDrmi(InstPtr ip, BasicBlock *&b, const MCOperand &dst, Value *mem_addr, const MCOperand &order)
+{
+    NASSERT(dst.isReg());
+    NASSERT(order.isImm());
+    NASSERT(mem_addr != NULL);
+
+    Value *input1 = M_READ<128>(ip, b, mem_addr);
+    Value *input2 = R_READ<128>(b, dst.getReg());
+    
+    Value *shuffled = doDoubleShuffle<128,64>(b, input2, input1, order.getImm());
+
+    R_WRITE<128>(b, dst.getReg(), shuffled);
+    return ContinueBlock;
+}
+
 static InstTransResult doSHUFPSrri(BasicBlock *&b, const MCOperand &dst, const MCOperand &src, const MCOperand &order)
 {
     NASSERT(dst.isReg());
@@ -2171,6 +2264,37 @@ static InstTransResult doSHUFPSrmi(InstPtr ip, BasicBlock *&b, const MCOperand &
     return ContinueBlock;
 }
 
+static Value* doPSHUFHWvv(BasicBlock *&b, Value *in, Value *dstVal, const MCOperand &order)
+{
+    Value *shuffled = doShuffle<64,16>(b, in, order.getImm());
+
+    Value *sleft = BinaryOperator::Create(
+            Instruction::Shl,
+            dstVal,
+            CONST_V<128>(b, 64),
+            "", b);
+    Value *sright = BinaryOperator::Create(
+            Instruction::LShr,
+            sright,
+            CONST_V<128>(b, 64),
+            "", b);
+
+    Value *shufAdjusted = BinaryOperator::Create(
+            Instruction::Shl,
+            shuffled,
+            CONST_V<128>(b, 64),
+            "", b);
+      
+    Value *ored = BinaryOperator::Create(
+            Instruction::Or,
+            sright,
+            shufAdjusted,
+            "", b);
+
+    return ored;
+}
+
+
 static Value* doPSHUFLWvv(BasicBlock *&b, Value *in, Value *dstVal, const MCOperand &order)
 {
     Value *shuffled = doShuffle<64,16>(b, in, order.getImm());
@@ -2199,6 +2323,47 @@ static Value* doPSHUFLWvv(BasicBlock *&b, Value *in, Value *dstVal, const MCOper
     return ored;
 }
 
+static InstTransResult doPSHUFHWri(BasicBlock *&b, const MCOperand &dst, const MCOperand &src, const MCOperand &order)
+{
+    NASSERT(dst.isReg());
+    NASSERT(src.isReg());
+    NASSERT(order.isImm());
+
+    Value *input1 = R_READ<128>(b, src.getReg());
+
+    Value *higher = BinaryOperator::Create(
+                  Instruction::LShr,
+                  input1,
+                  CONST_V<128>(b, 64),
+                  "", b);
+
+    Value *res = doPSHUFHWvv(b, higher, input1, order);
+    
+    
+    R_WRITE<128>(b, dst.getReg(), res);
+    return ContinueBlock;
+}
+
+static InstTransResult doPSHUFHWmi(InstPtr ip, BasicBlock *&b, const MCOperand &dst, Value *mem_addr, const MCOperand &order)
+{
+    NASSERT(dst.isReg());
+    NASSERT(order.isImm());
+    NASSERT(mem_addr != NULL);
+
+    Value *input1 = M_READ<128>(ip, b, mem_addr);
+
+    Value *higher = BinaryOperator::Create(
+                  Instruction::LShr,
+                  input1,
+                  CONST_V<128>(b, 64),
+                  "", b);
+
+    Value *res = doPSHUFHWvv(b, higher, input1, order);
+    
+
+    R_WRITE<128>(b, dst.getReg(), res);
+    return ContinueBlock;
+}
 static InstTransResult doPSHUFLWri(BasicBlock *&b, const MCOperand &dst, const MCOperand &src, const MCOperand &order)
 {
     NASSERT(dst.isReg());
@@ -2659,6 +2824,12 @@ GENERIC_TRANSLATION_REF(PSHUFBrm,
         (doPSHUFBrm<128>(ip, block, OP(1), ADDR_NOREF(2))),
         (doPSHUFBrm<128>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
+GENERIC_TRANSLATION(PSHUFHWri,
+        (doPSHUFHWri(block, OP(0), OP(1), OP(2))) )
+GENERIC_TRANSLATION_REF(PSHUFHWmi, 
+        (doPSHUFHWmi(ip, block, OP(0), ADDR_NOREF(1), OP(6))),
+        (doPSHUFHWmi(ip, block, OP(0), MEM_REFERENCE(1), OP(6))) )
+
 GENERIC_TRANSLATION(PSHUFLWri,
         (doPSHUFLWri(block, OP(0), OP(1), OP(2))) )
 GENERIC_TRANSLATION_REF(PSHUFLWmi, 
@@ -2817,6 +2988,22 @@ GENERIC_TRANSLATION_REF(ADDPDrm,
         (do_SSE_FP_VECTOR_RM<128,64,Instruction::FAdd>(ip, block, OP(1), ADDR_NOREF(2))),
         (do_SSE_FP_VECTOR_RM<128,64,Instruction::FAdd>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
+GENERIC_TRANSLATION(MULPSrr,
+        (do_SSE_FP_VECTOR_RR<128,32,Instruction::FMul>(ip, block, OP(1), OP(2))) )
+
+GENERIC_TRANSLATION_REF(MULPSrm,
+        (do_SSE_FP_VECTOR_RM<128,32,Instruction::FMul>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_FP_VECTOR_RM<128,32,Instruction::FMul>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION(MULPDrr,
+        (do_SSE_FP_VECTOR_RR<128,64,Instruction::FMul>(ip, block, OP(1), OP(2))) )
+
+GENERIC_TRANSLATION_REF(MULPDrm,
+        (do_SSE_FP_VECTOR_RM<128,64,Instruction::FMul>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_FP_VECTOR_RM<128,64,Instruction::FMul>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION(DIVPDrr,
+        (do_SSE_FP_VECTOR_RR<128,64,Instruction::FDiv>(ip, block, OP(1), OP(2))) )
 
 GENERIC_TRANSLATION(PSUBUSBrr, 
         (do_SATURATED_SUB_RR<128,8,ICmpInst::ICMP_UGE>(ip, block, OP(1), OP(2))))
@@ -2850,6 +3037,19 @@ GENERIC_TRANSLATION(PSUBQrr,
 GENERIC_TRANSLATION_REF(PSUBQrm, 
         (do_SSE_VECTOR_RM<128,64,Instruction::Sub>(ip, block, OP(1), ADDR_NOREF(2))),
         (do_SSE_VECTOR_RM<128,64,Instruction::Sub>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+  //dsand
+GENERIC_TRANSLATION(MAXPSrr,
+        (doMAXMIN_FP_VECTOR_rr<128, 32, FCmpInst::FCMP_UGT>(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_REF(MAXPSrm,
+        (doMAXMIN_FP_VECTOR_rm<128, 32, FCmpInst::FCMP_UGT>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doMAXMIN_FP_VECTOR_rm<128, 32, FCmpInst::FCMP_UGT>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION(MAXPDrr,
+        (doMAXMIN_FP_VECTOR_rr<128, 64, FCmpInst::FCMP_UGT>(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_REF(MAXPDrm,
+        (doMAXMIN_FP_VECTOR_rm<128, 64, FCmpInst::FCMP_UGT>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doMAXMIN_FP_VECTOR_rm<128, 64, FCmpInst::FCMP_UGT>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(MAXSSrr,
         (doMAXMINrr<32, FCmpInst::FCMP_UGT>(block, OP(1), OP(2))) )
@@ -2896,6 +3096,12 @@ GENERIC_TRANSLATION_REF(CVTTPS2DQrm,
 GENERIC_TRANSLATION_REF(MOVLPDrm, 
         (doMOVLPDrm(ip, block, OP(1), ADDR_NOREF(2))),
         (doMOVLPDrm(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION(SHUFPDrri,
+        (doSHUFPDrri(block, OP(1), OP(2), OP(3))) )
+GENERIC_TRANSLATION_REF(SHUFPDrmi,
+        (doSHUFPDrmi(ip, block, OP(1), ADDR_NOREF(2), OP(7))),
+        (doSHUFPDrmi(ip, block, OP(1), MEM_REFERENCE(2), OP(7))) )
 
 GENERIC_TRANSLATION(SHUFPSrri,
         (doSHUFPSrri(block, OP(1), OP(2), OP(3))) )
@@ -3132,6 +3338,10 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::PSUBQrr] = translate_PSUBQrr;
     m[X86::PSUBQrm] = translate_PSUBQrm;
 
+    m[X86::MAXPSrr] = translate_MAXPSrr;
+    m[X86::MAXPSrm] = translate_MAXPSrm;
+    m[X86::MAXPDrr] = translate_MAXPDrr;
+    m[X86::MAXPDrm] = translate_MAXPDrm;
     m[X86::MAXSSrr] = translate_MAXSSrr;
     m[X86::MAXSSrm] = translate_MAXSSrm;
     m[X86::MAXSDrr] = translate_MAXSDrr;
@@ -3224,7 +3434,11 @@ void SSE_populateDispatchMap(DispatchMap &m) {
 
     m[X86::SHUFPSrri] = translate_SHUFPSrri;
     m[X86::SHUFPSrmi] = translate_SHUFPSrmi;
+    m[X86::SHUFPDrri] = translate_SHUFPDrri;
+    m[X86::SHUFPDrmi] = translate_SHUFPDrmi;
 
+    m[X86::PSHUFHWri] = translate_PSHUFLWri;
+    m[X86::PSHUFHWmi] = translate_PSHUFLWmi;
     m[X86::PSHUFLWri] = translate_PSHUFLWri;
     m[X86::PSHUFLWmi] = translate_PSHUFLWmi;
 
@@ -3258,4 +3472,12 @@ void SSE_populateDispatchMap(DispatchMap &m) {
 
     m[X86::ADDPSrr] = translate_ADDPSrr;
     m[X86::ADDPSrm] = translate_ADDPSrm;
+
+    m[X86::MULPDrr] = translate_MULPDrr;
+    m[X86::MULPDrm] = translate_MULPDrm;
+
+    m[X86::MULPSrr] = translate_MULPSrr;
+    m[X86::MULPSrm] = translate_MULPSrm;
+
+    m[X86::DIVPDrr] = translate_DIVPDrr;
 }
