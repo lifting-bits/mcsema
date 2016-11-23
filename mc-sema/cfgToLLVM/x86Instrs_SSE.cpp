@@ -930,7 +930,8 @@ static Value* doDoubleShuffle(BasicBlock *&b, Value *input1, Value *input2, unsi
 
     Value *vecShuffle;
     if(32 == elemwidth) {
-      // take two from first vector, and two from second vector
+      // Based on order, take two doublewords from first vector of 4 double words, and 
+      // two next two double words from second vector of 4 double words.
       Constant *shuffle_vec[4] = {
           CONST_V<32>(b, (order >> 0) & 3),
           CONST_V<32>(b, (order >> 2) & 3),
@@ -940,10 +941,11 @@ static Value* doDoubleShuffle(BasicBlock *&b, Value *input1, Value *input2, unsi
 
       vecShuffle = ConstantVector::get(shuffle_vec);
     } else if(64 == elemwidth) {
-      // take one from first vector, and next from second vector
+      // Based on order, take one quadword from first vector of 2 quadwords, 
+      // and next quadword from second vector of 2 quadwords
       Constant *shuffle_vec[2] = {
-          CONST_V<64>(b, (order >> 0) & 1),
-          CONST_V<64>(b, elem_count + ((order >> 1) & 1)),
+          CONST_V<32>(b, (order >> 0) & 1),
+          CONST_V<32>(b, elem_count + ((order >> 1) & 1)),
       };
 
       vecShuffle = ConstantVector::get(shuffle_vec);
@@ -2332,6 +2334,18 @@ static Value* doPSHUFHWvv(BasicBlock *&b, Value *in, Value *dstVal, const MCOper
 {
     Value *shuffled = doShuffle<64,16>(b, in, order.getImm());
 
+    Value *shufExt = new ZExtInst(shuffled,
+                        llvm::Type::getIntNTy(b->getContext(), 128),
+                        "",
+                        b);
+
+    Value *shufAdjusted = BinaryOperator::Create(
+            Instruction::Shl,
+            shufExt,
+            CONST_V<128>(b, 64),
+            "", b);
+
+    // Clear the bits [127:64] of dstVal
     Value *sleft = BinaryOperator::Create(
             Instruction::Shl,
             dstVal,
@@ -2339,15 +2353,10 @@ static Value* doPSHUFHWvv(BasicBlock *&b, Value *in, Value *dstVal, const MCOper
             "", b);
     Value *sright = BinaryOperator::Create(
             Instruction::LShr,
-            sright,
+            sleft,
             CONST_V<128>(b, 64),
             "", b);
 
-    Value *shufAdjusted = BinaryOperator::Create(
-            Instruction::Shl,
-            shuffled,
-            CONST_V<128>(b, 64),
-            "", b);
       
     Value *ored = BinaryOperator::Create(
             Instruction::Or,
@@ -2358,6 +2367,60 @@ static Value* doPSHUFHWvv(BasicBlock *&b, Value *in, Value *dstVal, const MCOper
     return ored;
 }
 
+
+static InstTransResult doPSHUFHWri(BasicBlock *&b, const MCOperand &dst, const MCOperand &src, const MCOperand &order)
+{
+    NASSERT(dst.isReg());
+    NASSERT(src.isReg());
+    NASSERT(order.isImm());
+
+    Value *input1 = R_READ<128>(b, src.getReg());
+
+    Value *rightShiftedHigher = BinaryOperator::Create(
+                  Instruction::LShr,
+                  input1,
+                  CONST_V<128>(b, 64),
+                  "", b);
+
+    Value *i1_lower = new TruncInst( 
+            rightShiftedHigher, 
+            Type::getIntNTy(b->getContext(), 64), 
+            "",
+            b);
+
+
+    Value *res = doPSHUFHWvv(b, i1_lower, input1, order);
+    
+    R_WRITE<128>(b, dst.getReg(), res);
+    return ContinueBlock;
+}
+
+static InstTransResult doPSHUFHWmi(InstPtr ip, BasicBlock *&b, const MCOperand &dst, Value *mem_addr, const MCOperand &order)
+{
+    NASSERT(dst.isReg());
+    NASSERT(order.isImm());
+    NASSERT(mem_addr != NULL);
+
+    Value *input1 = M_READ<128>(ip, b, mem_addr);
+
+    Value *rightShiftedHigher = BinaryOperator::Create(
+                  Instruction::LShr,
+                  input1,
+                  CONST_V<128>(b, 64),
+                  "", b);
+
+    Value *i1_lower = new TruncInst( 
+            rightShiftedHigher, 
+            Type::getIntNTy(b->getContext(), 64), 
+            "",
+            b);
+
+
+    Value *res = doPSHUFHWvv(b, i1_lower, input1, order);
+
+    R_WRITE<128>(b, dst.getReg(), res);
+    return ContinueBlock;
+}
 
 static Value* doPSHUFLWvv(BasicBlock *&b, Value *in, Value *dstVal, const MCOperand &order)
 {
@@ -2387,47 +2450,6 @@ static Value* doPSHUFLWvv(BasicBlock *&b, Value *in, Value *dstVal, const MCOper
     return ored;
 }
 
-static InstTransResult doPSHUFHWri(BasicBlock *&b, const MCOperand &dst, const MCOperand &src, const MCOperand &order)
-{
-    NASSERT(dst.isReg());
-    NASSERT(src.isReg());
-    NASSERT(order.isImm());
-
-    Value *input1 = R_READ<128>(b, src.getReg());
-
-    Value *higher = BinaryOperator::Create(
-                  Instruction::LShr,
-                  input1,
-                  CONST_V<128>(b, 64),
-                  "", b);
-
-    Value *res = doPSHUFHWvv(b, higher, input1, order);
-    
-    
-    R_WRITE<128>(b, dst.getReg(), res);
-    return ContinueBlock;
-}
-
-static InstTransResult doPSHUFHWmi(InstPtr ip, BasicBlock *&b, const MCOperand &dst, Value *mem_addr, const MCOperand &order)
-{
-    NASSERT(dst.isReg());
-    NASSERT(order.isImm());
-    NASSERT(mem_addr != NULL);
-
-    Value *input1 = M_READ<128>(ip, b, mem_addr);
-
-    Value *higher = BinaryOperator::Create(
-                  Instruction::LShr,
-                  input1,
-                  CONST_V<128>(b, 64),
-                  "", b);
-
-    Value *res = doPSHUFHWvv(b, higher, input1, order);
-    
-
-    R_WRITE<128>(b, dst.getReg(), res);
-    return ContinueBlock;
-}
 static InstTransResult doPSHUFLWri(BasicBlock *&b, const MCOperand &dst, const MCOperand &src, const MCOperand &order)
 {
     NASSERT(dst.isReg());
@@ -3127,6 +3149,10 @@ GENERIC_TRANSLATION_REF(MULPDrm,
 GENERIC_TRANSLATION(DIVPDrr,
         (do_SSE_FP_VECTOR_RR<128,64,Instruction::FDiv>(ip, block, OP(1), OP(2))) )
 
+GENERIC_TRANSLATION_REF(DIVPDrm,
+        (do_SSE_FP_VECTOR_RM<128,64,Instruction::FDiv>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_FP_VECTOR_RM<128,64,Instruction::FDiv>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
 GENERIC_TRANSLATION(PSUBUSBrr, 
         (do_SATURATED_SUB_RR<128,8,ICmpInst::ICMP_UGE>(ip, block, OP(1), OP(2))))
 GENERIC_TRANSLATION_REF(PSUBUSBrm, 
@@ -3579,8 +3605,8 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::SHUFPDrri] = translate_SHUFPDrri;
     m[X86::SHUFPDrmi] = translate_SHUFPDrmi;
 
-    m[X86::PSHUFHWri] = translate_PSHUFLWri;
-    m[X86::PSHUFHWmi] = translate_PSHUFLWmi;
+    m[X86::PSHUFHWri] = translate_PSHUFHWri;
+    m[X86::PSHUFHWmi] = translate_PSHUFHWmi;
     m[X86::PSHUFLWri] = translate_PSHUFLWri;
     m[X86::PSHUFLWmi] = translate_PSHUFLWmi;
 
@@ -3626,4 +3652,5 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::MULPSrm] = translate_MULPSrm;
 
     m[X86::DIVPDrr] = translate_DIVPDrr;
+    m[X86::DIVPDrm] = translate_DIVPDrm;
 }
