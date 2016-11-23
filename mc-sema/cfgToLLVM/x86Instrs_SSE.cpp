@@ -2108,6 +2108,70 @@ static InstTransResult doPMULUDQrm(InstPtr ip, BasicBlock *&b, const MCOperand &
     return ContinueBlock;
 }
 
+static InstTransResult doMOVHPDmr(InstPtr ip, BasicBlock *&b, Value *memAddr, const MCOperand &src)
+{
+    NASSERT(src.isReg());
+
+    Value *dstVal = R_READ<128>(b, src.getReg());
+
+    Value *sright = BinaryOperator::Create(
+            Instruction::LShr,
+            dstVal,
+            CONST_V<128>(b, 64),
+            "", b);
+
+    Value *trunc_upper_64 = new TruncInst( 
+            sright, 
+            Type::getIntNTy(b->getContext(), 64), 
+            "",
+            b);
+
+    M_WRITE<64>(ip, b, memAddr, trunc_upper_64);
+    return ContinueBlock;
+}
+
+static InstTransResult doMOVHPDrm(InstPtr ip, BasicBlock *&b, const MCOperand &dst, Value *memAddr)
+{
+    NASSERT(dst.isReg());
+
+    Value *dstVal = R_READ<128>(b, dst.getReg());
+    Value *srcVal = M_READ<64>(ip, b, memAddr);
+
+    // Extend the type of src to 128 bits
+    Value *srcExt = new ZExtInst(srcVal,
+                        llvm::Type::getIntNTy(b->getContext(), 128),
+                        "",
+                        b);
+
+    //Left sheft 64 LSB to hihger quadword
+    Value *srcLShift = BinaryOperator::Create(
+            Instruction::Shl,
+            srcExt,
+            CONST_V<128>(b, 64),
+            "", b);
+
+    //Clean up the upper 64 bits of dest reg 
+    Value *sleft = BinaryOperator::Create(
+            Instruction::Shl,
+            dstVal,
+            CONST_V<128>(b, 64),
+            "", b);
+    Value *sright = BinaryOperator::Create(
+            Instruction::LShr,
+            sleft,
+            CONST_V<128>(b, 64),
+            "", b);
+
+    Value *ored = BinaryOperator::Create(
+            Instruction::Or,
+            sright,
+            srcLShift,
+            "", b);
+    
+    R_WRITE<128>(b, dst.getReg(), ored);
+    return ContinueBlock;
+}
+
 static InstTransResult doMOVLPDrm(InstPtr ip, BasicBlock *&b, const MCOperand &dst, Value *memAddr)
 {
     NASSERT(dst.isReg());
@@ -2472,6 +2536,29 @@ static InstTransResult doUNPCKLPDrm(InstPtr ip, BasicBlock *b, const MCOperand &
     return ContinueBlock;
 }
 
+static Value *doUNPCKHPDvv(BasicBlock *b, Value *dest, Value *src)
+{
+    Value *vecSrc = INT_AS_VECTOR<128,64>(b, src);
+    Value *vecDst = INT_AS_VECTOR<128,64>(b, dest);
+
+    Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "", b);
+    Value *dst1 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 1), "", b);
+
+    Value *res1 = InsertElementInst::Create(vecDst, dst1, CONST_V<32>(b, 0), "", b);
+    Value *res2 = InsertElementInst::Create(res1, src1, CONST_V<32>(b, 1), "", b);
+
+    // convert the output back to an integer
+    return VECTOR_AS_INT<128>(b, res2);
+}
+
+static InstTransResult doUNPCKHPDrr(BasicBlock *b, const MCOperand &dest, const MCOperand &src)
+{
+    R_WRITE<128>(b, dest.getReg(),
+                 doUNPCKHPDvv(b, R_READ<128>(b, dest.getReg()),
+                                 R_READ<128>(b, src.getReg())));
+    return ContinueBlock;
+}
+
 Value *doCVTPS2PDvv(BasicBlock *&b, Value *dest, Value *src) {
   Type *DoubleTy = Type::getDoubleTy(b->getContext());
 
@@ -2524,6 +2611,41 @@ static InstTransResult doCVTPS2PDrr(BasicBlock *b, const MCOperand &dest, const 
                                  R_READ<128>(b, src.getReg())));
     return ContinueBlock;
 }
+
+Value *doCVTDQ2PSvv(BasicBlock *&b, Value *dest, Value *src) {
+  Type *FloatTy = Type::getFloatTy(b->getContext());
+
+  Value *vecSrc = INT_AS_FPVECTOR<128,32>(b, src);
+  Value *vecDst = INT_AS_FPVECTOR<128,32>(b, dest);
+
+  Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "", b);
+  Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "", b);
+  Value *src3 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 2), "", b);
+  Value *src4 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 3), "", b);
+
+  Value *src1_trunc = INT_AS_FP<32>(b, src1);
+  Value *src2_trunc = INT_AS_FP<32>(b, src2);
+  Value *src3_trunc = INT_AS_FP<32>(b, src3);
+  Value *src4_trunc = INT_AS_FP<32>(b, src4);
+
+  Value *res1 = InsertElementInst::Create(vecDst, src1_trunc, CONST_V<32>(b, 0), "", b);
+  Value *res2 = InsertElementInst::Create(res1, src2_trunc, CONST_V<32>(b, 1), "", b);
+  Value *res3 = InsertElementInst::Create(res2, src3_trunc, CONST_V<32>(b, 2), "", b);
+  Value *res4 = InsertElementInst::Create(res3, src4_trunc, CONST_V<32>(b, 3), "", b);
+
+  // convert the output back to an integer
+  return VECTOR_AS_INT<128>(b, res4);
+}
+
+
+static InstTransResult doCVTDQ2PSrr(BasicBlock *b, const MCOperand &dest, const MCOperand &src)
+{
+    R_WRITE<128>(b, dest.getReg(),
+                 doCVTDQ2PSvv(b, R_READ<128>(b, dest.getReg()),
+                                 R_READ<128>(b, src.getReg())));
+    return ContinueBlock;
+}
+
 
 static InstTransResult doCVTPS2PDrm(InstPtr ip, BasicBlock *b, const MCOperand &dest, Value *src)
 {
@@ -3093,6 +3215,14 @@ GENERIC_TRANSLATION_REF(CVTTPS2DQrm,
         (doCVTTPS2DQrm(ip, block, OP(0), ADDR_NOREF(1))),
         (doCVTTPS2DQrm(ip, block, OP(0), MEM_REFERENCE(1))) )
 
+GENERIC_TRANSLATION_REF(MOVHPDrm, 
+        (doMOVHPDrm(ip, block, OP(1), ADDR_NOREF(2))),
+        (doMOVHPDrm(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION_REF(MOVHPDmr,
+        (doMOVHPDmr(ip, block, ADDR_NOREF(0), OP(5))),
+        (doMOVHPDmr(ip, block, MEM_REFERENCE(0), OP(5))) )
+
 GENERIC_TRANSLATION_REF(MOVLPDrm, 
         (doMOVLPDrm(ip, block, OP(1), ADDR_NOREF(2))),
         (doMOVLPDrm(ip, block, OP(1), MEM_REFERENCE(2))) )
@@ -3119,6 +3249,12 @@ GENERIC_TRANSLATION(UNPCKLPDrr,
 GENERIC_TRANSLATION_REF(UNPCKLPDrm,
         (doUNPCKLPDrm(ip, block, OP(1), ADDR_NOREF(2))),
         (doUNPCKLPDrm(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION(UNPCKHPDrr,
+        (doUNPCKHPDrr(block, OP(1), OP(2))) )
+
+GENERIC_TRANSLATION(CVTDQ2PSrr,
+        (doCVTPS2PDrr(block, OP(0), OP(1))) )
 
 GENERIC_TRANSLATION(CVTPS2PDrr,
         (doCVTPS2PDrr(block, OP(0), OP(1))) )
@@ -3218,6 +3354,9 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::MOVDQAmr] = (doMOVSmr<128>);
     m[X86::MOVDQArr] = (doMOVSrr<128,0,1>);
     m[X86::MOVDQArr_REV] = (doMOVSrr<128,0,1>);
+
+    m[X86::MOVUPDrm] = (doMOVSrm<128>);
+    m[X86::MOVUPDmr] = (doMOVSmr<128>);
 
     m[X86::MOVUPSrm] = (doMOVSrm<128>);
     m[X86::MOVUPSmr] = (doMOVSmr<128>);
@@ -3424,6 +3563,9 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::CVTTPS2DQrr] = translate_CVTTPS2DQrr;
     m[X86::CVTTPS2DQrm] = translate_CVTTPS2DQrm;
 
+    m[X86::MOVHPDrm] = translate_MOVHPDrm;
+    m[X86::MOVHPDmr] = translate_MOVHPDmr;
+
     m[X86::MOVLPDrm] = translate_MOVLPDrm;
     m[X86::MOVLPDmr] = (doMOVSmr<64>);
 
@@ -3447,8 +3589,12 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::UNPCKLPDrm] = translate_UNPCKLPDrm;
     m[X86::UNPCKLPDrr] = translate_UNPCKLPDrr;
 
+    m[X86::UNPCKHPDrr] = translate_UNPCKHPDrr;
+
     m[X86::CVTPS2PDrm] = translate_CVTPS2PDrm;
     m[X86::CVTPS2PDrr] = translate_CVTPS2PDrr;
+
+    m[X86::CVTDQ2PSrr] = translate_CVTDQ2PSrr;
 
     m[X86::CVTPD2PSrm] = translate_CVTPD2PSrm;
     m[X86::CVTPD2PSrr] = translate_CVTPD2PSrr;
