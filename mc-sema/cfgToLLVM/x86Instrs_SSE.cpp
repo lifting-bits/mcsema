@@ -2637,7 +2637,7 @@ static InstTransResult doCVTPS2PDrr(BasicBlock *b, const MCOperand &dest, const 
 Value *doCVTDQ2PSvv(BasicBlock *&b, Value *dest, Value *src) {
   Type *FloatTy = Type::getFloatTy(b->getContext());
 
-  Value *vecSrc = INT_AS_FPVECTOR<128,32>(b, src);
+  Value *vecSrc = INT_AS_VECTOR<128,32>(b, src);
   Value *vecDst = INT_AS_FPVECTOR<128,32>(b, dest);
 
   Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "", b);
@@ -2645,15 +2645,17 @@ Value *doCVTDQ2PSvv(BasicBlock *&b, Value *dest, Value *src) {
   Value *src3 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 2), "", b);
   Value *src4 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 3), "", b);
 
-  Value *src1_trunc = INT_AS_FP<32>(b, src1);
-  Value *src2_trunc = INT_AS_FP<32>(b, src2);
-  Value *src3_trunc = INT_AS_FP<32>(b, src3);
-  Value *src4_trunc = INT_AS_FP<32>(b, src4);
+  Type *fpType = getFpTypeForWidth(b, 32);
+    //TODO: Check rounding modes!
+  Value *fp_value1 = CastInst::Create( Instruction::SIToFP, src1, fpType, "", b);
+  Value *fp_value2 = CastInst::Create( Instruction::SIToFP, src2, fpType, "", b);
+  Value *fp_value3 = CastInst::Create( Instruction::SIToFP, src3, fpType, "", b);
+  Value *fp_value4 = CastInst::Create( Instruction::SIToFP, src4, fpType, "", b);
 
-  Value *res1 = InsertElementInst::Create(vecDst, src1_trunc, CONST_V<32>(b, 0), "", b);
-  Value *res2 = InsertElementInst::Create(res1, src2_trunc, CONST_V<32>(b, 1), "", b);
-  Value *res3 = InsertElementInst::Create(res2, src3_trunc, CONST_V<32>(b, 2), "", b);
-  Value *res4 = InsertElementInst::Create(res3, src4_trunc, CONST_V<32>(b, 3), "", b);
+  Value *res1 = InsertElementInst::Create(vecDst, fp_value1, CONST_V<32>(b, 0), "", b);
+  Value *res2 = InsertElementInst::Create(res1, fp_value2, CONST_V<32>(b, 1), "", b);
+  Value *res3 = InsertElementInst::Create(res2, fp_value3, CONST_V<32>(b, 2), "", b);
+  Value *res4 = InsertElementInst::Create(res3, fp_value4, CONST_V<32>(b, 3), "", b);
 
   // convert the output back to an integer
   return VECTOR_AS_INT<128>(b, res4);
@@ -2843,7 +2845,7 @@ GENERIC_TRANSLATION_REF(SUBSSrm,
         (do_SSE_RM<32,Instruction::FSub>(ip, block, OP(1), ADDR_NOREF(2))),
         (do_SSE_RM<32,Instruction::FSub>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
-GENERIC_TRANSLATION(DIVSDrr, 
+GENERIC_TRANSLATION(DIVSDrr,
         (do_SSE_RR<64,Instruction::FDiv>(ip, block, OP(1), OP(2))) )
 GENERIC_TRANSLATION_REF(DIVSDrm, 
         (do_SSE_RM<64,Instruction::FDiv>(ip, block, OP(1), ADDR_NOREF(2))),
@@ -3146,6 +3148,13 @@ GENERIC_TRANSLATION_REF(MULPDrm,
         (do_SSE_FP_VECTOR_RM<128,64,Instruction::FMul>(ip, block, OP(1), ADDR_NOREF(2))),
         (do_SSE_FP_VECTOR_RM<128,64,Instruction::FMul>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
+GENERIC_TRANSLATION(DIVPSrr,
+        (do_SSE_FP_VECTOR_RR<128,32,Instruction::FDiv>(ip, block, OP(1), OP(2))) )
+
+GENERIC_TRANSLATION_REF(DIVPSrm,
+        (do_SSE_FP_VECTOR_RM<128,32,Instruction::FDiv>(ip, block, OP(1), ADDR_NOREF(2))),
+        (do_SSE_FP_VECTOR_RM<128,32,Instruction::FDiv>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
 GENERIC_TRANSLATION(DIVPDrr,
         (do_SSE_FP_VECTOR_RR<128,64,Instruction::FDiv>(ip, block, OP(1), OP(2))) )
 
@@ -3186,7 +3195,6 @@ GENERIC_TRANSLATION_REF(PSUBQrm,
         (do_SSE_VECTOR_RM<128,64,Instruction::Sub>(ip, block, OP(1), ADDR_NOREF(2))),
         (do_SSE_VECTOR_RM<128,64,Instruction::Sub>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
-  //dsand
 GENERIC_TRANSLATION(MAXPSrr,
         (doMAXMIN_FP_VECTOR_rr<128, 32, FCmpInst::FCMP_UGT>(block, OP(1), OP(2))) )
 GENERIC_TRANSLATION_REF(MAXPSrm,
@@ -3210,6 +3218,18 @@ GENERIC_TRANSLATION(MAXSDrr,
 GENERIC_TRANSLATION_REF(MAXSDrm,
         (doMAXMINrm<64, FCmpInst::FCMP_UGT>(ip, block, OP(1), ADDR_NOREF(2))),
         (doMAXMINrm<64, FCmpInst::FCMP_UGT>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION(MINPSrr,
+        (doMAXMIN_FP_VECTOR_rr<128, 32, FCmpInst::FCMP_ULT>(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_REF(MINPSrm,
+        (doMAXMIN_FP_VECTOR_rm<128, 32, FCmpInst::FCMP_ULT>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doMAXMIN_FP_VECTOR_rm<128, 32, FCmpInst::FCMP_ULT>(ip, block, OP(1), MEM_REFERENCE(2))) )
+
+GENERIC_TRANSLATION(MINPDrr,
+        (doMAXMIN_FP_VECTOR_rr<128, 64, FCmpInst::FCMP_ULT>(block, OP(1), OP(2))) )
+GENERIC_TRANSLATION_REF(MINPDrm,
+        (doMAXMIN_FP_VECTOR_rm<128, 64, FCmpInst::FCMP_ULT>(ip, block, OP(1), ADDR_NOREF(2))),
+        (doMAXMIN_FP_VECTOR_rm<128, 64, FCmpInst::FCMP_ULT>(ip, block, OP(1), MEM_REFERENCE(2))) )
 
 GENERIC_TRANSLATION(MINSSrr,
         (doMAXMINrr<32, FCmpInst::FCMP_ULT>(block, OP(1), OP(2))) )
@@ -3280,7 +3300,7 @@ GENERIC_TRANSLATION(UNPCKHPDrr,
         (doUNPCKHPDrr(block, OP(1), OP(2))) )
 
 GENERIC_TRANSLATION(CVTDQ2PSrr,
-        (doCVTPS2PDrr(block, OP(0), OP(1))) )
+        (doCVTDQ2PSrr(block, OP(0), OP(1))) )
 
 GENERIC_TRANSLATION(CVTPS2PDrr,
         (doCVTPS2PDrr(block, OP(0), OP(1))) )
@@ -3511,6 +3531,11 @@ void SSE_populateDispatchMap(DispatchMap &m) {
     m[X86::MAXSSrm] = translate_MAXSSrm;
     m[X86::MAXSDrr] = translate_MAXSDrr;
     m[X86::MAXSDrm] = translate_MAXSDrm;
+
+    m[X86::MINPSrr] = translate_MINPSrr;
+    m[X86::MINPSrm] = translate_MINPSrm;
+    m[X86::MINPDrr] = translate_MINPDrr;
+    m[X86::MINPDrm] = translate_MINPDrm;
     m[X86::MINSSrr] = translate_MINSSrr;
     m[X86::MINSSrm] = translate_MINSSrm;
     m[X86::MINSDrr] = translate_MINSDrr;
@@ -3650,6 +3675,9 @@ void SSE_populateDispatchMap(DispatchMap &m) {
 
     m[X86::MULPSrr] = translate_MULPSrr;
     m[X86::MULPSrm] = translate_MULPSrm;
+
+    m[X86::DIVPSrr] = translate_DIVPSrr;
+    m[X86::DIVPSrm] = translate_DIVPSrm;
 
     m[X86::DIVPDrr] = translate_DIVPDrr;
     m[X86::DIVPDrm] = translate_DIVPDrm;
