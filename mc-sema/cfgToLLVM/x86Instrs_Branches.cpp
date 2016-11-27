@@ -523,7 +523,6 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
         arg1 = new LoadInst(GEP_double, "", b);
 
       } else {
-        printf("Argument is RCX\n"), fflush(stdout);
         arg1 = x86_64::R_READ<64>(b, X86::RCX);
       }
 

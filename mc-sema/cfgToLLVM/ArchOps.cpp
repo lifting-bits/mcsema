@@ -106,7 +106,11 @@ void ArchInitAttachDetach(llvm::Module *M) {
     }
   } else if (llvm::Triple::Win32 == OS) {
     if (_X86_64_ == Arch) {
-      llvm::errs() << "Initializing unsupported attach/detach code for Win32.\n";
+      InitADFeatues(M, "__mcsema_attach_call", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
+      InitADFeatues(M, "__mcsema_detach_ret", EPTy);
     } else {
       InitADFeatues(M, "__mcsema_attach_call_cdecl", EPTy);
       InitADFeatues(M, "__mcsema_attach_ret_cdecl", EPTy);
@@ -161,6 +165,12 @@ std::string ArchNameMcsemaCall(const std::string &name) {
 
 static std::string WindowsDecorateName(llvm::Function *F, const std::string &name) {
 
+  // 64-bit doesn't mangle
+    Module *M = F->getParent();
+    if(64 == ArchPointerSize(M)) {
+      return name;
+    }
+
     switch(F->getCallingConv())
     {
 
@@ -206,7 +216,11 @@ static void WindowsAddPushJumpStub(bool decorateStub, llvm::Module *M, llvm::Fun
   as << "  .globl " << stub_name << ";\n";
   as << stub_name << ":\n";
   as << "  .cfi_startproc;\n";
-  as << "  " << push << " $" << stubbed_func_name << ";\n";
+  if( 32 == ArchPointerSize(M) ) {
+    as << "  " << push << " $" << stubbed_func_name << ";\n";
+  } else {
+    as << "  " << push << " " << stubbed_func_name << "(%rip);\n";
+  }
   as << "  jmp " << stub_handler << ";\n";
   as << "  .cfi_endproc;\n";
 
@@ -254,9 +268,7 @@ llvm::Function *ArchAddEntryPointDriver(llvm::Module *M,
     }
   } else if (llvm::Triple::Win32 == OS) {
     if (_X86_64_ == Arch) {
-        llvm::errs()
-            << "Win32 callback entrypoint driver for "
-            << s << " has no backing implementation\n";
+      WindowsAddPushJumpStub(true, M, F, W, "__mcsema_attach_call");
     } else {
       WindowsAddPushJumpStub(true, M, F, W, "__mcsema_attach_call_cdecl");
     }
@@ -321,8 +333,7 @@ llvm::Function *ArchAddExitPointDriver(llvm::Function *F) {
   } else if (llvm::Triple::Win32 == OS) {
 
     if (_X86_64_ == Arch) {
-        llvm::errs() << "Win32 exit point driver for " << F->getName()
-                     << " has no backing implementation\n";
+        WindowsAddPushJumpStub(true, M, F, W, "__mcsema_detach_call");
     } else {
       switch (F->getCallingConv()) {
         case CallingConv::C:

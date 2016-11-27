@@ -14,7 +14,7 @@
 #define PACKED
 #endif
 
-#ifdef _WIN64
+#if defined(_WIN64) && !defined(__x86_64__)
 #define __x86_64__
 #endif
 
