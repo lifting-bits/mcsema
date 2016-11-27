@@ -910,6 +910,7 @@ GENERIC_TRANSLATION_REF(BT64mi8,
 
 GENERIC_TRANSLATION(BSR32rr, doBsrr<32>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BSR16rr, doBsrr<16>(block, OP(0), OP(1)))
+GENERIC_TRANSLATION(BSR64rr, doBsrr<64>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BSF32rr, doBsfr<32>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION_REF(BSF32rm, (doBsfrm<32>(ip, block, OP(0), ADDR_NOREF(1))),
                         (doBsfrm<32>(ip, block, OP(0), MEM_REFERENCE(1))))
@@ -956,6 +957,7 @@ void Misc_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::BT16ri8] = translate_BT16ri8;
   m[llvm::X86::BT64mi8] = translate_BT64mi8;
   m[llvm::X86::BT32mi8] = translate_BT32mi8;
+  m[llvm::X86::BSR64rr] = translate_BSR64rr;
   m[llvm::X86::BSR32rr] = translate_BSR32rr;
   m[llvm::X86::BSR16rr] = translate_BSR16rr;
   m[llvm::X86::BSF32rr] = translate_BSF32rr;
