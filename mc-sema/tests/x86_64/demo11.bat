@@ -6,15 +6,12 @@ cl /nologo /c demo_test11.c
 
 if exist "%IDA_PATH%\idaq.exe" (
     echo Using IDA to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend_wrapper.py -march=x86-64 -d -func-map=%STD_DEFS% -entry-symbol=printdata -i=demo_test11.obj
+    %PYTHON% %BIN_DESCEND_PATH%\bin_descend_wrapper.py -march=x86-64 -d -func-map=%STD_DEFS% -entry-symbol=printdata -i=demo_test11.obj
 ) else (
-    echo Using bin_descend to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend.exe -d -march=x86-64 -func-map=%STD_DEFS% -entry-symbol=printdata -i=demo_test11.obj
+    echo Bin_descend is no longer supported
+    exit 1
 )
 
-%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=x86_64-pc-win32 -i demo_test11.cfg -driver=demo11_entry,printdata,0,return,C -o demo_test11.bc
-
-%LLVM_PATH%\opt.exe -O3 -o demo_test11_opt.bc demo_test11.bc
-%LLVM_PATH%\llc.exe -filetype=obj -o demo_test11_mine.obj demo_test11_opt.bc
-cl /Zi /nologo demo_driver11.c demo_test11_mine.obj
+%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=x86_64-pc-windows-msvc -i demo_test11.cfg -entrypoint=printdata -o demo_test11.bc
+clang-cl /Zi -O3 -m64 -o demo_driver11.exe demo_driver11.c ..\..\..\drivers\PE_64_windows.asm demo_test11.bc
 demo_driver11.exe
