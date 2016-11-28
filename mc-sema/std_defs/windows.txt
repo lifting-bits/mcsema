@@ -28983,3 +28983,4 @@ __crtTerminateProcess 1 C N
 __stdio_common_vfprintf 12 C N
 __acrt_iob_func 1 C N
 DATA: ?_OptionsStorage@?1??__local_stdio_printf_options@@9@9 PTR
+DATA: __ImageBase PTR
