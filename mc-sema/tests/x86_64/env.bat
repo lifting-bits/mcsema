@@ -14,3 +14,4 @@ set /p NASM_PATH=< NASM_PATH.win32
 set /p IDA_PATH=< IDA_PATH.win32
 set GET_CFG_PY=%BIN_DESCEND_PATH%\get_cfg.py
 set STD_DEFS=..\..\std_defs\std_defs.txt
+set PYTHON=C:\Python27\python.exe
