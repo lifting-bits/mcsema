@@ -531,7 +531,7 @@ static InstTransResult doXorRR(InstPtr ip, BasicBlock *&b,
     return ContinueBlock;
 }
 
-GENERIC_TRANSLATION(AND16i16, doAndRI<16>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(AND16i16, doAndRI<16>(ip, block, MCOperand::CreateReg(X86::AX), MCOperand::CreateReg(X86::AX), OP(0)))
 GENERIC_TRANSLATION_REF(AND16mi,
 	doAndMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
 	doAndMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
@@ -598,7 +598,7 @@ GENERIC_TRANSLATION_REF(AND64rm,
 GENERIC_TRANSLATION(AND64rr, doAndRR<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND32rr, doAndRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND32rr_REV, doAndRR<32>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(AND8i8, doAndRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(AND8i8, doAndRI<8>(ip, block, MCOperand::CreateReg(X86::AL), MCOperand::CreateReg(X86::AL), OP(0)))
 GENERIC_TRANSLATION_REF(AND8mi,
 	doAndMI<8>(ip, block, ADDR_NOREF(0), OP(5)),
 	doAndMI<8>(ip, block, MEM_REFERENCE(0), OP(5)))
@@ -628,7 +628,7 @@ GENERIC_TRANSLATION_REF(NOT8m,
 	doNotM<8>(ip, block, ADDR_NOREF(0)),
 	doNotM<8>(ip, block, MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(NOT8r, doNotR<8>(ip, block, OP(0)))
-GENERIC_TRANSLATION(OR16i16, doOrRI<16>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(OR16i16, doOrRI<16>(ip, block, MCOperand::CreateReg(X86::AX), MCOperand::CreateReg(X86::AX), OP(0)))
 GENERIC_TRANSLATION_REF(OR16mi,
 	doOrMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
 	doOrMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
@@ -688,7 +688,7 @@ GENERIC_TRANSLATION_REF(OR64mi8,
      doOrMI<64>(ip, block, ADDR_NOREF(0), OP(5)),
      doOrMI<64>(ip, block, MEM_REFERENCE(0), OP(5)))
 
-GENERIC_TRANSLATION(OR8i8, doOrRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(OR8i8, doOrRI<8>(ip, block, MCOperand::CreateReg(X86::AL), MCOperand::CreateReg(X86::AL), OP(0)))
 GENERIC_TRANSLATION_REF(OR8mi,
 	doOrMI<8>(ip, block, ADDR_NOREF(0), OP(5)),
 	doOrMI<8>(ip, block, MEM_REFERENCE(0), OP(5)))
@@ -701,7 +701,7 @@ GENERIC_TRANSLATION_REF(OR8rm,
 	doOrRM<8>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(OR8rr, doOrRR<8>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(OR8rr_REV, doOrRR<8>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(XOR16i16, doXorRI<16>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(XOR16i16, doXorRI<16>(ip, block, MCOperand::CreateReg(X86::AX), MCOperand::CreateReg(X86::AX), OP(0)))
 GENERIC_TRANSLATION_REF(XOR16mi,
 	doXorMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
 	doXorMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
@@ -760,7 +760,7 @@ GENERIC_TRANSLATION_REF(XOR64mi8,
      doXorMI<64>(ip, block, ADDR_NOREF(0), OP(5)),
      doXorMI<64>(ip, block, MEM_REFERENCE(0), OP(5)))
 
-GENERIC_TRANSLATION(XOR8i8, doXorRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(XOR8i8, doXorRI<8>(ip, block, MCOperand::CreateReg(X86::AL), MCOperand::CreateReg(X86::AL), OP(0)))
 GENERIC_TRANSLATION_REF(XOR8mi,
 	doXorMI<8>(ip, block, ADDR_NOREF(0), OP(5)),
 	doXorMI<8>(ip, block, MEM_REFERENCE(0), OP(5)))

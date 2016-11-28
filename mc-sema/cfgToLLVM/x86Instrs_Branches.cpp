@@ -485,7 +485,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target,
         Value *arg1FieldGEPV[] = { CONST_V<64>(b, 0), CONST_V<32>(b, k) };
 
         Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(
-            b->getParent()->arg_begin(), arg1FieldGEPV, "XMM0_val", b);
+            b->getParent()->arg_begin(), arg1FieldGEPV, "XMM0", b);
         Instruction *GEP_double = CastInst::CreatePointerCast(
             GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0),
             "conv0", b);
@@ -510,7 +510,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target,
         Value *arg2FieldGEPV[] = { CONST_V<64>(b, 0), CONST_V<32>(b, k) };
 
         Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(
-            b->getParent()->arg_begin(), arg2FieldGEPV, "XMM1_val", b);
+            b->getParent()->arg_begin(), arg2FieldGEPV, "XMM1", b);
         Instruction *GEP_double = CastInst::CreatePointerCast(
             GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0),
             "conv1", b);
@@ -532,7 +532,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target,
         Value *arg3FieldGEPV[] = { CONST_V<64>(b, 0), CONST_V<32>(b, k) };
 
         Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(
-            b->getParent()->arg_begin(), arg3FieldGEPV, "XMM2_val", b);
+            b->getParent()->arg_begin(), arg3FieldGEPV, "XMM2", b);
         Instruction *GEP_double = CastInst::CreatePointerCast(
             GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0),
             "conv2", b);
@@ -556,7 +556,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target,
         Value *arg4FieldGEPV[] = { CONST_V<64>(b, 0), CONST_V<32>(b, k) };
 
         Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(
-            b->getParent()->arg_begin(), arg4FieldGEPV, "XMM3_val", b);
+            b->getParent()->arg_begin(), arg4FieldGEPV, "XMM3", b);
         Instruction *GEP_double = CastInst::CreatePointerCast(
             GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0),
             "conv3", b);

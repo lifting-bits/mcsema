@@ -564,6 +564,18 @@ static InstTransResult translate_MOV64ri(NativeModulePtr natM, BasicBlock *& blo
     return ret ;
 }
 
+template <int width>
+int GET_XAX() {
+  if (64 == width) {
+    return X86::RAX;
+  } else if (32 == width) {
+    return X86::EAX;
+  } else if (16 == width) {
+    return X86::AX;
+  } else {
+    return X86::AL;
+  }
+}
 
 //write to memory
 template <int width>
@@ -594,12 +606,11 @@ static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& bloc
         } else {
             data_v = IMM_AS_DATA_REF<width>(block, natM, ip);
         }
-
         ret = doMRMov<width>(ip, block, data_v,
-                MCOperand::CreateReg(X86::EAX) );
+                MCOperand::CreateReg(GET_XAX<width>()) );
     } else {
         Value *addrv = CONST_V<width>(block, OP(0).getImm());
-        ret = doMRMov<width>(ip, block, addrv, MCOperand::CreateReg(X86::EAX)) ;
+        ret = doMRMov<width>(ip, block, addrv, MCOperand::CreateReg(GET_XAX<width>())) ;
     }
     return ret ;
 }

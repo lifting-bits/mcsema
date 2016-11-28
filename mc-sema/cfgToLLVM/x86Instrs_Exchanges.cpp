@@ -328,7 +328,7 @@ GENERIC_TRANSLATION_REF(XADD8rm,
 	doXaddRM<8>(ip, block, OP(5), ADDR_NOREF(0)),
 	doXaddRM<8>(ip, block, OP(5), MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(XADD8rr, doXaddRR<8>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION(XCHG16ar, doXchgRR<16>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(XCHG16ar, doXchgRR<16>(ip, block, MCOperand::CreateReg(X86::AL), OP(0)))
 GENERIC_TRANSLATION_REF(XCHG16rm,
 	doXchgRM<16>(ip,  block, OP(0), ADDR_NOREF(2)),
 	doXchgRM<16>(ip,  block, OP(0), MEM_REFERENCE(2)))

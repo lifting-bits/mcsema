@@ -163,6 +163,7 @@ def prepare_tests():
     global TEST_NUMBER
 
     # assume every .asm file in the tests directory is a test
+    #asm_files = [os.path.join(args.testfiles, "LEA16r.asm")]
     asm_files = glob.glob( os.path.join(args.testfiles,"*.asm") )
     
     # test names are the file name without .asm

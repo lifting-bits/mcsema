@@ -7,8 +7,8 @@ BITS 64
     mov rax, 0x323
     mov rbx, 0xbbbbbbbb
     push rbx
-    pop rbx
     ;TEST_BEGIN_RECORDING
-    imul rax, [rsp - 8]
+    imul rax, [rsp]
     ;TEST_END_RECORDING
+    pop rbx
 

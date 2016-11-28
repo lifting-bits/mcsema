@@ -26,6 +26,9 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+#define __USE_GNU
+
 #include "toLLVM.h"
 #include "raiseX86.h"
 #include "X86.h"
@@ -38,11 +41,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <vector>
 #include <cmath>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#define M_LN2 0.693147180559945309417
-#define M_LOG10E 0.434294481903251827651
-#define M_LOG2E 1.44269504088896340736
+#ifndef M_PIl
+# define M_PIl    3.141592653589793238462643383279502884L /* pi */
+# define M_LN2l   0.693147180559945309417232121458176568L /* log_e 2 */
+# define M_LOG2El 1.442695040888963407359924681001892137L /* log_2 e */
+# define M_LOG10El  0.434294481903251827651128918916605082L /* log_10 e */
 #endif
 
 #define M_FLDLG2 0.301029995663981195214
@@ -947,7 +950,7 @@ static InstTransResult doFldM(InstPtr ip, BasicBlock *&b, Value *memAddr)
     return ContinueBlock;
 }
 
-static InstTransResult doFldC(InstPtr ip, BasicBlock *&b, double constv) {
+static InstTransResult doFldC(InstPtr ip, BasicBlock *&b, long double constv) {
 
     // load constant onto FPU stack
     Value *fp_const = CONSTFP_V(b, constv);
@@ -1789,12 +1792,12 @@ FPU_TRANSLATION(LD_F1, true, false, true, false,
         doFldC(ip, block, 1.0))
 
 FPU_TRANSLATION(FLDPI, true, false, true, false,
-        doFldC(ip, block, M_PI))
+        doFldC(ip, block, M_PIl))
 FPU_TRANSLATION(FLDLN2, true, false, true, false,
-        doFldC(ip, block, M_LN2))
+        doFldC(ip, block, M_LN2l))
 
 FPU_TRANSLATION(FLDL2E, true, false, true, false,
-        doFldC(ip, block, M_LOG2E))
+        doFldC(ip, block, M_LOG2El))
 
 FPU_TRANSLATION(FLDLG2, true, false, true, false,
         doFldC(ip, block, M_FLDLG2))

@@ -38,406 +38,336 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using namespace llvm;
 using namespace std;
 
-template <int width>
-static void doMulV(InstPtr ip,  BasicBlock  *&b,
-                Value       *rhs)
-{
-    // Handle the different source register depending on the bit width
-    Value   *lhs;
+template<int width>
+static void doMulV(InstPtr ip, BasicBlock *&b, Value *rhs) {
+  // Handle the different source register depending on the bit width
+  Value *lhs;
 
-    switch(width) {
-        case 8:
-            lhs = R_READ<8>(b, X86::AL);
-            break;
-        case 16:
-            lhs = R_READ<16>(b, X86::AX);
-            break;
-        case 32:
-            lhs = R_READ<32>(b, X86::EAX);
-            break;
-        case 64:
-            lhs = R_READ<64>(b, X86::RAX);
-            break;
-        default:
-            throw TErr(__LINE__, __FILE__, "Not supported width");
-    }
+  switch (width) {
+    case 8:
+      lhs = R_READ<8>(b, X86::AL);
+      break;
+    case 16:
+      lhs = R_READ<16>(b, X86::AX);
+      break;
+    case 32:
+      lhs = R_READ<32>(b, X86::EAX);
+      break;
+    case 64:
+      lhs = R_READ<64>(b, X86::RAX);
+      break;
+    default:
+      throw TErr(__LINE__, __FILE__, "Not supported width");
+  }
 
-    Type    *dt = Type::getIntNTy(b->getContext(), width*2);
-    Value   *a1_x = new ZExtInst(lhs, dt, "", b);
-    Value   *a2_x = new ZExtInst(rhs, dt, "", b);
-    Value   *tmp = BinaryOperator::Create(Instruction::Mul, a1_x, a2_x, "", b);
-   
-    Type    *t = Type::getIntNTy(b->getContext(), width);
-    Value   *res_sh = BinaryOperator::Create(Instruction::LShr, tmp, CONST_V<width*2>(b, width), "", b);
-    Value   *wrAX = new TruncInst(tmp, t, "", b);
-    Value   *wrDX = new TruncInst(res_sh, t, "", b);
+  Type *dt = Type::getIntNTy(b->getContext(), width * 2);
+  Value *a1_x = new ZExtInst(lhs, dt, "", b);
+  Value *a2_x = new ZExtInst(rhs, dt, "", b);
+  Value *tmp = BinaryOperator::Create(Instruction::Mul, a1_x, a2_x, "", b);
 
-    // set clear CF and OF if DX is clear, set if DX is set
-    Value   *r = new ICmpInst(*b, CmpInst::ICMP_NE, wrDX, CONST_V<width>(b, 0));
+  Type *t = Type::getIntNTy(b->getContext(), width);
+  Value *res_sh = BinaryOperator::Create(Instruction::LShr, tmp,
+                                         CONST_V<width * 2>(b, width), "", b);
+  Value *wrAX = new TruncInst(tmp, t, "", b);
+  Value *wrDX = new TruncInst(res_sh, t, "", b);
 
-    F_WRITE(b, CF, r);
-    F_WRITE(b, OF, r);
+  // set clear CF and OF if DX is clear, set if DX is set
+  Value *r = new ICmpInst( *b, CmpInst::ICMP_NE, wrDX, CONST_V<width>(b, 0));
 
-    switch(width) {
-        case 8:
-            R_WRITE<width>(b, X86::AH, wrDX);
-            R_WRITE<width>(b, X86::AL, wrAX);
-            break;
-        case 16:
-            R_WRITE<width>(b, X86::DX, wrDX);
-            R_WRITE<width>(b, X86::AX, wrAX);
-            break;
-        case 32:
-            R_WRITE<width>(b, X86::EDX, wrDX);
-            R_WRITE<width>(b, X86::EAX, wrAX);
-            break;
-        case 64:
-            R_WRITE<width>(b, X86::RDX, wrDX);
-            R_WRITE<width>(b, X86::RAX, wrAX);
-            break;
-        default:
-            throw TErr(__LINE__, __FILE__, "Not supported width");
-    }
+  F_WRITE(b, CF, r);
+  F_WRITE(b, OF, r);
+
+  switch (width) {
+    case 8:
+      R_WRITE<width>(b, X86::AH, wrDX);
+      R_WRITE<width>(b, X86::AL, wrAX);
+      break;
+    case 16:
+      R_WRITE<width>(b, X86::DX, wrDX);
+      R_WRITE<width>(b, X86::AX, wrAX);
+      break;
+    case 32:
+      R_WRITE<width>(b, X86::EDX, wrDX);
+      R_WRITE<width>(b, X86::EAX, wrAX);
+      break;
+    case 64:
+      R_WRITE<width>(b, X86::RDX, wrDX);
+      R_WRITE<width>(b, X86::RAX, wrAX);
+      break;
+    default:
+      throw TErr(__LINE__, __FILE__, "Not supported width");
+  }
 
 }
 
-template <int width>
-static Value *doIMulV(InstPtr ip,  BasicBlock  *&b,
-                Value       *rhs)
-{
-    // Handle the different source register depending on the bit width
-    Value   *lhs;
+template<int width>
+static InstTransResult doMulR(InstPtr ip, BasicBlock *&b,
+                              const MCOperand &src) {
+  NASSERT(src.isReg());
 
-    switch(width) {
-        case 8:
-            lhs = R_READ<8>(b, X86::AL);
-            break;
-        case 16:
-            lhs = R_READ<16>(b, X86::AX);
-            break;
-        case 32:
-            lhs = R_READ<32>(b, X86::EAX);
-            break;
-        case 64:
-            lhs = R_READ<64>(b, X86::RAX);
-            break;
-        default:
-            throw TErr(__LINE__, __FILE__, "Not supported width");
-    }
+  doMulV<width>(ip, b, R_READ<width>(b, src.getReg()));
 
-    //model the semantics of the signed multiply
-    Value   *a1 = lhs;
-    Value   *a2 = rhs;
-
-    Type    *dt = Type::getIntNTy(b->getContext(), width*2);
-    Value   *a1_x = new SExtInst(a1, dt, "", b);
-    Value   *a2_x = new SExtInst(a2, dt, "", b);
-    Value   *tmp = BinaryOperator::Create(Instruction::Mul, a1_x, a2_x, "", b);
-    Value   *dest = BinaryOperator::Create(Instruction::Mul, a1, a2, "", b);
-   
-    //R_WRITE<width>(b, dst.getReg(), dest);
-
-    Value   *dest_x = new SExtInst(dest, dt, "", b);
-    Value   *r = new ICmpInst(*b, CmpInst::ICMP_NE, dest_x, tmp);
-
-    F_WRITE(b, CF, r);
-    F_WRITE(b, OF, r);
-
-    return tmp;
+  return ContinueBlock;
 }
 
-template <int width>
-static InstTransResult doMulR(InstPtr ip,    BasicBlock *&b, 
-                           const MCOperand &src)
-{
-    NASSERT(src.isReg());
+template<int width>
+static InstTransResult doMulM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+  NASSERT(memAddr != NULL);
 
-    doMulV<width>(ip, b, R_READ<width>(b, src.getReg()));
+  doMulV<width>(ip, b, M_READ<width>(ip, b, memAddr));
 
-    return ContinueBlock;
+  return ContinueBlock;
 }
 
-template <int width>
-static InstTransResult doMulM(InstPtr ip,    BasicBlock *&b, 
-                           Value *memAddr)
-{
-    NASSERT(memAddr != NULL);
+struct IMulRes {
+  Value *full;
+  Value *trunc;
+};
 
-    doMulV<width>(ip, b, M_READ<width>(ip, b, memAddr));
+template<int width>
+static IMulRes doIMulVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs) {
+  //model the semantics of the signed multiply
+  Value *a1 = lhs;
+  Value *a2 = rhs;
 
-    return ContinueBlock;
+  Type *st = Type::getIntNTy(b->getContext(), width);
+  Type *dt = Type::getIntNTy(b->getContext(), width * 2);
+
+  Value *a1_x = new SExtInst(a1, dt, "", b);
+  Value *a2_x = new SExtInst(a2, dt, "", b);
+  Value *tmp = BinaryOperator::Create(Instruction::Mul, a1_x, a2_x, "", b);
+
+  Value *dest = new TruncInst(tmp, st, "", b);
+  Value *dest_x = new SExtInst(dest, dt, "", b);
+
+  Value *zero = ConstantInt::get(st, 0, true);
+  Value *r = new ICmpInst( *b, CmpInst::ICMP_NE, dest_x, tmp);
+  Value *sf = new ICmpInst( *b, CmpInst::ICMP_SLT, dest, zero);
+
+  F_WRITE(b, SF, sf);
+  F_WRITE(b, OF, r);
+  F_WRITE(b, CF, r);
+
+  return {tmp, dest};
 }
 
-template <int width>
-static InstTransResult doIMulR(InstPtr ip,    BasicBlock *&b, 
-                           const MCOperand &src)
-{
-    NASSERT(src.isReg());
+template<int width>
+static IMulRes doIMulV(InstPtr ip, BasicBlock *&b, Value *rhs) {
+  // Handle the different source register depending on the bit width
+  Value *lhs;
 
-    Value   *res = doIMulV<width>(ip, b, R_READ<width>(b, src.getReg()));
-
-    Type    *t = Type::getIntNTy(b->getContext(), width);
-    Value   *res_sh = BinaryOperator::Create(Instruction::LShr, res, CONST_V<width*2>(b, width), "", b);
-    Value   *wrAX = new TruncInst(res, t, "", b);
-    Value   *wrDX = new TruncInst(res_sh, t, "", b);
-
-    switch(width) {
-        case 8:
-            R_WRITE<width>(b, X86::AH, wrDX);
-            R_WRITE<width>(b, X86::AL, wrAX);
-            break;
-        case 16:
-            R_WRITE<width>(b, X86::DX, wrDX);
-            R_WRITE<width>(b, X86::AX, wrAX);
-            break;
-        case 32:
-            R_WRITE<width>(b, X86::EDX, wrDX);
-            R_WRITE<width>(b, X86::EAX, wrAX);
-            break;
-        case 64:
-            R_WRITE<width>(b, X86::RDX, wrDX);
-            R_WRITE<width>(b, X86::RAX, wrAX);
-            break;
-        default:
-            throw TErr(__LINE__, __FILE__, "Not supported width");
-    }
-    
-    return ContinueBlock;
+  switch (width) {
+    case 8:
+      lhs = R_READ<8>(b, X86::AL);
+      break;
+    case 16:
+      lhs = R_READ<16>(b, X86::AX);
+      break;
+    case 32:
+      lhs = R_READ<32>(b, X86::EAX);
+      break;
+    case 64:
+      lhs = R_READ<64>(b, X86::RAX);
+      break;
+    default:
+      throw TErr(__LINE__, __FILE__, "Not supported width");
+  }
+  return doIMulVV<width>(ip, b, lhs, rhs);
 }
 
-template <int width>
-static InstTransResult doIMulM(InstPtr ip,     BasicBlock      *&b,
-                            Value           *memAddr)
-{
-    NASSERT(memAddr != NULL);
+template<int width>
+static InstTransResult doIMulR(InstPtr ip, BasicBlock *&b,
+                               const MCOperand &src) {
+  NASSERT(src.isReg());
 
-    Value   *res = doIMulV<width>(ip, b, M_READ<width>(ip, b, memAddr));
+  auto imul_res = doIMulV<width>(ip, b, R_READ<width>(b, src.getReg()));
+  //Value   *res =
 
-    Type    *t = Type::getIntNTy(b->getContext(), width);
-    Value   *res_sh = BinaryOperator::Create(Instruction::LShr, res, CONST_V<width*2>(b, width), "", b);
-    Value   *wrAX = new TruncInst(res, t, "", b);
-    Value   *wrDX = new TruncInst(res_sh, t, "", b);
+  Type *t = Type::getIntNTy(b->getContext(), width);
+  Value *res_sh = BinaryOperator::Create(Instruction::LShr, imul_res.full,
+                                         CONST_V<width * 2>(b, width), "", b);
 
-    switch(width) {
-        case 8:
-            R_WRITE<width>(b, X86::AX, res);
-            break;
-        case 16:
-            R_WRITE<width>(b, X86::DX, wrDX);
-            R_WRITE<width>(b, X86::AX, wrAX);
-            break;
-        case 32:
-            R_WRITE<width>(b, X86::EDX, wrDX);
-            R_WRITE<width>(b, X86::EAX, wrAX);
-            break;
-        case 64:
-            R_WRITE<width>(b, X86::RDX, wrDX);
-            R_WRITE<width>(b, X86::RAX, wrAX);
-            break;
-        default:
-            throw new TErr(__LINE__, __FILE__, "Not supported width");
-    }
+  Value *wrDX = new TruncInst(res_sh, t, "", b);
+  Value *wrAX = imul_res.trunc;
 
-    return ContinueBlock;
+  switch (width) {
+    case 8:
+      R_WRITE<width>(b, X86::AH, wrDX);
+      R_WRITE<width>(b, X86::AL, wrAX);
+      break;
+    case 16:
+      R_WRITE<width>(b, X86::DX, wrDX);
+      R_WRITE<width>(b, X86::AX, wrAX);
+      break;
+    case 32:
+      R_WRITE<width>(b, X86::EDX, wrDX);
+      R_WRITE<width>(b, X86::EAX, wrAX);
+      break;
+    case 64:
+      R_WRITE<width>(b, X86::RDX, wrDX);
+      R_WRITE<width>(b, X86::RAX, wrAX);
+      break;
+    default:
+      throw TErr(__LINE__, __FILE__, "Not supported width");
+  }
+
+  return ContinueBlock;
 }
 
-template <int width>
-static Value *doIMulVV(InstPtr ip,     BasicBlock  *&b,
-                Value       *lhs,
-                Value       *rhs)
-{
-    //model the semantics of the signed multiply
-    Value   *a1 = lhs;
-    Value   *a2 = rhs;
+template<int width>
+static InstTransResult doIMulM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+  NASSERT(memAddr != NULL);
 
-    Type    *dt = Type::getIntNTy(b->getContext(), width*2);
-    Value   *a1_x = new SExtInst(a1, dt, "", b);
-    Value   *a2_x = new SExtInst(a2, dt, "", b);
-    Value   *tmp = BinaryOperator::Create(Instruction::Mul, a1_x, a2_x, "", b);
-    Value   *dest = BinaryOperator::Create(Instruction::Mul, a1, a2, "", b);
-   
+  auto imul_res = doIMulV<width>(ip, b, M_READ<width>(ip, b, memAddr));
 
-    Value   *dest_x = new SExtInst(dest, dt, "", b);
-    Value   *r = new ICmpInst(*b, CmpInst::ICMP_NE, dest_x, tmp);
+  Type *t = Type::getIntNTy(b->getContext(), width);
+  Value *res_sh = BinaryOperator::Create(Instruction::LShr, imul_res.full,
+                                         CONST_V<width * 2>(b, width), "", b);
+  Value *wrDX = new TruncInst(res_sh, t, "", b);
+  Value *wrAX = imul_res.trunc;
 
-    F_WRITE(b, SF, r);
-    F_WRITE(b, OF, r);
+  switch (width) {
+    case 8:
+      R_WRITE<width>(b, X86::AX, wrAX);
+      break;
+    case 16:
+      R_WRITE<width>(b, X86::DX, wrDX);
+      R_WRITE<width>(b, X86::AX, wrAX);
+      break;
+    case 32:
+      R_WRITE<width>(b, X86::EDX, wrDX);
+      R_WRITE<width>(b, X86::EAX, wrAX);
+      break;
+    case 64:
+      R_WRITE<width>(b, X86::RDX, wrDX);
+      R_WRITE<width>(b, X86::RAX, wrAX);
+      break;
+    default:
+      throw new TErr(__LINE__, __FILE__, "Not supported width");
+  }
 
-    return dest;
+  return ContinueBlock;
 }
 
-template <int width>
-static InstTransResult doIMulRM(InstPtr ip,    BasicBlock      *&b,
-                            const MCOperand &dst,
-                            const MCOperand &lhs,
-                            Value           *rhs)
-{
-    NASSERT(dst.isReg());
-    NASSERT(lhs.isReg());
-    NASSERT(rhs != NULL);
+template<int width>
+static InstTransResult doIMulRM(InstPtr ip, BasicBlock *&b,
+                                const MCOperand &dst, const MCOperand &lhs,
+                                Value *rhs) {
+  NASSERT(dst.isReg());
+  NASSERT(lhs.isReg());
+  NASSERT(rhs != NULL);
 
-    Value   *res = 
-        doIMulVV<width>(ip, b,
-                        R_READ<width>(b, lhs.getReg()),
-                        M_READ<width>(ip, b, rhs));
+  auto imul_res = doIMulVV<width>(ip, b, R_READ<width>(b, lhs.getReg()),
+                                  M_READ<width>(ip, b, rhs));
 
-    R_WRITE<width>(b, dst.getReg(), res);
+  R_WRITE<width>(b, dst.getReg(), imul_res.trunc);
 
-    return ContinueBlock;
+  return ContinueBlock;
 }
 
-template <int width>
-static InstTransResult doIMulRR(InstPtr ip,    BasicBlock *&b,
-                            const MCOperand &dst, 
-                            const MCOperand &lhs, 
-                            const MCOperand &rhs)
-{
-    NASSERT(dst.isReg());
-    NASSERT(lhs.isReg());
-    NASSERT(rhs.isReg());
+template<int width>
+static InstTransResult doIMulRR(InstPtr ip, BasicBlock *&b,
+                                const MCOperand &dst, const MCOperand &lhs,
+                                const MCOperand &rhs) {
+  NASSERT(dst.isReg());
+  NASSERT(lhs.isReg());
+  NASSERT(rhs.isReg());
 
-    Value *res = 
-        doIMulVV<width>(ip, b, 
-                        R_READ<width>(b, lhs.getReg()), 
-                        R_READ<width>(b, rhs.getReg()));
-    //write out the result
-    R_WRITE<width>(b, dst.getReg(), res);
-    
-    return ContinueBlock;
+  auto imul_res = doIMulVV<width>(ip, b, R_READ<width>(b, lhs.getReg()),
+                                  R_READ<width>(b, rhs.getReg()));
+  //write out the result
+  R_WRITE<width>(b, dst.getReg(), imul_res.trunc);
+
+  return ContinueBlock;
 }
 
-template <int width>
-static Value *doIMulVVV(InstPtr ip,    BasicBlock  *&b,
-                Value       *lhs,
-                Value       *rhs)
-{
-    //model the semantics of the signed multiply
-    Value   *a1 = lhs;
-    Value   *a2 = rhs;
+template<int width>
+static Value *doIMulVVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs) {
 
-    Type    *dt = Type::getIntNTy(b->getContext(), width*2);
-    Value   *a1_x = new SExtInst(a1, dt, "", b);
-    Value   *a2_x = new SExtInst(a2, dt, "", b);
-    Value   *tmp = BinaryOperator::Create(Instruction::Mul, a1_x, a2_x, "", b);
-    Value   *dest = BinaryOperator::Create(Instruction::Mul, a1, a2, "", b);
-   
-    //R_WRITE<width>(b, dst.getReg(), dest);
-
-    Value   *dest_x = new SExtInst(dest, dt, "", b);
-    Value   *r = new ICmpInst(*b, CmpInst::ICMP_NE, dest_x, tmp);
-
-    F_WRITE(b, SF, r);
-    F_WRITE(b, OF, r);
-
-    return dest;
+  return doIMulVV<width>(ip, b, lhs, rhs).trunc;
 }
 
-template <int width>
-static InstTransResult doIMulRMI(InstPtr ip,   BasicBlock      *&b,
-                            const MCOperand &dst,
-                            Value           *lhs,
-                            const MCOperand &rhs)
-{
-    NASSERT(dst.isReg());
-    NASSERT(lhs != NULL);
-    NASSERT(rhs.isImm());
+template<int width>
+static InstTransResult doIMulRMI(InstPtr ip, BasicBlock *&b,
+                                 const MCOperand &dst, Value *lhs,
+                                 const MCOperand &rhs) {
+  NASSERT(dst.isReg());
+  NASSERT(lhs != NULL);
+  NASSERT(rhs.isImm());
 
-    Value   *res = 
-        doIMulVVV<width>(ip, b,
-                        M_READ<width>(ip, b, lhs),
-                        CONST_V<width>(b, rhs.getImm()));
+  Value *res = doIMulVVV<width>(ip, b, M_READ<width>(ip, b, lhs),
+                                CONST_V<width>(b, rhs.getImm()));
 
-    R_WRITE<width>(b, dst.getReg(), res);
+  R_WRITE<width>(b, dst.getReg(), res);
 
-    return ContinueBlock;
+  return ContinueBlock;
 }
 
-template <int width>
-static InstTransResult doIMulRRI(InstPtr ip,   BasicBlock      *&b,
-                            const MCOperand &dst,
-                            const MCOperand &lhs,
-                            const MCOperand &rhs)
-{
-    NASSERT(dst.isReg());
-    NASSERT(lhs.isReg());
-    NASSERT(rhs.isImm());
+template<int width>
+static InstTransResult doIMulRRI(InstPtr ip, BasicBlock *&b,
+                                 const MCOperand &dst, const MCOperand &lhs,
+                                 const MCOperand &rhs) {
+  NASSERT(dst.isReg());
+  NASSERT(lhs.isReg());
+  NASSERT(rhs.isImm());
 
-    Value   *res = 
-        doIMulVVV<width>(ip, b,
-                        R_READ<width>(b, lhs.getReg()),
-                        CONST_V<width>(b, rhs.getImm()));
+  Value *res = doIMulVVV<width>(ip, b, R_READ<width>(b, lhs.getReg()),
+                                CONST_V<width>(b, rhs.getImm()));
 
-    R_WRITE<width>(b, dst.getReg(), res);
+  R_WRITE<width>(b, dst.getReg(), res);
 
-    return ContinueBlock;
+  return ContinueBlock;
 }
 
-template <int width>
-static InstTransResult doIMulRRV(InstPtr ip,   BasicBlock      *&b,
-                            Value *addr,
-                            const MCOperand &lhs,
-                            const MCOperand &dst)
-{
-    NASSERT(dst.isReg());
-    NASSERT(lhs.isReg());
+template<int width>
+static InstTransResult doIMulRRV(InstPtr ip, BasicBlock *&b, Value *addr,
+                                 const MCOperand &lhs, const MCOperand &dst) {
+  NASSERT(dst.isReg());
+  NASSERT(lhs.isReg());
 
-    Value   *res = 
-        doIMulVVV<width>(ip, b,
-                        R_READ<width>(b, lhs.getReg()),
-                        addr);
+  Value *res = doIMulVVV<width>(ip, b, R_READ<width>(b, lhs.getReg()), addr);
 
-    R_WRITE<width>(b, dst.getReg(), res);
+  R_WRITE<width>(b, dst.getReg(), res);
 
-    return ContinueBlock;
+  return ContinueBlock;
 }
 
+template<int width>
+static InstTransResult doIMulRMI8(InstPtr ip, BasicBlock *&b,
+                                  const MCOperand &dst, Value *lhs,
+                                  const MCOperand &rhs) {
+  NASSERT(dst.isReg());
+  NASSERT(lhs != NULL);
+  NASSERT(rhs.isImm());
 
-template <int width>
-static InstTransResult doIMulRMI8(InstPtr ip,  BasicBlock      *&b,
-                            const MCOperand &dst,
-                            Value           *lhs,
-                            const MCOperand &rhs)
-{
-    NASSERT(dst.isReg());
-    NASSERT(lhs != NULL);
-    NASSERT(rhs.isImm());
+  Value *vRhs = CONST_V<8>(b, rhs.getImm());
+  Type *sx = Type::getIntNTy(b->getContext(), width);
+  Value *vRhs_x = new SExtInst(vRhs, sx, "", b);
 
-    Value   *vRhs = CONST_V<8>(b, rhs.getImm());
-    Type    *sx = Type::getIntNTy(b->getContext(), width);
-    Value   *vRhs_x = new SExtInst(vRhs, sx, "", b); 
+  Value *res = doIMulVVV<width>(ip, b, M_READ<width>(ip, b, lhs), vRhs_x);
 
-    Value   *res = 
-        doIMulVVV<width>(ip, b,
-                        M_READ<width>(ip, b, lhs),
-                        vRhs_x);
+  R_WRITE<width>(b, dst.getReg(), res);
 
-    R_WRITE<width>(b, dst.getReg(), res);
-
-    return ContinueBlock;
+  return ContinueBlock;
 }
 
-template <int width>
-static InstTransResult doIMulRRI8(InstPtr ip,  BasicBlock      *&b,
-                            const MCOperand &dst,
-                            const MCOperand &lhs,
-                            const MCOperand &rhs)
-{
-    NASSERT(dst.isReg());
-    NASSERT(lhs.isReg());
-    NASSERT(rhs.isImm());
+template<int width>
+static InstTransResult doIMulRRI8(InstPtr ip, BasicBlock *&b,
+                                  const MCOperand &dst, const MCOperand &lhs,
+                                  const MCOperand &rhs) {
+  NASSERT(dst.isReg());
+  NASSERT(lhs.isReg());
+  NASSERT(rhs.isImm());
 
-    Value   *vRhs = CONST_V<8>(b, rhs.getImm());
-    Type    *sx = Type::getIntNTy(b->getContext(), width);
-    Value   *vRhs_x = new SExtInst(vRhs, sx, "", b); 
+  Value *vRhs = CONST_V<8>(b, rhs.getImm());
+  Type *sx = Type::getIntNTy(b->getContext(), width);
+  Value *vRhs_x = new SExtInst(vRhs, sx, "", b);
 
-    Value   *res = 
-        doIMulVVV<width>(ip, b,
-                        R_READ<width>(b, lhs.getReg()),
-                        vRhs_x);
+  Value *res = doIMulVVV<width>(ip, b, R_READ<width>(b, lhs.getReg()), vRhs_x);
 
-    R_WRITE<width>(b, dst.getReg(), res);
+  R_WRITE<width>(b, dst.getReg(), res);
 
-    return ContinueBlock;
+  return ContinueBlock;
 }
 
 template <int width>

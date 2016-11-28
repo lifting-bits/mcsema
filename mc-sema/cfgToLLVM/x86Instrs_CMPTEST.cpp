@@ -300,7 +300,7 @@ GENERIC_TRANSLATION_REF(CMP64i32,
     doCmpRI<64>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)),
     doCmpRV<64>(ip, block, MCOperand::CreateReg(X86::EAX), IMM_AS_DATA_REF(block, natM, ip)));
 
-GENERIC_TRANSLATION(CMP16i16, doCmpRI<16>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(CMP16i16, doCmpRI<16>(ip, block, MCOperand::CreateReg(X86::AX), OP(0)))
 GENERIC_TRANSLATION(CMP32rr_REV, doCmpRR<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP32rr, doCmpRR<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP64rr, doCmpRR<64>(ip, block, OP(0), OP(1)))
@@ -308,7 +308,7 @@ GENERIC_TRANSLATION(CMP32ri, doCmpRI<32>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(CMP64ri, doCmpRI<64>(ip, block, OP(0), OP(1)))
 
 GENERIC_TRANSLATION(CMP8ri, doCmpRI<8>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION(CMP8i8, doCmpRI<8>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(CMP8i8, doCmpRI<8>(ip, block, MCOperand::CreateReg(X86::AL), OP(0)))
 GENERIC_TRANSLATION(CMP8rr_REV, doCmpRR<8>(ip, block, OP(0), OP(1)))
 
 GENERIC_TRANSLATION(CMP32ri8, doCmpRI<32>(ip, block, OP(0), OP(1)))
@@ -393,7 +393,7 @@ GENERIC_TRANSLATION_REF(TEST64ri32,
     doTestRV<64>(ip, block, OP(0), IMM_AS_DATA_REF(block, natM, ip)));
 
 GENERIC_TRANSLATION(TEST32ri, doTestRI<32>(ip,  block, OP(0), OP(1)))
-GENERIC_TRANSLATION(TEST16i16, doTestRI<16>(ip,  block, MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(TEST16i16, doTestRI<16>(ip,  block, MCOperand::CreateReg(X86::AX), OP(0)))
 GENERIC_TRANSLATION_REF(TEST16mi, 
 	doTestMI<16>(ip,  block, ADDR_NOREF(0), OP(5)),
 	doTestMI<16>(ip,  block, MEM_REFERENCE(0), OP(5)))
@@ -416,7 +416,7 @@ GENERIC_TRANSLATION_REF(TEST64rm,
 GENERIC_TRANSLATION_REF(TEST32rm, 
 	doTestRM<32>(ip,  block, OP(0), ADDR_NOREF(1)),
 	doTestRM<32>(ip,  block, OP(0), MEM_REFERENCE(1)))
-GENERIC_TRANSLATION(TEST8i8, doTestRI<8>(ip,   block, MCOperand::CreateReg(X86::EAX), OP(0)))
+GENERIC_TRANSLATION(TEST8i8, doTestRI<8>(ip,   block, MCOperand::CreateReg(X86::AL), OP(0)))
 GENERIC_TRANSLATION_REF(TEST8mi, 
 	doTestMI<8>(ip, block, ADDR_NOREF(0), OP(5)),
 	doTestMI<8>(ip, block, MEM_REFERENCE(0), OP(5)))

@@ -41,7 +41,7 @@ template <int width>
 static Value *getBit(BasicBlock *b, Value *val, int which)
 {
     TASSERT(which < width, "Bit width too big for getBit!");
-    uint64_t mask_value = 1 << which;
+    uint64_t mask_value = 1ULL << which;
     Value *mask = CONST_V<width>(b, mask_value);
     Value *sigbyte = BinaryOperator::CreateAnd(val, mask, "", b);
     Value *is_set = new ICmpInst(*b, CmpInst::ICMP_NE,
@@ -97,14 +97,14 @@ static Value *doShiftOp(InstPtr ip,
         b);
 
 
-    int mask_value = 1;
+    auto mask_value = 1ULL;
     switch(shift_op) {
         case Instruction::LShr:
         case Instruction::AShr:
-            mask_value = 1;
+            mask_value = 1ULL;
             break;
         case Instruction::Shl:
-            mask_value = 1 << (width-1);
+            mask_value = 1ULL << (width-1ULL);
             break;
         default:
             // assert;

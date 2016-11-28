@@ -188,7 +188,7 @@ Value *lookupLocalByName(Function *F, string localName) {
   BasicBlock *entry = &F->getEntryBlock();
   BasicBlock::iterator it = entry->begin();
 
-  localName += "_val";
+  localName += "";
   while (it != entry->end()) {
     Value *v = it;
 
@@ -212,6 +212,327 @@ Value *MCRegToValue(BasicBlock *b, unsigned reg) {
     return x86_64::MCRegToValue(b, reg);
   }
 }
+
+static int accessOffset(int reg) {
+  switch(reg) {
+    case X86::DH: return 8;
+    case X86::CH: return 8;
+    case X86::BH: return 8;
+    case X86::AH: return 8;
+    default: return 0;
+  }
+}
+
+static int readRegWidth(int reg) {
+  switch(reg) {
+    case X86::DH: return 8;
+    case X86::CH: return 8;
+    case X86::BH: return 8;
+    case X86::AH: return 8;
+    case X86::AX: return 16;
+    case X86::AL: return 8;
+    case X86::EAX: return 32;
+    case X86::RAX: return 64;
+    case X86::BX: return 16;
+    case X86::BL: return 8;
+    case X86::EBX: return 32;
+    case X86::RBX: return 64;
+    case X86::CX: return 16;
+    case X86::CL: return 8;
+    case X86::ECX: return 32;
+    case X86::RCX: return 64;
+    case X86::DX: return 16;
+    case X86::DL: return 8;
+    case X86::EDX: return 32;
+    case X86::RDX: return 64;
+    case X86::SIL: return 8;
+    case X86::SI: return 16;
+    case X86::ESI: return 32;
+    case X86::RSI: return 64;
+    case X86::DIL: return 8;
+    case X86::DI: return 16;
+    case X86::EDI: return 32;
+    case X86::RDI: return 64;
+    case X86::SPL: return 8;
+    case X86::SP: return 16;
+    case X86::ESP: return 32;
+    case X86::RSP: return 64;
+    case X86::BPL: return 8;
+    case X86::BP: return 16;
+    case X86::EBP: return 32;
+    case X86::RBP: return 64;
+    case X86::R8B: return 8;
+    case X86::R8W: return 16;
+    case X86::R8D: return 32;
+    case X86::R8: return 64;
+    case X86::R9B: return 8;
+    case X86::R9W: return 16;
+    case X86::R9D: return 32;
+    case X86::R9: return 64;
+    case X86::R10B: return 8;
+    case X86::R10W: return 16;
+    case X86::R10D: return 32;
+    case X86::R10: return 64;
+    case X86::R11B: return 8;
+    case X86::R11W: return 16;
+    case X86::R11D: return 32;
+    case X86::R11: return 64;
+    case X86::R12B: return 8;
+    case X86::R12W: return 16;
+    case X86::R12D: return 32;
+    case X86::R12: return 64;
+    case X86::R13B: return 8;
+    case X86::R13W: return 16;
+    case X86::R13D: return 32;
+    case X86::R13: return 64;
+    case X86::R14B: return 8;
+    case X86::R14W: return 16;
+    case X86::R14D: return 32;
+    case X86::R14: return 64;
+    case X86::R15B: return 8;
+    case X86::R15W: return 16;
+    case X86::R15D: return 32;
+    case X86::R15: return 64;
+
+
+    case X86::ST0: return 80;
+    case X86::ST1: return 80;
+    case X86::ST2: return 80;
+    case X86::ST3: return 80;
+    case X86::ST4: return 80;
+    case X86::ST5: return 80;
+    case X86::ST6: return 80;
+    case X86::ST7: return 80;
+
+    case X86::XMM0: return 128;
+    case X86::XMM1: return 128;
+    case X86::XMM2: return 128;
+    case X86::XMM3: return 128;
+    case X86::XMM4: return 128;
+    case X86::XMM5: return 128;
+    case X86::XMM6: return 128;
+    case X86::XMM7: return 128;
+    case X86::XMM8: return 128;
+    case X86::XMM9: return 128;
+    case X86::XMM10: return 128;
+    case X86::XMM11: return 128;
+    case X86::XMM12: return 128;
+    case X86::XMM13: return 128;
+    case X86::XMM14: return 128;
+    case X86::XMM15: return 128;
+
+    case X86::EIP: return 32;
+    case X86::RIP: return 64;
+
+    default:
+      throw TErr(__LINE__, __FILE__, "Reg type "+to_string<unsigned>(reg, dec)+" is unknown");
+  }
+
+  return -1;
+}
+
+static const char *regName(int reg) {
+  switch(reg) {
+    case X86::DH: return "DH";
+    case X86::CH: return "CH";
+    case X86::BH: return "BH";
+    case X86::AH: return "AH";
+    case X86::AX: return "AX";
+    case X86::AL: return "AL";
+    case X86::EAX: return "EAX";
+    case X86::RAX: return "RAX";
+    case X86::BX: return "BX";
+    case X86::BL: return "BL";
+    case X86::EBX: return "EBX";
+    case X86::RBX: return "RBX";
+    case X86::CX: return "CX";
+    case X86::CL: return "CL";
+    case X86::ECX: return "ECX";
+    case X86::RCX: return "RCX";
+    case X86::DX: return "DX";
+    case X86::DL: return "DL";
+    case X86::EDX: return "EDX";
+    case X86::RDX: return "RDX";
+    case X86::SIL: return "SIL";
+    case X86::SI: return "SI";
+    case X86::ESI: return "ESI";
+    case X86::RSI: return "RSI";
+    case X86::DIL: return "DIL";
+    case X86::DI: return "DI";
+    case X86::EDI: return "EDI";
+    case X86::RDI: return "RDI";
+    case X86::SPL: return "SPL";
+    case X86::SP: return "SP";
+    case X86::ESP: return "ESP";
+    case X86::RSP: return "RSP";
+    case X86::BPL: return "BPL";
+    case X86::BP: return "BP";
+    case X86::EBP: return "EBP";
+    case X86::RBP: return "RBP";
+    case X86::R8B: return "R8B";
+    case X86::R8W: return "R8W";
+    case X86::R8D: return "R8D";
+    case X86::R8: return "R8";
+    case X86::R9B: return "R9B";
+    case X86::R9W: return "R9W";
+    case X86::R9D: return "R9D";
+    case X86::R9: return "R9";
+    case X86::R10B: return "R10B";
+    case X86::R10W: return "R10W";
+    case X86::R10D: return "R10D";
+    case X86::R10: return "R10";
+    case X86::R11B: return "R11B";
+    case X86::R11W: return "R11W";
+    case X86::R11D: return "R11D";
+    case X86::R11: return "R11";
+    case X86::R12B: return "R12B";
+    case X86::R12W: return "R12W";
+    case X86::R12D: return "R12D";
+    case X86::R12: return "R12";
+    case X86::R13B: return "R13B";
+    case X86::R13W: return "R13W";
+    case X86::R13D: return "R13D";
+    case X86::R13: return "R13";
+    case X86::R14B: return "R14B";
+    case X86::R14W: return "R14W";
+    case X86::R14D: return "R14D";
+    case X86::R14: return "R14";
+    case X86::R15B: return "R15B";
+    case X86::R15W: return "R15W";
+    case X86::R15D: return "R15D";
+    case X86::R15: return "R15";
+
+
+    case X86::ST0: return "ST0";
+    case X86::ST1: return "ST1";
+    case X86::ST2: return "ST2";
+    case X86::ST3: return "ST3";
+    case X86::ST4: return "ST4";
+    case X86::ST5: return "ST5";
+    case X86::ST6: return "ST6";
+    case X86::ST7: return "ST7";
+
+    case X86::XMM0: return "XMM0";
+    case X86::XMM1: return "XMM1";
+    case X86::XMM2: return "XMM2";
+    case X86::XMM3: return "XMM3";
+    case X86::XMM4: return "XMM4";
+    case X86::XMM5: return "XMM5";
+    case X86::XMM6: return "XMM6";
+    case X86::XMM7: return "XMM7";
+    case X86::XMM8: return "XMM8";
+    case X86::XMM9: return "XMM9";
+    case X86::XMM10: return "XMM10";
+    case X86::XMM11: return "XMM11";
+    case X86::XMM12: return "XMM12";
+    case X86::XMM13: return "XMM13";
+    case X86::XMM14: return "XMM14";
+    case X86::XMM15: return "XMM15";
+
+    case X86::EIP: return "EIP";
+    case X86::RIP: return "RIP";
+
+    default:
+      throw TErr(__LINE__, __FILE__, "Reg type "+to_string<unsigned>(reg, dec)+" is unknown");
+  }
+
+  return nullptr;
+}
+
+static int gReadWriteId = 0;
+
+static std::string regAddrName(int mc_reg) {
+  std::stringstream ss;
+  ss << regName(mc_reg) << "." << gReadWriteId++;
+  return ss.str();
+}
+
+static std::string regValName(int mc_reg) {
+  std::stringstream ss;
+  ss << regName(mc_reg) << "_val." << gReadWriteId++;
+  return ss.str();
+}
+
+void GENERIC_MC_WRITEREG(BasicBlock *b, int mc_reg, Value *v) {
+  auto M = b->getParent()->getParent();
+  auto &C = M->getContext();
+  auto backing_reg = llvm::dyn_cast<llvm::AllocaInst>(MCRegToValue(b, mc_reg));
+  auto backing_reg_ty = backing_reg->getAllocatedType();
+  auto size = readRegWidth(mc_reg);
+  auto index_in_backing_reg = accessOffset(mc_reg) / 8;
+  if (32 == size && Pointer64 == getPointerSize(M)) {
+    size = 64;
+  }
+
+  DataLayout DL(M);
+  auto value_size = DL.getTypeAllocSizeInBits(v->getType());
+  if (64 >= size) {
+    auto reg_ty = Type::getIntNTy(C, size);
+    if (value_size < size) {
+      v = new llvm::ZExtInst(v, reg_ty, "", b);
+      value_size = size;
+    } else if (value_size > size) {
+      v = new llvm::TruncInst(v, reg_ty, "", b);
+      value_size = size;
+    }
+  }
+
+  auto backing_reg_size = DL.getTypeAllocSizeInBits(backing_reg_ty);
+  if (backing_reg_size == value_size) {
+    new llvm::StoreInst(v, backing_reg, b);
+    return;
+  }
+
+  auto value_ty = Type::getIntNTy(C, value_size);
+  auto value_ptr_ty = PointerType::get(value_ty, 0);
+  auto i32_ty = Type::getInt32Ty(C);
+  auto zero = ConstantInt::get(i32_ty, 0, false);
+  auto index = ConstantInt::get(i32_ty, index_in_backing_reg, false);
+  auto cast = new llvm::BitCastInst(backing_reg, value_ptr_ty, "", b);
+  llvm::Value *index_list[] = {index};
+  auto addr = llvm::GetElementPtrInst::Create(
+      cast, index_list, regAddrName(mc_reg), b);
+
+  new llvm::StoreInst(v, addr, b);
+}
+
+Value *GENERIC_MC_READREG(BasicBlock *b, int mc_reg, int desired_size) {
+  auto M = b->getParent()->getParent();
+  auto &C = M->getContext();
+  auto backing_reg = llvm::dyn_cast<llvm::AllocaInst>(MCRegToValue(b, mc_reg));
+  auto backing_reg_ty = backing_reg->getAllocatedType();
+  auto desired_ty = llvm::Type::getIntNTy(C, desired_size);
+  auto size = readRegWidth(mc_reg);
+
+  DataLayout DL(M);
+  llvm::Value *val = nullptr;
+
+  if (size == DL.getTypeAllocSizeInBits(backing_reg_ty)) {
+    val = new llvm::LoadInst(backing_reg, regValName(mc_reg), b);
+  } else {
+
+    auto index_in_backing_reg = accessOffset(mc_reg) / 8;
+    auto dst_ty = Type::getIntNTy(C, size);
+    auto dst_ptr_ty = PointerType::get(dst_ty, 0);
+    auto i32_ty = Type::getInt32Ty(C);
+    auto zero = ConstantInt::get(i32_ty, 0, false);
+    auto index = ConstantInt::get(i32_ty, index_in_backing_reg, false);
+    auto cast = new llvm::BitCastInst(backing_reg, dst_ptr_ty, "", b);
+    llvm::Value *index_list[] = {index};
+    auto addr = llvm::GetElementPtrInst::Create(
+        cast, index_list, regAddrName(mc_reg), b);
+    val = new llvm::LoadInst(addr, regValName(mc_reg), b);
+  }
+
+  if (desired_size > size) {
+    val = new llvm::ZExtInst(val, desired_ty, val->getName() + ".zext", b);
+  } else if (desired_size < size) {
+    val = new llvm::TruncInst(val, desired_ty, val->getName() + ".trunc", b);
+  }
+
+  return val;
+}
+
 Value *GENERIC_READREG(BasicBlock *b, MCSemaRegs reg) {
   Module *M = b->getParent()->getParent();
   Value *localRegVar;
@@ -223,10 +544,6 @@ Value *GENERIC_READREG(BasicBlock *b, MCSemaRegs reg) {
   }
   Instruction *readFlag = noAliasMCSemaScope(new LoadInst(localRegVar, "", b));
   return readFlag;
-}
-
-Value *F_READ(BasicBlock *b, MCSemaRegs flag) {
-  return GENERIC_READREG(b, flag);
 }
 
 void GENERIC_WRITEREG(BasicBlock *b, MCSemaRegs reg, Value *v) {
@@ -246,6 +563,10 @@ void GENERIC_WRITEREG(BasicBlock *b, MCSemaRegs reg, Value *v) {
   Instruction *st = noAliasMCSemaScope(new StoreInst(v, localRegVar, b));
   TASSERT(st != NULL, "");
   return;
+}
+
+Value *F_READ(BasicBlock *b, MCSemaRegs flag) {
+  return GENERIC_READREG(b, flag);
 }
 
 void F_WRITE(BasicBlock *b, MCSemaRegs flag, Value *v) {
@@ -284,173 +605,173 @@ void allocateLocals(Function *F, int bits) {
       //create a local for every member in the 'regs' struct
       //create 32-bit width general purpose registers
       Type *uintTy = Type::getInt32Ty(F->getContext());
-      Instruction *eaxA = new AllocaInst(uintTy, "EAX_val", begin);
-      Instruction *ebxA = new AllocaInst(uintTy, "EBX_val", eaxA);
-      Instruction *ecxA = new AllocaInst(uintTy, "ECX_val", ebxA);
-      Instruction *edxA = new AllocaInst(uintTy, "EDX_val", ecxA);
-      Instruction *esiA = new AllocaInst(uintTy, "ESI_val", edxA);
-      Instruction *ediA = new AllocaInst(uintTy, "EDI_val", esiA);
-      Instruction *ebpA = new AllocaInst(uintTy, "EBP_val", ediA);
-      Instruction *espA = new AllocaInst(uintTy, "ESP_val", ebpA);
+      Instruction *eaxA = new AllocaInst(uintTy, "EAX", begin);
+      Instruction *ebxA = new AllocaInst(uintTy, "EBX", eaxA);
+      Instruction *ecxA = new AllocaInst(uintTy, "ECX", ebxA);
+      Instruction *edxA = new AllocaInst(uintTy, "EDX", ecxA);
+      Instruction *esiA = new AllocaInst(uintTy, "ESI", edxA);
+      Instruction *ediA = new AllocaInst(uintTy, "EDI", esiA);
+      Instruction *ebpA = new AllocaInst(uintTy, "EBP", ediA);
+      Instruction *espA = new AllocaInst(uintTy, "ESP", ebpA);
       //create other fields for flags
 
       Type *boolTy = Type::getInt1Ty(F->getContext());
-      Instruction *zfA = new AllocaInst(boolTy, "ZF_val", espA);
-      Instruction *sfA = new AllocaInst(boolTy, "PF_val", zfA);
-      Instruction *ofA = new AllocaInst(boolTy, "AF_val", sfA);
-      Instruction *cfA = new AllocaInst(boolTy, "CF_val", ofA);
-      Instruction *pfA = new AllocaInst(boolTy, "SF_val", cfA);
-      Instruction *afA = new AllocaInst(boolTy, "OF_val", pfA);
-      Instruction *dfA = new AllocaInst(boolTy, "DF_val", afA);
+      Instruction *zfA = new AllocaInst(boolTy, "ZF", espA);
+      Instruction *sfA = new AllocaInst(boolTy, "PF", zfA);
+      Instruction *ofA = new AllocaInst(boolTy, "AF", sfA);
+      Instruction *cfA = new AllocaInst(boolTy, "CF", ofA);
+      Instruction *pfA = new AllocaInst(boolTy, "SF", cfA);
+      Instruction *afA = new AllocaInst(boolTy, "OF", pfA);
+      Instruction *dfA = new AllocaInst(boolTy, "DF", afA);
       TASSERT(dfA != NULL, "");
 
       // FPU STACK
       Type *floatTy = Type::getX86_FP80Ty(F->getContext());
       // 8 float values make up the ST registers
       Type *floatArrayTy = ArrayType::get(floatTy, 8);
-      Instruction *stRegs = new AllocaInst(floatArrayTy, "STi_val", dfA);
+      Instruction *stRegs = new AllocaInst(floatArrayTy, "STi", dfA);
 
       // sanity check
       TASSERT(stRegs != NULL, "");
 
       // FPU FLAGS
-      Instruction *fpu_B = new AllocaInst(boolTy, "FPU_B_val", stRegs);
-      Instruction *fpu_C3 = new AllocaInst(boolTy, "FPU_C3_val", fpu_B);
+      Instruction *fpu_B = new AllocaInst(boolTy, "FPU_B", stRegs);
+      Instruction *fpu_C3 = new AllocaInst(boolTy, "FPU_C3", fpu_B);
 
       // TOP of stack from FPU flags
       // really a 3-bit integer
       Type *topTy = Type::getIntNTy(F->getContext(), 3);
-      Instruction *fpu_TOP = new AllocaInst(topTy, "FPU_TOP_val", fpu_C3);
+      Instruction *fpu_TOP = new AllocaInst(topTy, "FPU_TOP", fpu_C3);
       TASSERT(fpu_TOP != NULL, "");
 
-      Instruction *fpu_C2 = new AllocaInst(boolTy, "FPU_C2_val", fpu_TOP);
-      Instruction *fpu_C1 = new AllocaInst(boolTy, "FPU_C1_val", fpu_C2);
-      Instruction *fpu_C0 = new AllocaInst(boolTy, "FPU_C0_val", fpu_C1);
-      Instruction *fpu_ES = new AllocaInst(boolTy, "FPU_ES_val", fpu_C0);
-      Instruction *fpu_SF = new AllocaInst(boolTy, "FPU_SF_val", fpu_ES);
-      Instruction *fpu_PE = new AllocaInst(boolTy, "FPU_PE_val", fpu_SF);
-      Instruction *fpu_UE = new AllocaInst(boolTy, "FPU_UE_val", fpu_PE);
-      Instruction *fpu_OE = new AllocaInst(boolTy, "FPU_OE_val", fpu_UE);
-      Instruction *fpu_ZE = new AllocaInst(boolTy, "FPU_ZE_val", fpu_OE);
-      Instruction *fpu_DE = new AllocaInst(boolTy, "FPU_DE_val", fpu_ZE);
-      Instruction *fpu_IE = new AllocaInst(boolTy, "FPU_IE_val", fpu_DE);
+      Instruction *fpu_C2 = new AllocaInst(boolTy, "FPU_C2", fpu_TOP);
+      Instruction *fpu_C1 = new AllocaInst(boolTy, "FPU_C1", fpu_C2);
+      Instruction *fpu_C0 = new AllocaInst(boolTy, "FPU_C0", fpu_C1);
+      Instruction *fpu_ES = new AllocaInst(boolTy, "FPU_ES", fpu_C0);
+      Instruction *fpu_SF = new AllocaInst(boolTy, "FPU_SF", fpu_ES);
+      Instruction *fpu_PE = new AllocaInst(boolTy, "FPU_PE", fpu_SF);
+      Instruction *fpu_UE = new AllocaInst(boolTy, "FPU_UE", fpu_PE);
+      Instruction *fpu_OE = new AllocaInst(boolTy, "FPU_OE", fpu_UE);
+      Instruction *fpu_ZE = new AllocaInst(boolTy, "FPU_ZE", fpu_OE);
+      Instruction *fpu_DE = new AllocaInst(boolTy, "FPU_DE", fpu_ZE);
+      Instruction *fpu_IE = new AllocaInst(boolTy, "FPU_IE", fpu_DE);
 
       // sanity check
       TASSERT(fpu_IE != NULL, "");
 
       // FPU CONTROL FLAGS
       Type *int2Ty = Type::getIntNTy(F->getContext(), 2);
-      Instruction *fpu_X = new AllocaInst(boolTy, "FPU_X_val", fpu_IE);
-      Instruction *fpu_RC = new AllocaInst(int2Ty, "FPU_RC_val", fpu_X);
-      Instruction *fpu_PC = new AllocaInst(int2Ty, "FPU_PC_val", fpu_RC);
-      Instruction *fpu_PM = new AllocaInst(boolTy, "FPU_PM_val", fpu_PC);
-      Instruction *fpu_UM = new AllocaInst(boolTy, "FPU_UM_val", fpu_PM);
-      Instruction *fpu_OM = new AllocaInst(boolTy, "FPU_OM_val", fpu_UM);
-      Instruction *fpu_ZM = new AllocaInst(boolTy, "FPU_ZM_val", fpu_OM);
-      Instruction *fpu_DM = new AllocaInst(boolTy, "FPU_DM_val", fpu_ZM);
-      Instruction *fpu_IM = new AllocaInst(boolTy, "FPU_IM_val", fpu_DM);
+      Instruction *fpu_X = new AllocaInst(boolTy, "FPU_X", fpu_IE);
+      Instruction *fpu_RC = new AllocaInst(int2Ty, "FPU_RC", fpu_X);
+      Instruction *fpu_PC = new AllocaInst(int2Ty, "FPU_PC", fpu_RC);
+      Instruction *fpu_PM = new AllocaInst(boolTy, "FPU_PM", fpu_PC);
+      Instruction *fpu_UM = new AllocaInst(boolTy, "FPU_UM", fpu_PM);
+      Instruction *fpu_OM = new AllocaInst(boolTy, "FPU_OM", fpu_UM);
+      Instruction *fpu_ZM = new AllocaInst(boolTy, "FPU_ZM", fpu_OM);
+      Instruction *fpu_DM = new AllocaInst(boolTy, "FPU_DM", fpu_ZM);
+      Instruction *fpu_IM = new AllocaInst(boolTy, "FPU_IM", fpu_DM);
 
       TASSERT(fpu_IM != NULL, "");
 
       // FPU TAG WORD
       // 8 2-bit values. One for each ST register
       Type *tagArrayType = ArrayType::get(int2Ty, 8);
-      Instruction *fpu_TagWord = new AllocaInst(tagArrayType, "FPU_TAG_val",
+      Instruction *fpu_TagWord = new AllocaInst(tagArrayType, "FPU_TAG",
                                                 fpu_IM);
 
       TASSERT(fpu_TagWord != NULL, "");
 
       Instruction *fpu_LASTIP_SEG = new AllocaInst(
-          Type::getInt16Ty(F->getContext()), "FPU_LASTIP_SEG_val", fpu_TagWord);
+          Type::getInt16Ty(F->getContext()), "FPU_LASTIP_SEG", fpu_TagWord);
       Instruction *fpu_LASTIP_OFF = new AllocaInst(
-          Type::getInt32Ty(F->getContext()), "FPU_LASTIP_OFF_val",
+          Type::getInt32Ty(F->getContext()), "FPU_LASTIP_OFF",
           fpu_LASTIP_SEG);
       Instruction *fpu_LASTDATA_SEG = new AllocaInst(
-          Type::getInt16Ty(F->getContext()), "FPU_LASTDATA_SEG_val",
+          Type::getInt16Ty(F->getContext()), "FPU_LASTDATA_SEG",
           fpu_LASTIP_OFF);
       Instruction *fpu_LASTDATA_OFF = new AllocaInst(
-          Type::getInt32Ty(F->getContext()), "FPU_LASTDATA_OFF_val",
+          Type::getInt32Ty(F->getContext()), "FPU_LASTDATA_OFF",
           fpu_LASTDATA_SEG);
 
       Instruction *fpu_FOPCODE = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE_val",
+          Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE",
           fpu_LASTDATA_OFF);
       TASSERT(fpu_FOPCODE != NULL, "");
 
       //vector registers
       Instruction *vec_xmm0 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM0_val", fpu_FOPCODE);
+          Type::getIntNTy(F->getContext(), 128), "XMM0", fpu_FOPCODE);
       Instruction *vec_xmm1 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM1_val", vec_xmm0);
+          Type::getIntNTy(F->getContext(), 128), "XMM1", vec_xmm0);
       Instruction *vec_xmm2 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM2_val", vec_xmm1);
+          Type::getIntNTy(F->getContext(), 128), "XMM2", vec_xmm1);
       Instruction *vec_xmm3 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM3_val", vec_xmm2);
+          Type::getIntNTy(F->getContext(), 128), "XMM3", vec_xmm2);
       Instruction *vec_xmm4 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM4_val", vec_xmm3);
+          Type::getIntNTy(F->getContext(), 128), "XMM4", vec_xmm3);
       Instruction *vec_xmm5 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM5_val", vec_xmm4);
+          Type::getIntNTy(F->getContext(), 128), "XMM5", vec_xmm4);
       Instruction *vec_xmm6 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM6_val", vec_xmm5);
+          Type::getIntNTy(F->getContext(), 128), "XMM6", vec_xmm5);
       Instruction *vec_xmm7 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM7_val", vec_xmm6);
+          Type::getIntNTy(F->getContext(), 128), "XMM7", vec_xmm6);
       Instruction *vec_xmm8 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM8_val", vec_xmm7);
+          Type::getIntNTy(F->getContext(), 128), "XMM8", vec_xmm7);
       Instruction *vec_xmm9 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM9_val", vec_xmm8);
+          Type::getIntNTy(F->getContext(), 128), "XMM9", vec_xmm8);
       Instruction *vec_xmm10 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM10_val", vec_xmm9);
+          Type::getIntNTy(F->getContext(), 128), "XMM10", vec_xmm9);
       Instruction *vec_xmm11 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM11_val", vec_xmm10);
+          Type::getIntNTy(F->getContext(), 128), "XMM11", vec_xmm10);
       Instruction *vec_xmm12 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM12_val", vec_xmm11);
+          Type::getIntNTy(F->getContext(), 128), "XMM12", vec_xmm11);
       Instruction *vec_xmm13 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM13_val", vec_xmm12);
+          Type::getIntNTy(F->getContext(), 128), "XMM13", vec_xmm12);
       Instruction *vec_xmm14 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM14_val", vec_xmm13);
+          Type::getIntNTy(F->getContext(), 128), "XMM14", vec_xmm13);
       Instruction *vec_xmm15 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM15_val", vec_xmm14);
+          Type::getIntNTy(F->getContext(), 128), "XMM15", vec_xmm14);
 
       // stack base and limit
       Instruction *stack_base = new AllocaInst(
-          Type::getInt32Ty(F->getContext()), "STACK_BASE_val", vec_xmm15);
+          Type::getInt32Ty(F->getContext()), "STACK_BASE", vec_xmm15);
       Instruction *stack_limit = new AllocaInst(
-          Type::getInt32Ty(F->getContext()), "STACK_LIMIT_val", stack_base);
+          Type::getInt32Ty(F->getContext()), "STACK_LIMIT", stack_base);
     }
       break;
 
     case 64: {
       //create 64-bit width general purpose registers
       Type *uintTy = Type::getInt64Ty(F->getContext());
-      Instruction *raxA = new AllocaInst(uintTy, "RAX_val", begin);
-      Instruction *rbxA = new AllocaInst(uintTy, "RBX_val", raxA);
-      Instruction *rcxA = new AllocaInst(uintTy, "RCX_val", rbxA);
-      Instruction *rdxA = new AllocaInst(uintTy, "RDX_val", rcxA);
-      Instruction *rsiA = new AllocaInst(uintTy, "RSI_val", rdxA);
-      Instruction *rdiA = new AllocaInst(uintTy, "RDI_val", rsiA);
-      Instruction *rbpA = new AllocaInst(uintTy, "RBP_val", rdiA);
-      Instruction *rspA = new AllocaInst(uintTy, "RSP_val", rbpA);
+      Instruction *raxA = new AllocaInst(uintTy, "RAX", begin);
+      Instruction *rbxA = new AllocaInst(uintTy, "RBX", raxA);
+      Instruction *rcxA = new AllocaInst(uintTy, "RCX", rbxA);
+      Instruction *rdxA = new AllocaInst(uintTy, "RDX", rcxA);
+      Instruction *rsiA = new AllocaInst(uintTy, "RSI", rdxA);
+      Instruction *rdiA = new AllocaInst(uintTy, "RDI", rsiA);
+      Instruction *rbpA = new AllocaInst(uintTy, "RBP", rdiA);
+      Instruction *rspA = new AllocaInst(uintTy, "RSP", rbpA);
 
-      Instruction *r8A = new AllocaInst(uintTy, "R8_val", rspA);
-      Instruction *r9A = new AllocaInst(uintTy, "R9_val", r8A);
-      Instruction *r10A = new AllocaInst(uintTy, "R10_val", r9A);
-      Instruction *r11A = new AllocaInst(uintTy, "R11_val", r10A);
-      Instruction *r12A = new AllocaInst(uintTy, "R12_val", r11A);
-      Instruction *r13A = new AllocaInst(uintTy, "R13_val", r12A);
-      Instruction *r14A = new AllocaInst(uintTy, "R14_val", r13A);
-      Instruction *r15A = new AllocaInst(uintTy, "R15_val", r14A);
+      Instruction *r8A = new AllocaInst(uintTy, "R8", rspA);
+      Instruction *r9A = new AllocaInst(uintTy, "R9", r8A);
+      Instruction *r10A = new AllocaInst(uintTy, "R10", r9A);
+      Instruction *r11A = new AllocaInst(uintTy, "R11", r10A);
+      Instruction *r12A = new AllocaInst(uintTy, "R12", r11A);
+      Instruction *r13A = new AllocaInst(uintTy, "R13", r12A);
+      Instruction *r14A = new AllocaInst(uintTy, "R14", r13A);
+      Instruction *r15A = new AllocaInst(uintTy, "R15", r14A);
 
-      Instruction *ripA = new AllocaInst(uintTy, "RIP_val", r14A);
+      Instruction *ripA = new AllocaInst(uintTy, "RIP", r14A);
       //create other fields for flags
 
       Type *boolTy = Type::getInt1Ty(F->getContext());
-      Instruction *zfA = new AllocaInst(boolTy, "ZF_val", ripA);
-      Instruction *sfA = new AllocaInst(boolTy, "PF_val", zfA);
-      Instruction *ofA = new AllocaInst(boolTy, "AF_val", sfA);
-      Instruction *cfA = new AllocaInst(boolTy, "CF_val", ofA);
-      Instruction *pfA = new AllocaInst(boolTy, "SF_val", cfA);
-      Instruction *afA = new AllocaInst(boolTy, "OF_val", pfA);
-      Instruction *dfA = new AllocaInst(boolTy, "DF_val", afA);
+      Instruction *zfA = new AllocaInst(boolTy, "ZF", ripA);
+      Instruction *sfA = new AllocaInst(boolTy, "PF", zfA);
+      Instruction *ofA = new AllocaInst(boolTy, "AF", sfA);
+      Instruction *cfA = new AllocaInst(boolTy, "CF", ofA);
+      Instruction *pfA = new AllocaInst(boolTy, "SF", cfA);
+      Instruction *afA = new AllocaInst(boolTy, "OF", pfA);
+      Instruction *dfA = new AllocaInst(boolTy, "DF", afA);
       TASSERT(dfA != NULL, "");
 
       // FPU STACK
@@ -458,114 +779,114 @@ void allocateLocals(Function *F, int bits) {
       Type *floatTy = Type::getX86_FP80Ty(F->getContext());
       // 8 float values make up the ST registers
       Type *floatArrayTy = ArrayType::get(floatTy, 8);
-      Instruction *stRegs = new AllocaInst(floatArrayTy, "STi_val", dfA);
+      Instruction *stRegs = new AllocaInst(floatArrayTy, "STi", dfA);
 
       // sanity check
       TASSERT(stRegs != NULL, "");
 
       // FPU FLAGS
-      Instruction *fpu_B = new AllocaInst(boolTy, "FPU_B_val", stRegs);
-      Instruction *fpu_C3 = new AllocaInst(boolTy, "FPU_C3_val", fpu_B);
+      Instruction *fpu_B = new AllocaInst(boolTy, "FPU_B", stRegs);
+      Instruction *fpu_C3 = new AllocaInst(boolTy, "FPU_C3", fpu_B);
 
       // TOP of stack from FPU flags
       // really a 3-bit integer
       Type *topTy = Type::getIntNTy(F->getContext(), 3);
-      Instruction *fpu_TOP = new AllocaInst(topTy, "FPU_TOP_val", fpu_C3);
+      Instruction *fpu_TOP = new AllocaInst(topTy, "FPU_TOP", fpu_C3);
       TASSERT(fpu_TOP != NULL, "");
 
-      Instruction *fpu_C2 = new AllocaInst(boolTy, "FPU_C2_val", fpu_TOP);
-      Instruction *fpu_C1 = new AllocaInst(boolTy, "FPU_C1_val", fpu_C2);
-      Instruction *fpu_C0 = new AllocaInst(boolTy, "FPU_C0_val", fpu_C1);
-      Instruction *fpu_ES = new AllocaInst(boolTy, "FPU_ES_val", fpu_C0);
-      Instruction *fpu_SF = new AllocaInst(boolTy, "FPU_SF_val", fpu_ES);
-      Instruction *fpu_PE = new AllocaInst(boolTy, "FPU_PE_val", fpu_SF);
-      Instruction *fpu_UE = new AllocaInst(boolTy, "FPU_UE_val", fpu_PE);
-      Instruction *fpu_OE = new AllocaInst(boolTy, "FPU_OE_val", fpu_UE);
-      Instruction *fpu_ZE = new AllocaInst(boolTy, "FPU_ZE_val", fpu_OE);
-      Instruction *fpu_DE = new AllocaInst(boolTy, "FPU_DE_val", fpu_ZE);
-      Instruction *fpu_IE = new AllocaInst(boolTy, "FPU_IE_val", fpu_DE);
+      Instruction *fpu_C2 = new AllocaInst(boolTy, "FPU_C2", fpu_TOP);
+      Instruction *fpu_C1 = new AllocaInst(boolTy, "FPU_C1", fpu_C2);
+      Instruction *fpu_C0 = new AllocaInst(boolTy, "FPU_C0", fpu_C1);
+      Instruction *fpu_ES = new AllocaInst(boolTy, "FPU_ES", fpu_C0);
+      Instruction *fpu_SF = new AllocaInst(boolTy, "FPU_SF", fpu_ES);
+      Instruction *fpu_PE = new AllocaInst(boolTy, "FPU_PE", fpu_SF);
+      Instruction *fpu_UE = new AllocaInst(boolTy, "FPU_UE", fpu_PE);
+      Instruction *fpu_OE = new AllocaInst(boolTy, "FPU_OE", fpu_UE);
+      Instruction *fpu_ZE = new AllocaInst(boolTy, "FPU_ZE", fpu_OE);
+      Instruction *fpu_DE = new AllocaInst(boolTy, "FPU_DE", fpu_ZE);
+      Instruction *fpu_IE = new AllocaInst(boolTy, "FPU_IE", fpu_DE);
 
       // sanity check
       TASSERT(fpu_IE != NULL, "");
 
       // FPU CONTROL FLAGS
       Type *int2Ty = Type::getIntNTy(F->getContext(), 2);
-      Instruction *fpu_X = new AllocaInst(boolTy, "FPU_X_val", fpu_IE);
-      Instruction *fpu_RC = new AllocaInst(int2Ty, "FPU_RC_val", fpu_X);
-      Instruction *fpu_PC = new AllocaInst(int2Ty, "FPU_PC_val", fpu_RC);
-      Instruction *fpu_PM = new AllocaInst(boolTy, "FPU_PM_val", fpu_PC);
-      Instruction *fpu_UM = new AllocaInst(boolTy, "FPU_UM_val", fpu_PM);
-      Instruction *fpu_OM = new AllocaInst(boolTy, "FPU_OM_val", fpu_UM);
-      Instruction *fpu_ZM = new AllocaInst(boolTy, "FPU_ZM_val", fpu_OM);
-      Instruction *fpu_DM = new AllocaInst(boolTy, "FPU_DM_val", fpu_ZM);
-      Instruction *fpu_IM = new AllocaInst(boolTy, "FPU_IM_val", fpu_DM);
+      Instruction *fpu_X = new AllocaInst(boolTy, "FPU_X", fpu_IE);
+      Instruction *fpu_RC = new AllocaInst(int2Ty, "FPU_RC", fpu_X);
+      Instruction *fpu_PC = new AllocaInst(int2Ty, "FPU_PC", fpu_RC);
+      Instruction *fpu_PM = new AllocaInst(boolTy, "FPU_PM", fpu_PC);
+      Instruction *fpu_UM = new AllocaInst(boolTy, "FPU_UM", fpu_PM);
+      Instruction *fpu_OM = new AllocaInst(boolTy, "FPU_OM", fpu_UM);
+      Instruction *fpu_ZM = new AllocaInst(boolTy, "FPU_ZM", fpu_OM);
+      Instruction *fpu_DM = new AllocaInst(boolTy, "FPU_DM", fpu_ZM);
+      Instruction *fpu_IM = new AllocaInst(boolTy, "FPU_IM", fpu_DM);
 
       TASSERT(fpu_IM != NULL, "");
 
       // FPU TAG WORD
       // 8 2-bit values. One for each ST register
       Type *tagArrayType = ArrayType::get(int2Ty, 8);
-      Instruction *fpu_TagWord = new AllocaInst(tagArrayType, "FPU_TAG_val",
+      Instruction *fpu_TagWord = new AllocaInst(tagArrayType, "FPU_TAG",
                                                 fpu_IM);
 
       TASSERT(fpu_TagWord != NULL, "");
 
       Instruction *fpu_LASTIP_SEG = new AllocaInst(
-          Type::getInt16Ty(F->getContext()), "FPU_LASTIP_SEG_val", fpu_TagWord);
+          Type::getInt16Ty(F->getContext()), "FPU_LASTIP_SEG", fpu_TagWord);
       Instruction *fpu_LASTIP_OFF = new AllocaInst(
-          Type::getInt64Ty(F->getContext()), "FPU_LASTIP_OFF_val",
+          Type::getInt64Ty(F->getContext()), "FPU_LASTIP_OFF",
           fpu_LASTIP_SEG);
       Instruction *fpu_LASTDATA_SEG = new AllocaInst(
-          Type::getInt16Ty(F->getContext()), "FPU_LASTDATA_SEG_val",
+          Type::getInt16Ty(F->getContext()), "FPU_LASTDATA_SEG",
           fpu_LASTIP_OFF);
       Instruction *fpu_LASTDATA_OFF = new AllocaInst(
-          Type::getInt64Ty(F->getContext()), "FPU_LASTDATA_OFF_val",
+          Type::getInt64Ty(F->getContext()), "FPU_LASTDATA_OFF",
           fpu_LASTDATA_SEG);
 
       Instruction *fpu_FOPCODE = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE_val",
+          Type::getIntNTy(F->getContext(), 11), "FPU_FOPCODE",
           fpu_LASTDATA_OFF);
       TASSERT(fpu_FOPCODE != NULL, "");
 
       //vector registers
       Instruction *vec_xmm0 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM0_val", fpu_FOPCODE);
+          Type::getIntNTy(F->getContext(), 128), "XMM0", fpu_FOPCODE);
       Instruction *vec_xmm1 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM1_val", vec_xmm0);
+          Type::getIntNTy(F->getContext(), 128), "XMM1", vec_xmm0);
       Instruction *vec_xmm2 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM2_val", vec_xmm1);
+          Type::getIntNTy(F->getContext(), 128), "XMM2", vec_xmm1);
       Instruction *vec_xmm3 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM3_val", vec_xmm2);
+          Type::getIntNTy(F->getContext(), 128), "XMM3", vec_xmm2);
       Instruction *vec_xmm4 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM4_val", vec_xmm3);
+          Type::getIntNTy(F->getContext(), 128), "XMM4", vec_xmm3);
       Instruction *vec_xmm5 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM5_val", vec_xmm4);
+          Type::getIntNTy(F->getContext(), 128), "XMM5", vec_xmm4);
       Instruction *vec_xmm6 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM6_val", vec_xmm5);
+          Type::getIntNTy(F->getContext(), 128), "XMM6", vec_xmm5);
       Instruction *vec_xmm7 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM7_val", vec_xmm6);
+          Type::getIntNTy(F->getContext(), 128), "XMM7", vec_xmm6);
       Instruction *vec_xmm8 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM8_val", vec_xmm7);
+          Type::getIntNTy(F->getContext(), 128), "XMM8", vec_xmm7);
       Instruction *vec_xmm9 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM9_val", vec_xmm8);
+          Type::getIntNTy(F->getContext(), 128), "XMM9", vec_xmm8);
       Instruction *vec_xmm10 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM10_val", vec_xmm9);
+          Type::getIntNTy(F->getContext(), 128), "XMM10", vec_xmm9);
       Instruction *vec_xmm11 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM11_val", vec_xmm10);
+          Type::getIntNTy(F->getContext(), 128), "XMM11", vec_xmm10);
       Instruction *vec_xmm12 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM12_val", vec_xmm11);
+          Type::getIntNTy(F->getContext(), 128), "XMM12", vec_xmm11);
       Instruction *vec_xmm13 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM13_val", vec_xmm12);
+          Type::getIntNTy(F->getContext(), 128), "XMM13", vec_xmm12);
       Instruction *vec_xmm14 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM14_val", vec_xmm13);
+          Type::getIntNTy(F->getContext(), 128), "XMM14", vec_xmm13);
       Instruction *vec_xmm15 = new AllocaInst(
-          Type::getIntNTy(F->getContext(), 128), "XMM15_val", vec_xmm14);
+          Type::getIntNTy(F->getContext(), 128), "XMM15", vec_xmm14);
 
       // stack base and limit
       Instruction *stack_base = new AllocaInst(
-          Type::getInt64Ty(F->getContext()), "STACK_BASE_val", vec_xmm15);
+          Type::getInt64Ty(F->getContext()), "STACK_BASE", vec_xmm15);
       Instruction *stack_limit = new AllocaInst(
-          Type::getInt64Ty(F->getContext()), "STACK_LIMIT_val", stack_base);
+          Type::getInt64Ty(F->getContext()), "STACK_LIMIT", stack_base);
     }
       break;
 

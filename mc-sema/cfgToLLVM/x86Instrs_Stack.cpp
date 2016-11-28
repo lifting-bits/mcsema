@@ -344,39 +344,24 @@ static InstTransResult doLeave(InstPtr ip,  BasicBlock      *b ) {
 
 	if(getPointerSize(M) == Pointer32){
 		// read EBP
-		Value   *vEBP = x86::R_READ<32>(b, X86::EBP);
+		Value   *link_pointer = x86::R_READ<32>(b, X86::EBP);
+    Value   *base_pointer = M_READ<32>(ip, b, link_pointer);
+    R_WRITE<32>(b, X86::EBP, base_pointer);
 
 		//write this to ESP
-		x86::R_WRITE<32>(b, X86::ESP, vEBP);
+		R_WRITE<32>(b, X86::ESP, llvm::BinaryOperator::Create(
+		    Instruction::Add,
+		    link_pointer, CONST_V<32>(b, 4), "", b));
 
-		//do a pop into EBP
-		//read from memory at the top of the stack
-		Value   *vESP = x86::R_READ<32>(b, X86::ESP);
-		Value   *atTop = M_READ<32>(ip, b, vESP);
-
-		//write this value into EBP
-		x86::R_WRITE<32>(b, X86::EBP, atTop);
-
-		//add 4 to the stack pointer
-		Value   *updt = BinaryOperator::CreateAdd(vESP, CONST_V<32>(b, 4), "", b);
-		x86::R_WRITE<32>(b, X86::ESP, updt);
 	} else {
-		Value   *vEBP = x86_64::R_READ<64>(b, X86::RBP);
+	  Value   *link_pointer = x86::R_READ<64>(b, X86::RBP);
+    Value   *base_pointer = M_READ<64>(ip, b, link_pointer);
+    R_WRITE<64>(b, X86::RBP, base_pointer);
 
-		//write this to ESP
-		x86_64::R_WRITE<64>(b, X86::RSP, vEBP);
-
-		//do a pop into EBP
-		//read from memory at the top of the stack
-		Value   *vESP = x86_64::R_READ<64>(b, X86::RSP);
-		Value   *atTop = M_READ<64>(ip, b, vESP);
-
-		//write this value into EBP
-		x86_64::R_WRITE<64>(b, X86::RBP, atTop);
-
-		//add 4 to the stack pointer
-		Value   *updt = BinaryOperator::CreateAdd(vESP, CONST_V<64>(b, 8), "", b);
-		x86_64::R_WRITE<64>(b, X86::RSP, updt);
+    //write this to ESP
+    R_WRITE<64>(b, X86::RSP, llvm::BinaryOperator::Create(
+        Instruction::Add,
+        link_pointer, CONST_V<64>(b, 8), "", b));
 	}
 
     return ContinueBlock;
