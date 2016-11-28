@@ -5,17 +5,13 @@ del /q sailboat.obj sailboat_mine.obj sailboat.cfg sailboat.bc sailboat_opt.bc s
 cl /nologo /c sailboat.c
 if exist "%IDA_PATH%\idaq.exe" (
     echo Using IDA to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend_wrapper.py -march=x86-64 -d -func-map=sailboat.txt,"%STD_DEFS%" -entry-symbol=keycomp -i=sailboat.obj
+    %PYTHON% %BIN_DESCEND_PATH%\bin_descend_wrapper.py -march=x86-64 -d -func-map=sailboat.txt,"%STD_DEFS%" -entry-symbol=keycomp -i=sailboat.obj
 ) else (
-    echo Using bin_descend to recover CFG
-    echo %BIN_DESCEND_PATH%\bin_descend.exe -d -func-map=sailboat.txt,"%STD_DEFS%" -entry-symbol=keycomp -i=sailboat.obj
-    %BIN_DESCEND_PATH%\bin_descend.exe -march=x86-64 -d -func-map=sailboat.txt,"%STD_DEFS%" -entry-symbol=keycomp -i=sailboat.obj
+    echo Bin_descend is no longer supported
+    exit 1
 )
 
-%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=x86_64-pc-win32 -i sailboat.cfg -driver=sailboat,keycomp,1,return,C -o sailboat.bc
+%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=x86_64-pc-windows-msvc -i sailboat.cfg -entrypoint=keycomp -o sailboat.bc
 
-%LLVM_PATH%\opt.exe -O3 -o sailboat_opt.bc sailboat.bc
-%LLVM_PATH%\llc.exe -filetype=obj -o sailboat_mine.obj sailboat_opt.bc
-cl /Zi /nologo sailboat_run.c sailboat_mine.obj
+clang-cl /Zi -O3 -m64 -o sailboat_run.exe sailboat_run.c ..\..\..\drivers\PE_64_windows.asm sailboat.bc
 sailboat_run.exe "key{d9dd1cb9dc13ebc3dc3780d76123ee34}"
-
