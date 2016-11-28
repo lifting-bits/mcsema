@@ -6,7 +6,7 @@
 #include "../common/RegisterState.h"
 
 static const unsigned long long kStackSize = 1ULL << 20ULL;
-static const unsigned long long kStackArgSize = 256ULL;
+static const unsigned long long kStackArgSize = 264ULL;
 
 void getTlsIndex(const char dest_reg[]) {
   // store TLS index into dest_reg
@@ -28,6 +28,7 @@ void emitFunctionDef(const char func_name[]) {
 	printf(".type	32;\n");
 	printf(".endef\n");
 	printf(".globl %s\n", func_name);
+  printf(".align 16, 0x90\n");
   printf("%s:\n", func_name);
 }
 
@@ -38,41 +39,41 @@ int main(void) {
   printf("\n");
 
   printf("  .section        .tls$,\"wd\"\n");
-  printf("  .p2align 2\n");
+  printf("  .align 16\n");
 
   // Thread-local state structure, named by `__mcsema_reg_state`.
-  printf("     .globl  __mcsema_reg_state\n");
+  printf("  .globl  __mcsema_reg_state\n");
+  printf("  .align 16\n");
   printf("__mcsema_reg_state:\n");
-  printf("  .p2align 2\n");
   printf("  .zero   %llu\n", sizeof(mcsema::RegState));
   printf("\n");
 
   // Thread-local stack structure, named by `__mcsema_stack`.
-  printf("     .globl  __mcsema_stack\n");
+  printf("  .globl  __mcsema_stack\n");
+  printf("  .align 16\n");
   printf("__mcsema_stack:\n");
-  printf("  .p2align 4\n");
   printf("  .zero   %llu\n", kStackSize); // MiB
   printf("\n");
 
   // Thread-local stack structure, named by `__mcsema_stack_args`
   // used to store stack-passed function arguments
-  printf("     .globl  __mcsema_stack_args\n");
+  printf("  .globl  __mcsema_stack_args\n");
+  printf("  .align 16\n");
   printf("__mcsema_stack_args:\n");
-  printf("  .p2align 4\n");
   printf("  .zero   %llu\n", kStackArgSize);
   printf("\n");
 
   // Thread-local variable structure, named by `__mcsema_stack_mark`
   // used to store the expected stack location on return,
   // so caller cleanup conventions can know how many bytes to pop off
-  printf("     .globl  __mcsema_stack_mark\n");
+  printf("  .globl  __mcsema_stack_mark\n");
+  printf("  .align 8\n");
   printf("__mcsema_stack_mark:\n");
-  printf("  .p2align 2\n");
   printf("  .zero   %u\n", 8);
   printf("\n");
 
   printf("  .text\n");
-	printf("  .p2align	4, 0x90\n");
+	printf("  .align	16, 0x90\n");
   printf("\n");
 
   ///////////////////////////////////////////////////////////////////////////////////
@@ -137,7 +138,8 @@ int main(void) {
   printf("  cmp rsp, 0\n");
   printf("  jnz .Lhave_stack\n");
   // end inline getTlsIndex
-  printf("  lea rsp, [rax + __mcsema_stack@SECREL32 + %llu]\n", kStackSize);
+  // the -8 is to get an aligned stack for a call
+  printf("  lea rsp, [rax + __mcsema_stack@SECREL32 + %llu - 8]\n", kStackSize);
   printf(".Lhave_stack:\n");
 
   // the state struture is the first and only arg to lifted functions
@@ -303,14 +305,6 @@ int main(void) {
 
   printf("  pop QWORD PTR [rax + __mcsema_stack_mark@SECREL32]\n");
   // Unstash the callee-saved registers.
-  printf("  pop rbx\n");
-  printf("  pop rsi\n");
-  printf("  pop rdi\n");
-  printf("  pop rbp\n");
-  printf("  pop r12\n");
-  printf("  pop r13\n");
-  printf("  pop r14\n");
-  printf("  pop r15\n");
   printf("  movdqu xmm6, [rsp+%llu]\n", 0*sizeof(mcsema::RegState::XMM6));
   printf("  movdqu xmm7, [rsp+%llu]\n", 1*sizeof(mcsema::RegState::XMM7));
   printf("  movdqu xmm8, [rsp+%llu]\n", 2*sizeof(mcsema::RegState::XMM8));
@@ -322,6 +316,14 @@ int main(void) {
   printf("  movdqu xmm14, [rsp+%llu]\n",8*sizeof(mcsema::RegState::XMM14));
   printf("  movdqu xmm15, [rsp+%llu]\n",9*sizeof(mcsema::RegState::XMM15));
   printf("  add rsp, %llu\n", sizeof(mcsema::RegState::XMM0)*10);
+  printf("  pop rbx\n");
+  printf("  pop rsi\n");
+  printf("  pop rdi\n");
+  printf("  pop rbp\n");
+  printf("  pop r12\n");
+  printf("  pop r13\n");
+  printf("  pop r14\n");
+  printf("  pop r15\n");
 
   printf("  ret\n");
   printf("\n");

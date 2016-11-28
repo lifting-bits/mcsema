@@ -3,35 +3,36 @@
   .intel_syntax noprefix
 
   .section        .tls$,"wd"
-  .p2align 2
-     .globl  __mcsema_reg_state
+  .align 16
+  .globl  __mcsema_reg_state
+  .align 16
 __mcsema_reg_state:
-  .p2align 2
   .zero   532
 
-     .globl  __mcsema_stack
+  .globl  __mcsema_stack
+  .align 16
 __mcsema_stack:
-  .p2align 4
   .zero   1048576
 
-     .globl  __mcsema_stack_args
+  .globl  __mcsema_stack_args
+  .align 16
 __mcsema_stack_args:
-  .p2align 4
-  .zero   256
+  .zero   264
 
-     .globl  __mcsema_stack_mark
+  .globl  __mcsema_stack_mark
+  .align 8
 __mcsema_stack_mark:
-  .p2align 2
   .zero   8
 
   .text
-  .p2align	4, 0x90
+  .align	16, 0x90
 
 .def	 __mcsema_attach_call;
 .scl	2;
 .type	32;
 .endef
 .globl __mcsema_attach_call
+.align 16, 0x90
 __mcsema_attach_call:
   push QWORD ptr [rsp]
   mov QWORD ptr [rsp+8], rbp
@@ -83,7 +84,7 @@ pop rdx
   xchg rsp, [rax + __mcsema_reg_state@SECREL32 + 56]
   cmp rsp, 0
   jnz .Lhave_stack
-  lea rsp, [rax + __mcsema_stack@SECREL32 + 1048576]
+  lea rsp, [rax + __mcsema_stack@SECREL32 + 1048576 - 8]
 .Lhave_stack:
   lea rcx, [rax + __mcsema_reg_state@SECREL32]
   lea rdx, [rip + __mcsema_detach_ret]
@@ -97,8 +98,9 @@ pop rdx
 .type	32;
 .endef
 .globl __mcsema_attach_ret
+.align 16, 0x90
 __mcsema_attach_ret:
-  add rsp, 264
+  add rsp, 272
 push rax
 push rdx
 mov	edx, DWORD ptr [rip + _tls_index]
@@ -164,6 +166,7 @@ pop rdx
 .type	32;
 .endef
 .globl __mcsema_attach_ret_value
+.align 16, 0x90
 __mcsema_attach_ret_value:
   push rbp
 push rdx
@@ -212,18 +215,10 @@ pop rdx
   movdqu [rax + __mcsema_reg_state@SECREL32 + 436], xmm15
   sub QWORD PTR [rax + __mcsema_stack_mark@SECREL32], rsp
   mov rcx, QWORD PTR [rax + __mcsema_stack_mark@SECREL32]
-  add rsp, 264
+  add rsp, 272
   add rsp, rcx
   xchg rsp, QWORD PTR [rax + __mcsema_reg_state@SECREL32 + 56]
   pop QWORD PTR [rax + __mcsema_stack_mark@SECREL32]
-  pop rbx
-  pop rsi
-  pop rdi
-  pop rbp
-  pop r12
-  pop r13
-  pop r14
-  pop r15
   movdqu xmm6, [rsp+0]
   movdqu xmm7, [rsp+16]
   movdqu xmm8, [rsp+32]
@@ -235,6 +230,14 @@ pop rdx
   movdqu xmm14, [rsp+128]
   movdqu xmm15, [rsp+144]
   add rsp, 160
+  pop rbx
+  pop rsi
+  pop rdi
+  pop rbp
+  pop r12
+  pop r13
+  pop r14
+  pop r15
   ret
 
 .def	 __mcsema_detach_ret;
@@ -242,6 +245,7 @@ pop rdx
 .type	32;
 .endef
 .globl __mcsema_detach_ret
+.align 16, 0x90
 __mcsema_detach_ret:
   push rbp
 push rdx
@@ -301,6 +305,7 @@ pop rdx
 .type	32;
 .endef
 .globl __mcsema_detach_call
+.align 16, 0x90
 __mcsema_detach_call:
 push rdx
 mov	edx, DWORD ptr [rip + _tls_index]
@@ -330,7 +335,7 @@ pop rdx
   movdqu  [rsp+144], xmm15
   lea rdi, [rax + __mcsema_stack_args@SECREL32]
   lea rsi, [rsp + 232]
-  mov rcx, 256
+  mov rcx, 264
   rep movsb
   mov rsi, [rax + __mcsema_reg_state@SECREL32 + 40]
   mov rdi, [rax + __mcsema_reg_state@SECREL32 + 48]
@@ -342,13 +347,13 @@ pop rdx
   mov r14, [rax + __mcsema_reg_state@SECREL32 + 516]
   mov r15, [rax + __mcsema_reg_state@SECREL32 + 524]
   xchg QWORD PTR [rax + __mcsema_reg_state@SECREL32 + 56], rsp
-  sub rsp, 256
+  sub rsp, 264
   push rsi
   push rdi
   push rcx
   lea rdi, [rsp + 24]
   lea rsi, [rax + __mcsema_stack_args@SECREL32]
-  mov rcx, 256
+  mov rcx, 264
   rep movsb
   pop rcx
   pop rdi
@@ -363,6 +368,7 @@ pop rdx
 .type	32;
 .endef
 .globl __mcsema_detach_call_value
+.align 16, 0x90
 __mcsema_detach_call_value:
   push r15
   push r14
@@ -392,7 +398,7 @@ pop rdx
   push QWORD PTR [rax + __mcsema_stack_mark@SECREL32]
   lea rdi, [rax + __mcsema_stack_args@SECREL32]
   mov rsi, QWORD PTR [rax + __mcsema_reg_state@SECREL32 + 56]
-  mov rcx, 256
+  mov rcx, 264
   rep movsb
   mov rbp, rax
   mov rax, [rbp + __mcsema_reg_state@SECREL32 + 8]
@@ -428,13 +434,13 @@ pop rdx
   movdqu xmm14, [rax + __mcsema_reg_state@SECREL32 + 420]
   movdqu xmm15, [rax + __mcsema_reg_state@SECREL32 + 436]
   xchg QWORD PTR [rax + __mcsema_reg_state@SECREL32 + 56], rsp
-  sub rsp, 256
+  sub rsp, 264
   push rsi
   push rdi
   push rcx
   lea rdi, [rsp + 24]
   lea rsi, [rax + __mcsema_stack_args@SECREL32]
-  mov rcx, 256
+  mov rcx, 264
   rep movsb
   pop rcx
   pop rdi
@@ -450,6 +456,7 @@ pop rdx
 .type	32;
 .endef
 .globl __mcsema_debug_get_reg_state
+.align 16, 0x90
 __mcsema_debug_get_reg_state:
 push rdx
 mov	edx, DWORD ptr [rip + _tls_index]

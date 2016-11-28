@@ -655,6 +655,15 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
     // rest of the arguments are passed over stack
     // adjust the stack pointer if required
     baseRspVal = x86_64::R_READ<64>(b, X86::RSP);
+
+    // The Windows amd64 calling convention requires
+    // 32-bytes of stack reserved in each function call. At the call point,
+    // the stack is already pre-reserved, so the arguments start 32 bytes up
+    // of where we would expect
+    if (SystemOS(M) == llvm::Triple::Win32) {
+        baseRspVal = BinaryOperator::CreateAdd(baseRspVal, CONST_V<64>(b, 0x20), "", b);
+    }
+
     // if this is a JMP, there is already a fake return address
     // on the stack. Skip it to read stack arguments
     if(is_jump) {

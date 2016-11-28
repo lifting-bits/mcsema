@@ -12,7 +12,10 @@ extern int foo(char*);
 int main(int argc, char *argv[]) {
 
 #ifdef _WIN32
-    int k = foo("c:\\windows\\temp\\foo.txt");
+    char tmp[MAX_PATH+7+1] = {0};
+    GetTempPath(MAX_PATH, tmp);
+    strcat(tmp, "foo.txt");
+    int k = foo(tmp);
 #else
     int k = foo("/tmp/demo5_foo.txt");
 #endif
