@@ -9,7 +9,7 @@ if exist "%IDA_PATH%\idaq.exe" (
     %PYTHON% %BIN_DESCEND_PATH%\bin_descend_wrapper.py -march=x86-64 -d -entry-symbol=start -i=demo_test2.obj
 ) else (
     echo Bin_descend is no longer supported
-    REM exit 1
+    exit 1
 )
 
 %CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=x86_64-pc-windows-msvc -i demo_test2.cfg -entrypoint=start -o demo_test2.bc

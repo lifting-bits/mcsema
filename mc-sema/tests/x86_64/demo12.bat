@@ -6,15 +6,13 @@ del /q demo_test12.cfg demo_driver12.obj demo_test12.obj demo_test12_mine.obj de
 
 if exist "%IDA_PATH%\idaq.exe" (
     echo Using IDA to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend_wrapper.py -march=x86-64 -d -entry-symbol=start -i=demo_test12.obj
+    %PYTHON% %BIN_DESCEND_PATH%\bin_descend_wrapper.py -march=x86-64 -d -entry-symbol=start -i=demo_test12.obj
 ) else (
-    echo Using bin_descend to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend.exe -march=x86-64 -d -entry-symbol=start -i=demo_test12.obj
+    echo Bin_descend is no longer supported
+    exit 1
 )
 
-%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=x86_64-pc-win32 -i demo_test12.cfg -driver=demo12_entry,start,raw,return,C -o demo_test12.bc
+%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=x86_64-pc-windows-msvc -i demo_test12.cfg -entrypoint=start -o demo_test12.bc
+clang-cl -O3 -m64 -o demo_driver12.exe demo_driver12.c ..\..\..\drivers\PE_64_windows.asm demo_test12.bc
 
-%LLVM_PATH%\opt.exe -O3 -o demo_test12_opt.bc demo_test12.bc
-%LLVM_PATH%\llc.exe -filetype=obj -o demo_test12_mine.obj demo_test12_opt.bc
-cl /Zi /nologo demo_driver12.c demo_test12_mine.obj
 demo_driver12.exe
