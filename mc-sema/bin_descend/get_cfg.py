@@ -152,6 +152,9 @@ def readQword(ea):
     qword = struct.unpack("<Q", bytestr)[0]
     return qword
 
+def isElf():
+    return idc.GetLongPrm(idc.INF_FILETYPE) == idc.FT_ELF
+
 def isLinkedElf():
     return idc.GetLongPrm(idc.INF_FILETYPE) == idc.FT_ELF and \
         idc.BeginEA() not in [0xffffffffL, 0xffffffffffffffffL]
@@ -416,7 +419,7 @@ def handleExternalRef(fn):
         if fn.startswith("@") and not in_a_map:
             fn = fn[1:]
 
-        if '@' in fn:
+        if isElf() and '@' in fn:
             fn = fn[:fn.find('@')]
 
     fixfn = fixExternalName(fn)
