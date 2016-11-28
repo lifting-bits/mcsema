@@ -13,7 +13,7 @@ if exist "%IDA_PATH%\idaq.exe" (
     exit 1
 )
 
-%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=x86_64-pc-win32 -i demo_test3.cfg -entrypoint=demo3 -o demo_test3.bc
+%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=x86_64-pc-windows-msvc -i demo_test3.cfg -entrypoint=demo3 -o demo_test3.bc
 
 clang-cl /Zi -O3 -m64 -o demo_driver3.exe demo_driver3.c ..\..\..\drivers\PE_64_windows.asm demo_test3.bc
 demo_driver3.exe

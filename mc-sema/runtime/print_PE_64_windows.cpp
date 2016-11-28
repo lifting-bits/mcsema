@@ -212,14 +212,6 @@ int main(void) {
   printf("  pop rcx\n");
 
   // Unstash the callee-saved registers.
-  printf("  pop rbx\n");
-  printf("  pop rsi\n");
-  printf("  pop rdi\n");
-  printf("  pop rbp\n");
-  printf("  pop r12\n");
-  printf("  pop r13\n");
-  printf("  pop r14\n");
-  printf("  pop r15\n");
   printf("  movdqu xmm6, [rsp+%llu]\n", 0*sizeof(mcsema::RegState::XMM6));
   printf("  movdqu xmm7, [rsp+%llu]\n", 1*sizeof(mcsema::RegState::XMM7));
   printf("  movdqu xmm8, [rsp+%llu]\n", 2*sizeof(mcsema::RegState::XMM8));
@@ -231,6 +223,14 @@ int main(void) {
   printf("  movdqu xmm14, [rsp+%llu]\n",8*sizeof(mcsema::RegState::XMM14));
   printf("  movdqu xmm15, [rsp+%llu]\n",9*sizeof(mcsema::RegState::XMM15));
   printf("  add rsp, %llu\n", sizeof(mcsema::RegState::XMM0)*10);
+  printf("  pop rbx\n");
+  printf("  pop rsi\n");
+  printf("  pop rdi\n");
+  printf("  pop rbp\n");
+  printf("  pop r12\n");
+  printf("  pop r13\n");
+  printf("  pop r14\n");
+  printf("  pop r15\n");
   printf("  ret\n");
   printf("\n");
 
@@ -405,7 +405,7 @@ int main(void) {
   // into native code.
   emitFunctionDef("__mcsema_detach_call");
 
-  // *** This function assumes we can clobber rax and rcx
+  // *** This function assumes we can clobber rax
   
   // clobber rax to use as TLS index
   getTlsIndex("rax");
@@ -446,10 +446,16 @@ int main(void) {
   // do the copy
   printf("  rep movsb\n");
 
+  // restore arguments and callee-saved regs
   printf("  mov rsi, [rax + __mcsema_reg_state@SECREL32 + %llu]\n", __builtin_offsetof(mcsema::RegState, RSI));
   printf("  mov rdi, [rax + __mcsema_reg_state@SECREL32 + %llu]\n", __builtin_offsetof(mcsema::RegState, RDI));
   printf("  mov rbx, [rax + __mcsema_reg_state@SECREL32 + %llu]\n", __builtin_offsetof(mcsema::RegState, RBX));
   printf("  mov rbp, [rax + __mcsema_reg_state@SECREL32 + %llu]\n", __builtin_offsetof(mcsema::RegState, RBP));
+  printf("  mov rcx, [rax + __mcsema_reg_state@SECREL32 + %llu]\n", __builtin_offsetof(mcsema::RegState, RCX));
+  printf("  mov r12, [rax + __mcsema_reg_state@SECREL32 + %llu]\n", __builtin_offsetof(mcsema::RegState, R12));
+  printf("  mov r13, [rax + __mcsema_reg_state@SECREL32 + %llu]\n", __builtin_offsetof(mcsema::RegState, R13));
+  printf("  mov r14, [rax + __mcsema_reg_state@SECREL32 + %llu]\n", __builtin_offsetof(mcsema::RegState, R14));
+  printf("  mov r15, [rax + __mcsema_reg_state@SECREL32 + %llu]\n", __builtin_offsetof(mcsema::RegState, R15));
 
   // Swap onto the native stack.
   printf("  xchg QWORD PTR [rax + __mcsema_reg_state@SECREL32 + %llu], rsp\n", __builtin_offsetof(mcsema::RegState, RSP));

@@ -138,14 +138,6 @@ pop rdx
   movdqu [rcx + __mcsema_reg_state@SECREL32 + 420], xmm14
   movdqu [rcx + __mcsema_reg_state@SECREL32 + 436], xmm15
   pop rcx
-  pop rbx
-  pop rsi
-  pop rdi
-  pop rbp
-  pop r12
-  pop r13
-  pop r14
-  pop r15
   movdqu xmm6, [rsp+0]
   movdqu xmm7, [rsp+16]
   movdqu xmm8, [rsp+32]
@@ -157,6 +149,14 @@ pop rdx
   movdqu xmm14, [rsp+128]
   movdqu xmm15, [rsp+144]
   add rsp, 160
+  pop rbx
+  pop rsi
+  pop rdi
+  pop rbp
+  pop r12
+  pop r13
+  pop r14
+  pop r15
   ret
 
 .def	 __mcsema_attach_ret_value;
@@ -336,6 +336,11 @@ pop rdx
   mov rdi, [rax + __mcsema_reg_state@SECREL32 + 48]
   mov rbx, [rax + __mcsema_reg_state@SECREL32 + 16]
   mov rbp, [rax + __mcsema_reg_state@SECREL32 + 64]
+  mov rcx, [rax + __mcsema_reg_state@SECREL32 + 24]
+  mov r12, [rax + __mcsema_reg_state@SECREL32 + 500]
+  mov r13, [rax + __mcsema_reg_state@SECREL32 + 508]
+  mov r14, [rax + __mcsema_reg_state@SECREL32 + 516]
+  mov r15, [rax + __mcsema_reg_state@SECREL32 + 524]
   xchg QWORD PTR [rax + __mcsema_reg_state@SECREL32 + 56], rsp
   sub rsp, 256
   push rsi
