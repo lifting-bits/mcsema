@@ -203,7 +203,6 @@ static void WindowsAddPushJumpStub(bool decorateStub, llvm::Module *M, llvm::Fun
                                  llvm::Function *W, const char *stub_handler) {
   auto stub_name = W->getName().str();
   auto stubbed_func_name = F->getName().str();
-  const char *push = 32 == ArchPointerSize(M) ? "pushl" : "pushq";
 
   std::stringstream as;
   stubbed_func_name = WindowsDecorateName(F, stubbed_func_name);
@@ -217,9 +216,12 @@ static void WindowsAddPushJumpStub(bool decorateStub, llvm::Module *M, llvm::Fun
   as << stub_name << ":\n";
   as << "  .cfi_startproc;\n";
   if( 32 == ArchPointerSize(M) ) {
-    as << "  " << push << " $" << stubbed_func_name << ";\n";
+    as << "  " << "pushl $" << stubbed_func_name << ";\n";
   } else {
-    as << "  " << push << " " << stubbed_func_name << "(%rip);\n";
+    // use leaq to get rip-relative address of stubbed func
+    as << "  " << "pushq %rax\n";
+    as << "  " << "leaq " << stubbed_func_name << "(%rip), %rax;\n";
+    as << "  " << "xchgq %rax, (%rsp);\n";
   }
   as << "  jmp " << stub_handler << ";\n";
   as << "  .cfi_endproc;\n";

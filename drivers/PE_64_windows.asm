@@ -36,7 +36,8 @@ __mcsema_attach_call:
   push QWORD ptr [rsp]
   mov QWORD ptr [rsp+8], rbp
 push rdx
-mov	rbp, QWORD ptr [rip + _tls_index]
+mov	edx, DWORD ptr [rip + _tls_index]
+mov rbp, rdx
 mov	rdx, QWORD ptr gs:[88]
 mov	rbp, QWORD ptr [rdx + 8*rbp]
 pop rdx
@@ -44,7 +45,8 @@ pop rdx
   mov [rbp + __mcsema_reg_state@SECREL32 + 8], rax
   pop rbp
 push rdx
-mov	rax, QWORD ptr [rip + _tls_index]
+mov	edx, DWORD ptr [rip + _tls_index]
+mov rax, rdx
 mov	rdx, QWORD ptr gs:[88]
 mov	rax, QWORD ptr [rdx + 8*rax]
 pop rdx
@@ -99,7 +101,8 @@ __mcsema_attach_ret:
   add rsp, 264
 push rax
 push rdx
-mov	rax, QWORD ptr [rip + _tls_index]
+mov	edx, DWORD ptr [rip + _tls_index]
+mov rax, rdx
 mov	rdx, QWORD ptr gs:[88]
 mov	rax, QWORD ptr [rdx + 8*rax]
 pop rdx
@@ -109,7 +112,8 @@ pop rdx
   mov rax, QWORD ptr [rax-8]
   push rcx
 push rdx
-mov	rcx, QWORD ptr [rip + _tls_index]
+mov	edx, DWORD ptr [rip + _tls_index]
+mov rcx, rdx
 mov	rdx, QWORD ptr gs:[88]
 mov	rcx, QWORD ptr [rdx + 8*rcx]
 pop rdx
@@ -163,7 +167,8 @@ pop rdx
 __mcsema_attach_ret_value:
   push rbp
 push rdx
-mov	rbp, QWORD ptr [rip + _tls_index]
+mov	edx, DWORD ptr [rip + _tls_index]
+mov rbp, rdx
 mov	rdx, QWORD ptr gs:[88]
 mov	rbp, QWORD ptr [rdx + 8*rbp]
 pop rdx
@@ -183,7 +188,8 @@ pop rdx
   mov [rbp + __mcsema_reg_state@SECREL32 + 524], r15
   pop rbp
 push rdx
-mov	rax, QWORD ptr [rip + _tls_index]
+mov	edx, DWORD ptr [rip + _tls_index]
+mov rax, rdx
 mov	rdx, QWORD ptr gs:[88]
 mov	rax, QWORD ptr [rdx + 8*rax]
 pop rdx
@@ -239,7 +245,8 @@ pop rdx
 __mcsema_detach_ret:
   push rbp
 push rdx
-mov	rbp, QWORD ptr [rip + _tls_index]
+mov	edx, DWORD ptr [rip + _tls_index]
+mov rbp, rdx
 mov	rdx, QWORD ptr gs:[88]
 mov	rbp, QWORD ptr [rdx + 8*rbp]
 pop rdx
@@ -276,7 +283,8 @@ pop rdx
   pop rbp
   push rax
 push rdx
-mov	rax, QWORD ptr [rip + _tls_index]
+mov	edx, DWORD ptr [rip + _tls_index]
+mov rax, rdx
 mov	rdx, QWORD ptr gs:[88]
 mov	rax, QWORD ptr [rdx + 8*rax]
 pop rdx
@@ -295,7 +303,8 @@ pop rdx
 .globl __mcsema_detach_call
 __mcsema_detach_call:
 push rdx
-mov	rax, QWORD ptr [rip + _tls_index]
+mov	edx, DWORD ptr [rip + _tls_index]
+mov rax, rdx
 mov	rdx, QWORD ptr gs:[88]
 mov	rax, QWORD ptr [rdx + 8*rax]
 pop rdx
@@ -370,7 +379,8 @@ __mcsema_detach_call_value:
   movdqu  [rsp+128], xmm14
   movdqu  [rsp+144], xmm15
 push rdx
-mov	rax, QWORD ptr [rip + _tls_index]
+mov	edx, DWORD ptr [rip + _tls_index]
+mov rax, rdx
 mov	rdx, QWORD ptr gs:[88]
 mov	rax, QWORD ptr [rdx + 8*rax]
 pop rdx
@@ -437,7 +447,8 @@ pop rdx
 .globl __mcsema_debug_get_reg_state
 __mcsema_debug_get_reg_state:
 push rdx
-mov	rax, QWORD ptr [rip + _tls_index]
+mov	edx, DWORD ptr [rip + _tls_index]
+mov rax, rdx
 mov	rdx, QWORD ptr gs:[88]
 mov	rax, QWORD ptr [rdx + 8*rax]
 pop rdx

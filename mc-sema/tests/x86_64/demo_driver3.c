@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#define _CRT_SECURE_NO_WARNINGS
+
 extern void demo3(const char *, const char*);
 
 int main(int argc, char *argv[]) {

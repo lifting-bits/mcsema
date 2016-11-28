@@ -10,8 +10,13 @@ static const unsigned long long kStackArgSize = 256ULL;
 
 void getTlsIndex(const char dest_reg[]) {
   // store TLS index into dest_reg
+  
   printf("push rdx\n");
-	printf("mov	%s, QWORD ptr [rip + _tls_index]\n", dest_reg);
+	printf("mov	edx, DWORD ptr [rip + _tls_index]\n");
+  // do this awkward mov via rdx since we need to get a 32-bit
+  // value, and this helps us avoid figuring out the 32-bit 
+  // component of the destination register
+  printf("mov %s, rdx\n", dest_reg);
 	printf("mov	rdx, QWORD ptr gs:[88]\n");
 	printf("mov	%s, QWORD ptr [rdx + 8*%s]\n", dest_reg, dest_reg);
   printf("pop rdx\n");
