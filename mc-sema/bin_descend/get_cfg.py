@@ -632,6 +632,12 @@ def manualRelocOffset(I, inst, dref):
                 continue
 
             if op.type in [idaapi.o_imm, idaapi.o_mem, idaapi.o_near, idaapi.o_far]:
+                # we aren't sure what we have, but it use a register... probably not
+                # an immediate but instead a memory reference
+                if op.reg > 0:
+                    I.mem_reloc_offset = op.offb
+                    return "MEM"
+
                 I.imm_reloc_offset = op.offb
                 return "IMM"
 
