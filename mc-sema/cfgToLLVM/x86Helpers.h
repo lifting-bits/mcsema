@@ -43,14 +43,23 @@ llvm::Value *getValueForExternal(llvm::Module *M, InstPtr ip, llvm::BasicBlock *
                 ext_fn, llvm::Type::getIntNTy(block->getContext(), width), "", block);
     } else if (ip->has_ext_data_ref() ) {
         std::string target = ip->get_ext_data_ref()->getSymbolName();
-        llvm::Value *gvar = M->getGlobalVariable(target);
-
+        llvm::GlobalValue *gvar = M->getGlobalVariable(target);
         TASSERT(gvar != NULL, "Could not find external data: " + target);
-
         std::cout << __FUNCTION__ << ": Found external data ref to: " << target << "\n";
 
-        addrInt = new llvm::PtrToIntInst(
-                gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
+        if (SystemOS(M) == llvm::Triple::Win32) {
+          gvar->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+          // sometimes windows will import this directly as the variable instead of
+          // as a reference to a variable. But the rest of the code wants a pointer to var
+          llvm::Value *toPtr = new AllocaInst(gvar->getType(), "", block);
+          llvm::Value *writeIt = new StoreInst(gvar, toPtr, block);
+          addrInt = new llvm::PtrToIntInst(
+              toPtr, llvm::Type::getIntNTy(block->getContext(), width), "", block);
+        } else {
+
+          addrInt = new llvm::PtrToIntInst(
+              gvar, llvm::Type::getIntNTy(block->getContext(), width), "", block);
+        }
 
     } else {
         throw TErr(__LINE__, __FILE__, "No external refernce to get value for!");

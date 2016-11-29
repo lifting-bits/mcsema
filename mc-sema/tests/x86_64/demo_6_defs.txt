@@ -1,0 +1,2 @@
+# data defines for testing data imports
+DATA: fortytwo 1
