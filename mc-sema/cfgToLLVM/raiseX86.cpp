@@ -1500,7 +1500,7 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
 
     if (dsec_itr->getSymbol(sym_name)) {
       const char *func_addr_str = sym_name.c_str() + 4;
-      VA func_addr = strtol(func_addr_str, nullptr, 16);
+      VA func_addr = strtoull(func_addr_str, nullptr, 16);
 
       std::cout << __FUNCTION__ << ": Found symbol: " << sym_name << "\n";
 
