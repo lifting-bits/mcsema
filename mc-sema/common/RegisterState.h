@@ -72,11 +72,14 @@ typedef unsigned uint128_t __attribute__((mode(TI)));
 #endif
 
 #ifdef _WIN32
+typedef union { double d; char pad[16];} PACKED LDOUBLE;
 #pragma pack(push, 1)
+#else
+typedef long double LDOUBLE;
 #endif
 typedef struct _fpuregs {
-  long double st[STREGS_MAX];
-} PACKED fpuregs;  // 96 bytes
+  LDOUBLE st[STREGS_MAX];
+} PACKED fpuregs;  // 16*8 bytes
 #ifdef _WIN32
 #pragma pack(pop)
 #endif

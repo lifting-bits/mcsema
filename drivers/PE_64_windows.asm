@@ -7,7 +7,7 @@
   .globl  __mcsema_reg_state
   .align 16
 __mcsema_reg_state:
-  .zero   532
+  .zero   596
 
   .globl  __mcsema_stack
   .align 16
@@ -57,30 +57,30 @@ pop rdx
   mov [rax + __mcsema_reg_state@SECREL32 + 40], rsi
   mov [rax + __mcsema_reg_state@SECREL32 + 48], rdi
   mov [rax + __mcsema_reg_state@SECREL32 + 64], rbp
-  mov [rax + __mcsema_reg_state@SECREL32 + 468], r8
-  mov [rax + __mcsema_reg_state@SECREL32 + 476], r9
-  mov [rax + __mcsema_reg_state@SECREL32 + 484], r10
-  mov [rax + __mcsema_reg_state@SECREL32 + 492], r11
-  mov [rax + __mcsema_reg_state@SECREL32 + 500], r12
-  mov [rax + __mcsema_reg_state@SECREL32 + 508], r13
-  mov [rax + __mcsema_reg_state@SECREL32 + 516], r14
-  mov [rax + __mcsema_reg_state@SECREL32 + 524], r15
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 196], xmm0
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 212], xmm1
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 228], xmm2
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 244], xmm3
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 260], xmm4
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 276], xmm5
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 292], xmm6
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 308], xmm7
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 324], xmm8
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 340], xmm9
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 356], xmm10
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 372], xmm11
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 388], xmm12
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 404], xmm13
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 420], xmm14
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 436], xmm15
+  mov [rax + __mcsema_reg_state@SECREL32 + 532], r8
+  mov [rax + __mcsema_reg_state@SECREL32 + 540], r9
+  mov [rax + __mcsema_reg_state@SECREL32 + 548], r10
+  mov [rax + __mcsema_reg_state@SECREL32 + 556], r11
+  mov [rax + __mcsema_reg_state@SECREL32 + 564], r12
+  mov [rax + __mcsema_reg_state@SECREL32 + 572], r13
+  mov [rax + __mcsema_reg_state@SECREL32 + 580], r14
+  mov [rax + __mcsema_reg_state@SECREL32 + 588], r15
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 260], xmm0
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 276], xmm1
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 292], xmm2
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 308], xmm3
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 324], xmm4
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 340], xmm5
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 356], xmm6
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 372], xmm7
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 388], xmm8
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 404], xmm9
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 420], xmm10
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 436], xmm11
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 452], xmm12
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 468], xmm13
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 484], xmm14
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 500], xmm15
   xchg rsp, [rax + __mcsema_reg_state@SECREL32 + 56]
   cmp rsp, 0
   jnz .Lhave_stack
@@ -120,25 +120,25 @@ mov	rdx, QWORD ptr gs:[88]
 mov	rcx, QWORD ptr [rdx + 8*rcx]
 pop rdx
   mov [rcx + __mcsema_reg_state@SECREL32 + 8], rax
-  movdqu [rcx + __mcsema_reg_state@SECREL32 + 196], xmm0
+  movdqu [rcx + __mcsema_reg_state@SECREL32 + 260], xmm0
   mov [rcx + __mcsema_reg_state@SECREL32 + 16], rbx
   mov [rcx + __mcsema_reg_state@SECREL32 + 40], rsi
   mov [rcx + __mcsema_reg_state@SECREL32 + 48], rdi
   mov [rcx + __mcsema_reg_state@SECREL32 + 64], rbp
-  mov [rcx + __mcsema_reg_state@SECREL32 + 500], r12
-  mov [rcx + __mcsema_reg_state@SECREL32 + 508], r13
-  mov [rcx + __mcsema_reg_state@SECREL32 + 516], r14
-  mov [rcx + __mcsema_reg_state@SECREL32 + 524], r15
-  movdqu [rcx + __mcsema_reg_state@SECREL32 + 292], xmm6
-  movdqu [rcx + __mcsema_reg_state@SECREL32 + 308], xmm7
-  movdqu [rcx + __mcsema_reg_state@SECREL32 + 324], xmm8
-  movdqu [rcx + __mcsema_reg_state@SECREL32 + 340], xmm9
-  movdqu [rcx + __mcsema_reg_state@SECREL32 + 356], xmm10
-  movdqu [rcx + __mcsema_reg_state@SECREL32 + 372], xmm11
-  movdqu [rcx + __mcsema_reg_state@SECREL32 + 388], xmm12
-  movdqu [rcx + __mcsema_reg_state@SECREL32 + 404], xmm13
-  movdqu [rcx + __mcsema_reg_state@SECREL32 + 420], xmm14
-  movdqu [rcx + __mcsema_reg_state@SECREL32 + 436], xmm15
+  mov [rcx + __mcsema_reg_state@SECREL32 + 564], r12
+  mov [rcx + __mcsema_reg_state@SECREL32 + 572], r13
+  mov [rcx + __mcsema_reg_state@SECREL32 + 580], r14
+  mov [rcx + __mcsema_reg_state@SECREL32 + 588], r15
+  movdqu [rcx + __mcsema_reg_state@SECREL32 + 356], xmm6
+  movdqu [rcx + __mcsema_reg_state@SECREL32 + 372], xmm7
+  movdqu [rcx + __mcsema_reg_state@SECREL32 + 388], xmm8
+  movdqu [rcx + __mcsema_reg_state@SECREL32 + 404], xmm9
+  movdqu [rcx + __mcsema_reg_state@SECREL32 + 420], xmm10
+  movdqu [rcx + __mcsema_reg_state@SECREL32 + 436], xmm11
+  movdqu [rcx + __mcsema_reg_state@SECREL32 + 452], xmm12
+  movdqu [rcx + __mcsema_reg_state@SECREL32 + 468], xmm13
+  movdqu [rcx + __mcsema_reg_state@SECREL32 + 484], xmm14
+  movdqu [rcx + __mcsema_reg_state@SECREL32 + 500], xmm15
   pop rcx
   movdqu xmm6, [rsp+0]
   movdqu xmm7, [rsp+16]
@@ -181,14 +181,14 @@ pop rdx
   mov [rbp + __mcsema_reg_state@SECREL32 + 32], rdx
   mov [rbp + __mcsema_reg_state@SECREL32 + 40], rsi
   mov [rbp + __mcsema_reg_state@SECREL32 + 48], rdi
-  mov [rbp + __mcsema_reg_state@SECREL32 + 468], r8
-  mov [rbp + __mcsema_reg_state@SECREL32 + 476], r9
-  mov [rbp + __mcsema_reg_state@SECREL32 + 484], r10
-  mov [rbp + __mcsema_reg_state@SECREL32 + 492], r11
-  mov [rbp + __mcsema_reg_state@SECREL32 + 500], r12
-  mov [rbp + __mcsema_reg_state@SECREL32 + 508], r13
-  mov [rbp + __mcsema_reg_state@SECREL32 + 516], r14
-  mov [rbp + __mcsema_reg_state@SECREL32 + 524], r15
+  mov [rbp + __mcsema_reg_state@SECREL32 + 532], r8
+  mov [rbp + __mcsema_reg_state@SECREL32 + 540], r9
+  mov [rbp + __mcsema_reg_state@SECREL32 + 548], r10
+  mov [rbp + __mcsema_reg_state@SECREL32 + 556], r11
+  mov [rbp + __mcsema_reg_state@SECREL32 + 564], r12
+  mov [rbp + __mcsema_reg_state@SECREL32 + 572], r13
+  mov [rbp + __mcsema_reg_state@SECREL32 + 580], r14
+  mov [rbp + __mcsema_reg_state@SECREL32 + 588], r15
   pop rbp
 push rdx
 mov	edx, DWORD ptr [rip + _tls_index]
@@ -197,22 +197,22 @@ mov	rdx, QWORD ptr gs:[88]
 mov	rax, QWORD ptr [rdx + 8*rax]
 pop rdx
   mov [rax + __mcsema_reg_state@SECREL32 + 64], rbp
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 196], xmm0
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 212], xmm1
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 228], xmm2
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 244], xmm3
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 260], xmm4
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 276], xmm5
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 292], xmm6
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 308], xmm7
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 324], xmm8
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 340], xmm9
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 356], xmm10
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 372], xmm11
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 388], xmm12
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 404], xmm13
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 420], xmm14
-  movdqu [rax + __mcsema_reg_state@SECREL32 + 436], xmm15
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 260], xmm0
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 276], xmm1
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 292], xmm2
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 308], xmm3
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 324], xmm4
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 340], xmm5
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 356], xmm6
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 372], xmm7
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 388], xmm8
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 404], xmm9
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 420], xmm10
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 436], xmm11
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 452], xmm12
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 468], xmm13
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 484], xmm14
+  movdqu [rax + __mcsema_reg_state@SECREL32 + 500], xmm15
   sub QWORD PTR [rax + __mcsema_stack_mark@SECREL32], rsp
   mov rcx, QWORD PTR [rax + __mcsema_stack_mark@SECREL32]
   add rsp, 272
@@ -260,30 +260,30 @@ pop rdx
   mov rdx, [rbp + __mcsema_reg_state@SECREL32 + 32]
   mov rsi, [rbp + __mcsema_reg_state@SECREL32 + 40]
   mov rdi, [rbp + __mcsema_reg_state@SECREL32 + 48]
-  mov r8,  [rbp + __mcsema_reg_state@SECREL32 + 468]
-  mov r9,  [rbp + __mcsema_reg_state@SECREL32 + 476]
-  mov r10, [rbp + __mcsema_reg_state@SECREL32 + 484]
-  mov r11, [rbp + __mcsema_reg_state@SECREL32 + 492]
-  mov r12, [rbp + __mcsema_reg_state@SECREL32 + 500]
-  mov r13, [rbp + __mcsema_reg_state@SECREL32 + 508]
-  mov r14, [rbp + __mcsema_reg_state@SECREL32 + 516]
-  mov r15, [rbp + __mcsema_reg_state@SECREL32 + 524]
-  movdqu xmm0, [rbp + __mcsema_reg_state@SECREL32 + 196]
-  movdqu xmm1, [rbp + __mcsema_reg_state@SECREL32 + 212]
-  movdqu xmm2, [rbp + __mcsema_reg_state@SECREL32 + 228]
-  movdqu xmm3, [rbp + __mcsema_reg_state@SECREL32 + 244]
-  movdqu xmm4, [rbp + __mcsema_reg_state@SECREL32 + 260]
-  movdqu xmm5, [rbp + __mcsema_reg_state@SECREL32 + 276]
-  movdqu xmm6, [rbp + __mcsema_reg_state@SECREL32 + 292]
-  movdqu xmm7, [rbp + __mcsema_reg_state@SECREL32 + 308]
-  movdqu xmm8,  [rbp + __mcsema_reg_state@SECREL32 + 324]
-  movdqu xmm9,  [rbp + __mcsema_reg_state@SECREL32 + 340]
-  movdqu xmm10, [rbp + __mcsema_reg_state@SECREL32 + 356]
-  movdqu xmm11, [rbp + __mcsema_reg_state@SECREL32 + 372]
-  movdqu xmm12, [rbp + __mcsema_reg_state@SECREL32 + 388]
-  movdqu xmm13, [rbp + __mcsema_reg_state@SECREL32 + 404]
-  movdqu xmm14, [rbp + __mcsema_reg_state@SECREL32 + 420]
-  movdqu xmm15, [rbp + __mcsema_reg_state@SECREL32 + 436]
+  mov r8,  [rbp + __mcsema_reg_state@SECREL32 + 532]
+  mov r9,  [rbp + __mcsema_reg_state@SECREL32 + 540]
+  mov r10, [rbp + __mcsema_reg_state@SECREL32 + 548]
+  mov r11, [rbp + __mcsema_reg_state@SECREL32 + 556]
+  mov r12, [rbp + __mcsema_reg_state@SECREL32 + 564]
+  mov r13, [rbp + __mcsema_reg_state@SECREL32 + 572]
+  mov r14, [rbp + __mcsema_reg_state@SECREL32 + 580]
+  mov r15, [rbp + __mcsema_reg_state@SECREL32 + 588]
+  movdqu xmm0, [rbp + __mcsema_reg_state@SECREL32 + 260]
+  movdqu xmm1, [rbp + __mcsema_reg_state@SECREL32 + 276]
+  movdqu xmm2, [rbp + __mcsema_reg_state@SECREL32 + 292]
+  movdqu xmm3, [rbp + __mcsema_reg_state@SECREL32 + 308]
+  movdqu xmm4, [rbp + __mcsema_reg_state@SECREL32 + 324]
+  movdqu xmm5, [rbp + __mcsema_reg_state@SECREL32 + 340]
+  movdqu xmm6, [rbp + __mcsema_reg_state@SECREL32 + 356]
+  movdqu xmm7, [rbp + __mcsema_reg_state@SECREL32 + 372]
+  movdqu xmm8,  [rbp + __mcsema_reg_state@SECREL32 + 388]
+  movdqu xmm9,  [rbp + __mcsema_reg_state@SECREL32 + 404]
+  movdqu xmm10, [rbp + __mcsema_reg_state@SECREL32 + 420]
+  movdqu xmm11, [rbp + __mcsema_reg_state@SECREL32 + 436]
+  movdqu xmm12, [rbp + __mcsema_reg_state@SECREL32 + 452]
+  movdqu xmm13, [rbp + __mcsema_reg_state@SECREL32 + 468]
+  movdqu xmm14, [rbp + __mcsema_reg_state@SECREL32 + 484]
+  movdqu xmm15, [rbp + __mcsema_reg_state@SECREL32 + 500]
   pop rbp
   push rax
 push rdx
@@ -342,10 +342,10 @@ pop rdx
   mov rbx, [rax + __mcsema_reg_state@SECREL32 + 16]
   mov rbp, [rax + __mcsema_reg_state@SECREL32 + 64]
   mov rcx, [rax + __mcsema_reg_state@SECREL32 + 24]
-  mov r12, [rax + __mcsema_reg_state@SECREL32 + 500]
-  mov r13, [rax + __mcsema_reg_state@SECREL32 + 508]
-  mov r14, [rax + __mcsema_reg_state@SECREL32 + 516]
-  mov r15, [rax + __mcsema_reg_state@SECREL32 + 524]
+  mov r12, [rax + __mcsema_reg_state@SECREL32 + 564]
+  mov r13, [rax + __mcsema_reg_state@SECREL32 + 572]
+  mov r14, [rax + __mcsema_reg_state@SECREL32 + 580]
+  mov r15, [rax + __mcsema_reg_state@SECREL32 + 588]
   xchg QWORD PTR [rax + __mcsema_reg_state@SECREL32 + 56], rsp
   sub rsp, 264
   push rsi
@@ -409,30 +409,30 @@ pop rdx
   mov rsi, [rax + __mcsema_reg_state@SECREL32 + 40]
   mov rdi, [rax + __mcsema_reg_state@SECREL32 + 48]
   mov rbp, [rax + __mcsema_reg_state@SECREL32 + 64]
-  mov r8,  [rax + __mcsema_reg_state@SECREL32 + 468]
-  mov r9,  [rax + __mcsema_reg_state@SECREL32 + 476]
-  mov r10, [rax + __mcsema_reg_state@SECREL32 + 484]
-  mov r11, [rax + __mcsema_reg_state@SECREL32 + 492]
-  mov r12, [rax + __mcsema_reg_state@SECREL32 + 500]
-  mov r13, [rax + __mcsema_reg_state@SECREL32 + 508]
-  mov r14, [rax + __mcsema_reg_state@SECREL32 + 516]
-  mov r15, [rax + __mcsema_reg_state@SECREL32 + 524]
-  movdqu xmm0, [rax + __mcsema_reg_state@SECREL32 + 196]
-  movdqu xmm1, [rax + __mcsema_reg_state@SECREL32 + 212]
-  movdqu xmm2, [rax + __mcsema_reg_state@SECREL32 + 228]
-  movdqu xmm3, [rax + __mcsema_reg_state@SECREL32 + 244]
-  movdqu xmm4, [rax + __mcsema_reg_state@SECREL32 + 260]
-  movdqu xmm5, [rax + __mcsema_reg_state@SECREL32 + 276]
-  movdqu xmm6, [rax + __mcsema_reg_state@SECREL32 + 292]
-  movdqu xmm7, [rax + __mcsema_reg_state@SECREL32 + 308]
-  movdqu xmm8,  [rax + __mcsema_reg_state@SECREL32 + 324]
-  movdqu xmm9,  [rax + __mcsema_reg_state@SECREL32 + 340]
-  movdqu xmm10, [rax + __mcsema_reg_state@SECREL32 + 356]
-  movdqu xmm11, [rax + __mcsema_reg_state@SECREL32 + 372]
-  movdqu xmm12, [rax + __mcsema_reg_state@SECREL32 + 388]
-  movdqu xmm13, [rax + __mcsema_reg_state@SECREL32 + 404]
-  movdqu xmm14, [rax + __mcsema_reg_state@SECREL32 + 420]
-  movdqu xmm15, [rax + __mcsema_reg_state@SECREL32 + 436]
+  mov r8,  [rax + __mcsema_reg_state@SECREL32 + 532]
+  mov r9,  [rax + __mcsema_reg_state@SECREL32 + 540]
+  mov r10, [rax + __mcsema_reg_state@SECREL32 + 548]
+  mov r11, [rax + __mcsema_reg_state@SECREL32 + 556]
+  mov r12, [rax + __mcsema_reg_state@SECREL32 + 564]
+  mov r13, [rax + __mcsema_reg_state@SECREL32 + 572]
+  mov r14, [rax + __mcsema_reg_state@SECREL32 + 580]
+  mov r15, [rax + __mcsema_reg_state@SECREL32 + 588]
+  movdqu xmm0, [rax + __mcsema_reg_state@SECREL32 + 260]
+  movdqu xmm1, [rax + __mcsema_reg_state@SECREL32 + 276]
+  movdqu xmm2, [rax + __mcsema_reg_state@SECREL32 + 292]
+  movdqu xmm3, [rax + __mcsema_reg_state@SECREL32 + 308]
+  movdqu xmm4, [rax + __mcsema_reg_state@SECREL32 + 324]
+  movdqu xmm5, [rax + __mcsema_reg_state@SECREL32 + 340]
+  movdqu xmm6, [rax + __mcsema_reg_state@SECREL32 + 356]
+  movdqu xmm7, [rax + __mcsema_reg_state@SECREL32 + 372]
+  movdqu xmm8,  [rax + __mcsema_reg_state@SECREL32 + 388]
+  movdqu xmm9,  [rax + __mcsema_reg_state@SECREL32 + 404]
+  movdqu xmm10, [rax + __mcsema_reg_state@SECREL32 + 420]
+  movdqu xmm11, [rax + __mcsema_reg_state@SECREL32 + 436]
+  movdqu xmm12, [rax + __mcsema_reg_state@SECREL32 + 452]
+  movdqu xmm13, [rax + __mcsema_reg_state@SECREL32 + 468]
+  movdqu xmm14, [rax + __mcsema_reg_state@SECREL32 + 484]
+  movdqu xmm15, [rax + __mcsema_reg_state@SECREL32 + 500]
   xchg QWORD PTR [rax + __mcsema_reg_state@SECREL32 + 56], rsp
   sub rsp, 264
   push rsi

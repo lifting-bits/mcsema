@@ -6,15 +6,13 @@ cl /nologo /c demo_fpu1.c
 
 if exist "%IDA_PATH%\idaq.exe" (
     echo Using IDA to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend_wrapper.py -march=x86-64 -d -entry-symbol=timespi -i=demo_fpu1.obj
+    %PYTHON% %BIN_DESCEND_PATH%\bin_descend_wrapper.py -march=x86-64 -d -entry-symbol=timespi -i=demo_fpu1.obj
 ) else (
-    echo Using bin_descend to recover CFG
-    %BIN_DESCEND_PATH%\bin_descend.exe -march=x86-64 -d -entry-symbol=timespi -i=demo_fpu1.obj
+    echo Bin_descend is no longer supported
+    exit 1
 )
 
-%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=x86_64-pc-win32 -i demo_fpu1.cfg -driver=demo_fpu1_entry,timespi,raw,return,C -o demo_fpu1.bc
+%CFG_TO_BC_PATH%\cfg_to_bc.exe -mtriple=x86_64-pc-win32 -i demo_fpu1.cfg -entrypoint=timespi -o demo_fpu1.bc
+clang-cl /Zi -O3 -m64 -o demo_driver_fpu1.exe demo_driver_fpu1.c ..\..\..\drivers\PE_64_windows.asm demo_fpu1.bc
 
-%LLVM_PATH%\opt.exe -O3 -o demo_fpu1_opt.bc demo_fpu1.bc
-%LLVM_PATH%\llc.exe -filetype=obj -o demo_fpu1_mine.obj demo_fpu1_opt.bc
-cl.exe /Zi /nologo demo_driver_fpu1.c demo_fpu1_mine.obj
 demo_driver_fpu1.exe
