@@ -138,8 +138,7 @@ int main(void) {
   printf("  cmp rsp, 0\n");
   printf("  jnz .Lhave_stack\n");
   // end inline getTlsIndex
-  // the -8 is to get an aligned stack for a call
-  printf("  lea rsp, [rax + __mcsema_stack@SECREL32 + %llu - 8]\n", kStackSize);
+  printf("  lea rsp, [rax + __mcsema_stack@SECREL32 + %llu]\n", kStackSize);
   printf(".Lhave_stack:\n");
 
   // the state struture is the first and only arg to lifted functions
@@ -148,8 +147,6 @@ int main(void) {
   // set up return address
   printf("  lea rdx, [rip + __mcsema_detach_ret]\n");
 
-  // push twice for stack alignment
-  printf("  push rdx\n");
   printf("  push rdx\n");
 
   // get RIP we need to jump to, in the process, clobber TLS index
@@ -297,8 +294,8 @@ int main(void) {
   // TODO(artem) check if we can clobber rcx
   printf("  mov rcx, QWORD PTR [rax + __mcsema_stack_mark@SECREL32]\n");
 
-  // adjust for our copied stack args + fake return
-  printf("  add rsp, %llu\n", kStackArgSize+8);
+  // adjust for our copied stack args + fake return (we copied kStackArgSize-8 before)
+  printf("  add rsp, %llu\n", kStackArgSize);
   printf("  add rsp, rcx\n");
 
   printf("  xchg rsp, QWORD PTR [rax + __mcsema_reg_state@SECREL32 + %llu]\n", __builtin_offsetof(mcsema::RegState, RSP));
@@ -540,7 +537,8 @@ int main(void) {
   // this is not RSP since for do_call_value there is no spilling via an 
   // intermediate function
   printf("  mov rsi, QWORD PTR [rax + __mcsema_reg_state@SECREL32 + %llu]\n", __builtin_offsetof(mcsema::RegState, RSP));
-  printf("  mov rcx, %llu\n", kStackArgSize);
+  // use -8 since we have a ret addr on stack already and need alignment
+  printf("  mov rcx, %llu\n", kStackArgSize-8);
   printf("  rep movsb\n");
 
   // we wil use rbp to index once we clobber rax
@@ -587,7 +585,8 @@ int main(void) {
 
   // copy posible stack args from holding area to native stack
   // allocate space for our arguments on stack
-  printf("  sub rsp, %llu\n", kStackArgSize);
+  // use -8 since we have a ret addr on stack already and need alignment
+  printf("  sub rsp, %llu\n", kStackArgSize-8);
   // we need to save these 
   printf("  push rsi\n");
   printf("  push rdi\n");
@@ -597,7 +596,8 @@ int main(void) {
   printf("  lea rdi, [rsp + %u]\n", 8+8+8);
   // source is temp area
   printf("  lea rsi, [rax + __mcsema_stack_args@SECREL32]\n");
-  printf("  mov rcx, %llu\n", kStackArgSize);
+  // use -8 since we have a ret addr on stack already and need alignment
+  printf("  mov rcx, %llu\n", kStackArgSize-8);
   // copy
   printf("  rep movsb\n");
 

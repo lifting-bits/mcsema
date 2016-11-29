@@ -84,11 +84,10 @@ pop rdx
   xchg rsp, [rax + __mcsema_reg_state@SECREL32 + 56]
   cmp rsp, 0
   jnz .Lhave_stack
-  lea rsp, [rax + __mcsema_stack@SECREL32 + 1048576 - 8]
+  lea rsp, [rax + __mcsema_stack@SECREL32 + 1048576]
 .Lhave_stack:
   lea rcx, [rax + __mcsema_reg_state@SECREL32]
   lea rdx, [rip + __mcsema_detach_ret]
-  push rdx
   push rdx
   mov rax, QWORD PTR [rax + __mcsema_reg_state@SECREL32 + 0]
   jmp rax
@@ -215,7 +214,7 @@ pop rdx
   movdqu [rax + __mcsema_reg_state@SECREL32 + 500], xmm15
   sub QWORD PTR [rax + __mcsema_stack_mark@SECREL32], rsp
   mov rcx, QWORD PTR [rax + __mcsema_stack_mark@SECREL32]
-  add rsp, 272
+  add rsp, 264
   add rsp, rcx
   xchg rsp, QWORD PTR [rax + __mcsema_reg_state@SECREL32 + 56]
   pop QWORD PTR [rax + __mcsema_stack_mark@SECREL32]
@@ -398,7 +397,7 @@ pop rdx
   push QWORD PTR [rax + __mcsema_stack_mark@SECREL32]
   lea rdi, [rax + __mcsema_stack_args@SECREL32]
   mov rsi, QWORD PTR [rax + __mcsema_reg_state@SECREL32 + 56]
-  mov rcx, 264
+  mov rcx, 256
   rep movsb
   mov rbp, rax
   mov rax, [rbp + __mcsema_reg_state@SECREL32 + 8]
@@ -434,13 +433,13 @@ pop rdx
   movdqu xmm14, [rax + __mcsema_reg_state@SECREL32 + 484]
   movdqu xmm15, [rax + __mcsema_reg_state@SECREL32 + 500]
   xchg QWORD PTR [rax + __mcsema_reg_state@SECREL32 + 56], rsp
-  sub rsp, 264
+  sub rsp, 256
   push rsi
   push rdi
   push rcx
   lea rdi, [rsp + 24]
   lea rsi, [rax + __mcsema_stack_args@SECREL32]
-  mov rcx, 264
+  mov rcx, 256
   rep movsb
   pop rcx
   pop rdi
