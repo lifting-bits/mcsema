@@ -2,12 +2,11 @@
 #include <stdio.h>
 #include <windows.h>
 
-//extern DWORD get_value();
-extern DWORD d_get_value();
+extern DWORD get_value();
 
 int main(int argc, char *argv[]) {
 
-    DWORD value = d_get_value();
+    DWORD value = get_value();
     printf("This should print 42: %d [%x]\n", value, value);
     return 0;
 }

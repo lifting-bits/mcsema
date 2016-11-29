@@ -6,7 +6,7 @@
 #include <string.h>
 
 
-extern __declspec(dllimport) BYTE fortytwo;
+__declspec(dllimport) BYTE fortytwo;
 
 __declspec(dllexport) DWORD get_value()
 {
