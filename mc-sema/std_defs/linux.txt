@@ -1,3 +1,45 @@
+_ZdlPv 2 C N
+_ZdaPv 2 C N
+_Znam 2 C N
+_Znwm 2 C N
+
+__cxa_guard_release 1 C N
+__cxa_guard_acquire 1 C N
+__cxa_guard_abort 1 C N
+__cxa_throw 0 C N
+__cxa_allocate_exception 0 C N
+__cxa_free_exception 0 C N
+__cxa_atexit 0 C N
+__cxa_pure_virtual 0 C N
+_ZSt25__throw_bad_function_callv 0 C N
+
+_1 5 C N
+_2 5 C N
+_3 5 C N
+__assert_fail 5 C N
+__cxa_atexit 5 C N
+__cxa_guard_acquire 5 C N
+__cxa_guard_release 5 C N
+__gmon_start__ 5 C N
+_ITM_deregisterTMCloneTable 5 C N
+_ITM_registerTMCloneTable 5 C N
+_Jv_RegisterClasses 5 C N
+__libc_start_main 5 C N
+_ZdaPv 5 C N
+_ZdlPv 5 C N
+_Znam 5 C N
+_ZNSt8__detail15_List_node_base7_M_hookEPS0_ 5 C N
+_ZNSt8__detail15_List_node_base9_M_unhookEv 5 C N
+_Znwm 5 C N
+_ZSt17__throw_bad_allocv 5 C N
+_ZSt18_Rb_tree_decrementPSt18_Rb_tree_node_base 5 C N
+_ZSt18_Rb_tree_incrementPKSt18_Rb_tree_node_base 5 C N
+_ZSt18_Rb_tree_incrementPSt18_Rb_tree_node_base 5 C N
+_ZSt20__throw_length_errorPKc 5 C N
+_ZSt24__throw_out_of_range_fmtPKcz 5 C N
+_ZSt28_Rb_tree_rebalance_for_erasePSt18_Rb_tree_node_baseRS_ 5 C N
+_ZSt29_Rb_tree_insert_and_rebalancebPSt18_Rb_tree_node_baseS0_RS_ 5 C N
+
 
 a2d_ASN1_OBJECT 4 C N
 a2i_ASN1_ENUMERATED 4 C N
@@ -8635,6 +8677,7 @@ fribidi_shape 5 C N
 fribidi_shape_arabic 5 C N
 fribidi_shape_mirroring 3 C N
 fribidi_unicode_to_charset 4 C N
+__isoc99_scanf 16 C N
 fscanf 16 C N
 fseek 3 C N
 fseeko 3 C N
@@ -37264,3 +37307,4 @@ ZZ_DestroyLink 1 C N
 ZZ_DestroyList 1 C N
 ZZ_NewLink 1 C N
 ZZ_NewList 0 C N
+

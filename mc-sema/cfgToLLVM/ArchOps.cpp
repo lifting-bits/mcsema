@@ -141,7 +141,6 @@ static void LinuxAddPushJumpStub(llvm::Module *M, llvm::Function *F,
                                  llvm::Function *W, const char *stub_handler) {
   auto stub_name = W->getName().str();
   auto stubbed_func_name = F->getName().str();
-  const char *push = 32 == ArchPointerSize(M) ? "pushl" : "pushq";
 
   std::stringstream as;
   as << "  .globl " << stubbed_func_name << ";\n";
@@ -149,7 +148,16 @@ static void LinuxAddPushJumpStub(llvm::Module *M, llvm::Function *F,
   as << "  .type " << stub_name << ",@function\n";
   as << stub_name << ":\n";
   as << "  .cfi_startproc;\n";
-  as << "  " << push << " $" << stubbed_func_name << ";\n";
+  if (32 == ArchPointerSize(M)) {
+    as << "  pushl $" << stubbed_func_name << ";\n";
+  } else {
+    if (F->isDeclaration()) {
+      stubbed_func_name += "@plt";
+    }
+    as << "  pushq %rax;\n";
+    as << "  leaq " << stubbed_func_name << "(%rip), %rax;\n";
+    as << "  xchgq (%rsp), %rax;\n";
+  }
   as << "  jmp " << stub_handler << ";\n";
   as << "0:\n";
   as << "  .size " << stub_name << ",0b-" << stub_name << ";\n";
