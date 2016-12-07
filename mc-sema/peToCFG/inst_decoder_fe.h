@@ -46,6 +46,7 @@ private:
   const llvm::MCDisassembler  *DisAsm;
   llvm::Triple                 *TT;
   const llvm::Target           *target;
+  llvm::MCContext             *Ctx;
 
 public:
   LLVMByteDecoder(void)
@@ -90,7 +91,7 @@ public:
                                       *STI);
     LASSERT( this->IP, "this->IP" );
 
-    llvm::MCContext *Ctx = new llvm::MCContext(AsmInfo, MRI, nullptr);
+    this->Ctx = new llvm::MCContext(AsmInfo, MRI, nullptr);
     this->DisAsm = target->createMCDisassembler(*this->STI, *Ctx );
 
     LASSERT( this->DisAsm, "this->DisAsm" );
@@ -149,7 +150,7 @@ public:
                                       *STI);
     LASSERT( this->IP, "this->IP" );
 
-    llvm::MCContext *Ctx = new llvm::MCContext(AsmInfo, MRI, nullptr);
+    this->Ctx = new llvm::MCContext(AsmInfo, MRI, nullptr);
     this->DisAsm = target->createMCDisassembler(*this->STI, *Ctx );
 
     LASSERT( this->DisAsm, "this->DisAsm" );
@@ -157,6 +158,7 @@ public:
     return;
   }
 
+  llvm::MCContext *getContext() { return this->Ctx; }
   llvm::MCInstPrinter *getPrinter(void) { return this->IP; }
   InstPtr getInstFromBuff(VA, llvm::MemoryObject *);
 };

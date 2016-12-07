@@ -793,6 +793,8 @@ class NativeModule {
   llvm::MCInstPrinter *get_printer(void) {
     return this->MyPrinter;
   }
+  const llvm::MCContext *getMCContext() const { return ctxt; }
+  void setMCContext(llvm::MCContext *c) { ctxt = c; }
 
   //add a data section from a COFF object
   void addDataSection(VA, std::vector<uint8_t> &);
@@ -831,6 +833,7 @@ class NativeModule {
   void setTarget(const llvm::Target *T) {
     this->target = T;
   }
+  const llvm::Target *getTarget() const { return this->target; }
 
   void setTargetTriple(const std::string &triple) {
     this->triple = llvm::Triple(triple);
@@ -858,6 +861,7 @@ class NativeModule {
   std::list<DataSection> dataSecs;
   std::list<ExternalCodeRefPtr> extCalls;
   std::list<ExternalDataRefPtr> extData;
+  llvm::MCContext *ctxt;
 
  public:
   std::unordered_map<VA, MCSOffsetTablePtr> offsetTables;

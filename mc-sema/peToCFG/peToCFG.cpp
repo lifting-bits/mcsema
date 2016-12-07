@@ -46,7 +46,8 @@ NativeModule::NativeModule(string modName, list<NativeFunctionPtr> f,
       callGraph(f.size()),
       nextID(0),
       nameStr(modName),
-      MyPrinter(p) {
+      MyPrinter(p),
+      ctxt(nullptr) {
 
   return;
 }
@@ -641,6 +642,7 @@ NativeModulePtr readProtoBuf(std::string fName, const llvm::Target *T) {
 
     cout << "Setting target..." << endl;
     m->setTarget(T);
+    m->setMCContext(decode.getContext());
     cout << "Done setting target" << endl;
 
     //populate the module with externals calls

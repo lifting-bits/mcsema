@@ -169,12 +169,144 @@ InstTransResult liftInstrImpl(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
     }
   } else {
     // Instruction translation not defined.
-    errs() << "Unsupported opcode " << opcode << "!";
+    errs() << "Unsupported opcode " << opcode << " ("
+      << IP->getOpcodeName(opcode) << "): ";
     IP->printInst( &inst, errs(), to_string<VA>(ip->get_loc(), hex));
-    // Print out the unhandled opcode.
-    errs() << to_string<VA>(ip->get_loc(), hex) << " ";
-    errs() << strOut.str() << "\n";
-    errs() << inst.getOpcode() << "\n";
+    errs() << "\n";
+
+    // In the case that we can't find the opcode, try building it out with
+    // inline assembly calls in LLVM instead. If at any point we don't know
+    // how to build the assembly, give up on trying to do so.
+    const MCRegisterInfo *MRI = natM->getMCContext()->getRegisterInfo();
+    const MCInstrInfo *MII = natM->getTarget()->createMCInstrInfo();
+
+    // Build the inline asm and the constraint string.
+    string inlineAsm = "", constraints = "";
+
+    // Use the printer to build the ASM string. We'll need to substitute
+    // $ for $$, though.
+    {
+      IP->printInst(&inst, strOut, "");
+      for (char c : strOut.str()) {
+        if (c == '$')
+          inlineAsm += "$$";
+        else
+          inlineAsm += c;
+      }
+    }
+
+    // Find all of the involved registers and build the LLVM
+    unsigned argnum = 0;
+    SmallVector<Value *, 3> operands;
+    SmallVector<Type *, 3> resultTypes;
+    for (unsigned i = 0; i < inst.getNumOperands(); i++) {
+      MCOperand &op = inst.getOperand(i);
+      if (op.isReg()) {
+        if (argnum++ > 0) constraints += ",";
+        if (i < MII->get(opcode).getNumDefs()) {
+          constraints += "=";
+
+          // Find the size of the register. Surprisingly, this is how you
+          // have to do that.
+          unsigned maxSize = 0;
+          for (auto rc = MRI->regclass_begin();
+              rc != MRI->regclass_end(); ++rc) {
+            if (rc->contains(op.getReg())) {
+              maxSize = std::max(maxSize, rc->getSize());
+            }
+          }
+
+          if (maxSize > 8) {
+            // LLVM can't handle register constraints of i128, so we
+            // need to map this to <16 x i8>.
+            resultTypes.push_back(VectorType::get(
+              Type::getInt8Ty(block->getContext()), maxSize));
+          } else if (maxSize > 0) {
+            resultTypes.push_back(IntegerType::get(block->getContext(),
+                  8 * maxSize));
+          } else {
+            errs() << "Can't find register size for " <<
+              MRI->getName(op.getReg()) << '\n';
+            goto failinlineasm;
+          }
+        } else {
+          Value *readReg = nullptr;
+          unsigned maxSize = 0;
+          for (auto rc = MRI->regclass_begin();
+              rc != MRI->regclass_end(); ++rc) {
+            if (rc->contains(op.getReg()))
+              maxSize = std::max(maxSize, rc->getSize());
+          }
+          switch (maxSize) {
+            case 1: readReg = ::R_READ<8>(block, op.getReg()); break;
+            case 2: readReg = ::R_READ<16>(block, op.getReg()); break;
+            case 4: readReg = ::R_READ<32>(block, op.getReg()); break;
+            case 8: readReg = ::R_READ<64>(block, op.getReg()); break;
+            case 16: {
+              readReg = ::R_READ<128>(block, op.getReg());
+              // LLVM can't handle register constraints of i128, so we
+              // need to map this to <16 x i8>.
+              readReg = CastInst::Create(Instruction::BitCast, readReg,
+                VectorType::get(Type::getInt8Ty(block->getContext()), 16),
+                  "", block);
+              break;
+            }
+            default:
+              errs() << "Unknown register size " << maxSize << " for " <<
+                MRI->getName(op.getReg()) << '\n';
+              goto failinlineasm;
+          }
+          operands.push_back(readReg);
+        }
+        constraints += "{";
+        constraints += MRI->getName(op.getReg());
+        constraints += "}";
+      }
+    }
+
+    // Build the call to inline asm at this point.
+    {
+      SmallVector<Type *, 3> argTypes;
+      for (auto val : operands)
+        argTypes.push_back(val->getType());
+      Type *returnTy;
+      if (resultTypes.empty())
+        returnTy = Type::getVoidTy(block->getContext());
+      else if (resultTypes.size() == 1)
+        returnTy = resultTypes[0];
+      else
+        returnTy = StructType::get(block->getContext(), resultTypes);
+      FunctionType *asmTy = FunctionType::get(returnTy, argTypes, false);
+      InlineAsm *callee = InlineAsm::get(asmTy, inlineAsm, constraints, false);
+      Value *resultPack =
+        CallInst::Create(callee, operands, IP->getOpcodeName(opcode), block);
+      for (unsigned i = 0; i < resultTypes.size(); i++) {
+        Value *result = resultTypes.size() == 1 ? resultPack :
+          ExtractValueInst::Create(resultPack, i, "", block);
+        Type *ty = resultTypes[i];
+        // Cast vector outputs to iXYZ for R_WRITE.
+        if (ty->isVectorTy()) {
+          ty = Type::getIntNTy(block->getContext(),
+            ty->getVectorNumElements() * 8);
+          result = CastInst::Create(Instruction::BitCast, result,
+            ty, "", block);
+        }
+        unsigned regNo = inst.getOperand(i).getReg();
+        switch (ty->getIntegerBitWidth()) {
+        case 8: ::R_WRITE<8>(block, regNo, result); break;
+        case 16: ::R_WRITE<16>(block, regNo, result); break;
+        case 32: ::R_WRITE<32>(block, regNo, result); break;
+        case 64: ::R_WRITE<64>(block, regNo, result); break;
+        case 128: ::R_WRITE<128>(block, regNo, result); break;
+        default:
+          errs() << "Unknown register size " << resultTypes[i]->getIntegerBitWidth() << '\n';
+          goto failinlineasm;
+        }
+      }
+    }
+
+    return itr;
+failinlineasm:
     if (X86::REP_PREFIX != opcode && X86::REPNE_PREFIX != opcode) {
       itr = TranslateErrorUnsupported;
     } else {
