@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 2.8)
 
+option(MCSEMA_ENABLE_PIN_VALIDATOR ON)
+
 set(CMAKE_MODULE_PATH
   ${CMAKE_MODULE_PATH}
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules"
 )
-	
+
 set(PROTOBUF_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/protobuf-2.5.0)
 if( WIN32 OR CYGWIN)
   # MinGW warns if -fvisibility-inlines-hidden is used.
@@ -95,35 +97,36 @@ add_subdirectory(binary_common)
 add_subdirectory(bin_descend)
 add_subdirectory(runtime)
 
-find_package(Pin)
-if(NOT PIN_FOUND AND NOT WIN32)
-
-	if(UNIX)
-		set(PIN_DOWNLOAD_URL https://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-67254-gcc.4.4.7-linux.tar.gz)
-		set(PIN_DOWNLOAD_HASH 4499cfed383f362a0c74560a3ee66a5f117bea95f40067224ddf3c2606c77006)
-	endif(UNIX)
-
-	if(APPLE)
-		set(PIN_DOWNLOAD_URL https://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-67254-clang.5.1-mac.tar.gz)
-		set(PIN_DOWNLOAD_HASH b715d995bac010fd04c5c33c8efdcd6e2e42db8568a42071cd9a90d9a989e337)
-	endif(APPLE)
-
-	ExternalProject_add(Pin
-		URL ${PIN_DOWNLOAD_URL}
-		URL_HASH SHA256=${PIN_DOWNLOAD_HASH}
-		CONFIGURE_COMMAND ""
-		BUILD_COMMAND ""
-		SOURCE_DIR pin
-		INSTALL_COMMAND ""
-	)
-
-	set(PIN_PATH ${CMAKE_CURRENT_BINARY_DIR}/pin)
-	set(PIN_EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pin/pin)
-
-	add_subdirectory(validator)
+if(MCSEMA_ENABLE_PIN_VALIDATOR)
+	find_package(Pin)
+	if(NOT PIN_FOUND AND NOT WIN32)
 	
-endif(NOT PIN_FOUND AND NOT WIN32)
-
-if(WIN32 AND PIN_FOUND)
-	add_subdirectory(validator)
-endif(WIN32 AND PIN_FOUND)
+		if(UNIX)
+			set(PIN_DOWNLOAD_URL https://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-67254-gcc.4.4.7-linux.tar.gz)
+			set(PIN_DOWNLOAD_HASH 792eaaa199e9deba84cde79858e93ffc)
+		endif(UNIX)
+	
+		if(APPLE)
+			set(PIN_DOWNLOAD_URL https://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-67254-clang.5.1-mac.tar.gz)
+			set(PIN_DOWNLOAD_HASH 0f93c64484d039ceca828cd2909d321b)
+		endif(APPLE)
+	
+		ExternalProject_add(Pin
+			URL ${PIN_DOWNLOAD_URL}
+			URL_MD5 ${PIN_DOWNLOAD_HASH}
+			CONFIGURE_COMMAND ""
+			BUILD_COMMAND ""
+			SOURCE_DIR pin
+			INSTALL_COMMAND ""
+		)
+	
+		set(PIN_PATH ${CMAKE_CURRENT_BINARY_DIR}/pin)
+		set(PIN_EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pin/pin)
+	
+		add_subdirectory(validator)
+	endif(NOT PIN_FOUND AND NOT WIN32)
+	
+	if(WIN32 AND PIN_FOUND)
+		add_subdirectory(validator)
+	endif(WIN32 AND PIN_FOUND)
+endif(MCSEMA_ENABLE_PIN_VALIDATOR)
