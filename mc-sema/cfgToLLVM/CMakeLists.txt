@@ -7,7 +7,7 @@ add_library(cfgToLLVM x86Helpers.cpp x86_64Helpers.cpp x86Instrs.cpp x86Instrs_M
   x86Instrs_ShiftRoll.cpp x86Instrs_Misc.cpp x86Instrs_Jcc.cpp
   x86Instrs_CMOV.cpp x86Instrs_MULDIV.cpp x86Instrs_CMPTEST.cpp
   x86Instrs_fpu.cpp x86Instrs_SSE.cpp InstructionDispatch.cpp toLLVM.cpp raiseX86.cpp
-  raiseX86_64.cpp TransExcn.cpp win32cb.cpp JumpTables.cpp postPasses.cpp inlineSpecials.cpp
-  win32_Intrinsics.cpp ArchOps.cpp Annotation.cpp win32ArchOps.cpp win64ArchOps.cpp linuxArchOps.cpp osxArchOps.cpp RegisterUsage.cpp)
+  raiseX86_64.cpp TransExcn.cpp JumpTables.cpp 
+  ArchOps.cpp Annotation.cpp RegisterUsage.cpp)
 
 add_dependencies(cfgToLLVM LLVMX86CodeGen)
