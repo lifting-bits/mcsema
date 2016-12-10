@@ -35,7 +35,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "JumpTables.h"
 #include "Externals.h"
 #include "ArchOps.h"
-#include "win64ArchOps.h"
 #include "llvm/Support/Debug.h"
 
 #define NASSERT(cond) TASSERT(cond, "")

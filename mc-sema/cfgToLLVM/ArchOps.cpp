@@ -9,11 +9,7 @@
 
 #include "TransExcn.h"
 
-#include "win32cb.h"
-
 #include "ArchOps.h"
-#include "win32ArchOps.h"
-#include "linuxArchOps.h"
 
 #include "../common/Defaults.h"
 

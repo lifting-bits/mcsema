@@ -37,5 +37,4 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 void renameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
                            const std::set<VA> &entry_point_pcs);
 bool liftNativeCodeIntoModule(NativeModulePtr, llvm::Module *);
-bool doPostAnalysis(NativeModulePtr N, llvm::Module *M);
 #endif

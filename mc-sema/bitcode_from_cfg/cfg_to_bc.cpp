@@ -94,10 +94,6 @@ static cl::opt<bool> OutputModule("m", cl::desc("Output native module format"));
 static cl::opt<bool> IgnoreUnsupported(
     "ignore-unsupported", cl::desc("Ignore unsupported instructions"));
 
-static cl::opt<bool> EnablePostAnalysis(
-    "post-analysis", cl::desc("Enable post analysis and optimizations"),
-    cl::init(true));
-
 static cl::opt<bool> ShouldVerify(
     "should-verify", cl::desc("Verify module after bitcode emission?"),
     cl::init(true));
@@ -285,13 +281,6 @@ int main(int argc, char *argv[]) {
     }
 
     renameLiftedFunctions(mod, M, entry_point_pcs);
-
-    if (EnablePostAnalysis) {
-      std::cerr << "Doing post analysis passes...\n";
-      doPostAnalysis(mod, M);
-    } else {
-      std::cerr << "NOT doing post analysis passes.\n";
-    }
 
     // will abort if verification fails
     if (ShouldVerify && llvm::verifyModule( *M, &errs())) {

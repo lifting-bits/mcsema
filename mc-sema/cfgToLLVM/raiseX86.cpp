@@ -52,7 +52,6 @@
 
 #include "llvm/Support/CommandLine.h"
 
-#include "postPasses.h"
 #include <boost/graph/breadth_first_search.hpp>
 #include "Externals.h"
 #include "../common/to_string.h"
@@ -1385,35 +1384,6 @@ static bool insertFunctionIntoModule(NativeModulePtr mod,
 
   //we should be done, having inserted every block into the module
   return !error;
-}
-
-bool doPostAnalysis(NativeModulePtr N, Module *M) {
-  //first, we need to instantiate the pass manager and perform the mem2reg transform
-  //on the module to lift it at least into SSA form
-  llvm::PassManager modulePasses;
-  llvm::FunctionPassManager functionPasses(M);
-  llvm::PassManagerBuilder builder;
-
-  llvm::errs() << "in : " << __FUNCTION__ << "\n";
-
-  builder.OptLevel = 1;
-  builder.SizeLevel = 2;
-
-  //register our specific analyses
-  registerPostPasses(builder);
-
-  builder.populateModulePassManager(modulePasses);
-  builder.populateFunctionPassManager(functionPasses);
-
-  functionPasses.doInitialization();
-  for (Module::iterator i = M->begin(), e = M->end(); i != e; ++i) {
-    functionPasses.run( *i);
-  }
-  functionPasses.doFinalization();
-
-  modulePasses.run( *M);
-
-  return true;
 }
 
 

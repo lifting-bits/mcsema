@@ -39,7 +39,6 @@
 #include "JumpTables.h"
 #include "llvm/Support/Debug.h"
 #include "ArchOps.h"
-#include "win64ArchOps.h"
 
 using namespace llvm;
 
