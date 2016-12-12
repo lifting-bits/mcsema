@@ -17,8 +17,8 @@ else
     ${BIN_DESCEND_PATH}/bin_descend -d -march=x86_64 -func-map=${STD_DEFS} -i=${BINF} -entry-symbol=main
 fi
 
-echo "${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=x86_64-pc-linux-gnu -i ${BINF}.cfg -driver=mcsema_main,main,raw,return,C -o ${BINF}.bc >> $IDALOG"
-${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=x86_64-pc-linux-gnu -i ${BINF}.cfg -driver=mcsema_main,main,raw,return,C -o ${BINF}.bc >> $IDALOG
+echo "${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=x86_64-pc-linux-gnu -i ${BINF}.cfg -entrypoint=main -o ${BINF}.bc >> $IDALOG"
+${CFG_TO_BC_PATH}/cfg_to_bc -mtriple=x86_64-pc-linux-gnu -i ${BINF}.cfg -entrypoint=main -o ${BINF}.bc >> $IDALOG
 
 #${LLVM_PATH}/opt -O0 -o ${BINF}_opt.bc ${BINF}.bc
 cp ${BINF}.bc ${BINF}_opt.bc
