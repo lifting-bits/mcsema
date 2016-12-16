@@ -1,4 +1,28 @@
+# I don't know!!
+COMCTL32_345 5 C N
+
+DATA: acmdln PTR
+DATA: wcmdln PTR
+DATA: aenvptr PTR
+
+initterm 2 C N
+initterm_e 2 C N
+amsg_exit 1 C N
+
+RtlLookupFunctionEntry 3 C N
+RtlVirtualUnwind 8 C N
+
+commode 0 C N
+fmode 0 C N
+
 #processing C runtime
+getmainargs 5 C N
+__getmainargs 5 C N
+__wgetmainargs 5 C N
+wgetmainargs 5 C N
+_Exit 1 C N
+_exit 1 C N
+exit 1 C N
 memset 3 C N
 free 1 C N
 memcpy 3 C N
@@ -617,7 +641,10 @@ _wstat32i64 2 C N
 _wstati64 2 C N
 rename 2 C N
 set_unexpected 1 C N
+?terminate@@YAXXZ 0 C Y
 terminate 0 C Y
+set_app_type 1 C N
+__set_app_type 1 C N
 unexpected 0 C Y
 _inconsistency 0 C N
 _CallSETranslator 7 C N

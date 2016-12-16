@@ -728,6 +728,7 @@ void Stack_populateDispatchMap(DispatchMap &m) {
   m[X86::POP32rmm] = translate_POP32rmm;
 
   m[X86::PUSH64r] = translate_PUSH64r;
+  m[X86::PUSH64rmr] = translate_PUSH64r;  // TODO(pag): Is this right??
   m[X86::PUSH64rmm] = translate_PUSH64rmm;
   m[X86::PUSH64i8] = translate_PUSHi8;
   m[X86::PUSH64i32] = translate_PUSHi32;
