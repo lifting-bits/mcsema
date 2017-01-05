@@ -170,7 +170,7 @@ def BlockItems(BB):
         yield fii.current()
         ok = fii.next_code()
 
-def collect_func_vars(F):
+def collect_func_vars(F, global_var_data):
     '''
     Collect stack variable data from a single function F.
     Returns a dict of stack variables 'stackArgs'.
@@ -179,9 +179,9 @@ def collect_func_vars(F):
     '''
 
     f = F.entry_address
-    return collect_function_vars(f)
+    return collect_function_vars(f, global_var_data)
 
-def collect_function_vars(f):
+def collect_function_vars(f, global_var_data):
     stackArgs = dict()
     name = idc.Name(f)
     end = idc.GetFunctionAttr(f, idc.FUNCATTR_END)
@@ -225,11 +225,11 @@ def collect_function_vars(f):
         offset = idc.GetStrucNextOff(frame, offset)
     #functions.append({"name":name, "stackArgs":stackArgs})
     if len(stackArgs) > 0:
-        _find_local_references(f, {"name":name, "stackArgs":stackArgs, "uses_bp":_uses_bp})
+        _find_local_references(f, {"name":name, "stackArgs":stackArgs, "uses_bp":_uses_bp, "globals":dict()}, global_var_data)
 
     return stackArgs
 
-def collect_func_vars_all():
+def collect_variables():
     '''
     Collects stack variable data from all functions in the database.
     Returns a list of dictionaries with keys 'ea' and 'stackArgs'.
@@ -243,15 +243,17 @@ def collect_func_vars_all():
             self.entry_address = addr
 
     functions = list()
+    global_var_data = dict() #global address -> usage
     funcs = idautils.Functions()
     for f in funcs:
         #name = idc.Name(f)
         f_ea = idc.GetFunctionAttr(f, idc.FUNCATTR_START)
-        f_vars = collect_func_vars(functionWrapper(f))
+        f_vars = collect_func_vars(functionWrapper(f), global_var_data)
         functions.append({"ea":f_ea, "stackArgs":f_vars, "name":idc.Name(f)})
-    return functions
 
-def _process_mov_inst(addr, referers, dereferences, func_var_data):
+    return {"functions":functions, "globals":global_var_data}
+
+def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_data):
     '''
     - type data regarding the target operand is discarded
     - if the source operand contains an address of a stack variable:
@@ -265,6 +267,9 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data):
     read_op = _translate_reg(idc.GetOpnd(addr, 1))
     target_on_stack = (_stack_ptr_format in target_op) or (func_var_data["uses_bp"] and (_base_ptr_format in target_op))
     read_on_stack = (_stack_ptr_format in read_op) or (func_var_data["uses_bp"] and (_base_ptr_format in read_op))
+
+    target_global = idc.GetOpType(addr, 0) == 2 #2 is a memory reference
+    read_global = idc.GetOpType(addr, 1) == 2
 
     referers.pop(target_op, None)
     dereferences.pop(target_op, None)
@@ -307,6 +312,17 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data):
         if offset in func_var_data["stackArgs"].keys():
             func_var_data["stackArgs"][offset]["writes"].add(addr)
 
+    if target_global:
+        memory_ref = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
+        var_name = idc.GetOpnd(addr, 0)
+        if var_name not in global_var_data:
+            global_var_data[var_name] = dict(reads=set(), writes=set(), offset=memory_ref)
+        global_var_data[var_name]["writes"].add(addr)
+        if var_name not in func_var_data["globals"]:
+            func_var_data["globals"][var_name] = dict(reads=set(), writes=set(), offset=memory_ref)
+        func_var_data["globals"][var_name]["writes"].add(addr)
+
+
     ''' collect EAs of instructions that read from stack variables'''
     if read_on_stack:
         # mov eax, [ebp-4]
@@ -314,15 +330,26 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data):
         if offset in func_var_data["stackArgs"].keys():
             func_var_data["stackArgs"][offset]["reads"].add(addr)
 
-def _process_lea_inst(addr, referers, dereferences, func_var_data):
+    if read_global:
+        memory_ref = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
+        var_name = idc.GetOpnd(addr, 1)
+        if var_name not in global_var_data:
+            global_var_data[var_name] = dict(reads=set(), writes=set(), offset=memory_ref)
+        global_var_data[var_name]["reads"].add(addr)
+        if memory_ref not in func_var_data["globals"]:
+            func_var_data["globals"][var_name] = dict(reads=set(), writes=set(), offset=memory_ref)
+        func_var_data["globals"][var_name]["reads"].add(addr)
+
+def _process_lea_inst(addr, referers, dereferences, func_var_data, global_var_data):
     read_op = _translate_reg(idc.GetOpnd(addr, 1))
     target_op = _translate_reg(idc.GetOpnd(addr, 0))
     read_on_stack = (_stack_ptr_format in read_op) or (func_var_data["uses_bp"] and (_base_ptr_format in read_op))
+    read_global = idc.GetOpType(addr, 1) == 2
     if read_on_stack:
         #referers[operand] = offset
         referers[target_op] = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
 
-def _process_call_inst(addr, referers, dereferences, func_var_data):
+def _process_call_inst(addr, referers, dereferences, func_var_data, global_var_data):
     target_op = _translate_reg(idc.GetOpnd(addr, 0))
     if target_op in referers:
         #maybe do something here? explicitly calling to the stack. Hrm.
@@ -343,7 +370,7 @@ def _process_call_inst(addr, referers, dereferences, func_var_data):
         dereferences.pop(reg, None)
         referers.pop(reg, None)
 
-def _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb):
+def _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb, global_var_data):
     if BB.startEA in visited_bb:
         return
     visited_bb.add(BB.startEA)
@@ -353,7 +380,7 @@ def _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb):
                   "call":_process_call_inst}
         func = _funcs.get(idc.GetMnem(addr), None)
         if func:
-            func(addr, referers, dereferences, func_var_data)
+            func(addr, referers, dereferences, func_var_data, global_var_data)
         else:
             #check for reads from stack var
             read_op = _translate_reg(idc.GetOpnd(addr, 1))
@@ -367,9 +394,9 @@ def _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb):
                     #print "offset {} not found at address {}".format(hex(offset), hex(addr))
 
     for block in BB.succs():
-        _process_basic_block(block, func_var_data, referers.copy(), dereferences.copy(), visited_bb)
+        _process_basic_block(block, func_var_data, referers.copy(), dereferences.copy(), visited_bb, global_var_data)
 
-def _find_local_references(func, func_var_data):
+def _find_local_references(func, func_var_data, global_var_data):
     frame = idc.GetFrame(func)
     if frame is None:
         return
@@ -380,13 +407,18 @@ def _find_local_references(func, func_var_data):
 
     #build the dict of addr->basicblock objects
     fc = idaapi.FlowChart(idaapi.get_func(func))
-    _process_basic_block(fc[0], func_var_data, referers, dereferences, visited_bb)
+    _process_basic_block(fc[0], func_var_data, referers, dereferences, visited_bb, global_var_data)
 
 def print_func_vars():
     print
+    variable_data = collect_variables()
+
+    print "Global Vars:"
+    import pprint
+    pprint.pprint(variable_data["globals"])
+    print "End Global Vars\n"
     print "Stack Vars:"
-    func_list = collect_func_vars_all()
-    for entry in func_list:
+    for entry in variable_data["functions"]:
         print "{} {{".format(entry['name'])
         for offset in sorted(entry['stackArgs'].keys()):
             print "  {}: {}".format(hex(offset), entry['stackArgs'][offset])
