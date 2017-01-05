@@ -81,16 +81,15 @@ static InstTransResult doInt(BasicBlock *&b, const MCOperand &o) {
 
   auto os = SystemOS(M);
 
-  if(0x2e == interrupt_val && llvm::Triple::Win32 == os) {
-      TASSERT(false, "System call via interrupt is not supported!");
+  if (0x2e == interrupt_val && llvm::Triple::Win32 == os) {
+    TASSERT(false, "System call via interrupt is not supported!");
   }
 
-  if(0x80 == interrupt_val && llvm::Triple::Linux == os) {
-      TASSERT(false, "System call via interrupt is not supported!");
+  if (0x80 == interrupt_val && llvm::Triple::Linux == os) {
+    TASSERT(false, "System call via interrupt is not supported!");
   }
 
-  llvm::dbgs()
-      << "WARNING: Treating INT " << interrupt_val << " as trap!\n";
+  llvm::dbgs() << "WARNING: Treating INT " << interrupt_val << " as trap!\n";
 
   return doTrap(b);
 }
@@ -494,50 +493,51 @@ static InstTransResult translate_SAHF(NativeModulePtr natM, BasicBlock *&block,
   return ContinueBlock;
 }
 
-
 template<int width>
-static InstTransResult doBtmi(InstPtr ip, BasicBlock *&b, Value *base, const MCOperand &index) {
-    TASSERT(index.isImm(), "Operand must be an immediate");
+static InstTransResult doBtmi(InstPtr ip, BasicBlock *&b, Value *base,
+                              const MCOperand &index) {
+  TASSERT(index.isImm(), "Operand must be an immediate");
 
-    int imm = index.getImm();
-    int bytes_offt = imm/8;
-    int whichbit = imm % 8;
-    if(whichbit < 0) {
-        // make this always positive
-        whichbit *= -1;
-    }
+  int imm = index.getImm();
+  int bytes_offt = imm / 8;
+  int whichbit = imm % 8;
+  if (whichbit < 0) {
+    // make this always positive
+    whichbit *= -1;
+  }
 
+  Value *addrInt = base;
 
-    Value *addrInt = base;
+  if (base->getType()->isPointerTy()) {
+    addrInt = new PtrToIntInst(base,
+                               llvm::Type::getIntNTy(b->getContext(), width),
+                               "", b);
+  }
 
-    if(base->getType()->isPointerTy()) {
-        addrInt = new PtrToIntInst(
-                base, llvm::Type::getIntNTy(b->getContext(), width), "", b);
-    }
+  // pick which byte we need to bit test
+  Value *new_base = BinaryOperator::Create(Instruction::Add, addrInt,
+                                           CONST_V<width>(b, bytes_offt), "",
+                                           b);
 
-    // pick which byte we need to bit test
-    Value *new_base = BinaryOperator::Create(Instruction::Add, addrInt,
-            CONST_V<width>(b, bytes_offt), "", b);
+  Value *base_val = M_READ<8>(ip, b, new_base);
+  SHR_SET_FLAG_V<8, 1>(b, base_val, CF, CONST_V<8>(b, whichbit));
 
-
-    Value *base_val = M_READ<8>(ip, b, new_base);
-    SHR_SET_FLAG_V<8, 1>(b, base_val, CF, CONST_V<8>(b, whichbit));
-
-    return ContinueBlock;
+  return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult doBtri(BasicBlock *&b, const MCOperand &base, const MCOperand &index) {
-    TASSERT(base.isReg(), "Operand must be an immediate");
-    TASSERT(index.isImm(), "Operand must be an immediate");
+static InstTransResult doBtri(BasicBlock *&b, const MCOperand &base,
+                              const MCOperand &index) {
+  TASSERT(base.isReg(), "Operand must be an immediate");
+  TASSERT(index.isImm(), "Operand must be an immediate");
 
-    unsigned whichbit = index.getImm();
-    whichbit %= width;
+  unsigned whichbit = index.getImm();
+  whichbit %= width;
 
-    Value *base_val = R_READ<width>(b, base.getReg());
-    SHR_SET_FLAG_V<width, 1>(b, base_val, CF, CONST_V<width>(b, whichbit));
+  Value *base_val = R_READ<width>(b, base.getReg());
+  SHR_SET_FLAG_V<width, 1>(b, base_val, CF, CONST_V<width>(b, whichbit));
 
-    return ContinueBlock;
+  return ContinueBlock;
 }
 
 template<int width>
@@ -556,6 +556,100 @@ static InstTransResult doBtrr(BasicBlock *&b, const MCOperand &base,
                                                 b);
 
   SHR_SET_FLAG_V<width, 1>(b, base_val, CF, index_mod);
+
+  return ContinueBlock;
+}
+
+template<int width>
+static InstTransResult doBTSri(BasicBlock *&b, const MCOperand &base,
+                               const MCOperand &index) {
+  TASSERT(base.isReg(), "Operand must be an immediate");
+  TASSERT(index.isImm(), "Operand must be an immediate");
+
+  unsigned whichbit = index.getImm();
+  whichbit %= width;
+
+  Value *base_val = R_READ<width>(b, base.getReg());
+  SHR_SET_FLAG_V<width, 1>(b, base_val, CF, CONST_V<width>(b, whichbit));
+
+  auto new_base_val = BinaryOperator::Create(
+      Instruction::Or, base_val, CONST_V<width>(b, 1ULL << whichbit), "", b);
+  R_WRITE<width>(b, base.getReg(), new_base_val);
+
+  return ContinueBlock;
+}
+
+template<int width>
+static InstTransResult doBTSmi(InstPtr ip, BasicBlock *&b, Value *base,
+                               const MCOperand &index) {
+  TASSERT(index.isImm(), "Operand must be an immediate");
+
+  int imm = index.getImm();
+  int bytes_offt = imm / 8;
+  int whichbit = imm % 8;
+  if (whichbit < 0) {
+    // make this always positive
+    whichbit *= -1;
+  }
+
+  Value *addrInt = base;
+
+  if (base->getType()->isPointerTy()) {
+    addrInt = new PtrToIntInst(base,
+                               llvm::Type::getIntNTy(b->getContext(), width),
+                               "", b);
+  }
+
+  // pick which byte we need to bit test
+  Value *new_base = BinaryOperator::Create(Instruction::Add, addrInt,
+                                           CONST_V<width>(b, bytes_offt), "",
+                                           b);
+
+  Value *base_val = M_READ<8>(ip, b, new_base);
+  SHR_SET_FLAG_V<8, 1>(b, base_val, CF, CONST_V<8>(b, whichbit));
+
+  auto new_base_val = BinaryOperator::Create(Instruction::Or, base_val,
+                                             CONST_V<8>(b, 1 << whichbit), "",
+                                             b);
+  M_WRITE<8>(ip, b, new_base, new_base_val);
+
+  return ContinueBlock;
+}
+
+template<int width>
+static InstTransResult doBTRmi(InstPtr ip, BasicBlock *&b, Value *base,
+                               const MCOperand &index) {
+  TASSERT(index.isImm(), "Operand must be an immediate");
+
+  int imm = index.getImm();
+  int bytes_offt = imm / 8;
+  int whichbit = imm % 8;
+  if (whichbit < 0) {
+    // make this always positive
+    whichbit *= -1;
+  }
+
+  Value *addrInt = base;
+
+  if (base->getType()->isPointerTy()) {
+    addrInt = new PtrToIntInst(base,
+                               llvm::Type::getIntNTy(b->getContext(), width),
+                               "", b);
+  }
+
+  // pick which byte we need to bit test
+  Value *new_base = BinaryOperator::Create(Instruction::Add, addrInt,
+                                           CONST_V<width>(b, bytes_offt), "",
+                                           b);
+
+  Value *base_val = M_READ<8>(ip, b, new_base);
+  SHR_SET_FLAG_V<8, 1>(b, base_val, CF, CONST_V<8>(b, whichbit));
+
+  auto new_base_val = BinaryOperator::Create(Instruction::And, base_val,
+                                             CONST_V<8>(b, ~(1ULL << whichbit)),
+                                             "", b);
+
+  M_WRITE<8>(ip, b, new_base, new_base_val);
 
   return ContinueBlock;
 }
@@ -707,8 +801,8 @@ static InstTransResult doLeaRef(NativeModulePtr natM, BasicBlock *&block,
       throw TErr(__LINE__, __FILE__, "Have code ref but no reference");
     }
 
-    Value *callback_fn = ArchAddCallbackDriver(
-        block->getParent()->getParent(), ip->get_reference(optype));
+    Value *callback_fn = ArchAddCallbackDriver(block->getParent()->getParent(),
+                                               ip->get_reference(optype));
     Value *addrInt = new PtrToIntInst(
         callback_fn, llvm::Type::getIntNTy(block->getContext(), width), "",
         block);
@@ -900,13 +994,26 @@ GENERIC_TRANSLATION(BT64ri8, doBtri<64>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BT32ri8, doBtri<32>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BT16ri8, doBtri<16>(block, OP(0), OP(1)))
 
-GENERIC_TRANSLATION_REF(BT32mi8, 
-        doBtmi<32>(ip, block, ADDR_NOREF(0), OP(5)),
-        doBtmi<32>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION(BTS64ri8, doBTSri<64>(block, OP(0), OP(1)))
+GENERIC_TRANSLATION(BTS32ri8, doBTSri<32>(block, OP(0), OP(1)))
 
-GENERIC_TRANSLATION_REF(BT64mi8, 
-        doBtmi<64>(ip, block, ADDR_NOREF(0), OP(5)),
-        doBtmi<64>(ip, block, MEM_REFERENCE(0), OP(5)))
+GENERIC_TRANSLATION_REF(BT32mi8, doBtmi<32>(ip, block, ADDR_NOREF(0), OP(5)),
+                        doBtmi<32>(ip, block, MEM_REFERENCE(0), OP(5)))
+
+GENERIC_TRANSLATION_REF(BT64mi8, doBtmi<64>(ip, block, ADDR_NOREF(0), OP(5)),
+                        doBtmi<64>(ip, block, MEM_REFERENCE(0), OP(5)))
+
+GENERIC_TRANSLATION_REF(BTS32mi8, doBTSmi<32>(ip, block, ADDR_NOREF(0), OP(5)),
+                        doBTSmi<32>(ip, block, MEM_REFERENCE(0), OP(5)))
+
+GENERIC_TRANSLATION_REF(BTS64mi8, doBTSmi<64>(ip, block, ADDR_NOREF(0), OP(5)),
+                        doBTSmi<64>(ip, block, MEM_REFERENCE(0), OP(5)))
+
+GENERIC_TRANSLATION_REF(BTR32mi8, doBTRmi<32>(ip, block, ADDR_NOREF(0), OP(5)),
+                        doBTRmi<32>(ip, block, MEM_REFERENCE(0), OP(5)))
+
+GENERIC_TRANSLATION_REF(BTR64mi8, doBTRmi<64>(ip, block, ADDR_NOREF(0), OP(5)),
+                        doBTRmi<64>(ip, block, MEM_REFERENCE(0), OP(5)))
 
 GENERIC_TRANSLATION(BSR32rr, doBsrr<32>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BSR16rr, doBsrr<16>(block, OP(0), OP(1)))
@@ -956,7 +1063,15 @@ void Misc_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::BT32ri8] = translate_BT32ri8;
   m[llvm::X86::BT16ri8] = translate_BT16ri8;
   m[llvm::X86::BT64mi8] = translate_BT64mi8;
+  m[llvm::X86::BTS64mi8] = translate_BTS64mi8;
+  m[llvm::X86::BTS64ri8] = translate_BTS64ri8;
+
+  m[llvm::X86::BTR64mi8] = translate_BTR64mi8;
   m[llvm::X86::BT32mi8] = translate_BT32mi8;
+  m[llvm::X86::BTS32mi8] = translate_BTS32mi8;
+  m[llvm::X86::BTS32ri8] = translate_BTS32ri8;
+
+  m[llvm::X86::BTR32mi8] = translate_BTR32mi8;
   m[llvm::X86::BSR64rr] = translate_BSR64rr;
   m[llvm::X86::BSR32rr] = translate_BSR32rr;
   m[llvm::X86::BSR16rr] = translate_BSR16rr;
