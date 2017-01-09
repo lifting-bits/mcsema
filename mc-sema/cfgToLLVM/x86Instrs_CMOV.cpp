@@ -94,8 +94,11 @@ static InstTransResult  doCMOV(
     return ContinueBlock;
 }
 
-#define EMIT_CMOV_RM(width, condition) [] (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst)->InstTransResult {\
-    BasicBlock *b = block;\
+#define EMIT_CMOV_RM(width, condition) [] (TranslationContext &ctx, BasicBlock *&block)->InstTransResult {\
+    auto ip = ctx.natI; \
+    auto &inst = ip->get_inst(); \
+    auto natM = ctx.natM; \
+    llvm::BasicBlock *b = block;\
     if( ip->has_mem_reference ) {\
         return doCMOV<width>(block, OP(0), condition, M_READ<width>(ip, b, MEM_REFERENCE(2)));\
     }else {\
@@ -103,7 +106,10 @@ static InstTransResult  doCMOV(
     }\
 }
 
-#define EMIT_CMOV_RR(width, condition) [] (NativeModulePtr natM, BasicBlock *&b, InstPtr ip, MCInst &inst)->InstTransResult {\
+#define EMIT_CMOV_RR(width, condition) [] (TranslationContext &ctx, BasicBlock *&b)->InstTransResult {\
+    auto ip = ctx.natI; \
+    auto &inst = ip->get_inst(); \
+    auto natM = ctx.natM; \
     return doCMOV<width>(b, OP(0), condition, R_READ<width>(b, OP(2).getReg())); \
 }
 

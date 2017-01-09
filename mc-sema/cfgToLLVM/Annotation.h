@@ -27,11 +27,14 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #pragma once
+
+#include <cstdint>
+#include <memory>
+
 #include "llvm/IR/Module.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
-#include <boost/shared_ptr.hpp>
-#include <boost/cstdint.hpp>
+
 typedef uint64_t VA;
 
 void addAnnotation(llvm::Instruction *inst, VA addr);

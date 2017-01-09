@@ -471,7 +471,7 @@ static void FPU_POP(BasicBlock *&b) {
   INCREMENT_FPU_TOP(b);
 }
 
-static Value *FPUM_READ(InstPtr ip, int memwidth, llvm::BasicBlock *&b,
+static Value *FPUM_READ(NativeInstPtr ip, int memwidth, llvm::BasicBlock *&b,
                         Value *addr) {
   Value *readLoc = addr;
   llvm::Type *ptrTy;
@@ -568,7 +568,7 @@ static BasicBlock * createNewFpuBlock(BasicBlock *&b, std::string instName) {
     } while(0);
 
 template<int width, bool reverse>
-static InstTransResult doFiOpMR(InstPtr ip, BasicBlock *&b, unsigned dstReg,
+static InstTransResult doFiOpMR(NativeInstPtr ip, BasicBlock *&b, unsigned dstReg,
                                 Value *memAddr, unsigned opcode,
                                 llvm::Instruction::BinaryOps fpop) {
   // Read register.
@@ -597,7 +597,7 @@ static InstTransResult doFiOpMR(InstPtr ip, BasicBlock *&b, unsigned dstReg,
 }
 
 template<int width, bool reverse>
-static InstTransResult doFOpMR(InstPtr ip, BasicBlock *&b, unsigned dstReg,
+static InstTransResult doFOpMR(NativeInstPtr ip, BasicBlock *&b, unsigned dstReg,
                                Value *memAddr, unsigned opcode,
                                llvm::Instruction::BinaryOps fpop) {
   // Read register.
@@ -626,7 +626,7 @@ static InstTransResult doFOpMR(InstPtr ip, BasicBlock *&b, unsigned dstReg,
 }
 
 template<bool reverse>
-static InstTransResult doFOpRR(InstPtr ip, BasicBlock *&b, unsigned srcReg,
+static InstTransResult doFOpRR(NativeInstPtr ip, BasicBlock *&b, unsigned srcReg,
                                unsigned dstReg, unsigned opcode,
                                llvm::Instruction::BinaryOps fpop) {
   // Load source.
@@ -653,7 +653,7 @@ static InstTransResult doFOpRR(InstPtr ip, BasicBlock *&b, unsigned srcReg,
 }
 
 template<bool reverse>
-static InstTransResult doFOpPRR(InstPtr ip, BasicBlock *&b, unsigned srcReg,
+static InstTransResult doFOpPRR(NativeInstPtr ip, BasicBlock *&b, unsigned srcReg,
                                 unsigned dstReg, unsigned opcode,
                                 llvm::Instruction::BinaryOps fpop) {
   // Do the operation.
@@ -666,7 +666,7 @@ static InstTransResult doFOpPRR(InstPtr ip, BasicBlock *&b, unsigned srcReg,
   return ContinueBlock;
 }
 
-static InstTransResult doFldcw(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFldcw(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
   Value *memPtr = ADDR_TO_POINTER<16>(b, memAddr);
 
   Value *memVal = M_READ<16>(ip, b, memPtr);
@@ -684,7 +684,7 @@ static InstTransResult doFldcw(InstPtr ip, BasicBlock *&b, Value *memAddr) {
   return ContinueBlock;
 }
 
-static InstTransResult doFstcw(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFstcw(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
   Value *memPtr = ADDR_TO_POINTER<16>(b, memAddr);
 
   // Pre-clear reserved FPU bits.
@@ -705,7 +705,7 @@ static InstTransResult doFstcw(InstPtr ip, BasicBlock *&b, Value *memAddr) {
   return ContinueBlock;
 }
 
-static InstTransResult doFstenv(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFstenv(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
   llvm::Module *M = b->getParent()->getParent();
   unsigned int bitWidth = ArchPointerSize(M);
 
@@ -788,7 +788,7 @@ static InstTransResult doFstenv(InstPtr ip, BasicBlock *&b, Value *memAddr) {
 }
 
 template<int width>
-static InstTransResult doFildM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFildM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
   NASSERT(memAddr != NULL);
 
   // Read memory value.
@@ -807,7 +807,7 @@ static InstTransResult doFildM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
 }
 
 template<int width>
-static InstTransResult doFldM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFldM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
   NASSERT(memAddr != NULL);
 
   // Step 1: read value from memory.
@@ -834,7 +834,7 @@ static InstTransResult doFldM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
   return ContinueBlock;
 }
 
-static InstTransResult doFldC(InstPtr ip, BasicBlock *&b, long double constv) {
+static InstTransResult doFldC(NativeInstPtr ip, BasicBlock *&b, long double constv) {
 
   // load constant onto FPU stack
   Value *fp_const = CONSTFP_V(b, constv);
@@ -843,7 +843,7 @@ static InstTransResult doFldC(InstPtr ip, BasicBlock *&b, long double constv) {
 
 }
 
-static InstTransResult doFldR(InstPtr ip, BasicBlock *&b, const MCOperand &r) {
+static InstTransResult doFldR(NativeInstPtr ip, BasicBlock *&b, const MCOperand &r) {
   // Make sure that this is a register.
   NASSERT(r.isReg());
 
@@ -858,7 +858,7 @@ static InstTransResult doFldR(InstPtr ip, BasicBlock *&b, const MCOperand &r) {
 }
 
 template<int width>
-static InstTransResult doFistM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFistM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
   NASSERT(memAddr != NULL);
 
   Value *regVal = FPUR_READ(b, X86::ST0);
@@ -874,7 +874,7 @@ static InstTransResult doFistM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
 }
 
 template<int width>
-static InstTransResult doFstM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFstM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
   NASSERT(memAddr != NULL);
 
   Value *regVal = FPUR_READ(b, X86::ST0);
@@ -916,7 +916,7 @@ static InstTransResult doFstM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
 }
 
 template<int width>
-static InstTransResult doFstpM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFstpM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
   // Do the FST.
   doFstM<width>(ip, b, memAddr);
 
@@ -930,7 +930,7 @@ static InstTransResult doFstpM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
 // TODO: This is like FISTP, but FISTTP does not check rounding mode and
 // always rounds to zero. 
 template<int width>
-static InstTransResult doFistTpM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFistTpM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
   // Do the FST.
   doFistM<width>(ip, b, memAddr);
 
@@ -942,7 +942,7 @@ static InstTransResult doFistTpM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
 }
 
 template<int width>
-static InstTransResult doFistpM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFistpM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
   // Do the FST.
   doFistM<width>(ip, b, memAddr);
 
@@ -953,7 +953,7 @@ static InstTransResult doFistpM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
   return ContinueBlock;
 }
 
-static InstTransResult doFstR(InstPtr ip, BasicBlock *&b, const MCOperand &r) {
+static InstTransResult doFstR(NativeInstPtr ip, BasicBlock *&b, const MCOperand &r) {
   // Make sure that this is a register.
   NASSERT(r.isReg());
 
@@ -967,7 +967,7 @@ static InstTransResult doFstR(InstPtr ip, BasicBlock *&b, const MCOperand &r) {
   return ContinueBlock;
 }
 
-static InstTransResult doFstpR(InstPtr ip, BasicBlock *&b, const MCOperand &r) {
+static InstTransResult doFstpR(NativeInstPtr ip, BasicBlock *&b, const MCOperand &r) {
   // Do the FST.
   doFstR(ip, b, r);
 
@@ -978,7 +978,7 @@ static InstTransResult doFstpR(InstPtr ip, BasicBlock *&b, const MCOperand &r) {
   return ContinueBlock;
 }
 
-static InstTransResult doFsin(InstPtr ip, BasicBlock *&b, unsigned reg) {
+static InstTransResult doFsin(NativeInstPtr ip, BasicBlock *&b, unsigned reg) {
   Module *M = b->getParent()->getParent();
 
   Value *regval = FPUR_READ(b, reg);
@@ -1001,7 +1001,7 @@ static InstTransResult doFsin(InstPtr ip, BasicBlock *&b, unsigned reg) {
   return ContinueBlock;
 }
 
-static InstTransResult doFucom(InstPtr ip, BasicBlock *&b, unsigned reg,
+static InstTransResult doFucom(NativeInstPtr ip, BasicBlock *&b, unsigned reg,
                                unsigned int stackPops) {
   Value *st0_val = FPUR_READ(b, X86::ST0);
   Value *sti_val = FPUR_READ(b, reg);
@@ -1028,7 +1028,7 @@ static InstTransResult doFucom(InstPtr ip, BasicBlock *&b, unsigned reg,
   return ContinueBlock;
 }
 
-static InstTransResult doFucomi(InstPtr ip, BasicBlock *&b, unsigned reg,
+static InstTransResult doFucomi(NativeInstPtr ip, BasicBlock *&b, unsigned reg,
                                 unsigned int stackPops) {
   Value *st0_val = FPUR_READ(b, X86::ST0);
   Value *sti_val = FPUR_READ(b, reg);
@@ -1077,7 +1077,7 @@ static Value* doFstsV(BasicBlock *&b) {
   return sw;
 }
 
-static InstTransResult doFstswm(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFstswm(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
   Value *memPtr = ADDR_TO_POINTER<16>(b, memAddr);
 
   Value *status_word = doFstsV(b);
@@ -1087,7 +1087,7 @@ static InstTransResult doFstswm(InstPtr ip, BasicBlock *&b, Value *memAddr) {
   return ContinueBlock;
 }
 
-static InstTransResult doFstswr(InstPtr ip, BasicBlock *&b) {
+static InstTransResult doFstswr(NativeInstPtr ip, BasicBlock *&b) {
   Value *status_word = doFstsV(b);
 
   R_WRITE<16>(b, X86::AX, status_word);
@@ -1095,7 +1095,7 @@ static InstTransResult doFstswr(InstPtr ip, BasicBlock *&b) {
   return ContinueBlock;
 }
 
-static InstTransResult doFxch(MCInst &inst, InstPtr ip, BasicBlock *&b) {
+static InstTransResult doFxch(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
   // Check num operands.
   // No operands implies ST1
   unsigned src_reg = X86::ST1;
@@ -1112,7 +1112,7 @@ static InstTransResult doFxch(MCInst &inst, InstPtr ip, BasicBlock *&b) {
   return ContinueBlock;
 }
 
-static InstTransResult doF2XM1(MCInst &inst, InstPtr ip, BasicBlock *&b) {
+static InstTransResult doF2XM1(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
 
   /*
    * Computes (2**st0)-1 and stores in ST0
@@ -1143,7 +1143,7 @@ static InstTransResult doF2XM1(MCInst &inst, InstPtr ip, BasicBlock *&b) {
   return ContinueBlock;
 }
 
-static InstTransResult doFSCALE(MCInst &inst, InstPtr ip, BasicBlock *&b) {
+static InstTransResult doFSCALE(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
 
   /*
    * st0 = st0 * (2 ** RoundToZero(st1))
@@ -1184,7 +1184,7 @@ static InstTransResult doFSCALE(MCInst &inst, InstPtr ip, BasicBlock *&b) {
 }
 
 template<bool p>
-static InstTransResult doFYL2Xx(MCInst &inst, InstPtr ip, BasicBlock *&b) {
+static InstTransResult doFYL2Xx(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
 
   /*
    * Computes (ST(1) ∗ log2(ST(0))), stores the result in ST(1), and pops the x87 register stack. The value
@@ -1228,7 +1228,7 @@ static InstTransResult doFYL2Xx(MCInst &inst, InstPtr ip, BasicBlock *&b) {
   return ContinueBlock;
 }
 
-static InstTransResult doFRNDINT(MCInst &inst, InstPtr ip, BasicBlock *&b) {
+static InstTransResult doFRNDINT(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
   Module *M = b->getParent()->getParent();
 
   Value *regVal = FPUR_READ(b, X86::ST0);
@@ -1297,7 +1297,7 @@ static InstTransResult doFRNDINT(MCInst &inst, InstPtr ip, BasicBlock *&b) {
   return ContinueBlock;
 }
 
-static InstTransResult doFABS(MCInst &inst, InstPtr ip, BasicBlock *&b) {
+static InstTransResult doFABS(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
 
   Value *st0_val = FPUR_READ(b, X86::ST0);
 
@@ -1318,7 +1318,7 @@ static InstTransResult doFABS(MCInst &inst, InstPtr ip, BasicBlock *&b) {
   return ContinueBlock;
 }
 
-static InstTransResult doFSQRT(MCInst &inst, InstPtr ip, BasicBlock *&b) {
+static InstTransResult doFSQRT(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
 
   Value *st0_val = FPUR_READ(b, X86::ST0);
 
@@ -1339,7 +1339,7 @@ static InstTransResult doFSQRT(MCInst &inst, InstPtr ip, BasicBlock *&b) {
   return ContinueBlock;
 }
 
-static InstTransResult doFCOS(MCInst &inst, InstPtr ip, BasicBlock *&b) {
+static InstTransResult doFCOS(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
 
   Value *st0_val = FPUR_READ(b, X86::ST0);
 
@@ -1365,7 +1365,7 @@ static InstTransResult doFCOS(MCInst &inst, InstPtr ip, BasicBlock *&b) {
 
   return ContinueBlock;
 }
-static InstTransResult doFSINCOS(MCInst &inst, InstPtr ip, BasicBlock *&b) {
+static InstTransResult doFSINCOS(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
 
   /*
    * Computes the sine and cosine of the value in ST(0), stores the sine in ST(0),
@@ -1403,21 +1403,21 @@ static InstTransResult doFSINCOS(MCInst &inst, InstPtr ip, BasicBlock *&b) {
   return ContinueBlock;
 }
 
-static InstTransResult doFINCSTP(MCInst &inst, InstPtr ip, BasicBlock *&b) {
+static InstTransResult doFINCSTP(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
 
   INCREMENT_FPU_TOP(b);
 
   return ContinueBlock;
 }
 
-static InstTransResult doFDECSTP(MCInst &inst, InstPtr ip, BasicBlock *&b) {
+static InstTransResult doFDECSTP(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
 
   DECREMENT_FPU_TOP(b);
 
   return ContinueBlock;
 }
 
-static InstTransResult doFPTAN(MCInst &inst, InstPtr ip, BasicBlock *&b) {
+static InstTransResult doFPTAN(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
   Module *M = b->getParent()->getParent();
   Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
   Function *sin = Intrinsic::getDeclaration(M, Intrinsic::sin, t);
@@ -1449,7 +1449,7 @@ static InstTransResult doFPTAN(MCInst &inst, InstPtr ip, BasicBlock *&b) {
   return ContinueBlock;
 }
 
-static InstTransResult doCHS(MCInst &inst, InstPtr ip, BasicBlock *&b) {
+static InstTransResult doCHS(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
   Value *st0_val = FPUR_READ(b, X86::ST0);
 
   Value *negone = CONSTFP_V(b, -1.0);
@@ -1461,8 +1461,11 @@ static InstTransResult doCHS(MCInst &inst, InstPtr ip, BasicBlock *&b) {
 }
 
 //mem_src =  IMM_AS_DATA_REF(block, natM, ip);
-#define FPU_TRANSLATION(NAME, SETPTR, SETDATA, SETFOPCODE, ACCESSMEM, THECALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst)\
-{\
+#define FPU_TRANSLATION(NAME, SETPTR, SETDATA, SETFOPCODE, ACCESSMEM, THECALL) static InstTransResult translate_ ## NAME (TranslationContext &ctx, BasicBlock *&block)\
+{   auto natM = ctx.natM; \
+    Function *F = ctx.F; \
+    auto ip = ctx.natI; \
+    auto &inst = ip->get_inst(); \
     InstTransResult ret;\
     block = createNewFpuBlock(block, #NAME);\
     Function *F = block->getParent();\
@@ -1940,7 +1943,7 @@ FPU_TRANSLATION(FPTAN, true, false, true, false, doFPTAN(inst, ip, block))
 FPU_TRANSLATION(CHS_F, true, false, true, false, doCHS(inst, ip, block))
 
 static InstTransResult translate_WAIT(NativeModulePtr natM, BasicBlock *&block,
-                                      InstPtr ip, MCInst &inst) {
+                                      NativeInstPtr ip, MCInst &inst) {
   return ContinueBlock;
 }
 

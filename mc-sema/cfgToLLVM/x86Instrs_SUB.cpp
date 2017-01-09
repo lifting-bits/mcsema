@@ -41,7 +41,7 @@ using namespace llvm;
 #define NASSERT(cond) TASSERT(cond, "")
 
 template <int width>
-static Value * doSubVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs)
+static Value * doSubVV(NativeInstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs)
 {
     Value *subRes = BinaryOperator::CreateSub(lhs, rhs, "", b); 
 
@@ -57,7 +57,7 @@ static Value * doSubVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs)
 }
 
 template <int width>
-static InstTransResult doSubMI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSubMI(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &imm)
 {
@@ -75,7 +75,7 @@ static InstTransResult doSubMI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doSubMV(InstPtr ip, 
+static InstTransResult doSubMV(NativeInstPtr ip, 
                                BasicBlock *&b,
                                Value *lhs,
                                Value *rhs)
@@ -93,7 +93,7 @@ static InstTransResult doSubMV(InstPtr ip,
 }
 
 template <int width>
-static InstTransResult doSubMR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSubMR(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &o1)
 {
@@ -111,7 +111,7 @@ static InstTransResult doSubMR(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doSubRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSubRI(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &dst,
                                const MCOperand &src1,
                                const MCOperand &src2)
@@ -136,7 +136,7 @@ static InstTransResult doSubRI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doSubRV(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSubRV(NativeInstPtr ip, BasicBlock *&b,
                                Value *addr,
                                const MCOperand &dst,
                                const MCOperand &src1)
@@ -158,7 +158,7 @@ static InstTransResult doSubRV(InstPtr ip, BasicBlock *&b,
 }
 
 template <int dstWidth, int srcWidth>
-static InstTransResult doSubRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSubRI(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &dst,
                                const MCOperand &src1,
                                const MCOperand &src2)
@@ -185,7 +185,7 @@ static InstTransResult doSubRI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doSubRM(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSubRM(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &o1,
                                const MCOperand &o2)
@@ -205,7 +205,7 @@ static InstTransResult doSubRM(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doSubRR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSubRR(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &dst,
                                const MCOperand &src1,
                                const MCOperand &src2)
@@ -225,7 +225,7 @@ static InstTransResult doSubRR(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static Value * doSbbVV(InstPtr ip, BasicBlock *&b, Value *o1, Value *o2)
+static Value * doSbbVV(NativeInstPtr ip, BasicBlock *&b, Value *o1, Value *o2)
 {
     NASSERT(o1 != NULL);
     NASSERT(o2 != NULL);
@@ -249,7 +249,7 @@ static Value * doSbbVV(InstPtr ip, BasicBlock *&b, Value *o1, Value *o2)
 }
 
 template <int width>
-static InstTransResult doSbbMI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSbbMI(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &imm)
 {
@@ -267,7 +267,7 @@ static InstTransResult doSbbMI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doSbbMV(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSbbMV(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                Value *rhs)
 {
@@ -284,7 +284,7 @@ static InstTransResult doSbbMV(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doSbbMR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSbbMR(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &src)
 {
@@ -303,7 +303,7 @@ static InstTransResult doSbbMR(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doSbbRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSbbRI(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &o1,
                                const MCOperand &o2,
                                const MCOperand &dst)
@@ -323,7 +323,7 @@ static InstTransResult doSbbRI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doSbbRV(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSbbRV(NativeInstPtr ip, BasicBlock *&b,
                                Value *addr,
                                const MCOperand &dst,
                                const MCOperand &src1)
@@ -345,7 +345,7 @@ static InstTransResult doSbbRV(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doSbbRM(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSbbRM(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &o1,
                                Value           *addr,
                                const MCOperand &dst)
@@ -365,7 +365,7 @@ static InstTransResult doSbbRM(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doSbbRR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSbbRR(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &o1,
                                const MCOperand &o2, 
                                const MCOperand &dst)
@@ -533,7 +533,7 @@ GENERIC_TRANSLATION_REF(SBB8rm,
 GENERIC_TRANSLATION(SBB8rr, doSbbRR<8>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SBB8rr_REV, doSbbRR<8>(ip, block, OP(1), OP(2), OP(0)))
 
-static InstTransResult translate_SUB64ri8(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
+static InstTransResult translate_SUB64ri8(NativeModulePtr natM, BasicBlock *&block, NativeInstPtr ip, MCInst &inst) {
 	InstTransResult ret;
 	ret = doSubRI<64, 8>(ip, block, OP(0), OP(1), OP(2));
 	return ret;

@@ -32,13 +32,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 
-#define INSTR_DEBUG(ip) llvm::dbgs() << __FUNCTION__ << "\tRepresentation: " << ip->printInst() << "\n"
-
-//class INSTR_DEBUG;
 void MOV_populateDispatchMap(DispatchMap &m);
 
 template <int width, SystemArchType arch>
-InstTransResult doMRMov(InstPtr ip, llvm::BasicBlock *&b,
+InstTransResult doMRMov(NativeInstPtr ip, llvm::BasicBlock *&b,
                         llvm::Value           *dstAddr,
                         const llvm::MCOperand &src)
 {
@@ -52,7 +49,7 @@ InstTransResult doMRMov(InstPtr ip, llvm::BasicBlock *&b,
 }
 
 template <int width>
-InstTransResult doMRMovBE(InstPtr ip, llvm::BasicBlock *&b,
+InstTransResult doMRMovBE(NativeInstPtr ip, llvm::BasicBlock *&b,
                         llvm::Value           *dstAddr,
                         const llvm::MCOperand &src)
 {
@@ -125,7 +122,7 @@ InstTransResult doMRMovBE(InstPtr ip, llvm::BasicBlock *&b,
 }
 
 template <int width>
-InstTransResult doMRMov(InstPtr ip, llvm::BasicBlock *&b,
+InstTransResult doMRMov(NativeInstPtr ip, llvm::BasicBlock *&b,
                         llvm::Value           *dstAddr,
                         const llvm::MCOperand &src)
 {
@@ -140,7 +137,7 @@ InstTransResult doMRMov(InstPtr ip, llvm::BasicBlock *&b,
 
 
 template <int width, SystemArchType arch>
-InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b,
+InstTransResult doRRMov(NativeInstPtr ip, llvm::BasicBlock *b,
                         const llvm::MCOperand &dst,
                         const llvm::MCOperand &src)
 {
@@ -154,7 +151,7 @@ InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b,
 }
 
 template <int width>
-InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b,
+InstTransResult doRRMov(NativeInstPtr ip, llvm::BasicBlock *b,
                         const llvm::MCOperand &dst,
                         const llvm::MCOperand &src)
 {
@@ -169,7 +166,7 @@ InstTransResult doRRMov(InstPtr ip, llvm::BasicBlock *b,
 }
 
 template <int width>
-InstTransResult doRRMovD(InstPtr ip, llvm::BasicBlock *b,
+InstTransResult doRRMovD(NativeInstPtr ip, llvm::BasicBlock *b,
                         const llvm::MCOperand &dst,
                         const llvm::MCOperand &src)
 {
@@ -185,7 +182,7 @@ InstTransResult doRRMovD(InstPtr ip, llvm::BasicBlock *b,
 
 
 template <int width>
-InstTransResult doRMMovBE(InstPtr ip, llvm::BasicBlock *&b,
+InstTransResult doRMMovBE(NativeInstPtr ip, llvm::BasicBlock *&b,
                         llvm::Value           *srcAddr,
                         const llvm::MCOperand &dst)
 {
@@ -261,7 +258,7 @@ InstTransResult doRMMovBE(InstPtr ip, llvm::BasicBlock *&b,
 
 
 template <int width>
-InstTransResult doRMMov(InstPtr ip, llvm::BasicBlock      *b,
+InstTransResult doRMMov(NativeInstPtr ip, llvm::BasicBlock      *b,
                         llvm::Value           *srcAddr,
                         const llvm::MCOperand &dst)
 {

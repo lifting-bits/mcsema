@@ -44,7 +44,7 @@
 using namespace llvm;
 
 template<int width>
-static void doPushVT(InstPtr ip, BasicBlock *&b, Value *v) {
+static void doPushVT(NativeInstPtr ip, BasicBlock *&b, Value *v) {
   //ESP <- ESP - 4
   //Memory[ESP] = v
   if (ArchPointerSize(b->getParent()->getParent())) {
@@ -76,7 +76,7 @@ static void doPushVT(InstPtr ip, BasicBlock *&b, Value *v) {
 }
 
 template<int width>
-static void doPushV(InstPtr ip, BasicBlock *&b, Value *v) {
+static void doPushV(NativeInstPtr ip, BasicBlock *&b, Value *v) {
   //ESP <- ESP - 4
   //Memory[ESP] = v
   llvm::Module *M = b->getParent()->getParent();
@@ -102,7 +102,7 @@ static void doPushV(InstPtr ip, BasicBlock *&b, Value *v) {
 }
 
 template<int width>
-static InstTransResult doPushAV(InstPtr ip, BasicBlock *b) {
+static InstTransResult doPushAV(NativeInstPtr ip, BasicBlock *b) {
   // Temp := (ESP);
   // Push(EAX);
   // Push(ECX);
@@ -127,7 +127,7 @@ static InstTransResult doPushAV(InstPtr ip, BasicBlock *b) {
 }
 
 namespace x86 {
-static InstTransResult doEnter(InstPtr ip, BasicBlock *&b,
+static InstTransResult doEnter(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &frameSize,
                                const MCOperand &nestingLevel) {
   Function *F = b->getParent();
@@ -210,7 +210,7 @@ static InstTransResult doEnter(InstPtr ip, BasicBlock *&b,
 }
 
 namespace x86_64 {
-static InstTransResult doEnter(InstPtr ip, BasicBlock *&b,
+static InstTransResult doEnter(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &frameSize,
                                const MCOperand &nestingLevel) {
   Function *F = b->getParent();
@@ -292,7 +292,7 @@ static InstTransResult doEnter(InstPtr ip, BasicBlock *&b,
 }
 }
 
-static InstTransResult doEnter(InstPtr ip, BasicBlock *&b,
+static InstTransResult doEnter(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &frameSize,
                                const MCOperand &nestingLevel) {
   llvm::Module *M = b->getParent()->getParent();
@@ -303,7 +303,7 @@ static InstTransResult doEnter(InstPtr ip, BasicBlock *&b,
   }
 }
 
-static InstTransResult doLeave(InstPtr ip, BasicBlock *b) {
+static InstTransResult doLeave(NativeInstPtr ip, BasicBlock *b) {
   // LEAVE
   llvm::Module *M = b->getParent()->getParent();
 
@@ -336,7 +336,7 @@ static InstTransResult doLeave(InstPtr ip, BasicBlock *b) {
   return ContinueBlock;
 }
 
-static InstTransResult doLeave64(InstPtr ip, BasicBlock *b) {
+static InstTransResult doLeave64(NativeInstPtr ip, BasicBlock *b) {
   // LEAVE
 
   // read RBP
@@ -361,7 +361,7 @@ static InstTransResult doLeave64(InstPtr ip, BasicBlock *b) {
 }
 
 template<int width>
-static InstTransResult doPopR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doPopR(NativeInstPtr ip, BasicBlock *&b,
                               const MCOperand &dst) {
   NASSERT(dst.isReg());
   llvm::Module *M = b->getParent()->getParent();
@@ -423,7 +423,7 @@ static InstTransResult doPopD(BasicBlock *b) {
 }
 
 template<int width>
-static InstTransResult doPopAV(InstPtr ip, BasicBlock *b) {
+static InstTransResult doPopAV(NativeInstPtr ip, BasicBlock *b) {
   // EDI := Pop();
   // ESI := Pop();
   // EBP := Pop();
@@ -446,7 +446,7 @@ static InstTransResult doPopAV(InstPtr ip, BasicBlock *b) {
 }
 
 template<int width>
-static InstTransResult doPushR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doPushR(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &src) {
   //PUSH <r>
   NASSERT(src.isReg());
@@ -460,7 +460,7 @@ static InstTransResult doPushR(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doPushI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doPushI(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &src) {
   // PUSH <imm>
   NASSERT(src.isImm());
@@ -490,7 +490,7 @@ static InstTransResult doPushI(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doPopM(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doPopM(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
   NASSERT(addr != NULL);
 
   //read the stack pointer
@@ -513,7 +513,7 @@ static InstTransResult doPopM(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doPushRMM(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doPushRMM(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
   NASSERT(addr != NULL);
 
   Value *fromMem = M_READ<width>(ip, b, addr);
@@ -523,7 +523,7 @@ static InstTransResult doPushRMM(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 static InstTransResult translate_PUSH32rmm(NativeModulePtr natM,
-                                           BasicBlock *& block, InstPtr ip,
+                                           BasicBlock *& block, NativeInstPtr ip,
                                            MCInst &inst) {
   InstTransResult ret;
   Function *F = block->getParent();
@@ -541,7 +541,7 @@ static InstTransResult translate_PUSH32rmm(NativeModulePtr natM,
 }
 
 static InstTransResult translate_PUSH64rmm(NativeModulePtr natM,
-                                           BasicBlock *& block, InstPtr ip,
+                                           BasicBlock *& block, NativeInstPtr ip,
                                            MCInst &inst) {
   InstTransResult ret;
   Function *F = block->getParent();
@@ -559,13 +559,13 @@ static InstTransResult translate_PUSH64rmm(NativeModulePtr natM,
 }
 
 static InstTransResult translate_PUSHi32(NativeModulePtr natM,
-                                         BasicBlock *&block, InstPtr ip,
+                                         BasicBlock *&block, NativeInstPtr ip,
                                          MCInst &inst) {
   InstTransResult ret;
   Function *F = block->getParent();
   if (ip->has_code_ref()) {
     Value *callback_fn = ArchAddCallbackDriver(
-        block->getParent()->getParent(), ip->get_reference(Inst::IMMRef));
+        block->getParent()->getParent(), ip->get_reference(NativeInst::IMMRef));
     Value *addrInt = new PtrToIntInst(
         callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
     doPushV<32>(ip, block, addrInt);
@@ -609,7 +609,7 @@ static Value * checkIfBitSet(Value *field, int bit, BasicBlock *b) {
 }
 
 template<int width>
-static InstTransResult doPopF(InstPtr ip, BasicBlock *b) {
+static InstTransResult doPopF(NativeInstPtr ip, BasicBlock *b) {
   Value *newFlags = R_READ<width>(b, X86::ESP);
   doPopD<width>(b);
 
@@ -638,7 +638,7 @@ static InstTransResult doPopF(InstPtr ip, BasicBlock *b) {
 }
 
 template<int width>
-static InstTransResult doPushF(InstPtr ip, BasicBlock *b) {
+static InstTransResult doPushF(NativeInstPtr ip, BasicBlock *b) {
 
   // put eflags into one value.
   //

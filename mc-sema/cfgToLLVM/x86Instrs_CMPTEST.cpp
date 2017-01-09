@@ -35,12 +35,11 @@
 #include "llvm/Support/Debug.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
-#define INSTR_DEBUG(ip) llvm::dbgs() << __FUNCTION__ << "\tRepresentation: " << ip->printInst() << "\n"
 
 using namespace llvm;
 
 template<int width>
-static InstTransResult doCmpRR(InstPtr ip, BasicBlock *&b, const MCOperand &lhs,
+static InstTransResult doCmpRR(NativeInstPtr ip, BasicBlock *&b, const MCOperand &lhs,
                                const MCOperand &rhs) {
   NASSERT(lhs.isReg());
   NASSERT(rhs.isReg());
@@ -54,7 +53,7 @@ static InstTransResult doCmpRR(InstPtr ip, BasicBlock *&b, const MCOperand &lhs,
 }
 
 template<int width>
-static InstTransResult doCmpRI(InstPtr ip, BasicBlock *&b, const MCOperand &lhs,
+static InstTransResult doCmpRI(NativeInstPtr ip, BasicBlock *&b, const MCOperand &lhs,
                                const MCOperand &rhs) {
   NASSERT(lhs.isReg());
   NASSERT(rhs.isImm());
@@ -68,7 +67,7 @@ static InstTransResult doCmpRI(InstPtr ip, BasicBlock *&b, const MCOperand &lhs,
 }
 
 template<int width>
-static InstTransResult doCmpRV(InstPtr ip, BasicBlock *&b, const MCOperand &lhs,
+static InstTransResult doCmpRV(NativeInstPtr ip, BasicBlock *&b, const MCOperand &lhs,
                                llvm::Value *rhs) {
   NASSERT(lhs.isReg());
 
@@ -81,7 +80,7 @@ static InstTransResult doCmpRV(InstPtr ip, BasicBlock *&b, const MCOperand &lhs,
 }
 
 template<int width>
-static InstTransResult doCmpMR(InstPtr ip, BasicBlock *&b, Value *mem,
+static InstTransResult doCmpMR(NativeInstPtr ip, BasicBlock *&b, Value *mem,
                                const MCOperand &reg) {
   NASSERT(reg.isReg());
   NASSERT(mem!=NULL);
@@ -99,7 +98,7 @@ static InstTransResult doCmpMR(InstPtr ip, BasicBlock *&b, Value *mem,
 }
 
 template<int width>
-static InstTransResult doCmpRM(InstPtr ip, BasicBlock *&b, const MCOperand &reg,
+static InstTransResult doCmpRM(NativeInstPtr ip, BasicBlock *&b, const MCOperand &reg,
                                Value *mem) {
   NASSERT(reg.isReg());
   NASSERT(mem!=NULL);
@@ -117,7 +116,7 @@ static InstTransResult doCmpRM(InstPtr ip, BasicBlock *&b, const MCOperand &reg,
 }
 
 template<int width>
-static InstTransResult doCmpMI(InstPtr ip, BasicBlock *&b, Value *r1,
+static InstTransResult doCmpMI(NativeInstPtr ip, BasicBlock *&b, Value *r1,
                                const MCOperand &r2) {
   NASSERT(r1 != NULL);
   NASSERT(r2.isImm());
@@ -132,7 +131,7 @@ static InstTransResult doCmpMI(InstPtr ip, BasicBlock *&b, Value *r1,
 }
 
 template<int width>
-static InstTransResult doCmpMV(InstPtr ip, BasicBlock *&b, Value *r1,
+static InstTransResult doCmpMV(NativeInstPtr ip, BasicBlock *&b, Value *r1,
                                Value *rhs) {
   NASSERT(r1 != NULL);
   NASSERT(rhs != NULL);
@@ -146,7 +145,7 @@ static InstTransResult doCmpMV(InstPtr ip, BasicBlock *&b, Value *r1,
 }
 
 template<int width>
-static void doTestVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs) {
+static void doTestVV(NativeInstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs) {
 
   Value *temp = BinaryOperator::CreateAnd(lhs, rhs, "", b);
 
@@ -177,7 +176,7 @@ static void doTestVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs) {
 }
 
 template<int width>
-static InstTransResult doTestMI(InstPtr ip, BasicBlock *&b, Value *lhs,
+static InstTransResult doTestMI(NativeInstPtr ip, BasicBlock *&b, Value *lhs,
                                 const MCOperand &rhs) {
   NASSERT(lhs != NULL);
   NASSERT(rhs.isImm());
@@ -189,7 +188,7 @@ static InstTransResult doTestMI(InstPtr ip, BasicBlock *&b, Value *lhs,
 }
 
 template<int width>
-static InstTransResult doTestMV(InstPtr ip, BasicBlock *&b, Value *lhs,
+static InstTransResult doTestMV(NativeInstPtr ip, BasicBlock *&b, Value *lhs,
                                 Value *rhs) {
   NASSERT(lhs != NULL);
   NASSERT(rhs != NULL);
@@ -200,7 +199,7 @@ static InstTransResult doTestMV(InstPtr ip, BasicBlock *&b, Value *lhs,
 }
 
 template<int width>
-static InstTransResult doTestRM(InstPtr ip, BasicBlock *&b,
+static InstTransResult doTestRM(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &lhs, Value *rhs) {
   NASSERT(rhs != NULL);
   NASSERT(lhs.isReg());
@@ -212,7 +211,7 @@ static InstTransResult doTestRM(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doTestRR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doTestRR(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &lhs, const MCOperand &rhs) {
   NASSERT(lhs.isReg());
   NASSERT(rhs.isReg());
@@ -224,7 +223,7 @@ static InstTransResult doTestRR(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doTestRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doTestRI(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &lhs, const MCOperand &rhs) {
   NASSERT(lhs.isReg());
   NASSERT(rhs.isImm());
@@ -236,7 +235,7 @@ static InstTransResult doTestRI(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doTestRV(InstPtr ip, BasicBlock *&b,
+static InstTransResult doTestRV(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &lhs, llvm::Value *rhs) {
   NASSERT(lhs.isReg());
 

@@ -190,7 +190,7 @@ Value *emitTestCode(BasicBlock *&b, unsigned opCode) {
     return emittedInsn;
 }
 //emit a conditional branch
-static InstTransResult doCondBranch(InstPtr ip,   BasicBlock *&b, 
+static InstTransResult doCondBranch(NativeInstPtr ip,   BasicBlock *&b, 
                                 BasicBlock  *ifTrue, 
                                 BasicBlock  *ifFalse, 
                                 Value       *cond)
@@ -206,7 +206,7 @@ static InstTransResult doCondBranch(InstPtr ip,   BasicBlock *&b,
     return EndBlock;
 }
 
-static InstTransResult translate_Jcc(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+static InstTransResult translate_Jcc(NativeModulePtr natM, BasicBlock *& block, NativeInstPtr ip, MCInst &inst) {
 
     Function *F = block->getParent();
    // llvm::dbgs() << __FUNCTION__ << "\tRepresentation: " << ip->printInst() << "\n";

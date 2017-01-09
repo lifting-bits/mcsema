@@ -76,7 +76,7 @@ static Value* getSegmentValue(BasicBlock *&b, unsigned sreg) {
 }
 
 template <int width>
-static InstTransResult doMSMov(InstPtr ip, BasicBlock *&b,
+static InstTransResult doMSMov(NativeInstPtr ip, BasicBlock *&b,
                         Value           *dstAddr,
                         const MCOperand &src)
 {
@@ -91,7 +91,7 @@ static InstTransResult doMSMov(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doSMMov(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSMMov(NativeInstPtr ip, BasicBlock *&b,
                         Value           *dstAddr,
                         const MCOperand &src)
 {
@@ -106,7 +106,7 @@ static InstTransResult doSMMov(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doRSMov(InstPtr ip,   BasicBlock *&b,
+static InstTransResult doRSMov(NativeInstPtr ip,   BasicBlock *&b,
                             const MCOperand &dst,
                             const MCOperand &src)
 {
@@ -121,13 +121,13 @@ static InstTransResult doRSMov(InstPtr ip,   BasicBlock *&b,
 }
 
 template <int dstWidth>
-static Value *doMovSXV(InstPtr ip, BasicBlock * b, Value *src) {
+static Value *doMovSXV(NativeInstPtr ip, BasicBlock * b, Value *src) {
 	// do an SX
 	return new SExtInst(src, Type::getIntNTy(b->getContext(), dstWidth), "", b);
 }
 
 template <int width>
-static InstTransResult doRIMovV(InstPtr ip,
+static InstTransResult doRIMovV(NativeInstPtr ip,
                         BasicBlock *&b,
                         Value *src,
                         const MCOperand &dst)
@@ -143,7 +143,7 @@ static InstTransResult doRIMovV(InstPtr ip,
 }
 
 template <int width>
-static InstTransResult doRIMov(InstPtr ip, BasicBlock *&b,
+static InstTransResult doRIMov(NativeInstPtr ip, BasicBlock *&b,
                         const MCOperand &src,
                         const MCOperand &dst)
 {
@@ -158,7 +158,7 @@ static InstTransResult doRIMov(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doMIMovV(InstPtr ip, BasicBlock *&b,
+static InstTransResult doMIMovV(NativeInstPtr ip, BasicBlock *&b,
                         Value           *dstAddr,
                         Value           *src)
 {
@@ -171,7 +171,7 @@ static InstTransResult doMIMovV(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doMIMov(InstPtr ip, BasicBlock *&b,
+static InstTransResult doMIMov(NativeInstPtr ip, BasicBlock *&b,
                         Value           *dstAddr,
                         const MCOperand &src)
 {
@@ -184,7 +184,7 @@ static InstTransResult doMIMov(InstPtr ip, BasicBlock *&b,
 }
 
 template <int dstWidth, int srcWidth>
-static InstTransResult doMIMov(InstPtr ip, BasicBlock *&b,
+static InstTransResult doMIMov(NativeInstPtr ip, BasicBlock *&b,
                         Value           *dstAddr,
                         const MCOperand &src)
 {
@@ -192,12 +192,11 @@ static InstTransResult doMIMov(InstPtr ip, BasicBlock *&b,
     //store the constant in src into dstAddr
     NASSERT(dstAddr != NULL);
     NASSERT(src.isImm());
-	INSTR_DEBUG(ip);
     return doMIMovV<dstWidth>(ip, b, dstAddr, CONST_V<srcWidth>(b, src.getImm()));
 }
 
 template <int dstWidth, int srcWidth>
-static InstTransResult doMovZXRR(InstPtr ip,   BasicBlock *&b,
+static InstTransResult doMovZXRR(NativeInstPtr ip,   BasicBlock *&b,
                             const MCOperand &dst,
                             const MCOperand &src)
 {
@@ -219,7 +218,7 @@ static InstTransResult doMovZXRR(InstPtr ip,   BasicBlock *&b,
 }
 
 template <int dstWidth, int srcWidth>
-static InstTransResult doMovZXRM(InstPtr ip,   BasicBlock *&b,
+static InstTransResult doMovZXRM(NativeInstPtr ip,   BasicBlock *&b,
                             const MCOperand &dst,
                             Value *src)
 {
@@ -249,7 +248,7 @@ static InstTransResult doMovZXRM(InstPtr ip,   BasicBlock *&b,
 }
 
 template<int dstWidth, int srcWidth>
-static InstTransResult doMovSXRR(InstPtr ip, 	BasicBlock *&b,
+static InstTransResult doMovSXRR(NativeInstPtr ip, 	BasicBlock *&b,
 							const MCOperand	&dst,
 							const MCOperand &src)
 {
@@ -268,7 +267,7 @@ static InstTransResult doMovSXRR(InstPtr ip, 	BasicBlock *&b,
 }
 
 template <int dstWidth, int srcWidth>
-static InstTransResult doMovSXRM(InstPtr ip, 	BasicBlock *&b,
+static InstTransResult doMovSXRM(NativeInstPtr ip, 	BasicBlock *&b,
 							const MCOperand	&dst,
 							Value			*src)
 {
@@ -283,7 +282,7 @@ static InstTransResult doMovSXRM(InstPtr ip, 	BasicBlock *&b,
 }
 
 template <int dstWidth, int srcWidth>
-static InstTransResult doMovSMR(InstPtr ip, 	BasicBlock *&b,
+static InstTransResult doMovSMR(NativeInstPtr ip, 	BasicBlock *&b,
 							Value			*memAddr,
 							const MCOperand	&dest)
 {
@@ -325,7 +324,7 @@ GENERIC_TRANSLATION_REF(MOV16mi,
 //    doMIMovV<32>(ip,  block, ADDR_NOREF(0), IMM_AS_DATA_REF(block, natM, ip))
 //    )
 //
-static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
+static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&block, NativeInstPtr ip, MCInst &inst) {
     InstTransResult ret;
     
     Function *F = block->getParent();
@@ -379,7 +378,7 @@ static InstTransResult translate_MOV32mi(NativeModulePtr natM, BasicBlock *&bloc
     return ret;
 }
 
-static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {
+static InstTransResult translate_MOV64mi32(NativeModulePtr natM, BasicBlock *&block, NativeInstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
     Module *M = F->getParent();
@@ -506,7 +505,7 @@ GENERIC_TRANSLATION_REF(MOVBE64mr,
 	doRMMovBE<64>(ip,    block, ADDR_NOREF(0), OP(5)),
 	doRMMovBE<64>(ip,    block, MEM_REFERENCE(0), OP(5)))
 
-static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& block, NativeInstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
     Module *M = F->getParent();
@@ -537,7 +536,7 @@ static InstTransResult translate_MOV32ri(NativeModulePtr natM, BasicBlock *& blo
     return ret ;
 }
 
-static InstTransResult translate_MOV64ri(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+static InstTransResult translate_MOV64ri(NativeModulePtr natM, BasicBlock *& block, NativeInstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
     Module *M = F->getParent();
@@ -580,7 +579,7 @@ int GET_XAX() {
 
 //write to memory
 template <int width>
-static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& block, NativeInstPtr ip, MCInst &inst) {
     InstTransResult ret;
 
     Function *F = block->getParent();
@@ -591,7 +590,7 @@ static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& bloc
     // have an immediate, so this is safe
     if( ip->has_imm_reference || ip->has_mem_reference ) {
         ip->has_imm_reference = true;
-        ip->set_reference(Inst::IMMRef, ip->get_reference(Inst::MEMRef));
+        ip->set_reference(NativeInst::IMMRef, ip->get_reference(NativeInst::MEMRef));
     }
 
     if( ip->has_imm_reference ) {
@@ -618,7 +617,7 @@ static InstTransResult translate_MOVao (NativeModulePtr natM, BasicBlock *& bloc
 
 //write to EAX
 template <int width>
-static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {
+static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& block, NativeInstPtr ip, MCInst &inst) {
     InstTransResult ret;
     Function *F = block->getParent();
     Module *M = F->getParent();
@@ -638,7 +637,7 @@ static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& bloc
     // have an immediate, so this is safe
     if( ip->has_imm_reference || ip->has_mem_reference ) {
         ip->has_imm_reference = true;
-        ip->set_reference(Inst::IMMRef, ip->get_reference(Inst::MEMRef));
+        ip->set_reference(NativeInst::IMMRef, ip->get_reference(NativeInst::MEMRef));
     }
 
     if( ip->has_code_ref() ) {
@@ -668,7 +667,7 @@ static InstTransResult translate_MOVoa (NativeModulePtr natM, BasicBlock *& bloc
     return ret ;
 }
 
-static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst)
+static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& block, NativeInstPtr ip, MCInst &inst)
 {
 
     InstTransResult ret;
@@ -702,7 +701,7 @@ static InstTransResult translate_MOV32rm(NativeModulePtr natM, BasicBlock *& blo
     return ret ;
 }
 
-static InstTransResult translate_MOV32mr(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst)
+static InstTransResult translate_MOV32mr(NativeModulePtr natM, BasicBlock *& block, NativeInstPtr ip, MCInst &inst)
 {
     InstTransResult ret;
     Function *F = block->getParent();
@@ -720,7 +719,7 @@ static InstTransResult translate_MOV32mr(NativeModulePtr natM, BasicBlock *& blo
 }
 
 
-static InstTransResult translate_MOV64rm(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst)
+static InstTransResult translate_MOV64rm(NativeModulePtr natM, BasicBlock *& block, NativeInstPtr ip, MCInst &inst)
 {
     InstTransResult ret;
     Function *F = block->getParent();
@@ -751,7 +750,7 @@ static InstTransResult translate_MOV64rm(NativeModulePtr natM, BasicBlock *& blo
     return ret ;
 }
 
-static InstTransResult translate_MOV64mr(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst)
+static InstTransResult translate_MOV64mr(NativeModulePtr natM, BasicBlock *& block, NativeInstPtr ip, MCInst &inst)
 {
     InstTransResult ret;
     Function *F = block->getParent();
@@ -769,7 +768,7 @@ static InstTransResult translate_MOV64mr(NativeModulePtr natM, BasicBlock *& blo
 }
 
 // sign extend %eax to %rax
-static InstTransResult translate_CDQE(NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst)
+static InstTransResult translate_CDQE(NativeModulePtr natM, BasicBlock *& block, NativeInstPtr ip, MCInst &inst)
 {
     InstTransResult ret = ContinueBlock;
     llvm::Value *eax = R_READ<32>(block, X86::EAX);

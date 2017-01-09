@@ -39,7 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using namespace llvm;
 
 template <int width>
-static Value *doNegV(InstPtr ip, BasicBlock *&b, Value *v) {
+static Value *doNegV(NativeInstPtr ip, BasicBlock *&b, Value *v) {
     //compare dest to 0
     Value   *cmpRes = 
         new ICmpInst(*b, CmpInst::ICMP_NE, v, CONST_V<width>(b, 0));
@@ -57,7 +57,7 @@ static Value *doNegV(InstPtr ip, BasicBlock *&b, Value *v) {
 }
 
 template <int width>
-static InstTransResult doNegM(InstPtr ip,  BasicBlock *&b, Value *v) {
+static InstTransResult doNegM(NativeInstPtr ip,  BasicBlock *&b, Value *v) {
     NASSERT(v != NULL);
 
     Value   *fromMem = M_READ<width>(ip, b, v);
@@ -68,7 +68,7 @@ static InstTransResult doNegM(InstPtr ip,  BasicBlock *&b, Value *v) {
 }
 
 template <int width>
-static InstTransResult doNegR(InstPtr ip,  BasicBlock      *&b,
+static InstTransResult doNegR(NativeInstPtr ip,  BasicBlock      *&b,
                         const MCOperand &dst)
 {
     NASSERT(dst.isReg());
@@ -98,7 +98,7 @@ static InstTransResult doNegR(InstPtr ip,  BasicBlock      *&b,
 }
 
 template <int width>
-static Value *doIncV(InstPtr ip, BasicBlock *&b, Value *val) {
+static Value *doIncV(NativeInstPtr ip, BasicBlock *&b, Value *val) {
 
     //add by 1
     Value *result = BinaryOperator::CreateAdd(val, CONST_V<width>(b, 1), "", b);
@@ -114,7 +114,7 @@ static Value *doIncV(InstPtr ip, BasicBlock *&b, Value *val) {
 }
 
 template <int width>
-static InstTransResult doIncM(InstPtr ip,  BasicBlock  *&b, 
+static InstTransResult doIncM(NativeInstPtr ip,  BasicBlock  *&b, 
                         Value       *addr)
 {
     NASSERT(addr != NULL);
@@ -129,7 +129,7 @@ static InstTransResult doIncM(InstPtr ip,  BasicBlock  *&b,
 }
 
 template <int width>
-static Value *doDecV(InstPtr ip, BasicBlock *&b, Value *val) {
+static Value *doDecV(NativeInstPtr ip, BasicBlock *&b, Value *val) {
 
     Value *result = BinaryOperator::CreateSub(val, CONST_V<width>(b, 1), "", b);
 
@@ -144,7 +144,7 @@ static Value *doDecV(InstPtr ip, BasicBlock *&b, Value *val) {
 }
 
 template <int width, int regWidth>
-static InstTransResult doDecR(InstPtr ip,  BasicBlock      *&b,
+static InstTransResult doDecR(NativeInstPtr ip,  BasicBlock      *&b,
                         const MCOperand &dst)
 {
     NASSERT(dst.isReg());
@@ -168,7 +168,7 @@ static InstTransResult doDecR(InstPtr ip,  BasicBlock      *&b,
 }
 
 template <int width, int regWidth>
-static InstTransResult doDecM(InstPtr ip, BasicBlock *&b, Value *m) {
+static InstTransResult doDecM(NativeInstPtr ip, BasicBlock *&b, Value *m) {
     NASSERT(m != NULL);
 
     Value   *from_mem = M_READ<width>(ip, b, m);
@@ -230,7 +230,7 @@ GENERIC_TRANSLATION_REF(INC64m,
 	doIncM<64>(ip, block, MEM_REFERENCE(0)))
 	
 template <int width, int regWidth>
-static InstTransResult doIncR(InstPtr ip,  BasicBlock      *&b,
+static InstTransResult doIncR(NativeInstPtr ip,  BasicBlock      *&b,
                         const MCOperand &dst)
 {
     NASSERT(dst.isReg());

@@ -518,13 +518,13 @@ static InstTransResult doRepMovs(llvm::BasicBlock *&b) {
 }
 
 template<int width>
-static InstTransResult doMovs(llvm::BasicBlock *&b, InstPtr ip) {
+static InstTransResult doMovs(llvm::BasicBlock *&b, NativeInstPtr ip) {
   //we will just kind of paste a new block into the end
   //here so that we have less duplicated logic
   llvm::Module *M = b->getParent()->getParent();
   int bitWidth = ArchPointerSize(M);
-  Inst::Prefix pfx = ip->get_prefix();
-  if (pfx == Inst::RepPrefix) {
+  NativeInst::Prefix pfx = ip->get_prefix();
+  if (pfx == NativeInst::RepPrefix) {
     if (bitWidth == Pointer32) {
       doRepMovs<width, x86::REG_SIZE>(b);
     } else {
@@ -547,18 +547,18 @@ static InstTransResult doRepStos(llvm::BasicBlock *&b) {
 }
 
 template <int width>
-static InstTransResult doStos(llvm::BasicBlock *&b, InstPtr ip) {
+static InstTransResult doStos(llvm::BasicBlock *&b, NativeInstPtr ip) {
   auto M = b->getParent()->getParent();
   auto bitWidth = ArchPointerSize(M);
-  Inst::Prefix pfx = ip->get_prefix();
+  NativeInst::Prefix pfx = ip->get_prefix();
   if (bitWidth == Pointer32) {
-    if (pfx == Inst::RepPrefix) {
+    if (pfx == NativeInst::RepPrefix) {
       doRepStos<width, x86::REG_SIZE>(b);
     } else {
       b = doStosV<width, x86::REG_SIZE>(b);
     }
   } else {
-    if (pfx == Inst::RepPrefix) {
+    if (pfx == NativeInst::RepPrefix) {
       doRepStos<width, x86_64::REG_SIZE>(b);
     } else {
       b = doStosV<width, x86_64::REG_SIZE>(b);
@@ -592,8 +592,10 @@ GENERIC_TRANSLATION(REP_STOSQ_64, (doRepStos<64, 64>(block)))
 
 #define SCAS_TRANSLATION(NAME, WIDTH) \
     static InstTransResult translate_ ## NAME ( \
-        NativeModulePtr natM, llvm::BasicBlock *& block, \
-        InstPtr ip, llvm::MCInst &inst) {\
+        TranslationContext &ctx, llvm::BasicBlock *& block) {\
+    auto natM = ctx.natM; \
+    auto ip = ctx.natI; \
+    auto &inst = ip->get_inst(); \
     InstTransResult ret = TranslateError;\
     Inst::Prefix pfx = ip->get_prefix();\
     switch(pfx) { \
@@ -614,19 +616,21 @@ GENERIC_TRANSLATION(REP_STOSQ_64, (doRepStos<64, 64>(block)))
 
 #define CMPS_TRANSLATION(NAME, WIDTH) \
     static InstTransResult translate_ ## NAME ( \
-        NativeModulePtr natM, llvm::BasicBlock *&block, \
-        InstPtr ip, llvm::MCInst &inst) {\
+        TranslationContext &ctx, llvm::BasicBlock *&block) {\
+    auto natM = ctx.natM; \
+    auto ip = ctx.natI; \
+    auto &inst = ip->get_inst(); \
     InstTransResult ret;\
-    Inst::Prefix pfx = ip->get_prefix();\
+    NativeInst::Prefix pfx = ip->get_prefix();\
     switch(pfx) { \
-      case Inst::NoPrefix: \
+      case NativeInst::NoPrefix: \
         block = doCmps<WIDTH>(block); \
         ret = ContinueBlock; \
         break; \
-      case Inst::RepPrefix: \
+      case NativeInst::RepPrefix: \
         ret = doRepeCmps<WIDTH>(block); \
         break; \
-      case Inst::RepNePrefix: \
+      case NativeInst::RepNePrefix: \
         ret = doRepNeCmps<WIDTH>(block); \
         break; \
       default: \

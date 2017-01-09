@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 void CMPTEST_populateDispatchMap(DispatchMap &m);
 
 template <int width>
-void doCmpVV(InstPtr ip, llvm::BasicBlock *b, llvm::Value *lhs, llvm::Value *rhs) {
+void doCmpVV(NativeInstPtr ip, llvm::BasicBlock *b, llvm::Value *lhs, llvm::Value *rhs) {
     llvm::Value   *subRes = llvm::BinaryOperator::Create(Instruction::Sub, lhs, rhs, "", b);
 
 

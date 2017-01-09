@@ -116,7 +116,7 @@ static InstTransResult doCdq(BasicBlock *b) {
 }
 
 template<int width>
-static InstTransResult doBswapR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doBswapR(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &reg) {
   TASSERT(reg.isReg(), "");
 
@@ -230,7 +230,7 @@ static InstTransResult doLeaV(BasicBlock *&b, const MCOperand &dst,
 }
 
 template<int width>
-static InstTransResult doLea(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doLea(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                              const MCOperand &dst) {
   // LEA <r>, <expr>
   TASSERT(addr != NULL, "");
@@ -478,7 +478,7 @@ static InstTransResult doCwd(BasicBlock *b) {
 }
 
 static InstTransResult translate_SAHF(NativeModulePtr natM, BasicBlock *&block,
-                                      InstPtr ip, MCInst &inst) {
+                                      NativeInstPtr ip, MCInst &inst) {
   Value *ah_val = R_READ<8>(block, llvm::X86::AH);
 
   SHR_SET_FLAG<8, 1>(block, ah_val, CF, 0);
@@ -494,7 +494,7 @@ static InstTransResult translate_SAHF(NativeModulePtr natM, BasicBlock *&block,
 }
 
 template<int width>
-static InstTransResult doBtmi(InstPtr ip, BasicBlock *&b, Value *base,
+static InstTransResult doBtmi(NativeInstPtr ip, BasicBlock *&b, Value *base,
                               const MCOperand &index) {
   TASSERT(index.isImm(), "Operand must be an immediate");
 
@@ -580,7 +580,7 @@ static InstTransResult doBTSri(BasicBlock *&b, const MCOperand &base,
 }
 
 template<int width>
-static InstTransResult doBTSmi(InstPtr ip, BasicBlock *&b, Value *base,
+static InstTransResult doBTSmi(NativeInstPtr ip, BasicBlock *&b, Value *base,
                                const MCOperand &index) {
   TASSERT(index.isImm(), "Operand must be an immediate");
 
@@ -617,7 +617,7 @@ static InstTransResult doBTSmi(InstPtr ip, BasicBlock *&b, Value *base,
 }
 
 template<int width>
-static InstTransResult doBTRmi(InstPtr ip, BasicBlock *&b, Value *base,
+static InstTransResult doBTRmi(NativeInstPtr ip, BasicBlock *&b, Value *base,
                                const MCOperand &index) {
   TASSERT(index.isImm(), "Operand must be an immediate");
 
@@ -697,7 +697,7 @@ static InstTransResult doBsrr(BasicBlock *&b, const MCOperand &dst,
 }
 
 template<int width>
-static InstTransResult doBsfrm(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
+static InstTransResult doBsfrm(NativeInstPtr ip, BasicBlock *&b, const MCOperand &dst,
                                Value *memAddr) {
 
   TASSERT(dst.isReg(), "operand must be register");
@@ -787,16 +787,16 @@ GENERIC_TRANSLATION_REF(LEA16r, doLea<16>(ip, block, ADDR_NOREF(1), OP(0)),
 
 template<int width>
 static InstTransResult doLeaRef(NativeModulePtr natM, BasicBlock *&block,
-                                InstPtr ip, MCInst &inst) {
+                                NativeInstPtr ip, MCInst &inst) {
   InstTransResult ret;
   Function *F = block->getParent();
   if (ip->has_code_ref()) {
-    Inst::CFGOpType optype;
+    NativeInst::CFGOpType optype;
 
     if (ip->has_mem_reference) {
-      optype = Inst::MEMRef;
+      optype = NativeInst::MEMRef;
     } else if (ip->has_imm_reference) {
-      optype = Inst::IMMRef;
+      optype = NativeInst::IMMRef;
     } else {
       throw TErr(__LINE__, __FILE__, "Have code ref but no reference");
     }
@@ -818,25 +818,25 @@ static InstTransResult doLeaRef(NativeModulePtr natM, BasicBlock *&block,
   return ret;
 }
 static InstTransResult translate_LEA32r(NativeModulePtr natM,
-                                        BasicBlock *&block, InstPtr ip,
+                                        BasicBlock *&block, NativeInstPtr ip,
                                         MCInst &inst) {
   return doLeaRef<32>(natM, block, ip, inst);
 }
 
 static InstTransResult translate_LEA64r(NativeModulePtr natM,
-                                        BasicBlock *&block, InstPtr ip,
+                                        BasicBlock *&block, NativeInstPtr ip,
                                         MCInst &inst) {
   return doLeaRef<64>(natM, block, ip, inst);
 }
 
 static InstTransResult translate_LEA64_32r(NativeModulePtr natM,
-                                           BasicBlock *&block, InstPtr ip,
+                                           BasicBlock *&block, NativeInstPtr ip,
                                            MCInst &inst) {
   return doLeaRef<32>(natM, block, ip, inst);
 }
 
 static InstTransResult translate_CPUID32(NativeModulePtr natM,
-                                         BasicBlock *&block, InstPtr ip,
+                                         BasicBlock *&block, NativeInstPtr ip,
                                          MCInst &inst) {
   Value *eax = R_READ<32>(block, llvm::X86::EAX);
   Value *ecx = R_READ<32>(block, llvm::X86::ECX);

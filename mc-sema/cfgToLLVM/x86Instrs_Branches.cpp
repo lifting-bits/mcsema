@@ -271,7 +271,7 @@ static void writeDetachReturnAddr(BasicBlock *B) {
   R_WRITE<width>(B, xsp, espSub);
 }
 
-static void doCallV(BasicBlock *&block, InstPtr ip, Value *call_addr, bool is_jump) {
+static void doCallV(BasicBlock *&block, NativeInstPtr ip, Value *call_addr, bool is_jump) {
 
   Function *F = block->getParent();
   Module *M = F->getParent();
@@ -296,7 +296,7 @@ static void doCallV(BasicBlock *&block, InstPtr ip, Value *call_addr, bool is_ju
 }
 
 template<int width>
-static void doCallM(BasicBlock *&block, InstPtr ip, Value *mem_addr, bool is_jump) {
+static void doCallM(BasicBlock *&block, NativeInstPtr ip, Value *mem_addr, bool is_jump) {
   Value *call_addr = M_READ<width>(ip, block, mem_addr);
   return doCallV(block, ip, call_addr, is_jump);
 }
@@ -330,7 +330,7 @@ static llvm::CallInst* emitInternalCall(BasicBlock *&b, Module *M, const std::st
 }
 
 template<int width>
-static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr, bool is_jump) {
+static InstTransResult doCallPC(NativeInstPtr ip, BasicBlock *&b, VA tgtAddr, bool is_jump) {
   Module *M = b->getParent()->getParent();
 
   //We should be able to look it up in our module.
@@ -711,8 +711,8 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
 }
 
 template<int width>
-static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
-                                      InstPtr ip, MCInst &inst) {
+static InstTransResult translate_JMPm(TranslationContext &ctx, BasicBlock *& block,
+                                      NativeInstPtr ip, MCInst &inst) {
   InstTransResult ret;
 
   // translate JMP mem64 API calls
@@ -725,7 +725,7 @@ static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
     // is reserved for functions that we are going to implement internally
     if(ip->get_ext_call_target()->getCallingConvention() == ExternalCodeRef::McsemaCall) {
         Module *M = block->getParent()->getParent();
-        std::string target_fn = ArchNameMcsemaCall(s);
+        std::string target_fn = ArchNameMcSemaCall(s);
         emitInternalCall<width>(block, M, target_fn, true);
         return ContinueBlock;
     }
@@ -784,8 +784,8 @@ static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
 }
 
 template<int width>
-static InstTransResult translate_JMPr(NativeModulePtr natM, BasicBlock *&block,
-                                      InstPtr ip, MCInst &inst) {
+static InstTransResult translate_JMPr(TranslationContext &ctx, BasicBlock *&block,
+                                      NativeInstPtr ip, MCInst &inst) {
   const MCOperand &tgtOp = inst.getOperand(0);
 
   TASSERT(inst.getNumOperands() == 1, "");
@@ -800,12 +800,12 @@ static InstTransResult translate_JMPr(NativeModulePtr natM, BasicBlock *&block,
 
   // does this inst have an offset table?
   if (ot_addr != -1) {
-    auto ot_value = natM->offsetTables.find(ot_addr);
+    auto ot_value = natM->offset_tables.find(ot_addr);
     TASSERT(
-        ot_value != natM->offsetTables.end(),
+        ot_value != natM->offset_tables.end(),
         "Could not find offset table for addr:"
             + to_string<VA>(ot_addr, std::hex));
-    if (ot_value != natM->offsetTables.end()) {
+    if (ot_value != natM->offset_tables.end()) {
       llvm::dbgs() << __FUNCTION__ << ": We have an offset table for: "
                    << to_string<VA>(ip->get_loc(), std::hex) << " at: "
                    << to_string<VA>(ot_addr, std::hex) << "\n";
@@ -870,8 +870,8 @@ static InstTransResult translate_JMPr(NativeModulePtr natM, BasicBlock *&block,
 }
 
 template<int width>
-static InstTransResult translate_CALLpcrel32(NativeModulePtr natM,
-                                             BasicBlock *& block, InstPtr ip,
+static InstTransResult translate_CALLpcrel32(TranslationContext &ctx,
+                                             BasicBlock *& block, NativeInstPtr ip,
                                              MCInst &inst) {
   InstTransResult ret;
 
@@ -879,7 +879,7 @@ static InstTransResult translate_CALLpcrel32(NativeModulePtr natM,
     std::string s = ip->get_ext_call_target()->getSymbolName();
     if(ip->get_ext_call_target()->getCallingConvention() == ExternalCodeRef::McsemaCall) {
         Module *M = block->getParent()->getParent();
-        std::string target_fn = ArchNameMcsemaCall(s);
+        std::string target_fn = ArchNameMcSemaCall(s);
         emitInternalCall<width>(block, M, target_fn, false);
         return ContinueBlock;
     } else {
@@ -892,7 +892,7 @@ static InstTransResult translate_CALLpcrel32(NativeModulePtr natM,
       ret = x86::doCallPCExtern(block, s, false);
     }
   } else if (ip->has_code_ref()) {
-    int64_t off = (int64_t) ip->get_reference(Inst::MEMRef);
+    int64_t off = (int64_t) ip->get_reference(NativeInst::MEMRef);
     ret = doCallPC<width>(ip, block, off, false);
   } else {
     int64_t off = (int64_t) OP(0).getImm();
@@ -903,8 +903,8 @@ static InstTransResult translate_CALLpcrel32(NativeModulePtr natM,
 }
 
 template<int width>
-static InstTransResult translate_CALLm(NativeModulePtr natM,
-                                       BasicBlock *& block, InstPtr ip,
+static InstTransResult translate_CALLm(TranslationContext &ctx,
+                                       BasicBlock *& block, NativeInstPtr ip,
                                        MCInst &inst) {
   InstTransResult ret;
 
@@ -916,7 +916,7 @@ static InstTransResult translate_CALLm(NativeModulePtr natM,
     // is reserved for functions that we are going to implement internally
     if(ip->get_ext_call_target()->getCallingConvention() == ExternalCodeRef::McsemaCall) {
         Module *M = block->getParent()->getParent();
-        std::string target_fn = ArchNameMcsemaCall(s);
+        std::string target_fn = ArchNameMcSemaCall(s);
         emitInternalCall<width>(block, M, target_fn, false);
         return ContinueBlock;
     }
@@ -930,7 +930,7 @@ static InstTransResult translate_CALLm(NativeModulePtr natM,
     // not external call, but some weird way of calling local function?
   } else if (ip->has_code_ref()) {
     cout << __FUNCTION__ << ":" << __LINE__ << ": doing call" << std::endl;
-    doCallPC<width>(ip, block, ip->get_reference(Inst::MEMRef), false);
+    doCallPC<width>(ip, block, ip->get_reference(NativeInst::MEMRef), false);
   }
   // is this referencing global data?
   else if (ip->has_mem_reference) {
@@ -946,8 +946,8 @@ static InstTransResult translate_CALLm(NativeModulePtr natM,
 }
 
 template<int width>
-static InstTransResult translate_CALLr(NativeModulePtr natM, BasicBlock *&block,
-                                       InstPtr ip, MCInst &inst) {
+static InstTransResult translate_CALLr(TranslationContext &ctx, BasicBlock *&block,
+                                       NativeInstPtr ip, MCInst &inst) {
   const MCOperand &tgtOp = inst.getOperand(0);
   //we are calling a register! this is VERY EXCITING
   //first, we need to know which register we are calling. read that
@@ -969,7 +969,7 @@ static InstTransResult translate_CALLr(NativeModulePtr natM, BasicBlock *&block,
   return ContinueBlock;
 }
 
-#define BLOCKNAMES_TRANSLATION(NAME, THECALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {\
+#define BLOCKNAMES_TRANSLATION(NAME, THECALL) static InstTransResult translate_ ## NAME (TranslationContext &ctx, BasicBlock *& block, InstPtr ip, MCInst &inst) {\
     Function *F = block->getParent(); \
     std::string  trueStrName = "block_0x"+to_string<VA>(ip->get_tr(), std::hex); \
     std::string  falseStrName = "block_0x"+to_string<VA>(ip->get_fa(), std::hex); \

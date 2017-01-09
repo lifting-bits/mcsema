@@ -8,7 +8,8 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
- Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
  Neither the name of the {organization} nor the names of its
@@ -67,10 +68,6 @@
 #include "../common/LExcn.h"
 #include "../common/Defaults.h"
 
-#include <boost/tokenizer.hpp>
-#include <boost/foreach.hpp>
-#include <boost/algorithm/string.hpp>
-
 using namespace llvm;
 
 static cl::opt<std::string> OutputFilename("o", cl::desc("Output filename"),
@@ -94,55 +91,14 @@ static cl::opt<bool> OutputModule("m", cl::desc("Output native module format"));
 static cl::opt<bool> IgnoreUnsupported(
     "ignore-unsupported", cl::desc("Ignore unsupported instructions"));
 
-static cl::opt<bool> ShouldVerify(
-    "should-verify", cl::desc("Verify module after bitcode emission?"),
-    cl::init(true));
-
 static void printVersion(void) {
   std::cout << "0.6" << std::endl;
 }
 
-class block_label_writer {
- private:
-  NativeFunctionPtr func;
- public:
-  block_label_writer(NativeFunctionPtr f)
-      : func(f) {
-    return;
-  }
-  template<class VertexOrEdge>
-  void operator()(std::ostream &out, const VertexOrEdge &v) const {
-    NativeBlockPtr curB = this->func->block_from_id(v);
-
-    if (curB) {
-      std::string blockS = curB->print_block();
-      out << "[label=\"" << blockS << "\"]";
-    }
-
-    return;
-  }
-};
-
-static void doPrintModule(NativeModulePtr m) {
-  std::string pathBase = "./";
-
-  for (auto f : m->get_funcs()) {
-    std::string n = pathBase + to_string<uint64_t>(f->get_start(), std::hex)
-        + ".dot";
-
-    std::ofstream out(n.c_str());
-
-    block_label_writer bgl(f);
-    CFG g = f->get_cfg();
-    write_graphviz(out, g, bgl);
-  }
-
-  return;
-}
-
-llvm::Module *createModuleForArch(std::string name, const std::string &triple) {
-  llvm::Module *M = new llvm::Module(name, llvm::getGlobalContext());
-  llvm::Triple TT = llvm::Triple(triple);
+static llvm::Module *CreateModule(std::string name,
+                                         const std::string &triple) {
+  auto M = new llvm::Module(name, llvm::getGlobalContext());
+  llvm::Triple TT(triple);
   M->setTargetTriple(triple);
 
   std::string layout;
@@ -150,7 +106,9 @@ llvm::Module *createModuleForArch(std::string name, const std::string &triple) {
   if (TT.getOS() == llvm::Triple::Win32) {
     if (TT.getArch() == llvm::Triple::x86) {
       layout =
-          "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-f80:128:128-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32-S32";
+          "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:"
+          "32:32-f64:64:64-f80:128:128-v64:64:64-v128:128:128-a0:0:64-f80:"
+          "32:32-n8:16:32-S32";
     } else if (TT.getArch() == llvm::Triple::x86_64) {
       layout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128";
     } else {
@@ -160,7 +118,9 @@ llvm::Module *createModuleForArch(std::string name, const std::string &triple) {
   } else if (TT.getOS() == llvm::Triple::Linux) {
     if (TT.getArch() == llvm::Triple::x86) {
       layout =
-          "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:16:32-S128";
+          "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:"
+          "32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:"
+          "16:32-S128";
     } else if (TT.getArch() == llvm::Triple::x86_64) {
       // x86_64-linux-gnu
       layout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128";
@@ -177,13 +137,13 @@ llvm::Module *createModuleForArch(std::string name, const std::string &triple) {
   return M;
 }
 
-static VA findSymInModule(NativeModulePtr mod, const std::string &sym_name) {
+static VA FindSymbolInModule(NativeModulePtr mod, const std::string &sym_name) {
   for (auto &sym : mod->getEntryPoints()) {
     if (sym.getName() == sym_name) {
       return sym.getAddr();
     }
   }
-  return (VA)(-1);
+  return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -202,9 +162,8 @@ int main(int argc, char *argv[]) {
 
   std::string errstr;
   std::cerr << "Looking up target..." << std::endl;
-  auto x86Target = llvm::TargetRegistry::lookupTarget(TargetTriple, errstr);
-
-  if (!x86Target) {
+  auto target = llvm::TargetRegistry::lookupTarget(TargetTriple, errstr);
+  if (!target) {
     std::cerr
       << "Could not find target triple: " << TargetTriple << std::endl
       << "Error: " << errstr << "\n";
@@ -214,25 +173,16 @@ int main(int argc, char *argv[]) {
   //reproduce NativeModule from CFG input argument
   std::cerr << "Reading module ..." << std::endl;
   try {
-    auto mod = readModule(InputFilename, ProtoBuff, std::list<VA>(), x86Target);
+    auto mod = ReadProtoBuf(InputFilename, TargetTriple, target);
     if (!mod) {
       std::cerr << "Could not process input module: " << InputFilename
-          << std::endl;
+                << std::endl;
       return EXIT_FAILURE;
     }
 
-    // set native module target
-    std::cerr << "Setting initial triples..." << std::endl;
-    mod->setTarget(x86Target);
-    mod->setTargetTriple(TargetTriple);
-
-    if ( !mod) {
+    if (!mod) {
       std::cerr << "Unable to read module from CFG" << std::endl;
       return EXIT_FAILURE;
-    }
-
-    if (OutputModule) {
-      doPrintModule(mod);
     }
 
     if (IgnoreUnsupported) {
@@ -240,32 +190,21 @@ int main(int argc, char *argv[]) {
     }
 
     //now, convert it to an LLVM module
-    std::cerr << "Getting LLVM module..." << std::endl;
-    auto M = createModuleForArch(mod->name(), TargetTriple);
-
-    if ( !M) {
-      std::cerr << "Unable to get LLVM module" << std::endl;
-      return EXIT_FAILURE;
-    }
-
-    initRegStateStruct(M);
+    auto M = CreateModule(mod->name(), TargetTriple);
+    ArchInitRegStateStruct(M);
     ArchInitAttachDetach(M);
-    initInstructionDispatch();
+    ArchInitInstructionDispatch();
 
-    std::cerr << "Converting to LLVM..." << std::endl;
-    if (!liftNativeCodeIntoModule(mod, M)) {
+    if (!LiftCodeIntoModule(mod, M)) {
       std::cerr << "Failure to convert to LLVM module!" << std::endl;
       return EXIT_FAILURE;
     }
 
     std::set<VA> entry_point_pcs;
-
     for (const auto &entry_point_name : EntryPoints) {
-      std::cerr << "Adding entry point: " << entry_point_name << std::endl;
-
-      auto entry_pc = findSymInModule(mod, entry_point_name);
-      if ((VA)(-1) != entry_pc) {
-        std::cerr << entry_point_name << " is implemented by sub_" << std::hex
+      if (auto entry_pc = FindSymbolInModule(mod, entry_point_name)) {
+        std::cerr << "Adding entry point: " << entry_point_name << std::endl
+                  << entry_point_name << " is implemented by sub_" << std::hex
                   << entry_pc << std::endl;
 
         if (!ArchAddEntryPointDriver(M, entry_point_name, entry_pc)) {
@@ -274,32 +213,34 @@ int main(int argc, char *argv[]) {
 
         entry_point_pcs.insert(entry_pc);
       } else {
-        llvm::errs() << "Could not find entry point: " << entry_point_name
-                     << "; aborting\n";
+        std::cerr << "Could not find entry point: " << entry_point_name
+                  << "; aborting" << std::endl;
         return EXIT_FAILURE;
       }
     }
 
-    renameLiftedFunctions(mod, M, entry_point_pcs);
+    RenameLiftedFunctions(mod, M, entry_point_pcs);
 
     // will abort if verification fails
-    if (ShouldVerify && llvm::verifyModule( *M, &errs())) {
-      std::cerr << "Could not verify module!\n";
+    if (llvm::verifyModule(*M, &errs())) {
+      std::cerr << "Could not verify module!" << std::endl;
       return EXIT_FAILURE;
     }
 
-    M->addModuleFlag(Module::Error, "Debug Info Version",
-                     DEBUG_METADATA_VERSION);
-    M->addModuleFlag(Module::Error, "Dwarf Version", 3);
+    M->addModuleFlag(llvm::Module::Error, "Debug Info Version",
+                     llvm::DEBUG_METADATA_VERSION);
+    M->addModuleFlag(llvm::Module::Error, "Dwarf Version", 3);
 
     std::string errorInfo;
     llvm::tool_output_file Out(OutputFilename.c_str(), errorInfo,
-                               sys::fs::F_None);
-    WriteBitcodeToFile(M, Out.os());
+                               llvm::sys::fs::F_None);
+    llvm::WriteBitcodeToFile(M, Out.os());
     Out.keep();
+
   } catch (std::exception &e) {
     std::cerr << "error: " << std::endl << e.what() << std::endl;
     return EXIT_FAILURE;
   }
+
   return EXIT_SUCCESS;
 }

@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "Externals.h"
 
 //translate a NativeModule into an LLVM Module
-void renameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
+void RenameLiftedFunctions(NativeModulePtr mod, llvm::Module *M,
                            const std::set<VA> &entry_point_pcs);
-bool liftNativeCodeIntoModule(NativeModulePtr, llvm::Module *);
+bool LiftCodeIntoModule(NativeModulePtr, llvm::Module *);
 #endif

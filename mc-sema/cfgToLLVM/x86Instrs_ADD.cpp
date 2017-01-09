@@ -45,7 +45,7 @@ static InstTransResult doNoop(BasicBlock *b) {
 GENERIC_TRANSLATION(NOOP, doNoop(block))
 
 template <int width>
-static Value * doAddVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs)
+static Value * doAddVV(NativeInstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs)
 {
     // Add src1 to the constant formed by src2.
     Value *addRes = BinaryOperator::Create(Instruction::Add, rhs, lhs, "", b);
@@ -68,7 +68,7 @@ static Value * doAddVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs)
 }
 
 template <int width>
-static InstTransResult doAddMI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAddMI(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &imm)
 {
@@ -86,7 +86,7 @@ static InstTransResult doAddMI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doAddMV(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAddMV(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                Value *rhs)
 {
@@ -103,7 +103,7 @@ static InstTransResult doAddMV(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doAddMR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAddMR(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &reg)
 {
@@ -121,7 +121,7 @@ static InstTransResult doAddMR(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doAddRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAddRI(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &dst,
                                const MCOperand &src1,
                                const MCOperand &src2)
@@ -146,7 +146,7 @@ static InstTransResult doAddRI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doAddRM(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAddRM(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &o1,
                                const MCOperand &o2)
@@ -171,7 +171,7 @@ static InstTransResult doAddRM(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doAddRV(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAddRV(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &o1,
                                const MCOperand &o2)
@@ -196,7 +196,7 @@ static InstTransResult doAddRV(InstPtr ip, BasicBlock *&b,
 
 
 template <int width>
-static InstTransResult doAddRR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAddRR(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &dst,
                                const MCOperand &o1,
                                const MCOperand &o2)
@@ -220,7 +220,7 @@ static InstTransResult doAddRR(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static Value * doAdcVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *src)
+static Value * doAdcVV(NativeInstPtr ip, BasicBlock *&b, Value *dst, Value *src)
 {
     Type *t;
 
@@ -259,7 +259,7 @@ static Value * doAdcVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *src)
 }
 
 template <int width>
-static InstTransResult doAdcRV(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAdcRV(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &o1,
                                const MCOperand &o2)
@@ -281,7 +281,7 @@ static InstTransResult doAdcRV(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doAdcI(InstPtr ip, BasicBlock *&b, const MCOperand &src)
+static InstTransResult doAdcI(NativeInstPtr ip, BasicBlock *&b, const MCOperand &src)
 {
     TASSERT(src.isImm(), "");
 
@@ -330,7 +330,7 @@ static InstTransResult doAdcI(InstPtr ip, BasicBlock *&b, const MCOperand &src)
 }
 
 template <int width>
-static InstTransResult doAdcMI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAdcMI(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &src) 
 {
@@ -348,7 +348,7 @@ static InstTransResult doAdcMI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doAdcMV(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAdcMV(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                Value           *rhs)
 {
@@ -366,7 +366,7 @@ static InstTransResult doAdcMV(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doAdcMI8(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAdcMI8(NativeInstPtr ip, BasicBlock *&b,
                                 Value           *addr,
                                 const MCOperand &src) 
 {
@@ -389,7 +389,7 @@ static InstTransResult doAdcMI8(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doAdcMR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAdcMR(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &reg) 
 {
@@ -407,7 +407,7 @@ static InstTransResult doAdcMR(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doAdcRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAdcRI(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &dst,
                                const MCOperand &o1,
                                const MCOperand &o2)
@@ -427,7 +427,7 @@ static InstTransResult doAdcRI(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doAdcRI8(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAdcRI8(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &dst,
                                 const MCOperand &o1,
                                 const MCOperand &o2)
@@ -452,7 +452,7 @@ static InstTransResult doAdcRI8(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doAdcRM(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAdcRM(NativeInstPtr ip, BasicBlock *&b,
                                Value           *addr,
                                const MCOperand &o1,
                                const MCOperand &o2)
@@ -477,7 +477,7 @@ static InstTransResult doAdcRM(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doAdcRR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doAdcRR(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &dst,
                                const MCOperand &o1,
                                const MCOperand &o2)

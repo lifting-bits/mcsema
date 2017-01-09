@@ -56,9 +56,9 @@ using namespace x86;
 // currently used to turn non-conforming jump talbles
 // into data sections
 //
-static void preprocessInstruction(NativeModulePtr natM, BasicBlock *&block,
-                                  InstPtr ip, MCInst &inst) {
-
+static void PreProcessInst(TranslationContext &ctx, llvm::BasicBlock *&block) {
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
   // only add data sections for non-conformant jump tables
   //
   // the conformant tables are handled in the instruction
@@ -67,46 +67,41 @@ static void preprocessInstruction(NativeModulePtr natM, BasicBlock *&block,
     if ( !isConformantJumpInst(ip)) {
       {
         llvm::dbgs() << "WARNING: jump table but non-conformant instruction:\n";
-        llvm::dbgs() << to_string<VA>(ip->get_loc(), hex) << ": ";
+        llvm::dbgs() << to_string<VA>(ip->get_loc(), std::hex) << ": ";
         llvm::dbgs() << inst << "\n";
 
-        VA tbl_va;
-        MCSJumpTablePtr jmptbl = ip->get_jump_table();
+        VA tbl_va = 0;
+        auto jmptbl = ip->get_jump_table();
 
-        bool ok = addJumpTableDataSection(natM, block->getParent()->getParent(),
-                                          tbl_va, *jmptbl);
+        bool ok = addJumpTableDataSection(ctx, tbl_va, *jmptbl);
 
         TASSERT(ok, "Could not add jump table data section!\n");
 
-        uint32_t data_ref_va = static_cast<uint32_t>(tbl_va
-            + 4 * jmptbl->getInitialEntry());
+        auto data_ref_va = static_cast<uint32_t>(tbl_va
+            + (4 * jmptbl->getInitialEntry()));
 
-        ip->set_reference(Inst::MEMRef, data_ref_va);
-        ip->set_ref_type(Inst::MEMRef, Inst::CFGDataRef);
+        ip->set_reference(NativeInst::MEMRef, data_ref_va);
+        ip->set_ref_type(NativeInst::MEMRef, NativeInst::CFGDataRef);
       }
-
     }
-  }
-  // only add data references for unknown jump index table
-  // reads
-  else if (ip->has_jump_index_table() && inst.getOpcode() != X86::MOVZX32rm8) {
 
-    VA idx_va;
+  // only add data references for unknown jump index table reads
+  } else if (ip->has_jump_index_table() &&
+             inst.getOpcode() != llvm::X86::MOVZX32rm8) {
+
+    VA idx_va = 0;
     JumpIndexTablePtr idxtbl = ip->get_jump_index_table();
 
-    bool ok = addJumpIndexTableDataSection(natM,
-                                           block->getParent()->getParent(),
-                                           idx_va, *idxtbl);
+    bool ok = addJumpIndexTableDataSection(ctx, idx_va, *idxtbl);
 
     TASSERT(ok, "Could not add jump index table data section!\n");
 
     uint32_t data_ref_va = static_cast<uint32_t>(idx_va
         + idxtbl->getInitialEntry());
 
-    ip->set_reference(Inst::MEMRef, data_ref_va);
-    ip->set_ref_type(Inst::MEMRef, Inst::CFGDataRef);
+    ip->set_reference(NativeInst::MEMRef, data_ref_va);
+    ip->set_ref_type(NativeInst::MEMRef, NativeInst::CFGDataRef);
   }
-
 }
 
 // Take the supplied MCInst and turn it into a series of LLVM instructions.
@@ -135,56 +130,40 @@ static void preprocessInstruction(NativeModulePtr natM, BasicBlock *&block,
 //
 //     The innermost is where most of the intelligent decisions happen.
 //
-InstTransResult liftInstrImpl(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
-                            Function *F, NativeFunctionPtr natF,
-                            NativeModulePtr natM) {
-  MCInst inst = ip->get_inst();
+InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
+                                      llvm::BasicBlock *&block) {
   InstTransResult itr = ContinueBlock;
-  string outS;
-  raw_string_ostream strOut(outS);
-  MCInstPrinter *IP = nb->get_printer();
-
-  if (IP == NULL) {
-    throw TErr(__LINE__, __FILE__,
-               "No instruction printer supplied with native block");
-  }
 
   // For conditional instructions, get the "true" and "false" targets.
   // This will also look up the target for nonconditional jumps.
   //string trueStrName = "block_0x" + to_string<VA>(ip->get_tr(), hex);
   //string falseStrName = "block_0x" + to_string<VA>(ip->get_fa(), hex);
 
-  TranslationFuncPtr translationPtr;
+  auto &inst = ctx.natI->get_inst();
+  auto opcode = inst.getOpcode();
 
-  unsigned opcode = inst.getOpcode();
-  if (translationDispatchMap.find(opcode) != translationDispatchMap.end()) {
-    // Instruction translation defined.
-    translationPtr = translationDispatchMap[opcode];
-    preprocessInstruction(natM, block, ip, inst);
-    itr = translationPtr(natM, block, ip, inst);
+  if (translationDispatchMap.count(opcode)) {
+    auto translationPtr = translationDispatchMap[opcode];
+    PreProcessInst(ctx, block);
+    itr = translationPtr(ctx, block);
     if (TranslateError == itr || TranslateErrorUnsupported == itr) {
-      errs() << "Error translating!";
-      IP->printInst( &inst, errs(), to_string<VA>(ip->get_loc(), hex));
-      errs() << "\n";
+      std::cerr << "Error translating instruction at " << std::hex
+                << ctx.natI->get_loc() << std::endl;
     }
-  } else {
+
     // Instruction translation not defined.
-    errs() << "Unsupported opcode " << opcode << "!";
-    IP->printInst( &inst, errs(), to_string<VA>(ip->get_loc(), hex));
-    // Print out the unhandled opcode.
-    errs() << to_string<VA>(ip->get_loc(), hex) << " ";
-    errs() << strOut.str() << "\n";
-    errs() << inst.getOpcode() << "\n";
-    if (X86::REP_PREFIX != opcode && X86::REPNE_PREFIX != opcode) {
+  } else {
+    std::cerr << "Error translating instruction at " << std::hex
+              << ctx.natI->get_loc() << "; unsupported opcode " << std::dec
+              << opcode << std::endl;
+    if (llvm::X86::REP_PREFIX != opcode && llvm::X86::REPNE_PREFIX != opcode) {
       itr = TranslateErrorUnsupported;
     } else {
-      errs()
-          << "Unsupported instruction is a rep/repne, trying to skip to next instr.\n";
+      std::cerr
+          << "Unsupported instruction is a rep/repne, trying to skip to next instr."
+          << std::endl;
     }
   }
-
-  //D(cout << __FUNCTION__ << " : " << opcode << "\n";
-  //cout.flush();)
   return itr;
 }
 

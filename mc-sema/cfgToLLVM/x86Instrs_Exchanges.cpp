@@ -37,7 +37,7 @@
 #define NASSERT(cond) TASSERT(cond, "")
 
 template<int width>
-static InstTransResult doCmpxchgRR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doCmpxchgRR(NativeInstPtr ip, BasicBlock *&b,
                                    const MCOperand &dstReg,
                                    const MCOperand &srcReg) {
   NASSERT(dstReg.isReg());
@@ -101,7 +101,7 @@ static InstTransResult doCmpxchgRR(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doCmpxchgRM(InstPtr ip, BasicBlock *&b, Value *dstAddr,
+static InstTransResult doCmpxchgRM(NativeInstPtr ip, BasicBlock *&b, Value *dstAddr,
                                    const MCOperand &srcReg) {
   NASSERT(dstAddr != NULL);
   NASSERT(srcReg.isReg());
@@ -180,7 +180,7 @@ static InstTransResult doCmpxchgRM(InstPtr ip, BasicBlock *&b, Value *dstAddr,
 }
 
 template<int width>
-static InstTransResult doXaddRM(InstPtr ip, BasicBlock *&b,
+static InstTransResult doXaddRM(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &srcReg, Value *dstAddr) {
   NASSERT(srcReg.isReg());
   NASSERT(dstAddr != NULL);
@@ -211,7 +211,7 @@ static InstTransResult doXaddRM(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doXaddRR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doXaddRR(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &dstReg,
                                 const MCOperand &srcReg) {
   NASSERT(dstReg.isReg());
@@ -243,7 +243,7 @@ static InstTransResult doXaddRR(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doXchgRR(InstPtr ip, BasicBlock *&b, const MCOperand &o1,
+static InstTransResult doXchgRR(NativeInstPtr ip, BasicBlock *&b, const MCOperand &o1,
                                 const MCOperand &o2) {
   NASSERT(o1.isReg());
   NASSERT(o2.isReg());
@@ -258,7 +258,7 @@ static InstTransResult doXchgRR(InstPtr ip, BasicBlock *&b, const MCOperand &o1,
 }
 
 template<int width>
-static InstTransResult doXchgRM(InstPtr ip, BasicBlock *&b, const MCOperand &r,
+static InstTransResult doXchgRM(NativeInstPtr ip, BasicBlock *&b, const MCOperand &r,
                                 Value *mem) {
   NASSERT(mem != NULL);
   NASSERT(r.isReg());

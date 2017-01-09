@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ArchOps.h"
 
 template <int width>
-llvm::Value *getValueForExternal(llvm::Module *M, InstPtr ip, llvm::BasicBlock *block) {
+llvm::Value *getValueForExternal(llvm::Module *M, NativeInstPtr ip, llvm::BasicBlock *block) {
 
     llvm::Value *addrInt = NULL;
 
@@ -102,7 +102,7 @@ llvm::Value *getAddrFromExpr(
         llvm::BasicBlock      *b,
         NativeModulePtr mod,
         const llvm::MCInst &inst,
-        InstPtr ip,
+        NativeInstPtr ip,
         uint32_t which);
 
 bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr);
@@ -177,7 +177,7 @@ llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t val);
 llvm::Value *MEM_AS_DATA_REF(llvm::BasicBlock *B, 
         NativeModulePtr natM, 
         const llvm::MCInst &inst, 
-        InstPtr ip,
+        NativeInstPtr ip,
         uint32_t which);
 
 // emit an llvm memcpy intrinsic
@@ -190,7 +190,7 @@ using namespace std;
 
 // return a computed pointer to that data reference for 32/64 bit architecture
 template <int width>
-llvm::Value* IMM_AS_DATA_REF(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
+llvm::Value* IMM_AS_DATA_REF(BasicBlock *b, NativeModulePtr mod , NativeInstPtr ip)
 {
     TASSERT(width == 32 || width == 64, "Pointer size must be sane");
     VA  baseGlobal;
@@ -206,12 +206,12 @@ llvm::Value* IMM_AS_DATA_REF(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
     if(false == ip->has_imm_reference) {
         throw TErr(__LINE__, __FILE__, "Want to use IMM as data ref but have no IMM reference");
     }
-    uint64_t off = ip->get_reference(Inst::IMMRef);
+    uint64_t off = ip->get_reference(NativeInst::IMMRef);
     
     if(ip->has_code_ref()) {
         Value *callback_fn = ArchAddCallbackDriver(
                 b->getParent()->getParent(),
-                ip->get_reference(Inst::IMMRef));
+                ip->get_reference(NativeInst::IMMRef));
         Value *addrInt = new PtrToIntInst(
             callback_fn, llvm::Type::getIntNTy(b->getContext(), width), "", b);
         return addrInt;
@@ -255,7 +255,7 @@ llvm::Value* IMM_AS_DATA_REF(BasicBlock *b, NativeModulePtr mod , InstPtr ip)
 // return a computed pointer to that data reference
 static inline llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *b, 
         NativeModulePtr mod, 
-        InstPtr ip)
+        NativeInstPtr ip)
 {
     
     llvm::Module *M = b->getParent()->getParent();
@@ -273,7 +273,7 @@ inline llvm::PointerType *getVoidPtrType (llvm::LLVMContext & C) {
 }
 
 template <int width>
-static inline Value *ADDR_NOREF_IMPL(NativeModulePtr natM, llvm::BasicBlock *b, int x, InstPtr ip, const llvm::MCInst &inst) {
+static inline Value *ADDR_NOREF_IMPL(NativeModulePtr natM, llvm::BasicBlock *b, int x, NativeInstPtr ip, const llvm::MCInst &inst) {
 
     // Turns out this function name is a lie. This case can ref external data
     llvm::Module *M = b->getParent()->getParent();

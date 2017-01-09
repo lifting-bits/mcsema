@@ -35,7 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 
-static Value *doSetaV(InstPtr ip, BasicBlock *&b)
+static Value *doSetaV(NativeInstPtr ip, BasicBlock *&b)
 {
 
     // set 1 if CF==0 && ZF==0
@@ -56,7 +56,7 @@ static Value *doSetaV(InstPtr ip, BasicBlock *&b)
     return ext_to_set;
 }
 
-static Value *doSetbV(InstPtr ip, BasicBlock *&b)
+static Value *doSetbV(NativeInstPtr ip, BasicBlock *&b)
 {
     // setb == set if cf == 1
     // essentially, read CF
@@ -68,7 +68,7 @@ static Value *doSetbV(InstPtr ip, BasicBlock *&b)
     return ext_to_set;
 }
 
-static Value *doSetsV(InstPtr ip, BasicBlock *&b)
+static Value *doSetsV(NativeInstPtr ip, BasicBlock *&b)
 {
     // sets == set if sf == 1
     // essentially, read SF
@@ -81,7 +81,7 @@ static Value *doSetsV(InstPtr ip, BasicBlock *&b)
 }
 
 // set if CF==0
-static Value *doSetaeV(InstPtr ip, BasicBlock *&b)
+static Value *doSetaeV(NativeInstPtr ip, BasicBlock *&b)
 {
     //read CF
     Value *cf_val = F_READ(b, CF);
@@ -96,7 +96,7 @@ static Value *doSetaeV(InstPtr ip, BasicBlock *&b)
     return res;
 }
 
-static Value *doSetneV(InstPtr ip, BasicBlock *&b)
+static Value *doSetneV(NativeInstPtr ip, BasicBlock *&b)
 {
     //read ZF
     Value *zf_val = F_READ(b, ZF);
@@ -111,7 +111,7 @@ static Value *doSetneV(InstPtr ip, BasicBlock *&b)
     return res;
 }
 
-static Value *doSeteV(InstPtr ip, BasicBlock *&b)
+static Value *doSeteV(NativeInstPtr ip, BasicBlock *&b)
 {
     //read ZF
     Value *zf_val = F_READ(b, ZF);
@@ -127,7 +127,7 @@ static Value *doSeteV(InstPtr ip, BasicBlock *&b)
 }
 
 // setge: of == sf
-static Value *doSetgeV(InstPtr ip, BasicBlock *&b)
+static Value *doSetgeV(NativeInstPtr ip, BasicBlock *&b)
 {
     Value *sf_val = F_READ(b, SF);
     Value *of_val = F_READ(b, OF);
@@ -143,7 +143,7 @@ static Value *doSetgeV(InstPtr ip, BasicBlock *&b)
 }
 
 // setg: of == sf && ZF==0
-static Value *doSetgV(InstPtr ip, BasicBlock *&b)
+static Value *doSetgV(NativeInstPtr ip, BasicBlock *&b)
 {
     Value *sf_val = F_READ(b, SF);
     Value *of_val = F_READ(b, OF);
@@ -169,7 +169,7 @@ static Value *doSetgV(InstPtr ip, BasicBlock *&b)
 }
 
 // setle: of != sf || ZF==1
-static Value *doSetleV(InstPtr ip, BasicBlock *&b)
+static Value *doSetleV(NativeInstPtr ip, BasicBlock *&b)
 {
     Value *sf_val = F_READ(b, SF);
     Value *of_val = F_READ(b, OF);
@@ -192,7 +192,7 @@ static Value *doSetleV(InstPtr ip, BasicBlock *&b)
 }
 
 // setge: of != sf
-static Value *doSetlV(InstPtr ip, BasicBlock *&b)
+static Value *doSetlV(NativeInstPtr ip, BasicBlock *&b)
 {
     Value *sf_val = F_READ(b, SF);
     Value *of_val = F_READ(b, OF);
@@ -209,7 +209,7 @@ static Value *doSetlV(InstPtr ip, BasicBlock *&b)
 
 
 //setbe: cf==1 or zf==1
-static Value *doSetbeV(InstPtr ip, BasicBlock *&b)
+static Value *doSetbeV(NativeInstPtr ip, BasicBlock *&b)
 {
     Value *cf_val = F_READ(b, CF);
     Value *zf_val = F_READ(b, ZF);
@@ -227,7 +227,7 @@ static Value *doSetbeV(InstPtr ip, BasicBlock *&b)
 }
 
 // set if pf == 0
-static Value *doSetnpV(InstPtr ip, BasicBlock *&b)
+static Value *doSetnpV(NativeInstPtr ip, BasicBlock *&b)
 {
     //read PF
     Value *pf_val = F_READ(b, PF);
@@ -243,7 +243,7 @@ static Value *doSetnpV(InstPtr ip, BasicBlock *&b)
 }
 
 // set if pf == 1
-static Value *doSetpV(InstPtr ip, BasicBlock *&b)
+static Value *doSetpV(NativeInstPtr ip, BasicBlock *&b)
 {
     //read PF
     Value *pf_val = F_READ(b, PF);
@@ -259,7 +259,7 @@ static Value *doSetpV(InstPtr ip, BasicBlock *&b)
 }
 
 // set if sf == 0
-static Value *doSetnsV(InstPtr ip, BasicBlock *&b)
+static Value *doSetnsV(NativeInstPtr ip, BasicBlock *&b)
 {
     //read SF
     Value *sf_val = F_READ(b, SF);
