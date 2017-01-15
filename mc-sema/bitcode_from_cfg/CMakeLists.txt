@@ -34,7 +34,7 @@ target_link_libraries(cfg_to_bc
   LLVMInstrumentation
   LLVMObjCARCOpts
   ${Boost_LIBRARIES}
-  libprotobuf)
+  ${Protobuf_LIBRARIES})
 
 add_dependencies(cfg_to_bc
   peToCFG

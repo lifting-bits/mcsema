@@ -1,7 +1,8 @@
 project(mc-sema)
 cmake_minimum_required(VERSION 2.8)
 
-find_package(Boost COMPONENTS thread system filesystem date_time program_options)
+find_package(Boost REQUIRED COMPONENTS thread system filesystem date_time program_options)
+find_package(Protobuf REQUIRED)
 
 if (MSVC60)
   set(BOOST_TOOLSET "vc6")
@@ -30,4 +31,5 @@ SET(CMAKE_EXE_LINKER_FLAGS "/LARGEADDRESSAWARE ${CMAKE_EXE_LINKER_FLAGS}")
 endif(WIN32)
 
 add_subdirectory(llvm-3.5)
+
 add_subdirectory(mc-sema)
