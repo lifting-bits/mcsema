@@ -7,7 +7,6 @@ set(CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules"
 )
 
-set(PROTOBUF_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/protobuf-2.5.0)
 if( WIN32 OR CYGWIN)
   # MinGW warns if -fvisibility-inlines-hidden is used.
 else()
@@ -19,7 +18,6 @@ else()
 
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
-add_subdirectory(protobuf-cmake)
 
 function(PROTOBUF_GENERATE_CPP SRCS HDRS)
   if(NOT ARGN)
