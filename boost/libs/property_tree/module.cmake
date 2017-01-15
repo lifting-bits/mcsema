@@ -1,1 +1,0 @@
-boost_module(property_tree DEPENDS smart_ptr)

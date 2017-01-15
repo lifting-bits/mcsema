@@ -1,2 +1,0 @@
-boost_module(compatibility)
-

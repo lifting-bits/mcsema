@@ -1,3 +1,0 @@
-boost_module(uuid)
-
-

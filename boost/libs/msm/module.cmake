@@ -1,1 +1,0 @@
-boost_module(msm DEPENDS smart_ptr)
