@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-option(MCSEMA_ENABLE_PIN_VALIDATOR ON)
+option(MCSEMA_ENABLE_PIN_VALIDATOR "Use Intel Pin to test instruction semantics" OFF)
 
 set(CMAKE_MODULE_PATH
   ${CMAKE_MODULE_PATH}
