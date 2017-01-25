@@ -15,6 +15,7 @@ add_executable(cfg_to_bc
 target_link_libraries(cfg_to_bc
   cfgToLLVM
   peToCFG
+  binary_common
   LLVMBitReader
   LLVMBitWriter
   LLVMMCDisassembler
@@ -36,4 +37,5 @@ target_link_libraries(cfg_to_bc
   libprotobuf)
 
 add_dependencies(cfg_to_bc
-  peToCFG)
+  peToCFG
+  binary_common)
