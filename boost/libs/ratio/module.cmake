@@ -1,1 +1,0 @@
-boost_module(ratio DEPENDS parameter typeof foreach)

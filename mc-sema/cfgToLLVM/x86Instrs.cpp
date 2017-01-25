@@ -140,8 +140,6 @@ InstTransResult liftInstrImpl(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
                             NativeModulePtr natM) {
   MCInst inst = ip->get_inst();
   InstTransResult itr = ContinueBlock;
-  string outS;
-  raw_string_ostream strOut(outS);
   MCInstPrinter *IP = nb->get_printer();
 
   if (IP == NULL) {
@@ -171,10 +169,7 @@ InstTransResult liftInstrImpl(InstPtr ip, BasicBlock *&block, NativeBlockPtr nb,
     // Instruction translation not defined.
     errs() << "Unsupported opcode " << opcode << "!";
     IP->printInst( &inst, errs(), to_string<VA>(ip->get_loc(), hex));
-    // Print out the unhandled opcode.
-    errs() << to_string<VA>(ip->get_loc(), hex) << " ";
-    errs() << strOut.str() << "\n";
-    errs() << inst.getOpcode() << "\n";
+    errs() << "\n";
     if (X86::REP_PREFIX != opcode && X86::REPNE_PREFIX != opcode) {
       itr = TranslateErrorUnsupported;
     } else {
