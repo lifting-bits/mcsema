@@ -165,7 +165,7 @@ class ExternalCodeRef : public ExternalRef {
   std::string funcSign;
 };
 
-typedef std::shared_ptr<ExternalCodeRef> ExternalCodeRefPtr;
-typedef std::shared_ptr<ExternalDataRef> ExternalDataRefPtr;
+typedef ExternalCodeRef *ExternalCodeRefPtr;
+typedef ExternalDataRef *ExternalDataRefPtr;
 
 #endif

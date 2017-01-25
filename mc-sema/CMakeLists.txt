@@ -96,37 +96,3 @@ add_subdirectory(bitcode_from_cfg)
 add_subdirectory(binary_common)
 add_subdirectory(bin_descend)
 add_subdirectory(runtime)
-
-if(MCSEMA_ENABLE_PIN_VALIDATOR)
-	find_package(Pin)
-	if(NOT PIN_FOUND AND NOT WIN32)
-	
-		if(UNIX)
-			set(PIN_DOWNLOAD_URL https://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-67254-gcc.4.4.7-linux.tar.gz)
-			set(PIN_DOWNLOAD_HASH 792eaaa199e9deba84cde79858e93ffc)
-		endif(UNIX)
-	
-		if(APPLE)
-			set(PIN_DOWNLOAD_URL https://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-67254-clang.5.1-mac.tar.gz)
-			set(PIN_DOWNLOAD_HASH 0f93c64484d039ceca828cd2909d321b)
-		endif(APPLE)
-	
-		ExternalProject_add(Pin
-			URL ${PIN_DOWNLOAD_URL}
-			URL_MD5 ${PIN_DOWNLOAD_HASH}
-			CONFIGURE_COMMAND ""
-			BUILD_COMMAND ""
-			SOURCE_DIR pin
-			INSTALL_COMMAND ""
-		)
-	
-		set(PIN_PATH ${CMAKE_CURRENT_BINARY_DIR}/pin)
-		set(PIN_EXECUTABLE ${CMAKE_CURRENT_BINARY_DIR}/pin/pin)
-	
-		add_subdirectory(validator)
-	endif(NOT PIN_FOUND AND NOT WIN32)
-	
-	if(WIN32 AND PIN_FOUND)
-		add_subdirectory(validator)
-	endif(WIN32 AND PIN_FOUND)
-endif(MCSEMA_ENABLE_PIN_VALIDATOR)

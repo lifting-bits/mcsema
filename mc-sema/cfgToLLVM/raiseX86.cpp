@@ -32,6 +32,7 @@
 #include "x86Helpers.h"
 #include "ArchOps.h"
 #include "RegisterUsage.h"
+#include "InstructionDispatch.h"
 
 #include "llvm/ADT/StringSwitch.h"
 
@@ -1245,7 +1246,7 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
   }
 
   auto entryBlock = llvm::BasicBlock::Create(F->getContext(), "entry", F);
-  ArchAllocRegisterVars(F, ArchPointerSize(M));
+  ArchAllocRegisterVars(entryBlock, ArchPointerSize(M));
 
   TranslationContext ctx;
   ctx.natM = mod;

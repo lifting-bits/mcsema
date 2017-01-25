@@ -64,11 +64,11 @@ bool ArchInitInstructionDispatch(void);
     ADDR_NOREF_IMPL<32>(natM, block, x, ip, inst) :\
     ADDR_NOREF_IMPL<64>(natM, block, x, ip, inst)
 
-#define CREATE_BLOCK(nm, b) auto block_ ## nm = BasicBlock::Create((b)->getContext(), #nm, (b)->getParent())
+#define CREATE_BLOCK(nm, b) auto block_ ## nm = llvm::BasicBlock::Create((b)->getContext(), #nm, (b)->getParent())
 #define MEM_REFERENCE(which) MEM_AS_DATA_REF(block, natM, inst, ip, which)
 
 #define GENERIC_TRANSLATION_MI(NAME, NOREFS, MEMREF, IMMREF, TWOREFS) \
-  static InstTransResult translate_ ## NAME (TranslationContext &ctx, BasicBlock *&block) {\
+  static InstTransResult translate_ ## NAME (TranslationContext &ctx, llvm::BasicBlock *&block) {\
     InstTransResult ret;\
     auto natM = ctx.natM; \
     Function *F = ctx.F; \

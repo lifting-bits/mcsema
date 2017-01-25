@@ -41,68 +41,65 @@
 
 #define NASSERT(cond) TASSERT(cond, "")
 
-using namespace llvm;
-
 template<int width>
-static void doPushVT(NativeInstPtr ip, BasicBlock *&b, Value *v) {
+static void doPushVT(NativeInstPtr ip, llvm::BasicBlock *&b, llvm::Value *v) {
   //ESP <- ESP - 4
   //Memory[ESP] = v
   if (ArchPointerSize(b->getParent()->getParent())) {
-    Value *oldESP = R_READ<32>(b, X86::ESP);
-    Value *newESP = BinaryOperator::CreateSub(oldESP,
-                                              CONST_V<32>(b, (width / 8)), "",
-                                              b);
+    auto oldESP = R_READ<32>(b, llvm::X86::ESP);
+    auto newESP = llvm::BinaryOperator::CreateSub(oldESP,
+                                                  CONST_V<32>(b, (width / 8)),
+                                                  "", b);
 
-    Value *intVal = CastInst::CreatePointerCast(
-        v, Type::getInt32Ty(b->getContext()), "", b);
+    auto intVal = llvm::CastInst::CreatePointerCast(
+        v, llvm::Type::getInt32Ty(b->getContext()), "", b);
 
     M_WRITE_0<width>(b, newESP, intVal);
-    R_WRITE<32>(b, X86::ESP, newESP);
+    R_WRITE<32>(b, llvm::X86::ESP, newESP);
+
   } else {
-
-    Value *oldESP = R_READ<64>(b, X86::RSP);
-    Value *newESP = BinaryOperator::CreateSub(oldESP,
-                                              CONST_V<64>(b, (width / 8)), "",
-                                              b);
-
-    Value *intVal = CastInst::CreatePointerCast(
-        v, Type::getInt64Ty(b->getContext()), "", b);
+    auto oldESP = R_READ<64>(b, llvm::X86::RSP);
+    auto newESP = llvm::BinaryOperator::CreateSub(oldESP,
+                                                  CONST_V<64>(b, (width / 8)),
+                                                  "", b);
+    auto intVal = llvm::CastInst::CreatePointerCast(
+        v, llvm::Type::getInt64Ty(b->getContext()), "", b);
 
     M_WRITE_0<width>(b, newESP, intVal);
-    R_WRITE<64>(b, X86::RSP, newESP);
+    R_WRITE<64>(b, llvm::X86::RSP, newESP);
   }
 
   return;
 }
 
 template<int width>
-static void doPushV(NativeInstPtr ip, BasicBlock *&b, Value *v) {
+static void doPushV(NativeInstPtr ip, llvm::BasicBlock *&b, llvm::Value *v) {
   //ESP <- ESP - 4
   //Memory[ESP] = v
-  llvm::Module *M = b->getParent()->getParent();
+  auto M = b->getParent()->getParent();
   if (ArchPointerSize(M) == Pointer32) {
-    Value *oldESP = x86::R_READ<32>(b, X86::ESP);
-    Value *newESP = BinaryOperator::CreateSub(oldESP,
-                                              CONST_V<32>(b, (width / 8)), "",
-                                              b);
+    auto oldESP = x86::R_READ<32>(b, llvm::X86::ESP);
+    auto newESP = llvm::BinaryOperator::CreateSub(oldESP,
+                                                  CONST_V<32>(b, (width / 8)),
+                                                  "", b);
 
     M_WRITE_0<width>(b, newESP, v);
-    x86::R_WRITE<32>(b, X86::ESP, newESP);
+    x86::R_WRITE<32>(b, llvm::X86::ESP, newESP);
   } else {
-    Value *oldRSP = x86_64::R_READ<64>(b, X86::RSP);
-    Value *newRSP = BinaryOperator::CreateSub(oldRSP,
-                                              CONST_V<64>(b, (width / 8)), "",
-                                              b);
+    auto oldRSP = x86_64::R_READ<64>(b, llvm::X86::RSP);
+    auto newRSP = llvm::BinaryOperator::CreateSub(oldRSP,
+                                                  CONST_V<64>(b, (width / 8)),
+                                                  "", b);
 
     M_WRITE_0<width>(b, newRSP, v);
-    x86_64::R_WRITE<64>(b, X86::RSP, newRSP);
+    x86_64::R_WRITE<64>(b, llvm::X86::RSP, newRSP);
   }
 
   return;
 }
 
 template<int width>
-static InstTransResult doPushAV(NativeInstPtr ip, BasicBlock *b) {
+static InstTransResult doPushAV(NativeInstPtr ip, llvm::BasicBlock *b) {
   // Temp := (ESP);
   // Push(EAX);
   // Push(ECX);
@@ -112,94 +109,95 @@ static InstTransResult doPushAV(NativeInstPtr ip, BasicBlock *b) {
   // Push(EBP);
   // Push(ESI);
   // Push(EDI);
-  Value *Temp = R_READ<width>(b, X86::ESP);
+  auto Temp = R_READ<width>(b, llvm::X86::ESP);
 
-  doPushV<width>(ip, b, R_READ<width>(b, X86::EAX));
-  doPushV<width>(ip, b, R_READ<width>(b, X86::ECX));
-  doPushV<width>(ip, b, R_READ<width>(b, X86::EDX));
-  doPushV<width>(ip, b, R_READ<width>(b, X86::EBX));
+  doPushV<width>(ip, b, R_READ<width>(b, llvm::X86::EAX));
+  doPushV<width>(ip, b, R_READ<width>(b, llvm::X86::ECX));
+  doPushV<width>(ip, b, R_READ<width>(b, llvm::X86::EDX));
+  doPushV<width>(ip, b, R_READ<width>(b, llvm::X86::EBX));
   doPushV<width>(ip, b, Temp);
-  doPushV<width>(ip, b, R_READ<width>(b, X86::EBP));
-  doPushV<width>(ip, b, R_READ<width>(b, X86::ESI));
-  doPushV<width>(ip, b, R_READ<width>(b, X86::EDI));
+  doPushV<width>(ip, b, R_READ<width>(b, llvm::X86::EBP));
+  doPushV<width>(ip, b, R_READ<width>(b, llvm::X86::ESI));
+  doPushV<width>(ip, b, R_READ<width>(b, llvm::X86::EDI));
 
   return ContinueBlock;
 }
 
 namespace x86 {
-static InstTransResult doEnter(NativeInstPtr ip, BasicBlock *&b,
-                               const MCOperand &frameSize,
-                               const MCOperand &nestingLevel) {
-  Function *F = b->getParent();
+static InstTransResult doEnter(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               const llvm::MCOperand &frameSize,
+                               const llvm::MCOperand &nestingLevel) {
+  auto F = b->getParent();
   NASSERT(frameSize.isImm());
   NASSERT(nestingLevel.isImm());
 
-  Value *vFrameSize = CONST_V<32>(b, frameSize.getImm());
-  Value *vNestingLevel = CONST_V<32>(b, nestingLevel.getImm());
+  auto vFrameSize = CONST_V<32>(b, frameSize.getImm());
+  auto vNestingLevel = CONST_V<32>(b, nestingLevel.getImm());
 
   //Push EBP
-  doPushV<32>(ip, b, x86::R_READ<32>(b, X86::EBP));
+  doPushV<32>(ip, b, x86::R_READ<32>(b, llvm::X86::EBP));
 
   //set FrameTemp equal to the current value in ESP
-  Value *frameTemp = x86::R_READ<32>(b, X86::ESP);
+  auto frameTemp = x86::R_READ<32>(b, llvm::X86::ESP);
 
   //we'll need some blocks for -
   //  * the loop header
   //  * the loop body
   //  * the end of the loop
-  BasicBlock *loopHeader = BasicBlock::Create(b->getContext(), "loopHeader", F);
-  BasicBlock *loopBody = BasicBlock::Create(b->getContext(), "loopBody", F);
-  BasicBlock *loopEnd = BasicBlock::Create(b->getContext(), "loopEnd", F);
-  BasicBlock *cont = BasicBlock::Create(b->getContext(), "continue", F);
-  BasicBlock *preLoop = BasicBlock::Create(b->getContext(), "preLoop", F);
-  BasicBlock *loopSetup = BasicBlock::Create(b->getContext(), "loopSetup", F);
+  auto &C = b->getContext();
+  auto loopHeader = llvm::BasicBlock::Create(C, "loopHeader", F);
+  auto loopBody = llvm::BasicBlock::Create(C, "loopBody", F);
+  auto loopEnd = llvm::BasicBlock::Create(C, "loopEnd", F);
+  auto cont = llvm::BasicBlock::Create(C, "continue", F);
+  auto preLoop = llvm::BasicBlock::Create(C, "preLoop", F);
+  auto loopSetup = llvm::BasicBlock::Create(C, "loopSetup", F);
 
   //test to see if NestingLevel is 0
-  Value *isNestZ = new ICmpInst( *b, CmpInst::ICMP_EQ, vNestingLevel,
-                                CONST_V<32>(b, 0));
-  BranchInst::Create(cont, preLoop, isNestZ, b);
+  auto isNestZ = new llvm::ICmpInst(*b, llvm::CmpInst::ICMP_EQ, vNestingLevel,
+                                    CONST_V<32>(b, 0));
+  llvm::BranchInst::Create(cont, preLoop, isNestZ, b);
 
   //test to see if NestingLevel is greater than 1
-  Value *testRes = new ICmpInst( *preLoop, CmpInst::ICMP_UGT, vNestingLevel,
-                                CONST_V<32>(b, 1));
-  BranchInst::Create(loopSetup, loopEnd, testRes, preLoop);
+  auto testRes = new llvm::ICmpInst(*preLoop, llvm::CmpInst::ICMP_UGT,
+                                    vNestingLevel, CONST_V<32>(b, 1));
+  llvm::BranchInst::Create(loopSetup, loopEnd, testRes, preLoop);
 
   //initialize i to 1
-  Value *i_init = CONST_V<32>(loopSetup, 1);
-  BranchInst::Create(loopHeader, loopSetup);
+  auto i_init = CONST_V<32>(loopSetup, 1);
+  llvm::BranchInst::Create(loopHeader, loopSetup);
 
   //the counter is a PHI instruction
-  PHINode *i = PHINode::Create(Type::getInt32Ty(F->getContext()), 2, "",
-                               loopHeader);
+  auto i = llvm::PHINode::Create(llvm::Type::getInt32Ty(F->getContext()), 2, "",
+                                 loopHeader);
   i->addIncoming(i_init, loopSetup);
   //test and see if we should leave
-  Value *leaveLoop = new ICmpInst( *loopHeader, CmpInst::ICMP_ULT, i,
-                                  vNestingLevel);
+  auto leaveLoop = new llvm::ICmpInst(*loopHeader, llvm::CmpInst::ICMP_ULT, i,
+                                      vNestingLevel);
   BranchInst::Create(loopBody, loopEnd, leaveLoop, loopHeader);
 
   //subtract 4 from EBP
-  Value *oEBP = x86::R_READ<32>(loopBody, X86::EBP);
-  Value *nEBP = BinaryOperator::CreateSub(oEBP, CONST_V<32>(loopBody, 4), "",
-                                          loopBody);
-  x86::R_WRITE<32>(loopBody, X86::EBP, nEBP);
+  auto oEBP = x86::R_READ<32>(loopBody, llvm::X86::EBP);
+  auto nEBP = llvm::BinaryOperator::CreateSub(oEBP, CONST_V<32>(loopBody, 4),
+                                              "", loopBody);
+  x86::R_WRITE<32>(loopBody, llvm::X86::EBP, nEBP);
   doPushV<32>(ip, loopBody, nEBP);
 
   //add to the counter
-  Value *i_inc = BinaryOperator::CreateAdd(i, CONST_V<32>(loopBody, 1), "",
-                                           loopBody);
+  auto i_inc = BinaryOperator::CreateAdd(i, CONST_V<32>(loopBody, 1), "",
+                                         loopBody);
   i->addIncoming(i_inc, loopBody);
-  BranchInst::Create(loopHeader, loopBody);
+  llvm::BranchInst::Create(loopHeader, loopBody);
 
   //now at the end of the loop, push the frame temp
   doPushV<32>(ip, loopEnd, frameTemp);
-  BranchInst::Create(cont, loopEnd);
+  llvm::BranchInst::Create(cont, loopEnd);
 
   //write the frame temp into EBP
-  x86::R_WRITE<32>(cont, X86::EBP, frameTemp);
+  x86::R_WRITE<32>(cont, llvm::X86::EBP, frameTemp);
   //Subtract the size from ESP
-  Value *oESP = x86::R_READ<32>(cont, X86::ESP);
-  Value *nESP = BinaryOperator::CreateSub(oESP, vFrameSize, "", cont);
-  x86::R_WRITE<32>(cont, X86::ESP, nESP);
+  auto oESP = x86::R_READ<32>(cont, llvm::X86::ESP);
+  auto nESP = llvm::BinaryOperator::CreateSub(oESP, vFrameSize, "", cont);
+  x86::R_WRITE<32>(cont, llvm::X86::ESP, nESP);
 
   //update our caller to use the 'continue' block as the place to continue
   //sticking instructions
@@ -210,80 +208,81 @@ static InstTransResult doEnter(NativeInstPtr ip, BasicBlock *&b,
 }
 
 namespace x86_64 {
-static InstTransResult doEnter(NativeInstPtr ip, BasicBlock *&b,
-                               const MCOperand &frameSize,
-                               const MCOperand &nestingLevel) {
-  Function *F = b->getParent();
+static InstTransResult doEnter(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               const llvm::MCOperand &frameSize,
+                               const llvm::MCOperand &nestingLevel) {
+  auto F = b->getParent();
   NASSERT(frameSize.isImm());
   NASSERT(nestingLevel.isImm());
 
-  Value *vFrameSize = CONST_V<64>(b, frameSize.getImm());
-  Value *vNestingLevel = CONST_V<64>(b, nestingLevel.getImm());
+  auto vFrameSize = CONST_V<64>(b, frameSize.getImm());
+  auto vNestingLevel = CONST_V<64>(b, nestingLevel.getImm());
 
   //Push EBP
-  doPushV<64>(ip, b, R_READ<64>(b, X86::RBP));
+  doPushV<64>(ip, b, R_READ<64>(b, llvm::X86::RBP));
 
   //set FrameTemp equal to the current value in ESP
-  Value *frameTemp = R_READ<64>(b, X86::RSP);
+  auto frameTemp = R_READ<64>(b, llvm::X86::RSP);
 
   //we'll need some blocks for -
   //  * the loop header
   //  * the loop body
   //  * the end of the loop
-  BasicBlock *loopHeader = BasicBlock::Create(b->getContext(), "loopHeader", F);
-  BasicBlock *loopBody = BasicBlock::Create(b->getContext(), "loopBody", F);
-  BasicBlock *loopEnd = BasicBlock::Create(b->getContext(), "loopEnd", F);
-  BasicBlock *cont = BasicBlock::Create(b->getContext(), "continue", F);
-  BasicBlock *preLoop = BasicBlock::Create(b->getContext(), "preLoop", F);
-  BasicBlock *loopSetup = BasicBlock::Create(b->getContext(), "loopSetup", F);
+  auto &C = b->getContext();
+  auto loopHeader = llvm::BasicBlock::Create(C, "loopHeader", F);
+  auto loopBody = llvm::BasicBlock::Create(C, "loopBody", F);
+  auto loopEnd = llvm::BasicBlock::Create(C, "loopEnd", F);
+  auto cont = llvm::BasicBlock::Create(C, "continue", F);
+  auto preLoop = llvm::BasicBlock::Create(C, "preLoop", F);
+  auto loopSetup = llvm::BasicBlock::Create(C, "loopSetup", F);
 
   //test to see if NestingLevel is 0
-  Value *isNestZ = new ICmpInst( *b, CmpInst::ICMP_EQ, vNestingLevel,
-                                CONST_V<64>(b, 0));
+  auto isNestZ = new llvm::ICmpInst(*b, llvm::CmpInst::ICMP_EQ, vNestingLevel,
+                                    CONST_V<64>(b, 0));
 
-  BranchInst::Create(cont, preLoop, isNestZ, b);
+  llvm::BranchInst::Create(cont, preLoop, isNestZ, b);
 
   //test to see if NestingLevel is greater than 1
-  Value *testRes = new ICmpInst( *preLoop, CmpInst::ICMP_UGT, vNestingLevel,
-                                CONST_V<64>(b, 1));
-  BranchInst::Create(loopSetup, loopEnd, testRes, preLoop);
+  auto testRes = new llvm::ICmpInst(*preLoop, llvm::CmpInst::ICMP_UGT,
+                                    vNestingLevel, CONST_V<64>(b, 1));
+  llvm::BranchInst::Create(loopSetup, loopEnd, testRes, preLoop);
 
   //initialize i to 1
-  Value *i_init = CONST_V<64>(loopSetup, 1);
-  BranchInst::Create(loopHeader, loopSetup);
+  auto i_init = CONST_V<64>(loopSetup, 1);
+  llvm::BranchInst::Create(loopHeader, loopSetup);
 
   //the counter is a PHI instruction
-  PHINode *i = PHINode::Create(Type::getInt64Ty(F->getContext()), 2, "",
-                               loopHeader);
+  auto i = llvm::PHINode::Create(llvm::Type::getInt64Ty(F->getContext()), 2, "",
+                                 loopHeader);
   i->addIncoming(i_init, loopSetup);
   //test and see if we should leave
-  Value *leaveLoop = new ICmpInst( *loopHeader, CmpInst::ICMP_ULT, i,
-                                  vNestingLevel);
-  BranchInst::Create(loopBody, loopEnd, leaveLoop, loopHeader);
+  auto leaveLoop = new llvm::ICmpInst(*loopHeader, llvm::CmpInst::ICMP_ULT, i,
+                                      vNestingLevel);
+  llvm::BranchInst::Create(loopBody, loopEnd, leaveLoop, loopHeader);
 
   //subtract 8 from EBP
-  Value *oEBP = R_READ<64>(loopBody, X86::RBP);
-  Value *nEBP = BinaryOperator::CreateSub(oEBP, CONST_V<64>(loopBody, 8), "",
-                                          loopBody);
-  R_WRITE<64>(loopBody, X86::RBP, nEBP);
+  auto oEBP = R_READ<64>(loopBody, llvm::X86::RBP);
+  auto nEBP = llvm::BinaryOperator::CreateSub(oEBP, CONST_V<64>(loopBody, 8),
+                                              "", loopBody);
+  R_WRITE<64>(loopBody, llvm::X86::RBP, nEBP);
   doPushV<64>(ip, loopBody, nEBP);
 
   //add to the counter
-  Value *i_inc = BinaryOperator::CreateAdd(i, CONST_V<64>(loopBody, 1), "",
-                                           loopBody);
+  auto i_inc = llvm::BinaryOperator::CreateAdd(i, CONST_V<64>(loopBody, 1), "",
+                                               loopBody);
   i->addIncoming(i_inc, loopBody);
-  BranchInst::Create(loopHeader, loopBody);
+  llvm::BranchInst::Create(loopHeader, loopBody);
 
   //now at the end of the loop, push the frame temp
   doPushV<64>(ip, loopEnd, frameTemp);
-  BranchInst::Create(cont, loopEnd);
+  llvm::BranchInst::Create(cont, loopEnd);
 
   //write the frame temp into EBP
-  R_WRITE<64>(cont, X86::RBP, frameTemp);
+  R_WRITE<64>(cont, llvm::X86::RBP, frameTemp);
   //Subtract the size from ESP
-  Value *oESP = R_READ<64>(cont, X86::RSP);
-  Value *nESP = BinaryOperator::CreateSub(oESP, vFrameSize, "", cont);
-  R_WRITE<64>(cont, X86::RSP, nESP);
+  auto oESP = R_READ<64>(cont, llvm::X86::RSP);
+  auto nESP = llvm::BinaryOperator::CreateSub(oESP, vFrameSize, "", cont);
+  R_WRITE<64>(cont, llvm::X86::RSP, nESP);
   //update our caller to use the 'continue' block as the place to continue
   //sticking instructions
   b = cont;
@@ -292,10 +291,10 @@ static InstTransResult doEnter(NativeInstPtr ip, BasicBlock *&b,
 }
 }
 
-static InstTransResult doEnter(NativeInstPtr ip, BasicBlock *&b,
-                               const MCOperand &frameSize,
-                               const MCOperand &nestingLevel) {
-  llvm::Module *M = b->getParent()->getParent();
+static InstTransResult doEnter(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               const llvm::MCOperand &frameSize,
+                               const llvm::MCOperand &nestingLevel) {
+  auto M = b->getParent()->getParent();
   if (ArchPointerSize(M) == Pointer32) {
     return x86::doEnter(ip, b, frameSize, nestingLevel);
   } else {
@@ -303,127 +302,128 @@ static InstTransResult doEnter(NativeInstPtr ip, BasicBlock *&b,
   }
 }
 
-static InstTransResult doLeave(NativeInstPtr ip, BasicBlock *b) {
+static InstTransResult doLeave(NativeInstPtr ip, llvm::BasicBlock *b) {
   // LEAVE
-  llvm::Module *M = b->getParent()->getParent();
+  auto M = b->getParent()->getParent();
 
   if (ArchPointerSize(M) == Pointer32) {
     // read EBP
-    Value *link_pointer = x86::R_READ<32>(b, X86::EBP);
-    Value *base_pointer = M_READ<32>(ip, b, link_pointer);
-    R_WRITE<32>(b, X86::EBP, base_pointer);
+    auto link_pointer = x86::R_READ<32>(b, llvm::X86::EBP);
+    auto base_pointer = M_READ<32>(ip, b, link_pointer);
+    R_WRITE<32>(b, llvm::X86::EBP, base_pointer);
 
     //write this to ESP
     R_WRITE<32>(
         b,
-        X86::ESP,
-        llvm::BinaryOperator::Create(Instruction::Add, link_pointer,
+        llvm::X86::ESP,
+        llvm::BinaryOperator::Create(llvm::Instruction::Add, link_pointer,
                                      CONST_V<32>(b, 4), "", b));
 
   } else {
-    Value *link_pointer = x86::R_READ<64>(b, X86::RBP);
-    Value *base_pointer = M_READ<64>(ip, b, link_pointer);
-    R_WRITE<64>(b, X86::RBP, base_pointer);
+    auto link_pointer = x86::R_READ<64>(b, llvm::X86::RBP);
+    auto base_pointer = M_READ<64>(ip, b, link_pointer);
+    R_WRITE<64>(b, llvm::X86::RBP, base_pointer);
 
     //write this to ESP
     R_WRITE<64>(
         b,
-        X86::RSP,
-        llvm::BinaryOperator::Create(Instruction::Add, link_pointer,
+        llvm::X86::RSP,
+        llvm::BinaryOperator::Create(llvm::Instruction::Add, link_pointer,
                                      CONST_V<64>(b, 8), "", b));
   }
 
   return ContinueBlock;
 }
 
-static InstTransResult doLeave64(NativeInstPtr ip, BasicBlock *b) {
+static InstTransResult doLeave64(NativeInstPtr ip, llvm::BasicBlock *b) {
   // LEAVE
 
   // read RBP
-  Value *vRBP = x86_64::R_READ<64>(b, X86::RBP);
+  auto vRBP = x86_64::R_READ<64>(b, llvm::X86::RBP);
 
   //write this to RSP
-  x86_64::R_WRITE<64>(b, X86::RSP, vRBP);
+  x86_64::R_WRITE<64>(b, llvm::X86::RSP, vRBP);
 
   //do a pop into EBP
   //read from memory at the top of the stack
-  Value *vRSP = x86_64::R_READ<64>(b, X86::RSP);
-  Value *atTop = M_READ<64>(ip, b, vRSP);
+  auto vRSP = x86_64::R_READ<64>(b, llvm::X86::RSP);
+  auto atTop = M_READ<64>(ip, b, vRSP);
 
   //write this value into EBP
-  x86_64::R_WRITE<64>(b, X86::RBP, atTop);
+  x86_64::R_WRITE<64>(b, llvm::X86::RBP, atTop);
 
   //add 8 to the stack pointer
-  Value *updt = BinaryOperator::CreateAdd(vRSP, CONST_V<64>(b, 8), "", b);
-  x86_64::R_WRITE<64>(b, X86::RSP, updt);
+  auto updt = llvm::BinaryOperator::CreateAdd(vRSP, CONST_V<64>(b, 8), "", b);
+  x86_64::R_WRITE<64>(b, llvm::X86::RSP, updt);
 
   return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult doPopR(NativeInstPtr ip, BasicBlock *&b,
-                              const MCOperand &dst) {
+static InstTransResult doPopR(NativeInstPtr ip, llvm::BasicBlock *&b,
+                              const llvm::MCOperand &dst) {
   NASSERT(dst.isReg());
-  llvm::Module *M = b->getParent()->getParent();
+  auto M = b->getParent()->getParent();
 
   //read the stack pointer
-  Value *oldRSP;
+  llvm::Value *oldRSP = nullptr;
 
   if (ArchPointerSize(M) == Pointer32) {
-    oldRSP = x86::R_READ<32>(b, X86::ESP);
+    oldRSP = x86::R_READ<32>(b, llvm::X86::ESP);
   } else {
-    oldRSP = x86_64::R_READ<64>(b, X86::RSP);
+    oldRSP = x86_64::R_READ<64>(b, llvm::X86::RSP);
   }
 
   //read the value from the memory at the stack pointer address
-  Value *m = M_READ_0<width>(b, oldRSP);
+  auto m = M_READ_0<width>(b, oldRSP);
 
   //write that value into dst
   R_WRITE<width>(b, dst.getReg(), m);
 
   //add to the stack pointer
   if (ArchPointerSize(M) == Pointer32) {
-    Value *newESP = BinaryOperator::CreateAdd(oldRSP,
-                                              CONST_V<32>(b, (width / 8)), "",
-                                              b);
+    auto newESP = llvm::BinaryOperator::CreateAdd(oldRSP,
+                                                  CONST_V<32>(b, (width / 8)),
+                                                  "", b);
 
     //update the stack pointer register
-    x86::R_WRITE<32>(b, X86::ESP, newESP);
+    x86::R_WRITE<32>(b, llvm::X86::ESP, newESP);
   } else {
-    Value *newRSP = BinaryOperator::CreateAdd(oldRSP,
-                                              CONST_V<64>(b, (width / 8)), "",
-                                              b);
+    auto newRSP = llvm::BinaryOperator::CreateAdd(oldRSP,
+                                                  CONST_V<64>(b, (width / 8)),
+                                                  "", b);
 
     //update the stack pointer register
-    x86_64::R_WRITE<64>(b, X86::RSP, newRSP);
+    x86_64::R_WRITE<64>(b, llvm::X86::RSP, newRSP);
   }
 
   return ContinueBlock;
 }
 
-template<int width>
-static InstTransResult doPopD(BasicBlock *b) {
+template <int width>
+static llvm::Value *doPopV(llvm::BasicBlock *b) {
   //read the stack pointer
-  Value *oldESP = R_READ<width>(b, X86::ESP);
+  auto xsp = 32 == width ? llvm::X86::ESP : llvm::X86::RSP;
+  auto oldESP = R_READ<width>(b, xsp);
 
   //read the value from the memory at the stack pointer address,
   //and throw it away
-  Value *m = M_READ_0<width>(b, oldESP);
-  NASSERT(m != NULL);
+  auto m = INTERNAL_M_READ(width, 0, b, oldESP);
+  NASSERT(m != nullptr);
 
   //add to the stack pointer
-  Value *newESP = BinaryOperator::CreateAdd(oldESP,
-                                            CONST_V<width>(b, (width / 8)), "",
-                                            b);
+  auto newESP = llvm::BinaryOperator::CreateAdd(oldESP,
+                                                CONST_V<width>(b, (width / 8)),
+                                                "", b);
 
   //update the stack pointer register
-  R_WRITE<width>(b, X86::ESP, newESP);
+  R_WRITE<width>(b, xsp, newESP);
 
-  return ContinueBlock;
+  return m;
 }
 
 template<int width>
-static InstTransResult doPopAV(NativeInstPtr ip, BasicBlock *b) {
+static InstTransResult doPopAV(NativeInstPtr ip, llvm::BasicBlock *b) {
   // EDI := Pop();
   // ESI := Pop();
   // EBP := Pop();
@@ -433,26 +433,26 @@ static InstTransResult doPopAV(NativeInstPtr ip, BasicBlock *b) {
   // ECX := Pop();
   // EAX := Pop();
 
-  doPopR<width>(ip, b, MCOperand::CreateReg(X86::EDI));
-  doPopR<width>(ip, b, MCOperand::CreateReg(X86::ESI));
-  doPopR<width>(ip, b, MCOperand::CreateReg(X86::EBP));
-  doPopD<width>(b);
-  doPopR<width>(ip, b, MCOperand::CreateReg(X86::EBX));
-  doPopR<width>(ip, b, MCOperand::CreateReg(X86::EDX));
-  doPopR<width>(ip, b, MCOperand::CreateReg(X86::ECX));
-  doPopR<width>(ip, b, MCOperand::CreateReg(X86::EAX));
+  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::EDI));
+  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::ESI));
+  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::EBP));
+  doPopV<width>(b);
+  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::EBX));
+  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::EDX));
+  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::ECX));
+  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::EAX));
 
   return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult doPushR(NativeInstPtr ip, BasicBlock *&b,
-                               const MCOperand &src) {
+static InstTransResult doPushR(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               const llvm::MCOperand &src) {
   //PUSH <r>
   NASSERT(src.isReg());
 
   //first, read from <r> into a temp
-  Value *TMP = R_READ<width>(b, src.getReg());
+  auto TMP = R_READ<width>(b, src.getReg());
 
   doPushV<width>(ip, b, TMP);
 
@@ -460,26 +460,28 @@ static InstTransResult doPushR(NativeInstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doPushI(NativeInstPtr ip, BasicBlock *&b,
-                               const MCOperand &src) {
+static InstTransResult doPushI(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               const llvm::MCOperand &src) {
   // PUSH <imm>
   NASSERT(src.isImm());
 
-  Value *OrigIMM = CONST_V<width>(b, src.getImm());
+  auto OrigIMM = CONST_V<width>(b, src.getImm());
   // PUSHi32 and PUSHi16 will never be extended
   // in IA32
-  Value *SExt_Val = OrigIMM;
+  llvm::Value *SExt_Val = OrigIMM;
 
   // PUSHi8 is extended to operand size, which is 32
   if (width == 8) {
-    SExt_Val = new SExtInst(OrigIMM, Type::getInt32Ty(b->getContext()), "", b);
+    SExt_Val = new llvm::SExtInst(OrigIMM,
+                                  llvm::Type::getInt32Ty(b->getContext()), "",
+                                  b);
     doPushV<32>(ip, b, SExt_Val);
   } else {
     if (width == 32 && ip->has_ext_call_target()) {
       std::string target = ip->get_ext_call_target()->getSymbolName();
-      Module *M = b->getParent()->getParent();
-      Function *externFunction = M->getFunction(target);
-      NASSERT(externFunction != NULL);
+      auto M = b->getParent()->getParent();
+      auto externFunction = M->getFunction(target);
+      NASSERT(externFunction != nullptr);
       doPushVT<width>(ip, b, externFunction);
     } else {
       doPushV<width>(ip, b, SExt_Val);
@@ -490,46 +492,52 @@ static InstTransResult doPushI(NativeInstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doPopM(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
-  NASSERT(addr != NULL);
+static InstTransResult doPop32M(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                llvm::Value *addr) {
+  NASSERT(addr != nullptr);
 
   //read the stack pointer
-  Value *oldESP = R_READ<32>(b, X86::ESP);
+  auto oldESP = R_READ<32>(b, llvm::X86::ESP);
 
   //read the value from the memory at the stack pointer address
-  Value *m = M_READ_0<width>(b, oldESP);
+  auto m = M_READ_0<width>(b, oldESP);
 
   //write that value into dst
   M_WRITE<width>(ip, b, addr, m);
 
   //add to the stack pointer
-  Value *newESP = BinaryOperator::CreateAdd(oldESP, CONST_V<32>(b, (width / 8)),
-                                            "", b);
+  auto newESP = llvm::BinaryOperator::CreateAdd(oldESP,
+                                                CONST_V<32>(b, (width / 8)), "",
+                                                b);
 
   //update the stack pointer register
-  R_WRITE<32>(b, X86::ESP, newESP);
+  R_WRITE<32>(b, llvm::X86::ESP, newESP);
 
   return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult doPushRMM(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
-  NASSERT(addr != NULL);
+static InstTransResult doPushRMM(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                 llvm::Value *addr) {
+  NASSERT(addr != nullptr);
 
-  Value *fromMem = M_READ<width>(ip, b, addr);
+  auto fromMem = M_READ<width>(ip, b, addr);
   doPushV<width>(ip, b, fromMem);
 
   return ContinueBlock;
 }
 
-static InstTransResult translate_PUSH32rmm(NativeModulePtr natM,
-                                           BasicBlock *& block, NativeInstPtr ip,
-                                           MCInst &inst) {
+static InstTransResult translate_PUSH32rmm(TranslationContext &ctx,
+                                           llvm::BasicBlock *&block) {
   InstTransResult ret;
-  Function *F = block->getParent();
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  auto F = block->getParent();
+
   if (ip->has_external_ref()) {
-    Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
-    TASSERT(addrInt != NULL, "Could not get address for external");
+    auto addrInt = getValueForExternal<32>(F->getParent(), ip, block);
+    TASSERT(addrInt != nullptr, "Could not get address for external");
     doPushV<32>(ip, block, addrInt);
     return ContinueBlock;
   } else if (ip->has_mem_reference) {
@@ -540,14 +548,17 @@ static InstTransResult translate_PUSH32rmm(NativeModulePtr natM,
   return ret;
 }
 
-static InstTransResult translate_PUSH64rmm(NativeModulePtr natM,
-                                           BasicBlock *& block, NativeInstPtr ip,
-                                           MCInst &inst) {
+static InstTransResult translate_PUSH64rmm(TranslationContext &ctx,
+                                           llvm::BasicBlock *&block) {
   InstTransResult ret;
-  Function *F = block->getParent();
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  auto F = block->getParent();
+
   if (ip->has_external_ref()) {
-    Value *addrInt = getValueForExternal<64>(F->getParent(), ip, block);
-    TASSERT(addrInt != NULL, "Could not get address for external");
+    auto addrInt = getValueForExternal<64>(F->getParent(), ip, block);
+    TASSERT(addrInt != nullptr, "Could not get address for external");
     doPushV<64>(ip, block, addrInt);
     return ContinueBlock;
   } else if (ip->has_mem_reference) {
@@ -558,26 +569,31 @@ static InstTransResult translate_PUSH64rmm(NativeModulePtr natM,
   return ret;
 }
 
-static InstTransResult translate_PUSHi32(NativeModulePtr natM,
-                                         BasicBlock *&block, NativeInstPtr ip,
-                                         MCInst &inst) {
+static InstTransResult translate_PUSHi32(TranslationContext &ctx,
+                                         llvm::BasicBlock *&block) {
   InstTransResult ret;
-  Function *F = block->getParent();
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  auto F = block->getParent();
   if (ip->has_code_ref()) {
-    Value *callback_fn = ArchAddCallbackDriver(
+    auto callback_fn = ArchAddCallbackDriver(
         block->getParent()->getParent(), ip->get_reference(NativeInst::IMMRef));
-    Value *addrInt = new PtrToIntInst(
-        callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
+    auto addrInt = new PtrToIntInst(callback_fn,
+                                    llvm::Type::getInt32Ty(block->getContext()),
+                                    "", block);
     doPushV<32>(ip, block, addrInt);
     ret = ContinueBlock;
   } else if (ip->has_imm_reference) {
-    Module *M = F->getParent();
-    Value *ref = IMM_AS_DATA_REF(block, natM, ip);
+    auto M = F->getParent();
+    auto ref = IMM_AS_DATA_REF(block, natM, ip);
 
     // this may fail catastrophically, but we can only push those 32-bits
     // or we break the stack
     if (Pointer64 == ArchPointerSize(M)) {
-        ref = new llvm::TruncInst(ref, llvm::Type::getInt32Ty(block->getContext()), "", block);
+      ref = new llvm::TruncInst(ref,
+                                llvm::Type::getInt32Ty(block->getContext()), "",
+                                block);
     }
 
     doPushV<32>(ip, block, ref);
@@ -589,29 +605,28 @@ static InstTransResult translate_PUSHi32(NativeModulePtr natM,
 }
 
 #define EMIT_SHL_OR(destval, inval, shiftcount) do {\
-    Value *tmp = BinaryOperator::CreateShl(inval, CONST_V<width>(b, shiftcount), "", b); \
-    destval = BinaryOperator::CreateOr(destval, tmp, "", b); \
+    auto tmp = llvm::BinaryOperator::CreateShl(inval, CONST_V<width>(b, shiftcount), "", b); \
+    destval = llvm::BinaryOperator::CreateOr(destval, tmp, "", b); \
     } while (0)
 
 #define EMIT_SHR_AND(destval, inval, shiftcount) do {\
-    Value *tmp = BinaryOperator::CreateLShr(inval, CONST_V<width>(b, shiftcount), "", b); \
-    destval = BinaryOperator::CreateAnd(destval, tmp, "", b); \
+    auto tmp = llvm::BinaryOperator::CreateLShr(inval, CONST_V<width>(b, shiftcount), "", b); \
+    destval = llvm::BinaryOperator::CreateAnd(destval, tmp, "", b); \
     } while (0)
 
 template<int width>
-static Value * checkIfBitSet(Value *field, int bit, BasicBlock *b) {
+static llvm::Value *checkIfBitSet(llvm::Value *field, int bit,
+                                  llvm::BasicBlock *b) {
 
-  Value *tmp = BinaryOperator::CreateAnd(field, CONST_V<width>(b, 1 << bit), "",
-                                         b);
-  Value *res = new ICmpInst( *b, CmpInst::ICMP_NE, tmp, CONST_V<width>(b, 0));
-
-  return res;
+  auto tmp = llvm::BinaryOperator::CreateAnd(field, CONST_V<width>(b, 1 << bit),
+                                             "", b);
+  return new llvm::ICmpInst(*b, llvm::CmpInst::ICMP_NE, tmp,
+                            CONST_V<width>(b, 0));
 }
 
 template<int width>
-static InstTransResult doPopF(NativeInstPtr ip, BasicBlock *b) {
-  Value *newFlags = R_READ<width>(b, X86::ESP);
-  doPopD<width>(b);
+static InstTransResult doPopF(NativeInstPtr ip, llvm::BasicBlock *b) {
+  auto newFlags = doPopV<width>(b);
 
   // bit 0: CF
   F_WRITE(b, CF, checkIfBitSet<width>(newFlags, 0, b));
@@ -638,24 +653,24 @@ static InstTransResult doPopF(NativeInstPtr ip, BasicBlock *b) {
 }
 
 template<int width>
-static InstTransResult doPushF(NativeInstPtr ip, BasicBlock *b) {
+static InstTransResult doPushF(NativeInstPtr ip, llvm::BasicBlock *b) {
 
   // put eflags into one value.
   //
-  Type *toT = Type::getIntNTy(b->getContext(), width);
+  Type *toT = llvm::Type::getIntNTy(b->getContext(), width);
 
-  Value *cf = new ZExtInst(F_READ(b, CF), toT, "", b);
-  Value *pf = new ZExtInst(F_READ(b, PF), toT, "", b);
-  Value *af = new ZExtInst(F_READ(b, AF), toT, "", b);
-  Value *zf = new ZExtInst(F_READ(b, ZF), toT, "", b);
-  Value *sf = new ZExtInst(F_READ(b, SF), toT, "", b);
-  Value *df = new ZExtInst(F_READ(b, DF), toT, "", b);
-  Value *of = new ZExtInst(F_READ(b, OF), toT, "", b);
+  Value *cf = new llvm::ZExtInst(F_READ(b, CF), toT, "", b);
+  Value *pf = new llvm::ZExtInst(F_READ(b, PF), toT, "", b);
+  Value *af = new llvm::ZExtInst(F_READ(b, AF), toT, "", b);
+  Value *zf = new llvm::ZExtInst(F_READ(b, ZF), toT, "", b);
+  Value *sf = new llvm::ZExtInst(F_READ(b, SF), toT, "", b);
+  Value *df = new llvm::ZExtInst(F_READ(b, DF), toT, "", b);
+  Value *of = new llvm::ZExtInst(F_READ(b, OF), toT, "", b);
 
   Value *eflags_base = CONST_V<width>(b, 0x202);
 
   // bit 0: CF
-  Value *cur_flags = BinaryOperator::CreateOr(eflags_base, cf, "", b);
+  Value *cur_flags = llvm::BinaryOperator::CreateOr(eflags_base, cf, "", b);
   // bit 1: 1 (reserved)
   // bit 2: PF
   EMIT_SHL_OR(cur_flags, pf, 2);
@@ -706,8 +721,8 @@ GENERIC_TRANSLATION_REF(PUSHi8, doPushI<8>(ip, block, OP(0)),
                         doPushV<8>(ip, block, MEM_REFERENCE(0) ))
 GENERIC_TRANSLATION_REF(PUSHi16, doPushI<16>(ip, block, OP(0)),
                         doPushV<16>(ip, block, MEM_REFERENCE(0) ))
-GENERIC_TRANSLATION_REF(POP32rmm, doPopM<32>(ip, block, ADDR_NOREF(0)),
-                        doPopM<32>(ip, block, MEM_REFERENCE(0)));
+GENERIC_TRANSLATION_REF(POP32rmm, doPop32M<32>(ip, block, ADDR_NOREF(0)),
+                        doPop32M<32>(ip, block, MEM_REFERENCE(0)));
 
 void Stack_populateDispatchMap(DispatchMap &m) {
   m[X86::ENTER] = translate_ENTER;

@@ -8,7 +8,8 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
- Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
  Neither the name of Trail of Bits nor the names of its
@@ -39,18 +40,16 @@
 
 #define NASSERT(cond) TASSERT(cond, "")
 
-using namespace llvm;
-
-static std::tuple<llvm::VectorType *, llvm::Type *> getIntVectorTypes(llvm::BasicBlock *b,
-                                                        int ewidth, int count) {
+static std::tuple<llvm::VectorType *, llvm::Type *> getIntVectorTypes(
+    llvm::BasicBlock *b, int ewidth, int count) {
   auto elem_ty = llvm::Type::getIntNTy(b->getContext(), ewidth);
   auto vt = llvm::VectorType::get(elem_ty, count);
 
   return std::tuple<llvm::VectorType *, llvm::Type *>(vt, elem_ty);
 }
 
-static std::tuple<llvm::VectorType *, llvm::Type *> getFPVectorTypes(llvm::BasicBlock *b,
-                                                       int ewidth, int count) {
+static std::tuple<llvm::VectorType *, llvm::Type *> getFPVectorTypes(
+    llvm::BasicBlock *b, int ewidth, int count) {
   llvm::Type *elem_ty = nullptr;
 
   switch (ewidth) {
@@ -106,11 +105,12 @@ static llvm::Value *VECTOR_AS_INT(llvm::BasicBlock *b, llvm::Value *vector) {
 
   // convert our base value to a vector
   return llvm::CastInst::Create(llvm::Instruction::BitCast, vector,
-                                     llvm::Type::getIntNTy(b->getContext(), width),
-                                     "", b);
+                                llvm::Type::getIntNTy(b->getContext(), width),
+                                "", b);
 }
 
-static llvm::Type *getFpTypeForWidth(const llvm::BasicBlock *block, int fpwidth) {
+static llvm::Type *getFpTypeForWidth(const llvm::BasicBlock *block,
+                                     int fpwidth) {
   llvm::Type *fpType = nullptr;
 
   switch (fpwidth) {
@@ -121,22 +121,24 @@ static llvm::Type *getFpTypeForWidth(const llvm::BasicBlock *block, int fpwidth)
       fpType = llvm::Type::getDoubleTy(block->getContext());
       break;
     default:
-      TASSERT(false, "Invalid width for getFpTypeForWidth");
+      TASSERT(false, "Invalid width for getFpTypeForWidth")
+      ;
   }
 
   return fpType;
 }
 
 template<int width>
-static InstTransResult MOVAndZextRV(llvm::BasicBlock *& block, const llvm::MCOperand &dst,
-                                    Value *src) {
+static InstTransResult MOVAndZextRV(llvm::BasicBlock *& block,
+                                    const llvm::MCOperand &dst,
+                                    llvm::Value *src) {
 
   NASSERT(dst.isReg());
 
   llvm::Value *zext = src;
 
   if (width < 128) {
-    zext = new llvm::llvm::ZExtInst(src,
+    zext = new llvm::ZExtInst(src,
                               llvm::Type::getIntNTy(block->getContext(), 128),
                               "", block);
   } else if (width > 128) {
@@ -148,7 +150,8 @@ static InstTransResult MOVAndZextRV(llvm::BasicBlock *& block, const llvm::MCOpe
 }
 
 template<int width>
-static InstTransResult MOVAndZextRR(llvm::BasicBlock *& block, const llvm::MCOperand &dst,
+static InstTransResult MOVAndZextRR(llvm::BasicBlock *& block,
+                                    const llvm::MCOperand &dst,
                                     const llvm::MCOperand &src) {
   NASSERT(src.isReg());
 
@@ -159,15 +162,19 @@ static InstTransResult MOVAndZextRR(llvm::BasicBlock *& block, const llvm::MCOpe
 
 template<int width>
 static InstTransResult MOVAndZextRM(NativeInstPtr ip, llvm::BasicBlock *& block,
-                                    const llvm::MCOperand &dst, llvm::Value *mem_val) {
+                                    const llvm::MCOperand &dst,
+                                    llvm::Value *mem_val) {
   auto src_val = M_READ<width>(ip, block, mem_val);
 
   return MOVAndZextRV<width>(block, dst, src_val);
 }
 
 template<int width>
-static InstTransResult doMOVSrm(NativeModulePtr natM, llvm::BasicBlock *& block,
-                                NativeInstPtr ip, llvm::MCInst &inst) {
+static InstTransResult doMOVSrm(TranslationContext &ctx,
+                                llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
   InstTransResult ret;
   auto F = block->getParent();
   // MOV from memory to XMM register will set the unused poriton
@@ -192,8 +199,11 @@ static InstTransResult doMOVSrm(NativeModulePtr natM, llvm::BasicBlock *& block,
 }
 
 template<int width>
-static InstTransResult doMOVSmr(NativeModulePtr natM, llvm::BasicBlock *&block,
-                                NativeInstPtr ip, llvm::MCInst &inst) {
+static InstTransResult doMOVSmr(TranslationContext &ctx,
+                                llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
   InstTransResult ret;
   auto F = block->getParent();
   if (ip->has_external_ref()) {
@@ -210,17 +220,19 @@ static InstTransResult doMOVSmr(NativeModulePtr natM, llvm::BasicBlock *&block,
 }
 
 template<int width, int op1, int op2>
-static InstTransResult doMOVSrr(NativeModulePtr natM, llvm::BasicBlock *&block,
-                                NativeInstPtr ip, llvm::MCInst &inst) {
+static InstTransResult doMOVSrr(TranslationContext &ctx,
+                                llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
   return doRRMov<width>(ip, block, OP(op1), OP(op2));
 }
 
 template<int fpwidth>
 static llvm::Value *INT_AS_FP(llvm::BasicBlock *&block, llvm::Value *in) {
   auto fpType = getFpTypeForWidth(block, fpwidth);
-
   return llvm::CastInst::Create(llvm::Instruction::BitCast, in, fpType, "",
-                                     block);
+                                block);
 }
 
 template<int fpwidth>
@@ -228,27 +240,29 @@ static llvm::Value *FP_AS_INT(llvm::BasicBlock *&block, llvm::Value *in) {
   Type *intType = llvm::Type::getIntNTy(block->getContext(), fpwidth);
 
   return llvm::CastInst::Create(llvm::Instruction::BitCast, in, intType, "",
-                                   block);
+                                block);
 }
 
 template<int fpwidth>
-static llvm::Value *INT_TO_FP_TO_INT(llvm::BasicBlock *&block, llvm::Value *in) {
+static llvm::Value *INT_TO_FP_TO_INT(llvm::BasicBlock *&block,
+                                     llvm::Value *in) {
 
   auto fpType = getFpTypeForWidth(block, fpwidth);
   auto intType = llvm::Type::getIntNTy(block->getContext(), fpwidth);
 
   //TODO: Check rounding modes!
-  auto fp_value = llvm::CastInst::Create(llvm::Instruction::SIToFP, in, fpType, "",
-                                     block);
+  auto fp_value = llvm::CastInst::Create(llvm::Instruction::SIToFP, in, fpType,
+                                         "", block);
 
-  return llvm::CastInst::Create(llvm::Instruction::BitCast, fp_value, intType, "",
-                                   block);
+  return llvm::CastInst::Create(llvm::Instruction::BitCast, fp_value, intType,
+                                "", block);
 
 }
 
 template<int width>
-static InstTransResult doCVTSI2SrV(NativeModulePtr natM, llvm::BasicBlock *&block,
-                                   NativeInstPtr ip, llvm::MCInst &inst, llvm::Value *src,
+static InstTransResult doCVTSI2SrV(NativeModulePtr natM,
+                                   llvm::BasicBlock *&block, NativeInstPtr ip,
+                                   llvm::MCInst &inst, llvm::Value *src,
                                    const llvm::MCOperand &dst) {
 
   auto final_v = INT_TO_FP_TO_INT<width>(block, src);
@@ -263,9 +277,11 @@ static InstTransResult doCVTSI2SrV(NativeModulePtr natM, llvm::BasicBlock *&bloc
 // The result is stored in the low quad- word of the destination operand, and the high quadword left unchanged. 
 
 template<int width>
-static InstTransResult translate_CVTSI2SDrr(NativeModulePtr natM,
-                                            llvm::BasicBlock *&block,
-                                            NativeInstPtr ip, llvm::MCInst &inst) {
+static InstTransResult translate_CVTSI2SDrr(TranslationContext &ctx,
+                                            llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
   const auto &dst = OP(0);
   const auto &src = OP(1);
 
@@ -279,9 +295,11 @@ static InstTransResult translate_CVTSI2SDrr(NativeModulePtr natM,
 }
 
 template<int width>
-static InstTransResult translate_CVTSI2SDrm(NativeModulePtr natM,
-                                            llvm::BasicBlock *&block,
-                                            NativeInstPtr ip, llvm::MCInst &inst) {
+static InstTransResult translate_CVTSI2SDrm(TranslationContext &ctx,
+                                            llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
   const auto &dst = OP(0);
   NASSERT(dst.isReg());
 
@@ -296,25 +314,25 @@ static InstTransResult translate_CVTSI2SDrm(NativeModulePtr natM,
 //Converts a double-precision floating-point value in the source operand (second operand) 
 //to a single-precision floating-point value in the destination operand (first operand).
 template<int width>
-static InstTransResult doCVTSD2SSrV(NativeModulePtr natM, llvm::BasicBlock *&block,
-                                    NativeInstPtr ip, llvm::MCInst &inst, llvm::Value *src,
+static InstTransResult doCVTSD2SSrV(NativeModulePtr natM,
+                                    llvm::BasicBlock *&block, NativeInstPtr ip,
+                                    llvm::MCInst &inst, llvm::Value *src,
                                     const llvm::MCOperand &dst) {
 
   // convert the 64-bits we are reading into an FPU double
   //TODO: Check rounding modes!
-  auto to_double = llvm::CastInst::Create(llvm::Instruction::BitCast, src,
-                                      llvm::Type::getDoubleTy(block->getContext()),
-                                      "", block);
+  auto to_double = llvm::CastInst::Create(
+      llvm::Instruction::BitCast, src,
+      llvm::Type::getDoubleTy(block->getContext()), "", block);
 
   // Truncate double to a single
-  auto fp_single = new llvm::FPTruncInst(to_double,
-                                     llvm::Type::getFloatTy(block->getContext()), "",
-                                     block);
+  auto fp_single = new llvm::FPTruncInst(
+      to_double, llvm::Type::getFloatTy(block->getContext()), "", block);
 
   // treat the bits as a 32-bit int
-  auto to_int = llvm::CastInst::Create(llvm::Instruction::BitCast, fp_single,
-                                   llvm::Type::getIntNTy(block->getContext(), 32), "",
-                                   block);
+  auto to_int = llvm::CastInst::Create(
+      llvm::Instruction::BitCast, fp_single,
+      llvm::Type::getIntNTy(block->getContext(), 32), "", block);
 
   // write them to destination
   R_WRITE<width>(block, dst.getReg(), to_int);
@@ -324,54 +342,59 @@ static InstTransResult doCVTSD2SSrV(NativeModulePtr natM, llvm::BasicBlock *&blo
 
 // read 64-bits from memory, convert to single precision fpu value, 
 // write the 32-bit value into register dst
-static InstTransResult translate_CVTSD2SSrm(NativeModulePtr natM,
-                                            BasicBlock *& block,
-                                            NativeInstPtr ip, MCInst &inst) {
-  const MCOperand &dst = OP(0);
+static InstTransResult translate_CVTSD2SSrm(TranslationContext &ctx,
+                                            llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  const llvm::MCOperand &dst = OP(0);
   NASSERT(dst.isReg());
 
-  Value *mem = ADDR_NOREF(1);
+  llvm::Value *mem = ADDR_NOREF(1);
 
-  Value *double_val = M_READ<64>(ip, block, mem);
+  llvm::Value *double_val = M_READ<64>(ip, block, mem);
 
   return doCVTSD2SSrV<32>(natM, block, ip, inst, double_val, dst);
 }
 
 // read 64-bits from register src, convert to single precision fpu value, 
 // write the 32-bit value into register dst
-static InstTransResult translate_CVTSD2SSrr(NativeModulePtr natM,
-                                            BasicBlock *& block,
-                                            NativeInstPtr ip, MCInst &inst) {
-  const MCOperand &dst = OP(0);
-  const MCOperand &src = OP(1);
+static InstTransResult translate_CVTSD2SSrr(TranslationContext &ctx,
+                                            llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  const llvm::MCOperand &dst = OP(0);
+  const llvm::MCOperand &src = OP(1);
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
 
   // read 64 bits from source
-  Value *rval = R_READ<64>(block, src.getReg());
+  llvm::Value *rval = R_READ<64>(block, src.getReg());
 
   return doCVTSD2SSrV<32>(natM, block, ip, inst, rval, dst);
 }
 
 template<int width>
-static InstTransResult doCVTSS2SDrV(NativeModulePtr natM, BasicBlock *& block,
-                                    NativeInstPtr ip, MCInst &inst, Value *src,
-                                    const MCOperand &dst) {
+static InstTransResult doCVTSS2SDrV(NativeModulePtr natM,
+                                    llvm::BasicBlock *& block, NativeInstPtr ip,
+                                    llvm::MCInst &inst, llvm::Value *src,
+                                    const llvm::MCOperand &dst) {
 
   // convert the 32 bits we read into an fpu single
-  Value *to_single = CastInst::Create(Instruction::BitCast, src,
-                                      Type::getFloatTy(block->getContext()), "",
-                                      block);
+  llvm::Value *to_single = CastInst::Create(
+      Instruction::BitCast, src, Type::getFloatTy(block->getContext()), "",
+      block);
 
   // extend to a double
-  Value *fp_double = new FPExtInst(to_single,
-                                   Type::getDoubleTy(block->getContext()), "",
-                                   block);
+  llvm::Value *fp_double = new FPExtInst(to_single,
+                                         Type::getDoubleTy(block->getContext()),
+                                         "", block);
 
   // treat the bits as a 64-bit int
-  Value *to_int = CastInst::Create(Instruction::BitCast, fp_double,
-                                   Type::getIntNTy(block->getContext(), 64), "",
-                                   block);
+  llvm::Value *to_int = CastInst::Create(
+      Instruction::BitCast, fp_double, Type::getIntNTy(block->getContext(), 64),
+      "", block);
 
   // write them to destination
   R_WRITE<width>(block, dst.getReg(), to_int);
@@ -379,139 +402,156 @@ static InstTransResult doCVTSS2SDrV(NativeModulePtr natM, BasicBlock *& block,
   return ContinueBlock;
 }
 
-// Convert Scalar Single-Precision FP Value to Scalar Double-Precision FP Value
+// Convert Scalar Single-Precision FP llvm::Value to Scalar Double-Precision FP llvm::Value
 // read 32-bits from memory, convert to double precision fpu value,
 // write the 64-bit value into register dst
-static InstTransResult translate_CVTSS2SDrm(NativeModulePtr natM,
-                                            BasicBlock *& block,
-                                            NativeInstPtr ip, MCInst &inst) {
-  const MCOperand &dst = OP(0);
+static InstTransResult translate_CVTSS2SDrm(TranslationContext &ctx,
+                                            llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  const llvm::MCOperand &dst = OP(0);
   NASSERT(dst.isReg());
 
-  Value *mem = ADDR_NOREF(1);
+  llvm::Value *mem = ADDR_NOREF(1);
 
   // read 32 bits from mem
-  Value *single_val = M_READ<32>(ip, block, mem);
+  llvm::Value *single_val = M_READ<32>(ip, block, mem);
 
   return doCVTSS2SDrV<64>(natM, block, ip, inst, single_val, dst);
 }
 
-// Convert Scalar Single-Precision FP Value to Scalar Double-Precision FP Value
+// Convert Scalar Single-Precision FP llvm::Value to Scalar Double-Precision FP llvm::Value
 // read 32-bits from register src, convert to double precision fpu value,
 // write the 64-bit value into register dst
-static InstTransResult translate_CVTSS2SDrr(NativeModulePtr natM,
-                                            BasicBlock *& block,
-                                            NativeInstPtr ip, MCInst &inst) {
-  const MCOperand &dst = OP(0);
-  const MCOperand &src = OP(1);
+static InstTransResult translate_CVTSS2SDrr(TranslationContext &ctx,
+                                            llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  const llvm::MCOperand &dst = OP(0);
+  const llvm::MCOperand &src = OP(1);
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
 
   // read 32 bits from source
-  Value *rval = R_READ<32>(block, src.getReg());
+  llvm::Value *rval = R_READ<32>(block, src.getReg());
 
   return doCVTSS2SDrV<64>(natM, block, ip, inst, rval, dst);
 }
 
 template<int width, Instruction::BinaryOps bin_op>
-static InstTransResult do_SSE_INT_VV(unsigned reg, BasicBlock *& block,
-                                     Value *o1, Value *o2) {
-  Value *xoredVal = BinaryOperator::Create(bin_op, o1, o2, "", block);
+static InstTransResult do_SSE_INT_VV(unsigned reg, llvm::BasicBlock *& block,
+                                     llvm::Value *o1, llvm::Value *o2) {
+  llvm::Value *xoredVal = BinaryOperator::Create(bin_op, o1, o2, "", block);
   R_WRITE<width>(block, reg, xoredVal);
 
   return ContinueBlock;
 }
 
 template<int width, Instruction::BinaryOps bin_op>
-static InstTransResult do_SSE_INT_RR(NativeInstPtr ip, BasicBlock *& block,
-                                     const MCOperand &o1, const MCOperand &o2) {
+static InstTransResult do_SSE_INT_RR(NativeInstPtr ip,
+                                     llvm::BasicBlock *& block,
+                                     const llvm::MCOperand &o1,
+                                     const llvm::MCOperand &o2) {
   NASSERT(o1.isReg());
   NASSERT(o2.isReg());
 
-  Value *opVal1 = R_READ<width>(block, o1.getReg());
-  Value *opVal2 = R_READ<width>(block, o2.getReg());
+  llvm::Value *opVal1 = R_READ<width>(block, o1.getReg());
+  llvm::Value *opVal2 = R_READ<width>(block, o2.getReg());
 
   return do_SSE_INT_VV<width, bin_op>(o1.getReg(), block, opVal1, opVal2);
 }
 
 template<int width, Instruction::BinaryOps bin_op>
-static InstTransResult do_SSE_INT_RM(NativeInstPtr ip, BasicBlock *& block,
-                                     const MCOperand &o1, Value *addr) {
+static InstTransResult do_SSE_INT_RM(NativeInstPtr ip,
+                                     llvm::BasicBlock *& block,
+                                     const llvm::MCOperand &o1,
+                                     llvm::Value *addr) {
   NASSERT(o1.isReg());
 
-  Value *opVal1 = R_READ<width>(block, o1.getReg());
-  Value *opVal2 = M_READ<width>(ip, block, addr);
+  llvm::Value *opVal1 = R_READ<width>(block, o1.getReg());
+  llvm::Value *opVal2 = M_READ<width>(ip, block, addr);
 
   return do_SSE_INT_VV<width, bin_op>(o1.getReg(), block, opVal1, opVal2);
 }
 
 // convert signed integer (register) to single precision float (xmm register)
-static InstTransResult translate_CVTSI2SSrr(NativeModulePtr natM,
-                                            BasicBlock *& block,
-                                            NativeInstPtr ip, MCInst &inst) {
+static InstTransResult translate_CVTSI2SSrr(TranslationContext &ctx,
+                                            llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
   const MCOperand &dst = OP(0);
-  const MCOperand &src = OP(1);
+  const llvm::MCOperand &src = OP(1);
 
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
 
-  Value *src_val = R_READ<32>(block, src.getReg());
+  llvm::Value *src_val = R_READ<32>(block, src.getReg());
 
   return doCVTSI2SrV<32>(natM, block, ip, inst, src_val, dst);
 }
 
 // convert signed integer (memory) to single precision float (xmm register)
-static InstTransResult translate_CVTSI2SSrm(NativeModulePtr natM,
-                                            BasicBlock *& block,
-                                            NativeInstPtr ip, MCInst &inst) {
-  const MCOperand &dst = OP(0);
-  Value *mem_addr = ADDR_NOREF(1);
+static InstTransResult translate_CVTSI2SSrm(TranslationContext &ctx,
+                                            llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  const llvm::MCOperand &dst = OP(0);
+  llvm::Value *mem_addr = ADDR_NOREF(1);
 
   NASSERT(dst.isReg());
 
-  Value *src_val = M_READ<32>(ip, block, mem_addr);
+  llvm::Value *src_val = M_READ<32>(ip, block, mem_addr);
 
   return doCVTSI2SrV<32>(natM, block, ip, inst, src_val, dst);
 
 }
 
 // convert signed integer (register) to single precision float (xmm register)
-static InstTransResult translate_CVTSI2SS64rr(NativeModulePtr natM,
-                                              BasicBlock *& block,
-                                              NativeInstPtr ip, MCInst &inst) {
-  const MCOperand &dst = OP(0);
-  const MCOperand &src = OP(1);
+static InstTransResult translate_CVTSI2SS64rr(TranslationContext &ctx,
+                                              llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  const llvm::MCOperand &dst = OP(0);
+  const llvm::MCOperand &src = OP(1);
 
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
 
-  Value *src_val = R_READ<64>(block, src.getReg());
+  llvm::Value *src_val = R_READ<64>(block, src.getReg());
 
   return doCVTSI2SrV<64>(natM, block, ip, inst, src_val, dst);
 }
 
 // convert signed integer (memory) to single precision float (xmm register)
-static InstTransResult translate_CVTSI2SS64rm(NativeModulePtr natM,
-                                              BasicBlock *& block,
-                                              NativeInstPtr ip, MCInst &inst) {
-  const MCOperand &dst = OP(0);
-  Value *mem_addr = ADDR_NOREF(1);
+static InstTransResult translate_CVTSI2SS64rm(TranslationContext &ctx,
+                                              llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  const llvm::MCOperand &dst = OP(0);
+  llvm::Value *mem_addr = ADDR_NOREF(1);
 
   NASSERT(dst.isReg());
 
-  Value *src_val = M_READ<64>(ip, block, mem_addr);
+  llvm::Value *src_val = M_READ<64>(ip, block, mem_addr);
 
   return doCVTSI2SrV<64>(natM, block, ip, inst, src_val, dst);
 
 }
 
 template<int width, int regwidth>
-static InstTransResult doCVTTS2SIrV(NativeModulePtr natM, BasicBlock *& block,
-                                    NativeInstPtr ip, MCInst &inst, Value *src,
-                                    const MCOperand &dst) {
-  Value *final_v = NULL;
+static InstTransResult doCVTTS2SIrV(NativeModulePtr natM,
+                                    llvm::BasicBlock *& block, NativeInstPtr ip,
+                                    llvm::MCInst &inst, llvm::Value *src,
+                                    const llvm::MCOperand &dst) {
+  llvm::Value *final_v = NULL;
 
-  Value *to_int = CastInst::Create(
+  llvm::Value *to_int = CastInst::Create(
       Instruction::FPToSI, INT_AS_FP<width>(block, src),
       Type::getIntNTy(block->getContext(), regwidth), "", block);
 
@@ -523,16 +563,18 @@ static InstTransResult doCVTTS2SIrV(NativeModulePtr natM, BasicBlock *& block,
 
 // convert w/ truncation scalar single-precision fp value to dword integer
 template<int fpwidth, int regwidth>
-static InstTransResult doCVTT_to_SI_rm(NativeModulePtr natM,
-                                       BasicBlock *& block, NativeInstPtr ip,
-                                       MCInst &inst) {
+static InstTransResult doCVTT_to_SI_rm(TranslationContext &ctx,
+                                       llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
 
-  const MCOperand &dst = OP(0);
-  Value *mem_addr = ADDR_NOREF(1);
+  const llvm::MCOperand &dst = OP(0);
+  llvm::Value *mem_addr = ADDR_NOREF(1);
 
   NASSERT(dst.isReg());
 
-  Value *src_val = M_READ<fpwidth>(ip, block, mem_addr);
+  llvm::Value *src_val = M_READ<fpwidth>(ip, block, mem_addr);
 
   return doCVTTS2SIrV<fpwidth, regwidth>(natM, block, ip, inst, src_val, dst);
 
@@ -540,66 +582,72 @@ static InstTransResult doCVTT_to_SI_rm(NativeModulePtr natM,
 
 // convert w/ truncation scalar single-precision fp value (xmm reg) to dword integer
 template<int fpwidth, int regwidth>
-static InstTransResult doCVTT_to_SI_rr(NativeModulePtr natM,
-                                       BasicBlock *& block, NativeInstPtr ip,
-                                       MCInst &inst) {
+static InstTransResult doCVTT_to_SI_rr(TranslationContext &ctx,
+                                       llvm::BasicBlock *&block) {
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
 
-  const MCOperand &dst = OP(0);
-  const MCOperand &src = OP(1);
+  const llvm::MCOperand &dst = OP(0);
+  const llvm::MCOperand &src = OP(1);
 
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
 
-  Value *src_val = R_READ<fpwidth>(block, src.getReg());
+  llvm::Value *src_val = R_READ<fpwidth>(block, src.getReg());
 
   return doCVTTS2SIrV<fpwidth, regwidth>(natM, block, ip, inst, src_val, dst);
 
 }
 
 template<int fpwidth, Instruction::BinaryOps bin_op>
-static InstTransResult do_SSE_VV(unsigned reg, BasicBlock *& block, Value *o1,
-                                 Value *o2) {
-  Value *sumVal = BinaryOperator::Create(bin_op, INT_AS_FP<fpwidth>(block, o1),
-                                         INT_AS_FP<fpwidth>(block, o2), "",
-                                         block);
+static InstTransResult do_SSE_VV(unsigned reg, llvm::BasicBlock *& block,
+                                 llvm::Value *o1, llvm::Value *o2) {
+
+  llvm::Value *sumVal = BinaryOperator::Create(bin_op,
+                                               INT_AS_FP<fpwidth>(block, o1),
+                                               INT_AS_FP<fpwidth>(block, o2),
+                                               "", block);
   R_WRITE<fpwidth>(block, reg, FP_AS_INT<fpwidth>(block, sumVal));
 
   return ContinueBlock;
 }
 
 template<int fpwidth, Instruction::BinaryOps bin_op>
-static InstTransResult do_SSE_RR(NativeInstPtr ip, BasicBlock *& block,
-                                 const MCOperand &o1, const MCOperand &o2) {
+static InstTransResult do_SSE_RR(NativeInstPtr ip, llvm::BasicBlock *& block,
+                                 const llvm::MCOperand &o1,
+                                 const llvm::MCOperand &o2) {
   NASSERT(o1.isReg());
   NASSERT(o2.isReg());
 
-  Value *opVal1 = R_READ<fpwidth>(block, o1.getReg());
-  Value *opVal2 = R_READ<fpwidth>(block, o2.getReg());
+  llvm::Value *opVal1 = R_READ<fpwidth>(block, o1.getReg());
+  llvm::Value *opVal2 = R_READ<fpwidth>(block, o2.getReg());
 
   return do_SSE_VV<fpwidth, bin_op>(o1.getReg(), block, opVal1, opVal2);
 }
 
 template<int fpwidth, Instruction::BinaryOps bin_op>
-static InstTransResult do_SSE_RM(NativeInstPtr ip, BasicBlock *& block,
-                                 const MCOperand &o1, Value *addr) {
+static InstTransResult do_SSE_RM(NativeInstPtr ip, llvm::BasicBlock *& block,
+                                 const llvm::MCOperand &o1, llvm::Value *addr) {
   NASSERT(o1.isReg());
 
-  Value *opVal1 = R_READ<fpwidth>(block, o1.getReg());
-  Value *opVal2 = M_READ<fpwidth>(ip, block, addr);
+  llvm::Value *opVal1 = R_READ<fpwidth>(block, o1.getReg());
+  llvm::Value *opVal2 = M_READ<fpwidth>(ip, block, addr);
 
   return do_SSE_VV<fpwidth, bin_op>(o1.getReg(), block, opVal1, opVal2);
 }
 
-static InstTransResult doUCOMISvv(BasicBlock *& block, Value *op1, Value *op2) {
+static InstTransResult doUCOMISvv(llvm::BasicBlock *& block, llvm::Value *op1,
+                                  llvm::Value *op2) {
 
   // TODO: Make sure these treat negative zero and positive zero
   // as the same value.
-  Value *is_lt = new FCmpInst( *block, FCmpInst::FCMP_ULT, op1, op2);
-  Value *is_eq = new FCmpInst( *block, FCmpInst::FCMP_UEQ, op1, op2);
+  llvm::Value *is_lt = new FCmpInst( *block, FCmpInst::FCMP_ULT, op1, op2);
+  llvm::Value *is_eq = new FCmpInst( *block, FCmpInst::FCMP_UEQ, op1, op2);
 
   // if BOTH the equql AND less than is true
   // it means that one of the ops is a QNaN
-  Value *is_qnan = BinaryOperator::CreateAnd(is_lt, is_eq, "", block);
+  llvm::Value *is_qnan = BinaryOperator::CreateAnd(is_lt, is_eq, "", block);
 
   F_WRITE(block, ZF, is_eq);          // ZF is 1 if either is QNaN or op1 == op2
   F_WRITE(block, PF, is_qnan);          // PF is 1 if either op is a QNaN
@@ -613,43 +661,46 @@ static InstTransResult doUCOMISvv(BasicBlock *& block, Value *op1, Value *op2) {
 }
 
 template<int width>
-static InstTransResult doUCOMISrr(BasicBlock *&b, const MCOperand &op1,
-                                  const MCOperand &op2) {
+static InstTransResult doUCOMISrr(llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &op1,
+                                  const llvm::MCOperand &op2) {
   NASSERT(op1.isReg());
   NASSERT(op2.isReg());
 
-  Value *op1_val = R_READ<width>(b, op1.getReg());
-  Value *op2_val = R_READ<width>(b, op2.getReg());
+  llvm::Value *op1_val = R_READ<width>(b, op1.getReg());
+  llvm::Value *op2_val = R_READ<width>(b, op2.getReg());
 
-  Value *fp1_val = INT_AS_FP<width>(b, op1_val);
-  Value *fp2_val = INT_AS_FP<width>(b, op2_val);
+  llvm::Value *fp1_val = INT_AS_FP<width>(b, op1_val);
+  llvm::Value *fp2_val = INT_AS_FP<width>(b, op2_val);
 
   return doUCOMISvv(b, fp1_val, fp2_val);
 
 }
 
 template<int width>
-static InstTransResult doUCOMISrm(NativeInstPtr ip, BasicBlock *&b,
-                                  const MCOperand &op1, Value *memAddr) {
+static InstTransResult doUCOMISrm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &op1,
+                                  llvm::Value *memAddr) {
   NASSERT(op1.isReg());
 
-  Value *op1_val = R_READ<width>(b, op1.getReg());
-  Value *op2_val = M_READ<width>(ip, b, memAddr);
+  llvm::Value *op1_val = R_READ<width>(b, op1.getReg());
+  llvm::Value *op2_val = M_READ<width>(ip, b, memAddr);
 
-  Value *fp1_val = INT_AS_FP<width>(b, op1_val);
-  Value *fp2_val = INT_AS_FP<width>(b, op2_val);
+  llvm::Value *fp1_val = INT_AS_FP<width>(b, op1_val);
+  llvm::Value *fp2_val = INT_AS_FP<width>(b, op2_val);
 
   return doUCOMISvv(b, fp1_val, fp2_val);
 }
 
 template<int elementwidth, Instruction::BinaryOps bin_op>
-static InstTransResult doNewShift(BasicBlock *&b, const MCOperand &dst,
-                                  Value *shift_count,
-                                  Value *fallback = nullptr) {
+static InstTransResult doNewShift(llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &dst,
+                                  llvm::Value *shift_count,
+                                  llvm::Value *fallback = nullptr) {
   NASSERT(dst.isReg());
   NASSERT(128 % elementwidth == 0);
 
-  Value *max_count = CONST_V<64>(b, elementwidth - 1);
+  llvm::Value *max_count = CONST_V<64>(b, elementwidth - 1);
 
   IntegerType *int_t = dyn_cast<IntegerType>(shift_count->getType());
   if (int_t->getBitWidth() > 64) {
@@ -658,13 +709,13 @@ static InstTransResult doNewShift(BasicBlock *&b, const MCOperand &dst,
   }
   // check if our shift count is over the
   // allowable limit
-  Value *countOverLimit = new ICmpInst( *b, CmpInst::ICMP_UGT, shift_count,
-                                       max_count);
+  llvm::Value *countOverLimit = new ICmpInst( *b, CmpInst::ICMP_UGT,
+                                             shift_count, max_count);
 
   // max the shift count at elementwidth
   // real_count = over limit ? max count : original count
-  Value *real_count = SelectInst::Create(countOverLimit, max_count, shift_count,
-                                         "", b);
+  llvm::Value *real_count = SelectInst::Create(countOverLimit, max_count,
+                                               shift_count, "", b);
 
   Type *elem_ty;
   VectorType *vt;
@@ -673,14 +724,14 @@ static InstTransResult doNewShift(BasicBlock *&b, const MCOperand &dst,
                                             128 / elementwidth);
 
   // convert our base value to a vector
-  Value *to_shift = R_READ<128>(b, dst.getReg());
-  Value *vecValue = INT_AS_VECTOR<128, elementwidth>(b, to_shift);
+  llvm::Value *to_shift = R_READ<128>(b, dst.getReg());
+  llvm::Value *vecValue = INT_AS_VECTOR<128, elementwidth>(b, to_shift);
 
   // truncate shift count to element size since we
   // need to shove it in a vector
   int_t = dyn_cast<IntegerType>(real_count->getType());
   IntegerType *elem_int_t = dyn_cast<IntegerType>(elem_ty);
-  Value *trunc_shift = nullptr;
+  llvm::Value *trunc_shift = nullptr;
 
   // size of shift count has to be the size of the vector elements
   if (elem_int_t->getBitWidth() < int_t->getBitWidth()) {
@@ -691,8 +742,9 @@ static InstTransResult doNewShift(BasicBlock *&b, const MCOperand &dst,
     trunc_shift = new ZExtInst(real_count, elem_ty, "", b);
   }
 
-  Value *vecShiftPtr = new AllocaInst(vt, nullptr, "", b);
-  Value *shiftVector = noAliasMCSemaScope(new LoadInst(vecShiftPtr, "", b));
+  llvm::Value *vecShiftPtr = new AllocaInst(vt, nullptr, "", b);
+  llvm::Value *shiftVector = noAliasMCSemaScope(
+      new LoadInst(vecShiftPtr, "", b));
 
   int elem_count = 128 / elementwidth;
 
@@ -704,15 +756,16 @@ static InstTransResult doNewShift(BasicBlock *&b, const MCOperand &dst,
   }
 
   // shift each element of the vector
-  Value *shifted = BinaryOperator::Create(bin_op, vecValue, shiftVector, "", b);
+  llvm::Value *shifted = BinaryOperator::Create(bin_op, vecValue, shiftVector,
+                                                "", b);
 
   // convert value back to a 128bit int
-  Value *back_to_int = CastInst::Create(Instruction::BitCast, shifted,
-                                        Type::getIntNTy(b->getContext(), 128),
-                                        "", b);
+  llvm::Value *back_to_int = CastInst::Create(
+      Instruction::BitCast, shifted, Type::getIntNTy(b->getContext(), 128), "",
+      b);
 
   // write back to register
-  Value *final_to_write = back_to_int;
+  llvm::Value *final_to_write = back_to_int;
 
   // if this is an instruction that needs
   // a special case for shifts of
@@ -733,98 +786,107 @@ static InstTransResult doNewShift(BasicBlock *&b, const MCOperand &dst,
 }
 
 template<int width>
-static InstTransResult doPSRArr(BasicBlock *&b, const MCOperand &dst,
-                                const MCOperand &src) {
+static InstTransResult doPSRArr(llvm::BasicBlock *&b,
+                                const llvm::MCOperand &dst,
+                                const llvm::MCOperand &src) {
   NASSERT(src.isReg());
 
-  Value *shift_count = R_READ<128>(b, src.getReg());
+  llvm::Value *shift_count = R_READ<128>(b, src.getReg());
 
   return doNewShift<width, Instruction::AShr>(b, dst, shift_count, nullptr);
 }
 
 template<int width>
-static InstTransResult doPSRArm(NativeInstPtr ip, BasicBlock *&b,
-                                const MCOperand &dst, Value *memAddr) {
-  Value *shift_count = M_READ<128>(ip, b, memAddr);
+static InstTransResult doPSRArm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                const llvm::MCOperand &dst,
+                                llvm::Value *memAddr) {
+  llvm::Value *shift_count = M_READ<128>(ip, b, memAddr);
 
   return doNewShift<width, Instruction::AShr>(b, dst, shift_count, nullptr);
 }
 
 template<int width>
-static InstTransResult doPSRAri(BasicBlock *&b, const MCOperand &dst,
-                                const MCOperand &src) {
+static InstTransResult doPSRAri(llvm::BasicBlock *&b,
+                                const llvm::MCOperand &dst,
+                                const llvm::MCOperand &src) {
   NASSERT(src.isImm());
 
-  Value *shift_count = CONST_V<128>(b, src.getImm());
+  llvm::Value *shift_count = CONST_V<128>(b, src.getImm());
 
   return doNewShift<width, Instruction::AShr>(b, dst, shift_count, nullptr);
 }
 
 template<int width>
-static InstTransResult doPSLLrr(BasicBlock *&b, const MCOperand &dst,
-                                const MCOperand &src) {
+static InstTransResult doPSLLrr(llvm::BasicBlock *&b,
+                                const llvm::MCOperand &dst,
+                                const llvm::MCOperand &src) {
   NASSERT(src.isReg());
 
-  Value *shift_count = R_READ<128>(b, src.getReg());
+  llvm::Value *shift_count = R_READ<128>(b, src.getReg());
 
   return doNewShift<width, Instruction::Shl>(b, dst, shift_count,
                                              CONST_V<128>(b, 0));
 }
 
 template<int width>
-static InstTransResult doPSLLrm(NativeInstPtr ip, BasicBlock *&b,
-                                const MCOperand &dst, Value *memAddr) {
-  Value *shift_count = M_READ<128>(ip, b, memAddr);
+static InstTransResult doPSLLrm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                const llvm::MCOperand &dst,
+                                llvm::Value *memAddr) {
+  llvm::Value *shift_count = M_READ<128>(ip, b, memAddr);
 
   return doNewShift<width, Instruction::Shl>(b, dst, shift_count,
                                              CONST_V<128>(b, 0));
 }
 
 template<int width>
-static InstTransResult doPSRLrr(BasicBlock *&b, const MCOperand &dst,
-                                const MCOperand &src) {
+static InstTransResult doPSRLrr(llvm::BasicBlock *&b,
+                                const llvm::MCOperand &dst,
+                                const llvm::MCOperand &src) {
   NASSERT(src.isReg());
 
-  Value *shift_count = R_READ<128>(b, src.getReg());
+  llvm::Value *shift_count = R_READ<128>(b, src.getReg());
 
   return doNewShift<width, Instruction::LShr>(b, dst, shift_count,
                                               CONST_V<128>(b, 0));
 }
 
 template<int width>
-static InstTransResult doPSRLrm(NativeInstPtr ip, BasicBlock *&b,
-                                const MCOperand &dst, Value *memAddr) {
-  Value *shift_count = M_READ<128>(ip, b, memAddr);
+static InstTransResult doPSRLrm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                const llvm::MCOperand &dst,
+                                llvm::Value *memAddr) {
+  llvm::Value *shift_count = M_READ<128>(ip, b, memAddr);
 
   return doNewShift<width, Instruction::LShr>(b, dst, shift_count,
                                               CONST_V<128>(b, 0));
 }
 
 template<int width>
-static InstTransResult doPSRLri(BasicBlock *&b, const MCOperand &dst,
-                                const MCOperand &src) {
+static InstTransResult doPSRLri(llvm::BasicBlock *&b,
+                                const llvm::MCOperand &dst,
+                                const llvm::MCOperand &src) {
   NASSERT(src.isImm());
 
-  Value *shift_count = CONST_V<128>(b, src.getImm());
+  llvm::Value *shift_count = CONST_V<128>(b, src.getImm());
 
   return doNewShift<width, Instruction::LShr>(b, dst, shift_count,
                                               CONST_V<128>(b, 0));
 }
 
 template<int width>
-static InstTransResult doPSLLri(BasicBlock *&b, const MCOperand &dst,
-                                const MCOperand &src) {
+static InstTransResult doPSLLri(llvm::BasicBlock *&b,
+                                const llvm::MCOperand &dst,
+                                const llvm::MCOperand &src) {
   NASSERT(src.isImm());
 
-  Value *shift_count = CONST_V<128>(b, src.getImm());
+  llvm::Value *shift_count = CONST_V<128>(b, src.getImm());
 
   return doNewShift<width, Instruction::Shl>(b, dst, shift_count,
                                              CONST_V<128>(b, 0));
 }
 
 template<int width, int elemwidth>
-static Value* doDoubleShuffle(BasicBlock *&b, Value *input1, Value *input2,
-                              unsigned order) {
+static llvm::Value* doDoubleShuffle(llvm::BasicBlock *&b, llvm::Value *input1,
+                                    llvm::Value *input2, unsigned order) {
   NASSERT(width % elemwidth == 0);
 
   int elem_count = width / elemwidth;
@@ -834,10 +896,10 @@ static Value* doDoubleShuffle(BasicBlock *&b, Value *input1, Value *input2,
 
   std::tie(vt, elem_ty) = getIntVectorTypes(b, elemwidth, elem_count);
 
-  Value *vecInput1 = INT_AS_VECTOR<width, elemwidth>(b, input1);
-  Value *vecInput2 = INT_AS_VECTOR<width, elemwidth>(b, input2);
+  llvm::Value *vecInput1 = INT_AS_VECTOR<width, elemwidth>(b, input1);
+  llvm::Value *vecInput2 = INT_AS_VECTOR<width, elemwidth>(b, input2);
 
-  Value *vecShuffle;
+  llvm::Value *vecShuffle;
   if (32 == elemwidth) {
     // Based on order, take two doublewords from first vector of 4 double words, and
     // two next two double words from second vector of 4 double words.
@@ -855,19 +917,20 @@ static Value* doDoubleShuffle(BasicBlock *&b, Value *input1, Value *input2,
     vecShuffle = ConstantVector::get(shuffle_vec);
   }
   // do the shuffle
-  Value *shuffled = new ShuffleVectorInst(vecInput1, vecInput2, vecShuffle, "",
-                                          b);
+  llvm::Value *shuffled = new ShuffleVectorInst(vecInput1, vecInput2,
+                                                vecShuffle, "", b);
 
   // convert the output back to an integer
-  Value *intOutput = CastInst::Create(Instruction::BitCast, shuffled,
-                                      Type::getIntNTy(b->getContext(), width),
-                                      "", b);
+  llvm::Value *intOutput = CastInst::Create(
+      Instruction::BitCast, shuffled, Type::getIntNTy(b->getContext(), width),
+      "", b);
 
   return intOutput;
 }
 
 template<int width, int elemwidth>
-static Value* doShuffle(BasicBlock *&b, Value *input, unsigned order) {
+static llvm::Value* doShuffle(llvm::BasicBlock *&b, llvm::Value *input,
+                              unsigned order) {
   NASSERT(width % elemwidth == 0);
 
   int elem_count = width / elemwidth;
@@ -877,33 +940,33 @@ static Value* doShuffle(BasicBlock *&b, Value *input, unsigned order) {
 
   std::tie(vt, elem_ty) = getIntVectorTypes(b, elemwidth, elem_count);
 
-  Value *vecInput = INT_AS_VECTOR<width, elemwidth>(b, input);
+  llvm::Value *vecInput = INT_AS_VECTOR<width, elemwidth>(b, input);
 
   Constant *shuffle_vec[4] = {CONST_V<32>(b, (order >> 0) & 3), CONST_V<32>(
       b, (order >> 2) & 3), CONST_V<32>(b, (order >> 4) & 3), CONST_V<32>(
       b, (order >> 6) & 3), };
 
-  Value *vecShuffle = ConstantVector::get(shuffle_vec);
+  llvm::Value *vecShuffle = ConstantVector::get(shuffle_vec);
 
   // we are only shuffling one vector, so the
   // other one is undefined
-  Value *vecUndef = UndefValue::get(vt);
+  llvm::Value *vecUndef = UndefValue::get(vt);
 
   // do the shuffle
-  Value *shuffled = new ShuffleVectorInst(vecInput, vecUndef, vecShuffle, "",
-                                          b);
+  llvm::Value *shuffled = new ShuffleVectorInst(vecInput, vecUndef, vecShuffle,
+                                                "", b);
 
   // convert the output back to an integer
-  Value *intOutput = CastInst::Create(Instruction::BitCast, shuffled,
-                                      Type::getIntNTy(b->getContext(), width),
-                                      "", b);
+  llvm::Value *intOutput = CastInst::Create(
+      Instruction::BitCast, shuffled, Type::getIntNTy(b->getContext(), width),
+      "", b);
 
   return intOutput;
 }
 
 template<int width, int elemwidth>
-static Value* doBlendVV(BasicBlock *&b, Value *input1, Value *input2,
-                        Value *order) {
+static llvm::Value* doBlendVV(llvm::BasicBlock *&b, llvm::Value *input1,
+                              llvm::Value *input2, llvm::Value *order) {
   NASSERT(width % elemwidth == 0);
 
   int elem_count = width / elemwidth;
@@ -913,21 +976,21 @@ static Value* doBlendVV(BasicBlock *&b, Value *input1, Value *input2,
 
   std::tie(vt, elem_ty) = getIntVectorTypes(b, elemwidth, elem_count);
 
-  Value *vecInput1 = INT_AS_VECTOR<width, elemwidth>(b, input1);
-  Value *vecInput2 = INT_AS_VECTOR<width, elemwidth>(b, input2);
+  llvm::Value *vecInput1 = INT_AS_VECTOR<width, elemwidth>(b, input1);
+  llvm::Value *vecInput2 = INT_AS_VECTOR<width, elemwidth>(b, input2);
 
-  Value *vecOrder = INT_AS_VECTOR<width, elemwidth>(b, order);
+  llvm::Value *vecOrder = INT_AS_VECTOR<width, elemwidth>(b, order);
 
-  Value *resultAlloc = new AllocaInst(vt, nullptr, "", b);
-  Value *vecResult = noAliasMCSemaScope(new LoadInst(resultAlloc, "", b));
+  llvm::Value *resultAlloc = new AllocaInst(vt, nullptr, "", b);
+  llvm::Value *vecResult = noAliasMCSemaScope(new LoadInst(resultAlloc, "", b));
 
   for (int i = 0; i < elem_count; i++) {
     // get input value
-    Value *toTest = ExtractElementInst::Create(vecOrder, CONST_V<32>(b, i), "",
-                                               b);
+    llvm::Value *toTest = ExtractElementInst::Create(vecOrder,
+                                                     CONST_V<32>(b, i), "", b);
 
     // check if high bit is set
-    Value *highBitSet = BinaryOperator::CreateAnd(
+    llvm::Value *highBitSet = BinaryOperator::CreateAnd(
         toTest, CONST_V<elemwidth>(b, 1 << (elemwidth - 1)), "", b);
 
     int mask = 0xF;
@@ -943,17 +1006,19 @@ static Value* doBlendVV(BasicBlock *&b, Value *input1, Value *input2,
         ;
     }
 
-    Value *origPiece = ExtractElementInst::Create(vecInput1, CONST_V<32>(b, i),
-                                                  "", b);
-    Value *newPiece = ExtractElementInst::Create(vecInput2, CONST_V<32>(b, i),
-                                                 "", b);
+    llvm::Value *origPiece = ExtractElementInst::Create(vecInput1,
+                                                        CONST_V<32>(b, i), "",
+                                                        b);
+    llvm::Value *newPiece = ExtractElementInst::Create(vecInput2,
+                                                       CONST_V<32>(b, i), "",
+                                                       b);
 
     // check if high bit was not set
-    Value *isZero = new ICmpInst( *b, CmpInst::ICMP_EQ, highBitSet,
-                                 CONST_V<elemwidth>(b, 0));
+    llvm::Value *isZero = new ICmpInst( *b, CmpInst::ICMP_EQ, highBitSet,
+                                       CONST_V<elemwidth>(b, 0));
 
     // pick either other byte position, or zero
-    Value *whichValue = SelectInst::Create(isZero,  // if highBit is zero (aka not set), we keep old piece
+    llvm::Value *whichValue = SelectInst::Create(isZero,  // if highBit is zero (aka not set), we keep old piece
         origPiece,  // use dst version
         newPiece,  // use src version (high bit is 1)
         "", b);
@@ -963,15 +1028,16 @@ static Value* doBlendVV(BasicBlock *&b, Value *input1, Value *input2,
   }
 
   // convert the output back to an integer
-  Value *intOutput = CastInst::Create(Instruction::BitCast, vecResult,
-                                      Type::getIntNTy(b->getContext(), width),
-                                      "", b);
+  llvm::Value *intOutput = CastInst::Create(
+      Instruction::BitCast, vecResult, Type::getIntNTy(b->getContext(), width),
+      "", b);
 
   return intOutput;
 }
 
 template<int width, int elemwidth>
-static Value* doShuffleRR(BasicBlock *&b, Value *input, Value *order) {
+static llvm::Value* doShuffleRR(llvm::BasicBlock *&b, llvm::Value *input,
+                                llvm::Value *order) {
   NASSERT(width % elemwidth == 0);
 
   int elem_count = width / elemwidth;
@@ -981,19 +1047,19 @@ static Value* doShuffleRR(BasicBlock *&b, Value *input, Value *order) {
 
   std::tie(vt, elem_ty) = getIntVectorTypes(b, elemwidth, elem_count);
 
-  Value *vecInput = INT_AS_VECTOR<width, elemwidth>(b, input);
-  Value *vecOrder = INT_AS_VECTOR<width, elemwidth>(b, order);
+  llvm::Value *vecInput = INT_AS_VECTOR<width, elemwidth>(b, input);
+  llvm::Value *vecOrder = INT_AS_VECTOR<width, elemwidth>(b, order);
 
-  Value *resultAlloc = new AllocaInst(vt, nullptr, "", b);
-  Value *vecResult = noAliasMCSemaScope(new LoadInst(resultAlloc, "", b));
+  llvm::Value *resultAlloc = new AllocaInst(vt, nullptr, "", b);
+  llvm::Value *vecResult = noAliasMCSemaScope(new LoadInst(resultAlloc, "", b));
 
   for (int i = 0; i < elem_count; i++) {
     // get input value
-    Value *toTest = ExtractElementInst::Create(vecOrder, CONST_V<32>(b, i), "",
-                                               b);
+    llvm::Value *toTest = ExtractElementInst::Create(vecOrder,
+                                                     CONST_V<32>(b, i), "", b);
 
     // check if high bit is set
-    Value *highBitSet = BinaryOperator::CreateAnd(
+    llvm::Value *highBitSet = BinaryOperator::CreateAnd(
         toTest, CONST_V<elemwidth>(b, 1 << (elemwidth - 1)), "", b);
 
     int mask = 0xF;
@@ -1010,18 +1076,18 @@ static Value* doShuffleRR(BasicBlock *&b, Value *input, Value *order) {
     }
 
     // extract the low bits
-    Value *lowBits = BinaryOperator::CreateAnd(toTest,
-                                               CONST_V<elemwidth>(b, mask), "",
-                                               b);
+    llvm::Value *lowBits = BinaryOperator::CreateAnd(
+        toTest, CONST_V<elemwidth>(b, mask), "", b);
 
-    Value *origPiece = ExtractElementInst::Create(vecInput, lowBits, "", b);
+    llvm::Value *origPiece = ExtractElementInst::Create(vecInput, lowBits, "",
+                                                        b);
 
     // check if high bit was not set
-    Value *isZero = new ICmpInst( *b, CmpInst::ICMP_EQ, highBitSet,
-                                 CONST_V<elemwidth>(b, 0));
+    llvm::Value *isZero = new ICmpInst( *b, CmpInst::ICMP_EQ, highBitSet,
+                                       CONST_V<elemwidth>(b, 0));
 
     // pick either other byte position, or zero
-    Value *whichValue = SelectInst::Create(isZero,  // if highBit is zero (aka not set), we take a piece of the vector
+    llvm::Value *whichValue = SelectInst::Create(isZero,  // if highBit is zero (aka not set), we take a piece of the vector
         origPiece,  // vector piece
         CONST_V<elemwidth>(b, 0),  // if it is set, we take zero
         "", b);
@@ -1031,184 +1097,198 @@ static Value* doShuffleRR(BasicBlock *&b, Value *input, Value *order) {
   }
 
   // convert the output back to an integer
-  Value *intOutput = CastInst::Create(Instruction::BitCast, vecResult,
-                                      Type::getIntNTy(b->getContext(), width),
-                                      "", b);
+  llvm::Value *intOutput = CastInst::Create(
+      Instruction::BitCast, vecResult, Type::getIntNTy(b->getContext(), width),
+      "", b);
 
   return intOutput;
 }
 
 template<int width>
-static InstTransResult doBLENDVBrr(BasicBlock *&b, const MCOperand &dst,
-                                   const MCOperand &src) {
+static InstTransResult doBLENDVBrr(llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   const llvm::MCOperand &src) {
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
 
-  Value *input1 = R_READ<width>(b, dst.getReg());
-  Value *input2 = R_READ<width>(b, src.getReg());
-  Value *order = R_READ<width>(b, X86::XMM0);
+  llvm::Value *input1 = R_READ<width>(b, dst.getReg());
+  llvm::Value *input2 = R_READ<width>(b, src.getReg());
+  llvm::Value *order = R_READ<width>(b, X86::XMM0);
 
-  Value *blended = doBlendVV<width, 8>(b, input1, input2, order);
+  llvm::Value *blended = doBlendVV<width, 8>(b, input1, input2, order);
 
   R_WRITE<width>(b, dst.getReg(), blended);
   return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult doBLENDVBrm(NativeInstPtr ip, BasicBlock *&b,
-                                   const MCOperand &dst, Value *memAddr) {
+static InstTransResult doBLENDVBrm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   llvm::Value *memAddr) {
   NASSERT(dst.isReg());
   NASSERT(memAddr != nullptr);
 
-  Value *input1 = R_READ<width>(b, dst.getReg());
-  Value *input2 = M_READ<width>(ip, b, memAddr);
-  Value *order = R_READ<width>(b, X86::XMM0);
+  llvm::Value *input1 = R_READ<width>(b, dst.getReg());
+  llvm::Value *input2 = M_READ<width>(ip, b, memAddr);
+  llvm::Value *order = R_READ<width>(b, X86::XMM0);
 
-  Value *blended = doBlendVV<width, 8>(b, input1, input2, order);
+  llvm::Value *blended = doBlendVV<width, 8>(b, input1, input2, order);
   R_WRITE<width>(b, dst.getReg(), blended);
   return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult doPSHUFBrr(BasicBlock *&b, const MCOperand &dst,
-                                  const MCOperand &src) {
+static InstTransResult doPSHUFBrr(llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &dst,
+                                  const llvm::MCOperand &src) {
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
 
-  Value *input = R_READ<width>(b, dst.getReg());
-  Value *order = R_READ<width>(b, src.getReg());
+  llvm::Value *input = R_READ<width>(b, dst.getReg());
+  llvm::Value *order = R_READ<width>(b, src.getReg());
 
-  Value *shuffled = doShuffleRR<width, 8>(b, input, order);
+  llvm::Value *shuffled = doShuffleRR<width, 8>(b, input, order);
 
   R_WRITE<width>(b, dst.getReg(), shuffled);
   return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult doPSHUFBrm(NativeInstPtr ip, BasicBlock *&b,
-                                  const MCOperand &dst, Value *memAddr) {
+static InstTransResult doPSHUFBrm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &dst,
+                                  llvm::Value *memAddr) {
   NASSERT(dst.isReg());
   NASSERT(memAddr != nullptr);
 
-  Value *order = M_READ<width>(ip, b, memAddr);
-  Value *input = R_READ<width>(b, dst.getReg());
+  llvm::Value *order = M_READ<width>(ip, b, memAddr);
+  llvm::Value *input = R_READ<width>(b, dst.getReg());
 
-  Value *shuffled = doShuffleRR<width, 8>(b, input, order);
+  llvm::Value *shuffled = doShuffleRR<width, 8>(b, input, order);
   R_WRITE<width>(b, dst.getReg(), shuffled);
   return ContinueBlock;
 }
 
-static InstTransResult doPSHUFDri(BasicBlock *&b, const MCOperand &dst,
-                                  const MCOperand &src,
-                                  const MCOperand &order) {
+static InstTransResult doPSHUFDri(llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &dst,
+                                  const llvm::MCOperand &src,
+                                  const llvm::MCOperand &order) {
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
   NASSERT(order.isImm());
 
-  Value *input = R_READ<128>(b, src.getReg());
+  llvm::Value *input = R_READ<128>(b, src.getReg());
 
-  Value *shuffled = doShuffle<128, 32>(b, input, order.getImm());
+  llvm::Value *shuffled = doShuffle<128, 32>(b, input, order.getImm());
 
   R_WRITE<128>(b, dst.getReg(), shuffled);
   return ContinueBlock;
 }
 
-static InstTransResult doPSHUFDmi(NativeInstPtr ip, BasicBlock *&b,
-                                  const MCOperand &dst, Value *mem_addr,
-                                  const MCOperand &order) {
+static InstTransResult doPSHUFDmi(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &dst,
+                                  llvm::Value *mem_addr,
+                                  const llvm::MCOperand &order) {
   NASSERT(dst.isReg());
   NASSERT(order.isImm());
 
-  Value *input = M_READ<128>(ip, b, mem_addr);
+  llvm::Value *input = M_READ<128>(ip, b, mem_addr);
 
-  Value *shuffled = doShuffle<128, 32>(b, input, order.getImm());
+  llvm::Value *shuffled = doShuffle<128, 32>(b, input, order.getImm());
 
   R_WRITE<128>(b, dst.getReg(), shuffled);
   return ContinueBlock;
 }
 
 template<int width, int elementwidth>
-static Value* doInsertion(BasicBlock *&b, Value *input, Value *what,
-                          unsigned position) {
-  Value *vec = INT_AS_VECTOR<width, elementwidth>(b, input);
+static llvm::Value* doInsertion(llvm::BasicBlock *&b, llvm::Value *input,
+                                llvm::Value *what, unsigned position) {
+  llvm::Value *vec = INT_AS_VECTOR<width, elementwidth>(b, input);
 
-  Value *newvec = InsertElementInst::Create(vec, what, CONST_V<32>(b, position),
-                                            "", b);
+  llvm::Value *newvec = InsertElementInst::Create(vec, what,
+                                                  CONST_V<32>(b, position), "",
+                                                  b);
 
-  Value *newint = VECTOR_AS_INT<width>(b, newvec);
+  llvm::Value *newint = VECTOR_AS_INT<width>(b, newvec);
 
   return newint;
 }
 
-static InstTransResult doPINSRWrri(BasicBlock *&b, const MCOperand &dst,
-                                   const MCOperand &src,
-                                   const MCOperand &order) {
+static InstTransResult doPINSRWrri(llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   const llvm::MCOperand &src,
+                                   const llvm::MCOperand &order) {
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
   NASSERT(order.isImm());
 
-  Value *vec = R_READ<128>(b, dst.getReg());
-  Value *elem = R_READ<16>(b, src.getReg());
+  llvm::Value *vec = R_READ<128>(b, dst.getReg());
+  llvm::Value *elem = R_READ<16>(b, src.getReg());
 
-  Value *new_vec = doInsertion<128, 16>(b, vec, elem, order.getImm());
+  llvm::Value *new_vec = doInsertion<128, 16>(b, vec, elem, order.getImm());
 
   R_WRITE<128>(b, dst.getReg(), new_vec);
   return ContinueBlock;
 }
 
-static InstTransResult doPINSRWrmi(NativeInstPtr ip, BasicBlock *&b,
-                                   const MCOperand &dst, Value *memAddr,
-                                   const MCOperand &order) {
+static InstTransResult doPINSRWrmi(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   llvm::Value *memAddr,
+                                   const llvm::MCOperand &order) {
 
   NASSERT(dst.isReg());
   NASSERT(order.isImm());
 
-  Value *vec = R_READ<128>(b, dst.getReg());
-  Value *elem = M_READ<16>(ip, b, memAddr);
+  llvm::Value *vec = R_READ<128>(b, dst.getReg());
+  llvm::Value *elem = M_READ<16>(ip, b, memAddr);
 
-  Value *new_vec = doInsertion<128, 16>(b, vec, elem, order.getImm());
+  llvm::Value *new_vec = doInsertion<128, 16>(b, vec, elem, order.getImm());
 
   R_WRITE<128>(b, dst.getReg(), new_vec);
   return ContinueBlock;
 }
 
 template<int width, int elementwidth>
-static Value* doExtraction(BasicBlock *&b, Value *input, unsigned position) {
-  Value *vec = INT_AS_VECTOR<width, elementwidth>(b, input);
+static llvm::Value* doExtraction(llvm::BasicBlock *&b, llvm::Value *input,
+                                 unsigned position) {
+  llvm::Value *vec = INT_AS_VECTOR<width, elementwidth>(b, input);
 
-  Value *element = ExtractElementInst::Create(vec, CONST_V<32>(b, position), "",
-                                              b);
+  llvm::Value *element = ExtractElementInst::Create(vec,
+                                                    CONST_V<32>(b, position),
+                                                    "", b);
 
   return element;
 }
 
-static InstTransResult doPEXTRWri(BasicBlock *&b, const MCOperand &dst,
-                                  const MCOperand &src,
-                                  const MCOperand &order) {
+static InstTransResult doPEXTRWri(llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &dst,
+                                  const llvm::MCOperand &src,
+                                  const llvm::MCOperand &order) {
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
   NASSERT(order.isImm());
 
-  Value *vec = R_READ<128>(b, src.getReg());
+  llvm::Value *vec = R_READ<128>(b, src.getReg());
 
-  Value *item = doExtraction<128, 16>(b, vec, order.getImm());
+  llvm::Value *item = doExtraction<128, 16>(b, vec, order.getImm());
 
   // upper bits are set to zero
-  Value *extItem = new ZExtInst(item, Type::getInt32Ty(b->getContext()), "", b);
+  llvm::Value *extItem = new ZExtInst(item, Type::getInt32Ty(b->getContext()),
+                                      "", b);
 
   R_WRITE<32>(b, dst.getReg(), extItem);
   return ContinueBlock;
 }
 
-static InstTransResult doPEXTRWmr(NativeInstPtr ip, BasicBlock *&b,
-                                  Value *memAddr, const MCOperand &src,
-                                  const MCOperand &order) {
+static InstTransResult doPEXTRWmr(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                  llvm::Value *memAddr,
+                                  const llvm::MCOperand &src,
+                                  const llvm::MCOperand &order) {
   NASSERT(src.isReg());
   NASSERT(order.isImm());
 
-  Value *vec = R_READ<128>(b, src.getReg());
+  llvm::Value *vec = R_READ<128>(b, src.getReg());
 
-  Value *item = doExtraction<128, 16>(b, vec, order.getImm());
+  llvm::Value *item = doExtraction<128, 16>(b, vec, order.getImm());
 
   M_WRITE<16>(ip, b, memAddr, item);
   return ContinueBlock;
@@ -1219,7 +1299,8 @@ enum UnpackType {
   UNPACK_HIGH
 };
 template<int width, int elemwidth, UnpackType upt>
-static Value* doUnpack(BasicBlock *&b, Value *v1, Value *v2) {
+static llvm::Value* doUnpack(llvm::BasicBlock *&b, llvm::Value *v1,
+                             llvm::Value *v2) {
   NASSERT(width % elemwidth == 0);
 
   int elem_count = width / elemwidth;
@@ -1229,8 +1310,8 @@ static Value* doUnpack(BasicBlock *&b, Value *v1, Value *v2) {
 
   std::tie(vt, elem_ty) = getIntVectorTypes(b, elemwidth, elem_count);
 
-  Value *vecInput1 = INT_AS_VECTOR<width, elemwidth>(b, v1);
-  Value *vecInput2 = INT_AS_VECTOR<width, elemwidth>(b, v2);
+  llvm::Value *vecInput1 = INT_AS_VECTOR<width, elemwidth>(b, v1);
+  llvm::Value *vecInput2 = INT_AS_VECTOR<width, elemwidth>(b, v2);
 
   std::vector<Constant*> shuffle_vec;
 
@@ -1243,58 +1324,62 @@ static Value* doUnpack(BasicBlock *&b, Value *v1, Value *v2) {
     shuffle_vec.push_back(CONST_V<32>(b, elem_start + i + elem_count));
     shuffle_vec.push_back(CONST_V<32>(b, elem_start + i));
   }
-  Value *vecShuffle = ConstantVector::get(shuffle_vec);
+  llvm::Value *vecShuffle = ConstantVector::get(shuffle_vec);
 
   // do the shuffle
-  Value *shuffled = new ShuffleVectorInst(vecInput1, vecInput2, vecShuffle, "",
-                                          b);
+  llvm::Value *shuffled = new ShuffleVectorInst(vecInput1, vecInput2,
+                                                vecShuffle, "", b);
 
   // convert the output back to an integer
-  Value *intOutput = CastInst::Create(Instruction::BitCast, shuffled,
-                                      Type::getIntNTy(b->getContext(), width),
-                                      "", b);
+  llvm::Value *intOutput = CastInst::Create(
+      Instruction::BitCast, shuffled, Type::getIntNTy(b->getContext(), width),
+      "", b);
 
   return intOutput;
 }
 
 template<int width, int slice_width, UnpackType upt>
-static InstTransResult doPUNPCKVV(BasicBlock *&b, const MCOperand &dst,
-                                  Value *v1, Value *v2) {
+static InstTransResult doPUNPCKVV(llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &dst, llvm::Value *v1,
+                                  llvm::Value *v2) {
 
   NASSERT(dst.isReg());
 
-  Value *shuffled = doUnpack<width, slice_width, upt>(b, v1, v2);
+  llvm::Value *shuffled = doUnpack<width, slice_width, upt>(b, v1, v2);
 
   R_WRITE<width>(b, dst.getReg(), shuffled);
   return ContinueBlock;
 }
 
 template<int width, int slice_width, UnpackType upt>
-static InstTransResult doPUNPCKrr(BasicBlock *&b, const MCOperand &dst,
-                                  const MCOperand &src) {
+static InstTransResult doPUNPCKrr(llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &dst,
+                                  const llvm::MCOperand &src) {
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
 
-  Value *srcVal = R_READ<width>(b, src.getReg());
-  Value *dstVal = R_READ<width>(b, dst.getReg());
+  llvm::Value *srcVal = R_READ<width>(b, src.getReg());
+  llvm::Value *dstVal = R_READ<width>(b, dst.getReg());
 
   return doPUNPCKVV<width, slice_width, upt>(b, dst, srcVal, dstVal);
 }
 
 template<int width, int slice_width, UnpackType upt>
-static InstTransResult doPUNPCKrm(NativeInstPtr ip, BasicBlock *&b,
-                                  const MCOperand &dst, Value *memAddr) {
+static InstTransResult doPUNPCKrm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &dst,
+                                  llvm::Value *memAddr) {
   NASSERT(dst.isReg());
   NASSERT(memAddr != nullptr);
 
-  Value *srcVal = M_READ<width>(ip, b, memAddr);
-  Value *dstVal = R_READ<width>(b, dst.getReg());
+  llvm::Value *srcVal = M_READ<width>(ip, b, memAddr);
+  llvm::Value *dstVal = R_READ<width>(b, dst.getReg());
 
   return doPUNPCKVV<width, slice_width, upt>(b, dst, srcVal, dstVal);
 }
 
 template<int width, int elemwidth, CmpInst::Predicate cmp_op>
-static llvm::Value* do_SATURATED_SUB(BasicBlock *&b, Value *v1, Value *v2) {
+static llvm::Value* do_SATURATED_SUB(llvm::BasicBlock *&b, llvm::Value *v1,
+                                     llvm::Value *v2) {
   NASSERT(width % elemwidth == 0);
   constexpr int elem_count = width / elemwidth;
   Type *elem_ty;
@@ -1303,68 +1388,72 @@ static llvm::Value* do_SATURATED_SUB(BasicBlock *&b, Value *v1, Value *v2) {
   VectorType *vt_int32ty = VectorType::get(int32ty, elem_count);
 
   std::tie(vt, elem_ty) = getIntVectorTypes(b, elemwidth, elem_count);
-  Value *vecInput1 = INT_AS_VECTOR<width, elemwidth>(b, v1);
-  Value *vecInput2 = INT_AS_VECTOR<width, elemwidth>(b, v2);
+  llvm::Value *vecInput1 = INT_AS_VECTOR<width, elemwidth>(b, v1);
+  llvm::Value *vecInput2 = INT_AS_VECTOR<width, elemwidth>(b, v2);
 
   // result = v1 - v2
-  Value *op_result = BinaryOperator::Create(Instruction::Sub, vecInput1,
-                                            vecInput2, "", b);
+  llvm::Value *op_result = BinaryOperator::Create(Instruction::Sub, vecInput1,
+                                                  vecInput2, "", b);
 
   // if v1 is => v2, then we keep the original value (mask with 0xFF...)
   // else, if v1 < v2, make it saturate to 0x00 (mask with 0x00...)
   // The mask can be made as a sign extend of the (v1 => v2) vector op
 
-  Value *comparison = CmpInst::Create(Instruction::ICmp, cmp_op, vecInput1,
-                                      vecInput2, "", b);
+  llvm::Value *comparison = CmpInst::Create(Instruction::ICmp, cmp_op,
+                                            vecInput1, vecInput2, "", b);
   // values we should keep get sign extended to 0b11111...
   // values we want to set to zero get sign extended to 0b000000...
-  Value *saturate_mask = new SExtInst(comparison, vt, "", b);
+  llvm::Value *saturate_mask = new SExtInst(comparison, vt, "", b);
 
   // mask result with the saturation mask
-  Value *saturated = BinaryOperator::Create(Instruction::And, op_result,
-                                            saturate_mask, "", b);
+  llvm::Value *saturated = BinaryOperator::Create(Instruction::And, op_result,
+                                                  saturate_mask, "", b);
 
-  Value *intOutput = CastInst::Create(Instruction::BitCast, saturated,
-                                      Type::getIntNTy(b->getContext(), width),
-                                      "", b);
+  llvm::Value *intOutput = CastInst::Create(
+      Instruction::BitCast, saturated, Type::getIntNTy(b->getContext(), width),
+      "", b);
   return intOutput;
 }
 
 template<int width, int elemwidth, CmpInst::Predicate cmp_op>
 static InstTransResult do_SATURATED_SUB_RR(NativeInstPtr ip,
-                                           BasicBlock *& block,
-                                           const MCOperand &o1,
-                                           const MCOperand &o2) {
+                                           llvm::BasicBlock *& block,
+                                           const llvm::MCOperand &o1,
+                                           const llvm::MCOperand &o2) {
   NASSERT(o1.isReg());
   NASSERT(o2.isReg());
 
-  Value *opVal1 = R_READ<width>(block, o1.getReg());
-  Value *opVal2 = R_READ<width>(block, o2.getReg());
+  llvm::Value *opVal1 = R_READ<width>(block, o1.getReg());
+  llvm::Value *opVal2 = R_READ<width>(block, o2.getReg());
 
-  Value *result = do_SATURATED_SUB<width, elemwidth, cmp_op>(block, opVal1,
-                                                             opVal2);
+  llvm::Value *result = do_SATURATED_SUB<width, elemwidth, cmp_op>(block,
+                                                                   opVal1,
+                                                                   opVal2);
   R_WRITE<width>(block, o1.getReg(), result);
   return ContinueBlock;
 }
 
 template<int width, int elemwidth, CmpInst::Predicate cmp_op>
 static InstTransResult do_SATURATED_SUB_RM(NativeInstPtr ip,
-                                           BasicBlock *& block,
-                                           const MCOperand &o1, Value *addr) {
+                                           llvm::BasicBlock *& block,
+                                           const llvm::MCOperand &o1,
+                                           llvm::Value *addr) {
   NASSERT(o1.isReg());
 
-  Value *opVal1 = R_READ<width>(block, o1.getReg());
-  Value *opVal2 = M_READ<width>(ip, block, addr);
+  llvm::Value *opVal1 = R_READ<width>(block, o1.getReg());
+  llvm::Value *opVal2 = M_READ<width>(ip, block, addr);
 
-  Value *result = do_SATURATED_SUB<width, elemwidth, cmp_op>(block, opVal1,
-                                                             opVal2);
+  llvm::Value *result = do_SATURATED_SUB<width, elemwidth, cmp_op>(block,
+                                                                   opVal1,
+                                                                   opVal2);
   R_WRITE<width>(block, o1.getReg(), result);
   return ContinueBlock;
 }
 
 template<int width, int elemwidth, CmpInst::Predicate cmp_op>
-static InstTransResult do_SSE_COMPARE(const MCOperand &dst, BasicBlock *&b,
-                                      Value *v1, Value *v2) {
+static InstTransResult do_SSE_COMPARE(const llvm::MCOperand &dst,
+                                      llvm::BasicBlock *&b, llvm::Value *v1,
+                                      llvm::Value *v2) {
   NASSERT(width % elemwidth == 0);
 
   int elem_count = width / elemwidth;
@@ -1374,117 +1463,128 @@ static InstTransResult do_SSE_COMPARE(const MCOperand &dst, BasicBlock *&b,
 
   std::tie(vt, elem_ty) = getIntVectorTypes(b, elemwidth, elem_count);
 
-  Value *vecInput1 = INT_AS_VECTOR<width, elemwidth>(b, v1);
-  Value *vecInput2 = INT_AS_VECTOR<width, elemwidth>(b, v2);
+  llvm::Value *vecInput1 = INT_AS_VECTOR<width, elemwidth>(b, v1);
+  llvm::Value *vecInput2 = INT_AS_VECTOR<width, elemwidth>(b, v2);
 
-  Value *op_out = CmpInst::Create(Instruction::ICmp, cmp_op, vecInput1,
-                                  vecInput2, "", b);
+  llvm::Value *op_out = CmpInst::Create(Instruction::ICmp, cmp_op, vecInput1,
+                                        vecInput2, "", b);
 
   // SExt to width since CmpInst returns
   // a vector of i1
-  Value *sext_out = new SExtInst(op_out, vt, "", b);
+  llvm::Value *sext_out = new SExtInst(op_out, vt, "", b);
 
   // convert the output back to an integer
-  Value *intOutput = CastInst::Create(Instruction::BitCast, sext_out,
-                                      Type::getIntNTy(b->getContext(), width),
-                                      "", b);
+  llvm::Value *intOutput = CastInst::Create(
+      Instruction::BitCast, sext_out, Type::getIntNTy(b->getContext(), width),
+      "", b);
 
   R_WRITE<width>(b, dst.getReg(), intOutput);
   return ContinueBlock;
 }
 
 template<int width, int elem_width, CmpInst::Predicate cmp_op>
-static InstTransResult do_SSE_COMPARE_RM(NativeInstPtr ip, BasicBlock *& block,
-                                         const MCOperand &o1, Value *addr) {
+static InstTransResult do_SSE_COMPARE_RM(NativeInstPtr ip,
+                                         llvm::BasicBlock *& block,
+                                         const llvm::MCOperand &o1,
+                                         llvm::Value *addr) {
   NASSERT(o1.isReg());
 
-  Value *opVal1 = R_READ<width>(block, o1.getReg());
-  Value *opVal2 = M_READ<width>(ip, block, addr);
+  llvm::Value *opVal1 = R_READ<width>(block, o1.getReg());
+  llvm::Value *opVal2 = M_READ<width>(ip, block, addr);
 
   return do_SSE_COMPARE<width, elem_width, cmp_op>(o1, block, opVal1, opVal2);
 }
 
 template<int width, int elem_width, CmpInst::Predicate cmp_op>
-static InstTransResult do_SSE_COMPARE_RR(NativeInstPtr ip, BasicBlock *& block,
-                                         const MCOperand &o1,
-                                         const MCOperand &o2) {
+static InstTransResult do_SSE_COMPARE_RR(NativeInstPtr ip,
+                                         llvm::BasicBlock *& block,
+                                         const llvm::MCOperand &o1,
+                                         const llvm::MCOperand &o2) {
   NASSERT(o1.isReg());
   NASSERT(o2.isReg());
 
-  Value *opVal1 = R_READ<width>(block, o1.getReg());
-  Value *opVal2 = R_READ<width>(block, o2.getReg());
+  llvm::Value *opVal1 = R_READ<width>(block, o1.getReg());
+  llvm::Value *opVal2 = R_READ<width>(block, o2.getReg());
 
   return do_SSE_COMPARE<width, elem_width, cmp_op>(o1, block, opVal1, opVal2);
 }
 
 template<int width, int elemwidth, Instruction::BinaryOps bin_op>
-static InstTransResult do_SSE_VECTOR_OP(const MCOperand &dst, BasicBlock *&b,
-                                        Value *v1, Value *v2) {
+static InstTransResult do_SSE_VECTOR_OP(const llvm::MCOperand &dst,
+                                        llvm::BasicBlock *&b, llvm::Value *v1,
+                                        llvm::Value *v2) {
   NASSERT(width % elemwidth == 0);
-  Value *vecInput1 = INT_AS_VECTOR<width, elemwidth>(b, v1);
-  Value *vecInput2 = INT_AS_VECTOR<width, elemwidth>(b, v2);
+  llvm::Value *vecInput1 = INT_AS_VECTOR<width, elemwidth>(b, v1);
+  llvm::Value *vecInput2 = INT_AS_VECTOR<width, elemwidth>(b, v2);
 
-  Value *op_out = BinaryOperator::Create(bin_op, vecInput1, vecInput2, "", b);
+  llvm::Value *op_out = BinaryOperator::Create(bin_op, vecInput1, vecInput2, "",
+                                               b);
 
   // convert the output back to an integer
-  Value *intOutput = CastInst::Create(Instruction::BitCast, op_out,
-                                      Type::getIntNTy(b->getContext(), width),
-                                      "", b);
+  llvm::Value *intOutput = CastInst::Create(
+      Instruction::BitCast, op_out, Type::getIntNTy(b->getContext(), width), "",
+      b);
 
   R_WRITE<width>(b, dst.getReg(), intOutput);
   return ContinueBlock;
 }
 
 template<int width, int elemwidth, Instruction::BinaryOps bin_op>
-static InstTransResult do_SSE_FP_VECTOR_OP(const MCOperand &dst, BasicBlock *&b,
-                                           Value *v1, Value *v2) {
+static InstTransResult do_SSE_FP_VECTOR_OP(const llvm::MCOperand &dst,
+                                           llvm::BasicBlock *&b,
+                                           llvm::Value *v1, llvm::Value *v2) {
   NASSERT(width % elemwidth == 0);
-  Value *vecInput1 = INT_AS_FPVECTOR<width, elemwidth>(b, v1);
-  Value *vecInput2 = INT_AS_FPVECTOR<width, elemwidth>(b, v2);
+  llvm::Value *vecInput1 = INT_AS_FPVECTOR<width, elemwidth>(b, v1);
+  llvm::Value *vecInput2 = INT_AS_FPVECTOR<width, elemwidth>(b, v2);
 
-  Value *op_out = BinaryOperator::Create(bin_op, vecInput1, vecInput2, "", b);
+  llvm::Value *op_out = BinaryOperator::Create(bin_op, vecInput1, vecInput2, "",
+                                               b);
 
   // convert the output back to an integer
-  Value *intOutput = CastInst::Create(Instruction::BitCast, op_out,
-                                      Type::getIntNTy(b->getContext(), width),
-                                      "", b);
+  llvm::Value *intOutput = CastInst::Create(
+      Instruction::BitCast, op_out, Type::getIntNTy(b->getContext(), width), "",
+      b);
 
   R_WRITE<width>(b, dst.getReg(), intOutput);
   return ContinueBlock;
 }
 
 template<int width, int elem_width, Instruction::BinaryOps bin_op>
-static InstTransResult do_SSE_VECTOR_RM(NativeInstPtr ip, BasicBlock *& block,
-                                        const MCOperand &o1, Value *addr) {
+static InstTransResult do_SSE_VECTOR_RM(NativeInstPtr ip,
+                                        llvm::BasicBlock *& block,
+                                        const llvm::MCOperand &o1,
+                                        llvm::Value *addr) {
   NASSERT(o1.isReg());
 
-  Value *opVal1 = R_READ<width>(block, o1.getReg());
-  Value *opVal2 = M_READ<width>(ip, block, addr);
+  llvm::Value *opVal1 = R_READ<width>(block, o1.getReg());
+  llvm::Value *opVal2 = M_READ<width>(ip, block, addr);
 
   return do_SSE_VECTOR_OP<width, elem_width, bin_op>(o1, block, opVal1, opVal2);
 }
 
 template<int width, int elem_width, Instruction::BinaryOps bin_op>
-static InstTransResult do_SSE_VECTOR_RR(NativeInstPtr ip, BasicBlock *& block,
-                                        const MCOperand &o1,
-                                        const MCOperand &o2) {
+static InstTransResult do_SSE_VECTOR_RR(NativeInstPtr ip,
+                                        llvm::BasicBlock *& block,
+                                        const llvm::MCOperand &o1,
+                                        const llvm::MCOperand &o2) {
   NASSERT(o1.isReg());
   NASSERT(o2.isReg());
 
-  Value *opVal1 = R_READ<width>(block, o1.getReg());
-  Value *opVal2 = R_READ<width>(block, o2.getReg());
+  llvm::Value *opVal1 = R_READ<width>(block, o1.getReg());
+  llvm::Value *opVal2 = R_READ<width>(block, o2.getReg());
 
   return do_SSE_VECTOR_OP<width, elem_width, bin_op>(o1, block, opVal1, opVal2);
 }
 
 template<int width, int elem_width, Instruction::BinaryOps bin_op>
 static InstTransResult do_SSE_FP_VECTOR_RM(NativeInstPtr ip,
-                                           BasicBlock *& block,
-                                           const MCOperand &o1, Value *addr) {
+                                           llvm::BasicBlock *& block,
+                                           const llvm::MCOperand &o1,
+                                           llvm::Value *addr) {
   NASSERT(o1.isReg());
 
-  Value *opVal1 = R_READ<width>(block, o1.getReg());
-  Value *opVal2 = M_READ<width>(ip, block, addr);
+  llvm::Value *opVal1 = R_READ<width>(block, o1.getReg());
+  llvm::Value *opVal2 = M_READ<width>(ip, block, addr);
 
   return do_SSE_FP_VECTOR_OP<width, elem_width, bin_op>(o1, block, opVal1,
                                                         opVal2);
@@ -1492,135 +1592,141 @@ static InstTransResult do_SSE_FP_VECTOR_RM(NativeInstPtr ip,
 
 template<int width, int elem_width, Instruction::BinaryOps bin_op>
 static InstTransResult do_SSE_FP_VECTOR_RR(NativeInstPtr ip,
-                                           BasicBlock *& block,
-                                           const MCOperand &o1,
-                                           const MCOperand &o2) {
+                                           llvm::BasicBlock *& block,
+                                           const llvm::MCOperand &o1,
+                                           const llvm::MCOperand &o2) {
   NASSERT(o1.isReg());
   NASSERT(o2.isReg());
 
-  Value *opVal1 = R_READ<width>(block, o1.getReg());
-  Value *opVal2 = R_READ<width>(block, o2.getReg());
+  llvm::Value *opVal1 = R_READ<width>(block, o1.getReg());
+  llvm::Value *opVal2 = R_READ<width>(block, o2.getReg());
 
   return do_SSE_FP_VECTOR_OP<width, elem_width, bin_op>(o1, block, opVal1,
                                                         opVal2);
 }
 
 template<FCmpInst::Predicate binop>
-static Value* doMAXMINvv(BasicBlock *&block, Value *op1, Value *op2) {
+static llvm::Value* doMAXMINvv(llvm::BasicBlock *&block, llvm::Value *op1,
+                               llvm::Value *op2) {
 
   // TODO: handle the zero case
-  Value *is_gt = new FCmpInst( *block, binop, op1, op2);
+  llvm::Value *is_gt = new FCmpInst( *block, binop, op1, op2);
 
   // if op1 > op2, use op1, else op2
-  Value *which_op = SelectInst::Create(is_gt, op1, op2, "", block);
+  llvm::Value *which_op = SelectInst::Create(is_gt, op1, op2, "", block);
 
   return which_op;
 }
 
 template<int width, int elemwidth, FCmpInst::Predicate binop>
-static InstTransResult doMAXMIN_FP_VECTOR_rr(BasicBlock *&b,
-                                             const MCOperand &op1,
-                                             const MCOperand &op2) {
+static InstTransResult doMAXMIN_FP_VECTOR_rr(llvm::BasicBlock *&b,
+                                             const llvm::MCOperand &op1,
+                                             const llvm::MCOperand &op2) {
   NASSERT(op1.isReg());
   NASSERT(op2.isReg());
 
-  Value *op1_val = R_READ<width>(b, op1.getReg());
-  Value *op2_val = R_READ<width>(b, op2.getReg());
+  llvm::Value *op1_val = R_READ<width>(b, op1.getReg());
+  llvm::Value *op2_val = R_READ<width>(b, op2.getReg());
 
   NASSERT(width % elemwidth == 0);
-  Value *vecInput1 = INT_AS_FPVECTOR<width, elemwidth>(b, op1_val);
-  Value *vecInput2 = INT_AS_FPVECTOR<width, elemwidth>(b, op2_val);
+  llvm::Value *vecInput1 = INT_AS_FPVECTOR<width, elemwidth>(b, op1_val);
+  llvm::Value *vecInput2 = INT_AS_FPVECTOR<width, elemwidth>(b, op2_val);
 
-  Value *max = doMAXMINvv<binop>(b, vecInput1, vecInput2);
+  llvm::Value *max = doMAXMINvv<binop>(b, vecInput1, vecInput2);
 
   // convert the output back to an integer
-  Value *intOutput = CastInst::Create(Instruction::BitCast, max,
-                                      Type::getIntNTy(b->getContext(), width),
-                                      "", b);
+  llvm::Value *intOutput = CastInst::Create(
+      Instruction::BitCast, max, Type::getIntNTy(b->getContext(), width), "",
+      b);
 
   R_WRITE<width>(b, op1.getReg(), intOutput);
   return ContinueBlock;
 }
 
 template<int width, int elemwidth, FCmpInst::Predicate binop>
-static InstTransResult doMAXMIN_FP_VECTOR_rm(NativeInstPtr ip, BasicBlock *&b,
-                                             const MCOperand &op1,
-                                             Value *memAddr) {
+static InstTransResult doMAXMIN_FP_VECTOR_rm(NativeInstPtr ip,
+                                             llvm::BasicBlock *&b,
+                                             const llvm::MCOperand &op1,
+                                             llvm::Value *memAddr) {
   NASSERT(op1.isReg());
 
-  Value *op1_val = R_READ<width>(b, op1.getReg());
-  Value *op2_val = M_READ<width>(ip, b, memAddr);
+  llvm::Value *op1_val = R_READ<width>(b, op1.getReg());
+  llvm::Value *op2_val = M_READ<width>(ip, b, memAddr);
 
   NASSERT(width % elemwidth == 0);
-  Value *vecInput1 = INT_AS_FPVECTOR<width, elemwidth>(b, op1_val);
-  Value *vecInput2 = INT_AS_FPVECTOR<width, elemwidth>(b, op2_val);
+  llvm::Value *vecInput1 = INT_AS_FPVECTOR<width, elemwidth>(b, op1_val);
+  llvm::Value *vecInput2 = INT_AS_FPVECTOR<width, elemwidth>(b, op2_val);
 
-  Value *max = doMAXMINvv<binop>(b, vecInput1, vecInput2);
+  llvm::Value *max = doMAXMINvv<binop>(b, vecInput1, vecInput2);
 
   // convert the output back to an integer
-  Value *intOutput = CastInst::Create(Instruction::BitCast, max,
-                                      Type::getIntNTy(b->getContext(), width),
-                                      "", b);
+  llvm::Value *intOutput = CastInst::Create(
+      Instruction::BitCast, max, Type::getIntNTy(b->getContext(), width), "",
+      b);
 
   R_WRITE<width>(b, op1.getReg(), intOutput);
   return ContinueBlock;
 }
 
 template<int width, FCmpInst::Predicate binop>
-static InstTransResult doMAXMINrr(BasicBlock *&b, const MCOperand &op1,
-                                  const MCOperand &op2) {
+static InstTransResult doMAXMINrr(llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &op1,
+                                  const llvm::MCOperand &op2) {
   NASSERT(op1.isReg());
   NASSERT(op2.isReg());
 
-  Value *op1_val = R_READ<width>(b, op1.getReg());
-  Value *op2_val = R_READ<width>(b, op2.getReg());
+  llvm::Value *op1_val = R_READ<width>(b, op1.getReg());
+  llvm::Value *op2_val = R_READ<width>(b, op2.getReg());
 
-  Value *fp1_val = INT_AS_FP<width>(b, op1_val);
-  Value *fp2_val = INT_AS_FP<width>(b, op2_val);
+  llvm::Value *fp1_val = INT_AS_FP<width>(b, op1_val);
+  llvm::Value *fp2_val = INT_AS_FP<width>(b, op2_val);
 
-  Value *max = doMAXMINvv<binop>(b, fp1_val, fp2_val);
+  llvm::Value *max = doMAXMINvv<binop>(b, fp1_val, fp2_val);
   R_WRITE<width>(b, op1.getReg(), FP_AS_INT<width>(b, max));
   return ContinueBlock;
 }
 
 template<int width, FCmpInst::Predicate binop>
-static InstTransResult doMAXMINrm(NativeInstPtr ip, BasicBlock *&b,
-                                  const MCOperand &op1, Value *memAddr) {
+static InstTransResult doMAXMINrm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &op1,
+                                  llvm::Value *memAddr) {
   NASSERT(op1.isReg());
 
-  Value *op1_val = R_READ<width>(b, op1.getReg());
-  Value *op2_val = M_READ<width>(ip, b, memAddr);
+  llvm::Value *op1_val = R_READ<width>(b, op1.getReg());
+  llvm::Value *op2_val = M_READ<width>(ip, b, memAddr);
 
-  Value *fp1_val = INT_AS_FP<width>(b, op1_val);
-  Value *fp2_val = INT_AS_FP<width>(b, op2_val);
+  llvm::Value *fp1_val = INT_AS_FP<width>(b, op1_val);
+  llvm::Value *fp2_val = INT_AS_FP<width>(b, op2_val);
 
-  Value *max = doMAXMINvv<binop>(b, fp1_val, fp2_val);
+  llvm::Value *max = doMAXMINvv<binop>(b, fp1_val, fp2_val);
   R_WRITE<width>(b, op1.getReg(), FP_AS_INT<width>(b, max));
   return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult do_PANDNrr(NativeInstPtr ip, BasicBlock *& block,
-                                  const MCOperand &o1, const MCOperand &o2) {
+static InstTransResult do_PANDNrr(NativeInstPtr ip, llvm::BasicBlock *& block,
+                                  const llvm::MCOperand &o1,
+                                  const llvm::MCOperand &o2) {
   NASSERT(o1.isReg());
   NASSERT(o2.isReg());
 
-  Value *opVal1 = R_READ<width>(block, o1.getReg());
-  Value *notVal1 = BinaryOperator::CreateNot(opVal1, "", block);
-  Value *opVal2 = R_READ<width>(block, o2.getReg());
+  llvm::Value *opVal1 = R_READ<width>(block, o1.getReg());
+  llvm::Value *notVal1 = BinaryOperator::CreateNot(opVal1, "", block);
+  llvm::Value *opVal2 = R_READ<width>(block, o2.getReg());
 
   return do_SSE_INT_VV<width, Instruction::And>(o1.getReg(), block, notVal1,
                                                 opVal2);
 }
 
 template<int width>
-static InstTransResult do_PANDNrm(NativeInstPtr ip, BasicBlock *& block,
-                                  const MCOperand &o1, Value *addr) {
+static InstTransResult do_PANDNrm(NativeInstPtr ip, llvm::BasicBlock *& block,
+                                  const llvm::MCOperand &o1,
+                                  llvm::Value *addr) {
   NASSERT(o1.isReg());
 
-  Value *opVal1 = R_READ<width>(block, o1.getReg());
-  Value *notVal1 = BinaryOperator::CreateNot(opVal1, "", block);
-  Value *opVal2 = M_READ<width>(ip, block, addr);
+  llvm::Value *opVal1 = R_READ<width>(block, o1.getReg());
+  llvm::Value *notVal1 = BinaryOperator::CreateNot(opVal1, "", block);
+  llvm::Value *opVal2 = M_READ<width>(ip, block, addr);
 
   return do_SSE_INT_VV<width, Instruction::And>(o1.getReg(), block, notVal1,
                                                 opVal2);
@@ -1632,8 +1738,8 @@ enum ExtendOp {
 };
 
 template<int width, int srcelem, int dstelem, ExtendOp op>
-static InstTransResult do_SSE_EXTEND_OP(const MCOperand &dst, BasicBlock *&b,
-                                        Value *v1) {
+static InstTransResult do_SSE_EXTEND_OP(const llvm::MCOperand &dst,
+                                        llvm::BasicBlock *&b, llvm::Value *v1) {
   NASSERT(width % srcelem == 0);
   NASSERT(width % dstelem == 0);
   TASSERT(dstelem > srcelem, "Must use SSE extend to a bigger element size");
@@ -1650,17 +1756,17 @@ static InstTransResult do_SSE_EXTEND_OP(const MCOperand &dst, BasicBlock *&b,
   std::tie(dst_vt, dst_elem_ty) = getIntVectorTypes(b, dstelem, dst_elem_count);
 
   // read input vector
-  Value *vecInput1 = INT_AS_VECTOR<width, srcelem>(b, v1);
+  llvm::Value *vecInput1 = INT_AS_VECTOR<width, srcelem>(b, v1);
 
-  Value *resultAlloc = new AllocaInst(dst_vt, nullptr, "", b);
-  Value *vecResult = noAliasMCSemaScope(new LoadInst(resultAlloc, "", b));
+  llvm::Value *resultAlloc = new AllocaInst(dst_vt, nullptr, "", b);
+  llvm::Value *vecResult = noAliasMCSemaScope(new LoadInst(resultAlloc, "", b));
 
   // we take lower dst_elem_count values
   for (int i = 0; i < dst_elem_count; i++) {
     // read source element
-    Value *item = ExtractElementInst::Create(vecInput1, CONST_V<32>(b, i), "",
-                                             b);
-    Value *newitem = nullptr;
+    llvm::Value *item = ExtractElementInst::Create(vecInput1, CONST_V<32>(b, i),
+                                                   "", b);
+    llvm::Value *newitem = nullptr;
     // op it to dst element type
     switch (op) {
       case SEXT:
@@ -1681,17 +1787,19 @@ static InstTransResult do_SSE_EXTEND_OP(const MCOperand &dst, BasicBlock *&b,
   }
 
   // convert the output back to an integer
-  Value *intOutput = CastInst::Create(Instruction::BitCast, vecResult,
-                                      Type::getIntNTy(b->getContext(), width),
-                                      "", b);
+  llvm::Value *intOutput = CastInst::Create(
+      Instruction::BitCast, vecResult, Type::getIntNTy(b->getContext(), width),
+      "", b);
 
   R_WRITE<width>(b, dst.getReg(), intOutput);
   return ContinueBlock;
 }
 
 template<int width, int srcelem, int dstelem, ExtendOp op>
-static InstTransResult do_SSE_EXTEND_RM(NativeInstPtr ip, BasicBlock *& block,
-                                        const MCOperand &o1, Value *addr) {
+static InstTransResult do_SSE_EXTEND_RM(NativeInstPtr ip,
+                                        llvm::BasicBlock *& block,
+                                        const llvm::MCOperand &o1,
+                                        llvm::Value *addr) {
   NASSERT(o1.isReg());
 
   // memory operands are weird -- its the minimum
@@ -1699,220 +1807,232 @@ static InstTransResult do_SSE_EXTEND_RM(NativeInstPtr ip, BasicBlock *& block,
   const int count = width / dstelem * srcelem;
   TASSERT(count < width, "Must SSE extend to greater size");
   llvm::dbgs() << "Reading: " << count << " bytes\n";
-  Value *opVal1 = M_READ<count>(ip, block, addr);
+  llvm::Value *opVal1 = M_READ<count>(ip, block, addr);
 
-  Value *zext = new ZExtInst(opVal1,
-                             Type::getIntNTy(block->getContext(), width), "",
-                             block);
+  llvm::Value *zext = new ZExtInst(opVal1,
+                                   Type::getIntNTy(block->getContext(), width),
+                                   "", block);
 
   return do_SSE_EXTEND_OP<width, srcelem, dstelem, op>(o1, block, zext);
 }
 
 template<int width, int srcelem, int dstelem, ExtendOp op>
-static InstTransResult do_SSE_EXTEND_RR(NativeInstPtr ip, BasicBlock *& block,
-                                        const MCOperand &o1,
-                                        const MCOperand &o2) {
+static InstTransResult do_SSE_EXTEND_RR(NativeInstPtr ip,
+                                        llvm::BasicBlock *& block,
+                                        const llvm::MCOperand &o1,
+                                        const llvm::MCOperand &o2) {
   NASSERT(o1.isReg());
   NASSERT(o2.isReg());
 
-  Value *opVal2 = R_READ<width>(block, o2.getReg());
+  llvm::Value *opVal2 = R_READ<width>(block, o2.getReg());
 
   return do_SSE_EXTEND_OP<width, srcelem, dstelem, op>(o1, block, opVal2);
 }
 
 template<int width>
-static InstTransResult doMOVHLPSrr(NativeInstPtr ip, BasicBlock *b,
-                                   const MCOperand &dest,
-                                   const MCOperand &src) {
+static InstTransResult doMOVHLPSrr(NativeInstPtr ip, llvm::BasicBlock *b,
+                                   const llvm::MCOperand &dest,
+                                   const llvm::MCOperand &src) {
   NASSERT(dest.isReg());
   NASSERT(src.isReg());
 
-  Value *r_dest = R_READ<width>(b, dest.getReg());
-  Value *r_src = R_READ<width>(b, src.getReg());
+  llvm::Value *r_dest = R_READ<width>(b, dest.getReg());
+  llvm::Value *r_src = R_READ<width>(b, src.getReg());
 
   // capture top half of src
-  Value *dest_keep = BinaryOperator::Create(Instruction::LShr, r_dest,
-                                            CONST_V<width>(b, width / 2), "",
-                                            b);
+  llvm::Value *dest_keep = BinaryOperator::Create(Instruction::LShr, r_dest,
+                                                  CONST_V<width>(b, width / 2),
+                                                  "", b);
   // put it back in top part
   dest_keep = BinaryOperator::Create(Instruction::Shl, dest_keep,
                                      CONST_V<width>(b, width / 2), "", b);
 
   // get top of src
-  Value *src_keep = BinaryOperator::Create(Instruction::LShr, r_src,
-                                           CONST_V<width>(b, width / 2), "", b);
+  llvm::Value *src_keep = BinaryOperator::Create(Instruction::LShr, r_src,
+                                                 CONST_V<width>(b, width / 2),
+                                                 "", b);
 
   // or top half of src with the old
   // top half of dst, which is now the bottom
-  Value *res = BinaryOperator::Create(Instruction::Or, src_keep, dest_keep, "",
-                                      b);
+  llvm::Value *res = BinaryOperator::Create(Instruction::Or, src_keep,
+                                            dest_keep, "", b);
 
   R_WRITE<width>(b, dest.getReg(), res);
 }
 
 template<int width>
-static InstTransResult doMOVLHPSrr(NativeInstPtr ip, BasicBlock *b,
-                                   const MCOperand &dest,
-                                   const MCOperand &src) {
+static InstTransResult doMOVLHPSrr(NativeInstPtr ip, llvm::BasicBlock *b,
+                                   const llvm::MCOperand &dest,
+                                   const llvm::MCOperand &src) {
   NASSERT(dest.isReg());
   NASSERT(src.isReg());
 
-  Value *r_dest = R_READ<width>(b, dest.getReg());
-  Value *r_src = R_READ<width>(b, src.getReg());
+  llvm::Value *r_dest = R_READ<width>(b, dest.getReg());
+  llvm::Value *r_src = R_READ<width>(b, src.getReg());
 
   // put low into high
-  Value* dest_keep = BinaryOperator::Create(Instruction::Shl, r_src,
-                                            CONST_V<width>(b, width / 2), "",
-                                            b);
+  llvm::Value* dest_keep = BinaryOperator::Create(Instruction::Shl, r_src,
+                                                  CONST_V<width>(b, width / 2),
+                                                  "", b);
 
   TASSERT(width >= 64, "Can't truncate from smaller width");
 
-  Value* bottom_part = new TruncInst(r_dest,
-                                     Type::getIntNTy(b->getContext(), 64), "",
-                                     b);
-  Value *zext = new llvm::ZExtInst(bottom_part,
-                                   llvm::Type::getIntNTy(b->getContext(), 128),
-                                   "", b);
+  llvm::Value* bottom_part = new TruncInst(r_dest,
+                                           Type::getIntNTy(b->getContext(), 64),
+                                           "", b);
+  llvm::Value *zext = new llvm::ZExtInst(
+      bottom_part, llvm::Type::getIntNTy(b->getContext(), 128), "", b);
 
   // or top half of src with the old
   // top half of dst, which is now the bottom
-  Value *res = BinaryOperator::Create(Instruction::Or, zext, dest_keep, "", b);
+  llvm::Value *res = BinaryOperator::Create(Instruction::Or, zext, dest_keep,
+                                            "", b);
 
   R_WRITE<width>(b, dest.getReg(), res);
 }
 
-static Value *doPMULUDQVV(BasicBlock *b, Value *dest, Value *src) {
+static llvm::Value *doPMULUDQVV(llvm::BasicBlock *b, llvm::Value *dest,
+                                llvm::Value *src) {
 
   // get top of src
-  Value *vecSrc = INT_AS_VECTOR<128, 32>(b, src);
-  Value *vecDst = INT_AS_VECTOR<128, 32>(b, dest);
+  llvm::Value *vecSrc = INT_AS_VECTOR<128, 32>(b, src);
+  llvm::Value *vecDst = INT_AS_VECTOR<128, 32>(b, dest);
 
-  Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "", b);
-  Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 2), "", b);
+  llvm::Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "",
+                                                 b);
+  llvm::Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 2), "",
+                                                 b);
 
-  Value *src1_e = new llvm::ZExtInst(
+  llvm::Value *src1_e = new llvm::ZExtInst(
       src1, llvm::Type::getIntNTy(b->getContext(), 128), "", b);
-  Value *src2_e = new llvm::ZExtInst(
+  llvm::Value *src2_e = new llvm::ZExtInst(
       src2, llvm::Type::getIntNTy(b->getContext(), 128), "", b);
 
-  Value *dst1 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 0), "", b);
-  Value *dst2 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 2), "", b);
+  llvm::Value *dst1 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 0), "",
+                                                 b);
+  llvm::Value *dst2 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 2), "",
+                                                 b);
 
-  Value *dst1_e = new llvm::ZExtInst(
+  llvm::Value *dst1_e = new llvm::ZExtInst(
       dst1, llvm::Type::getIntNTy(b->getContext(), 128), "", b);
-  Value *dst2_e = new llvm::ZExtInst(
+  llvm::Value *dst2_e = new llvm::ZExtInst(
       dst2, llvm::Type::getIntNTy(b->getContext(), 128), "", b);
 
-  Value *res1 = BinaryOperator::Create(Instruction::Mul, src1_e, dst1_e, "", b);
+  llvm::Value *res1 = BinaryOperator::Create(Instruction::Mul, src1_e, dst1_e,
+                                             "", b);
 
-  Value *res2 = BinaryOperator::Create(Instruction::Mul, src2_e, dst2_e, "", b);
+  llvm::Value *res2 = BinaryOperator::Create(Instruction::Mul, src2_e, dst2_e,
+                                             "", b);
 
-  Value *res_shift = BinaryOperator::Create(Instruction::Shl, res2,
-                                            CONST_V<128>(b, 64), "", b);
+  llvm::Value *res_shift = BinaryOperator::Create(Instruction::Shl, res2,
+                                                  CONST_V<128>(b, 64), "", b);
 
-  Value *res_or = BinaryOperator::Create(Instruction::Or, res_shift, res1, "",
-                                         b);
+  llvm::Value *res_or = BinaryOperator::Create(Instruction::Or, res_shift, res1,
+                                               "", b);
 
   return res_or;
 
 }
 
-static InstTransResult doPMULUDQrr(BasicBlock *&b, const MCOperand &dst,
-                                   const MCOperand &src) {
+static InstTransResult doPMULUDQrr(llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   const llvm::MCOperand &src) {
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
 
-  Value *srcVal = R_READ<128>(b, src.getReg());
-  Value *dstVal = R_READ<128>(b, dst.getReg());
+  llvm::Value *srcVal = R_READ<128>(b, src.getReg());
+  llvm::Value *dstVal = R_READ<128>(b, dst.getReg());
 
-  Value *res = doPMULUDQVV(b, dstVal, srcVal);
+  llvm::Value *res = doPMULUDQVV(b, dstVal, srcVal);
   R_WRITE<128>(b, dst.getReg(), res);
   return ContinueBlock;
 }
 
-static InstTransResult doPMULUDQrm(NativeInstPtr ip, BasicBlock *&b,
-                                   const MCOperand &dst, Value *memAddr) {
+static InstTransResult doPMULUDQrm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   llvm::Value *memAddr) {
   NASSERT(dst.isReg());
 
-  Value *dstVal = R_READ<128>(b, dst.getReg());
-  Value *srcVal = M_READ<128>(ip, b, memAddr);
-  Value *res = doPMULUDQVV(b, dstVal, srcVal);
+  llvm::Value *dstVal = R_READ<128>(b, dst.getReg());
+  llvm::Value *srcVal = M_READ<128>(ip, b, memAddr);
+  llvm::Value *res = doPMULUDQVV(b, dstVal, srcVal);
   R_WRITE<128>(b, dst.getReg(), res);
   return ContinueBlock;
 }
 
-static InstTransResult doMOVHPDmr(NativeInstPtr ip, BasicBlock *&b,
-                                  Value *memAddr, const MCOperand &src) {
+static InstTransResult doMOVHPDmr(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                  llvm::Value *memAddr,
+                                  const llvm::MCOperand &src) {
   NASSERT(src.isReg());
 
-  Value *dstVal = R_READ<128>(b, src.getReg());
+  llvm::Value *dstVal = R_READ<128>(b, src.getReg());
 
-  Value *sright = BinaryOperator::Create(Instruction::LShr, dstVal,
-                                         CONST_V<128>(b, 64), "", b);
+  llvm::Value *sright = BinaryOperator::Create(Instruction::LShr, dstVal,
+                                               CONST_V<128>(b, 64), "", b);
 
-  Value *trunc_upper_64 = new TruncInst(sright,
-                                        Type::getIntNTy(b->getContext(), 64),
-                                        "", b);
+  llvm::Value *trunc_upper_64 = new TruncInst(
+      sright, Type::getIntNTy(b->getContext(), 64), "", b);
 
   M_WRITE<64>(ip, b, memAddr, trunc_upper_64);
   return ContinueBlock;
 }
 
-static InstTransResult doMOVHPDrm(NativeInstPtr ip, BasicBlock *&b,
-                                  const MCOperand &dst, Value *memAddr) {
+static InstTransResult doMOVHPDrm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &dst,
+                                  llvm::Value *memAddr) {
   NASSERT(dst.isReg());
 
-  Value *dstVal = R_READ<128>(b, dst.getReg());
-  Value *srcVal = M_READ<64>(ip, b, memAddr);
+  llvm::Value *dstVal = R_READ<128>(b, dst.getReg());
+  llvm::Value *srcVal = M_READ<64>(ip, b, memAddr);
 
   // Extend the type of src to 128 bits
-  Value *srcExt = new ZExtInst(srcVal,
-                               llvm::Type::getIntNTy(b->getContext(), 128), "",
-                               b);
+  llvm::Value *srcExt = new ZExtInst(
+      srcVal, llvm::Type::getIntNTy(b->getContext(), 128), "", b);
 
   //Left sheft 64 LSB to hihger quadword
-  Value *srcLShift = BinaryOperator::Create(Instruction::Shl, srcExt,
-                                            CONST_V<128>(b, 64), "", b);
+  llvm::Value *srcLShift = BinaryOperator::Create(Instruction::Shl, srcExt,
+                                                  CONST_V<128>(b, 64), "", b);
 
   //Clean up the upper 64 bits of dest reg
-  Value *sleft = BinaryOperator::Create(Instruction::Shl, dstVal,
-                                        CONST_V<128>(b, 64), "", b);
-  Value *sright = BinaryOperator::Create(Instruction::LShr, sleft,
-                                         CONST_V<128>(b, 64), "", b);
+  llvm::Value *sleft = BinaryOperator::Create(Instruction::Shl, dstVal,
+                                              CONST_V<128>(b, 64), "", b);
+  llvm::Value *sright = BinaryOperator::Create(Instruction::LShr, sleft,
+                                               CONST_V<128>(b, 64), "", b);
 
-  Value *ored = BinaryOperator::Create(Instruction::Or, sright, srcLShift, "",
-                                       b);
+  llvm::Value *ored = BinaryOperator::Create(Instruction::Or, sright, srcLShift,
+                                             "", b);
 
   R_WRITE<128>(b, dst.getReg(), ored);
   return ContinueBlock;
 }
 
-static InstTransResult doMOVLPDrm(NativeInstPtr ip, BasicBlock *&b,
-                                  const MCOperand &dst, Value *memAddr) {
+static InstTransResult doMOVLPDrm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                  const llvm::MCOperand &dst,
+                                  llvm::Value *memAddr) {
   NASSERT(dst.isReg());
 
-  Value *dstVal = R_READ<128>(b, dst.getReg());
-  Value *srcVal = M_READ<64>(ip, b, memAddr);
+  llvm::Value *dstVal = R_READ<128>(b, dst.getReg());
+  llvm::Value *srcVal = M_READ<64>(ip, b, memAddr);
 
-  Value *srcExt = new ZExtInst(srcVal,
-                               llvm::Type::getIntNTy(b->getContext(), 128), "",
-                               b);
+  llvm::Value *srcExt = new ZExtInst(
+      srcVal, llvm::Type::getIntNTy(b->getContext(), 128), "", b);
 
-  Value *sright = BinaryOperator::Create(Instruction::LShr, dstVal,
-                                         CONST_V<128>(b, 64), "", b);
-  Value *sleft = BinaryOperator::Create(Instruction::Shl, sright,
-                                        CONST_V<128>(b, 64), "", b);
+  llvm::Value *sright = BinaryOperator::Create(Instruction::LShr, dstVal,
+                                               CONST_V<128>(b, 64), "", b);
+  llvm::Value *sleft = BinaryOperator::Create(Instruction::Shl, sright,
+                                              CONST_V<128>(b, 64), "", b);
 
-  Value *ored = BinaryOperator::Create(Instruction::Or, sleft, srcExt, "", b);
+  llvm::Value *ored = BinaryOperator::Create(Instruction::Or, sleft, srcExt, "",
+                                             b);
 
   R_WRITE<128>(b, dst.getReg(), ored);
   return ContinueBlock;
 }
 
-Value *doCVTTPS2DQvv(BasicBlock *&b, Value *in) {
+Value *doCVTTPS2DQvv(llvm::BasicBlock *&b, llvm::Value *in) {
   // read in as FP vector
   //
-  Value *fpv = INT_AS_FPVECTOR<128, 32>(b, in);
+  llvm::Value *fpv = INT_AS_FPVECTOR<128, 32>(b, in);
   //
   // truncate
   //
@@ -1922,261 +2042,296 @@ Value *doCVTTPS2DQvv(BasicBlock *&b, Value *in) {
   VectorType *vt;
   std::tie(vt, elem_ty) = getIntVectorTypes(b, 32, 4);
 
-  Value *as_ints = CastInst::Create(Instruction::FPToSI, fpv, vt, "", b);
+  llvm::Value *as_ints = CastInst::Create(Instruction::FPToSI, fpv, vt, "", b);
 
   // cast as int
-  Value *intOutput = CastInst::Create(Instruction::BitCast, as_ints,
-                                      Type::getIntNTy(b->getContext(), 128), "",
-                                      b);
+  llvm::Value *intOutput = CastInst::Create(
+      Instruction::BitCast, as_ints, Type::getIntNTy(b->getContext(), 128), "",
+      b);
   // return
   return intOutput;
 }
 
-static InstTransResult doCVTTPS2DQrm(NativeInstPtr ip, BasicBlock *&b,
-                                     const MCOperand &dst, Value *memAddr) {
+static InstTransResult doCVTTPS2DQrm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                     const llvm::MCOperand &dst,
+                                     llvm::Value *memAddr) {
   NASSERT(dst.isReg());
   NASSERT(memAddr != nullptr);
 
-  Value *memval = M_READ<128>(ip, b, memAddr);
-  Value *out = doCVTTPS2DQvv(b, memval);
+  llvm::Value *memval = M_READ<128>(ip, b, memAddr);
+  llvm::Value *out = doCVTTPS2DQvv(b, memval);
   R_WRITE<128>(b, dst.getReg(), out);
 
   return ContinueBlock;
 }
 
-static InstTransResult doCVTTPS2DQrr(BasicBlock *&b, const MCOperand &dst,
-                                     const MCOperand &src)
+static InstTransResult doCVTTPS2DQrr(llvm::BasicBlock *&b,
+                                     const llvm::MCOperand &dst,
+                                     const llvm::MCOperand &src)
 
                                      {
   NASSERT(dst.isReg());
 
-  Value *inval = R_READ<128>(b, src.getReg());
-  Value *out = doCVTTPS2DQvv(b, inval);
+  llvm::Value *inval = R_READ<128>(b, src.getReg());
+  llvm::Value *out = doCVTTPS2DQvv(b, inval);
   R_WRITE<128>(b, dst.getReg(), out);
 
   return ContinueBlock;
 }
 
-static InstTransResult doSHUFPDrri(BasicBlock *&b, const MCOperand &dst,
-                                   const MCOperand &src,
-                                   const MCOperand &order) {
+static InstTransResult doSHUFPDrri(llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   const llvm::MCOperand &src,
+                                   const llvm::MCOperand &order) {
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
   NASSERT(order.isImm());
 
-  Value *input1 = R_READ<128>(b, src.getReg());
-  Value *input2 = R_READ<128>(b, dst.getReg());
+  llvm::Value *input1 = R_READ<128>(b, src.getReg());
+  llvm::Value *input2 = R_READ<128>(b, dst.getReg());
 
-  Value *shuffled = doDoubleShuffle<128, 64>(b, input2, input1, order.getImm());
+  llvm::Value *shuffled = doDoubleShuffle<128, 64>(b, input2, input1,
+                                                   order.getImm());
 
   R_WRITE<128>(b, dst.getReg(), shuffled);
   return ContinueBlock;
 }
 
-static InstTransResult doSHUFPDrmi(NativeInstPtr ip, BasicBlock *&b,
-                                   const MCOperand &dst, Value *mem_addr,
-                                   const MCOperand &order) {
+static InstTransResult doSHUFPDrmi(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   llvm::Value *mem_addr,
+                                   const llvm::MCOperand &order) {
   NASSERT(dst.isReg());
   NASSERT(order.isImm());
   NASSERT(mem_addr != NULL);
 
-  Value *input1 = M_READ<128>(ip, b, mem_addr);
-  Value *input2 = R_READ<128>(b, dst.getReg());
+  llvm::Value *input1 = M_READ<128>(ip, b, mem_addr);
+  llvm::Value *input2 = R_READ<128>(b, dst.getReg());
 
-  Value *shuffled = doDoubleShuffle<128, 64>(b, input2, input1, order.getImm());
+  llvm::Value *shuffled = doDoubleShuffle<128, 64>(b, input2, input1,
+                                                   order.getImm());
 
   R_WRITE<128>(b, dst.getReg(), shuffled);
   return ContinueBlock;
 }
 
-static InstTransResult doSHUFPSrri(BasicBlock *&b, const MCOperand &dst,
-                                   const MCOperand &src,
-                                   const MCOperand &order) {
+static InstTransResult doSHUFPSrri(llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   const llvm::MCOperand &src,
+                                   const llvm::MCOperand &order) {
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
   NASSERT(order.isImm());
 
-  Value *input1 = R_READ<128>(b, src.getReg());
-  Value *input2 = R_READ<128>(b, dst.getReg());
+  llvm::Value *input1 = R_READ<128>(b, src.getReg());
+  llvm::Value *input2 = R_READ<128>(b, dst.getReg());
 
-  Value *shuffled = doDoubleShuffle<128, 32>(b, input2, input1, order.getImm());
+  llvm::Value *shuffled = doDoubleShuffle<128, 32>(b, input2, input1,
+                                                   order.getImm());
 
   R_WRITE<128>(b, dst.getReg(), shuffled);
   return ContinueBlock;
 }
 
-static InstTransResult doSHUFPSrmi(NativeInstPtr ip, BasicBlock *&b,
-                                   const MCOperand &dst, Value *mem_addr,
-                                   const MCOperand &order) {
+static InstTransResult doSHUFPSrmi(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   llvm::Value *mem_addr,
+                                   const llvm::MCOperand &order) {
   NASSERT(dst.isReg());
   NASSERT(order.isImm());
   NASSERT(mem_addr != NULL);
 
-  Value *input1 = M_READ<128>(ip, b, mem_addr);
-  Value *input2 = R_READ<128>(b, dst.getReg());
+  llvm::Value *input1 = M_READ<128>(ip, b, mem_addr);
+  llvm::Value *input2 = R_READ<128>(b, dst.getReg());
 
-  Value *shuffled = doDoubleShuffle<128, 32>(b, input2, input1, order.getImm());
+  llvm::Value *shuffled = doDoubleShuffle<128, 32>(b, input2, input1,
+                                                   order.getImm());
 
   R_WRITE<128>(b, dst.getReg(), shuffled);
   return ContinueBlock;
 }
 
-static Value* doPSHUFHWvv(BasicBlock *&b, Value *in, Value *dstVal,
-                          const MCOperand &order) {
-  Value *shuffled = doShuffle<64, 16>(b, in, order.getImm());
+static llvm::Value* doPSHUFHWvv(llvm::BasicBlock *&b, llvm::Value *in,
+                                llvm::Value *dstVal,
+                                const llvm::MCOperand &order) {
+  llvm::Value *shuffled = doShuffle<64, 16>(b, in, order.getImm());
 
-  Value *shufExt = new ZExtInst(shuffled,
-                                llvm::Type::getIntNTy(b->getContext(), 128), "",
-                                b);
+  llvm::Value *shufExt = new ZExtInst(
+      shuffled, llvm::Type::getIntNTy(b->getContext(), 128), "", b);
 
-  Value *shufAdjusted = BinaryOperator::Create(Instruction::Shl, shufExt,
-                                               CONST_V<128>(b, 64), "", b);
+  llvm::Value *shufAdjusted = BinaryOperator::Create(Instruction::Shl, shufExt,
+                                                     CONST_V<128>(b, 64), "",
+                                                     b);
 
   // Clear the bits [127:64] of dstVal
-  Value *sleft = BinaryOperator::Create(Instruction::Shl, dstVal,
-                                        CONST_V<128>(b, 64), "", b);
-  Value *sright = BinaryOperator::Create(Instruction::LShr, sleft,
-                                         CONST_V<128>(b, 64), "", b);
+  llvm::Value *sleft = BinaryOperator::Create(Instruction::Shl, dstVal,
+                                              CONST_V<128>(b, 64), "", b);
+  llvm::Value *sright = BinaryOperator::Create(Instruction::LShr, sleft,
+                                               CONST_V<128>(b, 64), "", b);
 
-  Value *ored = BinaryOperator::Create(Instruction::Or, sright, shufAdjusted,
-                                       "", b);
-
-  return ored;
-}
-
-static InstTransResult doPSHUFHWri(BasicBlock *&b, const MCOperand &dst,
-                                   const MCOperand &src,
-                                   const MCOperand &order) {
-  NASSERT(dst.isReg());
-  NASSERT(src.isReg());
-  NASSERT(order.isImm());
-
-  Value *input1 = R_READ<128>(b, src.getReg());
-
-  Value *rightShiftedHigher = BinaryOperator::Create(Instruction::LShr, input1,
-                                                     CONST_V<128>(b, 64), "",
-                                                     b);
-
-  Value *i1_lower = new TruncInst(rightShiftedHigher,
-                                  Type::getIntNTy(b->getContext(), 64), "", b);
-
-  Value *res = doPSHUFHWvv(b, i1_lower, input1, order);
-
-  R_WRITE<128>(b, dst.getReg(), res);
-  return ContinueBlock;
-}
-
-static InstTransResult doPSHUFHWmi(NativeInstPtr ip, BasicBlock *&b,
-                                   const MCOperand &dst, Value *mem_addr,
-                                   const MCOperand &order) {
-  NASSERT(dst.isReg());
-  NASSERT(order.isImm());
-  NASSERT(mem_addr != NULL);
-
-  Value *input1 = M_READ<128>(ip, b, mem_addr);
-
-  Value *rightShiftedHigher = BinaryOperator::Create(Instruction::LShr, input1,
-                                                     CONST_V<128>(b, 64), "",
-                                                     b);
-
-  Value *i1_lower = new TruncInst(rightShiftedHigher,
-                                  Type::getIntNTy(b->getContext(), 64), "", b);
-
-  Value *res = doPSHUFHWvv(b, i1_lower, input1, order);
-
-  R_WRITE<128>(b, dst.getReg(), res);
-  return ContinueBlock;
-}
-
-static Value* doPSHUFLWvv(BasicBlock *&b, Value *in, Value *dstVal,
-                          const MCOperand &order) {
-  Value *shuffled = doShuffle<64, 16>(b, in, order.getImm());
-
-  Value *sright = BinaryOperator::Create(Instruction::LShr, dstVal,
-                                         CONST_V<128>(b, 64), "", b);
-  Value *sleft = BinaryOperator::Create(Instruction::Shl, sright,
-                                        CONST_V<128>(b, 64), "", b);
-
-  Value *shufExt = new ZExtInst(shuffled,
-                                llvm::Type::getIntNTy(b->getContext(), 128), "",
-                                b);
-  Value *ored = BinaryOperator::Create(Instruction::Or, sleft, shufExt, "", b);
+  llvm::Value *ored = BinaryOperator::Create(Instruction::Or, sright,
+                                             shufAdjusted, "", b);
 
   return ored;
 }
 
-static InstTransResult doPSHUFLWri(BasicBlock *&b, const MCOperand &dst,
-                                   const MCOperand &src,
-                                   const MCOperand &order) {
+static InstTransResult doPSHUFHWri(llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   const llvm::MCOperand &src,
+                                   const llvm::MCOperand &order) {
   NASSERT(dst.isReg());
   NASSERT(src.isReg());
   NASSERT(order.isImm());
 
-  Value *input1 = R_READ<128>(b, src.getReg());
-  Value *i1_lower = new TruncInst(input1, Type::getIntNTy(b->getContext(), 64),
-                                  "", b);
+  llvm::Value *input1 = R_READ<128>(b, src.getReg());
 
-  Value *res = doPSHUFLWvv(b, i1_lower, input1, order);
+  llvm::Value *rightShiftedHigher = BinaryOperator::Create(Instruction::LShr,
+                                                           input1,
+                                                           CONST_V<128>(b, 64),
+                                                           "", b);
+
+  llvm::Value *i1_lower = new TruncInst(rightShiftedHigher,
+                                        Type::getIntNTy(b->getContext(), 64),
+                                        "", b);
+
+  llvm::Value *res = doPSHUFHWvv(b, i1_lower, input1, order);
 
   R_WRITE<128>(b, dst.getReg(), res);
   return ContinueBlock;
 }
 
-static InstTransResult doPSHUFLWmi(NativeInstPtr ip, BasicBlock *&b,
-                                   const MCOperand &dst, Value *mem_addr,
-                                   const MCOperand &order) {
+static InstTransResult doPSHUFHWmi(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   llvm::Value *mem_addr,
+                                   const llvm::MCOperand &order) {
   NASSERT(dst.isReg());
   NASSERT(order.isImm());
   NASSERT(mem_addr != NULL);
 
-  Value *input1 = M_READ<128>(ip, b, mem_addr);
+  llvm::Value *input1 = M_READ<128>(ip, b, mem_addr);
 
-  Value *i1_lower = new TruncInst(input1, Type::getIntNTy(b->getContext(), 64),
-                                  "", b);
+  llvm::Value *rightShiftedHigher = BinaryOperator::Create(Instruction::LShr,
+                                                           input1,
+                                                           CONST_V<128>(b, 64),
+                                                           "", b);
 
-  Value *res = doPSHUFLWvv(b, i1_lower, input1, order);
+  llvm::Value *i1_lower = new TruncInst(rightShiftedHigher,
+                                        Type::getIntNTy(b->getContext(), 64),
+                                        "", b);
+
+  llvm::Value *res = doPSHUFHWvv(b, i1_lower, input1, order);
 
   R_WRITE<128>(b, dst.getReg(), res);
   return ContinueBlock;
 }
 
-static Value *doUNPCKLPSvv(BasicBlock *b, Value *dest, Value *src) {
-  Value *vecSrc = INT_AS_VECTOR<128, 32>(b, src);
-  Value *vecDst = INT_AS_VECTOR<128, 32>(b, dest);
+static llvm::Value* doPSHUFLWvv(llvm::BasicBlock *&b, llvm::Value *in,
+                                llvm::Value *dstVal,
+                                const llvm::MCOperand &order) {
+  llvm::Value *shuffled = doShuffle<64, 16>(b, in, order.getImm());
 
-  Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "", b);
-  Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "", b);
+  llvm::Value *sright = BinaryOperator::Create(Instruction::LShr, dstVal,
+                                               CONST_V<128>(b, 64), "", b);
+  llvm::Value *sleft = BinaryOperator::Create(Instruction::Shl, sright,
+                                              CONST_V<128>(b, 64), "", b);
 
-  Value *dst1 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 0), "", b);
-  Value *dst2 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 1), "", b);
+  llvm::Value *shufExt = new ZExtInst(
+      shuffled, llvm::Type::getIntNTy(b->getContext(), 128), "", b);
+  llvm::Value *ored = BinaryOperator::Create(Instruction::Or, sleft, shufExt,
+                                             "", b);
 
-  Value *res1 = InsertElementInst::Create(vecDst, dst1, CONST_V<32>(b, 0), "",
-                                          b);
-  Value *res2 = InsertElementInst::Create(res1, src1, CONST_V<32>(b, 1), "", b);
-  Value *res3 = InsertElementInst::Create(res2, dst2, CONST_V<32>(b, 2), "", b);
-  Value *res4 = InsertElementInst::Create(res3, src2, CONST_V<32>(b, 3), "", b);
+  return ored;
+}
+
+static InstTransResult doPSHUFLWri(llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   const llvm::MCOperand &src,
+                                   const llvm::MCOperand &order) {
+  NASSERT(dst.isReg());
+  NASSERT(src.isReg());
+  NASSERT(order.isImm());
+
+  llvm::Value *input1 = R_READ<128>(b, src.getReg());
+  llvm::Value *i1_lower = new TruncInst(input1,
+                                        Type::getIntNTy(b->getContext(), 64),
+                                        "", b);
+
+  llvm::Value *res = doPSHUFLWvv(b, i1_lower, input1, order);
+
+  R_WRITE<128>(b, dst.getReg(), res);
+  return ContinueBlock;
+}
+
+static InstTransResult doPSHUFLWmi(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dst,
+                                   llvm::Value *mem_addr,
+                                   const llvm::MCOperand &order) {
+  NASSERT(dst.isReg());
+  NASSERT(order.isImm());
+  NASSERT(mem_addr != NULL);
+
+  llvm::Value *input1 = M_READ<128>(ip, b, mem_addr);
+
+  llvm::Value *i1_lower = new TruncInst(input1,
+                                        Type::getIntNTy(b->getContext(), 64),
+                                        "", b);
+
+  llvm::Value *res = doPSHUFLWvv(b, i1_lower, input1, order);
+
+  R_WRITE<128>(b, dst.getReg(), res);
+  return ContinueBlock;
+}
+
+static llvm::Value *doUNPCKLPSvv(llvm::BasicBlock *b, llvm::Value *dest,
+                                 llvm::Value *src) {
+  llvm::Value *vecSrc = INT_AS_VECTOR<128, 32>(b, src);
+  llvm::Value *vecDst = INT_AS_VECTOR<128, 32>(b, dest);
+
+  llvm::Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "",
+                                                 b);
+  llvm::Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "",
+                                                 b);
+
+  llvm::Value *dst1 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 0), "",
+                                                 b);
+  llvm::Value *dst2 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 1), "",
+                                                 b);
+
+  llvm::Value *res1 = InsertElementInst::Create(vecDst, dst1, CONST_V<32>(b, 0),
+                                                "", b);
+  llvm::Value *res2 = InsertElementInst::Create(res1, src1, CONST_V<32>(b, 1),
+                                                "", b);
+  llvm::Value *res3 = InsertElementInst::Create(res2, dst2, CONST_V<32>(b, 2),
+                                                "", b);
+  llvm::Value *res4 = InsertElementInst::Create(res3, src2, CONST_V<32>(b, 3),
+                                                "", b);
 
   // convert the output back to an integer
   return VECTOR_AS_INT<128>(b, res4);
 }
 
-static Value *doUNPCKLPDvv(BasicBlock *b, Value *dest, Value *src) {
-  Value *vecSrc = INT_AS_VECTOR<128, 64>(b, src);
-  Value *vecDst = INT_AS_VECTOR<128, 64>(b, dest);
+static llvm::Value *doUNPCKLPDvv(llvm::BasicBlock *b, llvm::Value *dest,
+                                 llvm::Value *src) {
+  llvm::Value *vecSrc = INT_AS_VECTOR<128, 64>(b, src);
+  llvm::Value *vecDst = INT_AS_VECTOR<128, 64>(b, dest);
 
-  Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "", b);
-  Value *dst1 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 0), "", b);
+  llvm::Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "",
+                                                 b);
+  llvm::Value *dst1 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 0), "",
+                                                 b);
 
-  Value *res1 = InsertElementInst::Create(vecDst, dst1, CONST_V<32>(b, 0), "",
-                                          b);
-  Value *res2 = InsertElementInst::Create(res1, src1, CONST_V<32>(b, 1), "", b);
+  llvm::Value *res1 = InsertElementInst::Create(vecDst, dst1, CONST_V<32>(b, 0),
+                                                "", b);
+  llvm::Value *res2 = InsertElementInst::Create(res1, src1, CONST_V<32>(b, 1),
+                                                "", b);
 
   // convert the output back to an integer
   return VECTOR_AS_INT<128>(b, res2);
 }
 
-static InstTransResult doUNPCKLPSrr(BasicBlock *b, const MCOperand &dest,
-                                    const MCOperand &src) {
+static InstTransResult doUNPCKLPSrr(llvm::BasicBlock *b,
+                                    const llvm::MCOperand &dest,
+                                    const llvm::MCOperand &src) {
   R_WRITE<128>(
       b,
       dest.getReg(),
@@ -2185,16 +2340,18 @@ static InstTransResult doUNPCKLPSrr(BasicBlock *b, const MCOperand &dest,
   return ContinueBlock;
 }
 
-static InstTransResult doUNPCKLPSrm(NativeInstPtr ip, BasicBlock *b,
-                                    const MCOperand &dest, Value *src) {
+static InstTransResult doUNPCKLPSrm(NativeInstPtr ip, llvm::BasicBlock *b,
+                                    const llvm::MCOperand &dest,
+                                    llvm::Value *src) {
   R_WRITE<128>(
       b, dest.getReg(),
       doUNPCKLPSvv(b, R_READ<128>(b, dest.getReg()), M_READ<128>(ip, b, src)));
   return ContinueBlock;
 }
 
-static InstTransResult doUNPCKLPDrr(BasicBlock *b, const MCOperand &dest,
-                                    const MCOperand &src) {
+static InstTransResult doUNPCKLPDrr(llvm::BasicBlock *b,
+                                    const llvm::MCOperand &dest,
+                                    const llvm::MCOperand &src) {
   R_WRITE<128>(
       b,
       dest.getReg(),
@@ -2203,31 +2360,37 @@ static InstTransResult doUNPCKLPDrr(BasicBlock *b, const MCOperand &dest,
   return ContinueBlock;
 }
 
-static InstTransResult doUNPCKLPDrm(NativeInstPtr ip, BasicBlock *b,
-                                    const MCOperand &dest, Value *src) {
+static InstTransResult doUNPCKLPDrm(NativeInstPtr ip, llvm::BasicBlock *b,
+                                    const llvm::MCOperand &dest,
+                                    llvm::Value *src) {
   R_WRITE<128>(
       b, dest.getReg(),
       doUNPCKLPDvv(b, R_READ<128>(b, dest.getReg()), M_READ<128>(ip, b, src)));
   return ContinueBlock;
 }
 
-static Value *doUNPCKHPDvv(BasicBlock *b, Value *dest, Value *src) {
-  Value *vecSrc = INT_AS_VECTOR<128, 64>(b, src);
-  Value *vecDst = INT_AS_VECTOR<128, 64>(b, dest);
+static llvm::Value *doUNPCKHPDvv(llvm::BasicBlock *b, llvm::Value *dest,
+                                 llvm::Value *src) {
+  llvm::Value *vecSrc = INT_AS_VECTOR<128, 64>(b, src);
+  llvm::Value *vecDst = INT_AS_VECTOR<128, 64>(b, dest);
 
-  Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "", b);
-  Value *dst1 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 1), "", b);
+  llvm::Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "",
+                                                 b);
+  llvm::Value *dst1 = ExtractElementInst::Create(vecDst, CONST_V<32>(b, 1), "",
+                                                 b);
 
-  Value *res1 = InsertElementInst::Create(vecDst, dst1, CONST_V<32>(b, 0), "",
-                                          b);
-  Value *res2 = InsertElementInst::Create(res1, src1, CONST_V<32>(b, 1), "", b);
+  llvm::Value *res1 = InsertElementInst::Create(vecDst, dst1, CONST_V<32>(b, 0),
+                                                "", b);
+  llvm::Value *res2 = InsertElementInst::Create(res1, src1, CONST_V<32>(b, 1),
+                                                "", b);
 
   // convert the output back to an integer
   return VECTOR_AS_INT<128>(b, res2);
 }
 
-static InstTransResult doUNPCKHPDrr(BasicBlock *b, const MCOperand &dest,
-                                    const MCOperand &src) {
+static InstTransResult doUNPCKHPDrr(llvm::BasicBlock *b,
+                                    const llvm::MCOperand &dest,
+                                    const llvm::MCOperand &src) {
   R_WRITE<128>(
       b,
       dest.getReg(),
@@ -2236,59 +2399,66 @@ static InstTransResult doUNPCKHPDrr(BasicBlock *b, const MCOperand &dest,
   return ContinueBlock;
 }
 
-Value *doCVTPS2PDvv(BasicBlock *&b, Value *dest, Value *src) {
+Value *doCVTPS2PDvv(llvm::BasicBlock *&b, llvm::Value *dest, llvm::Value *src) {
   Type *DoubleTy = Type::getDoubleTy(b->getContext());
 
-  Value *vecSrc = INT_AS_FPVECTOR<128, 32>(b, src);
-  Value *vecDst = INT_AS_FPVECTOR<128, 64>(b, dest);
+  llvm::Value *vecSrc = INT_AS_FPVECTOR<128, 32>(b, src);
+  llvm::Value *vecDst = INT_AS_FPVECTOR<128, 64>(b, dest);
 
-  Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "", b);
-  Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "", b);
+  llvm::Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "",
+                                                 b);
+  llvm::Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "",
+                                                 b);
 
-  Value *src1_ext = CastInst::Create(Instruction::FPExt, src1, DoubleTy, "", b);
-  Value *src2_ext = CastInst::Create(Instruction::FPExt, src2, DoubleTy, "", b);
+  llvm::Value *src1_ext = CastInst::Create(Instruction::FPExt, src1, DoubleTy,
+                                           "", b);
+  llvm::Value *src2_ext = CastInst::Create(Instruction::FPExt, src2, DoubleTy,
+                                           "", b);
 
-  Value *res1 = InsertElementInst::Create(vecDst, src1_ext, CONST_V<32>(b, 0),
-                                          "", b);
-  Value *res2 = InsertElementInst::Create(res1, src2_ext, CONST_V<32>(b, 1), "",
-                                          b);
+  llvm::Value *res1 = InsertElementInst::Create(vecDst, src1_ext,
+                                                CONST_V<32>(b, 0), "", b);
+  llvm::Value *res2 = InsertElementInst::Create(res1, src2_ext,
+                                                CONST_V<32>(b, 1), "", b);
 
   // convert the output back to an integer
   return VECTOR_AS_INT<128>(b, res2);
 }
 
-Value *doCVTPD2PSvv(BasicBlock *&b, Value *dest, Value *src) {
+Value *doCVTPD2PSvv(llvm::BasicBlock *&b, llvm::Value *dest, llvm::Value *src) {
   Type *FloatTy = Type::getFloatTy(b->getContext());
 
-  Value *vecSrc = INT_AS_FPVECTOR<128, 64>(b, src);
-  Value *vecDst = INT_AS_FPVECTOR<128, 32>(b, dest);
+  llvm::Value *vecSrc = INT_AS_FPVECTOR<128, 64>(b, src);
+  llvm::Value *vecDst = INT_AS_FPVECTOR<128, 32>(b, dest);
 
-  Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "", b);
-  Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "", b);
+  llvm::Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "",
+                                                 b);
+  llvm::Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "",
+                                                 b);
 
-  Value *src1_trunc = new FPTruncInst(src1, FloatTy, "", b);
-  Value *src2_trunc = new FPTruncInst(src2, FloatTy, "", b);
+  llvm::Value *src1_trunc = new FPTruncInst(src1, FloatTy, "", b);
+  llvm::Value *src2_trunc = new FPTruncInst(src2, FloatTy, "", b);
 
-  Value *zero = CONST_V<32>(b, 0);
+  llvm::Value *zero = CONST_V<32>(b, 0);
 
-  Value *zero_as_fp = CastInst::Create(Instruction::BitCast, zero, FloatTy, "",
-                                       b);
+  llvm::Value *zero_as_fp = CastInst::Create(Instruction::BitCast, zero,
+                                             FloatTy, "", b);
 
-  Value *res1 = InsertElementInst::Create(vecDst, src1_trunc, CONST_V<32>(b, 0),
-                                          "", b);
-  Value *res2 = InsertElementInst::Create(res1, src2_trunc, CONST_V<32>(b, 1),
-                                          "", b);
-  Value *res3 = InsertElementInst::Create(res2, zero_as_fp, CONST_V<32>(b, 2),
-                                          "", b);
-  Value *res4 = InsertElementInst::Create(res3, zero_as_fp, CONST_V<32>(b, 3),
-                                          "", b);
+  llvm::Value *res1 = InsertElementInst::Create(vecDst, src1_trunc,
+                                                CONST_V<32>(b, 0), "", b);
+  llvm::Value *res2 = InsertElementInst::Create(res1, src2_trunc,
+                                                CONST_V<32>(b, 1), "", b);
+  llvm::Value *res3 = InsertElementInst::Create(res2, zero_as_fp,
+                                                CONST_V<32>(b, 2), "", b);
+  llvm::Value *res4 = InsertElementInst::Create(res3, zero_as_fp,
+                                                CONST_V<32>(b, 3), "", b);
 
   // convert the output back to an integer
   return VECTOR_AS_INT<128>(b, res4);
 }
 
-static InstTransResult doCVTPS2PDrr(BasicBlock *b, const MCOperand &dest,
-                                    const MCOperand &src) {
+static InstTransResult doCVTPS2PDrr(llvm::BasicBlock *b,
+                                    const llvm::MCOperand &dest,
+                                    const llvm::MCOperand &src) {
   R_WRITE<128>(
       b,
       dest.getReg(),
@@ -2297,39 +2467,48 @@ static InstTransResult doCVTPS2PDrr(BasicBlock *b, const MCOperand &dest,
   return ContinueBlock;
 }
 
-Value *doCVTDQ2PSvv(BasicBlock *&b, Value *dest, Value *src) {
+Value *doCVTDQ2PSvv(llvm::BasicBlock *&b, llvm::Value *dest, llvm::Value *src) {
   Type *FloatTy = Type::getFloatTy(b->getContext());
 
-  Value *vecSrc = INT_AS_VECTOR<128, 32>(b, src);
-  Value *vecDst = INT_AS_FPVECTOR<128, 32>(b, dest);
+  llvm::Value *vecSrc = INT_AS_VECTOR<128, 32>(b, src);
+  llvm::Value *vecDst = INT_AS_FPVECTOR<128, 32>(b, dest);
 
-  Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "", b);
-  Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "", b);
-  Value *src3 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 2), "", b);
-  Value *src4 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 3), "", b);
+  llvm::Value *src1 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 0), "",
+                                                 b);
+  llvm::Value *src2 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 1), "",
+                                                 b);
+  llvm::Value *src3 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 2), "",
+                                                 b);
+  llvm::Value *src4 = ExtractElementInst::Create(vecSrc, CONST_V<32>(b, 3), "",
+                                                 b);
 
   Type *fpType = getFpTypeForWidth(b, 32);
   //TODO: Check rounding modes!
-  Value *fp_value1 = CastInst::Create(Instruction::SIToFP, src1, fpType, "", b);
-  Value *fp_value2 = CastInst::Create(Instruction::SIToFP, src2, fpType, "", b);
-  Value *fp_value3 = CastInst::Create(Instruction::SIToFP, src3, fpType, "", b);
-  Value *fp_value4 = CastInst::Create(Instruction::SIToFP, src4, fpType, "", b);
+  llvm::Value *fp_value1 = CastInst::Create(Instruction::SIToFP, src1, fpType,
+                                            "", b);
+  llvm::Value *fp_value2 = CastInst::Create(Instruction::SIToFP, src2, fpType,
+                                            "", b);
+  llvm::Value *fp_value3 = CastInst::Create(Instruction::SIToFP, src3, fpType,
+                                            "", b);
+  llvm::Value *fp_value4 = CastInst::Create(Instruction::SIToFP, src4, fpType,
+                                            "", b);
 
-  Value *res1 = InsertElementInst::Create(vecDst, fp_value1, CONST_V<32>(b, 0),
-                                          "", b);
-  Value *res2 = InsertElementInst::Create(res1, fp_value2, CONST_V<32>(b, 1),
-                                          "", b);
-  Value *res3 = InsertElementInst::Create(res2, fp_value3, CONST_V<32>(b, 2),
-                                          "", b);
-  Value *res4 = InsertElementInst::Create(res3, fp_value4, CONST_V<32>(b, 3),
-                                          "", b);
+  llvm::Value *res1 = InsertElementInst::Create(vecDst, fp_value1,
+                                                CONST_V<32>(b, 0), "", b);
+  llvm::Value *res2 = InsertElementInst::Create(res1, fp_value2,
+                                                CONST_V<32>(b, 1), "", b);
+  llvm::Value *res3 = InsertElementInst::Create(res2, fp_value3,
+                                                CONST_V<32>(b, 2), "", b);
+  llvm::Value *res4 = InsertElementInst::Create(res3, fp_value4,
+                                                CONST_V<32>(b, 3), "", b);
 
   // convert the output back to an integer
   return VECTOR_AS_INT<128>(b, res4);
 }
 
-static InstTransResult doCVTDQ2PSrr(BasicBlock *b, const MCOperand &dest,
-                                    const MCOperand &src) {
+static InstTransResult doCVTDQ2PSrr(llvm::BasicBlock *b,
+                                    const llvm::MCOperand &dest,
+                                    const llvm::MCOperand &src) {
   R_WRITE<128>(
       b,
       dest.getReg(),
@@ -2338,16 +2517,18 @@ static InstTransResult doCVTDQ2PSrr(BasicBlock *b, const MCOperand &dest,
   return ContinueBlock;
 }
 
-static InstTransResult doCVTPS2PDrm(NativeInstPtr ip, BasicBlock *b,
-                                    const MCOperand &dest, Value *src) {
+static InstTransResult doCVTPS2PDrm(NativeInstPtr ip, llvm::BasicBlock *b,
+                                    const llvm::MCOperand &dest,
+                                    llvm::Value *src) {
   R_WRITE<128>(
       b, dest.getReg(),
       doCVTPS2PDvv(b, R_READ<128>(b, dest.getReg()), M_READ<128>(ip, b, src)));
   return ContinueBlock;
 }
 
-static InstTransResult doCVTPD2PSrr(BasicBlock *b, const MCOperand &dest,
-                                    const MCOperand &src) {
+static InstTransResult doCVTPD2PSrr(llvm::BasicBlock *b,
+                                    const llvm::MCOperand &dest,
+                                    const llvm::MCOperand &src) {
   R_WRITE<128>(
       b,
       dest.getReg(),
@@ -2356,28 +2537,31 @@ static InstTransResult doCVTPD2PSrr(BasicBlock *b, const MCOperand &dest,
   return ContinueBlock;
 }
 
-static InstTransResult doCVTPD2PSrm(NativeInstPtr ip, BasicBlock *b,
-                                    const MCOperand &dest, Value *src) {
+static InstTransResult doCVTPD2PSrm(NativeInstPtr ip, llvm::BasicBlock *b,
+                                    const llvm::MCOperand &dest,
+                                    llvm::Value *src) {
   R_WRITE<128>(
       b, dest.getReg(),
       doCVTPD2PSvv(b, R_READ<128>(b, dest.getReg()), M_READ<128>(ip, b, src)));
   return ContinueBlock;
 }
 
-static InstTransResult doMOVDDUPrr(BasicBlock *b, const MCOperand &dest,
-                                   const MCOperand &src) {
-  Value *s = R_READ<128>(b, src.getReg());
+static InstTransResult doMOVDDUPrr(llvm::BasicBlock *b,
+                                   const llvm::MCOperand &dest,
+                                   const llvm::MCOperand &src) {
+  llvm::Value *s = R_READ<128>(b, src.getReg());
 
-  Value* lower = new TruncInst(s, Type::getIntNTy(b->getContext(), 64), "", b);
-  Value *lower_ext = new llvm::ZExtInst(
+  llvm::Value* lower = new TruncInst(s, Type::getIntNTy(b->getContext(), 64),
+                                     "", b);
+  llvm::Value *lower_ext = new llvm::ZExtInst(
       lower, llvm::Type::getIntNTy(b->getContext(), 128), "", b);
 
   // duplicate it in upper half
-  Value *top_half = BinaryOperator::Create(Instruction::Shl, lower_ext,
-                                           CONST_V<128>(b, 64), "", b);
+  llvm::Value *top_half = BinaryOperator::Create(Instruction::Shl, lower_ext,
+                                                 CONST_V<128>(b, 64), "", b);
 
   // combine the halves
-  Value *combined = BinaryOperator::CreateAnd(lower_ext, top_half, "", b);
+  llvm::Value *combined = BinaryOperator::CreateAnd(lower_ext, top_half, "", b);
 
   R_WRITE<128>(b, dest.getReg(), combined);
 
@@ -3026,13 +3210,13 @@ GENERIC_TRANSLATION_REF(MOVQI2PQIrm,
 GENERIC_TRANSLATION(MOVDDUPrr, (doMOVDDUPrr(block, OP(0), OP(1))))
 
 void SSE_populateDispatchMap(DispatchMap &m) {
-  m[X86::MOVSDrm] = (doMOVSrm<64> );
-  m[X86::MOVSDmr] = (doMOVSmr<64> );
+  m[X86::MOVSDrm] = doMOVSrm<64>;
+  m[X86::MOVSDmr] = doMOVSmr<64>;
 
-  m[X86::CVTSI2SDrr] = (translate_CVTSI2SDrr<32> );
-  m[X86::CVTSI2SDrm] = (translate_CVTSI2SDrm<32> );
-  m[X86::CVTSI2SD64rr] = (translate_CVTSI2SDrr<64> );
-  m[X86::CVTSI2SD64rm] = (translate_CVTSI2SDrm<64> );
+  m[X86::CVTSI2SDrr] = translate_CVTSI2SDrr<32>;
+  m[X86::CVTSI2SDrm] = translate_CVTSI2SDrm<32>;
+  m[X86::CVTSI2SD64rr] = translate_CVTSI2SDrr<64>;
+  m[X86::CVTSI2SD64rm] = translate_CVTSI2SDrm<64>;
 
   m[X86::CVTSD2SSrm] = translate_CVTSD2SSrm;
   m[X86::CVTSD2SSrr] = translate_CVTSD2SSrr;
@@ -3062,15 +3246,15 @@ void SSE_populateDispatchMap(DispatchMap &m) {
   m[X86::CVTSI2SS64rr] = translate_CVTSI2SS64rr;
   m[X86::CVTSI2SS64rm] = translate_CVTSI2SS64rm;
 
-  m[X86::CVTTSD2SIrm] = (doCVTT_to_SI_rm<64, 32> );
-  m[X86::CVTTSD2SIrr] = (doCVTT_to_SI_rr<64, 32> );
-  m[X86::CVTTSS2SIrm] = (doCVTT_to_SI_rm<32, 32> );
-  m[X86::CVTTSS2SIrr] = (doCVTT_to_SI_rr<32, 32> );
+  m[X86::CVTTSD2SIrm] = doCVTT_to_SI_rm<64, 32>;
+  m[X86::CVTTSD2SIrr] = doCVTT_to_SI_rr<64, 32>;
+  m[X86::CVTTSS2SIrm] = doCVTT_to_SI_rm<32, 32>;
+  m[X86::CVTTSS2SIrr] = doCVTT_to_SI_rr<32, 32>;
 
-  m[X86::CVTTSD2SI64rm] = (doCVTT_to_SI_rm<64, 64> );
-  m[X86::CVTTSD2SI64rr] = (doCVTT_to_SI_rr<64, 64> );
-  m[X86::CVTTSS2SI64rm] = (doCVTT_to_SI_rm<32, 64> );
-  m[X86::CVTTSS2SI64rr] = (doCVTT_to_SI_rr<32, 64> );
+  m[X86::CVTTSD2SI64rm] = doCVTT_to_SI_rm<64, 64>;
+  m[X86::CVTTSD2SI64rr] = doCVTT_to_SI_rr<64, 64>;
+  m[X86::CVTTSS2SI64rm] = doCVTT_to_SI_rm<32, 64>;
+  m[X86::CVTTSS2SI64rr] = doCVTT_to_SI_rr<32, 64>;
 
   m[X86::ADDSDrr] = translate_ADDSDrr;
   m[X86::ADDSDrm] = translate_ADDSDrm;
@@ -3091,45 +3275,45 @@ void SSE_populateDispatchMap(DispatchMap &m) {
   m[X86::PORrr] = translate_PORrr;
   m[X86::PORrm] = translate_PORrm;
 
-  m[X86::MOVDQUrm] = (doMOVSrm<128> );
-  m[X86::MOVDQUmr] = (doMOVSmr<128> );
-  m[X86::MOVDQUrr] = (doMOVSrr<128, 0, 1> );
-  m[X86::MOVDQUrr_REV] = (doMOVSrr<128, 0, 1> );
+  m[X86::MOVDQUrm] = doMOVSrm<128>;
+  m[X86::MOVDQUmr] = doMOVSmr<128>;
+  m[X86::MOVDQUrr] = doMOVSrr<128, 0, 1>;
+  m[X86::MOVDQUrr_REV] = doMOVSrr<128, 0, 1>;
 
-  m[X86::MOVDQArm] = (doMOVSrm<128> );
-  m[X86::MOVDQAmr] = (doMOVSmr<128> );
-  m[X86::MOVDQArr] = (doMOVSrr<128, 0, 1> );
-  m[X86::MOVDQArr_REV] = (doMOVSrr<128, 0, 1> );
+  m[X86::MOVDQArm] = doMOVSrm<128>;
+  m[X86::MOVDQAmr] = doMOVSmr<128>;
+  m[X86::MOVDQArr] = doMOVSrr<128, 0, 1>;
+  m[X86::MOVDQArr_REV] = doMOVSrr<128, 0, 1>;
 
-  m[X86::MOVUPDrm] = (doMOVSrm<128> );
-  m[X86::MOVUPDmr] = (doMOVSmr<128> );
+  m[X86::MOVUPDrm] = doMOVSrm<128>;
+  m[X86::MOVUPDmr] = doMOVSmr<128>;
 
-  m[X86::MOVUPSrm] = (doMOVSrm<128> );
-  m[X86::MOVUPSmr] = (doMOVSmr<128> );
-  m[X86::MOVUPSrr] = (doMOVSrr<128, 0, 1> );
-  m[X86::MOVUPSrr_REV] = (doMOVSrr<128, 0, 1> );
+  m[X86::MOVUPSrm] = doMOVSrm<128>;
+  m[X86::MOVUPSmr] = doMOVSmr<128>;
+  m[X86::MOVUPSrr] = doMOVSrr<128, 0, 1>;
+  m[X86::MOVUPSrr_REV] = doMOVSrr<128, 0, 1>;
 
-  m[X86::MOVAPSrm] = (doMOVSrm<128> );
-  m[X86::MOVAPSmr] = (doMOVSmr<128> );
-  m[X86::MOVAPSrr] = (doMOVSrr<128, 0, 1> );
-  m[X86::MOVAPSrr_REV] = (doMOVSrr<128, 0, 1> );
+  m[X86::MOVAPSrm] = doMOVSrm<128>;
+  m[X86::MOVAPSmr] = doMOVSmr<128>;
+  m[X86::MOVAPSrr] = doMOVSrr<128, 0, 1>;
+  m[X86::MOVAPSrr_REV] = doMOVSrr<128, 0, 1>;
 
-  m[X86::MOVAPDrm] = (doMOVSrm<128> );
-  m[X86::MOVAPDmr] = (doMOVSmr<128> );
-  m[X86::MOVAPDrr] = (doMOVSrr<128, 0, 1> );
-  m[X86::MOVAPDrr_REV] = (doMOVSrr<128, 0, 1> );
+  m[X86::MOVAPDrm] = doMOVSrm<128>;
+  m[X86::MOVAPDmr] = doMOVSmr<128>;
+  m[X86::MOVAPDrr] = doMOVSrr<128, 0, 1>;
+  m[X86::MOVAPDrr_REV] = doMOVSrr<128, 0, 1>;
 
-  m[X86::MOVSDrr] = (doMOVSrr<64, 1, 2> );
-  m[X86::MOVSSrr] = (doMOVSrr<32, 1, 2> );
+  m[X86::MOVSDrr] = doMOVSrr<64, 1, 2>;
+  m[X86::MOVSSrr] = doMOVSrr<32, 1, 2>;
 
   m[X86::MOVDI2PDIrr] = translate_MOVDI2PDIrr;
   m[X86::MOVDI2PDIrm] = translate_MOVDI2PDIrm;
 
-  m[X86::MOVPDI2DIrr] = (doMOVSrr<32, 0, 1> );
-  m[X86::MOVPDI2DImr] = (doMOVSmr<32> );
+  m[X86::MOVPDI2DIrr] = doMOVSrr<32, 0, 1>;
+  m[X86::MOVPDI2DImr] = doMOVSmr<32>;
 
   m[X86::MOVSS2DIrr] = translate_MOVSS2DIrr;
-  m[X86::MOVSS2DImr] = (doMOVSmr<32> );
+  m[X86::MOVSS2DImr] = doMOVSmr<32>;
 
   m[X86::UCOMISSrr] = translate_UCOMISSrr;
   m[X86::UCOMISSrm] = translate_UCOMISSrm;
@@ -3318,12 +3502,12 @@ void SSE_populateDispatchMap(DispatchMap &m) {
   m[X86::MOVHPDmr] = translate_MOVHPDmr;
 
   m[X86::MOVLPDrm] = translate_MOVLPDrm;
-  m[X86::MOVLPDmr] = (doMOVSmr<64> );
+  m[X86::MOVLPDmr] = doMOVSmr<64>;
 
   // we don't care if its moving two single precision floats
   // or a double precision float. 64 bits are 64 bits
   m[X86::MOVLPSrm] = translate_MOVLPDrm;
-  m[X86::MOVLPSmr] = (doMOVSmr<64> );
+  m[X86::MOVLPSmr] = doMOVSmr<64>;
 
   m[X86::SHUFPSrri] = translate_SHUFPSrri;
   m[X86::SHUFPSrmi] = translate_SHUFPSrmi;
@@ -3351,10 +3535,10 @@ void SSE_populateDispatchMap(DispatchMap &m) {
   m[X86::CVTPD2PSrr] = translate_CVTPD2PSrr;
 
   m[X86::MOV64toPQIrr] = translate_MOV64toPQIrr;
-  m[X86::MOVPQIto64rr] = (doMOVSrr<64, 0, 1> );
+  m[X86::MOVPQIto64rr] = doMOVSrr<64, 0, 1>;
   m[X86::MOV64toSDrm] = translate_MOV64toSDrm;
   m[X86::MOVQI2PQIrm] = translate_MOVQI2PQIrm;
-  m[X86::MOVPQI2QImr] = (doMOVSmr<64> );
+  m[X86::MOVPQI2QImr] = doMOVSmr<64>;
 
   m[X86::MOVDDUPrr] = translate_MOVDDUPrr;
 

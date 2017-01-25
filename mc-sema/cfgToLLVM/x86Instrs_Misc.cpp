@@ -8,7 +8,8 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
- Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
  Neither the name of Trail of Bits nor the names of its
@@ -39,46 +40,40 @@
 
 using namespace llvm;
 
-static InstTransResult doNoop(BasicBlock *b) {
+static InstTransResult doNoop(llvm::BasicBlock *b) {
   //isn't this exciting
   return ContinueBlock;
 }
 
-static InstTransResult doHlt(BasicBlock *b) {
+static InstTransResult doHlt(llvm::BasicBlock *b) {
   //isn't this exciting
-  llvm::dbgs()
-      << "WARNING: Treating HLT as no-op, but HLT is normally privileged\n";
+  std::cerr << "WARNING: Treating HLT as no-op, but HLT is normally privileged"
+            << std::endl;
   return ContinueBlock;
 }
 
-static InstTransResult doInt3(BasicBlock *b) {
-  Module *M = b->getParent()->getParent();
+static InstTransResult doInt3(llvm::BasicBlock *b) {
+  auto M = b->getParent()->getParent();
   //emit an LLVM trap intrinsic
   //this should be changed to a debugtrap intrinsic eventually
-  Function *trapIntrin = Intrinsic::getDeclaration(M, Intrinsic::trap);
-
-  CallInst::Create(trapIntrin, "", b);
-
-  Value *unreachable = new UnreachableInst(b->getContext(), b);
-
+  auto trapIntrin = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::trap);
+  llvm::CallInst::Create(trapIntrin, "", b);
+  (void) new llvm::UnreachableInst(b->getContext(), b);
   return ContinueBlock;
 }
 
-static InstTransResult doTrap(BasicBlock *b) {
-  Module *M = b->getParent()->getParent();
-  Function *trapIntrin = Intrinsic::getDeclaration(M, Intrinsic::trap);
-  CallInst::Create(trapIntrin, "", b);
-  Value *unreachable = new UnreachableInst(b->getContext(), b);
+static InstTransResult doTrap(llvm::BasicBlock *b) {
+  auto M = b->getParent()->getParent();
+  auto trapIntrin = Intrinsic::getDeclaration(M, llvm::Intrinsic::trap);
+  llvm::CallInst::Create(trapIntrin, "", b);
+  (void) new llvm::UnreachableInst(b->getContext(), b);
   return ContinueBlock;
 }
 
-static InstTransResult doInt(BasicBlock *&b, const MCOperand &o) {
+static InstTransResult doInt(llvm::BasicBlock *&b, const llvm::MCOperand &o) {
   TASSERT(o.isImm(), "Operand not immediate");
-
-  Module *M = b->getParent()->getParent();
-
+  auto M = b->getParent()->getParent();
   int interrupt_val = o.getImm();
-
   auto os = SystemOS(M);
 
   if (0x2e == interrupt_val && llvm::Triple::Win32 == os) {
@@ -89,25 +84,23 @@ static InstTransResult doInt(BasicBlock *&b, const MCOperand &o) {
     TASSERT(false, "System call via interrupt is not supported!");
   }
 
-  llvm::dbgs() << "WARNING: Treating INT " << interrupt_val << " as trap!\n";
+  std::cerr << "WARNING: Treating INT " << interrupt_val << " as trap!"
+            << std::endl;
 
   return doTrap(b);
 }
 
-static InstTransResult doCdq(BasicBlock *b) {
+static InstTransResult doCdq(llvm::BasicBlock *b) {
   // EDX <- SEXT(EAX)
 
   //read EAX
-  Value *EAX_v = R_READ<32>(b, llvm::X86::EAX);
-
-  Value *sign_bit = CONST_V<32>(b, 1 << 31);
-
-  Value *test_bit = BinaryOperator::CreateAnd(EAX_v, sign_bit, "", b);
-
-  Value *is_zero = new ICmpInst( *b, CmpInst::ICMP_EQ, test_bit,
-                                CONST_V<32>(b, 0));
-  Value *edx_val = SelectInst::Create(is_zero, CONST_V<32>(b, 0),
-                                      CONST_V<32>(b, 0xFFFFFFFF), "", b);
+  auto EAX_v = R_READ<32>(b, llvm::X86::EAX);
+  auto sign_bit = CONST_V<32>(b, 1ULL << 31U);
+  auto test_bit = llvm::BinaryOperator::CreateAnd(EAX_v, sign_bit, "", b);
+  auto is_zero = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ, test_bit,
+                                    CONST_V<32>(b, 0));
+  auto edx_val = llvm::SelectInst::Create(is_zero, CONST_V<32>(b, 0),
+                                          CONST_V<32>(b, 0xFFFFFFFF), "", b);
 
   //write this value to EDX
   R_WRITE<32>(b, llvm::X86::EDX, edx_val);
@@ -116,72 +109,74 @@ static InstTransResult doCdq(BasicBlock *b) {
 }
 
 template<int width>
-static InstTransResult doBswapR(NativeInstPtr ip, BasicBlock *&b,
-                                const MCOperand &reg) {
+static InstTransResult doBswapR(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                const llvm::MCOperand &reg) {
   TASSERT(reg.isReg(), "");
 
   if (width != 32) {
     throw TErr(__LINE__, __FILE__, "Width not supported");
   }
 
-  Value *tmp = R_READ<width>(b, reg.getReg());
+  auto tmp = R_READ<width>(b, reg.getReg());
 
   // Create the new bytes from the original value
-  Value *newByte1 = BinaryOperator::CreateShl(tmp, CONST_V<width>(b, 24), "",
-                                              b);
-  Value *newByte2 = BinaryOperator::CreateShl(
-      BinaryOperator::CreateAnd(tmp, CONST_V<width>(b, 0x0000FF00), "", b),
+  auto newByte1 = llvm::BinaryOperator::CreateShl(tmp, CONST_V<width>(b, 24),
+                                                  "", b);
+  auto newByte2 = llvm::BinaryOperator::CreateShl(
+      llvm::BinaryOperator::CreateAnd(tmp, CONST_V<width>(b, 0x0000FF00), "",
+                                      b),
       CONST_V<width>(b, 8), "", b);
-  Value *newByte3 = BinaryOperator::CreateLShr(
-      BinaryOperator::CreateAnd(tmp, CONST_V<width>(b, 0x00FF0000), "", b),
+  auto newByte3 = BinaryOperator::CreateLShr(
+      llvm::BinaryOperator::CreateAnd(tmp, CONST_V<width>(b, 0x00FF0000), "",
+                                      b),
       CONST_V<width>(b, 8), "", b);
-  Value *newByte4 = BinaryOperator::CreateLShr(tmp, CONST_V<width>(b, 24), "",
-                                               b);
+  auto newByte4 = llvm::BinaryOperator::CreateLShr(tmp, CONST_V<width>(b, 24),
+                                                   "", b);
 
   // Add the bytes together to make the resulting DWORD
-  Value *res = BinaryOperator::CreateAdd(newByte1, newByte2, "", b);
-  res = BinaryOperator::CreateAdd(res, newByte3, "", b);
-  res = BinaryOperator::CreateAdd(res, newByte4, "", b);
+  llvm::Value *res = llvm::BinaryOperator::CreateAdd(newByte1, newByte2, "", b);
+  res = llvm::BinaryOperator::CreateAdd(res, newByte3, "", b);
+  res = llvm::BinaryOperator::CreateAdd(res, newByte4, "", b);
 
   R_WRITE<width>(b, reg.getReg(), res);
 
   return ContinueBlock;
 }
 
-static InstTransResult doLAHF(BasicBlock *b) {
+static InstTransResult doLAHF(llvm::BasicBlock *b) {
 
   //we need to create an 8-bit value out of the status
   //flags, shift and OR them, and then write them into AH
 
-  Type *t = Type::getInt8Ty(b->getContext());
-  Value *cf = new ZExtInst(F_READ(b, CF), t, "", b);
-  Value *af = new ZExtInst(F_READ(b, AF), t, "", b);
-  Value *pf = new ZExtInst(F_READ(b, PF), t, "", b);
-  Value *zf = new ZExtInst(F_READ(b, ZF), t, "", b);
-  Value *sf = new ZExtInst(F_READ(b, SF), t, "", b);
+  auto t = llvm::Type::getInt8Ty(b->getContext());
+  auto cf = new llvm::ZExtInst(F_READ(b, CF), t, "", b);
+  auto af = new llvm::ZExtInst(F_READ(b, AF), t, "", b);
+  auto pf = new llvm::ZExtInst(F_READ(b, PF), t, "", b);
+  auto zf = new llvm::ZExtInst(F_READ(b, ZF), t, "", b);
+  auto sf = new llvm::ZExtInst(F_READ(b, SF), t, "", b);
 
   //shift everything
-  Value *p_0 = cf;
-  Value *p_1 = BinaryOperator::CreateShl(CONST_V<8>(b, 1), CONST_V<8>(b, 1), "",
-                                         b);
-  Value *p_2 = BinaryOperator::CreateShl(pf, CONST_V<8>(b, 2), "", b);
-  Value *p_3 = BinaryOperator::CreateShl(CONST_V<8>(b, 0), CONST_V<8>(b, 3), "",
-                                         b);
-  Value *p_4 = BinaryOperator::CreateShl(af, CONST_V<8>(b, 4), "", b);
-  Value *p_5 = BinaryOperator::CreateShl(CONST_V<8>(b, 0), CONST_V<8>(b, 5), "",
-                                         b);
-  Value *p_6 = BinaryOperator::CreateShl(zf, CONST_V<8>(b, 6), "", b);
-  Value *p_7 = BinaryOperator::CreateShl(sf, CONST_V<8>(b, 7), "", b);
+  auto p_0 = cf;
+  auto p_1 = llvm::BinaryOperator::CreateShl(CONST_V<8>(b, 1), CONST_V<8>(b, 1),
+                                             "", b);
+  auto p_2 = llvm::BinaryOperator::CreateShl(pf, CONST_V<8>(b, 2), "", b);
+  auto p_3 = llvm::BinaryOperator::CreateShl(CONST_V<8>(b, 0), CONST_V<8>(b, 3),
+                                             "", b);
+  auto p_4 = llvm::BinaryOperator::CreateShl(af, CONST_V<8>(b, 4), "", b);
+  auto p_5 = llvm::BinaryOperator::CreateShl(CONST_V<8>(b, 0), CONST_V<8>(b, 5),
+                                             "", b);
+  auto p_6 = llvm::BinaryOperator::CreateShl(zf, CONST_V<8>(b, 6), "", b);
+  auto p_7 = llvm::BinaryOperator::CreateShl(sf, CONST_V<8>(b, 7), "", b);
 
   //OR everything
-  Value *res = BinaryOperator::CreateOr(
-      BinaryOperator::CreateOr(
-          BinaryOperator::CreateOr(BinaryOperator::CreateOr(p_0, p_1, "", b),
-                                   p_2, "", b),
+  auto res = llvm::BinaryOperator::CreateOr(
+      llvm::BinaryOperator::CreateOr(
+          llvm::BinaryOperator::CreateOr(
+              llvm::BinaryOperator::CreateOr(p_0, p_1, "", b), p_2, "", b),
           p_3, "", b),
-      BinaryOperator::CreateOr(
-          BinaryOperator::CreateOr(BinaryOperator::CreateOr(p_4, p_5, "", b),
-                                   p_6, "", b),
+      llvm::BinaryOperator::CreateOr(
+          llvm::BinaryOperator::CreateOr(
+              llvm::BinaryOperator::CreateOr(p_4, p_5, "", b), p_6, "", b),
           p_7, "", b),
       "", b);
 
@@ -190,117 +185,116 @@ static InstTransResult doLAHF(BasicBlock *b) {
   return ContinueBlock;
 }
 
-static InstTransResult doStd(BasicBlock *b) {
-
+static InstTransResult doStd(llvm::BasicBlock *b) {
   F_SET(b, DF);
-
   return ContinueBlock;
 }
 
-static InstTransResult doCld(BasicBlock *b) {
-
+static InstTransResult doCld(llvm::BasicBlock *b) {
   F_CLEAR(b, DF);
-
   return ContinueBlock;
 }
 
-static InstTransResult doStc(BasicBlock *b) {
-
+static InstTransResult doStc(llvm::BasicBlock *b) {
   F_SET(b, CF);
-
   return ContinueBlock;
 }
 
-static InstTransResult doClc(BasicBlock *b) {
-
+static InstTransResult doClc(llvm::BasicBlock *b) {
   F_CLEAR(b, CF);
-
   return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult doLeaV(BasicBlock *&b, const MCOperand &dst,
-                              Value *addrInt)
-
-                              {
+static InstTransResult doLeaV(llvm::BasicBlock *&b, const llvm::MCOperand &dst,
+                              llvm::Value *addrInt) {
   //write the address into the register
   R_WRITE<width>(b, dst.getReg(), addrInt);
-
   return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult doLea(NativeInstPtr ip, BasicBlock *&b, Value *addr,
-                             const MCOperand &dst) {
+static InstTransResult doLea(NativeInstPtr ip, llvm::BasicBlock *&b,
+                             llvm::Value *addr, const llvm::MCOperand &dst) {
   // LEA <r>, <expr>
   TASSERT(addr != NULL, "");
   TASSERT(dst.isReg(), "");
 
   //addr is an address, so, convert it to an integer value to write
-  Type *ty = Type::getIntNTy(b->getContext(), width);
-  Value *addrInt = addr;
+  auto ty = llvm::Type::getIntNTy(b->getContext(), width);
+  auto addrInt = addr;
   if (addr->getType()->isPointerTy()) {
-    addrInt = new PtrToIntInst(addr, ty, "", b);
+    addrInt = new llvm::PtrToIntInst(addr, ty, "", b);
   }
 
   return doLeaV<width>(b, dst, addrInt);
 }
 
-static InstTransResult doRdtsc(BasicBlock *b) {
+static InstTransResult doRdtsc(llvm::BasicBlock *b) {
   /* write out a call to the RDTSC intrinsic */
-  Module *M = b->getParent()->getParent();
+  auto M = b->getParent()->getParent();
+  auto &C = M->getContext();
   //emit an LLVM trap intrinsic
   //this should be changed to a debugtrap intrinsic eventually
-  Function *rcc = Intrinsic::getDeclaration(M, Intrinsic::readcyclecounter);
-
-  CallInst::Create(rcc, "", b);
-
+  auto rcc = llvm::Intrinsic::getDeclaration(M,
+                                             llvm::Intrinsic::readcyclecounter);
+  auto ret = llvm::CallInst::Create(rcc, "", b);
+  auto Int32Ty = llvm::Type::getInt32Ty(C);
+  auto low = new llvm::TruncInst(ret, Int32Ty, "", b);
+  auto high = new llvm::TruncInst(
+      llvm::BinaryOperator::Create(llvm::Instruction::LShr, ret,
+                                   llvm::ConstantInt::get(Int32Ty, 32), "", b),
+      Int32Ty, "", b);
+  R_WRITE<32>(b, X86::EDX, high);
+  R_WRITE<32>(b, X86::EAX, low);
   return ContinueBlock;
 }
 
-static InstTransResult doAAA(BasicBlock *b) {
+static InstTransResult doAAA(llvm::BasicBlock *b) {
 
-  Function *F = b->getParent();
+  auto F = b->getParent();
+  auto &C = F->getContext();
   //trueBlock for when ((AL & 0x0F > 9) || (AF == 1)); falseblock otherwise
-  BasicBlock *trueBlock = BasicBlock::Create(F->getContext(), "", F);
-  BasicBlock *falseBlock = BasicBlock::Create(F->getContext(), "", F);
-  BasicBlock *endBlock = BasicBlock::Create(F->getContext(), "", F);
+  auto trueBlock = llvm::BasicBlock::Create(C, "", F);
+  auto falseBlock = llvm::BasicBlock::Create(C, "", F);
+  auto endBlock = llvm::BasicBlock::Create(C, "", F);
 
-  Value *al;
-  Value *af;
+  llvm::Value *al = nullptr;
+  llvm::Value *af = nullptr;
 
   al = R_READ<8>(b, llvm::X86::AL);
   af = F_READ(b, AF);
 
   // AL & 0x0F
-  Value *andRes = BinaryOperator::CreateAnd(al, CONST_V<8>(b, 0x0F), "", b);
+  auto andRes = llvm::BinaryOperator::CreateAnd(al, CONST_V<8>(b, 0x0F), "", b);
 
   // ((AL & 0x0F) > 9)?
-  Value *testRes = new ICmpInst( *b, CmpInst::ICMP_UGT, andRes,
-                                CONST_V<8>(b, 9));
+  auto testRes = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_UGT, andRes,
+                                    CONST_V<8>(b, 9));
 
-  Value *orRes = BinaryOperator::CreateOr(testRes, af, "", b);
+  auto orRes = llvm::BinaryOperator::CreateOr(testRes, af, "", b);
 
-  BranchInst::Create(trueBlock, falseBlock, orRes, b);
+  llvm::BranchInst::Create(trueBlock, falseBlock, orRes, b);
 
   //True Block Statements
-  Value *alRes = BinaryOperator::CreateAdd(al, CONST_V<8>(trueBlock, 6), "",
-                                           trueBlock);
+  llvm::Value *alRes = llvm::BinaryOperator::CreateAdd(al,
+                                                       CONST_V<8>(trueBlock, 6),
+                                                       "", trueBlock);
   R_WRITE<8>(trueBlock, llvm::X86::AL, alRes);
 
-  Value *ahRes = BinaryOperator::CreateAdd(R_READ<8>(trueBlock, llvm::X86::AH),
-                                           CONST_V<8>(trueBlock, 1), "",
-                                           trueBlock);
+  auto ahRes = llvm::BinaryOperator::CreateAdd(
+      R_READ<8>(trueBlock, llvm::X86::AH), CONST_V<8>(trueBlock, 1), "",
+      trueBlock);
   R_WRITE<8>(trueBlock, llvm::X86::AH, ahRes);
 
   F_SET(trueBlock, AF);
   F_SET(trueBlock, CF);
 
-  alRes = BinaryOperator::CreateAnd(alRes, CONST_V<8>(trueBlock, 0x0F), "",
-                                    trueBlock);
+  alRes = llvm::BinaryOperator::CreateAnd(alRes, CONST_V<8>(trueBlock, 0x0F),
+                                          "", trueBlock);
   R_WRITE<8>(trueBlock, llvm::X86::AL, alRes);
 
-  BranchInst::Create(endBlock, trueBlock);
+  llvm::BranchInst::Create(endBlock, trueBlock);
 
   //False Block Statements
   F_CLEAR(falseBlock, AF);
@@ -310,7 +304,7 @@ static InstTransResult doAAA(BasicBlock *b) {
                                     falseBlock);
   R_WRITE<8>(falseBlock, llvm::X86::AL, alRes);
 
-  BranchInst::Create(endBlock, falseBlock);
+  llvm::BranchInst::Create(endBlock, falseBlock);
 
   F_ZAP(endBlock, OF);
   F_ZAP(endBlock, SF);
@@ -323,49 +317,53 @@ static InstTransResult doAAA(BasicBlock *b) {
   return ContinueBlock;
 }
 
-static InstTransResult doAAS(BasicBlock *b) {
+static InstTransResult doAAS(llvm::BasicBlock *b) {
 
-  Function *F = b->getParent();
+  auto F = b->getParent();
+  auto &C = F->getContext();
+
   //trueBlock for when ((AL & 0x0F > 9) || (AF == 1)); falseblock otherwise
-  BasicBlock *trueBlock = BasicBlock::Create(F->getContext(), "", F);
-  BasicBlock *falseBlock = BasicBlock::Create(F->getContext(), "", F);
-  BasicBlock *endBlock = BasicBlock::Create(F->getContext(), "", F);
+  auto trueBlock = llvm::BasicBlock::Create(C, "", F);
+  auto falseBlock = llvm::BasicBlock::Create(C, "", F);
+  auto endBlock = llvm::BasicBlock::Create(C, "", F);
 
-  Value *al;
-  Value *af;
+  llvm::Value *al = nullptr;
+  llvm::Value *af = nullptr;
 
   al = R_READ<8>(b, llvm::X86::AL);
   af = F_READ(b, AF);
 
   // AL & 0x0F
-  Value *andRes = BinaryOperator::CreateAnd(al, CONST_V<8>(b, 0x0F), "", b);
+  llvm::Value *andRes = llvm::BinaryOperator::CreateAnd(al, CONST_V<8>(b, 0x0F),
+                                                        "", b);
 
   // ((AL & 0x0F) > 9)?
-  Value *testRes = new ICmpInst( *b, CmpInst::ICMP_UGT, andRes,
-                                CONST_V<8>(b, 9));
+  llvm::Value *testRes = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_UGT,
+                                            andRes, CONST_V<8>(b, 9));
 
-  Value *orRes = BinaryOperator::CreateOr(testRes, af, "", b);
+  llvm::Value *orRes = llvm::BinaryOperator::CreateOr(testRes, af, "", b);
 
-  BranchInst::Create(trueBlock, falseBlock, orRes, b);
+  llvm::BranchInst::Create(trueBlock, falseBlock, orRes, b);
 
   //True Block Statements
-  Value *alRes = BinaryOperator::CreateSub(al, CONST_V<8>(trueBlock, 6), "",
-                                           trueBlock);
+  llvm::Value *alRes = llvm::BinaryOperator::CreateSub(al,
+                                                       CONST_V<8>(trueBlock, 6),
+                                                       "", trueBlock);
   R_WRITE<8>(trueBlock, llvm::X86::AL, alRes);
 
-  Value *ahRes = BinaryOperator::CreateSub(R_READ<8>(trueBlock, llvm::X86::AH),
-                                           CONST_V<8>(trueBlock, 1), "",
-                                           trueBlock);
+  llvm::Value *ahRes = llvm::BinaryOperator::CreateSub(
+      R_READ<8>(trueBlock, llvm::X86::AH), CONST_V<8>(trueBlock, 1), "",
+      trueBlock);
   R_WRITE<8>(trueBlock, llvm::X86::AH, ahRes);
 
   F_SET(trueBlock, AF);
   F_SET(trueBlock, CF);
 
-  alRes = BinaryOperator::CreateAnd(alRes, CONST_V<8>(trueBlock, 0x0F), "",
-                                    trueBlock);
+  alRes = llvm::BinaryOperator::CreateAnd(alRes, CONST_V<8>(trueBlock, 0x0F),
+                                          "", trueBlock);
   R_WRITE<8>(trueBlock, llvm::X86::AL, alRes);
 
-  BranchInst::Create(endBlock, trueBlock);
+  llvm::BranchInst::Create(endBlock, trueBlock);
 
   //False Block Statements
   F_CLEAR(falseBlock, AF);
@@ -375,7 +373,7 @@ static InstTransResult doAAS(BasicBlock *b) {
                                     falseBlock);
   R_WRITE<8>(falseBlock, llvm::X86::AL, alRes);
 
-  BranchInst::Create(endBlock, falseBlock);
+  llvm::BranchInst::Create(endBlock, falseBlock);
 
   F_ZAP(endBlock, OF);
   F_ZAP(endBlock, SF);
@@ -388,16 +386,16 @@ static InstTransResult doAAS(BasicBlock *b) {
   return ContinueBlock;
 }
 
-static InstTransResult doAAM(BasicBlock *b) {
+static InstTransResult doAAM(llvm::BasicBlock *b) {
 
-  Value *al;
+  llvm::Value *al = nullptr;
 
   al = R_READ<8>(b, llvm::X86::AL);
 
-  Value *res = BinaryOperator::Create(Instruction::SDiv, al,
-                                      CONST_V<8>(b, 0x0A), "", b);
-  Value *mod = BinaryOperator::Create(Instruction::SRem, al,
-                                      CONST_V<8>(b, 0x0A), "", b);
+  llvm::Value *res = llvm::BinaryOperator::Create(llvm::Instruction::SDiv, al,
+                                                  CONST_V<8>(b, 0x0A), "", b);
+  llvm::Value *mod = llvm::BinaryOperator::Create(llvm::Instruction::SRem, al,
+                                                  CONST_V<8>(b, 0x0A), "", b);
 
   R_WRITE<8>(b, llvm::X86::AL, mod);
   R_WRITE<8>(b, llvm::X86::AH, res);
@@ -412,18 +410,18 @@ static InstTransResult doAAM(BasicBlock *b) {
   return ContinueBlock;
 }
 
-static InstTransResult doAAD(BasicBlock *b) {
+static InstTransResult doAAD(llvm::BasicBlock *b) {
 
-  Value *al;
-  Value *ah;
+  llvm::Value *al = nullptr;
+  llvm::Value *ah = nullptr;
 
   al = R_READ<8>(b, llvm::X86::AL);
   ah = R_READ<8>(b, llvm::X86::AH);
 
-  Value *tmp = BinaryOperator::Create(Instruction::Mul, ah, CONST_V<8>(b, 0x0A),
-                                      "", b);
-  tmp = BinaryOperator::CreateAdd(tmp, al, "", b);
-  tmp = BinaryOperator::CreateAnd(tmp, CONST_V<8>(b, 0xFF), "", b);
+  llvm::Value *tmp = llvm::BinaryOperator::Create(llvm::Instruction::Mul, ah,
+                                                  CONST_V<8>(b, 0x0A), "", b);
+  tmp = llvm::BinaryOperator::CreateAdd(tmp, al, "", b);
+  tmp = llvm::BinaryOperator::CreateAnd(tmp, CONST_V<8>(b, 0xFF), "", b);
 
   R_WRITE<8>(b, llvm::X86::AL, tmp);
   R_WRITE<8>(b, llvm::X86::AH, CONST_V<8>(b, 0x00));
@@ -439,23 +437,24 @@ static InstTransResult doAAD(BasicBlock *b) {
 }
 
 template<int width>
-static InstTransResult doCwd(BasicBlock *b) {
+static InstTransResult doCwd(llvm::BasicBlock *b) {
 
   // read ax or eax
-  Value *ax_val = R_READ<width>(b, llvm::X86::EAX);
+  llvm::Value *ax_val = R_READ<width>(b, llvm::X86::EAX);
 
   // sign extend to twice width
-  Type *dt = Type::getIntNTy(b->getContext(), width * 2);
-  Value *tmp = new SExtInst(ax_val, dt, "", b);
+  auto dt = llvm::Type::getIntNTy(b->getContext(), width * 2);
+  auto tmp = new llvm::SExtInst(ax_val, dt, "", b);
 
   // rotate leftmost bits into rightmost
-  Type *t = Type::getIntNTy(b->getContext(), width);
-  Value *res_sh = BinaryOperator::Create(Instruction::LShr, tmp,
-                                         CONST_V<width * 2>(b, width), "", b);
+  auto t = llvm::Type::getIntNTy(b->getContext(), width);
+  auto res_sh = llvm::BinaryOperator::Create(llvm::Instruction::LShr, tmp,
+                                             CONST_V<width * 2>(b, width), "",
+                                             b);
   // original rightmost
-  Value *wrAX = new TruncInst(tmp, t, "", b);
+  auto wrAX = new llvm::TruncInst(tmp, t, "", b);
   // original leftmost
-  Value *wrDX = new TruncInst(res_sh, t, "", b);
+  auto wrDX = new llvm::TruncInst(res_sh, t, "", b);
   switch (width) {
     case 16:
       R_WRITE<width>(b, llvm::X86::DX, wrDX);
@@ -477,9 +476,9 @@ static InstTransResult doCwd(BasicBlock *b) {
 
 }
 
-static InstTransResult translate_SAHF(NativeModulePtr natM, BasicBlock *&block,
-                                      NativeInstPtr ip, MCInst &inst) {
-  Value *ah_val = R_READ<8>(block, llvm::X86::AH);
+static InstTransResult translate_SAHF(TranslationContext &ctx,
+                                      llvm::BasicBlock *&block) {
+  auto ah_val = R_READ<8>(block, llvm::X86::AH);
 
   SHR_SET_FLAG<8, 1>(block, ah_val, CF, 0);
   // bit 1 is reserved
@@ -494,8 +493,8 @@ static InstTransResult translate_SAHF(NativeModulePtr natM, BasicBlock *&block,
 }
 
 template<int width>
-static InstTransResult doBtmi(NativeInstPtr ip, BasicBlock *&b, Value *base,
-                              const MCOperand &index) {
+static InstTransResult doBtmi(NativeInstPtr ip, llvm::BasicBlock *&b,
+                              llvm::Value *base, const llvm::MCOperand &index) {
   TASSERT(index.isImm(), "Operand must be an immediate");
 
   int imm = index.getImm();
@@ -506,54 +505,53 @@ static InstTransResult doBtmi(NativeInstPtr ip, BasicBlock *&b, Value *base,
     whichbit *= -1;
   }
 
-  Value *addrInt = base;
+  auto addrInt = base;
 
   if (base->getType()->isPointerTy()) {
-    addrInt = new PtrToIntInst(base,
-                               llvm::Type::getIntNTy(b->getContext(), width),
-                               "", b);
+    addrInt = new llvm::PtrToIntInst(
+        base, llvm::Type::getIntNTy(b->getContext(), width), "", b);
   }
 
   // pick which byte we need to bit test
-  Value *new_base = BinaryOperator::Create(Instruction::Add, addrInt,
-                                           CONST_V<width>(b, bytes_offt), "",
-                                           b);
+  auto new_base = llvm::BinaryOperator::Create(llvm::Instruction::Add, addrInt,
+                                               CONST_V<width>(b, bytes_offt),
+                                               "", b);
 
-  Value *base_val = M_READ<8>(ip, b, new_base);
+  auto base_val = M_READ<8>(ip, b, new_base);
   SHR_SET_FLAG_V<8, 1>(b, base_val, CF, CONST_V<8>(b, whichbit));
 
   return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult doBtri(BasicBlock *&b, const MCOperand &base,
-                              const MCOperand &index) {
+static InstTransResult doBtri(llvm::BasicBlock *&b, const llvm::MCOperand &base,
+                              const llvm::MCOperand &index) {
   TASSERT(base.isReg(), "Operand must be an immediate");
   TASSERT(index.isImm(), "Operand must be an immediate");
 
   unsigned whichbit = index.getImm();
   whichbit %= width;
 
-  Value *base_val = R_READ<width>(b, base.getReg());
+  auto base_val = R_READ<width>(b, base.getReg());
   SHR_SET_FLAG_V<width, 1>(b, base_val, CF, CONST_V<width>(b, whichbit));
 
   return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult doBtrr(BasicBlock *&b, const MCOperand &base,
-                              const MCOperand &index) {
+static InstTransResult doBtrr(llvm::BasicBlock *&b, const llvm::MCOperand &base,
+                              const llvm::MCOperand &index) {
 
   TASSERT(base.isReg(), "operand must be register");
   TASSERT(index.isReg(), "operand must be register");
 
-  Value *base_val = R_READ<width>(b, base.getReg());
-  Value *index_val = R_READ<width>(b, index.getReg());
+  auto base_val = R_READ<width>(b, base.getReg());
+  auto index_val = R_READ<width>(b, index.getReg());
 
   // modulo the index by register size
-  Value *index_mod = BinaryOperator::CreateURem(index_val,
-                                                CONST_V<width>(b, width), "",
-                                                b);
+  auto index_mod = llvm::BinaryOperator::CreateURem(index_val,
+                                                    CONST_V<width>(b, width),
+                                                    "", b);
 
   SHR_SET_FLAG_V<width, 1>(b, base_val, CF, index_mod);
 
@@ -561,27 +559,30 @@ static InstTransResult doBtrr(BasicBlock *&b, const MCOperand &base,
 }
 
 template<int width>
-static InstTransResult doBTSri(BasicBlock *&b, const MCOperand &base,
-                               const MCOperand &index) {
+static InstTransResult doBTSri(llvm::BasicBlock *&b,
+                               const llvm::MCOperand &base,
+                               const llvm::MCOperand &index) {
   TASSERT(base.isReg(), "Operand must be an immediate");
   TASSERT(index.isImm(), "Operand must be an immediate");
 
   unsigned whichbit = index.getImm();
   whichbit %= width;
 
-  Value *base_val = R_READ<width>(b, base.getReg());
+  auto base_val = R_READ<width>(b, base.getReg());
   SHR_SET_FLAG_V<width, 1>(b, base_val, CF, CONST_V<width>(b, whichbit));
 
-  auto new_base_val = BinaryOperator::Create(
-      Instruction::Or, base_val, CONST_V<width>(b, 1ULL << whichbit), "", b);
+  auto new_base_val = llvm::BinaryOperator::Create(
+      llvm::Instruction::Or, base_val, CONST_V<width>(b, 1ULL << whichbit), "",
+      b);
   R_WRITE<width>(b, base.getReg(), new_base_val);
 
   return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult doBTSmi(NativeInstPtr ip, BasicBlock *&b, Value *base,
-                               const MCOperand &index) {
+static InstTransResult doBTSmi(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               llvm::Value *base,
+                               const llvm::MCOperand &index) {
   TASSERT(index.isImm(), "Operand must be an immediate");
 
   int imm = index.getImm();
@@ -592,33 +593,34 @@ static InstTransResult doBTSmi(NativeInstPtr ip, BasicBlock *&b, Value *base,
     whichbit *= -1;
   }
 
-  Value *addrInt = base;
+  auto addrInt = base;
 
   if (base->getType()->isPointerTy()) {
-    addrInt = new PtrToIntInst(base,
-                               llvm::Type::getIntNTy(b->getContext(), width),
-                               "", b);
+    addrInt = new llvm::PtrToIntInst(
+        base, llvm::Type::getIntNTy(b->getContext(), width), "", b);
   }
 
   // pick which byte we need to bit test
-  Value *new_base = BinaryOperator::Create(Instruction::Add, addrInt,
-                                           CONST_V<width>(b, bytes_offt), "",
-                                           b);
+  auto new_base = llvm::BinaryOperator::Create(llvm::Instruction::Add, addrInt,
+                                               CONST_V<width>(b, bytes_offt),
+                                               "", b);
 
-  Value *base_val = M_READ<8>(ip, b, new_base);
+  auto base_val = M_READ<8>(ip, b, new_base);
   SHR_SET_FLAG_V<8, 1>(b, base_val, CF, CONST_V<8>(b, whichbit));
 
-  auto new_base_val = BinaryOperator::Create(Instruction::Or, base_val,
-                                             CONST_V<8>(b, 1 << whichbit), "",
-                                             b);
+  auto new_base_val = llvm::BinaryOperator::Create(llvm::Instruction::Or,
+                                                   base_val,
+                                                   CONST_V<8>(b, 1 << whichbit),
+                                                   "", b);
   M_WRITE<8>(ip, b, new_base, new_base_val);
 
   return ContinueBlock;
 }
 
 template<int width>
-static InstTransResult doBTRmi(NativeInstPtr ip, BasicBlock *&b, Value *base,
-                               const MCOperand &index) {
+static InstTransResult doBTRmi(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               llvm::Value *base,
+                               const llvm::MCOperand &index) {
   TASSERT(index.isImm(), "Operand must be an immediate");
 
   int imm = index.getImm();
@@ -629,25 +631,24 @@ static InstTransResult doBTRmi(NativeInstPtr ip, BasicBlock *&b, Value *base,
     whichbit *= -1;
   }
 
-  Value *addrInt = base;
+  auto addrInt = base;
 
   if (base->getType()->isPointerTy()) {
-    addrInt = new PtrToIntInst(base,
-                               llvm::Type::getIntNTy(b->getContext(), width),
-                               "", b);
+    addrInt = new llvm::PtrToIntInst(
+        base, llvm::Type::getIntNTy(b->getContext(), width), "", b);
   }
 
   // pick which byte we need to bit test
-  Value *new_base = BinaryOperator::Create(Instruction::Add, addrInt,
-                                           CONST_V<width>(b, bytes_offt), "",
-                                           b);
+  auto new_base = llvm::BinaryOperator::Create(llvm::Instruction::Add, addrInt,
+                                               CONST_V<width>(b, bytes_offt),
+                                               "", b);
 
-  Value *base_val = M_READ<8>(ip, b, new_base);
+  auto base_val = M_READ<8>(ip, b, new_base);
   SHR_SET_FLAG_V<8, 1>(b, base_val, CF, CONST_V<8>(b, whichbit));
 
-  auto new_base_val = BinaryOperator::Create(Instruction::And, base_val,
-                                             CONST_V<8>(b, ~(1ULL << whichbit)),
-                                             "", b);
+  auto new_base_val = llvm::BinaryOperator::Create(
+      llvm::Instruction::And, base_val, CONST_V<8>(b, ~(1ULL << whichbit)), "",
+      b);
 
   M_WRITE<8>(ip, b, new_base, new_base_val);
 
@@ -655,38 +656,38 @@ static InstTransResult doBTRmi(NativeInstPtr ip, BasicBlock *&b, Value *base,
 }
 
 template<int width>
-static InstTransResult doBsrr(BasicBlock *&b, const MCOperand &dst,
-                              const MCOperand &src) {
+static InstTransResult doBsrr(llvm::BasicBlock *&b, const llvm::MCOperand &dst,
+                              const llvm::MCOperand &src) {
 
   TASSERT(dst.isReg(), "operand must be register");
   TASSERT(src.isReg(), "operand must be register");
 
-  Value *src_val = R_READ<width>(b, src.getReg());
+  auto src_val = R_READ<width>(b, src.getReg());
 
-  Type *s[1] = {Type::getIntNTy(b->getContext(), width)};
-  Function *ctlzFn = Intrinsic::getDeclaration(b->getParent()->getParent(),
-                                               Intrinsic::ctlz, s);
+  llvm::Type *s[] = {llvm::Type::getIntNTy(b->getContext(), width)};
+  auto ctlzFn = Intrinsic::getDeclaration(b->getParent()->getParent(),
+                                          Intrinsic::ctlz, s);
 
   TASSERT(ctlzFn != NULL, "Could not find ctlz intrinsic");
 
-  vector<Value*> ctlzArgs;
+  std::vector<llvm::Value *> ctlzArgs;
   ctlzArgs.push_back(src_val);
   ctlzArgs.push_back(CONST_V<1>(b, 0));
-  Value *ctlz = CallInst::Create(ctlzFn, ctlzArgs, "", b);
+  auto ctlz = llvm::CallInst::Create(ctlzFn, ctlzArgs, "", b);
 
-  Value *index_of_first_1 = BinaryOperator::CreateSub(CONST_V<width>(b, width),
-                                                      ctlz, "", b);
+  auto index_of_first_1 = llvm::BinaryOperator::CreateSub(
+      CONST_V<width>(b, width), ctlz, "", b);
 
-  Value *is_zero = new ICmpInst( *b, CmpInst::ICMP_EQ, CONST_V<width>(b, 0),
-                                index_of_first_1);
+  auto is_zero = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ,
+                                    CONST_V<width>(b, 0), index_of_first_1);
 
   F_WRITE(b, ZF, is_zero);
 
-  Value *fix_index = BinaryOperator::CreateSub(index_of_first_1,
-                                               CONST_V<width>(b, 1), "", b);
+  auto fix_index = llvm::BinaryOperator::CreateSub(index_of_first_1,
+                                                   CONST_V<width>(b, 1), "", b);
 
   // See if we write to register
-  Value *save_index = SelectInst::Create(is_zero,  // check if the source was zero
+  auto save_index = llvm::SelectInst::Create(is_zero,  // check if the source was zero
       src_val,  // if it was, do not change contents
       fix_index,  // if it was not, set index
       "", b);
@@ -697,31 +698,32 @@ static InstTransResult doBsrr(BasicBlock *&b, const MCOperand &dst,
 }
 
 template<int width>
-static InstTransResult doBsfrm(NativeInstPtr ip, BasicBlock *&b, const MCOperand &dst,
-                               Value *memAddr) {
+static InstTransResult doBsfrm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               const llvm::MCOperand &dst,
+                               llvm::Value *memAddr) {
 
   TASSERT(dst.isReg(), "operand must be register");
 
-  Value *src_val = M_READ<width>(ip, b, memAddr);
+  auto src_val = M_READ<width>(ip, b, memAddr);
 
-  Type *s[1] = {Type::getIntNTy(b->getContext(), width)};
-  Function *cttzFn = Intrinsic::getDeclaration(b->getParent()->getParent(),
-                                               Intrinsic::cttz, s);
+  llvm::Type *s[] = {llvm::Type::getIntNTy(b->getContext(), width)};
+  auto cttzFn = Intrinsic::getDeclaration(b->getParent()->getParent(),
+                                          Intrinsic::cttz, s);
 
   TASSERT(cttzFn != NULL, "Could not find cttz intrinsic");
 
-  vector<Value*> cttzArgs;
+  std::vector<llvm::Value *> cttzArgs;
   cttzArgs.push_back(src_val);
   cttzArgs.push_back(CONST_V<1>(b, 0));
-  Value *cttz = CallInst::Create(cttzFn, cttzArgs, "", b);
+  auto cttz = llvm::CallInst::Create(cttzFn, cttzArgs, "", b);
 
-  Value *is_zero = new ICmpInst( *b, CmpInst::ICMP_EQ, CONST_V<width>(b, width),
-                                cttz);
+  auto is_zero = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ,
+                                    CONST_V<width>(b, width), cttz);
 
   F_WRITE(b, ZF, is_zero);
 
   // See if we write to register
-  Value *save_index = SelectInst::Create(is_zero,  // check if the source was zero
+  auto save_index = llvm::SelectInst::Create(is_zero,  // check if the source was zero
       src_val,  // if it was, do not change contents
       cttz,  // if it was not, set index
       "", b);
@@ -732,32 +734,32 @@ static InstTransResult doBsfrm(NativeInstPtr ip, BasicBlock *&b, const MCOperand
 }
 
 template<int width>
-static InstTransResult doBsfr(BasicBlock *&b, const MCOperand &dst,
-                              const MCOperand &src) {
+static InstTransResult doBsfr(llvm::BasicBlock *&b, const llvm::MCOperand &dst,
+                              const llvm::MCOperand &src) {
 
   TASSERT(dst.isReg(), "operand must be register");
   TASSERT(src.isReg(), "operand must be register");
 
-  Value *src_val = R_READ<width>(b, src.getReg());
+  auto src_val = R_READ<width>(b, src.getReg());
 
-  Type *s[1] = {Type::getIntNTy(b->getContext(), width)};
-  Function *cttzFn = Intrinsic::getDeclaration(b->getParent()->getParent(),
-                                               Intrinsic::cttz, s);
+  llvm::Type *s[] = {llvm::Type::getIntNTy(b->getContext(), width)};
+  auto cttzFn = Intrinsic::getDeclaration(b->getParent()->getParent(),
+                                          Intrinsic::cttz, s);
 
   TASSERT(cttzFn != NULL, "Could not find cttz intrinsic");
 
-  vector<Value*> cttzArgs;
+  std::vector<llvm::Value *> cttzArgs;
   cttzArgs.push_back(src_val);
   cttzArgs.push_back(CONST_V<1>(b, 0));
-  Value *cttz = CallInst::Create(cttzFn, cttzArgs, "", b);
+  auto cttz = llvm::CallInst::Create(cttzFn, cttzArgs, "", b);
 
-  Value *is_zero = new ICmpInst( *b, CmpInst::ICMP_EQ, CONST_V<width>(b, width),
-                                cttz);
+  auto is_zero = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ,
+                                    CONST_V<width>(b, width), cttz);
 
   F_WRITE(b, ZF, is_zero);
 
   // See if we write to register
-  Value *save_index = SelectInst::Create(is_zero,  // check if the source was zero
+  auto save_index = llvm::SelectInst::Create(is_zero,  // check if the source was zero
       src_val,  // if it was, do not change contents
       cttz,  // if it was not, set index
       "", b);
@@ -786,10 +788,13 @@ GENERIC_TRANSLATION_REF(LEA16r, doLea<16>(ip, block, ADDR_NOREF(1), OP(0)),
                         doLea<16>(ip, block, MEM_REFERENCE(1), OP(0)))
 
 template<int width>
-static InstTransResult doLeaRef(NativeModulePtr natM, BasicBlock *&block,
-                                NativeInstPtr ip, MCInst &inst) {
+static InstTransResult doLeaRef(TranslationContext &ctx,
+                                llvm::BasicBlock *&block) {
   InstTransResult ret;
-  Function *F = block->getParent();
+  auto F = block->getParent();
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  auto natM = ctx.natM;
   if (ip->has_code_ref()) {
     NativeInst::CFGOpType optype;
 
@@ -801,9 +806,9 @@ static InstTransResult doLeaRef(NativeModulePtr natM, BasicBlock *&block,
       throw TErr(__LINE__, __FILE__, "Have code ref but no reference");
     }
 
-    Value *callback_fn = ArchAddCallbackDriver(block->getParent()->getParent(),
-                                               ip->get_reference(optype));
-    Value *addrInt = new PtrToIntInst(
+    auto callback_fn = ArchAddCallbackDriver(block->getParent()->getParent(),
+                                             ip->get_reference(optype));
+    auto addrInt = new llvm::PtrToIntInst(
         callback_fn, llvm::Type::getIntNTy(block->getContext(), width), "",
         block);
     ret = doLeaV<width>(block, OP(0), addrInt);
@@ -817,29 +822,26 @@ static InstTransResult doLeaRef(NativeModulePtr natM, BasicBlock *&block,
   }
   return ret;
 }
-static InstTransResult translate_LEA32r(NativeModulePtr natM,
-                                        BasicBlock *&block, NativeInstPtr ip,
-                                        MCInst &inst) {
-  return doLeaRef<32>(natM, block, ip, inst);
+
+static InstTransResult translate_LEA32r(TranslationContext &ctx,
+                                        llvm::BasicBlock *&block) {
+  return doLeaRef<32>(ctx, block);
 }
 
-static InstTransResult translate_LEA64r(NativeModulePtr natM,
-                                        BasicBlock *&block, NativeInstPtr ip,
-                                        MCInst &inst) {
-  return doLeaRef<64>(natM, block, ip, inst);
+static InstTransResult translate_LEA64r(TranslationContext &ctx,
+                                        llvm::BasicBlock *&block) {
+  return doLeaRef<64>(ctx, block);
 }
 
-static InstTransResult translate_LEA64_32r(NativeModulePtr natM,
-                                           BasicBlock *&block, NativeInstPtr ip,
-                                           MCInst &inst) {
-  return doLeaRef<32>(natM, block, ip, inst);
+static InstTransResult translate_LEA64_32r(TranslationContext &ctx,
+                                           llvm::BasicBlock *&block) {
+  return doLeaRef<32>(ctx, block);
 }
 
-static InstTransResult translate_CPUID32(NativeModulePtr natM,
-                                         BasicBlock *&block, NativeInstPtr ip,
-                                         MCInst &inst) {
-  Value *eax = R_READ<32>(block, llvm::X86::EAX);
-  Value *ecx = R_READ<32>(block, llvm::X86::ECX);
+static InstTransResult translate_CPUID32(TranslationContext &ctx,
+                                         llvm::BasicBlock *&block) {
+  auto eax = R_READ<32>(block, llvm::X86::EAX);
+  auto ecx = R_READ<32>(block, llvm::X86::ECX);
 
   CREATE_BLOCK(b0, block);
   CREATE_BLOCK(b1, block);
@@ -862,8 +864,7 @@ static InstTransResult translate_CPUID32(NativeModulePtr natM,
   CREATE_BLOCK(eax11_b1, block_b11);
   CREATE_BLOCK(eax11_bdefault, block_b11);
 
-  llvm::SwitchInst *si = llvm::SwitchInst::Create(eax, block_bdefault, 7,
-                                                  block);
+  auto si = llvm::SwitchInst::Create(eax, block_bdefault, 7, block);
 
   // 32-bit CPUID values taken by sampling from a live CPU
 

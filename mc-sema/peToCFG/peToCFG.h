@@ -66,7 +66,7 @@
 typedef uint64_t VA;
 
 class NativeInst;
-typedef std::shared_ptr<NativeInst> NativeInstPtr;
+typedef NativeInst *NativeInstPtr;
 
 #include <BaseBMO.h>
 
@@ -79,11 +79,11 @@ class MCSJumpTable;
 class JumpIndexTable;
 class MCSOffsetTable;
 
-typedef std::shared_ptr<ExternalCodeRef> ExternalCodeRefPtr;
-typedef std::shared_ptr<ExternalDataRef> ExternalDataRefPtr;
-typedef std::shared_ptr<MCSJumpTable> MCSJumpTablePtr;
-typedef std::shared_ptr<JumpIndexTable> JumpIndexTablePtr;
-typedef std::shared_ptr<MCSOffsetTable> MCSOffsetTablePtr;
+typedef ExternalCodeRef *ExternalCodeRefPtr;
+typedef ExternalDataRef *ExternalDataRefPtr;
+typedef MCSJumpTable *MCSJumpTablePtr;
+typedef JumpIndexTable *JumpIndexTablePtr;
+typedef MCSOffsetTable *MCSOffsetTablePtr;
 
 class BufferMemoryObject : public llvm::MemoryObject {
  private:
@@ -280,7 +280,7 @@ class NativeBlock {
   NativeBlock(void) = delete;
 };
 
-typedef std::shared_ptr<NativeBlock> NativeBlockPtr;
+typedef NativeBlock *NativeBlockPtr;
 
 class NativeFunction {
  public:
@@ -312,8 +312,8 @@ class NativeFunction {
   std::string funcSymName;
 };
 
-typedef std::shared_ptr<NativeBlock> NativeBlockPtr;
-typedef std::shared_ptr<NativeFunction> NativeFunctionPtr;
+typedef NativeBlock *NativeBlockPtr;
+typedef NativeFunction *NativeFunctionPtr;
 
 class DataSectionEntry {
  public:
@@ -443,7 +443,7 @@ class NativeModule {
   std::unordered_map<VA, MCSOffsetTablePtr> offset_tables;
 };
 
-typedef std::shared_ptr<NativeModule> NativeModulePtr;
+typedef NativeModule *NativeModulePtr;
 
 enum ModuleInputFormat {
   COFFObject,

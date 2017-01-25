@@ -40,7 +40,7 @@ mkdir -p ${PKGDIR}/drivers
 
 # ensure we always copy CFG protobuf parser
 chmod +x ./build/mc-sema/bin_descend/CFG_pb2.py
-MC_BINS=$(find ./build/mc-sema -executable -type f | grep -v '/pin/' | grep -v 'testSemantics' | grep -v 'valTest')
+MC_BINS=$(find ./build/mc-sema -executable -type f)
 if [ "${MC_BINS}" == "" ]
 then
     echo "Could not find mcsema binaries. Did you build mcsema?"

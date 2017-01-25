@@ -8,7 +8,8 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
- Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
  Neither the name of Trail of Bits nor the names of its
@@ -55,15 +56,14 @@
 #define MAKEWORD(x, y) (((x) << 8) | (y))
 #define MAKE_FOPCODE(x, y) (MAKEWORD(x, y) & 0x7FF)
 
-using namespace llvm;
-
-static Value* ADDR_TO_POINTER_V(BasicBlock *b, Value *memAddr, Type *ptrType) {
+static llvm::Value *ADDR_TO_POINTER_V(llvm::BasicBlock *b, llvm::Value *memAddr,
+                                      llvm::Type *ptrType) {
   if (memAddr->getType()->isPointerTy() == false) {
     // its an integer, make it a pointer
     return new llvm::IntToPtrInst(memAddr, ptrType, "", b);
   } else if (memAddr->getType() != ptrType) {
     // its a pointer, but of the wrong type
-    return CastInst::CreatePointerCast(memAddr, ptrType, "", b);
+    return llvm::CastInst::CreatePointerCast(memAddr, ptrType, "", b);
   } else {
     // already correct ptr type
     return memAddr;
@@ -71,43 +71,40 @@ static Value* ADDR_TO_POINTER_V(BasicBlock *b, Value *memAddr, Type *ptrType) {
 }
 
 template<int width>
-static Value* ADDR_TO_POINTER(BasicBlock *b, Value *memAddr) {
+static llvm::Value *ADDR_TO_POINTER(llvm::BasicBlock *b, llvm::Value *memAddr) {
   NASSERT(memAddr != NULL);
-  llvm::Type *ptrType = Type::getIntNPtrTy(b->getContext(), width);
+  auto ptrType = llvm::Type::getIntNPtrTy(b->getContext(), width);
   return ADDR_TO_POINTER_V(b, memAddr, ptrType);
 }
 
 template<int width>
-static Value *SHL_NOTXOR_V(llvm::BasicBlock *block, Value *val,
-                           Value *val_to_shift, int shlbits) {
-  Value *fv = val_to_shift;
-  Value *nfv = llvm::BinaryOperator::CreateNot(fv, "", block);
-  Value *nzfv = new llvm::ZExtInst(
+static llvm::Value *SHL_NOTXOR_V(llvm::BasicBlock *block, llvm::Value *val,
+                                 llvm::Value *val_to_shift, int shlbits) {
+  auto fv = val_to_shift;
+  auto nfv = llvm::BinaryOperator::CreateNot(fv, "", block);
+  auto nzfv = new llvm::ZExtInst(
       nfv, llvm::Type::getIntNTy(block->getContext(), width), "", block);
-  Value *shl = llvm::BinaryOperator::CreateShl(nzfv,
-                                               CONST_V<width>(block, shlbits),
-                                               "", block);
-  Value *anded = llvm::BinaryOperator::CreateXor(shl, val, "", block);
-
-  return anded;
+  auto shl = llvm::BinaryOperator::CreateShl(nzfv,
+                                             CONST_V<width>(block, shlbits), "",
+                                             block);
+  return llvm::BinaryOperator::CreateXor(shl, val, "", block);
 }
 
 template<int width>
-static Value *SHL_NOTXOR_FLAG(llvm::BasicBlock *block, Value *val,
-                              MCSemaRegs flag, int shlbits) {
-  Value *fv = F_READ(block, flag);
+static llvm::Value *SHL_NOTXOR_FLAG(llvm::BasicBlock *block, llvm::Value *val,
+                                    MCSemaRegs flag, int shlbits) {
+  auto fv = F_READ(block, flag);
   return SHL_NOTXOR_V<width>(block, val, fv, shlbits);
 }
 
-static void SET_FPU_FOPCODE(BasicBlock *&b, uint8_t opcode[4]) {
+static void SET_FPU_FOPCODE(llvm::BasicBlock *&b, uint8_t opcode[4]) {
   //assume we will never set fopcode
   //uint16_t op = MAKE_FOPCODE(opcode[0], opcode[1]);
   //Value *op_v = CONST_V<11>(b, op);
   //F_WRITE(b, FPU_FOPCODE, op_v);
-  return;
 }
 
-static void setFpuDataPtr(BasicBlock *&b, Value *dataptr) {
+static void setFpuDataPtr(llvm::BasicBlock *&b, llvm::Value *dataptr) {
   // assume no FPU data
   //Value *addrInt = new PtrToIntInst(
   //    dataptr, llvm::Type::getInt32Ty(b->getContext()), "", b);
@@ -131,70 +128,65 @@ static void setFpuInstPtr(llvm::BasicBlock *&b,
   //Value *addrInt = CONST_V<32>(b, 0);
   //F_WRITE(b, FPU_LASTIP_OFF, addrInt);
   // assume no fpu last ip
-  return;
 }
 
 static void setFpuInstPtr(llvm::BasicBlock *b) {
   return setFpuInstPtr(b, b);
 }
 
-static Value* adjustFpuPrecision(BasicBlock *&b, Value *fpuval) {
+static llvm::Value *adjustFpuPrecision(llvm::BasicBlock *&b,
+                                       llvm::Value *fpuval) {
   return fpuval;
 }
 
-static void FPUF_SET(BasicBlock *&b, MCSemaRegs reg) {
+static void FPUF_SET(llvm::BasicBlock *&b, MCSemaRegs reg) {
   F_WRITE(b, reg, CONST_V<1>(b, 1));
-  return;
 }
 
-static void FPUF_CLEAR(BasicBlock *&b, MCSemaRegs reg) {
+static void FPUF_CLEAR(llvm::BasicBlock *&b, MCSemaRegs reg) {
   F_WRITE(b, reg, CONST_V<1>(b, 0));
-  return;
 }
 
-static Value * CONSTFP_V(BasicBlock *&b, long double val) {
-  llvm::Type *bTy = llvm::Type::getX86_FP80Ty(b->getContext());
-  return ConstantFP::get(bTy, val);
+static llvm::Value *CONSTFP_V(llvm::BasicBlock *&b, long double val) {
+  auto bTy = llvm::Type::getX86_FP80Ty(b->getContext());
+  return llvm::ConstantFP::get(bTy, val);
 }
 
-static Value *doGEPV(BasicBlock *&b, Value *gepindex, MCSemaRegs reg) {
-  llvm::Type *gepindex_type = gepindex->getType();
-
-  Value *gep_ext = gepindex;
+static llvm::Value *doGEPV(llvm::BasicBlock *&b, llvm::Value *gepindex,
+                           MCSemaRegs reg) {
+  auto gepindex_type = gepindex->getType();
+  auto gep_ext = gepindex;
 
   if ( !gepindex_type->isIntegerTy())
     throw TErr(__LINE__, __FILE__, "gepindex number is not an integer");
 
   if ( !gepindex_type->isIntegerTy(32)) {
     // Zero extend to 32 bits.
-    gep_ext = new ZExtInst(gepindex, llvm::Type::getInt32Ty(b->getContext()),
-                           "", b);
+    gep_ext = new llvm::ZExtInst(gepindex,
+                                 llvm::Type::getInt32Ty(b->getContext()), "",
+                                 b);
   }
 
-  Value *stGEPV[] = {CONST_V<32>(b, 0), gep_ext};
-
-  Value* localgepreg = x86::lookupLocal(b->getParent(), reg);
+  llvm::Value *stGEPV[] = {CONST_V<32>(b, 0), gep_ext};
+  auto localgepreg = x86::lookupLocal(b->getParent(), reg);
 
   // Get actual register.
-  Instruction *gepreg = GetElementPtrInst::CreateInBounds(localgepreg, stGEPV,
-                                                          "", b);
-
-  return gepreg;
+  return llvm::GetElementPtrInst::CreateInBounds(localgepreg, stGEPV, "", b);
 }
 
-static Value *GetFPUTagPtrV(BasicBlock *&b, Value *tagval) {
+static llvm::Value *GetFPUTagPtrV(llvm::BasicBlock *&b, llvm::Value *tagval) {
   auto TagTy = llvm::Type::getIntNTy(b->getContext(), 2);
   auto TagPtrTy = llvm::PointerType::get(TagTy, 0);
   return new llvm::BitCastInst(doGEPV(b, tagval, FPU_TAG), TagPtrTy, "", b);
 }
 
-static Value *GetFPUTagV(BasicBlock *&b, Value *tagval) {
-  Value *tagptr = GetFPUTagPtrV(b, tagval);
-  Value *load = noAliasMCSemaScope(new LoadInst(tagptr, "", b));
+static Value *GetFPUTagV(llvm::BasicBlock *&b, llvm::Value *tagval) {
+  auto tagptr = GetFPUTagPtrV(b, tagval);
+  auto load = noAliasMCSemaScope(new llvm::LoadInst(tagptr, "", b));
   return load;
 }
 
-static Value *GetFPURegV(BasicBlock *&b, Value *fpureg) {
+static llvm::Value *GetFPURegV(llvm::BasicBlock *&b, llvm::Value *fpureg) {
   // Create GEP array to get local value of ST(regslot).
   return doGEPV(b, fpureg, ST0);
 }
@@ -202,51 +194,35 @@ static Value *GetFPURegV(BasicBlock *&b, Value *fpureg) {
 // Map fpreg (a value from the enum of X86::ST0 - X86::ST7 to register slot in
 // the floating point register array. This maps the i in ST(i) to a slot that
 // can be used with FPUR_READV/FPUR_WRITEV.
-static Value *GetSlotForFPUReg(BasicBlock *&b, unsigned fpreg) {
+static llvm::Value *GetSlotForFPUReg(llvm::BasicBlock *&b, unsigned fpreg) {
   // How far away is this register from ST0?
   // This is needed to find the correct slot in the FPRegs to read from.
-  unsigned offset_from_st0 = fpreg - X86::ST0;
+  unsigned offset_from_st0 = fpreg - llvm::X86::ST0;
 
   // Sanity check: there are only 8 FPU registers.
-  if (offset_from_st0 >= NUM_FPU_REGS)
+  if (offset_from_st0 >= NUM_FPU_REGS) {
     throw TErr(__LINE__, __FILE__,
                "Trying to write to non-existant FPU register");
-
-  Value *topval = F_READ(b, FPU_TOP);
-  // Add should overflow automatically.
-  Value *regslot = BinaryOperator::CreateAdd(topval,
-                                             CONST_V<3>(b, offset_from_st0), "",
-                                             b);
-
-  NASSERT(regslot != NULL);
-
-  return regslot;
+  }
+  auto topval = F_READ(b, FPU_TOP);
+  return llvm::BinaryOperator::CreateAdd(topval, CONST_V<3>(b, offset_from_st0),
+                                         "", b);
 }
 
-static Value* DECREMENT_FPU_TOP(BasicBlock *&b) {
-  // Read TOP.
-  Value *topval = F_READ(b, FPU_TOP);
-
-  Value *dectop = BinaryOperator::CreateSub(topval, CONST_V<3>(b, 1), "", b);
-
-  // Checking for range removed due to operations on 3-bit integers and
-  // automatic overflow.
-
+static llvm::Value *DECREMENT_FPU_TOP(llvm::BasicBlock *&b) {
+  auto topval = F_READ(b, FPU_TOP);
+  auto dectop = llvm::BinaryOperator::CreateSub(topval, CONST_V<3>(b, 1), "",
+                                                b);
   F_WRITE(b, FPU_TOP, dectop);
-
   return dectop;
 }
 
 // Increments TOP and returns the new value of TOP.
-static Value* INCREMENT_FPU_TOP(BasicBlock *&b) {
-  // Read TOP.
-  Value *topval = F_READ(b, FPU_TOP);
-
-  // Increment TOP.
-  Value *inctop = BinaryOperator::CreateAdd(topval, CONST_V<3>(b, 1), "", b);
-
+static llvm::Value *INCREMENT_FPU_TOP(llvm::BasicBlock *&b) {
+  auto topval = F_READ(b, FPU_TOP);
+  auto inctop = llvm::BinaryOperator::CreateAdd(topval, CONST_V<3>(b, 1), "",
+                                                b);
   F_WRITE(b, FPU_TOP, inctop);
-
   return inctop;
 }
 
@@ -255,26 +231,24 @@ static Value* INCREMENT_FPU_TOP(BasicBlock *&b) {
 // register slot based on the value of the TOP flag.
 // So if TOP == 5, then ST(0) references register slot 5, and ST(3) references
 // register slot 0.
-static Value *FPUR_READV(BasicBlock *&b, Value *regslot) {
+static llvm::Value *FPUR_READV(llvm::BasicBlock *&b, llvm::Value *regslot) {
   // Check TAG register
   // If TAG(regslot) != 0, then we have a problem.
-  Value *tagval = GetFPUTagV(b, regslot);
-  Function *F = b->getParent();
+  auto tagval = GetFPUTagV(b, regslot);
+  auto F = b->getParent();
+  auto &C = F->getContext();
 
-  BasicBlock *read_normal_block = BasicBlock::Create(b->getContext(),
-                                                     "fpu_read_normal", F);
+  auto read_normal_block = llvm::BasicBlock::Create(C, "fpu_read_normal", F);
   //BasicBlock *read_zero_block =
   //    BasicBlock::Create(b->getContext(), "fpu_read_zero", F);
   //BasicBlock *read_special_block =
   //    BasicBlock::Create(b->getContext(), "fpu_read_special", F);
-  BasicBlock *read_empty_block = BasicBlock::Create(b->getContext(),
-                                                    "fpu_read_empty", F);
+  auto read_empty_block = llvm::BasicBlock::Create(C, "fpu_read_empty", F);
 
-  BasicBlock *fpu_read_continue = BasicBlock::Create(b->getContext(),
-                                                     "fpu_read_continue", F);
+  auto fpu_read_continue = llvm::BasicBlock::Create(C, "fpu_read_continue", F);
 
   // The default case should never be hit. Use LLVM Switch Node.
-  SwitchInst *tagSwitch = SwitchInst::Create(tagval, read_empty_block, 4, b);
+  auto tagSwitch = llvm::SwitchInst::Create(tagval, read_empty_block, 4, b);
   tagSwitch->addCase(CONST_V<2>(b, FPU_TAG_VALID), read_normal_block);
   tagSwitch->addCase(CONST_V<2>(b, FPU_TAG_ZERO), read_normal_block);
   tagSwitch->addCase(CONST_V<2>(b, FPU_TAG_SPECIAL), read_normal_block);
@@ -282,13 +256,13 @@ static Value *FPUR_READV(BasicBlock *&b, Value *regslot) {
   //tagSwitch->addCase(CONST_V<2>(b, 2), read_special_block);
   //tagSwitch->addCase(CONST_V<2>(b, 3), read_empty_block);
 
-  Value *streg = GetFPURegV(read_normal_block, regslot);
-  Instruction *loadVal = noAliasMCSemaScope(
-      new LoadInst(streg, "", read_normal_block));
+  auto streg = GetFPURegV(read_normal_block, regslot);
+  auto loadVal = noAliasMCSemaScope(
+      new llvm::LoadInst(streg, "", read_normal_block));
 
   // C1 is set load needs to round up and cleared otherwise.
   FPUF_CLEAR(read_normal_block, FPU_C1);
-  BranchInst::Create(fpu_read_continue, read_normal_block);
+  llvm::BranchInst::Create(fpu_read_continue, read_normal_block);
 
   // Populate read zero block.
   // This is the zero block. Return zero.
@@ -318,13 +292,14 @@ static Value *FPUR_READV(BasicBlock *&b, Value *regslot) {
   // underflow.
   // TODO: Throw an exception.
   FPUF_CLEAR(read_empty_block, FPU_C1);
-  Value *zval = CONSTFP_V(read_empty_block, 0.0);
-  BranchInst::Create(fpu_read_continue, read_empty_block);
+  auto zval = CONSTFP_V(read_empty_block, 0.0);
+  llvm::BranchInst::Create(fpu_read_continue, read_empty_block);
 
   // Populate continue block.
   // Use phi instruction to determine value that was loaded.
-  PHINode *whichval = PHINode::Create(Type::getX86_FP80Ty(F->getContext()), 2,
-                                      "fpu_switch_phinode", fpu_read_continue);
+  auto whichval = llvm::PHINode::Create(llvm::Type::getX86_FP80Ty(C), 2,
+                                        "fpu_switch_phinode",
+                                        fpu_read_continue);
 
   whichval->addIncoming(loadVal, read_normal_block);
   //whichval->addIncoming(zval, read_zero_block);
@@ -336,13 +311,12 @@ static Value *FPUR_READV(BasicBlock *&b, Value *regslot) {
   b = fpu_read_continue;
 
   // Read PC flag and adjust precision based on its value.
-  Value *precision_adjusted = adjustFpuPrecision(b, whichval);
-  return precision_adjusted;
+  return adjustFpuPrecision(b, whichval);
 }
 
 // Read the value of X86::STi as specified by fpreg.
-static Value *FPUR_READ(BasicBlock *&b, unsigned fpreg) {
-  Value *regslot = GetSlotForFPUReg(b, fpreg);
+static llvm::Value *FPUR_READ(llvm::BasicBlock *&b, unsigned fpreg) {
+  auto regslot = GetSlotForFPUReg(b, fpreg);
   return FPUR_READV(b, regslot);
 }
 
@@ -351,7 +325,8 @@ static Value *FPUR_READ(BasicBlock *&b, unsigned fpreg) {
 // register slot based of the value of the TOP flag.
 // So if TOP == 5, ST(0) references register slot 5, and ST(3) references
 // register slot 0.
-static void FPUR_WRITEV(BasicBlock *&b, Value *regslot, Value *val) {
+static void FPUR_WRITEV(llvm::BasicBlock *&b, llvm::Value *regslot,
+                        llvm::Value *val) {
   CREATE_BLOCK(fpu_write, b);
   CREATE_BLOCK(fpu_exception, b);
 
@@ -364,36 +339,36 @@ static void FPUR_WRITEV(BasicBlock *&b, Value *regslot, Value *val) {
   // if so, then we will overflow. Need to throw exception.
 
   // Get ptr to FPU register.
-  Value *streg = GetFPURegV(b, regslot);
-  Value *tagReg = GetFPUTagPtrV(b, regslot);
-  Instruction *tagVal = noAliasMCSemaScope(new LoadInst(tagReg, "", b));
+  auto streg = GetFPURegV(b, regslot);
+  auto tagReg = GetFPUTagPtrV(b, regslot);
+  auto tagVal = noAliasMCSemaScope(new llvm::LoadInst(tagReg, "", b));
 
   // If tag != empty, then throw exception.
-  Value *cmp_inst = new ICmpInst( *b, ICmpInst::ICMP_EQ, tagVal,
-                                 CONST_V<2>(b, FPU_TAG_EMPTY));
+  auto cmp_inst = new llvm::ICmpInst( *b, llvm::ICmpInst::ICMP_EQ, tagVal,
+                                     CONST_V<2>(b, FPU_TAG_EMPTY));
 
-  BranchInst::Create(block_fpu_write, block_fpu_exception, cmp_inst, b);
+  llvm::BranchInst::Create(block_fpu_write, block_fpu_exception, cmp_inst, b);
 
   // Set up block_fpu_exception.
   // TODO: real exception throwing.
   // For now, just set C1 and branch to write anyway.
   FPUF_SET(block_fpu_exception, FPU_C1);
-  BranchInst::Create(block_fpu_write, block_fpu_exception);
+  llvm::BranchInst::Create(block_fpu_write, block_fpu_exception);
 
   // Default block is now block_fpu_write.
   b = block_fpu_write;
 
   // Write 0 to tagReg.
   FPUF_CLEAR(b, FPU_C1);
-  Instruction *storeVal_normal = noAliasMCSemaScope(
-      new StoreInst(CONST_V<2>(b, FPU_TAG_VALID), tagReg, b));
+  auto storeVal_normal = noAliasMCSemaScope(
+      new llvm::StoreInst(CONST_V<2>(b, FPU_TAG_VALID), tagReg, b));
 
   NASSERT(storeVal_normal != NULL);
 
   // This is used later, but is needed now so things can branch to it.
   CREATE_BLOCK(fpu_write_exit, b);
 
-  BranchInst::Create(block_fpu_write_exit, b);
+  llvm::BranchInst::Create(block_fpu_write_exit, b);
 
   // Write 1 to tagReg.
   //CREATE_BLOCK(fpu_write_zero, b);
@@ -432,49 +407,51 @@ static void FPUR_WRITEV(BasicBlock *&b, Value *regslot, Value *val) {
   //    block_fpu_write_zero, block_fpu_write_normal, is_poszero, b);
 
   b = block_fpu_write_exit;
-  Value *precision_adjusted = adjustFpuPrecision(b, val);
+  auto precision_adjusted = adjustFpuPrecision(b, val);
   // Store value into local ST register array.
-  Instruction *storeVal = noAliasMCSemaScope(
-      new StoreInst(precision_adjusted, streg, b));
+  auto storeVal = noAliasMCSemaScope(
+      new llvm::StoreInst(precision_adjusted, streg, b));
 
   NASSERT(storeVal != NULL);
 }
 
 // Write val to X86::STi (specified by fpreg).
-static void FPUR_WRITE(BasicBlock *&b, unsigned fpreg, Value *val) {
+static void FPUR_WRITE(llvm::BasicBlock *&b, unsigned fpreg, llvm::Value *val) {
   // Map fpreg to register slot in the register array.
   Value *regslot = GetSlotForFPUReg(b, fpreg);
   FPUR_WRITEV(b, regslot, val);
 }
 
 // Decrement Top, set ST(TOP) = fpuval.
-static void FPU_PUSHV(BasicBlock *&b, Value *fpuval) {
-  Value *new_top = DECREMENT_FPU_TOP(b);
-  Value *ext_top = new ZExtInst(new_top, Type::getInt32Ty(b->getContext()), "",
-                                b);
+static void FPU_PUSHV(llvm::BasicBlock *&b, llvm::Value *fpuval) {
+  auto new_top = DECREMENT_FPU_TOP(b);
+  auto ext_top = new llvm::ZExtInst(new_top,
+                                    llvm::Type::getInt32Ty(b->getContext()), "",
+                                    b);
 
   // The FPUR_WRITEV will mark the currentTOP as valid in the tag registers.
   FPUR_WRITEV(b, ext_top, fpuval);
 }
 
-static void FPU_POP(BasicBlock *&b) {
+static void FPU_POP(llvm::BasicBlock *&b) {
   // Set tag at current top as empty.
-  Value *topslot = GetSlotForFPUReg(b, X86::ST0);
-  Value *tagReg = GetFPUTagPtrV(b, topslot);
+  auto topslot = GetSlotForFPUReg(b, llvm::X86::ST0);
+  auto tagReg = GetFPUTagPtrV(b, topslot);
   // Should an exception be thrown if an empty FPU value is popped without
   // being used?
-  Value *empty_the_tag = noAliasMCSemaScope(
-      new StoreInst(CONST_V<2>(b, FPU_TAG_EMPTY), tagReg, b));
+  auto empty_the_tag = noAliasMCSemaScope(
+      new llvm::StoreInst(CONST_V<2>(b, FPU_TAG_EMPTY), tagReg, b));
 
   NASSERT(empty_the_tag != NULL);
 
   INCREMENT_FPU_TOP(b);
 }
 
-static Value *FPUM_READ(NativeInstPtr ip, int memwidth, llvm::BasicBlock *&b,
-                        Value *addr) {
-  Value *readLoc = addr;
-  llvm::Type *ptrTy;
+static llvm::Value *FPUM_READ(NativeInstPtr ip, int memwidth,
+                              llvm::BasicBlock *&b, llvm::Value *addr) {
+  auto &C = b->getContext();
+  auto readLoc = addr;
+  llvm::Type *ptrTy = nullptr;
   unsigned addrspace = ip->get_addr_space();
 
   switch (memwidth) {
@@ -482,13 +459,13 @@ static Value *FPUM_READ(NativeInstPtr ip, int memwidth, llvm::BasicBlock *&b,
       throw TErr(__LINE__, __FILE__, "HALFPTR TYPE NOT YET SUPPORTED!");
       break;
     case 32:
-      ptrTy = llvm::Type::getFloatPtrTy(b->getContext(), addrspace);
+      ptrTy = llvm::Type::getFloatPtrTy(C, addrspace);
       break;
     case 64:
-      ptrTy = llvm::Type::getDoublePtrTy(b->getContext(), addrspace);
+      ptrTy = llvm::Type::getDoublePtrTy(C, addrspace);
       break;
     case 80:
-      ptrTy = llvm::Type::getX86_FP80PtrTy(b->getContext(), addrspace);
+      ptrTy = llvm::Type::getX86_FP80PtrTy(C, addrspace);
       break;
     default:
       throw TErr(__LINE__, __FILE__, "FPU TYPE NOT IMPLEMENTED!");
@@ -497,15 +474,14 @@ static Value *FPUM_READ(NativeInstPtr ip, int memwidth, llvm::BasicBlock *&b,
 
   readLoc = ADDR_TO_POINTER_V(b, addr, ptrTy);
 
-  Value *read = noAliasMCSemaScope(new llvm::LoadInst(readLoc, "", b));
+  auto read = noAliasMCSemaScope(new llvm::LoadInst(readLoc, "", b));
 
   // Convert precision - this is here for cases like FPU compares where the
   // compare would fail unless both precisions were adjusted.
-  Value *extended;
+  llvm::Value *extended = nullptr;
 
   if (memwidth < 80) {
-    extended = new FPExtInst(read, llvm::Type::getX86_FP80Ty(b->getContext()),
-                             "", b);
+    extended = new llvm::FPExtInst(read, llvm::Type::getX86_FP80Ty(C), "", b);
   } else if (memwidth == 80) {
     extended = read;
   } else {
@@ -513,21 +489,19 @@ static Value *FPUM_READ(NativeInstPtr ip, int memwidth, llvm::BasicBlock *&b,
   }
 
   // Precision adjust works on 80-bit FPU.
-  Value *precision_adjusted = adjustFpuPrecision(b, extended);
+  auto precision_adjusted = adjustFpuPrecision(b, extended);
 
   // Re-truncate back to requested size.
-  Value *returnval;
+  llvm::Value *returnval = nullptr;
 
   switch (memwidth) {
     case 32:
-      returnval = new FPTruncInst(precision_adjusted,
-                                  llvm::Type::getFloatTy(b->getContext()), "",
-                                  b);
+      returnval = new FPTruncInst(precision_adjusted, llvm::Type::getFloatTy(C),
+                                  "", b);
       break;
     case 64:
       returnval = new FPTruncInst(precision_adjusted,
-                                  llvm::Type::getDoubleTy(b->getContext()), "",
-                                  b);
+                                  llvm::Type::getDoubleTy(C), "", b);
       break;
     case 80:
       // Do nothing.
@@ -543,49 +517,49 @@ static Value *FPUM_READ(NativeInstPtr ip, int memwidth, llvm::BasicBlock *&b,
 
 // Create a new basic block and jump to it from the previous block.
 // This is used to set the last FPU instruction pointer via BlockAddr later.
-static BasicBlock *createNewFpuBlock(Function *F, BasicBlock *&b,
-                                     std::string instname) {
-  BasicBlock* newb = BasicBlock::Create(F->getContext(),
-                                        ("fpuinst_" + instname), F);
-  Value *br = BranchInst::Create(newb, b);
-
-  NASSERT(br != NULL);
-
+static llvm::BasicBlock *createNewFpuBlock(llvm::Function *F,
+                                           llvm::BasicBlock *&b,
+                                           std::string instname) {
+  auto newb = llvm::BasicBlock::Create(
+      F->getContext(), ("fpuinst_" + instname), F);
+  (void) llvm::BranchInst::Create(newb, b);
   return newb;
 }
 
-static BasicBlock * createNewFpuBlock(BasicBlock *&b, std::string instName) {
+static llvm::BasicBlock *createNewFpuBlock(llvm::BasicBlock *&b,
+                                           std::string instName) {
   return createNewFpuBlock(b->getParent(), b, instName);
 }
 
 #define SET_STRUCT_MEMBER(st, index, member, b) do {\
-    Value *stGEPV[] = {\
+    llvm::Value *stGEPV[] = {\
         CONST_V<32>(b, 0),\
         CONST_V<32>(b, index) };\
-    Instruction *gepreg = GetElementPtrInst::CreateInBounds(st, stGEPV, "", b);\
-    Value *storeIt = noAliasMCSemaScope(new StoreInst(member, gepreg, b));\
+    auto gepreg = llvm::GetElementPtrInst::CreateInBounds(st, stGEPV, "", b);\
+    auto storeIt = noAliasMCSemaScope(new llvm::StoreInst(member, gepreg, b));\
     NASSERT(storeIt != NULL);\
     } while(0);
 
 template<int width, bool reverse>
-static InstTransResult doFiOpMR(NativeInstPtr ip, BasicBlock *&b, unsigned dstReg,
-                                Value *memAddr, unsigned opcode,
+static InstTransResult doFiOpMR(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                unsigned dstReg, llvm::Value *memAddr,
+                                unsigned opcode,
                                 llvm::Instruction::BinaryOps fpop) {
   // Read register.
-  Value *dstVal = FPUR_READ(b, dstReg);
+  auto dstVal = FPUR_READ(b, dstReg);
 
   // Read memory value.
-  Value *memVal = M_READ<width>(ip, b, memAddr);
+  auto memVal = M_READ<width>(ip, b, memAddr);
 
-  Value *fp_mem_val = llvm::CastInst::Create(
+  auto fp_mem_val = llvm::CastInst::Create(
       llvm::Instruction::SIToFP, memVal,
       llvm::Type::getX86_FP80Ty(b->getContext()), "", b);
 
-  Value *result;
+  llvm::Value *result = nullptr;
   if (reverse == false) {
-    result = BinaryOperator::Create(fpop, dstVal, fp_mem_val, "", b);
+    result = llvm::BinaryOperator::Create(fpop, dstVal, fp_mem_val, "", b);
   } else {
-    result = BinaryOperator::Create(fpop, fp_mem_val, dstVal, "", b);
+    result = llvm::BinaryOperator::Create(fpop, fp_mem_val, dstVal, "", b);
   }
 
   // Store result in dstReg.
@@ -597,25 +571,26 @@ static InstTransResult doFiOpMR(NativeInstPtr ip, BasicBlock *&b, unsigned dstRe
 }
 
 template<int width, bool reverse>
-static InstTransResult doFOpMR(NativeInstPtr ip, BasicBlock *&b, unsigned dstReg,
-                               Value *memAddr, unsigned opcode,
+static InstTransResult doFOpMR(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               unsigned dstReg, llvm::Value *memAddr,
+                               unsigned opcode,
                                llvm::Instruction::BinaryOps fpop) {
   // Read register.
-  Value *dstVal = FPUR_READ(b, dstReg);
+  auto dstVal = FPUR_READ(b, dstReg);
 
   // Read memory value.
-  Value *memVal = FPUM_READ(ip, width, b, memAddr);
+  auto memVal = FPUM_READ(ip, width, b, memAddr);
 
   // Extend memory value to be native FPU type.
-  Value *extVal = new FPExtInst(memVal,
-                                llvm::Type::getX86_FP80Ty(b->getContext()), "",
-                                b);
+  auto extVal = new llvm::FPExtInst(memVal,
+                                    llvm::Type::getX86_FP80Ty(b->getContext()),
+                                    "", b);
 
-  Value *result;
-  if (reverse == false) {
-    result = BinaryOperator::Create(fpop, dstVal, extVal, "", b);
+  llvm::Value *result = nullptr;
+  if ( !reverse) {
+    result = llvm::BinaryOperator::Create(fpop, dstVal, extVal, "", b);
   } else {
-    result = BinaryOperator::Create(fpop, extVal, dstVal, "", b);
+    result = llvm::BinaryOperator::Create(fpop, extVal, dstVal, "", b);
   }
 
   // Store result in dstReg.
@@ -626,20 +601,21 @@ static InstTransResult doFOpMR(NativeInstPtr ip, BasicBlock *&b, unsigned dstReg
 }
 
 template<bool reverse>
-static InstTransResult doFOpRR(NativeInstPtr ip, BasicBlock *&b, unsigned srcReg,
-                               unsigned dstReg, unsigned opcode,
+static InstTransResult doFOpRR(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               unsigned srcReg, unsigned dstReg,
+                               unsigned opcode,
                                llvm::Instruction::BinaryOps fpop) {
   // Load source.
-  Value *srcVal = FPUR_READ(b, srcReg);
+  auto srcVal = FPUR_READ(b, srcReg);
 
   // Load destination.
-  Value *dstVal = FPUR_READ(b, dstReg);
+  auto dstVal = FPUR_READ(b, dstReg);
 
-  Value *result;
-  if (reverse == false) {
-    result = BinaryOperator::Create(fpop, srcVal, dstVal, "", b);
+  llvm::Value *result = nullptr;
+  if ( !reverse) {
+    result = llvm::BinaryOperator::Create(fpop, srcVal, dstVal, "", b);
   } else {
-    result = BinaryOperator::Create(fpop, dstVal, srcVal, "", b);
+    result = llvm::BinaryOperator::Create(fpop, dstVal, srcVal, "", b);
   }
 
   // Store result in dstReg.
@@ -653,8 +629,9 @@ static InstTransResult doFOpRR(NativeInstPtr ip, BasicBlock *&b, unsigned srcReg
 }
 
 template<bool reverse>
-static InstTransResult doFOpPRR(NativeInstPtr ip, BasicBlock *&b, unsigned srcReg,
-                                unsigned dstReg, unsigned opcode,
+static InstTransResult doFOpPRR(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                unsigned srcReg, unsigned dstReg,
+                                unsigned opcode,
                                 llvm::Instruction::BinaryOps fpop) {
   // Do the operation.
   doFOpRR<reverse>(ip, b, srcReg, dstReg, opcode, fpop);
@@ -666,11 +643,10 @@ static InstTransResult doFOpPRR(NativeInstPtr ip, BasicBlock *&b, unsigned srcRe
   return ContinueBlock;
 }
 
-static InstTransResult doFldcw(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
-  Value *memPtr = ADDR_TO_POINTER<16>(b, memAddr);
-
-  Value *memVal = M_READ<16>(ip, b, memPtr);
-
+static InstTransResult doFldcw(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               llvm::Value *memAddr) {
+  auto memPtr = ADDR_TO_POINTER<16>(b, memAddr);
+  auto memVal = M_READ<16>(ip, b, memPtr);
   SHR_SET_FLAG<16, 1>(b, memVal, FPU_IM, 0);
   SHR_SET_FLAG<16, 1>(b, memVal, FPU_DM, 1);
   SHR_SET_FLAG<16, 1>(b, memVal, FPU_ZM, 2);
@@ -680,16 +656,15 @@ static InstTransResult doFldcw(NativeInstPtr ip, BasicBlock *&b, Value *memAddr)
   SHR_SET_FLAG<16, 2>(b, memVal, FPU_PC, 8);
   SHR_SET_FLAG<16, 2>(b, memVal, FPU_RC, 10);
   SHR_SET_FLAG<16, 1>(b, memVal, FPU_X, 12);
-
   return ContinueBlock;
 }
 
-static InstTransResult doFstcw(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
-  Value *memPtr = ADDR_TO_POINTER<16>(b, memAddr);
+static InstTransResult doFstcw(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               llvm::Value *memAddr) {
+  auto memPtr = ADDR_TO_POINTER<16>(b, memAddr);
 
   // Pre-clear reserved FPU bits.
-  Value *cw = CONST_V<16>(b, 0x1F7F);
-
+  llvm::Value *cw = CONST_V<16>(b, 0x1F7F);
   cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_IM, 0);
   cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_DM, 1);
   cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_ZM, 2);
@@ -700,20 +675,20 @@ static InstTransResult doFstcw(NativeInstPtr ip, BasicBlock *&b, Value *memAddr)
   cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_RC, 10);
   cw = SHL_NOTXOR_FLAG<16>(b, cw, FPU_X, 12);
 
-  Value *store = noAliasMCSemaScope(new StoreInst(cw, memPtr, b));
+  (void) noAliasMCSemaScope(new llvm::StoreInst(cw, memPtr, b));
 
   return ContinueBlock;
 }
 
-static InstTransResult doFstenv(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
-  llvm::Module *M = b->getParent()->getParent();
+static InstTransResult doFstenv(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                llvm::Value *memAddr) {
+  auto M = b->getParent()->getParent();
   unsigned int bitWidth = ArchPointerSize(M);
 
-  Value *memPtr = ADDR_TO_POINTER<8>(b, memAddr);
+  auto memPtr = ADDR_TO_POINTER<8>(b, memAddr);
 
   // Pre-clear reserved FPU bits.
-  Value *cw = CONST_V<32>(b, 0xFFFF1F7F);
-
+  llvm::Value *cw = CONST_V<32>(b, 0xFFFF1F7F);
   cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_IM, 0);
   cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_DM, 1);
   cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_ZM, 2);
@@ -724,8 +699,7 @@ static InstTransResult doFstenv(NativeInstPtr ip, BasicBlock *&b, Value *memAddr
   cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_RC, 10);
   cw = SHL_NOTXOR_FLAG<32>(b, cw, FPU_X, 12);
 
-  Value *sw = CONST_V<32>(b, 0xFFFFFFFF);
-
+  llvm::Value *sw = CONST_V<32>(b, 0xFFFFFFFF);
   sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_IE, 0);
   sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_DE, 1);
   sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_ZE, 2);
@@ -741,8 +715,7 @@ static InstTransResult doFstenv(NativeInstPtr ip, BasicBlock *&b, Value *memAddr
   sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_C3, 14);
   sw = SHL_NOTXOR_FLAG<32>(b, sw, FPU_B, 15);
 
-  Value *tw = CONST_V<32>(b, 0xFFFFFFFF);
-
+  llvm::Value *tw = CONST_V<32>(b, 0xFFFFFFFF);
   tw = SHL_NOTXOR_V<32>(b, tw, GetFPUTagV(b, CONST_V<32>(b, 0)), 0);
   tw = SHL_NOTXOR_V<32>(b, tw, GetFPUTagV(b, CONST_V<32>(b, 1)), 2);
   tw = SHL_NOTXOR_V<32>(b, tw, GetFPUTagV(b, CONST_V<32>(b, 2)), 4);
@@ -752,16 +725,16 @@ static InstTransResult doFstenv(NativeInstPtr ip, BasicBlock *&b, Value *memAddr
   tw = SHL_NOTXOR_V<32>(b, tw, GetFPUTagV(b, CONST_V<32>(b, 6)), 12);
   tw = SHL_NOTXOR_V<32>(b, tw, GetFPUTagV(b, CONST_V<32>(b, 7)), 14);
 
-  Value *fpu_ip = F_READ(b, FPU_LASTIP_OFF);
-  Value *fpu_seg_op = CONST_V<32>(b, 0x0);
+  auto fpu_ip = F_READ(b, FPU_LASTIP_OFF);
+  llvm::Value *fpu_seg_op = CONST_V<32>(b, 0x0);
   fpu_seg_op = SHL_NOTXOR_V<32>(b, fpu_seg_op, F_READ(b, FPU_LASTIP_SEG), 0);
   fpu_seg_op = SHL_NOTXOR_V<32>(b, fpu_seg_op, F_READ(b, FPU_FOPCODE), 16);
 
-  Value *fpu_dp_o = F_READ(b, FPU_LASTDATA_OFF);
-  Value *fpu_dp_s = CONST_V<32>(b, 0xFFFFFFFF);
+  auto fpu_dp_o = F_READ(b, FPU_LASTDATA_OFF);
+  llvm::Value *fpu_dp_s = CONST_V<32>(b, 0xFFFFFFFF);
   fpu_dp_s = SHL_NOTXOR_V<32>(b, fpu_dp_s, F_READ(b, FPU_LASTDATA_SEG), 0);
-  StructType *fpuenv_t = StructType::create(b->getContext(), "struct.fpuenv");
-  std::vector<Type *> envfields;
+  auto fpuenv_t = llvm::StructType::create(b->getContext(), "struct.fpuenv");
+  std::vector<llvm::Type *> envfields;
   envfields.push_back(Type::getInt32Ty(b->getContext()));
   envfields.push_back(Type::getInt32Ty(b->getContext()));
   envfields.push_back(Type::getInt32Ty(b->getContext()));
@@ -772,9 +745,9 @@ static InstTransResult doFstenv(NativeInstPtr ip, BasicBlock *&b, Value *memAddr
 
   fpuenv_t->setBody(envfields, true);
   //make a pointer type for struct.fpuenv
-  PointerType *ptype = PointerType::get(fpuenv_t, 0);
+  auto ptype = llvm::PointerType::get(fpuenv_t, 0);
   //cast memPtr to a pointer to struct.fpuenv *
-  Value *k = new BitCastInst(memPtr, ptype, "", b);
+  llvm::Value *k = new llvm::BitCastInst(memPtr, ptype, "", b);
   //perform field writes
   SET_STRUCT_MEMBER(k, 0, cw, b);
   SET_STRUCT_MEMBER(k, 1, sw, b);
@@ -788,13 +761,14 @@ static InstTransResult doFstenv(NativeInstPtr ip, BasicBlock *&b, Value *memAddr
 }
 
 template<int width>
-static InstTransResult doFildM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFildM(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               llvm::Value *memAddr) {
   NASSERT(memAddr != NULL);
 
   // Read memory value.
-  Value *memVal = M_READ<width>(ip, b, memAddr);
+  auto memVal = M_READ<width>(ip, b, memAddr);
 
-  Value *fp_mem_val = llvm::CastInst::Create(
+  auto fp_mem_val = llvm::CastInst::Create(
       llvm::Instruction::SIToFP, memVal,
       llvm::Type::getX86_FP80Ty(b->getContext()), "", b);
 
@@ -807,18 +781,19 @@ static InstTransResult doFildM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr)
 }
 
 template<int width>
-static InstTransResult doFldM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFldM(NativeInstPtr ip, llvm::BasicBlock *&b,
+                              llvm::Value *memAddr) {
   NASSERT(memAddr != NULL);
 
   // Step 1: read value from memory.
-  Value *memVal = FPUM_READ(ip, width, b, memAddr);
+  auto memVal = FPUM_READ(ip, width, b, memAddr);
 
   // Step 2: Convert value to x87 double precision FP.
-  llvm::Type *fpuType = llvm::Type::getX86_FP80Ty(b->getContext());
-  Value *fpuVal;
+  auto fpuType = llvm::Type::getX86_FP80Ty(b->getContext());
+  llvm::Value *fpuVal = nullptr;
 
   if ( !memVal->getType()->isX86_FP80Ty()) {
-    fpuVal = new FPExtInst(memVal, fpuType, "", b);
+    fpuVal = new llvm::FPExtInst(memVal, fpuType, "", b);
   } else {
     fpuVal = memVal;
   }
@@ -834,21 +809,23 @@ static InstTransResult doFldM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) 
   return ContinueBlock;
 }
 
-static InstTransResult doFldC(NativeInstPtr ip, BasicBlock *&b, long double constv) {
+static InstTransResult doFldC(NativeInstPtr ip, llvm::BasicBlock *&b,
+                              long double constv) {
 
   // load constant onto FPU stack
-  Value *fp_const = CONSTFP_V(b, constv);
+  auto fp_const = CONSTFP_V(b, constv);
   FPU_PUSHV(b, fp_const);
   return ContinueBlock;
 
 }
 
-static InstTransResult doFldR(NativeInstPtr ip, BasicBlock *&b, const MCOperand &r) {
+static InstTransResult doFldR(NativeInstPtr ip, llvm::BasicBlock *&b,
+                              const llvm::MCOperand &r) {
   // Make sure that this is a register.
   NASSERT(r.isReg());
 
   // Read register.
-  Value *srcVal = FPUR_READ(b, r.getReg());
+  auto srcVal = FPUR_READ(b, r.getReg());
 
   // Push value on stack.
   FPU_PUSHV(b, srcVal);
@@ -858,14 +835,14 @@ static InstTransResult doFldR(NativeInstPtr ip, BasicBlock *&b, const MCOperand 
 }
 
 template<int width>
-static InstTransResult doFistM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFistM(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               llvm::Value *memAddr) {
   NASSERT(memAddr != NULL);
 
-  Value *regVal = FPUR_READ(b, X86::ST0);
-
-  Value *ToInt = llvm::CastInst::Create(llvm::Instruction::FPToSI, regVal,
-                                        Type::getIntNTy(b->getContext(), width),
-                                        "", b);
+  auto regVal = FPUR_READ(b, llvm::X86::ST0);
+  auto ToInt = llvm::CastInst::Create(
+      llvm::Instruction::FPToSI, regVal,
+      llvm::Type::getIntNTy(b->getContext(), width), "", b);
 
   M_WRITE<width>(ip, b, memAddr, ToInt);
 
@@ -874,26 +851,27 @@ static InstTransResult doFistM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr)
 }
 
 template<int width>
-static InstTransResult doFstM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFstM(NativeInstPtr ip, llvm::BasicBlock *&b,
+                              llvm::Value *memAddr) {
   NASSERT(memAddr != NULL);
-
-  Value *regVal = FPUR_READ(b, X86::ST0);
-  llvm::Type *destType;
-  llvm::Type *ptrType;
+  auto &C = b->getContext();
+  auto regVal = FPUR_READ(b, X86::ST0);
+  llvm::Type *destType = nullptr;
+  llvm::Type *ptrType = nullptr;
   unsigned addrspace = ip->get_addr_space();
 
   switch (width) {
     case 32:
-      destType = llvm::Type::getFloatTy(b->getContext());
-      ptrType = llvm::Type::getFloatPtrTy(b->getContext(), addrspace);
+      destType = llvm::Type::getFloatTy(C);
+      ptrType = llvm::Type::getFloatPtrTy(C, addrspace);
       break;
     case 64:
-      destType = llvm::Type::getDoubleTy(b->getContext());
-      ptrType = llvm::Type::getDoublePtrTy(b->getContext(), addrspace);
+      destType = llvm::Type::getDoubleTy(C);
+      ptrType = llvm::Type::getDoublePtrTy(C, addrspace);
       break;
     case 80:
-      //destType = llvm::Type::getX86_FP80Ty(b->getContext());
-      ptrType = llvm::Type::getX86_FP80PtrTy(b->getContext(), addrspace);
+      //destType = llvm::Type::getX86_FP80Ty(C);
+      ptrType = llvm::Type::getX86_FP80PtrTy(C, addrspace);
       break;
     default:
       throw TErr(__LINE__, __FILE__, "Invalid width specified for FST");
@@ -902,7 +880,7 @@ static InstTransResult doFstM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) 
 
   // do not truncate 80-bit to 80-bit, causes a truncation error
   if (width < 80) {
-    Value *trunc = new FPTruncInst(regVal, destType, "", b);
+    auto trunc = new llvm::FPTruncInst(regVal, destType, "", b);
     M_WRITE_T(ip, b, memAddr, trunc, ptrType);
   } else if (width == 80) {
     M_WRITE_T(ip, b, memAddr, regVal, ptrType);
@@ -916,7 +894,8 @@ static InstTransResult doFstM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) 
 }
 
 template<int width>
-static InstTransResult doFstpM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFstpM(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               llvm::Value *memAddr) {
   // Do the FST.
   doFstM<width>(ip, b, memAddr);
 
@@ -930,7 +909,8 @@ static InstTransResult doFstpM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr)
 // TODO: This is like FISTP, but FISTTP does not check rounding mode and
 // always rounds to zero. 
 template<int width>
-static InstTransResult doFistTpM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFistTpM(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                 llvm::Value *memAddr) {
   // Do the FST.
   doFistM<width>(ip, b, memAddr);
 
@@ -942,7 +922,8 @@ static InstTransResult doFistTpM(NativeInstPtr ip, BasicBlock *&b, Value *memAdd
 }
 
 template<int width>
-static InstTransResult doFistpM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doFistpM(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                llvm::Value *memAddr) {
   // Do the FST.
   doFistM<width>(ip, b, memAddr);
 
@@ -953,12 +934,13 @@ static InstTransResult doFistpM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr
   return ContinueBlock;
 }
 
-static InstTransResult doFstR(NativeInstPtr ip, BasicBlock *&b, const MCOperand &r) {
+static InstTransResult doFstR(NativeInstPtr ip, llvm::BasicBlock *&b,
+                              const llvm::MCOperand &r) {
   // Make sure that this is a register.
   NASSERT(r.isReg());
 
   // Read ST0.
-  Value *srcVal = FPUR_READ(b, X86::ST0);
+  auto srcVal = FPUR_READ(b, llvm::X86::ST0);
 
   // Write register.
   FPUR_WRITE(b, r.getReg(), srcVal);
@@ -967,7 +949,8 @@ static InstTransResult doFstR(NativeInstPtr ip, BasicBlock *&b, const MCOperand 
   return ContinueBlock;
 }
 
-static InstTransResult doFstpR(NativeInstPtr ip, BasicBlock *&b, const MCOperand &r) {
+static InstTransResult doFstpR(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               const llvm::MCOperand &r) {
   // Do the FST.
   doFstR(ip, b, r);
 
@@ -978,22 +961,22 @@ static InstTransResult doFstpR(NativeInstPtr ip, BasicBlock *&b, const MCOperand
   return ContinueBlock;
 }
 
-static InstTransResult doFsin(NativeInstPtr ip, BasicBlock *&b, unsigned reg) {
-  Module *M = b->getParent()->getParent();
-
-  Value *regval = FPUR_READ(b, reg);
+static InstTransResult doFsin(NativeInstPtr ip, llvm::BasicBlock *&b,
+                              unsigned reg) {
+  auto M = b->getParent()->getParent();
+  auto regval = FPUR_READ(b, reg);
 
   // get a declaration for llvm.fsin
-  Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
-  Function *fsin_func = Intrinsic::getDeclaration(M, Intrinsic::sin, t);
+  auto t = llvm::Type::getX86_FP80Ty(b->getContext());
+  auto fsin_func = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::sin, t);
 
   NASSERT(fsin_func != NULL);
 
   // call llvm.fsin(reg)
-  std::vector<Value*> args;
+  std::vector<llvm::Value *> args;
   args.push_back(regval);
 
-  Value *fsin_val = CallInst::Create(fsin_func, args, "", b);
+  auto fsin_val = llvm::CallInst::Create(fsin_func, args, "", b);
 
   // store return in reg
   FPUR_WRITE(b, reg, fsin_val);
@@ -1001,20 +984,22 @@ static InstTransResult doFsin(NativeInstPtr ip, BasicBlock *&b, unsigned reg) {
   return ContinueBlock;
 }
 
-static InstTransResult doFucom(NativeInstPtr ip, BasicBlock *&b, unsigned reg,
-                               unsigned int stackPops) {
-  Value *st0_val = FPUR_READ(b, X86::ST0);
-  Value *sti_val = FPUR_READ(b, reg);
+static InstTransResult doFucom(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               unsigned reg, unsigned int stackPops) {
+  auto st0_val = FPUR_READ(b, llvm::X86::ST0);
+  auto sti_val = FPUR_READ(b, reg);
 
   // TODO: Make sure these treat negative zero and positive zero
   // as the same value.
-  Value *is_lt = new FCmpInst( *b, FCmpInst::FCMP_ULT, st0_val, sti_val);
-  Value *is_eq = new FCmpInst( *b, FCmpInst::FCMP_UEQ, st0_val, sti_val);
+  auto is_lt = new llvm::FCmpInst( *b, llvm::FCmpInst::FCMP_ULT, st0_val,
+                                  sti_val);
+  auto is_eq = new llvm::FCmpInst( *b, llvm::FCmpInst::FCMP_UEQ, st0_val,
+                                  sti_val);
 
   // if BOTH the equql AND less than is true
   // it means that one of the ops is a QNaN
 
-  Value *lt_and_eq = BinaryOperator::CreateAnd(is_lt, is_eq, "", b);
+  auto lt_and_eq = llvm::BinaryOperator::CreateAnd(is_lt, is_eq, "", b);
 
   F_WRITE(b, FPU_C0, is_lt);        // C0 is 1 if either is QNaN or op1 < op2
   F_WRITE(b, FPU_C3, is_eq);        // C3 is 1 if either is QNaN or op1 == op2
@@ -1028,20 +1013,22 @@ static InstTransResult doFucom(NativeInstPtr ip, BasicBlock *&b, unsigned reg,
   return ContinueBlock;
 }
 
-static InstTransResult doFucomi(NativeInstPtr ip, BasicBlock *&b, unsigned reg,
-                                unsigned int stackPops) {
-  Value *st0_val = FPUR_READ(b, X86::ST0);
-  Value *sti_val = FPUR_READ(b, reg);
+static InstTransResult doFucomi(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                unsigned reg, unsigned int stackPops) {
+  auto st0_val = FPUR_READ(b, llvm::X86::ST0);
+  auto sti_val = FPUR_READ(b, reg);
 
   // TODO: Make sure these treat negative zero and positive zero
   // as the same value.
-  Value *is_lt = new FCmpInst( *b, FCmpInst::FCMP_ULT, st0_val, sti_val);
-  Value *is_eq = new FCmpInst( *b, FCmpInst::FCMP_UEQ, st0_val, sti_val);
+  auto is_lt = new llvm::FCmpInst( *b, llvm::FCmpInst::FCMP_ULT, st0_val,
+                                  sti_val);
+  auto is_eq = new llvm::FCmpInst( *b, llvm::FCmpInst::FCMP_UEQ, st0_val,
+                                  sti_val);
 
   // if BOTH the equql AND less than is true
   // it means that one of the ops is a QNaN
 
-  Value *lt_and_eq = BinaryOperator::CreateAnd(is_lt, is_eq, "", b);
+  auto lt_and_eq = llvm::BinaryOperator::CreateAnd(is_lt, is_eq, "", b);
 
   F_WRITE(b, CF, is_lt);        // C0 is 1 if either is QNaN or op1 < op2
   F_WRITE(b, ZF, is_eq);        // C3 is 1 if either is QNaN or op1 == op2
@@ -1055,10 +1042,8 @@ static InstTransResult doFucomi(NativeInstPtr ip, BasicBlock *&b, unsigned reg,
   return ContinueBlock;
 }
 
-static Value* doFstsV(BasicBlock *&b) {
-
-  Value *sw = CONST_V<16>(b, 0xFFFF);
-
+static llvm::Value *doFstsV(llvm::BasicBlock *&b) {
+  llvm::Value *sw = CONST_V<16>(b, 0xFFFF);
   sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_IE, 0);
   sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_DE, 1);
   sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_ZE, 2);
@@ -1073,182 +1058,168 @@ static Value* doFstsV(BasicBlock *&b) {
   sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_TOP, 11);
   sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_C3, 14);
   sw = SHL_NOTXOR_FLAG<16>(b, sw, FPU_B, 15);
-
   return sw;
 }
 
-static InstTransResult doFstswm(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
-  Value *memPtr = ADDR_TO_POINTER<16>(b, memAddr);
-
-  Value *status_word = doFstsV(b);
-
+static InstTransResult doFstswm(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                llvm::Value *memAddr) {
+  auto memPtr = ADDR_TO_POINTER<16>(b, memAddr);
+  auto status_word = doFstsV(b);
   M_WRITE<16>(ip, b, memPtr, status_word);
-
   return ContinueBlock;
 }
 
-static InstTransResult doFstswr(NativeInstPtr ip, BasicBlock *&b) {
-  Value *status_word = doFstsV(b);
-
-  R_WRITE<16>(b, X86::AX, status_word);
-
+static InstTransResult doFstswr(NativeInstPtr ip, llvm::BasicBlock *&b) {
+  auto status_word = doFstsV(b);
+  R_WRITE<16>(b, llvm::X86::AX, status_word);
   return ContinueBlock;
 }
 
-static InstTransResult doFxch(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
+static InstTransResult doFxch(llvm::MCInst &inst, NativeInstPtr ip,
+                              llvm::BasicBlock *&b) {
   // Check num operands.
   // No operands implies ST1
-  unsigned src_reg = X86::ST1;
+  unsigned src_reg = llvm::X86::ST1;
   if (inst.getNumOperands() > 0) {
     src_reg = inst.getOperand(0).getReg();
   }
-
-  Value *src_val = FPUR_READ(b, src_reg);
-  Value *st0_val = FPUR_READ(b, X86::ST0);
-
-  FPUR_WRITE(b, X86::ST0, src_val);
+  auto src_val = FPUR_READ(b, src_reg);
+  auto st0_val = FPUR_READ(b, llvm::X86::ST0);
+  FPUR_WRITE(b, llvm::X86::ST0, src_val);
   FPUR_WRITE(b, src_reg, st0_val);
 
   return ContinueBlock;
 }
 
-static InstTransResult doF2XM1(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
+static InstTransResult doF2XM1(llvm::MCInst &inst, NativeInstPtr ip,
+                               llvm::BasicBlock *&b) {
 
   /*
    * Computes (2**st0)-1 and stores in ST0
    */
 
-  Value *st0_val = FPUR_READ(b, X86::ST0);
-
-  Module *M = b->getParent()->getParent();
-
-  Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
-  Function *exp_func = Intrinsic::getDeclaration(M, Intrinsic::exp2, t);
+  auto st0_val = FPUR_READ(b, llvm::X86::ST0);
+  auto M = b->getParent()->getParent();
+  auto t = llvm::Type::getX86_FP80Ty(b->getContext());
+  auto exp_func = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::exp2, t);
   NASSERT(exp_func != nullptr);
 
-  std::vector<Value*> args;
+  std::vector<llvm::Value *> args;
 
   args.push_back(st0_val);
 
-  Value *exp2_val = CallInst::Create(exp_func, args, "", b);
-
-  Value *one = CONSTFP_V(b, 1.0);
-
-  Value *exp2_m_1 = BinaryOperator::Create(llvm::Instruction::FSub, exp2_val,
-                                           one, "", b);
+  auto exp2_val = llvm::CallInst::Create(exp_func, args, "", b);
+  auto one = CONSTFP_V(b, 1.0);
+  auto exp2_m_1 = llvm::BinaryOperator::Create(llvm::Instruction::FSub,
+                                               exp2_val, one, "", b);
 
   // store return in reg
-  FPUR_WRITE(b, X86::ST0, exp2_m_1);
+  FPUR_WRITE(b, llvm::X86::ST0, exp2_m_1);
 
   return ContinueBlock;
 }
 
-static InstTransResult doFSCALE(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
+static InstTransResult doFSCALE(llvm::MCInst &inst, NativeInstPtr ip,
+                                llvm::BasicBlock *&b) {
 
   /*
    * st0 = st0 * (2 ** RoundToZero(st1))
    */
 
-  Module *M = b->getParent()->getParent();
-
-  Value *st0_val = FPUR_READ(b, X86::ST0);
-  Value *st1_val = FPUR_READ(b, X86::ST0);
-
-  Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
-
-  Function *exp_func = Intrinsic::getDeclaration(M, Intrinsic::exp2, t);
-
-  Function *trunc_func = Intrinsic::getDeclaration(M, Intrinsic::trunc, t);
+  auto M = b->getParent()->getParent();
+  auto st0_val = FPUR_READ(b, X86::ST0);
+  auto st1_val = FPUR_READ(b, X86::ST0);
+  auto t = llvm::Type::getX86_FP80Ty(b->getContext());
+  auto exp_func = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::exp2, t);
+  auto trunc_func = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::trunc,
+                                                    t);
 
   NASSERT(exp_func != nullptr);
   NASSERT(trunc_func != nullptr);
 
   // round st1 to zero
-  std::vector<Value*> args;
+  std::vector<llvm::Value *> args;
   args.push_back(st1_val);
-  Value *trunc_st1_val = CallInst::Create(trunc_func, args, "", b);
+  auto trunc_st1_val = llvm::CallInst::Create(trunc_func, args, "", b);
 
   // calculate 2^st1
-  std::vector<Value*> exp_args;
+  std::vector<llvm::Value *> exp_args;
   exp_args.push_back(trunc_st1_val);
-  Value *exp2_val = CallInst::Create(exp_func, exp_args, "", b);
+  auto exp2_val = llvm::CallInst::Create(exp_func, exp_args, "", b);
 
   // st0 * 2*st1
-  Value *scaled_val = BinaryOperator::Create(llvm::Instruction::FMul, st0_val,
-                                             exp2_val, "", b);
+  auto scaled_val = llvm::BinaryOperator::Create(llvm::Instruction::FMul,
+                                                 st0_val, exp2_val, "", b);
 
   // store return in reg
-  FPUR_WRITE(b, X86::ST0, scaled_val);
+  FPUR_WRITE(b, llvm::X86::ST0, scaled_val);
 
   return ContinueBlock;
 }
 
 template<bool p>
-static InstTransResult doFYL2Xx(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
+static InstTransResult doFYL2Xx(llvm::MCInst &inst, NativeInstPtr ip,
+                                llvm::BasicBlock *&b) {
 
   /*
    * Computes (ST(1) ∗ log2(ST(0))), stores the result in ST(1), and pops the x87 register stack. The value
    * in ST(0) must be greater than zero.
    * If the zero-divide-exception mask (ZM) bit in the x87 control word is set to 1 and ST(0) contains ±zero, the instruction returns ∞ with the opposite sign of the value in register ST(1).
    */
-
-  Value *st0_val = FPUR_READ(b, X86::ST0);
-  Value *st1_val = FPUR_READ(b, X86::ST1);
-
-  Module *M = b->getParent()->getParent();
-  Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
-  Function *flog2_func = Intrinsic::getDeclaration(M, Intrinsic::log2, t);
+  auto st0_val = FPUR_READ(b, llvm::X86::ST0);
+  auto st1_val = FPUR_READ(b, llvm::X86::ST1);
+  auto M = b->getParent()->getParent();
+  auto t = llvm::Type::getX86_FP80Ty(b->getContext());
+  auto flog2_func = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::log2,
+                                                    t);
 
   NASSERT(flog2_func != NULL);
 
-  std::vector<Value*> args;
+  std::vector<llvm::Value *> args;
 
-  if (p)  // FYLX2P1 case
-  {
-    llvm::Constant *one = llvm::ConstantFP::get(
-        llvm::Type::getX86_FP80Ty(b->getContext()), 1.0);
+  if (p) {  // FYLX2P1 case
+    auto one = llvm::ConstantFP::get(llvm::Type::getX86_FP80Ty(b->getContext()),
+                                     1.0);
 
-    Value *st0_plus_one = BinaryOperator::Create(llvm::Instruction::FAdd,
-                                                 st0_val, one, "", b);
+    auto st0_plus_one = llvm::BinaryOperator::Create(llvm::Instruction::FAdd,
+                                                     st0_val, one, "", b);
     args.push_back(st0_plus_one);
   } else {
     args.push_back(st0_val);
   }
 
-  Value *flog2_val = CallInst::Create(flog2_func, args, "", b);
-
-  Value *result = BinaryOperator::Create(llvm::Instruction::FMul, flog2_val,
-                                         st1_val, "", b);
+  auto flog2_val = llvm::CallInst::Create(flog2_func, args, "", b);
+  auto result = llvm::BinaryOperator::Create(llvm::Instruction::FMul, flog2_val,
+                                             st1_val, "", b);
 
   // store return in reg
-  FPUR_WRITE(b, X86::ST1, result);
-
+  FPUR_WRITE(b, llvm::X86::ST1, result);
   FPU_POP(b);
-
   return ContinueBlock;
 }
 
-static InstTransResult doFRNDINT(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
-  Module *M = b->getParent()->getParent();
-
-  Value *regVal = FPUR_READ(b, X86::ST0);
-  Type *fpTy = llvm::Type::getX86_FP80Ty(b->getContext());
+static InstTransResult doFRNDINT(llvm::MCInst &inst, NativeInstPtr ip,
+                                 llvm::BasicBlock *&b) {
+  auto M = b->getParent()->getParent();
+  auto regVal = FPUR_READ(b, llvm::X86::ST0);
+  auto fpTy = llvm::Type::getX86_FP80Ty(b->getContext());
 
   // get our intrinsics
   /// nearest
-  Function *round_nearest = Intrinsic::getDeclaration(M, Intrinsic::nearbyint,
-                                                      fpTy);
-  NASSERT(round_nearest != NULL);
+  auto round_nearest = llvm::Intrinsic::getDeclaration(
+      M, llvm::Intrinsic::nearbyint, fpTy);
+
   // round will round away from zero
-  Function *round_down = Intrinsic::getDeclaration(M, Intrinsic::round, fpTy);
-  NASSERT(round_down != NULL);
+  auto round_down = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::round,
+                                                    fpTy);
+
   // round will round away from zero
-  Function *round_up = Intrinsic::getDeclaration(M, Intrinsic::round, fpTy);
-  NASSERT(round_up != NULL);
+  auto round_up = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::round,
+                                                  fpTy);
+
   // truncate
-  //
-  Function *round_zero = Intrinsic::getDeclaration(M, Intrinsic::trunc, fpTy);
-  NASSERT(round_zero != NULL);
+  auto round_zero = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::trunc,
+                                                    fpTy);
 
   CREATE_BLOCK(nearest, b);
   CREATE_BLOCK(down, b);
@@ -1257,31 +1228,32 @@ static InstTransResult doFRNDINT(MCInst &inst, NativeInstPtr ip, BasicBlock *&b)
   CREATE_BLOCK(finished, b);
 
   // switch on Rounding control
-  Value *rc = F_READ(b, FPU_RC);
-  SwitchInst *rcSwitch = SwitchInst::Create(rc, block_nearest, 4, b);
+  auto rc = F_READ(b, FPU_RC);
+  auto rcSwitch = llvm::SwitchInst::Create(rc, block_nearest, 4, b);
   rcSwitch->addCase(CONST_V<2>(b, 0), block_nearest);
   rcSwitch->addCase(CONST_V<2>(b, 1), block_down);
   rcSwitch->addCase(CONST_V<2>(b, 2), block_up);
   rcSwitch->addCase(CONST_V<2>(b, 3), block_zero);
 
-  std::vector<Value*> args;
+  std::vector<llvm::Value *> args;
   args.push_back(regVal);
 
-  Value *nearest_val = CallInst::Create(round_nearest, args, "", block_nearest);
-  BranchInst::Create(block_finished, block_nearest);
+  auto nearest_val = llvm::CallInst::Create(round_nearest, args, "",
+                                            block_nearest);
+  llvm::BranchInst::Create(block_finished, block_nearest);
 
-  Value *down_val = CallInst::Create(round_down, args, "", block_down);
-  BranchInst::Create(block_finished, block_down);
+  auto down_val = llvm::CallInst::Create(round_down, args, "", block_down);
+  llvm::BranchInst::Create(block_finished, block_down);
 
-  Value *up_val = CallInst::Create(round_up, args, "", block_up);
-  BranchInst::Create(block_finished, block_up);
+  auto up_val = llvm::CallInst::Create(round_up, args, "", block_up);
+  llvm::BranchInst::Create(block_finished, block_up);
 
-  Value *zero_val = CallInst::Create(round_zero, args, "", block_zero);
-  BranchInst::Create(block_finished, block_zero);
+  auto zero_val = llvm::CallInst::Create(round_zero, args, "", block_zero);
+  llvm::BranchInst::Create(block_finished, block_zero);
 
   // adjust to whichever branch we did
-  PHINode *roundedVal = PHINode::Create(
-      Type::getX86_FP80Ty(block_finished->getContext()), 4, "fpu_round",
+  auto roundedVal = llvm::PHINode::Create(
+      llvm::Type::getX86_FP80Ty(block_finished->getContext()), 4, "fpu_round",
       block_finished);
 
   roundedVal->addIncoming(nearest_val, block_nearest);
@@ -1292,70 +1264,58 @@ static InstTransResult doFRNDINT(MCInst &inst, NativeInstPtr ip, BasicBlock *&b)
   b = block_finished;
 
   // write it back
-  FPUR_WRITE(b, X86::ST0, roundedVal);
+  FPUR_WRITE(b, llvm::X86::ST0, roundedVal);
 
   return ContinueBlock;
 }
 
-static InstTransResult doFABS(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
+static InstTransResult doFABS(llvm::MCInst &inst, NativeInstPtr ip,
+                              llvm::BasicBlock *&b) {
 
-  Value *st0_val = FPUR_READ(b, X86::ST0);
-
-  Module *M = b->getParent()->getParent();
-  Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
-  Function *func = Intrinsic::getDeclaration(M, Intrinsic::fabs, t);
-
-  NASSERT(func != NULL);
-
-  std::vector<Value*> args;
+  auto st0_val = FPUR_READ(b, llvm::X86::ST0);
+  auto M = b->getParent()->getParent();
+  auto t = llvm::Type::getX86_FP80Ty(b->getContext());
+  auto func = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::fabs, t);
+  std::vector<llvm::Value *> args;
   args.push_back(st0_val);
-
-  Value *result = CallInst::Create(func, args, "", b);
+  auto result = llvm::CallInst::Create(func, args, "", b);
 
   // store return in reg
-  FPUR_WRITE(b, X86::ST0, result);
+  FPUR_WRITE(b, llvm::X86::ST0, result);
 
   return ContinueBlock;
 }
 
-static InstTransResult doFSQRT(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
-
-  Value *st0_val = FPUR_READ(b, X86::ST0);
-
-  Module *M = b->getParent()->getParent();
-  Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
-  Function *func = Intrinsic::getDeclaration(M, Intrinsic::sqrt, t);
-
-  NASSERT(func != NULL);
-
-  std::vector<Value*> args;
+static InstTransResult doFSQRT(llvm::MCInst &inst, NativeInstPtr ip,
+                               llvm::BasicBlock *&b) {
+  auto st0_val = FPUR_READ(b, llvm::X86::ST0);
+  auto M = b->getParent()->getParent();
+  auto t = llvm::Type::getX86_FP80Ty(b->getContext());
+  auto func = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::sqrt, t);
+  std::vector<llvm::Value *> args;
   args.push_back(st0_val);
 
-  Value *result = CallInst::Create(func, args, "", b);
+  auto result = llvm::CallInst::Create(func, args, "", b);
 
   // store return in reg
-  FPUR_WRITE(b, X86::ST0, result);
+  FPUR_WRITE(b, llvm::X86::ST0, result);
 
   return ContinueBlock;
 }
 
-static InstTransResult doFCOS(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
-
-  Value *st0_val = FPUR_READ(b, X86::ST0);
-
-  Module *M = b->getParent()->getParent();
-  Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
-  Function *func = Intrinsic::getDeclaration(M, Intrinsic::cos, t);
-
-  NASSERT(func != NULL);
-
-  std::vector<Value*> args;
+static InstTransResult doFCOS(llvm::MCInst &inst, NativeInstPtr ip,
+                              llvm::BasicBlock *&b) {
+  auto st0_val = FPUR_READ(b, llvm::X86::ST0);
+  auto M = b->getParent()->getParent();
+  auto t = llvm::Type::getX86_FP80Ty(b->getContext());
+  auto func = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::cos, t);
+  std::vector<llvm::Value *> args;
   args.push_back(st0_val);
 
-  Value *result = CallInst::Create(func, args, "", b);
+  auto result = llvm::CallInst::Create(func, args, "", b);
 
   // store return in reg
-  FPUR_WRITE(b, X86::ST0, result);
+  FPUR_WRITE(b, llvm::X86::ST0, result);
 
   /* XXX: If the radian value lies outside the valid range of –263
    *  to +263 radians, the instruction sets the C2 flag in the x87
@@ -1365,7 +1325,8 @@ static InstTransResult doFCOS(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
 
   return ContinueBlock;
 }
-static InstTransResult doFSINCOS(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
+static InstTransResult doFSINCOS(llvm::MCInst &inst, NativeInstPtr ip,
+                                 llvm::BasicBlock *&b) {
 
   /*
    * Computes the sine and cosine of the value in ST(0), stores the sine in ST(0),
@@ -1373,29 +1334,25 @@ static InstTransResult doFSINCOS(MCInst &inst, NativeInstPtr ip, BasicBlock *&b)
    *   in the range –263 to +263 radians.
    */
 
-  Value *st0_val = FPUR_READ(b, X86::ST0);
+  auto st0_val = FPUR_READ(b, llvm::X86::ST0);
 
-  Module *M = b->getParent()->getParent();
-  Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
-
-  Function *sin = Intrinsic::getDeclaration(M, Intrinsic::sin, t);
-  Function *cos = Intrinsic::getDeclaration(M, Intrinsic::cos, t);
-
-  NASSERT(sin != NULL);
-  NASSERT(cos != NULL);
+  auto M = b->getParent()->getParent();
+  auto t = llvm::Type::getX86_FP80Ty(b->getContext());
+  auto sin = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::sin, t);
+  auto cos = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::cos, t);
 
   // Compute the sin of st(0)
-  std::vector<Value*> args;
+  std::vector<llvm::Value *> args;
   args.push_back(st0_val);
-  Value *sin_result = CallInst::Create(sin, args, "", b);
+  auto sin_result = llvm::CallInst::Create(sin, args, "", b);
 
   // store the result of the sin call back into st(0)
-  FPUR_WRITE(b, X86::ST0, sin_result);
+  FPUR_WRITE(b, llvm::X86::ST0, sin_result);
 
   // Compute the cos of st(0)
   args.clear();
   args.push_back(st0_val);
-  Value *cos_result = CallInst::Create(cos, args, "", b);
+  auto cos_result = llvm::CallInst::Create(cos, args, "", b);
 
   // Push the result of the cos on the register stack
   FPU_PUSHV(b, cos_result);
@@ -1403,87 +1360,90 @@ static InstTransResult doFSINCOS(MCInst &inst, NativeInstPtr ip, BasicBlock *&b)
   return ContinueBlock;
 }
 
-static InstTransResult doFINCSTP(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
-
+static InstTransResult doFINCSTP(llvm::MCInst &inst, NativeInstPtr ip,
+                                 llvm::BasicBlock *&b) {
   INCREMENT_FPU_TOP(b);
-
   return ContinueBlock;
 }
 
-static InstTransResult doFDECSTP(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
-
+static InstTransResult doFDECSTP(llvm::MCInst &inst, NativeInstPtr ip,
+                                 llvm::BasicBlock *&b) {
   DECREMENT_FPU_TOP(b);
-
   return ContinueBlock;
 }
 
-static InstTransResult doFPTAN(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
-  Module *M = b->getParent()->getParent();
-  Type *t = llvm::Type::getX86_FP80Ty(b->getContext());
-  Function *sin = Intrinsic::getDeclaration(M, Intrinsic::sin, t);
-  Function *cos = Intrinsic::getDeclaration(M, Intrinsic::cos, t);
-
-  NASSERT(sin != NULL);
-  NASSERT(cos != NULL);
-
-  Value *st0_val = FPUR_READ(b, X86::ST0);
+static InstTransResult doFPTAN(llvm::MCInst &inst, NativeInstPtr ip,
+                               llvm::BasicBlock *&b) {
+  auto M = b->getParent()->getParent();
+  auto t = llvm::Type::getX86_FP80Ty(b->getContext());
+  auto sin = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::sin, t);
+  auto cos = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::cos, t);
+  auto st0_val = FPUR_READ(b, llvm::X86::ST0);
 
   // Compute the sin of st(0)
-  std::vector<Value*> args;
+  std::vector<llvm::Value *> args;
   args.push_back(st0_val);
-  Value *sin_result = CallInst::Create(sin, args, "", b);
+  auto sin_result = llvm::CallInst::Create(sin, args, "", b);
 
   // Compute the cos of st(0)
   args.clear();
   args.push_back(st0_val);
-  Value *cos_result = CallInst::Create(cos, args, "", b);
+  auto cos_result = llvm::CallInst::Create(cos, args, "", b);
 
   // tan = sin/cos
 
-  Value *tan_result = BinaryOperator::Create(llvm::Instruction::FDiv,
-                                             sin_result, cos_result, "", b);
+  auto tan_result = llvm::BinaryOperator::Create(llvm::Instruction::FDiv,
+                                                 sin_result, cos_result, "", b);
 
-  FPUR_WRITE(b, X86::ST0, tan_result);
-  Value *one = CONSTFP_V(b, 1.0);
+  FPUR_WRITE(b, llvm::X86::ST0, tan_result);
+  auto one = CONSTFP_V(b, 1.0);
   FPU_PUSHV(b, one);
   return ContinueBlock;
 }
 
-static InstTransResult doCHS(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
-  Value *st0_val = FPUR_READ(b, X86::ST0);
-
-  Value *negone = CONSTFP_V(b, -1.0);
-  Value *signchange = BinaryOperator::Create(llvm::Instruction::FMul, st0_val,
-                                             negone, "", b);
-
-  FPUR_WRITE(b, X86::ST0, signchange);
+static InstTransResult doCHS(llvm::MCInst &inst, NativeInstPtr ip,
+                             llvm::BasicBlock *&b) {
+  auto st0_val = FPUR_READ(b, llvm::X86::ST0);
+  auto negone = CONSTFP_V(b, -1.0);
+  auto signchange = BinaryOperator::Create(llvm::Instruction::FMul, st0_val,
+                                           negone, "", b);
+  FPUR_WRITE(b, llvm::X86::ST0, signchange);
   return ContinueBlock;
 }
 
 //mem_src =  IMM_AS_DATA_REF(block, natM, ip);
-#define FPU_TRANSLATION(NAME, SETPTR, SETDATA, SETFOPCODE, ACCESSMEM, THECALL) static InstTransResult translate_ ## NAME (TranslationContext &ctx, BasicBlock *&block)\
-{   auto natM = ctx.natM; \
-    Function *F = ctx.F; \
-    auto ip = ctx.natI; \
-    auto &inst = ip->get_inst(); \
-    InstTransResult ret;\
-    block = createNewFpuBlock(block, #NAME);\
-    Function *F = block->getParent();\
-    Value *mem_src = NULL;\
-    if (ACCESSMEM) {\
-        if( ip->has_mem_reference ) {\
-            mem_src =  MEM_REFERENCE(0);\
-            if (SETDATA) { setFpuDataPtr(block, mem_src); }\
+#define FPU_TRANSLATION(NAME, SETPTR, SETDATA, SETFOPCODE, ACCESSMEM, THECALL) \
+    static InstTransResult translate_ ## NAME (TranslationContext &ctx, \
+                                               llvm::BasicBlock *&block) { \
+      auto natM = ctx.natM; \
+      auto F = ctx.F; \
+      auto ip = ctx.natI; \
+      auto &inst = ip->get_inst(); \
+      InstTransResult ret;\
+      block = createNewFpuBlock(block, #NAME);\
+      Value *mem_src = NULL;\
+      if (ACCESSMEM) {\
+        if(ip->has_mem_reference) {\
+          mem_src =  MEM_REFERENCE(0);\
+          if (SETDATA) { \
+            setFpuDataPtr(block, mem_src); \
+          }\
         } else {\
-            mem_src = ADDR_NOREF(0);\
-            if (SETDATA) { setFpuDataPtr(block, mem_src); }\
+          mem_src = ADDR_NOREF(0);\
+          if (SETDATA) { \
+            setFpuDataPtr(block, mem_src); \
+          }\
         }\
-    }\
-    if (SETPTR) { setFpuInstPtr(block); }\
-    ret = THECALL;\
-    if (SETFOPCODE) { SET_FPU_FOPCODE(block, inst.native_opcode); }\
-    return ret;\
-}
+      }\
+      if (SETPTR) { \
+        setFpuInstPtr(block); \
+      }\
+      ret = THECALL;\
+      if (SETFOPCODE) { \
+        SET_FPU_FOPCODE(block, inst.native_opcode); \
+      }\
+      return ret;\
+    }
 
 /***************************
  ***************************
@@ -1500,8 +1460,8 @@ static InstTransResult doCHS(MCInst &inst, NativeInstPtr ip, BasicBlock *&b) {
 
  *** for *DIV* instructions, reverse is the OPPOSITE of normal, since *DIV*
  instructions have an operand order opposite of other instructions ***
- ** EXCEPT for those that use memory operands. Since there is no write to memory,
- the order stays the same. Yes, this is confusing.**
+ ** EXCEPT for those that use memory operands. Since there is no write to
+ memory, the order stays the same. Yes, this is confusing.**
 
 
  ***************************
@@ -1514,7 +1474,7 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFOpMR<32, false>(ip, block, X86::ST0, mem_src, X86::ADD_F32m,
+    (doFOpMR<32, false>(ip, block, llvm::X86::ST0, mem_src, llvm::X86::ADD_F32m,
                         llvm::Instruction::FAdd)))
 FPU_TRANSLATION(
     ADD_F64m,
@@ -1522,7 +1482,7 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFOpMR<64, false>(ip, block, X86::ST0, mem_src, X86::ADD_F64m,
+    (doFOpMR<64, false>(ip, block, llvm::X86::ST0, mem_src, llvm::X86::ADD_F64m,
                         llvm::Instruction::FAdd)))
 FPU_TRANSLATION(
     ADD_FI16m,
@@ -1530,44 +1490,47 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFiOpMR<16, false>(ip, block, X86::ST0, mem_src, X86::ADD_FI16m,
-                         llvm::Instruction::FAdd)))
+    (doFiOpMR<16, false>(ip, block, llvm::X86::ST0, mem_src,
+                         llvm::X86::ADD_FI16m, llvm::Instruction::FAdd)))
 FPU_TRANSLATION(
     ADD_FI32m,
     true,
     true,
     true,
     true,
-    (doFiOpMR<32, false>(ip, block, X86::ST0, mem_src, X86::ADD_FI32m,
-                         llvm::Instruction::FAdd)))
+    (doFiOpMR<32, false>(ip, block, llvm::X86::ST0, mem_src,
+                         llvm::X86::ADD_FI32m, llvm::Instruction::FAdd)))
 FPU_TRANSLATION(
     ADD_FPrST0,
     true,
     false,
     true,
     false,
-    doFOpPRR<false>(ip, block, X86::ST0, OP(0).getReg(), X86::ADD_FPrST0, llvm::Instruction::FAdd))
+    doFOpPRR<false>(ip, block, llvm::X86::ST0, OP(0).getReg(),
+                    llvm::X86::ADD_FPrST0, llvm::Instruction::FAdd))
 FPU_TRANSLATION(
     ADD_FST0r,
     true,
     false,
     true,
     false,
-    doFOpRR<false>(ip, block, OP(0).getReg(), X86::ST0, X86::ADD_FST0r, llvm::Instruction::FAdd))
+    doFOpRR<false>(ip, block, OP(0).getReg(), llvm::X86::ST0,
+                   llvm::X86::ADD_FST0r, llvm::Instruction::FAdd))
 FPU_TRANSLATION(
     ADD_FrST0,
     true,
     false,
     true,
     false,
-    doFOpRR<false>(ip, block, X86::ST0, OP(0).getReg(), X86::ADD_FrST0, llvm::Instruction::FAdd))
+    doFOpRR<false>(ip, block, llvm::X86::ST0, OP(0).getReg(),
+                   llvm::X86::ADD_FrST0, llvm::Instruction::FAdd))
 FPU_TRANSLATION(
     DIVR_F32m,
     true,
     true,
     true,
     true,
-    (doFOpMR<32, true>(ip, block, X86::ST0, mem_src, X86::DIVR_F32m,
+    (doFOpMR<32, true>(ip, block, llvm::X86::ST0, mem_src, llvm::X86::DIVR_F32m,
                        llvm::Instruction::FDiv)))
 FPU_TRANSLATION(
     DIVR_F64m,
@@ -1575,7 +1538,7 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFOpMR<64, true>(ip, block, X86::ST0, mem_src, X86::DIVR_F64m,
+    (doFOpMR<64, true>(ip, block, llvm::X86::ST0, mem_src, llvm::X86::DIVR_F64m,
                        llvm::Instruction::FDiv)))
 FPU_TRANSLATION(
     DIVR_FI16m,
@@ -1583,44 +1546,47 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFiOpMR<16, true>(ip, block, X86::ST0, mem_src, X86::DIVR_FI16m,
-                        llvm::Instruction::FDiv)))
+    (doFiOpMR<16, true>(ip, block, llvm::X86::ST0, mem_src,
+                        llvm::X86::DIVR_FI16m, llvm::Instruction::FDiv)))
 FPU_TRANSLATION(
     DIVR_FI32m,
     true,
     true,
     true,
     true,
-    (doFiOpMR<32, true>(ip, block, X86::ST0, mem_src, X86::DIVR_FI32m,
-                        llvm::Instruction::FDiv)))
+    (doFiOpMR<32, true>(ip, block, llvm::X86::ST0, mem_src,
+                        llvm::X86::DIVR_FI32m, llvm::Instruction::FDiv)))
 FPU_TRANSLATION(
     DIVR_FPrST0,
     true,
     false,
     true,
     false,
-    doFOpPRR<false>(ip, block, X86::ST0, OP(0).getReg(), X86::DIVR_FPrST0, llvm::Instruction::FDiv))
+    doFOpPRR<false>(ip, block, llvm::X86::ST0, OP(0).getReg(),
+                    llvm::X86::DIVR_FPrST0, llvm::Instruction::FDiv))
 FPU_TRANSLATION(
     DIVR_FST0r,
     true,
     false,
     true,
     false,
-    doFOpRR<false>(ip, block, OP(0).getReg(), X86::ST0, X86::DIVR_FST0r, llvm::Instruction::FDiv))
+    doFOpRR<false>(ip, block, OP(0).getReg(), llvm::X86::ST0,
+                   llvm::X86::DIVR_FST0r, llvm::Instruction::FDiv))
 FPU_TRANSLATION(
     DIVR_FrST0,
     true,
     false,
     true,
     false,
-    doFOpRR<false>(ip, block, X86::ST0, OP(0).getReg(), X86::DIVR_FrST0, llvm::Instruction::FDiv))
+    doFOpRR<false>(ip, block, llvm::X86::ST0, OP(0).getReg(),
+                   llvm::X86::DIVR_FrST0, llvm::Instruction::FDiv))
 FPU_TRANSLATION(
     DIV_F32m,
     true,
     true,
     true,
     true,
-    (doFOpMR<32, false>(ip, block, X86::ST0, mem_src, X86::DIV_F32m,
+    (doFOpMR<32, false>(ip, block, llvm::X86::ST0, mem_src, llvm::X86::DIV_F32m,
                         llvm::Instruction::FDiv)))
 FPU_TRANSLATION(
     DIV_F64m,
@@ -1628,7 +1594,7 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFOpMR<64, false>(ip, block, X86::ST0, mem_src, X86::DIV_F64m,
+    (doFOpMR<64, false>(ip, block, llvm::X86::ST0, mem_src, llvm::X86::DIV_F64m,
                         llvm::Instruction::FDiv)))
 FPU_TRANSLATION(
     DIV_FI16m,
@@ -1636,37 +1602,39 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFiOpMR<16, false>(ip, block, X86::ST0, mem_src, X86::DIV_FI16m,
-                         llvm::Instruction::FDiv)))
+    (doFiOpMR<16, false>(ip, block, llvm::X86::ST0, mem_src,
+                         llvm::X86::DIV_FI16m, llvm::Instruction::FDiv)))
 FPU_TRANSLATION(
     DIV_FI32m,
     true,
     true,
     true,
     true,
-    (doFiOpMR<32, false>(ip, block, X86::ST0, mem_src, X86::DIV_FI32m,
-                         llvm::Instruction::FDiv)))
+    (doFiOpMR<32, false>(ip, block, llvm::X86::ST0, mem_src,
+                         llvm::X86::DIV_FI32m, llvm::Instruction::FDiv)))
 FPU_TRANSLATION(
     DIV_FPrST0,
     true,
     false,
     true,
     false,
-    doFOpPRR<true>(ip, block, X86::ST0, OP(0).getReg(), X86::DIV_FPrST0, llvm::Instruction::FDiv))
+    doFOpPRR<true>(ip, block, llvm::X86::ST0, OP(0).getReg(),
+                   llvm::X86::DIV_FPrST0, llvm::Instruction::FDiv))
 FPU_TRANSLATION(
     DIV_FST0r,
     true,
     false,
     true,
     false,
-    doFOpRR<true>(ip, block, OP(0).getReg(), X86::ST0, X86::DIV_FST0r, llvm::Instruction::FDiv))
+    doFOpRR<true>(ip, block, OP(0).getReg(), llvm::X86::ST0,
+                  llvm::X86::DIV_FST0r, llvm::Instruction::FDiv))
 FPU_TRANSLATION(
     DIV_FrST0,
     true,
     false,
     true,
     false,
-    doFOpRR<true>(ip, block, X86::ST0, OP(0).getReg(), X86::DIV_FrST0, llvm::Instruction::FDiv))
+    doFOpRR<true>(ip, block, llvm::X86::ST0, OP(0).getReg(), llvm::X86::DIV_FrST0, llvm::Instruction::FDiv))
 FPU_TRANSLATION(FSTENVm, false, false, true, true, doFstenv(ip, block, mem_src))
 FPU_TRANSLATION(LD_F32m, true, true, true, true, doFldM<32>(ip, block, mem_src))
 FPU_TRANSLATION(LD_F64m, true, true, true, true, doFldM<64>(ip, block, mem_src))
@@ -1678,7 +1646,7 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFOpMR<32, false>(ip, block, X86::ST0, mem_src, X86::MUL_F32m,
+    (doFOpMR<32, false>(ip, block, llvm::X86::ST0, mem_src, llvm::X86::MUL_F32m,
                         llvm::Instruction::FMul)))
 FPU_TRANSLATION(
     MUL_F64m,
@@ -1686,7 +1654,7 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFOpMR<64, false>(ip, block, X86::ST0, mem_src, X86::MUL_F64m,
+    (doFOpMR<64, false>(ip, block, llvm::X86::ST0, mem_src, llvm::X86::MUL_F64m,
                         llvm::Instruction::FMul)))
 FPU_TRANSLATION(
     MUL_FI16m,
@@ -1694,37 +1662,37 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFiOpMR<16, false>(ip, block, X86::ST0, mem_src, X86::MUL_FI16m,
-                         llvm::Instruction::FMul)))
+    (doFiOpMR<16, false>(ip, block, llvm::X86::ST0, mem_src,
+                         llvm::X86::MUL_FI16m, llvm::Instruction::FMul)))
 FPU_TRANSLATION(
     MUL_FI32m,
     true,
     true,
     true,
     true,
-    (doFiOpMR<32, false>(ip, block, X86::ST0, mem_src, X86::MUL_FI32m,
-                         llvm::Instruction::FMul)))
+    (doFiOpMR<32, false>(ip, block, llvm::X86::ST0, mem_src,
+                         llvm::X86::MUL_FI32m, llvm::Instruction::FMul)))
 FPU_TRANSLATION(
     MUL_FPrST0,
     true,
     false,
     true,
     false,
-    doFOpPRR<false>(ip, block, X86::ST0, OP(0).getReg(), X86::MUL_FPrST0, llvm::Instruction::FMul))
+    doFOpPRR<false>(ip, block, llvm::X86::ST0, OP(0).getReg(), llvm::X86::MUL_FPrST0, llvm::Instruction::FMul))
 FPU_TRANSLATION(
     MUL_FST0r,
     true,
     false,
     true,
     false,
-    doFOpRR<false>(ip, block, OP(0).getReg(), X86::ST0, X86::MUL_FST0r, llvm::Instruction::FMul))
+    doFOpRR<false>(ip, block, OP(0).getReg(), llvm::X86::ST0, llvm::X86::MUL_FST0r, llvm::Instruction::FMul))
 FPU_TRANSLATION(
     MUL_FrST0,
     true,
     false,
     true,
     false,
-    doFOpRR<false>(ip, block, X86::ST0, OP(0).getReg(), X86::MUL_FrST0, llvm::Instruction::FMul))
+    doFOpRR<false>(ip, block, llvm::X86::ST0, OP(0).getReg(), llvm::X86::MUL_FrST0, llvm::Instruction::FMul))
 FPU_TRANSLATION(ST_F32m, true, true, true, true, doFstM<32>(ip, block, mem_src))
 FPU_TRANSLATION(ST_F64m, true, true, true, true, doFstM<64>(ip, block, mem_src))
 FPU_TRANSLATION(ST_FP32m, true, true, true, true,
@@ -1741,7 +1709,7 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFOpMR<32, true>(ip, block, X86::ST0, mem_src, X86::SUBR_F32m,
+    (doFOpMR<32, true>(ip, block, llvm::X86::ST0, mem_src, llvm::X86::SUBR_F32m,
                        llvm::Instruction::FSub)))
 FPU_TRANSLATION(
     SUBR_F64m,
@@ -1749,7 +1717,7 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFOpMR<64, true>(ip, block, X86::ST0, mem_src, X86::SUBR_F64m,
+    (doFOpMR<64, true>(ip, block, llvm::X86::ST0, mem_src, llvm::X86::SUBR_F64m,
                        llvm::Instruction::FSub)))
 FPU_TRANSLATION(
     SUBR_FI16m,
@@ -1757,44 +1725,44 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFiOpMR<16, true>(ip, block, X86::ST0, mem_src, X86::SUBR_FI16m,
-                        llvm::Instruction::FSub)))
+    (doFiOpMR<16, true>(ip, block, llvm::X86::ST0, mem_src,
+                        llvm::X86::SUBR_FI16m, llvm::Instruction::FSub)))
 FPU_TRANSLATION(
     SUBR_FI32m,
     true,
     true,
     true,
     true,
-    (doFiOpMR<32, true>(ip, block, X86::ST0, mem_src, X86::SUBR_FI32m,
-                        llvm::Instruction::FSub)))
+    (doFiOpMR<32, true>(ip, block, llvm::X86::ST0, mem_src,
+                        llvm::X86::SUBR_FI32m, llvm::Instruction::FSub)))
 FPU_TRANSLATION(
     SUBR_FPrST0,
     true,
     false,
     true,
     false,
-    doFOpPRR<true>(ip, block, X86::ST0, OP(0).getReg(), X86::SUBR_FPrST0, llvm::Instruction::FSub))
+    doFOpPRR<true>(ip, block, llvm::X86::ST0, OP(0).getReg(), llvm::X86::SUBR_FPrST0, llvm::Instruction::FSub))
 FPU_TRANSLATION(
     SUBR_FST0r,
     true,
     false,
     true,
     false,
-    doFOpRR<true>(ip, block, OP(0).getReg(), X86::ST0, X86::SUBR_FST0r, llvm::Instruction::FSub))
+    doFOpRR<true>(ip, block, OP(0).getReg(), llvm::X86::ST0, llvm::X86::SUBR_FST0r, llvm::Instruction::FSub))
 FPU_TRANSLATION(
     SUBR_FrST0,
     true,
     false,
     true,
     false,
-    doFOpRR<true>(ip, block, X86::ST0, OP(0).getReg(), X86::SUBR_FrST0, llvm::Instruction::FSub))
+    doFOpRR<true>(ip, block, llvm::X86::ST0, OP(0).getReg(), llvm::X86::SUBR_FrST0, llvm::Instruction::FSub))
 FPU_TRANSLATION(
     SUB_F32m,
     true,
     true,
     true,
     true,
-    (doFOpMR<32, false>(ip, block, X86::ST0, mem_src, X86::SUB_F32m,
+    (doFOpMR<32, false>(ip, block, llvm::X86::ST0, mem_src, llvm::X86::SUB_F32m,
                         llvm::Instruction::FSub)))
 FPU_TRANSLATION(
     SUB_F64m,
@@ -1802,7 +1770,7 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFOpMR<64, false>(ip, block, X86::ST0, mem_src, X86::SUB_F64m,
+    (doFOpMR<64, false>(ip, block, llvm::X86::ST0, mem_src, llvm::X86::SUB_F64m,
                         llvm::Instruction::FSub)))
 FPU_TRANSLATION(
     SUB_FI16m,
@@ -1810,46 +1778,46 @@ FPU_TRANSLATION(
     true,
     true,
     true,
-    (doFiOpMR<16, false>(ip, block, X86::ST0, mem_src, X86::SUB_FI16m,
-                         llvm::Instruction::FSub)))
+    (doFiOpMR<16, false>(ip, block, llvm::X86::ST0, mem_src,
+                         llvm::X86::SUB_FI16m, llvm::Instruction::FSub)))
 FPU_TRANSLATION(
     SUB_FI32m,
     true,
     true,
     true,
     true,
-    (doFiOpMR<32, false>(ip, block, X86::ST0, mem_src, X86::SUB_FI32m,
-                         llvm::Instruction::FSub)))
+    (doFiOpMR<32, false>(ip, block, llvm::X86::ST0, mem_src,
+                         llvm::X86::SUB_FI32m, llvm::Instruction::FSub)))
 FPU_TRANSLATION(
     SUB_FPrST0,
     true,
     false,
     true,
     false,
-    doFOpPRR<false>(ip, block, X86::ST0, OP(0).getReg(), X86::SUB_FPrST0, llvm::Instruction::FSub))
+    doFOpPRR<false>(ip, block, llvm::X86::ST0, OP(0).getReg(), llvm::X86::SUB_FPrST0, llvm::Instruction::FSub))
 FPU_TRANSLATION(
     SUB_FST0r,
     true,
     false,
     true,
     false,
-    doFOpRR<false>(ip, block, OP(0).getReg(), X86::ST0, X86::SUB_FST0r, llvm::Instruction::FSub))
+    doFOpRR<false>(ip, block, OP(0).getReg(), llvm::X86::ST0, llvm::X86::SUB_FST0r, llvm::Instruction::FSub))
 FPU_TRANSLATION(
     SUB_FrST0,
     true,
     false,
     true,
     false,
-    doFOpRR<false>(ip, block, X86::ST0, OP(0).getReg(), X86::SUB_FrST0, llvm::Instruction::FSub))
+    doFOpRR<false>(ip, block, llvm::X86::ST0, OP(0).getReg(), llvm::X86::SUB_FrST0, llvm::Instruction::FSub))
 
-// take the remainder of ( DST_VAL[st0] / SRC_VAL[st1]), store in st0
+// take the remainder of (DST_VAL[st0] / SRC_VAL[st1]), store in st0
 FPU_TRANSLATION(
     FPREM,
     true,
     false,
     true,
     false,
-    doFOpRR<true>(ip, block, X86::ST1, X86::ST0, X86::FPREM,
+    doFOpRR<true>(ip, block, llvm::X86::ST1, llvm::X86::ST0, llvm::X86::FPREM,
                   llvm::Instruction::FRem))
 FPU_TRANSLATION(
     FPREM1,
@@ -1857,10 +1825,11 @@ FPU_TRANSLATION(
     false,
     true,
     false,
-    doFOpRR<true>(ip, block, X86::ST1, X86::ST0, X86::FPREM1,
+    doFOpRR<true>(ip, block, llvm::X86::ST1, llvm::X86::ST0, llvm::X86::FPREM1,
                   llvm::Instruction::FRem))
 
-FPU_TRANSLATION(SIN_F, true, false, true, false, doFsin(ip, block, X86::ST0))
+FPU_TRANSLATION(SIN_F, true, false, true, false,
+                doFsin(ip, block, llvm::X86::ST0))
 
 FPU_TRANSLATION(LD_F0, true, false, true, false, doFldC(ip, block, 0.0))
 FPU_TRANSLATION(LD_F1, true, false, true, false, doFldC(ip, block, 1.0))
@@ -1942,8 +1911,7 @@ FPU_TRANSLATION(FPTAN, true, false, true, false, doFPTAN(inst, ip, block))
 
 FPU_TRANSLATION(CHS_F, true, false, true, false, doCHS(inst, ip, block))
 
-static InstTransResult translate_WAIT(NativeModulePtr natM, BasicBlock *&block,
-                                      NativeInstPtr ip, MCInst &inst) {
+static InstTransResult translate_WAIT(TranslationContext &, BasicBlock *&) {
   return ContinueBlock;
 }
 

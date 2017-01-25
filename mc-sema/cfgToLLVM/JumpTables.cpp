@@ -244,7 +244,8 @@ void doJumpTableViaSwitch(TranslationContext &ctx, llvm::BasicBlock *&block, int
 }
 
 template<int bitness>
-static void doJumpTableViaSwitchReg(llvm::BasicBlock *&block, NativeInstPtr ip,
+static void doJumpTableViaSwitchReg(TranslationContext &ctx,
+                                    llvm::BasicBlock *&block,
                                     llvm::Value *regVal,
                                     llvm::BasicBlock *&default_block) {
 
@@ -252,6 +253,7 @@ static void doJumpTableViaSwitchReg(llvm::BasicBlock *&block, NativeInstPtr ip,
 
   auto F = block->getParent();
   auto M = F->getParent();
+  auto ip = ctx.natI;
   auto jmpptr = ip->get_jump_table();
 
   // create a default block that just traps
@@ -268,25 +270,19 @@ static void doJumpTableViaSwitchReg(llvm::BasicBlock *&block, NativeInstPtr ip,
 
   // populate switch
   for (auto blockVA : uniq_blocks) {
-    std::string bbname = "block_0x" + to_string<VA>(blockVA, std::hex);
-    auto toBlock = bbFromStrName(bbname, F);
-    llvm::errs() << __FUNCTION__ << ": Mapping from "
-                 << to_string<VA>(blockVA, std::hex) << " => " << bbname
-                 << "\n";
-    TASSERT(toBlock != NULL, "Could not find block: " + bbname);
-
+    auto toBlock = ctx.va_to_bb[blockVA];
+    TASSERT(toBlock != NULL, "Could not find block!");
     auto thecase = CONST_V<bitness>(block, blockVA);
-
     theSwitch->addCase(thecase, toBlock);
   }
 }
 
-void doJumpOffsetTableViaSwitchReg(llvm::BasicBlock *&block, NativeInstPtr ip,
+void doJumpOffsetTableViaSwitchReg(TranslationContext &ctx, llvm::BasicBlock *&block,
                                    llvm::Value *regVal,
                                    llvm::BasicBlock *&default_block,
                                    llvm::Value *data_location,
                                    MCSOffsetTablePtr ot_ptr) {
-
+  auto ip = ctx.natI;
   llvm::errs() << __FUNCTION__ << ": Doing jump offset table via switch(reg)\n";
   auto F = block->getParent();
 
@@ -314,28 +310,22 @@ void doJumpOffsetTableViaSwitchReg(llvm::BasicBlock *&block, NativeInstPtr ip,
 
   // populate switch
   for (const auto &entry : uniq_blocks) {
-    std::string bbname = "block_0x" + to_string<VA>(entry.second, std::hex);
-    auto toBlock = bbFromStrName(bbname, F);
-    llvm::errs() << __FUNCTION__ << ": Mapping from "
-                 << to_string<VA>(entry.first, std::hex) << " => " << bbname
-                 << "\n";
-    TASSERT(toBlock != NULL, "Could not find block: " + bbname);
-
+    auto toBlock = ctx.va_to_bb[entry.second];
+    TASSERT(toBlock != NULL, "Could not find block!");
     auto thecase = CONST_V<64>(block, entry.first);
-
     theSwitch->addCase(thecase, toBlock);
   }
 }
 
-void doJumpTableViaSwitchReg(llvm::BasicBlock *&block, NativeInstPtr ip,
+void doJumpTableViaSwitchReg(TranslationContext &ctx, llvm::BasicBlock *&block,
                              llvm::Value *regVal,
                              llvm::BasicBlock *&default_block,
                              const int bitness) {
   switch (bitness) {
     case 32:
-      return doJumpTableViaSwitchReg<32>(block, ip, regVal, default_block);
+      return doJumpTableViaSwitchReg<32>(ctx, block, regVal, default_block);
     case 64:
-      return doJumpTableViaSwitchReg<64>(block, ip, regVal, default_block);
+      return doJumpTableViaSwitchReg<64>(ctx, block, regVal, default_block);
     default:
       TASSERT(false, "Invalid bitness!")
       ;

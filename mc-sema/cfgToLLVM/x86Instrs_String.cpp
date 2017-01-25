@@ -35,7 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "x86Instrs_String.h"
 
 template<int width, int regWidth>
-static BasicBlock *doCmpsV(BasicBlock *pred) {
+static llvm::BasicBlock *doCmpsV(llvm::BasicBlock *pred) {
   auto lhsRegVal = R_READ<regWidth>(pred, llvm::X86::RSI);
   auto lhsFromMem = M_READ_0<width>(pred, lhsRegVal);
 
@@ -592,20 +592,20 @@ GENERIC_TRANSLATION(REP_STOSQ_64, (doRepStos<64, 64>(block)))
 
 #define SCAS_TRANSLATION(NAME, WIDTH) \
     static InstTransResult translate_ ## NAME ( \
-        TranslationContext &ctx, llvm::BasicBlock *& block) {\
+        TranslationContext &ctx, llvm::BasicBlock *&block) {\
     auto natM = ctx.natM; \
     auto ip = ctx.natI; \
     auto &inst = ip->get_inst(); \
     InstTransResult ret = TranslateError;\
-    Inst::Prefix pfx = ip->get_prefix();\
-    switch(pfx) { \
-      case Inst::NoPrefix: \
+    NativeInst::Prefix pfx = ip->get_prefix();\
+    switch (pfx) { \
+      case NativeInst::NoPrefix: \
         throw TErr(__LINE__, __FILE__, "NIY"); \
         break; \
-      case Inst::RepPrefix: \
+      case NativeInst::RepPrefix: \
         throw TErr(__LINE__, __FILE__, "NIY"); \
         break; \
-      case Inst::RepNePrefix: \
+      case NativeInst::RepNePrefix: \
         ret = doRepNeScas<WIDTH>(block); \
         break; \
       default: \

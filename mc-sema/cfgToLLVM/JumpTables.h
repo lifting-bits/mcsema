@@ -124,8 +124,8 @@ class JumpIndexTable : public Table<uint8_t> {
   virtual ~JumpIndexTable() {}
 };
 
-typedef std::shared_ptr<MCSJumpTable> MCSJumpTablePtr;
-typedef std::shared_ptr<JumpIndexTable> JumpIndexTablePtr;
+typedef MCSJumpTable *MCSJumpTablePtr;
+typedef JumpIndexTable *JumpIndexTablePtr;
 
 bool addJumpTableDataSection(TranslationContext &ctx, VA &newVA,
                              const MCSJumpTable &table);
@@ -170,14 +170,14 @@ void doJumpTableViaData(llvm::BasicBlock *&block, llvm::Value *val,
 void doJumpTableViaSwitch(TranslationContext &ctx, llvm::BasicBlock *&block,
                           const int bitness);
 
-void doJumpTableViaSwitchReg(llvm::BasicBlock *& block, NativeInstPtr ip,
+void doJumpTableViaSwitchReg(TranslationContext &ctx, llvm::BasicBlock *& block,
                              llvm::Value *regVal,
                              llvm::BasicBlock *&default_block,
                              const int bitness);
 
 void doJumpIndexTableViaSwitch(llvm::BasicBlock *& block, NativeInstPtr ip);
 
-void doJumpOffsetTableViaSwitchReg(llvm::BasicBlock *& block, NativeInstPtr ip,
+void doJumpOffsetTableViaSwitchReg(TranslationContext &ctx, llvm::BasicBlock *&block,
                                    llvm::Value *regVal,
                                    llvm::BasicBlock *&default_block,
                                    llvm::Value *data_location,

@@ -215,11 +215,11 @@ void NativeInst::set_is_call_external(void) {
 }
 
 llvm::MCInst &NativeInst::get_inst(void) {
-  return this->NativeInst;
+  return this->decoded_inst;
 }
 
 void NativeInst::set_inst(const llvm::MCInst &i) {
-  this->NativeInst = i;
+  this->decoded_inst = i;
 }
 
 VA NativeInst::get_loc(void) const {
@@ -292,10 +292,10 @@ VA NativeInst::get_rip_relative(void) const {
 }
 
 void NativeInst::set_rip_relative(unsigned i) {
-  const llvm::MCOperand &base = NativeInst.getOperand(i + 0);
-  const llvm::MCOperand &scale = NativeInst.getOperand(i + 1);
-  const llvm::MCOperand &index = NativeInst.getOperand(i + 2);
-  const llvm::MCOperand &disp = NativeInst.getOperand(i + 3);
+  const llvm::MCOperand &base = decoded_inst.getOperand(i + 0);
+  const llvm::MCOperand &scale = decoded_inst.getOperand(i + 1);
+  const llvm::MCOperand &index = decoded_inst.getOperand(i + 2);
+  const llvm::MCOperand &disp = decoded_inst.getOperand(i + 3);
 
   rip_target = loc + len + disp.getImm();
   //const
@@ -346,7 +346,7 @@ unsigned int NativeInst::get_addr_space(void) const {
 }
 
 unsigned int NativeInst::get_opcode(void) const {
-  return this->NativeInst.getOpcode();
+  return this->decoded_inst.getOpcode();
 }
 
 ExternalCodeRefPtr NativeInst::get_ext_call_target(void) const {
@@ -362,7 +362,7 @@ NativeInst::NativeInst(VA v, uint8_t l, const llvm::MCInst &inst, Prefix k,
       tgtIfTrue(0),
       tgtIfFalse(0),
       loc(v),
-      NativeInst(inst),
+      decoded_inst(inst),
       pfx(k),
       ext_call_target(false),
       is_call_external(false),

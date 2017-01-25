@@ -64,8 +64,6 @@ typedef std::vector<llvm::Value*> regDefT;
 //registers via alloca and then copies into them from the structure argument
 void setupFlow(llvm::Function *, regDefT &);
 
-llvm::BasicBlock *bbFromStrName(std::string n, llvm::Function *F);
-
 ///////////////////////////////////////////////////////////////////////////////
 // state modeling functions
 ///////////////////////////////////////////////////////////////////////////////
@@ -105,7 +103,6 @@ static llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t width,
   llvm::IntegerType *bTy = llvm::Type::getIntNTy(b->getContext(), width);
   return llvm::ConstantInt::get(bTy, val);
 }
-
 
 llvm::Value *MCRegToValue(llvm::BasicBlock *b, unsigned reg);
 
@@ -149,8 +146,8 @@ llvm::Value *R_READ(llvm::BasicBlock *b, int reg) {
 }
 }
 
-llvm::Value *INTERNAL_M_READ(unsigned width, unsigned addrspace, llvm::BasicBlock *b,
-                             llvm::Value *addr);
+llvm::Value *INTERNAL_M_READ(unsigned width, unsigned addrspace,
+                             llvm::BasicBlock *b, llvm::Value *addr);
 
 template<int width>
 llvm::Value *M_READ(NativeInstPtr ip, llvm::BasicBlock *b, llvm::Value *addr) {
@@ -189,9 +186,7 @@ void F_SET(llvm::BasicBlock *b, MCSemaRegs flag);
 
 void F_CLEAR(llvm::BasicBlock *b, MCSemaRegs flag);
 
-void ArchAllocRegisterVars(llvm::Function *, int);
-
-llvm::BasicBlock *bbFromStrName(std::string, llvm::Function *);
+void ArchAllocRegisterVars(llvm::BasicBlock *, int);
 
 ///////////////////////////////////////////////////////////////////////////////
 // API usage functions
