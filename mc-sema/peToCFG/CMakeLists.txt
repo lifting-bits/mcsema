@@ -1,10 +1,8 @@
 include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/../PELib ${CMAKE_CURRENT_BINARY_DIR}/../../llvm-3.5/lib/Target/X86
 ${CMAKE_CURRENT_SOURCE_DIR}/../../llvm-3.5/lib/Target/X86 )
 
-PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS CFG.proto)
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/../binary_common ${PROTOBUF_INCLUDE_DIR})
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR} ${PROTOBUF_INCLUDE_DIR})
+add_library(peToCFG peToCFG.cpp inst_decoder_fe.cpp)
 
-add_library(peToCFG ${PROTO_SRCS} ${PROTO_HDRS} peToCFG.cpp inst_decoder_fe.cpp)
-
-add_dependencies(peToCFG LLVMX86CodeGen)
+add_dependencies(peToCFG LLVMX86CodeGen binary_common)
