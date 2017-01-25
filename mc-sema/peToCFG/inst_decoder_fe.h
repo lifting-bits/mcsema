@@ -158,6 +158,6 @@ public:
   }
 
   llvm::MCInstPrinter *getPrinter(void) { return this->IP; }
-  InstPtr getInstFromBuff(VA, llvm::MemoryObject *);
+  InstPtr getInstFromBuff(VA, const llvm::MemoryObject *);
 };
 #endif

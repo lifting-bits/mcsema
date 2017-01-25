@@ -37,7 +37,7 @@ using namespace boost;
 using namespace llvm;
 
 
-InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
+InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, const llvm::MemoryObject *bmo) {
   InstPtr           inst;
   llvm::MCInst      mcInst;
   ::uint64_t    insLen;
