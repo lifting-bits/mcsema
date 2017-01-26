@@ -153,12 +153,12 @@ static InstTransResult doEnter(NativeInstPtr ip, llvm::BasicBlock *&b,
   auto loopSetup = llvm::BasicBlock::Create(C, "loopSetup", F);
 
   //test to see if NestingLevel is 0
-  auto isNestZ = new llvm::ICmpInst(*b, llvm::CmpInst::ICMP_EQ, vNestingLevel,
+  auto isNestZ = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ, vNestingLevel,
                                     CONST_V<32>(b, 0));
   llvm::BranchInst::Create(cont, preLoop, isNestZ, b);
 
   //test to see if NestingLevel is greater than 1
-  auto testRes = new llvm::ICmpInst(*preLoop, llvm::CmpInst::ICMP_UGT,
+  auto testRes = new llvm::ICmpInst( *preLoop, llvm::CmpInst::ICMP_UGT,
                                     vNestingLevel, CONST_V<32>(b, 1));
   llvm::BranchInst::Create(loopSetup, loopEnd, testRes, preLoop);
 
@@ -171,7 +171,7 @@ static InstTransResult doEnter(NativeInstPtr ip, llvm::BasicBlock *&b,
                                  loopHeader);
   i->addIncoming(i_init, loopSetup);
   //test and see if we should leave
-  auto leaveLoop = new llvm::ICmpInst(*loopHeader, llvm::CmpInst::ICMP_ULT, i,
+  auto leaveLoop = new llvm::ICmpInst( *loopHeader, llvm::CmpInst::ICMP_ULT, i,
                                       vNestingLevel);
   BranchInst::Create(loopBody, loopEnd, leaveLoop, loopHeader);
 
@@ -237,13 +237,13 @@ static InstTransResult doEnter(NativeInstPtr ip, llvm::BasicBlock *&b,
   auto loopSetup = llvm::BasicBlock::Create(C, "loopSetup", F);
 
   //test to see if NestingLevel is 0
-  auto isNestZ = new llvm::ICmpInst(*b, llvm::CmpInst::ICMP_EQ, vNestingLevel,
+  auto isNestZ = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ, vNestingLevel,
                                     CONST_V<64>(b, 0));
 
   llvm::BranchInst::Create(cont, preLoop, isNestZ, b);
 
   //test to see if NestingLevel is greater than 1
-  auto testRes = new llvm::ICmpInst(*preLoop, llvm::CmpInst::ICMP_UGT,
+  auto testRes = new llvm::ICmpInst( *preLoop, llvm::CmpInst::ICMP_UGT,
                                     vNestingLevel, CONST_V<64>(b, 1));
   llvm::BranchInst::Create(loopSetup, loopEnd, testRes, preLoop);
 
@@ -256,7 +256,7 @@ static InstTransResult doEnter(NativeInstPtr ip, llvm::BasicBlock *&b,
                                  loopHeader);
   i->addIncoming(i_init, loopSetup);
   //test and see if we should leave
-  auto leaveLoop = new llvm::ICmpInst(*loopHeader, llvm::CmpInst::ICMP_ULT, i,
+  auto leaveLoop = new llvm::ICmpInst( *loopHeader, llvm::CmpInst::ICMP_ULT, i,
                                       vNestingLevel);
   llvm::BranchInst::Create(loopBody, loopEnd, leaveLoop, loopHeader);
 
@@ -400,7 +400,7 @@ static InstTransResult doPopR(NativeInstPtr ip, llvm::BasicBlock *&b,
   return ContinueBlock;
 }
 
-template <int width>
+template<int width>
 static llvm::Value *doPopV(llvm::BasicBlock *b) {
   //read the stack pointer
   auto xsp = 32 == width ? llvm::X86::ESP : llvm::X86::RSP;
@@ -492,12 +492,13 @@ static InstTransResult doPushI(NativeInstPtr ip, llvm::BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doPop32M(NativeInstPtr ip, llvm::BasicBlock *&b,
-                                llvm::Value *addr) {
+static InstTransResult doPopM(NativeInstPtr ip, llvm::BasicBlock *&b,
+                              llvm::Value *addr) {
   NASSERT(addr != nullptr);
 
+  auto xsp = 32 == width ? llvm::X86::ESP : llvm::X86::RSP;
   //read the stack pointer
-  auto oldESP = R_READ<32>(b, llvm::X86::ESP);
+  auto oldESP = R_READ<width>(b, xsp);
 
   //read the value from the memory at the stack pointer address
   auto m = M_READ_0<width>(b, oldESP);
@@ -507,11 +508,11 @@ static InstTransResult doPop32M(NativeInstPtr ip, llvm::BasicBlock *&b,
 
   //add to the stack pointer
   auto newESP = llvm::BinaryOperator::CreateAdd(oldESP,
-                                                CONST_V<32>(b, (width / 8)), "",
-                                                b);
+                                                CONST_V<width>(b, (width / 8)),
+                                                "", b);
 
   //update the stack pointer register
-  R_WRITE<32>(b, llvm::X86::ESP, newESP);
+  R_WRITE<32>(b, xsp, newESP);
 
   return ContinueBlock;
 }
@@ -620,7 +621,7 @@ static llvm::Value *checkIfBitSet(llvm::Value *field, int bit,
 
   auto tmp = llvm::BinaryOperator::CreateAnd(field, CONST_V<width>(b, 1 << bit),
                                              "", b);
-  return new llvm::ICmpInst(*b, llvm::CmpInst::ICMP_NE, tmp,
+  return new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_NE, tmp,
                             CONST_V<width>(b, 0));
 }
 
@@ -721,34 +722,37 @@ GENERIC_TRANSLATION_REF(PUSHi8, doPushI<8>(ip, block, OP(0)),
                         doPushV<8>(ip, block, MEM_REFERENCE(0) ))
 GENERIC_TRANSLATION_REF(PUSHi16, doPushI<16>(ip, block, OP(0)),
                         doPushV<16>(ip, block, MEM_REFERENCE(0) ))
-GENERIC_TRANSLATION_REF(POP32rmm, doPop32M<32>(ip, block, ADDR_NOREF(0)),
-                        doPop32M<32>(ip, block, MEM_REFERENCE(0)));
+GENERIC_TRANSLATION_REF(POP32rmm, doPopM<32>(ip, block, ADDR_NOREF(0)),
+                        doPopM<32>(ip, block, MEM_REFERENCE(0)));
+GENERIC_TRANSLATION_REF(POP64rmm, doPopM<64>(ip, block, ADDR_NOREF(0)),
+                        doPopM<32>(ip, block, MEM_REFERENCE(0)));
 
 void Stack_populateDispatchMap(DispatchMap &m) {
-  m[X86::ENTER] = translate_ENTER;
-  m[X86::LEAVE] = translate_LEAVE;
-  m[X86::LEAVE64] = translate_LEAVE64;
-  m[X86::POP16r] = translate_POP16r;
-  m[X86::POP32r] = translate_POP32r;
-  m[X86::PUSH16r] = translate_PUSH16r;
-  m[X86::PUSH32r] = translate_PUSH32r;
-  m[X86::PUSH32i8] = translate_PUSHi8;
-  m[X86::PUSHi16] = translate_PUSHi16;
-  m[X86::PUSHi32] = translate_PUSHi32;
-  m[X86::PUSH32rmm] = translate_PUSH32rmm;
-  m[X86::POPA32] = translate_POPA32;
-  m[X86::PUSHA32] = translate_PUSHA32;
-  m[X86::PUSHF32] = translate_PUSHF32;
-  m[X86::PUSHF64] = translate_PUSHF64;
-  m[X86::POP32rmm] = translate_POP32rmm;
+  m[llvm::X86::ENTER] = translate_ENTER;
+  m[llvm::X86::LEAVE] = translate_LEAVE;
+  m[llvm::X86::LEAVE64] = translate_LEAVE64;
+  m[llvm::X86::POP16r] = translate_POP16r;
+  m[llvm::X86::POP32r] = translate_POP32r;
+  m[llvm::X86::PUSH16r] = translate_PUSH16r;
+  m[llvm::X86::PUSH32r] = translate_PUSH32r;
+  m[llvm::X86::PUSH32i8] = translate_PUSHi8;
+  m[llvm::X86::PUSHi16] = translate_PUSHi16;
+  m[llvm::X86::PUSHi32] = translate_PUSHi32;
+  m[llvm::X86::PUSH32rmm] = translate_PUSH32rmm;
+  m[llvm::X86::POPA32] = translate_POPA32;
+  m[llvm::X86::PUSHA32] = translate_PUSHA32;
+  m[llvm::X86::PUSHF32] = translate_PUSHF32;
+  m[llvm::X86::PUSHF64] = translate_PUSHF64;
+  m[llvm::X86::POP32rmm] = translate_POP32rmm;
 
-  m[X86::PUSH64r] = translate_PUSH64r;
-  m[X86::PUSH64rmr] = translate_PUSH64r;  // TODO(pag): Is this right??
-  m[X86::PUSH64rmm] = translate_PUSH64rmm;
-  m[X86::PUSH64i8] = translate_PUSHi8;
-  m[X86::PUSH64i32] = translate_PUSHi32;
+  m[llvm::X86::PUSH64r] = translate_PUSH64r;
+  m[llvm::X86::PUSH64rmr] = translate_PUSH64r;  // TODO(pag): Is this right??
+  m[llvm::X86::PUSH64rmm] = translate_PUSH64rmm;
+  m[llvm::X86::PUSH64i8] = translate_PUSHi8;
+  m[llvm::X86::PUSH64i32] = translate_PUSHi32;
 
-  m[X86::POP64r] = translate_POP64r;
-  m[X86::POPF64] = translate_POPF64;
-  m[X86::POPF32] = translate_POPF32;
+  m[llvm::X86::POP64r] = translate_POP64r;
+  m[llvm::X86::POP64rmm] = translate_POP64rmm;
+  m[llvm::X86::POPF64] = translate_POPF64;
+  m[llvm::X86::POPF32] = translate_POPF32;
 }
