@@ -6,7 +6,7 @@ The output of each demo appears after its description.
 
 The demos live in `mc-sema\tests` in the source tree. These demos require that a **debug version** of the mc-sema be built prior to execution. 
 
-The output may differ in debug statements from what you see. Demos are usually tested by using IDAPython as the CFG recovery script, but should work with `bin_descend`.
+The output may differ in debug statements from what you see. Demos are tested by using IDAPython as the CFG recovery script.
 
 ## demo1
 

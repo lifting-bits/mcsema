@@ -1448,7 +1448,7 @@ struct DataSectionVar {
   llvm::GlobalVariable *var;
 };
 
-static bool insertDataSections(NativeModulePtr natMod, Module *M) {
+static bool InsertDataSections(NativeModulePtr natMod, Module *M) {
 
   auto &globaldata = natMod->getData();
   //insert all global data before we insert the CFG
@@ -1684,6 +1684,6 @@ bool LiftCodeIntoModule(NativeModulePtr natMod, Module *M) {
   InitLiftedFunctions(natMod, M);
   InitExternalData(natMod, M);
   InitExternalCode(natMod, M);
-  insertDataSections(natMod, M);
+  InsertDataSections(natMod, M);
   return LiftFunctionsIntoModule(natMod, M);
 }

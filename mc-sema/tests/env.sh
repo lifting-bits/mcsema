@@ -5,8 +5,8 @@ IDA_PATH=$(<./IDA_PATH.linux)
 GET_CFG_PY=${BIN_DESCEND_PATH}/get_cfg.py
 STD_DEFS=$(<./STD_DEFS.linux)
 RUNTIME_PATH=$(<./RUNTIME_PATH.linux)
-CC=clang
-CXX=clang++
+CC=clang-3.5
+CXX=clang++-3.5
 export TVHEADLESS=1
 export IDALOG=/dev/null
 export IDA_PATH
