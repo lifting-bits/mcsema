@@ -143,7 +143,7 @@ static VA FindSymbolInModule(NativeModulePtr mod, const std::string &sym_name) {
       return sym.getAddr();
     }
   }
-  return 0;
+  return static_cast<VA>(-1);
 }
 
 int main(int argc, char *argv[]) {
@@ -202,7 +202,8 @@ int main(int argc, char *argv[]) {
 
     std::set<VA> entry_point_pcs;
     for (const auto &entry_point_name : EntryPoints) {
-      if (auto entry_pc = FindSymbolInModule(mod, entry_point_name)) {
+      auto entry_pc = FindSymbolInModule(mod, entry_point_name);
+      if (entry_pc != static_cast<VA>(-1)) {
         std::cerr << "Adding entry point: " << entry_point_name << std::endl
                   << entry_point_name << " is implemented by sub_" << std::hex
                   << entry_pc << std::endl;
