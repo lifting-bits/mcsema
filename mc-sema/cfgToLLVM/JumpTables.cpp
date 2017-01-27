@@ -1,31 +1,31 @@
 /*
-Copyright (c) 2014, Trail of Bits
-All rights reserved.
+ Copyright (c) 2014, Trail of Bits
+ All rights reserved.
 
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
+ Redistribution and use in source and binary forms, with or without modification,
+ are permitted provided that the following conditions are met:
 
-  Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
+ Redistributions of source code must retain the above copyright notice, this
+ list of conditions and the following disclaimer.
 
-  Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
-  other materials provided with the distribution.
+ Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ other materials provided with the distribution.
 
-  Neither the name of Trail of Bits nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
+ Neither the name of Trail of Bits nor the names of its
+ contributors may be used to endorse or promote products derived from
+ this software without specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include <vector>
 #include <unordered_set>
 #include <string>
@@ -48,439 +48,354 @@ using namespace llvm;
 extern llvm::PointerType *g_PRegStruct;
 
 // convert a jump table to a data section of symbols
-static DataSection* tableToDataSection(VA new_base, const MCSJumpTable& jt) {
-    DataSection *ds = new DataSection();
-    
-    const vector<VA>& entries = jt.getJumpTable();
-    VA curAddr = new_base;
+static DataSection* tableToDataSection(VA new_base, const MCSJumpTable &jt) {
+  auto ds = new DataSection();
+  const auto &entries = jt.getJumpTable();
+  VA curAddr = new_base;
 
-    for(vector<VA>::const_iterator itr = entries.begin();
-        itr != entries.end();
-        itr++)
-    {
-        string sub_name = "sub_" + to_string<VA>(*itr, hex);
-        DataSectionEntry dse(curAddr, sub_name);
-        ds->addEntry(dse);
-        curAddr += 4;
-    }
+  for (auto va : entries) {
+    std::string sub_name = "sub_" + to_string<VA>(va, hex);
+    DataSectionEntry dse(curAddr, sub_name);
+    ds->addEntry(dse);
+    curAddr += 4;
+  }
 
-    return ds;
+  return ds;
 }
 
 // convert an index table to a data blob
-static DataSection* tableToDataSection(VA new_base, const JumpIndexTable& jit) {
-    DataSection *ds = new DataSection();
-    
-    const vector<uint8_t>& entries = jit.getJumpIndexTable();
-
-    DataSectionEntry dse(new_base, entries);
-    ds->addEntry(dse);
-
-    return ds;
+static DataSection *tableToDataSection(VA new_base, const JumpIndexTable &jit) {
+  auto ds = new DataSection();
+  const auto &entries = jit.getJumpIndexTable();
+  DataSectionEntry dse(new_base, entries);
+  ds->addEntry(dse);
+  return ds;
 }
 
-template <class T>
-static bool addTableDataSection(NativeModulePtr natMod, 
-        Module *M, VA &newVA, const T& table)
-{
+template <typename T>
+static bool addTableDataSection(TranslationContext &ctx,
+                                VA &newVA, const T &table) {
+  auto natMod = ctx.natM;
+  auto M = ctx.M;
 
-    list<DataSection>  &globaldata = natMod->getData();
-    list<DataSection>::const_iterator git = globaldata.begin();
-
-    // ensure we make this the last data section
-    newVA = 0;
-    while( git != globaldata.end() ) {
-        const DataSection         &dt = *git;
-        uint64_t extent = dt.getBase() + dt.getSize();
-        if(newVA < extent) {
-            newVA = extent;
-        }
-        git++;
+  // ensure we make this the last data section
+  newVA = 0;
+  for (const auto &dt : natMod->getData()) {
+    uint64_t extent = dt.getBase() + dt.getSize();
+    if (newVA < extent) {
+      newVA = extent;
     }
+  }
 
-    // skip a few
-    newVA += 4;
+  // skip a few
+  newVA += 4;
 
-    // create a new data section from the table
-    DataSection *ds = tableToDataSection(newVA, table);
-    
-    // add to global data section list
-    globaldata.push_back(*ds);
+  // create a new data section from the table
+  DataSection *ds = tableToDataSection(newVA, table);
 
-    // create the GlobalVariable
-    string bufferName = "data_0x" + to_string<VA>(newVA, hex);
-    StructType *st_opaque = StructType::create(M->getContext());
-    GlobalVariable *gv = new GlobalVariable(*M,
-                            st_opaque, 
-                            true,
-                            GlobalVariable::InternalLinkage,
-                            NULL,
-                            bufferName);
+  // add to global data section list
+  natMod->addDataSection(*ds);
 
-    vector<Type*> data_section_types;
-    vector<Constant*>    secContents;
+  // create the GlobalVariable
+  std::string bufferName = "data_0x" + to_string<VA>(newVA, std::hex);
+  auto st_opaque = llvm::StructType::create(M->getContext());
+  auto gv = new llvm::GlobalVariable( *M, st_opaque, true,
+                                     llvm::GlobalVariable::InternalLinkage,
+                                     NULL,
+                                     bufferName);
 
-    dataSectionToTypesContents(globaldata, 
-            *ds, 
-            M, 
-            secContents, 
-            data_section_types, 
-            false);
+  std::vector<llvm::Type *> data_section_types;
+  std::vector<llvm::Constant *> secContents;
+  dataSectionToTypesContents(natMod->getData(), *ds, M, secContents,
+                             data_section_types, false);
 
-    st_opaque->setBody(data_section_types, true);
-    Constant *cst = ConstantStruct::get(st_opaque, secContents);
-    gv->setAlignment(4);
-    gv->setInitializer(cst);
+  st_opaque->setBody(data_section_types, true);
+  auto cst = llvm::ConstantStruct::get(st_opaque, secContents);
+  gv->setAlignment(4);
+  gv->setInitializer(cst);
 
-    return true;
+  return true;
 
-} 
-bool addJumpTableDataSection(NativeModulePtr natMod,
-        Module *M,
-        VA &newVA,
-        const MCSJumpTable& table)
-{
-    return addTableDataSection<MCSJumpTable>(natMod, M, newVA, table);
+}
+bool addJumpTableDataSection(TranslationContext &ctx, VA &newVA,
+                             const MCSJumpTable &table) {
+  return addTableDataSection<MCSJumpTable>(ctx, newVA, table);
 }
 
-bool addJumpIndexTableDataSection(NativeModulePtr natMod,
-        Module *M,
-        VA &newVA,
-        const JumpIndexTable& table)
-{
-    return addTableDataSection<JumpIndexTable>(natMod, M, newVA, table);
+bool addJumpIndexTableDataSection(TranslationContext &ctx, VA &newVA, const JumpIndexTable &table) {
+  return addTableDataSection<JumpIndexTable>(ctx, newVA, table);
 }
 
-void doJumpTableViaData(
-        BasicBlock *& block, 
-        Value *fptr,
-        const int bitness)
-{
-    Function *ourF = block->getParent();
-    //make the call, the only argument should be our parents arguments
-    TASSERT(ourF->arg_size() == 1, "");
+void doJumpTableViaData(llvm::BasicBlock *&block, llvm::Value *fptr,
+                        const int bitness) {
+  auto ourF = block->getParent();
+  //make the call, the only argument should be our parents arguments
+  TASSERT(ourF->arg_size() == 1, "");
 
-
-    if(!fptr->getType()->isPtrOrPtrVectorTy()) {
-        Module *M = ourF->getParent();
-        // get mem address
-        std::vector<Type *>  args;
-        args.push_back(g_PRegStruct);
-        Type  *returnTy = Type::getVoidTy(M->getContext());
-        FunctionType *FT = FunctionType::get(returnTy, args, false);
-
-        PointerType *FptrTy = PointerType::get(FT, 0);
-        fptr = new IntToPtrInst(fptr, FptrTy, "", block);
-    }
-    std::vector<Value*>	subArgs;
-    subArgs.push_back(ourF->arg_begin());
-    CallInst *c = CallInst::Create(fptr, subArgs, "", block);
-}
-
-void doJumpTableViaData(
-        NativeModulePtr natM, 
-        BasicBlock *& block, 
-        InstPtr ip, 
-        MCInst &inst,
-        const int bitness)
-{
-    Value *addr = MEM_REFERENCE(0); 
-    //doJumpTableViaData(block, addr, bitness);
-
-    llvm::errs() << __FUNCTION__ << ": Doing jump table via data\n";
-    Function *ourF = block->getParent();
-    Module *M = ourF->getParent();
+  if (!fptr->getType()->isPtrOrPtrVectorTy()) {
+    auto M = ourF->getParent();
     // get mem address
-    std::vector<Type *>  args;
+    std::vector<llvm::Type *> args;
     args.push_back(g_PRegStruct);
-    Type  *returnTy = Type::getVoidTy(M->getContext());
-    FunctionType *FT = FunctionType::get(returnTy, args, false);
-    
-    PointerType *FptrTy = PointerType::get(FT, 0);
-    PointerType *Fptr2Ty = PointerType::get(FptrTy, 0);
-
-    Value *func_addr = CastInst::CreatePointerCast(addr, Fptr2Ty, "", block);
-
-    // read in entry from table
-    Instruction *new_func = noAliasMCSemaScope(new LoadInst(func_addr, "", block));
-
-    doJumpTableViaData(block, new_func, bitness);
+    auto returnTy = llvm::Type::getVoidTy(M->getContext());
+    auto FT = llvm::FunctionType::get(returnTy, args, false);
+    auto FptrTy = llvm::PointerType::get(FT, 0);
+    fptr = new llvm::IntToPtrInst(fptr, FptrTy, "", block);
+  }
+  std::vector<llvm::Value *> subArgs;
+  subArgs.push_back(ourF->arg_begin());
+  llvm::CallInst::Create(fptr, subArgs, "", block);
 }
 
-template <int bitness>
-static void doJumpTableViaSwitch(
-        NativeModulePtr natM, 
-        BasicBlock *& block, 
-        InstPtr ip, 
-        MCInst &inst)
-{
+void doJumpTableViaData(TranslationContext &ctx, llvm::BasicBlock *&block,
+                        const int bitness) {
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  auto natM = ctx.natM;
 
-    llvm::errs() << __FUNCTION__ << ": Doing jumpt table via switch\n";
-    Function *F = block->getParent();
-    Module *M = F->getParent();
-    // we know this conforms to
-    // jmp [reg*4+displacement]
+  llvm::Value *addr = MEM_REFERENCE(0);
+  //doJumpTableViaData(block, addr, bitness);
 
-    // sanity check
-    const MCOperand& scale = OP(1);
-    const MCOperand& index = OP(2);
+  llvm::errs() << __FUNCTION__ << ": Doing jump table via data\n";
+  auto ourF = block->getParent();
+  auto M = ourF->getParent();
+  // get mem address
+  std::vector<llvm::Type *> args;
+  args.push_back(g_PRegStruct);
+  auto returnTy = llvm::Type::getVoidTy(M->getContext());
+  auto FT = llvm::FunctionType::get(returnTy, args, false);
 
-    TASSERT(index.isReg(), "Conformant jump tables need index to be a register");
-    TASSERT(scale.isImm() && scale.getImm() == (bitness/8), "Conformant jump tables have scale == 4");
+  auto FptrTy = llvm::PointerType::get(FT, 0);
+  auto Fptr2Ty = llvm::PointerType::get(FptrTy, 0);
+  auto func_addr = llvm::CastInst::CreatePointerCast(addr, Fptr2Ty, "", block);
 
-    MCSJumpTablePtr jmpptr = ip->get_jump_table();
+  // read in entry from table
+  auto new_func = noAliasMCSemaScope(new llvm::LoadInst(func_addr, "", block));
 
-    // to ensure no negative entries
-    Value *adjustment = CONST_V<bitness>(block, jmpptr->getInitialEntry());
-    Value *reg_val = R_READ<bitness>(block, index.getReg());
-    Value *real_index = 
-        BinaryOperator::Create(Instruction::Add, adjustment, reg_val, "", block);
-   
-    // create a default block that just traps
-    BasicBlock *defaultBlock = 
-        BasicBlock::Create(block->getContext(), "", block->getParent(), 0);
-    Function *trapFn = Intrinsic::getDeclaration(M, Intrinsic::trap);
-    CallInst::Create(trapFn, "", defaultBlock);
-    ReturnInst::Create(defaultBlock->getContext(), defaultBlock);
-    // end default block
-
-    const std::vector<VA> &jmpblocks = jmpptr->getJumpTable();
-
-    // create a switch inst
-    SwitchInst *theSwitch = SwitchInst::Create(
-            real_index, 
-            defaultBlock,
-            jmpblocks.size(),
-            block);
-
-    // populate switch
-    int myindex = 0;
-    for(std::vector<VA>::const_iterator itr = jmpblocks.begin();
-        itr != jmpblocks.end();
-        itr++) 
-    {
-        std::string  bbname = "block_0x"+to_string<VA>(*itr, std::hex);
-        BasicBlock *toBlock = bbFromStrName(bbname, F);
-        TASSERT(toBlock != NULL, "Could not find block: "+bbname);
-        theSwitch->addCase(CONST_V<bitness>(block, myindex), toBlock);
-        ++myindex;
-    }
-
+  doJumpTableViaData(block, new_func, bitness);
 }
 
-void doJumpTableViaSwitch(
-        NativeModulePtr natM, 
-        BasicBlock *& block, 
-        InstPtr ip, 
-        MCInst &inst,
-        const int bitness)
-{
-    switch(bitness)
-    {
-        case 32:
-            return doJumpTableViaSwitch<32>(natM, block, ip, inst);
-        case 64:
-            return doJumpTableViaSwitch<64>(natM, block, ip, inst);
-        default:
-            TASSERT(false, "Invalid bitness!");
-    }
+template<int bitness>
+static void doJumpTableViaSwitch(TranslationContext &ctx, llvm::BasicBlock *&block) {
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  auto natM = ctx.natM;
 
+  llvm::errs() << __FUNCTION__ << ": Doing jump table via switch\n";
+  auto F = block->getParent();
+  auto M = F->getParent();
+  // we know this conforms to
+  // jmp [reg*4+displacement]
+
+  // sanity check
+  const auto &scale = OP(1);
+  const auto &index = OP(2);
+
+  TASSERT(index.isReg(), "Conformant jump tables need index to be a register");
+  TASSERT(scale.isImm() && scale.getImm() == (bitness / 8),
+          "Conformant jump tables have scale == 4");
+
+  MCSJumpTablePtr jmpptr = ip->get_jump_table();
+
+  // to ensure no negative entries
+  llvm::Value *adjustment = CONST_V<bitness>(block, jmpptr->getInitialEntry());
+  llvm::Value *reg_val = R_READ<bitness>(block, index.getReg());
+  llvm::Value *real_index = llvm::BinaryOperator::Create(llvm::Instruction::Add,
+                                                         adjustment, reg_val,
+                                                         "", block);
+
+  // create a default block that just traps
+  auto defaultBlock = llvm::BasicBlock::Create(block->getContext(), "",
+                                               block->getParent(), 0);
+  auto trapFn = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::trap);
+
+  llvm::CallInst::Create(trapFn, "", defaultBlock);
+  llvm::ReturnInst::Create(defaultBlock->getContext(), defaultBlock);
+  // end default block
+
+  const auto &jmpblocks = jmpptr->getJumpTable();
+
+  // create a switch inst
+  SwitchInst *theSwitch = SwitchInst::Create(real_index, defaultBlock,
+                                             jmpblocks.size(), block);
+
+  // populate switch
+  int myindex = 0;
+  for (auto jmp_block_va : jmpblocks) {
+    BasicBlock *toBlock = ctx.va_to_bb[jmp_block_va];
+    TASSERT(toBlock != NULL, "Could not find block");
+    theSwitch->addCase(CONST_V<bitness>(block, myindex), toBlock);
+    ++myindex;
+  }
 }
 
-
-template <int bitness>
-static void doJumpTableViaSwitchReg(
-        BasicBlock *& block, 
-        InstPtr ip, 
-        Value *regVal,
-        BasicBlock *&default_block)
-{
-
-    llvm::errs() << __FUNCTION__ << ": Doing jumpt table via switch(reg)\n";
-    Function *F = block->getParent();
-    Module *M = F->getParent();
-    
-
-    MCSJumpTablePtr jmpptr = ip->get_jump_table();
-
-    // create a default block that just traps
-    default_block = 
-        BasicBlock::Create(block->getContext(), "", block->getParent(), 0);
-    // end default block
-
-    const std::vector<VA> &jmpblocks = jmpptr->getJumpTable();
-    std::unordered_set<VA> uniq_blocks(jmpblocks.begin(), jmpblocks.end());
-
-    // create a switch inst
-    SwitchInst *theSwitch = SwitchInst::Create(
-            regVal, 
-            default_block,
-            uniq_blocks.size(),
-            block);
-
-    // populate switch
-    for(auto blockVA : uniq_blocks) 
-    {
-        std::string  bbname = "block_0x"+to_string<VA>(blockVA, std::hex);
-        BasicBlock *toBlock = bbFromStrName(bbname, F);
-        llvm::errs() << __FUNCTION__ << ": Mapping from " << to_string<VA>(blockVA, std::hex) << " => " << bbname << "\n";
-        TASSERT(toBlock != NULL, "Could not find block: "+bbname);
-
-        ConstantInt *thecase = CONST_V<bitness>(block, blockVA);
-
-        theSwitch->addCase(
-                thecase,
-                toBlock);
-    }
-
+void doJumpTableViaSwitch(TranslationContext &ctx, llvm::BasicBlock *&block, int bitness) {
+  switch (bitness) {
+    case 32:
+      doJumpTableViaSwitch<32>(ctx, block);
+      break;
+    case 64:
+      doJumpTableViaSwitch<64>(ctx, block);
+      break;
+    default:
+      TASSERT(false, "Invalid bitness!")
+      ;
+  }
 }
 
-void doJumpOffsetTableViaSwitchReg(
-        BasicBlock *& block, 
-        InstPtr ip, 
-        Value *regVal,
-        BasicBlock *&default_block,
-        Value *data_location,
-        MCSOffsetTablePtr ot_ptr)
-{
+template<int bitness>
+static void doJumpTableViaSwitchReg(TranslationContext &ctx,
+                                    llvm::BasicBlock *&block,
+                                    llvm::Value *regVal,
+                                    llvm::BasicBlock *&default_block) {
 
-    llvm::errs() << __FUNCTION__ << ": Doing jump offset table via switch(reg)\n";
-    Function *F = block->getParent();
-    
+  llvm::errs() << __FUNCTION__ << ": Doing jump table via switch(reg)\n";
 
-    // create a default block that just traps
-    default_block = 
-        BasicBlock::Create(block->getContext(), "", block->getParent(), 0);
-    // end default block
+  auto F = block->getParent();
+  auto M = F->getParent();
+  auto ip = ctx.natI;
+  auto jmpptr = ip->get_jump_table();
 
-    const std::vector< std::pair<VA,VA> > &offset_dest = ot_ptr->getConstTable();
-    std::unordered_map<VA,VA> uniq_blocks;
-    for (auto const & blockpair : offset_dest) {
-        uniq_blocks[blockpair.first] = blockpair.second;
-    }
+  // create a default block that just traps
+  default_block = BasicBlock::Create(block->getContext(), "",
+                                     block->getParent(), 0);
+  // end default block
 
-    // switch on the offset, not the memory value
-    Value *switch_val = BinaryOperator::CreateSub(regVal, data_location, "", block);
-    switch_val = BinaryOperator::CreateAnd(switch_val, CONST_V<64>(block, 0xFFFFFFFF), "", block);
-    // create a switch inst
-    SwitchInst *theSwitch = SwitchInst::Create(
-            switch_val, 
-            default_block,
-            uniq_blocks.size(),
-            block);
+  const std::vector<VA> &jmpblocks = jmpptr->getJumpTable();
+  std::unordered_set<VA> uniq_blocks(jmpblocks.begin(), jmpblocks.end());
 
-    // populate switch
-    for(const auto & entry : uniq_blocks) 
-    {
-        std::string  bbname = "block_0x"+to_string<VA>(entry.second, std::hex);
-        BasicBlock *toBlock = bbFromStrName(bbname, F);
-        llvm::errs() << __FUNCTION__ << ": Mapping from " << to_string<VA>(entry.first, std::hex) << " => " << bbname << "\n";
-        TASSERT(toBlock != NULL, "Could not find block: "+bbname);
+  // create a switch inst
+  auto theSwitch = llvm::SwitchInst::Create(regVal, default_block,
+                                            uniq_blocks.size(), block);
 
-        ConstantInt *thecase = CONST_V<64>(block, entry.first);
-
-        theSwitch->addCase(
-                thecase,
-                toBlock);
-    }
-
+  // populate switch
+  for (auto blockVA : uniq_blocks) {
+    auto toBlock = ctx.va_to_bb[blockVA];
+    TASSERT(toBlock != NULL, "Could not find block!");
+    auto thecase = CONST_V<bitness>(block, blockVA);
+    theSwitch->addCase(thecase, toBlock);
+  }
 }
 
-void doJumpTableViaSwitchReg(
-        BasicBlock *& block, 
-        InstPtr ip, 
-        Value *regVal,
-        BasicBlock *&default_block,
-        const int bitness)
-{
-    switch(bitness)
-    {
-        case 32:
-            return doJumpTableViaSwitchReg<32>(block, ip, regVal, default_block);
-        case 64:
-            return doJumpTableViaSwitchReg<64>(block, ip, regVal, default_block);
-        default:
-            TASSERT(false, "Invalid bitness!");
-    }
+void doJumpOffsetTableViaSwitchReg(TranslationContext &ctx, llvm::BasicBlock *&block,
+                                   llvm::Value *regVal,
+                                   llvm::BasicBlock *&default_block,
+                                   llvm::Value *data_location,
+                                   MCSOffsetTablePtr ot_ptr) {
+  auto ip = ctx.natI;
+  llvm::errs() << __FUNCTION__ << ": Doing jump offset table via switch(reg)\n";
+  auto F = block->getParent();
+
+  // create a default block that just traps
+  default_block = llvm::BasicBlock::Create(block->getContext(), "",
+                                           block->getParent(), 0);
+  // end default block
+
+  const auto &offset_dest = ot_ptr->getConstTable();
+  std::unordered_map<VA, VA> uniq_blocks;
+  for (auto const &blockpair : offset_dest) {
+    uniq_blocks[blockpair.first] = blockpair.second;
+  }
+
+  // switch on the offset, not the memory value
+  llvm::Value *switch_val = llvm::BinaryOperator::CreateSub(regVal,
+                                                            data_location, "",
+                                                            block);
+  switch_val = llvm::BinaryOperator::CreateAnd(switch_val,
+                                               CONST_V<64>(block, 0xFFFFFFFF),
+                                               "", block);
+  // create a switch inst
+  auto theSwitch = llvm::SwitchInst::Create(switch_val, default_block,
+                                            uniq_blocks.size(), block);
+
+  // populate switch
+  for (const auto &entry : uniq_blocks) {
+    auto toBlock = ctx.va_to_bb[entry.second];
+    TASSERT(toBlock != NULL, "Could not find block!");
+    auto thecase = CONST_V<64>(block, entry.first);
+    theSwitch->addCase(thecase, toBlock);
+  }
 }
 
-static BasicBlock *emitJumpIndexWrite(
-        Function *F,
-        uint8_t idx_val,
-        unsigned dest_reg,
-        BasicBlock *contBlock
-        ) 
-{
-    // create new block
-    BasicBlock *writeBlock = 
-        BasicBlock::Create(F->getContext(), "", F, 0);
-    
-    // write index to destination register
-    R_WRITE<32>(writeBlock, dest_reg, CONST_V<32>(writeBlock, idx_val));
-
-    // jump to continue block
-    BranchInst::Create(contBlock, writeBlock);
-
-    return writeBlock; 
+void doJumpTableViaSwitchReg(TranslationContext &ctx, llvm::BasicBlock *&block,
+                             llvm::Value *regVal,
+                             llvm::BasicBlock *&default_block,
+                             const int bitness) {
+  switch (bitness) {
+    case 32:
+      return doJumpTableViaSwitchReg<32>(ctx, block, regVal, default_block);
+    case 64:
+      return doJumpTableViaSwitchReg<64>(ctx, block, regVal, default_block);
+    default:
+      TASSERT(false, "Invalid bitness!")
+      ;
+  }
 }
 
-void doJumpIndexTableViaSwitch(
-        BasicBlock *&block, 
-        InstPtr ip)
-{
-    Function *F = block->getParent();
-    Module *M = F->getParent();
-    // we know this conforms to
-    // movzx reg32, [base+disp]
+static llvm::BasicBlock *emitJumpIndexWrite(llvm::Function *F, uint8_t idx_val,
+                                            unsigned dest_reg,
+                                            llvm::BasicBlock *contBlock) {
+  // create new block
+  auto writeBlock = llvm::BasicBlock::Create(F->getContext(), "", F, 0);
 
-    // sanity check
-    const MCInst &inst = ip->get_inst();
-    const MCOperand& dest = OP(0);
-    const MCOperand& base = OP(1);
+  // write index to destination register
+  R_WRITE<32>(writeBlock, dest_reg, CONST_V<32>(writeBlock, idx_val));
 
-    TASSERT(base.isReg(), "Conformant jump index tables need base to be a register");
-    TASSERT(dest.isReg(), "Conformant jump index tables need to write to a register");
+  // jump to continue block
+  llvm::BranchInst::Create(contBlock, writeBlock);
 
-    JumpIndexTablePtr idxptr = ip->get_jump_index_table();
+  return writeBlock;
+}
 
-    // to ensure no negative entries
-    Value *adjustment = CONST_V<32>(block, idxptr->getInitialEntry());
-    Value *reg_val = R_READ<32>(block, base.getReg());
-    Value *real_index = 
-        BinaryOperator::Create(Instruction::Add, adjustment, reg_val, "", block);
-   
-    BasicBlock *continueBlock = 
-        BasicBlock::Create(block->getContext(), "", F, 0);
+void doJumpIndexTableViaSwitch(llvm::BasicBlock *&block, NativeInstPtr ip) {
+  auto F = block->getParent();
+  auto M = F->getParent();
+  // we know this conforms to
+  // movzx reg32, [base+disp]
 
-    // create a default block that just traps
-    BasicBlock *defaultBlock = 
-        BasicBlock::Create(block->getContext(), "", F, 0);
-    Function *trapFn = Intrinsic::getDeclaration(M, Intrinsic::trap);
-    CallInst::Create(trapFn, "", defaultBlock);
-    BranchInst::Create(continueBlock, defaultBlock);
-    // end default block
+  // sanity check
+  const auto &inst = ip->get_inst();
+  const auto &dest = OP(0);
+  const auto &base = OP(1);
 
-    const std::vector<uint8_t> &idxblocks = idxptr->getJumpIndexTable();
+  TASSERT(base.isReg(),
+          "Conformant jump index tables need base to be a register");
+  TASSERT(dest.isReg(),
+          "Conformant jump index tables need to write to a register");
 
+  JumpIndexTablePtr idxptr = ip->get_jump_index_table();
 
-    // create a switch inst
-    SwitchInst *theSwitch = SwitchInst::Create(
-            real_index, 
-            defaultBlock,
-            idxblocks.size(),
-            block);
+  // to ensure no negative entries
+  llvm::Value *adjustment = CONST_V<32>(block, idxptr->getInitialEntry());
+  llvm::Value *reg_val = R_READ<32>(block, base.getReg());
+  llvm::Value *real_index = llvm::BinaryOperator::Create(llvm::Instruction::Add,
+                                                         adjustment, reg_val,
+                                                         "", block);
 
-    // populate switch
-    int myindex = 0;
-    for(std::vector<uint8_t>::const_iterator itr = idxblocks.begin();
-        itr != idxblocks.end();
-        itr++) 
-    {
-        BasicBlock *writeBl = emitJumpIndexWrite(F, *itr, dest.getReg(), continueBlock );
-        theSwitch->addCase(CONST_V<32>(block, myindex), writeBl);
-        ++myindex;
-    }
+  auto continueBlock = llvm::BasicBlock::Create(block->getContext(), "", F, 0);
 
-    // new block to write to is continue block
-    block = continueBlock;
+  // create a default block that just traps
+  auto defaultBlock = llvm::BasicBlock::Create(block->getContext(), "", F, 0);
+  auto trapFn = Intrinsic::getDeclaration(M, llvm::Intrinsic::trap);
+  llvm::CallInst::Create(trapFn, "", defaultBlock);
+  llvm::BranchInst::Create(continueBlock, defaultBlock);
+  // end default block
+
+  const auto &idxblocks = idxptr->getJumpIndexTable();
+
+  // create a switch inst
+  auto theSwitch = llvm::SwitchInst::Create(real_index, defaultBlock,
+                                            idxblocks.size(), block);
+
+  // populate switch
+  int myindex = 0;
+  for (auto index : idxblocks) {
+    BasicBlock *writeBl = emitJumpIndexWrite(F, index, dest.getReg(),
+                                             continueBlock);
+    theSwitch->addCase(CONST_V<32>(block, myindex), writeBl);
+    ++myindex;
+  }
+
+  // new block to write to is continue block
+  block = continueBlock;
 }

@@ -40,20 +40,19 @@
 #include "llvm/Support/Debug.h"
 #include "ArchOps.h"
 
-using namespace llvm;
-
 template<int width>
-static InstTransResult doLRet(BasicBlock *b) {
+static InstTransResult doLRet(llvm::BasicBlock *b) {
   //do a read from the location pointed to by ESP
 
   TASSERT(width == 32 || width == 64, "Invalid reg width for RET");
-  auto xsp = 32 == width ? X86::ESP : X86::RSP;
-  Value *rESP = R_READ<width>(b, xsp);
-  Value *nESP = BinaryOperator::CreateAdd(rESP, CONST_V<width>(b, 2 * width / 8),
-                                          "", b);
+  auto xsp = 32 == width ? llvm::X86::ESP : llvm::X86::RSP;
+  auto rESP = R_READ<width>(b, xsp);
+  auto nESP = llvm::BinaryOperator::CreateAdd(rESP,
+                                              CONST_V<width>(b, 2 * width / 8),
+                                              "", b);
 
-  auto xip = 32 == width ? X86::EIP : X86::RIP;
-  Value *ra = M_READ_0<width>(b, rESP);
+  auto xip = 32 == width ? llvm::X86::EIP : llvm::X86::RIP;
+  auto ra = M_READ_0<width>(b, rESP);
   // set EIP -- this is used by the asm stubs that
   // connect translated code and native code
   R_WRITE<width>(b, xip, ra);
@@ -61,23 +60,24 @@ static InstTransResult doLRet(BasicBlock *b) {
   //write back to ESP
   R_WRITE<width>(b, xsp, nESP);
 
-  ReturnInst::Create(b->getContext(), b);
+  llvm::ReturnInst::Create(b->getContext(), b);
 
   return EndCFG;
 }
 
 template<int width>
-static InstTransResult doRet(BasicBlock *b) {
+static InstTransResult doRet(llvm::BasicBlock *b) {
   //do a read from the location pointed to by ESP
 
   TASSERT(width == 32 || width == 64, "Invalid reg width for RET");
   auto xsp = 32 == width ? X86::ESP : X86::RSP;
-  Value *rESP = R_READ<width>(b, xsp);
-  Value *nESP = BinaryOperator::CreateAdd(rESP, CONST_V<width>(b, width / 8),
-                                          "", b);
+  auto rESP = R_READ<width>(b, xsp);
+  auto nESP = llvm::BinaryOperator::CreateAdd(rESP,
+                                              CONST_V<width>(b, width / 8), "",
+                                              b);
 
-  auto xip = 32 == width ? X86::EIP : X86::RIP;
-  Value *ra = M_READ_0<width>(b, rESP);
+  auto xip = 32 == width ? llvm::X86::EIP : llvm::X86::RIP;
+  auto ra = M_READ_0<width>(b, rESP);
   // set EIP -- this is used by the asm stubs that
   // connect translated code and native code
   R_WRITE<width>(b, xip, ra);
@@ -85,46 +85,48 @@ static InstTransResult doRet(BasicBlock *b) {
   //write back to ESP
   R_WRITE<width>(b, xsp, nESP);
 
-  ReturnInst::Create(b->getContext(), b);
+  llvm::ReturnInst::Create(b->getContext(), b);
 
   return EndCFG;
 }
 
 template<int width>
-static InstTransResult doRetI(BasicBlock *&b, const MCOperand &o) {
+static InstTransResult doRetI(llvm::BasicBlock *&b, const llvm::MCOperand &o) {
   TASSERT(width == 32 || width == 64, "Invalid reg width for RETI");
   TASSERT(o.isImm(), "Operand not immediate");
 
-  auto xsp = 32 == width ? X86::ESP : X86::RSP;
-  Value *c = CONST_V<width>(b, o.getImm());
-  Value *rESP = R_READ<width>(b, xsp);
-  Value *ra = M_READ_0<width>(b, rESP);
+  auto xsp = 32 == width ? llvm::X86::ESP : llvm::X86::RSP;
+  auto c = CONST_V<width>(b, o.getImm());
+  auto rESP = R_READ<width>(b, xsp);
+  auto ra = M_READ_0<width>(b, rESP);
   TASSERT(ra != NULL, "Could not read value from stack");
 
-  auto xip = 32 == width ? X86::EIP : X86::RIP;
+  auto xip = 32 == width ? llvm::X86::EIP : llvm::X86::RIP;
   // set EIP -- this is used by the asm stubs that
   // connect translated code and native code
   R_WRITE<width>(b, xip, ra);
   //add the immediate to ESP
-  Value *rESP_1 = BinaryOperator::CreateAdd(rESP, c, "", b);
+  auto rESP_1 = llvm::BinaryOperator::CreateAdd(rESP, c, "", b);
 
   //add pointer width to ESP
-  Value *nESP = BinaryOperator::CreateAdd(rESP_1, CONST_V<width>(b, width / 8),
-                                          "", b);
+  auto nESP = llvm::BinaryOperator::CreateAdd(rESP_1,
+                                              CONST_V<width>(b, width / 8), "",
+                                              b);
 
   //write back to ESP
   R_WRITE<width>(b, xsp, nESP);
 
   //spill all locals into the structure
-  ReturnInst::Create(b->getContext(), b);
+  llvm::ReturnInst::Create(b->getContext(), b);
   return EndCFG;
 }
 
 //emit a nonconditional branch
-static InstTransResult doNonCondBranch(BasicBlock *&b, BasicBlock *tgt) {
+static InstTransResult doNonCondBranch(llvm::BasicBlock *&b,
+                                       llvm::BasicBlock *tgt) {
   TASSERT(tgt != NULL, "Branch to a NULL target");
 
-  BranchInst::Create(tgt, b);
+  llvm::BranchInst::Create(tgt, b);
 
   return EndBlock;
 }
@@ -132,93 +134,96 @@ static InstTransResult doNonCondBranch(BasicBlock *&b, BasicBlock *tgt) {
 //for the LOOP class of instructions, we'll assume that the
 //target of the loop branch has already been defined as a block
 template<size_t width>
-static InstTransResult doLoopIMPL(BasicBlock *&b, BasicBlock *T,
-                                  BasicBlock *F) {
+static InstTransResult doLoopIMPL(llvm::BasicBlock *&b, llvm::BasicBlock *T,
+                                  llvm::BasicBlock *F) {
   TASSERT(T != NULL, "True block is NULL");
   TASSERT(F != NULL, "False block is NULL");
 
   //retrieve ECX
-  auto xcx = 32 == width ? X86::ECX : X86::RCX;
+  auto xcx = 32 == width ? llvm::X86::ECX : llvm::X86::RCX;
 
-  Value *count = R_READ<width>(b, xcx);
+  auto count = R_READ<width>(b, xcx);
   //decrement ECX
-  Value *count_dec = BinaryOperator::CreateSub(count, CONST_V<width>(b, 1), "",
-                                               b);
+  auto count_dec = llvm::BinaryOperator::CreateSub(count, CONST_V<width>(b, 1),
+                                                   "", b);
   //write ECX back into the register
   R_WRITE<width>(b, xcx, count_dec);
 
   //test and see if ECX is 0
-  Value *testRes = new ICmpInst( *b, CmpInst::ICMP_NE, count_dec,
-                                CONST_V<width>(b, 0));
+  auto testRes = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_NE, count_dec,
+                                    CONST_V<width>(b, 0));
 
   //conditionally branch on this result
-  BranchInst::Create(T, F, testRes, b);
+  llvm::BranchInst::Create(T, F, testRes, b);
 
   return EndBlock;
 }
 
 template<int width>
-static InstTransResult doLoopEIMPL(BasicBlock *&b, BasicBlock *T,
-                                   BasicBlock *F) {
+static InstTransResult doLoopEIMPL(llvm::BasicBlock *&b, llvm::BasicBlock *T,
+                                   llvm::BasicBlock *F) {
   TASSERT(T != NULL, "");
   TASSERT(F != NULL, "");
 
   //retrieve ECX
-  auto xcx = 32 == width ? X86::ECX : X86::RCX;
-  Value *count = R_READ<width>(b, xcx);
+  auto xcx = 32 == width ? X86::ECX : llvm::X86::RCX;
+  auto count = R_READ<width>(b, xcx);
   //decrement ECX
-  Value *count_dec = BinaryOperator::CreateSub(count, CONST_V<width>(b, 1), "",
-                                               b);
+  auto count_dec = llvm::BinaryOperator::CreateSub(count, CONST_V<width>(b, 1),
+                                                   "", b);
   //write ECX back into the register
   R_WRITE<width>(b, xcx, count_dec);
 
   //test and see if ECX is 0
-  Value *testRes = new ICmpInst( *b, CmpInst::ICMP_NE, count_dec,
-                                CONST_V<width>(b, 0));
+  auto testRes = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_NE, count_dec,
+                                    CONST_V<width>(b, 0));
 
   //also test and see if ZF is 1
-  Value *zf = F_READ(b, ZF);
-  Value *zfRes = new ICmpInst( *b, CmpInst::ICMP_EQ, zf, CONST_V<1>(b, 1));
+  auto zf = F_READ(b, ZF);
+  auto zfRes = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ, zf,
+                                  CONST_V<1>(b, 1));
 
-  Value *andRes = BinaryOperator::CreateAnd(zfRes, testRes, "", b);
+  auto andRes = llvm::BinaryOperator::CreateAnd(zfRes, testRes, "", b);
   //conditionally branch on this result
-  BranchInst::Create(T, F, andRes, b);
+  llvm::BranchInst::Create(T, F, andRes, b);
 
   return EndBlock;
 }
 
 template<int width>
-static InstTransResult doLoopNEIMPL(BasicBlock *&b, BasicBlock *T,
-                                    BasicBlock *F) {
+static InstTransResult doLoopNEIMPL(llvm::BasicBlock *&b, llvm::BasicBlock *T,
+                                    llvm::BasicBlock *F) {
   TASSERT(T != NULL, "");
   TASSERT(F != NULL, "");
 
   //retrieve ECX
   auto xcx = 32 == width ? X86::ECX : X86::RCX;
-  Value *count = R_READ<width>(b, xcx);
+  auto count = R_READ<width>(b, xcx);
   //decrement ECX
-  Value *count_dec = BinaryOperator::CreateSub(count, CONST_V<width>(b, 1), "",
-                                               b);
+  auto count_dec = llvm::BinaryOperator::CreateSub(count, CONST_V<width>(b, 1),
+                                                   "", b);
   //write ECX back into the register
   R_WRITE<width>(b, xcx, count_dec);
 
   //test and see if ECX is 0
-  Value *testRes = new ICmpInst( *b, CmpInst::ICMP_NE, count_dec,
-                                CONST_V<width>(b, 0));
+  auto testRes = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_NE, count_dec,
+                                    CONST_V<width>(b, 0));
 
   //test and see if ZF is 0
-  Value *zf = F_READ(b, ZF);
-  Value *zfRes = new ICmpInst( *b, CmpInst::ICMP_EQ, zf, CONST_V<1>(b, 0));
+  auto zf = F_READ(b, ZF);
+  auto zfRes = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ, zf,
+                                  CONST_V<1>(b, 0));
 
-  Value *andRes = BinaryOperator::CreateAnd(zfRes, testRes, "", b);
+  auto andRes = llvm::BinaryOperator::CreateAnd(zfRes, testRes, "", b);
   //conditionally branch on this result
-  BranchInst::Create(T, F, andRes, b);
+  llvm::BranchInst::Create(T, F, andRes, b);
 
   return EndBlock;
 }
 
-static InstTransResult doLoop(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
-  llvm::Module *M = b->getParent()->getParent();
+static InstTransResult doLoop(llvm::BasicBlock *&b, llvm::BasicBlock *T,
+                              llvm::BasicBlock *F) {
+  auto M = b->getParent()->getParent();
 
   if (ArchPointerSize(M) == Pointer32) {
     return doLoopIMPL<32>(b, T, F);
@@ -227,8 +232,9 @@ static InstTransResult doLoop(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
   }
 }
 
-static InstTransResult doLoopE(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
-  llvm::Module *M = b->getParent()->getParent();
+static InstTransResult doLoopE(llvm::BasicBlock *&b, llvm::BasicBlock *T,
+                               llvm::BasicBlock *F) {
+  auto M = b->getParent()->getParent();
 
   if (ArchPointerSize(M) == Pointer32) {
     return doLoopEIMPL<32>(b, T, F);
@@ -237,8 +243,9 @@ static InstTransResult doLoopE(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
   }
 }
 
-static InstTransResult doLoopNE(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
-  llvm::Module *M = b->getParent()->getParent();
+static InstTransResult doLoopNE(llvm::BasicBlock *&b, llvm::BasicBlock *T,
+                                llvm::BasicBlock *F) {
+  auto M = b->getParent()->getParent();
 
   if (ArchPointerSize(M) == Pointer32) {
     return doLoopNEIMPL<32>(b, T, F);
@@ -248,81 +255,83 @@ static InstTransResult doLoopNE(BasicBlock *&b, BasicBlock *T, BasicBlock *F) {
 }
 
 template<int width>
-static void writeReturnAddr(BasicBlock *B) {
-  auto xsp = 32 == width ? X86::ESP : X86::RSP;
-  auto xip = 32 == width ? X86::EIP : X86::RIP;
-  Value *espOld = R_READ<width>(B, xsp);
-  Value *espSub = BinaryOperator::CreateSub(espOld,
-                                            CONST_V<width>(B, width / 8), "",
-                                            B);
+static void writeReturnAddr(llvm::BasicBlock *B) {
+  auto xsp = 32 == width ? llvm::X86::ESP : llvm::X86::RSP;
+  auto xip = 32 == width ? llvm::X86::EIP : llvm::X86::RIP;
+  auto espOld = R_READ<width>(B, xsp);
+  auto espSub = llvm::BinaryOperator::CreateSub(espOld,
+                                                CONST_V<width>(B, width / 8),
+                                                "", B);
   M_WRITE_0<width>(B, espSub, CONST_V<width>(B, 0xbadf00d0badbeef0));
   R_WRITE<width>(B, xsp, espSub);
 }
 
 template<int width>
-static void writeDetachReturnAddr(BasicBlock *B) {
-  auto xsp = 32 == width ? X86::ESP : X86::RSP;
-  auto xip = 32 == width ? X86::EIP : X86::RIP;
-  Value *espOld = R_READ<width>(B, xsp);
-  Value *espSub = BinaryOperator::CreateSub(espOld,
-                                            CONST_V<width>(B, width / 8), "",
-                                            B);
+static void writeDetachReturnAddr(llvm::BasicBlock *B) {
+  auto xsp = 32 == width ? llvm::X86::ESP : llvm::X86::RSP;
+  auto xip = 32 == width ? llvm::X86::EIP : llvm::X86::RIP;
+  auto espOld = R_READ<width>(B, xsp);
+  auto espSub = llvm::BinaryOperator::CreateSub(espOld,
+                                                CONST_V<width>(B, width / 8),
+                                                "", B);
   M_WRITE_0<width>(B, espSub, CONST_V<width>(B, 0xde7accccde7acccc));
   R_WRITE<width>(B, xsp, espSub);
 }
 
-static void doCallV(BasicBlock *&block, InstPtr ip, Value *call_addr, bool is_jump) {
+static void doCallV(llvm::BasicBlock *&block, NativeInstPtr ip,
+                    llvm::Value *call_addr, bool is_jump) {
 
-  Function *F = block->getParent();
-  Module *M = F->getParent();
+  auto F = block->getParent();
+  auto M = F->getParent();
   auto &C = M->getContext();
   uint32_t bitWidth = ArchPointerSize(M);
 
   if (_X86_64_ == SystemArch(M)) {
-    R_WRITE<64>(block, X86::RIP, call_addr);
-    if (!is_jump) {
+    R_WRITE<64>(block, llvm::X86::RIP, call_addr);
+    if ( !is_jump) {
       writeDetachReturnAddr<64>(block);
     }
   } else {
-    R_WRITE<32>(block, X86::EIP, call_addr);
-    if (!is_jump) {
+    R_WRITE<32>(block, llvm::X86::EIP, call_addr);
+    if ( !is_jump) {
       writeDetachReturnAddr<32>(block);
     }
   }
 
   auto detach = M->getFunction("__mcsema_detach_call_value");
-  auto call_detach = CallInst::Create(detach, "", block);
+  auto call_detach = llvm::CallInst::Create(detach, "", block);
   call_detach->setCallingConv(CallingConv::C);
 }
 
 template<int width>
-static void doCallM(BasicBlock *&block, InstPtr ip, Value *mem_addr, bool is_jump) {
-  Value *call_addr = M_READ<width>(ip, block, mem_addr);
+static void doCallM(llvm::BasicBlock *&block, NativeInstPtr ip,
+                    llvm::Value *mem_addr, bool is_jump) {
+  auto call_addr = M_READ<width>(ip, block, mem_addr);
   return doCallV(block, ip, call_addr, is_jump);
 }
 
-
 template<int width>
-static llvm::CallInst* emitInternalCall(BasicBlock *&b, Module *M, const std::string &target_fn, bool is_jmp) {
+static llvm::CallInst* emitInternalCall(llvm::BasicBlock *&b, llvm::Module *M,
+                                        const std::string &target_fn,
+                                        bool is_jmp) {
   // we need the parent function to get the regstate argument
-  Function *ourF = b->getParent();
+  auto ourF = b->getParent();
   TASSERT(ourF->arg_size() == 1, "");
 
   // figure out who we are calling
-  Function *targetF = M->getFunction(target_fn);
-  
-  TASSERT(targetF != nullptr, "Could not find target function: "+target_fn);
+  auto targetF = M->getFunction(target_fn);
+
+  TASSERT(targetF != nullptr, "Could not find target function: " + target_fn);
 
   // do we need to push a ret addr?
-  if (!is_jmp) {
+  if ( !is_jmp) {
     writeReturnAddr<width>(b);
   }
 
-
   // emit: call target_fn(regstate);
-  std::vector<Value*> subArgs;
+  std::vector<llvm::Value *> subArgs;
   subArgs.push_back(ourF->arg_begin());
-  CallInst *c = CallInst::Create(targetF, subArgs, "", b);
+  auto c = llvm::CallInst::Create(targetF, subArgs, "", b);
   ArchSetCallingConv(M, c);
 
   // return ptr to this callinst
@@ -330,16 +339,17 @@ static llvm::CallInst* emitInternalCall(BasicBlock *&b, Module *M, const std::st
 }
 
 template<int width>
-static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr, bool is_jump) {
-  Module *M = b->getParent()->getParent();
+static InstTransResult doCallPC(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                VA tgtAddr, bool is_jump) {
+  auto M = b->getParent()->getParent();
 
   //We should be able to look it up in our module.
   std::cout << __FUNCTION__ << "target address : "
             << to_string<VA>(tgtAddr, std::hex) << "\n";
   std::string fname = "sub_" + to_string<VA>(tgtAddr, std::hex);
 
-  CallInst *c = emitInternalCall<width>(b, M, fname, is_jump);
-  Function *F = c->getCalledFunction();
+  auto c = emitInternalCall<width>(b, M, fname, is_jump);
+  auto F = c->getCalledFunction();
 
   if (ip->has_local_noreturn() || F->doesNotReturn()) {
     // noreturn functions just hit unreachable
@@ -348,7 +358,7 @@ static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr, bool is_
               << std::endl;
     c->setDoesNotReturn();
     c->setTailCall();
-    Value *unreachable = new UnreachableInst(b->getContext(), b);
+    auto unreachable = new llvm::UnreachableInst(b->getContext(), b);
     return EndBlock;
   }
   //and we can continue to run the old code
@@ -357,93 +367,91 @@ static InstTransResult doCallPC(InstPtr ip, BasicBlock *&b, VA tgtAddr, bool is_
 }
 
 namespace x86 {
-static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool is_jump) {
-  Module *M = b->getParent()->getParent();
+static InstTransResult doCallPCExtern(llvm::BasicBlock *&b, std::string target,
+                                      bool is_jump) {
+  auto M = b->getParent()->getParent();
 
   //write it into the location pointer to by ESP-4
-  Value *espOld = x86::R_READ<32>(b, X86::ESP);
+  auto espOld = x86::R_READ<32>(b, llvm::X86::ESP);
 
   //lookup the function in the module
-  Function *externFunction = M->getFunction(target);
-  TASSERT(externFunction != NULL, "Could not find external function: " + target);
-  FunctionType *externFunctionTy = externFunction->getFunctionType();
-  Type *rType = externFunction->getReturnType();
+  auto externFunction = M->getFunction(target);
+  TASSERT(externFunction != nullptr,
+          "Could not find external function: " + target);
+  auto externFunctionTy = externFunction->getFunctionType();
+  auto rType = externFunction->getReturnType();
   int paramCount = externFunctionTy->getNumParams();
 
   //now we need to do a series of reads off the stack, essentially
   //a series of POPs but without writing anything back to ESP
-  Value *baseEspVal = NULL;
-  std::vector<Value *> arguments;
+  llvm::Value *baseEspVal = nullptr;
+  std::vector<llvm::Value *> arguments;
 
   // in fastcall, the first two params are passed via register
   // only need to adjust stack if there are more than two args
   //
 
-  Function *exit_point = ArchAddExitPointDriver(externFunction);
+  auto exit_point = ArchAddExitPointDriver(externFunction);
 
   if (externFunction->getCallingConv() == CallingConv::X86_FastCall) {
 
-    Function::ArgumentListType::iterator it = externFunction->getArgumentList()
-        .begin();
-    Function::ArgumentListType::iterator end = externFunction->getArgumentList()
-        .end();
+    auto it = externFunction->getArgumentList().begin();
+    auto end = externFunction->getArgumentList().end();
 
-    Function::ArgumentListType::iterator it_ep = exit_point->getArgumentList()
-        .begin();
-    Function::ArgumentListType::iterator end_ep = exit_point->getArgumentList()
-        .end();
+    auto it_ep = exit_point->getArgumentList().begin();
+    auto end_ep = exit_point->getArgumentList().end();
 
-    AttrBuilder B;
-    B.addAttribute(Attribute::InReg);
+    llvm::AttrBuilder B;
+    B.addAttribute(llvm::Attribute::InReg);
 
     if (paramCount && it != end) {
-      Value *r_ecx = x86::R_READ<32>(b, X86::ECX);
+      auto r_ecx = x86::R_READ<32>(b, llvm::X86::ECX);
       arguments.push_back(r_ecx);
       --paramCount;
       // set argument 1's attribute: make it in a register
-      it->addAttr(AttributeSet::get(it->getContext(), 1, B));
-      it_ep->addAttr(AttributeSet::get(it_ep->getContext(), 1, B));
+      it->addAttr(llvm::AttributeSet::get(it->getContext(), 1, B));
+      it_ep->addAttr(llvm::AttributeSet::get(it_ep->getContext(), 1, B));
       ++it;
       ++it_ep;
     }
 
     if (paramCount && it != end) {
-      Value *r_edx = x86::R_READ<32>(b, X86::EDX);
+      auto r_edx = x86::R_READ<32>(b, llvm::X86::EDX);
       arguments.push_back(r_edx);
       --paramCount;
       // set argument 2's attribute: make it in a register
-      it->addAttr(AttributeSet::get(it->getContext(), 2, B));
-      it_ep->addAttr(AttributeSet::get(it_ep->getContext(), 2, B));
+      it->addAttr(llvm::AttributeSet::get(it->getContext(), 2, B));
+      it_ep->addAttr(llvm::AttributeSet::get(it_ep->getContext(), 2, B));
       ++it;
       ++it_ep;
     }
   }
 
   if (paramCount) {
-    baseEspVal = x86::R_READ<32>(b, X86::ESP);
+    baseEspVal = x86::R_READ<32>(b, llvm::X86::ESP);
     // if this is a JMP, there is already a fake return address
     // on the stack. Skip it to read stack arguments
-    if(is_jump) {
-        baseEspVal = BinaryOperator::CreateAdd(baseEspVal, CONST_V<32>(b, 4), "", b);
+    if (is_jump) {
+      baseEspVal = llvm::BinaryOperator::CreateAdd(baseEspVal,
+                                                   CONST_V<32>(b, 4), "", b);
     }
   }
 
   for (int i = 0; i < paramCount; i++) {
-    Value *vFromStack = M_READ_0<32>(b, baseEspVal);
+    auto vFromStack = M_READ_0<32>(b, baseEspVal);
 
     arguments.push_back(vFromStack);
 
     if (i + 1 != paramCount) {
-      baseEspVal = BinaryOperator::CreateAdd(baseEspVal, CONST_V<32>(b, 4), "",
-                                             b);
+      baseEspVal = llvm::BinaryOperator::CreateAdd(baseEspVal,
+                                                   CONST_V<32>(b, 4), "", b);
     }
   }
 
-  if (!is_jump) {
+  if ( !is_jump) {
     writeDetachReturnAddr<32>(b);
   }
-  CallInst *callR = CallInst::Create(exit_point,
-                                     arguments, "", b);
+  auto callR = llvm::CallInst::Create(exit_point, arguments, "", b);
   callR->setCallingConv(externFunction->getCallingConv());
 
   noAliasMCSemaScope(callR);
@@ -454,7 +462,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
               << std::endl;
     callR->setDoesNotReturn();
     callR->setTailCall();
-    Value *unreachable = new UnreachableInst(b->getContext(), b);
+    (void) new llvm::UnreachableInst(b->getContext(), b);
     return EndBlock;
   }
 
@@ -465,8 +473,8 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
 
   //if our convention says to keep the call result alive then do it
   //really, we could always keep the call result alive...
-  if (rType == Type::getInt32Ty(M->getContext())) {
-    x86::R_WRITE<32>(b, X86::EAX, callR);
+  if (rType == llvm::Type::getInt32Ty(M->getContext())) {
+    x86::R_WRITE<32>(b, llvm::X86::EAX, callR);
   }
 
   return ContinueBlock;
@@ -475,14 +483,16 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
 
 namespace x86_64 {
 
-static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool is_jump) {
-  Module *M = b->getParent()->getParent();
+static InstTransResult doCallPCExtern(llvm::BasicBlock *&b, std::string target,
+                                      bool is_jump) {
+  auto M = b->getParent()->getParent();
 
   //lookup the function in the module
-  Function *externFunction = M->getFunction(target);
-  TASSERT(externFunction != NULL, "Could not find external function: " + target);
-  FunctionType *externFunctionTy = externFunction->getFunctionType();
-  Type *rType = externFunction->getReturnType();
+  auto externFunction = M->getFunction(target);
+  TASSERT(externFunction != nullptr,
+          "Could not find external function: " + target);
+  auto externFunctionTy = externFunction->getFunctionType();
+  auto rType = externFunction->getReturnType();
   int paramCount = externFunctionTy->getNumParams();
   //std::string 	funcSign = externFunction->getSignature();
 
@@ -495,157 +505,157 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
 
   //now we need to do a series of reads off the stack, essentially
   //a series of POPs but without writing anything back to ESP
-  Value *baseRspVal = NULL;
-  std::vector<Value *> arguments;
+  llvm::Value *baseRspVal = nullptr;
+  std::vector<llvm::Value *> arguments;
 
   // on x86_64 platform all calls will be x86_64_SysV
-  Function::ArgumentListType::iterator it = externFunction->getArgumentList()
-      .begin();
-  Function::ArgumentListType::iterator end = externFunction->getArgumentList()
-      .end();
-  AttrBuilder B;
-  B.addAttribute(Attribute::InReg);
+  auto it = externFunction->getArgumentList().begin();
+  auto end = externFunction->getArgumentList().end();
+  llvm::AttrBuilder B;
+  B.addAttribute(llvm::Attribute::InReg);
 
   if (SystemOS(M) == llvm::Triple::Win32) {
     if (paramCount && it != end) {
-      Type *T = it->getType();
-      Value *arg1;
+      auto T = it->getType();
+      llvm::Value *arg1 = nullptr;
       if (T->isDoubleTy()) {
         int k = x86_64::getRegisterOffset(XMM0);
-        Value *arg1FieldGEPV[] = {CONST_V<64>(b, 0), CONST_V<32>(b, k)};
+        llvm::Value *arg1FieldGEPV[] = {CONST_V<64>(b, 0), CONST_V<32>(b, k)};
 
-        Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(
+        auto GEP_128 = llvm::GetElementPtrInst::CreateInBounds(
             b->getParent()->arg_begin(), arg1FieldGEPV, "XMM0", b);
-        Instruction *GEP_double = CastInst::CreatePointerCast(
-            GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0),
+        auto GEP_double = llvm::CastInst::CreatePointerCast(
+            GEP_128,
+            llvm::PointerType::get(llvm::Type::getDoubleTy(M->getContext()), 0),
             "conv0", b);
-        arg1 = new LoadInst(GEP_double, "", b);
+        arg1 = new llvm::LoadInst(GEP_double, "", b);
 
       } else {
-        arg1 = x86_64::R_READ<64>(b, X86::RCX);
+        arg1 = x86_64::R_READ<64>(b, llvm::X86::RCX);
       }
 
       arguments.push_back(arg1);
       --paramCount;
-      it->addAttr(AttributeSet::get(it->getContext(), 1, B));
+      it->addAttr(llvm::AttributeSet::get(it->getContext(), 1, B));
       ++it;
     }
 
     if (paramCount && it != end) {
-      Type *T = it->getType();
-      Value *arg2;
+      auto T = it->getType();
+      llvm::Value *arg2 = nullptr;
       if (T->isDoubleTy()) {
         int k = x86_64::getRegisterOffset(XMM1);
-        Value *arg2FieldGEPV[] = {CONST_V<64>(b, 0), CONST_V<32>(b, k)};
+        llvm::Value *arg2FieldGEPV[] = {CONST_V<64>(b, 0), CONST_V<32>(b, k)};
 
-        Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(
+        auto GEP_128 = llvm::GetElementPtrInst::CreateInBounds(
             b->getParent()->arg_begin(), arg2FieldGEPV, "XMM1", b);
-        Instruction *GEP_double = CastInst::CreatePointerCast(
-            GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0),
+        auto GEP_double = llvm::CastInst::CreatePointerCast(
+            GEP_128,
+            llvm::PointerType::get(llvm::Type::getDoubleTy(M->getContext()), 0),
             "conv1", b);
-        arg2 = new LoadInst(GEP_double, "", b);
-      } else
-        arg2 = x86_64::R_READ<64>(b, X86::RDX);
-
+        arg2 = new llvm::LoadInst(GEP_double, "", b);
+      } else {
+        arg2 = x86_64::R_READ<64>(b, llvm::X86::RDX);
+      }
       arguments.push_back(arg2);
       --paramCount;
-      it->addAttr(AttributeSet::get(it->getContext(), 2, B));
+      it->addAttr(llvm::AttributeSet::get(it->getContext(), 2, B));
       ++it;
     }
 
     if (paramCount && it != end) {
-      Type *T = it->getType();
-      Value *arg3;
+      auto T = it->getType();
+      llvm::Value *arg3 = nullptr;
       if (T->isDoubleTy()) {
         int k = x86_64::getRegisterOffset(XMM2);
-        Value *arg3FieldGEPV[] = {CONST_V<64>(b, 0), CONST_V<32>(b, k)};
+        llvm::Value *arg3FieldGEPV[] = {CONST_V<64>(b, 0), CONST_V<32>(b, k)};
 
-        Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(
+        auto GEP_128 = llvm::GetElementPtrInst::CreateInBounds(
             b->getParent()->arg_begin(), arg3FieldGEPV, "XMM2", b);
-        Instruction *GEP_double = CastInst::CreatePointerCast(
-            GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0),
+        auto GEP_double = llvm::CastInst::CreatePointerCast(
+            GEP_128,
+            llvm::PointerType::get(llvm::Type::getDoubleTy(M->getContext()), 0),
             "conv2", b);
-        arg3 = new LoadInst(GEP_double, "", b);
+        arg3 = new llvm::LoadInst(GEP_double, "", b);
+      } else {
+        arg3 = x86_64::R_READ<64>(b, llvm::X86::R8);
       }
-
-      else
-        arg3 = x86_64::R_READ<64>(b, X86::R8);
-
       arguments.push_back(arg3);
       --paramCount;
-      it->addAttr(AttributeSet::get(it->getContext(), 3, B));
+      it->addAttr(llvm::AttributeSet::get(it->getContext(), 3, B));
       ++it;
     }
 
     if (paramCount && it != end) {
-      Type *T = it->getType();
-      Value *arg4;
+      auto T = it->getType();
+      llvm::Value *arg4 = nullptr;
       if (T->isDoubleTy()) {
         int k = x86_64::getRegisterOffset(XMM3);
-        Value *arg4FieldGEPV[] = {CONST_V<64>(b, 0), CONST_V<32>(b, k)};
+        llvm::Value *arg4FieldGEPV[] = {CONST_V<64>(b, 0), CONST_V<32>(b, k)};
 
-        Instruction *GEP_128 = GetElementPtrInst::CreateInBounds(
+        auto GEP_128 = llvm::GetElementPtrInst::CreateInBounds(
             b->getParent()->arg_begin(), arg4FieldGEPV, "XMM3", b);
-        Instruction *GEP_double = CastInst::CreatePointerCast(
-            GEP_128, PointerType::get(Type::getDoubleTy(M->getContext()), 0),
+        auto GEP_double = llvm::CastInst::CreatePointerCast(
+            GEP_128,
+            llvm::PointerType::get(llvm::Type::getDoubleTy(M->getContext()), 0),
             "conv3", b);
-        arg4 = new LoadInst(GEP_double, "", b);
-      } else
-        arg4 = x86_64::R_READ<64>(b, X86::R9);
-
+        arg4 = new llvm::LoadInst(GEP_double, "", b);
+      } else {
+        arg4 = x86_64::R_READ<64>(b, llvm::X86::R9);
+      }
       arguments.push_back(arg4);
       --paramCount;
-      it->addAttr(AttributeSet::get(it->getContext(), 4, B));
+      it->addAttr(llvm::AttributeSet::get(it->getContext(), 4, B));
       ++it;
     }
   } else {
     if (paramCount && it != end) {
       // fix it by updating the value type
-      Value *reg_rdi = x86_64::R_READ<64>(b, X86::RDI);
+      auto reg_rdi = x86_64::R_READ<64>(b, llvm::X86::RDI);
       arguments.push_back(reg_rdi);
       --paramCount;
-      it->addAttr(AttributeSet::get(it->getContext(), 1, B));
+      it->addAttr(llvm::AttributeSet::get(it->getContext(), 1, B));
       ++it;
 
     }
 
     if (paramCount && it != end) {
-      Value *reg_rsi = x86_64::R_READ<64>(b, X86::RSI);
+      auto reg_rsi = x86_64::R_READ<64>(b, llvm::X86::RSI);
       arguments.push_back(reg_rsi);
       --paramCount;
-      it->addAttr(AttributeSet::get(it->getContext(), 2, B));
+      it->addAttr(llvm::AttributeSet::get(it->getContext(), 2, B));
       ++it;
     }
 
     if (paramCount && it != end) {
-      Value *reg_rdx = x86_64::R_READ<64>(b, X86::RDX);
+      auto reg_rdx = x86_64::R_READ<64>(b, llvm::X86::RDX);
       arguments.push_back(reg_rdx);
       --paramCount;
-      it->addAttr(AttributeSet::get(it->getContext(), 3, B));
+      it->addAttr(llvm::AttributeSet::get(it->getContext(), 3, B));
       ++it;
     }
 
     if (paramCount && it != end) {
-      Value *reg_rcx = x86_64::R_READ<64>(b, X86::RCX);
+      auto reg_rcx = x86_64::R_READ<64>(b, llvm::X86::RCX);
       arguments.push_back(reg_rcx);
       --paramCount;
-      it->addAttr(AttributeSet::get(it->getContext(), 4, B));
+      it->addAttr(llvm::AttributeSet::get(it->getContext(), 4, B));
       ++it;
     }
 
     if (paramCount && it != end) {
-      Value *reg_r8 = x86_64::R_READ<64>(b, X86::R8);
+      auto reg_r8 = x86_64::R_READ<64>(b, llvm::X86::R8);
       arguments.push_back(reg_r8);
       --paramCount;
-      it->addAttr(AttributeSet::get(it->getContext(), 5, B));
+      it->addAttr(llvm::AttributeSet::get(it->getContext(), 5, B));
       ++it;
     }
 
     if (paramCount && it != end) {
-      Value *reg_r9 = x86_64::R_READ<64>(b, X86::R9);
+      auto reg_r9 = x86_64::R_READ<64>(b, llvm::X86::R9);
       arguments.push_back(reg_r9);
       --paramCount;
-      it->addAttr(AttributeSet::get(it->getContext(), 6, B));
+      it->addAttr(llvm::AttributeSet::get(it->getContext(), 6, B));
       ++it;
     }
   }
@@ -653,40 +663,42 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
   if (paramCount) {
     // rest of the arguments are passed over stack
     // adjust the stack pointer if required
-    baseRspVal = x86_64::R_READ<64>(b, X86::RSP);
+    baseRspVal = x86_64::R_READ<64>(b, llvm::X86::RSP);
 
     // The Windows amd64 calling convention requires
     // 32-bytes of stack reserved in each function call. At the call point,
     // the stack is already pre-reserved, so the arguments start 32 bytes up
     // of where we would expect
     if (SystemOS(M) == llvm::Triple::Win32) {
-        baseRspVal = BinaryOperator::CreateAdd(baseRspVal, CONST_V<64>(b, 0x20), "", b);
+      baseRspVal = llvm::BinaryOperator::CreateAdd(baseRspVal,
+                                                   CONST_V<64>(b, 0x20), "", b);
     }
 
     // if this is a JMP, there is already a fake return address
     // on the stack. Skip it to read stack arguments
-    if(is_jump) {
-        baseRspVal = BinaryOperator::CreateAdd(baseRspVal, CONST_V<64>(b, 8), "", b);
+    if (is_jump) {
+      baseRspVal = llvm::BinaryOperator::CreateAdd(baseRspVal,
+                                                   CONST_V<64>(b, 8), "", b);
     }
   }
 
   for (int i = 0; i < paramCount; i++) {
-    Value *vFromStack = M_READ_0<64>(b, baseRspVal);
+    auto vFromStack = M_READ_0<64>(b, baseRspVal);
 
     arguments.push_back(vFromStack);
 
     if (i + 1 != paramCount) {
-      baseRspVal = BinaryOperator::CreateAdd(baseRspVal, CONST_V<64>(b, 8), "",
-                                             b);
+      baseRspVal = llvm::BinaryOperator::CreateAdd(baseRspVal,
+                                                   CONST_V<64>(b, 8), "", b);
     }
   }
 
-  if (!is_jump) {
+  if ( !is_jump) {
     writeDetachReturnAddr<64>(b);
   }
 
-  CallInst *callR = CallInst::Create(ArchAddExitPointDriver(externFunction),
-                                     arguments, "", b);
+  auto callR = llvm::CallInst::Create(ArchAddExitPointDriver(externFunction),
+                                      arguments, "", b);
   ArchSetCallingConv(M, callR);
 
   if (externFunction->doesNotReturn()) {
@@ -695,13 +707,13 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
               << std::endl;
     callR->setDoesNotReturn();
     callR->setTailCall();
-    Value *unreachable = new UnreachableInst(b->getContext(), b);
+    (void) new llvm::UnreachableInst(b->getContext(), b);
     return EndBlock;
   }
 
   //if our convention says to keep the call result alive then do it
   //really, we could always keep the call result alive...
-  if (rType == Type::getInt64Ty(M->getContext())) {
+  if (rType == llvm::Type::getInt64Ty(M->getContext())) {
     x86_64::R_WRITE<64>(b, X86::RAX, callR);
   }
 
@@ -711,9 +723,12 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool i
 }
 
 template<int width>
-static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
-                                      InstPtr ip, MCInst &inst) {
+static InstTransResult translate_JMPm(TranslationContext &ctx,
+                                      llvm::BasicBlock *& block) {
   InstTransResult ret;
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
 
   // translate JMP mem64 API calls
   // as a call <api>, ret;
@@ -723,11 +738,12 @@ static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
 
     // this is really an internal call; this calling convention
     // is reserved for functions that we are going to implement internally
-    if(ip->get_ext_call_target()->getCallingConvention() == ExternalCodeRef::McsemaCall) {
-        Module *M = block->getParent()->getParent();
-        std::string target_fn = ArchNameMcsemaCall(s);
-        emitInternalCall<width>(block, M, target_fn, true);
-        return ContinueBlock;
+    if (ip->get_ext_call_target()->getCallingConvention()
+        == ExternalCodeRef::McsemaCall) {
+      auto M = block->getParent()->getParent();
+      std::string target_fn = ArchNameMcSemaCall(s);
+      emitInternalCall<width>(block, M, target_fn, true);
+      return ContinueBlock;
     }
 
     if (64 == width) {
@@ -736,15 +752,15 @@ static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
       ret = x86::doCallPCExtern(block, s, true);
     }
     if (ret != EndBlock) {
-        //doRet<width>(block);
-        llvm::ReturnInst::Create(block->getContext(), block);
-        return EndBlock;
+      //doRet<width>(block);
+      llvm::ReturnInst::Create(block->getContext(), block);
+      return EndBlock;
     } else {
-        // the external was a call to donotreturn function
-        return ret;
+      // the external was a call to donotreturn function
+      return ret;
     }
   } else if (ip->has_ext_data_ref()) {
-    Module *M = block->getParent()->getParent();
+    auto M = block->getParent()->getParent();
 
     std::string target = ip->get_ext_data_ref()->getSymbolName();
     llvm::Value *gvar = M->getGlobalVariable(target);
@@ -761,14 +777,14 @@ static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
   } else if (ip->has_jump_table() && ip->has_mem_reference) {
     // this is a jump table that got converted
     // into a table in the data section
-    doJumpTableViaData(natM, block, ip, inst, width);
+    doJumpTableViaData(ctx, block, width);
     llvm::ReturnInst::Create(block->getContext(), block);
     return EndBlock;
 
   } else if (ip->has_jump_table()) {
     // this is a conformant jump table
     // emit an llvm switch
-    doJumpTableViaSwitch(natM, block, ip, inst, width);
+    doJumpTableViaSwitch(ctx, block, width);
     return EndBlock;
 
   } else if (ip->has_mem_reference) {
@@ -784,28 +800,30 @@ static InstTransResult translate_JMPm(NativeModulePtr natM, BasicBlock *& block,
 }
 
 template<int width>
-static InstTransResult translate_JMPr(NativeModulePtr natM, BasicBlock *&block,
-                                      InstPtr ip, MCInst &inst) {
-  const MCOperand &tgtOp = inst.getOperand(0);
+static InstTransResult translate_JMPr(TranslationContext &ctx,
+                                      llvm::BasicBlock *&block) {
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  const auto &tgtOp = inst.getOperand(0);
 
   TASSERT(inst.getNumOperands() == 1, "");
   TASSERT(tgtOp.isReg(), "");
 
   //read the register
-  Value *fromReg = R_READ<width>(block, tgtOp.getReg());
+  auto fromReg = R_READ<width>(block, tgtOp.getReg());
 
-  Module *M = block->getParent()->getParent();
+  auto M = block->getParent()->getParent();
 
   VA ot_addr = ip->offset_table;
 
   // does this inst have an offset table?
   if (ot_addr != -1) {
-    auto ot_value = natM->offsetTables.find(ot_addr);
+    auto ot_value = ctx.natM->offset_tables.find(ot_addr);
     TASSERT(
-        ot_value != natM->offsetTables.end(),
+        ot_value != ctx.natM->offset_tables.end(),
         "Could not find offset table for addr:"
             + to_string<VA>(ot_addr, std::hex));
-    if (ot_value != natM->offsetTables.end()) {
+    if (ot_value != ctx.natM->offset_tables.end()) {
       llvm::dbgs() << __FUNCTION__ << ": We have an offset table for: "
                    << to_string<VA>(ip->get_loc(), std::hex) << " at: "
                    << to_string<VA>(ot_addr, std::hex) << "\n";
@@ -813,22 +831,21 @@ static InstTransResult translate_JMPr(NativeModulePtr natM, BasicBlock *&block,
       VA data_section = 0;
       MCSOffsetTablePtr ot = ot_value->second;
       VA old_table_addr = ot->getStartAddr();
-      Value *global_v = getGlobalFromOriginalAddr<width>(old_table_addr, natM,
-                                                         0, block);
+      auto global_v = getGlobalFromOriginalAddr<width>(old_table_addr, ctx.natM,
+                                                       0, block);
       TASSERT(
           global_v != nullptr,
           "Could not find global for addr:"
               + to_string<VA>(old_table_addr, std::hex));
 
       if (global_v != nullptr) {
-        BasicBlock *defaultb = nullptr;
-        doJumpOffsetTableViaSwitchReg(block, ip, fromReg, defaultb, global_v,
+        llvm::BasicBlock *defaultb = nullptr;
+        doJumpOffsetTableViaSwitchReg(ctx, block, fromReg, defaultb, global_v,
                                       ot);
         // add trap to default block
-        Function *trapIntrin = Intrinsic::getDeclaration(M, Intrinsic::trap);
-        CallInst::Create(trapIntrin, "", defaultb);
-        Value *unreachable = new UnreachableInst(defaultb->getContext(),
-                                                 defaultb);
+        auto trapIntrin = Intrinsic::getDeclaration(M, llvm::Intrinsic::trap);
+        llvm::CallInst::Create(trapIntrin, "", defaultb);
+        (void) new llvm::UnreachableInst(defaultb->getContext(), defaultb);
         return EndCFG;
       }
     }
@@ -840,23 +857,23 @@ static InstTransResult translate_JMPr(NativeModulePtr natM, BasicBlock *&block,
     llvm::dbgs() << __FUNCTION__ << ": jump table via register: "
                  << to_string<VA>(ip->get_loc(), std::hex) << "\n";
 
-    BasicBlock *defaultb = nullptr;
+    llvm::BasicBlock *defaultb = nullptr;
 
     // Terrible HACK
     // Subtract image base since we assume win64 adds it for jump
     // tables. This may not always be true.
-    Value *minus_base = nullptr;
+    llvm::Value *minus_base = nullptr;
     if (width == 64 && shouldSubtractImageBase(M)) {
       minus_base = doSubtractImageBaseInt(fromReg, block);
     } else {
       minus_base = fromReg;
     }
     // end terrible HACK
-    doJumpTableViaSwitchReg(block, ip, minus_base, defaultb, width);
+    doJumpTableViaSwitchReg(ctx, block, minus_base, defaultb, width);
     TASSERT(defaultb != nullptr, "Default block has to exit");
     // fallback to doing do_call_value
     doCallV(defaultb, ip, fromReg, true);
-    ReturnInst::Create(defaultb->getContext(), defaultb);
+    llvm::ReturnInst::Create(defaultb->getContext(), defaultb);
     return EndCFG;
 
   } else {
@@ -864,27 +881,30 @@ static InstTransResult translate_JMPr(NativeModulePtr natM, BasicBlock *&block,
     llvm::dbgs() << __FUNCTION__ << ": regular jump via register: "
                  << to_string<VA>(ip->get_loc(), std::hex) << "\n";
     doCallV(block, ip, fromReg, true);
-    ReturnInst::Create(block->getContext(), block);
+    llvm::ReturnInst::Create(block->getContext(), block);
     return EndCFG;
   }
 }
 
 template<int width>
-static InstTransResult translate_CALLpcrel32(NativeModulePtr natM,
-                                             BasicBlock *& block, InstPtr ip,
-                                             MCInst &inst) {
+static InstTransResult translate_CALLpcrel32(TranslationContext &ctx,
+                                             llvm::BasicBlock *&block) {
   InstTransResult ret;
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
 
   if (ip->has_ext_call_target()) {
     std::string s = ip->get_ext_call_target()->getSymbolName();
-    if(ip->get_ext_call_target()->getCallingConvention() == ExternalCodeRef::McsemaCall) {
-        Module *M = block->getParent()->getParent();
-        std::string target_fn = ArchNameMcsemaCall(s);
-        emitInternalCall<width>(block, M, target_fn, false);
-        return ContinueBlock;
+    if (ip->get_ext_call_target()->getCallingConvention()
+        == ExternalCodeRef::McsemaCall) {
+      auto M = block->getParent()->getParent();
+      std::string target_fn = ArchNameMcSemaCall(s);
+      emitInternalCall<width>(block, M, target_fn, false);
+      return ContinueBlock;
     } else {
       llvm::dbgs() << __FUNCTION__ << ": function is: " << s << ", cc is: "
-                   << ip->get_ext_call_target()->getCallingConvention() << "\n";       
+                   << ip->get_ext_call_target()->getCallingConvention() << "\n";
     }
     if (width == 64) {
       ret = x86_64::doCallPCExtern(block, s, false);
@@ -892,21 +912,24 @@ static InstTransResult translate_CALLpcrel32(NativeModulePtr natM,
       ret = x86::doCallPCExtern(block, s, false);
     }
   } else if (ip->has_code_ref()) {
-    int64_t off = (int64_t) ip->get_reference(Inst::MEMRef);
+    VA off = ip->get_reference(NativeInst::MEMRef);
     ret = doCallPC<width>(ip, block, off, false);
   } else {
-    int64_t off = (int64_t) OP(0).getImm();
-    ret = doCallPC<width>(ip, block, ip->get_loc() + ip->get_len() + off, false);
+    VA off = OP(0).getImm();
+    ret = doCallPC<width>(ip, block, ip->get_loc() + ip->get_len() + off,
+                          false);
   }
 
   return ret;
 }
 
 template<int width>
-static InstTransResult translate_CALLm(NativeModulePtr natM,
-                                       BasicBlock *& block, InstPtr ip,
-                                       MCInst &inst) {
+static InstTransResult translate_CALLm(TranslationContext &ctx,
+                                       llvm::BasicBlock *&block) {
   InstTransResult ret;
+  auto natM = ctx.natM;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
 
   // is this an external call?
   if (ip->has_ext_call_target()) {
@@ -914,11 +937,12 @@ static InstTransResult translate_CALLm(NativeModulePtr natM,
 
     // this is really an internal call; this calling convention
     // is reserved for functions that we are going to implement internally
-    if(ip->get_ext_call_target()->getCallingConvention() == ExternalCodeRef::McsemaCall) {
-        Module *M = block->getParent()->getParent();
-        std::string target_fn = ArchNameMcsemaCall(s);
-        emitInternalCall<width>(block, M, target_fn, false);
-        return ContinueBlock;
+    if (ip->get_ext_call_target()->getCallingConvention()
+        == ExternalCodeRef::McsemaCall) {
+      auto M = block->getParent()->getParent();
+      std::string target_fn = ArchNameMcSemaCall(s);
+      emitInternalCall<width>(block, M, target_fn, false);
+      return ContinueBlock;
     }
 
     if (width == 64) {
@@ -930,7 +954,7 @@ static InstTransResult translate_CALLm(NativeModulePtr natM,
     // not external call, but some weird way of calling local function?
   } else if (ip->has_code_ref()) {
     cout << __FUNCTION__ << ":" << __LINE__ << ": doing call" << std::endl;
-    doCallPC<width>(ip, block, ip->get_reference(Inst::MEMRef), false);
+    doCallPC<width>(ip, block, ip->get_reference(NativeInst::MEMRef), false);
   }
   // is this referencing global data?
   else if (ip->has_mem_reference) {
@@ -946,9 +970,11 @@ static InstTransResult translate_CALLm(NativeModulePtr natM,
 }
 
 template<int width>
-static InstTransResult translate_CALLr(NativeModulePtr natM, BasicBlock *&block,
-                                       InstPtr ip, MCInst &inst) {
-  const MCOperand &tgtOp = inst.getOperand(0);
+static InstTransResult translate_CALLr(TranslationContext &ctx,
+                                       llvm::BasicBlock *&block) {
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  const auto &tgtOp = inst.getOperand(0);
   //we are calling a register! this is VERY EXCITING
   //first, we need to know which register we are calling. read that
   //register, then make a call to the external procedure.
@@ -959,23 +985,16 @@ static InstTransResult translate_CALLr(NativeModulePtr natM, BasicBlock *&block,
   TASSERT(tgtOp.isReg(), "");
 
   //read the register
-  Value *fromReg = R_READ<width>(block, tgtOp.getReg());
-
-  Module *M = block->getParent()->getParent();
-  const std::string &triple = M->getTargetTriple();
-
+  auto fromReg = R_READ<width>(block, tgtOp.getReg());
   doCallV(block, ip, fromReg, false);
-
   return ContinueBlock;
 }
 
-#define BLOCKNAMES_TRANSLATION(NAME, THECALL) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *& block, InstPtr ip, MCInst &inst) {\
-    Function *F = block->getParent(); \
-    std::string  trueStrName = "block_0x"+to_string<VA>(ip->get_tr(), std::hex); \
-    std::string  falseStrName = "block_0x"+to_string<VA>(ip->get_fa(), std::hex); \
-    BasicBlock          *ifTrue = bbFromStrName(trueStrName, F); \
-    TASSERT(ifTrue != NULL, "Could not find true block:"+trueStrName); \
-    BasicBlock          *ifFalse = bbFromStrName(falseStrName, F); \
+#define BLOCKNAMES_TRANSLATION(NAME, THECALL) static InstTransResult translate_ ## NAME (TranslationContext &ctx, llvm::BasicBlock *&block) {\
+    auto F = block->getParent(); \
+    auto ip = ctx.natI; \
+    auto ifTrue = ctx.va_to_bb[ip->get_tr()]; \
+    auto ifFalse = ctx.va_to_bb[ip->get_fa()]; \
     InstTransResult ret;\
     ret = THECALL ; \
     return ret ;\
@@ -992,16 +1011,15 @@ GENERIC_TRANSLATION(RETIQ, doRetI<64>(block, OP(0)))
 
 GENERIC_TRANSLATION(LRET, doLRet<32>(block))
 
-
 BLOCKNAMES_TRANSLATION(JMP_4, doNonCondBranch(block, ifTrue))
 BLOCKNAMES_TRANSLATION(JMP_2, doNonCondBranch(block, ifTrue))
 BLOCKNAMES_TRANSLATION(JMP_1, doNonCondBranch(block, ifTrue))
 
 void Branches_populateDispatchMap(DispatchMap &m) {
-  m[X86::JMP32r] = (translate_JMPr<32> );
-  m[X86::JMP32m] = (translate_JMPm<32> );
-  m[X86::JMP64r] = (translate_JMPr<64> );
-  m[X86::JMP64m] = (translate_JMPm<64> );
+  m[X86::JMP32r] = translate_JMPr<32>;
+  m[X86::JMP32m] = translate_JMPm<32>;
+  m[X86::JMP64r] = translate_JMPr<64>;
+  m[X86::JMP64m] = translate_JMPm<64>;
 
   m[X86::JMP_4] = translate_JMP_4;
   m[X86::JMP_2] = translate_JMP_2;
@@ -1009,10 +1027,10 @@ void Branches_populateDispatchMap(DispatchMap &m) {
 
   m[X86::CALLpcrel32] = (translate_CALLpcrel32<32> );
   m[X86::CALL64pcrel32] = (translate_CALLpcrel32<64> );
-  m[X86::CALL32m] = (translate_CALLm<32> );
-  m[X86::CALL64m] = (translate_CALLm<64> );
-  m[X86::CALL32r] = (translate_CALLr<32> );
-  m[X86::CALL64r] = (translate_CALLr<64> );
+  m[X86::CALL32m] = translate_CALLm<32>;
+  m[X86::CALL64m] = translate_CALLm<64>;
+  m[X86::CALL32r] = translate_CALLr<32>;
+  m[X86::CALL64r] = translate_CALLr<64>;
 
   m[X86::LOOP] = translate_LOOP;
   m[X86::LOOPE] = translate_LOOPE;
@@ -1022,7 +1040,6 @@ void Branches_populateDispatchMap(DispatchMap &m) {
   m[X86::RETQ] = translate_RETQ;
   m[X86::RETIQ] = translate_RETIQ;
   m[X86::RETIW] = translate_RETIW;
-
 
   m[X86::LRETL] = translate_LRET;
 }

@@ -64,8 +64,6 @@ typedef std::vector<llvm::Value*> regDefT;
 //registers via alloca and then copies into them from the structure argument
 void setupFlow(llvm::Function *, regDefT &);
 
-llvm::BasicBlock *bbFromStrName(std::string n, llvm::Function *F);
-
 ///////////////////////////////////////////////////////////////////////////////
 // state modeling functions
 ///////////////////////////////////////////////////////////////////////////////
@@ -105,7 +103,6 @@ static llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t width,
   llvm::IntegerType *bTy = llvm::Type::getIntNTy(b->getContext(), width);
   return llvm::ConstantInt::get(bTy, val);
 }
-
 
 llvm::Value *MCRegToValue(llvm::BasicBlock *b, unsigned reg);
 
@@ -149,11 +146,11 @@ llvm::Value *R_READ(llvm::BasicBlock *b, int reg) {
 }
 }
 
-llvm::Value *INTERNAL_M_READ(unsigned width, unsigned addrspace, llvm::BasicBlock *b,
-                             llvm::Value *addr);
+llvm::Value *INTERNAL_M_READ(unsigned width, unsigned addrspace,
+                             llvm::BasicBlock *b, llvm::Value *addr);
 
 template<int width>
-llvm::Value *M_READ(InstPtr ip, llvm::BasicBlock *b, llvm::Value *addr) {
+llvm::Value *M_READ(NativeInstPtr ip, llvm::BasicBlock *b, llvm::Value *addr) {
   return INTERNAL_M_READ(width, ip->get_addr_space(), b, addr);
 }
 
@@ -163,14 +160,14 @@ llvm::Value *M_READ_0(llvm::BasicBlock *b, llvm::Value *addr) {
 }
 
 // defined in raiseX86.cpp
-void M_WRITE_T(InstPtr ip, llvm::BasicBlock *b, llvm::Value *addr,
+void M_WRITE_T(NativeInstPtr ip, llvm::BasicBlock *b, llvm::Value *addr,
                llvm::Value *data, llvm::Type *ptrtype);
 
 void INTERNAL_M_WRITE(int width, unsigned addrspace, llvm::BasicBlock *b,
                       llvm::Value *addr, llvm::Value *data);
 
 template<int width>
-void M_WRITE(InstPtr ip, llvm::BasicBlock *b, llvm::Value *addr,
+void M_WRITE(NativeInstPtr ip, llvm::BasicBlock *b, llvm::Value *addr,
              llvm::Value *data) {
   return INTERNAL_M_WRITE(width, ip->get_addr_space(), b, addr, data);
 }
@@ -189,23 +186,16 @@ void F_SET(llvm::BasicBlock *b, MCSemaRegs flag);
 
 void F_CLEAR(llvm::BasicBlock *b, MCSemaRegs flag);
 
-void allocateLocals(llvm::Function *, int);
-
-llvm::BasicBlock *bbFromStrName(std::string, llvm::Function *);
+void ArchAllocRegisterVars(llvm::BasicBlock *, int);
 
 ///////////////////////////////////////////////////////////////////////////////
 // API usage functions
 ///////////////////////////////////////////////////////////////////////////////
 
-InstTransResult liftInstr(InstPtr ip, llvm::BasicBlock *&block,
-                         NativeBlockPtr nb, llvm::Function *F,
-                         NativeFunctionPtr natF, NativeModulePtr natM,
-                         bool doAnnotation);
-
 llvm::Value *makeCallbackForLocalFunction(llvm::Module *M, VA local_target);
 
 void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
-                                DataSection& ds, llvm::Module *M,
+                                const DataSection &ds, llvm::Module *M,
                                 std::vector<llvm::Constant*>& secContents,
                                 std::vector<llvm::Type*>& data_section_types,
                                 bool convert_to_callback);

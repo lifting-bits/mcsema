@@ -58,12 +58,12 @@ Value *doAndVV32(BasicBlock *&b, Value *o1, Value *o2) {
 }
 
 template<int width>
-static Value * doAndVV(InstPtr ip, BasicBlock *&b, Value *o1, Value *o2) {
+static Value * doAndVV(NativeInstPtr ip, BasicBlock *&b, Value *o1, Value *o2) {
   return doAndVV<width>(b, o1, o2);
 }
 
 template<int width>
-static InstTransResult doAndMI(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doAndMI(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &imm) {
   TASSERT(addr != NULL, "");
   TASSERT(imm.isImm(), "");
@@ -79,7 +79,7 @@ static InstTransResult doAndMI(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doAndMV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doAndMV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                Value *rhs) {
   TASSERT(addr != NULL, "");
   TASSERT(rhs != NULL, "");
@@ -94,7 +94,7 @@ static InstTransResult doAndMV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doAndMR(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doAndMR(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &src) {
   TASSERT(addr != NULL, "");
   TASSERT(src.isReg(), "");
@@ -110,7 +110,7 @@ static InstTransResult doAndMR(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doAndRI(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
+static InstTransResult doAndRI(NativeInstPtr ip, BasicBlock *&b, const MCOperand &dst,
                                const MCOperand &o1, const MCOperand &o2) {
   TASSERT(dst.isReg(), "");
   TASSERT(o1.isReg(), "");
@@ -125,7 +125,7 @@ static InstTransResult doAndRI(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
 }
 
 template<int width>
-static InstTransResult doAndRV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doAndRV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &o1, const MCOperand &o2) {
   TASSERT(o2.isReg(), "");
   TASSERT(o1.isReg(), "");
@@ -138,7 +138,7 @@ static InstTransResult doAndRV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doAndRM(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doAndRM(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &o1, const MCOperand &dst) {
   TASSERT(dst.isReg(), "");
   TASSERT(addr != NULL, "");
@@ -153,7 +153,7 @@ static InstTransResult doAndRM(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doAndRR(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
+static InstTransResult doAndRR(NativeInstPtr ip, BasicBlock *&b, const MCOperand &dst,
                                const MCOperand &o1, const MCOperand &o2) {
   TASSERT(dst.isReg(), "");
   TASSERT(o1.isReg(), "");
@@ -168,7 +168,7 @@ static InstTransResult doAndRR(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
 }
 
 template<int width>
-static Value * doNotV(InstPtr ip, BasicBlock *&b, Value *v) {
+static Value * doNotV(NativeInstPtr ip, BasicBlock *&b, Value *v) {
   TASSERT(v != NULL, "");
 
   Value *highest = NULL;
@@ -200,7 +200,7 @@ static Value * doNotV(InstPtr ip, BasicBlock *&b, Value *v) {
 }
 
 template<int width>
-static InstTransResult doNotM(InstPtr ip, BasicBlock *&b, Value *a) {
+static InstTransResult doNotM(NativeInstPtr ip, BasicBlock *&b, Value *a) {
   TASSERT(a != NULL, "");
 
   Value *m = M_READ<width>(ip, b, a);
@@ -213,7 +213,7 @@ static InstTransResult doNotM(InstPtr ip, BasicBlock *&b, Value *a) {
 }
 
 template<int width>
-static InstTransResult doNotR(InstPtr ip, BasicBlock *&b, const MCOperand &o) {
+static InstTransResult doNotR(NativeInstPtr ip, BasicBlock *&b, const MCOperand &o) {
   TASSERT(o.isReg(), "");
 
   Value *r = R_READ<width>(b, o.getReg());
@@ -226,7 +226,7 @@ static InstTransResult doNotR(InstPtr ip, BasicBlock *&b, const MCOperand &o) {
 }
 
 template<int width>
-static Value * doOrVV(InstPtr ip, BasicBlock *&b, Value *o1, Value *o2) {
+static Value * doOrVV(NativeInstPtr ip, BasicBlock *&b, Value *o1, Value *o2) {
   // Do the operation.
   Value *result = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
 
@@ -242,7 +242,7 @@ static Value * doOrVV(InstPtr ip, BasicBlock *&b, Value *o1, Value *o2) {
 }
 
 template<int width>
-static InstTransResult doOrMI(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doOrMI(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                               const MCOperand &imm) {
   TASSERT(addr != NULL, "");
   TASSERT(imm.isImm(), "");
@@ -258,7 +258,7 @@ static InstTransResult doOrMI(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doOrMV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doOrMV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                               Value *rhs) {
   TASSERT(addr != NULL, "");
   TASSERT(rhs != NULL, "");
@@ -273,7 +273,7 @@ static InstTransResult doOrMV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doOrMR(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doOrMR(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                               const MCOperand &src) {
   TASSERT(addr != NULL, "");
   TASSERT(src.isReg(), "");
@@ -289,7 +289,7 @@ static InstTransResult doOrMR(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doOrRI(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
+static InstTransResult doOrRI(NativeInstPtr ip, BasicBlock *&b, const MCOperand &dst,
                               const MCOperand &o1, const MCOperand &o2) {
   TASSERT(dst.isReg(), "");
   TASSERT(o1.isReg(), "");
@@ -304,7 +304,7 @@ static InstTransResult doOrRI(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
 }
 
 template<int width>
-static InstTransResult doOrRV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doOrRV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                               const MCOperand &o1, const MCOperand &o2) {
   TASSERT(o2.isReg(), "");
   TASSERT(o1.isReg(), "");
@@ -317,7 +317,7 @@ static InstTransResult doOrRV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doOrRM(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doOrRM(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                               const MCOperand &o1, const MCOperand &dst) {
   TASSERT(addr != NULL, "");
   TASSERT(o1.isReg(), "");
@@ -332,7 +332,7 @@ static InstTransResult doOrRM(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doOrRR(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
+static InstTransResult doOrRR(NativeInstPtr ip, BasicBlock *&b, const MCOperand &dst,
                               const MCOperand &o1, const MCOperand &o2) {
   TASSERT(dst.isReg(), "");
   TASSERT(o1.isReg(), "");
@@ -347,7 +347,7 @@ static InstTransResult doOrRR(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
 }
 
 template<int width>
-static Value * doXorVV(InstPtr ip, BasicBlock *&b, Value *o1, Value *o2) {
+static Value * doXorVV(NativeInstPtr ip, BasicBlock *&b, Value *o1, Value *o2) {
   Value *xoredVal = BinaryOperator::Create(Instruction::Xor, o1, o2, "", b);
 
   // Clear CF and OF.
@@ -366,7 +366,7 @@ static Value * doXorVV(InstPtr ip, BasicBlock *&b, Value *o1, Value *o2) {
 }
 
 template<int width>
-static InstTransResult doXorMI(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doXorMI(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &imm) {
   TASSERT(addr != NULL, "");
   TASSERT(imm.isImm(), "");
@@ -381,7 +381,7 @@ static InstTransResult doXorMI(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doXorMV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doXorMV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                Value *rhs) {
   TASSERT(addr != NULL, "");
   TASSERT(rhs != NULL, "");
@@ -395,7 +395,7 @@ static InstTransResult doXorMV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doXorMR(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doXorMR(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &reg) {
   TASSERT(addr != NULL, "");
   TASSERT(reg.isReg(), "");
@@ -409,7 +409,7 @@ static InstTransResult doXorMR(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doXorRI(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
+static InstTransResult doXorRI(NativeInstPtr ip, BasicBlock *&b, const MCOperand &dst,
                                const MCOperand &o1, const MCOperand &o2) {
   TASSERT(dst.isReg(), "");
   TASSERT(o1.isReg(), "");
@@ -424,7 +424,7 @@ static InstTransResult doXorRI(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
 }
 
 template<int width>
-static InstTransResult doXorRV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doXorRV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &o1, const MCOperand &o2) {
   TASSERT(o1.isReg(), "");
   TASSERT(o2.isReg(), "");
@@ -437,7 +437,7 @@ static InstTransResult doXorRV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doXorRM(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
+static InstTransResult doXorRM(NativeInstPtr ip, BasicBlock *&b, const MCOperand &dst,
                                const MCOperand &src1, Value *mem) {
   TASSERT(mem != NULL, "");
   TASSERT(dst.isReg(), "");
@@ -452,7 +452,7 @@ static InstTransResult doXorRM(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
 }
 
 template<int width>
-static InstTransResult doXorRR(InstPtr ip, BasicBlock *&b, const MCOperand &dst,
+static InstTransResult doXorRR(NativeInstPtr ip, BasicBlock *&b, const MCOperand &dst,
                                const MCOperand &o1, const MCOperand &o2) {
   TASSERT(dst.isReg(), "");
   TASSERT(o1.isReg(), "");

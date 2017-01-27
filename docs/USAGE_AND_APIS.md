@@ -1,12 +1,12 @@
 # Usage and APIs
 
-To use mcsema on its valid input files, two tools are provided: `bin_descend` for control flow recovery and `cfg_to_bc` for translation. The `bin_descend` tool takes as input a valid COFF object or PE DLL, and recovers its control flow. The `cfg_to_bc` tool takes a control flow graph in Google protocol buffer format, and translates it into LLVM bitcode. The generated bitcode is not optimized and will be very noisy with unnecessarily live variables. Unoptimized bitcode is useful for debugging translation errors, but before use this bitcode should be run through the LLVM `opt` tool.
+The `cfg_to_bc` tool takes a control flow graph in Google protocol buffer format, and translates it into LLVM bitcode. The generated bitcode is not optimized and will be very noisy with unnecessarily live variables. Unoptimized bitcode is useful for debugging translation errors, but before use this bitcode should be run through the LLVM `opt` tool.
 
 More information on the syntax and usage of each tool is in the TOOLS document.
 
 ## CFG Recovery
 
-The `bin_descend` tool performs recursive descent based control flow recovery on COFF objects and PE DLLs. The output is a serialized Google protocol buffer, defined in `CFG.proto`. This CFG is then used in by the translator to generate LLVM bitcode. 
+CFG recovery is performed using an IDAPython script, `mc-sema/bin_descend/get_cfg.py`. The output is a serialized Google protocol buffer, defined in `CFG.proto`. This CFG is then used in by the translator to generate LLVM bitcode. 
 
 The following is a description of the current (November, 2013) of the fields in the protocol.
 
@@ -190,7 +190,7 @@ The Module message represents all the recovered information about the input prog
 
 ### External Calls
 
-Since external calls (e.g. calls to APIs or other compilation units) are not translated by mcsema, their semantics must be accurately known to reference them from translated code. The information needed about external calls is external name, calling convention, number of arguments, and whether or not the call returns. The `bin_descend` tool identifies information about external calls from a definition file specified by the `-func-map` argument. A default mapping, that includes the vast majority of the Windows API, is provided in `mc-sema/std_defs/std_defs.txt`.
+Since external calls (e.g. calls to APIs or other compilation units) are not translated by mcsema, their semantics must be accurately known to reference them from translated code. The information needed about external calls is external name, calling convention, number of arguments, and whether or not the call returns. A default mapping, that includes the vast majority of the Windows API, is provided in `mc-sema/std_defs/std_defs.txt`.
 
 ## Translation
 
@@ -217,7 +217,7 @@ All functions referenced in the data section are assumed to be used as callbacks
 
 ## Using the bitcode
 
-The bitcode output can be used as input to `opt` for optimization and to `llc` as input for object file generation. The demos in `mc-sema/tests` show how to use `bin_descend`, `cfg_to_bc`, `opt` and `llc` to take a COFF object, translate it, and link it with existing code.
+The bitcode output can be used as input to `opt` for optimization and to `llc` as input for object file generation. The demos in `mc-sema/tests` show how to use `cfg_to_bc`, `opt` and `llc` to take a COFF object, translate it, and link it with existing code.
 
 Prior to using any generated bitcode, it is recommended to run it through `opt` with the `-O3` optimization level.
 

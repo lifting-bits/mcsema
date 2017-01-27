@@ -1,13 +1,13 @@
 #ifndef ARCHOPS_H
 #define ARCHOPS_H
 
+#include <cstdint>
+
 #include "llvm/IR/Value.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/ADT/Triple.h"
-
-#include <boost/cstdint.hpp>
 
 typedef uint64_t VA;
 
@@ -44,7 +44,7 @@ SystemArchType SystemArch(llvm::Module *M);
 
 PointerSize ArchPointerSize(llvm::Module *M);
 
-std::string ArchNameMcsemaCall(const std::string &name);
+std::string ArchNameMcSemaCall(const std::string &name);
 
 
 template <int width>

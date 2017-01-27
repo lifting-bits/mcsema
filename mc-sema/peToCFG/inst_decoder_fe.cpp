@@ -1,31 +1,32 @@
 /*
-Copyright (c) 2014, Trail of Bits
-All rights reserved.
+ Copyright (c) 2014, Trail of Bits
+ All rights reserved.
 
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
+ Redistribution and use in source and binary forms, with or without modification,
+ are permitted provided that the following conditions are met:
 
-  Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
+ Redistributions of source code must retain the above copyright notice, this
+ list of conditions and the following disclaimer.
 
-  Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
-  other materials provided with the distribution.
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
+ other materials provided with the distribution.
 
-  Neither the name of Trail of Bits nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
+ Neither the name of Trail of Bits nor the names of its
+ contributors may be used to endorse or promote products derived from
+ this software without specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #include "peToCFG.h"
 #include "X86.h"
 #include <LExcn.h>
@@ -33,113 +34,107 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "llvm/Support/Debug.h"
 
 using namespace std;
-using namespace boost;
 using namespace llvm;
 
+LLVMByteDecoder::LLVMByteDecoder(const std::string &triple,
+                                 const llvm::Target *target_)
+      : STI(target_->createMCSubtargetInfo(triple, "", "")),
+        MRI(target_->createMCRegInfo(triple)),
+        AsmInfo(target_->createMCAsmInfo(*MRI, triple)),
+        Ctx(new llvm::MCContext(AsmInfo, MRI, nullptr)),
+        DisAsm(target_->createMCDisassembler( *this->STI, *Ctx)),
+        TT(triple),
+        target(target_) {}
 
-InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
-  InstPtr           inst;
-  llvm::MCInst      mcInst;
-  ::uint64_t    insLen;
-  VA                nextVA = addr;
-  ::uint32_t        arch_type;
+NativeInstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
+  NativeInstPtr inst;
+  llvm::MCInst mcInst;
+  uint64_t insLen;
+  VA nextVA = addr;
+  uint32_t arch_type;
 
   uint8_t prefixes[0x100] = {0};
 
-  llvm::MCDisassembler::DecodeStatus  s;
-
+  llvm::MCDisassembler::DecodeStatus s;
 
   bool have_prefix = true;
   size_t bmo_size = bmo->getExtent() - bmo->getBase();
-  while(have_prefix)
-  {
-      insLen = 0;
-      s = DisAsm->getInstruction( mcInst,
-                                  insLen,
-                                  *bmo,
-                                  ((::uint64_t)nextVA),
-                                  llvm::nulls(),
-                                  llvm::nulls());
+  while (have_prefix) {
+    insLen = 0;
+    s = DisAsm->getInstruction(mcInst, insLen, *bmo, ((uint64_t) nextVA),
+                               llvm::nulls(), llvm::nulls());
 
-      if(s == llvm::MCDisassembler::Success && bmo_size > 1)
-      {
-          switch(mcInst.getOpcode()) {
-              case llvm::X86::REP_PREFIX:
-                  prefixes[0xF3] = 1;
-                  break;
-              case llvm::X86::REPNE_PREFIX:
-                  prefixes[0xF2] = 1;
-                  break;
-              case llvm::X86::LOCK_PREFIX:
-                  prefixes[0xF0] = 1;
-                  break;
-              default:
-                  have_prefix = false;
-          }
-
-      } else {
+    if (s == llvm::MCDisassembler::Success && bmo_size > 1) {
+      switch (mcInst.getOpcode()) {
+        case llvm::X86::REP_PREFIX:
+          prefixes[0xF3] = 1;
+          break;
+        case llvm::X86::REPNE_PREFIX:
+          prefixes[0xF2] = 1;
+          break;
+        case llvm::X86::LOCK_PREFIX:
+          prefixes[0xF0] = 1;
+          break;
+        default:
           have_prefix = false;
-          break;
       }
 
-      if(have_prefix) {
-          nextVA += 1;
-      } else {
-          for(int i = 0; i < 0x100; i++) {
-              if(prefixes[i] == 1) {
-                  mcInst.prefixPresent[i] = 1;
-              }
-          }
-          break;
-          // set prefixes
+    } else {
+      have_prefix = false;
+      break;
+    }
+
+    if (have_prefix) {
+      nextVA += 1;
+    } else {
+      for (int i = 0; i < 0x100; i++) {
+        if (prefixes[i] == 1) {
+          mcInst.prefixPresent[i] = 1;
+        }
       }
+      break;
+      // set prefixes
+    }
   }
 
-  Inst::Prefix    pfx = Inst::NoPrefix;
-  if(s == llvm::MCDisassembler::Success) {
+  NativeInst::Prefix pfx = NativeInst::NoPrefix;
+  if (s == llvm::MCDisassembler::Success) {
 
-    if( mcInst.getOpcode() == llvm::X86::MOVSL && mcInst.hasPrefix(0xF3) ) {
-        mcInst.setOpcode(llvm::X86::REP_MOVSD_32);
-    } else if( mcInst.hasPrefix(0xF2) ) {
-        pfx = Inst::RepNePrefix;
-    } else if( mcInst.hasPrefix(0xF3) ) {
-        pfx = Inst::RepPrefix;
-    } else if ( mcInst.hasPrefix(0x64) ) {
-        pfx = Inst::FSPrefix;
-    } else if ( mcInst.hasPrefix(0x64) ) {
-        pfx = Inst::GSPrefix;
+    if (mcInst.getOpcode() == llvm::X86::MOVSL && mcInst.hasPrefix(0xF3)) {
+      mcInst.setOpcode(llvm::X86::REP_MOVSD_32);
+    } else if (mcInst.hasPrefix(0xF2)) {
+      pfx = NativeInst::RepNePrefix;
+    } else if (mcInst.hasPrefix(0xF3)) {
+      pfx = NativeInst::RepPrefix;
+    } else if (mcInst.hasPrefix(0x64)) {
+      pfx = NativeInst::FSPrefix;
+    } else if (mcInst.hasPrefix(0x64)) {
+      pfx = NativeInst::GSPrefix;
     }
 
-    string                      outS;
-    llvm::raw_string_ostream    osOut(outS);
-    MCOperand                   oper;
+    MCOperand oper;
 
-    this->IP->printInst(&mcInst, osOut, "");
-    vector<uint8_t>  bytes;
-	  //store the bytes from the MO in the inst
-	  for(unsigned int i = 0; i < insLen; i++) {
+    std::vector<uint8_t> bytes;
+
+    //store the bytes from the MO in the inst
+    for (unsigned int i = 0; i < insLen; i++) {
       uint8_t b;
-      int     k = bmo->readByte(addr+i, &b);
+      int k = bmo->readByte(addr + i, &b);
       LASSERT(k == 0, "Failed to read data when decoder could");
       bytes.push_back(b);
-	  }
-    inst = InstPtr(new Inst(  addr,
-                              insLen,
-                              mcInst,
-                              osOut.str(),
-                              pfx,
-                              bytes));
+    }
+    inst = NativeInstPtr(new NativeInst(addr, insLen, mcInst, pfx, bytes));
 
-    for (unsigned i = 0; i < mcInst.getNumOperands(); ++i) {
-        const MCOperand &Op = mcInst.getOperand(i);
+    for (auto i = 0U; i < mcInst.getNumOperands(); ++i) {
+      const MCOperand &Op = mcInst.getOperand(i);
 
-        if (Op.isReg() && Op.getReg() == X86::RIP)
-            inst->set_rip_relative(i);
+      if (Op.isReg() && Op.getReg() == X86::RIP) {
+        inst->set_rip_relative(i);
+      }
     }
 
-
     //ask if this is a jmp, and figure out what the true / false follows are
-    switch(mcInst.getOpcode()) {
+    switch (mcInst.getOpcode()) {
       case X86::JMP32m:
       case X86::JMP32r:
       case X86::JMP64m:
@@ -158,7 +153,7 @@ InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
       case X86::JMP_4:
       case X86::JMP_1:
         oper = mcInst.getOperand(0);
-        if(oper.isImm()) {
+        if (oper.isImm()) {
           nextVA += oper.getImm() + insLen;
           inst->set_tr(nextVA);
         } else {
@@ -211,8 +206,8 @@ InstPtr LLVMByteDecoder::getInstFromBuff(VA addr, llvm::MemoryObject *bmo) {
     }
 
   } else {
-    string  s = to_string<VA>(addr, hex);
-    throw LErr(__LINE__, __FILE__, "Failed to decode address 0x"+s);
+    string s = to_string<VA>(addr, hex);
+    throw LErr(__LINE__, __FILE__, "Failed to decode address 0x" + s);
   }
 
   return inst;

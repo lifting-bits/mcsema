@@ -8,35 +8,23 @@
 
 #include <string>
 
-using namespace std;
-using namespace llvm;
-
-const char MCSEMA_ANNOT_STRING[] = "mcsema_real_eip";
+const char * const kRealEIPAnnotation = "mcsema_real_eip";
 
 void addAnnotation(llvm::Instruction *inst, VA addr) {
-
-    Constant *C = ConstantInt::get(Type::getInt64Ty(llvm::getGlobalContext()), addr);
-    MDNode *n = MDNode::get(llvm::getGlobalContext(), C);
-
-    inst->setMetadata(MCSEMA_ANNOT_STRING, n);
+  auto C = llvm::ConstantInt::get(
+      llvm::Type::getInt64Ty(llvm::getGlobalContext()), addr);
+  auto n = llvm::MDNode::get(llvm::getGlobalContext(), C);
+  inst->setMetadata(kRealEIPAnnotation, n);
 }
 
 bool getAnnotation(llvm::Instruction *inst, VA &its_eip) {
-    MDNode *metad = inst->getMetadata(MCSEMA_ANNOT_STRING);
-    if(metad == nullptr) {
-        return false;
-    }
-
-    Value *val = metad->getOperand(0);
-    if(val == nullptr) {
-        return false;
-    }
-
-    if (ConstantInt *ci = dyn_cast<ConstantInt>(val)) {
+  if (auto metad = inst->getMetadata(kRealEIPAnnotation)) {
+    if (auto val = metad->getOperand(0)) {
+      if (auto ci = llvm::dyn_cast<llvm::ConstantInt>(val)) {
         its_eip = ci->getLimitedValue();
-
         return true;
+      }
     }
-
-    return false;
+  }
+  return false;
 }

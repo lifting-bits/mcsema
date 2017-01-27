@@ -39,7 +39,7 @@ using namespace llvm;
 using namespace std;
 
 template<int width>
-static void doMulV(InstPtr ip, BasicBlock *&b, Value *rhs) {
+static void doMulV(NativeInstPtr ip, BasicBlock *&b, Value *rhs) {
   // Handle the different source register depending on the bit width
   Value *lhs;
 
@@ -101,7 +101,7 @@ static void doMulV(InstPtr ip, BasicBlock *&b, Value *rhs) {
 }
 
 template<int width>
-static InstTransResult doMulR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doMulR(NativeInstPtr ip, BasicBlock *&b,
                               const MCOperand &src) {
   NASSERT(src.isReg());
 
@@ -111,7 +111,7 @@ static InstTransResult doMulR(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doMulM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doMulM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
   NASSERT(memAddr != NULL);
 
   doMulV<width>(ip, b, M_READ<width>(ip, b, memAddr));
@@ -125,7 +125,7 @@ struct IMulRes {
 };
 
 template<int width>
-static IMulRes doIMulVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs) {
+static IMulRes doIMulVV(NativeInstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs) {
   //model the semantics of the signed multiply
   Value *a1 = lhs;
   Value *a2 = rhs;
@@ -152,7 +152,7 @@ static IMulRes doIMulVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs) {
 }
 
 template<int width>
-static IMulRes doIMulV(InstPtr ip, BasicBlock *&b, Value *rhs) {
+static IMulRes doIMulV(NativeInstPtr ip, BasicBlock *&b, Value *rhs) {
   // Handle the different source register depending on the bit width
   Value *lhs;
 
@@ -176,7 +176,7 @@ static IMulRes doIMulV(InstPtr ip, BasicBlock *&b, Value *rhs) {
 }
 
 template<int width>
-static InstTransResult doIMulR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doIMulR(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &src) {
   NASSERT(src.isReg());
 
@@ -215,7 +215,7 @@ static InstTransResult doIMulR(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doIMulM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
+static InstTransResult doIMulM(NativeInstPtr ip, BasicBlock *&b, Value *memAddr) {
   NASSERT(memAddr != NULL);
 
   auto imul_res = doIMulV<width>(ip, b, M_READ<width>(ip, b, memAddr));
@@ -250,7 +250,7 @@ static InstTransResult doIMulM(InstPtr ip, BasicBlock *&b, Value *memAddr) {
 }
 
 template<int width>
-static InstTransResult doIMulRM(InstPtr ip, BasicBlock *&b,
+static InstTransResult doIMulRM(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &dst, const MCOperand &lhs,
                                 Value *rhs) {
   NASSERT(dst.isReg());
@@ -266,7 +266,7 @@ static InstTransResult doIMulRM(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doIMulRR(InstPtr ip, BasicBlock *&b,
+static InstTransResult doIMulRR(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &dst, const MCOperand &lhs,
                                 const MCOperand &rhs) {
   NASSERT(dst.isReg());
@@ -282,13 +282,13 @@ static InstTransResult doIMulRR(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static Value *doIMulVVV(InstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs) {
+static Value *doIMulVVV(NativeInstPtr ip, BasicBlock *&b, Value *lhs, Value *rhs) {
 
   return doIMulVV<width>(ip, b, lhs, rhs).trunc;
 }
 
 template<int width>
-static InstTransResult doIMulRMI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doIMulRMI(NativeInstPtr ip, BasicBlock *&b,
                                  const MCOperand &dst, Value *lhs,
                                  const MCOperand &rhs) {
   NASSERT(dst.isReg());
@@ -304,7 +304,7 @@ static InstTransResult doIMulRMI(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doIMulRMV(InstPtr ip, BasicBlock *&b,
+static InstTransResult doIMulRMV(NativeInstPtr ip, BasicBlock *&b,
                                  const MCOperand &dst, Value *lhs,
                                  Value *rhs) {
   NASSERT(dst.isReg());
@@ -318,7 +318,7 @@ static InstTransResult doIMulRMV(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doIMulRRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doIMulRRI(NativeInstPtr ip, BasicBlock *&b,
                                  const MCOperand &dst, const MCOperand &lhs,
                                  const MCOperand &rhs) {
   NASSERT(dst.isReg());
@@ -334,7 +334,7 @@ static InstTransResult doIMulRRI(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doIMulRRV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doIMulRRV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                  const MCOperand &lhs, const MCOperand &dst) {
   NASSERT(dst.isReg());
   NASSERT(lhs.isReg());
@@ -347,7 +347,7 @@ static InstTransResult doIMulRRV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doIMulRMI8(InstPtr ip, BasicBlock *&b,
+static InstTransResult doIMulRMI8(NativeInstPtr ip, BasicBlock *&b,
                                   const MCOperand &dst, Value *lhs,
                                   const MCOperand &rhs) {
   NASSERT(dst.isReg());
@@ -366,7 +366,7 @@ static InstTransResult doIMulRMI8(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doIMulRRI8(InstPtr ip, BasicBlock *&b,
+static InstTransResult doIMulRRI8(NativeInstPtr ip, BasicBlock *&b,
                                   const MCOperand &dst, const MCOperand &lhs,
                                   const MCOperand &rhs) {
   NASSERT(dst.isReg());
@@ -385,7 +385,7 @@ static InstTransResult doIMulRRI8(InstPtr ip, BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doDivV(InstPtr ip, BasicBlock *&b, Value *divisor, 
+static InstTransResult doDivV(NativeInstPtr ip, BasicBlock *&b, Value *divisor, 
         llvm::Instruction::BinaryOps whichdiv) {
 
     //read in EDX and EAX
@@ -482,7 +482,7 @@ static InstTransResult doDivV(InstPtr ip, BasicBlock *&b, Value *divisor,
 }
 
 template <int width>
-static InstTransResult doIDivR(InstPtr ip,  BasicBlock *&b,
+static InstTransResult doIDivR(NativeInstPtr ip,  BasicBlock *&b,
                         const MCOperand &div)
 {
     NASSERT(div.isReg());
@@ -495,7 +495,7 @@ static InstTransResult doIDivR(InstPtr ip,  BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doIDivM(InstPtr ip, BasicBlock *&b, Value *memLoc) {
+static InstTransResult doIDivM(NativeInstPtr ip, BasicBlock *&b, Value *memLoc) {
     NASSERT(memLoc != NULL);
 
     Value   *from_mem = M_READ<width>(ip, b, memLoc);
@@ -506,7 +506,7 @@ static InstTransResult doIDivM(InstPtr ip, BasicBlock *&b, Value *memLoc) {
 }
 
 template <int width>
-static InstTransResult doDivR(InstPtr ip,  BasicBlock *&b,
+static InstTransResult doDivR(NativeInstPtr ip,  BasicBlock *&b,
                         const MCOperand &div)
 {
     NASSERT(div.isReg());
@@ -519,7 +519,7 @@ static InstTransResult doDivR(InstPtr ip,  BasicBlock *&b,
 }
 
 template <int width>
-static InstTransResult doDivM(InstPtr ip, BasicBlock *&b, Value *memLoc) {
+static InstTransResult doDivM(NativeInstPtr ip, BasicBlock *&b, Value *memLoc) {
     NASSERT(memLoc != NULL);
 
     Value   *from_mem = M_READ<width>(ip, b, memLoc);

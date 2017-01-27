@@ -49,7 +49,7 @@ static Value *getBit(BasicBlock *b, Value *val, int which) {
 }
 
 template<int width, Instruction::BinaryOps shift_op>
-static Value *doShiftOp(InstPtr ip, BasicBlock *b, Value *src, Value *count) {
+static Value *doShiftOp(NativeInstPtr ip, BasicBlock *b, Value *src, Value *count) {
 
   // get the masked count variable
   int count_max = (width == 64) ? 63 : 31;
@@ -172,12 +172,12 @@ static Value *doShiftOp(InstPtr ip, BasicBlock *b, Value *src, Value *count) {
 }
 
 Value *doShrVV32(BasicBlock *&b, Value *src, Value *count) {
-  return doShiftOp<32, Instruction::LShr>(InstPtr((Inst*) (nullptr)), b, src,
+  return doShiftOp<32, Instruction::LShr>(NativeInstPtr((NativeInst*) (nullptr)), b, src,
                                           count);
 }
 
 template<int width>
-static Value *doShldVV(InstPtr ip, BasicBlock *&b, Value* addr,
+static Value *doShldVV(NativeInstPtr ip, BasicBlock *&b, Value* addr,
                        unsigned srcReg1,
                        //unsigned shiftBy)
                        Value* shiftBy) {
@@ -217,7 +217,7 @@ static Value *doShldVV(InstPtr ip, BasicBlock *&b, Value* addr,
 }
 
 template<int width>
-static Value *doShldRV(InstPtr ip, BasicBlock *&b, unsigned dstReg,
+static Value *doShldRV(NativeInstPtr ip, BasicBlock *&b, unsigned dstReg,
                        unsigned srcReg1, Value* shiftBy) {
   Value *from_left = R_READ<width>(b, dstReg);
   Value *reg_val = doShldVV<width>(ip, b, from_left, srcReg1, shiftBy);
@@ -227,7 +227,7 @@ static Value *doShldRV(InstPtr ip, BasicBlock *&b, unsigned dstReg,
 }
 
 template<int width>
-static Value *doShldMV(InstPtr ip, BasicBlock *&b, Value *addr,
+static Value *doShldMV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                        unsigned srcReg1, Value *shiftBy) {
   Value *from_left = M_READ<width>(ip, b, addr);
   Value *mem_val = doShldVV<width>(ip, b, from_left, srcReg1, shiftBy);
@@ -237,7 +237,7 @@ static Value *doShldMV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static Value *doShrdVV(InstPtr ip, BasicBlock *&b, unsigned dstReg,
+static Value *doShrdVV(NativeInstPtr ip, BasicBlock *&b, unsigned dstReg,
                        unsigned srcReg1,
                        //unsigned shiftBy)
                        Value* shiftBy) {
@@ -280,11 +280,11 @@ static Value *doShrdVV(InstPtr ip, BasicBlock *&b, unsigned dstReg,
 Value *ShrdVV32(BasicBlock *&b, unsigned dstReg, unsigned srcReg1,
                 Value* shiftBy) {
 
-  return doShrdVV<32>(InstPtr((Inst*) (NULL)), b, dstReg, srcReg1, shiftBy);
+  return doShrdVV<32>(NativeInstPtr((NativeInst*) (NULL)), b, dstReg, srcReg1, shiftBy);
 }
 
 template<int width>
-static InstTransResult doShrdRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doShrdRI(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &dst, const MCOperand &src1,
                                 const MCOperand &src2) {
   TASSERT(src2.isImm(), "");
@@ -298,7 +298,7 @@ static InstTransResult doShrdRI(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doShldRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doShldRI(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &dst, const MCOperand &src1,
                                 const MCOperand &src2) {
   TASSERT(src2.isImm(), "");
@@ -322,7 +322,7 @@ static Value *getShifyByValueFromCLRegister(BasicBlock *&b) {
 }
 
 template<int width>
-static InstTransResult doShldRCL(InstPtr ip, BasicBlock *&b,
+static InstTransResult doShldRCL(NativeInstPtr ip, BasicBlock *&b,
                                  const MCOperand &dst, const MCOperand &src1) {
   TASSERT(src1.isReg(), "");
   TASSERT(dst.isReg(), "");
@@ -334,7 +334,7 @@ static InstTransResult doShldRCL(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doShldMCL(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doShldMCL(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                  const MCOperand &src1) {
   TASSERT(src1.isReg(), "");
 
@@ -345,7 +345,7 @@ static InstTransResult doShldMCL(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doShrdRCL(InstPtr ip, BasicBlock *&b,
+static InstTransResult doShrdRCL(NativeInstPtr ip, BasicBlock *&b,
                                  const MCOperand &dst, const MCOperand &src1) {
   TASSERT(src1.isReg(), "");
   TASSERT(dst.isReg(), "");
@@ -357,7 +357,7 @@ static InstTransResult doShrdRCL(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doShrRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doShrRI(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &src1, const MCOperand &src2,
                                const MCOperand &dst) {
   TASSERT(src1.isReg(), "");
@@ -375,7 +375,7 @@ static InstTransResult doShrRI(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doShrR1(InstPtr ip, BasicBlock *&b,
+static InstTransResult doShrR1(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &reg) {
   TASSERT(reg.isReg(), "");
 
@@ -390,7 +390,7 @@ static InstTransResult doShrR1(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doShrRCL(InstPtr ip, BasicBlock *&b,
+static InstTransResult doShrRCL(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &reg) {
   TASSERT(reg.isReg(), "");
 
@@ -405,7 +405,7 @@ static InstTransResult doShrRCL(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doShrMI(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doShrMI(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &imm) {
   TASSERT(addr != NULL, "");
   TASSERT(imm.isImm(), "");
@@ -421,7 +421,7 @@ static InstTransResult doShrMI(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doShrMV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doShrMV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                Value *rhs) {
   TASSERT(addr != NULL, "");
   TASSERT(rhs != NULL, "");
@@ -436,7 +436,7 @@ static InstTransResult doShrMV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doShrM1(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doShrM1(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
   TASSERT(addr != NULL, "");
 
   Value *dst = M_READ<width>(ip, b, addr);
@@ -450,7 +450,7 @@ static InstTransResult doShrM1(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doShrMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doShrMCL(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
   TASSERT(addr != NULL, "");
 
   Value *dst = M_READ<width>(ip, b, addr);
@@ -464,7 +464,7 @@ static InstTransResult doShrMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doShlRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doShlRI(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &src1, const MCOperand &src2,
                                const MCOperand &dst) {
   TASSERT(src1.isReg(), "");
@@ -482,7 +482,7 @@ static InstTransResult doShlRI(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doShlR1(InstPtr ip, BasicBlock *&b,
+static InstTransResult doShlR1(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &reg) {
   TASSERT(reg.isReg(), "");
 
@@ -497,7 +497,7 @@ static InstTransResult doShlR1(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doShlRCL(InstPtr ip, BasicBlock *&b,
+static InstTransResult doShlRCL(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &reg) {
   TASSERT(reg.isReg(), "");
 
@@ -512,7 +512,7 @@ static InstTransResult doShlRCL(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doShlMI(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doShlMI(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &imm) {
   TASSERT(addr != NULL, "");
   TASSERT(imm.isImm(), "");
@@ -528,7 +528,7 @@ static InstTransResult doShlMI(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doShlMV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doShlMV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                Value *rhs) {
   TASSERT(addr != NULL, "");
   TASSERT(rhs != NULL, "");
@@ -543,7 +543,7 @@ static InstTransResult doShlMV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doShlM1(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doShlM1(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
   TASSERT(addr != NULL, "");
 
   Value *dst = M_READ<width>(ip, b, addr);
@@ -557,7 +557,7 @@ static InstTransResult doShlM1(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doShlMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doShlMCL(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
   TASSERT(addr != NULL, "");
 
   Value *dst = M_READ<width>(ip, b, addr);
@@ -571,7 +571,7 @@ static InstTransResult doShlMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doSarRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSarRI(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &src1, const MCOperand &src2,
                                const MCOperand &dst) {
   TASSERT(src1.isReg(), "");
@@ -589,7 +589,7 @@ static InstTransResult doSarRI(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doSarR1(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSarR1(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &reg) {
   TASSERT(reg.isReg(), "");
 
@@ -604,7 +604,7 @@ static InstTransResult doSarR1(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doSarRCL(InstPtr ip, BasicBlock *&b,
+static InstTransResult doSarRCL(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &reg) {
   TASSERT(reg.isReg(), "");
 
@@ -619,7 +619,7 @@ static InstTransResult doSarRCL(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doSarMI(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doSarMI(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &imm) {
   TASSERT(addr != NULL, "");
   TASSERT(imm.isImm(), "");
@@ -635,7 +635,7 @@ static InstTransResult doSarMI(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doSarMV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doSarMV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                Value *rhs) {
   TASSERT(addr != NULL, "");
   TASSERT(rhs != NULL, "");
@@ -650,7 +650,7 @@ static InstTransResult doSarMV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doSarM1(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doSarM1(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
   TASSERT(addr != NULL, "");
 
   Value *dst = M_READ<width>(ip, b, addr);
@@ -664,7 +664,7 @@ static InstTransResult doSarM1(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doSarMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doSarMCL(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
   TASSERT(addr != NULL, "");
 
   Value *dst = M_READ<width>(ip, b, addr);
@@ -678,7 +678,7 @@ static InstTransResult doSarMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static Value *doRclVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
+static Value *doRclVV(NativeInstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
   Function *F = b->getParent();
 
   //create basic blocks to define the branching behavior
@@ -803,7 +803,7 @@ static Value *doRclVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
 }
 
 template<int width>
-static InstTransResult doRclM1(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doRclM1(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
 
   TASSERT(addr != NULL, "");
 
@@ -818,7 +818,7 @@ static InstTransResult doRclM1(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doRclMI(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doRclMI(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &count) {
 
   TASSERT(addr != NULL, "");
@@ -835,7 +835,7 @@ static InstTransResult doRclMI(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doRclMV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doRclMV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                Value *rhs) {
 
   TASSERT(addr != NULL, "");
@@ -851,7 +851,7 @@ static InstTransResult doRclMV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doRclMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doRclMCL(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
 
   TASSERT(addr != NULL, "");
 
@@ -866,7 +866,7 @@ static InstTransResult doRclMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doRclR1(InstPtr ip, BasicBlock *&b,
+static InstTransResult doRclR1(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &reg) {
 
   TASSERT(reg.isReg(), "");
@@ -882,7 +882,7 @@ static InstTransResult doRclR1(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doRclRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doRclRI(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &dst1, const MCOperand &reg,
                                const MCOperand &count) {
 
@@ -901,7 +901,7 @@ static InstTransResult doRclRI(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doRclRCL(InstPtr ip, BasicBlock *&b,
+static InstTransResult doRclRCL(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &reg) {
 
   TASSERT(reg.isReg(), "");
@@ -917,7 +917,7 @@ static InstTransResult doRclRCL(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static Value *doRcrVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
+static Value *doRcrVV(NativeInstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
   Function *F = b->getParent();
 
   //create basic blocks to define the branching behavior
@@ -1045,7 +1045,7 @@ static Value *doRcrVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
 }
 
 template<int width>
-static InstTransResult doRcrM1(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doRcrM1(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
 
   TASSERT(addr != NULL, "");
 
@@ -1060,7 +1060,7 @@ static InstTransResult doRcrM1(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doRcrMI(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doRcrMI(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &count) {
 
   TASSERT(addr != NULL, "");
@@ -1077,7 +1077,7 @@ static InstTransResult doRcrMI(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doRcrMV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doRcrMV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                Value *rhs) {
 
   TASSERT(addr != NULL, "");
@@ -1093,7 +1093,7 @@ static InstTransResult doRcrMV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doRcrMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doRcrMCL(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
 
   TASSERT(addr != NULL, "");
 
@@ -1108,7 +1108,7 @@ static InstTransResult doRcrMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doRcrR1(InstPtr ip, BasicBlock *&b,
+static InstTransResult doRcrR1(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &reg) {
 
   TASSERT(reg.isReg(), "");
@@ -1124,7 +1124,7 @@ static InstTransResult doRcrR1(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doRcrRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doRcrRI(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &dst1, const MCOperand &reg,
                                const MCOperand &count) {
 
@@ -1143,7 +1143,7 @@ static InstTransResult doRcrRI(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doRcrRCL(InstPtr ip, BasicBlock *&b,
+static InstTransResult doRcrRCL(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &reg) {
 
   TASSERT(reg.isReg(), "");
@@ -1159,7 +1159,7 @@ static InstTransResult doRcrRCL(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static Value *doRolVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
+static Value *doRolVV(NativeInstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
   Function *F = b->getParent();
 
   //create basic blocks to define the branching behavior
@@ -1259,7 +1259,7 @@ static Value *doRolVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
 }
 
 template<int width>
-static InstTransResult doRolM1(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doRolM1(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
 
   TASSERT(addr != NULL, "");
 
@@ -1274,7 +1274,7 @@ static InstTransResult doRolM1(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doRolMI(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doRolMI(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &count) {
 
   TASSERT(addr != NULL, "");
@@ -1291,7 +1291,7 @@ static InstTransResult doRolMI(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doRolMV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doRolMV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                Value *rhs) {
 
   TASSERT(addr != NULL, "");
@@ -1307,7 +1307,7 @@ static InstTransResult doRolMV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doRolMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doRolMCL(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
 
   TASSERT(addr != NULL, "");
 
@@ -1322,7 +1322,7 @@ static InstTransResult doRolMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doRolR1(InstPtr ip, BasicBlock *&b,
+static InstTransResult doRolR1(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &reg) {
 
   TASSERT(reg.isReg(), "");
@@ -1338,7 +1338,7 @@ static InstTransResult doRolR1(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doRolRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doRolRI(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &dst1, const MCOperand &reg,
                                const MCOperand &count) {
 
@@ -1357,7 +1357,7 @@ static InstTransResult doRolRI(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doRolRCL(InstPtr ip, BasicBlock *&b,
+static InstTransResult doRolRCL(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &reg) {
 
   TASSERT(reg.isReg(), "");
@@ -1373,7 +1373,7 @@ static InstTransResult doRolRCL(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static Value *doRorVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
+static Value *doRorVV(NativeInstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
   Function *F = b->getParent();
 
   //create basic blocks to define the branching behavior
@@ -1478,7 +1478,7 @@ static Value *doRorVV(InstPtr ip, BasicBlock *&b, Value *dst, Value *count) {
 }
 
 template<int width>
-static InstTransResult doRorM1(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doRorM1(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
 
   TASSERT(addr != NULL, "");
 
@@ -1493,7 +1493,7 @@ static InstTransResult doRorM1(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doRorMI(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doRorMI(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                const MCOperand &count) {
 
   TASSERT(addr != NULL, "");
@@ -1510,7 +1510,7 @@ static InstTransResult doRorMI(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doRorMV(InstPtr ip, BasicBlock *&b, Value *addr,
+static InstTransResult doRorMV(NativeInstPtr ip, BasicBlock *&b, Value *addr,
                                Value *rhs) {
 
   TASSERT(addr != NULL, "");
@@ -1526,7 +1526,7 @@ static InstTransResult doRorMV(InstPtr ip, BasicBlock *&b, Value *addr,
 }
 
 template<int width>
-static InstTransResult doRorMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
+static InstTransResult doRorMCL(NativeInstPtr ip, BasicBlock *&b, Value *addr) {
 
   TASSERT(addr != NULL, "");
 
@@ -1542,7 +1542,7 @@ static InstTransResult doRorMCL(InstPtr ip, BasicBlock *&b, Value *addr) {
 }
 
 template<int width>
-static InstTransResult doRorR1(InstPtr ip, BasicBlock *&b,
+static InstTransResult doRorR1(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &reg) {
 
   TASSERT(reg.isReg(), "");
@@ -1558,7 +1558,7 @@ static InstTransResult doRorR1(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doRorRI(InstPtr ip, BasicBlock *&b,
+static InstTransResult doRorRI(NativeInstPtr ip, BasicBlock *&b,
                                const MCOperand &dst1, const MCOperand &reg,
                                const MCOperand &count) {
 
@@ -1577,7 +1577,7 @@ static InstTransResult doRorRI(InstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doRorRCL(InstPtr ip, BasicBlock *&b,
+static InstTransResult doRorRCL(NativeInstPtr ip, BasicBlock *&b,
                                 const MCOperand &reg) {
 
   TASSERT(reg.isReg(), "");

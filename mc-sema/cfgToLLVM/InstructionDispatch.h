@@ -40,12 +40,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "peToCFG.h"
 #include "raiseX86.h"
 
-typedef InstTransResult(*TranslationFuncPtr)(NativeModulePtr natM, llvm::BasicBlock *&block, InstPtr ip, llvm::MCInst &inst);
+struct TranslationContext {
+  NativeModulePtr natM;
+  NativeFunctionPtr natF;
+  NativeBlockPtr natB;
+  NativeInstPtr natI;
+  llvm::Module *M;
+  llvm::Function *F;
+  std::map<VA, llvm::BasicBlock *> va_to_bb;
+};
+
+typedef InstTransResult(*TranslationFuncPtr)(TranslationContext &, llvm::BasicBlock *&);
 typedef std::map<unsigned, TranslationFuncPtr> DispatchMap;
 
 extern DispatchMap translationDispatchMap;
 
-bool initInstructionDispatch();
+bool ArchInitInstructionDispatch(void);
 
 #define OP(x) inst.getOperand(x)
 
@@ -54,12 +64,16 @@ bool initInstructionDispatch();
     ADDR_NOREF_IMPL<32>(natM, block, x, ip, inst) :\
     ADDR_NOREF_IMPL<64>(natM, block, x, ip, inst)
 
-#define CREATE_BLOCK(nm, b) BasicBlock *block_ ## nm = BasicBlock::Create((b)->getContext(), #nm, (b)->getParent())
+#define CREATE_BLOCK(nm, b) auto block_ ## nm = llvm::BasicBlock::Create((b)->getContext(), #nm, (b)->getParent())
 #define MEM_REFERENCE(which) MEM_AS_DATA_REF(block, natM, inst, ip, which)
 
-#define GENERIC_TRANSLATION_MI(NAME, NOREFS, MEMREF, IMMREF, TWOREFS) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {\
+#define GENERIC_TRANSLATION_MI(NAME, NOREFS, MEMREF, IMMREF, TWOREFS) \
+  static InstTransResult translate_ ## NAME (TranslationContext &ctx, llvm::BasicBlock *&block) {\
     InstTransResult ret;\
-    Function *F = block->getParent(); \
+    auto natM = ctx.natM; \
+    Function *F = ctx.F; \
+    auto ip = ctx.natI; \
+    auto &inst = ip->get_inst(); \
     if( ip->has_mem_reference && ip->has_imm_reference) {\
         TWOREFS; \
     } else if( ip->has_mem_reference ) { \
@@ -73,9 +87,12 @@ bool initInstructionDispatch();
 }
 
 
-#define GENERIC_TRANSLATION_REF(NAME, NOREFS, HASREF) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {\
+#define GENERIC_TRANSLATION_REF(NAME, NOREFS, HASREF) static InstTransResult translate_ ## NAME (TranslationContext &ctx, BasicBlock *&block) {\
     InstTransResult ret;\
-    Function *F = block->getParent(); \
+    auto natM = ctx.natM; \
+    Function *F = ctx.F; \
+    auto ip = ctx.natI; \
+    auto &inst = ip->get_inst(); \
     if( ip->has_mem_reference || ip->has_imm_reference || ip->has_external_ref() ) {\
         HASREF;\
     } else {\
@@ -84,8 +101,12 @@ bool initInstructionDispatch();
     return ContinueBlock;\
 }
 
-#define GENERIC_TRANSLATION(NAME, NOREFS) static InstTransResult translate_ ## NAME (NativeModulePtr natM, BasicBlock *&block, InstPtr ip, MCInst &inst) {\
+#define GENERIC_TRANSLATION(NAME, NOREFS) static InstTransResult translate_ ## NAME (TranslationContext &ctx, BasicBlock *&block) {\
     InstTransResult ret;\
+    auto natM = ctx.natM; \
+    Function *F = ctx.F; \
+    auto ip = ctx.natI; \
+    auto &inst = ip->get_inst(); \
     ret = NOREFS;\
     return ret;\
 }

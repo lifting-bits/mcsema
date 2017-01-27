@@ -162,49 +162,49 @@ static void LinuxAddPushJumpStub(llvm::Module *M, llvm::Function *F,
   M->appendModuleInlineAsm(as.str());
 }
 
-std::string ArchNameMcsemaCall(const std::string &name) {
+std::string ArchNameMcSemaCall(const std::string &name) {
     return "__mcsema_" + name;
 }
 
-
-static std::string WindowsDecorateName(llvm::Function *F, const std::string &name) {
+static std::string WindowsDecorateName(llvm::Function *F,
+                                       const std::string &name) {
 
   // 64-bit doesn't mangle
-    Module *M = F->getParent();
-    if(64 == ArchPointerSize(M)) {
-      return name;
+  Module *M = F->getParent();
+  if (64 == ArchPointerSize(M)) {
+    return name;
+  }
+
+  switch (F->getCallingConv()) {
+
+    case CallingConv::C:
+      return "_" + name;
+      break;
+    case CallingConv::X86_StdCall: {
+      std::stringstream as;
+      int argc = F->arg_size();
+      as << "_" << name << "@" << argc * 4;
+      return as.str();
     }
-
-    switch(F->getCallingConv())
-    {
-
-        case CallingConv::C:
-          return "_" + name;
-          break;
-        case CallingConv::X86_StdCall:
-          {
-            std::stringstream as;
-            int argc = F->arg_size();
-            as << "_" << name << "@" << argc*4;
-            return as.str();
-          }
-          break;
-        case CallingConv::X86_FastCall:
-          {
-            std::stringstream as;
-            int argc = F->arg_size();
-            as << "@" << name << "@" << argc*4;
-            return as.str();
-          }
-          break;
-        default:
-          TASSERT(false, "Unsupported Calling Convention for 32-bit Windows");
-          break;
-      }
-      return "";
+      break;
+    case CallingConv::X86_FastCall: {
+      std::stringstream as;
+      int argc = F->arg_size();
+      as << "@" << name << "@" << argc * 4;
+      return as.str();
+    }
+      break;
+    default:
+      TASSERT(false, "Unsupported Calling Convention for 32-bit Windows")
+      ;
+      break;
+  }
+  return "";
 }
-static void WindowsAddPushJumpStub(bool decorateStub, llvm::Module *M, llvm::Function *F,
-                                 llvm::Function *W, const char *stub_handler) {
+
+static void WindowsAddPushJumpStub(bool decorateStub, llvm::Module *M,
+                                   llvm::Function *F, llvm::Function *W,
+                                   const char *stub_handler) {
   auto stub_name = W->getName().str();
   auto stubbed_func_name = F->getName().str();
 
@@ -405,17 +405,15 @@ bool shouldSubtractImageBase(llvm::Module *M) {
 
 llvm::Value *doSubtractImageBaseInt(llvm::Value *original,
                                     llvm::BasicBlock *block) {
-  llvm::Module *M = block->getParent()->getParent();
-  llvm::Value *ImageBase = archGetImageBase(M);
+  auto M = block->getParent()->getParent();
+  auto ImageBase = archGetImageBase(M);
 
   // convert image base pointer to int
-  llvm::Value *ImageBase_int = new llvm::PtrToIntInst(
-      ImageBase, llvm::Type::getIntNTy(block->getContext(), 64), "", block);
+  auto ImageBase_int = new llvm::PtrToIntInst(
+      ImageBase, llvm::Type::getIntNTy(block->getContext(), ArchPointerSize(M)),
+      "", block);
 
   // do the subtraction
-  llvm::Value *data_v = BinaryOperator::CreateSub(original, ImageBase_int, "",
-                                                  block);
-
-  return data_v;
+  return llvm::BinaryOperator::CreateSub(original, ImageBase_int, "", block);
 }
 

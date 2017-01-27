@@ -4,17 +4,16 @@
 #include <exception>
 #include <iostream>
 #include <sstream>
-#include <boost/exception/to_string.hpp>
 
 class LErr : public std::exception {
 private:
   std::string message;
 public:
   LErr(unsigned int line, const char *file, std::string message) {
-    this->message = "Generic error: Line: " + 
-                    boost::to_string<unsigned int>(line) + "\n" +
-                    "File: " + std::string(file) + "\n" +
-                    message;
+    std::stringstream ss;
+    ss << "Generic error: Line: " << line << "\n"
+       << "File: " << file << "\n" << message;
+    this->message = ss.str();
   }
   virtual ~LErr(void) throw() { }
 

@@ -34,41 +34,31 @@
 #include <llvm/IR/InstrTypes.h>
 #include <cstdio>
 
-using namespace llvm;
-using namespace std;
+llvm::StructType *g_RegStruct = nullptr;
+llvm::PointerType *g_PRegStruct = nullptr;
 
-StructType *g_RegStruct;
-PointerType *g_PRegStruct;
-
-FunctionType *getBaseFunctionType(Module *M) {
-  vector<Type *> baseFunctionArgs;
+llvm::FunctionType *getBaseFunctionType(llvm::Module *M) {
+  std::vector<llvm::Type *> baseFunctionArgs;
   baseFunctionArgs.push_back(g_PRegStruct);
-  FunctionType *funcTy = FunctionType::get(Type::getVoidTy(M->getContext()),
-                                           baseFunctionArgs, false);
-  TASSERT(funcTy != NULL, "");
-
+  auto funcTy = llvm::FunctionType::get(
+      llvm::Type::getVoidTy(M->getContext()),
+      baseFunctionArgs, false);
   return funcTy;
 }
 
-Triple *getTargetTriple(const llvm::Target *T) {
-  if (T->getName() == "x86")
-    return new Triple("i386", "unknown", "unknown");
-  else if (T->getName() == "x86-64")
-    return new Triple("x86_64", "unknown", "unknown");
-}
-
-void initRegStateStruct(Module *M) {
+void ArchInitRegStateStruct(llvm::Module *M) {
 
   unsigned int regWidth = ArchPointerSize(M);
 
   //create the "reg" struct type
   auto &C = M->getContext();
-  StructType *regs = StructType::create(C, "RegState");
-  vector<Type *> regFields;
+  auto regs = llvm::StructType::create(C, "RegState");
+  std::vector<llvm::Type *> regFields;
 
-  Type *RegTy = IntegerType::getIntNTy(C, regWidth);
-  Type *XMMTy = IntegerType::getIntNTy(C, 128);
-  Type *FlagTy = IntegerType::getInt8Ty(C);
+  auto RegTy = llvm::IntegerType::getIntNTy(C, regWidth);
+  auto XMMTy = llvm::IntegerType::getIntNTy(C, 128);
+  auto FlagTy = llvm::IntegerType::getInt8Ty(C);
+  auto SegTy = llvm::Type::getInt16Ty(C);
 
   //UPDATEREGS -- when we add something to 'regs', add it here
   //GPRs
@@ -91,7 +81,7 @@ void initRegStateStruct(Module *M) {
   regFields.push_back(FlagTy);  // OF // 14
   regFields.push_back(FlagTy);  // DF // 15
 
-  ArrayType *fpu_regs = ArrayType::get(Type::getX86_FP80Ty(C), 8);
+  auto fpu_regs = llvm::ArrayType::get(llvm::Type::getX86_FP80Ty(C), 8);
   regFields.push_back(fpu_regs);  // 80 bytes 24
 
   // FPU Status Word
@@ -121,18 +111,18 @@ void initRegStateStruct(Module *M) {
   regFields.push_back(FlagTy);  // FPU Invalid Operation Mask // 39
 
   // FPU tag word; 8 element array of 2-bit entries
-  ArrayType *fpu_tag_word = ArrayType::get(FlagTy, 8);
+  auto fpu_tag_word = llvm::ArrayType::get(FlagTy, 8);
   regFields.push_back(fpu_tag_word);  // 40
 
   // Last Instruction.
-  regFields.push_back(Type::getInt16Ty(C));  // Segment // 41
+  regFields.push_back(SegTy);  // Segment // 41
   regFields.push_back(RegTy);  // Offset // 42
 
   // Last Data
-  regFields.push_back(Type::getInt16Ty(C));  // Segment // 43
+  regFields.push_back(SegTy);  // Segment // 43
   regFields.push_back(RegTy);  // Offset // 44
 
-  regFields.push_back(Type::getInt16Ty(C));  // FPU FOPCODE // 45
+  regFields.push_back(llvm::Type::getInt16Ty(C));  // FPU FOPCODE // 45
 
   // vector registers
   regFields.push_back(XMMTy);  // XMM0 46
@@ -158,21 +148,19 @@ void initRegStateStruct(Module *M) {
   regFields.push_back(RegTy);  // 71: stack limit (smallest value)
 
   if (64 == regWidth) {
-    regFields.push_back(RegTy);  // R8  // 8
-    regFields.push_back(RegTy);  // R9  // 9
-    regFields.push_back(RegTy);  // R10 // 10
-    regFields.push_back(RegTy);  // R11 // 11
-    regFields.push_back(RegTy);  // R12 // 12
-    regFields.push_back(RegTy);  // R13 // 13
-    regFields.push_back(RegTy);  // R14 // 14
-    regFields.push_back(RegTy);  // R15 // 15
+    regFields.push_back(RegTy);  // R8 72
+    regFields.push_back(RegTy);  // R9 73
+    regFields.push_back(RegTy);  // R10 74
+    regFields.push_back(RegTy);  // R11 75
+    regFields.push_back(RegTy);  // R12 76
+    regFields.push_back(RegTy);  // R13 77
+    regFields.push_back(RegTy);  // R14 78
+    regFields.push_back(RegTy);  // R15 79
   }
 
-  PointerType *ptrToRegs = PointerType::get(regs, 0);
+  auto ptrToRegs = llvm::PointerType::get(regs, 0);
   regs->setBody(regFields, true);
 
   g_RegStruct = regs;
   g_PRegStruct = ptrToRegs;
-
-  return;
 }

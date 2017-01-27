@@ -17,11 +17,11 @@ We hope that this library is useful to the program analysis and reverse engineer
 
 ## Separation of Components
 
-MC-Semantics is separated into two conceptual parts: control flow recovery and instruction translation. 
+McSema is separated into two conceptual parts: control flow recovery and instruction translation. 
 
 The two parts communicate via a control flow graph structure that contains native code. This control flow graph structure connects basic blocks and defines information about external calls, but provides no further semantic information.
 
-The `bin_descend` program attempts to recover a control flow graph from a given binary file. It will write the recovered control flow graph into a Google Protocol Buffer serialized file. There is also an IDAPython script to recover control flow from within IDA Pro.
+An IDAPython script, `get_cfg.py`, attempts to recover a control flow graph from a given binary file. It will write the recovered control flow graph into a Google Protocol Buffer serialized file. There is also an IDAPython script to recover control flow from within IDA Pro.
 
 The `cfg_to_bc` program attempts to convert a control flow graph structure into LLVM bitcode. This translation process is more a transcription act than an analysis, since a control flow structure has already been recovered.
 
@@ -56,6 +56,10 @@ mcsema uses external code which has been included in this source release:
  * Boost
 
 mcsema uses Intel Pin, which has not been included in this source release, but is freely available. Pin is used only for testing of instruction semantics and is not required to use the library.
+
+### Pronunciation
+
+McSema is pronounced as "mick sema".
 
 ## Contact
 

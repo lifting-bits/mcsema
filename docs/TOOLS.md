@@ -81,90 +81,12 @@ Recover control flow from `demo_dll_6.dll`. Start recovery at the symbol `get_va
 
 `"%IDA_PATH%\idaq.exe" -B -S"%GET_CFG_PY% --batch --std-defs \"%STD_DEFS%\" demo_6_defs.txt --entry-symbol get_value --output demo_dll_6.cfg" demo_dll_6.dll`
 
-## bin_descend
-
-bin_descend is a recursive descent disassembler and control flow recovery tool. As input, bin_descend accepts COFF object files and Windows PE DLLs. To accurately recover control flow, it is imperative that relocation information *not* be stripped from the input file.
-
-The output file is named `<input name without extension>.cfg`. That is, an input of `foo.obj` will produce `foo.cfg`.
-
-When recovering control flow, bin_descend uses certain heuristics to attempt accurate control flow recovery:
-
-* Relocated immediate values in code (e.g. PUSH imm32) that point to the code section are assumed to be function pointers. These will be added to the list of entry points from which to recover control flow.
-* Relocated values in the data section that point to the code section are assumed to be function pointers. These will be added to the list of entry points from which to recover control flow.
-* Additionally, relocated function pointers in the data section are assumed to be used as callbacks. A thunk that takes current register state and transforms it into a translator specific register context will automatically be created for these functions, and used in place of the function when it referenced not by a direct call.
-* Relocated immediate values in code (e.g. PUSH imm32) that point to the data section are assumed to be data values.
-* Relocated immediate values in the data section that point to the data section are assumed to be data values.
-
-### Limitations
-
-COFF files will have several sections based at address zero. As there is no specification for how to assign addresses, we will assign addresses to sections in the order in which they are processed. This usually matches the address what other tools (e.g. IDA Pro)  select, but not always. It is recommended that the entry point for COFF object should be specified by `-entry-symbol` and not `-e`.
-
-### Usage
-
-     C:\>bin_descend -help
-     
-     OVERVIEW: binary recursive descent
-     USAGE: bin_descend.exe [options]
-     
-     OPTIONS:
-       -d                                                         - Print debug information
-       -e=<VA>                                                    - Entry point
-       -entry-symbol=<symbol1,symbol2,symbol3,...>                - Entry point symbol(s)
-       -func-map=<std_defs.txt,custom_defs.txt,other_mapping.txt> - Function map files
-       -help                                                      - Display available options (-help-hidden for more)
-       -i=<filename>                                              - Input filename
-       -ignore-native-entry-points                                - Ignore any exported functions not explicitly specified via -e or -entry-symbol
-       -mc-x86-disable-arith-relaxation                           - Disable relaxation of arithmetic instruction for X86
-       -mtriple=<target triple>                                   - Target Triple
-       -stats                                                     - Enable statistics output from program
-       -v=<level>                                                 - Verbosity level
-       -version                                                   - Display the version of this program
-       -x86-asm-syntax                                            - Choose style of code to emit from X86 backend:
-         =att                                                     -   Emit AT&T-style assembly
-         =intel                                                   -   Emit Intel-style assembly
-
-
-* `-d`: This flag will enable output of extra debugging information to standard out.
-* `-e=<VA>`: Specify the entry point address where disassembly will begin. This value should be a virtual address in the target module. Both decimal and hex values are accepted. Hex values must be prefixed with 0x or 0X.
-* `-entry-symbol`: Specify entry point symbol(s) from which to start disassembly. This is particualrly useful for COFF files where several sections based at address zero will be rebased during control flow recovery. 
-* `-func-map=<std_defs.txt,custom_defs.txt,other_mapping.txt>`: Location of file(s) that specify arguments and calling conventions of externally referenced functions. Externally referenced functions are those that are not a part of the translated code: APIs, functions in other compilation units, etc. The file `std_defs.txt` is a pre-existing define file that provides definitions for most of the Win32 API and the standard C library. 
-* `-help`: Display the help screen above.
-* `-i=<filename>`: Specify the input file. This should be a COFF object or a Window PE DLL.
-* `-ignore-native-entry-points`: Do not process any exported functions other than the one specified by `-e` or `-entry-symbol`. This option should be used when processing DLLs that import C runtime initialization code or include exports unrelated to the one you are trying to lift.
-* `-mc-x86-disable-arith-relaxation`: 
-* `-mtriple=<target triple>`: Specify the target triple (e.g. i686-pc-win32, i686-pc-linux-gnu) of the input file. This option should be used when processing Windows object files on Linux, or vice versa.
-* `-stats`:
-* `-v=<level>`: 
-* `-version`: Display the version of bin_descend.
-* `-x86-asm-syntax`: Chose whether assembly output will use ATT or Intel syntax.
-
-### Examples
-
-These examples are taken from the tests present in `mc-sema/tests`.
-
-Recover control flow for `demo_test1.obj` starting at symbol `start` and enable debugging output:
-
-`bin_descend.exe -d -entry-symbol=start -i=demo_test1.obj`
-
-Recover control flow for `demo_test4.obj` starting at symbol `_doTrans`, enable debugging, and specify a definitions file for external functions (to properly link API calls):
-
-`bin_descend.exe -d -func-map=std_defs.txt -entry-symbol=_doTrans -i=demo_test4.obj`
-
-Recover control flow for `sailboat.obj` starting at symbol `_keycomp`, enable debugging, and specify two external function definition files:
-
-`bin_descend.exe -d -func-map=sailboat.txt,std_defs.txt -entry-symbol=_keycomp -i=sailboat.obj`
-
-Recover control flow from `demo_dll_1.dll`, starting at symbol `HelloWorld`, enable debugging, specify an external function definition, and ignore all entry points other than `HelloWorld`:
-
-`bin_descend.exe -d -entry-symbol=HelloWorld -ignore-native-entry-points=true -i=demo_dll_1.dll -func-map=std_defs.txt`
-
-
 ## cfg_to_bc 
 
 The cfg_to_bc tool will take a control flow graph in the format produced by bin_descend, and translate it to LLVM bitcode. The resulting bitcode will have a driver function, specified by `-driver-name`. The driver is an exported function that takes place of the entrypoint in the original code. If the original function accepted arguments as 32-bit values pushed onto the stack, a stub to place these into a register context can be automatically generated by specifying the argument count via `-driver-argc`. In case of other calling conventions, a raw driver that accepts a complete register context can be defined via `-driver-raw`.
 
 
-The CFG is in Google protocol buffer format. The definition of the protocol is in `mc-sema/peToCFG/CFG.proto`. The CFG does not have to be created by bin_descend, but it can be created by any tool (e.g. IDA Python) that can write to the protocol buffer format. The control flow recovery and translation portions were explicitly designed to be separable. 
+The CFG is in Google protocol buffer format. The definition of the protocol is in `mc-sema/peToCFG/CFG.proto`. The CFG can be created by any tool (e.g. IDA Python) that can write to the protocol buffer format. The control flow recovery and translation portions were explicitly designed to be separable. 
 
 ### Limitations
 

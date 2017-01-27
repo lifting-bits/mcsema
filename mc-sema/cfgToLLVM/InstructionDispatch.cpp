@@ -50,7 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 DispatchMap translationDispatchMap;
 
-bool initInstructionDispatch() {
+bool ArchInitInstructionDispatch(void) {
 
     FPU_populateDispatchMap(translationDispatchMap);
     MOV_populateDispatchMap(translationDispatchMap);
