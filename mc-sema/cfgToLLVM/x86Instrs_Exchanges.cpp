@@ -26,72 +26,91 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "InstructionDispatch.h"
-#include "toLLVM.h"
-#include "X86.h"
-#include "raiseX86.h"
-#include "x86Helpers.h"
-#include "x86Instrs_CMPTEST.h"
-#include "x86Instrs_Exchanges.h"
+
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include <llvm/IR/Argument.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/Intrinsics.h>
+
+#include <llvm/MC/MCInst.h>
+
+#include "mc-sema/Arch/Arch.h"
+#include "mc-sema/Arch/Dispatch.h"
+#include "mc-sema/Arch/Register.h"
+
+#include "mc-sema/cfgToLLVM/InstructionDispatch.h"
+#include "mc-sema/cfgToLLVM/raiseX86.h"
+#include "mc-sema/cfgToLLVM/x86Helpers.h"
+#include "mc-sema/cfgToLLVM/x86Instrs_CMPTEST.h"
+#include "mc-sema/cfgToLLVM/x86Instrs_Exchanges.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
 
 template<int width>
-static InstTransResult doCmpxchgRR(NativeInstPtr ip, BasicBlock *&b,
-                                   const MCOperand &dstReg,
-                                   const MCOperand &srcReg) {
+static InstTransResult doCmpxchgRR(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                   const llvm::MCOperand &dstReg,
+                                   const llvm::MCOperand &srcReg) {
   NASSERT(dstReg.isReg());
   NASSERT(srcReg.isReg());
 
-  Value *acc;
+  llvm::Value *acc = nullptr;
 
   switch (width) {
     case 8:
-      acc = R_READ<width>(b, X86::AL);
+      acc = R_READ<width>(b, llvm::X86::AL);
       break;
     case 16:
-      acc = R_READ<width>(b, X86::AX);
+      acc = R_READ<width>(b, llvm::X86::AX);
       break;
     case 32:
-      acc = R_READ<width>(b, X86::EAX);
+      acc = R_READ<width>(b, llvm::X86::EAX);
       break;
     case 64:
-      acc = R_READ<width>(b, X86::RAX);
+      acc = R_READ<width>(b, llvm::X86::RAX);
       break;
     default:
       throw TErr(__LINE__, __FILE__, "Width not supported");
   }
 
-  Value *dstReg_v = R_READ<width>(b, dstReg.getReg());
-  Value *srcReg_v = R_READ<width>(b, srcReg.getReg());
+  llvm::Value *dstReg_v = R_READ<width>(b, dstReg.getReg());
+  llvm::Value *srcReg_v = R_READ<width>(b, srcReg.getReg());
 
   doCmpVV<width>(ip, b, acc, dstReg_v);
 
-  Value *Cmp = new ICmpInst( *b, CmpInst::ICMP_EQ, acc, dstReg_v);
+  llvm::Value *Cmp = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ, acc,
+                                        dstReg_v);
 
-  F_WRITE(b, ZF, Cmp);
+  F_WRITE(b, llvm::X86::ZF, Cmp);
 
   ///
   // ZF = Acc == DST
   // acc = select(ZF, acc, dst)
   // dst = select(ZF, src, dst)
-  Value *new_acc = SelectInst::Create(Cmp, acc, dstReg_v, "", b);
-  Value *new_dst = SelectInst::Create(Cmp, srcReg_v, dstReg_v, "", b);
+  llvm::Value *new_acc = llvm::SelectInst::Create(Cmp, acc, dstReg_v, "", b);
+  llvm::Value *new_dst = llvm::SelectInst::Create(Cmp, srcReg_v, dstReg_v, "",
+                                                  b);
 
   R_WRITE<width>(b, dstReg.getReg(), new_dst);
 
   switch (width) {
     case 8:
-      R_WRITE<width>(b, X86::AL, new_acc);
+      R_WRITE<width>(b, llvm::X86::AL, new_acc);
       break;
     case 16:
-      R_WRITE<width>(b, X86::AX, new_acc);
+      R_WRITE<width>(b, llvm::X86::AX, new_acc);
       break;
     case 32:
-      R_WRITE<width>(b, X86::EAX, new_acc);
+      R_WRITE<width>(b, llvm::X86::EAX, new_acc);
       break;
     case 64:
-      R_WRITE<width>(b, X86::RAX, new_acc);
+      R_WRITE<width>(b, llvm::X86::RAX, new_acc);
       break;
     default:
       throw TErr(__LINE__, __FILE__, "Width not supported");
@@ -101,76 +120,76 @@ static InstTransResult doCmpxchgRR(NativeInstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doCmpxchgRM(NativeInstPtr ip, BasicBlock *&b, Value *dstAddr,
-                                   const MCOperand &srcReg) {
-  NASSERT(dstAddr != NULL);
+static InstTransResult doCmpxchgRM(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                   llvm::Value *dstAddr,
+                                   const llvm::MCOperand &srcReg) {
+  NASSERT(dstAddr != nullptr);
   NASSERT(srcReg.isReg());
 
-  Value *acc;
+  llvm::Value *acc = nullptr;
 
   switch (width) {
     case 8:
-      acc = R_READ<width>(b, X86::AL);
+      acc = R_READ<width>(b, llvm::X86::AL);
       break;
     case 16:
-      acc = R_READ<width>(b, X86::AX);
+      acc = R_READ<width>(b, llvm::X86::AX);
       break;
     case 32:
-      acc = R_READ<width>(b, X86::EAX);
+      acc = R_READ<width>(b, llvm::X86::EAX);
       break;
     case 64:
-      acc = R_READ<width>(b, X86::RAX);
+      acc = R_READ<width>(b, llvm::X86::RAX);
       break;
     default:
       throw TErr(__LINE__, __FILE__, "Width not supported");
   }
 
   //Value   *mem_v = M_READ<width>(ip, b, dstAddr);
-  Value *m_addr = NULL;
+  llvm::Value *m_addr = nullptr;
 
   unsigned addrspace = ip->get_addr_space();
+  auto IntPtrTy = llvm::Type::getIntNPtrTy(b->getContext(), width, addrspace);
 
   if (dstAddr->getType()->isPointerTy() == false) {
-    llvm::Type *ptrTy = Type::getIntNPtrTy(b->getContext(), width, addrspace);
+    auto ptrTy = IntPtrTy;
     m_addr = new llvm::IntToPtrInst(dstAddr, ptrTy, "", b);
-  } else if (dstAddr->getType()
-      != Type::getIntNPtrTy(b->getContext(), width, addrspace)) {
+  } else if (dstAddr->getType() != IntPtrTy) {
     //we need to bitcast the pointer value to a pointer type of the appropriate width
-    m_addr = CastInst::CreatePointerCast(
-        dstAddr, Type::getIntNPtrTy(b->getContext(), width, addrspace), "", b);
+    m_addr = llvm::CastInst::CreatePointerCast(dstAddr, IntPtrTy, "", b);
   } else {
     m_addr = dstAddr;
   }
 
-  Value *srcReg_v = R_READ<width>(b, srcReg.getReg());
-
-  AtomicCmpXchgInst *cmpx = new AtomicCmpXchgInst(m_addr, acc, srcReg_v,
-                                                  llvm::SequentiallyConsistent,
-                                                  llvm::SequentiallyConsistent,
-                                                  llvm::CrossThread, b);
+  auto srcReg_v = R_READ<width>(b, srcReg.getReg());
+  auto cmpx = new llvm::AtomicCmpXchgInst(m_addr, acc, srcReg_v,
+                                          llvm::SequentiallyConsistent,
+                                          llvm::SequentiallyConsistent,
+                                          llvm::CrossThread, b);
   cmpx->setVolatile(true);
 
-  Value *cmpx_val = ExtractValueInst::Create(cmpx, 0, "cmpxchg_cmpx_val", b);
-  Value *was_eq = ExtractValueInst::Create(cmpx, 1, "cmpxchg_was_eq", b);
+  auto cmpx_val = llvm::ExtractValueInst::Create(cmpx, 0, "cmpxchg_cmpx_val",
+                                                 b);
+  auto was_eq = llvm::ExtractValueInst::Create(cmpx, 1, "cmpxchg_was_eq", b);
 
   doCmpVV<width>(ip, b, acc, cmpx_val);
 
-  F_WRITE(b, ZF, was_eq);
+  F_WRITE(b, llvm::X86::ZF, was_eq);
 
-  Value *new_acc = SelectInst::Create(was_eq, acc, cmpx_val, "", b);
+  auto new_acc = llvm::SelectInst::Create(was_eq, acc, cmpx_val, "", b);
 
   switch (width) {
     case 8:
-      R_WRITE<width>(b, X86::AL, new_acc);
+      R_WRITE<width>(b, llvm::X86::AL, new_acc);
       break;
     case 16:
-      R_WRITE<width>(b, X86::AX, new_acc);
+      R_WRITE<width>(b, llvm::X86::AX, new_acc);
       break;
     case 32:
-      R_WRITE<width>(b, X86::EAX, new_acc);
+      R_WRITE<width>(b, llvm::X86::EAX, new_acc);
       break;
     case 64:
-      R_WRITE<width>(b, X86::RAX, new_acc);
+      R_WRITE<width>(b, llvm::X86::RAX, new_acc);
       break;
     default:
       throw TErr(__LINE__, __FILE__, "Width not supported");
@@ -180,15 +199,16 @@ static InstTransResult doCmpxchgRM(NativeInstPtr ip, BasicBlock *&b, Value *dstA
 }
 
 template<int width>
-static InstTransResult doXaddRM(NativeInstPtr ip, BasicBlock *&b,
-                                const MCOperand &srcReg, Value *dstAddr) {
+static InstTransResult doXaddRM(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                const llvm::MCOperand &srcReg,
+                                llvm::Value *dstAddr) {
   NASSERT(srcReg.isReg());
-  NASSERT(dstAddr != NULL);
+  NASSERT(dstAddr != nullptr);
 
-  Value *reg_v = R_READ<width>(b, srcReg.getReg());
-  Value *mem_v = M_READ<width>(ip, b, dstAddr);
+  llvm::Value *reg_v = R_READ<width>(b, srcReg.getReg());
+  llvm::Value *mem_v = M_READ<width>(ip, b, dstAddr);
 
-  Value *res = BinaryOperator::CreateAdd(reg_v, mem_v, "", b);
+  llvm::Value *res = llvm::BinaryOperator::CreateAdd(reg_v, mem_v, "", b);
 
   M_WRITE<width>(ip, b, dstAddr, res);
   R_WRITE<width>(b, srcReg.getReg(), mem_v);
@@ -211,16 +231,16 @@ static InstTransResult doXaddRM(NativeInstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doXaddRR(NativeInstPtr ip, BasicBlock *&b,
-                                const MCOperand &dstReg,
-                                const MCOperand &srcReg) {
+static InstTransResult doXaddRR(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                const llvm::MCOperand &dstReg,
+                                const llvm::MCOperand &srcReg) {
   NASSERT(dstReg.isReg());
   NASSERT(srcReg.isReg());
 
-  Value *dstReg_v = R_READ<width>(b, dstReg.getReg());
-  Value *srcReg_v = R_READ<width>(b, srcReg.getReg());
+  llvm::Value *dstReg_v = R_READ<width>(b, dstReg.getReg());
+  llvm::Value *srcReg_v = R_READ<width>(b, srcReg.getReg());
 
-  Value *res = BinaryOperator::CreateAdd(dstReg_v, srcReg_v, "", b);
+  llvm::Value *res = llvm::BinaryOperator::CreateAdd(dstReg_v, srcReg_v, "", b);
 
   R_WRITE<width>(b, dstReg.getReg(), res);
   R_WRITE<width>(b, srcReg.getReg(), dstReg_v);
@@ -243,13 +263,14 @@ static InstTransResult doXaddRR(NativeInstPtr ip, BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doXchgRR(NativeInstPtr ip, BasicBlock *&b, const MCOperand &o1,
-                                const MCOperand &o2) {
+static InstTransResult doXchgRR(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                const llvm::MCOperand &o1,
+                                const llvm::MCOperand &o2) {
   NASSERT(o1.isReg());
   NASSERT(o2.isReg());
 
-  Value *t1 = R_READ<width>(b, o1.getReg());
-  Value *t2 = R_READ<width>(b, o2.getReg());
+  llvm::Value *t1 = R_READ<width>(b, o1.getReg());
+  llvm::Value *t2 = R_READ<width>(b, o2.getReg());
 
   R_WRITE<width>(b, o2.getReg(), t1);
   R_WRITE<width>(b, o1.getReg(), t2);
@@ -258,13 +279,13 @@ static InstTransResult doXchgRR(NativeInstPtr ip, BasicBlock *&b, const MCOperan
 }
 
 template<int width>
-static InstTransResult doXchgRM(NativeInstPtr ip, BasicBlock *&b, const MCOperand &r,
-                                Value *mem) {
-  NASSERT(mem != NULL);
+static InstTransResult doXchgRM(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                const llvm::MCOperand &r, llvm::Value *mem) {
+  NASSERT(mem != nullptr);
   NASSERT(r.isReg());
 
-  Value *t1 = R_READ<width>(b, r.getReg());
-  Value *t2 = M_READ<width>(ip, b, mem);
+  llvm::Value *t1 = R_READ<width>(b, r.getReg());
+  llvm::Value *t2 = M_READ<width>(ip, b, mem);
 
   R_WRITE<width>(b, r.getReg(), t2);
   M_WRITE<width>(ip, b, mem, t1);
@@ -301,18 +322,21 @@ GENERIC_TRANSLATION_REF(XADD8rm, doXaddRM<8>(ip, block, OP(5), ADDR_NOREF(0)),
                         doXaddRM<8>(ip, block, OP(5), MEM_REFERENCE(0)))
 GENERIC_TRANSLATION(XADD8rr, doXaddRR<8>(ip, block, OP(0), OP(1)))
 GENERIC_TRANSLATION(
-    XCHG16ar, doXchgRR<16>(ip, block, MCOperand::CreateReg(X86::AL), OP(0)))
+    XCHG16ar,
+    doXchgRR<16>(ip, block, llvm::MCOperand::createReg(llvm::X86::AL), OP(0)))
 GENERIC_TRANSLATION_REF(XCHG16rm, doXchgRM<16>(ip, block, OP(0), ADDR_NOREF(2)),
                         doXchgRM<16>(ip, block, OP(0), MEM_REFERENCE(2)))
 GENERIC_TRANSLATION(XCHG16rr, doXchgRR<16>(ip, block, OP(1), OP(2)))
 GENERIC_TRANSLATION(
-    XCHG32ar, doXchgRR<32>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
+    XCHG32ar,
+    doXchgRR<32>(ip, block, llvm::MCOperand::createReg(llvm::X86::EAX), OP(0)))
 GENERIC_TRANSLATION(
-    XCHG32ar64, doXchgRR<64>(ip, block, MCOperand::CreateReg(X86::EAX), OP(0)))
+    XCHG32ar64,
+    doXchgRR<64>(ip, block, llvm::MCOperand::createReg(llvm::X86::EAX), OP(0)))
 GENERIC_TRANSLATION(
-    XCHG64ar, doXchgRR<64>(ip, block, MCOperand::CreateReg(X86::RAX), OP(0)))
-GENERIC_TRANSLATION_REF(XCHG64rm,
-                        doXchgRM<64>(ip, block, OP(0), ADDR_NOREF(2)),
+    XCHG64ar,
+    doXchgRR<64>(ip, block, llvm::MCOperand::createReg(llvm::X86::RAX), OP(0)))
+GENERIC_TRANSLATION_REF(XCHG64rm, doXchgRM<64>(ip, block, OP(0), ADDR_NOREF(2)),
                         doXchgRM<64>(ip, block, OP(0), MEM_REFERENCE(2)))
 GENERIC_TRANSLATION_REF(XCHG32rm, doXchgRM<32>(ip, block, OP(0), ADDR_NOREF(2)),
                         doXchgRM<32>(ip, block, OP(0), MEM_REFERENCE(2)))
@@ -323,33 +347,32 @@ GENERIC_TRANSLATION_REF(XCHG8rm, doXchgRM<8>(ip, block, OP(0), ADDR_NOREF(2)),
 GENERIC_TRANSLATION(XCHG8rr, doXchgRR<8>(ip, block, OP(1), OP(2)))
 
 void Exchanges_populateDispatchMap(DispatchMap &m) {
-
-  m[X86::CMPXCHG16rm] = translate_CMPXCHG16rm;
-  m[X86::CMPXCHG16rr] = translate_CMPXCHG16rr;
-  m[X86::CMPXCHG32rm] = translate_CMPXCHG32rm;
-  m[X86::CMPXCHG64rm] = translate_CMPXCHG64rm;
-  m[X86::CMPXCHG32rr] = translate_CMPXCHG32rr;
-  m[X86::CMPXCHG64rr] = translate_CMPXCHG64rr;
-  m[X86::CMPXCHG8rm] = translate_CMPXCHG8rm;
-  m[X86::CMPXCHG8rr] = translate_CMPXCHG8rr;
-  m[X86::XADD16rm] = translate_XADD16rm;
-  m[X86::XADD16rr] = translate_XADD16rr;
-  m[X86::XADD32rm] = translate_XADD32rm;
-  m[X86::XADD64rm] = translate_XADD64rm;
-  m[X86::XADD32rr] = translate_XADD32rr;
-  m[X86::XADD64rr] = translate_XADD64rr;
-  m[X86::XADD8rm] = translate_XADD8rm;
-  m[X86::XADD8rr] = translate_XADD8rr;
-  m[X86::XCHG16ar] = translate_XCHG16ar;
-  m[X86::XCHG16rm] = translate_XCHG16rm;
-  m[X86::XCHG16rr] = translate_XCHG16rr;
-  m[X86::XCHG32ar] = translate_XCHG32ar;
-  m[X86::XCHG32ar64] = translate_XCHG32ar64;
-  m[X86::XCHG64ar] = translate_XCHG64ar;
-  m[X86::XCHG32rm] = translate_XCHG32rm;
-  m[X86::XCHG64rr] = translate_XCHG64rr;
-  m[X86::XCHG64rm] = translate_XCHG64rm;
-  m[X86::XCHG32rr] = translate_XCHG32rr;
-  m[X86::XCHG8rm] = translate_XCHG8rm;
-  m[X86::XCHG8rr] = translate_XCHG8rr;
+  m[llvm::X86::CMPXCHG16rm] = translate_CMPXCHG16rm;
+  m[llvm::X86::CMPXCHG16rr] = translate_CMPXCHG16rr;
+  m[llvm::X86::CMPXCHG32rm] = translate_CMPXCHG32rm;
+  m[llvm::X86::CMPXCHG64rm] = translate_CMPXCHG64rm;
+  m[llvm::X86::CMPXCHG32rr] = translate_CMPXCHG32rr;
+  m[llvm::X86::CMPXCHG64rr] = translate_CMPXCHG64rr;
+  m[llvm::X86::CMPXCHG8rm] = translate_CMPXCHG8rm;
+  m[llvm::X86::CMPXCHG8rr] = translate_CMPXCHG8rr;
+  m[llvm::X86::XADD16rm] = translate_XADD16rm;
+  m[llvm::X86::XADD16rr] = translate_XADD16rr;
+  m[llvm::X86::XADD32rm] = translate_XADD32rm;
+  m[llvm::X86::XADD64rm] = translate_XADD64rm;
+  m[llvm::X86::XADD32rr] = translate_XADD32rr;
+  m[llvm::X86::XADD64rr] = translate_XADD64rr;
+  m[llvm::X86::XADD8rm] = translate_XADD8rm;
+  m[llvm::X86::XADD8rr] = translate_XADD8rr;
+  m[llvm::X86::XCHG16ar] = translate_XCHG16ar;
+  m[llvm::X86::XCHG16rm] = translate_XCHG16rm;
+  m[llvm::X86::XCHG16rr] = translate_XCHG16rr;
+  m[llvm::X86::XCHG32ar] = translate_XCHG32ar;
+  m[llvm::X86::XCHG32ar64] = translate_XCHG32ar64;
+  m[llvm::X86::XCHG64ar] = translate_XCHG64ar;
+  m[llvm::X86::XCHG32rm] = translate_XCHG32rm;
+  m[llvm::X86::XCHG64rr] = translate_XCHG64rr;
+  m[llvm::X86::XCHG64rm] = translate_XCHG64rm;
+  m[llvm::X86::XCHG32rr] = translate_XCHG32rr;
+  m[llvm::X86::XCHG8rm] = translate_XCHG8rm;
+  m[llvm::X86::XCHG8rr] = translate_XCHG8rr;
 }

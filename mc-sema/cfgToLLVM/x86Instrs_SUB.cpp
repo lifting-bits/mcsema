@@ -26,14 +26,30 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include <llvm/IR/Argument.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/Intrinsics.h>
+
+#include <llvm/MC/MCInst.h>
+
+#include "mc-sema/Arch/Arch.h"
+#include "mc-sema/Arch/Dispatch.h"
+#include "mc-sema/Arch/Register.h"
+
 #include "InstructionDispatch.h"
-#include "toLLVM.h"
-#include "X86.h"
 #include "raiseX86.h"
 #include "x86Helpers.h"
 #include "x86Instrs_flagops.h"
 #include "x86Instrs_SUB.h"
-#include "llvm/Support/Debug.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
 
@@ -171,12 +187,12 @@ static InstTransResult doSubRR(NativeInstPtr ip, llvm::BasicBlock *&b,
 }
 
 template<int width>
-static Value * doSbbVV(NativeInstPtr ip, llvm::BasicBlock *&b, llvm::Value *o1,
-                       llvm::Value *o2) {
+static llvm::Value *doSbbVV(NativeInstPtr ip, llvm::BasicBlock *&b,
+                            llvm::Value *o1, llvm::Value *o2) {
   NASSERT(o1 != NULL);
   NASSERT(o2 != NULL);
 
-  auto cf = F_READ(b, CF);
+  auto cf = F_READ(b, llvm::X86::CF);
   auto cf_ex = new llvm::ZExtInst(cf,
                                   llvm::Type::getIntNTy(b->getContext(), width),
                                   "", b);
@@ -294,7 +310,7 @@ static InstTransResult doSbbRR(NativeInstPtr ip, llvm::BasicBlock *&b,
 
 GENERIC_TRANSLATION(
     SUB16i16,
-    doSubRI<16>(ip, block, llvm::MCOperand::CreateReg(llvm::X86::AX), llvm::MCOperand::CreateReg(llvm::X86::AX), OP(0)))
+    doSubRI<16>(ip, block, llvm::MCOperand::createReg(llvm::X86::AX), llvm::MCOperand::createReg(llvm::X86::AX), OP(0)))
 GENERIC_TRANSLATION_REF(SUB16mi, doSubMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
                         doSubMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION_REF(SUB16mi8, doSubMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -310,10 +326,10 @@ GENERIC_TRANSLATION(SUB16rr, doSubRR<16>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SUB16rr_REV, doSubRR<16>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION_REF(
     SUB32i32,
-    doSubRI<32>(ip, block, llvm::MCOperand::CreateReg(llvm::X86::EAX), llvm::MCOperand::CreateReg(llvm::X86::EAX), OP(0)),
+    doSubRI<32>(ip, block, llvm::MCOperand::createReg(llvm::X86::EAX), llvm::MCOperand::createReg(llvm::X86::EAX), OP(0)),
     doSubRV<32>(ip, block, IMM_AS_DATA_REF<32>(block, natM, ip),
-                llvm::MCOperand::CreateReg(llvm::X86::EAX),
-                llvm::MCOperand::CreateReg(llvm::X86::EAX)))
+                llvm::MCOperand::createReg(llvm::X86::EAX),
+                llvm::MCOperand::createReg(llvm::X86::EAX)))
 
 GENERIC_TRANSLATION_MI(
     SUB32mi, doSubMI<32>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -342,10 +358,10 @@ GENERIC_TRANSLATION_REF(
 
 GENERIC_TRANSLATION_REF(
     SUB64i32,
-    doSubRI<64>(ip, block, llvm::MCOperand::CreateReg(llvm::X86::RAX), llvm::MCOperand::CreateReg(llvm::X86::RAX), OP(0)),
+    doSubRI<64>(ip, block, llvm::MCOperand::createReg(llvm::X86::RAX), llvm::MCOperand::createReg(llvm::X86::RAX), OP(0)),
     doSubRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip),
-                llvm::MCOperand::CreateReg(llvm::X86::RAX),
-                MCOperand::CreateReg(llvm::X86::RAX)))
+                llvm::MCOperand::createReg(llvm::X86::RAX),
+                llvm::MCOperand::createReg(llvm::X86::RAX)))
 
 GENERIC_TRANSLATION_REF(SUB32rm,
                         doSubRM<32>(ip, block, ADDR_NOREF(2), OP(0), OP(1)),
@@ -361,7 +377,7 @@ GENERIC_TRANSLATION(SUB64rr_REV, doSubRR<64>(ip, block, OP(0), OP(1), OP(2)))
 
 GENERIC_TRANSLATION(
     SUB8i8,
-    doSubRI<8>(ip, block, llvm::MCOperand::CreateReg(llvm::X86::AL), llvm::MCOperand::CreateReg(llvm::X86::AL), OP(0)))
+    doSubRI<8>(ip, block, llvm::MCOperand::createReg(llvm::X86::AL), llvm::MCOperand::createReg(llvm::X86::AL), OP(0)))
 GENERIC_TRANSLATION_REF(SUB8mi, doSubMI<8>(ip, block, ADDR_NOREF(0), OP(5)),
                         doSubMI<8>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION_REF(SUB8mr, doSubMR<8>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -374,7 +390,7 @@ GENERIC_TRANSLATION(SUB8rr, doSubRR<8>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SUB8rr_REV, doSubRR<8>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(
     SBB16i16,
-    doSbbRI<16>(ip, block, llvm::MCOperand::CreateReg(llvm::X86::AX), OP(0), llvm::MCOperand::CreateReg(llvm::X86::AX)))
+    doSbbRI<16>(ip, block, llvm::MCOperand::createReg(llvm::X86::AX), OP(0), llvm::MCOperand::createReg(llvm::X86::AX)))
 GENERIC_TRANSLATION_REF(SBB16mi, doSbbMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
                         doSbbMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION_REF(SBB16mi8, doSbbMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -390,10 +406,10 @@ GENERIC_TRANSLATION(SBB16rr, doSbbRR<16>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SBB16rr_REV, doSbbRR<16>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION_REF(
     SBB32i32,
-    doSbbRI<32>(ip, block, llvm::MCOperand::CreateReg(llvm::X86::EAX), OP(0), llvm::MCOperand::CreateReg(llvm::X86::EAX)),
+    doSbbRI<32>(ip, block, llvm::MCOperand::createReg(llvm::X86::EAX), OP(0), llvm::MCOperand::createReg(llvm::X86::EAX)),
     doSbbRV<32>(ip, block, IMM_AS_DATA_REF<32>(block, natM, ip),
-                llvm::MCOperand::CreateReg(llvm::X86::EAX),
-                llvm::MCOperand::CreateReg(llvm::X86::EAX)))
+                llvm::MCOperand::createReg(llvm::X86::EAX),
+                llvm::MCOperand::createReg(llvm::X86::EAX)))
 GENERIC_TRANSLATION(SBB32ri, doSbbRI<32>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SBB32ri8, doSbbRI<32>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SBB64ri8, doSbbRI<64>(ip, block, OP(1), OP(2), OP(0)))
@@ -425,7 +441,7 @@ GENERIC_TRANSLATION(SBB64rr_REV, doSbbRR<64>(ip, block, OP(1), OP(2), OP(0)))
 
 GENERIC_TRANSLATION(
     SBB8i8,
-    doSbbRI<8>(ip, block, llvm::MCOperand::CreateReg(llvm::X86::AL), OP(0), llvm::MCOperand::CreateReg(llvm::X86::AL)))
+    doSbbRI<8>(ip, block, llvm::MCOperand::createReg(llvm::X86::AL), OP(0), llvm::MCOperand::createReg(llvm::X86::AL)))
 GENERIC_TRANSLATION(SBB8ri, doSbbRI<8>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION_REF(SBB8mi, doSbbMI<8>(ip, block, ADDR_NOREF(0), OP(5)),
                         doSbbMI<8>(ip, block, MEM_REFERENCE(0), OP(5)))
@@ -447,79 +463,79 @@ static InstTransResult translate_SUB64ri8(TranslationContext &ctx,
 }
 
 void SUB_populateDispatchMap(DispatchMap &m) {
-  m[X86::SUB16i16] = translate_SUB16i16;
-  m[X86::SUB16mi] = translate_SUB16mi;
-  m[X86::SUB16mi8] = translate_SUB16mi8;
-  m[X86::SUB16mr] = translate_SUB16mr;
-  m[X86::SUB16ri] = translate_SUB16ri;
-  m[X86::SUB16ri8] = translate_SUB16ri8;
-  m[X86::SUB16rm] = translate_SUB16rm;
-  m[X86::SUB16rr] = translate_SUB16rr;
-  m[X86::SUB16rr_REV] = translate_SUB16rr_REV;
-  m[X86::SUB32i32] = translate_SUB32i32;
-  m[X86::SUB32mi] = translate_SUB32mi;
-  m[X86::SUB32mi8] = translate_SUB32mi8;
-  m[X86::SUB32mr] = translate_SUB32mr;
+  m[llvm::X86::SUB16i16] = translate_SUB16i16;
+  m[llvm::X86::SUB16mi] = translate_SUB16mi;
+  m[llvm::X86::SUB16mi8] = translate_SUB16mi8;
+  m[llvm::X86::SUB16mr] = translate_SUB16mr;
+  m[llvm::X86::SUB16ri] = translate_SUB16ri;
+  m[llvm::X86::SUB16ri8] = translate_SUB16ri8;
+  m[llvm::X86::SUB16rm] = translate_SUB16rm;
+  m[llvm::X86::SUB16rr] = translate_SUB16rr;
+  m[llvm::X86::SUB16rr_REV] = translate_SUB16rr_REV;
+  m[llvm::X86::SUB32i32] = translate_SUB32i32;
+  m[llvm::X86::SUB32mi] = translate_SUB32mi;
+  m[llvm::X86::SUB32mi8] = translate_SUB32mi8;
+  m[llvm::X86::SUB32mr] = translate_SUB32mr;
 
-  m[X86::SUB64mi8] = translate_SUB64mi8;
-  m[X86::SUB64mr] = translate_SUB64mr;
+  m[llvm::X86::SUB64mi8] = translate_SUB64mi8;
+  m[llvm::X86::SUB64mr] = translate_SUB64mr;
 
-  m[X86::SUB32ri] = translate_SUB32ri;
-  m[X86::SUB32ri8] = translate_SUB32ri8;
-  m[X86::SUB32rm] = translate_SUB32rm;
-  m[X86::SUB32rr] = translate_SUB32rr;
-  m[X86::SUB32rr_REV] = translate_SUB32rr_REV;
+  m[llvm::X86::SUB32ri] = translate_SUB32ri;
+  m[llvm::X86::SUB32ri8] = translate_SUB32ri8;
+  m[llvm::X86::SUB32rm] = translate_SUB32rm;
+  m[llvm::X86::SUB32rr] = translate_SUB32rr;
+  m[llvm::X86::SUB32rr_REV] = translate_SUB32rr_REV;
 
-  m[X86::SUB64rm] = translate_SUB64rm;
-  m[X86::SUB64rr] = translate_SUB64rr;
-  m[X86::SUB64rr_REV] = translate_SUB64rr_REV;
+  m[llvm::X86::SUB64rm] = translate_SUB64rm;
+  m[llvm::X86::SUB64rr] = translate_SUB64rr;
+  m[llvm::X86::SUB64rr_REV] = translate_SUB64rr_REV;
 
-  m[X86::SUB8i8] = translate_SUB8i8;
-  m[X86::SUB8mi] = translate_SUB8mi;
-  m[X86::SUB8mr] = translate_SUB8mr;
-  m[X86::SUB8ri] = translate_SUB8ri;
-  m[X86::SUB8rm] = translate_SUB8rm;
-  m[X86::SUB8rr] = translate_SUB8rr;
-  m[X86::SUB8rr_REV] = translate_SUB8rr_REV;
-  m[X86::SBB16i16] = translate_SBB16i16;
-  m[X86::SBB16mi] = translate_SBB16mi;
-  m[X86::SBB16mi8] = translate_SBB16mi8;
-  m[X86::SBB16mr] = translate_SBB16mr;
-  m[X86::SBB16ri] = translate_SBB16ri;
-  m[X86::SBB16ri8] = translate_SBB16ri8;
-  m[X86::SBB16rm] = translate_SBB16rm;
-  m[X86::SBB16rr] = translate_SBB16rr;
-  m[X86::SBB16rr_REV] = translate_SBB16rr_REV;
-  m[X86::SBB32i32] = translate_SBB32i32;
-  m[X86::SBB32mi] = translate_SBB32mi;
-  m[X86::SBB32mi8] = translate_SBB32mi8;
-  m[X86::SBB64mi8] = translate_SBB64mi8;
+  m[llvm::X86::SUB8i8] = translate_SUB8i8;
+  m[llvm::X86::SUB8mi] = translate_SUB8mi;
+  m[llvm::X86::SUB8mr] = translate_SUB8mr;
+  m[llvm::X86::SUB8ri] = translate_SUB8ri;
+  m[llvm::X86::SUB8rm] = translate_SUB8rm;
+  m[llvm::X86::SUB8rr] = translate_SUB8rr;
+  m[llvm::X86::SUB8rr_REV] = translate_SUB8rr_REV;
+  m[llvm::X86::SBB16i16] = translate_SBB16i16;
+  m[llvm::X86::SBB16mi] = translate_SBB16mi;
+  m[llvm::X86::SBB16mi8] = translate_SBB16mi8;
+  m[llvm::X86::SBB16mr] = translate_SBB16mr;
+  m[llvm::X86::SBB16ri] = translate_SBB16ri;
+  m[llvm::X86::SBB16ri8] = translate_SBB16ri8;
+  m[llvm::X86::SBB16rm] = translate_SBB16rm;
+  m[llvm::X86::SBB16rr] = translate_SBB16rr;
+  m[llvm::X86::SBB16rr_REV] = translate_SBB16rr_REV;
+  m[llvm::X86::SBB32i32] = translate_SBB32i32;
+  m[llvm::X86::SBB32mi] = translate_SBB32mi;
+  m[llvm::X86::SBB32mi8] = translate_SBB32mi8;
+  m[llvm::X86::SBB64mi8] = translate_SBB64mi8;
 
-  m[X86::SBB32mr] = translate_SBB32mr;
-  m[X86::SBB64mr] = translate_SBB64mr;
+  m[llvm::X86::SBB32mr] = translate_SBB32mr;
+  m[llvm::X86::SBB64mr] = translate_SBB64mr;
 
-  m[X86::SBB32ri] = translate_SBB32ri;
-  m[X86::SBB32ri8] = translate_SBB32ri8;
+  m[llvm::X86::SBB32ri] = translate_SBB32ri;
+  m[llvm::X86::SBB32ri8] = translate_SBB32ri8;
 
-  m[X86::SBB64ri8] = translate_SBB64ri8;
+  m[llvm::X86::SBB64ri8] = translate_SBB64ri8;
 
-  m[X86::SBB32rm] = translate_SBB32rm;
-  m[X86::SBB32rr] = translate_SBB32rr;
-  m[X86::SBB32rr_REV] = translate_SBB32rr_REV;
+  m[llvm::X86::SBB32rm] = translate_SBB32rm;
+  m[llvm::X86::SBB32rr] = translate_SBB32rr;
+  m[llvm::X86::SBB32rr_REV] = translate_SBB32rr_REV;
 
-  m[X86::SBB64rm] = translate_SBB64rm;
-  m[X86::SBB64rr] = translate_SBB64rr;
-  m[X86::SBB64rr_REV] = translate_SBB64rr_REV;
+  m[llvm::X86::SBB64rm] = translate_SBB64rm;
+  m[llvm::X86::SBB64rr] = translate_SBB64rr;
+  m[llvm::X86::SBB64rr_REV] = translate_SBB64rr_REV;
 
-  m[X86::SBB8i8] = translate_SBB8i8;
-  m[X86::SBB8mi] = translate_SBB8mi;
-  m[X86::SBB8mr] = translate_SBB8mr;
-  m[X86::SBB8ri] = translate_SBB8ri;
-  m[X86::SBB8rm] = translate_SBB8rm;
-  m[X86::SBB8rr] = translate_SBB8rr;
-  m[X86::SBB8rr_REV] = translate_SBB8rr_REV;
+  m[llvm::X86::SBB8i8] = translate_SBB8i8;
+  m[llvm::X86::SBB8mi] = translate_SBB8mi;
+  m[llvm::X86::SBB8mr] = translate_SBB8mr;
+  m[llvm::X86::SBB8ri] = translate_SBB8ri;
+  m[llvm::X86::SBB8rm] = translate_SBB8rm;
+  m[llvm::X86::SBB8rr] = translate_SBB8rr;
+  m[llvm::X86::SBB8rr_REV] = translate_SBB8rr_REV;
 
-  m[X86::SUB64ri8] = translate_SUB64ri8;
-  m[X86::SUB64ri32] = translate_SUB64ri32;
-  m[X86::SUB64i32] = translate_SUB64i32;
+  m[llvm::X86::SUB64ri8] = translate_SUB64ri8;
+  m[llvm::X86::SUB64ri32] = translate_SUB64ri32;
+  m[llvm::X86::SUB64i32] = translate_SUB64i32;
 }

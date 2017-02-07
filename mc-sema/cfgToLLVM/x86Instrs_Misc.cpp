@@ -27,8 +27,26 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include <llvm/IR/Argument.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/Intrinsics.h>
+
+#include <llvm/MC/MCInst.h>
+
+#include "mc-sema/Arch/Arch.h"
+#include "mc-sema/Arch/Dispatch.h"
+#include "mc-sema/Arch/Register.h"
+
 #include "InstructionDispatch.h"
-#include "toLLVM.h"
 #include "X86.h"
 #include "raiseX86.h"
 #include "x86Helpers.h"
@@ -37,8 +55,6 @@
 #include "x86Instrs_Misc.h"
 #include "llvm/Support/Debug.h"
 #include "ArchOps.h"
-
-using namespace llvm;
 
 static InstTransResult doNoop(llvm::BasicBlock *b) {
   //isn't this exciting
@@ -64,7 +80,7 @@ static InstTransResult doInt3(llvm::BasicBlock *b) {
 
 static InstTransResult doTrap(llvm::BasicBlock *b) {
   auto M = b->getParent()->getParent();
-  auto trapIntrin = Intrinsic::getDeclaration(M, llvm::Intrinsic::trap);
+  auto trapIntrin = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::trap);
   llvm::CallInst::Create(trapIntrin, "", b);
   (void) new llvm::UnreachableInst(b->getContext(), b);
   return ContinueBlock;
@@ -126,7 +142,7 @@ static InstTransResult doBswapR(NativeInstPtr ip, llvm::BasicBlock *&b,
       llvm::BinaryOperator::CreateAnd(tmp, CONST_V<width>(b, 0x0000FF00), "",
                                       b),
       CONST_V<width>(b, 8), "", b);
-  auto newByte3 = BinaryOperator::CreateLShr(
+  auto newByte3 = llvm::BinaryOperator::CreateLShr(
       llvm::BinaryOperator::CreateAnd(tmp, CONST_V<width>(b, 0x00FF0000), "",
                                       b),
       CONST_V<width>(b, 8), "", b);
@@ -148,12 +164,11 @@ static InstTransResult doLAHF(llvm::BasicBlock *b) {
   //we need to create an 8-bit value out of the status
   //flags, shift and OR them, and then write them into AH
 
-  auto t = llvm::Type::getInt8Ty(b->getContext());
-  auto cf = new llvm::ZExtInst(F_READ(b, CF), t, "", b);
-  auto af = new llvm::ZExtInst(F_READ(b, AF), t, "", b);
-  auto pf = new llvm::ZExtInst(F_READ(b, PF), t, "", b);
-  auto zf = new llvm::ZExtInst(F_READ(b, ZF), t, "", b);
-  auto sf = new llvm::ZExtInst(F_READ(b, SF), t, "", b);
+  auto cf = F_READ(b, llvm::X86::CF);
+  auto af = F_READ(b, llvm::X86::AF);
+  auto pf = F_READ(b, llvm::X86::PF);
+  auto zf = F_READ(b, llvm::X86::ZF);
+  auto sf = F_READ(b, llvm::X86::SF);
 
   //shift everything
   auto p_0 = cf;
@@ -186,22 +201,22 @@ static InstTransResult doLAHF(llvm::BasicBlock *b) {
 }
 
 static InstTransResult doStd(llvm::BasicBlock *b) {
-  F_SET(b, DF);
+  F_SET(b, llvm::X86::DF);
   return ContinueBlock;
 }
 
 static InstTransResult doCld(llvm::BasicBlock *b) {
-  F_CLEAR(b, DF);
+  F_CLEAR(b, llvm::X86::DF);
   return ContinueBlock;
 }
 
 static InstTransResult doStc(llvm::BasicBlock *b) {
-  F_SET(b, CF);
+  F_SET(b, llvm::X86::CF);
   return ContinueBlock;
 }
 
 static InstTransResult doClc(llvm::BasicBlock *b) {
-  F_CLEAR(b, CF);
+  F_CLEAR(b, llvm::X86::CF);
   return ContinueBlock;
 }
 
@@ -245,8 +260,8 @@ static InstTransResult doRdtsc(llvm::BasicBlock *b) {
       llvm::BinaryOperator::Create(llvm::Instruction::LShr, ret,
                                    llvm::ConstantInt::get(Int32Ty, 32), "", b),
       Int32Ty, "", b);
-  R_WRITE<32>(b, X86::EDX, high);
-  R_WRITE<32>(b, X86::EAX, low);
+  R_WRITE<32>(b, llvm::X86::EDX, high);
+  R_WRITE<32>(b, llvm::X86::EAX, low);
   return ContinueBlock;
 }
 
@@ -263,7 +278,7 @@ static InstTransResult doAAA(llvm::BasicBlock *b) {
   llvm::Value *af = nullptr;
 
   al = R_READ<8>(b, llvm::X86::AL);
-  af = F_READ(b, AF);
+  af = F_READ(b, llvm::X86::AF);
 
   // AL & 0x0F
   auto andRes = llvm::BinaryOperator::CreateAnd(al, CONST_V<8>(b, 0x0F), "", b);
@@ -287,8 +302,8 @@ static InstTransResult doAAA(llvm::BasicBlock *b) {
       trueBlock);
   R_WRITE<8>(trueBlock, llvm::X86::AH, ahRes);
 
-  F_SET(trueBlock, AF);
-  F_SET(trueBlock, CF);
+  F_SET(trueBlock, llvm::X86::AF);
+  F_SET(trueBlock, llvm::X86::CF);
 
   alRes = llvm::BinaryOperator::CreateAnd(alRes, CONST_V<8>(trueBlock, 0x0F),
                                           "", trueBlock);
@@ -297,19 +312,19 @@ static InstTransResult doAAA(llvm::BasicBlock *b) {
   llvm::BranchInst::Create(endBlock, trueBlock);
 
   //False Block Statements
-  F_CLEAR(falseBlock, AF);
-  F_CLEAR(falseBlock, CF);
+  F_CLEAR(falseBlock, llvm::X86::AF);
+  F_CLEAR(falseBlock, llvm::X86::CF);
 
-  alRes = BinaryOperator::CreateAnd(al, CONST_V<8>(trueBlock, 0x0F), "",
-                                    falseBlock);
+  alRes = llvm::BinaryOperator::CreateAnd(al, CONST_V<8>(trueBlock, 0x0F), "",
+                                          falseBlock);
   R_WRITE<8>(falseBlock, llvm::X86::AL, alRes);
 
   llvm::BranchInst::Create(endBlock, falseBlock);
 
-  F_ZAP(endBlock, OF);
-  F_ZAP(endBlock, SF);
-  F_ZAP(endBlock, ZF);
-  F_ZAP(endBlock, PF);
+  F_ZAP(endBlock, llvm::X86::OF);
+  F_ZAP(endBlock, llvm::X86::SF);
+  F_ZAP(endBlock, llvm::X86::ZF);
+  F_ZAP(endBlock, llvm::X86::PF);
 
   //update our parents concept of what the current block is
   b = endBlock;
@@ -331,7 +346,7 @@ static InstTransResult doAAS(llvm::BasicBlock *b) {
   llvm::Value *af = nullptr;
 
   al = R_READ<8>(b, llvm::X86::AL);
-  af = F_READ(b, AF);
+  af = F_READ(b, llvm::X86::AF);
 
   // AL & 0x0F
   llvm::Value *andRes = llvm::BinaryOperator::CreateAnd(al, CONST_V<8>(b, 0x0F),
@@ -356,8 +371,8 @@ static InstTransResult doAAS(llvm::BasicBlock *b) {
       trueBlock);
   R_WRITE<8>(trueBlock, llvm::X86::AH, ahRes);
 
-  F_SET(trueBlock, AF);
-  F_SET(trueBlock, CF);
+  F_SET(trueBlock, llvm::X86::AF);
+  F_SET(trueBlock, llvm::X86::CF);
 
   alRes = llvm::BinaryOperator::CreateAnd(alRes, CONST_V<8>(trueBlock, 0x0F),
                                           "", trueBlock);
@@ -366,19 +381,19 @@ static InstTransResult doAAS(llvm::BasicBlock *b) {
   llvm::BranchInst::Create(endBlock, trueBlock);
 
   //False Block Statements
-  F_CLEAR(falseBlock, AF);
-  F_CLEAR(falseBlock, CF);
+  F_CLEAR(falseBlock, llvm::X86::AF);
+  F_CLEAR(falseBlock, llvm::X86::CF);
 
-  alRes = BinaryOperator::CreateAnd(al, CONST_V<8>(trueBlock, 0x0F), "",
-                                    falseBlock);
+  alRes = llvm::BinaryOperator::CreateAnd(al, CONST_V<8>(trueBlock, 0x0F), "",
+                                          falseBlock);
   R_WRITE<8>(falseBlock, llvm::X86::AL, alRes);
 
   llvm::BranchInst::Create(endBlock, falseBlock);
 
-  F_ZAP(endBlock, OF);
-  F_ZAP(endBlock, SF);
-  F_ZAP(endBlock, ZF);
-  F_ZAP(endBlock, PF);
+  F_ZAP(endBlock, llvm::X86::OF);
+  F_ZAP(endBlock, llvm::X86::SF);
+  F_ZAP(endBlock, llvm::X86::ZF);
+  F_ZAP(endBlock, llvm::X86::PF);
 
   //update our parents concept of what the current block is
   b = endBlock;
@@ -403,9 +418,9 @@ static InstTransResult doAAM(llvm::BasicBlock *b) {
   WriteSF<8>(b, mod);
   WriteZF<8>(b, mod);
   WritePF<8>(b, mod);
-  F_ZAP(b, OF);
-  F_ZAP(b, AF);
-  F_ZAP(b, CF);
+  F_ZAP(b, llvm::X86::OF);
+  F_ZAP(b, llvm::X86::AF);
+  F_ZAP(b, llvm::X86::CF);
 
   return ContinueBlock;
 }
@@ -429,9 +444,9 @@ static InstTransResult doAAD(llvm::BasicBlock *b) {
   WriteSF<8>(b, tmp);
   WriteZF<8>(b, tmp);
   WritePF<8>(b, tmp);
-  F_ZAP(b, OF);
-  F_ZAP(b, AF);
-  F_ZAP(b, CF);
+  F_ZAP(b, llvm::X86::OF);
+  F_ZAP(b, llvm::X86::AF);
+  F_ZAP(b, llvm::X86::CF);
 
   return ContinueBlock;
 }
@@ -480,14 +495,14 @@ static InstTransResult translate_SAHF(TranslationContext &ctx,
                                       llvm::BasicBlock *&block) {
   auto ah_val = R_READ<8>(block, llvm::X86::AH);
 
-  SHR_SET_FLAG<8, 1>(block, ah_val, CF, 0);
+  SHR_SET_FLAG<8, 1>(block, ah_val, llvm::X86::CF, 0);
   // bit 1 is reserved
-  SHR_SET_FLAG<8, 1>(block, ah_val, PF, 2);
+  SHR_SET_FLAG<8, 1>(block, ah_val, llvm::X86::PF, 2);
   // bit 3 is reserved
-  SHR_SET_FLAG<8, 1>(block, ah_val, AF, 4);
+  SHR_SET_FLAG<8, 1>(block, ah_val, llvm::X86::AF, 4);
   // bit 5 is reserved
-  SHR_SET_FLAG<8, 1>(block, ah_val, ZF, 6);
-  SHR_SET_FLAG<8, 1>(block, ah_val, SF, 7);
+  SHR_SET_FLAG<8, 1>(block, ah_val, llvm::X86::ZF, 6);
+  SHR_SET_FLAG<8, 1>(block, ah_val, llvm::X86::SF, 7);
 
   return ContinueBlock;
 }
@@ -518,7 +533,7 @@ static InstTransResult doBtmi(NativeInstPtr ip, llvm::BasicBlock *&b,
                                                "", b);
 
   auto base_val = M_READ<8>(ip, b, new_base);
-  SHR_SET_FLAG_V<8, 1>(b, base_val, CF, CONST_V<8>(b, whichbit));
+  SHR_SET_FLAG_V<8, 1>(b, base_val, llvm::X86::CF, CONST_V<8>(b, whichbit));
 
   return ContinueBlock;
 }
@@ -533,7 +548,8 @@ static InstTransResult doBtri(llvm::BasicBlock *&b, const llvm::MCOperand &base,
   whichbit %= width;
 
   auto base_val = R_READ<width>(b, base.getReg());
-  SHR_SET_FLAG_V<width, 1>(b, base_val, CF, CONST_V<width>(b, whichbit));
+  SHR_SET_FLAG_V<width, 1>(b, base_val, llvm::X86::CF,
+                           CONST_V<width>(b, whichbit));
 
   return ContinueBlock;
 }
@@ -553,7 +569,7 @@ static InstTransResult doBtrr(llvm::BasicBlock *&b, const llvm::MCOperand &base,
                                                     CONST_V<width>(b, width),
                                                     "", b);
 
-  SHR_SET_FLAG_V<width, 1>(b, base_val, CF, index_mod);
+  SHR_SET_FLAG_V<width, 1>(b, base_val, llvm::X86::CF, index_mod);
 
   return ContinueBlock;
 }
@@ -569,7 +585,8 @@ static InstTransResult doBTSri(llvm::BasicBlock *&b,
   whichbit %= width;
 
   auto base_val = R_READ<width>(b, base.getReg());
-  SHR_SET_FLAG_V<width, 1>(b, base_val, CF, CONST_V<width>(b, whichbit));
+  SHR_SET_FLAG_V<width, 1>(b, base_val, llvm::X86::CF,
+                           CONST_V<width>(b, whichbit));
 
   auto new_base_val = llvm::BinaryOperator::Create(
       llvm::Instruction::Or, base_val, CONST_V<width>(b, 1ULL << whichbit), "",
@@ -606,7 +623,7 @@ static InstTransResult doBTSmi(NativeInstPtr ip, llvm::BasicBlock *&b,
                                                "", b);
 
   auto base_val = M_READ<8>(ip, b, new_base);
-  SHR_SET_FLAG_V<8, 1>(b, base_val, CF, CONST_V<8>(b, whichbit));
+  SHR_SET_FLAG_V<8, 1>(b, base_val, llvm::X86::CF, CONST_V<8>(b, whichbit));
 
   auto new_base_val = llvm::BinaryOperator::Create(llvm::Instruction::Or,
                                                    base_val,
@@ -644,7 +661,7 @@ static InstTransResult doBTRmi(NativeInstPtr ip, llvm::BasicBlock *&b,
                                                "", b);
 
   auto base_val = M_READ<8>(ip, b, new_base);
-  SHR_SET_FLAG_V<8, 1>(b, base_val, CF, CONST_V<8>(b, whichbit));
+  SHR_SET_FLAG_V<8, 1>(b, base_val, llvm::X86::CF, CONST_V<8>(b, whichbit));
 
   auto new_base_val = llvm::BinaryOperator::Create(
       llvm::Instruction::And, base_val, CONST_V<8>(b, ~(1ULL << whichbit)), "",
@@ -665,8 +682,8 @@ static InstTransResult doBsrr(llvm::BasicBlock *&b, const llvm::MCOperand &dst,
   auto src_val = R_READ<width>(b, src.getReg());
 
   llvm::Type *s[] = {llvm::Type::getIntNTy(b->getContext(), width)};
-  auto ctlzFn = Intrinsic::getDeclaration(b->getParent()->getParent(),
-                                          Intrinsic::ctlz, s);
+  auto ctlzFn = llvm::Intrinsic::getDeclaration(b->getParent()->getParent(),
+                                                llvm::Intrinsic::ctlz, s);
 
   TASSERT(ctlzFn != NULL, "Could not find ctlz intrinsic");
 
@@ -681,7 +698,7 @@ static InstTransResult doBsrr(llvm::BasicBlock *&b, const llvm::MCOperand &dst,
   auto is_zero = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ,
                                     CONST_V<width>(b, 0), index_of_first_1);
 
-  F_WRITE(b, ZF, is_zero);
+  F_WRITE(b, llvm::X86::ZF, is_zero);
 
   auto fix_index = llvm::BinaryOperator::CreateSub(index_of_first_1,
                                                    CONST_V<width>(b, 1), "", b);
@@ -707,8 +724,8 @@ static InstTransResult doBsfrm(NativeInstPtr ip, llvm::BasicBlock *&b,
   auto src_val = M_READ<width>(ip, b, memAddr);
 
   llvm::Type *s[] = {llvm::Type::getIntNTy(b->getContext(), width)};
-  auto cttzFn = Intrinsic::getDeclaration(b->getParent()->getParent(),
-                                          Intrinsic::cttz, s);
+  auto cttzFn = llvm::Intrinsic::getDeclaration(b->getParent()->getParent(),
+                                                llvm::Intrinsic::cttz, s);
 
   TASSERT(cttzFn != NULL, "Could not find cttz intrinsic");
 
@@ -720,7 +737,7 @@ static InstTransResult doBsfrm(NativeInstPtr ip, llvm::BasicBlock *&b,
   auto is_zero = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ,
                                     CONST_V<width>(b, width), cttz);
 
-  F_WRITE(b, ZF, is_zero);
+  F_WRITE(b, llvm::X86::ZF, is_zero);
 
   // See if we write to register
   auto save_index = llvm::SelectInst::Create(is_zero,  // check if the source was zero
@@ -743,8 +760,8 @@ static InstTransResult doBsfr(llvm::BasicBlock *&b, const llvm::MCOperand &dst,
   auto src_val = R_READ<width>(b, src.getReg());
 
   llvm::Type *s[] = {llvm::Type::getIntNTy(b->getContext(), width)};
-  auto cttzFn = Intrinsic::getDeclaration(b->getParent()->getParent(),
-                                          Intrinsic::cttz, s);
+  auto cttzFn = llvm::Intrinsic::getDeclaration(b->getParent()->getParent(),
+                                                llvm::Intrinsic::cttz, s);
 
   TASSERT(cttzFn != NULL, "Could not find cttz intrinsic");
 
@@ -756,7 +773,7 @@ static InstTransResult doBsfr(llvm::BasicBlock *&b, const llvm::MCOperand &dst,
   auto is_zero = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ,
                                     CONST_V<width>(b, width), cttz);
 
-  F_WRITE(b, ZF, is_zero);
+  F_WRITE(b, llvm::X86::ZF, is_zero);
 
   // See if we write to register
   auto save_index = llvm::SelectInst::Create(is_zero,  // check if the source was zero
@@ -873,21 +890,21 @@ static InstTransResult translate_CPUID32(TranslationContext &ctx,
   R_WRITE<32>(block_b0, llvm::X86::EBX, CONST_V<32>(block, 0x756e6547));
   R_WRITE<32>(block_b0, llvm::X86::ECX, CONST_V<32>(block, 0x6c65746e));
   R_WRITE<32>(block_b0, llvm::X86::EDX, CONST_V<32>(block, 0x49656e69));
-  BranchInst::Create(block_bexit, block_b0);
+  llvm::BranchInst::Create(block_bexit, block_b0);
 
   // eax = 1
   R_WRITE<32>(block_b1, llvm::X86::EAX, CONST_V<32>(block, 0x000306c3));
   R_WRITE<32>(block_b1, llvm::X86::EBX, CONST_V<32>(block, 0x05100800));
   R_WRITE<32>(block_b1, llvm::X86::ECX, CONST_V<32>(block, 0x7ffafbff));
   R_WRITE<32>(block_b1, llvm::X86::EDX, CONST_V<32>(block, 0xbfebfbff));
-  BranchInst::Create(block_bexit, block_b1);
+  llvm::BranchInst::Create(block_bexit, block_b1);
 
   // eax = 2
   R_WRITE<32>(block_b2, llvm::X86::EAX, CONST_V<32>(block, 0x76035a01));
   R_WRITE<32>(block_b2, llvm::X86::EBX, CONST_V<32>(block, 0x00f0b5ff));
   R_WRITE<32>(block_b2, llvm::X86::ECX, CONST_V<32>(block, 0x00000000));
   R_WRITE<32>(block_b2, llvm::X86::EDX, CONST_V<32>(block, 0x00c10000));
-  BranchInst::Create(block_bexit, block_b2);
+  llvm::BranchInst::Create(block_bexit, block_b2);
 
   llvm::SwitchInst *si_eax4 = llvm::SwitchInst::Create(ecx, block_eax4_bdefault,
                                                        4, block_b4);
@@ -896,28 +913,28 @@ static InstTransResult translate_CPUID32(TranslationContext &ctx,
   R_WRITE<32>(block_eax4_b0, llvm::X86::EBX, CONST_V<32>(block, 0x01c0003f));
   R_WRITE<32>(block_eax4_b0, llvm::X86::ECX, CONST_V<32>(block, 0x0000003f));
   R_WRITE<32>(block_eax4_b0, llvm::X86::EDX, CONST_V<32>(block, 0x00000000));
-  BranchInst::Create(block_bexit, block_eax4_b0);
+  llvm::BranchInst::Create(block_bexit, block_eax4_b0);
 
   // eax = 4, ecx = 1
   R_WRITE<32>(block_eax4_b1, llvm::X86::EAX, CONST_V<32>(block, 0x1c004122));
   R_WRITE<32>(block_eax4_b1, llvm::X86::EBX, CONST_V<32>(block, 0x01c0003f));
   R_WRITE<32>(block_eax4_b1, llvm::X86::ECX, CONST_V<32>(block, 0x0000003f));
   R_WRITE<32>(block_eax4_b1, llvm::X86::EDX, CONST_V<32>(block, 0x00000000));
-  BranchInst::Create(block_bexit, block_eax4_b1);
+  llvm::BranchInst::Create(block_bexit, block_eax4_b1);
 
   // eax = 4, ecx = 2
   R_WRITE<32>(block_eax4_b2, llvm::X86::EAX, CONST_V<32>(block, 0x1c004143));
   R_WRITE<32>(block_eax4_b2, llvm::X86::EBX, CONST_V<32>(block, 0x01c0003f));
   R_WRITE<32>(block_eax4_b2, llvm::X86::ECX, CONST_V<32>(block, 0x000001ff));
   R_WRITE<32>(block_eax4_b2, llvm::X86::EDX, CONST_V<32>(block, 0x00000000));
-  BranchInst::Create(block_bexit, block_eax4_b2);
+  llvm::BranchInst::Create(block_bexit, block_eax4_b2);
 
   // eax = 4, ecx = 3
   R_WRITE<32>(block_eax4_b3, llvm::X86::EAX, CONST_V<32>(block, 0x1c03c163));
   R_WRITE<32>(block_eax4_b3, llvm::X86::EBX, CONST_V<32>(block, 0x03c0003f));
   R_WRITE<32>(block_eax4_b3, llvm::X86::ECX, CONST_V<32>(block, 0x00000fff));
   R_WRITE<32>(block_eax4_b3, llvm::X86::EDX, CONST_V<32>(block, 0x00000006));
-  BranchInst::Create(block_bexit, block_eax4_b3);
+  llvm::BranchInst::Create(block_bexit, block_eax4_b3);
 
   // eax = 4, default
   doTrap(block_eax4_bdefault);
@@ -932,7 +949,7 @@ static InstTransResult translate_CPUID32(TranslationContext &ctx,
   R_WRITE<32>(block_b7, llvm::X86::EBX, CONST_V<32>(block, 0xffffffff));
   R_WRITE<32>(block_b7, llvm::X86::ECX, CONST_V<32>(block, 0x00000000));
   R_WRITE<32>(block_b7, llvm::X86::EDX, CONST_V<32>(block, 0x00000000));
-  BranchInst::Create(block_bexit, block_b7);
+  llvm::BranchInst::Create(block_bexit, block_b7);
 
   llvm::SwitchInst *si_eax11 = llvm::SwitchInst::Create(ecx,
                                                         block_eax11_bdefault, 2,
@@ -942,14 +959,14 @@ static InstTransResult translate_CPUID32(TranslationContext &ctx,
   R_WRITE<32>(block_eax11_b0, llvm::X86::EBX, CONST_V<32>(block, 0x00000002));
   R_WRITE<32>(block_eax11_b0, llvm::X86::ECX, CONST_V<32>(block, 0x00000100));
   R_WRITE<32>(block_eax11_b0, llvm::X86::EDX, CONST_V<32>(block, 0x00000005));
-  BranchInst::Create(block_bexit, block_eax11_b0);
+  llvm::BranchInst::Create(block_bexit, block_eax11_b0);
 
   // eax = 11, ecx = 1
   R_WRITE<32>(block_eax11_b1, llvm::X86::EAX, CONST_V<32>(block, 0x00000004));
   R_WRITE<32>(block_eax11_b1, llvm::X86::EBX, CONST_V<32>(block, 0x00000004));
   R_WRITE<32>(block_eax11_b1, llvm::X86::ECX, CONST_V<32>(block, 0x00000201));
   R_WRITE<32>(block_eax11_b1, llvm::X86::EDX, CONST_V<32>(block, 0x00000003));
-  BranchInst::Create(block_bexit, block_eax11_b1);
+  llvm::BranchInst::Create(block_bexit, block_eax11_b1);
 
   si_eax11->addCase(CONST_V<32>(block_b11, 0), block_eax11_b0);
   si_eax11->addCase(CONST_V<32>(block_b11, 1), block_eax11_b1);
@@ -961,7 +978,7 @@ static InstTransResult translate_CPUID32(TranslationContext &ctx,
   R_WRITE<32>(block_b8m, llvm::X86::EBX, CONST_V<32>(block, 0x00000000));
   R_WRITE<32>(block_b8m, llvm::X86::ECX, CONST_V<32>(block, 0x00000000));
   R_WRITE<32>(block_b8m, llvm::X86::EDX, CONST_V<32>(block, 0x00000000));
-  BranchInst::Create(block_bexit, block_b8m);
+  llvm::BranchInst::Create(block_bexit, block_b8m);
 
   doTrap(block_bdefault);
 
@@ -1081,7 +1098,5 @@ void Misc_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::BSF16rr] = translate_BSF16rr;
   m[llvm::X86::TRAP] = translate_TRAP;
 
-  m[llvm::X86::CPUID32] = translate_CPUID32;
-  // the 64-bit version also only access 32-bit regs
-  m[llvm::X86::CPUID64] = translate_CPUID32;
+  m[llvm::X86::CPUID] = translate_CPUID32;
 }

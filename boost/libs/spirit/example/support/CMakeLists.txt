@@ -1,9 +1,0 @@
-foreach(
-    example
-    multi_pass
-)
-boost_add_executable(
-    ${example}
-)
-endforeach(
-)

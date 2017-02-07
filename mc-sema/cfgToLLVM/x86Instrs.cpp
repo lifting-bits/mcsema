@@ -26,11 +26,16 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "toLLVM.h"
+
+#include <llvm/IR/DataLayout.h>
+#include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/Intrinsics.h>
+
+#include "mc-sema/Arch/Dispatch.h"
+
 #include "raiseX86.h"
 #include "X86.h"
 
-#include "RegisterUsage.h"
 
 #include "JumpTables.h"
 
@@ -38,18 +43,7 @@
 #include "x86Instrs_fpu.h"
 #include "x86Instrs_MOV.h"
 #include "InstructionDispatch.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/Support/Debug.h"
 #include "x86Instrs_flagops.h"
-#include "../common/to_string.h"
-
-using namespace std;
-using namespace llvm;
-
-namespace x86 {
-}
-
-using namespace x86;
 
 // do any instruction preprocessing/conversion
 // before moving on to translation.
@@ -64,25 +58,23 @@ static void PreProcessInst(TranslationContext &ctx, llvm::BasicBlock *&block) {
   // the conformant tables are handled in the instruction
   // translator via switch()
   if (ip->has_jump_table()) {
-    if ( !isConformantJumpInst(ip)) {
-      {
-        llvm::dbgs() << "WARNING: jump table but non-conformant instruction:\n";
-        llvm::dbgs() << to_string<VA>(ip->get_loc(), std::hex) << ": ";
-        llvm::dbgs() << inst << "\n";
+    if (!isConformantJumpInst(ip)) {
+      std::cerr
+          << "WARNING: jump table but non-conformant instruction:" << std::endl
+          << std::hex << ip->get_loc();
 
-        VA tbl_va = 0;
-        auto jmptbl = ip->get_jump_table();
+      VA tbl_va = 0;
+      auto jmptbl = ip->get_jump_table();
 
-        bool ok = addJumpTableDataSection(ctx, tbl_va, *jmptbl);
+      bool ok = addJumpTableDataSection(ctx, tbl_va, *jmptbl);
 
-        TASSERT(ok, "Could not add jump table data section!\n");
+      TASSERT(ok, "Could not add jump table data section!\n");
 
-        auto data_ref_va = static_cast<uint32_t>(tbl_va
-            + (4 * jmptbl->getInitialEntry()));
+      auto data_ref_va = static_cast<uint32_t>(tbl_va
+          + (4 * jmptbl->getInitialEntry()));
 
-        ip->set_reference(NativeInst::MEMRef, data_ref_va);
-        ip->set_ref_type(NativeInst::MEMRef, NativeInst::CFGDataRef);
-      }
+      ip->set_reference(NativeInst::MEMRef, data_ref_va);
+      ip->set_ref_type(NativeInst::MEMRef, NativeInst::CFGDataRef);
     }
 
   // only add data references for unknown jump index table reads
@@ -140,19 +132,18 @@ InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
   //string falseStrName = "block_0x" + to_string<VA>(ip->get_fa(), hex);
 
   auto &inst = ctx.natI->get_inst();
-  auto opcode = inst.getOpcode();
 
-  if (translationDispatchMap.count(opcode)) {
-    auto translationPtr = translationDispatchMap[opcode];
+  if (auto lifter = ArchGetInstructionLifter(inst)) {
     PreProcessInst(ctx, block);
-    itr = translationPtr(ctx, block);
+    itr = lifter(ctx, block);
     if (TranslateError == itr || TranslateErrorUnsupported == itr) {
       std::cerr << "Error translating instruction at " << std::hex
                 << ctx.natI->get_loc() << std::endl;
     }
 
-    // Instruction translation not defined.
+  // Instruction translation not defined.
   } else {
+    auto opcode = inst.getOpcode();
     std::cerr << "Error translating instruction at " << std::hex
               << ctx.natI->get_loc() << "; unsupported opcode " << std::dec
               << opcode << std::endl;
@@ -166,5 +157,3 @@ InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
   }
   return itr;
 }
-
-#undef OP

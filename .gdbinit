@@ -23,6 +23,34 @@ define print-reg-state-64
   dont-repeat
 end
 
+define print-flags-64
+  set $rptr = (unsigned long long *) ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  set $flptr = (char *) &($rptr[17])
+  printf "eflags ["
+  if $flptr[0]
+    printf "CF "
+  end
+  if $flptr[1]
+    printf "PF "
+  end
+  if $flptr[2]
+    printf "AF "
+  end
+  if $flptr[3]
+    printf "ZF "
+  end
+  if $flptr[4]
+    printf "SF "
+  end
+  if $flptr[5]
+    printf "OF "
+  end
+  if $flptr[6]
+    printf "DF "
+  end
+  printf "]\n"
+  dont-repeat
+end
 
 define print-reg-state-32
   set $rptr = ((unsigned (*)(void))__mcsema_debug_get_reg_state)()

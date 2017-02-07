@@ -8,7 +8,8 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
- Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
  Neither the name of Trail of Bits nor the names of its
@@ -26,8 +27,26 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include <llvm/IR/Argument.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/Intrinsics.h>
+
+#include <llvm/MC/MCInst.h>
+
+#include "mc-sema/Arch/Arch.h"
+#include "mc-sema/Arch/Dispatch.h"
+#include "mc-sema/Arch/Register.h"
+
 #include "InstructionDispatch.h"
-#include "toLLVM.h"
 #include "X86.h"
 #include "raiseX86.h"
 #include "x86Instrs_Stack.h"
@@ -68,8 +87,6 @@ static void doPushVT(NativeInstPtr ip, llvm::BasicBlock *&b, llvm::Value *v) {
     M_WRITE_0<width>(b, newESP, intVal);
     R_WRITE<64>(b, llvm::X86::RSP, newESP);
   }
-
-  return;
 }
 
 template<int width>
@@ -94,8 +111,6 @@ static void doPushV(NativeInstPtr ip, llvm::BasicBlock *&b, llvm::Value *v) {
     M_WRITE_0<width>(b, newRSP, v);
     x86_64::R_WRITE<64>(b, llvm::X86::RSP, newRSP);
   }
-
-  return;
 }
 
 template<int width>
@@ -173,7 +188,7 @@ static InstTransResult doEnter(NativeInstPtr ip, llvm::BasicBlock *&b,
   //test and see if we should leave
   auto leaveLoop = new llvm::ICmpInst( *loopHeader, llvm::CmpInst::ICMP_ULT, i,
                                       vNestingLevel);
-  BranchInst::Create(loopBody, loopEnd, leaveLoop, loopHeader);
+  llvm::BranchInst::Create(loopBody, loopEnd, leaveLoop, loopHeader);
 
   //subtract 4 from EBP
   auto oEBP = x86::R_READ<32>(loopBody, llvm::X86::EBP);
@@ -183,8 +198,8 @@ static InstTransResult doEnter(NativeInstPtr ip, llvm::BasicBlock *&b,
   doPushV<32>(ip, loopBody, nEBP);
 
   //add to the counter
-  auto i_inc = BinaryOperator::CreateAdd(i, CONST_V<32>(loopBody, 1), "",
-                                         loopBody);
+  auto i_inc = llvm::BinaryOperator::CreateAdd(i, CONST_V<32>(loopBody, 1), "",
+                                               loopBody);
   i->addIncoming(i_inc, loopBody);
   llvm::BranchInst::Create(loopHeader, loopBody);
 
@@ -433,14 +448,14 @@ static InstTransResult doPopAV(NativeInstPtr ip, llvm::BasicBlock *b) {
   // ECX := Pop();
   // EAX := Pop();
 
-  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::EDI));
-  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::ESI));
-  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::EBP));
+  doPopR<width>(ip, b, llvm::MCOperand::createReg(llvm::X86::EDI));
+  doPopR<width>(ip, b, llvm::MCOperand::createReg(llvm::X86::ESI));
+  doPopR<width>(ip, b, llvm::MCOperand::createReg(llvm::X86::EBP));
   doPopV<width>(b);
-  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::EBX));
-  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::EDX));
-  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::ECX));
-  doPopR<width>(ip, b, llvm::MCOperand::CreateReg(llvm::X86::EAX));
+  doPopR<width>(ip, b, llvm::MCOperand::createReg(llvm::X86::EBX));
+  doPopR<width>(ip, b, llvm::MCOperand::createReg(llvm::X86::EDX));
+  doPopR<width>(ip, b, llvm::MCOperand::createReg(llvm::X86::ECX));
+  doPopR<width>(ip, b, llvm::MCOperand::createReg(llvm::X86::EAX));
 
   return ContinueBlock;
 }
@@ -580,9 +595,8 @@ static InstTransResult translate_PUSHi32(TranslationContext &ctx,
   if (ip->has_code_ref()) {
     auto callback_fn = ArchAddCallbackDriver(
         block->getParent()->getParent(), ip->get_reference(NativeInst::IMMRef));
-    auto addrInt = new PtrToIntInst(callback_fn,
-                                    llvm::Type::getInt32Ty(block->getContext()),
-                                    "", block);
+    auto addrInt = new llvm::PtrToIntInst(
+        callback_fn, llvm::Type::getInt32Ty(block->getContext()), "", block);
     doPushV<32>(ip, block, addrInt);
     ret = ContinueBlock;
   } else if (ip->has_imm_reference) {
@@ -630,24 +644,24 @@ static InstTransResult doPopF(NativeInstPtr ip, llvm::BasicBlock *b) {
   auto newFlags = doPopV<width>(b);
 
   // bit 0: CF
-  F_WRITE(b, CF, checkIfBitSet<width>(newFlags, 0, b));
+  F_WRITE(b, llvm::X86::CF, checkIfBitSet<width>(newFlags, 0, b));
   // bit 1: 1 (reserved)
   // bit 2: PF
-  F_WRITE(b, PF, checkIfBitSet<width>(newFlags, 2, b));
+  F_WRITE(b, llvm::X86::PF, checkIfBitSet<width>(newFlags, 2, b));
   // bit 3: 0
   // bit 4: AF
-  F_WRITE(b, AF, checkIfBitSet<width>(newFlags, 4, b));
+  F_WRITE(b, llvm::X86::AF, checkIfBitSet<width>(newFlags, 4, b));
   // bit 5: 0
   // bit 6: ZF
-  F_WRITE(b, ZF, checkIfBitSet<width>(newFlags, 6, b));
+  F_WRITE(b, llvm::X86::ZF, checkIfBitSet<width>(newFlags, 6, b));
   // bit 7: SF
-  F_WRITE(b, SF, checkIfBitSet<width>(newFlags, 7, b));
+  F_WRITE(b, llvm::X86::SF, checkIfBitSet<width>(newFlags, 7, b));
   // bit 8: TF (set to zero)
   // bit 9: IF (set to 1)
   // bit 10: DF
-  F_WRITE(b, DF, checkIfBitSet<width>(newFlags, 10, b));
+  F_WRITE(b, llvm::X86::DF, checkIfBitSet<width>(newFlags, 10, b));
   // bit 11: OF
-  F_WRITE(b, OF, checkIfBitSet<width>(newFlags, 11, b));
+  F_WRITE(b, llvm::X86::OF, checkIfBitSet<width>(newFlags, 11, b));
 
   return ContinueBlock;
 
@@ -658,20 +672,20 @@ static InstTransResult doPushF(NativeInstPtr ip, llvm::BasicBlock *b) {
 
   // put eflags into one value.
   //
-  Type *toT = llvm::Type::getIntNTy(b->getContext(), width);
+  auto toT = llvm::Type::getIntNTy(b->getContext(), width);
 
-  Value *cf = new llvm::ZExtInst(F_READ(b, CF), toT, "", b);
-  Value *pf = new llvm::ZExtInst(F_READ(b, PF), toT, "", b);
-  Value *af = new llvm::ZExtInst(F_READ(b, AF), toT, "", b);
-  Value *zf = new llvm::ZExtInst(F_READ(b, ZF), toT, "", b);
-  Value *sf = new llvm::ZExtInst(F_READ(b, SF), toT, "", b);
-  Value *df = new llvm::ZExtInst(F_READ(b, DF), toT, "", b);
-  Value *of = new llvm::ZExtInst(F_READ(b, OF), toT, "", b);
+  auto cf = new llvm::ZExtInst(F_READ(b, llvm::X86::CF), toT, "", b);
+  auto pf = new llvm::ZExtInst(F_READ(b, llvm::X86::PF), toT, "", b);
+  auto af = new llvm::ZExtInst(F_READ(b, llvm::X86::AF), toT, "", b);
+  auto zf = new llvm::ZExtInst(F_READ(b, llvm::X86::ZF), toT, "", b);
+  auto sf = new llvm::ZExtInst(F_READ(b, llvm::X86::SF), toT, "", b);
+  auto df = new llvm::ZExtInst(F_READ(b, llvm::X86::DF), toT, "", b);
+  auto of = new llvm::ZExtInst(F_READ(b, llvm::X86::OF), toT, "", b);
 
-  Value *eflags_base = CONST_V<width>(b, 0x202);
+  auto eflags_base = CONST_V<width>(b, 0x202);
 
   // bit 0: CF
-  Value *cur_flags = llvm::BinaryOperator::CreateOr(eflags_base, cf, "", b);
+  auto cur_flags = llvm::BinaryOperator::CreateOr(eflags_base, cf, "", b);
   // bit 1: 1 (reserved)
   // bit 2: PF
   EMIT_SHL_OR(cur_flags, pf, 2);

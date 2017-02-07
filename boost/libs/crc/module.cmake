@@ -1,1 +1,0 @@
-boost_module(crc DEPENDS integer config)

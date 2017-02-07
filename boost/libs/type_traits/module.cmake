@@ -1,1 +1,0 @@
-boost_module(type_traits DEPENDS config static_assert)

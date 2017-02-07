@@ -2,23 +2,19 @@
 #include <string>
 #include <sstream>
 
-#include "llvm/ADT/Triple.h"
-#include "llvm/IR/InlineAsm.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/Support/raw_ostream.h"
+#include <llvm/ADT/Triple.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/InlineAsm.h>
+#include <llvm/IR/Module.h>
+#include <llvm/Support/raw_ostream.h>
 
 #include "TransExcn.h"
 
 #include "ArchOps.h"
 
-#include "../common/Defaults.h"
-
-using namespace std;
-using namespace llvm;
-
-SystemArchType SystemArch(llvm::Module *M) {
-  llvm::Triple TT(M->getTargetTriple());
-  llvm::Triple::ArchType arch = TT.getArch();
+SystemArchType SystemArch(llvm::Module *) {
+  auto arch = ArchType();
   if (arch == llvm::Triple::x86) {
     return _X86_;
   } else if (arch == llvm::Triple::x86_64) {
@@ -31,38 +27,6 @@ SystemArchType SystemArch(llvm::Module *M) {
 llvm::Triple::OSType SystemOS(llvm::Module *M) {
   llvm::Triple TT(M->getTargetTriple());
   return TT.getOS();
-}
-
-PointerSize ArchPointerSize(llvm::Module *M) {
-  llvm::Triple TT(M->getTargetTriple());
-  llvm::Triple::ArchType arch = TT.getArch();
-  if (arch == llvm::Triple::x86) {
-    return Pointer32;
-  } else if (arch == llvm::Triple::x86_64) {
-    return Pointer64;
-  } else {
-    throw TErr(__LINE__, __FILE__, "Unsupported architecture");
-  }
-}
-
-llvm::CallingConv::ID ArchGetCallingConv(llvm::Module *M) {
-  const auto OS = SystemOS(M);
-  const auto Arch = SystemArch(M);
-  if (llvm::Triple::Win32 == OS) {
-    if (_X86_64_ == Arch) {
-      return CallingConv::X86_64_Win64;
-    } else {
-      return CallingConv::C;
-    }
-  } else if (llvm::Triple::Linux == OS) {
-    if (_X86_64_ == Arch) {
-      return CallingConv::X86_64_SysV;
-    } else {
-      return CallingConv::C;
-    }
-  } else {
-    TASSERT(false, "Unsupported OS");
-  }
 }
 
 static void InitADFeatues(llvm::Module *M, const char *name,
@@ -170,24 +134,24 @@ static std::string WindowsDecorateName(llvm::Function *F,
                                        const std::string &name) {
 
   // 64-bit doesn't mangle
-  Module *M = F->getParent();
+  auto M = F->getParent();
   if (64 == ArchPointerSize(M)) {
     return name;
   }
 
   switch (F->getCallingConv()) {
 
-    case CallingConv::C:
+    case llvm::CallingConv::C:
       return "_" + name;
       break;
-    case CallingConv::X86_StdCall: {
+    case llvm::CallingConv::X86_StdCall: {
       std::stringstream as;
       int argc = F->arg_size();
       as << "_" << name << "@" << argc * 4;
       return as.str();
     }
       break;
-    case CallingConv::X86_FastCall: {
+    case llvm::CallingConv::X86_FastCall: {
       std::stringstream as;
       int argc = F->arg_size();
       as << "@" << name << "@" << argc * 4;
@@ -322,13 +286,13 @@ llvm::Function *ArchAddExitPointDriver(llvm::Function *F) {
       LinuxAddPushJumpStub(M, F, W, "__mcsema_detach_call");
     } else {
       switch (F->getCallingConv()) {
-        case CallingConv::C:
+        case llvm::CallingConv::C:
           LinuxAddPushJumpStub(M, F, W, "__mcsema_detach_call_cdecl");
           break;
-        case CallingConv::X86_StdCall:
+        case llvm::CallingConv::X86_StdCall:
           LinuxAddPushJumpStub(M, F, W, "__mcsema_detach_call_stdcall");
           break;
-        case CallingConv::X86_FastCall:
+        case llvm::CallingConv::X86_FastCall:
           LinuxAddPushJumpStub(M, F, W, "__mcsema_detach_call_fastcall");
           break;
         default:
@@ -342,13 +306,13 @@ llvm::Function *ArchAddExitPointDriver(llvm::Function *F) {
         WindowsAddPushJumpStub(true, M, F, W, "__mcsema_detach_call");
     } else {
       switch (F->getCallingConv()) {
-        case CallingConv::C:
+        case llvm::CallingConv::C:
           WindowsAddPushJumpStub(true, M, F, W, "__mcsema_detach_call_cdecl");
           break;
-        case CallingConv::X86_StdCall:
+        case llvm::CallingConv::X86_StdCall:
           WindowsAddPushJumpStub(true, M, F, W, "__mcsema_detach_call_stdcall");
           break;
-        case CallingConv::X86_FastCall:
+        case llvm::CallingConv::X86_FastCall:
           WindowsAddPushJumpStub(true, M, F, W, "__mcsema_detach_call_fastcall");
           break;
         default:
@@ -403,6 +367,36 @@ bool shouldSubtractImageBase(llvm::Module *M) {
   return true;
 }
 
+llvm::Value *doSubtractImageBase(llvm::Value *original,
+                                 llvm::BasicBlock *block, int width) {
+  llvm::Module *M = block->getParent()->getParent();
+  auto &C = M->getContext();
+  llvm::Value *ImageBase = archGetImageBase(M);
+
+  llvm::Type *intWidthTy = llvm::Type::getIntNTy(C, width);
+  llvm::Type *ptrWidthTy = llvm::PointerType::get(intWidthTy, 0);
+
+  // TODO(artem): Why use `64` below??
+
+  // convert original value pointer to int
+  llvm::Value *original_int = new llvm::PtrToIntInst(
+      original, llvm::Type::getIntNTy(C, 64), "", block);
+
+  // convert image base pointer to int
+  llvm::Value *ImageBase_int = new llvm::PtrToIntInst(
+      ImageBase, llvm::Type::getIntNTy(C, 64), "", block);
+
+  // do the subtraction
+  llvm::Value *data_v = llvm::BinaryOperator::CreateSub(original_int,
+                                                        ImageBase_int, "",
+                                                        block);
+
+  // convert back to a pointer
+  llvm::Value *data_ptr = new llvm::IntToPtrInst(data_v, ptrWidthTy, "", block);
+
+  return data_ptr;
+}
+
 llvm::Value *doSubtractImageBaseInt(llvm::Value *original,
                                     llvm::BasicBlock *block) {
   auto M = block->getParent()->getParent();
@@ -416,4 +410,3 @@ llvm::Value *doSubtractImageBaseInt(llvm::Value *original,
   // do the subtraction
   return llvm::BinaryOperator::CreateSub(original, ImageBase_int, "", block);
 }
-

@@ -26,26 +26,33 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <vector>
 #include <unordered_set>
+#include <sstream>
 #include <string>
-#include "peToCFG.h"
-#include "JumpTables.h"
-#include "toLLVM.h"
-#include "raiseX86.h"
 
+#include <llvm/IR/Argument.h>
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
-#include "../common/to_string.h"
-#include "x86Helpers.h"
+#include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/Intrinsics.h>
+
+#include "mc-sema/Arch/Dispatch.h"
+#include "mc-sema/BC/Util.h"
+#include "mc-sema/CFG/CFG.h"
+
+#include "mc-sema/cfgToLLVM/JumpTables.h"
+#include "mc-sema/cfgToLLVM/raiseX86.h"
+#include "mc-sema/cfgToLLVM/x86Helpers.h"
+
 #include "InstructionDispatch.h"
-#include "llvm/Support/Debug.h"
 
 using namespace std;
 using namespace llvm;
 //using namespace x86;
-
-extern llvm::PointerType *g_PRegStruct;
 
 // convert a jump table to a data section of symbols
 static DataSection* tableToDataSection(VA new_base, const MCSJumpTable &jt) {
@@ -54,7 +61,9 @@ static DataSection* tableToDataSection(VA new_base, const MCSJumpTable &jt) {
   VA curAddr = new_base;
 
   for (auto va : entries) {
-    std::string sub_name = "sub_" + to_string<VA>(va, hex);
+    std::stringstream ss;
+    ss << "sub_" << std::hex << va;
+    std::string sub_name = ss.str();
     DataSectionEntry dse(curAddr, sub_name);
     ds->addEntry(dse);
     curAddr += 4;
@@ -97,7 +106,9 @@ static bool addTableDataSection(TranslationContext &ctx,
   natMod->addDataSection(*ds);
 
   // create the GlobalVariable
-  std::string bufferName = "data_0x" + to_string<VA>(newVA, std::hex);
+  std::stringstream ss;
+  ss << "data_" << std::hex << newVA;
+  std::string bufferName = ss.str();
   auto st_opaque = llvm::StructType::create(M->getContext());
   auto gv = new llvm::GlobalVariable( *M, st_opaque, true,
                                      llvm::GlobalVariable::InternalLinkage,
@@ -128,22 +139,19 @@ bool addJumpIndexTableDataSection(TranslationContext &ctx, VA &newVA, const Jump
 
 void doJumpTableViaData(llvm::BasicBlock *&block, llvm::Value *fptr,
                         const int bitness) {
-  auto ourF = block->getParent();
-  //make the call, the only argument should be our parents arguments
-  TASSERT(ourF->arg_size() == 1, "");
+  llvm::Function *ourF = block->getParent();
 
   if (!fptr->getType()->isPtrOrPtrVectorTy()) {
-    auto M = ourF->getParent();
-    // get mem address
-    std::vector<llvm::Type *> args;
-    args.push_back(g_PRegStruct);
-    auto returnTy = llvm::Type::getVoidTy(M->getContext());
-    auto FT = llvm::FunctionType::get(returnTy, args, false);
+    auto FT = LiftedFunctionType();
     auto FptrTy = llvm::PointerType::get(FT, 0);
     fptr = new llvm::IntToPtrInst(fptr, FptrTy, "", block);
   }
+
   std::vector<llvm::Value *> subArgs;
-  subArgs.push_back(ourF->arg_begin());
+  for (llvm::Argument &arg : ourF->args()) {
+    subArgs.push_back(&arg);
+  }
+
   llvm::CallInst::Create(fptr, subArgs, "", block);
 }
 
@@ -160,10 +168,8 @@ void doJumpTableViaData(TranslationContext &ctx, llvm::BasicBlock *&block,
   auto ourF = block->getParent();
   auto M = ourF->getParent();
   // get mem address
-  std::vector<llvm::Type *> args;
-  args.push_back(g_PRegStruct);
-  auto returnTy = llvm::Type::getVoidTy(M->getContext());
-  auto FT = llvm::FunctionType::get(returnTy, args, false);
+
+  auto FT = LiftedFunctionType();
 
   auto FptrTy = llvm::PointerType::get(FT, 0);
   auto Fptr2Ty = llvm::PointerType::get(FptrTy, 0);

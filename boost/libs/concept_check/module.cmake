@@ -1,1 +1,0 @@
-boost_module(concept_check DEPENDS preprocessor)

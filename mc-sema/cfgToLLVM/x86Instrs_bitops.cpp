@@ -26,14 +26,27 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <iostream>
+#include <string>
+
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/Intrinsics.h>
+
+#include <llvm/MC/MCInst.h>
+
+#include "mc-sema/Arch/Arch.h"
+#include "mc-sema/Arch/Dispatch.h"
+#include "mc-sema/Arch/Register.h"
+
 #include "InstructionDispatch.h"
-#include "toLLVM.h"
 #include "X86.h"
 #include "raiseX86.h"
 #include "x86Helpers.h"
 #include "x86Instrs_flagops.h"
 #include "x86Instrs_bitops.h"
-#include "llvm/Support/Debug.h"
 
 using namespace llvm;
 
@@ -46,9 +59,9 @@ static Value * doAndVV(BasicBlock *&b, Value *o1, Value *o2) {
   WriteSF<width>(b, result);
   WriteZF<width>(b, result);
   WritePF<width>(b, result);
-  F_CLEAR(b, OF);
-  F_CLEAR(b, CF);
-  F_ZAP(b, AF);
+  F_CLEAR(b, llvm::X86::OF);
+  F_CLEAR(b, llvm::X86::CF);
+  F_ZAP(b, llvm::X86::AF);
 
   return result;
 }
@@ -231,9 +244,9 @@ static Value * doOrVV(NativeInstPtr ip, BasicBlock *&b, Value *o1, Value *o2) {
   Value *result = BinaryOperator::Create(Instruction::Or, o1, o2, "", b);
 
   // Set flags.
-  F_ZAP(b, AF);
-  F_CLEAR(b, OF);
-  F_CLEAR(b, CF);
+  F_ZAP(b, llvm::X86::AF);
+  F_CLEAR(b, llvm::X86::OF);
+  F_CLEAR(b, llvm::X86::CF);
   WriteSF<width>(b, result);
   WriteZF<width>(b, result);
   WritePF<width>(b, result);
@@ -351,8 +364,8 @@ static Value * doXorVV(NativeInstPtr ip, BasicBlock *&b, Value *o1, Value *o2) {
   Value *xoredVal = BinaryOperator::Create(Instruction::Xor, o1, o2, "", b);
 
   // Clear CF and OF.
-  F_CLEAR(b, CF);
-  F_CLEAR(b, OF);
+  F_CLEAR(b, llvm::X86::CF);
+  F_CLEAR(b, llvm::X86::OF);
 
   // Set SF, ZF, and PF.
   WriteSF<width>(b, xoredVal);
@@ -360,7 +373,7 @@ static Value * doXorVV(NativeInstPtr ip, BasicBlock *&b, Value *o1, Value *o2) {
   WritePF<width>(b, xoredVal);
 
   // Undefine AF.
-  F_ZAP(b, AF);
+  F_ZAP(b, llvm::X86::AF);
 
   return xoredVal;
 }
@@ -470,7 +483,7 @@ static InstTransResult doXorRR(NativeInstPtr ip, BasicBlock *&b, const MCOperand
 
 GENERIC_TRANSLATION(
     AND16i16,
-    doAndRI<16>(ip, block, MCOperand::CreateReg(X86::AX), MCOperand::CreateReg(X86::AX), OP(0)))
+    doAndRI<16>(ip, block, MCOperand::createReg(X86::AX), MCOperand::createReg(X86::AX), OP(0)))
 GENERIC_TRANSLATION_REF(AND16mi, doAndMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
                         doAndMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION_REF(AND16mi8, doAndMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -484,12 +497,12 @@ GENERIC_TRANSLATION_REF(AND16rm,
                         doAndRM<16>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(AND16rr, doAndRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND16rr_REV, doAndRR<16>(ip, block, OP(0), OP(1), OP(2)))
-//GENERIC_TRANSLATION(AND32i32, doAndRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+//GENERIC_TRANSLATION(AND32i32, doAndRI<32>(ip, block, MCOperand::createReg(X86::EAX), MCOperand::createReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION_REF(
     AND32i32,
-    doAndRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
+    doAndRI<32>(ip, block, MCOperand::createReg(X86::EAX), MCOperand::createReg(X86::EAX), OP(0)),
     doAndRV<32>(ip, block, IMM_AS_DATA_REF<32>(block, natM, ip),
-                MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+                MCOperand::createReg(X86::EAX), MCOperand::createReg(X86::EAX)))
 
 GENERIC_TRANSLATION_MI(
     AND32mi, doAndMI<32>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -519,12 +532,12 @@ GENERIC_TRANSLATION(AND64ri8, doAndRI<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_REF(
     AND64ri32, doAndRI<64>(ip, block, OP(0), OP(1), OP(2)),
     doAndRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), OP(0), OP(1)))
-//GENERIC_TRANSLATION(AND64i32, doAndRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)))
+//GENERIC_TRANSLATION(AND64i32, doAndRI<64>(ip, block, MCOperand::createReg(X86::RAX), MCOperand::createReg(X86::RAX), OP(0)))
 GENERIC_TRANSLATION_REF(
     AND64i32,
-    doAndRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
+    doAndRI<64>(ip, block, MCOperand::createReg(X86::RAX), MCOperand::createReg(X86::RAX), OP(0)),
     doAndRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip),
-                MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
+                MCOperand::createReg(X86::RAX), MCOperand::createReg(X86::RAX)))
 
 GENERIC_TRANSLATION_REF(AND32rm,
                         doAndRM<32>(ip, block, ADDR_NOREF(2), OP(0), OP(1)),
@@ -538,7 +551,7 @@ GENERIC_TRANSLATION(AND32rr, doAndRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(AND32rr_REV, doAndRR<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(
     AND8i8,
-    doAndRI<8>(ip, block, MCOperand::CreateReg(X86::AL), MCOperand::CreateReg(X86::AL), OP(0)))
+    doAndRI<8>(ip, block, MCOperand::createReg(X86::AL), MCOperand::createReg(X86::AL), OP(0)))
 GENERIC_TRANSLATION_REF(AND8mi, doAndMI<8>(ip, block, ADDR_NOREF(0), OP(5)),
                         doAndMI<8>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION_REF(AND8mr, doAndMR<8>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -564,7 +577,7 @@ GENERIC_TRANSLATION_REF(NOT8m, doNotM<8>(ip, block, ADDR_NOREF(0)),
 GENERIC_TRANSLATION(NOT8r, doNotR<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(
     OR16i16,
-    doOrRI<16>(ip, block, MCOperand::CreateReg(X86::AX), MCOperand::CreateReg(X86::AX), OP(0)))
+    doOrRI<16>(ip, block, MCOperand::createReg(X86::AX), MCOperand::createReg(X86::AX), OP(0)))
 GENERIC_TRANSLATION_REF(OR16mi, doOrMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
                         doOrMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION_REF(OR16mi8, doOrMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -578,17 +591,17 @@ GENERIC_TRANSLATION_REF(OR16rm,
                         doOrRM<16>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
 GENERIC_TRANSLATION(OR16rr, doOrRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(OR16rr_REV, doOrRR<16>(ip, block, OP(0), OP(1), OP(2)))
-//GENERIC_TRANSLATION(OR32i32, doOrRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)))
+//GENERIC_TRANSLATION(OR32i32, doOrRI<32>(ip, block, MCOperand::createReg(X86::EAX), MCOperand::createReg(X86::EAX), OP(0)))
 GENERIC_TRANSLATION_REF(
     OR32i32,
-    doOrRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
+    doOrRI<32>(ip, block, MCOperand::createReg(X86::EAX), MCOperand::createReg(X86::EAX), OP(0)),
     doOrRV<32>(ip, block, IMM_AS_DATA_REF<32>(block, natM, ip),
-               MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+               MCOperand::createReg(X86::EAX), MCOperand::createReg(X86::EAX)))
 GENERIC_TRANSLATION_REF(
     OR64i32,
-    doOrRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
+    doOrRI<64>(ip, block, MCOperand::createReg(X86::RAX), MCOperand::createReg(X86::RAX), OP(0)),
     doOrRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip),
-               MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
+               MCOperand::createReg(X86::RAX), MCOperand::createReg(X86::RAX)))
 GENERIC_TRANSLATION_REF(
     OR64ri32, doOrRI<64>(ip, block, OP(0), OP(1), OP(2)),
     doOrRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), OP(0), OP(1)))
@@ -628,7 +641,7 @@ GENERIC_TRANSLATION_MI(
 
 GENERIC_TRANSLATION(
     OR8i8,
-    doOrRI<8>(ip, block, MCOperand::CreateReg(X86::AL), MCOperand::CreateReg(X86::AL), OP(0)))
+    doOrRI<8>(ip, block, MCOperand::createReg(X86::AL), MCOperand::createReg(X86::AL), OP(0)))
 GENERIC_TRANSLATION_REF(OR8mi, doOrMI<8>(ip, block, ADDR_NOREF(0), OP(5)),
                         doOrMI<8>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION_REF(OR8mr, doOrMR<8>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -641,7 +654,7 @@ GENERIC_TRANSLATION(OR8rr, doOrRR<8>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(OR8rr_REV, doOrRR<8>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(
     XOR16i16,
-    doXorRI<16>(ip, block, MCOperand::CreateReg(X86::AX), MCOperand::CreateReg(X86::AX), OP(0)))
+    doXorRI<16>(ip, block, MCOperand::createReg(X86::AX), MCOperand::createReg(X86::AX), OP(0)))
 GENERIC_TRANSLATION_REF(XOR16mi, doXorMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
                         doXorMI<16>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION_REF(XOR16mi8, doXorMI<16>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -672,14 +685,14 @@ GENERIC_TRANSLATION(XOR32ri8, doXorRI<32>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(XOR64ri8, doXorRI<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_REF(
     XOR32i32,
-    doXorRI<32>(ip, block, MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX), OP(0)),
+    doXorRI<32>(ip, block, MCOperand::createReg(X86::EAX), MCOperand::createReg(X86::EAX), OP(0)),
     doXorRV<32>(ip, block, IMM_AS_DATA_REF<32>(block, natM, ip),
-                MCOperand::CreateReg(X86::EAX), MCOperand::CreateReg(X86::EAX)))
+                MCOperand::createReg(X86::EAX), MCOperand::createReg(X86::EAX)))
 GENERIC_TRANSLATION_REF(
     XOR64i32,
-    doXorRI<64>(ip, block, MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX), OP(0)),
+    doXorRI<64>(ip, block, MCOperand::createReg(X86::RAX), MCOperand::createReg(X86::RAX), OP(0)),
     doXorRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip),
-                MCOperand::CreateReg(X86::RAX), MCOperand::CreateReg(X86::RAX)))
+                MCOperand::createReg(X86::RAX), MCOperand::createReg(X86::RAX)))
 GENERIC_TRANSLATION_REF(
     XOR64ri32, doXorRI<64>(ip, block, OP(0), OP(1), OP(2)),
     doXorRV<64>(ip, block, IMM_AS_DATA_REF(block, natM, ip), OP(0), OP(1)))
@@ -705,7 +718,7 @@ GENERIC_TRANSLATION_MI(
 
 GENERIC_TRANSLATION(
     XOR8i8,
-    doXorRI<8>(ip, block, MCOperand::CreateReg(X86::AL), MCOperand::CreateReg(X86::AL), OP(0)))
+    doXorRI<8>(ip, block, MCOperand::createReg(X86::AL), MCOperand::createReg(X86::AL), OP(0)))
 GENERIC_TRANSLATION_REF(XOR8mi, doXorMI<8>(ip, block, ADDR_NOREF(0), OP(5)),
                         doXorMI<8>(ip, block, MEM_REFERENCE(0), OP(5)))
 GENERIC_TRANSLATION_REF(XOR8mr, doXorMR<8>(ip, block, ADDR_NOREF(0), OP(5)),

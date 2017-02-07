@@ -8,7 +8,8 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
- Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
  Neither the name of the {organization} nor the names of its
@@ -27,12 +28,26 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #pragma once
+
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Instruction.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+
+#include <llvm/Support/Casting.h>
+
 #include <string>
-#include "ArchOps.h"
+#include <sstream>
+
+#include "mc-sema/BC/Util.h"
+
+#include "mc-sema/cfgToLLVM/ArchOps.h"
+#include "mc-sema/cfgToLLVM/TransExcn.h"
 
 template<int width>
-llvm::Value *getValueForExternal(llvm::Module *M, NativeInstPtr ip,
-                                 llvm::BasicBlock *block) {
+static llvm::Value *getValueForExternal(llvm::Module *M, NativeInstPtr ip,
+                                        llvm::BasicBlock *block) {
 
   llvm::Value *addrInt = NULL;
 
@@ -72,7 +87,8 @@ llvm::Value *getValueForExternal(llvm::Module *M, NativeInstPtr ip,
 }
 
 template<int width>
-llvm::Value *concatInts(llvm::BasicBlock *b, llvm::Value *a1, llvm::Value *a2) {
+static llvm::Value *concatInts(llvm::BasicBlock *b, llvm::Value *a1,
+                               llvm::Value *a2) {
   TASSERT(width == 8 || width == 16 || width == 32 || width == 64, "");
   llvm::Type *typeTo = llvm::Type::getIntNTy(b->getContext(), width * 2);
 
@@ -102,13 +118,18 @@ llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
 bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr);
 
 template<int width>
-llvm::Value* getGlobalFromOriginalAddr(VA original_addr, NativeModulePtr mod,
-                                       VA addr_start, llvm::BasicBlock *b) {
+static llvm::Value* getGlobalFromOriginalAddr(VA original_addr,
+                                              NativeModulePtr mod,
+                                              VA addr_start,
+                                              llvm::BasicBlock *b) {
   VA baseGlobal;
   if (addrIsInData(original_addr, mod, baseGlobal, addr_start)) {
     //we should be able to find a reference to this in global data
     llvm::Module *M = b->getParent()->getParent();
-    std::string sn = "data_0x" + to_string<VA>(baseGlobal, std::hex);
+
+    std::stringstream ss;
+    ss << "data_" << std::hex << baseGlobal;
+    std::string sn = ss.str();
 
     llvm::GlobalVariable *gData = M->getNamedGlobal(sn);
 
@@ -122,12 +143,7 @@ llvm::Value* getGlobalFromOriginalAddr(VA original_addr, NativeModulePtr mod,
     // Need to get ptr and then add integer displacement to ptr
     //
     llvm::Type *int_ty = llvm::Type::getIntNTy(b->getContext(), width);
-    llvm::Value *globalGEPV[] = {llvm::ConstantInt::get(int_ty, 0),
-        llvm::ConstantInt::get(llvm::Type::getInt32Ty(b->getContext()), 0)};
-    llvm::Instruction *globalGEP = llvm::GetElementPtrInst::Create(gData,
-                                                                   globalGEPV,
-                                                                   "", b);
-    llvm::Value *intVal = new llvm::PtrToIntInst(globalGEP, int_ty, "", b);
+    llvm::Value *intVal = new llvm::PtrToIntInst(gData, int_ty, "", b);
     uint64_t addr_offset = original_addr - baseGlobal;
     llvm::Value *int_adjusted = llvm::BinaryOperator::CreateAdd(
         intVal, CONST_V<width>(b, addr_offset), "", b);
@@ -144,7 +160,7 @@ llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
                              const llvm::MCOperand &Oscale,
                              const llvm::MCOperand &Oindex, const int64_t Odisp,
                              const llvm::MCOperand &Oseg, bool dataOffset);
-}
+}  // namespace x86
 
 namespace x86_64 {
 llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
@@ -152,7 +168,8 @@ llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
                              const llvm::MCOperand &Oscale,
                              const llvm::MCOperand &Oindex, const int64_t Odisp,
                              const llvm::MCOperand &Oseg, bool dataOffset);
-}
+}  // namespace x86_64
+
 // Convert the number to a constant in LLVM IR
 llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t val);
 
@@ -168,13 +185,10 @@ llvm::Instruction* callMemcpy(llvm::BasicBlock *B, llvm::Value *dest,
                                   4,
                               bool isVolatile = false);
 
-using namespace llvm;
-using namespace std;
-
 // return a computed pointer to that data reference for 32/64 bit architecture
 template<int width>
-llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr mod,
-                             NativeInstPtr ip) {
+static llvm::Value *IMM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr mod,
+                                    NativeInstPtr ip) {
   auto &C = B->getContext();
 
   TASSERT(width == 32 || width == 64, "Pointer size must be sane");
@@ -182,8 +196,8 @@ llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr mod,
   // off is the displacement part of a memory reference
 
   if (ip->has_external_ref()) {
-    Function *F = B->getParent();
-    Value *addrInt = getValueForExternal<width>(F->getParent(), ip, B);
+    auto F = B->getParent();
+    auto addrInt = getValueForExternal<width>(F->getParent(), ip, B);
     TASSERT(addrInt != 0, "Could not get external data reference");
     return addrInt;
   }
@@ -203,9 +217,11 @@ llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr mod,
     return addrInt;
 
   } else if (addrIsInData(off, mod, baseGlobal, 0)) {
+    std::stringstream ss;
+    ss << "data_" << std::hex << baseGlobal;
     //we should be able to find a reference to this in global data
     auto M = B->getParent()->getParent();
-    std::string sn = "data_0x" + to_string<VA>(baseGlobal, hex);
+    std::string sn = ss.str();
     llvm::Value *int_adjusted = nullptr;
     auto gData = M->getNamedGlobal(sn);
 
@@ -218,12 +234,8 @@ llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr mod,
     // we cannot simply slice into them.
     // Need to get ptr and then add integer displacement to ptr
 
-    llvm::Value *globalGEPV[] = {llvm::ConstantInt::get(
-        llvm::Type::getIntNTy(C, width), 0), llvm::ConstantInt::get(
-        llvm::Type::getInt32Ty(C), 0)};
-    auto globalGEP = llvm::GetElementPtrInst::Create(gData, globalGEPV, "", B);
     auto ty = llvm::Type::getIntNTy(C, width);
-    auto intVal = new llvm::PtrToIntInst(globalGEP, ty, "", B);
+    auto intVal = new llvm::PtrToIntInst(gData, ty, "", B);
     uint32_t addr_offset = off - baseGlobal;
     int_adjusted = llvm::BinaryOperator::CreateAdd(
         intVal, CONST_V<width>(B, addr_offset), "", B);
@@ -233,35 +245,33 @@ llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr mod,
     return int_adjusted;
   } else {
     throw TErr(__LINE__, __FILE__, "Address not in data");
-    return NULL;
+    return nullptr;
   }
 }
 
 // Assume the instruction has a data reference, and
 // return a computed pointer to that data reference
-static inline llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *b,
-                                           NativeModulePtr mod,
-                                           NativeInstPtr ip) {
+static llvm::Value* IMM_AS_DATA_REF(llvm::BasicBlock *b, NativeModulePtr mod,
+                                    NativeInstPtr ip) {
 
   auto M = b->getParent()->getParent();
   int regWidth = ArchPointerSize(M);
-  if (regWidth <= x86::REG_SIZE) {
+  if (Pointer32 == regWidth) {
     return IMM_AS_DATA_REF<32>(b, mod, ip);
   } else {
     return IMM_AS_DATA_REF<64>(b, mod, ip);
   }
 }
 
-inline llvm::PointerType *getVoidPtrType(llvm::LLVMContext & C) {
+static inline llvm::PointerType *getVoidPtrType(llvm::LLVMContext & C) {
   auto Int8Type = llvm::IntegerType::getInt8Ty(C);
   return llvm::PointerType::getUnqual(Int8Type);
 }
 
 template<int width>
-static inline llvm::Value *ADDR_NOREF_IMPL(NativeModulePtr natM,
-                                           llvm::BasicBlock *b, int x,
-                                           NativeInstPtr ip,
-                                           const llvm::MCInst &inst) {
+static llvm::Value *ADDR_NOREF_IMPL(NativeModulePtr natM, llvm::BasicBlock *b,
+                                    int x, NativeInstPtr ip,
+                                    const llvm::MCInst &inst) {
 
   // Turns out this function name is a lie. This case can ref external data
   auto M = b->getParent()->getParent();
@@ -283,5 +293,27 @@ static inline llvm::Value *ADDR_NOREF_IMPL(NativeModulePtr natM,
                                    inst.getOperand(x + 3).getImm(),
                                    inst.getOperand(x + 4), false);
   }
+}
 
+template<int width, int maskbits>
+static void SHR_SET_FLAG_V(llvm::BasicBlock *block, llvm::Value *val,
+                           MCSemaRegs flag, llvm::Value *shrbit_val) {
+  llvm::Value *shr = llvm::BinaryOperator::CreateLShr(val, shrbit_val, "",
+                                                      block);
+  llvm::Value *mask_pre = CONST_V<maskbits>(block, 0);
+  llvm::Value *mask = llvm::BinaryOperator::CreateNot(mask_pre, "", block);
+  llvm::Value *shr_trunc = new llvm::TruncInst(
+      shr, llvm::Type::getIntNTy(block->getContext(), maskbits), "", block);
+
+  llvm::Value *anded = llvm::BinaryOperator::CreateAnd(shr_trunc, mask, "",
+                                                       block);
+
+  F_WRITE(block, flag, anded);
+}
+
+template<int width, int maskbits>
+static void SHR_SET_FLAG(llvm::BasicBlock *block, llvm::Value *val,
+                         MCSemaRegs flag, int shrbits) {
+  SHR_SET_FLAG_V<width, maskbits>(block, val, flag,
+                                  CONST_V<width>(block, shrbits));
 }

@@ -27,9 +27,27 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include <llvm/IR/Argument.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/Intrinsics.h>
+
+#include <llvm/MC/MCInst.h>
+
+#include "mc-sema/Arch/Arch.h"
+#include "mc-sema/Arch/Dispatch.h"
+#include "mc-sema/Arch/Register.h"
+
 #include "InstructionDispatch.h"
-#include "toLLVM.h"
-#include "X86.h"
+
 #include "raiseX86.h"
 #include "x86Helpers.h"
 #include "x86Instrs_SETcc.h"
@@ -38,8 +56,8 @@ static llvm::Value *doSetaV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 
   // set 1 if CF==0 && ZF==0
   // else, set 0
-  auto cf_val = F_READ(b, CF);
-  auto zf_val = F_READ(b, ZF);
+  auto cf_val = F_READ(b, llvm::X86::CF);
+  auto zf_val = F_READ(b, llvm::X86::ZF);
 
   // cf|zf == 0 iff cf == 0 && zf == 0
   auto f_or = llvm::BinaryOperator::CreateOr(cf_val, zf_val, "", b);
@@ -55,7 +73,7 @@ static llvm::Value *doSetaV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 static llvm::Value *doSetbV(NativeInstPtr ip, llvm::BasicBlock *&b) {
   // setb == set if cf == 1
   // essentially, read CF
-  auto cf_val = F_READ(b, CF);
+  auto cf_val = F_READ(b, llvm::X86::CF);
 
   // zero extend to desired width
   return new llvm::ZExtInst(cf_val, llvm::Type::getIntNTy(b->getContext(), 8),
@@ -65,7 +83,7 @@ static llvm::Value *doSetbV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 static llvm::Value *doSetsV(NativeInstPtr ip, llvm::BasicBlock *&b) {
   // sets == set if sf == 1
   // essentially, read SF
-  auto sf_val = F_READ(b, SF);
+  auto sf_val = F_READ(b, llvm::X86::SF);
 
   // zero extend to desired width
   return new llvm::ZExtInst(sf_val, llvm::Type::getIntNTy(b->getContext(), 8),
@@ -75,7 +93,7 @@ static llvm::Value *doSetsV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 // set if CF==0
 static llvm::Value *doSetaeV(NativeInstPtr ip, llvm::BasicBlock *&b) {
   //read CF
-  auto cf_val = F_READ(b, CF);
+  auto cf_val = F_READ(b, llvm::X86::CF);
 
   //compare to 0
   auto cmp_res = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ, cf_val,
@@ -88,7 +106,7 @@ static llvm::Value *doSetaeV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 
 static llvm::Value *doSetneV(NativeInstPtr ip, llvm::BasicBlock *&b) {
   //read ZF
-  auto zf_val = F_READ(b, ZF);
+  auto zf_val = F_READ(b, llvm::X86::ZF);
 
   //compare to 0
   auto cmp_res = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ, zf_val,
@@ -101,7 +119,7 @@ static llvm::Value *doSetneV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 
 static llvm::Value *doSeteV(NativeInstPtr ip, llvm::BasicBlock *&b) {
   //read ZF
-  auto zf_val = F_READ(b, ZF);
+  auto zf_val = F_READ(b, llvm::X86::ZF);
 
   //compare to not 0
   auto cmp_res = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_NE, zf_val,
@@ -114,8 +132,8 @@ static llvm::Value *doSeteV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 
 // setge: of == sf
 static llvm::Value *doSetgeV(NativeInstPtr ip, llvm::BasicBlock *&b) {
-  auto sf_val = F_READ(b, SF);
-  auto of_val = F_READ(b, OF);
+  auto sf_val = F_READ(b, llvm::X86::SF);
+  auto of_val = F_READ(b, llvm::X86::OF);
 
   //compare of == sf
   auto cmp_res = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ, sf_val,
@@ -128,9 +146,9 @@ static llvm::Value *doSetgeV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 
 // setg: of == sf && ZF==0
 static llvm::Value *doSetgV(NativeInstPtr ip, llvm::BasicBlock *&b) {
-  auto sf_val = F_READ(b, SF);
-  auto of_val = F_READ(b, OF);
-  auto zf_val = F_READ(b, ZF);
+  auto sf_val = F_READ(b, llvm::X86::SF);
+  auto of_val = F_READ(b, llvm::X86::OF);
+  auto zf_val = F_READ(b, llvm::X86::ZF);
 
   //compare of == sf
   auto cmp0_res = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ, sf_val,
@@ -150,9 +168,9 @@ static llvm::Value *doSetgV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 
 // setle: of != sf || ZF==1
 static llvm::Value *doSetleV(NativeInstPtr ip, llvm::BasicBlock *&b) {
-  auto sf_val = F_READ(b, SF);
-  auto of_val = F_READ(b, OF);
-  auto zf_val = F_READ(b, ZF);
+  auto sf_val = F_READ(b, llvm::X86::SF);
+  auto of_val = F_READ(b, llvm::X86::OF);
+  auto zf_val = F_READ(b, llvm::X86::ZF);
 
   //compare of == sf
   auto cmp0_res = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_NE, sf_val,
@@ -169,8 +187,8 @@ static llvm::Value *doSetleV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 
 // setge: of != sf
 static llvm::Value *doSetlV(NativeInstPtr ip, llvm::BasicBlock *&b) {
-  auto sf_val = F_READ(b, SF);
-  auto of_val = F_READ(b, OF);
+  auto sf_val = F_READ(b, llvm::X86::SF);
+  auto of_val = F_READ(b, llvm::X86::OF);
 
   //compare of != sf
   auto cmp_res = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_NE, sf_val,
@@ -183,8 +201,8 @@ static llvm::Value *doSetlV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 
 //setbe: cf==1 or zf==1
 static llvm::Value *doSetbeV(NativeInstPtr ip, llvm::BasicBlock *&b) {
-  auto cf_val = F_READ(b, CF);
-  auto zf_val = F_READ(b, ZF);
+  auto cf_val = F_READ(b, llvm::X86::CF);
+  auto zf_val = F_READ(b, llvm::X86::ZF);
 
   // final result:
   // result = cf | zf
@@ -198,7 +216,7 @@ static llvm::Value *doSetbeV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 // set if pf == 0
 static llvm::Value *doSetnpV(NativeInstPtr ip, llvm::BasicBlock *&b) {
   //read PF
-  auto pf_val = F_READ(b, PF);
+  auto pf_val = F_READ(b, llvm::X86::PF);
 
   //compare to 0
   auto cmp_res = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ, pf_val,
@@ -212,7 +230,7 @@ static llvm::Value *doSetnpV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 // set if pf == 1
 static llvm::Value *doSetpV(NativeInstPtr ip, llvm::BasicBlock *&b) {
   //read PF
-  auto pf_val = F_READ(b, PF);
+  auto pf_val = F_READ(b, llvm::X86::PF);
 
   //compare to 0
   auto cmp_res = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ, pf_val,
@@ -226,7 +244,7 @@ static llvm::Value *doSetpV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 // set if sf == 0
 static llvm::Value *doSetnsV(NativeInstPtr ip, llvm::BasicBlock *&b) {
   //read SF
-  auto sf_val = F_READ(b, SF);
+  auto sf_val = F_READ(b, llvm::X86::SF);
 
   //compare to 0
   auto cmp_res = new llvm::ICmpInst( *b, llvm::CmpInst::ICMP_EQ, sf_val,
@@ -327,37 +345,32 @@ GENERIC_TRANSLATION_REF(SETPm, doSetpM(ip, block, ADDR_NOREF(0)),
                         doSetpM(ip, block, MEM_REFERENCE(0)))
 
 void SETcc_populateDispatchMap(DispatchMap &m) {
-  m[X86::SETAm] = translate_SETAm;
-  m[X86::SETAr] = translate_SETAr;
-  m[X86::SETBm] = translate_SETBm;
-  m[X86::SETBr] = translate_SETBr;
-  m[X86::SETNEr] = translate_SETNEr;
-  m[X86::SETNEm] = translate_SETNEm;
-  m[X86::SETEr] = translate_SETEr;
-  m[X86::SETEm] = translate_SETEm;
-  m[X86::SETGEr] = translate_SETGEr;
-  m[X86::SETGEm] = translate_SETGEm;
-  m[X86::SETLr] = translate_SETLr;
-  m[X86::SETLm] = translate_SETLm;
-  m[X86::SETLEr] = translate_SETLEr;
-  m[X86::SETLEm] = translate_SETLEm;
-  m[X86::SETGr] = translate_SETGr;
-  m[X86::SETGm] = translate_SETGm;
-  m[X86::SETSr] = translate_SETSr;
-  m[X86::SETSm] = translate_SETSm;
-
-  m[X86::SETAEr] = translate_SETAEr;
-  m[X86::SETAEm] = translate_SETAEm;
-
-  m[X86::SETBEr] = translate_SETBEr;
-  m[X86::SETBEm] = translate_SETBEm;
-
-  m[X86::SETNPr] = translate_SETNPr;
-  m[X86::SETNPm] = translate_SETNPm;
-
-  m[X86::SETPr] = translate_SETPr;
-  m[X86::SETPm] = translate_SETPm;
-
-  m[X86::SETNSr] = translate_SETNSr;
-  m[X86::SETNSm] = translate_SETNSm;
+  m[llvm::X86::SETAm] = translate_SETAm;
+  m[llvm::X86::SETAr] = translate_SETAr;
+  m[llvm::X86::SETBm] = translate_SETBm;
+  m[llvm::X86::SETBr] = translate_SETBr;
+  m[llvm::X86::SETNEr] = translate_SETNEr;
+  m[llvm::X86::SETNEm] = translate_SETNEm;
+  m[llvm::X86::SETEr] = translate_SETEr;
+  m[llvm::X86::SETEm] = translate_SETEm;
+  m[llvm::X86::SETGEr] = translate_SETGEr;
+  m[llvm::X86::SETGEm] = translate_SETGEm;
+  m[llvm::X86::SETLr] = translate_SETLr;
+  m[llvm::X86::SETLm] = translate_SETLm;
+  m[llvm::X86::SETLEr] = translate_SETLEr;
+  m[llvm::X86::SETLEm] = translate_SETLEm;
+  m[llvm::X86::SETGr] = translate_SETGr;
+  m[llvm::X86::SETGm] = translate_SETGm;
+  m[llvm::X86::SETSr] = translate_SETSr;
+  m[llvm::X86::SETSm] = translate_SETSm;
+  m[llvm::X86::SETAEr] = translate_SETAEr;
+  m[llvm::X86::SETAEm] = translate_SETAEm;
+  m[llvm::X86::SETBEr] = translate_SETBEr;
+  m[llvm::X86::SETBEm] = translate_SETBEm;
+  m[llvm::X86::SETNPr] = translate_SETNPr;
+  m[llvm::X86::SETNPm] = translate_SETNPm;
+  m[llvm::X86::SETPr] = translate_SETPr;
+  m[llvm::X86::SETPm] = translate_SETPm;
+  m[llvm::X86::SETNSr] = translate_SETNSr;
+  m[llvm::X86::SETNSm] = translate_SETNSm;
 }

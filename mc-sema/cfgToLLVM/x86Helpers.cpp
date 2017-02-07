@@ -26,17 +26,18 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "toLLVM.h"
+
+#include <iostream>
+
+#include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/Intrinsics.h>
+
 #include "raiseX86.h"
 #include "Externals.h"
 #include "X86.h"
 #include "x86Helpers.h"
-#include "../common/to_string.h"
-#include "llvm/Support/Debug.h"
+#include "TransExcn.h"
 
-using namespace llvm;
-using namespace std;
-//using namespace x86;
 // check if addr falls into a data section, and is at least minAddr.
 // the minAddr check exists for times when we are not sure if an address
 // is a data reference or an immediate value; in some cases data is mapped
@@ -51,7 +52,7 @@ bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr = 0x0) {
 
   auto &sections = m->getData();
   if (sections.empty()) {
-    llvm::dbgs() << __FUNCTION__ << ": WARNING: no data sections!\n";
+    std::cerr << __FUNCTION__ << ": WARNING: no data sections!" << std::endl;
     return false;
 
   }
@@ -74,10 +75,11 @@ bool addrIsInData(VA addr, NativeModulePtr m, VA &base, VA minAddr = 0x0) {
 // that in the computation instead of assuming values
 // are opaque immediates
 namespace x86 {
-Value *getAddrFromExpr(BasicBlock *b, NativeModulePtr mod,
-                       const MCOperand &Obase, const MCOperand &Oscale,
-                       const MCOperand &Oindex, const int64_t Odisp,
-                       const MCOperand &Oseg, bool dataOffset) {
+llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
+                             const llvm::MCOperand &Obase,
+                             const llvm::MCOperand &Oscale,
+                             const llvm::MCOperand &Oindex, const int64_t Odisp,
+                             const llvm::MCOperand &Oseg, bool dataOffset) {
   TASSERT(Obase.isReg(), "");
   TASSERT(Oscale.isImm(), "");
   TASSERT(Oindex.isReg(), "");
@@ -93,13 +95,14 @@ Value *getAddrFromExpr(BasicBlock *b, NativeModulePtr mod,
   //HANDY HEURISTIC HACK
   //if the base register is the stack pointer or the frame
   //pointer, then skip this part
-  Value *d = NULL;
-  IntegerType *iTy = IntegerType::getInt32Ty(b->getContext());
+  llvm::Value *d = nullptr;
+  auto iTy = llvm::IntegerType::getInt32Ty(b->getContext());
 
   if (dataOffset
-      || (mod && disp && baseReg != X86::EBP && baseReg != X86::ESP)) {
-    Value *int_val = getGlobalFromOriginalAddr<32>(disp, mod,
-                                                   dataOffset ? 0 : 0x1000, b);
+      || (mod && disp && baseReg != llvm::X86::EBP &&
+          baseReg != llvm::X86::ESP)) {
+    auto int_val = getGlobalFromOriginalAddr<32>(disp, mod,
+                                                 dataOffset ? 0 : 0x1000, b);
     d = int_val;
   } else {
     //there is no disp value, or its relative to esp/ebp in which case
@@ -109,50 +112,50 @@ Value *getAddrFromExpr(BasicBlock *b, NativeModulePtr mod,
   if (nullptr == d) {
     //create a constant integer out of the raw displacement
     //we were unable to assign the displacement to an address
-    d = ConstantInt::getSigned(iTy, disp);
+    d = llvm::ConstantInt::getSigned(iTy, disp);
   }
 
-  Value *rVal = nullptr;
+  llvm::Value *rVal = nullptr;
 
   //read the base register (if given)
-  if (baseReg != X86::NoRegister) {
+  if (baseReg != llvm::X86::NoRegister) {
     rVal = R_READ<32>(b, baseReg);
   } else {
     //if the base is not present, just use 0
     rVal = CONST_V<32>(b, 0);
   }
 
-  Value *dispComp;
-  dispComp = BinaryOperator::Create(Instruction::Add, rVal, d, "", b);
+  llvm::Value *dispComp = nullptr;
+  dispComp = llvm::BinaryOperator::Create(llvm::Instruction::Add, rVal, d, "",
+                                          b);
 
   //add the index amount, if present
-  if (Oindex.getReg() != X86::NoRegister) {
-    Value *index = R_READ<32>(b, Oindex.getReg());
+  if (Oindex.getReg() != llvm::X86::NoRegister) {
+    auto index = R_READ<32>(b, Oindex.getReg());
 
     int64_t scaleAmt = Oscale.getImm();
     if (scaleAmt > 1) {
-      index = BinaryOperator::CreateMul(index, CONST_V<32>(b, scaleAmt), "", b);
+      index = llvm::BinaryOperator::CreateMul(index, CONST_V<32>(b, scaleAmt),
+                                              "", b);
     }
 
-    dispComp = BinaryOperator::CreateAdd(dispComp, index, "", b);
-
+    dispComp = llvm::BinaryOperator::CreateAdd(dispComp, index, "", b);
   }
 
   //convert the resulting integer into a pointer type
-  PointerType *piTy = Type::getInt32PtrTy(b->getContext());
-  Value *dispPtr = new IntToPtrInst(dispComp, piTy, "", b);
-
-  return dispPtr;
+  auto piTy = llvm::Type::getInt32PtrTy(b->getContext());
+  return new llvm::IntToPtrInst(dispComp, piTy, "", b);
 }
 }
 
-Value *getAddrFromExpr(BasicBlock *b, NativeModulePtr mod, const MCInst &inst,
-                       NativeInstPtr ip, uint32_t which) {
-  const MCOperand& base = inst.getOperand(which + 0);
-  const MCOperand& scale = inst.getOperand(which + 1);
-  const MCOperand& index = inst.getOperand(which + 2);
-  const MCOperand& disp = inst.getOperand(which + 3);
-  const MCOperand& seg = inst.getOperand(which + 4);
+llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
+                             const llvm::MCInst &inst, NativeInstPtr ip,
+                             uint32_t which) {
+  const auto &base = inst.getOperand(which + 0);
+  const auto &scale = inst.getOperand(which + 1);
+  const auto &index = inst.getOperand(which + 2);
+  const auto &disp = inst.getOperand(which + 3);
+  const auto &seg = inst.getOperand(which + 4);
 
   TASSERT(base.isReg(), "");
   TASSERT(scale.isImm(), "");
@@ -163,8 +166,9 @@ Value *getAddrFromExpr(BasicBlock *b, NativeModulePtr mod, const MCInst &inst,
   // determine if this instruction is using a memory reference
   // or if the displacement should be used at face value
   bool has_ref = ip->has_reference(NativeInst::MEMRef);
-  int64_t real_disp = has_ref ? ip->get_reference(NativeInst::MEMRef) : disp.getImm();
-  llvm::Module *M = b->getParent()->getParent();
+  int64_t real_disp =
+      has_ref ? ip->get_reference(NativeInst::MEMRef) : disp.getImm();
+  auto M = b->getParent()->getParent();
 
   if (ArchPointerSize(M) == Pointer32) {
 
@@ -178,8 +182,9 @@ Value *getAddrFromExpr(BasicBlock *b, NativeModulePtr mod, const MCInst &inst,
 
 }
 
-Value *MEM_AS_DATA_REF(BasicBlock *B, NativeModulePtr natM, const MCInst &inst,
-                       NativeInstPtr ip, uint32_t which) {
+llvm::Value *MEM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr natM,
+                             const llvm::MCInst &inst, NativeInstPtr ip,
+                             uint32_t which) {
   if (false == ip->has_mem_reference) {
     throw TErr(__LINE__, __FILE__,
                "Want to use MEM as data ref but have no MEM reference");
@@ -187,21 +192,22 @@ Value *MEM_AS_DATA_REF(BasicBlock *B, NativeModulePtr natM, const MCInst &inst,
   return getAddrFromExpr(B, natM, inst, ip, which);
 }
 
-Instruction* callMemcpy(BasicBlock *B, Value *dest, Value *src, uint32_t size,
-                        uint32_t align, bool isVolatile) {
-  Value *copySize = CONST_V<32>(B, size);
+llvm::Instruction *callMemcpy(llvm::BasicBlock *B, llvm::Value *dest,
+                              llvm::Value *src, uint32_t size, uint32_t align,
+                              bool isVolatile) {
+  auto copySize = CONST_V<32>(B, size);
   // ALIGN: 4 byte alignment, i think
-  Value *alignSize = CONST_V<32>(B, align);
+  auto alignSize = CONST_V<32>(B, align);
   // VOLATILE: false
-  Value *vIsVolatile = CONST_V<1>(B, isVolatile);
+  auto vIsVolatile = CONST_V<1>(B, isVolatile);
 
-  Type *Tys[] = {dest->getType(), src->getType(), copySize->getType()};
+  llvm::Type *Tys[] = {dest->getType(), src->getType(), copySize->getType()};
 
-  Module *M = B->getParent()->getParent();
+  auto M = B->getParent()->getParent();
+  auto doMemCpy = llvm::Intrinsic::getDeclaration(
+      M, llvm::Intrinsic::memcpy, Tys);
 
-  Function *doMemCpy = Intrinsic::getDeclaration(M, Intrinsic::memcpy, Tys);
-
-  Value *callArgs[] = {dest,  // DST
+  llvm::Value *callArgs[] = {dest,  // DST
       src,  // SRC
       copySize,  // SIZE
       alignSize,  // ALIGN
@@ -209,5 +215,5 @@ Instruction* callMemcpy(BasicBlock *B, Value *dest, Value *src, uint32_t size,
       };
 
   // actually call llvm.memcpy
-  return CallInst::Create(doMemCpy, callArgs, "", B);
+  return llvm::CallInst::Create(doMemCpy, callArgs, "", B);
 }

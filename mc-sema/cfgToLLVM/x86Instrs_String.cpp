@@ -1,34 +1,51 @@
 /*
-Copyright (c) 2014, Trail of Bits
-All rights reserved.
+ Copyright (c) 2014, Trail of Bits
+ All rights reserved.
 
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
+ Redistribution and use in source and binary forms, with or without modification,
+ are permitted provided that the following conditions are met:
 
-  Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
+ Redistributions of source code must retain the above copyright notice, this
+ list of conditions and the following disclaimer.
 
-  Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
-  other materials provided with the distribution.
+ Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ other materials provided with the distribution.
 
-  Neither the name of Trail of Bits nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
+ Neither the name of Trail of Bits nor the names of its
+ contributors may be used to endorse or promote products derived from
+ this software without specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include <llvm/IR/Argument.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/Intrinsics.h>
+
+#include <llvm/MC/MCInst.h>
+
+#include "mc-sema/Arch/Arch.h"
+#include "mc-sema/Arch/Dispatch.h"
+#include "mc-sema/Arch/Register.h"
+
 #include "InstructionDispatch.h"
-#include "toLLVM.h"
-#include "X86.h"
 #include "raiseX86.h"
 #include "x86Helpers.h"
 #include "x86Instrs_flagops.h"
@@ -59,7 +76,7 @@ static llvm::BasicBlock *doCmpsV(llvm::BasicBlock *pred) {
 
   CREATE_BLOCK(post_write, pred);
 
-  auto df = F_READ(pred, DF);
+  auto df = F_READ(pred, llvm::X86::DF);
   auto dfSwitch = llvm::SwitchInst::Create(df, block_df_zero, 2, pred);
   dfSwitch->addCase(CONST_V<1>(pred, 0), block_df_zero);
   dfSwitch->addCase(CONST_V<1>(pred, 1), block_df_one);
@@ -111,7 +128,7 @@ static llvm::BasicBlock *doCmpsV(llvm::BasicBlock *pred) {
   return block_post_write;
 }
 
-template <int width>
+template<int width>
 static llvm::BasicBlock *doCmps(llvm::BasicBlock *b) {
   auto M = b->getParent()->getParent();
   auto bitWidth = ArchPointerSize(M);
@@ -140,7 +157,8 @@ static llvm::BasicBlock *doStosV(llvm::BasicBlock *pred) {
 
   //compare DF against 0
   auto cmpRes = new llvm::ICmpInst( *pred, llvm::CmpInst::ICMP_EQ,
-                                   F_READ(pred, DF), CONST_V<1>(pred, 0), "");
+                                   F_READ(pred, llvm::X86::DF),
+                                   CONST_V<1>(pred, 0), "");
 
   //do a branch based on the cmp
   llvm::BranchInst::Create(isZero, isOne, cmpRes, pred);
@@ -218,7 +236,8 @@ static llvm::BasicBlock *doScasV(llvm::BasicBlock *pred) {
 
   //compare DF against 0
   auto cmpRes = new llvm::ICmpInst( *pred, llvm::CmpInst::ICMP_EQ,
-                                   F_READ(pred, DF), CONST_V<1>(pred, 0), "");
+                                   F_READ(pred, llvm::X86::DF),
+                                   CONST_V<1>(pred, 0), "");
 
   //do a branch based on the cmp
   llvm::BranchInst::Create(isZero, isOne, cmpRes, pred);
@@ -271,14 +290,14 @@ static llvm::BasicBlock *doScas(llvm::BasicBlock *B) {
   auto M = B->getParent()->getParent();
   const auto bitWidth = ArchPointerSize(M);
   if (bitWidth == Pointer32) {
-    return doScasV<width, x86::REG_SIZE>(B);
+    return doScasV<width, 32>(B);
   } else {
-    return doScasV<width, x86_64::REG_SIZE>(B);
+    return doScasV<width, 64>(B);
   }
 }
 
 // Uses RDI & RSI registers 
-template <int width>
+template<int width>
 static llvm::BasicBlock *doMovsV(llvm::BasicBlock *pred) {
   auto F = pred->getParent();
   auto M = F->getParent();
@@ -287,7 +306,7 @@ static llvm::BasicBlock *doMovsV(llvm::BasicBlock *pred) {
   llvm::Value *dstRegVal = nullptr;
   llvm::Value *srcRegVal = nullptr;
 
-  if(bitWidth == x86::REG_SIZE){
+  if (bitWidth == 32) {
     dstRegVal = x86::R_READ<32>(pred, llvm::X86::EDI);
     srcRegVal = x86::R_READ<32>(pred, llvm::X86::ESI);
   } else {
@@ -304,8 +323,9 @@ static llvm::BasicBlock *doMovsV(llvm::BasicBlock *pred) {
   auto doWrite = llvm::BasicBlock::Create(C, "", F);
 
   //compare DF against 0
-  auto cmpRes = new llvm::ICmpInst(
-      *pred, CmpInst::ICMP_EQ, F_READ(pred, DF), CONST_V<1>(pred, 0), "");
+  auto cmpRes = new llvm::ICmpInst( *pred, llvm::CmpInst::ICMP_EQ,
+                                   F_READ(pred, llvm::X86::DF),
+                                   CONST_V<1>(pred, 0), "");
 
   //do a branch based on the cmp
   llvm::BranchInst::Create(isZero, isOne, cmpRes, pred);
@@ -339,11 +359,13 @@ static llvm::BasicBlock *doMovsV(llvm::BasicBlock *pred) {
 
   //populate the isOne branch
   //if one, then sub from src and dst registers
-  auto oneSrc = llvm::BinaryOperator::CreateSub(
-      srcRegVal, CONST_V(isOne, bitWidth, disp), "", isOne);
+  auto oneSrc = llvm::BinaryOperator::CreateSub(srcRegVal,
+                                                CONST_V(isOne, bitWidth, disp),
+                                                "", isOne);
 
-  auto oneDst = llvm::BinaryOperator::CreateSub(
-      dstRegVal, CONST_V(isOne, bitWidth, disp), "", isOne);
+  auto oneDst = llvm::BinaryOperator::CreateSub(dstRegVal,
+                                                CONST_V(isOne, bitWidth, disp),
+                                                "", isOne);
 
   llvm::BranchInst::Create(doWrite, isOne);
 
@@ -357,7 +379,7 @@ static llvm::BasicBlock *doMovsV(llvm::BasicBlock *pred) {
   newSrc->addIncoming(oneSrc, isOne);
   newDst->addIncoming(oneDst, isOne);
 
-  if(bitWidth == x86::REG_SIZE){
+  if (bitWidth == 32) {
     x86::R_WRITE<32>(doWrite, llvm::X86::ESI, newSrc);
     x86::R_WRITE<32>(doWrite, llvm::X86::EDI, newDst);
   } else {
@@ -408,7 +430,7 @@ static llvm::BasicBlock *doRep(llvm::BasicBlock *b, llvm::BasicBlock *bodyB,
 
   if (use_condition) {
     //do a test on the REP condition
-    auto zf_val = F_READ(bodyE, ZF);
+    auto zf_val = F_READ(bodyE, llvm::X86::ZF);
     // ICMP_EQ ==  "terminate if ZF == 0"
     // ICMP_NE ==  "temrinate if ZF == 1"
     auto rep_condition = new llvm::ICmpInst( *bodyE, check_op, zf_val,
@@ -430,29 +452,26 @@ static llvm::BasicBlock *doRep(llvm::BasicBlock *b, llvm::BasicBlock *bodyB,
 
   // this is the final return block
   return rest;
-} 
+}
 
 template<int opSize, int bitWidth>
 static llvm::BasicBlock *doRepN(llvm::BasicBlock *b, llvm::BasicBlock *bodyB,
                                 llvm::BasicBlock *bodyE) {
-  return doRep<opSize, bitWidth, false>(
-      b, bodyB, bodyE, llvm::CmpInst::ICMP_EQ);
+  return doRep<opSize, bitWidth, false>(b, bodyB, bodyE, llvm::CmpInst::ICMP_EQ);
 
 }
 
 template<int opSize, int bitWidth>
 static llvm::BasicBlock *doRepe(llvm::BasicBlock *b, llvm::BasicBlock *bodyB,
                                 llvm::BasicBlock *bodyE) {
-  return doRep<opSize, bitWidth, true>(
-      b, bodyB, bodyE, llvm::CmpInst::ICMP_EQ);
+  return doRep<opSize, bitWidth, true>(b, bodyB, bodyE, llvm::CmpInst::ICMP_EQ);
 
 }
 
 template<int opSize, int bitWidth>
 static llvm::BasicBlock *doRepNe(llvm::BasicBlock *b, llvm::BasicBlock *bodyB,
                                  llvm::BasicBlock *bodyE) {
-  return doRep<opSize, bitWidth, true>(
-      b, bodyB, bodyE, llvm::CmpInst::ICMP_NE);
+  return doRep<opSize, bitWidth, true>(b, bodyB, bodyE, llvm::CmpInst::ICMP_NE);
 
 }
 
@@ -526,9 +545,9 @@ static InstTransResult doMovs(llvm::BasicBlock *&b, NativeInstPtr ip) {
   NativeInst::Prefix pfx = ip->get_prefix();
   if (pfx == NativeInst::RepPrefix) {
     if (bitWidth == Pointer32) {
-      doRepMovs<width, x86::REG_SIZE>(b);
+      doRepMovs<width, 32>(b);
     } else {
-      doRepMovs<width, x86_64::REG_SIZE>(b);
+      doRepMovs<width, 64>(b);
     }
   } else {
     b = doMovsV<width>(b);
@@ -537,31 +556,31 @@ static InstTransResult doMovs(llvm::BasicBlock *&b, NativeInstPtr ip) {
   return ContinueBlock;
 }
 
-template <int opSize, int bitWidth>
+template<int opSize, int bitWidth>
 static InstTransResult doRepStos(llvm::BasicBlock *&b) {
-  auto bodyBegin = llvm::BasicBlock::Create(
-      b->getContext(), "", b->getParent());
+  auto bodyBegin = llvm::BasicBlock::Create(b->getContext(), "",
+                                            b->getParent());
   auto bodyEnd = doStosV<opSize, bitWidth>(bodyBegin);
   b = doRepN<opSize, bitWidth>(b, bodyBegin, bodyEnd);
   return ContinueBlock;
 }
 
-template <int width>
+template<int width>
 static InstTransResult doStos(llvm::BasicBlock *&b, NativeInstPtr ip) {
   auto M = b->getParent()->getParent();
   auto bitWidth = ArchPointerSize(M);
   NativeInst::Prefix pfx = ip->get_prefix();
   if (bitWidth == Pointer32) {
     if (pfx == NativeInst::RepPrefix) {
-      doRepStos<width, x86::REG_SIZE>(b);
+      doRepStos<width, 32>(b);
     } else {
-      b = doStosV<width, x86::REG_SIZE>(b);
+      b = doStosV<width, 32>(b);
     }
   } else {
     if (pfx == NativeInst::RepPrefix) {
-      doRepStos<width, x86_64::REG_SIZE>(b);
+      doRepStos<width, 64>(b);
     } else {
-      b = doStosV<width, x86_64::REG_SIZE>(b);
+      b = doStosV<width, 64>(b);
     }
   }
   return ContinueBlock;
@@ -641,18 +660,20 @@ GENERIC_TRANSLATION(REP_STOSQ_64, (doRepStos<64, 64>(block)))
 
 SCAS_TRANSLATION(SCAS16, 16)
 SCAS_TRANSLATION(SCAS32, 32)
+SCAS_TRANSLATION(SCAS64, 64)
 SCAS_TRANSLATION(SCAS8, 8)
 
 CMPS_TRANSLATION(CMPS8, 8)
 CMPS_TRANSLATION(CMPS16, 16)
 CMPS_TRANSLATION(CMPS32, 32)
+CMPS_TRANSLATION(CMPS64, 64)
 
 void String_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::MOVSL] = translate_MOVSD;
-  m[llvm::X86::REP_MOVSD_32] = translate_REP_MOVSD_32;
   m[llvm::X86::MOVSW] = translate_MOVSW;
-  m[llvm::X86::REP_MOVSW_32] = translate_REP_MOVSW_32;
   m[llvm::X86::MOVSB] = translate_MOVSB;
+  m[llvm::X86::REP_MOVSD_32] = translate_REP_MOVSD_32;
+  m[llvm::X86::REP_MOVSW_32] = translate_REP_MOVSW_32;
   m[llvm::X86::REP_MOVSB_32] = translate_REP_MOVSB_32;
 
   m[llvm::X86::MOVSQ] = translate_MOVSQ;
@@ -664,8 +685,8 @@ void String_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::STOSL] = translate_STOSD;
   m[llvm::X86::STOSW] = translate_STOSW;
   m[llvm::X86::STOSB] = translate_STOSB;
-
   m[llvm::X86::STOSQ] = translate_STOSQ;
+
   m[llvm::X86::REP_STOSB_64] = translate_REP_STOSB_64;
   m[llvm::X86::REP_STOSW_64] = translate_REP_STOSW_64;
   m[llvm::X86::REP_STOSD_64] = translate_REP_STOSD_64;
@@ -674,7 +695,46 @@ void String_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::SCASW] = translate_SCAS16;
   m[llvm::X86::SCASL] = translate_SCAS32;
   m[llvm::X86::SCASB] = translate_SCAS8;
+  m[llvm::X86::SCASQ] = translate_SCAS64;
+
+  m[llvm::X86::REPE_SCASB_32] = translate_SCAS8;
+  m[llvm::X86::REPE_SCASW_32] = translate_SCAS16;
+  m[llvm::X86::REPE_SCASD_32] = translate_SCAS32;
+
+  m[llvm::X86::REPE_SCASB_64] = translate_SCAS8;
+  m[llvm::X86::REPE_SCASW_64] = translate_SCAS16;
+  m[llvm::X86::REPE_SCASD_64] = translate_SCAS32;
+  m[llvm::X86::REPE_SCASQ_64] = translate_SCAS64;
+
+  m[llvm::X86::REPNE_SCASB_32] = translate_SCAS8;
+  m[llvm::X86::REPNE_SCASW_32] = translate_SCAS16;
+  m[llvm::X86::REPNE_SCASD_32] = translate_SCAS32;
+
+  m[llvm::X86::REPNE_SCASB_64] = translate_SCAS8;
+  m[llvm::X86::REPNE_SCASW_64] = translate_SCAS16;
+  m[llvm::X86::REPNE_SCASD_64] = translate_SCAS32;
+  m[llvm::X86::REPNE_SCASQ_64] = translate_SCAS64;
+
   m[llvm::X86::CMPSB] = translate_CMPS8;
   m[llvm::X86::CMPSW] = translate_CMPS16;
   m[llvm::X86::CMPSL] = translate_CMPS32;
+  m[llvm::X86::CMPSQ] = translate_CMPS64;
+
+  m[llvm::X86::REPE_CMPSB_32] = translate_CMPS8;
+  m[llvm::X86::REPE_CMPSW_32] = translate_CMPS16;
+  m[llvm::X86::REPE_CMPSD_32] = translate_CMPS32;
+
+  m[llvm::X86::REPE_CMPSB_64] = translate_CMPS8;
+  m[llvm::X86::REPE_CMPSW_64] = translate_CMPS16;
+  m[llvm::X86::REPE_CMPSD_64] = translate_CMPS32;
+  m[llvm::X86::REPE_CMPSQ_64] = translate_CMPS64;
+
+  m[llvm::X86::REPNE_CMPSB_32] = translate_CMPS8;
+  m[llvm::X86::REPNE_CMPSW_32] = translate_CMPS16;
+  m[llvm::X86::REPNE_CMPSD_32] = translate_CMPS32;
+
+  m[llvm::X86::REPNE_CMPSB_64] = translate_CMPS8;
+  m[llvm::X86::REPNE_CMPSW_64] = translate_CMPS16;
+  m[llvm::X86::REPNE_CMPSD_64] = translate_CMPS32;
+  m[llvm::X86::REPNE_CMPSQ_64] = translate_CMPS64;
 }

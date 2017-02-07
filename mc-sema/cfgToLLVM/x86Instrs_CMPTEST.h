@@ -26,25 +26,26 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
 #pragma once
-#include "raiseX86.h"
+
 #include "InstructionDispatch.h"
-#include "x86Instrs_flagops.h"
+
+#include "mc-sema/cfgToLLVM/x86Instrs_flagops.h"
+
+template<int width>
+static void doCmpVV(NativeInstPtr ip, llvm::BasicBlock *b, llvm::Value *lhs,
+                    llvm::Value *rhs) {
+  auto subRes = llvm::BinaryOperator::Create(llvm::Instruction::Sub, lhs, rhs,
+                                             "", b);
+
+  //set the flags
+  WriteAFAddSub<width>(b, subRes, lhs, rhs);
+  WritePF<width>(b, subRes);
+  WriteZF<width>(b, subRes);
+  WriteSF<width>(b, subRes);
+  WriteCFSub(b, lhs, rhs);
+  WriteOFSub<width>(b, subRes, lhs, rhs);
+}
 
 void CMPTEST_populateDispatchMap(DispatchMap &m);
-
-template <int width>
-void doCmpVV(NativeInstPtr ip, llvm::BasicBlock *b, llvm::Value *lhs, llvm::Value *rhs) {
-    llvm::Value   *subRes = llvm::BinaryOperator::Create(Instruction::Sub, lhs, rhs, "", b);
-
-
-    //set the flags
-    WriteAFAddSub<width>(b, subRes, lhs, rhs);
-    WritePF<width>(b, subRes);
-    WriteZF<width>(b, subRes);
-    WriteSF<width>(b, subRes);
-    WriteCFSub(b, lhs, rhs);
-    WriteOFSub<width>(b, subRes, lhs, rhs);
-
-    return;
-}

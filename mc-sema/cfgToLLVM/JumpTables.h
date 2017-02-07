@@ -35,7 +35,10 @@
 #include <vector>
 #include <utility>
 
+#include "mc-sema/Arch/Arch.h"
+
 struct TranslationContext;
+class NativeInst;
 
 template<class T>
 class Table {
@@ -137,7 +140,7 @@ bool addJumpIndexTableDataSection(TranslationContext &ctx,
 // jmp [reg*4+<relocated offset>]
 //
 // TODO(pag): This is x86-specific; factor into an arch-specific place.
-static bool isConformantJumpInst(NativeInstPtr jmpinst) {
+static bool isConformantJumpInst(NativeInst *jmpinst) {
 
   const auto &inst = jmpinst->get_inst();
 
@@ -175,7 +178,7 @@ void doJumpTableViaSwitchReg(TranslationContext &ctx, llvm::BasicBlock *& block,
                              llvm::BasicBlock *&default_block,
                              const int bitness);
 
-void doJumpIndexTableViaSwitch(llvm::BasicBlock *& block, NativeInstPtr ip);
+void doJumpIndexTableViaSwitch(llvm::BasicBlock *& block, NativeInst *ip);
 
 void doJumpOffsetTableViaSwitchReg(TranslationContext &ctx, llvm::BasicBlock *&block,
                                    llvm::Value *regVal,

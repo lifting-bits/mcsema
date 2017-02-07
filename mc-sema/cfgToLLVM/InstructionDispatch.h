@@ -8,7 +8,8 @@ are permitted provided that the following conditions are met:
   Redistributions of source code must retain the above copyright notice, this
   list of conditions and the following disclaimer.
 
-  Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+  Redistributions in binary form must reproduce the above copyright notice, this
+  list of conditions and the following disclaimer in the documentation and/or
   other materials provided with the distribution.
 
   Neither the name of the {organization} nor the names of its
@@ -26,36 +27,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#ifndef _INS_DISPATCH_H
-#define _INS_DISPATCH_H
-#include "llvm/MC/MCInst.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Type.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/Intrinsics.h"
-#include "llvm/IR/InstrTypes.h"
-#include <map>
-#include "peToCFG.h"
-#include "raiseX86.h"
 
-struct TranslationContext {
-  NativeModulePtr natM;
-  NativeFunctionPtr natF;
-  NativeBlockPtr natB;
-  NativeInstPtr natI;
-  llvm::Module *M;
-  llvm::Function *F;
-  std::map<VA, llvm::BasicBlock *> va_to_bb;
-};
+#pragma once
 
-typedef InstTransResult(*TranslationFuncPtr)(TranslationContext &, llvm::BasicBlock *&);
-typedef std::map<unsigned, TranslationFuncPtr> DispatchMap;
-
-extern DispatchMap translationDispatchMap;
-
-bool ArchInitInstructionDispatch(void);
+#include "mc-sema/cfgToLLVM/raiseX86.h"
 
 #define OP(x) inst.getOperand(x)
 
@@ -64,50 +39,58 @@ bool ArchInitInstructionDispatch(void);
     ADDR_NOREF_IMPL<32>(natM, block, x, ip, inst) :\
     ADDR_NOREF_IMPL<64>(natM, block, x, ip, inst)
 
-#define CREATE_BLOCK(nm, b) auto block_ ## nm = llvm::BasicBlock::Create((b)->getContext(), #nm, (b)->getParent())
+#define CREATE_BLOCK(nm, b) \
+    auto block_ ## nm = llvm::BasicBlock::Create( \
+        (b)->getContext(), #nm, (b)->getParent())
+
 #define MEM_REFERENCE(which) MEM_AS_DATA_REF(block, natM, inst, ip, which)
 
 #define GENERIC_TRANSLATION_MI(NAME, NOREFS, MEMREF, IMMREF, TWOREFS) \
-  static InstTransResult translate_ ## NAME (TranslationContext &ctx, llvm::BasicBlock *&block) {\
-    InstTransResult ret;\
-    auto natM = ctx.natM; \
-    Function *F = ctx.F; \
-    auto ip = ctx.natI; \
-    auto &inst = ip->get_inst(); \
-    if( ip->has_mem_reference && ip->has_imm_reference) {\
-        TWOREFS; \
-    } else if( ip->has_mem_reference ) { \
-        MEMREF; \
-    } else if( ip->has_imm_reference ) { \
-        IMMREF; \
-    } else { \
-        NOREFS; \
-    } \
-    return ContinueBlock;\
-}
+    static InstTransResult translate_ ## NAME ( \
+        TranslationContext &ctx, llvm::BasicBlock *&block) { \
+      InstTransResult ret; \
+      auto natM = ctx.natM; \
+      auto F = ctx.F; \
+      auto ip = ctx.natI; \
+      auto &inst = ip->get_inst(); \
+      if (ip->has_mem_reference && ip->has_imm_reference) { \
+          TWOREFS; \
+      } else if (ip->has_mem_reference ) { \
+          MEMREF; \
+      } else if (ip->has_imm_reference ) { \
+          IMMREF; \
+      } else { \
+          NOREFS; \
+      } \
+      return ContinueBlock;\
+    }
 
 
-#define GENERIC_TRANSLATION_REF(NAME, NOREFS, HASREF) static InstTransResult translate_ ## NAME (TranslationContext &ctx, BasicBlock *&block) {\
-    InstTransResult ret;\
-    auto natM = ctx.natM; \
-    Function *F = ctx.F; \
-    auto ip = ctx.natI; \
-    auto &inst = ip->get_inst(); \
-    if( ip->has_mem_reference || ip->has_imm_reference || ip->has_external_ref() ) {\
-        HASREF;\
-    } else {\
-        NOREFS;\
-    }\
-    return ContinueBlock;\
-}
+#define GENERIC_TRANSLATION_REF(NAME, NOREFS, HASREF) \
+    static InstTransResult translate_ ## NAME ( \
+        TranslationContext &ctx, llvm::BasicBlock *&block) { \
+      InstTransResult ret;\
+      auto natM = ctx.natM; \
+      auto F = ctx.F; \
+      auto ip = ctx.natI; \
+      auto &inst = ip->get_inst(); \
+      if (ip->has_mem_reference || ip->has_imm_reference || \
+         ip->has_external_ref()) { \
+          HASREF; \
+      } else {\
+          NOREFS; \
+      } \
+      return ContinueBlock; \
+    }
 
-#define GENERIC_TRANSLATION(NAME, NOREFS) static InstTransResult translate_ ## NAME (TranslationContext &ctx, BasicBlock *&block) {\
-    InstTransResult ret;\
-    auto natM = ctx.natM; \
-    Function *F = ctx.F; \
-    auto ip = ctx.natI; \
-    auto &inst = ip->get_inst(); \
-    ret = NOREFS;\
-    return ret;\
-}
-#endif
+#define GENERIC_TRANSLATION(NAME, NOREFS) \
+    static InstTransResult translate_ ## NAME ( \
+        TranslationContext &ctx, llvm::BasicBlock *&block) { \
+      InstTransResult ret;\
+      auto natM = ctx.natM; \
+      auto F = ctx.F; \
+      auto ip = ctx.natI; \
+      auto &inst = ip->get_inst(); \
+      ret = NOREFS; \
+      return ret; \
+    }

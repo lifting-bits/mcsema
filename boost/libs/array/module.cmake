@@ -1,1 +1,0 @@
-boost_module(array DEPENDS utility)

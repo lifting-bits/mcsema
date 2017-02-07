@@ -26,28 +26,20 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #pragma once
+
 #include <list>
 #include <set>
 #include <vector>
 
-#include "TransExcn.h"
-#include "llvm/IR/BasicBlock.h"
-#include "peToCFG.h"
-#include "toModule.h"
 #include <llvm/IR/Constants.h>
-#include "RegisterUsage.h"
-#include "llvm/IR/Module.h"
-#include "llvm/ADT/Triple.h"
-#include "ArchOps.h"
+#include <llvm/IR/InstrTypes.h>
+#include <llvm/IR/Type.h>
 
-enum InstTransResult {
-  ContinueBlock,
-  EndBlock,
-  EndCFG,
-  TranslateErrorUnsupported,
-  TranslateError
-};
+#include "mc-sema/Arch/Register.h"
+#include "mc-sema/BC/Util.h"
+#include "mc-sema/CFG/CFG.h"
 
 enum StoreSpillType {
   AllRegs = (1 << 0),   // store/spill all regs
@@ -57,94 +49,62 @@ enum StoreSpillType {
   ABIRetSpill = (1 << 4)    // spill regs right after a RET
 };
 
-//type that maps registers to their Value defn in a flow
-typedef std::vector<llvm::Value*> regDefT;
-
-//setup code in the first block of the function that defines all of the
-//registers via alloca and then copies into them from the structure argument
-void setupFlow(llvm::Function *, regDefT &);
-
 ///////////////////////////////////////////////////////////////////////////////
 // state modeling functions
 ///////////////////////////////////////////////////////////////////////////////
 
-llvm::Instruction * noAliasMCSemaScope(llvm::Instruction * inst);
-llvm::Instruction * aliasMCSemaScope(llvm::Instruction * inst);
-
-// Architecture specific utilities are under namespace
-namespace x86 {
-enum {
-  REG_SIZE = 32,
-};
-llvm::Value *MCRegToValue(llvm::BasicBlock *b, unsigned reg);
+inline static llvm::Instruction *noAliasMCSemaScope(llvm::Instruction *inst) {
+  return inst;
 }
 
-namespace x86_64 {
-enum {
-  REG_SIZE = 64,
-};
-llvm::Value *MCRegToValue(llvm::BasicBlock *b, unsigned reg);
+inline static llvm::Instruction *aliasMCSemaScope(llvm::Instruction *inst) {
+  return inst;
 }
-
-template<int width>
-llvm::ConstantInt *CONST_V_INT(llvm::LLVMContext &ctx, uint64_t val) {
-  llvm::IntegerType *bTy = llvm::Type::getIntNTy(ctx, width);
-  return llvm::ConstantInt::get(bTy, val);
-}
-
-template<int width>
-llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t val) {
-  llvm::IntegerType *bTy = llvm::Type::getIntNTy(b->getContext(), width);
-  return llvm::ConstantInt::get(bTy, val);
-}
-
-static llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t width,
-                                  uint64_t val) {
-  llvm::IntegerType *bTy = llvm::Type::getIntNTy(b->getContext(), width);
-  return llvm::ConstantInt::get(bTy, val);
-}
-
-llvm::Value *MCRegToValue(llvm::BasicBlock *b, unsigned reg);
 
 void GENERIC_WRITEREG(llvm::BasicBlock *b, MCSemaRegs reg, llvm::Value *v);
 llvm::Value *GENERIC_READREG(llvm::BasicBlock *b, MCSemaRegs reg);
 
-void GENERIC_MC_WRITEREG(llvm::BasicBlock *b, int reg, llvm::Value *v);
-llvm::Value *GENERIC_MC_READREG(llvm::BasicBlock *b, int reg, int desired_size);
+void GENERIC_MC_WRITEREG(llvm::BasicBlock *b, MCSemaRegs reg, llvm::Value *v);
+llvm::Value *GENERIC_MC_READREG(llvm::BasicBlock *b, MCSemaRegs reg,
+                                int desired_size);
 
 template<int width>
-void R_WRITE(llvm::BasicBlock *b, int reg, llvm::Value *write) {
+void R_WRITE(llvm::BasicBlock *b, MCSemaRegs reg, llvm::Value *write) {
   GENERIC_MC_WRITEREG(b, reg, write);
 }
 
 template<int width>
-llvm::Value *R_READ(llvm::BasicBlock *b, int reg) {
+llvm::Value *R_READ(llvm::BasicBlock *b, MCSemaRegs reg) {
   return GENERIC_MC_READREG(b, reg, width);
 }
 
 namespace x86 {
+
 template<int width>
-void R_WRITE(llvm::BasicBlock *b, int reg, llvm::Value *write) {
+void R_WRITE(llvm::BasicBlock *b, MCSemaRegs reg, llvm::Value *write) {
   GENERIC_MC_WRITEREG(b, reg, write);
 }
 
 template<int width>
-llvm::Value *R_READ(llvm::BasicBlock *b, int reg) {
+llvm::Value *R_READ(llvm::BasicBlock *b, MCSemaRegs reg) {
   return GENERIC_MC_READREG(b, reg, width);
 }
-}
+
+}  // namespace x86
 
 namespace x86_64 {
+
 template<int width>
-void R_WRITE(llvm::BasicBlock *b, int reg, llvm::Value *write) {
+void R_WRITE(llvm::BasicBlock *b, MCSemaRegs reg, llvm::Value *write) {
   GENERIC_MC_WRITEREG(b, reg, write);
 }
 
 template<int width>
-llvm::Value *R_READ(llvm::BasicBlock *b, int reg) {
+llvm::Value *R_READ(llvm::BasicBlock *b, MCSemaRegs reg) {
   return GENERIC_MC_READREG(b, reg, width);
 }
-}
+
+}  // namespace x86_64
 
 llvm::Value *INTERNAL_M_READ(unsigned width, unsigned addrspace,
                              llvm::BasicBlock *b, llvm::Value *addr);
@@ -176,7 +136,9 @@ template<int width>
 void M_WRITE_0(llvm::BasicBlock *b, llvm::Value *addr, llvm::Value *data) {
   return INTERNAL_M_WRITE(width, 0, b, addr, data);
 }
+
 llvm::Value *F_READ(llvm::BasicBlock *b, MCSemaRegs flag);
+llvm::Value *F_READ(llvm::BasicBlock *b, MCSemaRegs flag, int size);
 
 void F_WRITE(llvm::BasicBlock *b, MCSemaRegs flag, llvm::Value *v);
 
@@ -186,8 +148,6 @@ void F_SET(llvm::BasicBlock *b, MCSemaRegs flag);
 
 void F_CLEAR(llvm::BasicBlock *b, MCSemaRegs flag);
 
-void ArchAllocRegisterVars(llvm::BasicBlock *, int);
-
 ///////////////////////////////////////////////////////////////////////////////
 // API usage functions
 ///////////////////////////////////////////////////////////////////////////////
@@ -196,31 +156,8 @@ llvm::Value *makeCallbackForLocalFunction(llvm::Module *M, VA local_target);
 
 void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
                                 const DataSection &ds, llvm::Module *M,
-                                std::vector<llvm::Constant*>& secContents,
-                                std::vector<llvm::Type*>& data_section_types,
+                                std::vector<llvm::Constant *>& secContents,
+                                std::vector<llvm::Type *>& data_section_types,
                                 bool convert_to_callback);
 
 extern bool ignoreUnsupportedInsts;
-
-template<int width, int maskbits>
-static void SHR_SET_FLAG_V(llvm::BasicBlock *block, llvm::Value *val,
-                           MCSemaRegs flag, llvm::Value *shrbit_val) {
-  llvm::Value *shr = llvm::BinaryOperator::CreateLShr(val, shrbit_val, "",
-                                                      block);
-  llvm::Value *mask_pre = CONST_V<maskbits>(block, 0);
-  llvm::Value *mask = llvm::BinaryOperator::CreateNot(mask_pre, "", block);
-  llvm::Value *shr_trunc = new llvm::TruncInst(
-      shr, llvm::Type::getIntNTy(block->getContext(), maskbits), "", block);
-
-  llvm::Value *anded = llvm::BinaryOperator::CreateAnd(shr_trunc, mask, "",
-                                                       block);
-
-  F_WRITE(block, flag, anded);
-}
-
-template<int width, int maskbits>
-static void SHR_SET_FLAG(llvm::BasicBlock *block, llvm::Value *val,
-                         MCSemaRegs flag, int shrbits) {
-  SHR_SET_FLAG_V<width, maskbits>(block, val, flag,
-                                  CONST_V<width>(block, shrbits));
-}
