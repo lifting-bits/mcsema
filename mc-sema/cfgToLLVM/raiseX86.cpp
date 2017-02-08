@@ -554,14 +554,18 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
     std::string sym_name;
 
     if (data_sec_entry.getSymbol(sym_name)) {
-      const char *func_addr_str = sym_name.c_str() + 4;
-      VA func_addr = strtoull(func_addr_str, nullptr, 16);
 
-      std::cout << __FUNCTION__ << ": Found symbol: " << sym_name << std::endl;
+      std::cout
+          << __FUNCTION__ << ": Found symbol: " << sym_name << " in "
+          << std::hex << data_sec_entry.getBase() << std::endl;
 
       if (sym_name.find("ext_") == 0) {
+
+        // TODO(pag): this is flaky!
+        auto ext_sym_name = sym_name.c_str() + 4 /* strlen("ext_") */;
+
         llvm::Constant *final_val = nullptr;
-        auto ext_v = M->getNamedValue(func_addr_str);
+        auto ext_v = M->getNamedValue(ext_sym_name);
 
         if (ext_v != nullptr && llvm::isa<llvm::Function>(ext_v)) {
           final_val = getPtrSizedValue(M, ext_v, data_sec_entry.getSize());
@@ -572,7 +576,7 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
           // assume ext data
         } else {
           TASSERT(ext_v != nullptr,
-                  "Could not find external: " + std::string(func_addr_str));
+                  "Could not find external: " + std::string(ext_sym_name));
           //cout << "External fail" << sym_name << " has type: " << final_val->getType() << "\n";
         }
 
@@ -580,6 +584,12 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
         data_section_types.push_back(final_val->getType());
 
       } else if (sym_name.find("sub_") == 0) {
+
+        // TODO(pag): This is so flaky.
+        auto sub_addr_str = sym_name.c_str() + 4 /* strlen("sub_") */;
+        VA sub_addr = 0;
+        sscanf(sub_addr_str, "%lx", &sub_addr);
+
         // add function pointer to data section
         // to do this, create a callback driver for
         // it first (since it may be called externally)
@@ -587,7 +597,7 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
         llvm::Function *func = nullptr;
 
         if (convert_to_callback) {
-          func = ArchAddCallbackDriver(M, func_addr);
+          func = ArchAddCallbackDriver(M, sub_addr);
           TASSERT(func != nullptr, "Could make callback for: " + sym_name);
         } else {
           func = M->getFunction(sym_name);
@@ -598,21 +608,27 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
         secContents.push_back(final_val);
         data_section_types.push_back(final_val->getType());
 
-      } else {
+      } else if (sym_name.find("data_") == 0) {
+
+        // TODO(pag): This is so flaky.
+        auto data_addr_str = sym_name.c_str() + 5 /* strlen("data_") */;
+        VA data_addr = 0;
+        sscanf(data_addr_str, "%lx", &data_addr);
+
         // data symbol
         // get the base of the data section for this symobol
         // then compute the offset from base of data
         // and store as integer value of (base+offset)
         VA section_base;
-        auto g_ref = GetSectionForDataAddr(globaldata, M, func_addr,
+        auto g_ref = GetSectionForDataAddr(globaldata, M, data_addr,
                                            section_base);
         TASSERT(g_ref != nullptr,
-                "Could not get data addr for:" + std::string(func_addr_str));
+                "Could not get data addr for:" + std::string(data_addr_str));
         // instead of referencing an element directly
         // we just convert the pointer to an integer
         // and add its offset from the base of data
         // to the new data section pointer
-        VA addr_diff = func_addr - section_base;
+        VA addr_diff = data_addr - section_base;
         llvm::Constant *final_val = nullptr;
         //cout << " Symbol name : " << string(func_addr_str) << " : "
         //     << to_string<VA>(func_addr, hex) << " : "
@@ -631,6 +647,11 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
         }
         secContents.push_back(final_val);
         data_section_types.push_back(final_val->getType());
+
+      } else {
+        std::cerr
+            << __FUNCTION__ << ": Unknown data section entry symbol type "
+            << sym_name << std::endl;
       }
     } else {
       // add array

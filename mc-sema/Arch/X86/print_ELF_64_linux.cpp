@@ -133,12 +133,12 @@ int main(void) {
   printf("  movdqu fs:[__mcsema_reg_state@TPOFF + %lu], xmm0\n", __builtin_offsetof(RegState, XMM0));
 
   // Callee-saved registers.
-  printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rbx\n", __builtin_offsetof(RegState, RBX));
-  printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], rbp\n", __builtin_offsetof(RegState, RBP));
-  printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], r12\n", __builtin_offsetof(RegState, R12));
-  printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], r13\n", __builtin_offsetof(RegState, R13));
-  printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], r14\n", __builtin_offsetof(RegState, R14));
-  printf("  mov fs:[__mcsema_reg_state@TPOFF + %lu], r15\n", __builtin_offsetof(RegState, R15));
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R15));
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R14));
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R13));
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R12));
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, RBP));
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, RBX));
 
   // Unstash the callee-saved registers.
   printf("  pop r15\n");
@@ -198,6 +198,14 @@ int main(void) {
   printf("  movdqu fs:[__mcsema_reg_state@TPOFF + %lu], xmm13\n", __builtin_offsetof(RegState, XMM13));
   printf("  movdqu fs:[__mcsema_reg_state@TPOFF + %lu], xmm14\n", __builtin_offsetof(RegState, XMM14));
   printf("  movdqu fs:[__mcsema_reg_state@TPOFF + %lu], xmm15\n", __builtin_offsetof(RegState, XMM15));
+
+  // Callee-saved registers.
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R15));
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R14));
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R13));
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R12));
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, RBP));
+  printf("  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, RBX));
 
   // Unstash the callee-saved registers.
   printf("  pop r15\n");
@@ -295,11 +303,17 @@ int main(void) {
   // Marshal the callee-saved registers (of the emulated code) into the native
   // state. We don't touch the argument registers.
   printf("  mov rbx, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, RBX));
+  printf("  push QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, RBX));
   printf("  mov rbp, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, RBP));
+  printf("  push QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, RBP));
   printf("  mov r12, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R12));
+  printf("  push QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R12));
   printf("  mov r13, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R13));
+  printf("  push QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R13));
   printf("  mov r14, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R14));
+  printf("  push QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R14));
   printf("  mov r15, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R15));
+  printf("  push QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R15));
 
   // Swap onto the native stack.
   printf("  xchg fs:[__mcsema_reg_state@TPOFF + %lu], rsp\n", __builtin_offsetof(RegState, RSP));
@@ -331,6 +345,13 @@ int main(void) {
   printf("  push r13\n");
   printf("  push r14\n");
   printf("  push r15\n");
+
+  printf("  push QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, RBX));
+  printf("  push QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, RBP));
+  printf("  push QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R12));
+  printf("  push QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R13));
+  printf("  push QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R14));
+  printf("  push QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, R15));
 
   // General purpose registers.
   printf("  mov rax, fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(RegState, RAX));

@@ -49,18 +49,18 @@ template<int width>
 static llvm::Value *getValueForExternal(llvm::Module *M, NativeInstPtr ip,
                                         llvm::BasicBlock *block) {
 
-  llvm::Value *addrInt = NULL;
+  llvm::Value *addrInt = nullptr;
 
   if (ip->has_ext_call_target()) {
     std::string target = ip->get_ext_call_target()->getSymbolName();
     llvm::Value *ext_fn = M->getFunction(target);
-    TASSERT(ext_fn != NULL, "Could not find external: " + target);
+    TASSERT(ext_fn != nullptr, "Could not find external: " + target);
     addrInt = new llvm::PtrToIntInst(
         ext_fn, llvm::Type::getIntNTy(block->getContext(), width), "", block);
   } else if (ip->has_ext_data_ref()) {
     std::string target = ip->get_ext_data_ref()->getSymbolName();
     llvm::GlobalValue *gvar = M->getGlobalVariable(target);
-    TASSERT(gvar != NULL, "Could not find external data: " + target);
+    TASSERT(gvar != nullptr, "Could not find external data: " + target);
     std::cout << __FUNCTION__ << ": Found external data ref to: " << target
               << "\n";
 
@@ -92,7 +92,7 @@ static llvm::Value *concatInts(llvm::BasicBlock *b, llvm::Value *a1,
   TASSERT(width == 8 || width == 16 || width == 32 || width == 64, "");
   llvm::Type *typeTo = llvm::Type::getIntNTy(b->getContext(), width * 2);
 
-  TASSERT(typeTo != NULL, "");
+  TASSERT(typeTo != nullptr, "");
   //bitcast a to twice width
   assert(a1->getType()->getScalarSizeInBits() < typeTo->getScalarSizeInBits());
   llvm::Value *twiceLarger = new llvm::ZExtInst(a1, typeTo, "", b);
@@ -135,7 +135,7 @@ static llvm::Value* getGlobalFromOriginalAddr(VA original_addr,
 
     //if we thought it was a global, we should be able to
     //pin it to a global array we made during module setup
-    if (gData == NULL)
+    if (gData == nullptr)
       throw TErr(__LINE__, __FILE__, "Global variable not found");
 
     // since globals are now a structure
@@ -189,10 +189,11 @@ llvm::Instruction* callMemcpy(llvm::BasicBlock *B, llvm::Value *dest,
 template<int width>
 static llvm::Value *IMM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr mod,
                                     NativeInstPtr ip) {
-  auto &C = B->getContext();
+  static_assert(width == 32 || width == 64, "Pointer size must be sane");
 
-  TASSERT(width == 32 || width == 64, "Pointer size must be sane");
-  VA baseGlobal;
+  auto &C = B->getContext();
+  VA baseGlobal = 0;
+
   // off is the displacement part of a memory reference
 
   if (ip->has_external_ref()) {
@@ -227,8 +228,9 @@ static llvm::Value *IMM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr mod,
 
     //if we thought it was a global, we should be able to
     //pin it to a global variable we made during module setup
-    if (gData == NULL)
+    if (!gData) {
       throw TErr(__LINE__, __FILE__, "Global variable not found");
+    }
 
     // since globals are now a structure
     // we cannot simply slice into them.
@@ -277,7 +279,7 @@ static llvm::Value *ADDR_NOREF_IMPL(NativeModulePtr natM, llvm::BasicBlock *b,
   auto M = b->getParent()->getParent();
   if (ip->has_external_ref()) {
     auto addrInt = getValueForExternal<width>(M, ip, b);
-    TASSERT(addrInt != NULL, "Could not get address for external");
+    TASSERT(addrInt != nullptr, "Could not get address for external");
     return addrInt;
   }
 

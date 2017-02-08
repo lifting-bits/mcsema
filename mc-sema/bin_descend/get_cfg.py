@@ -1077,10 +1077,10 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas, itemsiz
         ext_fn = getFunctionName(reloc_dest)
         ext_fn = handleExternalRef(ext_fn)
         DEBUG("External ref from data at {:x} => {}\n".format(reloc_dest, ext_fn))
-        DS.symbol_name = "ext_"+ext_fn
+        DS.symbol_name = "ext_{}".format(ext_fn)
         DS.symbol_size = itemsize
     elif idc.isCode(pf):
-        DS.symbol_name = "sub_"+hex(reloc_dest)
+        DS.symbol_name = "sub_{0:x}".format(reloc_dest)
         DS.symbol_size = itemsize
         DEBUG("Code Ref: {0:x}!\n".format(reloc_dest))
 
@@ -1089,12 +1089,12 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas, itemsiz
 
     elif idc.isData(pf):
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
-        DS.symbol_name = "dta_"+hex(reloc_dest)
+        DS.symbol_name = "data_{:x}".format(reloc_dest)
         DS.symbol_size = itemsize
         DEBUG("Data Ref!\n")
     else:
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
-        DS.symbol_name = "dta_"+hex(reloc_dest)
+        DS.symbol_name = "data_{:x}".format(reloc_dest)
         DS.symbol_size = itemsize
         DEBUG("UNKNOWN Ref, assuming data\n")
 
