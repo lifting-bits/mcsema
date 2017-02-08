@@ -5314,6 +5314,10 @@ d2i_X509_SIG 3 C N
 d2i_X509_VAL 3 C N
 daemon 2 C N
 data_ahead 1 C N
+DATA: optind 4
+DATA: opterr 4
+DATA: optopt 4
+DATA: optarg PTR
 DATA: apr_bucket_type_eos 64
 DATA: apr_bucket_type_file 64
 DATA: apr_bucket_type_flush 64
