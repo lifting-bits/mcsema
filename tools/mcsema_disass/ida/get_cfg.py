@@ -35,7 +35,7 @@ tools_disass_dir = os.path.dirname(tools_disass_ida_dir)
 # Note: The bootstrap file will copy CFG_pb2.py into this dir!!
 import CFG_pb2
 
-_DEBUG = False
+_DEBUG = True
 _DEBUG_FILE = sys.stderr
 
 EXTERNALS = set()
@@ -1678,12 +1678,12 @@ def getInstructionSize(ea):
     insn = idautils.DecodeInstruction(ea)
     return insn.size
 
-def recoverStackVars(M, F):
+def recoverStackVars(F):
     from var_recovery import collect_ida
     from var_recovery import parse_ida_types
 
     # pull info from IDA
-    stack_locals = collect_ida.collect_func_vars(F)
+    stack_locals = collect_ida.collect_func_vars(F, {}) # functionWrapper?
 
     # TODO: convert flags/type info
     #stack_locals_typed = map(parse_ida_types.parse_type, stack_locals)
@@ -1705,11 +1705,38 @@ def recoverStackVars(M, F):
         r.inst_addr = i
         #r.opd_idx = -1
 
+# TODO restructure so we aren't calling collect_func_vars twice
+def recoverGlobalVars(M, F):
+    from var_recovery import collect_ida
+    from var_recovery import parse_ida_types
+  
+    # pull info from IDA
+    global_var_data = dict() # global address -> usage
+    collect_ida.collect_func_vars(F, global_var_data) # functionWrapper?
+
+    # TODO store in protobuf
+    for g in global_var_data.keys():
+      var = M.global_vars.add()
+      var.address = global_var_data[g]["offset"]
+      var.var.name = g
+      var.var.size = 0 # TODO
+      var.var.ida_type = "" # TODO
+      for i in global_var_data[g]["writes"]: # reads vs writes? do we care?
+        r = var.var.ref_eas.add()
+        r.inst_addr = i
+      for i in global_var_data[g]["reads"]:
+        r = var.var.ref_eas.add()
+        r.inst_addr = i
+
+    return
+
 def recoverFunctionFromSet(M, F, blockset, new_eas):
     processed_blocks = set()
 
     if TO_RECOVER["stack_vars"]:
-      recoverStackVars(M, F)
+      recoverStackVars(F)
+    if TO_RECOVER["global_vars"]:
+      recoverGlobalVars(M, F)
 
     while len(blockset) > 0:
         block = blockset.pop()
@@ -1908,7 +1935,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
     preprocessBinary()
 
     processDataSegments(M, new_eas)
-
+    
     for name in to_recover:
 
         if name in exports:

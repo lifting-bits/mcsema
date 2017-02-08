@@ -7,6 +7,8 @@ sys.path.append('../../bin_descend')
 import CFG_pb2
 
 def print_vars(M):
+    for g in M.global_vars:
+      print g
     for f in M.internal_funcs:
         if len(f.stackvars):
             print "ea: 0x%016x" % (f.entry_address)
