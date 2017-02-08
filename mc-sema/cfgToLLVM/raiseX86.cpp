@@ -266,11 +266,11 @@ llvm::Value *F_READ(llvm::BasicBlock *b, MCSemaRegs flag) {
 void F_WRITE(llvm::BasicBlock *b, MCSemaRegs flag, llvm::Value *v) {
   auto &C = b->getContext();
   auto bool_ty = llvm::Type::getInt1Ty(C);
-  if (auto val_ty = llvm::dyn_cast<llvm::IntegerType>(v->getType())) {
-    if (8 > val_ty->getScalarSizeInBits()) {
-      v = new llvm::ZExtInst(v, llvm::Type::getInt8Ty(C), "", b);
-    }
+  auto int8_ty = llvm::Type::getInt8Ty(C);
+  if (v->getType() != bool_ty) {
+    v = new llvm::TruncInst(v, bool_ty, "", b);
   }
+  v = new llvm::ZExtInst(v, int8_ty, "", b);
   return GENERIC_WRITEREG(b, flag, v);
 }
 
@@ -297,7 +297,7 @@ static void CreateInstrBreakpoint(llvm::BasicBlock *B, VA pc) {
   auto &C = M->getContext();
 
   std::stringstream ss;
-  ss << "breakpoint_0x" << std::hex << pc;
+  ss << "breakpoint"; //_0x" << std::hex << pc;
   auto instr_func_name = ss.str();
 
   auto IFT = M->getFunction(instr_func_name);
@@ -356,19 +356,19 @@ static InstTransResult LiftInstIntoBlock(TranslationContext &ctx,
                                          bool doAnnotation) {
   auto pc = ctx.natI->get_loc();
 
-  // At the beginning of the block, make a call to a dummy function with the
-  // same name as the block. This function call cannot be optimized away, and
-  // so it serves as a useful marker for where we are.
-  if (AddBreakpoints) {
-    CreateInstrBreakpoint(block, pc);
-  }
-
   // Update the program counter.
   auto pc_ty = llvm::Type::getIntNTy(block->getContext(), ArchAddressSize());
   GENERIC_MC_WRITEREG(
       block,
       llvm::X86::EIP,
       llvm::ConstantInt::get(pc_ty, pc));
+
+  // At the beginning of the block, make a call to a dummy function with the
+  // same name as the block. This function call cannot be optimized away, and
+  // so it serves as a useful marker for where we are.
+  if (AddBreakpoints) {
+    CreateInstrBreakpoint(block, pc);
+  }
 
   auto lift_status = LiftInstIntoBlockImpl(ctx, block);
 

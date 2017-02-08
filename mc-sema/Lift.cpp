@@ -154,10 +154,6 @@ int main(int argc, char *argv[]) {
       return EXIT_FAILURE;
     }
 
-    M->addModuleFlag(llvm::Module::Error, "Debug Info Version",
-                     llvm::DEBUG_METADATA_VERSION);
-    M->addModuleFlag(llvm::Module::Error, "Dwarf Version", 3);
-
     std::error_code ec;
     llvm::tool_output_file Out(OutputFilename.c_str(), ec,
                                llvm::sys::fs::F_None);

@@ -37,8 +37,14 @@ static std::vector<llvm::Type *> gRegFields;
 
 static llvm::StructType *gRegStateStruct = nullptr;
 
-static MCSemaRegs gLastAddedReg = 0;
+static MCSemaRegs gLastAddedReg = llvm::X86::NoRegister;
 static unsigned gNumRegs = 0;
+
+static void AddPadding(llvm::Type *type, int num_elements) {
+  gNumRegs++;
+  gRegFields.push_back(llvm::ArrayType::get(type, num_elements));
+  gLastAddedReg = llvm::X86::NoRegister;
+}
 
 static void AddReg(MCSemaRegs reg, const char *name, llvm::Type *type) {
   RegInfo info = {name, reg, false, type, type, gNumRegs++, reg, 0};
@@ -203,6 +209,8 @@ void X86InitRegisterState(llvm::LLVMContext *context) {
   AddReg(llvm::X86::FPU_CONTROL_DM, "FPU_CONTROL_DM", int8_type);
   AddReg(llvm::X86::FPU_CONTROL_IM, "FPU_CONTROL_IM", int8_type);
 
+  AddPadding(int8_type, 10);
+
   AddReg(llvm::X86::XMM0, "XMM0", int128_type);
   AddReg(llvm::X86::XMM1, "XMM1", int128_type);
   AddReg(llvm::X86::XMM2, "XMM2", int128_type);
@@ -220,8 +228,7 @@ void X86InitRegisterState(llvm::LLVMContext *context) {
   AddReg(llvm::X86::XMM14, "XMM14", int128_type);
   AddReg(llvm::X86::XMM15, "XMM15", int128_type);
 
-  gRegStateStruct = llvm::StructType::create(*context, "RegState");
-  gRegStateStruct->setBody(gRegFields, true);
+  gRegStateStruct = llvm::StructType::create(*context, gRegFields, "RegState", false);
 }
 
 const std::string &X86RegisterName(MCSemaRegs reg) {

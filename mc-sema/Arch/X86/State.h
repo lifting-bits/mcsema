@@ -20,11 +20,11 @@
 
 
 #ifdef _WIN32
-typedef struct __uint128_t {
+typedef struct alignas(16) __uint128_t {
     char pad[16];
-    } PACKED uint128_t;
+} PACKED uint128_t;
 #else
-typedef unsigned uint128_t __attribute__((mode(TI)));
+typedef unsigned uint128_t __attribute__((mode(TI), aligned(16)));
 #endif
 
 #ifdef _WIN32
@@ -41,7 +41,7 @@ typedef uint32_t reg_t;
 #endif
 
 //structure for register state
-typedef struct _RegState {
+struct alignas(16) RegState {
 
   reg_t RIP;
   reg_t RAX;
@@ -104,6 +104,8 @@ typedef struct _RegState {
   uint8_t FPU_CONTROL_DM;
   uint8_t FPU_CONTROL_IM;
 
+  uint8_t _padding[10];
+
   // XMM registers.
   uint128_t XMM0;
   uint128_t XMM1;
@@ -121,5 +123,5 @@ typedef struct _RegState {
   uint128_t XMM13;
   uint128_t XMM14;
   uint128_t XMM15;
-} RegState;
+};
 

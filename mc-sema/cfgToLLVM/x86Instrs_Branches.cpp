@@ -270,14 +270,13 @@ static InstTransResult doLoopNE(llvm::BasicBlock *&b, llvm::BasicBlock *T,
 }
 
 template<int width>
-static void writeReturnAddr(llvm::BasicBlock *B) {
+static void writeReturnAddr(llvm::BasicBlock *B, VA ret_addr) {
   auto xsp = 32 == width ? llvm::X86::ESP : llvm::X86::RSP;
-  auto xip = 32 == width ? llvm::X86::EIP : llvm::X86::RIP;
   auto espOld = R_READ<width>(B, xsp);
   auto espSub = llvm::BinaryOperator::CreateSub(espOld,
                                                 CONST_V<width>(B, width / 8),
                                                 "", B);
-  M_WRITE_0<width>(B, espSub, CONST_V<width>(B, 0xbadf00d0badbeef0));
+  M_WRITE_0<width>(B, espSub, CONST_V<width>(B, ret_addr));
   R_WRITE<width>(B, xsp, espSub);
 }
 
@@ -326,9 +325,9 @@ static void doCallM(llvm::BasicBlock *&block, NativeInstPtr ip,
 }
 
 template<int width>
-static llvm::CallInst* emitInternalCall(llvm::BasicBlock *&b, llvm::Module *M,
+static llvm::CallInst *emitInternalCall(llvm::BasicBlock *&b, llvm::Module *M,
                                         const std::string &target_fn,
-                                        bool is_jmp) {
+                                        VA ret_addr, bool is_jmp) {
   // we need the parent function to get the regstate argument
   auto ourF = b->getParent();
   TASSERT(ourF->arg_size() == 1, "");
@@ -339,8 +338,8 @@ static llvm::CallInst* emitInternalCall(llvm::BasicBlock *&b, llvm::Module *M,
   TASSERT(targetF != nullptr, "Could not find target function: " + target_fn);
 
   // do we need to push a ret addr?
-  if ( !is_jmp) {
-    writeReturnAddr<width>(b);
+  if (!is_jmp) {
+    writeReturnAddr<width>(b, ret_addr);
   }
 
   // emit: call target_fn(regstate);
@@ -368,7 +367,8 @@ static InstTransResult doCallPC(NativeInstPtr ip, llvm::BasicBlock *&b,
   ss << "sub_" << std::hex << tgtAddr;
   std::string fname = ss.str();
 
-  auto c = emitInternalCall<width>(b, M, fname, is_jump);
+  auto c = emitInternalCall<width>(
+      b, M, fname, ip->get_loc() + ip->get_len(), is_jump);
   auto F = c->getCalledFunction();
 
   if (ip->has_local_noreturn() || F->doesNotReturn()) {
@@ -766,7 +766,8 @@ static InstTransResult translate_JMPm(TranslationContext &ctx,
         == ExternalCodeRef::McsemaCall) {
       auto M = block->getParent()->getParent();
       std::string target_fn = ArchNameMcSemaCall(s);
-      emitInternalCall<width>(block, M, target_fn, true);
+      emitInternalCall<width>(
+          block, M, target_fn, ip->get_loc() + ip->get_len(), true);
       return ContinueBlock;
     }
 
@@ -933,7 +934,8 @@ static InstTransResult translate_CALLpcrel32(TranslationContext &ctx,
         == ExternalCodeRef::McsemaCall) {
       auto M = block->getParent()->getParent();
       std::string target_fn = ArchNameMcSemaCall(s);
-      emitInternalCall<width>(block, M, target_fn, false);
+      emitInternalCall<width>(
+          block, M, target_fn, ip->get_loc() + ip->get_len(), false);
       return ContinueBlock;
     } else {
       llvm::dbgs() << __FUNCTION__ << ": function is: " << s << ", cc is: "
@@ -974,7 +976,8 @@ static InstTransResult translate_CALLm(TranslationContext &ctx,
         == ExternalCodeRef::McsemaCall) {
       auto M = block->getParent()->getParent();
       std::string target_fn = ArchNameMcSemaCall(s);
-      emitInternalCall<width>(block, M, target_fn, false);
+      emitInternalCall<width>(
+          block, M, target_fn, ip->get_loc() + ip->get_len(), false);
       return ContinueBlock;
     }
 

@@ -19,7 +19,8 @@ fi
 echo "[x] Installing dependencies via apt-get"
 sudo apt-get install -y \
   gcc-multilib g++-multilib realpath \
-  python2.7 python-pip
+  python2.7 python-pip \
+  clang-3.8
 
 echo "[+] Upgrading PIP"
 
@@ -93,16 +94,16 @@ fi
 # Produce the runtimes.
 if [ ! -e ${GEN_DIR}/ELF_32_linux.S ]; then
   echo "[+] Generating runtimes"
-  gcc -std=gnu++11 ${DIR}/mc-sema/Arch/X86/print_ELF_32_linux.cpp
+  clang++-3.8 -std=gnu++11 ${DIR}/mc-sema/Arch/X86/print_ELF_32_linux.cpp
   ./a.out > ${GEN_DIR}/ELF_32_linux.S
 
-  gcc -std=gnu++11 ${DIR}/mc-sema/Arch/X86/print_ELF_64_linux.cpp
+  clang++-3.8 -std=gnu++11 ${DIR}/mc-sema/Arch/X86/print_ELF_64_linux.cpp
   ./a.out > ${GEN_DIR}/ELF_64_linux.S
 
-  gcc -std=gnu++11 ${DIR}/mc-sema/Arch/X86/print_PE_32_windows.cpp
+  clang++-3.8 -std=gnu++11 ${DIR}/mc-sema/Arch/X86/print_PE_32_windows.cpp
   ./a.out > ${GEN_DIR}/PE_32_windows.asm
 
-  gcc -std=gnu++11 ${DIR}/mc-sema/Arch/X86/print_PE_64_windows.cpp
+  clang++-3.8 -std=gnu++11 ${DIR}/mc-sema/Arch/X86/print_PE_64_windows.cpp
   ./a.out > ${GEN_DIR}/PE_64_windows.asm
 
   rm a.out
@@ -118,7 +119,11 @@ PROTO_DIR=$(realpath ${PROTO_DIR})
 GEN_DIR=$(realpath ${GEN_DIR})
 
 echo "[x] Creating Makefiles"
-CFLAGS="-g3 -O0" CXXFLAGS="-g3 -O0" \
+
+CC=clang-3.8 \
+CXX=clang++-3.8 \
+CFLAGS="-g3 -O0" \
+CXXFLAGS="-g3 -O0" \
 cmake \
   -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE=$BUILD_TYPE \

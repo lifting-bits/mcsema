@@ -133,8 +133,6 @@ static void WriteOFSub(llvm::BasicBlock *b, llvm::Value *res, llvm::Value *lhs,
 
   //write to OF
   F_WRITE(b, llvm::X86::OF, trunced);
-
-  return;
 }
 
 template<int width>
