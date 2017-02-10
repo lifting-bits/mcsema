@@ -1,3 +1,4 @@
+# Copyright 2017 Peter Goodman (peter@trailofbits.com), all rights reserved.
 
 project(mcsema)
 cmake_minimum_required(VERSION 2.8)
@@ -97,3 +98,8 @@ target_link_libraries(mcsema-lift
   LLVMScalarOpts
   LLVMInstrumentation
   LLVMObjCARCOpts)
+
+install(
+  TARGETS mcsema-lift
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib)

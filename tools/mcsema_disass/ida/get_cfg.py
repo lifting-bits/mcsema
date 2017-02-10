@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 ##
 ## Instructions:
 ## 1) Install python-protobuf for your IDAPython installation. This probably means
@@ -20,15 +22,17 @@ import traceback
 
 import itertools
 
-#hack for IDAPython to see google protobuf lib
-sys.path.append('/usr/lib/python2.7/dist-packages')
-import CFG_pb2
 
-def xrange(begin, end=None, step=1):
-    if end:
-        return iter(itertools.count(begin, step).next, end)
-    else:
-        return iter(itertools.count().next, begin)
+#hack for IDAPython to see google protobuf lib
+if os.path.isdir('/usr/lib/python2.7/dist-packages'):
+    sys.path.append('/usr/lib/python2.7/dist-packages')
+
+tools_disass_ida_dir = os.path.dirname(__file__)
+tools_disass_dir = os.path.dirname(tools_disass_ida_dir)
+tools_dir = os.path.dirname(tools_disass_dir)
+
+# Note: The bootstrap file will copy CFG_pb2.py into this dir!!
+import CFG_pb2
 
 _DEBUG = False
 _DEBUG_FILE = sys.stderr
@@ -123,7 +127,14 @@ EXTERNAL_DATA_COMMENTS = [
 def DEBUG(s):
     global _DEBUG, _DEBUG_FILE
     if _DEBUG:
-        _DEBUG_FILE.write(str(s))
+        _DEBUG_FILE.write("{}\n".format(str(s)))
+
+# Python 2.7's xrange doesn't work with `long`s.
+def xrange(begin, end=None, step=1):
+    if end:
+        return iter(itertools.count(begin, step).next, end)
+    else:
+        return iter(itertools.count().next, begin)
 
 def hasExternalDataComment(ea):
     cmt = idc.GetCommentEx(ea, 0)
@@ -261,21 +272,21 @@ def entryPointHandler(M, ep, name, args_from_stddef=False):
     
     F = addFunction(M, ep)
 
-    DEBUG("At EP {0}:{1:x}\n".format(name,ep))
+    DEBUG("At EP {0}:{1:x}".format(name,ep))
 
     return F
 
 def basicBlockHandler(F, block, blockset, processed_blocks):
     B = F.blocks.add()
     B.base_address = block.startEA
-    DEBUG("BB: {0:x}\n".format(block.startEA))
+    DEBUG("BB: {0:x}".format(block.startEA))
 
     B.block_follows.extend(block.succs)
 
     if _DEBUG:
         str_l = ["{0:x}".format(i) for i in block.succs]
         if len(str_l) > 0:
-            DEBUG("Successors: {0}\n".format(", ".join(str_l)))
+            DEBUG("Successors: {0}".format(", ".join(str_l)))
 
     return B
 
@@ -307,11 +318,11 @@ def isNotCode(ea):
 
 def isExternalReference(ea):
     # see if this is in an internal or external code ref
-    DEBUG("Testing {0:x} for externality\n".format(ea))
+    DEBUG("Testing {0:x} for externality".format(ea))
     ext_types = [idc.SEG_XTRN]
     seg = idc.SegStart(ea)
     if seg == idc.BADADDR:
-        DEBUG("WARNING: Could not get segment addr for: {0:x}\n".format(ea))
+        DEBUG("WARNING: Could not get segment addr for: {0:x}".format(ea))
         return False
 
     segtype = idc.GetSegmentAttr(seg, idc.SEGATTR_TYPE)
@@ -322,7 +333,7 @@ def isExternalReference(ea):
         fn = getFunctionName(ea)
         for extsign in EXTERNAL_NAMES:
             if extsign in fn:
-                DEBUG("Assuming external reference because: {} in {}\n".format(extsign, fn))
+                DEBUG("Assuming external reference because: {} in {}".format(extsign, fn))
                 return True
 
         if isExternalData(fn):
@@ -350,7 +361,7 @@ def addInst(block, addr, inst_bytes, true_target=None, false_target=None):
         inst_bytes = inst_bytes[1:]
 
     if insn_t is not None and (insn_t.auxpref & 0x3) == 0x2:
-        DEBUG("REP Prefix at: 0x{0:x}\n".format(addr))
+        DEBUG("REP Prefix at: 0x{0:x}".format(addr))
         # special handling of certain REP pairs
         rest_bytes = inst_bytes[1:]
         if rest_bytes in SPECIAL_REP_HANDLING:
@@ -430,17 +441,17 @@ def handleExternalRef(fn):
 def isInData(start_ea, end_ea):
     for (start,end) in DATA_SEGMENTS.values():
         if start_ea >= start and start_ea < end:
-            DEBUG("Data Range: {0:x} <= {1:x} < {2:x}\n".format(start, start_ea, end))
-            DEBUG("Data Range: {:x} - {:x}\n".format(start_ea, end_ea))
+            DEBUG("Data Range: {0:x} <= {1:x} < {2:x}".format(start, start_ea, end))
+            DEBUG("Data Range: {:x} - {:x}".format(start_ea, end_ea))
             if end_ea <= end:
                 return True
             else:
-                DEBUG("{0:x} NOT <= {1:x}\n".format(end_ea, end))
-                DEBUG("{0:x}-{1:x} overlaps with: {2:x}-{3:x}\n".format(start_ea, end_ea, start, end))
+                DEBUG("{0:x} NOT <= {1:x}".format(end_ea, end))
+                DEBUG("{0:x}-{1:x} overlaps with: {2:x}-{3:x}".format(start_ea, end_ea, start, end))
                 raise Exception("Overlapping data segments!")
         else:
             if end_ea > start and end_ea <= end:
-                DEBUG("Overlaps with: {0:x}-{1:x}\n".format(start, end))
+                DEBUG("Overlaps with: {0:x}-{1:x}".format(start, end))
                 raise Exception("Overlapping data segments!")
 
     return False
@@ -489,7 +500,7 @@ def sanityCheckJumpTableSize(table_ea, ecount):
 
     table_insn = idautils.DecodeInstruction(table_ea)
     if table_insn is None:
-        DEBUG("Could not decode instruction at {:x}\n".format(table_insn))
+        DEBUG("Could not decode instruction at {:x}".format(table_insn))
         return ecount
 
     # This code is only reached if we *already know this is a jump table
@@ -499,7 +510,7 @@ def sanityCheckJumpTableSize(table_ea, ecount):
     if table_insn.Operands[0].type != idc.o_reg:
         return ecount
 
-    DEBUG("Sanity checking table at {:x}\n".format(table_ea))
+    DEBUG("Sanity checking table at {:x}".format(table_ea))
 
     # get register we jump with
     jmp_reg = table_insn.Operands[0].value
@@ -535,7 +546,7 @@ def sanityCheckJumpTableSize(table_ea, ecount):
                     new_count = 1 + inst.Operands[1].value
                     # compare to ecount. Take the bigger value.
                     if new_count > ecount:
-                        DEBUG("Overriding old JMP count of {} with {} for table at {:x}\n".format(ecount, new_count, table_ea))
+                        DEBUG("Overriding old JMP count of {} with {} for table at {:x}".format(ecount, new_count, table_ea))
                         return new_count
             return ecount
 
@@ -555,12 +566,12 @@ def handleJmpTable(I, inst, new_eas):
         raise Exception("Jump table is not a valid size: {}".format(jsize))
         return
 
-    DEBUG("\tJMPTable Start: {0:x}\n".format(jstart))
+    DEBUG("\tJMPTable Start: {0:x}".format(jstart))
     seg_start = idc.SegStart(jstart)
 
     if seg_start != idc.BADADDR:
         I.jump_table.offset_from_data = jstart - seg_start
-        DEBUG("\tJMPTable offset from data: {:x}\n".format(I.jump_table.offset_from_data))
+        DEBUG("\tJMPTable offset from data: {:x}".format(I.jump_table.offset_from_data))
 
     I.jump_table.zero_offset = 0
     i = 0
@@ -579,13 +590,13 @@ def handleJmpTable(I, inst, new_eas):
         if je not in RECOVERED_EAS and isStartOfFunction(je):
             new_eas.add(je)
 
-        DEBUG("\t\tAdding JMPTable {0}: {1:x}\n".format(i, je))
+        DEBUG("\t\tAdding JMPTable {0}: {1:x}".format(i, je))
     #je = idc.GetFixupTgtOff(jstart+i*jsize)
     #while je != -1:
     #    I.jump_table.table_entries.append(je)
     #    if je not in RECOVERED_EAS: 
     #        new_eas.add(je)
-    #    DEBUG("\t\tAdding JMPTable {0}: {1:x}\n".format( i, je))
+    #    DEBUG("\t\tAdding JMPTable {0}: {1:x}".format( i, je))
     #    i += 1
     #    je = idc.GetFixupTgtOff(jstart+i*jsize)
 
@@ -631,7 +642,7 @@ def manualRelocOffset(I, inst, dref):
 
             # its the first operand (probably a destination) and IDA thinks its o_mem
             # in this case, IDA is probaly right; don't mark it as an immediate
-            if idx == 0 and op.type == o_mem:
+            if idx == 0 and op.type == idaapi.o_mem:
                 continue
 
             if op.type in [idaapi.o_imm, idaapi.o_mem, idaapi.o_near, idaapi.o_far]:
@@ -666,7 +677,7 @@ def opAtOffset(insn_t, off):
             if op.type in [idaapi.o_imm, idaapi.o_mem, idaapi.o_near, idaapi.o_far]:
                 return "IMM"
 
-            DEBUG("ERROR: Unknown op type {}, assuming MEM\n".format(op.type))
+            DEBUG("ERROR: Unknown op type {}, assuming MEM".format(op.type))
             return "MEM"
 
     return None
@@ -679,7 +690,7 @@ def setReference(I, optype, reftype, ref):
         I.mem_reference = ref
         I.mem_ref_type = reftype
     else:
-        DEBUG("ERROR: Unknown ref type: {}\n".format(optype))
+        DEBUG("ERROR: Unknown ref type: {}".format(optype))
 
 def addDataReference(M, I, inst, dref, new_eas):
     if inValidSegment(dref): 
@@ -691,16 +702,16 @@ def addDataReference(M, I, inst, dref, new_eas):
             fn = handleExternalRef(fn)
             if isExternalData(fn):
                 I.ext_data_name = fn
-                DEBUG("EXTERNAL DATA REF FROM {0:x} to {1}\n".format(inst, fn))
+                DEBUG("EXTERNAL DATA REF FROM {0:x} to {1}".format(inst, fn))
             else:
                 I.ext_call_name = fn 
-                DEBUG("EXTERNAL CODE REF FROM {0:x} to {1}\n".format(inst, fn))
+                DEBUG("EXTERNAL CODE REF FROM {0:x} to {1}".format(inst, fn))
 
             return
 
         which_op = manualRelocOffset(I, inst, dref)
         if which_op is None:
-            DEBUG("ERROR: could not decode instruction at {:x}\n".format(inst))
+            DEBUG("ERROR: could not decode instruction at {:x}".format(inst))
             return
 
         ref = None
@@ -712,18 +723,18 @@ def addDataReference(M, I, inst, dref, new_eas):
                 new_eas.add(dref)
         else:
             dref_size = idc.ItemSize(dref)
-            DEBUG("\t\tData Ref: {0:x}, size: {1}\n".format(
+            DEBUG("\t\tData Ref: {0:x}, size: {1}".format(
                 dref, dref_size))
             ref = handleDataRelocation(M, dref, new_eas)
             reftype = CFG_pb2.Instruction.DataRef
 
         
-        DEBUG("\t\tSetting {} ref at {:x}: to {:x} type: {}\n".format(
+        DEBUG("\t\tSetting {} ref at {:x}: to {:x} type: {}".format(
             which_op, inst, ref, ReftypeString(reftype)))
         setReference(I, which_op, reftype, ref)
 
     else:
-        DEBUG("WARNING: Data not in valid segment {0:x}\n".format(dref))
+        DEBUG("WARNING: Data not in valid segment {0:x}".format(dref))
 
 def instructionHandler(M, B, inst, new_eas):
     insn_t = idautils.DecodeInstruction(inst)
@@ -739,21 +750,21 @@ def instructionHandler(M, B, inst, new_eas):
     if isHlt(insn_t):
         return None, False
 
-    #DEBUG("\t\tinst: {0}\n".format(idc.GetDisasm(inst)))
+    #DEBUG("\t\tinst: {0}".format(idc.GetDisasm(inst)))
     inst_bytes = readInstructionBytes(inst)
-    DEBUG("\t\tBytes: {0}\n".format(inst_bytes))
+    DEBUG("\t\tBytes: {0}".format(inst_bytes))
 
     I = addInst(B, inst, inst_bytes)
 
     if isJmpTable(inst):
-        DEBUG("Its a jump table\n")
+        DEBUG("Its a jump table")
         handleJmpTable(I, inst, new_eas)
         return I, False
 
     # mark that this is an offset table
     if PIE_MODE and inst in OFFSET_TABLES:
         table_va = OFFSET_TABLES[inst].start_addr
-        DEBUG("JMP at {:08x} has offset table {:08x}\n".format(inst, table_va))
+        DEBUG("JMP at {:08x} has offset table {:08x}".format(inst, table_va))
         I.offset_table_addr = table_va
 
     crefs_from_here = idautils.CodeRefsFrom(inst, 0)
@@ -774,12 +785,12 @@ def instructionHandler(M, B, inst, new_eas):
     # this is a call $+5, needs special handling
     if len(crefs) == 0 and is_call and isize == 5:
         selfCallEA = next_ea
-        DEBUG("INTERNAL CALL $+5: {0:x}\n".format(selfCallEA))
-        DEBUG("LOCAL NORETURN CALL!\n")
+        DEBUG("INTERNAL CALL $+5: {0:x}".format(selfCallEA))
+        DEBUG("LOCAL NORETURN CALL!")
         I.local_noreturn = True
 
         if selfCallEA not in RECOVERED_EAS:
-            DEBUG("Adding new EA: {0:x}\n".format(selfCallEA))
+            DEBUG("Adding new EA: {0:x}".format(selfCallEA))
             new_eas.add(selfCallEA)
             I.mem_reference = selfCallEA
             I.mem_ref_type = CFG_pb2.Instruction.CodeRef
@@ -787,7 +798,7 @@ def instructionHandler(M, B, inst, new_eas):
             return I, True
     
     for cref in crefs:
-        DEBUG("Checking code ref {:x}\n".format(cref))
+        DEBUG("Checking code ref {:x}".format(cref))
         had_refs = True
         fn = getFunctionName(cref)
         if is_call:
@@ -795,12 +806,12 @@ def instructionHandler(M, B, inst, new_eas):
             elfy, fn_replace = isElfThunk(cref) 
             if elfy:
                 fn = fn_replace
-                DEBUG("Found external call via ELF thunk {:x} => {}\n".format(cref, fn_replace))
+                DEBUG("Found external call via ELF thunk {:x} => {}".format(cref, fn_replace))
 
             if isExternalReference(cref) or elfy:
                 fn = handleExternalRef(fn)
                 I.ext_call_name = fn 
-                DEBUG("EXTERNAL CALL: {0}\n".format(fn))
+                DEBUG("EXTERNAL CALL: {0}".format(fn))
 
                 if doesNotReturn(fn):
                     return I, True
@@ -811,18 +822,18 @@ def instructionHandler(M, B, inst, new_eas):
                 if cref not in RECOVERED_EAS: 
                     new_eas.add(cref)
 
-                DEBUG("INTERNAL CALL: {0}\n".format(fn))
+                DEBUG("INTERNAL CALL: {0}".format(fn))
         elif isUnconditionalJump(inst):
             if isExternalReference(cref):
                 fn = handleExternalRef(fn)
                 I.ext_call_name = fn 
-                DEBUG("EXTERNAL JMP: {0}\n".format(fn))
+                DEBUG("EXTERNAL JMP: {0}".format(fn))
 
                 if doesNotReturn(fn):
-                    DEBUG("Nonreturn JMP\n")
+                    DEBUG("Nonreturn JMP")
                     return I, True
             else:
-                DEBUG("INTERNAL JMP: {0:x}\n".format(cref))
+                DEBUG("INTERNAL JMP: {0:x}".format(cref))
                 I.true_target = cref
 
     #true: jump to where we have a code-ref
@@ -833,7 +844,7 @@ def instructionHandler(M, B, inst, new_eas):
         return I, False
 
     if is_call and isNotCode(next_ea):
-        DEBUG("LOCAL NORETURN CALL!\n")
+        DEBUG("LOCAL NORETURN CALL!")
         I.local_noreturn = True
         return I, True
 
@@ -845,11 +856,11 @@ def instructionHandler(M, B, inst, new_eas):
 
         # don't overwrite an offset set by other means
         if "IMM" == which_op and not I.HasField("imm_reloc_offset"):
-            DEBUG("findRelocOffset setting imm reloc offset at {0:x} to {1:x}\n".format(inst, relo_off))
+            DEBUG("findRelocOffset setting imm reloc offset at {0:x} to {1:x}".format(inst, relo_off))
             I.imm_reloc_offset = relo_off
         
         if "MEM" == which_op and not I.HasField("mem_reloc_offset"):
-            DEBUG("findRelocOffset setting mem reloc offset at {0:x} to {1:x}\n".format(inst, relo_off))
+            DEBUG("findRelocOffset setting mem reloc offset at {0:x} to {1:x}".format(inst, relo_off))
             I.mem_reloc_offset = relo_off
 
     drefs_from_here = idautils.DataRefsFrom(inst)
@@ -857,18 +868,18 @@ def instructionHandler(M, B, inst, new_eas):
         had_refs = True
         if dref in crefs:
             continue
-        DEBUG("Adding reference because of data refs from {:x}\n".format(inst))
+        DEBUG("Adding reference because of data refs from {:x}".format(inst))
         addDataReference(M, I, inst, dref, new_eas)
         if isUnconditionalJump(inst):
             xdrefs = idautils.DataRefsFrom(dref)
             for xref in xdrefs:
-                DEBUG("xref : {0:x}\n".format(xref))
+                DEBUG("xref : {0:x}".format(xref))
                 # check if it refers to come instructions; link Control flow
                 if isExternalReference(xref):
                    fn = getFunctionName(xref)
                    fn = handleExternalRef(fn)
                    I.ext_call_name = fn
-                   DEBUG("EXTERNAL CALL : {0}\n".format(fn))
+                   DEBUG("EXTERNAL CALL : {0}".format(fn))
 
     if isLinkedElf() and not PIE_MODE:
         for op in insn_t.Operands:
@@ -880,7 +891,7 @@ def instructionHandler(M, B, inst, new_eas):
                 end_a = begin_a + idc.ItemSize(begin_a)
                 if isInData(begin_a, end_a):
                     # add data reference
-                    DEBUG("Adding reference because we fixed IMM value\n")
+                    DEBUG("Adding reference because we fixed IMM value")
                     addDataReference(M, I, inst, begin_a, new_eas)
                 #elif isInCode(begin_a, end_a):
                 # add code ref
@@ -909,7 +920,7 @@ def parseDefsFile(df):
             if len(line_args) == 2:
                 fname, conv = line_args
                 if conv == "MCSEMA":
-                    DEBUG("Found mcsema internal function: {}\n".format(fname))
+                    DEBUG("Found mcsema internal function: {}".format(fname))
                     realconv = CFG_pb2.ExternalFunction.McsemaCall
                     emap[fname] = (1, realconv, 'N', None)
                     continue
@@ -946,7 +957,7 @@ def processExternalFunction(M, fn):
     ea = idc.LocByName(fn)
     is_weak = idaapi.is_weak_name(ea)
 
-    DEBUG("Program will reference external{}: {}\n".format(" (weak)" if is_weak else "", fn))
+    DEBUG("Program will reference external{}: {}".format(" (weak)" if is_weak else "", fn))
     extfn = M.external_funcs.add()
     extfn.symbol_name = fn
     extfn.calling_convention = conv
@@ -965,7 +976,7 @@ def processExternalData(M, dt):
     ea = idc.LocByName(dt)
     is_weak = idaapi.is_weak_name(ea)
     
-    DEBUG("Program will reference external{}: {}\n".format(" (weak)" if is_weak else "", dt))
+    DEBUG("Program will reference external{}: {}".format(" (weak)" if is_weak else "", dt))
 
     extdt = M.external_data.add()
     extdt.symbol_name = dt
@@ -981,7 +992,7 @@ def processExternals(M):
         elif nameInMap(EMAP_DATA, fixedn):
             processExternalData(M, fixedn)
         else:
-            DEBUG("UNKNOWN API: {0}\n".format(fixedn))
+            DEBUG("UNKNOWN API: {0}".format(fixedn))
 
 def readBytesSlowly(start, end):
     bytestr = ""
@@ -992,7 +1003,7 @@ def readBytesSlowly(start, end):
         else:
             #virtual size may be bigger than size on disk
             #pad with nulls
-            #DEBUG("Failed on {0:x}\n".format(i))
+            #DEBUG("Failed on {0:x}".format(i))
             bytestr += "\x00"
     return bytestr
 
@@ -1046,7 +1057,7 @@ def resolveRelocation(ea):
         if rtype == -1:
             raise Exception("No relocation type at ea: {:x}".format(ea))
 
-        DEBUG("rtype : {0:x}, {1:x}, {2:x}\n".format(rtype, idc.GetFixupTgtOff(ea), idc.GetFixupTgtDispl(ea)))
+        DEBUG("rtype : {0:x}, {1:x}, {2:x}".format(rtype, idc.GetFixupTgtOff(ea), idc.GetFixupTgtDispl(ea)))
         relocVal = idc.GetFixupTgtDispl(ea) +  idc.GetFixupTgtOff(ea)
     else:
         if rtype == idc.FIXUP_OFF32:
@@ -1069,20 +1080,20 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas, itemsiz
     if itemsize == -1:
         itemsize = int(idc.ItemSize(offset))
 
-    DEBUG("Offset: {0:x}, seg_offset: {1:x} => {2:x}\n".format(offset, seg_offset, reloc_dest))
-    DEBUG("Reloc Base Address: {0:x}\n".format(DS.base_address))
-    DEBUG("Reloc size: {0:x}\n".format(itemsize))
+    DEBUG("Offset: {0:x}, seg_offset: {1:x} => {2:x}".format(offset, seg_offset, reloc_dest))
+    DEBUG("Reloc Base Address: {0:x}".format(DS.base_address))
+    DEBUG("Reloc size: {0:x}".format(itemsize))
 
     if isExternalReference(reloc_dest):
         ext_fn = getFunctionName(reloc_dest)
         ext_fn = handleExternalRef(ext_fn)
-        DEBUG("External ref from data at {:x} => {}\n".format(reloc_dest, ext_fn))
+        DEBUG("External ref from data at {:x} => {}".format(reloc_dest, ext_fn))
         DS.symbol_name = "ext_{}".format(ext_fn)
         DS.symbol_size = itemsize
     elif idc.isCode(pf):
         DS.symbol_name = "sub_{0:x}".format(reloc_dest)
         DS.symbol_size = itemsize
-        DEBUG("Code Ref: {0:x}!\n".format(reloc_dest))
+        DEBUG("Code Ref: {0:x}!".format(reloc_dest))
 
         if reloc_dest not in RECOVERED_EAS:
             new_eas.add(reloc_dest)
@@ -1091,12 +1102,12 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas, itemsiz
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "data_{:x}".format(reloc_dest)
         DS.symbol_size = itemsize
-        DEBUG("Data Ref!\n")
+        DEBUG("Data Ref!")
     else:
         reloc_dest = handleDataRelocation(M, reloc_dest, new_eas)
         DS.symbol_name = "data_{:x}".format(reloc_dest)
         DS.symbol_size = itemsize
-        DEBUG("UNKNOWN Ref, assuming data\n")
+        DEBUG("UNKNOWN Ref, assuming data")
 
 def isStartOfFunction(ea):
     fname = idc.GetFunctionName(ea)
@@ -1132,11 +1143,11 @@ def processTable(ea, size):
         for jea in xrange(start, end, readsize):
             pword = read_option(jea)
             if isSaneReference(pword): 
-                DEBUG("Sane table entry at: {:x}\n".format(pword))
+                DEBUG("Sane table entry at: {:x}".format(pword))
             elif pword == 0:
-                DEBUG("Ignoring NULL entry in possible table: {:x}\n".format(jea))
+                DEBUG("Ignoring NULL entry in possible table: {:x}".format(jea))
             else:
-                DEBUG("NOT a table entry at {:x}\n".format(jea))
+                DEBUG("NOT a table entry at {:x}".format(jea))
                 return False, table_map, readsize 
 
             table_map[jea] = pword
@@ -1145,13 +1156,13 @@ def processTable(ea, size):
 
     did_find, table, readsz = scan_table(ea, ea+size, getPointerSize())
     if did_find == False and getPointerSize() == 8:
-        DEBUG("Failed to find a table, trying with smaller pointer size\n")
+        DEBUG("Failed to find a table, trying with smaller pointer size")
         did_find, table, readsz = scan_table(ea, ea+size, 4)
 
     return did_find, table, readsz
 
 def parseSingleStruct(ea, idastruct):
-    DEBUG("Parsing idastruct at {:x}\n".format(ea))
+    DEBUG("Parsing idastruct at {:x}".format(ea))
     # get first member offset
     first_off = idc.GetFirstMember(idastruct.tid);
 
@@ -1173,7 +1184,7 @@ def parseSingleStruct(ea, idastruct):
             members.add(mn)
 
     for member in members:
-        DEBUG("Checking idastruct member: {}\n".format(member))
+        DEBUG("Checking idastruct member: {}".format(member))
         member_off = idc.GetMemberOffset(idastruct.tid, member)
         assert member_off != -1
         # get element size
@@ -1182,15 +1193,15 @@ def parseSingleStruct(ea, idastruct):
         
         #if its pointer size, check for ptr
         if member_sz == read_size:
-            DEBUG("\tit is pointer sized\n")
+            DEBUG("\tit is pointer sized")
             # check if points to sanity
             member_ea = ea+member_off
             pword = read_option(member_ea)
             if isSaneReference(pword):
-                DEBUG("\tAdding reference from {:x} => {:x}\n".format(member_ea, pword))
+                DEBUG("\tAdding reference from {:x} => {:x}".format(member_ea, pword))
                 ptrs[member_ea] = pword
             else:
-                DEBUG("\tNot a sane reference ({:x})\n".format(pword))
+                DEBUG("\tNot a sane reference ({:x})".format(pword))
 
 
     return len(ptrs) != 0, ptrs, getPointerSize()
@@ -1215,7 +1226,7 @@ def processStruct(ea, size):
     # get struct size
     idastruct = getStructType(ea)
     if idastruct is None:
-        DEBUG("Could not get structure size at: {:x}\n".format(ea))
+        DEBUG("Could not get structure size at: {:x}".format(ea))
         return False, {}, 0
 
     struct_size = idc.GetStrucSize(idastruct.tid)
@@ -1243,13 +1254,13 @@ def processDataChunk(ea, size):
     # Get chunk type
     # if its a string, skip it
     if IsString(ea):
-        DEBUG("Found a string at {:x}\n".format(ea))
+        DEBUG("Found a string at {:x}".format(ea))
         return False, {}, 0
     elif IsStruct(ea):
-        DEBUG("Found a struct at {:x}\n".format(ea))
+        DEBUG("Found a struct at {:x}".format(ea))
         return processStruct(ea, size)
     else:
-        DEBUG("Found an unknown blob at {:x}, treating as table\n".format(ea))
+        DEBUG("Found an unknown blob at {:x}, treating as table".format(ea))
         return processTable(ea, size)
 
 #referenced from
@@ -1265,29 +1276,29 @@ def checkIfOffsetTable(ea):
     in the VA of a jump target
     """
 
-    DEBUG("LOOKING FOR OFFSET TABLE AT: {:08x}\n".format(ea))
+    DEBUG("LOOKING FOR OFFSET TABLE AT: {:08x}".format(ea))
     # preconditions
     # can only really do this when all sections are 
     # correctly based
     if not isLinkedElf():
-        DEBUG("\t... not a linked elf\n");
+        DEBUG("\t... not a linked elf");
         return False, 0, []
 
     # only present in PIE executables
     if not PIE_MODE:
-        DEBUG("\t... not in PIE mode\n");
+        DEBUG("\t... not in PIE mode");
         return False
 
     #TODO: revisit
     if getBitness() != 64:
-        DEBUG("\t... not 64-bit\n");
+        DEBUG("\t... not 64-bit");
         return False, 0, []
 
     # check that there is a code reference
     # to ea somewhere
     refs = [x for x in idautils.DataRefsTo(ea)]
     if len(refs) == 0:
-        DEBUG("\t... no refs to ea\n");
+        DEBUG("\t... no refs to ea");
         return False, 0, []
     
     # assumes 32-bit offsets
@@ -1312,11 +1323,11 @@ def checkIfOffsetTable(ea):
         # has to point to code and to the
         # start of an instruction
         if isInternalCode(dest_guess) and isSaneReference(dest_guess):
-            DEBUG("\tAdded destination: {:08x}\n".format(dest_guess))
+            DEBUG("\tAdded destination: {:08x}".format(dest_guess))
             entries.append(dest_guess)
             entrycount += 1
         else:
-            DEBUG("\tInvalid destination: {:08x}\n".format(dest_guess))
+            DEBUG("\tInvalid destination: {:08x}".format(dest_guess))
             # invalid entry
             break
 
@@ -1344,11 +1355,11 @@ def createOffsetTable(M, table_start, table_entries):
 
     jmp_refs = set()
     for ref in idautils.DataRefsTo(table_start):
-        DEBUG("Checking ref to table...\n")
+        DEBUG("Checking ref to table...")
         insn_t = idautils.DecodeInstruction(ref)
         # check if REF points to LEA REG, <value>
         if insn_t.itype == idaapi.NN_lea and insn_t.Operands[0].type == idc.o_reg:
-            DEBUG("Found a LEA\n")
+            DEBUG("Found a LEA")
             dest_reg = idc.GetOpnd(ref, 0)
 
             # get next 5 insts
@@ -1356,16 +1367,16 @@ def createOffsetTable(M, table_start, table_entries):
             for i in xrange(5):
                 # is it a jump?
                 if isUnconditionalJump(cur_head):
-                    DEBUG("Found follow unconditional jump at {:08x}\n".format(cur_head))
+                    DEBUG("Found follow unconditional jump at {:08x}".format(cur_head))
                     # is it a JMP?
                     jmp_reg = idc.GetOpnd(cur_head, 0)
                     if jmp_reg == dest_reg:
                         # yes: add EA of JMP REG ot jmp_refs 
-                        DEBUG("Found JMP using offset table {:08x} at {:08x}\n".format(table_start, cur_head))
+                        DEBUG("Found JMP using offset table {:08x} at {:08x}".format(table_start, cur_head))
                         jmp_refs.add(cur_head)
                 cur_head = idc.NextHead(cur_head)
         else:
-            DEBUG("NOT a lea :(\n")
+            DEBUG("NOT a lea :(")
 
     for jmp_ref in jmp_refs:
         OFFSET_TABLES[jmp_ref] = OT
@@ -1378,10 +1389,10 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
         if PIE_MODE:
             (is_table, ecount, entries) = checkIfOffsetTable(i)
             if is_table:
-                DEBUG("FOUND AN OFFSET TABLE AT: {:08x}\n".format(i))
-                DEBUG("Table has {} destinations:\n".format(ecount))
+                DEBUG("FOUND AN OFFSET TABLE AT: {:08x}".format(i))
+                DEBUG("Table has {} destinations:".format(ecount))
                 for e in entries:
-                    DEBUG("\t{:08x}\n".format(e))
+                    DEBUG("\t{:08x}".format(e))
                     # these may be the only references to certain
                     # code islands. Make sure we recover them
                     #if e not in RECOVERED_EAS:
@@ -1390,7 +1401,7 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
                 refs = createOffsetTable(M, i, entries)
                 for ref in refs:
                     for e in set(entries):
-                        DEBUG("Adding Offset Table XREF {} => {}\n".format(ref, e))
+                        DEBUG("Adding Offset Table XREF {} => {}".format(ref, e))
                         idc.AddCodeXref(ref, e, idc.XREF_USER|idc.fl_F)
 
                 i += (4 * ecount) - 1
@@ -1405,20 +1416,20 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
             if isInData(dword, dword+1) and idc.ItemHead(dword) == dword:
                 if idc.MakeDword(i):
                     idc.add_dref(i, dword, idc.XREF_USER|idc.dr_O)
-                    DEBUG("making New Data Reference at: {0:x} => {1:x}\n".format(i, dword))
+                    DEBUG("making New Data Reference at: {0:x} => {1:x}".format(i, dword))
                     dref_size = 4
                 else:
-                    DEBUG("WARNING: Could not make reference at {:x}\n".format(i))
+                    DEBUG("WARNING: Could not make reference at {:x}".format(i))
             # check if code and points to the beginning of an instruction
             elif isInternalCode(dword) and idc.ItemHead(dword) == dword:
                 if idc.MakeDword(i):
                     idc.AddCodeXref(i, dword, idc.XREF_USER|idc.fl_F)
-                    DEBUG("making New Code Reference at: {0:x} => {1:x}\n".format(i, dword))
+                    DEBUG("making New Code Reference at: {0:x} => {1:x}".format(i, dword))
                     dref_size = 4
                 else:
-                    DEBUG("WARNING: Could not make reference at {:x}\n".format(i))
+                    DEBUG("WARNING: Could not make reference at {:x}".format(i))
             else:
-                DEBUG("not code or data ref\n")
+                DEBUG("not code or data ref")
 
         i += dref_size
 
@@ -1429,33 +1440,33 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
         if ea in ACCESSED_VIA_JMP and not isStartOfFunction(pointsto):
             # bail only if we are access via JMP and not the start
             # of a function
-            DEBUG("\t\tNOT ADDING REF: {:08x} -> {:08x}\n".format(ea, pointsto))
+            DEBUG("\t\tNOT ADDING REF: {:08x} -> {:08x}".format(ea, pointsto))
             return
 
-        DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}\n".format(ea, pointsto))
+        DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}".format(ea, pointsto))
         real_size = idc.ItemSize(pointsto)
         if force_size is None:
             reloc_size = idc.ItemSize(ea)
         else:
             reloc_size = force_size
-        DEBUG("\t\tReal Ref: {0:x}, reloc size: {2}, ref size: {1}\n".format(pointsto, real_size, reloc_size))
+        DEBUG("\t\tReal Ref: {0:x}, reloc size: {2}, ref size: {1}".format(pointsto, real_size, reloc_size))
         insertRelocatedSymbol(M, D, pointsto, ea, seg_offset, new_eas, reloc_size)
 
 
     i = start
     while i < end:
-        DEBUG("Checking address: {:x}\n".format(i))
+        DEBUG("Checking address: {:x}".format(i))
         dref_size = idc.ItemSize(i) or 1
         if dref_size > getPointerSize():
-            DEBUG("Possible table/struct data at {:x}; size: {:x}\n".format(i, dref_size))
+            DEBUG("Possible table/struct data at {:x}; size: {:x}".format(i, dref_size))
             (found, addrs, entry_size) = processDataChunk(i, dref_size)
             if found:
-                DEBUG("Its a table/struct, adding {} references\n".format(len(addrs)))
+                DEBUG("Its a table/struct, adding {} references".format(len(addrs)))
                 for ta in sorted(addrs.keys()):
                     if addrs[ta] != 0:
                         insertReference(M, D, ta, addrs[ta], seg_offset, new_eas, force_size=entry_size)
             else:
-                DEBUG("Not a stable/struct, skipping\n")
+                DEBUG("Not a stable/struct, skipping")
 
         elif dref_size == getPointerSize() or dref_size == 4:
             if dref_size == 4 and getBitness() == 64:
@@ -1463,16 +1474,16 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
                 dw = readDword(i+4)
                 if dw == 0:
                     if idc.MakeQword(i):
-                        DEBUG("Making qword from 32-bit dref at {:x}\n".format(i))
+                        DEBUG("Making qword from 32-bit dref at {:x}".format(i))
                         dref_size = 8
                     else:
-                        DEBUG("WARNING: Failed at make qword at {:x}, ignoring ref\n".format(i))
+                        DEBUG("WARNING: Failed at make qword at {:x}, ignoring ref".format(i))
                         dref_size = 4
                         i += dref_size
                         continue
 
                 else:
-                    DEBUG("WARNING: could not make qword from 32-bit dref at {:x}, ignoring ref\n".format(i))
+                    DEBUG("WARNING: could not make qword from 32-bit dref at {:x}, ignoring ref".format(i))
                     dref_size = 4
                     i += dref_size
                     continue
@@ -1487,11 +1498,11 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
             # do this check since IDA is crazy and sometimes returns data
             # references > 0xff00000000000000
             if len(more_dref) > 0 and more_dref[0] < 0xff00000000000000:
-                DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}\n".format(i, more_dref[0]))
+                DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}".format(i, more_dref[0]))
                 if len(more_dref) == 1:
                     insertReference(M, D, i, more_dref[0], seg_offset, new_eas)
                 else: 
-                    DEBUG("\t\tWARNING: Possible data ref problem\n");
+                    DEBUG("\t\tWARNING: Possible data ref problem");
                     insertReference(M, D, i, more_dref[0], seg_offset, new_eas)
 
         i += dref_size
@@ -1503,20 +1514,20 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
 
     i = idc.GetNextFixupEA(start-1)
 
-    DEBUG("Looking for relocations in {:x} - {:x}\n".format(start, end))
+    DEBUG("Looking for relocations in {:x} - {:x}".format(start, end))
 
     if i == idc.BADADDR or i > end:
         if isLinkedElf():
-            DEBUG("No relocations in binary, scanning for data references\n");
+            DEBUG("No relocations in binary, scanning for data references");
             # no fixups, do manual reloc searching
             scanDataForRelocs(M, D, start, end, new_eas, seg_offset)
         else:
-            DEBUG("Not scanning data sections of object file for pointer-alikes\n")
+            DEBUG("Not scanning data sections of object file for pointer-alikes")
     else:
-        DEBUG("Found relocations in binary: ({:x})..\n".format(i))
+        DEBUG("Found relocations in binary: ({:x})..".format(i))
         while i < end and i != idc.BADADDR:
             pointsto, itemsize = resolveRelocation(i)
-            DEBUG("{0:x} Found reloc to: {1:x} (size: {2:x})\n".format(i, pointsto, itemsize))
+            DEBUG("{0:x} Found reloc to: {1:x} (size: {2:x})".format(i, pointsto, itemsize))
 
             if not isExternalReference(pointsto):
                 # do not add references in jump tables....
@@ -1524,11 +1535,11 @@ def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
                 if i in ACCESSED_VIA_JMP and not isStartOfFunction(pointsto):
                     # bail only if we are access via JMP and not the start
                     # of a function
-                    DEBUG("\t\tNOT ADDING REF: {:08x} -> {:08x}\n".format(i, pointsto))
+                    DEBUG("\t\tNOT ADDING REF: {:08x} -> {:08x}".format(i, pointsto))
                 else:
                     insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas, itemsize)
             else:
-                DEBUG("{:x} is an external reference\n".format(i))
+                DEBUG("{:x} is an external reference".format(i))
                 insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas, itemsize)
 
             i = idc.GetNextFixupEA(i)
@@ -1567,11 +1578,11 @@ def addDataSegment(start, end):
     if need_move:
         free_data = findFreeData()
         seg_offset = free_data - start
-        DEBUG("Data Segment {0:x} moved to: {1:x}\n".format(start, start+seg_offset))
+        DEBUG("Data Segment {0:x} moved to: {1:x}".format(start, start+seg_offset))
 
     DATA_SEGMENTS[ (start, end,) ] = (start+seg_offset, end+seg_offset,)
 
-    DEBUG("Adding data seg: {0}: {1}-{2}\n".format( 
+    DEBUG("Adding data seg: {0}: {1}-{2}".format( 
         idc.SegName(start),
         hex(start+seg_offset),
         hex(end+seg_offset)))
@@ -1602,7 +1613,7 @@ def populateDataSegment(M, start, end, new_eas):
 
     processRelocationsInData(M, D, start, end, new_eas, seg_offset)
 
-    DEBUG("Adding data seg: {0}: {1}-{2}\n".format( 
+    DEBUG("Adding data seg: {0}: {1}-{2}".format( 
         idc.SegName(start),
         hex(new_start),
         hex(new_end)))
@@ -1630,7 +1641,7 @@ def recoverFunctionFromSet(M, F, blockset, new_eas):
         block = blockset.pop()
 
         if block.startEA == block.endEA:
-            DEBUG("Zero sized block: {0:x}\n".format(block.startEA))
+            DEBUG("Zero sized block: {0:x}".format(block.startEA))
 
         if block.startEA in processed_blocks:
             raise Exception("Attempting to add same block twice: {0:x}".format(block.startEA))
@@ -1639,11 +1650,11 @@ def recoverFunctionFromSet(M, F, blockset, new_eas):
 
         B = basicBlockHandler(F, block, blockset, processed_blocks)
         prevHead = block.startEA
-        DEBUG("Starting insn at: {0:x}\n".format(prevHead))
+        DEBUG("Starting insn at: {0:x}".format(prevHead))
         for head in idautils.Heads(block.startEA, block.endEA):
             # we ended the function on a call
 
-            DEBUG("Processing insn at {:x}\n".format(head))
+            DEBUG("Processing insn at {:x}".format(head))
             I, endBlock = instructionHandler(M, B, head, new_eas)
             # sometimes there is junk after a terminator due to off-by-ones in
             # IDAPython. Ignore them.
@@ -1652,7 +1663,7 @@ def recoverFunctionFromSet(M, F, blockset, new_eas):
                 break
             prevHead = head
 
-        DEBUG("Ending insn at: {0:x}\n".format(prevHead))
+        DEBUG("Ending insn at: {0:x}".format(prevHead))
 
 def recoverFunction(M, F, fnea, new_eas):
     blockset = getFunctionBlocks(fnea)
@@ -1675,7 +1686,7 @@ def recoverBlock(startEA):
                 b.endEA = curEA+1
                 return b
             else:
-                DEBUG("WARNING: Couldn't decode insn at: {0:x}. Ending block.\n".format(curEA))
+                DEBUG("WARNING: Couldn't decode insn at: {0:x}. Ending block.".format(curEA))
                 b.endEA = curEA
                 return b
 
@@ -1767,7 +1778,7 @@ def preprocessBinary():
             if idc.isCode(idc.GetFlags(head)):
                 si = idaapi.get_switch_info_ex(head)
                 if si is not None and isUnconditionalJump(head):
-                    DEBUG("Found a jmp based switch at: {0:x}\n".format(head))
+                    DEBUG("Found a jmp based switch at: {0:x}".format(head))
                     esize = si.get_jtable_element_size()
                     readers = { 4: readDword,
                                 8: readQword }
@@ -1777,7 +1788,7 @@ def preprocessBinary():
                     jmp_refs = set(idautils.CodeRefsFrom(head, 1))
                     for i in xrange(count):
                         fulladdr = base+i*esize
-                        DEBUG("Address accessed via JMP: {:x}\n".format(fulladdr))
+                        DEBUG("Address accessed via JMP: {:x}".format(fulladdr))
                         ACCESSED_VIA_JMP.add(fulladdr)
                         je = readers[esize](fulladdr)
                         if si.flags & idaapi.SWI_ELBASE == idaapi.SWI_ELBASE:
@@ -1787,7 +1798,7 @@ def preprocessBinary():
                             je = 0xFFFFFFFF & (je + si.elbase)
                         if je not in jmp_refs:
                             jmp_refs.add(je)
-                            DEBUG("\t\tJMPTable entry not in original; adding ref {:x} => {:x}\n".format(head, je))
+                            DEBUG("\t\tJMPTable entry not in original; adding ref {:x} => {:x}".format(head, je))
                             idc.AddCodeXref(head, je, idc.XREF_USER|idc.fl_F)
                             mark_as_code(je)
             if PIE_MODE:
@@ -1808,7 +1819,7 @@ def preprocessBinary():
 def recoverCfg(to_recover, outf, exports_are_apis=False):
     M = CFG_pb2.Module()
     M.module_name = idc.GetInputFile()
-    DEBUG("PROCESSING: {0}\n".format(M.module_name))
+    DEBUG("PROCESSING: {0}".format(M.module_name))
 
     our_entries = []
     entrypoints = idautils.Entries()
@@ -1834,11 +1845,11 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
         fwdname = isFwdExport(name, ea)
 
         if fwdname is not None:
-            DEBUG("Skipping fwd export {0} : {1}\n".format(name, fwdname))
+            DEBUG("Skipping fwd export {0} : {1}".format(name, fwdname))
             continue
 
         if not isInternalCode(ea):
-            DEBUG("Export {0} at {1} does not point to code; skipping\n".format(name, hex(ea)))
+            DEBUG("Export {0} at {1} does not point to code; skipping".format(name, hex(ea)))
             continue
             
         our_entries.append( (name, ea) )
@@ -1848,7 +1859,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
     # process main entry points
     for fname, fea in our_entries:
 
-        DEBUG("Recovering: {0}\n".format(fname))
+        DEBUG("Recovering: {0}".format(fname))
 
         F = entryPointHandler(M, fea, fname, exports_are_apis)
 
@@ -1866,7 +1877,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
             raise Exception("Function EA not code: {0:x}".format(cur_ea))
 
         F = addFunction(M, cur_ea)
-        DEBUG("Recovering: {0}\n".format(hex(cur_ea)))
+        DEBUG("Recovering: {0}".format(hex(cur_ea)))
         RECOVERED_EAS.add(cur_ea)
 
         recoverFunction(M, F, cur_ea, new_eas)
@@ -1874,7 +1885,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
         recovered_fns += 1
 
     if recovered_fns == 0:
-        DEBUG("COULD NOT RECOVER ANY FUNCTIONS\n")
+        DEBUG("COULD NOT RECOVER ANY FUNCTIONS")
         return
 
     mypath = path.dirname(__file__)
@@ -1883,8 +1894,8 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
     outf.write(M.SerializeToString())
     outf.close()
 
-    DEBUG("Recovered {0} functions.\n".format(recovered_fns))
-    DEBUG("Saving to: {0}\n".format(outf.name))
+    DEBUG("Recovered {0} functions.".format(recovered_fns))
+    DEBUG("Saving to: {0}".format(outf.name))
 
 
 def isFwdExport(iname, ea):
@@ -1931,22 +1942,22 @@ def generateBatFile(batname, eps):
 
     batfile.write(batheader)
     batfile.write("%CFG_TO_BC% ")
-    batfile.write("-ignore-unsupported=true -i={0}_ida.cfg -o={0}.bc\n".format(infile))
-    batfile.write("\n")
-    batfile.write(" echo Optimizing Bitcode\n")
+    batfile.write("-ignore-unsupported=true -i={0}_ida.cfg -o={0}.bc".format(infile))
+    batfile.write("")
+    batfile.write(" echo Optimizing Bitcode")
     batfile.write("%OPT% ")
-    batfile.write("-O3 -o {0}_opt.bc {0}.bc\n".format(infile))
-    batfile.write("echo Creating .obj\n")
-    batfile.write("del kernel32.dll.obj 2>NUL\n")
+    batfile.write("-O3 -o {0}_opt.bc {0}.bc".format(infile))
+    batfile.write("echo Creating .obj")
+    batfile.write("del kernel32.dll.obj 2>NUL")
     batfile.write("%LLC% ")
-    batfile.write("-O3 -filetype=obj -o {0}.obj {0}_opt.bc\n".format(infile))
-    batfile.write("echo Building export stub\n")
-    batfile.write("cl /c {0}_exportstub.c \n".format(infile))
-    batfile.write("REM Below is a compilation template. You need to uncomment it to build.\n")
-    batfile.write("REM and add some .lib files to the line as well.\n")
-    batfile.write("REM \n")
-    batfile.write("REM link /NODEFAULTLIB /ENTRY:export_DllEntryPoint /DLL /DEF:{0}.def /OUT:{0} {0}.obj {0}_exportstub.obj msvcrt.lib *.lib \n".format(infile))
-    batfile.write("echo Uncomment lines to attempt linking to a DLL\n")
+    batfile.write("-O3 -filetype=obj -o {0}.obj {0}_opt.bc".format(infile))
+    batfile.write("echo Building export stub")
+    batfile.write("cl /c {0}_exportstub.c ".format(infile))
+    batfile.write("REM Below is a compilation template. You need to uncomment it to build.")
+    batfile.write("REM and add some .lib files to the line as well.")
+    batfile.write("REM ")
+    batfile.write("REM link /NODEFAULTLIB /ENTRY:export_DllEntryPoint /DLL /DEF:{0}.def /OUT:{0} {0}.obj {0}_exportstub.obj msvcrt.lib *.lib ".format(infile))
+    batfile.write("echo Uncomment lines to attempt linking to a DLL")
     batfile.close()
 
 def parseTypeString(typestr, ea):
@@ -1974,7 +1985,7 @@ def parseTypeString(typestr, ea):
 
 def getExportType(name, ep):
     try:
-        DEBUG("Processing export name: {} at: {:x}\n".format(name, ep))
+        DEBUG("Processing export name: {} at: {:x}".format(name, ep))
         args, conv, ret, sign = getFromEMAP(name)
     except KeyError as ke:
         tp = idc.GetType(ep);
@@ -1989,7 +2000,7 @@ def getExportType(name, ep):
 
 def generateDefFile(defname, eps):
     deffile = open(defname, 'wb')
-    deffile.write("EXPORTS\n")
+    deffile.write("EXPORTS")
     entrypoints = idautils.Entries()
 
     for ep_tuple in entrypoints:
@@ -2000,7 +2011,7 @@ def generateDefFile(defname, eps):
 
         fwdname = isFwdExport(name, ea)
         if fwdname is not None:
-            deffile.write("{0}={1}\n".format(name, fwdname))
+            deffile.write("{0}={1}".format(name, fwdname))
         else:
             args, conv, ret = getExportType(name, ea)
 
@@ -2013,7 +2024,7 @@ def generateDefFile(defname, eps):
             else:
                 raise Exception("Unknown calling convention: " + str(conv))
 
-            deffile.write("{0}={1}\n".format(name, decor_name))
+            deffile.write("{0}={1}".format(name, decor_name))
 
     deffile.close()
 
@@ -2066,10 +2077,10 @@ def generateExportStub(cname, eps):
             declargs = makeArgStr(name, declaration=True)
             callargs = makeArgStr(name, declaration=False)
 
-            cfile.write("extern int {2} driver_{0}({1});\n".format(name, declargs, convstr))
-            cfile.write("int {3} export_{0}({1}) {{ return driver_{0}({2}); }} \n".format(
+            cfile.write("extern int {2} driver_{0}({1});".format(name, declargs, convstr))
+            cfile.write("int {3} export_{0}({1}) {{ return driver_{0}({2}); }} ".format(
                 name, declargs, callargs, convstr))
-            cfile.write("\n")
+            cfile.write("")
 
     cfile.close()
 
@@ -2086,7 +2097,7 @@ def getAllExports() :
 # Mark an address as containing code.
 def mark_as_code(address):
     if not idc.isCode(idc.GetFlags(address)):
-        DEBUG("Marking {:x} as code\n".format(address))
+        DEBUG("Marking {:x} as code".format(address))
         idc.MakeCode(address)
         idaapi.autoWait()
 
@@ -2103,69 +2114,105 @@ def try_mark_as_function(address):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch", 
-        help="Indicate the script is running in batch mode",
-        action="store_true",
-        default=False)
 
-    parser.add_argument("--entry-symbol", nargs='*', help="Symbol(s) to start disassembling from")
+    parser.add_argument("--log_file", type=argparse.FileType('w'),
+        default=sys.stderr,
+        help="Log to a specific file. Default is stderr.")
 
-    parser.add_argument("-o", "--output", type=argparse.FileType('wb'),
-        default=None,
-        help="The output control flow graph recovered from this file")
+    parser.add_argument(
+        '--arch',
+        help='Name of the architecture. Valid names are x86, amd64.',
+        required=True)
 
-    parser.add_argument("-s", "--std-defs", action='append', type=argparse.FileType('r'),
+    parser.add_argument(
+        '--os',
+        help='Name of the operating system. Valid names are linux, windows.',
+        required=True)
+
+    parser.add_argument(
+        "--output", type=argparse.FileType('wb'), default=None,
+        help="The output control flow graph recovered from this file",
+        required=True)
+
+    parser.add_argument(
+        "--entry-symbol", nargs='*',
+        help="Symbol(s) to start disassembling from")
+
+    parser.add_argument("--std-defs", action='append', type=str,
         default=[],
-        help="std_defs file: definitions and calling conventions of imported functions and data"
-        )
+        help="std_defs file: definitions and calling conventions of imported functions and data")
     
     parser.add_argument("-e", "--exports-to-lift", type=argparse.FileType('r'),
         default=None,
-        help="A file containing a exported functions to lift, one per line. If not specified, all exports will be lifted."
-        )
+        help="A file containing a exported functions to lift, one per line. If not specified, all exports will be lifted.")
+
     parser.add_argument("--make-export-stubs", action="store_true",
         default=False,
-        help="Generate a .bat/.c/.def combination to provide export symbols. Use this if you're lifting a DLL and want to re-export the same symbols"
-        )
+        help="Generate a .bat/.c/.def combination to provide export symbols. Use this if you're lifting a DLL and want to re-export the same symbols")
+
     parser.add_argument("--exports-are-apis", action="store_true",
         default=False,
-        help="Exported functions are defined in std_defs. Useful when lifting DLLs"
-        )
-    parser.add_argument("-d", "--debug", action="store_true",
-        default=False,
-        help="Enable verbose debugging mode"
-        )
-    parser.add_argument("--debug_output", type=argparse.FileType('w'),
-        default=sys.stderr,
-        help="Log to a specific file. Default is stderr."
-        )
+        help="Exported functions are defined in std_defs. Useful when lifting DLLs")
     
     parser.add_argument("-z", "--syms", type=argparse.FileType('r'), default=None,
-        help="File containing <name> <address> pairs of symbols to pre-define."
-        )
+        help="File containing <name> <address> pairs of symbols to pre-define.")
 
     parser.add_argument("--pie-mode", action="store_true", default=False,
-            help="Assume all immediate values are constants (useful for ELFs built with -fPIE")
+        help="Assume all immediate values are constants (useful for ELFs built with -fPIE")
 
     args = parser.parse_args(args=idc.ARGV[1:])
 
-    if args.debug:
+    if args.log_file != os.devnull:
         _DEBUG = True
-        _DEBUG_FILE = args.debug_output
+        _DEBUG_FILE = args.log_file
         DEBUG("Debugging is enabled.")
+
+    addr_size = {"x86": 32, "amd64": 64}.get(args.arch, 0)
+    if addr_size != getBitness():
+        DEBUG("Arch name doesn't match bitness of program being disassembled!")
+        idc.Exit(-1)
 
     if args.pie_mode:
         DEBUG("Using PIE mode.")
         PIE_MODE = True
 
+    EMAP = {}
+    EMAP_DATA = {}
+
+    # Try to find the defs file or this OS
+    os_defs_file = os.path.join(tools_disass_dir, "defs", "{}.txt".format(args.os))
+    if os.path.isfile(os_defs_file):
+        args.std_defs.insert(0, os_defs_file)
+
+    # Load in all defs files, include custom ones
+    for defsfile in args.std_defs:
+        with open(defsfile, "r") as df:
+            DEBUG("Loading Standard Definitions file: {0}".format(defsfile))
+            em_update, emd_update = parseDefsFile(df)
+            EMAP.update(em_update)
+            EMAP_DATA.update(emd_update)
+
+
+    eps = []
+    try:
+        if args.exports_to_lift: 
+            eps = args.exports_to_lift.readlines()
+        elif args.entry_symbol is None:
+            eps = getAllExports()
+
+        eps = [ep.strip() for ep in eps]
+
+    except IOError as e:
+        DEBUG("Could not open file of exports to lift. See source for details")
+        idc.Exit(-1)
+
     # for batch mode: ensure IDA is done processing
-    if args.batch:
-        DEBUG("Using Batch mode.")
-        analysis_flags = idc.GetShortPrm(idc.INF_START_AF)
-        analysis_flags &= ~idc.AF_IMMOFF
-        # turn off "automatically make offset" heuristic
-        idc.SetShortPrm(idc.INF_START_AF, analysis_flags)
-        idaapi.autoWait()
+    DEBUG("Using Batch mode.")
+    analysis_flags = idc.GetShortPrm(idc.INF_START_AF)
+    analysis_flags &= ~idc.AF_IMMOFF
+    # turn off "automatically make offset" heuristic
+    idc.SetShortPrm(idc.INF_START_AF, analysis_flags)
+    idaapi.autoWait()
 
     DEBUG("Starting analysis")
     try:
@@ -2182,75 +2229,35 @@ if __name__ == "__main__":
 
         myname = idc.GetInputFile()
         mypath = path.dirname(__file__)
-
-        EMAP = {}
-        EMAP_DATA = {}
-
-        if len(args.std_defs) > 0:
-            for defsfile in args.std_defs:
-                DEBUG("Loading Standard Definitions file: {0}\n".format(defsfile.name))
-                em_update, emd_update = parseDefsFile(defsfile)
-                EMAP.update(em_update)
-                EMAP_DATA.update(emd_update)
-
-        if args.output:
-            outpath = os.path.dirname(args.output.name)
-        else:
-            outpath =  os.path.join(mypath, myname)
-            try:
-                os.mkdir(outpath)
-            except:
-                pass
-
-        eps = []
-        try:
-            if args.exports_to_lift: 
-                eps = args.exports_to_lift.readlines()
-            elif args.entry_symbol is None:
-                eps = getAllExports()
-
-            eps = [ep.strip() for ep in eps]
-
-        except IOError as e:
-            DEBUG("Could not open file of exports to lift. See source for details\n")
-            idc.Exit(-1)
+        outpath = os.path.dirname(args.output.name)
 
         if args.entry_symbol:
             eps.extend(args.entry_symbol)
 
         assert len(eps) > 0, "Need to have at least one entry point to lift"
 
-        DEBUG("Will lift {0} exports\n".format(len(eps)))
+        DEBUG("Will lift {0} exports".format(len(eps)))
         if args.make_export_stubs:
-            DEBUG("Generating export stubs...\n");
+            DEBUG("Generating export stubs...");
 
             outdef = path.join(outpath, "{0}.def".format(myname))
-            DEBUG("Output .DEF file: {0}\n".format(outdef))
+            DEBUG("Output .DEF file: {0}".format(outdef))
             generateDefFile(outdef, eps)
 
             outstub = path.join(outpath, "{0}_exportstub.c".format(myname))
-            DEBUG("Output export stub file: {0}\n".format(outstub))
+            DEBUG("Output export stub file: {0}".format(outstub))
             generateExportStub(outstub, eps)
 
             outbat = path.join(outpath, "{0}.bat".format(myname))
-            DEBUG("Output build .BAT: {0}\n".format(outbat))
+            DEBUG("Output build .BAT: {0}".format(outbat))
             generateBatFile(outbat, eps)
 
-
-        if args.output:
-            outf = args.output
-        else:
-            cfgname = path.join(outpath, myname + "_ida.cfg")
-            cfgpath = path.join(outpath, cfgname)
-            outf = open(cfgpath, 'wb')
-
-        DEBUG("CFG Output File file: {0}\n".format(outf.name))
+        outf = args.output
+        DEBUG("CFG Output File file: {0}".format(outf.name))
 
         recoverCfg(eps, outf, args.exports_are_apis)
     except Exception as e:
         DEBUG(str(e))
         DEBUG(traceback.format_exc())
     
-    #for batch mode: exit IDA when done
-    if args.batch:
-        idc.Exit(0)
+    idc.Exit(0)

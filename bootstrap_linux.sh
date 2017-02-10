@@ -88,6 +88,12 @@ if [ ! -e ${GEN_DIR}/CFG.pb.h ]; then
     --python_out ${GEN_DIR} \
     --proto_path ${PROTO_PATH} \
     ${PROTO_PATH}/CFG.proto
+
+
+  # Copy this into the IDA disassembly dir to make importing the CFG_pb2
+  # file easier.
+  cp CFG_pb2.py ${DIR}/tools/disass/ida
+  
   popd
 fi
 
@@ -108,6 +114,10 @@ if [ ! -e ${GEN_DIR}/ELF_32_linux.S ]; then
 
   rm a.out
 fi
+
+# Install the disassembler
+echo "[+] Installing the disassembler"
+sudo python ${DIR}/tools/setup.py install
 
 # Create makefiles
 echo "[+] Creating Makefiles"
