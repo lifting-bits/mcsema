@@ -19,7 +19,7 @@ else
 fi
 
 echo "[x] Installing dependencies via apt-get"
-sudo apt-get install \
+sudo apt-get install -yqq \
   git \
   cmake \
   libprotoc-dev libprotobuf-dev libprotobuf-dev protobuf-compiler \
@@ -50,35 +50,6 @@ if [ ! -d ${LLVM_DIR} ]; then
   popd
 fi
 
-# Download and extract Google Protocol Buffers.
-if [ ! -d ${PROTO_DIR} ]; then
-  echo "[+] Downloading Google Protocol Buffers"
-  mkdir -p ${PROTO_DIR}
-  pushd ${PROTO_DIR}
-  PROTO_VER=2.6.1
-  FILE=protobuf-${PROTO_VER}.tar.gz
-  if [ ! -e ${FILE} ]; then
-    wget https://github.com/google/protobuf/releases/download/v${PROTO_VER}/${FILE}
-  fi
-  echo "[+] Extracting.."
-  tar xf ${FILE} -C ./ --strip-components=1 
-  popd
-fi
-
-# Compile protobufs.
-if [ ! -e ${BUILD_DIR}/bin/protoc ]; then
-  echo "[+] Building protobuf"
-  pushd ${PROTO_DIR}
-
-  CFLAGS="-DGOOGLE_PROTOBUF_NO_RTTI=1" \
-  CXXFLAGS="-DGOOGLE_PROTOBUF_NO_RTTI=1"\
-  ./configure --prefix ${BUILD_DIR}
-  
-  make
-  make install
-  popd
-fi
-
 echo "[+] Installing python-protobuf"
 sudo pip install 'protobuf==2.6.1'
 
@@ -88,7 +59,7 @@ if [ ! -e ${GEN_DIR}/CFG.pb.h ]; then
   echo "[+] Auto-generating protobuf files"
   pushd ${GEN_DIR}
   PROTO_PATH=${DIR}/mcsema/CFG
-  ${BUILD_DIR}/bin/protoc \
+  protoc \
     --cpp_out ${GEN_DIR} \
     --python_out ${GEN_DIR} \
     --proto_path ${PROTO_PATH} \
@@ -167,4 +138,8 @@ cmake \
   -DMCSEMA_GEN_DIR="${GEN_DIR}" \
   ${MCSEMA_DIR}
 
+make -j4
+sudo make install
+
 popd
+ 

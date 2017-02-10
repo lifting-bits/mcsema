@@ -13,6 +13,9 @@ set(CMAKE_MODULE_PATH "${LLVM_DIR}/cmake/modules ${CMAKE_MODULE_PATH}")
 find_package(LLVM 3.8 REQUIRED CONFIG)
 add_definitions(${LLVM_DEFINITIONS})
 
+# Get protobufs.
+find_package(Protobuf REQUIRED)
+
 include_directories(${MCSEMA_DIR})
 include_directories(${MCSEMA_DIR}/third_party)
 include_directories(${MCSEMA_LLVM_DIR})
@@ -30,9 +33,6 @@ include_directories(${MCSEMA_DIR}/mcsema/cfgToLLVM)
 include_directories(${MCSEMA_DIR}/mcsema/common)
 include_directories(${MCSEMA_DIR}/mcsema/peToCFG)
 include_directories(${MCSEMA_DIR}/mcsema/cfgToLLVM)
-
-# Make sure we can find libprotobuf
-link_directories(${MCSEMA_BUILD_DIR}/lib)
 
 add_compile_options(
   -x c++
