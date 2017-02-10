@@ -1,1 +1,0 @@
-printf 4 C N

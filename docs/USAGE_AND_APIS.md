@@ -1,8 +1,6 @@
 # Usage and APIs
 
-The `cfg_to_bc` tool takes a control flow graph in Google protocol buffer format, and translates it into LLVM bitcode. The generated bitcode is not optimized and will be very noisy with unnecessarily live variables. Unoptimized bitcode is useful for debugging translation errors, but before use this bitcode should be run through the LLVM `opt` tool.
-
-More information on the syntax and usage of each tool is in the TOOLS document.
+The `mcsema-lift` tool takes a control flow graph in Google protocol buffer format, and translates it into LLVM bitcode. The generated bitcode is not optimized and will be very noisy with unnecessarily live variables. Unoptimized bitcode is useful for debugging translation errors, but before use this bitcode should be run through the LLVM `opt` tool.
 
 ## CFG Recovery
 

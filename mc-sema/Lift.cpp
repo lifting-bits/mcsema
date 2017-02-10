@@ -51,7 +51,7 @@
 #include "mc-sema/cfgToLLVM/toModule.h"
 
 static llvm::cl::opt<std::string> OutputFilename(
-    "o", llvm::cl::desc("Output filename"), llvm::cl::init("-"),
+    "output", llvm::cl::desc("Output filename"), llvm::cl::init("-"),
     llvm::cl::value_desc("filename"));
 
 static llvm::cl::opt<std::string> Arch("arch", llvm::cl::desc("Arch name"),

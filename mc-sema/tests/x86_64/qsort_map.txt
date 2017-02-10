@@ -1,4 +1,0 @@
-fprintf 3 C N
-printf 3 C N
-qsort_r 5 C N
-DATA: stderr 8

@@ -15,7 +15,7 @@ setup(name="mcsema-disass",
       license='BSD 3-clause "New" or "Revised License"',
       packages=['mcsema_disass', 'mcsema_disass.ida', 'mcsema_disass.defs'],
       package_data={
-        "disass.defs": ["linux.txt", "windows.txt"]},
+        "mcsema_disass.defs": ["linux.txt", "windows.txt"]},
       entry_points={
         "console_scripts": [
           "mcsema-disass = mcsema_disass.__main__:main"

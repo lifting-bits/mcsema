@@ -29,7 +29,6 @@ if os.path.isdir('/usr/lib/python2.7/dist-packages'):
 
 tools_disass_ida_dir = os.path.dirname(__file__)
 tools_disass_dir = os.path.dirname(tools_disass_ida_dir)
-tools_dir = os.path.dirname(tools_disass_dir)
 
 # Note: The bootstrap file will copy CFG_pb2.py into this dir!!
 import CFG_pb2
@@ -2135,7 +2134,7 @@ if __name__ == "__main__":
         required=True)
 
     parser.add_argument(
-        "--entry-symbol", nargs='*',
+        "--entrypoint", nargs='*',
         help="Symbol(s) to start disassembling from")
 
     parser.add_argument("--std-defs", action='append', type=str,
@@ -2197,7 +2196,7 @@ if __name__ == "__main__":
     try:
         if args.exports_to_lift: 
             eps = args.exports_to_lift.readlines()
-        elif args.entry_symbol is None:
+        elif args.entrypoint is None:
             eps = getAllExports()
 
         eps = [ep.strip() for ep in eps]
@@ -2231,8 +2230,8 @@ if __name__ == "__main__":
         mypath = path.dirname(__file__)
         outpath = os.path.dirname(args.output.name)
 
-        if args.entry_symbol:
-            eps.extend(args.entry_symbol)
+        if args.entrypoint:
+            eps.extend(args.entrypoint)
 
         assert len(eps) > 0, "Need to have at least one entry point to lift"
 

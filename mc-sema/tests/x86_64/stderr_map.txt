@@ -1,3 +1,0 @@
-fprintf 3 C N
-printf 3 C N
-DATA: stderr 8

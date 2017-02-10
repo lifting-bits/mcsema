@@ -1,69 +1,129 @@
-MC-Semantics
-============
+# McSema [![Slack Chat](http://empireslacking.herokuapp.com/badge.svg)](https://empireslacking.herokuapp.com/)
 
-[![Build Status](https://travis-ci.org/trailofbits/mcsema.svg?branch=master)](https://travis-ci.org/trailofbits/mcsema)
-[![Coverity Scan Build Status](https://scan.coverity.com/projects/4144/badge.svg)](https://scan.coverity.com/projects/4144)
-[![Slack Chat](http://empireslacking.herokuapp.com/badge.svg)](https://empireslacking.herokuapp.com/)
+McSema (pronounced 'em see se ma'), short for machine code semantics, is a set of tools for lifting x86 and amd64 binaries to LLVM bitcode modules. McSema is able to lift integer, floating point, and SSE instructions.
 
-MC-Semantics (or mcsema, pronounced 'em see se ma') is a library for translating the semantics of native code to LLVM IR. McSema support translation of x86 machine code, including integer, floating point, and SSE instructions. Control flow recovery is separated from translation, permitting the use of custom control flow recovery front-ends. Code for McSema is open-source and licensed under BSD3.
+McSema is separated into two conceptual parts: control flow recovery and instruction translation. Control flow recovery is performed using the `mcsema-disass` tool, which uses IDA Pro to disassemble a binary file and produces a CFG file. Instruction translation is performed using the `mcsema-lift` tool, which converts a CFG file into a lifted bitcode module.
 
-At a high level, McSema is organized into subprojects for:
-* Control Flow Recovery
-* Instruction Semantics
-* Binary File Parsing
-* Semantics Testing
+McSema is open-source and licensed under the BSD 3-clause license.
 
-We hope that this library is useful to the program analysis and reverse engineering community. Work is in progress, and additional semantics are constantly being added. [Patches are welcome](https://github.com/trailofbits/mcsema/issues).
+## Build Status
 
-## Separation of Components
+|       | master |
+| ----- | ------ |
+| Linux | [![Build Status](https://travis-ci.org/trailofbits/mcsema.svg?branch=master)](https://travis-ci.org/trailofbits/mcsema) |
 
-McSema is separated into two conceptual parts: control flow recovery and instruction translation. 
+## Additional Documentation
+ 
+ - [Navigating the source code](docs/NAVIGATION.md)
+ - [Design and architecture](docs/ARCHITECTURE.md)
+ - [How to implement the semantics of an instruction](docs/ADD_AN_INSTRUCTION.md)
+ - [Usage and APIs](docs/USAGE_AND_APIS.md)
+ - [Limitations](docs/LIMITATIONS.md)
 
-The two parts communicate via a control flow graph structure that contains native code. This control flow graph structure connects basic blocks and defines information about external calls, but provides no further semantic information.
+**Note:** McSema is undergoing modernization and architectural changes, so some documentation may be out-of-date, or in the process of being improved.
 
-An IDAPython script, `get_cfg.py`, attempts to recover a control flow graph from a given binary file. It will write the recovered control flow graph into a Google Protocol Buffer serialized file. There is also an IDAPython script to recover control flow from within IDA Pro.
+## Getting Help
 
-The `cfg_to_bc` program attempts to convert a control flow graph structure into LLVM bitcode. This translation process is more a transcription act than an analysis, since a control flow structure has already been recovered.
+If you are experiencing undocumented problems with McSema, or just want to learn more and contribute, then ask for help in the `#tool-mcsema` channel of the [Empire Hacking Slack](https://empireslacking.herokuapp.com/). Alternatively, you can join our mailing list at [mcsema-dev@googlegroups.com](https://groups.google.com/forum/?hl=en#!forum/mcsema-dev) or email us privately at mcsema@trailofbits.com.
 
-The problems of instruction semantics and control flow recovery are separated. Any recovered control flow graph, from any mechanism, may be analyzed and studied in an LLVM intermediate representation. 
+## Supported Platforms
 
-## Documentation
+McSema is supported on Windows and Linux platforms and has been tested on Ubuntu 14.04 and 16.04.
 
-Detailed design and usage information can be found in the [docs](docs/) directory.
+## Dependencies
 
-### Building
+| Name | Version | 
+| ---- | ------- |
+| [Git](https://git-scm.com/) | Latest |
+| [CMake](https://cmake.org/) | 2.8+ |
+| [Google Protobuf](https://github.com/google/protobuf) | 2.6.1 |
+| [LLVM](http://llvm.org/) | 3.8 |
+| [Clang](http://clang.llvm.org/) | 3.8 |
+| [Python](https://www.python.org/) | 2.7 | 
+| [Python Package Index](https://pypi.python.org/pypi) | Latest |
+| [python-protobuf](https://pypi.python.org/pypi/protobuf) | 2.6.1 |
+| [IDA Pro](https://www.hex-rays.com/products/ida) | 6.7+ |
 
-Detailed build instructions for Windows and Linux are at [docs/BUILDING.md](docs/BUILDING.md). If you use Ubuntu 14.04, then `bash bootstrap.sh` will install dependencies via apt-get and compile the release version of the tools into a directory called `build`. The entire process can take over 40 minutes. 
 
-### Usage
+## Getting and Building the Code
+
+### Step 1: Install dependencies
+
+#### On Linux
+
+##### Run
+
+```shell
+sudo apt-get update
+sudo apt-get upgrade
+
+sudo apt-get install \
+     git \
+     cmake \
+     libprotoc-dev libprotobuf-dev libprotobuf-dev protobuf-compiler \
+     python2.7 python-pip \
+     llvm-3.8 clang-3.8 \
+     realpath
+
+sudo pip install --upgrade pip
+sudo pip install 'protobuf==2.6.1'
+```
+
+##### Using IDA on 64 bit Ubuntu
+
+If your IDA install does not use the system's Python, you can add the `protobuf` library manually to IDA's zip of modules.
+
+```
+# Python module dir is generally in /usr/lib or /usr/local/lib
+touch /path/to/python2.7/dist-packages/google/__init__.py
+cd /path/to/lib/python2.7/dist-packages/              
+sudo zip -rv /path/to/ida-6.X/python/lib/python27.zip google/
+sudo chown your_user:your_user /home/taxicat/ida-6.7/python/lib/python27.zip
+```
+
+### Step 2: Clone and Enter the Repository
+
+#### On Linux
+
+##### Clone the repository
+
+```shell
+git clone git@github.com:trailofbits/mcsema.git
+```
+
+##### Run the bootstrap script
+```shell
+cd mcsema
+./bootstrap_linux.sh
+```
+
+#### Step 3: Build and install the code
+
+#### On Linux
+
+```shell
+sudo python tools/setup.py install
+cd build
+make
+sudo make install
+```
 
 
-IDA Pro is highly recommended for CFG recovery. The guide for setting up IDA is at [docs/IDA.md](docs/IDA.md).
+## Try it Out
 
-Usage instructions, with examples, are at [docs/TOOLS.md](docs/TOOLS.md). For more examples, see the demos described in [docs/DEMOS.md](docs/DEMOS.md).
+If you have a binary, you can get started with the following commands. First, you recover control flow graph information using `mcsema-disass`. For now, this needs to use IDA Pro as the disassembler.
 
-Most of the documentation uses Windows-based examples, but pretty much everything should be cross-platform.
+```shell
+mcsema-disass --disassembler /path/to/ida/idal64 --arch amd64 --os linux --output /tmp/ls.cfg --binary /bin/ls --entrypoint main
+```
 
+Once you have the control flow graph information, you can lift the target binary using `mcsema-lift`.
 
-### Source Code Information 
+```shell
+mcsema-lift --arch amd64 --os linux --cfg /tmp/ls.cfg --entrypoint main --output /tmp/ls.bc
+```
 
-The layout of the source code is described in [docs/NAVIGATION.md](docs/NAVIGATION.md). The description of the protocol buffer layout and the translation process is in [docs/USAGE_AND_APIS.md](docs/USAGE_AND_APIS.md).
-
-## External Code
-mcsema uses external code which has been included in this source release:
- * LLVM
- * Google Protocol Buffers
- * Boost
-
-mcsema uses Intel Pin, which has not been included in this source release, but is freely available. Pin is used only for testing of instruction semantics and is not required to use the library.
-
-### Pronunciation
-
-McSema is pronounced as "mick sema".
-
-## Contact
-
-For any questions:
-* Join our mailing list at [mcsema-dev@googlegroups.com](https://groups.google.com/forum/?hl=en#!forum/mcsema-dev)
-* Join our public Slack chat [#opensource](https://empireslacking.herokuapp.com/)
-* or email us privately at mcsema@trailofbits.com
+There are a few things that we can do with the lifted bitcode. The usual thing to do is to recompile it back to an executable.
+```shell
+clang-3.8 -o /tmp/ls_lifted generated/ELF_64_linux.S /tmp/ls.bc -lpthread -ldl -lpcre /lib/x86_64-linux-gnu/libselinux.so.1
+```
