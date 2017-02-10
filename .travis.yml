@@ -2,15 +2,14 @@ sudo: required
 dist: trusty
 language: cpp
 cache: apt
-osx_image: xcode7.1
 os:
-- linux
+ - linux
 compiler:
-- gcc
-before_script:
-- if [ "$TRAVIS_OS_NAME" = "linux" ]; then ./bootstrap_linux.sh ; fi
+ - gcc
+install:
+ - ./bootstrap_linux.sh
 script:
-- cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j4
+ - cd build && make -j4
 notifications:
   slack:
     secure: g1Nm7C7TYKg4RjDJ5cwuEcgKXfOAmVOu51adTPLBLGzZcCbCrkwQgI39ZycsalaACSnC8iNvqSCbRfZIA5mkDZ7VADaiZgLoWjq3RQzJmWgwGhhtyRkbtiicBnowTL5hIEiMOv6RnKlbB7M2OwzRiS07+FQXrK24hz+qm6zPptw=
