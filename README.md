@@ -94,7 +94,7 @@ git clone git@github.com:trailofbits/mcsema.git
 ##### Run the bootstrap script
 ```shell
 cd mcsema
-./bootstrap_linux.sh
+./bootstrap_linux.sh Release
 ```
 
 #### Step 3: Build and install the code

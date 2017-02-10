@@ -7,20 +7,20 @@ if(WIN32)
   SET(CMAKE_EXE_LINKER_FLAGS "/LARGEADDRESSAWARE ${CMAKE_EXE_LINKER_FLAGS}")
 endif(WIN32)
 
-# Bring in LLVM.
-add_subdirectory(${MCSEMA_LLVM_DIR})
-set(CMAKE_MODULE_PATH "${MCSEMA_LLVM_DIR}/cmake/modules ${CMAKE_MODULE_PATH}")
+set(CMAKE_MODULE_PATH "${LLVM_DIR}/cmake/modules ${CMAKE_MODULE_PATH}")
 
-find_package(LLVM REQUIRED)
+# Configure with the build LLVM
+find_package(LLVM 3.8 REQUIRED CONFIG)
 add_definitions(${LLVM_DEFINITIONS})
 
 include_directories(${MCSEMA_DIR})
 include_directories(${MCSEMA_DIR}/third_party)
-include_directories(${MCSEMA_BUILD_DIR}/include)
+include_directories(${MCSEMA_LLVM_DIR})
 include_directories(${MCSEMA_LLVM_DIR}/include)
 include_directories(${MCSEMA_LLVM_DIR}/lib/Target/X86/)
-include_directories(${MCSEMA_BUILD_DIR}/third_party/llvm/include)
-include_directories(${MCSEMA_BUILD_DIR}/third_party/llvm/lib/Target/X86)
+include_directories(${MCSEMA_BUILD_DIR}/include)
+include_directories(${MCSEMA_BUILD_DIR}/llvm/include)
+include_directories(${MCSEMA_BUILD_DIR}/llvm/lib/Target/X86)
 include_directories(${MCSEMA_GEN_DIR})
 
 # Make sure we can find the mcsema headers.

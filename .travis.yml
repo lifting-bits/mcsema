@@ -7,7 +7,7 @@ os:
 compiler:
  - gcc
 install:
- - ./bootstrap_linux.sh
+ - sudo apt-get update -q && sudo apt-get upgrade -yqq && ./bootstrap_linux.sh
 script:
  - cd build && make -j4
 notifications:

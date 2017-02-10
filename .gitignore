@@ -26,10 +26,6 @@
 *.nam
 *.til
 
-mc-sema/tests/*.bc
-mc-sema/tests/*.cfg
-mc-sema/tests/*.exe
-
 third_party/*
 generated/*
 

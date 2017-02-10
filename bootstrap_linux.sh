@@ -9,18 +9,23 @@ LLVM_DIR=${DIR}/third_party/llvm
 PROTO_DIR=${DIR}/third_party/protobuf
 GEN_DIR=${DIR}/generated
 
+DEBUG_BUILD_ARGS=
 if [ $# -eq 0 ]; then
   echo "No arguments supplied. Defaulting to DCMAKE_BUILD_TYPE=Release"
   BUILD_TYPE=Debug
+  DEBUG_BUILD_ARGS="-g3 -O0"
 else
   BUILD_TYPE=$1
 fi
 
 echo "[x] Installing dependencies via apt-get"
-sudo apt-get install -y \
-  gcc-multilib g++-multilib realpath \
+sudo apt-get install \
+  git \
+  cmake \
+  libprotoc-dev libprotobuf-dev libprotobuf-dev protobuf-compiler \
   python2.7 python-pip \
-  clang-3.8
+  llvm-3.8 clang-3.8 \
+  realpath
 
 echo "[+] Upgrading PIP"
 
@@ -82,7 +87,7 @@ mkdir -p ${GEN_DIR}
 if [ ! -e ${GEN_DIR}/CFG.pb.h ]; then
   echo "[+] Auto-generating protobuf files"
   pushd ${GEN_DIR}
-  PROTO_PATH=${DIR}/mc-sema/CFG
+  PROTO_PATH=${DIR}/mcsema/CFG
   ${BUILD_DIR}/bin/protoc \
     --cpp_out ${GEN_DIR} \
     --python_out ${GEN_DIR} \
@@ -92,7 +97,7 @@ if [ ! -e ${GEN_DIR}/CFG.pb.h ]; then
 
   # Copy this into the IDA disassembly dir to make importing the CFG_pb2
   # file easier.
-  cp CFG_pb2.py ${DIR}/tools/disass/ida
+  cp CFG_pb2.py ${DIR}/tools/mcsema_disass/ida
   
   popd
 fi
@@ -100,16 +105,16 @@ fi
 # Produce the runtimes.
 if [ ! -e ${GEN_DIR}/ELF_32_linux.S ]; then
   echo "[+] Generating runtimes"
-  clang++-3.8 -std=gnu++11 ${DIR}/mc-sema/Arch/X86/print_ELF_32_linux.cpp
+  clang++-3.8 -std=gnu++11 ${DIR}/mcsema/Arch/X86/print_ELF_32_linux.cpp
   ./a.out > ${GEN_DIR}/ELF_32_linux.S
 
-  clang++-3.8 -std=gnu++11 ${DIR}/mc-sema/Arch/X86/print_ELF_64_linux.cpp
+  clang++-3.8 -std=gnu++11 ${DIR}/mcsema/Arch/X86/print_ELF_64_linux.cpp
   ./a.out > ${GEN_DIR}/ELF_64_linux.S
 
-  clang++-3.8 -std=gnu++11 ${DIR}/mc-sema/Arch/X86/print_PE_32_windows.cpp
+  clang++-3.8 -std=gnu++11 ${DIR}/mcsema/Arch/X86/print_PE_32_windows.cpp
   ./a.out > ${GEN_DIR}/PE_32_windows.asm
 
-  clang++-3.8 -std=gnu++11 ${DIR}/mc-sema/Arch/X86/print_PE_64_windows.cpp
+  clang++-3.8 -std=gnu++11 ${DIR}/mcsema/Arch/X86/print_PE_64_windows.cpp
   ./a.out > ${GEN_DIR}/PE_64_windows.asm
 
   rm a.out
@@ -128,6 +133,24 @@ LLVM_DIR=$(realpath ${LLVM_DIR})
 PROTO_DIR=$(realpath ${PROTO_DIR})
 GEN_DIR=$(realpath ${GEN_DIR})
 
+echo "[x] Building LLVM"
+mkdir -p llvm
+pushd llvm
+CC=clang-3.8 \
+CXX=clang++-3.8 \
+CFLAGS="${DEBUG_BUILD_ARGS}" \
+CXXFLAGS="${DEBUG_BUILD_ARGS}" \
+cmake \
+  -G "Unix Makefiles" \
+  -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+  -DLLVM_TARGETS_TO_BUILD="X86" \
+  -DLLVM_INCLUDE_EXAMPLES=OFF \
+  -DLLVM_INCLUDE_TESTS=OFF \
+  ${LLVM_DIR}
+
+make -j4
+popd
+
 echo "[x] Creating Makefiles"
 
 CC=clang-3.8 \
@@ -137,10 +160,7 @@ CXXFLAGS="-g3 -O0" \
 cmake \
   -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-  -DLLVM_TARGETS_TO_BUILD="X86" \
-  -DLLVM_INCLUDE_EXAMPLES=OFF \
-  -DLLVM_INCLUDE_TESTS=OFF \
-  -DLLVM_DIR="${LLVM_DIR}" \
+  -DLLVM_DIR="${BUILD_DIR}/llvm/share/llvm/cmake" \
   -DMCSEMA_LLVM_DIR="${LLVM_DIR}" \
   -DMCSEMA_DIR="${MCSEMA_DIR}" \
   -DMCSEMA_BUILD_DIR="${BUILD_DIR}" \

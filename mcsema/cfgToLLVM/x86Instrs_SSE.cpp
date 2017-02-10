@@ -1885,6 +1885,7 @@ static InstTransResult doMOVHLPSrr(NativeInstPtr ip, llvm::BasicBlock *b,
                                                   src_keep, dest_keep, "", b);
 
   R_WRITE<width>(b, dest.getReg(), res);
+  return ContinueBlock;
 }
 
 template<int width>
@@ -1914,6 +1915,7 @@ static InstTransResult doMOVLHPSrr(NativeInstPtr ip, llvm::BasicBlock *b,
                                                   dest_keep, "", b);
 
   R_WRITE<width>(b, dest.getReg(), res);
+  return ContinueBlock;
 }
 
 static llvm::Value *doPMULUDQVV(llvm::BasicBlock *b, llvm::Value *dest,
@@ -1962,7 +1964,6 @@ static llvm::Value *doPMULUDQVV(llvm::BasicBlock *b, llvm::Value *dest,
                                                      res_shift, res1, "", b);
 
   return res_or;
-
 }
 
 static InstTransResult doPMULUDQrr(llvm::BasicBlock *&b,
