@@ -7,7 +7,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BUILD_DIR=${DIR}/build
 THIRD_PARTY_DIR=${DIR}/third_party
 LLVM_DIR=${DIR}/third_party/llvm
-PROTO_DIR=${DIR}/third_party/protobuf
+
 GEN_DIR=${DIR}/generated
 
 DEBUG_BUILD_ARGS=
@@ -103,7 +103,6 @@ pushd ${BUILD_DIR}
 MCSEMA_DIR=$(realpath ${DIR})
 BUILD_DIR=$(realpath ${BUILD_DIR})
 LLVM_DIR=$(realpath ${LLVM_DIR})
-PROTO_DIR=$(realpath ${PROTO_DIR})
 GEN_DIR=$(realpath ${GEN_DIR})
 
 echo "[x] Building LLVM"
