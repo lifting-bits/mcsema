@@ -1,13 +1,12 @@
 sudo: required
 dist: trusty
-language: cpp
-cache: apt
+language: generic
 os:
  - linux
 compiler:
  - gcc
 install:
- - sudo apt-get update -q && sudo apt-get upgrade -yqq && ./bootstrap_linux.sh
+ - ./bootstrap.sh
 script:
  - cd build && make -j4
 notifications:

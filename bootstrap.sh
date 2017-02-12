@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright 2017 Peter Goodman (peter@trailofbits.com), all rights reserved.
 
 set -e
 
@@ -19,6 +20,7 @@ else
 fi
 
 echo "[x] Installing dependencies via apt-get"
+sudo apt-get update -qq
 sudo apt-get install -yqq \
   git \
   cmake \

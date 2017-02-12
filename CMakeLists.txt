@@ -14,6 +14,10 @@ find_package(LLVM 3.8 REQUIRED CONFIG)
 add_definitions(${LLVM_DEFINITIONS})
 
 # Get protobufs.
+if(WIN32)
+  set(PROTOBUF_ROOT, "${MCSEMA_DIR}/third_party/protobuf-2.6.1")
+  add_directory(${MCSEMA_DIR}/cmake/protobuf)
+endif(WIN32)
 find_package(Protobuf REQUIRED)
 
 include_directories(${MCSEMA_DIR})

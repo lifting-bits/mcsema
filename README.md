@@ -81,6 +81,20 @@ sudo zip -rv /path/to/ida-6.X/python/lib/python27.zip google/
 sudo chown your_user:your_user /home/taxicat/ida-6.7/python/lib/python27.zip
 ```
 
+#### On Windows
+
+##### Step 1: Download Chocolatey
+
+Download and install [Chocolatey](https://chocolatey.org/install).
+
+##### Step 2: Install Packages
+
+Open Windows Powershell in *administrator* mode, and run the following.
+
+```shell
+choco install -y git cmake python2 pip wget unzip microsoft-build-tools windows-sdk-10.0 windowsdriverkit10 7zip
+```
+
 ### Step 2: Clone and Enter the Repository
 
 #### On Linux
@@ -88,13 +102,33 @@ sudo chown your_user:your_user /home/taxicat/ida-6.7/python/lib/python27.zip
 ##### Clone the repository
 
 ```shell
-git clone git@github.com:trailofbits/mcsema.git
+git clone git@github.com:trailofbits/mcsema.git --depth 1
 ```
 
 ##### Run the bootstrap script
 ```shell
 cd mcsema
-./bootstrap_linux.sh Release
+./bootstrap.sh Release
+```
+
+#### On Windows
+
+##### Clone the repository
+
+Open the Developer Command Prompt for Visual Studio application, and run the following 
+
+```shell
+cd C:\
+if not exist git mkdir git
+cd git
+
+git clone https://github.com/trailofbits/mcsema.git --depth 1
+```
+
+##### Run the bootstrap script
+```shell
+cd mcsema
+./bootstrap.bat
 ```
 
 #### Step 3: Build and install the code
@@ -102,12 +136,16 @@ cd mcsema
 #### On Linux
 
 ```shell
-sudo python tools/setup.py install
 cd build
 make
 sudo make install
 ```
 
+#### On Windows
+
+```shell
+
+```
 
 ## Try it Out
 
