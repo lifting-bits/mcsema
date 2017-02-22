@@ -92,7 +92,8 @@ Download and install [Chocolatey](https://chocolatey.org/install).
 Open Windows Powershell in *administrator* mode, and run the following.
 
 ```shell
-choco install -y git cmake python2 pip wget unzip microsoft-build-tools windows-sdk-10.0 windowsdriverkit10 7zip
+choco install -y git cmake python2 pip wget unzip 7zip
+choco install -y microsoft-visual-cpp-build-tools --installargs "/InstallSelectableItems Win81SDK_CppBuildSKUV1;Win10SDK_VisibleV1"
 ```
 
 ### Step 2: Clone and Enter the Repository
