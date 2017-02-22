@@ -1,23 +1,21 @@
 protobuf-cmake: CMake build files for Protocol Buffers
 
-Written by Jesper Eskilson (jesper@eskilson.se)
+Written by Jesper Eskilson (jesper@eskilson.se) with contributions from
+several other people.
 
 Requirements
 ------------
 
-* CMake version 2.6 
+* CMake version 2.6
+* Protobuf version 2.5.0 or 2.6.1
 
-* Protocol Buffers version 2.2.x. Version 2.3.0 is not supported in
-this version of protobuf-cmake.
+Download links
+--------------
+http://www.cmake.org/cmake/resources/software.html
+http://protobuf.googlecode.com/files/protobuf-2.5.0.tar.gz
 
 Instructions
 ------------
-
-On Unix, the Protobuf configure script needs to be run before running 
-CMake in order to create the config.h file:
-
-   $ cd /path/to/protobuf
-   $ ./configure
 
 The CMake variable PROTOBUF_ROOT needs to be set to the location of
 the Protocol Buffers sources. When running CMake on the command line,
@@ -26,3 +24,5 @@ this can be set like this:
    $ cd build
    $ cmake /path/to/protobuf-cmake -DPROTOBUF_ROOT=/path/to/protobufs
 
+If you specify -DDOWNLOAD_PROTOBUF=1, the script will automatically
+download protobuf.
