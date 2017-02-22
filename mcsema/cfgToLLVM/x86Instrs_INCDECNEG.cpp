@@ -280,6 +280,7 @@ void INCDECNEG_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::DEC64m] = translate_DEC64m;
   m[llvm::X86::DEC8m] = translate_DEC8m;
   m[llvm::X86::DEC32r] = translate_DEC32r;
+  m[llvm::X86::DEC32r_alt] = translate_DEC32r;
 
 //  m[llvm::X86::DEC64_16r] = translate_DEC64_16r;
 //  m[llvm::X86::DEC64_32r] = translate_DEC64_32r;
@@ -297,6 +298,7 @@ void INCDECNEG_populateDispatchMap(DispatchMap &m) {
   // On 64bit INC16r/INC32r can't be encoded
   m[llvm::X86::INC16r] = translate_INC16r;
   m[llvm::X86::INC32r] = translate_INC32r;
+  m[llvm::X86::INC32r_alt] = translate_INC32r;
 
   // Is it required to have check for REX prefix to check register premissions?
   // uses check for REX.W for 64 bit access.

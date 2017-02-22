@@ -69,27 +69,6 @@
 #define MAKEWORD(x, y) (((x) << 8) | (y))
 #define MAKE_FOPCODE(x, y) (MAKEWORD(x, y) & 0x7FF)
 
-static llvm::Value *ADDR_TO_POINTER_V(llvm::BasicBlock *b, llvm::Value *memAddr,
-                                      llvm::Type *ptrType) {
-  if (memAddr->getType()->isPointerTy() == false) {
-    // its an integer, make it a pointer
-    return new llvm::IntToPtrInst(memAddr, ptrType, "", b);
-  } else if (memAddr->getType() != ptrType) {
-    // its a pointer, but of the wrong type
-    return llvm::CastInst::CreatePointerCast(memAddr, ptrType, "", b);
-  } else {
-    // already correct ptr type
-    return memAddr;
-  }
-}
-
-template<int width>
-static llvm::Value *ADDR_TO_POINTER(llvm::BasicBlock *b, llvm::Value *memAddr) {
-  NASSERT(memAddr != NULL);
-  auto ptrType = llvm::Type::getIntNPtrTy(b->getContext(), width);
-  return ADDR_TO_POINTER_V(b, memAddr, ptrType);
-}
-
 template<int width>
 static llvm::Value *SHL_NOTXOR_V(llvm::BasicBlock *block, llvm::Value *val,
                                  llvm::Value *val_to_shift, int shlbits) {

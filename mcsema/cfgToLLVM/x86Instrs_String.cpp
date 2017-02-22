@@ -609,6 +609,10 @@ GENERIC_TRANSLATION(REP_STOSW_64, (doRepStos<16, 64>(block)))
 GENERIC_TRANSLATION(REP_STOSD_64, (doRepStos<32, 64>(block)))
 GENERIC_TRANSLATION(REP_STOSQ_64, (doRepStos<64, 64>(block)))
 
+GENERIC_TRANSLATION(REP_STOSB_32, (doRepStos<8, 32>(block)))
+GENERIC_TRANSLATION(REP_STOSW_32, (doRepStos<16, 32>(block)))
+GENERIC_TRANSLATION(REP_STOSD_32, (doRepStos<32, 32>(block)))
+
 #define SCAS_TRANSLATION(NAME, WIDTH) \
     static InstTransResult translate_ ## NAME ( \
         TranslationContext &ctx, llvm::BasicBlock *&block) {\
@@ -686,6 +690,10 @@ void String_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::STOSW] = translate_STOSW;
   m[llvm::X86::STOSB] = translate_STOSB;
   m[llvm::X86::STOSQ] = translate_STOSQ;
+
+  m[llvm::X86::REP_STOSB_32] = translate_REP_STOSB_32;
+  m[llvm::X86::REP_STOSW_32] = translate_REP_STOSW_32;
+  m[llvm::X86::REP_STOSD_32] = translate_REP_STOSD_32;
 
   m[llvm::X86::REP_STOSB_64] = translate_REP_STOSB_64;
   m[llvm::X86::REP_STOSW_64] = translate_REP_STOSW_64;

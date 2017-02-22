@@ -53,7 +53,12 @@
 #include "mcsema/cfgToLLVM/InstructionDispatch.h"
 #include "mcsema/cfgToLLVM/Externals.h"
 
-bool ignoreUnsupportedInsts = false;
+static llvm::cl::opt<bool> IgnoreUnsupportedInsts(
+    "ignore-unsupported",
+    llvm::cl::desc(
+        "Ignore unsupported instructions."),
+    llvm::cl::init(false));
+
 
 static llvm::cl::opt<bool> AddBreakpoints(
     "add-breakpoints",
@@ -146,6 +151,26 @@ void M_WRITE_T(NativeInstPtr ip, llvm::BasicBlock *b, llvm::Value *addr,
   }
 
   (void) new llvm::StoreInst(data, writeLoc, b);
+}
+
+llvm::Value *ADDR_TO_POINTER(
+    llvm::BasicBlock *b, llvm::Value *memAddr, int width) {
+  auto ptrType = llvm::Type::getIntNPtrTy(b->getContext(), width);
+  return ADDR_TO_POINTER_V(b, memAddr, ptrType);
+}
+
+llvm::Value *ADDR_TO_POINTER_V(llvm::BasicBlock *b, llvm::Value *memAddr,
+                               llvm::Type *ptrType) {
+  if (memAddr->getType()->isPointerTy() == false) {
+    // its an integer, make it a pointer
+    return new llvm::IntToPtrInst(memAddr, ptrType, "", b);
+  } else if (memAddr->getType() != ptrType) {
+    // its a pointer, but of the wrong type
+    return llvm::CastInst::CreatePointerCast(memAddr, ptrType, "", b);
+  } else {
+    // already correct ptr type
+    return memAddr;
+  }
 }
 
 static llvm::Value *GetReadReg(llvm::Function *F, MCSemaRegs reg) {
@@ -303,13 +328,22 @@ static void CreateInstrBreakpoint(llvm::BasicBlock *B, VA pc) {
   auto IFT = M->getFunction(instr_func_name);
   if (!IFT) {
     std::stringstream as;
+    as << "  .data\n";
+    as << "addr_format:\n";
+    as << "  .asciz \"0x%lx\\n\"\n";
+    as << "  .text\n";
     as << "  .globl " << instr_func_name << "\n";
     as << "  .type " << instr_func_name << ",@function\n";
     as << instr_func_name << ":\n";
     as << "  .cfi_startproc\n";
-    as << "  ret" << "\n";
+    as << ".intel_syntax noprefix\n";
+    as << "  call __mcsema_debug_get_reg_state\n";
+    as << "  mov rsi, qword ptr [rax]\n";
+    as << "  lea rdi, qword ptr [rip + addr_format]\n";
+    as << "  jmp printf@plt\n";
     as << "  .size " << instr_func_name << ",1\n";
     as << "  .cfi_endproc\n";
+    as << "  .att_syntax prefix\n";
     as << "\n";
     M->appendModuleInlineAsm(as.str());
 
@@ -403,15 +437,21 @@ static bool LiftBlockIntoFunction(TranslationContext &ctx) {
   //statements that branch SHOULD be the last statement in a block
   for (auto inst : ctx.natB->get_insts()) {
     ctx.natI = inst;
-    auto r = LiftInstIntoBlock(ctx, curLLVMBlock, true);
-    if (r == TranslateError) {
-      didError = true;
-      break;
-    } else if (r == TranslateErrorUnsupported && !ignoreUnsupportedInsts) {
-      didError = true;
-      break;
+    switch (LiftInstIntoBlock(ctx, curLLVMBlock, true)) {
+      case ContinueBlock:
+        break;
+      case EndBlock:
+      case EndCFG:
+        goto done;
+      case TranslateErrorUnsupported:
+        didError = !IgnoreUnsupportedInsts;
+        goto done;
+      case TranslateError:
+        didError = true;
+        goto done;
     }
   }
+done:
 
   if (curLLVMBlock->getTerminator()) {
     return didError;

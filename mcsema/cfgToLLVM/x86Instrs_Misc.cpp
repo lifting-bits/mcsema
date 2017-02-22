@@ -88,7 +88,9 @@ static InstTransResult doTrap(llvm::BasicBlock *b) {
 
 static InstTransResult doInt(llvm::BasicBlock *&b, const llvm::MCOperand &o) {
   TASSERT(o.isImm(), "Operand not immediate");
-  auto M = b->getParent()->getParent();
+  auto F = b->getParent();
+  auto M = F->getParent();
+  auto &C = M->getContext();
   int interrupt_val = o.getImm();
   auto os = SystemOS(M);
 
@@ -97,7 +99,26 @@ static InstTransResult doInt(llvm::BasicBlock *&b, const llvm::MCOperand &o) {
   }
 
   if (0x80 == interrupt_val && llvm::Triple::Linux == os) {
-    TASSERT(false, "System call via interrupt is not supported!");
+    TASSERT(32 == ArchAddressSize(),
+            "int 0x80 syscall not supported on 64-bit.");
+    llvm::Type *arg_tys[] = {llvm::Type::getInt32Ty(C)};
+    auto syscall_func_ty = llvm::FunctionType::get(
+        llvm::Type::getInt32Ty(C), arg_tys, true /* IsVarArg */);
+    auto syscall_func = M->getOrInsertFunction("syscall", syscall_func_ty);
+
+    std::vector<llvm::Value *> args = {
+      R_READ<32>(b, llvm::X86::EAX),  // syscall num
+      R_READ<32>(b, llvm::X86::EBX),
+      R_READ<32>(b, llvm::X86::ECX),
+      R_READ<32>(b, llvm::X86::EDX),
+      R_READ<32>(b, llvm::X86::ESI),
+      R_READ<32>(b, llvm::X86::EDI),
+      R_READ<32>(b, llvm::X86::EBP),
+    };
+    auto ret = llvm::CallInst::Create(syscall_func, args, "", b);
+    R_WRITE<32>(b, llvm::X86::EAX, ret);
+
+    return ContinueBlock;
   }
 
   std::cerr << "WARNING: Treating INT " << interrupt_val << " as trap!"
@@ -574,6 +595,23 @@ static InstTransResult doBtrr(llvm::BasicBlock *&b, const llvm::MCOperand &base,
   return ContinueBlock;
 }
 
+
+template<int width>
+static InstTransResult doBtmr(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               llvm::Value *base,
+                               const llvm::MCOperand &index) {
+  TASSERT(index.isReg(), "Operand must be an immediate");
+  auto index_val = R_READ<width>(b, index.getReg());
+  auto word_size = CONST_V<width>(b, width);
+  auto bit = llvm::BinaryOperator::CreateURem(index_val, word_size, "", b);
+  auto word = llvm::BinaryOperator::CreateUDiv(index_val, word_size, "", b);
+  auto ptr = ADDR_TO_POINTER<width>(b, base);
+  auto gep = llvm::GetElementPtrInst::CreateInBounds(ptr, {word}, "", b);
+  auto val = M_READ<width>(ip, b, gep);
+  SHR_SET_FLAG_V<width, 1>(b, val, llvm::X86::CF, bit);
+  return ContinueBlock;
+}
+
 template<int width>
 static InstTransResult doBTSri(llvm::BasicBlock *&b,
                                const llvm::MCOperand &base,
@@ -635,6 +673,28 @@ static InstTransResult doBTSmi(NativeInstPtr ip, llvm::BasicBlock *&b,
 }
 
 template<int width>
+static InstTransResult doBTSmr(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               llvm::Value *base,
+                               const llvm::MCOperand &index) {
+  TASSERT(index.isReg(), "Operand must be an immediate");
+  auto index_val = R_READ<width>(b, index.getReg());
+  auto word_size = CONST_V<width>(b, width);
+  auto bit = llvm::BinaryOperator::CreateURem(index_val, word_size, "", b);
+  auto word = llvm::BinaryOperator::CreateUDiv(index_val, word_size, "", b);
+  auto ptr = ADDR_TO_POINTER<width>(b, base);
+  auto gep = llvm::GetElementPtrInst::CreateInBounds(ptr, {word}, "", b);
+  auto val = M_READ<width>(ip, b, gep);
+  SHR_SET_FLAG_V<width, 1>(b, val, llvm::X86::CF, bit);
+
+  auto bit_to_set = llvm::BinaryOperator::CreateLShr(
+      CONST_V<width>(b, 1), bit, "", b);
+  auto new_val = llvm::BinaryOperator::CreateOr(val, bit_to_set, "", b);
+  M_WRITE<width>(ip, b, gep, new_val);
+
+  return ContinueBlock;
+}
+
+template<int width>
 static InstTransResult doBTRmi(NativeInstPtr ip, llvm::BasicBlock *&b,
                                llvm::Value *base,
                                const llvm::MCOperand &index) {
@@ -668,6 +728,28 @@ static InstTransResult doBTRmi(NativeInstPtr ip, llvm::BasicBlock *&b,
       b);
 
   M_WRITE<8>(ip, b, new_base, new_base_val);
+
+  return ContinueBlock;
+}
+
+template<int width>
+static InstTransResult doBTRmr(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               llvm::Value *base,
+                               const llvm::MCOperand &index) {
+  TASSERT(index.isReg(), "Operand must be an immediate");
+  auto index_val = R_READ<width>(b, index.getReg());
+  auto word_size = CONST_V<width>(b, width);
+  auto bit = llvm::BinaryOperator::CreateURem(index_val, word_size, "", b);
+  auto word = llvm::BinaryOperator::CreateUDiv(index_val, word_size, "", b);
+  auto ptr = ADDR_TO_POINTER<width>(b, base);
+  auto gep = llvm::GetElementPtrInst::CreateInBounds(ptr, {word}, "", b);
+  auto val = M_READ<width>(ip, b, gep);
+  SHR_SET_FLAG_V<width, 1>(b, val, llvm::X86::CF, bit);
+  auto bit_to_clear = llvm::BinaryOperator::CreateXor(
+      llvm::BinaryOperator::CreateLShr(CONST_V<width>(b, 1), bit, "", b),
+      CONST_V<width>(b, 0), "", b);
+  auto new_val = llvm::BinaryOperator::CreateAnd(val, bit_to_clear, "", b);
+  M_WRITE<width>(ip, b, gep, new_val);
 
   return ContinueBlock;
 }
@@ -1021,17 +1103,35 @@ GENERIC_TRANSLATION_REF(BT32mi8, doBtmi<32>(ip, block, ADDR_NOREF(0), OP(5)),
 GENERIC_TRANSLATION_REF(BT64mi8, doBtmi<64>(ip, block, ADDR_NOREF(0), OP(5)),
                         doBtmi<64>(ip, block, MEM_REFERENCE(0), OP(5)))
 
+GENERIC_TRANSLATION_REF(BT32mr, doBtmr<32>(ip, block, ADDR_NOREF(0), OP(5)),
+                        doBtmr<32>(ip, block, MEM_REFERENCE(0), OP(5)))
+
+GENERIC_TRANSLATION_REF(BT64mr, doBtmr<64>(ip, block, ADDR_NOREF(0), OP(5)),
+                        doBtmr<64>(ip, block, MEM_REFERENCE(0), OP(5)))
+
+GENERIC_TRANSLATION_REF(BTS32mr, doBTSmr<32>(ip, block, ADDR_NOREF(0), OP(5)),
+                        doBTSmr<32>(ip, block, MEM_REFERENCE(0), OP(5)))
+
 GENERIC_TRANSLATION_REF(BTS32mi8, doBTSmi<32>(ip, block, ADDR_NOREF(0), OP(5)),
                         doBTSmi<32>(ip, block, MEM_REFERENCE(0), OP(5)))
 
 GENERIC_TRANSLATION_REF(BTS64mi8, doBTSmi<64>(ip, block, ADDR_NOREF(0), OP(5)),
                         doBTSmi<64>(ip, block, MEM_REFERENCE(0), OP(5)))
 
+GENERIC_TRANSLATION_REF(BTS64mr, doBTSmr<64>(ip, block, ADDR_NOREF(0), OP(5)),
+                        doBTSmr<64>(ip, block, MEM_REFERENCE(0), OP(5)))
+
 GENERIC_TRANSLATION_REF(BTR32mi8, doBTRmi<32>(ip, block, ADDR_NOREF(0), OP(5)),
                         doBTRmi<32>(ip, block, MEM_REFERENCE(0), OP(5)))
 
 GENERIC_TRANSLATION_REF(BTR64mi8, doBTRmi<64>(ip, block, ADDR_NOREF(0), OP(5)),
                         doBTRmi<64>(ip, block, MEM_REFERENCE(0), OP(5)))
+
+GENERIC_TRANSLATION_REF(BTR32mr, doBTRmr<32>(ip, block, ADDR_NOREF(0), OP(5)),
+                        doBTRmr<32>(ip, block, MEM_REFERENCE(0), OP(5)))
+
+GENERIC_TRANSLATION_REF(BTR64mr, doBTRmr<64>(ip, block, ADDR_NOREF(0), OP(5)),
+                        doBTRmr<64>(ip, block, MEM_REFERENCE(0), OP(5)))
 
 GENERIC_TRANSLATION(BSR32rr, doBsrr<32>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BSR16rr, doBsrr<16>(block, OP(0), OP(1)))
@@ -1081,14 +1181,18 @@ void Misc_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::BT32ri8] = translate_BT32ri8;
   m[llvm::X86::BT16ri8] = translate_BT16ri8;
   m[llvm::X86::BT64mi8] = translate_BT64mi8;
+  m[llvm::X86::BT32mr] = translate_BT32mr;
+  m[llvm::X86::BT64mr] = translate_BT64mr;
+  m[llvm::X86::BTS32mr] = translate_BTS32mr;
+  m[llvm::X86::BTS64mr] = translate_BTS64mr;
   m[llvm::X86::BTS64mi8] = translate_BTS64mi8;
   m[llvm::X86::BTS64ri8] = translate_BTS64ri8;
-
   m[llvm::X86::BTR64mi8] = translate_BTR64mi8;
+  m[llvm::X86::BTR32mr] = translate_BTR32mr;
+  m[llvm::X86::BTR64mr] = translate_BTR64mr;
   m[llvm::X86::BT32mi8] = translate_BT32mi8;
   m[llvm::X86::BTS32mi8] = translate_BTS32mi8;
   m[llvm::X86::BTS32ri8] = translate_BTS32ri8;
-
   m[llvm::X86::BTR32mi8] = translate_BTR32mi8;
   m[llvm::X86::BSR64rr] = translate_BSR64rr;
   m[llvm::X86::BSR32rr] = translate_BSR32rr;
@@ -1097,6 +1201,5 @@ void Misc_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::BSF32rm] = translate_BSF32rm;
   m[llvm::X86::BSF16rr] = translate_BSF16rr;
   m[llvm::X86::TRAP] = translate_TRAP;
-
   m[llvm::X86::CPUID] = translate_CPUID32;
 }
