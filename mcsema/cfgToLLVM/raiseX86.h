@@ -69,24 +69,26 @@ llvm::Value *GENERIC_MC_READREG(llvm::BasicBlock *b, MCSemaRegs reg,
                                 int desired_size);
 
 template<int width>
-void R_WRITE(llvm::BasicBlock *b, MCSemaRegs reg, llvm::Value *write) {
+inline static void R_WRITE(llvm::BasicBlock *b, MCSemaRegs reg,
+                           llvm::Value *write) {
   GENERIC_MC_WRITEREG(b, reg, write);
 }
 
 template<int width>
-llvm::Value *R_READ(llvm::BasicBlock *b, MCSemaRegs reg) {
+inline static llvm::Value *R_READ(llvm::BasicBlock *b, MCSemaRegs reg) {
   return GENERIC_MC_READREG(b, reg, width);
 }
 
 namespace x86 {
 
 template<int width>
-void R_WRITE(llvm::BasicBlock *b, MCSemaRegs reg, llvm::Value *write) {
+inline static void R_WRITE(llvm::BasicBlock *b, MCSemaRegs reg,
+                           llvm::Value *write) {
   GENERIC_MC_WRITEREG(b, reg, write);
 }
 
 template<int width>
-llvm::Value *R_READ(llvm::BasicBlock *b, MCSemaRegs reg) {
+inline static llvm::Value *R_READ(llvm::BasicBlock *b, MCSemaRegs reg) {
   return GENERIC_MC_READREG(b, reg, width);
 }
 
@@ -95,12 +97,13 @@ llvm::Value *R_READ(llvm::BasicBlock *b, MCSemaRegs reg) {
 namespace x86_64 {
 
 template<int width>
-void R_WRITE(llvm::BasicBlock *b, MCSemaRegs reg, llvm::Value *write) {
+inline static void R_WRITE(llvm::BasicBlock *b, MCSemaRegs reg,
+                           llvm::Value *write) {
   GENERIC_MC_WRITEREG(b, reg, write);
 }
 
 template<int width>
-llvm::Value *R_READ(llvm::BasicBlock *b, MCSemaRegs reg) {
+inline static llvm::Value *R_READ(llvm::BasicBlock *b, MCSemaRegs reg) {
   return GENERIC_MC_READREG(b, reg, width);
 }
 
@@ -110,12 +113,13 @@ llvm::Value *INTERNAL_M_READ(unsigned width, unsigned addrspace,
                              llvm::BasicBlock *b, llvm::Value *addr);
 
 template<int width>
-llvm::Value *M_READ(NativeInstPtr ip, llvm::BasicBlock *b, llvm::Value *addr) {
+inline static llvm::Value *M_READ(NativeInstPtr ip, llvm::BasicBlock *b,
+                                  llvm::Value *addr) {
   return INTERNAL_M_READ(width, ip->get_addr_space(), b, addr);
 }
 
 template<int width>
-llvm::Value *M_READ_0(llvm::BasicBlock *b, llvm::Value *addr) {
+inline static llvm::Value *M_READ_0(llvm::BasicBlock *b, llvm::Value *addr) {
   return INTERNAL_M_READ(width, 0, b, addr);
 }
 
@@ -127,14 +131,27 @@ void INTERNAL_M_WRITE(int width, unsigned addrspace, llvm::BasicBlock *b,
                       llvm::Value *addr, llvm::Value *data);
 
 template<int width>
-void M_WRITE(NativeInstPtr ip, llvm::BasicBlock *b, llvm::Value *addr,
-             llvm::Value *data) {
+inline static void M_WRITE(NativeInstPtr ip, llvm::BasicBlock *b,
+                           llvm::Value *addr, llvm::Value *data) {
   return INTERNAL_M_WRITE(width, ip->get_addr_space(), b, addr, data);
 }
 
 template<int width>
-void M_WRITE_0(llvm::BasicBlock *b, llvm::Value *addr, llvm::Value *data) {
+inline static void M_WRITE_0(llvm::BasicBlock *b, llvm::Value *addr,
+                             llvm::Value *data) {
   return INTERNAL_M_WRITE(width, 0, b, addr, data);
+}
+
+llvm::Value *ADDR_TO_POINTER_V(llvm::BasicBlock *b, llvm::Value *memAddr,
+                               llvm::Type *ptrType);
+
+llvm::Value *ADDR_TO_POINTER(llvm::BasicBlock *b, llvm::Value *memAddr,
+                             int width);
+
+template<int width>
+inline static llvm::Value *ADDR_TO_POINTER(llvm::BasicBlock *b,
+                                           llvm::Value *memAddr) {
+  return ADDR_TO_POINTER(b, memAddr, width);
 }
 
 llvm::Value *F_READ(llvm::BasicBlock *b, MCSemaRegs flag);

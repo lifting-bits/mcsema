@@ -24,11 +24,6 @@ SystemArchType SystemArch(llvm::Module *) {
   }
 }
 
-llvm::Triple::OSType SystemOS(llvm::Module *M) {
-  llvm::Triple TT(M->getTargetTriple());
-  return TT.getOS();
-}
-
 static void InitADFeatues(llvm::Module *M, const char *name,
                           llvm::FunctionType *EPTy) {
   auto FC = M->getOrInsertFunction(name, EPTy);

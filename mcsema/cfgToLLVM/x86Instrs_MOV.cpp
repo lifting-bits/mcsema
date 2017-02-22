@@ -57,6 +57,21 @@
 #define NASSERT(cond) TASSERT(cond, "")
 
 template<int width>
+static int GET_XAX() {
+  if (64 == width) {
+    return llvm::X86::RAX;
+  } else if (32 == width) {
+    return llvm::X86::EAX;
+  } else if (16 == width) {
+    return llvm::X86::AX;
+  } else if (8 == width) {
+    return llvm::X86::AL;
+  } else {
+    throw TErr(__LINE__, __FILE__, "Unknown width!");
+  }
+}
+
+template<int width>
 static InstTransResult doMRMovBE(NativeInstPtr ip, llvm::BasicBlock *&b,
                                  llvm::Value *dstAddr,
                                  const llvm::MCOperand &src) {
@@ -672,8 +687,51 @@ static InstTransResult translate_MOV64mi32(TranslationContext &ctx,
     }
 
   }
-  ret = ContinueBlock;
-  return ret;
+  return ContinueBlock;
+}
+
+template <int dest_width, int addr_width>
+static InstTransResult translate_MOV_NaoM(
+    TranslationContext &ctx, llvm::BasicBlock *&block) {
+  auto &inst = ctx.natI->get_inst();
+  auto &imm_addr_op = inst.getOperand(0);
+  auto &reg_op = inst.getOperand(1);
+  if (!imm_addr_op.isImm() || !reg_op.isReg()) {
+    return TranslateErrorUnsupported;
+  }
+
+  reg_op = llvm::MCOperand::createReg(GET_XAX<dest_width>());
+
+  llvm::Value *addr = nullptr;
+  if (ctx.natI->has_imm_reference) {
+    addr = IMM_AS_DATA_REF(block, ctx.natM, ctx.natI);
+  } else {
+    addr = ADDR_TO_POINTER<dest_width>(block, CONST_V<addr_width>(block, imm_addr_op.getImm()));
+  }
+
+  return doRMMov<16>(ctx.natI, block, addr, reg_op);
+}
+
+template <int dest_width, int addr_width>
+static InstTransResult translate_MOV_NoaM(
+    TranslationContext &ctx, llvm::BasicBlock *&block) {
+  auto &inst = ctx.natI->get_inst();
+  auto &imm_addr_op = inst.getOperand(0);
+  auto &reg_op = inst.getOperand(1);
+  if (!imm_addr_op.isImm() || !reg_op.isReg()) {
+    return TranslateErrorUnsupported;
+  }
+
+  reg_op = llvm::MCOperand::createReg(GET_XAX<dest_width>());
+
+  llvm::Value *addr = nullptr;
+  if (ctx.natI->has_imm_reference) {
+    addr = IMM_AS_DATA_REF(block, ctx.natM, ctx.natI);
+  } else {
+    addr = ADDR_TO_POINTER<dest_width>(block, CONST_V<addr_width>(block, imm_addr_op.getImm()));
+  }
+
+  return doMRMov<16>(ctx.natI, block, addr, reg_op);
 }
 
 GENERIC_TRANSLATION_REF(MOV8mr, doMRMov<8>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -820,21 +878,6 @@ static InstTransResult translate_MOV64ri(TranslationContext &ctx,
     ret = doRIMov<64>(ip, block, OP(1), OP(0));
   }
   return ret;
-}
-
-template<int width>
-int GET_XAX() {
-  if (64 == width) {
-    return llvm::X86::RAX;
-  } else if (32 == width) {
-    return llvm::X86::EAX;
-  } else if (16 == width) {
-    return llvm::X86::AX;
-  } else if (8 == width) {
-    return llvm::X86::AL;
-  } else {
-    throw TErr(__LINE__, __FILE__, "Unknown width!");
-  }
 }
 
 //write to memory
@@ -1098,6 +1141,13 @@ void MOV_populateDispatchMap(DispatchMap &m) {
 
   m[llvm::X86::MOV8mr] = translate_MOV8mr;
   m[llvm::X86::MOV16mr] = translate_MOV16mr;
+
+  m[llvm::X86::MOV8o32a] = translate_MOV_NoaM<8, 32>;
+  m[llvm::X86::MOV8ao32] = translate_MOV_NaoM<8, 32>;
+
+  m[llvm::X86::MOV16o32a] = translate_MOV_NoaM<16, 32>;
+  m[llvm::X86::MOV16ao32] = translate_MOV_NaoM<16, 32>;
+
   m[llvm::X86::MOV32mr] = translate_MOV32mr;
   m[llvm::X86::MOV64mr] = translate_MOV64mr;
 

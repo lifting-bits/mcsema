@@ -1115,7 +1115,12 @@ def isStartOfFunction(ea):
 def isSaneReference(ea):
     if isInternalCode(ea) and idc.ItemHead(ea) == ea:
         return True
-    elif isInData(ea, ea+1) and idc.ItemHead(ea) == ea:
+
+    # TODO(pag): Some compilers will dedup strings. This shows up in something
+    # like /bin/ls, where you have `almost-all` and `all` as two options, and
+    # the latter belongs to the former. A dref to `all` doesn't show up as an
+    # item head, so :-/
+    elif isInData(ea, ea+1): # and idc.ItemHead(ea) == ea:
         return True
     else:
         return False
@@ -2168,7 +2173,8 @@ if __name__ == "__main__":
 
     addr_size = {"x86": 32, "amd64": 64}.get(args.arch, 0)
     if addr_size != getBitness():
-        DEBUG("Arch name doesn't match bitness of program being disassembled!")
+        DEBUG("Arch {} doesn't match bitness {} of program being disassembled!".format(
+            args.arch, getBitness()))
         idc.Exit(-1)
 
     if args.pie_mode:

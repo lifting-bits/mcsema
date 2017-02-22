@@ -37,7 +37,7 @@ void ArchSetCallingConv(llvm::Module *M, llvm::Function *F);
 
 llvm::GlobalVariable *archGetImageBase(llvm::Module *M);
 
-llvm::Triple::OSType SystemOS(llvm::Module *M);
+#define SystemOS(...) OSType()
 
 SystemArchType SystemArch(llvm::Module *M);
 
