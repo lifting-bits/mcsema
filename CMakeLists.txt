@@ -15,8 +15,16 @@ add_definitions(${LLVM_DEFINITIONS})
 
 # Get protobufs.
 if(WIN32)
-  set(PROTOBUF_ROOT, "${MCSEMA_DIR}/third_party/protobuf")
-  add_directory(${MCSEMA_DIR}/cmake/protobuf)
+  # Change the slashes to Unix style or risk the wrath of invalid escape
+  # sequences!
+  string(REGEX REPLACE "\\\\" "/" MCSEMA_DIR ${MCSEMA_DIR})
+
+  set(PROTOBUF_ROOT "${MCSEMA_DIR}/third_party/protobuf")
+  set(Protobuf_LIBRARIES "${PROTOBUF_ROOT}/build/libprotobuf/Release")
+  set(Protobuf_INCLUDE_DIR "${PROTOBUF_ROOT}/src")
+  
+  include_directories(${Protobuf_INCLUDE_DIR})
+  link_directories(${Protobuf_LIBRARIES})
 endif(WIN32)
 find_package(Protobuf REQUIRED)
 
@@ -38,13 +46,20 @@ include_directories(${MCSEMA_DIR}/mcsema/common)
 include_directories(${MCSEMA_DIR}/mcsema/peToCFG)
 include_directories(${MCSEMA_DIR}/mcsema/cfgToLLVM)
 
-add_compile_options(
-  -x c++
-  -g3
-  -O0
-  -std=gnu++11
-  -fno-rtti
-  -DGOOGLE_PROTOBUF_NO_RTTI)
+if(WIN32)
+  add_compile_options(
+    /nologo
+    /DGOOGLE_PROTOBUF_NO_RTTI
+    /W3)
+else()
+  add_compile_options(
+    -x c++
+    -g3
+    -O0
+    -std=gnu++11
+    -fno-rtti
+    -DGOOGLE_PROTOBUF_NO_RTTI)
+endif(WIN32)
 
 add_executable(mcsema-lift
   ${MCSEMA_DIR}/mcsema/Lift.cpp

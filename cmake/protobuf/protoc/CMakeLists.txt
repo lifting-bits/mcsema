@@ -11,7 +11,11 @@ add_definitions(
 )
 
 add_executable( protoc ${SOURCES} )
-target_link_libraries( protoc libprotoc libprotobuf )
+target_link_libraries( protoc libprotoc )
 if( UNIX )
   target_link_libraries( protoc -lpthread )
 endif()
+
+install(TARGETS protoc
+    RUNTIME DESTINATION ${BIN_DIR}
+    )
