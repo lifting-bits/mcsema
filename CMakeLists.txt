@@ -24,6 +24,7 @@ if(WIN32)
   set(Protobuf_INCLUDE_DIR "${PROTOBUF_ROOT}/src")
   
   include_directories(${Protobuf_INCLUDE_DIR})
+  link_directories(${Protobuf_LIBRARIES})
 endif(WIN32)
 find_package(Protobuf REQUIRED)
 

@@ -71,6 +71,7 @@ pushd "%BUILD_DIR%\llvm"
   -DLLVM_TARGETS_TO_BUILD="X86" ^
   -DLLVM_INCLUDE_EXAMPLES=OFF ^
   -DLLVM_INCLUDE_TESTS=OFF ^
+  -DCMAKE_BUILD_TYPE="Release" ^
   %LLVM_DIR%
 nmake
   
@@ -86,6 +87,7 @@ pushd build
   -DMCSEMA_DIR="%DIR%" ^
   -DMCSEMA_BUILD_DIR="%BUILD_DIR%" ^
   -DMCSEMA_GEN_DIR="%GEN_DIR%" ^
+  -DCMAKE_BUILD_TYPE="Release" ^
   %MCSEMA_DIR%
 nmake
 
