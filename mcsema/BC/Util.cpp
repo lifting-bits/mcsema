@@ -22,7 +22,7 @@ llvm::Module *CreateModule(llvm::LLVMContext *context) {
 }
 
 // Return a constnat integer of width `width` and value `val`.
-llvm::ConstantInt *ConstantInt(int width, uint64_t val) {
+llvm::ConstantInt *CreateConstantInt(int width, uint64_t val) {
   auto bTy = llvm::Type::getIntNTy(*gContext, width);
   return llvm::ConstantInt::get(bTy, val);
 }

@@ -216,7 +216,7 @@ llvm::Value *GENERIC_MC_READREG(llvm::BasicBlock *B, MCSemaRegs mc_reg,
   if (llvm::X86::NoRegister == mc_reg) {
     std::cerr
         << "Reading 0 for no-register read-reg" << std::endl;
-    return ConstantInt(desired_size, 0);
+    return CreateConstantInt(desired_size, 0);
   }
 
   llvm::DataLayout DL(M);
