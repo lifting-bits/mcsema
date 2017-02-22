@@ -15,8 +15,13 @@ add_definitions(${LLVM_DEFINITIONS})
 
 # Get protobufs.
 if(WIN32)
-  set(PROTOBUF_ROOT, "${MCSEMA_DIR}/third_party/protobuf")
-  add_directory(${MCSEMA_DIR}/cmake/protobuf)
+  # Change the slashes to Unix style or risk the wrath of invalid escape
+  # sequences!
+  string(REGEX REPLACE "\\\\" "/" MCSEMA_DIR ${MCSEMA_DIR})
+
+  set(PROTOBUF_ROOT "${MCSEMA_DIR}/third_party/protobuf")
+  set(Protobuf_LIBRARIES "${PROTOBUF_ROOT}/build/libprotobuf/Release")
+  set(Protobuf_INCLUDE_DIR "${PROTOBUF_ROOT}/src")
 endif(WIN32)
 find_package(Protobuf REQUIRED)
 
