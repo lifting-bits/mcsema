@@ -5,6 +5,7 @@ rem Copyright 2017 Peter Goodman, all rights reserved.
 set DIR=%~dp0
 if "%DIR:~-1%"=="\" set DIR=%DIR:~0,-1%
 
+set MCSEMA_DIR=%DIR%
 set BUILD_DIR=%DIR%\build
 set THIRD_PARTY_DIR=%DIR%\third_party
 set LLVM_DIR=%THIRD_PARTY_DIR%\llvm

@@ -28,7 +28,7 @@ If you are experiencing undocumented problems with McSema, or just want to learn
 
 ## Supported Platforms
 
-McSema is supported on Windows and Linux platforms and has been tested on Ubuntu 14.04 and 16.04.
+McSema is supported on Windows and Linux platforms and has been tested on Windows 10, Ubuntu 14.04, and Ubuntu 16.04.
 
 ## Dependencies
 
@@ -92,7 +92,7 @@ Download and install [Chocolatey](https://chocolatey.org/install).
 Open Windows Powershell in *administrator* mode, and run the following.
 
 ```shell
-choco install -y git cmake python2 pip wget unzip 7zip
+choco install -y --allowemptychecksum git cmake python2 pip wget unzip 7zip
 choco install -y microsoft-visual-cpp-build-tools --installargs "/InstallSelectableItems Win81SDK_CppBuildSKUV1;Win10SDK_VisibleV1"
 ```
 
@@ -129,7 +129,7 @@ git clone https://github.com/trailofbits/mcsema.git --depth 1
 ##### Run the bootstrap script
 ```shell
 cd mcsema
-./bootstrap.bat
+bootstrap
 ```
 
 #### Step 3: Build and install the code
