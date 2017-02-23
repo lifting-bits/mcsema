@@ -1,6 +1,6 @@
 
-EXE = basic basic_ptr basic_struct basic_local_ref
-CFLAGS = -O0 -m32
+EXE = basic basic_ptr basic_struct basic_local_ref basic_global basic_global_struct basic_global_array
+CFLAGS = -O0
 
 all: $(EXE)
 
