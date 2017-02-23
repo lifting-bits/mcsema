@@ -2,6 +2,11 @@
 
 #include <cstdio>
 
+#ifdef _WIN32
+#include <stddef.h>
+#define __builtin_offsetof offsetof
+#endif
+
 #define ONLY_STRUCT
 #include "State.h"
 
