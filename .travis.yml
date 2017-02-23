@@ -1,25 +1,14 @@
 sudo: required
 dist: trusty
-language: cpp
-cache: apt
-osx_image: xcode7.1
+language: generic
 os:
-- linux
-- osx
+ - linux
 compiler:
-- gcc
-- clang
-matrix:
-  allow_failures:
-  - os: osx
-  exclude:
-  - compiler: gcc
-    os: osx
-before_script:
-- if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get update && sudo apt-get install -qq -y nasm cmake git gcc-multilib g++-multilib build-essential libc6-i386 zlib1g gzip ; fi
-- if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew update && brew install nasm cmake; fi
+ - gcc
+install:
+ - ./bootstrap.sh
 script:
-- mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j2
+ - cd build && make -j4
 notifications:
   slack:
     secure: g1Nm7C7TYKg4RjDJ5cwuEcgKXfOAmVOu51adTPLBLGzZcCbCrkwQgI39ZycsalaACSnC8iNvqSCbRfZIA5mkDZ7VADaiZgLoWjq3RQzJmWgwGhhtyRkbtiicBnowTL5hIEiMOv6RnKlbB7M2OwzRiS07+FQXrK24hz+qm6zPptw=

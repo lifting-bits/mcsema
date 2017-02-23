@@ -1,2 +1,0 @@
-printf 4 C N
-puts 1 C N

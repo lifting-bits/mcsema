@@ -1,1 +1,0 @@
-boost_module(tokenizer DEPENDS utility)

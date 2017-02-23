@@ -1,1 +1,0 @@
-strcmp 2 C N

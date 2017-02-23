@@ -1,1 +1,0 @@
-boost_module(geometry DEPENDS parameter typeof foreach)
