@@ -224,8 +224,7 @@ def collect_function_vars(f, global_var_data):
                                    "reads":set()}
         offset = idc.GetStrucNextOff(frame, offset)
     #functions.append({"name":name, "stackArgs":stackArgs})
-    if len(stackArgs) > 0:
-        _find_local_references(f, {"name":name, "stackArgs":stackArgs, "uses_bp":_uses_bp, "globals":dict()}, global_var_data)
+    _find_local_references(f, {"name":name, "stackArgs":stackArgs, "uses_bp":_uses_bp, "globals":dict()}, global_var_data)
 
     return stackArgs
 
@@ -252,6 +251,16 @@ def collect_variables():
         functions.append({"ea":f_ea, "stackArgs":f_vars, "name":idc.Name(f)})
 
     return {"functions":functions, "globals":global_var_data}
+
+def _process_single_func(funcaddr):
+    '''easy invocation for debugging'''
+    class functionWrapper(object):
+        def __init__(self, addr):
+            self.entry_address = addr
+
+    glb = dict()
+    f_vars = collect_func_vars(functionWrapper(funcaddr), glb)
+    return f_vars, glb
 
 def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_data):
     '''
