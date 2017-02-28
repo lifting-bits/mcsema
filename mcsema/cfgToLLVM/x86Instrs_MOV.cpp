@@ -1131,6 +1131,7 @@ void MOV_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::MOV16o16a] = translate_MOVoa<16>;
 //  m[llvm::X86::MOV8o8a] = translate_MOVoa<8>;
   m[llvm::X86::MOV32ri] = translate_MOV32ri;
+  m[llvm::X86::MOV32ri_alt] = translate_MOV32ri;
   m[llvm::X86::MOV64ri] = translate_MOV64ri;
   m[llvm::X86::MOV64ri32] = translate_MOV64ri;
 
