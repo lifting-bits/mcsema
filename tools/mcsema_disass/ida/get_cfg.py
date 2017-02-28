@@ -900,27 +900,26 @@ def instructionHandler(M, B, inst, new_eas):
     return I, False
 
 WEAK_SYMS = set()
+OS_NAME = ""
 
 def parseDefsFile(df):
+    global OS_NAME, WEAK_SYMS
     emap = {}
     emap_data = {}
+    is_linux = OS_NAME == "linux"
     for l in df.readlines():
         #skip comments / empty lines
         l = l.strip()
         if not l or l[0] == "#":
             continue
 
-        
         if l.startswith('DATA:'):
             # process as data
             (marker, symname, dsize) = l.split()
             if 'PTR' in dsize:
                 dsize = getPointerSize()
             emap_data[symname] = int(dsize)
-        elif l.startswith('ALIAS:'):
-            (marker, symname, real_symname) = l.split()
-            emap[symname] = emap[real_symname]
-            WEAK_SYMS.add(symname)
+
         else:
             fname = args = conv = ret = sign = None
             line_args = l.split()
@@ -953,6 +952,11 @@ def parseDefsFile(df):
 
             emap[fname] = (int(args), realconv, ret, sign)
 
+            if is_linux:
+                imp_name = "__imp_{}".format(fname)
+                emap[imp_name] = emap[fname]
+                WEAK_SYMS.add(imp_name)
+
     
     df.close()
 
@@ -960,7 +964,7 @@ def parseDefsFile(df):
 
 def processExternalFunction(M, fn):
     global WEAK_SYMS
-    
+
     args, conv, ret, sign = getFromEMAP(fn)
     ea = idc.LocByName(fn)
     is_weak = idaapi.is_weak_name(ea) or fn in WEAK_SYMS
@@ -2204,6 +2208,7 @@ if __name__ == "__main__":
     EMAP_DATA = {}
 
     # Try to find the defs file or this OS
+    OS_NAME = args.os
     os_defs_file = os.path.join(tools_disass_dir, "defs", "{}.txt".format(args.os))
     if os.path.isfile(os_defs_file):
         args.std_defs.insert(0, os_defs_file)
