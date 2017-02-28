@@ -27,6 +27,9 @@ import itertools
 if os.path.isdir('/usr/lib/python2.7/dist-packages'):
     sys.path.append('/usr/lib/python2.7/dist-packages')
 
+if os.path.isdir('/usr/local/lib/python2.7/dist-packages'):
+    sys.path.append('/usr/local/lib/python2.7/dist-packages')
+
 tools_disass_ida_dir = os.path.dirname(__file__)
 tools_disass_dir = os.path.dirname(tools_disass_ida_dir)
 
@@ -176,7 +179,6 @@ def IsStruct(ea):
     return idc.isStruct(idaapi.getFlags(ea))
 
 def fixExternalName(fn):
-    
     if fn in EMAP:
         return fn
 
@@ -897,6 +899,8 @@ def instructionHandler(M, B, inst, new_eas):
 
     return I, False
 
+WEAK_SYMS = set()
+
 def parseDefsFile(df):
     emap = {}
     emap_data = {}
@@ -913,6 +917,10 @@ def parseDefsFile(df):
             if 'PTR' in dsize:
                 dsize = getPointerSize()
             emap_data[symname] = int(dsize)
+        elif l.startswith('ALIAS:'):
+            (marker, symname, real_symname) = l.split()
+            emap[symname] = emap[real_symname]
+            WEAK_SYMS.add(symname)
         else:
             fname = args = conv = ret = sign = None
             line_args = l.split()
@@ -951,10 +959,11 @@ def parseDefsFile(df):
     return emap, emap_data
 
 def processExternalFunction(M, fn):
-
+    global WEAK_SYMS
+    
     args, conv, ret, sign = getFromEMAP(fn)
     ea = idc.LocByName(fn)
-    is_weak = idaapi.is_weak_name(ea)
+    is_weak = idaapi.is_weak_name(ea) or fn in WEAK_SYMS
 
     DEBUG("Program will reference external{}: {}".format(" (weak)" if is_weak else "", fn))
     extfn = M.external_funcs.add()
@@ -1014,13 +1023,19 @@ def handleDataRelocation(M, dref, new_eas):
     else:
         return dref
 
-def getBitness():
+def getAvailableBitness():
     if (idaapi.ph.flag & idaapi.PR_USE64) != 0:
         # support 64-bit addressing
         return 64
     else:
         # no support for 64-bit, assume 32-bit
         return 32
+
+ADDRESS_SIZE = 0
+
+def getBitness():
+    global ADDRESS_SIZE
+    return ADDRESS_SIZE
 
 def getPointerSize():
     return getBitness() / 8
@@ -1821,12 +1836,14 @@ def preprocessBinary():
 
 
 def recoverCfg(to_recover, outf, exports_are_apis=False):
+    global EMAP
     M = CFG_pb2.Module()
     M.module_name = idc.GetInputFile()
     DEBUG("PROCESSING: {0}".format(M.module_name))
 
     our_entries = []
     entrypoints = idautils.Entries()
+
     exports = {}
     for index,ordinal,exp_ea, exp_name in entrypoints:
         exports[exp_name] = exp_ea
@@ -1855,8 +1872,9 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
         if not isInternalCode(ea):
             DEBUG("Export {0} at {1} does not point to code; skipping".format(name, hex(ea)))
             continue
-            
-        our_entries.append( (name, ea) )
+        
+        if name not in EMAP:
+            our_entries.append( (name, ea) )
 
     recovered_fns = 0
 
@@ -2172,9 +2190,10 @@ if __name__ == "__main__":
         DEBUG("Debugging is enabled.")
 
     addr_size = {"x86": 32, "amd64": 64}.get(args.arch, 0)
-    if addr_size != getBitness():
-        DEBUG("Arch {} doesn't match bitness {} of program being disassembled!".format(
-            args.arch, getBitness()))
+    ADDRESS_SIZE = addr_size
+    if addr_size > getAvailableBitness():
+        DEBUG("Arch {} address size is too big for IDA's available bitness {}! Did you mean to use idal64?".format(
+            args.arch, getAvailableBitness()))
         idc.Exit(-1)
 
     if args.pie_mode:

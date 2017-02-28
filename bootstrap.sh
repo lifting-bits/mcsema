@@ -55,6 +55,10 @@ fi
 echo "[+] Installing python-protobuf"
 sudo pip install 'protobuf==2.6.1'
 
+if [ -d /usr/local/lib/python2.7/dist-packages/google ] ; then
+  sudo touch /usr/local/lib/python2.7/dist-packages/google/__init__.py
+fi
+
 # Generate protobuf files.
 mkdir -p ${GEN_DIR}
 if [ ! -e ${GEN_DIR}/CFG.pb.h ]; then

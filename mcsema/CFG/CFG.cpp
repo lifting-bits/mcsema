@@ -865,9 +865,11 @@ static NativeInstPtr DeserializeInst(
 
   if (inst.has_ext_call_name()) {
     ExternalCodeRefPtr p = getExternal(inst.ext_call_name(), extcode);
-    if (p == nullptr) {
-      throw TErr(__LINE__, __FILE__,
-                 "Could not find external: " + inst.ext_call_name());
+    if (!p) {
+      std::cerr
+          << "Unable to find external call " << inst.ext_call_name()
+          << " for inst at " << std::hex << addr << std::endl;
+      return nullptr;
     }
     ip->set_ext_call_target(p);
   }
