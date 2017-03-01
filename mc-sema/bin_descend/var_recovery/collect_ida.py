@@ -170,6 +170,17 @@ def BlockItems(BB):
         yield fii.current()
         ok = fii.next_code()
 
+def _create_global_var_entry(memory_ref):
+    return dict(reads=set(), writes=set(), addrs=set(), offset=memory_ref)
+
+def _normalize_global_var_name(name):
+    return_name = name
+    if return_name.startswith("offset "):
+        return_name = return_name[7:]
+    if return_name.startswith("cs:"):
+        return_name = return_name[3:]
+    return return_name
+
 def collect_func_vars(F, global_var_data):
     '''
     Collect stack variable data from a single function F.
@@ -279,9 +290,20 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_da
 
     target_global = idc.GetOpType(addr, 0) == 2 #2 is a memory reference
     read_global = idc.GetOpType(addr, 1) == 2
+    global_address = (idc.GetOpType(addr, 1) == 5) and ('offset' in idc.GetOpnd(addr, 1)) #are both clauses needed?
 
     referers.pop(target_op, None)
     dereferences.pop(target_op, None)
+
+    if global_address:
+        memory_ref = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
+        var_name = _normalize_global_var_name(idc.GetOpnd(addr, 1))
+        if var_name not in global_var_data:
+            global_var_data[var_name] = _create_global_var_entry(memory_ref)
+        global_var_data[var_name]["addrs"].add(addr)
+        if var_name not in func_var_data["globals"]:
+            func_var_data["globals"][var_name] = _create_global_var_entry(memory_ref)
+        func_var_data["globals"][var_name]["addrs"].add(addr)
 
 
     if read_op in referers:
@@ -323,12 +345,12 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_da
 
     if target_global:
         memory_ref = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
-        var_name = idc.GetOpnd(addr, 0)
+        var_name = _normalize_global_var_name(idc.GetOpnd(addr, 0))
         if var_name not in global_var_data:
-            global_var_data[var_name] = dict(reads=set(), writes=set(), offset=memory_ref)
+            global_var_data[var_name] = _create_global_var_entry(memory_ref)
         global_var_data[var_name]["writes"].add(addr)
         if var_name not in func_var_data["globals"]:
-            func_var_data["globals"][var_name] = dict(reads=set(), writes=set(), offset=memory_ref)
+            func_var_data["globals"][var_name] = _create_global_var_entry(memory_ref)
         func_var_data["globals"][var_name]["writes"].add(addr)
 
 
@@ -341,12 +363,12 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_da
 
     if read_global:
         memory_ref = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
-        var_name = idc.GetOpnd(addr, 1)
+        var_name = _normalize_global_var_name(idc.GetOpnd(addr, 1))
         if var_name not in global_var_data:
-            global_var_data[var_name] = dict(reads=set(), writes=set(), offset=memory_ref)
+            global_var_data[var_name] = _create_global_var_entry(memory_ref)
         global_var_data[var_name]["reads"].add(addr)
         if memory_ref not in func_var_data["globals"]:
-            func_var_data["globals"][var_name] = dict(reads=set(), writes=set(), offset=memory_ref)
+            func_var_data["globals"][var_name] = _create_global_var_entry(memory_ref)
         func_var_data["globals"][var_name]["reads"].add(addr)
 
 def _process_lea_inst(addr, referers, dereferences, func_var_data, global_var_data):
@@ -357,6 +379,16 @@ def _process_lea_inst(addr, referers, dereferences, func_var_data, global_var_da
     if read_on_stack:
         #referers[operand] = offset
         referers[target_op] = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
+    if read_global:
+        memory_ref = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
+        var_name = _normalize_global_var_name(idc.GetOpnd(addr, 1))
+        if var_name not in global_var_data:
+            global_var_data[var_name] = _create_global_var_entry(memory_ref)
+        global_var_data[var_name]["addrs"].add(addr)
+        if var_name not in func_var_data["globals"]:
+            func_var_data["globals"][var_name] = _create_global_var_entry(memory_ref)
+        func_var_data["globals"][var_name]["addrs"].add(addr)
+
 
 def _process_call_inst(addr, referers, dereferences, func_var_data, global_var_data):
     target_op = _translate_reg(idc.GetOpnd(addr, 0))
