@@ -41,12 +41,13 @@
 
 #include <llvm/MC/MCInst.h>
 
+#include <llvm/Support/CodeGen.h>
+
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
 
 #include "InstructionDispatch.h"
-#include "X86.h"
 #include "raiseX86.h"
 #include "x86Helpers.h"
 #include "x86Instrs_Jcc.h"
