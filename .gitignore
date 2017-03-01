@@ -34,6 +34,7 @@ tools/dist/*
 tools/mcsema_disass.egg-info/*
 tools/mcsema_disass/ida/CFG_pb2.py
 
+bin
 
 #==============================================================================#
 # Directories to ignore (do not add trailing '/'s, they skip symlinks).

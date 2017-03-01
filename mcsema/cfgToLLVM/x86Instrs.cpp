@@ -31,11 +31,11 @@
 #include <llvm/IR/IntrinsicInst.h>
 #include <llvm/IR/Intrinsics.h>
 
+#include <llvm/Support/CodeGen.h>
+
 #include "mcsema/Arch/Dispatch.h"
 
 #include "raiseX86.h"
-#include "X86.h"
-
 
 #include "JumpTables.h"
 

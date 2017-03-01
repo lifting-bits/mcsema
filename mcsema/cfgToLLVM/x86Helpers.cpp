@@ -31,10 +31,10 @@
 
 #include <llvm/IR/IntrinsicInst.h>
 #include <llvm/IR/Intrinsics.h>
+#include <llvm/Support/CodeGen.h>
 
 #include "raiseX86.h"
 #include "Externals.h"
-#include "X86.h"
 #include "x86Helpers.h"
 #include "TransExcn.h"
 
