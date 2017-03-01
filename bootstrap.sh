@@ -101,6 +101,8 @@ fi
 echo "[+] Installing the disassembler"
 sudo python ${DIR}/tools/setup.py install
 
+PROCS=$(nproc)
+
 # Create makefiles
 echo "[+] Creating Makefiles"
 pushd ${BUILD_DIR}
@@ -108,6 +110,7 @@ MCSEMA_DIR=$(realpath ${DIR})
 BUILD_DIR=$(realpath ${BUILD_DIR})
 LLVM_DIR=$(realpath ${LLVM_DIR})
 GEN_DIR=$(realpath ${GEN_DIR})
+INSTALL_DIR=${MCSEMA_DIR}
 
 echo "[x] Building LLVM"
 mkdir -p llvm
@@ -118,13 +121,14 @@ CFLAGS="${DEBUG_BUILD_ARGS}" \
 CXXFLAGS="${DEBUG_BUILD_ARGS}" \
 cmake \
   -G "Unix Makefiles" \
+  -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
   -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
   -DLLVM_TARGETS_TO_BUILD="X86" \
   -DLLVM_INCLUDE_EXAMPLES=OFF \
   -DLLVM_INCLUDE_TESTS=OFF \
   ${LLVM_DIR}
 
-make -j4
+make -j${PROCS}
 popd
 
 echo "[x] Creating Makefiles"
@@ -135,7 +139,8 @@ CFLAGS="-g3 -O0" \
 CXXFLAGS="-g3 -O0" \
 cmake \
   -G "Unix Makefiles" \
-  -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+  -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
+  -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
   -DLLVM_DIR="${BUILD_DIR}/llvm/share/llvm/cmake" \
   -DMCSEMA_LLVM_DIR="${LLVM_DIR}" \
   -DMCSEMA_DIR="${MCSEMA_DIR}" \
@@ -143,8 +148,8 @@ cmake \
   -DMCSEMA_GEN_DIR="${GEN_DIR}" \
   ${MCSEMA_DIR}
 
-make -j4
-sudo make install
+make -j${PROCS}
+make install
 
 popd
- 
+
