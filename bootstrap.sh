@@ -3,20 +3,65 @@
 
 set -e
 
+usage() {
+  echo "Usage:"
+  echo "$0 [--prefix <PREFIX>] [--build <BUILD TYPE>]"
+  echo "PREFIX: Installation directory prefix"
+  echo "BUILDTYPE: Built type (e.g. Debug, Release, etc.)"
+  exit 1
+}
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BUILD_DIR=${DIR}/build
 THIRD_PARTY_DIR=${DIR}/third_party
 LLVM_DIR=${DIR}/third_party/llvm
-
 GEN_DIR=${DIR}/generated
 
+# default argument values
+# Debug Build
+BUILD_TYPE=Debug
+#Install to directory of the git clone
+PREFIX=$(readlink -f ${DIR})
+
+# taken from:
+# http://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
+while [[ $# -gt 0 ]]
+do
+  key="$1"
+
+  case $key in
+      -p|--prefix)
+        PREFIX=$(readlink -f $2)
+        shift # past argument
+      ;;
+      -b|--build)
+        BUILD_TYPE="$2"
+        shift # past argument
+      ;;
+      *)
+        # unknown option
+        echo "Unknown option: $key"
+        usage
+      ;;
+  esac
+  shift # past argument or value
+done
+
+if [ ! -d "${PREFIX}" ]; then
+  echo "Cannot find installation prefix directory: ${PREFIX}"
+  exit 1
+else
+    echo "Installation directory prefix: ${PREFIX}"
+fi
+
 DEBUG_BUILD_ARGS=
-if [ $# -eq 0 ]; then
-  echo "No arguments supplied. Defaulting to DCMAKE_BUILD_TYPE=Release"
+if [[ "${BUILD_TYPE}" == "Debug" ]]; then
+  echo "Build type set to: ${BUILD_TYPE}"
+  echo "  Setting build arguments for DCMAKE_BUILD_TYPE=Debug"
   BUILD_TYPE=Debug
   DEBUG_BUILD_ARGS="-g3 -O0"
 else
-  BUILD_TYPE=$1
+  echo "Build type set to: ${BUILD_TYPE}"
 fi
 
 echo "[x] Installing dependencies via apt-get"
@@ -110,7 +155,6 @@ MCSEMA_DIR=$(realpath ${DIR})
 BUILD_DIR=$(realpath ${BUILD_DIR})
 LLVM_DIR=$(realpath ${LLVM_DIR})
 GEN_DIR=$(realpath ${GEN_DIR})
-INSTALL_DIR=${MCSEMA_DIR}
 
 echo "[x] Building LLVM"
 mkdir -p llvm
@@ -121,7 +165,7 @@ CFLAGS="${DEBUG_BUILD_ARGS}" \
 CXXFLAGS="${DEBUG_BUILD_ARGS}" \
 cmake \
   -G "Unix Makefiles" \
-  -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
+  -DCMAKE_INSTALL_PREFIX=${PREFIX} \
   -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
   -DLLVM_TARGETS_TO_BUILD="X86" \
   -DLLVM_INCLUDE_EXAMPLES=OFF \
@@ -139,7 +183,7 @@ CFLAGS="-g3 -O0" \
 CXXFLAGS="-g3 -O0" \
 cmake \
   -G "Unix Makefiles" \
-  -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} \
+  -DCMAKE_INSTALL_PREFIX=${PREFIX} \
   -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
   -DLLVM_DIR="${BUILD_DIR}/llvm/share/llvm/cmake" \
   -DMCSEMA_LLVM_DIR="${LLVM_DIR}" \
