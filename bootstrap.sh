@@ -65,6 +65,7 @@ else
 fi
 
 echo "[x] Installing dependencies via apt-get"
+# gcc-multilib required onyl for 32-bit integration tests
 sudo apt-get update -qq
 sudo apt-get install -yqq \
   git \
@@ -72,7 +73,8 @@ sudo apt-get install -yqq \
   libprotoc-dev libprotobuf-dev libprotobuf-dev protobuf-compiler \
   python2.7 python-pip \
   llvm-3.8 clang-3.8 \
-  realpath
+  realpath \
+  gcc-multilib
 
 echo "[+] Upgrading PIP"
 
