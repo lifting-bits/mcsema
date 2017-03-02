@@ -83,7 +83,7 @@ echo "[+] Creating '${BUILD_DIR}'"
 mkdir -p ${BUILD_DIR}
 
 # Download and extract LLVM.
-if [ ! -d ${LLVM_DIR} ]; then
+if [ ! -e ${LLVM_DIR}/CMakeLists.txt ]; then
   mkdir -p ${LLVM_DIR}
   pushd ${LLVM_DIR}
   echo "[+] Downloading LLVM.."
