@@ -34,6 +34,8 @@ tools/dist/*
 tools/mcsema_disass.egg-info/*
 tools/mcsema_disass/ida/CFG_pb2.py
 
+bin
+
 #ignore test binaries, only keep CFGs in git
 tests/linux/x86/*.elf
 tests/linux/amd64/*.elf
