@@ -13,7 +13,7 @@ X64_CFGS=$(addprefix amd64/,$(SRCS:.c=.cfg))
 
 # do not delete intermediate targets
 # we may want to examine these manually
-.PRECIOUS: *.elf
+.PRECIOUS: x86/%.elf amd64/%.elf
 
 all: $(X86_CFGS) $(X64_CFGS)
 
