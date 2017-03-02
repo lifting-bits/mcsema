@@ -6,8 +6,15 @@ IDA64=~/ida-6.9/idal64
 SRCS=$(wildcard *.c)
 X86=$(addprefix x86/,$(SRCS:.c=.elf))
 X64=$(addprefix amd64/,$(SRCS:.c=.elf))
+
 X86_CFGS=$(addprefix x86/,$(SRCS:.c=.cfg))
 X64_CFGS=$(addprefix amd64/,$(SRCS:.c=.cfg))
+
+X86_ELFS=$(wildcard x86/*.elf)
+X64_ELFS=$(wildcard amd64/*.elf)
+
+X86_ELFS_CFGS=$(X86_ELFS:.elf=.cfg)
+X64_ELFS_CFGS=$(X64_ELFS:.elf=.cfg)
 
 .PHONY: all clean
 
@@ -15,7 +22,7 @@ X64_CFGS=$(addprefix amd64/,$(SRCS:.c=.cfg))
 # we may want to examine these manually
 .PRECIOUS: x86/%.elf amd64/%.elf
 
-all: $(X86_CFGS) $(X64_CFGS)
+all: $(X86_CFGS) $(X64_CFGS) $(X86_ELFS_CFGS) $(X64_ELFS_CFGS)
 
 # Build an ELF from our source
 x86/%.elf: %.c
@@ -32,5 +39,7 @@ amd64/%.cfg: amd64/%.elf
 	${DISASS} --disassembler ${IDA64} --arch amd64 --os linux --output $@ --binary $< --entrypoint main
 
 clean:
-	rm -f x86/*.elf x86/*.cfg
-	rm -f amd64/*.elf amd64/*.cfg
+	rm -f $(X86)
+	rm -f $(X86_CFGS)
+	rm -f $(X64)
+	rm -f $(X64_CFGS)
