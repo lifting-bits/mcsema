@@ -83,6 +83,13 @@ class LinuxTest(unittest.TestCase):
         self._runX86Test("hello")
         self._runAMD64Test("hello")
 
+    def testStringPool(self):
+        self._runX86Test("stringpool")
+        self._runAMD64Test("stringpool")
+
+    def testls(self):
+        self._runAMD64Test("ls")
+
 if __name__ == '__main__':
     unittest.main()
 
