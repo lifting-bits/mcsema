@@ -5,14 +5,27 @@ import os
 import subprocess
 import time
 import shutil
+import platform
 
 DEBUG = False
 
 class LinuxTest(unittest.TestCase):
+    """ Test translating CFGs created from Linux binaries 
+        When this test runs on Linux, it will also attempt to
+        rebuild the bitcode to new, and to run the new binaries.
+    """
     def setUp(self):
         # Create a temporary directory
         self.test_dir = tempfile.mkdtemp()
         self.archdirs = {}
+
+        # we are testing linux binaries
+        self.os = "linux"
+        self.on_test_os = platform.system().lower() == self.os
+
+        if not self.on_test_os:
+            msg = "WARNING: Running {} tests on {}. Some tests will be disabled."
+            sys.stderr.write(msg.format(self.os, platform.system()))
 
         for arch in ["x86", "amd64"]:
             self.archdirs[arch] = os.path.join(self.test_dir, arch)
@@ -24,15 +37,18 @@ class LinuxTest(unittest.TestCase):
         self.mcsema_gencode = os.path.realpath(
             os.path.join(self.my_dir, "..", "generated"))
 
-        try:
-            clang_file = subprocess.check_output(["which", "clang-3.8"])
-            self.clang = clang_file.strip()
-        except OSError as oe:
-            sys.stderr.write("Could not find clang-3.8: {}\n".format(str(oe)))
-            self.assertTrue(False)
-        except subprocess.CalledProcessError as ce:
-            sys.stderr.write("Could not find clang-3.8: {}\n".format(str(ce)))
-            self.assertTrue(False)
+        if self.on_test_os:
+            # we can only rebuild binaries if we are running on the same OS
+            # as the test OS
+            try:
+                clang_file = subprocess.check_output(["which", "clang-3.8"])
+                self.clang = clang_file.strip()
+            except OSError as oe:
+                sys.stderr.write("Could not find clang-3.8: {}\n".format(str(oe)))
+                self.assertTrue(False)
+            except subprocess.CalledProcessError as ce:
+                sys.stderr.write("Could not find clang-3.8: {}\n".format(str(ce)))
+                self.assertTrue(False)
 
 
     def tearDown(self):
@@ -112,7 +128,7 @@ class LinuxTest(unittest.TestCase):
         # run the lifter
         args = [self.mcsema_lift,
                 "--arch", arch,
-                "--os", "linux",
+                "--os", self.os,
                 "--cfg", cfg_file,
                 "--entrypoint", entrypoint,
                 "--output", bcfile,]
@@ -123,8 +139,9 @@ class LinuxTest(unittest.TestCase):
 
         # check that the bitcode was created
         self._sanityCheckFile(bcfile)
-        elffile = os.path.join(self.archdirs[arch], testname + ".elf")
-        self._compileBitcode(arch, bcfile, elffile, buildargs)
+        if self.on_test_os:
+            elffile = os.path.join(self.archdirs[arch], testname + ".bin")
+            self._compileBitcode(arch, bcfile, elffile, buildargs)
 
     def testHello(self):
         self._runX86Test("hello")
@@ -135,7 +152,12 @@ class LinuxTest(unittest.TestCase):
         self._runAMD64Test("stringpool")
 
     def testls(self):
-        self._runAMD64Test("ls", buildargs=["-lpthread", "-ldl", "-lpcre", "/lib/x86_64-linux-gnu/libselinux.so.1"])
+        libs = ["-lrt",
+                "-lpthread",
+                "-ldl",
+                "-lpcre",
+                "/lib/x86_64-linux-gnu/libselinux.so.1"]
+        self._runAMD64Test("ls", buildargs=libs)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

@@ -1,7 +1,12 @@
-CC=clang
+CC=clang-3.8
 DISASS=mcsema-disass
-IDA32=~/ida-6.9/idal
-IDA64=~/ida-6.9/idal64
+ifdef IDA_PATH
+	IDA32=$(IDA_PATH)/idal
+	IDA64=$(IDA_PATH)/idal64
+else
+	IDA32=~/ida-6.9/idal
+	IDA64=~/ida-6.9/idal64
+endif
 
 SRCS=$(wildcard *.c)
 X86=$(addprefix x86/,$(SRCS:.c=.elf))
