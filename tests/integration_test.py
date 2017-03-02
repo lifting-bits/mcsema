@@ -42,7 +42,7 @@ class LinuxTest(unittest.TestCase):
 
     def _sanityCheckFile(self, fname):
         self.assertTrue(os.path.exists(fname))
-        self.assertTrue(os.path.getsize(fname) > 0)
+        self.assertGreater(os.path.getsize(fname), 0)
 
     def _runWithTimeout(self, procargs, timeout=1200):
 
@@ -58,10 +58,10 @@ class LinuxTest(unittest.TestCase):
                 secs_used += 1
 
         # took less than timeout
-        self.assertTrue(secs_used < timeout)
+        self.assertLessEqual(secs_used, timeout)
 
         # successfully exited
-        self.assertTrue(po.returncode == 0)
+        self.assertEqual(po.returncode, 0)
         sys.stderr.write("\n")
 
     def _runAMD64Test(self, testname, entrypoint="main", buildargs=None):
@@ -138,5 +138,5 @@ class LinuxTest(unittest.TestCase):
         self._runAMD64Test("ls", buildargs=["-lpthread", "-ldl", "-lpcre", "/lib/x86_64-linux-gnu/libselinux.so.1"])
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(verbosity=2)
 
