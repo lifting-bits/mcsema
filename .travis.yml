@@ -9,6 +9,10 @@ cache:
     - build/llvm
 os:
  - linux
+before_install:
+ - sudo apt-get -qq update
+ - sudo apt-get install -qqy libxml2-dev git cmake libprotoc-dev libprotobuf-dev libprotobuf-dev protobuf-compiler python2.7 python-pip llvm-3.8 clang-3.8 realpath
+ - sudo pip install 'protobuf==2.6.1'
 install: true
 script:
  - ./bootstrap.sh
