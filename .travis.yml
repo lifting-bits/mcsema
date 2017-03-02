@@ -2,6 +2,7 @@ sudo: required
 dist: trusty
 language: generic
 cache:
+  timeout: 660
   pip: true
   custom_install: true
   directories:
