@@ -6,6 +6,8 @@ import subprocess
 import time
 import shutil
 
+DEBUG = False
+
 class LinuxTest(unittest.TestCase):
     def setUp(self):
         # Create a temporary directory
@@ -19,10 +21,24 @@ class LinuxTest(unittest.TestCase):
         self.my_dir = os.path.dirname(__file__)
         self.mcsema_lift = os.path.realpath(
             os.path.join(self.my_dir, "..", "build", "mcsema-lift"))
+        self.mcsema_gencode = os.path.realpath(
+            os.path.join(self.my_dir, "..", "generated"))
+
+        try:
+            clang_file = subprocess.check_output(["which", "clang-3.8"])
+            self.clang = clang_file.strip()
+        except OSError as oe:
+            sys.stderr.write("Could not find clang-3.8: {}\n".format(str(oe)))
+            self.assertTrue(False)
+        except subprocess.CalledProcessError as ce:
+            sys.stderr.write("Could not find clang-3.8: {}\n".format(str(ce)))
+            self.assertTrue(False)
+
 
     def tearDown(self):
         # Remove the directory after the test
-        shutil.rmtree(self.test_dir)
+        if not DEBUG:
+            shutil.rmtree(self.test_dir)
 
     def _sanityCheckFile(self, fname):
         self.assertTrue(os.path.exists(fname))
@@ -31,6 +47,8 @@ class LinuxTest(unittest.TestCase):
     def _runWithTimeout(self, procargs, timeout=1200):
 
         with open(os.devnull, "w") as devnull:
+            if DEBUG:
+                sys.stderr.write("executing: {}\n".format(" ".join(procargs)))
             po = subprocess.Popen(procargs, stderr=devnull, stdout=devnull)
             secs_used = 0
 
@@ -46,13 +64,40 @@ class LinuxTest(unittest.TestCase):
         self.assertTrue(po.returncode == 0)
         sys.stderr.write("\n")
 
-    def _runAMD64Test(self, testname, entrypoint="main"):
-        self._runArchTest("amd64", testname, entrypoint)
+    def _runAMD64Test(self, testname, entrypoint="main", buildargs=None):
+        self._runArchTest("amd64", testname, entrypoint, buildargs)
 
-    def _runX86Test(self, testname, entrypoint="main"):
-        self._runArchTest("x86", testname, entrypoint)
+    def _runX86Test(self, testname, entrypoint="main", buildargs=None):
+        self._runArchTest("x86", testname, entrypoint, buildargs)
 
-    def _runArchTest(self, arch, testname, entrypoint):
+    def _compileBitcode(self, arch, infile, outfile, extra_args=None):
+
+        generated_asm = {
+                "amd64": "ELF_64_linux.S",
+                "x86": "ELF_32_linux.S",}
+
+        asm_file = os.path.join(self.mcsema_gencode, 
+                generated_asm[arch])
+
+        flags = {
+                "amd64": "-m64",
+                "x86": "-m32", }
+
+        self.assertTrue(os.path.exists(self.clang))
+        args = [self.clang,
+                flags[arch],
+                "-o", outfile,
+                asm_file,
+                infile,
+                ]
+
+        if extra_args:
+            args.extend(extra_args)
+
+        self._runWithTimeout(args)
+        self._sanityCheckFile(outfile)
+
+    def _runArchTest(self, arch, testname, entrypoint, buildargs=None):
         # sanity check #1: lifter is built
         self._sanityCheckFile(self.mcsema_lift)
         cfg_file = os.path.abspath( os.path.join(self.my_dir, "..", "tests", "linux", arch) )
@@ -78,6 +123,8 @@ class LinuxTest(unittest.TestCase):
 
         # check that the bitcode was created
         self._sanityCheckFile(bcfile)
+        elffile = os.path.join(self.archdirs[arch], testname + ".elf")
+        self._compileBitcode(arch, bcfile, elffile, buildargs)
 
     def testHello(self):
         self._runX86Test("hello")
@@ -88,7 +135,7 @@ class LinuxTest(unittest.TestCase):
         self._runAMD64Test("stringpool")
 
     def testls(self):
-        self._runAMD64Test("ls")
+        self._runAMD64Test("ls", buildargs=["-lpthread", "-ldl", "-lpcre", "/lib/x86_64-linux-gnu/libselinux.so.1"])
 
 if __name__ == '__main__':
     unittest.main()
