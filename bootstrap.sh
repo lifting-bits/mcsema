@@ -31,7 +31,7 @@ sudo apt-get install -yqq \
 
 echo "[+] Upgrading PIP"
 
-sudo pip install --upgrade pip
+sudo -H pip install --upgrade pip
 
 # Create the build dir.
 echo "[+] Creating '${BUILD_DIR}'"
@@ -53,7 +53,7 @@ if [ ! -d ${LLVM_DIR} ]; then
 fi
 
 echo "[+] Installing python-protobuf"
-sudo pip install 'protobuf==2.6.1'
+sudo -H pip install 'protobuf==2.6.1'
 
 if [ -d /usr/local/lib/python2.7/dist-packages/google ] ; then
   sudo touch /usr/local/lib/python2.7/dist-packages/google/__init__.py
