@@ -1,0 +1,29 @@
+{
+    "_comment": "AMD64 architecture list of programs under test",
+    "hello": { 
+        "_comment": "These are test names, in case each program has more than one test",
+        "default": {
+            "_comment": "The hello program has no arguments",
+            "args": []
+        }
+    },
+
+    "stringpool": {
+        "_comment": "These are test names, in case each program has more than one test",
+        "default": {
+            "_comment": "The stringpool program has no arguments",
+            "args": []
+        }
+    },
+
+    "ls": {
+        "_comment": "These are test names, in case each program has more than one test",
+        "default": {
+            "_comment": "Default ls will have too many varying outputs, checking for /usr will be fairly sane",
+            "args": ["-d", "/usr"]
+        },
+        "width test": {
+            "args": ["--width=100", "-d", "/usr"]
+        }
+    }
+}

@@ -1,11 +1,14 @@
 CC=clang-3.8
+# adapted from:
+# http://stackoverflow.com/questions/18136918/how-to-get-current-relative-directory-of-your-makefile
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+current_dir := $(dir $(mkfile_path))
+
+OUTPUT_GEN=$(current_dir)/generate_expected_output.py
+
 ifdef MCSEMA_PATH
 	DISASS=$(MCSEMA_PATH)/mcsema-disass
 else
-	# adapted from:
-	# http://stackoverflow.com/questions/18136918/how-to-get-current-relative-directory-of-your-makefile
-	mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
-	current_dir := $(dir $(mkfile_path))
 	DISASS=$(current_dir)/../../bin/mcsema-disass
 endif
 
@@ -36,7 +39,7 @@ X64_ELFS_CFGS=$(X64_ELFS:.elf=.cfg)
 # we may want to examine these manually
 .PRECIOUS: x86/%.elf amd64/%.elf
 
-all: $(X86_CFGS) $(X64_CFGS) $(X86_ELFS_CFGS) $(X64_ELFS_CFGS)
+all: outputs_amd64 outputs_x86
 
 # Build an ELF from our source
 x86/%.elf: %.c
@@ -52,8 +55,16 @@ x86/%.cfg: x86/%.elf
 amd64/%.cfg: amd64/%.elf
 	${DISASS} --disassembler ${IDA64} --arch amd64 --os linux --output $@ --binary $< --entrypoint main
 
+outputs_amd64: amd64/config.json $(X64_CFGS) $(X64_ELFS_CFGS)
+	$(OUTPUT_GEN) amd64/config.json amd64/expected_outputs.json
+
+outputs_x86: x86/config.json $(X86_CFGS) $(X86_ELFS_CFGS)
+	$(OUTPUT_GEN) x86/config.json x86/expected_outputs.json
+
 clean:
 	rm -f $(X86)
 	rm -f $(X86_CFGS)
 	rm -f $(X64)
 	rm -f $(X64_CFGS)
+	rm -f amd64/expected_outputs.json
+	rm -f x86/expected_outputs.json
