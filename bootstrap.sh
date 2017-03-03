@@ -146,7 +146,12 @@ fi
 
 # Install the disassembler
 echo "[+] Installing the disassembler"
-sudo python ${DIR}/tools/setup.py install
+if [ ! -d "${PREFIX}/bin" ]; then 
+    mkdir -p "${PREFIX}/bin"
+fi
+# by default install to the user's python package directory
+# and copy the script itself to ${PREFIX}/bin
+python ${DIR}/tools/setup.py install --user --install-scripts "${PREFIX}/bin"
 
 PROCS=$(nproc)
 

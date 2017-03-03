@@ -1,5 +1,14 @@
 CC=clang-3.8
-DISASS=mcsema-disass
+ifdef MCSEMA_PATH
+	DISASS=$(MCSEMA_PATH)/mcsema-disass
+else
+	# adapted from:
+	# http://stackoverflow.com/questions/18136918/how-to-get-current-relative-directory-of-your-makefile
+	mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+	current_dir := $(dir $(mkfile_path))
+	DISASS=$(current_dir)/../../bin/mcsema-disass
+endif
+
 ifdef IDA_PATH
 	IDA32=$(IDA_PATH)/idal
 	IDA64=$(IDA_PATH)/idal64
