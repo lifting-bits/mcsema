@@ -65,6 +65,7 @@ else
 fi
 
 echo "[x] Installing dependencies via apt-get"
+# gcc-multilib required onyl for 32-bit integration tests
 sudo apt-get update -qq
 sudo apt-get install -yqq \
   git \
@@ -72,18 +73,19 @@ sudo apt-get install -yqq \
   libprotoc-dev libprotobuf-dev libprotobuf-dev protobuf-compiler \
   python2.7 python-pip \
   llvm-3.8 clang-3.8 \
-  realpath
+  realpath \
+  gcc-multilib
 
 echo "[+] Upgrading PIP"
 
-sudo pip install --upgrade pip
+sudo -H pip install --upgrade pip
 
 # Create the build dir.
 echo "[+] Creating '${BUILD_DIR}'"
 mkdir -p ${BUILD_DIR}
 
 # Download and extract LLVM.
-if [ ! -d ${LLVM_DIR} ]; then
+if [ ! -e ${LLVM_DIR}/CMakeLists.txt ]; then
   mkdir -p ${LLVM_DIR}
   pushd ${LLVM_DIR}
   echo "[+] Downloading LLVM.."
@@ -98,7 +100,7 @@ if [ ! -d ${LLVM_DIR} ]; then
 fi
 
 echo "[+] Installing python-protobuf"
-sudo pip install 'protobuf==2.6.1'
+sudo -H pip install 'protobuf==2.6.1'
 
 if [ -d /usr/local/lib/python2.7/dist-packages/google ] ; then
   sudo touch /usr/local/lib/python2.7/dist-packages/google/__init__.py
