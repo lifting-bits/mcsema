@@ -115,7 +115,7 @@ class LinuxTest(unittest.TestCase):
 
         self.assertTrue(os.path.exists(self.clang))
         args = [self.clang,
-                "-O0",
+                "-O3",
                 flags[arch],
                 "-o", outfile,
                 asm_file,
