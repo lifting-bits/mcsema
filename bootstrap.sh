@@ -66,6 +66,7 @@ fi
 
 echo "[x] Installing dependencies via apt-get"
 # gcc-multilib required onyl for 32-bit integration tests
+# g++-multilib required to build 32-bit generated code
 sudo apt-get update -qq
 sudo apt-get install -yqq \
   git \
@@ -74,7 +75,7 @@ sudo apt-get install -yqq \
   python2.7 python-pip \
   llvm-3.8 clang-3.8 \
   realpath \
-  gcc-multilib
+  gcc-multilib g++-multilib
 
 echo "[+] Upgrading PIP"
 
@@ -129,13 +130,13 @@ fi
 # Produce the runtimes.
 if [ ! -e ${GEN_DIR}/ELF_32_linux.S ]; then
   echo "[+] Generating runtimes"
-  clang++-3.8 -std=gnu++11 ${DIR}/mcsema/Arch/X86/print_ELF_32_linux.cpp
+  clang++-3.8 -m32 -std=gnu++11 ${DIR}/mcsema/Arch/X86/print_ELF_32_linux.cpp
   ./a.out > ${GEN_DIR}/ELF_32_linux.S
 
   clang++-3.8 -std=gnu++11 ${DIR}/mcsema/Arch/X86/print_ELF_64_linux.cpp
   ./a.out > ${GEN_DIR}/ELF_64_linux.S
 
-  clang++-3.8 -std=gnu++11 ${DIR}/mcsema/Arch/X86/print_PE_32_windows.cpp
+  clang++-3.8 -m32 -std=gnu++11 ${DIR}/mcsema/Arch/X86/print_PE_32_windows.cpp
   ./a.out > ${GEN_DIR}/PE_32_windows.asm
 
   clang++-3.8 -std=gnu++11 ${DIR}/mcsema/Arch/X86/print_PE_64_windows.cpp

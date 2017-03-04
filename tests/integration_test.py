@@ -198,13 +198,11 @@ class LinuxTest(unittest.TestCase):
             self._checkInputs(arch, testname, elffile)
 
     def testHello(self):
-        #TODO(artem): enable when translated x86 binaries run again
-        #self._runX86Test("hello")
+        self._runX86Test("hello")
         self._runAMD64Test("hello")
 
     def testStringPool(self):
-        #TODO(artem): enable when translated x86 binaries run again
-        #self._runX86Test("stringpool")
+        self._runX86Test("stringpool")
         self._runAMD64Test("stringpool")
 
     #TODO(artem): enable when we address issue #108
