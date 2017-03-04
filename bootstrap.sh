@@ -66,6 +66,7 @@ fi
 
 echo "[x] Installing dependencies via apt-get"
 # gcc-multilib required onyl for 32-bit integration tests
+# g++-multilib required to build 32-bit generated code
 sudo apt-get update -qq
 sudo apt-get install -yqq \
   git \
@@ -74,7 +75,7 @@ sudo apt-get install -yqq \
   python2.7 python-pip \
   llvm-3.8 clang-3.8 \
   realpath \
-  gcc-multilib
+  gcc-multilib g++-multilib
 
 echo "[+] Upgrading PIP"
 
