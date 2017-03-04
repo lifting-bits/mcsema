@@ -1,0 +1,18 @@
+{
+    "_comment": "x86 architecture list of programs under test",
+    "hello": { 
+        "_comment": "These are test names, in case each program has more than one test",
+        "default": {
+            "_comment": "The hello program has no arguments",
+            "args": []
+        }
+    },
+
+    "stringpool": {
+        "_comment": "These are test names, in case each program has more than one test",
+        "default": {
+            "_comment": "The stringpool program has no arguments",
+            "args": []
+        }
+    }
+}
