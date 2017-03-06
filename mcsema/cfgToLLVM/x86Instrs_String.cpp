@@ -208,14 +208,14 @@ static llvm::BasicBlock *doStosV(llvm::BasicBlock *pred) {
 
 template<int opSize, int regWidth>
 static llvm::BasicBlock *doLodsV(llvm::BasicBlock *pred) {
-  //write EAX to [EDI]
+  //read [ESI]
   auto srcRegVal = R_READ<regWidth>(pred, llvm::X86::RSI);
   auto fromMem = M_READ_0<opSize>(pred, srcRegVal);
 
-  // store EAX in [EDI]
+  // Store [ESI] in EAX
   R_WRITE<opSize>(pred, llvm::X86::RAX, fromMem);
 
-  //now, either increment or decrement EDI based on the DF flag
+  //now, either increment or decrement ESI based on the DF flag
   auto &C = pred->getContext();
   auto F = pred->getParent();
   auto isZero = llvm::BasicBlock::Create(C, "", F);
@@ -669,7 +669,6 @@ template<int width>
 static InstTransResult doLods(llvm::BasicBlock *&b, NativeInstPtr ip) {
   auto M = b->getParent()->getParent();
   auto bitWidth = ArchPointerSize(M);
-  printf("IM IN HERE YO!\n");
   NativeInst::Prefix pfx = ip->get_prefix();
   if (bitWidth == Pointer32) {
     if (pfx == NativeInst::RepPrefix) {
