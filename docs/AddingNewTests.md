@@ -107,7 +107,7 @@ For this example, we'll start with the following source file, to be named `switc
 
 ### Generating Expected Output
 
-We need to tell the test generation scripts what output the program should have. To do that, edit x86/config.json and amd64/config.json and add:
+We need to tell the test generation scripts what output the program should have. To do that, edit [x86/config.json](https://github.com/trailofbits/mcsema/blob/master/tests/linux/x86/config.json) and [amd64/config.json](https://github.com/trailofbits/mcsema/blob/master/tests/linux/amd64/config.json) and add:
 
     "switch": {
         "_comment": "A test for switch statements, which hits mcsema's jump table handling",
@@ -133,7 +133,7 @@ Each entry in the testing block for `"switch"` is a test name, like `"switch 14"
 
 ### Generate the tests
 
-The Makefile in [tests/linux]() will generate the CFG files and expected outputs.
+The Makefile in [tests/linux](https://github.com/trailofbits/mcsema/blob/master/tests/linux/Makefile) will generate the CFG files and expected outputs.
 
 IDA Pro is required to generate the pre-computed CFG files.
 
@@ -197,7 +197,7 @@ In this example, we'll manually specify the IDA and mcsema paths. To build the n
 
 There is one more step needed before these tests will be run by the integration test system: telling the test system to run them.
 
-To do that, edit [tests/linux/integration_test.py]() and add a new function to the LinuxTest class. Since these tests use the Python `unittest` framework, the name of each function must start with `test`. We'll name this one `testswitch`:
+To do that, edit [tests/integration_test.py](https://github.com/trailofbits/mcsema/blob/master/tests/integration_test.py) and add a new function to the LinuxTest class. Since these tests use the Python `unittest` framework, the name of each function must start with `test`. We'll name this one `testswitch`:
 
     def testswitch(self):
         self._runX86Test("switch")
