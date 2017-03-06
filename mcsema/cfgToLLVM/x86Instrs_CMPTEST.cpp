@@ -344,6 +344,13 @@ GENERIC_TRANSLATION_REF(TEST16rm, doTestRM<16>(ip, block, OP(0), ADDR_NOREF(1)),
 GENERIC_TRANSLATION(TEST16rr, doTestRR<16>(ip, block, OP(0), OP(1)))
 
 GENERIC_TRANSLATION_MI(
+    TEST64mi32,
+    doTestMI<64>(ip, block, ADDR_NOREF(0), OP(5)),
+    doTestMI<64>(ip, block, MEM_REFERENCE(0), OP(5)),
+    doTestMV<64>(ip, block, ADDR_NOREF(0), IMM_AS_DATA_REF<32>(block, natM, ip)),
+    doTestMV<64>(ip, block, MEM_REFERENCE(0), IMM_AS_DATA_REF<32>(block, natM, ip)))
+
+GENERIC_TRANSLATION_MI(
     TEST32mi,
     doTestMI<32>(ip, block, ADDR_NOREF(0), OP(5)),
     doTestMI<32>(ip, block, MEM_REFERENCE(0), OP(5)),
@@ -408,6 +415,7 @@ void CMPTEST_populateDispatchMap(DispatchMap &m) {
 
   m[llvm::X86::TEST64ri32] = translate_TEST64ri32;
   m[llvm::X86::TEST64i32] = translate_TEST64i32;
+  m[llvm::X86::TEST64mi32] = translate_TEST64mi32;
   m[llvm::X86::TEST64rm] = translate_TEST64rm;
   m[llvm::X86::TEST64rr] = translate_TEST64rr;
   m[llvm::X86::TEST32rr] = translate_TEST32rr;

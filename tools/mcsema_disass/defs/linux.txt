@@ -5340,78 +5340,6 @@ data_behind 1 C N
 # data definitions
 DATA: environ PTR
 DATA: __gmon_start___ptr PTR
-DATA: __imp_abort PTR
-DATA: __imp_access PTR
-DATA: __imp_calloc PTR
-DATA: __imp_chdir PTR
-DATA: __imp_chown PTR
-DATA: __imp_chroot PTR
-DATA: __imp___ctype_b_loc PTR
-DATA: __imp___ctype_tolower_loc PTR
-DATA: __imp___ctype_toupper_loc PTR
-DATA: __imp___cxa_finalize PTR
-DATA: __imp___errno_location PTR
-DATA: __imp_exit PTR
-DATA: __imp___fprintf_chk PTR
-DATA: __imp_free PTR
-DATA: __imp_freopen PTR
-DATA: __imp_getenv PTR
-DATA: __imp_geteuid PTR
-DATA: __imp_getgrnam PTR
-DATA: __imp_getloadavg PTR
-DATA: __imp_getpgid PTR
-DATA: __imp_getpgrp PTR
-DATA: __imp_getpid PTR
-DATA: __imp_getpwnam PTR
-DATA: __imp_getpwuid PTR
-DATA: __imp_getrlimit PTR
-DATA: __imp___gmon_start__ PTR
-DATA: __imp_initgroups PTR
-DATA: __imp_kill PTR
-DATA: __imp___libc_start_main PTR
-DATA: __imp_malloc PTR
-DATA: __imp_memcmp PTR
-DATA: __imp_memcpy PTR
-DATA: __imp_memmove PTR
-DATA: __imp_memset PTR
-DATA: __imp_openlog PTR
-DATA: __imp_pcre_compile2 PTR
-DATA: __imp_pcre_exec PTR
-DATA: __imp_pcre_fullinfo PTR
-DATA: __imp_prctl PTR
-DATA: __imp___printf_chk PTR
-DATA: __imp_putchar PTR
-DATA: __imp_puts PTR
-DATA: __imp_qsort PTR
-DATA: __imp___rawmemchr PTR
-DATA: __imp_read PTR
-DATA: __imp_realloc PTR
-DATA: __imp_semctl PTR
-DATA: __imp_setenv PTR
-DATA: __imp_setgid PTR
-DATA: __imp_setsockopt PTR
-DATA: __imp_setuid PTR
-DATA: __imp_sigaction PTR
-DATA: __imp_sigemptyset PTR
-DATA: __imp_sscanf PTR
-DATA: __imp___stack_chk_fail PTR
-DATA: __imp_stpcpy PTR
-DATA: __imp_strcasecmp PTR
-DATA: __imp_strchr PTR
-DATA: __imp_strcmp PTR
-DATA: __imp_strcpy PTR
-DATA: __imp_strlen PTR
-DATA: __imp_strncasecmp PTR
-DATA: __imp_strncmp PTR
-DATA: __imp_strncpy PTR
-DATA: __imp_strrchr PTR
-DATA: __imp_strstr PTR
-DATA: __imp_strtol PTR
-DATA: __imp_syscall PTR
-DATA: __imp_sysconf PTR
-DATA: __imp___syslog_chk PTR
-DATA: __imp_times PTR
-DATA: __imp_write PTR
 DATA: in6addr_any PTR
 DATA: stderr PTR
 DATA: stdin PTR
@@ -26656,6 +26584,7 @@ strncat 3 C N
 __strncat_chk 4 C N
 strncmp 3 C N
 strncpy 3 C N
+__strncpy_chk 4 C N
 strndup 2 C N
 strnlen 2 C N
 strnstr 3 C N
@@ -37311,4 +37240,5 @@ ZZ_DestroyLink 1 C N
 ZZ_DestroyList 1 C N
 ZZ_NewLink 1 C N
 ZZ_NewList 0 C N
-
+__fdelt_chk 1 C N
+__fdelt_warn 1 C N

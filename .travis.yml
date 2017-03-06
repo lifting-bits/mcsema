@@ -1,14 +1,23 @@
 sudo: required
 dist: trusty
 language: generic
+cache:
+  timeout: 660
+  pip: true
+  custom_install: true
+  directories:
+    - build/llvm
+    - third_party/llvm
 os:
  - linux
-compiler:
- - gcc
-install:
- - ./bootstrap.sh
+before_install:
+ - sudo apt-get -qq update
+ - sudo apt-get install -qqy libxml2-dev git cmake libprotoc-dev libprotobuf-dev libprotobuf-dev protobuf-compiler python2.7 python-pip llvm-3.8 clang-3.8 realpath gcc-multilib
+ - sudo pip install 'protobuf==2.6.1'
+install: true
 script:
- - cd build && make -j4
+ - ./bootstrap.sh
+ - python tests/integration_test.py
 notifications:
   slack:
     secure: g1Nm7C7TYKg4RjDJ5cwuEcgKXfOAmVOu51adTPLBLGzZcCbCrkwQgI39ZycsalaACSnC8iNvqSCbRfZIA5mkDZ7VADaiZgLoWjq3RQzJmWgwGhhtyRkbtiicBnowTL5hIEiMOv6RnKlbB7M2OwzRiS07+FQXrK24hz+qm6zPptw=

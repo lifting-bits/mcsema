@@ -109,8 +109,13 @@ git clone git@github.com:trailofbits/mcsema.git --depth 1
 ##### Run the bootstrap script
 ```shell
 cd mcsema
-./bootstrap.sh Release
+./bootstrap.sh --build Release
 ```
+
+The Linux bootstrap script supports two configuration options:
+
+  * `--prefix`: The installation directory prefix for mcsema-lift. Defaults to the directory containing the bootstrap script.
+  * `--build`: Set the build type. Defaults to `Debug`
 
 #### On Windows
 
