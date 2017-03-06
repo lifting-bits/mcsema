@@ -728,7 +728,8 @@ GENERIC_TRANSLATION(REP_STOSD_32, (doRepStos<32, 32>(block)))
     NativeInst::Prefix pfx = ip->get_prefix();\
     switch (pfx) { \
       case NativeInst::NoPrefix: \
-        throw TErr(__LINE__, __FILE__, "NIY"); \
+        block = doScas<WIDTH>(block); \
+        return ContinueBlock; \
         break; \
       case NativeInst::RepPrefix: \
         throw TErr(__LINE__, __FILE__, "NIY"); \
@@ -741,6 +742,8 @@ GENERIC_TRANSLATION(REP_STOSD_32, (doRepStos<32, 32>(block)))
     } \
     return ret ;\
 }
+//	ret = doScas<WIDTH>(block); \
+
 
 #define CMPS_TRANSLATION(NAME, WIDTH) \
     static InstTransResult translate_ ## NAME ( \
