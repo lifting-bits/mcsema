@@ -1,8 +1,9 @@
+#include <llvm/Support/CodeGen.h>
+#include <llvm/Support/Debug.h>
+
 #include "raiseX86.h"
 #include "Externals.h"
-#include "X86.h"
 #include "x86Helpers.h"
-#include "llvm/Support/Debug.h"
 
 using namespace std;
 using namespace llvm;
