@@ -206,6 +206,74 @@ static llvm::BasicBlock *doStosV(llvm::BasicBlock *pred) {
   return doWrite;
 }
 
+template<int opSize, int regWidth>
+static llvm::BasicBlock *doLodsV(llvm::BasicBlock *pred) {
+  //write EAX to [EDI]
+  auto srcRegVal = R_READ<regWidth>(pred, llvm::X86::RSI);
+  auto fromMem = M_READ_0<opSize>(pred, srcRegVal);
+
+  // store EAX in [EDI]
+  R_WRITE<opSize>(pred, llvm::X86::RAX, fromMem);
+
+  //now, either increment or decrement EDI based on the DF flag
+  auto &C = pred->getContext();
+  auto F = pred->getParent();
+  auto isZero = llvm::BasicBlock::Create(C, "", F);
+  auto isOne = llvm::BasicBlock::Create(C, "", F);
+  auto doWrite = llvm::BasicBlock::Create(C, "", F);
+
+  //compare DF against 0
+  auto cmpRes = new llvm::ICmpInst( *pred, llvm::CmpInst::ICMP_EQ,
+                                   F_READ(pred, llvm::X86::DF),
+                                   CONST_V<1>(pred, 0), "");
+
+  //do a branch based on the cmp
+  llvm::BranchInst::Create(isZero, isOne, cmpRes, pred);
+
+  uint64_t disp = 0;
+  switch (opSize) {
+    case 8:
+      disp = 1;
+      break;
+    case 16:
+      disp = 2;
+      break;
+    case 32:
+      disp = 4;
+      break;
+    case 64:
+      disp = 8;
+      break;
+    default:
+      throw TErr(__LINE__, __FILE__, "Invalid width");
+  }
+
+  //populate the isZero branch
+  //if zero, then add to src and dst registers
+  auto zeroDst = llvm::BinaryOperator::CreateAdd(
+      srcRegVal, CONST_V<regWidth>(isZero, disp), "", isZero);
+  llvm::BranchInst::Create(doWrite, isZero);
+
+  //populate the isOne branch
+  //if one, then sub from src and dst registers
+  auto oneDst = llvm::BinaryOperator::CreateSub(srcRegVal,
+                                                CONST_V<regWidth>(isOne, disp),
+                                                "", isOne);
+  llvm::BranchInst::Create(doWrite, isOne);
+
+  //populate the update of the source/dest registers
+  auto newDst = llvm::PHINode::Create(llvm::Type::getIntNTy(C, regWidth), 2, "",
+                                      doWrite);
+
+
+  newDst->addIncoming(zeroDst, isZero);
+  newDst->addIncoming(oneDst, isOne);
+
+  R_WRITE<regWidth>(doWrite, llvm::X86::RSI, newDst);
+
+  return doWrite;
+}
+
 template<int width, int regWidth>
 static llvm::BasicBlock *doScasV(llvm::BasicBlock *pred) {
   //do a read from the memory pointed to by EDI
@@ -565,6 +633,17 @@ static InstTransResult doRepStos(llvm::BasicBlock *&b) {
   return ContinueBlock;
 }
 
+
+template<int opSize, int bitWidth>
+static InstTransResult doRepLods(llvm::BasicBlock *&b) {
+  auto bodyBegin = llvm::BasicBlock::Create(b->getContext(), "",
+                                            b->getParent());
+  auto bodyEnd = doLodsV<opSize, bitWidth>(bodyBegin);
+  b = doRepN<opSize, bitWidth>(b, bodyBegin, bodyEnd);
+  return ContinueBlock;
+}
+
+
 template<int width>
 static InstTransResult doStos(llvm::BasicBlock *&b, NativeInstPtr ip) {
   auto M = b->getParent()->getParent();
@@ -581,6 +660,28 @@ static InstTransResult doStos(llvm::BasicBlock *&b, NativeInstPtr ip) {
       doRepStos<width, 64>(b);
     } else {
       b = doStosV<width, 64>(b);
+    }
+  }
+  return ContinueBlock;
+}
+
+template<int width>
+static InstTransResult doLods(llvm::BasicBlock *&b, NativeInstPtr ip) {
+  auto M = b->getParent()->getParent();
+  auto bitWidth = ArchPointerSize(M);
+  printf("IM IN HERE YO!\n");
+  NativeInst::Prefix pfx = ip->get_prefix();
+  if (bitWidth == Pointer32) {
+    if (pfx == NativeInst::RepPrefix) {
+      doRepLods<width, 32>(b);
+    } else {
+      b = doLodsV<width, 32>(b);
+    }
+  } else {
+    if (pfx == NativeInst::RepPrefix) {
+      doRepLods<width, 64>(b);
+    } else {
+      b = doLodsV<width, 64>(b);
     }
   }
   return ContinueBlock;
@@ -603,6 +704,11 @@ GENERIC_TRANSLATION(STOSQ, doStos<64>(block, ip))
 GENERIC_TRANSLATION(STOSD, doStos<32>(block, ip))
 GENERIC_TRANSLATION(STOSW, doStos<16>(block, ip))
 GENERIC_TRANSLATION(STOSB, doStos<8>(block, ip))
+
+GENERIC_TRANSLATION(LODSQ, doLods<64>(block, ip))
+GENERIC_TRANSLATION(LODSD, doLods<32>(block, ip))
+GENERIC_TRANSLATION(LODSW, doLods<16>(block, ip))
+GENERIC_TRANSLATION(LODSB, doLods<8>(block, ip))
 
 GENERIC_TRANSLATION(REP_STOSB_64, (doRepStos<8, 64>(block)))
 GENERIC_TRANSLATION(REP_STOSW_64, (doRepStos<16, 64>(block)))
@@ -690,6 +796,12 @@ void String_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::STOSW] = translate_STOSW;
   m[llvm::X86::STOSB] = translate_STOSB;
   m[llvm::X86::STOSQ] = translate_STOSQ;
+
+
+  m[llvm::X86::LODSL] = translate_LODSD;
+  m[llvm::X86::LODSW] = translate_LODSW;
+  m[llvm::X86::LODSB] = translate_LODSB;
+  m[llvm::X86::LODSQ] = translate_LODSQ;
 
   m[llvm::X86::REP_STOSB_32] = translate_REP_STOSB_32;
   m[llvm::X86::REP_STOSW_32] = translate_REP_STOSW_32;
