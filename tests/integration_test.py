@@ -205,6 +205,10 @@ class LinuxTest(unittest.TestCase):
         self._runX86Test("stringpool")
         self._runAMD64Test("stringpool")
 
+    def testlodsb(self):
+        self._runX86Test("lodsb")
+        self._runAMD64Test("lodsb")
+
     #TODO(artem): enable when we address issue #108
     @unittest.skip("Re-enable after we fix issue #108")
     def testls(self):

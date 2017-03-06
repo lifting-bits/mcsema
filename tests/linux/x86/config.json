@@ -14,5 +14,13 @@
             "_comment": "The stringpool program has no arguments",
             "args": []
         }
+    },
+
+    "lodsb": {
+        "_comment": "The lodsb program checks if lodsb, stosb, and testb instructions work",
+        "default": {
+            "_comment": "The lodsb program has no arguments",
+            "args": []
+        }
     }
 }
