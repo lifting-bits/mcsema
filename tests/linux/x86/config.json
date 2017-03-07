@@ -14,5 +14,29 @@
             "_comment": "The stringpool program has no arguments",
             "args": []
         }
+    },
+
+    "lodsb": {
+        "_comment": "The lodsb program checks if lodsb, stosb, and testb instructions work",
+        "default": {
+            "_comment": "The lodsb program has no arguments",
+            "args": []
+        }
+    },
+
+    "switch": {
+        "_comment": "A test for switch statements, which hits mcsema's jump table handling",
+        "switch 1": {
+            "_comment": "Executes ./switch 1 [the most simple test case]",
+            "args": ["1"]
+        },
+        "switch 14": {
+            "_comment": "Executes ./switch 14 [hits the default case]",
+            "args": ["14"]
+        },
+        "switch 74642": {
+            "_comment": "Executes ./switch 74642 [hits the big number case]",
+            "args": ["74642"]
+        }
     }
 }

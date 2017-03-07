@@ -10,6 +10,15 @@
       "expected_stdout": "SGVsbG8sIFdvcmxkIQo="
     }
   }, 
+  "lodsb": {
+    "_comment": "The lodsb program checks if lodsb, stosb, and testb instructions work", 
+    "default": {
+      "_comment": "The lodsb program has no arguments", 
+      "args": [], 
+      "expected_stderr": "", 
+      "expected_stdout": "aSBhbSBzbyBjb29sLgpUaGUgc3RyaW5ncyBtYXRjaAo="
+    }
+  }, 
   "stringpool": {
     "_comment": "These are test names, in case each program has more than one test", 
     "default": {
@@ -17,6 +26,33 @@
       "args": [], 
       "expected_stderr": "", 
       "expected_stdout": "cGFydGlhbCBzdHJpbmcgdGVzdDogc3RyaW5nIHRlc3QK"
+    }
+  }, 
+  "switch": {
+    "_comment": "A test for switch statements, which hits mcsema's jump table handling", 
+    "switch 1": {
+      "_comment": "Executes ./switch 1 [the most simple test case]", 
+      "args": [
+        "1"
+      ], 
+      "expected_stderr": "", 
+      "expected_stdout": "SW5wdXQgd2FzIG9uZQo="
+    }, 
+    "switch 14": {
+      "_comment": "Executes ./switch 14 [hits the default case]", 
+      "args": [
+        "14"
+      ], 
+      "expected_stderr": "", 
+      "expected_stdout": "VW5rbm93biBpbnB1dDogMTQK"
+    }, 
+    "switch 74642": {
+      "_comment": "Executes ./switch 74642 [hits the big number case]", 
+      "args": [
+        "74642"
+      ], 
+      "expected_stderr": "", 
+      "expected_stdout": "UmVhbGx5IGJpZyBpbnB1dDogIDB4MTIzOTIK"
     }
   }
 }
