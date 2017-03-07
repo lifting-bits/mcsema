@@ -94,9 +94,9 @@ When using `mcsema-lift` you see an assertion failure in StoreInst like the foll
 
 **Technical Background:** There is an LLVM `store` instruction, and the type of what you're trying to store and where you are trying to put it are different.
 
-**Possible Fixes:** The core issue is probably a bitness mismatch between the destination and the value. For example, you are trying to write an `i32` value into an `i64*` pointer, or vice versa. Mcsema-lift needs to be fixed to use the correct bitwidth. Luckily, this is probably very simple -- make sure the pointer and destination match sizes! 
+**Possible Fixes:** The core issue is probably a bitness mismatch between the destination and the value. For example, you are trying to write an `i32` value into an `i64*` pointer, or vice versa. Mcsema must be fixed to use the correct bitwidth. Luckily, this is likely simple.
 
-**Debugging Hints:** Use a debugger to launch mcsema-lift, and identify the instruction from the backtrace. Here is an example:
+**Debugging Hints:** Use a debugger to launch `mcsema-lift`, and identify the instruction from the backtrace. Here is an example:
 
     Program received signal SIGABRT, Aborted.
     0x00007ffff6418428 in __GI_raise (sig=sig@entry=6) at ../sysdeps/unix/sysv/linux/raise.c:54
@@ -125,14 +125,14 @@ When using `mcsema-lift` you see an assertion failure in StoreInst like the foll
     #17 0x00000000005aaee4 in LiftCodeIntoModule (natMod=0x72093b0, M=0x16d2060) at /store/artem/git/mcsema/mcsema/cfgToLLVM/raiseX86.cpp:952
     #18 0x00000000005544a0 in main (argc=11, argv=0x7fffffffdec8) at /store/artem/git/mcsema/mcsema/Lift.cpp:124
 
-This tells us the problem is in the `MOV32mi` instruction. That instruction writes a 32-bit value to memory, so the core issue is probably a 64-bit pointer and a 32-bit value mismatch, because the architecture for this specific program is `amd64`. Looking at the code at line 643 we see:
+This tells us the problem is in the `MOV32mi` instruction. That instruction writes a 32-bit value to memory, so the core issue is probably a 32-bit pointer and a 64-bit value mismatch, because the architecture for this specific program is `amd64`. Looking at the code at line 643 we see:
 
     640         data_v = IMM_AS_DATA_REF(block, natM, ip);
     641       }
     642
     643       doMIMovV<32>(ip, block, ADDR_NOREF(0), data_v);
 
-The `IMM_AS_DATA_REF` function returns an architecture sized pointer, which in this case would be 64-bit. Problem found: there is a 32-bit sized MOV to a 64-bit pointer! The solution is to replace `IMM_AS_DATA_REF` with `IMM_AS_DATA_REF<32>`, which will return a 32-bit value.
+The `IMM_AS_DATA_REF` function returns an architecture sized pointer, which in this case would be 64-bit. The MOV itself will be to a 32-bit value. Problem found: we are trying to put an `i64` into an `i32*` pointer! The solution is to replace `IMM_AS_DATA_REF` with `IMM_AS_DATA_REF<32>`, which will return a 32-bit value.
 
 # Errors rebuilding binaries from Bitcode
 
