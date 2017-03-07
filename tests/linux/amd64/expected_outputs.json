@@ -39,5 +39,32 @@
       "expected_stderr": "", 
       "expected_stdout": "cGFydGlhbCBzdHJpbmcgdGVzdDogc3RyaW5nIHRlc3QK"
     }
+  }, 
+  "switch": {
+    "_comment": "A test for switch statements, which hits mcsema's jump table handling", 
+    "switch 1": {
+      "_comment": "Executes ./switch 1 [the most simple test case]", 
+      "args": [
+        "1"
+      ], 
+      "expected_stderr": "", 
+      "expected_stdout": "SW5wdXQgd2FzIG9uZQo="
+    }, 
+    "switch 14": {
+      "_comment": "Executes ./switch 14 [hits the default case]", 
+      "args": [
+        "14"
+      ], 
+      "expected_stderr": "", 
+      "expected_stdout": "VW5rbm93biBpbnB1dDogMTQK"
+    }, 
+    "switch 74642": {
+      "_comment": "Executes ./switch 74642 [hits the big number case]", 
+      "args": [
+        "74642"
+      ], 
+      "expected_stderr": "", 
+      "expected_stdout": "UmVhbGx5IGJpZyBpbnB1dDogIDB4MTIzOTIK"
+    }
   }
 }
