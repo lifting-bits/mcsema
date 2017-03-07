@@ -85,6 +85,55 @@ You get an error that says "NIY" and has a line number, for example:
 
 **Debugging Hints:** To know more about the problem, look at the line number in the error message. The line may be a macro, so you may need to find the macro definition to see the root cause of the problem.
 
+## StoreInst assertion failure
+
+When using `mcsema-lift` you see an assertion failure in StoreInst like the following:
+
+    mcsema-lift: /store/artem/git/mcsema/third_party/llvm/lib/IR/Instructions.cpp:1304: void llvm::StoreInst::AssertOK(): Assertion `getOperand(0)->getType() == cast<PointerType>(getOperand(1)->getType())->getElementType() && "Ptr must be a pointer to Val type!"' failed.
+    Aborted (core dumped)
+
+**Technical Background:** There is an LLVM `store` instruction, and the type of what you're trying to store and where you are trying to put it are different.
+
+**Possible Fixes:** The core issue is probably a bitness mismatch between the destination and the value. For example, you are trying to write an `i32` value into an `i64*` pointer, or vice versa. Mcsema-lift needs to be fixed to use the correct bitwidth. Luckily, this is probably very simple -- make sure the pointer and destination match sizes! 
+
+**Debugging Hints:** Use a debugger to launch mcsema-lift, and identify the instruction from the backtrace. Here is an example:
+
+    Program received signal SIGABRT, Aborted.
+    0x00007ffff6418428 in __GI_raise (sig=sig@entry=6) at ../sysdeps/unix/sysv/linux/raise.c:54
+    54      ../sysdeps/unix/sysv/linux/raise.c: No such file or directory.
+    (gdb) bt
+    #0  0x00007ffff6418428 in __GI_raise (sig=sig@entry=6) at ../sysdeps/unix/sysv/linux/raise.c:54
+    #1  0x00007ffff641a02a in __GI_abort () at abort.c:89
+    #2  0x00007ffff6410bd7 in __assert_fail_base (fmt=<optimized out>, assertion=assertion@entry=0x1129956 "getOperand(0)->getType() == cast<PointerType>(getOperand(1)->getType())->getElementType() && \"Ptr must be a pointer to Val type!\"",
+        file=file@entry=0x112869c "/store/artem/git/mcsema/third_party/llvm/lib/IR/Instructions.cpp", line=line@entry=1304, function=function@entry=0x11298ec "void llvm::StoreInst::AssertOK()") at assert.c:92
+    #3  0x00007ffff6410c82 in __GI___assert_fail (assertion=0x1129956 "getOperand(0)->getType() == cast<PointerType>(getOperand(1)->getType())->getElementType() && \"Ptr must be a pointer to Val type!\"",
+        file=0x112869c "/store/artem/git/mcsema/third_party/llvm/lib/IR/Instructions.cpp", line=1304, function=0x11298ec "void llvm::StoreInst::AssertOK()") at assert.c:101
+    #4  0x0000000000c1961e in llvm::StoreInst::AssertOK (this=0x9a3fe40) at /store/artem/git/mcsema/third_party/llvm/lib/IR/Instructions.cpp:1302
+    #5  0x0000000000c19ad3 in llvm::StoreInst::StoreInst (this=0x9a3fe40, val=0x9a3fdc0, addr=0x9a3fc98, isVolatile=false, Align=0, Order=llvm::NotAtomic, SynchScope=llvm::CrossThread, InsertAtEnd=0x9a2b1e0)
+        at /store/artem/git/mcsema/third_party/llvm/lib/IR/Instructions.cpp:1362
+    #6  0x0000000000c19893 in llvm::StoreInst::StoreInst (this=0x9a3fe40, val=0x9a3fdc0, addr=0x9a3fc98, isVolatile=false, Align=0, InsertAtEnd=0x9a2b1e0) at /store/artem/git/mcsema/third_party/llvm/lib/IR/Instructions.cpp:1330
+    #7  0x0000000000c19799 in llvm::StoreInst::StoreInst (this=0x9a3fe40, val=0x9a3fdc0, addr=0x9a3fc98, isVolatile=false, InsertAtEnd=0x9a2b1e0) at /store/artem/git/mcsema/third_party/llvm/lib/IR/Instructions.cpp:1321
+    #8  0x00000000005a7d71 in INTERNAL_M_WRITE (width=32, addrspace=0, b=0x9a2b1e0, addr=0x9a3fbd8, data=0x9a3fdc0) at /store/artem/git/mcsema/mcsema/cfgToLLVM/raiseX86.cpp:132
+    #9  0x00000000006762e9 in M_WRITE<32> (ip=0x5873c20, b=0x9a2b1e0, addr=0x9a3fbd8, data=0x9a3fdc0) at /store/artem/git/mcsema/mcsema/cfgToLLVM/raiseX86.h:136
+    #10 0x0000000000676020 in doMIMovV<32> (ip=0x5873c20, b=@0x7fffffffd730: 0x9a2b1e0, dstAddr=0x9a3fbd8, src=0x9a3fdc0) at /store/artem/git/mcsema/mcsema/cfgToLLVM/x86Instrs_MOV.cpp:473
+    #11 0x000000000066d2b9 in translate_MOV32mi (ctx=..., block=@0x7fffffffd730: 0x9a2b1e0) at /store/artem/git/mcsema/mcsema/cfgToLLVM/x86Instrs_MOV.cpp:643
+    #12 0x00000000005b7db6 in LiftInstIntoBlockImpl (ctx=..., block=@0x7fffffffd730: 0x9a2b1e0) at /store/artem/git/mcsema/mcsema/cfgToLLVM/x86Instrs.cpp:138
+    #13 0x00000000005ad51a in LiftInstIntoBlock (ctx=..., block=@0x7fffffffd730: 0x9a2b1e0, doAnnotation=true) at /store/artem/git/mcsema/mcsema/cfgToLLVM/raiseX86.cpp:407
+    #14 0x00000000005ad25e in LiftBlockIntoFunction (ctx=...) at /store/artem/git/mcsema/mcsema/cfgToLLVM/raiseX86.cpp:440
+    #15 0x00000000005acec9 in InsertFunctionIntoModule (mod=0x72093b0, func=0x586e550, M=0x16d2060) at /store/artem/git/mcsema/mcsema/cfgToLLVM/raiseX86.cpp:509
+    #16 0x00000000005ac814 in LiftFunctionsIntoModule (natMod=0x72093b0, M=0x16d2060) at /store/artem/git/mcsema/mcsema/cfgToLLVM/raiseX86.cpp:937
+    #17 0x00000000005aaee4 in LiftCodeIntoModule (natMod=0x72093b0, M=0x16d2060) at /store/artem/git/mcsema/mcsema/cfgToLLVM/raiseX86.cpp:952
+    #18 0x00000000005544a0 in main (argc=11, argv=0x7fffffffdec8) at /store/artem/git/mcsema/mcsema/Lift.cpp:124
+
+This tells us the problem is in the `MOV32mi` instruction. That instruction writes a 32-bit value to memory, so the core issue is probably a 64-bit pointer and a 32-bit value mismatch, because the architecture for this specific program is `amd64`. Looking at the code at line 643 we see:
+
+    640         data_v = IMM_AS_DATA_REF(block, natM, ip);
+    641       }
+    642
+    643       doMIMovV<32>(ip, block, ADDR_NOREF(0), data_v);
+
+The `IMM_AS_DATA_REF` function returns an architecture sized pointer, which in this case would be 64-bit. Problem found: there is a 32-bit sized MOV to a 64-bit pointer! The solution is to replace `IMM_AS_DATA_REF` with `IMM_AS_DATA_REF<32>`, which will return a 32-bit value.
+
 # Errors rebuilding binaries from Bitcode
 
 ## LLVM ERROR: expected relocatable expression
