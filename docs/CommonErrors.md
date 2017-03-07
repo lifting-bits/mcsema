@@ -28,6 +28,31 @@ The error in the mcsema-disass output log looks something like this:
 
 # Errors when using `mcsema-lift`
 
+## Error translating and instruction
+
+The error message reads similar to:
+
+    Error translating instruction at 4007cf; unsupported opcode 176
+
+**Technical Background:**: The semantics of the instruction you are trying to translate are not present in mcsema.
+
+**Possible Fixes:** First, you could implement the instruction semantics and submit a pull request with the implementation. Second, you can try to use the `-ignore-unsupported` flag to `mcsema-lift` so mcsema will silenty ignore this unsupported instruction. Missing instructions may or may not matter, depending on what you want to do with the translated bitcode.
+
+**Debugging Hints:** The error message tells you the location of the instruction in the binary, and its LLVM MC-layer opcode. This information will help in implmenting the instruction. In the case of our example message, the instruction is `aeskeygenassist`:
+    $ objdump -x -d our_binary | grep 4007cf
+      4007cf:       66 0f 3a df d1 00       aeskeygenassist $0x0,%xmm1,%xmm2
+
+The `llvm-mc` tool can then tell you more about how the LLVM MC layer identifies the instruction:
+
+    $ echo 'aeskeygenassist $0x0,%xmm1,%xmm2' | llvm-mc-3.8 -assemble -show-inst
+            .text
+            aeskeygenassist $0, %xmm1, %xmm2 # <MCInst #176 AESKEYGENASSIST128rr
+                                            #  <MCOperand Reg:128>
+                                            #  <MCOperand Reg:127>
+                                            #  <MCOperand Imm:0>>
+
+In this case, we'd need to add an entry for `X86::AESKEYGENASSIST128rr` in the instruction dispatch map to implement `aeskeygenassist`.
+
 ## Basic Block does not have a terminator
 
 You are translating a binary, and you see something that resembles the following output:
