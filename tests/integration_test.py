@@ -205,6 +205,10 @@ class LinuxTest(unittest.TestCase):
         self._runX86Test("stringpool")
         self._runAMD64Test("stringpool")
 
+    def testlodsb(self):
+        self._runX86Test("lodsb")
+        self._runAMD64Test("lodsb")
+
     def testswitch(self):
         self._runX86Test("switch")
         self._runAMD64Test("switch")

@@ -16,6 +16,14 @@
         }
     },
 
+    "lodsb": {
+        "_comment": "The lodsb program checks if lodsb, stosb, and testb instructions work",
+        "default": {
+            "_comment": "The lodsb program has no arguments",
+            "args": []
+        }
+    },
+
     "switch": {
         "_comment": "A test for switch statements, which hits mcsema's jump table handling",
         "switch 1": {

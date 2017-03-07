@@ -10,6 +10,15 @@
       "expected_stdout": "SGVsbG8sIFdvcmxkIQo="
     }
   }, 
+  "lodsb": {
+    "_comment": "The lodsb program checks if lodsb, stosb, and testb instructions work", 
+    "default": {
+      "_comment": "The lodsb program has no arguments", 
+      "args": [], 
+      "expected_stderr": "", 
+      "expected_stdout": "aSBhbSBzbyBjb29sLgpUaGUgc3RyaW5ncyBtYXRjaAo="
+    }
+  }, 
   "ls": {
     "_comment": "These are test names, in case each program has more than one test", 
     "default": {
