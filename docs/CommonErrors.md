@@ -1,5 +1,24 @@
 # Common McSema Errors
 
+# Segfaults, segfaults everywhere!
+
+So, you've got a case of the segfaults. Lets try to diagnose the issue.
+
+Most likely, you've got a case of CFG recovery failure. Here are some common causes:
+
+## Lifting position independent code without `--pie-mode`
+
+When mcsema-lift sees an instruction like `mov rax, 0x60008`, it needs to know whether that `0x60008` is a constant value, or whether it references code or data somewhere in the program at location `0x60008`. IDA is pretty good at figuring out the differnce, but not always. Sometimes mcsema just has to make an educated guess. On binaries built with position independent code (`-pie`, `-fPIC`), the default heuristic is wrong. You want to use `mcsema-disass --pie-mode` for more correct behavior.
+
+How can you tell which to use? Check the binary type.
+
+    $ file my-pie-binary
+    my-pie-binary: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, ...
+
+If you see the words `LSB shared object`, you probably want to use `--pie-mode`. This isn't a 100% reliable heuristic; if you are having segfault issues try `--pie-mode` to see if it helps.
+
+**Technical Details:** Using `--pie-mode` mcsema assumes values it encounters are constants. Normally, mcsema is biased towards immediate values that fall into the code or data section as being references.
+
 # Errors when using `mcsema-disass`
 
 ## Unknown External `<Function Name>`
@@ -24,7 +43,31 @@ The error in the mcsema-disass output log looks something like this:
 
 **Technical Background:** Mcsema needs to know how to call external functions, including the function calling convention and number of arguments. It knows how to call many common functions, but you hit one that it does not know about.
 
-**Possible Fixes:** Add an entry to the [external function definitions file](https://github.com/trailofbits/mcsema/tree/master/tools/mcsema_disass/defs) describing the function's calling convention and number of arguments. Don't forget to re-build `mcsema-disass`. Submit a pull request so we can include it in future mcsema releases. Alternatively, you can specify a custom definitions file location by using the `--std-defs` argument (e.g. `mcsema-disass --std-defs /path/to/my/defs/file.txt ...`). 
+**Possible Fixes:** Add an entry to the [external function definitions file](https://github.com/trailofbits/mcsema/tree/master/tools/mcsema_disass/defs) describing the function's calling convention and number of arguments. Don't forget to re-build `mcsema-disass`. Submit a pull request so we can include it in future mcsema releases. Alternatively, you can specify a custom definitions file location by using the `--std-defs` argument (e.g. `mcsema-disass --std-defs /path/to/my/defs/file.txt ...`).
+
+##  Could not parse function type
+
+You are trying to disassemble a binary and see something like the following in the output log:
+
+    Could not parse function type:__int64(void)
+    Traceback (most recent call last):
+      File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 2287, in <module>
+        recoverCfg(eps, outf, args.exports_are_apis)
+      File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 1890, in recoverCfg
+        F = entryPointHandler(M, fea, fname, exports_are_apis)
+      File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 265, in entryPointHandler
+        (argc, conv, ret) = getExportType(name, ep)
+      File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 2023, in getExportType
+        return parseTypeString(tp, ep)
+      File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 2001, in parseTypeString
+        raise Exception("Could not parse function type:"+typestr)
+    Exception: Could not parse function type:__int64(void)
+
+**Technical Background:** Mcsema tries to parse IDA's type signatures for functions it doesn't know about. The type signature parsing is a last ditch effort, and it failed.
+
+**Possible Fixes:** The most likely thing that happened is you specified a bad entry point, or forgot to specify and entry point and mcsema is trying to lift every function. Eventually it hits the decorated name of an external function, can't identify it, and tries to parse type signatures.
+
+**Debugging Hints:** Make sure you specify an entrypoint when using `mcsema-disass` (e.g. `--entrypoint main`).
 
 # Errors when using `mcsema-lift`
 
@@ -34,7 +77,7 @@ The error message reads similar to:
 
     Error translating instruction at 4007cf; unsupported opcode 176
 
-**Technical Background:**: The semantics of the instruction you are trying to translate are not present in mcsema.
+**Technical Background:** The semantics of the instruction you are trying to translate are not present in mcsema.
 
 **Possible Fixes:** First, you could implement the instruction semantics and submit a pull request with the implementation. Second, you can try to use the `-ignore-unsupported` flag to `mcsema-lift` so mcsema will silenty ignore this unsupported instruction. Missing instructions may or may not matter, depending on what you want to do with the translated bitcode.
 
@@ -68,8 +111,7 @@ You are translating a binary, and you see something that resembles the following
 
 **Possible fixes:** There is likely a bug in an instruction implementation. Does your instruction create new blocks? If yes, did you update the "current block to add stuff to" (the `block` argument to the instruction implementation handler)? It is passed as a reference to a pointer, so `block = newBlock;` will update it.
 
-**Debugging Hints:**: Use the `--print-before-all` flag to `mcsema-lift` to dump generated IR to a file. Look through it backwards to identify the terminator-less block, and its corresponding x86 instruction.
-
+**Debugging Hints:** Use the `--print-before-all` flag to `mcsema-lift` to dump generated IR to a file. Look through it backwards to identify the terminator-less block, and its corresponding x86 instruction.
 
 ## NIY Error
 
@@ -79,7 +121,7 @@ You get an error that says "NIY" and has a line number, for example:
     /home/user/mcsema/mcsema/cfgToLLVM/x86Instrs_String.cpp:773
     : NIY
 
-**Technical Background:** Congratulations! You hit a part of mcsema that we thought about, but didn't finish implementing. 
+**Technical Background:** Congratulations! You hit a part of mcsema that we thought about, but didn't finish implementing.
 
 **Possible Fixes:** The best option is to implement the missing functionality and submit a pull request :). Alternatively, file an issue on Github and provide us a binary so we can reproduce the problem.
 
@@ -142,7 +184,7 @@ You are trying to recompile bitcode into a new binary, but clang crashes with th
 
     LLVM ERROR: expected relocatable expression
 
-**Technical Background:** This is most likely a sign you mismatched the architecture between CFG recovery and translation. 
+**Technical Background:** This is most likely a sign you mismatched the architecture between CFG recovery and translation.
 
 If you are sure you didn't, this is a combination of CFG recovery problem and clang bug. Mcsema is emitting bitcode that takes the lower 32-bits of a 64-bit function pointer, and puts it in a data section. Clang does not want to do this. This may be a CFG recovery bug if somehow only the lower 32-bits were deteted as a function pointer. Unfortunately, some compilers emit just the lower 32-bits of a pointer into the data section. Mcsema has no choice but to deal witht it as best it can.
 
@@ -162,4 +204,3 @@ If these data sections are not used, delete them and recompile the bitcode with 
     @data_600e08 = internal global %4 <{ i64 ptrtoint (void ()* @callback_sub_400770 to i64) }>, align 64
 
 Neither of these fixes is guaranteed to work.
-
