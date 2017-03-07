@@ -28,7 +28,7 @@ The error in the mcsema-disass output log looks something like this:
 
 # Errors when using `mcsema-lift`
 
-## Error translating and instruction
+## Error translating instruction
 
 The error message reads similar to:
 
