@@ -140,7 +140,12 @@ static InstTransResult doRetI(llvm::BasicBlock *&b, const llvm::MCOperand &o) {
 //emit a nonconditional branch
 static InstTransResult doNonCondBranch(llvm::BasicBlock *&b,
                                        llvm::BasicBlock *tgt) {
-  TASSERT(tgt != NULL, "Branch to a NULL target");
+  // Added by Josh to not crash if a binary has jmp 0x0
+  if (!tgt)
+  {
+     return EndBlock;
+  }
+  // Removed by Josh: TASSERT(tgt != NULL, "Branch to a NULL target");
 
   llvm::BranchInst::Create(tgt, b);
 
@@ -336,6 +341,7 @@ static llvm::CallInst *emitInternalCall(llvm::BasicBlock *&b, llvm::Module *M,
   // figure out who we are calling
   auto targetF = M->getFunction(target_fn);
 
+  std::cout << targetF << std::endl;
   TASSERT(targetF != nullptr, "Could not find target function: " + target_fn);
 
   // do we need to push a ret addr?
@@ -367,6 +373,13 @@ static InstTransResult doCallPC(NativeInstPtr ip, llvm::BasicBlock *&b,
   std::stringstream ss;
   ss << "sub_" << std::hex << tgtAddr;
   std::string fname = ss.str();
+
+  // Added by Josh to not crash if a binary has call 0x0
+  if (!tgtAddr)
+  {
+    std::cerr << "WARNING: Found a 0x0 target address for a call, returning EndBlock..." << std::endl;
+    return EndBlock;
+  }
 
   auto c = emitInternalCall<width>(
       b, M, fname, ip->get_loc() + ip->get_len(), is_jump);
