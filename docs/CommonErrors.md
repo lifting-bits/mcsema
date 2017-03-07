@@ -68,9 +68,13 @@ You are trying to recompile bitcode into a new binary, but clang crashes with th
 
     LLVM ERROR: expected relocatable expression
 
-**Technical Background:** This is a combination of CFG recovery problem and clang bug. Mcsema is emitting bitcode that takes the lower 32-bits of a 64-bit function pointer, and puts it in a data section. Clang does not want to do this. This may be a CFG recovery bug if somehow only the lower 32-bits were deteted as a function pointer. Unfortunately, some compilers emit just the lower 32-bits of a pointer into the data section. Mcsema has no choice but to deal witht it as best it can.
+**Technical Background:** This is most likely a sign you mismatched the architecture between CFG recovery and translation. 
 
-**Possible Fixes:**: Disassemble the bitcode with `llvm-dis`. Look for lines similar to the ones below. Specifically, you are looking for `ptrtoint` that converts a pointer to a 32-bit integer.
+If you are sure you didn't, this is a combination of CFG recovery problem and clang bug. Mcsema is emitting bitcode that takes the lower 32-bits of a 64-bit function pointer, and puts it in a data section. Clang does not want to do this. This may be a CFG recovery bug if somehow only the lower 32-bits were deteted as a function pointer. Unfortunately, some compilers emit just the lower 32-bits of a pointer into the data section. Mcsema has no choice but to deal witht it as best it can.
+
+**Possible Fixes:** Make sure you use the correct architecture (x86, amd64) for both the translation and CFG recovery.
+
+If that fails, disassemble the bitcode with `llvm-dis`. Look for lines similar to the ones below. Specifically, you are looking for `ptrtoint` that converts a pointer to a 32-bit integer.
 
     @data_600e00 = internal global %3 <{ i32 ptrtoint (void ()* @callback_sub_400790 to i32), [4 x i8] zeroinitializer }>, align 64
     @data_600e08 = internal global %4 <{ i32 ptrtoint (void ()* @callback_sub_400770 to i32), [4 x i8] zeroinitializer }>, align 64
