@@ -229,7 +229,17 @@ static void doJumpTableViaSwitch(TranslationContext &ctx, llvm::BasicBlock *&blo
   int myindex = 0;
   for (auto jmp_block_va : jmpblocks) {
     BasicBlock *toBlock = ctx.va_to_bb[jmp_block_va];
-    TASSERT(toBlock != NULL, "Could not find block");
+     
+    // FIXME: this needs more testing, I (Josh) added it and I'm not 100% on the syntax, but it's worked thus far
+    if (!toBlock)
+    {
+       std::cerr << "WARNING: NULL block found... adding unreachable instruction" << std::endl;
+       auto &C = block->getContext();
+       auto trapIntrin = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::trap);
+       auto newblock = llvm::BasicBlock::Create(C, "", trapIntrin);
+       auto unreachable = new llvm::UnreachableInst(newblock->getContext(), newblock);
+       toBlock = newblock;
+    }
     theSwitch->addCase(CONST_V<bitness>(block, myindex), toBlock);
     ++myindex;
   }
