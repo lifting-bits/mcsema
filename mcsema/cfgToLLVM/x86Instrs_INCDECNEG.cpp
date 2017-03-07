@@ -297,6 +297,7 @@ void INCDECNEG_populateDispatchMap(DispatchMap &m) {
 
   // On 64bit INC16r/INC32r can't be encoded
   m[llvm::X86::INC16r] = translate_INC16r;
+  m[llvm::X86::INC16r_alt] = translate_INC16r;
   m[llvm::X86::INC32r] = translate_INC32r;
   m[llvm::X86::INC32r_alt] = translate_INC32r;
 
