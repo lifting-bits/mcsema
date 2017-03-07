@@ -16,7 +16,7 @@
       "_comment": "The lodsb program has no arguments", 
       "args": [], 
       "expected_stderr": "", 
-      "expected_stdout": "aSBhbSBzbyBjb29sLgo="
+      "expected_stdout": "aSBhbSBzbyBjb29sLgpUaGUgc3RyaW5ncyBtYXRjaAo="
     }
   }, 
   "ls": {
