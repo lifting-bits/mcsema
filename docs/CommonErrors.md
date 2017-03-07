@@ -59,3 +59,29 @@ You get an error that says "NIY" and has a line number, for example:
 **Possible Fixes:** The best option is to implement the missing functionality and submit a pull request :). Alternatively, file an issue on Github and provide us a binary so we can reproduce the problem.
 
 **Debugging Hints:** To know more about the problem, look at the line number in the error message. The line may be a macro, so you may need to find the macro definition to see the root cause of the problem.
+
+# Errors rebuilding binaries from Bitcode
+
+## LLVM ERROR: expected relocatable expression
+
+You are trying to recompile bitcode into a new binary, but clang crashes with the following error:
+
+    LLVM ERROR: expected relocatable expression
+
+**Technical Background:** This is a combination of CFG recovery problem and clang bug. Mcsema is emitting bitcode that takes the lower 32-bits of a 64-bit function pointer, and puts it in a data section. Clang does not want to do this. This may be a CFG recovery bug if somehow only the lower 32-bits were deteted as a function pointer. Unfortunately, some compilers emit just the lower 32-bits of a pointer into the data section. Mcsema has no choice but to deal witht it as best it can.
+
+**Possible Fixes:**: Disassemble the bitcode with `llvm-dis`. Look for lines similar to the ones below. Specifically, you are looking for `ptrtoint` that converts a pointer to a 32-bit integer.
+
+    @data_600e00 = internal global %3 <{ i32 ptrtoint (void ()* @callback_sub_400790 to i32), [4 x i8] zeroinitializer }>, align 64
+    @data_600e08 = internal global %4 <{ i32 ptrtoint (void ()* @callback_sub_400770 to i32), [4 x i8] zeroinitializer }>, align 64
+
+If these data sections are not used, delete them and recompile the bitcode with `llvm-as`. Alternatively, remove the `zeroinitializer` padding and expand the `ptrtoint` to 64 bits. This will also require editing the structure types of the data sections:
+
+    %3 = type <{ i64 }>
+    %4 = type <{ i64 }>
+    ...
+    @data_600e00 = internal global %3 <{ i64 ptrtoint (void ()* @callback_sub_400790 to i64) }>, align 64
+    @data_600e08 = internal global %4 <{ i64 ptrtoint (void ()* @callback_sub_400770 to i64) }>, align 64
+
+Neither of these fixes is guaranteed to work.
+
