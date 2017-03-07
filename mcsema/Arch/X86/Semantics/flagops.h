@@ -8,7 +8,8 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
- Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
  Neither the name of Trail of Bits nor the names of its
@@ -34,7 +35,7 @@
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Instruction.h>
 
-#include "mcsema/cfgToLLVM/raiseX86.h"
+#include "mcsema/Arch/X86/Util.h"
 #include "mcsema/cfgToLLVM/TransExcn.h"
 
 template<int width>
@@ -217,8 +218,7 @@ static void WritePF(llvm::BasicBlock *b, llvm::Value *written) {
   std::vector<llvm::Value *> countArgs;
   countArgs.push_back(lsb);
 
-  auto count = noAliasMCSemaScope(
-      llvm::CallInst::Create(popCntFun, countArgs, "", b));
+  auto count = llvm::CallInst::Create(popCntFun, countArgs, "", b);
 
   //truncate the count to a bit
   auto ty = llvm::Type::getInt1Ty(C);

@@ -48,13 +48,12 @@
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
 
-#include "InstructionDispatch.h"
-#include "raiseX86.h"
-#include "x86Helpers.h"
-#include "x86Instrs_Branches.h"
-#include "Externals.h"
-#include "JumpTables.h"
-#include "ArchOps.h"
+#include "mcsema/Arch/X86/Util.h"
+#include "mcsema/Arch/X86/Semantics/Branches.h"
+
+#include "mcsema/cfgToLLVM/Externals.h"
+#include "mcsema/cfgToLLVM/InstructionDispatch.h"
+#include "mcsema/cfgToLLVM/JumpTables.h"
 
 template<int width>
 static InstTransResult doLRet(llvm::BasicBlock *b) {

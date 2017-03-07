@@ -8,7 +8,8 @@ are permitted provided that the following conditions are met:
   Redistributions of source code must retain the above copyright notice, this
   list of conditions and the following disclaimer.
 
-  Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+  Redistributions in binary form must reproduce the above copyright notice, this
+  list of conditions and the following disclaimer in the documentation and/or
   other materials provided with the distribution.
 
   Neither the name of the {organization} nor the names of its
@@ -26,15 +27,17 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#ifndef _TO_MODULE_H
-#define _TO_MODULE_H
+#ifndef MCSEMA_BC_LIFT_H_
+#define MCSEMA_BC_LIFT_H_
 
 #include <set>
 
-#include "Externals.h"
+#include "mcsema/CFG/CFG.h"
 
 //translate a NativeModule into an LLVM Module
 void RenameLiftedFunctions(NativeModulePtr mod, llvm::Module *M,
                            const std::set<VA> &entry_point_pcs);
+
 bool LiftCodeIntoModule(NativeModulePtr, llvm::Module *);
-#endif
+
+#endif  // MCSEMA_BC_LIFT_H_

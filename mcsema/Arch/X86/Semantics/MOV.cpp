@@ -46,13 +46,12 @@
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
 
-#include "InstructionDispatch.h"
-#include "raiseX86.h"
-#include "x86Helpers.h"
-#include "x86Instrs_MOV.h"
-#include "JumpTables.h"
-#include "Externals.h"
-#include "ArchOps.h"
+#include "mcsema/Arch/X86/Util.h"
+#include "mcsema/Arch/X86/Semantics/MOV.h"
+
+#include "mcsema/cfgToLLVM/Externals.h"
+#include "mcsema/cfgToLLVM/InstructionDispatch.h"
+#include "mcsema/cfgToLLVM/JumpTables.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
 

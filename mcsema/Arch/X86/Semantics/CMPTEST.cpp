@@ -47,10 +47,9 @@
 #include "mcsema/Arch/Register.h"
 
 #include "InstructionDispatch.h"
-#include "raiseX86.h"
-#include "x86Helpers.h"
-#include "x86Instrs_CMPTEST.h"
-#include "x86Instrs_flagops.h"
+#include "mcsema/Arch/X86/Util.h"
+#include "mcsema/Arch/X86/Semantics/CMPTEST.h"
+#include "mcsema/Arch/X86/Semantics/flagops.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
 

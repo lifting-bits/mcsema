@@ -8,7 +8,8 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
- Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
  Neither the name of the {organization} nor the names of its
@@ -33,10 +34,10 @@
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/Support/CodeGen.h>
 
-#include "raiseX86.h"
-#include "Externals.h"
-#include "x86Helpers.h"
-#include "TransExcn.h"
+#include "mcsema/Arch/X86/Util.h"
+#include "mcsema/BC/Util.h"
+#include "mcsema/cfgToLLVM/Externals.h"
+#include "mcsema/cfgToLLVM/TransExcn.h"
 
 // check if addr falls into a data section, and is at least minAddr.
 // the minAddr check exists for times when we are not sure if an address
@@ -217,3 +218,70 @@ llvm::Instruction *callMemcpy(llvm::BasicBlock *B, llvm::Value *dest,
   // actually call llvm.memcpy
   return llvm::CallInst::Create(doMemCpy, callArgs, "", B);
 }
+
+namespace x86_64 {
+
+llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
+                       const llvm::MCOperand &Obase, const llvm::MCOperand &Oscale,
+                       const llvm::MCOperand &Oindex, const int64_t Odisp,
+                       const llvm::MCOperand &Oseg, bool dataOffset) {
+  TASSERT(Obase.isReg(), "");
+  TASSERT(Oscale.isImm(), "");
+  TASSERT(Oindex.isReg(), "");
+  TASSERT(Oseg.isReg(), "");
+
+  unsigned baseReg = Obase.getReg();
+  int64_t disp = Odisp;
+
+  // specific function for 64 bit
+  llvm::Value *d = nullptr;
+  auto iTy = llvm::IntegerType::getInt64Ty(b->getContext());
+
+  if (dataOffset
+      || (mod && disp && baseReg != llvm::X86::RBP && baseReg != llvm::X86::RSP)) {
+    d = getGlobalFromOriginalAddr<64>(disp, mod,
+                                                   dataOffset ? 0 : 0x1000, b);
+  } else {
+
+    //there is no disp value, or its relative to esp/ebp in which case
+    //we might not want to do anything
+  }
+
+  if (!d) {
+    //create a constant integer out of the raw displacement
+    //we were unable to assign the displacement to an address
+    d = llvm::ConstantInt::getSigned(iTy, disp);
+  }
+
+  llvm::Value *rVal = nullptr;
+
+  //read the base register (if given)
+  if (baseReg != llvm::X86::NoRegister && baseReg != llvm::X86::RIP) {
+    rVal = R_READ<64>(b, baseReg);
+  } else {
+    //if the base is not present, just use 0
+    rVal = CONST_V<64>(b, 0);
+  }
+
+  llvm::Value *dispComp = nullptr;
+  dispComp = llvm::BinaryOperator::Create(llvm::Instruction::Add, rVal, d, "", b);
+
+  //add the index amount, if present
+  if (Oindex.getReg() != llvm::X86::NoRegister) {
+    auto index = R_READ<64>(b, Oindex.getReg());
+
+    int64_t scaleAmt = Oscale.getImm();
+    if (scaleAmt > 1) {
+      index = llvm::BinaryOperator::CreateMul(index, CONST_V<64>(b, scaleAmt), "", b);
+    }
+
+    dispComp = llvm::BinaryOperator::CreateAdd(dispComp, index, "", b);
+
+  }
+
+  //convert the resulting integer into a pointer type
+  auto piTy = llvm::Type::getInt64PtrTy(b->getContext());
+  return new llvm::IntToPtrInst(dispComp, piTy, "", b);
+}
+
+}  // namespace x86_64

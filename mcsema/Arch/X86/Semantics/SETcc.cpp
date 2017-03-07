@@ -48,9 +48,8 @@
 
 #include "InstructionDispatch.h"
 
-#include "raiseX86.h"
-#include "x86Helpers.h"
-#include "x86Instrs_SETcc.h"
+#include "mcsema/Arch/X86/Util.h"
+#include "mcsema/Arch/X86/Semantics/SETcc.h"
 
 static llvm::Value *doSetaV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 

@@ -64,19 +64,18 @@ endif(WIN32)
 add_executable(mcsema-lift
   ${MCSEMA_DIR}/mcsema/Lift.cpp
   ${MCSEMA_DIR}/mcsema/Arch/Arch.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Register.cpp
+  
   ${MCSEMA_DIR}/mcsema/Arch/X86/Dispatch.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Lift.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Register.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Util.cpp
+
+  ${MCSEMA_DIR}/mcsema/BC/Lift.cpp
   ${MCSEMA_DIR}/mcsema/BC/Util.cpp
   ${MCSEMA_DIR}/mcsema/CFG/CFG.cpp
   ${MCSEMA_DIR}/generated/CFG.pb.cc
 
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/raiseX86.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Helpers.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86_64Helpers.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/ArchOps.cpp
   ${MCSEMA_DIR}/mcsema/cfgToLLVM/JumpTables.cpp
-
   ${MCSEMA_DIR}/mcsema/cfgToLLVM/TransExcn.cpp
 
   ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/ADD.cpp

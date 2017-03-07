@@ -47,10 +47,9 @@
 #include "mcsema/Arch/Register.h"
 
 #include "mcsema/cfgToLLVM/InstructionDispatch.h"
-#include "mcsema/cfgToLLVM/raiseX86.h"
-#include "mcsema/cfgToLLVM/x86Helpers.h"
-#include "mcsema/cfgToLLVM/x86Instrs_SSE.h"
-#include "mcsema/cfgToLLVM/x86Instrs_MOV.h"
+#include "mcsema/Arch/X86/Util.h"
+#include "mcsema/Arch/X86/Semantics/SSE.h"
+#include "mcsema/Arch/X86/Semantics/MOV.h"
 
 #include <tuple>
 

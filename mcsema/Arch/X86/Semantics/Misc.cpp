@@ -43,19 +43,17 @@
 #include <llvm/MC/MCInst.h>
 
 #include <llvm/Support/CodeGen.h>
+#include <llvm/Support/Debug.h>
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
 
-#include "InstructionDispatch.h"
-#include "raiseX86.h"
-#include "x86Helpers.h"
-#include "x86Instrs_MOV.h"
-#include "x86Instrs_flagops.h"
-#include "x86Instrs_Misc.h"
-#include "llvm/Support/Debug.h"
-#include "ArchOps.h"
+#include "mcsema/cfgToLLVM/InstructionDispatch.h"
+#include "mcsema/Arch/X86/Util.h"
+#include "mcsema/Arch/X86/Semantics/MOV.h"
+#include "mcsema/Arch/X86/Semantics/flagops.h"
+#include "mcsema/Arch/X86/Semantics/Misc.h"
 
 static InstTransResult doNoop(llvm::BasicBlock *b) {
   //isn't this exciting

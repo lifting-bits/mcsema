@@ -40,10 +40,14 @@
 #include <string>
 #include <sstream>
 
+#include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Util.h"
 
-#include "mcsema/cfgToLLVM/ArchOps.h"
 #include "mcsema/cfgToLLVM/TransExcn.h"
+
+namespace llvm {
+class MCOperand;
+}  // namespace llvm
 
 template<int width>
 static llvm::Value *getValueForExternal(llvm::Module *M, NativeInstPtr ip,
@@ -170,20 +174,11 @@ llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
                              const llvm::MCOperand &Oseg, bool dataOffset);
 }  // namespace x86_64
 
-// Convert the number to a constant in LLVM IR
-llvm::ConstantInt *CONST_V(llvm::BasicBlock *b, uint64_t val);
-
 // this is an alias for getAddressFromExpr, but used when
 // we expect the address computation to contain a data reference
 llvm::Value *MEM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr natM,
                              const llvm::MCInst &inst, NativeInstPtr ip,
                              uint32_t which);
-
-// emit an llvm memcpy intrinsic
-llvm::Instruction* callMemcpy(llvm::BasicBlock *B, llvm::Value *dest,
-                              llvm::Value *src, uint32_t size, uint32_t align =
-                                  4,
-                              bool isVolatile = false);
 
 // return a computed pointer to that data reference for 32/64 bit architecture
 template<int width>

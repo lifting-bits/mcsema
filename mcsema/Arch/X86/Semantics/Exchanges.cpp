@@ -8,7 +8,8 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
- Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
  Neither the name of Trail of Bits nor the names of its
@@ -46,10 +47,9 @@
 #include "mcsema/Arch/Register.h"
 
 #include "mcsema/cfgToLLVM/InstructionDispatch.h"
-#include "mcsema/cfgToLLVM/raiseX86.h"
-#include "mcsema/cfgToLLVM/x86Helpers.h"
-#include "mcsema/cfgToLLVM/x86Instrs_CMPTEST.h"
-#include "mcsema/cfgToLLVM/x86Instrs_Exchanges.h"
+#include "mcsema/Arch/X86/Util.h"
+#include "mcsema/Arch/X86/Semantics/CMPTEST.h"
+#include "mcsema/Arch/X86/Semantics/Exchanges.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
 

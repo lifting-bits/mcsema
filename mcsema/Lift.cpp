@@ -44,11 +44,10 @@
 #include <llvm/Support/ToolOutputFile.h>
 
 #include "mcsema/Arch/Arch.h"
+#include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Util.h"
 
-#include "mcsema/cfgToLLVM/ArchOps.h"
 #include "mcsema/cfgToLLVM/InstructionDispatch.h"
-#include "mcsema/cfgToLLVM/toModule.h"
 
 static llvm::cl::opt<std::string> OutputFilename(
     "output", llvm::cl::desc("Output filename"), llvm::cl::init("-"),

@@ -30,8 +30,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
-#include "mcsema/cfgToLLVM/raiseX86.h"
-
 #define OP(x) inst.getOperand(x)
 
 #define ADDR_NOREF(x) \

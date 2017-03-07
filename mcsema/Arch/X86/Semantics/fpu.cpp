@@ -49,10 +49,8 @@
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
 
-#include "mcsema/cfgToLLVM/raiseX86.h"
-
-#include "mcsema/cfgToLLVM/x86Helpers.h"
-#include "mcsema/cfgToLLVM/x86Instrs_fpu.h"
+#include "mcsema/Arch/X86/Util.h"
+#include "mcsema/Arch/X86/Semantics/fpu.h"
 #include "mcsema/cfgToLLVM/InstructionDispatch.h"
 
 #ifndef M_PIl

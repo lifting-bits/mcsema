@@ -34,6 +34,7 @@
 #include <vector>
 
 #include <llvm/IR/Argument.h>
+#include <llvm/IR/Attributes.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
@@ -43,21 +44,18 @@
 #include <llvm/MC/MCInst.h>
 
 #include <llvm/Support/CodeGen.h>
+#include <llvm/Support/Debug.h>
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
 
-#include "InstructionDispatch.h"
-#include "raiseX86.h"
-#include "x86Instrs_Stack.h"
-#include "x86Instrs_MOV.h"
-#include "x86Helpers.h"
-#include "Externals.h"
-#include "ArchOps.h"
-#include <llvm/IR/Attributes.h>
-#include "llvm/Support/Debug.h"
-#include <iostream>
+#include "mcsema/Arch/X86/Util.h"
+#include "mcsema/Arch/X86/Semantics/Stack.h"
+#include "mcsema/Arch/X86/Semantics/MOV.h"
+
+#include "mcsema/cfgToLLVM/Externals.h"
+#include "mcsema/cfgToLLVM/InstructionDispatch.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
 
