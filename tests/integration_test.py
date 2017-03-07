@@ -209,6 +209,10 @@ class LinuxTest(unittest.TestCase):
         self._runX86Test("lodsb")
         self._runAMD64Test("lodsb")
 
+    def testswitch(self):
+        self._runX86Test("switch")
+        self._runAMD64Test("switch")
+
     #TODO(artem): enable when we address issue #108
     @unittest.skip("Re-enable after we fix issue #108")
     def testls(self):
