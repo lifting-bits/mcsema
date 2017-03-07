@@ -604,7 +604,7 @@ static InstTransResult translate_MOV32mi(TranslationContext &ctx,
   auto &inst = ip->get_inst();
 
   if (ip->has_code_ref()) {
-    llvm::Value *addrInt = IMM_AS_DATA_REF(block, natM, ip);
+    llvm::Value *addrInt = IMM_AS_DATA_REF<32>(block, natM, ip);
     if (ip->has_mem_reference) {
       ret = doMIMovV<32>(ip, block, MEM_REFERENCE(0), addrInt);
     } else {
@@ -618,10 +618,10 @@ static InstTransResult translate_MOV32mi(TranslationContext &ctx,
         // * archGetImageBase is defined
         // * we are on win64
 
-        data_v = IMM_AS_DATA_REF(block, natM, ip);
+        data_v = IMM_AS_DATA_REF<32>(block, natM, ip);
         data_v = doSubtractImageBase<32>(data_v, block);
       } else {
-        data_v = IMM_AS_DATA_REF(block, natM, ip);
+        data_v = IMM_AS_DATA_REF<32>(block, natM, ip);
       }
       doMIMovV<32>(ip, block, MEM_REFERENCE(0), data_v);
     } else if (ip->has_mem_reference) {
@@ -633,10 +633,10 @@ static InstTransResult translate_MOV32mi(TranslationContext &ctx,
         // * archGetImageBase is defined
         // * we are on win64
 
-        data_v = IMM_AS_DATA_REF(block, natM, ip);
+        data_v = IMM_AS_DATA_REF<32>(block, natM, ip);
         data_v = doSubtractImageBase<32>(data_v, block);
       } else {
-        data_v = IMM_AS_DATA_REF(block, natM, ip);
+        data_v = IMM_AS_DATA_REF<32>(block, natM, ip);
       }
 
       doMIMovV<32>(ip, block, ADDR_NOREF(0), data_v);
@@ -825,7 +825,7 @@ static InstTransResult translate_MOV32ri(TranslationContext &ctx,
   auto &inst = ip->get_inst();
 
   if (ip->has_code_ref()) {
-    llvm::Value *addrInt = IMM_AS_DATA_REF(block, natM, ip);
+    llvm::Value *addrInt = IMM_AS_DATA_REF<32>(block, natM, ip);
     ret = doRIMovV<32>(ip, block, addrInt, OP(0));
   } else {
     if (ip->has_imm_reference) {
@@ -835,10 +835,10 @@ static InstTransResult translate_MOV32ri(TranslationContext &ctx,
         // * archGetImageBase is defined
         // * we are on win64
 
-        data_v = IMM_AS_DATA_REF(block, natM, ip);
+        data_v = IMM_AS_DATA_REF<32>(block, natM, ip);
         data_v = doSubtractImageBase<32>(data_v, block);
       } else {
-        data_v = IMM_AS_DATA_REF(block, natM, ip);
+        data_v = IMM_AS_DATA_REF<32>(block, natM, ip);
       }
 
       ret = doRIMovV<32>(ip, block, data_v, OP(0));
