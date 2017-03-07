@@ -79,24 +79,24 @@ add_executable(mcsema-lift
 
   ${MCSEMA_DIR}/mcsema/cfgToLLVM/TransExcn.cpp
 
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_ADD.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_bitops.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_Branches.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_CMOV.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_CMPTEST.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_Exchanges.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_fpu.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_INCDECNEG.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_Jcc.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_Misc.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_MOV.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_MULDIV.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_SETcc.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_ShiftRoll.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_SSE.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_Stack.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_String.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_SUB.cpp)
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/ADD.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/bitops.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Branches.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/CMOV.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/CMPTEST.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Exchanges.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/fpu.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/INCDECNEG.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Jcc.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Misc.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/MOV.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/MULDIV.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/SETcc.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/ShiftRoll.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/SSE.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Stack.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/String.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/SUB.cpp)
 
 target_link_libraries(mcsema-lift
   protobuf
