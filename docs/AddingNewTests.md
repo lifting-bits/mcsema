@@ -6,7 +6,7 @@ This document describes how to add new tests to mcsema's testing frameworks.
 
 The mcsema integration tests are designed to test that mcsema translates real programs correctly and in a reasonable amount of time.
 
-Translation is a two step process: first there is CFG recovery, and then transcription to bitcode. As of mcsema <VERSION>, CFG recovery requires IDA Pro. To ensure integration tests can run without IDA Pro present, the recovered control flow (.cfg files) are checked into git.
+Translation is a two step process: first there is CFG recovery, and then transcription to bitcode. As of mcsema 0.6, CFG recovery requires IDA Pro. To ensure integration tests can run without IDA Pro present, the recovered control flow (.cfg files) are checked into git.
 
 Translation is correct if the following hold:
 
