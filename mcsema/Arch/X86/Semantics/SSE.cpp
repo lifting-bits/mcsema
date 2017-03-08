@@ -46,10 +46,11 @@
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
 
-#include "mcsema/cfgToLLVM/InstructionDispatch.h"
 #include "mcsema/Arch/X86/Util.h"
 #include "mcsema/Arch/X86/Semantics/SSE.h"
 #include "mcsema/Arch/X86/Semantics/MOV.h"
+
+#include "mcsema/BC/Util.h"
 
 #include <tuple>
 

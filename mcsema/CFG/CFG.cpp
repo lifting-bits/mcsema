@@ -40,7 +40,7 @@
 
 #include "mcsema/cfgToLLVM/TransExcn.h"
 
-#include "mcsema/cfgToLLVM/Externals.h"
+#include "mcsema/CFG/Externals.h"
 #include "mcsema/cfgToLLVM/JumpTables.h"
 
 bool NativeInst::terminator(void) const {
@@ -958,7 +958,7 @@ static NativeInstPtr DeserializeInst(
   return ip;
 }
 
-static NativeBlockPtr deserializeBlock(
+static NativeBlockPtr DeserializeBlock(
     const ::Block &block,
     const std::list<ExternalCodeRefPtr> &extcode) {
 
@@ -997,7 +997,7 @@ static NativeFunctionPtr DeserializeNativeFunc(
 
   //read all the blocks from this function
   for (auto &block : func.blocks()) {
-    auto native_block = deserializeBlock(block, extcode);
+    auto native_block = DeserializeBlock(block, extcode);
     if (!native_block) {
       std::cerr
           << "Unable to deserialize function at " << std::hex

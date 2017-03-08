@@ -36,7 +36,7 @@
 
 #include "mcsema/Arch/X86/Util.h"
 #include "mcsema/BC/Util.h"
-#include "mcsema/cfgToLLVM/Externals.h"
+#include "mcsema/CFG/Externals.h"
 #include "mcsema/cfgToLLVM/TransExcn.h"
 
 // check if addr falls into a data section, and is at least minAddr.

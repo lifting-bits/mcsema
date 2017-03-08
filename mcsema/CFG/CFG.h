@@ -43,7 +43,7 @@
 #include <llvm/ADT/Triple.h>
 #include <llvm/MC/MCInst.h>
 
-#include "mcsema/cfgToLLVM/Externals.h"
+#include "mcsema/CFG/Externals.h"
 
 namespace llvm {
 class Target;

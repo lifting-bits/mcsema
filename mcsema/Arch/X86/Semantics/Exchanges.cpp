@@ -46,10 +46,11 @@
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
 
-#include "mcsema/cfgToLLVM/InstructionDispatch.h"
 #include "mcsema/Arch/X86/Util.h"
 #include "mcsema/Arch/X86/Semantics/CMPTEST.h"
 #include "mcsema/Arch/X86/Semantics/Exchanges.h"
+
+#include "mcsema/BC/Util.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
 

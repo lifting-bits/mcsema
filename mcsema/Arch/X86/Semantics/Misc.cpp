@@ -49,11 +49,12 @@
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
 
-#include "mcsema/cfgToLLVM/InstructionDispatch.h"
 #include "mcsema/Arch/X86/Util.h"
 #include "mcsema/Arch/X86/Semantics/MOV.h"
 #include "mcsema/Arch/X86/Semantics/flagops.h"
 #include "mcsema/Arch/X86/Semantics/Misc.h"
+
+#include "mcsema/BC/Util.h"
 
 static InstTransResult doNoop(llvm::BasicBlock *b) {
   //isn't this exciting

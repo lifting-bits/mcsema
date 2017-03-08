@@ -42,11 +42,11 @@
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
 
-#include "InstructionDispatch.h"
-
 #include "mcsema/Arch/X86/Util.h"
 #include "mcsema/Arch/X86/Semantics/flagops.h"
 #include "mcsema/Arch/X86/Semantics/ADD.h"
+
+#include "mcsema/BC/Util.h"
 
 using namespace llvm;
 
