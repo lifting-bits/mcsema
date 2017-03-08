@@ -133,13 +133,13 @@ if [ ! -e ${GEN_DIR}/ELF_32_linux.S ]; then
   clang++-3.8 -m32 -std=gnu++11 ${DIR}/mcsema/Arch/X86/Runtime/print_ELF_32_linux.cpp
   ./a.out > ${GEN_DIR}/ELF_32_linux.S
 
-  clang++-3.8 -std=gnu++11 ${DIR}/mcsema/Arch/X86/Runtime/print_ELF_64_linux.cpp
+  clang++-3.8 -m64 -std=gnu++11 ${DIR}/mcsema/Arch/X86/Runtime/print_ELF_64_linux.cpp
   ./a.out > ${GEN_DIR}/ELF_64_linux.S
 
   clang++-3.8 -m32 -std=gnu++11 ${DIR}/mcsema/Arch/X86/Runtime/print_PE_32_windows.cpp
   ./a.out > ${GEN_DIR}/PE_32_windows.asm
 
-  clang++-3.8 -std=gnu++11 ${DIR}/mcsema/Arch/X86/Runtime/print_PE_64_windows.cpp
+  clang++-3.8 -m64 -std=gnu++11 ${DIR}/mcsema/Arch/X86/Runtime/print_PE_64_windows.cpp
   ./a.out > ${GEN_DIR}/PE_64_windows.asm
 
   rm a.out

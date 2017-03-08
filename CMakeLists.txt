@@ -53,7 +53,6 @@ if(WIN32)
     /W3)
 else()
   add_compile_options(
-    -x c++
     -g3
     -O0
     -std=gnu++11

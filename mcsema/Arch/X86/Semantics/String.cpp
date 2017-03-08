@@ -687,7 +687,11 @@ static InstTransResult doLods(llvm::BasicBlock *&b, NativeInstPtr ip) {
 }
 
 static InstTransResult translate_REP_prefix(
-    TranslationContext &ctx, llvm::BasicBlock *&block) {
+    TranslationContext &ctx, llvm::BasicBlock *&) {
+  std::cerr
+      << "Warning! Unaccompanied REP/REPE prefix at " << std::hex
+      << ctx.natI->get_loc() << " in " << ctx.natF->get_symbol_name()
+      << std::dec << std::endl;
   return ContinueBlock;
 }
 
