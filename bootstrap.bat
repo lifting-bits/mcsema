@@ -81,16 +81,16 @@ popd
 
 if exist %GEN_DIR%\ELF_32_linux.S goto create_mcsema_files
 echo [+] Generating runtimes
-cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\print_ELF_32_linux.cpp
+cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_ELF_32_linux.cpp
 a.out.exe > %GEN_DIR%\ELF_32_linux.S
 
-cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\print_ELF_64_linux.cpp
+cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_ELF_64_linux.cpp
 a.out.exe > %GEN_DIR%\ELF_64_linux.S
 
-cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\print_PE_32_windows.cpp
+cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_PE_32_windows.cpp
 a.out.exe > %GEN_DIR%\PE_32_windows.asm
 
-cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\print_PE_64_windows.cpp
+cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_PE_64_windows.cpp
 a.out.exe > %GEN_DIR%\PE_64_windows.asm
 
 del a.out.exe a.out.obj
