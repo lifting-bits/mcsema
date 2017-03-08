@@ -52,6 +52,11 @@ def main(args=None):
       help='Binary to recover control flow graph from',
       required=True)
 
+  arg_parser.add_argument(
+      '--entrypoint',
+      help="The entrypoint where disassembly should begin",
+      required=True)
+
   args, command_args = arg_parser.parse_known_args()
 
   if not os.path.isfile(args.binary):
