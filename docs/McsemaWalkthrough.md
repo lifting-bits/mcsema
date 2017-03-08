@@ -25,9 +25,9 @@ For clarity, we assume that all operations happen in `~/mcsema`, but any directo
 
 ## Control Flow Recovery
 
-The first step in translation is to identify all the instructions, functions, and data in the binary. This is done via `mcsema-disass`, which will use the IDA Pro disassembler to do most of the real work. As of this writing IDA Pro is required for control flow recovery, but we hope to transition to other tools in the future.
+The first step in translation is to identify all the instructions, functions, and data in the binary. This is done via `mcsema-disass`, which will use the IDA Pro disassembler to do most of the initial analysis. As of this writing IDA Pro is required for the control flow recovery step, but we hope to transition to other tools in the future.
 
-First, lets get the binary into our working directory:
+First, let's place a copy of the binary in our working directory:
 
     cd ~/mcsema
     cp /usr/bin/xz ./
@@ -37,26 +37,26 @@ Next, we'll use `mcsema-disass`, the CFG recovery portion of mcsema, to recover 
     mcsema-disass --disassembler ~/ida-6.9/idal64 --os linux --arch amd64 --output xz.cfg --binary xz --entrypoint main --log_file xz.log
     
     
-Lets look through each option:
+Let's walk through each option:
 
-* `--disassembler ~/ida-6.9/idal64`: this is a path to the IDA Pro executable which will do the bulk of the disassembly work.
-* `--os linux`: The binary we are lifting is for the Linux operating system. It is possible to use mcsema on any supported platform for any supported binary (e.g. you can lift Windows binaries on Linux and vice versa).
+* `--disassembler ~/ida-6.9/idal64`: This is a path to the IDA Pro executable which will do the bulk of the disassembly work.
+* `--os linux`: The binary we are lifting is for the Linux operating system. It is possible to use mcsema on any supported platform for any supported binary (e.g. Windows binaries can be lifted on Linux and vice versa).
 * `--arch amd64`: The binary we are lifting is a 64-bit binary that uses the amd64 or x86_64 instruction set.
-* `--output xz.cfg`: Store the recovered control flow in the file named `xz.cfg`.
+* `--output xz.cfg`: Store the recovered control flow information in the file named `xz.cfg`.
 * `--binary xz`: Use `xz` as the input binary
 * `--entrypoint main`: Specifies where the disassembler should start recovering control flow. This tells it to use the `main` function as the starting point for CFG recovery.
-* `--log_file xz.log`: Where to store the disassembly log. This is optional, but it greatly helps in debugging, as we shall see later in this guide.
+* `--log_file xz.log`: Where to store the disassembly log. This is optional, but it greatly aids in debugging, as we shall see later in this guide.
 
-### Lets Fix Errors
+### Fixing Errors
 
-This part documents how to fix a common CFG recovery problem: undefined external functions. By the time you are reading this guide, the functions described here may have already been added to the [list of common external Linux functions that comes with mcsema](https://github.com/trailofbits/mcsema/blob/master/tools/mcsema_disass/defs/linux.txt).
+This section documents how to fix a common CFG recovery problem: undefined external functions. By the time you are reading this guide, the functions described here may have already been added to the [list of common external Linux functions that comes with mcsema](https://github.com/trailofbits/mcsema/blob/master/tools/mcsema_disass/defs/linux.txt).
 
 The previous command should have failed:
 
     $ mcsema-disass --disassembler ~/ida-6.9/idal64 --os linux --arch amd64 --output xz.cfg --binary xz --entrypoint main --log_file xz.log
     Generated an invalid (zero-sized) CFG. Please use the --log_file option to see an error log.
     
-Lets take a look at the log, like the message suggests:
+Let's take a look at the log, like the message suggests:
 
     $ tail xz.log
       File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 1693, in recoverFunction
@@ -69,20 +69,20 @@ Lets take a look at the log, like the message suggests:
         raise Exception("Unknown external: " + fname)
     Exception: Unknown external: __open_2
     
-This means the binary is trying to call an external function, but mcsema does not know what calling convention it is, or how many arguments to give it. After searching for `__open_2` we can see that its a C library function that takes two arguments. We can tell mcsema about it via a custom external definitions file.
+This means the binary is trying to call an external function, but mcsema does not know what calling convention it is, or how many arguments to give it. After searching for `__open_2` we can see that it's a C library function that takes two arguments. We can tell mcsema about it via a custom external definitions file.
 
-Create a new file named `xz_defs.txt` with the following content:
+Create a new file in your working directory named `xz_defs.txt` with the following content:
 
     __open_2 2 C N
     
 This tells mcsema that the function is named `__open_2`, it takes `2` arguments, its calling convention is `C`aller cleanup, and the function returns (or is `N`ot noreturn, as mcsema sees it).
 
-Lets tell `mcsema-disass` about our new definitions file:
+Now let's tell `mcsema-disass` about our new definitions file:
 
     $ mcsema-disass --disassembler ~/ida-6.9/idal64 --os linux --arch amd64 --output xz.cfg --binary xz --entrypoint main --log_file xz.log --std-defs xz_defs.txt
     Generated an invalid (zero-sized) CFG. Please use the --log_file option to see an error log.
     
-Oh no! it is still failing? Lets see the problem now:
+Oh no! It's still failing? Let's check the log again:
 
     $ tail xz.log
       File "/home/artem/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg/mcsema_disass/ida/get_cfg.py", line 1693, in recoverFunction
@@ -95,12 +95,12 @@ Oh no! it is still failing? Lets see the problem now:
         raise Exception("Unknown external: " + fname)
     Exception: Unknown external: __vfprintf_chk
     
-The culprit is another missing external function. Lets add this one is as well. The new `xz_defs.txt` should now look like:
+The culprit is another missing external function. Let's add this one is as well. Our new `xz_defs.txt` should now look like:
 
     __open_2 2 C N
     __vfprintf_chk 4 C N
     
-Finally, our command should succeed. We can verify by looking at the size of the generated CFG:
+Finally, our command should succeed. We can verify that the CFG recovery completed by looking at the size of the generated CFG:
 
     $ mcsema-disass --disassembler ~/ida-6.9/idal64 --os linux --arch amd64 --output xz.cfg --binary xz --entrypoint main --log_file xz.log --std-defs xz_defs.txt
     $ ls -lh xz.cfg
@@ -108,16 +108,16 @@ Finally, our command should succeed. We can verify by looking at the size of the
     
 ## Translation to Bitcode
 
-Once we have the program's control flow, we can translate it to LLVM bitcode using `mcsema-lift`. 
+Once we have the program's control flow information, we can translate it to LLVM bitcode using `mcsema-lift`. 
 
 Here is the command to translate the CFG into bitcode:
 
     mcsema-lift -os linux -arch amd64 -cfg xz.cfg -entrypoint main -output xz.bc
 
-Lets explore the options one by one:
+Let's explore the options one by one:
 
-* `-os linux`: The CFG came from a binary for the Linux operating system. Currently the valid options are `linux` or `windows`. This option affects some aspects of translation, like ABI compatibility for external function, etc. 
-* `-arch amd64`: Use instruction semantics for the `amd64` architecture. The valid options are `x86` (32-bit x86 semantics) and `amd64` (64-bit x86).
+* `-os linux`: The CFG came from a binary for the Linux operating system. Currently the valid options are `linux` or `windows`. This option is required for certain aspects of translation, like ABI compatibility for external functions, etc. 
+* `-arch amd64`: Use instruction semantics for the `amd64` architecture. Valid options are `x86` (32-bit x86 semantics) and `amd64` (64-bit x86).
 * `-cfg xz.cfg`: The input control flow graph to convert into bitcode.
 * `-entrypoint main`: The name of the entrypoint into the translated code. This should match the value used for `-entrypoint` specified to `mcsema-disass`.
 * `-output xz.bc`: Where to write the bitcode. If the `-output` option is not specified, the bitcode will be written to stdout.
@@ -127,26 +127,26 @@ The `mcsema-lift` program will output a lot of debugging information to stdout a
     Adding entry point: main
     main is implemented by sub_4026c0
     
-And there will be a generated bitcode file:
+And there will be a generated bitcode file in the output location we specified:
 
     $ ls -lh xz.bc
     -rw-rw-r-- 1 artem artem 1.9M Mar  8 14:57 xz.bc
     
 ## Building a New Binary
 
-The new bitcode can be used for a variety of purposes ranging from informational analyses to hardening and transformation. Eventually though, you may want to re-create a new, working binary. Here is how to do that.
+The new bitcode can be used for a variety of purposes ranging from informational analyses to hardening and transformation. Eventually, though, you may want to re-create a new, working binary. Here is how to do that.
 
-First, you'll need the assembly stubs generated during installation, these are typically in `<mcsema git clone directory>/generated`. You will also need to link against the same library as the original program. For this example, make sure that the liblzma-dev package is installed on your machine:
+First, you'll need the assembly stubs generated during mcsema installation; these are typically located in `<mcsema git clone directory>/generated`. You will also need to link against any libraries that the original program was linked against. For this example, make sure that the liblzma-dev package is installed on your machine:
 
     $ sudo apt-get install liblzma-dev
     
 As of this writing, mcsema outputs bitcode suitable for clang 3.8, and that is the recommended version for rebuilding binaries. A [compatibility script for clang 3.5](https://github.com/trailofbits/mcsema/blob/master/tools/llvm_38_to_35.sh) bitcode is available, but it is experimental and should only be used as a last resort.
 
-Now, lets re-create a new `xz` binary and see it in action!
+Now, let's re-create a new `xz` binary and see it in action!
 
     $ clang-3.8 -m64 -O3 -o xz.new /store/artem/git/mcsema/generated/ELF_64_linux.S xz.bc -llzma
     
-This is an ordinary clang command line, the only thing of note is `/store/artem/git/mcsema/generated/ELF_64_linux.S`, which happens to be my path to the generated assembly stubs. The `ELF_64_linux.S` is the stub to use for 64-bit ELF files on Linux. Other possible options include:
+This is a fairly ordinary clang command line; the only thing of note is `/store/artem/git/mcsema/generated/ELF_64_linux.S`, which happens to be my path to the aforementioned generated assembly stubs. The `ELF_64_linux.S` is the stub to use for 64-bit ELF files on Linux. Other possible options include:
 
 * `ELF_32_linux.S`: Used when generating 32-bit Linux ELFs
 * `PE_64_windows.asm`: Used when generating 64-bit Windows PEs
@@ -195,4 +195,4 @@ However, some long-form arguments fail as of this writing due to [bug #108](http
     ./xz.new: unrecognized option '--help'
     ./xz.new: Try `./xz.new --help' for more information.
     
-Thats it for the walkthrough. Please let us know if any of the steps fail or change so that we can update this document. Happy translating!
+That's it for the walkthrough. Please let us know if any of the steps fail or change so that we can update this document. Happy translating!
