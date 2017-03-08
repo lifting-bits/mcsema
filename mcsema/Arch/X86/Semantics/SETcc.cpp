@@ -46,10 +46,10 @@
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
 
-#include "InstructionDispatch.h"
-
 #include "mcsema/Arch/X86/Util.h"
 #include "mcsema/Arch/X86/Semantics/SETcc.h"
+
+#include "mcsema/BC/Util.h"
 
 static llvm::Value *doSetaV(NativeInstPtr ip, llvm::BasicBlock *&b) {
 

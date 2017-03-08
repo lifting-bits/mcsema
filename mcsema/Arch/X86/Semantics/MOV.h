@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include "mcsema/Arch/X86/Util.h"
-#include "InstructionDispatch.h"
+#include "mcsema/BC/Util.h"
 #include "llvm/Support/Debug.h"
 
 #include "mcsema/cfgToLLVM/TransExcn.h"

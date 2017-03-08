@@ -51,8 +51,8 @@
 #include "mcsema/Arch/X86/Util.h"
 #include "mcsema/Arch/X86/Semantics/Branches.h"
 
-#include "mcsema/cfgToLLVM/Externals.h"
-#include "mcsema/cfgToLLVM/InstructionDispatch.h"
+#include "mcsema/CFG/Externals.h"
+#include "mcsema/BC/Util.h"
 #include "mcsema/cfgToLLVM/JumpTables.h"
 
 template<int width>

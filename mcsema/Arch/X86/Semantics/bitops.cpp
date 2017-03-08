@@ -44,12 +44,13 @@
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
 
-#include "InstructionDispatch.h"
-
 #include "mcsema/Arch/X86/Util.h"
 #include "mcsema/Arch/X86/Semantics/flagops.h"
 #include "mcsema/Arch/X86/Semantics/bitops.h"
 
+#include "mcsema/BC/Util.h"
+
+// TODO(pag): Remove this.
 using namespace llvm;
 
 template<int width>
