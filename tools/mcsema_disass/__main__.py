@@ -19,7 +19,7 @@ def main(args=None):
     epilog=textwrap.dedent("""\
     Additional arguments are passed to the disassembler script directly. These include:
     
-      --std_defs <file>       Load additional external function definitions from <file>
+      --std-defs <file>       Load additional external function definitions from <file>
       --pie-mode              Change disassembler heuristics to work on position independent code"""))
 
   arg_parser.add_argument(
@@ -77,6 +77,15 @@ def main(args=None):
   args.output = os.path.abspath(args.output)
   args.log_file = os.path.abspath(args.log_file)
 
+  fixed_command_args = []
+  # ensure that any paths in arguments to the disassembler
+  # are absolute path
+  for fix_arg in command_args:
+    if os.path.exists(fix_arg):
+      fixed_command_args.append(os.path.abspath(fix_arg))
+    else:
+      fixed_command_args.append(fix_arg)
+
   disass_dir = os.path.dirname(os.path.abspath(__file__))
   os.chdir(disass_dir)
   sys.path.append(disass_dir)
@@ -90,7 +99,19 @@ def main(args=None):
   try:
     if 'ida' in args.disassembler:
       import ida.disass
-      ret = ida.disass.execute(args, command_args)
+      ret = ida.disass.execute(args, fixed_command_args)
+
+      # in case IDA somehow says success, but no output was generated
+      if not os.path.isfile(args.output):
+          sys.stderr.write("Could not generate a CFG. Try using the --log_file option to see an error log.\n")
+          ret = 1
+
+      # The disassembler script probably threw an exception
+      if 0 == os.path.getsize(args.output):
+          sys.stderr.write("Generated an invalid (zero-sized) CFG. Please use the --log_file option to see an error log.\n")
+          # remove the zero-sized file
+          os.unlink(args.output)
+          ret = 1
 
       # in case IDA somehow says success, but no output was generated
       if not os.path.isfile(args.output):
