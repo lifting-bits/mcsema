@@ -50,9 +50,10 @@
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
 
-#include "mcsema/cfgToLLVM/InstructionDispatch.h"
-#include "mcsema/cfgToLLVM/Externals.h"
+#include "mcsema/CFG/Externals.h"
 #include "mcsema/cfgToLLVM/TransExcn.h"
+
+#include "mcsema/BC/Util.h"
 
 static llvm::cl::opt<bool> IgnoreUnsupportedInsts(
     "ignore-unsupported",

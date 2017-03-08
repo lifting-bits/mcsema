@@ -26,8 +26,8 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _EXTERNALS_H
-#define _EXTERNALS_H
+#ifndef MCSEMA_CFG_EXTERNALS_H_
+#define MCSEMA_CFG_EXTERNALS_H_
 
 #include <cstdint>
 #include <string>
@@ -168,4 +168,4 @@ class ExternalCodeRef : public ExternalRef {
 typedef ExternalCodeRef *ExternalCodeRefPtr;
 typedef ExternalDataRef *ExternalDataRefPtr;
 
-#endif
+#endif  // MCSEMA_CFG_EXTERNALS_H_

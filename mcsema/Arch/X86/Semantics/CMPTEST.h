@@ -30,9 +30,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
-#include "InstructionDispatch.h"
-
 #include "mcsema/Arch/X86/Semantics/flagops.h"
+
+#include "mcsema/BC/Util.h"
+
+class DispatchMap;
 
 template<int width>
 static void doCmpVV(NativeInstPtr ip, llvm::BasicBlock *b, llvm::Value *lhs,

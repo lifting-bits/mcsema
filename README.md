@@ -14,7 +14,7 @@ McSema is open-source and licensed under the BSD 3-clause license.
 
 ## Additional Documentation
  
- - [Navigating the source code](docs/NAVIGATION.md)
+ - [Navigating the source code](docs/NavigatingTheCode.md)
  - [Design and architecture](docs/ARCHITECTURE.md)
  - [How to implement the semantics of an instruction](docs/ADD_AN_INSTRUCTION.md)
  - [Usage and APIs](docs/USAGE_AND_APIS.md)

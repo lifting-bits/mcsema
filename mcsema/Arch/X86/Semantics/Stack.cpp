@@ -54,8 +54,9 @@
 #include "mcsema/Arch/X86/Semantics/Stack.h"
 #include "mcsema/Arch/X86/Semantics/MOV.h"
 
-#include "mcsema/cfgToLLVM/Externals.h"
-#include "mcsema/cfgToLLVM/InstructionDispatch.h"
+#include "mcsema/BC/Util.h"
+
+#include "mcsema/CFG/Externals.h"
 
 #define NASSERT(cond) TASSERT(cond, "")
 

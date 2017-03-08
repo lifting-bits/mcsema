@@ -28,10 +28,12 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/Value.h>
+namespace llvm {
+class BasicBlock;
+class Value;
+}  // namespace llvm
 
-#include "InstructionDispatch.h"
+class DispatchMap;
 
 void ShiftRoll_populateDispatchMap(DispatchMap &m);
 llvm::Value *ShrdVV32(llvm::BasicBlock *&b, unsigned dstReg, unsigned srcReg1,

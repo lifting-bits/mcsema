@@ -40,7 +40,7 @@ enum InstTransResult : int {
 typedef InstTransResult (InstructionLifter)(
     TranslationContext &, llvm::BasicBlock *&);
 
-typedef std::map<unsigned, InstructionLifter *> DispatchMap;
+class DispatchMap : public std::map<unsigned, InstructionLifter *> {};
 
 InstructionLifter *ArchGetInstructionLifter(const llvm::MCInst &inst);
 

@@ -28,8 +28,8 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MC_SEMA_BC_UTIL_H_
-#define MC_SEMA_BC_UTIL_H_
+#ifndef MCSEMA_BC_UTIL_H_
+#define MCSEMA_BC_UTIL_H_
 
 #include <cstdint>
 
@@ -205,4 +205,69 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
                                 std::vector<llvm::Type *>& data_section_types,
                                 bool convert_to_callback);
 
-#endif  // MC_SEMA_BC_UTIL_H_
+
+#define OP(x) inst.getOperand(x)
+
+#define ADDR_NOREF(x) \
+    ArchPointerSize(block->getParent()->getParent()) == Pointer32 ? \
+    ADDR_NOREF_IMPL<32>(natM, block, x, ip, inst) :\
+    ADDR_NOREF_IMPL<64>(natM, block, x, ip, inst)
+
+#define CREATE_BLOCK(nm, b) \
+    auto block_ ## nm = llvm::BasicBlock::Create( \
+        (b)->getContext(), #nm, (b)->getParent())
+
+#define MEM_REFERENCE(which) MEM_AS_DATA_REF(block, natM, inst, ip, which)
+
+#define GENERIC_TRANSLATION_MI(NAME, NOREFS, MEMREF, IMMREF, TWOREFS) \
+    static InstTransResult translate_ ## NAME ( \
+        TranslationContext &ctx, llvm::BasicBlock *&block) { \
+      InstTransResult ret; \
+      auto natM = ctx.natM; \
+      auto F = ctx.F; \
+      auto ip = ctx.natI; \
+      auto &inst = ip->get_inst(); \
+      if (ip->has_mem_reference && ip->has_imm_reference) { \
+          TWOREFS; \
+      } else if (ip->has_mem_reference ) { \
+          MEMREF; \
+      } else if (ip->has_imm_reference ) { \
+          IMMREF; \
+      } else { \
+          NOREFS; \
+      } \
+      return ContinueBlock;\
+    }
+
+
+#define GENERIC_TRANSLATION_REF(NAME, NOREFS, HASREF) \
+    static InstTransResult translate_ ## NAME ( \
+        TranslationContext &ctx, llvm::BasicBlock *&block) { \
+      InstTransResult ret;\
+      auto natM = ctx.natM; \
+      auto F = ctx.F; \
+      auto ip = ctx.natI; \
+      auto &inst = ip->get_inst(); \
+      if (ip->has_mem_reference || ip->has_imm_reference || \
+         ip->has_external_ref()) { \
+          HASREF; \
+      } else {\
+          NOREFS; \
+      } \
+      return ContinueBlock; \
+    }
+
+#define GENERIC_TRANSLATION(NAME, NOREFS) \
+    static InstTransResult translate_ ## NAME ( \
+        TranslationContext &ctx, llvm::BasicBlock *&block) { \
+      InstTransResult ret;\
+      auto natM = ctx.natM; \
+      auto F = ctx.F; \
+      auto ip = ctx.natI; \
+      auto &inst = ip->get_inst(); \
+      ret = NOREFS; \
+      return ret; \
+    }
+
+
+#endif  // MCSEMA_BC_UTIL_H_
