@@ -10,6 +10,15 @@
 #include <llvm/lib/Target/X86/X86InstrInfo.h>
 
 namespace llvm {
+
+class BasicBlock;
+class CallInst;
+class Function;
+class Module;
+class PointerType;
+class StructType;
+class Value;
+
 namespace X86 {
 
 // TODO(pag): This is kind of a hack. The idea here is that LLVM's opcode map
@@ -102,5 +111,40 @@ llvm::Triple::OSType OSType(void);
 // For compatibility.
 #define ArchPointerSize(...) ArchAddressSize()
 #define ArchGetCallingConv(...) ArchCallingConv()
+
+void ArchInitAttachDetach(llvm::Module *M);
+
+llvm::Function *ArchAddEntryPointDriver(
+    llvm::Module *M, const std::string &name, VA entry);
+
+llvm::Function *ArchAddExitPointDriver(llvm::Function *F);
+
+llvm::Function *ArchAddCallbackDriver(llvm::Module *M, VA local_target);
+
+void ArchSetCallingConv(llvm::Module *M, llvm::CallInst *ci);
+
+void ArchSetCallingConv(llvm::Module *M, llvm::Function *F);
+
+llvm::GlobalVariable *archGetImageBase(llvm::Module *M);
+
+#define SystemOS(...) OSType()
+
+SystemArchType SystemArch(llvm::Module *M);
+
+std::string ArchNameMcSemaCall(const std::string &name);
+
+llvm::Value *doSubtractImageBase(llvm::Value *original,
+                                 llvm::BasicBlock *block, int width);
+
+template <int width>
+inline static llvm::Value *doSubtractImageBase(
+    llvm::Value *original, llvm::BasicBlock *block) {
+  return doSubtractImageBase(original, block, width);
+}
+
+bool shouldSubtractImageBase(llvm::Module *M);
+
+llvm::Value *doSubtractImageBaseInt(llvm::Value *original,
+                                    llvm::BasicBlock *block);
 
 #endif  // MC_SEMA_ARCH_ARCH_H_

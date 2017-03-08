@@ -53,7 +53,6 @@ if(WIN32)
     /W3)
 else()
   add_compile_options(
-    -x c++
     -g3
     -O0
     -std=gnu++11
@@ -64,39 +63,38 @@ endif(WIN32)
 add_executable(mcsema-lift
   ${MCSEMA_DIR}/mcsema/Lift.cpp
   ${MCSEMA_DIR}/mcsema/Arch/Arch.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Register.cpp
+  
   ${MCSEMA_DIR}/mcsema/Arch/X86/Dispatch.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Lift.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Register.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Util.cpp
+
+  ${MCSEMA_DIR}/mcsema/BC/Lift.cpp
   ${MCSEMA_DIR}/mcsema/BC/Util.cpp
   ${MCSEMA_DIR}/mcsema/CFG/CFG.cpp
   ${MCSEMA_DIR}/generated/CFG.pb.cc
 
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/raiseX86.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Helpers.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86_64Helpers.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/ArchOps.cpp
   ${MCSEMA_DIR}/mcsema/cfgToLLVM/JumpTables.cpp
-
   ${MCSEMA_DIR}/mcsema/cfgToLLVM/TransExcn.cpp
 
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_ADD.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_bitops.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_Branches.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_CMOV.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_CMPTEST.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_Exchanges.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_fpu.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_INCDECNEG.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_Jcc.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_Misc.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_MOV.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_MULDIV.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_SETcc.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_ShiftRoll.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_SSE.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_Stack.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_String.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/x86Instrs_SUB.cpp)
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/ADD.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/bitops.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Branches.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/CMOV.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/CMPTEST.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Exchanges.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/fpu.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/INCDECNEG.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Jcc.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Misc.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/MOV.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/MULDIV.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/SETcc.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/ShiftRoll.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/SSE.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Stack.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/String.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/SUB.cpp)
 
 target_link_libraries(mcsema-lift
   protobuf
