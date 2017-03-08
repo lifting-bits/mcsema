@@ -10,13 +10,13 @@ There are three high-level steps to using McSema:
 
 ## <a id="disass"></a> Producing a CFG file
 
-The first step to using McSema is to disassemble a program binary and produce a [CFG file](/trailofbits/mcsema/mcsema/CFG/CFG.proto). The program that disassembles binaries is [`remill-disass`](/trailofbits/mcsema/tools/mcsema_disass).
+The first step to using McSema is to disassemble a program binary and produce a [CFG file](/mcsema/CFG/CFG.proto). The program that disassembles binaries is [`remill-disass`](/tools/mcsema_disass).
 
 ### `mcsema-disass`
 
-`mcsema-disass` is organized into a [frontend](/trailofbits/mcsema/tools/mcsema_disass/__main__.py) and backend. The front-end command accepts a `--disassembler` command-line argument that tells it what disassembly engine to use. In practice, this will always be a path to IDA Pro.
+`mcsema-disass` is organized into a [frontend](/tools/mcsema_disass/__main__.py) and backend. The front-end command accepts a `--disassembler` command-line argument that tells it what disassembly engine to use. In practice, this will always be a path to IDA Pro.
 
-The front-end is responsible for invoking the backend and disassembly engine. The IDA Pro [backend](/trailofbits/mcsema/tools/mcsema_disass/ida/get_cfg.py) is an IDA Python script invoked by `idal` or `idal64`, and will output a CFG file.
+The front-end is responsible for invoking the backend and disassembly engine. The IDA Pro [backend](/tools/mcsema_disass/ida/get_cfg.py) is an IDA Python script invoked by `idal` or `idal64`, and will output a CFG file.
 
 ### CFG files, a closer look
 
@@ -36,31 +36,31 @@ The `mcsema-lift` command is used to lift CFG files to LLVM bitcode. Two importa
  1. `--os`: The operating system of the code being lifted. In practice, each binary format is specific to an operating system. ELF files are for Linux, Mach-O files for macOS, and DLL files for Windows.
  2. `--arch`: The architecture of the code being lifted. This is one of `x86` or `amd64`.
 
-Both of the above arguments instruct the [lifter](/trailofbits/mcsema/mcsema/Lift.cpp) on how to configure the bitcode file.
+Both of the above arguments instruct the [lifter](/mcsema/Lift.cpp) on how to configure the bitcode file.
 
 ### Setting up
 
-McSema self-initializes before any bitcode is produced. The first initialization step is [`InitArch`](/trailofbits/mcsema/mcsema/Arch/Arch.cpp). This function uses the values passed to the `--os` and `--arch` command-line flags to set up a target triple and data layout for the bitcode file. The triple and data layouts tell LLVM about things like the size of pointers and calling conventions.
+McSema self-initializes before any bitcode is produced. The first initialization step is [`InitArch`](/mcsema/Arch/Arch.cpp). This function uses the values passed to the `--os` and `--arch` command-line flags to set up a target triple and data layout for the bitcode file. The triple and data layouts tell LLVM about things like the size of pointers and calling conventions.
 
-`InitArch` also initializes things like the instruction disassembler and [dispatcher]((/trailofbits/mcsema/mcsema/Arch/X86/Dispatcher.cpp). McSema uses LLVM's built-in instruction disassembler. The disassembler converts bytes of machine code into `MCInst` objects. `MCInst` instructions are labelled with an "op code." McSema has a function for lifting each op code. An instruction dispatcher is used to map an instruction's op code to an function that produces bitcode.
+`InitArch` also initializes things like the instruction disassembler and [dispatcher]((/mcsema/Arch/X86/Dispatcher.cpp). McSema uses LLVM's built-in instruction disassembler. The disassembler converts bytes of machine code into `MCInst` objects. `MCInst` instructions are labelled with an "op code." McSema has a function for lifting each op code. An instruction dispatcher is used to map an instruction's op code to an function that produces bitcode.
 
-Machine code architecture-specific functionality is isolated into the [Arch](/trailofbits/mcsema/mcsema/Arch) directory and its sub-directories. Architecture-specific functions are prefixed using `Arch`. For example, `ArchRegisterName` is a function that returns the name of a register. This function dispatches to [`X86RegisterName`](/trailofbits/mcsema/mcsema/Arch/X86/Register.cpp) when the value passed to the `--arch` command-line option is `x86` or `amd64`.
+Machine code architecture-specific functionality is isolated into the [Arch](/mcsema/Arch) directory and its sub-directories. Architecture-specific functions are prefixed using `Arch`. For example, `ArchRegisterName` is a function that returns the name of a register. This function dispatches to [`X86RegisterName`](/mcsema/Arch/X86/Register.cpp) when the value passed to the `--arch` command-line option is `x86` or `amd64`.
 
 ### Decoding the CFG file
 
-McSema decodes the CFG file (passed to `--cfg`) after all architecture- and OS-specific initialization is performed. The [`ReadProtoBuf`](/trailofbits/mcsema/mcsema/CFG/CFG.cpp) reads the contents of the CFG file produced by `mcsema-disass`, and converts the various CFG components in-memory data structures.
+McSema decodes the CFG file (passed to `--cfg`) after all architecture- and OS-specific initialization is performed. The [`ReadProtoBuf`](/mcsema/CFG/CFG.cpp) reads the contents of the CFG file produced by `mcsema-disass`, and converts the various CFG components in-memory data structures.
 
 There are four steps involved:
 
- 1. `DeserializeExternFunc`: `ExternalFunction` messages from the CFG file are decoded into [`ExternalCodeRef`](/trailofbits/mcsema/mcsema/CFG/Externals.h) data structures.
+ 1. `DeserializeExternFunc`: `ExternalFunction` messages from the CFG file are decoded into [`ExternalCodeRef`](/mcsema/CFG/Externals.h) data structures.
 
-    External functions cannot be modeled like translated functions, and the control flow recovery tool needs to know the calling convention and argument count of these external functions. The calling convention and argument count are specified by an external function map file. There is a default external function map for both [Linux](/trailofbits/mcsema/tools/mcsema_disass/defs/linux.txt) and [Windows](/trailofbits/mcsema/tools/mcsema_disass/defs/linux.txt). in `tests/std_defs.txt`.
+    External functions cannot be modeled like translated functions, and the control flow recovery tool needs to know the calling convention and argument count of these external functions. The calling convention and argument count are specified by an external function map file. There is a default external function map for both [Linux](/tools/mcsema_disass/defs/linux.txt) and [Windows](/tools/mcsema_disass/defs/linux.txt). in `tests/std_defs.txt`.
 
  2. `DeserializeNativeFunc`: `Function` messages from the CFG file are decoded into `NativeFunc` data structures. Each one of these functions will be lifted into bitcode.
 
     The `Function` message contains one or more `Block` messages. These represent [basic blocks](https://en.wikipedia.org/wiki/Basic_block) of machine code. `Block` messages are decoded by `DeserializeBlock` into `NativeBlock` objects. Each one of these objects will produce one or more `llvm::BasicBlock` objects.
 
-    Each `Instruction` message contained in the `Block` is decoded by `DeserializeInst` into a `NativeInst` object. The `NativeInst` object is produced by decoding the raw bytes of the instruction using the `DecodeInst`. `DecodeInst` uses the architecture-neutral [`ArchDecodeInstruction`](/trailofbits/mcsema/mcsema/Arch/Arch.cpp) function to decode the instruction bytes into an `llvm::MCInst` object.
+    Each `Instruction` message contained in the `Block` is decoded by `DeserializeInst` into a `NativeInst` object. The `NativeInst` object is produced by decoding the raw bytes of the instruction using the `DecodeInst`. `DecodeInst` uses the architecture-neutral [`ArchDecodeInstruction`](/mcsema/Arch/Arch.cpp) function to decode the instruction bytes into an `llvm::MCInst` object.
 
     The `NativeInst` class, augments `llvm::MCInst` with data not needed by LLVM itself. For instance, `NativeInst` records instruction prefixes, whether the instruction is the last in a block, whether any others point to it, whether it references external data, etc. All of the `mc-sema` code will operate on `NativeInst` instances, and not `llvm::MCInst`.
 
@@ -76,7 +76,7 @@ There are four steps involved:
 
 ### Lifting the code
 
-The [`LiftCodeIntoModule`](/trailofbits/mcsema/mcsema/BC/Lift.cpp) does the bulk of the lifting work. The function is mostly self-describing:
+The [`LiftCodeIntoModule`](/mcsema/BC/Lift.cpp) does the bulk of the lifting work. The function is mostly self-describing:
 
 ```c++
 bool LiftCodeIntoModule(NativeModulePtr natMod, llvm::Module *M) {
@@ -94,7 +94,7 @@ bool LiftCodeIntoModule(NativeModulePtr natMod, llvm::Module *M) {
 
 `InitExternalCode` creates external `llvm::Function` declarations for every `ExternalCodeRef`. This involves declaring the functions with the correct prototypes that include the OS-specific calling convention, and argument and return types.
 
-`InsertDataSections` creates the global packed structs for each `DataSectionEntry` item. The translation happens via two nested loops. The first loop iterates over every data section in the CFG. The second loop, found in [`dataSectionToTypesContents`](/trailofbits/mcsema/mcsema/BC/Util.cpp) iterates over every item in the data section and fills their content into the bitcode file.
+`InsertDataSections` creates the global packed structs for each `DataSectionEntry` item. The translation happens via two nested loops. The first loop iterates over every data section in the CFG. The second loop, found in [`dataSectionToTypesContents`](/mcsema/BC/Util.cpp) iterates over every item in the data section and fills their content into the bitcode file.
 
 `LiftFunctionsIntoModule` lifts the actual instructions into the `llvm::Function`s created by `InitLiftedFunctions`. The first step to lifting each function is `InsertFunctionIntoModule`. This function starts by creating one `llvm::BasicBlock` for each of the function's `NativeBlock`s. A special entry basic block is added to the `llvm::Function`. This block creates one variable for every machine code register. The creation of the local references into the register state is done by `ArchAllocRegisterVars`.
 
