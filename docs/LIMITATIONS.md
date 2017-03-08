@@ -10,7 +10,7 @@ The translator is not designed to accommodate self-modifying code directly. An a
 
 ## Translation
 
-### Instrution Support
+### Instruction Support
 
 While the vast majority of integer operations and many floating point operations are supported, there are many x86 instructions left. The following broad categories of instructions have support in internal register context structures, but the translations are incomplete:
 

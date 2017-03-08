@@ -164,12 +164,4 @@ Some operating system specific functionality is necessary to get call by memory 
 
 ## Testing
 
-There is currently some testing infrastructure. There are two main catgories of tests, the functionality demos and the instruction semantics tests.
-
-### Functionality Demos
-
-The functionality demos are meant to only run on Win32 and live in `mc-sema/tests`. These serve both as demos and as tests of translating actual binaries. The demos are a series of batch files named `demo1.bat` - `demo16.bat`, `demo_sailboat.bat`, `demo_fpu1.bat`, and `demo_dll_1.bat` through `demo_dll_6.bat`. More details on these is in the [DEMOS.md](DEMOS.md) document.
-
-### Instruction Semantics Tests
-
-Instruction semantics tests have been temporarily removed, pending a reimplementation that simplifies the testing process.
+There is currently some testing infrastructure providing support for integration testing.
