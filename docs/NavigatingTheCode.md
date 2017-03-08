@@ -108,9 +108,9 @@ This section will briefly cover raw instruction translation. For more details on
 
 The LLVM disassembler produces its own opcodes, with each operand combination having its own opcode. For instance, the x86 `ADD` instruction has at least 31 different LLVM opcodes, with names like `ADD32ri` (add a 32-bit immediate to a 32-bit register), `ADD8mi` (add an 8-bit immediate to an 8-bit memory location), etc. 
 
-All of these opcodes will have very similar translations, only different by operand order and memory width. To simplify translation, the core of the instruction is usually a templated function based on width that operates on two `llvm::Value` pairs that act as operands. For the `ADD` instruction, this is `cfgToLLVM/x86Instrs_ADD.cpp`:`doAddVV`. Other helper functions exist to convert immediate values and memory addresses to `llvm::Value` objects and to write the result of the addition to the correct destination (e.g. memory or register). Examples of these helper functions are `doAddRI`, `doAddMI`, etc.
+All of these opcodes will have very similar translations, only different by operand order and memory width. To simplify translation, the core of the instruction is usually a templated function based on width that operates on two `llvm::Value` pairs that act as operands. For the `ADD` instruction, this is [`doAddVV`](/mcsema/Arch/X86/Semantics/ADD.cpp). Other helper functions exist to convert immediate values and memory addresses to `llvm::Value` objects and to write the result of the addition to the correct destination (e.g. memory or register). Examples of these helper functions are `doAddRI`, `doAddMI`, etc.
 
-All the translation functions must have the same prototype and share lots of boilerplate code. To make writing them easier, there are several helper macros defined in `cfgToLLVM/InstructionDispatch.h`:
+All the translation functions must have the same prototype and share lots of boilerplate code. To make writing them easier, there are several helper macros defined in [`mcsema/BC/Util.h`](/mcsema/BC/Util.h):
 
 * `GENERIC_TRANSLATION(NAME, THECALL)`: Create a function named `translate_<NAME>` that executes the statement `THECALL`.
 * ` GENERIC_TRANSLATION_MEM(NAME, THECALL, GLOBALCALL)`: Like `GENERIC_TRANSLATION`, but checks if the instruction references code or data. If so, execute `GLOBALCALL` instead of `THECALL`.
@@ -127,6 +127,8 @@ Many x86 instructions require complex address computation due to complex address
 
 Using these macros, it is then possible to define a translation function. For instance, `ADD32ri` is defined as:
 
-`GENERIC_TRANSLATION(ADD32ri, doAddRI<32>(ip, block, OP(0), OP(1), OP(2)))`
+```c++
+GENERIC_TRANSLATION(ADD32ri, doAddRI<32>(ip, block, OP(0), OP(1), OP(2)))
+```
 
 That code will define a function named `translate_ADD32ri`, and call `doAddRI<32>(ip, block, OP(0), OP(1), OP(2))` to do the translation. The result will be stored in operand 0, and the two addends are operand 1 and operand 2. 
