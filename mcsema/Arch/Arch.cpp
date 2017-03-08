@@ -561,7 +561,7 @@ llvm::Function *ArchAddExitPointDriver(llvm::Function *F) {
   }
 
   W = llvm::Function::Create(F->getFunctionType(),
-                             llvm::GlobalValue::ExternalLinkage, name, M);
+                             F->getLinkage(), name, M);
   W->setCallingConv(F->getCallingConv());
   W->addFnAttr(llvm::Attribute::NoInline);
   W->addFnAttr(llvm::Attribute::Naked);
@@ -611,7 +611,6 @@ llvm::Function *ArchAddExitPointDriver(llvm::Function *F) {
     TASSERT(false, "Unsupported OS for exit point driver.");
   }
 
-  F->setLinkage(llvm::GlobalValue::ExternalLinkage);  // TODO(artem): No-op?
   if (F->doesNotReturn()) {
     W->setDoesNotReturn();
   }
