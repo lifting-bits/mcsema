@@ -76,7 +76,7 @@ There are four steps involved:
 
 ### Lifting the code
 
-The [`LiftCodeIntoModule`](/mcsema/BC/Lift.cpp) does the bulk of the lifting work. The function is mostly self-describing:
+The [`LiftCodeIntoModule`](/mcsema/BC/Lift.cpp) does the bulk of the lifting work. The function is mostly self-documenting:
 
 ```c++
 bool LiftCodeIntoModule(NativeModulePtr natMod, llvm::Module *M) {
