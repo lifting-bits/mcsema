@@ -8,9 +8,49 @@ There are three high-level steps to using McSema:
  2. [Lifting the CFG file into LLVM bitcode](#lift)
  3. Compiling the LLVM bitcode into a runnable binary
 
+## File Layout
+
+First, let's familiarize ourselve with essentials of the file layout of McSema.
+
+```
+┌── mcsema
+│   ├── Arch
+│   │   ├── ...               Architecture-neutral files
+│   │   └── X86
+│   │       ├── ...           X86-specific files
+│   │       ├── Runtime
+│   │       │   ├── ...
+│   │       │   └── State.h   X86 `RegState` structure
+│   │       └── Semantics
+│   │           ├── ADD.cpp   Semantics for ADD instruction
+│   │           └── ...       Other semantics code
+│   │    
+│   ├── BC 
+│   │    ├── Lift.cpp         Bitcode lifting code
+│   │    └── Util.cpp         Bitcode generation utilities 
+│   │  
+│   ├── CFG
+│   │   ├── CFG.cpp           CFG file deserialization code
+│   │   └── CFG.proto         CFG file format description
+│   │  
+│   ├── cfgToLLVM             Legacy translation routines
+│   │   └── ...
+│   │  
+│   └── Lift.cpp              Entrypoint of `mcsema-lift`
+│
+├── tools
+│   └── mcsema_disass
+│       ├── ida
+│       │   └── get_cfg.py    IDA script to produce CFG files           
+│       └── __main__.py       Entrypoint of `mcsema-disass`               
+│
+└── third_party
+    └── llvm                  LLVM source code
+```
+
 ## <a id="disass"></a> Producing a CFG file
 
-The first step to using McSema is to disassemble a program binary and produce a [CFG file](/mcsema/CFG/CFG.proto). The program that disassembles binaries is [`remill-disass`](/tools/mcsema_disass).
+The first step to using McSema is to disassemble a program binary and produce a [CFG file](/mcsema/CFG/CFG.proto). The program that disassembles binaries is [`mcsema-disass`](/tools/mcsema_disass).
 
 ### `mcsema-disass`
 
@@ -117,7 +157,7 @@ All the translation functions must have the same prototype and share lots of boi
 * `GENERIC_TRANSLATION_32MI(NAME, THECALL, GLOBALCALL, GLOBALIMMCALL)`: Used only for instructions that have two operands: 32-bit immediate and a memory value. Like GENERIC_TRANSLATION_MEM, but checks which operand references code or data. If its the immediate, execute `GLOBALIMMCALL`.
 * `OP(x)`: Shorthand for `inst.getOperand(x)`
 * `ADDR(x)`: Shorthand for `getAddrFromExpr` with common arguments.
-* `ADDR_NOREF(x)`: Shortang for `getAddrFromExpr` where it is **certain** the function will never reference a data variable, but needs to compute a complex address expression.
+* `ADDR_NOREF(x)`: Shorthand for `getAddrFromExpr` where it is **certain** the function will never reference a data variable, but needs to compute a complex address expression.
 
 Many x86 instructions require complex address computation due to complex addressing modes. The helper following helper functions are defined in `cfgToLLVM/x86Helpers.cpp` and are used to do address computation:
 
