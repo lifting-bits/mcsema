@@ -1140,7 +1140,7 @@ static void DeserializeData(const ::Data &d, DataSection &ds) {
 NativeModulePtr ReadProtoBuf(const std::string &file_name) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-  NativeModulePtr m;
+  NativeModulePtr m = nullptr;
   ::Module proto;
 
   std::ifstream fstream(file_name, std::ios::binary);
