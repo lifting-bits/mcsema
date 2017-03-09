@@ -20,7 +20,6 @@ __assert_fail 5 C N
 __cxa_atexit 5 C N
 __cxa_guard_acquire 5 C N
 __cxa_guard_release 5 C N
-__gmon_start__ 5 C N
 _ITM_deregisterTMCloneTable 5 C N
 _ITM_registerTMCloneTable 5 C N
 _Jv_RegisterClasses 5 C N

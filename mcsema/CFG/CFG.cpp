@@ -8,7 +8,8 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
- Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
  Neither the name of Trail of Bits nor the names of its
@@ -39,7 +40,7 @@
 
 #include "mcsema/cfgToLLVM/TransExcn.h"
 
-#include "mcsema/cfgToLLVM/Externals.h"
+#include "mcsema/CFG/Externals.h"
 #include "mcsema/cfgToLLVM/JumpTables.h"
 
 bool NativeInst::terminator(void) const {
@@ -957,7 +958,7 @@ static NativeInstPtr DeserializeInst(
   return ip;
 }
 
-static NativeBlockPtr deserializeBlock(
+static NativeBlockPtr DeserializeBlock(
     const ::Block &block,
     const std::list<ExternalCodeRefPtr> &extcode) {
 
@@ -996,7 +997,7 @@ static NativeFunctionPtr DeserializeNativeFunc(
 
   //read all the blocks from this function
   for (auto &block : func.blocks()) {
-    auto native_block = deserializeBlock(block, extcode);
+    auto native_block = DeserializeBlock(block, extcode);
     if (!native_block) {
       std::cerr
           << "Unable to deserialize function at " << std::hex
@@ -1139,7 +1140,7 @@ static void DeserializeData(const ::Data &d, DataSection &ds) {
 NativeModulePtr ReadProtoBuf(const std::string &file_name) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-  NativeModulePtr m;
+  NativeModulePtr m = nullptr;
   ::Module proto;
 
   std::ifstream fstream(file_name, std::ios::binary);

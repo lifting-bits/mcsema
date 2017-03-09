@@ -29,7 +29,7 @@ struct TranslationContext {
   std::map<VA, llvm::BasicBlock *> va_to_bb;
 };
 
-enum InstTransResult {
+enum InstTransResult : int {
   ContinueBlock,
   EndBlock,
   EndCFG,
@@ -40,8 +40,11 @@ enum InstTransResult {
 typedef InstTransResult (InstructionLifter)(
     TranslationContext &, llvm::BasicBlock *&);
 
-typedef std::map<unsigned, InstructionLifter *> DispatchMap;
+class DispatchMap : public std::map<unsigned, InstructionLifter *> {};
 
 InstructionLifter *ArchGetInstructionLifter(const llvm::MCInst &inst);
+
+extern InstTransResult (*ArchLiftInstruction)(
+    TranslationContext &, llvm::BasicBlock *&, InstructionLifter *);
 
 #endif  // MC_SEMA_ARCH_DISPATCH_H_

@@ -8,7 +8,8 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
- Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
  Neither the name of Trail of Bits nor the names of its
@@ -41,21 +42,18 @@
 #include <llvm/IR/Intrinsics.h>
 
 #include "mcsema/Arch/Dispatch.h"
+
+#include "mcsema/Arch/X86/Util.h"  // TODO(pag): MEM_AS_DATA_REF
+
 #include "mcsema/BC/Util.h"
+
 #include "mcsema/CFG/CFG.h"
 
 #include "mcsema/cfgToLLVM/JumpTables.h"
-#include "mcsema/cfgToLLVM/raiseX86.h"
-#include "mcsema/cfgToLLVM/x86Helpers.h"
-
-#include "InstructionDispatch.h"
-
-using namespace std;
-using namespace llvm;
-//using namespace x86;
+#include "mcsema/cfgToLLVM/TransExcn.h"
 
 // convert a jump table to a data section of symbols
-static DataSection* tableToDataSection(VA new_base, const MCSJumpTable &jt) {
+static DataSection *tableToDataSection(VA new_base, const MCSJumpTable &jt) {
   auto ds = new DataSection();
   const auto &entries = jt.getJumpTable();
   VA curAddr = new_base;
@@ -81,9 +79,9 @@ static DataSection *tableToDataSection(VA new_base, const JumpIndexTable &jit) {
   return ds;
 }
 
-template <typename T>
-static bool addTableDataSection(TranslationContext &ctx,
-                                VA &newVA, const T &table) {
+template<typename T>
+static bool addTableDataSection(TranslationContext &ctx, VA &newVA,
+                                const T &table) {
   auto natMod = ctx.natM;
   auto M = ctx.M;
 
@@ -103,7 +101,7 @@ static bool addTableDataSection(TranslationContext &ctx,
   DataSection *ds = tableToDataSection(newVA, table);
 
   // add to global data section list
-  natMod->addDataSection(*ds);
+  natMod->addDataSection( *ds);
 
   // create the GlobalVariable
   std::stringstream ss;
@@ -133,7 +131,8 @@ bool addJumpTableDataSection(TranslationContext &ctx, VA &newVA,
   return addTableDataSection<MCSJumpTable>(ctx, newVA, table);
 }
 
-bool addJumpIndexTableDataSection(TranslationContext &ctx, VA &newVA, const JumpIndexTable &table) {
+bool addJumpIndexTableDataSection(TranslationContext &ctx, VA &newVA,
+                                  const JumpIndexTable &table) {
   return addTableDataSection<JumpIndexTable>(ctx, newVA, table);
 }
 
@@ -141,7 +140,7 @@ void doJumpTableViaData(llvm::BasicBlock *&block, llvm::Value *fptr,
                         const int bitness) {
   llvm::Function *ourF = block->getParent();
 
-  if (!fptr->getType()->isPtrOrPtrVectorTy()) {
+  if ( !fptr->getType()->isPtrOrPtrVectorTy()) {
     auto FT = LiftedFunctionType();
     auto FptrTy = llvm::PointerType::get(FT, 0);
     fptr = new llvm::IntToPtrInst(fptr, FptrTy, "", block);
@@ -149,7 +148,7 @@ void doJumpTableViaData(llvm::BasicBlock *&block, llvm::Value *fptr,
 
   std::vector<llvm::Value *> subArgs;
   for (llvm::Argument &arg : ourF->args()) {
-    subArgs.push_back(&arg);
+    subArgs.push_back( &arg);
   }
 
   llvm::CallInst::Create(fptr, subArgs, "", block);
@@ -176,13 +175,14 @@ void doJumpTableViaData(TranslationContext &ctx, llvm::BasicBlock *&block,
   auto func_addr = llvm::CastInst::CreatePointerCast(addr, Fptr2Ty, "", block);
 
   // read in entry from table
-  auto new_func = noAliasMCSemaScope(new llvm::LoadInst(func_addr, "", block));
+  auto new_func = new llvm::LoadInst(func_addr, "", block);
 
   doJumpTableViaData(block, new_func, bitness);
 }
 
 template<int bitness>
-static void doJumpTableViaSwitch(TranslationContext &ctx, llvm::BasicBlock *&block) {
+static void doJumpTableViaSwitch(TranslationContext &ctx,
+                                 llvm::BasicBlock *&block) {
   auto ip = ctx.natI;
   auto &inst = ip->get_inst();
   auto natM = ctx.natM;
@@ -222,20 +222,21 @@ static void doJumpTableViaSwitch(TranslationContext &ctx, llvm::BasicBlock *&blo
   const auto &jmpblocks = jmpptr->getJumpTable();
 
   // create a switch inst
-  SwitchInst *theSwitch = SwitchInst::Create(real_index, defaultBlock,
-                                             jmpblocks.size(), block);
+  auto theSwitch = llvm::SwitchInst::Create(real_index, defaultBlock,
+                                            jmpblocks.size(), block);
 
   // populate switch
   int myindex = 0;
   for (auto jmp_block_va : jmpblocks) {
-    BasicBlock *toBlock = ctx.va_to_bb[jmp_block_va];
+    auto toBlock = ctx.va_to_bb[jmp_block_va];
     TASSERT(toBlock != NULL, "Could not find block");
     theSwitch->addCase(CONST_V<bitness>(block, myindex), toBlock);
     ++myindex;
   }
 }
 
-void doJumpTableViaSwitch(TranslationContext &ctx, llvm::BasicBlock *&block, int bitness) {
+void doJumpTableViaSwitch(TranslationContext &ctx, llvm::BasicBlock *&block,
+                          int bitness) {
   switch (bitness) {
     case 32:
       doJumpTableViaSwitch<32>(ctx, block);
@@ -263,8 +264,8 @@ static void doJumpTableViaSwitchReg(TranslationContext &ctx,
   auto jmpptr = ip->get_jump_table();
 
   // create a default block that just traps
-  default_block = BasicBlock::Create(block->getContext(), "",
-                                     block->getParent(), 0);
+  default_block = llvm::BasicBlock::Create(block->getContext(), "",
+                                           block->getParent(), 0);
   // end default block
 
   const std::vector<VA> &jmpblocks = jmpptr->getJumpTable();
@@ -283,7 +284,8 @@ static void doJumpTableViaSwitchReg(TranslationContext &ctx,
   }
 }
 
-void doJumpOffsetTableViaSwitchReg(TranslationContext &ctx, llvm::BasicBlock *&block,
+void doJumpOffsetTableViaSwitchReg(TranslationContext &ctx,
+                                   llvm::BasicBlock *&block,
                                    llvm::Value *regVal,
                                    llvm::BasicBlock *&default_block,
                                    llvm::Value *data_location,
@@ -382,7 +384,7 @@ void doJumpIndexTableViaSwitch(llvm::BasicBlock *&block, NativeInstPtr ip) {
 
   // create a default block that just traps
   auto defaultBlock = llvm::BasicBlock::Create(block->getContext(), "", F, 0);
-  auto trapFn = Intrinsic::getDeclaration(M, llvm::Intrinsic::trap);
+  auto trapFn = llvm::Intrinsic::getDeclaration(M, llvm::Intrinsic::trap);
   llvm::CallInst::Create(trapFn, "", defaultBlock);
   llvm::BranchInst::Create(continueBlock, defaultBlock);
   // end default block
@@ -396,8 +398,7 @@ void doJumpIndexTableViaSwitch(llvm::BasicBlock *&block, NativeInstPtr ip) {
   // populate switch
   int myindex = 0;
   for (auto index : idxblocks) {
-    BasicBlock *writeBl = emitJumpIndexWrite(F, index, dest.getReg(),
-                                             continueBlock);
+    auto writeBl = emitJumpIndexWrite(F, index, dest.getReg(), continueBlock);
     theSwitch->addCase(CONST_V<32>(block, myindex), writeBl);
     ++myindex;
   }
