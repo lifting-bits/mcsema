@@ -13,10 +13,11 @@ McSema is open-source and licensed under the BSD 3-clause license.
 | Linux | [![Build Status](https://travis-ci.org/trailofbits/mcsema.svg?branch=master)](https://travis-ci.org/trailofbits/mcsema) |
 
 ## Additional Documentation
- 
+
+ - [How to use mcsema: A walkthrough](docs/McsemaWalkthrough.md)
  - [Navigating the source code](docs/NavigatingTheCode.md)
  - [Design and architecture](docs/ARCHITECTURE.md)
- - [How to implement the semantics of an instruction](docs/ADD_AN_INSTRUCTION.md)
+ - [How to implement the semantics of an instruction](docs/AddAnInstruction.md)
  - [Usage and APIs](docs/USAGE_AND_APIS.md)
  - [Limitations](docs/Limitations.md)
 
