@@ -73,6 +73,26 @@ void (*ArchAllocRegisterVars)(llvm::BasicBlock *) = nullptr;
 unsigned (*ArchRegisterSize)(MCSemaRegs) = nullptr;
 llvm::StructType *(*ArchRegStateStructType)(void) = nullptr;
 
+bool ListArchSupportedInstructions(const std::string &triple, llvm::raw_ostream &s) {
+  std::string errstr;
+  auto target = llvm::TargetRegistry::lookupTarget(triple, errstr);
+  if (!target) {
+    return false;
+  }
+
+  llvm::MCInstrInfo *mii = target->createMCInstrInfo();
+
+  for (auto i : gDispatcher) {
+    if (i.first < llvm::X86::INSTRUCTION_LIST_END) {
+      s << mii->getName(i.first) << "\n";
+    }
+    if (i.first > llvm::X86::MCSEMA_OPCODE_LIST_BEGIN) {
+      s << "mcsema-specific: " << i.first << "\n";
+    }
+  }
+  return true;
+}
+
 bool InitArch(llvm::LLVMContext *context, const std::string &os, const std::string &arch) {
 
   // Windows.

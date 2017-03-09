@@ -77,6 +77,8 @@ enum PointerSize {
   Pointer64 = 64
 };
 
+bool ListArchSupportedInstructions(const std::string &triple, llvm::raw_ostream &s);
+
 bool InitArch(llvm::LLVMContext *context,
               const std::string &os,
               const std::string &arch);
