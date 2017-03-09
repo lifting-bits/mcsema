@@ -1,6 +1,6 @@
 # Machine code to bitcode: the life of an instruction
 
-This document describes how machine code instructions are lifted into LLVM bitcode. It should provide a detailed, inside-out overview of how McSema performs binary translation. This document omits some important steps, so consulting the [Navigating the code](NagivatingTheCode.md) document will be helpful.
+This document describes how machine code instructions are lifted into LLVM bitcode. It should provide a detailed, inside-out overview of how McSema performs binary translation. This document omits some important steps, so consulting the [Navigating the code](NavigatingTheCode.md) document will be helpful.
 
 ### Running example
 
@@ -10,7 +10,7 @@ This document will use the instructions in the following basic block as a runnin
 
 ## Step 1: CFG protocol buffer representation
 
-The first step to lifting involves getting the machine code instructions of some binary file into a format the McSema understands. We use a common and simple format so that McSema doesn't need to understand the many executable file formats ([ELF](https://en.wikipedia.org/wiki/Executable_and_Linkable_Format), [Mach-O](https://en.wikipedia.org/wiki/Mach-O), [PE](https://en.wikipedia.org/wiki/Portable_Executable), etc.).
+The first step to lifting involves getting the machine code instructions of some binary file into a format the McSema understands. These files are generated with the help of external tools for program disassembly (IDA Pro) so that McSema doesn't need to understand the many executable file formats.
 
 The file format used by McSema is a [CFG protocol buffer](/mcsema/CFG/CFG.proto). This file is produced using the [`mcsema-disass`](/mcsema/tools/mcsema_disass) tool. The CFG file for the above code block contains the following data.
 
@@ -63,7 +63,6 @@ Module {
 ## Step 2: Lifting to bitcode
 
 The second step, which is really a few steps, is to decode the CFG file and produce one LLVM bitcode function for every `Function` message into the CFG file. Below is a portion of the *unoptimized* bitcode produced for the above function.
-
 
 ```llvm
 ; Function Attrs: noinline
@@ -133,9 +132,11 @@ The produced LLVM functions have a predictable structure. They are named accordi
 
 All lifted functions accept a single argument: a pointer to a [`RegState`](/mcsema/Arch/X86/Runtime/State.h) structure. The `entry` block of the function is filled with a series of `getelementptr` and `bitcast` instructions. These instruction index into the fields of the `RegState` structure.
 
-Each field in the `RegState` structure produces at least two variables in the bitcode. An extreme example is `RegState::RAX` field. It is associated with `RAX_read`, `RAX_write`, `EAX_read`, `EAX_write`, `AX_read`, `AX_write`, `AH_read`, `AH_write`, `AL_read`, and `AL_write`. Each of these variables is used when lifting register read or write instructions. 
+Each field in the `RegState` structure produces at least two variables in the bitcode. These register variants are created by the `ArchAllocRegisterVars` function. In the case of X86, this architecture-neutral function is implemented using the [`X86AllocRegisterVars`](/mcsema/Arch/X86/Register.cpp) function.
 
-We can see the `_read` and `_write` variants of the register variables in action below in the translation of the `push ebx` instruction:
+Some registers have more derived registers than others. On one end, we have the FPU stack registers like `RegState::ST0` that have only one `_read` and `_write` variant. At the other extreme, we have `RegState::RAX`, which is associated with `RAX_read`, `RAX_write`, `EAX_read`, `EAX_write`, `AX_read`, `AX_write`, `AH_read`, `AH_write`, `AL_read`, and `AL_write`. All of the variants are made available in every lifted function prologue, and a subset of them will usually be used by the semantics bitcode.
+
+We can see the `_read` and `_write` variants of the register variables in action below in the translation of the `push ebx` instruction. This bitcode is produced using the [`doPushR`](/mcsema/Arch/X86/Semantics/Stack.cpp) function.
 
 ```llvm
   %1 = load i32, i32* %EBX_read           ; read EBX
