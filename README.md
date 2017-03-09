@@ -19,7 +19,7 @@ McSema is open-source and licensed under the BSD 3-clause license.
  - [Design and architecture](docs/ARCHITECTURE.md)
  - [How to implement the semantics of an instruction](docs/ADD_AN_INSTRUCTION.md)
  - [Usage and APIs](docs/USAGE_AND_APIS.md)
- - [Limitations](docs/LIMITATIONS.md)
+ - [Limitations](docs/Limitations.md)
 
 **Note:** McSema is undergoing modernization and architectural changes, so some documentation may be out-of-date, or in the process of being improved.
 
