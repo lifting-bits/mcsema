@@ -99,13 +99,13 @@ int main(int argc, char *argv[]) {
   // check manually
   if (!ListSupported && OS.empty()) {
     std::cerr
-        << "-os must be specified!" << std::endl;
+        << "-os must be specified" << std::endl;
         return EXIT_FAILURE;
   }
 
   if (!ListSupported && EntryPoints.empty()) {
     std::cerr
-        << "-entrypoint must be specified!" << std::endl;
+        << "-entrypoint must be specified" << std::endl;
         return EXIT_FAILURE;
   }
 
@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
 
   if (InputFilename.empty() || OutputFilename.empty()) {
     std::cerr
-        << "Must specify an input and output file";
+        << "Must specify an input and output file." << std::endl;
     return EXIT_FAILURE;
   }
 
