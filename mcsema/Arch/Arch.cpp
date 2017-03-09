@@ -86,8 +86,9 @@ bool ListArchSupportedInstructions(const std::string &triple, llvm::raw_ostream 
     if (i.first < llvm::X86::INSTRUCTION_LIST_END) {
       s << mii->getName(i.first) << "\n";
     }
-    if (i.first > llvm::X86::MCSEMA_OPCODE_LIST_BEGIN) {
-      s << "mcsema-specific: " << i.first << "\n";
+    if (i.first > llvm::X86::MCSEMA_OPCODE_LIST_BEGIN &&
+        i.first <= llvm::X86::MCSEMA_OPCODE_LIST_BEGIN + llvm::X86::gExtendedOpcodeNames.size()) {
+      s << llvm::X86::gExtendedOpcodeNames[i.first] << "\n";
     }
   }
   return true;
