@@ -9,7 +9,7 @@ import platform
 import json
 import base64
 
-DEBUG = False
+DEBUG = True
 
 def b64(f):
     """ Base64 encodes the file 'f' """
@@ -213,8 +213,6 @@ class LinuxTest(unittest.TestCase):
         self._runX86Test("switch")
         self._runAMD64Test("switch")
 
-    #TODO(artem): enable when we address issue #108
-    @unittest.skip("Re-enable after we fix issue #108")
     def testls(self):
         libs = ["-lrt",
                 "-lpthread",
