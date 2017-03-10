@@ -1,14 +1,14 @@
 # Using libFuzzer with Mcsema
 
-[libFuzzer](http://blog.llvm.org/2015/04/fuzz-all-clangs.html) is an LLVM-based coverage guided fuzzing framework, similar to AFL. Using libFuzzer, its simple to integrate coverage guided fuzzing: just defined a special function, update some build flags, and you have instant coverage guided fuzzing.
+[libFuzzer](http://blog.llvm.org/2015/04/fuzz-all-clangs.html) is an LLVM-based coverage guided fuzzing framework, similar to AFL. Using libFuzzer, it's simple to integrate coverage guided fuzzing: just define a special function, update some build flags, and you have instant coverage guided fuzzing.
 
 Since libFuzzer works at the LLVM level, we thought, why not try applying libFuzzer to mcsema translated bitcode, and see if we can use libFuzzer on binaries?
 
 It turns out the answer is yes!
 
-However, the yes comes with caveats. First, mcsema assembly stubs to some things that normal programs should never do (like calculate dynamic return addresses, allocate new stacks, etc). This behavior can conflict with address sanitizer, a feature that libFuzzer uses. Second, mcsema's control flow recovery is frequently wrong on large programs. Since libFuzzer explores new code paths, it has a very high likelihood of triggering a path where control flow recovery was incorrect. This means that a lot of the bugs found may be artifacts of translation that are not present in the original program.
+However, the 'yes' comes with caveats. First, mcsema assembly stubs do some things that normal programs should never do (like calculate dynamic return addresses, allocate new stacks, etc). This behavior can conflict with address sanitizer, a feature that libFuzzer uses. Second, mcsema's control flow recovery is frequently wrong on large programs. Since libFuzzer explores new code paths, it has a very high likelihood of triggering a path where control flow recovery was incorrect. This means that a lot of the bugs found may be artifacts of translation that are not present in the original program.
 
-We hope to improve both of these issues in the future. Now, lets take a look at a proof of concept for using libFuzzer on binary code!
+We hope to improve both of these issues in the future. For now, let's take a look at a proof of concept for using libFuzzer on binary code!
 
 The code we will be fuzzing is a [simple program](../tests/libFuzzer/fuzzme.cc) that tries to dereference user input once it reads the word 'fuzz':
 
@@ -67,7 +67,7 @@ For this guide, we will assume that mcsema was built in `$MCSEMA_DIR`, and all o
 
 ## Preparing and verifying libFuzzer
 
-First, run the `buildFuzzer.sh` script to generate libFuzzer objects. This should generate several files matching the patter `Fuzzer*.o`:
+First, run the `buildFuzzer.sh` script to generate libFuzzer objects. This should generate several files matching the pattern `Fuzzer*.o`:
 
     $ ./buildFuzzer.sh
     $ ls -1 Fuzzer*.o
@@ -83,14 +83,14 @@ First, run the `buildFuzzer.sh` script to generate libFuzzer objects. This shoul
     FuzzerTraceState.o
     FuzzerUtil.o
 
-Next, lets build a normal, non-mcsema version of our test to make sure libFuzzer works.    
+Next, let's build a normal, non-mcsema version of our test to make sure libFuzzer works.    
 
     clang++-3.8 -DSOURCE_FUZZ -o fuzzme fuzzme.cc Fuzzer*.o -fsanitize=address -fsanitize-coverage=edge
 
 The `-fsanitize` and `-fsanitize-coverage` arguments are standard arguments to instrument the built code for libFuzzer. The `-DSOURCE_FUZZ` argument sets a define to make sure the required `LLVMFuzzerTestOneInput` is emitted by our test code. For more details, see the [libFuzzer documentation](http://releases.llvm.org/3.8.0/docs/LibFuzzer.html).
 
 
-Now, lets run the source-based libFuzzer executable to make sure it works. Very quickly, you should see output similar to the following:
+Now, let's run the source-based libFuzzer executable to make sure it works. Very quickly, you should see output similar to the following:
 
     $ ./fuzzme
     Seed: 1013786530
@@ -128,7 +128,7 @@ Good news! libFuzzer found our magic prefix of 'fuzz' and triggered the error.
 
 ## Building The Binary
 
-Mcsema operates on binaries, so lets give it a binary to translate and make sure it works:
+Mcsema operates on binaries, so let's give it a binary to translate and make sure it works:
 
     $ clang++-3.8 -o fuzzme.binary fuzzme.cc
     $ ./fuzzme.binary
@@ -139,20 +139,20 @@ Mcsema operates on binaries, so lets give it a binary to translate and make sure
     $ ./fuzzme.binary fuzza
     Segmentation fault (core dumped)
 
-Great, the binary runs and exhibits the bad condition we want to fuzz for. Now lets lift it into bitcode!
+Great, the binary runs and exhibits the bad condition we want to fuzz for. Now let's lift it into bitcode!
 
 ## Lifting the Binary
 
-The function we really want to lift isn't `main`, but `vulnerable`. Since the binary is C++ based, `vulnerable`'s has been mangled. Lets find the [mangled name](https://en.wikipedia.org/wiki/Name_mangling) we need to use as the entry point.
+The function we really want to lift isn't `main`, but `vulnerable`. Since the binary is C++ based, `vulnerable`'s symbol name has been mangled. Let's find the [mangled name](https://en.wikipedia.org/wiki/Name_mangling) we need to use as the entry point.
 
     $ nm fuzzme.binary | grep vulnerable
     00000000004005f0 T _Z10vulnerablePKc
 
-Now, lets disassemble the binary, starting with the entry point of `_Z10vulnerablePKc`.
+Now, let's disassemble the binary, starting with the entry point of `_Z10vulnerablePKc`.
 
     $ ../../bin/mcsema-disass --disassembler ~/ida-6.9/idal64 --arch amd64 --os linux --entrypoint _Z10vulnerablePKc --binary fuzzme.binary --output fuzzme.cfg --log_file fuzzme.log 
 
-And once we have the control flow graph, we can re-convert it to bitcode:
+And once we have the control flow graph, we can convert it to bitcode:
 
     $ ../../bin/mcsema-lift --arch amd64 --os linux --entrypoint _Z10vulnerablePKc --cfg fuzzme.cfg --output fuzzme.bc
     ... lots of outputs ...
@@ -174,9 +174,9 @@ To use libFuzzer, we need a function named `LLVMFuzzerTestOneInput`, so we have 
         return 0;
     }
 
-The driver just says there is an external function with the signature `int vulnerable(const char *)` (this is the function we lifted), and calls it.
+The driver just says that there is an external function with the signature `int vulnerable(const char *)` (this is the function we lifted), and calls it.
 
-Now lets combine the driver, our bitcode, mcsema assembly stubs and libFuzzer instrumentation into one program:
+Now let's combine the driver, our bitcode, mcsema assembly stubs, and libFuzzer instrumentation into one program:
 
     $ clang++-3.8 -O3 -o fuzzme.mcsema driver.cc fuzzme.bc ../../generated/ELF_64_linux.S Fuzzer*.o -fsanitize=address -fsanitize-coverage=edge
 
