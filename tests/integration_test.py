@@ -9,7 +9,7 @@ import platform
 import json
 import base64
 
-DEBUG = True
+DEBUG = False
 
 def b64(f):
     """ Base64 encodes the file 'f' """
