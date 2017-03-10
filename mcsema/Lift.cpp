@@ -58,15 +58,23 @@ static llvm::cl::opt<std::string> Arch("arch", llvm::cl::desc("Arch name"),
 
 static llvm::cl::opt<std::string> OS("os", llvm::cl::desc("Operating system"),
                                      llvm::cl::value_desc("<os>"),
-                                     llvm::cl::Required);
+                                     llvm::cl::Optional);
 
 static llvm::cl::opt<std::string> InputFilename(
     "cfg", llvm::cl::desc("Input CFG file"), llvm::cl::value_desc("<cfg>"),
-    llvm::cl::Required);
+    llvm::cl::Optional);
 
 static llvm::cl::list<std::string> EntryPoints(
     "entrypoint", llvm::cl::desc("Describe externally visible entry points"),
     llvm::cl::value_desc("<symbol | ep address>"));
+
+static llvm::cl::opt<bool> ListSupported("list-supported",
+                                         llvm::cl::desc("List supported instructions for <arch>"),
+                                         llvm::cl::Optional);
+
+static llvm::cl::opt<bool> ListUnsupported("list-unsupported",
+                                           llvm::cl::desc("List unsupported (not-yet-implemented) instructions for <arch>"),
+                                           llvm::cl::Optional);
 
 static void PrintVersion(void) {
   std::cout << "0.6" << std::endl;
@@ -85,14 +93,23 @@ int main(int argc, char *argv[]) {
   llvm::cl::SetVersionPrinter(PrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv, "CFG to LLVM");
 
+  auto context = new llvm::LLVMContext;
 
-  if (InputFilename.empty() || OutputFilename.empty()) {
-    std::cerr
-        << "Must specify an input and output file";
-    return EXIT_FAILURE;
+  if (OS.empty()) {
+    if (ListSupported || ListUnsupported) {
+      OS = "linux"; // just need something
+    }
+    else {
+      std::cerr << "-os must be specified" << std::endl;
+      return EXIT_FAILURE;
+    }
   }
 
-  auto context = new llvm::LLVMContext;
+  if (!(ListSupported || ListUnsupported) && EntryPoints.empty()) {
+    std::cerr
+        << "-entrypoint must be specified" << std::endl;
+        return EXIT_FAILURE;
+  }
 
   if (!InitArch(context, OS, Arch)) {
     std::cerr
@@ -107,6 +124,17 @@ int main(int argc, char *argv[]) {
   }
 
   auto triple = M->getTargetTriple();
+
+  if (ListSupported || ListUnsupported) {
+    ListArchSupportedInstructions(triple, llvm::outs(), ListSupported, ListUnsupported);
+    return EXIT_SUCCESS;
+  }
+
+  if (InputFilename.empty() || OutputFilename.empty()) {
+    std::cerr
+        << "Must specify an input and output file." << std::endl;
+    return EXIT_FAILURE;
+  }
 
   //reproduce NativeModule from CFG input argument
   try {

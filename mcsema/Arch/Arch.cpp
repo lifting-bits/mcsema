@@ -40,6 +40,7 @@ static bool InitInstructionDecoder(void) {
   std::string errstr;
   auto target = llvm::TargetRegistry::lookupTarget(gTriple, errstr);
   if (!target) {
+    llvm::errs() << "Can't find target for " << gTriple << ": " << errstr << "\n";
     return false;
   }
 
@@ -78,6 +79,40 @@ unsigned (*ArchRegisterSize)(MCSemaRegs) = nullptr;
 llvm::StructType *(*ArchRegStateStructType)(void) = nullptr;
 InstTransResult (*ArchLiftInstruction)(
     TranslationContext &, llvm::BasicBlock *&, InstructionLifter *) = nullptr;
+
+bool ListArchSupportedInstructions(const std::string &triple, llvm::raw_ostream &s, bool ListSupported, bool ListUnsupported) {
+  std::string errstr;
+  auto target = llvm::TargetRegistry::lookupTarget(triple, errstr);
+  if (!target) {
+    llvm::errs() << "Can't find target for " << triple << ": " << errstr << "\n";
+    return false;
+  }
+
+  llvm::MCInstrInfo *mii = target->createMCInstrInfo();
+
+  if(ListSupported) {
+    s << "SUPPORTED INSTRUCTIONS: \n";
+    for (auto i : gDispatcher) {
+      if (i.first < llvm::X86::INSTRUCTION_LIST_END) {
+        s << mii->getName(i.first) << "\n";
+      }
+      if (i.first > llvm::X86::MCSEMA_OPCODE_LIST_BEGIN &&
+          i.first <= llvm::X86::MCSEMA_OPCODE_LIST_BEGIN + llvm::X86::gExtendedOpcodeNames.size()) {
+        s << llvm::X86::gExtendedOpcodeNames[i.first] << "\n";
+      }
+    }
+  }
+
+  if (ListUnsupported) {
+    s << "UNSUPPORTED INSTRUCTIONS: \n";
+    for (int i = llvm::X86::AAA; i < llvm::X86::INSTRUCTION_LIST_END; ++i) {
+      if (gDispatcher.end() == gDispatcher.find(i)) {
+        s << mii->getName(i) << "\n";
+      }
+    }
+  }
+  return true;
+}
 
 bool InitArch(llvm::LLVMContext *context, const std::string &os, const std::string &arch) {
 
