@@ -116,7 +116,7 @@ class MCInst;
 
 }  // namespace llvm
 
-typedef uintptr_t VA;
+typedef uint64_t VA;
 
 enum SystemArchType {
   _X86_,
