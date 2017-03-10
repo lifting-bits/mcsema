@@ -24,4 +24,7 @@ Mcsema is open source: there are no hidden surprises, and if you find a bug you 
 
 ## Apache
 
-As an example of how robust the mcsema lifting process is, the Apache web server program has been lifted by mcsema into llvm bitcode which was subsequently recompiled bakc into a binary form an executed. The resulting binary will run and serve pages.
+As an example of how robust the mcsema lifting process is, the Apache web server program has been lifted by mcsema into llvm bitcode which was subsequently recompiled back into a binary form an executed. The resulting binary will run and serve pages.
+
+## libFuzzer
+[libFuzzer](http://llvm.org/docs/LibFuzzer.html) operates on llvm ir. Work is ongoing to make mcsema lifted ir compatible with libfuzzer.
