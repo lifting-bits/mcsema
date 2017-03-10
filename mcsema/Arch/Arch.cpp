@@ -40,7 +40,7 @@ static bool InitInstructionDecoder(void) {
   std::string errstr;
   auto target = llvm::TargetRegistry::lookupTarget(gTriple, errstr);
   if (!target) {
-    llvm::errs() << "Can't find target for " << triple << ": " << errstr << "\n";
+    llvm::errs() << "Can't find target for " << gTriple << ": " << errstr << "\n";
     return false;
   }
 
