@@ -40,6 +40,7 @@ static bool InitInstructionDecoder(void) {
   std::string errstr;
   auto target = llvm::TargetRegistry::lookupTarget(gTriple, errstr);
   if (!target) {
+    llvm::errs() << "Can't find target for " << triple << ": " << errstr << "\n";
     return false;
   }
 
@@ -83,6 +84,7 @@ bool ListArchSupportedInstructions(const std::string &triple, llvm::raw_ostream 
   std::string errstr;
   auto target = llvm::TargetRegistry::lookupTarget(triple, errstr);
   if (!target) {
+    llvm::errs() << "Can't find target for " << triple << ": " << errstr << "\n";
     return false;
   }
 
