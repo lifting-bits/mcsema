@@ -72,6 +72,10 @@ static llvm::cl::opt<bool> ListSupported("list-supported",
                                          llvm::cl::desc("List supported instructions for <arch>"),
                                          llvm::cl::Optional);
 
+static llvm::cl::opt<bool> ListUnsupported("list-unsupported",
+                                           llvm::cl::desc("List unsupported (not-yet-implemented) instructions for <arch>"),
+                                           llvm::cl::Optional);
+
 static void PrintVersion(void) {
   std::cout << "0.6" << std::endl;
 }
@@ -92,7 +96,7 @@ int main(int argc, char *argv[]) {
   auto context = new llvm::LLVMContext;
 
   if (OS.empty()) {
-    if (ListSupported) {
+    if (ListSupported || ListUnsupported) {
       OS = "linux"; // just need something
     }
     else {
@@ -101,7 +105,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (!ListSupported && EntryPoints.empty()) {
+  if (!(ListSupported || ListUnsupported) && EntryPoints.empty()) {
     std::cerr
         << "-entrypoint must be specified" << std::endl;
         return EXIT_FAILURE;
@@ -121,8 +125,8 @@ int main(int argc, char *argv[]) {
 
   auto triple = M->getTargetTriple();
 
-  if (ListSupported) {
-    ListArchSupportedInstructions(triple, llvm::outs());
+  if (ListSupported || ListUnsupported) {
+    ListArchSupportedInstructions(triple, llvm::outs(), ListSupported, ListUnsupported);
     return EXIT_SUCCESS;
   }
 
