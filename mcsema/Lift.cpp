@@ -91,16 +91,14 @@ int main(int argc, char *argv[]) {
 
   auto context = new llvm::LLVMContext;
 
-  if (ListSupported && OS.empty()) {
-    OS = "linux"; // just need something 
-  }
-
-  // because os is not required for -list-supported,
-  // check manually
-  if (!ListSupported && OS.empty()) {
-    std::cerr
-        << "-os must be specified" << std::endl;
-        return EXIT_FAILURE;
+  if (OS.empty()) {
+    if (ListSupported) {
+      OS = "linux"; // just need something
+    }
+    else {
+      std::cerr << "-os must be specified" << std::endl;
+      return EXIT_FAILURE;
+    }
   }
 
   if (!ListSupported && EntryPoints.empty()) {
