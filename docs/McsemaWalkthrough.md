@@ -106,6 +106,8 @@ Finally, our command should succeed. We can verify that the CFG recovery complet
     $ ls -lh xz.cfg
     -rw-rw-r-- 1 artem artem 212K Mar  8 14:54 xz.cfg
     
+If header files are available that declare these external functions, these files can be automatically generated using the [DEF file generation script](DEFFileGeneration.md).
+
 ## Translation to Bitcode
 
 Once we have the program's control flow information, we can translate it to LLVM bitcode using `mcsema-lift`. 
