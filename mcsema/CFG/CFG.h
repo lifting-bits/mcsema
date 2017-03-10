@@ -49,7 +49,11 @@ namespace llvm {
 class Target;
 }  // namespace llvm
 
+#ifdef __x86_64__
 typedef uint64_t VA;
+#else
+typedef uintptr_t VA;
+#endif
 
 class NativeInst;
 typedef NativeInst *NativeInstPtr;
