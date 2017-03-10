@@ -10,7 +10,7 @@ However, the yes comes with caveats. First, mcsema assembly stubs to some things
 
 We hope to improve both of these issues in the future. Now, lets take a look at a proof of concept for using libFuzzer on binary code!
 
-The code we will be fuzzing is a [simple program](tests/libFuzzer/fuzzme.cc) that tries to dereference user input once it reads the word 'fuzz':
+The code we will be fuzzing is a [simple program](../tests/libFuzzer/fuzzme.cc) that tries to dereference user input once it reads the word 'fuzz':
 
     $ cat fuzzme.cc
     #include <stdio.h>
@@ -63,7 +63,7 @@ The code we will be fuzzing is a [simple program](tests/libFuzzer/fuzzme.cc) tha
 
 libFuzzer is constantly improving; this guide will use an older version of libFuzzer that comes with LLVM 3.8, because that is the LLVM version used by mcsema.
 
-For this guide, we will assume that mcsema was built in `$MCSEMA_DIR`, and all operations take place in [`$MCSEMA_DIR/mcsema/tests/libFuzzer`](mcsema/tests/libFuzzer).
+For this guide, we will assume that mcsema was built in `$MCSEMA_DIR`, and all operations take place in [`$MCSEMA_DIR/mcsema/tests/libFuzzer`](../tests/libFuzzer).
 
 ## Preparing and verifying libFuzzer
 
