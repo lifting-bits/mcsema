@@ -18,9 +18,7 @@ McSema is open-source and licensed under the BSD 3-clause license.
  - [Using Mcsema with libFuzzer](docs/UsingLibFuzzer.md)
  - [Navigating the source code](docs/NavigatingTheCode.md)
  - [Life of an instruction](docs/LifeOfAnInstruction.md)
- - [Design and architecture](docs/ARCHITECTURE.md)
  - [How to implement the semantics of an instruction](docs/AddAnInstruction.md)
- - [Usage and APIs](docs/USAGE_AND_APIS.md)
  - [Limitations](docs/Limitations.md)
  - [Usecases](docs/Usecases.md)
 
