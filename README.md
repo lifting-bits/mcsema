@@ -127,7 +127,7 @@ choco install -y --allowemptychecksum git cmake python2 pip wget unzip 7zip
 choco install -y microsoft-visual-cpp-build-tools --installargs "/InstallSelectableItems Win81SDK_CppBuildSKUV1;Win10SDK_VisibleV1"
 ```
 
-#### Step 2: Clone and enter the repository
+#### Step 2: Clone the repository
 
 Open the Developer Command Prompt for Visual Studio, and run:
 
