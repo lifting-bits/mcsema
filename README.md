@@ -33,19 +33,6 @@ Why would anyone translate binaries *back* to bitcode?
 
 * **Write one set of analysis tools**. Lifting to LLVM IR means that one set of analysis tools can work on both the source and the binary. Maintaining a single set of tools saves development time and effort, and allows for a single set of better tools.
 
-## Documentation
-
- - [How to use mcsema: A walkthrough](docs/McsemaWalkthrough.md)
- - [Using Mcsema with libFuzzer](docs/UsingLibFuzzer.md)
- - [Navigating the source code](docs/NavigatingTheCode.md)
- - [Life of an instruction](docs/LifeOfAnInstruction.md)
- - [How to implement the semantics of an instruction](docs/AddAnInstruction.md)
- - [Limitations](docs/Limitations.md)
-
-## Getting help
-
-If you are experiencing problems with McSema or just want to learn more and contribute, then join the `#tool-mcsema` channel of the [Empire Hacking Slack](https://empireslacking.herokuapp.com/). Alternatively, you can join our mailing list at [mcsema-dev@googlegroups.com](https://groups.google.com/forum/?hl=en#!forum/mcsema-dev) or email us privately at mcsema@trailofbits.com.
-
 ## Dependencies
 
 | Name | Version | 
@@ -164,6 +151,19 @@ There are a few things that we can do with the lifted bitcode. The usual thing t
 ```shell
 clang-3.8 -o /tmp/ls_lifted generated/ELF_64_linux.S /tmp/ls.bc -lpthread -ldl -lpcre /lib/x86_64-linux-gnu/libselinux.so.1
 ```
+
+## Additional Documentation
+
+ - [How to use mcsema: A walkthrough](docs/McsemaWalkthrough.md)
+ - [Using Mcsema with libFuzzer](docs/UsingLibFuzzer.md)
+ - [Navigating the source code](docs/NavigatingTheCode.md)
+ - [Life of an instruction](docs/LifeOfAnInstruction.md)
+ - [How to implement the semantics of an instruction](docs/AddAnInstruction.md)
+ - [Limitations](docs/Limitations.md)
+
+## Getting help
+
+If you are experiencing problems with McSema or just want to learn more and contribute, join the `#tool-mcsema` channel of the [Empire Hacking Slack](https://empireslacking.herokuapp.com/). Alternatively, you can join our mailing list at [mcsema-dev@googlegroups.com](https://groups.google.com/forum/?hl=en#!forum/mcsema-dev) or email us privately at mcsema@trailofbits.com.
 
 ## FAQ
 
