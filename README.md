@@ -139,15 +139,11 @@ cd git
 git clone https://github.com/trailofbits/mcsema.git --depth 1
 ```
 
+#### Step 3: Build and install the code
+
 ```shell
 cd mcsema
 bootstrap
-```
-
-#### Step 3: Build and install the code
-
-```
-Help wanted!
 ```
 
 ## Try it Out
