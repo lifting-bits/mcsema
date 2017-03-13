@@ -64,7 +64,7 @@ If you are experiencing problems with McSema, or just want to learn more and con
 
 ### On Linux
 
-### Step 1: Install dependencies
+#### Step 1: Install dependencies
 
 ```shell
 sudo apt-get update
@@ -82,9 +82,7 @@ sudo pip install --upgrade pip
 sudo pip install 'protobuf==2.6.1'
 ```
 
-#### Note: Using IDA on 64 bit Ubuntu
-
-If your IDA install does not use the system's Python, you can add the `protobuf` library manually to IDA's zip of modules.
+Note: If you are using IDA on 64 bit Ubuntu and your IDA install does not use the system Python, you can add the `protobuf` library manually to IDA's zip of modules.
 
 ```
 # Python module dir is generally in /usr/lib or /usr/local/lib
@@ -94,7 +92,7 @@ sudo zip -rv /path/to/ida-6.X/python/lib/python27.zip google/
 sudo chown your_user:your_user /home/taxicat/ida-6.7/python/lib/python27.zip
 ```
 
-### Step 2: Clone and enter the repository
+#### Step 2: Clone and enter the repository
 
 ```shell
 git clone git@github.com:trailofbits/mcsema.git --depth 1
@@ -110,7 +108,7 @@ cd mcsema
 ./bootstrap.sh --build Release
 ```
 
-### Step 3: Build and install the code
+#### Step 3: Build and install the code
 
 ```shell
 cd build
@@ -118,9 +116,9 @@ make
 sudo make install
 ```
 
-## On Windows
+### On Windows
 
-### Step 1: Install dependencies
+#### Step 1: Install dependencies
 
 Download and install [Chocolatey](https://chocolatey.org/install). Then, open Powershell in *administrator* mode, and run the following:
 
@@ -129,7 +127,7 @@ choco install -y --allowemptychecksum git cmake python2 pip wget unzip 7zip
 choco install -y microsoft-visual-cpp-build-tools --installargs "/InstallSelectableItems Win81SDK_CppBuildSKUV1;Win10SDK_VisibleV1"
 ```
 
-### Step 2: Clone and enter the repository
+#### Step 2: Clone and enter the repository
 
 Open the Developer Command Prompt for Visual Studio, and run:
 
@@ -146,7 +144,7 @@ cd mcsema
 bootstrap
 ```
 
-### Step 3: Build and install the code
+#### Step 3: Build and install the code
 
 ```
 Help wanted!
