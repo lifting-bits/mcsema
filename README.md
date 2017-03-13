@@ -44,7 +44,7 @@ Why would anyone translate binaries *back* to bitcode?
 
 ## Getting help
 
-If you are experiencing problems with McSema, or just want to learn more and contribute, then ask for help in the `#tool-mcsema` channel of the [Empire Hacking Slack](https://empireslacking.herokuapp.com/). Alternatively, you can join our mailing list at [mcsema-dev@googlegroups.com](https://groups.google.com/forum/?hl=en#!forum/mcsema-dev) or email us privately at mcsema@trailofbits.com.
+If you are experiencing problems with McSema or just want to learn more and contribute, then join the `#tool-mcsema` channel of the [Empire Hacking Slack](https://empireslacking.herokuapp.com/). Alternatively, you can join our mailing list at [mcsema-dev@googlegroups.com](https://groups.google.com/forum/?hl=en#!forum/mcsema-dev) or email us privately at mcsema@trailofbits.com.
 
 ## Dependencies
 
