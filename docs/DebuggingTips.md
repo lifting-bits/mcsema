@@ -1,6 +1,6 @@
 # Things have gone wrong, now what?
 
-This document describes some approaches to debugging the lifted bitcode produced by McSema on Linux. This document does not describe [how to add missing instructions](AddAnInstruction.md), or how to [resolve lifting errors](McsemaWalkthrough.md#fixing-errors).
+This document describes some approaches to debugging the lifted bitcode produced by McSema on Linux. This document does not describe [how to add missing instructions](AddAnInstruction.md), or how to [resolve common errors](CommonErrors.md).
 
 #### Terminology
 
