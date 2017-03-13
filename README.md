@@ -170,3 +170,12 @@ If you are experiencing problems with McSema or just want to learn more and cont
 ### How do you pronounce McSema and where did the name come from?
 
 McSema is pronounced 'em see se ma' and is short for machine code semantics.
+
+### Why do I need IDA Pro to use McSema?
+
+McSema's goal is binary to bitcode translation. Accurate disassembly and control flow recovery is a separate and difficult problem. IDA has already invested countless man-hours into getting disassembly right, and it only makes sense that we re-use existing work. We understand that not everyone can afford an IDA license. With the original release of McSema, we shipped our own tool recursive descent disassembler. It was never as good as IDA and it never would be. Maintaining the broken tool took away valuable development time from more important McSema work. We hope to eventually transition to more accessible control flow recovery frontends, such as Binary Ninja (we have a branch with [initial Binary Ninja support](https://github.com/trailofbits/mcsema/tree/getcfg_binja)). We very warmly welcome pull requests that implement new control flow recovery frontends. 
+
+
+### I'm a student and I'd like to contribute to McSema. How can I help?
+
+We would love to take you on as an intern to help improve McSema. We have several project ideas labelled `intern_project` in [the issues tracker](https://github.com/trailofbits/mcsema/issues?q=is%3Aissue+is%3Aopen+label%3Aintern_project). You are not limited to those items: if you think of a great feature you want in McSema, let us know and we will sponsor it. Simply contact us on our [Slack channel](https://empireslacking.herokuapp.com/) or via mcsema@trailofbits.com and let us know what you'd want to work on and why.
