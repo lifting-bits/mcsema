@@ -17,7 +17,7 @@ This binary was chosen since it has complex features, it was easy to verify that
 
 ## Assumptions
 
-This guide assumes that you are working on a Linux system, have already built and installed a working version of mcsema, and that `mcsema-lift` and `mcsema-disass` are in your execution path.
+This guide assumes that you are working on a Linux system, have already built and installed a working version of mcsema, and that `mcsema-lift` and `mcsema-disass` are in your execution path. We assume that the mcsema repository was cloned into `$MCSEMA_DIR`.
 
 The guide also assumes that you have working version of IDA Pro, which is required for control flow recovery.
 
@@ -49,9 +49,9 @@ Let's walk through each option:
 
 ### Fixing Errors
 
-This section documents how to fix a common CFG recovery problem: undefined external functions. By the time you are reading this guide, the functions described here may have already been added to the [list of common external Linux functions that comes with mcsema](https://github.com/trailofbits/mcsema/blob/master/tools/mcsema_disass/defs/linux.txt).
+This section documents how to fix a common CFG recovery problem: undefined external functions. By the time you are reading this guide, the functions described here may have already been added to the [list of common external Linux functions that comes with mcsema](https://github.com/trailofbits/mcsema/blob/master/tools/mcsema_disass/defs/linux.txt) and you can skip this section.
 
-The previous command should have failed:
+The previous command may have failed (as in this snippet). If it did, read on. If not, skip this section and move on to Translation To Bitcode.
 
     $ mcsema-disass --disassembler ~/ida-6.9/idal64 --os linux --arch amd64 --output xz.cfg --binary xz --entrypoint main --log_file xz.log
     Generated an invalid (zero-sized) CFG. Please use the --log_file option to see an error log.
@@ -146,9 +146,9 @@ As of this writing, mcsema outputs bitcode suitable for clang 3.8, and that is t
 
 Now, let's re-create a new `xz` binary and see it in action!
 
-    $ clang-3.8 -m64 -O3 -o xz.new /store/artem/git/mcsema/generated/ELF_64_linux.S xz.bc -llzma
+    $ clang-3.8 -m64 -O3 -o xz.new ${MCSEMA_DIR}/generated/ELF_64_linux.S xz.bc -llzma
     
-This is a fairly ordinary clang command line; the only thing of note is `/store/artem/git/mcsema/generated/ELF_64_linux.S`, which happens to be my path to the aforementioned generated assembly stubs. The `ELF_64_linux.S` is the stub to use for 64-bit ELF files on Linux. Other possible options include:
+This is a fairly ordinary clang command line; the only thing of note is `${MCSEMA_DIR}/generated/ELF_64_linux.S`, which is the path to the aforementioned generated assembly stubs. The `ELF_64_linux.S` is the stub to use for 64-bit ELF files on Linux. Other possible options include:
 
 * `ELF_32_linux.S`: Used when generating 32-bit Linux ELFs
 * `PE_64_windows.asm`: Used when generating 64-bit Windows PEs
@@ -160,12 +160,12 @@ We can verify that our new binary, `xz.new`, works, and compresses output that c
     $ echo "testing compression" | ./xz.new | unxz
     testing compression
  
-Most command line arguments to xz also work:   
+Command line arguments to `xz.new` also work:   
  
     $ ./xz.new --version
     xz (XZ Utils) 5.1.0alpha
     liblzma 5.1.0alpha
-    $ ./xz.new -h
+    $ ./xz.new --help
     Usage: ./xz.new [OPTION]... [FILE]...
     Compress or decompress FILEs in the .xz format.
 
@@ -190,11 +190,5 @@ Most command line arguments to xz also work:
 
     Report bugs to <lasse.collin@tukaani.org> (in English or Finnish).
     XZ Utils home page: <http://tukaani.org/xz/>
-    
-However, some long-form arguments fail as of this writing due to [bug #108](https://github.com/trailofbits/mcsema/issues/108).
-
-    $ ./xz.new --help
-    ./xz.new: unrecognized option '--help'
-    ./xz.new: Try `./xz.new --help' for more information.
     
 That's it for the walkthrough. Please let us know if any of the steps fail or change so that we can update this document. Happy translating!
