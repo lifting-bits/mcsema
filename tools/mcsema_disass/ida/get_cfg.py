@@ -1432,23 +1432,40 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
         more_dref = [d for d in idautils.DataRefsFrom(i)]
         dref_size = idc.ItemSize(i) or 1
         if len(more_dref) == 0 and dref_size == 1 and not PIE_MODE:
-            dword = readDword(i)
             DEBUG("Testing address: {0:x}... ".format(i))
+
+            # try to read a qword first, then fall back on dword
+            inc_size = 1
+            if getBitness() == 64:
+                pword = readQword(i)
+                make_word = idc.MakeQword
+                inc_size = 8
+                if not isSaneReference(pword):
+                    pword = readDword(i)
+                    make_word = idc.MakeDword
+                    inc_size = 4
+            else:
+                make_word = idc.MakeDword
+                pword = readDword(i)
+                inc_size = 4
+
             # check for unmakred references
-            # that point to the beginning of an item
-            if isInData(dword, dword+1) and idc.ItemHead(dword) == dword:
-                if idc.MakeDword(i):
-                    idc.add_dref(i, dword, idc.XREF_USER|idc.dr_O)
-                    DEBUG("making New Data Reference at: {0:x} => {1:x}".format(i, dword))
-                    dref_size = 4
+
+            #TODO(artem) possibly add check that do more reference sanity 
+            # checking, such as if pword falls in the middle of a string
+            if isInData(pword, pword+1):# and idc.ItemHead(pword) == pword:
+                if make_word(i):
+                    idc.add_dref(i, pword, idc.XREF_USER|idc.dr_O)
+                    DEBUG("making New Data Reference at: {0:x} => {1:x}".format(i, pword))
+                    dref_size = inc_size
                 else:
                     DEBUG("WARNING: Could not make reference at {:x}".format(i))
             # check if code and points to the beginning of an instruction
-            elif isInternalCode(dword) and idc.ItemHead(dword) == dword:
-                if idc.MakeDword(i):
-                    idc.AddCodeXref(i, dword, idc.XREF_USER|idc.fl_F)
-                    DEBUG("making New Code Reference at: {0:x} => {1:x}".format(i, dword))
-                    dref_size = 4
+            elif isInternalCode(pword) and idc.ItemHead(pword) == pword:
+                if make_word(i):
+                    idc.AddCodeXref(i, pword, idc.XREF_USER|idc.fl_F)
+                    DEBUG("making New Code Reference at: {0:x} => {1:x}".format(i, pword))
+                    dref_size = inc_size
                 else:
                     DEBUG("WARNING: Could not make reference at {:x}".format(i))
             else:

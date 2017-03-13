@@ -70,7 +70,7 @@ static llvm::Value *doShiftOp(NativeInstPtr ip, llvm::BasicBlock *b,
                               llvm::Value *src, llvm::Value *count) {
 
   // get the masked count variable
-  int count_max = (width == 64) ? 63 : 31;
+  int count_max = (width >= 64) ? 63 : 31;
 
   llvm::Value *tempCOUNT = llvm::BinaryOperator::CreateAnd(
       count, CONST_V<width>(b, count_max), "", b);
@@ -100,14 +100,16 @@ static llvm::Value *doShiftOp(NativeInstPtr ip, llvm::BasicBlock *b,
   llvm::Value *shift_first = llvm::BinaryOperator::Create(shift_op, src,
                                                           whichShift1, "", b);
 
-  auto mask_value = 1ULL;
+  llvm::Value *mask = nullptr;
   switch (shift_op) {
     case llvm::Instruction::LShr:
     case llvm::Instruction::AShr:
-      mask_value = 1ULL;
+      mask = CONST_V<width>(b, 1);
       break;
     case llvm::Instruction::Shl:
-      mask_value = 1ULL << (width - 1ULL);
+      mask = CONST_V<width>(b, 1);
+      mask = llvm::BinaryOperator::CreateShl(
+          mask, CONST_V<width>(b, width-1), "", b);
       break;
     default:
       // assert;
@@ -117,7 +119,6 @@ static llvm::Value *doShiftOp(NativeInstPtr ip, llvm::BasicBlock *b,
   }
 
   // extract lsb or msb
-  llvm::Value *mask = CONST_V<width>(b, mask_value);
   llvm::Value *sigbyte = llvm::BinaryOperator::CreateAnd(shift_first, mask, "",
                                                          b);
 
@@ -1992,7 +1993,9 @@ GENERIC_TRANSLATION(SHR8r1, doShrR1<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHR8rCL, doShrRCL<8>(ip, block, OP(0)))
 GENERIC_TRANSLATION(SHR8ri, doShrRI<8>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SHRD32rri8, doShrdRI<32>(ip, block, OP(1), OP(2), OP(3)))
+GENERIC_TRANSLATION(SHRD64rri8, doShrdRI<64>(ip, block, OP(1), OP(2), OP(3)))
 GENERIC_TRANSLATION(SHLD32rri8, doShldRI<32>(ip, block, OP(1), OP(2), OP(3)))
+GENERIC_TRANSLATION(SHLD64rri8, doShldRI<64>(ip, block, OP(1), OP(2), OP(3)))
 GENERIC_TRANSLATION(SHRD32rrCL, doShrdRCL<32>(ip, block, OP(1), OP(2)))
 GENERIC_TRANSLATION(SHLD32rrCL, doShldRCL<32>(ip, block, OP(1), OP(2)))
 GENERIC_TRANSLATION_REF(SHLD32mrCL,
@@ -2151,6 +2154,8 @@ void ShiftRoll_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::SHLD32rrCL] = translate_SHLD32rrCL;
   m[llvm::X86::SHLD32mrCL] = translate_SHLD32mrCL;
   m[llvm::X86::SHLD32rri8] = translate_SHLD32rri8;
+  m[llvm::X86::SHLD64rri8] = translate_SHLD64rri8;
+  m[llvm::X86::SHRD64rri8] = translate_SHRD64rri8;
 
   m[llvm::X86::SHR64ri] = translate_SHR64ri;
   m[llvm::X86::SHR64r1] = translate_SHR64r1;

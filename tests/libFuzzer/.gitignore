@@ -1,0 +1,5 @@
+Fuzz*.o
+*.log
+*.cfg
+crash-*
+*.bc

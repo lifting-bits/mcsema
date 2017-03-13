@@ -68,13 +68,55 @@ enum : unsigned {
   REP_LODSQ_64,
 };
 
+static std::map<unsigned, std::string> gExtendedOpcodeNames = {
+  { REPE_CMPSB_32, "REPE_CMPSB_32" },
+  { REPE_CMPSW_32, "REPE_CMPSW_32" },
+  { REPE_CMPSD_32, "REPE_CMPSD_32" },
+  { REPE_CMPSB_64, "REPE_CMPSB_64" },
+  { REPE_CMPSW_64, "REPE_CMPSW_64" },
+  { REPE_CMPSD_64, "REPE_CMPSD_64" },
+  { REPE_CMPSQ_64, "REPE_CMPSQ_64" },
+
+  { REPNE_CMPSB_32, "REPNE_CMPSB_32" },
+  { REPNE_CMPSW_32, "REPNE_CMPSW_32" },
+  { REPNE_CMPSD_32, "REPNE_CMPSD_32" },
+  { REPNE_CMPSB_64, "REPNE_CMPSB_64" },
+  { REPNE_CMPSW_64, "REPNE_CMPSW_64" },
+  { REPNE_CMPSD_64, "REPNE_CMPSD_64" },
+  { REPNE_CMPSQ_64, "REPNE_CMPSQ_64" },
+
+  { REPE_SCASB_32, "REPE_SCASB_32" },
+  { REPE_SCASW_32, "REPE_SCASW_32" },
+  { REPE_SCASD_32, "REPE_SCASD_32" },
+  { REPE_SCASB_64, "REPE_SCASB_64" },
+  { REPE_SCASW_64, "REPE_SCASW_64" },
+  { REPE_SCASD_64, "REPE_SCASD_64" },
+  { REPE_SCASQ_64, "REPE_SCASQ_64" },
+
+  { REPNE_SCASB_32, "REPNE_SCASB_32" },
+  { REPNE_SCASW_32, "REPNE_SCASW_32" },
+  { REPNE_SCASD_32, "REPNE_SCASD_32" },
+  { REPNE_SCASB_64, "REPNE_SCASB_64" },
+  { REPNE_SCASW_64, "REPNE_SCASW_64" },
+  { REPNE_SCASD_64, "REPNE_SCASD_64" },
+  { REPNE_SCASQ_64, "REPNE_SCASQ_64" },
+
+  { REP_LODSB_32, "REP_LODSB_32" },
+  { REP_LODSW_32, "REP_LODSW_32" },
+  { REP_LODSD_32, "REP_LODSD_32" },
+  { REP_LODSB_64, "REP_LODSB_64" },
+  { REP_LODSW_64, "REP_LODSW_64" },
+  { REP_LODSD_64, "REP_LODSD_64" },
+  { REP_LODSQ_64, "REP_LODSQ_64" }
+};
+
 }  // namespace X86
 
 class MCInst;
 
 }  // namespace llvm
 
-typedef uintptr_t VA;
+typedef uint64_t VA;
 
 enum SystemArchType {
   _X86_,
@@ -85,6 +127,8 @@ enum PointerSize {
   Pointer32 = 32,
   Pointer64 = 64
 };
+
+bool ListArchSupportedInstructions(const std::string &triple, llvm::raw_ostream &s, bool ListSupported, bool ListUnsupported);
 
 bool InitArch(llvm::LLVMContext *context,
               const std::string &os,

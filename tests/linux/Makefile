@@ -66,5 +66,7 @@ clean:
 	rm -f $(X86_CFGS)
 	rm -f $(X64)
 	rm -f $(X64_CFGS)
+	rm -f $(X64_ELFS_CFGS)
+	rm -f $(X86_ELFS_CFGS)
 	rm -f amd64/expected_outputs.json
 	rm -f x86/expected_outputs.json
