@@ -36,6 +36,16 @@ def run_a_program(pargs, outfile, errfile, timeout=600):
     if po.returncode != 0:
         raise RuntimeError("A program returned an error code: {}".format(args))
 
+def run_a_shell(shellargs, outfile, errfile):
+
+    with open(outfile, 'w') as outf:
+        with open(errfile, 'w') as errf:
+            sys.stdout.write("Executing: {}\n".format(shellargs))
+            try:
+                subprocess.check_call(shellargs, stderr=errf, stdout=outf, shell=True)
+            except subprocess.CalledProcessError as cpe:
+                raise RuntimeError("A program returned an error code: {}".format(cpe.returncode))
+
 def run_programs(testdir, basedir, rundict):
     # make new temp directory
     # read input json
@@ -79,11 +89,18 @@ def run_programs(testdir, basedir, rundict):
             if not os.path.exists(prog):
                 raise RuntimeError("Could not find test program: {}".format(prog))
         
-            progargs = [prog]
-            progargs.extend(config['args'])
+            if 'args' in config:
+                progargs = [prog]
+                progargs.extend(config['args'])
 
-            # do the test
-            run_a_program(progargs, stdoutfile, stderrfile)
+                # do the test
+                run_a_program(progargs, stdoutfile, stderrfile)
+            elif 'shell' in config:
+                shellargs = config['shell']
+                shellargs = shellargs.replace("#PROGNAME", prog)
+                run_a_shell(shellargs, stdoutfile, stderrfile)
+            else:
+                raise RuntimeError("No 'args' or 'shell' item for test {}".format(testname))
 
             #base64 the output content to fit into json
             test_result['expected_stdout'] = b64(stdoutfile)

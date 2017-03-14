@@ -49,5 +49,17 @@
             "_comment": "Executes ./switch 74642 [hits the big number case]",
             "args": ["74642"]
         }
+    },
+
+    "xz": {
+        "_comment": "Checks that the linux xz binary translates",
+        "version": {
+            "_comment": "xz --version",
+            "args": ["--version"]
+        },
+        "compression test": {
+            "_comment": "compression and decompression test",
+            "shell": "echo 'compression test' | #PROGNAME -c | #PROGNAME -d"
+        }
     }
 }

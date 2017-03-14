@@ -77,6 +77,9 @@ sudo apt-get install -yqq \
   realpath \
   gcc-multilib g++-multilib
 
+#only neded for the xz integration test
+sudo apt-get install -yqq liblzma-dev
+
 echo "[+] Upgrading PIP"
 
 sudo -H pip install --upgrade pip

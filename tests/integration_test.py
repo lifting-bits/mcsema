@@ -94,6 +94,13 @@ class LinuxTest(unittest.TestCase):
         self.assertEqual(po.returncode, 0)
         sys.stderr.write("\n")
 
+    def _runShell(self, shellargs, stdout=None, stderr=None):
+
+        with open(os.devnull, "w") as devnull:
+            if DEBUG:
+                sys.stderr.write("executing: {}\n".format(shellargs))
+            subprocess.check_call(shellargs, stderr=stderr or devnull, stdout=stdout or devnull, shell=True)
+
     def _runAMD64Test(self, testname, entrypoint="main", buildargs=None):
         self._runArchTest("amd64", testname, entrypoint, buildargs)
 
@@ -142,8 +149,17 @@ class LinuxTest(unittest.TestCase):
 
             # use the same arguments to the lifted program as to the original
             # the original args are stored in the config
-            progargs = [exefile]
-            progargs.extend(testset[test]['args'])
+            if 'args' in testset[test]:
+                progargs = [exefile]
+                progargs.extend(testset[test]['args'])
+                testfunction = self._runWithTimeout
+            elif 'shell' in testset[test]:
+                progargs = testset[test]['shell']
+                progargs = progargs.replace("#PROGNAME", exefile)
+                testfunction = self._runShell
+            else:
+                raise RuntimeError("No 'args' or 'shell' item for test {}".format(testname))
+
             # create files to hold stdin/stdout
             stdout = os.path.join(self.archdirs[arch], testname + ".stdout")
             stderr = os.path.join(self.archdirs[arch], testname + ".stderr")
@@ -155,7 +171,7 @@ class LinuxTest(unittest.TestCase):
             # run the program
             with open(stdout, 'w') as outf:
                 with open(stderr, 'w') as errf:
-                    self._runWithTimeout(progargs, stdout=outf, stderr=errf)
+                    testfunction(progargs, stdout=outf, stderr=errf)
 
             self.assertTrue(os.path.exists(stdout))
             have_stdin = b64(stdout)
@@ -220,6 +236,11 @@ class LinuxTest(unittest.TestCase):
                 "-lpcre",
                 "/lib/x86_64-linux-gnu/libselinux.so.1"]
         self._runAMD64Test("ls", buildargs=libs)
+
+    def testxz(self):
+        libs = ["-lrt",
+                "-llzma"]
+        self._runAMD64Test("xz", buildargs=libs)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

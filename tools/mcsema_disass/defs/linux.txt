@@ -37241,3 +37241,7 @@ ZZ_NewLink 1 C N
 ZZ_NewList 0 C N
 __fdelt_chk 1 C N
 __fdelt_warn 1 C N
+
+# used for the xz walkthrough example
+__open_2 2 C N
+__vfprintf_chk 4 C N

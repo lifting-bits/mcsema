@@ -75,5 +75,22 @@
       "expected_stderr": "", 
       "expected_stdout": "UmVhbGx5IGJpZyBpbnB1dDogIDB4MTIzOTIK"
     }
+  }, 
+  "xz": {
+    "_comment": "Checks that the linux xz binary translates", 
+    "compression test": {
+      "_comment": "compression and decompression test", 
+      "expected_stderr": "", 
+      "expected_stdout": "Y29tcHJlc3Npb24gdGVzdAo=", 
+      "shell": "echo 'compression test' | #PROGNAME -c | #PROGNAME -d"
+    }, 
+    "version": {
+      "_comment": "xz --version", 
+      "args": [
+        "--version"
+      ], 
+      "expected_stderr": "", 
+      "expected_stdout": "eHogKFhaIFV0aWxzKSA1LjEuMGFscGhhCmxpYmx6bWEgNS4xLjBhbHBoYQo="
+    }
   }
 }
