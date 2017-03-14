@@ -29,6 +29,103 @@ define print-reg-state-64
   dont-repeat
 end
 
+
+define addr-of-xmm0-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm0) = 0x%016lx\n", $rptr + 304
+  dont-repeat
+end
+
+define addr-of-xmm1-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm1) = 0x%016lx\n", $rptr + 320
+  dont-repeat
+end
+
+define addr-of-xmm2-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm2) = 0x%016lx\n", $rptr + 336
+  dont-repeat
+end
+
+define addr-of-xmm3-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm3) = 0x%016lx\n", $rptr + 352
+  dont-repeat
+end
+
+define addr-of-xmm4-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm4) = 0x%016lx\n", $rptr + 368
+  dont-repeat
+end
+
+define addr-of-xmm5-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm5) = 0x%016lx\n", $rptr + 384
+  dont-repeat
+end
+
+define addr-of-xmm6-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm6) = 0x%016lx\n", $rptr + 400
+  dont-repeat
+end
+
+define addr-of-xmm7-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm7) = 0x%016lx\n", $rptr + 416
+  dont-repeat
+end
+
+define addr-of-xmm8-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm8) = 0x%016lx\n", $rptr + 432
+  dont-repeat
+end
+
+define addr-of-xmm9-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm9) = 0x%016lx\n", $rptr + 448
+  dont-repeat
+end
+
+define addr-of-xmm10-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm10) = 0x%016lx\n", $rptr + 464
+  dont-repeat
+end
+
+define addr-of-xmm11-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm11) = 0x%016lx\n", $rptr + 480
+  dont-repeat
+end
+
+define addr-of-xmm12-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm12) = 0x%016lx\n", $rptr + 496
+  dont-repeat
+end
+
+define addr-of-xmm13-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm13) = 0x%016lx\n", $rptr + 512
+  dont-repeat
+end
+
+define addr-of-xmm14-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm14) = 0x%016lx\n", $rptr + 528
+  dont-repeat
+end
+
+define addr-of-xmm15-64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "&(RegState::xmm15) = 0x%016lx\n", $rptr + 544
+  dont-repeat
+end
+
 define print-flags-64
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
   set $flptr = (char *) ($rptr + 136)

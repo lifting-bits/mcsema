@@ -539,7 +539,7 @@ static InstTransResult translate_CVTSI2SS64rr(TranslationContext &ctx,
 
   llvm::Value *src_val = R_READ<64>(block, src.getReg());
 
-  return doCVTSI2SrV<64>(natM, block, ip, inst, src_val, dst);
+  return doCVTSI2SrV<32>(natM, block, ip, inst, src_val, dst);
 }
 
 // convert signed integer (memory) to single precision float (xmm register)
@@ -555,7 +555,7 @@ static InstTransResult translate_CVTSI2SS64rm(TranslationContext &ctx,
 
   llvm::Value *src_val = M_READ<64>(ip, block, mem_addr);
 
-  return doCVTSI2SrV<64>(natM, block, ip, inst, src_val, dst);
+  return doCVTSI2SrV<32>(natM, block, ip, inst, src_val, dst);
 
 }
 

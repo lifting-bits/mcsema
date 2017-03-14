@@ -263,37 +263,314 @@ The first gotcha is calls to externals, like `strlen`. In native code, there wil
 
 The second gotcha is spurious differences between the traces. There are likely to be a lot of these, especially when the original binary calls out to a shared library, and then execution returns back into the original binary. Many register values on return from the library code, but in the lifted program, will have different values that what is recorded by `regtrace`.
 
-Another example of spurious differences relate to `REP`-prefixed instructions. The first example is repeated string instructions, e.g. `rep stos`. In a native trace, each repeated iteration will produce a single line of output. In the lifted trace, there will only be one line.
+Another example of spurious differences relate to `REP`-prefixed instructions. The first example is repeated string instructions, e.g. `rep stos`. In a native trace, each repeated iteration will produce a single line of output. In the lifted trace, there will only be one line. The second example is `repz ret`. This can show up as two distinct instructions in the lifted trace, but only one in the native trace.
 
 ##### Gotcha #3: Huge traces
 
-The final gotcha is huge traces. It is often useful to narrow the scope of what is diffed. Our current example produces a segmentation fault when running `/tmp/lifted_ls --recursive`, but this happens after some file information is printed. So we'll start by diffing a prefix of the trace, using some program's output (a file name) as a starting point.
+The final gotcha is huge traces. It is often useful to narrow the scope of what is diffed. This gotcha is exacerbated by the issue of spurious differences. In general, a good starting point is to take the trace, and chop out the sequence of program counters only. This will let us find a first point of non-spurious divergence, and then we can work back from there using more of the information available in the trace.
 
-First we find the line in the traces containing the word `Trace`, which is part of the name of one of the listed files, `Trace.cpp`. Here's what we see:
-
-```shell
-pag@sloth:~/Code/mcsema/tools/regtrace$ grep -n Trace /tmp/native_trace 
-16156:Trace.cpp
-16159:Trace.o
-16160:Trace.so
-16163:Trace.o
-16164:Trace.so
-pag@sloth:~/Code/mcsema/tools/regtrace$ grep -n Trace /tmp/lifted_trace 
-8847:Trace.cppRIP=4054cf RAX=9 RBX=9 RCX=7ffb9e7aa620 RDX=0 RSI=1 RDI=7ffd7755b190 RSP=7ffd7755b150 RBP=7ffd7755d1d0 R8=0 R9=0 R10=2000 R11=7ffb9e406740 R12=0 R13=1bebe80 R14=1bde040 R15=0
-11132:Trace.oRIP=4054cf RAX=7 RBX=7 RCX=7ffb9e7aa620 RDX=0 RSI=1 RDI=7ffd7755b190 RSP=7ffd7755b150 RBP=7ffd7755d1d0 R8=0 R9=0 R10=2000 R11=7ffb9e406740 R12=0 R13=1bebec0 R14=1bde040 R15=0
-11798:Trace.soRIP=4054cf RAX=8 RBX=8 RCX=7ffb9e7aa620 RDX=0 RSI=1 RDI=7ffd7755b190 RSP=7ffd7755b150 RBP=7ffd7755d1d0 R8=0 R9=0 R10=2000 R11=7ffb9e406740 R12=0 R13=1bebe80 R14=1bde040 R15=0
-```
-
-Now lets chop down the traces using those first line numbers as a guide.
+We can chop out the sequence of instruction pointers as follows:
 
 ```shell
-pag@sloth:~/Code/mcsema/tools/regtrace$ head -n 8847 /tmp/lifted_trace >/tmp/lifted_trace_short 
-pag@sloth:~/Code/mcsema/tools/regtrace$ head -n 16156 /tmp/native_trace >/tmp/native_trace_short 
+grep -oP '^[ER]IP[^ ]+' /tmp/native_trace > /tmp/native_pc_trace
 ```
 
-Great, we can diff these. Still though, there are thousands of lines, and due spurious differences, we're still stuck with everything looking different. We can take a new approach though. Let's focus on the program counters first, and look for the first significant control-flow divergence, then work back from there.
+#### Analyzing the traces
+
+Our current example produces a segmentation fault when running `/tmp/lifted_ls --recursive`, but this happens after some file information is printed. The traces that we record are huge, so we will start by focusing only on the sequence of `RIP` values printed out, then work back from there.
 
 ```shell
-pag@sloth:~/Code/mcsema/tools/regtrace$ grep -oP '^RIP[^ ]+' /tmp/native_trace | head -n 16156  >/tmp/native_trace_short
-pag@sloth:~/Code/mcsema/tools/regtrace$ grep -oP '^RIP[^ ]+' /tmp/lifted_trace | head -n 8847  >/tmp/lifted_trace_short
+pag@sloth:~/Code/mcsema/tools/regtrace$ grep -oP '^[ER]IP[^ ]+' /tmp/native_trace > /tmp/native_pc_trace
+pag@sloth:~/Code/mcsema/tools/regtrace$ grep -oP '^[ER]IP[^ ]+' /tmp/lifted_trace > /tmp/lifted_pc_trace
 ```
+
+I use Meld Diff Viewer, so what I usually look for in the diff is the blue sections (minor differences) in the diff. Here's what I see for this issue.
+
+![First difference](images/first_diff_in_pc_trace.png)
+![First difference](images/first_diff_control_flow.png)
+
+So what we see above is that there is a `jbe 0x40adf8`, and in the lifted code, it goes down the taken path to `0x40adf8`, whereas the native code goes down the not-taken path to `0x40ad7a`.
+
+First, we'll lift a second copy of this binary using the `-add-breakpoints` option and not the `-add-reg-tracer`. Then we'll whip open the debugger and try to figure out this issue.
+
+```shell
+pag@sloth:~/Code/mcsema/build$ undodb-gdb /tmp/ls_lifted_bp
+...
+(undodb-gdb) source /home/pag/Code/mcsema/.gdbinit
+(undodb-gdb) b breakpoint_40ad74
+Breakpoint 1 at 0x4f0fc0
+(undodb-gdb) r --recursive
+...
+
+Breakpoint 1, 0x00000000004f0fc0 in breakpoint_40ad74 ()
+(undodb-gdb) print-flags-64
+eflags [CF AF SF ]
+```
+
+Alright, in the lifted code we see that the `EFLAGS` at the point of the `jbe` are `CF`, `AF`, and `SF`. Here's what the manual has to say on what conditions must be set for `jbe` to follow the taken path:
+
+![JBE conditions](images/jbe_eflags.png)
+
+This explains why the lifted execution follows the taken path; the `CF` (carry flag) is set in the lifted code. Let's see what the native execution looks like:
+
+```shell
+pag@sloth:~/Code/mcsema/build$ undodb-gdb /bin/ls
+...
+(undodb-gdb) b *0x40ad74
+Breakpoint 1 at 0x40ad74
+(undodb-gdb) r --recursive
+...
+Breakpoint 1, 0x000000000040ad74 in ?? ()
+(undodb-gdb) info reg
+...
+rip            0x40ad74 0x40ad74
+eflags         0x212  [ AF IF ]
+...
+```
+
+Ignore the `IF`, that's the interrupt flag, and it will always be set unless we're debugging kernel space code where interrupts are disabled (e.g. in an interrupt handler). The `AF` flag (auxiliary carry flag) is set in both traces, but that's the only common thing. Time to work backwards to see why `CF` is set in the lifted trace and not in the native trace.
+
+The instruction just before the `jbe` at `0x40ad74` is a `cmp rdi, 0x9`. This instruction will modify the flags, so lets look in our extended traces and see what the value of `rdi` is in both traces.
+
+```shell
+pag@sloth:~/Code/mcsema/tools/regtrace$ grep 'RIP=40ad74' /tmp/lifted_trace
+RIP=40ad74 ... RDI=0 ...
+pag@sloth:~/Code/mcsema/tools/regtrace$ grep 'RIP=40ad74' /tmp/native_trace
+RIP=40ad74 ... RDI=25 ...
+```
+
+So, the value of `RDI` should be `0x25` but instead it is `0x0`. We can step back slightly through the program counter trace and see that `sub_40ad70` is called in the block starting at `0x40b62b` (shown below).
+
+![Many predecessors](images/r15_from_predecessors.png)
+
+The value of `RDI` comes from `R15`, but unfortunately there's a lot of predecessors. We can deal with this by working backward through our trace, figuring out the location of the last assignment to `R15`. I'm going to cheat and use reverse execution.
+
+```shell
+(undodb-gdb) addr-of-r15
+&(RegState::r15) = 0x00007f8d4ff1d890
+(undodb-gdb) watch *0x00007f8d4ff1d890
+Hardware watchpoint 2: *0x00007f8d4ff1d890
+(undodb-gdb) reverse-continue
+Continuing.
+Hardware watchpoint 2: *0x00007f8d4ff1d890
+
+Old value = 0
+New value = 30
+0x00000000004c4c26 in sub_40B5B0 ()
+(undodb-gdb) print-reg-state-64
+             emulated                   native
+rip     0x000000000040b710        0x00000000004c4c26
+...
+(undodb-gdb) addr-of-xmm0
+&(RegState::xmm0) = 0x00007f8d4ff1d940
+(undodb-gdb) x/4f 0x00007f8d4ff1d940
+0x7f8d4ff1d940: 0 0 0 0
+```
+
+This tells us that the value of `R15` was changed at instruction `0x40b710`, shown below. 
+
+![Source of r15](images/source_of_r15.png)
+
+The `cvttss2si` instruction is pretty complicated. Let's see what should have happened in the native execution.
+
+```shell
+(undodb-gdb) b *0x40b710
+Breakpoint 2 at 0x40b710
+(undodb-gdb) reverse-continue
+Continuing.
+
+Breakpoint 2, 0x000000000040b710 in ?? ()
+(undodb-gdb) x/i $pc
+=> 0x40b710:  cvttss2si r15,xmm0
+(undodb-gdb) p/x $r15
+$1 = 0x1e
+(undodb-gdb) p $xmm0
+$2 = {v4_float = {37.5, 0, 0, 0}, ...}
+```
+
+Looks like we can see a difference in the values of `XMM0` compared. In the lifted trace, the first float is a `0`, but in the native trace, the value is `37.5`, which converted to an integer is `0x25`. We're going to need to work backward again.
+
+```shell
+(undodb-gdb) addr-of-xmm0-64
+&(RegState::xmm0) = 0x00007f8d4ff1d940
+(undodb-gdb) watch *0x00007f8d4ff1d940
+Hardware watchpoint 3: *0x00007f8d4ff1d940
+(undodb-gdb) reverse-continue
+Continuing.
+Hardware watchpoint 3: *0x00007f8d4ff1d940
+
+Old value = 0
+New value = -16777216
+__mcsema_attach_ret () at runtime_64.S:80
+80    movdqu fs:[__mcsema_reg_state@TPOFF + 304], xmm0
+Warning: the current language does not match this frame.
+(undodb-gdb) print-reg-state-64
+             emulated                   native
+rip     0x0000000000402190        0x0000000000514ea6
+...
+```
+
+Oof. We've found ourselves in one of the attach/detach routines (`__mcsema_attach_ret`) for transitioning between lifted code and native code. These routines are tricky.
+
+When we see an `__mcsema_attach_ret`, what it's really meaning is that at some earlier point, lifted code called into some native library code. This lifted-to-native transition happens via the `__mcsema_detach_call` or `__mcsema_detach_call_value` functions. Eventually that native code needs to transition back to lifted code. This is achieved by setting up a special return address on the stack, `__mcsema_attach_ret`. When native code returns, it returns to `__mcsema_attach_ret`, which marshals native register state back into the `RegState` structure, and continues on in lifted code. 
+
+Alright, lets step back and attack this problem from the native side. Looking back at our control-flow graph, we can see that `XMM0` is modified by a `divss` instruction.
+
+![divss setting xmm0](images/source_of_xmm0_divss.png)
+
+Let's confirm that the `divss` instruction at `0x40b6d6` is really the source of the `37.5` number.
+
+```shell
+(undodb-gdb) b *0x40b6d6
+Breakpoint 3 at 0x40b6d6
+(undodb-gdb) reverse-continue
+Continuing.
+
+Breakpoint 3, 0x000000000040b6d6 in ?? ()
+(undodb-gdb) p $xmm0.v4_float
+$5 = {30, 0, 0, 0}
+(undodb-gdb) p $xmm1.v4_float
+$6 = {0.800000012, 0, 0, 0}
+(undodb-gdb) p 30 / 0.800000012
+$7 = 37.499999437500009
+```
+
+Yup, it is. Our reverse-execution based on a watchpoint on `&(RegState::XMM0)` led us astray. Lets go back to the breakpoint approach, and see what things look like at `breakpoint_40b6d6`.
+
+```shell
+(undodb-gdb) c
+Continuing.
+
+Breakpoint 1, 0x00000000004f0fc0 in breakpoint_40ad74 ()
+undodb-gdb: Have switched to record mode.
+(undodb-gdb) b *breakpoint_40b6d6
+Breakpoint 4 at 0x50f6c0
+(undodb-gdb) reverse-continue
+Continuing.
+
+Breakpoint 4, 0x000000000050f6c0 in breakpoint_40b6d6 ()
+...
+(undodb-gdb) addr-of-xmm0-64
+&(RegState::xmm0) = 0x00007f8d4ff1d940
+(undodb-gdb) addr-of-xmm1-64
+&(RegState::xmm1) = 0x00007f8d4ff1d950
+(undodb-gdb) x/f 0x00007f8d4ff1d940
+0x7f8d4ff1d940: 0
+(undodb-gdb) x/f 0x00007f8d4ff1d940
+0x7f8d4ff1d940: 0
+(undodb-gdb) x/f 0x00007f8d4ff1d950
+0x7f8d4ff1d950: 0.800000012
+```
+
+So this is sort of encouraging. `XMM1` contains the correct value of `0.800000012` but `XMM0` is off at this point. Let's use our trace to find the last source of `XMM0`.
+
+![Trace to xmm0](images/diff_back_to_pxor_xmm0.png) | ![CFG to xmm0](images/pxor_to_divss_xmm0_xmm1.png)
+
+OK we're in business. The `pxor xmm0, xmm0` clears out the `XMM0` register, then the `cvtsi2ss` converts `R15` into a `float`, and stores it into `XMM0`. Lets step back to the `cvtsi2ss` and compare lifted to native.
+
+```shell
+(undodb-gdb) b breakpoint_40b6d1
+Breakpoint 6 at 0x50f6b0
+(undodb-gdb) reverse-continue
+Continuing.
+
+Breakpoint 6, 0x000000000050f6b0 in breakpoint_40b6d1 ()
+(undodb-gdb) print-reg-state-64
+             emulated                   native
+...
+r15     0x000000000000001e        0xde7accccde7acccc
+```
+
+And in the native code.
+
+```shell
+(undodb-gdb) b *0x40b6d1
+Breakpoint 4 at 0x40b6d1
+(undodb-gdb) reverse-continue
+Continuing.
+
+Breakpoint 4, 0x000000000040b6d1 in ?? ()
+(undodb-gdb) info reg
+...
+r15            0x1e 30
+...
+```
+
+Amazing! The `RegState::R15` in the lifted code and `R15` in the native code match up. This tells us that there is a bug in the semantics of `cvtsi2ss`! Alright, what does this instruction even do?
+
+![cvtsi2ss docs](images/cvtsi2ss_doc.png)
+
+So, it will take a signed integer in `R15`, convert it into a `float`, and store that into the low 4 bytes of `XMM0`, zeroing out the other 12 bytes in `XMM0`. What is our lifted code doing?
+
+![lifted cvtsi2ss](images/lifted_cvtsi2ss.png)
+
+What we're seeing here is that `R15` is converted into a `double`, then storing that to the low 8 bytes of `XMM0`, then clearing out the high 8 bytes of `XMM0`. This doesn't sound right! Let's confirm that this is indeed what is happening.
+
+```shell
+(undodb-gdb) b *0x4c4879
+Breakpoint 7 at 0x4c4879
+(undodb-gdb) c
+Continuing.
+
+Breakpoint 7, 0x00000000004c4879 in sub_40B5B0 ()
+(undodb-gdb) addr-of-xmm0-64
+&(RegState::xmm0) = 0x00007f8d4ff1d940
+(undodb-gdb) p *(double *)0x00007f8d4ff1d940
+$4 = 30
+```
+
+Alright, we have confirmation, the lifted code for `cvtsi2ss` is definitely doing the wrong thing. Time to see the C++ code implementing this instruction.
+
+First, we'll figure out what LLVM opcode implements this instruction.
+
+```shell
+pag@sloth:~/Code/mcsema/build$ echo "cvtsi2ss xmm0, r15" | llvm-mc-3.8 -x86-asm-syntax=intel -show-inst 
+  .text
+  cvtsi2ssq %r15, %xmm0     # <MCInst #670 CVTSI2SS64rr
+                            #  <MCOperand Reg:126>
+                            #  <MCOperand Reg:117>>
+```
+
+We can find the instruction dispatcher for this function in [SSE semantics code](/mcsema/Arch/X86/Semantics/SSE.cpp).
+
+![code for cvts12ss](images/cxx_for_cvtsi2ssrr64.png)
+
+We can also disassemble (using `llvm-dis-3.8`) the lifted bitcode file and look directly at the LLVM IR to see what is produced.
+
+```llvm
+  call void @breakpoint_40b6d1(%RegState* %0), !mcsema_real_eip !14434
+  %665 = load i64, i64* %R15_read, !mcsema_real_eip !14434
+  %666 = sitofp i64 %665 to double, !mcsema_real_eip !14434
+  %667 = bitcast double %666 to i64, !mcsema_real_eip !14434
+  %668 = zext i64 %667 to i128, !mcsema_real_eip !14434
+  store volatile i128 %668, i128* %XMM0_write, !mcsema_real_eip !14434
+  br label %block_40b6d6, !mcsema_real_eip !14435
+```
+
+What we are seeing is that the semantics function `translate_CVTSI2SS64rr` is using `64` for target floating point width when calling `doCVTSI2SrV`. The `doCVTSI2SrV` function
+
+ 1. Calls the `INT_TO_FP_TO_INT<64>` helper function with the value of `R15`.
+ 2. `INT_TO_FP_TO_INT<64>` converts `R15` to a `width`-sized floating point number (in our case, a 64-bit float, i.e. a `double`).
+ 3. `INT_TO_FP_TO_INT<64>` reinterprets that value as an integer (without a format change).
+ 4. `doCVTSI2SrV` writes that 64-bit integer (containing a float) to `XMM0`, which zero extends the 64-bit integer into a 128-bit integer.
+
+Clearly we should have called `doCVTSI2SrV<32>` instead of `doCVTSI2SrV<64>`, so that `INT_TO_FP_TO_INT<width=32>` would do a narrower conversion.
+
+Let's make this change, rebuild and install mcsema, re-run `mcsema-lift`, compile the new bitcode, and hope for the best. Here's what the new bitcode looks like after the fix:
+
+```llvm
+  call void @breakpoint_40b6d1(%RegState* %0), !mcsema_real_eip !14434
+  %665 = load i64, i64* %R15_read, !mcsema_real_eip !14434
+  %666 = sitofp i64 %665 to float, !mcsema_real_eip !14434
+  %667 = bitcast float %666 to i32, !mcsema_real_eip !14434
+  %668 = zext i32 %667 to i128, !mcsema_real_eip !14434
+  store volatile i128 %668, i128* %XMM0_write, !mcsema_real_eip !14434
+  br label %block_40b6d6, !mcsema_real_eip !14435
+```
+
+
+#### Closing comments
+
+This document presented a few of the helpful commands provided for debugging, and then walked through the diagnosis and fixing of a specific bug that was present in McSema at commit [409abe3d31a7b0d09b1fee9c60e1d190de39cced](https://github.com/trailofbits/mcsema/commit/409abe3d31a7b0d09b1fee9c60e1d190de39cced).
+
+There is a lot of information in this document. Despite this, the same techniques used in this document can be productively applied to may similar types of bugs.
