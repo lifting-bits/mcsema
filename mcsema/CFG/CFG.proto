@@ -58,6 +58,10 @@ message Block {
     repeated    int64       block_follows = 3;
 }
 
+message Reference {
+    required    int64 inst_addr = 1;
+}
+
 message Variable {
 
     // not sure this is what we want here, just throwing it in for now 
@@ -73,8 +77,8 @@ message Variable {
 
     required    string  name = 1;
     required    int64   size = 2;
-    required    Type    type = 3; // ???
-    optional    OtherType othertype = 4; // ???
+    required    string  ida_type = 3; // ???
+    //optional    OtherType othertype = 4; // ???
 
     // instructions referring to this variable
     // have run into issues with protobuf format before trying to make this
@@ -84,7 +88,7 @@ message Variable {
     // references at the protobuf level last time i tried this. i might
     // have just started using the instruction addresses instead and
     // assuming i'd match them up in the next phase. (inst_addr in Instruction)
-    repeated    Instruction inst_refs = 5;
+    repeated    Reference ref_eas = 4;
 
     // we probably want some kind of 'address' information here? but i'm not
     // sure. we're only doing stack vars for now so it's not as important as
@@ -96,11 +100,16 @@ message StackVar {
     required int64      sp_offset = 2;
 }
 
+message GlobalVar {
+    required Variable  var = 1;
+    required int64     address = 2;
+}
+
 message Function {
     repeated    Block      blocks = 1;
     required    int64      entry_address = 2;
-    optional    string     symbol_name = 3;
-    repeated    StackVar   stackvars = 4;
+    repeated    StackVar   stackvars = 3;
+    optional    string     symbol_name = 4;
 }
 
 message ExternalFunction {
@@ -160,4 +169,5 @@ message Module {
     repeated    EntrySymbol         entries = 5;
     repeated    ExternalData        external_data = 6;
     repeated    OffsetTable         offset_tables = 7;
+    repeated    GlobalVar           global_vars = 8;
 }
