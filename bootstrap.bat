@@ -1,6 +1,6 @@
 rem Copyright 2017 Peter Goodman, all rights reserved.
 
-rem @echo off
+@echo off
 
 set DIR=%~dp0
 if "%DIR:~-1%"=="\" set DIR=%DIR:~0,-1%
@@ -51,37 +51,6 @@ REM pip install --upgrade pip
 echo Go into the mcsema directory
 pushd "%~dp0" 
 
-echo [+] Download and extract Google Protocol Buffers 2.6.1
-pushd third_party
-if exist protoc.exe goto get_llvm
-powershell -Command "(new-object System.Net.WebClient).DownloadFile('https://github.com/google/protobuf/releases/download/v2.6.1/protoc-2.6.1-win32.zip','protoc-2.6.1-win32.zip')"
-7z -bd x -y protoc-2.6.1-win32.zip > NUL
-
-:get_llvm
-popd
-
-if exist %GEN_DIR%\CFG.pb.h goto download_llvm
-echo [+] Auto-generating protobuf files
-set PROTO_PATH=%MCSEMA_DIR%\mcsema\CFG
-pushd %GEN_DIR%
-%THIRD_PARTY_DIR%\protoc.exe ^
-  --cpp_out "%GEN_DIR%" ^
-  --python_out "%GEN_DIR%" ^
-  --proto_path "%PROTO_PATH%" ^
-  "%PROTO_PATH%\CFG.proto"
-popd
-:download_llvm
-
-echo [+] Download and extract LLVM
-pushd third_party
-if exist llvm goto compile_llvm
-
-powershell -Command "(new-object System.Net.WebClient).DownloadFile('http://releases.llvm.org/3.8.1/llvm-3.8.1.src.tar.xz', 'llvm-3.8.1.src.tar.xz')"
-7z -bd x -y llvm-3.8.1.src.tar.xz > NUL
-7z -bd x -y llvm-3.8.1.src.tar > NUL
-move llvm-3.8.1.src llvm
-:compile_llvm
-
 if "%PROCESSOR_ARCHITECTURE%"=="AMD64" ( 
     set BITNESS=Win64 ) else (
     set BITNESS=)
@@ -103,6 +72,50 @@ if "%VSBUILD%"=="UNKNOWN" (
 )
 
 echo "Found Visual Studio: %VSBUILD%"
+
+pushd third_party
+if exist protobuf goto compile_proto
+echo [+] Download and extract Google Protocol Buffers 2.6.1
+powershell -Command "(new-object System.Net.WebClient).DownloadFile('https://github.com/google/protobuf/releases/download/v2.6.1/protobuf-2.6.1.zip','protobuf-2.6.1.zip')"
+7z -bd x -y protobuf-2.6.1.zip > NUL
+move protobuf-2.6.1 protobuf
+
+:compile_proto
+pushd protobuf
+if not exist build mkdir build
+pushd build
+cmake.exe ^
+  -G "%VSBUILD%" ^
+  -DPROTOBUF_ROOT="%PROTO_DIR%" ^
+  %MCSEMA_DIR%\cmake\protobuf
+cmake --build . --config Release
+popd
+popd
+
+popd
+
+if exist %GEN_DIR%\CFG.pb.h goto download_llvm
+echo [+] Auto-generating protobuf files
+set PROTO_PATH=%MCSEMA_DIR%\mcsema\CFG
+pushd %GEN_DIR% 
+%THIRD_PARTY_DIR%\protobuf\build\protoc\Release\protoc.exe ^
+  --cpp_out "%GEN_DIR%" ^
+  --python_out "%GEN_DIR%" ^
+  --proto_path "%PROTO_PATH%" ^
+  "%PROTO_PATH%\CFG.proto"
+popd
+:download_llvm
+
+echo [+] Download and extract LLVM
+pushd third_party
+if exist llvm goto compile_llvm
+
+powershell -Command "(new-object System.Net.WebClient).DownloadFile('http://releases.llvm.org/3.8.1/llvm-3.8.1.src.tar.xz', 'llvm-3.8.1.src.tar.xz')"
+7z -bd x -y llvm-3.8.1.src.tar.xz > NUL
+7z -bd x -y llvm-3.8.1.src.tar > NUL
+move llvm-3.8.1.src llvm
+:compile_llvm
+
 if not exist "%BUILD_DIR%\llvm" mkdir "%BUILD_DIR%\llvm"
 pushd "%BUILD_DIR%\llvm"
 cmake.exe ^
@@ -151,7 +164,7 @@ rem Create McSema build files
 pushd build
 
 cmake.exe ^
-  -G "%VSBUILD%"
+  -G "%VSBUILD%" ^
   -DLLVM_DIR="%BUILD_DIR%\llvm\share\llvm\cmake" ^
   -DMCSEMA_LLVM_DIR="%LLVM_DIR%" ^
   -DMCSEMA_DIR="%DIR%" ^

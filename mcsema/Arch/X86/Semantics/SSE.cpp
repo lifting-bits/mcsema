@@ -1406,7 +1406,7 @@ template<int width, int elemwidth, llvm::CmpInst::Predicate cmp_op>
 static llvm::Value* do_SATURATED_SUB(llvm::BasicBlock *&b, llvm::Value *v1,
                                      llvm::Value *v2) {
   NASSERT(width % elemwidth == 0);
-  constexpr int elem_count = width / elemwidth;
+  int elem_count = width / elemwidth;
   llvm::Type *elem_ty = nullptr;
   llvm::VectorType *vt = nullptr;
   llvm::Type *int32ty = llvm::Type::getIntNTy(b->getContext(), 32);
