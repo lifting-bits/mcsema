@@ -1,5 +1,7 @@
 # Common McSema Errors
 
+This document describes common errors and fixes to problems faced when running `mcsema-lift` and `mcsema-disass`. If you are facing problems when running the compiled bitcode then check out the [Debugging Tips](DebuggingTips.md) document.
+
 # Segfaults, segfaults everywhere!
 
 So, you've got a case of the segfaults. Lets try to diagnose the issue.

@@ -34,6 +34,7 @@
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/InstIterator.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Metadata.h>
 #include <llvm/IR/MDBuilder.h>
@@ -61,13 +62,20 @@ static llvm::cl::opt<bool> IgnoreUnsupportedInsts(
         "Ignore unsupported instructions."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> AddTracer(
+    "add-reg-tracer",
+    llvm::cl::desc(
+        "Add a debug function that prints out the register state before "
+        "each lifted instruction execution."),
+    llvm::cl::init(false));
 
 static llvm::cl::opt<bool> AddBreakpoints(
     "add-breakpoints",
     llvm::cl::desc(
-        "Add debug breakpoint function calls before each lifted instruction."),
+        "Add 'breakpoint' functions between every lifted instruction. This "
+        "allows one to set a breakpoint, in the lifted code, just before a "
+        "specific lifted instruction is executed."),
     llvm::cl::init(false));
-
 
 llvm::CallingConv::ID getLLVMCC(ExternalCodeRef::CallingConvention cc) {
   switch (cc) {
@@ -95,42 +103,39 @@ llvm::CallingConv::ID getLLVMCC(ExternalCodeRef::CallingConvention cc) {
 
 
 static void CreateInstrBreakpoint(llvm::BasicBlock *B, VA pc) {
-  auto M = B->getParent()->getParent();
-  auto &C = M->getContext();
+  auto F = B->getParent();
+  auto M = F->getParent();
 
   std::stringstream ss;
-  ss << "breakpoint"; //_0x" << std::hex << pc;
+  ss << "breakpoint_" << std::hex << pc;
   auto instr_func_name = ss.str();
 
   auto IFT = M->getFunction(instr_func_name);
   if (!IFT) {
-    std::stringstream as;
-    as << "  .data\n";
-    as << "addr_format:\n";
-    as << "  .asciz \"0x%lx\\n\"\n";
-    as << "  .text\n";
-    as << "  .globl " << instr_func_name << "\n";
-    as << "  .type " << instr_func_name << ",@function\n";
-    as << instr_func_name << ":\n";
-    as << "  .cfi_startproc\n";
-    as << ".intel_syntax noprefix\n";
-    as << "  call __mcsema_debug_get_reg_state\n";
-    as << "  mov rsi, qword ptr [rax]\n";
-    as << "  lea rdi, qword ptr [rip + addr_format]\n";
-    as << "  jmp printf@plt\n";
-    as << "  .size " << instr_func_name << ",1\n";
-    as << "  .cfi_endproc\n";
-    as << "  .att_syntax prefix\n";
-    as << "\n";
-    M->appendModuleInlineAsm(as.str());
 
-    auto VoidTy = llvm::Type::getVoidTy(M->getContext());
-    auto IFTy = llvm::FunctionType::get(VoidTy, false);
-    IFT = llvm::Function::Create(IFTy, llvm::GlobalValue::ExternalLinkage,
-                                 instr_func_name, M);
+    IFT = llvm::Function::Create(
+        LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
+        instr_func_name, M);
+
+    IFT->addFnAttr(llvm::Attribute::OptimizeNone);
+    IFT->addFnAttr(llvm::Attribute::NoInline);
+
+    auto &C = M->getContext();
+    llvm::IRBuilder<> ir(llvm::BasicBlock::Create(C, "", IFT));
+    ir.CreateRetVoid();
   }
 
-  llvm::CallInst::Create(IFT, "", B);
+  auto state_ptr = &*F->arg_begin();
+  llvm::CallInst::Create(IFT, {state_ptr}, "", B);
+}
+
+static void AddRegStateTracer(llvm::BasicBlock *B) {
+  auto F = B->getParent();
+  auto M = F->getParent();
+  auto IFT = ArchGetOrCreateRegStateTracer(M);
+
+  auto state_ptr = &*F->arg_begin();
+  llvm::CallInst::Create(IFT, {state_ptr}, "", B);
 }
 
 static const char * const kRealEIPAnnotation = "mcsema_real_eip";
@@ -236,6 +241,10 @@ static InstTransResult LiftInstIntoBlock(TranslationContext &ctx,
   // so it serves as a useful marker for where we are.
   if (AddBreakpoints) {
     CreateInstrBreakpoint(block, pc);
+  }
+
+  if (AddTracer) {
+    AddRegStateTracer(block);
   }
 
   auto lift_status = LiftInstIntoBlockImpl(ctx, block);

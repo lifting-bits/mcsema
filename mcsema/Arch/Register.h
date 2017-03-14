@@ -10,6 +10,8 @@
 namespace llvm {
 
 class BasicBlock;
+class Function;
+class Module;
 class StructType;
 
 namespace X86 {
@@ -90,6 +92,7 @@ extern MCSemaRegs (*ArchRegisterParent)(MCSemaRegs);
 extern void (*ArchAllocRegisterVars)(llvm::BasicBlock *);
 extern unsigned (*ArchRegisterSize)(MCSemaRegs);
 extern llvm::StructType *(*ArchRegStateStructType)(void);
+extern llvm::Function *(*ArchGetOrCreateRegStateTracer)(llvm::Module *);
 
 #define getRegisterName ArchRegisterName
 #define getRegisterFromName ArchRegisterNumber

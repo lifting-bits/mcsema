@@ -2,9 +2,7 @@
 define print-rip
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
   set $_rip = *((unsigned long long *)($rptr + 0))
-  set $_rax = *((unsigned long long *)($rptr + 8))
-  set $_rcx = *((unsigned long long *)($rptr + 24))
-  printf "0x%lx 0x%lx 0x%lx\n", $_rip, $_rax, $_rcx
+  printf "0x%lx\n", $_rip
   dont-repeat
 end
 

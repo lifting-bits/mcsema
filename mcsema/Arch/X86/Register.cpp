@@ -28,6 +28,7 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <inttypes.h>
 #include <iostream>
 #include <unordered_map>
 #include <vector>
@@ -353,4 +354,110 @@ unsigned X86RegisterSize(MCSemaRegs reg) {
 
 llvm::StructType *X86RegStateStructType(void) {
   return gRegStateStruct;
+}
+
+static llvm::Function *GetPrintf(llvm::Module *M) {
+  // ; Function Attrs: nounwind
+  // declare i32 @printf(i8* nocapture readonly, ...) local_unnamed_addr #1
+
+  auto F = M->getFunction("printf");
+  if (F) {
+    return F;
+  }
+
+  auto &C = M->getContext();
+  auto FTy = llvm::FunctionType::get(
+      llvm::Type::getInt32Ty(C),
+      {llvm::Type::getInt8PtrTy(C, 0)},
+      true /* IsVarArg */);
+
+  F = llvm::Function::Create(
+      FTy, llvm::GlobalValue::ExternalLinkage, "printf", M);
+  F->addFnAttr(llvm::Attribute::NoUnwind);
+  return F;
+}
+
+llvm::Function *X86GetOrCreateRegStateTracer(llvm::Module *M) {
+  auto F = M->getFunction("__mcsema_trace_regs");
+  if (F) {
+    return F;
+  }
+
+  F = llvm::Function::Create(
+      LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
+      "__mcsema_trace_regs", M);
+  F->addFnAttr(llvm::Attribute::NoInline);
+
+  auto &C = M->getContext();
+  auto B = llvm::BasicBlock::Create(C, "", F);
+  X86AllocRegisterVars(B);
+
+  const char *format = nullptr;
+  if (Pointer64 == ArchAddressSize()) {
+    format = "RIP=%" PRIx64 " RAX=%" PRIx64 " RBX=%" PRIx64
+             " RCX=%" PRIx64 " RDX=%" PRIx64 " RSI=%" PRIx64
+             " RDI=%" PRIx64 " RSP=%" PRIx64 " RBP=%" PRIx64
+             " R8=%" PRIx64 " R9=%" PRIx64 " R10=%" PRIx64
+             " R11=%" PRIx64 " R12=%" PRIx64 " R13=%" PRIx64
+             " R14=%" PRIx64 " R15=%" PRIx64 "\n";
+  } else {
+    format = "EIP=%" PRIx32 " EAX=%" PRIx32 " EBX=%" PRIx32
+             " ECX=%" PRIx32 " EDX=%" PRIx32 " ESI=%" PRIx32
+             " EDI=%" PRIx32 " ESP=%" PRIx32 " EBP=%" PRIx32
+             "\n";
+  }
+
+  auto fmt_str = llvm::ConstantDataArray::getString(C, format, true);
+  auto fmt = llvm::dyn_cast<llvm::GlobalVariable>(
+      M->getOrInsertGlobal("reg_trace_fmt", fmt_str->getType()));
+
+  fmt->setLinkage(llvm::GlobalValue::PrivateLinkage);
+  fmt->setInitializer(fmt_str);
+
+  auto i32_ty = llvm::Type::getInt32Ty(C);
+  auto str_ty = llvm::Type::getInt8PtrTy(C);
+  auto zero = llvm::ConstantInt::get(i32_ty, 0, false);
+
+  std::vector<llvm::Value *> args;
+  args.push_back(zero);
+  args.push_back(zero);
+  auto gep = llvm::GetElementPtrInst::CreateInBounds(fmt, args, "", B);
+
+  args.clear();
+  args.push_back(gep);
+
+  if (Pointer64 == ArchAddressSize()) {
+    args.push_back(R_READ<64>(B, llvm::X86::RIP));
+    args.push_back(R_READ<64>(B, llvm::X86::RAX));
+    args.push_back(R_READ<64>(B, llvm::X86::RBX));
+    args.push_back(R_READ<64>(B, llvm::X86::RCX));
+    args.push_back(R_READ<64>(B, llvm::X86::RDX));
+    args.push_back(R_READ<64>(B, llvm::X86::RSI));
+    args.push_back(R_READ<64>(B, llvm::X86::RDI));
+    args.push_back(R_READ<64>(B, llvm::X86::RSP));
+    args.push_back(R_READ<64>(B, llvm::X86::RBP));
+    args.push_back(R_READ<64>(B, llvm::X86::R8));
+    args.push_back(R_READ<64>(B, llvm::X86::R9));
+    args.push_back(R_READ<64>(B, llvm::X86::R10));
+    args.push_back(R_READ<64>(B, llvm::X86::R11));
+    args.push_back(R_READ<64>(B, llvm::X86::R12));
+    args.push_back(R_READ<64>(B, llvm::X86::R13));
+    args.push_back(R_READ<64>(B, llvm::X86::R14));
+    args.push_back(R_READ<64>(B, llvm::X86::R15));
+  } else {
+    args.push_back(R_READ<32>(B, llvm::X86::EIP));
+    args.push_back(R_READ<32>(B, llvm::X86::EAX));
+    args.push_back(R_READ<32>(B, llvm::X86::EBX));
+    args.push_back(R_READ<32>(B, llvm::X86::ECX));
+    args.push_back(R_READ<32>(B, llvm::X86::EDX));
+    args.push_back(R_READ<32>(B, llvm::X86::ESI));
+    args.push_back(R_READ<32>(B, llvm::X86::EDI));
+    args.push_back(R_READ<32>(B, llvm::X86::ESP));
+    args.push_back(R_READ<32>(B, llvm::X86::EBP));
+  }
+
+  llvm::IRBuilder<> ir(B);
+  ir.CreateCall(GetPrintf(M), args);
+  ir.CreateRetVoid();
+  return F;
 }
