@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2017 Peter Goodman (peter@trailofbits.com), all rights reserved.
+# Copyright 2017 Trail of Bits, see LICENSE for details
 
 set -e
 
@@ -64,23 +64,7 @@ else
   echo "Build type set to: ${BUILD_TYPE}"
 fi
 
-#echo "[x] Installing dependencies via apt-get"
-## gcc-multilib required onyl for 32-bit integration tests
-## g++-multilib required to build 32-bit generated code
-#sudo apt-get update -qq
-#sudo apt-get install -yqq \
-#  git \
-#  cmake \
-#  libprotoc-dev libprotobuf-dev libprotobuf-dev protobuf-compiler \
-#  python2.7 python-pip \
-#  llvm-3.8 clang-3.8 \
-#  realpath \
-#  gcc-multilib g++-multilib
-#
-##only neded for the xz integration test
-#sudo apt-get install -yqq liblzma-dev
-
-brew install git cmake protobuf || true
+brew install wget git cmake || true
 
 echo "[+] Upgrading PIP"
 
@@ -103,6 +87,18 @@ if [ ! -e ${LLVM_DIR}/CMakeLists.txt ]; then
   echo "[+] Extracting.."
   tar xf ${FILE} -C ./ --strip-components=1 
   popd
+
+fi
+
+if [ ! -e ${THIRD_PARTY_DIR}/protobuf ]; then
+    mkdir -p ${THIRD_PARTY_DIR}/protobuf
+    pushd ${THIRD_PARTY_DIR}/protobuf
+    wget https://github.com/google/protobuf/releases/download/v2.6.1/protobuf-2.6.1.tar.gz
+    tar xf protobuf-2.6.1.tar.gz -C ./ --strip-components=1
+    ./configure --prefix=$(realpath build)
+    make
+    make install
+    popd
 fi
 
 echo "[+] Installing python-protobuf"
@@ -118,7 +114,7 @@ if [ ! -e ${GEN_DIR}/CFG.pb.h ]; then
   echo "[+] Auto-generating protobuf files"
   pushd ${GEN_DIR}
   PROTO_PATH=${DIR}/mcsema/CFG
-  protoc \
+  ${THIRD_PARTY_DIR}/protobuf/build/bin/protoc \
     --cpp_out ${GEN_DIR} \
     --python_out ${GEN_DIR} \
     --proto_path ${PROTO_PATH} \
@@ -159,7 +155,7 @@ if [ ! -d "${PREFIX}/bin" ]; then
 fi
 # by default install to the user's python package directory
 # and copy the script itself to ${PREFIX}/bin
-python ${DIR}/tools/setup.py install --user --prefix= #--install-scripts "${PREFIX}/bin"
+python ${DIR}/tools/setup.py install --install-scripts "${PREFIX}/bin"
 
 PROCS=$(sysctl -n hw.ncpu)
 
