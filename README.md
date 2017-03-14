@@ -154,12 +154,13 @@ clang-3.8 -o /tmp/ls_lifted generated/ELF_64_linux.S /tmp/ls.bc -lpthread -ldl -
 
 ## Additional Documentation
 
- - [How to use mcsema: A walkthrough](docs/McsemaWalkthrough.md)
- - [Using Mcsema with libFuzzer](docs/UsingLibFuzzer.md)
- - [Navigating the source code](docs/NavigatingTheCode.md)
- - [Life of an instruction](docs/LifeOfAnInstruction.md)
- - [How to implement the semantics of an instruction](docs/AddAnInstruction.md)
- - [Limitations](docs/Limitations.md)
+- [Common Errors](docs/CommonErrors.md) and [Debugging Tips](docs/DebuggingTips.md)
+- [How to implement the semantics of an instruction](docs/AddAnInstruction.md)
+- [How to use mcsema: A walkthrough](docs/McsemaWalkthrough.md)
+- [Life of an instruction](docs/LifeOfAnInstruction.md)
+- [Limitations](docs/Limitations.md)
+- [Navigating the source code](docs/NavigatingTheCode.md)
+- [Using Mcsema with libFuzzer](docs/UsingLibFuzzer.md)
 
 ## Getting help
 
