@@ -1,12 +1,12 @@
 # Using libFuzzer with Mcsema
 
-[libFuzzer](http://blog.llvm.org/2015/04/fuzz-all-clangs.html) is an LLVM-based coverage guided fuzzing framework, similar to AFL. Using libFuzzer, it's simple to integrate coverage guided fuzzing: just define a special function, update some build flags, and you have instant coverage guided fuzzing.
+[libFuzzer](http://blog.llvm.org/2015/04/fuzz-all-clangs.html) is an LLVM-based coverage-guided fuzzing framework, similar to AFL. Using libFuzzer, it's simple to integrate coverage-guided fuzzing: just define a special function, update some build flags, and you have instant coverage-guided fuzzing.
 
-Since libFuzzer works at the LLVM level, we thought, why not try applying libFuzzer to mcsema translated bitcode, and see if we can use libFuzzer on binaries?
+Since libFuzzer works at the LLVM level, we thought, can we apply libFuzzer to mcsema translated bitcode, and use libFuzzer on binaries?
 
 It turns out the answer is yes!
 
-However, the 'yes' comes with caveats. First, mcsema assembly stubs do some things that normal programs should never do (like calculate dynamic return addresses, allocate new stacks, etc). This behavior can conflict with address sanitizer, a feature that libFuzzer uses. Second, mcsema's control flow recovery is frequently wrong on large programs. Since libFuzzer explores new code paths, it has a very high likelihood of triggering a path where control flow recovery was incorrect. This means that a lot of the bugs found may be artifacts of translation that are not present in the original program.
+However, the 'yes' comes with caveats. First, mcsema assembly stubs do some things that normal programs should never do (like calculate dynamic return addresses, allocate new stacks, etc). This behavior can conflict with address sanitizer, a feature that libFuzzer uses. Second, mcsema's control flow recovery is frequently wrong on large programs. Since libFuzzer explores new code paths, it has a very high likelihood of triggering a path where control flow recovery is incorrect. This means that some of the bugs found may be artifacts of translation that are not present in the original program.
 
 We hope to improve both of these issues in the future. For now, let's take a look at a proof of concept for using libFuzzer on binary code!
 
