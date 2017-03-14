@@ -17,6 +17,10 @@
 .*.swp
 # Object files
 *.o
+*.so
+
+tools/regtrace/obj-ia32/*
+tools/regtrace/obj-intel64/*
 
 *.idb
 *.id0
