@@ -25,6 +25,13 @@ if(WIN32)
   
   include_directories(${Protobuf_INCLUDE_DIR})
   link_directories(${Protobuf_LIBRARIES})
+elseif(APPLE)
+  set(PROTOBUF_ROOT "${MCSEMA_DIR}/third_party/protobuf")
+  set(Protobuf_LIBRARIES "${PROTOBUF_ROOT}/build/lib")
+  set(Protobuf_INCLUDE_DIR "${PROTOBUF_ROOT}/src")
+  
+  include_directories(${Protobuf_INCLUDE_DIR})
+  link_directories(${Protobuf_LIBRARIES})
 endif(WIN32)
 find_package(Protobuf REQUIRED)
 
