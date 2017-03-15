@@ -961,7 +961,6 @@ static InstTransResult translate_CALLpcrel32(TranslationContext &ctx,
 template<int width>
 static InstTransResult translate_CALLm(TranslationContext &ctx,
                                        llvm::BasicBlock *&block) {
-  InstTransResult ret;
   auto natM = ctx.natM;
   auto ip = ctx.natI;
   auto &inst = ip->get_inst();
@@ -982,27 +981,26 @@ static InstTransResult translate_CALLm(TranslationContext &ctx,
     }
 
     if (width == 64) {
-      ret = x86_64::doCallPCExtern(block, s, false);
+      return x86_64::doCallPCExtern(block, s, false);
     } else {
-      ret = x86::doCallPCExtern(block, s, false);
+      return x86::doCallPCExtern(block, s, false);
     }
 
-    // not external call, but some weird way of calling local function?
+  // not external call, but some weird way of calling local function?
   } else if (ip->has_code_ref()) {
     std::cout << __FUNCTION__ << ":" << __LINE__ << ": doing call" << std::endl;
-    doCallPC<width>(ip, block, ip->get_reference(NativeInst::MEMRef), false);
-  }
+    return doCallPC<width>(ip, block, ip->get_reference(NativeInst::MEMRef), false);
+
   // is this referencing global data?
-  else if (ip->has_mem_reference) {
+  } else if (ip->has_mem_reference) {
     doCallM<width>(block, ip, MEM_REFERENCE(0), false);
-    ret = ContinueBlock;
+    return ContinueBlock;
     // is this a simple address computation?
+
   } else {
     doCallM<width>(block, ip, ADDR_NOREF(0), false);
-    ret = ContinueBlock;
+    return ContinueBlock;
   }
-
-  return ret;
 }
 
 template<int width>
