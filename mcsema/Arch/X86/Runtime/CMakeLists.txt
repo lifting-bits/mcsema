@@ -1,15 +1,10 @@
 # Copyright 2017 Peter Goodman (peter@trailofbits.com), all rights reserved.
-
 enable_language(ASM)
 
 # Create the Windows runtimes
 if(WIN32)
-  set(ASM_SUFFIX asm)
-  add_executable(mcsema-print-runtime-x86
-    ${MCSEMA_DIR}/mcsema/Arch/X86/Runtime/print_PE_32_windows.cpp)
- 
-  add_executable(mcsema-print-runtime-amd64
-    ${MCSEMA_DIR}/mcsema/Arch/X86/Runtime/print_PE_64_windows.cpp)
+
+    #TODO(artem): find clang for windows compiler and build
 
 # Create the Linux runtimes
 else()
