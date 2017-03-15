@@ -177,8 +177,6 @@ target_link_libraries(mcsema-lift
   LLVMInstrumentation
   LLVMObjCARCOpts)
 
-add_custom_target(runtime)
-
 add_subdirectory(${MCSEMA_DIR}/mcsema/Arch/X86/Runtime)
 
 install(
