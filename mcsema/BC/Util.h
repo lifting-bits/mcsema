@@ -222,7 +222,6 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
 #define GENERIC_TRANSLATION_MI(NAME, NOREFS, MEMREF, IMMREF, TWOREFS) \
     static InstTransResult translate_ ## NAME ( \
         TranslationContext &ctx, llvm::BasicBlock *&block) { \
-      InstTransResult ret; \
       auto natM = ctx.natM; \
       auto F = ctx.F; \
       auto ip = ctx.natI; \
@@ -243,7 +242,6 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
 #define GENERIC_TRANSLATION_REF(NAME, NOREFS, HASREF) \
     static InstTransResult translate_ ## NAME ( \
         TranslationContext &ctx, llvm::BasicBlock *&block) { \
-      InstTransResult ret;\
       auto natM = ctx.natM; \
       auto F = ctx.F; \
       auto ip = ctx.natI; \
