@@ -30,6 +30,17 @@
       "expected_stderr": "", 
       "expected_stdout": "L3Vzcgo="
     }, 
+    "recurisve option": {
+      "_comment": "The --recursive option triggers a call that used to fail during cfg recovery", 
+      "args": [
+        "--recursive", 
+        "--width=100", 
+        "-d", 
+        "/usr"
+      ], 
+      "expected_stderr": "", 
+      "expected_stdout": "L3Vzcgo="
+    }, 
     "width test": {
       "args": [
         "--width=100", 
