@@ -105,6 +105,22 @@ else()
         COMMAND mcsema-print-runtime-amd64
         DEPENDS mcsema-print-runtime-amd64
         COMMENT "Generating 64-bit Windows PE runtime...")
+    elseif(UNIX)
+      # Linux and friends
+      add_executable(mcsema-print-runtime-amd64
+        print_ELF_64_linux.cpp)
+      set_target_properties(mcsema-print-runtime-amd64
+        PROPERTIES COMPILE_FLAGS "-m64" LINK_FLAGS "-m64")
+
+      add_library(mcsema_rt64 STATIC runtime_64.S)
+      set_target_properties(mcsema_rt64
+        PROPERTIES COMPILE_FLAGS "-m64" LINK_FLAGS "-m64")
+
+      add_custom_command(
+        OUTPUT runtime_64.S
+        COMMAND mcsema-print-runtime-amd64
+        DEPENDS mcsema-print-runtime-amd64
+        COMMENT "Generating 64-bit Linux ELF runtime...")
     else()
       message(ERROR "Unsupported operating system")
     endif()
