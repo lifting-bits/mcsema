@@ -1,6 +1,5 @@
-rem Copyright 2017 Peter Goodman, all rights reserved.
-
 @echo off
+rem Copyright 2017 Peter Goodman, all rights reserved.
 
 set DIR=%~dp0
 if "%DIR:~-1%"=="\" set DIR=%DIR:~0,-1%
@@ -39,9 +38,9 @@ if not %ERRORLEVEL% == 0 (
     echo "The cmake command is not found. Please install cmake"
     exit /B 1
 )
-where cl.exe >NUL 2>NUL
+where clang-cl.exe >NUL 2>NUL
 if not %ERRORLEVEL% == 0 (
-    echo "The Visual Studio Compiler s not found. Please run from a Visual Studio command prompt"
+    echo "The llvm-based Visual Studio compiler (clang-cl) is not found. Please install visual studio and clang for Windows"
     exit /B 1
 )
 
@@ -56,13 +55,17 @@ if "%PROCESSOR_ARCHITECTURE%"=="AMD64" (
     set BITNESS=)
 
 set VSBUILD=UNKNOWN
+set VSTOOLSET=UNKNOWN
 cl /? 2>&1 | findstr /C:"Version 18" > nul
 if %ERRORLEVEL% == 0 (
     set VSBUILD=Visual Studio 12 2013%BITNESS%
+    set VSTOOLSET=llvm-vs2013
 ) 
 cl /? 2>&1 | findstr /C:"Version 19" > nul
 if %ERRORLEVEL% == 0 (
     set VSBUILD=Visual Studio 14 2015%BITNESS%
+    REM The 2014 below is intentional. Its called that even for VS2015.
+    set VSTOOLSET=llvm-vs2014
 ) 
 
 if "%VSBUILD%"=="UNKNOWN" (
@@ -84,6 +87,8 @@ move protobuf-2.6.1 protobuf
 pushd protobuf
 if not exist build mkdir build
 pushd build
+REM Google protobufs crashes clang-cl 3.8.1, so build with
+REM the normal VS2013 toolset
 cmake.exe ^
   -G "%VSBUILD%" ^
   -DPROTOBUF_ROOT="%PROTO_DIR%" ^
@@ -120,6 +125,7 @@ if not exist "%BUILD_DIR%\llvm" mkdir "%BUILD_DIR%\llvm"
 pushd "%BUILD_DIR%\llvm"
 cmake.exe ^
   -G "%VSBUILD%" ^
+  -T "%VSTOOLSET%" ^
   -DLLVM_TARGETS_TO_BUILD="X86" ^
   -DLLVM_INCLUDE_EXAMPLES=OFF ^
   -DLLVM_INCLUDE_TESTS=OFF ^
@@ -138,10 +144,10 @@ if "%BITNESS%"=="Win64" (
     if exist %GEN_DIR%\ELF_64_linux.S goto create_mcsema_files
     echo [+] Generating runtimes
     
-    cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_ELF_64_linux.cpp
+    clang-cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_ELF_64_linux.cpp
     a.out.exe > %GEN_DIR%\ELF_64_linux.S
     
-    cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_PE_64_windows.cpp
+    clang-cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_PE_64_windows.cpp
     a.out.exe > %GEN_DIR%\PE_64_windows.asm
     del a.out.exe a.out.obj
 
@@ -150,10 +156,10 @@ if "%BITNESS%"=="Win64" (
     if exist %GEN_DIR%\ELF_32_linux.S goto create_mcsema_files
     echo [+] Generating runtimes
 
-    cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_ELF_32_linux.cpp
+    clang-cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_ELF_32_linux.cpp
     a.out.exe > %GEN_DIR%\ELF_32_linux.S
     
-    cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_PE_32_windows.cpp
+    clang-cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_PE_32_windows.cpp
     a.out.exe > %GEN_DIR%\PE_32_windows.asm
     del a.out.exe a.out.obj
 )
@@ -165,6 +171,7 @@ pushd build
 
 cmake.exe ^
   -G "%VSBUILD%" ^
+  -T "%VSTOOLSET%" ^
   -DLLVM_DIR="%BUILD_DIR%\llvm\share\llvm\cmake" ^
   -DMCSEMA_LLVM_DIR="%LLVM_DIR%" ^
   -DMCSEMA_DIR="%DIR%" ^
