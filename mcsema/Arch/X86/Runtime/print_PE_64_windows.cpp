@@ -34,7 +34,7 @@ void emitFunctionDef(FILE *out, const char func_name[]) {
 
 int main(void) {
 
-  FILE *out = fopen("runtime_32.asm", "w");
+  FILE *out = fopen("runtime_64.asm", "w");
 
   fprintf(out, "/* Auto-generated file! Don't modify! */\n\n");
   fprintf(out, "  .intel_syntax noprefix\n");

@@ -23,12 +23,14 @@ else()
 
     # build a static library from this generated object
     add_library(mcsema_rt32 STATIC mcsema_rt32.obj)
+    set_target_properties(mcsema_rt32 PROPERTIES STATIC_LIBRARY_FLAGS "/machine:x86")
     # add_library does not know how to link this thing together from an obj
     # tell cmake its just like C (the same command line will work for the object)
     set_target_properties(
       mcsema_rt32 
       PROPERTIES
-      LINKER_LANGUAGE C)
+      LINKER_LANGUAGE C
+      )
 
     # use a custom step to build asm->obj since cmake wont recognize how to build our asm
     add_custom_command(
@@ -81,12 +83,14 @@ else()
 
       # build a static library from this generated object
       add_library(mcsema_rt64 STATIC mcsema_rt64.obj)
+      set_target_properties(mcsema_rt64 PROPERTIES STATIC_LIBRARY_FLAGS "/MACHINE:X64")
       # add_library does not know how to link this thing together from an obj
       # tell cmake its just like C (the same command line will work for the object)
       set_target_properties(
         mcsema_rt64 
         PROPERTIES
-        LINKER_LANGUAGE C)
+        LINKER_LANGUAGE C
+        )
 
       # use a custom step to build asm->obj since cmake wont recognize how to build our asm
       add_custom_command(

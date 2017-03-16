@@ -1,4 +1,4 @@
-@echo off
+REM @echo off
 rem Copyright 2017 Peter Goodman, all rights reserved.
 
 set DIR=%~dp0
@@ -16,10 +16,10 @@ if not exist third_party mkdir third_party
 if not exist build mkdir build
 if not exist generated mkdir generated
 
-set PATH=%ProgramFiles%\7-zip\;%PATH%
 if defined ProgramFiles(x86) (
-    set PATH=%ProgramFiles(x86)%\7-zip\;%PATH%
+    set "PATH=%PATH%;%ProgramFiles(x86)%\7-zip"
 )
+set "PATH=%PATH%;%ProgramFiles%\7-zip"
 
 REM sanity checks for installed software
 where 7z >NUL 2>NUL
@@ -51,7 +51,7 @@ echo Go into the mcsema directory
 pushd "%~dp0" 
 
 if "%PROCESSOR_ARCHITECTURE%"=="AMD64" ( 
-    set BITNESS=Win64 ) else (
+    set BITNESS= Win64) else (
     set BITNESS=)
 
 set VSBUILD=UNKNOWN
@@ -67,6 +67,20 @@ if %ERRORLEVEL% == 0 (
     REM The 2014 below is intentional. Its called that even for VS2015.
     set VSTOOLSET=llvm-vs2014
 ) 
+
+clang-cl 2>&1 -v | findstr /R /C:"version 3.[0-8]" > NUL
+if "%VSTOOLSET%"=="llvm-vs2014" (
+    REM Visual Studio integration and the clang-cl in PATH do not always match
+    REM but we should check for unsupported clangs just to be sure, or people will
+    REM think mcsema doesnt build, when its clang that can't parse new-ish MSVC headers
+    if %ERRORLEVEL% == 0 (
+        echo "Detected clang <= 3.8. This version of clang is too old to build VS2015 header files"
+        echo "Please install Clang 3.9 or newer"
+        echo "***You may have multiple clangs installed, including 3.9+ and still be get this message***"
+        echo "***If you are SURE that Visual Studio integration uses clang 3.9+ please comment out this code in bootstrap***"
+        exit /B 1
+    )
+)
 
 if "%VSBUILD%"=="UNKNOWN" (
     echo "Could not identify Visual Studio Version"
@@ -135,36 +149,6 @@ cmake --build . --config Release
   
 popd
 popd
-
-REM cl does not have a flag to specify 32-bit or 64-bit output
-REM TODO(artem): Use the path of cl.exe to find the other CL that will 
-REM output the correct bitness code
-if "%BITNESS%"=="Win64" (
-
-    if exist %GEN_DIR%\ELF_64_linux.S goto create_mcsema_files
-    echo [+] Generating runtimes
-    
-    clang-cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_ELF_64_linux.cpp
-    a.out.exe > %GEN_DIR%\ELF_64_linux.S
-    
-    clang-cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_PE_64_windows.cpp
-    a.out.exe > %GEN_DIR%\PE_64_windows.asm
-    del a.out.exe a.out.obj
-
-) else (
-
-    if exist %GEN_DIR%\ELF_32_linux.S goto create_mcsema_files
-    echo [+] Generating runtimes
-
-    clang-cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_ELF_32_linux.cpp
-    a.out.exe > %GEN_DIR%\ELF_32_linux.S
-    
-    clang-cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_PE_32_windows.cpp
-    a.out.exe > %GEN_DIR%\PE_32_windows.asm
-    del a.out.exe a.out.obj
-)
-
-:create_mcsema_files
 
 rem Create McSema build files
 pushd build
