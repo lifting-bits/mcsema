@@ -20,6 +20,8 @@ struct RegInfo final {
 static uintptr_t gLowAddr = 0;
 static uintptr_t gHighAddr = 0;
 
+static uintptr_t gLowExcludeAddr = 0;
+static uintptr_t gHighExcludeAddr = 0;
 #ifdef __x86_64__
 
 static const struct RegInfo gGprs[] = {
@@ -83,7 +85,9 @@ VOID PrintRegState(CONTEXT *ctx) {
 }
 
 VOID InstrumentInstruction(INS ins, VOID *) {
-  if (INS_Address(ins) >= gLowAddr && INS_Address(ins) <= gHighAddr) {
+  auto addr = INS_Address(ins);
+  if (addr >= gLowAddr && addr < gHighAddr &&
+      !(addr >= gLowExcludeAddr && addr < gHighExcludeAddr)) {
   INS_InsertCall(
       ins, IPOINT_BEFORE, (AFUNPTR)PrintRegState, IARG_CONTEXT, IARG_END);
   }
@@ -95,6 +99,14 @@ VOID FindEntrypoint(IMG img, void *) {
   if (low <= gEntrypoint.Value() && gEntrypoint.Value() <= high) {
     gLowAddr = low;
     gHighAddr = high;
+  
+    // Find 
+    for (SEC sec = IMG_SecHead(img); SEC_Valid(sec); sec = SEC_Next(sec)) {
+      if (SEC_Name(sec) == ".plt" || SEC_Name(sec) == ".PLT") {
+        gLowExcludeAddr = SEC_Address(sec);
+        gHighExcludeAddr = gLowExcludeAddr + SEC_Size(sec);
+      }
+    }
   }
 }
 
