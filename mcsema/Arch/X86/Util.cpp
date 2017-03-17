@@ -186,10 +186,38 @@ llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
 llvm::Value *MEM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr natM,
                              const llvm::MCInst &inst, NativeInstPtr ip,
                              uint32_t which) {
+  if (ip->has_external_ref()) {
+    auto F = B->getParent();
+    llvm::Value* addrInt = nullptr;
+    llvm::PointerType* piTy = nullptr;
+    auto ptrsize = ArchPointerSize(M);
+    if (Pointer32 == ptrsize) {
+      addrInt = getValueForExternal<32>(F->getParent(), ip, B);
+      TASSERT(addrInt != 0, "Could not get external data reference");
+      piTy = llvm::Type::getInt32PtrTy(B->getContext());
+    } else if(Pointer64 == ptrsize) {
+      addrInt = getValueForExternal<64>(F->getParent(), ip, B);
+      TASSERT(addrInt != 0, "Could not get external data reference");
+      piTy = llvm::Type::getInt64PtrTy(B->getContext());
+    } else {
+
+      throw TErr(__LINE__, __FILE__,
+                 "Unknown pointer size used to reference memory");
+      // not needed but here just in case
+      return nullptr;
+    }
+
+    return new llvm::IntToPtrInst(addrInt, piTy, "", B);
+  }
+
   if (false == ip->has_mem_reference) {
     throw TErr(__LINE__, __FILE__,
                "Want to use MEM as data ref but have no MEM reference");
+    // not needed but here just in case
+    return nullptr;
   }
+
+
   return getAddrFromExpr(B, natM, inst, ip, which);
 }
 
