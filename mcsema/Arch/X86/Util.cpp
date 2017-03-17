@@ -193,11 +193,11 @@ llvm::Value *MEM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr natM,
     auto ptrsize = ArchPointerSize(M);
     if (Pointer32 == ptrsize) {
       addrInt = getValueForExternal<32>(F->getParent(), ip, B);
-      TASSERT(addrInt != 0, "Could not get external data reference");
+      TASSERT(addrInt != nullptr, "Could not get external data reference");
       piTy = llvm::Type::getInt32PtrTy(B->getContext());
     } else if(Pointer64 == ptrsize) {
       addrInt = getValueForExternal<64>(F->getParent(), ip, B);
-      TASSERT(addrInt != 0, "Could not get external data reference");
+      TASSERT(addrInt != nullptr, "Could not get external data reference");
       piTy = llvm::Type::getInt64PtrTy(B->getContext());
     } else {
 
