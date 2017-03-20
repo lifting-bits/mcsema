@@ -116,9 +116,13 @@ else()
   add_compile_options(
     -g3
     -O0
-    -std=gnu++11
-    -fno-rtti
-    -DGOOGLE_PROTOBUF_NO_RTTI)
+    -std=gnu++11)
+
+  if(NOT LLVM_ENABLE_RTTI)
+    add_compile_options(
+      -fno-rtti
+      -DGOOGLE_PROTOBUF_NO_RTTI)
+  endif()
 endif(WIN32)
 
 add_executable(mcsema-lift
