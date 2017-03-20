@@ -111,8 +111,15 @@ class LinuxTest(unittest.TestCase):
             "amd64": "libmcsema_rt64.a",
             "x86": "libmcsema_rt32.a", }
 
+        arch_bitcode_name = {
+            "amd64": "mcsema_semantics_amd64.bc",
+            "x86": "mcsema_semantics_x86.bc", }
+
         runtime_lib = os.path.realpath(
             os.path.join(self.my_dir, "../", "lib", arch_lib_name[arch]))
+
+        bitcode_lib = os.path.realpath(
+            os.path.join(self.my_dir, "../", "lib", arch_bitcode_name[arch]))
 
         flags = {
             "amd64": "-m64",
@@ -124,6 +131,7 @@ class LinuxTest(unittest.TestCase):
                 flags[arch],
                 "-o", outfile,
                 infile,
+                bitcode_lib,
                 runtime_lib,
                 ]
 
@@ -239,6 +247,9 @@ class LinuxTest(unittest.TestCase):
         libs = ["-lrt",
                 "-llzma"]
         self._runAMD64Test("xz", buildargs=libs)
+
+    def testgzip(self):
+        self._runAMD64Test("gzip")
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
