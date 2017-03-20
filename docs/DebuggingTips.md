@@ -207,7 +207,7 @@ mcsema-lift --arch amd64 --os linux --cfg /tmp/ls.cfg --output /tmp/ls.bc --entr
 Finally, compile it back to a program.
 
 ```shell
-clang-3.8 -O3 -o /tmp/ls_lifted /home/pag/Code/mcsema/generated/ELF_64_linux.S /tmp/ls.bc -lpthread -ldl -lpcre /lib/x86_64-linux-gnu/libselinux.so.1
+clang-3.8 -O3 -o /tmp/ls_lifted /home/pag/Code/mcsema/lib/libmcsema_rt64.a /tmp/ls.bc -lpthread -ldl -lpcre /lib/x86_64-linux-gnu/libselinux.so.1
 ```
 
 Now we can run it and see an example of the output.
