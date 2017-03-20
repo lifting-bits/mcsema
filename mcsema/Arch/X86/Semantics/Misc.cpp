@@ -161,7 +161,7 @@ static InstTransResult doBswapR(NativeInstPtr ip, llvm::BasicBlock *&b,
   auto bswapF = llvm::dyn_cast<llvm::Function>(
       M->getOrInsertFunction(ss.str(), bswapFTy));
 
-  if (!bswapF->getIntrinsicID()) {
+  if (llvm::Intrinsic::bswap != bswapF->getIntrinsicID()) {
     bswapF->recalculateIntrinsicID();
   }
 
