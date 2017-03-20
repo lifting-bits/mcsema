@@ -1,6 +1,5 @@
+REM @echo off
 rem Copyright 2017 Peter Goodman, all rights reserved.
-
-@echo off
 
 set DIR=%~dp0
 if "%DIR:~-1%"=="\" set DIR=%DIR:~0,-1%
@@ -17,10 +16,10 @@ if not exist third_party mkdir third_party
 if not exist build mkdir build
 if not exist generated mkdir generated
 
-set PATH=%ProgramFiles%\7-zip\;%PATH%
 if defined ProgramFiles(x86) (
-    set PATH=%ProgramFiles(x86)%\7-zip\;%PATH%
+    set "PATH=%PATH%;%ProgramFiles(x86)%\7-zip"
 )
+set "PATH=%PATH%;%ProgramFiles%\7-zip"
 
 REM sanity checks for installed software
 where 7z >NUL 2>NUL
@@ -39,9 +38,9 @@ if not %ERRORLEVEL% == 0 (
     echo "The cmake command is not found. Please install cmake"
     exit /B 1
 )
-where cl.exe >NUL 2>NUL
+where clang-cl.exe >NUL 2>NUL
 if not %ERRORLEVEL% == 0 (
-    echo "The Visual Studio Compiler s not found. Please run from a Visual Studio command prompt"
+    echo "The llvm-based Visual Studio compiler (clang-cl) is not found. Please install visual studio and clang for Windows"
     exit /B 1
 )
 
@@ -52,18 +51,36 @@ echo Go into the mcsema directory
 pushd "%~dp0" 
 
 if "%PROCESSOR_ARCHITECTURE%"=="AMD64" ( 
-    set BITNESS=Win64 ) else (
+    set BITNESS= Win64) else (
     set BITNESS=)
 
 set VSBUILD=UNKNOWN
+set VSTOOLSET=UNKNOWN
 cl /? 2>&1 | findstr /C:"Version 18" > nul
 if %ERRORLEVEL% == 0 (
     set VSBUILD=Visual Studio 12 2013%BITNESS%
+    set VSTOOLSET=llvm-vs2013
 ) 
 cl /? 2>&1 | findstr /C:"Version 19" > nul
 if %ERRORLEVEL% == 0 (
     set VSBUILD=Visual Studio 14 2015%BITNESS%
+    REM The 2014 below is intentional. Its called that even for VS2015.
+    set VSTOOLSET=llvm-vs2014
 ) 
+
+clang-cl 2>&1 -v | findstr /R /C:"version 3.[0-8]" > NUL
+if "%VSTOOLSET%"=="llvm-vs2014" (
+    REM Visual Studio integration and the clang-cl in PATH do not always match
+    REM but we should check for unsupported clangs just to be sure, or people will
+    REM think mcsema doesnt build, when its clang that can't parse new-ish MSVC headers
+    if %ERRORLEVEL% == 0 (
+        echo "Detected clang <= 3.8. This version of clang is too old to build VS2015 header files"
+        echo "Please install Clang 3.9 or newer"
+        echo "***You may have multiple clangs installed, including 3.9+ and still be get this message***"
+        echo "***If you are SURE that Visual Studio integration uses clang 3.9+ please comment out this code in bootstrap***"
+        exit /B 1
+    )
+)
 
 if "%VSBUILD%"=="UNKNOWN" (
     echo "Could not identify Visual Studio Version"
@@ -84,6 +101,8 @@ move protobuf-2.6.1 protobuf
 pushd protobuf
 if not exist build mkdir build
 pushd build
+REM Google protobufs crashes clang-cl 3.8.1, so build with
+REM the normal VS2013 toolset
 cmake.exe ^
   -G "%VSBUILD%" ^
   -DPROTOBUF_ROOT="%PROTO_DIR%" ^
@@ -120,6 +139,7 @@ if not exist "%BUILD_DIR%\llvm" mkdir "%BUILD_DIR%\llvm"
 pushd "%BUILD_DIR%\llvm"
 cmake.exe ^
   -G "%VSBUILD%" ^
+  -T "%VSTOOLSET%" ^
   -DLLVM_TARGETS_TO_BUILD="X86" ^
   -DLLVM_INCLUDE_EXAMPLES=OFF ^
   -DLLVM_INCLUDE_TESTS=OFF ^
@@ -130,41 +150,12 @@ cmake --build . --config Release
 popd
 popd
 
-REM cl does not have a flag to specify 32-bit or 64-bit output
-REM TODO(artem): Use the path of cl.exe to find the other CL that will 
-REM output the correct bitness code
-if "%BITNESS%"=="Win64" (
-
-    if exist %GEN_DIR%\ELF_64_linux.S goto create_mcsema_files
-    echo [+] Generating runtimes
-    
-    cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_ELF_64_linux.cpp
-    a.out.exe > %GEN_DIR%\ELF_64_linux.S
-    
-    cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_PE_64_windows.cpp
-    a.out.exe > %GEN_DIR%\PE_64_windows.asm
-    del a.out.exe a.out.obj
-
-) else (
-
-    if exist %GEN_DIR%\ELF_32_linux.S goto create_mcsema_files
-    echo [+] Generating runtimes
-
-    cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_ELF_32_linux.cpp
-    a.out.exe > %GEN_DIR%\ELF_32_linux.S
-    
-    cl.exe /nologo /Fe:a.out.exe /Fo:a.out.obj %MCSEMA_DIR%\mcsema\Arch\X86\Runtime\print_PE_32_windows.cpp
-    a.out.exe > %GEN_DIR%\PE_32_windows.asm
-    del a.out.exe a.out.obj
-)
-
-:create_mcsema_files
-
 rem Create McSema build files
 pushd build
 
 cmake.exe ^
   -G "%VSBUILD%" ^
+  -T "%VSTOOLSET%" ^
   -DLLVM_DIR="%BUILD_DIR%\llvm\share\llvm\cmake" ^
   -DMCSEMA_LLVM_DIR="%LLVM_DIR%" ^
   -DMCSEMA_BUILD_DIR="%BUILD_DIR%" ^

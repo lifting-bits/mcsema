@@ -41,9 +41,7 @@ class LinuxTest(unittest.TestCase):
 
         self.my_dir = os.path.dirname(__file__)
         self.mcsema_lift = os.path.realpath(
-            os.path.join(self.my_dir, "..", "build", "mcsema-lift"))
-        self.mcsema_gencode = os.path.realpath(
-            os.path.join(self.my_dir, "..", "generated"))
+            os.path.join(self.my_dir, "../", "bin", "mcsema-lift"))
 
         if self.on_test_os:
             # we can only rebuild binaries if we are running on the same OS
@@ -109,24 +107,24 @@ class LinuxTest(unittest.TestCase):
 
     def _compileBitcode(self, arch, infile, outfile, extra_args=None):
 
-        generated_asm = {
-                "amd64": "ELF_64_linux.S",
-                "x86": "ELF_32_linux.S",}
+        arch_lib_name = {
+            "amd64": "libmcsema_rt64.a",
+            "x86": "libmcsema_rt32.a", }
 
-        asm_file = os.path.join(self.mcsema_gencode, 
-                generated_asm[arch])
+        runtime_lib = os.path.realpath(
+            os.path.join(self.my_dir, "../", "lib", arch_lib_name[arch]))
 
         flags = {
-                "amd64": "-m64",
-                "x86": "-m32", }
+            "amd64": "-m64",
+            "x86": "-m32", }
 
         self.assertTrue(os.path.exists(self.clang))
         args = [self.clang,
                 "-O3",
                 flags[arch],
                 "-o", outfile,
-                asm_file,
                 infile,
+                runtime_lib,
                 ]
 
         if extra_args:

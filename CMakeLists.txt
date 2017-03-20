@@ -185,8 +185,9 @@ target_link_libraries(mcsema-lift
 #TODO(artem):  Make this ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86 and have a 
 # CMakeLists.txt there add any relevant subdirs
 add_subdirectory(${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/Bitcode)
+add_subdirectory(${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Runtime)
 
 install(
-  TARGETS mcsema-lift
+  TARGETS mcsema-lift 
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib)
