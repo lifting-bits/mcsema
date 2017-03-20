@@ -178,7 +178,7 @@ The driver just says that there is an external function with the signature `int 
 
 Now let's combine the driver, our bitcode, mcsema assembly stubs, and libFuzzer instrumentation into one program:
 
-    $ clang++-3.8 -O3 -o fuzzme.mcsema driver.cc fuzzme.bc ../../generated/ELF_64_linux.S Fuzzer*.o -fsanitize=address -fsanitize-coverage=edge
+    $ clang++-3.8 -O3 -o fuzzme.mcsema driver.cc fuzzme.bc ../../lib/libmcsema_rt64.a Fuzzer*.o -fsanitize=address -fsanitize-coverage=edge
 
 We can now try fuzzing the newly instrumented binary:
 
