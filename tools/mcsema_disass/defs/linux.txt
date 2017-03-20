@@ -16010,6 +16010,7 @@ mempcpy 3 C N
 __mempcpy_chk 4 C N
 memrchr 3 C N
 memset 3 C N
+__memset_chk 4 C N
 memset_extent_buffer 4 C N
 menu_back 1 C N
 menu_driver 2 C N

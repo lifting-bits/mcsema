@@ -150,33 +150,24 @@ static InstTransResult doBswapR(NativeInstPtr ip, llvm::BasicBlock *&b,
                                 const llvm::MCOperand &reg) {
   TASSERT(reg.isReg(), "");
 
-  if (width != 32) {
-    throw TErr(__LINE__, __FILE__, "Width not supported");
+  auto &C = b->getContext();
+  auto M = b->getModule();
+
+  auto intNTy = llvm::Type::getIntNTy(C, width);
+  auto bswapFTy = llvm::FunctionType::get(intNTy, {intNTy}, false);
+
+  std::stringstream ss;
+  ss << "llvm.bswap.i" << width;
+  auto bswapF = llvm::dyn_cast<llvm::Function>(
+      M->getOrInsertFunction(ss.str(), bswapFTy));
+
+  if (!bswapF->getIntrinsicID()) {
+    bswapF->recalculateIntrinsicID();
   }
 
   auto tmp = R_READ<width>(b, reg.getReg());
-
-  // Create the new bytes from the original value
-  auto newByte1 = llvm::BinaryOperator::CreateShl(tmp, CONST_V<width>(b, 24),
-                                                  "", b);
-  auto newByte2 = llvm::BinaryOperator::CreateShl(
-      llvm::BinaryOperator::CreateAnd(tmp, CONST_V<width>(b, 0x0000FF00), "",
-                                      b),
-      CONST_V<width>(b, 8), "", b);
-  auto newByte3 = llvm::BinaryOperator::CreateLShr(
-      llvm::BinaryOperator::CreateAnd(tmp, CONST_V<width>(b, 0x00FF0000), "",
-                                      b),
-      CONST_V<width>(b, 8), "", b);
-  auto newByte4 = llvm::BinaryOperator::CreateLShr(tmp, CONST_V<width>(b, 24),
-                                                   "", b);
-
-  // Add the bytes together to make the resulting DWORD
-  llvm::Value *res = llvm::BinaryOperator::CreateAdd(newByte1, newByte2, "", b);
-  res = llvm::BinaryOperator::CreateAdd(res, newByte3, "", b);
-  res = llvm::BinaryOperator::CreateAdd(res, newByte4, "", b);
-
+  auto res = llvm::CallInst::Create(bswapF, {tmp}, "", b);
   R_WRITE<width>(b, reg.getReg(), res);
-
   return ContinueBlock;
 }
 
@@ -876,6 +867,7 @@ GENERIC_TRANSLATION(NOOP, doNoop(block))
 GENERIC_TRANSLATION(HLT, doHlt(block))
 
 GENERIC_TRANSLATION(BSWAP32r, doBswapR<32>(ip, block, OP(0)))
+GENERIC_TRANSLATION(BSWAP64r, doBswapR<64>(ip, block, OP(0)))
 
 GENERIC_TRANSLATION(LAHF, doLAHF(block))
 GENERIC_TRANSLATION(STD, doStd(block))
@@ -1156,6 +1148,7 @@ void Misc_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::STC] = translate_STC;
   m[llvm::X86::CLC] = translate_CLC;
   m[llvm::X86::BSWAP32r] = translate_BSWAP32r;
+  m[llvm::X86::BSWAP64r] = translate_BSWAP64r;
   m[llvm::X86::CDQ] = translate_CDQ;
   m[llvm::X86::INT3] = translate_INT3;
   m[llvm::X86::INT] = translate_INT;
