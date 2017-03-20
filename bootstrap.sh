@@ -198,7 +198,6 @@ cmake \
   -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
   -DLLVM_DIR="${BUILD_DIR}/llvm/share/llvm/cmake" \
   -DMCSEMA_LLVM_DIR="${LLVM_DIR}" \
-  -DMCSEMA_DIR="${MCSEMA_DIR}" \
   -DMCSEMA_BUILD_DIR="${BUILD_DIR}" \
   -DMCSEMA_GEN_DIR="${GEN_DIR}" \
   ${MCSEMA_DIR}
