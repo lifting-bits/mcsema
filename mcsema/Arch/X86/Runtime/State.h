@@ -18,14 +18,9 @@
 #define __x86_64__
 #endif
 
+#define ALIGN(x) alignas(x)
 
-#ifdef _WIN32
-typedef struct alignas(16) __uint128_t {
-    char pad[16];
-} PACKED uint128_t;
-#else
 typedef unsigned uint128_t __attribute__((mode(TI), aligned(16)));
-#endif
 
 #ifdef _WIN32
 typedef union { double d; char pad[16];} PACKED LDOUBLE;
@@ -41,7 +36,7 @@ typedef uint32_t reg_t;
 #endif
 
 //structure for register state
-struct alignas(16) RegState {
+struct ALIGN(16) RegState {
 
   reg_t RIP;
   reg_t RAX;
@@ -124,4 +119,7 @@ struct alignas(16) RegState {
   uint128_t XMM14;
   uint128_t XMM15;
 };
+#ifdef _WIN32
+#pragma pack(pop)
+#endif
 

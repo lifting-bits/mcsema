@@ -788,9 +788,9 @@ def instructionHandler(M, B, inst, new_eas):
     had_refs = False
  
     # this is a call $+5, needs special handling
-    if len(crefs) == 0 and is_call and isize == 5:
+    if insn_t.itype == idaapi.NN_call and insn_t.Op1.addr == next_ea:
         selfCallEA = next_ea
-        DEBUG("INTERNAL CALL $+5: {0:x}".format(selfCallEA))
+        DEBUG("INTERNAL CALL to next instruction: {0:x}".format(selfCallEA))
         DEBUG("LOCAL NORETURN CALL!")
         I.local_noreturn = True
 

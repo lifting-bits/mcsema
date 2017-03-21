@@ -1240,6 +1240,6 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
     m->addEntryPoint(native_es);
   }
 
-  std::cerr << "Returning modue..." << std::endl;
+  std::cerr << "Returning module..." << std::endl;
   return m;
 }

@@ -138,7 +138,7 @@ And there will be a generated bitcode file in the output location we specified:
 
 The new bitcode can be used for a variety of purposes ranging from informational analyses to hardening and transformation. Eventually, though, you may want to re-create a new, working binary. Here is how to do that.
 
-First, you'll need the assembly stubs generated during mcsema installation; these are typically located in `<mcsema git clone directory>/generated`. You will also need to link against any libraries that the original program was linked against. For this example, make sure that the liblzma-dev package is installed on your machine:
+First, you'll need mcsema's runtime libraries that are generated during installation; these are typically located in `<mcsema installation directory>/lib`. You will also need to link against any libraries that the original program was linked against. For this example, make sure that the liblzma-dev package is installed on your machine:
 
     $ sudo apt-get install liblzma-dev
     
@@ -146,13 +146,9 @@ As of this writing, mcsema outputs bitcode suitable for clang 3.8, and that is t
 
 Now, let's re-create a new `xz` binary and see it in action!
 
-    $ clang-3.8 -m64 -O3 -o xz.new ${MCSEMA_DIR}/generated/ELF_64_linux.S xz.bc -llzma
+    $ clang-3.8 -m64 -O3 -o xz.new xz.bc ${MCSEMA_DIR}/lib/libmcsema_rt64.a -llzma 
     
-This is a fairly ordinary clang command line; the only thing of note is `${MCSEMA_DIR}/generated/ELF_64_linux.S`, which is the path to the aforementioned generated assembly stubs. The `ELF_64_linux.S` is the stub to use for 64-bit ELF files on Linux. Other possible options include:
-
-* `ELF_32_linux.S`: Used when generating 32-bit Linux ELFs
-* `PE_64_windows.asm`: Used when generating 64-bit Windows PEs
-* `PE_32_windows.asm`: Used when generating 32-bit Windows PEs
+This is a fairly ordinary clang command line; the only thing of note is `${MCSEMA_DIR}/lib/libmcsema_rt64.a`, which is the path to the aforementioned runtime libraries. The `libmcsema_rt64.a` is the library to use for 64-bit bitcode, and `libmcsema_rt32.a` is the library to use for 32-bit bitcode. On Windows, these libraries are named `mcsema_rt64.lib` and `mcsema_rt32.lib`, respectively.
 
 
 We can verify that our new binary, `xz.new`, works, and compresses output that can be read by `unxz`:

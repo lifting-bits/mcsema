@@ -1528,6 +1528,8 @@ static InstTransResult translate_WAIT(TranslationContext &, llvm::BasicBlock *&)
   return ContinueBlock;
 }
 
+EXTERNAL_SEMANTICS(FXAM);
+
 void FPU_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::ADD_F32m] = translate_ADD_F32m;
   m[llvm::X86::ADD_F64m] = translate_ADD_F64m;
@@ -1641,5 +1643,7 @@ void FPU_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::FPREM1] = translate_FPREM1;
 
   m[llvm::X86::CHS_F] = translate_CHS_F;
+
+  m[llvm::X86::FXAM] = translate_FXAM;
 }
 

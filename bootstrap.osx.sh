@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2017 Peter Goodman (peter@trailofbits.com), all rights reserved.
+# Copyright 2017 Trail of Bits, see LICENSE for details
 
 set -e
 
@@ -21,7 +21,7 @@ GEN_DIR=${DIR}/generated
 # Debug Build
 BUILD_TYPE=Debug
 #Install to directory of the git clone
-PREFIX=$(readlink -f ${DIR})
+PREFIX=${DIR}
 
 # taken from:
 # http://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
@@ -31,7 +31,7 @@ do
 
   case $key in
       -p|--prefix)
-        PREFIX=$(readlink -f $2)
+        PREFIX=$2
         shift # past argument
       ;;
       -b|--build)
@@ -64,22 +64,7 @@ else
   echo "Build type set to: ${BUILD_TYPE}"
 fi
 
-echo "[x] Installing dependencies via apt-get"
-# gcc-multilib required onyl for 32-bit integration tests
-# g++-multilib required to build 32-bit generated code
-sudo apt-get update -qq
-sudo apt-get install -yqq \
-  git \
-  cmake \
-  libprotoc-dev libprotobuf-dev libprotobuf-dev protobuf-compiler \
-  python2.7 python-pip \
-  llvm-3.8 clang-3.8 \
-  realpath \
-  gcc-multilib g++-multilib
-
-# liblzma-dev neded for the xz integration test
-# libpcre3-dev needed for some integration tests
-sudo apt-get install -yqq liblzma-dev libpcre3-dev
+brew install wget git cmake || true
 
 echo "[+] Upgrading PIP"
 
@@ -102,6 +87,18 @@ if [ ! -e ${LLVM_DIR}/CMakeLists.txt ]; then
   echo "[+] Extracting.."
   tar xf ${FILE} -C ./ --strip-components=1 
   popd
+
+fi
+
+if [ ! -e ${THIRD_PARTY_DIR}/protobuf ]; then
+    mkdir -p ${THIRD_PARTY_DIR}/protobuf
+    pushd ${THIRD_PARTY_DIR}/protobuf
+    wget https://github.com/google/protobuf/releases/download/v2.6.1/protobuf-2.6.1.tar.gz
+    tar xf protobuf-2.6.1.tar.gz -C ./ --strip-components=1
+    ./configure --prefix=$(realpath build)
+    make
+    make install
+    popd
 fi
 
 echo "[+] Installing python-protobuf"
@@ -117,7 +114,7 @@ if [ ! -e ${GEN_DIR}/CFG.pb.h ]; then
   echo "[+] Auto-generating protobuf files"
   pushd ${GEN_DIR}
   PROTO_PATH=${DIR}/mcsema/CFG
-  protoc \
+  ${THIRD_PARTY_DIR}/protobuf/build/bin/protoc \
     --cpp_out ${GEN_DIR} \
     --python_out ${GEN_DIR} \
     --proto_path ${PROTO_PATH} \
@@ -131,6 +128,26 @@ if [ ! -e ${GEN_DIR}/CFG.pb.h ]; then
   popd
 fi
 
+OSX_SDK=$(xcrun -sdk macosx --show-sdk-path)
+
+# Produce the runtimes.
+if [ ! -e ${GEN_DIR}/ELF_32_linux.S ]; then
+  echo "[+] Generating runtimes"
+  clang++-3.8 -m32 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_ELF_32_linux.cpp
+  ./a.out > ${GEN_DIR}/ELF_32_linux.S
+
+  clang++-3.8 -m64 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_ELF_64_linux.cpp
+  ./a.out > ${GEN_DIR}/ELF_64_linux.S
+
+  clang++-3.8 -m32 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_PE_32_windows.cpp
+  ./a.out > ${GEN_DIR}/PE_32_windows.asm
+
+  clang++-3.8 -m64 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_PE_64_windows.cpp
+  ./a.out > ${GEN_DIR}/PE_64_windows.asm
+
+  rm a.out
+fi
+
 # Install the disassembler
 echo "[+] Installing the disassembler"
 if [ ! -d "${PREFIX}/bin" ]; then 
@@ -138,9 +155,9 @@ if [ ! -d "${PREFIX}/bin" ]; then
 fi
 # by default install to the user's python package directory
 # and copy the script itself to ${PREFIX}/bin
-python ${DIR}/tools/setup.py install --user --install-scripts "${PREFIX}/bin"
+python ${DIR}/tools/setup.py install --install-scripts "${PREFIX}/bin"
 
-PROCS=$(nproc)
+PROCS=$(sysctl -n hw.ncpu)
 
 # Create makefiles
 echo "[+] Creating Makefiles"
@@ -181,6 +198,7 @@ cmake \
   -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
   -DLLVM_DIR="${BUILD_DIR}/llvm/share/llvm/cmake" \
   -DMCSEMA_LLVM_DIR="${LLVM_DIR}" \
+  -DMCSEMA_DIR="${MCSEMA_DIR}" \
   -DMCSEMA_BUILD_DIR="${BUILD_DIR}" \
   -DMCSEMA_GEN_DIR="${GEN_DIR}" \
   ${MCSEMA_DIR}

@@ -41,11 +41,12 @@ Why would anyone translate binaries *back* to bitcode?
 | [CMake](https://cmake.org/) | 2.8+ |
 | [Google Protobuf](https://github.com/google/protobuf) | 2.6.1 |
 | [LLVM](http://llvm.org/) | 3.8 |
-| [Clang](http://clang.llvm.org/) | 3.8 |
+| [Clang](http://clang.llvm.org/) | 3.8 (3.9 if using Visual Studio 2015) |
 | [Python](https://www.python.org/) | 2.7 | 
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 2.6.1 |
 | [IDA Pro](https://www.hex-rays.com/products/ida) | 6.7+ |
+| [Visual Studio](https://www.visualstudio.com/downloads/) | 2013+ (Windows Only) |
 
 ## Getting and building the code
 
@@ -110,9 +111,13 @@ sudo make install
 Download and install [Chocolatey](https://chocolatey.org/install). Then, open Powershell in *administrator* mode, and run the following:
 
 ```shell
-choco install -y --allowemptychecksum git cmake python2 pip wget unzip 7zip
+choco install -y --allowemptychecksum git cmake python2 pip 7zip
 choco install -y microsoft-visual-cpp-build-tools --installargs "/InstallSelectableItems Win81SDK_CppBuildSKUV1;Win10SDK_VisibleV1"
 ```
+
+Mcsema should be built with clang. Newer versions of clang for Windows automatically integrate with Visual Studio. The mcsema build scripts rely on this integration. The minimum version of clang required is [Clang 3.8](http://releases.llvm.org/download.html#3.8.1) (when using VS 2013) or [Clang 3.9](http://releases.llvm.org/download.html#3.9.1) (when using VS 2015).
+
+Sometimes `cmake` will not be available on the command line after being installed from Chocolatey. If you have this issue, install `cmake` from the [official Windows installer](https://cmake.org/download/).
 
 #### Step 2: Clone the repository
 
