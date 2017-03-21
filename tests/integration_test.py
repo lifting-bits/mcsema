@@ -9,7 +9,7 @@ import platform
 import json
 import base64
 
-DEBUG = False
+DEBUG = True
 
 def b64(f):
     """ Base64 encodes the file 'f' """
@@ -74,21 +74,35 @@ class LinuxTest(unittest.TestCase):
 
     def _runWithTimeout(self, procargs, timeout=1200, stdout=None, stderr=None):
 
-        with open(os.devnull, "w") as devnull:
-            if DEBUG:
-                sys.stderr.write("executing: {}\n".format(" ".join(procargs)))
-            po = subprocess.Popen(procargs, stderr=stderr or devnull, stdout=stdout or devnull)
-            secs_used = 0
+        if not DEBUG:
+            errfile = os.devnull
+        else:
+            errfile = os.path.join(self.test_dir, "errfile")
 
-            while po.poll() is None and secs_used < timeout:
-                time.sleep(1)
-                sys.stderr.write("~")
-                secs_used += 1
+        if not DEBUG:
+            outfile = os.devnull
+        else:
+            outfile = os.path.join(self.test_dir, "outfile")
+
+        with open(errfile, "w") as err_devnull:
+            with open(outfile, "w") as out_devnull:
+                if DEBUG:
+                    sys.stderr.write("executing: {}\n".format(" ".join(procargs)))
+                po = subprocess.Popen(procargs, stderr=stderr or err_devnull, stdout=stdout or out_devnull)
+                secs_used = 0
+
+                while po.poll() is None and secs_used < timeout:
+                    time.sleep(1)
+                    sys.stderr.write("~")
+                    secs_used += 1
 
         # took less than timeout
         self.assertLessEqual(secs_used, timeout)
 
         # successfully exited
+        if po.returncode != 0 and errfile != os.devnull:
+            errcontent = open(errfile, 'r').read()
+            sys.stderr.write("Return code not zero!. Stderr said:\n{}".format(errcontent))
         self.assertEqual(po.returncode, 0)
         sys.stderr.write("\n")
 

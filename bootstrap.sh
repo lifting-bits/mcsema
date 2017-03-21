@@ -77,8 +77,9 @@ sudo apt-get install -yqq \
   realpath \
   gcc-multilib g++-multilib
 
-#only neded for the xz integration test
-sudo apt-get install -yqq liblzma-dev
+# liblzma-dev neded for the xz integration test
+# libpcre3-dev needed for some integration tests
+sudo apt-get install -yqq liblzma-dev libpcre3-dev
 
 echo "[+] Upgrading PIP"
 
