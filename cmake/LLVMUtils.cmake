@@ -104,10 +104,32 @@ if (NOT (LLVM_TOOLS_BINARY_DIR))
   message(SEND_ERROR "LLVM_TOOLS_BINARY_DIR must be defined. Did you find_package(LLVM) ?")
 endif()
 
-find_program(LLVM_BC_C_COMPILER clang PATH ${LLVM_TOOLS_BINARY_DIR})
-find_program(LLVM_BC_CXX_COMPILER clang++ PATH ${LLVM_TOOLS_BINARY_DIR})
-find_program(LLVM_BC_LINK llvm-link PATH ${LLVM_TOOLS_BINARY_DIR})
+#LLVM_PACKAGE_VERSION has the full 3 digit version number (i.e 3.8.1); we only want 
+# the major and minor to find a working toolset
+set(LLVM_TO_FIND "${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}")
 
+#try to find tools for this specific LLVM version
+find_program(LLVM_BC_C_COMPILER "clang-${LLVM_TO_FIND}" PATH ${LLVM_TOOLS_BINARY_DIR})
+find_program(LLVM_BC_CXX_COMPILER "clang++-${LLVM_TO_FIND}" PATH ${LLVM_TOOLS_BINARY_DIR})
+find_program(LLVM_BC_LINK "llvm-link-${LLVM_TO_FIND}" PATH ${LLVM_TOOLS_BINARY_DIR})
+
+# back up to non-version-specific toolset
+if (NOT LLVM_BC_C_COMPILER)
+  message(STATUS "Could not find clang-${LLVM_TO_FIND}, looking for clang")
+  find_program(LLVM_BC_C_COMPILER clang PATH ${LLVM_TOOLS_BINARY_DIR})
+endif()
+
+if (NOT LLVM_BC_CXX_COMPILER)
+  message(STATUS "Could not find clang++-${LLVM_TO_FIND}, looking for clang++")
+  find_program(LLVM_BC_CXX_COMPILER clang++ PATH ${LLVM_TOOLS_BINARY_DIR})
+endif()
+
+if (NOT LLVM_BC_LINK)
+  message(STATUS "Could not find llvm-link-${LLVM_TO_FIND}, looking for llvm-link")
+  find_program(LLVM_BC_LINK llvm-link PATH ${LLVM_TOOLS_BINARY_DIR})
+endif()
+
+# all attempts at finding working tools failed. error out
 if (NOT (LLVM_BC_C_COMPILER AND LLVM_BC_CXX_COMPILER AND LLVM_BC_LINK))
   message(SEND_ERROR "Some of following tools have not been found:")
   if (NOT LLVM_BC_C_COMPILER)
