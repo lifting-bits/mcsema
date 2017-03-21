@@ -23,6 +23,9 @@ BUILD_TYPE=Debug
 #Install to directory of the git clone
 PREFIX=$(readlink -f ${DIR})
 
+CC=${CC:-clang-3.8}
+CXX=${CXX:-clang++-3.8}
+
 # taken from:
 # http://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
 while [[ $# -gt 0 ]]
@@ -152,8 +155,8 @@ GEN_DIR=$(realpath ${GEN_DIR})
 echo "[x] Building LLVM"
 mkdir -p llvm
 pushd llvm
-CC=clang-3.8 \
-CXX=clang++-3.8 \
+CC=${CC} \
+CXX=${CXX} \
 CFLAGS="${DEBUG_BUILD_ARGS}" \
 CXXFLAGS="${DEBUG_BUILD_ARGS}" \
 cmake \
@@ -171,8 +174,8 @@ popd
 
 echo "[x] Creating Makefiles"
 
-CC=clang-3.8 \
-CXX=clang++-3.8 \
+CC=${CC} \
+CXX=${CXX} \
 CFLAGS="-g3 -O0" \
 CXXFLAGS="-g3 -O0" \
 cmake \

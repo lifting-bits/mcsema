@@ -23,8 +23,8 @@ BUILD_TYPE=Debug
 #Install to directory of the git clone
 PREFIX=${DIR}
 
-CC=clang
-CXX=clang++
+CC=${CC:-clang-3.8}
+CXX=${CXX:-clang++-3.8}
 
 # taken from:
 # http://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
