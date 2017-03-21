@@ -11,7 +11,7 @@ function(CheckEmitLlvmFlag)
     if(AOUT_IS_NOT_BC)
       message(FATAL_ERROR "${LLVM_BC_C_COMPILER} is not valid LLVM compiler")
     endif()
-    message(STATUS "Checking for C LLVM compiler... works.")
+    message(STATUS "Checking for C LLVM compiler... works: ${LLVM_BC_C_COMPILER}")
 
     message(STATUS "Checking for CXX LLVM compiler...")
     execute_process(COMMAND "${LLVM_BC_CXX_COMPILER}" "-emit-llvm" "-c" "emitllvm.test.cpp" "-o" "emitllvm.test.cpp.bc"
@@ -21,7 +21,7 @@ function(CheckEmitLlvmFlag)
     if(AOUT_IS_NOT_BC)
         message(FATAL_ERROR "${LLVM_BC_CXX_COMPILER} is not valid LLVM compiler")
     endif()
-    message(STATUS "Checking for CXX LLVM compiler... works.")
+    message(STATUS "Checking for CXX LLVM compiler... works: ${LLVM_BC_CXX_COMPILER}")
 endfunction(CheckEmitLlvmFlag)
 
 ######################################################################################################

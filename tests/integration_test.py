@@ -9,7 +9,7 @@ import platform
 import json
 import base64
 
-DEBUG = True
+DEBUG = False
 
 def b64(f):
     """ Base64 encodes the file 'f' """
@@ -147,6 +147,7 @@ class LinuxTest(unittest.TestCase):
                 infile,
                 bitcode_lib,
                 runtime_lib,
+                "-lm", # this is usually needed by the external semantics
                 ]
 
         if extra_args:
