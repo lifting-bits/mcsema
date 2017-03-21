@@ -74,21 +74,35 @@ class LinuxTest(unittest.TestCase):
 
     def _runWithTimeout(self, procargs, timeout=1200, stdout=None, stderr=None):
 
-        with open(os.devnull, "w") as devnull:
-            if DEBUG:
-                sys.stderr.write("executing: {}\n".format(" ".join(procargs)))
-            po = subprocess.Popen(procargs, stderr=stderr or devnull, stdout=stdout or devnull)
-            secs_used = 0
+        if not DEBUG:
+            errfile = os.devnull
+        else:
+            errfile = os.path.join(self.test_dir, "errfile")
 
-            while po.poll() is None and secs_used < timeout:
-                time.sleep(1)
-                sys.stderr.write("~")
-                secs_used += 1
+        if not DEBUG:
+            outfile = os.devnull
+        else:
+            outfile = os.path.join(self.test_dir, "outfile")
+
+        with open(errfile, "w") as err_devnull:
+            with open(outfile, "w") as out_devnull:
+                if DEBUG:
+                    sys.stderr.write("executing: {}\n".format(" ".join(procargs)))
+                po = subprocess.Popen(procargs, stderr=stderr or err_devnull, stdout=stdout or out_devnull)
+                secs_used = 0
+
+                while po.poll() is None and secs_used < timeout:
+                    time.sleep(1)
+                    sys.stderr.write("~")
+                    secs_used += 1
 
         # took less than timeout
         self.assertLessEqual(secs_used, timeout)
 
         # successfully exited
+        if po.returncode != 0 and errfile != os.devnull:
+            errcontent = open(errfile, 'r').read()
+            sys.stderr.write("Return code not zero!. Stderr said:\n{}".format(errcontent))
         self.assertEqual(po.returncode, 0)
         sys.stderr.write("\n")
 
@@ -111,8 +125,15 @@ class LinuxTest(unittest.TestCase):
             "amd64": "libmcsema_rt64.a",
             "x86": "libmcsema_rt32.a", }
 
+        arch_bitcode_name = {
+            "amd64": "mcsema_semantics_amd64.bc",
+            "x86": "mcsema_semantics_x86.bc", }
+
         runtime_lib = os.path.realpath(
             os.path.join(self.my_dir, "../", "lib", arch_lib_name[arch]))
+
+        bitcode_lib = os.path.realpath(
+            os.path.join(self.my_dir, "../", "lib", arch_bitcode_name[arch]))
 
         flags = {
             "amd64": "-m64",
@@ -124,7 +145,9 @@ class LinuxTest(unittest.TestCase):
                 flags[arch],
                 "-o", outfile,
                 infile,
+                bitcode_lib,
                 runtime_lib,
+                "-lm", # this is usually needed by the external semantics
                 ]
 
         if extra_args:
@@ -239,6 +262,9 @@ class LinuxTest(unittest.TestCase):
         libs = ["-lrt",
                 "-llzma"]
         self._runAMD64Test("xz", buildargs=libs)
+
+    def testgzip(self):
+        self._runAMD64Test("gzip")
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

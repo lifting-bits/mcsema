@@ -158,7 +158,6 @@ cmake.exe ^
   -T "%VSTOOLSET%" ^
   -DLLVM_DIR="%BUILD_DIR%\llvm\share\llvm\cmake" ^
   -DMCSEMA_LLVM_DIR="%LLVM_DIR%" ^
-  -DMCSEMA_DIR="%DIR%" ^
   -DMCSEMA_BUILD_DIR="%BUILD_DIR%" ^
   -DMCSEMA_GEN_DIR="%GEN_DIR%" ^
   -DCMAKE_BUILD_TYPE="Release" ^
