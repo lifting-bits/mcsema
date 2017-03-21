@@ -464,3 +464,16 @@ llvm::Function *X86GetOrCreateRegStateTracer(llvm::Module *M) {
   ir.CreateRetVoid();
   return F;
 }
+
+llvm::Function *X86GetOrCreateSemantics(llvm::Module *M, const std::string &instr) {
+  std::string fname = "__mcsema_" + instr;
+  auto F = M->getFunction(fname);
+  if (F) {
+    return F;
+  }
+
+  F = llvm::Function::Create(
+      LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
+      fname, M);
+  return F;
+}

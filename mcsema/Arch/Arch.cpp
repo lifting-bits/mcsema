@@ -67,6 +67,7 @@ void X86AllocRegisterVars(llvm::BasicBlock *);
 unsigned X86RegisterSize(MCSemaRegs reg);
 llvm::StructType *X86RegStateStructType(void);
 llvm::Function *X86GetOrCreateRegStateTracer(llvm::Module *);
+llvm::Function *X86GetOrCreateSemantics(llvm::Module *, const std::string &instr);
 InstTransResult X86LiftInstruction(
     TranslationContext &, llvm::BasicBlock *&, InstructionLifter *);
 
@@ -79,6 +80,7 @@ void (*ArchAllocRegisterVars)(llvm::BasicBlock *) = nullptr;
 unsigned (*ArchRegisterSize)(MCSemaRegs) = nullptr;
 llvm::StructType *(*ArchRegStateStructType)(void) = nullptr;
 llvm::Function *(*ArchGetOrCreateRegStateTracer)(llvm::Module *) = nullptr;
+llvm::Function *(*ArchGetOrCreateSemantics)(llvm::Module *, const std::string &) = nullptr;
 InstTransResult (*ArchLiftInstruction)(
     TranslationContext &, llvm::BasicBlock *&, InstructionLifter *) = nullptr;
 
@@ -183,6 +185,7 @@ bool InitArch(llvm::LLVMContext *context, const std::string &os, const std::stri
     ArchAllocRegisterVars = X86AllocRegisterVars;
     ArchRegStateStructType = X86RegStateStructType;
     ArchGetOrCreateRegStateTracer = X86GetOrCreateRegStateTracer;
+    ArchGetOrCreateSemantics = X86GetOrCreateSemantics;
     ArchLiftInstruction = X86LiftInstruction;
   } else {
     return false;

@@ -13,20 +13,26 @@ set(CMAKE_MODULE_PATH "${LLVM_DIR}/cmake/modules ${CMAKE_MODULE_PATH}")
 find_package(LLVM 3.8 REQUIRED CONFIG)
 add_definitions(${LLVM_DEFINITIONS})
 
+set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+include (LLVMUtils)
+
+# we need C++11
+set(CMAKE_CXX_STANDARD 11)
+
 # Get protobufs.
 if(WIN32)
   # Change the slashes to Unix style or risk the wrath of invalid escape
   # sequences!
-  string(REGEX REPLACE "\\\\" "/" MCSEMA_DIR ${MCSEMA_DIR})
+  string(REGEX REPLACE "\\\\" "/" CMAKE_SOURCE_DIR ${CMAKE_SOURCE_DIR})
 
-  set(PROTOBUF_ROOT "${MCSEMA_DIR}/third_party/protobuf")
+  set(PROTOBUF_ROOT "${CMAKE_SOURCE_DIR}/third_party/protobuf")
   set(Protobuf_LIBRARIES "${PROTOBUF_ROOT}/build/libprotobuf/Release")
   set(Protobuf_INCLUDE_DIR "${PROTOBUF_ROOT}/src")
   
   include_directories(${Protobuf_INCLUDE_DIR})
   link_directories(${Protobuf_LIBRARIES})
 elseif(APPLE)
-  set(PROTOBUF_ROOT "${MCSEMA_DIR}/third_party/protobuf")
+  set(PROTOBUF_ROOT "${CMAKE_SOURCE_DIR}/third_party/protobuf")
   set(Protobuf_LIBRARIES "${PROTOBUF_ROOT}/build/lib")
   set(Protobuf_INCLUDE_DIR "${PROTOBUF_ROOT}/src")
   
@@ -35,8 +41,8 @@ elseif(APPLE)
 endif(WIN32)
 find_package(Protobuf REQUIRED)
 
-include_directories(${MCSEMA_DIR})
-include_directories(${MCSEMA_DIR}/third_party)
+include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/third_party)
 include_directories(${MCSEMA_LLVM_DIR})
 include_directories(${MCSEMA_LLVM_DIR}/include)
 include_directories(${MCSEMA_LLVM_DIR}/lib/Target/X86/)
@@ -46,12 +52,12 @@ include_directories(${MCSEMA_BUILD_DIR}/llvm/lib/Target/X86)
 include_directories(${MCSEMA_GEN_DIR})
 
 # Make sure we can find the mcsema headers.
-include_directories(${MCSEMA_DIR}/mcsema)
-include_directories(${MCSEMA_DIR}/mcsema/binary_common)
-include_directories(${MCSEMA_DIR}/mcsema/cfgToLLVM)
-include_directories(${MCSEMA_DIR}/mcsema/common)
-include_directories(${MCSEMA_DIR}/mcsema/peToCFG)
-include_directories(${MCSEMA_DIR}/mcsema/cfgToLLVM)
+include_directories(${CMAKE_SOURCE_DIR}/mcsema)
+include_directories(${CMAKE_SOURCE_DIR}/mcsema/binary_common)
+include_directories(${CMAKE_SOURCE_DIR}/mcsema/cfgToLLVM)
+include_directories(${CMAKE_SOURCE_DIR}/mcsema/common)
+include_directories(${CMAKE_SOURCE_DIR}/mcsema/peToCFG)
+include_directories(${CMAKE_SOURCE_DIR}/mcsema/cfgToLLVM)
 
 if(WIN32)
   add_compile_options(
@@ -116,46 +122,45 @@ else()
   add_compile_options(
     -g3
     -O0
-    -std=gnu++11
     -fno-rtti
     -DGOOGLE_PROTOBUF_NO_RTTI)
 endif(WIN32)
 
 add_executable(mcsema-lift
-  ${MCSEMA_DIR}/mcsema/Lift.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/Arch.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Lift.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/Arch.cpp
   
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Dispatch.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Lift.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Register.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Util.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Dispatch.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Lift.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Register.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Util.cpp
 
-  ${MCSEMA_DIR}/mcsema/BC/Lift.cpp
-  ${MCSEMA_DIR}/mcsema/BC/Util.cpp
-  ${MCSEMA_DIR}/mcsema/CFG/CFG.cpp
-  ${MCSEMA_DIR}/generated/CFG.pb.cc
+  ${CMAKE_SOURCE_DIR}/mcsema/BC/Lift.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/BC/Util.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.cpp
+  ${CMAKE_SOURCE_DIR}/generated/CFG.pb.cc
 
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/JumpTables.cpp
-  ${MCSEMA_DIR}/mcsema/cfgToLLVM/TransExcn.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/cfgToLLVM/JumpTables.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/cfgToLLVM/TransExcn.cpp
 
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/ADD.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/bitops.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Branches.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/CMOV.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/CMPTEST.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Exchanges.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/fpu.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/INCDECNEG.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Jcc.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Misc.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/MOV.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/MULDIV.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/SETcc.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/ShiftRoll.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/SSE.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/Stack.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/String.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/X86/Semantics/SUB.cpp)
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/ADD.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/bitops.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/Branches.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/CMOV.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/CMPTEST.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/Exchanges.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/fpu.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/INCDECNEG.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/Jcc.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/Misc.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/MOV.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/MULDIV.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/SETcc.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/ShiftRoll.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/SSE.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/Stack.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/String.cpp
+  ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/SUB.cpp)
 
 target_link_libraries(mcsema-lift
   protobuf
@@ -177,7 +182,10 @@ target_link_libraries(mcsema-lift
   LLVMInstrumentation
   LLVMObjCARCOpts)
 
-add_subdirectory(${MCSEMA_DIR}/mcsema/Arch/X86/Runtime)
+#TODO(artem):  Make this ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86 and have a 
+# CMakeLists.txt there add any relevant subdirs
+add_subdirectory(${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/Bitcode)
+add_subdirectory(${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Runtime)
 
 install(
   TARGETS mcsema-lift 

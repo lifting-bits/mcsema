@@ -77,8 +77,9 @@ sudo apt-get install -yqq \
   realpath \
   gcc-multilib g++-multilib
 
-#only neded for the xz integration test
-sudo apt-get install -yqq liblzma-dev
+# liblzma-dev neded for the xz integration test
+# libpcre3-dev needed for some integration tests
+sudo apt-get install -yqq liblzma-dev libpcre3-dev
 
 echo "[+] Upgrading PIP"
 
@@ -180,7 +181,6 @@ cmake \
   -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
   -DLLVM_DIR="${BUILD_DIR}/llvm/share/llvm/cmake" \
   -DMCSEMA_LLVM_DIR="${LLVM_DIR}" \
-  -DMCSEMA_DIR="${MCSEMA_DIR}" \
   -DMCSEMA_BUILD_DIR="${BUILD_DIR}" \
   -DMCSEMA_GEN_DIR="${GEN_DIR}" \
   ${MCSEMA_DIR}
