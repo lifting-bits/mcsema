@@ -110,7 +110,8 @@ class LinuxTest(unittest.TestCase):
 
         with open(os.devnull, "w") as devnull:
             if DEBUG:
-                sys.stderr.write("executing: {}\n".format(shellargs))
+                sys.stderr.write("executing: {}".format(shellargs).encode('string_escape'))
+                sys.stderr.write("\n")
             subprocess.check_call(shellargs, stderr=stderr or devnull, stdout=stdout or devnull, shell=True)
 
     def _runAMD64Test(self, testname, entrypoint="main", buildargs=None):
@@ -265,6 +266,11 @@ class LinuxTest(unittest.TestCase):
 
     def testgzip(self):
         self._runAMD64Test("gzip")
+
+    def testnc(self):
+        libs = ["-lbsd",
+                "-lresolv"]
+        self._runAMD64Test("nc", buildargs=libs)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

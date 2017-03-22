@@ -60,6 +60,23 @@
       "expected_stdout": "L3Vzcgo="
     }
   }, 
+  "nc": {
+    "_comment": "Tests for netcat", 
+    "grab webpage": {
+      "_comment": "fetch example.com", 
+      "expected_stderr": "", 
+      "expected_stdout": "PC9odG1sPgo=", 
+      "shell": "python -c \"import sys; sys.stdout.write('GET / HTTP/1.1\\\r\\\nHost: example.com\\\r\\\n\\\r\\\n')\" | #PROGNAME example.com 80 | tail -n 1"
+    }, 
+    "help arg": {
+      "_comment": "nc -help", 
+      "args": [
+        "-help"
+      ], 
+      "expected_stderr": "T3BlbkJTRCBuZXRjYXQgKERlYmlhbiBwYXRjaGxldmVsIDEuMTA1LTd1YnVudHUxKQpUaGlzIGlzIG5jIGZyb20gdGhlIG5ldGNhdC1vcGVuYnNkIHBhY2thZ2UuIEFuIGFsdGVybmF0aXZlIG5jIGlzIGF2YWlsYWJsZQppbiB0aGUgbmV0Y2F0LXRyYWRpdGlvbmFsIHBhY2thZ2UuCnVzYWdlOiBuYyBbLTQ2YkNEZGhqa2xuclN0VXV2WnpdIFstSSBsZW5ndGhdIFstaSBpbnRlcnZhbF0gWy1PIGxlbmd0aF0KCSAgWy1QIHByb3h5X3VzZXJuYW1lXSBbLXAgc291cmNlX3BvcnRdIFstcSBzZWNvbmRzXSBbLXMgc291cmNlXQoJICBbLVQgdG9za2V5d29yZF0gWy1WIHJ0YWJsZV0gWy13IHRpbWVvdXRdIFstWCBwcm94eV9wcm90b2NvbF0KCSAgWy14IHByb3h5X2FkZHJlc3NbOnBvcnRdXSBbZGVzdGluYXRpb25dIFtwb3J0XQoJQ29tbWFuZCBTdW1tYXJ5OgoJCS00CQlVc2UgSVB2NAoJCS02CQlVc2UgSVB2NgoJCS1iCQlBbGxvdyBicm9hZGNhc3QKCQktQwkJU2VuZCBDUkxGIGFzIGxpbmUtZW5kaW5nCgkJLUQJCUVuYWJsZSB0aGUgZGVidWcgc29ja2V0IG9wdGlvbgoJCS1kCQlEZXRhY2ggZnJvbSBzdGRpbgoJCS1oCQlUaGlzIGhlbHAgdGV4dAoJCS1JIGxlbmd0aAlUQ1AgcmVjZWl2ZSBidWZmZXIgbGVuZ3RoCgkJLWkgc2VjcwkJRGVsYXkgaW50ZXJ2YWwgZm9yIGxpbmVzIHNlbnQsIHBvcnRzIHNjYW5uZWQKCQktagkJVXNlIGp1bWJvIGZyYW1lCgkJLWsJCUtlZXAgaW5ib3VuZCBzb2NrZXRzIG9wZW4gZm9yIG11bHRpcGxlIGNvbm5lY3RzCgkJLWwJCUxpc3RlbiBtb2RlLCBmb3IgaW5ib3VuZCBjb25uZWN0cwoJCS1uCQlTdXBwcmVzcyBuYW1lL3BvcnQgcmVzb2x1dGlvbnMKCQktTyBsZW5ndGgJVENQIHNlbmQgYnVmZmVyIGxlbmd0aAoJCS1QIHByb3h5dXNlcglVc2VybmFtZSBmb3IgcHJveHkgYXV0aGVudGljYXRpb24KCQktcCBwb3J0CQlTcGVjaWZ5IGxvY2FsIHBvcnQgZm9yIHJlbW90ZSBjb25uZWN0cwogICAgICAgIAktcSBzZWNzCQlxdWl0IGFmdGVyIEVPRiBvbiBzdGRpbiBhbmQgZGVsYXkgb2Ygc2VjcwoJCS1yCQlSYW5kb21pemUgcmVtb3RlIHBvcnRzCgkJLVMJCUVuYWJsZSB0aGUgVENQIE1ENSBzaWduYXR1cmUgb3B0aW9uCgkJLXMgYWRkcgkJTG9jYWwgc291cmNlIGFkZHJlc3MKCQktVCB0b3NrZXl3b3JkCVNldCBJUCBUeXBlIG9mIFNlcnZpY2UKCQktdAkJQW5zd2VyIFRFTE5FVCBuZWdvdGlhdGlvbgoJCS1VCQlVc2UgVU5JWCBkb21haW4gc29ja2V0CgkJLXUJCVVEUCBtb2RlCgkJLVYgcnRhYmxlCVNwZWNpZnkgYWx0ZXJuYXRlIHJvdXRpbmcgdGFibGUKCQktdgkJVmVyYm9zZQoJCS13IHNlY3MJCVRpbWVvdXQgZm9yIGNvbm5lY3RzIGFuZCBmaW5hbCBuZXQgcmVhZHMKCQktWCBwcm90bwlQcm94eSBwcm90b2NvbDogIjQiLCAiNSIgKFNPQ0tTKSBvciAiY29ubmVjdCIKCQkteCBhZGRyWzpwb3J0XQlTcGVjaWZ5IHByb3h5IGFkZHJlc3MgYW5kIHBvcnQKCQktWgkJRENDUCBtb2RlCgkJLXoJCVplcm8tSS9PIG1vZGUgW3VzZWQgZm9yIHNjYW5uaW5nXQoJUG9ydCBudW1iZXJzIGNhbiBiZSBpbmRpdmlkdWFsIG9yIHJhbmdlczogbG8taGkgW2luY2x1c2l2ZV0K", 
+      "expected_stdout": ""
+    }
+  }, 
   "stringpool": {
     "_comment": "These are test names, in case each program has more than one test", 
     "default": {

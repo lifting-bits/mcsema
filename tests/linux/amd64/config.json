@@ -73,5 +73,18 @@
             "_comment": "compression and decompression test",
             "shell": "echo 'compression and decompression test' | #PROGNAME -c | #PROGNAME -d"
         }
+    },
+
+    "nc": {
+        "_comment": "Tests for netcat",
+        "grab webpage": {
+            "_comment": "fetch example.com",
+            "shell": "python -c \"import sys; sys.stdout.write('GET / HTTP/1.1\\\r\\\nHost: example.com\\\r\\\n\\\r\\\n')\" | #PROGNAME example.com 80 | tail -n 1"
+        },
+
+        "help arg": {
+            "_comment": "nc -help",
+            "args": ["-help"]
+        }
     }
 }
