@@ -24,6 +24,10 @@
         },
         "width test": {
             "args": ["--width=100", "-d", "/usr"]
+        },
+        "recurisve option": {
+            "_comment": "The --recursive option triggers a call that used to fail during cfg recovery",
+            "args": ["--recursive", "--width=100", "-d", "/usr"]
         }
     },
 
@@ -60,6 +64,14 @@
         "compression test": {
             "_comment": "compression and decompression test",
             "shell": "echo 'compression test' | #PROGNAME -c | #PROGNAME -d"
+        }
+    },
+
+    "gzip": {
+        "_comment": "Tests for gzip",
+        "compression test": {
+            "_comment": "compression and decompression test",
+            "shell": "echo 'compression and decompression test' | #PROGNAME -c | #PROGNAME -d"
         }
     }
 }

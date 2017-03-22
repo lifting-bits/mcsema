@@ -1,12 +1,12 @@
 # Using libFuzzer with Mcsema
 
-[libFuzzer](http://blog.llvm.org/2015/04/fuzz-all-clangs.html) is an LLVM-based coverage-guided fuzzing framework, similar to AFL. Using libFuzzer, it's simple to integrate coverage-guided fuzzing: just define a special function, update some build flags, and you have instant coverage-guided fuzzing.
+[libFuzzer](http://blog.llvm.org/2015/04/fuzz-all-clangs.html) is an LLVM-based coverage-guided fuzzing framework similar to AFL. It is simple to integrate coverage-guided fuzzing with libFuzzer: just define a special function, update some build flags, and you have instant coverage-guided fuzzing.
 
-Since libFuzzer works at the LLVM level, we thought, can we apply libFuzzer to mcsema translated bitcode, and use libFuzzer on binaries?
+Since libFuzzer works at the LLVM level, can we apply libFuzzer to mcsema translated bitcode and use libFuzzer on binaries?
 
 It turns out the answer is yes!
 
-However, the 'yes' comes with caveats. First, mcsema assembly stubs do some things that normal programs should never do (like calculate dynamic return addresses, allocate new stacks, etc). This behavior can conflict with address sanitizer, a feature that libFuzzer uses. Second, mcsema's control flow recovery is frequently wrong on large programs. Since libFuzzer explores new code paths, it has a very high likelihood of triggering a path where control flow recovery is incorrect. This means that some of the bugs found may be artifacts of translation that are not present in the original program.
+However, the 'yes' comes with caveats. First, mcsema assembly stubs do things that normal programs should never do (like calculate dynamic return addresses, allocate new stacks, etc). This behavior can conflict with address sanitizer, a feature that libFuzzer uses. Second, mcsema's control flow recovery is frequently wrong on large programs. Since libFuzzer explores new code paths, it has a very high likelihood of triggering a path where control flow recovery is incorrect. This means that some of the bugs found may be artifacts of translation that are not present in the original program.
 
 We hope to improve both of these issues in the future. For now, let's take a look at a proof of concept for using libFuzzer on binary code!
 
@@ -61,7 +61,7 @@ The code we will be fuzzing is a [simple program](../tests/libFuzzer/fuzzme.cc) 
 
 ## Prepare
 
-libFuzzer is constantly improving; this guide will use an older version of libFuzzer that comes with LLVM 3.8, because that is the LLVM version used by mcsema.
+libFuzzer is constantly improving; this guide will use an older version of libFuzzer that comes with LLVM 3.8 because that is the LLVM version used by mcsema.
 
 For this guide, we will assume that mcsema was built in `$MCSEMA_DIR`, and all operations take place in [`$MCSEMA_DIR/mcsema/tests/libFuzzer`](../tests/libFuzzer).
 
@@ -178,7 +178,7 @@ The driver just says that there is an external function with the signature `int 
 
 Now let's combine the driver, our bitcode, mcsema assembly stubs, and libFuzzer instrumentation into one program:
 
-    $ clang++-3.8 -O3 -o fuzzme.mcsema driver.cc fuzzme.bc ../../generated/ELF_64_linux.S Fuzzer*.o -fsanitize=address -fsanitize-coverage=edge
+    $ clang++-3.8 -O3 -o fuzzme.mcsema driver.cc fuzzme.bc ../../lib/libmcsema_rt64.a Fuzzer*.o -fsanitize=address -fsanitize-coverage=edge
 
 We can now try fuzzing the newly instrumented binary:
 

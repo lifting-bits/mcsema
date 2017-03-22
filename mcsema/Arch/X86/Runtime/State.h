@@ -18,19 +18,9 @@
 #define __x86_64__
 #endif
 
-#ifdef _WIN32
-#define ALIGN(x) __declspec( align( x ) )
-#else
 #define ALIGN(x) alignas(x)
-#endif
 
-#ifdef _WIN32
-typedef struct ALIGN(16)  __uint128_t {
-    char pad[16];
-} PACKED uint128_t;
-#else
 typedef unsigned uint128_t __attribute__((mode(TI), aligned(16)));
-#endif
 
 #ifdef _WIN32
 typedef union { double d; char pad[16];} PACKED LDOUBLE;
