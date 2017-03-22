@@ -133,9 +133,17 @@ endif(WIN32)
 git_describe(MCSEMA_VERSION_STRING)
 git_get_branch(MCSEMA_BRANCH_NAME)
 
+if(NOT MCSEMA_VERSION_STRING)
+  set(MCSEMA_VERSION_STRING "unknown")
+endif()
+
+if(NOT MCSEMA_BRANCH_NAME)
+  set(MCSEMA_BRANCH_NAME "unknown")
+endif()
+
 configure_file (
   "mcsema/Version.h.in" #input is based on CMAKE_SOURCE_DIR
-  "mcsema/Version.h" #output is based on CMAKE_BINARY_DIR
+  "${CMAKE_SOURCE_DIR}/generated/Version.h" #output is based on CMAKE_BINARY_DIR
 )
        
 # Make sure we find Version.h
