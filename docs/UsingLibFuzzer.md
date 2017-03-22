@@ -2,7 +2,7 @@
 
 [libFuzzer](http://blog.llvm.org/2015/04/fuzz-all-clangs.html) is an LLVM-based coverage-guided fuzzing framework similar to AFL. It is simple to integrate coverage-guided fuzzing with libFuzzer: just define a special function, update some build flags, and you have instant coverage-guided fuzzing.
 
-Since libFuzzer works at the LLVM level can we apply libFuzzer to mcsema translated bitcode and use libFuzzer on binaries?
+Since libFuzzer works at the LLVM level, can we apply libFuzzer to mcsema translated bitcode and use libFuzzer on binaries?
 
 It turns out the answer is yes!
 
