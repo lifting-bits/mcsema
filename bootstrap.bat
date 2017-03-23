@@ -139,7 +139,6 @@ if not exist "%BUILD_DIR%\llvm" mkdir "%BUILD_DIR%\llvm"
 pushd "%BUILD_DIR%\llvm"
 cmake.exe ^
   -G "%VSBUILD%" ^
-  -T "%VSTOOLSET%" ^
   -DCMAKE_INSTALL_PREFIX="%MCSEMA_DIR%" ^
   -DLLVM_TARGETS_TO_BUILD="X86" ^
   -DLLVM_INCLUDE_EXAMPLES=OFF ^
