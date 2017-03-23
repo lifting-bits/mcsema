@@ -17,7 +17,11 @@ set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 include (LLVMUtils)
 
 # we need C++11
-set(CMAKE_CXX_STANDARD 11)
+if(NOT WIN32)
+  # WIN32 defaults to CXX11 by default, and setting it explicitly here
+  # confuses clang-cl, which will bail out with "unknown flag -std=g++11"
+  set(CMAKE_CXX_STANDARD 11)
+endif()
 
 # Get protobufs.
 if(WIN32)
