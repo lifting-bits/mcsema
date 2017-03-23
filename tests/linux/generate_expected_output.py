@@ -21,7 +21,8 @@ def run_a_program(pargs, outfile, errfile, timeout=600):
 
     with open(outfile, 'w') as outf:
         with open(errfile, 'w') as errf:
-            sys.stdout.write("Executing: {}\n".format(pargs))
+            sys.stdout.write("Executing: {}".format(pargs).encode("string_escape"))
+            sys.stdout.write("\n")
             po = subprocess.Popen(pargs, stderr=errf, stdout=outf)
             secs_used = 0
 
@@ -40,7 +41,8 @@ def run_a_shell(shellargs, outfile, errfile):
 
     with open(outfile, 'w') as outf:
         with open(errfile, 'w') as errf:
-            sys.stdout.write("Executing: {}\n".format(shellargs))
+            sys.stdout.write("Executing: {}".format(shellargs).encode("string_escape"))
+            sys.stdout.write("\n")
             try:
                 subprocess.check_call(shellargs, stderr=errf, stdout=outf, shell=True)
             except subprocess.CalledProcessError as cpe:
