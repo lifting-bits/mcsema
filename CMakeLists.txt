@@ -15,9 +15,14 @@ add_definitions(${LLVM_DEFINITIONS})
 
 set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 include (LLVMUtils)
+include (GetGitRevisionDescription)
 
 # we need C++11
-set(CMAKE_CXX_STANDARD 11)
+if(NOT WIN32)
+  # WIN32 defaults to CXX11 by default, and setting it explicitly here
+  # confuses clang-cl, which will bail out with "unknown flag -std=g++11"
+  set(CMAKE_CXX_STANDARD 11)
+endif()
 
 # Get protobufs.
 if(WIN32)
@@ -125,6 +130,28 @@ else()
     -fno-rtti
     -DGOOGLE_PROTOBUF_NO_RTTI)
 endif(WIN32)
+
+# configure a header file to pass some of the CMake settings
+# to the source code
+
+git_describe(MCSEMA_VERSION_STRING)
+git_get_branch(MCSEMA_BRANCH_NAME)
+
+if(NOT MCSEMA_VERSION_STRING)
+  set(MCSEMA_VERSION_STRING "unknown")
+endif()
+
+if(NOT MCSEMA_BRANCH_NAME)
+  set(MCSEMA_BRANCH_NAME "unknown")
+endif()
+
+configure_file (
+  "mcsema/Version.h.in" #input is based on CMAKE_SOURCE_DIR
+  "${CMAKE_SOURCE_DIR}/generated/Version.h" #output is based on CMAKE_BINARY_DIR
+)
+       
+# Make sure we find Version.h
+include_directories("${CMAKE_BINARY_DIR}")
 
 add_executable(mcsema-lift
   ${CMAKE_SOURCE_DIR}/mcsema/Lift.cpp

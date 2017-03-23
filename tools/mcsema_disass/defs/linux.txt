@@ -16010,6 +16010,7 @@ mempcpy 3 C N
 __mempcpy_chk 4 C N
 memrchr 3 C N
 memset 3 C N
+__memset_chk 4 C N
 memset_extent_buffer 4 C N
 menu_back 1 C N
 menu_driver 2 C N
@@ -37245,3 +37246,7 @@ __fdelt_warn 1 C N
 # used for the xz walkthrough example
 __open_2 2 C N
 __vfprintf_chk 4 C N
+
+# used for netcat test
+__recvfrom_chk 7 C N
+__poll_chk 4 C N
