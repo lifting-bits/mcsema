@@ -1,0 +1,15 @@
+version: 0.6.{build}
+clone_depth: 1
+clone_folder: C:\Projects\mcsema
+image: Visual Studio 2015
+cache:
+- C:\Projects\mcsema\build\llvm
+- C:\Projects\mcsema\third_party\protobuf
+- C:\Projects\mcsema\third_party\llvm
+build_script:
+- cmd: >-
+    call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86_amd64
+
+    cd C:\Projects\mcsema\
+
+    bootstrap.bat
