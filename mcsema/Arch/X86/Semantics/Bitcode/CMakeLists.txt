@@ -10,7 +10,6 @@ add_bitcode(
     mcsema_semantics_x86
     "-m32"
     ${SEMANTICS_TARGETS})
-set_target_properties( mcsema_semantics_x86 PROPERTIES TYPE "STATIC_LIBRARY")
 install(
     FILES $<TARGET_PROPERTY:mcsema_semantics_x86,LOCATION>
     DESTINATION "${CMAKE_INSTALL_PREFIX}/lib")

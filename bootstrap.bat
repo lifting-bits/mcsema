@@ -140,12 +140,15 @@ pushd "%BUILD_DIR%\llvm"
 cmake.exe ^
   -G "%VSBUILD%" ^
   -T "%VSTOOLSET%" ^
+  -DCMAKE_INSTALL_PREFIX="%MCSEMA_DIR%" ^
   -DLLVM_TARGETS_TO_BUILD="X86" ^
   -DLLVM_INCLUDE_EXAMPLES=OFF ^
   -DLLVM_INCLUDE_TESTS=OFF ^
   -DCMAKE_BUILD_TYPE="Release" ^
   %LLVM_DIR%
 cmake --build . --config Release
+REM Enable parallel building with MSBuild
+cmake --build . --config Release --target install -- /m /p:BuildInParallel=true
   
 popd
 popd
@@ -161,8 +164,11 @@ cmake.exe ^
   -DMCSEMA_BUILD_DIR="%BUILD_DIR%" ^
   -DMCSEMA_GEN_DIR="%GEN_DIR%" ^
   -DCMAKE_BUILD_TYPE="Release" ^
+  -DCMAKE_INSTALL_PREFIX="%MCSEMA_DIR%" ^
   %MCSEMA_DIR%
 cmake --build . --config Release
+REM Enable parallel building with MSBuild
+cmake --build . --config Release --target install -- /m /p:BuildInParallel=true
 
 popd
 

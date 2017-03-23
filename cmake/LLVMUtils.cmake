@@ -40,13 +40,26 @@ macro(add_bitcode target flags)
         endforeach()
 
 
+        if(CMAKE_CXX_STANDARD)
+          set(BC_CXX_STANDARD ${CMAKE_CXX_STANDARD})
+        else()
+          set(BC_CXX_STANDARD "11")
+        endif()
         if(${srcfile} MATCHES "(.*).cpp" OR ${srcfile} MATCHES "(.*).cc")
-            separate_arguments(srcflags UNIX_COMMAND ${CMAKE_CXX_FLAGS})
-            list(APPEND srcflags "-std=gnu++${CMAKE_CXX_STANDARD}")
+            if(NOT WIN32)
+              separate_arguments(srcflags UNIX_COMMAND ${CMAKE_CXX_FLAGS})
+            else()
+              set(srcflags "")
+            endif()
+            list(APPEND srcflags "-std=gnu++${BC_CXX_STANDARD}")
             set(src_bc_compiler ${LLVM_BC_CXX_COMPILER})
         else()
-            separate_arguments(srcflags UNIX_COMMAND ${CMAKE_C_FLAGS})
-            list(APPEND srcflags "-std=gnu${CMAKE_CXX_STANDARD}")
+            if(NOT WIN32)
+              separate_arguments(srcflags UNIX_COMMAND ${CMAKE_C_FLAGS})
+            else()
+              set(srcflags "")
+            endif()
+            list(APPEND srcflags "-std=gnu${BC_CXX_STANDARD}")
             set(src_bc_compiler ${LLVM_BC_C_COMPILER} )
         endif()
         # include any extra compilation flags
@@ -126,7 +139,10 @@ endif()
 
 if (NOT LLVM_BC_LINK)
   message(STATUS "Could not find llvm-link-${LLVM_TO_FIND}, looking for llvm-link")
-  find_program(LLVM_BC_LINK llvm-link PATH ${LLVM_TOOLS_BINARY_DIR})
+  # Windows LLVM distributions may ship without llvm-link
+  # we build LLVM, so try to find it in the install path 
+  # Bootstrap should use the same one for llvm as mcsema
+  find_program(LLVM_BC_LINK llvm-link PATH ${LLVM_TOOLS_BINARY_DIR} "${CMAKE_INSTALL_PREFIX}/bin")
 endif()
 
 # all attempts at finding working tools failed. error out

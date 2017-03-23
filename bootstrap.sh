@@ -79,7 +79,8 @@ sudo apt-get install -yqq \
 
 # liblzma-dev neded for the xz integration test
 # libpcre3-dev needed for some integration tests
-sudo apt-get install -yqq liblzma-dev libpcre3-dev
+# libbsd-dev needed for netcat test
+sudo apt-get install -yqq liblzma-dev libpcre3-dev libbsd-dev
 
 echo "[+] Upgrading PIP"
 
