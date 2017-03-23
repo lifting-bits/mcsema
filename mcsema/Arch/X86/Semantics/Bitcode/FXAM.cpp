@@ -4,7 +4,7 @@
 // FXAM semantics are adaptd from Remill
 DEFINE_SEMANTICS(FXAM)
 {
-  auto st0 = state->ST0;
+  auto st0 = DOUBLE(state->ST0);
 
   uint8_t sign = __builtin_signbit(st0) == 0 ? 0 : 1;
   auto c = __builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, FP_SUBNORMAL,
