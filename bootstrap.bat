@@ -148,7 +148,7 @@ cmake.exe ^
   %LLVM_DIR%
 cmake --build . --config Release
 REM Enable parallel building with MSBuild
-cmake --build . --config Release --target install -- /m /p:BuildInParallel=true
+cmake --build . --config Release --target install -- /maxcpucount:%NUMBER_OF_PROCESSORS% /p:BuildInParallel=true
   
 popd
 popd
@@ -168,7 +168,7 @@ cmake.exe ^
   %MCSEMA_DIR%
 cmake --build . --config Release
 REM Enable parallel building with MSBuild
-cmake --build . --config Release --target install -- /m /p:BuildInParallel=true
+cmake --build . --config Release --target install -- /maxcpucount:%NUMBER_OF_PROCESSORS% /p:BuildInParallel=true
 
 popd
 
