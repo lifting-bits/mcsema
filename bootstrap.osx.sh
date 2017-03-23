@@ -5,7 +5,7 @@ set -e
 
 usage() {
   echo "Usage:"
-  echo "$0 [--prefix <PREFIX>] [--build <BUILD TYPE>]"
+  echo "$0 [--prefix <PREFIX>] [--build <BUILD TYPE>] [--enable-rtti]"
   echo "PREFIX: Installation directory prefix"
   echo "BUILDTYPE: Built type (e.g. Debug, Release, etc.)"
   echo "--enable-rtti: Enable RTTI for building LLVM"
