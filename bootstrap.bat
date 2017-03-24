@@ -63,7 +63,8 @@ if not %ERRORLEVEL% == 0 (
     echo [+] Detected clang != 3.8; downloading clang 3.8
     echo [+] Downloading LLVM-3.8.1-win%CLANGBITS%.exe
     powershell -Command "(new-object System.Net.WebClient).DownloadFile('http://releases.llvm.org/3.8.1/LLVM-3.8.1-win%CLANGBITS%.exe','%THIRD_PARTY_DIR%\CLANG_38.exe')"
-    7z -bd -o%THIRDPARTY%\CLANG_38 x -y %THIDPARTY%\CLANG_38.exe > NUL
+    echo [+] Extracting LLVM-3.8.1-win%CLANGBITS%.exe
+    7z -bd -o%THIRDPARTY%\CLANG_38 x -y %THIRDPARTY%\CLANG_38.exe > NUL
 )
 
 
