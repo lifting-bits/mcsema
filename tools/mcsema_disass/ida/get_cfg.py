@@ -135,28 +135,28 @@ _PREFIX_ITYPES = (idaapi.NN_lock, idaapi.NN_rep,
                   idaapi.NN_repe, idaapi.NN_repne)
 
 def _decode_instruction(ea):
-  """Read the bytes of an x86/amd64 instruction. This handles things like
-  combining the bytes of an instruction with its prefix. IDA Pro sometimes
-  treats these as separate."""
-  global _PREFIX_ITYPES
+    """Read the bytes of an x86/amd64 instruction. This handles things like
+    combining the bytes of an instruction with its prefix. IDA Pro sometimes
+    treats these as separate."""
+    global _PREFIX_ITYPES
 
-  decoded_inst = idautils.DecodeInstruction(ea)
-  if not decoded_inst:
-    return None, tuple()
+    decoded_inst = idautils.DecodeInstruction(ea)
+    if not decoded_inst:
+        return None, tuple()
 
-  assert decoded_inst.ea == ea
-  end_ea = ea + decoded_inst.size
-  decoded_bytes = [chr(idc.Byte(byte_ea)) for byte_ea in range(ea, end_ea)]
+    assert decoded_inst.ea == ea
+    end_ea = ea + decoded_inst.size
+    decoded_bytes = "".join(chr(idc.Byte(byte_ea)) for byte_ea in range(ea, end_ea))
 
-  # We've got an instruction with a prefix, but the prefix is treated as
-  # independent.
-  if 1 == decoded_inst.size and decoded_inst.itype in _PREFIX_ITYPES:
-    decoded_inst, extra_bytes = _decode_instruction(end_ea)
-    DEBUG("Extended instruction at {:08x} by {} bytes".format(
-        ea, len(extra_bytes)))
-    decoded_bytes.extend(extra_bytes)
+    # We've got an instruction with a prefix, but the prefix is treated as
+    # independent.
+    if 1 == decoded_inst.size and decoded_inst.itype in _PREFIX_ITYPES:
+        decoded_inst, extra_bytes = _decode_instruction(end_ea)
+        DEBUG("Extended instruction at {:08x} by {} bytes".format(
+            ea, len(extra_bytes)))
+        decoded_bytes.extend(extra_bytes)
 
-  return decoded_inst, decoded_bytes
+    return decoded_inst, decoded_bytes
 
 # Python 2.7's xrange doesn't work with `long`s.
 def xrange(begin, end=None, step=1):
@@ -378,23 +378,9 @@ def getFunctionName(ea):
     
 def addInst(block, addr, insn_t, inst_bytes, true_target=None, false_target=None):
     # check if there is a lock prefix:
-
-    if insn_t is not None and (insn_t.auxpref & 0x3) == 0x2:
-        DEBUG("REP Prefix at: 0x{0:x}".format(addr))
-        # special handling of certain REP pairs
-        rest_bytes = inst_bytes[1:]
-        if rest_bytes in SPECIAL_REP_HANDLING:
-            # generate a separate REP_PREFIX instruction
-            i_rep = block.insts.add()
-            i_rep.inst_addr = addr
-            i_rep.inst_bytes = chr(inst_bytes[0])
-            i_rep.inst_len = 1
-            addr += 1
-            inst_bytes = inst_bytes[1:]
-
     inst = block.insts.add()
     inst.inst_addr = addr
-    str_val = "".join([chr(b) for b in inst_bytes])
+    str_val = inst_bytes
     inst.inst_bytes = str_val
     inst.inst_len = len(inst_bytes)
 
@@ -718,7 +704,8 @@ def isElfThunk(ea):
     if not isLinkedElf():
         return False, None
 
-    if isUnconditionalJump(ea):
+    insn_t, _ = _decode_instruction(ea)
+    if isUnconditionalJump(insn_t):
         real_ext_ref = None
 
         for cref in idautils.CodeRefsFrom(ea, 0):
@@ -866,7 +853,7 @@ def instructionHandler(M, B, addr, new_eas):
         return None, False
 
     #DEBUG("\t\tinst: {0}".format(idc.GetDisasm(addr)))
-    DEBUG("\t\tBytes: {0}".format(inst_bytes))
+    #DEBUG("\t\tBytes: {0}".format(inst_bytes))
 
     I = addInst(B, addr, insn_t, inst_bytes)
 
