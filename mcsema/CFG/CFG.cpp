@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2014, Trail of Bits
+ Copyright (c) 2017, Trail of Bits
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without modification,
@@ -12,7 +12,7 @@
  list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
- Neither the name of Trail of Bits nor the names of its
+ Neither the name of the organization nor the names of its
  contributors may be used to endorse or promote products derived from
  this software without specific prior written permission.
 
@@ -210,19 +210,6 @@ VA NativeInst::get_fa(void) const {
 
 uint8_t NativeInst::get_len(void) const {
   return this->len;
-}
-
-void NativeInst::set_call_tgt(VA addr) {
-  this->targets.push_back(addr);
-  return;
-}
-
-bool NativeInst::has_call_tgt(void) const {
-  return !this->targets.empty();
-}
-
-VA NativeInst::get_call_tgt(int index) const {
-  return this->targets.at(index);
 }
 
 void NativeInst::set_ext_call_target(ExternalCodeRefPtr t) {

@@ -11,7 +11,6 @@
 #include "remill/Arch/Instruction.h"
 
 namespace llvm {
-
 class BasicBlock;
 class CallInst;
 class Function;
@@ -21,8 +20,11 @@ class Module;
 class PointerType;
 class StructType;
 class Value;
-
 }  // namespace llvm
+
+namespace remill {
+class Arch;
+}  // namespace remill
 
 typedef uint64_t VA;
 
@@ -35,6 +37,8 @@ enum PointerSize {
   Pointer32 = 32,
   Pointer64 = 64
 };
+
+extern const remill::Arch *gArch;
 
 bool InitArch(llvm::LLVMContext *context,
               const std::string &os,

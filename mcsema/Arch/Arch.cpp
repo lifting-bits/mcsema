@@ -17,6 +17,8 @@
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 
+#include "remill/Arch/Arch.h"
+
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/Arch/Dispatch.h"
 
@@ -33,11 +35,15 @@ static llvm::Triple::OSType gOSType;
 
 }  // namespace
 
+const remill::Arch *gArch = nullptr;
+
 bool InitArch(llvm::LLVMContext *context, const std::string &os,
               const std::string &arch) {
 
   LOG(INFO)
       << "Initializing for " << arch << " code on " << os;
+
+  gArch = remill::GetGlobalArch();
 
   // Windows.
   if (os == "win32") {

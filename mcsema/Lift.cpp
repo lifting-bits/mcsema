@@ -119,9 +119,7 @@ int main(int argc, char *argv[]) {
 
   auto input = remill::FindSemanticsBitcodeFile("", FLAGS_arch);
   gModule = remill::LoadModuleFromFile(gContext, input);
-
-  auto arch = remill::GetGlobalArch();
-  arch->PrepareModule(gModule);
+  gArch->PrepareModule(gModule);
 
   auto cfg_module = ReadProtoBuf(FLAGS_cfg);
   CHECK(nullptr != cfg_module)
@@ -129,7 +127,7 @@ int main(int argc, char *argv[]) {
 
   ArchInitAttachDetach(gModule);
 
-  CHECK(LiftCodeIntoModule(cfg_module, gModule))
+  CHECK(LiftCodeIntoModule(cfg_module))
       << "Unable to lift CFG from " << FLAGS_cfg << " into module "
       << FLAGS_output;
 

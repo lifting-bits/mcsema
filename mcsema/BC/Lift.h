@@ -35,9 +35,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mcsema/CFG/CFG.h"
 
 //translate a NativeModule into an LLVM Module
-void RenameLiftedFunctions(NativeModulePtr mod, llvm::Module *M,
+void RenameLiftedFunctions(NativeModulePtr mod,
                            const std::set<VA> &entry_point_pcs);
 
-bool LiftCodeIntoModule(NativeModulePtr, llvm::Module *);
+bool LiftCodeIntoModule(NativeModulePtr);
 
 #endif  // MCSEMA_BC_LIFT_H_

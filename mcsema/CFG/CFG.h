@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2013, Trail of Bits
+ Copyright (c) 2017, Trail of Bits
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without modification,
@@ -8,10 +8,11 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
- Redistributions in binary form must reproduce the above copyright notice, this  list of conditions and the following disclaimer in the documentation and/or
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
- Neither the name of the {organization} nor the names of its
+ Neither the name of the organization nor the names of its
  contributors may be used to endorse or promote products derived from
  this software without specific prior written permission.
 
@@ -183,10 +184,6 @@ class NativeInst {
   VA get_fa(void) const;
 
   uint8_t get_len(void) const;
-
-  void set_call_tgt(VA addr);
-  bool has_call_tgt(void) const;
-  VA get_call_tgt(int index) const;
 
   void set_ext_call_target(ExternalCodeRefPtr t);
   ExternalCodeRefPtr get_ext_call_target(void) const;

@@ -12,7 +12,7 @@
  list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
- Neither the name of the {organization} nor the names of its
+ Neither the name of the organization nor the names of its
  contributors may be used to endorse or promote products derived from
  this software without specific prior written permission.
 
@@ -40,13 +40,23 @@
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/InstIterator.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Metadata.h>
 #include <llvm/IR/MDBuilder.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/PassManager.h>
 #include <llvm/IR/Type.h>
 
+#include <llvm/Transforms/IPO.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/Utils/Local.h>
+#include <llvm/Transforms/Utils/Cloning.h>
+#include <llvm/Transforms/Utils/ValueMapper.h>
+
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 #include "remill/Arch/Arch.h"
@@ -60,8 +70,6 @@
 #include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
-
-//#include "mcsema/CFG/Externals.h"
 
 DEFINE_bool(ignore_unsupported, false,
             "Should unsupported instructions be ignored?");
@@ -162,6 +170,15 @@ static void AnnotateInsts(llvm::Function *F, VA pc) {
   }
 }
 
+// Update the program counter in the state struct with a hard-coded value.
+static void StoreProgramCounter(TranslationContext &ctx,
+                                llvm::BasicBlock *block,
+                                uint64_t pc) {
+  auto pc_ptr = remill::LoadProgramCounterRef(block);
+  (void) new llvm::StoreInst(
+      llvm::ConstantInt::get(ctx.lifter->word_type, pc), pc_ptr, block);
+}
+
 // Tries to get the lifted function beginning at `pc`.
 static llvm::Function *GetLiftedFunction(uint64_t pc) {
   std::stringstream ss;
@@ -195,6 +212,32 @@ static void InlineSubFuncCall(llvm::BasicBlock *block,
   new llvm::StoreInst(val, mem_ptr, block);
 }
 
+static llvm::Function *FindFunction(TranslationContext &ctx,
+                                    uint64_t target_pc) {
+  auto func = GetLiftedFunction(target_pc);
+  if (func) {
+    return func;
+  }
+
+  CHECK(ctx.natI->has_ext_call_target())
+      << "Cannot find target of instruction at " << std::hex
+      << ctx.natI->get_loc() << "; the static target " << std::hex << target_pc
+      << " is not associated with a lifted subroutine, and it does not have"
+      << " an external call target.";
+
+  auto target = ctx.natI->get_ext_call_target();
+  auto name = target->getSymbolName();
+
+  std::stringstream ss;
+  ss << "external_" << name;
+
+  auto ext_func = gModule->getOrInsertFunction(
+      ss.str(), ctx.F->getFunctionType());
+
+  return llvm::dyn_cast<llvm::Function>(ext_func);
+}
+
+
 // Get the basic block within this function associated with a specific program
 // counter.
 static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
@@ -206,14 +249,11 @@ static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
 
     // First, try to see if it's actually related to another function. This is
     // equivalent to a tail-call in the original code.
-    if (auto tail_called_func = GetLiftedFunction(pc)) {
+    if (auto tail_called_func = FindFunction(ctx, pc)) {
       LOG(INFO)
           << "Missing block is a tail call to sub_" << std::hex << pc;
 
-      llvm::ReturnInst::Create(
-          *gContext,
-          AddSubFuncCall(block, tail_called_func),
-          block);
+      remill::AddTerminatingTailCall(block, tail_called_func);
 
     // Terminate the block with an unreachable inst.
     } else {
@@ -250,6 +290,8 @@ static void LiftConditionalBranch(TranslationContext &ctx,
           block_false);
 }
 
+// Returns `true` if `instr` should end a basic block and if a terminator was
+// added to end the block.
 static bool TryLiftTerminator(TranslationContext &ctx,
                               llvm::BasicBlock *block,
                               remill::Instruction *instr) {
@@ -276,7 +318,9 @@ static bool TryLiftTerminator(TranslationContext &ctx,
       return true;
 
     case remill::Instruction::kCategoryDirectFunctionCall:
-      InlineSubFuncCall(block, GetLiftedFunction(instr->branch_taken_pc));
+      InlineSubFuncCall(
+          block, FindFunction(ctx, instr->branch_taken_pc));
+      StoreProgramCounter(ctx, block, instr->next_pc);
       return false;
 
     case remill::Instruction::kCategoryIndirectFunctionCall:
@@ -284,8 +328,8 @@ static bool TryLiftTerminator(TranslationContext &ctx,
       return false;
 
     case remill::Instruction::kCategoryFunctionReturn:
-      llvm::ReturnInst::Create(
-          *gContext, remill::LoadMemoryPointer(block), block);
+      remill::AddTerminatingTailCall(
+          block, ctx.lifter->intrinsics->function_return);
       return true;
 
     case remill::Instruction::kCategoryConditionalBranch:
@@ -295,6 +339,7 @@ static bool TryLiftTerminator(TranslationContext &ctx,
 
     case remill::Instruction::kCategoryAsyncHyperCall:
       InlineSubFuncCall(block, ctx.lifter->intrinsics->async_hyper_call);
+      StoreProgramCounter(ctx, block, instr->next_pc);
       return false;
   }
 }
@@ -302,15 +347,10 @@ static bool TryLiftTerminator(TranslationContext &ctx,
 static bool LiftInstIntoBlock(TranslationContext &ctx,
                               llvm::BasicBlock *block,
                               bool is_last) {
-  static const remill::Arch *arch = nullptr;
-  if (!arch) {
-    arch = remill::GetGlobalArch();
-  }
-
   auto instr_addr = ctx.natI->get_loc();
   auto &bytes = ctx.natI->get_bytes();
   std::unique_ptr<remill::Instruction> instr(
-      arch->DecodeInstruction(instr_addr, bytes));
+      gArch->DecodeInstruction(instr_addr, bytes));
 
   CHECK(instr->IsValid())
       << "Cannot decode instruction at " << std::hex << instr_addr;
@@ -322,6 +362,10 @@ static bool LiftInstIntoBlock(TranslationContext &ctx,
       << bytes.size() << ").";
 
   auto ret = ctx.lifter->LiftIntoBlock(instr.get(), block);
+  if (!ret) {
+    LOG(ERROR)
+        << "Can't lift instruction " << instr->Serialize();
+  }
 
   if (TryLiftTerminator(ctx, block, instr.get())) {
     CHECK(is_last)
@@ -336,6 +380,7 @@ static bool LiftInstIntoBlock(TranslationContext &ctx,
   return ret;
 }
 
+// Lift a decoded block into a function.
 static bool LiftBlockIntoFunction(TranslationContext &ctx) {
   auto good = true;
   auto block_name = ctx.natB->get_name();
@@ -350,6 +395,9 @@ static bool LiftBlockIntoFunction(TranslationContext &ctx) {
         << " of block " << ctx.natB->get_base();
   }
 
+  // Store this program counter into the state structure.
+  StoreProgramCounter(ctx, block, block_pc);
+
   // Lift each instruction into the block.
   size_t i = 0;
   for (auto inst : ctx.natB->get_insts()) {
@@ -363,7 +411,7 @@ static bool LiftBlockIntoFunction(TranslationContext &ctx) {
       llvm::BranchInst::Create(ctx.va_to_bb[follows.front()], block);
     } else {
       LOG_IF(ERROR, !ctx.natI->has_local_noreturn())
-          << "Block " << std::hex << block_pc << " has no terminator, and "
+          << "Block " << std::hex << block_pc << " has no terminator, and"
           << " instruction at " << std::hex << ctx.natI->get_loc()
           << " is not a local no-return function call.";
 
@@ -371,21 +419,19 @@ static bool LiftBlockIntoFunction(TranslationContext &ctx) {
     }
   }
 
-  block->dump();
+//  block->dump();
   return good;
 }
 
-static bool InsertFunctionIntoModule(NativeModulePtr mod,
-                                     NativeFunctionPtr func,
-                                     llvm::Module *M) {
+static llvm::Function *InsertFunctionIntoModule(NativeModulePtr mod,
+                                                NativeFunctionPtr func) {
 
   static std::unique_ptr<remill::IntrinsicTable> intrinsics;
   if (!intrinsics.get()) {
-    intrinsics.reset(new remill::IntrinsicTable(M));
+    intrinsics.reset(new remill::IntrinsicTable(gModule));
   }
 
-  auto &C = M->getContext();
-  auto F = M->getFunction(func->get_name());
+  auto F = gModule->getFunction(func->get_name());
   CHECK(nullptr != F)
       << "Could not get func " << func->get_name();
 
@@ -393,18 +439,12 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
     LOG(WARNING)
         << "Asking to re-insert function: " << func->get_name()
         << "; returning current function instead";
-    return true;
+    return F;
   }
 
-  auto arch = remill::GetGlobalArch();
-  auto word_type = llvm::Type::getIntNTy(C, arch->address_size);
+  auto word_type = llvm::Type::getIntNTy(*gContext, gArch->address_size);
 
-  auto old_cc = F->getCallingConv();
   remill::CloneBlockFunctionInto(F);
-
-  // Remill uses the fastcall calling convention, but we want to use the OS-
-  // specific one.
-  F->setCallingConv(old_cc);
 
   // For ease of debugging generated code, don't allow lifted functions to
   // be inlined. This will make lifted and native call graphs one-to-one.
@@ -417,13 +457,13 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
   ctx.lifter = lifter.get();
   ctx.natM = mod;
   ctx.natF = func;
-  ctx.M = M;
+  ctx.M = gModule;
   ctx.F = F;
 
   // Create basic blocks for each basic block in the original function.
   for (auto block_info : func->get_blocks()) {
     ctx.va_to_bb[block_info.first] = llvm::BasicBlock::Create(
-        C, block_info.second->get_name(), F);
+        *gContext, block_info.second->get_name(), F);
   }
 
   // Create a branch from the end of the entry block to the first block
@@ -436,7 +476,7 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
     good = good && LiftBlockIntoFunction(ctx);
   }
 
-  return good;
+  return good ? F : nullptr;
 }
 
 struct DataSectionVar {
@@ -445,10 +485,9 @@ struct DataSectionVar {
   llvm::GlobalVariable *var;
 };
 
-static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
-
+// Insert all global data before we insert the CFG
+static bool InsertDataSections(NativeModulePtr natMod) {
   auto &globaldata = natMod->getData();
-  //insert all global data before we insert the CFG
 
   std::vector<DataSectionVar> gvars;
 
@@ -459,19 +498,16 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
   for (auto &dt : globaldata) {
     std::stringstream ss;
     ss << "data_" << std::hex << dt.getBase();
+    auto bufferName = ss.str();
 
-    std::string bufferName = ss.str();
-
-    //report << "inserting global data section named ";
-    //report << bufferName << "\n";
     LOG(INFO)
         << "Inserting global data section named " << bufferName;
 
-    auto st_opaque = llvm::StructType::create(M->getContext());
+    auto st_opaque = llvm::StructType::create(gModule->getContext());
     // Used to be PrivateLinkage, but that emitted
     // .objs that would not link with MSVC
     auto g = new llvm::GlobalVariable(
-        *M, st_opaque, dt.isReadOnly(),
+        *gModule, st_opaque, dt.isReadOnly(),
         llvm::GlobalVariable::InternalLinkage,
         nullptr, bufferName);
     gvars.push_back({&dt, st_opaque, g});
@@ -480,14 +516,14 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
   // actually populate the data sections
   for (auto &var : gvars) {
 
-    //data we use to create LLVM values for this section
+    // Data we use to create LLVM values for this section
     // secContents is the actual values we will be inserting
     std::vector<llvm::Constant *> secContents;
     // data_section_types is their types, which are needed to initialize
     // the global variable
     std::vector<llvm::Type *> data_section_types;
 
-    dataSectionToTypesContents(globaldata, *var.section, M, secContents,
+    dataSectionToTypesContents(globaldata, *var.section, gModule, secContents,
                                data_section_types, true);
 
     // fill in the opaqure structure with actual members
@@ -497,14 +533,14 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
     // structure type
     auto cst = llvm::ConstantStruct::get(var.opaque_type, secContents);
     // align on pointer size boundary, max needed by SSE instructions
-    var.var->setAlignment(ArchPointerSize(M));
+    var.var->setAlignment(ArchPointerSize(gModule));
     var.var->setInitializer(cst);
 
   }
   return true;
 }
 
-void RenameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
+void RenameLiftedFunctions(NativeModulePtr natMod,
                            const std::set<VA> &entry_point_pcs) {
   // Rename the functions to have their 'nice' names, where available.
   for (auto &f : natMod->get_funcs()) {
@@ -514,10 +550,10 @@ void RenameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
     }
 
     auto sub_name = native_func->get_name();
-    auto F = M->getFunction(sub_name);
+    auto F = gModule->getFunction(sub_name);
     std::stringstream ss;
     ss << "callback_" << sub_name;
-    if (!M->getFunction(ss.str())) {
+    if (!gModule->getFunction(ss.str())) {
       auto &sym_name = native_func->get_symbol_name();
       if (!sym_name.empty()) {
         F->setName(sym_name);
@@ -526,20 +562,20 @@ void RenameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
   }
 }
 
-static void InitLiftedFunctions(NativeModulePtr natMod, llvm::Module *M) {
+static void InitLiftedFunctions(NativeModulePtr natMod) {
   for (auto &f : natMod->get_funcs()) {
     NativeFunctionPtr native_func = f.second;
     auto fname = native_func->get_name();
-    auto F = M->getFunction(fname);
+    auto F = gModule->getFunction(fname);
 
     if (!F) {
       F = llvm::dyn_cast<llvm::Function>(
-          M->getOrInsertFunction(fname, LiftedFunctionType()));
+          gModule->getOrInsertFunction(fname, LiftedFunctionType()));
 
       CHECK(F != nullptr)
           << "Could not insert function " << fname << " into module";
 
-      ArchSetCallingConv(M, F);
+      ArchSetCallingConv(gModule, F);
       // make local functions 'static'
       F->setLinkage(llvm::GlobalValue::InternalLinkage);
       LOG(INFO)
@@ -551,14 +587,14 @@ static void InitLiftedFunctions(NativeModulePtr natMod, llvm::Module *M) {
   }
 }
 
-static void InitExternalData(NativeModulePtr natMod, llvm::Module *M) {
+static void InitExternalData(NativeModulePtr natMod) {
   for (auto dr : natMod->getExtDataRefs()) {
     auto dsize = dr->getDataSize();
     auto symname = dr->getSymbolName();
-    auto extType = llvm::ArrayType::get(llvm::Type::getInt8Ty(M->getContext()),
+    auto extType = llvm::ArrayType::get(llvm::Type::getInt8Ty(*gContext),
                                         dsize);
     auto gv = llvm::dyn_cast<llvm::GlobalValue>(
-        M->getOrInsertGlobal(symname, extType));
+        gModule->getOrInsertGlobal(symname, extType));
 
     CHECK(gv != nullptr)
         << "Could not make global value for external data symbol " << symname;
@@ -569,7 +605,7 @@ static void InitExternalData(NativeModulePtr natMod, llvm::Module *M) {
       gv->setLinkage(llvm::GlobalValue::ExternalLinkage);
     }
 
-    llvm::Triple triple(M->getTargetTriple());
+    llvm::Triple triple(gModule->getTargetTriple());
     if (llvm::Triple::Win32 == triple.getOS()) {
       gv->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
     }
@@ -578,7 +614,7 @@ static void InitExternalData(NativeModulePtr natMod, llvm::Module *M) {
 
 // Iterate over the list of external functions and insert them as
 // global functions.
-static void InitExternalCode(NativeModulePtr natMod, llvm::Module *M) {
+static void InitExternalCode(NativeModulePtr natMod) {
   for (auto e : natMod->getExtCalls()) {
     auto conv = e->getCallingConvention();
     auto argCount = e->getNumArgs();
@@ -586,17 +622,16 @@ static void InitExternalCode(NativeModulePtr natMod, llvm::Module *M) {
     auto funcSign = e->getFunctionSignature();
 
     // Create the function if it is not already there.
-    auto &C = M->getContext();
-    auto F = M->getFunction(symName);
+    auto F = gModule->getFunction(symName);
     if (F) {
       continue;
     }
 
     if (ExternalCodeRef::McsemaCall == conv) {
        // normal mcsema function prototypes
-      F = llvm::dyn_cast<llvm::Function>(M->getOrInsertFunction(
+      F = llvm::dyn_cast<llvm::Function>(gModule->getOrInsertFunction(
           ArchNameMcSemaCall(symName), LiftedFunctionType()));
-      ArchSetCallingConv(M, F);
+      ArchSetCallingConv(gModule, F);
       F->setLinkage(llvm::GlobalValue::ExternalLinkage);
       continue;
     }
@@ -605,25 +640,25 @@ static void InitExternalCode(NativeModulePtr natMod, llvm::Module *M) {
     llvm::Type *returnType = nullptr;
 
     // Create arguments.
-    const auto Arch = SystemArch(M);
-    const auto OS = SystemOS(M);
+    const auto Arch = SystemArch(gModule);
+    const auto OS = SystemOS(gModule);
     for (auto i = 0; i < argCount; i++) {
       if (_X86_64_ == Arch) {
         if (llvm::Triple::Win32 == OS) {
           if (funcSign.c_str()[i] == 'F') {
-            arguments.push_back(llvm::Type::getDoubleTy(C));
+            arguments.push_back(llvm::Type::getDoubleTy(*gContext));
           } else {
-            arguments.push_back(llvm::Type::getInt64Ty(C));
+            arguments.push_back(llvm::Type::getInt64Ty(*gContext));
           }
         } else if (llvm::Triple::Linux == OS) {
-          arguments.push_back(llvm::Type::getInt64Ty(C));
+          arguments.push_back(llvm::Type::getInt64Ty(*gContext));
 
         } else {
           LOG(FATAL)
               << "Unknown OS Type!";
         }
       } else {
-        arguments.push_back(llvm::Type::getInt32Ty(C));
+        arguments.push_back(llvm::Type::getInt32Ty(*gContext));
       }
     }
 
@@ -631,15 +666,15 @@ static void InitExternalCode(NativeModulePtr natMod, llvm::Module *M) {
     switch (e->getReturnType()) {
       case ExternalCodeRef::NoReturn:
       case ExternalCodeRef::VoidTy:
-        returnType = llvm::Type::getVoidTy(C);
+        returnType = llvm::Type::getVoidTy(*gContext);
         break;
 
       case ExternalCodeRef::Unknown:
       case ExternalCodeRef::IntTy:
         if (natMod->is64Bit()) {
-          returnType = llvm::Type::getInt64Ty(C);
+          returnType = llvm::Type::getInt64Ty(*gContext);
         } else {
-          returnType = llvm::Type::getInt32Ty(C);
+          returnType = llvm::Type::getInt32Ty(*gContext);
         }
         break;
 
@@ -651,42 +686,186 @@ static void InitExternalCode(NativeModulePtr natMod, llvm::Module *M) {
     auto FTy = llvm::FunctionType::get(returnType, arguments, false);
     if (e->isWeak()) {
       F = llvm::Function::Create(FTy, llvm::GlobalValue::ExternalWeakLinkage,
-                                 symName, M);
+                                 symName, gModule);
     } else {
       F = llvm::Function::Create(FTy, llvm::GlobalValue::ExternalLinkage,
-                                 symName, M);
+                                 symName, gModule);
     }
 
     if (e->getReturnType() == ExternalCodeRef::NoReturn) {
       F->setDoesNotReturn();
     }
 
-    //set calling convention
+    // Set calling convention
     if (natMod->is64Bit()) {
-      ArchSetCallingConv(M, F);
+      ArchSetCallingConv(gModule, F);
     } else {
       F->setCallingConv(getLLVMCC(conv));
     }
   }
 }
 
-static bool LiftFunctionsIntoModule(NativeModulePtr natMod, llvm::Module *M) {
-  // populate functions
+
+static void RunO3(void) {
+  llvm::legacy::FunctionPassManager func_manager(gModule);
+  llvm::legacy::PassManager module_manager;
+
+  auto TLI = new llvm::TargetLibraryInfoImpl(
+      llvm::Triple(gModule->getTargetTriple()));
+  TLI->disableAllFunctions();
+
+  llvm::PassManagerBuilder builder;
+  builder.OptLevel = 0;  // -O0.
+  builder.SizeLevel = 0;  // -Oz
+  builder.Inliner = llvm::createFunctionInliningPass(999);
+  builder.LibraryInfo = TLI;  // Deleted by `llvm::~PassManagerBuilder`.
+  builder.DisableTailCalls = false;  // Enable tail calls.
+  builder.DisableUnrollLoops = false;  // Unroll loops!
+  builder.DisableUnitAtATime = false;
+  builder.SLPVectorize = false;  // Don't produce vector operations.
+  builder.LoopVectorize = false;  // Don't produce vector operations.
+  builder.LoadCombine = false;  // Don't coalesce loads.
+  builder.MergeFunctions = false;  // Try to deduplicate functions.
+  builder.VerifyInput = false;
+  builder.VerifyOutput = false;
+
+  builder.populateFunctionPassManager(func_manager);
+  builder.populateModulePassManager(module_manager);
+
+  func_manager.add(llvm::createCFGSimplificationPass());
+  func_manager.add(llvm::createPromoteMemoryToRegisterPass());
+  func_manager.add(llvm::createReassociatePass());
+  func_manager.add(llvm::createInstructionCombiningPass());
+  func_manager.add(llvm::createDeadStoreEliminationPass());
+  func_manager.add(llvm::createDeadCodeEliminationPass());
+
+  func_manager.doInitialization();
+  for (auto &func : *gModule) {
+    if (func.getName().startswith("sub_")) {
+      func_manager.run(func);
+    }
+  }
+  func_manager.doFinalization();
+  module_manager.run(*gModule);
+}
+
+static bool LiftFunctionsIntoModule(NativeModulePtr natMod) {
+  llvm::legacy::FunctionPassManager func_pass_manager(gModule);
+  func_pass_manager.add(llvm::createCFGSimplificationPass());
+  func_pass_manager.add(llvm::createPromoteMemoryToRegisterPass());
+  func_pass_manager.add(llvm::createReassociatePass());
+  func_pass_manager.add(llvm::createInstructionCombiningPass());
+  func_pass_manager.add(llvm::createDeadStoreEliminationPass());
+  func_pass_manager.add(llvm::createDeadCodeEliminationPass());
+
+  func_pass_manager.doInitialization();
+
   for (auto &func_info : natMod->get_funcs()) {
     NativeFunctionPtr f = func_info.second;
-    if (!InsertFunctionIntoModule(natMod, f, M)) {
+    auto lifted_func = InsertFunctionIntoModule(natMod, f);
+    if (!lifted_func) {
       LOG(ERROR)
           << "Could lift function: " << f->get_name();
       return false;
     }
+    func_pass_manager.run(*lifted_func);
   }
+
+  func_pass_manager.doFinalization();
   return true;
 }
 
-bool LiftCodeIntoModule(NativeModulePtr natMod, llvm::Module *M) {
-  InitLiftedFunctions(natMod, M);
-  InitExternalData(natMod, M);
-  InitExternalCode(natMod, M);
-  InsertDataSections(natMod, M);
-  return LiftFunctionsIntoModule(natMod, M);
+static std::vector<llvm::GlobalVariable *> FindISELs(void) {
+  std::vector<llvm::GlobalVariable *> isels;
+  auto basic_block = gModule->getFunction("__remill_basic_block");
+  if (!basic_block) {
+    LOG(ERROR)
+        << "Not removing any ISELs or SEMs; can't find __remill_basic_block.";
+    return isels;
+  }
+
+  auto lifted_func_type = basic_block->getFunctionType();
+  auto mem_type = lifted_func_type->getParamType(0);
+  auto state_type = lifted_func_type->getParamType(1);
+
+  isels.reserve(gModule->size());
+  for (auto &isel : gModule->globals()) {
+    if (!isel.hasInitializer()) {
+      continue;
+    }
+
+    auto sem = llvm::dyn_cast<llvm::Function>(
+        isel.getInitializer()->stripPointerCasts());
+    if (!sem) {
+      continue;
+    }
+
+    auto sem_type = sem->getFunctionType();
+
+    if (mem_type == sem_type->getParamType(0) &&
+        state_type == sem_type->getParamType(1)) {
+      LOG(INFO)
+          << "Found ISEL " << isel.getName().str();
+      isels.push_back(&isel);
+    }
+  }
+
+  return isels;
+}
+
+// Remove the ISEL variables used for finding the instruction semantics.
+static void RemoveISELs(std::vector<llvm::GlobalVariable *> &isels) {
+  std::vector<llvm::GlobalVariable *> next_isels;
+  while (isels.size()) {
+    next_isels.clear();
+    for (auto isel : isels) {
+      isel->setLinkage(llvm::GlobalValue::InternalLinkage);
+      if (1 >= isel->getNumUses()) {
+        LOG(INFO)
+            << "Removing ISEL " << isel->getName().str();
+        isel->eraseFromParent();
+      } else {
+        next_isels.push_back(isel);
+      }
+    }
+    isels.swap(next_isels);
+  }
+}
+
+// Remove some of the remill intrinsics.
+static void RemoveIntrinsics(void) {
+  if (auto used = gModule->getGlobalVariable("llvm.used")) {
+    used->eraseFromParent();
+  }
+
+  if (auto intrinsic_keeper = gModule->getFunction("__remill_intrinsics")) {
+    intrinsic_keeper->eraseFromParent();
+  }
+
+  if (auto basic_block = gModule->getFunction("__remill_basic_block")) {
+    basic_block->eraseFromParent();
+  }
+
+  if (auto mark_used = gModule->getFunction("__remill_mark_as_used")) {
+    mark_used->eraseFromParent();
+  }
+}
+
+bool LiftCodeIntoModule(NativeModulePtr natMod) {
+  auto isels = FindISELs();
+
+  InitLiftedFunctions(natMod);
+  InitExternalData(natMod);
+  InitExternalCode(natMod);
+  InsertDataSections(natMod);
+  if (!LiftFunctionsIntoModule(natMod)) {
+    return false;
+  } else {
+    RemoveIntrinsics();
+    LOG(INFO)
+        << "Optimizing module.";
+    RemoveISELs(isels);
+    RunO3();
+    return true;
+  }
 }

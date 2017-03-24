@@ -19,7 +19,7 @@ import argparse
 import struct
 #import syslog
 import traceback
-
+import collections
 import itertools
 
 
@@ -131,6 +131,33 @@ def DEBUG(s):
     if _DEBUG:
         _DEBUG_FILE.write("{}\n".format(str(s)))
 
+_PREFIX_ITYPES = (idaapi.NN_lock, idaapi.NN_rep,
+                  idaapi.NN_repe, idaapi.NN_repne)
+
+def _decode_instruction(ea):
+  """Read the bytes of an x86/amd64 instruction. This handles things like
+  combining the bytes of an instruction with its prefix. IDA Pro sometimes
+  treats these as separate."""
+  global _PREFIX_ITYPES
+
+  decoded_inst = idautils.DecodeInstruction(ea)
+  if not decoded_inst:
+    return None, tuple()
+
+  assert decoded_inst.ea == ea
+  end_ea = ea + decoded_inst.size
+  decoded_bytes = [chr(idc.Byte(byte_ea)) for byte_ea in range(ea, end_ea)]
+
+  # We've got an instruction with a prefix, but the prefix is treated as
+  # independent.
+  if 1 == decoded_inst.size and decoded_inst.itype in _PREFIX_ITYPES:
+    decoded_inst, extra_bytes = _decode_instruction(end_ea)
+    DEBUG("Extended instruction at {:08x} by {} bytes".format(
+        ea, len(extra_bytes)))
+    decoded_bytes.extend(extra_bytes)
+
+  return decoded_inst, decoded_bytes
+
 # Python 2.7's xrange doesn't work with `long`s.
 def xrange(begin, end=None, step=1):
     if end:
@@ -225,10 +252,11 @@ def isHlt(insn_t):
     return insn_t.itype == idaapi.NN_hlt
 
 def isJmpTable(ea):
-    insn_t = idautils.DecodeInstruction(ea)
+    insn_t, _ = _decode_instruction(ea)
+
     is_jmp = insn_t.itype in [idaapi.NN_jmp, 
-            idaapi.NN_jmpfi,
-            idaapi.NN_jmpni]
+                              idaapi.NN_jmpfi,
+                              idaapi.NN_jmpni]
 
     if not is_jmp: return False
 
@@ -292,8 +320,8 @@ def basicBlockHandler(F, block, blockset, processed_blocks):
     return B
 
 def readInstructionBytes(inst):
-    insn_t = idautils.DecodeInstruction(inst)
-    return [idc.Byte(b) for b in xrange(inst, inst+insn_t.size)]
+    _, decoded_bytes = _decode_instruction(inst)
+    return decoded_bytes
         
 def isInternalCode(ea):
 
@@ -348,18 +376,8 @@ def isExternalReference(ea):
 def getFunctionName(ea):
     return idc.GetTrueNameEx(ea,ea)
     
-def addInst(block, addr, inst_bytes, true_target=None, false_target=None):
+def addInst(block, addr, insn_t, inst_bytes, true_target=None, false_target=None):
     # check if there is a lock prefix:
-    insn_t = idautils.DecodeInstruction(addr)
-    if insn_t is not None and (insn_t.auxpref & 0x1) == 0x1:
-        # has LOCK
-        i_lock = block.insts.add()
-        i_lock.inst_addr = addr
-        i_lock.inst_bytes = chr(inst_bytes[0])
-        i_lock.inst_len = 1
-
-        addr += 1
-        inst_bytes = inst_bytes[1:]
 
     if insn_t is not None and (insn_t.auxpref & 0x3) == 0x2:
         DEBUG("REP Prefix at: 0x{0:x}".format(addr))
@@ -385,24 +403,119 @@ def addInst(block, addr, inst_bytes, true_target=None, false_target=None):
 
     return inst
 
-def isConditionalJump(ea):
-    insn_t = idautils.DecodeInstruction(ea)
-    return insn_t.itype in COND_BRANCHES
+PERSONALITY_INVALID = 0
+PERSONALITY_DIRECT_JUMP = 1
+PERSONALITY_INDIRECT_JUMP = 2
+PERSONALITY_DIRECT_CALL = 3
+PERSONALITY_INDIRECT_CALL = 4
+PERSONALITY_RETURN = 5
+PERSONALITY_SYSTEM_CALL = 6
+PERSONALITY_SYSTEM_RETURN = 7
+PERSONALITY_CONDITIONAL_BRANCH = 8
+PERSONALITY_TERMINATOR = 9
+PERSONALITY_FALL_THROUGH = 10
+PERSONALITY_FALL_THROUGH_TERMINATOR = 11
 
-def isUnconditionalJump(ea):
-    insn_t = idautils.DecodeInstruction(ea)
-    return insn_t.itype in UCOND_BRANCHES
+_PERSONALITIES = collections.defaultdict(int)
+_PERSONALITIES.update({
+  idaapi.NN_call: PERSONALITY_DIRECT_CALL,
+  idaapi.NN_callfi: PERSONALITY_INDIRECT_CALL,
+  idaapi.NN_callni: PERSONALITY_INDIRECT_CALL,
 
-def isCall(ea):
-    insn_t = idautils.DecodeInstruction(ea)
-    return insn_t.itype in CALLS
+  idaapi.NN_retf: PERSONALITY_RETURN,
+  idaapi.NN_retfd: PERSONALITY_RETURN,
+  idaapi.NN_retfq: PERSONALITY_RETURN,
+  idaapi.NN_retfw: PERSONALITY_RETURN,
+  idaapi.NN_retn: PERSONALITY_RETURN,
+  idaapi.NN_retnd: PERSONALITY_RETURN,
+  idaapi.NN_retnq: PERSONALITY_RETURN,
+  idaapi.NN_retnw: PERSONALITY_RETURN,
 
-def isRet(ea):
-    insn_t = idautils.DecodeInstruction(ea)
-    return insn_t.itype in RETS
+  idaapi.NN_jmp: PERSONALITY_DIRECT_JUMP,
+  idaapi.NN_jmpshort: PERSONALITY_DIRECT_JUMP,
+  idaapi.NN_jmpfi: PERSONALITY_INDIRECT_JUMP,
+  idaapi.NN_jmpni: PERSONALITY_INDIRECT_JUMP,
 
-def isTrap(ea):
-    insn_t = idautils.DecodeInstruction(ea)
+  idaapi.NN_int: PERSONALITY_SYSTEM_CALL,
+  idaapi.NN_into: PERSONALITY_SYSTEM_CALL,
+  idaapi.NN_int3: PERSONALITY_SYSTEM_CALL,
+  idaapi.NN_bound: PERSONALITY_SYSTEM_CALL,
+  idaapi.NN_syscall: PERSONALITY_SYSTEM_CALL,
+  idaapi.NN_sysenter: PERSONALITY_SYSTEM_CALL,
+
+  idaapi.NN_iretw: PERSONALITY_SYSTEM_RETURN,
+  idaapi.NN_iret: PERSONALITY_SYSTEM_RETURN,
+  idaapi.NN_iretd: PERSONALITY_SYSTEM_RETURN,
+  idaapi.NN_iretq: PERSONALITY_SYSTEM_RETURN,
+  idaapi.NN_sysret: PERSONALITY_SYSTEM_RETURN,
+  idaapi.NN_sysexit: PERSONALITY_SYSTEM_RETURN,
+
+  idaapi.NN_hlt: PERSONALITY_TERMINATOR,
+  idaapi.NN_ud2: PERSONALITY_TERMINATOR,
+  idaapi.NN_icebp: PERSONALITY_TERMINATOR,
+
+  idaapi.NN_ja: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jae: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jb: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jbe: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jc: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jcxz: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_je: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jecxz: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jg: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jge: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jl: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jle: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jna: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jnae: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jnb: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jnbe: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jnc: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jne: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jng: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jnge: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jnl: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jnle: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jno: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jnp: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jns: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jnz: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jo: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jp: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jpe: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jpo: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jrcxz: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_js: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_jz: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_xbegin: PERSONALITY_CONDITIONAL_BRANCH,
+
+  idaapi.NN_loopw: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_loop: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_loopd: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_loopq: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_loopwe: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_loope: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_loopde: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_loopqe: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_loopwne: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_loopne: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_loopdne: PERSONALITY_CONDITIONAL_BRANCH,
+  idaapi.NN_loopqne: PERSONALITY_CONDITIONAL_BRANCH,
+})
+
+def isConditionalJump(insn_t):
+    return _PERSONALITIES[insn_t.itype] == PERSONALITY_CONDITIONAL_BRANCH
+
+def isUnconditionalJump(insn_t):
+    return _PERSONALITIES[insn_t.itype] in (PERSONALITY_DIRECT_JUMP, PERSONALITY_INDIRECT_JUMP)
+
+def isCall(insn_t):
+    return _PERSONALITIES[insn_t.itype] in (PERSONALITY_DIRECT_CALL, PERSONALITY_INDIRECT_CALL)
+
+def isRet(insn_t):
+    return _PERSONALITIES[insn_t.itype] == PERSONALITY_RETURN
+
+def isTrap(insn_t):
     return insn_t.itype in TRAPS
 
 def findRelocOffset(ea, size):
@@ -737,38 +850,38 @@ def addDataReference(M, I, inst, dref, new_eas):
     else:
         DEBUG("WARNING: Data not in valid segment {0:x}".format(dref))
 
-def instructionHandler(M, B, inst, new_eas):
-    insn_t = idautils.DecodeInstruction(inst)
+def instructionHandler(M, B, addr, new_eas):
+    insn_t, inst_bytes = _decode_instruction(addr)
+
     if not insn_t:
         # handle jumps after noreturn functions
-        if idc.Byte(inst) == 0xCC:
-            I = addInst(B, inst, [0xCC])
+        if idc.Byte(addr) == 0xCC:
+            I = addInst(B, addr, insn_t, inst_bytes)
             return I, True
         else:
-            raise Exception("Cannot read instruction at: {0:x}".format(inst))
+            raise Exception("Cannot read instruction at: {0:x}".format(addr))
 
     # skip HLTs -- they are privileged, and are used in ELFs after a noreturn call
     if isHlt(insn_t):
         return None, False
 
-    #DEBUG("\t\tinst: {0}".format(idc.GetDisasm(inst)))
-    inst_bytes = readInstructionBytes(inst)
+    #DEBUG("\t\tinst: {0}".format(idc.GetDisasm(addr)))
     DEBUG("\t\tBytes: {0}".format(inst_bytes))
 
-    I = addInst(B, inst, inst_bytes)
+    I = addInst(B, addr, insn_t, inst_bytes)
 
-    if isJmpTable(inst):
+    if isJmpTable(addr):
         DEBUG("Its a jump table")
-        handleJmpTable(I, inst, new_eas)
+        handleJmpTable(I, addr, new_eas)
         return I, False
 
     # mark that this is an offset table
-    if PIE_MODE and inst in OFFSET_TABLES:
-        table_va = OFFSET_TABLES[inst].start_addr
-        DEBUG("JMP at {:08x} has offset table {:08x}".format(inst, table_va))
+    if PIE_MODE and addr in OFFSET_TABLES:
+        table_va = OFFSET_TABLES[addr].start_addr
+        DEBUG("JMP at {:08x} has offset table {:08x}".format(addr, table_va))
         I.offset_table_addr = table_va
 
-    crefs_from_here = idautils.CodeRefsFrom(inst, 0)
+    crefs_from_here = idautils.CodeRefsFrom(addr, 0)
 
     #check for code refs from here
     crefs = []
@@ -777,9 +890,9 @@ def instructionHandler(M, B, inst, new_eas):
     for cref_i in crefs_from_here:
         crefs.append(cref_i)
 
-    is_call = isCall(inst)
-    isize = insn_t.size
-    next_ea = inst+isize
+    is_call = isCall(insn_t)
+    isize = len(inst_bytes)
+    next_ea = addr+isize
 
     had_refs = False
  
@@ -817,14 +930,15 @@ def instructionHandler(M, B, inst, new_eas):
                 if doesNotReturn(fn):
                     return I, True
             else:
-                which_op = manualRelocOffset(I, inst, cref);
+                which_op = manualRelocOffset(I, addr, cref);
                 setReference(I, which_op, CFG_pb2.Instruction.CodeRef, cref)
 
                 if cref not in RECOVERED_EAS: 
                     new_eas.add(cref)
 
                 DEBUG("INTERNAL CALL: {0}".format(fn))
-        elif isUnconditionalJump(inst):
+
+        elif isUnconditionalJump(insn_t):
             if isExternalReference(cref):
                 fn = handleExternalRef(fn)
                 I.ext_call_name = fn 
@@ -839,9 +953,9 @@ def instructionHandler(M, B, inst, new_eas):
 
     #true: jump to where we have a code-ref
     #false: continue as we were
-    if isConditionalJump(inst):
+    if isConditionalJump(insn_t):
         I.true_target = crefs[0]
-        I.false_target = inst+len(inst_bytes)
+        I.false_target = addr+len(inst_bytes)
         return I, False
 
     if is_call and isNotCode(next_ea):
@@ -849,7 +963,7 @@ def instructionHandler(M, B, inst, new_eas):
         I.local_noreturn = True
         return I, True
 
-    relo_off = findRelocOffset(inst, len(inst_bytes))
+    relo_off = findRelocOffset(addr, len(inst_bytes))
     # don't re-set reloc offset if we already set it somewhere
     if relo_off != -1:
         # check which operand this would be the offset for
@@ -857,21 +971,21 @@ def instructionHandler(M, B, inst, new_eas):
 
         # don't overwrite an offset set by other means
         if "IMM" == which_op and not I.HasField("imm_reloc_offset"):
-            DEBUG("findRelocOffset setting imm reloc offset at {0:x} to {1:x}".format(inst, relo_off))
+            DEBUG("findRelocOffset setting imm reloc offset at {0:x} to {1:x}".format(addr, relo_off))
             I.imm_reloc_offset = relo_off
         
         if "MEM" == which_op and not I.HasField("mem_reloc_offset"):
-            DEBUG("findRelocOffset setting mem reloc offset at {0:x} to {1:x}".format(inst, relo_off))
+            DEBUG("findRelocOffset setting mem reloc offset at {0:x} to {1:x}".format(addr, relo_off))
             I.mem_reloc_offset = relo_off
 
-    drefs_from_here = idautils.DataRefsFrom(inst)
+    drefs_from_here = idautils.DataRefsFrom(addr)
     for dref in drefs_from_here:
         had_refs = True
         if dref in crefs:
             continue
-        DEBUG("Adding reference because of data refs from {:x}".format(inst))
-        addDataReference(M, I, inst, dref, new_eas)
-        if isUnconditionalJump(inst):
+        DEBUG("Adding reference because of data refs from {:x}".format(addr))
+        addDataReference(M, I, addr, dref, new_eas)
+        if isUnconditionalJump(insn_t):
             xdrefs = idautils.DataRefsFrom(dref)
             for xref in xdrefs:
                 DEBUG("xref : {0:x}".format(xref))
@@ -893,7 +1007,7 @@ def instructionHandler(M, B, inst, new_eas):
                 if isInData(begin_a, end_a):
                     # add data reference
                     DEBUG("Adding reference because we fixed IMM value")
-                    addDataReference(M, I, inst, begin_a, new_eas)
+                    addDataReference(M, I, addr, begin_a, new_eas)
                 #elif isInCode(begin_a, end_a):
                 # add code ref
 
@@ -1379,7 +1493,8 @@ def createOffsetTable(M, table_start, table_entries):
     jmp_refs = set()
     for ref in idautils.DataRefsTo(table_start):
         DEBUG("Checking ref to table...")
-        insn_t = idautils.DecodeInstruction(ref)
+        insn_t, _ = _decode_instruction(ref)
+
         # check if REF points to LEA REG, <value>
         if insn_t.itype == idaapi.NN_lea and insn_t.Operands[0].type == idc.o_reg:
             DEBUG("Found a LEA")
@@ -1389,7 +1504,8 @@ def createOffsetTable(M, table_start, table_entries):
             cur_head = idc.NextHead(ref)
             for i in xrange(5):
                 # is it a jump?
-                if isUnconditionalJump(cur_head):
+                next_insn_t, _ = _decode_instruction(cur_head)
+                if next_insn_t and isUnconditionalJump(next_insn_t):
                     DEBUG("Found follow unconditional jump at {:08x}".format(cur_head))
                     # is it a JMP?
                     jmp_reg = idc.GetOpnd(cur_head, 0)
@@ -1670,10 +1786,6 @@ def processDataSegments(M, new_eas):
             end = idc.SegEnd(ea)
             populateDataSegment(M, start, end, new_eas)
 
-def getInstructionSize(ea):
-    insn = idautils.DecodeInstruction(ea)
-    return insn.size
-
 def recoverFunctionFromSet(M, F, blockset, new_eas):
     processed_blocks = set()
 
@@ -1698,8 +1810,8 @@ def recoverFunctionFromSet(M, F, blockset, new_eas):
             I, endBlock = instructionHandler(M, B, head, new_eas)
             # sometimes there is junk after a terminator due to off-by-ones in
             # IDAPython. Ignore them.
-            #if endBlock or isRet(head) or isUnconditionalJump(head) or isTrap(head):
-            if endBlock or isRet(head) or isTrap(head):
+            insn_t, _ = _decode_instruction(head)
+            if endBlock or isRet(insn_t) or isTrap(insn_t):
                 break
             prevHead = head
 
@@ -1720,7 +1832,7 @@ def recoverBlock(startEA):
     curEA = startEA
 
     while True:
-        insn_t = idautils.DecodeInstruction(curEA)
+        insn_t, instr_bytes = _decode_instruction(curEA)
         if insn_t is None:
             if idc.Byte(curEA) == 0xCC:
                 b.endEA = curEA+1
@@ -1738,10 +1850,10 @@ def recoverBlock(startEA):
         # get curEA follows
         follows = [cref for cref in crefs]
 
-        if follows == [nextEA] or isCall(curEA):
+        if follows == [nextEA] or isCall(insn_t):
             # there is only one following branch, to the next instruction
             # check if this is a JMP 0; in that case, make a new block
-            if isUnconditionalJump(curEA):
+            if isUnconditionalJump(insn_t):
                 b.endEA = nextEA
                 for f in follows:
                     # do not decode external code refs
@@ -1817,7 +1929,8 @@ def preprocessBinary():
         for head in idautils.Heads(seg_ea, idc.SegEnd(seg_ea)):
             if idc.isCode(idc.GetFlags(head)):
                 si = idaapi.get_switch_info_ex(head)
-                if si is not None and isUnconditionalJump(head):
+                insn_t, _ = _decode_instruction(head)
+                if si is not None and insn_t and isUnconditionalJump(insn_t):
                     DEBUG("Found a jmp based switch at: {0:x}".format(head))
                     esize = si.get_jtable_element_size()
                     readers = { 4: readDword,
