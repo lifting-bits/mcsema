@@ -28,12 +28,14 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <glog/logging.h>
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <utility>
 
-#include "CFG.pb.h"  // Auto-generated.
+#include "generated/CFG.pb.h"  // Auto-generated.
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/CFG/CFG.h"
@@ -44,10 +46,14 @@
 #include "mcsema/cfgToLLVM/JumpTables.h"
 
 bool NativeInst::terminator(void) const {
+  LOG(FATAL)
+      << "Not yet reimplemented";
   return this->is_terminator;
 }
 
 void NativeInst::set_terminator(void) {
+  LOG(FATAL)
+      << "Not yet reimplemented";
   this->is_terminator = true;
 }
 
@@ -118,8 +124,9 @@ void NativeInst::set_ref_reloc_type(CFGOpType op, uint64_t ref, uint64_t ro,
   const char *ops = op == MEMRef ? "MEM" : "IMM";
   const char *rts = rt == CFGCodeRef ? "CODE" : "DATA";
 
-  std::cerr << __FUNCTION__ << ": Adding  ref: " << ops << ", to: " << std::hex
-            << ref << ", ro: " << ro << ", rt: " << rts << std::endl;
+  LOG(INFO)
+      << ": Adding ref: " << ops << ", to: " << std::hex
+      << ref << ", ro: " << ro << ", rt: " << rts;
   this->set_reference(op, ref);
   this->set_reloc_offset(op, ro);
   this->set_ref_type(op, rt);
@@ -148,12 +155,8 @@ uint64_t NativeInst::get_reference(CFGOpType op) const {
 NativeInst::CFGRefType NativeInst::get_ref_type(CFGOpType op) const {
   if (op == MEMRef) {
     return this->mem_ref_type;
-  } else if (op == IMMRef) {
-    return this->imm_ref_type;
   } else {
-    //TODO throw exception?
-    //return -1;
-    return this->mem_ref_type;
+    return this->imm_ref_type;
   }
 }
 
@@ -177,16 +180,12 @@ void NativeInst::set_is_call_external(void) {
   this->is_call_external = true;
 }
 
-llvm::MCInst &NativeInst::get_inst(void) {
-  return this->decoded_inst;
-}
-
-void NativeInst::set_inst(const llvm::MCInst &i) {
-  this->decoded_inst = i;
-}
-
 VA NativeInst::get_loc(void) const {
   return this->loc;
+}
+
+const std::string &NativeInst::get_bytes(void) const {
+  return this->bytes;
 }
 
 void NativeInst::set_tr(VA a) {
@@ -198,10 +197,14 @@ void NativeInst::set_fa(VA a) {
 }
 
 VA NativeInst::get_tr(void) const {
+  LOG(FATAL)
+      << "Not yet reimplemented";
   return this->tgtIfTrue;
 }
 
 VA NativeInst::get_fa(void) const {
+  LOG(FATAL)
+      << "Not yet reimplemented";
   return this->tgtIfFalse;
 }
 
@@ -246,25 +249,6 @@ bool NativeInst::has_external_ref(void) const {
   return this->has_ext_call_target() || this->has_ext_data_ref();
 }
 
-bool NativeInst::has_rip_relative(void) const {
-  return this->hasRIP;
-}
-
-VA NativeInst::get_rip_relative(void) const {
-  return this->rip_target;
-}
-
-void NativeInst::set_rip_relative(unsigned i) {
-  const llvm::MCOperand &base = decoded_inst.getOperand(i + 0);
-  const llvm::MCOperand &scale = decoded_inst.getOperand(i + 1);
-  const llvm::MCOperand &index = decoded_inst.getOperand(i + 2);
-  const llvm::MCOperand &disp = decoded_inst.getOperand(i + 3);
-
-  rip_target = loc + len + disp.getImm();
-  //const
-  this->hasRIP = true;
-}
-
 // accessors for JumpTable
 void NativeInst::set_jump_table(MCSJumpTablePtr p) {
   this->jump_table = true;
@@ -294,6 +278,8 @@ bool NativeInst::has_jump_index_table(void) const {
 }
 
 NativeInst::Prefix NativeInst::get_prefix(void) const {
+  LOG(FATAL)
+      << "Not yet reimplemented, probably unnecessary.";
   return this->pfx;
 }
 
@@ -307,10 +293,6 @@ unsigned int NativeInst::get_addr_space(void) const {
   }
 }
 
-unsigned int NativeInst::get_opcode(void) const {
-  return this->decoded_inst.getOpcode();
-}
-
 ExternalCodeRefPtr NativeInst::get_ext_call_target(void) const {
   return this->extCallTgt;
 }
@@ -318,14 +300,22 @@ ExternalDataRefPtr NativeInst::get_ext_data_ref(void) const {
   return this->extDataRef;
 }
 
-NativeInst::NativeInst(VA v, uint8_t l, const llvm::MCInst &inst, Prefix k)
+NativeInst::NativeInst(VA v, const std::string &bytes_)
     : tgtIfTrue(0),
       tgtIfFalse(0),
       loc(v),
-      decoded_inst(inst),
-      pfx(k),
+      bytes(bytes_),
+      extCallTgt(nullptr),
+      extDataRef(nullptr),
+      jumpTable(nullptr),
+      jump_table(false),
+      jumpIndexTable(nullptr),
+      jump_index_table(false),
+      pfx(NoPrefix),
       ext_call_target(false),
+      ext_data_ref(false),
       is_call_external(false),
+      len(bytes.size()),
       is_terminator(false),
       imm_reloc_offset(0),
       imm_reference(0),
@@ -335,16 +325,9 @@ NativeInst::NativeInst(VA v, uint8_t l, const llvm::MCInst &inst, Prefix k)
       mem_reference(0),
       mem_ref_type(CFGDataRef),
       has_mem_reference(false),
-      len(l),
-      jump_table(false),
-      jump_index_table(false),
-      ext_data_ref(false),
-      arch(0),
-      system_call_number( -1),
+      system_call_number(-1),
       local_noreturn(false),
-      hasRIP(false),
-      rip_target(0),
-      offset_table( -1) {}
+      offset_table(-1) {}
 
 DataSectionEntry::DataSectionEntry(uint64_t base, const std::vector<uint8_t> &b)
     : base(base),
@@ -353,8 +336,8 @@ DataSectionEntry::DataSectionEntry(uint64_t base, const std::vector<uint8_t> &b)
 
 DataSectionEntry::DataSectionEntry(uint64_t base, const std::string &sname)
     : base(base),
-      sym_name(sname),
-      is_symbol(true) {
+      is_symbol(true),
+      sym_name(sname) {
 
   this->bytes.push_back(0x0);
   this->bytes.push_back(0x0);
@@ -366,8 +349,8 @@ DataSectionEntry::DataSectionEntry(uint64_t base, const std::string &sname,
                                    uint64_t symbol_size)
     : base(base),
       bytes(symbol_size),
-      sym_name(sname),
-      is_symbol(true) {}
+      is_symbol(true),
+      sym_name(sname) {}
 
 uint64_t DataSectionEntry::getBase(void) const {
   return this->base;
@@ -512,7 +495,8 @@ const std::map<VA, NativeBlockPtr> &NativeFunction::get_blocks(void) const {
 
 NativeBlockPtr NativeFunction::block_from_base(VA base) {
   auto block_it = blocks.find(base);
-  TASSERT(block_it != blocks.end(), "Block not found");
+  CHECK(block_it != blocks.end())
+      << "Could not find block at address " << std::hex << base;
   return block_it->second;
 }
 
@@ -541,7 +525,8 @@ const std::list<NativeInstPtr> &NativeBlock::get_insts(void) {
 
 void NativeFunction::add_block(NativeBlockPtr b) {
   auto blockBase = b->get_base();
-  TASSERT( !this->blocks.count(blockBase), "Added duplicate block!");
+  CHECK(!this->blocks.count(blockBase))
+      << "Added duplicate block for address " << std::hex << blockBase;
   this->blocks[blockBase] = b;
 }
 
@@ -591,7 +576,6 @@ const std::list<DataSection> &NativeModule::getData(void) const {
   return this->data_sections;
 }
 
-//add an external reference
 void NativeModule::addExtCall(ExternalCodeRefPtr p) {
   this->external_code_refs.push_back(p);
 }
@@ -600,7 +584,6 @@ const std::list<ExternalCodeRefPtr> &NativeModule::getExtCalls(void) const {
   return this->external_code_refs;
 }
 
-//external data ref
 void NativeModule::addExtDataRef(ExternalDataRefPtr p) {
   this->external_data_refs.push_back(p);
 }
@@ -625,10 +608,9 @@ void NativeModule::addOffsetTables(
     const std::list<MCSOffsetTablePtr> & tables) {
 
   for (const auto &table : tables) {
-    std::cerr
-        << "Adding offset table at " << std::hex
-        << table->getStartAddr() << std::endl;
-    this->offset_tables.insert( {table->getStartAddr(), table});
+    LOG(INFO)
+        << "Adding offset table at " << std::hex << table->getStartAddr();
+    this->offset_tables.insert({table->getStartAddr(), table});
   }
 }
 
@@ -639,7 +621,9 @@ NativeInst::CFGRefType deserRefType(::Instruction::RefType k) {
     case ::Instruction::DataRef:
       return NativeInst::CFGDataRef;
     default:
-      throw TErr(__LINE__, __FILE__, "Unsupported Ref Type");
+      LOG(FATAL)
+          << "Unsupported reference type";
+      return NativeInst::CFGInvalidRef;
   }
 }
 
@@ -657,219 +641,34 @@ enum : size_t {
   kMaxNumInstrBytes = 16ULL  // 15 on x86 and amd64.
 };
 
-static NativeInst::Prefix GetPrefix(const llvm::MCInst &inst) {
-  switch (inst.getOpcode()) {
-    case llvm::X86::REP_MOVSB_32:
-    case llvm::X86::REP_MOVSB_64:
-    case llvm::X86::REP_MOVSW_32:
-    case llvm::X86::REP_MOVSW_64:
-    case llvm::X86::REP_MOVSD_32:
-    case llvm::X86::REP_MOVSD_64:
-    case llvm::X86::REP_MOVSQ_64:
-    case llvm::X86::REP_LODSB_32:
-    case llvm::X86::REP_LODSB_64:
-    case llvm::X86::REP_LODSW_32:
-    case llvm::X86::REP_LODSW_64:
-    case llvm::X86::REP_LODSD_32:
-    case llvm::X86::REP_LODSD_64:
-    case llvm::X86::REP_LODSQ_64:
-    case llvm::X86::REP_STOSB_32:
-    case llvm::X86::REP_STOSB_64:
-    case llvm::X86::REP_STOSW_32:
-    case llvm::X86::REP_STOSW_64:
-    case llvm::X86::REP_STOSD_32:
-    case llvm::X86::REP_STOSD_64:
-    case llvm::X86::REP_STOSQ_64:
-      return NativeInst::RepPrefix;
-
-    case llvm::X86::REPE_CMPSB_32:
-    case llvm::X86::REPE_CMPSB_64:
-    case llvm::X86::REPE_CMPSW_32:
-    case llvm::X86::REPE_CMPSW_64:
-    case llvm::X86::REPE_CMPSD_32:
-    case llvm::X86::REPE_CMPSD_64:
-    case llvm::X86::REPE_CMPSQ_64:
-      return NativeInst::RepPrefix;
-
-    case llvm::X86::REPNE_CMPSB_32:
-    case llvm::X86::REPNE_CMPSB_64:
-    case llvm::X86::REPNE_CMPSW_32:
-    case llvm::X86::REPNE_CMPSW_64:
-    case llvm::X86::REPNE_CMPSD_32:
-    case llvm::X86::REPNE_CMPSD_64:
-    case llvm::X86::REPNE_CMPSQ_64:
-      return NativeInst::RepNePrefix;
-
-    case llvm::X86::REPE_SCASB_32:
-    case llvm::X86::REPE_SCASB_64:
-    case llvm::X86::REPE_SCASW_32:
-    case llvm::X86::REPE_SCASW_64:
-    case llvm::X86::REPE_SCASD_32:
-    case llvm::X86::REPE_SCASD_64:
-    case llvm::X86::REPE_SCASQ_64:
-      return NativeInst::RepPrefix;
-
-    case llvm::X86::REPNE_SCASB_32:
-    case llvm::X86::REPNE_SCASB_64:
-    case llvm::X86::REPNE_SCASW_32:
-    case llvm::X86::REPNE_SCASW_64:
-    case llvm::X86::REPNE_SCASD_32:
-    case llvm::X86::REPNE_SCASD_64:
-    case llvm::X86::REPNE_SCASQ_64:
-      return NativeInst::RepNePrefix;
-  }
-
-  for (const auto &op : inst) {
-    if (op.isReg()) {
-      if (op.getReg() == llvm::X86::GS) {
-        return NativeInst::GSPrefix;
-      } else if (op.getReg() == llvm::X86::FS) {
-        return NativeInst::FSPrefix;
-      }
-    }
-  }
-
-  return NativeInst::NoPrefix;
-}
-
-static NativeInstPtr DecodeInst(
-    uintptr_t addr, const std::vector<uint8_t> &bytes) {
-
-  VA nextVA = addr;
-  // Get the maximum number of bytes for decoding.
-  uint8_t decodable_bytes[kMaxNumInstrBytes] = {};
-  std::copy(bytes.begin(), bytes.end(), decodable_bytes);
-  auto max_size = bytes.size();
-
-  // Try to decode the instruction.
-  llvm::MCInst mcInst;
-  auto num_decoded_bytes = ArchDecodeInstruction(
-      decodable_bytes, decodable_bytes + max_size, addr, mcInst);
-
-  if (!num_decoded_bytes) {
-    std::cerr
-        << "Failed to decode instruction at address "
-        << std::hex << addr << std::endl;
-    return nullptr;
-  }
-
-  NativeInstPtr inst = new NativeInst(
-      addr, num_decoded_bytes, mcInst, GetPrefix(mcInst));
-
-  // Mark some operands as being RIP-relative.
-  for (auto i = 0U; i < mcInst.getNumOperands(); ++i) {
-    const auto &Op = mcInst.getOperand(i);
-    if (Op.isReg() && Op.getReg() == llvm::X86::RIP) {
-      inst->set_rip_relative(i);
-    }
-  }
-
-  llvm::MCOperand oper;
-
-  //ask if this is a jmp, and figure out what the true / false follows are
-  switch (mcInst.getOpcode()) {
-    case llvm::X86::JMP32m:
-    case llvm::X86::JMP32r:
-    case llvm::X86::JMP64m:
-    case llvm::X86::JMP64r:
-      inst->set_terminator();
-      break;
-    case llvm::X86::RETL:
-    case llvm::X86::RETIL:
-    case llvm::X86::RETIQ:
-    case llvm::X86::RETIW:
-    case llvm::X86::RETQ:
-      inst->set_terminator();
-      break;
-    case llvm::X86::JMP_4:
-    case llvm::X86::JMP_1:
-      oper = mcInst.getOperand(0);
-      if (oper.isImm()) {
-        nextVA += oper.getImm() + num_decoded_bytes;
-        inst->set_tr(nextVA);
-      } else {
-        std::cerr << "Unhandled indirect branch at 0x" << std::hex << addr;
-        return nullptr;
-      }
-      break;
-    case llvm::X86::LOOP:
-    case llvm::X86::LOOPE:
-    case llvm::X86::LOOPNE:
-    case llvm::X86::JO_4:
-    case llvm::X86::JO_1:
-    case llvm::X86::JNO_4:
-    case llvm::X86::JNO_1:
-    case llvm::X86::JB_4:
-    case llvm::X86::JB_1:
-    case llvm::X86::JAE_4:
-    case llvm::X86::JAE_1:
-    case llvm::X86::JE_4:
-    case llvm::X86::JE_1:
-    case llvm::X86::JNE_4:
-    case llvm::X86::JNE_1:
-    case llvm::X86::JBE_4:
-    case llvm::X86::JBE_1:
-    case llvm::X86::JA_4:
-    case llvm::X86::JA_1:
-    case llvm::X86::JS_4:
-    case llvm::X86::JS_1:
-    case llvm::X86::JNS_4:
-    case llvm::X86::JNS_1:
-    case llvm::X86::JP_4:
-    case llvm::X86::JP_1:
-    case llvm::X86::JNP_4:
-    case llvm::X86::JNP_1:
-    case llvm::X86::JL_4:
-    case llvm::X86::JL_1:
-    case llvm::X86::JGE_4:
-    case llvm::X86::JGE_1:
-    case llvm::X86::JLE_4:
-    case llvm::X86::JLE_1:
-    case llvm::X86::JG_4:
-    case llvm::X86::JG_1:
-    case llvm::X86::JCXZ:
-    case llvm::X86::JECXZ:
-    case llvm::X86::JRCXZ:
-      oper = mcInst.getOperand(0);
-      inst->set_tr(addr + oper.getImm() + num_decoded_bytes);
-      inst->set_fa(addr + num_decoded_bytes);
-      break;
-  }
-
-  return inst;
-}
-
 static NativeInstPtr DeserializeInst(
     const ::Instruction &inst,
     const std::list<ExternalCodeRefPtr> &extcode) {
   VA addr = inst.inst_addr();
   auto tr_tgt = static_cast<VA>(inst.true_target());
   auto fa_tgt = static_cast<VA>(inst.false_target());
-  const auto &bytes_str = inst.inst_bytes();
-  std::vector<uint8_t> bytes(bytes_str.begin(), bytes_str.end());
 
-  //produce an MCInst from the instruction buffer using the ByteDecoder
-  NativeInstPtr ip = DecodeInst(addr, bytes);
+  NativeInstPtr ip = new NativeInst(addr, inst.inst_bytes());
   if (!ip) {
-    std::cerr
-        << "Unable to deserialize inst at " << std::hex << addr << std::endl;
+    LOG(ERROR)
+        << "Unable to deserialize instruction at " << std::hex << addr;
     return nullptr;
   }
 
-  if (tr_tgt > 0) {
+  if (tr_tgt) {
     ip->set_tr(tr_tgt);
   }
 
-  if (fa_tgt > 0) {
+  if (fa_tgt) {
     ip->set_fa(fa_tgt);
   }
 
   if (inst.has_ext_call_name()) {
     ExternalCodeRefPtr p = getExternal(inst.ext_call_name(), extcode);
     if (!p) {
-      std::cerr
+      LOG(ERROR)
           << "Unable to find external call " << inst.ext_call_name()
-          << " for inst at " << std::hex << addr << std::endl;
+          << " for inst at " << std::hex << addr;
       return nullptr;
     }
     ip->set_ext_call_target(p);
@@ -883,7 +682,7 @@ static NativeInstPtr DeserializeInst(
   if (inst.has_imm_reference()) {
     auto ref = static_cast<uint64_t>(inst.imm_reference());
     uint64_t ro = 0;
-    NativeInst::CFGRefType rt;
+    auto rt = NativeInst::CFGInvalidRef;
 
     if (inst.has_imm_reloc_offset()) {
       ro = static_cast<VA>(inst.imm_reloc_offset());
@@ -899,7 +698,7 @@ static NativeInstPtr DeserializeInst(
   if (inst.has_mem_reference()) {
     uint64_t ref = inst.mem_reference();
     uint64_t ro = 0;
-    NativeInst::CFGRefType rt;
+    auto rt = NativeInst::CFGInvalidRef;
 
     if (inst.has_mem_reloc_offset()) {
       ro = inst.mem_reloc_offset();
@@ -922,7 +721,7 @@ static NativeInstPtr DeserializeInst(
       table_entries.push_back(jmp_tbl.table_entries(i));
     }
 
-    VA data_offset = (VA) ( -1);
+    VA data_offset = ~0ULL;
     if (jmp_tbl.has_offset_from_data()) {
       data_offset = jmp_tbl.offset_from_data();
     }
@@ -968,9 +767,8 @@ static NativeBlockPtr DeserializeBlock(
   for (auto &inst : block.insts()) {
     auto native_inst = DeserializeInst(inst, extcode);
     if (!native_inst) {
-      std::cerr
-          << "Unable to deserialize block at " << std::hex
-          << block_va << std::endl;
+      LOG(INFO)
+          << "Unable to deserialize block at " << std::hex << block_va;
       return nullptr;
     }
     natB->add_inst(native_inst);
@@ -995,13 +793,13 @@ static NativeFunctionPtr DeserializeNativeFunc(
     nf = new NativeFunction(func.entry_address());
   }
 
-  //read all the blocks from this function
+  // Read all the blocks from this function
   for (auto &block : func.blocks()) {
     auto native_block = DeserializeBlock(block, extcode);
     if (!native_block) {
-      std::cerr
+      LOG(ERROR)
           << "Unable to deserialize function at " << std::hex
-          << func.entry_address() << std::endl;
+          << func.entry_address();
       return nullptr;
     }
     nf->add_block(native_block);
@@ -1015,22 +813,19 @@ static ExternalCodeRef::CallingConvention DeserializeCallingConvention(
   switch (k) {
     case ::ExternalFunction::CallerCleanup:
       return ExternalCodeRef::CallerCleanup;
-      break;
 
     case ::ExternalFunction::CalleeCleanup:
       return ExternalCodeRef::CalleeCleanup;
-      break;
 
     case ::ExternalFunction::FastCall:
       return ExternalCodeRef::FastCall;
-      break;
 
     case ::ExternalFunction::McsemaCall:
       return ExternalCodeRef::McsemaCall;
-      break;
 
     default:
-      throw TErr(__LINE__, __FILE__, "Unsupported CC");
+      LOG(FATAL)
+          << "Unsupported calling covention.";
   }
 }
 
@@ -1066,18 +861,18 @@ static ExternalDataRefPtr DeserializeExternData(const ::ExternalData &ed) {
 }
 
 static DataSectionEntry DeserializeDataSymbol(const ::DataSymbol &ds) {
-  std::cerr
+  LOG(INFO)
       << "Deserializing symbol at: " << std::hex << ds.base_address() << ", "
-      << ds.symbol_name() << ", " << ds.symbol_size() << std::endl;
+      << ds.symbol_name() << ", " << ds.symbol_size();
 
-  return DataSectionEntry(ds.base_address(), ds.symbol_name(), ds.symbol_size());
+  return DataSectionEntry(
+      ds.base_address(), ds.symbol_name(), ds.symbol_size());
 }
 
 static DataSectionEntry makeDSEBlob(const std::vector<uint8_t> &bytes,
                                     uint64_t start,  // offset in bytes vector
     uint64_t end,  // offset in bytes vector
-    uint64_t base_va)  // virtual address these bytes are based at
-    {
+    uint64_t base_va) {  // virtual address these bytes are based at
   std::vector<uint8_t> blob_bytes(bytes.begin() + (start),
                                   bytes.begin() + (end));
   return DataSectionEntry(base_va, blob_bytes);
@@ -1091,17 +886,14 @@ static void DeserializeData(const ::Data &d, DataSection &ds) {
 
   ds.setReadOnly(d.read_only());
 
-  //DataSectionEntry  dse(d.base_address(), bytes);
-  std::vector<uint8_t>::iterator bytepos = bytes.begin();
-
   // assumes symbols are in-order
   for (int i = 0; i < d.symbols_size(); i++) {
     DataSectionEntry dse_sym = DeserializeDataSymbol(d.symbols(i));
     auto dse_base = dse_sym.getBase();
 
-    std::cerr
-        << "cur_pos: " << std::hex << cur_pos << std::endl
-        << "dse_base: " << std::hex << dse_base << std::endl;
+    LOG(INFO)
+        << "cur_pos: " << std::hex << cur_pos
+        << ", dse_base: " << std::hex << dse_base;
 
     // symbol next to blob
     if (dse_base > cur_pos) {
@@ -1111,21 +903,19 @@ static void DeserializeData(const ::Data &d, DataSection &ds) {
       ds.addEntry(dse_sym);
 
       cur_pos = dse_base + dse_sym.getSize();
-      std::cerr
-          << "new_cur_pos: " << std::hex << cur_pos << std::endl;
+      LOG(INFO)
+          << "new_cur_pos: " << std::hex << cur_pos;
 
       // symbols next to each other
     } else if (dse_base == cur_pos) {
       ds.addEntry(dse_sym);
       cur_pos = dse_base + dse_sym.getSize();
-      std::cerr
-          << "new_cur_pos2: " << std::hex << cur_pos << std::endl;
+      LOG(INFO)
+          << "new_cur_pos2: " << std::hex << cur_pos;
 
     } else {
-      std::cerr
-          << __FILE__ << ":" << __LINE__ << std::endl
-          << "Deserialized an out-of-order symbol!" << std::endl;
-      throw TErr(__LINE__, __FILE__, "Deserialized an out-of-order symbol!");
+      LOG(FATAL)
+          << "Deserialized an out-of-order symbol!";
     }
   }
 
@@ -1145,13 +935,14 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
 
   std::ifstream fstream(file_name, std::ios::binary);
   if (!fstream.good()) {
-    std::cerr << "Failed to open file " << file_name << std::endl;
+    LOG(ERROR)
+        << "Failed to open file " << file_name;
     return m;
   }
 
-  //read the protobuf object in
   if (!proto.ParseFromIstream(&fstream)) {
-    std::cerr << "Failed to deserialize protobuf module" << std::endl;
+    LOG(ERROR)
+        << "Failed to deserialize protobuf module";
     return m;
   }
 
@@ -1161,29 +952,36 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
   std::list<DataSection> data_sections;
   std::list<MCSOffsetTablePtr> offset_tables;
 
-  std::cerr << "Deserializing externs..." << std::endl;
+  LOG(INFO)
+      << "Deserializing externs...";
+
   for (const auto &external_func : proto.external_funcs()) {
     extern_funcs.push_back(DeserializeExternFunc(external_func));
   }
 
-  std::cerr << "Deserializing functions..." << std::endl;
+  LOG(INFO)
+      << "Deserializing functions...";
+
   for (const auto &internal_func : proto.internal_funcs()) {
     auto natf = DeserializeNativeFunc(internal_func, extern_funcs);
     if (!natf) {
-      std::cerr << "Unable to deserialize module." << std::endl;
+      LOG(ERROR)
+          << "Unable to deserialize module.";
       return nullptr;
     }
     native_funcs[static_cast<VA>(internal_func.entry_address())] = natf;
   }
 
-  std::cerr << "Deserializing data..." << std::endl;
+  LOG(INFO)
+      << "Deserializing data...";
   for (auto &internal_data_elem : proto.internal_data()) {
     DataSection ds;
     DeserializeData(internal_data_elem, ds);
     data_sections.push_back(ds);
   }
 
-  std::cerr << "Deserializing external data..." << std::endl;
+  LOG(INFO)
+      << "Deserializing external data...";
   for (const auto &exteral_data_elem : proto.external_data()) {
     extern_data.push_back(DeserializeExternData(exteral_data_elem));
   }
@@ -1200,33 +998,39 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
     offset_tables.push_back(t);
   }
 
-  std::cerr << "Creating module..." << std::endl;
+  LOG(INFO)
+      << "Creating module...";
   m = NativeModulePtr(
       new NativeModule(proto.module_name(), native_funcs, ArchTriple()));
 
   //populate the module with externals calls
-  std::cerr << "Adding external funcs..." << std::endl;
+  LOG(INFO)
+      << "Adding external funcs...";
   for (auto &extern_func_call : extern_funcs) {
     m->addExtCall(extern_func_call);
   }
 
-  //populate the module with externals data
-  std::cerr << "Adding external data..." << std::endl;
+  // Populate the module with externals data
+  LOG(INFO)
+      << "Adding external data...";
   for (auto &extern_data_ref : extern_data) {
     m->addExtDataRef(extern_data_ref);
   }
 
-  //populate the module with internal data
-  std::cerr << "Adding internal data..." << std::endl;
+  // Populate the module with internal data
+  LOG(INFO)
+      << "Adding internal data...";
   for (auto &data_section : data_sections) {
     m->addDataSection(data_section);
   }
 
-  std::cerr << "Adding Offset Tables..." << std::endl;
+  LOG(INFO)
+      << "Adding Offset Tables...";
   m->addOffsetTables(offset_tables);
 
   // set entry points for the module
-  std::cerr << "Adding entry points..." << std::endl;
+  LOG(INFO)
+      << "Adding entry points...";
   for (const auto &entry_symbol : proto.entries()) {
     NativeEntrySymbol native_es(
         entry_symbol.entry_name(),
@@ -1240,6 +1044,7 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
     m->addEntryPoint(native_es);
   }
 
-  std::cerr << "Returning module..." << std::endl;
+  LOG(INFO)
+      << "Returning module...";
   return m;
 }

@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2013, Trail of Bits
+ Copyright (c) 2017, Trail of Bits
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without modification,
@@ -8,6 +8,8 @@
  Redistributions of source code must retain the above copyright notice, this
  list of conditions and the following disclaimer.
 
+ Redistributions in binary form must reproduce the above copyright notice, this
+ list of conditions and the following disclaimer in the documentation and/or
  other materials provided with the distribution.
 
  Neither the name of the {organization} nor the names of its
@@ -26,6 +28,9 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+
 #include <llvm/ADT/StringSwitch.h>
 
 #include <llvm/Bitcode/ReaderWriter.h>
@@ -41,9 +46,14 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
-#include <llvm/Support/CommandLine.h>
-
+#include <memory>
 #include <vector>
+
+#include "remill/Arch/Arch.h"
+#include "remill/Arch/Instruction.h"
+#include "remill/BC/ABI.h"
+#include "remill/BC/IntrinsicTable.h"
+#include "remill/BC/Lifter.h"
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/Arch/Dispatch.h"
@@ -51,31 +61,16 @@
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
 
-#include "mcsema/CFG/Externals.h"
-#include "mcsema/cfgToLLVM/TransExcn.h"
+//#include "mcsema/CFG/Externals.h"
 
-#include "mcsema/BC/Util.h"
+DEFINE_bool(ignore_unsupported, false,
+            "Should unsupported instructions be ignored?");
 
-static llvm::cl::opt<bool> IgnoreUnsupportedInsts(
-    "ignore-unsupported",
-    llvm::cl::desc(
-        "Ignore unsupported instructions."),
-    llvm::cl::init(false));
+DEFINE_bool(add_reg_tracer, false,
+            "Add a debug function that prints out the register state before "
+            "each lifted instruction execution.");
 
-static llvm::cl::opt<bool> AddTracer(
-    "add-reg-tracer",
-    llvm::cl::desc(
-        "Add a debug function that prints out the register state before "
-        "each lifted instruction execution."),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> AddBreakpoints(
-    "add-breakpoints",
-    llvm::cl::desc(
-        "Add 'breakpoint' functions between every lifted instruction. This "
-        "allows one to set a breakpoint, in the lifted code, just before a "
-        "specific lifted instruction is executed."),
-    llvm::cl::init(false));
+DECLARE_bool(add_breakpoints);  // Already part of Remill's lifting process.
 
 llvm::CallingConv::ID getLLVMCC(ExternalCodeRef::CallingConvention cc) {
   switch (cc) {
@@ -89,8 +84,8 @@ llvm::CallingConv::ID getLLVMCC(ExternalCodeRef::CallingConvention cc) {
       // mcsema internal calls are cdecl with one argument
       return llvm::CallingConv::C;
     default:
-      throw TErr(__LINE__, __FILE__, "Unknown calling convention!");
-      break;
+      LOG(FATAL)
+          << "Unknown calling convention.";
   }
 
   return llvm::CallingConv::C;
@@ -102,41 +97,41 @@ llvm::CallingConv::ID getLLVMCC(ExternalCodeRef::CallingConvention cc) {
 //
 
 
-static void CreateInstrBreakpoint(llvm::BasicBlock *B, VA pc) {
-  auto F = B->getParent();
-  auto M = F->getParent();
+//static void CreateInstrBreakpoint(llvm::BasicBlock *B, VA pc) {
+//  auto F = B->getParent();
+//  auto M = F->getParent();
+//
+//  std::stringstream ss;
+//  ss << "breakpoint_" << std::hex << pc;
+//  auto instr_func_name = ss.str();
+//
+//  auto IFT = M->getFunction(instr_func_name);
+//  if (!IFT) {
+//
+//    IFT = llvm::Function::Create(
+//        LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
+//        instr_func_name, M);
+//
+//    IFT->addFnAttr(llvm::Attribute::OptimizeNone);
+//    IFT->addFnAttr(llvm::Attribute::NoInline);
+//
+//    auto &C = M->getContext();
+//    llvm::IRBuilder<> ir(llvm::BasicBlock::Create(C, "", IFT));
+//    ir.CreateRetVoid();
+//  }
+//
+//  auto state_ptr = &*F->arg_begin();
+//  llvm::CallInst::Create(IFT, {state_ptr}, "", B);
+//}
 
-  std::stringstream ss;
-  ss << "breakpoint_" << std::hex << pc;
-  auto instr_func_name = ss.str();
-
-  auto IFT = M->getFunction(instr_func_name);
-  if (!IFT) {
-
-    IFT = llvm::Function::Create(
-        LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
-        instr_func_name, M);
-
-    IFT->addFnAttr(llvm::Attribute::OptimizeNone);
-    IFT->addFnAttr(llvm::Attribute::NoInline);
-
-    auto &C = M->getContext();
-    llvm::IRBuilder<> ir(llvm::BasicBlock::Create(C, "", IFT));
-    ir.CreateRetVoid();
-  }
-
-  auto state_ptr = &*F->arg_begin();
-  llvm::CallInst::Create(IFT, {state_ptr}, "", B);
-}
-
-static void AddRegStateTracer(llvm::BasicBlock *B) {
-  auto F = B->getParent();
-  auto M = F->getParent();
-  auto IFT = ArchGetOrCreateRegStateTracer(M);
-
-  auto state_ptr = &*F->arg_begin();
-  llvm::CallInst::Create(IFT, {state_ptr}, "", B);
-}
+//static void AddRegStateTracer(llvm::BasicBlock *B) {
+//  auto F = B->getParent();
+//  auto M = F->getParent();
+//  auto IFT = ArchGetOrCreateRegStateTracer(M);
+//
+//  auto state_ptr = &*F->arg_begin();
+//  llvm::CallInst::Create(IFT, {state_ptr}, "", B);
+//}
 
 static const char * const kRealEIPAnnotation = "mcsema_real_eip";
 
@@ -167,170 +162,259 @@ static void AnnotateInsts(llvm::Function *F, VA pc) {
   }
 }
 
-
-// Take the supplied MCInst and turn it into a series of LLVM instructions.
-// Insert those instructions into the supplied block.
-// Here's the philosophy:
-// LLVM MCInst opcodes encode X86 instructions by, roughly:
-//
-//    mnemonic[bitwidth]<operandlist>
-//
-//  So for example, there are many different encodings and bitwidths of the
-//  "add" mnemonic. each combination has its own space in the opcodes enum
-//
-//  We're narrowing from the space of LLVM MCInst opcodes in a few steps:
-//     1. First by width. we take each mnemonic and classify it by width.
-//        there are templated functions for dealing with mnemonic / operand
-//        pairs, parameterized around operand width
-//     2. next by operand type. Within each parameterized wrapper, we
-//        'unrwrap' by extracting each operand and producing input values
-//        to the instructions
-//     3. finally, in an inner step, we define the instruction semantics
-//        entirely in terms of LLVM Value objects. This is where the 'meat'
-//        of semantic modeling takes places.
-//     The breakdown looks something like this:
-//
-//     X86::CMP8rr -> [1] -> doCmpRR<8> -> [2] doCmpVV<8> -> [3]
-//
-//     The innermost is where most of the intelligent decisions happen.
-//
-static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
-                                      llvm::BasicBlock *&block) {
-  InstTransResult itr = ContinueBlock;
-
-  // For conditional instructions, get the "true" and "false" targets.
-  // This will also look up the target for nonconditional jumps.
-  //string trueStrName = "block_0x" + to_string<VA>(ip->get_tr(), hex);
-  //string falseStrName = "block_0x" + to_string<VA>(ip->get_fa(), hex);
-
-  auto &inst = ctx.natI->get_inst();
-
-  if (auto lifter = ArchGetInstructionLifter(inst)) {
-    itr = ArchLiftInstruction(ctx, block, lifter);
-
-    if (TranslateError == itr || TranslateErrorUnsupported == itr) {
-      std::cerr << "Error translating instruction at " << std::hex
-                << ctx.natI->get_loc() << std::endl;
-    }
-
-  // Instruction translation not defined.
-  } else {
-    auto opcode = inst.getOpcode();
-    std::cerr << "Error translating instruction at " << std::hex
-              << ctx.natI->get_loc() << "; unsupported opcode " << std::dec
-              << opcode << std::endl;
-    return TranslateErrorUnsupported;
-  }
-  return itr;
+// Tries to get the lifted function beginning at `pc`.
+static llvm::Function *GetLiftedFunction(uint64_t pc) {
+  std::stringstream ss;
+  ss << "sub_" << std::hex << pc;
+  auto sub_name = ss.str();
+  return gModule->getFunction(sub_name);
 }
 
-static InstTransResult LiftInstIntoBlock(TranslationContext &ctx,
-                                         llvm::BasicBlock *&block,
-                                         bool doAnnotation) {
-  auto pc = ctx.natI->get_loc();
+// Call another lifted function, e.g. `sub_abc123`, or an intrinsic function,
+// e.g. `__remill_async_hyper_call`.
+static llvm::Value *AddSubFuncCall(llvm::BasicBlock *block,
+                                   llvm::Function *sub) {
+  // Set up arguments according to our ABI.
+  std::vector<llvm::Value *> args(remill::kNumBlockArgs);
+  args[remill::kMemoryPointerArgNum] = remill::LoadMemoryPointer(block);
+  args[remill::kStatePointerArgNum] = remill::LoadStatePointer(block);
+  args[remill::kPCArgNum] = remill::LoadProgramCounter(block);
 
-  // Update the program counter.
-  auto pc_ty = llvm::Type::getIntNTy(block->getContext(), ArchAddressSize());
-  GENERIC_MC_WRITEREG(
-      block,
-      llvm::X86::EIP,
-      llvm::ConstantInt::get(pc_ty, pc));
+  auto func = block->getParent();
+  sub->setCallingConv(func->getCallingConv());
 
-  // At the beginning of the block, make a call to a dummy function with the
-  // same name as the block. This function call cannot be optimized away, and
-  // so it serves as a useful marker for where we are.
-  if (AddBreakpoints) {
-    CreateInstrBreakpoint(block, pc);
+  return llvm::CallInst::Create(sub, args, "", block);
+}
+
+// Add a call to another function, and then update the memory pointer with the
+// result of the function.
+static void InlineSubFuncCall(llvm::BasicBlock *block,
+                              llvm::Function *sub) {
+  auto val = AddSubFuncCall(block, sub);
+  auto mem_ptr = remill::LoadMemoryPointerRef(block);
+  new llvm::StoreInst(val, mem_ptr, block);
+}
+
+// Get the basic block within this function associated with a specific program
+// counter.
+static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
+                                          uint64_t pc) {
+  auto &block = ctx.va_to_bb[pc];
+  if (!block) {
+    LOG(ERROR)
+        << "Adding missing block " << std::hex << pc;
+
+    // First, try to see if it's actually related to another function. This is
+    // equivalent to a tail-call in the original code.
+    if (auto tail_called_func = GetLiftedFunction(pc)) {
+      LOG(INFO)
+          << "Missing block is a tail call to sub_" << std::hex << pc;
+
+      llvm::ReturnInst::Create(
+          *gContext,
+          AddSubFuncCall(block, tail_called_func),
+          block);
+
+    // Terminate the block with an unreachable inst.
+    } else {
+      new llvm::UnreachableInst(*gContext, block);
+    }
+  }
+  return block;
+}
+
+// Lift both targets of a conditional branch into a branch in the bitcode,
+// where each side of the branch tail-calls to the functions associated with
+// the lifted blocks for those branch targets.
+static void LiftConditionalBranch(TranslationContext &ctx,
+                                  llvm::BasicBlock *source,
+                                  remill::Instruction *instr) {
+  auto function = source->getParent();
+  auto block_true = GetOrCreateBlock(ctx, instr->branch_taken_pc);
+  auto block_false = GetOrCreateBlock(ctx, instr->branch_not_taken_pc);
+
+  // TODO(pag): This is a bit ugly. The idea here is that, from the semantics
+  //            code, we need a way to communicate what direction of the
+  //            conditional branch should be followed. It turns out to be
+  //            easiest just to write to a special variable :-)
+  auto branch_taken = remill::FindVarInFunction(function, "BRANCH_TAKEN");
+
+  llvm::IRBuilder<> cond_ir(source);
+  auto cond_addr = cond_ir.CreateLoad(branch_taken);
+  auto cond = cond_ir.CreateLoad(cond_addr);
+  cond_ir.CreateCondBr(
+      cond_ir.CreateICmpEQ(
+          cond,
+          llvm::ConstantInt::get(cond->getType(), 1)),
+          block_true,
+          block_false);
+}
+
+static bool TryLiftTerminator(TranslationContext &ctx,
+                              llvm::BasicBlock *block,
+                              remill::Instruction *instr) {
+  switch (instr->category) {
+    case remill::Instruction::kCategoryInvalid:
+    case remill::Instruction::kCategoryError:
+      new llvm::UnreachableInst(*gContext, block);
+      return true;
+
+    case remill::Instruction::kCategoryNormal:
+    case remill::Instruction::kCategoryNoOp:
+      return false;
+
+    case remill::Instruction::kCategoryDirectJump:
+      llvm::BranchInst::Create(
+          GetOrCreateBlock(ctx, instr->branch_taken_pc), block);
+      return true;
+
+    case remill::Instruction::kCategoryIndirectJump:
+      llvm::ReturnInst::Create(
+          *gContext,
+          AddSubFuncCall(block, ctx.lifter->intrinsics->jump),
+          block);
+      return true;
+
+    case remill::Instruction::kCategoryDirectFunctionCall:
+      InlineSubFuncCall(block, GetLiftedFunction(instr->branch_taken_pc));
+      return false;
+
+    case remill::Instruction::kCategoryIndirectFunctionCall:
+      InlineSubFuncCall(block, ctx.lifter->intrinsics->function_call);
+      return false;
+
+    case remill::Instruction::kCategoryFunctionReturn:
+      llvm::ReturnInst::Create(
+          *gContext, remill::LoadMemoryPointer(block), block);
+      return true;
+
+    case remill::Instruction::kCategoryConditionalBranch:
+    case remill::Instruction::kCategoryConditionalAsyncHyperCall:
+      LiftConditionalBranch(ctx, block, instr);
+      return true;
+
+    case remill::Instruction::kCategoryAsyncHyperCall:
+      InlineSubFuncCall(block, ctx.lifter->intrinsics->async_hyper_call);
+      return false;
+  }
+}
+
+static bool LiftInstIntoBlock(TranslationContext &ctx,
+                              llvm::BasicBlock *block,
+                              bool is_last) {
+  static const remill::Arch *arch = nullptr;
+  if (!arch) {
+    arch = remill::GetGlobalArch();
   }
 
-  if (AddTracer) {
-    AddRegStateTracer(block);
+  auto instr_addr = ctx.natI->get_loc();
+  auto &bytes = ctx.natI->get_bytes();
+  std::unique_ptr<remill::Instruction> instr(
+      arch->DecodeInstruction(instr_addr, bytes));
+
+  CHECK(instr->IsValid())
+      << "Cannot decode instruction at " << std::hex << instr_addr;
+
+  DLOG_IF(WARNING, bytes.size() != instr->NumBytes())
+      << "Size of decoded instruction at " << std::hex << instr_addr
+      << " (" << std::dec << instr->NumBytes()
+      << ") doesn't match input instruction size ("
+      << bytes.size() << ").";
+
+  auto ret = ctx.lifter->LiftIntoBlock(instr.get(), block);
+
+  if (TryLiftTerminator(ctx, block, instr.get())) {
+    CHECK(is_last)
+        << "Instruction at " << std::hex << instr_addr
+        << " should end the basic block.";
   }
 
-  auto lift_status = LiftInstIntoBlockImpl(ctx, block);
+  // Annotate every un-annotated instruction in this function with the
+  // program counter of the current instruction.
+  AnnotateInsts(ctx.F, instr_addr);
 
-  // we need to loop over this function and find any un-annotated instructions.
-  // then we annotate each instruction
-  if (doAnnotation) {
-    AnnotateInsts(ctx.F, pc);
-  }
-
-  return lift_status;
+  return ret;
 }
 
 static bool LiftBlockIntoFunction(TranslationContext &ctx) {
-  auto didError = false;
-
-  //first, either create or look up the LLVM basic block for this native
-  //block. we are either creating it for the first time, or, we are
-  //going to look up a blank block
+  auto good = true;
   auto block_name = ctx.natB->get_name();
-  auto curLLVMBlock = ctx.va_to_bb[ctx.natB->get_base()];
+  auto block_pc = ctx.natB->get_base();
+  auto block = ctx.va_to_bb[block_pc];
 
-  //then, create a basic block for every follow of this block, if we do not
-  //already have that basic block in our LLVM CFG
+  // Sanity check; make sure that successor blocks exist.
   const auto &follows = ctx.natB->get_follows();
   for (auto succ_block_va : follows) {
-    if (!ctx.va_to_bb.count(succ_block_va)) {
-      throw TErr(__LINE__, __FILE__, "Missing successor block!");
-    }
+    CHECK(1 == ctx.va_to_bb.count(succ_block_va))
+        << "Missing successor block " << std::hex << succ_block_va
+        << " of block " << ctx.natB->get_base();
   }
 
-  //now, go through each statement and translate it into LLVM IR
-  //statements that branch SHOULD be the last statement in a block
+  // Lift each instruction into the block.
+  size_t i = 0;
   for (auto inst : ctx.natB->get_insts()) {
     ctx.natI = inst;
-    switch (LiftInstIntoBlock(ctx, curLLVMBlock, true)) {
-      case ContinueBlock:
-        break;
-      case EndBlock:
-      case EndCFG:
-        goto done;
-      case TranslateErrorUnsupported:
-        didError = !IgnoreUnsupportedInsts;
-        goto done;
-      case TranslateError:
-        didError = true;
-        goto done;
+    auto is_last = (++i) >= ctx.natB->get_insts().size();
+    good = good && LiftInstIntoBlock(ctx, block, is_last);
+  }
+
+  if (!block->getTerminator()) {
+    if (follows.size() == 1) {
+      llvm::BranchInst::Create(ctx.va_to_bb[follows.front()], block);
+    } else {
+      LOG_IF(ERROR, !ctx.natI->has_local_noreturn())
+          << "Block " << std::hex << block_pc << " has no terminator, and "
+          << " instruction at " << std::hex << ctx.natI->get_loc()
+          << " is not a local no-return function call.";
+
+      new llvm::UnreachableInst(block->getContext(), block);
     }
   }
-done:
 
-  if (curLLVMBlock->getTerminator()) {
-    return didError;
-  }
-
-  // we may need to insert a branch inst to the successor
-  // if the block ended on a non-terminator (this happens since we
-  // may split blocks in cfg recovery to avoid code duplication)
-  if (follows.size() == 1) {
-    llvm::BranchInst::Create(ctx.va_to_bb[follows.front()], curLLVMBlock);
-  } else {
-    new llvm::UnreachableInst(curLLVMBlock->getContext(), curLLVMBlock);
-  }
-
-  return didError;
+  block->dump();
+  return good;
 }
 
 static bool InsertFunctionIntoModule(NativeModulePtr mod,
-                                     NativeFunctionPtr func, llvm::Module *M) {
-  auto &C = M->getContext();
-  auto F = M->getFunction(func->get_name());
-  if (!F) {
-    throw TErr(__LINE__, __FILE__, "Could not get func " + func->get_name());
+                                     NativeFunctionPtr func,
+                                     llvm::Module *M) {
+
+  static std::unique_ptr<remill::IntrinsicTable> intrinsics;
+  if (!intrinsics.get()) {
+    intrinsics.reset(new remill::IntrinsicTable(M));
   }
 
+  auto &C = M->getContext();
+  auto F = M->getFunction(func->get_name());
+  CHECK(nullptr != F)
+      << "Could not get func " << func->get_name();
+
   if (!F->empty()) {
-    std::cout << "WARNING: Asking to re-insert function: " << func->get_name()
-              << std::endl << "\tReturning current function instead"
-              << std::endl;
+    LOG(WARNING)
+        << "Asking to re-insert function: " << func->get_name()
+        << "; returning current function instead";
     return true;
   }
 
-  auto entryBlock = llvm::BasicBlock::Create(F->getContext(), "entry", F);
-  ArchAllocRegisterVars(entryBlock);
+  auto arch = remill::GetGlobalArch();
+  auto word_type = llvm::Type::getIntNTy(C, arch->address_size);
+
+  auto old_cc = F->getCallingConv();
+  remill::CloneBlockFunctionInto(F);
+
+  // Remill uses the fastcall calling convention, but we want to use the OS-
+  // specific one.
+  F->setCallingConv(old_cc);
+
+  // For ease of debugging generated code, don't allow lifted functions to
+  // be inlined. This will make lifted and native call graphs one-to-one.
+  F->addFnAttr(llvm::Attribute::NoInline);
+
+  std::unique_ptr<remill::InstructionLifter> lifter(
+      new remill::InstructionLifter(word_type, intrinsics.get()));
 
   TranslationContext ctx;
+  ctx.lifter = lifter.get();
   ctx.natM = mod;
   ctx.natF = func;
   ctx.M = M;
@@ -343,21 +427,16 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
   }
 
   // Create a branch from the end of the entry block to the first block
-  llvm::BranchInst::Create(ctx.va_to_bb[func->get_start()], entryBlock);
+  llvm::BranchInst::Create(ctx.va_to_bb[func->get_start()], &(F->front()));
 
   // Lift every basic block into the functions.
-  auto error = false;
+  auto good = true;
   for (auto block_info : func->get_blocks()) {
     ctx.natB = block_info.second;
-    error = LiftBlockIntoFunction(ctx) || error;
+    good = good && LiftBlockIntoFunction(ctx);
   }
 
-  // For ease of debugging generated code, don't allow lifted functions to
-  // be inlined. This will make lifted and native call graphs one-to-one.
-  F->addFnAttr(llvm::Attribute::NoInline);
-
-  //we should be done, having inserted every block into the module
-  return !error;
+  return good;
 }
 
 struct DataSectionVar {
@@ -385,8 +464,8 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
 
     //report << "inserting global data section named ";
     //report << bufferName << "\n";
-    std::cout << "inserting global data section named ";
-    std::cout << bufferName << std::endl;
+    LOG(INFO)
+        << "Inserting global data section named " << bufferName;
 
     auto st_opaque = llvm::StructType::create(M->getContext());
     // Used to be PrivateLinkage, but that emitted
@@ -457,15 +536,17 @@ static void InitLiftedFunctions(NativeModulePtr natMod, llvm::Module *M) {
       F = llvm::dyn_cast<llvm::Function>(
           M->getOrInsertFunction(fname, LiftedFunctionType()));
 
-      TASSERT(F != nullptr, "Could not insert function into module");
+      CHECK(F != nullptr)
+          << "Could not insert function " << fname << " into module";
 
       ArchSetCallingConv(M, F);
       // make local functions 'static'
       F->setLinkage(llvm::GlobalValue::InternalLinkage);
-      std::cout << "Inserted function: " << fname << std::endl;
+      LOG(INFO)
+          << "Inserted function: " << fname;
     } else {
-      std::cout << "Already inserted function: " << fname << ", skipping."
-                << std::endl;
+      LOG(INFO)
+          << "Already inserted function: " << fname << ", skipping.";
     }
   }
 }
@@ -478,7 +559,9 @@ static void InitExternalData(NativeModulePtr natMod, llvm::Module *M) {
                                         dsize);
     auto gv = llvm::dyn_cast<llvm::GlobalValue>(
         M->getOrInsertGlobal(symname, extType));
-    TASSERT(gv != nullptr, "Could not make global value!");
+
+    CHECK(gv != nullptr)
+        << "Could not make global value for external data symbol " << symname;
 
     if (dr->isWeak()) {
       gv->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
@@ -536,14 +619,15 @@ static void InitExternalCode(NativeModulePtr natMod, llvm::Module *M) {
           arguments.push_back(llvm::Type::getInt64Ty(C));
 
         } else {
-          TASSERT(false, "Unknown OS Type!");
+          LOG(FATAL)
+              << "Unknown OS Type!";
         }
       } else {
         arguments.push_back(llvm::Type::getInt32Ty(C));
       }
     }
 
-    //create function type
+    // Create function type
     switch (e->getReturnType()) {
       case ExternalCodeRef::NoReturn:
       case ExternalCodeRef::VoidTy:
@@ -560,9 +644,8 @@ static void InitExternalCode(NativeModulePtr natMod, llvm::Module *M) {
         break;
 
       default:
-        throw TErr(
-            __LINE__, __FILE__,
-            "Encountered an unknown return type while translating function");
+        LOG(FATAL)
+            << "Encountered an unknown return type while translating function";
     }
 
     auto FTy = llvm::FunctionType::get(returnType, arguments, false);
@@ -592,9 +675,8 @@ static bool LiftFunctionsIntoModule(NativeModulePtr natMod, llvm::Module *M) {
   for (auto &func_info : natMod->get_funcs()) {
     NativeFunctionPtr f = func_info.second;
     if (!InsertFunctionIntoModule(natMod, f, M)) {
-      std::string fname = f->get_name();
-      std::cerr << "Could not insert function: " << fname
-                << " into the LLVM module" << std::endl;
+      LOG(ERROR)
+          << "Could lift function: " << f->get_name();
       return false;
     }
   }

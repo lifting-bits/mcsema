@@ -41,7 +41,6 @@
 #include <iostream>
 
 #include <llvm/ADT/Triple.h>
-#include <llvm/MC/MCInst.h>
 
 #include "mcsema/CFG/Externals.h"
 
@@ -89,6 +88,7 @@ class NativeInst {
   };
 
   enum CFGRefType {
+    CFGInvalidRef,
     CFGCodeRef,
     CFGDataRef
   };
@@ -103,7 +103,8 @@ class NativeInst {
   VA tgtIfTrue;
   VA tgtIfFalse;
   VA loc;
-  llvm::MCInst decoded_inst;
+  std::string bytes;
+
   ExternalCodeRefPtr extCallTgt;
   ExternalDataRefPtr extDataRef;
 
@@ -116,7 +117,7 @@ class NativeInst {
   bool ext_call_target;
   bool ext_data_ref;
   bool is_call_external;
-  uint8_t len;
+  size_t len;
   bool is_terminator;
 
   // relocation offset: the number of bytes from the start of the instruction
@@ -137,14 +138,10 @@ class NativeInst {
   bool has_mem_reference;
  private:
 
-  uint32_t arch;
   //  if this instruction is a system call, its system call number
   //  otherwise, -1
   int system_call_number;
   bool local_noreturn;
-
-  VA rip_target;
-  bool hasRIP;
  public:
   VA offset_table;
 
@@ -175,10 +172,9 @@ class NativeInst {
   bool get_is_call_external(void) const;
   void set_is_call_external(void);
 
-  llvm::MCInst &get_inst(void);
-  void set_inst(const llvm::MCInst &i);
-
   VA get_loc(void) const;
+
+  const std::string &get_bytes(void) const;
 
   void set_tr(VA a);
   void set_fa(VA a);
@@ -201,11 +197,7 @@ class NativeInst {
   bool has_ext_data_ref(void) const;
 
   bool has_external_ref(void) const;
-
-  bool has_rip_relative(void) const;
-  VA get_rip_relative(void) const;
-  void set_rip_relative(unsigned i);
-
+  
   // accessors for JumpTable
   void set_jump_table(MCSJumpTablePtr p);
   MCSJumpTablePtr get_jump_table(void) const;
@@ -218,9 +210,8 @@ class NativeInst {
 
   Prefix get_prefix(void) const;
   unsigned int get_addr_space(void) const;
-  unsigned int get_opcode(void) const;
 
-  NativeInst(VA v, uint8_t l, const llvm::MCInst &inst, Prefix k);
+  NativeInst(VA v, const std::string &bytes_);
 };
 
 class NativeBlock {

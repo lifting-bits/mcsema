@@ -14,12 +14,17 @@ class MCInst;
 class Module;
 }  // namespace llvm
 
+namespace remill {
+class InstructionLifter;
+}  // namespace remill
+
 class NativeModule;
 class NativeFunction;
 class NativeBlock;
 class NativeInst;
 
 struct TranslationContext {
+  remill::InstructionLifter *lifter;
   NativeModule *natM;
   NativeFunction *natF;
   NativeBlock *natB;
@@ -36,18 +41,5 @@ enum InstTransResult : int {
   TranslateErrorUnsupported,
   TranslateError
 };
-
-typedef InstTransResult (InstructionLifter)(
-    TranslationContext &, llvm::BasicBlock *&);
-
-class DispatchMap : public std::map<unsigned, InstructionLifter *> {};
-
-InstructionLifter *ArchGetInstructionLifter(const llvm::MCInst &inst);
-
-extern InstTransResult (*ArchLiftInstruction)(
-    TranslationContext &, llvm::BasicBlock *&, InstructionLifter *);
-
-extern llvm::Function *(*ArchGetOrCreateSemantics)(
-    llvm::Module *, const std::string &);
 
 #endif  // MC_SEMA_ARCH_DISPATCH_H_

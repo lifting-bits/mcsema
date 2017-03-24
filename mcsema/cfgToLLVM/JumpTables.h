@@ -30,6 +30,8 @@
 #ifndef _JUMPTABLES_H
 #define _JUMPTABLES_H
 
+#include <glog/logging.h>
+
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -138,33 +140,34 @@ bool addJumpTableDataSection(TranslationContext &ctx, VA &newVA,
 bool addJumpIndexTableDataSection(TranslationContext &ctx,
                                   VA &newVA, const JumpIndexTable &table);
 
-// check for the format:
-// jmp [reg*4+<relocated offset>]
-//
-// TODO(pag): This is x86-specific; factor into an arch-specific place.
-static bool isConformantJumpInst(NativeInst *jmpinst) {
+// // check for the format:
+// // jmp [reg*4+<relocated offset>]
+// //
+// // TODO(pag): This is x86-specific; factor into an arch-specific place.
+// static bool isConformantJumpInst(NativeInst *jmpinst) {
+//   LOG(FATAL)
+//       << "Not yet re-implemented!";
+//   // const auto &inst = jmpinst->get_inst();
 
-  const auto &inst = jmpinst->get_inst();
+//   // // these are now done via switch()
+//   // if (inst.getOpcode() == llvm::X86::JMP32r ||
+//   //     inst.getOpcode() == llvm::X86::JMP64r) {
+//   //   return true;
+//   // }
 
-  // these are now done via switch()
-  if (inst.getOpcode() == llvm::X86::JMP32r ||
-      inst.getOpcode() == llvm::X86::JMP64r) {
-    return true;
-  }
+//   // if (inst.getNumOperands() < 4) {
+//   //   return false;
+//   // }
 
-  if (inst.getNumOperands() < 4) {
-    return false;
-  }
+//   // const auto &scale = inst.getOperand(1);
+//   // const auto &index = inst.getOperand(2);
+//   // const auto &disp = inst.getOperand(3);
 
-  const auto &scale = inst.getOperand(1);
-  const auto &index = inst.getOperand(2);
-  const auto &disp = inst.getOperand(3);
-
-  // scale: can be 4 (32-bit) or 8 (64-bit)
-  // index must be a register
-  return scale.isImm() && index.isReg() && disp.isImm() &&
-         (scale.getImm() == 4 || scale.getImm() == 8);
-}
+//   // // scale: can be 4 (32-bit) or 8 (64-bit)
+//   // // index must be a register
+//   // return scale.isImm() && index.isReg() && disp.isImm() &&
+//   //        (scale.getImm() == 4 || scale.getImm() == 8);
+// }
 
 void doJumpTableViaData(TranslationContext &ctx, llvm::BasicBlock *&block,
                         const int bitness);
