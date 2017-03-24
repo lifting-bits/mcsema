@@ -4,17 +4,11 @@ clone_folder: C:\Projects\mcsema
 image: Visual Studio 2015
 init:
 - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
-install:
-- cmd: >-
-    "C:\Program Files\LLVM\Uninstall.exe" /S
-
-    powershell -Command "(new-object System.Net.WebClient).DownloadFile('http://releases.llvm.org/3.8.1/LLVM-3.8.1-win64.exe','%TEMP%\LLVM_381.exe')"
-
-    %TEMP%\LLVM_381.exe /S
 cache:
 - C:\Projects\mcsema\build\llvm
 - C:\Projects\mcsema\third_party\protobuf
 - C:\Projects\mcsema\third_party\llvm
+- C:\Projects\mcsema\third_party\CLANG_38
 build_script:
 - cmd: >-
     call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86_amd64
