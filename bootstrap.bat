@@ -54,7 +54,7 @@ REM We need a clang 3.8 on the system to generate bitcode-based semantics
 REM If one is not found, download it and extract it (but not install!)
 REM of course, it does't come with llvm-link.exe, so we *STILL* have to
 REM build llvm 3.8 from source as well
-if exist %THIRD_PARTY%\CLANG_38 goto check_vs
+if exist %THIRD_PARTY_DIR%\CLANG_38 goto check_vs
 if "%PROCESSOR_ARCHITECTURE%"=="AMD64" ( 
     set CLANGBITS=64) else (
     set CLANGBITS=32)
@@ -64,7 +64,7 @@ if not %ERRORLEVEL% == 0 (
     echo [+] Downloading LLVM-3.8.1-win%CLANGBITS%.exe
     powershell -Command "(new-object System.Net.WebClient).DownloadFile('http://releases.llvm.org/3.8.1/LLVM-3.8.1-win%CLANGBITS%.exe','%THIRD_PARTY_DIR%\CLANG_38.exe')"
     echo [+] Extracting LLVM-3.8.1-win%CLANGBITS%.exe
-    7z -bd -o%THIRDPARTY%\CLANG_38 x -y %THIRDPARTY%\CLANG_38.exe > NUL
+    7z -bd -o%THIRD_PARTY_DIR%\CLANG_38 x -y %THIRD_PARTY_DIR%\CLANG_38.exe > NUL
 )
 
 
@@ -83,6 +83,7 @@ if "%PROCESSOR_ARCHITECTURE%"=="AMD64" (
 
 set VSBUILD=UNKNOWN
 set VSTOOLSET=UNKNOWN
+echo Checking for Visual Studio
 cl /? 2>&1 | findstr /C:"Version 18" > nul
 if %ERRORLEVEL% == 0 (
     set VSBUILD=Visual Studio 12 2013%BITNESS%
@@ -202,3 +203,4 @@ cmake --build . --config Release --target install -- /maxcpucount:%NUMBER_OF_PRO
 popd
 
 popd
+
