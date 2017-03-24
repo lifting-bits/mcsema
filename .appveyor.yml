@@ -2,6 +2,15 @@ version: 0.6.{build}
 clone_depth: 1
 clone_folder: C:\Projects\mcsema
 image: Visual Studio 2015
+init:
+- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+install:
+- cmd: >-
+    "C:\Program Files\LLVM\Uninstall.exe" /S
+
+    curl -fsS -o %TEMP%\LLVM_391.exe http://releases.llvm.org/3.9.1/LLVM-3.9.1-win64.exe
+
+    %TEMP%\LLVM_391.exe /S
 cache:
 - C:\Projects\mcsema\build\llvm
 - C:\Projects\mcsema\third_party\protobuf
@@ -13,3 +22,5 @@ build_script:
     cd C:\Projects\mcsema\
 
     bootstrap.bat
+on_finish:
+- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
