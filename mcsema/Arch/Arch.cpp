@@ -1,4 +1,32 @@
-/* Copyright 2017 Peter Goodman (peter@trailofbits.com), all rights reserved. */
+/*
+Copyright (c) 2017, Trail of Bits
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+  Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+  Redistributions in binary form must reproduce the above copyright notice, this
+  list of conditions and the following disclaimer in the documentation and/or
+  other materials provided with the distribution.
+
+  Neither the name of the organization nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
 
 #include <glog/logging.h>
 
@@ -21,7 +49,9 @@
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/Arch/Dispatch.h"
+#include "mcsema/BC/Util.h"
 
+namespace mcsema {
 namespace {
 
 static std::string gDataLayout;
@@ -37,8 +67,7 @@ static llvm::Triple::OSType gOSType;
 
 const remill::Arch *gArch = nullptr;
 
-bool InitArch(llvm::LLVMContext *context, const std::string &os,
-              const std::string &arch) {
+bool InitArch(const std::string &os, const std::string &arch) {
 
   LOG(INFO)
       << "Initializing for " << arch << " code on " << os;
@@ -145,52 +174,52 @@ static void InitADFeatues(llvm::Module *M, const char *name,
   F->addFnAttr(llvm::Attribute::Naked);
 }
 
-void ArchInitAttachDetach(llvm::Module *M) {
-  auto &C = M->getContext();
-  auto VoidTy = llvm::Type::getVoidTy(C);
+void ArchInitAttachDetach(void) {
+  auto VoidTy = llvm::Type::getVoidTy(*gContext);
   auto EPTy = llvm::FunctionType::get(VoidTy, false);
-  const auto OS = SystemOS(M);
-  const auto Arch = SystemArch(M);
+  const auto OS = SystemOS(gModule);
+  const auto Arch = SystemArch(gModule);
+
   if (llvm::Triple::Linux == OS) {
     if (_X86_64_ == Arch) {
-      InitADFeatues(M, "__mcsema_attach_call", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
-      InitADFeatues(M, "__mcsema_detach_ret", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_call", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_ret", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_call", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_call_value", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_ret", EPTy);
 
     } else {
-      InitADFeatues(M, "__mcsema_attach_call_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_detach_ret_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_value", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_call_cdecl", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_ret_cdecl", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_call_cdecl", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_ret_cdecl", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_call_value", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_ret_value", EPTy);
 
-      InitADFeatues(M, "__mcsema_detach_call_stdcall", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_stdcall", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_fastcall", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_fastcall", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_call_stdcall", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_ret_stdcall", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_call_fastcall", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_ret_fastcall", EPTy);
     }
   } else if (llvm::Triple::Win32 == OS) {
     if (_X86_64_ == Arch) {
-      InitADFeatues(M, "__mcsema_attach_call", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
-      InitADFeatues(M, "__mcsema_detach_ret", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_call", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_ret", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_call", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_call_value", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_ret", EPTy);
     } else {
-      InitADFeatues(M, "__mcsema_attach_call_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_detach_ret_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_value", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_call_cdecl", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_ret_cdecl", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_call_cdecl", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_ret_cdecl", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_call_value", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_ret_value", EPTy);
 
-      InitADFeatues(M, "__mcsema_detach_call_stdcall", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_stdcall", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_fastcall", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_fastcall", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_call_stdcall", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_ret_stdcall", EPTy);
+      InitADFeatues(gModule, "__mcsema_detach_call_fastcall", EPTy);
+      InitADFeatues(gModule, "__mcsema_attach_ret_fastcall", EPTy);
     }
   } else {
     LOG(FATAL)
@@ -520,3 +549,5 @@ llvm::Value *doSubtractImageBaseInt(llvm::Value *original,
   // do the subtraction
   return llvm::BinaryOperator::CreateSub(original, ImageBase_int, "", block);
 }
+
+}  // namespace mcsema

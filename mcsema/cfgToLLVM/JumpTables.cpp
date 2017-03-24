@@ -52,6 +52,8 @@
 #include "mcsema/cfgToLLVM/JumpTables.h"
 #include "mcsema/cfgToLLVM/TransExcn.h"
 
+namespace mcsema {
+
 // convert a jump table to a data section of symbols
 static DataSection *tableToDataSection(VA new_base, const MCSJumpTable &jt) {
   auto ds = new DataSection();
@@ -406,3 +408,5 @@ void doJumpIndexTableViaSwitch(llvm::BasicBlock *&block, NativeInstPtr ip) {
   // new block to write to is continue block
   block = continueBlock;
 }
+
+}  // namespace mcsema

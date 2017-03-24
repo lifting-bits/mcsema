@@ -18,6 +18,8 @@ namespace remill {
 class InstructionLifter;
 }  // namespace remill
 
+namespace mcsema {
+
 class NativeModule;
 class NativeFunction;
 class NativeBlock;
@@ -41,5 +43,7 @@ enum InstTransResult : int {
   TranslateErrorUnsupported,
   TranslateError
 };
+
+}  // namespace mcsema
 
 #endif  // MC_SEMA_ARCH_DISPATCH_H_

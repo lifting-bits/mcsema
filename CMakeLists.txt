@@ -10,6 +10,7 @@ add_executable(mcsema-lift
   mcsema/Arch/Arch.cpp
   mcsema/CFG/CFG.cpp
   mcsema/BC/Lift.cpp
+  mcsema/BC/Optimize.cpp
   mcsema/BC/Util.cpp
   mcsema/Lift.cpp
 )

@@ -28,21 +28,13 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef MCSEMA_BC_LIFT_H_
-#define MCSEMA_BC_LIFT_H_
-
-#include <set>
-
-#include "mcsema/CFG/CFG.h"
+#ifndef MCSEMA_BC_OPTIMIZE_H_
+#define MCSEMA_BC_OPTIMIZE_H_
 
 namespace mcsema {
 
-//translate a NativeModule into an LLVM Module
-void RenameLiftedFunctions(NativeModulePtr mod,
-                           const std::set<VA> &entry_point_pcs);
-
-bool LiftCodeIntoModule(NativeModulePtr);
+void OptimizeBitcode(void);
 
 }  // namespace mcsema
 
-#endif  // MCSEMA_BC_LIFT_H_
+#endif  // MCSEMA_BC_OPTIMIZE_H_
