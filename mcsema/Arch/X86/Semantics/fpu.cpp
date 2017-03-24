@@ -1055,6 +1055,10 @@ static InstTransResult doCHS(llvm::MCInst &inst, NativeInstPtr ip,
         }\
       }\
       ret = THECALL;\
+      (void)(natM);\
+      (void)(F);\
+      (void)(ip);\
+      (void)(inst);\
       return ret;\
     }
 
