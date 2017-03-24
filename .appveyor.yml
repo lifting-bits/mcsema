@@ -8,9 +8,9 @@ install:
 - cmd: >-
     "C:\Program Files\LLVM\Uninstall.exe" /S
 
-    powershell -Command "(new-object System.Net.WebClient).DownloadFile('http://releases.llvm.org/3.9.1/LLVM-3.9.1-win64.exe','%TEMP%\LLVM_391.exe')"
+    powershell -Command "(new-object System.Net.WebClient).DownloadFile('http://releases.llvm.org/3.8.1/LLVM-3.8.1-win64.exe','%TEMP%\LLVM_381.exe')"
 
-    %TEMP%\LLVM_391.exe /S
+    %TEMP%\LLVM_381.exe /S
 cache:
 - C:\Projects\mcsema\build\llvm
 - C:\Projects\mcsema\third_party\protobuf
