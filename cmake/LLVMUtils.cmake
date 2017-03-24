@@ -126,15 +126,27 @@ find_program(LLVM_BC_C_COMPILER "clang-${LLVM_TO_FIND}" PATH ${LLVM_TOOLS_BINARY
 find_program(LLVM_BC_CXX_COMPILER "clang++-${LLVM_TO_FIND}" PATH ${LLVM_TOOLS_BINARY_DIR})
 find_program(LLVM_BC_LINK "llvm-link-${LLVM_TO_FIND}" PATH ${LLVM_TOOLS_BINARY_DIR})
 
+#We may have a local clang 3.8 install on Windows
+if(WIN32)
+    if (NOT LLVM_BC_C_COMPILER)
+      message(STATUS "Could not find clang-${LLVM_TO_FIND}, looking for local clang")
+      find_program(LLVM_BC_C_COMPILER clang PATH "${CMAKE_SOURCE_DIR}/third_party/CLANG_38/bin" NO_DEFAULT_PATH)
+    endif()
+  if (NOT LLVM_BC_CXX_COMPILER)
+    message(STATUS "Could not find clang++-${LLVM_TO_FIND}, looking for local clang++")
+    find_program(LLVM_BC_CXX_COMPILER clang++ PATH "${CMAKE_SOURCE_DIR}/third_party/CLANG_38/bin" NO_DEFAULT_PATH)
+  endif()
+endif()
+
 # back up to non-version-specific toolset
 if (NOT LLVM_BC_C_COMPILER)
   message(STATUS "Could not find clang-${LLVM_TO_FIND}, looking for clang")
-  find_program(LLVM_BC_C_COMPILER clang PATH "${CMAKE_SOURCE_DIR}/third_party/CLANG_38/bin" ${LLVM_TOOLS_BINARY_DIR})
+  find_program(LLVM_BC_C_COMPILER clang PATH ${LLVM_TOOLS_BINARY_DIR})
 endif()
 
 if (NOT LLVM_BC_CXX_COMPILER)
   message(STATUS "Could not find clang++-${LLVM_TO_FIND}, looking for clang++")
-  find_program(LLVM_BC_CXX_COMPILER clang++ PATH "${CMAKE_SOURCE_DIR}/third_party/CLANG_38/bin" ${LLVM_TOOLS_BINARY_DIR})
+  find_program(LLVM_BC_CXX_COMPILER clang++ PATH ${LLVM_TOOLS_BINARY_DIR})
 endif()
 
 if (NOT LLVM_BC_LINK)
