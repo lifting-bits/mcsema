@@ -121,8 +121,7 @@ if(WIN32)
 else()
   add_compile_options(
     -g3
-    -O0
-    -std=gnu++11)
+    -O0)
 
   if(NOT LLVM_ENABLE_RTTI)
     add_compile_options(
