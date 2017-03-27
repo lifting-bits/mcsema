@@ -168,7 +168,6 @@ void GENERIC_MC_WRITEREG(llvm::BasicBlock *B, MCSemaRegs mc_reg,
                          llvm::Value *val) {
   auto F = B->getParent();
   auto M = F->getParent();
-  auto &C = M->getContext();
   llvm::DataLayout DL(M);
 
   auto val_size = DL.getTypeAllocSizeInBits(val->getType());
