@@ -5,9 +5,10 @@ set -e
 
 usage() {
   echo "Usage:"
-  echo "$0 [--prefix <PREFIX>] [--build <BUILD TYPE>]"
+  echo "$0 [--prefix <PREFIX>] [--build <BUILD TYPE>] [--enable-rtti]"
   echo "PREFIX: Installation directory prefix"
   echo "BUILDTYPE: Built type (e.g. Debug, Release, etc.)"
+  echo "--enable-rtti: Enable RTTI for building LLVM"
   exit 1
 }
 
@@ -22,6 +23,11 @@ GEN_DIR=${DIR}/generated
 BUILD_TYPE=Debug
 #Install to directory of the git clone
 PREFIX=${DIR}
+
+CC=${CC:-clang-3.8}
+CXX=${CXX:-clang++-3.8}
+
+LLVM_CMAKE_OPTIONS=
 
 # taken from:
 # http://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
@@ -38,6 +44,10 @@ do
         BUILD_TYPE="$2"
         shift # past argument
       ;;
+      --enable-rtti)
+        LLVM_CMAKE_OPTIONS="${LLVM_CMAKE_OPTIONS} -DLLVM_ENABLE_RTTI=ON"
+      ;;
+
       *)
         # unknown option
         echo "Unknown option: $key"
@@ -64,7 +74,7 @@ else
   echo "Build type set to: ${BUILD_TYPE}"
 fi
 
-brew install wget git cmake || true
+brew install wget git cmake coreutils || true
 
 echo "[+] Upgrading PIP"
 
@@ -133,16 +143,16 @@ OSX_SDK=$(xcrun -sdk macosx --show-sdk-path)
 # Produce the runtimes.
 if [ ! -e ${GEN_DIR}/ELF_32_linux.S ]; then
   echo "[+] Generating runtimes"
-  clang++-3.8 -m32 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_ELF_32_linux.cpp
+  ${CXX} -m32 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_ELF_32_linux.cpp
   ./a.out > ${GEN_DIR}/ELF_32_linux.S
 
-  clang++-3.8 -m64 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_ELF_64_linux.cpp
+  ${CXX} -m64 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_ELF_64_linux.cpp
   ./a.out > ${GEN_DIR}/ELF_64_linux.S
 
-  clang++-3.8 -m32 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_PE_32_windows.cpp
+  ${CXX} -m32 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_PE_32_windows.cpp
   ./a.out > ${GEN_DIR}/PE_32_windows.asm
 
-  clang++-3.8 -m64 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_PE_64_windows.cpp
+  ${CXX} -m64 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_PE_64_windows.cpp
   ./a.out > ${GEN_DIR}/PE_64_windows.asm
 
   rm a.out
@@ -155,7 +165,7 @@ if [ ! -d "${PREFIX}/bin" ]; then
 fi
 # by default install to the user's python package directory
 # and copy the script itself to ${PREFIX}/bin
-python ${DIR}/tools/setup.py install --install-scripts "${PREFIX}/bin"
+python ${DIR}/tools/setup.py install --user --install-scripts "${PREFIX}/bin"
 
 PROCS=$(sysctl -n hw.ncpu)
 
@@ -168,10 +178,11 @@ LLVM_DIR=$(realpath ${LLVM_DIR})
 GEN_DIR=$(realpath ${GEN_DIR})
 
 echo "[x] Building LLVM"
+echo "[x] Additional Options: ${LLVM_CMAKE_OPTIONS}"
 mkdir -p llvm
 pushd llvm
-CC=clang-3.8 \
-CXX=clang++-3.8 \
+CC=${CC} \
+CXX=${CXX} \
 CFLAGS="${DEBUG_BUILD_ARGS}" \
 CXXFLAGS="${DEBUG_BUILD_ARGS}" \
 cmake \
@@ -181,6 +192,7 @@ cmake \
   -DLLVM_TARGETS_TO_BUILD="X86" \
   -DLLVM_INCLUDE_EXAMPLES=OFF \
   -DLLVM_INCLUDE_TESTS=OFF \
+  ${LLVM_CMAKE_OPTIONS} \
   ${LLVM_DIR}
 
 make -j${PROCS}
@@ -188,8 +200,8 @@ popd
 
 echo "[x] Creating Makefiles"
 
-CC=clang-3.8 \
-CXX=clang++-3.8 \
+CC=${CC} \
+CXX=${CXX} \
 CFLAGS="-g3 -O0" \
 CXXFLAGS="-g3 -O0" \
 cmake \

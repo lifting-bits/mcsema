@@ -126,9 +126,13 @@ if(WIN32)
 else()
   add_compile_options(
     -g3
-    -O0
-    -fno-rtti
-    -DGOOGLE_PROTOBUF_NO_RTTI)
+    -O0)
+
+  if(NOT LLVM_ENABLE_RTTI)
+    add_compile_options(
+      -fno-rtti
+      -DGOOGLE_PROTOBUF_NO_RTTI)
+  endif()
 endif(WIN32)
 
 # configure a header file to pass some of the CMake settings
