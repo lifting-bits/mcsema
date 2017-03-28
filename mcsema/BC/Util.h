@@ -237,6 +237,10 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
       } else { \
           NOREFS; \
       } \
+      (void)(natM);\
+      (void)(F);\
+      (void)(ip);\
+      (void)(inst);\
       return ContinueBlock;\
     }
 
@@ -254,6 +258,10 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
       } else {\
           NOREFS; \
       } \
+      (void)(natM);\
+      (void)(F);\
+      (void)(ip);\
+      (void)(inst);\
       return ContinueBlock; \
     }
 
@@ -266,6 +274,10 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
       auto ip = ctx.natI; \
       auto &inst = ip->get_inst(); \
       ret = NOREFS; \
+      (void)(natM);\
+      (void)(F);\
+      (void)(ip);\
+      (void)(inst);\
       return ret; \
     }
 

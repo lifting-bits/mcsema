@@ -1,4 +1,4 @@
-REM @echo off
+@echo off
 rem Copyright 2017 Peter Goodman, all rights reserved.
 
 set DIR=%~dp0
@@ -24,31 +24,58 @@ set "PATH=%PATH%;%ProgramFiles%\7-zip"
 REM sanity checks for installed software
 where 7z >NUL 2>NUL
 if not %ERRORLEVEL% == 0 (
-    echo "The 7z command is not found. Attempting to install"
+    echo [+] The 7z command is not found. Attempting to install
     powershell -Command "(new-object System.Net.WebClient).DownloadFile('http://www.7-zip.org/a/7z1604.msi','%THIRD_PARTY_DIR%\7z.msi')"
     msiexec /quiet /i %THIRD_PARTY_DIR%\7z.msi
 )
 where 7z >NUL 2>NUL
 if not %ERRORLEVEL% == 0 (
-    echo "Could not install 7zip, aborting"
+    echo [!] Could not install 7zip, aborting
     exit /B 1
 )
 where cmake >NUL 2>NUL
 if not %ERRORLEVEL% == 0 (
-    echo "The cmake command is not found. Please install cmake"
+    echo [!] The cmake command is not found. Please install cmake
     exit /B 1
 )
+
+REM This check is *SEPARATE* from the 3.8 check below for good reason
+REM Clang needs to be "installed" via the installer to it is available
+REM as a visual studio toolset. Mcsema uses it for the assembler and
+REM to build mcsema. We don't care as much what version this is, since 
+REM it will not generate bitcode
 where clang-cl.exe >NUL 2>NUL
 if not %ERRORLEVEL% == 0 (
-    echo "The llvm-based Visual Studio compiler (clang-cl) is not found. Please install visual studio and clang for Windows"
+    echo [!] The llvm-based Visual Studio compiler 'clang-cl.exe' is not found. Please install visual studio and clang for Windows
     exit /B 1
 )
+
+REM We need a clang 3.8 on the system to generate bitcode-based semantics
+REM If one is not found, download it and extract it (but not install!)
+REM of course, it does't come with llvm-link.exe, so we *STILL* have to
+REM build llvm 3.8 from source as well
+if exist %THIRD_PARTY_DIR%\CLANG_38 goto check_vs
+if "%PROCESSOR_ARCHITECTURE%"=="AMD64" ( 
+    set CLANGBITS=64) else (
+    set CLANGBITS=32)
+clang-cl 2>&1 -v | findstr /R /C:"version 3.8" > NUL
+if not %ERRORLEVEL% == 0 (
+    echo [+] Detected clang != 3.8; downloading clang 3.8
+    echo [+] Downloading LLVM-3.8.1-win%CLANGBITS%.exe
+    powershell -Command "(new-object System.Net.WebClient).DownloadFile('http://releases.llvm.org/3.8.1/LLVM-3.8.1-win%CLANGBITS%.exe','%THIRD_PARTY_DIR%\CLANG_38.exe')"
+    echo [+] Extracting LLVM-3.8.1-win%CLANGBITS%.exe
+    7z -bd -o%THIRD_PARTY_DIR%\CLANG_38 x -y %THIRD_PARTY_DIR%\CLANG_38.exe > NUL
+)
+
 
 REM echo [+] Upgrading PIP
 REM pip install --upgrade pip
 
+:check_vs
+
 echo Go into the mcsema directory
 pushd "%~dp0" 
+
 
 if "%PROCESSOR_ARCHITECTURE%"=="AMD64" ( 
     set BITNESS= Win64) else (
@@ -56,6 +83,7 @@ if "%PROCESSOR_ARCHITECTURE%"=="AMD64" (
 
 set VSBUILD=UNKNOWN
 set VSTOOLSET=UNKNOWN
+echo Checking for Visual Studio
 cl /? 2>&1 | findstr /C:"Version 18" > nul
 if %ERRORLEVEL% == 0 (
     set VSBUILD=Visual Studio 12 2013%BITNESS%
@@ -74,21 +102,21 @@ if "%VSTOOLSET%"=="llvm-vs2014" (
     REM but we should check for unsupported clangs just to be sure, or people will
     REM think mcsema doesnt build, when its clang that can't parse new-ish MSVC headers
     if %ERRORLEVEL% == 0 (
-        echo "Detected clang <= 3.8. This version of clang is too old to build VS2015 header files"
-        echo "Please install Clang 3.9 or newer"
-        echo "***You may have multiple clangs installed, including 3.9+ and still be get this message***"
-        echo "***If you are SURE that Visual Studio integration uses clang 3.9+ please comment out this code in bootstrap***"
+        echo "[!] Detected clang <= 3.8. This version of clang is too old to build VS2015 header files"
+        echo "[!] Please install Clang 3.9 or newer"
+        echo "[!] ***You may have multiple clangs installed, including 3.9+ and still be get this message***"
+        echo "[!] ***If you are SURE that Visual Studio integration uses clang 3.9+ please comment out this code in bootstrap***"
         exit /B 1
     )
 )
 
 if "%VSBUILD%"=="UNKNOWN" (
-    echo "Could not identify Visual Studio Version"
-    echo "This build requires at least VS 2013"
+    echo [!] Could not identify Visual Studio Version
+    echo [!] This build requires at least VS 2013
     exit /B 1
 )
 
-echo "Found Visual Studio: %VSBUILD%"
+echo Found Visual Studio: %VSBUILD%
 
 pushd third_party
 if exist protobuf goto compile_proto
@@ -131,7 +159,9 @@ if exist llvm goto compile_llvm
 
 powershell -Command "(new-object System.Net.WebClient).DownloadFile('http://releases.llvm.org/3.8.1/llvm-3.8.1.src.tar.xz', 'llvm-3.8.1.src.tar.xz')"
 7z -bd x -y llvm-3.8.1.src.tar.xz > NUL
+del llvm-3.8.1.src.tar.xz
 7z -bd x -y llvm-3.8.1.src.tar > NUL
+del llvm-3.8.1.src.tar
 move llvm-3.8.1.src llvm
 :compile_llvm
 
@@ -139,7 +169,6 @@ if not exist "%BUILD_DIR%\llvm" mkdir "%BUILD_DIR%\llvm"
 pushd "%BUILD_DIR%\llvm"
 cmake.exe ^
   -G "%VSBUILD%" ^
-  -T "%VSTOOLSET%" ^
   -DCMAKE_INSTALL_PREFIX="%MCSEMA_DIR%" ^
   -DLLVM_TARGETS_TO_BUILD="X86" ^
   -DLLVM_INCLUDE_EXAMPLES=OFF ^
@@ -148,7 +177,7 @@ cmake.exe ^
   %LLVM_DIR%
 cmake --build . --config Release
 REM Enable parallel building with MSBuild
-cmake --build . --config Release --target install -- /m /p:BuildInParallel=true
+cmake --build . --config Release --target install -- /maxcpucount:%NUMBER_OF_PROCESSORS% /p:BuildInParallel=true
   
 popd
 popd
@@ -156,6 +185,7 @@ popd
 rem Create McSema build files
 pushd build
 
+echo [+] Building mcsema-lift
 cmake.exe ^
   -G "%VSBUILD%" ^
   -T "%VSTOOLSET%" ^
@@ -168,8 +198,9 @@ cmake.exe ^
   %MCSEMA_DIR%
 cmake --build . --config Release
 REM Enable parallel building with MSBuild
-cmake --build . --config Release --target install -- /m /p:BuildInParallel=true
+cmake --build . --config Release --target install -- /maxcpucount:%NUMBER_OF_PROCESSORS% /p:BuildInParallel=true
 
 popd
 
 popd
+

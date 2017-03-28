@@ -37250,3 +37250,39 @@ __vfprintf_chk 4 C N
 # used for netcat test
 __recvfrom_chk 7 C N
 __poll_chk 4 C N
+
+#ACL Definitions
+acl_get_tag_type 2 C N
+acl_init 1 C N
+acl_dup 1 C N
+acl_free 1 C N
+acl_valid 1 C N
+
+acl_copy_entry 2 C N
+acl_create_entry 2 C N
+acl_delete_entry 2 C N
+acl_get_entry 3 C N
+
+acl_add_perm 2 C N
+acl_calc_mask 1 C N
+acl_clear_perms 1 C N
+acl_delete_perm 2 C N
+acl_get_permset 2 C N
+acl_set_permset 2 C N
+
+acl_get_qualifier 1 C N
+acl_get_tag_type 2 C N
+acl_set_qualifier 2 C N
+acl_set_tag_type 2 C N
+
+acl_copy_ext 3 C N
+acl_copy_int 1 C N
+acl_from_text 1 C N
+acl_size 1 C N
+acl_to_text 2 C N
+
+acl_delete_def_file 1 C N
+acl_get_fd 1 C N
+acl_get_file 2 C N
+acl_set_fd 2 C N
+acl_set_file 3 C N

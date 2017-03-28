@@ -5,9 +5,10 @@ set -e
 
 usage() {
   echo "Usage:"
-  echo "$0 [--prefix <PREFIX>] [--build <BUILD TYPE>]"
+  echo "$0 [--prefix <PREFIX>] [--build <BUILD TYPE>] [--enable-rtti]"
   echo "PREFIX: Installation directory prefix"
   echo "BUILDTYPE: Built type (e.g. Debug, Release, etc.)"
+  echo "--enable-rtti: Enable RTTI for building LLVM"
   exit 1
 }
 
@@ -23,6 +24,11 @@ BUILD_TYPE=Debug
 #Install to directory of the git clone
 PREFIX=$(readlink -f ${DIR})
 
+CC=${CC:-clang-3.8}
+CXX=${CXX:-clang++-3.8}
+
+LLVM_CMAKE_OPTIONS=
+
 # taken from:
 # http://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
 while [[ $# -gt 0 ]]
@@ -37,6 +43,9 @@ do
       -b|--build)
         BUILD_TYPE="$2"
         shift # past argument
+      ;;
+      --enable-rtti)
+        LLVM_CMAKE_OPTIONS="${LLVM_CMAKE_OPTIONS} -DLLVM_ENABLE_RTTI=ON"
       ;;
       *)
         # unknown option
@@ -152,10 +161,11 @@ LLVM_DIR=$(realpath ${LLVM_DIR})
 GEN_DIR=$(realpath ${GEN_DIR})
 
 echo "[x] Building LLVM"
+echo "[x] Additional Options: ${LLVM_CMAKE_OPTIONS}"
 mkdir -p llvm
 pushd llvm
-CC=clang-3.8 \
-CXX=clang++-3.8 \
+CC=${CC} \
+CXX=${CXX} \
 CFLAGS="${DEBUG_BUILD_ARGS}" \
 CXXFLAGS="${DEBUG_BUILD_ARGS}" \
 cmake \
@@ -165,6 +175,7 @@ cmake \
   -DLLVM_TARGETS_TO_BUILD="X86" \
   -DLLVM_INCLUDE_EXAMPLES=OFF \
   -DLLVM_INCLUDE_TESTS=OFF \
+  ${LLVM_CMAKE_OPTIONS} \
   ${LLVM_DIR}
 
 make -j${PROCS}
@@ -172,8 +183,8 @@ popd
 
 echo "[x] Creating Makefiles"
 
-CC=clang-3.8 \
-CXX=clang++-3.8 \
+CC=${CC} \
+CXX=${CXX} \
 CFLAGS="-g3 -O0" \
 CXXFLAGS="-g3 -O0" \
 cmake \

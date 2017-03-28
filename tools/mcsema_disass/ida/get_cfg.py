@@ -1267,7 +1267,7 @@ def processStruct(ea, size):
     for i in xrange(num_iters):
         # parse a single struct
         start_ea = ea + (i * struct_size)
-        worked, ptrs, ptrsize = parseSingleStruct(ea, idastruct)
+        worked, ptrs, ptrsize = parseSingleStruct(start_ea, idastruct)
         if worked:
             all_ptrs.update(ptrs)
 
