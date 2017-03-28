@@ -50,13 +50,6 @@
 
 using namespace llvm;
 
-static InstTransResult doNoop(BasicBlock *b) {
-  //isn't this exciting
-  return ContinueBlock;
-}
-
-GENERIC_TRANSLATION(NOOP, doNoop(block))
-
 template<int width>
 static Value * doAddVV(NativeInstPtr ip, BasicBlock *&b, Value *lhs,
                        Value *rhs) {
