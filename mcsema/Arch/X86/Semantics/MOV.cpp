@@ -590,12 +590,6 @@ GENERIC_TRANSLATION_REF(MOV8mi, doMIMov<8>(ip, block, ADDR_NOREF(0), OP(5)),
 GENERIC_TRANSLATION_REF(MOV16mi, doMIMov<16>(ip, block, ADDR_NOREF(0), OP(5)),
                         doMIMov<16>(ip, block, MEM_REFERENCE(0), OP(5)))
 
-//GENERIC_TRANSLATION_32MI(MOV32mi,
-//	doMIMov<32>(ip,   block, ADDR_NOREF(0), OP(5)),
-//	doMIMov<32>(ip,   block, MEM_REFERENCE(0), OP(5)),
-//    doMIMovV<32>(ip,  block, ADDR_NOREF(0), IMM_AS_DATA_REF(block, natM, ip))
-//    )
-//
 static InstTransResult translate_MOV32mi(TranslationContext &ctx,
                                          llvm::BasicBlock *&block) {
   InstTransResult ret;
@@ -697,20 +691,37 @@ static InstTransResult translate_MOV_NaoM(
   auto &inst = ctx.natI->get_inst();
   auto &imm_addr_op = inst.getOperand(0);
   auto &reg_op = inst.getOperand(1);
+  auto F = block->getParent();
+  auto ip = ctx.natI;
+
   if (!imm_addr_op.isImm() || !reg_op.isReg()) {
     return TranslateErrorUnsupported;
   }
 
-  reg_op = llvm::MCOperand::createReg(GET_XAX<dest_width>());
+  // this is awful, but sometimes IDA detects the immediate
+  // as a memory reference. However, this instruction can only
+  // have an immediate, so this is safe
+  if (ip->has_imm_reference || ip->has_mem_reference) {
+    ip->has_imm_reference = true;
+    ip->set_reference(NativeInst::IMMRef,
+                      ip->get_reference(NativeInst::MEMRef));
+  }
 
+  reg_op = llvm::MCOperand::createReg(GET_XAX<dest_width>());
   llvm::Value *addr = nullptr;
-  if (ctx.natI->has_imm_reference) {
+
+  // loading functions only available if its a 32-bit offset
+  if (ctx.natI->has_external_ref()) {
+    llvm::Value *addrInt = getValueForExternal<32>(F->getParent(), ctx.natI, block);
+    TASSERT(addrInt != 0, "Could not get external data reference");
+    addr = addrInt;
+  } else if (ctx.natI->has_imm_reference) {
     addr = IMM_AS_DATA_REF(block, ctx.natM, ctx.natI);
   } else {
     addr = ADDR_TO_POINTER<dest_width>(block, CONST_V<addr_width>(block, imm_addr_op.getImm()));
   }
 
-  return doRMMov<16>(ctx.natI, block, addr, reg_op);
+  return doRMMov<dest_width>(ctx.natI, block, addr, reg_op);
 }
 
 template <int dest_width, int addr_width>
@@ -719,20 +730,37 @@ static InstTransResult translate_MOV_NoaM(
   auto &inst = ctx.natI->get_inst();
   auto &imm_addr_op = inst.getOperand(0);
   auto &reg_op = inst.getOperand(1);
+  auto F = block->getParent();
+  auto ip = ctx.natI;
+
   if (!imm_addr_op.isImm() || !reg_op.isReg()) {
     return TranslateErrorUnsupported;
+  }
+
+  // this is awful, but sometimes IDA detects the immediate
+  // as a memory reference. However, this instruction can only
+  // have an immediate, so this is safe
+  if (ip->has_imm_reference || ip->has_mem_reference) {
+    ip->has_imm_reference = true;
+    ip->set_reference(NativeInst::IMMRef,
+                      ip->get_reference(NativeInst::MEMRef));
   }
 
   reg_op = llvm::MCOperand::createReg(GET_XAX<dest_width>());
 
   llvm::Value *addr = nullptr;
-  if (ctx.natI->has_imm_reference) {
+  // loading functions only available if its a 32-bit offset
+  if (ctx.natI->has_external_ref()) {
+    llvm::Value *addrInt = getValueForExternal<32>(F->getParent(), ctx.natI, block);
+    TASSERT(addrInt != 0, "Could not get external data reference");
+    addr = addrInt;
+  } else if (ctx.natI->has_imm_reference) {
     addr = IMM_AS_DATA_REF(block, ctx.natM, ctx.natI);
   } else {
     addr = ADDR_TO_POINTER<dest_width>(block, CONST_V<addr_width>(block, imm_addr_op.getImm()));
   }
 
-  return doMRMov<16>(ctx.natI, block, addr, reg_op);
+  return doMRMov<dest_width>(ctx.natI, block, addr, reg_op);
 }
 
 GENERIC_TRANSLATION_REF(MOV8mr, doMRMov<8>(ip, block, ADDR_NOREF(0), OP(5)),
@@ -883,7 +911,7 @@ static InstTransResult translate_MOV64ri(TranslationContext &ctx,
 
 //write to memory
 template<int width>
-static InstTransResult translate_MOVao(TranslationContext &ctx,
+static InstTransResult translate_MOVoa(TranslationContext &ctx,
                                        llvm::BasicBlock *&block) {
   InstTransResult ret;
 
@@ -892,6 +920,15 @@ static InstTransResult translate_MOVao(TranslationContext &ctx,
   auto ip = ctx.natI;
   auto natM = ctx.natM;
   auto &inst = ip->get_inst();
+  unsigned eaxReg = GET_XAX<width>();
+
+  // loading functions only available if its a 32-bit offset
+  if (ip->has_external_ref() && width == 32) {
+    llvm::Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
+    TASSERT(addrInt != 0, "Could not get external data reference");
+    doMRMov<width>(ip, block, addrInt, llvm::MCOperand::createReg(eaxReg));
+    return ContinueBlock;
+  }
 
   // this is awful, but sometimes IDA detects the immediate
   // as a memory reference. However, this instruction can only
@@ -916,18 +953,18 @@ static InstTransResult translate_MOVao(TranslationContext &ctx,
       data_v = IMM_AS_DATA_REF(block, natM, ip);
     }
     ret = doMRMov<width>(ip, block, data_v,
-                         llvm::MCOperand::createReg(GET_XAX<width>()));
+                         llvm::MCOperand::createReg(eaxReg));
   } else {
     llvm::Value *addrv = CONST_V<width>(block, OP(0).getImm());
     ret = doMRMov<width>(ip, block, addrv,
-                         llvm::MCOperand::createReg(GET_XAX<width>()));
+                         llvm::MCOperand::createReg(eaxReg));
   }
   return ret;
 }
 
 //write to EAX
 template<int width>
-static InstTransResult translate_MOVoa(TranslationContext &ctx,
+static InstTransResult translate_MOVao(TranslationContext &ctx,
                                        llvm::BasicBlock *&block) {
   InstTransResult ret;
   auto F = block->getParent();
