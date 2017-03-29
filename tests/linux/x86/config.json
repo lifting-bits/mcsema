@@ -38,5 +38,13 @@
             "_comment": "Executes ./switch 74642 [hits the big number case]",
             "args": ["74642"]
         }
+    },
+
+    "globals": {
+        "_comment": "mcsema's handling of global variables",
+        "default": {
+            "_comment": "globals takes no arguments",
+            "args": []
+        }
     }
 }

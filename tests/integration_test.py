@@ -251,6 +251,10 @@ class LinuxTest(unittest.TestCase):
         self._runX86Test("switch")
         self._runAMD64Test("switch")
 
+    def testglobals(self):
+        self._runX86Test("globals")
+        self._runAMD64Test("globals")
+
     def testls(self):
         libs = ["-lrt",
                 "-lpthread",
