@@ -335,22 +335,10 @@ static void WindowsAddPushJumpStub(bool decorateStub, llvm::Module *M,
 
 // Add a function that can be used to transition from native code into lifted
 // code.
-llvm::Function *ArchAddEntryPointDriver(llvm::Module *M,
-                                        const std::string &name, VA entry) {
-  // convert the VA into a string name of a function, try and look it up
-  std::stringstream ss;
-  ss << "sub_" << std::hex << entry;
-
-  auto s = ss.str();
-  llvm::Function *F = M->getFunction(s);
-  if (!F) {
-    llvm::errs() << "Could not find lifted function " << s
-                 << " for entry point " << name;
-    return nullptr;
-  }
-
-  auto &C = F->getContext();
-  auto W = M->getFunction(name);
+llvm::Function *ArchAddEntryPointDriver(const std::string &name,
+                                        llvm::Function *F) {
+  auto &C = *gContext;
+  auto W = gModule->getFunction(name);
   if (W) {
     return W;
   }
@@ -358,25 +346,25 @@ llvm::Function *ArchAddEntryPointDriver(llvm::Module *M,
   auto VoidTy = llvm::Type::getVoidTy(C);
   auto WTy = llvm::FunctionType::get(VoidTy, false);
   W = llvm::Function::Create(
-      WTy, llvm::GlobalValue::ExternalLinkage, name, M);
+      WTy, llvm::GlobalValue::ExternalLinkage, name, gModule);
 
   W->addFnAttr(llvm::Attribute::NoInline);
   W->addFnAttr(llvm::Attribute::Naked);
 
-  const auto Arch = SystemArch(M);
-  const auto OS = SystemOS(M);
+  const auto Arch = SystemArch(gModule);
+  const auto OS = SystemOS(gModule);
 
   if (llvm::Triple::Linux == OS) {
     if (_X86_64_ == Arch) {
-      LinuxAddPushJumpStub(M, F, W, "__mcsema_attach_call");
+      LinuxAddPushJumpStub(gModule, F, W, "__mcsema_attach_call");
     } else {
-      LinuxAddPushJumpStub(M, F, W, "__mcsema_attach_call_cdecl");
+      LinuxAddPushJumpStub(gModule, F, W, "__mcsema_attach_call_cdecl");
     }
   } else if (llvm::Triple::Win32 == OS) {
     if (_X86_64_ == Arch) {
-      WindowsAddPushJumpStub(true, M, F, W, "__mcsema_attach_call");
+      WindowsAddPushJumpStub(true, gModule, F, W, "__mcsema_attach_call");
     } else {
-      WindowsAddPushJumpStub(true, M, F, W, "__mcsema_attach_call_cdecl");
+      WindowsAddPushJumpStub(true, gModule, F, W, "__mcsema_attach_call_cdecl");
     }
   } else {
     LOG(FATAL)
@@ -399,9 +387,9 @@ llvm::Function *ArchAddExitPointDriver(llvm::Function *F) {
   const auto OS = SystemOS(M);
 
   if (llvm::Triple::Win32 == OS) {
-      ss << "mcsema_" << F->getName().str();
+    ss << "mcsema_" << F->getName().str();
   } else {
-      ss << "_" << F->getName().str();
+    ss << "_" << F->getName().str();
   }
 
   auto name = ss.str();
@@ -471,11 +459,11 @@ llvm::Function *ArchAddExitPointDriver(llvm::Function *F) {
   return W;
 }
 
-llvm::Function *ArchAddCallbackDriver(llvm::Module *M, VA local_target) {
+llvm::Function *ArchAddCallbackDriver(llvm::Function *F) {
   std::stringstream ss;
-  ss << "callback_sub_" << std::hex << local_target;
+  ss << "callback_" << F->getName().str();
   auto callback_name = ss.str();
-  return ArchAddEntryPointDriver(M, callback_name, local_target);
+  return ArchAddEntryPointDriver(callback_name, F);
 }
 
 llvm::GlobalVariable *archGetImageBase(llvm::Module *M) {

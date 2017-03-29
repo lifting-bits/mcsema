@@ -28,7 +28,6 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
 #include <glog/logging.h>
 
 #include <llvm/IR/Constants.h>
@@ -128,7 +127,7 @@ static std::vector<llvm::GlobalVariable *> FindISELs(void) {
 
     if (mem_type == sem_type->getParamType(0) &&
         state_type == sem_type->getParamType(1)) {
-      LOG(INFO)
+      DLOG(INFO)
           << "Found ISEL " << isel.getName().str();
       isels.push_back(&isel);
     }
@@ -145,7 +144,7 @@ static void RemoveISELs(std::vector<llvm::GlobalVariable *> &isels) {
     for (auto isel : isels) {
       isel->setLinkage(llvm::GlobalValue::InternalLinkage);
       if (1 >= isel->getNumUses()) {
-        LOG(INFO)
+        DLOG(INFO)
             << "Removing ISEL " << isel->getName().str();
         isel->eraseFromParent();
       } else {

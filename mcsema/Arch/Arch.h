@@ -93,11 +93,11 @@ llvm::Triple::OSType OSType(void);
 void ArchInitAttachDetach(void);
 
 llvm::Function *ArchAddEntryPointDriver(
-    llvm::Module *M, const std::string &name, VA entry);
+    const std::string &name, llvm::Function *F);
 
 llvm::Function *ArchAddExitPointDriver(llvm::Function *F);
 
-llvm::Function *ArchAddCallbackDriver(llvm::Module *M, VA local_target);
+llvm::Function *ArchAddCallbackDriver(llvm::Function *F);
 
 void ArchSetCallingConv(llvm::Module *M, llvm::CallInst *ci);
 

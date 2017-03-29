@@ -79,109 +79,6 @@ bool NativeInst::has_local_noreturn(void) const {
   return this->local_noreturn;
 }
 
-uint8_t NativeInst::get_reloc_offset(CFGOpType op) const {
-  if (op == MEMRef) {
-    return this->mem_reloc_offset;
-  } else if (op == IMMRef) {
-    return this->imm_reloc_offset;
-  } else {
-    return -1;
-  }
-}
-
-void NativeInst::set_reloc_offset(CFGOpType op, uint8_t ro) {
-  if (op == MEMRef) {
-    this->mem_reloc_offset = ro;
-  } else if (op == IMMRef) {
-    this->imm_reloc_offset = ro;
-  } else {
-    //
-  }
-}
-
-void NativeInst::set_reference(CFGOpType op, uint64_t ref) {
-  if (op == MEMRef) {
-    this->mem_reference = ref;
-    this->has_mem_reference = true;
-  } else if (op == IMMRef) {
-    this->imm_reference = ref;
-    this->has_imm_reference = true;
-  } else {
-    // void
-  }
-}
-
-void NativeInst::set_ref_type(CFGOpType op, CFGRefType rt) {
-  if (op == MEMRef) {
-    this->mem_ref_type = rt;
-  } else if (op == IMMRef) {
-    this->imm_ref_type = rt;
-  } else {
-    // void
-  }
-}
-
-void NativeInst::set_ref_reloc_type(CFGOpType op, uint64_t ref, uint64_t ro,
-                              CFGRefType rt) {
-  const char *ops = op == MEMRef ? "MEM" : "IMM";
-  const char *rts = rt == CFGCodeRef ? "CODE" : "DATA";
-
-  LOG(INFO)
-      << ": Adding ref: " << ops << ", to: " << std::hex
-      << ref << ", ro: " << ro << ", rt: " << rts;
-  this->set_reference(op, ref);
-  this->set_reloc_offset(op, ro);
-  this->set_ref_type(op, rt);
-}
-
-bool NativeInst::has_reference(CFGOpType op) const {
-  if (op == MEMRef) {
-    return this->has_mem_reference;
-  } else if (op == IMMRef) {
-    return this->has_imm_reference;
-  } else {
-    return false;
-  }
-}
-
-uint64_t NativeInst::get_reference(CFGOpType op) const {
-  if (op == MEMRef) {
-    return this->mem_reference;
-  } else if (op == IMMRef) {
-    return this->imm_reference;
-  } else {
-    return -1;
-  }
-}
-
-NativeInst::CFGRefType NativeInst::get_ref_type(CFGOpType op) const {
-  if (op == MEMRef) {
-    return this->mem_ref_type;
-  } else {
-    return this->imm_ref_type;
-  }
-}
-
-bool NativeInst::has_code_ref(void) const {
-  if (this->has_mem_reference && this->mem_ref_type == CFGCodeRef) {
-    return true;
-  }
-
-  if (this->has_imm_reference && this->imm_ref_type == CFGCodeRef) {
-    return true;
-  }
-
-  return false;
-}
-
-bool NativeInst::get_is_call_external(void) const {
-  return this->is_call_external;
-}
-
-void NativeInst::set_is_call_external(void) {
-  this->is_call_external = true;
-}
-
 VA NativeInst::get_loc(void) const {
   return this->loc;
 }
@@ -210,32 +107,8 @@ VA NativeInst::get_fa(void) const {
   return this->tgtIfFalse;
 }
 
-uint8_t NativeInst::get_len(void) const {
+size_t NativeInst::get_len(void) const {
   return this->len;
-}
-
-void NativeInst::set_ext_call_target(ExternalCodeRefPtr t) {
-  this->extCallTgt = t;
-  this->ext_call_target = true;
-  return;
-}
-
-void NativeInst::set_ext_data_ref(ExternalDataRefPtr t) {
-  this->extDataRef = t;
-  this->ext_data_ref = true;
-  return;
-}
-
-bool NativeInst::has_ext_data_ref(void) const {
-  return this->ext_data_ref;
-}
-
-bool NativeInst::has_ext_call_target(void) const {
-  return this->ext_call_target;
-}
-
-bool NativeInst::has_external_ref(void) const {
-  return this->has_ext_call_target() || this->has_ext_data_ref();
 }
 
 // accessors for JumpTable
@@ -266,54 +139,37 @@ bool NativeInst::has_jump_index_table(void) const {
   return this->jump_index_table;
 }
 
-NativeInst::Prefix NativeInst::get_prefix(void) const {
-  LOG(FATAL)
-      << "Not yet reimplemented, probably unnecessary.";
-  return this->pfx;
-}
-
-unsigned int NativeInst::get_addr_space(void) const {
-  if (this->pfx == NativeInst::FSPrefix) {
-    return 257;
-  } else if (this->pfx == NativeInst::GSPrefix) {
-    return 256;
-  } else {
-    return 0;
-  }
-}
-
-ExternalCodeRefPtr NativeInst::get_ext_call_target(void) const {
-  return this->extCallTgt;
-}
-ExternalDataRefPtr NativeInst::get_ext_data_ref(void) const {
-  return this->extDataRef;
-}
-
 NativeInst::NativeInst(VA v, const std::string &bytes_)
     : tgtIfTrue(0),
       tgtIfFalse(0),
       loc(v),
       bytes(bytes_),
-      extCallTgt(nullptr),
-      extDataRef(nullptr),
+
+      external_code_ref(nullptr),
+      code_addr(~0ULL),
+
+      external_mem_data_ref(nullptr),
+      external_mem_code_ref(nullptr),
+      external_disp_data_ref(nullptr),
+      external_disp_code_ref(nullptr),
+      external_imm_data_ref(nullptr),
+      external_imm_code_ref(nullptr),
+
+      mem_ref_data_addr(~0ULL),
+      mem_ref_code_addr(~0ULL),
+
+      disp_ref_data_addr(~0ULL),
+      disp_ref_code_addr(~0ULL),
+
+      imm_ref_data_addr(~0ULL),
+      imm_ref_code_addr(~0ULL),
+
       jumpTable(nullptr),
       jump_table(false),
       jumpIndexTable(nullptr),
       jump_index_table(false),
-      pfx(NoPrefix),
-      ext_call_target(false),
-      ext_data_ref(false),
-      is_call_external(false),
       len(bytes.size()),
       is_terminator(false),
-      imm_reloc_offset(0),
-      imm_reference(0),
-      imm_ref_type(CFGDataRef),
-      has_imm_reference(false),
-      mem_reloc_offset(0),
-      mem_reference(0),
-      mem_ref_type(CFGDataRef),
-      has_mem_reference(false),
       system_call_number(-1),
       local_noreturn(false),
       offset_table(-1) {}
@@ -501,10 +357,10 @@ VA NativeBlock::get_base(void) {
 }
 
 void NativeBlock::add_follow(VA f) {
-  this->follows.push_back(f);
+  this->follows.insert(f);
 }
 
-std::list<VA> &NativeBlock::get_follows(void) {
+std::set<VA> &NativeBlock::get_follows(void) {
   return this->follows;
 }
 
@@ -520,9 +376,13 @@ void NativeFunction::add_block(NativeBlockPtr b) {
 }
 
 std::string NativeFunction::get_name(void) {
-  std::stringstream ss;
-  ss << "sub_" << std::hex << this->funcEntryVA;
-  return ss.str();
+  if (funcSymName.empty()) {
+    std::stringstream ss;
+    ss << "sub_" << std::hex << this->funcEntryVA;
+    return ss.str();
+  } else {
+    return funcSymName;
+  }
 }
 
 const std::string &NativeFunction::get_symbol_name(void) {
@@ -603,19 +463,6 @@ void NativeModule::addOffsetTables(
   }
 }
 
-NativeInst::CFGRefType deserRefType(::Instruction::RefType k) {
-  switch (k) {
-    case ::Instruction::CodeRef:
-      return NativeInst::CFGCodeRef;
-    case ::Instruction::DataRef:
-      return NativeInst::CFGDataRef;
-    default:
-      LOG(FATAL)
-          << "Unsupported reference type";
-      return NativeInst::CFGInvalidRef;
-  }
-}
-
 static ExternalCodeRefPtr getExternal(
     const std::string &s, const std::list<ExternalCodeRefPtr> &extcode) {
   for (auto e : extcode) {
@@ -650,54 +497,6 @@ static NativeInstPtr DeserializeInst(
 
   if (fa_tgt) {
     ip->set_fa(fa_tgt);
-  }
-
-  if (inst.has_ext_call_name()) {
-    ExternalCodeRefPtr p = getExternal(inst.ext_call_name(), extcode);
-    if (!p) {
-      LOG(ERROR)
-          << "Unable to find external call " << inst.ext_call_name()
-          << " for inst at " << std::hex << addr;
-      return nullptr;
-    }
-    ip->set_ext_call_target(p);
-  }
-
-  if (inst.has_ext_data_name()) {
-    ExternalDataRefPtr p(new ExternalDataRef(inst.ext_data_name()));
-    ip->set_ext_data_ref(p);
-  }
-
-  if (inst.has_imm_reference()) {
-    auto ref = static_cast<uint64_t>(inst.imm_reference());
-    uint64_t ro = 0;
-    auto rt = NativeInst::CFGInvalidRef;
-
-    if (inst.has_imm_reloc_offset()) {
-      ro = static_cast<VA>(inst.imm_reloc_offset());
-    }
-
-    if (inst.has_imm_ref_type()) {
-      rt = deserRefType(inst.imm_ref_type());
-    }
-
-    ip->set_ref_reloc_type(NativeInst::IMMRef, ref, ro, rt);
-  }
-
-  if (inst.has_mem_reference()) {
-    uint64_t ref = inst.mem_reference();
-    uint64_t ro = 0;
-    auto rt = NativeInst::CFGInvalidRef;
-
-    if (inst.has_mem_reloc_offset()) {
-      ro = inst.mem_reloc_offset();
-    }
-
-    if (inst.has_mem_ref_type()) {
-      rt = deserRefType(inst.mem_ref_type());
-    }
-
-    ip->set_ref_reloc_type(NativeInst::MEMRef, ref, ro, rt);
   }
 
   if (inst.has_jump_table()) {
@@ -741,6 +540,62 @@ static NativeInstPtr DeserializeInst(
 
   if (inst.has_offset_table_addr()) {
     ip->offset_table = inst.offset_table_addr();
+  }
+
+  for (const auto &ref : inst.refs()) {
+    ExternalDataRefPtr ext_data_ref = nullptr;
+    VA data_addr = ~0ULL;
+
+    ExternalCodeRefPtr ext_code_ref = nullptr;
+    VA code_addr = ~0ULL;
+
+    if (ref.target_type() == Reference_TargetType_CodeTarget) {
+      code_addr = ref.address();
+    } else {
+      data_addr = ref.address();
+    }
+
+    if (ref.location() == Reference_Location_External) {
+      const auto &name = ref.name();
+      CHECK(!name.empty())
+          << "External code reference from instruction " << std::hex
+          << inst.inst_addr() << " doesn't have a name.";
+
+      if (ref.target_type() == Reference_TargetType_CodeTarget) {
+        ext_code_ref = getExternal(name, extcode);
+        CHECK(ext_code_ref != nullptr)
+            << "Could not find external code " << name << " at address "
+            << std::hex << code_addr;
+
+      } else {
+        ext_data_ref = new ExternalDataRef(name);
+      }
+    }
+
+    switch (ref.operand_type()) {
+      case Reference_OperandType_ImmediateOperand:
+        ip->imm_ref_code_addr = code_addr;
+        ip->imm_ref_data_addr = data_addr;
+        ip->external_imm_code_ref = ext_code_ref;
+        ip->external_imm_data_ref = ext_data_ref;
+        break;
+      case Reference_OperandType_MemoryOperand:
+        ip->mem_ref_code_addr = code_addr;
+        ip->mem_ref_data_addr = data_addr;
+        ip->external_mem_code_ref = ext_code_ref;
+        ip->external_mem_data_ref = ext_data_ref;
+        break;
+      case Reference_OperandType_MemoryDisplacementOperand:
+        ip->disp_ref_code_addr = code_addr;
+        ip->disp_ref_data_addr = data_addr;
+        ip->external_disp_code_ref = ext_code_ref;
+        ip->external_disp_data_ref = ext_data_ref;
+        break;
+      case Reference_OperandType_ControlFlowOperand:
+        ip->external_code_ref = ext_code_ref;
+        ip->code_addr = code_addr;
+        break;
+    }
   }
 
   return ip;

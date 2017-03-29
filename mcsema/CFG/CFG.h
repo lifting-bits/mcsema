@@ -78,27 +78,12 @@ typedef MCSOffsetTable *MCSOffsetTablePtr;
  assign that value to the EAX register
  */
 
+struct NativeRef {
+  ExternalCodeRefPtr code;
+  ExternalDataRefPtr data;
+};
+
 class NativeInst {
- public:
-  enum Prefix {
-    NoPrefix,
-    RepPrefix,
-    RepNePrefix,
-    FSPrefix,
-    GSPrefix
-  };
-
-  enum CFGRefType {
-    CFGInvalidRef,
-    CFGCodeRef,
-    CFGDataRef
-  };
-
-  enum CFGOpType {
-    IMMRef,
-    MEMRef
-  };
-
  private:
   std::vector<VA> targets;
   VA tgtIfTrue;
@@ -106,38 +91,36 @@ class NativeInst {
   VA loc;
   std::string bytes;
 
-  ExternalCodeRefPtr extCallTgt;
-  ExternalDataRefPtr extDataRef;
+ public:
+  ExternalCodeRefPtr external_code_ref;
+  VA code_addr;
 
+  ExternalDataRefPtr external_mem_data_ref;
+  ExternalCodeRefPtr external_mem_code_ref;
+
+  ExternalDataRefPtr external_disp_data_ref;
+  ExternalCodeRefPtr external_disp_code_ref;
+
+  ExternalDataRefPtr external_imm_data_ref;
+  ExternalCodeRefPtr external_imm_code_ref;
+
+  VA mem_ref_data_addr;
+  VA mem_ref_code_addr;
+
+  VA disp_ref_data_addr;
+  VA disp_ref_code_addr;
+
+  VA imm_ref_data_addr;
+  VA imm_ref_code_addr;
+
+ private:
   MCSJumpTablePtr jumpTable;
   bool jump_table;
   JumpIndexTablePtr jumpIndexTable;
   bool jump_index_table;
 
-  Prefix pfx;
-  bool ext_call_target;
-  bool ext_data_ref;
-  bool is_call_external;
   size_t len;
   bool is_terminator;
-
-  // relocation offset: the number of bytes from the start of the instruction
-  // that there is a relocation.
-  // Zero if there is no relocation that occurs in the bytes of this
-  // instruction
-  uint64_t imm_reloc_offset;
-  uint64_t imm_reference;
-  CFGRefType imm_ref_type;
- public:
-  bool has_imm_reference;
- private:
-
-  uint64_t mem_reloc_offset;
-  uint64_t mem_reference;
-  CFGRefType mem_ref_type;
- public:
-  bool has_mem_reference;
- private:
 
   //  if this instruction is a system call, its system call number
   //  otherwise, -1
@@ -156,23 +139,6 @@ class NativeInst {
   void set_local_noreturn(void);
   bool has_local_noreturn(void) const;
 
-  uint8_t get_reloc_offset(CFGOpType op) const;
-  void set_reloc_offset(CFGOpType op, uint8_t ro);
-
-  void set_reference(CFGOpType op, uint64_t ref);
-  uint64_t get_reference(CFGOpType op) const;
-  bool has_reference(CFGOpType op) const;
-
-  void set_ref_type(CFGOpType op, CFGRefType rt);
-  CFGRefType get_ref_type(CFGOpType op) const;
-  void set_ref_reloc_type(CFGOpType op, uint64_t ref, uint64_t ro,
-                          CFGRefType rt);
-
-  bool has_code_ref(void) const;
-
-  bool get_is_call_external(void) const;
-  void set_is_call_external(void);
-
   VA get_loc(void) const;
 
   const std::string &get_bytes(void) const;
@@ -183,18 +149,8 @@ class NativeInst {
   VA get_tr(void) const;
   VA get_fa(void) const;
 
-  uint8_t get_len(void) const;
+  size_t get_len(void) const;
 
-  void set_ext_call_target(ExternalCodeRefPtr t);
-  ExternalCodeRefPtr get_ext_call_target(void) const;
-  bool has_ext_call_target(void) const;
-
-  void set_ext_data_ref(ExternalDataRefPtr t);
-  ExternalDataRefPtr get_ext_data_ref(void) const;
-  bool has_ext_data_ref(void) const;
-
-  bool has_external_ref(void) const;
-  
   // accessors for JumpTable
   void set_jump_table(MCSJumpTablePtr p);
   MCSJumpTablePtr get_jump_table(void) const;
@@ -205,25 +161,22 @@ class NativeInst {
   JumpIndexTablePtr get_jump_index_table(void) const;
   bool has_jump_index_table(void) const;
 
-  Prefix get_prefix(void) const;
-  unsigned int get_addr_space(void) const;
-
   NativeInst(VA v, const std::string &bytes_);
 };
 
 class NativeBlock {
  private:
-  //a list of instructions
+  // A list of instructions
   VA baseAddr;
   std::list<NativeInstPtr> instructions;
-  std::list<VA> follows;
+  std::set<VA> follows;
 
  public:
   explicit NativeBlock(VA);
   void add_inst(NativeInstPtr);
   VA get_base(void);
   void add_follow(VA f);
-  std::list<VA> &get_follows(void);
+  std::set<VA> &get_follows(void);
   std::string get_name(void);
   const std::list<NativeInstPtr> &get_insts(void);
 
@@ -257,7 +210,7 @@ class NativeFunction {
   // Use a `std::map` to keep the blocks in their original order.
   std::map<VA, NativeBlockPtr> blocks;
 
-  //addr of function entry point
+  // Addr of function entry point
   VA funcEntryVA;
 
   std::string funcSymName;
@@ -300,7 +253,7 @@ class DataSection {
   bool read_only;
 
  public:
-  static const uint64_t NO_BASE = (uint64_t) ( -1);
+  static constexpr uint64_t NO_BASE = ~0ULL;
 
   DataSection(void);
   virtual ~DataSection(void);

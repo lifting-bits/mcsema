@@ -333,7 +333,8 @@ static llvm::Constant *CreateConstantBlob(llvm::LLVMContext &ctx,
   return llvm::ConstantArray::get(arrT, array_elements);
 }
 
-void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
+void dataSectionToTypesContents(NativeModulePtr natM,
+                                const std::list<DataSection> &globaldata,
                                 const DataSection &ds, llvm::Module *M,
                                 std::vector<llvm::Constant *> &secContents,
                                 std::vector<llvm::Type *> &data_section_types,
@@ -388,26 +389,36 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
         data_section_types.push_back(final_val->getType());
 
       } else if (sym_name.find("sub_") == 0) {
-
         // TODO(pag): This is so flaky.
         auto sub_addr_str = sym_name.c_str() + 4 /* strlen("sub_") */;
         VA sub_addr = 0;
         sscanf(sub_addr_str, "%lx", &sub_addr);
 
+        const auto &funcs = natM->get_funcs();
+        auto func_it = funcs.find(sub_addr);
+
+        CHECK(func_it != funcs.end())
+            << "Could not find function associated with symbol "
+            << sym_name << " at address " << std::hex << sub_addr
+            << " in data section entry.";
+
         // add function pointer to data section
         // to do this, create a callback driver for
         // it first (since it may be called externally)
 
-        llvm::Function *func = nullptr;
+        auto natF = func_it->second;
+        auto func_name = natF->get_name();
+        auto func = M->getFunction(func_name);
+        CHECK(func != nullptr)
+            << "Could not find function" << func_name << "(" << sym_name
+            << " in the data section entry)";
 
         if (convert_to_callback) {
-          func = ArchAddCallbackDriver(M, sub_addr);
+          func = ArchAddCallbackDriver(func);
           CHECK(func != nullptr)
-              << "Could make callback for: " << sym_name;
-        } else {
-          func = M->getFunction(sym_name);
-          CHECK(func != nullptr)
-              << "Could not find function: " << sym_name;
+              << "Could make callback for " << func_name
+              << " at address " << std::hex << sub_addr << " ("
+              << sym_name << " in the data section entry)";
         }
 
         auto final_val = GetPointerSizedValue(
@@ -454,7 +465,7 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
         data_section_types.push_back(final_val->getType());
 
       } else {
-        LOG(ERROR)
+        LOG(FATAL)
             << "Unknown data section entry symbol type " << sym_name;
       }
     } else {

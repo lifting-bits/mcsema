@@ -88,7 +88,8 @@ enum StoreSpillType {
 
 llvm::Value *makeCallbackForLocalFunction(llvm::Module *M, VA local_target);
 
-void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
+void dataSectionToTypesContents(NativeModulePtr natM,
+                                const std::list<DataSection> &globaldata,
                                 const DataSection &ds, llvm::Module *M,
                                 std::vector<llvm::Constant *>& secContents,
                                 std::vector<llvm::Type *>& data_section_types,
