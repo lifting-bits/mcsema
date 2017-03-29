@@ -1,7 +1,7 @@
 # Copyright 2017 Peter Goodman (peter@trailofbits.com), all rights reserved.
 
 project(mcsema)
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.1)
 
 if(WIN32)
   SET(CMAKE_EXE_LINKER_FLAGS "/LARGEADDRESSAWARE ${CMAKE_EXE_LINKER_FLAGS}")
