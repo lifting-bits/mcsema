@@ -39,7 +39,7 @@ Why would anyone translate binaries *back* to bitcode?
 | Name | Version | 
 | ---- | ------- |
 | [Git](https://git-scm.com/) | Latest |
-| [CMake](https://cmake.org/) | 2.8+ |
+| [CMake](https://cmake.org/) | 3.1+ |
 | [Google Protobuf](https://github.com/google/protobuf) | 2.6.1 |
 | [LLVM](http://llvm.org/) | 3.8 |
 | [Clang](http://clang.llvm.org/) | 3.8 (3.9 if using Visual Studio 2015) |
