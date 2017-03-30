@@ -341,11 +341,16 @@ def find_default_block_heads(sub_ea):
 
   return heads
 
+_FUNCTION_BLOCK_HEAD_EAS = {}
+
 def analyse_subroutine(sub_ea):
   """Goes through the basic blocks of an identified function. Returns a set
   of basic block heads in the function, as well as block terminator
   instructions."""
-  global _BLOCK_HEAD_EAS, _FUNC_HEAD_EAS
+  global _BLOCK_HEAD_EAS, _FUNC_HEAD_EAS, _FUNCTION_BLOCK_HEAD_EAS
+
+  if sub_ea in _FUNCTION_BLOCK_HEAD_EAS:
+    return _FUNCTION_BLOCK_HEAD_EAS[sub_ea]
 
   #log.info("Analysing subroutine {} at {:08x}".format(sub.name, sub.ea))
   block_head_eas = find_default_block_heads(sub_ea)
@@ -401,7 +406,9 @@ def analyse_subroutine(sub_ea):
   #log.debug("Subroutine {:08x} has {} blocks".format(sub.ea, len(blocks)))
 
   # Analyse the blocks
-  return found_block_eas, term_insts
+  ret = found_block_eas, term_insts
+  _FUNCTION_BLOCK_HEAD_EAS[sub_ea] = ret
+  return ret
 
 class Reference(object):
   __slots__ = ('offset', 'addr', 'symbol', 'type')
@@ -472,6 +479,14 @@ def _get_ref_candidate(op, all_refs):
 
 _REFS = {}
 
+def memop_is_actually_displacement(I):
+  """IDA will unhelpfully decode something like `jmp ds:off_48A5F0[rax*8]`
+  and tell us that this is an `o_mem` rather than an `o_displ`. We really want
+  to recognize it as an `o_displ` because the memory reference is a displacement
+  and not an absolute address."""
+  asm = idc.GetDisasm(I.ea)
+  return "[" in asm and ("+" in asm or "*" in asm)
+
 # Get a list of references from an instruction.
 def get_instruction_references(arg, binary_is_pie=False):
   I = arg
@@ -541,7 +556,10 @@ def get_instruction_references(arg, binary_is_pie=False):
     # are references that IDA can recognize statically.
     elif idc.o_mem == op.type:
       assert ref.addr == op.addr
-      ref.type = Reference.MEMORY
+      if memop_is_actually_displacement(I):
+        ref.type = Reference.DISPLACEMENT
+      else:
+        ref.type = Reference.MEMORY
       ref.symbol = get_symbol_name(op_ea, ref.addr)
 
     # Code reference.
@@ -555,7 +573,6 @@ def get_instruction_references(arg, binary_is_pie=False):
   for ref in refs:
     assert ref.addr != idc.BADADDR
   
-  refs = tuple(refs)
   _REFS[I.ea] = refs
 
   return refs

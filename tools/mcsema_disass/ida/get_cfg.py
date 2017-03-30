@@ -53,72 +53,6 @@ PIE_MODE = False
 
 OFFSET_TABLES = {}
 
-SPECIAL_REP_HANDLING = [ 
-        [0xC3],
-        ]
-
-TRAPS = [ 
-        idaapi.NN_int3,
-        idaapi.NN_icebp,
-        ]
-
-CALLS = [
-        idaapi.NN_call,
-        idaapi.NN_callfi,
-        idaapi.NN_callni]
-
-RETS = [
-        idaapi.NN_retf,
-        idaapi.NN_retfd,
-        idaapi.NN_retfq,
-        idaapi.NN_retfw,
-        idaapi.NN_retn,
-        idaapi.NN_retnd,
-        idaapi.NN_retnq,
-        idaapi.NN_retnw]
-
-COND_BRANCHES = [\
-    idaapi.NN_ja,\
-    idaapi.NN_jae,\
-    idaapi.NN_jb,\
-    idaapi.NN_jbe,\
-    idaapi.NN_jc,\
-    idaapi.NN_jcxz,\
-    idaapi.NN_je,\
-    idaapi.NN_jecxz,\
-    idaapi.NN_jg,\
-    idaapi.NN_jge,\
-    idaapi.NN_jl,\
-    idaapi.NN_jle,\
-    idaapi.NN_jna,\
-    idaapi.NN_jnae,\
-    idaapi.NN_jnb,\
-    idaapi.NN_jnbe,\
-    idaapi.NN_jnc,\
-    idaapi.NN_jne,\
-    idaapi.NN_jng,\
-    idaapi.NN_jnge,\
-    idaapi.NN_jnl,\
-    idaapi.NN_jnle,\
-    idaapi.NN_jno,\
-    idaapi.NN_jnp,\
-    idaapi.NN_jns,\
-    idaapi.NN_jnz,\
-    idaapi.NN_jo,\
-    idaapi.NN_jp,\
-    idaapi.NN_jpe,\
-    idaapi.NN_jpo,\
-    idaapi.NN_jrcxz,\
-    idaapi.NN_js,\
-    idaapi.NN_jz,]
-
-UCOND_BRANCHES = [\
-    idaapi.NN_jmp,\
-    idaapi.NN_jmpfi,\
-    idaapi.NN_jmpni,\
-    idaapi.NN_jmpshort]
-
-
 EXTERNAL_NAMES = [
         "@@GLIBC_",\
         ]
@@ -134,10 +68,6 @@ def DEBUG(s):
         _DEBUG_FILE.flush()
 
 util.DEBUG = DEBUG
-
-_PREFIX_ITYPES = (idaapi.NN_lock, idaapi.NN_rep,
-                  idaapi.NN_repe, idaapi.NN_repne)
-
 
 # Python 2.7's xrange doesn't work with `long`s.
 def xrange(begin, end=None, step=1):
@@ -203,12 +133,11 @@ def fixExternalName(fn):
         if newfn in EMAP:
             return newfn
 
-    # found = False
-    # for en in EXTERNAL_NAMES:
-    #     if en in fn:
-    #         found = True
-    #         fn = fn[:fn.find(en)]
-    #         break
+    # Go and strip off things like the `@@GLIBC_*` symbol suffixes.
+    for en in EXTERNAL_NAMES:
+        if en in fn:
+            fn = fn[:fn.find(en)]
+            break
 
     # In some cases we'll have something like a reference to `stderr_ptr` in
     # the `.got` section, and that will have a pointer that is the actual
@@ -231,21 +160,6 @@ def getFromEMAP(fname):
     fixname = fixExternalName(fname)
     return EMAP[fixname]
 
-def isHlt(insn_t):
-    return insn_t.itype == idaapi.NN_hlt
-
-def isJmpTable(insn_t):
-    is_jmp = insn_t.itype in [idaapi.NN_jmp, 
-                              idaapi.NN_jmpfi,
-                              idaapi.NN_jmpni]
-
-    if not is_jmp:
-        return False
-
-    if idaapi.get_switch_info_ex(insn_t.ea):
-        return True
-
-    return False
 
 def addFunction(M, ep):
     F = M.internal_funcs.add()
@@ -285,6 +199,13 @@ def entryPointHandler(M, ep, name, args_from_stddef=False):
     
     DEBUG("At EP {0}:{1:x}".format(name,ep))
 
+def is_noreturn_inst(inst):
+    if is_direct_function_call(inst) or is_direct_jump(inst):
+        called_ea = get_direct_branch_target(inst.ea)
+        return is_noreturn_function(called_ea)
+
+    return inst.itype in (idaapi.NN_int3, idaapi.NN_icebp, idaapi.NN_hlt)
+
 def basicBlockHandler(M, F, block_ea, blockset, processed_blocks, new_func_eas):
     _, inst_eas, succ_eas = analyse_block(F.entry_address, block_ea)
 
@@ -302,13 +223,9 @@ def basicBlockHandler(M, F, block_ea, blockset, processed_blocks, new_func_eas):
 
     for inst_ea in inst_eas:
         insn_t, inst_bytes = decode_instruction(inst_ea)
-        I, endBlock = instructionHandler(
+        instructionHandler(
             M, B, insn_t, inst_bytes, inst_ea, new_func_eas)
 
-        if is_direct_function_call(insn_t):
-            called_ea = get_direct_branch_target(insn_t.ea)
-            if is_noreturn_function(called_ea):
-                I.local_noreturn = True
 
     return B
         
@@ -331,7 +248,8 @@ def isInternalCode(ea):
 
 def isExternalSegment(ea):
     ext_types = []
-    if ".got" in idc.SegName(ea).lower():
+    seg_name = idc.SegName(ea).lower()
+    if ".got" in seg_name or ".plt" in seg_name:
         return True
 
     seg = idc.SegStart(ea)
@@ -377,6 +295,18 @@ _REFERENCE_OPERAND_TYPE = {
 }
 
 def reference_target_type(ref):
+    global EMAP, EMAP_DATA
+
+    # Sometimes code references into the GOT would be treated as data
+    # references. We fall back onto our external maps as an oracle for
+    # what the type should really be. This has happened with `pcre_free`
+    # references from Apache.
+    if ref.symbol and reference_location(ref) == CFG_pb2.Reference.External:
+        if nameInMap(EMAP, ref.symbol):
+            return CFG_pb2.Reference.CodeTarget
+        elif nameInMap(EMAP_DATA, ref.symbol):
+            return CFG_pb2.Reference.DataTarget
+
     if is_code(ref.addr):
         return CFG_pb2.Reference.CodeTarget
     else:
@@ -393,7 +323,7 @@ def reference_location(ref):
 
 MISSING_FUNCS = set()
 
-def addInst(block, addr, insn_t, inst_bytes, new_func_eas):
+def add_inst_to_cfg(block, addr, insn_t, inst_bytes, new_func_eas):
     global EXTERNALS, PIE_MODE
 
     I = block.insts.add()
@@ -452,20 +382,17 @@ def addInst(block, addr, insn_t, inst_bytes, new_func_eas):
         # when we follow references through to their logical externals.
         new_addr = idc.LocByName(ref.symbol)
         if ref.addr != new_addr and idc.BADADDR != new_addr:
-            DEBUG("Reference address changed from {:x} to {:x}".format(
-                ref.addr, new_addr))
+            DEBUG("Reference address of {} changed from {:x} to {:x}".format(
+                ref.symbol, ref.addr, new_addr))
             ref.addr = new_addr
-            R.target_type = reference_target_type(ref)
             R.location = reference_location(ref)
+            R.target_type = reference_target_type(ref)
 
         debug_info.append(str(ref))
 
     DEBUG(" ".join(debug_info))
 
     return I
-
-def isTrap(insn_t):
-    return insn_t.itype in TRAPS
 
 def handleExternalRef(fn):
     # Don't mangle symbols for fully linked ELFs... yet
@@ -523,166 +450,382 @@ def isExternalData(fn):
     else:
         return False
 
+# def sanityCheckJumpTableSize(inst, table_ea, ecount):
+#     """IDA doesn't correctly calculate some  jump table sizes. Fix them.
 
-def sanityCheckJumpTableSize(table_ea, ecount):
-    """ IDA doesn't correctly calculate some  jump table sizes. Fix them.
+#     This will look for the following jump tables:
 
-    This will look for the following jump tables:
-
-    ----
-    cmp eax, num_entries
-    ja bad_entry
-    fall_through:
-    mov rax, qword [index * ptr_size + table_base_address]
-    jmp rax
-    bad_entry:
-    ----
+#     ----
+#     cmp eax, num_entries
+#     ja bad_entry
+#     fall_through:
+#     mov rax, qword [index * ptr_size + table_base_address]
+#     jmp rax
+#     bad_entry:
+#     ----
 
 
-    IDA will detect these as jump tables, but it sometimes
-    does not correctly calculate the "num_entries" properly,
-    which leads us to missing jump table cases.
+#     IDA will detect these as jump tables, but it sometimes
+#     does not correctly calculate the "num_entries" properly,
+#     which leads us to missing jump table cases.
 
-    Attempt to identify where 'num_entries' is compared, and
-    sanity check it vs. what IDA found.
+#     Attempt to identify where 'num_entries' is compared, and
+#     sanity check it vs. what IDA found.
 
-    """
+#     """
+#     if not isLinkedElf():
+#         return ecount
+
+#     if getBitness() != 64:
+#         return ecount
+
+#     # This code is only reached if we *already know this is a jump table
+#     # The goal is to sanity check the size
+
+#     # First, Check to make sure that this is a "jmp reg" instruction. 
+#     if inst.Operands[0].type != idc.o_reg:
+#         return ecount
+
+#     DEBUG("Sanity checking table at {:x}".format(inst.ea))
+
+#     # get register we jump with
+#     jmp_reg = inst.Operands[0].value
+#     inst_ea = inst.ea
+
+#     # This will walk back up to 5 instructions looking for a 'cmp' against
+#     # the jump register, and use the immediate value from the cmp as 
+#     # the true jump table case count.
+
+#     # This strategy has the potential for false positives, since it
+#     # does not strictly check for the exact format of jump table instructions.
+#     # For now that is intentional to allow some flexibility, because we are
+#     # uncertain what the compiler will emit.
+
+#     # TODO(artem):  Make this loop strict check for the instructions we expect,
+#     #               if we find the current lax check causing false positives
+#     for i in xrange(5):
+#         # walk back a few instructions until we find a cmp
+#         inst_ea = idc.PrevHead(inst_ea)
+#         if inst_ea == idc.BADADDR:
+#             return ecount
+#         inst, _ = decode_instruction(inst_ea)
+#         if inst is None:
+#             return ecount
+
+#         if inst.itype != idaapi.NN_cmp or inst.Operands[0].type != idc.o_reg:
+#             continue
+
+#         # Check if the `cmp` operates on the jump table register and an immediate.
+#         if jmp_reg != inst.Operands[0].value or inst.Operands[1].type != idc.o_imm:
+#             break
+
+#         # The immediate is our new count. We assume that the comparison
+#         # bounds the table by the maximum start, but the cases start at 0,
+#         # so add 1 to get case count.
+#         new_count = 1 + inst.Operands[1].value
+
+#         # compare to ecount. Take the bigger value.
+#         if new_count > ecount:
+#             DEBUG("Overriding old JMP count of {} with {} for table at {:x}".format(
+#                 ecount, new_count, table_ea))
+#             return new_count
+            
+#         return ecount
+
+#     return ecount
+
+class JumpTable(object):
+    """Represents generic info known about a particular jump table."""
+    __slots__ = ('inst_ea', 'entry_size', 'table_ea', 'entries', 'raw_entries')
+
+    def __init__(self, inst_ea, table_ea, entry_size, entries, raw_entries):
+        global ACCESSED_VIA_JMP
+        self.inst_ea = inst_ea
+        self.table_ea = table_ea
+        self.entry_size = entry_size
+        self.entries = entries
+        self.raw_entries = raw_entries
+
+        for entry_ea, target_ea in entries.items():
+            ACCESSED_VIA_JMP.add(entry_ea)
+            idc.AddCodeXref(inst_ea, target_ea, idc.XREF_USER | idc.fl_JN)
+
+def get_default_jump_table_entries(inst, table_ea, reader):
+    """Return the 'default' jump table entries, based on IDA's ability to
+    recognize a jump table. If IDA doesn't recognize the table, then we
+    say that there are 0 entries, but we also return what we have inferred
+    to be the first entry."""
+    si = idaapi.get_switch_info_ex(inst.ea)
     
-    if not isLinkedElf():
-        return ecount
+    if si:
+        num_entries = si.get_jtable_size()
+        entries = []
+        next_addr = table_ea
+        for i in xrange(num_entries):
+            target_ea, raw_target, next_addr = reader(next_addr)
+            entries.append(target_ea)
+        return num_entries, entries
+    else:
+        target_ea, raw_target, next_addr = reader(table_ea)
+        return 0, [target_ea]
 
-    if getBitness() != 64:
-        return ecount
+def get_num_jump_table_entries(table_ea, reader, curr_num_targets, curr_targets):
+    """Try to get the number of entries in a jump table. This will use some
+    base set of entries."""
+    DEBUG("Checking if jump table at {:x} has more than {} entries".format(
+        table_ea, curr_num_targets))
 
-    table_insn = idautils.DecodeInstruction(table_ea)
-    if table_insn is None:
-        DEBUG("Could not decode instruction at {:x}".format(table_insn))
-        return ecount
+    min_ea = 1L << 48
+    max_ea = 0
+    
+    # Treat the current set of targets as candidates, even if the source of
+    # those targets is IDA. We will assume that jump table entries point within
+    # a given function, or within nearby functions that IDA believes to be
+    # different (but hopefully are logically the same). So we will get bounds
+    # on the range of possible targets based on the function(s) containing the
+    # candidates, and use that as a scanning heuristic to find missing entries.
+    last_target_func = None
+    for i, curr_target in enumerate(curr_targets):
+        if not is_code(curr_target):
+            DEBUG("ERROR jump table {:x} entry {} target {:x} is not code!".format(
+                table_ea, i, curr_target))
 
-    # This code is only reached if we *already know this is a jump table
-    # The goal is to sanity check the size
+        assert is_code(curr_target)
+        target_func = idaapi.get_func(curr_target)
+        if target_func:
+            if last_target_func and target_func != last_target_func:
+                DEBUG("Default jump table {:x} entries span more than one function".format(
+                    table_ea))
+            min_ea = min(min_ea, target_func.startEA)
+            max_ea = max(max_ea, target_func.endEA)
+            last_target_func = target_func
 
-    # First, Check to make sure that this is a "jmp reg" instruction. 
-    if table_insn.Operands[0].type != idc.o_reg:
-        return ecount
+    if not max_ea:
+        return curr_num_targets
 
-    DEBUG("Sanity checking table at {:x}".format(table_ea))
+    DEBUG("Jump table {:x} targets can be in the range [{:x}, {:x})".format(
+        table_ea, min_ea, max_ea))
 
-    # get register we jump with
-    jmp_reg = table_insn.Operands[0].value
+    i = 0
+    max_i = max(curr_num_targets, 1024)
+    entry_addr = table_ea
+    while i < max_i:
+        entry_data, raw_entry_data, next_entry_addr = reader(entry_addr)
+        
+        # Note: if this is a candidate table that IDA doesn't recognize, then
+        #       curr_num_targets will be 0, even though there will be one
+        #       entry in the `curr_targets`. This first entry will be guaranteed
+        #       to be targeted by a data/code ref, so we check that `i` is non-
+        #       zero to avoid failing the check before we do anything useful.
+        if i and i >= curr_num_targets:
+            DEBUG("Checking possible jump table {:x} entry {} at {:x} going to {:x}".format(
+                table_ea, i, entry_addr, entry_data))
 
-    inst_ea = table_ea
-    # This will walk back up to 5 instructions looking for a 'cmp' against
-    # the jump register, and use the immediate value from the cmp as 
-    # the true jump table case count.
+            if not is_code(entry_data):
+                DEBUG("Not an entry, the target {:x} isn't code.".format(entry_data))
+                break
+            
+            elif min_ea > entry_data or entry_data >= max_ea:
+                break
 
-    # This strategy has the potential for false positives, since it
-    # does not strictly check for the exact format of jump table instructions.
-    # For now that is intentional to allow some flexibility, because we are
-    # uncertain what the compiler will emit.
+            # We will assume that any reference to the data in here means
+            # that we've gone and found the end of a table.
+            #
+            # TODO(pag): Handle more fine-grained refs, i.e. ones where there's
+            #            a reference into the Nth byte of what could be the
+            #            next address.
+            elif len(list(idautils.DataRefsTo(entry_addr))):
+                DEBUG("Not an entry, the target {:x} is referenced by data.".format(entry_data))
+                break
+            elif len(list(idautils.CodeRefsTo(entry_addr, 0))):
+                DEBUG("Not an entry, the target {:x} is referenced by code.".format(entry_data))
+                break
+            elif len(list(idautils.CodeRefsTo(entry_addr, 1))):
+                DEBUG("Not an entry, the target {:x} is referenced by code.".format(entry_data))
+                break
 
-    #TODO(artem): Make this loop strict check for the instructions we expect,
-    # if we find the current lax check causing false positives
-    for i in xrange(5):
-        # walk back a few instructions until we find a cmp
-        inst_ea = idc.PrevHead(inst_ea)
-        if inst_ea == idc.BADADDR:
-            return ecount
-        inst = idautils.DecodeInstruction(inst_ea)
-        if inst is None:
-            return ecount
-        if inst.itype == idaapi.NN_cmp and inst.Operands[0].type == idc.o_reg:
-            # check if reg in cmp == reg we jump with
-            if jmp_reg == inst.Operands[0].value:
-                # check if the CMP is with an immediate
-                if inst.Operands[1].type == idc.o_imm:
-                    # the immediate is our new count
-                    # the comaprison is vs the max case#, but the cases start at 0, so add 1
-                    # to get case count
-                    new_count = 1 + inst.Operands[1].value
-                    # compare to ecount. Take the bigger value.
-                    if new_count > ecount:
-                        DEBUG("Overriding old JMP count of {} with {} for table at {:x}".format(ecount, new_count, table_ea))
-                        return new_count
-            return ecount
+        entry_addr = next_entry_addr
+        i += 1
 
-    return ecount
+    if i != curr_num_targets:
+        DEBUG("Jump table at {:x} actually has {} entries".format(table_ea, i))
+    return i
+
+def wrap_jump_table_reader(entry_size, reader, wrapper):
+    """Create a jump table entry reader that will read bytes from memory,
+    potentially modify them, thereby converting them into plausible code
+    references, and finally returning the modified data, the original
+    data, and the address of the next entry to check."""
+    def do_read(addr):
+        raw_data = reader(addr)
+        return wrapper(raw_data), raw_data, (addr + entry_size)
+    return do_read
+
+def try_get_simple_jump_table_reader(table_ea):
+    """Try to create a jump table entry reader by looking for address-sized
+    code pointers in the memory pointed to by `table_ea`.
+
+    This uses heuristics like assuming certain alignments of table entries,
+    and that the entry targets must be code."""
+    entry_size = 0
+    wrapper = lambda d: d
+
+    if 0 == (table_ea % 8) and 64 == getBitness():
+        if is_code(readQword(table_ea)):
+            return 8, wrap_jump_table_reader(8, readDword, wrapper), table_ea
+
+    if 0 == (table_ea % 4) and is_code(readDword(table_ea)):
+        return 4, wrap_jump_table_reader(4, readDword, wrapper), table_ea
+
+    return 0, None, idc.BADADDR
+
+def get_jump_table_reader(inst):
+    """Returns the size of a jump table entry, as well as a reader function
+    that can extract entries."""
+    si = idaapi.get_switch_info_ex(inst.ea)
+
+    if not si:
+        # IDA can be a bit ignorant at recognizing jump tables. This came up
+        # in sqlite3 where IDA decided that `jmp ds:off_48A5F0[rax*8]` wasn't
+        # a table-based jump. It's possible that this was because IDA
+        # incorrectly recognized the memory operand as being an `o_mem` as
+        # opposed to being an `o_disp`. `get_instruction_references` correctly
+        # resolves this difference, so we'll also try to use it to pick up
+        # where IDA leaves off.
+        refs = get_instruction_references(inst, PIE_MODE)
+        if len(refs) and refs[0].type == Reference.DISPLACEMENT:
+            return try_get_simple_jump_table_reader(refs[0].addr)
+        return 0, None, idc.BADADDR
+
+    wrapper = lambda d: d
+
+    # Check if this is an offset based jump table, and if so, create an
+    # appropriate
+    if (si.flags & idaapi.SWI_ELBASE) == idaapi.SWI_ELBASE:
+        elem_base = si.elbase
+        # adjust jump target based on offset in table
+        # we only ever see these as 32-bit offsets, even
+        # when looking at 64-bit applications
+        wrapper = (lambda d: 0xFFFFFFFF & (d + elem_base))
+
+    entry_size = si.get_jtable_element_size()
+    if 8 == entry_size and 64 == getBitness():
+        reader = wrap_jump_table_reader(8, readQword, wrapper)
+        return 8, reader, si.jumps
+    
+    elif 4 == entry_size:
+        reader = wrap_jump_table_reader(4, readDword, wrapper)
+        return 4, reader, si.jumps
+    else:
+        DEBUG("ERROR! Incorrect jump table entry size {}".format(entry_size))
+        return 0, None, idc.BADADDR
+
+
+_JMP_THROUGH_TABLE_INFO = {}
+_NOT_A_JMP_THROUGH_TABLE = set()
+
+def get_jump_table(inst):
+    """Returns an instance of JumpTable, or None depending on whether or not
+    a jump table was discovered."""
+    global _JMP_THROUGH_TABLE_INFO, _NOT_A_JMP_THROUGH_TABLE
+    global _INVALID_JMP_TABLE, ACCESSED_VIA_JMP
+
+    if not inst or not is_indirect_jump(inst):
+        return None  # Don't cache.
+
+    if inst.ea in _JMP_THROUGH_TABLE_INFO:
+        return _JMP_THROUGH_TABLE_INFO[inst.ea]
+
+    elif inst.ea in _NOT_A_JMP_THROUGH_TABLE:
+        return None
+
+    elif isExternalSegment(inst.ea):
+        _NOT_A_JMP_THROUGH_TABLE.add(inst.ea)
+        return None
+
+    entry_size, reader, table_ea = get_jump_table_reader(inst)
+    if not entry_size or not reader:
+        _NOT_A_JMP_THROUGH_TABLE.add(inst.ea)
+        return None
+
+    DEBUG("Jump table candidate at {:x} referenced by instruction {:x}".format(
+        table_ea, inst.ea))
+
+    num_entries, default_entries = get_default_jump_table_entries(
+        inst, table_ea, reader)
+
+    if len(default_entries):
+        DEBUG("Jump table candidate {:x} has {} entries, with {} candidate targets".format(
+            table_ea, num_entries, len(default_entries)))
+
+        # Try to fix-up the number of entries.
+        num_entries = get_num_jump_table_entries(
+            table_ea, reader, num_entries, default_entries)
+
+    if not num_entries:
+        _NOT_A_JMP_THROUGH_TABLE.add(inst.ea)
+        return None
+
+    DEBUG("Jump table {:x} entries:".format(table_ea))
+
+    # We've got a more accurate number of table entries, so go and actually
+    # read them to fill in our `JumpTable` data structure.
+    entries = {}
+    raw_entries = {}
+    entry_addr = table_ea
+    for i in xrange(num_entries):
+        entry_data, raw_entry_data, next_entry_addr = reader(entry_addr)
+        raw_entries[entry_addr] = raw_entry_data
+        entries[entry_addr] = entry_data
+
+        if raw_entry_data != entry_data:
+            DEBUG("  {:x} => {:x} (raw {:x})".format(entry_addr, entry_data, raw_entry_data))
+        else:
+            DEBUG("  {:x} => {:x}".format(entry_addr, entry_data))
+
+        entry_addr = next_entry_addr
+
+    table = JumpTable(inst.ea, table_ea, entry_size, entries, raw_entries)
+    _JMP_THROUGH_TABLE_INFO[inst.ea] = table
+
+    return table
 
 def updateWithJmpTableTargets(inst, new_eas, new_func_eas):
-    si = idaapi.get_switch_info_ex(inst)
-    jsize = si.get_jtable_element_size()
-    jstart = si.jumps
-    # accept 32-bit jump tables in 64-bit, for now
-    valid_sizes = [4, getBitness() / 8]
-    readers = { 4: readDword,
-                8: readQword }
-
-    if jsize not in valid_sizes:
-        raise Exception("Jump table is not a valid size: {}".format(jsize))
+    """Function recovery is an iterative process. Sometimes we'll find things
+    in the entries of the jump table that we need to go mark as code to be
+    added into the CFG."""
+    table = get_jump_table(inst)
+    if not table:
         return
-
-    DEBUG("\tJMPTable Start: {0:x}".format(jstart))
-    seg_start = idc.SegStart(jstart)
-
-    if seg_start != idc.BADADDR:
-        DEBUG("\tJMPTable offset from data: {:x}".format(jstart - seg_start))
-
-    i = 0
-    entries = si.get_jtable_size()
-    entries = sanityCheckJumpTableSize(inst, entries)
-    for i in xrange(entries):
-        je = readers[jsize](jstart+i*jsize)
-        # check if this is an offset based jump table
-        if si.flags & idaapi.SWI_ELBASE == idaapi.SWI_ELBASE:
-            # adjust jump target based on offset in table
-            # we only ever see these as 32-bit offsets, even
-            # when looking at 64-bit applications
-            je = 0xFFFFFFFF & (je + si.elbase)
-
-        if isStartOfFunction(je):
-            DEBUG("\t\tJMPTable {0} references function: {1:x}".format(i, je))
-            new_func_eas.add(je)
+    for entry_addr, entry_target in table.entries.items():
+        if isStartOfFunction(entry_target):
+            DEBUG("Jump table {:x} entry at {:x} references function at {:x}".format(
+                table.table_ea, entry_addr, entry_target))
+            new_func_eas.add(entry_target)
         else:
-            DEBUG("\t\tAdding JMPTable {0}: {1:x}".format(i, je))
-            new_eas.add(je)
 
-def handleJmpTable(I, inst):
-    si = idaapi.get_switch_info_ex(inst)
-    jsize = si.get_jtable_element_size()
-    jstart = si.jumps
+            DEBUG("Jump table {:x} entry at {:x} references block at {:x}".format(
+                table.table_ea, entry_addr, entry_target))
+            new_eas.add(entry_target)
 
-    # accept 32-bit jump tables in 64-bit, for now
-    valid_sizes = [4, getBitness()/8]
-    readers = { 4: readDword,
-                8: readQword }
+def add_jump_table_to_cfg_inst(I, inst):
+    """Add the entries and info of a jump table into the CFG"""
 
-    if jsize not in valid_sizes:
-        raise Exception("Jump table is not a valid size: {}".format(jsize))
-        return
+    table = get_jump_table(inst)
+    assert table is not None
 
-    DEBUG("\tJMPTable Start: {0:x}".format(jstart))
-    seg_start = idc.SegStart(jstart)
+    I.jump_table.zero_offset = 0  # TODO(pag): What is the purpose of this?
+    DEBUG("\tJMPTable Start: {0:x}".format(table.table_ea))
+    seg_start = idc.SegStart(table.table_ea)
 
     if seg_start != idc.BADADDR:
-        I.jump_table.offset_from_data = jstart - seg_start
-        DEBUG("\tJMPTable offset from data: {:x}".format(I.jump_table.offset_from_data))
+        I.jump_table.offset_from_data = table.table_ea - seg_start
+        DEBUG("\tJMPTable offset from data: {:x}".format(
+            I.jump_table.offset_from_data))
 
-    I.jump_table.zero_offset = 0
-    i = 0
-    entries = si.get_jtable_size()
-    entries = sanityCheckJumpTableSize(inst, entries)
-    for i in xrange(entries):
-        je = readers[jsize](jstart+i*jsize)
-        # check if this is an offset based jump table
-        if si.flags & idaapi.SWI_ELBASE == idaapi.SWI_ELBASE:
-            # adjust jump target based on offset in table
-            # we only ever see these as 32-bit offsets, even
-            # when looking at 64-bit applications
-            je = 0xFFFFFFFF & (je + si.elbase)
+    for entry_addr, entry_target in table.entries.items():
+        I.jump_table.table_entries.append(entry_target)
 
-        I.jump_table.table_entries.append(je)
-
-        DEBUG("\t\tAdding JMPTable {0}: {1:x}".format(i, je))
     #je = idc.GetFixupTgtOff(jstart+i*jsize)
     #while je != -1:
     #    I.jump_table.table_entries.append(je)
@@ -694,12 +837,15 @@ def handleJmpTable(I, inst):
 
 _ELF_THUNKS = {}
 _NOT_ELF_THUNKS = set()
+_INVALID_THUNK = (False, None)
 
 def isElfThunkByStructureImpl(ea):
     """Try to manually identify an ELF thunk by its structure."""
+    global _INVALID_THUNK
+
     insn_t, _ = decode_instruction(ea)
-    if not insn_t or not is_unconditional_jump(insn_t):
-        return False, None
+    if not insn_t or not is_indirect_jump(insn_t):
+        return _INVALID_THUNK
 
     real_ext_ref = None
     for cref in idautils.CodeRefsFrom(ea, 0):
@@ -718,7 +864,7 @@ def isElfThunkByStructureImpl(ea):
     if real_ext_ref is not None:
         return True, handleExternalRef(getFunctionName(real_ext_ref))
 
-    return False, None
+    return _INVALID_THUNK
 
 def isThunkByFlags(ea):
     """Try to identify an ELF thunk based off of the IDA flags.
@@ -727,17 +873,17 @@ def isThunkByFlags(ea):
     another thunk, then the former thing is treated as a thunk. The former
     thing will not actually follow the 'structured' form matched above, so
     we'll try to recursively match to the 'final' referenced thunk."""
-    global _ELF_THUNKS
+    global _ELF_THUNKS, _INVALID_THUNK
 
     flags = idc.GetFunctionFlags(ea)
     if 0 >= flags or not (flags & idaapi.FUNC_THUNK):
-        return False, None
+        return _INVALID_THUNK
     
     ea_name = getFunctionName(ea)
     insn_t, _ = decode_instruction(ea)
     if not insn_t:
         DEBUG("{} at {:x} is a thunk with no code??".format(ea_name, ea))
-        return False, None
+        return _INVALID_THUNK
 
     # Recursively find thunk-to-thunks.
     if is_direct_jump(insn_t) or is_direct_function_call(insn_t):
@@ -750,7 +896,7 @@ def isThunkByFlags(ea):
         DEBUG("XXX targ_ea={:x} is not thunk".format(targ_ea))
 
     if not isExternalReference(ea):
-        return False, None
+        return _INVALID_THUNK
 
     # # This has the structure of a PLT thunk, but is more like an 'internal'
     # # thunk. This comes up, for example, with `sqlite3MallocSize`, where this
@@ -773,14 +919,14 @@ def isElfThunk(ea):
     that represents a 'local' definition for an external function. Thunks work
     by having the local function jump through a function pointer that is
     resolved at runtime."""
-    global _ELF_THUNKS, _NOT_ELF_THUNKS
+    global _ELF_THUNKS, _NOT_ELF_THUNKS, _INVALID_THUNK
 
     if ea in _ELF_THUNKS:
         return _ELF_THUNKS[ea]
 
     if ea in _NOT_ELF_THUNKS:
         _NOT_ELF_THUNKS.add(ea)
-        return False, None
+        return _INVALID_THUNK
 
     # Try two approaches to detecting whether or not
     # something is a thunk.
@@ -790,43 +936,23 @@ def isElfThunk(ea):
     
     if not is_thunk:
         _NOT_ELF_THUNKS.add(ea)
-        return False, None
+        return _INVALID_THUNK
     else:
         _ELF_THUNKS[ea] = (is_thunk, name)
         return is_thunk, name
-
-def opAtOffset(insn_t, off):
-
-    if insn_t is None:
-        return None
-
-    for op in insn_t.Operands:
-        
-        if op.offb == off:
-            if op.type in [idaapi.o_displ, idaapi.o_phrase]:
-                return "MEM"
-
-            if op.type in [idaapi.o_imm, idaapi.o_mem, idaapi.o_near, idaapi.o_far]:
-                return "IMM"
-
-            DEBUG("ERROR: Unknown op type {}, assuming MEM".format(op.type))
-            return "MEM"
-
-    return None
 
 def instructionHandler(M, B, insn_t, inst_bytes, addr, new_func_eas):
 
     #DEBUG("\t\tinst: {0}".format(idc.GetDisasm(addr)))
     #DEBUG("\t\tBytes: {0}".format(inst_bytes))
 
-    I = addInst(B, addr, insn_t, inst_bytes, new_func_eas)
-    if isTrap(insn_t) or isHlt(insn_t):
+    I = add_inst_to_cfg(B, addr, insn_t, inst_bytes, new_func_eas)
+    if is_noreturn_inst(insn_t):
         I.local_noreturn = True
         return I, True
 
-    if isJmpTable(insn_t):
-        DEBUG("Its a jump table")
-        handleJmpTable(I, addr)
+    if get_jump_table(insn_t):
+        add_jump_table_to_cfg_inst(I, insn_t)
         return I, True
 
     # mark that this is an offset table
@@ -940,7 +1066,6 @@ def processExternalFunction(M, fn):
         extfn.no_return = True
 
 def processExternalData(M, dt):
-
     data_size = EMAP_DATA[dt]
     ea = idc.LocByName(dt)
     is_weak = idaapi.is_weak_name(ea)
@@ -1438,24 +1563,28 @@ def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
         i += dref_size
 
     def insertReference(M, D, ea, pointsto, seg_offset, new_eas, force_size=None):
+        # Sometiems we can have a spurious data-to-code ref, where the code should
+        # not be considered a function, because it's part of some basic block, and
+        # there is a normal control-flow (fall-through) to that code. This happens
+        # because we embed the code sections into the CFG as if they are data
+        # sections, and so they are scanned for xrefs.
+        if not is_code(ea) and is_code(pointsto) \
+        and len(tuple(idautils.CodeRefsTo(pointsto, 1))):
+            DEBUG("Not adding code-to-code ref {:x} -> {:x} into code-data section".format(
+                ea, pointsto))
+            return
+
         # do not make code references for mid-function code accessed via a JMP -- 
         # they will be found via the jumptable code. This prevents the insertion
         # of lots of extra code, but could be wrong for some cases
-        if ea in ACCESSED_VIA_JMP and not isStartOfFunction(pointsto):
+        elif ea in ACCESSED_VIA_JMP and not isStartOfFunction(pointsto):
             # bail only if we are access via JMP and not the start
             # of a function
-            DEBUG("\t\tNOT ADDING REF (i): {:08x} -> {:08x}".format(ea, pointsto))
+            DEBUG("Not adding jmp table data-to-code {:x} -> {:x} into data section".format(
+                ea, pointsto))
             return
 
-        # Sometiems we can have a spurious data-to-code ref, where the code should
-        # not be considered a function, because it's part of some basic block, and
-        # there is a normal control-flow (fall-through) to that code. 
-        if not is_code(ea) and is_code(pointsto) \
-        and len(tuple(idautils.CodeRefsTo(pointsto, 1))):
-            DEBUG("\t\tNOT ADDING REF (ii): {:08x} -> {:08x}".format(ea, pointsto))
-            return
-
-        DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}".format(ea, pointsto))
+        DEBUG("\t\tFound a probable ref from: {:x} => {:x}".format(ea, pointsto))
         real_size = idc.ItemSize(pointsto)
         if force_size is None:
             reloc_size = idc.ItemSize(ea)
@@ -1658,14 +1787,15 @@ def recoverFunction(M, fnea, new_func_eas):
 
     blockset, term_insts = analyse_subroutine(fnea)
     for term_inst in term_insts:
-        if isJmpTable(term_inst):
+        if get_jump_table(term_inst):
             DEBUG("Terminator inst {:x} in func {:x} is a jump table".format(
                 term_inst.ea, fnea))
-            updateWithJmpTableTargets(term_inst.ea, blockset, new_func_eas)
+            updateWithJmpTableTargets(term_inst, blockset, new_func_eas)
     
     recoverFunctionFromSet(M, F, blockset, new_func_eas)
 
 def preprocessSegment(seg_ea):
+    """Pre-process the segments."""
     segtype = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
     if segtype in (idc.SEG_DATA, idc.SEG_BSS, idc.SEG_CODE):
         addDataSegment(seg_ea, idc.SegEnd(seg_ea))
@@ -1674,42 +1804,10 @@ def preprocessSegment(seg_ea):
         if not is_code(head):
             continue
 
-        insn_t, _ = decode_instruction(head)
-        if not insn_t:
-            continue
-
-        # This may mark some immediates as not being refs. Otherwise we
-        # don't actually care about the results.
-        refs = get_instruction_references(insn_t, PIE_MODE)
-
-        si = idaapi.get_switch_info_ex(head)
-        if not si or is_unconditional_jump(insn_t):
-            continue
-
-        DEBUG("Found a jmp based switch at: {0:x}".format(head))
-        esize = si.get_jtable_element_size()
-        readers = { 4: readDword,
-                    8: readQword }
-        base = si.jumps
-        count = si.get_jtable_size()
-        count = sanityCheckJumpTableSize(head, count)
-        jmp_refs = set(idautils.CodeRefsFrom(head, 1))
-        for i in xrange(count):
-            fulladdr = base+i*esize
-            DEBUG("Address accessed via JMP: {:x}".format(fulladdr))
-            ACCESSED_VIA_JMP.add(fulladdr)
-            je = readers[esize](fulladdr)
-            if si.flags & idaapi.SWI_ELBASE == idaapi.SWI_ELBASE:
-                # adjust jump target based on offset in table
-                # we only ever see these as 32-bit offsets, even
-                # when looking at 64-bit applications
-                je = 0xFFFFFFFF & (je + si.elbase)
-
-            if je not in jmp_refs:
-                jmp_refs.add(je)
-                DEBUG("\t\tJMPTable entry not in original; adding ref {:x} => {:x}".format(head, je))
-                idc.AddCodeXref(head, je, idc.XREF_USER|idc.fl_F)
-                mark_as_code(je)
+        # Try to build the jump tables ahead of time. This will cache a bunch
+        # of info that is needed later on.
+        inst, _ = decode_instruction(head)
+        table = get_jump_table(inst)
 
 def preprocessBinary(new_eas):
     

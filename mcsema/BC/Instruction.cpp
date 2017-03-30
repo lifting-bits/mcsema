@@ -119,12 +119,13 @@ llvm::Value *InstructionLifter::GetAddress(
   llvm::IRBuilder<> ir(block);
   if (code) {
     const auto &func_name = code->getSymbolName();
-    llvm::Value *func = ctx.M->getFunction(func_name);
+    llvm::GlobalObject *func = ctx.M->getFunction(func_name);
     if (!func) {
       func = ctx.M->getNamedGlobal(func_name);
       LOG_IF(ERROR, func != nullptr)
           << "Function pointer to " << std::hex << code_addr << " with symbol "
-          << func_name << " was resolved to a global variable. There is "
+          << func_name << " was resolved to a global variable from "
+          << std::hex << instr->pc << ". There is "
           << "probably an error in the CFG script.";
     }
 
@@ -136,12 +137,15 @@ llvm::Value *InstructionLifter::GetAddress(
 
   } else if (data) {
     const auto &global_name = data->getSymbolName();
-    llvm::Value *global = ctx.M->getNamedGlobal(global_name);
+    llvm::GlobalObject *global = ctx.M->getNamedGlobal(global_name);
     if (!global) {
       global = ctx.M->getFunction(global_name);
-      LOG_IF(ERROR, global != nullptr)
+      LOG_IF(ERROR,
+             global &&
+             !llvm::GlobalValue::isExternalWeakLinkage(global->getLinkage()))
           << "Data pointer to " << std::hex << data_addr << " with symbol "
-          << global_name << " was resolved to a subroutine. There is probably "
+          << global_name << " was resolved to a subroutine from "
+          << std::hex << instr->pc << ". There is probably "
           << "an error in the CFG script.";
     }
 
@@ -249,7 +253,13 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
     if (mem_ref) {
       return mem_ref;
     }
+
   } else {
+    LOG_IF(ERROR, mem_ref != nullptr)
+        << "IDA probably incorrectly decoded memory operand "
+        << op.Debug() << " of instruction " << std::hex << instr->pc
+        << "as an absolute memory reference when it should be treated as a "
+        << "displacement memory reference.";
 
     // It's a reference located in the displacement. We'll clear out the
     // displacement, calculate the address operand stuff, then add the address
