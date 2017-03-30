@@ -16,6 +16,31 @@ message JumpIndexTbl {
     required    int32       zero_offset = 2;
 }
 
+message Reference {
+    enum TargetType {
+        CodeTarget = 0;
+        DataTarget = 1;
+    }
+
+    enum OperandType {
+        ImmediateOperand = 0;
+        MemoryOperand = 1;  // Absolute and PC-relative accesses.
+        MemoryDisplacementOperand = 2;
+        ControlFlowOperand = 3;  // E.g. Function call target.
+    }
+
+    enum Location {
+        Internal = 0;
+        External = 1;
+    }
+
+    required    TargetType  target_type = 1;
+    required    OperandType operand_type = 2;
+    required    Location    location = 3;
+    required    int64       address = 4;
+    optional    string      name = 5;
+}
+
 message Instruction {
 
     enum RefType {
@@ -29,24 +54,13 @@ message Instruction {
     optional    int64             false_target = 4;
     required    int32             inst_len = 5;
 
-    optional    int64             imm_reference = 6;
-    optional    int64             imm_reloc_offset = 15;
-    optional    RefType           imm_ref_type = 16;
+    repeated    Reference         refs = 6;
 
-    optional    int64             mem_reference = 8;
-    optional    int64             mem_reloc_offset = 9;
-    optional    RefType           mem_ref_type = 18;
-
-    //optional    int64             call_target = 8;
-
-    optional    string            ext_call_name = 7;
-    //optional    int32             reloc_offset = 9;
-    optional    JumpTbl           jump_table = 10;
-    optional    JumpIndexTbl      jump_index_table = 11;
-    optional    string            ext_data_name = 12;
-    optional    int32             system_call_number = 13;
-    optional    bool              local_noreturn = 14;
-    optional    int64             offset_table_addr = 19;
+    optional    JumpTbl           jump_table = 7;
+    optional    JumpIndexTbl      jump_index_table = 8;
+    optional    int32             system_call_number = 9;
+    optional    bool              local_noreturn = 10;
+    optional    int64             offset_table_addr = 11;
 }
 
 message Block {
@@ -120,5 +134,4 @@ message Module {
     required    string              module_name = 4;
     repeated    EntrySymbol         entries = 5;
     repeated    ExternalData        external_data = 6;
-    repeated    OffsetTable         offset_tables = 7;
 }
