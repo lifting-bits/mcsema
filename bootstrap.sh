@@ -377,12 +377,18 @@ function DownloadLLVMTarball
   fi
 
   if [ -e ${LLVM_DIR}/CMakeLists.txt ] ; then
-    local local_llvm_version=`cat ${LLVM_DIR}/llvm_version`
+    if [ -f ${LLVM_DIR}/llvm_version ] ; then
+      local local_llvm_version=`cat ${LLVM_DIR}/llvm_version`
 
-    if [ "$LLVM_VER" != "$local_llvm_version" ]; then
-      echo "The local LLVM copy differs from the required version"
-      echo "Please delete the following folder and re-run the bootstrap script: ${LLVM_DIR}"
-      return 1    
+      if [ "$LLVM_VER" != "$local_llvm_version" ]; then
+        echo "The local LLVM copy differs from the required version"
+        echo "Please delete the following folder and re-run the bootstrap script: ${LLVM_DIR}"
+        return 1    
+      fi
+    else
+
+      echo "Warning: the following file could not be found: ${LLVM_DIR}/llvm_version"
+      echo "Make sure the tarball you extracted matches the following version: ${LLVM_VER}"
     fi
 
     return 0
