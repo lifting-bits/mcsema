@@ -39,8 +39,26 @@ class JumpTable(object):
     self.entries = entries
     self.raw_entries = raw_entries
 
+    max_ea = table_ea
+    data_flags = (4 == entry_size) and idc.FF_DWRD or idc.FF_QWRD
+
+    # Update IDA's understanding of the flow of control out of the jump
+    # instruction, as well as references to/from the table.
     for entry_ea, target_ea in entries.items():
+      idc.MakeData(entry_ea, data_flags, entry_size, 0)
       idc.AddCodeXref(inst_ea, target_ea, idc.XREF_USER | idc.fl_JN)
+      remove_all_refs(entry_ea)
+      max_ea = max(max_ea, entry_ea + entry_size)
+    
+    # Make sure each entry is seen as referenced.
+    for entry_ea, target_ea in entries.items():
+      idc.add_dref(inst_ea, entry_ea, idc.dr_I)
+
+    # Make sure that the contents of the table are no longer considered
+    # code (only affects `is_code`). This is only meaningful if the table
+    # itself is embedded in a code segment.
+    for ea_into_table in xrange(table_ea, max_ea):
+      mark_as_not_code(ea_into_table)
 
     idaapi.autoWait()
 
@@ -63,46 +81,8 @@ def get_default_jump_table_entries(inst, table_ea, reader):
     target_ea, raw_target, next_addr = reader(table_ea)
     return 0, [target_ea]
 
-def get_function_bounds(ea):
-  """Get the bounds of the function containing `ea`. This has a slightly
-  looser notion of bounds than what we see with IDA's `func_t` type. We want
-  to discover jump table targets that are missed by IDA, and it's possible
-  that they aren't marked as being part of the current function, and perhaps
-  are after the assumed range of the current function. Ideally they will
-  Fall before the beginning of the next function, though."""
-  seg_start, seg_end = idc.SegStart(ea), idc.SegEnd(ea)
-  min_ea = seg_end
-  max_ea = seg_start
-
-  if idc.BADADDR == min_ea or not is_code(ea):
-    return ea, ea
-
-  # Narrow down from segment to function bounds.
-  func = idaapi.get_func(ea)
-  if func:
-    min_ea = min(min_ea, func.startEA)
-    max_ea = max(max_ea, func.endEA)
-  else:
-    min_ea = ea
-    max_ea = ea
-
-  # Try to widen using the beginning of the next functions.
-  next_ea = idc.NextFunction(max_ea)
-  if idc.BADADDR != next_ea and idc.SegStart(next_ea) == seg_start:
-    max_ea = max(max_ea, next_ea)
-
-  # Try to widen using the end of the previous function.
-  prev_ea = idc.PrevFunction(min_ea)
-  if idc.BADADDR != next_ea and idc.SegStart(next_ea) == seg_start:
-    prev_func = idaapi.get_func(prev_ea)
-    if prev_func:
-      min_ea = min(min_ea, prev_func.endEA)
-    max_ea = max(max_ea, next_ea)
-
-  return min_ea, max_ea
-
 def get_num_jump_table_entries(inst_ea, table_ea, reader, curr_num_targets,
-                 curr_targets):
+                               curr_targets):
   """Try to get the number of entries in a jump table. This will use some
   base set of entries."""
   DEBUG("Checking if jump table at {:x} has more than {} entries".format(
@@ -229,38 +209,15 @@ def try_get_simple_jump_table_reader(inst_ea, table_ea):
 
   return _NO_READER
 
-def get_jump_table_reader(inst, binary_is_pie):
-  """Returns the size of a jump table entry, as well as a reader function
-  that can extract entries."""
-  si = idaapi.get_switch_info_ex(inst.ea)
+def is_thunk(ea):
+  """Returns true if some address is a known to IDA to be a thunk."""
+  flags = idc.GetFunctionFlags(ea)
+  return 0 < flags and 0 != (flags & idaapi.FUNC_THUNK)
 
-  # IDA can be a bit ignorant at recognizing jump tables. This came up
-  # in sqlite3 where IDA decided that `jmp ds:off_48A5F0[rax*8]` wasn't
-  # a table-based jump. It's possible that this was because IDA
-  # incorrectly recognized the memory operand as being an `o_mem` as
-  # opposed to being an `o_disp`. `get_instruction_references` correctly
-  # resolves this difference, so we'll also try to use it to pick up
-  # where IDA leaves off.
-  if not si:
-
-    # Scan backwards looking for somehting that looks like a jump table,
-    # even if it's not explicitly referenced in the current instruction.
-    # This handles the case where we see something like a `mov` or an `lea`
-    # of the table base address that happens before the actual `jmp`.
-    inst_ea = inst.ea
-    for i in xrange(5):
-      if inst_ea == idc.BADADDR:
-        return _NO_READER
-      refs = get_instruction_references(inst_ea, binary_is_pie)
-      if len(refs):
-        reader = try_get_simple_jump_table_reader(inst.ea, refs[0].addr)
-        if reader[0]:
-          return reader
-
-      inst_ea = idc.PrevHead(inst_ea)
-    
-    return _NO_READER
-
+def get_ida_jump_table_reader(inst, si, binary_is_pie):
+  """Try to trust IDA's ability to recognize a jump table and its entries,
+  and return an appropriate jump table entry reader."""
+  global _NO_READER
   wrapper = lambda d: d
 
   # Check if this is an offset based jump table, and if so, create an
@@ -282,6 +239,50 @@ def get_jump_table_reader(inst, binary_is_pie):
     DEBUG("ERROR! Incorrect jump table entry size {}".format(entry_size))
     return _NO_READER
 
+def get_manual_jump_table_reader(inst, binary_is_pie):
+  """Scan backwards looking for something that looks like a jump table,
+  even if it's not explicitly referenced in the current instruction.
+  This handles the case where we see something like a `mov` or an `lea`
+  of the table base address that happens before the actual `jmp`."""
+  next_inst_ea = inst.ea
+  for i in xrange(5):
+    inst_ea = next_inst_ea
+    next_inst_ea = idc.PrevHead(inst_ea)
+    if inst_ea == idc.BADADDR:
+      return _NO_READER
+    
+    refs = get_instruction_references(inst_ea, binary_is_pie)
+    if not len(refs):
+      continue
+
+    candidate_table_ea = refs[0].addr
+    
+    # Don't treat things like thunks to be tables.
+    if is_thunk(candidate_table_ea) or is_external_segment(candidate_table_ea):
+      return _NO_READER
+
+    reader = try_get_simple_jump_table_reader(inst.ea, candidate_table_ea)
+    if reader[0]:
+      return reader
+  
+  return _NO_READER
+
+def get_jump_table_reader(inst, binary_is_pie):
+  """Returns the size of a jump table entry, as well as a reader function
+  that can extract entries."""
+  si = idaapi.get_switch_info_ex(inst.ea)
+  if si:
+    return get_ida_jump_table_reader(inst, si, binary_is_pie)
+
+  # IDA can be a bit ignorant at recognizing jump tables. This came up
+  # in sqlite3 where IDA decided that `jmp ds:off_48A5F0[rax*8]` wasn't
+  # a table-based jump. It's possible that this was because IDA
+  # incorrectly recognized the memory operand as being an `o_mem` as
+  # opposed to being an `o_disp`. `get_instruction_references` correctly
+  # resolves this difference, so we'll also try to use it to pick up
+  # where IDA leaves off.
+  else:
+    return get_manual_jump_table_reader(inst, binary_is_pie)
 
 _JMP_THROUGH_TABLE_INFO = {}
 _NOT_A_JMP_THROUGH_TABLE = set()
@@ -324,7 +325,10 @@ def get_jump_table(inst, binary_is_pie=False):
     num_entries = get_num_jump_table_entries(
       inst.ea, table_ea, reader, num_entries, default_entries)
 
-  if not num_entries:
+  # Treat zero- or one-entry 'tables' as not actually being tables.
+  if num_entries <= 1:
+    DEBUG("Ignoring jump table {:x} with 1 >= {} entries referenced by {:x}".format(
+        table_ea, num_entries, inst.ea))
     _NOT_A_JMP_THROUGH_TABLE.add(inst.ea)
     return None
 

@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <string>
 #include <utility>
 
 #include "generated/CFG.pb.h"  // Auto-generated.
@@ -46,30 +47,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mcsema/cfgToLLVM/JumpTables.h"
 
 namespace mcsema {
-
-bool NativeInst::terminator(void) const {
-  LOG(FATAL)
-      << "Not yet reimplemented";
-  return this->is_terminator;
-}
-
-void NativeInst::set_terminator(void) {
-  LOG(FATAL)
-      << "Not yet reimplemented";
-  this->is_terminator = true;
-}
-
-void NativeInst::set_system_call_number(int cn) {
-  this->system_call_number = cn;
-}
-
-int NativeInst::get_system_call_number(void) const {
-  return this->system_call_number;
-}
-
-bool NativeInst::has_system_call_number(void) const {
-  return this->system_call_number != -1;
-}
 
 void NativeInst::set_local_noreturn(void) {
   this->local_noreturn = true;
@@ -85,30 +62,6 @@ VA NativeInst::get_loc(void) const {
 
 const std::string &NativeInst::get_bytes(void) const {
   return this->bytes;
-}
-
-void NativeInst::set_tr(VA a) {
-  this->tgtIfTrue = a;
-}
-
-void NativeInst::set_fa(VA a) {
-  this->tgtIfFalse = a;
-}
-
-VA NativeInst::get_tr(void) const {
-  LOG(FATAL)
-      << "Not yet reimplemented";
-  return this->tgtIfTrue;
-}
-
-VA NativeInst::get_fa(void) const {
-  LOG(FATAL)
-      << "Not yet reimplemented";
-  return this->tgtIfFalse;
-}
-
-size_t NativeInst::get_len(void) const {
-  return this->len;
 }
 
 // accessors for JumpTable
@@ -140,9 +93,7 @@ bool NativeInst::has_jump_index_table(void) const {
 }
 
 NativeInst::NativeInst(VA v, const std::string &bytes_)
-    : tgtIfTrue(0),
-      tgtIfFalse(0),
-      loc(v),
+    : loc(v),
       bytes(bytes_),
 
       external_code_ref(nullptr),
@@ -168,9 +119,6 @@ NativeInst::NativeInst(VA v, const std::string &bytes_)
       jump_table(false),
       jumpIndexTable(nullptr),
       jump_index_table(false),
-      len(bytes.size()),
-      is_terminator(false),
-      system_call_number(-1),
       local_noreturn(false),
       offset_table(-1) {}
 
@@ -470,7 +418,7 @@ static ExternalCodeRefPtr getExternal(
       return e;
     }
   }
-  return ExternalCodeRefPtr();
+  return nullptr;
 }
 
 enum : size_t {
@@ -481,22 +429,12 @@ static NativeInstPtr DeserializeInst(
     const ::Instruction &inst,
     const std::list<ExternalCodeRefPtr> &extcode) {
   VA addr = inst.inst_addr();
-  auto tr_tgt = static_cast<VA>(inst.true_target());
-  auto fa_tgt = static_cast<VA>(inst.false_target());
 
   NativeInstPtr ip = new NativeInst(addr, inst.inst_bytes());
   if (!ip) {
     LOG(ERROR)
         << "Unable to deserialize instruction at " << std::hex << addr;
     return nullptr;
-  }
-
-  if (tr_tgt) {
-    ip->set_tr(tr_tgt);
-  }
-
-  if (fa_tgt) {
-    ip->set_fa(fa_tgt);
   }
 
   if (inst.has_jump_table()) {
@@ -530,10 +468,6 @@ static NativeInstPtr DeserializeInst(
     ip->set_jump_index_table(JumpIndexTablePtr(idx));
   }
 
-  if (inst.has_system_call_number()) {
-    ip->set_system_call_number(inst.system_call_number());
-  }
-
   if (inst.has_local_noreturn()) {
     ip->set_local_noreturn();
   }
@@ -558,14 +492,23 @@ static NativeInstPtr DeserializeInst(
     if (ref.location() == Reference_Location_External) {
       const auto &name = ref.name();
       CHECK(!name.empty())
-          << "External code reference from instruction " << std::hex
+          << "External reference from instruction " << std::hex
           << inst.inst_addr() << " doesn't have a name.";
 
-      if (ref.target_type() == Reference_TargetType_CodeTarget) {
-        ext_code_ref = getExternal(name, extcode);
+      auto is_code = ref.target_type() == Reference_TargetType_CodeTarget;
+      ext_code_ref = getExternal(name, extcode);
+
+      if (is_code) {
         CHECK(ext_code_ref != nullptr)
             << "Could not find external code " << name << " at address "
             << std::hex << code_addr;
+
+      } else if (ext_code_ref) {
+        LOG(ERROR)
+            << "External reference to " << name
+            << " is marked as being a data reference but is actually a code"
+            << " reference. This is probably a bug in the CFG script.";
+        std::swap(code_addr, data_addr);
 
       } else {
         ext_data_ref = new ExternalDataRef(name);
@@ -834,7 +777,8 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
     std::vector<std::pair<VA, VA>> v;
     for (auto j = 0; j < offset_table.table_offsets_size(); j++) {
       v.push_back(
-          std::make_pair<VA, VA>(offset_table.table_offsets(j),
+          std::make_pair<VA, VA>(
+              offset_table.table_offsets(j),
               offset_table.destinations(j)));
     }
 
@@ -847,7 +791,7 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
   m = NativeModulePtr(
       new NativeModule(proto.module_name(), native_funcs, ArchTriple()));
 
-  //populate the module with externals calls
+  // Populate the module with externals calls.
   LOG(INFO)
       << "Adding external funcs...";
   for (auto &extern_func_call : extern_funcs) {

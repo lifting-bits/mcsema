@@ -64,9 +64,9 @@ static void RunO3(void) {
   TLI->disableAllFunctions();
 
   llvm::PassManagerBuilder builder;
-  builder.OptLevel = 0;  // -O0.
-  builder.SizeLevel = 0;  // -Oz
-  builder.Inliner = llvm::createFunctionInliningPass(999);
+  builder.OptLevel = 3;
+  builder.SizeLevel = 2;
+  builder.Inliner = llvm::createFunctionInliningPass(100);
   builder.LibraryInfo = TLI;  // Deleted by `llvm::~PassManagerBuilder`.
   builder.DisableTailCalls = false;  // Enable tail calls.
   builder.DisableUnrollLoops = false;  // Unroll loops!
@@ -80,19 +80,9 @@ static void RunO3(void) {
 
   builder.populateFunctionPassManager(func_manager);
   builder.populateModulePassManager(module_manager);
-
-  func_manager.add(llvm::createCFGSimplificationPass());
-  func_manager.add(llvm::createPromoteMemoryToRegisterPass());
-  func_manager.add(llvm::createReassociatePass());
-  func_manager.add(llvm::createInstructionCombiningPass());
-  func_manager.add(llvm::createDeadStoreEliminationPass());
-  func_manager.add(llvm::createDeadCodeEliminationPass());
-
   func_manager.doInitialization();
   for (auto &func : *gModule) {
-    if (func.getName().startswith("sub_")) {
-      func_manager.run(func);
-    }
+    func_manager.run(func);
   }
   func_manager.doFinalization();
   module_manager.run(*gModule);

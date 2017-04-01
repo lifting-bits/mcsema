@@ -26,7 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from util import *
+from table import *
 
 # def instruction_is_referenced(ea):
 #   """Returns `True` if it appears that there's a non-fall-through reference
@@ -50,6 +50,15 @@ _DEFAULT_BLOCK_HEAD_EAS = {}
 
 # Addresses of instructions that terminate a basic block.
 _TERMINATOR_EAS = set()
+
+# Instruction bytes that are used for alignment. In this case, an x86 NOP.
+_ALIGNMENT_BYTES = set([0x90])
+
+# Maps subroutine addresses to sets of block that are not targeted by any
+# flows. We use this as an opportunistic way of handling jump tables that
+# IDA does not understand. They are not handled directly as jump tables,
+# rather they get handled as code cross-references.
+_MISSING_FLOWS = collections.defaultdict(set)
 
 # Mark an address as being the beginning of a function.
 def try_mark_as_function(address):
@@ -113,13 +122,9 @@ def get_direct_branch_target(arg):
     #    branch_inst_ea, target_ea))
     return target_ea
 
-def is_noreturn_function(ea):
-  """Returns true if the function at `ea` is a no-return function."""
-  flags = idc.GetFunctionFlags(ea)
-  return 0 < flags and (flags & idaapi.FUNC_NORET)
-
-def get_static_successors(inst):
+def get_static_successors(sub_ea, inst, binary_is_pie):
   """Returns the statically known successors of an instruction."""
+
   branch_flows = tuple(idautils.CodeRefsFrom(inst.ea, False))
   next_ea = inst.ea + inst.size
   # Direct function call. The successor will be the fall-through instruction
@@ -139,21 +144,32 @@ def get_static_successors(inst):
     yield get_direct_branch_target(inst.ea)
 
   elif is_indirect_jump(inst):
-    #TODO(pag): Augment with better switch table analysis.
-    si = idaapi.get_switch_info_ex(inst.ea)
-    if si:
-      for case_ea in idautils.CodeRefsFrom(inst.ea, True):
-        yield case_ea
+    table = get_jump_table(inst, binary_is_pie)
+    target_eas = set(idautils.CodeRefsFrom(inst.ea, True))
+    if table:
+      for target_ea in table.entries.values():
+        target_eas.add(target_ea)
+    
+    # Opportunistically add more flows to this instruction if it seems like
+    # there are any blocks in the function with no predecessors.
+    if not len(target_eas) and sub_ea in _MISSING_FLOWS:
+      missing_flows = _MISSING_FLOWS[sub_ea]
+      for target_ea in missing_flows:
+        if not has_flow_to_code(target_ea):
+          DEBUG("Assuming that jump at {:x} targets block {:x} with missing flow.")
+          idc.AddCodeXref(inst.ea, target_ea, idc.XREF_USER | idc.fl_JN)
+          target_eas.add(target_ea)
+
+    for target_ea in target_eas:
+      yield target_ea
 
   elif not is_control_flow(inst):
     yield next_ea
 
   else:
-    # TODO(pag): Log this.
-    #log.debug("No static successors of {:08x}".format(inst.ea))
-    pass
+    DEBUG("No static successors of instruction at {:x}".format(inst.ea))
 
-def analyse_block(func_ea, ea):
+def analyse_block(func_ea, ea, binary_is_pie=False):
   """Find the instructions of a basic block."""
   global _BLOCK_HEAD_EAS, _TERMINATOR_EAS, _FUNC_HEAD_EAS
   assert is_code(ea)
@@ -182,7 +198,7 @@ def analyse_block(func_ea, ea):
   successors = []
   if inst_eas:
     _TERMINATOR_EAS.add(inst_eas[-1])
-    successors = get_static_successors(insts[-1])
+    successors = get_static_successors(func_ea, insts[-1], binary_is_pie)
     successors = [succ for succ in successors if is_code(succ)]
   
   return (ea, inst_eas, set(successors))
@@ -191,6 +207,7 @@ def find_default_block_heads(sub_ea):
   """Pre-process a function by finding all the recognized block head EAs
   before we dig deeper into individual blocks."""
   global _BLOCK_HEAD_EAS, _FUNC_HEAD_EAS, _DEFAULT_BLOCK_HEAD_EAS
+  global _ALIGNMENT_BYTES
 
   if sub_ea in _DEFAULT_BLOCK_HEAD_EAS:
     return _DEFAULT_BLOCK_HEAD_EAS[sub_ea]
@@ -198,15 +215,41 @@ def find_default_block_heads(sub_ea):
   _FUNC_HEAD_EAS.add(sub_ea)
   heads = set([sub_ea])
 
+  seg_start, seg_end = idc.SegStart(sub_ea), idc.SegEnd(sub_ea)
+  min_ea, max_ea = get_function_bounds(sub_ea)
+
+  DEBUG("Default block heads for function {:x} with loose bounds [{:x}, {:x})".format(
+      sub_ea, min_ea, max_ea))
+
   f = idaapi.get_func(sub_ea)
   if f:
     for b in idaapi.FlowChart(f):
-      _BLOCK_HEAD_EAS.add(b.startEA)
-      heads.add(b.startEA)
+      if min_ea <= b.startEA < max_ea:
+        _BLOCK_HEAD_EAS.add(b.startEA)
+        heads.add(b.startEA)
+        DEBUG("  block [{:x}, {:x})".format(b.startEA, b.endEA))
 
     for chunk_start_ea, chunk_end_ea in idautils.Chunks(sub_ea):
       _BLOCK_HEAD_EAS.add(chunk_start_ea)
       heads.add(chunk_start_ea)
+      DEBUG("  chunk [{:x}, {:x})".format(chunk_start_ea, chunk_end_ea))
+
+  # Look for possibly good jump table target candidates. We will use this
+  # information in `get_static_successors` when we come across an indirect
+  # jump with no known targets (i.e. not a jump table). In that case, we
+  # assert that the untargeted code (if still not targeted) are candidate
+  # targets for the instruction.
+  if max_ea:
+    ea = sub_ea
+    while min_ea <= ea < max_ea and ea != idc.BADADDR:
+      if ea not in _BLOCK_HEAD_EAS \
+      and 16 < idaapi.get_alignment(ea) \
+      and read_byte(ea) not in _ALIGNMENT_BYTES \
+      and not has_flow_to_code(ea):
+        DEBUG("  block {:x} of function {:x} is not targeted by any flows!".format(
+            ea, sub_ea))
+        _MISSING_FLOWS[sub_ea].add(ea)
+      ea = idc.NextHead(ea, max_ea)
 
   _DEFAULT_BLOCK_HEAD_EAS[sub_ea] = heads
 
@@ -214,7 +257,7 @@ def find_default_block_heads(sub_ea):
 
 _FUNCTION_BLOCK_HEAD_EAS = {}
 
-def analyse_subroutine(sub_ea):
+def analyse_subroutine(sub_ea, binary_is_pie):
   """Goes through the basic blocks of an identified function. Returns a set
   of basic block heads in the function, as well as block terminator
   instructions."""
@@ -223,7 +266,8 @@ def analyse_subroutine(sub_ea):
   if sub_ea in _FUNCTION_BLOCK_HEAD_EAS:
     return _FUNCTION_BLOCK_HEAD_EAS[sub_ea]
 
-  #log.info("Analysing subroutine {} at {:08x}".format(sub.name, sub.ea))
+  sub_name = get_symbol_name(sub_ea, allow_dummy=True)
+  DEBUG("Analysing subroutine {} at {:x}".format(sub_name, sub_ea))
   block_head_eas = find_default_block_heads(sub_ea)
   term_insts = set()
 
@@ -243,7 +287,7 @@ def analyse_subroutine(sub_ea):
     seen_blocks.add(block_head_ea)
 
     if not is_code(block_head_ea):
-      #log.error("Block head at {:08x} is not code.".format(block_head_ea))
+      DEBUG("Block head at {:08x} is not code.".format(block_head_ea))
       continue
 
     found_block_eas.add(block_head_ea)
@@ -258,7 +302,7 @@ def analyse_subroutine(sub_ea):
     #log.debug("Found block head at {:08x}".format(block_head_ea))
     term_inst = find_linear_terminator(block_head_ea)
     if not term_inst:
-      #log.error("Block at {:08x} has no terminator!".format(block_head_ea))
+      DEBUG("Block at {:x} has no terminator!".format(block_head_ea))
       found_block_eas.remove(block_head_ea)
       continue
     
@@ -270,11 +314,12 @@ def analyse_subroutine(sub_ea):
     #log.debug("Linear terminator of {:08x} is {:08x}".format(
     #    block_head_ea, term_inst.ea))
 
-    for succ_ea in get_static_successors(term_inst):
+    for succ_ea in get_static_successors(sub_ea, term_inst, binary_is_pie):
       if succ_ea not in _FUNC_HEAD_EAS or succ_ea == sub_ea:
         block_head_eas.add(succ_ea)
 
-  #log.debug("Subroutine {:08x} has {} blocks".format(sub.ea, len(blocks)))
+  DEBUG("Subroutine {} at {:x} has {} blocks".format(
+      sub_name, sub_ea, len(found_block_eas)))
 
   # Analyse the blocks
   ret = found_block_eas, term_insts

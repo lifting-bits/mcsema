@@ -52,6 +52,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <llvm/Transforms/Utils/ValueMapper.h>
 
 #include <memory>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -62,7 +63,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "remill/BC/Lifter.h"
 
 #include "mcsema/Arch/Arch.h"
-#include "mcsema/Arch/Dispatch.h"
 #include "mcsema/BC/Instruction.h"
 #include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Optimize.h"
@@ -199,7 +199,10 @@ static llvm::Value *AddSubFuncCall(llvm::BasicBlock *block,
   args[remill::kMemoryPointerArgNum] = remill::LoadMemoryPointer(block);
   args[remill::kStatePointerArgNum] = remill::LoadStatePointer(block);
   args[remill::kPCArgNum] = remill::LoadProgramCounter(block);
-  return llvm::CallInst::Create(sub, args, "", block);
+  auto call = llvm::CallInst::Create(sub, args, "", block);
+//  call->setTailCallKind(llvm::CallInst::TCK_NoTail);
+  call->setCallingConv(llvm::CallingConv::Fast);
+  return call;
 }
 
 // Add a call to another function, and then update the memory pointer with the
@@ -218,8 +221,8 @@ static void InlineSubFuncCall(llvm::BasicBlock *block,
 // function.
 static llvm::Function *FindFunction(TranslationContext &ctx,
                                     uint64_t target_pc) {
-  if (ctx.natI->external_code_ref) {
-    auto target = ctx.natI->external_code_ref;
+  if (ctx.cfg_inst->external_code_ref) {
+    auto target = ctx.cfg_inst->external_code_ref;
     auto name = target->getSymbolName();
 
     std::stringstream ss;
@@ -228,7 +231,7 @@ static llvm::Function *FindFunction(TranslationContext &ctx,
     auto ext_func = gModule->getFunction(driver_name);
     if (!ext_func) {
       ext_func = llvm::dyn_cast<llvm::Function>(
-          gModule->getOrInsertFunction(ss.str(), ctx.F->getFunctionType()));
+          gModule->getOrInsertFunction(ss.str(), ctx.lifted_func->getFunctionType()));
 
       ext_func->removeFnAttr(llvm::Attribute::AlwaysInline);
       ext_func->removeFnAttr(llvm::Attribute::InlineHint);
@@ -238,25 +241,25 @@ static llvm::Function *FindFunction(TranslationContext &ctx,
 
     return ext_func;
 
-  } else if (auto func = GetLiftedFunction(ctx.natM, target_pc)) {
+  } else if (auto func = GetLiftedFunction(ctx.cfg_module, target_pc)) {
     return func;
 
-  } else if (~0ULL != ctx.natI->code_addr) {
-    if (auto func = GetLiftedFunction(ctx.natM, ctx.natI->code_addr)) {
+  } else if (~0ULL != ctx.cfg_inst->code_addr) {
+    if (auto func = GetLiftedFunction(ctx.cfg_module, ctx.cfg_inst->code_addr)) {
       return func;
     } else {
       LOG(ERROR)
           << "Can't find function target of " << std::hex
-          << ctx.natI->get_loc() << ". Could not resolve static candidate "
+          << ctx.cfg_inst->get_loc() << ". Could not resolve static candidate "
           << std::hex << target_pc << " or code ref " << std::hex
-          << ctx.natI->code_addr << " to a function";
+          << ctx.cfg_inst->code_addr << " to a function";
       return ctx.lifter->intrinsics->error;
     }
 
   } else {
     LOG(ERROR)
         << "Cannot find target of instruction at " << std::hex
-        << ctx.natI->get_loc() << "; the static target "
+        << ctx.cfg_inst->get_loc() << "; the static target "
         << std::hex << target_pc << " is not associated with a lifted"
         << " subroutine, and it does not have a known call target.";
 
@@ -270,18 +273,18 @@ static llvm::Function *FindFunction(TranslationContext &ctx,
 // counter.
 static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
                                           uint64_t pc) {
-  auto &block = ctx.va_to_bb[pc];
+  auto &block = ctx.ea_to_block[pc];
   if (!block) {
     std::stringstream ss;
     ss << "block_" << std::hex << pc;
-    block = llvm::BasicBlock::Create(*gContext, ss.str(), ctx.F);
+    block = llvm::BasicBlock::Create(*gContext, ss.str(), ctx.lifted_func);
 
     // First, try to see if it's actually related to another function. This is
     // equivalent to a tail-call in the original code.
     if (auto tail_called_func = FindFunction(ctx, pc)) {
-      LOG_IF(ERROR, !ctx.natB->get_follows().count(pc))
+      LOG_IF(ERROR, !ctx.cfg_block->get_follows().count(pc))
           << "Adding missing block " << std::hex << pc << " in function "
-          << ctx.natF->get_name() << " as a tail call to "
+          << ctx.cfg_func->get_name() << " as a tail call to "
           << tail_called_func->getName().str();
 
       remill::AddTerminatingTailCall(block, tail_called_func);
@@ -290,7 +293,7 @@ static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
     } else {
       LOG(ERROR)
           << "Adding missing block " << std::hex << pc << " in function "
-          << ctx.natF->get_name() << " as a jump to the error intrinsic.";
+          << ctx.cfg_func->get_name() << " as a jump to the error intrinsic.";
       remill::AddTerminatingTailCall(
           block, ctx.lifter->intrinsics->missing_block);
     }
@@ -325,6 +328,61 @@ static void LiftConditionalBranch(TranslationContext &ctx,
           block_false);
 }
 
+// Lift an indirect jump into a switch instruction.
+static void LiftIndirectJump(TranslationContext &ctx,
+                             llvm::BasicBlock *block,
+                             remill::Instruction *instr) {
+  std::unordered_map<uint64_t, llvm::BasicBlock *> block_map;
+
+  auto fallback = ctx.lifter->intrinsics->jump;
+
+  for (auto target_ea : ctx.cfg_block->get_follows()) {
+    block_map[target_ea] = GetOrCreateBlock(ctx, target_ea);
+    fallback = ctx.lifter->intrinsics->missing_block;
+  }
+
+  // Pessimistic approach: assume all blocks are potential targets.
+  if (block_map.empty()) {
+    if (1 == ctx.ea_to_block.size()) {
+      LOG(INFO)
+          << "Indirect jump at " << std::hex << instr->pc << " looks like"
+          << "a thunk; falling back to `__remill_indrect_jump`.";
+      remill::AddTerminatingTailCall(block, fallback);
+      return;
+    }
+
+    LOG(WARNING)
+        << "Assuming every block in function " << ctx.cfg_func->get_name()
+        << " is targeted by indirect jump at "<< std::hex << instr->pc;
+
+    for (auto ea_to_block : ctx.ea_to_block) {
+      block_map[ea_to_block.first] = ea_to_block.second;
+    }
+  }
+
+  // Create a "default" fall-back block for the switch.
+  auto fallback_block = llvm::BasicBlock::Create(
+      *gContext, "", block->getParent());
+  remill::AddTerminatingTailCall(fallback_block, fallback);
+
+  // TODO(pag): Handle offset tables.
+  auto switch_index = remill::LoadProgramCounter(block);
+
+  auto switch_inst = llvm::SwitchInst::Create(
+      switch_index, fallback_block, block_map.size(), block);
+
+  LOG(INFO)
+      << "Indirect jump at " << std::hex << instr->pc
+      << " has " << std::dec << block_map.size() << " targets";
+
+  // Add the cases.
+  for (auto ea_to_block : block_map) {
+    switch_inst->addCase(
+        llvm::ConstantInt::get(ctx.lifter->word_type, ea_to_block.first, false),
+        ea_to_block.second);
+  }
+}
+
 // Returns `true` if `instr` should end a basic block and if a terminator was
 // added to end the block.
 static bool TryLiftTerminator(TranslationContext &ctx,
@@ -346,7 +404,7 @@ static bool TryLiftTerminator(TranslationContext &ctx,
       return true;
 
     case remill::Instruction::kCategoryIndirectJump:
-      remill::AddTerminatingTailCall(block, ctx.lifter->intrinsics->jump);
+      LiftIndirectJump(ctx, block, instr);
       return true;
 
     case remill::Instruction::kCategoryDirectFunctionCall:
@@ -356,7 +414,7 @@ static bool TryLiftTerminator(TranslationContext &ctx,
       if (instr->branch_taken_pc != instr->next_pc) {
         auto targ_func = FindFunction(ctx, instr->branch_taken_pc);
         LOG(INFO)
-            << "Function " << ctx.F->getName().str()
+            << "Function " << ctx.lifted_func->getName().str()
             << " calls " << targ_func->getName().str()
             << " at " << std::hex << instr->pc;
         InlineSubFuncCall(block, targ_func);
@@ -366,11 +424,12 @@ static bool TryLiftTerminator(TranslationContext &ctx,
             << "Not adding a subroutine self-call at "
             << std::hex << instr->pc;
       }
-//      StoreProgramCounter(ctx, block, instr->next_pc);
+      StoreProgramCounter(ctx, block, instr->next_pc);
       return false;
 
     case remill::Instruction::kCategoryIndirectFunctionCall:
       InlineSubFuncCall(block, ctx.lifter->intrinsics->function_call);
+      StoreProgramCounter(ctx, block, instr->next_pc);
       return false;
 
     case remill::Instruction::kCategoryFunctionReturn:
@@ -394,8 +453,8 @@ static bool TryLiftTerminator(TranslationContext &ctx,
 static bool LiftInstIntoBlock(TranslationContext &ctx,
                               llvm::BasicBlock *block,
                               bool is_last) {
-  auto instr_addr = ctx.natI->get_loc();
-  auto &bytes = ctx.natI->get_bytes();
+  auto instr_addr = ctx.cfg_inst->get_loc();
+  auto &bytes = ctx.cfg_inst->get_bytes();
   std::unique_ptr<remill::Instruction> instr(
       gArch->DecodeInstruction(instr_addr, bytes));
 
@@ -422,7 +481,7 @@ static bool LiftInstIntoBlock(TranslationContext &ctx,
 
   // Annotate every un-annotated instruction in this function with the
   // program counter of the current instruction.
-  AnnotateInsts(ctx.F, instr_addr);
+  AnnotateInsts(ctx.lifted_func, instr_addr);
 
   return ret;
 }
@@ -430,18 +489,18 @@ static bool LiftInstIntoBlock(TranslationContext &ctx,
 // Lift a decoded block into a function.
 static bool LiftBlockIntoFunction(TranslationContext &ctx) {
   auto good = true;
-  auto block_name = ctx.natB->get_name();
-  auto block_pc = ctx.natB->get_base();
-  auto block = ctx.va_to_bb[block_pc];
+  auto block_name = ctx.cfg_block->get_name();
+  auto block_pc = ctx.cfg_block->get_base();
+  auto block = ctx.ea_to_block[block_pc];
 
   // Store this program counter into the state structure.
   StoreProgramCounter(ctx, block, block_pc);
 
   // Lift each instruction into the block.
   size_t i = 0;
-  for (auto inst : ctx.natB->get_insts()) {
-    ctx.natI = inst;
-    auto is_last = (++i) >= ctx.natB->get_insts().size();
+  for (auto inst : ctx.cfg_block->get_insts()) {
+    ctx.cfg_inst = inst;
+    auto is_last = (++i) >= ctx.cfg_block->get_insts().size();
     good = good && LiftInstIntoBlock(ctx, block, is_last);
 
     LOG_IF(WARNING, inst->has_local_noreturn() && !is_last)
@@ -451,13 +510,9 @@ static bool LiftBlockIntoFunction(TranslationContext &ctx) {
         << "). Terminating anyway.";
   }
 
-//  if (block_pc == 0x406e94) {
-//    block->dump();
-//  }
-
-  const auto &follows = ctx.natB->get_follows();
+  const auto &follows = ctx.cfg_block->get_follows();
   if (!block->getTerminator()) {
-    if (ctx.natI->has_local_noreturn()) {
+    if (ctx.cfg_inst->has_local_noreturn()) {
       remill::AddTerminatingTailCall(block, ctx.lifter->intrinsics->error);
 
     } else if (follows.size() == 1) {
@@ -467,7 +522,7 @@ static bool LiftBlockIntoFunction(TranslationContext &ctx) {
     } else {
       LOG(ERROR)
           << "Block " << std::hex << block_pc << " has no terminator, and"
-          << " instruction at " << std::hex << ctx.natI->get_loc()
+          << " instruction at " << std::hex << ctx.cfg_inst->get_loc()
           << " is not a local no-return function call.";
       remill::AddTerminatingTailCall(
           block, ctx.lifter->intrinsics->missing_block);
@@ -509,43 +564,39 @@ static llvm::Function *InsertFunctionIntoModule(NativeModulePtr mod,
 
   remill::CloneBlockFunctionInto(lifted_func);
 
-  // For ease of debugging generated code, don't allow lifted functions to
-  // be inlined. This will make lifted and native call graphs one-to-one.
   lifted_func->removeFnAttr(llvm::Attribute::AlwaysInline);
   lifted_func->removeFnAttr(llvm::Attribute::InlineHint);
+  lifted_func->removeFnAttr(llvm::Attribute::NoInline);
   lifted_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
-  lifted_func->setLinkage(llvm::GlobalValue::InternalLinkage);
+  lifted_func->setLinkage(llvm::GlobalValue::ExternalLinkage);
 
   TranslationContext ctx;
   std::unique_ptr<remill::InstructionLifter> lifter(
       new InstructionLifter(word_type, intrinsics.get(), ctx));
 
   ctx.lifter = lifter.get();
-  ctx.natM = mod;
-  ctx.natF = func;
-  ctx.M = gModule;
-  ctx.F = lifted_func;
+  ctx.cfg_module = mod;
+  ctx.cfg_func = func;
+  ctx.cfg_block = nullptr;
+  ctx.cfg_inst = nullptr;
+  ctx.lifted_func = lifted_func;
 
   // Create basic blocks for each basic block in the original function.
   for (auto block_info : func->get_blocks()) {
-    ctx.va_to_bb[block_info.first] = llvm::BasicBlock::Create(
+    ctx.ea_to_block[block_info.first] = llvm::BasicBlock::Create(
         *gContext, block_info.second->get_name(), lifted_func);
   }
 
   // Create a branch from the end of the entry block to the first block
-  llvm::BranchInst::Create(ctx.va_to_bb[func->get_start()],
+  llvm::BranchInst::Create(ctx.ea_to_block[func->get_start()],
                            &(lifted_func->front()));
 
   // Lift every basic block into the functions.
   auto good = true;
   for (auto block_info : blocks) {
-    ctx.natB = block_info.second;
+    ctx.cfg_block = block_info.second;
     good = good && LiftBlockIntoFunction(ctx);
   }
-
-//  if (func->get_start() == 0x40dba0) {
-//    lifted_func->dump();
-//  }
 
   return good ? lifted_func : nullptr;
 }
@@ -575,6 +626,7 @@ static bool InsertDataSections(NativeModulePtr natMod) {
         << "Inserting global data section named " << bufferName;
 
     auto st_opaque = llvm::StructType::create(gModule->getContext());
+
     // Used to be PrivateLinkage, but that emitted
     // .objs that would not link with MSVC
     auto g = new llvm::GlobalVariable(
@@ -597,16 +649,17 @@ static bool InsertDataSections(NativeModulePtr natMod) {
     dataSectionToTypesContents(natMod, globaldata, *var.section,
                                gModule, secContents, data_section_types, true);
 
-    // fill in the opaqure structure with actual members
+    // Fill in the opaqure structure with actual members.
     var.opaque_type->setBody(data_section_types, true);
 
-    // create an initializer list using the now filled in opaque
-    // structure type
+    // Create an initializer list using the now filled in opaque
+    // structure type.
     auto cst = llvm::ConstantStruct::get(var.opaque_type, secContents);
-    // align on pointer size boundary, max needed by SSE instructions
-    var.var->setAlignment(ArchPointerSize(gModule));
-    var.var->setInitializer(cst);
 
+    // Align to a 16-byte boundary; this is the max needed by aligned
+    // memory access instructions.
+    var.var->setAlignment(16);
+    var.var->setInitializer(cst);
   }
   return true;
 }
@@ -760,7 +813,6 @@ static bool LiftFunctionsIntoModule(NativeModulePtr natMod) {
   func_pass_manager.add(llvm::createCFGSimplificationPass());
   func_pass_manager.add(llvm::createPromoteMemoryToRegisterPass());
   func_pass_manager.add(llvm::createReassociatePass());
-  func_pass_manager.add(llvm::createInstructionCombiningPass());
   func_pass_manager.add(llvm::createDeadStoreEliminationPass());
   func_pass_manager.add(llvm::createDeadCodeEliminationPass());
 
@@ -782,28 +834,6 @@ static bool LiftFunctionsIntoModule(NativeModulePtr natMod) {
 }
 
 }  // namespace
-
-void RenameLiftedFunctions(NativeModulePtr natMod,
-                           const std::set<VA> &entry_point_pcs) {
-  // Rename the functions to have their 'nice' names, where available.
-  for (auto &f : natMod->get_funcs()) {
-    NativeFunctionPtr native_func = f.second;
-    if (entry_point_pcs.count(native_func->get_start())) {
-      continue;
-    }
-
-    auto sub_name = native_func->get_name();
-    auto F = gModule->getFunction(sub_name);
-    std::stringstream ss;
-    ss << "callback_" << sub_name;
-    if (!gModule->getFunction(ss.str())) {
-      auto &sym_name = native_func->get_symbol_name();
-      if (!sym_name.empty()) {
-        F->setName(sym_name);
-      }
-    }
-  }
-}
 
 bool LiftCodeIntoModule(NativeModulePtr natMod) {
   InitLiftedFunctions(natMod);

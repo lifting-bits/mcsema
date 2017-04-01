@@ -29,7 +29,7 @@
 from util import *
 
 class Reference(object):
-  __slots__ = ('offset', 'addr', 'symbol', 'type')
+  __slots__ = ('offset', 'addr', 'orig_addr', 'symbol', 'type')
 
   INVALID = 0
   IMMEDIATE = 1
@@ -56,28 +56,6 @@ class Reference(object):
       is_code(self.addr) and "code" or "data",
       self.TYPE_TO_STR[self.type],
       self.symbol or "0x{:x}".format(self.addr))
-
-# Tries to get the name of a symbol.
-def get_symbol_name(from_ea, ea=None):
-  if ea is None:
-    ea = from_ea
-
-  flags = idc.GetFlags(ea)
-  if idaapi.has_dummy_name(flags):
-    return ""
-
-  name = ""
-  try:
-    name = name or idc.GetTrueNameEx(from_ea, ea)
-  except:
-    pass
-
-  try:
-    name = name or idc.GetFunctionName(ea)
-  except:
-    pass
-
-  return name
 
 # Try to recognize an operand as a reference candidate when a target fixup
 # is not available.

@@ -2,8 +2,12 @@
 
 #include <cstdio>
 
-#define ONLY_STRUCT
-#include "State.h"
+#define HAS_FEATURE_AVX 1
+#define HAS_FEATURE_AVX512 0
+#define ADDRESS_SIZE_BITS 32
+
+#include "remill/Arch/X86/Runtime/State.h"
+#include "mcsema/Arch/X86/Runtime/Registers.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wformat"
@@ -24,7 +28,7 @@ int main(void) {
   fprintf(out, "  .type __mcsema_reg_state,@object\n");
   fprintf(out, "  .section .tbss,\"awT\",@nobits\n");
   fprintf(out, "__mcsema_reg_state:\n");
-  fprintf(out, "  .zero %u\n", sizeof(RegState));
+  fprintf(out, "  .zero %u\n", sizeof(State));
   fprintf(out, "  .size __mcsema_reg_state, 100\n");
   fprintf(out, "\n");
 
@@ -75,30 +79,30 @@ int main(void) {
   fprintf(out, "__mcsema_attach_call_cdecl:\n");
   fprintf(out, "  .cfi_startproc\n");
 
-  // Pop the target function into the `RegState` structure. This resets `ESP`
+  // Pop the target function into the `State` structure. This resets `ESP`
   // to what it should be on entry to `__mcsema_attach_call`.
-  fprintf(out, "  pop DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  pop DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RIP));
 
   // General purpose registers.
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], eax\n", __builtin_offsetof(RegState, RAX));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ecx\n", __builtin_offsetof(RegState, RCX));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(RegState, RDX));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(RegState, RDI));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(RegState, RBP));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], eax\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ecx\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(State, RBP));
 
-  fprintf(out, "  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RSP));
 
   // XMM registers.
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm0\n", __builtin_offsetof(RegState, XMM0));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm1\n", __builtin_offsetof(RegState, XMM1));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm2\n", __builtin_offsetof(RegState, XMM2));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm3\n", __builtin_offsetof(RegState, XMM3));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm4\n", __builtin_offsetof(RegState, XMM4));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm5\n", __builtin_offsetof(RegState, XMM5));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm6\n", __builtin_offsetof(RegState, XMM6));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm7\n", __builtin_offsetof(RegState, XMM7));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm0\n", __builtin_offsetof(State, XMM0));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm1\n", __builtin_offsetof(State, XMM1));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm2\n", __builtin_offsetof(State, XMM2));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm3\n", __builtin_offsetof(State, XMM3));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm4\n", __builtin_offsetof(State, XMM4));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm5\n", __builtin_offsetof(State, XMM5));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm6\n", __builtin_offsetof(State, XMM6));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm7\n", __builtin_offsetof(State, XMM7));
 
   // If `ESP` is null then we need to initialize it to our new stack.
   fprintf(out, "  cmp esp, 0\n");
@@ -125,7 +129,7 @@ int main(void) {
   // as a 16-bit push
   fprintf(out, "  lea eax, __mcsema_detach_ret_cdecl\n");
   fprintf(out, "  push eax\n");
-  fprintf(out, "  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RIP));
 
   fprintf(out, ".Lfunc_end1:\n");
   fprintf(out, "  .size __mcsema_attach_call_cdecl,.Lfunc_end1-__mcsema_attach_call_cdecl\n");
@@ -154,18 +158,18 @@ int main(void) {
   // add an extra 4 bytes to compensate for the fake return address
   fprintf(out, "  add esp, %u\n", kStackArgSize+4);
   // Swap into the mcsema stack.
-  fprintf(out, "  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RSP));
 
   // Return registers.
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], eax\n", __builtin_offsetof(RegState, RAX));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(RegState, RDX));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm0\n", __builtin_offsetof(RegState, XMM0));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], eax\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm0\n", __builtin_offsetof(State, XMM0));
 
   // Callee-saved registers.
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(RegState, RBP));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(RegState, RDI));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(State, RBP));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(State, RDI));
 
   // Unstash the callee-saved registers.
   fprintf(out, "  pop ebp\n");
@@ -194,13 +198,13 @@ int main(void) {
   fprintf(out, "  .cfi_startproc\n");
 
   // General purpose registers.
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], eax\n", __builtin_offsetof(RegState, RAX));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ecx\n", __builtin_offsetof(RegState, RCX));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(RegState, RDX));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(RegState, RDI));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(RegState, RBP));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], eax\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ecx\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(State, RBP));
 
   // if this function had no args, this will be zero, otherwise
   // it will be -argcount*4 (esp is now > old esp, due to pops)
@@ -209,17 +213,17 @@ int main(void) {
   // adjust for our copied stack args + fake return
   fprintf(out, "  add esp, %u\n", kStackArgSize+4);
 
-  fprintf(out, "  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RSP));
 
   // XMM registers.
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm0\n", __builtin_offsetof(RegState, XMM0));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm1\n", __builtin_offsetof(RegState, XMM1));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm2\n", __builtin_offsetof(RegState, XMM2));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm3\n", __builtin_offsetof(RegState, XMM3));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm4\n", __builtin_offsetof(RegState, XMM4));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm5\n", __builtin_offsetof(RegState, XMM5));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm6\n", __builtin_offsetof(RegState, XMM6));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm7\n", __builtin_offsetof(RegState, XMM7));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm0\n", __builtin_offsetof(State, XMM0));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm1\n", __builtin_offsetof(State, XMM1));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm2\n", __builtin_offsetof(State, XMM2));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm3\n", __builtin_offsetof(State, XMM3));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm4\n", __builtin_offsetof(State, XMM4));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm5\n", __builtin_offsetof(State, XMM5));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm6\n", __builtin_offsetof(State, XMM6));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm7\n", __builtin_offsetof(State, XMM7));
 
   // Unstash the callee-saved registers.
   fprintf(out, "  pop ebp\n");
@@ -249,7 +253,7 @@ int main(void) {
   ///////////////////////////////////////////////////////////////
 
   // Implements `__mcsema_detach_ret_cdecl`. This goes from lifted code into native code.
-  // The native code pointer is located at the native `[RegState::ESP - 4]`
+  // The native code pointer is located at the native `[State::ESP - 4]`
   // address.
   fprintf(out, "  .globl __mcsema_detach_ret_cdecl\n");
   fprintf(out, "  .type __mcsema_detach_ret_cdecl,@function\n");
@@ -257,30 +261,30 @@ int main(void) {
   fprintf(out, "  .cfi_startproc\n");
 
   // General purpose registers.
-  fprintf(out, "  mov eax, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RAX));
-  fprintf(out, "  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov ecx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RCX));
-  fprintf(out, "  mov edx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RDX));
-  fprintf(out, "  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RDI));
-  fprintf(out, "  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RBP));
-  fprintf(out, "  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  mov eax, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov ecx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov edx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RBP));
+  fprintf(out, "  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RSP));
 
   // XMM registers.
-  fprintf(out, "  movdqu xmm0, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM0));
-  fprintf(out, "  movdqu xmm1, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM1));
-  fprintf(out, "  movdqu xmm2, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM2));
-  fprintf(out, "  movdqu xmm3, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM3));
-  fprintf(out, "  movdqu xmm4, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM4));
-  fprintf(out, "  movdqu xmm5, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM5));
-  fprintf(out, "  movdqu xmm6, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM6));
-  fprintf(out, "  movdqu xmm7, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM7));
+  fprintf(out, "  movdqu xmm0, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM0));
+  fprintf(out, "  movdqu xmm1, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM1));
+  fprintf(out, "  movdqu xmm2, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM2));
+  fprintf(out, "  movdqu xmm3, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM3));
+  fprintf(out, "  movdqu xmm4, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM4));
+  fprintf(out, "  movdqu xmm5, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM5));
+  fprintf(out, "  movdqu xmm6, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM6));
+  fprintf(out, "  movdqu xmm7, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM7));
 
   // We assume the lifted code was generated by a sane complier and ended in a RET
-  // which will write a return address into RegState::XIP and then pop off the stack,
+  // which will write a return address into State::XIP and then pop off the stack,
   // if its callee cleanup.
-  // We will jump to RegState::XIP since it shoudl be the 'real' return address we have to get to
-  fprintf(out, "  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RIP));
+  // We will jump to State::XIP since it shoudl be the 'real' return address we have to get to
+  fprintf(out, "  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RIP));
 
   fprintf(out, ".Lfunc_end3:\n");
   fprintf(out, "  .size __mcsema_detach_ret_cdecl,.Lfunc_end3-__mcsema_detach_ret_cdecl\n");
@@ -300,9 +304,9 @@ int main(void) {
   fprintf(out, "__mcsema_detach_call_cdecl:\n");
   fprintf(out, "  .cfi_startproc\n");
 
-  // Pop the target function into the `RegState` structure. This resets `EIP`
+  // Pop the target function into the `State` structure. This resets `EIP`
   // to what it should be on entry to `__mcsema_detach_call_cdecl`.
-  fprintf(out, "  pop DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  pop DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RIP));
   // Marshal the callee-saved registers (of the emulated code) into the native
   // state. We don't touch the argument registers.
 
@@ -320,13 +324,13 @@ int main(void) {
   fprintf(out, "  mov ecx, %u\n", kStackArgSize);
   fprintf(out, "  rep movsb\n");
 
-  fprintf(out, "  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RDI));
-  fprintf(out, "  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RBP));
+  fprintf(out, "  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RBP));
 
   // Swap onto the native stack.
-  fprintf(out, "  xchg DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u], esp\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  xchg DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u], esp\n", __builtin_offsetof(State, RSP));
 
   // copy posible stack args from holding area to native stack
   // allocate space for our arguments on stack
@@ -356,7 +360,7 @@ int main(void) {
   fprintf(out, "  lea eax, __mcsema_attach_ret_cdecl\n");
   fprintf(out, "  push eax\n");
 
-  fprintf(out, "  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RIP));
 
   fprintf(out, ".Lfunc_end4:\n");
   fprintf(out, "  .size __mcsema_detach_call_cdecl,.Lfunc_end4-__mcsema_detach_call_cdecl\n");
@@ -376,7 +380,7 @@ int main(void) {
   fprintf(out, "__mcsema_detach_call_value:\n");
   fprintf(out, "  .cfi_startproc\n");
 
-  // Note: the bitcode has already put the target address into `RegState::EIP`.
+  // Note: the bitcode has already put the target address into `State::EIP`.
 
   // Stash the callee-saved registers.
   fprintf(out, "  push edi\n");
@@ -392,29 +396,29 @@ int main(void) {
   fprintf(out, "  lea edi, [eax + __mcsema_stack_args@NTPOFF]\n");
   // this is not ESP since for do_call_value there is no spilling via an 
   // intermediate function
-  fprintf(out, "  mov esi, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  mov esi, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RSP));
   fprintf(out, "  mov ecx, %u\n", kStackArgSize);
   fprintf(out, "  rep movsb\n");
 
   // General purpose registers.
-  fprintf(out, "  mov eax, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RAX));
-  fprintf(out, "  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov ecx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RCX));
-  fprintf(out, "  mov edx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RDX));
-  fprintf(out, "  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RDI));
-  fprintf(out, "  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RBP));
-  fprintf(out, "  xchg DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u], esp\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  mov eax, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov ecx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov edx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RBP));
+  fprintf(out, "  xchg DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u], esp\n", __builtin_offsetof(State, RSP));
 
   // XMM registers.
-  fprintf(out, "  movdqu xmm0, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM0));
-  fprintf(out, "  movdqu xmm1, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM1));
-  fprintf(out, "  movdqu xmm2, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM2));
-  fprintf(out, "  movdqu xmm3, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM3));
-  fprintf(out, "  movdqu xmm4, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM4));
-  fprintf(out, "  movdqu xmm5, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM5));
-  fprintf(out, "  movdqu xmm6, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM6));
-  fprintf(out, "  movdqu xmm7, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, XMM7));
+  fprintf(out, "  movdqu xmm0, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM0));
+  fprintf(out, "  movdqu xmm1, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM1));
+  fprintf(out, "  movdqu xmm2, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM2));
+  fprintf(out, "  movdqu xmm3, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM3));
+  fprintf(out, "  movdqu xmm4, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM4));
+  fprintf(out, "  movdqu xmm5, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM5));
+  fprintf(out, "  movdqu xmm6, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM6));
+  fprintf(out, "  movdqu xmm7, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, XMM7));
 
   // copy posible stack args from holding area to native stack
   // allocate space for our arguments on stack
@@ -450,7 +454,7 @@ int main(void) {
   fprintf(out, "  push eax\n");
 
   // Go native.
-  fprintf(out, "  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RIP));
 
   fprintf(out, ".Lfunc_end5:\n");
   fprintf(out, "  .size __mcsema_detach_call_value,.Lfunc_end5-__mcsema_detach_call_value\n");
@@ -484,9 +488,9 @@ int main(void) {
   fprintf(out, "__mcsema_detach_call_stdcall:\n");
   fprintf(out, "  .cfi_startproc\n");
 
-  // Pop the target function into the `RegState` structure. This resets `EIP`
+  // Pop the target function into the `State` structure. This resets `EIP`
   // to what it should be on entry to `__mcsema_detach_call_stdcall`.
-  fprintf(out, "  pop DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  pop DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RIP));
   // Marshal the callee-saved registers (of the emulated code) into the native
   // state. We don't touch the argument registers.
 
@@ -516,13 +520,13 @@ int main(void) {
   fprintf(out, "  pop edx\n");
   fprintf(out, "  pop ecx\n");
 
-  fprintf(out, "  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RDI));
-  fprintf(out, "  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RBP));
+  fprintf(out, "  mov edi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov esi, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov ebx, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov ebp, gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RBP));
 
   // Swap onto the native stack.
-  fprintf(out, "  xchg DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u], esp\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  xchg DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u], esp\n", __builtin_offsetof(State, RSP));
 
   // copy posible stack args from holding area to native stack
   // allocate space for our arguments on stack
@@ -556,7 +560,7 @@ int main(void) {
   fprintf(out, "  lea eax, __mcsema_attach_ret_stdcall\n");
   fprintf(out, "  push eax\n");
 
-  fprintf(out, "  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RIP));
 
   fprintf(out, ".Lfunc_endA:\n");
   fprintf(out, "  .size __mcsema_detach_call_stdcall,.Lfunc_endA-__mcsema_detach_call_stdcall\n");
@@ -594,18 +598,18 @@ int main(void) {
   // adjust for our copied stack args + fake return
   fprintf(out, "  add esp, %u\n", kStackArgSize+4);
   // Swap into the mcsema stack.
-  fprintf(out, "  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  xchg esp, DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, RSP));
 
   // Return registers.
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], eax\n", __builtin_offsetof(RegState, RAX));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(RegState, RDX));
-  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm0\n", __builtin_offsetof(RegState, XMM0));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], eax\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edx\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  movdqu gs:[__mcsema_reg_state@NTPOFF + %u], xmm0\n", __builtin_offsetof(State, XMM0));
 
   // Callee-saved registers.
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(RegState, RBP));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(RegState, RDI));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebp\n", __builtin_offsetof(State, RBP));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], ebx\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], esi\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov gs:[__mcsema_reg_state@NTPOFF + %u], edi\n", __builtin_offsetof(State, RDI));
 
   // Unstash the callee-saved registers.
   // restore old stack mark

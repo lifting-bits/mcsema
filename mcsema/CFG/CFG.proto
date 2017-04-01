@@ -42,25 +42,15 @@ message Reference {
 }
 
 message Instruction {
-
-    enum RefType {
-      CodeRef = 0;
-      DataRef = 1;
-    }
-
     required    bytes             inst_bytes = 1;
     required    int64             inst_addr = 2;
-    optional    int64             true_target = 3;
-    optional    int64             false_target = 4;
-    required    int32             inst_len = 5;
 
-    repeated    Reference         refs = 6;
+    repeated    Reference         refs = 3;
 
-    optional    JumpTbl           jump_table = 7;
-    optional    JumpIndexTbl      jump_index_table = 8;
-    optional    int32             system_call_number = 9;
-    optional    bool              local_noreturn = 10;
-    optional    int64             offset_table_addr = 11;
+    optional    JumpTbl           jump_table = 4;
+    optional    JumpIndexTbl      jump_index_table = 5;
+    optional    bool              local_noreturn = 6;
+    optional    int64             offset_table_addr = 7;
 }
 
 message Block {

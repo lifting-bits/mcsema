@@ -84,8 +84,7 @@ static DataSection *tableToDataSection(VA new_base, const JumpIndexTable &jit) {
 template<typename T>
 static bool addTableDataSection(TranslationContext &ctx, VA &newVA,
                                 const T &table) {
-  auto natMod = ctx.natM;
-  auto M = ctx.M;
+  auto natMod = ctx.cfg_module;
 
   // ensure we make this the last data section
   newVA = 0;
@@ -109,15 +108,15 @@ static bool addTableDataSection(TranslationContext &ctx, VA &newVA,
   std::stringstream ss;
   ss << "data_" << std::hex << newVA;
   std::string bufferName = ss.str();
-  auto st_opaque = llvm::StructType::create(M->getContext());
-  auto gv = new llvm::GlobalVariable( *M, st_opaque, true,
+  auto st_opaque = llvm::StructType::create(*gContext);
+  auto gv = new llvm::GlobalVariable(*gModule, st_opaque, true,
                                      llvm::GlobalVariable::InternalLinkage,
                                      NULL,
                                      bufferName);
 
   std::vector<llvm::Type *> data_section_types;
   std::vector<llvm::Constant *> secContents;
-  dataSectionToTypesContents(natMod->getData(), *ds, M, secContents,
+  dataSectionToTypesContents(natMod->getData(), *ds, gModule, secContents,
                              data_section_types, false);
 
   st_opaque->setBody(data_section_types, true);
@@ -158,9 +157,9 @@ void doJumpTableViaData(llvm::BasicBlock *&block, llvm::Value *fptr,
 
 void doJumpTableViaData(TranslationContext &ctx, llvm::BasicBlock *&block,
                         const int bitness) {
-  auto ip = ctx.natI;
+  auto ip = ctx.cfg_inst;
   auto &inst = ip->get_inst();
-  auto natM = ctx.natM;
+  auto natM = ctx.cfg_module;
 
   llvm::Value *addr = MEM_REFERENCE(0);
   //doJumpTableViaData(block, addr, bitness);
@@ -185,9 +184,9 @@ void doJumpTableViaData(TranslationContext &ctx, llvm::BasicBlock *&block,
 template<int bitness>
 static void doJumpTableViaSwitch(TranslationContext &ctx,
                                  llvm::BasicBlock *&block) {
-  auto ip = ctx.natI;
+  auto ip = ctx.cfg_inst;
   auto &inst = ip->get_inst();
-  auto natM = ctx.natM;
+  auto natM = ctx.cfg_module;
 
   llvm::errs() << __FUNCTION__ << ": Doing jump table via switch\n";
   auto F = block->getParent();
@@ -230,7 +229,7 @@ static void doJumpTableViaSwitch(TranslationContext &ctx,
   // populate switch
   int myindex = 0;
   for (auto jmp_block_va : jmpblocks) {
-    auto toBlock = ctx.va_to_bb[jmp_block_va];
+    auto toBlock = ctx.ea_to_block[jmp_block_va];
     TASSERT(toBlock != NULL, "Could not find block");
     theSwitch->addCase(CONST_V<bitness>(block, myindex), toBlock);
     ++myindex;
@@ -262,7 +261,7 @@ static void doJumpTableViaSwitchReg(TranslationContext &ctx,
 
   auto F = block->getParent();
   auto M = F->getParent();
-  auto ip = ctx.natI;
+  auto ip = ctx.cfg_inst;
   auto jmpptr = ip->get_jump_table();
 
   // create a default block that just traps
@@ -279,7 +278,7 @@ static void doJumpTableViaSwitchReg(TranslationContext &ctx,
 
   // populate switch
   for (auto blockVA : uniq_blocks) {
-    auto toBlock = ctx.va_to_bb[blockVA];
+    auto toBlock = ctx.ea_to_block[blockVA];
     TASSERT(toBlock != NULL, "Could not find block!");
     auto thecase = CONST_V<bitness>(block, blockVA);
     theSwitch->addCase(thecase, toBlock);
@@ -292,7 +291,7 @@ void doJumpOffsetTableViaSwitchReg(TranslationContext &ctx,
                                    llvm::BasicBlock *&default_block,
                                    llvm::Value *data_location,
                                    MCSOffsetTablePtr ot_ptr) {
-  auto ip = ctx.natI;
+  auto ip = ctx.cfg_inst;
   llvm::errs() << __FUNCTION__ << ": Doing jump offset table via switch(reg)\n";
   auto F = block->getParent();
 
@@ -320,7 +319,7 @@ void doJumpOffsetTableViaSwitchReg(TranslationContext &ctx,
 
   // populate switch
   for (const auto &entry : uniq_blocks) {
-    auto toBlock = ctx.va_to_bb[entry.second];
+    auto toBlock = ctx.ea_to_block[entry.second];
     TASSERT(toBlock != NULL, "Could not find block!");
     auto thecase = CONST_V<64>(block, entry.first);
     theSwitch->addCase(thecase, toBlock);

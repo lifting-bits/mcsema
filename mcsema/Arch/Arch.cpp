@@ -48,7 +48,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "remill/Arch/Arch.h"
 
 #include "mcsema/Arch/Arch.h"
-#include "mcsema/Arch/Dispatch.h"
 #include "mcsema/BC/Util.h"
 
 namespace mcsema {

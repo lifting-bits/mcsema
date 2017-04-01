@@ -46,9 +46,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "remill/Arch/Instruction.h"
 
 #include "mcsema/Arch/Arch.h"
-#include "mcsema/Arch/Dispatch.h"
 
 #include "mcsema/BC/Instruction.h"
+#include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Util.h"
 
 #include "mcsema/CFG/CFG.h"
@@ -58,13 +58,24 @@ namespace mcsema {
 namespace {
 
 // Try to get the base address of a data section containing `addr`.
-bool TryGetBaseAddress(NativeModulePtr mod, VA addr, VA *base) {
+bool TryGetBaseAddress(NativeModulePtr mod, VA addr, VA *base,
+                       std::string *sym_name) {
+  *sym_name = "";
   for (auto &section : mod->getData()) {
     const VA low = section.getBase();
     const VA high = low + section.getSize();
 
     if (low <= addr && addr < high) {
       *base = low;
+      // TODO(pag): Eventually what I would like is for this to refer to
+      //            the name of an actual global variable. So, if the original
+      //            binary has a global variable, then we have a constant GEP
+      //            into the lifted data with the same name as the global.
+//      for (const auto &entry : section.getEntries()) {
+//        if (entry.getBase() == addr) {
+//          entry.getSymbol(*sym_name);
+//        }
+//      }
       return true;
     }
   }
@@ -94,20 +105,20 @@ bool InstructionLifter::LiftIntoBlock(remill::Instruction *instr_,
   instr = instr_;
   block = block_;
 
-  mem_ref = GetAddress(ctx.natI->external_mem_code_ref,
-                       ctx.natI->external_mem_data_ref,
-                       ctx.natI->mem_ref_code_addr,
-                       ctx.natI->mem_ref_data_addr);
+  mem_ref = GetAddress(ctx.cfg_inst->external_mem_code_ref,
+                       ctx.cfg_inst->external_mem_data_ref,
+                       ctx.cfg_inst->mem_ref_code_addr,
+                       ctx.cfg_inst->mem_ref_data_addr);
 
-  imm_ref = GetAddress(ctx.natI->external_imm_code_ref,
-                       ctx.natI->external_imm_data_ref,
-                       ctx.natI->imm_ref_code_addr,
-                       ctx.natI->imm_ref_data_addr);
+  imm_ref = GetAddress(ctx.cfg_inst->external_imm_code_ref,
+                       ctx.cfg_inst->external_imm_data_ref,
+                       ctx.cfg_inst->imm_ref_code_addr,
+                       ctx.cfg_inst->imm_ref_data_addr);
 
-  disp_ref = GetAddress(ctx.natI->external_disp_code_ref,
-                       ctx.natI->external_disp_data_ref,
-                       ctx.natI->disp_ref_code_addr,
-                       ctx.natI->disp_ref_data_addr);
+  disp_ref = GetAddress(ctx.cfg_inst->external_disp_code_ref,
+                       ctx.cfg_inst->external_disp_data_ref,
+                       ctx.cfg_inst->disp_ref_code_addr,
+                       ctx.cfg_inst->disp_ref_data_addr);
 
   return this->remill::InstructionLifter::LiftIntoBlock(instr, block);
 }
@@ -119,9 +130,9 @@ llvm::Value *InstructionLifter::GetAddress(
   llvm::IRBuilder<> ir(block);
   if (code) {
     const auto &func_name = code->getSymbolName();
-    llvm::GlobalObject *func = ctx.M->getFunction(func_name);
+    llvm::GlobalObject *func = gModule->getFunction(func_name);
     if (!func) {
-      func = ctx.M->getNamedGlobal(func_name);
+      func = gModule->getNamedGlobal(func_name);
       LOG_IF(ERROR, func != nullptr)
           << "Function pointer to " << std::hex << code_addr << " with symbol "
           << func_name << " was resolved to a global variable from "
@@ -137,9 +148,9 @@ llvm::Value *InstructionLifter::GetAddress(
 
   } else if (data) {
     const auto &global_name = data->getSymbolName();
-    llvm::GlobalObject *global = ctx.M->getNamedGlobal(global_name);
+    llvm::GlobalObject *global = gModule->getNamedGlobal(global_name);
     if (!global) {
-      global = ctx.M->getFunction(global_name);
+      global = gModule->getFunction(global_name);
       LOG_IF(ERROR,
              global &&
              !llvm::GlobalValue::isExternalWeakLinkage(global->getLinkage()))
@@ -156,7 +167,7 @@ llvm::Value *InstructionLifter::GetAddress(
     return ir.CreatePtrToInt(global, word_type);
 
   } else if (~0ULL != code_addr) {
-    auto &funcs = ctx.natM->get_funcs();
+    auto &funcs = ctx.cfg_module->get_funcs();
     auto func_it = funcs.find(code_addr);
     if (func_it == funcs.end()) {
       LOG(ERROR)
@@ -178,7 +189,16 @@ llvm::Value *InstructionLifter::GetAddress(
 
   } else if (~0ULL != data_addr) {
     VA base_addr = ~0ULL;
-    if (TryGetBaseAddress(ctx.natM, data_addr, &base_addr)) {
+    std::string sym_name;
+    if (TryGetBaseAddress(ctx.cfg_module, data_addr, &base_addr, &sym_name)) {
+
+      if (!sym_name.empty()) {
+        if (auto global = gModule->getNamedGlobal(sym_name)) {
+          return ir.CreatePtrToInt(global, word_type);
+        }
+      }
+
+      // Go find the section base, and add to it.
       std::stringstream ss;
       ss << "data_" << std::hex << base_addr;
       auto sym_name = ss.str();

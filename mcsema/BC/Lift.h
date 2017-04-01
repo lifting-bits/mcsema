@@ -31,15 +31,30 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef MCSEMA_BC_LIFT_H_
 #define MCSEMA_BC_LIFT_H_
 
-#include <set>
+#include <unordered_map>
 
 #include "mcsema/CFG/CFG.h"
 
+namespace remill {
+class InstructionLifter;
+}  // namespace remill
+
+namespace llvm {
+class BasicBlock;
+class Function;
+}  // namespace llvm
+
 namespace mcsema {
 
-//translate a NativeModule into an LLVM Module
-void RenameLiftedFunctions(NativeModulePtr mod,
-                           const std::set<VA> &entry_point_pcs);
+struct TranslationContext {
+  remill::InstructionLifter *lifter;
+  NativeModule *cfg_module;
+  NativeFunction *cfg_func;
+  NativeBlock *cfg_block;
+  NativeInst *cfg_inst;
+  llvm::Function *lifted_func;
+  std::unordered_map<VA, llvm::BasicBlock *> ea_to_block;
+};
 
 bool LiftCodeIntoModule(NativeModulePtr);
 

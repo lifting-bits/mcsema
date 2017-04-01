@@ -184,17 +184,26 @@ def instruction_ends_block(arg):
                                           PERSONALITY_TERMINATOR,
                                           PERSONALITY_SYSTEM_RETURN) 
 
-
+_NOT_CODE_EAS = set()
 
 # Returns `True` if `ea` belongs to some code segment.
 def is_code(ea):
-  return idc.isCode(idc.GetFlags(ea))
+  global _NOT_CODE_EAS
+  return ea not in _NOT_CODE_EAS and idc.isCode(idc.GetFlags(ea))
 
 # Mark an address as containing code.
 def mark_as_code(ea):
   if not is_code(ea):
     idc.MakeCode(ea)
     idaapi.autoWait()
+
+def mark_as_not_code(ea):
+  global _NOT_CODE_EAS, _INSTRUCTION_CACHE
+
+  if ea in _INSTRUCTION_CACHE:
+    del _INSTRUCTION_CACHE[ea]
+
+  _NOT_CODE_EAS.add(ea)
 
 def read_bytes_slowly(start, end):
   bytestr = ""
@@ -224,21 +233,24 @@ def read_qword(ea):
   qword = struct.unpack("<Q", bytestr)[0]
   return qword
 
+_BAD_INSTRUCTION = (None, "")
 
 def decode_instruction(ea):
   """Read the bytes of an x86/amd64 instruction. This handles things like
   combining the bytes of an instruction with its prefix. IDA Pro sometimes
   treats these as separate."""
-  global _INSTRUCTION_CACHE
+  global _INSTRUCTION_CACHE, _NOT_CODE_EAS, _BAD_INSTRUCTION, _PREFIX_ITYPES
+
+  if ea in _NOT_CODE_EAS:
+    return _BAD_INSTRUCTION
+
   if ea in _INSTRUCTION_CACHE:
     return _INSTRUCTION_CACHE[ea]
 
-  global _PREFIX_ITYPES
-
   decoded_inst = idautils.DecodeInstruction(ea)
   if not decoded_inst:
-    _INSTRUCTION_CACHE[ea] = (None, "")
-    return (None, "")
+    _INSTRUCTION_CACHE[ea] = _BAD_INSTRUCTION
+    return _BAD_INSTRUCTION
 
   assert decoded_inst.ea == ea
   end_ea = ea + decoded_inst.size
@@ -264,9 +276,51 @@ def decode_instruction(ea):
 #     return True
 #   return ea in POSSIBLE_CODE_REFS
 
+def has_flow_to_code(ea):
+  """Returns `True` if there are and control flows to the instruction at 
+  `ea`."""
+  for _ in idautils.CodeRefsTo(ea, True):
+    return True
+
+  for _ in idautils.CodeRefsTo(ea, False):
+    return True
+
+  return False
+
+_NOT_EXTERNAL_SEGMENTS = set([idc.BADADDR])
+_EXTERNAL_SEGMENTS = set()
+
+def is_external_segment(ea):
+  """Returns `True` if the segment containing `ea` looks to be solely containing
+  external references."""
+  global _NOT_EXTERNAL_SEGMENTS
+
+  base_ea = idc.SegStart(ea)
+  if base_ea in _NOT_EXTERNAL_SEGMENTS:
+    return False
+
+  if base_ea in _EXTERNAL_SEGMENTS:
+    return True
+
+  ext_types = []
+  seg_name = idc.SegName(base_ea).lower()
+  if ".got" in seg_name or ".plt" in seg_name:
+    _EXTERNAL_SEGMENTS.add(base_ea)
+    return True
+
+  segtype = idc.GetSegmentAttr(base_ea, idc.SEGATTR_TYPE)
+  if segtype == idc.SEG_XTRN:
+    _EXTERNAL_SEGMENTS.add(base_ea)
+    return True
+
+  _NOT_EXTERNAL_SEGMENTS.add(base_ea)
+  return False
+
 def is_internal_code(ea):
-  pf = idc.GetFlags(ea)
-  if idc.isCode(pf) and not idc.isData(pf):
+  if is_external_segment(ea):
+    return False
+  
+  if is_code(ea):
     return True
 
   # find stray 0x90 (NOP) bytes in .text that IDA 
@@ -288,25 +342,6 @@ def is_block_or_instruction_head(ea):
     return True
   return is_internal_code(ea) and idc.ItemHead(ea) == ea
 
-def is_external_segment(ea):
-  """Returns `True` if the segment containing `ea` looks to be solely containing
-  external references."""
-  ext_types = []
-  seg_name = idc.SegName(ea).lower()
-  if ".got" in seg_name or ".plt" in seg_name:
-    return True
-
-  seg = idc.SegStart(ea)
-  if seg == idc.BADADDR:
-    DEBUG("WARNING: Could not get segment addr for: {0:x}".format(ea))
-    return False
-
-  segtype = idc.GetSegmentAttr(seg, idc.SEGATTR_TYPE)
-  if segtype == idc.SEG_XTRN:
-    return True
-
-  return False
-
 def get_address_size_in_bits():
   """Returns the available address size."""
   if (idaapi.ph.flag & idaapi.PR_USE64) != 0:
@@ -314,6 +349,92 @@ def get_address_size_in_bits():
   else:
     return 32
 
-
 def get_address_size_in_bytes():
   return get_address_size_in_bits() / 8
+
+# Tries to get the name of a symbol.
+def get_symbol_name(from_ea, ea=None, allow_dummy=False):
+  if ea is None:
+    ea = from_ea
+
+  flags = idc.GetFlags(ea)
+  if not allow_dummy and idaapi.has_dummy_name(flags):
+    return ""
+
+  name = ""
+  try:
+    name = name or idc.GetTrueNameEx(from_ea, ea)
+  except:
+    pass
+
+  try:
+    name = name or idc.GetFunctionName(ea)
+  except:
+    pass
+
+  return name
+
+def get_function_bounds(ea):
+  """Get the bounds of the function containing `ea`. We want to discover jump
+  table targets that are missed by IDA, and it's possible that they aren't
+  marked as being part of the current function, and perhaps are after the
+  assumed range of the current function. Ideally they will fall before the
+  beginning of the next function, though.
+
+  We need to be pretty careful with the case that one function tail-calls
+  another. IDA will sometimes treat the end of the tail-called function
+  (e.g. a thunk) as if it is the end of the caller. For this reason, we start
+  with loose bounds using the prev/next functions, then try to narrow with
+  the bounds of the function containing `ea`.
+
+  TODO(pag): Handle discontinuous regions (e.g. because of function chunks).
+             It may be worth to return an object here that can we queried
+             for membership using the `__in__` method.
+  """
+  seg_start, seg_end = idc.SegStart(ea), idc.SegEnd(ea)
+  min_ea = seg_start
+  max_ea = seg_end
+
+  if idc.BADADDR == min_ea or not is_code(ea):
+    return ea, ea
+
+  # Get an upper bound using the next function.
+  next_func_ea = idc.NextFunction(ea)
+  if next_func_ea != idc.BADADDR:
+    max_ea = min(next_func_ea, max_ea)
+
+  # Get a lower bound using the previous function.
+  prev_func_ea = idc.PrevFunction(ea)
+  if prev_func_ea != idc.BADADDR:
+    min_ea = max(min_ea, prev_func_ea)
+    prev_func = idaapi.get_func(prev_func_ea)
+    if prev_func and prev_func.endEA < ea:
+      min_ea = max(min_ea, prev_func.endEA)
+
+  # Try to tighten the bounds using the function containing `ea`.
+  func = idaapi.get_func(ea)
+  if func:
+    min_ea = max(min_ea, func.startEA)
+    max_ea = min(max_ea, func.endEA)
+
+  return min_ea, max_ea
+
+def is_noreturn_function(ea):
+  """Returns true if the function at `ea` is a no-return function."""
+  flags = idc.GetFunctionFlags(ea)
+  return 0 < flags and (flags & idaapi.FUNC_NORET)
+
+def remove_all_refs(ea):
+  """Remove all references to something."""
+  dref_eas = list(idautils.DataRefsFrom(ea))
+  cref_eas0 = list(idautils.CodeRefsFrom(ea, False))
+  cref_eas1 = list(idautils.CodeRefsFrom(ea, True))
+
+  for ref_ea in dref_eas:
+    idaapi.del_dref(ea, ref_ea)
+
+  for ref_ea in cref_eas0:
+    idaapi.del_cref(ea, ref_ea, False)
+
+  for ref_ea in cref_eas1:
+    idaapi.del_cref(ea, ref_ea, True)

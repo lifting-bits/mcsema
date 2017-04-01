@@ -2,8 +2,12 @@
 
 #include <cstdio>
 
-#define ONLY_STRUCT
-#include "State.h"
+#define HAS_FEATURE_AVX 1
+#define HAS_FEATURE_AVX512 0
+#define ADDRESS_SIZE_BITS 32
+
+#include "remill/Arch/X86/Runtime/State.h"
+#include "mcsema/Arch/X86/Runtime/Registers.h"
 
 static const unsigned kStackSize = 1UL << 20U;
 static const unsigned kStackArgSize = 256U;
@@ -30,7 +34,7 @@ int main(void) {
   fprintf(out, "     .globl  __mcsema_reg_state\n");
   fprintf(out, "__mcsema_reg_state:\n");
   fprintf(out, "     .align  4\n");
-  fprintf(out, "     .zero   %u\n", sizeof(RegState));
+  fprintf(out, "     .zero   %u\n", sizeof(State));
   fprintf(out, "\n");
 
   // Thread-local stack structure, named by `__mcsema_stack`.
@@ -83,34 +87,34 @@ int main(void) {
   fprintf(out, "  mov dword ptr [esp+4], ebp\n"); // save ebp, we will clobber it
   getTlsIndex(out, "ebp");
 
-  // Pop the target function into the `RegState` structure. This resets `ESP`
+  // Pop the target function into the `State` structure. This resets `ESP`
   // to what it should be on entry to `__mcsema_attach_call`.
-  fprintf(out, "  pop DWORD PTR [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  pop DWORD PTR [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RIP));
 
   // General purpose registers.
-  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], eax\n", __builtin_offsetof(RegState, RAX));
-  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], ebx\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], ecx\n", __builtin_offsetof(RegState, RCX));
-  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], edx\n", __builtin_offsetof(RegState, RDX));
-  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], esi\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], edi\n", __builtin_offsetof(RegState, RDI));
+  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], eax\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], ebx\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], ecx\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], edx\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], esi\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], edi\n", __builtin_offsetof(State, RDI));
 
   fprintf(out, "  pop ebp\n");
 
   getTlsIndex(out, "eax");
-  fprintf(out, "  mov [eax + __mcsema_reg_state@SECREL32 + %u], ebp\n", __builtin_offsetof(RegState, RBP));
+  fprintf(out, "  mov [eax + __mcsema_reg_state@SECREL32 + %u], ebp\n", __builtin_offsetof(State, RBP));
 
   // XMM registers.
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm0\n", __builtin_offsetof(RegState, XMM0));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm1\n", __builtin_offsetof(RegState, XMM1));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm2\n", __builtin_offsetof(RegState, XMM2));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm3\n", __builtin_offsetof(RegState, XMM3));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm4\n", __builtin_offsetof(RegState, XMM4));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm5\n", __builtin_offsetof(RegState, XMM5));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm6\n", __builtin_offsetof(RegState, XMM6));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm7\n", __builtin_offsetof(RegState, XMM7));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm0\n", __builtin_offsetof(State, XMM0));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm1\n", __builtin_offsetof(State, XMM1));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm2\n", __builtin_offsetof(State, XMM2));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm3\n", __builtin_offsetof(State, XMM3));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm4\n", __builtin_offsetof(State, XMM4));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm5\n", __builtin_offsetof(State, XMM5));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm6\n", __builtin_offsetof(State, XMM6));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm7\n", __builtin_offsetof(State, XMM7));
 
-  fprintf(out, "  xchg esp, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  xchg esp, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RSP));
 
   // If `ESP` is null then we need to initialize it to our new stack.
   fprintf(out, "  cmp esp, 0\n");
@@ -140,7 +144,7 @@ int main(void) {
   fprintf(out, "  xchg eax, [esp]\n");
 
   // get EIP we need to jump to, in the process, clobber TLS index
-  fprintf(out, "  mov eax, DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  mov eax, DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RIP));
   // and away we go!
   fprintf(out, "  jmp eax\n");
 
@@ -171,24 +175,24 @@ int main(void) {
   // Swap into the mcsema stack.
   fprintf(out, "push eax\n");
   getTlsIndex(out, "eax");
-  fprintf(out, "  xchg esp, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  xchg esp, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RSP));
   // simulate a pop eax from old stack
-  fprintf(out, "  add dword ptr [eax + __mcsema_reg_state@SECREL32 + %u], 4\n", __builtin_offsetof(RegState, RSP));
-  fprintf(out, "  mov eax, dword ptr [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  add dword ptr [eax + __mcsema_reg_state@SECREL32 + %u], 4\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  mov eax, dword ptr [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RSP));
   fprintf(out, "  mov eax, dword ptr [eax-4]\n"); // use -4 here since we just added 4 to the old esp to simulate a pop
 
   fprintf(out, "  push ecx\n");
   getTlsIndex(out, "ecx");
   // Return registers.
-  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], eax\n", __builtin_offsetof(RegState, RAX));
-  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], edx\n", __builtin_offsetof(RegState, RDX));
-  fprintf(out, "  movdqu [ecx + __mcsema_reg_state@SECREL32 + %u], xmm0\n", __builtin_offsetof(RegState, XMM0));
+  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], eax\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], edx\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  movdqu [ecx + __mcsema_reg_state@SECREL32 + %u], xmm0\n", __builtin_offsetof(State, XMM0));
 
   // Callee-saved registers.
-  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], ebp\n", __builtin_offsetof(RegState, RBP));
-  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], ebx\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], esi\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], edi\n", __builtin_offsetof(RegState, RDI));
+  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], ebp\n", __builtin_offsetof(State, RBP));
+  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], ebx\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], esi\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], edi\n", __builtin_offsetof(State, RDI));
 
   fprintf(out, "  pop ecx\n");
   // Unstash the callee-saved registers.
@@ -219,28 +223,28 @@ int main(void) {
   getTlsIndex(out, "ebp");
 
   // General purpose registers.
-  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], eax\n", __builtin_offsetof(RegState, RAX));
-  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], ebx\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], ecx\n", __builtin_offsetof(RegState, RCX));
-  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], edx\n", __builtin_offsetof(RegState, RDX));
-  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], esi\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], edi\n", __builtin_offsetof(RegState, RDI));
+  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], eax\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], ebx\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], ecx\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], edx\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], esi\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov [ebp + __mcsema_reg_state@SECREL32 + %u], edi\n", __builtin_offsetof(State, RDI));
 
   fprintf(out, "  pop ebp\n");
 
   // TODO(artem): check if we need to save eax
   getTlsIndex(out, "eax");
-  fprintf(out, "  mov [eax + __mcsema_reg_state@SECREL32 + %u], ebp\n", __builtin_offsetof(RegState, RBP));
+  fprintf(out, "  mov [eax + __mcsema_reg_state@SECREL32 + %u], ebp\n", __builtin_offsetof(State, RBP));
 
   // XMM registers.
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm0\n", __builtin_offsetof(RegState, XMM0));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm1\n", __builtin_offsetof(RegState, XMM1));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm2\n", __builtin_offsetof(RegState, XMM2));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm3\n", __builtin_offsetof(RegState, XMM3));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm4\n", __builtin_offsetof(RegState, XMM4));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm5\n", __builtin_offsetof(RegState, XMM5));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm6\n", __builtin_offsetof(RegState, XMM6));
-  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm7\n", __builtin_offsetof(RegState, XMM7));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm0\n", __builtin_offsetof(State, XMM0));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm1\n", __builtin_offsetof(State, XMM1));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm2\n", __builtin_offsetof(State, XMM2));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm3\n", __builtin_offsetof(State, XMM3));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm4\n", __builtin_offsetof(State, XMM4));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm5\n", __builtin_offsetof(State, XMM5));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm6\n", __builtin_offsetof(State, XMM6));
+  fprintf(out, "  movdqu [eax + __mcsema_reg_state@SECREL32 + %u], xmm7\n", __builtin_offsetof(State, XMM7));
 
 
   // if this function had no args, this will be zero, otherwise
@@ -252,7 +256,7 @@ int main(void) {
   fprintf(out, "  add esp, %u\n", kStackArgSize+4);
   fprintf(out, "  add esp, ecx\n");
 
-  fprintf(out, "  xchg esp, DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  xchg esp, DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RSP));
 
   fprintf(out, "  pop DWORD PTR [eax + __mcsema_stack_mark@SECREL32]\n");
   // Unstash the callee-saved registers.
@@ -274,54 +278,54 @@ int main(void) {
   ///////////////////////////////////////////////////////////////
 
   // Implements `__mcsema_detach_ret_cdecl`. This goes from lifted code into native code.
-  // The native code pointer is located at the native `[RegState::ESP - 4]`
+  // The native code pointer is located at the native `[State::ESP - 4]`
   // address.
   fprintf(out, "  .globl __mcsema_detach_ret_cdecl\n");
   fprintf(out, "__mcsema_detach_ret_cdecl:\n");
   fprintf(out, "  .cfi_startproc\n");
 
-  // the stack has the RegState structure argument on it. 
+  // the stack has the State structure argument on it.
   // we need to pop it off anyway due to caller cleanup, so 
   // just re-use it as a place to stash `ebp`, which we pop later
   fprintf(out, "  mov [esp], ebp\n");
   getTlsIndex(out, "ebp");
 
   // General purpose registers.
-  fprintf(out, "  mov eax, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RAX));
-  fprintf(out, "  mov ebx, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov ecx, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RCX));
-  fprintf(out, "  mov edx, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RDX));
-  fprintf(out, "  mov esi, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov edi, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RDI));
+  fprintf(out, "  mov eax, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov ebx, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov ecx, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov edx, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  mov esi, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov edi, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RDI));
 
   // XMM registers.
-  fprintf(out, "  movdqu xmm0, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM0));
-  fprintf(out, "  movdqu xmm1, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM1));
-  fprintf(out, "  movdqu xmm2, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM2));
-  fprintf(out, "  movdqu xmm3, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM3));
-  fprintf(out, "  movdqu xmm4, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM4));
-  fprintf(out, "  movdqu xmm5, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM5));
-  fprintf(out, "  movdqu xmm6, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM6));
-  fprintf(out, "  movdqu xmm7, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM7));
+  fprintf(out, "  movdqu xmm0, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM0));
+  fprintf(out, "  movdqu xmm1, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM1));
+  fprintf(out, "  movdqu xmm2, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM2));
+  fprintf(out, "  movdqu xmm3, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM3));
+  fprintf(out, "  movdqu xmm4, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM4));
+  fprintf(out, "  movdqu xmm5, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM5));
+  fprintf(out, "  movdqu xmm6, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM6));
+  fprintf(out, "  movdqu xmm7, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM7));
 
   fprintf(out, "  pop ebp\n");
 
   fprintf(out, "  push eax\n");
   getTlsIndex(out, "eax");
-  fprintf(out, "  mov ebp, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RBP));
-  fprintf(out, "  xchg esp, DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  mov ebp, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RBP));
+  fprintf(out, "  xchg esp, DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RSP));
   // simulate a pop eax from old stack
-  fprintf(out, "  add dword ptr [eax + __mcsema_reg_state@SECREL32 + %u], 4\n", __builtin_offsetof(RegState, RSP));
-  fprintf(out, "  mov eax, dword ptr [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  add dword ptr [eax + __mcsema_reg_state@SECREL32 + %u], 4\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  mov eax, dword ptr [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RSP));
   fprintf(out, "  mov eax, dword ptr [eax-4]\n"); // use -4 here since we just added 4 to the old esp to simulate a pop
 
   // We assume the lifted code was generated by a sane complier and ended in a RET
-  // which will write a return address into RegState::XIP and then pop off the stack,
+  // which will write a return address into State::XIP and then pop off the stack,
   // if its callee cleanup.
-  // We will jump to RegState::XIP since it should be the 'real' return address we have to get to
+  // We will jump to State::XIP since it should be the 'real' return address we have to get to
   fprintf(out, "  push eax\n");
   getTlsIndex(out, "eax");
-  fprintf(out, "  mov eax, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  mov eax, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RIP));
   // conveniently restores EAX to its saved value, and
   // uses the stack slot to set up an address we can return to
   
@@ -350,9 +354,9 @@ int main(void) {
   
   // clobber eax to use as TLS index
   getTlsIndex(out, "eax");
-  // Pop the target function into the `RegState` structure. This resets `EIP`
+  // Pop the target function into the `State` structure. This resets `EIP`
   // to what it should be on entry to `__mcsema_detach_call_cdecl`.
-  fprintf(out, "  pop DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  pop DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RIP));
   // Marshal the callee-saved registers (of the emulated code) into the native
   // state. We don't touch the argument registers.
 
@@ -371,13 +375,13 @@ int main(void) {
   // do the copy
   fprintf(out, "  rep movsb\n");
 
-  fprintf(out, "  mov esi, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov edi, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RDI));
-  fprintf(out, "  mov ebx, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov ebp, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RBP));
+  fprintf(out, "  mov esi, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov edi, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov ebx, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov ebp, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RBP));
 
   // Swap onto the native stack.
-  fprintf(out, "  xchg DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u], esp\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  xchg DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u], esp\n", __builtin_offsetof(State, RSP));
 
   // copy posible stack args from holding area to native stack
   // allocate space for our arguments on stack
@@ -410,7 +414,7 @@ int main(void) {
   // code we are about to jump to
   fprintf(out, "  xchg eax, [esp]\n");
 
-  fprintf(out, "  jmp DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  jmp DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RIP));
 
   fprintf(out, ".Lfunc_end4:\n");
   fprintf(out, "  .cfi_endproc\n");
@@ -435,7 +439,7 @@ int main(void) {
   fprintf(out, "___mcsema_detach_call_value:\n");
   fprintf(out, "  .cfi_startproc\n");
 
-  // Note: the bitcode has already put the target address into `RegState::EIP`.
+  // Note: the bitcode has already put the target address into `State::EIP`.
   // *** assumes we can clobber eax
 
   // Stash the callee-saved registers.
@@ -452,7 +456,7 @@ int main(void) {
   fprintf(out, "  lea edi, [eax + __mcsema_stack_args@SECREL32]\n");
   // this is not ESP since for do_call_value there is no spilling via an 
   // intermediate function
-  fprintf(out, "  mov esi, DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  mov esi, DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RSP));
   fprintf(out, "  mov ecx, %u\n", kStackArgSize);
   fprintf(out, "  rep movsb\n");
 
@@ -461,26 +465,26 @@ int main(void) {
   // General purpose registers.
   // we still read out eax on principle, in case we need to do debugging
   // but we clobber it later anyway, so... ignore it
-  fprintf(out, "  mov eax, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RAX));
+  fprintf(out, "  mov eax, [ebp + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RAX));
   fprintf(out, "  mov eax, ebp\n");
-  fprintf(out, "  mov ebx, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov ecx, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RCX));
-  fprintf(out, "  mov edx, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RDX));
-  fprintf(out, "  mov esi, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov edi, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RDI));
-  fprintf(out, "  mov ebp, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RBP));
+  fprintf(out, "  mov ebx, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov ecx, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov edx, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  mov esi, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov edi, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov ebp, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RBP));
 
   // XMM registers.
-  fprintf(out, "  movdqu xmm0, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM0));
-  fprintf(out, "  movdqu xmm1, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM1));
-  fprintf(out, "  movdqu xmm2, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM2));
-  fprintf(out, "  movdqu xmm3, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM3));
-  fprintf(out, "  movdqu xmm4, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM4));
-  fprintf(out, "  movdqu xmm5, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM5));
-  fprintf(out, "  movdqu xmm6, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM6));
-  fprintf(out, "  movdqu xmm7, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, XMM7));
+  fprintf(out, "  movdqu xmm0, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM0));
+  fprintf(out, "  movdqu xmm1, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM1));
+  fprintf(out, "  movdqu xmm2, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM2));
+  fprintf(out, "  movdqu xmm3, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM3));
+  fprintf(out, "  movdqu xmm4, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM4));
+  fprintf(out, "  movdqu xmm5, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM5));
+  fprintf(out, "  movdqu xmm6, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM6));
+  fprintf(out, "  movdqu xmm7, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, XMM7));
 
-  fprintf(out, "  xchg DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u], esp\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  xchg DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u], esp\n", __builtin_offsetof(State, RSP));
 
 
   // copy posible stack args from holding area to native stack
@@ -516,7 +520,7 @@ int main(void) {
   fprintf(out, "  xchg eax, [esp]\n");
 
   // Go native.
-  fprintf(out, "  jmp DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  jmp DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RIP));
 
   fprintf(out, ".Lfunc_end5:\n");
   fprintf(out, "  .cfi_endproc\n");
@@ -548,10 +552,10 @@ int main(void) {
 
   // *** assume we can clobber eax
 
-  // Pop the target function into the `RegState` structure. This resets `EIP`
+  // Pop the target function into the `State` structure. This resets `EIP`
   // to what it should be on entry to `__mcsema_detach_call_stdcall`.
   getTlsIndex(out, "eax");
-  fprintf(out, "  pop DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  pop DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RIP));
   // Marshal the callee-saved registers (of the emulated code) into the native
   // state. We don't touch the argument registers.
 
@@ -580,13 +584,13 @@ int main(void) {
   fprintf(out, "  pop edx\n");
   fprintf(out, "  pop ecx\n");
 
-  fprintf(out, "  mov edi, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RDI));
-  fprintf(out, "  mov esi, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov ebx, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov ebp, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RBP));
+  fprintf(out, "  mov edi, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov esi, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov ebx, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov ebp, [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RBP));
 
   // Swap onto the native stack.
-  fprintf(out, "  xchg DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u], esp\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  xchg DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u], esp\n", __builtin_offsetof(State, RSP));
 
   // copy posible stack args from holding area to native stack
   // allocate space for our arguments on stack
@@ -620,7 +624,7 @@ int main(void) {
   fprintf(out, "  lea eax, __mcsema_attach_ret_stdcall\n");
   fprintf(out, "  xchg eax, [esp]\n");
 
-  fprintf(out, "  jmp DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RIP));
+  fprintf(out, "  jmp DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RIP));
 
   fprintf(out, ".Lfunc_endA:\n");
   fprintf(out, "  .cfi_endproc\n");
@@ -659,18 +663,18 @@ int main(void) {
   fprintf(out, "  add esp, %u\n", kStackArgSize+4);
   //fprintf(out, "  add esp, DWORD PTR [ecx + __mcsema_stack_mark@SECREL32]\n");
   // Swap into the mcsema stack.
-  fprintf(out, "  xchg esp, DWORD PTR [ecx + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(RegState, RSP));
+  fprintf(out, "  xchg esp, DWORD PTR [ecx + __mcsema_reg_state@SECREL32 + %u]\n", __builtin_offsetof(State, RSP));
 
   // Return registers.
-  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], eax\n", __builtin_offsetof(RegState, RAX));
-  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], edx\n", __builtin_offsetof(RegState, RDX));
-  fprintf(out, "  movdqu [ecx + __mcsema_reg_state@SECREL32 + %u], xmm0\n", __builtin_offsetof(RegState, XMM0));
+  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], eax\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], edx\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  movdqu [ecx + __mcsema_reg_state@SECREL32 + %u], xmm0\n", __builtin_offsetof(State, XMM0));
 
   // Callee-saved registers.
-  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], ebp\n", __builtin_offsetof(RegState, RBP));
-  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], ebx\n", __builtin_offsetof(RegState, RBX));
-  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], esi\n", __builtin_offsetof(RegState, RSI));
-  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], edi\n", __builtin_offsetof(RegState, RDI));
+  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], ebp\n", __builtin_offsetof(State, RBP));
+  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], ebx\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], esi\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov [ecx + __mcsema_reg_state@SECREL32 + %u], edi\n", __builtin_offsetof(State, RDI));
 
   fprintf(out, "  mov ebp, ecx\n");
   // ecx is old stack mark we need for this function, to adjust stack after retn

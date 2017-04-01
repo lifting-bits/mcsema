@@ -35,8 +35,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <list>
 #include <vector>
 
-#include "mcsema/Arch/Register.h"
-#include "mcsema/Arch/Dispatch.h"
 #include "mcsema/CFG/CFG.h"
 
 namespace llvm {
@@ -51,10 +49,6 @@ namespace mcsema {
 
 extern llvm::LLVMContext *gContext;
 extern llvm::Module *gModule;
-
-//// Create a new module for the current arch/os pair.
-//llvm::Module *CreateModule(llvm::LLVMContext *context);
-//
 
 // Return a constnat integer of width `width` and value `val`.
 llvm::ConstantInt *CreateConstantInt(int width, uint64_t val);

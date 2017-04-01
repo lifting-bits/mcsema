@@ -99,9 +99,9 @@ util.DEBUG = DEBUG
 
 # Bring in utility libraries.
 from util import *
+from table import *
 from flow import *
 from refs import *
-from table import *
 
 def hasExternalDataComment(ea):
     cmt = idc.GetCommentEx(ea, 0)
@@ -219,7 +219,8 @@ def is_noreturn_inst(inst):
     return inst.itype in (idaapi.NN_int3, idaapi.NN_icebp, idaapi.NN_hlt)
 
 def basicBlockHandler(M, F, block_ea, blockset, processed_blocks, new_func_eas):
-    _, inst_eas, succ_eas = analyse_block(F.entry_address, block_ea)
+    _, inst_eas, succ_eas = analyse_block(
+        F.entry_address, block_ea, PIE_MODE)
 
     DEBUG("BB: {:x} in func {:x} with {} insts".format(
         block_ea, F.entry_address, len(inst_eas)))
@@ -238,14 +239,13 @@ def basicBlockHandler(M, F, block_ea, blockset, processed_blocks, new_func_eas):
         instructionHandler(
             M, B, insn_t, inst_bytes, inst_ea, new_func_eas)
 
-
     return B
 
 
 def isExternalReference(ea):
     # see if this is in an internal or external code ref
-    DEBUG("Testing {0:x} for externality".format(ea))
     if is_external_segment(ea):
+        DEBUG("{:x} is in an external segment".format(ea))
         return True
 
     if isLinkedElf():
@@ -296,27 +296,50 @@ def reference_operand_type(ref):
     return _REFERENCE_OPERAND_TYPE[ref.type]
 
 def reference_location(ref):
-    if ref.symbol and isExternalReference(ref.addr):
+    if isExternalReference(ref.addr):
         return CFG_pb2.Reference.External
-    return CFG_pb2.Reference.Internal
+    else:
+        return CFG_pb2.Reference.Internal
+
+_TARGET_NAME = {
+    CFG_pb2.Reference.CodeTarget: "code",
+    CFG_pb2.Reference.DataTarget: "data",
+}
+
+_OPERAND_NAME = {
+    CFG_pb2.Reference.ImmediateOperand: "imm",
+    CFG_pb2.Reference.MemoryDisplacementOperand: "disp",
+    CFG_pb2.Reference.MemoryOperand: "mem",
+    CFG_pb2.Reference.ControlFlowOperand: "flow",
+}
+
+_LOCATION_NAME = {
+    CFG_pb2.Reference.External: "external",
+    CFG_pb2.Reference.Internal: "internal",
+}
+
+def debug_ref_string(ref):
+    return "({} {} {} {:x} {})".format(
+        _TARGET_NAME[ref.target_type],
+        _OPERAND_NAME[ref.operand_type],
+        _LOCATION_NAME[ref.location],
+        ref.address,
+        ref.HasField('name') and ref.name or "")
 
 MISSING_FUNCS = set()
 
-def add_inst_to_cfg(block, addr, insn_t, inst_bytes, new_func_eas):
-    global EXTERNALS, PIE_MODE
+def add_inst_refs_to_cfg(I, insn_t, addr, new_func_eas):
+    """Add the memory/code reference information from this instruction
+    into the CFG format."""
 
-    I = block.insts.add()
-    I.inst_addr = addr  # May not be `insn_t.ea` because of prefix coalescing.
-    I.inst_bytes = inst_bytes
-    I.inst_len = len(inst_bytes)
     debug_info = ["  I: {:x}".format(addr)]
     refs = get_instruction_references(insn_t, PIE_MODE)
 
     for ref in refs:
         R = I.refs.add()
         R.target_type = reference_target_type(ref)
-        R.operand_type = reference_operand_type(ref)
         R.location = reference_location(ref)
+        R.operand_type = reference_operand_type(ref)
         R.address = ref.addr
 
         if ref.symbol:
@@ -326,11 +349,17 @@ def add_inst_to_cfg(block, addr, insn_t, inst_bytes, new_func_eas):
             # an external reference to `stderr`.
             if R.location == CFG_pb2.Reference.External:
                 new_name = fixExternalName(ref.symbol)
-                DEBUG("Fixing reference to {} into external reference to {}".format(
-                    ref.symbol, new_name))
-                ref.symbol = new_name
-                R.name = ref.symbol
-                EXTERNALS.add(ref.symbol)
+                new_addr = idc.LocByName(new_name)
+                if new_name != ref.symbol or new_addr != ref.addr:
+                    DEBUG("Changing reference to {} into reference to {}".format(
+                        ref.symbol, new_name))
+
+                    ref.addr = idc.LocByName(new_name)
+                    ref.symbol = new_name
+                    R.name = ref.symbol
+
+                    R.target_type = reference_target_type(ref)
+                    R.location = reference_location(ref)
 
         # Make sure anything that isn't yet resolved as a subroutine is resolved.
         if R.target_type == CFG_pb2.Reference.CodeTarget \
@@ -353,23 +382,38 @@ def add_inst_to_cfg(block, addr, insn_t, inst_bytes, new_func_eas):
                 addr, ref.addr, name))
             ref.symbol = name
             R.name = name
-            R.location = CFG_pb2.Reference.External
-
-        # If we changed the resolution of the thing, then go and update
-        # the target and location types. Sometimes we'll get what looks like
-        # a data reference, but ends up being resolved into a code reference
-        # when we follow references through to their logical externals.
-        new_addr = idc.LocByName(ref.symbol)
-        if ref.addr != new_addr and idc.BADADDR != new_addr:
-            DEBUG("Reference address of {} changed from {:x} to {:x}".format(
-                ref.symbol, ref.addr, new_addr))
-            ref.addr = new_addr
             R.location = reference_location(ref)
             R.target_type = reference_target_type(ref)
 
-        debug_info.append(str(ref))
+        # # If we changed the resolution of the thing, then go and update
+        # # the target and location types. Sometimes we'll get what looks like
+        # # a data reference, but ends up being resolved into a code reference
+        # # when we follow references through to their logical externals.
+        # new_addr = idc.LocByName(ref.symbol)
+        # if ref.addr != new_addr and idc.BADADDR != new_addr:
+        #     DEBUG("Reference address of {} changed from {:x} to {:x}".format(
+        #         ref.symbol, ref.addr, new_addr))
+
+        #     ref.addr = new_addr
+        #     R.location = reference_location(ref)
+        #     R.target_type = reference_target_type(ref)
+
+        # Update the externals map.
+        if R.location == CFG_pb2.Reference.External:
+            EXTERNALS.add(ref.symbol)
+
+        debug_info.append(debug_ref_string(R))
 
     DEBUG(" ".join(debug_info))
+
+def add_inst_to_cfg(block, addr, insn_t, inst_bytes, new_func_eas):
+    global EXTERNALS, PIE_MODE
+
+    I = block.insts.add()
+    I.inst_addr = addr  # May not be `insn_t.ea` because of prefix coalescing.
+    I.inst_bytes = inst_bytes
+    I.inst_len = len(inst_bytes)
+    add_inst_refs_to_cfg(I, insn_t, addr, new_func_eas)
 
     return I
 
@@ -581,10 +625,6 @@ def isElfThunk(ea):
         return is_thunk, name
 
 def instructionHandler(M, B, insn_t, inst_bytes, addr, new_func_eas):
-
-    #DEBUG("\t\tinst: {0}".format(idc.GetDisasm(addr)))
-    #DEBUG("\t\tBytes: {0}".format(inst_bytes))
-
     I = add_inst_to_cfg(B, addr, insn_t, inst_bytes, new_func_eas)
     if is_noreturn_inst(insn_t):
         I.local_noreturn = True
@@ -599,25 +639,6 @@ def instructionHandler(M, B, insn_t, inst_bytes, addr, new_func_eas):
         table_va = OFFSET_TABLES[addr].start_addr
         DEBUG("JMP at {:08x} has offset table {:08x}".format(addr, table_va))
         I.offset_table_addr = table_va
-
-    crefs_from_here = idautils.CodeRefsFrom(addr, 0)
-
-    #check for code refs from here
-    crefs = []
-
-    # pull code refs from generator into a list
-    for cref_i in crefs_from_here:
-        crefs.append(cref_i)
-
-    isize = len(inst_bytes)
-    next_ea = insn_t.ea + insn_t.size
-    had_refs = False
-
-    #true: jump to where we have a code-ref
-    #false: continue as we were
-    if is_conditional_jump(insn_t):
-        I.true_target = crefs[0]
-        I.false_target = next_ea
 
     return I, is_control_flow(insn_t) and not is_function_call(insn_t)
 
@@ -727,6 +748,30 @@ def processExternals(M):
             DEBUG("UNKNOWN API: {0}".format(fixedn))
 
 
+# class Segment(object):
+
+#     SEGMENTS = {}
+
+#     @classmethod
+#     def get(cls, ea):
+#         base_ea = idc.SegStart(ea)
+#         if base_ea == idc.BADADDR:
+#             DEBUG("ERROR: Can't get segment for {:x}".format(ea))
+#             return None
+
+#         if base_ea not cls.SEGMENTS:
+#             segtype = idc.GetSegmentAttr(seg, idc.SEGATTR_TYPE)
+#             can_exec = (segtype == idc.SEG_CODE)
+
+#         return cls.SEGMENTS[base_ea]
+
+#     def __init__(self, base_ea, limit_ea, can_write, can_exec):
+#         self.base_ea = base_ea
+#         self.limit_ea = limit_ea
+#         self.can_write = can_write
+#         self.can_exec = can_exec
+
+
 def handleDataRelocation(M, dref, new_eas):
     dref_size = idc.ItemSize(dref)
     if not isInData(dref, dref+dref_size):
@@ -799,7 +844,7 @@ def insertRelocatedSymbol(M, D, reloc_dest, offset, seg_offset, new_eas, itemsiz
         DEBUG("External ref from data at {:x} => {} (from {})".format(reloc_dest, ext_fn, fn))
         DS.symbol_name = "ext_{}".format(ext_fn)
         DS.symbol_size = itemsize
-    elif idc.isCode(pf):
+    elif is_code(pf):
         DS.symbol_name = "sub_{0:x}".format(reloc_dest)
         DS.symbol_size = itemsize
         DEBUG("Code Ref: {0:x}!".format(reloc_dest))
@@ -1395,7 +1440,7 @@ def recoverFunction(M, fnea, new_func_eas):
 
     F = addFunction(M, fnea)
 
-    blockset, term_insts = analyse_subroutine(fnea)
+    blockset, term_insts = analyse_subroutine(fnea, PIE_MODE)
     for term_inst in term_insts:
         if get_jump_table(term_inst, PIE_MODE):
             DEBUG("Terminator inst {:x} in func {:x} is a jump table".format(
@@ -1422,7 +1467,7 @@ def preprocessSegment(seg_ea):
 def preprocessBinary(new_eas):
     
     # Loop through every function, to discover the heads of all blocks that
-    # IDA recognizes. This will populate some global sets in `util.py` that
+    # IDA recognizes. This will populate some global sets in `flow.py` that
     # will help distinguish block heads.
     for seg_ea in idautils.Segments():    
         for funcea in idautils.Functions(idc.SegStart(seg_ea), idc.SegEnd(seg_ea)):
@@ -1521,7 +1566,7 @@ def isFwdExport(iname, ea):
 
     pf = idc.GetFlags(l)
 
-    if not idc.isCode(pf) and idc.isData(pf):
+    if not is_code(pf) and idc.isData(pf):
         sz = idc.ItemSize(l)
         iname = idaapi.get_many_bytes(l, sz-1)
         return iname

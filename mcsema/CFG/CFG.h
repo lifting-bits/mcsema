@@ -86,8 +86,6 @@ struct NativeRef {
 class NativeInst {
  private:
   std::vector<VA> targets;
-  VA tgtIfTrue;
-  VA tgtIfFalse;
   VA loc;
   std::string bytes;
 
@@ -119,12 +117,6 @@ class NativeInst {
   JumpIndexTablePtr jumpIndexTable;
   bool jump_index_table;
 
-  size_t len;
-  bool is_terminator;
-
-  //  if this instruction is a system call, its system call number
-  //  otherwise, -1
-  int system_call_number;
   bool local_noreturn;
  public:
   VA offset_table;
@@ -132,24 +124,12 @@ class NativeInst {
   bool terminator(void) const;
   void set_terminator(void);
 
-  void set_system_call_number(int cn);
-  int get_system_call_number(void) const;
-  bool has_system_call_number(void) const;
-
   void set_local_noreturn(void);
   bool has_local_noreturn(void) const;
 
   VA get_loc(void) const;
 
   const std::string &get_bytes(void) const;
-
-  void set_tr(VA a);
-  void set_fa(VA a);
-
-  VA get_tr(void) const;
-  VA get_fa(void) const;
-
-  size_t get_len(void) const;
 
   // accessors for JumpTable
   void set_jump_table(MCSJumpTablePtr p);

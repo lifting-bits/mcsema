@@ -2,8 +2,12 @@
 
 #include <cstdio>
 
-#define ONLY_STRUCT
-#include "State.h"
+#define HAS_FEATURE_AVX 1
+#define HAS_FEATURE_AVX512 0
+#define ADDRESS_SIZE_BITS 64
+
+#include "remill/Arch/X86/Runtime/State.h"
+#include "mcsema/Arch/X86/Runtime/Registers.h"
 
 static const unsigned long long kStackSize = 1ULL << 20ULL;
 static const unsigned long long kStackArgSize = 264ULL;
