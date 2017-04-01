@@ -54,6 +54,12 @@ typedef uint64_t VA;
 class NativeInst;
 typedef NativeInst *NativeInstPtr;
 
+class NativeVar;
+typedef NativeVar *NativeVarPtr;
+
+class NativeStackVar;
+typedef NativeStackVar *NativeStackVarPtr;
+
 //#include "mcsema/peToCFG/inst_decoder_fe.h"
 //#include "mcsema/common/to_string.h"
 
@@ -223,6 +229,34 @@ class NativeInst {
   NativeInst(VA v, uint8_t l, const llvm::MCInst &inst, Prefix k);
 };
 
+class NativeVar {
+    protected:
+    int64_t             size;
+    std::string         name;
+    std::string         type; // TODO: something cleverer than string. for now it's just ida_type wholesale.
+    std::list<uint64_t>  refs;
+    llvm::Instruction    *llvm_var;
+    public:
+    NativeVar(uint64_t size, std::string name, std::string type) : size(size), name(name), type(type) {}
+    uint64_t get_size(void) { return this->size; }
+    void add_ref(uint64_t ea) { this->refs.push_back(ea); }
+    std::list<uint64_t> &get_refs(void) { return this->refs; }
+    llvm::Instruction *get_llvm_var(void) { return this->llvm_var; }
+    void set_llvm_var(llvm::Instruction *v) { this->llvm_var = v; }
+    std::string print_var(void);
+    std::string get_name(void) { return this->name; }
+    std::string get_type(void) { return this->type; }
+
+};
+
+class NativeStackVar : public NativeVar {
+    private:
+    uint64_t            offset;
+    public:
+    NativeStackVar(uint64_t size, std::string name, std::string type, uint64_t offset) : NativeVar(size, name, type) { this->offset = offset; }
+    uint64_t get_offset(void) { return this->offset; }
+};
+
 class NativeBlock {
  private:
   //a list of instructions
@@ -262,6 +296,8 @@ class NativeFunction {
   const std::map<VA, NativeBlockPtr> &get_blocks(void) const;
   std::string get_name(void);
   const std::string &get_symbol_name(void);
+  void add_stackvar(NativeStackVarPtr);
+  std::list<NativeStackVarPtr> get_stackvars(void) { return this->stackvars; }
 
  private:
   NativeFunction(void) = delete;
@@ -273,6 +309,9 @@ class NativeFunction {
   VA funcEntryVA;
 
   std::string funcSymName;
+
+  //list of stack variables in this function
+  std::list<NativeStackVarPtr> stackvars;
 };
 
 typedef NativeBlock *NativeBlockPtr;

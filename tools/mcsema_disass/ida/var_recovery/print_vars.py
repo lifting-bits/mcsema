@@ -3,12 +3,14 @@
 import sys
 
 # hackety
-sys.path.append('../../bin_descend')
-import CFG_pb2
+#sys.path.append('../../bin_descend')
+import mcsema_disass.ida.CFG_pb2 as CFG_pb2
 
 def print_vars(M):
+    print "globals:"
     for g in M.global_vars:
       print g
+    print "functions and stack vars"
     for f in M.internal_funcs:
         if len(f.stackvars):
             print "ea: 0x%016x" % (f.entry_address)

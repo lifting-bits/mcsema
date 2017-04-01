@@ -516,6 +516,15 @@ NativeBlockPtr NativeFunction::block_from_base(VA base) {
   return block_it->second;
 }
 
+void NativeFunction::add_stackvar(NativeStackVarPtr s) {
+    // TODO: add refs
+    if(s->get_type().find("FUNC_ARG_REF") == std::string::npos)
+    {
+      this->stackvars.push_back(s);
+    }
+    return;
+}
+
 NativeBlock::NativeBlock(VA b)
     : baseAddr(b) {}
 
@@ -958,6 +967,20 @@ static NativeInstPtr DeserializeInst(
   return ip;
 }
 
+static NativeStackVarPtr DeserializeStackVar(
+    const ::StackVar &stackvar) {
+  ::Variable var = stackvar.var();
+  NativeStackVarPtr natSV =
+    new NativeStackVar(var.size(), var.name(), var.ida_type(), stackvar.sp_offset());
+
+  for(auto ref_ea : var.ref_eas())
+  {
+    natSV->add_ref(ref_ea.inst_addr());
+  }
+
+  return natSV;
+}
+
 static NativeBlockPtr DeserializeBlock(
     const ::Block &block,
     const std::list<ExternalCodeRefPtr> &extcode) {
@@ -994,6 +1017,20 @@ static NativeFunctionPtr DeserializeNativeFunc(
   } else {
     nf = new NativeFunction(func.entry_address());
   }
+
+  // read any recovered function local variables from this function
+  for(auto stackvar : func.stackvars()) {
+    auto native_stackvar = DeserializeStackVar(stackvar);
+    if (!native_stackvar)
+    {
+      std::cerr
+        << "Unable to deserialize stack variable at " << std::hex
+	<< func.entry_address() << std::endl;
+      return nullptr;
+    }
+    nf->add_stackvar(native_stackvar);
+  }
+
 
   //read all the blocks from this function
   for (auto &block : func.blocks()) {

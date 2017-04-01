@@ -312,6 +312,46 @@ done:
   return didError;
 }
 
+static void AllocStackVars(llvm::Function *F, llvm::BasicBlock *begin, NativeFunctionPtr func)
+{
+  llvm::Instruction *cur = begin->getFirstNonPHI();
+
+  std::list<NativeStackVarPtr> stackvars = func->get_stackvars();
+
+  llvm::Type *t;
+  for (auto s : stackvars)
+  {
+    switch(s->get_size())
+    {
+      t = NULL; // debugging; probably should choose a better failure value
+      case 1:
+        t = llvm::Type::getInt8Ty(F->getContext());
+        break;
+      case 2:
+        t = llvm::Type::getInt16Ty(F->getContext());
+        break;
+      case 4:
+        t = llvm::Type::getInt32Ty(F->getContext());
+        break;
+      case 8:
+        t = llvm::Type::getInt64Ty(F->getContext());
+        break;
+      default:
+        // ignore this one
+        continue;
+    }
+    // alloca
+    if(t != NULL)
+    {
+      std::cout << "Inserting var " << s->get_name() << ", size " << s->get_size() << " (ida_type " << s->get_type() <<")" << std::endl;
+      llvm::Instruction *v = new llvm::AllocaInst(t, s->get_name(), cur);
+      s->set_llvm_var(v);
+      cur = v;
+    }
+
+  }
+}
+
 static bool InsertFunctionIntoModule(NativeModulePtr mod,
                                      NativeFunctionPtr func, llvm::Module *M) {
   auto &C = M->getContext();
@@ -329,6 +369,7 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
 
   auto entryBlock = llvm::BasicBlock::Create(F->getContext(), "entry", F);
   ArchAllocRegisterVars(entryBlock);
+  AllocStackVars(F, entryBlock, func);
 
   TranslationContext ctx;
   ctx.natM = mod;
