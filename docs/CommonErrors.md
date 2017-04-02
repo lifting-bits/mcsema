@@ -10,7 +10,7 @@ Most likely, you've got a case of CFG recovery failure. Here are some common cau
 
 ## Lifting position independent code without `--pie-mode`
 
-When mcsema-lift sees an instruction like `mov rax, 0x60008`, it needs to know whether that `0x60008` is a constant value, or whether it references code or data somewhere in the program at location `0x60008`. IDA is pretty good at figuring out the differnce, but not always. Sometimes mcsema just has to make an educated guess. On binaries built with position independent code (`-pie`, `-fPIC`), the default heuristic is wrong. You want to use `mcsema-disass --pie-mode` for more correct behavior.
+When mcsema-lift sees an instruction like `mov rax, 0x60008`, it needs to know whether that `0x60008` is a constant value, or whether it references code or data somewhere in the program at location `0x60008`. IDA is pretty good at figuring out the difference, but not always. Sometimes mcsema just has to make an educated guess. On binaries built with position independent code (`-pie`, `-fPIC`), the default heuristic is wrong. You want to use `mcsema-disass --pie-mode` for more correct behavior.
 
 How can you tell which to use? Check the binary type.
 
