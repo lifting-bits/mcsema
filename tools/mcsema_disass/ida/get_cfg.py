@@ -641,7 +641,7 @@ def sanityCheckJumpTableSize(table_ea, ecount):
                 # check if the CMP is with an immediate
                 if inst.Operands[1].type == idc.o_imm:
                     # the immediate is our new count
-                    # the comaprison is vs the max case#, but the cases start at 0, so add 1
+                    # the comparison is vs the max case#, but the cases start at 0, so add 1
                     # to get case count
                     new_count = 1 + inst.Operands[1].value
                     # compare to ecount. Take the bigger value.
