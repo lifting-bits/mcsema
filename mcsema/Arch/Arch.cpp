@@ -357,7 +357,7 @@ SystemArchType SystemArch(llvm::Module *) {
   }
 }
 
-static void InitADFeatues(llvm::Module *M, const char *name,
+static void InitADFeatures(llvm::Module *M, const char *name,
                           llvm::FunctionType *EPTy) {
   auto FC = M->getOrInsertFunction(name, EPTy);
   auto F = llvm::dyn_cast<llvm::Function>(FC);
@@ -373,44 +373,44 @@ void ArchInitAttachDetach(llvm::Module *M) {
   const auto Arch = SystemArch(M);
   if (llvm::Triple::Linux == OS) {
     if (_X86_64_ == Arch) {
-      InitADFeatues(M, "__mcsema_attach_call", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
-      InitADFeatues(M, "__mcsema_detach_ret", EPTy);
+      InitADFeatures(M, "__mcsema_attach_call", EPTy);
+      InitADFeatures(M, "__mcsema_attach_ret", EPTy);
+      InitADFeatures(M, "__mcsema_detach_call", EPTy);
+      InitADFeatures(M, "__mcsema_detach_call_value", EPTy);
+      InitADFeatures(M, "__mcsema_detach_ret", EPTy);
 
     } else {
-      InitADFeatues(M, "__mcsema_attach_call_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_detach_ret_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_value", EPTy);
+      InitADFeatures(M, "__mcsema_attach_call_cdecl", EPTy);
+      InitADFeatures(M, "__mcsema_attach_ret_cdecl", EPTy);
+      InitADFeatures(M, "__mcsema_detach_call_cdecl", EPTy);
+      InitADFeatures(M, "__mcsema_detach_ret_cdecl", EPTy);
+      InitADFeatures(M, "__mcsema_detach_call_value", EPTy);
+      InitADFeatures(M, "__mcsema_attach_ret_value", EPTy);
 
-      InitADFeatues(M, "__mcsema_detach_call_stdcall", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_stdcall", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_fastcall", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_fastcall", EPTy);
+      InitADFeatures(M, "__mcsema_detach_call_stdcall", EPTy);
+      InitADFeatures(M, "__mcsema_attach_ret_stdcall", EPTy);
+      InitADFeatures(M, "__mcsema_detach_call_fastcall", EPTy);
+      InitADFeatures(M, "__mcsema_attach_ret_fastcall", EPTy);
     }
   } else if (llvm::Triple::Win32 == OS) {
     if (_X86_64_ == Arch) {
-      InitADFeatues(M, "__mcsema_attach_call", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
-      InitADFeatues(M, "__mcsema_detach_ret", EPTy);
+      InitADFeatures(M, "__mcsema_attach_call", EPTy);
+      InitADFeatures(M, "__mcsema_attach_ret", EPTy);
+      InitADFeatures(M, "__mcsema_detach_call", EPTy);
+      InitADFeatures(M, "__mcsema_detach_call_value", EPTy);
+      InitADFeatures(M, "__mcsema_detach_ret", EPTy);
     } else {
-      InitADFeatues(M, "__mcsema_attach_call_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_detach_ret_cdecl", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_value", EPTy);
+      InitADFeatures(M, "__mcsema_attach_call_cdecl", EPTy);
+      InitADFeatures(M, "__mcsema_attach_ret_cdecl", EPTy);
+      InitADFeatures(M, "__mcsema_detach_call_cdecl", EPTy);
+      InitADFeatures(M, "__mcsema_detach_ret_cdecl", EPTy);
+      InitADFeatures(M, "__mcsema_detach_call_value", EPTy);
+      InitADFeatures(M, "__mcsema_attach_ret_value", EPTy);
 
-      InitADFeatues(M, "__mcsema_detach_call_stdcall", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_stdcall", EPTy);
-      InitADFeatues(M, "__mcsema_detach_call_fastcall", EPTy);
-      InitADFeatues(M, "__mcsema_attach_ret_fastcall", EPTy);
+      InitADFeatures(M, "__mcsema_detach_call_stdcall", EPTy);
+      InitADFeatures(M, "__mcsema_attach_ret_stdcall", EPTy);
+      InitADFeatures(M, "__mcsema_detach_call_fastcall", EPTy);
+      InitADFeatures(M, "__mcsema_attach_ret_fastcall", EPTy);
     }
   } else {
     TASSERT(false, "Unknown OS Type!");
