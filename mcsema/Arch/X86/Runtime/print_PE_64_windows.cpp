@@ -91,7 +91,7 @@ int main(void) {
   // Pop the target function into the `RegState` structure. This resets `RSP`
   // to what it should be on entry to `__mcsema_attach_call`.
   //
-  fprintf(out, "  push QWORD ptr [rsp]\n"); // dupliate last stack element (the jump-to RIP), so we can pop it
+  fprintf(out, "  push QWORD ptr [rsp]\n"); // duplicate last stack element (the jump-to RIP), so we can pop it
   fprintf(out, "  mov QWORD ptr [rsp+8], rbp\n"); // save rbp, we will clobber it
   getTlsIndex(out, "rbp");
   fprintf(out, "  pop QWORD PTR [rbp + __mcsema_reg_state@SECREL32 + %llu]\n", __builtin_offsetof(RegState, RIP));

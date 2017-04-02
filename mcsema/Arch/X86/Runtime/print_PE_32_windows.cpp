@@ -79,7 +79,7 @@ int main(void) {
   //*** assume we can clobber eax
 
   // save reg for use with TLS offsets
-  fprintf(out, "  push dword ptr [esp]\n"); // dupliate last stack element (the jump-to EIP), so we can pop it
+  fprintf(out, "  push dword ptr [esp]\n"); // duplicate last stack element (the jump-to EIP), so we can pop it
   fprintf(out, "  mov dword ptr [esp+4], ebp\n"); // save ebp, we will clobber it
   getTlsIndex(out, "ebp");
 
