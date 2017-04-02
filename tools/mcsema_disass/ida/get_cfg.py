@@ -281,7 +281,7 @@ def entryPointHandler(M, ep, name, args_from_stddef=False):
 
 
     # should we get argument count  
-    # calling ocnvention, and return type from std_defs?
+    # calling convention, and return type from std_defs?
     if args_from_stddef:
         try:
             (argc, conv, ret, sign) = getFromEMAP(name)
