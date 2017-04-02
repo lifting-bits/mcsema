@@ -988,7 +988,7 @@ def instructionHandler(M, B, addr, new_eas):
             if op.type == idc.o_imm:
                 if op.value in drefs_from_here:
                     continue
-                # we have an immedaite.. check if its in a code or data section
+                # we have an immediate.. check if its in a code or data section
                 begin_a = op.value
                 end_a = begin_a + idc.ItemSize(begin_a)
                 if isInData(begin_a, end_a):
