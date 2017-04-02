@@ -10,7 +10,7 @@ Where mcsema runs is independent of the binaries it can process (e.g. the Window
 
 ## Control Flow Recovery
 
-Mcsema is desiged to translate compiler-generated binaries. It will probably not handle packed, encrypted, or otherwise obfuscated code.
+Mcsema is designed to translate compiler-generated binaries. It will probably not handle packed, encrypted, or otherwise obfuscated code.
 
 ## Code / Data / Constant mismatches
 
