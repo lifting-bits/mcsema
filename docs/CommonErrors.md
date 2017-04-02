@@ -188,7 +188,7 @@ You are trying to recompile bitcode into a new binary, but clang crashes with th
 
 **Technical Background:** This is most likely a sign you mismatched the architecture between CFG recovery and translation.
 
-If you are sure you didn't, this is a combination of CFG recovery problem and clang bug. Mcsema is emitting bitcode that takes the lower 32-bits of a 64-bit function pointer, and puts it in a data section. Clang does not want to do this. This may be a CFG recovery bug if somehow only the lower 32-bits were deteted as a function pointer. Unfortunately, some compilers emit just the lower 32-bits of a pointer into the data section. Mcsema has no choice but to deal witht it as best it can.
+If you are sure you didn't, this is a combination of CFG recovery problem and clang bug. Mcsema is emitting bitcode that takes the lower 32-bits of a 64-bit function pointer, and puts it in a data section. Clang does not want to do this. This may be a CFG recovery bug if somehow only the lower 32-bits were detected as a function pointer. Unfortunately, some compilers emit just the lower 32-bits of a pointer into the data section. Mcsema has no choice but to deal witht it as best it can.
 
 **Possible Fixes:** Make sure you use the correct architecture (x86, amd64) for both the translation and CFG recovery.
 
