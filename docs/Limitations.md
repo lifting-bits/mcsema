@@ -31,7 +31,7 @@ We do not support raw binary blobs (e.g. firmware). Operating on blobs should be
 While the vast majority of integer operations and many floating point operations are supported, there are many x86 instructions left. The following broad categories of instructions have support in internal register context structures, but the translations are incomplete:
 
 - Floating Point support is incomplete, but handles a lot of regular use-cases.
-- SSE 1/2/3/4 is incompelte, but handles a lot of regular use-cases.
+- SSE 1/2/3/4 is incomplete, but handles a lot of regular use-cases.
 - AVX is not supported
 - AESNI, SHA, RDRAND, MPX, SGX instruction sets are not supported
 
