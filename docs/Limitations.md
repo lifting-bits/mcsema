@@ -37,7 +37,7 @@ While the vast majority of integer operations and many floating point operations
 
 The following categories of instructions do not have internal register context support:
 
-- Debug Register Modifiction
+- Debug Register Modification
 - Privileged Instructions
 - AVX
 
