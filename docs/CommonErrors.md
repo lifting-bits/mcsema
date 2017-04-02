@@ -83,7 +83,7 @@ The error message reads similar to:
 
 **Possible Fixes:** First, you could implement the instruction semantics and submit a pull request with the implementation. Second, you can try to use the `-ignore-unsupported` flag to `mcsema-lift` so mcsema will silenty ignore this unsupported instruction. Missing instructions may or may not matter, depending on what you want to do with the translated bitcode.
 
-**Debugging Hints:** The error message tells you the location of the instruction in the binary, and its LLVM MC-layer opcode. This information will help in implmenting the instruction. In the case of our example message, the instruction is `aeskeygenassist`:
+**Debugging Hints:** The error message tells you the location of the instruction in the binary, and its LLVM MC-layer opcode. This information will help in implementing the instruction. In the case of our example message, the instruction is `aeskeygenassist`:
     $ objdump -x -d our_binary | grep 4007cf
       4007cf:       66 0f 3a df d1 00       aeskeygenassist $0x0,%xmm1,%xmm2
 
