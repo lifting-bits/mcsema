@@ -61,7 +61,7 @@ External functions that return floating point values are not yet supported, but 
 
 ### FPU
 
-Appliations that use the x87 FPU should run and report similar results. They are not currently guaranteed to report identical results. Better FPU support is a long term ongoing process.
+Applications that use the x87 FPU should run and report similar results. They are not currently guaranteed to report identical results. Better FPU support is a long term ongoing process.
 
 #### Testing/Polishing of Precision Control 
 
