@@ -107,11 +107,6 @@ function main
     return 1
   fi
 
-  GenerateProtobufFiles
-  if [ $? -ne 0 ] ; then
-    return 1
-  fi
-
   InstallDisassembler
   if [ $? -ne 0 ] ; then
     return 1
@@ -418,50 +413,6 @@ function DownloadLLVMTarball
   fi
 
   echo "$LLVM_VER" > llvm_version
-  popd
-
-  return 0
-}
-
-# generates the required protobuf files
-# returns 0 in case of success, or 1 otherwise
-function GenerateProtobufFiles
-{
-  if [ -e ${GEN_DIR}/CFG.pb.h ] ; then
-    echo "[+] Protobuf files are already up to date"
-    return 0
-  fi
-
-  echo "[+] Auto-generating protobuf files"
-
-  mkdir -p ${GEN_DIR}
-  if [ $? -ne 0 ] ; then
-    echo "Failed to create the protobuf gen directory"
-    return 1
-  fi
-
-  pushd ${GEN_DIR}
-  PROTO_PATH=${DIR}/mcsema/CFG
-
-  protoc \
-    --cpp_out ${GEN_DIR} \
-    --python_out ${GEN_DIR} \
-    --proto_path ${PROTO_PATH} \
-    ${PROTO_PATH}/CFG.proto
-
-  if [ $? -ne 0 ] ; then
-    echo "[x] Failed to generate the protobuf files"
-    return 1
-  fi
-
-  # Copy this into the IDA disassembly dir to make importing the CFG_pb2
-  # file easier.
-  cp CFG_pb2.py ${DIR}/tools/mcsema_disass/ida
-  if [ $? -ne 0 ] ; then
-    echo "Failed to copy the CFG_pb2.py to the ida disassembly directory"
-    return 1
-  fi
-
   popd
 
   return 0

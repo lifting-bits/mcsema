@@ -149,14 +149,43 @@ if(NOT MCSEMA_BRANCH_NAME)
   set(MCSEMA_BRANCH_NAME "unknown")
 endif()
 
+set(MCSEMA_GENERATED_FOLDER "${CMAKE_BINARY_DIR}/mcsema_generated")
+
 configure_file (
   "mcsema/Version.h.in" #input is based on CMAKE_SOURCE_DIR
-  "${CMAKE_SOURCE_DIR}/generated/Version.h" #output is based on CMAKE_BINARY_DIR
+  "${MCSEMA_GENERATED_FOLDER}/Version.h" #output is based on CMAKE_BINARY_DIR
 )
-       
+
 # Make sure we find Version.h
 include_directories("${CMAKE_BINARY_DIR}")
 
+#
+# protobuf file generation
+# this will make sure that the protobuf files are generated each time
+# the CFG.h header file is modified
+#
+
+set(PROTOBUF_CONFIGURATION "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.proto")
+
+set(PROTOBUF_OUTPUT_FILE_LIST
+    "${MCSEMA_GENERATED_FOLDER}/CFG.pb.cc"
+    "${MCSEMA_GENERATED_FOLDER}/CFG.pb.h"
+    "${MCSEMA_GENERATED_FOLDER}/CFG_pb2.py"
+)
+
+add_custom_command(
+    OUTPUT ${PROTOBUF_OUTPUT_FILE_LIST}
+
+    COMMAND protoc --cpp_out "${MCSEMA_GENERATED_FOLDER}" --python_out "${MCSEMA_GENERATED_FOLDER}" --proto_path "${CMAKE_SOURCE_DIR}/mcsema/CFG" "${PROTOBUF_CONFIGURATION}"
+
+    DEPENDS "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.h"
+    MAIN_DEPENDENCY "${PROTOBUF_CONFIGURATION}"
+
+    COMMENT "Generating protobuf files..."
+    VERBATIM
+)
+
+# mcsema source files
 add_executable(mcsema-lift
   ${CMAKE_SOURCE_DIR}/mcsema/Lift.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/Arch/Arch.cpp
@@ -169,7 +198,7 @@ add_executable(mcsema-lift
   ${CMAKE_SOURCE_DIR}/mcsema/BC/Lift.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/BC/Util.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.cpp
-  ${CMAKE_SOURCE_DIR}/generated/CFG.pb.cc
+  ${CMAKE_BINARY_DIR}/mcsema_generated/CFG.pb.cc
 
   ${CMAKE_SOURCE_DIR}/mcsema/cfgToLLVM/JumpTables.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/cfgToLLVM/TransExcn.cpp
@@ -222,3 +251,5 @@ install(
   TARGETS mcsema-lift 
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib)
+
+install(FILES "${MCSEMA_GENERATED_FOLDER}/CFG_pb2.py" DESTINATION "${CMAKE_SOURCE_DIR}/tools/mcsema_disass/ida")
