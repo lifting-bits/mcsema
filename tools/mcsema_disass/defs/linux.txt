@@ -8493,7 +8493,7 @@ fmodl 2 C N
 fmtcheck 2 C N
 fmtmsg 6 C N
 fnmatch 3 C N
-# Folowing could have 7 or 8 args, depending on if ELF auxvec is passed.
+# Following could have 7 or 8 args, depending on if ELF auxvec is passed.
 fopen 2 C N
 fopen64 2 C N
 fopencookie 3 C N

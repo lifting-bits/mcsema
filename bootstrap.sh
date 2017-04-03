@@ -215,7 +215,7 @@ function InstallUbuntuPackages
     'gcc-multilib'
     'g++-multilib'
 
-    # liblzma-dev neded for the xz integration test
+    # liblzma-dev needed for the xz integration test
     # libpcre3-dev needed for some integration tests
     # libbsd-dev needed for netcat test
 
@@ -269,7 +269,7 @@ function InstallArchLinuxPackages
     'clang'
     'llvm'
 
-    # liblzma-dev neded for the xz integration test
+    # liblzma-dev needed for the xz integration test
     # libpcre3-dev needed for some integration tests
     # libbsd-dev needed for netcat test
 

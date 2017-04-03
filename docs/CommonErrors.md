@@ -10,7 +10,7 @@ Most likely, you've got a case of CFG recovery failure. Here are some common cau
 
 ## Lifting position independent code without `--pie-mode`
 
-When mcsema-lift sees an instruction like `mov rax, 0x60008`, it needs to know whether that `0x60008` is a constant value, or whether it references code or data somewhere in the program at location `0x60008`. IDA is pretty good at figuring out the differnce, but not always. Sometimes mcsema just has to make an educated guess. On binaries built with position independent code (`-pie`, `-fPIC`), the default heuristic is wrong. You want to use `mcsema-disass --pie-mode` for more correct behavior.
+When mcsema-lift sees an instruction like `mov rax, 0x60008`, it needs to know whether that `0x60008` is a constant value, or whether it references code or data somewhere in the program at location `0x60008`. IDA is pretty good at figuring out the difference, but not always. Sometimes mcsema just has to make an educated guess. On binaries built with position independent code (`-pie`, `-fPIC`), the default heuristic is wrong. You want to use `mcsema-disass --pie-mode` for more correct behavior.
 
 How can you tell which to use? Check the binary type.
 
@@ -81,9 +81,9 @@ The error message reads similar to:
 
 **Technical Background:** The semantics of the instruction you are trying to translate are not present in mcsema.
 
-**Possible Fixes:** First, you could implement the instruction semantics and submit a pull request with the implementation. Second, you can try to use the `-ignore-unsupported` flag to `mcsema-lift` so mcsema will silenty ignore this unsupported instruction. Missing instructions may or may not matter, depending on what you want to do with the translated bitcode.
+**Possible Fixes:** First, you could implement the instruction semantics and submit a pull request with the implementation. Second, you can try to use the `-ignore-unsupported` flag to `mcsema-lift` so mcsema will silently ignore this unsupported instruction. Missing instructions may or may not matter, depending on what you want to do with the translated bitcode.
 
-**Debugging Hints:** The error message tells you the location of the instruction in the binary, and its LLVM MC-layer opcode. This information will help in implmenting the instruction. In the case of our example message, the instruction is `aeskeygenassist`:
+**Debugging Hints:** The error message tells you the location of the instruction in the binary, and its LLVM MC-layer opcode. This information will help in implementing the instruction. In the case of our example message, the instruction is `aeskeygenassist`:
     $ objdump -x -d our_binary | grep 4007cf
       4007cf:       66 0f 3a df d1 00       aeskeygenassist $0x0,%xmm1,%xmm2
 
@@ -188,7 +188,7 @@ You are trying to recompile bitcode into a new binary, but clang crashes with th
 
 **Technical Background:** This is most likely a sign you mismatched the architecture between CFG recovery and translation.
 
-If you are sure you didn't, this is a combination of CFG recovery problem and clang bug. Mcsema is emitting bitcode that takes the lower 32-bits of a 64-bit function pointer, and puts it in a data section. Clang does not want to do this. This may be a CFG recovery bug if somehow only the lower 32-bits were deteted as a function pointer. Unfortunately, some compilers emit just the lower 32-bits of a pointer into the data section. Mcsema has no choice but to deal witht it as best it can.
+If you are sure you didn't, this is a combination of CFG recovery problem and clang bug. Mcsema is emitting bitcode that takes the lower 32-bits of a 64-bit function pointer, and puts it in a data section. Clang does not want to do this. This may be a CFG recovery bug if somehow only the lower 32-bits were detected as a function pointer. Unfortunately, some compilers emit just the lower 32-bits of a pointer into the data section. Mcsema has no choice but to deal witht it as best it can.
 
 **Possible Fixes:** Make sure you use the correct architecture (x86, amd64) for both the translation and CFG recovery.
 

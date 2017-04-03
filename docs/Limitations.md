@@ -10,7 +10,7 @@ Where mcsema runs is independent of the binaries it can process (e.g. the Window
 
 ## Control Flow Recovery
 
-Mcsema is desiged to translate compiler-generated binaries. It will probably not handle packed, encrypted, or otherwise obfuscated code.
+Mcsema is designed to translate compiler-generated binaries. It will probably not handle packed, encrypted, or otherwise obfuscated code.
 
 ## Code / Data / Constant mismatches
 
@@ -31,13 +31,13 @@ We do not support raw binary blobs (e.g. firmware). Operating on blobs should be
 While the vast majority of integer operations and many floating point operations are supported, there are many x86 instructions left. The following broad categories of instructions have support in internal register context structures, but the translations are incomplete:
 
 - Floating Point support is incomplete, but handles a lot of regular use-cases.
-- SSE 1/2/3/4 is incompelte, but handles a lot of regular use-cases.
+- SSE 1/2/3/4 is incomplete, but handles a lot of regular use-cases.
 - AVX is not supported
 - AESNI, SHA, RDRAND, MPX, SGX instruction sets are not supported
 
 The following categories of instructions do not have internal register context support:
 
-- Debug Register Modifiction
+- Debug Register Modification
 - Privileged Instructions
 - AVX
 
@@ -57,11 +57,11 @@ The most conservative approach will greatly increase code size and reduce speed.
 
 We assume that external function ABIs are the default for the platform and processor combination of the target. While the ABI of internal functions inside a program does not matter, the ABI of external functions has to conform to the specification for the target platform. 
 
-External functions that return floating point values are not yet supported, but there is no technical limitation peventing it; the glue code enabling this has just not been written. Pull requests are welcome.
+External functions that return floating point values are not yet supported, but there is no technical limitation preventing it; the glue code enabling this has just not been written. Pull requests are welcome.
 
 ### FPU
 
-Appliations that use the x87 FPU should run and report similar results. They are not currently guaranteed to report identical results. Better FPU support is a long term ongoing process.
+Applications that use the x87 FPU should run and report similar results. They are not currently guaranteed to report identical results. Better FPU support is a long term ongoing process.
 
 #### Testing/Polishing of Precision Control 
 

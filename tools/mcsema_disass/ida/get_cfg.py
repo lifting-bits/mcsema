@@ -281,7 +281,7 @@ def entryPointHandler(M, ep, name, args_from_stddef=False):
 
 
     # should we get argument count  
-    # calling ocnvention, and return type from std_defs?
+    # calling convention, and return type from std_defs?
     if args_from_stddef:
         try:
             (argc, conv, ret, sign) = getFromEMAP(name)
@@ -641,7 +641,7 @@ def sanityCheckJumpTableSize(table_ea, ecount):
                 # check if the CMP is with an immediate
                 if inst.Operands[1].type == idc.o_imm:
                     # the immediate is our new count
-                    # the comaprison is vs the max case#, but the cases start at 0, so add 1
+                    # the comparison is vs the max case#, but the cases start at 0, so add 1
                     # to get case count
                     new_count = 1 + inst.Operands[1].value
                     # compare to ecount. Take the bigger value.
@@ -742,7 +742,7 @@ def manualRelocOffset(I, inst, dref):
             # if it references memory. Try to work around this issue
 
             # its the first operand (probably a destination) and IDA thinks its o_mem
-            # in this case, IDA is probaly right; don't mark it as an immediate
+            # in this case, IDA is probably right; don't mark it as an immediate
             if idx == 0 and op.type == idaapi.o_mem:
                 continue
 
@@ -988,7 +988,7 @@ def instructionHandler(M, B, addr, new_eas):
             if op.type == idc.o_imm:
                 if op.value in drefs_from_here:
                     continue
-                # we have an immedaite.. check if its in a code or data section
+                # we have an immediate.. check if its in a code or data section
                 begin_a = op.value
                 end_a = begin_a + idc.ItemSize(begin_a)
                 if isInData(begin_a, end_a):
@@ -1293,7 +1293,7 @@ def parseSingleStruct(ea, idastruct):
     # get last member offset
     last_off = idc.GetLastMember(idastruct.tid)
 
-    # get starting offests of all members
+    # get starting offsets of all members
     ptrs = {}
     members = set()
 

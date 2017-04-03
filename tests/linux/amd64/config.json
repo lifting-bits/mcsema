@@ -25,7 +25,7 @@
         "width test": {
             "args": ["--width=100", "-d", "/usr"]
         },
-        "recurisve option": {
+        "recursive option": {
             "_comment": "The --recursive option triggers a call that used to fail during cfg recovery",
             "args": ["--recursive", "--width=100", "-d", "/usr"]
         }
