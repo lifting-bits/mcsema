@@ -1293,7 +1293,7 @@ def parseSingleStruct(ea, idastruct):
     # get last member offset
     last_off = idc.GetLastMember(idastruct.tid)
 
-    # get starting offests of all members
+    # get starting offsets of all members
     ptrs = {}
     members = set()
 
