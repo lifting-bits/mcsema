@@ -57,7 +57,7 @@ The most conservative approach will greatly increase code size and reduce speed.
 
 We assume that external function ABIs are the default for the platform and processor combination of the target. While the ABI of internal functions inside a program does not matter, the ABI of external functions has to conform to the specification for the target platform. 
 
-External functions that return floating point values are not yet supported, but there is no technical limitation peventing it; the glue code enabling this has just not been written. Pull requests are welcome.
+External functions that return floating point values are not yet supported, but there is no technical limitation preventing it; the glue code enabling this has just not been written. Pull requests are welcome.
 
 ### FPU
 
