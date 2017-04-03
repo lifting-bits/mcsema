@@ -48,7 +48,7 @@
       "expected_stderr": "", 
       "expected_stdout": "L3Vzcgo="
     }, 
-    "recurisve option": {
+    "recursive option": {
       "_comment": "The --recursive option triggers a call that used to fail during cfg recovery", 
       "args": [
         "--recursive", 
