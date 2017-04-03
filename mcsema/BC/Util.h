@@ -286,7 +286,7 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
 // instantiate this template. The constant gets shoved in the mcsema_const_strings namespace.
 //
 // The template will call a function with the same prototype as the current translation semantics
-// The function itself is retreived by ArchGetOrCreateSemantics
+// The function itself is retrieved by ArchGetOrCreateSemantics
 template <char const *fname>
 static InstTransResult EXTERNAL_BITCODE_HELPER(TranslationContext &ctx, llvm::BasicBlock *&block) {
   auto F = ctx.F;
