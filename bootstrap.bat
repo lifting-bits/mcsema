@@ -9,12 +9,12 @@ set BUILD_DIR=%DIR%\build
 set THIRD_PARTY_DIR=%DIR%\third_party
 set LLVM_DIR=%THIRD_PARTY_DIR%\llvm
 set PROTO_DIR=%THIRD_PARTY_DIR%\protobuf
-set GEN_DIR=%DIR%\generated
+set GEN_DIR="%BUILD_DIR%\mcsema_generated"
 
 echo [+] Creating directories
 if not exist third_party mkdir third_party
 if not exist build mkdir build
-if not exist generated mkdir generated
+if not exist build\mcsema_generated mkdir build\mcsema_generated
 
 if defined ProgramFiles(x86) (
     set "PATH=%PATH%;%ProgramFiles(x86)%\7-zip"
@@ -140,18 +140,6 @@ popd
 popd
 
 popd
-
-if exist %GEN_DIR%\CFG.pb.h goto download_llvm
-echo [+] Auto-generating protobuf files
-set PROTO_PATH=%MCSEMA_DIR%\mcsema\CFG
-pushd %GEN_DIR% 
-%THIRD_PARTY_DIR%\protobuf\build\protoc\Release\protoc.exe ^
-  --cpp_out "%GEN_DIR%" ^
-  --python_out "%GEN_DIR%" ^
-  --proto_path "%PROTO_PATH%" ^
-  "%PROTO_PATH%\CFG.proto"
-popd
-:download_llvm
 
 echo [+] Download and extract LLVM
 pushd third_party

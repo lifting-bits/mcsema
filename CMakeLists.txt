@@ -3,6 +3,12 @@
 project(mcsema)
 cmake_minimum_required(VERSION 3.1)
 
+if (NOT MCSEMA_GEN_DIR)
+    set(MCSEMA_GEN_DIR "${CMAKE_BINARY_DIR}/mcsema_generated")
+endif()
+
+message(STATUS "Generated files will be stored in the following directory: ${MCSEMA_GEN_DIR}")
+
 if(WIN32)
   SET(CMAKE_EXE_LINKER_FLAGS "/LARGEADDRESSAWARE ${CMAKE_EXE_LINKER_FLAGS}")
 endif(WIN32)
@@ -151,12 +157,48 @@ endif()
 
 configure_file (
   "mcsema/Version.h.in" #input is based on CMAKE_SOURCE_DIR
-  "${CMAKE_SOURCE_DIR}/generated/Version.h" #output is based on CMAKE_BINARY_DIR
+  "${MCSEMA_GEN_DIR}/Version.h" #output is based on CMAKE_BINARY_DIR
 )
-       
+
 # Make sure we find Version.h
 include_directories("${CMAKE_BINARY_DIR}")
 
+#
+# protobuf file generation
+# this will make sure that the protobuf files are generated each time
+# the CFG.h header file is modified
+#
+# todo: use find protobuf CMake module to generate the files; this is
+# not easy on windows right now, since protoc is built on the fly.
+#
+
+set(PROTOBUF_CONFIGURATION "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.proto")
+
+set(PROTOBUF_OUTPUT_FILE_LIST
+    "${MCSEMA_GEN_DIR}/CFG.pb.cc"
+    "${MCSEMA_GEN_DIR}/CFG.pb.h"
+    "${MCSEMA_GEN_DIR}/CFG_pb2.py"
+)
+
+if (WIN32)
+    set(PROTOC_EXECUTABLE_PATH "${CMAKE_SOURCE_DIR}/third_party/protobuf/build/protoc/Release/protoc.exe")
+else ()
+    set(PROTOC_EXECUTABLE_PATH "protoc")
+endif()
+
+add_custom_command(
+    OUTPUT ${PROTOBUF_OUTPUT_FILE_LIST}
+
+    COMMAND "${PROTOC_EXECUTABLE_PATH}" --cpp_out "${MCSEMA_GEN_DIR}" --python_out "${MCSEMA_GEN_DIR}" --proto_path "${CMAKE_SOURCE_DIR}/mcsema/CFG" "${PROTOBUF_CONFIGURATION}"
+
+    DEPENDS "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.h"
+    MAIN_DEPENDENCY "${PROTOBUF_CONFIGURATION}"
+
+    COMMENT "Generating protobuf files..."
+    VERBATIM
+)
+
+# mcsema source files
 add_executable(mcsema-lift
   ${CMAKE_SOURCE_DIR}/mcsema/Lift.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/Arch/Arch.cpp
@@ -169,7 +211,7 @@ add_executable(mcsema-lift
   ${CMAKE_SOURCE_DIR}/mcsema/BC/Lift.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/BC/Util.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.cpp
-  ${CMAKE_SOURCE_DIR}/generated/CFG.pb.cc
+  ${CMAKE_BINARY_DIR}/mcsema_generated/CFG.pb.cc
 
   ${CMAKE_SOURCE_DIR}/mcsema/cfgToLLVM/JumpTables.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/cfgToLLVM/TransExcn.cpp
@@ -222,3 +264,5 @@ install(
   TARGETS mcsema-lift 
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib)
+
+install(FILES "${MCSEMA_GEN_DIR}/CFG_pb2.py" DESTINATION "${CMAKE_SOURCE_DIR}/tools/mcsema_disass/ida")
