@@ -6,7 +6,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BUILD_DIR=${DIR}/build
 THIRD_PARTY_DIR=${DIR}/third_party
 LLVM_DIR=${DIR}/third_party/llvm
-GEN_DIR=${DIR}/generated
+GEN_DIR=${BUILD_DIR}/mcsema_generated
 PREFIX=$(readlink -f ${DIR})
 
 # locate the osx sdk

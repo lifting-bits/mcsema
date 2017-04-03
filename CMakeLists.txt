@@ -3,6 +3,12 @@
 project(mcsema)
 cmake_minimum_required(VERSION 3.1)
 
+if (NOT MCSEMA_GEN_DIR)
+    set(MCSEMA_GEN_DIR "${CMAKE_BINARY_DIR}/mcsema_generated")
+endif()
+
+message(STATUS "Generated files will be stored in the following directory: ${MCSEMA_GEN_DIR}")
+
 if(WIN32)
   SET(CMAKE_EXE_LINKER_FLAGS "/LARGEADDRESSAWARE ${CMAKE_EXE_LINKER_FLAGS}")
 endif(WIN32)
@@ -149,11 +155,9 @@ if(NOT MCSEMA_BRANCH_NAME)
   set(MCSEMA_BRANCH_NAME "unknown")
 endif()
 
-set(MCSEMA_GENERATED_FOLDER "${CMAKE_BINARY_DIR}/mcsema_generated")
-
 configure_file (
   "mcsema/Version.h.in" #input is based on CMAKE_SOURCE_DIR
-  "${MCSEMA_GENERATED_FOLDER}/Version.h" #output is based on CMAKE_BINARY_DIR
+  "${MCSEMA_GEN_DIR}/Version.h" #output is based on CMAKE_BINARY_DIR
 )
 
 # Make sure we find Version.h
@@ -171,9 +175,9 @@ include_directories("${CMAKE_BINARY_DIR}")
 set(PROTOBUF_CONFIGURATION "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.proto")
 
 set(PROTOBUF_OUTPUT_FILE_LIST
-    "${MCSEMA_GENERATED_FOLDER}/CFG.pb.cc"
-    "${MCSEMA_GENERATED_FOLDER}/CFG.pb.h"
-    "${MCSEMA_GENERATED_FOLDER}/CFG_pb2.py"
+    "${MCSEMA_GEN_DIR}/CFG.pb.cc"
+    "${MCSEMA_GEN_DIR}/CFG.pb.h"
+    "${MCSEMA_GEN_DIR}/CFG_pb2.py"
 )
 
 if (WIN32)
@@ -185,7 +189,7 @@ endif()
 add_custom_command(
     OUTPUT ${PROTOBUF_OUTPUT_FILE_LIST}
 
-    COMMAND "${PROTOC_EXECUTABLE_PATH}" --cpp_out "${MCSEMA_GENERATED_FOLDER}" --python_out "${MCSEMA_GENERATED_FOLDER}" --proto_path "${CMAKE_SOURCE_DIR}/mcsema/CFG" "${PROTOBUF_CONFIGURATION}"
+    COMMAND "${PROTOC_EXECUTABLE_PATH}" --cpp_out "${MCSEMA_GEN_DIR}" --python_out "${MCSEMA_GEN_DIR}" --proto_path "${CMAKE_SOURCE_DIR}/mcsema/CFG" "${PROTOBUF_CONFIGURATION}"
 
     DEPENDS "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.h"
     MAIN_DEPENDENCY "${PROTOBUF_CONFIGURATION}"
@@ -261,4 +265,4 @@ install(
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib)
 
-install(FILES "${MCSEMA_GENERATED_FOLDER}/CFG_pb2.py" DESTINATION "${CMAKE_SOURCE_DIR}/tools/mcsema_disass/ida")
+install(FILES "${MCSEMA_GEN_DIR}/CFG_pb2.py" DESTINATION "${CMAKE_SOURCE_DIR}/tools/mcsema_disass/ida")
