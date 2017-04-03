@@ -112,12 +112,6 @@ function main
     return 1
   fi
 
-  # this function has no effect on non-darwin systems
-  GenerateOSXRuntimes
-  if [ $? -ne 0 ] ; then
-    return 1
-  fi
-
   InstallDisassembler
   if [ $? -ne 0 ] ; then
     return 1
@@ -200,7 +194,6 @@ function InstallUbuntuPackages
     'git'
     'cmake'
     'libprotoc-dev'
-    'libprotobuf-dev'
     'libprotobuf-dev'
     'protobuf-compiler'
     'python2.7'
@@ -622,76 +615,6 @@ function BuildMcSema
 
   popd
 
-  return 0
-}
-
-# generates the runtimes needed to build the project under osx
-# returns 0 in case of success, or 1 otherwise
-function GenerateOSXRuntimes
-{
-  if [[ "$OSTYPE" != "darwin"* ]] ; then
-    return 0
-  fi
-
-  if [ -e ${GEN_DIR}/ELF_32_linux.S ] ; then
-    echo "[+] Runtimes are up to date"
-    return 0
-  fi
-
-  echo "[+] Generating runtimes"
-
-  ${CXX} -m32 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_ELF_32_linux.cpp
-  if [ $? -ne 0 ] ; then
-    echo "The following target could not be compiled: print_ELF_32_linux"
-    return 1
-  fi
-
-  ./a.out > ${GEN_DIR}/ELF_32_linux.S
-  if [ $? -ne 0 ] ; then
-    echo "The following runtime could not be generated: ELF_32_linux.S"
-    return 1
-  fi
-
-
-  ${CXX} -m64 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_ELF_64_linux.cpp
-  if [ $? -ne 0 ] ; then
-    echo "The following target could not be compiled: print_ELF_64_linux"
-    return 1
-  fi
-
-  ./a.out > ${GEN_DIR}/ELF_64_linux.S
-  if [ $? -ne 0 ] ; then
-    echo "The following runtime could not be generated: ELF_64_linux.SS"
-    return 1
-  fi
-
-
-  ${CXX} -m32 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_PE_32_windows.cpp
-  if [ $? -ne 0 ] ; then
-    echo "The following target could not be compiled: print_PE_32_windows"
-    return 1
-  fi
-
-  ./a.out > ${GEN_DIR}/PE_32_windows.asm
-  if [ $? -ne 0 ] ; then
-    echo "The following runtime could not be generated: PE_32_windows.asm"
-    return 1
-  fi
-
-
-  ${CXX} -m64 -std=gnu++11 -isysroot ${OSX_SDK} ${DIR}/mcsema/Arch/X86/Runtime/print_PE_64_windows.cpp
-  if [ $? -ne 0 ] ; then
-    echo "The following target could not be compiled: print_PE_64_windows"
-    return 1
-  fi
-
-  ./a.out > ${GEN_DIR}/PE_64_windows.asm
-  if [ $? -ne 0 ] ; then
-    echo "The following runtime could not be generated: PE_64_windows.asm"
-    return 1
-  fi
-
-  rm a.out
   return 0
 }
 
