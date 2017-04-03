@@ -742,7 +742,7 @@ def manualRelocOffset(I, inst, dref):
             # if it references memory. Try to work around this issue
 
             # its the first operand (probably a destination) and IDA thinks its o_mem
-            # in this case, IDA is probaly right; don't mark it as an immediate
+            # in this case, IDA is probably right; don't mark it as an immediate
             if idx == 0 and op.type == idaapi.o_mem:
                 continue
 
