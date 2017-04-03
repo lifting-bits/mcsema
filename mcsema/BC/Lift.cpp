@@ -411,7 +411,7 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
     dataSectionToTypesContents(globaldata, *var.section, M, secContents,
                                data_section_types, true);
 
-    // fill in the opaqure structure with actual members
+    // fill in the opaque structure with actual members
     var.opaque_type->setBody(data_section_types, true);
 
     // create an initializer list using the now filled in opaque
