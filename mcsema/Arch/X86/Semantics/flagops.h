@@ -149,7 +149,7 @@ static void WriteOFAdd(llvm::BasicBlock *b, llvm::Value *res, llvm::Value *lhs,
   auto anded = llvm::BinaryOperator::CreateAnd(xor2, xor3, "", b);
   llvm::Value *shifted = nullptr;
   // shifts corrected to always place the OF bit
-  // in the bit 0 posision. This way it works for
+  // in the bit 0 position. This way it works for
   // all sized ints
   switch (width) {
     case 8:
