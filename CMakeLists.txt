@@ -164,6 +164,9 @@ include_directories("${CMAKE_BINARY_DIR}")
 # this will make sure that the protobuf files are generated each time
 # the CFG.h header file is modified
 #
+# todo: use find protobuf CMake module to generate the files; this is
+# not easy on windows right now, since protoc is built on the fly.
+#
 
 set(PROTOBUF_CONFIGURATION "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.proto")
 
@@ -173,10 +176,16 @@ set(PROTOBUF_OUTPUT_FILE_LIST
     "${MCSEMA_GENERATED_FOLDER}/CFG_pb2.py"
 )
 
+if (WIN32)
+    set(PROTOC_EXECUTABLE_PATH "${CMAKE_SOURCE_DIR}/third_party/protobuf/build/protoc/Release/protoc.exe")
+else ()
+    set(PROTOC_EXECUTABLE_PATH "protoc")
+endif()
+
 add_custom_command(
     OUTPUT ${PROTOBUF_OUTPUT_FILE_LIST}
 
-    COMMAND protoc --cpp_out "${MCSEMA_GENERATED_FOLDER}" --python_out "${MCSEMA_GENERATED_FOLDER}" --proto_path "${CMAKE_SOURCE_DIR}/mcsema/CFG" "${PROTOBUF_CONFIGURATION}"
+    COMMAND "${PROTOC_EXECUTABLE_PATH}" --cpp_out "${MCSEMA_GENERATED_FOLDER}" --python_out "${MCSEMA_GENERATED_FOLDER}" --proto_path "${CMAKE_SOURCE_DIR}/mcsema/CFG" "${PROTOBUF_CONFIGURATION}"
 
     DEPENDS "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.h"
     MAIN_DEPENDENCY "${PROTOBUF_CONFIGURATION}"

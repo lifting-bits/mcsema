@@ -141,18 +141,6 @@ popd
 
 popd
 
-if exist %GEN_DIR%\CFG.pb.h goto download_llvm
-echo [+] Auto-generating protobuf files
-set PROTO_PATH=%MCSEMA_DIR%\mcsema\CFG
-pushd %GEN_DIR% 
-%THIRD_PARTY_DIR%\protobuf\build\protoc\Release\protoc.exe ^
-  --cpp_out "%GEN_DIR%" ^
-  --python_out "%GEN_DIR%" ^
-  --proto_path "%PROTO_PATH%" ^
-  "%PROTO_PATH%\CFG.proto"
-popd
-:download_llvm
-
 echo [+] Download and extract LLVM
 pushd third_party
 if exist llvm goto compile_llvm
