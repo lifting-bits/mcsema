@@ -227,7 +227,7 @@ int main(void) {
   fprintf(out, "  pop esi\n");
   fprintf(out, "  pop edi\n");
 
-  // adjust again for the poppped off arguments
+  // adjust again for the popped off arguments
   // this emulates a "retn XX", but that
   // only takes an immediate value
   fprintf(out, "  sub esp, ecx\n"); // this sub is an add since ecx is negative
@@ -616,7 +616,7 @@ int main(void) {
   fprintf(out, "  pop esi\n");
   fprintf(out, "  pop edi\n");
 
-  // adjust again for the poppped off arguments
+  // adjust again for the popped off arguments
   // this emulates a "retn XX", but that
   // only takes an immediate value
   fprintf(out, "  sub esp, ecx\n"); // this sub is an add since ecx is negative
