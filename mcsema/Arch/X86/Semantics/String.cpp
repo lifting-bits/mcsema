@@ -501,7 +501,7 @@ static llvm::BasicBlock *doRep(llvm::BasicBlock *b, llvm::BasicBlock *bodyB,
     //do a test on the REP condition
     auto zf_val = F_READ(bodyE, llvm::X86::ZF);
     // ICMP_EQ ==  "terminate if ZF == 0"
-    // ICMP_NE ==  "temrinate if ZF == 1"
+    // ICMP_NE ==  "terminate if ZF == 1"
     auto rep_condition = new llvm::ICmpInst( *bodyE, check_op, zf_val,
                                             CONST_V<1>(bodyE, 0));
 
