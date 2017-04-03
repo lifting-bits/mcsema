@@ -25,6 +25,8 @@ def execute(args, command_args):
   env["HOME"] = os.path.expanduser('~')
   env["IDA_PATH"] = os.path.dirname(args.disassembler)
   env["PYTHONPATH"] = os.path.dirname(ida_dir)
+  if "SystemRoot" in os.environ:
+      env["SystemRoot"] = os.environ["SystemRoot"]
 
   script_cmd = []
   script_cmd.append(ida_get_cfg_path)
@@ -41,7 +43,7 @@ def execute(args, command_args):
   script_cmd.extend(command_args)  # Extra, script-specific arguments.
 
   cmd = []
-  cmd.append(args.disassembler)  # Path to IDA.
+  cmd.append(r'"{}"'.format(args.disassembler))  # Path to IDA.
   cmd.append("-B")  # Batch mode.
   cmd.append("-S\"{}\"".format(" ".join(script_cmd)))
   cmd.append(args.binary)

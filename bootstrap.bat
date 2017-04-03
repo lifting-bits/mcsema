@@ -21,7 +21,15 @@ if defined ProgramFiles(x86) (
 )
 set "PATH=%PATH%;%ProgramFiles%\7-zip"
 
+REM add third-party installs to our path
+set "PATH=%PATH%;%MCSEMA_DIR%\bin"
+
 REM sanity checks for installed software
+where cl >NUL 2>NUL
+if not %ERRORLEVEL% == 0 (
+    echo "[!] Visual Studio (cl.exe) is not found. Please run from a Visual Studio build prompt"
+    exit /B 1
+)
 where 7z >NUL 2>NUL
 if not %ERRORLEVEL% == 0 (
     echo [+] The 7z command is not found. Attempting to install
@@ -36,6 +44,19 @@ if not %ERRORLEVEL% == 0 (
 where cmake >NUL 2>NUL
 if not %ERRORLEVEL% == 0 (
     echo [!] The cmake command is not found. Please install cmake
+    exit /B 1
+)
+
+where python >NUL 2>NUL
+if not %ERRORLEVEL% == 0 (
+    echo "[!] The python command is not found. Please install python (or add it to your PATH)"
+    exit /B 1
+)
+
+python -V 2>&1 | findstr /R /C:"Python 2.7" > NUL
+if not %ERRORLEVEL% == 0 (
+    echo [!] Detected python != 2.7
+    echo [!] Please install Python 2.7 and make sure it appears first in your system path
     exit /B 1
 )
 
@@ -134,22 +155,33 @@ REM the normal VS2013 toolset
 cmake.exe ^
   -G "%VSBUILD%" ^
   -DPROTOBUF_ROOT="%PROTO_DIR%" ^
+  -DCMAKE_INSTALL_PREFIX="%MCSEMA_DIR%" ^
   %MCSEMA_DIR%\cmake\protobuf
-cmake --build . --config Release
+cmake --build . --config Release --target install
 popd
+
+echo "[+] Installing protobuf for python"
+pushd python
+python setup.py build
+python setup.py install
 popd
 
 popd
 
+popd
+
+REM Generate protobuf files.
 if exist %GEN_DIR%\CFG.pb.h goto download_llvm
+if not exist %GEN_DIR% mkdir %GEN_DIR%
 echo [+] Auto-generating protobuf files
 set PROTO_PATH=%MCSEMA_DIR%\mcsema\CFG
 pushd %GEN_DIR% 
-%THIRD_PARTY_DIR%\protobuf\build\protoc\Release\protoc.exe ^
+%MCSEMA_DIR%\bin\protoc.exe ^
   --cpp_out "%GEN_DIR%" ^
   --python_out "%GEN_DIR%" ^
   --proto_path "%PROTO_PATH%" ^
   "%PROTO_PATH%\CFG.proto"
+copy CFG_pb2.py %MCSEMA_DIR%\tools\mcsema_disass\ida
 popd
 :download_llvm
 
@@ -201,6 +233,9 @@ REM Enable parallel building with MSBuild
 cmake --build . --config Release --target install -- /maxcpucount:%NUMBER_OF_PROCESSORS% /p:BuildInParallel=true
 
 popd
+
+echo "[+] Installing mcsema-disass"
+python %MCSEMA_DIR%\tools\setup.py install --user --install-scripts %MCSEMA_DIR%\bin
 
 popd
 

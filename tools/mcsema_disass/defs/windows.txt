@@ -16,6 +16,11 @@ commode 0 C N
 fmode 0 C N
 
 #processing C runtime
+configthreadlocale 1 C N
+crtSetUnhandledExceptionFilter 1 C N
+XcptFilter 1 C N
+invoke_watson 5 C N
+
 getmainargs 5 C N
 __getmainargs 5 C N
 __wgetmainargs 5 C N
