@@ -193,7 +193,7 @@ static InstTransResult doMOVSrm(TranslationContext &ctx,
   auto &inst = ip->get_inst();
   InstTransResult ret;
   auto F = block->getParent();
-  // MOV from memory to XMM register will set the unused poriton
+  // MOV from memory to XMM register will set the unused portion
   // of the XMM register to 0s.
   // Just set the whole thing to zero, and let the subsequent
   // write take care of the rest
