@@ -2264,6 +2264,7 @@ if __name__ == "__main__":
     operating_system = None
     output_file_path = None
     log_file_path = None
+    entry_point_list = []
 
     if ida_kernwin.cvar.batch == 0:
         print "Manual run detected; setting default parameters..."
@@ -2298,11 +2299,16 @@ if __name__ == "__main__":
         output_file_path = idc.GetIdbPath() + '-mcsema.cfg'
         log_file_path = idc.GetIdbPath() + '-mcsema.log'
 
+        # get the function name under the cursor and set it as the starting entry point
+        entry_point_name = idc.GetFunctionName(idc.ScreenEA())
+        entry_point_list.append(entry_point_name)
+
         print "Summary:"
         print 'Log file: ' + log_file_path
         print 'Architecture: ' + architecture
         print 'Operating system: ' + operating_system
         print 'Output file: ' + output_file_path
+        print 'Entry point: ' + entry_point_name
 
     #
     # parse the command line argument
@@ -2327,7 +2333,7 @@ if __name__ == "__main__":
         help="The output control flow graph recovered from this file")
 
     parser.add_argument(
-        "--entrypoint", nargs='*',
+        "--entrypoint", nargs='*', default=entry_point_list,
         help="Symbol(s) to start disassembling from")
 
     parser.add_argument("--std-defs", action='append', type=str,
