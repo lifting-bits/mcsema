@@ -200,4 +200,4 @@ In the above example, both `sub` instructions modify the x86 `FLAGS` register. T
 
 ## Closing remarks
 
-This document gives a low level view as to what the machine code will look like as bitcode. This is only part of the picture, though. The instructions in our example did not perform any complex control-flow, register computations, or acccess to global data structures. Not to worry though, McSema also handles these complications.
+This document gives a low level view as to what the machine code will look like as bitcode. This is only part of the picture, though. The instructions in our example did not perform any complex control-flow, register computations, or access to global data structures. Not to worry though, McSema also handles these complications.

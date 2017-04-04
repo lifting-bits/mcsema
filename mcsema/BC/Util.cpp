@@ -216,7 +216,7 @@ llvm::Value *GENERIC_MC_READREG(llvm::BasicBlock *B, MCSemaRegs mc_reg,
         val = new llvm::ZExtInst(val, dst_ty, "", B);
       }
     } else if (val_ty->isFloatTy()) {
-      // TODO(pag): do somehting here?
+      // TODO(pag): do something here?
     }
   }
   return val;

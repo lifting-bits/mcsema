@@ -79,7 +79,7 @@ int main(void) {
   //*** assume we can clobber eax
 
   // save reg for use with TLS offsets
-  fprintf(out, "  push dword ptr [esp]\n"); // dupliate last stack element (the jump-to EIP), so we can pop it
+  fprintf(out, "  push dword ptr [esp]\n"); // duplicate last stack element (the jump-to EIP), so we can pop it
   fprintf(out, "  mov dword ptr [esp+4], ebp\n"); // save ebp, we will clobber it
   getTlsIndex(out, "ebp");
 
@@ -362,7 +362,7 @@ int main(void) {
   fprintf(out, "  push ebx\n");
   fprintf(out, "  push ebp\n");
 
-  // copy posible stack args into temporary holding area
+  // copy possible stack args into temporary holding area
   fprintf(out, "  lea edi, [eax + __mcsema_stack_args@SECREL32]\n");
   // stack args start after ebp+ebx+esi+edi + return address
   fprintf(out, "  lea esi, [esp + %u]\n", 4 + 4+4+4+4);
@@ -379,7 +379,7 @@ int main(void) {
   // Swap onto the native stack.
   fprintf(out, "  xchg DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u], esp\n", __builtin_offsetof(RegState, RSP));
 
-  // copy posible stack args from holding area to native stack
+  // copy possible stack args from holding area to native stack
   // allocate space for our arguments on stack
   fprintf(out, "  sub esp, %u\n", kStackArgSize);
   // we need to save these 
@@ -448,7 +448,7 @@ int main(void) {
   // save current stack mark
   fprintf(out, "  push DWORD PTR [eax + __mcsema_stack_mark@SECREL32]\n");
 
-  // copy posible stack args into temporary holding area
+  // copy possible stack args into temporary holding area
   fprintf(out, "  lea edi, [eax + __mcsema_stack_args@SECREL32]\n");
   // this is not ESP since for do_call_value there is no spilling via an 
   // intermediate function
@@ -483,7 +483,7 @@ int main(void) {
   fprintf(out, "  xchg DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u], esp\n", __builtin_offsetof(RegState, RSP));
 
 
-  // copy posible stack args from holding area to native stack
+  // copy possible stack args from holding area to native stack
   // allocate space for our arguments on stack
   fprintf(out, "  sub esp, %u\n", kStackArgSize);
   // we need to save these 
@@ -569,7 +569,7 @@ int main(void) {
   fprintf(out, "  push edx\n");
 
 
-  // copy posible stack args into temporary holding area
+  // copy possible stack args into temporary holding area
   fprintf(out, "  lea edi, [eax + __mcsema_stack_args@SECREL32]\n");
   //  ra + stack_mark + (ecx + edx) +  (edi+esi+ebx+ebp)
   fprintf(out, "  lea esi, [esp + %u]\n", 4 + 4 + 4+4 + 4+4+4+4);
@@ -588,7 +588,7 @@ int main(void) {
   // Swap onto the native stack.
   fprintf(out, "  xchg DWORD PTR [eax + __mcsema_reg_state@SECREL32 + %u], esp\n", __builtin_offsetof(RegState, RSP));
 
-  // copy posible stack args from holding area to native stack
+  // copy possible stack args from holding area to native stack
   // allocate space for our arguments on stack
   fprintf(out, "  sub esp, %u\n", kStackArgSize);
   // we need to save these 
@@ -684,7 +684,7 @@ int main(void) {
   fprintf(out, "  pop esi\n");
   fprintf(out, "  pop edi\n");
 
-  // adjust again for the poppped off arguments
+  // adjust again for the popped off arguments
   // this emulates a "retn XX", but that
   // only takes an immediate value
   fprintf(out, "  sub esp, ecx\n"); // this sub is an add since ecx is negative
