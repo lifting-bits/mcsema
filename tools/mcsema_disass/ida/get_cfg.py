@@ -2256,29 +2256,84 @@ def try_mark_as_function(address):
     
 if __name__ == "__main__":
 
+    #
+    # interactive mode support
+    #
+
+    architecture = None
+    operating_system = None
+    output_file_path = None
+    log_file_path = None
+    entry_point_list = []
+
+    if ida_kernwin.cvar.batch == 0:
+        print "Manual run detected; setting default parameters..."
+
+        # attempt to guess the architecture
+        # todo: use idaapi.get_inf_structure().procName to determine which arch we are dealing with.
+        # the 'bits' field is enough for the time being, since we only support x86 and amd64
+
+        if idaapi.get_inf_structure().procName != 'metapc':
+            print "Unsupported architecture"
+            exit(1)
+
+        if idaapi.get_inf_structure().is_64bit():
+            architecture="amd64"
+        elif idaapi.get_inf_structure().is_32bit():
+            architecture="x86"
+        else:
+            print "Only 32-bits and 64-bits targets are supported!"
+            exit(1)
+
+        # attempt to guess the file format
+        loader_module_name = idaapi.get_file_type_name()
+        if "Portable executable" in loader_module_name:
+            operating_system = "windows"
+        elif "ELF" in loader_module_name:
+            operating_system = "linux"
+        else:
+            print "Unsupported image type! Only PE and ELF executables are supported!"
+            exit(1)
+
+        # generate a default output path for both the cfg and the log file
+        output_file_path = idc.GetIdbPath() + '-mcsema.cfg'
+        log_file_path = idc.GetIdbPath() + '-mcsema.log'
+
+        # get the function name under the cursor and set it as the starting entry point
+        entry_point_name = idc.GetFunctionName(idc.ScreenEA())
+        entry_point_list.append(entry_point_name)
+
+        print "Summary:"
+        print 'Log file: ' + log_file_path
+        print 'Architecture: ' + architecture
+        print 'Operating system: ' + operating_system
+        print 'Output file: ' + output_file_path
+        print 'Entry point: ' + entry_point_name
+
+    #
+    # parse the command line argument
+    #
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--log_file", type=argparse.FileType('w'),
-        default=sys.stderr,
+        default=log_file_path,
         help="Log to a specific file. Default is stderr.")
 
     parser.add_argument(
-        '--arch',
-        help='Name of the architecture. Valid names are x86, amd64.',
-        required=True)
+        '--arch', default=architecture,
+        help='Name of the architecture. Valid names are x86, amd64.')
 
     parser.add_argument(
-        '--os',
-        help='Name of the operating system. Valid names are linux, windows.',
-        required=True)
+        '--os', default=operating_system,
+        help='Name of the operating system. Valid names are linux, windows.')
 
     parser.add_argument(
-        "--output", type=argparse.FileType('wb'), default=None,
-        help="The output control flow graph recovered from this file",
-        required=True)
+        "--output", type=argparse.FileType('wb'), default=output_file_path,
+        help="The output control flow graph recovered from this file")
 
     parser.add_argument(
-        "--entrypoint", nargs='*',
+        "--entrypoint", nargs='*', default=entry_point_list,
         help="Symbol(s) to start disassembling from")
 
     parser.add_argument("--std-defs", action='append', type=str,
@@ -2406,4 +2461,6 @@ if __name__ == "__main__":
         DEBUG(str(e))
         DEBUG(traceback.format_exc())
     
-    idc.Exit(0)
+    # do not close IDA if we are not being run in batch mode
+    if ida_kernwin.cvar.batch != 0:
+        idc.Exit(0)
