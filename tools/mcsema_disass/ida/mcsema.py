@@ -94,23 +94,24 @@ class MainWindow(PluginForm):
     def onExecuteButtonClick(self):
         print "Not yet implemented!"
 
-class FunctionListPage(QtWidgets.QWidget):
-    def __init__(self, parent = None):
-        super(FunctionListPage, self).__init__(parent)
+class GenericFunctionListPage(QtWidgets.QWidget):
+    def __init__(self, title, get_function_list_callback, parent = None):
+        super(GenericFunctionListPage, self).__init__(parent)
 
-        self.setWindowTitle("Function list")
+        self.setWindowTitle(title)
+        self._get_function_list_callback = get_function_list_callback
 
         main_layout = QtWidgets.QHBoxLayout()
         self.initializeWidgets(main_layout)
         self.setLayout(main_layout)
-
+        
         self.refresh()
 
     def initializeWidgets(self, layout):
         # ida functions
         temp_layout = QtWidgets.QVBoxLayout()
 
-        temp_layout.addWidget(QtWidgets.QLabel("Function list"))
+        temp_layout.addWidget(QtWidgets.QLabel(self.windowTitle()))
         self._ida_function_list = QtWidgets.QListWidget()
         temp_layout.addWidget(self._ida_function_list)
 
@@ -155,29 +156,14 @@ class FunctionListPage(QtWidgets.QWidget):
         layout.addLayout(temp_layout)
 
     def refresh(self):
-        # make a list of the exported functions so that we can filter them out
-        exported_function_address_list = [ ]
-        for exported_function_tuple in idautils.Entries():
-            exported_function_address_list.append(exported_function_tuple[2])
-
-        # refresh the ida function list
-        function_address_list = Functions(SegStart(BeginEA()), SegEnd(BeginEA()))
-
-        function_name_list = [ ]
-        for function_address in function_address_list:
-            if function_address in exported_function_address_list:
-                continue
-
-            function_name = GetFunctionName(function_address)
-            function_flags = GetFunctionAttr(function_address, FUNCATTR_FLAGS)
-
-            function_name_list.append(function_name)
+        function_name_list = self._get_function_list_callback()
 
         self._ida_function_list.clear()
         for function_name in function_name_list:
             self._ida_function_list.addItem(function_name)
 
-        # update the selected function list
+        # update the selected function list, removing everything that has
+        # vanished from the pool
         selected_function_list = [ ]
         for i in range(0, self._mcsema_function_list.count()):
             selected_function_name = self._mcsema_function_list.item(i).text()
@@ -215,47 +201,43 @@ class FunctionListPage(QtWidgets.QWidget):
             function_name = self._ida_function_list.item(i).text()
             self._mcsema_function_list.addItem(function_name)
 
-class ExportListPage(QtWidgets.QWidget):
+class FunctionListPage(GenericFunctionListPage):
     def __init__(self, parent = None):
-        super(ExportListPage, self).__init__(parent)
+        super(FunctionListPage, self).__init__("Function list", FunctionListPage.GetFunctionListCallback, parent)
 
-        self.setWindowTitle("Export list")
+    @staticmethod
+    def GetFunctionListCallback():
+        # make a list of the exported functions so that we can filter them out
+        exported_function_address_list = [ ]
+        for exported_function_tuple in idautils.Entries():
+            exported_function_address_list.append(exported_function_tuple[2])
 
-        main_layout = QtWidgets.QHBoxLayout()
-        self.initializeWidgets(main_layout)
-        self.setLayout(main_layout)
+        # refresh the ida function list
+        function_address_list = Functions(SegStart(BeginEA()), SegEnd(BeginEA()))
 
-        self.refresh()
+        function_name_list = [ ]
+        for function_address in function_address_list:
+            if function_address in exported_function_address_list:
+                continue
 
-    def initializeWidgets(self, layout):
-        # ida functions
-        temp_layout = QtWidgets.QVBoxLayout()
+            function_name = GetFunctionName(function_address)
+            function_flags = GetFunctionAttr(function_address, FUNCATTR_FLAGS)
 
-        temp_layout.addWidget(QtWidgets.QLabel("Exported list"))
-        self._ida_function_list = QtWidgets.QListWidget()
-        temp_layout.addWidget(self._ida_function_list)
+            function_name_list.append(function_name)
 
-        layout.addLayout(temp_layout)
+        return function_name_list
 
-        # arrow keys
-        temp_layout = QtWidgets.QVBoxLayout()
+class ExportListPage(GenericFunctionListPage):
+    def __init__(self, parent = None):
+        super(ExportListPage, self).__init__("Export list", ExportListPage.GetFunctionListCallback, parent)
 
-        temp_layout.addWidget(QtWidgets.QPushButton("<="))
-        temp_layout.addWidget(QtWidgets.QPushButton("=>"))
+    @staticmethod
+    def GetFunctionListCallback():
+        function_name_list = [ ]
+        for exported_function_tuple in idautils.Entries():
+            function_name_list.append(exported_function_tuple[3])
 
-        layout.addLayout(temp_layout)
-
-        # functions that will be used as entry points by mcsema
-        temp_layout = QtWidgets.QVBoxLayout()
-
-        temp_layout.addWidget(QtWidgets.QLabel("McSema input"))
-        self._mcsema_function_list = QtWidgets.QListWidget()
-        temp_layout.addWidget(self._mcsema_function_list)
-
-        layout.addLayout(temp_layout)
-
-    def refresh(self):
-        print "ExportListPage refresh"
+        return function_name_list
 
 class SymbolDefinitionsPage(QtWidgets.QWidget):
     def __init__(self, parent = None):
