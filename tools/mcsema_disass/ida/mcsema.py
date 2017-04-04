@@ -1,4 +1,5 @@
 from idaapi import PluginForm
+import idautils
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 import base64
@@ -145,12 +146,23 @@ class EntryPointListPage(QtWidgets.QWidget):
         layout.addLayout(temp_layout)
 
     def refresh(self):
+        # make a list of the exported functions so that we can filter them out
+        exported_function_address_list = [ ]
+        for exported_function_tuple in idautils.Entries():
+            exported_function_address_list.append(exported_function_tuple[2])
+
         # refresh the ida function list
         function_address_list = Functions(SegStart(BeginEA()), SegEnd(BeginEA()))
 
         function_name_list = [ ]
         for function_address in function_address_list:
-            function_name_list.append(GetFunctionName(function_address))
+            if function_address in exported_function_address_list:
+                continue
+
+            function_name = GetFunctionName(function_address)
+            function_flags = GetFunctionAttr(function_address, FUNCATTR_FLAGS)
+
+            function_name_list.append(function_name)
 
         self._ida_function_list.clear()
         for function_name in function_name_list:
@@ -159,7 +171,7 @@ class EntryPointListPage(QtWidgets.QWidget):
         # update the selected function list
         selected_function_list = [ ]
         for i in range(0, self._mcsema_function_list.count()):
-            selected_function_name = self._mcsema_function_list.itemText(i)
+            selected_function_name = self._mcsema_function_list.item(i).text()
             if selected_function_name in function_name_list:
                 selected_function_list.append(selected_function_name)
 
@@ -190,11 +202,9 @@ class EntryPointListPage(QtWidgets.QWidget):
     def onAddAllFunctionsButtonClick(self):
         self._mcsema_function_list.clear()
 
-        function_address_list = Functions(SegStart(BeginEA()), SegEnd(BeginEA()))
-
-        function_name_list = [ ]
-        for function_address in function_address_list:
-            self._mcsema_function_list.addItem(GetFunctionName(function_address))
+        for i in range(0, self._ida_function_list.count()):
+            function_name = self._ida_function_list.item(i).text()
+            self._mcsema_function_list.addItem(function_name)
 
 class ExportedFunctionListPage(QtWidgets.QWidget):
     def __init__(self, parent = None):
