@@ -28,29 +28,25 @@ if(NOT WIN32)
   # WIN32 defaults to CXX11 by default, and setting it explicitly here
   # confuses clang-cl, which will bail out with "unknown flag -std=g++11"
   set(CMAKE_CXX_STANDARD 11)
+
+  #FindPackage for protobuf is terrible for win32
+  # it assumes MSVC built protobuf from a visual studio project
+  #... we build with custom cmake, so it will never be found
+  #... but it should work for other OSes where we install from a package
+  find_package(Protobuf REQUIRED
+     HINTS
+     "${CMAKE_SOURCE_DIR}/third_party/protobuf"
+     "${CMAKE_SOURCE_DIR}/third_party/protobuf/build"
+     )
+else()
+   string(REGEX REPLACE "\\\\" "/" CMAKE_SOURCE_DIR ${CMAKE_SOURCE_DIR})
+   # on win32, manuallys set protobuf goodness
+   set(Protobuf_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/include")
+   set(Protobuf_LIBRARIES "${CMAKE_SOURCE_DIR}/lib/protobuf.lib")
+   set(Protobuf_PROTOC_EXECUTABLE "${CMAKE_SOURCE_DIR}/bin/protoc.exe")
 endif()
 
-# Get protobufs.
-if(WIN32)
-  # Change the slashes to Unix style or risk the wrath of invalid escape
-  # sequences!
-  string(REGEX REPLACE "\\\\" "/" CMAKE_SOURCE_DIR ${CMAKE_SOURCE_DIR})
-
-  set(PROTOBUF_ROOT "${CMAKE_SOURCE_DIR}/third_party/protobuf")
-  set(Protobuf_LIBRARIES "${PROTOBUF_ROOT}/build/libprotobuf/Release")
-  set(Protobuf_INCLUDE_DIR "${PROTOBUF_ROOT}/src")
-  
-  include_directories(${Protobuf_INCLUDE_DIR})
-  link_directories(${Protobuf_LIBRARIES})
-elseif(APPLE)
-  set(PROTOBUF_ROOT "${CMAKE_SOURCE_DIR}/third_party/protobuf")
-  set(Protobuf_LIBRARIES "${PROTOBUF_ROOT}/build/lib")
-  set(Protobuf_INCLUDE_DIR "${PROTOBUF_ROOT}/src")
-  
-  include_directories(${Protobuf_INCLUDE_DIR})
-  link_directories(${Protobuf_LIBRARIES})
-endif(WIN32)
-find_package(Protobuf REQUIRED)
+include_directories(${Protobuf_INCLUDE_DIRS})
 
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
@@ -168,9 +164,6 @@ include_directories("${CMAKE_BINARY_DIR}")
 # this will make sure that the protobuf files are generated each time
 # the CFG.h header file is modified
 #
-# todo: use find protobuf CMake module to generate the files; this is
-# not easy on windows right now, since protoc is built on the fly.
-#
 
 set(PROTOBUF_CONFIGURATION "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.proto")
 
@@ -180,16 +173,10 @@ set(PROTOBUF_OUTPUT_FILE_LIST
     "${MCSEMA_GEN_DIR}/CFG_pb2.py"
 )
 
-if (WIN32)
-    set(PROTOC_EXECUTABLE_PATH "${CMAKE_SOURCE_DIR}/third_party/protobuf/build/protoc/Release/protoc.exe")
-else ()
-    set(PROTOC_EXECUTABLE_PATH "protoc")
-endif()
-
 add_custom_command(
     OUTPUT ${PROTOBUF_OUTPUT_FILE_LIST}
 
-    COMMAND "${PROTOC_EXECUTABLE_PATH}" --cpp_out "${MCSEMA_GEN_DIR}" --python_out "${MCSEMA_GEN_DIR}" --proto_path "${CMAKE_SOURCE_DIR}/mcsema/CFG" "${PROTOBUF_CONFIGURATION}"
+    COMMAND "${Protobuf_PROTOC_EXECUTABLE}" --cpp_out "${MCSEMA_GEN_DIR}" --python_out "${MCSEMA_GEN_DIR}" --proto_path "${CMAKE_SOURCE_DIR}/mcsema/CFG" "${PROTOBUF_CONFIGURATION}"
 
     DEPENDS "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.h"
     MAIN_DEPENDENCY "${PROTOBUF_CONFIGURATION}"
@@ -236,7 +223,7 @@ add_executable(mcsema-lift
   ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/SUB.cpp)
 
 target_link_libraries(mcsema-lift
-  protobuf
+  ${Protobuf_LIBRARIES}
   LLVMBitReader
   LLVMBitWriter
   LLVMMCDisassembler
