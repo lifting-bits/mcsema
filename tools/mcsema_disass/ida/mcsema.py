@@ -1,5 +1,6 @@
 from idaapi import PluginForm
 import idautils
+
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 import base64
@@ -92,7 +93,25 @@ class MainWindow(PluginForm):
         self._defs_and_call_conventions_page.refresh()
 
     def onExecuteButtonClick(self):
-        print "Not yet implemented!"
+        architecture = self._settings_page.architecture()
+        operating_system = self._settings_page.operatingSystem()
+
+        pie_mode = self._settings_page.pieModeEnabled()
+        generate_export_stubs = self._settings_page.generateExportStubsEnabled()
+        exports_are_apis = self._settings_page.exportsAreApisEnabled()
+
+        function_list = self._function_list_page.getSelectedFunctionList()
+        export_list = self._export_list_page.getSelectedFunctionList()
+
+        PrintMessage("Not yet implemented!")
+
+        PrintMessage("Architecture: " + architecture)
+        PrintMessage("Operating_system: " + operating_system)
+        PrintMessage("PIE mode: " + str(pie_mode))
+        PrintMessage("Generate export stubs: " + str(generate_export_stubs))
+        PrintMessage("Exports are APIs: " + str(exports_are_apis))
+        PrintMessage("Selected functions: " + str(len(function_list)))
+        PrintMessage("Selected exports: " + str(len(export_list)))
 
 class GenericFunctionListPage(QtWidgets.QWidget):
     def __init__(self, title, get_function_list_callback, parent = None):
@@ -133,8 +152,8 @@ class GenericFunctionListPage(QtWidgets.QWidget):
         add_all_functions_button = QtWidgets.QPushButton("Add all")
         temp_layout.addWidget(add_all_functions_button)
 
-        clear_mcsema_function_list_button = QtWidgets.QPushButton("Clear")
-        temp_layout.addWidget(clear_mcsema_function_list_button)
+        clear_selected_function_list_button = QtWidgets.QPushButton("Clear")
+        temp_layout.addWidget(clear_selected_function_list_button)
 
         temp_layout.addSpacerItem(QtWidgets.QSpacerItem(1, 1, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
 
@@ -144,11 +163,11 @@ class GenericFunctionListPage(QtWidgets.QWidget):
         temp_layout = QtWidgets.QVBoxLayout()
 
         temp_layout.addWidget(QtWidgets.QLabel("McSema input"))
-        self._mcsema_function_list = QtWidgets.QListWidget()
-        temp_layout.addWidget(self._mcsema_function_list)
+        self._selected_function_list = QtWidgets.QListWidget()
+        temp_layout.addWidget(self._selected_function_list)
 
         # connections
-        clear_mcsema_function_list_button.clicked.connect(self._mcsema_function_list.clear)
+        clear_selected_function_list_button.clicked.connect(self._selected_function_list.clear)
         add_function_button.clicked.connect(self.onAddFunctionButtonClick)
         remove_function_button.clicked.connect(self.onRemoveFunctionButtonClick)
         add_all_functions_button.clicked.connect(self.onAddAllFunctionsButtonClick)
@@ -165,14 +184,14 @@ class GenericFunctionListPage(QtWidgets.QWidget):
         # update the selected function list, removing everything that has
         # vanished from the pool
         selected_function_list = [ ]
-        for i in range(0, self._mcsema_function_list.count()):
-            selected_function_name = self._mcsema_function_list.item(i).text()
+        for i in range(0, self._selected_function_list.count()):
+            selected_function_name = self._selected_function_list.item(i).text()
             if selected_function_name in function_name_list:
                 selected_function_list.append(selected_function_name)
 
-        self._mcsema_function_list.clear()
+        self._selected_function_list.clear()
         for selected_function_name in selected_function_list:
-            self._mcsema_function_list.addItem(selected_function_name)
+            self._selected_function_list.addItem(selected_function_name)
 
     def onAddFunctionButtonClick(self):
         selected_item = self._ida_function_list.currentItem()
@@ -181,25 +200,34 @@ class GenericFunctionListPage(QtWidgets.QWidget):
 
         function_name = selected_item.text()
 
-        search_result = self._mcsema_function_list.findItems(function_name, QtCore.Qt.MatchExactly)
+        search_result = self._selected_function_list.findItems(function_name, QtCore.Qt.MatchExactly)
         if len(search_result) != 0:
             return
 
-        self._mcsema_function_list.addItem(function_name)
+        self._selected_function_list.addItem(function_name)
 
     def onRemoveFunctionButtonClick(self):
-        selected_row_index = self._mcsema_function_list.currentRow()
+        selected_row_index = self._selected_function_list.currentRow()
         if selected_row_index == -1:
             return
 
-        self._mcsema_function_list.takeItem(selected_row_index)
+        self._selected_function_list.takeItem(selected_row_index)
 
     def onAddAllFunctionsButtonClick(self):
-        self._mcsema_function_list.clear()
+        self._selected_function_list.clear()
 
         for i in range(0, self._ida_function_list.count()):
             function_name = self._ida_function_list.item(i).text()
-            self._mcsema_function_list.addItem(function_name)
+            self._selected_function_list.addItem(function_name)
+
+    def getSelectedFunctionList(self):
+        function_list = [ ]
+
+        for i in range(0, self._selected_function_list.count()):
+            function_name = self._selected_function_list.item(i).text()
+            function_list.append(function_name)
+
+        return function_list
 
 class FunctionListPage(GenericFunctionListPage):
     def __init__(self, parent = None):
@@ -361,12 +389,8 @@ class SettingsPage(QtWidgets.QWidget):
 
         if idaapi.get_inf_structure().is_64bit():
             self._architecture.setCurrentIndex(0)
-            PrintMessage("Architecture: AMD64")
-
         elif idaapi.get_inf_structure().is_32bit():
             self._architecture.setCurrentIndex(1)
-            PrintMessage("Architecture: x86")
-
         else:
             PrintMessage("Unsupported architecture")
             return
@@ -374,14 +398,31 @@ class SettingsPage(QtWidgets.QWidget):
         # attempt to guess the file format
         if "ELF" in idaapi.get_file_type_name():
             self._operating_system.setCurrentIndex(0)
-            PrintMessage("Operating system: Linux")
-
         elif "Portable executable" in idaapi.get_file_type_name():
             self._operating_system.setCurrentIndex(1)
-            PrintMessage("Operating system: Windows")
-
         else:
             PrintMessage("Unsupported image type! Only PE and ELF executables are supported!")
+
+    def architecture(self):
+        if self._architecture.currentIndex() == 0:
+            return "amd64"
+        else:
+            return "x86"
+
+    def operatingSystem(self):
+        if self._operating_system.currentIndex() == 0:
+            return "linux"
+        else:
+            return "windows"
+
+    def pieModeEnabled(self):
+        return self._pie_mode.checkState() == QtCore.Qt.Checked
+
+    def generateExportStubsEnabled(self):
+        return self._generate_export_stubs.checkState() == QtCore.Qt.Checked
+
+    def exportsAreApisEnabled(self):
+        return self._exports_are_apis.checkState() == QtCore.Qt.Checked
 
 dark_mode_logo_base64 = """iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAAABmJLR0QA/wD/AP+g
 vaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH4QQEEhAfs0Y7qgAAAEVp
