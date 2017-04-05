@@ -20,8 +20,10 @@
 # configuration
 #
 
-# this is the same version shipped by HexRays with IDA 6.95
+# same versions used by HexRays with IDA 6.95
 PYTHON_VERSION='2.7.9'
+SIP_VERSION='4.16.7'
+
 PYTHON_PREFIX="/opt/IDAPython-${PYTHON_VERSION}"
 
 function main
@@ -59,6 +61,9 @@ function main
     printf "Installing PIP...\n"
     InstallPIP || return 1
 
+    printf "Installing SIP...\n"
+    InstallSIP || return 1
+
     printf "Generating the launcher...\n"
     InstallLauncher || return 1
 
@@ -77,6 +82,9 @@ function CheckDependencies
         'tar'
         'curl'
         'openssl'
+        'sed'
+        'gcc'
+        'g++'
     )
 
     for required_executable in ${required_executable_list[@]} ; do
@@ -93,6 +101,7 @@ function CheckDependencies
     # packages. you most likely want to add at least zlib and openssl
     printf 'Please make sure you have all the required -dev packages (use the ":i386" ones if you are on Ubuntu). You most likely want to have at least zlib and openssl\n'
 
+    rm "$LOG_FILE_NAME" 2> /dev/null
     return 0
 }
 
@@ -226,7 +235,7 @@ function InstallSetupTools
 
 function InstallPIP
 {
-   local pipinstaller_temp_dir='PIPInstallerData'
+    local pipinstaller_temp_dir='PIPInstallerData'
 
     mkdir "$pipinstaller_temp_dir"
     if [ $? -ne 0 ] ; then
@@ -261,6 +270,87 @@ function InstallPIP
     python -c 'import pip' 2> /dev/null 2>&1
     if [ $? -ne 0 ] ; then
         printf 'Failed to install PIP\n'
+        return 1
+    fi
+
+    return 0
+}
+
+function InstallSIP
+{
+    local sip_tarball_name="sip-${SIP_VERSION}"
+    local sip_download_link="https://sourceforge.net/projects/pyqt/files/sip/sip-${SIP_VERSION}/${sip_tarball_name}.tar.gz"
+
+    local sipinstaller_temp_dir='SIPInstallerData'
+    mkdir "$sipinstaller_temp_dir"
+
+    if [ $? -ne 0 ] ; then
+        printf 'Failed to create the SIP temporary folder\n'
+        return 1
+    fi
+
+    rm "$LOG_FILE_NAME" 2> /dev/null
+    curl -L "$sip_download_link" --output "${sipinstaller_temp_dir}/${sip_tarball_name}.tar.gz" >> "$LOG_FILE_NAME" 2>&1
+    if [ $? -ne 0 ] ; then
+        rm -r "$sipinstaller_temp_dir" 2> /dev/null
+
+        ShowLogFile "$LOG_FILE_NAME" 'Failed to download the SIP source tarball'
+        return 1
+    fi
+
+    rm "$LOG_FILE_NAME" 2> /dev/null
+    ( cd "$sipinstaller_temp_dir" && tar xzf "${sip_tarball_name}.tar.gz" ) >> "$LOG_FILE_NAME" 2>&1
+    if [ $? -ne 0 ] ; then
+        rm -r "$sipinstaller_temp_dir" 2> /dev/null
+
+        ShowLogFile "$LOG_FILE_NAME" 'Failed to extract the SIP source tarball'
+        return 1
+    fi
+
+    rm "$LOG_FILE_NAME" 2> /dev/null
+    ( cd "${sipinstaller_temp_dir}/${sip_tarball_name}" && python "./configure.py" ) >> "$LOG_FILE_NAME" 2>&1
+    if [ $? -ne 0 ] ; then
+        rm -r "$sipinstaller_temp_dir" 2> /dev/null
+
+        ShowLogFile "$LOG_FILE_NAME" 'Failed to configure the SIP source'
+        return 1
+    fi
+
+    sed -i 's/CFLAGS = /CFLAGS = -m32 /g' "${sipinstaller_temp_dir}/${sip_tarball_name}/sipgen/Makefile"
+    sed -i 's/CXXFLAGS = /CXXFLAGS = -m32 /g' "${sipinstaller_temp_dir}/${sip_tarball_name}/sipgen/Makefile"
+    sed -i 's/LINK = g++/LINK = g++ -m32/g' "${sipinstaller_temp_dir}/${sip_tarball_name}/sipgen/Makefile"
+
+    sed -i 's/CFLAGS = /CFLAGS = -m32 /g' "${sipinstaller_temp_dir}/${sip_tarball_name}/siplib/Makefile"
+    sed -i 's/CXXFLAGS = /CXXFLAGS = -m32 /g' "${sipinstaller_temp_dir}/${sip_tarball_name}/siplib/Makefile"
+    sed -i 's/LFLAGS = /LFLAGS = -m32 /g' "${sipinstaller_temp_dir}/${sip_tarball_name}/siplib/Makefile"
+
+    rm "$LOG_FILE_NAME" 2> /dev/null
+    ( cd "${sipinstaller_temp_dir}/${sip_tarball_name}" && make -j `nproc` ) >> "$LOG_FILE_NAME" 2>&1
+    if [ $? -ne 0 ] ; then
+        rm -r "$sipinstaller_temp_dir" 2> /dev/null
+
+        ShowLogFile "$LOG_FILE_NAME" 'Failed to build the SIP source'
+        return 1
+    fi
+
+    rm "$LOG_FILE_NAME" 2> /dev/null
+    ( cd "${sipinstaller_temp_dir}/${sip_tarball_name}" && make install ) >> "$LOG_FILE_NAME" 2>&1
+    if [ $? -ne 0 ] ; then
+        rm -r "$sipinstaller_temp_dir" 2> /dev/null
+
+        ShowLogFile "$LOG_FILE_NAME" 'Failed to install the SIP library'
+        return 1
+    fi
+
+    rm -r "$sipinstaller_temp_dir" 2> /dev/null
+    if [ $? -ne 0 ] ; then
+        printf 'Failed to delete the SIP temporary folder\n'
+        return 1
+    fi
+
+    python -c 'import sip' 2> /dev/null 2>&1
+    if [ $? -ne 0 ] ; then
+        printf 'Failed to install SIP\n'
         return 1
     fi
 
