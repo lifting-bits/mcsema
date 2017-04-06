@@ -51,6 +51,7 @@ endif()
 include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/third_party/llvm/include)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
 include_directories(${CMAKE_BINARY_DIR}/llvm/include)
 include_directories(${CMAKE_BINARY_DIR}/llvm/lib/Target/X86)
