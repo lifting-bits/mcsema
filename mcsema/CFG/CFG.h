@@ -31,310 +31,149 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef MCSEMA_CFG_CFG_H_
 #define MCSEMA_CFG_CFG_H_
 
-#include <stack>
-#include <set>
+#include <cstdint>
 #include <map>
 #include <memory>
-#include <list>
+#include <string>
 #include <unordered_map>
-
-#include <cstdio>
-#include <cstdint>
-#include <iostream>
-
-#include <llvm/ADT/Triple.h>
-
-#include "mcsema/CFG/Externals.h"
-
-namespace llvm {
-class Target;
-}  // namespace llvm
+#include <unordered_set>
+#include <vector>
 
 namespace mcsema {
 
-typedef uint64_t VA;
+struct NativeVariable;
+struct NativeFunction;
 
-class NativeInst;
-typedef NativeInst *NativeInstPtr;
+struct NativeExternalVariable;
+struct NativeExternalFunction;
 
-class ExternalCodeRef;
-class ExternalDataRef;
-class MCSJumpTable;
-class JumpIndexTable;
-class MCSOffsetTable;
+struct NativeSegment;
+struct NativeXref;
 
-typedef ExternalCodeRef *ExternalCodeRefPtr;
-typedef ExternalDataRef *ExternalDataRefPtr;
-typedef MCSJumpTable *MCSJumpTablePtr;
-typedef JumpIndexTable *JumpIndexTablePtr;
-typedef MCSOffsetTable *MCSOffsetTablePtr;
-
-
-/* we're going to make some assumptions about external calls:
- *  - they have some sane calling convention
- *  - they take a defined number of arguments
- *  - they either return no values and have no effects on local
- registers, or, they return a single integer value and
- assign that value to the EAX register
- */
-
-struct NativeRef {
-  ExternalCodeRefPtr code;
-  ExternalDataRefPtr data;
-};
-
-class NativeInst {
- private:
-  std::vector<VA> targets;
-  VA loc;
+struct NativeInstruction {
+ public:
+  uint64_t ea;
   std::string bytes;
 
- public:
-  ExternalCodeRefPtr external_code_ref;
-  VA code_addr;
+  const NativeXref *flow;
+  const NativeXref *mem;
+  const NativeXref *imm;
+  const NativeXref *disp;
 
-  ExternalDataRefPtr external_mem_data_ref;
-  ExternalCodeRefPtr external_mem_code_ref;
-
-  ExternalDataRefPtr external_disp_data_ref;
-  ExternalCodeRefPtr external_disp_code_ref;
-
-  ExternalDataRefPtr external_imm_data_ref;
-  ExternalCodeRefPtr external_imm_code_ref;
-
-  VA mem_ref_data_addr;
-  VA mem_ref_code_addr;
-
-  VA disp_ref_data_addr;
-  VA disp_ref_code_addr;
-
-  VA imm_ref_data_addr;
-  VA imm_ref_code_addr;
-
- private:
-  MCSJumpTablePtr jumpTable;
-  bool jump_table;
-  JumpIndexTablePtr jumpIndexTable;
-  bool jump_index_table;
-
-  bool local_noreturn;
- public:
-  VA offset_table;
-
-  bool terminator(void) const;
-  void set_terminator(void);
-
-  void set_local_noreturn(void);
-  bool has_local_noreturn(void) const;
-
-  VA get_loc(void) const;
-
-  const std::string &get_bytes(void) const;
-
-  // accessors for JumpTable
-  void set_jump_table(MCSJumpTablePtr p);
-  MCSJumpTablePtr get_jump_table(void) const;
-  bool has_jump_table(void) const;
-
-  // accessors for JumpIndexTable
-  void set_jump_index_table(JumpIndexTablePtr p);
-  JumpIndexTablePtr get_jump_index_table(void) const;
-  bool has_jump_index_table(void) const;
-
-  NativeInst(VA v, const std::string &bytes_);
+  bool does_not_return;
+  uint64_t offset_table;
 };
 
-class NativeBlock {
- private:
-  // A list of instructions
-  VA baseAddr;
-  std::list<NativeInstPtr> instructions;
-  std::set<VA> follows;
-
+struct NativeBlock {
  public:
-  explicit NativeBlock(VA);
-  void add_inst(NativeInstPtr);
-  VA get_base(void);
-  void add_follow(VA f);
-  std::set<VA> &get_follows(void);
-  std::string get_name(void);
-  const std::list<NativeInstPtr> &get_insts(void);
-
- private:
-  NativeBlock(void) = delete;
+  uint64_t ea;
+  std::string lifted_name;
+  std::vector<const NativeInstruction *> instructions;
+  std::unordered_set<uint64_t> successor_eas;
 };
 
-typedef NativeBlock *NativeBlockPtr;
-
-class NativeFunction {
+// Generic object used in the binary. This includes both internally and
+// externally defined. In practice, those externally defined objects still
+// have meaningful and unique effective addresses, usually pointing to
+// some kind of relocation section within the binary.
+struct NativeObject {
  public:
-  explicit NativeFunction(VA b)
-      : funcEntryVA(b) {}
-
-  NativeFunction(VA b, const std::string &sym)
-      : funcEntryVA(b),
-        funcSymName(sym) {}
-
-  void add_block(NativeBlockPtr);
-
-  VA get_start(void);
-  uint64_t num_blocks(void);
-  NativeBlockPtr block_from_base(VA);
-  const std::map<VA, NativeBlockPtr> &get_blocks(void) const;
-  std::string get_name(void);
-  const std::string &get_symbol_name(void);
-
- private:
-  NativeFunction(void) = delete;
-
-  // Use a `std::map` to keep the blocks in their original order.
-  std::map<VA, NativeBlockPtr> blocks;
-
-  // Addr of function entry point
-  VA funcEntryVA;
-
-  std::string funcSymName;
+  uint64_t ea;
+  std::string name;  // Name in the binary.
+  std::string lifted_name;  // Name in the bitcode.
+  bool is_external;
 };
 
-typedef NativeBlock *NativeBlockPtr;
-typedef NativeFunction *NativeFunctionPtr;
-
-class DataSectionEntry {
+// Function that is defined inside the binary.
+struct NativeFunction : public NativeObject {
  public:
-  DataSectionEntry(uint64_t base, const std::vector<uint8_t> &b);
-  DataSectionEntry(uint64_t base, const std::string &sname);
-  DataSectionEntry(uint64_t base, const std::string &sname,
-                   uint64_t symbol_size);
-
-  uint64_t getBase(void) const;
-
-  uint64_t getSize(void) const;
-
-  const std::vector<uint8_t> &getBytes(void) const;
-
-  bool getSymbol(std::string &sname) const;
-
-  virtual ~DataSectionEntry(void);
-
- protected:
-  uint64_t base;
-  std::vector<uint8_t> bytes;
-  bool is_symbol;
-  std::string sym_name;
-
- private:
-  DataSectionEntry(void) = delete;
+  std::unordered_map<uint64_t, const NativeBlock *> blocks;
 };
 
-class DataSection {
- protected:
-  std::list<DataSectionEntry> entries;
-  uint64_t base;
-  bool read_only;
-
+// Function that is defined outside of the binary.
+struct NativeExternalFunction : public NativeFunction {
  public:
-  static constexpr uint64_t NO_BASE = ~0ULL;
 
-  DataSection(void);
-  virtual ~DataSection(void);
-
-  void setReadOnly(bool isro);
-  bool isReadOnly(void) const;
-  uint64_t getBase(void) const;
-  const std::list<DataSectionEntry> &getEntries(void) const;
-  void addEntry(const DataSectionEntry &dse);
-  uint64_t getSize(void) const;
-  std::vector<uint8_t> getBytes(void) const;
 };
 
-class NativeEntrySymbol {
- private:
-  const VA addr;
-  std::string name;
-  bool has_extra;
-  int num_args;
-  bool does_return;
-  ExternalCodeRef::CallingConvention calling_conv;
-
+// Global variable defined inside of the lifted binary.
+struct NativeVariable : public NativeObject {
  public:
-  NativeEntrySymbol(const std::string &name_, VA addr_);
-  explicit NativeEntrySymbol(VA addr_);
-
-  const std::string &getName(void) const;
-  VA getAddr(void) const;
-  bool hasExtra(void) const;
-  void setExtra(int argc_, bool does_ret,
-                ExternalCodeRef::CallingConvention conv);
-  int getArgc(void) const;
-  bool doesReturn(void) const;
-  ExternalCodeRef::CallingConvention getConv(void) const;
-
- private:
-  NativeEntrySymbol(void) = delete;
+  const NativeSegment *segment;
 };
 
-class NativeModule {
+// Global variable defined outside of the lifted binary.
+struct NativeExternalVariable : public NativeVariable {
  public:
-  NativeModule(const std::string &module_name_,
-               const std::unordered_map<VA, NativeFunctionPtr> &funcs_,
-               const std::string &triple_);
-
-  void add_func(NativeFunctionPtr f);
-  const std::unordered_map<VA, NativeFunctionPtr> &get_funcs(void) const;
-
-  const std::string &name(void) const;
-
-  //add a data section from a COFF object
-  void addDataSection(VA, std::vector<uint8_t> &);
-  void addDataSection(const DataSection &d);
-
-  const std::list<DataSection> &getData(void) const;
-
-  //add an external reference
-  void addExtCall(ExternalCodeRefPtr p);
-
-  const std::list<ExternalCodeRefPtr> &getExtCalls(void) const;
-
-  //external data ref
-  void addExtDataRef(ExternalDataRefPtr p);
-
-  const std::list<ExternalDataRefPtr> &getExtDataRefs(void) const;
-
-  const std::vector<NativeEntrySymbol> &getEntryPoints(void) const;
-
-  void addEntryPoint(const NativeEntrySymbol &ep);
-
-  bool is64Bit(void) const;
-
-  void addOffsetTables(const std::list<MCSOffsetTablePtr> &tables);
-
-  std::vector<NativeEntrySymbol> entries;
-
- private:
-  NativeModule(void) = delete;
-
-  std::unordered_map<VA, NativeFunctionPtr> funcs;
-  const std::string module_name;
-  const llvm::Triple triple;
-
-  std::list<DataSection> data_sections;
-  std::list<ExternalCodeRefPtr> external_code_refs;
-  std::list<ExternalDataRefPtr> external_data_refs;
-
- public:
-  std::unordered_map<VA, MCSOffsetTablePtr> offset_tables;
+  uint64_t size;
+  bool is_weak;
 };
 
-typedef NativeModule *NativeModulePtr;
+// A cross-reference to something.
+struct NativeXref {
+ public:
+  uint64_t width;  // In bytes.
+  uint64_t ea;  // Location of the xref within its segment.
+  const NativeSegment *segment;  // Segment containing the xref.
 
-enum ModuleInputFormat {
-  COFFObject,
-  PEFile,
-  ASMText,
-  ProtoBuff
+  uint64_t target_ea;
+  std::string target_name;
+  const NativeSegment *target_segment;  // Target segment of the xref, if any.
+
+  const NativeVariable *var;
+  const NativeFunction *func;
 };
 
-NativeModulePtr ReadProtoBuf(const std::string &file_name);
+struct NativeBlob {
+ public:
+  uint64_t ea;
+  std::string data;
+};
+
+struct NativeSegment : public NativeObject {
+ public:
+  struct Entry {
+   public:
+    uint64_t ea;
+    uint64_t next_ea;
+    const NativeXref *xref;
+    const NativeBlob *blob;
+  };
+
+  uint64_t size;
+  bool is_read_only;
+
+  // Partition of entries, which are either cross-references, or opaque
+  // blobs of bytes. The ordering of entries is significant.
+  std::map<uint64_t, Entry> entries;
+};
+
+struct NativeModule {
+ public:
+  std::unordered_set<uint64_t> exported_vars;
+  std::unordered_set<uint64_t> exported_funcs;
+
+  // List of segments, keyed by the *ending* address of the segment, which
+  // permits lower bound queries to work to find things inside of the segment.
+  std::map<uint64_t, NativeSegment *> segments;
+
+  std::unordered_map<uint64_t, const NativeFunction *> ea_to_func;
+
+  std::unordered_map<std::string, const NativeExternalFunction *>
+      name_to_extern_func;
+
+  // Represent global and external variables.
+  std::unordered_map<uint64_t, const NativeVariable *> ea_to_var;
+  std::unordered_map<std::string, const NativeExternalVariable *>
+      name_to_extern_var;
+
+  std::unordered_map<uint64_t, const NativeXref *> code_xrefs;
+
+  const NativeFunction *TryGetFunction(uint64_t ea) const;
+  const NativeVariable *TryGetVariable(uint64_t ea) const;
+};
+
+NativeModule *ReadProtoBuf(const std::string &file_name);
 
 }  // namespace mcsema
 

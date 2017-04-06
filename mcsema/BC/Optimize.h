@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace mcsema {
 
-void OptimizeBitcode(void);
+void OptimizeModule(void);
 
 }  // namespace mcsema
 

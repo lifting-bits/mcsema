@@ -266,27 +266,6 @@ def decode_instruction(ea):
   _INSTRUCTION_CACHE[ea] = (decoded_inst, decoded_bytes)
   return decoded_inst, decoded_bytes
 
-# def instruction_is_referenced(ea):
-#   """Returns `True` if it appears that there's a non-fall-through reference
-#   to the instruction at `ea`."""
-#   global POSSIBLE_CODE_REFS
-#   if len(tuple(idautils.CodeRefsTo(ea, False))):
-#     return True
-#   if len(tuple(idautils.DataRefsTo(ea))):
-#     return True
-#   return ea in POSSIBLE_CODE_REFS
-
-def has_flow_to_code(ea):
-  """Returns `True` if there are and control flows to the instruction at 
-  `ea`."""
-  for _ in idautils.CodeRefsTo(ea, True):
-    return True
-
-  for _ in idautils.CodeRefsTo(ea, False):
-    return True
-
-  return False
-
 _NOT_EXTERNAL_SEGMENTS = set([idc.BADADDR])
 _EXTERNAL_SEGMENTS = set()
 
@@ -420,7 +399,7 @@ def get_function_bounds(ea):
   return min_ea, max_ea
 
 def is_noreturn_function(ea):
-  """Returns true if the function at `ea` is a no-return function."""
+  """Returns `True` if the function at `ea` is a no-return function."""
   flags = idc.GetFunctionFlags(ea)
   return 0 < flags and (flags & idaapi.FUNC_NORET)
 
@@ -438,3 +417,65 @@ def remove_all_refs(ea):
 
   for ref_ea in cref_eas1:
     idaapi.del_cref(ea, ref_ea, True)
+
+def is_thunk(ea):
+  """Returns true if some address is a known to IDA to be a thunk."""
+  flags = idc.GetFunctionFlags(ea)
+  return 0 < flags and 0 != (flags & idaapi.FUNC_THUNK)
+
+_IDA_WEIRD_BAD_REF = 0xff00000000000000
+_IGNORE_DREF = (lambda x: [_IDA_WEIRD_BAD_REF])
+_IGNORE_CREF = (lambda x, y: [_IDA_WEIRD_BAD_REF])
+
+def _reference_checker(ea, dref_finder=_IGNORE_DREF, cref_finder=_IGNORE_CREF):
+  """Looks for references to/from `ea`, and does some sanity checks on what
+  IDA returns."""
+  global _IDA_WEIRD_BAD_REF
+  for ref in dref_finder(ea):
+    if ref == idc.BADADDR or ref >= _IDA_WEIRD_BAD_REF:
+      continue
+    return True
+
+  for ref in cref_finder(ea, True):
+    if ref == idc.BADADDR or ref >= _IDA_WEIRD_BAD_REF:
+      continue
+    return True
+
+  for ref in cref_finder(ea, False):
+    if ref == idc.BADADDR or ref >= _IDA_WEIRD_BAD_REF:
+      continue
+    return True
+
+  return False
+
+def is_referenced(ea):
+  """Returns `True` if the data at `ea` is referenced by something else."""
+  return _reference_checker(ea, idautils.DataRefsTo, idautils.CodeRefsTo)
+
+def is_reference(ea):
+  """Returns `True` if the `ea` references something else."""
+  return _reference_checker(ea, idautils.DataRefsFrom, idautils.CodeRefsFrom)
+
+def has_flow_to_code(ea):
+  """Returns `True` if there are and control flows to the instruction at 
+  `ea`."""
+  return _reference_checker(ea, cref_finder=idautils.CodeRefsTo)
+
+def get_reference_target(ea):
+  global _IDA_WEIRD_BAD_REF
+  for ref in idautils.DataRefsFrom(ea):
+    if ref == idc.BADADDR or ref >= _IDA_WEIRD_BAD_REF:
+      continue
+    return ref
+
+  for ref in idautils.CodeRefsFrom(ea, True):
+    if ref == idc.BADADDR or ref >= _IDA_WEIRD_BAD_REF:
+      continue
+    return ref
+
+  for ref in idautils.CodeRefsFrom(ea, False):
+    if ref == idc.BADADDR or ref >= _IDA_WEIRD_BAD_REF:
+      continue
+    return ref
+
+  return idc.BADADDR

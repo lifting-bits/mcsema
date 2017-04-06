@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <glog/logging.h>
 
+#include <cctype>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -41,801 +42,637 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/CFG/CFG.h"
 
-#include "mcsema/cfgToLLVM/TransExcn.h"
-
 #include "mcsema/CFG/Externals.h"
-#include "mcsema/cfgToLLVM/JumpTables.h"
 
 namespace mcsema {
+namespace {
 
-void NativeInst::set_local_noreturn(void) {
-  this->local_noreturn = true;
-}
-
-bool NativeInst::has_local_noreturn(void) const {
-  return this->local_noreturn;
-}
-
-VA NativeInst::get_loc(void) const {
-  return this->loc;
-}
-
-const std::string &NativeInst::get_bytes(void) const {
-  return this->bytes;
-}
-
-// accessors for JumpTable
-void NativeInst::set_jump_table(MCSJumpTablePtr p) {
-  this->jump_table = true;
-  this->jumpTable = p;
-}
-
-MCSJumpTablePtr NativeInst::get_jump_table(void) const {
-  return this->jumpTable;
-}
-
-bool NativeInst::has_jump_table(void) const {
-  return this->jump_table;
-}
-
-// accessors for JumpIndexTable
-void NativeInst::set_jump_index_table(JumpIndexTablePtr p) {
-  this->jump_index_table = true;
-  this->jumpIndexTable = p;
-}
-
-JumpIndexTablePtr NativeInst::get_jump_index_table(void) const {
-  return this->jumpIndexTable;
-}
-
-bool NativeInst::has_jump_index_table(void) const {
-  return this->jump_index_table;
-}
-
-NativeInst::NativeInst(VA v, const std::string &bytes_)
-    : loc(v),
-      bytes(bytes_),
-
-      external_code_ref(nullptr),
-      code_addr(~0ULL),
-
-      external_mem_data_ref(nullptr),
-      external_mem_code_ref(nullptr),
-      external_disp_data_ref(nullptr),
-      external_disp_code_ref(nullptr),
-      external_imm_data_ref(nullptr),
-      external_imm_code_ref(nullptr),
-
-      mem_ref_data_addr(~0ULL),
-      mem_ref_code_addr(~0ULL),
-
-      disp_ref_data_addr(~0ULL),
-      disp_ref_code_addr(~0ULL),
-
-      imm_ref_data_addr(~0ULL),
-      imm_ref_code_addr(~0ULL),
-
-      jumpTable(nullptr),
-      jump_table(false),
-      jumpIndexTable(nullptr),
-      jump_index_table(false),
-      local_noreturn(false),
-      offset_table(-1) {}
-
-DataSectionEntry::DataSectionEntry(uint64_t base, const std::vector<uint8_t> &b)
-    : base(base),
-      bytes(b),
-      is_symbol(false) {}
-
-DataSectionEntry::DataSectionEntry(uint64_t base, const std::string &sname)
-    : base(base),
-      is_symbol(true),
-      sym_name(sname) {
-
-  this->bytes.push_back(0x0);
-  this->bytes.push_back(0x0);
-  this->bytes.push_back(0x0);
-  this->bytes.push_back(0x0);
-}
-
-DataSectionEntry::DataSectionEntry(uint64_t base, const std::string &sname,
-                                   uint64_t symbol_size)
-    : base(base),
-      bytes(symbol_size),
-      is_symbol(true),
-      sym_name(sname) {}
-
-uint64_t DataSectionEntry::getBase(void) const {
-  return this->base;
-}
-
-uint64_t DataSectionEntry::getSize(void) const {
-  return this->bytes.size();
-}
-
-const std::vector<uint8_t> &DataSectionEntry::getBytes(void) const {
-  return this->bytes;
-}
-
-bool DataSectionEntry::getSymbol(std::string &sname) const {
-  if (this->is_symbol) {
-    sname = this->sym_name;
-    return true;
-  } else {
-    return false;
-  }
-}
-
-DataSectionEntry::~DataSectionEntry(void) {}
-
-DataSection::DataSection(void)
-    : base(NO_BASE),
-      read_only(false) {}
-
-DataSection::~DataSection(void) {}
-
-void DataSection::setReadOnly(bool isro) {
-  this->read_only = isro;
-}
-
-bool DataSection::isReadOnly(void) const {
-  return this->read_only;
-}
-
-uint64_t DataSection::getBase(void) const {
-  return this->base;
-}
-
-const std::list<DataSectionEntry> &DataSection::getEntries(void) const {
-  return this->entries;
-}
-
-void DataSection::addEntry(const DataSectionEntry &dse) {
-  this->entries.push_back(dse);
-  if (this->base == NO_BASE || this->base > dse.getBase()) {
-    this->base = dse.getBase();
-  }
-}
-
-uint64_t DataSection::getSize(void) const {
-  uint64_t size_sum = 0;
-  for (std::list<DataSectionEntry>::const_iterator itr = entries.begin();
-      itr != entries.end(); itr++) {
-    size_sum += itr->getSize();
-  }
-  return size_sum;
-}
-
-std::vector<uint8_t> DataSection::getBytes(void) const {
-  std::vector<uint8_t> all_bytes;
-  for (const auto entry : entries) {
-    const auto &vec = entry.getBytes();
-    all_bytes.insert(all_bytes.end(), vec.begin(), vec.end());
-  }
-  return all_bytes;
-}
-
-NativeEntrySymbol::NativeEntrySymbol(const std::string &name_, VA addr_)
-    : addr(addr_),
-      name(name_),
-      has_extra(false),
-      num_args(0),
-      does_return(false),
-      calling_conv(ExternalCodeRef::CallerCleanup) {}
-
-NativeEntrySymbol::NativeEntrySymbol(VA addr_)
-    : addr(addr_),
-      has_extra(false),
-      num_args(0),
-      does_return(false),
-      calling_conv(ExternalCodeRef::CallerCleanup) {
+static std::string LiftedFunctionName(const Function &cfg_func) {
   std::stringstream ss;
-  ss << "sub_" << std::hex << this->addr;
-  this->name = ss.str();
-}
-
-const std::string &NativeEntrySymbol::getName(void) const {
-  return this->name;
-}
-
-VA NativeEntrySymbol::getAddr(void) const {
-  return this->addr;
-}
-
-bool NativeEntrySymbol::hasExtra(void) const {
-  return this->has_extra;
-}
-
-int NativeEntrySymbol::getArgc(void) const {
-  return this->num_args;
-}
-
-bool NativeEntrySymbol::doesReturn(void) const {
-  return this->does_return;
-}
-
-ExternalCodeRef::CallingConvention NativeEntrySymbol::getConv(void) const {
-  return this->calling_conv;
-}
-
-void NativeEntrySymbol::setExtra(int argc_, bool does_ret,
-                                 ExternalCodeRef::CallingConvention conv) {
-  this->num_args = argc_;
-  this->does_return = does_ret;
-  this->calling_conv = conv;
-  this->has_extra = true;
-}
-
-NativeModule::NativeModule(
-    const std::string &module_name_,
-    const std::unordered_map<VA, NativeFunctionPtr> &funcs_,
-    const std::string &triple_)
-    : funcs(funcs_),
-      module_name(module_name_),
-      triple(triple_) {}
-
-VA NativeFunction::get_start(void) {
-  return this->funcEntryVA;
-}
-
-uint64_t NativeFunction::num_blocks(void) {
-  return this->blocks.size();
-}
-
-const std::map<VA, NativeBlockPtr> &NativeFunction::get_blocks(void) const {
-  return this->blocks;
-}
-
-NativeBlockPtr NativeFunction::block_from_base(VA base) {
-  auto block_it = blocks.find(base);
-  CHECK(block_it != blocks.end())
-      << "Could not find block at address " << std::hex << base;
-  return block_it->second;
-}
-
-NativeBlock::NativeBlock(VA b)
-    : baseAddr(b) {}
-
-void NativeBlock::add_inst(NativeInstPtr p) {
-  this->instructions.push_back(p);
-}
-
-VA NativeBlock::get_base(void) {
-  return this->baseAddr;
-}
-
-void NativeBlock::add_follow(VA f) {
-  this->follows.insert(f);
-}
-
-std::set<VA> &NativeBlock::get_follows(void) {
-  return this->follows;
-}
-
-const std::list<NativeInstPtr> &NativeBlock::get_insts(void) {
-  return this->instructions;
-}
-
-void NativeFunction::add_block(NativeBlockPtr b) {
-  auto blockBase = b->get_base();
-  CHECK(!this->blocks.count(blockBase))
-      << "Added duplicate block for address " << std::hex << blockBase;
-  this->blocks[blockBase] = b;
-}
-
-std::string NativeFunction::get_name(void) {
-  if (funcSymName.empty()) {
-    std::stringstream ss;
-    ss << "sub_" << std::hex << this->funcEntryVA;
-    return ss.str();
-  } else {
-    return funcSymName;
+  ss << "sub_" << std::hex << cfg_func.ea();
+  if (cfg_func.has_name()) {
+    ss << "_" << cfg_func.name();
   }
-}
-
-const std::string &NativeFunction::get_symbol_name(void) {
-  return this->funcSymName;
-}
-
-std::string NativeBlock::get_name(void) {
-  std::stringstream ss;
-  ss << "block_" << std::hex << this->baseAddr;
   return ss.str();
 }
 
-void NativeModule::addDataSection(VA base, std::vector<uint8_t> &bytes) {
-
-  DataSection ds;
-  DataSectionEntry dse(base, bytes);
-  ds.addEntry(dse);
-
-  this->data_sections.push_back(ds);
-}
-
-void NativeModule::addDataSection(const DataSection &d) {
-  this->data_sections.push_back(d);
-}
-
-void NativeModule::add_func(NativeFunctionPtr f) {
-  this->funcs[f->get_start()] = f;
-}
-
-const std::unordered_map<VA, NativeFunctionPtr> &NativeModule::get_funcs(
-    void) const {
-  return this->funcs;
-}
-
-const std::string &NativeModule::name(void) const {
-  return this->module_name;
-}
-
-const std::list<DataSection> &NativeModule::getData(void) const {
-  return this->data_sections;
-}
-
-void NativeModule::addExtCall(ExternalCodeRefPtr p) {
-  this->external_code_refs.push_back(p);
-}
-
-const std::list<ExternalCodeRefPtr> &NativeModule::getExtCalls(void) const {
-  return this->external_code_refs;
-}
-
-void NativeModule::addExtDataRef(ExternalDataRefPtr p) {
-  this->external_data_refs.push_back(p);
-}
-
-const std::list<ExternalDataRefPtr> &NativeModule::getExtDataRefs(void) const {
-  return this->external_data_refs;
-}
-
-const std::vector<NativeEntrySymbol> &NativeModule::getEntryPoints(void) const {
-  return this->entries;
-}
-
-void NativeModule::addEntryPoint(const NativeEntrySymbol &ep) {
-  this->entries.push_back(ep);
-}
-
-bool NativeModule::is64Bit(void) const {
-  return 64 == ArchAddressSize();
-}
-
-void NativeModule::addOffsetTables(
-    const std::list<MCSOffsetTablePtr> & tables) {
-
-  for (const auto &table : tables) {
-    LOG(INFO)
-        << "Adding offset table at " << std::hex << table->getStartAddr();
-    this->offset_tables.insert({table->getStartAddr(), table});
-  }
-}
-
-static ExternalCodeRefPtr getExternal(
-    const std::string &s, const std::list<ExternalCodeRefPtr> &extcode) {
-  for (auto e : extcode) {
-    if (s == e->getSymbolName()) {
-      return e;
+static std::string LiftedSegmentName(const Segment &cfg_segment) {
+  std::stringstream ss;
+  ss << "seg_" << std::hex << cfg_segment.ea();
+  if (cfg_segment.has_name()) {
+    ss << "_";
+    for (auto c : cfg_segment.name()) {
+      if (isalnum(c)) {
+        ss << c;
+      } else {
+        ss << "_";
+      }
     }
+  }
+  return ss.str();
+}
+
+static std::string LiftedVarName(const Variable &cfg_var) {
+  std::stringstream ss;
+  ss << "var_" << std::hex << cfg_var.ea() << "_" << cfg_var.name();
+  return ss.str();
+}
+
+static std::string LiftedBlockName(const Block &cfg_block) {
+  std::stringstream ss;
+  ss << "block_" << std::hex << cfg_block.ea();
+  return ss.str();
+}
+
+static std::string ExternalFuncName(const ExternalFunction &cfg_func) {
+  std::stringstream ss;
+  ss << "ext_" << std::hex << cfg_func.ea() << "_" << cfg_func.name();
+  return ss.str();
+}
+
+// Find the segment containing the data at `ea`.
+static const NativeSegment *FindSegment(const NativeModule *module,
+                                        uint64_t ea) {
+  auto seg_it = module->segments.lower_bound(ea);
+  while (seg_it != module->segments.end()) {
+    auto target_segment = seg_it->second;
+    auto seg_end = target_segment->ea + target_segment->size;
+    if (ea >= seg_end) {
+      return nullptr;
+    }
+    if (target_segment->ea <= ea && ea < seg_end) {
+      return target_segment;
+    }
+    ++seg_it;
   }
   return nullptr;
 }
 
-enum : size_t {
-  kMaxNumInstrBytes = 16ULL  // 15 on x86 and amd64.
-};
+// Resolve `xref` to a location.
+static void ResolveReference(const NativeModule *module, NativeXref *xref) {
+  xref->var = nullptr;
+  xref->func = nullptr;
 
-static NativeInstPtr DeserializeInst(
-    const ::Instruction &inst,
-    const std::list<ExternalCodeRefPtr> &extcode) {
-  VA addr = inst.inst_addr();
-
-  NativeInstPtr ip = new NativeInst(addr, inst.inst_bytes());
-  if (!ip) {
-    LOG(ERROR)
-        << "Unable to deserialize instruction at " << std::hex << addr;
-    return nullptr;
+  auto var_it = module->ea_to_var.find(xref->target_ea);
+  if (var_it != module->ea_to_var.end()) {
+    xref->var = var_it->second;
+    return;
   }
 
-  if (inst.has_jump_table()) {
-    // create new jump table
+  auto func_it = module->ea_to_func.find(xref->target_ea);
+  if (func_it != module->ea_to_func.end()) {
+    xref->func = func_it->second;
+    return;
+  }
 
-    const ::JumpTbl &jmp_tbl = inst.jump_table();
-    std::vector<VA> table_entries;
-
-    for (int i = 0; i < jmp_tbl.table_entries_size(); i++) {
-      table_entries.push_back(jmp_tbl.table_entries(i));
+  if (!xref->target_name.empty()) {
+    auto var_name_it = module->name_to_extern_var.find(xref->target_name);
+    if (var_name_it != module->name_to_extern_var.end()) {
+      xref->var = var_name_it->second;
+      return;
     }
 
-    VA data_offset = ~0ULL;
-    if (jmp_tbl.has_offset_from_data()) {
-      data_offset = jmp_tbl.offset_from_data();
+    auto func_name_it = module->name_to_extern_func.find(xref->target_name);
+    if (func_name_it != module->name_to_extern_func.end()) {
+      xref->func = func_name_it->second;
+      return;
     }
-    auto jmp = new MCSJumpTable(table_entries, jmp_tbl.zero_offset(),
-                                data_offset);
-    ip->set_jump_table(MCSJumpTablePtr(jmp));
   }
 
-  if (inst.has_jump_index_table()) {
-    // create new jump table
+  LOG_IF(FATAL, !xref->target_segment)
+      << "Data cross reference at " << std::hex << xref->ea
+      << " targeting " << xref->target_name << " at "
+      << std::hex << xref->target_ea << " does not match any known "
+      << "externals and is not containing within any data segments.";
+}
 
-    const ::JumpIndexTbl &idx_tbl = inst.jump_index_table();
-    const auto &serialized_tbl = idx_tbl.table_entries();
-    std::vector<uint8_t> tbl_bytes(serialized_tbl.begin(),
-                                   serialized_tbl.end());
-
-    auto idx = new JumpIndexTable(tbl_bytes, idx_tbl.zero_offset());
-    ip->set_jump_index_table(JumpIndexTablePtr(idx));
+// Take the `CodeReference` information from the CFG and resolve it into
+// a `NativeXref`. We do a bunch of checking to see if the recorded info
+// in the protobuf is sane, and sanity doesn't 100% matter, because we
+// do best effort matching in here and above, so error checking is mostly
+// about letting us know if we should investigate something in the Python
+// side of things.
+static void AddXref(NativeModule *module, NativeInstruction *inst,
+                    const CodeReference &cfg_ref) {
+  NativeXref xref = {};
+  xref.ea = inst->ea;
+  xref.segment = FindSegment(module, xref.ea);
+  xref.target_ea = static_cast<uint64_t>(cfg_ref.address());
+  xref.target_segment = FindSegment(module, xref.target_ea);
+  if (cfg_ref.has_name()) {
+    xref.target_name = cfg_ref.name();
   }
 
-  if (inst.has_local_noreturn()) {
-    ip->set_local_noreturn();
+  const NativeXref *xref_ptr = nullptr;
+  auto xref_it = module->code_xrefs.find(xref.target_ea);
+  if (xref_it != module->code_xrefs.end()) {
+    xref_ptr = xref_it->second;
+    xref = *xref_ptr;
+  } else {
+    ResolveReference(module, &xref);
   }
 
-  if (inst.has_offset_table_addr()) {
-    ip->offset_table = inst.offset_table_addr();
+  bool xref_is_external = false;
+  bool xref_is_code = false;
+
+  // Does the XREF think its target is external?
+  if (xref.func) {
+    xref_is_external = xref.func->is_external;
+    xref_is_code = true;
+  } else if (xref.var) {
+    xref_is_external = xref.var->is_external;
+  } else {
+    LOG(WARNING)
+        << "Reference from " << std::hex << inst->ea
+        << " to " << std::hex << xref.target_ea
+        << " targets the segment " << xref.segment->name
+        << " but was not resolved to a real symbol.";
+    xref_is_external = xref.segment->is_external;
   }
 
-  for (const auto &ref : inst.refs()) {
-    ExternalDataRefPtr ext_data_ref = nullptr;
-    VA data_addr = ~0ULL;
+  // Does the CFG reference target type agree with the resolved code/data
+  // nature of the xref?
+  if (cfg_ref.target_type() == CodeReference_TargetType_CodeTarget) {
+    LOG_IF(ERROR, nullptr == xref.func)
+        << "Code cross-reference to " << std::hex << xref.target_ea
+        << " from " << std::hex << inst->ea
+        << " is not actually a code cross-reference";
+  } else {
+    LOG_IF(ERROR, nullptr != xref.func)
+        << "Data cross-reference to " << std::hex << xref.target_ea
+        << " from " << std::hex << inst->ea
+        << " is actually a code cross-reference";
+  }
 
-    ExternalCodeRefPtr ext_code_ref = nullptr;
-    VA code_addr = ~0ULL;
+  // Does the CFG reference target location agree with the resolved
+  // externality of the xref?
+  if (cfg_ref.location() == CodeReference_Location_External) {
+    LOG_IF(ERROR, !xref_is_external)
+        << "External reference from " << std::hex << inst->ea
+        << " to " << std::hex << xref.target_ea << " is actually internal";
+  } else {
+    LOG_IF(ERROR, xref_is_external)
+        << "Internal reference from " << std::hex << inst->ea
+        << " to " << std::hex << xref.target_ea << " is actually external";
+  }
 
-    if (ref.target_type() == Reference_TargetType_CodeTarget) {
-      code_addr = ref.address();
-    } else {
-      data_addr = ref.address();
+  // Only record flow cross-references for externals. Really, all we care
+  // about is short-circuiting calls through thunks into direct calls to
+  // externals. All other flow types should really be statically known.
+  if (cfg_ref.operand_type() == CodeReference_OperandType_ControlFlowOperand) {
+    if (!xref_is_external || !xref_is_code) {
+      return;
     }
+  }
 
-    if (ref.location() == Reference_Location_External) {
-      const auto &name = ref.name();
-      CHECK(!name.empty())
-          << "External reference from instruction " << std::hex
-          << inst.inst_addr() << " doesn't have a name.";
+  if (!xref_ptr) {
+    auto xref_alloc = new NativeXref;
+    *xref_alloc = xref;
+    xref_ptr = xref_alloc;
+    module->code_xrefs[xref.target_ea] = xref_ptr;
+  }
 
-      auto is_code = ref.target_type() == Reference_TargetType_CodeTarget;
-      ext_code_ref = getExternal(name, extcode);
+  switch (cfg_ref.operand_type()) {
+    case CodeReference_OperandType_ImmediateOperand:
+      inst->imm = xref_ptr;
+      break;
+    case CodeReference_OperandType_MemoryOperand:
+      inst->mem = xref_ptr;
+      break;
+    case CodeReference_OperandType_MemoryDisplacementOperand:
+      inst->disp = xref_ptr;
+      break;
+    case CodeReference_OperandType_ControlFlowOperand:
+      inst->flow = xref_ptr;
+      break;
+  }
+}
 
-      if (is_code) {
-        CHECK(ext_code_ref != nullptr)
-            << "Could not find external code " << name << " at address "
-            << std::hex << code_addr;
+}  // namespace
 
-      } else if (ext_code_ref) {
+// Convert the protobuf into an in-memory data structure. This does a fair
+// amount of checking and tries to correct errors in favor of converting
+// variables into functions, and internals into externals. The intuition is
+// that, at least in ELF binaries, externals will usually have some kind of
+// 'internal' location for the sake of linking, and so we want to dedup
+// internals into externals whenever possible.
+NativeModule *ReadProtoBuf(const std::string &file_name) {
+  GOOGLE_PROTOBUF_VERIFY_VERSION;
+
+  std::ifstream fstream(file_name, std::ios::binary);
+  CHECK(fstream.good())
+      << "Unable to open CFG file " << file_name;
+
+  Module cfg;
+  CHECK(cfg.ParseFromIstream(&fstream))
+      << "Unable to read module from CFG file " << file_name;
+
+  LOG(INFO)
+      << "Lifting program " << cfg.name() << " via CFG protobuf in "
+      << file_name;
+
+  auto module = new NativeModule;
+
+  // Collect variables from within the data sections. We set up the segment
+  // information by not their data. We leave that until later when all
+  // cross-references have been resolved.
+  for (const auto &cfg_segment : cfg.segments()) {
+    auto segment = new NativeSegment;
+    segment->ea = static_cast<uint64_t>(cfg_segment.ea());
+    segment->size = cfg_segment.data().size();
+    if (cfg_segment.has_name()) {
+      segment->name = cfg_segment.name();
+    }
+    segment->lifted_name = LiftedSegmentName(cfg_segment);
+    segment->is_read_only = cfg_segment.read_only();
+    segment->is_external = cfg_segment.is_external();
+
+    // Collect the variables.
+    for (const auto &cfg_var : cfg_segment.vars()) {
+      CHECK(!cfg_var.name().empty())
+          << "Unnamed variable at " << std::hex << cfg_var.ea()
+          << " in segment " << segment->name;
+
+      auto var = new NativeVariable;
+      var->ea = static_cast<uint64_t>(cfg_var.ea());
+      var->name = cfg_var.name();
+      var->is_external = false;
+      var->lifted_name = LiftedVarName(cfg_var);
+      var->segment = segment;
+
+      auto ea_var_it = module->ea_to_var.find(var->ea);
+      if (ea_var_it != module->ea_to_var.end()) {
         LOG(ERROR)
-            << "External reference to " << name
-            << " is marked as being a data reference but is actually a code"
-            << " reference. This is probably a bug in the CFG script.";
-        std::swap(code_addr, data_addr);
+            << "Duplicate (non-external) variable at " << std::hex << var->ea
+            << " in segment " << segment->name;
+        delete ea_var_it->second;
+      }
+      module->ea_to_var[var->ea] = var;
+    }
 
+    // Note! These go in by the *end* of the segment, so that `std::lower_bound`
+    // works!
+    module->segments[segment->ea + segment->size] = segment;
+
+    LOG(INFO)
+        << "Added segment " << segment->name << " [" << std::hex << segment->ea
+        << ", " << std::hex << (segment->ea + segment->size) << ")";
+  }
+
+  // Bring in the functions, although not their blocks or instructions. This
+  // first step enables better cross-reference resolution when we deserialize
+  // the instructions.
+  module->ea_to_func.reserve(cfg.funcs_size());
+  for (const auto &cfg_func : cfg.funcs()) {
+    auto func = new NativeFunction;
+    func->ea = static_cast<uint64_t>(cfg_func.ea());
+    func->is_external = false;
+    func->lifted_name = LiftedFunctionName(cfg_func);
+    func->name = cfg_func.has_name() ? cfg_func.name() : func->lifted_name;
+    func->blocks.reserve(cfg_func.blocks_size());
+
+    auto func_it = module->ea_to_func.find(func->ea);
+    if (func_it != module->ea_to_func.end()) {
+      LOG(ERROR)
+          << "Duplicate function at " << std::hex << func->ea;
+      delete func_it->second;
+    }
+
+    module->ea_to_func[func->ea] = func;
+
+    auto var_it = module->ea_to_var.find(func->ea);
+    if (var_it != module->ea_to_var.end()) {
+      auto dup_var = var_it->second;
+      LOG(ERROR)
+          << "Function " << func->name << " at " << std::hex << func->ea
+          << " is also defined as an internal variable " << dup_var->name;
+      module->ea_to_var.erase(var_it);
+      module->exported_vars.erase(func->ea);
+      delete dup_var;
+    }
+
+    if (cfg_func.is_entrypoint()) {
+      CHECK(!func->name.empty())
+          << "Exported function at address " << std::hex << func->ea
+          << " does not have a name";
+
+      LOG(INFO)
+          << "Exported function " << func->name << " at " << std::hex
+          << func->ea << " is implemented by " << func->lifted_name;
+      module->exported_funcs.insert(func->ea);
+    }
+  }
+
+  // Bring in the external variables.
+  for (const auto &cfg_extern_var : cfg.external_vars()) {
+    auto var = new NativeExternalVariable;
+    var->ea = static_cast<uint64_t>(cfg_extern_var.ea());
+    var->name = cfg_extern_var.name();
+    var->is_external = true;
+    var->lifted_name = var->name;
+    var->is_weak = cfg_extern_var.is_weak();
+    var->size = static_cast<uint64_t>(cfg_extern_var.size());
+
+    CHECK(!var->name.empty())
+        << "Unnamed external variable at " << std::hex << var->ea;
+
+    CHECK(!module->ea_to_func.count(var->ea))
+        << "Internal function at " << std::hex << var->ea
+        << " is also the external variable " << var->name;
+
+    auto extern_var_it = module->name_to_extern_var.find(var->name);
+    if (extern_var_it != module->name_to_extern_var.end()) {
+      auto dup_var = extern_var_it->second;
+
+      if (dup_var->ea != var->ea) {
+        LOG(ERROR)
+            << "External variable " << var->name << " at " << std::hex
+            << var->ea << " is also defined at " << dup_var->ea;
+        module->ea_to_var[dup_var->ea] = var;
       } else {
-        ext_data_ref = new ExternalDataRef(name);
+        LOG(ERROR)
+            << "External variable " << var->name << " at " << std::hex
+            << var->ea << " has the same name of external variable at "
+            << std::hex << dup_var->ea;
+      }
+
+      // Note:  Intentional leak, not doing `delete dup_var`. Could be solved
+      //        using `std::shared_ptr`, but we never free the CFG anyway.
+    }
+
+    auto var_it = module->ea_to_var.find(var->ea);
+    if (var_it != module->ea_to_var.end()) {
+      auto dup_var = var_it->second;
+
+      if (dup_var->name != var->name) {
+        LOG(ERROR)
+            << "External variable " << var->name << " at " << std::hex
+            << var->ea << " is also defined as " << dup_var->name;
+        module->name_to_extern_var[dup_var->name] = var;
+      } else {
+        LOG(ERROR)
+            << "External variable " << var->name << " at " << std::hex
+            << var->ea << " is defined twice";
+      }
+
+      // Note:  Intentional leak, not doing `delete dup_var`. Could be solved
+      //        using `std::shared_ptr`, but we never free the CFG anyway.
+    }
+
+    module->ea_to_var[var->ea] = var;
+    module->name_to_extern_var[var->name] = var;
+  }
+
+  // Bring in the external functions.
+  //
+  // TODO(pag): Handle calling conventions and stuff.
+  for (const auto &cfg_extern_func : cfg.external_funcs()) {
+    auto func = new NativeExternalFunction;
+    func->name = cfg_extern_func.name();
+    func->lifted_name = ExternalFuncName(cfg_extern_func);
+    func->ea = static_cast<uint64_t>(cfg_extern_func.ea());
+    func->is_external = true;
+
+    CHECK(!func->name.empty())
+        << "External function at " << std::hex << func->ea << " has no name.";
+
+    CHECK(!module->ea_to_var.count(func->ea))
+        << "Internal variable at " << std::hex << func->ea
+        << " is also the external function " << func->name;
+
+    LOG(INFO)
+        << "Found external function " << func->name << " via "
+        << std::hex << func->ea;
+
+    // Check to see if this function has previously been marked as a variable.
+    auto var_it = module->name_to_extern_var.find(func->name);
+    if (var_it != module->name_to_extern_var.end()) {
+      auto dup_var = var_it->second;
+      if (dup_var->ea != func->ea) {
+        LOG(ERROR)
+            << "External variable at " << std::hex << dup_var->ea
+            << " has the same name as the external function "
+            << func->name << " at " << std::hex << func->ea;
+
+        module->ea_to_func[dup_var->ea] = func;
+      } else {
+        LOG(ERROR)
+            << "External variable at " << std::hex << dup_var->ea
+            << " is actually an external function.";
+      }
+
+      module->ea_to_var.erase(dup_var->ea);
+      module->name_to_extern_var.erase(var_it);
+
+      // Note:  Intentional leak, not doing `delete dup_var`. Could be solved
+      //        using `std::shared_ptr`, but we never free the CFG anyway.
+    }
+
+    // Check to see if an external function with the same name was already
+    // added. This is possible if there are things like thunks calling thunks,
+    // or thin wrappers around thunks.
+    auto extern_func_it = module->name_to_extern_func.find(func->name);
+    auto will_find_ea = false;
+    if (extern_func_it != module->name_to_extern_func.end()) {
+      auto dup_func = extern_func_it->second;
+      LOG(ERROR)
+          << "External function " << func->name << " at " << std::hex
+          << func->ea << " has the same name of external function at "
+          << std::hex << dup_func->ea;
+
+      if (dup_func->ea != func->ea) {
+        LOG(ERROR)
+            << "External function " << func->name << " at " << std::hex
+            << func->ea << " is also defined at " << std::hex << dup_func->ea;
+        module->ea_to_func[dup_func->ea] = func;
+        will_find_ea = true;
+
+        // Note:  Intentional leak, not doing `delete dup_func`. Could be solved
+        //        using `std::shared_ptr`, but we never free the CFG anyway.
+      } else {
+        LOG(ERROR)
+            << "External function " << func->name << " at " << std::hex
+            << func->ea << " is defined twice";
       }
     }
 
-    switch (ref.operand_type()) {
-      case Reference_OperandType_ImmediateOperand:
-        ip->imm_ref_code_addr = code_addr;
-        ip->imm_ref_data_addr = data_addr;
-        ip->external_imm_code_ref = ext_code_ref;
-        ip->external_imm_data_ref = ext_data_ref;
+    auto func_it = module->ea_to_func.find(func->ea);
+    if (func_it != module->ea_to_func.end()) {
+      auto dup_func = func_it->second;
+      if (dup_func->name != func->name) {
+        LOG(ERROR)
+            << "External function " << func->name << " at " << std::hex
+            << func->ea << " is also defined as " << dup_func->name;
+        module->name_to_extern_func[dup_func->name] = func;
+
+        // Note:  Intentional leak, not doing `delete dup_func`. Could be solved
+        //        using `std::shared_ptr`, but we never free the CFG anyway.
+      } else if (!will_find_ea) {
+        LOG(ERROR)
+            << "External function " << func->name << " at " << std::hex
+            << func->ea << " is defined twice";
+      }
+    }
+
+    module->exported_funcs.erase(func->ea);
+    module->name_to_extern_func[func->name] = func;
+    module->ea_to_func[func->ea] = func;
+  }
+
+  // Fill in the cross-reference entries for each segment.
+  for (const auto &cfg_segment : cfg.segments()) {
+    auto ea = static_cast<uint64_t>(cfg_segment.ea());
+    auto seg_end_ea = ea + cfg_segment.data().size();
+    auto segment = module->segments[seg_end_ea];
+
+    std::map<uint64_t, const NativeXref *> xrefs;
+    for (const auto &cfg_xref : cfg_segment.xrefs()) {
+      auto xref = new NativeXref;
+      xref->ea = static_cast<uint64_t>(cfg_xref.ea());
+      xref->segment = segment;
+      xref->width = static_cast<uint64_t>(cfg_xref.width());
+      xref->target_ea = static_cast<uint64_t>(cfg_xref.target_ea());
+      xref->target_name = cfg_xref.target_name();
+      xref->target_segment = FindSegment(module, xref->target_ea);
+      ResolveReference(module, xref);
+      segment->entries[xref->ea] = {
+          xref->ea, (xref->ea + xref->width), xref, nullptr};
+    }
+  }
+
+  // Fill in the blob data entries for each segment.
+  for (const auto &cfg_segment : cfg.segments()) {
+    auto ea = static_cast<uint64_t>(cfg_segment.ea());
+    auto seg_end_ea = ea + cfg_segment.data().size();
+    auto segment = module->segments[seg_end_ea];
+    std::vector<NativeSegment::Entry> blobs;
+
+    // Sentinel.
+    segment->entries[seg_end_ea] = {seg_end_ea, seg_end_ea, nullptr, nullptr};
+
+    for (const auto &xref_entry : segment->entries) {
+      const auto &entry = xref_entry.second;
+
+      if (ea < entry.ea) {
+        auto pos = ea - segment->ea;
+        auto size = entry.ea - ea;
+
+        auto blob = new NativeBlob;
+        blob->ea = ea;
+        blob->data = cfg_segment.data().substr(pos, size);
+        blobs.push_back(NativeSegment::Entry{ea, entry.ea, nullptr, blob});
+      }
+
+      ea = entry.next_ea;
+      if (ea == seg_end_ea) {
         break;
-      case Reference_OperandType_MemoryOperand:
-        ip->mem_ref_code_addr = code_addr;
-        ip->mem_ref_data_addr = data_addr;
-        ip->external_mem_code_ref = ext_code_ref;
-        ip->external_mem_data_ref = ext_data_ref;
-        break;
-      case Reference_OperandType_MemoryDisplacementOperand:
-        ip->disp_ref_code_addr = code_addr;
-        ip->disp_ref_data_addr = data_addr;
-        ip->external_disp_code_ref = ext_code_ref;
-        ip->external_disp_data_ref = ext_data_ref;
-        break;
-      case Reference_OperandType_ControlFlowOperand:
-        ip->external_code_ref = ext_code_ref;
-        ip->code_addr = code_addr;
-        break;
+      }
+
+      CHECK(ea < seg_end_ea)
+          << "Walked off end of segment " << segment->name;
+    }
+
+    segment->entries.erase(seg_end_ea);
+
+    // Add the blobs into the partition.
+    for (const auto &entry : blobs) {
+      segment->entries[entry.ea] = entry;
+    }
+
+    // Verify the partitioning of this segment's data.
+    ea = segment->ea;
+    for (const auto &entry : segment->entries) {
+      CHECK(entry.first == ea)
+          << "Invalid partitioning of segment " << segment->name;
+
+      CHECK(entry.second.ea == ea)
+          << "Invalid partitioning of segment " << segment->name;
+
+      CHECK(entry.second.next_ea > entry.second.ea)
+          << "Invalid partitioning of segment " << segment->name;
+
+      ea = entry.second.next_ea;
+    }
+
+    CHECK(ea == (segment->ea + segment->size))
+        << "Invalid partitioning of segment " << segment->name;
+  }
+
+
+  // Add in each of the function's blocks. At this stage we have all cross-
+  // reference information available.
+  module->ea_to_func.reserve(cfg.funcs_size());
+  for (const auto &cfg_func : cfg.funcs()) {
+    auto func = const_cast<NativeFunction *>(
+        module->ea_to_func[static_cast<uint64_t>(cfg_func.ea())]);
+
+    for (const auto &cfg_block : cfg_func.blocks()) {
+      auto block = new NativeBlock;
+      block->ea = static_cast<uint64_t>(cfg_block.ea());
+      block->lifted_name = LiftedBlockName(cfg_block);
+      block->instructions.reserve(cfg_block.instructions_size());
+
+      // Add in the addresses of the block's successors.
+      for (auto succ_ea : cfg_block.successor_eas()) {
+        block->successor_eas.insert(static_cast<uint64_t>(succ_ea));
+      }
+
+      // Add in the block's instructions.
+      for (const auto &cfg_inst : cfg_block.instructions()) {
+        auto inst = new NativeInstruction;
+        inst->ea = static_cast<uint64_t>(cfg_inst.ea());
+        inst->bytes = cfg_inst.bytes();
+        inst->does_not_return = cfg_inst.has_local_noreturn();
+        inst->imm = nullptr;
+        inst->flow = nullptr;
+        inst->mem = nullptr;
+        inst->disp = nullptr;
+        inst->offset_table = 0;
+
+        for (const auto &cfg_ref : cfg_inst.xrefs()) {
+          AddXref(module, inst, cfg_ref);
+        }
+
+        block->instructions.push_back(inst);
+      }
+
+      func->blocks[block->ea] = block;
+    }
+
+    // Validate the successor relationships of this block.
+    for (const auto &cfg_block : cfg_func.blocks()) {
+      for (auto succ_ea : cfg_block.successor_eas()) {
+        auto ea = static_cast<uint64_t>(succ_ea);
+        auto succ_is_block = 0 != func->blocks.count(ea);
+        auto succ_is_func = module->ea_to_func.count(ea);
+
+        LOG_IF(ERROR, !succ_is_block && !succ_is_func)
+            << "Successor " << std::hex << ea << " of block "
+            << std::hex << static_cast<uint64_t>(cfg_block.ea())
+            << " in function " << static_cast<uint64_t>(cfg_func.ea())
+            << " does not exist";
+      }
     }
   }
 
-  return ip;
+  return module;
 }
 
-static NativeBlockPtr DeserializeBlock(
-    const ::Block &block,
-    const std::list<ExternalCodeRefPtr> &extcode) {
-
-  auto block_va = static_cast<VA>(block.base_address());
-  NativeBlockPtr natB = NativeBlockPtr(new NativeBlock(block_va));
-
-  for (auto &inst : block.insts()) {
-    auto native_inst = DeserializeInst(inst, extcode);
-    if (!native_inst) {
-      LOG(INFO)
-          << "Unable to deserialize block at " << std::hex << block_va;
-      return nullptr;
-    }
-    natB->add_inst(native_inst);
+const NativeFunction *NativeModule::TryGetFunction(uint64_t ea) const {
+  auto func_it = ea_to_func.find(ea);
+  if (func_it == ea_to_func.end()) {
+    return nullptr;
   }
-
-  /* add the follows */
-  for (auto &succ : block.block_follows()) {
-    natB->add_follow(succ);
-  }
-
-  return natB;
+  return func_it->second;
 }
 
-static NativeFunctionPtr DeserializeNativeFunc(
-    const ::Function &func,
-    const std::list<ExternalCodeRefPtr> &extcode) {
-
-  NativeFunction *nf = nullptr;
-  if (func.has_symbol_name() && !func.symbol_name().empty()) {
-    nf = new NativeFunction(func.entry_address(), func.symbol_name());
-  } else {
-    nf = new NativeFunction(func.entry_address());
+const NativeVariable *NativeModule::TryGetVariable(uint64_t ea) const {
+  auto var_it = ea_to_var.find(ea);
+  if (var_it == ea_to_var.end()) {
+    return nullptr;
   }
+  return var_it->second;
 
-  // Read all the blocks from this function
-  for (auto &block : func.blocks()) {
-    auto native_block = DeserializeBlock(block, extcode);
-    if (!native_block) {
-      LOG(ERROR)
-          << "Unable to deserialize function at " << std::hex
-          << func.entry_address();
-      return nullptr;
-    }
-    nf->add_block(native_block);
-  }
-
-  return NativeFunctionPtr(nf);
-}
-
-static ExternalCodeRef::CallingConvention DeserializeCallingConvention(
-    ::ExternalFunction::CallingConvention k) {
-  switch (k) {
-    case ::ExternalFunction::CallerCleanup:
-      return ExternalCodeRef::CallerCleanup;
-
-    case ::ExternalFunction::CalleeCleanup:
-      return ExternalCodeRef::CalleeCleanup;
-
-    case ::ExternalFunction::FastCall:
-      return ExternalCodeRef::FastCall;
-
-    case ::ExternalFunction::McsemaCall:
-      return ExternalCodeRef::McsemaCall;
-
-    default:
-      LOG(FATAL)
-          << "Unsupported calling covention.";
-  }
-}
-
-static ExternalCodeRefPtr DeserializeExternFunc(const ::ExternalFunction &f) {
-  auto c = DeserializeCallingConvention(f.calling_convention());
-  const auto &symName = f.symbol_name();
-  ExternalCodeRef::ReturnType retTy;
-  auto argCount = f.argument_count();
-
-  if (f.has_return()) {
-    retTy = ExternalCodeRef::IntTy;
-  } else {
-    retTy = ExternalCodeRef::VoidTy;
-  }
-
-  if (f.no_return()) {
-    retTy = ExternalCodeRef::NoReturn;
-  }
-
-  ExternalCodeRefPtr ext = ExternalCodeRefPtr(
-      new ExternalCodeRef(symName, argCount, c, retTy));
-  ext->setWeak(f.is_weak());
-
-  return ext;
-}
-
-static ExternalDataRefPtr DeserializeExternData(const ::ExternalData &ed) {
-  ExternalDataRefPtr ext = ExternalDataRefPtr(
-      new ExternalDataRef(ed.symbol_name(),
-                          static_cast<size_t>(ed.data_size())));
-  ext->setWeak(ed.is_weak());
-  return ext;
-}
-
-static DataSectionEntry DeserializeDataSymbol(const ::DataSymbol &ds) {
-  LOG(INFO)
-      << "Deserializing symbol at: " << std::hex << ds.base_address() << ", "
-      << ds.symbol_name() << ", " << ds.symbol_size();
-
-  return DataSectionEntry(
-      ds.base_address(), ds.symbol_name(), ds.symbol_size());
-}
-
-static DataSectionEntry makeDSEBlob(const std::vector<uint8_t> &bytes,
-                                    uint64_t start,  // offset in bytes vector
-    uint64_t end,  // offset in bytes vector
-    uint64_t base_va) {  // virtual address these bytes are based at
-  std::vector<uint8_t> blob_bytes(bytes.begin() + (start),
-                                  bytes.begin() + (end));
-  return DataSectionEntry(base_va, blob_bytes);
-}
-
-static void DeserializeData(const ::Data &d, DataSection &ds) {
-  const auto &dt = d.data();
-  std::vector<uint8_t> bytes(dt.begin(), dt.end());
-  uint64_t base_address = d.base_address();
-  uint64_t cur_pos = base_address;
-
-  ds.setReadOnly(d.read_only());
-
-  // assumes symbols are in-order
-  for (int i = 0; i < d.symbols_size(); i++) {
-    DataSectionEntry dse_sym = DeserializeDataSymbol(d.symbols(i));
-    auto dse_base = dse_sym.getBase();
-
-    LOG(INFO)
-        << "cur_pos: " << std::hex << cur_pos
-        << ", dse_base: " << std::hex << dse_base;
-
-    // symbol next to blob
-    if (dse_base > cur_pos) {
-      ds.addEntry(
-          makeDSEBlob(bytes, cur_pos - base_address, dse_base - base_address,
-                      cur_pos));
-      ds.addEntry(dse_sym);
-
-      cur_pos = dse_base + dse_sym.getSize();
-      LOG(INFO)
-          << "new_cur_pos: " << std::hex << cur_pos;
-
-      // symbols next to each other
-    } else if (dse_base == cur_pos) {
-      ds.addEntry(dse_sym);
-      cur_pos = dse_base + dse_sym.getSize();
-      LOG(INFO)
-          << "new_cur_pos2: " << std::hex << cur_pos;
-
-    } else {
-      LOG(FATAL)
-          << "Deserialized an out-of-order symbol!";
-    }
-  }
-
-  // there is a data blob after the last symbol
-  // or there are no symbols
-  if (cur_pos < base_address + bytes.size()) {
-    ds.addEntry(
-        makeDSEBlob(bytes, cur_pos - base_address, bytes.size(), cur_pos));
-  }
-}
-
-NativeModulePtr ReadProtoBuf(const std::string &file_name) {
-  GOOGLE_PROTOBUF_VERIFY_VERSION;
-
-  NativeModulePtr m = nullptr;
-  ::Module proto;
-
-  std::ifstream fstream(file_name, std::ios::binary);
-  if (!fstream.good()) {
-    LOG(ERROR)
-        << "Failed to open file " << file_name;
-    return m;
-  }
-
-  if (!proto.ParseFromIstream(&fstream)) {
-    LOG(ERROR)
-        << "Failed to deserialize protobuf module";
-    return m;
-  }
-
-  std::unordered_map<VA, NativeFunctionPtr> native_funcs;
-  std::list<ExternalCodeRefPtr> extern_funcs;
-  std::list<ExternalDataRefPtr> extern_data;
-  std::list<DataSection> data_sections;
-  std::list<MCSOffsetTablePtr> offset_tables;
-
-  LOG(INFO)
-      << "Deserializing externs...";
-
-  for (const auto &external_func : proto.external_funcs()) {
-    extern_funcs.push_back(DeserializeExternFunc(external_func));
-  }
-
-  LOG(INFO)
-      << "Deserializing functions...";
-
-  for (const auto &internal_func : proto.internal_funcs()) {
-    auto natf = DeserializeNativeFunc(internal_func, extern_funcs);
-    if (!natf) {
-      LOG(ERROR)
-          << "Unable to deserialize module.";
-      return nullptr;
-    }
-    native_funcs[static_cast<VA>(internal_func.entry_address())] = natf;
-  }
-
-  LOG(INFO)
-      << "Deserializing data...";
-  for (auto &internal_data_elem : proto.internal_data()) {
-    DataSection ds;
-    DeserializeData(internal_data_elem, ds);
-    data_sections.push_back(ds);
-  }
-
-  LOG(INFO)
-      << "Deserializing external data...";
-  for (const auto &exteral_data_elem : proto.external_data()) {
-    extern_data.push_back(DeserializeExternData(exteral_data_elem));
-  }
-
-  for (const auto &offset_table : proto.offset_tables()) {
-    std::vector<std::pair<VA, VA>> v;
-    for (auto j = 0; j < offset_table.table_offsets_size(); j++) {
-      v.push_back(
-          std::make_pair<VA, VA>(
-              offset_table.table_offsets(j),
-              offset_table.destinations(j)));
-    }
-
-    MCSOffsetTablePtr t(new MCSOffsetTable(v, 0, offset_table.start_addr()));
-    offset_tables.push_back(t);
-  }
-
-  LOG(INFO)
-      << "Creating module...";
-  m = NativeModulePtr(
-      new NativeModule(proto.module_name(), native_funcs, ArchTriple()));
-
-  // Populate the module with externals calls.
-  LOG(INFO)
-      << "Adding external funcs...";
-  for (auto &extern_func_call : extern_funcs) {
-    m->addExtCall(extern_func_call);
-  }
-
-  // Populate the module with externals data
-  LOG(INFO)
-      << "Adding external data...";
-  for (auto &extern_data_ref : extern_data) {
-    m->addExtDataRef(extern_data_ref);
-  }
-
-  // Populate the module with internal data
-  LOG(INFO)
-      << "Adding internal data...";
-  for (auto &data_section : data_sections) {
-    m->addDataSection(data_section);
-  }
-
-  LOG(INFO)
-      << "Adding Offset Tables...";
-  m->addOffsetTables(offset_tables);
-
-  // set entry points for the module
-  LOG(INFO)
-      << "Adding entry points...";
-  for (const auto &entry_symbol : proto.entries()) {
-    NativeEntrySymbol native_es(
-        entry_symbol.entry_name(),
-        entry_symbol.entry_address());
-
-    if (entry_symbol.has_entry_extra()) {
-      const auto &ese = entry_symbol.entry_extra();
-      auto c = DeserializeCallingConvention(ese.entry_cconv());
-      native_es.setExtra(ese.entry_argc(), ese.does_return(), c);
-    }
-    m->addEntryPoint(native_es);
-  }
-
-  LOG(INFO)
-      << "Returning module...";
-  return m;
 }
 
 }  // namespace mcsema
-

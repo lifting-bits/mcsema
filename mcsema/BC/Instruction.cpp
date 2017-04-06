@@ -55,35 +55,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mcsema/CFG/Externals.h"
 
 namespace mcsema {
-namespace {
-
-// Try to get the base address of a data section containing `addr`.
-bool TryGetBaseAddress(NativeModulePtr mod, VA addr, VA *base,
-                       std::string *sym_name) {
-  *sym_name = "";
-  for (auto &section : mod->getData()) {
-    const VA low = section.getBase();
-    const VA high = low + section.getSize();
-
-    if (low <= addr && addr < high) {
-      *base = low;
-      // TODO(pag): Eventually what I would like is for this to refer to
-      //            the name of an actual global variable. So, if the original
-      //            binary has a global variable, then we have a constant GEP
-      //            into the lifted data with the same name as the global.
-//      for (const auto &entry : section.getEntries()) {
-//        if (entry.getBase() == addr) {
-//          entry.getSymbol(*sym_name);
-//        }
-//      }
-      return true;
-    }
-  }
-
-  return false;
-}
-
-}  // namespace
 
 InstructionLifter::~InstructionLifter(void) {}
 
@@ -105,39 +76,30 @@ bool InstructionLifter::LiftIntoBlock(remill::Instruction *instr_,
   instr = instr_;
   block = block_;
 
-  mem_ref = GetAddress(ctx.cfg_inst->external_mem_code_ref,
-                       ctx.cfg_inst->external_mem_data_ref,
-                       ctx.cfg_inst->mem_ref_code_addr,
-                       ctx.cfg_inst->mem_ref_data_addr);
-
-  imm_ref = GetAddress(ctx.cfg_inst->external_imm_code_ref,
-                       ctx.cfg_inst->external_imm_data_ref,
-                       ctx.cfg_inst->imm_ref_code_addr,
-                       ctx.cfg_inst->imm_ref_data_addr);
-
-  disp_ref = GetAddress(ctx.cfg_inst->external_disp_code_ref,
-                       ctx.cfg_inst->external_disp_data_ref,
-                       ctx.cfg_inst->disp_ref_code_addr,
-                       ctx.cfg_inst->disp_ref_data_addr);
+  mem_ref = GetAddress(ctx.cfg_inst->mem);
+  imm_ref = GetAddress(ctx.cfg_inst->imm);
+  disp_ref = GetAddress(ctx.cfg_inst->disp);
 
   return this->remill::InstructionLifter::LiftIntoBlock(instr, block);
 }
 
-llvm::Value *InstructionLifter::GetAddress(
-    ExternalCodeRefPtr code, ExternalDataRefPtr data,
-    uint64_t code_addr, uint64_t data_addr) {
+llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
+  if (!cfg_xref) {
+    return nullptr;
+  }
 
   llvm::IRBuilder<> ir(block);
-  if (code) {
-    const auto &func_name = code->getSymbolName();
+  if (cfg_xref->func) {
+    auto cfg_func = cfg_xref->func;
+    const auto &func_name = cfg_func->lifted_name;
     llvm::GlobalObject *func = gModule->getFunction(func_name);
     if (!func) {
       func = gModule->getNamedGlobal(func_name);
       LOG_IF(ERROR, func != nullptr)
-          << "Function pointer to " << std::hex << code_addr << " with symbol "
-          << func_name << " was resolved to a global variable from "
-          << std::hex << instr->pc << ". There is "
-          << "probably an error in the CFG script.";
+          << "Function pointer to " << std::hex << cfg_func->ea
+          << " with symbol " << func_name
+          << " was resolved to a global variable from " << std::hex
+          << instr->pc << ". There is probably an error in the CFG script.";
     }
 
     CHECK(func != nullptr)
@@ -146,18 +108,19 @@ llvm::Value *InstructionLifter::GetAddress(
 
     return ir.CreatePtrToInt(func, word_type);
 
-  } else if (data) {
-    const auto &global_name = data->getSymbolName();
+  } else if (cfg_xref->var) {
+    auto cfg_var = cfg_xref->var;
+    const auto &global_name = cfg_var->lifted_name;
     llvm::GlobalObject *global = gModule->getNamedGlobal(global_name);
     if (!global) {
       global = gModule->getFunction(global_name);
       LOG_IF(ERROR,
              global &&
              !llvm::GlobalValue::isExternalWeakLinkage(global->getLinkage()))
-          << "Data pointer to " << std::hex << data_addr << " with symbol "
-          << global_name << " was resolved to a subroutine from "
-          << std::hex << instr->pc << ". There is probably "
-          << "an error in the CFG script.";
+          << "Data pointer to " << std::hex << cfg_var->ea
+          << " with symbol " << global_name
+          << " was resolved to a subroutine from " << std::hex << instr->pc
+          << ". There is probably an error in the CFG script.";
     }
 
     CHECK(global != nullptr)
@@ -166,66 +129,22 @@ llvm::Value *InstructionLifter::GetAddress(
 
     return ir.CreatePtrToInt(global, word_type);
 
-  } else if (~0ULL != code_addr) {
-    auto &funcs = ctx.cfg_module->get_funcs();
-    auto func_it = funcs.find(code_addr);
-    if (func_it == funcs.end()) {
-      LOG(ERROR)
-          << "Cannot find function for code reference to "
-          << std::hex << code_addr << " from " << std::hex << instr->pc;
-      return nullptr;
-
-    } else if (auto func = gModule->getFunction(func_it->second->get_name())) {
-      return ir.CreatePtrToInt(func, word_type);
-
-    } else {
-      LOG(ERROR)
-          << "Cannot find function " << func_it->second->get_name()
-          << " at address " << std::hex << func_it->second->get_start()
-          << " referenced using address " << std::hex << code_addr
-          << " from " << std::hex << instr->pc;
-      return nullptr;
-    }
-
-  } else if (~0ULL != data_addr) {
-    VA base_addr = ~0ULL;
-    std::string sym_name;
-    if (TryGetBaseAddress(ctx.cfg_module, data_addr, &base_addr, &sym_name)) {
-
-      if (!sym_name.empty()) {
-        if (auto global = gModule->getNamedGlobal(sym_name)) {
-          return ir.CreatePtrToInt(global, word_type);
-        }
-      }
-
-      // Go find the section base, and add to it.
-      std::stringstream ss;
-      ss << "data_" << std::hex << base_addr;
-      auto sym_name = ss.str();
-
-      if (auto global = gModule->getNamedGlobal(sym_name)) {
-        return ir.CreateAdd(
-            ir.CreatePtrToInt(global, word_type),
-            llvm::ConstantInt::get(word_type, (data_addr - base_addr), false));
-
-      } else {
-        LOG(ERROR)
-            << "Can't find global variable " << sym_name << " for section "
-            << "that should contain the memory referenced by immediate "
-            << std::hex << data_addr << " in instruction "
-            << std::hex << instr->pc;
-        return nullptr;
-      }
-    } else {
-      LOG(ERROR)
-          << "Data reference to " << std::hex << data_addr
-          << " from " << std::hex << instr->pc
-          << " does not belong to any lifted data section.";
-      return nullptr;
-    }
-
   } else {
-    return nullptr;
+    auto cfg_seg = cfg_xref->target_segment;
+    CHECK(cfg_seg != nullptr)
+        << "A non-function, non-variable cross-reference from "
+        << std::hex << instr->pc << " to " << std::hex << cfg_xref->target_ea
+        << " must be in a known segment.";
+
+    auto global = gModule->getNamedGlobal(cfg_seg->lifted_name);
+    CHECK(global != nullptr)
+        << "Cannot find global variable for segment " << cfg_seg->name
+        << " referenced by " << std::hex << instr->pc;
+
+    auto offset = cfg_xref->target_ea - cfg_seg->ea;
+    return ir.CreateAdd(
+        ir.CreatePtrToInt(global, word_type),
+        llvm::ConstantInt::get(word_type, offset, false));
   }
 }
 

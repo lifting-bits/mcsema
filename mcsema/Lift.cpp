@@ -126,9 +126,6 @@ int main(int argc, char *argv[]) {
   mcsema::gArch->PrepareModule(mcsema::gModule);
 
   auto cfg_module = mcsema::ReadProtoBuf(FLAGS_cfg);
-  CHECK(nullptr != cfg_module)
-      << "Unable to read module from CFG file " << FLAGS_cfg;
-
   mcsema::ArchInitAttachDetach();
 
   CHECK(mcsema::LiftCodeIntoModule(cfg_module))

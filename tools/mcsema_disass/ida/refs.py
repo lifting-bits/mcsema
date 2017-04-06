@@ -74,43 +74,48 @@ def _get_ref_candidate(op, all_refs):
   return ref
 
 _REFS = {}
+_HAS_NO_REFS = set()
+_NO_REFS = tuple()
 
-def memop_is_actually_displacement(I):
+def memop_is_actually_displacement(inst):
   """IDA will unhelpfully decode something like `jmp ds:off_48A5F0[rax*8]`
   and tell us that this is an `o_mem` rather than an `o_displ`. We really want
   to recognize it as an `o_displ` because the memory reference is a displacement
   and not an absolute address."""
-  asm = idc.GetDisasm(I.ea)
+  asm = idc.GetDisasm(inst.ea)
   return "[" in asm and ("+" in asm or "*" in asm)
 
 # Get a list of references from an instruction.
 def get_instruction_references(arg, binary_is_pie=False):
-  I = arg
+  inst = arg
   if isinstance(arg, (int, long)):
-    I, _ = decode_instruction(arg)
+    inst, _ = decode_instruction(arg)
+  
+  if not inst or inst.ea in _HAS_NO_REFS:
+    return _NO_REFS
 
-  if I.ea in _REFS:
-    return _REFS[I.ea]
+  if inst.ea in _REFS:
+    return _REFS[inst.ea]
 
   offset_to_ref = {}
   all_refs = set()
-  for ea in xrange(I.ea, I.ea + I.size):
+  for ea in xrange(inst.ea, inst.ea + inst.size):
     targ = idc.GetFixupTgtOff(ea)
     if targ != idc.BADADDR and targ != -1:
       all_refs.add(targ)
-      ref = Reference(targ, ea - I.ea)
+      ref = Reference(targ, ea - inst.ea)
       offset_to_ref[ref.offset] = ref
 
-  all_refs.update(long(x) for x in idautils.DataRefsFrom(I.ea))
-  all_refs.update(long(x) for x in idautils.CodeRefsFrom(I.ea, 0))
-  all_refs.update(long(x) for x in idautils.CodeRefsFrom(I.ea, 1))
+  all_refs.update(long(x) for x in idautils.DataRefsFrom(inst.ea))
+  all_refs.update(long(x) for x in idautils.CodeRefsFrom(inst.ea, 0))
+  all_refs.update(long(x) for x in idautils.CodeRefsFrom(inst.ea, 1))
 
   refs = []
-  for i, op in enumerate(I.Operands):
+  for i, op in enumerate(inst.Operands):
     if not op.type:
       continue
 
-    op_ea = I.ea + op.offb
+    op_ea = inst.ea + op.offb
     if op.offb in offset_to_ref:
       ref = offset_to_ref[op.offb]
     else:
@@ -152,7 +157,7 @@ def get_instruction_references(arg, binary_is_pie=False):
     # are references that IDA can recognize statically.
     elif idc.o_mem == op.type:
       assert ref.addr == op.addr
-      if memop_is_actually_displacement(I):
+      if memop_is_actually_displacement(inst):
         ref.type = Reference.DISPLACEMENT
       else:
         ref.type = Reference.MEMORY
@@ -164,11 +169,21 @@ def get_instruction_references(arg, binary_is_pie=False):
       ref.type = Reference.CODE
       ref.symbol = get_symbol_name(op_ea, ref.addr)
 
+    # TODO(pag): Not sure what to do with this yet.
+    elif idc.o_far == op.type:
+      DEBUG("ERROR inst={:x}\ntarget={:x}\nsym={}".format(
+          inst.ea, ref.addr, get_symbol_name(op_ea, ref.addr)))
+      assert False
+
     refs.append(ref)
 
   for ref in refs:
     assert ref.addr != idc.BADADDR
   
-  _REFS[I.ea] = refs
-
-  return refs
+  if len(refs):
+    refs = tuple(refs)
+    _REFS[inst.ea] = refs
+    return refs
+  else:
+    _HAS_NO_REFS.add(inst.ea)
+    return _NO_REFS

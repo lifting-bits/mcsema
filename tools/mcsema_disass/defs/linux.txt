@@ -16,7 +16,7 @@ _ZSt25__throw_bad_function_callv 0 C N
 _1 5 C N
 _2 5 C N
 _3 5 C N
-__assert_fail 5 C N
+__assert_fail 4 C Y
 __cxa_atexit 5 C N
 __cxa_guard_acquire 5 C N
 __cxa_guard_release 5 C N
@@ -1538,9 +1538,7 @@ ass_alloc_event 1 C N
 ass_alloc_style 1 C N
 ass_clear_fonts 1 C N
 __assert 3 C N
-__assert_fail 4 C N
-__assert_fail 4 C Y
-__assert_perror_fail 4 C N
+__assert_perror_fail 4 C Y
 ass_flush_events 1 C N
 ass_fonts_update 1 C N
 ass_free_event 2 C N
@@ -29278,6 +29276,7 @@ vaSetSubpictureChromakey 5 C N
 vaSetSubpictureGlobalAlpha 3 C N
 vaSetSubpictureImage 3 C N
 vasprintf 3 C N
+__vasprintf_chk 4 C N
 vaSyncSurface 2 C N
 vaTerminate 1 C N
 vaUnmapBuffer 2 C N

@@ -50,27 +50,27 @@ namespace mcsema {
 extern llvm::LLVMContext *gContext;
 extern llvm::Module *gModule;
 
-// Return a constnat integer of width `width` and value `val`.
-llvm::ConstantInt *CreateConstantInt(int width, uint64_t val);
+//// Return a constnat integer of width `width` and value `val`.
+//llvm::ConstantInt *CreateConstantInt(int width, uint64_t val);
 
 // Return the type of a lifted function.
 llvm::FunctionType *LiftedFunctionType(void);
 
-template <int width>
-inline static llvm::ConstantInt *CONST_V_INT(
-    llvm::LLVMContext &, uint64_t val) {
-  return CreateConstantInt(width, val);
-}
-
-template <int width>
-inline static llvm::ConstantInt *CONST_V(llvm::BasicBlock *, uint64_t val) {
-  return CreateConstantInt(width, val);
-}
-
-inline static llvm::ConstantInt *CONST_V(llvm::BasicBlock *, unsigned width,
-                                         uint64_t val) {
-  return CreateConstantInt(width, val);
-}
+//template <int width>
+//inline static llvm::ConstantInt *CONST_V_INT(
+//    llvm::LLVMContext &, uint64_t val) {
+//  return CreateConstantInt(width, val);
+//}
+//
+//template <int width>
+//inline static llvm::ConstantInt *CONST_V(llvm::BasicBlock *, uint64_t val) {
+//  return CreateConstantInt(width, val);
+//}
+//
+//inline static llvm::ConstantInt *CONST_V(llvm::BasicBlock *, unsigned width,
+//                                         uint64_t val) {
+//  return CreateConstantInt(width, val);
+//}
 
 enum StoreSpillType {
   AllRegs = (1 << 0),   // store/spill all regs
@@ -80,14 +80,8 @@ enum StoreSpillType {
   ABIRetSpill = (1 << 4)    // spill regs right after a RET
 };
 
-llvm::Value *makeCallbackForLocalFunction(llvm::Module *M, VA local_target);
-
-void dataSectionToTypesContents(NativeModulePtr natM,
-                                const std::list<DataSection> &globaldata,
-                                const DataSection &ds, llvm::Module *M,
-                                std::vector<llvm::Constant *>& secContents,
-                                std::vector<llvm::Type *>& data_section_types,
-                                bool convert_to_callback);
+//llvm::Value *makeCallbackForLocalFunction(
+//    llvm::Module *M, uint64_t local_target);
 
 //
 //#define OP(x) inst.getOperand(x)

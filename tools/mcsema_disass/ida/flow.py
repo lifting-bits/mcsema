@@ -122,6 +122,19 @@ def get_direct_branch_target(arg):
     #    branch_inst_ea, target_ea))
     return target_ea
 
+def is_noreturn_inst(arg):
+  """Returns `True` if the instruction `arg`, or at `arg`, will terminate
+  control flow."""
+  inst = arg
+  if isinstance(arg, (int, long)):
+    inst, _ = decode_instruction(arg)
+
+  if is_direct_function_call(inst) or is_direct_jump(inst):
+    called_ea = get_direct_branch_target(inst.ea)
+    return is_noreturn_function(called_ea)
+
+  return inst.itype in (idaapi.NN_int3, idaapi.NN_icebp, idaapi.NN_hlt)
+
 def get_static_successors(sub_ea, inst, binary_is_pie):
   """Returns the statically known successors of an instruction."""
 
@@ -164,15 +177,21 @@ def get_static_successors(sub_ea, inst, binary_is_pie):
       yield target_ea
 
   elif not is_control_flow(inst):
-    yield next_ea
+    if not is_noreturn_inst(inst):
+      yield next_ea
 
   else:
-    DEBUG("No static successors of instruction at {:x}".format(inst.ea))
+    DEBUG("  No static successors of instruction at {:x}".format(inst.ea))
+
+_BAD_BLOCK = (tuple(), set())
 
 def analyse_block(func_ea, ea, binary_is_pie=False):
   """Find the instructions of a basic block."""
   global _BLOCK_HEAD_EAS, _TERMINATOR_EAS, _FUNC_HEAD_EAS
-  assert is_code(ea)
+  
+  if not is_code(ea):
+    DEBUG("ERROR: Block at {:x} in function {:x} is not code".format(ea, func_ea))
+    return _BAD_BLOCK
 
   inst_eas = []
   insts = []
@@ -201,7 +220,7 @@ def analyse_block(func_ea, ea, binary_is_pie=False):
     successors = get_static_successors(func_ea, insts[-1], binary_is_pie)
     successors = [succ for succ in successors if is_code(succ)]
   
-  return (ea, inst_eas, set(successors))
+  return (inst_eas, set(successors))
 
 def find_default_block_heads(sub_ea):
   """Pre-process a function by finding all the recognized block head EAs
@@ -287,7 +306,8 @@ def analyse_subroutine(sub_ea, binary_is_pie):
     seen_blocks.add(block_head_ea)
 
     if not is_code(block_head_ea):
-      DEBUG("Block head at {:08x} is not code.".format(block_head_ea))
+      DEBUG("  Block head at {:08x} is not code.".format(block_head_ea))
+      found_block_eas.discard(block_head_ea)
       continue
 
     found_block_eas.add(block_head_ea)
@@ -302,7 +322,7 @@ def analyse_subroutine(sub_ea, binary_is_pie):
     #log.debug("Found block head at {:08x}".format(block_head_ea))
     term_inst = find_linear_terminator(block_head_ea)
     if not term_inst:
-      DEBUG("Block at {:x} has no terminator!".format(block_head_ea))
+      DEBUG("  Block at {:x} has no terminator!".format(block_head_ea))
       found_block_eas.remove(block_head_ea)
       continue
     

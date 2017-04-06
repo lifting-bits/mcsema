@@ -28,7 +28,13 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <gflags/gflags.h>
 #include <glog/logging.h>
+
+#include <algorithm>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
@@ -50,11 +56,111 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ValueMapper.h>
 
+#include "remill/Arch/Arch.h"
+#include "remill/BC/ABI.h"
+#include "remill/BC/Util.h"
+
+#include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Optimize.h"
 #include "mcsema/BC/Util.h"
 
+DEFINE_bool(lower_memops, true, "Controls whether or not Remill's memory "
+                                "access intrinsics are lowered to LLVM "
+                                "loads and stores.");
+
 namespace mcsema {
 namespace {
+
+// Replace all uses of a specific intrinsic with an undefined value.
+static void ReplaceUndefIntrinsic(llvm::Function *function) {
+  auto intrinsics = function->getParent()->getFunction("__remill_intrinsics");
+
+  std::vector<llvm::CallInst *> call_insts;
+  for (auto callers : function->users()) {
+    if (auto call_inst = llvm::dyn_cast<llvm::CallInst>(callers)) {
+      auto user_func = call_inst->getParent()->getParent();
+      if (user_func != intrinsics) {
+        call_insts.push_back(call_inst);
+      }
+    }
+  }
+
+  std::set<llvm::User *> work_list;
+  auto undef_val = llvm::UndefValue::get(function->getReturnType());
+  for (auto call_inst : call_insts) {
+    work_list.insert(call_inst->user_begin(), call_inst->user_end());
+    call_inst->replaceAllUsesWith(undef_val);
+    call_inst->removeFromParent();
+    delete call_inst;
+  }
+
+  // Try to propagate `undef` values produced from our intrinsics all the way
+  // to store instructions, and treat them as dead stores to be eliminated.
+  std::vector<llvm::StoreInst *> dead_stores;
+  while (work_list.size()) {
+    std::set<llvm::User *> next_work_list;
+    for (auto inst : work_list) {
+      if (llvm::isa<llvm::CmpInst>(inst) ||
+          llvm::isa<llvm::CastInst>(inst)) {
+        next_work_list.insert(inst->user_begin(), inst->user_end());
+        auto undef_val = llvm::UndefValue::get(inst->getType());
+        inst->replaceAllUsesWith(undef_val);
+      } else if (auto store_inst = llvm::dyn_cast<llvm::StoreInst>(inst)) {
+        dead_stores.push_back(store_inst);
+      }
+    }
+    work_list.swap(next_work_list);
+  }
+
+  for (auto dead_store : dead_stores) {
+    dead_store->eraseFromParent();
+  }
+}
+
+static void RemoveFunction(llvm::Function *func) {
+  if (!func->hasNUsesOrMore(1)) {
+    func->removeFromParent();
+    delete func;
+  }
+}
+
+static void RemoveFunction(const char *name) {
+  if (auto func = gModule->getFunction(name)) {
+    func->setLinkage(llvm::GlobalValue::InternalLinkage);
+
+//    llvm::SmallVector<std::pair<unsigned, llvm::MDNode *>, 4> mds;
+//    func->getAllMetadata(mds);
+//    for (auto md_info : mds) {
+//      auto num_ops = md_info.second->getNumOperands();
+//      for (unsigned i = 0; i < num_ops; ++i) {
+//        md_info.second->replaceOperandWith(i, nullptr);
+//      }
+//      func->setMetadata(md_info.first, nullptr);
+//    }
+
+    RemoveFunction(func);
+  }
+}
+
+// Remove calls to the various undefined value intrinsics.
+static void RemoveUndefFuncCalls(void) {
+  llvm::Function *undef_funcs[] = {
+      gModule->getFunction("__remill_undefined_8"),
+      gModule->getFunction("__remill_undefined_16"),
+      gModule->getFunction("__remill_undefined_32"),
+      gModule->getFunction("__remill_undefined_64"),
+      gModule->getFunction("__remill_undefined_f32"),
+      gModule->getFunction("__remill_undefined_f64"),
+  };
+
+  for (auto undef_func : undef_funcs) {
+    if (undef_func) {
+      ReplaceUndefIntrinsic(undef_func);
+      RemoveFunction(undef_func);
+    }
+  }
+}
+
 static void RunO3(void) {
   llvm::legacy::FunctionPassManager func_manager(gModule);
   llvm::legacy::PassManager module_manager;
@@ -71,9 +177,9 @@ static void RunO3(void) {
   builder.DisableTailCalls = false;  // Enable tail calls.
   builder.DisableUnrollLoops = false;  // Unroll loops!
   builder.DisableUnitAtATime = false;
-  builder.SLPVectorize = false;  // Don't produce vector operations.
-  builder.LoopVectorize = false;  // Don't produce vector operations.
-  builder.LoadCombine = false;  // Don't coalesce loads.
+  builder.SLPVectorize = true;
+  builder.LoopVectorize = true;
+  builder.LoadCombine = true;
   builder.MergeFunctions = false;  // Try to deduplicate functions.
   builder.VerifyInput = false;
   builder.VerifyOutput = false;
@@ -147,32 +253,162 @@ static void RemoveISELs(std::vector<llvm::GlobalVariable *> &isels) {
 
 // Remove some of the remill intrinsics.
 static void RemoveIntrinsics(void) {
-  if (auto used = gModule->getGlobalVariable("llvm.used")) {
-    used->eraseFromParent();
+  if (auto llvm_used = gModule->getGlobalVariable("llvm.used")) {
+    llvm_used->eraseFromParent();
   }
 
-  if (auto intrinsic_keeper = gModule->getFunction("__remill_intrinsics")) {
-    intrinsic_keeper->eraseFromParent();
+  // This function makes removing intrinsics tricky, so if it's there, then
+  // we'll try to get the optimizer to inline it on our behalf, which should
+  // drop some references :-D
+  if (auto remill_used = gModule->getFunction("__remill_mark_as_used")) {
+    if (remill_used->isDeclaration()) {
+      remill_used->setLinkage(llvm::GlobalValue::InternalLinkage);
+      remill_used->removeFnAttr(llvm::Attribute::NoInline);
+      remill_used->addFnAttr(llvm::Attribute::InlineHint);
+      remill_used->addFnAttr(llvm::Attribute::AlwaysInline);
+      auto block = llvm::BasicBlock::Create(*gContext, "", remill_used);
+      (void) llvm::ReturnInst::Create(*gContext, block);
+    }
   }
 
-  if (auto basic_block = gModule->getFunction("__remill_basic_block")) {
-    basic_block->eraseFromParent();
+  RemoveFunction("__remill_intrinsics");
+  RemoveFunction("__remill_basic_block");
+  RemoveFunction("__remill_mark_as_used");
+  RemoveFunction("__remill_defer_inlining");
+  RemoveFunction("__remill_function_return");
+  RemoveFunction("__remill_mark_as_used");
+}
+
+// Lower a memory read intrinsic into a `load` instruction.
+static void ReplaceMemReadOp(const char *name, llvm::Type *val_type) {
+  auto func = gModule->getFunction(name);
+  CHECK(func->isDeclaration())
+      << "Cannot lower already implemented memory intrinsic " << name;
+
+  std::vector<llvm::CallInst *> callers;
+  std::unordered_set<llvm::Function *> memop_callers;
+  for (auto user : func->users()) {
+    if (auto call_inst = llvm::dyn_cast<llvm::CallInst>(user)) {
+      if (call_inst->getCalledFunction() == func) {
+        callers.push_back(call_inst);
+        memop_callers.insert(call_inst->getFunction());
+      }
+    }
   }
 
-  if (auto mark_used = gModule->getFunction("__remill_mark_as_used")) {
-    mark_used->eraseFromParent();
+  for (auto call_inst : callers) {
+    auto addr = call_inst->getArgOperand(1);
+
+    llvm::IRBuilder<> ir(call_inst);
+    auto ptr = ir.CreateIntToPtr(addr, llvm::PointerType::get(val_type, 0));
+    llvm::Value *val = ir.CreateLoad(ptr);
+    if (val_type->isX86_FP80Ty()) {
+      val = ir.CreateFPTrunc(val, func->getReturnType());
+    }
+    call_inst->replaceAllUsesWith(val);
   }
+
+  // Update the functions using the memory pointer to
+  for (auto func : memop_callers) {
+    auto func_attrs = func->getAttributes();
+    if (func_attrs.getDereferenceableBytes(remill::kMemoryPointerArgNum)) {
+      continue;
+    }
+
+    func_attrs.addDereferenceableAttr(
+        *gContext, llvm::AttributeSet::ReturnIndex, ~0ULL);
+    func_attrs.addDereferenceableAttr(
+        *gContext, remill::kMemoryPointerArgNum, ~0ULL);
+    func->setAttributes(func_attrs);
+  }
+}
+
+// Lower a memory write intrinsic into a `store` instruction.
+static void ReplaceMemWriteOp(const char *name, llvm::Type *val_type) {
+  auto func = gModule->getFunction(name);
+  CHECK(func->isDeclaration())
+      << "Cannot lower already implemented memory intrinsic " << name;
+
+  std::vector<llvm::CallInst *> callers;
+  for (auto user : func->users()) {
+    if (auto call_inst = llvm::dyn_cast<llvm::CallInst>(user)) {
+      if (call_inst->getCalledFunction() == func) {
+        callers.push_back(call_inst);
+      }
+    }
+  }
+
+  for (auto call_inst : callers) {
+    auto mem_ptr = call_inst->getArgOperand(0);
+    auto addr = call_inst->getArgOperand(1);
+    auto val = call_inst->getArgOperand(2);
+
+    llvm::IRBuilder<> ir(call_inst);
+    auto ptr = ir.CreateIntToPtr(addr, llvm::PointerType::get(val_type, 0));
+    if (val_type->isX86_FP80Ty()) {
+      val = ir.CreateFPExt(val, val_type);
+    }
+    ir.CreateStore(val, ptr);
+    call_inst->replaceAllUsesWith(mem_ptr);
+  }
+
+  RemoveFunction(func);
+}
+
+static void LowerMemOps(void) {
+  auto mem_func = gModule->getFunction("__remill_write_memory_8");
+  auto mem_ptr_type = llvm::dyn_cast<llvm::PointerType>(
+      mem_func->getReturnType());
+  auto mem_type = llvm::dyn_cast<llvm::StructType>(
+      mem_ptr_type->getElementType());
+  mem_type->setBody(llvm::Type::getInt8Ty(*gContext), nullptr, nullptr);
+
+  ReplaceMemReadOp("__remill_read_memory_8",
+                   llvm::Type::getInt8Ty(*gContext));
+  ReplaceMemReadOp("__remill_read_memory_16",
+                   llvm::Type::getInt16Ty(*gContext));
+  ReplaceMemReadOp("__remill_read_memory_32",
+                   llvm::Type::getInt32Ty(*gContext));
+  ReplaceMemReadOp("__remill_read_memory_64",
+                   llvm::Type::getInt64Ty(*gContext));
+  ReplaceMemReadOp("__remill_read_memory_f32",
+                   llvm::Type::getFloatTy(*gContext));
+  ReplaceMemReadOp("__remill_read_memory_f64",
+                   llvm::Type::getDoubleTy(*gContext));
+
+  ReplaceMemWriteOp("__remill_write_memory_8",
+                    llvm::Type::getInt8Ty(*gContext));
+  ReplaceMemWriteOp("__remill_write_memory_16",
+                    llvm::Type::getInt16Ty(*gContext));
+  ReplaceMemWriteOp("__remill_write_memory_32",
+                    llvm::Type::getInt32Ty(*gContext));
+  ReplaceMemWriteOp("__remill_write_memory_64",
+                    llvm::Type::getInt64Ty(*gContext));
+  ReplaceMemWriteOp("__remill_write_memory_f32",
+                    llvm::Type::getFloatTy(*gContext));
+  ReplaceMemWriteOp("__remill_write_memory_f64",
+                    llvm::Type::getDoubleTy(*gContext));
+
+  ReplaceMemReadOp("__remill_read_memory_f80",
+                   llvm::Type::getX86_FP80Ty(*gContext));
+  ReplaceMemWriteOp("__remill_write_memory_f80",
+                    llvm::Type::getX86_FP80Ty(*gContext));
 }
 
 }  // namespace
 
-void OptimizeBitcode(void) {
+void OptimizeModule(void) {
   auto isels = FindISELs();
   RemoveIntrinsics();
   LOG(INFO)
       << "Optimizing module.";
   RemoveISELs(isels);
+  if (FLAGS_lower_memops) {
+    LowerMemOps();
+  }
   RunO3();
+  RemoveIntrinsics();
+  RemoveUndefFuncCalls();
 }
 
 }  // namespace mcsema

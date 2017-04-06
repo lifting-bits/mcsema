@@ -49,8 +49,7 @@ class IntrinsicTable;
 
 namespace mcsema {
 
-class ExternalCodeRef;
-class ExternalDataRef;
+struct NativeXref;
 struct TranslationContext;
 
 class InstructionLifter : public remill::InstructionLifter {
@@ -79,9 +78,7 @@ class InstructionLifter : public remill::InstructionLifter {
 
  private:
 
-  llvm::Value *GetAddress(
-      ExternalCodeRef *code, ExternalDataRef *data,
-      uint64_t code_addr, uint64_t data_addr);
+  llvm::Value *GetAddress(const NativeXref *cfg_xref);
 
   TranslationContext &ctx;
 

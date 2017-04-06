@@ -1,127 +1,134 @@
 
-message OffsetTable {
-    required int64 start_addr = 1;
-    repeated int64 table_offsets = 2;
-    repeated int64 destinations = 3;
+package mcsema;
+
+// A cross-reference contained within an instruction.
+message CodeReference {
+  enum TargetType {
+    CodeTarget = 0;
+    DataTarget = 1;
+  }
+
+  enum OperandType {
+    ImmediateOperand = 0;
+    MemoryOperand = 1;  // Absolute and PC-relative accesses.
+    MemoryDisplacementOperand = 2;
+    ControlFlowOperand = 3;  // E.g. Function call target.
+  }
+
+  enum Location {
+    Internal = 0;
+    External = 1;
+  }
+
+  required  TargetType  target_type = 1;
+  required  OperandType operand_type = 2;
+  required  Location    location = 3;
+  required  int64       address = 4;
+  optional  string      name = 5;
 }
 
-message JumpTbl {
-    repeated    int64       table_entries = 1;
-    required    int32       zero_offset = 2;
-    optional    int64       offset_from_data = 3;
-}
-
-message JumpIndexTbl {
-    required    bytes       table_entries = 1;
-    required    int32       zero_offset = 2;
-}
-
-message Reference {
-    enum TargetType {
-        CodeTarget = 0;
-        DataTarget = 1;
-    }
-
-    enum OperandType {
-        ImmediateOperand = 0;
-        MemoryOperand = 1;  // Absolute and PC-relative accesses.
-        MemoryDisplacementOperand = 2;
-        ControlFlowOperand = 3;  // E.g. Function call target.
-    }
-
-    enum Location {
-        Internal = 0;
-        External = 1;
-    }
-
-    required    TargetType  target_type = 1;
-    required    OperandType operand_type = 2;
-    required    Location    location = 3;
-    required    int64       address = 4;
-    optional    string      name = 5;
-}
-
+// An instruction inside of a block.
 message Instruction {
-    required    bytes             inst_bytes = 1;
-    required    int64             inst_addr = 2;
-
-    repeated    Reference         refs = 3;
-
-    optional    JumpTbl           jump_table = 4;
-    optional    JumpIndexTbl      jump_index_table = 5;
-    optional    bool              local_noreturn = 6;
-    optional    int64             offset_table_addr = 7;
+  required  int64           ea = 1;
+  required  bytes           bytes = 2;
+  repeated  CodeReference   xrefs = 3;
+  optional  bool            local_noreturn = 4;
+  optional  int64           jump_table_addr = 5;
+  optional  int64           offset_base_addr = 6;
 }
 
+// A basic block of instructions inside of a function.
 message Block {
-    repeated    Instruction insts = 1;
-    required    int64       base_address = 2;
-    //the block_follows list is used to rebuild the basic block CFG, so it 
-    //should contain the list of base_addresses for blocks following this 
-    //block in the CFG
-    repeated    int64       block_follows = 3;
+  required  int64       ea = 1;
+  repeated  Instruction instructions = 2;
+  repeated  int64       successor_eas = 3;
 }
 
+// A function with an implementation inside of the binary.
 message Function {
-    repeated    Block   blocks = 1;
-    required    int64   entry_address = 2;
-    optional    string  symbol_name = 3;
+  required  int64       ea = 1;
+  repeated  Block       blocks = 2;
+  required  bool        is_entrypoint = 3;
+  optional  string      name = 4;
 }
 
+// A function that is used or referenced within binary, but not implemented
+// within the binary.
 message ExternalFunction {
-    enum CallingConvention {
-      CallerCleanup = 0;
-      CalleeCleanup = 1;
-      FastCall      = 2;
-      McsemaCall    = 3;
-    }
+  enum CallingConvention {
+    CallerCleanup = 0;
+    CalleeCleanup = 1;
+    FastCall = 2;
+    McsemaCall = 3;
+  }
 
-    required    string            symbol_name = 1;
-    required    CallingConvention calling_convention = 2;
-    required    bool              has_return = 3;
-    required    bool              no_return = 4;
-    required    int32             argument_count = 5;
-    required    bool              is_weak = 6;
-    optional    string            signature = 7;
+  required  string            name = 1;
+  required  int64             ea = 2;  // E.g. address of the thunk in the binary.
+
+  required  CallingConvention cc = 3;
+  required  bool              has_return = 4;
+  required  bool              no_return = 5;
+  required  int32             argument_count = 6;
+  required  bool              is_weak = 7;
+  optional  string            signature = 8;
 }
 
-message ExternalData {
-    required    string      symbol_name = 1;
-    required    int32       data_size = 2;
-    required    bool        is_weak = 3;
+// A named symbol defined outside of the binary. For example, `stderr`.
+message ExternalVariable {
+  required  string      name = 1;
+  required  int64       ea = 2;    // E.g. address of the relocation in the binary.
+  required  int32       size = 3;
+  required  bool        is_weak = 4;
 }
 
+// A cross-reference contained within a data segment. This represents some
+// code- or data-reference embedded within the data segment.
+message DataReference {
+  
+  // Location of the cross-reference.
+  required  int64       ea = 1;
 
-message DataSymbol {
-    required int64 base_address = 1;
-    required string symbol_name = 2;
-    required int32 symbol_size = 3;
+  // How many bytes wide is this cross-reference? Not to be confused with the
+  // size of the data to which this reference points.
+  required  int32       width = 2;
+
+  // Information about the target of the cross-reference.
+  required  int64       target_ea = 4;
+  required  string      target_name = 5;
+  required  bool        target_is_code = 6;
 }
 
-message Data {
-    required    int64           base_address = 1;
-    required    bytes           data = 2;
-    repeated    DataSymbol      symbols = 3;    
-    required    bool            read_only = 4;
+// Represents a named location within a data segment. Variables will often
+// be the targets of cross-references, either within other parts of the
+// data segments, or from code.
+message Variable {
+  required  int64       ea = 1;
+  required  string      name = 2;
 }
 
-message EntrySymbolExtra {
-    required    int32                               entry_argc = 1;
-    required    ExternalFunction.CallingConvention  entry_cconv = 2;
-    required    bool                                does_return = 3;
-}
+// The data section is a verbatim copy of all the data in a given segment. This
+// copy will be "instantiated" into the LLVM module as a packed struct, where
+// the elements of the struct will be opaque sequences of bytes interspered
+// with cross-reference pointers.
+message Segment {
+  required  int64           ea = 1;
+  required  bytes           data = 2;
+  required  bool            read_only = 3;
+  required  bool            is_external = 4;
+  
+  repeated  DataReference   xrefs = 5;
+  repeated  Variable        vars = 6;
 
-message EntrySymbol {
-    required    string                              entry_name = 1;
-    required    int64                               entry_address = 2;
-    optional    EntrySymbolExtra                    entry_extra = 3;
+  // Section name, e.g. `.got`, `.text`, `.bss`, etc.
+  optional  string          name = 7;
 }
 
 message Module {
-    repeated    Function            internal_funcs = 1;
-    repeated    ExternalFunction    external_funcs = 2;
-    repeated    Data                internal_data = 3;
-    required    string              module_name = 4;
-    repeated    EntrySymbol         entries = 5;
-    repeated    ExternalData        external_data = 6;
+  required  string              name = 1;
+
+  repeated  Function            funcs = 2;
+  repeated  Segment             segments = 3;
+
+  repeated  ExternalFunction    external_funcs = 4;
+  repeated  ExternalVariable    external_vars = 5;
 }

@@ -28,39 +28,16 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef MCSEMA_BC_LIFT_H_
-#define MCSEMA_BC_LIFT_H_
-
-#include <unordered_map>
-
-namespace remill {
-class InstructionLifter;
-}  // namespace remill
-
-namespace llvm {
-class BasicBlock;
-class Function;
-}  // namespace llvm
+#ifndef MCSEMA_BC_FUNCTION_H_
+#define MCSEMA_BC_FUNCTION_H_
 
 namespace mcsema {
-
 struct NativeModule;
-struct NativeFunction;
-struct NativeBlock;
-struct NativeInstruction;
 
-struct TranslationContext {
-  remill::InstructionLifter *lifter;
-  const NativeModule *cfg_module;
-  const NativeFunction *cfg_func;
-  const NativeBlock *cfg_block;
-  const NativeInstruction *cfg_inst;
-  llvm::Function *lifted_func;
-  std::unordered_map<uint64_t, llvm::BasicBlock *> ea_to_block;
-};
+void DeclareLiftedFunctions(const NativeModule *cfg_module);
 
-bool LiftCodeIntoModule(const NativeModule *cfg_module);
+bool DefineLiftedFunctions(const NativeModule *cfg_module);
 
 }  // namespace mcsema
 
-#endif  // MCSEMA_BC_LIFT_H_
+#endif  // TOOLS_MCSEMA_MCSEMA_BC_FUNCTION_H_

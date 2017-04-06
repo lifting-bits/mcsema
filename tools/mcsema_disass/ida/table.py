@@ -28,70 +28,92 @@
 
 from refs import *
 
+_FIRST_JUMP_TABLE_ENTRY = {}
+_JUMP_TABLE_ENTRY = {}
+
 class JumpTable(object):
   """Represents generic info known about a particular jump table."""
-  __slots__ = ('inst_ea', 'entry_size', 'table_ea', 'entries', 'raw_entries')
+  __slots__ = ('inst_ea', 'entry_size', 'table_ea', 'offset', 'entries')
 
-  def __init__(self, inst_ea, table_ea, entry_size, entries, raw_entries):
-    self.inst_ea = inst_ea
-    self.table_ea = table_ea
-    self.entry_size = entry_size
+  def __init__(self, builder, entries):
+    global _FIRST_JUMP_TABLE_ENTRY, _JUMP_TABLE_ENTRY
+    self.inst_ea = builder.jump_ea
+    self.table_ea = builder.table_ea
+    self.offset = builder.offset
+    self.entry_size = builder.entry_size
     self.entries = entries
-    self.raw_entries = raw_entries
 
-    max_ea = table_ea
-    data_flags = (4 == entry_size) and idc.FF_DWRD or idc.FF_QWRD
+    max_ea = self.table_ea
+    data_flags = (4 == self.entry_size) and idc.FF_DWRD or idc.FF_QWRD
 
     # Update IDA's understanding of the flow of control out of the jump
     # instruction, as well as references to/from the table.
     for entry_ea, target_ea in entries.items():
-      idc.MakeData(entry_ea, data_flags, entry_size, 0)
-      idc.AddCodeXref(inst_ea, target_ea, idc.XREF_USER | idc.fl_JN)
-      remove_all_refs(entry_ea)
-      max_ea = max(max_ea, entry_ea + entry_size)
+      idc.AddCodeXref(self.inst_ea, target_ea, idc.XREF_USER | idc.fl_JN)
+      max_ea = max(max_ea, entry_ea + self.entry_size)
     
     # Make sure each entry is seen as referenced.
     for entry_ea, target_ea in entries.items():
-      idc.add_dref(inst_ea, entry_ea, idc.dr_I)
+      idc.add_dref(self.inst_ea, entry_ea, idc.dr_I)
 
     # Make sure that the contents of the table are no longer considered
     # code (only affects `is_code`). This is only meaningful if the table
     # itself is embedded in a code segment.
-    for ea_into_table in xrange(table_ea, max_ea):
+    for ea_into_table in xrange(self.table_ea, max_ea):
       mark_as_not_code(ea_into_table)
+      _FIRST_JUMP_TABLE_ENTRY[ea_into_table] = self.table_ea
 
+    _JUMP_TABLE_ENTRY[self.table_ea] = self
     idaapi.autoWait()
 
-def get_default_jump_table_entries(inst, table_ea, reader):
+class JumpTableBuilder(object):
+  _READERS = {
+      4: read_dword,
+      8: read_qword
+  }
+
+  def __init__(self, inst, binary_is_pie):
+    self.entry_size = 0
+    self.table_ea = idc.BADADDR
+    self.offset = 0
+    self.jump_ea = inst.ea
+    self.inst = inst
+    self.binary_is_pie = binary_is_pie
+    self.candidate_target_eas = []
+
+  def read_entry(self, entry_ea):
+    data = (self._READERS[self.entry_size])(entry_ea)
+    data += self.offset
+    data &= ((1 << (self.entry_size * 8)) - 1)
+    return data
+
+def get_default_jump_table_entries(builder):
   """Return the 'default' jump table entries, based on IDA's ability to
   recognize a jump table. If IDA doesn't recognize the table, then we
   say that there are 0 entries, but we also return what we have inferred
   to be the first entry."""
-  si = idaapi.get_switch_info_ex(inst.ea)
-  
+  si = idaapi.get_switch_info_ex(builder.jump_ea)
   if si:
-    num_entries = si.get_jtable_size()
-    entries = []
-    next_addr = table_ea
-    for i in xrange(num_entries):
-      target_ea, raw_target, next_addr = reader(next_addr)
-      entries.append(target_ea)
-    return num_entries, entries
+    next_addr = builder.table_ea
+    for i in xrange(si.get_jtable_size()):
+      target_ea = builder.read_entry(next_addr)
+      builder.candidate_target_eas.append(target_ea)
+      next_addr += builder.entry_size
   else:
-    target_ea, raw_target, next_addr = reader(table_ea)
-    return 0, [target_ea]
+    builder.candidate_target_eas.append(builder.read_entry(builder.table_ea))
 
-def get_num_jump_table_entries(inst_ea, table_ea, reader, curr_num_targets,
-                               curr_targets):
+def get_num_jump_table_entries(builder):
   """Try to get the number of entries in a jump table. This will use some
   base set of entries."""
+  curr_num_targets = len(builder.candidate_target_eas)
+
   DEBUG("Checking if jump table at {:x} has more than {} entries".format(
-      table_ea, curr_num_targets))
+      builder.table_ea, curr_num_targets))
 
   # Use the bounds of the function containing the jump instruction as our
   # initial bounds for candidate jump table targets.
-  min_ea, max_ea = get_function_bounds(inst_ea)
-  
+  min_ea, max_ea = get_function_bounds(builder.jump_ea)
+  orig_min_ea, orig_max_ea = min_ea, max_ea
   # Treat the current set of targets as candidates, even if the source of
   # those targets is IDA. We will assume that jump table entries point within
   # a given function, or within nearby functions that IDA believes to be
@@ -99,180 +121,160 @@ def get_num_jump_table_entries(inst_ea, table_ea, reader, curr_num_targets,
   # on the range of possible targets based on the function(s) containing the
   # candidates, and use that as a scanning heuristic to find missing entries.
   last_target_func = None
-  for i, curr_target in enumerate(curr_targets):
+  for i, curr_target in enumerate(builder.candidate_target_eas):
     is_sane_target = is_block_or_instruction_head(curr_target)
     if not is_sane_target:
-      DEBUG("ERROR jump table {:x} entry {} target {:x} is not sane!".format(
-          table_ea, i, curr_target))
+      DEBUG("  ERROR jump table {:x} entry candidate {} target {:x} is not sane!".format(
+          builder.table_ea, i, curr_target))
+      continue
 
-    assert is_sane_target
     targ_min_ea, targ_max_ea = get_function_bounds(curr_target)
+    if targ_min_ea >= max_ea or targ_max_ea <= min_ea:
+      DEBUG("  ERROR jump table {:x} entry candidate {} target {:x} inferred bounds are not sane".format(
+          builder.table_ea, i, curr_target))
+      continue
+
     min_ea = min(min_ea, targ_min_ea)
     max_ea = max(max_ea, targ_max_ea)
 
   if not max_ea:
     return curr_num_targets
 
+  # The candidate entries gave us a wider bound
+  if orig_min_ea != min_ea or orig_max_ea != max_ea:
+    assert (orig_max_ea - orig_min_ea) < (max_ea - min_ea)
+    DEBUG("Old table {:x} target bounds were  [{:x}, {:x})".format(
+        builder.table_ea, orig_min_ea, orig_max_ea))
+
   DEBUG("Jump table {:x} targets can be in the range [{:x}, {:x})".format(
-      table_ea, min_ea, max_ea))
+      builder.table_ea, min_ea, max_ea))
 
-  i = 0
+  # The candidate targets have given us some rough bounds on the function,
+  # now lets go and check all the targets
   max_i = max(curr_num_targets, 1024)
-  entry_addr = table_ea
-  while i < max_i:
-    entry_data, raw_entry_data, next_entry_addr = reader(entry_addr)
+  entry_addr = builder.table_ea
+  for i in xrange(max_i):
+    entry_data = builder.read_entry(entry_addr)
+    next_entry_addr = entry_addr + builder.entry_size
+
+    # We will have already checked, or assumed, the sanity of the first
+    # `curr_num_targets` entries of the table.
+    if i < curr_num_targets:
+      entry_addr = next_entry_addr
+      continue
+
+    DEBUG("  Checking possible jump table {:x} entry {} at {:x} going to {:x}".format(
+        builder.table_ea, i, entry_addr, entry_data))
+
+    if not is_block_or_instruction_head(entry_data):
+      DEBUG("    Not an entry, the target {:x} isn't sane.".format(entry_data))
+      break
     
-    # Note: if this is a candidate table that IDA doesn't recognize, then
-    #     curr_num_targets will be 0, even though there will be one
-    #     entry in the `curr_targets`. This first entry will be guaranteed
-    #     to be targeted by a data/code ref, so we check that `i` is non-
-    #     zero to avoid failing the check before we do anything useful.
-    if i and i >= curr_num_targets:
-      DEBUG("Checking possible jump table {:x} entry {} at {:x} going to {:x}".format(
-          table_ea, i, entry_addr, entry_data))
+    elif min_ea > entry_data or entry_data >= max_ea:
+      DEBUG("    Not an entry, the target {:x} is out of range.".format(entry_data))
+      break
 
-      if not is_block_or_instruction_head(entry_data):
-        DEBUG("Not an entry, the target {:x} isn't sane.".format(entry_data))
-        break
-      
-      elif min_ea > entry_data or entry_data >= max_ea:
-        break
-
-      # We will assume that any reference to the data in here means
-      # that we've gone and found the end of a table.
-      #
-      # TODO(pag): Handle more fine-grained refs, i.e. ones where there's
-      #      a reference into the Nth byte of what could be the
-      #      next address.
-      elif len(list(idautils.DataRefsTo(entry_addr))):
-        DEBUG("Not an entry, the target {:x} is referenced by data.".format(entry_data))
-        break
-      elif len(list(idautils.CodeRefsTo(entry_addr, 0))):
-        DEBUG("Not an entry, the target {:x} is referenced by code.".format(entry_data))
-        break
-      elif len(list(idautils.CodeRefsTo(entry_addr, 1))):
-        DEBUG("Not an entry, the target {:x} is referenced by code.".format(entry_data))
-        break
+    # We will assume that any reference to the data in here means
+    # that we've gone and found the end of a table.
+    #
+    # TODO(pag): Handle more fine-grained refs, i.e. ones where there's
+    #      a reference into the Nth byte of what could be the
+    #      next address.
+    elif len(list(idautils.DataRefsTo(entry_addr))):
+      DEBUG("    Ignoring entry {:x} is referenced by data.".format(entry_data))
+      break
+    elif len(list(idautils.CodeRefsTo(entry_addr, 0))):
+      DEBUG("    Ignoring entry {:x} is referenced by code (0).".format(entry_data))
+      break
+    elif len(list(idautils.CodeRefsTo(entry_addr, 1))):
+      DEBUG("    Ignoring entry {:x} is referenced by code (1).".format(entry_data))
+      break
 
     entry_addr = next_entry_addr
-    i += 1
 
   if i != curr_num_targets:
-    DEBUG("Jump table at {:x} actually has {} entries".format(table_ea, i))
+    DEBUG("Jump table at {:x} actually has {} entries".format(
+        builder.table_ea, i))
+
   return i
 
-def wrap_jump_table_reader(entry_size, reader, wrapper):
-  """Create a jump table entry reader that will read bytes from memory,
-  potentially modify them, thereby converting them into plausible code
-  references, and finally returning the modified data, the original
-  data, and the address of the next entry to check."""
-  def do_read(addr):
-    raw_data = reader(addr)
-    return wrapper(raw_data), raw_data, (addr + entry_size)
-  return do_read
-
-_NO_READER = 0, None, idc.BADADDR
-
-def try_get_simple_jump_table_reader(inst_ea, table_ea):
+def try_get_simple_jump_table_reader(builder):
   """Try to create a jump table entry reader by looking for address-sized
   code pointers in the memory pointed to by `table_ea`.
 
   This uses heuristics like assuming certain alignments of table entries,
   and that the entry targets must be code."""
-  entry_size = 0
-  offset_wrapper = (lambda d: 0xFFFFFFFF & (d + table_ea))
-  wrappers = [(lambda d: d), offset_wrapper]
+  if 0 != (builder.table_ea % 4):
+    return False  # Doesn't meet minimum alignment requirements.
 
-  for wrapper in wrappers:
-    candidate = 0, None, idc.BADADDR
-    target_ea = idc.BADADDR
-    if 0 == (table_ea % 8) and 64 == get_address_size_in_bits():
-      target_ea = read_qword(table_ea)
-      if is_block_or_instruction_head(target_ea):
-        reader = wrap_jump_table_reader(8, read_qword, wrapper)
-        candidate = 8, reader, table_ea
+  min_ea, max_ea = get_function_bounds(builder.jump_ea)
 
-    if not candidate[0] and 0 == (table_ea % 4):
-      target_ea = read_dword(table_ea)
-      if is_block_or_instruction_head(target_ea):
-        reader = wrap_jump_table_reader(4, read_dword, wrapper)
-        candidate = 4, reader, table_ea
+  sizes = [4]
+  if 64 == get_address_size_in_bits():
+    sizes.insert(0, 8)
 
-    # We've got a jump table target candidate; make sure that the target
-    # belongs to the same function as the jump instruction. We use the bounds
-    # of the function for checking, just in case the target is treated as
-    # soem non-part of the function within the function's bounds.
-    if candidate[0]:
-      min_ea, max_ea = get_function_bounds(inst_ea)
-      if min_ea <= target_ea < max_ea:
-        return candidate
+  # Try the offset table based approach first, as it's likely to be more
+  # constrained.
+  for offset in (builder.table_ea, 0):
+    for size in sizes:
+      builder.offset = offset
+      builder.entry_size = size
+      target_ea = builder.read_entry(builder.table_ea)
 
-  return _NO_READER
+      if min_ea <= target_ea < max_ea \
+      and is_block_or_instruction_head(target_ea):
+        return True
 
-def is_thunk(ea):
-  """Returns true if some address is a known to IDA to be a thunk."""
-  flags = idc.GetFunctionFlags(ea)
-  return 0 < flags and 0 != (flags & idaapi.FUNC_THUNK)
+  return False
 
-def get_ida_jump_table_reader(inst, si, binary_is_pie):
+def get_ida_jump_table_reader(builder, si):
   """Try to trust IDA's ability to recognize a jump table and its entries,
   and return an appropriate jump table entry reader."""
-  global _NO_READER
-  wrapper = lambda d: d
+  builder.table_ea = si.jumps
 
   # Check if this is an offset based jump table, and if so, create an
   # appropriate wrapper that uses the displacement from the table base
   # address to find the actual jump target.
   if (si.flags & idaapi.SWI_ELBASE) == idaapi.SWI_ELBASE:
-    table_ea = si.elbase
-    wrapper = (lambda d: 0xFFFFFFFF & (d + table_ea))
+    builder.offset = si.elbase
 
-  entry_size = si.get_jtable_element_size()
-  if 8 == entry_size and 64 == get_address_size_in_bits():
-    reader = wrap_jump_table_reader(8, read_qword, wrapper)
-    return 8, reader, si.jumps
-  
-  elif 4 == entry_size:
-    reader = wrap_jump_table_reader(4, read_dword, wrapper)
-    return 4, reader, si.jumps
-  else:
-    DEBUG("ERROR! Incorrect jump table entry size {}".format(entry_size))
-    return _NO_READER
+  builder.entry_size = si.get_jtable_element_size()
+  return True
 
-def get_manual_jump_table_reader(inst, binary_is_pie):
+def get_manual_jump_table_reader(builder):
   """Scan backwards looking for something that looks like a jump table,
   even if it's not explicitly referenced in the current instruction.
   This handles the case where we see something like a `mov` or an `lea`
   of the table base address that happens before the actual `jmp`."""
-  next_inst_ea = inst.ea
+  next_inst_ea = builder.jump_ea
   for i in xrange(5):
     inst_ea = next_inst_ea
     next_inst_ea = idc.PrevHead(inst_ea)
     if inst_ea == idc.BADADDR:
-      return _NO_READER
-    
-    refs = get_instruction_references(inst_ea, binary_is_pie)
+      return False
+
+    refs = get_instruction_references(inst_ea, builder.binary_is_pie)
     if not len(refs):
       continue
 
-    candidate_table_ea = refs[0].addr
-    
+    builder.table_ea = refs[0].addr
+    builder.offset = 0
+
     # Don't treat things like thunks to be tables.
-    if is_thunk(candidate_table_ea) or is_external_segment(candidate_table_ea):
-      return _NO_READER
+    if is_thunk(builder.table_ea) or is_external_segment(builder.table_ea):
+      continue
 
-    reader = try_get_simple_jump_table_reader(inst.ea, candidate_table_ea)
-    if reader[0]:
-      return reader
+    if try_get_simple_jump_table_reader(builder):
+      return True
   
-  return _NO_READER
+  return False
 
-def get_jump_table_reader(inst, binary_is_pie):
+def get_jump_table_reader(builder):
   """Returns the size of a jump table entry, as well as a reader function
   that can extract entries."""
-  si = idaapi.get_switch_info_ex(inst.ea)
+  si = idaapi.get_switch_info_ex(builder.jump_ea)
   if si:
-    return get_ida_jump_table_reader(inst, si, binary_is_pie)
+    return get_ida_jump_table_reader(builder, si)
 
   # IDA can be a bit ignorant at recognizing jump tables. This came up
   # in sqlite3 where IDA decided that `jmp ds:off_48A5F0[rax*8]` wasn't
@@ -282,7 +284,7 @@ def get_jump_table_reader(inst, binary_is_pie):
   # resolves this difference, so we'll also try to use it to pick up
   # where IDA leaves off.
   else:
-    return get_manual_jump_table_reader(inst, binary_is_pie)
+    return get_manual_jump_table_reader(builder)
 
 _JMP_THROUGH_TABLE_INFO = {}
 _NOT_A_JMP_THROUGH_TABLE = set()
@@ -306,53 +308,55 @@ def get_jump_table(inst, binary_is_pie=False):
     _NOT_A_JMP_THROUGH_TABLE.add(inst.ea)
     return None
 
-  entry_size, reader, table_ea = get_jump_table_reader(inst, binary_is_pie)
-  if not entry_size or not reader:
-    _NOT_A_JMP_THROUGH_TABLE.add(inst.ea)
+  builder = JumpTableBuilder(inst, binary_is_pie)
+
+  if not get_jump_table_reader(builder):
+    _NOT_A_JMP_THROUGH_TABLE.add(builder.jump_ea)
     return None
 
   DEBUG("Jump table candidate at {:x} referenced by instruction {:x}".format(
-      table_ea, inst.ea))
+      builder.table_ea, builder.jump_ea))
 
-  num_entries, default_entries = get_default_jump_table_entries(
-    inst, table_ea, reader)
+  get_default_jump_table_entries(builder)
 
-  if len(default_entries):
-    DEBUG("Jump table candidate {:x} has {} entries, with {} candidate targets".format(
-        table_ea, num_entries, len(default_entries)))
-
-    # Try to fix-up the number of entries.
-    num_entries = get_num_jump_table_entries(
-      inst.ea, table_ea, reader, num_entries, default_entries)
+  # Try to fix-up the number of entries.
+  num_entries = get_num_jump_table_entries(builder)
 
   # Treat zero- or one-entry 'tables' as not actually being tables.
   if num_entries <= 1:
     DEBUG("Ignoring jump table {:x} with 1 >= {} entries referenced by {:x}".format(
-        table_ea, num_entries, inst.ea))
-    _NOT_A_JMP_THROUGH_TABLE.add(inst.ea)
+        builder.table_ea, num_entries, builder.jump_ea))
+    _NOT_A_JMP_THROUGH_TABLE.add(builder.jump_ea)
     return None
 
-  DEBUG("Jump table {:x} entries:".format(table_ea))
+  DEBUG("Jump table {:x} entries:".format(builder.table_ea))
 
   # We've got a more accurate number of table entries, so go and actually
   # read them to fill in our `JumpTable` data structure.
   entries = {}
   raw_entries = {}
-  entry_addr = table_ea
+  entry_addr = builder.table_ea
   for i in xrange(num_entries):
-    entry_data, raw_entry_data, next_entry_addr = reader(entry_addr)
-    raw_entries[entry_addr] = raw_entry_data
+    entry_data = builder.read_entry(entry_addr)
     entries[entry_addr] = entry_data
+    DEBUG("  {:x} => {:x}".format(entry_addr, entry_data))
+    entry_addr += builder.entry_size
 
-    if raw_entry_data != entry_data:
-      DEBUG("  {:x} => {:x} (raw {:x})".format(
-          entry_addr, entry_data, raw_entry_data))
-    else:
-      DEBUG("  {:x} => {:x}".format(entry_addr, entry_data))
-
-    entry_addr = next_entry_addr
-
-  table = JumpTable(inst.ea, table_ea, entry_size, entries, raw_entries)
-  _JMP_THROUGH_TABLE_INFO[inst.ea] = table
+  table = JumpTable(builder, entries)
+  _JMP_THROUGH_TABLE_INFO[builder.jump_ea] = table
 
   return table
+
+def is_jump_table_entry(ea):
+  """Returns `True` if `ea` falls somewhere inside of the bytes of a jump
+  table."""
+  global _FIRST_JUMP_TABLE_ENTRY
+  return ea in _FIRST_JUMP_TABLE_ENTRY
+
+def get_jump_table_from_entry(entry_ea):
+  """Returns a `JumpTable` """
+  global _FIRST_JUMP_TABLE_ENTRY, _JUMP_TABLE_ENTRY
+  if entry_ea not in _FIRST_JUMP_TABLE_ENTRY:
+    return None
+  table_ea = _FIRST_JUMP_TABLE_ENTRY[entry_ea]
+  return _JUMP_TABLE_ENTRY[table_ea]

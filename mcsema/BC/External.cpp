@@ -28,39 +28,52 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef MCSEMA_BC_LIFT_H_
-#define MCSEMA_BC_LIFT_H_
+#include <glog/logging.h>
 
-#include <unordered_map>
+#include <sstream>
+#include <vector>
 
-namespace remill {
-class InstructionLifter;
-}  // namespace remill
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
 
-namespace llvm {
-class BasicBlock;
-class Function;
-}  // namespace llvm
+#include "mcsema/BC/External.h"
+#include "mcsema/BC/Util.h"
+#include "mcsema/CFG/CFG.h"
 
 namespace mcsema {
+namespace {
 
-struct NativeModule;
-struct NativeFunction;
-struct NativeBlock;
-struct NativeInstruction;
+static void MakeExternal(llvm::Constant *val) {
+  llvm::dyn_cast<llvm::GlobalValue>(val)->setLinkage(
+      llvm::GlobalValue::ExternalLinkage);
+}
 
-struct TranslationContext {
-  remill::InstructionLifter *lifter;
-  const NativeModule *cfg_module;
-  const NativeFunction *cfg_func;
-  const NativeBlock *cfg_block;
-  const NativeInstruction *cfg_inst;
-  llvm::Function *lifted_func;
-  std::unordered_map<uint64_t, llvm::BasicBlock *> ea_to_block;
-};
+}  // namespace
 
-bool LiftCodeIntoModule(const NativeModule *cfg_module);
+void DeclareExternals(const NativeModule *cfg_module) {
+  auto func_type = llvm::FunctionType::get(
+      llvm::Type::getVoidTy(*gContext), true);
+
+  // Declare external functions.
+  //
+  // TODO(pag): Calling conventions, argument counts, etc.
+  for (const auto &entry : cfg_module->name_to_extern_func) {
+    auto cfg_func = entry.second;
+
+    // The "actual" external function.
+    MakeExternal(gModule->getOrInsertFunction(cfg_func->name, func_type));
+
+    // Stub that will marshal lifted state into the native state.
+    gModule->getOrInsertFunction(cfg_func->lifted_name, LiftedFunctionType());
+  }
+
+  // Declare external variables.
+  for (const auto &entry : cfg_module->name_to_extern_var) {
+    auto cfg_var = entry.second;
+    auto var_type = llvm::Type::getIntNTy(*gContext, cfg_var->size * 8);
+    MakeExternal(gModule->getOrInsertGlobal(cfg_var->name, var_type));
+  }
+}
 
 }  // namespace mcsema
-
-#endif  // MCSEMA_BC_LIFT_H_
