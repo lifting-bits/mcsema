@@ -62,6 +62,11 @@ class MainWindow(PluginForm):
         logo.setAlignment(QtCore.Qt.AlignCenter)
         logo_layout.addWidget(logo)
 
+        about_text = QtWidgets.QLabel()
+        about_text.setTextFormat(QtCore.Qt.RichText)
+        about_text.setText("<p>McSema<br/>x86 to machine code translation framework<br/><br/><a href=\"https://trailofbits.com\">https://trailofbits.com</a><br/><a href=\"https://github.com/trailofbits/mcsema\">https://github.com/trailofbits/mcsema</a></p>")
+        logo_layout.addWidget(about_text)
+
         layout.addLayout(logo_layout)
 
         #
