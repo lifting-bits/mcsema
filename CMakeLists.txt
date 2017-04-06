@@ -3,6 +3,11 @@
 project(mcsema)
 cmake_minimum_required(VERSION 3.1)
 
+if(WIN32)
+   string(REGEX REPLACE "\\\\" "/" CMAKE_SOURCE_DIR ${CMAKE_SOURCE_DIR})
+   string(REGEX REPLACE "\\\\" "/" CMAKE_BINARY_DIR ${CMAKE_BINARY_DIR})
+endif()
+
 if (NOT MCSEMA_GEN_DIR)
     set(MCSEMA_GEN_DIR "${CMAKE_BINARY_DIR}/mcsema_generated")
 endif()
@@ -42,7 +47,6 @@ if(NOT WIN32)
 
   find_package(Protobuf REQUIRED)
 else()
-   string(REGEX REPLACE "\\\\" "/" CMAKE_SOURCE_DIR ${CMAKE_SOURCE_DIR})
    # on win32, manuallys set protobuf goodness
    set(PROTOBUF_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/include")
    set(PROTOBUF_LIBRARIES "${CMAKE_SOURCE_DIR}/lib/protobuf.lib")

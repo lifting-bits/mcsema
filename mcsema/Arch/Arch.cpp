@@ -121,7 +121,7 @@ bool ListArchSupportedInstructions(const std::string &triple, llvm::raw_ostream 
 bool InitArch(llvm::LLVMContext *context, const std::string &os, const std::string &arch) {
 
   // Windows.
-  if (os == "win32") {
+  if (os == "windows") {
     gOSType = llvm::Triple::Win32;
     if (arch == "x86") {
       gArchType = llvm::Triple::x86;
