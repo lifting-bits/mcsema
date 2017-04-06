@@ -202,6 +202,8 @@ class GenericFunctionListPage(QtWidgets.QWidget):
         add_function_button.clicked.connect(self.onAddFunctionButtonClick)
         remove_function_button.clicked.connect(self.onRemoveFunctionButtonClick)
         add_all_functions_button.clicked.connect(self.onAddAllFunctionsButtonClick)
+        self._ida_function_list.itemDoubleClicked.connect(self.onAddFunctionButtonClick)
+        self._selected_function_list.itemDoubleClicked.connect(self.onRemoveFunctionButtonClick)
 
         layout.addLayout(temp_layout)
 
