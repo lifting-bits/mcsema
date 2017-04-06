@@ -36,7 +36,7 @@ tools_disass_dir = os.path.dirname(tools_disass_ida_dir)
 # Note: The bootstrap file will copy CFG_pb2.py into this dir!!
 import CFG_pb2
 
-_DEBUG = False
+_DEBUG = True
 _DEBUG_FILE = sys.stderr
 
 EXTERNALS = set()
@@ -2253,67 +2253,108 @@ def try_mark_as_function(address):
   idaapi.autoWait()
   return True
 
+def export_cfg(log_file, arch, pie_mode, operating_system, std_defs, exports_to_lift, entrypoint, syms, output, make_export_stubs, exports_are_apis):
+    if log_file != os.devnull:
+        global _DEBUG, _DEBUG_FILE
+        _DEBUG = True
+        _DEBUG_FILE = log_file
+
+        DEBUG("Debugging is enabled.")
+
+    addr_size = {"x86": 32, "amd64": 64}.get(arch, 0)
+    ADDRESS_SIZE = addr_size
+    if addr_size > getAvailableBitness():
+        DEBUG("Arch {} address size is too big for IDA's available bitness {}! Did you mean to use idal64?".format(
+            arch, getAvailableBitness()))
+        return False
+
+    if pie_mode:
+        DEBUG("Using PIE mode.")
+        PIE_MODE = True
+
+    EMAP = {}
+    EMAP_DATA = {}
+
+    # Try to find the defs file or this OS
+    OS_NAME = operating_system
+    os_defs_file = os.path.join(tools_disass_dir, "defs", "{}.txt".format(operating_system))
+    if os.path.isfile(os_defs_file):
+        std_defs.insert(0, os_defs_file)
+
+    # Load in all defs files, include custom ones
+    for defsfile in std_defs:
+        with open(defsfile, "r") as df:
+            DEBUG("Loading Standard Definitions file: {0}".format(defsfile))
+            em_update, emd_update = parseDefsFile(df)
+            EMAP.update(em_update)
+            EMAP_DATA.update(emd_update)
+
+    eps = []
+    if len(exports_to_lift) != 0:
+        eps = exports_to_lift
+    elif entrypoint is None:
+        eps = getAllExports()
+
+    eps = [ep.strip() for ep in eps]
+
+    # for batch mode: ensure IDA is done processing
+    analysis_flags = idc.GetShortPrm(idc.INF_START_AF)
+    analysis_flags &= ~idc.AF_IMMOFF
+    # turn off "automatically make offset" heuristic
+    idc.SetShortPrm(idc.INF_START_AF, analysis_flags)
+    idaapi.autoWait()
+
+    DEBUG("Starting analysis")
+    try:
+        # Pre-define a bunch of symbol names and their addresses. Useful when reading
+        # a core dump.
+        if syms:
+            for line in syms:
+                name, ea_str = line.strip().split(" ")
+                ea = int(ea_str, base=16)
+                if not isInternalCode(ea):
+                    mark_as_code(ea)
+                try_mark_as_function(ea)
+                idc.MakeName(ea, name)
+
+        myname = idc.GetInputFile()
+        mypath = path.dirname(__file__)
+        outpath = os.path.dirname(output.name)
+
+        if entrypoint:
+            eps.extend(entrypoint)
+
+        assert len(eps) > 0, "Need to have at least one entry point to lift"
+
+        DEBUG("Will lift {0} exports".format(len(eps)))
+        if make_export_stubs:
+            DEBUG("Generating export stubs...");
+
+            outdef = path.join(outpath, "{0}.def".format(myname))
+            DEBUG("Output .DEF file: {0}".format(outdef))
+            generateDefFile(outdef, eps)
+
+            outstub = path.join(outpath, "{0}_exportstub.c".format(myname))
+            DEBUG("Output export stub file: {0}".format(outstub))
+            generateExportStub(outstub, eps)
+
+            outbat = path.join(outpath, "{0}.bat".format(myname))
+            DEBUG("Output build .BAT: {0}".format(outbat))
+            generateBatFile(outbat, eps)
+
+        outf = output
+        DEBUG("CFG Output File file: {0}".format(outf.name))
+
+        recoverCfg(eps, outf, exports_are_apis)
+        return True
+
+    except Exception as e:
+        DEBUG(str(e))
+        DEBUG(traceback.format_exc())
+
+        return False
     
 if __name__ == "__main__":
-
-    #
-    # interactive mode support
-    #
-
-    architecture = None
-    operating_system = None
-    output_file_path = None
-    log_file_path = None
-    entry_point_list = []
-
-    if ida_kernwin.cvar.batch == 0:
-        print "Manual run detected; setting default parameters..."
-
-        # attempt to guess the architecture
-        # todo: use idaapi.get_inf_structure().procName to determine which arch we are dealing with.
-        # the 'bits' field is enough for the time being, since we only support x86 and amd64
-
-        if idaapi.get_inf_structure().procName != 'metapc':
-            print "Unsupported architecture"
-            exit(1)
-
-        if idaapi.get_inf_structure().is_64bit():
-            architecture="amd64"
-        elif idaapi.get_inf_structure().is_32bit():
-            architecture="x86"
-        else:
-            print "Only 32-bits and 64-bits targets are supported!"
-            exit(1)
-
-        # attempt to guess the file format
-        loader_module_name = idaapi.get_file_type_name()
-        if "Portable executable" in loader_module_name:
-            operating_system = "windows"
-        elif "ELF" in loader_module_name:
-            operating_system = "linux"
-        else:
-            print "Unsupported image type! Only PE and ELF executables are supported!"
-            exit(1)
-
-        # generate a default output path for both the cfg and the log file
-        output_file_path = idc.GetIdbPath() + '-mcsema.cfg'
-        log_file_path = idc.GetIdbPath() + '-mcsema.log'
-
-        # get the function name under the cursor and set it as the starting entry point
-        entry_point_name = idc.GetFunctionName(idc.ScreenEA())
-        entry_point_list.append(entry_point_name)
-
-        print "Summary:"
-        print 'Log file: ' + log_file_path
-        print 'Architecture: ' + architecture
-        print 'Operating system: ' + operating_system
-        print 'Output file: ' + output_file_path
-        print 'Entry point: ' + entry_point_name
-
-    #
-    # parse the command line argument
-    #
-
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--log_file", type=argparse.FileType('w'),
@@ -2360,107 +2401,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args(args=idc.ARGV[1:])
 
-    if args.log_file != os.devnull:
-        _DEBUG = True
-        _DEBUG_FILE = args.log_file
-        DEBUG("Debugging is enabled.")
+    export_list = [ ]
+    if args.exports_to_lift != None:
+        export_list = exports_to_lift.readlines()
 
-    addr_size = {"x86": 32, "amd64": 64}.get(args.arch, 0)
-    ADDRESS_SIZE = addr_size
-    if addr_size > getAvailableBitness():
-        DEBUG("Arch {} address size is too big for IDA's available bitness {}! Did you mean to use idal64?".format(
-            args.arch, getAvailableBitness()))
+    if not export_cfg(args.log_file, args.arch, args.pie_mode, args.os, args.std_defs, export_list, args.entrypoint, args.syms, args.output, args.make_export_stubs, args.exports_are_apis):
         idc.Exit(-1)
 
-    if args.pie_mode:
-        DEBUG("Using PIE mode.")
-        PIE_MODE = True
-
-    EMAP = {}
-    EMAP_DATA = {}
-
-    # Try to find the defs file or this OS
-    OS_NAME = args.os
-    os_defs_file = os.path.join(tools_disass_dir, "defs", "{}.txt".format(args.os))
-    if os.path.isfile(os_defs_file):
-        args.std_defs.insert(0, os_defs_file)
-
-    # Load in all defs files, include custom ones
-    for defsfile in args.std_defs:
-        with open(defsfile, "r") as df:
-            DEBUG("Loading Standard Definitions file: {0}".format(defsfile))
-            em_update, emd_update = parseDefsFile(df)
-            EMAP.update(em_update)
-            EMAP_DATA.update(emd_update)
-
-
-    eps = []
-    try:
-        if args.exports_to_lift: 
-            eps = args.exports_to_lift.readlines()
-        elif args.entrypoint is None:
-            eps = getAllExports()
-
-        eps = [ep.strip() for ep in eps]
-
-    except IOError as e:
-        DEBUG("Could not open file of exports to lift. See source for details")
-        idc.Exit(-1)
-
-    # for batch mode: ensure IDA is done processing
-    DEBUG("Using Batch mode.")
-    analysis_flags = idc.GetShortPrm(idc.INF_START_AF)
-    analysis_flags &= ~idc.AF_IMMOFF
-    # turn off "automatically make offset" heuristic
-    idc.SetShortPrm(idc.INF_START_AF, analysis_flags)
-    idaapi.autoWait()
-
-    DEBUG("Starting analysis")
-    try:
-        # Pre-define a bunch of symbol names and their addresses. Useful when reading
-        # a core dump.
-        if args.syms:
-            for line in args.syms:
-                name, ea_str = line.strip().split(" ")
-                ea = int(ea_str, base=16)
-                if not isInternalCode(ea):
-                    mark_as_code(ea)
-                try_mark_as_function(ea)
-                idc.MakeName(ea, name)
-
-        myname = idc.GetInputFile()
-        mypath = path.dirname(__file__)
-        outpath = os.path.dirname(args.output.name)
-
-        if args.entrypoint:
-            eps.extend(args.entrypoint)
-
-        assert len(eps) > 0, "Need to have at least one entry point to lift"
-
-        DEBUG("Will lift {0} exports".format(len(eps)))
-        if args.make_export_stubs:
-            DEBUG("Generating export stubs...");
-
-            outdef = path.join(outpath, "{0}.def".format(myname))
-            DEBUG("Output .DEF file: {0}".format(outdef))
-            generateDefFile(outdef, eps)
-
-            outstub = path.join(outpath, "{0}_exportstub.c".format(myname))
-            DEBUG("Output export stub file: {0}".format(outstub))
-            generateExportStub(outstub, eps)
-
-            outbat = path.join(outpath, "{0}.bat".format(myname))
-            DEBUG("Output build .BAT: {0}".format(outbat))
-            generateBatFile(outbat, eps)
-
-        outf = args.output
-        DEBUG("CFG Output File file: {0}".format(outf.name))
-
-        recoverCfg(eps, outf, args.exports_are_apis)
-    except Exception as e:
-        DEBUG(str(e))
-        DEBUG(traceback.format_exc())
-    
-    # do not close IDA if we are not being run in batch mode
-    if ida_kernwin.cvar.batch != 0:
-        idc.Exit(0)
+    idc.Exit(0)

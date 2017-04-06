@@ -3,7 +3,13 @@ import idautils
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+import sip
 import base64
+import time
+import datetime
+import StringIO
+
+from get_cfg import *
 
 class MainWindow(PluginForm):
     def OnCreate(self, form):
@@ -22,11 +28,15 @@ class MainWindow(PluginForm):
         button.clicked.connect(self.onRefreshButtonClick)
         temp_layout.addWidget(button)
 
-        button = QtWidgets.QPushButton("Execute")
-        button.clicked.connect(self.onExecuteButtonClick)
+        button = QtWidgets.QPushButton("Export")
+        button.clicked.connect(self.onExportButtonClick)
         temp_layout.addWidget(button)
 
         layout.addLayout(temp_layout)
+
+        # attempt to dock us to the right side of the disassembly
+        # todo: doesn't look like we can use self.windowTitle
+        idaapi.set_dock_pos("McSema", "IDA View-A", idaapi.DP_RIGHT)
 
     def initializeWidgets(self, layout):
         #
@@ -72,13 +82,13 @@ class MainWindow(PluginForm):
         self._export_list_page = ExportListPage()
         tab_widget.addTab(self._export_list_page, self._export_list_page.windowTitle())
 
-        # symbol definitions page
+        # standard definitions page
+        self._standard_definitions_page = StandardDefinitionsPage()
+        tab_widget.addTab(self._standard_definitions_page, self._standard_definitions_page.windowTitle())
+
+        # symbol definitions
         self._symbol_definitions_page = SymbolDefinitionsPage()
         tab_widget.addTab(self._symbol_definitions_page, self._symbol_definitions_page.windowTitle())
-
-        # definitions and calling conventions for imported data and functions
-        self._defs_and_call_conventions_page = DefinitionsAndCallingConventionsPage()
-        tab_widget.addTab(self._defs_and_call_conventions_page, self._defs_and_call_conventions_page.windowTitle())
 
         layout.addWidget(tab_widget)
 
@@ -89,10 +99,8 @@ class MainWindow(PluginForm):
         self._settings_page.refresh()
         self._function_list_page.refresh()
         self._export_list_page.refresh()
-        self._symbol_definitions_page.refresh()
-        self._defs_and_call_conventions_page.refresh()
 
-    def onExecuteButtonClick(self):
+    def onExportButtonClick(self):
         architecture = self._settings_page.architecture()
         operating_system = self._settings_page.operatingSystem()
 
@@ -103,8 +111,16 @@ class MainWindow(PluginForm):
         function_list = self._function_list_page.getSelectedFunctionList()
         export_list = self._export_list_page.getSelectedFunctionList()
 
-        PrintMessage("Not yet implemented!")
+        symbol_definitions = self._symbol_definitions_page.getSymbolDefinitions()
+        str_helper = StringIO.StringIO()
+        str_helper.write(symbol_definitions)
+        symbol_definition_lines = str_helper.readlines()
 
+        output_file_path = idc.GetIdbPath();
+        output_file_path += ".mcd"
+
+        timestamp = datetime.datetime.now()
+        PrintMessage("=> " + str(timestamp))
         PrintMessage("Architecture: " + architecture)
         PrintMessage("Operating_system: " + operating_system)
         PrintMessage("PIE mode: " + str(pie_mode))
@@ -112,6 +128,21 @@ class MainWindow(PluginForm):
         PrintMessage("Exports are APIs: " + str(exports_are_apis))
         PrintMessage("Selected functions: " + str(len(function_list)))
         PrintMessage("Selected exports: " + str(len(export_list)))
+
+        try:
+            output_file = open(output_file_path, "w")
+            debug_stream = StringIO.StringIO()
+
+            if not export_cfg(debug_stream, architecture, pie_mode, operating_system, [ ], export_list, function_list, symbol_definition_lines, output_file, generate_export_stubs, exports_are_apis):
+                PrintMessage("Failed to generate the control flow graph information. Debug output follows")
+                PrintMessage("===\n" + debug_stream.getvalue())
+            else:
+                PrintMessage("Control flow information saved to " + output_file_path)
+
+            debug_stream.close()
+
+        except:
+            print "Failed to create the output file"
 
 class GenericFunctionListPage(QtWidgets.QWidget):
     def __init__(self, title, get_function_list_callback, parent = None):
@@ -162,7 +193,7 @@ class GenericFunctionListPage(QtWidgets.QWidget):
         # functions that will be used as entry points by mcsema
         temp_layout = QtWidgets.QVBoxLayout()
 
-        temp_layout.addWidget(QtWidgets.QLabel("McSema input"))
+        temp_layout.addWidget(QtWidgets.QLabel("Selected functions"))
         self._selected_function_list = QtWidgets.QListWidget()
         temp_layout.addWidget(self._selected_function_list)
 
@@ -267,23 +298,21 @@ class ExportListPage(GenericFunctionListPage):
 
         return function_name_list
 
-class SymbolDefinitionsPage(QtWidgets.QWidget):
+class StandardDefinitionsPage(QtWidgets.QWidget):
     def __init__(self, parent = None):
-        super(SymbolDefinitionsPage, self).__init__(parent)
+        super(StandardDefinitionsPage, self).__init__(parent)
 
-        self.setWindowTitle("Symbol definitions")
+        self.setWindowTitle("Standard definitions")
 
         main_layout = QtWidgets.QHBoxLayout()
         self.initializeWidgets(main_layout)
         self.setLayout(main_layout)
 
-        self.refresh()
-
     def initializeWidgets(self, layout):
         # text editor
         temp_layout = QtWidgets.QVBoxLayout()
 
-        self._symbol_definitions = QtWidgets.QTextEdit()
+        self._symbol_definitions = QtWidgets.QPlainTextEdit()
         temp_layout.addWidget(self._symbol_definitions)
 
         layout.addLayout(temp_layout)
@@ -296,20 +325,15 @@ class SymbolDefinitionsPage(QtWidgets.QWidget):
 
         layout.addLayout(temp_layout)
 
-    def refresh(self):
-        print "SymbolDefinitionsPage refresh"
-
-class DefinitionsAndCallingConventionsPage(QtWidgets.QWidget):
+class SymbolDefinitionsPage(QtWidgets.QWidget):
     def __init__(self, parent = None):
-        super(DefinitionsAndCallingConventionsPage, self).__init__(parent)
+        super(SymbolDefinitionsPage, self).__init__(parent)
 
-        self.setWindowTitle("Definitions and calling conventions")
+        self.setWindowTitle("Symbol definitions")
 
         main_layout = QtWidgets.QHBoxLayout()
         self.initializeWidgets(main_layout)
         self.setLayout(main_layout)
-
-        self.refresh()
 
     def initializeWidgets(self, layout):
         # text editor
@@ -322,14 +346,32 @@ class DefinitionsAndCallingConventionsPage(QtWidgets.QWidget):
 
         # controls
         temp_layout = QtWidgets.QVBoxLayout()
-        temp_layout.addWidget(QtWidgets.QPushButton("Load from file"))
-        temp_layout.addWidget(QtWidgets.QPushButton("Clear"))
+
+        load_button = QtWidgets.QPushButton("Load from file")
+        temp_layout.addWidget(load_button)
+        load_button.clicked.connect(self.onLoadButtonClick)
+
+        clear_button = QtWidgets.QPushButton("Clear")
+        temp_layout.addWidget(clear_button)
+        clear_button.clicked.connect(self._definitions.clear)
+
         temp_layout.addSpacerItem(QtWidgets.QSpacerItem(1, 1, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
 
         layout.addLayout(temp_layout)
 
-    def refresh(self):
-        print "DefinitionsAndCallingConventionsPage refresh"
+    def onLoadButtonClick(self):
+        input_file_path = QtWidgets.QFileDialog.getOpenFileName(self, "Symbol definitions file")[0]
+        if len(input_file_path) == 0:
+            return
+
+        input_file = open(input_file_path, "r")
+        input_file_content = input_file.read()
+        self._definitions.setText(input_file_content)
+
+        input_file.close()
+
+    def getSymbolDefinitions(self):
+        return self._definitions.toPlainText()
 
 class SettingsPage(QtWidgets.QWidget):
     def __init__(self, parent = None):
