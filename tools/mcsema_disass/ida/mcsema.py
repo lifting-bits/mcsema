@@ -116,6 +116,8 @@ class MainWindow(PluginForm):
         str_helper.write(symbol_definitions)
         symbol_definition_lines = str_helper.readlines()
 
+        standard_definition_file_list = self._standard_definitions_page.getStandardDefinitionFileList()
+
         output_file_path = idc.GetIdbPath();
         output_file_path += ".mcd"
 
@@ -133,7 +135,7 @@ class MainWindow(PluginForm):
             output_file = open(output_file_path, "w")
             debug_stream = StringIO.StringIO()
 
-            if not export_cfg(debug_stream, architecture, pie_mode, operating_system, [ ], export_list, function_list, symbol_definition_lines, output_file, generate_export_stubs, exports_are_apis):
+            if not export_cfg(debug_stream, architecture, pie_mode, operating_system, standard_definition_file_list, export_list, function_list, symbol_definition_lines, output_file, generate_export_stubs, exports_are_apis):
                 PrintMessage("Failed to generate the control flow graph information. Debug output follows")
                 PrintMessage("===\n" + debug_stream.getvalue())
             else:
@@ -314,18 +316,54 @@ class StandardDefinitionsPage(QtWidgets.QWidget):
         # text editor
         temp_layout = QtWidgets.QVBoxLayout()
 
-        self._symbol_definitions = QtWidgets.QPlainTextEdit()
-        temp_layout.addWidget(self._symbol_definitions)
+        self._definition_file_list = QtWidgets.QListWidget()
+        temp_layout.addWidget(self._definition_file_list)
 
         layout.addLayout(temp_layout)
 
         # controls
         temp_layout = QtWidgets.QVBoxLayout()
-        temp_layout.addWidget(QtWidgets.QPushButton("Load from file"))
-        temp_layout.addWidget(QtWidgets.QPushButton("Clear"))
-        temp_layout.addSpacerItem(QtWidgets.QSpacerItem(1, 1, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
 
+        add_file_button = QtWidgets.QPushButton("Add file")
+        temp_layout.addWidget(add_file_button)
+
+        remove_file_button = QtWidgets.QPushButton("Remove file")
+        temp_layout.addWidget(remove_file_button)
+
+        clear_button = QtWidgets.QPushButton("Clear")
+        temp_layout.addWidget(clear_button)
+
+        temp_layout.addSpacerItem(QtWidgets.QSpacerItem(1, 1, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding))
         layout.addLayout(temp_layout)
+
+        # connections
+        add_file_button.clicked.connect(self.onAddFileButtonClick)
+        remove_file_button.clicked.connect(self.onRemoveFileButtonClick)
+        clear_button.clicked.connect(self._definition_file_list.clear)
+        self._definition_file_list.itemDoubleClicked.connect(self.onRemoveFileButtonClick)
+
+    def onAddFileButtonClick(self):
+        file_path = QtWidgets.QFileDialog.getOpenFileName(self, "Symbol definitions file")[0]
+        if len(file_path) == 0:
+            return
+
+        self._definition_file_list.addItem(file_path)
+
+    def onRemoveFileButtonClick(self):
+        current_row = self._definition_file_list.currentRow()
+        if current_row == -1:
+            return
+
+        self._definition_file_list.takeItem(current_row)
+
+    def getStandardDefinitionFileList(self):
+        file_list = [ ]
+
+        for i in range(0, self._definition_file_list.count()):
+            file_name = self._definition_file_list.item(i).text()
+            file_list.append(file_name)
+
+        return file_list
 
 class SymbolDefinitionsPage(QtWidgets.QWidget):
     def __init__(self, parent = None):
