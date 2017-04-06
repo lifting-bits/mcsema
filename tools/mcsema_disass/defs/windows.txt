@@ -17,7 +17,7 @@ DATA: _fmode PTR
 
 #processing C runtime
 _configthreadlocale 1 C N
-_crtSetUnhandledExceptionFilter 1 C N
+__crtSetUnhandledExceptionFilter 1 C N
 _XcptFilter 1 C N
 _invoke_watson 5 C N
 
