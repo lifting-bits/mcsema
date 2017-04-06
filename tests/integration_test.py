@@ -11,6 +11,11 @@ import base64
 
 DEBUG = False
 
+def binary_name(s):
+  if platform.system().lower() == "windows":
+    return s+".exe"
+  return s
+
 def b64(f):
     """ Base64 encodes the file 'f' """
 
@@ -41,7 +46,7 @@ class LinuxTest(unittest.TestCase):
 
         self.my_dir = os.path.dirname(__file__)
         self.mcsema_lift = os.path.realpath(
-            os.path.join(self.my_dir, "../", "bin", "mcsema-lift"))
+            os.path.join(self.my_dir, "..", "bin", binary_name("mcsema-lift")))
 
         if self.on_test_os:
             # we can only rebuild binaries if we are running on the same OS
@@ -131,10 +136,10 @@ class LinuxTest(unittest.TestCase):
             "x86": "mcsema_semantics_x86.bc", }
 
         runtime_lib = os.path.realpath(
-            os.path.join(self.my_dir, "../", "lib", arch_lib_name[arch]))
+            os.path.join(self.my_dir, "..", "lib", arch_lib_name[arch]))
 
         bitcode_lib = os.path.realpath(
-            os.path.join(self.my_dir, "../", "lib", arch_bitcode_name[arch]))
+            os.path.join(self.my_dir, "..", "lib", arch_bitcode_name[arch]))
 
         flags = {
             "amd64": "-m64",
