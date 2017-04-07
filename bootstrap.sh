@@ -7,7 +7,9 @@ BUILD_DIR=${DIR}/build
 THIRD_PARTY_DIR=${DIR}/third_party
 LLVM_DIR=${DIR}/third_party/llvm
 GEN_DIR=${BUILD_DIR}/mcsema_generated
-PREFIX=$(readlink -f ${DIR})
+
+# we may not have realpath yet (installation comes later), so do use python to simulate
+PREFIX=$(python -c "import os; import sys; sys.stdout.write(os.path.abspath('${DIR}'))")
 
 # locate the osx sdk
 OSX_SDK=
@@ -37,7 +39,7 @@ function main
 
     case $key in
       -p|--prefix)
-      PREFIX=$(readlink -f $2)
+      PREFIX=$(python -c "import os; import sys; sys.stdout.write(os.path.abspath('${2}'))")
       shift # past argument
     ;;
 
