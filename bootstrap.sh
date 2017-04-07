@@ -465,7 +465,12 @@ function InstallDisassembler
     return 1
   fi
 
-  "$python_path" ${DIR}/tools/setup.py install --user --install-scripts "${PREFIX}/bin"
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    # python install on osx travis (and maybe normal osx with homebrew?) is broken, workaround
+    "$python_path" ${DIR}/tools/setup.py install --user --prefix= --install-scripts "${PREFIX}/bin"
+  else
+    "$python_path" ${DIR}/tools/setup.py install --user --install-scripts "${PREFIX}/bin"
+  fi
   if [ $? -ne 0 ] ; then
     echo "Failed to install the disassembler"
     return 1
