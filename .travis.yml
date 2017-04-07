@@ -1,6 +1,3 @@
-sudo: required
-dist: trusty
-language: generic
 cache:
   timeout: 660
   pip: true
@@ -8,12 +5,23 @@ cache:
   directories:
     - build/llvm
     - third_party/llvm
-os:
- - linux
+
+matrix:
+    include:
+        - os: linux
+          dist: trusty
+          language: generic
+          sudo: required
+        - os: osx
+          language: generic
+          sudo: required
+
 before_install:
- - sudo apt-get -qq update
- - sudo apt-get install -qqy libxml2-dev git cmake libprotoc-dev libprotobuf-dev libprotobuf-dev protobuf-compiler python2.7 python-pip llvm-3.8 clang-3.8 realpath gcc-multilib
+ - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; sudo apt-get -qq update               ; fi
+ - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; sudo apt-get install -qqy libxml2-dev git cmake libprotoc-dev libprotobuf-dev libprotobuf-dev protobuf-compiler python2.7 python-pip llvm-3.8 clang-3.8 realpath gcc-multilib; fi
  - sudo pip install 'protobuf==2.6.1'
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update                        ; fi
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install wget cmake coreutils  ; fi
 install: true
 script:
  - ./bootstrap.sh
