@@ -150,11 +150,10 @@ function InstallDependencies
   if [[ "$OSTYPE" == "darwin"* ]]; then
     local osx_dependencies="wget git cmake coreutils"
 
-    brew install $osx_dependencies
-    if [ $? -ne 0 ] ; then
-      echo "Brew has failed to install the following packages: ${osx_dependencies}. Continuing anyway..."
-      return 1
-    fi
+    for osx_dep in ${osx_dependencies[@]} ; do
+      # homebrew errors on installing already installed things
+      brew outdated ${osx_dep} || brew upgrade ${osx_dep} || brew install ${osx_dep}
+    done
 
     return 0
 
