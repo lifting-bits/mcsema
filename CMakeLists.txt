@@ -19,10 +19,10 @@ include_directories(${CMAKE_BINARY_DIR})
 
 message(STATUS "Generated files will be stored in: ${MCSEMA_GEN_DIR}")
 
-set(CMAKE_MODULE_PATH "${CMAKE_BINARY_DIR}/llvm/share/llvm/cmake/" "${CMAKE_SOURCE_DIR}/cmake" "${CMAKE_ROOT}/Modules")
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" "${CMAKE_ROOT}/Modules")
 
 # Configure with the build LLVM
-find_package(LLVM 3.8 REQUIRED CONFIG)
+find_package(LLVM 3.8 REQUIRED CONFIG HINTS "${CMAKE_BINARY_DIR}/llvm/share/llvm/cmake")
 add_definitions(${LLVM_DEFINITIONS})
 
 include (LLVMUtils)
