@@ -305,7 +305,17 @@ class ExportListPage(GenericFunctionListPage):
     def GetFunctionListCallback():
         function_name_list = [ ]
         for exported_function_tuple in idautils.Entries():
-            function_name_list.append(exported_function_tuple[3])
+            virtual_address = exported_function_tuple[2]
+            symbol_name = exported_function_tuple[3]
+
+            memory_flags = idc.GetFlags(virtual_address)
+            if not idc.isCode(memory_flags):
+                continue
+
+            if idc.isData(memory_flags):
+                continue
+
+            function_name_list.append(symbol_name)
 
         return function_name_list
 
