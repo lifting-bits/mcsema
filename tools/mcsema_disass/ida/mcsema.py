@@ -49,8 +49,10 @@ class MainWindow(PluginForm):
         gray = background_color.red() * 0.299 + background_color.green() * 0.587 + background_color.blue() * 0.114
         if gray <= 186:
             logo_image_base64 = dark_mode_logo_base64
+            link_color = "white"
         else:
             logo_image_base64 = bright_mode_logo_base64
+            link_color = "red"
 
         logo_layout = QtWidgets.QHBoxLayout()
 
@@ -64,7 +66,7 @@ class MainWindow(PluginForm):
 
         about_text = QtWidgets.QLabel()
         about_text.setTextFormat(QtCore.Qt.RichText)
-        about_text.setText("<p>McSema<br/>x86 to machine code translation framework<br/><br/><a href=\"https://trailofbits.com\">https://trailofbits.com</a><br/><a href=\"https://github.com/trailofbits/mcsema\">https://github.com/trailofbits/mcsema</a></p>")
+        about_text.setText("<p>McSema<br/>x86 to machine code translation framework<br/><br/><a href=\"https://trailofbits.com\" style=\"color: {};\">https://trailofbits.com</a><br/><a href=\"https://github.com/trailofbits/mcsema\" style=\"color: {};\">https://github.com/trailofbits/mcsema</a></p>".format(link_color, link_color))
         logo_layout.addWidget(about_text)
 
         layout.addLayout(logo_layout)
