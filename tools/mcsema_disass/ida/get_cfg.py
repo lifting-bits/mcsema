@@ -51,6 +51,13 @@ import traceback
 import collections
 import itertools
 
+# Bring in utility libraries.
+from util import *
+from table import *
+from flow import *
+from refs import *
+from segment import *
+
 #hack for IDAPython to see google protobuf lib
 if os.path.isdir('/usr/lib/python2.7/dist-packages'):
     sys.path.append('/usr/lib/python2.7/dist-packages')
@@ -63,9 +70,6 @@ tools_disass_dir = os.path.dirname(tools_disass_ida_dir)
 
 # Note: The bootstrap file will copy CFG_pb2.py into this dir!!
 import CFG_pb2
-
-_DEBUG = False
-_DEBUG_FILE = sys.stderr
 
 EXTERNALS = set()
 DATA_SEGMENTS = {}
@@ -88,22 +92,6 @@ EXTERNAL_NAMES = [
 EXTERNAL_DATA_COMMENTS = [
         "Copy of shared data",
         ]
-
-def DEBUG(s):
-    global _DEBUG, _DEBUG_FILE
-    if _DEBUG:
-        _DEBUG_FILE.write("{}\n".format(str(s)))
-        _DEBUG_FILE.flush()
-
-import util
-util.DEBUG = DEBUG
-
-# Bring in utility libraries.
-from util import *
-from table import *
-from flow import *
-from refs import *
-from segment import *
 
 def hasExternalDataComment(ea):
     cmt = idc.GetCommentEx(ea, 0)
@@ -139,6 +127,7 @@ def fixExternalName(fn):
     if fn in EMAP_DATA:
         return fn
 
+    # TODO(pag): Is this a macOS or Windows thing?
     if not isLinkedElf() and fn[0] == '_':
         return fn[1:]
 
@@ -174,56 +163,9 @@ def getFromEMAP(fname):
     fixname = fixExternalName(fname)
     return EMAP[fixname]
 
-def addFunction(M, ep):
-    F = M.funcs.add()
-    F.ea = ep
-    name = get_symbol_name(ep, ep)
-    if name:
-        F.name = name
-    return F
-
-def basicBlockHandler(M, F, block_ea, new_func_eas):
-    inst_eas, succ_eas = analyse_block(
-        F.ea, block_ea, PIE_MODE)
-
-    DEBUG("BB: {:x} in func {:x} with {} insts".format(
-        block_ea, F.ea, len(inst_eas)))
-    
-    B = F.blocks.add()
-    B.ea = block_ea
-    B.successor_eas.extend(succ_eas)
-
-    # Sometimes there will be tail-calls to thunks, or thunk-to-thunks, and 
-    # we want to make sure that we can recognize the target as an external,
-    # even if it isn't the final destination. The side-effect of this is that
-    # the same external function name may show up twice or more in the proto. 
-    for succ_ea in succ_eas:
-        if is_external_segment(succ_ea):
-            is_thunk, thunk_name = isElfThunk(succ_ea)
-            if is_thunk:
-                EXTERNAL_FUNCS_TO_RECOVER.add((succ_ea, thunk_name))
-            else:
-                name = get_symbol_name(succ_ea)
-                name = fixExternalName(name)
-                EXTERNAL_FUNCS_TO_RECOVER.add((succ_ea, name))
-
-    if _DEBUG:
-        str_l = ["{0:x}".format(i) for i in succ_eas]
-        if len(str_l) > 0:
-            DEBUG("Successors: {}".format(", ".join(str_l)))
-
-    for inst_ea in inst_eas:
-        insn_t, inst_bytes = decode_instruction(inst_ea)
-        instructionHandler(
-            M, B, insn_t, inst_bytes, inst_ea, new_func_eas)
-
-    return B
-
-
 def isExternalReference(ea):
     # see if this is in an internal or external code ref
     if is_external_segment(ea):
-        DEBUG("{:x} is in an external segment".format(ea))
         return True
 
     if isLinkedElf():
@@ -313,100 +255,6 @@ def debug_ref_string(ref):
 
 MISSING_FUNCS = set()
 
-def add_inst_refs_to_cfg(I, insn_t, addr, new_func_eas):
-    """Add the memory/code reference information from this instruction
-    into the CFG format."""
-    global EXTERNAL_FUNCS_TO_RECOVER, EXTERNALS
-
-    debug_info = ["  I: {:x}".format(addr)]
-    refs = get_instruction_references(insn_t, PIE_MODE)
-    for ref in refs:
-        addrs = set()
-        R = I.xrefs.add()
-        R.target_type = reference_target_type(ref)
-        R.location = reference_location(ref)
-        R.operand_type = reference_operand_type(ref)
-        R.address = ref.addr
-
-        if ref.symbol:
-            R.name = ref.symbol
-
-            # Handle renaming things like `stderr_ptr` in the `.got` into
-            # an external reference to `stderr`.
-            if R.location == CFG_pb2.CodeReference.External:
-                new_name = fixExternalName(ref.symbol)
-                new_addr = idc.LocByName(new_name)
-                if new_name != ref.symbol or new_addr != ref.addr:
-                    DEBUG("Changing reference to {} into reference to {}".format(
-                        ref.symbol, new_name))
-
-                    ref.addr = idc.LocByName(new_name)
-                    ref.symbol = new_name
-                    R.name = ref.symbol
-
-                    R.target_type = reference_target_type(ref)
-                    R.location = reference_location(ref)
-
-        # Make sure anything that isn't yet resolved as a subroutine is resolved.
-        if R.target_type == CFG_pb2.CodeReference.CodeTarget \
-        and R.location == CFG_pb2.CodeReference.Internal \
-        and not idc.GetFunctionName(ref.addr):
-            DEBUG("Marking {:x} referenced from {:x} as a function".format(
-                ref.addr, addr))
-            try_mark_as_function(ref.addr)
-            new_func_eas.add(ref.addr)
-
-        # If this is a code ref, and if it's a target to a thunk, then we want
-        # the lifter to treat the thunk as if it's the real function, so we
-        # mark this code reference as being external.
-        #
-        # Note: If `isElfThunk` returns `True` then `name` is already in, or
-        #       has been added, to the `EXTERNALS` set.
-        is_thunk, name = isElfThunk(ref.addr)
-        if is_thunk:
-            DEBUG("Redirecting code ref from {:x} to thunk {:x} to external {}".format(
-                addr, ref.addr, name))
-            ref.symbol = name
-            R.name = name
-            R.location = CFG_pb2.CodeReference.External
-            R.target_type = reference_target_type(ref)
-
-        # # If we changed the resolution of the thing, then go and update
-        # # the target and location types. Sometimes we'll get what looks like
-        # # a data reference, but ends up being resolved into a code reference
-        # # when we follow references through to their logical externals.
-        # new_addr = idc.LocByName(ref.symbol)
-        # if ref.addr != new_addr and idc.BADADDR != new_addr:
-        #     DEBUG("Reference address of {} changed from {:x} to {:x}".format(
-        #         ref.symbol, ref.addr, new_addr))
-
-        #     ref.addr = new_addr
-        #     R.location = reference_location(ref)
-        #     R.target_type = reference_target_type(ref)
-
-        # Update the externals map.
-        if R.location == CFG_pb2.CodeReference.External:
-            if R.target_type == CFG_pb2.CodeReference.CodeTarget:
-                EXTERNAL_FUNCS_TO_RECOVER.add((R.address, ref.symbol))
-            else:
-                EXTERNAL_VARS_TO_RECOVER.add((R.address, ref.symbol))
-
-            EXTERNALS.add(ref.symbol)
-
-        debug_info.append(debug_ref_string(R))
-
-    DEBUG(" ".join(debug_info))
-
-def add_inst_to_cfg(block, addr, inst, inst_bytes, new_func_eas):
-    global EXTERNALS, PIE_MODE
-
-    I = block.instructions.add()
-    I.ea = addr  # May not be `insn_t.ea` because of prefix coalescing.
-    I.bytes = inst_bytes
-    if is_function_call(inst):
-        add_inst_refs_to_cfg(I, inst, addr, new_func_eas)
-    return I
-
 def handleExternalRef(fn):
     # Don't mangle symbols for fully linked ELFs... yet
     in_a_map = fn in EMAP or fn in EMAP_DATA
@@ -489,8 +337,8 @@ def isElfThunkByStructureImpl(ea):
     """Try to manually identify an ELF thunk by its structure."""
     global _INVALID_THUNK
 
-    insn_t, _ = decode_instruction(ea)
-    if not insn_t or not is_indirect_jump(insn_t):
+    inst, _ = decode_instruction(ea)
+    if not inst or not is_indirect_jump(inst):
         return _INVALID_THUNK
 
     real_ext_ref = None
@@ -525,14 +373,14 @@ def isThunkByFlags(ea):
         return _INVALID_THUNK
     
     ea_name = getFunctionName(ea)
-    insn_t, _ = decode_instruction(ea)
-    if not insn_t:
+    inst, _ = decode_instruction(ea)
+    if not inst:
         DEBUG("{} at {:x} is a thunk with no code??".format(ea_name, ea))
         return _INVALID_THUNK
 
     # Recursively find thunk-to-thunks.
-    if is_direct_jump(insn_t) or is_direct_function_call(insn_t):
-        targ_ea = get_direct_branch_target(insn_t)
+    if is_direct_jump(inst) or is_direct_function_call(inst):
+        targ_ea = get_direct_branch_target(inst)
         targ_is_thunk, targ_thunk_name = isElfThunk(targ_ea)
         if targ_is_thunk:
             DEBUG("Found thunk-to-thunk {:x} -> {:x}: {} to {}".format(
@@ -543,20 +391,6 @@ def isThunkByFlags(ea):
 
     if not isExternalReference(ea):
         return _INVALID_THUNK
-
-    # # This has the structure of a PLT thunk, but is more like an 'internal'
-    # # thunk. This comes up, for example, with `sqlite3MallocSize`, where this
-    # # function goes and tail-calls via a global function pointer, where the
-    # # pointer is initialized on init based on config options.
-    # elif is_indirect_jump(insn_t):
-    #     return False, None
-    #     # refs = get_instruction_references(insn_t, PIE_MODE)
-    #     # if len(refs):
-    #     #     data_addr = refs[0].addr
-    #     #     if ".got" not in idc.SegName(data_addr).lower():
-    #     #         return False, ea_name
-
-    # DEBUG("{} at {:x} is a thunk by flags".format(ea_name, ea))
 
     return True, handleExternalRef(ea_name)
 
@@ -586,16 +420,6 @@ def isElfThunk(ea):
     else:
         _ELF_THUNKS[ea] = (is_thunk, name)
         return is_thunk, name
-
-def instructionHandler(M, B, insn_t, inst_bytes, addr, new_func_eas):
-    I = add_inst_to_cfg(B, addr, insn_t, inst_bytes, new_func_eas)
-    if is_noreturn_inst(insn_t):
-        I.local_noreturn = True
-
-    table = get_jump_table(insn_t, PIE_MODE)
-    if table:
-        I.jump_table_addr = table.table_ea
-        I.offset_base_addr = table.offset
 
 WEAK_SYMS = set()
 OS_NAME = ""
@@ -985,292 +809,191 @@ def processDataChunk(ea, size):
         DEBUG("Found an unknown blob at {:x}, treating as table".format(ea))
         return processTable(ea, size)
 
-# def scanDataForRelocs(M, D, start, end, new_eas, seg_offset):
-#     segtype = idc.GetSegmentAttr(start, idc.SEGATTR_TYPE)
-#     if segtype == idc.SEG_CODE:
-#         return
-
-#     i = start
-#     while i < end:
-#         more_dref = [d for d in idautils.DataRefsFrom(i)]
-#         dref_size = idc.ItemSize(i) or 1
-#         if len(more_dref) == 0 and dref_size == 1 and not PIE_MODE:
-#             DEBUG("Testing address: {0:x}... ".format(i))
-
-#             # try to read a qword first, then fall back on dword
-#             inc_size = 1
-#             if get_address_size_in_bits() == 64:
-#                 pword = read_qword(i)
-#                 make_word = idc.MakeQword
-#                 inc_size = 8
-#                 if not isSaneReference(pword):
-#                     pword = read_dword(i)
-#                     make_word = idc.MakeDword
-#                     inc_size = 4
-#             else:
-#                 make_word = idc.MakeDword
-#                 pword = read_dword(i)
-#                 inc_size = 4
-
-#             # check for unmakred references
-
-#             #TODO(artem) possibly add check that do more reference sanity 
-#             # checking, such as if pword falls in the middle of a string
-#             if isInData(pword, pword+1):# and idc.ItemHead(pword) == pword:
-#                 if make_word(i):
-#                     idc.add_dref(i, pword, idc.XREF_USER|idc.dr_O)
-#                     DEBUG("making New Data Reference at: {0:x} => {1:x}".format(i, pword))
-#                     dref_size = inc_size
-#                 else:
-#                     DEBUG("WARNING: Could not make reference at {:x}".format(i))
-#             # check if code and points to the beginning of an instruction
-#             elif is_internal_code(pword) and idc.ItemHead(pword) == pword:
-#                 if make_word(i):
-#                     idc.AddCodeXref(i, pword, idc.XREF_USER|idc.fl_F)
-#                     DEBUG("making New Code Reference at: {0:x} => {1:x}".format(i, pword))
-#                     dref_size = inc_size
-#                 else:
-#                     DEBUG("WARNING: Could not make reference at {:x}".format(i))
-#             else:
-#                 DEBUG("not code or data ref")
-
-#         i += dref_size
-
-#     def insertReference(M, D, ea, pointsto, seg_offset, new_eas, force_size=None):
-#         # Sometiems we can have a spurious data-to-code ref, where the code should
-#         # not be considered a function, because it's part of some basic block, and
-#         # there is a normal control-flow (fall-through) to that code. This happens
-#         # because we embed the code sections into the CFG as if they are data
-#         # sections, and so they are scanned for xrefs.
-#         if not is_code(ea) and is_code(pointsto) \
-#         and len(tuple(idautils.CodeRefsTo(pointsto, 1))):
-#             DEBUG("Not adding code-to-code ref {:x} -> {:x} into code-data section".format(
-#                 ea, pointsto))
-#             return
-
-#         # do not make code references for mid-function code accessed via a JMP -- 
-#         # they will be found via the jumptable code. This prevents the insertion
-#         # of lots of extra code, but could be wrong for some cases
-#         elif ea in ACCESSED_VIA_JMP and not isStartOfFunction(pointsto):
-#             # bail only if we are access via JMP and not the start
-#             # of a function
-#             DEBUG("Not adding jmp table data-to-code {:x} -> {:x} into data section".format(
-#                 ea, pointsto))
-#             return
-
-#         DEBUG("\t\tFound a probable ref from: {:x} => {:x}".format(ea, pointsto))
-#         real_size = idc.ItemSize(pointsto)
-#         if force_size is None:
-#             reloc_size = idc.ItemSize(ea)
-#         else:
-#             reloc_size = force_size
-#         DEBUG("\t\tReal Ref: {0:x}, reloc size: {2}, ref size: {1}".format(pointsto, real_size, reloc_size))
-#         insertRelocatedSymbol(M, D, pointsto, ea, seg_offset, new_eas, reloc_size)
-
-
-#     i = start
-#     while i < end:
-#         DEBUG("Checking address: {:x}".format(i))
-#         dref_size = idc.ItemSize(i) or 1
-#         if dref_size > get_address_size_in_bytes():
-#             DEBUG("Possible table/struct data at {:x}; size: {:x}".format(i, dref_size))
-#             (found, addrs, entry_size) = processDataChunk(i, dref_size)
-#             if found:
-#                 DEBUG("Its a table/struct, adding {} references".format(len(addrs)))
-#                 for ta in sorted(addrs.keys()):
-#                     if addrs[ta] != 0:
-#                         insertReference(M, D, ta, addrs[ta], seg_offset, new_eas, force_size=entry_size)
-#             else:
-#                 DEBUG("Not a stable/struct, skipping")
-
-#         elif dref_size == get_address_size_in_bytes() or dref_size == 4:
-#             if dref_size == 4 and get_address_size_in_bits() == 64:
-#                 # check if IDA missed a qword data reference
-#                 dw = read_dword(i+4)
-#                 if dw == 0:
-#                     if idc.MakeQword(i):
-#                         DEBUG("Making qword from 32-bit dref at {:x}".format(i))
-#                         dref_size = 8
-#                     else:
-#                         DEBUG("WARNING: Failed at make qword at {:x}, ignoring ref".format(i))
-#                         dref_size = 4
-#                         i += dref_size
-#                         continue
-
-#                 else:
-#                     DEBUG("WARNING: could not make qword from 32-bit dref at {:x}, ignoring ref".format(i))
-#                     dref_size = 4
-#                     i += dref_size
-#                     continue
-
-#             more_cref = [c for c in idautils.CodeRefsFrom(i,0)]
-
-#             # sanity check IDA
-#             more_cref = filter(lambda x: idc.ItemHead(x) == x, more_cref)
-
-#             more_dref = [d for d in idautils.DataRefsFrom(i)]
-#             more_dref.extend(more_cref)
-#             # do this check since IDA is crazy and sometimes returns data
-#             # references > 0xff00000000000000
-#             if len(more_dref) > 0 and more_dref[0] < 0xff00000000000000:
-#                 DEBUG("\t\tFound a probable ref from: {0:x} => {1:x}".format(i, more_dref[0]))
-#                 if len(more_dref) == 1:
-#                     insertReference(M, D, i, more_dref[0], seg_offset, new_eas)
-#                 else: 
-#                     DEBUG("\t\tWARNING: Possible data ref problem");
-#                     insertReference(M, D, i, more_dref[0], seg_offset, new_eas)
-
-#         i += dref_size
-
-# def processRelocationsInData(M, D, start, end, new_eas, seg_offset):
-
-#     if start == 0:
-#         start = 1
-
-#     i = idc.GetNextFixupEA(start-1)
-
-#     DEBUG("Looking for relocations in {:x} - {:x}".format(start, end))
-
-#     if i == idc.BADADDR or i > end:
-#         if isLinkedElf():
-#             DEBUG("No relocations in binary, scanning for data references");
-#             # no fixups, do manual reloc searching
-#             scanDataForRelocs(M, D, start, end, new_eas, seg_offset)
-#         else:
-#             DEBUG("Not scanning data sections of object file for pointer-alikes")
-#     else:
-#         DEBUG("Found relocations in binary: ({:x})..".format(i))
-#         while i < end and i != idc.BADADDR:
-#             pointsto, itemsize = resolveRelocation(i)
-#             DEBUG("{0:x} Found reloc to: {1:x} (size: {2:x})".format(i, pointsto, itemsize))
-
-#             if not isExternalReference(pointsto):
-#                 # do not add references in jump tables....
-#                 # MAY BREAK EXTERNAL API CALLS
-#                 if i in ACCESSED_VIA_JMP and not isStartOfFunction(pointsto):
-#                     # bail only if we are access via JMP and not the start
-#                     # of a function
-#                     DEBUG("\t\tNOT ADDING REF: {:08x} -> {:08x}".format(i, pointsto))
-#                 else:
-#                     insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas, itemsize)
-#             else:
-#                 DEBUG("{:x} is an external reference".format(i))
-#                 insertRelocatedSymbol(M, D, pointsto, i, seg_offset, new_eas, itemsize)
-
-#             i = idc.GetNextFixupEA(i)
-
 def inValidSegment(ea):
     if idc.SegStart(ea) == idc.BADADDR:
         return False
     return True
 
-def addDataSegment(start, end):
-    if end < start:
-        raise Exception("Start must be before end")
+def recoverInstructionReferences(I, inst, addr, new_func_eas):
+    """Add the memory/code reference information from this instruction
+    into the CFG format."""
+    global EXTERNAL_FUNCS_TO_RECOVER, EXTERNALS
 
-    seg = idaapi.getseg(start)
+    DEBUG_PUSH()
+    debug_info = ["I: {:x}".format(addr)]
+    refs = get_instruction_references(inst, PIE_MODE)
+    for ref in refs:
 
-    if not seg:
-        raise Exception("Data must be in a valid segment")
+        # Don't add code flows that go to internal code.
+        if ref.type == Reference.CODE \
+        and not is_analysed_function(ref.addr) \
+        and not is_external_segment(ref.addr):
+            if is_direct_jump(inst) or is_conditional_jump(inst):
+                continue
+
+        addrs = set()
+        R = I.xrefs.add()
+        R.target_type = reference_target_type(ref)
+        R.location = reference_location(ref)
+        R.operand_type = reference_operand_type(ref)
+        R.address = ref.addr
+
+        if ref.symbol:
+            R.name = ref.symbol
+
+            # Handle renaming things like `stderr_ptr` in the `.got` into
+            # an external reference to `stderr`.
+            if R.location == CFG_pb2.CodeReference.External:
+                new_name = fixExternalName(ref.symbol)
+                new_addr = idc.LocByName(new_name)
+                if new_name != ref.symbol or new_addr != ref.addr:
+                    DEBUG("Changing reference to {} into reference to {}".format(
+                        ref.symbol, new_name))
+
+                    ref.addr = idc.LocByName(new_name)
+                    ref.symbol = new_name
+                    R.name = ref.symbol
+
+                    R.target_type = reference_target_type(ref)
+                    R.location = reference_location(ref)
+
+        # Make sure anything that isn't yet resolved as a subroutine is resolved.
+        if R.target_type == CFG_pb2.CodeReference.CodeTarget \
+        and R.location == CFG_pb2.CodeReference.Internal \
+        and not idc.GetFunctionName(ref.addr):
+            DEBUG("Marking {:x} referenced from {:x} as a function".format(
+                ref.addr, addr))
+            try_mark_as_function(ref.addr)
+            new_func_eas.add(ref.addr)
+
+        # If this is a code ref, and if it's a target to a thunk, then we want
+        # the lifter to treat the thunk as if it's the real function, so we
+        # mark this code reference as being external.
+        #
+        # Note: If `isElfThunk` returns `True` then `name` is already in, or
+        #       has been added, to the `EXTERNALS` set.
+        is_thunk, name = isElfThunk(ref.addr)
+        if is_thunk:
+            DEBUG("  Redirecting code ref from {:x} to thunk {:x} to external {}".format(
+                addr, ref.addr, name))
+            ref.symbol = name
+            R.name = name
+            R.location = CFG_pb2.CodeReference.External
+            R.target_type = reference_target_type(ref)
+
+        # Update the externals map.
+        if R.location == CFG_pb2.CodeReference.External:
+            if R.target_type == CFG_pb2.CodeReference.CodeTarget:
+                EXTERNAL_FUNCS_TO_RECOVER.add((R.address, ref.symbol))
+            else:
+                EXTERNAL_VARS_TO_RECOVER.add((R.address, ref.symbol))
+
+            EXTERNALS.add(ref.symbol)
+
+        debug_info.append(debug_ref_string(R))
+
+    DEBUG_POP()
+    DEBUG(" ".join(debug_info))
+
+def recoverInstruction(M, B, inst, inst_bytes, addr, new_func_eas):
+    """Recover an instruction, adding it to its parent block."""
+
+    I = B.instructions.add()
+    I.ea = addr  # May not be `inst.ea` because of prefix coalescing.
+    I.bytes = inst_bytes
+    recoverInstructionReferences(I, inst, addr, new_func_eas)
+
+    if is_noreturn_inst(inst):
+        I.local_noreturn = True
+
+    table = get_jump_table(inst, PIE_MODE)
+    if table:
+        I.jump_table_addr = table.table_ea
+        I.offset_base_addr = table.offset
+
+def recoverBasicBlock(M, F, block_ea, new_func_eas):
+    inst_eas, succ_eas = analyse_block(
+        F.ea, block_ea, PIE_MODE)
+
+    DEBUG("BB: {:x} in func {:x} with {} insts".format(
+        block_ea, F.ea, len(inst_eas)))
     
-    # if this is in an executalbe region,
-    # move it to a data section
-    seg_offset = 0
-    # need_move = (seg.perm & idaapi.SEGPERM_EXEC) != 0
-    # if need_move:
-    #     free_data = findFreeData()
-    #     seg_offset = free_data - start
-    #     DEBUG("Data Segment {0:x} moved to: {1:x}".format(start, start+seg_offset))
+    B = F.blocks.add()
+    B.ea = block_ea
+    B.successor_eas.extend(succ_eas)
 
-    DATA_SEGMENTS[ (start, end,) ] = (start+seg_offset, end+seg_offset,)
+    DEBUG_PUSH()
+    # Sometimes there will be tail-calls to thunks, or thunk-to-thunks, and 
+    # we want to make sure that we can recognize the target as an external,
+    # even if it isn't the final destination. The side-effect of this is that
+    # the same external function name may show up twice or more in the proto. 
+    for succ_ea in succ_eas:
+        if is_external_segment(succ_ea):
+            is_thunk, thunk_name = isElfThunk(succ_ea)
+            if is_thunk:
+                EXTERNAL_FUNCS_TO_RECOVER.add((succ_ea, thunk_name))
+            else:
+                name = get_symbol_name(succ_ea)
+                name = fixExternalName(name)
+                EXTERNAL_FUNCS_TO_RECOVER.add((succ_ea, name))
 
-    DEBUG("Adding data seg: {0}: {1}-{2}".format( 
-        idc.SegName(start),
-        hex(start+seg_offset),
-        hex(end+seg_offset)))
+    for inst_ea in inst_eas:
+        inst, inst_bytes = decode_instruction(inst_ea)
+        recoverInstruction(
+            M, B, inst, inst_bytes, inst_ea, new_func_eas)
 
-    return seg_offset
+    str_l = ["{0:x}".format(i) for i in succ_eas]
+    if len(str_l) > 0:
+        DEBUG("Successors: {}".format(", ".join(str_l)))
 
-# def populateDataSegment(M, start, end, new_eas):
-
-#     (new_start, new_end) = DATA_SEGMENTS.get( (start, end,), (-1,-1) )
-
-#     if (new_start, new_end) == (-1,-1):
-#         raise Exception("Requested segment ({}, {}) not found".format(start, end))
-
-#     seg_offset = new_start - start
-
-#     D = M.internal_data.add()
-#     D.base_address = new_start
-
-#     SEGPERM_WRITE = 2
-    
-#     seg = idaapi.getseg(start)
-#     if (seg.perm & SEGPERM_WRITE) == 0:
-#         D.read_only = True
-#     else:
-#         D.read_only = False
-
-#     D.data = read_bytes_slowly(start, end)
-
-#     processRelocationsInData(M, D, start, end, new_eas, seg_offset)
-
-#     DEBUG("Adding data seg: {0}: {1}-{2}".format( 
-#         idc.SegName(start),
-#         hex(new_start),
-#         hex(new_end)))
-
-#     return seg_offset
-
-# def processDataSegments(M, new_eas):
-#     for n in xrange(idaapi.get_segm_qty()):
-#         seg = idaapi.getnseg(n)
-#         ea = seg.startEA
-#         segtype = idc.GetSegmentAttr(ea, idc.SEGATTR_TYPE)
-#         if segtype in (idc.SEG_DATA, idc.SEG_BSS, idc.SEG_CODE):
-#             start = idc.SegStart(ea)
-#             end = idc.SegEnd(ea)
-#             populateDataSegment(M, start, end, new_eas)
-
-def recoverFunctionFromSet(M, F, blockset, new_func_eas):
-    processed_blocks = set()
-
-    while len(blockset) > 0:
-        block_ea = blockset.pop()
-        if block_ea in processed_blocks:
-            raise Exception("Attempting to add same block twice: {0:x}".format(block_ea))
-
-        processed_blocks.add(block_ea)
-        B = basicBlockHandler(M, F, block_ea, new_func_eas)
+    DEBUG_POP()
 
 _RECOVERED_FUNCS = set()
 
-def recoverFunction(M, fnea, new_func_eas, entrypoints):
+def recoverFunction(M, sub_ea, new_func_eas, entrypoints):
+    """Decode a function and store it, all of its basic blocks, and all of
+    their instructions into the CFG file."""
     global _RECOVERED_FUNCS
-    if fnea in _RECOVERED_FUNCS:
+    if sub_ea in _RECOVERED_FUNCS:
         return
 
-    _RECOVERED_FUNCS.add(fnea)
+    _RECOVERED_FUNCS.add(sub_ea)
 
-    if not isStartOfFunction(fnea):
-        DEBUG("{:x} is not a function! Not recovering.".format(fnea))
+    if not isStartOfFunction(sub_ea):
+        DEBUG("{:x} is not a function! Not recovering.".format(sub_ea))
         return
 
-    F = addFunction(M, fnea)
-    F.is_entrypoint = (fnea in entrypoints)
 
-    blockset, term_insts = analyse_subroutine(fnea, PIE_MODE)
+    DEBUG("Recovering {:x}".format(sub_ea))
+    DEBUG_PUSH()
+    F = M.funcs.add()
+    F.ea = sub_ea
+    F.is_entrypoint = (sub_ea in entrypoints)
+    name = get_symbol_name(sub_ea)
+    if name:
+        F.name = name
 
-    for ea in blockset:
-        DEBUG("  Found block {:x}".format(ea))
+    blockset, term_insts = analyse_subroutine(sub_ea, PIE_MODE)
+
+    for block_ea in blockset:
+        DEBUG("Found block {:x}".format(block_ea))
 
     for term_inst in term_insts:
         if get_jump_table(term_inst, PIE_MODE):
             DEBUG("Terminator inst {:x} in func {:x} is a jump table".format(
-                term_inst.ea, fnea))
+                term_inst.ea, sub_ea))
             updateWithJmpTableTargets(term_inst, blockset, new_func_eas)
     
-    recoverFunctionFromSet(M, F, blockset, new_func_eas)
+    processed_blocks = set()
+    while len(blockset) > 0:
+        block_ea = blockset.pop()
+        if block_ea in processed_blocks:
+            DEBUG("ERROR: Attempting to add same block twice: {0:x}".format(block_ea))
+            continue
+
+        processed_blocks.add(block_ea)
+        recoverBasicBlock(M, F, block_ea, new_func_eas)
+    DEBUG_POP()
 
 def findDefaultFunctionHeads():
     func_heads = set()
@@ -1286,7 +1009,94 @@ def findDefaultFunctionHeads():
                 func_heads.add(func_ea)
     return func_heads
 
+def recoverSegmentVariables(M, S, seg_ea, seg_end_ea):
+    """Look for named locations pointing into the data of this segment, and
+    add them to the protobuf."""
+    global EMAP_DATA, EXTERNAL_VARS_TO_RECOVER
+
+    for ea, name in idautils.Names():
+        if ea < seg_ea or ea >= seg_end_ea:
+            continue
+
+        # Try to distinguish an internal name as being an external name. This
+        # comes up with things like `stderr@@GLIBC_2.2.5`, that is located in
+        # the `.bss` section, whose value will be filled in at runtime to be
+        # the address of the actual `stderr`. This is captured by the
+        # `extern_name in EMAP_DATA` check.
+        #
+        # Another example is `__gmon_start___ptr`, that is located in the `.got`
+        # section. This is captured by the `is_external_segment` check.
+        extern_name = fixExternalName(name)
+        if is_external_segment(ea) or extern_name in EMAP_DATA:
+
+            # Ignore thinks like the names of thunks (e.g. `fputs`) in the
+            # `.plt`, or `__gmon_start__` in the `.got.plt` section.
+            if extern_name in EMAP:
+                continue
+
+            EXTERNAL_VARS_TO_RECOVER.add((ea, extern_name))
+        
+        # Only add named internal variables if they are referenced.   
+        elif is_referenced(ea):
+            DEBUG("Variable {} at {:x}".format(name, ea))
+            V = S.vars.add()
+            V.ea = ea
+            V.name = name
+
+def recoverSegmentCrossReferences(M, S, seg_ea, seg_end_ea):
+    """Goes through the segment and identifies fixups that need to be
+    handled by the LLVM side of things."""
+
+    # Go through and look for the fixups. We start at `seg_ea - 1` because we
+    # always try to find the *next* fixup/heads, and if there's one right at
+    # the beginning of the segment then we don't want to jump to the second one.
+    ea = seg_ea - 1
+    while ea < seg_end_ea:
+        ea = min(idc.GetNextFixupEA(ea), idc.NextHead(ea, seg_end_ea))
+        if ea < seg_ea:
+            continue
+        elif ea >= seg_end_ea:
+            break
+
+        # We don't want to fill the jump table bytes with their actual
+        # code cross-references. This is because we can't get the address
+        # of a basic block. Our goal is thus to preserve the original values,
+        # and implement the switch in terms of those original values on the
+        # LLVM side of things.
+        if is_jump_table_entry(ea):
+            continue
+
+        if not is_reference(ea):
+            continue
+
+        target_ea = get_reference_target(ea)
+        if target_ea == idc.BADADDR or 0 > target_ea or 0xff00000000000000 <= target_ea:
+            DEBUG("ERROR: Reference at {:x} is not a reference.".format(ea))
+            continue
+
+        # Probably `idc.BADADDR`, or some really small number.
+        elif not idc.GetFlags(target_ea):
+            continue
+
+        elif (ea % 4) != 0:
+            DEBUG("ERROR: Unaligned reference at {:x} to {:x}".format(ea, target_ea))
+        
+        else:
+            X = S.xrefs.add()
+            X.ea = ea
+            X.width = min(max(idc.ItemSize(ea), 4), 8)
+            X.target_ea = target_ea
+            X.target_name = get_symbol_name(target_ea)
+            X.target_is_code = is_code(target_ea)
+            DEBUG("{}-byte reference at {:x} to {:x} ({})".format(
+                X.width, ea, target_ea, X.target_name))
+            assert is_referenced_by(target_ea, ea)
+
 def recoverSegment(M, seg_ea):
+    """Recover the data and cross-references from a segment. The data of a
+    segment is stored verbatim within the protobuf, and accompanied by a
+    series of variable and cross-reference entries."""
+
     seg_name = idc.SegName(seg_ea)
     seg_end_ea = idc.SegEnd(seg_ea)
     DEBUG("Recovering segment {} [{:x}, {:x})".format(
@@ -1301,38 +1111,34 @@ def recoverSegment(M, seg_ea):
     S.is_external = is_external_segment(seg_ea)
     S.name = seg_name
 
+    # Don't look for fixups in the code segment. These are all handled as
+    # `CodeReference`s and stored in the `Instruction`s themselves. We also
+    # don't want to mark jump table entries embedded in the code section
+    # either (see comment below), so this captures that case as well.
     seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
     if seg_type == idc.SEG_CODE:
+        S.read_only = True  # Force this even if it's not true.
         return
 
-    # Go through and look for the fixups.
-    ea = seg_ea
-    while ea < seg_end_ea:
-        ea = min(idc.GetNextFixupEA(ea), idc.NextHead(ea, seg_end_ea))
-        if ea >= seg_end_ea:
-            break
-
-        if is_jump_table_entry(ea) or not is_reference(ea):
-            continue
-
-        target = get_reference_target(ea)
-        if (ea % 4) != 0:
-            DEBUG("  ERROR: Unaligned reference at {:x} to {:x}".format(ea, target))
-        else:
-            DEBUG("  Reference at {:x} to {:x}".format(ea, target))
-        ea += 1
+    DEBUG_PUSH()
+    recoverSegmentCrossReferences(M, S, seg_ea, seg_end_ea)
+    recoverSegmentVariables(M, S, seg_ea, seg_end_ea)
+    DEBUG_POP()
 
 def recoverSegments(M):
     for seg_ea in idautils.Segments():
         seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
-        if seg_type not in (idc.SEG_CODE, idc.SEG_DATA, idc.SEG_BSS):
-            continue
+        # if seg_type not in (idc.SEG_CODE, idc.SEG_DATA, idc.SEG_BSS):
+        #     continue
         recoverSegment(M, seg_ea)
 
-def recoverExternals(M):
-    global EXTERNAL_FUNCS_TO_RECOVER, EXTERNAL_VARS_TO_RECOVER, WEAK_SYMS
+def recoverExternalFunctions(M):
+    """Recover the named external functions (e.g. `printf`) that are referenced
+    within this binary."""
+
+    global EXTERNAL_FUNCS_TO_RECOVER, WEAK_SYMS
     for ea, name in EXTERNAL_FUNCS_TO_RECOVER:
-        DEBUG("Recovering extern {} at {:x}".format(name, ea))
+        DEBUG("Recovering extern function {} at {:x}".format(name, ea))
         args, conv, ret, sign = getFromEMAP(name)
         E = M.external_funcs.add()
         E.name = name
@@ -1347,31 +1153,24 @@ def recoverExternals(M):
         #            return (e.g. `abort`).
         E.no_return = (not E.has_return)
 
+def recoverExternalVariables(M):
+    """Reover the named external variables (e.g. `stdout`) that are referenced
+    within this binary."""
+    global EXTERNAL_VARS_TO_RECOVER, WEAK_SYMS
     for ea, name in EXTERNAL_VARS_TO_RECOVER:
-        pass
+        DEBUG("Recovering extern variable {} at {:x}".format(name, ea))
+        EV = M.external_vars.add()
+        EV.ea = ea
+        EV.name = name
+        EV.is_weak = idaapi.is_weak_name(ea) or (name in WEAK_SYMS)
+        if name in EMAP_DATA:
+            EV.size = EMAP_DATA[name]
+        else:
+            EV.size = idc.ItemSize(ea)
 
-# def processExternalFunction(M, fn):
-#     global WEAK_SYMS
-
-#     args, conv, ret, sign = getFromEMAP(fn)
-#     ea = idc.LocByName(fn)
-#     is_weak = idaapi.is_weak_name(ea) or fn in WEAK_SYMS
-
-#     DEBUG("Program will reference external{}: {}".format(" (weak)" if is_weak else "", fn))
-#     extfn = M.external_funcs.add()
-#     extfn.symbol_name = fn
-#     extfn.calling_convention = conv
-#     extfn.argument_count = args
-#     extfn.is_weak = is_weak
-#     if ret == 'N':
-#         extfn.has_return = True
-#         extfn.no_return = False
-#     else:
-#         extfn.has_return = False
-#         extfn.no_return = True
-
-    #for seg_ea in idautils.Segments():
-    #    seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
+def recoverExternals(M):
+    recoverExternalFunctions(M)
+    recoverExternalVariables(M)
 
 def recoverCfg(outf):
     global EMAP
@@ -1422,7 +1221,6 @@ def recoverCfg(outf):
         if is_external_segment(cur_ea):
             continue
 
-        DEBUG("Recovering {:x}".format(cur_ea))
         recoverFunction(M, cur_ea, new_eas, entrypoints)
         recovered_fns += 1
 
@@ -1438,21 +1236,6 @@ def recoverCfg(outf):
 
     DEBUG("Recovered {0} functions.".format(recovered_fns))
     DEBUG("Saving to: {0}".format(outf.name))
-
-
-# def isFwdExport(iname, ea):
-#     l = ea
-#     if l == idc.BADADDR:
-#         raise Exception("Cannot find addr for: " + iname)
-
-#     pf = idc.GetFlags(l)
-
-#     if not is_code(pf) and idc.isData(pf):
-#         sz = idc.ItemSize(l)
-#         iname = idaapi.get_many_bytes(l, sz-1)
-#         return iname
-
-#     return None
 
 def parseTypeString(typestr, ea):
 
@@ -1567,8 +1350,7 @@ if __name__ == "__main__":
     args = parser.parse_args(args=idc.ARGV[1:])
 
     if args.log_file != os.devnull:
-        _DEBUG = True
-        _DEBUG_FILE = args.log_file
+        INIT_DEBUG_FILE(args.log_file)
         DEBUG("Debugging is enabled.")
 
     addr_size = {"x86": 32, "amd64": 64}.get(args.arch, 0)

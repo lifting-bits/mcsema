@@ -41,6 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <llvm/IR/Type.h>
 
 #include "remill/Arch/Arch.h"
+#include "remill/BC/Util.h"
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Segment.h"
@@ -114,7 +115,7 @@ static void DeclareDataSegment(const NativeSegment *cfg_seg) {
 
   auto global = new llvm::GlobalVariable(
       *gModule, seg_type, cfg_seg->is_read_only,
-      llvm::GlobalValue::ExternalLinkage, nullptr,
+      llvm::GlobalValue::InternalLinkage, nullptr,
       cfg_seg->lifted_name);
   global->setAlignment(16);
 }
@@ -124,6 +125,13 @@ static void DeclareDataSegment(const NativeSegment *cfg_seg) {
 // variables within a segment, so we want to try to preserve those names,
 // treating them as GEPs into the segment's data.
 void DeclareVariables(const NativeModule *cfg_module) {
+
+  // TODO(pag): Handle thread-local storage types by assigning a non-zero
+  //            address space to the byte pointer type?
+  auto intptr_type = llvm::Type::getIntNTy(*gContext, gArch->address_size);
+  auto byte_type = llvm::Type::getInt8Ty(*gContext);
+  auto byte_ptr_type = llvm::PointerType::get(byte_type, 0);
+
   for (auto entry : cfg_module->ea_to_var) {
     auto cfg_var = entry.second;
     if (cfg_var && cfg_var->is_external) {
@@ -138,23 +146,18 @@ void DeclareVariables(const NativeModule *cfg_module) {
         << "Variable " << cfg_var->name << " at " << std::hex << cfg_var->ea
         << " is incorrectly assigned to the segment " << cfg_seg->name;
 
-    auto seg = gModule->getNamedGlobal(cfg_seg->name);
+    auto seg = gModule->getNamedGlobal(cfg_seg->lifted_name);
     auto offset = cfg_var->ea - cfg_seg->ea;
-    auto disp = llvm::ConstantInt::get(
-        llvm::Type::getInt32Ty(*gContext), offset, false);
+    auto disp = llvm::ConstantInt::get(intptr_type, offset, false);
 
-    // TODO(pag): Handle thread-local storage types by assigning a non-zero
-    //            address space to the byte pointer type!
-    auto byte_type = llvm::Type::getInt8Ty(*gContext);
-    auto byte_ptr_type = llvm::PointerType::get(byte_type, 0);
-    auto seg_base = llvm::ConstantExpr::getBitCast(seg, byte_ptr_type);
-    auto addr = llvm::ConstantExpr::getInBoundsGetElementPtr(
-        byte_ptr_type, seg_base, disp);
+    auto seg_base = llvm::ConstantExpr::getPtrToInt(seg, intptr_type);
+    auto addr = llvm::ConstantExpr::getAdd(seg_base, disp);
+    auto ptr = llvm::ConstantExpr::getIntToPtr(addr, byte_ptr_type);
 
     (void) new llvm::GlobalVariable(
         *gModule, byte_ptr_type, true  /* IsConstant */,
-        llvm::GlobalVariable::ExternalLinkage,
-        addr, cfg_var->lifted_name);
+        llvm::GlobalVariable::InternalLinkage,
+        ptr, cfg_var->lifted_name);
   }
 }
 
@@ -162,13 +165,17 @@ void DeclareVariables(const NativeModule *cfg_module) {
 static void FillDataSegment(const NativeSegment *cfg_seg) {
   auto seg = gModule->getNamedGlobal(cfg_seg->lifted_name);
   auto seg_type = llvm::dyn_cast<llvm::StructType>(seg->getValueType());
+
+  seg->setLinkage(llvm::GlobalValue::InternalLinkage);
+  seg->setVisibility(llvm::GlobalValue::DefaultVisibility);
+
   if (IsZero(cfg_seg)) {
     seg->setInitializer(llvm::ConstantAggregateZero::get(seg_type));
     return;
   }
 
-  unsigned i = 0;
   auto intptr_type = llvm::Type::getIntNTy(*gContext, gArch->address_size);
+  unsigned i = 0;
 
   std::vector<llvm::Constant *> entry_vals;
   for (const auto &cfg_seg_entry : cfg_seg->entries) {
@@ -179,22 +186,41 @@ static void FillDataSegment(const NativeSegment *cfg_seg) {
     if (entry.blob) {
       if (IsZero(entry.blob->data)) {
         entry_vals.push_back(llvm::ConstantAggregateZero::get(entry_type));
-        continue;
+
       } else {
-        entry_vals.push_back(llvm::ConstantDataArray::getString(
-            *gContext, entry.blob->data));
+        auto data = llvm::ConstantDataArray::getString(
+            *gContext, entry.blob->data, false /* AddNull */);
+
+        CHECK(data->getType() == entry_type)
+            << "Type mismatch: Got "
+            << remill::LLVMThingToString(data->getType())
+            << " but expected "
+            << remill::LLVMThingToString(entry_type);
+
+        entry_vals.push_back(data);
       }
 
     // This entry is a cross-reference.
     } else {
+      CHECK(nullptr != entry.xref)
+          << "Empty entry at " << std::hex << entry.ea
+          << " in segment " << cfg_seg->name;
+
       auto val_size = entry.xref->width * 8;
       auto val_type = llvm::Type::getIntNTy(*gContext, val_size);
       auto xref = entry.xref;
       llvm::Constant *val = nullptr;
 
+      CHECK(val_type == entry_type)
+          << entry.xref->width << "-byte cross-reference at " << std::hex
+          << xref->ea << " to " << std::hex << xref->target_ea
+          << " doesn't match the type of the segment entry "
+          << remill::LLVMThingToString(entry_type);
+
       // Pointer to a (possibly external) function.
       if (auto cfg_func = xref->func) {
         val = gModule->getFunction(cfg_func->lifted_name);
+        val = llvm::ConstantExpr::getPtrToInt(val, intptr_type);
         CHECK(val != nullptr)
             << "Can't insert cross reference to function "
             << cfg_func->name << " at " << std::hex << cfg_seg_entry.first
@@ -203,6 +229,7 @@ static void FillDataSegment(const NativeSegment *cfg_seg) {
       // Pointer to a global (possibly external) variable.
       } else if (auto cfg_var = xref->var) {
         val = gModule->getNamedGlobal(cfg_var->lifted_name);
+        val = llvm::ConstantExpr::getPtrToInt(val, intptr_type);
         CHECK(val != nullptr)
             << "Can't insert cross reference to variable "
             << cfg_var->name << " at " << std::hex << cfg_seg_entry.first
@@ -211,30 +238,34 @@ static void FillDataSegment(const NativeSegment *cfg_seg) {
       // Pointer to an unnamed location inside of a data segment.
       } else {
         auto seg = gModule->getNamedGlobal(xref->target_segment->lifted_name);
-        auto offset = cfg_var->ea - cfg_seg->ea;
-        auto disp = llvm::ConstantInt::get(
-            llvm::Type::getInt32Ty(*gContext), offset, false);
-
-        // TODO(pag): Handle thread-local storage types by assigning a non-zero
-        //            address space to the byte pointer type!
-        auto byte_type = llvm::Type::getInt8Ty(*gContext);
-        auto byte_ptr_type = llvm::PointerType::get(byte_type, 0);
-        auto seg_base = llvm::ConstantExpr::getBitCast(seg, byte_ptr_type);
-        val = llvm::ConstantExpr::getInBoundsGetElementPtr(
-            byte_ptr_type, seg_base, disp);
+        auto offset = xref->target_ea - cfg_seg->ea;
+        auto disp = llvm::ConstantInt::get(intptr_type, offset, false);
+        auto seg_base = llvm::ConstantExpr::getPtrToInt(seg, intptr_type);
+        val = llvm::ConstantExpr::getAdd(seg_base, disp);
       }
 
       // Scale and add the value in. We need to fit it to its original width.
-      val = llvm::ConstantExpr::getPtrToInt(val, intptr_type);
-      if (val_size == gArch->address_size) {
-        entry_vals.push_back(val);
-      } else if (val_size > gArch->address_size) {
-        entry_vals.push_back(llvm::ConstantExpr::getZExt(val, val_type));
-      } else {
-        entry_vals.push_back(llvm::ConstantExpr::getTrunc(val, val_type));
+      if (val_size > gArch->address_size) {
+        val = llvm::ConstantExpr::getZExt(val, val_type);
+      } else if (val_size < gArch->address_size) {
+        val = llvm::ConstantExpr::getTrunc(val, val_type);
       }
+
+      if (val->getType() != entry_type) {
+        val->dump();
+      }
+
+      CHECK(val->getType() == entry_type)
+          << "Type mismatch: Got "
+          << remill::LLVMThingToString(val->getType())
+          << " but expected "
+          << remill::LLVMThingToString(entry_type);
+
+      entry_vals.push_back(val);
     }
   }
+
+  seg->setInitializer(llvm::ConstantStruct::get(seg_type, entry_vals));
 }
 
 }  // namespace

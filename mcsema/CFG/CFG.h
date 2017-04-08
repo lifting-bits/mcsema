@@ -167,8 +167,6 @@ struct NativeModule {
   std::unordered_map<std::string, const NativeExternalVariable *>
       name_to_extern_var;
 
-  std::unordered_map<uint64_t, const NativeXref *> code_xrefs;
-
   const NativeFunction *TryGetFunction(uint64_t ea) const;
   const NativeVariable *TryGetVariable(uint64_t ea) const;
 };

@@ -52,6 +52,10 @@ def is_sane_reference(target_ea):
 
 def make_xref(from_ea, to_ea, xref_constructor):
   """Force the data at `from_ea` to reference the data at `to_ea`."""
+  if not idc.GetFlags(to_ea):
+    DEBUG("  Not making reference from {:x} to {:x}".format(from_ea, to_ea))
+    return
+
   xref_constructor(from_ea)
   target_flags = idc.GetFlags(to_ea)
   if idc.isCode(target_flags):
@@ -69,7 +73,9 @@ def next_reasonable_head(ea, max_ea):
   """Returns the next 'reasonable' head, skipping over alignments. One heuristic
   for matching strings is to see if there's an unmatched string between two
   matched ones. If the next logical head is a string, but the actual head is
-  an alignment, then we really want to find the head of the string."""
+  an alignment, then we really want to find the head of the string.
+
+  TODO(pag): Investigate using `idc.NextNotTail(ea)`."""
   while ea < max_ea:
     ea = idc.NextHead(ea, max_ea)
     flags = idc.GetFlags(ea)
@@ -89,7 +95,7 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
     ea, next_ea = next_ea, next_head_ea
     item_size = idc.ItemSize(ea)
     if is_jump_table_entry(ea):
-      DEBUG("  Found jump table at {:x}, jumping to {:x}".format(ea, next_ea))
+      DEBUG("Found jump table at {:x}, jumping to {:x}".format(ea, next_ea))
       continue
 
     next_is_string = has_string_type(next_head_ea)
@@ -98,7 +104,7 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
     if has_str_type:
       next_ea = ea + item_size
       last_was_string = True
-      DEBUG("  Found string {} of length {} at {:x}, jumping to {:x}".format(
+      DEBUG("Found string {} of length {} at {:x}, jumping to {:x}".format(
           repr(idc.GetString(ea, -1, -1)), item_size, ea, next_ea))
       continue
 
@@ -133,7 +139,7 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
         continue
 
       item_size = idc.ItemSize(ea)
-      DEBUG("  Inferred string {} of length {} at {:x} to {:x}".format(
+      DEBUG("Inferred string {} of length {} at {:x} to {:x}".format(
           repr(as_str), item_size, ea, next_head_ea)) 
       next_ea = ea + item_size
       last_was_string = True
@@ -163,7 +169,7 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea):
     # If this thing is referenced then lets assume that IDA has already
     # determined whether or not it contains an xref.
     if is_referenced(ea):
-      DEBUG("  Data at {:x} is referenced, item size is {}, jumping to {:x}".format(
+      DEBUG("Data at {:x} is referenced, item size is {}, jumping to {:x}".format(
         ea, item_size, next_ea))
       next_ea = ea + max(item_size, 4)
       continue
@@ -172,13 +178,13 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea):
     # then don't make a reference.
     if 4 > (next_head_ea - ea):
       next_ea = next_head_ea
-      DEBUG("  Jumping to nearby next head {:x}".format(next_head_ea))
+      DEBUG("Jumping to nearby next head {:x}".format(next_head_ea))
       continue
 
     if (ea % 4) != 0:
       next_aligned_ea = (ea + 3) & ~3
       next_ea = min(next_head_ea, next_aligned_ea)
-      DEBUG("  Aligning from {:x} to {:x}".format(ea, next_ea))
+      DEBUG("Aligning from {:x} to {:x}".format(ea, next_ea))
       assert ea < next_ea
       continue
 
@@ -194,11 +200,11 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea):
           if read_qword(ea) == target_ea and not is_referenced(ea + 4):
             make_xref(ea, target_ea, idc.MakeQword)
             xref_size = 8
-            DEBUG("  Expanded xref size at {:x} to 8 bytes".format(ea))
+            DEBUG("Expanded xref size at {:x} to 8 bytes".format(ea))
 
       # Jump ahead to a reasonable alignment
       next_ea = ea + xref_size
-      DEBUG("  Found reference at {:x} of size {}, jumping to {:x}".format(
+      DEBUG("Found reference at {:x} of size {}, jumping to {:x}".format(
           ea, item_size, next_ea))
       continue
 
@@ -243,7 +249,9 @@ def process_segments(binary_is_pie):
     seg_end_ea = idc.SegEnd(seg_ea)
     if seg_type == idc.SEG_CODE:
       DEBUG("Looking for instructions in segment {}".format(seg_name))
+      DEBUG_PUSH()
       decode_segment_instructions(seg_ea, binary_is_pie)
+      DEBUG_POP()
 
   # Now go through through the data segments and look for strings and missing
   # cross-references.
@@ -256,7 +264,9 @@ def process_segments(binary_is_pie):
       continue
 
     DEBUG("Looking for strings in segment {}".format(seg_name))
+    DEBUG_PUSH()
     find_missing_strings_in_segment(seg_ea, seg_end_ea)
+    DEBUG_POP()
 
     # Ignore PIE binaries when scanning for cross-references that IDA may
     # have missed. The idea here is that there would be no hard-coded cross-
@@ -265,4 +275,6 @@ def process_segments(binary_is_pie):
     if not binary_is_pie:
 
       DEBUG("Looking for cross-references in segment {}".format(seg_name))
+      DEBUG_PUSH()
       find_missing_xrefs_in_segment(seg_ea, seg_end_ea)
+      DEBUG_POP()

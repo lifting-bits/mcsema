@@ -345,3 +345,6 @@ def analyse_subroutine(sub_ea, binary_is_pie):
   ret = found_block_eas, term_insts
   _FUNCTION_BLOCK_HEAD_EAS[sub_ea] = ret
   return ret
+
+def is_analysed_function(ea):
+  return ea in _FUNCTION_BLOCK_HEAD_EAS

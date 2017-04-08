@@ -33,7 +33,25 @@ import idc
 import itertools
 import struct
 
-DEBUG = (lambda *args: None)
+_DEBUG_FILE = None
+_DEBUG_PREFIX = ""
+
+def INIT_DEBUG_FILE(file):
+  global _DEBUG_FILE
+  _DEBUG_FILE = file
+
+def DEBUG_PUSH():
+  global _DEBUG_PREFIX
+  _DEBUG_PREFIX += "  "
+
+def DEBUG_POP():
+  global _DEBUG_PREFIX
+  _DEBUG_PREFIX = _DEBUG_PREFIX[:-2]
+
+def DEBUG(s):
+  global _DEBUG_FILE
+  if _DEBUG_FILE:
+    _DEBUG_FILE.write("{}{}\n".format(_DEBUG_PREFIX, str(s)))
 
 # Maps instruction EAs to a pair of decoded inst, and the bytes of the inst.
 _INSTRUCTION_CACHE = {}
@@ -450,7 +468,25 @@ def _reference_checker(ea, dref_finder=_IGNORE_DREF, cref_finder=_IGNORE_CREF):
 
 def is_referenced(ea):
   """Returns `True` if the data at `ea` is referenced by something else."""
-  return _reference_checker(ea, idautils.DataRefsTo, idautils.CodeRefsTo)
+  return idc.isRef(idc.GetFlags(ea))
+
+def is_referenced_by(ea, by_ea):
+  if not is_referenced(ea):
+    return False
+
+  for ref in idautils.DataRefsTo(ea):
+    if ref == by_ea:
+      return True
+
+  for ref in idautils.CodeRefsTo(ea, True):
+    if ref == by_ea:
+      return True
+
+  for ref in idautils.CodeRefsTo(ea, False):
+    if ref == by_ea:
+      return True
+
+  return False
 
 def is_reference(ea):
   """Returns `True` if the `ea` references something else."""

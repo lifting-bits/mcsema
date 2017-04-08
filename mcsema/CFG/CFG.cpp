@@ -109,41 +109,46 @@ static const NativeSegment *FindSegment(const NativeModule *module,
 }
 
 // Resolve `xref` to a location.
-static void ResolveReference(const NativeModule *module, NativeXref *xref) {
+static bool ResolveReference(const NativeModule *module, NativeXref *xref) {
   xref->var = nullptr;
   xref->func = nullptr;
 
   auto var_it = module->ea_to_var.find(xref->target_ea);
   if (var_it != module->ea_to_var.end()) {
     xref->var = var_it->second;
-    return;
+    return true;
   }
 
   auto func_it = module->ea_to_func.find(xref->target_ea);
   if (func_it != module->ea_to_func.end()) {
     xref->func = func_it->second;
-    return;
+    return true;
   }
 
   if (!xref->target_name.empty()) {
     auto var_name_it = module->name_to_extern_var.find(xref->target_name);
     if (var_name_it != module->name_to_extern_var.end()) {
       xref->var = var_name_it->second;
-      return;
+      return true;
     }
 
     auto func_name_it = module->name_to_extern_func.find(xref->target_name);
     if (func_name_it != module->name_to_extern_func.end()) {
       xref->func = func_name_it->second;
-      return;
+      return true;
     }
   }
 
-  LOG_IF(FATAL, !xref->target_segment)
-      << "Data cross reference at " << std::hex << xref->ea
-      << " targeting " << xref->target_name << " at "
-      << std::hex << xref->target_ea << " does not match any known "
-      << "externals and is not containing within any data segments.";
+  if (xref->target_segment) {
+    return true;
+  } else {
+    LOG(ERROR)
+        << "Data cross reference at " << std::hex << xref->ea
+        << " targeting " << xref->target_name << " at "
+        << std::hex << xref->target_ea << " does not match any known "
+        << "externals and is not containing within any data segments.";
+    return false;
+  }
 }
 
 // Take the `CodeReference` information from the CFG and resolve it into
@@ -154,66 +159,68 @@ static void ResolveReference(const NativeModule *module, NativeXref *xref) {
 // side of things.
 static void AddXref(NativeModule *module, NativeInstruction *inst,
                     const CodeReference &cfg_ref) {
-  NativeXref xref = {};
-  xref.ea = inst->ea;
-  xref.segment = FindSegment(module, xref.ea);
-  xref.target_ea = static_cast<uint64_t>(cfg_ref.address());
-  xref.target_segment = FindSegment(module, xref.target_ea);
+  auto xref = new NativeXref;
+  xref->ea = inst->ea;
+  xref->segment = FindSegment(module, xref->ea);
+  xref->target_ea = static_cast<uint64_t>(cfg_ref.address());
+  xref->target_segment = FindSegment(module, xref->target_ea);
+
   if (cfg_ref.has_name()) {
-    xref.target_name = cfg_ref.name();
+    xref->target_name = cfg_ref.name();
   }
 
-  const NativeXref *xref_ptr = nullptr;
-  auto xref_it = module->code_xrefs.find(xref.target_ea);
-  if (xref_it != module->code_xrefs.end()) {
-    xref_ptr = xref_it->second;
-    xref = *xref_ptr;
-  } else {
-    ResolveReference(module, &xref);
+  if (!ResolveReference(module, xref)) {
+    delete xref;
+    return;
   }
 
   bool xref_is_external = false;
   bool xref_is_code = false;
 
   // Does the XREF think its target is external?
-  if (xref.func) {
-    xref_is_external = xref.func->is_external;
+  if (xref->func) {
+    xref_is_external = xref->func->is_external;
     xref_is_code = true;
-  } else if (xref.var) {
-    xref_is_external = xref.var->is_external;
+  } else if (xref->var) {
+    xref_is_external = xref->var->is_external;
   } else {
     LOG(WARNING)
         << "Reference from " << std::hex << inst->ea
-        << " to " << std::hex << xref.target_ea
-        << " targets the segment " << xref.segment->name
+        << " to " << std::hex << xref->target_ea
+        << " targets the segment " << xref->segment->name
         << " but was not resolved to a real symbol.";
-    xref_is_external = xref.segment->is_external;
+    xref_is_external = xref->segment->is_external;
   }
 
   // Does the CFG reference target type agree with the resolved code/data
   // nature of the xref?
   if (cfg_ref.target_type() == CodeReference_TargetType_CodeTarget) {
-    LOG_IF(ERROR, nullptr == xref.func)
-        << "Code cross-reference to " << std::hex << xref.target_ea
+    LOG_IF(ERROR, nullptr == xref->func)
+        << "Code cross-reference to " << std::hex << xref->target_ea
         << " from " << std::hex << inst->ea
         << " is not actually a code cross-reference";
   } else {
-    LOG_IF(ERROR, nullptr != xref.func)
-        << "Data cross-reference to " << std::hex << xref.target_ea
+    LOG_IF(ERROR, nullptr != xref->func)
+        << "Data cross-reference to " << std::hex << xref->target_ea
         << " from " << std::hex << inst->ea
         << " is actually a code cross-reference";
   }
 
   // Does the CFG reference target location agree with the resolved
-  // externality of the xref?
+  // externality of the xref? This isn't an atypical error. It can come up
+  // where ELF binaries will have a relocation like `stderr@GLIBC_XYZ`, and
+  // that will be an element in the `.bss` wherein the actual pointer to
+  // `stderr` will be placed.
   if (cfg_ref.location() == CodeReference_Location_External) {
     LOG_IF(ERROR, !xref_is_external)
         << "External reference from " << std::hex << inst->ea
-        << " to " << std::hex << xref.target_ea << " is actually internal";
+        << " to " << std::hex << xref->target_ea << " (" << xref->target_name
+        << " in " << xref->target_segment->name << ") is actually internal";
   } else {
     LOG_IF(ERROR, xref_is_external)
         << "Internal reference from " << std::hex << inst->ea
-        << " to " << std::hex << xref.target_ea << " is actually external";
+        << " to " << std::hex << xref->target_ea << " (" << xref->target_name
+        << " in " << xref->target_segment->name << ") is actually external";
   }
 
   // Only record flow cross-references for externals. Really, all we care
@@ -225,25 +232,18 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
     }
   }
 
-  if (!xref_ptr) {
-    auto xref_alloc = new NativeXref;
-    *xref_alloc = xref;
-    xref_ptr = xref_alloc;
-    module->code_xrefs[xref.target_ea] = xref_ptr;
-  }
-
   switch (cfg_ref.operand_type()) {
     case CodeReference_OperandType_ImmediateOperand:
-      inst->imm = xref_ptr;
+      inst->imm = xref;
       break;
     case CodeReference_OperandType_MemoryOperand:
-      inst->mem = xref_ptr;
+      inst->mem = xref;
       break;
     case CodeReference_OperandType_MemoryDisplacementOperand:
-      inst->disp = xref_ptr;
+      inst->disp = xref;
       break;
     case CodeReference_OperandType_ControlFlowOperand:
-      inst->flow = xref_ptr;
+      inst->flow = xref;
       break;
   }
 }
@@ -534,7 +534,10 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
       xref->target_ea = static_cast<uint64_t>(cfg_xref.target_ea());
       xref->target_name = cfg_xref.target_name();
       xref->target_segment = FindSegment(module, xref->target_ea);
-      ResolveReference(module, xref);
+      if (!ResolveReference(module, xref)) {
+        delete xref;
+        continue;
+      }
       segment->entries[xref->ea] = {
           xref->ea, (xref->ea + xref->width), xref, nullptr};
     }

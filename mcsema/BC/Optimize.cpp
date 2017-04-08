@@ -71,19 +71,21 @@ DEFINE_bool(lower_memops, true, "Controls whether or not Remill's memory "
 namespace mcsema {
 namespace {
 
-// Replace all uses of a specific intrinsic with an undefined value.
-static void ReplaceUndefIntrinsic(llvm::Function *function) {
-  auto intrinsics = function->getParent()->getFunction("__remill_intrinsics");
-
-  std::vector<llvm::CallInst *> call_insts;
-  for (auto callers : function->users()) {
-    if (auto call_inst = llvm::dyn_cast<llvm::CallInst>(callers)) {
-      auto user_func = call_inst->getParent()->getParent();
-      if (user_func != intrinsics) {
-        call_insts.push_back(call_inst);
+static std::vector<llvm::CallInst *> CallersOf(llvm::Function *func) {
+  std::vector<llvm::CallInst *> callers;
+  for (auto user : func->users()) {
+    if (auto call_inst = llvm::dyn_cast<llvm::CallInst>(user)) {
+      if (call_inst->getCalledFunction() == func) {
+        callers.push_back(call_inst);
       }
     }
   }
+  return callers;
+}
+
+// Replace all uses of a specific intrinsic with an undefined value.
+static void ReplaceUndefIntrinsic(llvm::Function *function) {
+  auto call_insts = CallersOf(function);
 
   std::set<llvm::User *> work_list;
   auto undef_val = llvm::UndefValue::get(function->getReturnType());
@@ -127,17 +129,6 @@ static void RemoveFunction(llvm::Function *func) {
 static void RemoveFunction(const char *name) {
   if (auto func = gModule->getFunction(name)) {
     func->setLinkage(llvm::GlobalValue::InternalLinkage);
-
-//    llvm::SmallVector<std::pair<unsigned, llvm::MDNode *>, 4> mds;
-//    func->getAllMetadata(mds);
-//    for (auto md_info : mds) {
-//      auto num_ops = md_info.second->getNumOperands();
-//      for (unsigned i = 0; i < num_ops; ++i) {
-//        md_info.second->replaceOperandWith(i, nullptr);
-//      }
-//      func->setMetadata(md_info.first, nullptr);
-//    }
-
     RemoveFunction(func);
   }
 }
@@ -279,23 +270,30 @@ static void RemoveIntrinsics(void) {
   RemoveFunction("__remill_mark_as_used");
 }
 
+static void ReplaceBarrier(const char *name) {
+  auto func = gModule->getFunction(name);
+  if (!func) {
+    return;
+  }
+
+  CHECK(func->isDeclaration())
+      << "Cannot lower already implemented memory intrinsic " << name;
+
+  auto callers = CallersOf(func);
+  for (auto call_inst : callers) {
+    auto mem_ptr = call_inst->getArgOperand(remill::kMemoryPointerArgNum);
+    call_inst->replaceAllUsesWith(mem_ptr);
+    call_inst->eraseFromParent();
+  }
+}
+
 // Lower a memory read intrinsic into a `load` instruction.
 static void ReplaceMemReadOp(const char *name, llvm::Type *val_type) {
   auto func = gModule->getFunction(name);
   CHECK(func->isDeclaration())
       << "Cannot lower already implemented memory intrinsic " << name;
 
-  std::vector<llvm::CallInst *> callers;
-  std::unordered_set<llvm::Function *> memop_callers;
-  for (auto user : func->users()) {
-    if (auto call_inst = llvm::dyn_cast<llvm::CallInst>(user)) {
-      if (call_inst->getCalledFunction() == func) {
-        callers.push_back(call_inst);
-        memop_callers.insert(call_inst->getFunction());
-      }
-    }
-  }
-
+  auto callers = CallersOf(func);
   for (auto call_inst : callers) {
     auto addr = call_inst->getArgOperand(1);
 
@@ -307,20 +305,6 @@ static void ReplaceMemReadOp(const char *name, llvm::Type *val_type) {
     }
     call_inst->replaceAllUsesWith(val);
   }
-
-  // Update the functions using the memory pointer to
-  for (auto func : memop_callers) {
-    auto func_attrs = func->getAttributes();
-    if (func_attrs.getDereferenceableBytes(remill::kMemoryPointerArgNum)) {
-      continue;
-    }
-
-    func_attrs.addDereferenceableAttr(
-        *gContext, llvm::AttributeSet::ReturnIndex, ~0ULL);
-    func_attrs.addDereferenceableAttr(
-        *gContext, remill::kMemoryPointerArgNum, ~0ULL);
-    func->setAttributes(func_attrs);
-  }
 }
 
 // Lower a memory write intrinsic into a `store` instruction.
@@ -329,14 +313,7 @@ static void ReplaceMemWriteOp(const char *name, llvm::Type *val_type) {
   CHECK(func->isDeclaration())
       << "Cannot lower already implemented memory intrinsic " << name;
 
-  std::vector<llvm::CallInst *> callers;
-  for (auto user : func->users()) {
-    if (auto call_inst = llvm::dyn_cast<llvm::CallInst>(user)) {
-      if (call_inst->getCalledFunction() == func) {
-        callers.push_back(call_inst);
-      }
-    }
-  }
+  auto callers = CallersOf(func);
 
   for (auto call_inst : callers) {
     auto mem_ptr = call_inst->getArgOperand(0);
@@ -405,6 +382,12 @@ void OptimizeModule(void) {
   RemoveISELs(isels);
   if (FLAGS_lower_memops) {
     LowerMemOps();
+    ReplaceBarrier("__remill_barrier_load_load");
+    ReplaceBarrier("__remill_barrier_load_store");
+    ReplaceBarrier("__remill_barrier_store_load");
+    ReplaceBarrier("__remill_barrier_store_store");
+    ReplaceBarrier("__remill_barrier_atomic_begin");
+    ReplaceBarrier("__remill_barrier_atomic_end");
   }
   RunO3();
   RemoveIntrinsics();

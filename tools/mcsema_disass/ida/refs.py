@@ -121,7 +121,7 @@ def get_instruction_references(arg, binary_is_pie=False):
     else:
       ref = _get_ref_candidate(op, all_refs)
 
-    if not ref:
+    if not ref or not idc.GetFlags(ref.addr):
       continue
 
     # Immediate constant, may be the absolute address of a data reference.
