@@ -78,10 +78,19 @@ struct NativeBlock {
 // some kind of relocation section within the binary.
 struct NativeObject {
  public:
+  NativeObject(void);
+
+  // Forwarding pointer to resolve duplicates and such.
+  mutable NativeObject *forward;
+
   uint64_t ea;
   std::string name;  // Name in the binary.
   std::string lifted_name;  // Name in the bitcode.
   bool is_external;
+
+  void ForwardTo(NativeObject *dest) const;
+  const NativeObject *Get(void) const;
+  NativeObject *Get(void);
 };
 
 // Function that is defined inside the binary.
@@ -120,8 +129,8 @@ struct NativeXref {
   std::string target_name;
   const NativeSegment *target_segment;  // Target segment of the xref, if any.
 
-  const NativeVariable *var;
-  const NativeFunction *func;
+  const NativeObject *var;
+  const NativeObject *func;
 };
 
 struct NativeBlob {

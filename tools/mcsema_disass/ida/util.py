@@ -488,9 +488,23 @@ def is_referenced_by(ea, by_ea):
 
   return False
 
+def is_runtime_external_data_reference(ea):
+  """This can happen in ELF binaries, where you'll have somehting like
+  `stdout@@GLIBC_2.2.5` in the `.bss` section, where at runtime the
+  linker will fill in the slot with a pointer to the real `stdout`.
+
+  IDA discovers this type of reference, but it has no real way to
+  cross-reference it to anything, because the target address will
+  only exist at runtime."""
+  comment = idc.GetCommentEx(ea, 0)
+  return comment and "Copy of shared data" in comment
+
 def is_reference(ea):
   """Returns `True` if the `ea` references something else."""
-  return _reference_checker(ea, idautils.DataRefsFrom, idautils.CodeRefsFrom)
+  if _reference_checker(ea, idautils.DataRefsFrom, idautils.CodeRefsFrom):
+    return True
+
+  return is_runtime_external_data_reference(ea)
 
 def has_flow_to_code(ea):
   """Returns `True` if there are and control flows to the instruction at 
@@ -513,5 +527,17 @@ def get_reference_target(ea):
     if ref == idc.BADADDR or ref >= _IDA_WEIRD_BAD_REF:
       continue
     return ref
+
+  # This is kind of funny, but it works with how we understand external
+  # variable references from the CFG production and LLVM side. Really,
+  # we need a unique location for every reference (internal and external).
+  # For external references, the location itself is not super important, it's
+  # used for identification in the LLVM side of things.
+  #
+  # When creating cross-references, we need that ability to identify the
+  # "target" of the cross-reference, and again, that can be anything so long
+  # as other parts of the code agree on the target.
+  if is_runtime_external_data_reference(ea):
+    return ea
 
   return idc.BADADDR

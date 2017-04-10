@@ -534,7 +534,7 @@ static llvm::Function *LiftFunction(
 // are resolved before any data or instructions can use those references.
 void DeclareLiftedFunctions(const NativeModule *cfg_module) {
   for (auto func : cfg_module->ea_to_func) {
-    auto cfg_func = func.second;
+    auto cfg_func = func.second->Get();
     if (cfg_func->is_external) {
       continue;
     }
@@ -575,7 +575,8 @@ bool DefineLiftedFunctions(const NativeModule *cfg_module) {
   func_pass_manager.doInitialization();
 
   for (auto &entry : cfg_module->ea_to_func) {
-    auto cfg_func = entry.second;
+    auto cfg_func = reinterpret_cast<const NativeFunction *>(
+        entry.second->Get());
     if (cfg_func->is_external) {
       continue;
     }

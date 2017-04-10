@@ -29,7 +29,7 @@
 from util import *
 
 class Reference(object):
-  __slots__ = ('offset', 'addr', 'orig_addr', 'symbol', 'type')
+  __slots__ = ('offset', 'addr', 'symbol', 'type')
 
   INVALID = 0
   IMMEDIATE = 1

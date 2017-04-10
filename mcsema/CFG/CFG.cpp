@@ -109,46 +109,81 @@ static const NativeSegment *FindSegment(const NativeModule *module,
 }
 
 // Resolve `xref` to a location.
-static bool ResolveReference(const NativeModule *module, NativeXref *xref) {
+static bool ResolveReference(NativeModule *module, NativeXref *xref) {
   xref->var = nullptr;
   xref->func = nullptr;
 
   auto var_it = module->ea_to_var.find(xref->target_ea);
   if (var_it != module->ea_to_var.end()) {
-    xref->var = var_it->second;
+    xref->var = var_it->second->Get();
     return true;
   }
 
   auto func_it = module->ea_to_func.find(xref->target_ea);
   if (func_it != module->ea_to_func.end()) {
-    xref->func = func_it->second;
+    xref->func = func_it->second->Get();
     return true;
   }
 
   if (!xref->target_name.empty()) {
     auto var_name_it = module->name_to_extern_var.find(xref->target_name);
     if (var_name_it != module->name_to_extern_var.end()) {
-      xref->var = var_name_it->second;
+      xref->var = var_name_it->second->Get();
       return true;
     }
 
     auto func_name_it = module->name_to_extern_func.find(xref->target_name);
     if (func_name_it != module->name_to_extern_func.end()) {
-      xref->func = func_name_it->second;
+      xref->func = func_name_it->second->Get();
       return true;
     }
   }
 
   if (xref->target_segment) {
     return true;
-  } else {
-    LOG(ERROR)
-        << "Data cross reference at " << std::hex << xref->ea
-        << " targeting " << xref->target_name << " at "
-        << std::hex << xref->target_ea << " does not match any known "
-        << "externals and is not containing within any data segments.";
-    return false;
   }
+
+  // Try to recover by finding a local variable.
+  for (const auto &entry : module->ea_to_var) {
+    auto var = entry.second;
+    if (var->name == xref->target_name) {
+      auto final_var = reinterpret_cast<const NativeVariable *>(var->Get());
+      xref->var = final_var;
+      xref->target_segment = final_var->segment;
+      module->ea_to_var[xref->target_ea] = final_var;
+
+      LOG(ERROR)
+          << "Attempting reference fix at " << std::hex << xref->ea
+          << " targeting " << xref->target_name << " using variable "
+          << std::hex << var->ea << ", resolving to variable "
+          << final_var->name << " at " << std::hex << final_var->ea;
+      return true;
+    }
+  }
+
+  // Try to recover by finding a local variable.
+  for (const auto &entry : module->ea_to_func) {
+    auto func = entry.second;
+    if (func->name == xref->target_name) {
+      auto final_func = reinterpret_cast<const NativeFunction *>(func->Get());
+      xref->func = final_func;
+      module->ea_to_func[xref->target_ea] = final_func;
+
+      LOG(ERROR)
+          << "Attempting reference fix at " << std::hex << xref->ea
+          << " targeting " << xref->target_name << " using variable "
+          << std::hex << func->ea << ", resolving to function "
+          << final_func->name << " at " << std::hex << final_func->ea;
+      return true;
+    }
+  }
+
+  LOG(ERROR)
+      << "Data cross reference at " << std::hex << xref->ea
+      << " targeting " << xref->target_name << " at "
+      << std::hex << xref->target_ea << " does not match any known "
+      << "externals and is not containing within any data segments.";
+  return false;
 }
 
 // Take the `CodeReference` information from the CFG and resolve it into
@@ -249,6 +284,36 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
 }
 
 }  // namespace
+
+NativeObject::NativeObject(void)
+    : forward(this),
+      ea(0),
+      name(),
+      lifted_name(),
+      is_external(false) {}
+
+void NativeObject::ForwardTo(NativeObject *dest) const {
+  if (forward != this) {
+    forward->ForwardTo(dest);
+    forward = dest;
+  } else {
+    forward = dest->Get();
+  }
+}
+
+const NativeObject *NativeObject::Get(void) const {
+  if (forward != this) {
+    forward = forward->Get();
+  }
+  return forward;
+}
+
+NativeObject *NativeObject::Get(void) {
+  if (forward != this) {
+    forward = forward->Get();
+  }
+  return forward;
+}
 
 // Convert the protobuf into an in-memory data structure. This does a fair
 // amount of checking and tries to correct errors in favor of converting
@@ -380,12 +445,14 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
         << "Internal function at " << std::hex << var->ea
         << " is also the external variable " << var->name;
 
+    // Look for two extern variables with the same name.
     auto extern_var_it = module->name_to_extern_var.find(var->name);
     if (extern_var_it != module->name_to_extern_var.end()) {
       auto dup_var = extern_var_it->second;
+      dup_var->ForwardTo(var);
 
       if (dup_var->ea != var->ea) {
-        LOG(ERROR)
+        LOG(WARNING)
             << "External variable " << var->name << " at " << std::hex
             << var->ea << " is also defined at " << dup_var->ea;
         module->ea_to_var[dup_var->ea] = var;
@@ -395,14 +462,13 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
             << var->ea << " has the same name of external variable at "
             << std::hex << dup_var->ea;
       }
-
-      // Note:  Intentional leak, not doing `delete dup_var`. Could be solved
-      //        using `std::shared_ptr`, but we never free the CFG anyway.
     }
 
+    // Look for two variables with the sane address.
     auto var_it = module->ea_to_var.find(var->ea);
     if (var_it != module->ea_to_var.end()) {
       auto dup_var = var_it->second;
+      dup_var->ForwardTo(var);
 
       if (dup_var->name != var->name) {
         LOG(ERROR)
@@ -436,7 +502,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
     CHECK(!func->name.empty())
         << "External function at " << std::hex << func->ea << " has no name.";
 
-    CHECK(!module->ea_to_var.count(func->ea))
+    LOG_IF(ERROR, module->ea_to_var.count(func->ea))
         << "Internal variable at " << std::hex << func->ea
         << " is also the external function " << func->name;
 
@@ -448,6 +514,8 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
     auto var_it = module->name_to_extern_var.find(func->name);
     if (var_it != module->name_to_extern_var.end()) {
       auto dup_var = var_it->second;
+      dup_var->ForwardTo(func);
+
       if (dup_var->ea != func->ea) {
         LOG(ERROR)
             << "External variable at " << std::hex << dup_var->ea
@@ -475,42 +543,38 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
     auto will_find_ea = false;
     if (extern_func_it != module->name_to_extern_func.end()) {
       auto dup_func = extern_func_it->second;
-      LOG(ERROR)
-          << "External function " << func->name << " at " << std::hex
-          << func->ea << " has the same name of external function at "
-          << std::hex << dup_func->ea;
+      dup_func->ForwardTo(func);
 
       if (dup_func->ea != func->ea) {
-        LOG(ERROR)
+        LOG(WARNING)
             << "External function " << func->name << " at " << std::hex
             << func->ea << " is also defined at " << std::hex << dup_func->ea;
+
         module->ea_to_func[dup_func->ea] = func;
         will_find_ea = true;
 
-        // Note:  Intentional leak, not doing `delete dup_func`. Could be solved
-        //        using `std::shared_ptr`, but we never free the CFG anyway.
       } else {
         LOG(ERROR)
             << "External function " << func->name << " at " << std::hex
-            << func->ea << " is defined twice";
+            << func->ea << " is defined twice (by address)";
       }
     }
 
     auto func_it = module->ea_to_func.find(func->ea);
     if (func_it != module->ea_to_func.end()) {
       auto dup_func = func_it->second;
+      dup_func->ForwardTo(func);
+
       if (dup_func->name != func->name) {
         LOG(ERROR)
             << "External function " << func->name << " at " << std::hex
             << func->ea << " is also defined as " << dup_func->name;
         module->name_to_extern_func[dup_func->name] = func;
 
-        // Note:  Intentional leak, not doing `delete dup_func`. Could be solved
-        //        using `std::shared_ptr`, but we never free the CFG anyway.
       } else if (!will_find_ea) {
         LOG(ERROR)
             << "External function " << func->name << " at " << std::hex
-            << func->ea << " is defined twice";
+            << func->ea << " is defined twice (by name)";
       }
     }
 
@@ -666,7 +730,7 @@ const NativeFunction *NativeModule::TryGetFunction(uint64_t ea) const {
   if (func_it == ea_to_func.end()) {
     return nullptr;
   }
-  return func_it->second;
+  return reinterpret_cast<const NativeFunction *>(func_it->second->Get());
 }
 
 const NativeVariable *NativeModule::TryGetVariable(uint64_t ea) const {
@@ -674,8 +738,7 @@ const NativeVariable *NativeModule::TryGetVariable(uint64_t ea) const {
   if (var_it == ea_to_var.end()) {
     return nullptr;
   }
-  return var_it->second;
-
+  return reinterpret_cast<const NativeVariable *>(var_it->second->Get());
 }
 
 }  // namespace mcsema

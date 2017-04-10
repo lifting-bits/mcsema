@@ -52,6 +52,7 @@ static void MakeExternal(llvm::Constant *val) {
 }  // namespace
 
 void DeclareExternals(const NativeModule *cfg_module) {
+  auto lifted_func_type = LiftedFunctionType();
   auto func_type = llvm::FunctionType::get(
       llvm::Type::getVoidTy(*gContext), true);
 
@@ -59,18 +60,23 @@ void DeclareExternals(const NativeModule *cfg_module) {
   //
   // TODO(pag): Calling conventions, argument counts, etc.
   for (const auto &entry : cfg_module->name_to_extern_func) {
-    auto cfg_func = entry.second;
+    auto cfg_func = entry.second->Get();
 
     // The "actual" external function.
     MakeExternal(gModule->getOrInsertFunction(cfg_func->name, func_type));
 
     // Stub that will marshal lifted state into the native state.
-    gModule->getOrInsertFunction(cfg_func->lifted_name, LiftedFunctionType());
+    gModule->getOrInsertFunction(cfg_func->lifted_name, lifted_func_type);
+
+    LOG(INFO)
+        << "Adding external " << cfg_func->name << " implemented by thunk "
+        << cfg_func->lifted_name;
   }
 
   // Declare external variables.
   for (const auto &entry : cfg_module->name_to_extern_var) {
-    auto cfg_var = entry.second;
+    auto cfg_var = reinterpret_cast<const NativeExternalVariable *>(
+        entry.second->Get());
     auto var_type = llvm::Type::getIntNTy(*gContext, cfg_var->size * 8);
     MakeExternal(gModule->getOrInsertGlobal(cfg_var->name, var_type));
   }

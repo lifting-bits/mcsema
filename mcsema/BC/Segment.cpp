@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <glog/logging.h>
 
 #include <sstream>
+#include <string>
 #include <vector>
 
 #include <llvm/IR/Constants.h>
@@ -133,7 +134,8 @@ void DeclareVariables(const NativeModule *cfg_module) {
   auto byte_ptr_type = llvm::PointerType::get(byte_type, 0);
 
   for (auto entry : cfg_module->ea_to_var) {
-    auto cfg_var = entry.second;
+    auto cfg_var = reinterpret_cast<const NativeVariable *>(
+        entry.second->Get());
     if (cfg_var && cfg_var->is_external) {
       continue;
     }

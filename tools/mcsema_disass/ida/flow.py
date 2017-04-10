@@ -180,9 +180,6 @@ def get_static_successors(sub_ea, inst, binary_is_pie):
     if not is_noreturn_inst(inst):
       yield next_ea
 
-  else:
-    DEBUG("  No static successors of instruction at {:x}".format(inst.ea))
-
 _BAD_BLOCK = (tuple(), set())
 
 def analyse_block(func_ea, ea, binary_is_pie=False):
@@ -345,6 +342,3 @@ def analyse_subroutine(sub_ea, binary_is_pie):
   ret = found_block_eas, term_insts
   _FUNCTION_BLOCK_HEAD_EAS[sub_ea] = ret
   return ret
-
-def is_analysed_function(ea):
-  return ea in _FUNCTION_BLOCK_HEAD_EAS
