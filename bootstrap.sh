@@ -148,7 +148,7 @@ function InstallDependencies
 {
   # mac os x packages
   if [[ "$OSTYPE" == "darwin"* ]]; then
-    local osx_dependencies="wget git cmake coreutils protobuf"
+    local osx_dependencies="wget git cmake coreutils protobuf@2.6"
 
     for osx_dep in ${osx_dependencies[@]} ; do
       # homebrew errors on installing already installed things
