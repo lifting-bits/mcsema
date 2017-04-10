@@ -1,11 +1,15 @@
 /* Copyright 2017 Peter Goodman (peter@trailofbits.com), all rights reserved. */
 
+#include <sstream>
 #include <unordered_set>
 
 #include <llvm/ADT/ArrayRef.h>
+#include <llvm/ADT/SmallVector.h>
 
+#include <llvm/MC/MCAsmInfo.h>
 #include <llvm/MC/MCContext.h>
 #include <llvm/MC/MCDisassembler.h>
+#include <llvm/MC/MCInstPrinter.h>
 
 #include <llvm/lib/Target/X86/X86RegisterInfo.h>
 #include <llvm/lib/Target/X86/X86InstrBuilder.h>
@@ -19,6 +23,8 @@
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
 
+#include "mcsema/BC/Util.h"
+
 #include "mcsema/cfgToLLVM/TransExcn.h"
 
 namespace {
@@ -29,6 +35,10 @@ static std::string gTriple;
 static int gAddressSize = 0;
 
 static const llvm::MCDisassembler *gDisassembler = nullptr;
+static const llvm::MCInstrInfo *gMII = nullptr;
+static const llvm::MCRegisterInfo *gMRI = nullptr;
+static const llvm::MCSubtargetInfo *gSTI = nullptr;
+static llvm::MCInstPrinter *gIP = nullptr;
 
 static llvm::CallingConv::ID gCallingConv;
 static llvm::Triple::ArchType gArchType;
@@ -44,11 +54,14 @@ static bool InitInstructionDecoder(void) {
     return false;
   }
 
-  auto STI = target->createMCSubtargetInfo(gTriple, "", "");
-  auto MRI = target->createMCRegInfo(gTriple);
-  auto AsmInfo = target->createMCAsmInfo(*MRI, gTriple);
-  auto Ctx = new llvm::MCContext(AsmInfo, MRI, nullptr);
-  gDisassembler = target->createMCDisassembler(*STI, *Ctx);
+  gSTI = target->createMCSubtargetInfo(gTriple, "", "");
+  gMII = target->createMCInstrInfo();
+  gMRI = target->createMCRegInfo(gTriple);
+  auto AsmInfo = target->createMCAsmInfo(*gMRI, gTriple);
+  auto Ctx = new llvm::MCContext(AsmInfo, gMRI, nullptr);
+  gDisassembler = target->createMCDisassembler(*gSTI, *Ctx);
+  gIP = target->createMCInstPrinter(llvm::Triple(gTriple),
+      AsmInfo->getAssemblerDialect(), *AsmInfo, *gMII, *gMRI);
   return true;
 }
 
@@ -329,6 +342,111 @@ size_t ArchDecodeInstruction(const uint8_t *bytes, const uint8_t *bytes_end,
   FixupInstruction(inst, prefixes);
 
   return total_size;
+}
+
+// Convert the given assembly instruction into an inline ASM operation in lieu
+// of decompiling it. The output instruction will look something like this
+// (although note that i128 doesn't work properly with LLVM codegen for the
+// inline ASM instructions, necessitating a vector instead).
+// %151 = load i128, i128* %XMM0_read
+// %152 = bitcast i128 %151 to <16 x i8>
+// %153 = load i128, i128* %XMM1_read
+// %154 = bitcast i128 %153 to <16 x i8>
+// %AESDECrr = call <16 x i8> asm "\09aesdec\09%xmm1, %xmm0", "={XMM0},{XMM0},{XMM1}"(<16 x i8> %152, <16 x i8> %154)
+// %155 = bitcast <16 x i8> %AESDECrr to i128
+// store volatile i128 %155, i128* %XMM0_write
+void ArchBuildInlineAsm(llvm::MCInst &inst, llvm::BasicBlock *block) {
+  auto opcode = inst.getOpcode();
+
+  // Use the printer to build the ASM string. We'll need to escape the $ in
+  // register names with $$.
+  std::stringstream asmString;
+  {
+    std::string outS;
+    llvm::raw_string_ostream strOut(outS);
+    gIP->printInst(&inst, strOut, "", *gSTI);
+    for (char c : strOut.str()) {
+      if (c == '$')
+        asmString << "$$";
+      else
+        asmString << c;
+    }
+  }
+
+  // Next, find all the registers being used as definitions or uses in the
+  // inline ASM. This will write up the constraints for us, as well as
+  // provide us with a list of types (for the inline ASM output) and a list of
+  // values to pass into the string.
+  llvm::SmallVector<llvm::Value *, 3> operands;
+  llvm::SmallVector<llvm::Type *, 3> resultTypes;
+  std::stringstream constraints;
+  for (unsigned i = 0; i < inst.getNumOperands(); i++) {
+    llvm::MCOperand &op = inst.getOperand(i);
+    if (op.isReg()) {
+      unsigned regSize = ArchRegisterSize(op.getReg());
+      if (constraints.tellp() > 0) constraints << ",";
+      if (i < gMII->get(opcode).getNumDefs()) {
+        constraints << "=";
+
+        if (regSize > 64) {
+          // LLVM can't handle register constraints of i128, so we
+          // need to map this to <16 x i8>.
+          resultTypes.push_back(llvm::VectorType::get(
+            llvm::Type::getInt8Ty(block->getContext()), regSize / 8));
+        } else {
+          resultTypes.push_back(llvm::IntegerType::get(block->getContext(),
+            regSize));
+        }
+      } else {
+        auto readReg = GENERIC_MC_READREG(block, op.getReg(), regSize);
+        if (regSize > 64) {
+          // LLVM can't handle register constraints of i128, so we
+          // need to map this to <16 x i8>.
+          readReg = llvm::CastInst::Create(llvm::Instruction::BitCast, readReg,
+            llvm::VectorType::get(llvm::Type::getInt8Ty(block->getContext()), regSize / 8),
+            "", block);
+        }
+        operands.push_back(readReg);
+      }
+      constraints << "{" << gMRI->getName(op.getReg()) << "}";
+    }
+  }
+
+  // With all of these pieces, piece together the actual call to the inline ASM
+  // string.
+  llvm::SmallVector<llvm::Type *, 3> argTypes;
+  for (auto val : operands)
+    argTypes.push_back(val->getType());
+
+  llvm::Type *returnTy;
+  if (resultTypes.empty())
+    returnTy = llvm::Type::getVoidTy(block->getContext());
+  else if (resultTypes.size() == 1)
+    returnTy = resultTypes[0];
+  else
+    returnTy = llvm::StructType::get(block->getContext(), resultTypes);
+
+  auto asmTy = llvm::FunctionType::get(returnTy, argTypes, false);
+  auto callee = llvm::InlineAsm::get(asmTy, asmString.str(), constraints.str(),
+      false);
+  llvm::Value *resultPack =
+    llvm::CallInst::Create(callee, operands, gIP->getOpcodeName(opcode), block);
+
+  // Unpack the called registers into the LLVM values.
+  for (unsigned i = 0; i < resultTypes.size(); i++) {
+    llvm::Value *result = resultTypes.size() == 1 ? resultPack :
+      llvm::ExtractValueInst::Create(resultPack, i, "", block);
+    llvm::Type *ty = resultTypes[i];
+    // Cast vector outputs to iXYZ for R_WRITE.
+    if (ty->isVectorTy()) {
+      ty = llvm::Type::getIntNTy(block->getContext(),
+        ty->getVectorNumElements() * 8);
+      result = llvm::CastInst::Create(llvm::Instruction::BitCast, result,
+        ty, "", block);
+    }
+    unsigned regNo = inst.getOperand(i).getReg();
+    GENERIC_MC_WRITEREG(block, regNo, result);
+  }
 }
 
 // Return the default calling convention for code on this architecture.

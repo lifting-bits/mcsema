@@ -143,6 +143,10 @@ const std::string &ArchDataLayout(void);
 size_t ArchDecodeInstruction(const uint8_t *bytes, const uint8_t *bytes_end,
                              uintptr_t va, llvm::MCInst &inst);
 
+// Convert the given assembly instruction into an inline ASM operation in lieu
+// of decompiling it.
+void ArchBuildInlineAsm(llvm::MCInst &inst, llvm::BasicBlock *block);
+
 // Return the default calling convention for code on this architecture.
 llvm::CallingConv::ID ArchCallingConv(void);
 
