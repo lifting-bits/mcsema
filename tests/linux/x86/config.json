@@ -1,5 +1,12 @@
 {
     "_comment": "x86 architecture list of programs under test",
+    "aes-test": {
+        "_comment": "This tests inline ASM constructs work correctly by way of the AES instructions.",
+        "default": {
+            "args": []
+        }
+    },
+
     "hello": { 
         "_comment": "These are test names, in case each program has more than one test",
         "default": {
