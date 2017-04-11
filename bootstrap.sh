@@ -122,7 +122,6 @@ function main
   MCSEMA_DIR=$(realpath ${DIR})
   BUILD_DIR=$(realpath ${BUILD_DIR})
   LLVM_DIR=$(realpath ${LLVM_DIR})
-  GEN_DIR=$(realpath ${GEN_DIR})
 
   BuildLLVM
   if [ $? -ne 0 ] ; then
@@ -545,10 +544,6 @@ function BuildMcSema
       -G "Unix Makefiles" \
       -DCMAKE_INSTALL_PREFIX=${PREFIX} \
       -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
-      -DLLVM_DIR="${BUILD_DIR}/llvm/share/llvm/cmake" \
-      -DMCSEMA_LLVM_DIR="${LLVM_DIR}" \
-      -DMCSEMA_BUILD_DIR="${BUILD_DIR}" \
-      -DMCSEMA_GEN_DIR="${GEN_DIR}" \
       ${MCSEMA_DIR}
 
   if [ $? -ne 0 ] ; then
