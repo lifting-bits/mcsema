@@ -21,7 +21,6 @@ add_definitions(${LLVM_DEFINITIONS})
 
 include (LLVMUtils)
 include (GetGitRevisionDescription)
-include (${CMAKE_SOURCE_DIR}/cmake/protobuf/CMakeLists.txt)
 
 # we need C++11
 if(NOT WIN32)
@@ -35,13 +34,10 @@ if(NOT WIN32)
 
   set(CMAKE_CXX_STANDARD 11)
 
-  #if(APPLE)
-  #    set(PROTOBUF_ROOT "${CMAKE_SOURCE_DIR}/third_party/protobuf")
-  #    set(Protobuf_LIBRARIES "${PROTOBUF_ROOT}/build/lib")
-  #    set(Protobuf_INCLUDE_DIR "${PROTOBUF_ROOT}/src")
-  #endif()
-
-  find_package(Protobuf REQUIRED)
+  include (${CMAKE_SOURCE_DIR}/cmake/protobuf/CMakeLists.txt)
+  set(PROTOBUF_INCLUDE_DIRS "${PROTOBUF_ROOT}/src")
+  set(PROTOBUF_LIBRARIES "$<TARGET_FILE:libprotobuf>")
+  set(PROTOBUF_PROTOC_EXECUTABLE "$<TARGET_FILE:protoc>")
 else()
    string(REGEX REPLACE "\\\\" "/" CMAKE_SOURCE_DIR ${CMAKE_SOURCE_DIR})
    # on win32, manuallys set protobuf goodness
@@ -182,7 +178,7 @@ add_custom_command(
 
     COMMAND "${PROTOBUF_PROTOC_EXECUTABLE}" --cpp_out "${MCSEMA_GEN_DIR}" --python_out "${MCSEMA_GEN_DIR}" --proto_path "${CMAKE_SOURCE_DIR}/mcsema/CFG" "${PROTOBUF_CONFIGURATION}"
 
-    DEPENDS "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.h"
+    DEPENDS "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.h" ${PROTOBUF_PROTOC_EXECUTABLE}
     MAIN_DEPENDENCY "${PROTOBUF_CONFIGURATION}"
 
     COMMENT "Generating protobuf files..."
@@ -248,7 +244,11 @@ target_link_libraries(mcsema-lift
 
 #TODO(artem):  Make this ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86 and have a 
 # CMakeLists.txt there add any relevant subdirs
-add_subdirectory(${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/Bitcode)
+if(NOT APPLE)
+  # Apple clang is trolling us. On my (artem) machine, the llvm-link from 3.8 will assert() on the bitcode semantics
+  # TODO(artem): Install real clang 3.8 on MacOS, not hacky apple clang
+  add_subdirectory(${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/Bitcode)
+endif()
 add_subdirectory(${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Runtime)
 
 install(
