@@ -121,7 +121,7 @@ bool ListArchSupportedInstructions(const std::string &triple, llvm::raw_ostream 
 bool InitArch(llvm::LLVMContext *context, const std::string &os, const std::string &arch) {
 
   // Windows.
-  if (os == "win32") {
+  if (os == "windows") {
     gOSType = llvm::Triple::Win32;
     if (arch == "x86") {
       gArchType = llvm::Triple::x86;
@@ -467,6 +467,11 @@ static std::string WindowsDecorateName(llvm::Function *F,
     return name;
   }
 
+  // do not mangle already mangled C++ names
+  if('?' == name[0]) {
+    return name;
+  }
+
   switch (F->getCallingConv()) {
 
     case llvm::CallingConv::C:
@@ -506,6 +511,12 @@ static void WindowsAddPushJumpStub(bool decorateStub, llvm::Module *M,
   if(decorateStub) {
     stub_name = WindowsDecorateName(W, stub_name);
   }
+  // the " character is necesssary because sometimes Windows decorated C++
+  // names will start with '?', which will otherwise fail the 
+  // LLVM inline assembly parser
+  // this is not needed for stub_name since that name is prefixed 
+  // with "mcsema"
+  stubbed_func_name = "\"" + stubbed_func_name + "\"";
 
   as << "  .globl " << stubbed_func_name << ";\n";
   as << "  .globl " << stub_name << ";\n";
@@ -527,8 +538,10 @@ static void WindowsAddPushJumpStub(bool decorateStub, llvm::Module *M,
 
 // Add a function that can be used to transition from native code into lifted
 // code.
+// isCallback defaults to false
 llvm::Function *ArchAddEntryPointDriver(llvm::Module *M,
-                                        const std::string &name, VA entry) {
+                                        const std::string &name, VA entry,
+                                        bool isCallback) {
   //convert the VA into a string name of a function, try and look it up
   std::stringstream ss;
   ss << "sub_" << std::hex << entry;
@@ -565,10 +578,15 @@ llvm::Function *ArchAddEntryPointDriver(llvm::Module *M,
       LinuxAddPushJumpStub(M, F, W, "__mcsema_attach_call_cdecl");
     }
   } else if (llvm::Triple::Win32 == OS) {
+    // if we are creating and entry point for a callback
+    // then we need to decorate the function. 
+
+    // if we are creating an entry point specified via -entrypoint
+    // then the name is pre-decorated, and we don't decorate twice
     if (_X86_64_ == Arch) {
-      WindowsAddPushJumpStub(true, M, F, W, "__mcsema_attach_call");
+      WindowsAddPushJumpStub(isCallback, M, F, W, "__mcsema_attach_call");
     } else {
-      WindowsAddPushJumpStub(true, M, F, W, "__mcsema_attach_call_cdecl");
+      WindowsAddPushJumpStub(isCallback, M, F, W, "__mcsema_attach_call_cdecl");
     }
   } else {
     TASSERT(false, "Unsupported OS for entry point driver.");
@@ -662,7 +680,7 @@ llvm::Function *ArchAddCallbackDriver(llvm::Module *M, VA local_target) {
   std::stringstream ss;
   ss << "callback_sub_" << std::hex << local_target;
   auto callback_name = ss.str();
-  return ArchAddEntryPointDriver(M, callback_name, local_target);
+  return ArchAddEntryPointDriver(M, callback_name, local_target, true);
 }
 
 llvm::GlobalVariable *archGetImageBase(llvm::Module *M) {

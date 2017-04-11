@@ -3,36 +3,36 @@
 project(mcsema)
 cmake_minimum_required(VERSION 3.1)
 
-if (NOT MCSEMA_GEN_DIR)
-    set(MCSEMA_GEN_DIR "${CMAKE_BINARY_DIR}/mcsema_generated")
+if(WIN32)
+  string(REGEX REPLACE "\\\\" "/" CMAKE_SOURCE_DIR "${CMAKE_SOURCE_DIR}")
+  string(REGEX REPLACE "\\\\" "/" CMAKE_BINARY_DIR "${CMAKE_BINARY_DIR}")
+  SET(CMAKE_EXE_LINKER_FLAGS "/LARGEADDRESSAWARE ${CMAKE_EXE_LINKER_FLAGS}")
+else()
+  # WIN32 defaults to CXX11 by default, and setting it explicitly
+  # confuses clang-cl, which will bail out with "unknown flag -std=g++11"
+  # So only set this value for non-Win32 targets
+  set(CMAKE_CXX_STANDARD 11)
 endif()
 
-message(STATUS "Generated files will be stored in the following directory: ${MCSEMA_GEN_DIR}")
+set(MCSEMA_GEN_DIR "${CMAKE_BINARY_DIR}/mcsema_generated")
+include_directories(${CMAKE_BINARY_DIR})
 
-if(WIN32)
-  SET(CMAKE_EXE_LINKER_FLAGS "/LARGEADDRESSAWARE ${CMAKE_EXE_LINKER_FLAGS}")
-endif(WIN32)
+message(STATUS "Generated files will be stored in: ${MCSEMA_GEN_DIR}")
 
-set(CMAKE_MODULE_PATH "${LLVM_DIR}/cmake/modules" "${CMAKE_SOURCE_DIR}/cmake" "${CMAKE_ROOT}/Modules")
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" "${CMAKE_ROOT}/Modules")
 
 # Configure with the build LLVM
-find_package(LLVM 3.8 REQUIRED CONFIG)
+find_package(LLVM 3.8 REQUIRED CONFIG HINTS "${CMAKE_BINARY_DIR}/llvm/share/llvm/cmake")
 add_definitions(${LLVM_DEFINITIONS})
 
 include (LLVMUtils)
 include (GetGitRevisionDescription)
 
-# we need C++11
 if(NOT WIN32)
-  # WIN32 defaults to CXX11 by default, and setting it explicitly here
-  # confuses clang-cl, which will bail out with "unknown flag -std=g++11"
-
   #FindPackage for protobuf is terrible for win32
   # it assumes MSVC built protobuf from a visual studio project
   #... we build with custom cmake, so it will never be found
   #... but it should work for other OSes where we install from a package
-
-  set(CMAKE_CXX_STANDARD 11)
 
   if(APPLE)
       set(PROTOBUF_ROOT "${CMAKE_SOURCE_DIR}/third_party/protobuf")
@@ -42,7 +42,6 @@ if(NOT WIN32)
 
   find_package(Protobuf REQUIRED)
 else()
-   string(REGEX REPLACE "\\\\" "/" CMAKE_SOURCE_DIR ${CMAKE_SOURCE_DIR})
    # on win32, manuallys set protobuf goodness
    set(PROTOBUF_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/include")
    set(PROTOBUF_LIBRARIES "${CMAKE_SOURCE_DIR}/lib/protobuf.lib")
@@ -52,13 +51,10 @@ endif()
 include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/third_party/llvm/include)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
-include_directories(${MCSEMA_LLVM_DIR})
-include_directories(${MCSEMA_LLVM_DIR}/include)
-include_directories(${MCSEMA_LLVM_DIR}/lib/Target/X86/)
-include_directories(${MCSEMA_BUILD_DIR}/include)
-include_directories(${MCSEMA_BUILD_DIR}/llvm/include)
-include_directories(${MCSEMA_BUILD_DIR}/llvm/lib/Target/X86)
+include_directories(${CMAKE_BINARY_DIR}/llvm/include)
+include_directories(${CMAKE_BINARY_DIR}/llvm/lib/Target/X86)
 include_directories(${MCSEMA_GEN_DIR})
 
 # Make sure we can find the mcsema headers.
@@ -159,9 +155,6 @@ configure_file (
   "${MCSEMA_GEN_DIR}/Version.h" #output is based on CMAKE_BINARY_DIR
 )
 
-# Make sure we find Version.h
-include_directories("${CMAKE_BINARY_DIR}")
-
 #
 # protobuf file generation
 # this will make sure that the protobuf files are generated each time
@@ -201,7 +194,7 @@ add_executable(mcsema-lift
   ${CMAKE_SOURCE_DIR}/mcsema/BC/Lift.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/BC/Util.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.cpp
-  ${CMAKE_BINARY_DIR}/mcsema_generated/CFG.pb.cc
+  ${MCSEMA_GEN_DIR}/CFG.pb.cc
 
   ${CMAKE_SOURCE_DIR}/mcsema/cfgToLLVM/JumpTables.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/cfgToLLVM/TransExcn.cpp
@@ -255,4 +248,5 @@ install(
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib)
 
-install(FILES "${MCSEMA_GEN_DIR}/CFG_pb2.py" DESTINATION "${CMAKE_SOURCE_DIR}/tools/mcsema_disass/ida")
+install(FILES "${MCSEMA_GEN_DIR}/CFG_pb2.py"
+        DESTINATION "${CMAKE_SOURCE_DIR}/tools/mcsema_disass/ida")

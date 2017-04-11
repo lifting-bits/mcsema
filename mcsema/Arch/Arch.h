@@ -159,7 +159,7 @@ llvm::Triple::OSType OSType(void);
 void ArchInitAttachDetach(llvm::Module *M);
 
 llvm::Function *ArchAddEntryPointDriver(
-    llvm::Module *M, const std::string &name, VA entry);
+    llvm::Module *M, const std::string &name, VA entry, bool isCallback = false);
 
 llvm::Function *ArchAddExitPointDriver(llvm::Function *F);
 

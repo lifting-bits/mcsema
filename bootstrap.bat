@@ -9,7 +9,6 @@ set BUILD_DIR=%DIR%\build
 set THIRD_PARTY_DIR=%DIR%\third_party
 set LLVM_DIR=%THIRD_PARTY_DIR%\llvm
 set PROTO_DIR=%THIRD_PARTY_DIR%\protobuf
-set GEN_DIR="%BUILD_DIR%\mcsema_generated"
 
 echo [+] Creating directories
 if not exist third_party mkdir third_party
@@ -193,7 +192,6 @@ cmake.exe ^
   -DLLVM_INCLUDE_TESTS=OFF ^
   -DCMAKE_BUILD_TYPE="Release" ^
   %LLVM_DIR%
-cmake --build . --config Release
 REM Enable parallel building with MSBuild
 cmake --build . --config Release --target install -- /maxcpucount:%NUMBER_OF_PROCESSORS% /p:BuildInParallel=true
   
@@ -207,14 +205,9 @@ echo [+] Building mcsema-lift
 cmake.exe ^
   -G "%VSBUILD%" ^
   -T "%VSTOOLSET%" ^
-  -DLLVM_DIR="%BUILD_DIR%\llvm\share\llvm\cmake" ^
-  -DMCSEMA_LLVM_DIR="%LLVM_DIR%" ^
-  -DMCSEMA_BUILD_DIR="%BUILD_DIR%" ^
-  -DMCSEMA_GEN_DIR="%GEN_DIR%" ^
   -DCMAKE_BUILD_TYPE="Release" ^
   -DCMAKE_INSTALL_PREFIX="%MCSEMA_DIR%" ^
   %MCSEMA_DIR%
-cmake --build . --config Release
 REM Enable parallel building with MSBuild
 cmake --build . --config Release --target install -- /maxcpucount:%NUMBER_OF_PROCESSORS% /p:BuildInParallel=true
 

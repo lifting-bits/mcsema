@@ -2266,7 +2266,7 @@ if __name__ == "__main__":
     log_file_path = None
     entry_point_list = []
 
-    if ida_kernwin.cvar.batch == 0:
+    if idaapi.cvar.batch == 0:
         print "Manual run detected; setting default parameters..."
 
         # attempt to guess the architecture
@@ -2462,5 +2462,5 @@ if __name__ == "__main__":
         DEBUG(traceback.format_exc())
     
     # do not close IDA if we are not being run in batch mode
-    if ida_kernwin.cvar.batch != 0:
+    if idaapi.cvar.batch != 0:
         idc.Exit(0)
