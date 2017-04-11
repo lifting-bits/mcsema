@@ -13,7 +13,7 @@ if(WIN32)
   SET(CMAKE_EXE_LINKER_FLAGS "/LARGEADDRESSAWARE ${CMAKE_EXE_LINKER_FLAGS}")
 endif(WIN32)
 
-set(CMAKE_MODULE_PATH "${LLVM_DIR}/cmake/modules" "${CMAKE_SOURCE_DIR}/cmake" "${CMAKE_ROOT}/Modules")
+list(APPEND CMAKE_MODULE_PATH "${LLVM_DIR}/cmake/modules" "${CMAKE_SOURCE_DIR}/cmake/protobuf" "${CMAKE_SOURCE_DIR}/cmake" "${CMAKE_ROOT}/Modules")
 
 # Configure with the build LLVM
 find_package(LLVM 3.8 REQUIRED CONFIG)
@@ -21,6 +21,7 @@ add_definitions(${LLVM_DEFINITIONS})
 
 include (LLVMUtils)
 include (GetGitRevisionDescription)
+include (${CMAKE_SOURCE_DIR}/cmake/protobuf/CMakeLists.txt)
 
 # we need C++11
 if(NOT WIN32)

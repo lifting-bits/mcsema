@@ -13,7 +13,7 @@ endmacro(protobuf_extract)
 macro(protobuf_download VERSION_STRING PROTOBUF_ARCHIVE)
 
   set(PROTOBUF_ARCHIVE_URL
-    "http://protobuf.googlecode.com/files/protobuf-${VERSION_STRING}.tar.gz")
+      "https://github.com/google/protobuf/archive/v${VERSION_STRING}.tar.gz")
 
   message(STATUS "Downloading Protobuf version ${VERSION_STRING} from '${PROTOBUF_ARCHIVE_URL}'...")
 
