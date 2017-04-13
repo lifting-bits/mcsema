@@ -9,7 +9,6 @@
       "expected_stdout": "MzkgMjUgODQgMWQgMDIgZGMgMDkgZmIgIGRjIDExIDg1IDk3IDE5IDZhIDBiIDMyCjMyIDQzIGY2IGE4IDg4IDVhIDMwIDhkICAzMSAzMSA5OCBhMiBlMCAzNyAwNyAzNAo="
     }
   }, 
-
   "globals": {
     "_comment": "mcsema's handling of global variables", 
     "default": {
