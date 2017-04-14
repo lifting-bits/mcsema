@@ -269,6 +269,14 @@ class LinuxTest(unittest.TestCase):
         self._runX86Test("globals")
         self._runAMD64Test("globals")
 
+    def testbts(self):
+        self._runX86Test("bts")
+        self._runAMD64Test("bts")
+
+    def testdata_array(self):
+        self._runX86Test("data_array")
+        self._runAMD64Test("data_array")
+
     def testls(self):
         libs = ["-lrt",
                 "-lpthread",

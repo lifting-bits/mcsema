@@ -9,6 +9,24 @@
       "expected_stdout": "MzkgMjUgODQgMWQgMDIgZGMgMDkgZmIgIGRjIDExIDg1IDk3IDE5IDZhIDBiIDMyCjMyIDQzIGY2IGE4IDg4IDVhIDMwIDhkICAzMSAzMSA5OCBhMiBlMCAzNyAwNyAzNAo="
     }
   }, 
+  "bts": {
+    "_comment": "mcsema's handling of BTS", 
+    "default": {
+      "_comment": "bts takes no arguments", 
+      "args": [], 
+      "expected_stderr": "", 
+      "expected_stdout": "eCBpczogZGVhZGJlZTgK"
+    }
+  }, 
+  "data_array": {
+    "_comment": "array of function pointers", 
+    "default": {
+      "_comment": "takes no arguments", 
+      "args": [], 
+      "expected_stderr": "", 
+      "expected_stdout": "aHJtOiAzNgpocm06IDQKZGl2OiA5CnNvIGFuc3dlcjogNAo="
+    }
+  }, 
   "globals": {
     "_comment": "mcsema's handling of global variables", 
     "default": {
