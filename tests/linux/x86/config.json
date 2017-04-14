@@ -53,5 +53,21 @@
             "_comment": "globals takes no arguments",
             "args": []
         }
+    },
+
+    "bts": {
+        "_comment": "mcsema's handling of BTS",
+        "default": {
+            "_comment": "bts takes no arguments",
+            "args": []
+        }
+    },
+
+    "data_array": {
+        "_comment": "array of function pointers",
+        "default": {
+            "_comment": "takes no arguments",
+            "args": []
+        }
     }
 }
