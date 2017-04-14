@@ -1214,6 +1214,7 @@ void Misc_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::BT32mr] = translate_BT32mr;
   m[llvm::X86::BT64mr] = translate_BT64mr;
   m[llvm::X86::BTS64mr] = translate_BTS64mr;
+  m[llvm::X86::BTS32mr] = translate_BTS32mr;
   m[llvm::X86::BTS64mi8] = translate_BTS64mi8;
   m[llvm::X86::BTS64ri8] = translate_BTS64ri8;
   m[llvm::X86::BTR64mi8] = translate_BTR64mi8;
