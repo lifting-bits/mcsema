@@ -1,7 +1,7 @@
 project(Protobuf)
 cmake_minimum_required(VERSION 2.6)
 
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 include(CheckIncludeFiles)
 include(CheckCxxHashset)
 include(CheckCxxHashmap)
@@ -92,7 +92,7 @@ if(WIN32 AND BUILD_SHARED_LIBS AND MSVC)
     add_definitions("-DPROTOBUF_USE_DLLS")
 endif()
 add_definitions("-D_GNU_SOURCE=1")
-configure_file("config.h.in" "config.h")
+configure_file("${CMAKE_CURRENT_LIST_DIR}/config.h.in" "config.h")
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
@@ -101,7 +101,7 @@ option(DOWNLOAD_PROTOBUF "Download Protobuf sources." ON)
 
 if (NOT PROTOBUF_ROOT AND DOWNLOAD_PROTOBUF)
 
-  protobuf_download_and_extract("2.5.0" PROTOBUF_SOURCE_PATH)
+  protobuf_download_and_extract("2.6.1" PROTOBUF_SOURCE_PATH)
 
   if(PROTOBUF_SOURCE_PATH)
     set(PROTOBUF_ROOT "${PROTOBUF_SOURCE_PATH}" CACHE
@@ -116,7 +116,7 @@ else()
   message(STATUS "Protobuf sources in ${PROTOBUF_ROOT}")
 endif()
 
-add_subdirectory(libprotobuf)
-add_subdirectory(libprotoc)
-add_subdirectory(protoc)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libprotobuf)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libprotoc)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/protoc)
 

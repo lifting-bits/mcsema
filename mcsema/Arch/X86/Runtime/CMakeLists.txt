@@ -1,4 +1,17 @@
-# Copyright 2017 Peter Goodman (peter@trailofbits.com), all rights reserved.
+# Copyright (c) 2017 Trail of Bits, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 enable_language(ASM)
 
 # Create the Windows runtimes
@@ -18,8 +31,6 @@ else()
   if(WIN32)
     add_executable(mcsema-print-runtime-x86
       print_PE_32_windows.cpp)
-    set_target_properties(mcsema-print-runtime-x86
-      PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "/MACHINE:X86")
 
     # build a static library from this generated object
     add_library(mcsema_rt32 STATIC mcsema_rt32.obj)
@@ -51,10 +62,10 @@ else()
       COMMENT "Generating 32-bit Windows PE runtime...")
   elseif(UNIX)
     # Linux and friends
+    add_compile_options(-Wno-invalid-offsetof)
+    
     add_executable(mcsema-print-runtime-x86
       print_ELF_32_linux.cpp)
-    set_target_properties(mcsema-print-runtime-x86
-      PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
 
     add_library(mcsema_rt32 STATIC runtime_32.S)
     set_target_properties(mcsema_rt32
@@ -78,8 +89,6 @@ else()
     if(WIN32)
       add_executable(mcsema-print-runtime-amd64
         print_PE_64_windows.cpp)
-      set_target_properties(mcsema-print-runtime-amd64
-        PROPERTIES COMPILE_FLAGS "-m64" LINK_FLAGS "/MACHINE:X64")
 
       # build a static library from this generated object
       add_library(mcsema_rt64 STATIC mcsema_rt64.obj)
@@ -109,12 +118,13 @@ else()
         COMMAND mcsema-print-runtime-amd64
         DEPENDS mcsema-print-runtime-amd64
         COMMENT "Generating 64-bit Windows PE runtime...")
+    
     elseif(UNIX)
+      add_compile_options(-Wno-invalid-offsetof)
+
       # Linux and friends
       add_executable(mcsema-print-runtime-amd64
         print_ELF_64_linux.cpp)
-      set_target_properties(mcsema-print-runtime-amd64
-        PROPERTIES COMPILE_FLAGS "-m64" LINK_FLAGS "-m64")
 
       add_library(mcsema_rt64 STATIC runtime_64.S)
       set_target_properties(mcsema_rt64

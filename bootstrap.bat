@@ -1,5 +1,17 @@
 REM @echo off
-rem Copyright 2017 Peter Goodman, all rights reserved.
+rem Copyright 2017 Trail of Bits, Inc.
+rem
+rem Licensed under the Apache License, Version 2.0, i.e. the "License";
+rem you may not use this file except in compliance with the License.
+rem You may obtain a copy of the License at
+rem
+rem     http://www.apache.org/licenses/LICENSE-2.0
+rem
+rem Unless required by applicable law or agreed to in writing, software
+rem distributed under the License is distributed on an "AS IS" BASIS,
+rem WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+rem See the License for the specific language governing permissions and
+rem limitations under the License.
 
 set DIR=%~dp0
 if "%DIR:~-1%"=="\" set DIR=%DIR:~0,-1%

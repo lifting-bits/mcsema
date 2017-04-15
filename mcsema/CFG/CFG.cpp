@@ -1,32 +1,18 @@
 /*
-Copyright (c) 2017, Trail of Bits
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
-  Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-  Redistributions in binary form must reproduce the above copyright notice, this
-  list of conditions and the following disclaimer in the documentation and/or
-  other materials provided with the distribution.
-
-  Neither the name of the organization nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ * Copyright (c) 2017 Trail of Bits, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #include <glog/logging.h>
 
@@ -47,21 +33,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace mcsema {
 namespace {
 
-static std::string LiftedFunctionName(const Function &cfg_func) {
+static std::string SaneName(const std::string &name) {
   std::stringstream ss;
-  ss << "sub_" << std::hex << cfg_func.ea();
-  if (cfg_func.has_name()) {
-    ss << "_" << cfg_func.name();
-  }
-  return ss.str();
-}
-
-static std::string LiftedSegmentName(const Segment &cfg_segment) {
-  std::stringstream ss;
-  ss << "seg_" << std::hex << cfg_segment.ea();
-  if (cfg_segment.has_name()) {
-    ss << "_";
-    for (auto c : cfg_segment.name()) {
+  if (!name.empty()) {
+    for (auto c : name) {
       if (isalnum(c)) {
         ss << c;
       } else {
@@ -72,9 +47,27 @@ static std::string LiftedSegmentName(const Segment &cfg_segment) {
   return ss.str();
 }
 
+static std::string LiftedFunctionName(const Function &cfg_func) {
+  std::stringstream ss;
+  ss << "sub_" << std::hex << cfg_func.ea();
+  if (cfg_func.has_name()) {
+    ss << "_" << SaneName(cfg_func.name());
+  }
+  return ss.str();
+}
+
+static std::string LiftedSegmentName(const Segment &cfg_segment) {
+  std::stringstream ss;
+  ss << "seg_" << std::hex << cfg_segment.ea();
+  if (cfg_segment.has_name()) {
+    ss << "_" << SaneName(cfg_segment.name());
+  }
+  return ss.str();
+}
+
 static std::string LiftedVarName(const Variable &cfg_var) {
   std::stringstream ss;
-  ss << "var_" << std::hex << cfg_var.ea() << "_" << cfg_var.name();
+  ss << "var_" << std::hex << cfg_var.ea() << "_" << SaneName(cfg_var.name());
   return ss.str();
 }
 
@@ -86,7 +79,8 @@ static std::string LiftedBlockName(const Block &cfg_block) {
 
 static std::string ExternalFuncName(const ExternalFunction &cfg_func) {
   std::stringstream ss;
-  ss << "ext_" << std::hex << cfg_func.ea() << "_" << cfg_func.name();
+  ss << "ext_" << std::hex << cfg_func.ea()
+     << "_" << SaneName(cfg_func.name());
   return ss.str();
 }
 
@@ -495,9 +489,18 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
   for (const auto &cfg_extern_func : cfg.external_funcs()) {
     auto func = new NativeExternalFunction;
     func->name = cfg_extern_func.name();
-    func->lifted_name = ExternalFuncName(cfg_extern_func);
     func->ea = static_cast<uint64_t>(cfg_extern_func.ea());
     func->is_external = true;
+    func->is_weak = cfg_extern_func.is_weak();
+
+    if (func->is_weak) {
+      LOG(INFO)
+          << "Function " << func->name << " at " << std::hex << func->ea
+          << " is weak, not using an external stub name.";
+      func->lifted_name = func->name;
+    } else {
+      func->lifted_name = ExternalFuncName(cfg_extern_func);
+    }
 
     CHECK(!func->name.empty())
         << "External function at " << std::hex << func->ea << " has no name.";

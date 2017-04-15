@@ -670,15 +670,17 @@ def recover_function(M, func_ea, new_func_eas, entrypoints):
         DEBUG("{:x} is not a function! Not recovering.".format(func_ea))
         return
 
-    DEBUG("Recovering {:x}".format(func_ea))
-    DEBUG_PUSH()
     F = M.funcs.add()
     F.ea = func_ea
     F.is_entrypoint = (func_ea in entrypoints)
     name = get_symbol_name(func_ea)
     if name:
+        DEBUG("Recovering {} at {:x}".format(name, func_ea))
         F.name = name.format('utf-8')
+    else:
+        DEBUG("Recovering {:x}".format(func_ea))
 
+    DEBUG_PUSH()
     blockset, term_insts = analyse_subroutine(func_ea, PIE_MODE)
 
     for term_inst in term_insts:

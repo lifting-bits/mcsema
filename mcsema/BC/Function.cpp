@@ -1,32 +1,18 @@
 /*
-Copyright (c) 2017, Trail of Bits
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
-  Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-  Redistributions in binary form must reproduce the above copyright notice, this
-  list of conditions and the following disclaimer in the documentation and/or
-  other materials provided with the distribution.
-
-  Neither the name of the organization nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ * Copyright (c) 2017 Trail of Bits, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
@@ -103,15 +89,6 @@ static void AnnotateInsts(llvm::Function *F, uint64_t pc) {
   }
 }
 
-// Add a tail-call, but change the tail-call kind from must-tail to may-tail.
-// Optimizations may eliminate things like the third argument (program counter)
-// to functions, and so tail-calls to functions may not be satisfiable.
-template <typename T>
-static void AddTailCall(T *from, llvm::Value *to) {
-  auto call_inst = remill::AddTerminatingTailCall(from, to);
-  call_inst->setTailCallKind(llvm::CallInst::TCK_Tail);
-}
-
 // Update the program counter in the state struct with a hard-coded value.
 static void StoreProgramCounter(TranslationContext &ctx,
                                 llvm::BasicBlock *block,
@@ -140,7 +117,6 @@ static llvm::Value *AddSubFuncCall(llvm::BasicBlock *block,
   args[remill::kStatePointerArgNum] = remill::LoadStatePointer(block);
   args[remill::kPCArgNum] = remill::LoadProgramCounter(block);
   auto call = llvm::CallInst::Create(sub, args, "", block);
-//  call->setTailCallKind(llvm::CallInst::TCK_NoTail);
   call->setCallingConv(llvm::CallingConv::Fast);
   return call;
 }
@@ -167,7 +143,7 @@ static llvm::Function *FindFunction(TranslationContext &ctx,
         << "Broken invariant. Flow targets must be to external functions.";
 
     std::stringstream ss;
-    ss << "external_" << target->name;
+    ss << "call_extern_" << target->name;
     auto driver_name = ss.str();
 
     auto ext_func = gModule->getFunction(driver_name);
@@ -219,7 +195,7 @@ static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
           << ctx.cfg_func->lifted_name << " as a tail call to "
           << tail_called_func->getName().str();
 
-      AddTailCall(block, tail_called_func);
+      remill::AddTerminatingTailCall(block, tail_called_func);
 
     // Terminate the block with an unreachable inst.
     } else {
@@ -227,7 +203,8 @@ static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
           << "Adding missing block " << std::hex << pc << " in function "
           << ctx.cfg_func->lifted_name << " as a jump to the error intrinsic.";
 
-      AddTailCall(block, ctx.lifter->intrinsics->missing_block);
+      remill::AddTerminatingTailCall(
+          block, ctx.lifter->intrinsics->missing_block);
     }
   }
   return block;
@@ -277,7 +254,7 @@ static void LiftIndirectJump(TranslationContext &ctx,
       LOG(INFO)
           << "Indirect jump at " << std::hex << instr->pc << " looks like"
           << "a thunk; falling back to `__remill_indrect_jump`.";
-      AddTailCall(block, fallback);
+      remill::AddTerminatingTailCall(block, fallback);
       return;
     }
 
@@ -294,7 +271,7 @@ static void LiftIndirectJump(TranslationContext &ctx,
   auto fallback_block = llvm::BasicBlock::Create(
       *gContext, "", block->getParent());
 
-  AddTailCall(fallback_block, fallback);
+  remill::AddTerminatingTailCall(fallback_block, fallback);
 
   // TODO(pag): Handle offset tables.
   auto switch_index = remill::LoadProgramCounter(block);
@@ -321,7 +298,7 @@ static bool TryLiftTerminator(TranslationContext &ctx,
   switch (instr->category) {
     case remill::Instruction::kCategoryInvalid:
     case remill::Instruction::kCategoryError:
-      AddTailCall(block, ctx.lifter->intrinsics->error);
+      remill::AddTerminatingTailCall(block, ctx.lifter->intrinsics->error);
       return true;
 
     case remill::Instruction::kCategoryNormal:
@@ -439,7 +416,7 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
   const auto &follows = ctx.cfg_block->successor_eas;
   if (!block->getTerminator()) {
     if (ctx.cfg_inst->does_not_return) {
-      AddTailCall(block, ctx.lifter->intrinsics->error);
+      remill::AddTerminatingTailCall(block, ctx.lifter->intrinsics->error);
 
     } else if (follows.size() == 1) {
       (void) llvm::BranchInst::Create(
@@ -450,7 +427,8 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
           << "Block " << std::hex << block_pc << " has no terminator, and"
           << " instruction at " << std::hex << ctx.cfg_inst->ea
           << " is not a local no-return function call.";
-      AddTailCall(block, ctx.lifter->intrinsics->missing_block);
+      remill::AddTerminatingTailCall(
+          block, ctx.lifter->intrinsics->missing_block);
     }
   }
 }
@@ -483,7 +461,7 @@ static llvm::Function *LiftFunction(
   if (cfg_func->blocks.empty()) {
     LOG(ERROR)
         << "Function " << cfg_func->lifted_name << " is empty!";
-    AddTailCall(lifted_func, intrinsics->missing_block);
+    remill::AddTerminatingTailCall(lifted_func, intrinsics->missing_block);
     return lifted_func;
   }
 
@@ -529,9 +507,10 @@ static llvm::Function *LiftFunction(
 
 }  // namespace
 
-// Declare the lifted functions. This is a separate step from defining functions
-// because it's important that all possible code- and data-cross references
-// are resolved before any data or instructions can use those references.
+// Declare the lifted functions. This is a separate step from defining
+// functions because it's important that all possible code- and data-cross
+// references are resolved before any data or instructions can use
+// those references.
 void DeclareLiftedFunctions(const NativeModule *cfg_module) {
   for (auto func : cfg_module->ea_to_func) {
     auto cfg_func = func.second->Get();

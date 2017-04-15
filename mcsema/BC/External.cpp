@@ -1,32 +1,18 @@
 /*
-Copyright (c) 2017, Trail of Bits
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
-  Redistributions of source code must retain the above copyright notice, this
-  list of conditions and the following disclaimer.
-
-  Redistributions in binary form must reproduce the above copyright notice, this
-  list of conditions and the following disclaimer in the documentation and/or
-  other materials provided with the distribution.
-
-  Neither the name of the organization nor the names of its
-  contributors may be used to endorse or promote products derived from
-  this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ * Copyright (c) 2017 Trail of Bits, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #include <glog/logging.h>
 
@@ -53,6 +39,8 @@ static void MakeExternal(llvm::Constant *val) {
 
 void DeclareExternals(const NativeModule *cfg_module) {
   auto lifted_func_type = LiftedFunctionType();
+
+  // TODO(pag): Use the info from the CFG proto.
   auto func_type = llvm::FunctionType::get(
       llvm::Type::getVoidTy(*gContext), true);
 
@@ -60,17 +48,29 @@ void DeclareExternals(const NativeModule *cfg_module) {
   //
   // TODO(pag): Calling conventions, argument counts, etc.
   for (const auto &entry : cfg_module->name_to_extern_func) {
-    auto cfg_func = entry.second->Get();
+    auto cfg_func = reinterpret_cast<const NativeExternalFunction *>(
+        entry.second->Get());
 
     // The "actual" external function.
-    MakeExternal(gModule->getOrInsertFunction(cfg_func->name, func_type));
+    auto func = llvm::dyn_cast<llvm::Function>(
+        gModule->getOrInsertFunction(cfg_func->name, func_type) \
+            ->stripPointerCasts());
+    MakeExternal(func);
 
-    // Stub that will marshal lifted state into the native state.
-    gModule->getOrInsertFunction(cfg_func->lifted_name, lifted_func_type);
+    if (cfg_func->is_weak) {
+      CHECK(cfg_func->name == cfg_func->lifted_name);
+      func->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
 
-    LOG(INFO)
-        << "Adding external " << cfg_func->name << " implemented by thunk "
-        << cfg_func->lifted_name;
+    } else {
+      CHECK(cfg_func->name != cfg_func->lifted_name);
+
+      // Stub that will marshal lifted state into the native state.
+        gModule->getOrInsertFunction(cfg_func->lifted_name, lifted_func_type);
+
+        LOG(INFO)
+            << "Adding external " << cfg_func->name << " implemented by thunk "
+            << cfg_func->lifted_name;
+    }
   }
 
   // Declare external variables.
