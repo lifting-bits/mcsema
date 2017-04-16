@@ -705,10 +705,12 @@ static InstTransResult doBTSmr(NativeInstPtr ip, llvm::BasicBlock *&b,
   auto ptr = ADDR_TO_POINTER<width>(b, base);
   auto gep = llvm::GetElementPtrInst::CreateInBounds(ptr, {word}, "", b);
   auto val = M_READ<width>(ip, b, gep);
+
   SHR_SET_FLAG_V<width, 1>(b, val, llvm::X86::CF, bit);
 
-  auto bit_to_set = llvm::BinaryOperator::CreateLShr(
+  auto bit_to_set = llvm::BinaryOperator::CreateShl(
       CONST_V<width>(b, 1), bit, "", b);
+
   auto new_val = llvm::BinaryOperator::CreateOr(val, bit_to_set, "", b);
   M_WRITE<width>(ip, b, gep, new_val);
 
