@@ -410,6 +410,7 @@ struct DataSectionVar {
 static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
 
   auto &globaldata = natMod->getData();
+  auto &nativeglobalvars = natMod->global_variables;
   //insert all global data before we insert the CFG
 
   std::vector<DataSectionVar> gvars;
@@ -487,6 +488,22 @@ void RenameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
     }
   }
 }
+
+static void InitLiftedGlobals(NativeModulePtr natMod, llvm::Module *M) {
+  for (auto nGV : natMod->global_variables) {
+    llvm::PointerType *PointerTy_0 = llvm::PointerType::get(llvm::Type::getInt32Ty(M->getContext()), nGV->get_size()); // XXX make an actual type 
+    llvm::GlobalVariable *g = new llvm::GlobalVariable(/*Module=*/*M,
+                                                    /*Type=*/PointerTy_0,
+                                                    /*isConstant=*/false,
+                                                    /*Linkage=*/llvm::GlobalValue::CommonLinkage,
+                                                    /*Initializer=*/0,
+                                                    /*Name=*/nGV->get_name());
+
+    g->setAlignment(4); // ???
+    nGV->set_llvm_var(g); // this will explode XXX
+  }
+}
+
 
 static void InitLiftedFunctions(NativeModulePtr natMod, llvm::Module *M) {
   for (auto &f : natMod->get_funcs()) {
@@ -643,6 +660,7 @@ static bool LiftFunctionsIntoModule(NativeModulePtr natMod, llvm::Module *M) {
 }
 
 bool LiftCodeIntoModule(NativeModulePtr natMod, llvm::Module *M) {
+  InitLiftedGlobals(natMod, M);
   InitLiftedFunctions(natMod, M);
   InitExternalData(natMod, M);
   InitExternalCode(natMod, M);

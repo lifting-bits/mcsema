@@ -57,6 +57,9 @@ typedef NativeInst *NativeInstPtr;
 class NativeVar;
 typedef NativeVar *NativeVarPtr;
 
+class NativeGlobalVar;
+typedef NativeGlobalVar *NativeGlobalVarPtr;
+
 class NativeStackVar;
 typedef NativeStackVar *NativeStackVarPtr;
 
@@ -112,6 +115,7 @@ class NativeInst {
   llvm::MCInst decoded_inst;
   ExternalCodeRefPtr extCallTgt;
   ExternalDataRefPtr extDataRef;
+  NativeVarPtr mem_var;
 
   MCSJumpTablePtr jumpTable;
   bool jump_table;
@@ -141,6 +145,8 @@ class NativeInst {
   CFGRefType mem_ref_type;
  public:
   bool has_mem_reference;
+  bool has_mem_var;
+
  private:
 
   uint32_t arch;
@@ -208,6 +214,9 @@ class NativeInst {
 
   bool has_external_ref(void) const;
 
+  NativeVarPtr get_mem_var(void) const;
+  void set_mem_var(NativeVarPtr v);
+
   bool has_rip_relative(void) const;
   VA get_rip_relative(void) const;
   void set_rip_relative(unsigned i);
@@ -235,18 +244,26 @@ class NativeVar {
     std::string         name;
     std::string         type; // TODO: something cleverer than string. for now it's just ida_type wholesale.
     std::list<uint64_t>  refs;
-    llvm::Instruction    *llvm_var;
+    llvm::Value    *llvm_var;
     public:
     NativeVar(uint64_t size, std::string name, std::string type) : size(size), name(name), type(type) {}
     uint64_t get_size(void) { return this->size; }
     void add_ref(uint64_t ea) { this->refs.push_back(ea); }
     std::list<uint64_t> &get_refs(void) { return this->refs; }
-    llvm::Instruction *get_llvm_var(void) { return this->llvm_var; }
-    void set_llvm_var(llvm::Instruction *v) { this->llvm_var = v; }
+    llvm::Value *get_llvm_var(void) { return this->llvm_var; }
+    void set_llvm_var(llvm::Value *v) { this->llvm_var = v; }
     std::string print_var(void);
     std::string get_name(void) { return this->name; }
     std::string get_type(void) { return this->type; }
 
+};
+
+class NativeGlobalVar : public NativeVar {
+    private:
+    uint64_t            offset;
+    public:
+    NativeGlobalVar(uint64_t size, std::string name, std::string type, uint64_t offset) : NativeVar(size, name, type) { this->offset = offset; }
+    uint64_t get_offset(void) { return this->offset; }
 };
 
 class NativeStackVar : public NativeVar {
@@ -312,6 +329,7 @@ class NativeFunction {
 
   //list of stack variables in this function
   std::list<NativeStackVarPtr> stackvars;
+  std::list<NativeGlobalVarPtr> globalvars;
 };
 
 typedef NativeBlock *NativeBlockPtr;
@@ -425,6 +443,7 @@ class NativeModule {
   bool is64Bit(void) const;
 
   void addOffsetTables(const std::list<MCSOffsetTablePtr> &tables);
+  void addGlobalVariables(const std::list<NativeGlobalVarPtr> &global_var);
 
   std::vector<NativeEntrySymbol> entries;
 
@@ -439,7 +458,9 @@ class NativeModule {
   std::list<ExternalCodeRefPtr> external_code_refs;
   std::list<ExternalDataRefPtr> external_data_refs;
 
+
  public:
+  std::list<NativeGlobalVarPtr> global_variables;
   std::unordered_map<VA, MCSOffsetTablePtr> offset_tables;
 };
 

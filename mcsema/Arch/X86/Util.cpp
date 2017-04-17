@@ -217,6 +217,9 @@ llvm::Value *MEM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr natM,
     return nullptr;
   }
 
+  if(ip->has_mem_var) {
+    return ip->get_mem_var()->get_llvm_var();
+  }
 
   return getAddrFromExpr(B, natM, inst, ip, which);
 }

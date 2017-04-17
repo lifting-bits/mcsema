@@ -246,6 +246,14 @@ bool NativeInst::has_external_ref(void) const {
   return this->has_ext_call_target() || this->has_ext_data_ref();
 }
 
+void NativeInst::set_mem_var(NativeVarPtr t) {
+  this->mem_var = t;
+  this->has_mem_var = true;
+}
+
+NativeVarPtr NativeInst::get_mem_var(void) const {
+  return this->mem_var;
+}
 bool NativeInst::has_rip_relative(void) const {
   return this->hasRIP;
 }
@@ -630,6 +638,11 @@ bool NativeModule::is64Bit(void) const {
   return 64 == ArchAddressSize();
 }
 
+void NativeModule::addGlobalVariables(
+    const std::list<NativeGlobalVarPtr> & global_vars) {
+  this->global_variables = global_vars;
+} 
+
 void NativeModule::addOffsetTables(
     const std::list<MCSOffsetTablePtr> & tables) {
 
@@ -850,6 +863,7 @@ static NativeInstPtr DecodeInst(
 
 static NativeInstPtr DeserializeInst(
     const ::Instruction &inst,
+    const std::list<NativeGlobalVarPtr> &globalvars, 
     const std::list<ExternalCodeRefPtr> &extcode) {
   VA addr = inst.inst_addr();
   auto tr_tgt = static_cast<VA>(inst.true_target());
@@ -921,6 +935,14 @@ static NativeInstPtr DeserializeInst(
     ip->set_ref_reloc_type(NativeInst::MEMRef, ref, ro, rt);
   }
 
+  for (auto g : globalvars) {
+    for (auto ref : g->get_refs()) {
+      if (ref == addr) {
+        ip->set_mem_var(g);
+      }
+    }
+  }
+
   if (inst.has_jump_table()) {
     // create new jump table
 
@@ -967,6 +989,17 @@ static NativeInstPtr DeserializeInst(
   return ip;
 }
 
+static NativeGlobalVarPtr DeserializeGlobalVar(
+    const ::GlobalVar &globalvar) {
+  ::Variable var = globalvar.var();
+  NativeGlobalVarPtr natGV =
+    new NativeGlobalVar(var.size(), var.name(), var.ida_type(), globalvar.address());
+
+  for (auto ref_ea : var.ref_eas()) {
+    natGV->add_ref(ref_ea.inst_addr());
+  }
+  return natGV;
+}
 static NativeStackVarPtr DeserializeStackVar(
     const ::StackVar &stackvar) {
   ::Variable var = stackvar.var();
@@ -983,13 +1016,14 @@ static NativeStackVarPtr DeserializeStackVar(
 
 static NativeBlockPtr DeserializeBlock(
     const ::Block &block,
+    const std::list<NativeGlobalVarPtr> &globalvars, 
     const std::list<ExternalCodeRefPtr> &extcode) {
 
   auto block_va = static_cast<VA>(block.base_address());
   NativeBlockPtr natB = NativeBlockPtr(new NativeBlock(block_va));
 
   for (auto &inst : block.insts()) {
-    auto native_inst = DeserializeInst(inst, extcode);
+    auto native_inst = DeserializeInst(inst, globalvars, extcode);
     if (!native_inst) {
       std::cerr
           << "Unable to deserialize block at " << std::hex
@@ -1009,6 +1043,7 @@ static NativeBlockPtr DeserializeBlock(
 
 static NativeFunctionPtr DeserializeNativeFunc(
     const ::Function &func,
+    const std::list<NativeGlobalVarPtr> &globalvars, 
     const std::list<ExternalCodeRefPtr> &extcode) {
 
   NativeFunction *nf = nullptr;
@@ -1034,7 +1069,7 @@ static NativeFunctionPtr DeserializeNativeFunc(
 
   //read all the blocks from this function
   for (auto &block : func.blocks()) {
-    auto native_block = DeserializeBlock(block, extcode);
+    auto native_block = DeserializeBlock(block, globalvars, extcode);
     if (!native_block) {
       std::cerr
           << "Unable to deserialize function at " << std::hex
@@ -1196,6 +1231,7 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
   std::list<ExternalCodeRefPtr> extern_funcs;
   std::list<ExternalDataRefPtr> extern_data;
   std::list<DataSection> data_sections;
+  std::list<NativeGlobalVarPtr> global_variables;
   std::list<MCSOffsetTablePtr> offset_tables;
 
   std::cerr << "Deserializing externs..." << std::endl;
@@ -1203,9 +1239,14 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
     extern_funcs.push_back(DeserializeExternFunc(external_func));
   }
 
+  std::cerr << "Deserializing global variables..." << std::endl;
+  for (const auto &global_variable : proto.global_vars()) {
+    global_variables.push_back(DeserializeGlobalVar(global_variable));
+  }
+
   std::cerr << "Deserializing functions..." << std::endl;
   for (const auto &internal_func : proto.internal_funcs()) {
-    auto natf = DeserializeNativeFunc(internal_func, extern_funcs);
+    auto natf = DeserializeNativeFunc(internal_func, global_variables, extern_funcs);
     if (!natf) {
       std::cerr << "Unable to deserialize module." << std::endl;
       return nullptr;
@@ -1261,6 +1302,9 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
 
   std::cerr << "Adding Offset Tables..." << std::endl;
   m->addOffsetTables(offset_tables);
+
+  std::cerr << "Adding Global Variables..." << std::endl;
+  m->addGlobalVariables(global_variables);
 
   // set entry points for the module
   std::cerr << "Adding entry points..." << std::endl;
