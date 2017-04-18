@@ -1706,37 +1706,22 @@ def recoverStackVars(F):
         #r.opd_idx = -1
 
 # TODO restructure so we aren't calling collect_func_vars twice
-def recoverGlobalVars(M, F):
+def recoverGlobalVars(M, F, global_var_data):
     from var_recovery import collect_ida
     from var_recovery import parse_ida_types
   
     # pull info from IDA
-    global_var_data = dict() # global address -> usage
     collect_ida.collect_func_vars(F, global_var_data) # functionWrapper?
-
-    # TODO store in protobuf
-    for g in global_var_data.keys():
-      var = M.global_vars.add()
-      var.address = global_var_data[g]["offset"]
-      var.var.name = g
-      var.var.size = 0 # TODO
-      var.var.ida_type = "" # TODO
-      for i in global_var_data[g]["writes"]: # reads vs writes? do we care?
-        r = var.var.ref_eas.add()
-        r.inst_addr = i
-      for i in global_var_data[g]["reads"]:
-        r = var.var.ref_eas.add()
-        r.inst_addr = i
 
     return
 
-def recoverFunctionFromSet(M, F, blockset, new_eas):
+def recoverFunctionFromSet(M, F, blockset, new_eas, global_var_data):
     processed_blocks = set()
 
     if TO_RECOVER["stack_vars"]:
       recoverStackVars(F)
     if TO_RECOVER["global_vars"]:
-      recoverGlobalVars(M, F)
+      recoverGlobalVars(M, F, global_var_data)
 
     while len(blockset) > 0:
         block = blockset.pop()
@@ -1766,9 +1751,9 @@ def recoverFunctionFromSet(M, F, blockset, new_eas):
 
         DEBUG("Ending insn at: {0:x}".format(prevHead))
 
-def recoverFunction(M, F, fnea, new_eas):
+def recoverFunction(M, F, fnea, new_eas, global_var_data):
     blockset = getFunctionBlocks(fnea)
-    recoverFunctionFromSet(M, F, blockset, new_eas)
+    recoverFunctionFromSet(M, F, blockset, new_eas, global_var_data)
 
 class Block:
     def __init__(self, startEA):
@@ -1921,6 +1906,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
     global EMAP
     M = CFG_pb2.Module()
     M.module_name = idc.GetInputFile()
+    global_var_data = dict()
     DEBUG("PROCESSING: {0}".format(M.module_name))
 
     our_entries = []
@@ -1968,7 +1954,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
         F = entryPointHandler(M, fea, fname, exports_are_apis)
 
         RECOVERED_EAS.add(fea)
-        recoverFunction(M, F, fea, new_eas)
+        recoverFunction(M, F, fea, new_eas, global_var_data)
 
         recovered_fns += 1
 
@@ -1984,13 +1970,28 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
         DEBUG("Recovering: {0}".format(hex(cur_ea)))
         RECOVERED_EAS.add(cur_ea)
 
-        recoverFunction(M, F, cur_ea, new_eas)
+        recoverFunction(M, F, cur_ea, new_eas, global_var_data)
 
         recovered_fns += 1
 
     if recovered_fns == 0:
         DEBUG("COULD NOT RECOVER ANY FUNCTIONS")
         return
+
+    '''add global variables to protobuf'''
+    if TO_RECOVER["global_vars"]:
+        for g in global_var_data.keys():
+          var = M.global_vars.add()
+          var.address = global_var_data[g]["offset"]
+          var.var.name = g
+          var.var.size = 0 # TODO
+          var.var.ida_type = "" # TODO
+          for i in global_var_data[g]["writes"]: # reads vs writes? do we care?
+            r = var.var.ref_eas.add()
+            r.inst_addr = i
+          for i in global_var_data[g]["reads"]:
+            r = var.var.ref_eas.add()
+            r.inst_addr = i
 
     mypath = path.dirname(__file__)
     processExternals(M)

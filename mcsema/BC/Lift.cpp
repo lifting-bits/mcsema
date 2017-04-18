@@ -496,10 +496,11 @@ static void InitLiftedGlobals(NativeModulePtr natMod, llvm::Module *M) {
                                                     /*Type=*/PointerTy_0,
                                                     /*isConstant=*/false,
                                                     /*Linkage=*/llvm::GlobalValue::CommonLinkage,
-                                                    /*Initializer=*/0,
+                                                    /*Initializer=*/nullptr,
                                                     /*Name=*/nGV->get_name());
 
     g->setAlignment(4); // ???
+    g->setInitializer(llvm::Constant::getNullValue(PointerTy_0));
     nGV->set_llvm_var(g); // this will explode XXX
   }
 }
