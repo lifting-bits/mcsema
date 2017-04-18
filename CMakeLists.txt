@@ -12,30 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project(mcsema)
+project(MCSEMA)
 
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/protobuf" "${PROJECT_SOURCE_DIR}/cmake" "${CMAKE_ROOT}/Modules")
+# protobuf
+find_package(Protobuf REQUIRED)
+list(APPEND PROJECT_LIBRARIES ${Protobuf_LIBRARIES})
+list(APPEND PROJECT_INCLUDEDIRECTORIES ${Protobuf_INCLUDE_DIR})
+list(APPEND PROJECT_DEFINITIONS "GOOGLE_PROTOBUF_NO_RTTI")
 
-if(NOT WIN32)
-  #FindPackage for protobuf is terrible for win32
-  # it assumes MSVC built protobuf from a visual studio project
-  #... we build with custom cmake, so it will never be found
-  #... but it should work for other OSes where we install from a package
-  set(CMAKE_CXX_STANDARD 11)
-
-  include (${PROJECT_SOURCE_DIR}/cmake/protobuf/CMakeLists.txt)
-  set(PROTOBUF_INCLUDE_DIRS "${PROTOBUF_ROOT}/src")
-  set(PROTOBUF_LIBRARIES "$<TARGET_FILE:libprotobuf>")
-  set(PROTOBUF_PROTOC_EXECUTABLE "$<TARGET_FILE:protoc>")
-else()
-   # on win32, manuallys set protobuf goodness
-   set(PROTOBUF_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/include")
-   set(PROTOBUF_LIBRARIES "${PROJECT_SOURCE_DIR}/lib/protobuf.lib")
-   set(PROTOBUF_PROTOC_EXECUTABLE "${PROJECT_SOURCE_DIR}/bin/protoc.exe")
-endif()
-
+include_directories(${REMILL_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR})
-include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 add_executable(mcsema-lift
   EXCLUDE_FROM_ALL
@@ -45,11 +31,10 @@ add_executable(mcsema-lift
   mcsema/BC/External.cpp
   mcsema/BC/Function.cpp
   mcsema/BC/Instruction.cpp
-  mcsema/BC/Lift.cpp
   mcsema/BC/Optimize.cpp
   mcsema/BC/Segment.cpp
   mcsema/BC/Util.cpp
-  mcsema/tools/mcsema_lift/Lift.cpp
+  tools/mcsema_lift/Lift.cpp
 )
 
 add_dependencies(mcsema-lift

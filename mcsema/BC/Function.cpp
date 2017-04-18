@@ -219,18 +219,9 @@ static void LiftConditionalBranch(TranslationContext &ctx,
   auto function = source->getParent();
   auto block_true = GetOrCreateBlock(ctx, instr->branch_taken_pc);
   auto block_false = GetOrCreateBlock(ctx, instr->branch_not_taken_pc);
-
-  // TODO(pag): This is a bit ugly. The idea here is that, from the semantics
-  //            code, we need a way to communicate what direction of the
-  //            conditional branch should be followed. It turns out to be
-  //            easiest just to write to a special variable :-)
-  auto branch_taken = remill::FindVarInFunction(function, "BRANCH_TAKEN");
   llvm::IRBuilder<> cond_ir(source);
-  auto cond_addr = cond_ir.CreateLoad(branch_taken);
-  auto cond = cond_ir.CreateLoad(cond_addr);
-  auto true_val = llvm::ConstantInt::get(cond->getType(), 1);
   cond_ir.CreateCondBr(
-      cond_ir.CreateICmpEQ(cond, true_val),
+      remill::LoadBranchTaken(source),
       block_true,
       block_false);
 }

@@ -27,8 +27,9 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
-#include "remill/Arch/Arch.h"
-#include "remill/BC/Util.h"
+#include <remill/Arch/Arch.h>
+#include <remill/BC/Compat/GlobalValue.h>
+#include <remill/BC/Util.h>
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Segment.h"
@@ -152,7 +153,7 @@ void DeclareVariables(const NativeModule *cfg_module) {
 // Fill in the contents of the data segment.
 static void FillDataSegment(const NativeSegment *cfg_seg) {
   auto seg = gModule->getNamedGlobal(cfg_seg->lifted_name);
-  auto seg_type = llvm::dyn_cast<llvm::StructType>(seg->getValueType());
+  auto seg_type = llvm::dyn_cast<llvm::StructType>(remill::GetValueType(seg));
 
   seg->setLinkage(llvm::GlobalValue::InternalLinkage);
   seg->setVisibility(llvm::GlobalValue::DefaultVisibility);

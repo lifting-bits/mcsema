@@ -26,6 +26,7 @@
 
 #include <remill/Arch/Arch.h>
 #include <remill/BC/Util.h>
+#include <remill/BC/Version.h>
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Lift.h"
@@ -64,7 +65,8 @@ namespace {
 static void PrintVersion(void) {
   std::cout
       << "This is mcsema-lift version: " << MCSEMA_VERSION_STRING << std::endl
-      << "Built from branch: " << MCSEMA_BRANCH_NAME << std::endl;
+      << "Built from branch: " << MCSEMA_BRANCH_NAME << std::endl
+      << "Using LLVM " << LLVM_VERSION_STRING << std::endl;
 }
 
 }  // namespace
