@@ -5,17 +5,22 @@ DATA: acmdln PTR
 DATA: wcmdln PTR
 DATA: aenvptr PTR
 
-initterm 2 C N
-initterm_e 2 C N
-amsg_exit 1 C N
+_initterm 2 C N
+_initterm_e 2 C N
+_amsg_exit 1 C N
 
 RtlLookupFunctionEntry 3 C N
 RtlVirtualUnwind 8 C N
 
-commode 0 C N
-fmode 0 C N
+DATA: _commode PTR
+DATA: _fmode PTR
 
 #processing C runtime
+_configthreadlocale 1 C N
+__crtSetUnhandledExceptionFilter 1 C N
+_XcptFilter 1 C N
+_invoke_watson 5 C N
+
 getmainargs 5 C N
 __getmainargs 5 C N
 __wgetmainargs 5 C N
@@ -148,7 +153,7 @@ __strtoull_internal 4 C N
 _itow 3 C N
 _mbstowcs_l_helper 4 C N
 mbstowcs 3 C N
-__doserrno 0 C N
+DATA: _doserrno PTR
 _strnicmp 3 C N
 _wcstoi64 3 C N
 _wtoi64 1 C N

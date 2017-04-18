@@ -219,7 +219,15 @@ static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
     std::cerr << "Error translating instruction at " << std::hex
               << ctx.natI->get_loc() << "; unsupported opcode " << std::dec
               << opcode << std::endl;
-    return TranslateErrorUnsupported;
+
+    // In the case that we can't find the opcode, try building it out with
+    // inline assembly calls in LLVM instead.
+    if (IgnoreUnsupportedInsts) {
+      ArchBuildInlineAsm(inst, block);
+      return itr;
+    } else {
+      return TranslateErrorUnsupported;
+    }
   }
   return itr;
 }
@@ -453,7 +461,7 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
     dataSectionToTypesContents(globaldata, *var.section, M, secContents,
                                data_section_types, true);
 
-    // fill in the opaqure structure with actual members
+    // fill in the opaque structure with actual members
     var.opaque_type->setBody(data_section_types, true);
 
     // create an initializer list using the now filled in opaque

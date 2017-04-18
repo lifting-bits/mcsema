@@ -2,7 +2,7 @@
 
 ## Motivation
 
-When performing CFG recovery, if mcsema encounters an external function whose calling convention or agrument count is unknown, it will fail. The workaround is to provide mcsema with this information externally via a defs file. With one or two external functions, this is a simple enough task, but with more it becomes tedious and error prone work.
+When performing CFG recovery, if mcsema encounters an external function whose calling convention or argument count is unknown, it will fail. The workaround is to provide mcsema with this information externally via a defs file. With one or two external functions, this is a simple enough task, but with more it becomes tedious and error prone work.
 
 ## Use case
 

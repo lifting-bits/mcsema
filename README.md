@@ -8,7 +8,7 @@ McSema is separated into two conceptual parts: control flow recovery and instruc
 
 |       | master |
 | ----- | ------ |
-| Linux | [![Build Status](https://travis-ci.org/trailofbits/mcsema.svg?branch=master)](https://travis-ci.org/trailofbits/mcsema) |
+| Linux & macOS | [![Build Status](https://travis-ci.org/trailofbits/mcsema.svg?branch=master)](https://travis-ci.org/trailofbits/mcsema) |
 | Windows | [![Build Status](https://ci.appveyor.com/api/projects/status/3djkuakf5gd4p6vg/branch/master?svg=true)](https://ci.appveyor.com/project/artemdinaburg/mcsema/branch/master)
 
 ## Features
@@ -39,7 +39,7 @@ Why would anyone translate binaries *back* to bitcode?
 | Name | Version | 
 | ---- | ------- |
 | [Git](https://git-scm.com/) | Latest |
-| [CMake](https://cmake.org/) | 2.8+ |
+| [CMake](https://cmake.org/) | 3.1+ |
 | [Google Protobuf](https://github.com/google/protobuf) | 2.6.1 |
 | [LLVM](http://llvm.org/) | 3.8 |
 | [Clang](http://clang.llvm.org/) | 3.8 (3.9 if using Visual Studio 2015) |

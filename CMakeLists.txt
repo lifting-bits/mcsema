@@ -1,59 +1,58 @@
 # Copyright 2017 Peter Goodman (peter@trailofbits.com), all rights reserved.
 
 project(mcsema)
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.1)
 
 if(WIN32)
+  string(REGEX REPLACE "\\\\" "/" CMAKE_SOURCE_DIR "${CMAKE_SOURCE_DIR}")
+  string(REGEX REPLACE "\\\\" "/" CMAKE_BINARY_DIR "${CMAKE_BINARY_DIR}")
   SET(CMAKE_EXE_LINKER_FLAGS "/LARGEADDRESSAWARE ${CMAKE_EXE_LINKER_FLAGS}")
-endif(WIN32)
-
-set(CMAKE_MODULE_PATH "${LLVM_DIR}/cmake/modules ${CMAKE_MODULE_PATH}")
-
-# Configure with the build LLVM
-find_package(LLVM 3.8 REQUIRED CONFIG)
-add_definitions(${LLVM_DEFINITIONS})
-
-set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
-include (LLVMUtils)
-include (GetGitRevisionDescription)
-
-# we need C++11
-if(NOT WIN32)
-  # WIN32 defaults to CXX11 by default, and setting it explicitly here
+else()
+  # WIN32 defaults to CXX11 by default, and setting it explicitly
   # confuses clang-cl, which will bail out with "unknown flag -std=g++11"
+  # So only set this value for non-Win32 targets
   set(CMAKE_CXX_STANDARD 11)
 endif()
 
-# Get protobufs.
-if(WIN32)
-  # Change the slashes to Unix style or risk the wrath of invalid escape
-  # sequences!
-  string(REGEX REPLACE "\\\\" "/" CMAKE_SOURCE_DIR ${CMAKE_SOURCE_DIR})
+set(MCSEMA_GEN_DIR "${CMAKE_BINARY_DIR}/mcsema_generated")
+include_directories(${CMAKE_BINARY_DIR})
 
-  set(PROTOBUF_ROOT "${CMAKE_SOURCE_DIR}/third_party/protobuf")
-  set(Protobuf_LIBRARIES "${PROTOBUF_ROOT}/build/libprotobuf/Release")
-  set(Protobuf_INCLUDE_DIR "${PROTOBUF_ROOT}/src")
-  
-  include_directories(${Protobuf_INCLUDE_DIR})
-  link_directories(${Protobuf_LIBRARIES})
-elseif(APPLE)
-  set(PROTOBUF_ROOT "${CMAKE_SOURCE_DIR}/third_party/protobuf")
-  set(Protobuf_LIBRARIES "${PROTOBUF_ROOT}/build/lib")
-  set(Protobuf_INCLUDE_DIR "${PROTOBUF_ROOT}/src")
-  
-  include_directories(${Protobuf_INCLUDE_DIR})
-  link_directories(${Protobuf_LIBRARIES})
-endif(WIN32)
-find_package(Protobuf REQUIRED)
+message(STATUS "Generated files will be stored in: ${MCSEMA_GEN_DIR}")
+
+list(APPEND CMAKE_MODULE_PATH "${LLVM_DIR}/cmake/modules" "${CMAKE_SOURCE_DIR}/cmake/protobuf" "${CMAKE_SOURCE_DIR}/cmake" "${CMAKE_ROOT}/Modules")
+
+# Configure with the build LLVM
+find_package(LLVM 3.8 REQUIRED CONFIG HINTS "${CMAKE_BINARY_DIR}/llvm/share/llvm/cmake")
+add_definitions(${LLVM_DEFINITIONS})
+
+include (LLVMUtils)
+include (GetGitRevisionDescription)
+
+if(NOT WIN32)
+  #FindPackage for protobuf is terrible for win32
+  # it assumes MSVC built protobuf from a visual studio project
+  #... we build with custom cmake, so it will never be found
+  #... but it should work for other OSes where we install from a package
+  set(CMAKE_CXX_STANDARD 11)
+
+  include (${CMAKE_SOURCE_DIR}/cmake/protobuf/CMakeLists.txt)
+  set(PROTOBUF_INCLUDE_DIRS "${PROTOBUF_ROOT}/src")
+  set(PROTOBUF_LIBRARIES "$<TARGET_FILE:libprotobuf>")
+  set(PROTOBUF_PROTOC_EXECUTABLE "$<TARGET_FILE:protoc>")
+else()
+   # on win32, manuallys set protobuf goodness
+   set(PROTOBUF_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/include")
+   set(PROTOBUF_LIBRARIES "${CMAKE_SOURCE_DIR}/lib/protobuf.lib")
+   set(PROTOBUF_PROTOC_EXECUTABLE "${CMAKE_SOURCE_DIR}/bin/protoc.exe")
+endif()
+
+include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/third_party/llvm/include)
 include_directories(${CMAKE_SOURCE_DIR}/third_party)
-include_directories(${MCSEMA_LLVM_DIR})
-include_directories(${MCSEMA_LLVM_DIR}/include)
-include_directories(${MCSEMA_LLVM_DIR}/lib/Target/X86/)
-include_directories(${MCSEMA_BUILD_DIR}/include)
-include_directories(${MCSEMA_BUILD_DIR}/llvm/include)
-include_directories(${MCSEMA_BUILD_DIR}/llvm/lib/Target/X86)
+include_directories(${CMAKE_BINARY_DIR}/llvm/include)
+include_directories(${CMAKE_BINARY_DIR}/llvm/lib/Target/X86)
 include_directories(${MCSEMA_GEN_DIR})
 
 # Make sure we can find the mcsema headers.
@@ -151,12 +150,36 @@ endif()
 
 configure_file (
   "mcsema/Version.h.in" #input is based on CMAKE_SOURCE_DIR
-  "${CMAKE_SOURCE_DIR}/generated/Version.h" #output is based on CMAKE_BINARY_DIR
+  "${MCSEMA_GEN_DIR}/Version.h" #output is based on CMAKE_BINARY_DIR
 )
-       
-# Make sure we find Version.h
-include_directories("${CMAKE_BINARY_DIR}")
 
+#
+# protobuf file generation
+# this will make sure that the protobuf files are generated each time
+# the CFG.h header file is modified
+#
+
+set(PROTOBUF_CONFIGURATION "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.proto")
+
+set(PROTOBUF_OUTPUT_FILE_LIST
+    "${MCSEMA_GEN_DIR}/CFG.pb.cc"
+    "${MCSEMA_GEN_DIR}/CFG.pb.h"
+    "${MCSEMA_GEN_DIR}/CFG_pb2.py"
+)
+
+add_custom_command(
+    OUTPUT ${PROTOBUF_OUTPUT_FILE_LIST}
+
+    COMMAND "${PROTOBUF_PROTOC_EXECUTABLE}" --cpp_out "${MCSEMA_GEN_DIR}" --python_out "${MCSEMA_GEN_DIR}" --proto_path "${CMAKE_SOURCE_DIR}/mcsema/CFG" "${PROTOBUF_CONFIGURATION}"
+
+    DEPENDS "${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.h" ${PROTOBUF_PROTOC_EXECUTABLE}
+    MAIN_DEPENDENCY "${PROTOBUF_CONFIGURATION}"
+
+    COMMENT "Generating protobuf files..."
+    VERBATIM
+)
+
+# mcsema source files
 add_executable(mcsema-lift
   ${CMAKE_SOURCE_DIR}/mcsema/Lift.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/Arch/Arch.cpp
@@ -169,7 +192,7 @@ add_executable(mcsema-lift
   ${CMAKE_SOURCE_DIR}/mcsema/BC/Lift.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/BC/Util.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/CFG/CFG.cpp
-  ${CMAKE_SOURCE_DIR}/generated/CFG.pb.cc
+  ${MCSEMA_GEN_DIR}/CFG.pb.cc
 
   ${CMAKE_SOURCE_DIR}/mcsema/cfgToLLVM/JumpTables.cpp
   ${CMAKE_SOURCE_DIR}/mcsema/cfgToLLVM/TransExcn.cpp
@@ -194,7 +217,7 @@ add_executable(mcsema-lift
   ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/SUB.cpp)
 
 target_link_libraries(mcsema-lift
-  protobuf
+  ${PROTOBUF_LIBRARIES}
   LLVMBitReader
   LLVMBitWriter
   LLVMMCDisassembler
@@ -215,10 +238,17 @@ target_link_libraries(mcsema-lift
 
 #TODO(artem):  Make this ${CMAKE_SOURCE_DIR}/mcsema/Arch/X86 and have a 
 # CMakeLists.txt there add any relevant subdirs
-add_subdirectory(${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/Bitcode)
+if(NOT APPLE)
+  # Apple clang is trolling us. On my (artem) machine, the llvm-link from 3.8 will assert() on the bitcode semantics
+  # TODO(artem): Install real clang 3.8 on MacOS, not hacky apple clang
+  add_subdirectory(${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Semantics/Bitcode)
+endif()
 add_subdirectory(${CMAKE_SOURCE_DIR}/mcsema/Arch/X86/Runtime)
 
 install(
   TARGETS mcsema-lift 
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib)
+
+install(FILES "${MCSEMA_GEN_DIR}/CFG_pb2.py"
+        DESTINATION "${CMAKE_SOURCE_DIR}/tools/mcsema_disass/ida")

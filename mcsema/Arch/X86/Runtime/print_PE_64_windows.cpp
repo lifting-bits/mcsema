@@ -91,7 +91,7 @@ int main(void) {
   // Pop the target function into the `RegState` structure. This resets `RSP`
   // to what it should be on entry to `__mcsema_attach_call`.
   //
-  fprintf(out, "  push QWORD ptr [rsp]\n"); // dupliate last stack element (the jump-to RIP), so we can pop it
+  fprintf(out, "  push QWORD ptr [rsp]\n"); // duplicate last stack element (the jump-to RIP), so we can pop it
   fprintf(out, "  mov QWORD ptr [rsp+8], rbp\n"); // save rbp, we will clobber it
   getTlsIndex(out, "rbp");
   fprintf(out, "  pop QWORD PTR [rbp + __mcsema_reg_state@SECREL32 + %llu]\n", __builtin_offsetof(RegState, RIP));
@@ -438,7 +438,7 @@ out,   fprintf(out, "  lea rsp, [rax + __mcsema_stack@SECREL32 + %llu]\n", kStac
   fprintf(out, "  movdqu  [rsp+%llu], xmm15\n", 9*sizeof(RegState::XMM15));
 
 
-  // copy posible stack args into temporary holding area
+  // copy possible stack args into temporary holding area
   fprintf(out, "  lea rdi, [rax + __mcsema_stack_args@SECREL32]\n");
   // stack args start after return address + callee saved GPRs + callee saved XMM
   fprintf(out, "  lea rsi, [rsp + %llu]\n", 8 + 8*8 + sizeof(RegState::XMM0)*10);
@@ -461,7 +461,7 @@ out,   fprintf(out, "  lea rsp, [rax + __mcsema_stack@SECREL32 + %llu]\n", kStac
   // Swap onto the native stack.
   fprintf(out, "  xchg QWORD PTR [rax + __mcsema_reg_state@SECREL32 + %llu], rsp\n", __builtin_offsetof(RegState, RSP));
 
-  // copy posible stack args from holding area to native stack
+  // copy possible stack args from holding area to native stack
   // allocate space for our arguments on stack
   fprintf(out, "  sub rsp, %llu\n", kStackArgSize);
   // we need to save these 
@@ -534,7 +534,7 @@ out,   fprintf(out, "  lea rsp, [rax + __mcsema_stack@SECREL32 + %llu]\n", kStac
   // save current stack mark
   fprintf(out, "  push QWORD PTR [rax + __mcsema_stack_mark@SECREL32]\n");
 
-  // copy posible stack args into temporary holding area
+  // copy possible stack args into temporary holding area
   fprintf(out, "  lea rdi, [rax + __mcsema_stack_args@SECREL32]\n");
   // this is not RSP since for do_call_value there is no spilling via an 
   // intermediate function
@@ -585,7 +585,7 @@ out,   fprintf(out, "  lea rsp, [rax + __mcsema_stack@SECREL32 + %llu]\n", kStac
 
   fprintf(out, "  xchg QWORD PTR [rax + __mcsema_reg_state@SECREL32 + %llu], rsp\n", __builtin_offsetof(RegState, RSP));
 
-  // copy posible stack args from holding area to native stack
+  // copy possible stack args from holding area to native stack
   // allocate space for our arguments on stack
   // use -8 since we have a ret addr on stack already and need alignment
   fprintf(out, "  sub rsp, %llu\n", kStackArgSize-8);

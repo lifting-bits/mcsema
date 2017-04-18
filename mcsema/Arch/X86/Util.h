@@ -83,7 +83,7 @@ static llvm::Value *getValueForExternal(llvm::Module *M, NativeInstPtr ip,
     }
 
   } else {
-    throw TErr(__LINE__, __FILE__, "No external refernce to get value for!");
+    throw TErr(__LINE__, __FILE__, "No external reference to get value for!");
   }
 
   return addrInt;

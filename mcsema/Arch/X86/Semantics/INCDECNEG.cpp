@@ -301,7 +301,7 @@ void INCDECNEG_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::INC32r] = translate_INC32r;
   m[llvm::X86::INC32r_alt] = translate_INC32r;
 
-  // Is it required to have check for REX prefix to check register premissions?
+  // Is it required to have check for REX prefix to check register permissions?
   // uses check for REX.W for 64 bit access.
   m[llvm::X86::INC64r] = translate_INC64r;
 //  m[llvm::X86::INC64_32r] = translate_INC64_32r;
