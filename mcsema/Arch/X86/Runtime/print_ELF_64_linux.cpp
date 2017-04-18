@@ -20,8 +20,8 @@
 #define HAS_FEATURE_AVX512 0
 #define ADDRESS_SIZE_BITS 64
 
-#include "remill/Arch/X86/Runtime/State.h"
-#include "mcsema/Arch/X86/Runtime/Registers.h"
+#include <remill/Arch/X86/Runtime/State.h>
+#include <mcsema/Arch/X86/Runtime/Registers.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wformat"

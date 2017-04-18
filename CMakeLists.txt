@@ -135,8 +135,6 @@ add_custom_target(protobuf_python_module DEPENDS ${PROJECT_PROTOBUFPYTHONMODULE}
 # target settings
 #
 
-list(APPEND PROJECT_INCLUDEDIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR})
-
 add_executable(mcsema-lift
     EXCLUDE_FROM_ALL
 
@@ -152,6 +150,10 @@ add_executable(mcsema-lift
     mcsema/BC/Segment.cpp
     mcsema/BC/Util.cpp
 )
+
+# this is needed for the #include directives with absolutes paths to work correctly; it must
+# also be set to PUBLIC since remill-lift includes some files directly
+list(APPEND PROJECT_INCLUDEDIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_dependencies(mcsema-lift semantics protobuf_python_module)
 

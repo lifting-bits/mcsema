@@ -14,6 +14,10 @@
 
 enable_language(ASM)
 
+if (NOT TARGET REMILL)
+    message(FATAL_ERROR "The remill target does not exists!")
+endif ()
+
 # Create the Windows runtimes
 if(WIN32 AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 
@@ -31,6 +35,9 @@ else()
   if(WIN32)
     add_executable(mcsema-print-runtime-x86
       print_PE_32_windows.cpp)
+
+      target_link_libraries(mcsema-print-runtime-x86 PRIVATE REMILL) # this is going to import the public include headers of remill
+      target_include_directories(mcsema-print-runtime-x86 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../") # todo: HACK! fix this!
 
     # build a static library from this generated object
     add_library(mcsema_rt32 STATIC mcsema_rt32.obj)
@@ -67,6 +74,9 @@ else()
     add_executable(mcsema-print-runtime-x86
       print_ELF_32_linux.cpp)
 
+    target_link_libraries(mcsema-print-runtime-x86 PRIVATE REMILL) # this is going to import the public include headers of remill
+    target_include_directories(mcsema-print-runtime-x86 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../") # todo: HACK! fix this!
+
     add_library(mcsema_rt32 STATIC runtime_32.S)
     set_target_properties(mcsema_rt32
       PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
@@ -89,6 +99,9 @@ else()
     if(WIN32)
       add_executable(mcsema-print-runtime-amd64
         print_PE_64_windows.cpp)
+
+        target_link_libraries(mcsema-print-runtime-amd64 PRIVATE REMILL) # this is going to import the public include headers of remill
+        target_include_directories(mcsema-print-runtime-amd64 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../") # todo: HACK! fix this!
 
       # build a static library from this generated object
       add_library(mcsema_rt64 STATIC mcsema_rt64.obj)
@@ -125,6 +138,9 @@ else()
       # Linux and friends
       add_executable(mcsema-print-runtime-amd64
         print_ELF_64_linux.cpp)
+
+      target_link_libraries(mcsema-print-runtime-amd64 PRIVATE REMILL) # this is going to import the public include headers of remill
+      target_include_directories(mcsema-print-runtime-amd64 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../") # todo: HACK! fix this!
 
       add_library(mcsema_rt64 STATIC runtime_64.S)
       set_target_properties(mcsema_rt64
