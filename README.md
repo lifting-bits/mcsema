@@ -1,6 +1,6 @@
 # McSema [![Slack Chat](http://empireslacking.herokuapp.com/badge.svg)](https://empireslacking.herokuapp.com/)
 
-McSema lifts x86 and amd64 binaries to LLVM bitcode modules. McSema support both Linux and Windows binaries, and most x86 and amd64 instructions, including integer, FPU, and SSE operations.
+McSema lifts x86 and amd64 binaries to LLVM bitcode modules. McSema support both Linux and Windows binaries, and most x86 and amd64 instructions, including integer, X87, MMX, SSE and AVX operations.
 
 McSema is separated into two conceptual parts: control flow recovery and instruction translation. Control flow recovery is performed using the `mcsema-disass` tool, which uses IDA Pro to disassemble a binary file and produces a control flow graph. Instruction translation is performed using the `mcsema-lift` tool, which converts the control flow graph into LLVM bitcode.
 
@@ -13,9 +13,9 @@ McSema is separated into two conceptual parts: control flow recovery and instruc
 ## Features
 
 * Translates 32- and 64-bit Linux ELF and Windows PE binaries to bitcode, including executables and shared libraries for each platform.
-* Supports a large subset of x86 and x86-64 instructions, including most integer, FPU, and SSE operations. Use `mcsema-lift --list-supported --arch x86` to see a complete list.
+* Supports a large subset of x86 and x86-64 instructions, including most integer, X87, MMX, SSE, and AVX operations.
 * Runs on both Windows and Linux, and can translate Linux binaries on Windows and Windows binaries on Linux.
-* Output bitcode is compatible with the LLVM 3.8 toolchain.
+* Output bitcode is compatible with the LLVM toolchain (versions 3.5 and up).
 * Translated bitcode can be analyzed or [recompiled as a new, working executable](docs/McsemaWalkthrough.md) with functionality identical to the original.
 * McSema runs on Windows and Linux and has been tested on Windows 7, 10, Ubuntu 14.04, and Ubuntu 16.04.
 
@@ -40,8 +40,8 @@ Why would anyone translate binaries *back* to bitcode?
 | [Git](https://git-scm.com/) | Latest |
 | [CMake](https://cmake.org/) | 2.8+ |
 | [Google Protobuf](https://github.com/google/protobuf) | 2.6.1 |
-| [LLVM](http://llvm.org/) | 3.8 |
-| [Clang](http://clang.llvm.org/) | 3.8 (3.9 if using Visual Studio 2015) |
+| [LLVM](http://llvm.org/) | 3.5+ |
+| [Clang](http://clang.llvm.org/) | 3.5+ (3.9 if using Visual Studio 2015) |
 | [Python](https://www.python.org/) | 2.7 | 
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 2.6.1 |
@@ -61,9 +61,8 @@ sudo apt-get upgrade
 sudo apt-get install \
      git \
      cmake \
-     libprotoc-dev libprotobuf-dev libprotobuf-dev protobuf-compiler \
      python2.7 python-pip \
-     llvm-3.8 clang-3.8 \
+     build-essential \
      realpath
 
 sudo pip install --upgrade pip
@@ -80,28 +79,54 @@ sudo zip -rv /path/to/ida-6.X/python/lib/python27.zip google/
 sudo chown your_user:your_user /home/taxicat/ida-6.7/python/lib/python27.zip
 ```
 
-#### Step 2: Clone and enter the repository
+#### Step 2: Clone the repository
+
+The first step is to recursively clone the [Remill](https://github.com/trailofbits/remill) repository. This will pull in McSema and other needed dependencies.
 
 ```shell
-git clone git@github.com:trailofbits/mcsema.git --depth 1
+git clone --depth 1 --recursive https://github.com/trailofbits/remill.git
+cd remill
 ```
 
-The Linux bootstrap script supports two configuration options:
+#### Step 3: Build the dependencies
 
-  * `--prefix`: The installation directory prefix for mcsema-lift. Defaults to the directory containing the bootstrap script.
-  * `--build`: Set the build type. Defaults to `Debug`.
+Several Trail of Bits projects depend on a common subset of C and C++ codebases. We've organized these dependencies into the [cxx-common](https://github.com/trailofbits/cxx-common) repository. This repository is included as part of the above `git clone`.
 
 ```shell
-cd mcsema
-./bootstrap.sh --build Release
+mkdir remill-build
+cd remill-build
+
+../remill/cxx-common/build.sh --template everything `pwd`/libraries
 ```
 
-#### Step 3: Build and install the code
+**Note:** This will build McSema using the LLVM 3.9 toolchain. If you want to use McSema with other versions of the LLVM toolchain, then manually specify targets to the `cxx-common/build.sh` script. For example, to build LLVM and Clang 3.5, do the following:
 
 ```shell
-cd build
-make
-sudo make install
+../remill/cxx-common/build.sh --targets xed,llvm35,gflags,gtest,protobuf,glog,clang `pwd`/libraries
+```
+
+**Note:** You can omit some of the targets if you already have those installed as system packages. Building all of the dependencies in this way is the most stable approach. For example:
+
+```shell
+../remill/cxx-common/build.sh --targets xed,gflags,gtest,protobuf,glog `pwd`/libraries
+```
+
+#### Step 4: Build and install the code
+
+The next step is to build the code. McSema (and Remill) must be built using the Clang compiler.
+
+TODO TODO TODO talk about specifying the compiler correctly
+
+```shell
+export TRAILOFBITS_LIBRARIES=`pwd`/libraries/
+cmake ../remill
+make -j4
+```
+
+**Note:** If you are using custom version of LLVM then specify the following at the command line before running `cmake`:
+
+```shell
+export LLVM_INSTALL_PREFIX=/path/to/llvm/install/dir
 ```
 
 ### On Windows
