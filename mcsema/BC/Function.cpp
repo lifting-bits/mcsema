@@ -513,13 +513,7 @@ void DeclareLiftedFunctions(const NativeModule *cfg_module) {
     auto lifted_func = gModule->getFunction(func_name);
 
     if (!lifted_func) {
-      lifted_func = llvm::dyn_cast<llvm::Function>(
-          gModule->getOrInsertFunction(func_name, LiftedFunctionType()));
-
-      CHECK(lifted_func != nullptr)
-          << "Could not insert function " << func_name << " into module";
-
-      remill::InitFunctionAttributes(lifted_func);
+      lifted_func = remill::DeclareLiftedFunction(gModule, func_name);
 
       // make local functions 'static'
       LOG(INFO)
