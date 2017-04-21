@@ -42,6 +42,8 @@
 #include "remill/BC/ABI.h"
 #include "remill/BC/IntrinsicTable.h"
 #include "remill/BC/Lifter.h"
+#include "remill/BC/Util.h"
+#include "remill/BC/Version.h"
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Function.h"
@@ -66,8 +68,12 @@ static const char * const kRealEIPAnnotation = "mcsema_real_eip";
 static llvm::MDNode *CreateInstAnnotation(llvm::Function *F, uint64_t addr) {
   auto &C = F->getContext();
   auto addr_val = llvm::ConstantInt::get(llvm::Type::getInt64Ty(C), addr);
+#if LLVM_VERSION_NUMBER >= LLVM_VERSION(3, 6)
   auto addr_md = llvm::ValueAsMetadata::get(addr_val);
   return llvm::MDNode::get(C, addr_md);
+#else
+  return llvm::MDNode::get(C, addr_val);
+#endif
 }
 
 // Annotate and instruction with the `mcsema_real_eip` annotation if that
@@ -87,15 +93,6 @@ static void AnnotateInsts(llvm::Function *F, uint64_t pc) {
       AnnotateInst(&I, annot);
     }
   }
-}
-
-// Update the program counter in the state struct with a hard-coded value.
-static void StoreProgramCounter(TranslationContext &ctx,
-                                llvm::BasicBlock *block,
-                                uint64_t pc) {
-  auto pc_ptr = remill::LoadProgramCounterRef(block);
-  (void) new llvm::StoreInst(
-      llvm::ConstantInt::get(ctx.lifter->word_type, pc), pc_ptr, block);
 }
 
 // Tries to get the lifted function beginning at `pc`.
@@ -175,8 +172,6 @@ static llvm::Function *FindFunction(TranslationContext &ctx,
   }
 }
 
-
-
 // Get the basic block within this function associated with a specific program
 // counter.
 static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
@@ -216,7 +211,6 @@ static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
 static void LiftConditionalBranch(TranslationContext &ctx,
                                   llvm::BasicBlock *source,
                                   remill::Instruction *instr) {
-  auto function = source->getParent();
   auto block_true = GetOrCreateBlock(ctx, instr->branch_taken_pc);
   auto block_false = GetOrCreateBlock(ctx, instr->branch_not_taken_pc);
   llvm::IRBuilder<> cond_ir(source);
@@ -265,13 +259,14 @@ static void LiftIndirectJump(TranslationContext &ctx,
   remill::AddTerminatingTailCall(fallback_block, fallback);
 
   // TODO(pag): Handle offset tables.
+  auto num_blocks = static_cast<unsigned>(block_map.size());
   auto switch_index = remill::LoadProgramCounter(block);
   auto switch_inst = llvm::SwitchInst::Create(
-      switch_index, fallback_block, block_map.size(), block);
+      switch_index, fallback_block, num_blocks, block);
 
   LOG(INFO)
       << "Indirect jump at " << std::hex << instr->pc
-      << " has " << std::dec << block_map.size() << " targets";
+      << " has " << std::dec << num_blocks << " targets";
 
   // Add the cases.
   for (auto ea_to_block : block_map) {
@@ -322,12 +317,12 @@ static bool TryLiftTerminator(TranslationContext &ctx,
             << "Not adding a subroutine self-call at "
             << std::hex << instr->pc;
       }
-      StoreProgramCounter(ctx, block, instr->next_pc);
+      remill::StoreProgramCounter(block, instr->next_pc);
       return false;
 
     case remill::Instruction::kCategoryIndirectFunctionCall:
       InlineSubFuncCall(block, ctx.lifter->intrinsics->function_call);
-      StoreProgramCounter(ctx, block, instr->next_pc);
+      remill::StoreProgramCounter(block, instr->next_pc);
       return false;
 
     case remill::Instruction::kCategoryFunctionReturn:
@@ -342,7 +337,7 @@ static bool TryLiftTerminator(TranslationContext &ctx,
 
     case remill::Instruction::kCategoryAsyncHyperCall:
       InlineSubFuncCall(block, ctx.lifter->intrinsics->async_hyper_call);
-      StoreProgramCounter(ctx, block, instr->next_pc);
+      remill::StoreProgramCounter(block, instr->next_pc);
       return false;
   }
   return false;
@@ -387,7 +382,7 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
   auto block = ctx.ea_to_block[block_pc];
 
   // Store this program counter into the state structure.
-  StoreProgramCounter(ctx, block, block_pc);
+  remill::StoreProgramCounter(block, block_pc);
 
   // Lift each instruction into the block.
   size_t i = 0;
@@ -456,7 +451,8 @@ static llvm::Function *LiftFunction(
     return lifted_func;
   }
 
-  auto word_type = llvm::Type::getIntNTy(*gContext, gArch->address_size);
+  auto word_type = llvm::Type::getIntNTy(
+      *gContext, static_cast<unsigned>(gArch->address_size));
 
   remill::CloneBlockFunctionInto(lifted_func);
 

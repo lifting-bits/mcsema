@@ -38,7 +38,6 @@
 #include "mcsema/BC/Util.h"
 
 #include "mcsema/CFG/CFG.h"
-#include "mcsema/CFG/Externals.h"
 
 namespace mcsema {
 

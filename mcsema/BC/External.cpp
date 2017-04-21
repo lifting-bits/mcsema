@@ -77,7 +77,8 @@ void DeclareExternals(const NativeModule *cfg_module) {
   for (const auto &entry : cfg_module->name_to_extern_var) {
     auto cfg_var = reinterpret_cast<const NativeExternalVariable *>(
         entry.second->Get());
-    auto var_type = llvm::Type::getIntNTy(*gContext, cfg_var->size * 8);
+    auto var_type = llvm::Type::getIntNTy(
+        *gContext, static_cast<unsigned>(cfg_var->size * 8));
     MakeExternal(gModule->getOrInsertGlobal(cfg_var->name, var_type));
   }
 }

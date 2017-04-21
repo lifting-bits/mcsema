@@ -18,6 +18,7 @@
 #include <glog/logging.h>
 
 #include <algorithm>
+#include <set>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -32,7 +33,6 @@
 #include <llvm/IR/Metadata.h>
 #include <llvm/IR/MDBuilder.h>
 #include <llvm/IR/Module.h>
-#include <llvm/IR/PassManager.h>
 #include <llvm/IR/Type.h>
 
 #include <llvm/Transforms/IPO.h>
@@ -44,6 +44,7 @@
 
 #include "remill/Arch/Arch.h"
 #include "remill/BC/ABI.h"
+#include "remill/BC/Compat/TargetLibraryInfo.h"
 #include "remill/BC/Util.h"
 
 #include "mcsema/Arch/Arch.h"
@@ -151,15 +152,20 @@ static void RunO3(void) {
   builder.SizeLevel = 2;
   builder.Inliner = llvm::createFunctionInliningPass(100);
   builder.LibraryInfo = TLI;  // Deleted by `llvm::~PassManagerBuilder`.
-  builder.DisableTailCalls = false;  // Enable tail calls.
   builder.DisableUnrollLoops = false;  // Unroll loops!
   builder.DisableUnitAtATime = false;
   builder.SLPVectorize = true;
   builder.LoopVectorize = true;
+
+#if LLVM_VERSION_NUMBER >= LLVM_VERSION(3, 5)
+  builder.DisableTailCalls = false;  // Enable tail calls.
   builder.LoadCombine = true;
-  builder.MergeFunctions = false;  // Try to deduplicate functions.
-  builder.VerifyInput = false;
-  builder.VerifyOutput = false;
+#endif
+
+  // TODO(pag): Not sure when these became available.
+  // builder.MergeFunctions = false;  // Try to deduplicate functions.
+  // builder.VerifyInput = false;
+  // builder.VerifyOutput = false;
 
   builder.populateFunctionPassManager(func_manager);
   builder.populateModulePassManager(module_manager);

@@ -58,7 +58,7 @@ extern const remill::Arch *gArch;
 bool InitArch(const std::string &os,
               const std::string &arch);
 
-int ArchAddressSize(void);
+unsigned ArchAddressSize(void);
 
 const std::string &ArchTriple(void);
 const std::string &ArchDataLayout(void);
@@ -98,9 +98,10 @@ SystemArchType SystemArch(llvm::Module *M);
 std::string ArchNameMcSemaCall(const std::string &name);
 
 llvm::Value *doSubtractImageBase(llvm::Value *original,
-                                 llvm::BasicBlock *block, int width);
+                                 llvm::BasicBlock *block,
+                                 unsigned width);
 
-template <int width>
+template <unsigned width>
 inline static llvm::Value *doSubtractImageBase(
     llvm::Value *original, llvm::BasicBlock *block) {
   return doSubtractImageBase(original, block, width);

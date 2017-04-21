@@ -14,7 +14,7 @@
 
 enable_language(ASM)
 
-if (NOT TARGET REMILL)
+if (NOT TARGET remill)
     message(FATAL_ERROR "The remill target does not exists!")
 endif ()
 
@@ -36,7 +36,7 @@ else()
     add_executable(mcsema-print-runtime-x86
       print_PE_32_windows.cpp)
 
-      target_link_libraries(mcsema-print-runtime-x86 PRIVATE REMILL) # this is going to import the public include headers of remill
+      target_link_libraries(mcsema-print-runtime-x86 PRIVATE remill) # this is going to import the public include headers of remill
       target_include_directories(mcsema-print-runtime-x86 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../") # todo: HACK! fix this!
 
     # build a static library from this generated object
@@ -74,7 +74,7 @@ else()
     add_executable(mcsema-print-runtime-x86
       print_ELF_32_linux.cpp)
 
-    target_link_libraries(mcsema-print-runtime-x86 PRIVATE REMILL) # this is going to import the public include headers of remill
+    target_link_libraries(mcsema-print-runtime-x86 PRIVATE remill) # this is going to import the public include headers of remill
     target_include_directories(mcsema-print-runtime-x86 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../") # todo: HACK! fix this!
 
     add_library(mcsema_rt32 STATIC runtime_32.S)
@@ -100,7 +100,7 @@ else()
       add_executable(mcsema-print-runtime-amd64
         print_PE_64_windows.cpp)
 
-        target_link_libraries(mcsema-print-runtime-amd64 PRIVATE REMILL) # this is going to import the public include headers of remill
+        target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill) # this is going to import the public include headers of remill
         target_include_directories(mcsema-print-runtime-amd64 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../") # todo: HACK! fix this!
 
       # build a static library from this generated object
@@ -139,7 +139,7 @@ else()
       add_executable(mcsema-print-runtime-amd64
         print_ELF_64_linux.cpp)
 
-      target_link_libraries(mcsema-print-runtime-amd64 PRIVATE REMILL) # this is going to import the public include headers of remill
+      target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill) # this is going to import the public include headers of remill
       target_include_directories(mcsema-print-runtime-amd64 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../") # todo: HACK! fix this!
 
       add_library(mcsema_rt64 STATIC runtime_64.S)

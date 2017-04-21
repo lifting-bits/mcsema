@@ -27,11 +27,9 @@
 #include <llvm/IR/Metadata.h>
 #include <llvm/IR/MDBuilder.h>
 #include <llvm/IR/Module.h>
-#include <llvm/IR/PassManager.h>
 #include <llvm/IR/Type.h>
 
 #include <llvm/Transforms/IPO.h>
-#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Utils/Local.h>
 #include <llvm/Transforms/Utils/Cloning.h>

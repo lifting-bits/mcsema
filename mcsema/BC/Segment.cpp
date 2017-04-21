@@ -80,7 +80,8 @@ static void DeclareDataSegment(const NativeSegment *cfg_seg) {
       entry_types.push_back(arr_type);
 
     } else if (entry.xref) {
-      auto val_type = llvm::Type::getIntNTy(*gContext, (entry.xref->width * 8));
+      auto val_type = llvm::Type::getIntNTy(
+          *gContext, static_cast<unsigned>(entry.xref->width * 8));
       entry_types.push_back(val_type);
 
     } else {
@@ -116,7 +117,8 @@ void DeclareVariables(const NativeModule *cfg_module) {
 
   // TODO(pag): Handle thread-local storage types by assigning a non-zero
   //            address space to the byte pointer type?
-  auto intptr_type = llvm::Type::getIntNTy(*gContext, gArch->address_size);
+  auto intptr_type = llvm::Type::getIntNTy(
+      *gContext, static_cast<unsigned>(gArch->address_size));
   auto byte_type = llvm::Type::getInt8Ty(*gContext);
   auto byte_ptr_type = llvm::PointerType::get(byte_type, 0);
 
@@ -163,7 +165,8 @@ static void FillDataSegment(const NativeSegment *cfg_seg) {
     return;
   }
 
-  auto intptr_type = llvm::Type::getIntNTy(*gContext, gArch->address_size);
+  auto intptr_type = llvm::Type::getIntNTy(
+      *gContext, static_cast<unsigned>(gArch->address_size));
   unsigned i = 0;
 
   std::vector<llvm::Constant *> entry_vals;
@@ -195,7 +198,7 @@ static void FillDataSegment(const NativeSegment *cfg_seg) {
           << "Empty entry at " << std::hex << entry.ea
           << " in segment " << cfg_seg->name;
 
-      auto val_size = entry.xref->width * 8;
+      auto val_size = static_cast<unsigned>(entry.xref->width * 8);
       auto val_type = llvm::Type::getIntNTy(*gContext, val_size);
       auto xref = entry.xref;
       llvm::Constant *val = nullptr;

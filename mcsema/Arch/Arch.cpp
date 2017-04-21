@@ -42,7 +42,7 @@ namespace {
 static std::string gDataLayout;
 static std::string gTriple;
 
-static int gAddressSize = 0;
+static unsigned gAddressSize = 0;
 
 static llvm::CallingConv::ID gCallingConv;
 static llvm::Triple::ArchType gArchType;
@@ -112,7 +112,7 @@ bool InitArch(const std::string &os, const std::string &arch) {
 }
 
 
-int ArchAddressSize(void) {
+unsigned ArchAddressSize(void) {
   return gAddressSize;
 }
 
@@ -267,14 +267,14 @@ static std::string WindowsDecorateName(llvm::Function *F,
       break;
     case llvm::CallingConv::X86_StdCall: {
       std::stringstream as;
-      int argc = F->arg_size();
+      auto argc = F->arg_size();
       as << "_" << name << "@" << argc * 4;
       return as.str();
     }
       break;
     case llvm::CallingConv::X86_FastCall: {
       std::stringstream as;
-      int argc = F->arg_size();
+      auto argc = F->arg_size();
       as << "@" << name << "@" << argc * 4;
       return as.str();
     }
@@ -480,7 +480,8 @@ bool shouldSubtractImageBase(llvm::Module *M) {
 }
 
 llvm::Value *doSubtractImageBase(llvm::Value *original,
-                                 llvm::BasicBlock *block, int width) {
+                                 llvm::BasicBlock *block,
+                                 unsigned width) {
   llvm::Module *M = block->getParent()->getParent();
   auto &C = M->getContext();
   llvm::Value *ImageBase = archGetImageBase(M);
