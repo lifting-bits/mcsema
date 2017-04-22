@@ -56,8 +56,8 @@ InstructionLifter::InstructionLifter(llvm::IntegerType *word_type_,
 
 
 // Lift a single instruction into a basic block.
-bool InstructionLifter::LiftIntoBlock(remill::Instruction *instr_,
-                                      llvm::BasicBlock *block_) {
+remill::LiftStatus InstructionLifter::LiftIntoBlock(
+    remill::Instruction *instr_, llvm::BasicBlock *block_) {
   instr = instr_;
   block = block_;
 

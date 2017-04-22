@@ -32,12 +32,8 @@
 #include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Util.h"
 
-#ifndef MCSEMA_OS
-# if defined(__APPLE__)
-#   define MCSEMA_OS "mac"
-# elif defined(__linux__)
-#   define MCSEMA_OS "linux"
-# endif
+#ifndef LLVM_VERSION_STRING
+# define LLVM_VERSION_STRING LLVM_VERSION_MAJOR << "." << LLVM_VERSION_MINOR
 #endif
 
 #ifndef MCSEMA_VERSION_STRING
@@ -48,11 +44,8 @@
 # define MCSEMA_BRANCH_NAME "unknown"
 #endif  // MCSEMA_BRANCH_NAME
 
-DEFINE_string(arch, "", "Architecture of the code being translated. "
-                         "Valid architectures: x86, amd64 (with or without "
-                         "`_avx` or `_avx512` appended).");
-
-DEFINE_string(os, MCSEMA_OS, "Source OS. Valid OSes: linux, mac.");
+DECLARE_string(arch);
+DECLARE_string(os);
 
 DEFINE_string(cfg, "", "Path to the CFG file containing code to lift.");
 

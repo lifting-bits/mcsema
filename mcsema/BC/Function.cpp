@@ -361,8 +361,16 @@ static void LiftInstIntoBlock(TranslationContext &ctx,
       << ") doesn't match input instruction size ("
       << bytes.size() << ").";
 
-  CHECK(ctx.lifter->LiftIntoBlock(instr.get(), block))
-      << "Can't lift instruction " << instr->Serialize();
+  switch (auto status = ctx.lifter->LiftIntoBlock(instr.get(), block)) {
+    case remill::LiftStatus::kError:
+    case remill::LiftStatus::kInvalid:
+      LOG(FATAL)
+          << "Can't lift instruction " << instr->Serialize();
+      break;
+    default:
+      break;
+
+  }
 
   if (TryLiftTerminator(ctx, block, instr.get())) {
     CHECK(is_last)

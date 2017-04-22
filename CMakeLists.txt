@@ -157,6 +157,8 @@ add_executable(mcsema-lift
     mcsema/BC/Optimize.cpp
     mcsema/BC/Segment.cpp
     mcsema/BC/Util.cpp
+
+    tools/mcsema_lift/Lift.cpp
 )
 
 # this is needed for the #include directives with absolutes paths to work correctly; it must
