@@ -177,19 +177,19 @@ int main(int argc, char *argv[]) {
     }
 
     //make sure the entry point list is correct before we start lifting the code
-    const auto &function_map = mod->get_funcs();
+    const std::vector<NativeEntrySymbol> &module_entry_points = mod->getEntryPoints();
 
     for (const auto &entry_point : EntryPoints) {
       auto it = std::find_if(
-        function_map.begin(),
-        function_map.end(),
+        module_entry_points.begin(),
+        module_entry_points.end(),
 
-        [&entry_point](const std::pair<VA, NativeFunctionPtr> &function) -> bool {
-          return (function.second->get_name() == entry_point);
+        [&entry_point](const NativeEntrySymbol &symbol) -> bool {
+          return (symbol.getName() == entry_point);
         }
       );
 
-      if (it == function_map.end()) {
+      if (it == module_entry_points.end()) {
           std::cerr << "The following entry point could not be found: \"" << entry_point << "\". Aborting..." << std::endl;
           return EXIT_FAILURE;
       }
