@@ -34,6 +34,7 @@
 #include <system_error>
 #include <cassert>
 #include <iomanip>
+#include <memory>
 
 #include <llvm/Bitcode/ReaderWriter.h>
 
@@ -119,7 +120,7 @@ int main(int argc, char *argv[]) {
   llvm::cl::SetVersionPrinter(PrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv, "CFG to LLVM");
 
-  auto context = new llvm::LLVMContext;
+  auto context = llvm::make_unique<llvm::LLVMContext>();
 
   if (OS.empty()) {
     if (ListSupported || ListUnsupported) {
@@ -137,14 +138,14 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
   }
 
-  if (!InitArch(context, OS, Arch)) {
+  if (!InitArch(context.get(), OS, Arch)) {
     std::cerr
         << "Cannot initialize for arch " << Arch
         << " and OS " << OS << std::endl;
     return EXIT_FAILURE;
   }
 
-  auto M = CreateModule(context);
+  auto M = CreateModule(context.get());
   if (!M) {
     return EXIT_FAILURE;
   }
@@ -169,7 +170,7 @@ int main(int argc, char *argv[]) {
 
   //reproduce NativeModule from CFG input argument
   try {
-    auto mod = ReadProtoBuf(InputFilename);
+    std::unique_ptr<NativeModule> mod(ReadProtoBuf(InputFilename));
     if (!mod) {
       std::cerr << "Unable to read module from CFG" << std::endl;
       return EXIT_FAILURE;
@@ -177,7 +178,7 @@ int main(int argc, char *argv[]) {
 
     //we have reached this point because we already have everything we need
     if (ListCFGFunctions) {
-      PrintCFGFunctionList(mod, Arch);
+      PrintCFGFunctionList(mod.get(), Arch);
       return EXIT_SUCCESS;
     }
 
@@ -203,14 +204,14 @@ int main(int argc, char *argv[]) {
     //now, convert it to an LLVM module
     ArchInitAttachDetach(M);
 
-    if (!LiftCodeIntoModule(mod, M)) {
+    if (!LiftCodeIntoModule(mod.get(), M)) {
       std::cerr << "Failure to convert to LLVM module!" << std::endl;
       return EXIT_FAILURE;
     }
 
     std::set<VA> entry_point_pcs;
     for (const auto &entry_point_name : EntryPoints) {
-      auto entry_pc = FindSymbolInModule(mod, entry_point_name);
+      auto entry_pc = FindSymbolInModule(mod.get(), entry_point_name);
       assert(entry_pc != static_cast<VA>( -1));
 
       std::cerr << "Adding entry point: " << entry_point_name << std::endl
@@ -224,7 +225,7 @@ int main(int argc, char *argv[]) {
       entry_point_pcs.insert(entry_pc);
     }
 
-    RenameLiftedFunctions(mod, M, entry_point_pcs);
+    RenameLiftedFunctions(mod.get(), M, entry_point_pcs);
 
     // will abort if verification fails
     if (llvm::verifyModule( *M, &llvm::errs())) {
