@@ -16,6 +16,8 @@
 
 #include <glog/logging.h>
 
+#include <algorithm>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -65,11 +67,10 @@ static bool IsZero(const NativeSegment *cfg_seg) {
   return false;
 }
 
-// Declare a data segment, and return a global value pointing to that segment.
 // The type of the segment is a packed structure that is a sequence of opaque
 // byte arrays, interspersed with cross-references, which will be represented
 // as (pointers casted to) integers.
-static void DeclareDataSegment(const NativeSegment *cfg_seg) {
+static llvm::StructType *GetSegmentType(const NativeSegment *cfg_seg) {
   std::vector<llvm::Type *> entry_types;
 
   auto byte_type = llvm::Type::getInt8Ty(*gContext);
@@ -102,18 +103,86 @@ static void DeclareDataSegment(const NativeSegment *cfg_seg) {
       << "Size of structure type of segment " << cfg_seg->name
       << " is " << seg_size << " but was expected to be " << cfg_seg->size;
 
-  auto global = new llvm::GlobalVariable(
-      *gModule, seg_type, cfg_seg->is_read_only,
+  return seg_type;
+}
+
+// Declare a data segment, and return a global value pointing to that segment.
+static llvm::GlobalVariable *DeclareRegion(const SegmentMap &segments) {
+  std::vector<llvm::Type *> seg_types;
+
+  uint64_t min_ea = std::numeric_limits<uint64_t>::max();
+  uint64_t max_ea = 0;
+  auto is_read_only = true;
+
+  for (const auto &entry : segments) {
+    auto cfg_seg = entry.second;
+    auto type = GetSegmentType(cfg_seg);
+    seg_types.push_back(type);
+
+    auto seg_end_ea = cfg_seg->ea + cfg_seg->size;
+    min_ea = std::min(min_ea, cfg_seg->ea);
+    max_ea = std::max(max_ea, seg_end_ea);
+    is_read_only = is_read_only && cfg_seg->is_read_only;
+  }
+
+  // If a region contains both read-write and read-only segments, then we're
+  // going to have to convert the read-only segment into read-write.
+  //
+  // TODO(pag): What happens if a thread-local and non-thread-local segment
+  //            appear in the same region?
+  for (const auto &entry : segments) {
+    auto cfg_seg = entry.second;
+    auto seg_end_ea = cfg_seg->ea + cfg_seg->size;
+    LOG_IF(ERROR, cfg_seg->is_read_only && !is_read_only)
+        << "Adding read-only segment " << cfg_seg->name << " at ["
+        << std::hex << cfg_seg->ea << ", " << std::hex << seg_end_ea
+        << ") into non-read-only segment region [" << std::hex << min_ea
+        << ", " << std::hex << max_ea << ")";
+  }
+
+  auto region_type = llvm::StructType::create(seg_types, "", true);
+  auto intptr_type = llvm::Type::getIntNTy(
+      *gContext, static_cast<unsigned>(gArch->address_size));
+
+  CHECK(nullptr != region_type)
+      << "Unable to create structure type for segment region ["
+      << std::hex << min_ea << ", " << std::hex << max_ea << ")";
+
+  // Declare the region as a large structure.
+  std::stringstream ss;
+  ss << "region_" << std::hex << min_ea << "_" << std::hex << max_ea;
+  auto region = new llvm::GlobalVariable(
+      *gModule, region_type, is_read_only,
       llvm::GlobalValue::InternalLinkage, nullptr,
-      cfg_seg->lifted_name);
-  global->setAlignment(16);
+      ss.str());
+  region->setAlignment(16);
+
+  // Go and declare the individual segments as variables pointing
+  // into the region.
+  unsigned i = 0;
+  for (const auto &entry : segments) {
+    auto cfg_seg = entry.second;
+    auto seg_type = seg_types[i++];
+    auto offset = cfg_seg->ea - min_ea;
+    auto disp = llvm::ConstantInt::get(intptr_type, offset, false);
+    auto region_base = llvm::ConstantExpr::getPtrToInt(region, intptr_type);
+    auto addr = llvm::ConstantExpr::getAdd(region_base, disp);
+    auto ptr = llvm::ConstantExpr::getIntToPtr(addr, seg_type);
+
+    (void) new llvm::GlobalVariable(
+        *gModule, seg_type, true  /* IsConstant */,
+        llvm::GlobalVariable::InternalLinkage,
+        ptr, cfg_seg->lifted_name);
+  }
+
+  return region;
 }
 
 // Declare named variables that point into the data segment. The program being
 // lifted may have cross-references that addresses meaningfully named (global)
 // variables within a segment, so we want to try to preserve those names,
 // treating them as GEPs into the segment's data.
-void DeclareVariables(const NativeModule *cfg_module) {
+static void DeclareVariables(const NativeModule *cfg_module) {
 
   // TODO(pag): Handle thread-local storage types by assigning a non-zero
   //            address space to the byte pointer type?
@@ -153,7 +222,7 @@ void DeclareVariables(const NativeModule *cfg_module) {
 }
 
 // Fill in the contents of the data segment.
-static void FillDataSegment(const NativeSegment *cfg_seg) {
+static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg) {
   auto seg = gModule->getNamedGlobal(cfg_seg->lifted_name);
   auto seg_type = llvm::dyn_cast<llvm::StructType>(remill::GetValueType(seg));
 
@@ -161,8 +230,7 @@ static void FillDataSegment(const NativeSegment *cfg_seg) {
   seg->setVisibility(llvm::GlobalValue::DefaultVisibility);
 
   if (IsZero(cfg_seg)) {
-    seg->setInitializer(llvm::ConstantAggregateZero::get(seg_type));
-    return;
+    return llvm::ConstantAggregateZero::get(seg_type);
   }
 
   auto intptr_type = llvm::Type::getIntNTy(
@@ -243,10 +311,6 @@ static void FillDataSegment(const NativeSegment *cfg_seg) {
         val = llvm::ConstantExpr::getTrunc(val, val_type);
       }
 
-      if (val->getType() != entry_type) {
-        val->dump();
-      }
-
       CHECK(val->getType() == entry_type)
           << "Type mismatch: Got "
           << remill::LLVMThingToString(val->getType())
@@ -257,20 +321,78 @@ static void FillDataSegment(const NativeSegment *cfg_seg) {
     }
   }
 
-  seg->setInitializer(llvm::ConstantStruct::get(seg_type, entry_vals));
+  return llvm::ConstantStruct::get(seg_type, entry_vals);
+}
+
+// Fill all the data segments in a given region.
+static void FillRegion(llvm::GlobalVariable *global, const SegmentMap &region) {
+  std::vector<llvm::Constant *> entry_vals;
+  for (const auto &entry : region) {
+    auto cfg_seg = entry.second;
+    entry_vals.push_back(FillDataSegment(cfg_seg));
+  }
+
+  auto region_type = llvm::dyn_cast<llvm::StructType>(
+      remill::GetValueType(global));
+
+  global->setInitializer(llvm::ConstantStruct::get(region_type, entry_vals));
+}
+
+using Region = std::vector<SegmentMap>;
+
+// We need to group together contiguous segments. It's sometimes the
+// case that code will reference the address immediately following a segment
+// as a way of bounding the segment using a less-than comparison. This ending
+// address can be the beginning of another segment, so we need to actually
+// make sure that we maintain the correct addresses.
+//
+// TODO(pag): This is very conservative. Can we make it less so by checking to
+//            see if there's a reference to the first byte of a segment that
+//            immediately follows another one, and if there's no such reference
+//            then treat them as part of different regions?
+//
+// TODO(pag): Read-only and read-write segments being in the same region.
+//
+// TODO(pag): Thread-local and global segments being in the same region.
+//
+// TODO(pag): Perhaps in the above cases, we can permit references to actually
+//            reference just beyond the end of a segment.
+static Region PartitionSegments(const NativeModule *cfg_module) {
+  Region groups;
+  groups.reserve(cfg_module->segments.size());
+
+  NativeSegment *last_seg = nullptr;
+  for (auto cfg_segment_entry : cfg_module->segments) {
+    auto cfg_seg = cfg_segment_entry.second;
+    if (last_seg && (last_seg->ea + last_seg->size) == cfg_seg->ea) {
+      auto &prev_group = groups[groups.size() - 1];
+      prev_group[cfg_seg->ea] = cfg_seg;
+    } else {
+      SegmentMap new_group;
+      new_group[cfg_seg->ea] = cfg_seg;
+      groups.push_back(new_group);
+    }
+    last_seg = cfg_seg;
+  }
+  return groups;
 }
 
 }  // namespace
 
 void AddDataSegments(const NativeModule *cfg_module) {
-  for (auto cfg_segment_entry : cfg_module->segments) {
-    DeclareDataSegment(cfg_segment_entry.second);
+
+  auto regions = PartitionSegments(cfg_module);
+  std::vector<llvm::GlobalVariable *> region_vars;
+
+  for (const auto &region : regions) {
+    region_vars.push_back(DeclareRegion(region));
   }
 
   DeclareVariables(cfg_module);
 
-  for (auto cfg_segment_entry : cfg_module->segments) {
-    FillDataSegment(cfg_segment_entry.second);
+  unsigned i = 0;
+  for (const auto &region : regions) {
+    FillRegion(region_vars[i++], region);
   }
 }
 

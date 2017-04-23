@@ -16,6 +16,16 @@ _ZSt25__throw_bad_function_callv 0 C N
 _1 5 C N
 _2 5 C N
 _3 5 C N
+
+DATA: edata PTR
+DATA: _edata PTR
+
+DATA: etext PTR
+DATA: _etext PTR
+
+DATA: end PTR
+DATA: _end PTR
+
 __assert_fail 4 C Y
 __cxa_atexit 5 C N
 __cxa_guard_acquire 5 C N

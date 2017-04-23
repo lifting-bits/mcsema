@@ -368,6 +368,7 @@ void OptimizeModule(void) {
   LOG(INFO)
       << "Optimizing module.";
   RemoveISELs(isels);
+  RunO3();
   if (FLAGS_lower_memops) {
     LowerMemOps();
     ReplaceBarrier("__remill_barrier_load_load");
@@ -377,7 +378,6 @@ void OptimizeModule(void) {
     ReplaceBarrier("__remill_barrier_atomic_begin");
     ReplaceBarrier("__remill_barrier_atomic_end");
   }
-  RunO3();
   RemoveIntrinsics();
   RemoveUndefFuncCalls();
 }

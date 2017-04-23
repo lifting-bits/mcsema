@@ -89,17 +89,12 @@ static std::string ExternalFuncName(const ExternalFunction &cfg_func) {
 // Find the segment containing the data at `ea`.
 static const NativeSegment *FindSegment(const NativeModule *module,
                                         uint64_t ea) {
-  auto seg_it = module->segments.lower_bound(ea);
-  while (seg_it != module->segments.end()) {
-    auto target_segment = seg_it->second;
-    auto seg_end = target_segment->ea + target_segment->size;
-    if (ea >= seg_end) {
-      return nullptr;
+  for (const auto &entry : module->segments) {
+    auto seg = entry.second;
+    auto seg_end = seg->ea + seg->size;
+    if (seg->ea <= ea && ea < seg_end) {
+      return seg;
     }
-    if (target_segment->ea <= ea && ea < seg_end) {
-      return target_segment;
-    }
-    ++seg_it;
   }
   return nullptr;
 }
@@ -174,11 +169,29 @@ static bool ResolveReference(NativeModule *module, NativeXref *xref) {
     }
   }
 
-  LOG(ERROR)
-      << "Data cross reference at " << std::hex << xref->ea
-      << " targeting " << xref->target_name << " at "
-      << std::hex << xref->target_ea << " does not match any known "
-      << "externals and is not containing within any data segments.";
+  if (xref->target_segment) {
+    LOG(WARNING)
+        << "Data cross reference at " << std::hex << xref->ea
+        << " in segment " << xref->segment->name
+        << " targeting " << xref->target_ea << " in segment "
+        << xref->target_segment->name << " has no name.";
+    return true;
+  }
+
+  if (xref->target_name.empty()) {
+    LOG(ERROR)
+        << "Data cross reference at " << std::hex << xref->ea
+        << " targeting " << std::hex << xref->target_ea
+        << " does not match any known externals and is not "
+        << "contained within any data segments.";
+
+  } else {
+    LOG(ERROR)
+        << "Data cross reference at " << std::hex << xref->ea
+        << " targeting " << xref->target_name << " at "
+        << std::hex << xref->target_ea << " does not match any known "
+        << "externals and is not contained within any data segments.";
+  }
   return false;
 }
 
@@ -227,14 +240,14 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   // nature of the xref?
   if (cfg_ref.target_type() == CodeReference_TargetType_CodeTarget) {
     LOG_IF(ERROR, nullptr == xref->func)
-        << "Code cross-reference to " << std::hex << xref->target_ea
-        << " from " << std::hex << inst->ea
+        << "Code cross-reference from " << std::hex << inst->ea
+        << " to " << std::hex << xref->target_ea
         << " is not actually a code cross-reference";
   } else {
     LOG_IF(ERROR, nullptr != xref->func)
-        << "Data cross-reference to " << std::hex << xref->target_ea
-        << " from " << std::hex << inst->ea
-        << " is actually a code cross-reference";
+        << "Data cross-reference from " << std::hex << inst->ea
+        << " to " << std::hex << xref->target_ea
+        << "is actually a code cross-reference";
   }
 
   // Does the CFG reference target location agree with the resolved
@@ -371,9 +384,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
       module->ea_to_var[var->ea] = var;
     }
 
-    // Note! These go in by the *end* of the segment, so that `std::lower_bound`
-    // works!
-    module->segments[segment->ea + segment->size] = segment;
+    module->segments[segment->ea] = segment;
 
     LOG(INFO)
         << "Added segment " << segment->name << " [" << std::hex << segment->ea
@@ -439,7 +450,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
 
     CHECK(!module->ea_to_func.count(var->ea))
         << "Internal function at " << std::hex << var->ea
-        << " is also the external variable " << var->name;
+        << " has the same name as the external variable " << var->name;
 
     // Look for two extern variables with the same name.
     auto extern_var_it = module->name_to_extern_var.find(var->name);
@@ -509,7 +520,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
 
     LOG_IF(ERROR, module->ea_to_var.count(func->ea))
         << "Internal variable at " << std::hex << func->ea
-        << " is also the external function " << func->name;
+        << " has the same name as the external function " << func->name;
 
     LOG(INFO)
         << "Found external function " << func->name << " via "
@@ -591,8 +602,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
   // Fill in the cross-reference entries for each segment.
   for (const auto &cfg_segment : cfg.segments()) {
     auto ea = static_cast<uint64_t>(cfg_segment.ea());
-    auto seg_end_ea = ea + cfg_segment.data().size();
-    auto segment = module->segments[seg_end_ea];
+    auto segment = module->segments[ea];
 
     std::map<uint64_t, const NativeXref *> xrefs;
     for (const auto &cfg_xref : cfg_segment.xrefs()) {
@@ -615,11 +625,11 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
   // Fill in the blob data entries for each segment.
   for (const auto &cfg_segment : cfg.segments()) {
     auto ea = static_cast<uint64_t>(cfg_segment.ea());
-    auto seg_end_ea = ea + cfg_segment.data().size();
-    auto segment = module->segments[seg_end_ea];
+    auto segment = module->segments[ea];
     std::vector<NativeSegment::Entry> blobs;
 
     // Sentinel.
+    auto seg_end_ea = ea + segment->size;
     segment->entries[seg_end_ea] = {seg_end_ea, seg_end_ea, nullptr, nullptr};
 
     for (const auto &xref_entry : segment->entries) {

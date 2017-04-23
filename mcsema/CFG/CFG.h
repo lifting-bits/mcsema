@@ -143,14 +143,14 @@ struct NativeSegment : public NativeObject {
   std::map<uint64_t, Entry> entries;
 };
 
+using SegmentMap = std::map<uint64_t, NativeSegment *>;
+
 struct NativeModule {
  public:
   std::unordered_set<uint64_t> exported_vars;
   std::unordered_set<uint64_t> exported_funcs;
 
-  // List of segments, keyed by the *ending* address of the segment, which
-  // permits lower bound queries to work to find things inside of the segment.
-  std::map<uint64_t, NativeSegment *> segments;
+  SegmentMap segments;
 
   std::unordered_map<uint64_t, const NativeFunction *> ea_to_func;
 
