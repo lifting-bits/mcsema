@@ -69,12 +69,6 @@ if (NOT WIN32)
     set(CMAKE_CXX_STANDARD 11)
 endif ()
 
-# protobuf
-find_package(Protobuf REQUIRED)
-list(APPEND PROJECT_LIBRARIES ${Protobuf_LIBRARIES})
-list(APPEND PROJECT_INCLUDEDIRECTORIES ${Protobuf_INCLUDE_DIR})
-list(APPEND PROJECT_DEFINITIONS "GOOGLE_PROTOBUF_NO_RTTI")
-
 # warnings and compiler settings
 set(PROJECT_CXXWARNINGS "-Wall -Wextra -Werror -Wconversion -pedantic -Wno-unused-parameter -Wno-c++98-compat -Wno-unreachable-code-return -Wno-nested-anon-types -Wno-extended-offsetof -Wno-gnu-anonymous-struct -Wno-gnu-designator -Wno-variadic-macros -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-statement-expression -Wno-return-type-c-linkage -Wno-c99-extensions -Wno-ignored-attributes -Wno-unused-local-typedef")
 set(PROJECT_CXXFLAGS "${PROJECT_CXXFLAGS} -Wno-unknown-warning-option ${PROJECT_CXXWARNINGS} -fPIC -fno-omit-frame-pointer -fvisibility-inlines-hidden -fno-exceptions -fno-asynchronous-unwind-tables -fno-rtti")
@@ -173,3 +167,6 @@ target_compile_definitions(mcsema-lift PUBLIC ${PROJECT_DEFINITIONS})
 set_target_properties(mcsema-lift PROPERTIES COMPILE_FLAGS ${PROJECT_CXXFLAGS})
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mcsema/Arch/X86/Runtime)
+
+install(CODE
+    "execute_process(COMMAND python ${PROJECT_SOURCE_DIR}/tools/setup.py install -f --prefix=${CMAKE_INSTALL_PREFIX})")
