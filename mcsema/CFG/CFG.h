@@ -232,6 +232,7 @@ class NativeBlock {
 
  public:
   explicit NativeBlock(VA);
+  ~NativeBlock();
   void add_inst(NativeInstPtr);
   VA get_base(void);
   void add_follow(VA f);
@@ -253,6 +254,8 @@ class NativeFunction {
   NativeFunction(VA b, const std::string &sym)
       : funcEntryVA(b),
         funcSymName(sym) {}
+
+  ~NativeFunction();
 
   void add_block(NativeBlockPtr);
 
@@ -357,6 +360,7 @@ class NativeModule {
   NativeModule(const std::string &module_name_,
                const std::unordered_map<VA, NativeFunctionPtr> &funcs_,
                const std::string &triple_);
+  ~NativeModule();
 
   void add_func(NativeFunctionPtr f);
   const std::unordered_map<VA, NativeFunctionPtr> &get_funcs(void) const;
