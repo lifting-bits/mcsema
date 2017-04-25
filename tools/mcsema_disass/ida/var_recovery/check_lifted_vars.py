@@ -7,7 +7,7 @@ from llvmcpy.llvm import *
 
 import mcsema_disass.ida.CFG_pb2 as CFG_pb2
 
-# take global name, ir module
+# take global, ir module
 # return dict:
 #   "global" : g_ir
 #   "uses" : []
@@ -50,11 +50,41 @@ def check_lifted_globals(cfg, ir):
 
   return
 
+# take variable, fn containing variable, ir module
+# return dict:
+#   "stackvar" : v_ir (defining var)
+#   "uses" : []
+def get_lifted_stackvar_in_bc(v_cfg, fn_cfg, ir):
+  v_uses = {}
+  fn_ir = None
+
+  # find relevant function in ir 
+  for f in ir.iter_functions():
+    if f.get_name() == fn_cfg.symbol_name and fn_cfg.symbol_name != "main":
+      fn_ir = f
+    # entry_address comparison check to ID functions
+    if hex(fn_cfg.entry_address)[2:-1] in f.get_name():
+      fn_ir = f
+
+  # function not found
+  if not fn_ir:
+    return v_uses
+
+  for bb in fn_ir.iter_basic_blocks():
+    for i in bb.iter_instructions():
+      if v_cfg.var.name in i.get_name():
+        print "found var " + i.get_name() + " in " + fn_ir.get_name()
+        v_uses["stackvar"] = i 
+        v_uses["uses"] = []
+  
+  return v_uses
+
+
 # TODO
 def check_lifted_stackvars(cfg, ir):
-  #for f in cfg.internal_funcs:
-  #  for v in f.stackvars:
-  #    print v.var.name
+  for f in cfg.internal_funcs:
+    for v in f.stackvars:
+      get_lifted_stackvar_in_bc(v, f, ir)
 
   #for f in ir.iter_functions():
   #  for bb in f.iter_basic_blocks():
@@ -64,7 +94,7 @@ def check_lifted_stackvars(cfg, ir):
   return
 
 def check_lifted_vars(cfg, ir):
-  check_lifted_globals(cfg, ir)
+  #check_lifted_globals(cfg, ir)
   check_lifted_stackvars(cfg, ir)
   return
 
