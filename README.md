@@ -170,7 +170,7 @@ clang-3.8 -o /tmp/ls_lifted generated/ELF_64_linux.S /tmp/ls.bc -lpthread -ldl -
 
 ## Getting help
 
-If you are experiencing problems with McSema or just want to learn more and contribute, join the `#mcsema` channel of the [Empire Hacking Slack](https://empireslacking.herokuapp.com/). Alternatively, you can join our mailing list at [mcsema-dev@googlegroups.com](https://groups.google.com/forum/?hl=en#!forum/mcsema-dev) or email us privately at mcsema@trailofbits.com.
+If you are experiencing problems with McSema or just want to learn more and contribute, join the `#binary-lifting` channel of the [Empire Hacking Slack](https://empireslacking.herokuapp.com/). Alternatively, you can join our mailing list at [mcsema-dev@googlegroups.com](https://groups.google.com/forum/?hl=en#!forum/mcsema-dev) or email us privately at mcsema@trailofbits.com.
 
 ## FAQ
 
