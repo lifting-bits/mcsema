@@ -38,8 +38,12 @@ Why would anyone translate binaries *back* to bitcode?
 | Name | Version | 
 | ---- | ------- |
 | [Git](https://git-scm.com/) | Latest |
-| [CMake](https://cmake.org/) | 2.8+ |
+| [CMake](https://cmake.org/) | 3.2+ |
 | [Google Protobuf](https://github.com/google/protobuf) | 2.6.1 |
+| [Google Flags](https://github.com/google/glog) | Latest |
+| [Google Log](https://github.com/google/glog) | Latest |
+| [Google Test](https://github.com/google/googletest) | Latest |
+| [Intel XED](https://github.com/intelxed/xed) | Latest |
 | [LLVM](http://llvm.org/) | 3.5+ |
 | [Clang](http://clang.llvm.org/) | 3.5+ (3.9 if using Visual Studio 2015) |
 | [Python](https://www.python.org/) | 2.7 | 
@@ -69,6 +73,8 @@ sudo pip install --upgrade pip
 sudo pip install 'protobuf==2.6.1'
 ```
 
+##### Fixing IDA Pro's Python installation (Ubuntu 14.04)
+
 Note: If you are using IDA on 64 bit Ubuntu and your IDA install does not use the system Python, you can add the `protobuf` library manually to IDA's zip of modules.
 
 ```
@@ -79,43 +85,58 @@ sudo zip -rv /path/to/ida-6.X/python/lib/python27.zip google/
 sudo chown your_user:your_user /home/taxicat/ida-6.7/python/lib/python27.zip
 ```
 
-#### Step 2: Clone the repository
+##### Upgrade CMake (Ubuntu 14.04)
 
-The first step is to recursively clone the [Remill](https://github.com/trailofbits/remill) repository. This will pull in McSema and other needed dependencies.
+Users wishing to run McSema on Ubuntu 14.04 should upgrade their version of CMake.
 
 ```shell
-git clone --depth 1 --recursive https://github.com/trailofbits/remill.git
-cd remill
+sudo add-apt-repository -y ppa:george-edison55/cmake-3.x
+sudo apt-get update
+sudo apt-get upgrade
+sudo apt-get install cmake
 ```
 
-#### Step 3: Build the dependencies
+#### Step 2: Clone the repository
 
-Several Trail of Bits projects depend on a common subset of C and C++ codebases. We've organized these dependencies into the [cxx-common](https://github.com/trailofbits/cxx-common) repository. This repository is included as part of the above `git clone`.
+The next step is to clone the [Remill](https://github.com/trailofbits/remill) repository. We then clone the McSema repository into the `tools` subdirectory of Remill. This is kind of like how Clang and LLVM are distributed separately, and the Clang source code needs to be put into LLVM's tools directory.
 
 ```shell
+git clone --depth 1 https://github.com/trailofbits/remill.git
+pushd remill/tools
+git clone --depth 1 https://github.com/trailofbits/mcsema.git
+popd
+```
+
+#### Step 3: Get and build the dependencies
+
+Several Trail of Bits projects depend on a common subset of C and C++ codebases. We've organized these dependencies into the [cxx-common](https://github.com/trailofbits/cxx-common) repository. 
+
+```
+git clone --depth 1 https://github.com/trailofbits/cxx-common.git
 mkdir remill-build
 cd remill-build
 
-../remill/cxx-common/build.sh --template everything `pwd`/libraries
+../cxx-common/build.sh --template everything `pwd`/libraries
 ```
+
+**Note:** This will build all of the dependencies needed by Remill and McSema. This includes Intel XED, Google Protocol Buffers, Google Log, Google Flags, and Google Test.
+
+If you are using Ubuntu 16.04 and want to skip this step, then download and extract `libraries` from one of the following URLs. McSema works across several versions of LLVM. This makes integrating into third-party projects using older LLVM versions (e.g. KLEE) easier.
+
+| OS | LLVM | Download URL |
+|----|--------------|--------------|
+| Ubuntu 16.04 | 4.0 | https://s3.amazonaws.com/cxx-common/libraries-llvm40-ubuntu160402.tar.gz |
+| Ubuntu 16.04 | 3.9 | https://s3.amazonaws.com/cxx-common/libraries-llvm39-ubuntu160402.tar.gz |
+| Ubuntu 16.04 | 3.8 | https://s3.amazonaws.com/cxx-common/libraries-llvm38-ubuntu160402.tar.gz |
+| Ubuntu 16.04 | 3.7 | https://s3.amazonaws.com/cxx-common/libraries-llvm37-ubuntu160402.tar.gz |
+| Ubuntu 16.04 | 3.6 | https://s3.amazonaws.com/cxx-common/libraries-llvm36-ubuntu160402.tar.gz |
+| Ubuntu 16.04 | 3.5 | https://s3.amazonaws.com/cxx-common/libraries-llvm36-ubuntu160402.tar.gz |
 
 **Note:** This will build McSema using the LLVM 3.9 toolchain. If you want to use McSema with other versions of the LLVM toolchain, then manually specify targets to the `cxx-common/build.sh` script. For example, to build LLVM and Clang 3.5, do the following:
-
-```shell
-../remill/cxx-common/build.sh --targets xed,llvm35,gflags,gtest,protobuf,glog,clang `pwd`/libraries
-```
-
-**Note:** You can omit some of the targets if you already have those installed as system packages. Building all of the dependencies in this way is the most stable approach. For example:
-
-```shell
-../remill/cxx-common/build.sh --targets xed,gflags,gtest,protobuf,glog `pwd`/libraries
-```
 
 #### Step 4: Build and install the code
 
 The next step is to build the code. McSema (and Remill) must be built using the Clang compiler.
-
-TODO TODO TODO talk about specifying the compiler correctly
 
 ```shell
 export TRAILOFBITS_LIBRARIES=`pwd`/libraries/
@@ -131,61 +152,12 @@ export LLVM_INSTALL_PREFIX=/path/to/llvm/install/dir
 
 ### On Windows
 
-#### Step 1: Install dependencies
-
-Download and install [Chocolatey](https://chocolatey.org/install). Then, open Powershell in *administrator* mode, and run the following:
-
-```shell
-choco install -y --allowemptychecksum git cmake python2 pip 7zip
-choco install -y microsoft-visual-cpp-build-tools --installargs "/InstallSelectableItems Win81SDK_CppBuildSKUV1;Win10SDK_VisibleV1"
-```
-
-Mcsema should be built with clang. Newer versions of clang for Windows automatically integrate with Visual Studio. The mcsema build scripts rely on this integration. The minimum version of clang required is [Clang 3.8](http://releases.llvm.org/download.html#3.8.1) (when using VS 2013) or [Clang 3.9](http://releases.llvm.org/download.html#3.9.1) (when using VS 2015).
-
-Sometimes `cmake` will not be available on the command line after being installed from Chocolatey. If you have this issue, install `cmake` from the [official Windows installer](https://cmake.org/download/).
-
-#### Step 2: Clone the repository
-
-Open the Developer Command Prompt for Visual Studio, and run:
-
-```shell
-cd C:\
-if not exist git mkdir git
-cd git
-
-git clone https://github.com/trailofbits/mcsema.git --depth 1
-```
-
-#### Step 3: Build and install the code
-
-```shell
-cd mcsema
-bootstrap
-```
-
-## Try it Out
-
-If you have a binary, you can get started with the following commands. First, you recover control flow graph information using `mcsema-disass`. For now, this needs to use IDA Pro as the disassembler.
-
-```shell
-mcsema-disass --disassembler /path/to/ida/idal64 --arch amd64 --os linux --output /tmp/ls.cfg --binary /bin/ls --entrypoint main
-```
-
-Once you have the control flow graph information, you can lift the target binary using `mcsema-lift`.
-
-```shell
-mcsema-lift --arch amd64 --os linux --cfg /tmp/ls.cfg --entrypoint main --output /tmp/ls.bc
-```
-
-There are a few things that we can do with the lifted bitcode. The usual thing to do is to recompile it back to an executable.
-```shell
-clang-3.8 -o /tmp/ls_lifted generated/ELF_64_linux.S /tmp/ls.bc -lpthread -ldl -lpcre /lib/x86_64-linux-gnu/libselinux.so.1
-```
+TODO TODO
 
 ## Additional Documentation
 
 - [Common Errors](docs/CommonErrors.md) and [Debugging Tips](docs/DebuggingTips.md)
-- [How to implement the semantics of an instruction](docs/AddAnInstruction.md)
+- [How to implement the semantics of an instruction](https://github.com/trailofbits/remill/blob/master/docs/ADD_AN_INSTRUCTION.md)
 - [How to use mcsema: A walkthrough](docs/McsemaWalkthrough.md)
 - [Life of an instruction](docs/LifeOfAnInstruction.md)
 - [Limitations](docs/Limitations.md)
@@ -194,7 +166,7 @@ clang-3.8 -o /tmp/ls_lifted generated/ELF_64_linux.S /tmp/ls.bc -lpthread -ldl -
 
 ## Getting help
 
-If you are experiencing problems with McSema or just want to learn more and contribute, join the `#tool-mcsema` channel of the [Empire Hacking Slack](https://empireslacking.herokuapp.com/). Alternatively, you can join our mailing list at [mcsema-dev@googlegroups.com](https://groups.google.com/forum/?hl=en#!forum/mcsema-dev) or email us privately at mcsema@trailofbits.com.
+If you are experiencing problems with McSema or just want to learn more and contribute, join the `#binary-lifting` channel of the [Empire Hacking Slack](https://empireslacking.herokuapp.com/). Alternatively, you can join our mailing list at [mcsema-dev@googlegroups.com](https://groups.google.com/forum/?hl=en#!forum/mcsema-dev) or email us privately at mcsema@trailofbits.com.
 
 ## FAQ
 
