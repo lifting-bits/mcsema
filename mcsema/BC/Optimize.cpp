@@ -55,6 +55,8 @@ DEFINE_bool(lower_memops, true, "Controls whether or not Remill's memory "
                                 "access intrinsics are lowered to LLVM "
                                 "loads and stores.");
 
+DEFINE_bool(disable_optimizer, false, "Should optimizations be disabled?");
+
 namespace mcsema {
 namespace {
 
@@ -145,7 +147,8 @@ static void RunO3(void) {
 
   auto TLI = new llvm::TargetLibraryInfoImpl(
       llvm::Triple(gModule->getTargetTriple()));
-  TLI->disableAllFunctions();
+
+  TLI->disableAllFunctions();  // `-fno-builtin`.
 
   llvm::PassManagerBuilder builder;
   builder.OptLevel = 3;
@@ -154,8 +157,8 @@ static void RunO3(void) {
   builder.LibraryInfo = TLI;  // Deleted by `llvm::~PassManagerBuilder`.
   builder.DisableUnrollLoops = false;  // Unroll loops!
   builder.DisableUnitAtATime = false;
-  builder.SLPVectorize = true;
-  builder.LoopVectorize = true;
+  builder.SLPVectorize = false;
+  builder.LoopVectorize = false;
 
 #if LLVM_VERSION_NUMBER >= LLVM_VERSION(3, 5)
   builder.DisableTailCalls = false;  // Enable tail calls.
@@ -278,6 +281,10 @@ static void ReplaceBarrier(const char *name) {
 // Lower a memory read intrinsic into a `load` instruction.
 static void ReplaceMemReadOp(const char *name, llvm::Type *val_type) {
   auto func = gModule->getFunction(name);
+  if (!func) {
+    return;
+  }
+
   CHECK(func->isDeclaration())
       << "Cannot lower already implemented memory intrinsic " << name;
 
@@ -298,6 +305,10 @@ static void ReplaceMemReadOp(const char *name, llvm::Type *val_type) {
 // Lower a memory write intrinsic into a `store` instruction.
 static void ReplaceMemWriteOp(const char *name, llvm::Type *val_type) {
   auto func = gModule->getFunction(name);
+  if (!func) {
+    return;
+  }
+
   CHECK(func->isDeclaration())
       << "Cannot lower already implemented memory intrinsic " << name;
 
@@ -368,7 +379,12 @@ void OptimizeModule(void) {
   LOG(INFO)
       << "Optimizing module.";
   RemoveISELs(isels);
-  RunO3();
+
+  if (!FLAGS_disable_optimizer) {
+    RunO3();
+  }
+
+  RemoveIntrinsics();
   if (FLAGS_lower_memops) {
     LowerMemOps();
     ReplaceBarrier("__remill_barrier_load_load");
@@ -378,7 +394,6 @@ void OptimizeModule(void) {
     ReplaceBarrier("__remill_barrier_atomic_begin");
     ReplaceBarrier("__remill_barrier_atomic_end");
   }
-  RemoveIntrinsics();
   RemoveUndefFuncCalls();
 }
 

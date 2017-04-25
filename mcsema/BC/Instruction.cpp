@@ -33,6 +33,7 @@
 
 #include "mcsema/Arch/Arch.h"
 
+#include "mcsema/BC/Callback.h"
 #include "mcsema/BC/Instruction.h"
 #include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Util.h"
@@ -78,7 +79,10 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
     auto cfg_func = cfg_xref->func;
     const auto &func_name = cfg_func->lifted_name;
     llvm::GlobalObject *func = gModule->getFunction(func_name);
-    if (!func) {
+    if (func) {
+      func = GetEntryPoint(reinterpret_cast<const NativeFunction *>(cfg_func),
+                         llvm::dyn_cast<llvm::Function>(func));
+    } else {
       func = gModule->getNamedGlobal(func_name);
       LOG_IF(ERROR, func != nullptr)
           << "Function pointer to " << std::hex << cfg_func->ea
@@ -97,15 +101,17 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
     auto cfg_var = cfg_xref->var;
     const auto &global_name = cfg_var->lifted_name;
     llvm::GlobalObject *global = gModule->getNamedGlobal(global_name);
-    if (!global) {
-      global = gModule->getFunction(global_name);
-      LOG_IF(ERROR,
-             global &&
-             !llvm::GlobalValue::isExternalWeakLinkage(global->getLinkage()))
+    if (!global && (global = gModule->getFunction(global_name))) {
+      auto is_weak = llvm::GlobalValue::isExternalWeakLinkage(
+          global->getLinkage());
+      LOG_IF(ERROR, !is_weak)
           << "Data pointer to " << std::hex << cfg_var->ea
           << " with symbol " << global_name
           << " was resolved to a subroutine from " << std::hex << instr->pc
           << ". There is probably an error in the CFG script.";
+
+      global = GetEntryPoint(reinterpret_cast<const NativeFunction *>(cfg_var),
+                           llvm::dyn_cast<llvm::Function>(global));
     }
 
     CHECK(global != nullptr)

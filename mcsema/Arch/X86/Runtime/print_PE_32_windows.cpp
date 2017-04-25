@@ -84,14 +84,14 @@ int main(void) {
 
   ///////////////////////////////////////////////////////////////
   //
-  //         __mcsema_attach_call_cdecl
+  //         __mcsema_attach_call
   //
   ///////////////////////////////////////////////////////////////
 
-  // Implements `__mcsema_attach_call_cdecl`. This goes from native state into lifted code.
+  // Implements `__mcsema_attach_call`. This goes from native state into lifted code.
   // The lifted code function pointer is already on the stack.
-  fprintf(out, "  .globl __mcsema_attach_call_cdecl\n");
-  fprintf(out, "__mcsema_attach_call_cdecl:\n");
+  fprintf(out, "  .globl __mcsema_attach_call\n");
+  fprintf(out, "__mcsema_attach_call:\n");
   fprintf(out, "  .cfi_startproc\n");
 
   //*** assume we can clobber eax

@@ -76,20 +76,20 @@ int main(void) {
   fprintf(out, "\n");
 
   // Forward declarations.
-  fprintf(out, "  .globl __mcsema_detach_ret_cdecl\n");
+  fprintf(out, "  .globl __mcsema_detach_ret\n");
   fprintf(out, "\n");
 
   ///////////////////////////////////////////////////////////////
   //
-  //         __mcsema_attach_call_cdecl
+  //         __mcsema_attach_call
   //
   ///////////////////////////////////////////////////////////////
 
-  // Implements `__mcsema_attach_call_cdecl`. This goes from native state into lifted code.
+  // Implements `__mcsema_attach_call`. This goes from native state into lifted code.
   // The lifted code function pointer is already on the stack.
-  fprintf(out, "  .globl __mcsema_attach_call_cdecl\n");
-  fprintf(out, "  .type __mcsema_attach_call_cdecl,@function\n");
-  fprintf(out, "__mcsema_attach_call_cdecl:\n");
+  fprintf(out, "  .globl __mcsema_attach_call\n");
+  fprintf(out, "  .type __mcsema_attach_call,@function\n");
+  fprintf(out, "__mcsema_attach_call:\n");
   fprintf(out, "  .cfi_startproc\n");
 
   // Pop the target function into the `State` structure. This resets `ESP`
@@ -133,34 +133,34 @@ int main(void) {
   //    1) Set up a return address on the mcsema stack.
   //    2) Tail-call to the lifted function.
   //
-  // Note:  When the lifted function returns, it will go to `__mcsema_detach_ret_cdecl`,
+  // Note:  When the lifted function returns, it will go to `__mcsema_detach_ret`,
   //        which will return to native code.
   //
 
-  // do not push __mcsema_detach_ret_cdecl directly
+  // do not push __mcsema_detach_ret directly
   // to work around llvm assembler bug that emits it
   // as a 16-bit push
-  fprintf(out, "  lea eax, __mcsema_detach_ret_cdecl\n");
+  fprintf(out, "  lea eax, __mcsema_detach_ret\n");
   fprintf(out, "  push eax\n");
   fprintf(out, "  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, EIP));
 
   fprintf(out, ".Lfunc_end1:\n");
-  fprintf(out, "  .size __mcsema_attach_call_cdecl,.Lfunc_end1-__mcsema_attach_call_cdecl\n");
+  fprintf(out, "  .size __mcsema_attach_call,.Lfunc_end1-__mcsema_attach_call\n");
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 
 
   ///////////////////////////////////////////////////////////////
   //
-  //         __mcsema_attach_ret_cdecl
+  //         __mcsema_attach_ret
   //
   ///////////////////////////////////////////////////////////////
 
 
-  // Implements `__mcsema_attach_ret_cdecl`. This goes from native state into lifted code.
-  fprintf(out, "  .globl __mcsema_attach_ret_cdecl\n");
-  fprintf(out, "  .type __mcsema_attach_ret_cdecl,@function\n");
-  fprintf(out, "__mcsema_attach_ret_cdecl:\n");
+  // Implements `__mcsema_attach_ret`. This goes from native state into lifted code.
+  fprintf(out, "  .globl __mcsema_attach_ret\n");
+  fprintf(out, "  .type __mcsema_attach_ret,@function\n");
+  fprintf(out, "__mcsema_attach_ret:\n");
   fprintf(out, "  .cfi_startproc\n");
 
   // this should be valid for cdecl:
@@ -193,7 +193,7 @@ int main(void) {
   fprintf(out, "  ret\n");
 
   fprintf(out, ".Lfunc_end2:\n");
-  fprintf(out, "  .size __mcsema_attach_ret_cdecl,.Lfunc_end2-__mcsema_attach_ret_cdecl\n");
+  fprintf(out, "  .size __mcsema_attach_ret,.Lfunc_end2-__mcsema_attach_ret\n");
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 
@@ -261,16 +261,16 @@ int main(void) {
 
   ///////////////////////////////////////////////////////////////
   //
-  //         __mcsema_dettach_ret_cdecl
+  //         __mcsema_dettach_ret
   //
   ///////////////////////////////////////////////////////////////
 
-  // Implements `__mcsema_detach_ret_cdecl`. This goes from lifted code into native code.
+  // Implements `__mcsema_detach_ret`. This goes from lifted code into native code.
   // The native code pointer is located at the native `[State::ESP - 4]`
   // address.
-  fprintf(out, "  .globl __mcsema_detach_ret_cdecl\n");
-  fprintf(out, "  .type __mcsema_detach_ret_cdecl,@function\n");
-  fprintf(out, "__mcsema_detach_ret_cdecl:\n");
+  fprintf(out, "  .globl __mcsema_detach_ret\n");
+  fprintf(out, "  .type __mcsema_detach_ret,@function\n");
+  fprintf(out, "__mcsema_detach_ret:\n");
   fprintf(out, "  .cfi_startproc\n");
 
   // General purpose registers.
@@ -300,7 +300,7 @@ int main(void) {
   fprintf(out, "  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, EIP));
 
   fprintf(out, ".Lfunc_end3:\n");
-  fprintf(out, "  .size __mcsema_detach_ret_cdecl,.Lfunc_end3-__mcsema_detach_ret_cdecl\n");
+  fprintf(out, "  .size __mcsema_detach_ret,.Lfunc_end3-__mcsema_detach_ret\n");
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 
@@ -367,10 +367,10 @@ int main(void) {
   fprintf(out, "  pop esi\n");
 
   // Set up a re-attach return address.
-  // do not push __mcsema_attach_ret_cdecl directly
+  // do not push __mcsema_attach_ret directly
   // to work around llvm assembler bug that emits it
   // as a 16-bit push
-  fprintf(out, "  lea eax, __mcsema_attach_ret_cdecl\n");
+  fprintf(out, "  lea eax, __mcsema_attach_ret\n");
   fprintf(out, "  push eax\n");
 
   fprintf(out, "  jmp DWORD PTR gs:[__mcsema_reg_state@NTPOFF + %u]\n", __builtin_offsetof(State, EIP));
@@ -387,7 +387,7 @@ int main(void) {
   ///////////////////////////////////////////////////////////////
 
   // Implements `__mcsema_detach_call_value`. This is a thin wrapper around
-  // `__mcsema_detach_call`.
+  // `__mcsema_detach_call_cdecl`.
   fprintf(out, "  .globl __mcsema_detach_call_value\n");
   fprintf(out, "  .type __mcsema_detach_call_value,@function\n");
   fprintf(out, "__mcsema_detach_call_value:\n");

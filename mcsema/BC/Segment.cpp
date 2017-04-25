@@ -168,7 +168,7 @@ static llvm::GlobalVariable *DeclareRegion(const SegmentMap &segments) {
     auto region_base = llvm::ConstantExpr::getPtrToInt(region, intptr_type);
     auto addr = llvm::ConstantExpr::getAdd(region_base, disp);
     auto ptr = llvm::ConstantExpr::getIntToPtr(addr, seg_type);
-
+    ptr->dump();
     (void) new llvm::GlobalVariable(
         *gModule, seg_type, true  /* IsConstant */,
         llvm::GlobalVariable::InternalLinkage,
@@ -270,6 +270,11 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg) {
       auto val_type = llvm::Type::getIntNTy(*gContext, val_size);
       auto xref = entry.xref;
       llvm::Constant *val = nullptr;
+
+      CHECK(val_size <= gArch->address_size)
+          << "Cross-reference at " << std::hex
+          << xref->ea << " to " << std::hex << xref->target_ea
+          << " is too wide at " << entry.xref->width << " bytes";
 
       CHECK(val_type == entry_type)
           << entry.xref->width << "-byte cross-reference at " << std::hex

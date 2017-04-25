@@ -47,6 +47,7 @@
 #include "remill/BC/Lifter.h"
 
 #include "mcsema/Arch/Arch.h"
+#include "mcsema/BC/Callback.h"
 #include "mcsema/BC/External.h"
 #include "mcsema/BC/Function.h"
 #include "mcsema/BC/Lift.h"
@@ -316,6 +317,39 @@ namespace {
 ////    }
 //  }
 //}
+
+// Add entrypoint functions for any exported functions.
+static void ExportFunction(const NativeModule *cfg_module) {
+  for (auto ea : cfg_module->exported_funcs) {
+    auto cfg_func = cfg_module->ea_to_func.at(ea)->Get();
+    auto func = gModule->getFunction(cfg_func->lifted_name);
+    CHECK(func != nullptr)
+        << "Cannot find lifted version of exported function "
+        << cfg_func->lifted_name;
+
+    LOG(INFO)
+        << "Exporting function " << cfg_func->name;
+    auto ep = GetEntryPoint(cfg_func, func);
+    ep->setLinkage(llvm::GlobalValue::ExternalLinkage);
+    ep->setVisibility(llvm::GlobalValue::DefaultVisibility);
+  }
+}
+
+// Export any variables that should be externally visible. This will rename
+// the lifted variable names to have their original names.
+static void ExportVariables(const NativeModule *cfg_module) {
+  for (auto ea : cfg_module->exported_vars) {
+    auto cfg_var = cfg_module->ea_to_var.at(ea)->Get();
+    auto var = gModule->getNamedGlobal(cfg_var->lifted_name);
+    CHECK(var != nullptr)
+        << "Cannot find lifted version of exported variable "
+        << cfg_var->name;
+
+    var->setName(cfg_var->name);
+    var->setLinkage(llvm::GlobalValue::ExternalLinkage);
+  }
+}
+
 }  // namespace
 
 bool LiftCodeIntoModule(const NativeModule *cfg_module) {
@@ -328,10 +362,12 @@ bool LiftCodeIntoModule(const NativeModule *cfg_module) {
 
   if (!DefineLiftedFunctions(cfg_module)) {
     return false;
-  } else {
-    OptimizeModule();
-    return true;
   }
+
+  ExportFunction(cfg_module);
+  ExportVariables(cfg_module);
+  OptimizeModule();
+  return true;
 }
 
 }  // namespace mcsema

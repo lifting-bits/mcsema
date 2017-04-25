@@ -144,6 +144,7 @@ add_executable(mcsema-lift
 
     mcsema/Arch/Arch.cpp
     mcsema/CFG/CFG.cpp
+    mcsema/BC/Callback.cpp
     mcsema/BC/External.cpp
     mcsema/BC/Function.cpp
     mcsema/BC/Instruction.cpp

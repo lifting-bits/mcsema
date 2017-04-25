@@ -29,6 +29,8 @@
 #include <CFG.pb.h>
 #pragma clang diagnostic pop
 
+#include "remill/Arch/Arch.h"
+
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/CFG/CFG.h"
 
@@ -205,6 +207,7 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
                     const CodeReference &cfg_ref) {
   auto xref = new NativeXref;
   xref->ea = inst->ea;
+  xref->width = gArch->address_size / 8;
   xref->segment = FindSegment(module, xref->ea);
   xref->target_ea = static_cast<uint64_t>(cfg_ref.address());
   xref->target_segment = FindSegment(module, xref->target_ea);
@@ -613,6 +616,12 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
       xref->target_ea = static_cast<uint64_t>(cfg_xref.target_ea());
       xref->target_name = cfg_xref.target_name();
       xref->target_segment = FindSegment(module, xref->target_ea);
+
+      CHECK(xref->width <= (gArch->address_size / 8))
+          << "Cross reference at " << std::hex << xref->ea << " to "
+          << xref->target_name << " at " << std::hex << xref->target_ea
+          << " is too wide at " << xref->width << " bytes";
+
       if (!ResolveReference(module, xref)) {
         delete xref;
         continue;
