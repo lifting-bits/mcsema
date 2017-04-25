@@ -656,10 +656,10 @@ static llvm::Value *EXT16_AND_SHL(llvm::BasicBlock *&b, MCSemaRegs reg, int shif
   val = new llvm::ZExtInst(val, int16ty, "", b);
   val = llvm::BinaryOperator::Create(
       llvm::Instruction::And, val,
-      llvm::ConstantInt::get(int16ty, mask), "", b);
+      llvm::ConstantInt::get(val->getType(), mask), "", b);
   val = llvm::BinaryOperator::Create(
       llvm::Instruction::Shl, val,
-      llvm::ConstantInt::get(int16ty, shift), "", b);
+      llvm::ConstantInt::get(val->getType(), shift), "", b);
   return val;
 }
 
