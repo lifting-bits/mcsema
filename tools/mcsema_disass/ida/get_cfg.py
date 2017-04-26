@@ -2088,8 +2088,14 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
           var = M.global_vars.add()
           var.address = global_var_data[g]["offset"]
           var.var.name = g
-          var.var.size = 0 # TODO
-          var.var.ida_type = "" # TODO
+          var.var.size = {
+              'dt_byte':1,
+              'dt_word':2,
+              'dt_dword':4,
+              'dt_float':4,
+              'dt_double':8,
+              'dt_qword':8}.get(global_var_data[g]["type"], 0)
+          var.var.ida_type = global_var_data[g]["type"] # TODO: IDA agnostic type
           for i in global_var_data[g]["writes"]: # reads vs writes? do we care?
             r = var.var.ref_eas.add()
             r.inst_addr = i

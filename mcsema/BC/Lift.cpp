@@ -497,9 +497,29 @@ void RenameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
   }
 }
 
+
+static llvm::PointerType* llvmTypeFromCFGTypeStr(const std::string &cfg_type_str, llvm::LLVMContext &context) {
+	/*
+              'dt_byte':1,
+              'dt_word':2,
+              'dt_dword':4,
+              'dt_float':4,
+              'dt_double':8,
+              'dt_qword':8"
+	*/
+	if (cfg_type_str.compare("dt_byte") == 0) return llvm::Type::getInt8PtrTy(context);
+	if (cfg_type_str.compare("dt_word") == 0) return llvm::Type::getInt16PtrTy(context);
+	if (cfg_type_str.compare("dt_dword") == 0) return llvm::Type::getInt32PtrTy(context);
+	if (cfg_type_str.compare("dt_qword") == 0) return llvm::Type::getInt64PtrTy(context);
+	if (cfg_type_str.compare("dt_float") == 0) return llvm::Type::getFloatPtrTy(context);
+	if (cfg_type_str.compare("dt_double") == 0) return llvm::Type::getDoublePtrTy(context);
+	return nullptr;
+}
+
 static void InitLiftedGlobals(NativeModulePtr natMod, llvm::Module *M) {
   for (auto nGV : natMod->global_variables) {
-    llvm::PointerType *PointerTy_0 = llvm::PointerType::get(llvm::Type::getInt32Ty(M->getContext()), nGV->get_size()); // XXX make an actual type 
+    llvm::PointerType *PointerTy_0 = llvmTypeFromCFGTypeStr(nGV->get_type(), M->getContext());
+    if (nullptr == PointerTy_0) continue; //unrecognized type
     llvm::GlobalVariable *g = new llvm::GlobalVariable(/*Module=*/*M,
                                                     /*Type=*/PointerTy_0,
                                                     /*isConstant=*/false,
@@ -509,7 +529,7 @@ static void InitLiftedGlobals(NativeModulePtr natMod, llvm::Module *M) {
 
     g->setAlignment(4); // ???
     g->setInitializer(llvm::Constant::getNullValue(PointerTy_0));
-    nGV->set_llvm_var(g); // this will explode XXX
+    nGV->set_llvm_var(g);
   }
 }
 
