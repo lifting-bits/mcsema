@@ -78,7 +78,7 @@ def get_lifted_stackvar_in_bc(v_cfg, fn_cfg, ir):
   for bb in fn_ir.iter_basic_blocks():
     for i in bb.iter_instructions():
       if v_cfg.var.name in i.get_name():
-        print "found var " + i.get_name() + " in " + fn_ir.get_name()
+        #print "found var " + i.get_name() + " in " + fn_ir.get_name()
         v_uses["stackvar"] = i 
         v_uses["uses"] = []
  
