@@ -39,7 +39,11 @@ def check_lifted_globals(cfg, ir):
  
   print "Global Uses in IR:"
   for g in g_in_ir:
-    print g["global"].get_name() + ":\t" + str(g["uses"])
+    print g["global"].get_name() + ":\t"
+    if g["uses"]:
+      map(lambda x : x.get_user().dump(), g["uses"])
+    else:
+      print "  (None)"
 
   print ""
   print "Summary:"
@@ -70,13 +74,16 @@ def get_lifted_stackvar_in_bc(v_cfg, fn_cfg, ir):
   if not fn_ir:
     return v_uses
 
+  # check whether this (named) var is defined in this function
   for bb in fn_ir.iter_basic_blocks():
     for i in bb.iter_instructions():
       if v_cfg.var.name in i.get_name():
         print "found var " + i.get_name() + " in " + fn_ir.get_name()
         v_uses["stackvar"] = i 
         v_uses["uses"] = []
-  
+ 
+  # find uses in this function
+
   return v_uses
 
 
@@ -94,7 +101,7 @@ def check_lifted_stackvars(cfg, ir):
   return
 
 def check_lifted_vars(cfg, ir):
-  #check_lifted_globals(cfg, ir)
+  check_lifted_globals(cfg, ir)
   check_lifted_stackvars(cfg, ir)
   return
 
