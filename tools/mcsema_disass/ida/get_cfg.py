@@ -178,6 +178,8 @@ def parse_os_defs_file(df):
     """Parse the file containing external function and variable
     specifications."""
     global OS_NAME, WEAK_SYMS, EMAP, EMAP_DATA
+    global _FIXED_EXTERNAL_NAMES
+    
     is_linux = OS_NAME == "linux"
     for l in df.readlines():
         #skip comments / empty lines
@@ -244,7 +246,6 @@ def parse_os_defs_file(df):
             # is really the implementation of `__gmon_start__`, where that is
             # a weak symbol.
             if is_linux:
-                global _FIXED_EXTERNAL_NAMES
                 imp_name = "__imp_{}".format(fname)
 
                 if idc.LocByName(imp_name):
@@ -908,7 +909,7 @@ def identify_program_entrypoints(func_eas):
         
     return entrypoints
 
-def recover_module():
+def recover_module(entrypoint):
     global EMAP
     global EXTERNAL_FUNCS_TO_RECOVER
 
@@ -922,7 +923,12 @@ def recover_module():
     recovered_fns = 0
 
     identify_external_symbols()
+    
     entrypoints = identify_program_entrypoints(func_eas)
+    entrypoints = set()  # TODO(pag): Re-enable this?????
+    entry_ea = idc.LocByName(args.entrypoint)
+    if entry_ea != idc.BADADDR:
+        entrypoints.add(entry_ea)
 
     # Process and recover functions. 
     while len(func_eas) > 0:
@@ -1016,19 +1022,16 @@ if __name__ == "__main__":
         default=[],
         help="std_defs file: definitions and calling conventions of imported functions and data")
     
-    parser.add_argument("-e", "--exports-to-lift", type=argparse.FileType('r'),
-        default=None,
-        help="A file containing a exported functions to lift, one per line. If not specified, all exports will be lifted.")
-
-    parser.add_argument("--exports-are-apis", action="store_true",
-        default=False,
-        help="Exported functions are defined in std_defs. Useful when lifting DLLs")
-    
     parser.add_argument("-z", "--syms", type=argparse.FileType('r'), default=None,
         help="File containing <name> <address> pairs of symbols to pre-define.")
 
     parser.add_argument("--pie-mode", action="store_true", default=False,
         help="Assume all immediate values are constants (useful for ELFs built with -fPIE")
+
+    parser.add_argument(
+        '--entrypoint',
+        help="The entrypoint where disassembly should begin",
+        required=True)
 
     args = parser.parse_args(args=idc.ARGV[1:])
 
@@ -1036,7 +1039,7 @@ if __name__ == "__main__":
         INIT_DEBUG_FILE(args.log_file)
         DEBUG("Debugging is enabled.")
 
-    addr_size = {"x86": 32, "amd64": 64}.get(args.arch, 0)
+    addr_size = {"x86": 32, "amd64": 64, "aarch64": 64}.get(args.arch, 0)
     if addr_size != get_address_size_in_bits():
         DEBUG("Arch {} address size does not match IDA's available bitness {}! Did you mean to use idal64?".format(
             args.arch, get_address_size_in_bits()))
@@ -1082,7 +1085,7 @@ if __name__ == "__main__":
                 try_mark_as_function(ea)
                 idc.MakeName(ea, name)
 
-        M = recover_module()
+        M = recover_module(args.entrypoint)
 
         DEBUG("Saving to: {0}".format(args.output.name))
         args.output.write(M.SerializeToString())

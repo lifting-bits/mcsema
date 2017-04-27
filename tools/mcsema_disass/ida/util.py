@@ -21,6 +21,12 @@ import struct
 
 _DEBUG_FILE = None
 _DEBUG_PREFIX = ""
+_INFO = idaapi.get_inf_structure()
+
+if "ARM" in _INFO.procName:
+  from arm_util import *
+else:
+  from x86_util import *
 
 def INIT_DEBUG_FILE(file):
   global _DEBUG_FILE
@@ -39,111 +45,6 @@ def DEBUG(s):
   if _DEBUG_FILE:
     _DEBUG_FILE.write("{}{}\n".format(_DEBUG_PREFIX, str(s)))
 
-# Maps instruction EAs to a pair of decoded inst, and the bytes of the inst.
-_INSTRUCTION_CACHE = {}
-
-_PREFIX_ITYPES = (idaapi.NN_lock, idaapi.NN_rep,
-                  idaapi.NN_repe, idaapi.NN_repne)
-
-PERSONALITY_NORMAL = 0
-PERSONALITY_DIRECT_JUMP = 1
-PERSONALITY_INDIRECT_JUMP = 2
-PERSONALITY_DIRECT_CALL = 3
-PERSONALITY_INDIRECT_CALL = 4
-PERSONALITY_RETURN = 5
-PERSONALITY_SYSTEM_CALL = 6
-PERSONALITY_SYSTEM_RETURN = 7
-PERSONALITY_CONDITIONAL_BRANCH = 8
-PERSONALITY_TERMINATOR = 9
-
-_PERSONALITIES = collections.defaultdict(int)
-_PERSONALITIES.update({
-  idaapi.NN_call: PERSONALITY_DIRECT_CALL,
-  idaapi.NN_callfi: PERSONALITY_INDIRECT_CALL,
-  idaapi.NN_callni: PERSONALITY_INDIRECT_CALL,
-
-  idaapi.NN_retf: PERSONALITY_RETURN,
-  idaapi.NN_retfd: PERSONALITY_RETURN,
-  idaapi.NN_retfq: PERSONALITY_RETURN,
-  idaapi.NN_retfw: PERSONALITY_RETURN,
-  idaapi.NN_retn: PERSONALITY_RETURN,
-  idaapi.NN_retnd: PERSONALITY_RETURN,
-  idaapi.NN_retnq: PERSONALITY_RETURN,
-  idaapi.NN_retnw: PERSONALITY_RETURN,
-
-  idaapi.NN_jmp: PERSONALITY_DIRECT_JUMP,
-  idaapi.NN_jmpshort: PERSONALITY_DIRECT_JUMP,
-  idaapi.NN_jmpfi: PERSONALITY_INDIRECT_JUMP,
-  idaapi.NN_jmpni: PERSONALITY_INDIRECT_JUMP,
-
-  idaapi.NN_int: PERSONALITY_SYSTEM_CALL,
-  idaapi.NN_into: PERSONALITY_SYSTEM_CALL,
-  idaapi.NN_int3: PERSONALITY_SYSTEM_CALL,
-  idaapi.NN_bound: PERSONALITY_SYSTEM_CALL,
-  idaapi.NN_syscall: PERSONALITY_SYSTEM_CALL,
-  idaapi.NN_sysenter: PERSONALITY_SYSTEM_CALL,
-
-  idaapi.NN_iretw: PERSONALITY_SYSTEM_RETURN,
-  idaapi.NN_iret: PERSONALITY_SYSTEM_RETURN,
-  idaapi.NN_iretd: PERSONALITY_SYSTEM_RETURN,
-  idaapi.NN_iretq: PERSONALITY_SYSTEM_RETURN,
-  idaapi.NN_sysret: PERSONALITY_SYSTEM_RETURN,
-  idaapi.NN_sysexit: PERSONALITY_SYSTEM_RETURN,
-
-  idaapi.NN_hlt: PERSONALITY_TERMINATOR,
-  idaapi.NN_ud2: PERSONALITY_TERMINATOR,
-  idaapi.NN_icebp: PERSONALITY_TERMINATOR,
-
-  idaapi.NN_ja: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jae: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jb: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jbe: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jc: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jcxz: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_je: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jecxz: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jg: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jge: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jl: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jle: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jna: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jnae: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jnb: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jnbe: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jnc: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jne: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jng: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jnge: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jnl: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jnle: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jno: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jnp: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jns: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jnz: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jo: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jp: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jpe: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jpo: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jrcxz: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_js: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_jz: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_xbegin: PERSONALITY_CONDITIONAL_BRANCH,
-
-  idaapi.NN_loopw: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_loop: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_loopd: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_loopq: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_loopwe: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_loope: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_loopde: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_loopqe: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_loopwne: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_loopne: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_loopdne: PERSONALITY_CONDITIONAL_BRANCH,
-  idaapi.NN_loopqne: PERSONALITY_CONDITIONAL_BRANCH,
-})
-
-
 # Python 2.7's xrange doesn't work with `long`s.
 def xrange(begin, end=None, step=1):
   if end:
@@ -151,10 +52,56 @@ def xrange(begin, end=None, step=1):
   else:
     return iter(itertools.count().next, begin)
 
+_NOT_CODE_EAS = set()
+
+# Returns `True` if `ea` belongs to some code segment.
+def is_code(ea):
+  global _NOT_CODE_EAS
+  return ea not in _NOT_CODE_EAS and idc.isCode(idc.GetFlags(ea))
+
+# Mark an address as containing code.
+def mark_as_code(ea):
+  if not is_code(ea):
+    idc.MakeCode(ea)
+    idaapi.autoWait()
+
+def mark_as_not_code(ea):
+  global _NOT_CODE_EAS
+  _NOT_CODE_EAS.add(ea)
+
+def read_bytes_slowly(start, end):
+  bytestr = ""
+  for i in xrange(start, end):
+    if idc.hasValue(idc.GetFlags(i)):
+      bt = idc.Byte(i)
+      bytestr += chr(bt)
+    else:
+      #virtual size may be bigger than size on disk
+      #pad with nulls
+      #DEBUG("Failed on {0:x}".format(i))
+      bytestr += "\x00"
+  return bytestr
+
+def read_byte(ea):
+  byte = read_bytes_slowly(ea, ea + 1)
+  byte = ord(byte) 
+  return byte
+
+def read_dword(ea):
+  bytestr = read_bytes_slowly(ea, ea + 4)
+  dword = struct.unpack("<L", bytestr)[0]
+  return dword
+
+def read_qword(ea):
+  bytestr = read_bytes_slowly(ea, ea + 8)
+  qword = struct.unpack("<Q", bytestr)[0]
+  return qword
+
 def instruction_personality(arg):
+  global PERSONALITIES
   if isinstance(arg, (int, long)):
     arg, _ = decode_instruction(arg)
-  return _PERSONALITIES[arg.itype]
+  return PERSONALITIES[arg.itype]
 
 def is_conditional_jump(arg):
   return instruction_personality(arg) == PERSONALITY_CONDITIONAL_BRANCH
@@ -186,56 +133,7 @@ def instruction_ends_block(arg):
                                           PERSONALITY_INDIRECT_JUMP,
                                           PERSONALITY_RETURN,
                                           PERSONALITY_TERMINATOR,
-                                          PERSONALITY_SYSTEM_RETURN) 
-
-_NOT_CODE_EAS = set()
-
-# Returns `True` if `ea` belongs to some code segment.
-def is_code(ea):
-  global _NOT_CODE_EAS
-  return ea not in _NOT_CODE_EAS and idc.isCode(idc.GetFlags(ea))
-
-# Mark an address as containing code.
-def mark_as_code(ea):
-  if not is_code(ea):
-    idc.MakeCode(ea)
-    idaapi.autoWait()
-
-def mark_as_not_code(ea):
-  global _NOT_CODE_EAS, _INSTRUCTION_CACHE
-
-  if ea in _INSTRUCTION_CACHE:
-    del _INSTRUCTION_CACHE[ea]
-
-  _NOT_CODE_EAS.add(ea)
-
-def read_bytes_slowly(start, end):
-  bytestr = ""
-  for i in xrange(start, end):
-    if idc.hasValue(idc.GetFlags(i)):
-      bt = idc.Byte(i)
-      bytestr += chr(bt)
-    else:
-      #virtual size may be bigger than size on disk
-      #pad with nulls
-      #DEBUG("Failed on {0:x}".format(i))
-      bytestr += "\x00"
-  return bytestr
-
-def read_byte(ea):
-  byte = read_bytes_slowly(ea, ea + 1)
-  byte = ord(byte) 
-  return byte
-
-def read_dword(ea):
-  bytestr = read_bytes_slowly(ea, ea + 4)
-  dword = struct.unpack("<L", bytestr)[0]
-  return dword
-
-def read_qword(ea):
-  bytestr = read_bytes_slowly(ea, ea + 8)
-  qword = struct.unpack("<Q", bytestr)[0]
-  return qword
+                                          PERSONALITY_SYSTEM_RETURN)
 
 _BAD_INSTRUCTION = (None, "")
 
@@ -243,17 +141,14 @@ def decode_instruction(ea):
   """Read the bytes of an x86/amd64 instruction. This handles things like
   combining the bytes of an instruction with its prefix. IDA Pro sometimes
   treats these as separate."""
-  global _INSTRUCTION_CACHE, _NOT_CODE_EAS, _BAD_INSTRUCTION, _PREFIX_ITYPES
+  global _NOT_CODE_EAS, _BAD_INSTRUCTION, PREFIX_ITYPES
 
   if ea in _NOT_CODE_EAS:
     return _BAD_INSTRUCTION
 
-  if ea in _INSTRUCTION_CACHE:
-    return _INSTRUCTION_CACHE[ea]
-
   decoded_inst = idautils.DecodeInstruction(ea)
   if not decoded_inst:
-    _INSTRUCTION_CACHE[ea] = _BAD_INSTRUCTION
+    _NOT_CODE_EAS.add(ea)
     return _BAD_INSTRUCTION
 
   assert decoded_inst.ea == ea
@@ -263,11 +158,10 @@ def decode_instruction(ea):
 
   # We've got an instruction with a prefix, but the prefix is treated as
   # independent.
-  if 1 == decoded_inst.size and decoded_inst.itype in _PREFIX_ITYPES:
+  if 1 == decoded_inst.size and decoded_inst.itype in PREFIX_ITYPES:
     decoded_inst, extra_bytes = decode_instruction(end_ea)
     decoded_bytes += extra_bytes
 
-  _INSTRUCTION_CACHE[ea] = (decoded_inst, decoded_bytes)
   return decoded_inst, decoded_bytes
 
 _NOT_EXTERNAL_SEGMENTS = set([idc.BADADDR])
@@ -320,14 +214,12 @@ def is_internal_code(ea):
 def is_block_or_instruction_head(ea):
   """Returns `True` if `ea` looks like it's the beginning of an actual
   instruction."""
-  global _INSTRUCTION_CACHE
-  if ea in _INSTRUCTION_CACHE:
-    return True
   return is_internal_code(ea) and idc.ItemHead(ea) == ea
 
 def get_address_size_in_bits():
   """Returns the available address size."""
-  if (idaapi.ph.flag & idaapi.PR_USE64) != 0:
+  global _INFO
+  if _INFO.is_64bit() or (idaapi.ph.flag & idaapi.PR_USE64) != 0:
     return 64
   else:
     return 32

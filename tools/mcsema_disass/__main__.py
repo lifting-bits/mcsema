@@ -23,7 +23,7 @@ import textwrap
 
 
 SUPPORTED_OS = ('linux', 'windows',)
-SUPPORTED_ARCH = ('x86', 'amd64',)
+SUPPORTED_ARCH = ('x86', 'amd64', 'aarch64')
 
 def main(args=None):
   arg_parser = argparse.ArgumentParser(
@@ -41,7 +41,7 @@ def main(args=None):
 
   arg_parser.add_argument(
       '--arch',
-      help='Name of the architecture. Valid names are x86, amd64.',
+      help='Name of the architecture. Valid names are x86, amd64, and aarch64.',
       required=True)
 
   arg_parser.add_argument(

@@ -48,7 +48,7 @@ Why would anyone translate binaries *back* to bitcode?
 | [Clang](http://clang.llvm.org/) | 3.5+ (3.9 if using Visual Studio 2015) |
 | [Python](https://www.python.org/) | 2.7 | 
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
-| [python-protobuf](https://pypi.python.org/pypi/protobuf) | 2.6.1 |
+| [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
 | [IDA Pro](https://www.hex-rays.com/products/ida) | 6.7+ |
 | [Visual Studio](https://www.visualstudio.com/downloads/) | 2013+ (Windows Only) |
 
@@ -70,7 +70,7 @@ sudo apt-get install \
      realpath
 
 sudo pip install --upgrade pip
-sudo pip install 'protobuf==2.6.1'
+sudo pip install 'protobuf==3.2.0'
 ```
 
 ##### Fixing IDA Pro's Python installation (Ubuntu 14.04)
@@ -82,7 +82,7 @@ Note: If you are using IDA on 64 bit Ubuntu and your IDA install does not use th
 touch /path/to/python2.7/dist-packages/google/__init__.py
 cd /path/to/lib/python2.7/dist-packages/              
 sudo zip -rv /path/to/ida-6.X/python/lib/python27.zip google/
-sudo chown your_user:your_user /home/taxicat/ida-6.7/python/lib/python27.zip
+sudo chown your_user:your_user /home/your_user/ida-6.7/python/lib/python27.zip
 ```
 
 ##### Upgrade CMake (Ubuntu 14.04)
@@ -119,7 +119,7 @@ cd remill-build
 ../cxx-common/build.sh --template everything `pwd`/libraries
 ```
 
-**Note:** This will build all of the dependencies needed by Remill and McSema. This includes Intel XED, Google Protocol Buffers, Google Log, Google Flags, and Google Test.
+**Note:** This will build all of the dependencies needed by Remill and McSema. This includes LLVM, Clang, Intel XED, Google Protocol Buffers, Google Log, Google Flags, and Google Test.
 
 If you are using Ubuntu 16.04 and want to skip this step, then download and extract `libraries` from one of the following URLs. McSema works across several versions of LLVM. This makes integrating into third-party projects using older LLVM versions (e.g. KLEE) easier.
 

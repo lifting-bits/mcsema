@@ -21,11 +21,11 @@ from setuptools import setup, find_packages
 
 setup(name="mcsema-disass",
       description="Binary program disassembler for McSema.",
-      version="0.0.1",
+      version="2.0",
       url="https://github.com/trailofbits/mcsema",
       author="Trail of Bits",
       author_email="mcsema@trailofbits.com",
-      license='BSD 3-clause "New" or "Revised License"',
+      license='Apache 2.0',
       packages=['mcsema_disass', 'mcsema_disass.ida', 'mcsema_disass.defs'],
       package_data={
         "mcsema_disass.defs": ["linux.txt", "windows.txt"]},
