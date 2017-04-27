@@ -7,7 +7,7 @@ from llvmcpy.llvm import *
 
 import mcsema_disass.ida.CFG_pb2 as CFG_pb2
 
-# take global name, ir module
+# take global, ir module
 # return dict:
 #   "global" : g_ir
 #   "uses" : []
@@ -39,7 +39,11 @@ def check_lifted_globals(cfg, ir):
  
   print "Global Uses in IR:"
   for g in g_in_ir:
-    print g["global"].get_name() + ":\t" + str(g["uses"])
+    print g["global"].get_name() + ":\t"
+    if g["uses"]:
+      map(lambda x : x.get_user().dump(), g["uses"])
+    else:
+      print "  (None)"
 
   print ""
   print "Summary:"
@@ -50,17 +54,62 @@ def check_lifted_globals(cfg, ir):
 
   return
 
+# take variable, fn containing variable, ir module
+# return dict:
+#   "stackvar" : v_ir (defining var)
+#   "uses" : []
+def get_lifted_stackvar_in_bc(v_cfg, fn_cfg, ir):
+  v_uses = {}
+  fn_ir = None
+
+  # find relevant function in ir 
+  for f in ir.iter_functions():
+    if f.get_name() == fn_cfg.symbol_name and fn_cfg.symbol_name != "main":
+      fn_ir = f
+    # entry_address comparison check to ID functions
+    if hex(fn_cfg.entry_address)[2:-1] in f.get_name():
+      fn_ir = f
+
+  # function not found
+  if not fn_ir:
+    return v_uses
+
+  # check whether this (named) var is defined in this function
+  for bb in fn_ir.iter_basic_blocks():
+    for i in bb.iter_instructions():
+      if v_cfg.var.name in i.get_name():
+        #print "found var " + i.get_name() + " in " + fn_ir.get_name()
+        v_uses["stackvar"] = i 
+        v_uses["uses"] = []
+      # find uses in this function
+        for n in range(0,i.get_num_operands()):
+          if v_cfg.var.name in i.get_operand(n).get_name():
+            v_uses["uses"].append(i)
+
+  return v_uses
+
+
 # TODO
 def check_lifted_stackvars(cfg, ir):
-  #for f in cfg.internal_funcs:
-  #  for v in f.stackvars:
-  #    print v.var.name
+  v_in_cfg = [] 
+  v_in_ir = [] 
+  for f in cfg.internal_funcs:
+    for v in f.stackvars:
+      v_in_cfg.append(v)
+      v_uses = get_lifted_stackvar_in_bc(v, f, ir)
+      if v_uses:
+        v_in_ir.append(v_uses)
 
-  #for f in ir.iter_functions():
-  #  for bb in f.iter_basic_blocks():
-  #    for i in bb.iter_instructions():
-  #      #i.dump()
-  #      print dir(i)
+  print ""
+  print "Summary:"
+  print "recovered %d stack variables; lifted %d to bitcode" % (len(v_in_cfg), len(v_in_ir))
+  if len(v_in_cfg) > len(v_in_ir):
+    print "non-lifted variables:"
+    print map(lambda z : z.var.name, filter(lambda x : x.var.name not in map(lambda y : y["stackvar"].get_name(), v_in_ir), v_in_cfg))
+
+  print "of %d variables lifted to bitcode, %d have uses" % (len(v_in_ir), len(filter(lambda x : len(x["uses"]), v_in_ir)))
+  print ""
+
   return
 
 def check_lifted_vars(cfg, ir):
