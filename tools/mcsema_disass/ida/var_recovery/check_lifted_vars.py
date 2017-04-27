@@ -81,23 +81,35 @@ def get_lifted_stackvar_in_bc(v_cfg, fn_cfg, ir):
         #print "found var " + i.get_name() + " in " + fn_ir.get_name()
         v_uses["stackvar"] = i 
         v_uses["uses"] = []
- 
-  # find uses in this function
+      # find uses in this function
+        for n in range(0,i.get_num_operands()):
+          if v_cfg.var.name in i.get_operand(n).get_name():
+            v_uses["uses"].append(i)
 
   return v_uses
 
 
 # TODO
 def check_lifted_stackvars(cfg, ir):
+  v_in_cfg = [] 
+  v_in_ir = [] 
   for f in cfg.internal_funcs:
     for v in f.stackvars:
-      get_lifted_stackvar_in_bc(v, f, ir)
+      v_in_cfg.append(v)
+      v_uses = get_lifted_stackvar_in_bc(v, f, ir)
+      if v_uses:
+        v_in_ir.append(v_uses)
 
-  #for f in ir.iter_functions():
-  #  for bb in f.iter_basic_blocks():
-  #    for i in bb.iter_instructions():
-  #      #i.dump()
-  #      print dir(i)
+  print ""
+  print "Summary:"
+  print "recovered %d stack variables; lifted %d to bitcode" % (len(v_in_cfg), len(v_in_ir))
+  if len(v_in_cfg) > len(v_in_ir):
+    print "non-lifted variables:"
+    print map(lambda z : z.var.name, filter(lambda x : x.var.name not in map(lambda y : y["stackvar"].get_name(), v_in_ir), v_in_cfg))
+
+  print "of %d variables lifted to bitcode, %d have uses" % (len(v_in_ir), len(filter(lambda x : len(x["uses"]), v_in_ir)))
+  print ""
+
   return
 
 def check_lifted_vars(cfg, ir):
