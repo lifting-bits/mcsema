@@ -197,7 +197,7 @@ def BlockItems(BB):
         ok = fii.next_code()
 
 def _create_global_var_entry(memory_ref, op_type):
-    return dict(reads=set(), writes=set(), addrs=set(), width=-1, type=op_type, offset=memory_ref)
+    return dict(reads=set(), writes=set(), addrs=set(), width=-1, type=op_type, offset=memory_ref, safe=True)
 
 def _normalize_global_var_name(name):
     return_name = name

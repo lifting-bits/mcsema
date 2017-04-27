@@ -2084,9 +2084,11 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
 
     '''add global variables to protobuf'''
     if TO_RECOVER["global_vars"]:
-        for g in global_var_data.keys():
+        for g, val in global_var_data.iteritems():
+          if val["safe"] is False:
+              continue
           var = M.global_vars.add()
-          var.address = global_var_data[g]["offset"]
+          var.address = val["offset"]
           var.var.name = g
           var.var.size = {
               'dt_byte':1,
@@ -2094,12 +2096,12 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
               'dt_dword':4,
               'dt_float':4,
               'dt_double':8,
-              'dt_qword':8}.get(global_var_data[g]["type"], 0)
-          var.var.ida_type = global_var_data[g]["type"] # TODO: IDA agnostic type
-          for i in global_var_data[g]["writes"]: # reads vs writes? do we care?
+              'dt_qword':8}.get(val["type"], 0)
+          var.var.ida_type = val["type"] # TODO: IDA agnostic type
+          for i in val["writes"]: # reads vs writes? do we care?
             r = var.var.ref_eas.add()
             r.inst_addr = i
-          for i in global_var_data[g]["reads"]:
+          for i in val["reads"]:
             r = var.var.ref_eas.add()
             r.inst_addr = i
 
