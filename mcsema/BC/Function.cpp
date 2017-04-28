@@ -466,7 +466,8 @@ static llvm::Function *LiftFunction(
 
   lifted_func->removeFnAttr(llvm::Attribute::AlwaysInline);
   lifted_func->removeFnAttr(llvm::Attribute::InlineHint);
-  lifted_func->removeFnAttr(llvm::Attribute::NoInline);
+  lifted_func->removeFnAttr(llvm::Attribute::NoReturn);
+  lifted_func->addFnAttr(llvm::Attribute::NoInline);
   lifted_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
   lifted_func->setLinkage(llvm::GlobalValue::ExternalLinkage);
 
@@ -495,6 +496,14 @@ static llvm::Function *LiftFunction(
   for (auto block_info : cfg_func->blocks) {
     ctx.cfg_block = block_info.second;
     LiftBlockIntoFunction(ctx);
+  }
+
+  // Check the sanity of things.
+  for (auto block_info : ctx.ea_to_block) {
+    auto block = block_info.second;
+    CHECK(block->getTerminator() != nullptr)
+        << "Lifted block " << std::hex << block_info.first
+        << " has no terminator!";
   }
 
   return lifted_func;

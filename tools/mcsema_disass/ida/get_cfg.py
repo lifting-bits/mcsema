@@ -750,16 +750,15 @@ def recover_segment_cross_references(M, S, seg_ea, seg_end_ea):
         elif (ea % 4) != 0:
             DEBUG("ERROR: Unaligned reference at {:x} to {:x}".format(ea, target_ea))
         
+        elif is_runtime_external_data_reference(ea):
+            DEBUG("Not embedding reference to {:x} at {:x}".format(target_ea, ea))
+
         else:
             X = S.xrefs.add()
             X.ea = ea
             X.width = min(max(idc.ItemSize(ea), 4), 8)
             X.target_ea = target_ea
-            target_name = get_symbol_name(target_ea)
-            if is_runtime_external_data_reference(ea):
-                X.target_name = get_true_external_name(target_name)
-            else:
-                X.target_name = target_name
+            X.target_name = get_symbol_name(target_ea)
             X.target_is_code = is_code(target_ea)
             DEBUG("{}-byte reference at {:x} to {:x} ({})".format(
                 X.width, ea, target_ea, X.target_name))

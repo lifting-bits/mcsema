@@ -167,10 +167,11 @@ static llvm::GlobalVariable *DeclareRegion(const SegmentMap &segments) {
     auto disp = llvm::ConstantInt::get(intptr_type, offset, false);
     auto region_base = llvm::ConstantExpr::getPtrToInt(region, intptr_type);
     auto addr = llvm::ConstantExpr::getAdd(region_base, disp);
-    auto ptr = llvm::ConstantExpr::getIntToPtr(addr, seg_type);
-    ptr->dump();
+    auto ptr = llvm::ConstantExpr::getIntToPtr(
+        addr, llvm::PointerType::get(seg_type, 0));
+
     (void) new llvm::GlobalVariable(
-        *gModule, seg_type, true  /* IsConstant */,
+        *gModule, ptr->getType(), true  /* IsConstant */,
         llvm::GlobalVariable::InternalLinkage,
         ptr, cfg_seg->lifted_name);
   }
@@ -224,7 +225,8 @@ static void DeclareVariables(const NativeModule *cfg_module) {
 // Fill in the contents of the data segment.
 static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg) {
   auto seg = gModule->getNamedGlobal(cfg_seg->lifted_name);
-  auto seg_type = llvm::dyn_cast<llvm::StructType>(remill::GetValueType(seg));
+  auto seg_type = llvm::dyn_cast<llvm::StructType>(
+      remill::GetValueType(seg)->getPointerElementType());
 
   seg->setLinkage(llvm::GlobalValue::InternalLinkage);
   seg->setVisibility(llvm::GlobalValue::DefaultVisibility);
@@ -240,6 +242,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg) {
   std::vector<llvm::Constant *> entry_vals;
   for (const auto &cfg_seg_entry : cfg_seg->entries) {
     auto entry = cfg_seg_entry.second;
+
     auto entry_type = seg_type->getContainedType(i++);
 
     // This entry is an opaque sequence of bytes.

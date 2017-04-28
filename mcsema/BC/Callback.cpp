@@ -61,42 +61,45 @@ llvm::Function *GetEntryPoint(const NativeObject *cfg_func,
   callback_func->addFnAttr(llvm::Attribute::NoInline);
   callback_func->addFnAttr(llvm::Attribute::NoBuiltin);
 
-  std::stringstream ss;
-  switch (gArch->arch_name) {
-    case remill::kArchInvalid:
-    case remill::kArchX86:
-    case remill::kArchX86_AVX:
-    case remill::kArchX86_AVX512:
-      ss << "pushl %eax;"
-         << "leal $1, %eax;"
-         << "xchgl (%esp), %eax;"
-         << "jmp __mcsema_attach_call;";
-      break;
-    case remill::kArchAMD64:
-    case remill::kArchAMD64_AVX:
-    case remill::kArchAMD64_AVX512:
-      ss << "pushq %rax;"
-         << "leaq $0, %rax;"
-         << "xchgq (%rsp), %rax;"
-         << "jmp __mcsema_attach_call;";
-      break;
-  }
+  auto attach_target = llvm::dyn_cast<llvm::GlobalVariable>(
+      module->getOrInsertGlobal("__mcsema_attach_target", func->getType()));
 
-  std::vector<llvm::Type *> arg_types;
-  arg_types.push_back(func->getType());
-  auto asm_type = llvm::FunctionType::get(
-      llvm::Type::getVoidTy(context), arg_types, false  /* isVarArg */);
-
-  auto asm_code = llvm::InlineAsm::get(
-      asm_type,
-      ss.str(),
-      "*m,~{dirflag},~{fpsr},~{flags}",
-      true  /* hasSideEffects */);
+  attach_target->setThreadLocal(true);
+  attach_target->setThreadLocalMode(llvm::GlobalValue::InitialExecTLSModel);
+//  std::stringstream ss;
+//  switch (gArch->arch_name) {
+//    case remill::kArchInvalid:
+//    case remill::kArchX86:
+//    case remill::kArchX86_AVX:
+//    case remill::kArchX86_AVX512:
+//      ss << "pushl %eax;"
+//         << "leal " << func->getName().str() << ", %eax;"
+//         << "xchgl (%esp), %eax;"
+//         << "jmp __mcsema_attach_call;";
+//      break;
+//    case remill::kArchAMD64:
+//    case remill::kArchAMD64_AVX:
+//    case remill::kArchAMD64_AVX512:
+//      ss << "pushq %%rax;"
+//         << "leaq " << func->getName().str() << "(%ip), %%rax;"
+//         << "xchgq (%%rsp), %%rax;"
+//         << "jmp __mcsema_attach_call;";
+//      break;
+//  }
+//
+//  auto asm_type = llvm::FunctionType::get(
+//      llvm::Type::getVoidTy(context), false  /* isVarArg */);
+//
+//  auto asm_code = llvm::InlineAsm::get(
+//      asm_type,
+//      ss.str(),
+//      "~{dirflag},~{fpsr},~{flags}",
+//      true  /* hasSideEffects */);
 
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(context, "", callback_func));
-  auto asm_call = ir.CreateCall(asm_code, func);
-  asm_call->setTailCall(true);
-  asm_call->addAttribute(1, llvm::Attribute::NonNull);
+  ir.CreateStore(func, attach_target);
+  auto handler_call = ir.CreateCall(handler);
+  handler_call->setTailCallKind(llvm::CallInst::TCK_MustTail);
   ir.CreateRetVoid();
 
   return callback_func;

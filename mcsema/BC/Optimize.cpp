@@ -51,12 +51,6 @@
 #include "mcsema/BC/Optimize.h"
 #include "mcsema/BC/Util.h"
 
-DEFINE_bool(lower_memops, true, "Controls whether or not Remill's memory "
-                                "access intrinsics are lowered to LLVM "
-                                "loads and stores.");
-
-DEFINE_bool(disable_optimizer, false, "Should optimizations be disabled?");
-
 namespace mcsema {
 namespace {
 
@@ -300,6 +294,10 @@ static void ReplaceMemReadOp(const char *name, llvm::Type *val_type) {
     }
     call_inst->replaceAllUsesWith(val);
   }
+  for (auto call_inst : callers) {
+    call_inst->eraseFromParent();
+  }
+  RemoveFunction(func);
 }
 
 // Lower a memory write intrinsic into a `store` instruction.
@@ -327,18 +325,13 @@ static void ReplaceMemWriteOp(const char *name, llvm::Type *val_type) {
     ir.CreateStore(val, ptr);
     call_inst->replaceAllUsesWith(mem_ptr);
   }
-
+  for (auto call_inst : callers) {
+    call_inst->eraseFromParent();
+  }
   RemoveFunction(func);
 }
 
 static void LowerMemOps(void) {
-  auto mem_func = gModule->getFunction("__remill_write_memory_8");
-  auto mem_ptr_type = llvm::dyn_cast<llvm::PointerType>(
-      mem_func->getReturnType());
-  auto mem_type = llvm::dyn_cast<llvm::StructType>(
-      mem_ptr_type->getElementType());
-  mem_type->setBody(llvm::Type::getInt8Ty(*gContext), nullptr, nullptr);
-
   ReplaceMemReadOp("__remill_read_memory_8",
                    llvm::Type::getInt8Ty(*gContext));
   ReplaceMemReadOp("__remill_read_memory_16",
@@ -379,21 +372,15 @@ void OptimizeModule(void) {
   LOG(INFO)
       << "Optimizing module.";
   RemoveISELs(isels);
-
-  if (!FLAGS_disable_optimizer) {
-    RunO3();
-  }
-
+  RunO3();
   RemoveIntrinsics();
-  if (FLAGS_lower_memops) {
-    LowerMemOps();
-    ReplaceBarrier("__remill_barrier_load_load");
-    ReplaceBarrier("__remill_barrier_load_store");
-    ReplaceBarrier("__remill_barrier_store_load");
-    ReplaceBarrier("__remill_barrier_store_store");
-    ReplaceBarrier("__remill_barrier_atomic_begin");
-    ReplaceBarrier("__remill_barrier_atomic_end");
-  }
+  LowerMemOps();
+  ReplaceBarrier("__remill_barrier_load_load");
+  ReplaceBarrier("__remill_barrier_load_store");
+  ReplaceBarrier("__remill_barrier_store_load");
+  ReplaceBarrier("__remill_barrier_store_store");
+  ReplaceBarrier("__remill_barrier_atomic_begin");
+  ReplaceBarrier("__remill_barrier_atomic_end");
   RemoveUndefFuncCalls();
 }
 
