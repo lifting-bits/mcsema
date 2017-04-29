@@ -92,7 +92,10 @@ static llvm::StructType *GetSegmentType(const NativeSegment *cfg_seg) {
     }
   }
 
-  auto seg_type = llvm::StructType::create(entry_types, "", true);
+  std::stringstream ss;
+  ss << cfg_seg->lifted_name << "_type";
+
+  auto seg_type = llvm::StructType::create(entry_types, ss.str(), true);
   CHECK(nullptr != seg_type)
       << "Unable to create structure type for segment " << cfg_seg->name
       << " beginning at " << std::hex << cfg_seg->ea;
@@ -140,7 +143,13 @@ static llvm::GlobalVariable *DeclareRegion(const SegmentMap &segments) {
         << ", " << std::hex << max_ea << ")";
   }
 
-  auto region_type = llvm::StructType::create(seg_types, "", true);
+
+  std::stringstream ss;
+  ss << "region_" << std::hex << min_ea << "_" << std::hex << max_ea;
+  auto region_name = ss.str();
+  ss << "_type";
+
+  auto region_type = llvm::StructType::create(seg_types, ss.str(), true);
   auto intptr_type = llvm::Type::getIntNTy(
       *gContext, static_cast<unsigned>(gArch->address_size));
 
@@ -149,33 +158,32 @@ static llvm::GlobalVariable *DeclareRegion(const SegmentMap &segments) {
       << std::hex << min_ea << ", " << std::hex << max_ea << ")";
 
   // Declare the region as a large structure.
-  std::stringstream ss;
-  ss << "region_" << std::hex << min_ea << "_" << std::hex << max_ea;
   auto region = new llvm::GlobalVariable(
       *gModule, region_type, is_read_only,
       llvm::GlobalValue::InternalLinkage, nullptr,
-      ss.str());
+      region_name);
   region->setAlignment(16);
+
+  auto byte_type = llvm::Type::getInt8Ty(*gContext);
+  auto byte_ptr_type = llvm::PointerType::get(byte_type, 0);
 
   // Go and declare the individual segments as variables pointing
   // into the region.
-  unsigned i = 0;
   for (const auto &entry : segments) {
     auto cfg_seg = entry.second;
-    auto seg_type = seg_types[i++];
     auto offset = cfg_seg->ea - min_ea;
-    auto disp = llvm::ConstantInt::get(intptr_type, offset, false);
-    auto region_base = llvm::ConstantExpr::getPtrToInt(region, intptr_type);
-    auto addr = llvm::ConstantExpr::getAdd(region_base, disp);
-    auto ptr = llvm::ConstantExpr::getIntToPtr(
-        addr, llvm::PointerType::get(seg_type, 0));
 
-    (void) new llvm::GlobalVariable(
-        *gModule, ptr->getType(), true  /* IsConstant */,
-        llvm::GlobalVariable::InternalLinkage,
-        ptr, cfg_seg->lifted_name);
+    std::vector<llvm::Constant *> index_list;
+    index_list.push_back(llvm::ConstantInt::get(intptr_type, offset));
+
+    auto ptr = llvm::ConstantExpr::getBitCast(region, byte_ptr_type);
+    ptr = llvm::ConstantExpr::getInBoundsGetElementPtr(
+        byte_type, ptr, index_list);
+
+    (void) llvm::GlobalAlias::create(
+        byte_type, 0, llvm::GlobalVariable::InternalLinkage,
+        cfg_seg->lifted_name, ptr, gModule);
   }
-
   return region;
 }
 
@@ -190,11 +198,11 @@ static void DeclareVariables(const NativeModule *cfg_module) {
   auto intptr_type = llvm::Type::getIntNTy(
       *gContext, static_cast<unsigned>(gArch->address_size));
   auto byte_type = llvm::Type::getInt8Ty(*gContext);
-  auto byte_ptr_type = llvm::PointerType::get(byte_type, 0);
 
   for (auto entry : cfg_module->ea_to_var) {
     auto cfg_var = reinterpret_cast<const NativeVariable *>(
         entry.second->Get());
+
     if (cfg_var && cfg_var->is_external) {
       continue;
     }
@@ -207,26 +215,24 @@ static void DeclareVariables(const NativeModule *cfg_module) {
         << "Variable " << cfg_var->name << " at " << std::hex << cfg_var->ea
         << " is incorrectly assigned to the segment " << cfg_seg->name;
 
-    auto seg = gModule->getNamedGlobal(cfg_seg->lifted_name);
+    auto seg = gModule->getNamedAlias(cfg_seg->lifted_name);
     auto offset = cfg_var->ea - cfg_seg->ea;
-    auto disp = llvm::ConstantInt::get(intptr_type, offset, false);
 
-    auto seg_base = llvm::ConstantExpr::getPtrToInt(seg, intptr_type);
-    auto addr = llvm::ConstantExpr::getAdd(seg_base, disp);
-    auto ptr = llvm::ConstantExpr::getIntToPtr(addr, byte_ptr_type);
+    std::vector<llvm::Constant *> index_list;
+    index_list.push_back(llvm::ConstantInt::get(intptr_type, offset));
+    auto ptr = llvm::ConstantExpr::getInBoundsGetElementPtr(
+        byte_type, seg, index_list);
 
-    (void) new llvm::GlobalVariable(
-        *gModule, byte_ptr_type, true  /* IsConstant */,
-        llvm::GlobalVariable::InternalLinkage,
-        ptr, cfg_var->lifted_name);
+    (void) llvm::GlobalAlias::create(
+        byte_type, 0, llvm::GlobalVariable::InternalLinkage,
+        cfg_var->lifted_name, ptr, gModule);
   }
 }
 
 // Fill in the contents of the data segment.
-static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg) {
-  auto seg = gModule->getNamedGlobal(cfg_seg->lifted_name);
-  auto seg_type = llvm::dyn_cast<llvm::StructType>(
-      remill::GetValueType(seg)->getPointerElementType());
+static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
+                                       llvm::StructType *seg_type) {
+  auto seg = gModule->getNamedAlias(cfg_seg->lifted_name);
 
   seg->setLinkage(llvm::GlobalValue::InternalLinkage);
   seg->setVisibility(llvm::GlobalValue::DefaultVisibility);
@@ -296,7 +302,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg) {
 
       // Pointer to a global (possibly external) variable.
       } else if (auto cfg_var = xref->var) {
-        val = gModule->getNamedGlobal(cfg_var->lifted_name);
+        val = gModule->getNamedAlias(cfg_var->lifted_name);
         val = llvm::ConstantExpr::getPtrToInt(val, intptr_type);
         CHECK(val != nullptr)
             << "Can't insert cross reference to variable "
@@ -305,7 +311,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg) {
 
       // Pointer to an unnamed location inside of a data segment.
       } else {
-        auto seg = gModule->getNamedGlobal(xref->target_segment->lifted_name);
+        auto seg = gModule->getNamedAlias(xref->target_segment->lifted_name);
         auto offset = xref->target_ea - cfg_seg->ea;
         auto disp = llvm::ConstantInt::get(intptr_type, offset, false);
         auto seg_base = llvm::ConstantExpr::getPtrToInt(seg, intptr_type);
@@ -335,13 +341,15 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg) {
 // Fill all the data segments in a given region.
 static void FillRegion(llvm::GlobalVariable *global, const SegmentMap &region) {
   std::vector<llvm::Constant *> entry_vals;
-  for (const auto &entry : region) {
-    auto cfg_seg = entry.second;
-    entry_vals.push_back(FillDataSegment(cfg_seg));
-  }
-
   auto region_type = llvm::dyn_cast<llvm::StructType>(
       remill::GetValueType(global));
+  unsigned i = 0;
+  for (const auto &entry : region) {
+    auto cfg_seg = entry.second;
+    entry_vals.push_back(FillDataSegment(
+        cfg_seg,
+        llvm::dyn_cast<llvm::StructType>(region_type->getContainedType(i++))));
+  }
 
   global->setInitializer(llvm::ConstantStruct::get(region_type, entry_vals));
 }

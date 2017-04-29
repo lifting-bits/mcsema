@@ -644,23 +644,48 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
     for (const auto &xref_entry : segment->entries) {
       const auto &entry = xref_entry.second;
 
-      if (ea < entry.ea) {
+      // Split this segment's data up into logical components based on the
+      // variables indexing into this segment.
+      while (ea < entry.ea) {
+        if (ea == seg_end_ea) {
+          break;
+        }
+
         auto pos = ea - segment->ea;
-        auto size = entry.ea - ea;
+
+        // Find the beginning of the next variable or entry.
+        uint64_t size = 1;
+        for (; (ea + size) < entry.ea; ++size) {
+          if (module->ea_to_var.count(ea + size)) {
+            break;
+          }
+        }
 
         auto blob = new NativeBlob;
         blob->ea = ea;
         blob->data = cfg_segment.data().substr(pos, size);
-        blobs.push_back(NativeSegment::Entry{ea, entry.ea, nullptr, blob});
+        blobs.push_back(NativeSegment::Entry{ea, ea + size, nullptr, blob});
+        ea += size;
       }
 
-      ea = entry.next_ea;
+      CHECK(ea == entry.ea)
+          << "Invalid partitioning of data before " << std::hex << entry.ea;
+
       if (ea == seg_end_ea) {
         break;
       }
 
-      CHECK(ea < seg_end_ea)
-          << "Walked off end of segment " << segment->name;
+      // Do some sanity checking to see if there are any variables pointing
+      // into some actual cross-references. This is more strange than anything.
+      for (ea += 1; ea < entry.next_ea; ++ea) {
+        auto var_it = module->ea_to_var.find(ea);
+        LOG_IF(ERROR, var_it != module->ea_to_var.end())
+            << "Variable " << var_it->second->name << " at "
+            << std::hex << var_it->second->ea
+            << " points into a cross reference, located at " << std::hex
+            << entry.xref->ea << " and targeting " << std::hex
+            << entry.xref->target_ea;
+      }
     }
 
     segment->entries.erase(seg_end_ea);

@@ -18,6 +18,7 @@
 
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
@@ -74,16 +75,19 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
     return nullptr;
   }
 
+  auto zero = llvm::ConstantInt::get(word_type, 0);
+
   llvm::IRBuilder<> ir(block);
   if (cfg_xref->func) {
     auto cfg_func = cfg_xref->func;
     const auto &func_name = cfg_func->lifted_name;
-    llvm::GlobalObject *func = gModule->getFunction(func_name);
+    llvm::Constant *func = gModule->getFunction(func_name);
     if (func) {
-      func = GetEntryPoint(reinterpret_cast<const NativeFunction *>(cfg_func),
-                         llvm::dyn_cast<llvm::Function>(func));
+      func = GetEntryPoint(
+          reinterpret_cast<const NativeFunction *>(cfg_func),
+          llvm::dyn_cast<llvm::Function>(func));
     } else {
-      func = gModule->getNamedGlobal(func_name);
+      func = gModule->getNamedAlias(func_name);
       LOG_IF(ERROR, func != nullptr)
           << "Function pointer to " << std::hex << cfg_func->ea
           << " with symbol " << func_name
@@ -100,23 +104,29 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
   } else if (cfg_xref->var) {
     auto cfg_var = cfg_xref->var;
     const auto &global_name = cfg_var->lifted_name;
-    llvm::GlobalObject *global = gModule->getNamedGlobal(global_name);
-    if (!global && (global = gModule->getFunction(global_name))) {
+    llvm::Constant *global = gModule->getNamedAlias(global_name);
+
+    if (global) {
+      global = llvm::ConstantExpr::getInBoundsGetElementPtr(
+          nullptr, global, zero);
+
+    } else if (auto func = gModule->getFunction(global_name)) {
       auto is_weak = llvm::GlobalValue::isExternalWeakLinkage(
-          global->getLinkage());
+          func->getLinkage());
+
       LOG_IF(ERROR, !is_weak)
           << "Data pointer to " << std::hex << cfg_var->ea
           << " with symbol " << global_name
           << " was resolved to a subroutine from " << std::hex << instr->pc
           << ". There is probably an error in the CFG script.";
 
-      global = GetEntryPoint(reinterpret_cast<const NativeFunction *>(cfg_var),
-                           llvm::dyn_cast<llvm::Function>(global));
+      global = GetEntryPoint(
+          reinterpret_cast<const NativeFunction *>(cfg_var), func);
+    } else {
+      LOG(FATAL)
+          << "Can't resolve external data reference to "
+          << global_name << " from " << std::hex << instr->pc;
     }
-
-    CHECK(global != nullptr)
-        << "Can't resolve external data reference to "
-        << global_name << " from " << std::hex << instr->pc;
 
     return ir.CreatePtrToInt(global, word_type);
 
@@ -127,12 +137,19 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
         << std::hex << instr->pc << " to " << std::hex << cfg_xref->target_ea
         << " must be in a known segment.";
 
-    auto global = gModule->getNamedGlobal(cfg_seg->lifted_name);
+    llvm::Constant *global = gModule->getNamedAlias(cfg_seg->lifted_name);
     CHECK(global != nullptr)
         << "Cannot find global variable for segment " << cfg_seg->name
         << " referenced by " << std::hex << instr->pc;
 
     auto offset = cfg_xref->target_ea - cfg_seg->ea;
+    auto byte_type = llvm::Type::getInt8Ty(*gContext);
+    auto byte_ptr_type = llvm::PointerType::get(byte_type, 0);
+
+    global = llvm::ConstantExpr::getInBoundsGetElementPtr(
+        byte_type, llvm::ConstantExpr::getBitCast(global, byte_ptr_type),
+        llvm::ConstantInt::get(word_type, offset));
+
     return ir.CreateAdd(
         ir.CreatePtrToInt(global, word_type),
         llvm::ConstantInt::get(word_type, offset, false));
@@ -142,6 +159,7 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
 llvm::Value *InstructionLifter::LiftImmediateOperand(
     remill::Instruction *instr, llvm::BasicBlock *block,
     llvm::Type *arg_type, remill::Operand &op) {
+
   if (imm_ref) {
     llvm::DataLayout data_layout(gModule);
     auto arg_size = data_layout.getTypeSizeInBits(arg_type);
