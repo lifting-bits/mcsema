@@ -51,6 +51,8 @@
 #include "mcsema/BC/Optimize.h"
 #include "mcsema/BC/Util.h"
 
+DEFINE_bool(disable_optimizer, false, "Disable interprocedural optimizations?");
+
 namespace mcsema {
 namespace {
 
@@ -111,7 +113,6 @@ static void RemoveFunction(llvm::Function *func) {
 
 static void RemoveFunction(const char *name) {
   if (auto func = gModule->getFunction(name)) {
-    func->setLinkage(llvm::GlobalValue::InternalLinkage);
     RemoveFunction(func);
   }
 }
@@ -174,39 +175,13 @@ static void RunO3(void) {
   module_manager.run(*gModule);
 }
 
+// Get a list of all ISELs.
 static std::vector<llvm::GlobalVariable *> FindISELs(void) {
   std::vector<llvm::GlobalVariable *> isels;
-  auto basic_block = gModule->getFunction("__remill_basic_block");
-  if (!basic_block) {
-    LOG(ERROR)
-        << "Not removing any ISELs or SEMs; can't find __remill_basic_block.";
-    return isels;
-  }
-
-  auto lifted_func_type = basic_block->getFunctionType();
-  auto mem_type = lifted_func_type->getParamType(0);
-  auto state_type = lifted_func_type->getParamType(1);
-
-  isels.reserve(gModule->size());
-  for (auto &isel : gModule->globals()) {
-    if (!isel.hasInitializer()) {
-      continue;
-    }
-
-    auto sem = llvm::dyn_cast<llvm::Function>(
-        isel.getInitializer()->stripPointerCasts());
-    if (!sem) {
-      continue;
-    }
-
-    auto sem_type = sem->getFunctionType();
-
-    if (mem_type == sem_type->getParamType(0) &&
-        state_type == sem_type->getParamType(1)) {
-      isels.push_back(&isel);
-    }
-  }
-
+  remill::ForEachISel(
+      gModule, [&](llvm::GlobalVariable *isel, llvm::Function *sem) {
+        isels.push_back(isel);
+      });
   return isels;
 }
 
@@ -251,7 +226,6 @@ static void RemoveIntrinsics(void) {
   RemoveFunction("__remill_basic_block");
   RemoveFunction("__remill_mark_as_used");
   RemoveFunction("__remill_defer_inlining");
-  RemoveFunction("__remill_function_return");
   RemoveFunction("__remill_mark_as_used");
 }
 
@@ -287,7 +261,16 @@ static void ReplaceMemReadOp(const char *name, llvm::Type *val_type) {
     auto addr = call_inst->getArgOperand(1);
 
     llvm::IRBuilder<> ir(call_inst);
-    auto ptr = ir.CreateIntToPtr(addr, llvm::PointerType::get(val_type, 0));
+    llvm::Value *ptr = nullptr;
+    if (auto as_int = llvm::dyn_cast<llvm::PtrToIntInst>(addr)) {
+      ptr = ir.CreateBitCast(
+          as_int->getPointerOperand(),
+          llvm::PointerType::get(val_type, as_int->getPointerAddressSpace()));
+
+    } else {
+      ptr = ir.CreateIntToPtr(addr, llvm::PointerType::get(val_type, 0));
+    }
+
     llvm::Value *val = ir.CreateLoad(ptr);
     if (val_type->isX86_FP80Ty()) {
       val = ir.CreateFPTrunc(val, func->getReturnType());
@@ -318,10 +301,20 @@ static void ReplaceMemWriteOp(const char *name, llvm::Type *val_type) {
     auto val = call_inst->getArgOperand(2);
 
     llvm::IRBuilder<> ir(call_inst);
-    auto ptr = ir.CreateIntToPtr(addr, llvm::PointerType::get(val_type, 0));
+
+    llvm::Value *ptr = nullptr;
+    if (auto as_int = llvm::dyn_cast<llvm::PtrToIntInst>(addr)) {
+      ptr = ir.CreateBitCast(
+          as_int->getPointerOperand(),
+          llvm::PointerType::get(val_type, as_int->getPointerAddressSpace()));
+    } else {
+      ptr = ir.CreateIntToPtr(addr, llvm::PointerType::get(val_type, 0));
+    }
+
     if (val_type->isX86_FP80Ty()) {
       val = ir.CreateFPExt(val, val_type);
     }
+
     ir.CreateStore(val, ptr);
     call_inst->replaceAllUsesWith(mem_ptr);
   }
@@ -372,7 +365,9 @@ void OptimizeModule(void) {
   LOG(INFO)
       << "Optimizing module.";
   RemoveISELs(isels);
-  RunO3();
+  if (!FLAGS_disable_optimizer) {
+    RunO3();
+  }
   RemoveIntrinsics();
   LowerMemOps();
   ReplaceBarrier("__remill_barrier_load_load");

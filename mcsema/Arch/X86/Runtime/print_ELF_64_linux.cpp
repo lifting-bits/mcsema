@@ -36,20 +36,40 @@ int main(void) {
   fprintf(out, "  .intel_syntax noprefix\n");
   fprintf(out, "\n");
 
+  // Thread-local lifted function attach target.
+  fprintf(out, "  .globl __mcsema_attach_target\n");
+  fprintf(out, "  .type __mcsema_attach_target,@object\n");
+  fprintf(out, "  .section .tbss,\"awT\",@nobits\n");
+  fprintf(out, "__mcsema_attach_target:\n");
+  fprintf(out, "  .zero %lu\n", 8);
+  fprintf(out, "  .size __mcsema_attach_target, 8\n");
+  fprintf(out, "\n");
+
+  // Thread-local lifted function attach target address.
+  fprintf(out, "  .globl __mcsema_attach_target_address\n");
+  fprintf(out, "  .type __mcsema_attach_target_address,@object\n");
+  fprintf(out, "  .section .tbss,\"awT\",@nobits\n");
+  fprintf(out, "__mcsema_attach_target_address:\n");
+  fprintf(out, "  .zero %lu\n", 8);
+  fprintf(out, "  .size __mcsema_attach_target_address, 8\n");
+  fprintf(out, "\n");
+
   // Thread-local state structure, named by `__mcsema_reg_state`.
   fprintf(out, "  .type __mcsema_reg_state,@object\n");
   fprintf(out, "  .section .tbss,\"awT\",@nobits\n");
+  fprintf(out, "  .align 16\n");
   fprintf(out, "__mcsema_reg_state:\n");
   fprintf(out, "  .zero %lu\n", sizeof(State));
-  fprintf(out, "  .size __mcsema_reg_state, 100\n");
+  fprintf(out, "  .size __mcsema_reg_state, %lu\n", sizeof(State));
   fprintf(out, "\n");
 
   // Thread-local stack structure, named by `__mcsema_stack`.
   fprintf(out, "  .type __mcsema_stack,@object\n");
   fprintf(out, "  .section .tbss,\"awT\",@nobits\n");
+  fprintf(out, "  .align 16\n");
   fprintf(out, "__mcsema_stack:\n");
   fprintf(out, "  .zero %lu\n", kStackSize);  // 1 MiB.
-  fprintf(out, "  .size __mcsema_stack, 100\n");
+  fprintf(out, "  .size __mcsema_stack, %lu\n", kStackSize);
   fprintf(out, "\n");
 
 
@@ -67,9 +87,7 @@ int main(void) {
   fprintf(out, "__mcsema_attach_call:\n");
   fprintf(out, "  .cfi_startproc\n");
 
-  // Pop the target function into the `State` structure. This resets `RSP`
-  // to what it should be on entry to `__mcsema_attach_call`.
-  fprintf(out, "  pop QWORD PTR fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(State, RIP));
+  // Note: Target of call is in `__mcsema_attach_target`.
 
   // General purpose registers.
   fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %lu], rax\n", __builtin_offsetof(State, RAX));
@@ -123,12 +141,19 @@ int main(void) {
   fprintf(out, "  lea rdi, [rip + __mcsema_detach_ret]\n");
   fprintf(out, "  push rdi\n");
 
-  // Last but not least, set up `RDI` to be the address of the state structure.
-  // A pointer to the state structure is passed as the first argument to lifted
-  // code functions.
-  fprintf(out, "  mov rdi, fs:[0]\n");
-  fprintf(out, "  lea rdi, [rdi + __mcsema_reg_state@TPOFF]\n");
-  fprintf(out, "  jmp fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(State, RIP));
+  // Pass zero as the memory pointer. We don't need this.
+  fprintf(out, "  xor rdi, rdi\n");
+
+  // Pass in the address of the `State` structure as the second argument.
+  fprintf(out, "  mov rsi, fs:[0]\n");
+  fprintf(out, "  lea rsi, [rsi + __mcsema_reg_state@TPOFF]\n");
+
+  // Fill in `State`'s RIP, and arg3 (PC address) with the attach target address.
+  fprintf(out, "  mov rdx, fs:[__mcsema_attach_target_address@TPOFF]\n");
+  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %lu], rdx\n", __builtin_offsetof(State, RIP));
+
+  // Jump to the lifted function.
+  fprintf(out, "  jmp fs:[__mcsema_attach_target@TPOFF]\n");
 
   fprintf(out, ".Lfunc_end1:\n");
   fprintf(out, "  .size __mcsema_attach_call,.Lfunc_end1-__mcsema_attach_call\n");
@@ -244,7 +269,6 @@ int main(void) {
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 
-
   // Implements `__mcsema_detach_ret`. This goes from lifted code into native code.
   // The native code pointer is located at the native `[State::RSP - 8]`
   // address.
@@ -253,7 +277,7 @@ int main(void) {
   fprintf(out, "__mcsema_detach_ret:\n");
   fprintf(out, "  .cfi_startproc\n");
 
-  // The lifted code emulated a ret, which did incremented `rsp` by 8.
+  // The lifted code emulated a ret, which incremented `rsp` by 8.
   // We "undo" that, then swap back to the native stack. When we swap, we
   // save into `State::RSP` where we are in the lifted stack, so that the
   // next attach can continue on where we left off.
@@ -350,14 +374,19 @@ int main(void) {
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 
-  // Implements `__mcsema_detach_call_value`. This is a thin wrapper around
-  // `__mcsema_detach_call`.
-  fprintf(out, "  .globl __mcsema_detach_call_value\n");
-  fprintf(out, "  .type __mcsema_detach_call_value,@function\n");
-  fprintf(out, "__mcsema_detach_call_value:\n");
+  // Implements `__remill_function_call`. This is a fully generic form of function
+  // call detaching that is unaware of the ABI / calling convention of the target.
+  fprintf(out, "  .globl __remill_jump\n");
+  fprintf(out, "  .type __remill_jump,@function\n");
+
+  fprintf(out, "  .globl __remill_function_call\n");
+  fprintf(out, "  .type __remill_function_call,@function\n");
+  fprintf(out, "__remill_function_call:\n");
+  fprintf(out, "__remill_jump:\n");
   fprintf(out, "  .cfi_startproc\n");
 
-  // Note: the bitcode has already put the target address into `State::RIP`.
+  // Note: the target address is in arg3, i.e. RDX.
+  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %lu], rdx\n", __builtin_offsetof(State, RIP));
 
   // Stash the callee-saved registers.
   fprintf(out, "  push rbx\n");
@@ -418,7 +447,7 @@ int main(void) {
   fprintf(out, "  jmp fs:[__mcsema_reg_state@TPOFF + %lu]\n", __builtin_offsetof(State, RIP));
 
   fprintf(out, ".Lfunc_end5:\n");
-  fprintf(out, "  .size __mcsema_detach_call_value,.Lfunc_end5-__mcsema_detach_call_value\n");
+  fprintf(out, "  .size __remill_function_call,.Lfunc_end5-__remill_function_call\n");
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 
@@ -435,6 +464,26 @@ int main(void) {
   fprintf(out, "  .size __mcsema_debug_get_reg_state,.Lfunc_end6-__mcsema_debug_get_reg_state\n");
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
+
+  // Error functions.
+  fprintf(out, "  .globl __remill_error\n");
+  fprintf(out, "  .type __remill_error,@function\n");
+
+  fprintf(out, "  .globl __remill_missing_block\n");
+  fprintf(out, "  .type __remill_missing_block,@function\n");
+
+  fprintf(out, "__remill_error:\n");
+  fprintf(out, "__remill_missing_block:\n");
+  fprintf(out, "  ud2\n");
+  fprintf(out, ".Lfunc_end7:\n");
+  fprintf(out, "  .size __remill_error,.Lfunc_end7-__remill_error\n");
+
+  fprintf(out, "  .globl __remill_function_return\n");
+  fprintf(out, "  .type __remill_function_return,@function\n");
+  fprintf(out, "__remill_function_return:\n");
+  fprintf(out, "  ud2\n");
+  fprintf(out, ".Lfunc_end8:\n");
+  fprintf(out, "  .size __remill_function_return,.Lfunc_end8-__remill_function_return\n");
   return 0;
 }
 

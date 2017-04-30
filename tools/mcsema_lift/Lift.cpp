@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 
 #include <iostream>
 #include <string>
@@ -107,14 +107,11 @@ int main(int argc, char *argv[]) {
   mcsema::gArch->PrepareModule(mcsema::gModule);
 
   auto cfg_module = mcsema::ReadProtoBuf(FLAGS_cfg);
-  mcsema::ArchInitAttachDetach();
-
   CHECK(mcsema::LiftCodeIntoModule(cfg_module))
       << "Unable to lift CFG from " << FLAGS_cfg << " into module "
       << FLAGS_output;
 
   remill::StoreModuleToFile(mcsema::gModule, FLAGS_output);
-
   google::ShutDownCommandLineFlags();
   google::ShutdownGoogleLogging();
 

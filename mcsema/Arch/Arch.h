@@ -76,8 +76,6 @@ llvm::Triple::OSType OSType(void);
 #define ArchPointerSize(...) ArchAddressSize()
 #define ArchGetCallingConv(...) ArchCallingConv()
 
-void ArchInitAttachDetach(void);
-
 llvm::Function *ArchAddEntryPointDriver(
     const std::string &name, llvm::Function *F);
 

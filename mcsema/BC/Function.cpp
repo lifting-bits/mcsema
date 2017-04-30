@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
@@ -46,6 +46,7 @@
 #include "remill/BC/Version.h"
 
 #include "mcsema/Arch/Arch.h"
+#include "mcsema/BC/Callback.h"
 #include "mcsema/BC/Function.h"
 #include "mcsema/BC/Instruction.h"
 #include "mcsema/BC/Lift.h"
@@ -135,28 +136,11 @@ static void InlineSubFuncCall(llvm::BasicBlock *block,
 static llvm::Function *FindFunction(TranslationContext &ctx,
                                     uint64_t target_pc) {
   if (ctx.cfg_inst->flow) {
-    auto target = ctx.cfg_inst->flow->func;
-    CHECK(target && target->is_external)
+    auto cfg_func = ctx.cfg_inst->flow->func;
+    CHECK(cfg_func && cfg_func->is_external)
         << "Broken invariant. Flow targets must be to external functions.";
 
-    std::stringstream ss;
-    ss << "call_extern_" << target->name;
-    auto driver_name = ss.str();
-
-    auto ext_func = gModule->getFunction(driver_name);
-    if (!ext_func) {
-      ext_func = llvm::dyn_cast<llvm::Function>(
-          gModule->getOrInsertFunction(
-              driver_name, ctx.lifted_func->getFunctionType()));
-
-      ext_func->removeFnAttr(llvm::Attribute::AlwaysInline);
-      ext_func->removeFnAttr(llvm::Attribute::InlineHint);
-      ext_func->removeFnAttr(llvm::Attribute::NoInline);
-      ext_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
-      ext_func->setLinkage(llvm::GlobalValue::ExternalLinkage);
-    }
-
-    return ext_func;
+    return GetLiftedToNativeExitPoint(cfg_func);
 
   } else if (auto func = GetLiftedFunction(ctx.cfg_module, target_pc)) {
     return func;

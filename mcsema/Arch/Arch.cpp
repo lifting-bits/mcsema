@@ -111,7 +111,6 @@ bool InitArch(const std::string &os, const std::string &arch) {
   return true;
 }
 
-
 unsigned ArchAddressSize(void) {
   return gAddressSize;
 }
@@ -148,67 +147,6 @@ SystemArchType SystemArch(llvm::Module *) {
   } else {
     LOG(FATAL)
         << "Unsupported triple";
-  }
-}
-
-static void InitADFeatues(llvm::Module *M, const char *name,
-                          llvm::FunctionType *EPTy) {
-  auto FC = M->getOrInsertFunction(name, EPTy);
-  auto F = llvm::dyn_cast<llvm::Function>(FC);
-  F->setLinkage(llvm::GlobalValue::ExternalLinkage);
-  F->addFnAttr(llvm::Attribute::Naked);
-}
-
-void ArchInitAttachDetach(void) {
-  auto VoidTy = llvm::Type::getVoidTy(*gContext);
-  auto EPTy = llvm::FunctionType::get(VoidTy, false);
-  const auto OS = SystemOS(gModule);
-  const auto Arch = SystemArch(gModule);
-
-  if (llvm::Triple::Linux == OS) {
-    if (_X86_64_ == Arch) {
-      InitADFeatues(gModule, "__mcsema_attach_call", EPTy);
-      InitADFeatues(gModule, "__mcsema_attach_ret", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_call", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_call_value", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_ret", EPTy);
-
-    } else {
-      InitADFeatues(gModule, "__mcsema_attach_call_cdecl", EPTy);
-      InitADFeatues(gModule, "__mcsema_attach_ret_cdecl", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_call_cdecl", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_ret_cdecl", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_call_value", EPTy);
-      InitADFeatues(gModule, "__mcsema_attach_ret_value", EPTy);
-
-      InitADFeatues(gModule, "__mcsema_detach_call_stdcall", EPTy);
-      InitADFeatues(gModule, "__mcsema_attach_ret_stdcall", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_call_fastcall", EPTy);
-      InitADFeatues(gModule, "__mcsema_attach_ret_fastcall", EPTy);
-    }
-  } else if (llvm::Triple::Win32 == OS) {
-    if (_X86_64_ == Arch) {
-      InitADFeatues(gModule, "__mcsema_attach_call", EPTy);
-      InitADFeatues(gModule, "__mcsema_attach_ret", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_call", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_call_value", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_ret", EPTy);
-    } else {
-      InitADFeatues(gModule, "__mcsema_attach_call_cdecl", EPTy);
-      InitADFeatues(gModule, "__mcsema_attach_ret_cdecl", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_call_cdecl", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_ret_cdecl", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_call_value", EPTy);
-      InitADFeatues(gModule, "__mcsema_attach_ret_value", EPTy);
-
-      InitADFeatues(gModule, "__mcsema_detach_call_stdcall", EPTy);
-      InitADFeatues(gModule, "__mcsema_attach_ret_stdcall", EPTy);
-      InitADFeatues(gModule, "__mcsema_detach_call_fastcall", EPTy);
-      InitADFeatues(gModule, "__mcsema_attach_ret_fastcall", EPTy);
-    }
-  } else {
-    LOG(FATAL)
-        << "Unknown OS Type!";
   }
 }
 

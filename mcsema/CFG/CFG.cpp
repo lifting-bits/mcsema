@@ -508,15 +508,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
     func->ea = static_cast<uint64_t>(cfg_extern_func.ea());
     func->is_external = true;
     func->is_weak = cfg_extern_func.is_weak();
-
-    if (func->is_weak) {
-      LOG(INFO)
-          << "Function " << func->name << " at " << std::hex << func->ea
-          << " is weak, not using an external stub name.";
-      func->lifted_name = func->name;
-    } else {
-      func->lifted_name = ExternalFuncName(cfg_extern_func);
-    }
+    func->lifted_name = ExternalFuncName(cfg_extern_func);
 
     CHECK(!func->name.empty())
         << "External function at " << std::hex << func->ea << " has no name.";

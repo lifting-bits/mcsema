@@ -322,14 +322,13 @@ namespace {
 static void ExportFunction(const NativeModule *cfg_module) {
   for (auto ea : cfg_module->exported_funcs) {
     auto cfg_func = cfg_module->ea_to_func.at(ea)->Get();
-    auto func = gModule->getFunction(cfg_func->lifted_name);
-    CHECK(func != nullptr)
+    CHECK(gModule->getFunction(cfg_func->lifted_name) != nullptr)
         << "Cannot find lifted version of exported function "
         << cfg_func->lifted_name;
 
     LOG(INFO)
         << "Exporting function " << cfg_func->name;
-    auto ep = GetEntryPoint(cfg_func, func);
+    auto ep = GetNativeToLiftedEntryPoint(cfg_func);
     ep->setLinkage(llvm::GlobalValue::ExternalLinkage);
     ep->setVisibility(llvm::GlobalValue::DefaultVisibility);
   }
@@ -340,7 +339,7 @@ static void ExportFunction(const NativeModule *cfg_module) {
 static void ExportVariables(const NativeModule *cfg_module) {
   for (auto ea : cfg_module->exported_vars) {
     auto cfg_var = cfg_module->ea_to_var.at(ea)->Get();
-    auto var = gModule->getNamedGlobal(cfg_var->lifted_name);
+    auto var = gModule->getNamedAlias(cfg_var->lifted_name);
     CHECK(var != nullptr)
         << "Cannot find lifted version of exported variable "
         << cfg_var->name;

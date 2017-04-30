@@ -75,58 +75,34 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
     return nullptr;
   }
 
-  auto zero = llvm::ConstantInt::get(word_type, 0);
-
   llvm::IRBuilder<> ir(block);
   if (cfg_xref->func) {
     auto cfg_func = cfg_xref->func;
-    const auto &func_name = cfg_func->lifted_name;
-    llvm::Constant *func = gModule->getFunction(func_name);
-    if (func) {
-      func = GetEntryPoint(
-          reinterpret_cast<const NativeFunction *>(cfg_func),
-          llvm::dyn_cast<llvm::Function>(func));
+    llvm::Function *func = nullptr;
+
+    // If this is a lifted function, then create a wrapper around it. The
+    // idea is that this reference to a lifted function can be leaked to
+    // native code as a callback, and so native code calling it must be able
+    // to swap into the lifted context.
+    if (!cfg_func->is_external) {
+      func = GetNativeToLiftedEntryPoint(cfg_func);
     } else {
-      func = gModule->getNamedAlias(func_name);
-      LOG_IF(ERROR, func != nullptr)
-          << "Function pointer to " << std::hex << cfg_func->ea
-          << " with symbol " << func_name
-          << " was resolved to a global variable from " << std::hex
-          << instr->pc << ". There is probably an error in the CFG script.";
+      func = gModule->getFunction(cfg_func->name);
     }
 
     CHECK(func != nullptr)
-        << "Can't resolve external code reference to "
-        << func_name << " from " << std::hex << instr->pc;
+        << "Can't resolve reference to function "
+        << cfg_func->name << " from " << std::hex << instr->pc;
 
     return ir.CreatePtrToInt(func, word_type);
 
   } else if (cfg_xref->var) {
     auto cfg_var = cfg_xref->var;
     const auto &global_name = cfg_var->lifted_name;
-    llvm::Constant *global = gModule->getNamedAlias(global_name);
-
-    if (global) {
-      global = llvm::ConstantExpr::getInBoundsGetElementPtr(
-          nullptr, global, zero);
-
-    } else if (auto func = gModule->getFunction(global_name)) {
-      auto is_weak = llvm::GlobalValue::isExternalWeakLinkage(
-          func->getLinkage());
-
-      LOG_IF(ERROR, !is_weak)
-          << "Data pointer to " << std::hex << cfg_var->ea
-          << " with symbol " << global_name
-          << " was resolved to a subroutine from " << std::hex << instr->pc
-          << ". There is probably an error in the CFG script.";
-
-      global = GetEntryPoint(
-          reinterpret_cast<const NativeFunction *>(cfg_var), func);
-    } else {
-      LOG(FATAL)
-          << "Can't resolve external data reference to "
-          << global_name << " from " << std::hex << instr->pc;
-    }
+    auto global = gModule->getNamedAlias(global_name);
+    CHECK(global != nullptr)
+        << "Can't resolve reference to variable "
+        << global_name << " from " << std::hex << instr->pc;
 
     return ir.CreatePtrToInt(global, word_type);
 
@@ -142,17 +118,16 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
         << "Cannot find global variable for segment " << cfg_seg->name
         << " referenced by " << std::hex << instr->pc;
 
+
     auto offset = cfg_xref->target_ea - cfg_seg->ea;
     auto byte_type = llvm::Type::getInt8Ty(*gContext);
     auto byte_ptr_type = llvm::PointerType::get(byte_type, 0);
+    CHECK(global->getType() == byte_ptr_type);
 
     global = llvm::ConstantExpr::getInBoundsGetElementPtr(
-        byte_type, llvm::ConstantExpr::getBitCast(global, byte_ptr_type),
-        llvm::ConstantInt::get(word_type, offset));
+        byte_type, global, llvm::ConstantInt::get(word_type, offset));
 
-    return ir.CreateAdd(
-        ir.CreatePtrToInt(global, word_type),
-        llvm::ConstantInt::get(word_type, offset, false));
+    return ir.CreatePtrToInt(global, word_type);
   }
 }
 

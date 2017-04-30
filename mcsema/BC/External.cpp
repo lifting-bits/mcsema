@@ -23,6 +23,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
+#include "mcsema/BC/Callback.h"
 #include "mcsema/BC/External.h"
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
@@ -35,41 +36,40 @@ static void MakeExternal(llvm::Constant *val) {
       llvm::GlobalValue::ExternalLinkage);
 }
 
-}  // namespace
-
-void DeclareExternals(const NativeModule *cfg_module) {
-  auto lifted_func_type = LiftedFunctionType();
-
-  // TODO(pag): Use the info from the CFG proto.
+// TODO(pag): Use the info from the CFG proto.
+static void DeclareExternal(const NativeExternalFunction *cfg_func) {
   auto func_type = llvm::FunctionType::get(
       llvm::Type::getVoidTy(*gContext), true);
 
-  // Declare external functions.
-  //
-  // TODO(pag): Calling conventions, argument counts, etc.
+  auto func = llvm::Function::Create(
+      func_type, llvm::GlobalValue::ExternalLinkage,
+      cfg_func->name, gModule);
+
+  if (cfg_func->is_weak) {
+    func->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
+  }
+}
+
+}  // namespace
+
+// Declare external functions.
+//
+// TODO(pag): Calling conventions, argument counts, etc.
+void DeclareExternals(const NativeModule *cfg_module) {
   for (const auto &entry : cfg_module->name_to_extern_func) {
     auto cfg_func = reinterpret_cast<const NativeExternalFunction *>(
         entry.second->Get());
 
+    CHECK(cfg_func->is_external)
+        << "Trying to declare function " << cfg_func->name << " as external.";
+
+    CHECK(cfg_func->name != cfg_func->lifted_name);
+
     // The "actual" external function.
-    auto func = llvm::dyn_cast<llvm::Function>(
-        gModule->getOrInsertFunction(cfg_func->name, func_type) \
-            ->stripPointerCasts());
-    MakeExternal(func);
-
-    if (cfg_func->is_weak) {
-      CHECK(cfg_func->name == cfg_func->lifted_name);
-      func->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
-
-    } else {
-      CHECK(cfg_func->name != cfg_func->lifted_name);
-
-      // Stub that will marshal lifted state into the native state.
-        gModule->getOrInsertFunction(cfg_func->lifted_name, lifted_func_type);
-
-        LOG(INFO)
-            << "Adding external " << cfg_func->name << " implemented by thunk "
-            << cfg_func->lifted_name;
+    if (!gModule->getFunction(cfg_func->name)) {
+      LOG(INFO)
+          << "Adding external " << cfg_func->name;
+      DeclareExternal(cfg_func);
     }
   }
 
