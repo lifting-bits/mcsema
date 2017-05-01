@@ -53,12 +53,66 @@ DEFINE_string(cfg, "", "Path to the CFG file containing code to lift.");
 DEFINE_string(output, "", "Output bitcode file name.");
 
 DECLARE_bool(version);
-DEFINE_bool(dumpcfg, false, "Dump the CFG contents to screen.");
+DEFINE_bool(dump_cfg, false, "Dump the CFG contents to screen.");
 
 namespace {
 
-static void PrintVersion(void);
-static void DumpCFG(const std::string &cfg_path);
+static void PrintVersion(void) {
+  std::cout
+      << "This is mcsema-lift version: " << MCSEMA_VERSION_STRING << std::endl
+      << "Built from branch: " << MCSEMA_BRANCH_NAME << std::endl
+      << "Using LLVM " << LLVM_VERSION_STRING << std::endl;
+}
+
+static void DumpCFG(const mcsema::NativeModule *native_module) {
+  std::ios::fmtflags original_stream_flags(std::cout.flags());
+
+  // print the header on stderr so that the user can easily pipe the output to grep/awk
+  std::cerr << "Type Attr Address          Blocks   Instrs   Name\n";
+
+  for (const auto &pair : native_module->ea_to_func) {
+    std::uint64_t virtual_address = pair.first;
+    const auto *native_func = pair.second;
+
+    std::cout << "FUNC " << (native_func->is_external ? "EXT  " : "INT  ");
+    std::cout << std::hex << std::setfill('0') << std::setw(16) << virtual_address << " ";
+
+    if (native_func->is_external) {
+        std::cout << std::setfill(' ') << std::setw(8) << "NA" << " ";
+        std::cout << std::setfill(' ') << std::setw(8) << "NA" << " ";
+    } else {
+      std::size_t basic_block_count = 0;
+      std::size_t instruction_count = 0;
+
+      for (const auto &address_block_pair : native_func->blocks) {
+        ++basic_block_count;
+        instruction_count += address_block_pair.second->instructions.size();
+      }
+
+      std::cout << std::dec << std::setfill('0') << std::setw(8) << basic_block_count << " ";
+      std::cout << std::dec << std::setfill('0') << std::setw(8) << instruction_count << " ";
+    }
+
+    std::cout << (native_func->name.empty() ? native_func->lifted_name : native_func->name) << "\n";
+  }
+
+  for (const auto &pair : native_module->ea_to_var) {
+    std::uint64_t virtual_address = pair.first;
+    const auto &native_var = pair.second;
+
+    std::cout << "VAR  " << (native_var->is_external ? "EXT  " : "INT  ");
+    std::cout << std::hex << std::setfill('0') << std::setw(16) << virtual_address << " ";
+
+    std::cout << std::setfill(' ') << std::setw(8) << "NA" << " ";
+    std::cout << std::setfill(' ') << std::setw(8) << "NA" << " ";
+
+    std::cout << (native_var->name.empty() ? native_var->lifted_name : native_var->name) << "\n";
+  }
+  std::cout << std::endl;
+
+  // make sure we don't leave the stream in a bad state
+  std::cout.flags(original_stream_flags);
+}
 
 }  // namespace
 
@@ -70,7 +124,7 @@ int main(int argc, char *argv[]) {
      << "    --arch ARCH_NAME \\" << std::endl
      << "    --os OS_NAME \\" << std::endl
      << "    --cfg CFG_FILE \\" << std::endl
-     << "    [--dumpcfg] \\" << std::endl
+     << "    [--dump_cfg] \\" << std::endl
      << "    [--version]" << std::endl
      << std::endl;
 
@@ -92,13 +146,8 @@ int main(int argc, char *argv[]) {
   CHECK(!FLAGS_cfg.empty())
       << "Must specify the path to a CFG file to --cfg.";
 
-  if (FLAGS_dumpcfg) {
-    DumpCFG(FLAGS_cfg);
-    return EXIT_SUCCESS;
-  }
-
-  CHECK(!FLAGS_output.empty())
-      << "Must specify the lifted bitcode output path to --output.";
+  CHECK(FLAGS_dump_cfg && FLAGS_output.empty() || !FLAGS_dump_cfg && !FLAGS_output.empty())
+      << "Must either specify the bitcode output path (--output) or the --dump_cfg parameter.";
 
   mcsema::gContext = new llvm::LLVMContext;
 
@@ -106,11 +155,16 @@ int main(int argc, char *argv[]) {
       << "Cannot initialize for arch " << FLAGS_arch
       << " and OS " << FLAGS_os << std::endl;
 
+  auto cfg_module = mcsema::ReadProtoBuf(FLAGS_cfg);
+  if (FLAGS_dump_cfg) {
+    DumpCFG(cfg_module);
+    return EXIT_SUCCESS;
+  }
+
   auto input = remill::FindSemanticsBitcodeFile("", FLAGS_arch);
   mcsema::gModule = remill::LoadModuleFromFile(mcsema::gContext, input);
   mcsema::gArch->PrepareModule(mcsema::gModule);
 
-  auto cfg_module = mcsema::ReadProtoBuf(FLAGS_cfg);
   CHECK(mcsema::LiftCodeIntoModule(cfg_module))
       << "Unable to lift CFG from " << FLAGS_cfg << " into module "
       << FLAGS_output;
@@ -121,65 +175,3 @@ int main(int argc, char *argv[]) {
 
   return EXIT_SUCCESS;
 }
-
-namespace {
-
-static void PrintVersion(void) {
-  std::cout
-      << "This is mcsema-lift version: " << MCSEMA_VERSION_STRING << std::endl
-      << "Built from branch: " << MCSEMA_BRANCH_NAME << std::endl
-      << "Using LLVM " << LLVM_VERSION_STRING << std::endl;
-}
-
-static void DumpCFG(const std::string &cfg_path) {
-  std::ios::fmtflags original_stream_flags(std::cout.flags());
-  auto native_module = mcsema::ReadProtoBuf(cfg_path);
-
-  // print the header on stderr so that the user can easily pipe the output to grep/awk
-  std::cerr << "Type Attr Address          Blocks   Instrs   Name\n";
-
-  for (const auto &pair : native_module->ea_to_func) {
-    std::uint64_t virtual_address = pair.first;
-    const auto *native_function = pair.second;
-
-    std::cout << "FUNC " << (native_function->is_external ? "EXT  " : "INT  ");
-    std::cout << std::hex << std::setfill('0') << std::setw(16) << virtual_address << " ";
-
-    if (native_function->is_external) {
-        std::cout << std::setfill(' ') << std::setw(8) << "NA" << " ";
-        std::cout << std::setfill(' ') << std::setw(8) << "NA" << " ";
-    } else {
-      std::size_t basic_block_count = 0;
-      std::size_t instruction_count = 0;
-
-      for (const auto &address_block_pair : native_function->blocks) {
-        ++basic_block_count;
-        instruction_count += address_block_pair.second->instructions.size();
-      }
-
-      std::cout << std::dec << std::setfill('0') << std::setw(8) << basic_block_count << " ";
-      std::cout << std::dec << std::setfill('0') << std::setw(8) << instruction_count << " ";
-    }
-
-    std::cout << native_function->lifted_name << "\n";
-  }
-
-  for (const auto &pair : native_module->ea_to_var) {
-    std::uint64_t virtual_address = pair.first;
-    const auto &native_variable = pair.second;
-
-    std::cout << "VAR  " << (native_variable->is_external ? "EXT  " : "INT  ");
-    std::cout << std::hex << std::setfill('0') << std::setw(16) << virtual_address << " ";
-
-    std::cout << std::setfill(' ') << std::setw(8) << "NA" << " ";
-    std::cout << std::setfill(' ') << std::setw(8) << "NA" << " ";
-
-    std::cout << native_variable->lifted_name << "\n";
-  }
-  std::cout << std::endl;
-
-  // make sure we don't leave the stream in a bad state
-  std::cout.flags(original_stream_flags);
-}
-
-}  // namespace
