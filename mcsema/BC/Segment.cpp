@@ -34,6 +34,7 @@
 #include <remill/BC/Util.h>
 
 #include "mcsema/Arch/Arch.h"
+#include "mcsema/BC/Callback.h"
 #include "mcsema/BC/Segment.h"
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
@@ -293,7 +294,11 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
 
       // Pointer to a (possibly external) function.
       if (auto cfg_func = xref->func) {
-        val = gModule->getFunction(cfg_func->lifted_name);
+        if (cfg_func->is_external) {
+          val = gModule->getFunction(cfg_func->name);
+        } else {
+          val = GetNativeToLiftedCallback(cfg_func);
+        }
         val = llvm::ConstantExpr::getPtrToInt(val, intptr_type);
         CHECK(val != nullptr)
             << "Can't insert cross reference to function "

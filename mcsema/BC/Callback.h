@@ -26,6 +26,10 @@ namespace mcsema {
 struct NativeObject;
 
 // Get a callback function for an internal function that can be referenced by
+// internal code.
+llvm::Function *GetNativeToLiftedCallback(const NativeObject *cfg_func);
+
+// Get a callback function for an internal function that can be referenced by
 // external code.
 llvm::Function *GetNativeToLiftedEntryPoint(const NativeObject *cfg_func);
 

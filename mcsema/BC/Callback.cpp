@@ -17,6 +17,7 @@
 #include <glog/logging.h>
 
 #include <sstream>
+#include <string>
 #include <vector>
 
 #include <llvm/IR/BasicBlock.h>
@@ -62,15 +63,15 @@ static llvm::Function *GetDetachCallValueFunc(void) {
   return handler;
 }
 
-}  // namespace
-
 // Get a callback function for an internal function.
-llvm::Function *GetNativeToLiftedEntryPoint(const NativeObject *cfg_func) {
+llvm::Function *GetNativeToLiftedCallback(
+    const NativeObject *cfg_func, const std::string callback_name) {
+
   CHECK(!cfg_func->is_external)
       << "Cannot get entry point thunk for external function "
       << cfg_func->name;
 
-  auto callback_func = gModule->getFunction(cfg_func->name);
+  auto callback_func = gModule->getFunction(callback_name);
   if (callback_func) {
     return callback_func;
   }
@@ -101,7 +102,7 @@ llvm::Function *GetNativeToLiftedEntryPoint(const NativeObject *cfg_func) {
     case remill::kArchX86:
     case remill::kArchX86_AVX:
     case remill::kArchX86_AVX512:
-      asm_str << "pushl %reax;"
+      asm_str << "pushl %eax;"
               << "movl $0, %eax;"
               << "xchgl (%esp), %eax;"
               << "pushl %eax;"
@@ -125,7 +126,7 @@ llvm::Function *GetNativeToLiftedEntryPoint(const NativeObject *cfg_func) {
 
   callback_func = llvm::Function::Create(
       callback_type, llvm::GlobalValue::InternalLinkage,  // Tentative linkage.
-      cfg_func->name, gModule);
+      callback_name, gModule);
 
   callback_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
   callback_func->setCallingConv(llvm::CallingConv::Fast);
@@ -153,6 +154,21 @@ llvm::Function *GetNativeToLiftedEntryPoint(const NativeObject *cfg_func) {
   AnnotateInsts(callback_func, cfg_func->ea);
 
   return callback_func;
+}
+
+}  // namespace
+
+// Get a callback function for an internal function that can be referenced by
+// internal code.
+llvm::Function *GetNativeToLiftedCallback(const NativeObject *cfg_func) {
+  std::stringstream ss;
+  ss << "callback_" << cfg_func->lifted_name;
+  return GetNativeToLiftedCallback(cfg_func, ss.str());
+}
+
+// Get a callback function for an internal function.
+llvm::Function *GetNativeToLiftedEntryPoint(const NativeObject *cfg_func) {
+  return GetNativeToLiftedCallback(cfg_func, cfg_func->name);
 }
 
 // Get a callback function for an external function that can be referenced by

@@ -36,10 +36,10 @@ int main(void) {
   fprintf(out, "  .intel_syntax noprefix\n");
   fprintf(out, "\n");
 
-  fprintf(out, "  .section .tbss,\"awT\",@nobits\n");
 
   // Thread-local state structure, named by `__mcsema_reg_state`.
   fprintf(out, "  .type __mcsema_reg_state,@object\n");
+  fprintf(out, "  .section .tbss,\"awT\",@nobits\n");
   fprintf(out, "  .align 16\n");
   fprintf(out, "__mcsema_reg_state:\n");
   fprintf(out, "  .zero %lu\n", sizeof(State));
@@ -48,6 +48,7 @@ int main(void) {
 
   // Thread-local stack structure, named by `__mcsema_stack`.
   fprintf(out, "  .type __mcsema_stack,@object\n");
+  fprintf(out, "  .section .tbss,\"awT\",@nobits\n");
   fprintf(out, "  .align 16\n");
   fprintf(out, "__mcsema_stack:\n");
   fprintf(out, "  .zero %lu\n", kStackSize);  // 1 MiB.
@@ -73,16 +74,18 @@ int main(void) {
   //     8  Address of the lifted function (from the bitcode).
   //    16  Return address into native caller.
 
-  // Set up arg2 with the address of the State structure.
+  // Set up arg2 with the address of the State structure. Also set up the `FS`
+  // segment register so that TLS works :-)
   fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %lu], rsi\n", __builtin_offsetof(State, RSI));
   fprintf(out, "  mov rsi, QWORD PTR fs:[0]\n");
-  fprintf(out, "  lea rsi, QWORD PTR [rsi + __mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  mov [rsi - __mcsema_reg_state@TPOFF + %lu], rsi\n", __builtin_offsetof(State, FS_BASE));
+  fprintf(out, "  lea rsi, QWORD PTR [rsi - __mcsema_reg_state@TPOFF]\n");
 
   // Set up arg3 with the address of the lifted function, as it appeared in
-  // the original binary.
+  // the original binary, also stash it into the `State` structure.
   fprintf(out, "  mov [rsi + %lu], rdx\n", __builtin_offsetof(State, RDX));
-  fprintf(out, "  pop QWORD PTR [rsi + %lu]\n", __builtin_offsetof(State, RIP));
   fprintf(out, "  pop rdx\n");  // Holds the lifted function address.
+  fprintf(out, "  mov [rsi + %lu], rdx\n", __builtin_offsetof(State, RIP));
 
   // General purpose registers.
   fprintf(out, "  mov [rsi + %lu], rax\n", __builtin_offsetof(State, RAX));
@@ -148,34 +151,38 @@ int main(void) {
   fprintf(out, "  bt QWORD PTR [rsp], 11\n");
   fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, OF));
 
-  fprintf(out, "  mov rdi, [rsi + %lu]\n", __builtin_offsetof(State, RSP));
-
   // If `RSP` is null then we need to initialize it to our new stack.
+  fprintf(out, "  mov rdi, [rsi + %lu]\n", __builtin_offsetof(State, RSP));
   fprintf(out, "  cmp rdi, 0\n");
   fprintf(out, "  jnz .Lhave_stack\n");
   fprintf(out, "  mov rdi, fs:[0]\n");
-  fprintf(out, "  lea rdi, [rdi + __mcsema_stack@TPOFF + %lu]\n", kStackSize);
+  fprintf(out, "  lea rdi, [rdi - __mcsema_stack@TPOFF + %lu]\n", kStackSize);
   fprintf(out, ".Lhave_stack:\n");
-
-  // Swap onto the lifted stack.
-  fprintf(out, "  mov [rsi + %lu], rsp\n", __builtin_offsetof(State, RSP));
-  fprintf(out, "  mov rsp, rdi\n");
 
   // Set up a return address so that when the lifted function returns, it will
   // go to `__mcsema_detach_ret`, which will return to native code.
-  fprintf(out, "  lea rdi, [rip + __mcsema_detach_ret]\n");
-  fprintf(out, "  push rdi\n");
+  fprintf(out, "  lea rax, [rip + __mcsema_detach_ret]\n");
+  fprintf(out, "  mov [rdi - 8], rax\n");
 
-  // Pass zero as the memory pointer. We don't need this.
+  // Put the address of the lifted function onto the lifted stack, so that we
+  // can `RET` into the lifted function.
+  fprintf(out, "  pop QWORD PTR [rdi - 16]\n");
+
+  // Swap onto the lifted stack. The native `RSP` is now where it should be.
+  fprintf(out, "  mov [rsi + %lu], rsp\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  lea rsp, [rdi - 16]\n");
+
+  // Set up arg1 as the memory pointer, which is (for now?) a nullptr.
   fprintf(out, "  xor rdi, rdi\n");
+
+  // The address of the lifted function is still on the stack, and `RDX` holds
+  // the native PC of the original function.
 
   // RDX currently holds the address of the lifted function (where we want to
   // go). Inside of the lifted function, RDX (arg3 of AMD64 ABI) needs to hold
   // the same thing as State::RIP. So, push on the address of the lifted
   // function, get RDX right, then `RET` to the lifted function.
-  fprintf(out, "  push rdx\n");
-  fprintf(out, "  mov rdx, [rsi + %lu]\n", __builtin_offsetof(State, RIP));
-  fprintf(out, "  ret\n", __builtin_offsetof(State, RIP));
+  fprintf(out, "  ret\n");
 
   fprintf(out, ".Lfunc_end1:\n");
   fprintf(out, "  .size __mcsema_attach_call,.Lfunc_end1-__mcsema_attach_call\n");
@@ -191,13 +198,14 @@ int main(void) {
   fprintf(out, "  .cfi_startproc\n");
 
   fprintf(out, "  mov rsi, QWORD PTR fs:[0]\n");
-  fprintf(out, "  lea rsi, QWORD PTR [rsi + __mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  lea rsi, QWORD PTR [rsi - __mcsema_reg_state@TPOFF]\n");
 
   // The lifted code emulated a ret, which incremented `rsp` by 8.
   // We "undo" that, then swap back to the native stack. When we swap, we
   // save into `State::RSP` where we are in the lifted stack, so that the
   // next attach can continue on where we left off.
   fprintf(out, "  sub QWORD PTR [rsi + %lu], 8\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  xchg [rsi + %lu], rsp\n", __builtin_offsetof(State, RSP));
 
   // General purpose registers.
   fprintf(out, "  mov rax, [rsi + %lu]\n", __builtin_offsetof(State, RAX));
@@ -214,8 +222,6 @@ int main(void) {
   fprintf(out, "  mov r13, [rsi + %lu]\n", __builtin_offsetof(State, R13));
   fprintf(out, "  mov r14, [rsi + %lu]\n", __builtin_offsetof(State, R14));
   fprintf(out, "  mov r15, [rsi + %lu]\n", __builtin_offsetof(State, R15));
-
-  fprintf(out, "  xchg [rsi + %lu], rsp\n", __builtin_offsetof(State, RSP));
 
   // XMM registers.
   fprintf(out, "  movntdqa xmm0, [rsi + %lu]\n", __builtin_offsetof(State, XMM0));
@@ -272,18 +278,21 @@ int main(void) {
   // Stash the return address stored on the native stack, the replace it
   // with the re-attach function.
   fprintf(out, "  mov r15, [rsi + %lu]\n", __builtin_offsetof(State, RSP));
-  fprintf(out, "  push r15\n");
+  fprintf(out, "  push QWORD PTR [r15]\n");
   fprintf(out, "  lea r14, [rip + __mcsema_attach_ret]\n");
   fprintf(out, "  mov QWORD PTR [r15], r14\n");
 
-  // Push the target address onto the native stack. We will `ret` to the target
-  // later on.
+  // Emulate a push of the target address onto the native stack. We will
+  // `ret` to the target later on.
   //
   // Note: The target address is passed as arg3 (pc) to `__remill_function_call`
   //       which is `RDX` in the AMD64 ABI.
   fprintf(out, "  sub r15, 8\n");
   fprintf(out, "  mov QWORD PTR [r15], rdx\n");
-  fprintf(out, "  mov [rsi + %lu], r15\n", __builtin_offsetof(State, RSP));
+
+  // Swap off-stack, stash the lifted stack pointer.
+  fprintf(out, "  mov [rsi + %lu], rsp\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  mov rsp, r15\n");
 
   // (Most) General purpose registers.
   fprintf(out, "  mov rax, [rsi + %lu]\n", __builtin_offsetof(State, RAX));
@@ -300,9 +309,6 @@ int main(void) {
   fprintf(out, "  mov r13, [rsi + %lu]\n", __builtin_offsetof(State, R13));
   fprintf(out, "  mov r14, [rsi + %lu]\n", __builtin_offsetof(State, R14));
   fprintf(out, "  mov r15, [rsi + %lu]\n", __builtin_offsetof(State, R15));
-
-  // Swap off-stack, stash the lifted stack pointer.
-  fprintf(out, "  xchg rsp, [rsi + %lu]\n", __builtin_offsetof(State, RSP));
 
   // XMM registers.
   fprintf(out, "  movntdqa xmm0, [rsi + %lu]\n", __builtin_offsetof(State, XMM0));
@@ -344,10 +350,12 @@ int main(void) {
   fprintf(out, "  .cfi_startproc\n");
 
   // Copy RSI, then store the address of the reg state struct into RSI for
-  // easier indexing later on.
+  // easier indexing later on. Also set up the `FS` segment register so that
+  // TLS works :-)
   fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %lu], rsi\n", __builtin_offsetof(State, RSI));
   fprintf(out, "  mov rsi, QWORD PTR fs:[0]\n");
-  fprintf(out, "  lea rsi, QWORD PTR [rsi + __mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  mov [rsi - __mcsema_reg_state@TPOFF + %lu], rsi\n", __builtin_offsetof(State, FS_BASE));
+  fprintf(out, "  lea rsi, QWORD PTR [rsi - __mcsema_reg_state@TPOFF]\n");
 
   // General purpose registers.
   fprintf(out, "  mov [rsi + %lu], rax\n", __builtin_offsetof(State, RAX));
@@ -422,7 +430,7 @@ int main(void) {
   fprintf(out, "__mcsema_debug_get_reg_state:\n");
   fprintf(out, "  .cfi_startproc\n");
   fprintf(out, "  mov rax, fs:[0]\n");
-  fprintf(out, "  lea rax, [rax + __mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  lea rax, [rax - __mcsema_reg_state@TPOFF]\n");
   fprintf(out, "  ret\n");
   fprintf(out, ".Lfunc_end6:\n");
   fprintf(out, "  .size __mcsema_debug_get_reg_state,.Lfunc_end6-__mcsema_debug_get_reg_state\n");

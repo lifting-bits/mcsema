@@ -84,10 +84,10 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
     // idea is that this reference to a lifted function can be leaked to
     // native code as a callback, and so native code calling it must be able
     // to swap into the lifted context.
-    if (!cfg_func->is_external) {
-      func = GetNativeToLiftedEntryPoint(cfg_func);
-    } else {
+    if (cfg_func->is_external) {
       func = gModule->getFunction(cfg_func->name);
+    } else {
+      func = GetNativeToLiftedCallback(cfg_func);
     }
 
     CHECK(func != nullptr)
@@ -118,8 +118,6 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
 
       return ir.CreatePtrToInt(global, word_type);
     }
-
-
   } else {
     auto cfg_seg = cfg_xref->target_segment;
     CHECK(cfg_seg != nullptr)
