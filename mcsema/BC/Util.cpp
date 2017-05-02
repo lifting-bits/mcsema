@@ -20,22 +20,57 @@
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Metadata.h>
+#include <llvm/IR/MDBuilder.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
+
+#include "remill/Arch/Arch.h"
+#include "remill/BC/Version.h"
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Util.h"
 
 namespace mcsema {
+namespace {
+static const char * const kRealEIPAnnotation = "mcsema_real_eip";
+
+// Create the node for a `mcsema_real_eip` annotation.
+static llvm::MDNode *CreateInstAnnotation(llvm::Function *F, uint64_t addr) {
+  auto word_type = llvm::Type::getIntNTy(
+      *gContext, static_cast<unsigned>(gArch->address_size));
+  auto addr_val = llvm::ConstantInt::get(word_type, addr);
+#if LLVM_VERSION_NUMBER >= LLVM_VERSION(3, 6)
+  auto addr_md = llvm::ValueAsMetadata::get(addr_val);
+  return llvm::MDNode::get(*gContext, addr_md);
+#else
+  return llvm::MDNode::get(*gContext, addr_val);
+#endif
+}
+
+// Annotate and instruction with the `mcsema_real_eip` annotation if that
+// instruction is unannotated.
+static void AnnotateInst(llvm::Instruction *inst, llvm::MDNode *annot) {
+  if (!inst->getMetadata(kRealEIPAnnotation)) {
+    inst->setMetadata(kRealEIPAnnotation, annot);
+  }
+}
+
+}  // namespace
 
 llvm::LLVMContext *gContext = nullptr;
 llvm::Module *gModule = nullptr;
 
-//// Return a constnat integer of width `width` and value `val`.
-//llvm::ConstantInt *CreateConstantInt(int width, uint64_t val) {
-//  auto bTy = llvm::Type::getIntNTy(*gContext, width);
-//  return llvm::ConstantInt::get(bTy, val);
-//}
+// Create a `mcsema_real_eip` annotation, and annotate every unannotated
+// instruction with this new annotation.
+void AnnotateInsts(llvm::Function *func, uint64_t pc) {
+  auto annot = CreateInstAnnotation(func, pc);
+  for (llvm::BasicBlock &block : *func) {
+    for (llvm::Instruction &inst : block) {
+      AnnotateInst(&inst, annot);
+    }
+  }
+}
 
 // Return the type of a lifted function.
 llvm::FunctionType *LiftedFunctionType(void) {

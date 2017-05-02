@@ -36,27 +36,13 @@ namespace mcsema {
 extern llvm::LLVMContext *gContext;
 extern llvm::Module *gModule;
 
-//// Return a constnat integer of width `width` and value `val`.
-//llvm::ConstantInt *CreateConstantInt(int width, uint64_t val);
+// Create a `mcsema_real_eip` annotation, and annotate every unannotated
+// instruction with this new annotation.
+void AnnotateInsts(llvm::Function *func, uint64_t pc);
 
 // Return the type of a lifted function.
 llvm::FunctionType *LiftedFunctionType(void);
 
-//template <int width>
-//inline static llvm::ConstantInt *CONST_V_INT(
-//    llvm::LLVMContext &, uint64_t val) {
-//  return CreateConstantInt(width, val);
-//}
-//
-//template <int width>
-//inline static llvm::ConstantInt *CONST_V(llvm::BasicBlock *, uint64_t val) {
-//  return CreateConstantInt(width, val);
-//}
-//
-//inline static llvm::ConstantInt *CONST_V(llvm::BasicBlock *, unsigned width,
-//                                         uint64_t val) {
-//  return CreateConstantInt(width, val);
-//}
 
 enum StoreSpillType {
   AllRegs = (1 << 0),   // store/spill all regs

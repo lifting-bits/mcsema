@@ -63,38 +63,6 @@ DECLARE_bool(add_breakpoints);  // Already part of Remill's lifting process.
 
 namespace mcsema {
 namespace {
-static const char * const kRealEIPAnnotation = "mcsema_real_eip";
-
-// Create the node for a `mcsema_real_eip` annotation.
-static llvm::MDNode *CreateInstAnnotation(llvm::Function *F, uint64_t addr) {
-  auto &C = F->getContext();
-  auto addr_val = llvm::ConstantInt::get(llvm::Type::getInt64Ty(C), addr);
-#if LLVM_VERSION_NUMBER >= LLVM_VERSION(3, 6)
-  auto addr_md = llvm::ValueAsMetadata::get(addr_val);
-  return llvm::MDNode::get(C, addr_md);
-#else
-  return llvm::MDNode::get(C, addr_val);
-#endif
-}
-
-// Annotate and instruction with the `mcsema_real_eip` annotation if that
-// instruction is unannotated.
-static void AnnotateInst(llvm::Instruction *inst, llvm::MDNode *annot) {
-  if (!inst->getMetadata(kRealEIPAnnotation)) {
-    inst->setMetadata(kRealEIPAnnotation, annot);
-  }
-}
-
-// Create a `mcsema_real_eip` annotation, and annotate every unannotated
-// instruction with this new annotation.
-static void AnnotateInsts(llvm::Function *F, uint64_t pc) {
-  auto annot = CreateInstAnnotation(F, pc);
-  for (llvm::BasicBlock &B : *F) {
-    for (llvm::Instruction &I : B) {
-      AnnotateInst(&I, annot);
-    }
-  }
-}
 
 // Tries to get the lifted function beginning at `pc`.
 static llvm::Function *GetLiftedFunction(const NativeModule *cfg_module,
@@ -301,7 +269,6 @@ static bool TryLiftTerminator(TranslationContext &ctx,
             << "Not adding a subroutine self-call at "
             << std::hex << instr->pc;
       }
-      remill::StoreProgramCounter(block, instr->next_pc);
       return false;
 
     case remill::Instruction::kCategoryIndirectFunctionCall:

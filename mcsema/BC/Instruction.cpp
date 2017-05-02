@@ -98,13 +98,27 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
 
   } else if (cfg_xref->var) {
     auto cfg_var = cfg_xref->var;
-    const auto &global_name = cfg_var->lifted_name;
-    auto global = gModule->getNamedAlias(global_name);
-    CHECK(global != nullptr)
-        << "Can't resolve reference to variable "
-        << global_name << " from " << std::hex << instr->pc;
 
-    return ir.CreatePtrToInt(global, word_type);
+    // External variables are declared as global variables.
+    if (cfg_var->is_external) {
+      auto global = gModule->getGlobalVariable(cfg_var->name);
+      CHECK(global != nullptr)
+          << "Can't resolve reference to external variable "
+          << cfg_var->name << " from " << std::hex << instr->pc;
+
+      return ir.CreatePtrToInt(global, word_type);
+
+    // Internal global variables are aliases pointing into the
+    // lifted data segments.
+    } else {
+      auto global = gModule->getNamedAlias(cfg_var->lifted_name);
+      CHECK(global != nullptr)
+          << "Can't resolve reference to internal variable "
+          << cfg_var->lifted_name << " from " << std::hex << instr->pc;
+
+      return ir.CreatePtrToInt(global, word_type);
+    }
+
 
   } else {
     auto cfg_seg = cfg_xref->target_segment;

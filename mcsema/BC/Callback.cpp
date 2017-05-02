@@ -49,6 +49,7 @@ static llvm::Function *GetAttachCallFunc(void) {
         callback_type, llvm::GlobalValue::ExternalLinkage,
         "__mcsema_attach_call", gModule);
     handler->addFnAttr(llvm::Attribute::Naked);
+    handler->setCallingConv(llvm::CallingConv::Fast);
   }
   return handler;
 }
@@ -59,44 +60,6 @@ static llvm::Function *GetDetachCallValueFunc(void) {
     handler = gModule->getFunction("__remill_function_call");
   }
   return handler;
-}
-
-// Exported functions, e.g. `main`, are implemented as a small thunk that
-// writes the address of the lifted function to the `__mcsema_attach_target`
-// thread-local variable. This is so that `__mcsema_attach_call` can figure
-// out where to go.
-static llvm::GlobalVariable *GetAttachTarget(void) {
-  static llvm::GlobalVariable *target = nullptr;
-  if (!target) {
-    target = new llvm::GlobalVariable(
-        *gModule, llvm::PointerType::get(LiftedFunctionType(), 0),
-        false  /* IsConstant */, llvm::GlobalValue::ExternalLinkage,
-        nullptr  /* Initializer */, "__mcsema_attach_target",
-        nullptr  /* InsertBefore */, llvm::GlobalValue::InitialExecTLSModel,
-        0  /* AddressSpace */, true  /* IsExternallyInitialized */);
-  }
-  return target;
-}
-
-// Exported functions, e.g. `main`, are implemented as a small thunk that
-// writes the native address (as recorded in the CFG) of the lifted function
-// to the `__mcsema_attach_target_address` thread-local variable. This is
-// so that the right value can be passed in as the third argument (pc) to the
-// lifted function.
-static llvm::GlobalVariable *GetAttachTargetAddress(void) {
-  static llvm::GlobalVariable *target = nullptr;
-  if (!target) {
-    auto word_type = llvm::Type::getIntNTy(
-        *gContext, static_cast<unsigned>(gArch->address_size));
-
-    target = new llvm::GlobalVariable(
-        *gModule, word_type, false  /* IsConstant */,
-        llvm::GlobalValue::ExternalLinkage, nullptr  /* Initializer */,
-        "__mcsema_attach_target_address", nullptr  /* InsertBefore */,
-        llvm::GlobalValue::InitialExecTLSModel, 0  /* AddressSpace */,
-        true  /* IsExternallyInitialized */);
-  }
-  return target;
 }
 
 }  // namespace
@@ -113,31 +76,81 @@ llvm::Function *GetNativeToLiftedEntryPoint(const NativeObject *cfg_func) {
   }
 
   // If the native name of the function doesn't yet exist then add it in.
-  auto void_type = llvm::Type::getVoidTy(*gContext);
   auto func = gModule->getFunction(cfg_func->lifted_name);
   CHECK(func != nullptr)
       << "Cannot find lifted function " << cfg_func->lifted_name;
 
+  std::stringstream asm_str;
+  switch (gArch->arch_name) {
+    case remill::kArchInvalid:
+      LOG(FATAL)
+          << "Cannot generate native-to-lifted entrypoint thunk for "
+          << "unknown architecture.";
+      break;
+    case remill::kArchAMD64:
+    case remill::kArchAMD64_AVX:
+    case remill::kArchAMD64_AVX512:
+      asm_str << "pushq %rax;"
+              << "movq $0, %rax;"
+              << "xchgq (%rsp), %rax;"
+              << "pushq %rax;"
+              << "movq $1, %rax;"
+              << "xchgq (%rsp), %rax;";
+      break;
+
+    case remill::kArchX86:
+    case remill::kArchX86_AVX:
+    case remill::kArchX86_AVX512:
+      asm_str << "pushl %reax;"
+              << "movl $0, %eax;"
+              << "xchgl (%esp), %eax;"
+              << "pushl %eax;"
+              << "movl $1, %eax;"
+              << "xchgl (%esp), %eax;";
+      break;
+  }
+
+  auto void_type = llvm::Type::getVoidTy(*gContext);
+  auto callback_type = llvm::FunctionType::get(void_type, false);
   auto word_type = llvm::Type::getIntNTy(
       *gContext, static_cast<unsigned>(gArch->address_size));
 
-  auto callback_type = llvm::FunctionType::get(void_type, false);
+  // Saves a reg on the stack.
+  std::vector<llvm::Type *> param_types;
+  param_types.push_back(llvm::PointerType::get(word_type, 0));
+  param_types.push_back(param_types[0]);
+  auto asm_func_type = llvm::FunctionType::get(void_type, param_types, false);
+  auto asm_func = llvm::InlineAsm::get(
+      asm_func_type, asm_str.str(), "*m,*m,~{dirflag},~{fpsr},~{flags}", true);
+
   callback_func = llvm::Function::Create(
       callback_type, llvm::GlobalValue::InternalLinkage,  // Tentative linkage.
       cfg_func->name, gModule);
 
   callback_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
+  callback_func->setCallingConv(llvm::CallingConv::Fast);
   callback_func->addFnAttr(llvm::Attribute::Naked);
   callback_func->addFnAttr(llvm::Attribute::NoInline);
   callback_func->addFnAttr(llvm::Attribute::NoBuiltin);
 
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", callback_func));
-  ir.CreateStore(func, GetAttachTarget());
-  ir.CreateStore(llvm::ConstantInt::get(word_type, cfg_func->ea),
-                 GetAttachTargetAddress());
+
+  std::vector<llvm::Value *> asm_args;
+  asm_args.push_back(new llvm::GlobalVariable(
+      *gModule, word_type, true, llvm::GlobalValue::InternalLinkage,
+      llvm::ConstantExpr::getPtrToInt(func, word_type)));
+
+  asm_args.push_back(new llvm::GlobalVariable(
+      *gModule, word_type, true, llvm::GlobalValue::InternalLinkage,
+      llvm::ConstantInt::get(word_type, cfg_func->ea)));
+
+  ir.CreateCall(asm_func, asm_args);
+
   auto handler_call = ir.CreateCall(GetAttachCallFunc());
-  handler_call->setTailCallKind(llvm::CallInst::TCK_MustTail);
+  handler_call->setTailCall(true);
   ir.CreateRetVoid();
+
+  AnnotateInsts(callback_func, cfg_func->ea);
 
   return callback_func;
 }
@@ -185,6 +198,8 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func) {
   auto handler_call = ir.CreateCall(GetDetachCallValueFunc(), args);
   handler_call->setTailCall(true);
   ir.CreateRet(handler_call);
+
+  AnnotateInsts(callback_func, cfg_func->ea);
 
   return callback_func;
 }

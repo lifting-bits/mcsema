@@ -247,8 +247,8 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
 
   std::vector<llvm::Constant *> entry_vals;
   for (const auto &cfg_seg_entry : cfg_seg->entries) {
-    auto entry = cfg_seg_entry.second;
 
+    auto entry = cfg_seg_entry.second;
     auto entry_type = seg_type->getContainedType(i++);
 
     // This entry is an opaque sequence of bytes.
@@ -312,7 +312,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
       // Pointer to an unnamed location inside of a data segment.
       } else {
         auto seg = gModule->getNamedAlias(xref->target_segment->lifted_name);
-        auto offset = xref->target_ea - cfg_seg->ea;
+        auto offset = xref->target_ea - xref->target_segment->ea;
         auto disp = llvm::ConstantInt::get(intptr_type, offset, false);
         auto seg_base = llvm::ConstantExpr::getPtrToInt(seg, intptr_type);
         val = llvm::ConstantExpr::getAdd(seg_base, disp);
@@ -343,6 +343,7 @@ static void FillRegion(llvm::GlobalVariable *global, const SegmentMap &region) {
   std::vector<llvm::Constant *> entry_vals;
   auto region_type = llvm::dyn_cast<llvm::StructType>(
       remill::GetValueType(global));
+
   unsigned i = 0;
   for (const auto &entry : region) {
     auto cfg_seg = entry.second;

@@ -31,11 +31,6 @@
 namespace mcsema {
 namespace {
 
-static void MakeExternal(llvm::Constant *val) {
-  llvm::dyn_cast<llvm::GlobalValue>(val)->setLinkage(
-      llvm::GlobalValue::ExternalLinkage);
-}
-
 // TODO(pag): Use the info from the CFG proto.
 static void DeclareExternal(const NativeExternalFunction *cfg_func) {
   auto func_type = llvm::FunctionType::get(
@@ -68,7 +63,7 @@ void DeclareExternals(const NativeModule *cfg_module) {
     // The "actual" external function.
     if (!gModule->getFunction(cfg_func->name)) {
       LOG(INFO)
-          << "Adding external " << cfg_func->name;
+          << "Adding external function " << cfg_func->name;
       DeclareExternal(cfg_func);
     }
   }
@@ -77,9 +72,18 @@ void DeclareExternals(const NativeModule *cfg_module) {
   for (const auto &entry : cfg_module->name_to_extern_var) {
     auto cfg_var = reinterpret_cast<const NativeExternalVariable *>(
         entry.second->Get());
-    auto var_type = llvm::Type::getIntNTy(
-        *gContext, static_cast<unsigned>(cfg_var->size * 8));
-    MakeExternal(gModule->getOrInsertGlobal(cfg_var->name, var_type));
+
+    if (!gModule->getGlobalVariable(cfg_var->name)) {
+      LOG(INFO)
+          << "Adding external variable " << cfg_var->name;
+
+      auto var_type = llvm::Type::getIntNTy(
+          *gContext, static_cast<unsigned>(cfg_var->size * 8));
+
+      (void) new llvm::GlobalVariable(
+          *gModule, var_type, false, llvm::GlobalValue::ExternalLinkage,
+          nullptr, cfg_var->name);
+    }
   }
 }
 

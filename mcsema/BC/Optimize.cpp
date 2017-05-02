@@ -179,7 +179,7 @@ static void RunO3(void) {
 static std::vector<llvm::GlobalVariable *> FindISELs(void) {
   std::vector<llvm::GlobalVariable *> isels;
   remill::ForEachISel(
-      gModule, [&](llvm::GlobalVariable *isel, llvm::Function *sem) {
+      gModule, [&](llvm::GlobalVariable *isel, llvm::Function *) {
         isels.push_back(isel);
       });
   return isels;
@@ -364,9 +364,19 @@ void OptimizeModule(void) {
   RemoveIntrinsics();
   LOG(INFO)
       << "Optimizing module.";
-  RemoveISELs(isels);
   if (!FLAGS_disable_optimizer) {
+    RemoveISELs(isels);
     RunO3();
+  } else {
+    remill::ForEachISel(
+        gModule, [&](llvm::GlobalVariable *, llvm::Function *sem) {
+          if (sem->hasNUsesOrMore(2)) {
+            sem->removeFnAttr(llvm::Attribute::InlineHint);
+            sem->removeFnAttr(llvm::Attribute::AlwaysInline);
+            sem->addFnAttr(llvm::Attribute::NoInline);
+          }
+        });
+    RemoveISELs(isels);
   }
   RemoveIntrinsics();
   LowerMemOps();
