@@ -506,6 +506,25 @@ NativeModule::NativeModule(
       module_name(module_name_),
       triple(triple_) {}
 
+NativeModule::~NativeModule() {
+  for (ExternalCodeRefPtr ptr : this->external_code_refs) {
+    delete ptr;
+  }
+
+  for (ExternalDataRefPtr ptr : this->external_data_refs) {
+    delete ptr;
+  }
+
+  for (const auto &function_descriptor : this->funcs) {
+    NativeFunctionPtr function = function_descriptor.second;
+    delete function;
+  }
+
+  this->external_code_refs.clear();
+  this->external_data_refs.clear();
+  this->funcs.clear();
+}
+
 VA NativeFunction::get_start(void) {
   return this->funcEntryVA;
 }
@@ -536,6 +555,14 @@ void NativeFunction::add_stackvar(NativeStackVarPtr s) {
 NativeBlock::NativeBlock(VA b)
     : baseAddr(b) {}
 
+NativeBlock::~NativeBlock() {
+  for (NativeInstPtr ptr : this->instructions) {
+    delete ptr;
+  }
+
+  this->instructions.clear();
+}
+
 void NativeBlock::add_inst(NativeInstPtr p) {
   this->instructions.push_back(p);
 }
@@ -554,6 +581,15 @@ std::list<VA> &NativeBlock::get_follows(void) {
 
 const std::list<NativeInstPtr> &NativeBlock::get_insts(void) {
   return this->instructions;
+}
+
+NativeFunction::~NativeFunction() {
+  for (const auto &native_block_descriptor : this->blocks) {
+    NativeBlockPtr ptr = native_block_descriptor.second;
+    delete ptr;
+  }
+
+  this->blocks.clear();
 }
 
 void NativeFunction::add_block(NativeBlockPtr b) {

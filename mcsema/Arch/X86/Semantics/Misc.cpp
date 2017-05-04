@@ -270,7 +270,7 @@ static InstTransResult doRdtsc(llvm::BasicBlock *b) {
   auto low = new llvm::TruncInst(ret, Int32Ty, "", b);
   auto high = new llvm::TruncInst(
       llvm::BinaryOperator::Create(llvm::Instruction::LShr, ret,
-                                   llvm::ConstantInt::get(Int32Ty, 32), "", b),
+                                   llvm::ConstantInt::get(ret->getType(), 32), "", b),
       Int32Ty, "", b);
   R_WRITE<32>(b, llvm::X86::EDX, high);
   R_WRITE<32>(b, llvm::X86::EAX, low);

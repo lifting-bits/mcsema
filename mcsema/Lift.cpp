@@ -32,6 +32,9 @@
 #include <string>
 #include <sstream>
 #include <system_error>
+#include <cassert>
+#include <iomanip>
+#include <memory>
 
 #include <llvm/Bitcode/ReaderWriter.h>
 
@@ -77,6 +80,10 @@ static llvm::cl::opt<bool> ListUnsupported("list-unsupported",
                                            llvm::cl::desc("List unsupported (not-yet-implemented) instructions for <arch>"),
                                            llvm::cl::Optional);
 
+static llvm::cl::opt<bool> ListCFGFunctions("list-cfg-functions",
+                                           llvm::cl::desc("List CFG functions"),
+                                           llvm::cl::Optional);
+
 static void PrintVersion(void) {
   std::cout << "This is mcsema-lift version: " << MCSEMA_VERSION_STRING << std::endl;
   std::cout << "Built from branch: " << MCSEMA_BRANCH_NAME << std::endl;
@@ -91,11 +98,29 @@ static VA FindSymbolInModule(NativeModulePtr mod, const std::string &sym_name) {
   return static_cast<VA>( -1);
 }
 
+void PrintCFGFunctionList(const NativeModulePtr native_module, const std::string &architecture) noexcept {
+  std::ios::fmtflags original_stream_flags(std::cout.flags());
+  int address_digit_count = (architecture == "amd64" ? 16 : 8);
+
+  std::cout << "\nCFG Function List:\n";
+
+  const auto &function_map = native_module->get_funcs();
+  for (const auto &function_descriptor : function_map) {
+    VA virtual_address = function_descriptor.first;
+    const NativeFunctionPtr function = function_descriptor.second;
+
+    std::cout << "  " << std::hex << std::setw(address_digit_count) << std::setfill('0') << virtual_address << " ";
+    std::cout << function->get_name() << std::endl;
+  }
+
+  std::cout.flags(original_stream_flags);
+}
+
 int main(int argc, char *argv[]) {
   llvm::cl::SetVersionPrinter(PrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv, "CFG to LLVM");
 
-  auto context = new llvm::LLVMContext;
+  auto context = llvm::make_unique<llvm::LLVMContext>();
 
   if (OS.empty()) {
     if (ListSupported || ListUnsupported) {
@@ -107,20 +132,20 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (!(ListSupported || ListUnsupported) && EntryPoints.empty()) {
+  if (!(ListSupported || ListUnsupported || ListCFGFunctions) && EntryPoints.empty()) {
     std::cerr
         << "-entrypoint must be specified" << std::endl;
         return EXIT_FAILURE;
   }
 
-  if (!InitArch(context, OS, Arch)) {
+  if (!InitArch(context.get(), OS, Arch)) {
     std::cerr
         << "Cannot initialize for arch " << Arch
         << " and OS " << OS << std::endl;
     return EXIT_FAILURE;
   }
 
-  auto M = CreateModule(context);
+  auto M = CreateModule(context.get());
   if (!M) {
     return EXIT_FAILURE;
   }
@@ -132,49 +157,69 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
   }
 
-  if (InputFilename.empty() || OutputFilename.empty()) {
+  if (InputFilename.empty()) {
     std::cerr
-        << "Must specify an input and output file." << std::endl;
+        << "Must specify an input file." << std::endl;
     return EXIT_FAILURE;
   }
 
   //reproduce NativeModule from CFG input argument
   try {
-    auto mod = ReadProtoBuf(InputFilename);
+    std::unique_ptr<NativeModule> mod(ReadProtoBuf(InputFilename));
     if (!mod) {
       std::cerr << "Unable to read module from CFG" << std::endl;
       return EXIT_FAILURE;
     }
 
+    if (ListCFGFunctions) {
+      PrintCFGFunctionList(mod.get(), Arch);
+      return EXIT_SUCCESS;
+    }
+
+    //make sure the entry point list is correct before we start lifting the code
+    const std::vector<NativeEntrySymbol> &module_entry_points = mod->getEntryPoints();
+
+    for (const auto &entry_point : EntryPoints) {
+      auto it = std::find_if(
+        module_entry_points.begin(),
+        module_entry_points.end(),
+
+        [&entry_point](const NativeEntrySymbol &symbol) -> bool {
+          return (symbol.getName() == entry_point);
+        }
+      );
+
+      if (it == module_entry_points.end()) {
+          std::cerr << "The following entry point could not be found: \"" << entry_point << "\". Aborting..." << std::endl;
+          return EXIT_FAILURE;
+      }
+    }
+
     //now, convert it to an LLVM module
     ArchInitAttachDetach(M);
 
-    if (!LiftCodeIntoModule(mod, M)) {
+    if (!LiftCodeIntoModule(mod.get(), M)) {
       std::cerr << "Failure to convert to LLVM module!" << std::endl;
       return EXIT_FAILURE;
     }
 
     std::set<VA> entry_point_pcs;
     for (const auto &entry_point_name : EntryPoints) {
-      auto entry_pc = FindSymbolInModule(mod, entry_point_name);
-      if (entry_pc != static_cast<VA>( -1)) {
-        std::cerr << "Adding entry point: " << entry_point_name << std::endl
-                  << entry_point_name << " is implemented by sub_" << std::hex
-                  << entry_pc << std::endl;
+      auto entry_pc = FindSymbolInModule(mod.get(), entry_point_name);
+      assert(entry_pc != static_cast<VA>( -1));
 
-        if ( !ArchAddEntryPointDriver(M, entry_point_name, entry_pc)) {
-          return EXIT_FAILURE;
-        }
+      std::cerr << "Adding entry point: " << entry_point_name << std::endl
+                << entry_point_name << " is implemented by sub_" << std::hex
+                << entry_pc << std::endl;
 
-        entry_point_pcs.insert(entry_pc);
-      } else {
-        std::cerr << "Could not find entry point: " << entry_point_name
-                  << "; aborting" << std::endl;
+      if ( !ArchAddEntryPointDriver(M, entry_point_name, entry_pc)) {
         return EXIT_FAILURE;
       }
+
+      entry_point_pcs.insert(entry_pc);
     }
 
-    RenameLiftedFunctions(mod, M, entry_point_pcs);
+    RenameLiftedFunctions(mod.get(), M, entry_point_pcs);
 
     // will abort if verification fails
     if (llvm::verifyModule( *M, &llvm::errs())) {
