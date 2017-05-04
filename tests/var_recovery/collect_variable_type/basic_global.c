@@ -1,3 +1,4 @@
+#include <stdio.h>
 int global_var;
 
 int foo(int bar)
@@ -11,7 +12,9 @@ int foo(int bar)
 int main(int argc, char **argv)
 {
 	int m;
+	printf("global_var = %d\n", global_var);
 	global_var = argc;
 	m = foo(4);
+	printf("global_var = %d\n", global_var);
 	return m;
 }
