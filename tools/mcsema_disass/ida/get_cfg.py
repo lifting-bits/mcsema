@@ -2085,11 +2085,13 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
     '''add global variables to protobuf'''
     if TO_RECOVER["global_vars"]:
         for g, val in global_var_data.iteritems():
+          DEBUG("processing global var {}".format(val["name"]))
           if val["safe"] is False:
+              DEBUG("dropping global variable {}, marked unsafe".format(val["name"]))
               continue
           var = M.global_vars.add()
           var.address = val["offset"]
-          var.var.name = g
+          var.var.name = "recovered_global_{:0x}".format(g)
           var.var.size = {
               'dt_byte':1,
               'dt_word':2,
