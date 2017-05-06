@@ -15,6 +15,8 @@
 project(mcsema)
 cmake_minimum_required (VERSION 3.2)
 
+set(MCSEMA_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
+
 #
 # compiler selection
 #

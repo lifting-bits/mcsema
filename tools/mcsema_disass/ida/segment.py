@@ -25,7 +25,7 @@ def is_sane_reference(target_ea):
   if idaapi.isAlign(target_flags):
     return False
 
-  if not idc.isCode(target_flags):
+  if not is_code(target_ea):
     # TODO(pag):  If it's a tail then it would be reasonable to check if it's
     #             a pointer to a field in a struct. Not sure how to check that.
     if idc.isHead(target_flags) or idc.isTail(target_flags):
@@ -42,9 +42,9 @@ def make_xref(from_ea, to_ea, xref_constructor):
     DEBUG("  Not making reference from {:x} to {:x}".format(from_ea, to_ea))
     return
 
+  make_head(to_ea)
   xref_constructor(from_ea)
-  target_flags = idc.GetFlags(to_ea)
-  if idc.isCode(target_flags):
+  if is_code(to_ea):
     DEBUG("  Making code reference from {:x} to {:x}".format(from_ea, to_ea))
     idc.AddCodeXref(from_ea, to_ea, idc.XREF_USER | idc.fl_F)
   else:
@@ -92,6 +92,7 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
       last_was_string = True
       DEBUG("Found string {} of length {} at {:x}, jumping to {:x}".format(
           repr(idc.GetString(ea, -1, -1)), item_size, ea, next_ea))
+      make_head(ea)
       continue
 
     # If we find a zero, then assume it's possibly padding between strings, and
@@ -126,7 +127,8 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
 
       item_size = idc.ItemSize(ea)
       DEBUG("Inferred string {} of length {} at {:x} to {:x}".format(
-          repr(as_str), item_size, ea, next_head_ea)) 
+          repr(as_str), item_size, ea, next_head_ea))
+      make_head(ea)
       next_ea = ea + item_size
       last_was_string = True
 
@@ -259,8 +261,12 @@ def process_segments(binary_is_pie):
     # referenced addresses -- instead they would be offsets that are
     # indistinguishable from numbers.
     if not binary_is_pie:
-
       DEBUG("Looking for cross-references in segment {}".format(seg_name))
       DEBUG_PUSH()
       find_missing_xrefs_in_segment(seg_ea, seg_end_ea)
       DEBUG_POP()
+
+  # Okay, hopefully by this point we've been able to introduce more information
+  # so that IDA can better find references. We'll enable caching of instruction
+  # references from now on so that we don't need to repeat too much work.
+  enable_reference_caching()

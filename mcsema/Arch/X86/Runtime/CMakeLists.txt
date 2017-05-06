@@ -37,10 +37,10 @@ else()
       print_PE_32_windows.cpp)
 
       target_link_libraries(mcsema-print-runtime-x86 PRIVATE remill) # this is going to import the public include headers of remill
-      target_include_directories(mcsema-print-runtime-x86 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../") # todo: HACK! fix this!
+      target_include_directories(mcsema-print-runtime-x86 PRIVATE "${REMILL_SOURCE_DIR}" "${MCSEMA_SOURCE_DIR}")
 
     # build a static library from this generated object
-    add_library(mcsema_rt32 STATIC mcsema_rt32.obj)
+    add_library(mcsema_rt32 STATIC mcsema_rt32.obj reg_tracer_32.o)
     set_target_properties(mcsema_rt32 PROPERTIES STATIC_LIBRARY_FLAGS "/machine:x86")
     # add_library does not know how to link this thing together from an obj
     # tell cmake its just like C (the same command line will work for the object)
@@ -75,9 +75,9 @@ else()
       print_ELF_32_linux.cpp)
 
     target_link_libraries(mcsema-print-runtime-x86 PRIVATE remill) # this is going to import the public include headers of remill
-    target_include_directories(mcsema-print-runtime-x86 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../") # todo: HACK! fix this!
+    target_include_directories(mcsema-print-runtime-x86 PRIVATE "${REMILL_SOURCE_DIR}" "${MCSEMA_SOURCE_DIR}")
 
-    add_library(mcsema_rt32 STATIC runtime_32.S)
+    add_library(mcsema_rt32 STATIC runtime_32.S reg_tracer_32.o)
     set_target_properties(mcsema_rt32
       PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
 
@@ -101,10 +101,10 @@ else()
         print_PE_64_windows.cpp)
 
         target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill) # this is going to import the public include headers of remill
-        target_include_directories(mcsema-print-runtime-amd64 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../") # todo: HACK! fix this!
+        target_include_directories(mcsema-print-runtime-amd64 PRIVATE "${REMILL_SOURCE_DIR}" "${MCSEMA_SOURCE_DIR}")
 
       # build a static library from this generated object
-      add_library(mcsema_rt64 STATIC mcsema_rt64.obj)
+      add_library(mcsema_rt64 STATIC mcsema_rt64.obj reg_tracer_64.o)
       set_target_properties(mcsema_rt64 PROPERTIES STATIC_LIBRARY_FLAGS "/MACHINE:X64")
       # add_library does not know how to link this thing together from an obj
       # tell cmake its just like C (the same command line will work for the object)
@@ -140,9 +140,9 @@ else()
         print_ELF_64_linux.cpp)
 
       target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill) # this is going to import the public include headers of remill
-      target_include_directories(mcsema-print-runtime-amd64 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../../") # todo: HACK! fix this!
+      target_include_directories(mcsema-print-runtime-amd64 PRIVATE "${REMILL_SOURCE_DIR}" "${MCSEMA_SOURCE_DIR}")
 
-      add_library(mcsema_rt64 STATIC runtime_64.S)
+      add_library(mcsema_rt64 STATIC runtime_64.S reg_tracer_64.o)
       set_target_properties(mcsema_rt64
         PROPERTIES COMPILE_FLAGS "-m64" LINK_FLAGS "-m64")
 
@@ -159,6 +159,33 @@ else()
       TARGETS mcsema_rt64
       ARCHIVE DESTINATION lib)
   endif()
-
 endif()
+
+# Create a register tracer.
+add_custom_command(
+    OUTPUT reg_tracer_32.o
+    COMMAND "${CMAKE_CXX_COMPILER}" -std=gnu++11 -isystem "${REMILL_SOURCE_DIR}" -isystem "${MCSEMA_SOURCE_DIR}" -m32 -c "${CMAKE_CURRENT_SOURCE_DIR}/RegTracer.cpp" -o reg_tracer_32.o
+    DEPENDS RegTracer.cpp
+    COMMENT "Building 32-bit reg tracer")
+
+set_source_files_properties(
+    reg_tracer_32.o
+    PROPERTIES
+    EXTERNAL_OBJECT True
+    GENERATED True)
+
+# only do 64-bit binaries on 64-bit platforms
+if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
+    add_custom_command(
+        OUTPUT reg_tracer_64.o
+        COMMAND "${CMAKE_CXX_COMPILER}" -std=gnu++11 -isystem "${REMILL_SOURCE_DIR}" -isystem "${MCSEMA_SOURCE_DIR}" -m64 -c "${CMAKE_CURRENT_SOURCE_DIR}/RegTracer.cpp" -o reg_tracer_64.o
+        DEPENDS RegTracer.cpp
+        COMMENT "Building 64-bit reg tracer")
+    
+    set_source_files_properties(
+        reg_tracer_64.o
+        PROPERTIES
+        EXTERNAL_OBJECT True
+        GENERATED True)
+endif ()
 

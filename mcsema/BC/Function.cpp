@@ -59,10 +59,44 @@ DEFINE_bool(add_reg_tracer, false,
             "Add a debug function that prints out the register state before "
             "each lifted instruction execution.");
 
-DECLARE_bool(add_breakpoints);  // Already part of Remill's lifting process.
+DEFINE_bool(add_breakpoints, false,
+            "Add 'breakpoint' functions between every lifted instruction. This "
+            "allows one to set a breakpoint, in the lifted code, just before a "
+            "specific lifted instruction is executed.");
 
 namespace mcsema {
 namespace {
+
+static llvm::Function *GetRegTracer(void) {
+  auto reg_tracer = gModule->getFunction("__mcsema_reg_tracer");
+  if (!reg_tracer) {
+    reg_tracer = llvm::Function::Create(
+        LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
+        "__mcsema_reg_tracer", gModule);
+  }
+  return reg_tracer;
+}
+
+static llvm::Function *GetBreakPoint(uint64_t pc) {
+  std::stringstream ss;
+  ss << "breakpoint_" << std::hex << pc;
+
+  auto func_name = ss.str();
+  auto bp = gModule->getFunction(func_name);
+  if (!bp) {
+    bp = llvm::Function::Create(
+        LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
+        func_name, gModule);
+
+    // Make sure to keep this function around (along with `ExternalLinkage`).
+    bp->addFnAttr(llvm::Attribute::OptimizeNone);
+    bp->addFnAttr(llvm::Attribute::NoInline);
+
+    llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", bp));
+    ir.CreateRet(remill::NthArgument(bp, remill::kMemoryPointerArgNum));
+  }
+  return bp;
+}
 
 // Tries to get the lifted function beginning at `pc`.
 static llvm::Function *GetLiftedFunction(const NativeModule *cfg_module,
@@ -311,6 +345,14 @@ static void LiftInstIntoBlock(TranslationContext &ctx,
       << " (" << std::dec << instr->NumBytes()
       << ") doesn't match input instruction size ("
       << bytes.size() << ").";
+
+  if (FLAGS_add_reg_tracer) {
+    InlineSubFuncCall(block, GetRegTracer());
+  }
+
+  if (FLAGS_add_breakpoints) {
+    InlineSubFuncCall(block, GetBreakPoint(instr_addr));
+  }
 
   switch (auto status = ctx.lifter->LiftIntoBlock(instr.get(), block)) {
     case remill::LiftStatus::kError:

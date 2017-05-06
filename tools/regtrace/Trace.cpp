@@ -18,9 +18,9 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
-
 
 KNOB<uintptr_t> gEntrypoint(
     KNOB_MODE_WRITEONCE, "pintool", "entrypoint", "0",
@@ -84,18 +84,18 @@ VOID PrintRegState(CONTEXT *ctx) {
   }
 
   std::stringstream ss;
-
   const char *sep = "";
+  const auto width = sizeof(void *) * 2;
   for (auto &gpr : gGprs) {
     ss
-        << sep << gpr.name << "=" << std::hex
-        << PIN_GetContextReg(ctx, gpr.reg);
+        << sep << gpr.name << "=" << std::hex << std::setw(width)
+        << PIN_GetContextReg(ctx, gpr.reg) << std::setw(0);
     sep = " ";
   }
 
   // `-add-reg-tracer` uses `printf`, so even though it's a bit weird, we'll
   // do it here too and hopefully achieve some similar buffering.
-  printf("%s\n", ss.str().c_str());
+  fprintf(stderr, "%s\n", ss.str().c_str());
 }
 
 VOID InstrumentInstruction(INS ins, VOID *) {

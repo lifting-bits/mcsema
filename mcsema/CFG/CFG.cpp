@@ -209,7 +209,7 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   xref->ea = inst->ea;
   xref->width = gArch->address_size / 8;
   xref->segment = FindSegment(module, xref->ea);
-  xref->target_ea = static_cast<uint64_t>(cfg_ref.address());
+  xref->target_ea = static_cast<uint64_t>(cfg_ref.ea());
   xref->target_segment = FindSegment(module, xref->target_ea);
 
   if (cfg_ref.has_name()) {

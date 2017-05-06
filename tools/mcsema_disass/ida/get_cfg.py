@@ -232,8 +232,7 @@ def parse_os_defs_file(df):
                 raise Exception("Unknown return type:"+ret)
 
             ea = idc.LocByName(fname)
-            if ea != idc.BADADDR \
-            and ea < 0xff00000000000000 \
+            if not is_invalid_ea(ea) \
             and not is_external_segment(ea) \
             and not is_thunk(ea):
                 DEBUG("Not treating {} as external, it is defined at {:x}".format(
@@ -425,13 +424,17 @@ def reference_target_type(ref):
     references. We fall back onto our external maps as an oracle for
     what the type should really be. This has happened with `pcre_free`
     references from Apache."""
-    if is_external_reference(ref.addr):
-        if ref.addr in EXTERNAL_VARS_TO_RECOVER:
+    if is_external_reference(ref.ea):
+        if ref.ea in EXTERNAL_VARS_TO_RECOVER:
             return CFG_pb2.CodeReference.DataTarget
-        elif ref.addr in EXTERNAL_FUNCS_TO_RECOVER:
+        elif ref.ea in EXTERNAL_FUNCS_TO_RECOVER:
+            if ref.ea == 0x6ac148:
+                DEBUG("!!! a")
             return CFG_pb2.CodeReference.CodeTarget
 
-    if is_code(ref.addr):
+    if is_code(ref.ea):
+        if ref.ea == 0x6ac148:
+            DEBUG("!!! b")
         return CFG_pb2.CodeReference.CodeTarget
     else:
         return CFG_pb2.CodeReference.DataTarget
@@ -441,16 +444,16 @@ def reference_operand_type(ref):
     return _REFERENCE_OPERAND_TYPE[ref.type]
 
 def reference_location(ref):
-    if is_external_reference(ref.addr):
+    if is_external_reference(ref.ea):
         return CFG_pb2.CodeReference.External
     else:
         return CFG_pb2.CodeReference.Internal
 
 def referenced_name(ref):
-    if ref.addr in EXTERNAL_VARS_TO_RECOVER:
-        return EXTERNAL_VARS_TO_RECOVER[ref.addr]
-    elif ref.addr in EXTERNAL_FUNCS_TO_RECOVER:
-        return EXTERNAL_FUNCS_TO_RECOVER[ref.addr]
+    if ref.ea in EXTERNAL_VARS_TO_RECOVER:
+        return EXTERNAL_VARS_TO_RECOVER[ref.ea]
+    elif ref.ea in EXTERNAL_FUNCS_TO_RECOVER:
+        return EXTERNAL_FUNCS_TO_RECOVER[ref.ea]
     else:
         return get_true_external_name(ref.symbol)
 
@@ -478,7 +481,7 @@ def format_instruction_reference(ref):
         _TARGET_NAME[ref.target_type],
         _OPERAND_NAME[ref.operand_type],
         _LOCATION_NAME[ref.location],
-        ref.address,
+        ref.ea,
         ref.HasField('name') and ref.name or "")
 
 def recover_instruction_references(I, inst, addr):
@@ -558,7 +561,7 @@ def recover_instruction_references(I, inst, addr):
 
         addrs = set()
         R = I.xrefs.add()
-        R.address = ref.addr
+        R.ea = ref.ea
         R.operand_type = reference_operand_type(ref)
         R.target_type = target_type
         R.location = location
@@ -680,7 +683,6 @@ def find_default_function_heads():
     """Loop through every function, to discover the heads of all blocks that
     IDA recognizes. This will populate some global sets in `flow.py` that
     will help distinguish block heads."""
-    
     func_heads = set()
     for seg_ea in idautils.Segments():
         seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
@@ -739,7 +741,7 @@ def recover_segment_cross_references(M, S, seg_ea, seg_end_ea):
         #       an internal slot, whose value is filled in at runtime. 
         target_ea = get_reference_target(ea)
         
-        if target_ea == idc.BADADDR or 0 > target_ea or 0xff00000000000000 <= target_ea:
+        if is_invalid_ea(target_ea):
             DEBUG("ERROR: Reference at {:x} is not a reference.".format(ea))
             continue
 
@@ -1057,18 +1059,19 @@ if __name__ == "__main__":
     if os.path.isfile(os_defs_file):
         args.std_defs.insert(0, os_defs_file)
 
-    # Load in all defs files, include custom ones
+    # Load in all defs files, include custom ones.
     for defsfile in args.std_defs:
         with open(defsfile, "r") as df:
             DEBUG("Loading Standard Definitions file: {0}".format(defsfile))
             parse_os_defs_file(df)
 
-    # for batch mode: ensure IDA is done processing
+    # Turn off "automatically make offset" heuristic, and set some
+    # other sane defaults.
+    idc.SetShortPrm(idc.INF_START_AF, 0xdfff)
+    idc.SetShortPrm(idc.INF_AF2, 0xfffd)
+
+    # Ensure that IDA is done processing
     DEBUG("Using Batch mode.")
-    analysis_flags = idc.GetShortPrm(idc.INF_START_AF)
-    analysis_flags &= ~idc.AF_IMMOFF
-    # turn off "automatically make offset" heuristic
-    idc.SetShortPrm(idc.INF_START_AF, analysis_flags)
     idaapi.autoWait()
 
     DEBUG("Starting analysis")
@@ -1080,10 +1083,12 @@ if __name__ == "__main__":
                 name, ea_str = line.strip().split(" ")
                 ea = int(ea_str, base=16)
                 if not is_internal_code(ea):
-                    mark_as_code(ea)
-                try_mark_as_function(ea)
-                idc.MakeName(ea, name)
-
+                    try_mark_as_code(ea)
+                if is_code(ea):
+                    try_mark_as_function(ea)
+                    idc.MakeName(ea, name)
+            idaapi.autoWait()
+        
         M = recover_module(args.entrypoint)
 
         DEBUG("Saving to: {0}".format(args.output.name))

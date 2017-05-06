@@ -18,6 +18,7 @@ import idautils
 import idc
 import itertools
 import struct
+import inspect
 
 _DEBUG_FILE = None
 _DEBUG_PREFIX = ""
@@ -55,15 +56,40 @@ def xrange(begin, end=None, step=1):
 _NOT_CODE_EAS = set()
 
 # Returns `True` if `ea` belongs to some code segment.
+#
+# TODO(pag): This functon is extra aggressive, in that it doesn't strictly
+#            trust the `idc.isCode`. I have observed cases where data in
+#            `.bss` is treated as code and I am not sure why. Perhaps adding
+#            a reference to the data did this.
+#
+#            I think it has something to do with ELF thunks, e.g. entries in
+#            the `.plt` section. When I made this function stricter,
+#            `mcsema-lift` would report issues where it needed to add tail-calls
+#            to externals.
 def is_code(ea):
   global _NOT_CODE_EAS
-  return ea not in _NOT_CODE_EAS and idc.isCode(idc.GetFlags(ea))
+  if ea in _NOT_CODE_EAS or is_invalid_ea(ea):
+    return False
+
+  if not idc.isCode(idc.GetFlags(idc.SegStart(ea))):
+    return False
+
+  # if not idc.isCode(idc.GetFlags(idc.SegEnd(ea) - 1)):
+  #   return False
+
+  return idc.isCode(idc.GetFlags(ea))
 
 # Mark an address as containing code.
-def mark_as_code(ea):
+def try_mark_as_code(ea):
   if not is_code(ea):
-    idc.MakeCode(ea)
-    idaapi.autoWait()
+    seg_ea = idc.SegStart(ea)
+    if is_code(seg_ea):
+      if 0x6ac148 == ea:
+        assert False
+      idc.MakeCode(ea)
+      idaapi.autoWait()
+      return True
+  return False
 
 def mark_as_not_code(ea):
   global _NOT_CODE_EAS
@@ -206,7 +232,8 @@ def is_internal_code(ea):
     seg = idc.SegStart(ea)
     segtype = idc.GetSegmentAttr(seg, idc.SEGATTR_TYPE)
     if segtype == idc.SEG_CODE:
-      mark_as_code(ea)
+      if not try_mark_as_code(ea):
+        return False
       return True
 
   return False
@@ -301,6 +328,7 @@ def is_noreturn_function(ea):
 
 def remove_all_refs(ea):
   """Remove all references to something."""
+  assert False
   dref_eas = list(idautils.DataRefsFrom(ea))
   cref_eas0 = list(idautils.CodeRefsFrom(ea, False))
   cref_eas1 = list(idautils.CodeRefsFrom(ea, True))
@@ -319,28 +347,28 @@ def is_thunk(ea):
   flags = idc.GetFunctionFlags(ea)
   return 0 < flags and 0 != (flags & idaapi.FUNC_THUNK)
 
-_IDA_WEIRD_BAD_REF = 0xff00000000000000
-_IGNORE_DREF = (lambda x: [_IDA_WEIRD_BAD_REF])
-_IGNORE_CREF = (lambda x, y: [_IDA_WEIRD_BAD_REF])
+IDA_WEIRD_BAD_REF = 0xff00000000000000
+_IGNORE_DREF = (lambda x: [IDA_WEIRD_BAD_REF])
+_IGNORE_CREF = (lambda x, y: [IDA_WEIRD_BAD_REF])
+
+def is_invalid_ea(ea):
+  global IDA_WEIRD_BAD_REF
+  return idc.BADADDR == ea or ea >= IDA_WEIRD_BAD_REF or 0 > ea
 
 def _reference_checker(ea, dref_finder=_IGNORE_DREF, cref_finder=_IGNORE_CREF):
   """Looks for references to/from `ea`, and does some sanity checks on what
   IDA returns."""
-  global _IDA_WEIRD_BAD_REF
-  for ref in dref_finder(ea):
-    if ref == idc.BADADDR or ref >= _IDA_WEIRD_BAD_REF:
-      continue
-    return True
+  for ref_ea in dref_finder(ea):
+    if not is_invalid_ea(ref_ea):
+      return True
 
-  for ref in cref_finder(ea, True):
-    if ref == idc.BADADDR or ref >= _IDA_WEIRD_BAD_REF:
-      continue
-    return True
+  for ref_ea in cref_finder(ea, True):
+    if not is_invalid_ea(ref_ea):
+      return True
 
-  for ref in cref_finder(ea, False):
-    if ref == idc.BADADDR or ref >= _IDA_WEIRD_BAD_REF:
-      continue
-    return True
+  for ref_ea in cref_finder(ea, False):
+    if not is_invalid_ea(ref_ea):
+      return True
 
   return False
 
@@ -352,16 +380,16 @@ def is_referenced_by(ea, by_ea):
   if not is_referenced(ea):
     return False
 
-  for ref in idautils.DataRefsTo(ea):
-    if ref == by_ea:
+  for ref_ea in idautils.DataRefsTo(ea):
+    if ref_ea == by_ea:
       return True
 
-  for ref in idautils.CodeRefsTo(ea, True):
-    if ref == by_ea:
+  for ref_ea in idautils.CodeRefsTo(ea, True):
+    if ref_ea == by_ea:
       return True
 
-  for ref in idautils.CodeRefsTo(ea, False):
-    if ref == by_ea:
+  for ref_ea in idautils.CodeRefsTo(ea, False):
+    if ref_ea == by_ea:
       return True
 
   return False
@@ -390,21 +418,17 @@ def has_flow_to_code(ea):
   return _reference_checker(ea, cref_finder=idautils.CodeRefsTo)
 
 def get_reference_target(ea):
-  global _IDA_WEIRD_BAD_REF
-  for ref in idautils.DataRefsFrom(ea):
-    if ref == idc.BADADDR or ref >= _IDA_WEIRD_BAD_REF:
-      continue
-    return ref
+  for ref_ea in idautils.DataRefsFrom(ea):
+    if not is_invalid_ea(ref_ea):
+      return ref_ea
 
-  for ref in idautils.CodeRefsFrom(ea, True):
-    if ref == idc.BADADDR or ref >= _IDA_WEIRD_BAD_REF:
-      continue
-    return ref
+  for ref_ea in idautils.CodeRefsFrom(ea, True):
+    if not is_invalid_ea(ref_ea):
+      return ref_ea
 
-  for ref in idautils.CodeRefsFrom(ea, False):
-    if ref == idc.BADADDR or ref >= _IDA_WEIRD_BAD_REF:
-      continue
-    return ref
+  for ref_ea in idautils.CodeRefsFrom(ea, False):
+    if not is_invalid_ea(ref_ea):
+      return ref_ea
 
   # This is kind of funny, but it works with how we understand external
   # variable references from the CFG production and LLVM side. Really,
@@ -419,3 +443,14 @@ def get_reference_target(ea):
     return ea
 
   return idc.BADADDR
+
+def is_head(ea):
+  return idc.isHead(idc.GetFlags(ea))
+
+# Make the data at `ea` into a head.
+def make_head(ea):
+  flags = idc.GetFlags(ea)
+  if not idc.isHead(flags):
+    idc.SetFlags(ea, flags | idc.FF_DATA)
+    idaapi.autoWait()
+    assert is_head(ea)

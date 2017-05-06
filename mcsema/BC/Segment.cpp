@@ -151,7 +151,7 @@ static llvm::GlobalVariable *DeclareRegion(const SegmentMap &segments) {
   ss << "_type";
 
   auto region_type = llvm::StructType::create(seg_types, ss.str(), true);
-  auto intptr_type = llvm::Type::getIntNTy(
+  auto word_type = llvm::Type::getIntNTy(
       *gContext, static_cast<unsigned>(gArch->address_size));
 
   CHECK(nullptr != region_type)
@@ -165,25 +165,23 @@ static llvm::GlobalVariable *DeclareRegion(const SegmentMap &segments) {
       region_name);
   region->setAlignment(16);
 
-  auto byte_type = llvm::Type::getInt8Ty(*gContext);
-  auto byte_ptr_type = llvm::PointerType::get(byte_type, 0);
-
-  // Go and declare the individual segments as variables pointing
-  // into the region.
+  // Go and declare the individual segments as variables, whose values are
+  // addresses into the region.
   for (const auto &entry : segments) {
     auto cfg_seg = entry.second;
     auto offset = cfg_seg->ea - min_ea;
 
     std::vector<llvm::Constant *> index_list;
-    index_list.push_back(llvm::ConstantInt::get(intptr_type, offset));
+    index_list.push_back(llvm::ConstantInt::get(word_type, offset));
 
-    auto ptr = llvm::ConstantExpr::getBitCast(region, byte_ptr_type);
-    ptr = llvm::ConstantExpr::getInBoundsGetElementPtr(
-        byte_type, ptr, index_list);
+    auto ptr = llvm::ConstantExpr::getAdd(
+        llvm::ConstantExpr::getPtrToInt(region, word_type),
+        llvm::ConstantInt::get(word_type, offset));
 
-    (void) llvm::GlobalAlias::create(
-        byte_type, 0, llvm::GlobalVariable::InternalLinkage,
-        cfg_seg->lifted_name, ptr, gModule);
+    (void) new llvm::GlobalVariable(
+        *gModule, word_type, true  /* isConstant */,
+        llvm::GlobalVariable::InternalLinkage,
+        ptr, cfg_seg->lifted_name);
   }
   return region;
 }
@@ -196,9 +194,8 @@ static void DeclareVariables(const NativeModule *cfg_module) {
 
   // TODO(pag): Handle thread-local storage types by assigning a non-zero
   //            address space to the byte pointer type?
-  auto intptr_type = llvm::Type::getIntNTy(
+  auto word_type = llvm::Type::getIntNTy(
       *gContext, static_cast<unsigned>(gArch->address_size));
-  auto byte_type = llvm::Type::getInt8Ty(*gContext);
 
   for (auto entry : cfg_module->ea_to_var) {
     auto cfg_var = reinterpret_cast<const NativeVariable *>(
@@ -216,33 +213,31 @@ static void DeclareVariables(const NativeModule *cfg_module) {
         << "Variable " << cfg_var->name << " at " << std::hex << cfg_var->ea
         << " is incorrectly assigned to the segment " << cfg_seg->name;
 
-    auto seg = gModule->getNamedAlias(cfg_seg->lifted_name);
+    auto seg = gModule->getGlobalVariable(cfg_seg->lifted_name, true);
+    CHECK(seg != nullptr)
+        << "Cannot find segment variable " << cfg_seg->lifted_name
+        << " for segment " << cfg_seg->name;
+
     auto offset = cfg_var->ea - cfg_seg->ea;
+    auto ptr = llvm::ConstantExpr::getAdd(
+        seg->getInitializer(),
+        llvm::ConstantInt::get(word_type, offset));
 
-    std::vector<llvm::Constant *> index_list;
-    index_list.push_back(llvm::ConstantInt::get(intptr_type, offset));
-    auto ptr = llvm::ConstantExpr::getInBoundsGetElementPtr(
-        byte_type, seg, index_list);
-
-    (void) llvm::GlobalAlias::create(
-        byte_type, 0, llvm::GlobalVariable::InternalLinkage,
-        cfg_var->lifted_name, ptr, gModule);
+    (void) new llvm::GlobalVariable(
+        *gModule, word_type, true  /* isConstant */,
+        llvm::GlobalVariable::InternalLinkage,
+        ptr, cfg_var->lifted_name);
   }
 }
 
 // Fill in the contents of the data segment.
 static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
                                        llvm::StructType *seg_type) {
-  auto seg = gModule->getNamedAlias(cfg_seg->lifted_name);
-
-  seg->setLinkage(llvm::GlobalValue::InternalLinkage);
-  seg->setVisibility(llvm::GlobalValue::DefaultVisibility);
-
   if (IsZero(cfg_seg)) {
     return llvm::ConstantAggregateZero::get(seg_type);
   }
 
-  auto intptr_type = llvm::Type::getIntNTy(
+  auto word_type = llvm::Type::getIntNTy(
       *gContext, static_cast<unsigned>(gArch->address_size));
   unsigned i = 0;
 
@@ -299,7 +294,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
         } else {
           val = GetNativeToLiftedCallback(cfg_func);
         }
-        val = llvm::ConstantExpr::getPtrToInt(val, intptr_type);
+        val = llvm::ConstantExpr::getPtrToInt(val, word_type);
         CHECK(val != nullptr)
             << "Can't insert cross reference to function "
             << cfg_func->name << " at " << std::hex << cfg_seg_entry.first
@@ -307,20 +302,20 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
 
       // Pointer to a global (possibly external) variable.
       } else if (auto cfg_var = xref->var) {
-        val = gModule->getNamedAlias(cfg_var->lifted_name);
-        val = llvm::ConstantExpr::getPtrToInt(val, intptr_type);
-        CHECK(val != nullptr)
+        auto var = gModule->getGlobalVariable(cfg_var->lifted_name, true);
+        CHECK(var != nullptr)
             << "Can't insert cross reference to variable "
             << cfg_var->name << " at " << std::hex << cfg_seg_entry.first
             << " in segment " << cfg_seg->name;
+        val = var->getInitializer();
 
       // Pointer to an unnamed location inside of a data segment.
       } else {
-        auto seg = gModule->getNamedAlias(xref->target_segment->lifted_name);
+        auto seg = gModule->getGlobalVariable(
+            xref->target_segment->lifted_name, true);
         auto offset = xref->target_ea - xref->target_segment->ea;
-        auto disp = llvm::ConstantInt::get(intptr_type, offset, false);
-        auto seg_base = llvm::ConstantExpr::getPtrToInt(seg, intptr_type);
-        val = llvm::ConstantExpr::getAdd(seg_base, disp);
+        auto disp = llvm::ConstantInt::get(word_type, offset, false);
+        val = llvm::ConstantExpr::getAdd(seg->getInitializer(), disp);
       }
 
       // Scale and add the value in. We need to fit it to its original width.

@@ -38,7 +38,7 @@ message CodeReference {
   required  TargetType  target_type = 1;
   required  OperandType operand_type = 2;
   required  Location    location = 3;
-  required  int64       address = 4;
+  required  int64       ea = 4;
   optional  string      name = 5;
 }
 

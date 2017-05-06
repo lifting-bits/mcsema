@@ -56,13 +56,11 @@ InstructionLifter::InstructionLifter(llvm::IntegerType *word_type_,
         disp_ref(nullptr),
         imm_ref(nullptr) {}
 
-
 // Lift a single instruction into a basic block.
 remill::LiftStatus InstructionLifter::LiftIntoBlock(
     remill::Instruction *instr_, llvm::BasicBlock *block_) {
   instr = instr_;
   block = block_;
-
   mem_ref = GetAddress(ctx.cfg_inst->mem);
   imm_ref = GetAddress(ctx.cfg_inst->imm);
   disp_ref = GetAddress(ctx.cfg_inst->disp);
@@ -101,22 +99,25 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
 
     // External variables are declared as global variables.
     if (cfg_var->is_external) {
-      auto global = gModule->getGlobalVariable(cfg_var->name);
+      auto global = gModule->getGlobalVariable(cfg_var->name, true);
       CHECK(global != nullptr)
           << "Can't resolve reference to external variable "
           << cfg_var->name << " from " << std::hex << instr->pc;
 
       return ir.CreatePtrToInt(global, word_type);
 
-    // Internal global variables are aliases pointing into the
-    // lifted data segments.
+    // Internal global variables are word-sized integers, whose values address
+    // internal locations inside of the segments.
     } else {
-      auto global = gModule->getNamedAlias(cfg_var->lifted_name);
+      auto global = gModule->getGlobalVariable(cfg_var->lifted_name, true);
       CHECK(global != nullptr)
           << "Can't resolve reference to internal variable "
           << cfg_var->lifted_name << " from " << std::hex << instr->pc;
 
-      return ir.CreatePtrToInt(global, word_type);
+      // TODO(pag): We could actually use a load of the segment variable, but
+      //            it's constant, and optimization may just end up eliding
+      //            the load.
+      return global->getInitializer();
     }
   } else {
     auto cfg_seg = cfg_xref->target_segment;
@@ -125,21 +126,15 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
         << std::hex << instr->pc << " to " << std::hex << cfg_xref->target_ea
         << " must be in a known segment.";
 
-    llvm::Constant *global = gModule->getNamedAlias(cfg_seg->lifted_name);
-    CHECK(global != nullptr)
+    auto seg = gModule->getGlobalVariable(cfg_seg->lifted_name, true);
+    CHECK(seg != nullptr)
         << "Cannot find global variable for segment " << cfg_seg->name
         << " referenced by " << std::hex << instr->pc;
 
-
     auto offset = cfg_xref->target_ea - cfg_seg->ea;
-    auto byte_type = llvm::Type::getInt8Ty(*gContext);
-    auto byte_ptr_type = llvm::PointerType::get(byte_type, 0);
-    CHECK(global->getType() == byte_ptr_type);
-
-    global = llvm::ConstantExpr::getInBoundsGetElementPtr(
-        byte_type, global, llvm::ConstantInt::get(word_type, offset));
-
-    return ir.CreatePtrToInt(global, word_type);
+    return ir.CreateAdd(
+        seg->getInitializer(),
+        llvm::ConstantInt::get(word_type, offset));
   }
 }
 

@@ -17,7 +17,6 @@
 #ifndef MCSEMA_ARCH_X86_RUNTIME_REGISTERS_H_
 #define MCSEMA_ARCH_X86_RUNTIME_REGISTERS_H_
 
-
 #define AH gpr.rax.byte.high
 #define BH gpr.rbx.byte.high
 #define CH gpr.rcx.byte.high

@@ -243,7 +243,7 @@ def get_manual_jump_table_reader(builder):
     if not len(refs):
       continue
 
-    builder.table_ea = refs[0].addr
+    builder.table_ea = refs[0].ea
     builder.offset = 0
 
     # Don't treat things like thunks to be tables.

@@ -45,6 +45,7 @@ def try_mark_as_function(address):
 
   if not idaapi.add_func(address, idc.BADADDR):
     return False
+
   idaapi.autoWait()
   return True
 
