@@ -109,6 +109,10 @@ llvm::Function *GetNativeToLiftedCallback(
               << "movl $1, %eax;"
               << "xchgl (%esp), %eax;";
       break;
+    default:
+      LOG(FATAL)
+          << "unknown architecture -- not yet supported.";
+      break;
   }
 
   auto void_type = llvm::Type::getVoidTy(*gContext);
