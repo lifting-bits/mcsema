@@ -127,28 +127,28 @@ end
 
 define print-flags-64
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  set $flptr = (char *) ($rptr + 2065)
+  set $flptr = (char *) ($rptr + 0x810)
   printf "eflags ["
-  if $flptr[0]
+  if $flptr[1]
     printf "CF "
   end
-  if $flptr[2]
+  if $flptr[3]
     printf "PF "
   end
-  if $flptr[4]
+  if $flptr[5]
     printf "AF "
   end
-  if $flptr[6]
+  if $flptr[7]
     printf "ZF "
   end
-  if $flptr[8]
+  if $flptr[9]
     printf "SF "
   end
-  if $flptr[10]
-    printf "OF "
-  end
-  if $flptr[12]
+  if $flptr[11]
     printf "DF "
+  end
+  if $flptr[13]
+    printf "OF "
   end
   printf "]\n"
   dont-repeat

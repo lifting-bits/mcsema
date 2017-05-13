@@ -52,6 +52,7 @@
 #include "mcsema/BC/Util.h"
 
 DEFINE_bool(disable_optimizer, false, "Disable interprocedural optimizations?");
+DEFINE_bool(keep_memops, false, "Should the memory intrinsics be replaced or not?");
 
 namespace mcsema {
 namespace {
@@ -379,13 +380,16 @@ void OptimizeModule(void) {
     RemoveISELs(isels);
   }
   RemoveIntrinsics();
-  LowerMemOps();
-  ReplaceBarrier("__remill_barrier_load_load");
-  ReplaceBarrier("__remill_barrier_load_store");
-  ReplaceBarrier("__remill_barrier_store_load");
-  ReplaceBarrier("__remill_barrier_store_store");
-  ReplaceBarrier("__remill_barrier_atomic_begin");
-  ReplaceBarrier("__remill_barrier_atomic_end");
+  if (!FLAGS_keep_memops) {
+    LowerMemOps();
+    ReplaceBarrier("__remill_barrier_load_load");
+    ReplaceBarrier("__remill_barrier_load_store");
+    ReplaceBarrier("__remill_barrier_store_load");
+    ReplaceBarrier("__remill_barrier_store_store");
+    ReplaceBarrier("__remill_barrier_atomic_begin");
+    ReplaceBarrier("__remill_barrier_atomic_end");
+  }
+
   RemoveUndefFuncCalls();
 }
 

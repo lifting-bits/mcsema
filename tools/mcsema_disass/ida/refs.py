@@ -209,11 +209,9 @@ def _get_ref_candidate(inst, op, all_refs):
     DEBUG("Adding multiply seen {:x} as a reference target".format(addr_val))
 
   if addr_val not in all_refs:
-    if _ENABLE_CACHING:  # Don't warn during segment scanning.
-      DEBUG("POSSIBLE ERROR: Not adding reference from {:x} to {:x}".format(
-          inst.ea, addr_val))
-    else:  # Only do this during segment scanning.
-      _POSSIBLE_REFS.add(addr_val)
+    DEBUG("POSSIBLE ERROR: Not adding reference from {:x} to {:x}".format(
+        inst.ea, addr_val))
+    _POSSIBLE_REFS.add(addr_val)
     return None
 
   ref = Reference(addr_val, op.offb)

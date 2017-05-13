@@ -28,6 +28,85 @@
 
 static const size_t kStackSize = 1UL << 20UL;
 
+static void PrintStoreFlags(FILE * out) {
+  fprintf(out, "  push rdx\n");
+  fprintf(out, "  pushfq\n");
+  fprintf(out, "  mov edx, 0xcd5\n");
+  fprintf(out, "  not rdx\n");
+  fprintf(out, "  and QWORD PTR [rsp], rdx\n");
+
+  fprintf(out, "  mov edx, 1\n");
+  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, CF));
+  fprintf(out, "  shl edx, 0\n");
+  fprintf(out, "  or QWORD PTR [rsp], rdx\n");
+
+  fprintf(out, "  mov edx, 1\n");
+  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, PF));
+  fprintf(out, "  shl edx, 2\n");
+  fprintf(out, "  or QWORD PTR [rsp], rdx\n");
+
+  fprintf(out, "  mov edx, 1\n");
+  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, AF));
+  fprintf(out, "  shl edx, 4\n");
+  fprintf(out, "  or QWORD PTR [rsp], rdx\n");
+
+  fprintf(out, "  mov edx, 1\n");
+  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, ZF));
+  fprintf(out, "  shl edx, 6\n");
+  fprintf(out, "  or QWORD PTR [rsp], rdx\n");
+
+  fprintf(out, "  mov edx, 1\n");
+  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, SF));
+  fprintf(out, "  shl edx, 7\n");
+  fprintf(out, "  or QWORD PTR [rsp], rdx\n");
+
+  fprintf(out, "  mov edx, 1\n");
+  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, DF));
+  fprintf(out, "  shl edx, 10\n");
+  fprintf(out, "  or QWORD PTR [rsp], rdx\n");
+
+  fprintf(out, "  mov edx, 1\n");
+  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, OF));
+  fprintf(out, "  shl edx, 11\n");
+  fprintf(out, "  or QWORD PTR [rsp], rdx\n");
+
+  fprintf(out, "  popfq\n");
+  fprintf(out, "  pop rdx\n");
+}
+
+static void PrintLoadFlags(FILE * out) {
+  // Get the RFlags.
+    fprintf(out, "  pushfq\n");
+    fprintf(out, "  pop rdi\n");
+    fprintf(out, "  mov [rsi + %lu], rdi\n", __builtin_offsetof(State, rflag));
+
+    // Clear our the `ArithFlags` struct, which is 16 bytes.
+    fprintf(out, "  mov QWORD PTR [rsi + %lu], 0\n", __builtin_offsetof(State, aflag));
+    fprintf(out, "  mov QWORD PTR [rsi + %lu], 0\n", __builtin_offsetof(State, aflag) + 8);
+
+    // Marshal the RFlags into the ArithFlags struct.
+    fprintf(out, "  bt rdi, 0\n");
+    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, CF));
+
+    fprintf(out, "  bt rdi, 2\n");
+    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, PF));
+
+    fprintf(out, "  bt rdi, 4\n");
+    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, AF));
+
+    fprintf(out, "  bt rdi, 6\n");
+    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, ZF));
+
+    fprintf(out, "  bt rdi, 7\n");
+    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, SF));
+
+    fprintf(out, "  bt rdi, 10\n");
+    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, DF));
+
+    fprintf(out, "  bt rdi, 11\n");
+    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, OF));
+}
+
 int main(void) {
 
   FILE *out = fopen("runtime_64.S", "w");
@@ -120,36 +199,7 @@ int main(void) {
   fprintf(out, "  movntdq [rsi + %lu], xmm14\n", __builtin_offsetof(State, XMM14));
   fprintf(out, "  movntdq [rsi + %lu], xmm15\n", __builtin_offsetof(State, XMM15));
 
-  // Get the RFlags.
-  fprintf(out, "  pushfq\n");
-  fprintf(out, "  pop rdi\n");
-  fprintf(out, "  mov [rsi + %lu], rdi\n", __builtin_offsetof(State, rflag));
-
-  // Clear our the `ArithFlags` struct, which is 16 bytes.
-  fprintf(out, "  mov QWORD PTR [rsi + %lu], 0\n", __builtin_offsetof(State, aflag));
-  fprintf(out, "  mov QWORD PTR [rsi + %lu], 0\n", __builtin_offsetof(State, aflag) + 8);
-
-  // Marshal the RFlags into the ArithFlags struct.
-  fprintf(out, "  bt rdi, 0\n");
-  fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, CF));
-
-  fprintf(out, "  bt QWORD PTR [rsp], 2\n");
-  fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, PF));
-
-  fprintf(out, "  bt QWORD PTR [rsp], 4\n");
-  fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, AF));
-
-  fprintf(out, "  bt QWORD PTR [rsp], 6\n");
-  fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, ZF));
-
-  fprintf(out, "  bt QWORD PTR [rsp], 7\n");
-  fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, SF));
-
-  fprintf(out, "  bt QWORD PTR [rsp], 10\n");
-  fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, DF));
-
-  fprintf(out, "  bt QWORD PTR [rsp], 11\n");
-  fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, OF));
+  PrintLoadFlags(out);
 
   // If `RSP` is null then we need to initialize it to our new stack.
   fprintf(out, "  mov rdi, [rsi + %lu]\n", __builtin_offsetof(State, RSP));
@@ -241,6 +291,8 @@ int main(void) {
   fprintf(out, "  movntdqa xmm14, [rsi + %lu]\n", __builtin_offsetof(State, XMM14));
   fprintf(out, "  movntdqa xmm15, [rsi + %lu]\n", __builtin_offsetof(State, XMM15));
 
+  PrintStoreFlags(out);
+
   fprintf(out, "  mov rsi, [rsi + %lu]\n", __builtin_offsetof(State, RSI));
   fprintf(out, "  ret\n");
 
@@ -328,6 +380,8 @@ int main(void) {
   fprintf(out, "  movntdqa xmm14, [rsi + %lu]\n", __builtin_offsetof(State, XMM14));
   fprintf(out, "  movntdqa xmm15, [rsi + %lu]\n", __builtin_offsetof(State, XMM15));
 
+  PrintStoreFlags (out);
+
   // Swap out RSI.
   fprintf(out, "  mov rsi, [rsi + %lu]\n", __builtin_offsetof(State, RSI));
 
@@ -394,6 +448,8 @@ int main(void) {
   fprintf(out, "  movntdq [rsi + %lu], xmm14\n", __builtin_offsetof(State, XMM14));
   fprintf(out, "  movntdq [rsi + %lu], xmm15\n", __builtin_offsetof(State, XMM15));
 
+  PrintLoadFlags (out);
+
   // On the mcsema stack:
   //     8    stashed r15
   //    16    stashed r14
@@ -455,6 +511,171 @@ int main(void) {
   fprintf(out, "__remill_function_return:\n");
   fprintf(out, "__remill_sync_hyper_call:\n");
   fprintf(out, "  ud2\n");
+
+  // Memory read intrinsics.
+#if 0
+  fprintf(out, "  .globl __remill_read_memory_8\n");
+  fprintf(out, "  .type __remill_read_memory_8,@function\n");
+  fprintf(out, "__remill_read_memory_8:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  xor eax, eax\n");
+  fprintf(out, "  mov al, BYTE PTR [rsi]\n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end7:\n");static void PrintLoadFlags(FILE * out);
+  fprintf(out, "  .size __remill_read_memory_8,.Lfunc_end7-__remill_read_memory_8\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  fprintf(out, "  .globl __remill_read_memory_16\n");
+  fprintf(out, "  .type __remill_read_memory_16,@function\n");
+  fprintf(out, "__remill_read_memory_16:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  xor eax, eax\n");
+  fprintf(out, "  mov ax, WORD PTR [rsi]\n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end8:\n");
+  fprintf(out, "  .size __remill_read_memory_16,.Lfunc_end8-__remill_read_memory_16\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  fprintf(out, "  .globl __remill_read_memory_32\n");
+  fprintf(out, "  .type __remill_read_memory_32,@function\n");
+  fprintf(out, "__remill_read_memory_32:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  mov eax, DWORD PTR [rsi]\n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end9:\n");
+  fprintf(out, "  .size __remill_read_memory_32,.Lfunc_end9-__remill_read_memory_32\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  fprintf(out, "  .globl __remill_read_memory_64\n");
+  fprintf(out, "  .type __remill_read_memory_64,@function\n");
+  fprintf(out, "__remill_read_memory_64:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  mov rax, QWORD PTR [rsi]\n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end10:\n");
+  fprintf(out, "  .size __remill_read_memory_64,.Lfunc_end10-__remill_read_memory_64\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  fprintf(out, "  .globl __remill_read_memory_f32\n");
+  fprintf(out, "  .type __remill_read_memory_f32,@function\n");
+  fprintf(out, "__remill_read_memory_f32:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  movd xmm0, DWORD PTR [rsi] \n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_endf9:\n");
+  fprintf(out, "  .size __remill_read_memory_f32,.Lfunc_endf9-__remill_read_memory_f32\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  fprintf(out, "  .globl __remill_read_memory_f64\n");
+  fprintf(out, "  .type __remill_read_memory_f64,@function\n");
+  fprintf(out, "__remill_read_memory_f64:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  movq xmm0, QWORD PTR [rsi] \n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_endf10:\n");
+  fprintf(out, "  .size __remill_read_memory_f64,.Lfunc_endf9-__remill_read_memory_f64\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  // Memory write intrinsics.
+  fprintf(out, "  .globl __remill_write_memory_8\n");
+  fprintf(out, "  .type __remill_write_memory_8,@function\n");
+  fprintf(out, "__remill_write_memory_8:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  mov BYTE PTR [rsi], dl\n");
+  fprintf(out, "  mov rax, rdi\n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end11:\n");
+  fprintf(out, "  .size __remill_write_memory_8,.Lfunc_end11-__remill_write_memory_8\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  fprintf(out, "  .globl __remill_write_memory_16\n");
+  fprintf(out, "  .type __remill_write_memory_16,@function\n");
+  fprintf(out, "__remill_write_memory_16:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  mov WORD PTR [rsi], dx\n");
+  fprintf(out, "  mov rax, rdi\n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end12:\n");
+  fprintf(out, "  .size __remill_write_memory_16,.Lfunc_end12-__remill_write_memory_16\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  fprintf(out, "  .globl __remill_write_memory_32\n");
+  fprintf(out, "  .type __remill_write_memory_32,@function\n");
+  fprintf(out, "__remill_write_memory_32:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  mov DWORD PTR [rsi], edx\n");
+  fprintf(out, "  mov rax, rdi\n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end13:\n");
+  fprintf(out, "  .size __remill_write_memory_32,.Lfunc_end13-__remill_write_memory_32\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  fprintf(out, "  .globl __remill_write_memory_64\n");
+  fprintf(out, "  .type __remill_write_memory_64,@function\n");
+  fprintf(out, "__remill_write_memory_64:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  mov QWORD PTR [rsi], rdx\n");
+  fprintf(out, "  mov rax, rdi\n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end14:\n");
+  fprintf(out, "  .size __remill_write_memory_64,.Lfunc_end14-__remill_write_memory_64\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  fprintf(out, "  .globl __remill_write_memory_f32\n");
+  fprintf(out, "  .type __remill_write_memory_f32,@function\n");
+  fprintf(out, "__remill_write_memory_f32:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  movd DWORD PTR [rsi], xmm0\n");
+  fprintf(out, "  mov rax, rdi\n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end15:\n");
+  fprintf(out, "  .size __remill_write_memory_f32,.Lfunc_end15-__remill_write_memory_f32\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  fprintf(out, "  .globl __remill_write_memory_f64\n");
+  fprintf(out, "  .type __remill_write_memory_f64,@function\n");
+  fprintf(out, "__remill_write_memory_f64:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  movq QWORD PTR [rsi], xmm0\n");
+  fprintf(out, "  mov rax, rdi\n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end16:\n");
+  fprintf(out, "  .size __remill_write_memory_f64,.Lfunc_end16-__remill_write_memory_f64\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+
+  fprintf(out, "  .globl __remill_atomic_begin\n");
+  fprintf(out, "  .globl __remill_atomic_end\n");
+  fprintf(out, "  .globl __remill_barrier_load_store\n");
+  fprintf(out, "  .globl __remill_barrier_load_load\n");
+  fprintf(out, "  .globl __remill_barrier_store_load\n");
+  fprintf(out, "  .globl __remill_barrier_store_store\n");
+  fprintf(out, "  .type __remill_load_store,@function\n");
+  fprintf(out, "  .type __remill_load_load,@function\n");
+  fprintf(out, "  .type __remill_store_load,@function\n");
+  fprintf(out, "  .type __remill_store_store,@function\n");
+
+  fprintf(out, "__remill_remill_atomic_begin:\n");
+  fprintf(out, "__remill_remill_atomic_end:\n");
+  fprintf(out, "__remill_barrier_load_store:\n");
+  fprintf(out, "__remill_barrier_load_load:\n");
+  fprintf(out, "__remill_barrier_store_load:\n");
+  fprintf(out, "__remill_barrier_store_store:\n");
+  fprintf(out, "  mov rax, rdi\n");
+  fprintf(out, "  ret\n");
+#endif
 
   return 0;
 }
