@@ -101,6 +101,13 @@ bool InitArch(const std::string &os, const std::string &arch) {
       gTriple = "x86_64-pc-linux-gnu";
       gDataLayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128";
 
+    } else if (arch == "aarch64") {
+      gArchType = llvm::Triple::aarch64;
+      gCallingConv = llvm::CallingConv::ARM_AAPCS;
+      gAddressSize = 64;
+      gTriple = "arm64-unknown";
+      gDataLayout = "e-m:e-i64:64-i128:128-n32:64-S128";
+
     } else {
       return false;
     }
