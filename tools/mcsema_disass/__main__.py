@@ -125,18 +125,6 @@ def main(args=None):
           os.unlink(args.output)
           ret = 1
 
-      # in case IDA somehow says success, but no output was generated
-      if not os.path.isfile(args.output):
-          sys.stderr.write("Could not generate a CFG. Try using the --log_file option to see an error log.\n")
-          ret = 1
-
-      # The disassembler script probably threw an exception
-      if 0 == os.path.getsize(args.output):
-          sys.stderr.write("Generated an invalid (zero-sized) CFG. Please use the --log_file option to see an error log.\n")
-          # remove the zero-sized file
-          os.unlink(args.output)
-          ret = 1
-
     else:
       arg_parser.error("{} passed to --disassembler is not known.".format(
           args.disassembler))

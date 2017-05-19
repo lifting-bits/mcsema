@@ -717,13 +717,17 @@ def recover_segment_cross_references(M, S, seg_ea, seg_end_ea):
     # Go through and look for the fixups. We start at `seg_ea - 1` because we
     # always try to find the *next* fixup/heads, and if there's one right at
     # the beginning of the segment then we don't want to jump to the second one.
-    ea = seg_ea - 1
+    ea, next_ea = seg_ea, seg_ea
     while ea < seg_end_ea:
-        ea = min(idc.GetNextFixupEA(ea), idc.NextHead(ea, seg_end_ea))
-        if ea < seg_ea:
-            continue
-        elif ea >= seg_end_ea:
-            break
+        ea = next_ea
+        xref_width = min(max(idc.ItemSize(ea), 4), 8)
+        next_ea = min(ea + xref_width,
+                      # idc.GetNextFixupEA(ea),
+                      idc.NextHead(ea, seg_end_ea))
+
+        if ea == 0x6ab628:
+            DEBUG("!!! Where else are you at?")
+
 
         # We don't want to fill the jump table bytes with their actual
         # code cross-references. This is because we can't get the address
@@ -731,9 +735,13 @@ def recover_segment_cross_references(M, S, seg_ea, seg_end_ea):
         # and implement the switch in terms of those original values on the
         # LLVM side of things.
         if is_jump_table_entry(ea):
+            if ea == 0x6ab628:
+                DEBUG("!!! A- Where else are you at?")
             continue
 
         if not is_reference(ea):
+            if ea == 0x6ab628:
+                DEBUG("!!! B - Where else are you at?")
             continue
 
         # Note: it's possible that `ea == target_ea`. This happens with
@@ -747,6 +755,8 @@ def recover_segment_cross_references(M, S, seg_ea, seg_end_ea):
 
         # Probably `idc.BADADDR`, or some really small number.
         elif not idc.GetFlags(target_ea):
+            if ea == 0x6ab628:
+                DEBUG("!!! C - Where else are you at?")
             continue
 
         elif (ea % 4) != 0:
@@ -758,12 +768,12 @@ def recover_segment_cross_references(M, S, seg_ea, seg_end_ea):
         else:
             X = S.xrefs.add()
             X.ea = ea
-            X.width = min(max(idc.ItemSize(ea), 4), 8)
+            X.width = xref_width
             X.target_ea = target_ea
             X.target_name = get_symbol_name(target_ea)
             X.target_is_code = is_code(target_ea)
-            DEBUG("{}-byte reference at {:x} to {:x} ({})".format(
-                X.width, ea, target_ea, X.target_name))
+            DEBUG("{}-byte reference at {:x} to {:x} ({}), next_ea={:x}".format(
+                X.width, ea, target_ea, X.target_name, next_ea))
 
 def recover_segment(M, seg_ea):
     """Recover the data and cross-references from a segment. The data of a
@@ -1095,8 +1105,8 @@ if __name__ == "__main__":
         args.output.write(M.SerializeToString())
         args.output.close()
 
-    except Exception as e:
-        DEBUG(str(e))
+    except:
         DEBUG(traceback.format_exc())
     
+    DEBUG("Done analysis!")
     idc.Exit(0)

@@ -69,6 +69,6 @@ def execute(args, command_args):
           shell=True,  # Necessary.
           cwd=os.path.dirname(__file__))
 
-  except subprocess.CalledProcessError as e:
+  except:
     sys.stderr.write(traceback.format_exc())
     return 1

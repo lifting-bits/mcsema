@@ -53,7 +53,7 @@ def xrange(begin, end=None, step=1):
   else:
     return iter(itertools.count().next, begin)
 
-_NOT_CODE_EAS = set()
+_NOT_INST_EAS = set()
 
 # Returns `True` if `ea` belongs to some code segment.
 #
@@ -67,33 +67,33 @@ _NOT_CODE_EAS = set()
 #            `mcsema-lift` would report issues where it needed to add tail-calls
 #            to externals.
 def is_code(ea):
-  global _NOT_CODE_EAS
-  if ea in _NOT_CODE_EAS or is_invalid_ea(ea):
+  if is_invalid_ea(ea):
     return False
 
-  if not idc.isCode(idc.GetFlags(idc.SegStart(ea))):
-    return False
+  # if idc.isCode(idc.GetFlags(ea)):
+  #   if ea == 0x6ab628:
+  #     DEBUG("!!! {:x}".format(idc.GetFlags(ea)))
+  #   return True
 
-  # if not idc.isCode(idc.GetFlags(idc.SegEnd(ea) - 1)):
-  #   return False
-
-  return idc.isCode(idc.GetFlags(ea))
+  seg_ea = idc.SegStart(ea)
+  seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
+  return seg_type == idc.SEG_CODE
 
 # Mark an address as containing code.
 def try_mark_as_code(ea):
+  return False
+
   if not is_code(ea):
     seg_ea = idc.SegStart(ea)
     if is_code(seg_ea):
-      if 0x6ac148 == ea:
-        assert False
       idc.MakeCode(ea)
       idaapi.autoWait()
       return True
   return False
 
 def mark_as_not_code(ea):
-  global _NOT_CODE_EAS
-  _NOT_CODE_EAS.add(ea)
+  global _NOT_INST_EAS
+  _NOT_INST_EAS.add(ea)
 
 def read_bytes_slowly(start, end):
   bytestr = ""
@@ -161,20 +161,36 @@ def instruction_ends_block(arg):
                                           PERSONALITY_TERMINATOR,
                                           PERSONALITY_SYSTEM_RETURN)
 
+IDA_WEIRD_BAD_REF = 0xff00000000000000
+
+def is_invalid_ea(ea):
+  global IDA_WEIRD_BAD_REF
+
+  if idc.BADADDR == ea \
+  or ea >= IDA_WEIRD_BAD_REF \
+  or 0 > ea:
+    return True
+
+  try:
+    idc.GetSegmentAttr(idc.SegStart(ea), idc.SEGATTR_TYPE)
+    return False
+  except:
+    return True
+
 _BAD_INSTRUCTION = (None, "")
 
 def decode_instruction(ea):
   """Read the bytes of an x86/amd64 instruction. This handles things like
   combining the bytes of an instruction with its prefix. IDA Pro sometimes
   treats these as separate."""
-  global _NOT_CODE_EAS, _BAD_INSTRUCTION, PREFIX_ITYPES
+  global _NOT_INST_EAS, _BAD_INSTRUCTION, PREFIX_ITYPES
 
-  if ea in _NOT_CODE_EAS:
+  if ea in _NOT_INST_EAS:
     return _BAD_INSTRUCTION
 
   decoded_inst = idautils.DecodeInstruction(ea)
   if not decoded_inst:
-    _NOT_CODE_EAS.add(ea)
+    _NOT_INST_EAS.add(ea)
     return _BAD_INSTRUCTION
 
   assert decoded_inst.ea == ea
@@ -198,28 +214,31 @@ def is_external_segment(ea):
   external references."""
   global _NOT_EXTERNAL_SEGMENTS
 
-  base_ea = idc.SegStart(ea)
-  if base_ea in _NOT_EXTERNAL_SEGMENTS:
+  seg_ea = idc.SegStart(ea)
+  if seg_ea in _NOT_EXTERNAL_SEGMENTS:
     return False
 
-  if base_ea in _EXTERNAL_SEGMENTS:
+  if seg_ea in _EXTERNAL_SEGMENTS:
     return True
 
   ext_types = []
-  seg_name = idc.SegName(base_ea).lower()
+  seg_name = idc.SegName(seg_ea).lower()
   if ".got" in seg_name or ".plt" in seg_name:
-    _EXTERNAL_SEGMENTS.add(base_ea)
+    _EXTERNAL_SEGMENTS.add(seg_ea)
     return True
 
-  segtype = idc.GetSegmentAttr(base_ea, idc.SEGATTR_TYPE)
-  if segtype == idc.SEG_XTRN:
-    _EXTERNAL_SEGMENTS.add(base_ea)
+  seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
+  if seg_type == idc.SEG_XTRN:
+    _EXTERNAL_SEGMENTS.add(seg_ea)
     return True
 
-  _NOT_EXTERNAL_SEGMENTS.add(base_ea)
+  _NOT_EXTERNAL_SEGMENTS.add(seg_ea)
   return False
 
 def is_internal_code(ea):
+  if is_invalid_ea(ea):
+    return False
+
   if is_external_segment(ea):
     return False
   
@@ -227,14 +246,12 @@ def is_internal_code(ea):
     return True
 
   # find stray 0x90 (NOP) bytes in .text that IDA 
-  # thinks are data items
-  if read_byte(ea) == 0x90:
-    seg = idc.SegStart(ea)
-    segtype = idc.GetSegmentAttr(seg, idc.SEGATTR_TYPE)
-    if segtype == idc.SEG_CODE:
-      if not try_mark_as_code(ea):
-        return False
-      return True
+  # thinks are data items.
+  flags = idc.GetFlags(ea)
+  if idaapi.isAlign(flags):
+    if not try_mark_as_code(ea):
+      return False
+    return True
 
   return False
 
@@ -297,17 +314,17 @@ def get_function_bounds(ea):
   min_ea = seg_start
   max_ea = seg_end
 
-  if idc.BADADDR == min_ea or not is_code(ea):
+  if is_invalid_ea(min_ea) or not is_code(ea):
     return ea, ea
 
   # Get an upper bound using the next function.
   next_func_ea = idc.NextFunction(ea)
-  if next_func_ea != idc.BADADDR:
+  if not is_invalid_ea(next_func_ea):
     max_ea = min(next_func_ea, max_ea)
 
   # Get a lower bound using the previous function.
   prev_func_ea = idc.PrevFunction(ea)
-  if prev_func_ea != idc.BADADDR:
+  if not is_invalid_ea(prev_func_ea):
     min_ea = max(min_ea, prev_func_ea)
     prev_func = idaapi.get_func(prev_func_ea)
     if prev_func and prev_func.endEA < ea:
@@ -347,13 +364,9 @@ def is_thunk(ea):
   flags = idc.GetFunctionFlags(ea)
   return 0 < flags and 0 != (flags & idaapi.FUNC_THUNK)
 
-IDA_WEIRD_BAD_REF = 0xff00000000000000
 _IGNORE_DREF = (lambda x: [IDA_WEIRD_BAD_REF])
 _IGNORE_CREF = (lambda x, y: [IDA_WEIRD_BAD_REF])
 
-def is_invalid_ea(ea):
-  global IDA_WEIRD_BAD_REF
-  return idc.BADADDR == ea or ea >= IDA_WEIRD_BAD_REF or 0 > ea
 
 def _reference_checker(ea, dref_finder=_IGNORE_DREF, cref_finder=_IGNORE_CREF):
   """Looks for references to/from `ea`, and does some sanity checks on what
@@ -369,7 +382,7 @@ def _reference_checker(ea, dref_finder=_IGNORE_DREF, cref_finder=_IGNORE_CREF):
   for ref_ea in cref_finder(ea, False):
     if not is_invalid_ea(ref_ea):
       return True
-
+      
   return False
 
 def is_referenced(ea):

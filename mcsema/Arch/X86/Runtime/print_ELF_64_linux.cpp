@@ -315,6 +315,7 @@ int main(void) {
   // Stash the memory pointer. This is probably actually nothing. But for
   // generality, we will store and return it, as is expected by the prototype
   // of `__remill_function_call` (see remill/Arch/Runtime/Intrinsics.h).
+  fprintf(out, "  push rdi\n");  // Alignment.
   fprintf(out, "  push rdi\n");
 
   // Stash the callee-saved registers (amd64 ABI). These registers need to
@@ -470,6 +471,7 @@ int main(void) {
   fprintf(out, "  pop rbx\n");
 
   // Stashed memory pointer (for returning).
+  fprintf(out, "  pop rax\n");  // Alignment.
   fprintf(out, "  pop rax\n");
   fprintf(out, "  ret\n");
 
