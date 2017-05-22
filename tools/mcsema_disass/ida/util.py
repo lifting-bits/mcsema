@@ -70,11 +70,6 @@ def is_code(ea):
   if is_invalid_ea(ea):
     return False
 
-  # if idc.isCode(idc.GetFlags(ea)):
-  #   if ea == 0x6ab628:
-  #     DEBUG("!!! {:x}".format(idc.GetFlags(ea)))
-  #   return True
-
   seg_ea = idc.SegStart(ea)
   seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
   return seg_type == idc.SEG_CODE
@@ -387,12 +382,9 @@ def _reference_checker(ea, dref_finder=_IGNORE_DREF, cref_finder=_IGNORE_CREF):
 
 def is_referenced(ea):
   """Returns `True` if the data at `ea` is referenced by something else."""
-  return idc.isRef(idc.GetFlags(ea))
+  return _reference_checker(ea, idautils.DataRefsTo, idautils.CodeRefsTo)
 
 def is_referenced_by(ea, by_ea):
-  if not is_referenced(ea):
-    return False
-
   for ref_ea in idautils.DataRefsTo(ea):
     if ref_ea == by_ea:
       return True
@@ -416,12 +408,19 @@ def is_runtime_external_data_reference(ea):
   cross-reference it to anything, because the target address will
   only exist at runtime."""
   comment = idc.GetCommentEx(ea, 0)
-  return comment and "Copy of shared data" in comment
+  if comment and "Copy of shared data" in comment:
+    return True
+  else:
+    return False
 
 def is_reference(ea):
   """Returns `True` if the `ea` references something else."""
-  if _reference_checker(ea, idautils.DataRefsFrom, idautils.CodeRefsFrom):
-    return True
+  if is_invalid_ea(ea):
+    return False
+
+  for target in idautils.XrefsFrom(ea):
+    if ea == target.frm and not is_invalid_ea(target.to):
+      return True
 
   return is_runtime_external_data_reference(ea)
 

@@ -428,13 +428,9 @@ def reference_target_type(ref):
         if ref.ea in EXTERNAL_VARS_TO_RECOVER:
             return CFG_pb2.CodeReference.DataTarget
         elif ref.ea in EXTERNAL_FUNCS_TO_RECOVER:
-            if ref.ea == 0x6ac148:
-                DEBUG("!!! a")
             return CFG_pb2.CodeReference.CodeTarget
 
     if is_code(ref.ea):
-        if ref.ea == 0x6ac148:
-            DEBUG("!!! b")
         return CFG_pb2.CodeReference.CodeTarget
     else:
         return CFG_pb2.CodeReference.DataTarget
@@ -725,23 +721,15 @@ def recover_segment_cross_references(M, S, seg_ea, seg_end_ea):
                       # idc.GetNextFixupEA(ea),
                       idc.NextHead(ea, seg_end_ea))
 
-        if ea == 0x6ab628:
-            DEBUG("!!! Where else are you at?")
-
-
         # We don't want to fill the jump table bytes with their actual
         # code cross-references. This is because we can't get the address
         # of a basic block. Our goal is thus to preserve the original values,
         # and implement the switch in terms of those original values on the
         # LLVM side of things.
         if is_jump_table_entry(ea):
-            if ea == 0x6ab628:
-                DEBUG("!!! A- Where else are you at?")
             continue
 
         if not is_reference(ea):
-            if ea == 0x6ab628:
-                DEBUG("!!! B - Where else are you at?")
             continue
 
         # Note: it's possible that `ea == target_ea`. This happens with
@@ -755,8 +743,6 @@ def recover_segment_cross_references(M, S, seg_ea, seg_end_ea):
 
         # Probably `idc.BADADDR`, or some really small number.
         elif not idc.GetFlags(target_ea):
-            if ea == 0x6ab628:
-                DEBUG("!!! C - Where else are you at?")
             continue
 
         elif (ea % 4) != 0:

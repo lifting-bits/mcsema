@@ -41,10 +41,6 @@ def make_xref(from_ea, to_ea, xref_constructor, xref_size):
     DEBUG("  Not making reference (A) from {:x} to {:x}".format(from_ea, to_ea))
     return
 
-  if is_referenced_by(to_ea, from_ea):
-    DEBUG("  Not making reference (B) from {:x} to {:x}".format(from_ea, to_ea))
-    return
-
   make_head(from_ea)
   make_head(from_ea + xref_size)
   xref_constructor(from_ea)
@@ -157,6 +153,8 @@ def remaining_item_size(ea):
     return size
 
   head_ea = idc.PrevHead(ea, max(0, ea - size))
+  if is_invalid_ea(head_ea):
+    return 0
   assert (head_ea + size) >= ea
   return (head_ea + size) - ea
 
@@ -189,45 +187,29 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea):
       assert ea < next_ea
       continue
 
-    if not is_reference(ea):
-      # Try to read it as an 8-byte pointer.
-      if try_qwords and (ea + 8) <= seg_end_ea:
-        target_ea = read_qword(ea)
-        if is_sane_reference(target_ea):
-          DEBUG("Adding qword reference from {:x} to {:x}".format(ea, target_ea))
-          make_xref(ea, target_ea, idc.MakeQword, 8)
-          next_ea = ea + 8
-          continue
+    # Try to read it as an 8-byte pointer.
+    if try_qwords and (ea + 8) <= seg_end_ea:
+      target_ea = read_qword(ea)
+      if is_sane_reference(target_ea):
+        DEBUG("Adding qword reference from {:x} to {:x}".format(ea, target_ea))
+        make_xref(ea, target_ea, idc.MakeQword, 8)
+        next_ea = ea + 8
+        continue
 
-      # Try to read it as a 4-byte pointer.
-      if (ea + 4) <= seg_end_ea:
-        target_ea = read_dword(ea)
-        if is_sane_reference(target_ea):
-          DEBUG("Adding dword reference from {:x} to {:x}".format(ea, target_ea))
-          make_xref(ea, target_ea, idc.MakeDword, 4)
-          next_ea = ea + 4
-          continue
+    # Try to read it as a 4-byte pointer.
+    if (ea + 4) <= seg_end_ea:
+      target_ea = read_dword(ea)
+      if is_sane_reference(target_ea):
+        DEBUG("Adding dword reference from {:x} to {:x}".format(ea, target_ea))
+        make_xref(ea, target_ea, idc.MakeDword, 4)
+        next_ea = ea + 4
+        continue
 
-      next_ea = ea + 1
-
-    else:
-      xref_size = max(4, min(item_size, pointer_size))
-      assert xref_size == 4 or xref_size == 8
-
-      # If the 4- and 8-byte pointer values of this reference are the same,
-      # then extend it to be an 8-byte pointer.
-      if try_qwords:
-        if 4 == xref_size:
-          target_ea = read_dword(ea)
-          if read_qword(ea) == target_ea and not is_referenced(ea + 4):
-            make_xref(ea, target_ea, idc.MakeQword, 8)
-            xref_size = 8
-            DEBUG("Expanded xref size at {:x} to 8 bytes".format(ea))
-
-      # Jump ahead to a reasonable alignment
-      next_ea = ea + xref_size
-      DEBUG("Found reference at {:x} of size {}, jumping to {:x}".format(
-          ea, item_size, next_ea))
+    if is_reference(ea) and not is_runtime_external_data_reference(ea):
+      DEBUG("WARNING!!! Undefining reference at {:x}".format(ea))
+      idaapi.do_unknown_range(ea, 4, idc.DOUNK_EXPAND)
+    
+    next_ea = ea + 4
 
   DEBUG("Stopping scan at {:x}".format(ea))
     
