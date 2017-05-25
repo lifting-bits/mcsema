@@ -29,9 +29,6 @@
 #include <CFG.pb.h>
 #pragma clang diagnostic pop
 
-#include "remill/Arch/Arch.h"
-
-#include "mcsema/Arch/Arch.h"
 #include "mcsema/CFG/CFG.h"
 
 namespace mcsema {
@@ -204,10 +201,10 @@ static bool ResolveReference(NativeModule *module, NativeXref *xref) {
 // about letting us know if we should investigate something in the Python
 // side of things.
 static void AddXref(NativeModule *module, NativeInstruction *inst,
-                    const CodeReference &cfg_ref) {
+                    const CodeReference &cfg_ref, uint64_t pointer_size) {
   auto xref = new NativeXref;
   xref->ea = inst->ea;
-  xref->width = gArch->address_size / 8;
+  xref->width = pointer_size;
   xref->segment = FindSegment(module, xref->ea);
   xref->target_ea = static_cast<uint64_t>(cfg_ref.ea());
   xref->target_segment = FindSegment(module, xref->target_ea);
@@ -333,7 +330,8 @@ NativeObject *NativeObject::Get(void) {
 // that, at least in ELF binaries, externals will usually have some kind of
 // 'internal' location for the sake of linking, and so we want to dedup
 // internals into externals whenever possible.
-NativeModule *ReadProtoBuf(const std::string &file_name) {
+NativeModule *ReadProtoBuf(const std::string &file_name,
+                           uint64_t pointer_size) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
   std::ifstream fstream(file_name, std::ios::binary);
@@ -609,7 +607,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
       xref->target_name = cfg_xref.target_name();
       xref->target_segment = FindSegment(module, xref->target_ea);
 
-      CHECK(xref->width <= (gArch->address_size / 8))
+      CHECK(xref->width <= pointer_size)
           << "Cross reference at " << std::hex << xref->ea << " to "
           << xref->target_name << " at " << std::hex << xref->target_ea
           << " is too wide at " << xref->width << " bytes";
@@ -739,7 +737,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name) {
         inst->offset_table = 0;
 
         for (const auto &cfg_ref : cfg_inst.xrefs()) {
-          AddXref(module, inst, cfg_ref);
+          AddXref(module, inst, cfg_ref, pointer_size);
         }
 
         block->instructions.push_back(inst);

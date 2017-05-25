@@ -15,6 +15,7 @@
  */
 
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 
 #include <sstream>
 #include <string>
@@ -37,6 +38,12 @@
 #include "mcsema/BC/Util.h"
 #include "mcsema/BC/Callback.h"
 #include "mcsema/CFG/CFG.h"
+
+DEFINE_bool(explicit_args, false,
+            "Should arguments be explicitly passed to external functions. "
+            "This can be good for static analysis and symbolic execution, "
+            "but in practice it precludes the possibility of compiling "
+            "and running the bitcode.");
 
 namespace mcsema {
 namespace {
@@ -63,18 +70,26 @@ static llvm::Function *GetDetachCallValueFunc(void) {
   return handler;
 }
 
+static llvm::Function *CreateGenericCallback(const std::string &callback_name) {
+  auto void_type = llvm::Type::getVoidTy(*gContext);
+  auto callback_type = llvm::FunctionType::get(void_type, false);
+
+  auto callback_func = llvm::Function::Create(
+      callback_type, llvm::GlobalValue::InternalLinkage,  // Tentative linkage.
+      callback_name, gModule);
+
+  callback_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
+  callback_func->setCallingConv(llvm::CallingConv::Fast);
+  callback_func->addFnAttr(llvm::Attribute::Naked);
+  callback_func->addFnAttr(llvm::Attribute::NoInline);
+  callback_func->addFnAttr(llvm::Attribute::NoBuiltin);
+
+  return callback_func;
+}
+
 // Get a callback function for an internal function.
-llvm::Function *GetNativeToLiftedCallback(
-    const NativeObject *cfg_func, const std::string callback_name) {
-
-  CHECK(!cfg_func->is_external)
-      << "Cannot get entry point thunk for external function "
-      << cfg_func->name;
-
-  auto callback_func = gModule->getFunction(callback_name);
-  if (callback_func) {
-    return callback_func;
-  }
+static llvm::Function *GetNativeToLiftedCallback(
+    const NativeObject *cfg_func, const std::string &callback_name) {
 
   // If the native name of the function doesn't yet exist then add it in.
   auto func = gModule->getFunction(cfg_func->lifted_name);
@@ -109,14 +124,15 @@ llvm::Function *GetNativeToLiftedCallback(
               << "movl $1, %eax;"
               << "xchgl (%esp), %eax;";
       break;
+
     default:
       LOG(FATAL)
-          << "unknown architecture -- not yet supported.";
+          << "Cannot create native-to-lifted callback for the "
+          << GetArchName(gArch->arch_name) << " instruction set.";
       break;
   }
 
   auto void_type = llvm::Type::getVoidTy(*gContext);
-  auto callback_type = llvm::FunctionType::get(void_type, false);
   auto word_type = llvm::Type::getIntNTy(
       *gContext, static_cast<unsigned>(gArch->address_size));
 
@@ -128,16 +144,7 @@ llvm::Function *GetNativeToLiftedCallback(
   auto asm_func = llvm::InlineAsm::get(
       asm_func_type, asm_str.str(), "*m,*m,~{dirflag},~{fpsr},~{flags}", true);
 
-  callback_func = llvm::Function::Create(
-      callback_type, llvm::GlobalValue::InternalLinkage,  // Tentative linkage.
-      callback_name, gModule);
-
-  callback_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
-  callback_func->setCallingConv(llvm::CallingConv::Fast);
-  callback_func->addFnAttr(llvm::Attribute::Naked);
-  callback_func->addFnAttr(llvm::Attribute::NoInline);
-  callback_func->addFnAttr(llvm::Attribute::NoBuiltin);
-
+  auto callback_func = CreateGenericCallback(callback_name);
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", callback_func));
 
   std::vector<llvm::Value *> asm_args;
@@ -160,6 +167,32 @@ llvm::Function *GetNativeToLiftedCallback(
   return callback_func;
 }
 
+static llvm::Function *GetCallback(
+    const NativeObject *cfg_func, const std::string callback_name) {
+
+  CHECK(!cfg_func->is_external)
+      << "Cannot get entry point thunk for external function "
+      << cfg_func->name;
+
+  auto callback_func = gModule->getFunction(callback_name);
+  if (callback_func) {
+    return callback_func;
+  }
+
+  if (FLAGS_explicit_args) {
+    // TODO(car): Pull this out into its own function, and add in calling
+    //            convention-specific code to pass in arguments. May need
+    //            to declare and/or cast the exernal functions as something
+    //            like `addr_t foo(...)`.
+    auto callback_func = CreateGenericCallback(callback_name);
+    callback_func->setLinkage(llvm::GlobalValue::ExternalLinkage);
+    return callback_func;
+
+  } else {
+    return GetNativeToLiftedCallback(cfg_func, callback_name);
+  }
+}
+
 }  // namespace
 
 // Get a callback function for an internal function that can be referenced by
@@ -167,12 +200,12 @@ llvm::Function *GetNativeToLiftedCallback(
 llvm::Function *GetNativeToLiftedCallback(const NativeObject *cfg_func) {
   std::stringstream ss;
   ss << "callback_" << cfg_func->lifted_name;
-  return GetNativeToLiftedCallback(cfg_func, ss.str());
+  return GetCallback(cfg_func, ss.str());
 }
 
 // Get a callback function for an internal function.
 llvm::Function *GetNativeToLiftedEntryPoint(const NativeObject *cfg_func) {
-  return GetNativeToLiftedCallback(cfg_func, cfg_func->name);
+  return GetCallback(cfg_func, cfg_func->name);
 }
 
 // Get a callback function for an external function that can be referenced by

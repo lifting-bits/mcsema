@@ -158,6 +158,12 @@ add_executable(mcsema-lift
     tools/mcsema_lift/Lift.cpp
 )
 
+add_executable(mcsema-dump-cfg
+    ${PROJECT_PROTOBUFSOURCEFILES}
+    mcsema/CFG/CFG.cpp
+    tools/mcsema_dump_cfg/Dump.cpp
+)
+
 # Copy mcsema-disass in
 add_custom_command(
     TARGET protobuf_python_module PRE_BUILD
@@ -174,7 +180,22 @@ target_include_directories(mcsema-lift SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIE
 target_compile_definitions(mcsema-lift PUBLIC ${PROJECT_DEFINITIONS})
 set_target_properties(mcsema-lift PROPERTIES COMPILE_FLAGS ${PROJECT_CXXFLAGS})
 
+target_link_libraries(mcsema-dump-cfg PRIVATE ${PROJECT_LIBRARIES})
+target_include_directories(mcsema-dump-cfg SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIES})
+target_compile_definitions(mcsema-dump-cfg PUBLIC ${PROJECT_DEFINITIONS})
+set_target_properties(mcsema-dump-cfg PROPERTIES COMPILE_FLAGS ${PROJECT_CXXFLAGS})
+
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mcsema/Arch/X86/Runtime)
 
+install(
+  TARGETS mcsema-lift 
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib)
+
+install(
+  TARGETS mcsema-dump-cfg 
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib)
+  
 install(CODE
     "execute_process(COMMAND python ${PROJECT_SOURCE_DIR}/tools/setup.py install -f --prefix=${CMAKE_INSTALL_PREFIX})")

@@ -166,7 +166,8 @@ struct NativeModule {
   const NativeVariable *TryGetVariable(uint64_t ea) const;
 };
 
-NativeModule *ReadProtoBuf(const std::string &file_name);
+NativeModule *ReadProtoBuf(const std::string &file_name,
+                           uint64_t pointer_size);
 
 }  // namespace mcsema
 

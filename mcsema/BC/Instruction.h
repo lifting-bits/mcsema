@@ -47,8 +47,8 @@ class InstructionLifter : public remill::InstructionLifter {
   virtual ~InstructionLifter(void);
 
   // Lift a single instruction into a basic block.
-  remill::LiftStatus LiftIntoBlock(remill::Instruction *instr,
-                                   llvm::BasicBlock *block) override;
+  bool LiftIntoBlock(remill::Instruction *instr,
+                     llvm::BasicBlock *block) override;
 
  protected:
 

@@ -329,20 +329,16 @@ static bool TryLiftTerminator(TranslationContext &ctx,
 }
 
 // Lift a decoded instruction into `block`.
-static void LiftInstIntoBlock(TranslationContext &ctx,
+static bool LiftInstIntoBlock(TranslationContext &ctx,
                               llvm::BasicBlock *block,
                               bool is_last) {
-  auto instr_addr = ctx.cfg_inst->ea;
+  auto inst_addr = ctx.cfg_inst->ea;
   auto &bytes = ctx.cfg_inst->bytes;
-  std::unique_ptr<remill::Instruction> instr(
-      gArch->DecodeInstruction(instr_addr, bytes));
+  auto inst = gArch->DecodeInstruction(inst_addr, bytes);
 
-  CHECK(instr->IsValid())
-      << "Cannot decode instruction at " << std::hex << instr_addr;
-
-  DLOG_IF(WARNING, bytes.size() != instr->NumBytes())
-      << "Size of decoded instruction at " << std::hex << instr_addr
-      << " (" << std::dec << instr->NumBytes()
+  DLOG_IF(WARNING, bytes.size() != inst->NumBytes())
+      << "Size of decoded instruction at " << std::hex << inst_addr
+      << " (" << std::dec << inst->NumBytes()
       << ") doesn't match input instruction size ("
       << bytes.size() << ").";
 
@@ -351,29 +347,25 @@ static void LiftInstIntoBlock(TranslationContext &ctx,
   }
 
   if (FLAGS_add_breakpoints) {
-    InlineSubFuncCall(block, GetBreakPoint(instr_addr));
+    InlineSubFuncCall(block, GetBreakPoint(inst_addr));
   }
 
-  switch (auto status = ctx.lifter->LiftIntoBlock(instr.get(), block)) {
-    case remill::LiftStatus::kError:
-    case remill::LiftStatus::kInvalid:
-      LOG(FATAL)
-          << "Can't lift instruction " << instr->Serialize();
-      break;
-    default:
-      break;
+  CHECK(ctx.lifter->LiftIntoBlock(inst.get(), block))
+      << "Can't lift instruction " << inst->Serialize();
 
-  }
-
-  if (TryLiftTerminator(ctx, block, instr.get())) {
-    CHECK(is_last)
-        << "Instruction at " << std::hex << instr_addr
-        << " should end the basic block.";
+  auto ret = true;
+  if (TryLiftTerminator(ctx, block, inst.get())) {
+    if (!is_last) {
+      LOG(ERROR)
+          << "Ending block early at " << std::hex << inst_addr;
+      ret = false;
+    }
   }
 
   // Annotate every un-annotated instruction in this function with the
   // program counter of the current instruction.
-  AnnotateInsts(ctx.lifted_func, instr_addr);
+  AnnotateInsts(ctx.lifted_func, inst_addr);
+  return ret;
 }
 
 // Lift a decoded block into a function.
@@ -391,7 +383,10 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
   for (auto cfg_inst : ctx.cfg_block->instructions) {
     ctx.cfg_inst = cfg_inst;
     auto is_last = (++i) >= num_insts;
-    LiftInstIntoBlock(ctx, block, is_last);
+
+    if (!LiftInstIntoBlock(ctx, block, is_last)) {
+      return;
+    }
 
     LOG_IF(WARNING, cfg_inst->does_not_return && !is_last)
         << "Instruction at " << std::hex << cfg_inst->ea

@@ -57,8 +57,9 @@ InstructionLifter::InstructionLifter(llvm::IntegerType *word_type_,
         imm_ref(nullptr) {}
 
 // Lift a single instruction into a basic block.
-remill::LiftStatus InstructionLifter::LiftIntoBlock(
+bool InstructionLifter::LiftIntoBlock(
     remill::Instruction *instr_, llvm::BasicBlock *block_) {
+
   instr = instr_;
   block = block_;
   mem_ref = GetAddress(ctx.cfg_inst->mem);
