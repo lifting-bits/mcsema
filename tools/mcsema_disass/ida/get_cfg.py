@@ -1781,12 +1781,12 @@ def getInstructionSize(ea):
     insn = idautils.DecodeInstruction(ea)
     return insn.size
 
-def recoverStackVars(F):
+def recoverStackVars(F, BB):
     from var_recovery import collect_ida
     from var_recovery import parse_ida_types
 
     # pull info from IDA
-    stack_locals = collect_ida.collect_func_vars(F, {}) # functionWrapper?
+    stack_locals = collect_ida.collect_func_vars(F, BB, {}) # functionWrapper?
 
     # TODO: convert flags/type info
     #stack_locals_typed = map(parse_ida_types.parse_type, stack_locals)
@@ -1809,22 +1809,17 @@ def recoverStackVars(F):
         #r.opd_idx = -1
 
 # TODO restructure so we aren't calling collect_func_vars twice
-def recoverGlobalVars(M, F, global_var_data):
+def recoverGlobalVars(F, BB, global_var_data):
     from var_recovery import collect_ida
     from var_recovery import parse_ida_types
   
     # pull info from IDA
-    collect_ida.collect_func_vars(F, global_var_data) # functionWrapper?
+    collect_ida.collect_func_vars(F, BB, global_var_data) # functionWrapper?
 
     return
 
 def recoverFunctionFromSet(M, F, blockset, new_eas, global_var_data):
     processed_blocks = set()
-
-    if TO_RECOVER["stack_vars"]:
-      recoverStackVars(F)
-    if TO_RECOVER["global_vars"]:
-      recoverGlobalVars(M, F, global_var_data)
 
     while len(blockset) > 0:
         block = blockset.pop()
@@ -1853,6 +1848,12 @@ def recoverFunctionFromSet(M, F, blockset, new_eas, global_var_data):
             prevHead = head
 
         DEBUG("Ending insn at: {0:x}".format(prevHead))
+        # process global & stack variables
+        # idaapi.FlowChart(...) causes hang;
+        if TO_RECOVER["stack_vars"]:
+            recoverStackVars(F, block)
+        if TO_RECOVER["global_vars"]:
+            recoverGlobalVars(F, block, global_var_data)
 
 def recoverFunction(M, F, fnea, new_eas, global_var_data):
     blockset = getFunctionBlocks(fnea)
@@ -2027,7 +2028,6 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
     processDataSegments(M, new_eas)
 
     for name in to_recover:
-
         if name in exports:
             ea = exports[name]
         else:

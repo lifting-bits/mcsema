@@ -207,7 +207,7 @@ def _normalize_global_var_name(name):
         return_name = return_name[3:]
     return return_name
 
-def collect_func_vars(F, global_var_data):
+def collect_func_vars(F, BB, global_var_data):
     '''
     Collect stack variable data from a single function F.
     Returns a dict of stack variables 'stackArgs'.
@@ -216,9 +216,9 @@ def collect_func_vars(F, global_var_data):
     '''
 
     f = F.entry_address
-    return collect_function_vars(f, global_var_data)
+    return collect_function_vars(f, BB, global_var_data)
 
-def collect_function_vars(f, global_var_data):
+def collect_function_vars(f, BB, global_var_data):
     stackArgs = dict()
     name = idc.Name(f)
     end = idc.GetFunctionAttr(f, idc.FUNCATTR_END)
@@ -261,7 +261,7 @@ def collect_function_vars(f, global_var_data):
                                    "reads":set()}
         offset = idc.GetStrucNextOff(frame, offset)
     #functions.append({"name":name, "stackArgs":stackArgs})
-    _find_local_references(f, {"name":name, "stackArgs":stackArgs, "uses_bp":_uses_bp, "globals":dict()}, global_var_data)
+    _find_local_references(f, BB, {"name":name, "stackArgs":stackArgs, "uses_bp":_uses_bp, "globals":dict()}, global_var_data)
 
     return stackArgs
 
@@ -299,6 +299,42 @@ def _process_single_func(funcaddr):
     f_vars = collect_func_vars(functionWrapper(funcaddr), glb)
     return f_vars, glb
 
+def _process_add_inst(addr, referers, dereferences, func_var_data, global_var_data):
+    target_op = _translate_reg(idc.GetOpnd(addr, 0))
+    read_op = _translate_reg(idc.GetOpnd(addr, 1))
+    
+    taget_global = idc.GetOpType(addr, 0) == 2
+    read_global = idc.GetOpType(addr, 1) == 2
+    global_address = (idc.GetOpType(addr, 1) == 5) and ('offset' in idc.GetOpnd(addr, 1)) 
+    
+    referers.pop(target_op, None)
+    dereferences.pop(target_op, None)
+    
+    if global_address:
+        memory_ref =  _signed_from_unsigned(idc.GetOperandValue(addr, 1))
+        var_name = _normalize_global_var_name(idc.GetOpnd(addr, 1))
+        op_datatype = _get_operand_data(addr, 1)
+        if memory_ref not in global_var_data:
+            global_var_data[memory_ref] = _create_global_var_entry(memory_ref, var_name, op_datatype)
+        global_var_data[memory_ref]["addrs"].add(addr)
+        global_var_data[memory_ref]["safe"] = False
+        if memory_ref not in func_var_data["globals"]:
+            func_var_data["globals"][memory_ref] = _create_global_var_entry(memory_ref, var_name, op_datatype)
+        func_var_data["globals"][memory_ref]["addrs"].add(addr)
+        func_var_data["globals"][memory_ref]["safe"] = False
+        
+    if read_global:
+        memory_ref = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
+        var_name = _normalize_global_var_name(idc.GetOpnd(addr, 1))
+        op_datatype = _get_operand_data(addr, 1)
+        if memory_ref not in global_var_data:
+            global_var_data[memory_ref] = _create_global_var_entry(memory_ref, var_name, op_datatype)
+        global_var_data[memory_ref]["reads"].add(addr)
+        if memory_ref not in func_var_data["globals"]:
+            func_var_data["globals"][memory_ref] = _create_global_var_entry(memory_ref, var_name, op_datatype)
+        func_var_data["globals"][memory_ref]["reads"].add(addr)
+
+
 def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_data):
     '''
     - type data regarding the target operand is discarded
@@ -334,6 +370,17 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_da
         func_var_data["globals"][memory_ref]["addrs"].add(addr)
         func_var_data["globals"][memory_ref]["safe"] = False
 
+    if target_global:
+        memory_ref = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
+        var_name = _normalize_global_var_name(idc.GetOpnd(addr, 0))
+        op_datatype = _get_operand_data(addr, 0)
+        if memory_ref not in global_var_data:
+            global_var_data[memory_ref] = _create_global_var_entry(memory_ref, var_name, op_datatype)
+        global_var_data[memory_ref]["writes"].add(addr)
+        if memory_ref not in func_var_data["globals"]:
+            func_var_data["globals"][memory_ref] = _create_global_var_entry(memory_ref, var_name, op_datatype)
+        func_var_data["globals"][memory_ref]["writes"].add(addr)
+        
 
     if read_op in referers:
         # handling the two following mov cases in this block:
@@ -450,7 +497,8 @@ def _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb, 
     for addr in BlockItems(BB):
         _funcs = {"lea":_process_lea_inst,
                   "mov":_process_mov_inst,
-                  "call":_process_call_inst}
+                  "call":_process_call_inst,
+                  "add":_process_add_inst}
         func = _funcs.get(idc.GetMnem(addr), None)
         if func:
             func(addr, referers, dereferences, func_var_data, global_var_data)
@@ -466,10 +514,10 @@ def _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb, 
                     pass # Hmmm. Unsure what just happened.
                     #print "offset {} not found at address {}".format(hex(offset), hex(addr))
 
-    for block in BB.succs():
-        _process_basic_block(block, func_var_data, referers.copy(), dereferences.copy(), visited_bb, global_var_data)
+    #for block in BB.succs():
+    #    _process_basic_block(block, func_var_data, referers.copy(), dereferences.copy(), visited_bb, global_var_data)
 
-def _find_local_references(func, func_var_data, global_var_data):
+def _find_local_references(func, BB, func_var_data, global_var_data):
     frame = idc.GetFrame(func)
     if frame is None:
         return
@@ -479,8 +527,8 @@ def _find_local_references(func, func_var_data, global_var_data):
     next_bb = list()
 
     #build the dict of addr->basicblock objects
-    fc = idaapi.FlowChart(idaapi.get_func(func))
-    _process_basic_block(fc[0], func_var_data, referers, dereferences, visited_bb, global_var_data)
+    #fc = idaapi.FlowChart(idaapi.get_func(func))
+    _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb, global_var_data)
 
 def print_func_vars():
     print
