@@ -119,3 +119,5 @@ PERSONALITIES.update({
   idaapi.NN_loopqne: PERSONALITY_CONDITIONAL_BRANCH,
 })
 
+def fixup_personality(inst, p):
+  return p

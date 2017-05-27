@@ -52,3 +52,12 @@ PERSONALITIES.update({
   idaapi.ARM_tbnz: PERSONALITY_CONDITIONAL_BRANCH,
   idaapi.ARM_tbz: PERSONALITY_CONDITIONAL_BRANCH,
 })
+
+def fixup_personality(inst, p):
+  """For things like b.le, IDA will give us the `ARM_b` opcode, and we need
+  to figure out if it's actually conditional. This is stored in the `segpref`
+  field, and `0xe` is the unconditional version."""
+  if inst.itype == idaapi.ARM_b:
+    if 0 <= inst.segpref <= 0xf and inst.segpref != 0xe:
+      return PERSONALITY_CONDITIONAL_BRANCH
+  return p

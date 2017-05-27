@@ -122,7 +122,9 @@ def instruction_personality(arg):
   global PERSONALITIES
   if isinstance(arg, (int, long)):
     arg, _ = decode_instruction(arg)
-  return PERSONALITIES[arg.itype]
+  p = PERSONALITIES[arg.itype]
+
+  return fixup_personality(arg, p)
 
 def is_conditional_jump(arg):
   return instruction_personality(arg) == PERSONALITY_CONDITIONAL_BRANCH
@@ -156,19 +158,15 @@ def instruction_ends_block(arg):
                                           PERSONALITY_TERMINATOR,
                                           PERSONALITY_SYSTEM_RETURN)
 
-IDA_WEIRD_BAD_REF = 0xff00000000000000
-
 def is_invalid_ea(ea):
-  global IDA_WEIRD_BAD_REF
-
-  if idc.BADADDR == ea \
-  or ea >= IDA_WEIRD_BAD_REF \
-  or 0 > ea:
+  """Returns `True` if `ea` is not valid, i.e. it doesn't point into any
+  valid segment."""
+  if idc.BADADDR == ea:
     return True
 
   try:
     idc.GetSegmentAttr(idc.SegStart(ea), idc.SEGATTR_TYPE)
-    return False
+    return False  # If we get here, then it must be a valid ea!
   except:
     return True
 
@@ -204,6 +202,16 @@ def decode_instruction(ea):
 _NOT_EXTERNAL_SEGMENTS = set([idc.BADADDR])
 _EXTERNAL_SEGMENTS = set()
 
+def is_external_segment_by_flags(ea):
+  try:
+    seg_ea = idc.SegStart(ea)
+    seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
+    if seg_type == idc.SEG_XTRN:
+      _EXTERNAL_SEGMENTS.add(seg_ea)
+      return True
+  except:
+    return False
+
 def is_external_segment(ea):
   """Returns `True` if the segment containing `ea` looks to be solely containing
   external references."""
@@ -216,14 +224,13 @@ def is_external_segment(ea):
   if seg_ea in _EXTERNAL_SEGMENTS:
     return True
 
-  ext_types = []
-  seg_name = idc.SegName(seg_ea).lower()
-  if ".got" in seg_name or ".plt" in seg_name:
+  if is_external_segment_by_flags(ea):
     _EXTERNAL_SEGMENTS.add(seg_ea)
     return True
 
-  seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
-  if seg_type == idc.SEG_XTRN:
+  ext_types = []
+  seg_name = idc.SegName(seg_ea).lower()
+  if ".got" in seg_name or ".plt" in seg_name:
     _EXTERNAL_SEGMENTS.add(seg_ea)
     return True
 
@@ -359,9 +366,8 @@ def is_thunk(ea):
   flags = idc.GetFunctionFlags(ea)
   return 0 < flags and 0 != (flags & idaapi.FUNC_THUNK)
 
-_IGNORE_DREF = (lambda x: [IDA_WEIRD_BAD_REF])
-_IGNORE_CREF = (lambda x, y: [IDA_WEIRD_BAD_REF])
-
+_IGNORE_DREF = (lambda x: [idc.BADADDR])
+_IGNORE_CREF = (lambda x, y: [idc.BADADDR])
 
 def _reference_checker(ea, dref_finder=_IGNORE_DREF, cref_finder=_IGNORE_CREF):
   """Looks for references to/from `ea`, and does some sanity checks on what
@@ -465,4 +471,5 @@ def make_head(ea):
   if not idc.isHead(flags):
     idc.SetFlags(ea, flags | idc.FF_DATA)
     idaapi.autoWait()
-    assert is_head(ea)
+    return is_head(ea)
+  return True

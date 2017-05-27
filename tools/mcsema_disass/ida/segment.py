@@ -42,7 +42,12 @@ def make_xref(from_ea, to_ea, xref_constructor, xref_size):
     return
 
   make_head(from_ea)
-  make_head(from_ea + xref_size)
+  
+  # If we can't make a head, then it probably means that we're at the
+  # end of the binary, e.g. the last thing in the `.extern` segment.
+  if not make_head(from_ea + xref_size):
+    assert idc.BADADDR == idc.SegStart(from_ea + xref_size)
+
   xref_constructor(from_ea)
   if not is_code(from_ea):
     idc.add_dref(from_ea, to_ea, idc.XREF_USER|idc.dr_O)
@@ -161,7 +166,8 @@ def remaining_item_size(ea):
 def find_missing_xrefs_in_segment(seg_ea, seg_end_ea):
   """Look for cross-refernces that were missed by IDA. This function assumes
   a natural alignments for pointers (i.e. 4- or 8-byte alignment)."""
-  assert 0 == (seg_ea % 4)
+
+  seg_ea = (seg_ea + 3) & ~3  # Align to a 4-byte boundary.
 
   try_qwords = get_address_size_in_bits() == 64
   pointer_size = try_qwords and 8 or 4
@@ -212,7 +218,46 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea):
     next_ea = ea + 4
 
   DEBUG("Stopping scan at {:x}".format(ea))
-    
+
+def find_missing_xrefs_in_code_segment(seg_ea, seg_end_ea):
+  """Looks for data cross-references in a code segment."""
+  DEBUG_PUSH()
+  ea, next_ea = seg_ea, seg_ea
+  while next_ea < seg_end_ea:
+    ea = next_ea
+
+    if is_jump_table_entry(ea):
+      next_ea = ea + 1
+      continue
+
+    # This manifests in AArch64 as something like:
+    #
+    #     .text:00400488                 LDR             X0, =main
+    #     .text:0040048C                 LDR             X3, =__libc_csu_init
+    #     .text:00400490                 LDR             X4, =__libc_csu_fini
+    #     .text:00400494                 BL              .__libc_start_main
+    #     .text:00400498                 BL              .abort
+    #     .text:00400498 ; End of function _start
+    #     .text:00400498
+    #     .text:00400498 ; ----------------------------------------------------
+    #     .text:0040049C                 ALIGN 0x20
+    #     .text:004004A0 off_4004A0      DCQ main           
+    #     .text:004004A8 off_4004A8      DCQ __libc_csu_init
+    #     .text:004004B0 off_4004B0      DCQ __libc_csu_fini
+    #
+    # Where the `LDR` references a nearby slot in the `.text` segment wherein
+    # there is a reference to the real function.
+    flags = idc.GetFlags(ea)
+    if idc.isData(flags):
+      next_ea = ea + idc.ItemSize(ea)
+      find_missing_xrefs_in_segment(ea, next_ea)
+      continue
+
+    else:
+      next_ea = idc.NextHead(ea)
+      continue
+
+  DEBUG_POP()
 
 def decode_segment_instructions(seg_ea, binary_is_pie):
   """Tries to find all jump tables ahead of time. A side-effect of this is to
@@ -256,7 +301,11 @@ def process_segments(binary_is_pie):
     seg_end_ea = idc.SegEnd(seg_ea)
 
     if is_code(seg_ea):
-      DEBUG("Not looking for strings or references in {}".format(seg_name))
+      DEBUG("Not looking for strings in {}".format(seg_name))
+      if not binary_is_pie and is_external_segment(seg_ea):
+        DEBUG("Looking for cross-references in segment {} [{:x}, {:x})".format(
+            seg_name, seg_ea, seg_end_ea))
+        find_missing_xrefs_in_code_segment(seg_ea, seg_end_ea)
       continue
 
     DEBUG("Looking for strings in segment {} [{:x}, {:x})".format(

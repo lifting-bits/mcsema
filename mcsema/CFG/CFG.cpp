@@ -239,12 +239,12 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   // Does the CFG reference target type agree with the resolved code/data
   // nature of the xref?
   if (cfg_ref.target_type() == CodeReference_TargetType_CodeTarget) {
-    LOG_IF(ERROR, nullptr == xref->func)
+    LOG_IF(WARNING, nullptr == xref->func)
         << "Code cross-reference from " << std::hex << inst->ea
         << " to " << std::hex << xref->target_ea
         << " is not actually a code cross-reference";
   } else {
-    LOG_IF(ERROR, nullptr != xref->func)
+    LOG_IF(WARNING, nullptr != xref->func)
         << "Data cross-reference from " << std::hex << inst->ea
         << " to " << std::hex << xref->target_ea
         << "is actually a code cross-reference";
@@ -256,12 +256,12 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   // that will be an element in the `.bss` wherein the actual pointer to
   // `stderr` will be placed.
   if (cfg_ref.location() == CodeReference_Location_External) {
-    LOG_IF(ERROR, !xref_is_external)
+    LOG_IF(WARNING, !xref_is_external)
         << "External reference from " << std::hex << inst->ea
         << " to " << std::hex << xref->target_ea << " (" << xref->target_name
         << " in " << xref->target_segment->name << ") is actually internal";
   } else {
-    LOG_IF(ERROR, xref_is_external)
+    LOG_IF(WARNING, xref_is_external)
         << "Internal reference from " << std::hex << inst->ea
         << " to " << std::hex << xref->target_ea << " (" << xref->target_name
         << " in " << xref->target_segment->name << ") is actually external";
@@ -533,7 +533,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
 
         module->ea_to_func[dup_var->ea] = func;
       } else {
-        LOG(ERROR)
+        LOG(WARNING)
             << "External variable at " << std::hex << dup_var->ea
             << " is actually an external function.";
       }
@@ -689,7 +689,9 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     ea = segment->ea;
     for (const auto &entry : segment->entries) {
       CHECK(entry.first == ea)
-          << "Invalid partitioning of segment " << segment->name;
+          << "Invalid partitioning of segment " << segment->name
+          << "; entry ea " << std::hex << entry.first << " does not match "
+          << "up with expected entry ea " << std::hex << ea;
 
       CHECK(entry.second.ea == ea)
           << "Invalid partitioning of segment " << segment->name;
@@ -703,7 +705,6 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     CHECK(ea == (segment->ea + segment->size))
         << "Invalid partitioning of segment " << segment->name;
   }
-
 
   // Add in each of the function's blocks. At this stage we have all cross-
   // reference information available.
