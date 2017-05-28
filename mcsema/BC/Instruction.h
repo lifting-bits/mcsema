@@ -65,6 +65,7 @@ class InstructionLifter : public remill::InstructionLifter {
  private:
 
   llvm::Value *GetAddress(const NativeXref *cfg_xref);
+  llvm::Value *GetMaskedAddress(const NativeXref *cfg_xref);
 
   TranslationContext &ctx;
 

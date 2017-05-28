@@ -15,7 +15,7 @@
 from util import *
 
 class Reference(object):
-  __slots__ = ('offset', 'ea', 'symbol', 'type')
+  __slots__ = ('offset', 'ea', 'symbol', 'type', 'mask')
 
   INVALID = 0
   IMMEDIATE = 1
@@ -31,17 +31,22 @@ class Reference(object):
     CODE: "code",
   }
 
-  def __init__(self, ea, offset):
+  def __init__(self, ea, offset, mask=0):
     self.offset = offset
     self.ea = ea
     self.symbol = ""
     self.type = self.INVALID
+    self.mask = mask
 
   def __str__(self):
-    return "({} {} {})".format(
+    mask_str = ""
+    if self.mask:
+      mask_str = " & {:x}".format(self.mask)
+    return "({} {} {}{})".format(
       is_code(self.ea) and "code" or "data",
       self.TYPE_TO_STR[self.type],
-      self.symbol or "0x{:x}".format(self.ea))
+      self.symbol or "0x{:x}".format(self.ea),
+      mask_str)
 
 # Try to determine if `ea` points at a field within a structure. This is a
 # heuristic for determining whether or not an immediate `ea` should actually
@@ -156,6 +161,35 @@ _REFS = {}
 _HAS_NO_REFS = set()
 _NO_REFS = tuple()
 _ENABLE_CACHING = False
+_BAD_ARM_REF_OFF = (idc.BADADDR, 0)
+
+# Try to handle `@PAGE` and `@PAGEOFF` references, resolving them to their
+# 'intended' address.
+#
+# TODO(pag): There must be a better way than just string searching :-/
+def _try_get_arm_ref_addr(inst, op, op_val, all_refs):
+  global _BAD_ARM_REF_OFF
+
+  if op.type not in (idc.o_imm, idc.o_displ):
+    return _BAD_ARM_REF_OFF
+
+  op_str = idc.GetOpnd(inst.ea, op.n)
+
+  if '@PAGEOFF' in op_str:
+    mask = 0x0fff
+    for ref_ea in all_refs:
+      if (ref_ea & mask) == op_val:
+        return ref_ea, mask
+    DEBUG("Found @PAGEOFF-based reference at {:x} but could not match it in all_refs".format(inst.ea));
+
+  elif '@PAGE' in op_str:
+    mask = 0x0fffff000
+    for ref_ea in all_refs:
+      if (ref_ea & mask) == op_val:
+        return ref_ea, mask
+    DEBUG("Found @PAGE-based reference at {:x} but could not match it in all_refs".format(inst.ea));
+
+  return _BAD_ARM_REF_OFF
 
 # Try to recognize an operand as a reference candidate when a target fixup
 # is not available.
@@ -164,6 +198,7 @@ def _get_ref_candidate(inst, op, all_refs):
 
   ref = None
   addr_val = idc.BADADDR
+  mask = 0
 
   if idc.o_imm == op.type:
     addr_val = op.value
@@ -172,6 +207,9 @@ def _get_ref_candidate(inst, op, all_refs):
   else:
     return None
 
+  if IS_ARM:
+    addr_val, mask = _try_get_arm_ref_addr(inst, op, addr_val, all_refs)
+  
   seg_ea = idc.SegStart(addr_val)
   if is_invalid_ea(seg_ea):
     return None
@@ -214,7 +252,7 @@ def _get_ref_candidate(inst, op, all_refs):
     _POSSIBLE_REFS.add(addr_val)
     return None
 
-  ref = Reference(addr_val, op.offb)
+  ref = Reference(addr_val, op.offb, mask=mask)
 
   # Make sure we add in a reference to the (possibly new) head, addressed
   # by `addr_val`.
@@ -321,8 +359,10 @@ def get_instruction_references(arg, binary_is_pie=False):
 
     # Displacement within a memory operand, excluding PC-relative
     # displacements when those are memory references.
+    #
+    # Note: ref.ea may not be op.addr, this happens on AArch64 with
+    #       @PAGE and @PAGEOFF memory operands.
     elif idc.o_displ == op.type:
-      assert ref.ea == op.addr
       ref.type = Reference.DISPLACEMENT
       ref.symbol = get_symbol_name(op_ea, ref.ea)
 
@@ -347,6 +387,9 @@ def get_instruction_references(arg, binary_is_pie=False):
       DEBUG("ERROR inst={:x}\ntarget={:x}\nsym={}".format(
           inst.ea, ref.ea, get_symbol_name(op_ea, ref.ea)))
       assert False
+
+    # Note: idc.o_phrase is ignored because it doesn't have a displacement,
+    #       and so can't reference a specific symbol.
 
     refs.append(ref)
 

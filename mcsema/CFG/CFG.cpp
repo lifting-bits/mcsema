@@ -204,10 +204,15 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
                     const CodeReference &cfg_ref, uint64_t pointer_size) {
   auto xref = new NativeXref;
   xref->ea = inst->ea;
+  xref->mask = 0;
   xref->width = pointer_size;
   xref->segment = FindSegment(module, xref->ea);
   xref->target_ea = static_cast<uint64_t>(cfg_ref.ea());
   xref->target_segment = FindSegment(module, xref->target_ea);
+
+  if (cfg_ref.has_mask()) {
+    xref->mask = static_cast<uint64_t>(cfg_ref.mask());
+  }
 
   if (cfg_ref.has_name()) {
     xref->target_name = cfg_ref.name();

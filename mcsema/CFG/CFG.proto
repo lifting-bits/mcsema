@@ -39,7 +39,8 @@ message CodeReference {
   required  OperandType operand_type = 2;
   required  Location    location = 3;
   required  int64       ea = 4;
-  optional  string      name = 5;
+  optional  int64       mask = 5;
+  optional  string      name = 6;
 }
 
 // An instruction inside of a block.

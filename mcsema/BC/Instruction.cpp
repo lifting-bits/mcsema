@@ -63,10 +63,21 @@ bool InstructionLifter::LiftIntoBlock(
   instr = instr_;
   block = block_;
   mem_ref = GetAddress(ctx.cfg_inst->mem);
-  imm_ref = GetAddress(ctx.cfg_inst->imm);
-  disp_ref = GetAddress(ctx.cfg_inst->disp);
+  imm_ref = GetMaskedAddress(ctx.cfg_inst->imm);
+  disp_ref = GetMaskedAddress(ctx.cfg_inst->disp);
 
   return this->remill::InstructionLifter::LiftIntoBlock(instr, block);
+}
+
+llvm::Value *InstructionLifter::GetMaskedAddress(const NativeXref *cfg_xref) {
+  auto addr = GetAddress(cfg_xref);
+  if (!addr || !cfg_xref->mask) {
+    return addr;
+  }
+
+  auto mask = llvm::ConstantInt::get(word_type, cfg_xref->mask);
+  llvm::IRBuilder<> ir(block);
+  return ir.CreateAnd(addr, mask);
 }
 
 llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {

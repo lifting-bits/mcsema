@@ -24,7 +24,9 @@ _DEBUG_FILE = None
 _DEBUG_PREFIX = ""
 _INFO = idaapi.get_inf_structure()
 
-if "ARM" in _INFO.procName:
+IS_ARM = "ARM" in _INFO.procName
+
+if IS_ARM:
   from arm_util import *
 else:
   from x86_util import *

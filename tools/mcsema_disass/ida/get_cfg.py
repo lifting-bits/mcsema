@@ -301,29 +301,16 @@ _NOT_ELF_THUNKS = set()
 _INVALID_THUNK = (False, None)
 
 def is_ELF_thunk_by_structure(ea):
-  """Try to manually identify an ELF thunk by its structure. The structure
-  of this kind of thunk in x86 is usually something like:
-    
-      .plt:00041F10 _qsort      proc near         
-      .plt:00041F10         jmp   cs:off_31F388
-      .plt:00041F10 _qsort      endp
+  """Try to manually identify an ELF thunk by its structure.
 
-  With:
-
-    .got.plt:0031F388 off_31F388    dq offset qsort
-
-  For AArch64, the thunk structure is something like:
-      .plt:00400460 .printf
-      .plt:00400460             ADRP            X16, #off_411018@PAGE
-      .plt:00400464             LDR             X17, [X16,#off_411018@PAGEOFF]
-      .plt:00400468             ADD             X16, X16, #off_411018@PAGEOFF
-      .plt:0040046C             BR              X17 ; printf
+  
   """
   global _INVALID_THUNK
 
   if ".plt" not in idc.SegName(ea).lower():
     return _INVALID_THUNK
 
+  # Scan through looking for a branch, either direct or indirect.
   inst = None
   for i in range(4):  # 1 is good enough for x86, 4 for aarch64.
     inst, _ = decode_instruction(ea)
@@ -342,7 +329,12 @@ def is_ELF_thunk_by_structure(ea):
   # TODO(pag): Use `get_reference_target`?
   real_ext_ref = get_reference_target(ea)
 
-  # AArch64.
+  # For AArch64, the thunk structure is something like:
+  #     .plt:00400460 .printf
+  #     .plt:00400460             ADRP            X16, #off_411018@PAGE
+  #     .plt:00400464             LDR             X17, [X16,#off_411018@PAGEOFF]
+  #     .plt:00400468             ADD             X16, X16, #off_411018@PAGEOFF
+  #     .plt:0040046C             BR              X17 ; printf
   if is_direct_jump(inst):
     orig_name = get_function_name(ea)
     if is_external_segment(real_ext_ref):
@@ -350,7 +342,15 @@ def is_ELF_thunk_by_structure(ea):
       if is_external_segment(idc.LocByName(ext_ref_name)):
         return True, ext_ref_name
 
-  # x86.
+  # For x86, the thunk structure is something like:
+  #   
+  #     .plt:00041F10 _qsort      proc near         
+  #     .plt:00041F10         jmp   cs:off_31F388
+  #     .plt:00041F10 _qsort      endp
+  #     
+  # With:
+  # 
+  #   .got.plt:0031F388 off_31F388    dq offset qsort
   for got_plt_ea in idautils.CodeRefsFrom(ea, 0):
     if is_external_segment(got_plt_ea):
       real_ext_ref = got_plt_ea
@@ -505,11 +505,19 @@ _LOCATION_NAME = {
 def format_instruction_reference(ref):
   """Returns a string representation of a cross reference contained
   in an instruction."""
-  return "({} {} {} {:x} {})".format(
+  mask_begin = ""
+  mask_end = ""
+  if ref.mask:
+    mask_begin = "("
+    mask_end = " & {:x})".format(ref.mask)
+
+  return "({} {} {} {}{:x}{} {})".format(
       _TARGET_NAME[ref.target_type],
       _OPERAND_NAME[ref.operand_type],
       _LOCATION_NAME[ref.location],
+      mask_begin,
       ref.ea,
+      mask_end,
       ref.HasField('name') and ref.name or "")
 
 def recover_instruction_references(I, inst, addr):
@@ -590,6 +598,9 @@ def recover_instruction_references(I, inst, addr):
     addrs = set()
     R = I.xrefs.add()
     R.ea = ref.ea
+    if ref.mask:
+      R.mask = ref.mask
+
     R.operand_type = reference_operand_type(ref)
     R.target_type = target_type
     R.location = location
@@ -621,6 +632,10 @@ def recover_instruction(M, B, ea):
 
 def recover_basic_block(M, F, block_ea):
   """Add in a basic block to a specific function in the CFG."""
+  if is_external_segment(block_ea):
+    DEBUG("BB: {:x} in func {:x} is an external".format(block_ea, F.ea))
+    return
+
   inst_eas, succ_eas = analyse_block(F.ea, block_ea, PIE_MODE)
 
   DEBUG("BB: {:x} in func {:x} with {} insts".format(
@@ -975,6 +990,9 @@ def recover_module(entrypoint):
       continue
 
     if is_external_segment(func_ea):
+      continue
+
+    if try_identify_as_external_function(func_ea):
       continue
 
     recover_function(M, func_ea, func_eas, entrypoints)

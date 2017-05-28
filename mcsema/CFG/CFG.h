@@ -109,6 +109,7 @@ struct NativeXref {
  public:
   uint64_t width;  // In bytes.
   uint64_t ea;  // Location of the xref within its segment.
+  uint64_t mask;  // Bitmask to apply to this xref. Zero if none.
   const NativeSegment *segment;  // Segment containing the xref.
 
   uint64_t target_ea;
