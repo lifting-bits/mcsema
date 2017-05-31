@@ -91,6 +91,7 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
     // Make sure to keep this function around (along with `ExternalLinkage`).
     bp->addFnAttr(llvm::Attribute::OptimizeNone);
     bp->addFnAttr(llvm::Attribute::NoInline);
+    bp->removeFnAttr(llvm::Attribute::ReadNone);
 
     llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", bp));
     ir.CreateRet(remill::NthArgument(bp, remill::kMemoryPointerArgNum));
@@ -116,9 +117,7 @@ static llvm::Value *AddSubFuncCall(llvm::BasicBlock *block,
   args[remill::kMemoryPointerArgNum] = remill::LoadMemoryPointer(block);
   args[remill::kStatePointerArgNum] = remill::LoadStatePointer(block);
   args[remill::kPCArgNum] = remill::LoadProgramCounter(block);
-  auto call = llvm::CallInst::Create(sub, args, "", block);
-  call->setCallingConv(llvm::CallingConv::Fast);
-  return call;
+  return llvm::CallInst::Create(sub, args, "", block);
 }
 
 // Add a call to another function, and then update the memory pointer with the
@@ -221,21 +220,11 @@ static void LiftIndirectJump(TranslationContext &ctx,
 
   // Pessimistic approach: assume all blocks are potential targets.
   if (block_map.empty()) {
-    if (1 == ctx.ea_to_block.size()) {
-      LOG(INFO)
-          << "Indirect jump at " << std::hex << instr->pc << " looks like"
-          << "a thunk; falling back to `__remill_indrect_jump`.";
-      remill::AddTerminatingTailCall(block, fallback);
-      return;
-    }
-
-    LOG(WARNING)
-        << "Assuming every block in function " << ctx.cfg_func->lifted_name
-        << " is targeted by indirect jump at "<< std::hex << instr->pc;
-
-    for (auto ea_to_block : ctx.ea_to_block) {
-      block_map[ea_to_block.first] = ea_to_block.second;
-    }
+    LOG(INFO)
+        << "Indirect jump at " << std::hex << instr->pc << " looks like"
+        << "a thunk; falling back to `__remill_indrect_jump`.";
+    remill::AddTerminatingTailCall(block, fallback);
+    return;
   }
 
   // Create a "default" fall-back block for the switch.
