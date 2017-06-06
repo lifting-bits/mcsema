@@ -393,8 +393,9 @@ def is_thunk_by_flags(ea):
   # Recursively find thunk-to-thunks.
   if is_direct_jump(inst) or is_direct_function_call(inst):
     targ_ea = get_direct_branch_target(inst)
-    targ_is_thunk, targ_thunk_name = is_thunk(targ_ea)
+    targ_is_thunk = is_thunk(targ_ea)
     if targ_is_thunk:
+      targ_thunk_name = get_symbol_name(ea, targ_ea)
       DEBUG("Found thunk-to-thunk {:x} -> {:x}: {} to {}".format(
           ea, targ_ea, ea_name, targ_thunk_name))
       return True, targ_thunk_name
