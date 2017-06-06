@@ -918,6 +918,8 @@ def try_identify_as_external_function(ea):
 def identify_external_symbols():
   """Try to identify external functions and variables."""
   # Go try to find external variables.
+  global _FIXED_EXTERNAL_NAMES
+
   for ea, name in idautils.Names():
     if try_identify_as_external_function(ea) or is_code(ea):
       continue
@@ -935,8 +937,13 @@ def identify_external_symbols():
       elif is_ELF_got_pointer(ea):
         target_ea = get_reference_target(ea)
         if not is_external_segment(target_ea):
-          global _FIXED_EXTERNAL_NAMES  # Hack :-(
-          _FIXED_EXTERNAL_NAMES[name] = get_symbol_name(target_ea)
+          _FIXED_EXTERNAL_NAMES[name] = get_symbol_name(target_ea)  # Hack :-(
+
+      else:
+        DEBUG("WARNING: Adding variable {} at {:x} as external".format(
+            extern_name, ea))
+        EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
+        _FIXED_EXTERNAL_NAMES[ea] = extern_name
 
 def identify_program_entrypoints(func_eas):
   """Identify all entrypoints into the program. This is pretty much any
