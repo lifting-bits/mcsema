@@ -103,6 +103,7 @@ message StackVar {
 message GlobalVar {
     required Variable  var = 1;
     required int64     address = 2;
+    required bytes     data = 3;
 }
 
 message Function {

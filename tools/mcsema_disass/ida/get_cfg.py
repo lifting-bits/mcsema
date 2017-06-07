@@ -1843,9 +1843,9 @@ def recoverFunctionFromSet(M, F, blockset, new_eas, global_var_data):
             # sometimes there is junk after a terminator due to off-by-ones in
             # IDAPython. Ignore them.
             insn_t, _ = _decode_instruction(head)
+            prevHead = head
             if endBlock or isRet(insn_t) or isTrap(insn_t):
                 break
-            prevHead = head
 
         DEBUG("Ending insn at: {0:x}".format(prevHead))
         # process global & stack variables
@@ -2092,6 +2092,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
           var = M.global_vars.add()
           var.address = val["offset"]
           var.var.name = "recovered_global_{:0x}".format(g)
+          var.data= val["data"]
           var.var.size = {
               'dt_byte':1,
               'dt_word':2,
