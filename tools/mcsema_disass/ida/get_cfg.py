@@ -1786,7 +1786,7 @@ def recoverStackVars(F, BB):
     from var_recovery import parse_ida_types
 
     # pull info from IDA
-    stack_locals = collect_ida.collect_func_vars(F, BB, {}) # functionWrapper?
+    stack_locals = collect_ida.collect_stack_vars(F, BB, {}) # functionWrapper?
 
     # TODO: convert flags/type info
     #stack_locals_typed = map(parse_ida_types.parse_type, stack_locals)
@@ -1814,7 +1814,7 @@ def recoverGlobalVars(F, BB, global_var_data):
     from var_recovery import parse_ida_types
   
     # pull info from IDA
-    collect_ida.collect_func_vars(F, BB, global_var_data) # functionWrapper?
+    collect_ida.collect_global_vars(F, BB, global_var_data) # functionWrapper?
 
     return
 

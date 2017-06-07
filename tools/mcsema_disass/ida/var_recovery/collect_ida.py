@@ -227,18 +227,7 @@ def _normalize_global_var_name(name):
         return_name = return_name[3:]
     return return_name
 
-def collect_func_vars(F, BB, global_var_data):
-    '''
-    Collect stack variable data from a single function F.
-    Returns a dict of stack variables 'stackArgs'.
-    Skips stack arguments without names, as well as the special arguments with names " s" and " r".
-    variable_flags is a string with flag names.
-    '''
-
-    f = F.entry_address
-    return collect_function_vars(f, BB, global_var_data)
-
-def collect_function_vars(f, BB, global_var_data):
+def _build_stack_args(f):
     stackArgs = dict()
     name = idc.Name(f)
     end = idc.GetFunctionAttr(f, idc.FUNCATTR_END)
@@ -280,9 +269,42 @@ def collect_function_vars(f, BB, global_var_data):
                                    "referent":set(),
                                    "reads":set()}
         offset = idc.GetStrucNextOff(frame, offset)
-    #functions.append({"name":name, "stackArgs":stackArgs})
-    _find_local_references(f, BB, {"name":name, "stackArgs":stackArgs, "uses_bp":_uses_bp, "globals":dict()}, global_var_data)
 
+    return stackArgs
+
+    
+
+def collect_stack_vars(F, BB, global_var_data):
+    '''
+    Collect stack variable data from a single function F.
+    Returns a dict of stack variables 'stackArgs'.
+    Skips stack arguments without names, as well as the special arguments with names " s" and " r".
+    variable_flags is a string with flag names.
+    '''
+
+    f = F.entry_address
+    return collect_function_vars(f, BB, global_var_data)
+
+def collect_global_vars(F, BB, global_var_data):
+    '''
+    Collect the global variables and their references during program execution.
+    Populate the global_var_data with the variable name, references, and initialization value
+    '''
+
+    f = F.entry_address
+    collect_function_vars(f, BB, global_var_data)
+
+    return
+
+def collect_function_vars(f, BB, global_var_data):
+    stackArgs = dict()
+    name = idc.Name(f)
+    end = idc.GetFunctionAttr(f, idc.FUNCATTR_END)
+    _locals = idc.GetFunctionAttr(f, idc.FUNCATTR_FRSIZE)
+    _uses_bp = 0 != (idc.GetFunctionFlags(f) & idc.FUNC_FRAME)
+    
+    stackArgs = _build_stack_args(f)
+    _find_local_references(f, BB, {"name":name, "stackArgs": stackArgs, "uses_bp":_uses_bp, "globals":dict()}, global_var_data)
     return stackArgs
 
 def collect_variables():
@@ -610,9 +632,7 @@ def _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb, 
     #    _process_basic_block(block, func_var_data, referers.copy(), dereferences.copy(), visited_bb, global_var_data)
 
 def _find_local_references(func, BB, func_var_data, global_var_data):
-    frame = idc.GetFrame(func)
-    if frame is None:
-        return
+    
     referers = dict() # members of this collection contain the address of an element on the stack. keys are operands, values are stack offset
     dereferences = dict() # members of this collection contain the data of an element on the stack
     visited_bb = set()
