@@ -43,6 +43,7 @@
 
 #include <llvm/Support/CommandLine.h>
 
+#include <iostream>
 #include <vector>
 
 #include "mcsema/Arch/Arch.h"
@@ -472,6 +473,18 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
     var.var->setInitializer(cst);
 
   }
+#if 0
+    // initialize the native global variables
+  for (auto nGV : nativeglobalvars) {
+    auto var = nGV->get_llvm_var();
+
+    std::vector<llvm::Constant *> secContents;
+    std::vector<llvm::Type *> data_section_types;
+    dataSectionToTypesContents(globaldata, *var.section, M, secContents,
+                               data_section_types, true);
+    var.opaque_type->setBody(data_section_types, true);
+  }
+#endif
   return true;
 }
 
@@ -497,8 +510,7 @@ void RenameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
   }
 }
 
-
-static llvm::PointerType* llvmTypeFromCFGTypeStr(const std::string &cfg_type_str, llvm::LLVMContext &context) {
+static llvm::Type* llvmTypeFromCFGTypeStr(const std::string &cfg_type_str, llvm::LLVMContext &context) {
 	/*
               'dt_byte':1,
               'dt_word':2,
@@ -518,17 +530,32 @@ static llvm::PointerType* llvmTypeFromCFGTypeStr(const std::string &cfg_type_str
 
 static void InitLiftedGlobals(NativeModulePtr natMod, llvm::Module *M) {
   for (auto nGV : natMod->global_variables) {
-    llvm::PointerType *PointerTy_0 = llvmTypeFromCFGTypeStr(nGV->get_type(), M->getContext());
-    if (nullptr == PointerTy_0) continue; //unrecognized type
-    llvm::GlobalVariable *g = new llvm::GlobalVariable(/*Module=*/*M,
-                                                    /*Type=*/PointerTy_0,
-                                                    /*isConstant=*/false,
-                                                    /*Linkage=*/llvm::GlobalValue::CommonLinkage,
-                                                    /*Initializer=*/nullptr,
-                                                    /*Name=*/nGV->get_name());
+    // define global variable type as struct; Change it to the PointerType after testing
+    auto st_opaque = llvm::StructType::create(M->getContext());
+    if(st_opaque == nullptr) continue;
+    std::vector<llvm::Type *> data_section_types;
+    std::vector<llvm::Constant *> secContents;
+    auto charTy = llvm::Type::getInt8Ty(M->getContext());
+    auto blob = nGV->getBytes();
+    auto arrT = llvm::ArrayType::get(charTy, blob.size());
+    std::vector<llvm::Constant *> array_elements;
+    for (auto cur : blob) {
+        array_elements.push_back(llvm::ConstantInt::get(charTy, cur));
+    }
+    auto arr = llvm::ConstantArray::get(arrT, array_elements);
+    secContents.push_back(arr);
+    data_section_types.push_back(arr->getType());
+    st_opaque->setBody(data_section_types, true);
+    auto cst = llvm::ConstantStruct::get(st_opaque, secContents);
 
+    llvm::GlobalVariable *g = new llvm::GlobalVariable(/*Module=*/*M,
+                                                    /*Type=*/st_opaque,
+                                                    /*isConstant=*/false,
+                                                    /*Linkage=*/llvm::GlobalValue::InternalLinkage,
+                                                    /*Initializer=*/cst,
+                                                    /*Name=*/nGV->get_name());
+    
     g->setAlignment(4); // ???
-    g->setInitializer(llvm::Constant::getNullValue(PointerTy_0));
     nGV->set_llvm_var(g);
   }
 }

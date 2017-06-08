@@ -1028,8 +1028,11 @@ static NativeInstPtr DeserializeInst(
 static NativeGlobalVarPtr DeserializeGlobalVar(
     const ::GlobalVar &globalvar) {
   ::Variable var = globalvar.var();
+    const auto &dt = globalvar.data();
+    std::vector<uint8_t> local_bytes(dt.begin(), dt.end());
+
   NativeGlobalVarPtr natGV =
-    new NativeGlobalVar(var.size(), var.name(), var.ida_type(), globalvar.address());
+    new NativeGlobalVar(var.size(), var.name(), var.ida_type(), globalvar.address(), local_bytes);
 
   for (auto ref_ea : var.ref_eas()) {
     natGV->add_ref(ref_ea.inst_addr());
