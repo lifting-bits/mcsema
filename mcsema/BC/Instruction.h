@@ -47,19 +47,19 @@ class InstructionLifter : public remill::InstructionLifter {
   virtual ~InstructionLifter(void);
 
   // Lift a single instruction into a basic block.
-  bool LiftIntoBlock(remill::Instruction *instr,
+  bool LiftIntoBlock(remill::Instruction &inst,
                      llvm::BasicBlock *block) override;
 
  protected:
 
   // Lift an immediate operand.
   llvm::Value *LiftImmediateOperand(
-      remill::Instruction *instr, llvm::BasicBlock *block,
+      remill::Instruction &inst, llvm::BasicBlock *block,
       llvm::Type *arg_type, remill::Operand &op) override;
 
   // Lift an indirect memory operand to a value.
   llvm::Value *LiftAddressOperand(
-      remill::Instruction *instr, llvm::BasicBlock *block,
+      remill::Instruction &inst, llvm::BasicBlock *block,
       remill::Operand &mem) override;
 
  private:
@@ -69,7 +69,7 @@ class InstructionLifter : public remill::InstructionLifter {
 
   TranslationContext &ctx;
 
-  remill::Instruction *instr;
+  remill::Instruction *inst_ptr;
   llvm::BasicBlock *block;
 
   llvm::Value *mem_ref;

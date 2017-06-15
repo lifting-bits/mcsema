@@ -195,9 +195,9 @@ static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
 // the lifted blocks for those branch targets.
 static void LiftConditionalBranch(TranslationContext &ctx,
                                   llvm::BasicBlock *source,
-                                  remill::Instruction *instr) {
-  auto block_true = GetOrCreateBlock(ctx, instr->branch_taken_pc);
-  auto block_false = GetOrCreateBlock(ctx, instr->branch_not_taken_pc);
+                                  remill::Instruction &inst) {
+  auto block_true = GetOrCreateBlock(ctx, inst.branch_taken_pc);
+  auto block_false = GetOrCreateBlock(ctx, inst.branch_not_taken_pc);
   llvm::IRBuilder<> cond_ir(source);
   cond_ir.CreateCondBr(
       remill::LoadBranchTaken(source),
@@ -208,7 +208,7 @@ static void LiftConditionalBranch(TranslationContext &ctx,
 // Lift an indirect jump into a switch instruction.
 static void LiftIndirectJump(TranslationContext &ctx,
                              llvm::BasicBlock *block,
-                             remill::Instruction *instr) {
+                             remill::Instruction &inst) {
   std::unordered_map<uint64_t, llvm::BasicBlock *> block_map;
 
   auto fallback = ctx.lifter->intrinsics->jump;
@@ -221,7 +221,7 @@ static void LiftIndirectJump(TranslationContext &ctx,
   // Pessimistic approach: assume all blocks are potential targets.
   if (block_map.empty()) {
     LOG(INFO)
-        << "Indirect jump at " << std::hex << instr->pc << " looks like"
+        << "Indirect jump at " << std::hex << inst.pc << " looks like"
         << "a thunk; falling back to `__remill_indrect_jump`.";
     remill::AddTerminatingTailCall(block, fallback);
     return;
@@ -240,7 +240,7 @@ static void LiftIndirectJump(TranslationContext &ctx,
       switch_index, fallback_block, num_blocks, block);
 
   LOG(INFO)
-      << "Indirect jump at " << std::hex << instr->pc
+      << "Indirect jump at " << std::hex << inst.pc
       << " has " << std::dec << num_blocks << " targets";
 
   // Add the cases.
@@ -255,8 +255,8 @@ static void LiftIndirectJump(TranslationContext &ctx,
 // added to end the block.
 static bool TryLiftTerminator(TranslationContext &ctx,
                               llvm::BasicBlock *block,
-                              remill::Instruction *instr) {
-  switch (instr->category) {
+                              remill::Instruction &inst) {
+  switch (inst.category) {
     case remill::Instruction::kCategoryInvalid:
     case remill::Instruction::kCategoryError:
       remill::AddTerminatingTailCall(block, ctx.lifter->intrinsics->error);
@@ -268,35 +268,35 @@ static bool TryLiftTerminator(TranslationContext &ctx,
 
     case remill::Instruction::kCategoryDirectJump:
       llvm::BranchInst::Create(
-          GetOrCreateBlock(ctx, instr->branch_taken_pc), block);
+          GetOrCreateBlock(ctx, inst.branch_taken_pc), block);
       return true;
 
     case remill::Instruction::kCategoryIndirectJump:
-      LiftIndirectJump(ctx, block, instr);
+      LiftIndirectJump(ctx, block, inst);
       return true;
 
     case remill::Instruction::kCategoryDirectFunctionCall:
 
       // Treat a `call +5` as not actually needing to call out to a
       // new subroutine.
-      if (instr->branch_taken_pc != instr->next_pc) {
-        auto targ_func = FindFunction(ctx, instr->branch_taken_pc);
+      if (inst.branch_taken_pc != inst.next_pc) {
+        auto targ_func = FindFunction(ctx, inst.branch_taken_pc);
         LOG(INFO)
             << "Function " << ctx.lifted_func->getName().str()
             << " calls " << targ_func->getName().str()
-            << " at " << std::hex << instr->pc;
+            << " at " << std::hex << inst.pc;
         InlineSubFuncCall(block, targ_func);
 
       } else {
         LOG(WARNING)
             << "Not adding a subroutine self-call at "
-            << std::hex << instr->pc;
+            << std::hex << inst.pc;
       }
       return false;
 
     case remill::Instruction::kCategoryIndirectFunctionCall:
       InlineSubFuncCall(block, ctx.lifter->intrinsics->function_call);
-      remill::StoreProgramCounter(block, instr->next_pc);
+      remill::StoreProgramCounter(block, inst.next_pc);
       return false;
 
     case remill::Instruction::kCategoryFunctionReturn:
@@ -306,12 +306,12 @@ static bool TryLiftTerminator(TranslationContext &ctx,
 
     case remill::Instruction::kCategoryConditionalBranch:
     case remill::Instruction::kCategoryConditionalAsyncHyperCall:
-      LiftConditionalBranch(ctx, block, instr);
+      LiftConditionalBranch(ctx, block, inst);
       return true;
 
     case remill::Instruction::kCategoryAsyncHyperCall:
       InlineSubFuncCall(block, ctx.lifter->intrinsics->async_hyper_call);
-      remill::StoreProgramCounter(block, instr->next_pc);
+      remill::StoreProgramCounter(block, inst.next_pc);
       return false;
   }
   return false;
@@ -321,13 +321,23 @@ static bool TryLiftTerminator(TranslationContext &ctx,
 static bool LiftInstIntoBlock(TranslationContext &ctx,
                               llvm::BasicBlock *block,
                               bool is_last) {
+  remill::Instruction inst;
+
   auto inst_addr = ctx.cfg_inst->ea;
   auto &bytes = ctx.cfg_inst->bytes;
-  auto inst = gArch->DecodeInstruction(inst_addr, bytes);
 
-  DLOG_IF(WARNING, bytes.size() != inst->NumBytes())
+  if (!gArch->DecodeInstruction(inst_addr, bytes, inst)) {
+    LOG(ERROR)
+        << "Unable to decode instruction " << inst.Serialize()
+        << " at " << std::hex << inst_addr;
+
+    remill::AddTerminatingTailCall(block, ctx.lifter->intrinsics->error);
+    return false;
+  }
+
+  DLOG_IF(WARNING, bytes.size() != inst.NumBytes())
       << "Size of decoded instruction at " << std::hex << inst_addr
-      << " (" << std::dec << inst->NumBytes()
+      << " (" << std::dec << inst.NumBytes()
       << ") doesn't match input instruction size ("
       << bytes.size() << ").";
 
@@ -339,11 +349,11 @@ static bool LiftInstIntoBlock(TranslationContext &ctx,
     InlineSubFuncCall(block, GetBreakPoint(inst_addr));
   }
 
-  CHECK(ctx.lifter->LiftIntoBlock(inst.get(), block))
-      << "Can't lift instruction " << inst->Serialize();
+  CHECK(ctx.lifter->LiftIntoBlock(inst, block))
+      << "Can't lift instruction " << inst.Serialize();
 
   auto ret = true;
-  if (TryLiftTerminator(ctx, block, inst.get())) {
+  if (TryLiftTerminator(ctx, block, inst)) {
     if (!is_last) {
       LOG(ERROR)
           << "Ending block early at " << std::hex << inst_addr;

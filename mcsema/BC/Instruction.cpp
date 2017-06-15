@@ -50,23 +50,23 @@ InstructionLifter::InstructionLifter(llvm::IntegerType *word_type_,
                                      TranslationContext &ctx_)
       : remill::InstructionLifter(word_type_, intrinsics_),
         ctx(ctx_),
-        instr(nullptr),
+        inst_ptr(nullptr),
         block(nullptr),
         mem_ref(nullptr),
         disp_ref(nullptr),
         imm_ref(nullptr) {}
 
-// Lift a single instruction into a basic block.
+// Lift a single instuction into a basic block.
 bool InstructionLifter::LiftIntoBlock(
-    remill::Instruction *instr_, llvm::BasicBlock *block_) {
+    remill::Instruction &inst, llvm::BasicBlock *block_) {
 
-  instr = instr_;
+  inst_ptr = &inst;
   block = block_;
   mem_ref = GetAddress(ctx.cfg_inst->mem);
   imm_ref = GetMaskedAddress(ctx.cfg_inst->imm);
   disp_ref = GetMaskedAddress(ctx.cfg_inst->disp);
 
-  return this->remill::InstructionLifter::LiftIntoBlock(instr, block);
+  return this->remill::InstructionLifter::LiftIntoBlock(inst, block);
 }
 
 llvm::Value *InstructionLifter::GetMaskedAddress(const NativeXref *cfg_xref) {
@@ -102,7 +102,7 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
 
     CHECK(func != nullptr)
         << "Can't resolve reference to function "
-        << cfg_func->name << " from " << std::hex << instr->pc;
+        << cfg_func->name << " from " << std::hex << inst_ptr->pc;
 
     return ir.CreatePtrToInt(func, word_type);
 
@@ -114,7 +114,7 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
       auto global = gModule->getGlobalVariable(cfg_var->name, true);
       CHECK(global != nullptr)
           << "Can't resolve reference to external variable "
-          << cfg_var->name << " from " << std::hex << instr->pc;
+          << cfg_var->name << " from " << std::hex << inst_ptr->pc;
 
       return ir.CreatePtrToInt(global, word_type);
 
@@ -124,7 +124,7 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
       auto global = gModule->getGlobalVariable(cfg_var->lifted_name, true);
       CHECK(global != nullptr)
           << "Can't resolve reference to internal variable "
-          << cfg_var->lifted_name << " from " << std::hex << instr->pc;
+          << cfg_var->lifted_name << " from " << std::hex << inst_ptr->pc;
 
       // TODO(pag): We could actually use a load of the segment variable, but
       //            it's constant, and optimization may just end up eliding
@@ -135,13 +135,13 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
     auto cfg_seg = cfg_xref->target_segment;
     CHECK(cfg_seg != nullptr)
         << "A non-function, non-variable cross-reference from "
-        << std::hex << instr->pc << " to " << std::hex << cfg_xref->target_ea
+        << std::hex << inst_ptr->pc << " to " << std::hex << cfg_xref->target_ea
         << " must be in a known segment.";
 
     auto seg = gModule->getGlobalVariable(cfg_seg->lifted_name, true);
     CHECK(seg != nullptr)
         << "Cannot find global variable for segment " << cfg_seg->name
-        << " referenced by " << std::hex << instr->pc;
+        << " referenced by " << std::hex << inst_ptr->pc;
 
     auto offset = cfg_xref->target_ea - cfg_seg->ea;
     return ir.CreateAdd(
@@ -151,7 +151,7 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
 }
 
 llvm::Value *InstructionLifter::LiftImmediateOperand(
-    remill::Instruction *instr, llvm::BasicBlock *block,
+    remill::Instruction &inst, llvm::BasicBlock *block,
     llvm::Type *arg_type, remill::Operand &op) {
 
   if (imm_ref) {
@@ -160,7 +160,7 @@ llvm::Value *InstructionLifter::LiftImmediateOperand(
 
     CHECK(arg_size <= gArch->address_size)
         << "Immediate operand size " << op.size << " of "
-        << op.Debug() << " in instruction " << std::hex << instr->pc
+        << op.Debug() << " in instuction " << std::hex << inst.pc
         << " is wider than the architecture pointer size ("
         << std::dec << gArch->address_size << ").";
 
@@ -173,12 +173,12 @@ llvm::Value *InstructionLifter::LiftImmediateOperand(
   }
 
   return this->remill::InstructionLifter::LiftImmediateOperand(
-      instr, block, arg_type, op);
+      inst, block, arg_type, op);
 }
 
 // Lift an indirect memory operand to a value.
 llvm::Value *InstructionLifter::LiftAddressOperand(
-    remill::Instruction *instr, llvm::BasicBlock *block,
+    remill::Instruction &inst, llvm::BasicBlock *block,
     remill::Operand &op) {
 
   auto &mem = op.addr;
@@ -187,7 +187,7 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
   // we want to preserve it in the register state structure.
   if (mem.IsControlFlowTarget()) {
     return this->remill::InstructionLifter::LiftAddressOperand(
-        instr, block, op);
+        inst, block, op);
   }
 
   if ((mem.base_reg.name.empty() && mem.index_reg.name.empty()) ||
@@ -199,7 +199,7 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
   } else {
     LOG_IF(ERROR, mem_ref != nullptr)
         << "IDA probably incorrectly decoded memory operand "
-        << op.Debug() << " of instruction " << std::hex << instr->pc
+        << op.Debug() << " of instuction " << std::hex << inst.pc
         << "as an absolute memory reference when it should be treated as a "
         << "displacement memory reference.";
 
@@ -209,13 +209,13 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
     if (disp_ref) {
       mem.displacement = 0;
       auto dynamic_addr = this->remill::InstructionLifter::LiftAddressOperand(
-          instr, block, op);
+          inst, block, op);
       llvm::IRBuilder<> ir(block);
       return ir.CreateAdd(dynamic_addr, disp_ref);
     }
   }
 
-  return this->remill::InstructionLifter::LiftAddressOperand(instr, block, op);
+  return this->remill::InstructionLifter::LiftAddressOperand(inst, block, op);
 }
 
 }  // namespace mcsema
