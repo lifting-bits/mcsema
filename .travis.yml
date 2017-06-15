@@ -15,7 +15,7 @@ before_install:
   - git clone https://github.com/trailofbits/remill.git
   - mv mcsema remill/tools
 install:
-  - ./scripts/build_ubuntu.sh
+  - ./remill/scripts/build_ubuntu.sh
 before_script:
   - cd ../remill-build
   - make build_x86_tests
