@@ -12,6 +12,7 @@ os:
 compiler:
   - gcc
 before_install:
+  - cd ../
   - git clone https://github.com/trailofbits/remill.git
   - mv mcsema remill/tools
 install:
