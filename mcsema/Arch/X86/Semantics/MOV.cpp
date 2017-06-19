@@ -1033,7 +1033,14 @@ static InstTransResult translate_MOV32rm(TranslationContext &ctx,
   auto &inst = ip->get_inst();
 
   if (ip->has_external_ref()) {
-    llvm::Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
+    llvm::Value* addrInt = nullptr;
+    auto ptrsize = ArchPointerSize(M);
+
+    if(Pointer32 == ptrsize) {
+      addrInt = getValueForExternal<32>(F->getParent(), ip, block);
+    } else if(Pointer64 == ptrsize) {
+      addrInt = getValueForExternal<64>(F->getParent(), ip, block);
+    }
     ret = doRMMov<32>(ip, block, addrInt, OP(0));
     TASSERT(addrInt != NULL, "Could not get address for external");
     return ContinueBlock;
