@@ -3145,7 +3145,7 @@ PropertySheet 1 E N
 InitializeFlatSB 1 E N
 InitMUILanguage 1 E N
 InitCommonControlsEx 1 E N
-!ORDINAL_comctl32.dll_17:InitCommonControls 0 E N
+InitCommonControls 0 E N
 ImageList_WriteEx 3 E N
 ImageList_Write 2 E N
 ImageList_SetOverlayImage 3 E N
