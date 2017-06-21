@@ -270,10 +270,10 @@ class Instruction(object):
         self._operands = self._make_operands()
         
     def _is_operand_write_to(self, index):
-        return self.feature == OPND_WRITE_FLAGS[index]
+        return (self.feature & OPND_WRITE_FLAGS[index])
     
     def _is_operand_read_from(self, index):
-        return self.feature == OPND_READ_FLAGS[index]
+        return (self.feature & OPND_READ_FLAGS[index])
     
     def _make_operands(self):
         operands = []
@@ -609,7 +609,6 @@ def _process_single_func(funcaddr):
 
 def _process_inst(addr, referers, dereferences, func_var_data, global_var_data):
     insn = Instruction(addr)
-    
     for opnd in insn.opearnds:
         if opnd.is_mem:
             DEBUG("Operand is Memory {}".format(opnd.index))
@@ -620,8 +619,7 @@ def _process_inst(addr, referers, dereferences, func_var_data, global_var_data):
                 global_var_data[memory_ref] = _create_global_var_entry(memory_ref, var_name, opnd.dtype)
             if memory_ref not in func_var_data["globals"]:
                 func_var_data["globals"][memory_ref] = _create_global_var_entry(memory_ref, var_name, opnd.dtype)
-            dref = list(idautils.DataRefsFrom(memory_ref))
-            if dref:
+            for dref in idautils.DataRefsFrom(memory_ref):
                 global_var_data[memory_ref]["safe"] = False
             # Check if the address is of struct Type
             if idaapi.isStruct(flags):
@@ -633,6 +631,8 @@ def _process_inst(addr, referers, dereferences, func_var_data, global_var_data):
             elif opnd.is_write:
                 global_var_data[memory_ref]["writes"].add(addr)
                 func_var_data["globals"][memory_ref]["writes"].add(addr)
+            else:
+                DEBUG("Operand is Memory access type unknown {0:x}".format(memory_ref))
             global_var_data[memory_ref]["data"] = readBytesSlowly(memory_ref, memory_ref+opnd.size) 
         
         if opnd.is_imm and  ('offset' in opnd.text):
@@ -687,7 +687,6 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_da
 
     referers.pop(target_op, None)
     dereferences.pop(target_op, None)
-
     if global_address:
         memory_ref = _signed_from_unsigned(idc.GetOperandValue(addr, 1))
         var_name = _normalize_global_var_name(idc.GetOpnd(addr, 1))
