@@ -619,7 +619,8 @@ def _process_inst(addr, referers, dereferences, func_var_data, global_var_data):
                 global_var_data[memory_ref] = _create_global_var_entry(memory_ref, var_name, opnd.dtype)
             if memory_ref not in func_var_data["globals"]:
                 func_var_data["globals"][memory_ref] = _create_global_var_entry(memory_ref, var_name, opnd.dtype)
-            for dref in idautils.DataRefsFrom(memory_ref):
+            dref = list(idautils.DataRefsFrom(memory_ref))
+            if len(dref) or idc.SegName(memory_ref) in [".got.plt"]:
                 global_var_data[memory_ref]["safe"] = False
             # Check if the address is of struct Type
             if idaapi.isStruct(flags):
@@ -708,7 +709,8 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_da
         op_datatype = _get_operand_data(addr, 0)
         if memory_ref not in global_var_data:
             global_var_data[memory_ref] = _create_global_var_entry(memory_ref, var_name, op_datatype)
-        for dref in idautils.DataRefsFrom(memory_ref):
+        dref = list(idautils.DataRefsFrom(memory_ref))
+        if len(dref) or idc.SegName(memory_ref) in [".got.plt"]:
             global_var_data[memory_ref]["safe"] = False
         if idaapi.isStruct(flags):
             global_var_data[memory_ref]["safe"] = False
@@ -773,7 +775,8 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_da
         op_datatype = _get_operand_data(addr, 1)
         if memory_ref not in global_var_data:
             global_var_data[memory_ref] = _create_global_var_entry(memory_ref, var_name, op_datatype)
-        for dref in idautils.DataRefsFrom(memory_ref):
+        dref = list(idautils.DataRefsFrom(memory_ref))
+        if len(dref) or idc.SegName(memory_ref) in [".got.plt"]:
             global_var_data[memory_ref]["safe"] = False
         if idaapi.isStruct(flags):
             global_var_data[memory_ref]["safe"] = False
