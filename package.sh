@@ -59,7 +59,7 @@ cp -v ./build/llvm/bin/llvm-link ${PKGDIR}/bin/
 cp -v ./build/llvm/bin/llc ${PKGDIR}/bin/
 
 echo "Packaging scripts..."
-cp -vR ./mcsema/tools/* ${PKGDIR}/tools/
+cp -vR ./tools/* ${PKGDIR}/tools/
 
 echo "Packaging runtime..."
 cp -vR ./build/mcsema//Arch/X86/Runtime/*.a ${PKGDIR}/runtime/
