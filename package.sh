@@ -21,7 +21,7 @@ fi
 
 
 echo "Cleaning old directory"
-PKGDIR=./package/mcsema
+PKGDIR=./package
 rm -rf ${PKGDIR}
 
 # get a version number
@@ -71,8 +71,20 @@ cp -vR ./tools/mcsema_disass/defs/* ${PKGDIR}/defs/
 echo "Packaging RegisterState.h"
 cp -v ./mcsema/Arch/X86/Runtime/State.h ${PKGDIR}/runtime/
 
+./bootstrap.sh --prefix ${PKGDIR}
+echo "Package python libraries"
+mkdir -p ${PKGDIR}/lib/python2.7/dist-packages/
+cp -vR ${HOME}/.local/lib/python2.7/site-packages/mcsema_disass-0.0.1-py2.7.egg ${PKGDIR}/lib/python2.7/dist-packages/
+
+if [ -f /usr/local/lib/python2.7/dist-packages/google/__init__.py ]; then
+    cp -vR /usr/local/lib/python2.7/dist-packages/google ${PKGDIR}/lib/python2.7/dist-packages/
+fi
+if [ -f /usr/lib/python2.7/dist-packages/google/__init__.py ]; then
+    cp -vR /usr/lib/python2.7/dist-packages/google ${PKGDIR}/lib/python2.7/dist-packages/
+fi
+
 echo "Building .deb file..."
-fpm -s dir -t deb --name mcsema --version ${VERSION} --maintainer "<mcsema@trailofbits.com>" --url "https://github.com/trailofbits/mcsema" --vendor "Trail of Bits" --prefix "/usr/local/bin" -C ./package .
+fpm -s dir -t deb --name mcsema --version ${VERSION} --maintainer "<mcsema@trailofbits.com>" --url "https://github.com/trailofbits/mcsema" --vendor "Trail of Bits" --prefix "/usr/local" -C ./package .
 
 echo "Building .rpm file..."
-fpm -s dir -t rpm --name mcsema --version ${VERSION} --maintainer "<mcsema@trailofbits.com>" --url "https://github.com/trailofbits/mcsema" --vendor "Trail of Bits" --prefix "/usr/local/bin" -C ./package .
+fpm -s dir -t rpm --name mcsema --version ${VERSION} --maintainer "<mcsema@trailofbits.com>" --url "https://github.com/trailofbits/mcsema" --vendor "Trail of Bits" --prefix "/usr/local" -C ./package .
