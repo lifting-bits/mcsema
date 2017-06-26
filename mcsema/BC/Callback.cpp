@@ -168,7 +168,7 @@ static llvm::Function *GetNativeToLiftedCallback(
   return callback_func;
 }
 
-static void AddArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, llvm::CallingConv::ID cc) {
+static void AddArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, llvm::CallingConv::ID cc, llvm::Function *callback_func) {
     
     std::vector<llvm::Type *> tys;
     tys.push_back(llvm::PointerType::getIntNPtrTy(*gContext, static_cast<unsigned>(gArch->address_size)));
@@ -204,10 +204,11 @@ static void AddArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, llvm::CallingConv:
 
     auto f = gModule->getOrInsertFunction(arg_func, func_type);
     std::vector<llvm::Value *> args(2);
-    args[0] = remill::LoadMemoryPointer(ir->GetInsertBlock());
-    args[1] = remill::LoadStatePointer(ir->GetInsertBlock());
+    args[0] = remill::NthArgument(callback_func, remill::kMemoryPointerArgNum);
+    args[1] = remill::NthArgument(callback_func, remill::kStatePointerArgNum);
     auto ret = ir->CreateCall(f, args);
-    ir->CreateStore(ret, remill::LoadMemoryPointerRef(ir->GetInsertBlock()));
+
+    ir->CreateStore(ret, remill::NthArgument(callback_func, remill::kMemoryPointerArgNum)); // XXX progress this according to cconv?
     
     return;
 }
@@ -224,7 +225,7 @@ static llvm::Function *GetCallbackExplicitArgs(
     if(auto native_func = reinterpret_cast<const NativeExternalFunction *>(cfg_func)) {
       
       for(int64_t i = 0; i < native_func->num_args; i++) {
-        AddArgNForCConv(&ir, i, native_func->cc);
+        AddArgNForCConv(&ir, i, native_func->cc, callback_func);
       }
     }
     //TODO(car): set calling conv appropriately
