@@ -190,7 +190,6 @@ static void AddArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, llvm::CallingConv:
         cc_str = "mcsemacall";
         break;
       default:
-        LOG(WARNING) << "trying to get calling conv number " << cc << "\n";
         cc_str = "cdecl"; // XXX(car): just for testing; fix
         break;
     }
@@ -208,8 +207,8 @@ static void AddArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, llvm::CallingConv:
     args[1] = remill::NthArgument(callback_func, remill::kStatePointerArgNum);
     auto ret = ir->CreateCall(f, args);
 
-    ir->CreateStore(ret, remill::NthArgument(callback_func, remill::kMemoryPointerArgNum)); // XXX progress this according to cconv?
-    
+    ir->CreateStore(ret, remill::NthArgument(callback_func, remill::kMemoryPointerArgNum)); // XXX progress this according to cconv + n
+
     return;
 }
 
@@ -230,6 +229,7 @@ static llvm::Function *GetCallbackExplicitArgs(
     }
     //TODO(car): set calling conv appropriately
     callback_func->setCallingConv(llvm::CallingConv::C);
+    ir.CreateRetVoid(); //XXX(car): just for testing
     return callback_func;
 }
 
