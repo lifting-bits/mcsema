@@ -89,6 +89,14 @@ struct NativeFunction : public NativeObject {
 struct NativeExternalFunction : public NativeFunction {
  public:
   bool is_weak;
+  int64_t num_args;
+  enum calling_conv {
+    CallerCleanup,
+    CalleeCleanup,
+    FastCall,
+    McsemaCall
+  };
+  calling_conv cc;
 };
 
 // Global variable defined inside of the lifted binary.

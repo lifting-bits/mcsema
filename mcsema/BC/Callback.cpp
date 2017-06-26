@@ -38,6 +38,7 @@
 #include "mcsema/BC/Util.h"
 #include "mcsema/BC/Callback.h"
 #include "mcsema/CFG/CFG.h"
+#include "mcsema/Arch/X86/Runtime/CallingConv.h"
 
 DEFINE_bool(explicit_args, false,
             "Should arguments be explicitly passed to external functions. "
@@ -167,6 +168,70 @@ static llvm::Function *GetNativeToLiftedCallback(
   return callback_func;
 }
 
+static void AddArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, llvm::CallingConv::ID cc) {
+    
+    std::vector<llvm::Type *> tys;
+    tys.push_back(llvm::PointerType::getIntNPtrTy(*gContext, static_cast<unsigned>(gArch->address_size)));
+    tys.push_back(llvm::PointerType::getIntNPtrTy(*gContext, static_cast<unsigned>(gArch->address_size)));
+    auto func_type = llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext), tys, true);
+ 
+    std::string cc_str = "";
+    switch(cc) {
+      case (NativeExternalFunction::CallerCleanup):
+        cc_str = "cdecl";
+        break;
+      case (NativeExternalFunction::CalleeCleanup):
+        cc_str = "stdcall";
+        break;
+      case (NativeExternalFunction::FastCall):
+        cc_str = "fastcall";
+        break;
+      case (NativeExternalFunction::McsemaCall):
+        cc_str = "mcsemacall";
+        break;
+      default:
+        LOG(WARNING) << "trying to get calling conv number " << cc << "\n";
+        cc_str = "cdecl"; // XXX(car): just for testing; fix
+        break;
+    }
+    CHECK(!cc_str.empty()) << "Unknown calling convention for function: " << cc << "\n";
+
+    std::stringstream arg_tmp;
+    arg_tmp << "__mcsema_" << cc_str << "_arg_" << n;
+    std::string arg_func = arg_tmp.str(); 
+
+    LOG(ERROR) << "trying to get " << arg_func << "\n";
+
+    auto f = gModule->getOrInsertFunction(arg_func, func_type);
+    std::vector<llvm::Value *> args(2);
+    args[0] = remill::LoadMemoryPointer(ir->GetInsertBlock());
+    args[1] = remill::LoadStatePointer(ir->GetInsertBlock());
+    auto ret = ir->CreateCall(f, args);
+    ir->CreateStore(ret, remill::LoadMemoryPointerRef(ir->GetInsertBlock()));
+    
+    return;
+}
+
+static llvm::Function *GetCallbackExplicitArgs(
+    const NativeObject *cfg_func, const std::string callback_name) {
+    // TODO(car): Pull this out into its own function, and add in calling
+    //            convention-specific code to pass in arguments. May need
+    //            to declare and/or cast the exernal functions as something
+    //            like `addr_t foo(...)`.
+    auto callback_func = CreateGenericCallback(callback_name);
+    llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", callback_func));
+
+    if(auto native_func = reinterpret_cast<const NativeExternalFunction *>(cfg_func)) {
+      
+      for(int64_t i = 0; i < native_func->num_args; i++) {
+        AddArgNForCConv(&ir, i, native_func->cc);
+      }
+    }
+    //TODO(car): set calling conv appropriately
+    callback_func->setCallingConv(llvm::CallingConv::C);
+    return callback_func;
+}
+
 static llvm::Function *GetCallback(
     const NativeObject *cfg_func, const std::string callback_name) {
 
@@ -180,11 +245,7 @@ static llvm::Function *GetCallback(
   }
 
   if (FLAGS_explicit_args) {
-    // TODO(car): Pull this out into its own function, and add in calling
-    //            convention-specific code to pass in arguments. May need
-    //            to declare and/or cast the exernal functions as something
-    //            like `addr_t foo(...)`.
-    auto callback_func = CreateGenericCallback(callback_name);
+    auto callback_func = GetCallbackExplicitArgs(cfg_func, callback_name);
     callback_func->setLinkage(llvm::GlobalValue::ExternalLinkage);
     return callback_func;
 
