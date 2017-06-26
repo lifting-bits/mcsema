@@ -168,7 +168,7 @@ static llvm::Function *GetNativeToLiftedCallback(
   return callback_func;
 }
 
-static void AddArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, llvm::CallingConv::ID cc, llvm::Function *callback_func) {
+static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, llvm::CallingConv::ID cc, llvm::Function *callback_func) {
     
     std::vector<llvm::Type *> tys;
     tys.push_back(llvm::PointerType::getIntNPtrTy(*gContext, static_cast<unsigned>(gArch->address_size)));
@@ -209,7 +209,7 @@ static void AddArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, llvm::CallingConv:
 
     ir->CreateStore(ret, remill::NthArgument(callback_func, remill::kMemoryPointerArgNum)); // XXX progress this according to cconv + n
 
-    return;
+    return ret;
 }
 
 static llvm::Function *GetCallbackExplicitArgs(
@@ -221,14 +221,16 @@ static llvm::Function *GetCallbackExplicitArgs(
     auto callback_func = CreateGenericCallback(callback_name);
     llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", callback_func));
 
+    std::vector<llvm::Value *> args;
     if(auto native_func = reinterpret_cast<const NativeExternalFunction *>(cfg_func)) {
-      
+
       for(int64_t i = 0; i < native_func->num_args; i++) {
-        AddArgNForCConv(&ir, i, native_func->cc, callback_func);
+        args.push_back(GetArgNForCConv(&ir, i, native_func->cc, callback_func));
       }
     }
     //TODO(car): set calling conv appropriately
     callback_func->setCallingConv(llvm::CallingConv::C);
+    ir.CreateCall(callback_func, args);
     ir.CreateRetVoid(); //XXX(car): just for testing
     return callback_func;
 }
