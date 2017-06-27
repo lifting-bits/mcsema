@@ -10,7 +10,7 @@ namespace mcsema {
 addr_t __mcsema_cdecl_arg_0(Memory *, State *) {
   // stack args
   // memory[rsp]
-  return State->gpr->rsp;
+  return remill::State->gpr->rsp;
 }
 
 addr_t __mcsema_cdecl_arg_1(Memory *, State *) {
@@ -163,6 +163,23 @@ addr_t __mcsema_cdecl_arg_38(Memory *, State *) {
 
 addr_t __mcsema_cdecl_arg_39(Memory *, State *) {
   return State->gpr->rsp + 39*4; //XXX(car) sizeof
+}
+
+// fastcall
+addr_t __mcsema_argument_fastcc_1(Memory *, State *) {
+  return State->gpr->rcx;
+}
+
+addr_t __mcsema_argument_fastcc_2(Memory *, State *) {
+  return State->gpr->rdx;
+}
+
+addr_t __mcsema_argument_fastcc_3(Memory *, State *) {
+  return State->gpr->rsp; // deref?
+}
+
+addr_t __mcsema_argument_fastcc_4(Memory *, State *) {
+  return State->gpr->rsp+4; // deref; fix 4
 }
 
 } // namespace mcsema

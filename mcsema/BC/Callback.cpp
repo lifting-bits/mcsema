@@ -23,6 +23,7 @@
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Type.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/InlineAsm.h>
 #include <llvm/IR/Instruction.h>
@@ -218,48 +219,48 @@ static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, cons
     return ret;
 }
 
-static llvm::Function *GetCallbackExplicitArgs(
-    const NativeObject *cfg_func, const std::string callback_name) {
-    // TODO(car): Pull this out into its own function, and add in calling
-    //            convention-specific code to pass in arguments. May need
-    //            to declare and/or cast the exernal functions as something
-    //            like `addr_t foo(...)`.
-    auto callback_func = CreateGenericCallback(callback_name);
-    llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", callback_func));
-
-    LOG(ERROR) << "Processing function " << callback_name << "\n";
-
-    std::vector<llvm::Value *> args;
-    if(auto native_func = reinterpret_cast<const NativeExternalFunction *>(cfg_func)) {
-
-      LOG(INFO) << "trying to generate args for " << native_func->lifted_name << "\n";
-      switch(native_func->cc) {
-        case (NativeExternalFunction::calling_conv::CallerCleanup):
-          callback_func->setCallingConv(llvm::CallingConv::C);
-          break;
-        case (NativeExternalFunction::calling_conv::CalleeCleanup):
-          callback_func->setCallingConv(llvm::CallingConv::X86_StdCall);
-          break;
-        case (NativeExternalFunction::calling_conv::FastCall):
-          callback_func->setCallingConv(llvm::CallingConv::X86_FastCall);
-          break;
-        case (NativeExternalFunction::calling_conv::McsemaCall):
-          // TODO(car): ???
-          // fallthrough
-        case (NativeExternalFunction::calling_conv::Unknown):
-          // fallthrough
-        default:
-          LOG(ERROR) << "Function " << native_func->lifted_name << " has unknown calling convention! Processing as cdecl...\n";
-          callback_func->setCallingConv(llvm::CallingConv::C);
-      }
-      for(int64_t i = 0; i < native_func->num_args; i++) {
-        args.push_back(GetArgNForCConv(&ir, i, native_func, callback_func));
-      }
-    }
-    ir.CreateCall(callback_func, args);
-    ir.CreateRetVoid(); //XXX(car): just for testing
-    return callback_func;
-}
+//static llvm::Function *GetCallbackExplicitArgs(
+//    const NativeObject *cfg_func, const std::string callback_name) {
+//    // TODO(car): Pull this out into its own function, and add in calling
+//    //            convention-specific code to pass in arguments. May need
+//    //            to declare and/or cast the exernal functions as something
+//    //            like `addr_t foo(...)`.
+//    auto callback_func = CreateGenericCallback(callback_name);
+//    llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", callback_func));
+//
+//    LOG(ERROR) << "Processing function " << callback_name << "\n";
+//
+//    std::vector<llvm::Value *> args;
+//    if(auto native_func = reinterpret_cast<const NativeExternalFunction *>(cfg_func)) {
+//
+//      LOG(INFO) << "trying to generate args for " << native_func->lifted_name << "\n";
+//      switch(native_func->cc) {
+//        case (NativeExternalFunction::calling_conv::CallerCleanup):
+//          callback_func->setCallingConv(llvm::CallingConv::C);
+//          break;
+//        case (NativeExternalFunction::calling_conv::CalleeCleanup):
+//          callback_func->setCallingConv(llvm::CallingConv::X86_StdCall);
+//          break;
+//        case (NativeExternalFunction::calling_conv::FastCall):
+//          callback_func->setCallingConv(llvm::CallingConv::X86_FastCall);
+//          break;
+//        case (NativeExternalFunction::calling_conv::McsemaCall):
+//          // TODO(car): ???
+//          // fallthrough
+//        case (NativeExternalFunction::calling_conv::Unknown):
+//          // fallthrough
+//        default:
+//          LOG(ERROR) << "Function " << native_func->lifted_name << " has unknown calling convention! Processing as cdecl...\n";
+//          callback_func->setCallingConv(llvm::CallingConv::C);
+//      }
+//      for(int64_t i = 0; i < native_func->num_args; i++) {
+//        args.push_back(GetArgNForCConv(&ir, i, native_func, callback_func));
+//      }
+//    }
+//    ir.CreateCall(callback_func, args);
+//    ir.CreateRetVoid(); //XXX(car): just for testing
+//    return callback_func;
+//}
 
 static llvm::Function *GetCallback(
     const NativeObject *cfg_func, const std::string callback_name) {
@@ -293,7 +294,7 @@ llvm::Function *GetNativeToLiftedEntryPoint(const NativeObject *cfg_func) {
 
 static llvm::Function *getExplicitArgsFunction(const NativeExternalFunction *nf) {
     std::stringstream ss;
-    ss << "_" << cfg_func->name;
+    ss << "_" << nf->name;
     std::string external_name(ss.str());
 
     // check if this external function has previously been called
@@ -304,11 +305,11 @@ static llvm::Function *getExplicitArgsFunction(const NativeExternalFunction *nf)
         // uintN_t *_external(uintN_t *arg0, uintN_t *arg1, ...);
         auto ptrtype = llvm::PointerType::getIntNPtrTy(*gContext, static_cast<unsigned>(gArch->address_size));
         std::vector<llvm::Type *> tys;
-        for(int i = 0; i < nf->arg_count; i++) {
+        for(int i = 0; i < nf->num_args; i++) {
             tys.push_back(ptrtype);
         }
         // TODO: set calling convention
-        auto extcall_type = llvm::FunctionType::get(ptrtype, tys);
+        auto extcall_type = llvm::FunctionType::get(ptrtype, tys, false);
         extfun = llvm::Function::Create(
                 extcall_type, llvm::GlobalValue::ExternalLinkage,
                 external_name, gModule);
@@ -353,9 +354,9 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func) {
 
       if (FLAGS_explicit_args) {
 
-          LOG(ERROR) << "Processing function " << callback_name << "\n";
           if(auto native_func = reinterpret_cast<const NativeExternalFunction *>(cfg_func)) {
-              LOG(INFO) << "trying to generate args for " << native_func->lifted_name << "\n";
+              LOG(ERROR) << "Processing function " << native_func->lifted_name << "\n";
+              LOG(ERROR) << "trying to generate args for " << native_func->lifted_name << "\n";
               LOG(INFO) << "function has " << native_func->num_args << " arguments";
 
               // Call something to check if "_" + native_func->name exists in the binary
@@ -366,7 +367,7 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func) {
               //
               // create call to function and args
 
-              //std::vector<llvm::Value *> args;
+              std::vector<llvm::Value *> args;
               //if(auto native_func = reinterpret_cast<const NativeExternalFunction *>(cfg_func)) {
 
               //    LOG(INFO) << "trying to generate args for " << native_func->lifted_name << "\n";
