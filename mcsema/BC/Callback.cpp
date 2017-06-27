@@ -168,7 +168,7 @@ static llvm::Function *GetNativeToLiftedCallback(
   return callback_func;
 }
 
-static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, llvm::CallingConv::ID cc, llvm::Function *callback_func) {
+static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, const NativeExternalFunction *native_func, llvm::Function *callback_func) {
     
     std::vector<llvm::Type *> tys;
     tys.push_back(llvm::PointerType::getIntNPtrTy(*gContext, static_cast<unsigned>(gArch->address_size)));
@@ -176,31 +176,38 @@ static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, llvm
     auto func_type = llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext), tys, true);
  
     std::string cc_str = "";
-    switch(cc) {
-      case (NativeExternalFunction::CallerCleanup):
+    switch(native_func->cc) {
+      case (NativeExternalFunction::calling_conv::CallerCleanup):
         cc_str = "cdecl";
         break;
-      case (NativeExternalFunction::CalleeCleanup):
+      case (NativeExternalFunction::calling_conv::CalleeCleanup):
         cc_str = "stdcall";
         break;
-      case (NativeExternalFunction::FastCall):
+      case (NativeExternalFunction::calling_conv::FastCall):
         cc_str = "fastcc";
         break;
-      case (NativeExternalFunction::McsemaCall):
+      case (NativeExternalFunction::calling_conv::McsemaCall):
         cc_str = "mcsemacall";
         break;
+      case (NativeExternalFunction::calling_conv::Unknown):
+        // fallthrough
       default:
+        LOG(ERROR) << "Function " << native_func->lifted_name << " has unknown calling convention! Processing as cdecl...\n";
+        cc_str = "cdecl";
         break;
     }
-    CHECK(!cc_str.empty()) << "Unknown calling convention for function: " << cc << "\n";
-
+    
     std::stringstream arg_tmp;
     arg_tmp << "__mcsema_" << cc_str << "_arg_" << n;
     std::string arg_func = arg_tmp.str(); 
 
-    LOG(ERROR) << "trying to get " << arg_func << "\n";
-
     auto f = gModule->getOrInsertFunction(arg_func, func_type);
+    if(!f) {
+      LOG(INFO) << arg_func << " not found\n";
+      ir->CreateRetVoid();
+      return NULL;
+    }
+      
     std::vector<llvm::Value *> args(2);
     args[0] = remill::NthArgument(callback_func, remill::kMemoryPointerArgNum);
     args[1] = remill::NthArgument(callback_func, remill::kStatePointerArgNum);
@@ -225,28 +232,26 @@ static llvm::Function *GetCallbackExplicitArgs(
 
       LOG(INFO) << "trying to generate args for " << native_func->lifted_name << "\n";
       switch(native_func->cc) {
-        case (NativeExternalFunction::CallerCleanup):
+        case (NativeExternalFunction::calling_conv::CallerCleanup):
           callback_func->setCallingConv(llvm::CallingConv::C);
           break;
-        case (NativeExternalFunction::CalleeCleanup):
+        case (NativeExternalFunction::calling_conv::CalleeCleanup):
           callback_func->setCallingConv(llvm::CallingConv::X86_StdCall);
           break;
-        case (NativeExternalFunction::FastCall):
+        case (NativeExternalFunction::calling_conv::FastCall):
           callback_func->setCallingConv(llvm::CallingConv::X86_FastCall);
           break;
-        case (NativeExternalFunction::McsemaCall):
+        case (NativeExternalFunction::calling_conv::McsemaCall):
           // TODO(car): ???
-          break;
+          // fallthrough
+        case (NativeExternalFunction::calling_conv::Unknown):
+          // fallthrough
         default:
-          // TODO(car): ???
-          LOG(WARNING) << "Function " << native_func->lifted_name << " has unknown calling convention " << native_func->cc <<"\n";
-          ir.CreateCall(callback_func, args);
-          ir.CreateRetVoid();
-          return callback_func;
-          break;
+          LOG(ERROR) << "Function " << native_func->lifted_name << " has unknown calling convention! Processing as cdecl...\n";
+          callback_func->setCallingConv(llvm::CallingConv::C);
       }
       for(int64_t i = 0; i < native_func->num_args; i++) {
-        args.push_back(GetArgNForCConv(&ir, i, native_func->cc, callback_func));
+        args.push_back(GetArgNForCConv(&ir, i, native_func, callback_func));
       }
     }
     ir.CreateCall(callback_func, args);

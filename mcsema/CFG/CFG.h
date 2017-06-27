@@ -91,6 +91,7 @@ struct NativeExternalFunction : public NativeFunction {
   bool is_weak;
   int64_t num_args;
   enum calling_conv {
+    Unknown,
     CallerCleanup,
     CalleeCleanup,
     FastCall,

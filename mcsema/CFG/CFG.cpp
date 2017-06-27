@@ -516,6 +516,9 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     if(cfg_extern_func.has_argument_count()) {
       func->num_args = cfg_extern_func.argument_count();
     }
+    else { // no argc recorded
+      func->num_args = 0; // XXX ???
+    }
     if(cfg_extern_func.has_cc()) {
       switch(cfg_extern_func.cc()) {
       case ExternalFunction_CallingConvention_CalleeCleanup:
@@ -532,9 +535,12 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         break;
       default:
         // unknown calling conv...
-        //func->cc = llvm::CallingConv::Unknown;
+        func->cc = NativeExternalFunction::calling_conv::Unknown;
         break;
       }
+    }
+    else { // no cc recorded
+      func->cc = NativeExternalFunction::calling_conv::Unknown;
     }
 
     CHECK(!func->name.empty())
