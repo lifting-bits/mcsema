@@ -171,10 +171,13 @@ static llvm::Function *GetNativeToLiftedCallback(
 
 static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, const NativeExternalFunction *native_func, llvm::Function *callback_func) {
 
+  // TODO(car/artem): put this in its own "getArgExtractionType()" function
     auto addr_type = llvm::Type::getIntNTy(*gContext, static_cast<unsigned>(gArch->address_size));
     std::vector<llvm::Type *> tys;
-    tys.push_back(addr_type);
-    tys.push_back(addr_type);
+    auto arg0type = remill::NthArgument(callback_func, remill::kMemoryPointerArgNum)->getType();
+    auto arg1type = remill::NthArgument(callback_func, remill::kStatePointerArgNum)->getType();
+    tys.push_back(arg0type);
+    tys.push_back(arg1type);
     auto func_type = llvm::FunctionType::get(addr_type, tys, false);
 
     std::string cc_str = "";
@@ -217,7 +220,7 @@ static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, cons
     else {
       CHECK(func) << "getOrInsertFunction() returned non-function\n";
     }
-    return NULL; // shouldn't reach
+    return nullptr; // shouldn't reach
 }
 
 static llvm::Function *GetCallback(
@@ -252,7 +255,8 @@ llvm::Function *GetNativeToLiftedEntryPoint(const NativeObject *cfg_func) {
 
 static llvm::Function *getExplicitArgsFunction(const NativeExternalFunction *nf) {
     std::stringstream ss;
-    ss << "_" << nf->name;
+    //ss << "_" << nf->name;
+    ss << nf->name;
     std::string external_name(ss.str());
 
     // check if this external function has previously been called
@@ -261,7 +265,7 @@ static llvm::Function *getExplicitArgsFunction(const NativeExternalFunction *nf)
     if(nullptr == extfun) {
         // it hasn't, create a prototype of:
         // uintN_t *_external(uintN_t *arg0, uintN_t *arg1, ...);
-        auto ptrtype = llvm::PointerType::getIntNPtrTy(*gContext, static_cast<unsigned>(gArch->address_size));
+        auto ptrtype = llvm::Type::getIntNTy(*gContext, static_cast<unsigned>(gArch->address_size));
         std::vector<llvm::Type *> tys;
         for(int i = 0; i < nf->num_args; i++) {
             tys.push_back(ptrtype);
@@ -354,7 +358,8 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func) {
               //}
               ir.CreateCall(getExplicitArgsFunction(native_func), args);
           }
-          ir.CreateRetVoid(); //XXX(car): just for testing
+          // need to return a struct memory*
+          ir.CreateRet(remill::NthArgument(callback_func, remill::kMemoryPointerArgNum));
           //auto callback_func = GetCallbackExplicitArgs(cfg_func, cfg_func->lifted_name);
           //callback_func->setLinkage(llvm::GlobalValue::ExternalLinkage);
       } else {
