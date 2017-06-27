@@ -190,7 +190,6 @@ static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, llvm
         cc_str = "mcsemacall";
         break;
       default:
-        cc_str = "cdecl"; // XXX(car): just for testing; fix
         break;
     }
     CHECK(!cc_str.empty()) << "Unknown calling convention for function: " << cc << "\n";
@@ -224,12 +223,32 @@ static llvm::Function *GetCallbackExplicitArgs(
     std::vector<llvm::Value *> args;
     if(auto native_func = reinterpret_cast<const NativeExternalFunction *>(cfg_func)) {
 
+      LOG(INFO) << "trying to generate args for " << native_func->lifted_name << "\n";
+      switch(native_func->cc) {
+        case (NativeExternalFunction::CallerCleanup):
+          callback_func->setCallingConv(llvm::CallingConv::C);
+          break;
+        case (NativeExternalFunction::CalleeCleanup):
+          callback_func->setCallingConv(llvm::CallingConv::X86_StdCall);
+          break;
+        case (NativeExternalFunction::FastCall):
+          callback_func->setCallingConv(llvm::CallingConv::X86_FastCall);
+          break;
+        case (NativeExternalFunction::McsemaCall):
+          // TODO(car): ???
+          break;
+        default:
+          // TODO(car): ???
+          LOG(WARNING) << "Function " << native_func->lifted_name << " has unknown calling convention " << native_func->cc <<"\n";
+          ir.CreateCall(callback_func, args);
+          ir.CreateRetVoid();
+          return callback_func;
+          break;
+      }
       for(int64_t i = 0; i < native_func->num_args; i++) {
         args.push_back(GetArgNForCConv(&ir, i, native_func->cc, callback_func));
       }
     }
-    //TODO(car): set calling conv appropriately
-    callback_func->setCallingConv(llvm::CallingConv::C);
     ir.CreateCall(callback_func, args);
     ir.CreateRetVoid(); //XXX(car): just for testing
     return callback_func;
