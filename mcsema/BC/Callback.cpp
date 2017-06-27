@@ -192,7 +192,7 @@ static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, cons
       case (NativeExternalFunction::calling_conv::Unknown):
         // fallthrough
       default:
-        LOG(ERROR) << "Function " << native_func->lifted_name << " has unknown calling convention! Processing as cdecl...\n";
+        LOG(WARNING) << "Function " << native_func->lifted_name << " has unknown calling convention! Processing as cdecl...\n";
         cc_str = "cdecl";
         break;
     }
@@ -226,6 +226,8 @@ static llvm::Function *GetCallbackExplicitArgs(
     //            like `addr_t foo(...)`.
     auto callback_func = CreateGenericCallback(callback_name);
     llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", callback_func));
+
+    LOG(ERROR) << "Processing function " << callback_name << "\n";
 
     std::vector<llvm::Value *> args;
     if(auto native_func = reinterpret_cast<const NativeExternalFunction *>(cfg_func)) {
@@ -307,6 +309,12 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func) {
 
   auto callback_func = gModule->getFunction(cfg_func->lifted_name);
   if (callback_func) {
+    return callback_func;
+  }
+
+  if (FLAGS_explicit_args) {
+    auto callback_func = GetCallbackExplicitArgs(cfg_func, cfg_func->lifted_name);
+    callback_func->setLinkage(llvm::GlobalValue::ExternalLinkage);
     return callback_func;
   }
 
