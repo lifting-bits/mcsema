@@ -317,9 +317,7 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func) {
       if (FLAGS_explicit_args) {
 
           if(auto native_func = reinterpret_cast<const NativeExternalFunction *>(cfg_func)) {
-              LOG(INFO) << "Processing function " << native_func->lifted_name << "\n";
-              LOG(INFO) << "trying to generate args for " << native_func->lifted_name << "\n";
-              LOG(INFO) << "function has " << native_func->num_args << " arguments";
+              LOG(INFO) << "Generating " << native_func->num_args << " args for function " << native_func->lifted_name << "\n";
 
               // Call something to check if "_" + native_func->name exists in the binary
               // if not, create a function named "_" + native_func->name with:
@@ -327,41 +325,35 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func) {
               //    arg count of native_func->arg_count
               // if yes, return pointer to function
               //
+              switch(native_func->cc) {
+                  case (NativeExternalFunction::calling_conv::CallerCleanup):
+                      callback_func->setCallingConv(llvm::CallingConv::C);
+                      break;
+                  case (NativeExternalFunction::calling_conv::CalleeCleanup):
+                      callback_func->setCallingConv(llvm::CallingConv::X86_StdCall);
+                      break;
+                  case (NativeExternalFunction::calling_conv::FastCall):
+                      callback_func->setCallingConv(llvm::CallingConv::X86_FastCall);
+                      break;
+                  case (NativeExternalFunction::calling_conv::McsemaCall):
+                      // fallthrough
+                  case (NativeExternalFunction::calling_conv::Unknown):
+                      // fallthrough
+                  default:
+                      LOG(ERROR) << "Function " << native_func->lifted_name << " has unknown calling convention! Processing as cdecl...\n";
+                      callback_func->setCallingConv(llvm::CallingConv::C);
+              }
               // create call to function and args
-
               std::vector<llvm::Value *> args;
-              //if(auto native_func = reinterpret_cast<const NativeExternalFunction *>(cfg_func)) {
-
-              //    LOG(INFO) << "trying to generate args for " << native_func->lifted_name << "\n";
-              //    switch(native_func->cc) {
-              //        case (NativeExternalFunction::calling_conv::CallerCleanup):
-              //            callback_func->setCallingConv(llvm::CallingConv::C);
-              //            break;
-              //        case (NativeExternalFunction::calling_conv::CalleeCleanup):
-              //            callback_func->setCallingConv(llvm::CallingConv::X86_StdCall);
-              //            break;
-              //        case (NativeExternalFunction::calling_conv::FastCall):
-              //            callback_func->setCallingConv(llvm::CallingConv::X86_FastCall);
-              //            break;
-              //        case (NativeExternalFunction::calling_conv::McsemaCall):
-              //            // TODO(car): ???
-              //            // fallthrough
-              //        case (NativeExternalFunction::calling_conv::Unknown):
-              //            // fallthrough
-              //        default:
-              //            LOG(ERROR) << "Function " << native_func->lifted_name << " has unknown calling convention! Processing as cdecl...\n";
-              //            callback_func->setCallingConv(llvm::CallingConv::C);
-              //    }
               for(int64_t i = 0; i < native_func->num_args; i++) {
                   args.push_back(GetArgNForCConv(&ir, i, native_func, callback_func));
               }
-              //}
+              //auto arg_ret =
+              // TODO(car): stash return in rax
               ir.CreateCall(getExplicitArgsFunction(native_func), args);
           }
           // need to return a struct memory*
           ir.CreateRet(remill::NthArgument(callback_func, remill::kMemoryPointerArgNum));
-          //auto callback_func = GetCallbackExplicitArgs(cfg_func, cfg_func->lifted_name);
-          //callback_func->setLinkage(llvm::GlobalValue::ExternalLinkage);
       } else {
 
           std::vector<llvm::Value *> args(3);
