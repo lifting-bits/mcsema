@@ -30,6 +30,7 @@
 #pragma clang diagnostic pop
 
 #include "mcsema/CFG/CFG.h"
+#include "mcsema/BC/External.h"
 
 namespace mcsema {
 namespace {
@@ -512,6 +513,29 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     func->is_external = true;
     func->is_weak = cfg_extern_func.is_weak();
     func->lifted_name = ExternalFuncName(cfg_extern_func);
+    if(cfg_extern_func.has_argument_count()) {
+      func->num_args = cfg_extern_func.argument_count();
+    }
+    if(cfg_extern_func.has_cc()) {
+      switch(cfg_extern_func.cc()) {
+      case ExternalFunction_CallingConvention_CalleeCleanup:
+        func->cc = NativeExternalFunction::calling_conv::CalleeCleanup;
+        break;
+      case ExternalFunction_CallingConvention_CallerCleanup:
+        func->cc = NativeExternalFunction::calling_conv::CallerCleanup;
+        break;
+      case ExternalFunction_CallingConvention_FastCall:
+        func->cc = NativeExternalFunction::calling_conv::FastCall;
+        break;
+      case ExternalFunction_CallingConvention_McsemaCall:
+        func->cc = NativeExternalFunction::calling_conv::McsemaCall;
+        break;
+      default:
+        // unknown calling conv...
+        //func->cc = llvm::CallingConv::Unknown;
+        break;
+      }
+    }
 
     CHECK(!func->name.empty())
         << "External function at " << std::hex << func->ea << " has no name.";

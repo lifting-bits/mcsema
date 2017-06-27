@@ -184,7 +184,7 @@ static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, llvm
         cc_str = "stdcall";
         break;
       case (NativeExternalFunction::FastCall):
-        cc_str = "fastcall";
+        cc_str = "fastcc";
         break;
       case (NativeExternalFunction::McsemaCall):
         cc_str = "mcsemacall";
