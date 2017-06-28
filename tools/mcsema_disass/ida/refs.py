@@ -171,7 +171,9 @@ def _try_get_arm_ref_addr(inst, op, op_val, all_refs):
   global _BAD_ARM_REF_OFF
 
   if op.type not in (idc.o_imm, idc.o_displ):
-    return _BAD_ARM_REF_OFF
+    # This is a reference type that the other ref tracking code
+    # can handle, return defaults
+    return op_val, 0
 
   op_str = idc.GetOpnd(inst.ea, op.n)
 
@@ -207,6 +209,12 @@ def _get_ref_candidate(inst, op, all_refs):
   else:
     return None
 
+
+  #TODO(artem): we should have a class that has ref heuristics
+  # and put ARM related refs in the ARM class, and X86 in the x86 class
+  #
+  # that will avoid these awkward `if IS_ARM` and the comments
+  # about x86 / amd64 stuff
   if IS_ARM:
     addr_val, mask = _try_get_arm_ref_addr(inst, op, addr_val, all_refs)
   
@@ -277,14 +285,23 @@ def get_all_references_from(ea):
   for ref_ea in idautils.DataRefsFrom(ea):
     if not is_invalid_ea(ref_ea):
       all_refs.add(ref_ea)
+    else:
+      #DEBUG("Found an invalid ref from {:x} to {:x}".format(ea, ref_ea))
+      pass
 
   for ref_ea in idautils.CodeRefsFrom(ea, 0):
     if not is_invalid_ea(ref_ea):
       all_refs.add(ref_ea)
+    else:
+      #DEBUG("We found an invalid ref from {:x} to {:x}".format(ea, ref_ea))
+      pass
 
   for ref_ea in idautils.CodeRefsFrom(ea, 1):
     if not is_invalid_ea(ref_ea):
       all_refs.add(ref_ea)
+    else:
+      #DEBUG("We found an invalid ref from {:x} to {:x}".format(ea, ref_ea))
+      pass
 
   return all_refs
 
