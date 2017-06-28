@@ -169,6 +169,7 @@ static llvm::Function *GetNativeToLiftedCallback(
   return callback_func;
 }
 
+// Uses IRBuilder to insert a call to a function to retrieve argument n, depending on the calling convention of native_func.
 static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, const NativeExternalFunction *native_func, llvm::Function *callback_func) {
 
   // TODO(car/artem): put this in its own "getArgExtractionType()" function
@@ -192,8 +193,7 @@ static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, cons
         cc_str = "fastcc";
         break;
       case (NativeExternalFunction::calling_conv::McsemaCall):
-        cc_str = "mcsemacall";
-        break;
+        // fallthrough
       case (NativeExternalFunction::calling_conv::Unknown):
         // fallthrough
       default:
@@ -207,7 +207,7 @@ static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, cons
     std::string arg_func = arg_tmp.str(); 
 
     auto f = gModule->getOrInsertFunction(arg_func, func_type);
-    CHECK(f) << "Unable to find function " << arg_func << "\n";
+    CHECK(f) << "Unable to find argument retrieval function " << arg_func << "\n";
 
     if(llvm::Function *func = reinterpret_cast<llvm::Function *>(f)) {
       func->setLinkage(llvm::Function::ExternalLinkage);
@@ -270,11 +270,31 @@ static llvm::Function *getExplicitArgsFunction(const NativeExternalFunction *nf)
         for(int i = 0; i < nf->num_args; i++) {
             tys.push_back(ptrtype);
         }
-        // TODO: set calling convention
+
         auto extcall_type = llvm::FunctionType::get(ptrtype, tys, false);
         extfun = llvm::Function::Create(
                 extcall_type, llvm::GlobalValue::ExternalLinkage,
                 external_name, gModule);
+
+        // set calling convention
+        switch(nf->cc) {
+            case (NativeExternalFunction::calling_conv::CallerCleanup):
+                extfun->setCallingConv(llvm::CallingConv::C);
+                break;
+            case (NativeExternalFunction::calling_conv::CalleeCleanup):
+                extfun->setCallingConv(llvm::CallingConv::X86_StdCall);
+                break;
+            case (NativeExternalFunction::calling_conv::FastCall):
+                extfun->setCallingConv(llvm::CallingConv::X86_FastCall);
+                break;
+            case (NativeExternalFunction::calling_conv::McsemaCall):
+                // fallthrough
+            case (NativeExternalFunction::calling_conv::Unknown):
+                // fallthrough
+            default:
+                LOG(WARNING) << "Function " << nf->lifted_name << " has unknown calling convention! Setting to cdecl...\n";
+                extfun->setCallingConv(llvm::CallingConv::C);
+        }
     }
 
     return extfun;
@@ -325,24 +345,7 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func) {
               //    arg count of native_func->arg_count
               // if yes, return pointer to function
               //
-              switch(native_func->cc) {
-                  case (NativeExternalFunction::calling_conv::CallerCleanup):
-                      callback_func->setCallingConv(llvm::CallingConv::C);
-                      break;
-                  case (NativeExternalFunction::calling_conv::CalleeCleanup):
-                      callback_func->setCallingConv(llvm::CallingConv::X86_StdCall);
-                      break;
-                  case (NativeExternalFunction::calling_conv::FastCall):
-                      callback_func->setCallingConv(llvm::CallingConv::X86_FastCall);
-                      break;
-                  case (NativeExternalFunction::calling_conv::McsemaCall):
-                      // fallthrough
-                  case (NativeExternalFunction::calling_conv::Unknown):
-                      // fallthrough
-                  default:
-                      LOG(ERROR) << "Function " << native_func->lifted_name << " has unknown calling convention! Processing as cdecl...\n";
-                      callback_func->setCallingConv(llvm::CallingConv::C);
-              }
+
               // create call to function and args
               std::vector<llvm::Value *> args;
               for(int64_t i = 0; i < native_func->num_args; i++) {
@@ -352,7 +355,7 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func) {
               // TODO(car): stash return in rax
               ir.CreateCall(getExplicitArgsFunction(native_func), args);
           }
-          // need to return a struct memory*
+          // need to return a struct Memory*
           ir.CreateRet(remill::NthArgument(callback_func, remill::kMemoryPointerArgNum));
       } else {
 
