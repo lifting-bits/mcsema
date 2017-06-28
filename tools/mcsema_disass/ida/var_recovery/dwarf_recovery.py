@@ -19,7 +19,7 @@ _DEBUG_FILE = sys.stderr
 DWARF_OPERATIONS = collections.defaultdict(lambda: (lambda *args: None))
 DWARF_CU = set()
 TYPES_TAG = dict()
-GLOBAL_STRUCT = set()
+GLOBAL_STRUCT = dict()
 
 class Types(Enum):
     TYPE_BASE = 1
@@ -28,6 +28,12 @@ class Types(Enum):
 
 def DEBUG(s):
     _DEBUG_FILE.write("{}\n".format(str(s)))
+    
+def address_lookup(memory_ref):
+    for var, size in GLOBAL_STRUCT.iteritems():
+        if (memory_ref >= var) and (memory_ref < var + size):
+            return True
+    return False
     
 def show_loclist(loclist, dwarfinfo, indent):
     """ 
@@ -160,7 +166,7 @@ class CUnit(object):
             self._process_child(child, indent)
 
     def print_control_unit(self):
-        DEBUG("Type dictionary {}".format(self._types))
+        DEBUG("Type dictionary {}".format(TYPES_TAG))
         DEBUG("Variable recovered {}".format(self._global_variable))
 
 def resolve_variable_types():
@@ -172,7 +178,7 @@ def resolve_variable_types():
                 cu._global_variable[memory_ref]['type'] = type_tag
                 DEBUG("{0:x} {1}".format(memory_ref, variable))
                 if type_tag == Types.TYPE_ARRAY or type_tag == Types.TYPE_STRUCT :
-                    GLOBAL_STRUCT.add(memory_ref)
+                    GLOBAL_STRUCT[memory_ref] = TYPES_TAG[offset]['size']
 
 def process_dwarf_info(file):
     '''
@@ -196,7 +202,6 @@ def process_dwarf_info(file):
             top_DIE = CU.get_top_DIE()
             c_unit = CUnit(top_DIE, CU['unit_length'], CU.cu_offset, section_offset)
             DWARF_CU.add(c_unit)
-            DEBUG('    Top DIE with tag= {} name={}'.format(top_DIE.tag, top_DIE.get_full_path()))
             c_unit.decode_control_unit()
             c_unit.print_control_unit()
     
@@ -209,7 +214,7 @@ def updateCFG(file):
         M.ParseFromString(inf.read())
         
         for g in M.global_vars:
-            if g.address in GLOBAL_STRUCT:
+            if address_lookup(g.address):
                 DEBUG("Global Vars {} {}".format(str(g.var.name), hex(g.address)))
                 M.global_vars.remove(g)
                 
