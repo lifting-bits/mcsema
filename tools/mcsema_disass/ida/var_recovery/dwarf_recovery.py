@@ -2,7 +2,10 @@
 
 import sys
 import argparse
-import collections
+import pprint
+
+from collections import defaultdict
+from collections import namedtuple
 from enum import Enum
 
 from elftools.elf.elffile import ELFFile
@@ -14,127 +17,170 @@ from elftools.common.py3compat import maxint, bytes2str
 
 import mcsema_disass.ida.CFG_pb2 as CFG_pb2
 
+DWARF_OPERATIONS = defaultdict(lambda: (lambda *args: None))
+
+Type = namedtuple('Type', ['name', 'size', 'offset', 'tag'])
+
+GLOBAL_VARIABLES = dict()
+
+TYPES_MAP = dict()
+
+BASE_TYPES = [
+    'DW_TAG_base_type',
+    'DW_TAG_structure_type',
+    'DW_TAG_union_type',
+]
+
+POINTER_TYPES = {
+    'DW_TAG_pointer_type' : '*',
+}
+
+INDIRECT_TYPES = [
+    'DW_TAG_typedef',
+    'DW_TAG_const_type',
+    'DW_TAG_volatile_type',
+    'DW_TAG_restrict_type',
+    'DW_TAG_array_type',
+]
+
+TYPE_ENUM = {
+    'DW_TAG_base_type': 1,
+    'DW_TAG_structure_type' : 2,
+    'DW_TAG_union_type': 3,
+    }
+
 _DEBUG_FILE = sys.stderr
-
-DWARF_OPERATIONS = collections.defaultdict(lambda: (lambda *args: None))
-DWARF_CU = set()
-TYPES_TAG = dict()
-GLOBAL_STRUCT = dict()
-
-class Types(Enum):
-    TYPE_BASE = 1
-    TYPE_ARRAY = 2
-    TYPE_STRUCT = 3
 
 def DEBUG(s):
     _DEBUG_FILE.write("{}\n".format(str(s)))
+
+'''
+    DIE attributes utilities 
+'''
+def get_name(die):
+    if 'DW_AT_name' in die.attributes:
+        return die.attributes['DW_AT_name'].value
+    else:
+        return 'UNKNOWN'
+
+def get_size(die):
+    if 'DW_AT_byte_size' in die.attributes:
+        return die.attributes['DW_AT_byte_size'].value
+    else:
+        return -1
+    
+def get_location(die):
+    if 'DW_AT_location' in die.attributes:
+        return die.attributes['DW_AT_location'].value
+    else:
+        return None
+    
+def get_types(die):
+    if 'DW_AT_type' in die.attributes:
+        offset = die.attributes['DW_AT_type'].value
+        if offset in TYPES_MAP:
+            return (TYPES_MAP[offset], TYPES_MAP[offset].size, TYPES_MAP[offset].offset)
+
+    return (Type(None, None, None, None), -1, -1)
+
+def _create_variable_entry(name, offset):
+    return dict(name=name, offset=offset, type=Type(None, None, None, None), size=0, addr=0, is_global=False)
+
+def process_types(dwarf, typemap):
+    def process_direct_types(die):
+        if die.tag in BASE_TYPES:
+            name = get_name(die)
+            size = get_size(die)
+            # Some of the struct types are not having size attributes
+            # Check the dwarf specification for such cases
+            #assert(size > 0)
+            if die.offset not in typemap:
+                typemap[die.offset] = Type(name=name, size=size, offset=die.offset, tag=TYPE_ENUM.get(die.tag))
+            
+    def process_pointer_types(die):
+        if die.tag in POINTER_TYPES:
+            if 'DW_AT_type' in die.attributes:
+                offset = die.attributes['DW_AT_type'].value + die.cu.cu_offset
+                indirect = POINTER_TYPES[die.tag]
+                name = (typemap[offset].name if offset in typemap else 'UNKNOWN') + indirect
+                tag = typemap[offset].tag if offset in typemap else 0 
+            else:
+                name = 'void*'
+                tag = 0
+            if die.offset not in typemap:
+                typemap[die.offset] = Type(name=name, size=4, offset=die.offset, tag=tag)
+    
+    def process_indirect_types(die):
+        if die.tag in INDIRECT_TYPES:
+            if 'DW_AT_type' in die.attributes:
+                offset = die.attributes['DW_AT_type'].value + die.cu.cu_offset
+                if offset in typemap:
+                    size = typemap[offset].size
+                    name = typemap[offset].name
+                    tag = typemap[offset].tag if offset in typemap else 0
+                    if die.offset not in typemap:
+                        typemap[die.offset] = Type(name=name, size=size, offset=die.offset, tag=tag)
+                else:
+                    # Assume size is 4 if we can't derive the base type
+                    size = 4
+                    tag = 0
+                    name = get_name(die)
+                    if die.offset not in typemap:
+                        typemap[die.offset] = Type(name=name, size=size, offset=die.offset, tag=tag)
+                
+    build_typemap(dwarf, process_direct_types)
+    build_typemap(dwarf, process_pointer_types)
+    build_typemap(dwarf, process_indirect_types)
+
+    
+def _process_dies(die, fn):
+    fn(die)
+    for child in die.iter_children():
+        _process_dies(child, fn)
+
+def build_typemap(dwarf, fn):
+    for CU in dwarf.iter_CUs():
+        top = CU.get_top_DIE()
+        _process_dies(top, fn)
+
     
 def address_lookup(memory_ref):
-    for var, size in GLOBAL_STRUCT.iteritems():
-        if (memory_ref >= var) and (memory_ref < var + size):
+    for addr, variable in GLOBAL_VARIABLES.iteritems():
+        if (memory_ref >= addr) and (memory_ref < addr + variable['size']):
             return True
     return False
-    
-def show_loclist(loclist, dwarfinfo, indent):
-    """ 
-        Display a location list nicely, decoding the DWARF expressions
-        contained within.
-    """
-    d = []
-    for loc_entity in loclist:
-        if isinstance(loc_entity, LocationEntry):
-            d.append('%s <<%s>>' % (
-                loc_entity,
-                describe_DWARF_expr(loc_entity.loc_expr, dwarfinfo.structs)))
-        else:
-            d.append(str(loc_entity))
-    return '\n'.join(indent + s for s in d)
 
-def _print_die(DIE, section_offset):
-    for attr in itervalues(DIE.attributes):
+def _print_die(die, section_offset):
+    DEBUG("Processing DIE: {}".format(str(die)))
+    for attr in itervalues(die.attributes):
         if attr.name == 'DW_AT_name' :
             variable_name = attr.value
         name = attr.name
         if isinstance(name, int):
             name = 'Unknown AT value: %x' % name
-        DEBUG('    <%x>   %-18s: %s' % (attr.offset, name, describe_attr_value(attr, DIE, section_offset)))
-        
+        DEBUG('    <%x>   %-18s: %s' % (attr.offset, name, describe_attr_value(attr, die, section_offset)))
 
-def _create_type_entry(offset, type_name, type_size, type_tag):
-    return dict(name=type_name, offset=offset, size=type_size, tag=type_tag)
-
-def _create_variable_entry(var_name, offset):
-    return dict(name=var_name, offset=offset, type=0, type_offset=0, size=0, addr=0, is_global=False)
-
-def _process_compile_unit_tag(CU, DIE, section_offset):
-    return
-
-def _process_structure_tag(CU, DIE, section_offset):
-    if DIE.tag != 'DW_TAG_structure_type':
+def _process_variable_tag(die, section_offset, global_var_data):
+    if die.tag != 'DW_TAG_variable':
         return
-    DEBUG("Processing structure type TAG")
-    _print_die(DIE, section_offset)
-    offset = DIE.offset
-    name = "Unknown"
-    size = 0
-    for attr in itervalues(DIE.attributes):
-        if attr.name == 'DW_AT_name':
-            name = attr.value
-        if attr.name == 'DW_AT_byte_size':
-            size = attr.value
-    if offset not in TYPES_TAG:
-        TYPES_TAG[offset] = _create_type_entry(offset, name, size, Types.TYPE_STRUCT)
-        
-def _process_array_type_tag(CU, DIE, section_offset):
-    if DIE.tag != 'DW_TAG_array_type':
-        return
-    DEBUG("Processing array type TAG")
-    _print_die(DIE, section_offset)
-    offset = DIE.offset
-    name = "Unknown"
-    size = 0
-    for attr in itervalues(DIE.attributes):
-        if attr.name == 'DW_AT_name':
-            name = attr.value
-        if attr.name == 'DW_AT_byte_size':
-            size = attr.value
-    if offset not in TYPES_TAG:
-        TYPES_TAG[offset] = _create_type_entry(offset, name, size, Types.TYPE_ARRAY)
+    _print_die(die, section_offset)
+    name = get_name(die)
     
-def _process_base_type_tag(CU, DIE, section_offset):
-    pass    
-
-def _process_variable_tag(CU, DIE, section_offset):
-    if DIE.tag != 'DW_TAG_variable':
-        return
-    DEBUG("Processing variable TAG")
-    _print_die(DIE, section_offset)
-    offset = DIE.offset
-    variable_name = "Unknown"
-    type_offset = 0;
-    
-    if 'DW_AT_name' in DIE.attributes:
-        variable_name = DIE.attributes['DW_AT_name'].value
-    
-    if 'DW_AT_type' in DIE.attributes:
-        type_offset = DIE.attributes['DW_AT_type'].value
-  
-    if 'DW_AT_location' in DIE.attributes:
-        attr = DIE.attributes['DW_AT_location']
+    if 'DW_AT_location' in die.attributes:
+        attr = die.attributes['DW_AT_location']
         if attr.form not in ('DW_FORM_data4', 'DW_FORM_data8', 'DW_FORM_sec_offset'):
-            loc_expr = "{}".format(describe_DWARF_expr(attr.value, DIE.cu.structs)).split(':')
+            loc_expr = "{}".format(describe_DWARF_expr(attr.value, die.cu.structs)).split(':')
             if loc_expr[0][1:] == 'DW_OP_addr':
                 memory_ref = int(loc_expr[1][:-1][1:], 16)
-                if memory_ref not in  CU._global_variable:
-                    CU._global_variable[memory_ref] = _create_variable_entry(variable_name, offset)
-                    CU._global_variable[memory_ref]['is_global'] = True
-                    CU._global_variable[memory_ref]['type_offset'] = type_offset
+                if memory_ref not in  global_var_data:
+                    global_var_data[memory_ref] = _create_variable_entry(name, die.offset)
+                    global_var_data[memory_ref]['is_global'] = True
+                    (type, size, offset) = get_types(die)
+                    global_var_data[memory_ref]['type'] = type
+                    global_var_data[memory_ref]['size'] = size
     
 DWARF_OPERATIONS = {
-    'DW_TAG_compile_unit': _process_compile_unit_tag,
-    'DW_TAG_base_type': _process_base_type_tag,
-    'DW_TAG_structure_type' : _process_structure_tag,
-    'DW_TAG_array_type' : _process_array_type_tag,
+    #'DW_TAG_compile_unit': _process_compile_unit_tag,
     'DW_TAG_variable' : _process_variable_tag
 }
 
@@ -145,40 +191,22 @@ class CUnit(object):
         self._offset = cu_offset
         self._section_offset = global_offset
         self._global_variable = dict()
-        self._types = dict()
         
-    def _process_child(self, child_die, indent_level):
-        indent = indent_level + '  '
+    def _process_child(self, child_die, global_var_data):
         for child in child_die.iter_children():
             func_ = DWARF_OPERATIONS.get(child.tag)
             if func_:
-                func_(self, child, self._section_offset)
+                func_(child, self._section_offset, global_var_data)
                 continue
-            self._process_child(child, indent)
+            self._process_child(child, global_var_data)
         
-    def decode_control_unit(self, indent_level='    '):
-        indent = indent_level + '  '
+    def decode_control_unit(self, global_var_data):
         for child in self._die.iter_children():
             func_ = DWARF_OPERATIONS.get(child.tag)
             if func_:
-                func_(self, child, self._section_offset)
+                func_(child, self._section_offset, global_var_data)
                 continue
-            self._process_child(child, indent)
-
-    def print_control_unit(self):
-        DEBUG("Type dictionary {}".format(TYPES_TAG))
-        DEBUG("Variable recovered {}".format(self._global_variable))
-
-def resolve_variable_types():
-    for cu in DWARF_CU:
-        for memory_ref, variable  in cu._global_variable.iteritems():
-            offset = variable['type_offset']
-            if offset in TYPES_TAG:
-                type_tag = TYPES_TAG[offset]['tag']
-                cu._global_variable[memory_ref]['type'] = type_tag
-                DEBUG("{0:x} {1}".format(memory_ref, variable))
-                if type_tag == Types.TYPE_ARRAY or type_tag == Types.TYPE_STRUCT :
-                    GLOBAL_STRUCT[memory_ref] = TYPES_TAG[offset]['size']
+            self._process_child(child, global_var_data)
 
 def process_dwarf_info(file):
     '''
@@ -194,6 +222,8 @@ def process_dwarf_info(file):
             return
         
         dwarf_info = f_elf.get_dwarf_info()
+        process_types(dwarf_info, TYPES_MAP)
+        
         section_offset = dwarf_info.debug_info_sec.global_offset
         
         # Iterate through all the compile units
@@ -201,12 +231,19 @@ def process_dwarf_info(file):
             DEBUG('Found a compile unit at offset {0}, length {1}'.format(CU.cu_offset, CU['unit_length']))
             top_DIE = CU.get_top_DIE()
             c_unit = CUnit(top_DIE, CU['unit_length'], CU.cu_offset, section_offset)
-            DWARF_CU.add(c_unit)
-            c_unit.decode_control_unit()
-            c_unit.print_control_unit()
+            c_unit.decode_control_unit(GLOBAL_VARIABLES)
     
-    resolve_variable_types()
-    DEBUG('Number of control units : {0}'.format(len(DWARF_CU)))
+    DEBUG('Number of Global Vars: {0}'.format(len(GLOBAL_VARIABLES)))
+    print "Type Definitions:"
+    pprint.pprint
+    pprint.pprint(TYPES_MAP)
+    print "End Type Definitions:"
+    
+    print "Global Vars\n"
+    pprint.pprint
+    pprint.pprint('Number of Global Vars: {0}'.format(len(GLOBAL_VARIABLES)))
+    pprint.pprint(GLOBAL_VARIABLES)
+    print "End Global Vars\n"
     
 def updateCFG(file):
     M = CFG_pb2.Module()
