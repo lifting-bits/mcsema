@@ -213,7 +213,7 @@ def _get_ref_candidate(inst, op, all_refs):
   seg_ea = idc.SegStart(addr_val)
   if is_invalid_ea(seg_ea):
     return None
-
+  
   if addr_val not in all_refs and is_head(addr_val):
     all_refs.add(addr_val)
 
@@ -257,7 +257,10 @@ def _get_ref_candidate(inst, op, all_refs):
   # Make sure we add in a reference to the (possibly new) head, addressed
   # by `addr_val`.
   make_head(addr_val)
-  idc.add_dref(inst.ea, addr_val, idc.XREF_USER)
+
+  # WTF(pag): This silently kills IDA.
+  # idc.add_dref(inst.ea, addr_val, idc.XREF_USER)
+
   return ref
 
 def memop_is_actually_displacement(inst):

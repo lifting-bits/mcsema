@@ -586,7 +586,6 @@ def recover_instruction_references(I, inst, addr):
   debug_info = ["I: {:x}".format(addr)]
   refs = get_instruction_references(inst, PIE_MODE)
   for ref in refs:
-
     target_type = reference_target_type(ref)
     location = reference_location(ref)
 

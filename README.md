@@ -85,17 +85,6 @@ sudo zip -rv /path/to/ida-6.X/python/lib/python27.zip google/
 sudo chown your_user:your_user /home/your_user/ida-6.7/python/lib/python27.zip
 ```
 
-##### Upgrade CMake (Ubuntu 14.04)
-
-Users wishing to run McSema on Ubuntu 14.04 should upgrade their version of CMake.
-
-```shell
-sudo add-apt-repository -y ppa:george-edison55/cmake-3.x
-sudo apt-get update
-sudo apt-get upgrade
-sudo apt-get install cmake
-```
-
 #### Step 2: Clone the repository
 
 The next step is to clone the [Remill](https://github.com/trailofbits/remill) repository. We then clone the McSema repository into the `tools` subdirectory of Remill. This is kind of like how Clang and LLVM are distributed separately, and the Clang source code needs to be put into LLVM's tools directory.
@@ -107,52 +96,26 @@ git clone --depth 1 https://github.com/trailofbits/mcsema.git
 popd
 ```
 
-#### Step 3: Get and build the dependencies
+#### Step 3: Build and install the code
 
-Several Trail of Bits projects depend on a common subset of C and C++ codebases. We've organized these dependencies into the [cxx-common](https://github.com/trailofbits/cxx-common) repository. 
+McSema is a kind of sub-project of Remill, kind of like how Clang is a sub-project of LLVM. To that end, we invoke Remill's build script, and it will build both Remill and McSema. It will also download all remaining dependencies needed by Remill.
+
+The following script will build Remill and McSema into the `remill-build` directory, which will be at the same level as the `remill` directory. 
 
 ```
-git clone --depth 1 https://github.com/trailofbits/cxx-common.git
-mkdir remill-build
-cd remill-build
-
-../cxx-common/build.sh --template everything `pwd`/libraries
+./remill/scripts/build_ubuntu.sh
 ```
 
-**Note:** This will build all of the dependencies needed by Remill and McSema. This includes LLVM, Clang, Intel XED, Google Protocol Buffers, Google Log, Google Flags, and Google Test.
-
-If you are using Ubuntu 16.04 and want to skip this step, then download and extract `libraries` from one of the following URLs. McSema works across several versions of LLVM. This makes integrating into third-party projects using older LLVM versions (e.g. KLEE) easier.
-
-| OS | LLVM | Download URL |
-|----|--------------|--------------|
-| Ubuntu 16.04 | 4.0 | https://s3.amazonaws.com/cxx-common/libraries-llvm40-ubuntu160402.tar.gz |
-| Ubuntu 16.04 | 3.9 | https://s3.amazonaws.com/cxx-common/libraries-llvm39-ubuntu160402.tar.gz |
-| Ubuntu 16.04 | 3.8 | https://s3.amazonaws.com/cxx-common/libraries-llvm38-ubuntu160402.tar.gz |
-| Ubuntu 16.04 | 3.7 | https://s3.amazonaws.com/cxx-common/libraries-llvm37-ubuntu160402.tar.gz |
-| Ubuntu 16.04 | 3.6 | https://s3.amazonaws.com/cxx-common/libraries-llvm36-ubuntu160402.tar.gz |
-| Ubuntu 16.04 | 3.5 | https://s3.amazonaws.com/cxx-common/libraries-llvm36-ubuntu160402.tar.gz |
-
-**Note:** This will build McSema using the LLVM 3.9 toolchain. If you want to use McSema with other versions of the LLVM toolchain, then manually specify targets to the `cxx-common/build.sh` script. For example, to build LLVM and Clang 3.5, do the following:
-
-#### Step 4: Build and install the code
+#### Step 4: Install McSema
 
 The next step is to build the code. McSema (and Remill) must be built using the Clang compiler.
 
 ```shell
-export TRAILOFBITS_LIBRARIES=`pwd`/libraries/
-cmake ../remill
-make -j4
+cd remill-build
+sudo make install
 ```
 
-**Note:** If you are using custom version of LLVM then specify the following at the command line before running `cmake`:
-
-```shell
-export LLVM_INSTALL_PREFIX=/path/to/llvm/install/dir
-```
-
-### On Windows
-
-TODO TODO
+This will install McSema _globally_. Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcsema-lift` for lifting the disassembled binaries.
 
 ## Additional Documentation
 
@@ -172,12 +135,11 @@ If you are experiencing problems with McSema or just want to learn more and cont
 
 ### How do you pronounce McSema and where did the name come from?
 
-McSema is pronounced 'em see se ma' and is short for machine code semantics.
+This is a hotly contested issue. We must explore the etymology of the name to find an answer. The "Mc" in McSema was originally a contraction of the words "Machine Code." At that time, McSema used LLVM's instruction decoder to take machine code bytes, and turn them into `llvm::MCInst` data structures. It is possible that "MC" in that case is pronounced em-see. Alas, even those who understand the origin of the name pronounce it as if it were related to America's favorite fast food joint.
 
 ### Why do I need IDA Pro to use McSema?
 
 McSema's goal is binary to bitcode translation. Accurate disassembly and control flow recovery is a separate and difficult problem. IDA has already invested countless man-hours into getting disassembly right, and it only makes sense that we re-use existing work. We understand that not everyone can afford an IDA license. With the original release of McSema, we shipped our own tool recursive descent disassembler. It was never as good as IDA and it never would be. Maintaining the broken tool took away valuable development time from more important McSema work. We hope to eventually transition to more accessible control flow recovery frontends, such as Binary Ninja (we have a branch with [initial Binary Ninja support](https://github.com/trailofbits/mcsema/tree/getcfg_binja)). We very warmly welcome pull requests that implement new control flow recovery frontends. 
-
 
 ### I'm a student and I'd like to contribute to McSema. How can I help?
 
