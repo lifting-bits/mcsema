@@ -3,6 +3,7 @@
 import sys
 import argparse
 import collections
+from enum import Enum
 
 from elftools.elf.elffile import ELFFile
 from elftools.common.py3compat import itervalues
@@ -17,9 +18,13 @@ _DEBUG_FILE = sys.stderr
 
 DWARF_OPERATIONS = collections.defaultdict(lambda: (lambda *args: None))
 DWARF_CU = set()
-STRUCT_TYPES_TAG = dict()
-BASE_TYPES_TAG = dict()
-GLOBAL_VARIABLES = dict()
+TYPES_TAG = dict()
+GLOBAL_STRUCT = set()
+
+class Types(Enum):
+    TYPE_BASE = 1
+    TYPE_ARRAY = 2
+    TYPE_STRUCT = 3
 
 def DEBUG(s):
     _DEBUG_FILE.write("{}\n".format(str(s)))
@@ -49,11 +54,11 @@ def _print_die(DIE, section_offset):
         DEBUG('    <%x>   %-18s: %s' % (attr.offset, name, describe_attr_value(attr, DIE, section_offset)))
         
 
-def _create_type_entry(offset, type_name, type_size):
-    return dict(name=type_name, offset=offset, size=type_size)
+def _create_type_entry(offset, type_name, type_size, type_tag):
+    return dict(name=type_name, offset=offset, size=type_size, tag=type_tag)
 
 def _create_variable_entry(var_name, offset):
-    return dict(name=var_name, offset=offset, type=0, size=0, addr=0, is_global=False)
+    return dict(name=var_name, offset=offset, type=0, type_offset=0, size=0, addr=0, is_global=False)
 
 def _process_compile_unit_tag(CU, DIE, section_offset):
     return
@@ -71,11 +76,24 @@ def _process_structure_tag(CU, DIE, section_offset):
             name = attr.value
         if attr.name == 'DW_AT_byte_size':
             size = attr.value
-    if offset not in STRUCT_TYPES_TAG:
-        STRUCT_TYPES_TAG[offset] = _create_type_entry(offset, name, size)
+    if offset not in TYPES_TAG:
+        TYPES_TAG[offset] = _create_type_entry(offset, name, size, Types.TYPE_STRUCT)
         
 def _process_array_type_tag(CU, DIE, section_offset):
-    pass
+    if DIE.tag != 'DW_TAG_array_type':
+        return
+    DEBUG("Processing array type TAG")
+    _print_die(DIE, section_offset)
+    offset = DIE.offset
+    name = "Unknown"
+    size = 0
+    for attr in itervalues(DIE.attributes):
+        if attr.name == 'DW_AT_name':
+            name = attr.value
+        if attr.name == 'DW_AT_byte_size':
+            size = attr.value
+    if offset not in TYPES_TAG:
+        TYPES_TAG[offset] = _create_type_entry(offset, name, size, Types.TYPE_ARRAY)
     
 def _process_base_type_tag(CU, DIE, section_offset):
     pass    
@@ -87,27 +105,24 @@ def _process_variable_tag(CU, DIE, section_offset):
     _print_die(DIE, section_offset)
     offset = DIE.offset
     variable_name = "Unknown"
+    type_offset = 0;
+    
     if 'DW_AT_name' in DIE.attributes:
         variable_name = DIE.attributes['DW_AT_name'].value
-
-    if variable_name not in CU._global_variable :
-        CU._global_variable[variable_name] = _create_variable_entry(variable_name, offset)
     
-    for attr in itervalues(DIE.attributes):
-        if attr.name == 'DW_AT_type':
-            type_offset = attr.value
-            CU._global_variable[variable_name]['type'] = type_offset
-            if type_offset in STRUCT_TYPES_TAG:
-                size = STRUCT_TYPES_TAG[type_offset]['size']
-                CU._global_variable[variable_name]['size'] = size
-                
-        if attr.name == 'DW_AT_location' and attr.form not in ('DW_FORM_data4', 'DW_FORM_data8', 'DW_FORM_sec_offset'):
+    if 'DW_AT_type' in DIE.attributes:
+        type_offset = DIE.attributes['DW_AT_type'].value
+  
+    if 'DW_AT_location' in DIE.attributes:
+        attr = DIE.attributes['DW_AT_location']
+        if attr.form not in ('DW_FORM_data4', 'DW_FORM_data8', 'DW_FORM_sec_offset'):
             loc_expr = "{}".format(describe_DWARF_expr(attr.value, DIE.cu.structs)).split(':')
-            # How to find if the variable is global
-            # take help of extra descriptions
             if loc_expr[0][1:] == 'DW_OP_addr':
-                CU._global_variable[variable_name]['addr'] = int(loc_expr[1][:-1][1:], 16)
-                CU._global_variable[variable_name]['is_global'] = True
+                memory_ref = int(loc_expr[1][:-1][1:], 16)
+                if memory_ref not in  CU._global_variable:
+                    CU._global_variable[memory_ref] = _create_variable_entry(variable_name, offset)
+                    CU._global_variable[memory_ref]['is_global'] = True
+                    CU._global_variable[memory_ref]['type_offset'] = type_offset
     
 DWARF_OPERATIONS = {
     'DW_TAG_compile_unit': _process_compile_unit_tag,
@@ -150,12 +165,14 @@ class CUnit(object):
 
 def resolve_variable_types():
     for cu in DWARF_CU:
-        for name, variable  in cu._global_variable.iteritems():
-            type_offset = variable['type']
-            if type_offset in STRUCT_TYPES_TAG:
-                size = STRUCT_TYPES_TAG[type_offset]['size']
-                cu._global_variable[name]['size'] = size
-                DEBUG("{0} {1}".format(name, variable))
+        for memory_ref, variable  in cu._global_variable.iteritems():
+            offset = variable['type_offset']
+            if offset in TYPES_TAG:
+                type_tag = TYPES_TAG[offset]['tag']
+                cu._global_variable[memory_ref]['type'] = type_tag
+                DEBUG("{0:x} {1}".format(memory_ref, variable))
+                if type_tag == Types.TYPE_ARRAY or type_tag == Types.TYPE_STRUCT :
+                    GLOBAL_STRUCT.add(memory_ref)
 
 def process_dwarf_info(file):
     '''
@@ -185,6 +202,19 @@ def process_dwarf_info(file):
     
     resolve_variable_types()
     DEBUG('Number of control units : {0}'.format(len(DWARF_CU)))
+    
+def updateCFG(file):
+    M = CFG_pb2.Module()
+    with open(file, 'rb') as inf:
+        M.ParseFromString(inf.read())
+        
+        for g in M.global_vars:
+            if g.address in GLOBAL_STRUCT:
+                DEBUG("Global Vars {} {}".format(str(g.var.name), hex(g.address)))
+                M.global_vars.remove(g)
+                
+    with open(file, "w") as outf:
+        outf.write(M.SerializeToString())
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -209,3 +239,4 @@ if __name__ == '__main__':
         DEBUG("Debugging is enabled.")
     
     process_dwarf_info(args.binary)
+    updateCFG(args.cfg)
