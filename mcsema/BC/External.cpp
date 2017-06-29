@@ -31,9 +31,13 @@
 namespace mcsema {
 namespace {
 
-// TODO(pag): Use the info from the CFG proto.
 static void DeclareExternal(const NativeExternalFunction *cfg_func) {
+  //get(Type *Result, ArrayRef<Type*> Params, bool isVarArg)
+  //std::vector<llvm::Type *> params;
+  //for(int i = 0; i < cfg_func->num_args; i++)
+  //  params.push_back(llvm::Type::getVoidTy(*gContext));
   auto func_type = llvm::FunctionType::get(
+      //llvm::Type::getVoidTy(*gContext), params, true);
       llvm::Type::getVoidTy(*gContext), true);
 
   auto func = llvm::Function::Create(
@@ -43,6 +47,8 @@ static void DeclareExternal(const NativeExternalFunction *cfg_func) {
   if (cfg_func->is_weak) {
     func->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
   }
+
+  //func->setCallingConv(llvm::CallingConv::McSemaCall);
 }
 
 }  // namespace

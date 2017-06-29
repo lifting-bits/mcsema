@@ -117,7 +117,10 @@ static llvm::Value *AddSubFuncCall(llvm::BasicBlock *block,
   args[remill::kMemoryPointerArgNum] = remill::LoadMemoryPointer(block);
   args[remill::kStatePointerArgNum] = remill::LoadStatePointer(block);
   args[remill::kPCArgNum] = remill::LoadProgramCounter(block);
-  return llvm::CallInst::Create(sub, args, "", block);
+  auto call = llvm::CallInst::Create(sub, args, "", block);
+  // ensure we have compatible calling conventions
+  call->setCallingConv(sub->getCallingConv());
+  return call;
 }
 
 // Add a call to another function, and then update the memory pointer with the

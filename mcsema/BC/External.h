@@ -17,6 +17,15 @@
 #ifndef MCSEMA_BC_EXTERNAL_H_
 #define MCSEMA_BC_EXTERNAL_H_
 
+namespace llvm {
+namespace CallingConv {
+  using ID = unsigned;
+  enum {
+    McSemaCall = 144
+  };
+} // namespace CallingConv
+} // namespace llvm
+
 namespace mcsema {
 struct NativeModule;
 
