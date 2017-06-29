@@ -127,6 +127,12 @@ static llvm::Function *GetNativeToLiftedCallback(
               << "xchgl (%esp), %eax;";
       break;
 
+    case remill::kArchAArch64LittleEndian:
+      LOG(ERROR)
+          << "TODO: Create a native-to-lifted callback for the "
+          << GetArchName(gArch->arch_name) << " instruction set.";
+      asm_str << "nop;";
+      break;
     default:
       LOG(FATAL)
           << "Cannot create native-to-lifted callback for the "
@@ -206,11 +212,16 @@ static llvm::Instruction *GetArgNForCConv(llvm::IRBuilder<> *ir, int64_t n, cons
     arg_tmp << "__mcsema_" << cc_str << "_arg_" << n;
     std::string arg_func = arg_tmp.str(); 
 
-    auto f = gModule->getOrInsertFunction(arg_func, func_type);
+    auto f = gModule->getFunction(arg_func);
+    if (nullptr == f) {
+        f = llvm::Function::Create(
+                func_type, llvm::GlobalValue::ExternalLinkage,
+                arg_func, gModule); 
+    }
+
     CHECK(f) << "Unable to find argument retrieval function " << arg_func << "\n";
 
     if(llvm::Function *func = reinterpret_cast<llvm::Function *>(f)) {
-      func->setLinkage(llvm::Function::ExternalLinkage);
       std::vector<llvm::Value *> args(2);
       args[0] = remill::NthArgument(callback_func, remill::kMemoryPointerArgNum);
       args[1] = remill::NthArgument(callback_func, remill::kStatePointerArgNum);
