@@ -25,6 +25,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include <llvm/IR/CallingConv.h>
+
 namespace mcsema {
 
 struct NativeVariable;
@@ -90,14 +92,7 @@ struct NativeExternalFunction : public NativeFunction {
  public:
   bool is_weak;
   int64_t num_args;
-  enum calling_conv {
-    Unknown,
-    CallerCleanup,
-    CalleeCleanup,
-    FastCall,
-    McsemaCall
-  };
-  calling_conv cc;
+  llvm::CallingConv::ID cc;
 };
 
 // Global variable defined inside of the lifted binary.

@@ -29,8 +29,12 @@
 #include <CFG.pb.h>
 #pragma clang diagnostic pop
 
-#include "mcsema/CFG/CFG.h"
+#include "remill/Arch/Arch.h"
+#include "remill/OS/OS.h"
+
+#include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/External.h"
+#include "mcsema/CFG/CFG.h"
 
 namespace mcsema {
 namespace {
@@ -504,8 +508,6 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
   }
 
   // Bring in the external functions.
-  //
-  // TODO(pag): Handle calling conventions and stuff.
   for (const auto &cfg_extern_func : cfg.external_funcs()) {
     auto func = new NativeExternalFunction;
     func->name = cfg_extern_func.name();
@@ -513,34 +515,48 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     func->is_external = true;
     func->is_weak = cfg_extern_func.is_weak();
     func->lifted_name = ExternalFuncName(cfg_extern_func);
-    if(cfg_extern_func.has_argument_count()) {
+    func->num_args = 0;
+    func->cc = llvm::CallingConv::C;
+
+    if (cfg_extern_func.has_argument_count()) {
       func->num_args = cfg_extern_func.argument_count();
     }
-    else { // no argc recorded
-      func->num_args = 0; // XXX ???
-    }
-    if(cfg_extern_func.has_cc()) {
-      switch(cfg_extern_func.cc()) {
-      case ExternalFunction_CallingConvention_CalleeCleanup:
-        func->cc = NativeExternalFunction::calling_conv::CalleeCleanup;
-        break;
-      case ExternalFunction_CallingConvention_CallerCleanup:
-        func->cc = NativeExternalFunction::calling_conv::CallerCleanup;
-        break;
-      case ExternalFunction_CallingConvention_FastCall:
-        func->cc = NativeExternalFunction::calling_conv::FastCall;
-        break;
-      case ExternalFunction_CallingConvention_McsemaCall:
-        func->cc = NativeExternalFunction::calling_conv::McsemaCall;
-        break;
-      default:
-        // unknown calling conv...
-        func->cc = NativeExternalFunction::calling_conv::Unknown;
-        break;
+
+    bool is_windows = remill::kOSWindows == gArch->os_name;
+
+    // Most calling convention stuff is actually only meaningful for 32-bit,
+    // x86 code. McSema was originally designed for 32-bit X86, so there needed
+    // to be a way to distinguish between the various calling conventions used,
+    // and so each function was given a specific one. But then 64-bit support
+    // came along and now we're in a bad place where the calling convention is
+    // specified, but only in a way that is relevant to 32-bit x86, so we need
+    // to ignore it in some places and not others.
+    if (gArch->IsX86()) {
+      switch (cfg_extern_func.cc()) {
+        case ExternalFunction_CallingConvention_CalleeCleanup:
+          func->cc = llvm::CallingConv::X86_StdCall;
+          break;
+        case ExternalFunction_CallingConvention_FastCall:
+          func->cc = llvm::CallingConv::X86_FastCall;
+          break;
+
+        case ExternalFunction_CallingConvention_CallerCleanup:  // cdecl.
+          func->cc = llvm::CallingConv::C;
+          break;
+
+        default:
+          if (is_windows) {
+            func->cc = llvm::CallingConv::X86_StdCall;
+          }
+          break;
       }
-    }
-    else { // no cc recorded
-      func->cc = NativeExternalFunction::calling_conv::Unknown;
+
+    } else if (gArch->IsAMD64()) {
+      if (is_windows) {
+        func->cc = llvm::CallingConv::X86_64_Win64;
+      } else {
+        func->cc = llvm::CallingConv::X86_64_SysV;
+      }
     }
 
     CHECK(!func->name.empty())
