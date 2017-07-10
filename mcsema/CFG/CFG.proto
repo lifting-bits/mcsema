@@ -75,7 +75,6 @@ message ExternalFunction {
     CallerCleanup = 0;
     CalleeCleanup = 1;
     FastCall = 2;
-    McsemaCall = 3;
   }
 
   required  string            name = 1;

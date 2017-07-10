@@ -112,13 +112,8 @@ static llvm::Function *GetLiftedFunction(const NativeModule *cfg_module,
 // e.g. `__remill_async_hyper_call`.
 static llvm::Value *AddSubFuncCall(llvm::BasicBlock *block,
                                    llvm::Function *sub) {
-  // Set up arguments according to our ABI.
-  std::vector<llvm::Value *> args(remill::kNumBlockArgs);
-  args[remill::kMemoryPointerArgNum] = remill::LoadMemoryPointer(block);
-  args[remill::kStatePointerArgNum] = remill::LoadStatePointer(block);
-  args[remill::kPCArgNum] = remill::LoadProgramCounter(block);
-  auto call = llvm::CallInst::Create(sub, args, "", block);
-  // ensure we have compatible calling conventions
+  auto call = llvm::CallInst::Create(
+      sub, remill::LiftedFunctionArgs(block), "", block);
   call->setCallingConv(sub->getCallingConv());
   return call;
 }

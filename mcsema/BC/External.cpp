@@ -23,6 +23,10 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
+#include "remill/Arch/Arch.h"
+#include "remill/Arch/Name.h"
+
+#include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Callback.h"
 #include "mcsema/BC/External.h"
 #include "mcsema/BC/Util.h"
@@ -31,24 +35,31 @@
 namespace mcsema {
 namespace {
 
-static void DeclareExternal(const NativeExternalFunction *cfg_func) {
-  //get(Type *Result, ArrayRef<Type*> Params, bool isVarArg)
-  //std::vector<llvm::Type *> params;
-  //for(int i = 0; i < cfg_func->num_args; i++)
-  //  params.push_back(llvm::Type::getVoidTy(*gContext));
-  auto func_type = llvm::FunctionType::get(
-      //llvm::Type::getVoidTy(*gContext), params, true);
-      llvm::Type::getVoidTy(*gContext), true);
+// For an external named `external`, return a function with the prototype
+// `uintptr_t external(uintptr_t arg0, uintptr_t arg1, ...);`.
+//
+// TODO(pag,car,artem): Handle floating point types eventually.
+static void DeclareExternal(
+    const NativeExternalFunction *nf) {
+  auto addr_type = llvm::Type::getIntNTy(
+      *gContext, static_cast<unsigned>(gArch->address_size));
 
-  auto func = llvm::Function::Create(
-      func_type, llvm::GlobalValue::ExternalLinkage,
-      cfg_func->name, gModule);
-
-  if (cfg_func->is_weak) {
-    func->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
+  std::vector<llvm::Type *> tys;
+  for (auto i = 0; i < nf->num_args; i++) {
+    tys.push_back(addr_type);
   }
 
-  //func->setCallingConv(llvm::CallingConv::McSemaCall);
+  auto extfun = llvm::Function::Create(
+      llvm::FunctionType::get(addr_type, tys, false),
+      llvm::GlobalValue::ExternalLinkage,
+      nf->name, gModule);
+
+  if (nf->is_weak) {
+    extfun->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
+  }
+
+  extfun->setCallingConv(nf->cc);
+  extfun->addFnAttr(llvm::Attribute::NoInline);
 }
 
 }  // namespace
