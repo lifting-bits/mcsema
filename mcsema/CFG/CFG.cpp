@@ -235,15 +235,28 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   if (xref->func) {
     xref_is_external = xref->func->is_external;
     xref_is_code = true;
+
   } else if (xref->var) {
     xref_is_external = xref->var->is_external;
+
+  // `mcsema-disass` does not recover external segments (e.g. `.plt`), so
+  // a cross-reference that targets a NULL segment is, in practice, an
+  // external reference.
+  } else if (!xref->target_segment) {
+    LOG(WARNING)
+        << "Reference from " << std::hex << inst->ea
+        << " to " << std::hex << xref->target_ea
+        << " targets an unrecovered segment not resolved to a real symbol.";
+    xref_is_external = true;
+
   } else {
     LOG(WARNING)
         << "Reference from " << std::hex << inst->ea
         << " to " << std::hex << xref->target_ea
-        << " targets the segment " << xref->segment->name
+        << " targets the segment " << xref->target_segment->name
         << " but was not resolved to a real symbol.";
-    xref_is_external = xref->segment->is_external;
+    xref_is_external = xref->segment->is_external ||
+                       xref->target_segment->is_external;
   }
 
   // Does the CFG reference target type agree with the resolved code/data
@@ -268,13 +281,12 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   if (cfg_ref.location() == CodeReference_Location_External) {
     LOG_IF(WARNING, !xref_is_external)
         << "External reference from " << std::hex << inst->ea
-        << " to " << std::hex << xref->target_ea << " (" << xref->target_name
-        << " in " << xref->target_segment->name << ") is actually internal";
+        << " to " << std::hex << xref->target_ea << " is actually internal";
   } else {
     LOG_IF(WARNING, xref_is_external)
         << "Internal reference from " << std::hex << inst->ea
         << " to " << std::hex << xref->target_ea << " (" << xref->target_name
-        << " in " << xref->target_segment->name << ") is actually external";
+        << ") is actually external";
   }
 
   // Only record flow cross-references for externals. Really, all we care

@@ -307,7 +307,25 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
             << "Can't insert cross reference to variable "
             << cfg_var->name << " at " << std::hex << cfg_seg_entry.first
             << " in segment " << cfg_seg->name;
+
         val = var->getInitializer();
+        if (!val) {
+
+          // TODO(pag): This can come up in a few cases, and will eventually
+          //            need runtime support to handle. The gist of the issue
+          //            is this that we have a reference in the data section
+          //            to an external global variable, but we can't splat in
+          //            a value for the cross-reference because it won't
+          //            be known until runtime. This is the type of thing in
+          //            libc that gets handled by constructor functions.
+          LOG(ERROR)
+              << "Likely external data cross-reference from " << std::hex
+              << xref->ea << " to " << cfg_var->name << " at " << std::hex
+              << cfg_var->ea << " (lifted as " << cfg_var->lifted_name
+              << ") does not have an initializer.";
+
+          val = llvm::ConstantInt::get(val_type, 0);
+        }
 
       // Pointer to an unnamed location inside of a data segment.
       } else {
