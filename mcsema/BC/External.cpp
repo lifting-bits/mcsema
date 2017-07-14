@@ -45,7 +45,7 @@ static void DeclareExternal(
       *gContext, static_cast<unsigned>(gArch->address_size));
 
   std::vector<llvm::Type *> tys;
-  for (auto i = 0; i < nf->num_args; i++) {
+  for (auto i = 0U; i < nf->num_args; i++) {
     tys.push_back(addr_type);
   }
 

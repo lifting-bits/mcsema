@@ -531,7 +531,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     func->cc = llvm::CallingConv::C;
 
     if (cfg_extern_func.has_argument_count()) {
-      func->num_args = cfg_extern_func.argument_count();
+      func->num_args = static_cast<unsigned>(cfg_extern_func.argument_count());
     }
 
     bool is_windows = remill::kOSWindows == gArch->os_name;
@@ -548,6 +548,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         case ExternalFunction_CallingConvention_CalleeCleanup:
           func->cc = llvm::CallingConv::X86_StdCall;
           break;
+
         case ExternalFunction_CallingConvention_FastCall:
           func->cc = llvm::CallingConv::X86_FastCall;
           break;

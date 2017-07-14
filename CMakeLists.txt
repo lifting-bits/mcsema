@@ -134,8 +134,8 @@ protobuf_generate_python(PROJECT_PROTOBUFPYTHONMODULE "${CMAKE_CURRENT_SOURCE_DI
 add_custom_target(protobuf_python_module DEPENDS ${PROJECT_PROTOBUFPYTHONMODULE})
 
 # disable -Werror on these file since they have been generated
-set_source_files_properties(${PROJECT_PROTOBUFSOURCEFILES} PROPERTIES COMPILE_FLAGS "-Wno-sign-conversion -Wno-shorten-64-to-32")
-set_source_files_properties(${PROJECT_PROTOBUFHEADERFILES} PROPERTIES COMPILE_FLAGS "-Wno-sign-conversion -Wno-shorten-64-to-32")
+set_source_files_properties(${PROJECT_PROTOBUFSOURCEFILES} PROPERTIES COMPILE_FLAGS "-Wno-sign-conversion -Wno-shorten-64-to-32 -Wno-conversion")
+set_source_files_properties(${PROJECT_PROTOBUFHEADERFILES} PROPERTIES COMPILE_FLAGS "-Wno-sign-conversion -Wno-shorten-64-to-32 -Wno-conversion")
 
 #
 # target settings
@@ -144,8 +144,11 @@ set_source_files_properties(${PROJECT_PROTOBUFHEADERFILES} PROPERTIES COMPILE_FL
 add_executable(mcsema-lift
     ${PROJECT_PROTOBUFSOURCEFILES}
 
+    mcsema/Arch/ABI.cpp
     mcsema/Arch/Arch.cpp
+    
     mcsema/CFG/CFG.cpp
+    
     mcsema/BC/Callback.cpp
     mcsema/BC/External.cpp
     mcsema/BC/Function.cpp

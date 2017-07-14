@@ -174,6 +174,9 @@ set_source_files_properties(
     EXTERNAL_OBJECT True
     GENERATED True)
 
+set_source_files_properties(CallingConv.cpp PROPERTIES COMPILE_FLAGS "-O0 -g3")
+
+
 # only do 64-bit binaries on 64-bit platforms
 if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
     add_custom_command(

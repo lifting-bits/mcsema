@@ -91,7 +91,7 @@ struct NativeFunction : public NativeObject {
 struct NativeExternalFunction : public NativeFunction {
  public:
   bool is_weak;
-  int64_t num_args;
+  unsigned num_args;
   llvm::CallingConv::ID cc;
 };
 
