@@ -32,10 +32,8 @@
 #define MCSEMA_BC_UTIL_H_
 
 #include <cstdint>
-#include <vector>
 
 #include "mcsema/Arch/Register.h"
-#include "mcsema/Arch/Dispatch.h"
 #include "mcsema/CFG/CFG.h"
 
 namespace llvm {
@@ -139,6 +137,27 @@ inline static llvm::Value *R_READ(llvm::BasicBlock *b, MCSemaRegs reg) {
 
 }  // namespace x86_64
 
+namespace mips {
+
+template<int width>
+inline static void R_WRITE(llvm::BasicBlock *b, MCSemaRegs reg,
+                           llvm::Value *write) {
+  GENERIC_MC_WRITEREG(b, reg, write);
+}
+
+template<int width>
+inline static llvm::Value *R_READ(llvm::BasicBlock *b, MCSemaRegs reg) {
+/*  if (reg == llvm::Mips::ZERO) // TODOSH 157 for ZERO register - can be done in better way?
+  {
+    std::cout<<"reading zero register\n";
+    llvm::Value *zeroVal = llvm::ConstantInt::get(b->getContext(),llvm::APInt(32,0,false));
+    return llvm::BinaryOperator::Create(llvm::Instruction::Add, zeroVal, zeroVal, "", b);
+  }*/
+  return GENERIC_MC_READREG(b, reg, width);
+}
+
+}  // namespace mips
+
 llvm::Value *INTERNAL_M_READ(unsigned width, unsigned addrspace,
                              llvm::BasicBlock *b, llvm::Value *addr);
 
@@ -224,6 +243,7 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
 #define GENERIC_TRANSLATION_MI(NAME, NOREFS, MEMREF, IMMREF, TWOREFS) \
     static InstTransResult translate_ ## NAME ( \
         TranslationContext &ctx, llvm::BasicBlock *&block) { \
+      InstTransResult ret; \
       auto natM = ctx.natM; \
       auto F = ctx.F; \
       auto ip = ctx.natI; \
@@ -237,10 +257,6 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
       } else { \
           NOREFS; \
       } \
-      (void)(natM);\
-      (void)(F);\
-      (void)(ip);\
-      (void)(inst);\
       return ContinueBlock;\
     }
 
@@ -248,6 +264,7 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
 #define GENERIC_TRANSLATION_REF(NAME, NOREFS, HASREF) \
     static InstTransResult translate_ ## NAME ( \
         TranslationContext &ctx, llvm::BasicBlock *&block) { \
+      InstTransResult ret;\
       auto natM = ctx.natM; \
       auto F = ctx.F; \
       auto ip = ctx.natI; \
@@ -258,10 +275,6 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
       } else {\
           NOREFS; \
       } \
-      (void)(natM);\
-      (void)(F);\
-      (void)(ip);\
-      (void)(inst);\
       return ContinueBlock; \
     }
 
@@ -274,40 +287,8 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
       auto ip = ctx.natI; \
       auto &inst = ip->get_inst(); \
       ret = NOREFS; \
-      (void)(natM);\
-      (void)(F);\
-      (void)(ip);\
-      (void)(inst);\
       return ret; \
     }
-
-// this template and macro simplify referencing semantics defined in external bitcode
-// the EXTERNAL_SEMANTICS macro will create a global string constant necessary to 
-// instantiate this template. The constant gets shoved in the mcsema_const_strings namespace.
-//
-// The template will call a function with the same prototype as the current translation semantics
-// The function itself is retrieved by ArchGetOrCreateSemantics
-template <char const *fname>
-static InstTransResult EXTERNAL_BITCODE_HELPER(TranslationContext &ctx, llvm::BasicBlock *&block) {
-  auto F = ctx.F;
-  auto M = F->getParent();
-  auto externSemanticsF = ArchGetOrCreateSemantics(M, fname);
-  // we are calling a translation function, it gets the same args
-  // as our function
-  std::vector<llvm::Value *> subArgs;
-  for (auto &arg : F->args()) {
-    subArgs.push_back(&arg);
-  }
-  auto ci = llvm::CallInst::Create(externSemanticsF, subArgs, "", block);
-  ArchSetCallingConv(M, ci);
-  return ContinueBlock;
-}
-
-#define EXTERNAL_SEMANTICS(NAME) \
-  namespace mcsema_const_strings { char name_ ## NAME [] = #NAME; } \
-  static InstTransResult translate_ ## NAME (TranslationContext &ctx, llvm::BasicBlock *&block) { \
-      return EXTERNAL_BITCODE_HELPER<mcsema_const_strings::name_ ## NAME >(ctx, block); \
-  }
 
 
 #endif  // MCSEMA_BC_UTIL_H_

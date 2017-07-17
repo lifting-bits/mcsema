@@ -193,7 +193,7 @@ static InstTransResult doMOVSrm(TranslationContext &ctx,
   auto &inst = ip->get_inst();
   InstTransResult ret;
   auto F = block->getParent();
-  // MOV from memory to XMM register will set the unused portion
+  // MOV from memory to XMM register will set the unused poriton
   // of the XMM register to 0s.
   // Just set the whole thing to zero, and let the subsequent
   // write take care of the rest
@@ -539,7 +539,7 @@ static InstTransResult translate_CVTSI2SS64rr(TranslationContext &ctx,
 
   llvm::Value *src_val = R_READ<64>(block, src.getReg());
 
-  return doCVTSI2SrV<32>(natM, block, ip, inst, src_val, dst);
+  return doCVTSI2SrV<64>(natM, block, ip, inst, src_val, dst);
 }
 
 // convert signed integer (memory) to single precision float (xmm register)
@@ -555,7 +555,7 @@ static InstTransResult translate_CVTSI2SS64rm(TranslationContext &ctx,
 
   llvm::Value *src_val = M_READ<64>(ip, block, mem_addr);
 
-  return doCVTSI2SrV<32>(natM, block, ip, inst, src_val, dst);
+  return doCVTSI2SrV<64>(natM, block, ip, inst, src_val, dst);
 
 }
 
@@ -1406,7 +1406,7 @@ template<int width, int elemwidth, llvm::CmpInst::Predicate cmp_op>
 static llvm::Value* do_SATURATED_SUB(llvm::BasicBlock *&b, llvm::Value *v1,
                                      llvm::Value *v2) {
   NASSERT(width % elemwidth == 0);
-  int elem_count = width / elemwidth;
+  constexpr int elem_count = width / elemwidth;
   llvm::Type *elem_ty = nullptr;
   llvm::VectorType *vt = nullptr;
   llvm::Type *int32ty = llvm::Type::getIntNTy(b->getContext(), 32);

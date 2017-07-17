@@ -6,6 +6,7 @@
 #include <string>
 
 #include <llvm/lib/Target/X86/MCTargetDesc/X86MCTargetDesc.h>
+#include <llvm/lib/Target/Mips/MCTargetDesc/MipsMCTargetDesc.h>
 
 namespace llvm {
 
@@ -81,6 +82,15 @@ enum : unsigned {
 };
 
 }  // namespace X86
+
+namespace mips
+{
+	
+enum : unsigned {
+  MCSEMA_REGISTER_LIST_BEGIN =  llvm::Mips::NUM_TARGET_REGS 
+};
+} // namespace mips
+
 }  // namespace llvm
 
 using MCSemaRegs = unsigned;

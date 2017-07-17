@@ -40,4 +40,6 @@ void RenameLiftedFunctions(NativeModulePtr mod, llvm::Module *M,
 
 bool LiftCodeIntoModule(NativeModulePtr, llvm::Module *);
 
+//void doPrintModule(NativeModulePtr m);
+
 #endif  // MCSEMA_BC_LIFT_H_

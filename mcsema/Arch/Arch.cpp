@@ -1,19 +1,19 @@
 /* Copyright 2017 Peter Goodman (peter@trailofbits.com), all rights reserved. */
 
-#include <sstream>
 #include <unordered_set>
 
 #include <llvm/ADT/ArrayRef.h>
-#include <llvm/ADT/SmallVector.h>
 
-#include <llvm/MC/MCAsmInfo.h>
 #include <llvm/MC/MCContext.h>
 #include <llvm/MC/MCDisassembler.h>
-#include <llvm/MC/MCInstPrinter.h>
 
 #include <llvm/lib/Target/X86/X86RegisterInfo.h>
 #include <llvm/lib/Target/X86/X86InstrBuilder.h>
 #include <llvm/lib/Target/X86/X86MachineFunctionInfo.h>
+
+#include <llvm/lib/Target/Mips/MipsRegisterInfo.h>
+//#include <llvm/lib/Target/Mips/MipsInstrBuilder.h>
+//#include <llvm/lib/Target/Mips/MipsMachineFunctionInfo.h>
 
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/TargetRegistry.h>
@@ -22,8 +22,6 @@
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/Arch/Dispatch.h"
 #include "mcsema/Arch/Register.h"
-
-#include "mcsema/BC/Util.h"
 
 #include "mcsema/cfgToLLVM/TransExcn.h"
 
@@ -35,10 +33,6 @@ static std::string gTriple;
 static int gAddressSize = 0;
 
 static const llvm::MCDisassembler *gDisassembler = nullptr;
-static const llvm::MCInstrInfo *gMII = nullptr;
-static const llvm::MCRegisterInfo *gMRI = nullptr;
-static const llvm::MCSubtargetInfo *gSTI = nullptr;
-static llvm::MCInstPrinter *gIP = nullptr;
 
 static llvm::CallingConv::ID gCallingConv;
 static llvm::Triple::ArchType gArchType;
@@ -49,24 +43,36 @@ static DispatchMap gDispatcher;
 static bool InitInstructionDecoder(void) {
   std::string errstr;
   auto target = llvm::TargetRegistry::lookupTarget(gTriple, errstr);
+std::cout<<"gTriple :"<< gTriple <<std::endl;
   if (!target) {
     llvm::errs() << "Can't find target for " << gTriple << ": " << errstr << "\n";
     return false;
   }
 
-  gSTI = target->createMCSubtargetInfo(gTriple, "", "");
-  gMII = target->createMCInstrInfo();
-  gMRI = target->createMCRegInfo(gTriple);
-  auto AsmInfo = target->createMCAsmInfo(*gMRI, gTriple);
-  auto Ctx = new llvm::MCContext(AsmInfo, gMRI, nullptr);
-  gDisassembler = target->createMCDisassembler(*gSTI, *Ctx);
-  gIP = target->createMCInstPrinter(llvm::Triple(gTriple),
-      AsmInfo->getAssemblerDialect(), *AsmInfo, *gMII, *gMRI);
+  auto STI = target->createMCSubtargetInfo(gTriple, "", "");
+  auto MRI = target->createMCRegInfo(gTriple);
+  auto AsmInfo = target->createMCAsmInfo(*MRI, gTriple);
+  auto Ctx = new llvm::MCContext(AsmInfo, MRI, nullptr);
+  gDisassembler = target->createMCDisassembler(*STI, *Ctx);
   return true;
 }
 
 }  // namespace
 
+
+// forward declaration for mips.. TODOSH
+void MipsInitRegisterState(llvm::LLVMContext *);
+void MipsInitInstructionDispatch(DispatchMap &dispatcher);
+const std::string &MipsRegisterName(MCSemaRegs reg);
+MCSemaRegs MipsRegisterNumber(const std::string &name);
+unsigned MipsRegisterOffset(MCSemaRegs reg);
+MCSemaRegs MipsRegisterParent(MCSemaRegs reg);
+void MipsAllocRegisterVars(llvm::BasicBlock *);
+unsigned MipsRegisterSize(MCSemaRegs reg);
+llvm::StructType *MipsRegStateStructType(void);
+llvm::Function *MipsGetOrCreateRegStateTracer(llvm::Module *);
+InstTransResult MipsLiftInstruction(
+    TranslationContext &, llvm::BasicBlock *&, InstructionLifter *);
 
 // Forward declare all of the various x86-specific initializers and
 // accessors.
@@ -80,7 +86,6 @@ void X86AllocRegisterVars(llvm::BasicBlock *);
 unsigned X86RegisterSize(MCSemaRegs reg);
 llvm::StructType *X86RegStateStructType(void);
 llvm::Function *X86GetOrCreateRegStateTracer(llvm::Module *);
-llvm::Function *X86GetOrCreateSemantics(llvm::Module *, const std::string &instr);
 InstTransResult X86LiftInstruction(
     TranslationContext &, llvm::BasicBlock *&, InstructionLifter *);
 
@@ -93,7 +98,6 @@ void (*ArchAllocRegisterVars)(llvm::BasicBlock *) = nullptr;
 unsigned (*ArchRegisterSize)(MCSemaRegs) = nullptr;
 llvm::StructType *(*ArchRegStateStructType)(void) = nullptr;
 llvm::Function *(*ArchGetOrCreateRegStateTracer)(llvm::Module *) = nullptr;
-llvm::Function *(*ArchGetOrCreateSemantics)(llvm::Module *, const std::string &) = nullptr;
 InstTransResult (*ArchLiftInstruction)(
     TranslationContext &, llvm::BasicBlock *&, InstructionLifter *) = nullptr;
 
@@ -134,7 +138,7 @@ bool ListArchSupportedInstructions(const std::string &triple, llvm::raw_ostream 
 bool InitArch(llvm::LLVMContext *context, const std::string &os, const std::string &arch) {
 
   // Windows.
-  if (os == "windows") {
+  if (os == "win32") {
     gOSType = llvm::Triple::Win32;
     if (arch == "x86") {
       gArchType = llvm::Triple::x86;
@@ -175,6 +179,18 @@ bool InitArch(llvm::LLVMContext *context, const std::string &os, const std::stri
       gTriple = "x86_64-pc-linux-gnu";
       gDataLayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128";
 
+    } else if(arch == "mipsl"){	//TODOSH
+
+      gArchType = llvm::Triple::mipsel;
+      gCallingConv = llvm::CallingConv::C;
+      gAddressSize = 32;
+      gTriple = "mipsel";
+      //gTriple = "i686-pc-linux-gnu";
+      //gDataLayout = "e-m:m-p:32:32-i8:8:32-i16:16:32-i64:64-n32-S64"; // TODOSH: we are using datalayout of i686
+      gDataLayout = "e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:32:64-f32:"
+          "32:32-f64:32:64-v64:64:64-v128:128:128-a0:0:64-f80:32:32-n8:"
+          "16:32-S128";
+
     } else {
       return false;
     }
@@ -198,9 +214,22 @@ bool InitArch(llvm::LLVMContext *context, const std::string &os, const std::stri
     ArchAllocRegisterVars = X86AllocRegisterVars;
     ArchRegStateStructType = X86RegStateStructType;
     ArchGetOrCreateRegStateTracer = X86GetOrCreateRegStateTracer;
-    ArchGetOrCreateSemantics = X86GetOrCreateSemantics;
     ArchLiftInstruction = X86LiftInstruction;
-  } else {
+  }else if (arch == "mipsl") {
+	
+    MipsInitRegisterState(context);
+    MipsInitInstructionDispatch(gDispatcher);
+    ArchRegisterName = MipsRegisterName;
+    ArchRegisterNumber = MipsRegisterNumber;
+    ArchRegisterOffset = MipsRegisterOffset;
+    ArchRegisterParent = MipsRegisterParent;
+    ArchRegisterSize = MipsRegisterSize;
+    ArchAllocRegisterVars = MipsAllocRegisterVars;
+    ArchRegStateStructType = MipsRegStateStructType;
+    ArchGetOrCreateRegStateTracer = MipsGetOrCreateRegStateTracer;
+    ArchLiftInstruction = MipsLiftInstruction;
+	
+   } else {
     return false;
   }
 
@@ -208,6 +237,7 @@ bool InitArch(llvm::LLVMContext *context, const std::string &os, const std::stri
 }
 
 InstructionLifter *ArchGetInstructionLifter(const llvm::MCInst &inst) {
+  //std::cout<<"ArchGetInstructionLifter: before gDispatcher"<<std::endl;
   return gDispatcher[inst.getOpcode()];
 }
 
@@ -308,10 +338,12 @@ size_t ArchDecodeInstruction(const uint8_t *bytes, const uint8_t *bytes_end,
         &(bytes[total_size]), max_size - total_size);
 
     uint64_t size = 0;
+
     auto decode_status = gDisassembler->getInstruction(
         inst, size, bytes_to_decode, va, llvm::nulls(), llvm::nulls());
 
     if (llvm::MCDisassembler::Success != decode_status) {
+std::cout<<"decode_status = 0"<<std::endl;
       return 0;
     }
 
@@ -344,111 +376,6 @@ size_t ArchDecodeInstruction(const uint8_t *bytes, const uint8_t *bytes_end,
   return total_size;
 }
 
-// Convert the given assembly instruction into an inline ASM operation in lieu
-// of decompiling it. The output instruction will look something like this
-// (although note that i128 doesn't work properly with LLVM codegen for the
-// inline ASM instructions, necessitating a vector instead).
-// %151 = load i128, i128* %XMM0_read
-// %152 = bitcast i128 %151 to <16 x i8>
-// %153 = load i128, i128* %XMM1_read
-// %154 = bitcast i128 %153 to <16 x i8>
-// %AESDECrr = call <16 x i8> asm "\09aesdec\09%xmm1, %xmm0", "={XMM0},{XMM0},{XMM1}"(<16 x i8> %152, <16 x i8> %154)
-// %155 = bitcast <16 x i8> %AESDECrr to i128
-// store volatile i128 %155, i128* %XMM0_write
-void ArchBuildInlineAsm(llvm::MCInst &inst, llvm::BasicBlock *block) {
-  auto opcode = inst.getOpcode();
-
-  // Use the printer to build the ASM string. We'll need to escape the $ in
-  // register names with $$.
-  std::stringstream asmString;
-  {
-    std::string outS;
-    llvm::raw_string_ostream strOut(outS);
-    gIP->printInst(&inst, strOut, "", *gSTI);
-    for (char c : strOut.str()) {
-      if (c == '$')
-        asmString << "$$";
-      else
-        asmString << c;
-    }
-  }
-
-  // Next, find all the registers being used as definitions or uses in the
-  // inline ASM. This will write up the constraints for us, as well as
-  // provide us with a list of types (for the inline ASM output) and a list of
-  // values to pass into the string.
-  llvm::SmallVector<llvm::Value *, 3> operands;
-  llvm::SmallVector<llvm::Type *, 3> resultTypes;
-  std::stringstream constraints;
-  for (unsigned i = 0; i < inst.getNumOperands(); i++) {
-    llvm::MCOperand &op = inst.getOperand(i);
-    if (op.isReg()) {
-      unsigned regSize = ArchRegisterSize(op.getReg());
-      if (constraints.tellp() > 0) constraints << ",";
-      if (i < gMII->get(opcode).getNumDefs()) {
-        constraints << "=";
-
-        if (regSize > 64) {
-          // LLVM can't handle register constraints of i128, so we
-          // need to map this to <16 x i8>.
-          resultTypes.push_back(llvm::VectorType::get(
-            llvm::Type::getInt8Ty(block->getContext()), regSize / 8));
-        } else {
-          resultTypes.push_back(llvm::IntegerType::get(block->getContext(),
-            regSize));
-        }
-      } else {
-        auto readReg = GENERIC_MC_READREG(block, op.getReg(), regSize);
-        if (regSize > 64) {
-          // LLVM can't handle register constraints of i128, so we
-          // need to map this to <16 x i8>.
-          readReg = llvm::CastInst::Create(llvm::Instruction::BitCast, readReg,
-            llvm::VectorType::get(llvm::Type::getInt8Ty(block->getContext()), regSize / 8),
-            "", block);
-        }
-        operands.push_back(readReg);
-      }
-      constraints << "{" << gMRI->getName(op.getReg()) << "}";
-    }
-  }
-
-  // With all of these pieces, piece together the actual call to the inline ASM
-  // string.
-  llvm::SmallVector<llvm::Type *, 3> argTypes;
-  for (auto val : operands)
-    argTypes.push_back(val->getType());
-
-  llvm::Type *returnTy;
-  if (resultTypes.empty())
-    returnTy = llvm::Type::getVoidTy(block->getContext());
-  else if (resultTypes.size() == 1)
-    returnTy = resultTypes[0];
-  else
-    returnTy = llvm::StructType::get(block->getContext(), resultTypes);
-
-  auto asmTy = llvm::FunctionType::get(returnTy, argTypes, false);
-  auto callee = llvm::InlineAsm::get(asmTy, asmString.str(), constraints.str(),
-      false);
-  llvm::Value *resultPack =
-    llvm::CallInst::Create(callee, operands, gIP->getOpcodeName(opcode), block);
-
-  // Unpack the called registers into the LLVM values.
-  for (unsigned i = 0; i < resultTypes.size(); i++) {
-    llvm::Value *result = resultTypes.size() == 1 ? resultPack :
-      llvm::ExtractValueInst::Create(resultPack, i, "", block);
-    llvm::Type *ty = resultTypes[i];
-    // Cast vector outputs to iXYZ for R_WRITE.
-    if (ty->isVectorTy()) {
-      ty = llvm::Type::getIntNTy(block->getContext(),
-        ty->getVectorNumElements() * 8);
-      result = llvm::CastInst::Create(llvm::Instruction::BitCast, result,
-        ty, "", block);
-    }
-    unsigned regNo = inst.getOperand(i).getReg();
-    GENERIC_MC_WRITEREG(block, regNo, result);
-  }
-}
-
 // Return the default calling convention for code on this architecture.
 llvm::CallingConv::ID ArchCallingConv(void) {
   return gCallingConv;
@@ -468,6 +395,8 @@ SystemArchType SystemArch(llvm::Module *) {
   auto arch = ArchType();
   if (arch == llvm::Triple::x86) {
     return _X86_;
+  } else if (arch == llvm::Triple::mipsel) { // TODOSH
+    return _Mips_;
   } else if (arch == llvm::Triple::x86_64) {
     return _X86_64_;
   } else {
@@ -475,7 +404,7 @@ SystemArchType SystemArch(llvm::Module *) {
   }
 }
 
-static void InitADFeatures(llvm::Module *M, const char *name,
+static void InitADFeatues(llvm::Module *M, const char *name,
                           llvm::FunctionType *EPTy) {
   auto FC = M->getOrInsertFunction(name, EPTy);
   auto F = llvm::dyn_cast<llvm::Function>(FC);
@@ -491,44 +420,44 @@ void ArchInitAttachDetach(llvm::Module *M) {
   const auto Arch = SystemArch(M);
   if (llvm::Triple::Linux == OS) {
     if (_X86_64_ == Arch) {
-      InitADFeatures(M, "__mcsema_attach_call", EPTy);
-      InitADFeatures(M, "__mcsema_attach_ret", EPTy);
-      InitADFeatures(M, "__mcsema_detach_call", EPTy);
-      InitADFeatures(M, "__mcsema_detach_call_value", EPTy);
-      InitADFeatures(M, "__mcsema_detach_ret", EPTy);
+      InitADFeatues(M, "__mcsema_attach_call", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
+      InitADFeatues(M, "__mcsema_detach_ret", EPTy);
 
-    } else {
-      InitADFeatures(M, "__mcsema_attach_call_cdecl", EPTy);
-      InitADFeatures(M, "__mcsema_attach_ret_cdecl", EPTy);
-      InitADFeatures(M, "__mcsema_detach_call_cdecl", EPTy);
-      InitADFeatures(M, "__mcsema_detach_ret_cdecl", EPTy);
-      InitADFeatures(M, "__mcsema_detach_call_value", EPTy);
-      InitADFeatures(M, "__mcsema_attach_ret_value", EPTy);
+    } else { // TODOSH: Implicitly will work work for _Mipsel_ 32bit
+      InitADFeatues(M, "__mcsema_attach_call_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_detach_ret_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_value", EPTy);
 
-      InitADFeatures(M, "__mcsema_detach_call_stdcall", EPTy);
-      InitADFeatures(M, "__mcsema_attach_ret_stdcall", EPTy);
-      InitADFeatures(M, "__mcsema_detach_call_fastcall", EPTy);
-      InitADFeatures(M, "__mcsema_attach_ret_fastcall", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_stdcall", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_stdcall", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_fastcall", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_fastcall", EPTy);
     }
   } else if (llvm::Triple::Win32 == OS) {
     if (_X86_64_ == Arch) {
-      InitADFeatures(M, "__mcsema_attach_call", EPTy);
-      InitADFeatures(M, "__mcsema_attach_ret", EPTy);
-      InitADFeatures(M, "__mcsema_detach_call", EPTy);
-      InitADFeatures(M, "__mcsema_detach_call_value", EPTy);
-      InitADFeatures(M, "__mcsema_detach_ret", EPTy);
+      InitADFeatues(M, "__mcsema_attach_call", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
+      InitADFeatues(M, "__mcsema_detach_ret", EPTy);
     } else {
-      InitADFeatures(M, "__mcsema_attach_call_cdecl", EPTy);
-      InitADFeatures(M, "__mcsema_attach_ret_cdecl", EPTy);
-      InitADFeatures(M, "__mcsema_detach_call_cdecl", EPTy);
-      InitADFeatures(M, "__mcsema_detach_ret_cdecl", EPTy);
-      InitADFeatures(M, "__mcsema_detach_call_value", EPTy);
-      InitADFeatures(M, "__mcsema_attach_ret_value", EPTy);
+      InitADFeatues(M, "__mcsema_attach_call_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_detach_ret_cdecl", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_value", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_value", EPTy);
 
-      InitADFeatures(M, "__mcsema_detach_call_stdcall", EPTy);
-      InitADFeatures(M, "__mcsema_attach_ret_stdcall", EPTy);
-      InitADFeatures(M, "__mcsema_detach_call_fastcall", EPTy);
-      InitADFeatures(M, "__mcsema_attach_ret_fastcall", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_stdcall", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_stdcall", EPTy);
+      InitADFeatues(M, "__mcsema_detach_call_fastcall", EPTy);
+      InitADFeatues(M, "__mcsema_attach_ret_fastcall", EPTy);
     }
   } else {
     TASSERT(false, "Unknown OS Type!");
@@ -585,11 +514,6 @@ static std::string WindowsDecorateName(llvm::Function *F,
     return name;
   }
 
-  // do not mangle already mangled C++ names
-  if('?' == name[0]) {
-    return name;
-  }
-
   switch (F->getCallingConv()) {
 
     case llvm::CallingConv::C:
@@ -629,12 +553,6 @@ static void WindowsAddPushJumpStub(bool decorateStub, llvm::Module *M,
   if(decorateStub) {
     stub_name = WindowsDecorateName(W, stub_name);
   }
-  // the " character is necesssary because sometimes Windows decorated C++
-  // names will start with '?', which will otherwise fail the 
-  // LLVM inline assembly parser
-  // this is not needed for stub_name since that name is prefixed 
-  // with "mcsema"
-  stubbed_func_name = "\"" + stubbed_func_name + "\"";
 
   as << "  .globl " << stubbed_func_name << ";\n";
   as << "  .globl " << stub_name << ";\n";
@@ -656,10 +574,8 @@ static void WindowsAddPushJumpStub(bool decorateStub, llvm::Module *M,
 
 // Add a function that can be used to transition from native code into lifted
 // code.
-// isCallback defaults to false
 llvm::Function *ArchAddEntryPointDriver(llvm::Module *M,
-                                        const std::string &name, VA entry,
-                                        bool isCallback) {
+                                        const std::string &name, VA entry) {
   //convert the VA into a string name of a function, try and look it up
   std::stringstream ss;
   ss << "sub_" << std::hex << entry;
@@ -696,15 +612,10 @@ llvm::Function *ArchAddEntryPointDriver(llvm::Module *M,
       LinuxAddPushJumpStub(M, F, W, "__mcsema_attach_call_cdecl");
     }
   } else if (llvm::Triple::Win32 == OS) {
-    // if we are creating and entry point for a callback
-    // then we need to decorate the function. 
-
-    // if we are creating an entry point specified via -entrypoint
-    // then the name is pre-decorated, and we don't decorate twice
     if (_X86_64_ == Arch) {
-      WindowsAddPushJumpStub(isCallback, M, F, W, "__mcsema_attach_call");
+      WindowsAddPushJumpStub(true, M, F, W, "__mcsema_attach_call");
     } else {
-      WindowsAddPushJumpStub(isCallback, M, F, W, "__mcsema_attach_call_cdecl");
+      WindowsAddPushJumpStub(true, M, F, W, "__mcsema_attach_call_cdecl");
     }
   } else {
     TASSERT(false, "Unsupported OS for entry point driver.");
@@ -798,7 +709,7 @@ llvm::Function *ArchAddCallbackDriver(llvm::Module *M, VA local_target) {
   std::stringstream ss;
   ss << "callback_sub_" << std::hex << local_target;
   auto callback_name = ss.str();
-  return ArchAddEntryPointDriver(M, callback_name, local_target, true);
+  return ArchAddEntryPointDriver(M, callback_name, local_target);
 }
 
 llvm::GlobalVariable *archGetImageBase(llvm::Module *M) {

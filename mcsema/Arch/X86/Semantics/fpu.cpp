@@ -656,10 +656,10 @@ static llvm::Value *EXT16_AND_SHL(llvm::BasicBlock *&b, MCSemaRegs reg, int shif
   val = new llvm::ZExtInst(val, int16ty, "", b);
   val = llvm::BinaryOperator::Create(
       llvm::Instruction::And, val,
-      llvm::ConstantInt::get(val->getType(), mask), "", b);
+      llvm::ConstantInt::get(int16ty, mask), "", b);
   val = llvm::BinaryOperator::Create(
       llvm::Instruction::Shl, val,
-      llvm::ConstantInt::get(val->getType(), shift), "", b);
+      llvm::ConstantInt::get(int16ty, shift), "", b);
   return val;
 }
 
@@ -1055,10 +1055,6 @@ static InstTransResult doCHS(llvm::MCInst &inst, NativeInstPtr ip,
         }\
       }\
       ret = THECALL;\
-      (void)(natM);\
-      (void)(F);\
-      (void)(ip);\
-      (void)(inst);\
       return ret;\
     }
 
@@ -1532,8 +1528,6 @@ static InstTransResult translate_WAIT(TranslationContext &, llvm::BasicBlock *&)
   return ContinueBlock;
 }
 
-EXTERNAL_SEMANTICS(FXAM);
-
 void FPU_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::ADD_F32m] = translate_ADD_F32m;
   m[llvm::X86::ADD_F64m] = translate_ADD_F64m;
@@ -1647,7 +1641,5 @@ void FPU_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::FPREM1] = translate_FPREM1;
 
   m[llvm::X86::CHS_F] = translate_CHS_F;
-
-  m[llvm::X86::FXAM] = translate_FXAM;
 }
 

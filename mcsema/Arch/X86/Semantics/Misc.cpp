@@ -150,24 +150,33 @@ static InstTransResult doBswapR(NativeInstPtr ip, llvm::BasicBlock *&b,
                                 const llvm::MCOperand &reg) {
   TASSERT(reg.isReg(), "");
 
-  auto &C = b->getContext();
-  auto M = b->getModule();
-
-  auto intNTy = llvm::Type::getIntNTy(C, width);
-  auto bswapFTy = llvm::FunctionType::get(intNTy, {intNTy}, false);
-
-  std::stringstream ss;
-  ss << "llvm.bswap.i" << width;
-  auto bswapF = llvm::dyn_cast<llvm::Function>(
-      M->getOrInsertFunction(ss.str(), bswapFTy));
-
-  if (llvm::Intrinsic::bswap != bswapF->getIntrinsicID()) {
-    bswapF->recalculateIntrinsicID();
+  if (width != 32) {
+    throw TErr(__LINE__, __FILE__, "Width not supported");
   }
 
   auto tmp = R_READ<width>(b, reg.getReg());
-  auto res = llvm::CallInst::Create(bswapF, {tmp}, "", b);
+
+  // Create the new bytes from the original value
+  auto newByte1 = llvm::BinaryOperator::CreateShl(tmp, CONST_V<width>(b, 24),
+                                                  "", b);
+  auto newByte2 = llvm::BinaryOperator::CreateShl(
+      llvm::BinaryOperator::CreateAnd(tmp, CONST_V<width>(b, 0x0000FF00), "",
+                                      b),
+      CONST_V<width>(b, 8), "", b);
+  auto newByte3 = llvm::BinaryOperator::CreateLShr(
+      llvm::BinaryOperator::CreateAnd(tmp, CONST_V<width>(b, 0x00FF0000), "",
+                                      b),
+      CONST_V<width>(b, 8), "", b);
+  auto newByte4 = llvm::BinaryOperator::CreateLShr(tmp, CONST_V<width>(b, 24),
+                                                   "", b);
+
+  // Add the bytes together to make the resulting DWORD
+  llvm::Value *res = llvm::BinaryOperator::CreateAdd(newByte1, newByte2, "", b);
+  res = llvm::BinaryOperator::CreateAdd(res, newByte3, "", b);
+  res = llvm::BinaryOperator::CreateAdd(res, newByte4, "", b);
+
   R_WRITE<width>(b, reg.getReg(), res);
+
   return ContinueBlock;
 }
 
@@ -270,7 +279,7 @@ static InstTransResult doRdtsc(llvm::BasicBlock *b) {
   auto low = new llvm::TruncInst(ret, Int32Ty, "", b);
   auto high = new llvm::TruncInst(
       llvm::BinaryOperator::Create(llvm::Instruction::LShr, ret,
-                                   llvm::ConstantInt::get(ret->getType(), 32), "", b),
+                                   llvm::ConstantInt::get(Int32Ty, 32), "", b),
       Int32Ty, "", b);
   R_WRITE<32>(b, llvm::X86::EDX, high);
   R_WRITE<32>(b, llvm::X86::EAX, low);
@@ -604,40 +613,10 @@ static InstTransResult doBtmr(NativeInstPtr ip, llvm::BasicBlock *&b,
 }
 
 template<int width>
-static InstTransResult doBTSrr(llvm::BasicBlock *&b,
-                               const llvm::MCOperand &base,
-                               const llvm::MCOperand &index) {
-  TASSERT(base.isReg(), "Operand must be a register");
-  TASSERT(index.isReg(), "Operand must be a register");
-
-  auto base_val = R_READ<width>(b, base.getReg());
-  auto index_val = R_READ<width>(b, index.getReg());
-
-  // modulo the index by register size
-  auto index_mod = llvm::BinaryOperator::CreateURem(index_val,
-                                                    CONST_V<width>(b, width),
-                                                    "", b);
-
-  SHR_SET_FLAG_V<width, 1>(b, base_val, llvm::X86::CF,
-                           index_mod);
-
-  auto bit_mask = llvm::BinaryOperator::CreateShl(CONST_V<width>(b, 1),
-          index_mod, "", b);
-
-  auto new_base_val = llvm::BinaryOperator::Create(
-      llvm::Instruction::Or, base_val, bit_mask, "",
-      b);
-  R_WRITE<width>(b, base.getReg(), new_base_val);
-
-  return ContinueBlock;
-
-}
-
-template<int width>
 static InstTransResult doBTSri(llvm::BasicBlock *&b,
                                const llvm::MCOperand &base,
                                const llvm::MCOperand &index) {
-  TASSERT(base.isReg(), "Operand must be a register");
+  TASSERT(base.isReg(), "Operand must be an immediate");
   TASSERT(index.isImm(), "Operand must be an immediate");
 
   unsigned whichbit = index.getImm();
@@ -705,12 +684,10 @@ static InstTransResult doBTSmr(NativeInstPtr ip, llvm::BasicBlock *&b,
   auto ptr = ADDR_TO_POINTER<width>(b, base);
   auto gep = llvm::GetElementPtrInst::CreateInBounds(ptr, {word}, "", b);
   auto val = M_READ<width>(ip, b, gep);
-
   SHR_SET_FLAG_V<width, 1>(b, val, llvm::X86::CF, bit);
 
-  auto bit_to_set = llvm::BinaryOperator::CreateShl(
+  auto bit_to_set = llvm::BinaryOperator::CreateLShr(
       CONST_V<width>(b, 1), bit, "", b);
-
   auto new_val = llvm::BinaryOperator::CreateOr(val, bit_to_set, "", b);
   M_WRITE<width>(ip, b, gep, new_val);
 
@@ -899,7 +876,6 @@ GENERIC_TRANSLATION(NOOP, doNoop(block))
 GENERIC_TRANSLATION(HLT, doHlt(block))
 
 GENERIC_TRANSLATION(BSWAP32r, doBswapR<32>(ip, block, OP(0)))
-GENERIC_TRANSLATION(BSWAP64r, doBswapR<64>(ip, block, OP(0)))
 
 GENERIC_TRANSLATION(LAHF, doLAHF(block))
 GENERIC_TRANSLATION(STD, doStd(block))
@@ -1114,10 +1090,6 @@ GENERIC_TRANSLATION(BT64rr, doBtrr<64>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BT32rr, doBtrr<32>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BT16rr, doBtrr<16>(block, OP(0), OP(1)))
 
-GENERIC_TRANSLATION(BTS64rr, doBTSrr<64>(block, OP(0), OP(1)))
-GENERIC_TRANSLATION(BTS32rr, doBTSrr<32>(block, OP(0), OP(1)))
-GENERIC_TRANSLATION(BTS16rr, doBTSrr<16>(block, OP(0), OP(1)))
-
 GENERIC_TRANSLATION(BT64ri8, doBtri<64>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BT32ri8, doBtri<32>(block, OP(0), OP(1)))
 GENERIC_TRANSLATION(BT16ri8, doBtri<16>(block, OP(0), OP(1)))
@@ -1184,7 +1156,6 @@ void Misc_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::STC] = translate_STC;
   m[llvm::X86::CLC] = translate_CLC;
   m[llvm::X86::BSWAP32r] = translate_BSWAP32r;
-  m[llvm::X86::BSWAP64r] = translate_BSWAP64r;
   m[llvm::X86::CDQ] = translate_CDQ;
   m[llvm::X86::INT3] = translate_INT3;
   m[llvm::X86::INT] = translate_INT;
@@ -1206,17 +1177,14 @@ void Misc_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::BT64rr] = translate_BT64rr;
   m[llvm::X86::BT32rr] = translate_BT32rr;
   m[llvm::X86::BT16rr] = translate_BT16rr;
-  m[llvm::X86::BTS64rr] = translate_BTS64rr;
-  m[llvm::X86::BTS32rr] = translate_BTS32rr;
-  m[llvm::X86::BTS16rr] = translate_BTS16rr;
   m[llvm::X86::BT64ri8] = translate_BT64ri8;
   m[llvm::X86::BT32ri8] = translate_BT32ri8;
   m[llvm::X86::BT16ri8] = translate_BT16ri8;
   m[llvm::X86::BT64mi8] = translate_BT64mi8;
   m[llvm::X86::BT32mr] = translate_BT32mr;
   m[llvm::X86::BT64mr] = translate_BT64mr;
-  m[llvm::X86::BTS64mr] = translate_BTS64mr;
   m[llvm::X86::BTS32mr] = translate_BTS32mr;
+  m[llvm::X86::BTS64mr] = translate_BTS64mr;
   m[llvm::X86::BTS64mi8] = translate_BTS64mi8;
   m[llvm::X86::BTS64ri8] = translate_BTS64ri8;
   m[llvm::X86::BTR64mi8] = translate_BTR64mi8;

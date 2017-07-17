@@ -8,6 +8,7 @@
 #include <llvm/ADT/Triple.h>
 #include <llvm/IR/CallingConv.h>
 #include <llvm/lib/Target/X86/X86InstrInfo.h>
+#include <llvm/lib/Target/Mips/MipsInstrInfo.h>
 
 namespace llvm {
 
@@ -112,6 +113,15 @@ static std::map<unsigned, std::string> gExtendedOpcodeNames = {
 
 }  // namespace X86
 
+
+namespace Mips
+{
+
+enum : unsigned {
+  MCSEMA_OPCODE_LIST_BEGIN = llvm::Mips::INSTRUCTION_LIST_END
+};
+}
+
 class MCInst;
 
 }  // namespace llvm
@@ -120,7 +130,8 @@ typedef uint64_t VA;
 
 enum SystemArchType {
   _X86_,
-  _X86_64_
+  _X86_64_,
+  _Mips_
 };
 
 enum PointerSize {
@@ -143,10 +154,6 @@ const std::string &ArchDataLayout(void);
 size_t ArchDecodeInstruction(const uint8_t *bytes, const uint8_t *bytes_end,
                              uintptr_t va, llvm::MCInst &inst);
 
-// Convert the given assembly instruction into an inline ASM operation in lieu
-// of decompiling it.
-void ArchBuildInlineAsm(llvm::MCInst &inst, llvm::BasicBlock *block);
-
 // Return the default calling convention for code on this architecture.
 llvm::CallingConv::ID ArchCallingConv(void);
 
@@ -163,7 +170,7 @@ llvm::Triple::OSType OSType(void);
 void ArchInitAttachDetach(llvm::Module *M);
 
 llvm::Function *ArchAddEntryPointDriver(
-    llvm::Module *M, const std::string &name, VA entry, bool isCallback = false);
+    llvm::Module *M, const std::string &name, VA entry);
 
 llvm::Function *ArchAddExitPointDriver(llvm::Function *F);
 

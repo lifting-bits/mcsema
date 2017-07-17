@@ -1,0 +1,18 @@
+
+set(GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+set(MCSEMA_PROTOBUF_GEN_DIR "${GEN_DIR}" PARENT_SCOPE)
+
+set(MCSEMA_PROTOBUF_FILES_GENERATED
+		"${GEN_DIR}/CFG.pb.h"
+		"${GEN_DIR}/CFG.pb.cc"
+		"${GEN_DIR}/CFG_pb2.py")
+
+add_custom_command(OUTPUT ${MCSEMA_PROTOBUF_FILES_GENERATED}
+		COMMAND
+			${PROTOBUF_PROTOC_EXECUTABLE}
+				--cpp_out "${GEN_DIR}"
+				--python_out "${GEN_DIR}"
+				--proto_path "${CMAKE_CURRENT_SOURCE_DIR}"
+				${CMAKE_CURRENT_SOURCE_DIR}/CFG.proto)
+
+add_custom_target(cfg-protobuf DEPENDS ${MCSEMA_PROTOBUF_FILES_GENERATED})

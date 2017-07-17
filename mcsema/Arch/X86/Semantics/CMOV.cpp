@@ -117,16 +117,12 @@ static InstTransResult doCMOV(BasicBlock *b, MCOperand &dst, Value *condition,
     }else {\
         return doCMOV<width>(block, OP(0), condition, M_READ<width>(ip, b, ADDR_NOREF(2)));\
     }\
-    (void)(natM);\
-    (void)(inst);\
 }
 
 #define EMIT_CMOV_RR(width, condition) [] (TranslationContext &ctx, BasicBlock *&b)->InstTransResult {\
     auto ip = ctx.natI; \
     auto &inst = ip->get_inst(); \
     auto natM = ctx.natM; \
-    (void)(natM);\
-    (void)(inst);\
     return doCMOV<width>(b, OP(0), condition, R_READ<width>(b, OP(2).getReg())); \
 }
 

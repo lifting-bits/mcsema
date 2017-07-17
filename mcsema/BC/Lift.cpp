@@ -205,6 +205,11 @@ static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
 
   auto &inst = ctx.natI->get_inst();
 
+  //std::cout<<"opcode "<<inst.getOpcode()<<std::endl;
+  if(inst.getOpcode()==1896) // 1896 for nop instruction in delayslot of mips instruction pipeline
+    return NOP;			// TODOSH to cleanly do this create a file for NOP instruction in Mips/Semantics and return NOP from it
+
+  //std::cout<<"LiftInstIntoBlockImpl: before ArchGetInstruction" << std::endl;
   if (auto lifter = ArchGetInstructionLifter(inst)) {
     itr = ArchLiftInstruction(ctx, block, lifter);
 
@@ -219,15 +224,7 @@ static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
     std::cerr << "Error translating instruction at " << std::hex
               << ctx.natI->get_loc() << "; unsupported opcode " << std::dec
               << opcode << std::endl;
-
-    // In the case that we can't find the opcode, try building it out with
-    // inline assembly calls in LLVM instead.
-    if (IgnoreUnsupportedInsts) {
-      ArchBuildInlineAsm(inst, block);
-      return itr;
-    } else {
-      return TranslateErrorUnsupported;
-    }
+    return TranslateErrorUnsupported;
   }
   return itr;
 }
@@ -238,12 +235,14 @@ static InstTransResult LiftInstIntoBlock(TranslationContext &ctx,
   auto pc = ctx.natI->get_loc();
 
   // Update the program counter.
-  auto pc_ty = llvm::Type::getIntNTy(block->getContext(), ArchAddressSize());
-  GENERIC_MC_WRITEREG(
-      block,
-      llvm::X86::EIP,
-      llvm::ConstantInt::get(pc_ty, pc));
+  // TODOSH program count in MIPS?
+  // auto pc_ty = llvm::Type::getIntNTy(block->getContext(), ArchAddressSize());
+  // GENERIC_MC_WRITEREG(
+  //    block,
+  //    llvm::X86::EIP,
+  //    llvm::ConstantInt::get(pc_ty, pc));
 
+  //std::cout<<"LiftInstIntoBlock: after generic_mc_writereg" << std::endl;
   // At the beginning of the block, make a call to a dummy function with the
   // same name as the block. This function call cannot be optimized away, and
   // so it serves as a useful marker for where we are.
@@ -255,6 +254,8 @@ static InstTransResult LiftInstIntoBlock(TranslationContext &ctx,
     AddRegStateTracer(block);
   }
 
+  //std::cout<<"LiftInstIntoBlock: before LiftInstIntoBlockImpl" << std::endl;
+  
   auto lift_status = LiftInstIntoBlockImpl(ctx, block);
 
   // we need to loop over this function and find any un-annotated instructions.
@@ -284,11 +285,13 @@ static bool LiftBlockIntoFunction(TranslationContext &ctx) {
     }
   }
 
+  //std::cout << "LiftFunctionIntoBlock: before switch" << std::endl;
   //now, go through each statement and translate it into LLVM IR
   //statements that branch SHOULD be the last statement in a block
   for (auto inst : ctx.natB->get_insts()) {
     ctx.natI = inst;
     switch (LiftInstIntoBlock(ctx, curLLVMBlock, true)) {
+      case NOP:    
       case ContinueBlock:
         break;
       case EndBlock:
@@ -305,6 +308,7 @@ static bool LiftBlockIntoFunction(TranslationContext &ctx) {
 done:
 
   if (curLLVMBlock->getTerminator()) {
+    std::cout<<"we got terminator instruction "<< didError <<std::endl;	  
     return didError;
   }
 
@@ -312,8 +316,10 @@ done:
   // if the block ended on a non-terminator (this happens since we
   // may split blocks in cfg recovery to avoid code duplication)
   if (follows.size() == 1) {
+    std::cout<<"follows size = 1"<<std::endl;	  
     llvm::BranchInst::Create(ctx.va_to_bb[follows.front()], curLLVMBlock);
   } else {
+    std::cout<<"else -----"<<std::endl;	  
     new llvm::UnreachableInst(curLLVMBlock->getContext(), curLLVMBlock);
   }
 
@@ -338,6 +344,8 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
   auto entryBlock = llvm::BasicBlock::Create(F->getContext(), "entry", F);
   ArchAllocRegisterVars(entryBlock);
 
+  std::cout << "InsertFunctionIntoModule: ArchAllocRegisterVars done" << std::endl;
+	
   TranslationContext ctx;
   ctx.natM = mod;
   ctx.natF = func;
@@ -358,7 +366,10 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
   for (auto block_info : func->get_blocks()) {
     ctx.natB = block_info.second;
     error = LiftBlockIntoFunction(ctx) || error;
+    std::cout<< "error " << error << std::endl;
   }
+
+  std::cout << "InsertFunctionIntoModule: for{LiftBlockIntoFunction} done " << error << std::endl;
 
   // For ease of debugging generated code, don't allow lifted functions to
   // be inlined. This will make lifted and native call graphs one-to-one.
@@ -419,7 +430,7 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
     dataSectionToTypesContents(globaldata, *var.section, M, secContents,
                                data_section_types, true);
 
-    // fill in the opaque structure with actual members
+    // fill in the opaqure structure with actual members
     var.opaque_type->setBody(data_section_types, true);
 
     // create an initializer list using the now filled in opaque
@@ -461,6 +472,7 @@ static void InitLiftedFunctions(NativeModulePtr natMod, llvm::Module *M) {
     auto fname = native_func->get_name();
     auto F = M->getFunction(fname);
 
+std::cout<<"InitLiftedFunctions entered"<<std::endl;
     if (!F) {
       F = llvm::dyn_cast<llvm::Function>(
           M->getOrInsertFunction(fname, LiftedFunctionType()));
@@ -611,8 +623,58 @@ static bool LiftFunctionsIntoModule(NativeModulePtr natMod, llvm::Module *M) {
 
 bool LiftCodeIntoModule(NativeModulePtr natMod, llvm::Module *M) {
   InitLiftedFunctions(natMod, M);
+//std::cout<<"InitLiftedFunctions done"<<std::endl;
   InitExternalData(natMod, M);
+//std::cout<<"InitExternalData done"<<std::endl;
   InitExternalCode(natMod, M);
+//std::cout<<"InitInternalCode done"<<std::endl;
   InsertDataSections(natMod, M);
+//std::cout<<"InsertDataSecution done"<<std::endl;
   return LiftFunctionsIntoModule(natMod, M);
 }
+
+/*
+class block_label_writer {
+private:
+    NativeFunctionPtr func;
+public:
+    block_label_writer(NativeFunctionPtr f) : func(f) {
+        return;
+    }
+
+    template <class VertexOrEdge>
+    void operator()(std::ostream &out, const VertexOrEdge &v) const {
+        NativeBlockPtr    curB = this->func->block_from_id(v);
+
+        if( curB ) {
+            string blockS = curB->print_block();
+            out << "[label=\"" << blockS << "\"]";
+        }
+
+        return;
+    }
+};
+
+void doPrintModule(NativeModulePtr m) {
+	std::cout<<"printing module to .dot file\n";
+    string  pathBase = "./";
+
+    std::list<NativeFunctionPtr>           mod_funcs = m->get_funcs();
+    std::list<NativeFunctionPtr>::iterator it = mod_funcs.begin();
+
+    for(; it != mod_funcs.end(); ++it) {
+        NativeFunctionPtr f = *it;
+        std::string n =
+            pathBase+to_string<uint64_t>(f->get_start(), std::hex) + ".dot";
+	std::cout<<"name of .dot file"<<n<<"\n";
+
+        std::ofstream    out(n.c_str());
+
+        block_label_writer  bgl(f);
+        CFG                 g = f->get_cfg();
+        write_graphviz(out, g, bgl);
+    }
+
+    return;
+}
+*/

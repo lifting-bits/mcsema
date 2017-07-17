@@ -73,7 +73,7 @@ static llvm::Value *getValueForExternal(llvm::Module *M, NativeInstPtr ip,
       // sometimes windows will import this directly as the variable instead of
       // as a reference to a variable. But the rest of the code wants a pointer to var
       llvm::Value *toPtr = new llvm::AllocaInst(gvar->getType(), "", block);
-      (void) new llvm::StoreInst(gvar, toPtr, block);
+      llvm::Value *writeIt = new llvm::StoreInst(gvar, toPtr, block);
       addrInt = new llvm::PtrToIntInst(
           toPtr, llvm::Type::getIntNTy(block->getContext(), width), "", block);
     } else {
@@ -83,7 +83,7 @@ static llvm::Value *getValueForExternal(llvm::Module *M, NativeInstPtr ip,
     }
 
   } else {
-    throw TErr(__LINE__, __FILE__, "No external reference to get value for!");
+    throw TErr(__LINE__, __FILE__, "No external refernce to get value for!");
   }
 
   return addrInt;
@@ -165,6 +165,15 @@ llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
                              const llvm::MCOperand &Oindex, const int64_t Odisp,
                              const llvm::MCOperand &Oseg, bool dataOffset);
 }  // namespace x86
+
+// TODOSH
+namespace mips {
+llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
+                             const llvm::MCOperand &Obase,
+                             const llvm::MCOperand &Oscale,
+                             const llvm::MCOperand &Oindex, const int64_t Odisp,
+                             const llvm::MCOperand &Oseg, bool dataOffset);
+}  // namespace mips
 
 namespace x86_64 {
 llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,

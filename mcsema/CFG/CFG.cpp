@@ -33,7 +33,7 @@
 #include <sstream>
 #include <utility>
 
-#include <mcsema_generated/CFG.pb.h>  // Auto-generated.
+#include "CFG.pb.h"  // Auto-generated.
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/CFG/CFG.h"
@@ -498,25 +498,6 @@ NativeModule::NativeModule(
       module_name(module_name_),
       triple(triple_) {}
 
-NativeModule::~NativeModule() {
-  for (ExternalCodeRefPtr ptr : this->external_code_refs) {
-    delete ptr;
-  }
-
-  for (ExternalDataRefPtr ptr : this->external_data_refs) {
-    delete ptr;
-  }
-
-  for (const auto &function_descriptor : this->funcs) {
-    NativeFunctionPtr function = function_descriptor.second;
-    delete function;
-  }
-
-  this->external_code_refs.clear();
-  this->external_data_refs.clear();
-  this->funcs.clear();
-}
-
 VA NativeFunction::get_start(void) {
   return this->funcEntryVA;
 }
@@ -538,14 +519,6 @@ NativeBlockPtr NativeFunction::block_from_base(VA base) {
 NativeBlock::NativeBlock(VA b)
     : baseAddr(b) {}
 
-NativeBlock::~NativeBlock() {
-  for (NativeInstPtr ptr : this->instructions) {
-    delete ptr;
-  }
-
-  this->instructions.clear();
-}
-
 void NativeBlock::add_inst(NativeInstPtr p) {
   this->instructions.push_back(p);
 }
@@ -564,15 +537,6 @@ std::list<VA> &NativeBlock::get_follows(void) {
 
 const std::list<NativeInstPtr> &NativeBlock::get_insts(void) {
   return this->instructions;
-}
-
-NativeFunction::~NativeFunction() {
-  for (const auto &native_block_descriptor : this->blocks) {
-    NativeBlockPtr ptr = native_block_descriptor.second;
-    delete ptr;
-  }
-
-  this->blocks.clear();
 }
 
 void NativeFunction::add_block(NativeBlockPtr b) {
@@ -1276,6 +1240,6 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
     m->addEntryPoint(native_es);
   }
 
-  std::cerr << "Returning module..." << std::endl;
+  std::cerr << "Returning modue..." << std::endl;
   return m;
 }

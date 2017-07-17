@@ -45,7 +45,7 @@
 
 // do any instruction preprocessing/conversion
 // before moving on to translation.
-// currently used to turn non-conforming jump tables
+// currently used to turn non-conforming jump talbles
 // into data sections
 //
 static void PreProcessInst(TranslationContext &ctx, llvm::BasicBlock *&block) {

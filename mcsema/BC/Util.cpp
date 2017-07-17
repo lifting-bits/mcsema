@@ -168,6 +168,7 @@ void GENERIC_MC_WRITEREG(llvm::BasicBlock *B, MCSemaRegs mc_reg,
                          llvm::Value *val) {
   auto F = B->getParent();
   auto M = F->getParent();
+  auto &C = M->getContext();
   llvm::DataLayout DL(M);
 
   auto val_size = DL.getTypeAllocSizeInBits(val->getType());
@@ -194,11 +195,19 @@ llvm::Value *GENERIC_MC_READREG(llvm::BasicBlock *B, MCSemaRegs mc_reg,
   auto M = F->getParent();
   auto &C = M->getContext();
 
-  if (llvm::X86::NoRegister == mc_reg) {
+  if (llvm::X86::NoRegister == mc_reg || llvm::Mips::NoRegister == mc_reg) {
     std::cerr
         << "Reading 0 for no-register read-reg" << std::endl;
     return CreateConstantInt(desired_size, 0);
   }
+
+  if (mc_reg == llvm::Mips::ZERO) // TODOSH 157 for ZERO register - can be done in better way?
+  {
+    std::cout<<"reading zero register\n";
+    llvm::Value *zeroVal = llvm::ConstantInt::get(B->getContext(),llvm::APInt(32, 0, false));
+    return llvm::BinaryOperator::Create(llvm::Instruction::Add, zeroVal, zeroVal, "", B);
+  }
+
 
   llvm::DataLayout DL(M);
 
@@ -216,7 +225,7 @@ llvm::Value *GENERIC_MC_READREG(llvm::BasicBlock *B, MCSemaRegs mc_reg,
         val = new llvm::ZExtInst(val, dst_ty, "", B);
       }
     } else if (val_ty->isFloatTy()) {
-      // TODO(pag): do something here?
+      // TODO(pag): do somehting here?
     }
   }
   return val;

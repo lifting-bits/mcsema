@@ -147,7 +147,84 @@ llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
   auto piTy = llvm::Type::getInt32PtrTy(b->getContext());
   return new llvm::IntToPtrInst(dispComp, piTy, "", b);
 }
+} // namespace x86
+
+// Compute a Value from a complex address expression
+// such as [0x123456+eax*4]
+// If the expression references global data, use
+// that in the computation instead of assuming values
+// are opaque immediates
+namespace mips {
+llvm::Value *getAddrFromExprMips(llvm::BasicBlock *b, NativeModulePtr mod,
+                             const llvm::MCOperand &Obase,
+                             const llvm::MCOperand &Oscale,
+                             const int64_t Odisp,
+                             bool dataOffset) {
+  TASSERT(Obase.isReg(), "");
+  TASSERT(Oscale.isImm(), "");
+  
+  unsigned baseReg = Obase.getReg();
+  int64_t disp = Odisp;
+
+  //first, we should ask, is disp an absolute reference to
+  //some global symbol in the original source module?
+  //if it is, we can replace its value with that of a pointer
+  //to global data
+  //HANDY HEURISTIC HACK
+  //if the base register is the stack pointer or the frame
+  //pointer, then skip this part
+  llvm::Value *d = nullptr;
+  auto iTy = llvm::IntegerType::getInt32Ty(b->getContext());
+
+  if (dataOffset
+      || (mod && disp && baseReg != llvm::Mips::FP &&
+          baseReg != llvm::Mips::SP)) {
+    auto int_val = getGlobalFromOriginalAddr<32>(disp, mod,
+                                                 dataOffset ? 0 : 0x1000, b);
+    d = int_val;
+  } else {
+    //there is no disp value, or its relative to esp/ebp in which case
+    //we might not want to do anything
+  }
+
+  if (nullptr == d) {
+    //create a constant integer out of the raw displacement
+    //we were unable to assign the displacement to an address
+    d = llvm::ConstantInt::getSigned(iTy, disp);
+  }
+
+  llvm::Value *rVal = nullptr;
+
+  //read the base register (if given)
+  if (baseReg != llvm::Mips::NoRegister) {
+    rVal = R_READ<32>(b, baseReg);
+  } else {
+    //if the base is not present, just use 0
+    rVal = CONST_V<32>(b, 0);
+  }
+
+  llvm::Value *dispComp = nullptr;
+  dispComp = llvm::BinaryOperator::Create(llvm::Instruction::Add, rVal, d, "",
+                                          b);
+
+  //add the index amount, if present
+ /* if (Oindex.getReg() != llvm::Mips::NoRegister) {
+    auto index = R_READ<32>(b, Oindex.getReg());
+
+    int64_t scaleAmt = Oscale.getImm();
+    if (scaleAmt > 1) {
+      index = llvm::BinaryOperator::CreateMul(index, CONST_V<32>(b, scaleAmt),
+                                              "", b);
+    }
+
+    dispComp = llvm::BinaryOperator::CreateAdd(dispComp, index, "", b);
+  }*/
+
+  //convert the resulting integer into a pointer type
+  auto piTy = llvm::Type::getInt32PtrTy(b->getContext());
+  return new llvm::IntToPtrInst(dispComp, piTy, "", b);
 }
+} // namespace Mips
 
 llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
                              const llvm::MCInst &inst, NativeInstPtr ip,
@@ -183,43 +260,56 @@ llvm::Value *getAddrFromExpr(llvm::BasicBlock *b, NativeModulePtr mod,
 
 }
 
+llvm::Value *getAddrFromExprMips(llvm::BasicBlock *b, NativeModulePtr mod,
+                             const llvm::MCInst &inst, NativeInstPtr ip,
+                             uint32_t which) {
+  const auto &base = inst.getOperand(which + 0);
+  const auto &scale = inst.getOperand(which + 1);
+  //const auto &index = inst.getOperand(which + 2);
+  //const auto &disp = inst.getOperand(which + 3);
+  //const auto &seg = inst.getOperand(which + 4);
+
+  TASSERT(base.isReg(), "");
+  TASSERT(scale.isImm(), "");
+  //TASSERT(index.isReg(), "");
+  //TASSERT(disp.isImm(), "");
+  //TASSERT(seg.isReg(), "");
+
+  // determine if this instruction is using a memory reference
+  // or if the displacement should be used at face value
+  bool has_ref = ip->has_reference(NativeInst::MEMRef);
+  int64_t real_disp =
+      has_ref ? ip->get_reference(NativeInst::MEMRef) : scale.getImm();
+  auto M = b->getParent()->getParent();
+
+  if (ArchPointerSize(M) == Pointer32) {
+
+    return mips::getAddrFromExprMips(b, mod, base, scale, real_disp, 
+                                has_ref);
+
+  } else {
+    std::cout<<"64-bit Mips not supported:\n";
+  }
+
+}
+
 llvm::Value *MEM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr natM,
                              const llvm::MCInst &inst, NativeInstPtr ip,
                              uint32_t which) {
-  if (ip->has_external_ref()) {
-    auto F = B->getParent();
-    llvm::Value* addrInt = nullptr;
-    llvm::PointerType* piTy = nullptr;
-    auto ptrsize = ArchPointerSize(M);
-    if (Pointer32 == ptrsize) {
-      addrInt = getValueForExternal<32>(F->getParent(), ip, B);
-      TASSERT(addrInt != nullptr, "Could not get external data reference");
-      piTy = llvm::Type::getInt32PtrTy(B->getContext());
-    } else if(Pointer64 == ptrsize) {
-      addrInt = getValueForExternal<64>(F->getParent(), ip, B);
-      TASSERT(addrInt != nullptr, "Could not get external data reference");
-      piTy = llvm::Type::getInt64PtrTy(B->getContext());
-    } else {
-
-      throw TErr(__LINE__, __FILE__,
-                 "Unknown pointer size used to reference memory");
-      // not needed but here just in case
-      return nullptr;
-    }
-
-    return new llvm::IntToPtrInst(addrInt, piTy, "", B);
-  }
-
   if (false == ip->has_mem_reference) {
     throw TErr(__LINE__, __FILE__,
                "Want to use MEM as data ref but have no MEM reference");
-    // not needed but here just in case
-    return nullptr;
   }
+  auto arch = ArchType();
+  
+  if( arch == llvm::Triple::x86 || arch == llvm::Triple::x86_64 ) // for x86 and x64
+  	return getAddrFromExpr(B, natM, inst, ip, which);
+  else if(arch == llvm::Triple::mipsel) //for Mips
+  	return getAddrFromExprMips(B, natM, inst, ip, which);
 
-
-  return getAddrFromExpr(B, natM, inst, ip, which);
 }
+
+
 
 llvm::Instruction *callMemcpy(llvm::BasicBlock *B, llvm::Value *dest,
                               llvm::Value *src, uint32_t size, uint32_t align,

@@ -65,12 +65,12 @@ class ExternalDataRef : public ExternalRef {
  public:
 
   ExternalDataRef(const std::string &name)
-      : ExternalRef(name),
-        dataSize(0) {}
+      : dataSize(0),
+        ExternalRef(name) {}
 
   ExternalDataRef(const std::string &name, size_t dtsz)
-      : ExternalRef(name), 
-        dataSize(dtsz) {}
+      : dataSize(dtsz),
+        ExternalRef(name) {}
 
   void setDataSize(size_t newsize) {
     this->dataSize = newsize;
@@ -122,39 +122,39 @@ class ExternalCodeRef : public ExternalRef {
 
   ExternalCodeRef(const std::string &fn, int d, CallingConvention c,
                   ReturnType r, const std::string &sign)
-      : ExternalRef(fn),
-        numArgs(d),
+      : numArgs(d),
         conv(c),
         ret(r),
+        ExternalRef(fn),
         funcSign(sign) {}
 
   ExternalCodeRef(const std::string &fn, int d, CallingConvention c,
                   ReturnType r)
-      : ExternalRef(fn),
-        numArgs(d),
+      : numArgs(d),
         conv(c),
         ret(r),
+        ExternalRef(fn),
         funcSign("") {}
 
   ExternalCodeRef(const std::string &fn, int d, CallingConvention c)
-      : ExternalRef(fn),
-        numArgs(d),
+      : numArgs(d),
         conv(c),
         ret(Unknown),
+        ExternalRef(fn),
         funcSign("") {}
 
   ExternalCodeRef(const std::string &fn, int d)
-      : ExternalRef(fn),
-        numArgs(d),
+      : numArgs(d),
         conv(CallerCleanup),
         ret(Unknown),
+        ExternalRef(fn),
         funcSign("") {}
 
   ExternalCodeRef(const std::string &fn)
-      : ExternalRef(fn),
-        numArgs(-1),
+      : numArgs(-1),
         conv(CallerCleanup),
         ret(Unknown),
+        ExternalRef(fn),
         funcSign("") {}
 
  protected:

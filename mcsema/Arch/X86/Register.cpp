@@ -34,7 +34,6 @@
 #include <vector>
 
 #include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/IRBuilder.h>
@@ -357,22 +356,20 @@ llvm::StructType *X86RegStateStructType(void) {
   return gRegStateStruct;
 }
 
-static llvm::Constant *GetPrintf(llvm::Module *M) {
+static llvm::Function *GetPrintf(llvm::Module *M) {
   // ; Function Attrs: nounwind
   // declare i32 @printf(i8* nocapture readonly, ...) local_unnamed_addr #1
+
+  auto F = M->getFunction("printf");
+  if (F) {
+    return F;
+  }
+
   auto &C = M->getContext();
   auto FTy = llvm::FunctionType::get(
       llvm::Type::getInt32Ty(C),
       {llvm::Type::getInt8PtrTy(C, 0)},
       true /* IsVarArg */);
-
-  auto F = M->getFunction("printf");
-  if (F) {
-    if (FTy != F->getFunctionType()) {
-      return llvm::ConstantExpr::getBitCast(F, llvm::PointerType::get(FTy, 0));
-    }
-    return F;
-  }
 
   F = llvm::Function::Create(
       FTy, llvm::GlobalValue::ExternalLinkage, "printf", M);
@@ -462,18 +459,5 @@ llvm::Function *X86GetOrCreateRegStateTracer(llvm::Module *M) {
   llvm::IRBuilder<> ir(B);
   ir.CreateCall(GetPrintf(M), args);
   ir.CreateRetVoid();
-  return F;
-}
-
-llvm::Function *X86GetOrCreateSemantics(llvm::Module *M, const std::string &instr) {
-  std::string fname = "__mcsema_" + instr;
-  auto F = M->getFunction(fname);
-  if (F) {
-    return F;
-  }
-
-  F = llvm::Function::Create(
-      LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
-      fname, M);
   return F;
 }

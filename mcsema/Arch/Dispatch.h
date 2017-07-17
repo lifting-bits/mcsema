@@ -34,7 +34,8 @@ enum InstTransResult : int {
   EndBlock,
   EndCFG,
   TranslateErrorUnsupported,
-  TranslateError
+  TranslateError,
+  NOP
 };
 
 typedef InstTransResult (InstructionLifter)(
@@ -46,8 +47,5 @@ InstructionLifter *ArchGetInstructionLifter(const llvm::MCInst &inst);
 
 extern InstTransResult (*ArchLiftInstruction)(
     TranslationContext &, llvm::BasicBlock *&, InstructionLifter *);
-
-extern llvm::Function *(*ArchGetOrCreateSemantics)(
-    llvm::Module *, const std::string &);
 
 #endif  // MC_SEMA_ARCH_DISPATCH_H_

@@ -453,16 +453,6 @@ GENERIC_TRANSLATION_REF(SBB8rm,
                         doSbbRM<8>(ip, block, OP(1), MEM_REFERENCE(2), OP(0)))
 GENERIC_TRANSLATION(SBB8rr, doSbbRR<8>(ip, block, OP(1), OP(2), OP(0)))
 GENERIC_TRANSLATION(SBB8rr_REV, doSbbRR<8>(ip, block, OP(1), OP(2), OP(0)))
-GENERIC_TRANSLATION_MI(
-    SUB64mi32, doSubMI<64>(ip, block, ADDR_NOREF(0), OP(5)),
-    doSubMI<64>(ip, block, MEM_REFERENCE(0), OP(5)),
-    doSubMV<64>(ip, block, ADDR_NOREF(0), IMM_AS_DATA_REF(block, natM, ip)),
-    doSubMV<64>(ip, block, MEM_REFERENCE(0), IMM_AS_DATA_REF(block, natM, ip)))
-GENERIC_TRANSLATION_MI(
-    SBB64mi32, doSbbMI<64>(ip, block, ADDR_NOREF(0), OP(5)),
-    doSbbMI<64>(ip, block, MEM_REFERENCE(0), OP(5)),
-    doSbbMV<64>(ip, block, ADDR_NOREF(0), IMM_AS_DATA_REF(block, natM, ip)),
-    doSbbMV<64>(ip, block, MEM_REFERENCE(0), IMM_AS_DATA_REF(block, natM, ip)))
 
 static InstTransResult translate_SUB64ri8(TranslationContext &ctx,
                                           llvm::BasicBlock *&block) {
@@ -549,7 +539,4 @@ void SUB_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::SUB64ri8] = translate_SUB64ri8;
   m[llvm::X86::SUB64ri32] = translate_SUB64ri32;
   m[llvm::X86::SUB64i32] = translate_SUB64i32;
-
-  m[llvm::X86::SUB64mi32] = translate_SUB64mi32;
-  m[llvm::X86::SBB64mi32] = translate_SBB64mi32;
 }

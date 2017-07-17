@@ -1823,7 +1823,6 @@ GENERIC_TRANSLATION_MI(
 GENERIC_TRANSLATION(ROL32r1, doRolR1<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(ROL32rCL, doRolRCL<32>(ip, block, OP(0)))
 GENERIC_TRANSLATION(ROL32ri, doRolRI<32>(ip, block, OP(0), OP(1), OP(2)))
-GENERIC_TRANSLATION(ROL64r1, doRolR1<64>(ip, block, OP(0)))
 GENERIC_TRANSLATION(ROL64ri, doRolRI<64>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_REF(ROR8m1, doRorM1<8>(ip, block, ADDR_NOREF(0)),
                         doRorM1<8>(ip, block, MEM_REFERENCE(0)))
@@ -2060,7 +2059,6 @@ void ShiftRoll_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::ROL32r1] = translate_ROL32r1;
   m[llvm::X86::ROL32ri] = translate_ROL32ri;
   m[llvm::X86::ROL64ri] = translate_ROL64ri;
-  m[llvm::X86::ROL64r1] = translate_ROL64r1;
   m[llvm::X86::ROR8m1] = translate_ROR8m1;
   m[llvm::X86::ROR8mCL] = translate_ROR8mCL;
   m[llvm::X86::ROR8mi] = translate_ROR8mi;
