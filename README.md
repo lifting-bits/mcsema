@@ -1,5 +1,26 @@
 # McSema [![Slack Chat](http://empireslacking.herokuapp.com/badge.svg)](https://empireslacking.herokuapp.com/)
 
+
+This version of mcsema is an attempt to translate (disass and lift)  mips binary into LLVM IR.
+Status:Binary To CFG -->>> DONE !
+not yet verified.
+
+CFG to IR ::: ongoing
+a few instructions translations are performed.[JR, JALR, ADDiu, ADDu, OR, LW, SW]
+a combo of header and cpp file is generated for all instructions to be supported.
+following are useful commands:
+
+1) compile for mips:
+mipsel-linux-gnu-gcc -fno-stack-protector -o hello-mipsel hello.c
+
+2)  disass for mips
+./mcsema-disass --disassembler /home/embd-sec/ida-6.95/idal64 --arch mipsl --os linux --output hello.cfg --binary /home/embd-sec/mips-bins/hello-mipsel --entrypoint main
+
+3) lift for mips
+./mcsema-lift -arch mipsl --os linux --cfg hello.cfg --entrypoint main --output hello.bc
+
+
+/* original Readme from mcsema */
 McSema lifts x86 and amd64 binaries to LLVM bitcode modules. McSema support both Linux and Windows binaries, and most x86 and amd64 instructions, including integer, FPU, and SSE operations.
 
 McSema is separated into two conceptual parts: control flow recovery and instruction translation. Control flow recovery is performed using the `mcsema-disass` tool, which uses IDA Pro to disassemble a binary file and produces a control flow graph. Instruction translation is performed using the `mcsema-lift` tool, which converts the control flow graph into LLVM bitcode.
