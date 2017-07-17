@@ -13,12 +13,14 @@ following are useful commands:
 1) compile for mips:
 mipsel-linux-gnu-gcc -fno-stack-protector -o hello-mipsel hello.c
 
-2)  disass for mips
+2)  disass for mips:
 ./mcsema-disass --disassembler /home/embd-sec/ida-6.95/idal64 --arch mipsl --os linux --output hello.cfg --binary /home/embd-sec/mips-bins/hello-mipsel --entrypoint main
 
-3) lift for mips
+3) lift for mips:
 ./mcsema-lift -arch mipsl --os linux --cfg hello.cfg --entrypoint main --output hello.bc
 
+4) recompiling back to executable: 
+clang-3.8 -target i686-pc-linux-gnu -o hello /home/embd-sec/stranger/mcsema/generated/ELF_32_linux.S hello.bc
 
 /* original Readme from mcsema */
 McSema lifts x86 and amd64 binaries to LLVM bitcode modules. McSema support both Linux and Windows binaries, and most x86 and amd64 instructions, including integer, FPU, and SSE operations.
