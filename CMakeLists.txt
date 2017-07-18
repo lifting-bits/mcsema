@@ -83,8 +83,7 @@ add_executable(mcsema-lift
   ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/ADDiu.cpp
   ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/ADDu.cpp
   ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/B.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/BEQ.cpp
-  ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/BNE.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/Bcc.cpp
   ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/JAL.cpp
   ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/JR.cpp
   ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/LUi.cpp

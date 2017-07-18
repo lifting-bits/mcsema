@@ -80,22 +80,7 @@ static InstTransResult translate_ORi(TranslationContext &ctx,
 
         }
         std::cout<<std::endl;
-/*
-	std::cout<<" block: "<<block<<std::endl;	
-        if( ip->has_external_ref())
-        {
-                std::cout<<"or has external ref\n";
-        }
-        else if( ip->is_data_offset() )
-        {
-                std::cout<<"or is data offset\n";
-        }
-        else
-        {
-                std::cout<<"or other\n";
-        }
-
-*/
+	
 	// or $dest $reg $reg
         op0 = inst.getOperand(0);
         //Value *rd = R_READ<32>(block, op0.getReg());
@@ -104,7 +89,7 @@ static InstTransResult translate_ORi(TranslationContext &ctx,
         Value *rs = R_READ<32>(block, op1.getReg());
 
         op2 = inst.getOperand(2);
-        Value *rt = R_READ<32>(block, op2.getReg());
+        Value *rt = CONST_V<32>(block, op2.getImm());
 
 	Value *res = BinaryOperator::Create(Instruction::Or, rs, rt, "", block); 
         

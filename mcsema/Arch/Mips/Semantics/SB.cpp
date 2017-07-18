@@ -54,8 +54,10 @@ static InstTransResult translate_SB(TranslationContext &ctx,
 				      llvm::BasicBlock *&block)
 {
 	InstTransResult ret;
-std::cout << "translate_SB -> " << std::endl;
-/*
+
+	auto ip = ctx.natI;
+        auto &inst = ip->get_inst();	
+
 	std::cout << "translate_SB -> " << std::hex << ip << ":-" << std::dec << inst.getNumOperands() << "\t-----" ;
 
         MCOperand op, op0, op1, op2;
@@ -93,8 +95,7 @@ std::cout << "translate_SB -> " << std::endl;
         
         M_WRITE<32>(ip, block, res, rt);
         
-	return ContinueBlock;*/
-	return ret;
+	return ContinueBlock;
 }
 
 void SB_populateDispatchMap(DispatchMap &m)

@@ -5,8 +5,7 @@
 #include "mcsema/Arch/Mips/Semantics/ADDiu.h"
 #include "mcsema/Arch/Mips/Semantics/ADDu.h"
 #include "mcsema/Arch/Mips/Semantics/B.h"
-#include "mcsema/Arch/Mips/Semantics/BEQ.h"
-#include "mcsema/Arch/Mips/Semantics/BNE.h"
+#include "mcsema/Arch/Mips/Semantics/Bcc.h"
 #include "mcsema/Arch/Mips/Semantics/JAL.h"
 #include "mcsema/Arch/Mips/Semantics/JALR.h"
 #include "mcsema/Arch/Mips/Semantics/JR.h"
@@ -45,8 +44,7 @@ void MipsInitInstructionDispatch(DispatchMap &dispatcher) {
   ADDiu_populateDispatchMap(dispatcher);
   ADDu_populateDispatchMap(dispatcher);
   B_populateDispatchMap(dispatcher);
-  BEQ_populateDispatchMap(dispatcher);
-  BNE_populateDispatchMap(dispatcher);
+  Bcc_populateDispatchMap(dispatcher);
   JAL_populateDispatchMap(dispatcher);
   JALR_populateDispatchMap(dispatcher);
   JR_populateDispatchMap(dispatcher);

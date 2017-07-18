@@ -107,8 +107,9 @@ static InstTransResult translate_NOR(TranslationContext &ctx,
         Value *rt = R_READ<32>(block, op2.getReg());
 
 	Value *res = BinaryOperator::Create(Instruction::Or, rs, rt, "", block); 
+	Value *resn = BinaryOperator::CreateNot(resn, "", block); 
         
-	R_WRITE<32>(block, op0.getReg(), res);
+	R_WRITE<32>(block, op0.getReg(), resn);
 	
 	return ContinueBlock;
 }

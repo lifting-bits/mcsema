@@ -88,31 +88,9 @@ static InstTransResult translate_AND(TranslationContext &ctx,
 
 	Value *srcReg = R_READ<32>(block, op1.getReg());
 	
-	if( ip->has_external_ref() )
-	{
-		std::cout<<"has external ref\n";
-	}else if( /*ip->has_imm_reference*/ ip->has_mem_reference ) {
-
-		// TODOSH
-		std::cout<<"has MEMORY reference\n";
-/*
-		Value *data_v = GLOBAL_DATA_OFFSET(block, natM, ip);
-		//Value *data_v = GLOBAL(block, natM, inst, ip, 1);
-
-		//Value *res = BinaryOperator::Create(Instruction::Add, srcReg, data_v, "", block);
-		
-		//R_WRITE<32>(block, op0.getReg(), M_READ<32>(ip, block, res)); //res);
-		R_WRITE<32>(block, op0.getReg(), data_v);
-*/		
-	}
-	else {
-		std::cout<<"in else\n";
-
-		Value *srcImm = CONST_V<32>(block, op2.getImm());
-		Value *res = BinaryOperator::Create(Instruction::Add, srcReg, srcImm, "", block);
-		R_WRITE<32>(block, op0.getReg(), res);
-
-	}
+	Value *srct = R_READ<32>(block, op2.getReg());
+	Value *res = BinaryOperator::Create(Instruction::And, srcReg, srct, "", block);
+	R_WRITE<32>(block, op0.getReg(), res);
 		
 	return ContinueBlock;
 }

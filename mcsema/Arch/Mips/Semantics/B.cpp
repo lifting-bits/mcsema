@@ -49,18 +49,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace llvm;
 
-
 static InstTransResult translate_B(TranslationContext &ctx, 
 				      llvm::BasicBlock *&block)
 {
 	InstTransResult ret;
-std::cout << "translate_B -> " << std::endl;
-/*	std::cout << "translate_B -> " << std::hex << ip << ":-" << std::dec << inst.getNumOperands() << "\t-----" ;
 	
-        MCOperand op, op0, op1, op2;
+	auto ip = ctx.natI;
+	auto &inst = ip->get_inst();
 
-        for(int i=0; i < inst.getNumOperands(); i++ )
-        {
+	std::cout << "translate_B -> " << std::hex << ip << ":-" << std::dec << inst.getNumOperands() << "\t-----" ;
+	
+    MCOperand op, op0, op1, op2;
+
+    for(int i=0; i < inst.getNumOperands(); i++ )
+    {
 
         op = inst.getOperand(i);
         if(op.isValid())
@@ -75,22 +77,18 @@ std::cout << "translate_B -> " << std::endl;
                         std::cout << "isFPImm " << op.getFPImm() << "\t";
 
         }
+    }
 
-        }
-        std::cout<<std::endl;
+    std::cout<<std::endl;
 
-        Function *F = block->getParent();
+    Function *F = block->getParent();
 
-	std::string trueStrName = "block_0x"+to_string<VA>(ip->get_tr(), std::hex); // verify
-	
-	//std::cout<< "truStrName = " << trueStrName << std::endl;
-	BasicBlock *ifTrue = bbFromStrName(trueStrName, F);
+	auto ifTrue = ctx.va_to_bb[ip->get_tr()];
 
 	//emit a branch 
 	BranchInst::Create( ifTrue, block );
 
- 	return EndBlock; */
-	return ret;
+ 	return EndBlock;
 }
 
 void B_populateDispatchMap(DispatchMap &m)

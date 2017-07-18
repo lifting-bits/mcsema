@@ -109,8 +109,8 @@ static InstTransResult translate_ADD(TranslationContext &ctx,
 	else {
 		std::cout<<"in else\n";
 
-		Value *srcImm = CONST_V<32>(block, op2.getImm());
-		Value *res = BinaryOperator::Create(Instruction::Add, srcReg, srcImm, "", block);
+		Value *srct = R_READ<32>(block, op2.getReg());
+		Value *res = BinaryOperator::Create(Instruction::Add, srcReg, srct, "", block);
 		R_WRITE<32>(block, op0.getReg(), res);
 
 	}

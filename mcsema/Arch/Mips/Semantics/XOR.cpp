@@ -106,7 +106,7 @@ static InstTransResult translate_XOR(TranslationContext &ctx,
         op2 = inst.getOperand(2);
         Value *rt = R_READ<32>(block, op2.getReg());
 
-	Value *res = BinaryOperator::Create(Instruction::Or, rs, rt, "", block); 
+	Value *res = BinaryOperator::Create(Instruction::Xor, rs, rt, "", block); 
         
 	R_WRITE<32>(block, op0.getReg(), res);
 	
