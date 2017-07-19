@@ -67,6 +67,7 @@ sudo apt-get install \
      cmake \
      python2.7 python-pip \
      build-essential \
+     gcc-multilib \
      realpath
 
 sudo pip install --upgrade pip

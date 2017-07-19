@@ -55,89 +55,74 @@ Memory *__mcsema_reg_tracer(Memory *memory, State &state, uintptr_t) {
 
 
 // Memory read intrinsics.
-[[gnu::noinline, gnu::used]]
 uint8_t __remill_read_memory_8(Memory *, addr_t addr) {
   return *reinterpret_cast<uint8_t *>(addr);
 }
 
-[[gnu::noinline, gnu::used]]
 uint16_t __remill_read_memory_16(Memory *, addr_t addr) {
-   return *reinterpret_cast<uint16_t *>(addr);
- }
+  return *reinterpret_cast<uint16_t *>(addr);
+}
 
-[[gnu::noinline, gnu::used]]
 uint32_t __remill_read_memory_32(Memory *, addr_t addr) {
-   return *reinterpret_cast<uint32_t *>(addr);
- }
+  return *reinterpret_cast<uint32_t *>(addr);
+}
 
-[[gnu::noinline, gnu::used]]
 uint64_t __remill_read_memory_64(Memory *, addr_t addr) {
-   return *reinterpret_cast<uint64_t *>(addr);
- }
+  return *reinterpret_cast<uint64_t *>(addr);
+}
 
 // Memory write intrinsics.
-[[gnu::noinline, gnu::used]]
 Memory *__remill_write_memory_8(
     Memory * memory, addr_t addr, uint8_t val) {
   *reinterpret_cast<uint8_t *>(addr) = val;
   return memory;
 }
 
-[[gnu::noinline, gnu::used]]
 Memory *__remill_write_memory_16(
     Memory * memory, addr_t addr, uint16_t val) {
   *reinterpret_cast<uint16_t *>(addr) = val;
   return memory;
 }
 
-[[gnu::noinline, gnu::used]]
 Memory *__remill_write_memory_32(
     Memory * memory, addr_t addr, uint32_t val) {
   *reinterpret_cast<uint32_t *>(addr) = val;
   return memory;
 }
 
-[[gnu::noinline, gnu::used]]
 Memory *__remill_write_memory_64(
     Memory * memory, addr_t addr, uint64_t val) {
   *reinterpret_cast<uint64_t *>(addr) = val;
   return memory;
 }
 
-[[gnu::noinline, gnu::used]]
 float32_t __remill_read_memory_f32(
     Memory *, addr_t addr, float32_t val) {
   return *reinterpret_cast<float32_t *>(addr);
 }
 
-[[gnu::noinline, gnu::used]]
 float64_t __remill_read_memory_f64(
     Memory *, addr_t addr, float64_t val) {
   return *reinterpret_cast<float64_t *>(addr);
 
 }
 
-
-[[gnu::noinline, gnu::used]]
 float64_t __remill_read_memory_f80(Memory *, addr_t addr) {
   return static_cast<float64_t>(*reinterpret_cast<long double *>(addr));
 }
 
-[[gnu::noinline, gnu::used]]
 Memory *__remill_write_memory_f32(
     Memory * memory, addr_t addr, float32_t val) {
   *reinterpret_cast<float32_t *>(addr) = val;
   return memory;
 }
 
-[[gnu::noinline, gnu::used]]
 Memory *__remill_write_memory_f64(
     Memory * memory, addr_t addr, float64_t val) {
   *reinterpret_cast<float64_t *>(addr) = val;
   return memory;
 }
 
-[[gnu::noinline, gnu::used]]
 Memory *__remill_write_memory_f80(
     Memory * memory, addr_t addr, float64_t val) {
   *reinterpret_cast<long double *>(addr) = static_cast<long double>(val);
@@ -145,34 +130,28 @@ Memory *__remill_write_memory_f80(
 }
 
 // Memory barriers types, see: http://g.oswego.edu/dl/jmm/cookbook.html
-[[gnu::noinline, gnu::used]]
 Memory *__remill_barrier_load_load(Memory * memory) {
   return memory;
 }
 
-[[gnu::noinline, gnu::used]]
 Memory *__remill_barrier_load_store(Memory * memory) {
   return memory;
 }
 
-[[gnu::noinline, gnu::used]]
 Memory *__remill_barrier_store_load(Memory * memory) {
   return memory;
 }
 
-[[gnu::noinline, gnu::used]]
 Memory *__remill_barrier_store_store(Memory * memory) {
   return memory;
 }
 
 // Atomic operations. The address/size are hints, but the granularity of the
 // access can be bigger. These have implicit StoreLoad semantics.
-[[gnu::noinline, gnu::used]]
 Memory *__remill_atomic_begin(Memory * memory) {
   return memory;
 }
 
-[[gnu::noinline, gnu::used]]
 Memory *__remill_atomic_end(Memory * memory) {
   return memory;
 }
