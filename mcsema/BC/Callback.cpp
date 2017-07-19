@@ -58,7 +58,8 @@ static llvm::Function *GetAttachCallFunc(void) {
     handler = llvm::Function::Create(
         callback_type, llvm::GlobalValue::ExternalLinkage,
         "__mcsema_attach_call", gModule);
-    handler->addFnAttr(llvm::Attribute::Naked);
+//    handler->addFnAttr(llvm::Attribute::Naked);
+    handler->addFnAttr(llvm::Attribute::NoInline);
     handler->setCallingConv(llvm::CallingConv::Fast);
   }
   return handler;
@@ -98,6 +99,8 @@ static llvm::Function *GetNativeToLiftedCallback(
   CHECK(func != nullptr)
       << "Cannot find lifted function " << cfg_func->lifted_name;
 
+  auto attach_func = GetAttachCallFunc();
+
   std::stringstream asm_str;
   switch (gArch->arch_name) {
     case remill::kArchInvalid:
@@ -109,22 +112,24 @@ static llvm::Function *GetNativeToLiftedCallback(
     case remill::kArchAMD64_AVX:
     case remill::kArchAMD64_AVX512:
       asm_str << "pushq %rax;"
-              << "movq $0, %rax;"
+              << "leaq ${0:P}, %rax;"
               << "xchgq (%rsp), %rax;"
               << "pushq %rax;"
               << "movq $1, %rax;"
-              << "xchgq (%rsp), %rax;";
+              << "xchgq (%rsp), %rax;"
+              << "jmp ${2:P};";
       break;
 
     case remill::kArchX86:
     case remill::kArchX86_AVX:
     case remill::kArchX86_AVX512:
       asm_str << "pushl %eax;"
-              << "movl $0, %eax;"
+              << "leal ${0:P}, %eax;"
               << "xchgl (%esp), %eax;"
               << "pushl %eax;"
               << "movl $1, %eax;"
-              << "xchgl (%esp), %eax;";
+              << "xchgl (%esp), %eax;"
+              << "jmp ${2:P};";
       break;
 
     case remill::kArchAArch64LittleEndian:
@@ -145,30 +150,25 @@ static llvm::Function *GetNativeToLiftedCallback(
   auto word_type = llvm::Type::getIntNTy(
       *gContext, static_cast<unsigned>(gArch->address_size));
 
-  // Saves a reg on the stack.
   std::vector<llvm::Type *> param_types;
-  param_types.push_back(llvm::PointerType::get(word_type, 0));
-  param_types.push_back(param_types[0]);
+  param_types.push_back(func->getType());
+  param_types.push_back(word_type);
+  param_types.push_back(attach_func->getType());
+
   auto asm_func_type = llvm::FunctionType::get(void_type, param_types, false);
   auto asm_func = llvm::InlineAsm::get(
-      asm_func_type, asm_str.str(), "*m,*m,~{dirflag},~{fpsr},~{flags}", true);
+      asm_func_type, asm_str.str(), "i,i,i,~{dirflag},~{fpsr},~{flags}", true);
 
   auto callback_func = CreateGenericCallback(callback_name);
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", callback_func));
 
   std::vector<llvm::Value *> asm_args;
-  asm_args.push_back(new llvm::GlobalVariable(
-      *gModule, word_type, true, llvm::GlobalValue::InternalLinkage,
-      llvm::ConstantExpr::getPtrToInt(func, word_type)));
+  asm_args.push_back(func);
+  asm_args.push_back(llvm::ConstantInt::get(word_type, cfg_func->ea));
+  asm_args.push_back(attach_func);
 
-  asm_args.push_back(new llvm::GlobalVariable(
-      *gModule, word_type, true, llvm::GlobalValue::InternalLinkage,
-      llvm::ConstantInt::get(word_type, cfg_func->ea)));
-
-  ir.CreateCall(asm_func, asm_args);
-
-  auto handler_call = ir.CreateCall(GetAttachCallFunc());
-  handler_call->setTailCall(true);
+  auto asm_call = ir.CreateCall(asm_func, asm_args);
+  asm_call->setTailCall(true);
   ir.CreateRetVoid();
 
   AnnotateInsts(callback_func, cfg_func->ea);

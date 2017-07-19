@@ -166,16 +166,16 @@ int main(void) {
   fprintf(out, "  lea rdi, QWORD PTR [__mcsema_reg_state@TPOFF]\n");
   fprintf(out, "  lea rsi, QWORD PTR [rsi + rdi]\n");
 
-  // Set up arg3 with the address of the lifted function, as it appeared in
+  // Set up arg1 with the address of the lifted function, as it appeared in
   // the original binary, also stash it into the `State` structure.
-  fprintf(out, "  mov [rsi + %" PRIuMAX "], rdx\n", __builtin_offsetof(State, RDX));
-  fprintf(out, "  pop rdx\n");  // Holds the lifted function address.
-  fprintf(out, "  mov [rsi + %" PRIuMAX "], rdx\n", __builtin_offsetof(State, RIP));
+  fprintf(out, "  pop rdi\n");  // Holds the lifted function address.
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rdi\n", __builtin_offsetof(State, RIP));
 
   // Remaining general purpose registers.
   fprintf(out, "  mov [rsi + %" PRIuMAX "], rax\n", __builtin_offsetof(State, RAX));
   fprintf(out, "  mov [rsi + %" PRIuMAX "], rbx\n", __builtin_offsetof(State, RBX));
   fprintf(out, "  mov [rsi + %" PRIuMAX "], rcx\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rdx\n", __builtin_offsetof(State, RDX));
   fprintf(out, "  mov [rsi + %" PRIuMAX "], rbp\n", __builtin_offsetof(State, RBP));
   fprintf(out, "  mov [rsi + %" PRIuMAX "], r8\n", __builtin_offsetof(State, R8));
   fprintf(out, "  mov [rsi + %" PRIuMAX "], r9\n", __builtin_offsetof(State, R9));
@@ -207,29 +207,29 @@ int main(void) {
   PrintLoadFlags(out);
 
   // If `RSP` is null then we need to initialize it to our new stack.
-  fprintf(out, "  mov rdi, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RSP));
-  fprintf(out, "  cmp rdi, 0\n");
+  fprintf(out, "  mov rdx, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  cmp rdx, 0\n");
   fprintf(out, "  jnz .Lhave_stack\n");
-  fprintf(out, "  mov rdi, fs:[0]\n");
+  fprintf(out, "  mov rdx, fs:[0]\n");
   fprintf(out, "  lea r8, QWORD PTR [__mcsema_reg_state@TPOFF]\n");
-  fprintf(out, "  lea rdi, QWORD PTR [rdi + r8 + %" PRIuMAX "]\n", kStackSize);
+  fprintf(out, "  lea rdx, QWORD PTR [rdx + r8 + %" PRIuMAX "]\n", kStackSize);
   fprintf(out, ".Lhave_stack:\n");
 
   // Set up a return address so that when the lifted function returns, it will
   // go to `__mcsema_detach_ret`, which will return to native code.
   fprintf(out, "  lea rax, [rip + __mcsema_detach_ret]\n");
-  fprintf(out, "  mov [rdi - 8], rax\n");
+  fprintf(out, "  mov [rdx - 8], rax\n");
 
   // Put the address of the lifted function onto the lifted stack, so that we
   // can `RET` into the lifted function.
-  fprintf(out, "  pop QWORD PTR [rdi - 16]\n");
+  fprintf(out, "  pop QWORD PTR [rdx - 16]\n");
 
   // Swap onto the lifted stack. The native `RSP` is now where it should be.
   fprintf(out, "  mov [rsi + %" PRIuMAX "], rsp\n", __builtin_offsetof(State, RSP));
-  fprintf(out, "  lea rsp, [rdi - 16]\n");
+  fprintf(out, "  lea rsp, [rdx - 16]\n");
 
-  // Set up arg1 as the memory pointer, which is (for now?) a nullptr.
-  fprintf(out, "  xor rdi, rdi\n");
+  // Set up arg3 as the memory pointer, which is (for now?) a nullptr.
+  fprintf(out, "  xor rdx, rdx\n");
 
   // The address of the lifted function is still on the stack, and `RDX` holds
   // the native PC of the original function.
@@ -323,8 +323,8 @@ int main(void) {
   // Stash the memory pointer. This is probably actually nothing. But for
   // generality, we will store and return it, as is expected by the prototype
   // of `__remill_function_call` (see remill/Arch/Runtime/Intrinsics.h).
-  fprintf(out, "  push rdi\n");  // Alignment.
-  fprintf(out, "  push rdi\n");
+  fprintf(out, "  push rdx\n");  // Alignment.
+  fprintf(out, "  push rdx\n");
 
   // Stash the callee-saved registers (amd64 ABI). These registers need to
   // be restored later so that things are as they should be when we return
@@ -346,10 +346,10 @@ int main(void) {
   // Emulate a push of the target address onto the native stack. We will
   // `ret` to the target later on.
   //
-  // Note: The target address is passed as arg3 (pc) to `__remill_function_call`
-  //       which is `RDX` in the AMD64 ABI.
+  // Note: The target address is passed as arg1 (pc) to `__remill_function_call`
+  //       which is `RDO` in the AMD64 ABI.
   fprintf(out, "  sub r15, 8\n");
-  fprintf(out, "  mov QWORD PTR [r15], rdx\n");
+  fprintf(out, "  mov QWORD PTR [r15], rdi\n");
 
   // Swap off-stack, stash the lifted stack pointer.
   fprintf(out, "  mov [rsi + %" PRIuMAX "], rsp\n", __builtin_offsetof(State, RSP));
@@ -394,7 +394,7 @@ int main(void) {
   // Swap out RSI.
   fprintf(out, "  mov rsi, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RSI));
 
-  // Code above put the native target address (stored in RDX on entry to
+  // Code above put the native target address (stored in RDI on entry to
   // `__remill_function_call`) on the stack, just below the return address,
   // which is now `__mcsema_attach_ret`), so we can `ret` and go to our
   // intended target.

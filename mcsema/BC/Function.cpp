@@ -108,23 +108,16 @@ static llvm::Function *GetLiftedFunction(const NativeModule *cfg_module,
   return nullptr;
 }
 
-// Call another lifted function, e.g. `sub_abc123`, or an intrinsic function,
-// e.g. `__remill_async_hyper_call`.
-static llvm::Value *AddSubFuncCall(llvm::BasicBlock *block,
-                                   llvm::Function *sub) {
-  auto call = llvm::CallInst::Create(
-      sub, remill::LiftedFunctionArgs(block), "", block);
-  call->setCallingConv(sub->getCallingConv());
-  return call;
-}
-
 // Add a call to another function, and then update the memory pointer with the
 // result of the function.
 static void InlineSubFuncCall(llvm::BasicBlock *block,
                               llvm::Function *sub) {
-  auto val = AddSubFuncCall(block, sub);
+  auto call = llvm::CallInst::Create(
+      sub, remill::LiftedFunctionArgs(block), "", block);
+  call->setCallingConv(sub->getCallingConv());
+  call->setTailCall(false);
   auto mem_ptr = remill::LoadMemoryPointerRef(block);
-  (void) new llvm::StoreInst(val, mem_ptr, block);
+  (void) new llvm::StoreInst(call, mem_ptr, block);
 }
 
 // Try to find a function. We start by assuming that `target_pc` is an
@@ -279,7 +272,7 @@ static bool TryLiftTerminator(TranslationContext &ctx,
       // new subroutine.
       if (inst.branch_taken_pc != inst.next_pc) {
         auto targ_func = FindFunction(ctx, inst.branch_taken_pc);
-        LOG(INFO)
+        DLOG(INFO)
             << "Function " << ctx.lifted_func->getName().str()
             << " calls " << targ_func->getName().str()
             << " at " << std::hex << inst.pc;
@@ -370,9 +363,6 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
   auto block_name = ctx.cfg_block->lifted_name;
   auto block_pc = ctx.cfg_block->ea;
   auto block = ctx.ea_to_block[block_pc];
-
-  // Store this program counter into the state structure.
-  remill::StoreProgramCounter(block, block_pc);
 
   // Lift each instruction into the block.
   size_t i = 0;

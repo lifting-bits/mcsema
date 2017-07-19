@@ -71,39 +71,17 @@ static std::vector<llvm::CallInst *> CallersOf(llvm::Function *func) {
   return callers;
 }
 
-// Replace all uses of a specific intrinsic with an undefined value.
+// Replace all uses of a specific intrinsic with an undefined value. We actually
+// don't use LLVM's `undef` values because those can behave unpredictably
+// across different LLVM versions with different optimization levels. Instead,
+// we use a null value (zero, really).
 static void ReplaceUndefIntrinsic(llvm::Function *function) {
   auto call_insts = CallersOf(function);
-
-  std::set<llvm::User *> work_list;
-  auto undef_val = llvm::UndefValue::get(function->getReturnType());
+  auto undef_val = llvm::Constant::getNullValue(function->getReturnType());
   for (auto call_inst : call_insts) {
-    work_list.insert(call_inst->user_begin(), call_inst->user_end());
     call_inst->replaceAllUsesWith(undef_val);
     call_inst->removeFromParent();
     delete call_inst;
-  }
-
-  // Try to propagate `undef` values produced from our intrinsics all the way
-  // to store instructions, and treat them as dead stores to be eliminated.
-  std::vector<llvm::StoreInst *> dead_stores;
-  while (work_list.size()) {
-    std::set<llvm::User *> next_work_list;
-    for (auto inst : work_list) {
-      if (llvm::isa<llvm::CmpInst>(inst) ||
-          llvm::isa<llvm::CastInst>(inst)) {
-        next_work_list.insert(inst->user_begin(), inst->user_end());
-        auto undef_val = llvm::UndefValue::get(inst->getType());
-        inst->replaceAllUsesWith(undef_val);
-      } else if (auto store_inst = llvm::dyn_cast<llvm::StoreInst>(inst)) {
-        dead_stores.push_back(store_inst);
-      }
-    }
-    work_list.swap(next_work_list);
-  }
-
-  for (auto dead_store : dead_stores) {
-    dead_store->eraseFromParent();
   }
 }
 
@@ -160,7 +138,7 @@ static void RunO3(void) {
 
 #if LLVM_VERSION_NUMBER >= LLVM_VERSION(3, 5)
   builder.DisableTailCalls = false;  // Enable tail calls.
-  builder.LoadCombine = true;
+  builder.LoadCombine = false;  // Don't allow load coalescing.
 #endif
 
   // TODO(pag): Not sure when these became available.
