@@ -15,6 +15,7 @@
  */
 
 #include <cstdio>
+#include <cinttypes>
 
 #define HAS_FEATURE_AVX 1
 #define HAS_FEATURE_AVX512 0
@@ -36,37 +37,37 @@ static void PrintStoreFlags(FILE * out) {
   fprintf(out, "  and QWORD PTR [rsp], rdx\n");
 
   fprintf(out, "  mov edx, 1\n");
-  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, CF));
+  fprintf(out, "  and dl, BYTE PTR [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, CF));
   fprintf(out, "  shl edx, 0\n");
   fprintf(out, "  or QWORD PTR [rsp], rdx\n");
 
   fprintf(out, "  mov edx, 1\n");
-  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, PF));
+  fprintf(out, "  and dl, BYTE PTR [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, PF));
   fprintf(out, "  shl edx, 2\n");
   fprintf(out, "  or QWORD PTR [rsp], rdx\n");
 
   fprintf(out, "  mov edx, 1\n");
-  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, AF));
+  fprintf(out, "  and dl, BYTE PTR [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, AF));
   fprintf(out, "  shl edx, 4\n");
   fprintf(out, "  or QWORD PTR [rsp], rdx\n");
 
   fprintf(out, "  mov edx, 1\n");
-  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, ZF));
+  fprintf(out, "  and dl, BYTE PTR [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, ZF));
   fprintf(out, "  shl edx, 6\n");
   fprintf(out, "  or QWORD PTR [rsp], rdx\n");
 
   fprintf(out, "  mov edx, 1\n");
-  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, SF));
+  fprintf(out, "  and dl, BYTE PTR [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, SF));
   fprintf(out, "  shl edx, 7\n");
   fprintf(out, "  or QWORD PTR [rsp], rdx\n");
 
   fprintf(out, "  mov edx, 1\n");
-  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, DF));
+  fprintf(out, "  and dl, BYTE PTR [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, DF));
   fprintf(out, "  shl edx, 10\n");
   fprintf(out, "  or QWORD PTR [rsp], rdx\n");
 
   fprintf(out, "  mov edx, 1\n");
-  fprintf(out, "  and dl, BYTE PTR [rsi + %lu]\n", __builtin_offsetof(State, OF));
+  fprintf(out, "  and dl, BYTE PTR [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, OF));
   fprintf(out, "  shl edx, 11\n");
   fprintf(out, "  or QWORD PTR [rsp], rdx\n");
 
@@ -78,33 +79,33 @@ static void PrintLoadFlags(FILE * out) {
   // Get the RFlags.
     fprintf(out, "  pushfq\n");
     fprintf(out, "  pop rdi\n");
-    fprintf(out, "  mov [rsi + %lu], rdi\n", __builtin_offsetof(State, rflag));
+    fprintf(out, "  mov [rsi + %" PRIuMAX "], rdi\n", __builtin_offsetof(State, rflag));
 
     // Clear our the `ArithFlags` struct, which is 16 bytes.
-    fprintf(out, "  mov QWORD PTR [rsi + %lu], 0\n", __builtin_offsetof(State, aflag));
-    fprintf(out, "  mov QWORD PTR [rsi + %lu], 0\n", __builtin_offsetof(State, aflag) + 8);
+    fprintf(out, "  mov QWORD PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, aflag));
+    fprintf(out, "  mov QWORD PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, aflag) + 8);
 
     // Marshal the RFlags into the ArithFlags struct.
     fprintf(out, "  bt rdi, 0\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, CF));
+    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, CF));
 
     fprintf(out, "  bt rdi, 2\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, PF));
+    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, PF));
 
     fprintf(out, "  bt rdi, 4\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, AF));
+    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, AF));
 
     fprintf(out, "  bt rdi, 6\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, ZF));
+    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, ZF));
 
     fprintf(out, "  bt rdi, 7\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, SF));
+    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, SF));
 
     fprintf(out, "  bt rdi, 10\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, DF));
+    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, DF));
 
     fprintf(out, "  bt rdi, 11\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %lu], 0\n", __builtin_offsetof(State, OF));
+    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, OF));
 }
 
 int main(void) {
@@ -121,8 +122,8 @@ int main(void) {
   fprintf(out, "  .section .tbss,\"awT\",@nobits\n");
   fprintf(out, "  .align 16\n");
   fprintf(out, "__mcsema_reg_state:\n");
-  fprintf(out, "  .zero %lu\n", sizeof(State));
-  fprintf(out, "  .size __mcsema_reg_state, %lu\n", sizeof(State));
+  fprintf(out, "  .zero %" PRIuMAX "\n", sizeof(State));
+  fprintf(out, "  .size __mcsema_reg_state, %" PRIuMAX "\n", sizeof(State));
   fprintf(out, "\n");
 
   // Thread-local stack structure, named by `__mcsema_stack`.
@@ -130,8 +131,8 @@ int main(void) {
   fprintf(out, "  .section .tbss,\"awT\",@nobits\n");
   fprintf(out, "  .align 16\n");
   fprintf(out, "__mcsema_stack:\n");
-  fprintf(out, "  .zero %lu\n", kStackSize);  // 1 MiB.
-  fprintf(out, "  .size __mcsema_stack, %lu\n", kStackSize);
+  fprintf(out, "  .zero %" PRIuMAX "\n", kStackSize);  // 1 MiB.
+  fprintf(out, "  .size __mcsema_stack, %" PRIuMAX "\n", kStackSize);
   fprintf(out, "\n");
 
   fprintf(out, "  .text\n");
@@ -155,58 +156,63 @@ int main(void) {
 
   // Set up arg2 with the address of the State structure. Also set up the `FS`
   // segment register so that TLS works :-)
-  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %lu], rsi\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "], rsi\n", __builtin_offsetof(State, RSI));
   fprintf(out, "  mov rsi, QWORD PTR fs:[0]\n");
-  fprintf(out, "  mov [rsi - __mcsema_reg_state@TPOFF + %lu], rsi\n", __builtin_offsetof(State, FS_BASE));
-  fprintf(out, "  lea rsi, QWORD PTR [rsi - __mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "], rsi\n", __builtin_offsetof(State, FS_BASE));
+
+  // GCC has trouble with relocations that do arithmetic with the TPOFF stuff,
+  // so we need a two-step process.
+  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "], rdi\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  lea rdi, QWORD PTR [__mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  lea rsi, QWORD PTR [rsi + rdi]\n");
 
   // Set up arg3 with the address of the lifted function, as it appeared in
   // the original binary, also stash it into the `State` structure.
-  fprintf(out, "  mov [rsi + %lu], rdx\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rdx\n", __builtin_offsetof(State, RDX));
   fprintf(out, "  pop rdx\n");  // Holds the lifted function address.
-  fprintf(out, "  mov [rsi + %lu], rdx\n", __builtin_offsetof(State, RIP));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rdx\n", __builtin_offsetof(State, RIP));
 
-  // General purpose registers.
-  fprintf(out, "  mov [rsi + %lu], rax\n", __builtin_offsetof(State, RAX));
-  fprintf(out, "  mov [rsi + %lu], rbx\n", __builtin_offsetof(State, RBX));
-  fprintf(out, "  mov [rsi + %lu], rcx\n", __builtin_offsetof(State, RCX));
-  fprintf(out, "  mov [rsi + %lu], rdi\n", __builtin_offsetof(State, RDI));
-  fprintf(out, "  mov [rsi + %lu], rbp\n", __builtin_offsetof(State, RBP));
-  fprintf(out, "  mov [rsi + %lu], r8\n", __builtin_offsetof(State, R8));
-  fprintf(out, "  mov [rsi + %lu], r9\n", __builtin_offsetof(State, R9));
-  fprintf(out, "  mov [rsi + %lu], r10\n", __builtin_offsetof(State, R10));
-  fprintf(out, "  mov [rsi + %lu], r11\n", __builtin_offsetof(State, R11));
-  fprintf(out, "  mov [rsi + %lu], r12\n", __builtin_offsetof(State, R12));
-  fprintf(out, "  mov [rsi + %lu], r13\n", __builtin_offsetof(State, R13));
-  fprintf(out, "  mov [rsi + %lu], r14\n", __builtin_offsetof(State, R14));
-  fprintf(out, "  mov [rsi + %lu], r15\n", __builtin_offsetof(State, R15));
+  // Remaining general purpose registers.
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rax\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rbx\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rcx\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rbp\n", __builtin_offsetof(State, RBP));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r8\n", __builtin_offsetof(State, R8));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r9\n", __builtin_offsetof(State, R9));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r10\n", __builtin_offsetof(State, R10));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r11\n", __builtin_offsetof(State, R11));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r12\n", __builtin_offsetof(State, R12));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r13\n", __builtin_offsetof(State, R13));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r14\n", __builtin_offsetof(State, R14));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r15\n", __builtin_offsetof(State, R15));
 
   // XMM registers.
-  fprintf(out, "  movntdq [rsi + %lu], xmm0\n", __builtin_offsetof(State, XMM0));
-  fprintf(out, "  movntdq [rsi + %lu], xmm1\n", __builtin_offsetof(State, XMM1));
-  fprintf(out, "  movntdq [rsi + %lu], xmm2\n", __builtin_offsetof(State, XMM2));
-  fprintf(out, "  movntdq [rsi + %lu], xmm3\n", __builtin_offsetof(State, XMM3));
-  fprintf(out, "  movntdq [rsi + %lu], xmm4\n", __builtin_offsetof(State, XMM4));
-  fprintf(out, "  movntdq [rsi + %lu], xmm5\n", __builtin_offsetof(State, XMM5));
-  fprintf(out, "  movntdq [rsi + %lu], xmm6\n", __builtin_offsetof(State, XMM6));
-  fprintf(out, "  movntdq [rsi + %lu], xmm7\n", __builtin_offsetof(State, XMM7));
-  fprintf(out, "  movntdq [rsi + %lu], xmm8\n", __builtin_offsetof(State, XMM8));
-  fprintf(out, "  movntdq [rsi + %lu], xmm9\n", __builtin_offsetof(State, XMM9));
-  fprintf(out, "  movntdq [rsi + %lu], xmm10\n", __builtin_offsetof(State, XMM10));
-  fprintf(out, "  movntdq [rsi + %lu], xmm11\n", __builtin_offsetof(State, XMM11));
-  fprintf(out, "  movntdq [rsi + %lu], xmm12\n", __builtin_offsetof(State, XMM12));
-  fprintf(out, "  movntdq [rsi + %lu], xmm13\n", __builtin_offsetof(State, XMM13));
-  fprintf(out, "  movntdq [rsi + %lu], xmm14\n", __builtin_offsetof(State, XMM14));
-  fprintf(out, "  movntdq [rsi + %lu], xmm15\n", __builtin_offsetof(State, XMM15));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm0\n", __builtin_offsetof(State, XMM0));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm1\n", __builtin_offsetof(State, XMM1));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm2\n", __builtin_offsetof(State, XMM2));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm3\n", __builtin_offsetof(State, XMM3));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm4\n", __builtin_offsetof(State, XMM4));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm5\n", __builtin_offsetof(State, XMM5));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm6\n", __builtin_offsetof(State, XMM6));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm7\n", __builtin_offsetof(State, XMM7));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm8\n", __builtin_offsetof(State, XMM8));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm9\n", __builtin_offsetof(State, XMM9));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm10\n", __builtin_offsetof(State, XMM10));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm11\n", __builtin_offsetof(State, XMM11));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm12\n", __builtin_offsetof(State, XMM12));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm13\n", __builtin_offsetof(State, XMM13));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm14\n", __builtin_offsetof(State, XMM14));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm15\n", __builtin_offsetof(State, XMM15));
 
   PrintLoadFlags(out);
 
   // If `RSP` is null then we need to initialize it to our new stack.
-  fprintf(out, "  mov rdi, [rsi + %lu]\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  mov rdi, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RSP));
   fprintf(out, "  cmp rdi, 0\n");
   fprintf(out, "  jnz .Lhave_stack\n");
   fprintf(out, "  mov rdi, fs:[0]\n");
-  fprintf(out, "  lea rdi, [rdi - __mcsema_stack@TPOFF + %lu]\n", kStackSize);
+  fprintf(out, "  lea r8, QWORD PTR [__mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  lea rdi, QWORD PTR [rdi + r8 + %" PRIuMAX "]\n", kStackSize);
   fprintf(out, ".Lhave_stack:\n");
 
   // Set up a return address so that when the lifted function returns, it will
@@ -219,7 +225,7 @@ int main(void) {
   fprintf(out, "  pop QWORD PTR [rdi - 16]\n");
 
   // Swap onto the lifted stack. The native `RSP` is now where it should be.
-  fprintf(out, "  mov [rsi + %lu], rsp\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rsp\n", __builtin_offsetof(State, RSP));
   fprintf(out, "  lea rsp, [rdi - 16]\n");
 
   // Set up arg1 as the memory pointer, which is (for now?) a nullptr.
@@ -247,53 +253,55 @@ int main(void) {
   fprintf(out, "__mcsema_detach_ret:\n");
   fprintf(out, "  .cfi_startproc\n");
 
+  // RAX holds the memory pointer, which is null.
   fprintf(out, "  mov rsi, QWORD PTR fs:[0]\n");
-  fprintf(out, "  lea rsi, QWORD PTR [rsi - __mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  lea rax, QWORD PTR [__mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  lea rsi, QWORD PTR [rsi + rax]\n");
 
   // The lifted code emulated a ret, which incremented `rsp` by 8.
   // We "undo" that, then swap back to the native stack. When we swap, we
   // save into `State::RSP` where we are in the lifted stack, so that the
   // next attach can continue on where we left off.
-  fprintf(out, "  sub QWORD PTR [rsi + %lu], 8\n", __builtin_offsetof(State, RSP));
-  fprintf(out, "  xchg [rsi + %lu], rsp\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  sub QWORD PTR [rsi + %" PRIuMAX "], 8\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  xchg [rsi + %" PRIuMAX "], rsp\n", __builtin_offsetof(State, RSP));
 
   // General purpose registers.
-  fprintf(out, "  mov rax, [rsi + %lu]\n", __builtin_offsetof(State, RAX));
-  fprintf(out, "  mov rbx, [rsi + %lu]\n", __builtin_offsetof(State, RBX));
-  fprintf(out, "  mov rcx, [rsi + %lu]\n", __builtin_offsetof(State, RCX));
-  fprintf(out, "  mov rdx, [rsi + %lu]\n", __builtin_offsetof(State, RDX));
-  fprintf(out, "  mov rdi, [rsi + %lu]\n", __builtin_offsetof(State, RDI));
-  fprintf(out, "  mov rbp, [rsi + %lu]\n", __builtin_offsetof(State, RBP));
-  fprintf(out, "  mov r8, [rsi + %lu]\n", __builtin_offsetof(State, R8));
-  fprintf(out, "  mov r9, [rsi + %lu]\n", __builtin_offsetof(State, R9));
-  fprintf(out, "  mov r10, [rsi + %lu]\n", __builtin_offsetof(State, R10));
-  fprintf(out, "  mov r11, [rsi + %lu]\n", __builtin_offsetof(State, R11));
-  fprintf(out, "  mov r12, [rsi + %lu]\n", __builtin_offsetof(State, R12));
-  fprintf(out, "  mov r13, [rsi + %lu]\n", __builtin_offsetof(State, R13));
-  fprintf(out, "  mov r14, [rsi + %lu]\n", __builtin_offsetof(State, R14));
-  fprintf(out, "  mov r15, [rsi + %lu]\n", __builtin_offsetof(State, R15));
+  fprintf(out, "  mov rax, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov rbx, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov rcx, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov rdx, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  mov rdi, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov rbp, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RBP));
+  fprintf(out, "  mov r8, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R8));
+  fprintf(out, "  mov r9, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R9));
+  fprintf(out, "  mov r10, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R10));
+  fprintf(out, "  mov r11, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R11));
+  fprintf(out, "  mov r12, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R12));
+  fprintf(out, "  mov r13, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R13));
+  fprintf(out, "  mov r14, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R14));
+  fprintf(out, "  mov r15, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R15));
 
   // XMM registers.
-  fprintf(out, "  movntdqa xmm0, [rsi + %lu]\n", __builtin_offsetof(State, XMM0));
-  fprintf(out, "  movntdqa xmm1, [rsi + %lu]\n", __builtin_offsetof(State, XMM1));
-  fprintf(out, "  movntdqa xmm2, [rsi + %lu]\n", __builtin_offsetof(State, XMM2));
-  fprintf(out, "  movntdqa xmm3, [rsi + %lu]\n", __builtin_offsetof(State, XMM3));
-  fprintf(out, "  movntdqa xmm4, [rsi + %lu]\n", __builtin_offsetof(State, XMM4));
-  fprintf(out, "  movntdqa xmm5, [rsi + %lu]\n", __builtin_offsetof(State, XMM5));
-  fprintf(out, "  movntdqa xmm6, [rsi + %lu]\n", __builtin_offsetof(State, XMM6));
-  fprintf(out, "  movntdqa xmm7, [rsi + %lu]\n", __builtin_offsetof(State, XMM7));
-  fprintf(out, "  movntdqa xmm8, [rsi + %lu]\n", __builtin_offsetof(State, XMM8));
-  fprintf(out, "  movntdqa xmm9, [rsi + %lu]\n", __builtin_offsetof(State, XMM9));
-  fprintf(out, "  movntdqa xmm10, [rsi + %lu]\n", __builtin_offsetof(State, XMM10));
-  fprintf(out, "  movntdqa xmm11, [rsi + %lu]\n", __builtin_offsetof(State, XMM11));
-  fprintf(out, "  movntdqa xmm12, [rsi + %lu]\n", __builtin_offsetof(State, XMM12));
-  fprintf(out, "  movntdqa xmm13, [rsi + %lu]\n", __builtin_offsetof(State, XMM13));
-  fprintf(out, "  movntdqa xmm14, [rsi + %lu]\n", __builtin_offsetof(State, XMM14));
-  fprintf(out, "  movntdqa xmm15, [rsi + %lu]\n", __builtin_offsetof(State, XMM15));
+  fprintf(out, "  movntdqa xmm0, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM0));
+  fprintf(out, "  movntdqa xmm1, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM1));
+  fprintf(out, "  movntdqa xmm2, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM2));
+  fprintf(out, "  movntdqa xmm3, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM3));
+  fprintf(out, "  movntdqa xmm4, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM4));
+  fprintf(out, "  movntdqa xmm5, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM5));
+  fprintf(out, "  movntdqa xmm6, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM6));
+  fprintf(out, "  movntdqa xmm7, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM7));
+  fprintf(out, "  movntdqa xmm8, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM8));
+  fprintf(out, "  movntdqa xmm9, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM9));
+  fprintf(out, "  movntdqa xmm10, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM10));
+  fprintf(out, "  movntdqa xmm11, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM11));
+  fprintf(out, "  movntdqa xmm12, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM12));
+  fprintf(out, "  movntdqa xmm13, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM13));
+  fprintf(out, "  movntdqa xmm14, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM14));
+  fprintf(out, "  movntdqa xmm15, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM15));
 
   PrintStoreFlags(out);
 
-  fprintf(out, "  mov rsi, [rsi + %lu]\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov rsi, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RSI));
   fprintf(out, "  ret\n");
 
   fprintf(out, ".Lfunc_end3:\n");
@@ -330,7 +338,7 @@ int main(void) {
 
   // Stash the return address stored on the native stack, the replace it
   // with the re-attach function.
-  fprintf(out, "  mov r15, [rsi + %lu]\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  mov r15, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RSP));
   fprintf(out, "  push QWORD PTR [r15]\n");
   fprintf(out, "  lea r14, [rip + __mcsema_attach_ret]\n");
   fprintf(out, "  mov QWORD PTR [r15], r14\n");
@@ -344,47 +352,47 @@ int main(void) {
   fprintf(out, "  mov QWORD PTR [r15], rdx\n");
 
   // Swap off-stack, stash the lifted stack pointer.
-  fprintf(out, "  mov [rsi + %lu], rsp\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rsp\n", __builtin_offsetof(State, RSP));
   fprintf(out, "  mov rsp, r15\n");
 
   // (Most) General purpose registers.
-  fprintf(out, "  mov rax, [rsi + %lu]\n", __builtin_offsetof(State, RAX));
-  fprintf(out, "  mov rbx, [rsi + %lu]\n", __builtin_offsetof(State, RBX));
-  fprintf(out, "  mov rcx, [rsi + %lu]\n", __builtin_offsetof(State, RCX));
-  fprintf(out, "  mov rdx, [rsi + %lu]\n", __builtin_offsetof(State, RDX));
-  fprintf(out, "  mov rdi, [rsi + %lu]\n", __builtin_offsetof(State, RDI));
-  fprintf(out, "  mov rbp, [rsi + %lu]\n", __builtin_offsetof(State, RBP));
-  fprintf(out, "  mov r8, [rsi + %lu]\n", __builtin_offsetof(State, R8));
-  fprintf(out, "  mov r9, [rsi + %lu]\n", __builtin_offsetof(State, R9));
-  fprintf(out, "  mov r10, [rsi + %lu]\n", __builtin_offsetof(State, R10));
-  fprintf(out, "  mov r11, [rsi + %lu]\n", __builtin_offsetof(State, R11));
-  fprintf(out, "  mov r12, [rsi + %lu]\n", __builtin_offsetof(State, R12));
-  fprintf(out, "  mov r13, [rsi + %lu]\n", __builtin_offsetof(State, R13));
-  fprintf(out, "  mov r14, [rsi + %lu]\n", __builtin_offsetof(State, R14));
-  fprintf(out, "  mov r15, [rsi + %lu]\n", __builtin_offsetof(State, R15));
+  fprintf(out, "  mov rax, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov rbx, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov rcx, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov rdx, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  mov rdi, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov rbp, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RBP));
+  fprintf(out, "  mov r8, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R8));
+  fprintf(out, "  mov r9, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R9));
+  fprintf(out, "  mov r10, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R10));
+  fprintf(out, "  mov r11, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R11));
+  fprintf(out, "  mov r12, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R12));
+  fprintf(out, "  mov r13, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R13));
+  fprintf(out, "  mov r14, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R14));
+  fprintf(out, "  mov r15, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, R15));
 
   // XMM registers.
-  fprintf(out, "  movntdqa xmm0, [rsi + %lu]\n", __builtin_offsetof(State, XMM0));
-  fprintf(out, "  movntdqa xmm1, [rsi + %lu]\n", __builtin_offsetof(State, XMM1));
-  fprintf(out, "  movntdqa xmm2, [rsi + %lu]\n", __builtin_offsetof(State, XMM2));
-  fprintf(out, "  movntdqa xmm3, [rsi + %lu]\n", __builtin_offsetof(State, XMM3));
-  fprintf(out, "  movntdqa xmm4, [rsi + %lu]\n", __builtin_offsetof(State, XMM4));
-  fprintf(out, "  movntdqa xmm5, [rsi + %lu]\n", __builtin_offsetof(State, XMM5));
-  fprintf(out, "  movntdqa xmm6, [rsi + %lu]\n", __builtin_offsetof(State, XMM6));
-  fprintf(out, "  movntdqa xmm7, [rsi + %lu]\n", __builtin_offsetof(State, XMM7));
-  fprintf(out, "  movntdqa xmm8, [rsi + %lu]\n", __builtin_offsetof(State, XMM8));
-  fprintf(out, "  movntdqa xmm9, [rsi + %lu]\n", __builtin_offsetof(State, XMM9));
-  fprintf(out, "  movntdqa xmm10, [rsi + %lu]\n", __builtin_offsetof(State, XMM10));
-  fprintf(out, "  movntdqa xmm11, [rsi + %lu]\n", __builtin_offsetof(State, XMM11));
-  fprintf(out, "  movntdqa xmm12, [rsi + %lu]\n", __builtin_offsetof(State, XMM12));
-  fprintf(out, "  movntdqa xmm13, [rsi + %lu]\n", __builtin_offsetof(State, XMM13));
-  fprintf(out, "  movntdqa xmm14, [rsi + %lu]\n", __builtin_offsetof(State, XMM14));
-  fprintf(out, "  movntdqa xmm15, [rsi + %lu]\n", __builtin_offsetof(State, XMM15));
+  fprintf(out, "  movntdqa xmm0, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM0));
+  fprintf(out, "  movntdqa xmm1, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM1));
+  fprintf(out, "  movntdqa xmm2, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM2));
+  fprintf(out, "  movntdqa xmm3, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM3));
+  fprintf(out, "  movntdqa xmm4, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM4));
+  fprintf(out, "  movntdqa xmm5, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM5));
+  fprintf(out, "  movntdqa xmm6, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM6));
+  fprintf(out, "  movntdqa xmm7, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM7));
+  fprintf(out, "  movntdqa xmm8, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM8));
+  fprintf(out, "  movntdqa xmm9, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM9));
+  fprintf(out, "  movntdqa xmm10, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM10));
+  fprintf(out, "  movntdqa xmm11, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM11));
+  fprintf(out, "  movntdqa xmm12, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM12));
+  fprintf(out, "  movntdqa xmm13, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM13));
+  fprintf(out, "  movntdqa xmm14, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM14));
+  fprintf(out, "  movntdqa xmm15, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM15));
 
   PrintStoreFlags (out);
 
   // Swap out RSI.
-  fprintf(out, "  mov rsi, [rsi + %lu]\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov rsi, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RSI));
 
   // Code above put the native target address (stored in RDX on entry to
   // `__remill_function_call`) on the stack, just below the return address,
@@ -407,47 +415,50 @@ int main(void) {
   // Copy RSI, then store the address of the reg state struct into RSI for
   // easier indexing later on. Also set up the `FS` segment register so that
   // TLS works :-)
-  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %lu], rsi\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "], rsi\n", __builtin_offsetof(State, RSI));
+
   fprintf(out, "  mov rsi, QWORD PTR fs:[0]\n");
-  fprintf(out, "  mov [rsi - __mcsema_reg_state@TPOFF + %lu], rsi\n", __builtin_offsetof(State, FS_BASE));
-  fprintf(out, "  lea rsi, QWORD PTR [rsi - __mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "], rsi\n", __builtin_offsetof(State, FS_BASE));
+  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "], rdi\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  lea rdi, [__mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  lea rsi, QWORD PTR [rsi + rdi]\n");
 
   // General purpose registers.
-  fprintf(out, "  mov [rsi + %lu], rax\n", __builtin_offsetof(State, RAX));
-  fprintf(out, "  mov [rsi + %lu], rbx\n", __builtin_offsetof(State, RBX));
-  fprintf(out, "  mov [rsi + %lu], rcx\n", __builtin_offsetof(State, RCX));
-  fprintf(out, "  mov [rsi + %lu], rdx\n", __builtin_offsetof(State, RDX));
-  fprintf(out, "  mov [rsi + %lu], rdi\n", __builtin_offsetof(State, RDI));
-  fprintf(out, "  mov [rsi + %lu], rbp\n", __builtin_offsetof(State, RBP));
-  fprintf(out, "  mov [rsi + %lu], r8\n", __builtin_offsetof(State, R8));
-  fprintf(out, "  mov [rsi + %lu], r9\n", __builtin_offsetof(State, R9));
-  fprintf(out, "  mov [rsi + %lu], r10\n", __builtin_offsetof(State, R10));
-  fprintf(out, "  mov [rsi + %lu], r11\n", __builtin_offsetof(State, R11));
-  fprintf(out, "  mov [rsi + %lu], r12\n", __builtin_offsetof(State, R12));
-  fprintf(out, "  mov [rsi + %lu], r13\n", __builtin_offsetof(State, R13));
-  fprintf(out, "  mov [rsi + %lu], r14\n", __builtin_offsetof(State, R14));
-  fprintf(out, "  mov [rsi + %lu], r15\n", __builtin_offsetof(State, R15));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rax\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rbx\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rcx\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rdx\n", __builtin_offsetof(State, RDX));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rdi\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rbp\n", __builtin_offsetof(State, RBP));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r8\n", __builtin_offsetof(State, R8));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r9\n", __builtin_offsetof(State, R9));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r10\n", __builtin_offsetof(State, R10));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r11\n", __builtin_offsetof(State, R11));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r12\n", __builtin_offsetof(State, R12));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r13\n", __builtin_offsetof(State, R13));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r14\n", __builtin_offsetof(State, R14));
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], r15\n", __builtin_offsetof(State, R15));
 
   // Swap into the mcsema stack.
-  fprintf(out, "  xchg rsp, [rsi + %lu]\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  xchg rsp, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RSP));
 
   // XMM registers.
-  fprintf(out, "  movntdq [rsi + %lu], xmm0\n", __builtin_offsetof(State, XMM0));
-  fprintf(out, "  movntdq [rsi + %lu], xmm1\n", __builtin_offsetof(State, XMM1));
-  fprintf(out, "  movntdq [rsi + %lu], xmm2\n", __builtin_offsetof(State, XMM2));
-  fprintf(out, "  movntdq [rsi + %lu], xmm3\n", __builtin_offsetof(State, XMM3));
-  fprintf(out, "  movntdq [rsi + %lu], xmm4\n", __builtin_offsetof(State, XMM4));
-  fprintf(out, "  movntdq [rsi + %lu], xmm5\n", __builtin_offsetof(State, XMM5));
-  fprintf(out, "  movntdq [rsi + %lu], xmm6\n", __builtin_offsetof(State, XMM6));
-  fprintf(out, "  movntdq [rsi + %lu], xmm7\n", __builtin_offsetof(State, XMM7));
-  fprintf(out, "  movntdq [rsi + %lu], xmm8\n", __builtin_offsetof(State, XMM8));
-  fprintf(out, "  movntdq [rsi + %lu], xmm9\n", __builtin_offsetof(State, XMM9));
-  fprintf(out, "  movntdq [rsi + %lu], xmm10\n", __builtin_offsetof(State, XMM10));
-  fprintf(out, "  movntdq [rsi + %lu], xmm11\n", __builtin_offsetof(State, XMM11));
-  fprintf(out, "  movntdq [rsi + %lu], xmm12\n", __builtin_offsetof(State, XMM12));
-  fprintf(out, "  movntdq [rsi + %lu], xmm13\n", __builtin_offsetof(State, XMM13));
-  fprintf(out, "  movntdq [rsi + %lu], xmm14\n", __builtin_offsetof(State, XMM14));
-  fprintf(out, "  movntdq [rsi + %lu], xmm15\n", __builtin_offsetof(State, XMM15));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm0\n", __builtin_offsetof(State, XMM0));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm1\n", __builtin_offsetof(State, XMM1));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm2\n", __builtin_offsetof(State, XMM2));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm3\n", __builtin_offsetof(State, XMM3));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm4\n", __builtin_offsetof(State, XMM4));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm5\n", __builtin_offsetof(State, XMM5));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm6\n", __builtin_offsetof(State, XMM6));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm7\n", __builtin_offsetof(State, XMM7));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm8\n", __builtin_offsetof(State, XMM8));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm9\n", __builtin_offsetof(State, XMM9));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm10\n", __builtin_offsetof(State, XMM10));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm11\n", __builtin_offsetof(State, XMM11));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm12\n", __builtin_offsetof(State, XMM12));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm13\n", __builtin_offsetof(State, XMM13));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm14\n", __builtin_offsetof(State, XMM14));
+  fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm15\n", __builtin_offsetof(State, XMM15));
 
   PrintLoadFlags (out);
 
@@ -460,7 +471,7 @@ int main(void) {
   //    48    stashed rbx
 
   // Restore emulated return address.
-  fprintf(out, "  pop QWORD PTR [rsi + %lu]\n", __builtin_offsetof(State, RIP));
+  fprintf(out, "  pop QWORD PTR [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RIP));
 
   // Callee-saved registers.
   fprintf(out, "  pop r15\n");
@@ -488,7 +499,8 @@ int main(void) {
   fprintf(out, "__mcsema_debug_get_reg_state:\n");
   fprintf(out, "  .cfi_startproc\n");
   fprintf(out, "  mov rax, fs:[0]\n");
-  fprintf(out, "  lea rax, [rax - __mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  lea rdx, [__mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  lea rax, [rax + rdx]\n");
   fprintf(out, "  ret\n");
   fprintf(out, ".Lfunc_end6:\n");
   fprintf(out, "  .size __mcsema_debug_get_reg_state,.Lfunc_end6-__mcsema_debug_get_reg_state\n");
@@ -513,171 +525,6 @@ int main(void) {
   fprintf(out, "__remill_function_return:\n");
   fprintf(out, "__remill_sync_hyper_call:\n");
   fprintf(out, "  ud2\n");
-
-  // Memory read intrinsics.
-#if 0
-  fprintf(out, "  .globl __remill_read_memory_8\n");
-  fprintf(out, "  .type __remill_read_memory_8,@function\n");
-  fprintf(out, "__remill_read_memory_8:\n");
-  fprintf(out, "  .cfi_startproc\n");
-  fprintf(out, "  xor eax, eax\n");
-  fprintf(out, "  mov al, BYTE PTR [rsi]\n");
-  fprintf(out, "  ret\n");
-  fprintf(out, ".Lfunc_end7:\n");static void PrintLoadFlags(FILE * out);
-  fprintf(out, "  .size __remill_read_memory_8,.Lfunc_end7-__remill_read_memory_8\n");
-  fprintf(out, "  .cfi_endproc\n");
-  fprintf(out, "\n");
-
-  fprintf(out, "  .globl __remill_read_memory_16\n");
-  fprintf(out, "  .type __remill_read_memory_16,@function\n");
-  fprintf(out, "__remill_read_memory_16:\n");
-  fprintf(out, "  .cfi_startproc\n");
-  fprintf(out, "  xor eax, eax\n");
-  fprintf(out, "  mov ax, WORD PTR [rsi]\n");
-  fprintf(out, "  ret\n");
-  fprintf(out, ".Lfunc_end8:\n");
-  fprintf(out, "  .size __remill_read_memory_16,.Lfunc_end8-__remill_read_memory_16\n");
-  fprintf(out, "  .cfi_endproc\n");
-  fprintf(out, "\n");
-
-  fprintf(out, "  .globl __remill_read_memory_32\n");
-  fprintf(out, "  .type __remill_read_memory_32,@function\n");
-  fprintf(out, "__remill_read_memory_32:\n");
-  fprintf(out, "  .cfi_startproc\n");
-  fprintf(out, "  mov eax, DWORD PTR [rsi]\n");
-  fprintf(out, "  ret\n");
-  fprintf(out, ".Lfunc_end9:\n");
-  fprintf(out, "  .size __remill_read_memory_32,.Lfunc_end9-__remill_read_memory_32\n");
-  fprintf(out, "  .cfi_endproc\n");
-  fprintf(out, "\n");
-
-  fprintf(out, "  .globl __remill_read_memory_64\n");
-  fprintf(out, "  .type __remill_read_memory_64,@function\n");
-  fprintf(out, "__remill_read_memory_64:\n");
-  fprintf(out, "  .cfi_startproc\n");
-  fprintf(out, "  mov rax, QWORD PTR [rsi]\n");
-  fprintf(out, "  ret\n");
-  fprintf(out, ".Lfunc_end10:\n");
-  fprintf(out, "  .size __remill_read_memory_64,.Lfunc_end10-__remill_read_memory_64\n");
-  fprintf(out, "  .cfi_endproc\n");
-  fprintf(out, "\n");
-
-  fprintf(out, "  .globl __remill_read_memory_f32\n");
-  fprintf(out, "  .type __remill_read_memory_f32,@function\n");
-  fprintf(out, "__remill_read_memory_f32:\n");
-  fprintf(out, "  .cfi_startproc\n");
-  fprintf(out, "  movd xmm0, DWORD PTR [rsi] \n");
-  fprintf(out, "  ret\n");
-  fprintf(out, ".Lfunc_endf9:\n");
-  fprintf(out, "  .size __remill_read_memory_f32,.Lfunc_endf9-__remill_read_memory_f32\n");
-  fprintf(out, "  .cfi_endproc\n");
-  fprintf(out, "\n");
-
-  fprintf(out, "  .globl __remill_read_memory_f64\n");
-  fprintf(out, "  .type __remill_read_memory_f64,@function\n");
-  fprintf(out, "__remill_read_memory_f64:\n");
-  fprintf(out, "  .cfi_startproc\n");
-  fprintf(out, "  movq xmm0, QWORD PTR [rsi] \n");
-  fprintf(out, "  ret\n");
-  fprintf(out, ".Lfunc_endf10:\n");
-  fprintf(out, "  .size __remill_read_memory_f64,.Lfunc_endf9-__remill_read_memory_f64\n");
-  fprintf(out, "  .cfi_endproc\n");
-  fprintf(out, "\n");
-
-  // Memory write intrinsics.
-  fprintf(out, "  .globl __remill_write_memory_8\n");
-  fprintf(out, "  .type __remill_write_memory_8,@function\n");
-  fprintf(out, "__remill_write_memory_8:\n");
-  fprintf(out, "  .cfi_startproc\n");
-  fprintf(out, "  mov BYTE PTR [rsi], dl\n");
-  fprintf(out, "  mov rax, rdi\n");
-  fprintf(out, "  ret\n");
-  fprintf(out, ".Lfunc_end11:\n");
-  fprintf(out, "  .size __remill_write_memory_8,.Lfunc_end11-__remill_write_memory_8\n");
-  fprintf(out, "  .cfi_endproc\n");
-  fprintf(out, "\n");
-
-  fprintf(out, "  .globl __remill_write_memory_16\n");
-  fprintf(out, "  .type __remill_write_memory_16,@function\n");
-  fprintf(out, "__remill_write_memory_16:\n");
-  fprintf(out, "  .cfi_startproc\n");
-  fprintf(out, "  mov WORD PTR [rsi], dx\n");
-  fprintf(out, "  mov rax, rdi\n");
-  fprintf(out, "  ret\n");
-  fprintf(out, ".Lfunc_end12:\n");
-  fprintf(out, "  .size __remill_write_memory_16,.Lfunc_end12-__remill_write_memory_16\n");
-  fprintf(out, "  .cfi_endproc\n");
-  fprintf(out, "\n");
-
-  fprintf(out, "  .globl __remill_write_memory_32\n");
-  fprintf(out, "  .type __remill_write_memory_32,@function\n");
-  fprintf(out, "__remill_write_memory_32:\n");
-  fprintf(out, "  .cfi_startproc\n");
-  fprintf(out, "  mov DWORD PTR [rsi], edx\n");
-  fprintf(out, "  mov rax, rdi\n");
-  fprintf(out, "  ret\n");
-  fprintf(out, ".Lfunc_end13:\n");
-  fprintf(out, "  .size __remill_write_memory_32,.Lfunc_end13-__remill_write_memory_32\n");
-  fprintf(out, "  .cfi_endproc\n");
-  fprintf(out, "\n");
-
-  fprintf(out, "  .globl __remill_write_memory_64\n");
-  fprintf(out, "  .type __remill_write_memory_64,@function\n");
-  fprintf(out, "__remill_write_memory_64:\n");
-  fprintf(out, "  .cfi_startproc\n");
-  fprintf(out, "  mov QWORD PTR [rsi], rdx\n");
-  fprintf(out, "  mov rax, rdi\n");
-  fprintf(out, "  ret\n");
-  fprintf(out, ".Lfunc_end14:\n");
-  fprintf(out, "  .size __remill_write_memory_64,.Lfunc_end14-__remill_write_memory_64\n");
-  fprintf(out, "  .cfi_endproc\n");
-  fprintf(out, "\n");
-
-  fprintf(out, "  .globl __remill_write_memory_f32\n");
-  fprintf(out, "  .type __remill_write_memory_f32,@function\n");
-  fprintf(out, "__remill_write_memory_f32:\n");
-  fprintf(out, "  .cfi_startproc\n");
-  fprintf(out, "  movd DWORD PTR [rsi], xmm0\n");
-  fprintf(out, "  mov rax, rdi\n");
-  fprintf(out, "  ret\n");
-  fprintf(out, ".Lfunc_end15:\n");
-  fprintf(out, "  .size __remill_write_memory_f32,.Lfunc_end15-__remill_write_memory_f32\n");
-  fprintf(out, "  .cfi_endproc\n");
-  fprintf(out, "\n");
-
-  fprintf(out, "  .globl __remill_write_memory_f64\n");
-  fprintf(out, "  .type __remill_write_memory_f64,@function\n");
-  fprintf(out, "__remill_write_memory_f64:\n");
-  fprintf(out, "  .cfi_startproc\n");
-  fprintf(out, "  movq QWORD PTR [rsi], xmm0\n");
-  fprintf(out, "  mov rax, rdi\n");
-  fprintf(out, "  ret\n");
-  fprintf(out, ".Lfunc_end16:\n");
-  fprintf(out, "  .size __remill_write_memory_f64,.Lfunc_end16-__remill_write_memory_f64\n");
-  fprintf(out, "  .cfi_endproc\n");
-  fprintf(out, "\n");
-
-
-  fprintf(out, "  .globl __remill_atomic_begin\n");
-  fprintf(out, "  .globl __remill_atomic_end\n");
-  fprintf(out, "  .globl __remill_barrier_load_store\n");
-  fprintf(out, "  .globl __remill_barrier_load_load\n");
-  fprintf(out, "  .globl __remill_barrier_store_load\n");
-  fprintf(out, "  .globl __remill_barrier_store_store\n");
-  fprintf(out, "  .type __remill_load_store,@function\n");
-  fprintf(out, "  .type __remill_load_load,@function\n");
-  fprintf(out, "  .type __remill_store_load,@function\n");
-  fprintf(out, "  .type __remill_store_store,@function\n");
-
-  fprintf(out, "__remill_remill_atomic_begin:\n");
-  fprintf(out, "__remill_remill_atomic_end:\n");
-  fprintf(out, "__remill_barrier_load_store:\n");
-  fprintf(out, "__remill_barrier_load_load:\n");
-  fprintf(out, "__remill_barrier_store_load:\n");
-  fprintf(out, "__remill_barrier_store_store:\n");
-  fprintf(out, "  mov rax, rdi\n");
-  fprintf(out, "  ret\n");
-#endif
 
   return 0;
 }

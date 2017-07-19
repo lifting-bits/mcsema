@@ -100,22 +100,29 @@ popd
 
 McSema is a kind of sub-project of Remill, kind of like how Clang is a sub-project of LLVM. To that end, we invoke Remill's build script, and it will build both Remill and McSema. It will also download all remaining dependencies needed by Remill.
 
-The following script will build Remill and McSema into the `remill-build` directory, which will be at the same level as the `remill` directory. 
+The following script will build Remill and McSema into the `remill-build` directory, which will be placed in the current working directory.
 
 ```
-./remill/scripts/build_ubuntu.sh
+./remill/scripts/build.sh
 ```
+
+This script accepts several additional command line options:
+
+ - `--prefix PATH`: Install files to `PATH`. By default, `PATH` is `/usr/local`.
+ - `--llvm-version MAJOR.MINOR`: Download pre-built dependencies for LLVM version MAJOR.MINOR. The default is to use LLVM 4.0.
+ - `--build-dir PATH`: Produce all intermediate build files in `PATH`. By default, `PATH` is `$CWD/remill-build`.
+ - `--use-system-compiler`: Compile Remill+McSema using the system compiler toolchain (typically the GCC). This is likely necessary if you're using older LLVM versions.
 
 #### Step 4: Install McSema
 
-The next step is to build the code. McSema (and Remill) must be built using the Clang compiler.
+The next step is to build the code.
 
 ```shell
 cd remill-build
 sudo make install
 ```
 
-This will install McSema _globally_. Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcsema-lift` for lifting the disassembled binaries.
+This will install McSema _globally_. Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcsema-lift-4.0` for lifting the disassembled binaries. If you specified `--llvm-version 3.6` to the `build.sh` script, then you would use `mcsema-lift-3.6`.
 
 ## Additional Documentation
 

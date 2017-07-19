@@ -1,10 +1,3 @@
-cache:
-  timeout: 660
-  pip: true
-  custom_install: true
-  directories:
-    - remill-build/libraries
-sudo: required
 dist: trusty
 language: generic
 os: 
@@ -18,9 +11,9 @@ before_install:
   - git clone https://github.com/trailofbits/remill.git
   - mv mcsema remill/tools
 install:
-  - ./remill/scripts/build_ubuntu.sh
+  - ./remill/scripts/build.sh
 before_script:
-  - cd ../remill-build
+  - cd remill-build
   - make build_x86_tests
 script:
   - make test

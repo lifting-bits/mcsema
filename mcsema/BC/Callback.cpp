@@ -191,33 +191,6 @@ static llvm::Function *GetCallback(
   return GetNativeToLiftedCallback(cfg_func, callback_name);
 }
 
-//// For an external named `external`, return a function pointer with the type
-//// `uintptr_t *external(uintptr_t *arg0, uintptr_t *arg1, ...);`. This may
-//// end up being a casted version of the actual declaration.
-////
-//// TODO(pag,car,artem): Handle floating point types eventually. For this, we
-////                      should probably move to a constraint table-based
-////                      approach of generating code that will get all the
-////                      arguments from the appropriate spots.
-//static llvm::Constant *GetExplicitArgsFunction(
-//    const NativeExternalFunction *nf) {
-//
-//  auto extfun = gModule->getFunction(nf->name);
-//  CHECK(nullptr != extfun)
-//      << "Declaration of external " << nf->name << " does not exist.";
-//
-//  auto word_type = llvm::Type::getIntNTy(
-//      *gContext, static_cast<unsigned>(gArch->address_size));
-//
-//  std::vector<llvm::Type *> tys;
-//  for (auto i = 0; i < nf->num_args; i++) {
-//    tys.push_back(word_type);
-//  }
-//
-//  return gModule->getOrInsertFunction(
-//      nf->name, llvm::FunctionType::get(word_type, tys, false));
-//}
-
 // Implements a stub for an externally defined function in such a way that,
 // when executed, this stub redirects control flow into the actual external
 // function.

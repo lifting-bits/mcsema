@@ -141,7 +141,9 @@ set_source_files_properties(${PROJECT_PROTOBUFHEADERFILES} PROPERTIES COMPILE_FL
 # target settings
 #
 
-add_executable(mcsema-lift
+set(MCSEMA_LIFT mcsema-lift-${REMILL_LLVM_VERSION})
+
+add_executable(${MCSEMA_LIFT}
     ${PROJECT_PROTOBUFSOURCEFILES}
 
     mcsema/Arch/ABI.cpp
@@ -167,20 +169,20 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida)
 
 # this is needed for the #include directives with absolutes paths to work correctly; it must
-# also be set to PUBLIC since remill-lift includes some files directly
+# also be set to PUBLIC since mcsema-lift includes some files directly
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_dependencies(mcsema-lift semantics protobuf_python_module)
+add_dependencies(${MCSEMA_LIFT} semantics protobuf_python_module)
 
-target_link_libraries(mcsema-lift PRIVATE remill ${PROJECT_LIBRARIES})
-target_include_directories(mcsema-lift SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIES})
-target_compile_definitions(mcsema-lift PUBLIC ${PROJECT_DEFINITIONS})
-set_target_properties(mcsema-lift PROPERTIES COMPILE_FLAGS ${PROJECT_CXXFLAGS})
+target_link_libraries(${MCSEMA_LIFT} PRIVATE remill ${PROJECT_LIBRARIES})
+target_include_directories(${MCSEMA_LIFT} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIES})
+target_compile_definitions(${MCSEMA_LIFT} PUBLIC ${PROJECT_DEFINITIONS})
+set_target_properties(${MCSEMA_LIFT} PROPERTIES COMPILE_FLAGS ${PROJECT_CXXFLAGS})
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mcsema/Arch/X86/Runtime)
 
 install(
-  TARGETS mcsema-lift 
+  TARGETS ${MCSEMA_LIFT}
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib)
   
