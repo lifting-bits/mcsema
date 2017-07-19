@@ -6,7 +6,7 @@ compiler:
   - gcc
 before_install:
   - sudo apt-get update -yqq
-  - sudo apt-get install -y git python2.7 wget realpath build-essential libtinfo-dev lsb-release gcc-multilib
+  - sudo apt-get install -y git python2.7 wget realpath build-essential libtinfo-dev lsb-release gcc-multilib g++-multilib
   - cd ../
   - git clone https://github.com/trailofbits/remill.git
   - mv mcsema remill/tools
