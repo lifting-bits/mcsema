@@ -190,7 +190,7 @@ static InstTransResult doCallPCExtern(BasicBlock *&b, std::string target, bool s
     return ContinueBlock;
 }
 
-static InstTransResult doCallPC(BasicBlock *&b, VA tgtAddr) {
+static InstTransResult doCallPC(NativeInstPtr ip, BasicBlock *&b, VA tgtAddr, bool is_jump) {
 
         Module          *M = b->getParent()->getParent();
         Function        *ourF = b->getParent();
@@ -228,14 +228,138 @@ static InstTransResult doCallPC(BasicBlock *&b, VA tgtAddr) {
     	return ContinueBlock;
 }
 */
+template<int width>
+  static void writeReturnAddr(llvm::BasicBlock *B, VA ret_addr) {
+    auto xsp = 32 == width ? llvm::Mips::SP : llvm::Mips::SP;
+    auto espOld = R_READ<width>(B, xsp);
+    auto espSub = llvm::BinaryOperator::CreateSub(espOld,
+                                                  CONST_V<width>(B, width / 8),
+                                                  "", B);
+    M_WRITE_0<width>(B, espSub, CONST_V<width>(B, ret_addr));
+    R_WRITE<width>(B, xsp, espSub);
+  }
+
+template<int width>
+  static llvm::CallInst *emitInternalCall(llvm::BasicBlock *&b, llvm::Module *M,
+                                          const std::string &target_fn,
+                                          VA ret_addr, bool is_jmp) {
+    // we need the parent function to get the regstate argument
+    auto ourF = b->getParent();
+    TASSERT(ourF->arg_size() == 1, "");
+  
+    // figure out who we are calling
+    auto targetF = M->getFunction(target_fn);
+  
+    TASSERT(targetF != nullptr, "Could not find target function: " + target_fn);
+  
+    // do we need to push a ret addr?
+    if (!is_jmp) {
+      writeReturnAddr<width>(b, ret_addr);
+    }
+  
+    // emit: call target_fn(regstate);
+    std::vector<llvm::Value *> subArgs;
+    for (auto &arg : ourF->args()) {
+      subArgs.push_back(&arg);
+    }
+    auto c = llvm::CallInst::Create(targetF, subArgs, "", b);
+    ArchSetCallingConv(M, c);
+  
+    // return ptr to this callinst
+    return c;
+  }
+
+
+template<int width>
+  static InstTransResult doCallPC(NativeInstPtr ip, llvm::BasicBlock *&b,
+                                  VA tgtAddr, bool is_jump) {
+    auto M = b->getParent()->getParent();
+  
+    //We should be able to look it up in our module.
+    std::cout << __FUNCTION__ << "target address : "
+              << std::hex << tgtAddr << std::endl;
+  
+    std::stringstream ss;
+    ss << "sub_" << std::hex << tgtAddr;
+    std::string fname = ss.str();
+  
+    auto c = emitInternalCall<width>(
+        b, M, fname, ip->get_loc() + ip->get_len() * 2, is_jump);
+    auto F = c->getCalledFunction();
+  
+    if (ip->has_local_noreturn() || F->doesNotReturn()) {
+      // noreturn functions just hit unreachable
+      std::cout << __FUNCTION__
+                << ": Adding Unreachable Instruction to local noreturn"
+                << std::endl;
+      c->setDoesNotReturn();
+      c->setTailCall();
+      auto unreachable = new llvm::UnreachableInst(b->getContext(), b);
+      return EndBlock;
+    }
+    //and we can continue to run the old code
+  
+    return ContinueBlock;
+  }
+
+template<int width>
+static void writeDetachReturnAddr(llvm::BasicBlock *B) {
+  auto xsp = 32 == width ? llvm::Mips::SP : llvm::Mips::SP;
+  auto xip = 32 == width ? llvm::Mips::PC : llvm::Mips::PC;
+  auto espOld = R_READ<width>(B, xsp);
+  auto espSub = llvm::BinaryOperator::CreateSub(espOld,CONST_V<width>(B, width / 8),"", B);
+  M_WRITE_0<width>(B, espSub, CONST_V<width>(B, 0xde7accccde7acccc));
+  R_WRITE<width>(B, xsp, espSub);
+}
+
+static void doCallV(BasicBlock *&block,
+                    NativeInstPtr ip,
+                    Value *call_addr, bool is_jump)
+{
+  auto F = block->getParent();
+  auto M = F->getParent();
+  auto &C = M->getContext();
+  uint32_t bitWidth = ArchPointerSize(M);
+
+  if (_X86_64_ == SystemArch(M)) {
+    R_WRITE<64>(block, llvm::X86::RIP, call_addr);
+    if ( !is_jump) {
+      writeDetachReturnAddr<64>(block);
+    }
+  } else {
+    R_WRITE<32>(block, llvm::Mips::PC, call_addr);
+    if ( !is_jump) {
+      writeDetachReturnAddr<32>(block);
+    }
+  }
+
+  auto detach = M->getFunction("__mcsema_detach_call_value");
+  auto call_detach = llvm::CallInst::Create(detach, "", block);
+  call_detach->setCallingConv(llvm::CallingConv::C);
+}
+
+
+template<int width>
+static void doCallM(llvm::BasicBlock *&block, NativeInstPtr ip,
+       llvm::Value *mem_addr, bool is_jump) 
+{
+  auto call_addr = M_READ<width>(ip, block, mem_addr);
+  return doCallV(block, ip, call_addr, is_jump);
+}
+
 static InstTransResult translate_JAL(TranslationContext &ctx, 
 				      llvm::BasicBlock *&block)
 {
-	InstTransResult ret;
-std::cout << "translate_JAL -> " << std::endl;
-/*	std::cout << "translate_JAL -> " << std::hex << ip << ":-" << std::dec << inst.getNumOperands() << "\t-----" ;
+   InstTransResult ret;
+   auto ip = ctx.natI;
+   auto &inst = ip->get_inst();
+   //auto F = block->getParent();
+   //auto M = F->getParent();
+   auto natM = ctx.natM;
 
-        MCOperand op, op0, op1, op2;
+
+   std::cout << "translate_JAL -> " << std::hex << ip << ":-" << std::dec << inst.getNumOperands() << "\t-----" ;
+   MCOperand op, op0, op1, op2;
 
         for(int i=0; i < inst.getNumOperands(); i++ )
         {
@@ -258,28 +382,27 @@ std::cout << "translate_JAL -> " << std::endl;
         std::cout<<std::endl;
 
 	if( ip->has_ext_call_target() ) {
-        	std::string  s = ip->get_ext_call_target()->getSymbolName();
+   	std::string  s = ip->get_ext_call_target()->getSymbolName();
 		std::cout<< "JAL has external call target: "<< s << "\n";
-        	ret = doCallPCExtern(block, s);
+        	//ret = doCallPCExtern(block, s);
+	} 
+  else if( ip->has_code_ref() ) 
+  {
+		std::cout<< "JAL has code ref \n";
+    ret = doCallPC<32>(ip, block, ip->get_reference(NativeInst::MEMRef), false );
+	}
  
-	} else if( ip->has_call_tgt() ) {
-		std::cout<< "JAL has call tgt "<< "\n";
-        	ret = doCallPC(block, ip->get_call_tgt(0));
-    	}
- 
-    	else if( ip->is_data_offset() ) {
-        	//doCallM<32>(block, ip, STD_GLOBAL_OP(0));
-		std::cout<< "JAL is data off: "<< "\n";
-        	ret = ContinueBlock;
- 
-    	} else {
-        	//doCallM<32>(block, ip, ADDR(0));
+ 	else if( ip->has_mem_reference ) { // JAL should not go here?
+   	std::cout<< "JAL has memory reference: "<< "\n";
+   	//doCallM<32>(block, ip, MEM_REFERENCE(1), false);
+		ret = ContinueBlock;
+ 	} else {
+   	//doCallM<32>(block, ip, ADDR(0));
 		std::cout<< "JAL docallm: "<< "\n";
-        	ret = ContinueBlock;
-    	}			
-*/
+   	ret = ContinueBlock;
+ 	}			
+
 	return ret;
-	//return EndBlock;
 }
 
 void JAL_populateDispatchMap(DispatchMap &m)

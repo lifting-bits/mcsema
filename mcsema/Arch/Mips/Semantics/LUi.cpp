@@ -75,7 +75,7 @@ static InstTransResult translate_LUi(TranslationContext &ctx,
         	}
         }
         std::cout<<std::endl;
-/*
+
         op0 = inst.getOperand(0);
         op1 = inst.getOperand(1);
 
@@ -86,7 +86,7 @@ static InstTransResult translate_LUi(TranslationContext &ctx,
 	Value   *res = concatInts<16>(block, imm, zeroVal);
 	
 	R_WRITE<32>(block, op0.getReg(), res);
-*/	
+	
 	return ContinueBlock;
 }
 

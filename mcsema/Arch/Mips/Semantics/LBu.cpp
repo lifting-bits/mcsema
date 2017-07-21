@@ -52,42 +52,57 @@ using namespace llvm;
 static InstTransResult translate_LBu(TranslationContext &ctx, 
 				      llvm::BasicBlock *&block)
 {
-	InstTransResult ret;
-	auto ip = ctx.natI;
-	auto &inst = ip->get_inst();
-	std::cout << "translate_LBu -> " << std::hex << ip << ":-" << std::dec << inst.getNumOperands() << "\t-----" ;
+  InstTransResult ret;
+  auto ip = ctx.natI;
+  auto &inst = ip->get_inst();
+  std::cout << "translate_LBu -> " << std::hex << ip << ":-" << std::dec << inst.getNumOperands() << "\t-----" ;
 
         MCOperand op, op0, op1, op2;
 
         for(int i=0; i < inst.getNumOperands(); i++ )
         {
-        	op = inst.getOperand(i);
-        	if(op.isValid())
-        	{
-                	if(op.isReg())
-                        	std::cout << "isReg " << op.getReg() << "\t";
-                	if(op.isImm())
-                        	std::cout << "isImm " << op.getImm() << "\t";
-                	if(op.isFPImm())
-                        	std::cout << "isFPImm " << op.getFPImm() << "\t";
-                	if(op.isInst())
-                        	std::cout << "isFPImm " << op.getFPImm() << "\t";
-        	}
+
+        op = inst.getOperand(i);
+        if(op.isValid())
+        {
+                if(op.isReg())
+                        std::cout << "isReg " << op.getReg() << "\t";
+                if(op.isImm())
+                        std::cout << "isImm " << op.getImm() << "\t";
+                if(op.isFPImm())
+                        std::cout << "isFPImm " << op.getFPImm() << "\t";
+                if(op.isInst())
+                        std::cout << "isFPImm " << op.getFPImm() << "\t";
+
+        }
+
         }
         std::cout<<std::endl;
-/*
-        op0 = inst.getOperand(0);
-        op1 = inst.getOperand(1);
+        
+      op0 = inst.getOperand(0); //Reg
+        op1 = inst.getOperand(1); //Reg
+        op2 = inst.getOperand(2); //Imm
+        Value *base = R_READ<32>(block, op1.getReg());
+        
+      if( ip->has_external_ref())
+        {
+                std::cout<<"lw has external ref\n";
+        }
+        else if( ip->has_imm_reference || ip->has_mem_reference )
+        {
+                std::cout<<"lw has imm or mem reference\n";
+        }
+        else
+        {
+            std::cout<<"lw other\n";
+    
+            // we should have read 1 bytes..?
+            Value *offset = CONST_V<8>(block, op2.getImm());
+            Value *res = BinaryOperator::Create(Instruction::Add, base, offset, "", block);
+            R_WRITE<32>(block, op0.getReg(), M_READ<8>(ip, block, res));
+        }
 
-        Value *imm = CONST_V<16>(block, op1.getImm());
-
-	Value *zeroVal  = llvm::ConstantInt::get( block->getContext() , llvm::APInt(16, 0, false));
-
-	Value   *res = concatInts<16>(block, imm, zeroVal);
-	
-	R_WRITE<32>(block, op0.getReg(), res);
-*/	
-	return ContinueBlock;
+  return ContinueBlock;
 }
 
 void LBu_populateDispatchMap(DispatchMap &m)

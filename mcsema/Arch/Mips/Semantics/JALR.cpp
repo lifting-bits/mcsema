@@ -51,7 +51,7 @@ using namespace llvm;
 template<int width>
 static void writeDetachReturnAddr(llvm::BasicBlock *B) {
   auto xsp = 32 == width ? llvm::Mips::SP : llvm::Mips::SP;
-//  auto xip = 32 == width ? llvm::X86::EIP : llvm::X86::RIP;
+  auto xip = 32 == width ? llvm::Mips::PC : llvm::Mips::PC;
   auto espOld = R_READ<width>(B, xsp);
   auto espSub = llvm::BinaryOperator::CreateSub(espOld,CONST_V<width>(B, width / 8),"", B);
   M_WRITE_0<width>(B, espSub, CONST_V<width>(B, 0xde7accccde7acccc));
@@ -258,7 +258,7 @@ static void doCallV(BasicBlock       *&block,
       writeDetachReturnAddr<64>(block);
     }
   } else {
-    //R_WRITE<32>(block, llvm::X86::EIP, call_addr);
+    R_WRITE<32>(block, llvm::Mips::PC, call_addr);
     if ( !is_jump) {
       writeDetachReturnAddr<32>(block);
     }
@@ -274,7 +274,7 @@ static InstTransResult translate_JALR(TranslationContext &ctx,
 {
 	InstTransResult ret;
 	auto ip = ctx.natI;
-    	auto &inst = ip->get_inst();
+    auto &inst = ip->get_inst();
 
 	std::cout << "translate_JALR -> " << std::hex << ip << ":-" << std::dec << inst.getNumOperands() << "\t-----" ;
 

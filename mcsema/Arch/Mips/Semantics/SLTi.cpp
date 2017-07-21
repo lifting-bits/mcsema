@@ -54,8 +54,9 @@ static InstTransResult translate_SLTi(TranslationContext &ctx,
 				      llvm::BasicBlock *&block)
 {
 	InstTransResult ret;
-std::cout << "translate_SLTi -> " << std::endl;
-/*
+	auto ip = ctx.natI;
+	auto &inst = ip->get_inst();
+
 	std::cout << "translate_SLTi -> " << std::hex << ip << ":-" << std::dec << inst.getNumOperands() << "\t-----" ;
 
         MCOperand op, op0, op1, op2;
@@ -81,20 +82,18 @@ std::cout << "translate_SLTi -> " << std::endl;
         std::cout<<std::endl;
 	
         op0 = inst.getOperand(0);
-        Value *base = R_READ<32>(block, op0.getReg());
 
         op1 = inst.getOperand(1);
-        Value *rt = R_READ<32>(block, op1.getReg());
+        Value *rs = R_READ<32>(block, op1.getReg());
 
         op2 = inst.getOperand(2);
-        Value *offset = CONST_V<32>(block, op2.getImm());
+        Value *imm = CONST_V<32>(block, op2.getImm());
 
-        Value *res = BinaryOperator::Create(Instruction::Add, base, offset, "", block);
+        Value *res = new ICmpInst(*block, CmpInst::ICMP_SLT, rs, imm); 
         
-        M_WRITE<32>(ip, block, res, rt);
+        R_WRITE<32>(block, op0.getReg(), res);
         
-	return ContinueBlock;*/
-	return ret;
+	return ContinueBlock;
 }
 
 void SLTi_populateDispatchMap(DispatchMap &m)

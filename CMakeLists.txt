@@ -107,6 +107,7 @@ add_executable(mcsema-lift
   ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/SLTiu.cpp
   ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/SLTi.cpp
   ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/SLL.cpp
+  ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/SRL.cpp
   ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/ORi.cpp
   ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/DIV.cpp
   ${MCSEMA_DIR}/mcsema/Arch/Mips/Semantics/J.cpp

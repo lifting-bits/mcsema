@@ -79,36 +79,31 @@ static InstTransResult translate_LW(TranslationContext &ctx,
         }
         std::cout<<std::endl;
         
-	op0 = inst.getOperand(0); //Reg
+	    op0 = inst.getOperand(0); //Reg
         op1 = inst.getOperand(1); //Reg
         op2 = inst.getOperand(2); //Imm
-
         Value *base = R_READ<32>(block, op1.getReg());
         
-	if( ip->has_external_ref())
+    	if( ip->has_external_ref())
         {
                 std::cout<<"lw has external ref\n";
         }
         else if( ip->has_imm_reference || ip->has_mem_reference )
         {
                 std::cout<<"lw has imm or mem reference\n";
-		
-/*		//Value *data_v = GLOBAL_DATA_OFFSET(block, natM, ip);
-		Value *data_v = GLOBAL(block, natM, inst, ip, 1);
-
-		R_WRITE<32>(block, op0.getReg(), M_READ<32>(ip, block, data_v));*/
         }
         else
         {
-                std::cout<<"lw other\n";
+            std::cout<<"lw other\n";
 		
-		Value *offset = CONST_V<32>(block, op2.getImm());
+            // we should have read 2 bytes..?
+    		Value *offset = CONST_V<32>(block, op2.getImm());
 
 	        Value *res = BinaryOperator::Create(Instruction::Add, base, offset, "", block);
         
-		R_WRITE<32>(block, op0.getReg(), M_READ<32>(ip, block, res));
-	
+	       	R_WRITE<32>(block, op0.getReg(), M_READ<32>(ip, block, res));
         }
+
 	return ContinueBlock;
 }
 
