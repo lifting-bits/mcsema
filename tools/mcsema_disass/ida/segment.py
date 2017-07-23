@@ -63,7 +63,17 @@ def is_read_only_segment(ea):
 
   return (seg.perm & idaapi.SEGPERM_WRITE) == 0
 
+_NOT_STRING_TYPE_EAS = set()
+
+# TODO(pag): Why does the following get treated as a string with type `48326`?
+#
+# ; struct _EXCEPTION_POINTERS ExceptionInfo
+# ExceptionInfo   _EXCEPTION_POINTERS <offset dword_5CCFB8, offset dword_5CD008>
 def has_string_type(ea):
+  global _NOT_STRING_TYPE_EAS
+  if ea in _NOT_STRING_TYPE_EAS:
+    return False
+
   if not is_read_only_segment(ea):
     return False
 
@@ -92,6 +102,7 @@ def next_reasonable_head(ea, max_ea):
 
 def find_missing_strings_in_segment(seg_ea, seg_end_ea):
   """Try to find and mark missing strings in this segment."""
+  global _NOT_STRING_TYPE_EAS
   end_ea = idc.SegEnd(seg_ea)
   ea, next_ea = seg_ea, seg_ea
   last_was_string = False
@@ -106,13 +117,17 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
 
     next_is_string = has_string_type(next_head_ea)
 
+    as_str = idc.GetString(ea, -1, -1)
     if has_string_type(ea):
-      next_ea = ea + item_size
-      last_was_string = True
-      DEBUG("Found string {} of length {} at {:x}, jumping to {:x}".format(
-          repr(idc.GetString(ea, -1, -1)), item_size, ea, next_ea))
-      make_head(ea)
-      continue
+      if as_str is not None and len(as_str):
+        next_ea = ea + item_size
+        last_was_string = True
+        DEBUG("Found string {} of length {} at {:x}, jumping to {:x}".format(
+            repr(as_str), item_size, ea, next_ea))
+        make_head(ea)
+        continue
+      else:
+        _NOT_STRING_TYPE_EAS.add(ea)
 
     # If we find a zero, then assume it's possibly padding between strings, and
     # so don't change the state of `last_was_string`.
@@ -120,7 +135,6 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
       next_ea = ea + 1
       continue
 
-    as_str = idc.GetString(ea, -1, -1)
     if not as_str or not len(as_str):
       last_was_string = False
       continue

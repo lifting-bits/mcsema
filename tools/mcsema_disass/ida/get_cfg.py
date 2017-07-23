@@ -748,10 +748,12 @@ def recover_segment_cross_references(M, S, seg_ea, seg_end_ea):
   # Go through and look for the fixups. We start at `seg_ea - 1` because we
   # always try to find the *next* fixup/heads, and if there's one right at
   # the beginning of the segment then we don't want to jump to the second one.
+  max_xref_width = get_address_size_in_bits() / 8
   ea, next_ea = seg_ea, seg_ea
   while next_ea < seg_end_ea:
     ea = next_ea
-    xref_width = min(max(idc.ItemSize(ea), 4), 8)
+
+    xref_width = min(max(idc.ItemSize(ea), 4), max_xref_width)
     next_ea = min(ea + xref_width,
             # idc.GetNextFixupEA(ea),
             idc.NextHead(ea, seg_end_ea))
