@@ -223,7 +223,8 @@ static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
     // In the case that we can't find the opcode, try building it out with
     // inline assembly calls in LLVM instead.
     if (IgnoreUnsupportedInsts) {
-      ArchBuildInlineAsm(inst, block);
+      //TODO(artem): Re-enable via an opt-in commandline flag
+      //ArchBuildInlineAsm(inst, block);
       return itr;
     } else {
       return TranslateErrorUnsupported;
