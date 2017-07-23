@@ -982,10 +982,12 @@ def recover_module(entrypoint):
 
   identify_external_symbols()
   
-  entrypoints = identify_program_entrypoints(func_eas)
+  #entrypoints = identify_program_entrypoints(func_eas)
   entrypoints = set()  # TODO(pag): Re-enable this?????
   entry_ea = idc.LocByName(args.entrypoint)
-  if entry_ea != idc.BADADDR:
+  if is_invalid_ea(entry_ea):
+    DEBUG("ERROR: Could not find entrypoint {}".format(args.entrypoint))
+  else:
     entrypoints.add(entry_ea)
 
   # Process and recover functions. 
