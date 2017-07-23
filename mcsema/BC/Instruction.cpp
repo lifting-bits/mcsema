@@ -56,7 +56,7 @@ InstructionLifter::InstructionLifter(llvm::IntegerType *word_type_,
         disp_ref(nullptr),
         imm_ref(nullptr) {}
 
-// Lift a single instuction into a basic block.
+// Lift a single instruction into a basic block.
 bool InstructionLifter::LiftIntoBlock(
     remill::Instruction &inst, llvm::BasicBlock *block_) {
 
@@ -89,6 +89,7 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
   if (cfg_xref->func) {
     auto cfg_func = cfg_xref->func;
     llvm::Function *func = nullptr;
+    llvm::Value *func_val = nullptr;
 
     // If this is a lifted function, then create a wrapper around it. The
     // idea is that this reference to a lifted function can be leaked to
@@ -104,7 +105,32 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
         << "Can't resolve reference to function "
         << cfg_func->name << " from " << std::hex << inst_ptr->pc;
 
-    return ir.CreatePtrToInt(func, word_type);
+    func_val = func;
+
+    // Functions attributed with weak linkage may be defined, but aren't
+    // necessarily. What you end up getting is code that checks if the function
+    // pointer is non-null, and if so, calls the function.
+    //
+    //      mov     rax, cs:__gmon_start___ptr
+    //      test    rax, rax
+    //
+    // In the CFG, we get `__gmon_start__` instead of `__gmon_start___ptr`,
+    // but we don't want to actually read the machine code bytes of
+    // `__gmon_start__`, which is likely to be an ELF thunk. So we throw in
+    // an extra layer of indirection here.
+    //
+    // TODO(pag): This is an awful hack for now that won't generalize.
+    if (func->hasExternalWeakLinkage()) {
+      LOG(WARNING)
+          << "Adding pseudo-load of weak function " << cfg_func->name
+          << " at " << std::hex << inst_ptr->pc;
+
+      auto temp_loc = ir.CreateAlloca(func->getType());
+      ir.CreateStore(func, temp_loc);
+      func_val = temp_loc;
+    }
+
+    return ir.CreatePtrToInt(func_val, word_type);
 
   } else if (cfg_xref->var) {
     auto cfg_var = cfg_xref->var;
@@ -199,8 +225,8 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
   } else {
     LOG_IF(ERROR, mem_ref != nullptr)
         << "IDA probably incorrectly decoded memory operand "
-        << op.Debug() << " of instuction " << std::hex << inst.pc
-        << "as an absolute memory reference when it should be treated as a "
+        << op.Debug() << " of instruction " << std::hex << inst.pc
+        << " as an absolute memory reference when it should be treated as a "
         << "displacement memory reference.";
 
     // It's a reference located in the displacement. We'll clear out the

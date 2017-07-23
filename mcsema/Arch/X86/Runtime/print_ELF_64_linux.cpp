@@ -517,13 +517,9 @@ int main(void) {
   fprintf(out, "  .globl __remill_function_return\n");
   fprintf(out, "  .type __remill_function_return,@function\n");
 
-  fprintf(out, "  .globl __remill_sync_hyper_call\n");
-  fprintf(out, "  .type __remill_sync_hyper_call,@function\n");
-
   fprintf(out, "__remill_error:\n");
   fprintf(out, "__remill_missing_block:\n");
   fprintf(out, "__remill_function_return:\n");
-  fprintf(out, "__remill_sync_hyper_call:\n");
   fprintf(out, "  ud2\n");
 
   return 0;

@@ -277,7 +277,7 @@ def memop_is_actually_displacement(inst):
   to recognize it as an `o_displ` because the memory reference is a displacement
   and not an absolute address."""
   asm = idc.GetDisasm(inst.ea)
-  return "[" in asm and ("+" in asm or "*" in asm)
+  return "[" in asm and "]" in asm
 
 # Return the set of all references from `ea` to anything.
 def get_all_references_from(ea):

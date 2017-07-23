@@ -287,7 +287,6 @@ static bool TryLiftTerminator(TranslationContext &ctx,
 
     case remill::Instruction::kCategoryIndirectFunctionCall:
       InlineSubFuncCall(block, ctx.lifter->intrinsics->function_call);
-      remill::StoreProgramCounter(block, inst.next_pc);
       return false;
 
     case remill::Instruction::kCategoryFunctionReturn:

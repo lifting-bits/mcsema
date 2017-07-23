@@ -26,6 +26,81 @@
 
 extern "C" {
 
+// enum : size_t {
+//   kStackSize = 1UL << 20UL
+// };
+
+// struct alignas(16) Stack {
+//   uint8_t bytes[kStackSize];  // 1 MiB.
+// };
+
+// __thread State __mcsema_reg_state;
+// __thread Stack __mcsema_stack;
+
+// State *__mcsema_get_reg_state(void) {
+//   return &__mcsema_reg_state;
+// }
+
+// uint8_t *__mcsema_get_stack(void) {
+//   return &(__mcsema_stack.bytes[kStackSize - 16UL]);
+// }
+
+Memory *__remill_sync_hyper_call(
+    Memory *mem, State &state, SyncHyperCall::Name call) {
+  auto eax = state.gpr.rax.dword;
+  auto ebx = state.gpr.rbx.dword;
+  auto ecx = state.gpr.rcx.dword;
+  auto edx = state.gpr.rdx.dword;
+
+  switch (call) {
+    case SyncHyperCall::kX86CPUID:
+      state.gpr.rax.aword = 0;
+      state.gpr.rbx.aword = 0;
+      state.gpr.rcx.aword = 0;
+      state.gpr.rdx.aword = 0;
+
+      asm volatile(
+          "cpuid"
+          : "=a"(state.gpr.rax.dword),
+            "=b"(state.gpr.rbx.dword),
+            "=c"(state.gpr.rcx.dword),
+            "=d"(state.gpr.rdx.dword)
+          : "a"(eax),
+            "b"(ebx),
+            "c"(ecx),
+            "d"(edx)
+      );
+      break;
+
+    case SyncHyperCall::kX86ReadTSC:
+      state.gpr.rax.aword = 0;
+      state.gpr.rdx.aword = 0;
+      asm volatile(
+          "rdtsc"
+          : "=a"(state.gpr.rax.dword),
+            "=d"(state.gpr.rdx.dword)
+      );
+      break;
+
+    case SyncHyperCall::kX86ReadTSCP:
+      state.gpr.rax.aword = 0;
+      state.gpr.rcx.aword = 0;
+      state.gpr.rdx.aword = 0;
+      asm volatile(
+          "rdtscp"
+          : "=a"(state.gpr.rax.dword),
+            "=c"(state.gpr.rcx.dword),
+            "=d"(state.gpr.rdx.dword)
+      );
+      break;
+
+    default:
+      __builtin_unreachable();
+  }
+
+  return mem;
+}
+
 Memory *__mcsema_reg_tracer(Memory *memory, State &state, uintptr_t) {
   const char *format = nullptr;
   if (sizeof(void *) == 8) {

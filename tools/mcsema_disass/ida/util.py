@@ -24,7 +24,15 @@ _DEBUG_FILE = None
 _DEBUG_PREFIX = ""
 _INFO = idaapi.get_inf_structure()
 
+
 IS_ARM = "ARM" in _INFO.procName
+
+# True if we are running on an ELF file.
+IS_ELF = (idaapi.f_ELF == _INFO.filetype) or \
+         (idc.GetLongPrm(idc.INF_FILETYPE) == idc.FT_ELF)
+
+# True if this is a Windows PE file.
+IS_PE = idaapi.f_PE == _INFO.filetype
 
 if IS_ARM:
   from arm_util import *
@@ -232,9 +240,16 @@ def is_external_segment(ea):
 
   ext_types = []
   seg_name = idc.SegName(seg_ea).lower()
-  if ".got" in seg_name or ".plt" in seg_name:
-    _EXTERNAL_SEGMENTS.add(seg_ea)
-    return True
+  
+  if IS_ELF:
+    if ".got" in seg_name or ".plt" in seg_name:
+      _EXTERNAL_SEGMENTS.add(seg_ea)
+      return True
+
+  elif IS_PE:
+    if ".idata" == seg_name:  # Import table.
+      _EXTERNAL_SEGMENTS.add(seg_ea)
+      return True
 
   _NOT_EXTERNAL_SEGMENTS.add(seg_ea)
   return False
@@ -428,6 +443,17 @@ def is_reference(ea):
 
   for target in idautils.XrefsFrom(ea):
     if ea == target.frm and not is_invalid_ea(target.to):
+      return True
+
+  return is_runtime_external_data_reference(ea)
+
+def is_data_reference(ea):
+  """Returns `True` if the `ea` references something else."""
+  if is_invalid_ea(ea):
+    return False
+
+  for target_ea in idautils.DataRefsFrom(ea):
+    if not is_invalid_ea(target_ea):
       return True
 
   return is_runtime_external_data_reference(ea)

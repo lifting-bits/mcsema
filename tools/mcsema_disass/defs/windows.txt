@@ -29000,7 +29000,6 @@ NtWow64WriteVirtualMemory64 7 E N
 NtWow64ReadVirtualMemory64 7 E N
 RtlWow64LogMessageInEventLogger 3 E N
 NtWow64QueryInformationProcess64 5 E N
-__aullshr MCSEMA
 __dllonexit 3 C N
 __crtUnhandledException 1 C N
 __clean_type_info_names_internal 1 C N

@@ -23,6 +23,8 @@ struct NativeModule;
 
 void AddDataSegments(const NativeModule *cfg_module);
 
+void CallInitFiniCode(const NativeModule *cfg_module);
+
 }  // namespace mcsema
 
 #endif  // MCSEMA_BC_SEGMENT_H_

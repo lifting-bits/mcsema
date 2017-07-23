@@ -33,7 +33,6 @@ llvm::Function *GetNativeToLiftedCallback(const NativeObject *cfg_func);
 // external code.
 llvm::Function *GetNativeToLiftedEntryPoint(const NativeObject *cfg_func);
 
-
 // Get a callback function for an external function that can be referenced by
 // internal code.
 llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func);

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include <algorithm>
@@ -26,6 +27,7 @@
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 
@@ -38,6 +40,14 @@
 #include "mcsema/BC/Segment.h"
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
+
+DEFINE_string(libc_constructor, "",
+    "Constructor function for running pre-main initializers. For example, on "
+    "GNU-based systems, this is typically `__libc_csu_init`.");
+
+DEFINE_string(libc_destructor, "",
+    "Destructor function for running post-main finalizers. For example, on "
+    "GNU-based systems, this is typically `__libc_csu_fini`.");
 
 namespace mcsema {
 namespace {
@@ -144,7 +154,6 @@ static llvm::GlobalVariable *DeclareRegion(const SegmentMap &segments) {
         << ", " << std::hex << max_ea << ")";
   }
 
-
   std::stringstream ss;
   ss << "region_" << std::hex << min_ea << "_" << std::hex << max_ea;
   auto region_name = ss.str();
@@ -228,6 +237,123 @@ static void DeclareVariables(const NativeModule *cfg_module) {
         llvm::GlobalVariable::InternalLinkage,
         ptr, cfg_var->lifted_name);
   }
+}
+
+// Create a McSema-specific constructor/destructor function, and add it to the
+// corresponding LLVM-specific array.
+static llvm::Function *CreateMcSemaInitFiniImpl(
+    const char *func_name, const char *arr_name) {
+  LOG(INFO)
+      << "Creating " << func_name << " function to initialize runtime.";
+
+  auto func = llvm::Function::Create(
+      llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext), false),
+      llvm::GlobalValue::InternalLinkage,
+      func_name, gModule);
+
+  llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", func));
+  ir.CreateRetVoid();
+
+  auto i32_type = llvm::Type::getInt32Ty(*gContext);
+  auto ptr_type = llvm::Type::getInt8PtrTy(*gContext);
+  auto el_type = llvm::StructType::get(
+      i32_type, func->getType(), ptr_type, nullptr);
+  auto el_init = llvm::ConstantStruct::get(
+      el_type,
+      llvm::ConstantInt::get(i32_type, 101),  // Lowest non-system priority.
+      func,
+      llvm::Constant::getNullValue(ptr_type),
+      nullptr);
+
+  std::vector<llvm::Constant *> new_elems;
+
+  auto global_ctors = gModule->getGlobalVariable(arr_name);
+  if (global_ctors) {
+    LOG(INFO)
+        << "Module already has a " << arr_name << " array.";
+
+    auto arr = llvm::dyn_cast<llvm::ConstantArray>(
+        global_ctors->getInitializer());
+    auto num_ops = arr->getNumOperands();
+    for (auto i = 0U; i < num_ops; ++i) {
+      new_elems.push_back(arr->getOperand(i));
+    }
+  }
+
+  new_elems.push_back(el_init);
+
+  auto arr_type = llvm::ArrayType::get(el_type, new_elems.size());
+  auto arr_init = llvm::ConstantArray::get(arr_type, new_elems);
+  auto arr = new llvm::GlobalVariable(
+      *gModule, arr_type, true /* isConstant */,
+      llvm::GlobalVariable::AppendingLinkage,
+      arr_init, global_ctors ? "__mcsema.temp_array" : arr_name);
+
+  if (global_ctors) {
+    arr->takeName(global_ctors);
+    global_ctors->dropAllReferences();
+    global_ctors->eraseFromParent();
+  }
+
+  return func;
+}
+
+static llvm::Function *GetOrCreateMcSemaConstructor(void) {
+  static llvm::Function *gInitFunc = nullptr;
+  if (!gInitFunc) {
+    gInitFunc = CreateMcSemaInitFiniImpl(
+        "__mcsema_constructor", "llvm.global_ctors");
+  }
+  return gInitFunc;
+}
+
+static llvm::Function *GetOrCreateMcSemaDestructor(void) {
+  static llvm::Function *gFiniFunc = nullptr;
+  if (!gFiniFunc) {
+    gFiniFunc = CreateMcSemaInitFiniImpl(
+        "__mcsema_destructor", "llvm.global_dtors");
+  }
+  return gFiniFunc;
+}
+
+// Add code to the `__mcsema_constructor` function to lazily (i.e. at runtime)
+// initialize the value of a cross-reference.
+//
+// Consider the following C code:
+//
+//    FILE *gFilePtr = stdout;
+//
+// The type of `gFilePtr` is a `FILE **`, and it will show up as such in
+// the bitcode. `stdout` is an extern, and its initializer is not present.
+// What a compiler does in this case is allocate space for `gFilePtr` in the
+// `.bss` section, and produces some actual code that runs as a constructor
+// function that initializes the actual pointer at runtime before `main` is
+// executed.
+//
+// Sometimes IDA picks up on these types of references, and so we need to
+// handle them by emulating this runtime initialization. We create a special
+// constructor function of our own, `__mcsema_constructor`, that will contain
+// code that can do these initializations.
+static void LazyInitXRef(const NativeXref *xref,
+                         llvm::GlobalVariable *extern_ptr_var,
+                         llvm::Type *extern_addr_type) {
+  auto init_func = GetOrCreateMcSemaConstructor();
+  llvm::BasicBlock *block = &init_func->front();
+  llvm::IRBuilder<> ir(block);
+  ir.SetInsertPoint(&block->front());
+
+  auto extern_ptr_type = llvm::PointerType::get(extern_addr_type, 0);
+  auto xref_target = ir.CreateLoad(
+      ir.CreateBitCast(extern_ptr_var, extern_ptr_type));
+
+  auto word_type = llvm::Type::getIntNTy(
+      *gContext, static_cast<unsigned>(gArch->address_size));
+  auto seg = gModule->getGlobalVariable(xref->segment->lifted_name, true);
+  auto offset = xref->ea - xref->segment->ea;
+  auto disp = llvm::ConstantInt::get(word_type, offset, false);
+  auto addr_of_xref = llvm::ConstantExpr::getAdd(seg->getInitializer(), disp);
+  auto ptr_to_xref = ir.CreateIntToPtr(addr_of_xref, extern_ptr_type);
+  ir.CreateStore(xref_target, ptr_to_xref);
 }
 
 // Fill in the contents of the data segment.
@@ -318,13 +444,14 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
           //            a value for the cross-reference because it won't
           //            be known until runtime. This is the type of thing in
           //            libc that gets handled by constructor functions.
-          LOG(ERROR)
+          LOG(WARNING)
               << "Likely external data cross-reference from " << std::hex
               << xref->ea << " to " << cfg_var->name << " at " << std::hex
               << cfg_var->ea << " (lifted as " << cfg_var->lifted_name
               << ") does not have an initializer.";
 
           val = llvm::ConstantInt::get(val_type, 0);
+          LazyInitXRef(xref, var, val_type);
         }
 
       // Pointer to an unnamed location inside of a data segment.
@@ -428,6 +555,35 @@ void AddDataSegments(const NativeModule *cfg_module) {
   unsigned i = 0;
   for (const auto &region : regions) {
     FillRegion(region_vars[i++], region);
+  }
+}
+
+void CallInitFiniCode(const NativeModule *cfg_module) {
+  if (FLAGS_libc_constructor.empty() && FLAGS_libc_destructor.empty()) {
+    return;
+  }
+  for (const auto &entry : cfg_module->ea_to_func) {
+    auto cfg_func = entry.second;
+    llvm::Function *callback = nullptr;
+    llvm::Instruction *insert_point = nullptr;
+
+    if (FLAGS_libc_constructor.size() &&
+        FLAGS_libc_constructor == cfg_func->name) {
+      callback = GetNativeToLiftedCallback(cfg_func);
+      auto init_func = GetOrCreateMcSemaConstructor();
+      insert_point = &(init_func->front().back());
+
+    } else if (FLAGS_libc_destructor.size() &&
+               FLAGS_libc_destructor == cfg_func->name) {
+      auto fini_func = GetOrCreateMcSemaDestructor();
+      insert_point = &(fini_func->front().front());
+    }
+
+    if (insert_point) {
+      llvm::IRBuilder<> ir(insert_point);
+      auto call = ir.CreateCall(callback);
+      call->setCallingConv(llvm::CallingConv::Fast);
+    }
   }
 }
 

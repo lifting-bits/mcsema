@@ -73,14 +73,12 @@ OS_NAME = ""
 # part to resolve the "true" name,
 EXTERNAL_NAMES = ("@@GLIBC_",)
 
-def is_ELF_program():
-  """Returns `True` if the type of the program being recovered is an ELF."""
-  return idc.GetLongPrm(idc.INF_FILETYPE) == idc.FT_ELF
+_NOT_ELF_BEGIN_EAS = (0xffffffffL, 0xffffffffffffffffL)
 
 # Returns `True` if this is an ELF binary (as opposed to an ELF object file).
 def is_linked_ELF_program():
-  return idc.GetLongPrm(idc.INF_FILETYPE) == idc.FT_ELF and \
-    idc.BeginEA() not in [0xffffffffL, 0xffffffffffffffffL]
+  global _NOT_ELF_BEGIN_EAS
+  return IS_ELF and idc.BeginEA() not in _NOT_ELF_BEGIN_EAS
 
 def is_ELF_got_pointer(ea):
   """Returns `True` if this is a pointer to a pointer stored in the
@@ -154,7 +152,7 @@ def get_true_external_name(fn):
   if is_ELF_got_pointer_to_external(ea):
     name = get_symbol_name(get_reference_target(ea))
     if name:
-      fn = handleExternalRef(name)
+      fn = undecorate_external_name(name)
 
   # DEBUG("True name of {} at {:x} is {}".format(orig_fn, ea, fn))
   _FIXED_EXTERNAL_NAMES[orig_fn] = fn
@@ -204,15 +202,6 @@ def parse_os_defs_file(df):
     else:
       fname = args = conv = ret = sign = None
       line_args = l.split()
-      if len(line_args) == 2:
-        fname, conv = line_args
-        if conv == "MCSEMA":
-          DEBUG("Found mcsema internal function: {}".format(fname))
-          realconv = CFG_pb2.ExternalFunction.McsemaCall
-          EMAP[fname] = (1, realconv, 'N', None)
-          continue
-        else:
-          raise Exception("Unknown calling convention:"+str(conv))
 
       if len(line_args) == 4:
         (fname, args, conv, ret) = line_args
@@ -228,7 +217,7 @@ def parse_os_defs_file(df):
       else:
         raise Exception("Unknown calling convention:"+str(l))
 
-      if ret not in ['Y', 'N']:
+      if ret not in "YN":
         raise Exception("Unknown return type:"+ret)
 
       ea = idc.LocByName(fname)
@@ -271,7 +260,7 @@ def get_function_name(ea):
   dummy names, e.g. `sub_abc123`."""
   return get_symbol_name(ea, ea, allow_dummy=True)
 
-def handleExternalRef(fn):
+def undecorate_external_name(fn):
   # Don't mangle symbols for fully linked ELFs... yet
   in_a_map = fn in EMAP or fn in EMAP_DATA
   if not is_linked_ELF_program():
@@ -290,7 +279,7 @@ def handleExternalRef(fn):
     if fn.startswith("@") and not in_a_map:
       fn = fn[1:]
 
-    if is_ELF_program() and '@' in fn:
+    if IS_ELF and '@' in fn:
       fn = fn[:fn.find('@')]
 
   fixfn = get_true_external_name(fn)
@@ -338,7 +327,7 @@ def is_ELF_thunk_by_structure(ea):
   if is_direct_jump(inst):
     orig_name = get_function_name(ea)
     if is_external_segment(real_ext_ref):
-      ext_ref_name = handleExternalRef(get_function_name(real_ext_ref))
+      ext_ref_name = undecorate_external_name(get_function_name(real_ext_ref))
       if is_external_segment(idc.LocByName(ext_ref_name)):
         return True, ext_ref_name
 
@@ -369,7 +358,7 @@ def is_ELF_thunk_by_structure(ea):
   if real_ext_ref is None:
     return _INVALID_THUNK
   
-  return True, handleExternalRef(get_function_name(real_ext_ref))
+  return True, undecorate_external_name(get_function_name(real_ext_ref))
 
 def is_thunk_by_flags(ea):
   """Try to identify a thunk based off of the IDA flags. This isn't actually
@@ -405,7 +394,7 @@ def is_thunk_by_flags(ea):
   if not is_external_reference(ea):
     return _INVALID_THUNK
 
-  return True, handleExternalRef(ea_name)
+  return True, undecorate_external_name(ea_name)
 
 def try_get_thunk_name(ea):
   """Try to figure out if a function is actually a thunk, i.e. a function
@@ -424,7 +413,7 @@ def try_get_thunk_name(ea):
   # Try two approaches to detecting whether or not
   # something is a thunk.
   is_thunk = False
-  if is_ELF_program():
+  if IS_ELF:
     is_thunk, name = is_ELF_thunk_by_structure(ea)
 
   if not is_thunk:
@@ -794,8 +783,8 @@ def recover_segment_cross_references(M, S, seg_ea, seg_end_ea):
     elif (ea % 4) != 0:
       DEBUG("ERROR: Unaligned reference at {:x} to {:x}".format(ea, target_ea))
     
-    elif is_runtime_external_data_reference(ea):
-      DEBUG("Not embedding reference to {:x} at {:x}".format(target_ea, ea))
+    #elif is_runtime_external_data_reference(ea):
+    #  DEBUG("Not embedding reference to {:x} at {:x}".format(target_ea, ea))
 
     else:
       X = S.xrefs.add()
@@ -928,6 +917,7 @@ def identify_external_symbols():
       extern_name = get_true_external_name(name)
       if extern_name in EMAP_DATA:
         DEBUG("Variable at {:x} is the external {}".format(ea, extern_name))
+        idc.MakeName(ea, extern_name)  # Rename it.
         EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
 
       # Corner case, there is an external reference in the `.got` section
@@ -940,8 +930,24 @@ def identify_external_symbols():
           _FIXED_EXTERNAL_NAMES[name] = get_symbol_name(target_ea)  # Hack :-(
 
       else:
+        # IDA sometimes does this dumb thing where it will actually have a bunch
+        # of names for the same address, and it will choose the wrong one. This
+        # tends to happen with the `.bss` section, and can be reproduced by a C
+        # file with only one global variable `FILE *fp = stdout;`. Some versions
+        # of IDA will treat the local copy of `stdout` as being the symbol
+        # `__bss_start`.
+        comment = idc.GetCommentEx(ea, 0) or ""
+        for comment_line in comment.split("\n"):
+          comment_line = comment_line.replace(";", "").strip()
+          found_name = get_true_external_name(comment_line)
+          if found_name in EMAP_DATA:
+            extern_name = found_name
+            break
+
         DEBUG("WARNING: Adding variable {} at {:x} as external".format(
             extern_name, ea))
+
+        idc.MakeName(ea, extern_name)  # Rename it.
         EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
         _FIXED_EXTERNAL_NAMES[ea] = extern_name
 
@@ -952,7 +958,7 @@ def identify_program_entrypoints(func_eas):
   for index, ordinal, ea, name in idautils.Entries():
     assert ea != idc.BADADDR
     if not is_internal_code(ea) or is_external_reference(ea):
-      DEBUG("Export {0} at {1} does not point to code; skipping".format(name, hex(ea)))
+      DEBUG("Export {} at {:x} does not point to code; skipping".format(name, ea))
       continue
     func_eas.add(ea)
     entrypoints.add(ea)

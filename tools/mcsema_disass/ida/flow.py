@@ -239,9 +239,14 @@ def find_default_block_heads(sub_ea):
       and 16 < idaapi.get_alignment(ea) \
       and read_byte(ea) not in _ALIGNMENT_BYTES \
       and not has_flow_to_code(ea):
-        DEBUG("  block {:x} of function {:x} is not targeted by any flows!".format(
-            ea, sub_ea))
-        _MISSING_FLOWS[sub_ea].add(ea)
+        if is_data_reference(ea):
+          DEBUG("  {:x} in function {:x} looks like an embedded jump table entry".format(
+              ea, sub_ea))
+        else:
+          DEBUG("  block {:x} of function {:x} is not targeted by any flows!".format(
+              ea, sub_ea))
+
+          _MISSING_FLOWS[sub_ea].add(ea)
       ea = idc.NextHead(ea, max_ea)
 
   _DEFAULT_BLOCK_HEAD_EAS[sub_ea] = heads
