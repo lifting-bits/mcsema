@@ -15,6 +15,7 @@
 
 import argparse
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -102,8 +103,10 @@ def main(args=None):
   os.chdir(disass_dir)
   sys.path.append(disass_dir)
 
+  new_bin_name = re.sub(r"[^a-zA-Z0-9\.]+", "_", os.path.basename(args.binary))
+
   workspace_dir = tempfile.mkdtemp()
-  temp_bin_path = os.path.join(workspace_dir, os.path.basename(args.binary))
+  temp_bin_path = os.path.join(workspace_dir, new_bin_name)
   shutil.copyfile(args.binary, temp_bin_path)
   args.binary = temp_bin_path
 
