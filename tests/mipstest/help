@@ -1,0 +1,9 @@
+1)compiled world.c as follows
+mipsel-linux-gnu-gcc -fno-stack-protector -o world world.c
+
+2)run disass as original mcsema but changed some params to accomodate mips
+
+./mcsema-disass --disassembler /home/embd-sec/ida-6.95/idal64 --arch mipsl --os linux --output hello.cfg --binary /home/embd-sec/mips-bins/hello-mipsel --entrypoint main
+
+3)run lift as original mcsema but changed some params to accomodate mips
+./mcsema-lift -arch mipsl --os linux --cfg hello.cfg --entrypoint main --output hello.bc
