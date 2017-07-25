@@ -17,7 +17,7 @@ McSema is separated into two conceptual parts: control flow recovery and instruc
 * Runs on both Windows and Linux, and can translate Linux binaries on Windows and Windows binaries on Linux.
 * Output bitcode is compatible with the LLVM toolchain (versions 3.5 and up).
 * Translated bitcode can be analyzed or [recompiled as a new, working executable](docs/McsemaWalkthrough.md) with functionality identical to the original.
-* McSema runs on Windows and Linux and has been tested on Windows 7, 10, Ubuntu 14.04, and Ubuntu 16.04.
+* McSema runs on Windows and Linux and has been tested on Windows 7, 10, Ubuntu (14.04, 16.04), and openSUSE.
 
 ## Using Mcsema
 

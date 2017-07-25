@@ -179,7 +179,9 @@ target_include_directories(${MCSEMA_LIFT} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTO
 target_compile_definitions(${MCSEMA_LIFT} PUBLIC ${PROJECT_DEFINITIONS})
 set_target_properties(${MCSEMA_LIFT} PROPERTIES COMPILE_FLAGS ${PROJECT_CXXFLAGS})
 
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mcsema/Arch/X86/Runtime)
+if ("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mcsema/Arch/X86/Runtime)
+endif()
 
 install(
   TARGETS ${MCSEMA_LIFT}
