@@ -62,6 +62,12 @@ static llvm::cl::opt<bool> IgnoreUnsupportedInsts(
         "Ignore unsupported instructions."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> InjectInlineAsm(
+    "inline-unsupported",
+    llvm::cl::desc(
+        "Inline unsupported instructions using inline assembly."),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> AddTracer(
     "add-reg-tracer",
     llvm::cl::desc(
@@ -196,8 +202,6 @@ static void AnnotateInsts(llvm::Function *F, VA pc) {
 //
 static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
                                              llvm::BasicBlock *&block) {
-  InstTransResult itr = ContinueBlock;
-
   // For conditional instructions, get the "true" and "false" targets.
   // This will also look up the target for nonconditional jumps.
   //string trueStrName = "block_0x" + to_string<VA>(ip->get_tr(), hex);
@@ -206,12 +210,14 @@ static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
   auto &inst = ctx.natI->get_inst();
 
   if (auto lifter = ArchGetInstructionLifter(inst)) {
-    itr = ArchLiftInstruction(ctx, block, lifter);
+    auto itr = ArchLiftInstruction(ctx, block, lifter);
 
     if (TranslateError == itr || TranslateErrorUnsupported == itr) {
       std::cerr << "Error translating instruction at " << std::hex
                 << ctx.natI->get_loc() << std::endl;
     }
+
+    return itr;
 
   // Instruction translation not defined.
   } else {
@@ -222,14 +228,18 @@ static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
 
     // In the case that we can't find the opcode, try building it out with
     // inline assembly calls in LLVM instead.
-    if (IgnoreUnsupportedInsts) {
+    if (InjectInlineAsm) {
       ArchBuildInlineAsm(inst, block);
-      return itr;
-    } else {
+      return ContinueBlock;
+
+    } else if (IgnoreUnsupportedInsts) {
       return TranslateErrorUnsupported;
+
+    } else {
+      return TranslateError;
+
     }
   }
-  return itr;
 }
 
 static InstTransResult LiftInstIntoBlock(TranslationContext &ctx,
