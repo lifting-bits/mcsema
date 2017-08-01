@@ -2,7 +2,7 @@ _ZdlPv 2 C N
 _ZdaPv 2 C N
 _Znam 2 C N
 _Znwm 2 C N
-
+__strtol_internal 4 C N
 __cxa_guard_release 1 C N
 __cxa_guard_acquire 1 C N
 __cxa_guard_abort 1 C N
