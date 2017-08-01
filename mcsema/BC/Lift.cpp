@@ -195,7 +195,7 @@ static void AnnotateInsts(llvm::Function *F, VA pc) {
 //     The innermost is where most of the intelligent decisions happen.
 //
 static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
-                                      llvm::BasicBlock *&block) {
+                                             llvm::BasicBlock *&block) {
   InstTransResult itr = ContinueBlock;
 
   // For conditional instructions, get the "true" and "false" targets.
@@ -235,6 +235,10 @@ static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
 static InstTransResult LiftInstIntoBlock(TranslationContext &ctx,
                                          llvm::BasicBlock *&block,
                                          bool doAnnotation) {
+  if (!ctx.natI) {
+    return TranslateErrorUnsupported;
+  }
+
   auto pc = ctx.natI->get_loc();
 
   // Update the program counter.
