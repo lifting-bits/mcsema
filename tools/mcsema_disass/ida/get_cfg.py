@@ -154,7 +154,7 @@ def _decode_instruction(ea):
         decoded_inst, extra_bytes = _decode_instruction(end_ea)
         DEBUG("Extended instruction at {:08x} by {} bytes".format(
             ea, len(extra_bytes)))
-        decoded_bytes.extend(extra_bytes)
+        decoded_bytes += extra_bytes
 
     return decoded_inst, decoded_bytes
 
