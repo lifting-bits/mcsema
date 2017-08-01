@@ -355,6 +355,7 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
   TranslationContext ctx;
   ctx.natM = mod;
   ctx.natF = func;
+  ctx.natI = nullptr;
   ctx.M = M;
   ctx.F = F;
 
@@ -367,19 +368,36 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
   // Create a branch from the end of the entry block to the first block
   llvm::BranchInst::Create(ctx.va_to_bb[func->get_start()], entryBlock);
 
-  // Lift every basic block into the functions.
-  auto error = false;
-  for (auto block_info : func->get_blocks()) {
-    ctx.natB = block_info.second;
-    error = LiftBlockIntoFunction(ctx) || error;
+  try {
+    // Lift every basic block into the functions.
+    auto error = false;
+    for (auto block_info : func->get_blocks()) {
+      ctx.natB = block_info.second;
+      error = LiftBlockIntoFunction(ctx) || error;
+      ctx.natB = nullptr;
+    }
+
+    // For ease of debugging generated code, don't allow lifted functions to
+    // be inlined. This will make lifted and native call graphs one-to-one.
+    F->addFnAttr(llvm::Attribute::NoInline);
+
+    //we should be done, having inserted every block into the module
+    return !error;
+
+  } catch (std::exception &e) {
+    std::cerr << "error: " << std::endl << e.what() << std::endl
+              << "in function " << std::hex
+              << ctx.natF->get_start() << std::endl;
+    if (ctx.natB) {
+      std::cerr << "in block " << std::hex << ctx.natB->get_base() << std::endl;
+      if (ctx.natI) {
+        std::cerr << "in inst " << std::hex << ctx.natI->get_loc() << std::endl;
+      }
+    }
+    return false;
   }
 
-  // For ease of debugging generated code, don't allow lifted functions to
-  // be inlined. This will make lifted and native call graphs one-to-one.
-  F->addFnAttr(llvm::Attribute::NoInline);
-
-  //we should be done, having inserted every block into the module
-  return !error;
+  
 }
 
 struct DataSectionVar {
@@ -628,5 +646,6 @@ bool LiftCodeIntoModule(NativeModulePtr natMod, llvm::Module *M) {
   InitExternalData(natMod, M);
   InitExternalCode(natMod, M);
   InsertDataSections(natMod, M);
+  
   return LiftFunctionsIntoModule(natMod, M);
 }

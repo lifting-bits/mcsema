@@ -367,6 +367,7 @@ static llvm::Value* getLoadableValue(llvm::Value *ptr,
 
 template<int width>
 static llvm::Value* getSegmentValue(llvm::BasicBlock *&b, unsigned sreg) {
+
   llvm::Value *val = nullptr;
   switch (sreg) {
     case llvm::X86::SS:
@@ -387,9 +388,12 @@ static llvm::Value* getSegmentValue(llvm::BasicBlock *&b, unsigned sreg) {
     case llvm::X86::GS:
       val = CONST_V<width>(b, 0x00);
       break;
-    default:
-      throw TErr(__LINE__, __FILE__, "Unknown Segment Register");
+    default: {
+      std::stringstream ss;
+      ss << "Unknown Segment Register " << std::dec << sreg; 
+      throw TErr(__LINE__, __FILE__, ss.str());
       break;
+    }
   }
 
   return val;
