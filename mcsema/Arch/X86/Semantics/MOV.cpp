@@ -365,74 +365,6 @@ static llvm::Value* getLoadableValue(llvm::Value *ptr,
   return nullptr;
 }
 
-template<int width>
-static llvm::Value* getSegmentValue(llvm::BasicBlock *&b, unsigned sreg) {
-
-  llvm::Value *val = nullptr;
-  switch (sreg) {
-    case llvm::X86::SS:
-      val = CONST_V<width>(b, 0x23);
-      break;
-    case llvm::X86::CS:
-      val = CONST_V<width>(b, 0x1B);
-      break;
-    case llvm::X86::DS:
-      val = CONST_V<width>(b, 0x23);
-      break;
-    case llvm::X86::ES:
-      val = CONST_V<width>(b, 0x23);
-      break;
-    case llvm::X86::FS:
-      val = CONST_V<width>(b, 0x3B);
-      break;
-    case llvm::X86::GS:
-      val = CONST_V<width>(b, 0x00);
-      break;
-    default: {
-      std::stringstream ss;
-      ss << "Unknown Segment Register " << std::dec << sreg; 
-      throw TErr(__LINE__, __FILE__, ss.str());
-      break;
-    }
-  }
-
-  return val;
-
-}
-
-template<int width>
-static InstTransResult doMSMov(NativeInstPtr ip, llvm::BasicBlock *&b,
-                               llvm::Value *dstAddr,
-                               const llvm::MCOperand &src) {
-  NASSERT(dstAddr != NULL);
-  NASSERT(src.isReg());
-  auto seg_val = getSegmentValue<width>(b, src.getReg());
-  M_WRITE<width>(ip, b, dstAddr, seg_val);
-  return ContinueBlock;
-}
-
-template<int width>
-static InstTransResult doSMMov(NativeInstPtr ip, llvm::BasicBlock *&b,
-                               llvm::Value *dstAddr,
-                               const llvm::MCOperand &src) {
-  NASSERT(dstAddr != NULL);
-  NASSERT(src.isReg());
-  auto seg_val = getSegmentValue<width>(b, src.getReg());
-  M_WRITE<width>(ip, b, dstAddr, seg_val);
-  return ContinueBlock;
-}
-
-template<int width>
-static InstTransResult doRSMov(NativeInstPtr ip, llvm::BasicBlock *&b,
-                               const llvm::MCOperand &dst,
-                               const llvm::MCOperand &src) {
-  NASSERT(dst.isReg());
-  NASSERT(src.isReg());
-  auto seg_val = getSegmentValue<width>(b, src.getReg());
-  R_WRITE<width>(b, dst.getReg(), seg_val);
-  return ContinueBlock;
-}
-
 template<int dstWidth>
 static llvm::Value *doMovSXV(NativeInstPtr ip, llvm::BasicBlock * b,
                              llvm::Value *src) {
@@ -778,22 +710,6 @@ GENERIC_TRANSLATION_REF(MOV16rm, doRMMov<16>(ip, block, ADDR_NOREF(1), OP(0)),
 GENERIC_TRANSLATION(MOVZX16rr8, (doMovZXRR<16,8>(ip, block, OP(0), OP(1))))
 GENERIC_TRANSLATION(MOVZX32rr8, (doMovZXRR<32,8>(ip, block, OP(0), OP(1))))
 GENERIC_TRANSLATION(MOVZX32rr16, ( doMovZXRR<32,16>(ip, block, OP(0), OP(1))))
-
-GENERIC_TRANSLATION(MOV16rs, doRSMov<16>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION(MOV32rs, doRSMov<32>(ip, block, OP(0), OP(1)))
-GENERIC_TRANSLATION(MOV64rs, doRSMov<64>(ip, block, OP(0), OP(1)))
-
-GENERIC_TRANSLATION_REF(MOV64ms, doMSMov<64>(ip, block, ADDR_NOREF(0), OP(5)),
-                        doMSMov<64>(ip, block, MEM_REFERENCE(0), OP(5)))
-
-GENERIC_TRANSLATION_REF(MOV64sm, doSMMov<64>(ip, block, ADDR_NOREF(0), OP(5)),
-                        doSMMov<64>(ip, block, MEM_REFERENCE(0), OP(5)))
-
-GENERIC_TRANSLATION_REF(MOV32ms, doMSMov<32>(ip, block, ADDR_NOREF(0), OP(5)),
-                        doMSMov<32>(ip, block, MEM_REFERENCE(0), OP(5)))
-
-GENERIC_TRANSLATION_REF(MOV16ms, doMSMov<16>(ip, block, ADDR_NOREF(0), OP(5)),
-                        doMSMov<16>(ip, block, MEM_REFERENCE(0), OP(5)))
 
 GENERIC_TRANSLATION_REF(MOVZX16rm8,
                         (doMovZXRM<16,8>(ip, block, OP(0), ADDR_NOREF(1))),
@@ -1220,22 +1136,6 @@ void MOV_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::MOVSX64rm8] = translate_MOVSX64rm8;
   m[llvm::X86::MOVSX64rm16] = translate_MOVSX64rm16;
   m[llvm::X86::MOVSX64rm32] = translate_MOVSX64rm32;
-
-  m[llvm::X86::MOV16rs] = translate_MOV16rs;
-  m[llvm::X86::MOV32rs] = translate_MOV32rs;
-  m[llvm::X86::MOV64rs] = translate_MOV64rs;
-
-  m[llvm::X86::MOV16ms] = translate_MOV16ms;
-  m[llvm::X86::MOV32ms] = translate_MOV32ms;
-  m[llvm::X86::MOV64ms] = translate_MOV64ms;
-
-  m[llvm::X86::MOV16sr] = translate_MOV32rs;
-  m[llvm::X86::MOV32sr] = translate_MOV32rs;
-  m[llvm::X86::MOV64sr] = translate_MOV32rs;
-
-  //m[llvm::X86::MOV16sm] = translate_MOV16sm;
-  // m[llvm::X86::MOV32sm] = translate_MOV32sm;
-  // m[llvm::X86::MOV64sm] = translate_MOV64sm;
 
   m[llvm::X86::MOVBE16rm] = translate_MOVBE16rm;
   m[llvm::X86::MOVBE32rm] = translate_MOVBE32rm;
