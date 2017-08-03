@@ -244,12 +244,14 @@ class NativeVar {
     std::string         name;
     std::string         type; // TODO: something cleverer than string. for now it's just ida_type wholesale.
     std::list<uint64_t>  refs;
+    std::map<uint64_t, uint64_t>  offset;
     llvm::Value    *llvm_var;
     public:
     NativeVar(uint64_t size, std::string name, std::string type) : size(size), name(name), type(type) {}
     uint64_t get_size(void) { return this->size; }
-    void add_ref(uint64_t ea) { this->refs.push_back(ea); }
+    void add_ref(uint64_t ea, uint32_t offset = 0) { this->refs.push_back(ea); this->offset[ea] = offset; }
     std::list<uint64_t> &get_refs(void) { return this->refs; }
+    uint32_t get_offset(uint64_t ea) { return this->offset[ea]; }
     llvm::Value *get_llvm_var(void) { return this->llvm_var; }
     void set_llvm_var(llvm::Value *v) { this->llvm_var = v; }
     std::string print_var(void);

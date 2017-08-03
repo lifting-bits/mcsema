@@ -314,6 +314,53 @@ static llvm::Constant *CreateConstantBlob(llvm::LLVMContext &ctx,
   return llvm::ConstantArray::get(arrT, array_elements);
 }
 
+void dataSectionToGlobalVar(const std::list<DataSection> &globaldata, llvm::Module *M,
+                            NativeGlobalVarPtr nGV,
+                            std::vector<llvm::Constant *> &secContents,
+                            std::vector<llvm::Type *> &data_section_types) {
+
+  auto sym_name = nGV->get_name();
+  std::vector<uint8_t> data_blob;
+  bool is_found = 0;
+  DataSection section;
+  auto data_addr_str = sym_name.c_str() + 17 /* strlen("recovered_global_") */;
+  VA data_addr = 0;
+  VA section_base = 0;
+  sscanf(data_addr_str, "%lx", &data_addr);
+
+  for (auto &dt : globaldata) {
+    VA start = dt.getBase();
+    VA end = start + dt.getSize();
+    if (data_addr >= start && data_addr < end) {
+      section_base = start;
+      section = dt;
+      is_found = 1;
+      break;
+    }
+  }
+
+  if(is_found) {
+    auto offset = data_addr - section_base;
+    for(auto index = offset; index < offset + nGV->get_size(); index++)
+      data_blob.push_back(section.getBytes()[index]);
+  } else {
+    for(auto index = 0; index < nGV->get_size(); index++)
+      data_blob.push_back(nGV->getBytes()[index]);
+  }
+
+  auto charTy = llvm::Type::getInt8Ty(M->getContext());
+  auto blob = nGV->getBytes();
+  auto arrT = llvm::ArrayType::get(charTy, data_blob.size());
+  std::vector<llvm::Constant *> array_elements;
+  for (auto cur : data_blob) {
+      array_elements.push_back(llvm::ConstantInt::get(charTy, cur));
+  }
+  auto arr = llvm::ConstantArray::get(arrT, array_elements);
+  secContents.push_back(arr);
+  data_section_types.push_back(arr->getType());
+
+}
+
 void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
                                 const DataSection &ds, llvm::Module *M,
                                 std::vector<llvm::Constant *> &secContents,

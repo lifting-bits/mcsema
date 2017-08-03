@@ -60,6 +60,7 @@ message Block {
 
 message Reference {
     required    int64 inst_addr = 1;
+    required	int64 offset = 2;
 }
 
 message Variable {

@@ -1,29 +1,42 @@
 #!/usr/bin/env python
 
+import os
 import sys
 import argparse
 import pprint
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from collections import namedtuple
 from enum import Enum
 
-from elftools.elf.elffile import ELFFile
-from elftools.common.py3compat import itervalues
-from elftools.dwarf.descriptions import (describe_DWARF_expr, set_global_machine_arch)
-from elftools.dwarf.descriptions import describe_attr_value
-from elftools.dwarf.locationlists import LocationEntry
-from elftools.common.py3compat import maxint, bytes2str
+try:
+    from elftools.elf.elffile import ELFFile
+    from elftools.common.py3compat import itervalues
+    from elftools.dwarf.descriptions import (describe_DWARF_expr, set_global_machine_arch)
+    from elftools.dwarf.descriptions import describe_attr_value
+    from elftools.dwarf.locationlists import LocationEntry
+    from elftools.common.py3compat import maxint, bytes2str, byte2int, int2byte
+except ImportError:
+    print "Install pyelf tools"
 
-import mcsema_disass.ida.CFG_pb2 as CFG_pb2
 
 DWARF_OPERATIONS = defaultdict(lambda: (lambda *args: None))
+SYMBOL_BLACKLIST = defaultdict(lambda: (lambda *args: None))
+
+SYMBOL_BLACKLIST["httpd-kudu-canonical"] = [
+    "ap_coredump_dir",
+    "ap_prelinked_modules",
+    "ap_prelinked_module_symbols",
+    "htracker",
+    ]
+
+BINARY_FILE = ""
 
 Type = namedtuple('Type', ['name', 'size', 'type_offset', 'tag'])
 
-GLOBAL_VARIABLES = dict()
+GLOBAL_VARIABLES = OrderedDict()
 
-TYPES_MAP = dict()
+TYPES_MAP = OrderedDict()
 
 BASE_TYPES = [
     'DW_TAG_base_type',
@@ -100,7 +113,7 @@ def process_types(dwarf, typemap):
         if die.tag in BASE_TYPES:
             name = get_name(die)
             size = get_size(die)
-            if die.offset not in typemap:
+            if die.offset not in typemap :
                 typemap[die.offset] = Type(name=name, size=size, type_offset=die.offset, tag=TYPE_ENUM.get(die.tag))
             DEBUG("<{0:x}> {1}".format(die.offset, typemap.get(die.offset)))
 
@@ -148,7 +161,10 @@ def process_types(dwarf, typemap):
                 for child_die in die.iter_children():
                     if child_die.tag == 'DW_TAG_subrange_type':
                         if 'DW_AT_upper_bound' in child_die.attributes:
-                            size = size*child_die.attributes['DW_AT_upper_bound'].value
+                            index = child_die.attributes['DW_AT_upper_bound'].value
+                            if type(index) is int:
+                                index = index +1
+                            size = size*index
                             break
                 if die.offset not in typemap:
                     typemap[die.offset] = Type(name=name, size=size, type_offset=type_offset, tag=TYPE_ENUM.get(die.tag))
@@ -159,7 +175,6 @@ def process_types(dwarf, typemap):
     build_typemap(dwarf, process_pointer_types)
     build_typemap(dwarf, process_array_types)
     
-
     
 def _process_dies(die, fn):
     fn(die)
@@ -171,14 +186,82 @@ def build_typemap(dwarf, fn):
         top = CU.get_top_DIE()
         _process_dies(top, fn)
 
-def address_lookup(memory_ref):
-    gvar = GLOBAL_VARIABLES.get(memory_ref)
-    if gvar:
-        if (gvar['type'].tag == 1 or gvar['type'].tag == 4):
-            DEBUG("Found {}".format(pprint.pformat(gvar)))
-            return True
-    return False
-    
+def readBytes(start, end):
+    DEBUG("binary file : {}".format(BINARY_FILE))
+    bytestr = ""
+    with open(BINARY_FILE, 'rb') as f:
+        elffile = ELFFile(f)
+        for section in elffile.iter_sections():
+            if section['sh_type'] == 'SHT_NOBITS':
+                DEBUG("Section '{}' has no data to dump.".format(section.name))
+                continue
+            if start in xrange(section['sh_addr'], section['sh_addr']+section['sh_size']):
+                sec_addr = section['sh_addr']
+                data = section.data()
+                for i in xrange(start, end):
+                    bt = byte2int(data[i - sec_addr])
+                    bytestr += int2byte(bt)
+        
+    if bytestr == "":
+        for i in xrange(start, end):
+            bytestr += "\x00"
+    return bytestr
+
+def _create_global_var_entry(memory_ref, var_name):
+    return dict(addrs=set(), size=-1, name=var_name, type=None, data="\x00", safe=True)
+
+def address_lookup(g_ref, global_var_array):
+    for value, gvar in GLOBAL_VARIABLES.iteritems():
+        if (gvar['type'].tag == 1):
+            if gvar['addr'] == g_ref.address:
+                address = gvar['addr']
+                size = gvar['size']
+                if address not in global_var_array:
+                    global_var_array[address] = _create_global_var_entry(address, g_ref.var.name)
+                    global_var_array[address]['data'] = g_ref.data
+                    global_var_array[address]['size'] = size
+                    global_var_array[address]['type'] = g_ref.var.ida_type
+                    for ref in g_ref.var.ref_eas:
+                        global_var_array[address]['addrs'].add((ref.inst_addr, ref.offset))
+                DEBUG("Array Variable {}".format(pprint.pformat(global_var_array[address])))   
+                DEBUG("Found {}".format(pprint.pformat(gvar)))
+                return None
+        elif (gvar['type'].tag == 4 and gvar['name'] not in SYMBOL_BLACKLIST[os.path.basename(BINARY_FILE)]):
+            if gvar['addr'] == g_ref.address:
+                address = gvar['addr']
+                size = gvar['size']
+                if address not in global_var_array:
+                    global_var_array[address] = _create_global_var_entry(address, g_ref.var.name)
+                    global_var_array[address]['data'] = g_ref.data
+                    global_var_array[address]['size'] = size
+                    global_var_array[address]['type'] = g_ref.var.ida_type
+                    for ref in g_ref.var.ref_eas:
+                        global_var_array[address]['addrs'].add((ref.inst_addr, ref.offset))
+                DEBUG("Array Variable {}".format(pprint.pformat(global_var_array[address])))   
+                DEBUG("Found {}".format(pprint.pformat(gvar)))
+                return None
+        #elif (gvar['type'].tag == 5 or gvar['type'].tag == 2):
+        #    DEBUG("Array Variable {}".format(pprint.pformat(gvar)))
+        elif (gvar['type'].tag == 5 and gvar['name'] not in SYMBOL_BLACKLIST[os.path.basename(BINARY_FILE)]):
+            base_address = gvar['addr']
+            size = gvar['size']
+            name = "recovered_global_{:0x}".format(base_address)
+            if g_ref.address in xrange(base_address, base_address + size):
+                if base_address not in global_var_array:
+                    global_var_array[base_address] = _create_global_var_entry(base_address, name)
+                    global_var_array[base_address]['data'] = readBytes(base_address, base_address + size)
+                    global_var_array[base_address]['size'] = size
+                    global_var_array[base_address]['type'] = g_ref.var.ida_type
+                offset = g_ref.address - base_address
+                for ref in g_ref.var.ref_eas:
+                    global_var_array[base_address]['addrs'].add((ref.inst_addr, offset))
+                DEBUG("Array Variable {}".format(pprint.pformat(global_var_array[base_address])))   
+                DEBUG("Found {}".format(pprint.pformat(gvar)))
+                return None
+        
+    return None
+
+ 
 def _print_die(die, section_offset):
     DEBUG("Processing DIE: {}".format(str(die)))
     for attr in itervalues(die.attributes):
@@ -249,7 +332,7 @@ def process_dwarf_info(file):
         
         if not f_elf.has_dwarf_info():
             DEBUG("{0} has no debug informations!".format(file))
-            return
+            return False
         
         dwarf_info = f_elf.get_dwarf_info()
         process_types(dwarf_info, TYPES_MAP)
@@ -272,8 +355,14 @@ def process_dwarf_info(file):
     DEBUG('Number of Global Vars: {0}'.format(len(GLOBAL_VARIABLES)))
     DEBUG("{}".format(pprint.pformat(GLOBAL_VARIABLES)))
     DEBUG("End Global Vars\n")
-    
+    return True
+
 def updateCFG(in_file, out_file):
+    
+    import mcsema_disass.ida.CFG_pb2 as CFG_pb2
+    
+    global_var_array = dict()
+    
     M = CFG_pb2.Module()
     with open(in_file, 'rb') as inf:
         M.ParseFromString(inf.read())
@@ -281,9 +370,24 @@ def updateCFG(in_file, out_file):
         DEBUG("Number of Global Variables in CFG : {}".format(len(GV)))
         DEBUG('Number of Global Variables recovered from dwarf: {0}'.format(len(GLOBAL_VARIABLES)))
         for g in GV:
-            if address_lookup(g.address) is False:
+            gvar = address_lookup(g, global_var_array)
+            if gvar is None:
                 DEBUG("Global Vars {} {}".format(str(g.var.name), hex(g.address)))
                 M.global_vars.remove(g)
+        
+        DEBUG("{}".format(pprint.pformat(global_var_array)))       
+        for key in sorted(global_var_array.iterkeys()):
+            entry = global_var_array[key]
+            var = M.global_vars.add()
+            var.address = key
+            var.data = entry['data']
+            var.var.name = entry['name']
+            var.var.size = entry['size']
+            var.var.ida_type = entry['type']
+            for i in entry["addrs"]:
+                r = var.var.ref_eas.add()
+                r.inst_addr = i[0]
+                r.offset = i[1]
                 
     with open(out_file, "w") as outf:
         outf.write(M.SerializeToString())
@@ -300,6 +404,9 @@ if __name__ == '__main__':
                         help='Name of the CFG file.',
                         required=True)
     
+    parser.add_argument('--out_cfg',
+                        help='Optional CFG out file.')
+    
     parser.add_argument('--binary',
                         help='Name of the binary image.',
                         required=True)
@@ -311,5 +418,13 @@ if __name__ == '__main__':
         _DEBUG_FILE = args.log_file
         DEBUG("Debugging is enabled.")
         
-    process_dwarf_info(args.binary)
-    updateCFG(args.cfg, args.cfg)
+    if args.out_cfg:
+        out_file = args.out_cfg
+    else:
+        out_file = args.cfg
+        
+    BINARY_FILE = args.binary
+    if process_dwarf_info(args.binary) is True:
+        updateCFG(args.cfg, out_file)
+    
+    

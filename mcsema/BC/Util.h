@@ -207,6 +207,11 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
                                 std::vector<llvm::Type *>& data_section_types,
                                 bool convert_to_callback);
 
+void dataSectionToGlobalVar(const std::list<DataSection> &globaldata, llvm::Module *M,
+                            NativeGlobalVarPtr nGV,
+                            std::vector<llvm::Constant *> &secContents,
+                            std::vector<llvm::Type *> &data_section_types);
+
 
 #define OP(x) inst.getOperand(x)
 

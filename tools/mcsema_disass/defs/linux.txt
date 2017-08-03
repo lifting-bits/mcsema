@@ -37284,3 +37284,8 @@ acl_get_fd 1 C N
 acl_get_file 2 C N
 acl_set_fd 2 C N
 acl_set_file 3 C N
+
+delete_module 2 C N
+init_module 3 C N
+__asprintf_chk 16 C N
+__vasprintf_chk 16 C N

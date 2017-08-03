@@ -473,18 +473,30 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
     var.var->setInitializer(cst);
 
   }
-#if 0
-    // initialize the native global variables
-  for (auto nGV : nativeglobalvars) {
-    auto var = nGV->get_llvm_var();
 
-    std::vector<llvm::Constant *> secContents;
+    // create and initialize the native global variables
+  for (auto nGV : nativeglobalvars) {
+    auto st_opaque = llvm::StructType::create(M->getContext());
+    if(st_opaque == nullptr) continue;
+    llvm::GlobalVariable *g = new llvm::GlobalVariable(/*Module=*/*M,
+                                                    /*Type=*/st_opaque,
+                                                    /*isConstant=*/false,
+                                                    /*Linkage=*/llvm::GlobalValue::InternalLinkage,
+                                                    /*Initializer=*/nullptr,
+                                                    /*Name=*/nGV->get_name());
+
     std::vector<llvm::Type *> data_section_types;
-    dataSectionToTypesContents(globaldata, *var.section, M, secContents,
-                               data_section_types, true);
-    var.opaque_type->setBody(data_section_types, true);
+    std::vector<llvm::Constant *> secContents;
+
+    dataSectionToGlobalVar(globaldata, M, nGV, secContents, data_section_types);
+    st_opaque->setBody(data_section_types, true);
+    auto cst = llvm::ConstantStruct::get(st_opaque, secContents);
+
+    g->setAlignment(ArchPointerSize(M)/8);
+    g->setInitializer(cst);
+    nGV->set_llvm_var(g);
   }
-#endif
+
   return true;
 }
 
@@ -510,31 +522,13 @@ void RenameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
   }
 }
 
-static llvm::Type* llvmTypeFromCFGTypeStr(const std::string &cfg_type_str, llvm::LLVMContext &context) {
-	/*
-              'dt_byte':1,
-              'dt_word':2,
-              'dt_dword':4,
-              'dt_float':4,
-              'dt_double':8,
-              'dt_qword':8"
-	*/
-	if (cfg_type_str.compare("dt_byte") == 0) return llvm::Type::getInt8PtrTy(context);
-	if (cfg_type_str.compare("dt_word") == 0) return llvm::Type::getInt16PtrTy(context);
-	if (cfg_type_str.compare("dt_dword") == 0) return llvm::Type::getInt32PtrTy(context);
-	if (cfg_type_str.compare("dt_qword") == 0) return llvm::Type::getInt64PtrTy(context);
-	if (cfg_type_str.compare("dt_float") == 0) return llvm::Type::getFloatPtrTy(context);
-	if (cfg_type_str.compare("dt_double") == 0) return llvm::Type::getDoublePtrTy(context);
-	return nullptr;
-}
-
 static void InitLiftedGlobals(NativeModulePtr natMod, llvm::Module *M) {
+
   for (auto nGV : natMod->global_variables) {
-    // define global variable type as struct; Change it to the PointerType after testing
-    auto st_opaque = llvm::StructType::create(M->getContext());
-    if(st_opaque == nullptr) continue;
     std::vector<llvm::Type *> data_section_types;
     std::vector<llvm::Constant *> secContents;
+    auto st_opaque = llvm::StructType::create(M->getContext());
+    if(st_opaque == nullptr) continue;
     auto charTy = llvm::Type::getInt8Ty(M->getContext());
     auto blob = nGV->getBytes();
     auto arrT = llvm::ArrayType::get(charTy, blob.size());
@@ -545,6 +539,7 @@ static void InitLiftedGlobals(NativeModulePtr natMod, llvm::Module *M) {
     auto arr = llvm::ConstantArray::get(arrT, array_elements);
     secContents.push_back(arr);
     data_section_types.push_back(arr->getType());
+
     st_opaque->setBody(data_section_types, true);
     auto cst = llvm::ConstantStruct::get(st_opaque, secContents);
 
@@ -554,11 +549,12 @@ static void InitLiftedGlobals(NativeModulePtr natMod, llvm::Module *M) {
                                                     /*Linkage=*/llvm::GlobalValue::InternalLinkage,
                                                     /*Initializer=*/cst,
                                                     /*Name=*/nGV->get_name());
-    
+
     g->setAlignment(4); // ???
     nGV->set_llvm_var(g);
   }
 }
+
 
 
 static void InitLiftedFunctions(NativeModulePtr natMod, llvm::Module *M) {
@@ -716,7 +712,7 @@ static bool LiftFunctionsIntoModule(NativeModulePtr natMod, llvm::Module *M) {
 }
 
 bool LiftCodeIntoModule(NativeModulePtr natMod, llvm::Module *M) {
-  InitLiftedGlobals(natMod, M);
+  //InitLiftedGlobals(natMod, M);
   InitLiftedFunctions(natMod, M);
   InitExternalData(natMod, M);
   InitExternalCode(natMod, M);

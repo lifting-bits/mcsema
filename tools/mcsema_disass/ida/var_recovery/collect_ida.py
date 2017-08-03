@@ -2,25 +2,28 @@ import idaapi
 import idautils
 import idc
 import sys
-
+    
 from get_cfg import readByte
 from get_cfg import readDword
 from get_cfg import readQword
 from get_cfg import readBytesSlowly
 from get_cfg import _decode_instruction
 
+
 _DEBUG = True
 _DEBUG_FILE = sys.stderr
+_DWARF_FLAG = False
 
 def DEBUG(s):
     global _DEBUG, _DEBUG_FILE
     if _DEBUG:
         _DEBUG_FILE.write("{}\n".format(str(s)))
 
-def DEBUG_INIT(file, flag):
-    global _DEBUG, _DEBUG_FILE
+def DEBUG_INIT(file, flag, is_dwarf= False):
+    global _DEBUG, _DEBUG_FILE, _DWARF_FLAG
     _DEBUG = flag
     _DEBUG_FILE = file
+    _DWARF_FLAG = is_dwarf
 
 
 OPND_WRITE_FLAGS = {
@@ -259,7 +262,6 @@ class Operand(object):
         return self._displ
     
     
-
 class Instruction(object):
     '''
         Instruction objects
@@ -610,7 +612,7 @@ def _process_single_func(funcaddr):
 def _process_inst(addr, referers, dereferences, func_var_data, global_var_data):
     insn = Instruction(addr)
     for opnd in insn.opearnds:
-        if opnd.is_mem:
+        if opnd.is_mem and  ('fs' not in opnd.text) and ('ds' not in opnd.text):
             DEBUG("Operand is Memory {}".format(opnd.index))
             memory_ref = _signed_from_unsigned(opnd.value)
             var_name = _normalize_global_var_name(opnd.text)
@@ -622,10 +624,7 @@ def _process_inst(addr, referers, dereferences, func_var_data, global_var_data):
             dref = list(idautils.DataRefsFrom(memory_ref))
             if len(dref) or idc.SegName(memory_ref) in [".got.plt"]:
                 global_var_data[memory_ref]["safe"] = False
-            # Check if the address is of struct Type
-            if idaapi.isStruct(flags):
-                global_var_data[memory_ref]["safe"] = False
-                DEBUG("Memory reference is of type Struct {0:x} {1:x} {2:x}".format(addr, memory_ref, flags))
+                
             if opnd.is_read:
                 global_var_data[memory_ref]["reads"].add(addr)
                 func_var_data["globals"][memory_ref]["reads"].add(addr)
@@ -644,13 +643,17 @@ def _process_inst(addr, referers, dereferences, func_var_data, global_var_data):
                 global_var_data[memory_ref] = _create_global_var_entry(memory_ref, var_name, opnd.dtype)
             if memory_ref not in func_var_data["globals"]:
                 func_var_data["globals"][memory_ref] = _create_global_var_entry(memory_ref, var_name, opnd.dtype)
-            global_var_data[memory_ref]["safe"] = False
+            if _DWARF_FLAG is False:
+                global_var_data[memory_ref]["safe"] = False
             if opnd.is_read:
                 global_var_data[memory_ref]["reads"].add(addr)
                 func_var_data["globals"][memory_ref]["reads"].add(addr)
             elif opnd.is_write:
                 global_var_data[memory_ref]["writes"].add(addr)
                 func_var_data["globals"][memory_ref]["writes"].add(addr)
+            else:
+                global_var_data[memory_ref]["addrs"].add(addr)
+                func_var_data["globals"][memory_ref]["addrs"].add(addr)
             global_var_data[memory_ref]["data"] = readBytesSlowly(memory_ref, memory_ref+opnd.size) 
 
         if opnd.has_phrase:
@@ -682,8 +685,8 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_da
     target_on_stack = (_stack_ptr_format in target_op) or (func_var_data["uses_bp"] and (_base_ptr_format in target_op))
     read_on_stack = (_stack_ptr_format in read_op) or (func_var_data["uses_bp"] and (_base_ptr_format in read_op))
 
-    target_global = idc.GetOpType(addr, 0) == 2 #2 is a memory reference
-    read_global = idc.GetOpType(addr, 1) == 2
+    target_global = (idc.GetOpType(addr, 0) == 2) and ('fs' not in idc.GetOpnd(addr, 0)) #2 is a memory reference
+    read_global = (idc.GetOpType(addr, 1) == 2) and ('fs' not in idc.GetOpnd(addr, 1))
     global_address = (idc.GetOpType(addr, 1) == 5) and ('offset' in idc.GetOpnd(addr, 1)) #are both clauses needed?
 
     referers.pop(target_op, None)
@@ -695,11 +698,13 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_da
         if memory_ref not in global_var_data:
             global_var_data[memory_ref] = _create_global_var_entry(memory_ref, var_name, op_datatype)
         global_var_data[memory_ref]["addrs"].add(addr)
-        global_var_data[memory_ref]["safe"] = False
+        
+        #if _DWARF_FLAG is False:
+        #    global_var_data[memory_ref]["safe"] = False
         if memory_ref not in func_var_data["globals"]:
             func_var_data["globals"][memory_ref] = _create_global_var_entry(memory_ref, var_name, op_datatype)
         func_var_data["globals"][memory_ref]["addrs"].add(addr)
-        func_var_data["globals"][memory_ref]["safe"] = False
+        #func_var_data["globals"][memory_ref]["safe"] = False
 
     if target_global:
         memory_ref = _signed_from_unsigned(idc.GetOperandValue(addr, 0))
@@ -712,9 +717,9 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_da
         dref = list(idautils.DataRefsFrom(memory_ref))
         if len(dref) or idc.SegName(memory_ref) in [".got.plt"]:
             global_var_data[memory_ref]["safe"] = False
-        if idaapi.isStruct(flags):
-            global_var_data[memory_ref]["safe"] = False
-            DEBUG("Memory reference is of type Struct {0:x} {1:x} {2:x}".format(addr, memory_ref, flags))
+        #if idaapi.isStruct(flags):
+        #    global_var_data[memory_ref]["safe"] = False
+        #    DEBUG("Memory reference is of type Struct {0:x} {1:x} {2:x}".format(addr, memory_ref, flags))
         global_var_data[memory_ref]["writes"].add(addr)
         global_var_data[memory_ref]["data"] = readBytesSlowly(memory_ref, memory_ref+size) 
         if memory_ref not in func_var_data["globals"]:
@@ -778,9 +783,9 @@ def _process_mov_inst(addr, referers, dereferences, func_var_data, global_var_da
         dref = list(idautils.DataRefsFrom(memory_ref))
         if len(dref) or idc.SegName(memory_ref) in [".got.plt"]:
             global_var_data[memory_ref]["safe"] = False
-        if idaapi.isStruct(flags):
-            global_var_data[memory_ref]["safe"] = False
-            DEBUG("Memory reference is of type Struct {0:x} {1:x} {2:x}".format(addr, memory_ref, flags))
+        #if idaapi.isStruct(flags):
+        #    global_var_data[memory_ref]["safe"] = False
+        #    DEBUG("Memory reference is of type Struct {0:x} {1:x} {2:x}".format(addr, memory_ref, flags))
 
         global_var_data[memory_ref]["reads"].add(addr)
         global_var_data[memory_ref]["data"] = readBytesSlowly(memory_ref, memory_ref+size) 
@@ -792,7 +797,7 @@ def _process_lea_inst(addr, referers, dereferences, func_var_data, global_var_da
     read_op = _translate_reg(idc.GetOpnd(addr, 1))
     target_op = _translate_reg(idc.GetOpnd(addr, 0))
     read_on_stack = (_stack_ptr_format in read_op) or (func_var_data["uses_bp"] and (_base_ptr_format in read_op))
-    read_global = idc.GetOpType(addr, 1) == 2
+    read_global = (idc.GetOpType(addr, 1) == 2) and ('fs' not in  idc.GetOpnd(addr, 1)) and ('ds' not in  idc.GetOpnd(addr, 1));
     
     if read_on_stack:
         #referers[operand] = offset
@@ -805,11 +810,12 @@ def _process_lea_inst(addr, referers, dereferences, func_var_data, global_var_da
         if memory_ref not in global_var_data:
             global_var_data[memory_ref] = _create_global_var_entry(memory_ref, var_name, op_datatype)
         global_var_data[memory_ref]["addrs"].add(addr)
-        global_var_data[memory_ref]["safe"] = False
+        if _DWARF_FLAG is False:
+            global_var_data[memory_ref]["safe"] = False
         if memory_ref not in func_var_data["globals"]:
             func_var_data["globals"][memory_ref] = _create_global_var_entry(memory_ref, var_name, op_datatype)
         func_var_data["globals"][memory_ref]["addrs"].add(addr)
-        #global_var_data[memory_ref]["data"] = readBytesSlowly(memory_ref, memory_ref+size) 
+        global_var_data[memory_ref]["data"] = readBytesSlowly(memory_ref, memory_ref+size) 
 
 
 def _process_call_inst(addr, referers, dereferences, func_var_data, global_var_data):
@@ -838,6 +844,7 @@ def _process_basic_block(BB, func_var_data, referers, dereferences, visited_bb, 
         return
     visited_bb.add(BB.startEA)
     for addr in BlockItems(BB):
+        DEBUG("Processing instruction at {0:x}".format(addr))
         _funcs = {"lea":_process_lea_inst,
                   "mov":_process_mov_inst,
                   "call":_process_call_inst}
@@ -887,6 +894,7 @@ def print_func_vars():
     print "}"
     print
     print "End Stack Vars"
+
 
 if __name__ == "__main__":
    print_func_vars()

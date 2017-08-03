@@ -1035,7 +1035,7 @@ static NativeGlobalVarPtr DeserializeGlobalVar(
     new NativeGlobalVar(var.size(), var.name(), var.ida_type(), globalvar.address(), local_bytes);
 
   for (auto ref_ea : var.ref_eas()) {
-    natGV->add_ref(ref_ea.inst_addr());
+    natGV->add_ref(ref_ea.inst_addr(), ref_ea.offset());
   }
   return natGV;
 }

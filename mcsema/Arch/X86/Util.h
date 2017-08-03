@@ -34,6 +34,7 @@
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/IntrinsicInst.h>
 
 #include <llvm/Support/Casting.h>
 
@@ -198,6 +199,32 @@ static llvm::Value *IMM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr mod,
     return addrInt;
   }
 
+  if (ip->has_mem_var) {
+    std::cout << "LEA with Lifted variable at address " << std::hex << ip->get_loc() << std::endl;
+    //return ip->get_mem_var()->get_llvm_var();
+    auto gvar_name = ip->get_mem_var()->get_name();
+    auto M = B->getParent()->getParent();
+    llvm::Value *gvar_adjusted = nullptr;
+    auto gData = M->getNamedGlobal(gvar_name);
+    auto ptrsize = ArchPointerSize(M);
+
+    if (Pointer32 == ptrsize) {
+      uint32_t addr_offset = ip->get_mem_var()->get_offset(ip->get_loc());
+      auto ty = llvm::Type::getInt32Ty(B->getContext());
+      auto gvarVal = new llvm::PtrToIntInst(gData, ty, "", B);
+      gvar_adjusted = llvm::BinaryOperator::CreateAdd(
+              gvarVal, CONST_V<32>(B, addr_offset), "", B);
+      return gvar_adjusted;
+    } else if (Pointer64 == ptrsize) {
+      uint32_t addr_offset = ip->get_mem_var()->get_offset(ip->get_loc());
+      auto ty = llvm::Type::getInt64Ty(B->getContext());
+      auto gvarVal = new llvm::PtrToIntInst(gData, ty, "", B);
+      gvar_adjusted = llvm::BinaryOperator::CreateAdd(
+              gvarVal, CONST_V<64>(B, addr_offset), "", B);
+      return gvar_adjusted;
+    }
+  }
+
   if (false == ip->has_imm_reference) {
     throw TErr(__LINE__, __FILE__,
                "Want to use IMM as data ref but have no IMM reference");
@@ -213,6 +240,32 @@ static llvm::Value *IMM_AS_DATA_REF(llvm::BasicBlock *B, NativeModulePtr mod,
     return addrInt;
 
   } else if (addrIsInData(off, mod, baseGlobal, 0)) {
+
+    if(ip->has_mem_var) {
+      //return ip->get_mem_var()->get_llvm_var();
+      auto gvar_name = ip->get_mem_var()->get_name();
+      auto M = B->getParent()->getParent();
+      llvm::Value *gvar_adjusted = nullptr;
+      auto gData = M->getNamedGlobal(gvar_name);
+      auto ptrsize = ArchPointerSize(M);
+
+      if (Pointer32 == ptrsize) {
+        uint32_t addr_offset = ip->get_mem_var()->get_offset(ip->get_loc());
+        auto ty = llvm::Type::getInt32Ty(B->getContext());
+        auto gvarVal = new llvm::PtrToIntInst(gData, ty, "", B);
+        gvar_adjusted = llvm::BinaryOperator::CreateAdd(
+                gvarVal, CONST_V<32>(B, addr_offset), "", B);
+        return gvar_adjusted;
+      } else if (Pointer64 == ptrsize) {
+        uint32_t addr_offset = ip->get_mem_var()->get_offset(ip->get_loc());
+        auto ty = llvm::Type::getInt64Ty(B->getContext());
+        auto gvarVal = new llvm::PtrToIntInst(gData, ty, "", B);
+        gvar_adjusted = llvm::BinaryOperator::CreateAdd(
+                gvarVal, CONST_V<64>(B, addr_offset), "", B);
+        return gvar_adjusted;
+      }
+    }
+
     std::stringstream ss;
     ss << "data_" << std::hex << baseGlobal;
     //we should be able to find a reference to this in global data

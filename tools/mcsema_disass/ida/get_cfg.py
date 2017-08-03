@@ -2104,9 +2104,15 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
           for i in val["writes"]: # reads vs writes? do we care?
             r = var.var.ref_eas.add()
             r.inst_addr = i
+            r.offset = 0
           for i in val["reads"]:
             r = var.var.ref_eas.add()
             r.inst_addr = i
+            r.offset = 0
+          for i in val["addrs"]:
+            r = var.var.ref_eas.add()
+            r.inst_addr = i
+            r.offset = 0
 
     mypath = path.dirname(__file__)
     processExternals(M)
@@ -2396,6 +2402,9 @@ if __name__ == "__main__":
         _DEBUG = True
         _DEBUG_FILE = args.log_file
         DEBUG("Debugging is enabled.")
+        isdwarf = ((SegByName(".debug_info'") != idc.BADADDR) or (SegByName(".zdebug_info'") != idc.BADADDR))
+        from var_recovery import collect_ida
+        collect_ida.DEBUG_INIT(_DEBUG_FILE, _DEBUG, isdwarf)
 
     addr_size = {"x86": 32, "amd64": 64}.get(args.arch, 0)
     ADDRESS_SIZE = addr_size
