@@ -31,7 +31,7 @@ def main(args=None):
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=textwrap.dedent("""\
     Additional arguments are passed to the disassembler script directly. These include:
-    
+
       --std-defs <file>       Load additional external function definitions from <file>
       --pie-mode              Change disassembler heuristics to work on position independent code"""))
 
@@ -43,11 +43,13 @@ def main(args=None):
   arg_parser.add_argument(
       '--arch',
       help='Name of the architecture. Valid names are x86, amd64, and aarch64.',
+      choices=SUPPORTED_ARCH,
       required=True)
 
   arg_parser.add_argument(
       '--os',
       help='Name of the OS. Valid names are {}'.format(SUPPORTED_OS),
+      choices=SUPPORTED_OS,
       required=True)
 
   arg_parser.add_argument(
@@ -127,7 +129,9 @@ def main(args=None):
         # remove the zero-sized file
         os.unlink(args.output)
         ret = 1
-
+    elif 'binja' in args.disassembler or 'binaryninja' in args.disassembler:
+      from binja.cfg import get_cfg
+      ret = get_cfg(args)
     else:
       arg_parser.error("{} passed to --disassembler is not known.".format(
           args.disassembler))
