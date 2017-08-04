@@ -2,10 +2,36 @@ import binaryninja as binja
 from binaryninja.enums import (
     Endianness, SegmentFlag
 )
+import inspect
 import logging
 import magic
 import re
 import struct
+
+LOGNAME = 'binja.cfg'
+log = logging.getLogger(LOGNAME)
+
+
+class StackFormatter(logging.Formatter):
+    def __init__(self, fmt=None, datefmt=None):
+        logging.Formatter.__init__(self, fmt, datefmt)
+        self.stack_base = len(inspect.stack()) + 7
+
+    def format(self, record):
+        record.indent = '  ' * (len(inspect.stack()) - self.stack_base)
+        res = logging.Formatter.format(self, record)
+        del record.indent
+        return res
+
+
+def init_logger(log_file):
+    formatter = StackFormatter('[%(levelname)s] %(indent)s%(message)s')
+    handler = logging.FileHandler(log_file)
+    handler.setFormatter(formatter)
+
+    log.addHandler(handler)
+    log.setLevel(logging.DEBUG)
+
 
 ENDIAN_TO_STRUCT = {
     Endianness.LittleEndian: '<',
@@ -39,17 +65,17 @@ def load_binary(path):
         bv_type = binja.BinaryViewType['Raw']
 
         # Can't do anything with Raw type
-        logging.fatal('Unknown binary type: "{}", exiting'.format(magic_type))
+        log.fatal('Unknown binary type: "{}", exiting'.format(magic_type))
         exit(1)
 
-    logging.debug('Loading binary in binja...')
+    log.debug('Loading binary in binja...')
     bv = bv_type.open(path)
     bv.update_analysis_and_wait()
 
     # NOTE: at the moment binja will not load a binary
     # that doesn't have an entry point
     if len(bv) == 0:
-        logging.error('Binary could not be loaded in binja, is it linked?')
+        log.error('Binary could not be loaded in binja, is it linked?')
         exit(1)
 
     return bv

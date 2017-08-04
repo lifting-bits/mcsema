@@ -6,6 +6,8 @@ import os
 import CFG_pb2
 import util
 
+log = logging.getLogger(util.LOGNAME)
+
 BINJA_DIR = os.path.dirname(os.path.abspath(__file__))
 DISASS_DIR = os.path.dirname(BINJA_DIR)
 
@@ -63,7 +65,7 @@ def recover_section_vars(bv, pb_seg, sect):
 
 def recover_sections(bv, pb_mod):
     for sect in bv.sections.values():
-        logging.debug('  Processing segment %s', sect.name)
+        log.debug('Processing segment %s', sect.name)
         pb_seg = pb_mod.segments.add()
         pb_seg.name = sect.name
         pb_seg.ea = sect.start
@@ -79,14 +81,14 @@ def recover_cfg(bv, args):
     pb_mod = CFG_pb2.Module()
     pb_mod.name = os.path.basename(bv.file.filename)
 
-    logging.debug('Processing Segments')
+    log.debug('Processing Segments')
     recover_sections(bv, pb_mod)
 
     return pb_mod
 
 
 def parse_defs_file(bv, path):
-    logging.debug('  Parsing %s', path)
+    log.debug('Parsing %s', path)
     with open(path) as f:
         for line in f.readlines():
             # Skip comments/empty lines
@@ -104,11 +106,11 @@ def parse_defs_file(bv, path):
                 fname, args, cconv, ret, sign = (line.split() + [None])[:5]
 
                 if cconv not in CCONV_TYPES:
-                    logging.fatal('Unknown calling convention: %s', cconv)
+                    log.fatal('Unknown calling convention: %s', cconv)
                     exit(1)
 
                 if ret not in ['Y', 'N']:
-                    logging.fatal('Unknown return type: %s', ret)
+                    log.fatal('Unknown return type: %s', ret)
                     exit(1)
 
                 EXT_MAP[fname] = (int(args), CCONV_TYPES[cconv], ret, sign)
@@ -116,15 +118,13 @@ def parse_defs_file(bv, path):
 
 def get_cfg(args):
     # Setup logger
-    logging.basicConfig(format='[%(levelname)s] %(message)s',
-                        filename=args.log_file,
-                        level=logging.DEBUG)
+    util.init_logger(args.log_file)
 
     # Load the binary in binja
     bv = util.load_binary(args.binary)
 
     # Collect all paths to defs files
-    logging.debug('Parsing definitions files')
+    log.debug('Parsing definitions files')
     def_paths = set(map(os.path.abspath, args.std_defs))
     def_paths.add(os.path.join(DISASS_DIR, 'defs', '{}.txt'.format(args.os)))  # default defs file
 
@@ -133,14 +133,14 @@ def get_cfg(args):
         if os.path.isfile(fpath):
             parse_defs_file(bv, fpath)
         else:
-            logging.warn('%s is not a file', fpath)
+            log.warn('%s is not a file', fpath)
 
     # Recover module
-    logging.debug('Starting analysis')
+    log.debug('Starting analysis')
     pb_mod = recover_cfg(bv, args)
 
     # Save cfg
-    logging.debug('Saving to file: %s', args.output)
+    log.debug('Saving to file: %s', args.output)
     with open(args.output, 'wb') as f:
         f.write(pb_mod.SerializeToString())
 
