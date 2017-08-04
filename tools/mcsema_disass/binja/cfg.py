@@ -1,4 +1,5 @@
 import binaryninja as binja
+from binaryninja.enums import SegmentFlag
 import logging
 import os
 
@@ -18,9 +19,68 @@ CCONV_TYPES = {
 }
 
 
+def recover_section_cross_references(bv, pb_seg, sect):
+    """Find references to other code/data in this section
+
+    Args:
+        bv (binja.BinaryView)
+        pb_seg (CFG_pb2.Segment)
+        sect (binja.binaryview.Section)
+    """
+    entry_width = util.clamp(sect.align, 4, bv.address_size)
+    read_val = {4: util.read_dword,
+                8: util.read_qword}[entry_width]
+    for addr in xrange(sect.start, sect.end, entry_width):
+        xref = read_val(bv, addr)
+
+        # TODO: probably need a better way of telling this is a ref
+        seg = bv.get_segment_at(xref)
+        if seg is None:
+            continue
+
+        pb_ref = pb_seg.xrefs.add()
+        pb_ref.ea = addr
+        pb_ref.width = entry_width
+        pb_ref.target_ea = xref
+        pb_ref.target_name = util.find_symbol_name(bv, xref)
+        pb_ref.target_is_code = util.is_code(bv, xref)
+
+
+def recover_section_vars(bv, pb_seg, sect):
+    """Gather any symbols that point to data in this section
+
+    Args:
+        bv (binja.BinaryView)
+        pb_seg (CFG_pb2.Segment)
+        sect (binja.binaryview.Section)
+    """
+    for sym in bv.get_symbols():
+        if sect.start <= sym.address < sect.end:
+            pb_segvar = pb_seg.vars.add()
+            pb_segvar.ea = sym.address
+            pb_segvar.name = sym.name
+
+
+def recover_sections(bv, pb_mod):
+    for sect in bv.sections.values():
+        logging.debug('  Processing segment %s', sect.name)
+        pb_seg = pb_mod.segments.add()
+        pb_seg.name = sect.name
+        pb_seg.ea = sect.start
+        pb_seg.data = bv.read(sect.start, sect.length)
+        pb_seg.is_external = util.is_section_external(bv, sect)
+        pb_seg.read_only = not util.is_readable(bv, sect.start)
+
+        recover_section_vars(bv, pb_seg, sect)
+        recover_section_cross_references(bv, pb_seg, sect)
+
+
 def recover_cfg(bv, args):
     pb_mod = CFG_pb2.Module()
     pb_mod.name = os.path.basename(bv.file.filename)
+
+    logging.debug('Processing Segments')
+    recover_sections(bv, pb_mod)
 
     return pb_mod
 
