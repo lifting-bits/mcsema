@@ -215,10 +215,12 @@ def parse_os_defs_file(df):
       elif conv == "F":
         realconv = CFG_pb2.ExternalFunction.FastCall
       else:
-        raise Exception("Unknown calling convention:"+str(l))
+        DEBUG("ERROR: Unknown calling convention: {}".format(l))
+        continue
 
       if ret not in "YN":
-        raise Exception("Unknown return type:"+ret)
+        DEBUG("ERROR: Unknown return type {} in {}".format(ret, l))
+        continue
 
       ea = idc.LocByName(fname)
       if not is_invalid_ea(ea) \

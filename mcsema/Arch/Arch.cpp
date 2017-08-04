@@ -44,7 +44,7 @@ bool InitArch(const std::string &os, const std::string &arch) {
   LOG(INFO)
       << "Initializing for " << arch << " code on " << os;
 
-  gArch = remill::GetGlobalArch();
+  gArch = remill::GetTargetArch();
   return true;
 }
 

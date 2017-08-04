@@ -82,7 +82,7 @@ else()
 
     add_library(${MCSMEMA_RT32} STATIC runtime_32.S runtime_32.o)
     set_target_properties(${MCSMEMA_RT32}
-      PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
+      PROPERTIES COMPILE_FLAGS "-m32 -fPIC" LINK_FLAGS "-m32 -fPIC")
 
     add_custom_command(
       OUTPUT runtime_32.S
@@ -147,7 +147,7 @@ else()
 
       add_library(${MCSMEMA_RT64} STATIC runtime_64.S runtime_64.o)
       set_target_properties(${MCSMEMA_RT64}
-        PROPERTIES COMPILE_FLAGS "-m64" LINK_FLAGS "-m64")
+        PROPERTIES COMPILE_FLAGS "-m64 -fPIC" LINK_FLAGS "-m64 -fPIC")
 
       add_custom_command(
         OUTPUT runtime_64.S
@@ -167,7 +167,7 @@ endif()
 # Create a runtime.
 add_custom_command(
     OUTPUT runtime_32.o
-    COMMAND "${CMAKE_CXX_COMPILER}" -std=gnu++11 -isystem "${REMILL_SOURCE_DIR}" -isystem "${MCSEMA_SOURCE_DIR}" -m32 -c "${CMAKE_CURRENT_SOURCE_DIR}/Runtime.cpp" -o runtime_32.o
+    COMMAND "${CMAKE_CXX_COMPILER}" -std=gnu++11 -isystem "${REMILL_SOURCE_DIR}" -isystem "${MCSEMA_SOURCE_DIR}" -m32 -fPIC -c "${CMAKE_CURRENT_SOURCE_DIR}/Runtime.cpp" -o runtime_32.o
     DEPENDS Runtime.cpp
     COMMENT "Building 32-bit runtime")
 
@@ -181,7 +181,7 @@ set_source_files_properties(
 if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
     add_custom_command(
         OUTPUT runtime_64.o
-        COMMAND "${CMAKE_CXX_COMPILER}" -std=gnu++11 -isystem "${REMILL_SOURCE_DIR}" -isystem "${MCSEMA_SOURCE_DIR}" -m64 -c "${CMAKE_CURRENT_SOURCE_DIR}/Runtime.cpp" -o runtime_64.o
+        COMMAND "${CMAKE_CXX_COMPILER}" -std=gnu++11 -isystem "${REMILL_SOURCE_DIR}" -isystem "${MCSEMA_SOURCE_DIR}" -m64  -fPIC -c "${CMAKE_CURRENT_SOURCE_DIR}/Runtime.cpp" -o runtime_64.o
         DEPENDS Runtime.cpp
         COMMENT "Building 64-bit runtime")
     

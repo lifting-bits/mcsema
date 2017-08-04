@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
 
   auto cfg_module = mcsema::ReadProtoBuf(
       FLAGS_cfg, (mcsema::gArch->address_size / 8));
-  auto input = remill::FindSemanticsBitcodeFile("", FLAGS_arch);
+  auto input = remill::FindSemanticsBitcodeFile(FLAGS_arch);
   mcsema::gModule = remill::LoadModuleFromFile(mcsema::gContext, input);
   mcsema::gArch->PrepareModule(mcsema::gModule);
 

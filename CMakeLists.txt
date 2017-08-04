@@ -17,103 +17,10 @@ cmake_minimum_required (VERSION 3.2)
 
 set(MCSEMA_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
 
-#
-# compiler selection
-#
-
-if (DEFINED ENV{LLVM_INSTALL_PREFIX})
-    set(LLVM_INSTALL_PREFIX $ENV{LLVM_INSTALL_PREFIX})
-endif ()
-
-# it is important to avoid re-defining these variables if they have been already
-# set or you risk ending up in a configure loop!
-if (NOT DEFINED CMAKE_C_COMPILER)
-    if (DEFINED LLVM_INSTALL_PREFIX)
-        set(CMAKE_C_COMPILER "${LLVM_INSTALL_PREFIX}/bin/clang")
-    else ()
-        set(CMAKE_C_COMPILER "clang")
-    endif ()
-endif ()
-
-if (NOT DEFINED CMAKE_CXX_COMPILER)
-    if (DEFINED LLVM_INSTALL_PREFIX)
-        set(CMAKE_CXX_COMPILER "${LLVM_INSTALL_PREFIX}/bin/clang++")
-    else ()
-        set(CMAKE_CXX_COMPILER "clang++")
-    endif ()
-endif ()
-
-if (NOT DEFINED CMAKE_ASM_COMPILER)
-    if (DEFINED LLVM_INSTALL_PREFIX)
-        set(CMAKE_ASM_COMPILER "${LLVM_INSTALL_PREFIX}/bin/clang")
-    else ()
-        set(CMAKE_ASM_COMPILER ${CMAKE_CXX_COMPILER})
-    endif ()
-endif ()
-
-if (NOT DEFINED CMAKE_LLVM_LINK)
-    if (DEFINED LLVM_INSTALL_PREFIX)
-        set(CMAKE_LLVM_LINK "${LLVM_INSTALL_PREFIX}/bin/llvm-link")
-    else ()
-        set(CMAKE_LLVM_LINK "llvm-link")
-    endif ()
-endif ()
-
-#
-# compiler settings
-#
-
-# enable the gnu extensions
-set(CMAKE_CXX_EXTENSIONS ON)
-
-# visual studio already defaults to c++11
-if (NOT WIN32)
-    set(CMAKE_CXX_STANDARD 11)
-endif ()
-
 # warnings and compiler settings
 set(PROJECT_CXXWARNINGS "-Wall -Wextra -Werror -Wconversion -pedantic -Wno-unused-parameter -Wno-c++98-compat -Wno-unreachable-code-return -Wno-nested-anon-types -Wno-extended-offsetof -Wno-gnu-anonymous-struct -Wno-gnu-designator -Wno-variadic-macros -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-statement-expression -Wno-return-type-c-linkage -Wno-c99-extensions -Wno-ignored-attributes -Wno-unused-local-typedef")
+
 set(PROJECT_CXXFLAGS "${PROJECT_CXXFLAGS} -Wno-unknown-warning-option ${PROJECT_CXXWARNINGS} -fPIC -fno-omit-frame-pointer -fvisibility-inlines-hidden -fno-exceptions -fno-asynchronous-unwind-tables -fno-rtti")
-
-# default build type
-if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "RelWithDebInfo")
-endif ()
-
-# debug symbols
-if (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    set(PROJECT_CXXFLAGS "${PROJECT_CXXFLAGS} -gdwarf-2 -g3")
-endif ()
-
-# optimization flags and definitions
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(PROJECT_CXXFLAGS "${PROJECT_CXXFLAGS} -O0")
-else ()
-    set(PROJECT_CXXFLAGS "${PROJECT_CXXFLAGS} -O3")
-    list(APPEND PROJECT_DEFINITIONS "NDEBUG")
-endif ()
-
-#
-# libraries
-#
-
-if (DEFINED ENV{TRAILOFBITS_LIBRARIES})
-    set(LIBRARY_REPOSITORY_ROOT $ENV{TRAILOFBITS_LIBRARIES})
-    include("${LIBRARY_REPOSITORY_ROOT}/cmake/repository.cmake")
-
-    message(STATUS "Using the following library repository: ${LIBRARY_REPOSITORY_ROOT}")
-else ()
-    message(STATUS "Using system libraries")
-endif ()
-
-if (DEFINED ENV{TRAILOFBITS_LIBRARIES})
-    set(LIBRARY_REPOSITORY_ROOT $ENV{TRAILOFBITS_LIBRARIES})
-    include("${LIBRARY_REPOSITORY_ROOT}/cmake/repository.cmake")
-
-    message(STATUS "Using the following library repository: ${LIBRARY_REPOSITORY_ROOT}")
-else ()
-    message(STATUS "Using system libraries")
-endif ()
 
 # protobuf
 find_package(Protobuf REQUIRED)

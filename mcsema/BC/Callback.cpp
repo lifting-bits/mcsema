@@ -112,24 +112,24 @@ static llvm::Function *GetNativeToLiftedCallback(
     case remill::kArchAMD64_AVX:
     case remill::kArchAMD64_AVX512:
       asm_str << "pushq %rax;"
-              << "leaq ${0:P}, %rax;"
+              << "movq $0, %rax;"
               << "xchgq (%rsp), %rax;"
               << "pushq %rax;"
-              << "movq $1, %rax;"
+              << "movq $$0x" << std::hex << cfg_func->ea << ", %rax;"
               << "xchgq (%rsp), %rax;"
-              << "jmp ${2:P};";
+              << "jmpq *$1;";
       break;
 
     case remill::kArchX86:
     case remill::kArchX86_AVX:
     case remill::kArchX86_AVX512:
       asm_str << "pushl %eax;"
-              << "leal ${0:P}, %eax;"
+              << "movl $0, %eax;"
               << "xchgl (%esp), %eax;"
               << "pushl %eax;"
-              << "movl $1, %eax;"
+              << "movl $$0x" << std::hex << cfg_func->ea << ", %eax;"
               << "xchgl (%esp), %eax;"
-              << "jmp ${2:P};";
+              << "jmpl *$1;";
       break;
 
     case remill::kArchAArch64LittleEndian:
@@ -147,25 +147,26 @@ static llvm::Function *GetNativeToLiftedCallback(
   }
 
   auto void_type = llvm::Type::getVoidTy(*gContext);
-  auto word_type = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
 
   std::vector<llvm::Type *> param_types;
-  param_types.push_back(func->getType());
-  param_types.push_back(word_type);
-  param_types.push_back(attach_func->getType());
+  param_types.push_back(llvm::PointerType::get(func->getType(), 0));
+  param_types.push_back(llvm::PointerType::get(attach_func->getType(), 0));
 
   auto asm_func_type = llvm::FunctionType::get(void_type, param_types, false);
   auto asm_func = llvm::InlineAsm::get(
-      asm_func_type, asm_str.str(), "i,i,i,~{dirflag},~{fpsr},~{flags}", true);
+      asm_func_type, asm_str.str(), "*m,*m,~{dirflag},~{fpsr},~{flags}", true);
 
   auto callback_func = CreateGenericCallback(callback_name);
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", callback_func));
 
   std::vector<llvm::Value *> asm_args;
-  asm_args.push_back(func);
-  asm_args.push_back(llvm::ConstantInt::get(word_type, cfg_func->ea));
-  asm_args.push_back(attach_func);
+  asm_args.push_back(new llvm::GlobalVariable(
+      *gModule, func->getType(), true, llvm::GlobalValue::InternalLinkage,
+      func));
+
+  asm_args.push_back(new llvm::GlobalVariable(
+      *gModule, attach_func->getType(), true,
+      llvm::GlobalValue::InternalLinkage, attach_func));
 
   auto asm_call = ir.CreateCall(asm_func, asm_args);
   asm_call->setTailCall(true);
