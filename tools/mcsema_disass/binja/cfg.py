@@ -1,5 +1,7 @@
 import binaryninja as binja
-from binaryninja.enums import SegmentFlag
+from binaryninja.enums import (
+    SymbolType, TypeClass, CallingConventionName
+)
 import logging
 import os
 
@@ -19,6 +21,66 @@ CCONV_TYPES = {
     'E': CFG_pb2.ExternalFunction.CalleeCleanup,
     'F': CFG_pb2.ExternalFunction.FastCall
 }
+
+
+def recover_ext_func(bv, pb_mod, sym):
+    """ Recover external function information
+    Uses the map of predefined externals if possible
+
+    Args:
+        bv (binja.BinaryView)
+        pb_seg (CFG_pb2.Module)
+        sym (binja.types.Symbol)
+    """
+    if sym.name in EXT_MAP:
+        log.debug('Found defined external function: %s', sym.name)
+
+        args, cconv, ret, sign = EXT_MAP[sym.name]
+
+        pb_extfn = pb_mod.external_funcs.add()
+        pb_extfn.name = sym.name
+        pb_extfn.ea = sym.address
+        pb_extfn.argument_count = args
+        pb_extfn.cc = cconv
+        pb_extfn.has_return = (ret == 'N')
+        pb_extfn.no_return = (not pb_extfn.has_return)
+        pb_extfn.is_weak = False  # TODO: figure out how to decide this
+
+    else:
+        log.warn('Unknown external function: %s', sym.name)
+        log.warn('Attempting to recover manually')
+
+        func = bv.get_function_at(sym)
+
+
+def recover_ext_var(bv, pb_mod, sym):
+    """ Recover external variable information
+
+    Args:
+        bv (binja.BinaryView)
+        pb_seg (CFG_pb2.Module)
+        sym (binja.types.Symbol)
+    """
+    if sym.name in EXT_DATA_MAP:
+        log.debug('Found defined external var: %s', sym.name)
+
+        pb_extvar = pb_mod.external_vars.add()
+        pb_extvar.name = sym.name
+        pb_extvar.ea = sym.address
+        pb_extvar.size = EXT_DATA_MAP[sym.name]
+        pb_extvar.is_weak = False  # TODO: figure out how to decide this
+    else:
+        log.error('Unknown external var: %s', sym.name)
+
+
+def recover_externals(bv, pb_mod):
+    """Recover info about all external symbols"""
+    for sym in bv.get_symbols():
+        if sym.type == SymbolType.ImportedFunctionSymbol:
+            recover_ext_func(bv, pb_mod, sym)
+
+        if sym.type == SymbolType.ImportedDataSymbol:
+            recover_ext_var(bv, pb_mod, sym)
 
 
 def recover_section_cross_references(bv, pb_seg, sect):
@@ -65,7 +127,7 @@ def recover_section_vars(bv, pb_seg, sect):
 
 def recover_sections(bv, pb_mod):
     for sect in bv.sections.values():
-        log.debug('Processing segment %s', sect.name)
+        log.debug('Processing %s', sect.name)
         pb_seg = pb_mod.segments.add()
         pb_seg.name = sect.name
         pb_seg.ea = sect.start
@@ -83,6 +145,9 @@ def recover_cfg(bv, args):
 
     log.debug('Processing Segments')
     recover_sections(bv, pb_mod)
+
+    log.debug('Recovering Externals')
+    recover_externals(bv, pb_mod)
 
     return pb_mod
 
