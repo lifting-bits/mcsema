@@ -23,6 +23,11 @@ CCONV_TYPES = {
 }
 
 
+def func_has_return_type(func):
+    rtype = func.function_type.return_value.type_class
+    return rtype != TypeClass.VoidTypeClass
+
+
 def recover_ext_func(bv, pb_mod, sym):
     """ Recover external function information
     Uses the map of predefined externals if possible
@@ -36,21 +41,34 @@ def recover_ext_func(bv, pb_mod, sym):
         log.debug('Found defined external function: %s', sym.name)
 
         args, cconv, ret, sign = EXT_MAP[sym.name]
+        func = bv.get_function_at(sym.address)
 
         pb_extfn = pb_mod.external_funcs.add()
         pb_extfn.name = sym.name
         pb_extfn.ea = sym.address
         pb_extfn.argument_count = args
         pb_extfn.cc = cconv
-        pb_extfn.has_return = (ret == 'N')
-        pb_extfn.no_return = (not pb_extfn.has_return)
+        pb_extfn.has_return = func_has_return_type(func)
+        pb_extfn.no_return = ret == 'Y'
         pb_extfn.is_weak = False  # TODO: figure out how to decide this
 
     else:
         log.warn('Unknown external function: %s', sym.name)
         log.warn('Attempting to recover manually')
 
-        func = bv.get_function_at(sym)
+        func = bv.get_function_at(sym.address)
+        ftype = func.function_type
+
+        pb_extfn = pb_mod.external_funcs.add()
+        pb_extfn.name = sym.name
+        pb_extfn.ea = sym.address
+        pb_extfn.argument_count = len(ftype.parameters)
+        pb_extfn.has_return = func_has_return_type(func)
+        pb_extfn.no_return = not ftype.can_return
+        pb_extfn.is_weak = False  # TODO: figure out how to decide this
+
+        # TODO: binja only returns None for calling conventions?
+        pb_extfn.cc = CFG_pb2.ExternalFunction.CallerCleanup
 
 
 def recover_ext_var(bv, pb_mod, sym):
