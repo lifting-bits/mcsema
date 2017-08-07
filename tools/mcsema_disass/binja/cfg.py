@@ -1,9 +1,11 @@
 import binaryninja as binja
 from binaryninja.enums import (
-    SymbolType, TypeClass, CallingConventionName
+    SymbolType, TypeClass, CallingConventionName,
+    LowLevelILOperation
 )
 import logging
 import os
+from Queue import Queue
 
 import CFG_pb2
 import util
@@ -22,6 +24,14 @@ CCONV_TYPES = {
     'F': CFG_pb2.ExternalFunction.FastCall
 }
 
+RECOVERED = set()
+TO_RECOVER = Queue()
+
+
+def queue_func(addr):
+    if addr not in RECOVERED:
+        TO_RECOVER.put(addr)
+
 
 def func_has_return_type(func):
     rtype = func.function_type.return_value.type_class
@@ -34,8 +44,8 @@ def recover_ext_func(bv, pb_mod, sym):
 
     Args:
         bv (binja.BinaryView)
-        pb_seg (CFG_pb2.Module)
-        sym (binja.types.Symbol)
+        pb_mod (CFG_pb2.Module)
+        sym (binaryninja.types.Symbol)
     """
     if sym.name in EXT_MAP:
         log.debug('Found defined external function: %s', sym.name)
@@ -76,7 +86,7 @@ def recover_ext_var(bv, pb_mod, sym):
 
     Args:
         bv (binja.BinaryView)
-        pb_seg (CFG_pb2.Module)
+        pb_mod (CFG_pb2.Module)
         sym (binja.types.Symbol)
     """
     if sym.name in EXT_DATA_MAP:
@@ -102,7 +112,7 @@ def recover_externals(bv, pb_mod):
 
 
 def recover_section_cross_references(bv, pb_seg, sect):
-    """Find references to other code/data in this section
+    """ Find references to other code/data in this section
 
     Args:
         bv (binja.BinaryView)
@@ -129,7 +139,7 @@ def recover_section_cross_references(bv, pb_seg, sect):
 
 
 def recover_section_vars(bv, pb_seg, sect):
-    """Gather any symbols that point to data in this section
+    """ Gather any symbols that point to data in this section
 
     Args:
         bv (binja.BinaryView)
@@ -157,9 +167,93 @@ def recover_sections(bv, pb_mod):
         recover_section_cross_references(bv, pb_seg, sect)
 
 
+def read_inst_bytes(bv, il):
+    """ Get the opcode bytes for an instruction
+    Args:
+        bv (binja.BinaryView)
+        il (binaryninja.lowlevelil.LowLevelILInstruction)
+    Returns:
+        str
+    """
+    inst_len = bv.get_instruction_length(il.address)
+    return bv.read(il.address, inst_len)
+
+
+def recover_inst(bv, pb_inst, il):
+    """
+    Args:
+        bv (binja.BinaryView)
+        pb_inst (CFG_pb2.Instruction)
+        il (binaryninja.lowlevelil.LowLevelILInstruction)
+    """
+    pb_inst.ea = il.address
+    pb_inst.bytes = read_inst_bytes(bv, il)
+
+    op = il.operation
+
+
+def add_block(pb_func, block):
+    """
+    Args:
+        pb_func (CFG_pb2.Function)
+        block (binaryninja.basicblock.BasicBlock)
+
+    Returns:
+        CFG_pb2.Block
+    """
+    pb_block = pb_func.blocks.add()
+    pb_block.ea = block.start
+    pb_block.successor_eas.extend(edge.target.start for edge in block.outgoing_edges)
+    return pb_block
+
+
+def recover_function(bv, pb_mod, addr, is_entry=False):
+    func = bv.get_function_at(addr)
+    if func is None:
+        log.error('No function defined at 0x%x, skipping', addr)
+        return
+
+    # Initialize the protobuf for this function
+    log.debug("Recovering function @ 0x%x", addr)
+    pb_func = pb_mod.funcs.add()
+    pb_func.ea = addr
+    pb_func.is_entrypoint = is_entry
+    pb_func.name = func.symbol.name
+
+    # Recover all basic blocks
+    for block in func:
+        pb_block = add_block(pb_func, block)
+
+        # Recover every instruction in the block
+        inst_addr = block.start
+        while inst_addr < block.end:
+            il = func.get_lifted_il_at(inst_addr)
+
+            pb_inst = pb_block.instructions.add()
+            recover_inst(bv, pb_inst, il)
+            inst_addr += len(pb_inst.bytes)
+
+
 def recover_cfg(bv, args):
     pb_mod = CFG_pb2.Module()
     pb_mod.name = os.path.basename(bv.file.filename)
+
+    # Find the chosen entrypoint in the binary
+    if args.entrypoint not in bv.symbols:
+        log.fatal('Entrypoint not found: %s', args.entrypoint)
+    entry_addr = bv.symbols[args.entrypoint].address
+
+    # Recover the entrypoint func separately
+    log.debug('Recovering CFG')
+    recover_function(bv, pb_mod, entry_addr, is_entry=True)
+
+    # Recover any discovered functions until there are none left
+    while not TO_RECOVER.empty():
+        addr = TO_RECOVER.get()
+        RECOVERED.add(addr)
+
+        log.debug('Recovering function at 0x%x', addr)
+        recover_function(bv, pb_mod, addr)
 
     log.debug('Processing Segments')
     recover_sections(bv, pb_mod)
