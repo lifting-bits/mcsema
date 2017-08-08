@@ -49,6 +49,10 @@ DEFINE_string(libc_destructor, "",
     "Destructor function for running post-main finalizers. For example, on "
     "GNU-based systems, this is typically `__libc_csu_fini`.");
 
+DEFINE_bool(partition_segments, false,
+            "Partition segments into separate variables, even if they are "
+            "contiguous in the binary.");
+
 namespace mcsema {
 namespace {
 
@@ -537,7 +541,8 @@ static Region PartitionSegments(const NativeModule *cfg_module) {
   NativeSegment *last_seg = nullptr;
   for (auto cfg_segment_entry : cfg_module->segments) {
     auto cfg_seg = cfg_segment_entry.second;
-    if (last_seg && (last_seg->ea + last_seg->size) == cfg_seg->ea) {
+    if (!FLAGS_partition_segments &&
+        last_seg && (last_seg->ea + last_seg->size) == cfg_seg->ea) {
       auto &prev_group = groups[groups.size() - 1];
       prev_group[cfg_seg->ea] = cfg_seg;
     } else {
