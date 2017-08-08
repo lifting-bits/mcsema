@@ -187,7 +187,8 @@ static llvm::GlobalVariable *DeclareRegion(const SegmentMap &segments) {
         llvm::ConstantExpr::getPtrToInt(region, word_type),
         llvm::ConstantInt::get(word_type, offset));
 
-    (void) new llvm::GlobalVariable(
+    cfg_seg->region_var = region;
+    cfg_seg->seg_var = new llvm::GlobalVariable(
         *gModule, word_type, true  /* isConstant */,
         llvm::GlobalVariable::InternalLinkage,
         ptr, cfg_seg->lifted_name);
@@ -348,7 +349,17 @@ static void LazyInitXRef(const NativeXref *xref,
 
   auto word_type = llvm::Type::getIntNTy(
       *gContext, static_cast<unsigned>(gArch->address_size));
-  auto seg = gModule->getGlobalVariable(xref->segment->lifted_name, true);
+  auto seg = xref->segment->seg_var;
+  auto region = xref->segment->region_var;
+  if (seg->isConstant() || region->isConstant()) {
+    LOG(ERROR)
+        << "Marking " << region->getName().str() << " as non-constant to "
+        << "support lazy initialization of reference to " << xref->target_name
+        << " from " << std::hex << xref->ea;
+    seg->setConstant(false);
+    region->setConstant(false);
+  }
+
   auto offset = xref->ea - xref->segment->ea;
   auto disp = llvm::ConstantInt::get(word_type, offset, false);
   auto addr_of_xref = llvm::ConstantExpr::getAdd(seg->getInitializer(), disp);

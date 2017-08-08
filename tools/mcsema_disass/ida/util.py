@@ -360,7 +360,9 @@ def get_function_bounds(ea):
 def is_noreturn_function(ea):
   """Returns `True` if the function at `ea` is a no-return function."""
   flags = idc.GetFunctionFlags(ea)
-  return 0 < flags and (flags & idaapi.FUNC_NORET)
+  return 0 < flags and \
+         (flags & idaapi.FUNC_NORET) and \
+         "cxa_throw" not in get_symbol_name(ea)
 
 def remove_all_refs(ea):
   """Remove all references to something."""

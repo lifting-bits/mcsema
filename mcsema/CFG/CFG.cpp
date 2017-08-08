@@ -383,6 +383,8 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     segment->lifted_name = LiftedSegmentName(cfg_segment);
     segment->is_read_only = cfg_segment.read_only();
     segment->is_external = cfg_segment.is_external();
+    segment->seg_var = nullptr;
+    segment->region_var = nullptr;
 
     // Collect the variables.
     for (const auto &cfg_var : cfg_segment.vars()) {

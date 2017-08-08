@@ -27,6 +27,9 @@
 
 #include <llvm/IR/CallingConv.h>
 
+namespace llvm {
+class GlobalVariable;
+}  // namespace llvm
 namespace mcsema {
 
 struct NativeVariable;
@@ -146,6 +149,9 @@ struct NativeSegment : public NativeObject {
   // Partition of entries, which are either cross-references, or opaque
   // blobs of bytes. The ordering of entries is significant.
   std::map<uint64_t, Entry> entries;
+
+  llvm::GlobalVariable *seg_var;
+  llvm::GlobalVariable *region_var;
 };
 
 using SegmentMap = std::map<uint64_t, NativeSegment *>;

@@ -1121,6 +1121,7 @@ if __name__ == "__main__":
   if addr_size != get_address_size_in_bits():
     DEBUG("Arch {} address size does not match IDA's available bitness {}! Did you mean to use idal64?".format(
         args.arch, get_address_size_in_bits()))
+    idc.ChangeConfig("ABANDON_DATABASE=YES")
     idc.Exit(-1)
 
   if args.pie_mode:
@@ -1176,4 +1177,5 @@ if __name__ == "__main__":
     DEBUG(traceback.format_exc())
   
   DEBUG("Done analysis!")
+  idc.ChangeConfig("ABANDON_DATABASE=YES")
   idc.Exit(0)

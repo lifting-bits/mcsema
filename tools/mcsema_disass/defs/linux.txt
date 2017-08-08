@@ -8,7 +8,7 @@ __strtol_internal 4 C N
 __cxa_guard_release 1 C N
 __cxa_guard_acquire 1 C N
 __cxa_guard_abort 1 C N
-__cxa_throw 0 C N
+__cxa_throw 3 C N
 __cxa_end_catch 0 C N
 __cxa_begin_catch 1 C N
 __cxa_allocate_exception 0 C N
