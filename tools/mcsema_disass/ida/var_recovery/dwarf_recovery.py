@@ -27,7 +27,11 @@ SYMBOL_BLACKLIST["httpd-kudu-canonical"] = [
     "ap_coredump_dir",
     "ap_prelinked_modules",
     "ap_prelinked_module_symbols",
-    "htracker",
+    "ap_preloaded_modules",
+    "startup_hooks",
+    "request_hooks",
+    #"other_hooks",
+    #"htracker",
     ]
 
 BINARY_FILE = ""
@@ -226,7 +230,7 @@ def address_lookup(g_ref, global_var_array):
                 DEBUG("Array Variable {}".format(pprint.pformat(global_var_array[address])))   
                 DEBUG("Found {}".format(pprint.pformat(gvar)))
                 return None
-        elif (gvar['type'].tag == 4 and gvar['name'] not in SYMBOL_BLACKLIST[os.path.basename(BINARY_FILE)]):
+        elif (gvar['type'].tag == 4): # and gvar['name'] not in SYMBOL_BLACKLIST[os.path.basename(BINARY_FILE)]):
             if gvar['addr'] == g_ref.address:
                 address = gvar['addr']
                 size = gvar['size']
@@ -258,7 +262,6 @@ def address_lookup(g_ref, global_var_array):
                 DEBUG("Array Variable {}".format(pprint.pformat(global_var_array[base_address])))   
                 DEBUG("Found {}".format(pprint.pformat(gvar)))
                 return None
-        
     return None
 
  
@@ -357,6 +360,29 @@ def process_dwarf_info(file):
     DEBUG("End Global Vars\n")
     return True
 
+def is_global_variable_reference(global_var, address):
+    for key in sorted(global_var.iterkeys()):
+        entry = global_var[key]
+        start = key
+        end = start + entry['size']
+        if (start <= address) and (end > address):
+             return True
+    return False
+
+def add_global_variable_entry(M, ds):
+    DEBUG("Adding new symbol to global variables")
+    for g in M.global_vars:
+         start = g.address
+         end = start + g.var.size
+         DEBUG("add_global_variable_entry : start {0:x}, end {1:x}".format(start, end))
+         if (ds.base_address >= start) and (ds.base_address < end):
+             symbol = g.symbols.add()
+             symbol.base_address = ds.base_address
+             symbol.symbol_name = ds.symbol_name
+             symbol.symbol_size = ds.symbol_size
+             DEBUG("{}".format(pprint.pformat(symbol)))
+
+
 def updateCFG(in_file, out_file):
     
     import mcsema_disass.ida.CFG_pb2 as CFG_pb2
@@ -388,6 +414,18 @@ def updateCFG(in_file, out_file):
                 r = var.var.ref_eas.add()
                 r.inst_addr = i[0]
                 r.offset = i[1]
+                
+        for data in M.internal_data:
+            for ds in data.symbols:
+                DEBUG("{0:x} {1}".format(ds.base_address, ds.symbol_name))
+                symbol = ds.symbol_name.split("_")
+                if (symbol[0] == 'data') and (is_global_variable_reference(global_var_array, long(symbol[1], 16)) is True):
+                    ds.symbol_name = "recovered_global_{0:x}".format(long(symbol[1], 16))
+                    DEBUG("{0:x} {1}".format(ds.base_address, ds.symbol_name))
+                    
+                add_global_variable_entry(M, ds)
+                
+            
                 
     with open(out_file, "w") as outf:
         outf.write(M.SerializeToString())

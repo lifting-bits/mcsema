@@ -2395,6 +2395,13 @@ if __name__ == "__main__":
         default=False,
         help="Attempt to recover global variable information"
         )
+    
+    # this is temporary switch; Figure out a better way to do it
+    parser.add_argument("--process-dwarf", action="store_true",
+        default=False,
+        help="Attempt to process the dwarf information for variable recovery"
+        )
+
 
     args = parser.parse_args(args=idc.ARGV[1:])
 
@@ -2402,8 +2409,11 @@ if __name__ == "__main__":
         _DEBUG = True
         _DEBUG_FILE = args.log_file
         DEBUG("Debugging is enabled.")
-        isdwarf = ((SegByName(".debug_info'") != idc.BADADDR) or (SegByName(".zdebug_info'") != idc.BADADDR))
+        # debug_info section does not get recognised with 
+        isdwarf = ((SegByName(".debug_info'") != idc.BADADDR) or (SegByName(".zdebug_info'") != idc.BADADDR) or (args.process_dwarf))
         from var_recovery import collect_ida
+        if isdwarf is True:
+            DEBUG("Dwarf information is available.")
         collect_ida.DEBUG_INIT(_DEBUG_FILE, _DEBUG, isdwarf)
 
     addr_size = {"x86": 32, "amd64": 64}.get(args.arch, 0)

@@ -260,24 +260,6 @@ class NativeVar {
 
 };
 
-class NativeGlobalVar : public NativeVar {
-    private:
-    uint64_t            offset;
-    std::vector<uint8_t> bytes;
-    public:
-    NativeGlobalVar(uint64_t size, std::string name, std::string type, uint64_t offset) : NativeVar(size, name, type) { this->offset = offset; }
-    NativeGlobalVar(uint64_t size, std::string name, std::string type, uint64_t offset, const std::vector<uint8_t> &b) : NativeVar(size, name, type), bytes(b) { this->offset = offset; }
-    uint64_t get_offset(void) { return this->offset; }
-    const std::vector<uint8_t> &getBytes(void) const { return bytes;}
-};
-
-class NativeStackVar : public NativeVar {
-    private:
-    uint64_t            offset;
-    public:
-    NativeStackVar(uint64_t size, std::string name, std::string type, uint64_t offset) : NativeVar(size, name, type) { this->offset = offset; }
-    uint64_t get_offset(void) { return this->offset; }
-};
 
 class NativeBlock {
  private:
@@ -389,6 +371,31 @@ class DataSection {
   void addEntry(const DataSectionEntry &dse);
   uint64_t getSize(void) const;
   std::vector<uint8_t> getBytes(void) const;
+};
+
+class NativeGlobalVar : public NativeVar {
+    private:
+    uint64_t            offset;
+    std::vector<uint8_t> bytes;
+    std::list<DataSectionEntry> entries;
+    uint64_t base;
+    public:
+    NativeGlobalVar(uint64_t size, std::string name, std::string type, uint64_t offset) : NativeVar(size, name, type) { this->offset = offset; }
+    NativeGlobalVar(uint64_t size, std::string name, std::string type, uint64_t offset, const std::vector<uint8_t> &b) : NativeVar(size, name, type), bytes(b) { this->offset = offset; }
+    uint64_t get_offset(void) { return this->offset; }
+    const std::vector<uint8_t> &getBytes(void) const { return bytes;}
+    const std::list<DataSectionEntry> &getEntries(void) const;
+    void addEntry(const DataSectionEntry &dse);
+
+    static const uint64_t NO_BASE = (uint64_t) ( -1);
+};
+
+class NativeStackVar : public NativeVar {
+    private:
+    uint64_t            offset;
+    public:
+    NativeStackVar(uint64_t size, std::string name, std::string type, uint64_t offset) : NativeVar(size, name, type) { this->offset = offset; }
+    uint64_t get_offset(void) { return this->offset; }
 };
 
 class NativeEntrySymbol {

@@ -302,6 +302,46 @@ static llvm::GlobalVariable *GetSectionForDataAddr(
   return nullptr;
 }
 
+static llvm::GlobalVariable *GetSectionForDataAddr(
+    const std::list<DataSection> &dataSecs, llvm::Module *M, VA data_addr,
+    DataSection &section) {
+
+  for (auto &dt : dataSecs) {
+    VA start = dt.getBase();
+    VA end = start + dt.getSize();
+
+    if (data_addr >= start && data_addr < end) {
+      std::stringstream ss;
+      ss << "data_" << std::hex << start;
+      section = dt;
+      return M->getNamedGlobal(ss.str());
+    }
+  }
+  return nullptr;
+}
+
+static llvm::GlobalVariable *GetNativeGlobalForDataAddr(
+    const std::list<NativeGlobalVarPtr> &nativeglobalvars, llvm::Module *M,
+    VA data_addr, VA &base_address) {
+
+  for (auto nGV : nativeglobalvars) {
+    auto sym_name = nGV->get_name();
+    VA variable_address;
+    auto data_addr_str = sym_name.c_str() + 17  /* strlen("recovered_global_") */;
+    sscanf(data_addr_str, "%lx", &variable_address);
+
+    VA start = variable_address;
+    VA end = start + nGV->get_size();
+
+    if (data_addr >= start && data_addr < end) {
+      base_address = start;
+      return M->getNamedGlobal(nGV->get_name());
+    }
+  }
+  return nullptr;
+}
+
+
 static llvm::Constant *CreateConstantBlob(llvm::LLVMContext &ctx,
                                     const std::vector<uint8_t> &blob) {
   auto charTy = llvm::Type::getInt8Ty(ctx);
@@ -314,54 +354,140 @@ static llvm::Constant *CreateConstantBlob(llvm::LLVMContext &ctx,
   return llvm::ConstantArray::get(arrT, array_elements);
 }
 
-void dataSectionToGlobalVar(const std::list<DataSection> &globaldata, llvm::Module *M,
-                            NativeGlobalVarPtr nGV,
+bool dataSectionToGlobalVar(const std::list<DataSection> &globaldata,
+                            const std::list<NativeGlobalVarPtr> &nativeglobalvars,
+                            llvm::Module *M, NativeGlobalVarPtr nGV,
                             std::vector<llvm::Constant *> &secContents,
                             std::vector<llvm::Type *> &data_section_types) {
 
   auto sym_name = nGV->get_name();
-  std::vector<uint8_t> data_blob;
   bool is_found = 0;
   DataSection section;
   auto data_addr_str = sym_name.c_str() + 17 /* strlen("recovered_global_") */;
   VA data_addr = 0;
-  VA section_base = 0;
   sscanf(data_addr_str, "%lx", &data_addr);
 
-  for (auto &dt : globaldata) {
-    VA start = dt.getBase();
-    VA end = start + dt.getSize();
-    if (data_addr >= start && data_addr < end) {
-      section_base = start;
-      section = dt;
-      is_found = 1;
-      break;
+  const std::list<DataSectionEntry> &entries = nGV->getEntries();
+  for (auto &data_sec_entry : entries) {
+    std::string sym_name;
+    //      std::cout << __FUNCTION__ << ": section entries : " << std::hex << data_sec_entry.getBase() << " :\t" << data_sec_entry.getSize() << std::endl;
+
+    if (data_sec_entry.getSymbol(sym_name)) {
+      std::cout << __FUNCTION__ << ": Data entry symbol name : " << sym_name << std::endl;
+
+      if((data_sec_entry.getBase() >= data_addr) &&
+          (data_sec_entry.getBase() < data_addr + nGV->get_size()))
+      {
+        if (sym_name.find("ext_") == 0) {
+          auto ext_sym_name = sym_name.c_str() + 4 /* strlen("ext_") */;
+
+          llvm::Constant *final_val = nullptr;
+          auto ext_v = M->getNamedValue(ext_sym_name);
+
+          if (ext_v != nullptr && llvm::isa<llvm::Function>(ext_v)) {
+            final_val = GetPointerSizedValue(M, ext_v, data_sec_entry.getSize());
+          } else if (ext_v != nullptr) {
+            final_val = GetPointerSizedValue(M, ext_v, data_sec_entry.getSize());
+          } else {
+            TASSERT(ext_v != nullptr,
+                    "Could not find external: " + std::string(ext_sym_name));
+          }
+
+          secContents.push_back(final_val);
+          data_section_types.push_back(final_val->getType());
+        } else if (sym_name.find("sub_") == 0) {
+          auto sub_addr_str = sym_name.c_str() + 4 /* strlen("sub_") */;
+          VA sub_addr = 0;
+          sscanf(sub_addr_str, "%lx", &sub_addr);
+
+          // resolve the linkages to the function pointers
+          llvm::Function *func = nullptr;
+
+          func = M->getFunction(sym_name);
+          TASSERT(func != nullptr, "Could not find function: " + sym_name);
+
+          auto final_val = GetPointerSizedValue(M, func, data_sec_entry.getSize());
+          secContents.push_back(final_val);
+          data_section_types.push_back(final_val->getType());
+
+        }else if (sym_name.find("data_") == 0) {
+          auto data_addr_str = sym_name.c_str() + 5 /* strlen("data_") */;
+          VA data_addr = 0;
+          sscanf(data_addr_str, "%lx", &data_addr);
+
+          // data symbol
+          // get the base of the data section for this symobol
+          // then compute the offset from base of data
+          // and store as integer value of (base+offset)
+          VA section_base;
+          auto g_ref = GetSectionForDataAddr(globaldata, M, data_addr,
+                                             section_base);
+          TASSERT(g_ref != nullptr,
+                  "Could not get data addr for:" + std::string(data_addr_str));
+          // instead of referencing an element directly
+          // we just convert the pointer to an integer
+          // and add its offset from the base of data
+          // to the new data section pointer
+          VA addr_diff = data_addr - section_base;
+          llvm::Constant *final_val = nullptr;
+          if (ArchPointerSize(M) == Pointer32) {
+            auto int_val = llvm::ConstantExpr::getPtrToInt(
+                g_ref, llvm::Type::getInt32Ty(M->getContext()));
+            final_val = llvm::ConstantExpr::getAdd(
+                int_val, CONST_V_INT<32>(M->getContext(), addr_diff));
+          } else {
+            auto int_val = llvm::ConstantExpr::getPtrToInt(
+                g_ref, llvm::Type::getInt64Ty(M->getContext()));
+            final_val = llvm::ConstantExpr::getAdd(
+                int_val, CONST_V_INT<64>(M->getContext(), addr_diff));
+          }
+          secContents.push_back(final_val);
+          data_section_types.push_back(final_val->getType());
+
+        } else if (sym_name.find("recovered_global_") == 0) {
+          VA section_base;
+
+          auto data_addr_str = sym_name.c_str() + 17 /* strlen("recovered_global_") */;
+          VA data_addr = 0;
+          sscanf(data_addr_str, "%lx", &data_addr);
+
+          std::cout << "Looking for the symbol : " << sym_name << std::endl;
+          auto g_variable = GetNativeGlobalForDataAddr(nativeglobalvars, M, data_addr, section_base);
+
+          if(g_variable) {
+            llvm::Constant *final_val = nullptr;
+            VA addr_diff = data_addr - section_base;
+
+            if (ArchPointerSize(M) == Pointer32) {
+              auto int_val = llvm::ConstantExpr::getPtrToInt(
+                  g_variable, llvm::Type::getInt32Ty(M->getContext()));
+
+              final_val = llvm::ConstantExpr::getAdd(
+                  int_val, CONST_V_INT<32>(M->getContext(), addr_diff));
+            } else {
+              auto int_val = llvm::ConstantExpr::getPtrToInt(
+                  g_variable, llvm::Type::getInt64Ty(M->getContext()));
+
+              final_val = llvm::ConstantExpr::getAdd(
+                  int_val, CONST_V_INT<64>(M->getContext(), addr_diff));
+            }
+            secContents.push_back(final_val);
+            data_section_types.push_back(final_val->getType());
+
+          }
+        }
+      }
+    } else {
+      auto arr = CreateConstantBlob(M->getContext(), data_sec_entry.getBytes());
+      secContents.push_back(arr);
+      data_section_types.push_back(arr->getType());
     }
   }
-
-  if(is_found) {
-    auto offset = data_addr - section_base;
-    for(auto index = offset; index < offset + nGV->get_size(); index++)
-      data_blob.push_back(section.getBytes()[index]);
-  } else {
-    for(auto index = 0; index < nGV->get_size(); index++)
-      data_blob.push_back(nGV->getBytes()[index]);
-  }
-
-  auto charTy = llvm::Type::getInt8Ty(M->getContext());
-  auto blob = nGV->getBytes();
-  auto arrT = llvm::ArrayType::get(charTy, data_blob.size());
-  std::vector<llvm::Constant *> array_elements;
-  for (auto cur : data_blob) {
-      array_elements.push_back(llvm::ConstantInt::get(charTy, cur));
-  }
-  auto arr = llvm::ConstantArray::get(arrT, array_elements);
-  secContents.push_back(arr);
-  data_section_types.push_back(arr->getType());
-
+  return true;
 }
 
 void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
+                                const std::list<NativeGlobalVarPtr> &nativeglobalvars,
                                 const DataSection &ds, llvm::Module *M,
                                 std::vector<llvm::Constant *> &secContents,
                                 std::vector<llvm::Type *> &data_section_types,
@@ -442,7 +568,6 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
         data_section_types.push_back(final_val->getType());
 
       } else if (sym_name.find("data_") == 0) {
-
         // TODO(pag): This is so flaky.
         auto data_addr_str = sym_name.c_str() + 5 /* strlen("data_") */;
         VA data_addr = 0;
@@ -481,7 +606,41 @@ void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
         secContents.push_back(final_val);
         data_section_types.push_back(final_val->getType());
 
-      } else {
+      } else if (sym_name.find("recovered_global_") == 0) {
+        VA section_base;
+
+        auto data_addr_str = sym_name.c_str() + 17 /* strlen("recovered_global_") */;
+        VA data_addr = 0;
+        sscanf(data_addr_str, "%lx", &data_addr);
+
+        std::cout << "Looking for the symbol : " << sym_name << std::endl;
+        auto g_variable = GetNativeGlobalForDataAddr(nativeglobalvars, M, data_addr, section_base);
+
+        if(g_variable) {
+          llvm::Constant *final_val = nullptr;
+          VA addr_diff = data_addr - section_base;
+
+          std::cout << "Found Global variables : " << std::hex << section_base << std::endl;
+
+          if (ArchPointerSize(M) == Pointer32) {
+            auto int_val = llvm::ConstantExpr::getPtrToInt(
+                g_variable, llvm::Type::getInt32Ty(M->getContext()));
+
+            final_val = llvm::ConstantExpr::getAdd(
+                int_val, CONST_V_INT<32>(M->getContext(), addr_diff));
+          } else {
+            auto int_val = llvm::ConstantExpr::getPtrToInt(
+                g_variable, llvm::Type::getInt64Ty(M->getContext()));
+
+            final_val = llvm::ConstantExpr::getAdd(
+                int_val, CONST_V_INT<64>(M->getContext(), addr_diff));
+          }
+            secContents.push_back(final_val);
+            data_section_types.push_back(final_val->getType());
+
+          }
+      }
+      else {
         std::cerr
             << __FUNCTION__ << ": Unknown data section entry symbol type "
             << sym_name << std::endl;

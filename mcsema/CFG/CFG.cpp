@@ -343,6 +343,7 @@ NativeInst::NativeInst(VA v, uint8_t l, const llvm::MCInst &inst, Prefix k)
       mem_reference(0),
       mem_ref_type(CFGDataRef),
       has_mem_reference(false),
+      has_mem_var(false),
       len(l),
       jump_table(false),
       jump_index_table(false),
@@ -445,6 +446,17 @@ std::vector<uint8_t> DataSection::getBytes(void) const {
     all_bytes.insert(all_bytes.end(), vec.begin(), vec.end());
   }
   return all_bytes;
+}
+
+const std::list<DataSectionEntry> &NativeGlobalVar::getEntries(void) const {
+  return this->entries;
+}
+
+void NativeGlobalVar::addEntry(const DataSectionEntry &dse) {
+  this->entries.push_back(dse);
+  if (this->base == NO_BASE || this->base > dse.getBase()) {
+    this->base = dse.getBase();
+  }
 }
 
 NativeEntrySymbol::NativeEntrySymbol(const std::string &name_, VA addr_)
@@ -1025,17 +1037,85 @@ static NativeInstPtr DeserializeInst(
   return ip;
 }
 
+static bool GetSectionForDataAddr(
+    const std::list<DataSection> &dataSecs, VA data_addr,
+    DataSection &section) {
+
+  for (auto &dt : dataSecs) {
+    VA start = dt.getBase();
+    VA end = start + dt.getSize();
+
+    if (data_addr >= start && data_addr < end) {
+      section = dt;
+      return true;
+    }
+  }
+  return false;
+}
+
+static DataSectionEntry DeserializeDataSymbol(const ::DataSymbol &ds);
+static DataSectionEntry makeDSEBlob(const std::vector<uint8_t> &bytes,
+                                    uint64_t start,  // offset in bytes vector
+                                    uint64_t end,  // offset in bytes vector
+                                    uint64_t base_va);  // virtual address these bytes are based at
+
 static NativeGlobalVarPtr DeserializeGlobalVar(
-    const ::GlobalVar &globalvar) {
+    const ::GlobalVar &globalvar, std::list<DataSection> data_sections) {
   ::Variable var = globalvar.var();
-    const auto &dt = globalvar.data();
-    std::vector<uint8_t> local_bytes(dt.begin(), dt.end());
+  DataSection section;
+  const auto &dt = globalvar.data();
+  std::vector<uint8_t> local_bytes(dt.begin(), dt.end());
 
   NativeGlobalVarPtr natGV =
-    new NativeGlobalVar(var.size(), var.name(), var.ida_type(), globalvar.address(), local_bytes);
+    new NativeGlobalVar(var.size(), var.name(), var.ida_type(), globalvar.address());
 
   for (auto ref_ea : var.ref_eas()) {
     natGV->add_ref(ref_ea.inst_addr(), ref_ea.offset());
+  }
+
+  auto found = GetSectionForDataAddr(data_sections, globalvar.address(), section);
+
+  if (found) {
+    auto bytes = section.getBytes();
+    uint64_t base_address =  section.getBase();
+    uint64_t end_address = globalvar.address() + natGV->get_size();
+    uint64_t cur_pos =  globalvar.address();
+
+    // assumes symbols are in-order
+    for (int i = 0; i < globalvar.symbols_size(); i++) {
+      DataSectionEntry dse_sym = DeserializeDataSymbol(globalvar.symbols(i));
+      auto dse_base = dse_sym.getBase();
+
+      std::cerr << "cur_pos: " << std::hex << cur_pos << std::endl
+                << "dse_base: " << std::hex << dse_base << std::endl;
+
+      // symbol next to blob
+      if (dse_base > cur_pos) {
+        natGV->addEntry(makeDSEBlob(bytes, cur_pos - base_address, dse_base - base_address, cur_pos));
+        natGV->addEntry(dse_sym);
+
+        cur_pos = dse_base + dse_sym.getSize();
+        std::cerr << "new_cur_pos: " << std::hex << cur_pos << std::endl;
+
+        // symbols next to each other
+      } else if (dse_base == cur_pos) {
+        natGV->addEntry(dse_sym);
+        cur_pos = dse_base + dse_sym.getSize();
+        std::cerr << "new_cur_pos2: " << std::hex << cur_pos << std::endl;
+
+      } else {
+        std::cerr
+            << __FILE__ << ":" << __LINE__ << std::endl
+            << "Deserialized an out-of-order symbol!" << std::endl;
+        throw TErr(__LINE__, __FILE__, "Deserialized an out-of-order symbol!");
+      }
+    }
+
+    // there is a data blob after the last symbol
+    // or there are no symbols
+    if (cur_pos < end_address) {
+      natGV->addEntry(makeDSEBlob(bytes, cur_pos - base_address, end_address - base_address, cur_pos));
+    }
   }
   return natGV;
 }
@@ -1243,8 +1323,7 @@ static void DeserializeData(const ::Data &d, DataSection &ds) {
   // there is a data blob after the last symbol
   // or there are no symbols
   if (cur_pos < base_address + bytes.size()) {
-    ds.addEntry(
-        makeDSEBlob(bytes, cur_pos - base_address, bytes.size(), cur_pos));
+    ds.addEntry(makeDSEBlob(bytes, cur_pos - base_address, bytes.size(), cur_pos));
   }
 }
 
@@ -1278,9 +1357,17 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
     extern_funcs.push_back(DeserializeExternFunc(external_func));
   }
 
+
+  std::cerr << "Deserializing data..." << std::endl;
+  for (auto &internal_data_elem : proto.internal_data()) {
+    DataSection ds;
+    DeserializeData(internal_data_elem, ds);
+    data_sections.push_back(ds);
+  }
+
   std::cerr << "Deserializing global variables..." << std::endl;
   for (const auto &global_variable : proto.global_vars()) {
-    global_variables.push_back(DeserializeGlobalVar(global_variable));
+    global_variables.push_back(DeserializeGlobalVar(global_variable, data_sections));
   }
 
   std::cerr << "Deserializing functions..." << std::endl;
@@ -1291,13 +1378,6 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
       return nullptr;
     }
     native_funcs[static_cast<VA>(internal_func.entry_address())] = natf;
-  }
-
-  std::cerr << "Deserializing data..." << std::endl;
-  for (auto &internal_data_elem : proto.internal_data()) {
-    DataSection ds;
-    DeserializeData(internal_data_elem, ds);
-    data_sections.push_back(ds);
   }
 
   std::cerr << "Deserializing external data..." << std::endl;

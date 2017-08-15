@@ -416,6 +416,12 @@ struct DataSectionVar {
   llvm::GlobalVariable *var;
 };
 
+struct GlobalSectionVar {
+  NativeGlobalVarPtr nGV;
+  llvm::StructType *opaque_type;
+  llvm::GlobalVariable *var;
+};
+
 static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
 
   auto &globaldata = natMod->getData();
@@ -423,6 +429,7 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
   //insert all global data before we insert the CFG
 
   std::vector<DataSectionVar> gvars;
+  std::vector<GlobalSectionVar> global_vars;
 
   // pre-create references to all data sections
   // as later we may have data references that are
@@ -449,6 +456,21 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
     gvars.push_back({&dt, st_opaque, g});
   }
 
+  for (auto nGV : nativeglobalvars) {
+    auto st_opaque = llvm::StructType::create(M->getContext());
+    if(st_opaque == nullptr) continue;
+    llvm::GlobalVariable *g = new llvm::GlobalVariable(/*Module=*/*M,
+                                                    /*Type=*/st_opaque,
+                                                    /*isConstant=*/false,
+                                                    /*Linkage=*/llvm::GlobalValue::InternalLinkage,
+                                                    /*Initializer=*/nullptr,
+                                                    /*Name=*/nGV->get_name());
+
+    global_vars.push_back({nGV, st_opaque, g});
+  }
+
+
+
   // actually populate the data sections
   for (auto &var : gvars) {
 
@@ -459,7 +481,7 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
     // the global variable
     std::vector<llvm::Type *> data_section_types;
 
-    dataSectionToTypesContents(globaldata, *var.section, M, secContents,
+    dataSectionToTypesContents(globaldata, nativeglobalvars, *var.section, M, secContents,
                                data_section_types, true);
 
     // fill in the opaque structure with actual members
@@ -475,26 +497,17 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
   }
 
     // create and initialize the native global variables
-  for (auto nGV : nativeglobalvars) {
-    auto st_opaque = llvm::StructType::create(M->getContext());
-    if(st_opaque == nullptr) continue;
-    llvm::GlobalVariable *g = new llvm::GlobalVariable(/*Module=*/*M,
-                                                    /*Type=*/st_opaque,
-                                                    /*isConstant=*/false,
-                                                    /*Linkage=*/llvm::GlobalValue::InternalLinkage,
-                                                    /*Initializer=*/nullptr,
-                                                    /*Name=*/nGV->get_name());
-
+  for (auto &var : global_vars) {
     std::vector<llvm::Type *> data_section_types;
     std::vector<llvm::Constant *> secContents;
 
-    dataSectionToGlobalVar(globaldata, M, nGV, secContents, data_section_types);
-    st_opaque->setBody(data_section_types, true);
-    auto cst = llvm::ConstantStruct::get(st_opaque, secContents);
+    auto is_exist = dataSectionToGlobalVar(globaldata, nativeglobalvars, M, var.nGV, secContents, data_section_types);
 
-    g->setAlignment(ArchPointerSize(M)/8);
-    g->setInitializer(cst);
-    nGV->set_llvm_var(g);
+    var.opaque_type->setBody(data_section_types, true);
+    auto cst = llvm::ConstantStruct::get(var.opaque_type, secContents);
+    var.var->setAlignment(ArchPointerSize(M)/8);
+    var.var->setInitializer(cst);
+    var.nGV->set_llvm_var(var.var);
   }
 
   return true;
