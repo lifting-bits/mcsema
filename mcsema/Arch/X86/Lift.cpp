@@ -78,6 +78,7 @@ static bool PreProcessInst(TranslationContext &ctx, llvm::BasicBlock *&block) {
       ip->set_reference(NativeInst::MEMRef, data_ref_va);
       ip->set_ref_type(NativeInst::MEMRef, NativeInst::CFGDataRef);
     }
+    return true;
 
   // only add data references for unknown jump index table reads
   } else if (ip->has_jump_index_table() &&
