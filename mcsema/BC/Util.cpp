@@ -51,8 +51,14 @@ static llvm::MDNode *CreateInstAnnotation(llvm::Function *F, uint64_t addr) {
 // Annotate and instruction with the `mcsema_real_eip` annotation if that
 // instruction is unannotated.
 static void AnnotateInst(llvm::Instruction *inst, llvm::MDNode *annot) {
-  if (!inst->getMetadata(kRealEIPAnnotation)) {
-    inst->setMetadata(kRealEIPAnnotation, annot);
+  static bool has_id = false;
+  static unsigned id = 0;
+  if (!has_id) {
+    has_id = true;
+    id = gContext->getMDKindID(kRealEIPAnnotation);
+  }
+  if (!inst->getMetadata(id)) {
+    inst->setMetadata(id, annot);
   }
 }
 

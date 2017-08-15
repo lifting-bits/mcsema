@@ -56,7 +56,6 @@
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
 
-
 namespace mcsema {
 namespace {
 

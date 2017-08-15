@@ -147,11 +147,11 @@ def _is_near_another_head(ea, bounds):
   seg_ea = idc.SegStart(ea)
   seg_end_ea = idc.SegEnd(ea)
   next_head_ea = idc.NextHead(ea, seg_end_ea)
-  if not is_invalid_ea(next_head_ea) and bounds <= (next_head_ea - ea):
+  if not is_invalid_ea(next_head_ea) and bounds >= (next_head_ea - ea):
     return True
 
   prev_head_ea = idc.PrevHead(ea, seg_ea)
-  if not is_invalid_ea(prev_head_ea) and bounds <= (ea - prev_head_ea):
+  if not is_invalid_ea(prev_head_ea) and bounds >= (ea - prev_head_ea):
     return True
 
   return False
@@ -228,6 +228,8 @@ def _get_ref_candidate(inst, op, all_refs):
   # Some other instruction/data references this thing. Let's assume it's
   # a real thing within this particular instruction.
   if addr_val not in all_refs and is_referenced(addr_val):
+    DEBUG("WARNING: Adding reference from {:x} to {:x}, which is referenced by other stuff".format(
+        inst.ea, addr_val))
     all_refs.add(addr_val)
 
   # Curiously, sometimes `idaq` will recognize references that `idal64` will
@@ -235,10 +237,12 @@ def _get_ref_candidate(inst, op, all_refs):
   # in SQLite 3, where the `sqlite3_config` function references a field inside
   # of the `sqlite3Config` global structure variable. 
   if addr_val not in all_refs and _is_address_of_struct_field(addr_val):
+    DEBUG("WARNING: Adding reference from {:x} to {:x}, which is a struct field".format(
+        inst.ea, addr_val))
     all_refs.add(addr_val)
 
   # Same as above, `idal64` can miss things that `idaq` gets.
-  if addr_val not in all_refs and _is_near_another_head(addr_val, 128):
+  if addr_val not in all_refs and _is_near_another_head(addr_val, 512):
     DEBUG("WARNING: Adding reference from {:x} to {:x}, which is near other heads".format(
         inst.ea, addr_val))
     all_refs.add(addr_val)
@@ -252,7 +256,8 @@ def _get_ref_candidate(inst, op, all_refs):
   # with strings, especially in SQLite3.
   if addr_val not in all_refs and addr_val in _POSSIBLE_REFS:
     all_refs.add(addr_val)
-    DEBUG("Adding multiply seen {:x} as a reference target".format(addr_val))
+    DEBUG("WARNING: Adding reference from {:x} to {:x}, which appeared other times".format(
+        inst.ea, addr_val))
 
   if addr_val not in all_refs:
     DEBUG("POSSIBLE ERROR: Not adding reference from {:x} to {:x}".format(

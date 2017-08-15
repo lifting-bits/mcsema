@@ -15529,9 +15529,10 @@ LogLuv32fromXYZ 2 C N
 LogLuv32toXYZ 2 C N
 logout 1 C N
 logwtmp 3 C N
-_longjmp 2 C N
-longjmp 2 C N
-__longjmp_chk 2 C N
+_longjmp 2 C Y
+longjmp 2 C Y
+__longjmp_chk 2 C Y
+longjmp_unwind 1 C Y
 longname 0 C N
 _long_to_time 1 C N
 lookup_cache_extent2 4 C N

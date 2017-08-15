@@ -172,11 +172,18 @@ def get_true_external_name(fn):
 #     }
 WEAK_SYMS = set()
 
+# Used to track thunks that are actually implemented. For example, in a static
+# binary, you might have a bunch of calls to `strcpy` in the `.plt` section
+# that go through the `.plt.got` to call the implementation of `strcpy` compiled
+# into the binary.
+INTERNALLY_DEFINED_EXTERNALS = {}  # Name external to EA of internal.
+INTERNAL_THUNK_EAS = {}  # EA of thunk to EA of implementation.
+
 def parse_os_defs_file(df):
   """Parse the file containing external function and variable
   specifications."""
   global OS_NAME, WEAK_SYMS, EMAP, EMAP_DATA
-  global _FIXED_EXTERNAL_NAMES
+  global _FIXED_EXTERNAL_NAMES, INTERNALLY_DEFINED_EXTERNALS
   
   is_linux = OS_NAME == "linux"
   for l in df.readlines():
@@ -228,6 +235,7 @@ def parse_os_defs_file(df):
       and not is_thunk(ea):
         DEBUG("Not treating {} as external, it is defined at {:x}".format(
             fname, ea))
+        INTERNALLY_DEFINED_EXTERNALS[fname] = ea
         continue
 
       EMAP[fname] = (int(args), realconv, ret, sign)
@@ -292,10 +300,7 @@ _NOT_ELF_THUNKS = set()
 _INVALID_THUNK = (False, None)
 
 def is_ELF_thunk_by_structure(ea):
-  """Try to manually identify an ELF thunk by its structure.
-
-  
-  """
+  """Try to manually identify an ELF thunk by its structure."""
   global _INVALID_THUNK
 
   if ".plt" not in idc.SegName(ea).lower():
@@ -307,6 +312,9 @@ def is_ELF_thunk_by_structure(ea):
     inst, _ = decode_instruction(ea)
     if not inst:
       return _INVALID_THUNK
+    # elif is_direct_jump(inst):
+    #   ea = get_direct_branch_target(inst)
+    #   inst = None
     elif is_indirect_jump(inst) or is_direct_jump(inst):
       ea = inst.ea
       break
@@ -317,21 +325,22 @@ def is_ELF_thunk_by_structure(ea):
   if not inst:
     return _INVALID_THUNK
 
-  # TODO(pag): Use `get_reference_target`?
-  real_ext_ref = get_reference_target(ea)
+  target_ea = get_reference_target(inst.ea)
+  if ".got.plt" == idc.SegName(target_ea).lower():
+    target_ea = get_reference_target(target_ea)
 
   # For AArch64, the thunk structure is something like:
-  #     .plt:00400460 .printf
-  #     .plt:00400460             ADRP            X16, #off_411018@PAGE
-  #     .plt:00400464             LDR             X17, [X16,#off_411018@PAGEOFF]
-  #     .plt:00400468             ADD             X16, X16, #off_411018@PAGEOFF
-  #     .plt:0040046C             BR              X17 ; printf
-  if is_direct_jump(inst):
-    orig_name = get_function_name(ea)
-    if is_external_segment(real_ext_ref):
-      ext_ref_name = undecorate_external_name(get_function_name(real_ext_ref))
-      if is_external_segment(idc.LocByName(ext_ref_name)):
-        return True, ext_ref_name
+  #     .plt:000400470 .atoi
+  #     .plt:000400470    ADRP            X16, #off_411000@PAGE
+  #     .plt:000400474    LDR             X17, [X16,#off_411000@PAGEOFF]
+  #     .plt:000400478    ADD             X16, X16, #off_411000@PAGEOFF
+  #     .plt:00040047C    BR              X17 ; atoi
+  #
+  # With:
+  #
+  #     extern:000411070 ; int atoi(const char *nptr)
+  #     extern:000411070                 IMPORT atoi
+  
 
   # For x86, the thunk structure is something like:
   #   
@@ -341,26 +350,16 @@ def is_ELF_thunk_by_structure(ea):
   #     
   # With:
   # 
-  #   .got.plt:0031F388 off_31F388    dq offset qsort
-  for got_plt_ea in idautils.CodeRefsFrom(ea, 0):
-    if is_external_segment(got_plt_ea):
-      real_ext_ref = got_plt_ea
-      break
+  #     .got.plt:0031F388 off_31F388    dq offset qsort
+  #
+  # With
+  #     extern:0031F388 ; void qsort(void *base, ...)
+  #     extern:0031F388                 extrn qsort:near 
 
-  if real_ext_ref is None:
-    return _INVALID_THUNK
-
-  for dref in idautils.DataRefsFrom(ea):
-    if ".got" in idc.SegName(dref).lower():
-      # this is an external call after all
-      for extref in idautils.DataRefsFrom(dref):
-        if is_external_segment(extref):
-          real_ext_ref = extref
-
-  if real_ext_ref is None:
+  if is_invalid_ea(target_ea):
     return _INVALID_THUNK
   
-  return True, undecorate_external_name(get_function_name(real_ext_ref))
+  return True, undecorate_external_name(get_function_name(target_ea))
 
 def is_thunk_by_flags(ea):
   """Try to identify a thunk based off of the IDA flags. This isn't actually
@@ -424,6 +423,7 @@ def try_get_thunk_name(ea):
   if not is_thunk:
     _NOT_ELF_THUNKS.add(ea)
     return _INVALID_THUNK
+
   else:
     _ELF_THUNKS[ea] = (is_thunk, name)
     return is_thunk, name
@@ -577,14 +577,14 @@ def recover_instruction_references(I, inst, addr):
   debug_info = ["I: {:x}".format(addr)]
   refs = get_instruction_references(inst, PIE_MODE)
   for ref in refs:
+
+    # Redirect the thunk target to the internal target.
+    if ref.ea in INTERNAL_THUNK_EAS:
+      ref.ea = INTERNAL_THUNK_EAS[ref.ea]
+      ref.symbol = get_symbol_name(ref.ea)
+
     target_type = reference_target_type(ref)
     location = reference_location(ref)
-
-    # Don't add code flows that go to internal code.
-    if ref.type == Reference.CODE \
-    and CFG_pb2.CodeReference.CodeTarget == target_type \
-    and CFG_pb2.CodeReference.Internal == location:
-      continue
 
     addrs = set()
     R = I.xrefs.add()
@@ -623,7 +623,7 @@ def recover_instruction(M, B, ea):
 
 def recover_basic_block(M, F, block_ea):
   """Add in a basic block to a specific function in the CFG."""
-  if is_external_segment(block_ea):
+  if is_external_segment_by_flags(block_ea):
     DEBUG("BB: {:x} in func {:x} is an external".format(block_ea, F.ea))
     return
 
@@ -721,9 +721,11 @@ def find_default_function_heads():
     seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
     if seg_type != idc.SEG_CODE:
       continue
+
     for func_ea in idautils.Functions(seg_ea, idc.SegEnd(seg_ea)):
       if is_code(func_ea):
         func_heads.add(func_ea)
+
   return func_heads
 
 def recover_segment_variables(M, S, seg_ea, seg_end_ea):
@@ -836,7 +838,7 @@ def recover_segment(M, seg_ea):
 def recover_segments(M):
   """Recover all non-external segments into the CFG module."""
   for seg_ea in idautils.Segments():
-    if not is_external_segment(seg_ea):
+    if not is_external_segment_by_flags(seg_ea):
       recover_segment(M, seg_ea)
 
 def recover_external_functions(M):
@@ -853,12 +855,12 @@ def recover_external_functions(M):
     E.argument_count = args
     E.cc = conv
     E.is_weak = idaapi.is_weak_name(ea) or (name in WEAK_SYMS)
-    E.has_return = ret == 'N'
+    E.no_return = ret == 'Y'
 
     # TODO(pag): This should probably reflect whether or not the function
     #      actually returns something, rather than simply does not
     #      return (e.g. `abort`).
-    E.no_return = (not E.has_return)
+    E.has_return = ret == 'N'
 
 def recover_external_variables(M):
   """Reover the named external variables (e.g. `stdout`) that are referenced
@@ -887,6 +889,9 @@ def try_identify_as_external_function(ea):
   if ea in EXTERNAL_FUNCS_TO_RECOVER:
     return True
 
+  if ea in INTERNAL_THUNK_EAS:
+    return False
+  
   # First, check if it's a thunk. Some thunks are not location in exported
   # sections. Sometimes there are thunk-to-thunks, where there's a function
   # whose only instruction is a direct jump to the real thunk.
@@ -901,6 +906,12 @@ def try_identify_as_external_function(ea):
   else:
     return False
 
+  # We've got a thunk with an implementation already done.
+  if name in INTERNALLY_DEFINED_EXTERNALS:
+    impl_ea = INTERNALLY_DEFINED_EXTERNALS[name]
+    INTERNAL_THUNK_EAS[ea] = impl_ea
+    return False
+
   if name not in EMAP:
     return False
 
@@ -908,11 +919,22 @@ def try_identify_as_external_function(ea):
   EXTERNAL_FUNCS_TO_RECOVER[ea] = name
   return True
 
+def identify_thunks(func_eas):
+  DEBUG("Looking for thunks")
+  DEBUG_PUSH()
+  for func_ea in func_eas:
+    is_thunk, name = try_get_thunk_name(func_ea)
+    if is_thunk:
+      DEBUG("Found thunk for {} at {:x}".format(name, func_ea))
+  DEBUG_POP()
+
 def identify_external_symbols():
   """Try to identify external functions and variables."""
   # Go try to find external variables.
   global _FIXED_EXTERNAL_NAMES
 
+  DEBUG("Looking for external symbols")
+  DEBUG_PUSH()
   for ea, name in idautils.Names():
     if try_identify_as_external_function(ea) or is_code(ea):
       continue
@@ -954,10 +976,13 @@ def identify_external_symbols():
         idc.MakeName(ea, extern_name)  # Rename it.
         EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
         _FIXED_EXTERNAL_NAMES[ea] = extern_name
+  DEBUG_POP()
 
 def identify_program_entrypoints(func_eas):
   """Identify all entrypoints into the program. This is pretty much any
   externally visible function."""
+  DEBUG("Looking for entrypoints")
+  DEBUG_PUSH()
   entrypoints = set()
   for index, ordinal, ea, name in idautils.Entries():
     assert ea != idc.BADADDR
@@ -966,12 +991,13 @@ def identify_program_entrypoints(func_eas):
       continue
     func_eas.add(ea)
     entrypoints.add(ea)
-    
+  DEBUG_POP()
   return entrypoints
 
 def recover_module(entrypoint):
   global EMAP
   global EXTERNAL_FUNCS_TO_RECOVER
+  global INTERNAL_THUNK_EAS
 
   M = CFG_pb2.Module()
   M.name = idc.GetInputFile().format('utf-8')
@@ -982,6 +1008,7 @@ def recover_module(entrypoint):
 
   recovered_fns = 0
 
+  identify_thunks(func_eas)
   identify_external_symbols()
   
   #entrypoints = identify_program_entrypoints(func_eas)
@@ -1004,14 +1031,11 @@ def recover_module(entrypoint):
       DEBUG("ERROR: External function {:x} not previously identified".format(func_ea))
       continue
 
-    if not is_internal_code(func_ea):
+    if not is_code(func_ea):
       DEBUG("ERROR: Function EA not code: {:x}".format(func_ea))
       continue
 
-    if is_external_segment(func_ea):
-      continue
-
-    if try_identify_as_external_function(func_ea):
+    if is_external_segment_by_flags(func_ea):
       continue
 
     recover_function(M, func_ea, func_eas, entrypoints)

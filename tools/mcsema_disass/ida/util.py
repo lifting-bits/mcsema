@@ -282,7 +282,7 @@ def is_block_or_instruction_head(ea):
 def get_address_size_in_bits():
   """Returns the available address size."""
   global _INFO
-  if _INFO.is_64bit() or (idaapi.ph.flag & idaapi.PR_USE64) != 0:
+  if _INFO.is_64bit():
     return 64
   else:
     return 32

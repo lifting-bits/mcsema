@@ -53,8 +53,11 @@
 #include "mcsema/BC/Optimize.h"
 #include "mcsema/BC/Util.h"
 
-DEFINE_bool(disable_optimizer, false, "Disable interprocedural optimizations?");
-DEFINE_bool(keep_memops, false, "Should the memory intrinsics be replaced or not?");
+DEFINE_bool(disable_optimizer, false,
+            "Disable interprocedural optimizations?");
+
+DEFINE_bool(keep_memops, false,
+            "Should the memory intrinsics be replaced or not?");
 
 namespace mcsema {
 namespace {
@@ -221,7 +224,7 @@ static void ReplaceBarrier(const char *name) {
 
   auto callers = CallersOf(func);
   for (auto call_inst : callers) {
-    auto mem_ptr = call_inst->getArgOperand(remill::kMemoryPointerArgNum);
+    auto mem_ptr = call_inst->getArgOperand(0);
     call_inst->replaceAllUsesWith(mem_ptr);
     call_inst->eraseFromParent();
   }

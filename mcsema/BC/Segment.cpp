@@ -42,16 +42,27 @@
 #include "mcsema/CFG/CFG.h"
 
 DEFINE_string(libc_constructor, "",
-    "Constructor function for running pre-main initializers. For example, on "
-    "GNU-based systems, this is typically `__libc_csu_init`.");
+              "Constructor function for running pre-`main` initializers. This "
+              "is a (lifted) function that will be executed before the `main` "
+              "function is executed. This feature should be used when lifting "
+              "code compiled from C++ programs. Many C++ programs will "
+              "construct global objects before the `main` function is executed,"
+              " and those constructors will be called via a function like "
+              "`__libc_csu_init` (on GNU-based systems).");
 
 DEFINE_string(libc_destructor, "",
-    "Destructor function for running post-main finalizers. For example, on "
-    "GNU-based systems, this is typically `__libc_csu_fini`.");
+              "Destructor function for running post-`main` finalizers. This "
+              "is a (lifted) function that will be executed after the `main` "
+              "function returns. For example, on GNU-based systems, this is "
+              "typically `__libc_csu_fini`.");
 
 DEFINE_bool(partition_segments, false,
             "Partition segments into separate variables, even if they are "
-            "contiguous in the binary.");
+            "contiguous in the binary. By default this is disabled and "
+            "the data of contiguous segments are concatenated together into a "
+            "global variable. This is the default just in case some code uses "
+            "the address of the beginning of one segment to represent the "
+            "logical end of a prior segment.");
 
 namespace mcsema {
 namespace {
