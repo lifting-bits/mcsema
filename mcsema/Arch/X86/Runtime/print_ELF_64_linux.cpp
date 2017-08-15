@@ -77,35 +77,35 @@ static void PrintStoreFlags(FILE * out) {
 
 static void PrintLoadFlags(FILE * out) {
   // Get the RFlags.
-    fprintf(out, "  pushfq\n");
-    fprintf(out, "  pop rdi\n");
-    fprintf(out, "  mov [rsi + %" PRIuMAX "], rdi\n", __builtin_offsetof(State, rflag));
+  fprintf(out, "  pushfq\n");
+  fprintf(out, "  pop rdi\n");
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rdi\n", __builtin_offsetof(State, rflag));
 
-    // Clear our the `ArithFlags` struct, which is 16 bytes.
-    fprintf(out, "  mov QWORD PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, aflag));
-    fprintf(out, "  mov QWORD PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, aflag) + 8);
+  // Clear our the `ArithFlags` struct, which is 16 bytes.
+  fprintf(out, "  mov QWORD PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, aflag));
+  fprintf(out, "  mov QWORD PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, aflag) + 8);
 
-    // Marshal the RFlags into the ArithFlags struct.
-    fprintf(out, "  bt rdi, 0\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, CF));
+  // Marshal the RFlags into the ArithFlags struct.
+  fprintf(out, "  bt rdi, 0\n");
+  fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, CF));
 
-    fprintf(out, "  bt rdi, 2\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, PF));
+  fprintf(out, "  bt rdi, 2\n");
+  fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, PF));
 
-    fprintf(out, "  bt rdi, 4\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, AF));
+  fprintf(out, "  bt rdi, 4\n");
+  fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, AF));
 
-    fprintf(out, "  bt rdi, 6\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, ZF));
+  fprintf(out, "  bt rdi, 6\n");
+  fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, ZF));
 
-    fprintf(out, "  bt rdi, 7\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, SF));
+  fprintf(out, "  bt rdi, 7\n");
+  fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, SF));
 
-    fprintf(out, "  bt rdi, 10\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, DF));
+  fprintf(out, "  bt rdi, 10\n");
+  fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, DF));
 
-    fprintf(out, "  bt rdi, 11\n");
-    fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, OF));
+  fprintf(out, "  bt rdi, 11\n");
+  fprintf(out, "  adc BYTE PTR [rsi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, OF));
 }
 
 int main(void) {
@@ -166,11 +166,6 @@ int main(void) {
   fprintf(out, "  lea rdi, QWORD PTR [__mcsema_reg_state@TPOFF]\n");
   fprintf(out, "  lea rsi, QWORD PTR [rsi + rdi]\n");
 
-  // Set up arg1 with the address of the lifted function, as it appeared in
-  // the original binary, also stash it into the `State` structure.
-  fprintf(out, "  pop rdi\n");  // Holds the lifted function address.
-  fprintf(out, "  mov [rsi + %" PRIuMAX "], rdi\n", __builtin_offsetof(State, RIP));
-
   // Remaining general purpose registers.
   fprintf(out, "  mov [rsi + %" PRIuMAX "], rax\n", __builtin_offsetof(State, RAX));
   fprintf(out, "  mov [rsi + %" PRIuMAX "], rbx\n", __builtin_offsetof(State, RBX));
@@ -185,6 +180,13 @@ int main(void) {
   fprintf(out, "  mov [rsi + %" PRIuMAX "], r13\n", __builtin_offsetof(State, R13));
   fprintf(out, "  mov [rsi + %" PRIuMAX "], r14\n", __builtin_offsetof(State, R14));
   fprintf(out, "  mov [rsi + %" PRIuMAX "], r15\n", __builtin_offsetof(State, R15));
+
+  PrintLoadFlags(out);  // Note: Clobbers RDI.
+
+  // Set up arg1 with the address of the lifted function, as it appeared in
+  // the original binary, also stash it into the `State` structure.
+  fprintf(out, "  pop rdi\n");  // Holds the lifted function address.
+  fprintf(out, "  mov [rsi + %" PRIuMAX "], rdi\n", __builtin_offsetof(State, RIP));
 
   // XMM registers.
   fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm0\n", __builtin_offsetof(State, XMM0));
@@ -204,14 +206,13 @@ int main(void) {
   fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm14\n", __builtin_offsetof(State, XMM14));
   fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm15\n", __builtin_offsetof(State, XMM15));
 
-  PrintLoadFlags(out);
 
   // If `RSP` is null then we need to initialize it to our new stack.
   fprintf(out, "  mov rdx, [rsi + %" PRIuMAX "]\n", __builtin_offsetof(State, RSP));
   fprintf(out, "  cmp rdx, 0\n");
   fprintf(out, "  jnz .Lhave_stack\n");
   fprintf(out, "  mov rdx, fs:[0]\n");
-  fprintf(out, "  lea r8, QWORD PTR [__mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  lea r8, QWORD PTR [__mcsema_stack@TPOFF]\n");
   fprintf(out, "  lea rdx, QWORD PTR [rdx + r8 + %" PRIuMAX "]\n", kStackSize);
   fprintf(out, ".Lhave_stack:\n");
 
@@ -460,7 +461,7 @@ int main(void) {
   fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm14\n", __builtin_offsetof(State, XMM14));
   fprintf(out, "  movntdq [rsi + %" PRIuMAX "], xmm15\n", __builtin_offsetof(State, XMM15));
 
-  PrintLoadFlags (out);
+  PrintLoadFlags(out);  // Note: Clobbers RDI.
 
   // On the mcsema stack:
   //     8    stashed r15

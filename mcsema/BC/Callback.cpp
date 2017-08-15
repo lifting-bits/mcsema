@@ -111,24 +111,22 @@ static llvm::Function *GetNativeToLiftedCallback(
     case remill::kArchAMD64:
     case remill::kArchAMD64_AVX:
     case remill::kArchAMD64_AVX512:
-      asm_str << "pushq %rax;"
-              << "movq $0, %rax;"
-              << "xchgq (%rsp), %rax;"
-              << "pushq %rax;"
-              << "movq $$0x" << std::hex << cfg_func->ea << ", %rax;"
-              << "xchgq (%rsp), %rax;"
-              << "jmpq *$1;";
+      asm_str << "pushq $0;";
+      if (static_cast<uint32_t>(cfg_func->ea) == cfg_func->ea) {
+        asm_str << "pushq $$0x" << std::hex << cfg_func->ea << ";";
+      } else {
+        asm_str << "pushq %rax;"
+                << "movq $$0x" << std::hex << cfg_func->ea << ", %rax;"
+                << "xchgq (%rsp), %rax;";
+      }
+      asm_str << "jmpq *$1;";
       break;
 
     case remill::kArchX86:
     case remill::kArchX86_AVX:
     case remill::kArchX86_AVX512:
-      asm_str << "pushl %eax;"
-              << "movl $0, %eax;"
-              << "xchgl (%esp), %eax;"
-              << "pushl %eax;"
-              << "movl $$0x" << std::hex << cfg_func->ea << ", %eax;"
-              << "xchgl (%esp), %eax;"
+      asm_str << "pushl $0;"
+              << "pushl $$0x" << std::hex << cfg_func->ea << ";"
               << "jmpl *$1;";
       break;
 

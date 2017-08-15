@@ -26,6 +26,10 @@ KNOB<uintptr_t> gEntrypoint(
     KNOB_MODE_WRITEONCE, "pintool", "entrypoint", "0",
     "Entrypoint of lifted program. Usually address of `main`.");
 
+KNOB<uintptr_t> gStopAt(
+    KNOB_MODE_WRITEONCE, "pintool", "stop_at", "0",
+    "Address of code for when tracing should stop.");
+
 struct RegInfo final {
   const char *name;
   LEVEL_BASE::REG reg;
@@ -76,11 +80,16 @@ static const struct RegInfo gGprs[] = {
 
 VOID PrintRegState(CONTEXT *ctx) {
   static bool gPrinting = false;
+  auto pc = PIN_GetContextReg(ctx, gGprs[0].reg);
   if (!gPrinting) {
-    gPrinting = gEntrypoint.Value() == PIN_GetContextReg(ctx, gGprs[0].reg);
+    gPrinting = gEntrypoint.Value() == pc;
     if (!gPrinting) {
       return;
     }
+  }
+
+  if (gStopAt.Value() == pc) {
+    PIN_ExitApplication(0);
   }
 
   std::stringstream ss;
