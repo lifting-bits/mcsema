@@ -24,12 +24,12 @@ DWARF_OPERATIONS = defaultdict(lambda: (lambda *args: None))
 SYMBOL_BLACKLIST = defaultdict(lambda: (lambda *args: None))
 
 SYMBOL_BLACKLIST["httpd-kudu-canonical"] = [
-    "ap_coredump_dir",
-    "ap_prelinked_modules",
-    "ap_prelinked_module_symbols",
-    "ap_preloaded_modules",
-    "startup_hooks",
-    "request_hooks",
+    #"ap_coredump_dir",
+    #"ap_prelinked_modules",
+    #"ap_prelinked_module_symbols",
+    #"ap_preloaded_modules",
+    #"startup_hooks",
+    #"request_hooks",
     #"other_hooks",
     #"htracker",
     ]
@@ -216,7 +216,7 @@ def _create_global_var_entry(memory_ref, var_name):
 
 def address_lookup(g_ref, global_var_array):
     for value, gvar in GLOBAL_VARIABLES.iteritems():
-        if (gvar['type'].tag == 1):
+        if (gvar['type'].tag == 1) or (gvar['type'].tag == 4):
             if gvar['addr'] == g_ref.address:
                 address = gvar['addr']
                 size = gvar['size']
@@ -230,23 +230,7 @@ def address_lookup(g_ref, global_var_array):
                 DEBUG("Array Variable {}".format(pprint.pformat(global_var_array[address])))   
                 DEBUG("Found {}".format(pprint.pformat(gvar)))
                 return None
-        elif (gvar['type'].tag == 4): # and gvar['name'] not in SYMBOL_BLACKLIST[os.path.basename(BINARY_FILE)]):
-            if gvar['addr'] == g_ref.address:
-                address = gvar['addr']
-                size = gvar['size']
-                if address not in global_var_array:
-                    global_var_array[address] = _create_global_var_entry(address, g_ref.var.name)
-                    global_var_array[address]['data'] = g_ref.data
-                    global_var_array[address]['size'] = size
-                    global_var_array[address]['type'] = g_ref.var.ida_type
-                    for ref in g_ref.var.ref_eas:
-                        global_var_array[address]['addrs'].add((ref.inst_addr, ref.offset))
-                DEBUG("Array Variable {}".format(pprint.pformat(global_var_array[address])))   
-                DEBUG("Found {}".format(pprint.pformat(gvar)))
-                return None
-        #elif (gvar['type'].tag == 5 or gvar['type'].tag == 2):
-        #    DEBUG("Array Variable {}".format(pprint.pformat(gvar)))
-        elif (gvar['type'].tag == 5 and gvar['name'] not in SYMBOL_BLACKLIST[os.path.basename(BINARY_FILE)]):
+        elif (gvar['type'].tag == 5): # and gvar['name'] not in SYMBOL_BLACKLIST[os.path.basename(BINARY_FILE)]):
             base_address = gvar['addr']
             size = gvar['size']
             name = "recovered_global_{:0x}".format(base_address)

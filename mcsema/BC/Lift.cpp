@@ -501,7 +501,8 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
     std::vector<llvm::Type *> data_section_types;
     std::vector<llvm::Constant *> secContents;
 
-    auto is_exist = dataSectionToGlobalVar(globaldata, nativeglobalvars, M, var.nGV, secContents, data_section_types);
+    auto is_exist = dataSectionToGlobalVar(globaldata, nativeglobalvars, M, var.nGV, secContents,
+                                           data_section_types, true);
 
     var.opaque_type->setBody(data_section_types, true);
     auto cst = llvm::ConstantStruct::get(var.opaque_type, secContents);

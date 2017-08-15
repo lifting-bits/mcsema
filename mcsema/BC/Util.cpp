@@ -358,7 +358,8 @@ bool dataSectionToGlobalVar(const std::list<DataSection> &globaldata,
                             const std::list<NativeGlobalVarPtr> &nativeglobalvars,
                             llvm::Module *M, NativeGlobalVarPtr nGV,
                             std::vector<llvm::Constant *> &secContents,
-                            std::vector<llvm::Type *> &data_section_types) {
+                            std::vector<llvm::Type *> &data_section_types,
+                            bool convert_to_callback) {
 
   auto sym_name = nGV->get_name();
   bool is_found = 0;
@@ -403,8 +404,13 @@ bool dataSectionToGlobalVar(const std::list<DataSection> &globaldata,
           // resolve the linkages to the function pointers
           llvm::Function *func = nullptr;
 
-          func = M->getFunction(sym_name);
-          TASSERT(func != nullptr, "Could not find function: " + sym_name);
+          if (convert_to_callback) {
+            func = ArchAddCallbackDriver(M, sub_addr);
+            TASSERT(func != nullptr, "Could make callback for: " + sym_name);
+          } else {
+            func = M->getFunction(sym_name);
+            TASSERT(func != nullptr, "Could not find function: " + sym_name);
+          }
 
           auto final_val = GetPointerSizedValue(M, func, data_sec_entry.getSize());
           secContents.push_back(final_val);

@@ -212,7 +212,8 @@ bool dataSectionToGlobalVar(const std::list<DataSection> &globaldata,
                             const std::list<NativeGlobalVarPtr> &nativeglobalvars,
                             llvm::Module *M, NativeGlobalVarPtr nGV,
                             std::vector<llvm::Constant *> &secContents,
-                            std::vector<llvm::Type *> &data_section_types);
+                            std::vector<llvm::Type *> &data_section_types,
+                            bool convert_to_callback);
 
 
 #define OP(x) inst.getOperand(x)
