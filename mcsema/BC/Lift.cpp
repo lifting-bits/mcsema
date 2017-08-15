@@ -62,6 +62,12 @@ static llvm::cl::opt<bool> IgnoreUnsupportedInsts(
         "Ignore unsupported instructions."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> InjectInlineAsm(
+    "inline-unsupported",
+    llvm::cl::desc(
+        "Inline unsupported instructions using inline assembly."),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> AddTracer(
     "add-reg-tracer",
     llvm::cl::desc(
@@ -195,9 +201,7 @@ static void AnnotateInsts(llvm::Function *F, VA pc) {
 //     The innermost is where most of the intelligent decisions happen.
 //
 static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
-                                      llvm::BasicBlock *&block) {
-  InstTransResult itr = ContinueBlock;
-
+                                             llvm::BasicBlock *&block) {
   // For conditional instructions, get the "true" and "false" targets.
   // This will also look up the target for nonconditional jumps.
   //string trueStrName = "block_0x" + to_string<VA>(ip->get_tr(), hex);
@@ -206,12 +210,14 @@ static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
   auto &inst = ctx.natI->get_inst();
 
   if (auto lifter = ArchGetInstructionLifter(inst)) {
-    itr = ArchLiftInstruction(ctx, block, lifter);
+    auto itr = ArchLiftInstruction(ctx, block, lifter);
 
     if (TranslateError == itr || TranslateErrorUnsupported == itr) {
       std::cerr << "Error translating instruction at " << std::hex
                 << ctx.natI->get_loc() << std::endl;
     }
+
+    return itr;
 
   // Instruction translation not defined.
   } else {
@@ -222,19 +228,27 @@ static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
 
     // In the case that we can't find the opcode, try building it out with
     // inline assembly calls in LLVM instead.
-    if (IgnoreUnsupportedInsts) {
+    if (InjectInlineAsm) {
       ArchBuildInlineAsm(inst, block);
-      return itr;
-    } else {
+      return ContinueBlock;
+
+    } else if (IgnoreUnsupportedInsts) {
       return TranslateErrorUnsupported;
+
+    } else {
+      return TranslateError;
+
     }
   }
-  return itr;
 }
 
 static InstTransResult LiftInstIntoBlock(TranslationContext &ctx,
                                          llvm::BasicBlock *&block,
                                          bool doAnnotation) {
+  if (!ctx.natI) {
+    return TranslateErrorUnsupported;
+  }
+
   auto pc = ctx.natI->get_loc();
 
   // Update the program counter.
@@ -341,6 +355,7 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
   TranslationContext ctx;
   ctx.natM = mod;
   ctx.natF = func;
+  ctx.natI = nullptr;
   ctx.M = M;
   ctx.F = F;
 
@@ -353,19 +368,36 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
   // Create a branch from the end of the entry block to the first block
   llvm::BranchInst::Create(ctx.va_to_bb[func->get_start()], entryBlock);
 
-  // Lift every basic block into the functions.
-  auto error = false;
-  for (auto block_info : func->get_blocks()) {
-    ctx.natB = block_info.second;
-    error = LiftBlockIntoFunction(ctx) || error;
+  try {
+    // Lift every basic block into the functions.
+    auto error = false;
+    for (auto block_info : func->get_blocks()) {
+      ctx.natB = block_info.second;
+      error = LiftBlockIntoFunction(ctx) || error;
+      ctx.natB = nullptr;
+    }
+
+    // For ease of debugging generated code, don't allow lifted functions to
+    // be inlined. This will make lifted and native call graphs one-to-one.
+    F->addFnAttr(llvm::Attribute::NoInline);
+
+    //we should be done, having inserted every block into the module
+    return !error;
+
+  } catch (std::exception &e) {
+    std::cerr << "error: " << std::endl << e.what() << std::endl
+              << "in function " << std::hex
+              << ctx.natF->get_start() << std::endl;
+    if (ctx.natB) {
+      std::cerr << "in block " << std::hex << ctx.natB->get_base() << std::endl;
+      if (ctx.natI) {
+        std::cerr << "in inst " << std::hex << ctx.natI->get_loc() << std::endl;
+      }
+    }
+    return false;
   }
 
-  // For ease of debugging generated code, don't allow lifted functions to
-  // be inlined. This will make lifted and native call graphs one-to-one.
-  F->addFnAttr(llvm::Attribute::NoInline);
-
-  //we should be done, having inserted every block into the module
-  return !error;
+  
 }
 
 struct DataSectionVar {
@@ -614,5 +646,6 @@ bool LiftCodeIntoModule(NativeModulePtr natMod, llvm::Module *M) {
   InitExternalData(natMod, M);
   InitExternalCode(natMod, M);
   InsertDataSections(natMod, M);
+  
   return LiftFunctionsIntoModule(natMod, M);
 }

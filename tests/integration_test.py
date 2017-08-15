@@ -247,7 +247,7 @@ class LinuxTest(unittest.TestCase):
         # The x86 test is producing slightly diferent output for printf
         # reasons, so disable it for now.
         #self._runX86Test("aes-test")
-        self._runAMD64Test("aes-test", liftargs=["-ignore-unsupported"])
+        self._runAMD64Test("aes-test", liftargs=["-inline-unsupported"])
 
     def testHello(self):
         self._runX86Test("hello")

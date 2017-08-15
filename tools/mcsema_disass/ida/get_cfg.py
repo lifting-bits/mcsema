@@ -154,7 +154,7 @@ def _decode_instruction(ea):
         decoded_inst, extra_bytes = _decode_instruction(end_ea)
         DEBUG("Extended instruction at {:08x} by {} bytes".format(
             ea, len(extra_bytes)))
-        decoded_bytes.extend(extra_bytes)
+        decoded_bytes += extra_bytes
 
     return decoded_inst, decoded_bytes
 
@@ -681,10 +681,7 @@ def handleJmpTable(I, inst, new_eas):
         je = readers[jsize](jstart+i*jsize)
         # check if this is an offset based jump table
         if si.flags & idaapi.SWI_ELBASE == idaapi.SWI_ELBASE:
-            # adjust jump target based on offset in table
-            # we only ever see these as 32-bit offsets, even
-            # when looking at 64-bit applications
-            je = 0xFFFFFFFF & (je + si.elbase)
+            je += si.elbase
 
         I.jump_table.table_entries.append(je)
         if je not in RECOVERED_EAS and isStartOfFunction(je):
@@ -1932,10 +1929,7 @@ def preprocessBinary():
                         ACCESSED_VIA_JMP.add(fulladdr)
                         je = readers[esize](fulladdr)
                         if si.flags & idaapi.SWI_ELBASE == idaapi.SWI_ELBASE:
-                            # adjust jump target based on offset in table
-                            # we only ever see these as 32-bit offsets, even
-                            # when looking at 64-bit applications
-                            je = 0xFFFFFFFF & (je + si.elbase)
+                            je += si.elbase
                         if je not in jmp_refs:
                             jmp_refs.add(je)
                             DEBUG("\t\tJMPTable entry not in original; adding ref {:x} => {:x}".format(head, je))

@@ -1007,7 +1007,6 @@ static NativeBlockPtr DeserializeBlock(
       std::cerr
           << "Unable to deserialize block at " << std::hex
           << block_va << std::endl;
-      return nullptr;
     }
     natB->add_inst(native_inst);
   }

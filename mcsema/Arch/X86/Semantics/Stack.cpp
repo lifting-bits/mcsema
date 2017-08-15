@@ -485,12 +485,19 @@ static InstTransResult doPushI(NativeInstPtr ip, llvm::BasicBlock *&b,
   // in IA32
   llvm::Value *SExt_Val = OrigIMM;
 
-  // PUSHi8 is extended to operand size, which is 32
+  // PUSHi8 is extended to operand size, which is 32 or 64
   if (width == 8) {
+    if (ArchPointerSize(M) == Pointer32) {
     SExt_Val = new llvm::SExtInst(OrigIMM,
                                   llvm::Type::getInt32Ty(b->getContext()), "",
                                   b);
     doPushV<32>(ip, b, SExt_Val);
+    } else { //Pointer64
+      SExt_Val = new llvm::SExtInst(OrigIMM,
+                                  llvm::Type::getInt64Ty(b->getContext()), "",
+                                  b);
+    doPushV<64>(ip, b, SExt_Val);
+    }
   } else {
     if (width == 32 && ip->has_ext_call_target()) {
       std::string target = ip->get_ext_call_target()->getSymbolName();

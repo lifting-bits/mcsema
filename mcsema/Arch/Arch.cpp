@@ -430,7 +430,7 @@ void ArchBuildInlineAsm(llvm::MCInst &inst, llvm::BasicBlock *block) {
   auto callee = llvm::InlineAsm::get(asmTy, asmString.str(), constraints.str(),
       false);
   llvm::Value *resultPack =
-    llvm::CallInst::Create(callee, operands, gIP->getOpcodeName(opcode), block);
+    llvm::CallInst::Create(callee, operands, "", block);
 
   // Unpack the called registers into the LLVM values.
   for (unsigned i = 0; i < resultTypes.size(); i++) {
