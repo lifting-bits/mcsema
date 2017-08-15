@@ -83,9 +83,10 @@ static llvm::cl::opt<bool> AddBreakpoints(
         "specific lifted instruction is executed."),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> DryRun("dry-run",
-                                  llvm::cl::desc("Try to see if lifting will work."),
-                                  llvm::cl::Optional);
+static llvm::cl::opt<bool> DryRun(
+    "dry-run",
+    llvm::cl::desc("Try to see if lifting will work."),
+    llvm::cl::init(false));
 
 llvm::CallingConv::ID getLLVMCC(ExternalCodeRef::CallingConvention cc) {
   switch (cc) {
