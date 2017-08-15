@@ -620,6 +620,13 @@ static InstTransResult doFucom(NativeInstPtr ip, llvm::BasicBlock *&b,
   return ContinueBlock;
 }
 
+// we do not currently model #IA exceptions, so FCOM* is the same as FUCOM*
+static InstTransResult doFcom(NativeInstPtr ip, llvm::BasicBlock *&b,
+                               MCSemaRegs reg, unsigned int stackPops) {
+
+    return doFucom(ip, b, reg, stackPops);
+}
+
 static InstTransResult doFucomi(NativeInstPtr ip, llvm::BasicBlock *&b,
                                 unsigned reg, unsigned int stackPops) {
   auto st0_val = FPUR_READ(b, llvm::X86::ST0);
@@ -1495,6 +1502,13 @@ FPU_TRANSLATION(FYL2X, true, false, true, false,
 FPU_TRANSLATION(FYL2XP1, true, false, true, false,
                 doFYL2Xx<true>(inst, ip, block))
 
+FPU_TRANSLATION(FCOMPP, true, false, true, false,
+                doFcom(ip, block, llvm::X86::ST1, 2))
+FPU_TRANSLATION(COMP_FST0r, true, false, true, false,
+                doFcom(ip, block, OP(0).getReg(), 1))
+FPU_TRANSLATION(COM_FST0r, true, false, true, false,
+                doFcom(ip, block, OP(0).getReg(), 0))
+
 FPU_TRANSLATION(UCOM_FPPr, true, false, true, false,
                 doFucom(ip, block, llvm::X86::ST1, 2))
 FPU_TRANSLATION(UCOM_FPr, true, false, true, false,
@@ -1649,5 +1663,9 @@ void FPU_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::CHS_F] = translate_CHS_F;
 
   m[llvm::X86::FXAM] = translate_FXAM;
+
+  m[llvm::X86::FCOMPP] = translate_FCOMPP;
+  m[llvm::X86::COMP_FST0r] = translate_COMP_FST0r;
+  m[llvm::X86::COM_FST0r] = translate_COM_FST0r;
 }
 

@@ -139,7 +139,15 @@ static InstTransResult doRetI(llvm::BasicBlock *&b, const llvm::MCOperand &o) {
 //emit a nonconditional branch
 static InstTransResult doNonCondBranch(llvm::BasicBlock *&b,
                                        llvm::BasicBlock *tgt) {
-  TASSERT(tgt != NULL, "Branch to a NULL target");
+  if (!tgt) {
+    auto F = b->getParent();
+    auto &C = F->getContext();
+    std::cerr << "Error: Branch to a NULL target in "
+              << F->getName().str() << std::endl;
+
+    tgt = llvm::BasicBlock::Create(C, "", F);
+    (void) new llvm::UnreachableInst(C, tgt);
+  }
 
   llvm::BranchInst::Create(tgt, b);
 
@@ -334,8 +342,11 @@ static llvm::CallInst *emitInternalCall(llvm::BasicBlock *&b, llvm::Module *M,
 
   // figure out who we are calling
   auto targetF = M->getFunction(target_fn);
-
-  TASSERT(targetF != nullptr, "Could not find target function: " + target_fn);
+  if (!targetF) {
+    std::cerr << "Could not find target function: " + target_fn << std::endl;
+    (void) new llvm::UnreachableInst(b->getContext(), b);
+    return nullptr;
+  }
 
   // do we need to push a ret addr?
   if (!is_jmp) {
@@ -369,6 +380,10 @@ static InstTransResult doCallPC(NativeInstPtr ip, llvm::BasicBlock *&b,
 
   auto c = emitInternalCall<width>(
       b, M, fname, ip->get_loc() + ip->get_len(), is_jump);
+  if (!c) {
+    return EndBlock;
+  }
+
   auto F = c->getCalledFunction();
 
   if (ip->has_local_noreturn() || F->doesNotReturn()) {
@@ -766,9 +781,13 @@ static InstTransResult translate_JMPm(TranslationContext &ctx,
         == ExternalCodeRef::McsemaCall) {
       auto M = block->getParent()->getParent();
       std::string target_fn = ArchNameMcSemaCall(s);
-      emitInternalCall<width>(
+      auto c = emitInternalCall<width>(
           block, M, target_fn, ip->get_loc() + ip->get_len(), true);
-      return ContinueBlock;
+      if (c) {
+        return ContinueBlock;
+      } else {
+        return EndBlock;
+      }
     }
 
     if (64 == width) {
@@ -934,9 +953,13 @@ static InstTransResult translate_CALLpcrel32(TranslationContext &ctx,
         == ExternalCodeRef::McsemaCall) {
       auto M = block->getParent()->getParent();
       std::string target_fn = ArchNameMcSemaCall(s);
-      emitInternalCall<width>(
+      auto c = emitInternalCall<width>(
           block, M, target_fn, ip->get_loc() + ip->get_len(), false);
-      return ContinueBlock;
+      if (c) {
+        return ContinueBlock;
+      } else {
+        return EndBlock;
+      }
     } else {
       llvm::dbgs() << __FUNCTION__ << ": function is: " << s << ", cc is: "
                    << ip->get_ext_call_target()->getCallingConvention() << "\n";
@@ -975,9 +998,13 @@ static InstTransResult translate_CALLm(TranslationContext &ctx,
         == ExternalCodeRef::McsemaCall) {
       auto M = block->getParent()->getParent();
       std::string target_fn = ArchNameMcSemaCall(s);
-      emitInternalCall<width>(
+      auto c = emitInternalCall<width>(
           block, M, target_fn, ip->get_loc() + ip->get_len(), false);
-      return ContinueBlock;
+      if (c) {
+        return ContinueBlock;
+      } else {
+        return EndBlock;
+      }
     }
 
     if (width == 64) {
