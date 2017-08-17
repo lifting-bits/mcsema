@@ -32,51 +32,9 @@
 #include "mcsema/BC/Util.h"
 
 namespace mcsema {
-namespace {
-static const char * const kRealEIPAnnotation = "mcsema_real_eip";
-
-// Create the node for a `mcsema_real_eip` annotation.
-static llvm::MDNode *CreateInstAnnotation(llvm::Function *F, uint64_t addr) {
-  auto word_type = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
-  auto addr_val = llvm::ConstantInt::get(word_type, addr);
-#if LLVM_VERSION_NUMBER >= LLVM_VERSION(3, 6)
-  auto addr_md = llvm::ValueAsMetadata::get(addr_val);
-  return llvm::MDNode::get(*gContext, addr_md);
-#else
-  return llvm::MDNode::get(*gContext, addr_val);
-#endif
-}
-
-// Annotate and instruction with the `mcsema_real_eip` annotation if that
-// instruction is unannotated.
-static void AnnotateInst(llvm::Instruction *inst, llvm::MDNode *annot) {
-  static bool has_id = false;
-  static unsigned id = 0;
-  if (!has_id) {
-    has_id = true;
-    id = gContext->getMDKindID(kRealEIPAnnotation);
-  }
-  if (!inst->getMetadata(id)) {
-    inst->setMetadata(id, annot);
-  }
-}
-
-}  // namespace
 
 llvm::LLVMContext *gContext = nullptr;
 llvm::Module *gModule = nullptr;
-
-// Create a `mcsema_real_eip` annotation, and annotate every unannotated
-// instruction with this new annotation.
-void AnnotateInsts(llvm::Function *func, uint64_t pc) {
-  auto annot = CreateInstAnnotation(func, pc);
-  for (llvm::BasicBlock &block : *func) {
-    for (llvm::Instruction &inst : block) {
-      AnnotateInst(&inst, annot);
-    }
-  }
-}
 
 // Return the type of a lifted function.
 llvm::FunctionType *LiftedFunctionType(void) {

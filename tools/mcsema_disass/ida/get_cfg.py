@@ -802,13 +802,11 @@ def recover_segment_cross_references(M, S, seg_ea, seg_end_ea):
       DEBUG("{}-byte reference at {:x} to {:x} ({}), next_ea={:x}".format(
           X.width, ea, target_ea, X.target_name, next_ea))
 
-def recover_segment(M, seg_ea):
+def recover_segment(M, seg_name, seg_ea, seg_end_ea):
   """Recover the data and cross-references from a segment. The data of a
   segment is stored verbatim within the protobuf, and accompanied by a
   series of variable and cross-reference entries."""
 
-  seg_name = idc.SegName(seg_ea)
-  seg_end_ea = idc.SegEnd(seg_ea)
   DEBUG("Recovering segment {} [{:x}, {:x})".format(
       seg_name, seg_ea, seg_end_ea))
   seg_size = seg_end_ea - seg_ea
@@ -835,11 +833,53 @@ def recover_segment(M, seg_ea):
   recover_segment_variables(M, S, seg_ea, seg_end_ea)
   DEBUG_POP()
 
-def recover_segments(M):
-  """Recover all non-external segments into the CFG module."""
+def recover_segments(M, global_vars=[]):
+  """Recover all non-external segments into the CFG module. This will also
+  recover global variables, specified in terms of a list of
+  `(name, begin_ea, end_ea)` tuples, as their own segments."""
+  seg_begin_eas = set()
+  seg_end_eas = set()
+
+  var_names = {}
+
+  # Collect the segment bounds to lift.
   for seg_ea in idautils.Segments():
     if not is_external_segment_by_flags(seg_ea):
-      recover_segment(M, seg_ea)
+      seg_begin_eas.add(seg_ea)
+      seg_end_eas.add(idc.SegEnd(seg_ea))
+
+  # Treat global variables as segment begin/end points.
+  for var_name, begin_ea, end_ea in global_vars:
+    if is_external_segment_by_flags(begin_ea):
+      DEBUG("ERROR: Variable {} at {:x} is in an external segment.".format(
+          var_name, begin_ea))
+      continue
+
+    seg_begin_eas.add(begin_ea)
+    seg_end_eas.add(end_ea)
+
+    if end_ea < idc.SegEnd(begin_ea):
+      seg_begin_eas.add(end_ea)
+    
+    var_names[begin_ea] = var_name
+
+  seg_begin_eas = sorted(list(seg_begin_eas))
+
+  # Recover each segment / segment part.
+  for seg_ea in seg_begin_eas:
+    seg_end_eas.discard(seg_ea)
+    seg_end_ea = min(seg_end_eas)
+    seg_end_eas.discard(seg_end_ea)
+
+    assert seg_end_ea > seg_ea
+    assert seg_ea >= idc.SegStart(seg_ea)
+    assert seg_end_ea <= idc.SegEnd(seg_ea)
+
+    seg_name = idc.SegName(seg_ea)
+    if seg_ea in var_names:
+      seg_name = "{}_{}".format(seg_name, var_names[seg_ea])
+
+    recover_segment(M, seg_name, seg_ea, seg_end_ea)
 
 def recover_external_functions(M):
   """Recover the named external functions (e.g. `printf`) that are referenced

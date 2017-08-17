@@ -28,13 +28,20 @@ namespace mcsema {
 
 struct ArgConstraint;
 
-class ArgLoader {
+class CallingConvention {
  public:
-  explicit ArgLoader(llvm::CallingConv::ID cc_);
+  explicit CallingConvention(llvm::CallingConv::ID cc_);
 
-  llvm::Value *LoadNextArgument(llvm::BasicBlock *block, llvm::Type *goal_type);
+  llvm::Value *LoadNextArgument(llvm::BasicBlock *block,
+                                llvm::Type *goal_type=nullptr);
 
   void StoreReturnValue(llvm::BasicBlock *block, llvm::Value *ret_val);
+
+  llvm::Value *StoreNextArgument(llvm::BasicBlock *block,
+                                 llvm::Value *arg_val);
+
+  llvm::Value *LoadReturnValue(llvm::BasicBlock *block,
+                               llvm::Type *goal_type=nullptr);
 
  private:
   llvm::CallingConv::ID cc;
@@ -43,10 +50,8 @@ class ArgLoader {
   const char * const sp_name;
   const ArgConstraint *reg_table;
 
-  ArgLoader(void) = delete;
+  CallingConvention(void) = delete;
 };
-
-
 
 }  // namespace mcsema
 

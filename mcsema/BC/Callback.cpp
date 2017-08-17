@@ -37,15 +37,22 @@
 
 #include "mcsema/Arch/ABI.h"
 #include "mcsema/Arch/Arch.h"
-#include "mcsema/BC/Util.h"
 #include "mcsema/BC/Callback.h"
+#include "mcsema/BC/Legacy.h"
+#include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
+
+DECLARE_bool(legacy_mode);
 
 DEFINE_bool(explicit_args, false,
             "Should arguments be explicitly passed to external functions. "
             "This can be good for static analysis and symbolic execution, "
             "but in practice it precludes the possibility of compiling "
             "and running the bitcode.");
+
+DEFINE_uint64(default_num_explicit_args, 8,
+              "Default number of explicit args to pass to an unknown function,"
+              " or to accept from an unknown function.");
 
 namespace mcsema {
 namespace {
@@ -58,7 +65,6 @@ static llvm::Function *GetAttachCallFunc(void) {
     handler = llvm::Function::Create(
         callback_type, llvm::GlobalValue::ExternalLinkage,
         "__mcsema_attach_call", gModule);
-//    handler->addFnAttr(llvm::Attribute::Naked);
     handler->addFnAttr(llvm::Attribute::NoInline);
     handler->setCallingConv(llvm::CallingConv::Fast);
   }
@@ -162,16 +168,22 @@ static llvm::Function *GetNativeToLiftedCallback(
       *gModule, func->getType(), true, llvm::GlobalValue::InternalLinkage,
       func));
 
-  asm_args.push_back(new llvm::GlobalVariable(
-      *gModule, attach_func->getType(), true,
-      llvm::GlobalValue::InternalLinkage, attach_func));
+  static llvm::GlobalVariable *attach_func_ptr = nullptr;
+  if (!attach_func_ptr) {
+    attach_func_ptr = new llvm::GlobalVariable(
+        *gModule, attach_func->getType(), true,
+        llvm::GlobalValue::InternalLinkage, attach_func);
+  }
+
+  asm_args.push_back(attach_func_ptr);
 
   auto asm_call = ir.CreateCall(asm_func, asm_args);
   asm_call->setTailCall(true);
   ir.CreateRetVoid();
 
-  AnnotateInsts(callback_func, cfg_func->ea);
-
+  if (FLAGS_legacy_mode) {
+    legacy::AnnotateInsts(callback_func, cfg_func->ea);
+  }
   return callback_func;
 }
 
@@ -240,7 +252,7 @@ static void ImplementExplicitArgsCallback(
 
   auto func_type = extern_func->getFunctionType();
   auto num_params = func_type->getNumParams();
-  ArgLoader loader(cfg_func->cc);
+  CallingConvention loader(cfg_func->cc);
 
   if (num_params != cfg_func->num_args) {
     CHECK(num_params < cfg_func->num_args && func_type->isVarArg())
@@ -320,7 +332,55 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func_) {
     ImplementLiftedToNativeCallback(callback_func, extern_func, cfg_func);
   }
 
-  AnnotateInsts(callback_func, cfg_func->ea);
+  if (FLAGS_legacy_mode) {
+    legacy::AnnotateInsts(callback_func, cfg_func->ea);
+  }
+  return callback_func;
+}
+
+// Get a callback function that casts the program counter into a function
+// pointer and then calls it.
+llvm::Function *GetLegacyLiftedToNativeExitPoint(void) {
+  static llvm::Function *callback_func = nullptr;
+  if (callback_func) {
+    return callback_func;
+  }
+
+  CHECK(FLAGS_explicit_args && FLAGS_legacy_mode);
+
+  // Stub that will marshal lifted state into the native state.
+  callback_func = llvm::Function::Create(LiftedFunctionType(),
+                                         llvm::GlobalValue::InternalLinkage,
+                                         "__mcsema_detach_call_value", gModule);
+
+  remill::CloneBlockFunctionInto(callback_func);
+
+  callback_func->setCallingConv(llvm::CallingConv::Fast);
+
+  // Always inline so that static analyses of the bitcode don't need to dive
+  // into an extra function just to see the intended call.
+  callback_func->removeFnAttr(llvm::Attribute::NoInline);
+  callback_func->addFnAttr(llvm::Attribute::InlineHint);
+  callback_func->addFnAttr(llvm::Attribute::AlwaysInline);
+
+  CallingConvention loader(gArch->DefaultCallingConv());
+
+  auto block = &(callback_func->back());
+  std::vector<llvm::Value *> call_args;
+
+  for (uint64_t i = 0U; i < FLAGS_default_num_explicit_args; i++) {
+    call_args.push_back(loader.LoadNextArgument(block));
+  }
+
+  auto pc = remill::LoadProgramCounter(block);
+  auto func_ptr_ty = llvm::PointerType::get(
+      llvm::FunctionType::get(call_args[0]->getType(), true), 0);
+
+  llvm::IRBuilder<> ir(block);
+  loader.StoreReturnValue(
+      block, ir.CreateCall(ir.CreateIntToPtr(pc, func_ptr_ty), call_args));
+
+  ir.CreateRet(remill::LoadMemoryPointer(block));
 
   return callback_func;
 }

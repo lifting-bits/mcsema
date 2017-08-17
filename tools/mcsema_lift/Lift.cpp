@@ -54,6 +54,13 @@ DEFINE_string(output, "", "Output bitcode file name.");
 
 DECLARE_bool(version);
 
+DECLARE_bool(disable_optimizer);
+DECLARE_bool(keep_memops);
+DECLARE_bool(explicit_args);
+
+DEFINE_bool(legacy_mode, false,
+            "Try to make the output bitcode resemble the original McSema.");
+
 namespace {
 
 static void PrintVersion(void) {
@@ -99,6 +106,20 @@ int main(int argc, char *argv[]) {
   CHECK(mcsema::InitArch(FLAGS_os, FLAGS_arch))
       << "Cannot initialize for arch " << FLAGS_arch
       << " and OS " << FLAGS_os << std::endl;
+
+  if (FLAGS_legacy_mode) {
+    LOG_IF(WARNING, FLAGS_keep_memops)
+        << "Disabling --keep-memops in legacy mode.";
+    FLAGS_keep_memops = false;
+
+    LOG_IF(WARNING, FLAGS_disable_optimizer)
+        << "Disabling --explicit-args in legacy mode.";
+    FLAGS_disable_optimizer = false;
+
+    LOG_IF(WARNING, !FLAGS_explicit_args)
+        << "Enabling --explicit-args in legacy mode.";
+    FLAGS_explicit_args = true;
+  }
 
   auto cfg_module = mcsema::ReadProtoBuf(
       FLAGS_cfg, (mcsema::gArch->address_size / 8));

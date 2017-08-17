@@ -62,24 +62,12 @@ DEFINE_bool(keep_memops, false,
 namespace mcsema {
 namespace {
 
-static std::vector<llvm::CallInst *> CallersOf(llvm::Function *func) {
-  std::vector<llvm::CallInst *> callers;
-  for (auto user : func->users()) {
-    if (auto call_inst = llvm::dyn_cast<llvm::CallInst>(user)) {
-      if (call_inst->getCalledFunction() == func) {
-        callers.push_back(call_inst);
-      }
-    }
-  }
-  return callers;
-}
-
 // Replace all uses of a specific intrinsic with an undefined value. We actually
 // don't use LLVM's `undef` values because those can behave unpredictably
 // across different LLVM versions with different optimization levels. Instead,
 // we use a null value (zero, really).
 static void ReplaceUndefIntrinsic(llvm::Function *function) {
-  auto call_insts = CallersOf(function);
+  auto call_insts = remill::CallersOf(function);
   auto undef_val = llvm::Constant::getNullValue(function->getReturnType());
   for (auto call_inst : call_insts) {
     call_inst->replaceAllUsesWith(undef_val);
@@ -222,7 +210,7 @@ static void ReplaceBarrier(const char *name) {
   CHECK(func->isDeclaration())
       << "Cannot lower already implemented memory intrinsic " << name;
 
-  auto callers = CallersOf(func);
+  auto callers = remill::CallersOf(func);
   for (auto call_inst : callers) {
     auto mem_ptr = call_inst->getArgOperand(0);
     call_inst->replaceAllUsesWith(mem_ptr);
@@ -240,7 +228,7 @@ static void ReplaceMemReadOp(const char *name, llvm::Type *val_type) {
   CHECK(func->isDeclaration())
       << "Cannot lower already implemented memory intrinsic " << name;
 
-  auto callers = CallersOf(func);
+  auto callers = remill::CallersOf(func);
   for (auto call_inst : callers) {
     auto addr = call_inst->getArgOperand(1);
 
@@ -277,7 +265,7 @@ static void ReplaceMemWriteOp(const char *name, llvm::Type *val_type) {
   CHECK(func->isDeclaration())
       << "Cannot lower already implemented memory intrinsic " << name;
 
-  auto callers = CallersOf(func);
+  auto callers = remill::CallersOf(func);
 
   for (auto call_inst : callers) {
     auto mem_ptr = call_inst->getArgOperand(0);
@@ -362,7 +350,9 @@ void OptimizeModule(void) {
         });
     RemoveISELs(isels);
   }
+
   RemoveIntrinsics();
+
   if (!FLAGS_keep_memops) {
     LowerMemOps();
     ReplaceBarrier("__remill_barrier_load_load");

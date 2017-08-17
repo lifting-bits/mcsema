@@ -37,6 +37,10 @@ llvm::Function *GetNativeToLiftedEntryPoint(const NativeObject *cfg_func);
 // internal code.
 llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func);
 
+// Get a callback function that casts the program counter into a function
+// pointer and then calls it.
+llvm::Function *GetLegacyLiftedToNativeExitPoint(void);
+
 }  // namespace mcsema
 
 #endif  // MCSEMA_BC_CALLBACK_H_

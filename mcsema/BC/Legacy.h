@@ -14,32 +14,27 @@
  * limitations under the License.
  */
 
-#ifndef MCSEMA_BC_UTIL_H_
-#define MCSEMA_BC_UTIL_H_
+#ifndef MCSEMA_BC_LEGACY_H_
+#define MCSEMA_BC_LEGACY_H_
 
 #include <cstdint>
-#include <list>
-#include <vector>
-
-#include "mcsema/CFG/CFG.h"
 
 namespace llvm {
-
-class BasicBlock;
-class ConstantInt;
-class LLVMContext;
-class Module;
-
+class Function;
 }  // namespace llvm
 namespace mcsema {
+namespace legacy {
 
-extern llvm::LLVMContext *gContext;
-extern llvm::Module *gModule;
+void DowngradeModule(void);
 
-// Return the type of a lifted function.
-llvm::FunctionType *LiftedFunctionType(void);
+// Create a `mcsema_real_eip` annotation, and annotate every unannotated
+// instruction with this new annotation.
+void AnnotateInsts(llvm::Function *func, uint64_t pc);
 
+// Propagate any instruction annotations.
+void PropagateInstAnnotations(void);
 
+}  // namespace legacy
 }  // namespace mcsema
 
-#endif  // MCSEMA_BC_UTIL_H_
+#endif  // MCSEMA_BC_LEGACY_H_

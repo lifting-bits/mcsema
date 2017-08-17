@@ -50,11 +50,14 @@
 #include "mcsema/BC/Callback.h"
 #include "mcsema/BC/External.h"
 #include "mcsema/BC/Function.h"
+#include "mcsema/BC/Legacy.h"
 #include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Optimize.h"
 #include "mcsema/BC/Segment.h"
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
+
+DECLARE_bool(legacy_mode);
 
 namespace mcsema {
 namespace {
@@ -107,7 +110,13 @@ bool LiftCodeIntoModule(const NativeModule *cfg_module) {
   ExportFunction(cfg_module);
   ExportVariables(cfg_module);
   CallInitFiniCode(cfg_module);
+  if (FLAGS_legacy_mode) {
+    legacy::DowngradeModule();
+  }
   OptimizeModule();
+  if (FLAGS_legacy_mode) {
+    legacy::PropagateInstAnnotations();
+  }
   return true;
 }
 

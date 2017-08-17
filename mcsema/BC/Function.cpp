@@ -49,11 +49,14 @@
 #include "mcsema/BC/Callback.h"
 #include "mcsema/BC/Function.h"
 #include "mcsema/BC/Instruction.h"
+#include "mcsema/BC/Legacy.h"
 #include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Optimize.h"
 #include "mcsema/BC/Segment.h"
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
+
+DECLARE_bool(legacy_mode);
 
 DEFINE_bool(add_reg_tracer, false,
             "Add a debug function that prints out the register state before "
@@ -316,6 +319,10 @@ static bool LiftInstIntoBlock(TranslationContext &ctx,
   auto inst_addr = ctx.cfg_inst->ea;
   auto &bytes = ctx.cfg_inst->bytes;
 
+  if (FLAGS_legacy_mode) {
+    remill::StoreProgramCounter(block, inst_addr);
+  }
+
   if (!gArch->DecodeInstruction(inst_addr, bytes, inst)) {
     LOG(ERROR)
         << "Unable to decode instruction " << inst.Serialize()
@@ -353,7 +360,10 @@ static bool LiftInstIntoBlock(TranslationContext &ctx,
 
   // Annotate every un-annotated instruction in this function with the
   // program counter of the current instruction.
-  AnnotateInsts(ctx.lifted_func, inst_addr);
+  if (FLAGS_legacy_mode) {
+    legacy::AnnotateInsts(ctx.lifted_func, inst_addr);
+  }
+
   return ret;
 }
 

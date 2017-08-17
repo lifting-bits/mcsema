@@ -62,6 +62,7 @@ add_executable(${MCSEMA_LIFT}
     mcsema/BC/External.cpp
     mcsema/BC/Function.cpp
     mcsema/BC/Instruction.cpp
+    mcsema/BC/Legacy.cpp
     mcsema/BC/Lift.cpp
     mcsema/BC/Optimize.cpp
     mcsema/BC/Segment.cpp

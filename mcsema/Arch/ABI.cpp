@@ -323,14 +323,14 @@ static const char *ReturnValVar(llvm::CallingConv::ID cc, llvm::Type *type) {
 
 }  // namespace
 
-ArgLoader::ArgLoader(llvm::CallingConv::ID cc_)
+CallingConvention::CallingConvention(llvm::CallingConv::ID cc_)
     : cc(cc_),
       used_reg_bitmap(0),
       num_loaded_stack_bytes(DefaultUsedStackBytes(cc)),
       sp_name(StackPointerName()),
       reg_table(ConstraintTable(cc)) {}
 
-llvm::Value *ArgLoader::LoadNextArgument(llvm::BasicBlock *block,
+llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
                                          llvm::Type *goal_type) {
 
   auto addr_type = llvm::Type::getIntNTy(
@@ -440,8 +440,8 @@ llvm::Value *ArgLoader::LoadNextArgument(llvm::BasicBlock *block,
   return val;
 }
 
-void ArgLoader::StoreReturnValue(llvm::BasicBlock *block,
-                                 llvm::Value *ret_val) {
+void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
+                                         llvm::Value *ret_val) {
   if (!ret_val) {
     return;
   }
@@ -503,5 +503,29 @@ void ArgLoader::StoreReturnValue(llvm::BasicBlock *block,
   dest_loc = ir.CreateBitCast(dest_loc, llvm::PointerType::get(val_type, 0));
   ir.CreateStore(ret_val, dest_loc);
 }
+
+llvm::Value *CallingConvention::StoreNextArgument(llvm::BasicBlock *,
+                                                  llvm::Value *) {
+  LOG(FATAL)
+      << "Unimplemented.";
+  return nullptr;
+}
+
+llvm::Value *CallingConvention::LoadReturnValue(llvm::BasicBlock *block,
+                                                llvm::Type *val_type) {
+  llvm::IRBuilder<> ir(block);
+
+  auto addr_type = llvm::Type::getIntNTy(
+      *gContext, static_cast<unsigned>(gArch->address_size));
+  if (!val_type) {
+    val_type = addr_type;
+  }
+
+  auto val_var = ReturnValVar(cc, val_type);
+  return ir.CreateLoad(ir.CreateBitCast(
+      ir.CreateLoad(remill::FindVarInFunction(block, val_var)),
+      llvm::PointerType::get(val_type, 0)));
+}
+
 
 }  // namespace mcsema
