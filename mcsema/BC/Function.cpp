@@ -205,18 +205,19 @@ static void LiftIndirectJump(TranslationContext &ctx,
                              remill::Instruction &inst) {
   std::unordered_map<uint64_t, llvm::BasicBlock *> block_map;
 
-  auto fallback = ctx.lifter->intrinsics->jump;
+  auto fallback = GetLiftedToNativeExitPoint(kExitPointJump);
 
   for (auto target_ea : ctx.cfg_block->successor_eas) {
     block_map[target_ea] = GetOrCreateBlock(ctx, target_ea);
     fallback = ctx.lifter->intrinsics->missing_block;
   }
 
-  // Pessimistic approach: assume all blocks are potential targets.
+  // We have no jump table information, so assume that it's an indirect tail
+  // call, so just go native.
   if (block_map.empty()) {
     LOG(INFO)
         << "Indirect jump at " << std::hex << inst.pc << " looks like"
-        << "a thunk; falling back to `__remill_indrect_jump`.";
+        << "a thunk; falling back to `" << fallback->getName().str() << "`.";
     remill::AddTerminatingTailCall(block, fallback);
     return;
   }
@@ -289,7 +290,8 @@ static bool TryLiftTerminator(TranslationContext &ctx,
       return false;
 
     case remill::Instruction::kCategoryIndirectFunctionCall:
-      InlineSubFuncCall(block, ctx.lifter->intrinsics->function_call);
+      InlineSubFuncCall(
+          block, GetLiftedToNativeExitPoint(kExitPointFunctionCall));
       return false;
 
     case remill::Instruction::kCategoryFunctionReturn:
@@ -443,9 +445,6 @@ static llvm::Function *LiftFunction(
     return lifted_func;
   }
 
-  auto word_type = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
-
   remill::CloneBlockFunctionInto(lifted_func);
 
   lifted_func->removeFnAttr(llvm::Attribute::AlwaysInline);
@@ -457,7 +456,7 @@ static llvm::Function *LiftFunction(
 
   TranslationContext ctx;
   std::unique_ptr<remill::InstructionLifter> lifter(
-      new InstructionLifter(word_type, intrinsics.get(), ctx));
+      new InstructionLifter(intrinsics.get(), ctx));
 
   ctx.lifter = lifter.get();
   ctx.cfg_module = cfg_module;

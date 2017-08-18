@@ -175,8 +175,6 @@ static llvm::GlobalVariable *DeclareRegion(const SegmentMap &segments) {
   ss << "_type";
 
   auto region_type = llvm::StructType::create(seg_types, ss.str(), true);
-  auto word_type = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
 
   CHECK(nullptr != region_type)
       << "Unable to create structure type for segment region ["
@@ -196,15 +194,15 @@ static llvm::GlobalVariable *DeclareRegion(const SegmentMap &segments) {
     auto offset = cfg_seg->ea - min_ea;
 
     std::vector<llvm::Constant *> index_list;
-    index_list.push_back(llvm::ConstantInt::get(word_type, offset));
+    index_list.push_back(llvm::ConstantInt::get(gWordType, offset));
 
     auto ptr = llvm::ConstantExpr::getAdd(
-        llvm::ConstantExpr::getPtrToInt(region, word_type),
-        llvm::ConstantInt::get(word_type, offset));
+        llvm::ConstantExpr::getPtrToInt(region, gWordType),
+        llvm::ConstantInt::get(gWordType, offset));
 
     cfg_seg->region_var = region;
     cfg_seg->seg_var = new llvm::GlobalVariable(
-        *gModule, word_type, true  /* isConstant */,
+        *gModule, gWordType, true  /* isConstant */,
         llvm::GlobalVariable::InternalLinkage,
         ptr, cfg_seg->lifted_name);
   }
@@ -219,8 +217,6 @@ static void DeclareVariables(const NativeModule *cfg_module) {
 
   // TODO(pag): Handle thread-local storage types by assigning a non-zero
   //            address space to the byte pointer type?
-  auto word_type = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
 
   for (auto entry : cfg_module->ea_to_var) {
     auto cfg_var = reinterpret_cast<const NativeVariable *>(
@@ -246,10 +242,10 @@ static void DeclareVariables(const NativeModule *cfg_module) {
     auto offset = cfg_var->ea - cfg_seg->ea;
     auto ptr = llvm::ConstantExpr::getAdd(
         seg->getInitializer(),
-        llvm::ConstantInt::get(word_type, offset));
+        llvm::ConstantInt::get(gWordType, offset));
 
     (void) new llvm::GlobalVariable(
-        *gModule, word_type, true  /* isConstant */,
+        *gModule, gWordType, true  /* isConstant */,
         llvm::GlobalVariable::InternalLinkage,
         ptr, cfg_var->lifted_name);
   }
@@ -362,8 +358,6 @@ static void LazyInitXRef(const NativeXref *xref,
   auto xref_target = ir.CreateLoad(
       ir.CreateBitCast(extern_ptr_var, extern_ptr_type));
 
-  auto word_type = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
   auto seg = xref->segment->seg_var;
   auto region = xref->segment->region_var;
   if (seg->isConstant() || region->isConstant()) {
@@ -376,7 +370,7 @@ static void LazyInitXRef(const NativeXref *xref,
   }
 
   auto offset = xref->ea - xref->segment->ea;
-  auto disp = llvm::ConstantInt::get(word_type, offset, false);
+  auto disp = llvm::ConstantInt::get(gWordType, offset, false);
   auto addr_of_xref = llvm::ConstantExpr::getAdd(seg->getInitializer(), disp);
   auto ptr_to_xref = ir.CreateIntToPtr(addr_of_xref, extern_ptr_type);
   ir.CreateStore(xref_target, ptr_to_xref);
@@ -389,8 +383,6 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
     return llvm::ConstantAggregateZero::get(seg_type);
   }
 
-  auto word_type = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
   unsigned i = 0;
 
   std::vector<llvm::Constant *> entry_vals;
@@ -446,7 +438,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
         } else {
           val = GetNativeToLiftedCallback(cfg_func);
         }
-        val = llvm::ConstantExpr::getPtrToInt(val, word_type);
+        val = llvm::ConstantExpr::getPtrToInt(val, gWordType);
         CHECK(val != nullptr)
             << "Can't insert cross reference to function "
             << cfg_func->name << " at " << std::hex << cfg_seg_entry.first
@@ -485,7 +477,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
         auto seg = gModule->getGlobalVariable(
             xref->target_segment->lifted_name, true);
         auto offset = xref->target_ea - xref->target_segment->ea;
-        auto disp = llvm::ConstantInt::get(word_type, offset, false);
+        auto disp = llvm::ConstantInt::get(gWordType, offset, false);
         val = llvm::ConstantExpr::getAdd(seg->getInitializer(), disp);
       }
 

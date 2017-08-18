@@ -18,6 +18,7 @@
 #define MCSEMA_ARCH_ABI_H_
 
 #include <cstdint>
+#include <vector>
 
 #include <llvm/IR/CallingConv.h>
 
@@ -28,6 +29,8 @@ namespace mcsema {
 
 struct ArgConstraint;
 
+// Generic functions for reading/writing to the register/stack state in a way
+// that respects a supplied calling convention.
 class CallingConvention {
  public:
   explicit CallingConvention(llvm::CallingConv::ID cc_);
@@ -37,17 +40,35 @@ class CallingConvention {
 
   void StoreReturnValue(llvm::BasicBlock *block, llvm::Value *ret_val);
 
-  llvm::Value *StoreNextArgument(llvm::BasicBlock *block,
-                                 llvm::Value *arg_val);
+  void StoreArguments(llvm::BasicBlock *block,
+                      const std::vector<llvm::Value *> &arg_vals);
+
+  void AllocateReturnAddress(llvm::BasicBlock *block);
 
   llvm::Value *LoadReturnValue(llvm::BasicBlock *block,
                                llvm::Type *goal_type=nullptr);
 
+  llvm::Value *LoadStackPointer(llvm::BasicBlock *block);
+
+  void StoreStackPointer(llvm::BasicBlock *block, llvm::Value *new_val);
+
+  const char *StackPointerVarName(void) const {
+    return sp_name;
+  }
+
+  const char *ThreadPointerVarName(void) const {
+    return tp_name;
+  }
+
  private:
+
+  const char *GetVarForNextArgument(llvm::Type *val_type);
+
   llvm::CallingConv::ID cc;
   uint64_t used_reg_bitmap;
   uint64_t num_loaded_stack_bytes;
   const char * const sp_name;
+  const char * const tp_name;
   const ArgConstraint *reg_table;
 
   CallingConvention(void) = delete;

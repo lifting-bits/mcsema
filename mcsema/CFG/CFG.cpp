@@ -530,7 +530,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     func->is_weak = cfg_extern_func.is_weak();
     func->lifted_name = ExternalFuncName(cfg_extern_func);
     func->num_args = 0;
-    func->cc = llvm::CallingConv::C;
+    func->cc = gArch->DefaultCallingConv();
 
     if (cfg_extern_func.has_argument_count()) {
       func->num_args = static_cast<unsigned>(cfg_extern_func.argument_count());

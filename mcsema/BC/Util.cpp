@@ -26,6 +26,7 @@
 #include <llvm/IR/Type.h>
 
 #include "remill/Arch/Arch.h"
+#include "remill/BC/Util.h"
 #include "remill/BC/Version.h"
 
 #include "mcsema/Arch/Arch.h"
@@ -34,13 +35,14 @@
 namespace mcsema {
 
 llvm::LLVMContext *gContext = nullptr;
+llvm::IntegerType *gWordType = nullptr;
 llvm::Module *gModule = nullptr;
 
 // Return the type of a lifted function.
 llvm::FunctionType *LiftedFunctionType(void) {
   static llvm::FunctionType *func_type = nullptr;
   if (!func_type) {
-    func_type = gModule->getFunction("__remill_basic_block")->getFunctionType();
+    func_type = remill::LiftedFunctionType(gModule);
   }
   return func_type;
 }

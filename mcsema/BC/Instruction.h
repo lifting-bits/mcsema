@@ -40,8 +40,7 @@ struct TranslationContext;
 
 class InstructionLifter : public remill::InstructionLifter {
  public:
-  InstructionLifter(llvm::IntegerType *word_type_,
-                    const remill::IntrinsicTable *intrinsics_,
+  InstructionLifter(const remill::IntrinsicTable *intrinsics_,
                     TranslationContext &ctx_);
 
   virtual ~InstructionLifter(void);

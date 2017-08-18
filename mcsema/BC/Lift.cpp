@@ -110,13 +110,17 @@ bool LiftCodeIntoModule(const NativeModule *cfg_module) {
   ExportFunction(cfg_module);
   ExportVariables(cfg_module);
   CallInitFiniCode(cfg_module);
+
   if (FLAGS_legacy_mode) {
     legacy::DowngradeModule();
   }
+
   OptimizeModule();
+
   if (FLAGS_legacy_mode) {
     legacy::PropagateInstAnnotations();
   }
+
   return true;
 }
 

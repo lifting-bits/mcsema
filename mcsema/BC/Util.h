@@ -27,6 +27,7 @@ namespace llvm {
 
 class BasicBlock;
 class ConstantInt;
+class IntegerType;
 class LLVMContext;
 class Module;
 
@@ -34,6 +35,7 @@ class Module;
 namespace mcsema {
 
 extern llvm::LLVMContext *gContext;
+extern llvm::IntegerType *gWordType;
 extern llvm::Module *gModule;
 
 // Return the type of a lifted function.

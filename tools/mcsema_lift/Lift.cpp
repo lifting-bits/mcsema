@@ -112,10 +112,6 @@ int main(int argc, char *argv[]) {
         << "Disabling --keep-memops in legacy mode.";
     FLAGS_keep_memops = false;
 
-    LOG_IF(WARNING, FLAGS_disable_optimizer)
-        << "Disabling --explicit-args in legacy mode.";
-    FLAGS_disable_optimizer = false;
-
     LOG_IF(WARNING, !FLAGS_explicit_args)
         << "Enabling --explicit-args in legacy mode.";
     FLAGS_explicit_args = true;

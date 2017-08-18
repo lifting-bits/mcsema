@@ -21,6 +21,7 @@
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
@@ -38,25 +39,6 @@
 namespace mcsema {
 namespace legacy {
 namespace {
-
-// Replace indirect control-flow intrinsics (call, jump) with calls to the
-// legacy detach call value function.
-static void RemoveControlFlowIntrinsic(const char *name) {
-  auto callers = remill::CallersOf(gModule->getFunction(name));
-  auto detach_call_val = GetLegacyLiftedToNativeExitPoint();
-  for (auto call_inst : callers) {
-    std::vector<llvm::Value *> args(3);
-    args[0] = call_inst->getArgOperand(0);
-    args[1] = call_inst->getArgOperand(1);
-    args[2] = call_inst->getArgOperand(2);
-
-    auto new_mem_ptr = llvm::CallInst::Create(
-        detach_call_val, args, "", call_inst);
-
-    call_inst->replaceAllUsesWith(new_mem_ptr);
-    call_inst->eraseFromParent();
-  }
-}
 
 // Remove the `fastcc` calling convention, and any tail calls.
 static void RemoveFastCall(void) {
@@ -83,29 +65,28 @@ static void RemoveFastCall(void) {
 }
 
 // Remove calls to error-related intrinsics.
-static void RemoveErrorIntrinsic(const char *name) {
-  auto callers = remill::CallersOf(gModule->getFunction(name));
-  for (auto call_inst : callers) {
-    call_inst->replaceAllUsesWith(
-        call_inst->getArgOperand(remill::kMemoryPointerArgNum));
-
-    auto block = call_inst->getParent();
-    auto term_inst = block->getTerminator();
-
-    term_inst->eraseFromParent();
-    call_inst->eraseFromParent();
-
-    new llvm::UnreachableInst(*gContext, block);
+static void ImplementErrorIntrinsic(const char *name) {
+  auto func = gModule->getFunction(name);
+  if (!func) {
+    return;
   }
+
+  auto void_type = llvm::Type::getVoidTy(*gContext);
+  auto abort_func = gModule->getOrInsertFunction(
+      "abort", llvm::FunctionType::get(void_type, false));
+
+  func->setLinkage(llvm::GlobalValue::InternalLinkage);
+
+  llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", func));
+  ir.CreateCall(abort_func);
+  ir.CreateRet(remill::NthArgument(func, remill::kMemoryPointerArgNum));
 }
 
 static const char * const kRealEIPAnnotation = "mcsema_real_eip";
 
 // Create the node for a `mcsema_real_eip` annotation.
 static llvm::MDNode *CreateInstAnnotation(llvm::Function *F, uint64_t addr) {
-  auto word_type = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
-  auto addr_val = llvm::ConstantInt::get(word_type, addr);
+  auto addr_val = llvm::ConstantInt::get(gWordType, addr);
 #if LLVM_VERSION_NUMBER >= LLVM_VERSION(3, 6)
   auto addr_md = llvm::ValueAsMetadata::get(addr_val);
   return llvm::MDNode::get(*gContext, addr_md);
@@ -134,14 +115,6 @@ static void AnnotateInst(llvm::Instruction *inst, llvm::MDNode *annot) {
 }
 
 }  // namespace
-
-void DowngradeModule(void) {
-  RemoveControlFlowIntrinsic("__remill_function_call");
-  RemoveControlFlowIntrinsic("__remill_jump");
-  RemoveErrorIntrinsic("__remill_error");
-  RemoveErrorIntrinsic("__remill_missing_block");
-  RemoveFastCall();
-}
 
 // Create a `mcsema_real_eip` annotation, and annotate every unannotated
 // instruction with this new annotation.
@@ -192,6 +165,12 @@ void PropagateInstAnnotations(void) {
       }
     }
   }
+}
+
+void DowngradeModule(void) {
+  ImplementErrorIntrinsic("__remill_error");
+  ImplementErrorIntrinsic("__remill_missing_block");
+  RemoveFastCall();
 }
 
 }  // namespace legacy

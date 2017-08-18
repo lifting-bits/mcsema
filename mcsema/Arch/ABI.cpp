@@ -87,26 +87,91 @@ static ValueKind KindOfValue(llvm::Type *type) {
 }
 
 static const char *StackPointerName(void) {
+  static const char *sp_name = nullptr;
+  if (sp_name) {
+    return sp_name;
+  }
+
   switch (gArch->arch_name) {
     case remill::kArchAArch64LittleEndian:
-      return "SP";
+      sp_name = "SP";
+      break;
 
     case remill::kArchX86:
     case remill::kArchX86_AVX:
     case remill::kArchX86_AVX512:
-      return "ESP";
+      sp_name = "ESP";
+      break;
 
     case remill::kArchAMD64:
     case remill::kArchAMD64_AVX:
     case remill::kArchAMD64_AVX512:
-      return "RSP";
-
+      sp_name = "RSP";
+      break;
     default:
       LOG(FATAL)
           << "Can't get stack pointer name for architecture: "
           << remill::GetArchName(gArch->arch_name);
       return nullptr;
   }
+
+  return sp_name;
+}
+
+static const char *ThreadPointerNameX86(void) {
+  switch (gArch->os_name) {
+    case remill::kOSLinux:
+      return "GS_BASE";
+    case remill::kOSWindows:
+      return "FS_BASE";
+    default:
+      return nullptr;
+  }
+}
+
+static const char *ThreadPointerNameAMD64(void) {
+  switch (gArch->os_name) {
+    case remill::kOSLinux:
+      return "FS_BASE";
+    case remill::kOSWindows:
+      return "GS_BASE";
+    default:
+      return nullptr;
+  }
+}
+
+static const char *ThreadPointerName(void) {
+  static const char *tp_name = nullptr;
+  if (tp_name) {
+    return tp_name;
+  }
+
+  switch (gArch->arch_name) {
+    case remill::kArchAArch64LittleEndian:
+      tp_name = "TPIDR_EL0";
+      break;
+
+    case remill::kArchX86:
+    case remill::kArchX86_AVX:
+    case remill::kArchX86_AVX512:
+      tp_name = ThreadPointerNameX86();
+      break;
+
+    case remill::kArchAMD64:
+    case remill::kArchAMD64_AVX:
+    case remill::kArchAMD64_AVX512:
+      tp_name = ThreadPointerNameAMD64();
+      break;
+
+    default:
+      break;
+  }
+
+  LOG_IF(ERROR, !tp_name)
+      << "Can't get thread pointer name for architecture "
+      << remill::GetArchName(gArch->arch_name) << " and OS "
+      << remill::GetOSName(gArch->os_name);
+  return tp_name;
 }
 
 static const ArgConstraint *ConstraintTable(llvm::CallingConv::ID cc) {
@@ -225,8 +290,8 @@ static const ArgConstraint *ConstraintTable(llvm::CallingConv::ID cc) {
     }
   }
 
-  LOG(ERROR)
-      << "Unknown ABI/calling convention.";
+  LOG(FATAL)
+      << "Unknown ABI/calling convention: " << cc;
   return &(kNoArgs[0]);
 }
 
@@ -267,8 +332,8 @@ static const char *IntReturnValVar(llvm::CallingConv::ID cc) {
     }
   }
 
-  LOG(ERROR)
-      << "Unknown ABI/calling convention.";
+  LOG(FATAL)
+      << "Unknown ABI/calling convention: " << cc;
   return nullptr;
 }
 
@@ -328,22 +393,13 @@ CallingConvention::CallingConvention(llvm::CallingConv::ID cc_)
       used_reg_bitmap(0),
       num_loaded_stack_bytes(DefaultUsedStackBytes(cc)),
       sp_name(StackPointerName()),
+      tp_name(ThreadPointerName()),
       reg_table(ConstraintTable(cc)) {}
 
-llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
-                                         llvm::Type *goal_type) {
-
-  auto addr_type = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
-  if (!goal_type) {
-    goal_type = addr_type;
-  }
-
-  llvm::IRBuilder<> ir(block);
-
-  // Scan through the register table. If we can match this argument request
-  // to a register then do so.
-  auto val_kind = KindOfValue(goal_type);
+// Scan through the register table. If we can match this argument request
+// to a register then do so.
+const char *CallingConvention::GetVarForNextArgument(llvm::Type *val_type) {
+  auto val_kind = KindOfValue(val_type);
   for (uint64_t i = 0; ; ++i) {
     const auto &reg_loc = reg_table[i];
     if (!reg_loc.var_name) {
@@ -353,23 +409,37 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
       auto mask = 1ULL << i;
       if (!(used_reg_bitmap & mask)) {
         used_reg_bitmap |= mask;
-        auto reg_ptr_ptr = remill::FindVarInFunction(block, reg_loc.var_name);
-        auto reg_ptr = ir.CreateLoad(reg_ptr_ptr);
-        return ir.CreateLoad(
-            ir.CreateBitCast(reg_ptr, llvm::PointerType::get(goal_type, 0)));
+        return reg_loc.var_name;
       }
     }
   }
+  return nullptr;
+}
+
+llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
+                                                 llvm::Type *goal_type) {
+  if (!goal_type) {
+    goal_type = gWordType;
+  }
+
+  llvm::IRBuilder<> ir(block);
+
+  if (auto reg_var_name = GetVarForNextArgument(goal_type)) {
+    auto reg_ptr_ptr = remill::FindVarInFunction(block, reg_var_name);
+    auto reg_ptr = ir.CreateLoad(reg_ptr_ptr);
+    return ir.CreateLoad(
+        ir.CreateBitCast(reg_ptr, llvm::PointerType::get(goal_type, 0)));
+  }
 
   // We can't match the argument request to a register, so lets look for it on
-  // the stack.
-  auto sp = ir.CreateLoad(ir.CreateLoad(
-      remill::FindVarInFunction(block, sp_name)));
-  CHECK(sp->getType() == addr_type);
+  // the stack. The supported calling conventions are sane, to the extent
+  // that they push arguments onto the stack in reverse order (i.e. last arg
+  // first).
+  auto sp = LoadStackPointer(block);
+  CHECK(sp->getType() == gWordType);
 
   auto addr_size = gArch->address_size / 8U;
-  auto offset = llvm::ConstantInt::get(
-      addr_type, num_loaded_stack_bytes);
+  auto offset = llvm::ConstantInt::get(gWordType, num_loaded_stack_bytes);
 
   auto addr = ir.CreateAdd(sp, offset);
   std::vector<llvm::Value *> args = {remill::LoadMemoryPointer(block), addr};
@@ -452,11 +522,9 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
   auto val_var = ReturnValVar(cc, val_type);
 
   // If it's a pointer then convert it to a pointer-sized integer.
-  auto addr_type = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
   if (val_type->isPointerTy()) {
-    ret_val = ir.CreatePtrToInt(ret_val, addr_type);
-    val_type = addr_type;
+    ret_val = ir.CreatePtrToInt(ret_val, gWordType);
+    val_type = gWordType;
   }
 
   // If it's an 80-bit float then convert it to a double.
@@ -474,7 +542,7 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
   if (val_type->isIntegerTy()) {
     auto size = dl.getTypeSizeInBits(val_type);
     if (size < gArch->address_size) {
-      val_type = addr_type;
+      val_type = gWordType;
       ret_val = ir.CreateZExt(ret_val, val_type);
     } else {
       CHECK(size <= gArch->address_size)
@@ -504,21 +572,141 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
   ir.CreateStore(ret_val, dest_loc);
 }
 
-llvm::Value *CallingConvention::StoreNextArgument(llvm::BasicBlock *,
-                                                  llvm::Value *) {
-  LOG(FATAL)
-      << "Unimplemented.";
-  return nullptr;
+void CallingConvention::StoreArguments(
+    llvm::BasicBlock *block, const std::vector<llvm::Value *> &arg_vals) {
+
+  auto memory_ref = remill::LoadMemoryPointerRef(block);
+
+  llvm::IRBuilder<> ir(block);
+  std::vector<llvm::Value *> stack_arg_vals;
+
+  // First try to put as many as possible into registers.
+  for (auto arg_val : arg_vals) {
+    auto arg_type = arg_val->getType();
+    if (auto reg_var_name = GetVarForNextArgument(arg_type)) {
+      auto reg_ptr_ptr = remill::FindVarInFunction(block, reg_var_name);
+      auto reg_ptr = ir.CreateLoad(reg_ptr_ptr);
+      ir.CreateStore(
+          arg_val,
+          ir.CreateBitCast(reg_ptr, llvm::PointerType::get(arg_type, 0)));
+    } else {
+      stack_arg_vals.push_back(arg_val);
+    }
+  }
+
+  // Now we have some left that need to be pushed onto the stack. We're going
+  // to push them onto the stack in reverse order.
+  CHECK(gArch->IsX86() || gArch->IsAMD64() || gArch->IsAArch64());
+  std::reverse(stack_arg_vals.begin(), stack_arg_vals.end());
+
+  auto addr_size = gArch->address_size / 8;
+  auto sp = LoadStackPointer(block);
+  llvm::Value *memory = ir.CreateLoad(memory_ref);
+
+  llvm::DataLayout dl(gModule);
+
+  std::vector<llvm::Value *> args(3, nullptr);
+
+  for (auto arg_val : stack_arg_vals) {
+    auto arg_type = arg_val->getType();
+    auto alloc_size = dl.getTypeAllocSize(arg_type);
+    llvm::Function *func = nullptr;
+
+    if (arg_type->isX86_FP80Ty()) {
+      func = gModule->getFunction("__remill_write_memory_f80");
+      arg_val = ir.CreateFPTrunc(arg_val, llvm::Type::getDoubleTy(*gContext));
+
+    } else if (arg_type->isDoubleTy()) {
+      func = gModule->getFunction("__remill_write_memory_f64");
+
+    } else if (arg_type->isFloatTy()) {
+      func = gModule->getFunction("__remill_write_memory_f32");
+
+    } else if (arg_type->isIntegerTy()) {
+      if (8 == alloc_size) {
+        func = gModule->getFunction("__remill_write_memory_64");
+
+      } else if (4 == alloc_size) {
+        func = gModule->getFunction("__remill_write_memory_32");
+
+      } else if (2 == alloc_size) {
+        func = gModule->getFunction("__remill_write_memory_16");
+
+      } else if (1 == alloc_size) {
+        func = gModule->getFunction("__remill_write_memory_8");
+      }
+
+      if (dl.getTypeSizeInBits(arg_type) <
+          dl.getTypeAllocSizeInBits(arg_type)) {
+        arg_type = llvm::Type::getIntNTy(
+            *gContext, static_cast<unsigned>(alloc_size * 8));
+        arg_val = ir.CreateZExt(arg_val, arg_type);
+      }
+
+    } else if (arg_type->isPointerTy()) {
+      llvm::Function *func = nullptr;
+      if (32 == gArch->address_size) {
+        func = gModule->getFunction("__remill_write_memory_32");
+      } else {
+        func = gModule->getFunction("__remill_write_memory_64");
+      }
+      arg_val = ir.CreatePtrToInt(arg_val, gWordType);
+    }
+
+    CHECK(func != nullptr)
+        << "Could not find remill memory write intrinsic to write a "
+        << alloc_size << "-byte value of type "
+        << remill::LLVMThingToString(arg_type) << " to the stack.";
+
+    // Store the argument to the stack memory.
+    args[0] = memory;
+    args[1] = sp;
+    args[2] = arg_val;
+    memory = ir.CreateCall(func, args);
+
+    // Bump the stack pointer.
+    alloc_size = std::max<uint64_t>(alloc_size, addr_size);
+    sp = ir.CreateSub(sp, llvm::ConstantInt::get(gWordType, alloc_size));
+  }
+
+  ir.CreateStore(memory, memory_ref);  // Update the memory pointer.
+
+  StoreStackPointer(block, sp);
+}
+
+void CallingConvention::AllocateReturnAddress(llvm::BasicBlock *block) {
+  if (gArch->IsAArch64()) {
+    return;  // Return address is passed through the link pointer.
+
+  // The stack grows down on x86/amd64.
+  } else if (gArch->IsX86() || gArch->IsAMD64()) {
+    llvm::IRBuilder<> ir(block);
+
+    auto addr_size = gArch->address_size / 8;
+
+    if (llvm::CallingConv::X86_64_Win64 == cc) {
+      CHECK(gArch->IsAMD64());
+      addr_size += 32;  // Shadow space.
+    }
+
+    auto addr_size_bytes = llvm::ConstantInt::get(gWordType, addr_size);
+    StoreStackPointer(
+        block, ir.CreateSub(LoadStackPointer(block), addr_size_bytes));
+
+  } else {
+    LOG(FATAL)
+        << "Cannot allocate space for return address for architecture "
+        << remill::GetArchName(gArch->arch_name) << " and calling convention "
+        << cc;
+  }
 }
 
 llvm::Value *CallingConvention::LoadReturnValue(llvm::BasicBlock *block,
                                                 llvm::Type *val_type) {
   llvm::IRBuilder<> ir(block);
 
-  auto addr_type = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
   if (!val_type) {
-    val_type = addr_type;
+    val_type = gWordType;
   }
 
   auto val_var = ReturnValVar(cc, val_type);
@@ -527,5 +715,18 @@ llvm::Value *CallingConvention::LoadReturnValue(llvm::BasicBlock *block,
       llvm::PointerType::get(val_type, 0)));
 }
 
+llvm::Value *CallingConvention::LoadStackPointer(llvm::BasicBlock *block) {
+  llvm::IRBuilder<> ir(block);
+  return ir.CreateLoad(ir.CreateLoad(
+      remill::FindVarInFunction(block, sp_name)));
+}
+
+void CallingConvention::StoreStackPointer(llvm::BasicBlock *block,
+                                          llvm::Value *new_val) {
+  llvm::IRBuilder<> ir(block);
+  ir.CreateStore(
+      new_val,
+      ir.CreateLoad(remill::FindVarInFunction(block, sp_name)));
+}
 
 }  // namespace mcsema

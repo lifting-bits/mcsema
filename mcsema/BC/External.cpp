@@ -41,16 +41,11 @@ namespace {
 // TODO(pag,car,artem): Handle floating point types eventually.
 static void DeclareExternal(
     const NativeExternalFunction *nf) {
-  auto addr_type = llvm::Type::getIntNTy(
-      *gContext, static_cast<unsigned>(gArch->address_size));
 
-  std::vector<llvm::Type *> tys;
-  for (auto i = 0U; i < nf->num_args; i++) {
-    tys.push_back(addr_type);
-  }
+  std::vector<llvm::Type *> tys(nf->num_args, gWordType);
 
   auto extfun = llvm::Function::Create(
-      llvm::FunctionType::get(addr_type, tys, false),
+      llvm::FunctionType::get(gWordType, tys, false),
       llvm::GlobalValue::ExternalLinkage,
       nf->name, gModule);
 

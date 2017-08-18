@@ -45,6 +45,8 @@ bool InitArch(const std::string &os, const std::string &arch) {
       << "Initializing for " << arch << " code on " << os;
 
   gArch = remill::GetTargetArch();
+  gWordType = llvm::Type::getIntNTy(
+      *gContext, static_cast<unsigned>(gArch->address_size));
   return true;
 }
 

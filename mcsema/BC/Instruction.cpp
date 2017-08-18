@@ -45,10 +45,9 @@ namespace mcsema {
 
 InstructionLifter::~InstructionLifter(void) {}
 
-InstructionLifter::InstructionLifter(llvm::IntegerType *word_type_,
-                                     const remill::IntrinsicTable *intrinsics_,
+InstructionLifter::InstructionLifter(const remill::IntrinsicTable *intrinsics_,
                                      TranslationContext &ctx_)
-      : remill::InstructionLifter(word_type_, intrinsics_),
+      : remill::InstructionLifter(gWordType, intrinsics_),
         ctx(ctx_),
         inst_ptr(nullptr),
         block(nullptr),
