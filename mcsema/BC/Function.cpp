@@ -118,7 +118,6 @@ static void InlineSubFuncCall(llvm::BasicBlock *block,
   auto call = llvm::CallInst::Create(
       sub, remill::LiftedFunctionArgs(block), "", block);
   call->setCallingConv(sub->getCallingConv());
-  call->setTailCall(false);
   auto mem_ptr = remill::LoadMemoryPointerRef(block);
   (void) new llvm::StoreInst(call, mem_ptr, block);
 }

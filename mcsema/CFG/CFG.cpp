@@ -753,11 +753,13 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
 
     // Verify the partitioning of this segment's data.
     ea = segment->ea;
+    unsigned entry_num = 0;
     for (const auto &entry : segment->entries) {
       CHECK(entry.first == ea)
           << "Invalid partitioning of segment " << segment->name
-          << "; entry ea " << std::hex << entry.first << " does not match "
-          << "up with expected entry ea " << std::hex << ea;
+          << "; entry #" << std::dec << entry_num << " EA address "
+          << std::hex << entry.first << " does not match "
+          << "up with expected entry EA " << std::hex << ea;
 
       CHECK(entry.second.ea == ea)
           << "Invalid partitioning of segment " << segment->name;
@@ -766,6 +768,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
           << "Invalid partitioning of segment " << segment->name;
 
       ea = entry.second.next_ea;
+      entry_num++;
     }
 
     CHECK(ea == (segment->ea + segment->size))

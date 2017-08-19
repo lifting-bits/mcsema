@@ -600,8 +600,7 @@ void CallInitFiniCode(const NativeModule *cfg_module) {
 
     if (insert_point) {
       llvm::IRBuilder<> ir(insert_point);
-      auto call = ir.CreateCall(callback);
-      call->setCallingConv(llvm::CallingConv::Fast);
+      ir.CreateCall(callback);
     }
   }
 }

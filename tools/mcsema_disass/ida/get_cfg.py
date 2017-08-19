@@ -837,49 +837,39 @@ def recover_segments(M, global_vars=[]):
   """Recover all non-external segments into the CFG module. This will also
   recover global variables, specified in terms of a list of
   `(name, begin_ea, end_ea)` tuples, as their own segments."""
-  seg_begin_eas = set()
-  seg_end_eas = set()
-
-  var_names = {}
 
   # Collect the segment bounds to lift.
+  seg_parts = collections.defaultdict(set)
   for seg_ea in idautils.Segments():
     if not is_external_segment_by_flags(seg_ea):
-      seg_begin_eas.add(seg_ea)
-      seg_end_eas.add(idc.SegEnd(seg_ea))
+      seg_parts[seg_ea].add(seg_ea)
+      seg_parts[seg_ea].add(idc.SegEnd(seg_ea))
 
   # Treat global variables as segment begin/end points.
   for var_name, begin_ea, end_ea in global_vars:
-    if is_external_segment_by_flags(begin_ea):
-      DEBUG("ERROR: Variable {} at {:x} is in an external segment.".format(
-          var_name, begin_ea))
+    if is_invalid_ea(begin_ea) or is_invalid_ea(end_ea):
+      DEBUG("ERROR: Variable {} at [{:x}, {:x}) is not valid.".format(
+          var_name, begin_ea, end_ea))
       continue
 
-    seg_begin_eas.add(begin_ea)
-    seg_end_eas.add(end_ea)
+    if is_external_segment_by_flags(begin_ea):
+      DEBUG("ERROR: Variable {} at [{:x}, {:x}) is in an external segment.".format(
+          var_name, begin_ea, end_ea))
+      continue
 
-    if end_ea < idc.SegEnd(begin_ea):
-      seg_begin_eas.add(end_ea)
-    
-    var_names[begin_ea] = var_name
+    seg_ea = idc.SegStart(begin_ea)
+    if not is_invalid_ea(seg_ea):
+      seg_parts[seg_ea].add(begin_ea)
 
-  seg_begin_eas = sorted(list(seg_begin_eas))
+      if end_ea <= idc.SegEnd(seg_ea):
+        seg_parts[seg_ea].add(end_ea)
 
-  # Recover each segment / segment part.
-  for seg_ea in seg_begin_eas:
-    seg_end_eas.discard(seg_ea)
-    seg_end_ea = min(seg_end_eas)
-    seg_end_eas.discard(seg_end_ea)
-
-    assert seg_end_ea > seg_ea
-    assert seg_ea >= idc.SegStart(seg_ea)
-    assert seg_end_ea <= idc.SegEnd(seg_ea)
-
+  for seg_ea, eas in seg_parts.items():
+    parts = list(sorted(list(eas)))
     seg_name = idc.SegName(seg_ea)
-    if seg_ea in var_names:
-      seg_name = "{}_{}".format(seg_name, var_names[seg_ea])
 
-    recover_segment(M, seg_name, seg_ea, seg_end_ea)
+    for begin_ea, end_ea in zip(parts[:-1], parts[1:]):
+      recover_segment(M, seg_name, begin_ea, end_ea)
 
 def recover_external_functions(M):
   """Recover the named external functions (e.g. `printf`) that are referenced
@@ -1085,7 +1075,8 @@ def recover_module(entrypoint):
     DEBUG("COULD NOT RECOVER ANY FUNCTIONS")
     return
 
-  recover_segments(M)
+  global_vars = []  # TODO(akshay): Pass in relevant info.
+  recover_segments(M, global_vars)
   recover_external_symbols(M)
 
   DEBUG("Recovered {0} functions.".format(recovered_fns))

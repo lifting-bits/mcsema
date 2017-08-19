@@ -644,7 +644,6 @@ void CallingConvention::StoreArguments(
       }
 
     } else if (arg_type->isPointerTy()) {
-      llvm::Function *func = nullptr;
       if (32 == gArch->address_size) {
         func = gModule->getFunction("__remill_write_memory_32");
       } else {

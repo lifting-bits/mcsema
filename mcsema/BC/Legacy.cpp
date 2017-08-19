@@ -40,30 +40,6 @@ namespace mcsema {
 namespace legacy {
 namespace {
 
-// Remove the `fastcc` calling convention, and any tail calls.
-static void RemoveFastCall(void) {
-  for (auto &func : *gModule) {
-    if (func.getCallingConv() == llvm::CallingConv::Fast) {
-      func.setCallingConv(llvm::CallingConv::C);
-    }
-
-    if (func.isDeclaration()) {
-      continue;
-    }
-
-    for (auto &block : func) {
-      for (auto &inst : block) {
-        if (auto call_inst = llvm::dyn_cast<llvm::CallInst>(&inst)) {
-          if (call_inst->getCallingConv() == llvm::CallingConv::Fast) {
-            call_inst->setCallingConv(llvm::CallingConv::C);
-          }
-          call_inst->setTailCall(false);
-        }
-      }
-    }
-  }
-}
-
 // Remove calls to error-related intrinsics.
 static void ImplementErrorIntrinsic(const char *name) {
   auto func = gModule->getFunction(name);
@@ -170,7 +146,6 @@ void PropagateInstAnnotations(void) {
 void DowngradeModule(void) {
   ImplementErrorIntrinsic("__remill_error");
   ImplementErrorIntrinsic("__remill_missing_block");
-  RemoveFastCall();
 }
 
 }  // namespace legacy

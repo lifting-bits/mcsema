@@ -72,7 +72,6 @@ static llvm::Function *GetAttachCallFunc(void) {
         callback_type, llvm::GlobalValue::ExternalLinkage,
         "__mcsema_attach_call", gModule);
     handler->addFnAttr(llvm::Attribute::NoInline);
-    handler->setCallingConv(llvm::CallingConv::Fast);
   }
   return handler;
 }
@@ -156,7 +155,6 @@ static llvm::Function *ImplementNativeToLiftedCallback(
   callback_func->addFnAttr(llvm::Attribute::Naked);
   callback_func->addFnAttr(llvm::Attribute::NoInline);
   callback_func->addFnAttr(llvm::Attribute::NoBuiltin);
-  callback_func->setCallingConv(llvm::CallingConv::Fast);
 
   // Create the inline assembly. We use memory operands (
   std::vector<llvm::Type *> asm_arg_types;
@@ -165,7 +163,8 @@ static llvm::Function *ImplementNativeToLiftedCallback(
   asm_arg_types.push_back(llvm::PointerType::get(attach_func->getType(), 0));
   auto asm_func_type = llvm::FunctionType::get(void_type, asm_arg_types, false);
   auto asm_func = llvm::InlineAsm::get(
-      asm_func_type, asm_str.str(), "*m,*m,~{dirflag},~{fpsr},~{flags}", true);
+      asm_func_type, asm_str.str(), "*m,*m,~{dirflag},~{fpsr},~{flags}",
+      true /* hasSideEffects */);
 
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", callback_func));
 
@@ -185,8 +184,7 @@ static llvm::Function *ImplementNativeToLiftedCallback(
 
   asm_args.push_back(attach_func_ptr);
 
-  auto asm_call = ir.CreateCall(asm_func, asm_args);
-  asm_call->setTailCall(true);
+  ir.CreateCall(asm_func, asm_args);
   ir.CreateRetVoid();
 
   if (FLAGS_legacy_mode) {
@@ -489,7 +487,6 @@ static void ImplementLiftedToNativeCallback(
 
   llvm::IRBuilder<> ir(block);
   auto handler_call = ir.CreateCall(DetachCallValueFunc(), args);
-  handler_call->setTailCall(true);
   ir.CreateRet(handler_call);
 }
 
@@ -581,8 +578,6 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func_) {
   callback_func = llvm::Function::Create(LiftedFunctionType(),
                                          llvm::GlobalValue::InternalLinkage,
                                          cfg_func->lifted_name, gModule);
-  callback_func->setCallingConv(llvm::CallingConv::Fast);
-
 
   // Pass through the memory and state pointers, and pass the destination
   // (native external function address) as the PC argument.
@@ -626,8 +621,6 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
                                          "__mcsema_detach_call_value", gModule);
 
   remill::CloneBlockFunctionInto(callback_func);
-
-  callback_func->setCallingConv(llvm::CallingConv::Fast);
 
   // Always inline so that static analyses of the bitcode don't need to dive
   // into an extra function just to see the intended call.
