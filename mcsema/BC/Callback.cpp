@@ -537,6 +537,8 @@ static void ImplementExplicitArgsExitPoint(
     call_args.push_back(loader.LoadNextArgument(block, param_type));
   }
 
+  loader.FreeReturnAddress(block);
+
   llvm::IRBuilder<> ir(block);
   loader.StoreReturnValue(block, ir.CreateCall(extern_func, call_args));
 

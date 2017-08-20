@@ -44,6 +44,7 @@ class CallingConvention {
                       const std::vector<llvm::Value *> &arg_vals);
 
   void AllocateReturnAddress(llvm::BasicBlock *block);
+  void FreeReturnAddress(llvm::BasicBlock *block);
 
   llvm::Value *LoadReturnValue(llvm::BasicBlock *block,
                                llvm::Type *goal_type=nullptr);

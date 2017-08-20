@@ -700,6 +700,26 @@ void CallingConvention::AllocateReturnAddress(llvm::BasicBlock *block) {
   }
 }
 
+void CallingConvention::FreeReturnAddress(llvm::BasicBlock *block) {
+  if (gArch->IsAArch64()) {
+    return;  // Return address is passed through the link pointer.
+
+  // The stack grows down on x86/amd64.
+  } else if (gArch->IsX86() || gArch->IsAMD64()) {
+    llvm::IRBuilder<> ir(block);
+    auto addr_size = gArch->address_size / 8;
+    auto addr_size_bytes = llvm::ConstantInt::get(gWordType, addr_size);
+    StoreStackPointer(
+        block, ir.CreateAdd(LoadStackPointer(block), addr_size_bytes));
+
+  } else {
+    LOG(FATAL)
+        << "Cannot allocate space for return address for architecture "
+        << remill::GetArchName(gArch->arch_name) << " and calling convention "
+        << cc;
+  }
+}
+
 llvm::Value *CallingConvention::LoadReturnValue(llvm::BasicBlock *block,
                                                 llvm::Type *val_type) {
   llvm::IRBuilder<> ir(block);
