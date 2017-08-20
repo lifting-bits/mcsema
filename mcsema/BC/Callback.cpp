@@ -34,6 +34,7 @@
 #include "remill/Arch/Name.h"
 #include "remill/BC/ABI.h"
 #include "remill/BC/Util.h"
+#include "remill/BC/Version.h"
 
 #include "mcsema/Arch/ABI.h"
 #include "mcsema/Arch/Arch.h"
@@ -207,9 +208,12 @@ static llvm::Constant *InitialStackPointerValue(void) {
   indexes[1] = llvm::ConstantInt::get(
       gWordType, stack_type->getNumElements() - 2);
 
+#if LLVM_VERSION_NUMBER <= LLVM_VERSION(3, 6)
+  auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(stack, indexes);
+#else
   auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(
       nullptr, stack, indexes);
-
+#endif
   return llvm::ConstantExpr::getPtrToInt(gep, gWordType);
 }
 

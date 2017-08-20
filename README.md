@@ -44,8 +44,8 @@ Why would anyone translate binaries *back* to bitcode?
 | [Google Log](https://github.com/google/glog) | Latest |
 | [Google Test](https://github.com/google/googletest) | Latest |
 | [Intel XED](https://github.com/intelxed/xed) | Latest |
-| [LLVM](http://llvm.org/) | 3.5+ |
-| [Clang](http://clang.llvm.org/) | 3.5+ (3.9 if using Visual Studio 2015) |
+| [LLVM](http://llvm.org/) | 3.6+ |
+| [Clang](http://clang.llvm.org/) | 3.6+ (3.9 if using Visual Studio 2015) |
 | [Python](https://www.python.org/) | 2.7 | 
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
@@ -112,8 +112,8 @@ This script accepts several additional command line options:
  - `--prefix PATH`: Install files to `PATH`. By default, `PATH` is `/usr/local`.
  - `--llvm-version MAJOR.MINOR`: Download pre-built dependencies for LLVM version MAJOR.MINOR. The default is to use LLVM 4.0.
  - `--build-dir PATH`: Produce all intermediate build files in `PATH`. By default, `PATH` is `$CWD/remill-build`.
- - `--use-system-compiler`: Compile Remill+McSema using the system compiler toolchain (typically the GCC). This is likely necessary if you're using older LLVM versions.
-
+ - `--use-system-compiler`: Compile Remill+McSema using the system compiler toolchain (typically the GCC). 
+ 
 #### Step 4: Install McSema
 
 The next step is to build the code.
