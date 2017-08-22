@@ -239,7 +239,7 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   } else if (xref->var) {
     xref_is_external = xref->var->is_external;
 
-  // `mcsema-disass` does not recover external segments (e.g. `.plt`), so
+  // `mcsema-disass` does not recover external segments (e.g. `extern`), so
   // a cross-reference that targets a NULL segment is, in practice, an
   // external reference.
   } else if (!xref->target_segment) {
@@ -247,6 +247,7 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
         << "Reference from " << std::hex << inst->ea
         << " to " << std::hex << xref->target_ea
         << " targets an unrecovered segment not resolved to a real symbol.";
+
     xref_is_external = true;
 
   } else {
@@ -254,10 +255,14 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
         << "Reference from " << std::hex << inst->ea
         << " to " << std::hex << xref->target_ea
         << " targets the segment " << xref->target_segment->name
-        << " but was not resolved to a real symbol.";
+        << " but was not resolved to a named symbol.";
     xref_is_external = xref->segment->is_external ||
                        xref->target_segment->is_external;
   }
+
+  CHECK(!xref_is_external || !xref->target_name.empty())
+      << "External reference from " << std::hex << inst->ea
+      << " to " << std::hex << xref->target_ea << " does not have a name!";
 
   // Does the CFG reference target type agree with the resolved code/data
   // nature of the xref?
@@ -289,27 +294,40 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
         << ") is actually external";
   }
 
-  // Only record flow cross-references for externals. Really, all we care
-  // about is short-circuiting calls through thunks into direct calls to
-  // externals. All other flow types should really be statically known.
-  if (cfg_ref.operand_type() == CodeReference_OperandType_ControlFlowOperand) {
-    if (!xref_is_external || !xref_is_code) {
-      return;
-    }
-  }
-
   switch (cfg_ref.operand_type()) {
     case CodeReference_OperandType_ImmediateOperand:
+      LOG_IF(ERROR, inst->imm != nullptr)
+          << "Overwriting existing immediate reference at instruction "
+          << std::hex << inst->ea;
       inst->imm = xref;
       break;
+
     case CodeReference_OperandType_MemoryOperand:
+      LOG_IF(ERROR, inst->mem != nullptr)
+          << "Overwriting existing absolute reference at instruction "
+          << std::hex << inst->ea;
       inst->mem = xref;
       break;
+
     case CodeReference_OperandType_MemoryDisplacementOperand:
+      LOG_IF(ERROR, inst->disp != nullptr)
+          << "Overwriting existing displacement reference at instruction "
+          << std::hex << inst->ea;
       inst->disp = xref;
       break;
+
     case CodeReference_OperandType_ControlFlowOperand:
+      LOG_IF(ERROR, inst->flow != nullptr)
+          << "Overwriting existing flow reference at instruction "
+          << std::hex << inst->ea;
       inst->flow = xref;
+      break;
+
+    case CodeReference_OperandType_OffsetTable:
+      LOG_IF(ERROR, inst->offset_table != nullptr)
+          << "Overwriting existing offset table reference at instruction "
+          << std::hex << inst->ea;
+      inst->offset_table = xref;
       break;
   }
 }
@@ -407,12 +425,15 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         delete ea_var_it->second;
       }
       module->ea_to_var[var->ea] = var;
+
+      LOG(INFO)
+          << "Found variable " << var->name << " at " << std::hex << var->ea;
     }
 
     module->segments[segment->ea] = segment;
 
     LOG(INFO)
-        << "Added segment " << segment->name << " [" << std::hex << segment->ea
+        << "Found segment " << segment->name << " [" << std::hex << segment->ea
         << ", " << std::hex << (segment->ea + segment->size) << ")";
   }
 
@@ -436,6 +457,9 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     }
 
     module->ea_to_func[func->ea] = func;
+
+    LOG(INFO)
+        << "Found function " << func->name << " at " << std::hex << func->ea;
 
     auto var_it = module->ea_to_var.find(func->ea);
     if (var_it != module->ea_to_var.end()) {
@@ -470,6 +494,10 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     var->is_weak = cfg_extern_var.is_weak();
     var->size = static_cast<uint64_t>(cfg_extern_var.size());
 
+    LOG(INFO)
+        << "Found external variable " << var->name << " at "
+        << std::hex << var->ea;
+
     CHECK(!var->name.empty())
         << "Unnamed external variable at " << std::hex << var->ea;
 
@@ -496,7 +524,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       }
     }
 
-    // Look for two variables with the sane address.
+    // Look for two variables with the same address.
     auto var_it = module->ea_to_var.find(var->ea);
     if (var_it != module->ea_to_var.end()) {
       auto dup_var = var_it->second;
@@ -531,6 +559,10 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     func->lifted_name = ExternalFuncName(cfg_extern_func);
     func->num_args = 0;
     func->cc = gArch->DefaultCallingConv();
+
+    LOG(INFO)
+        << "Found external function " << func->name << " at "
+        << std::hex << func->ea;
 
     if (cfg_extern_func.has_argument_count()) {
       func->num_args = static_cast<unsigned>(cfg_extern_func.argument_count());
@@ -804,7 +836,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         inst->flow = nullptr;
         inst->mem = nullptr;
         inst->disp = nullptr;
-        inst->offset_table = 0;
+        inst->offset_table = nullptr;
 
         for (const auto &cfg_ref : cfg_inst.xrefs()) {
           AddXref(module, inst, cfg_ref, pointer_size);

@@ -5326,6 +5326,10 @@ d2i_X509_SIG 3 C N
 d2i_X509_VAL 3 C N
 daemon 2 C N
 data_ahead 1 C N
+
+# fec_scheme_str is 224 on 32-bit.
+DATA: fec_scheme_str 448
+
 DATA: optind 4
 DATA: opterr 4
 DATA: optopt 4
@@ -5341,13 +5345,13 @@ DATA: apr_bucket_type_pool 64
 DATA: apr_bucket_type_socket 64
 DATA: apr_bucket_type_transient 64
 DATA: apr_current_hooking_module PTR
-DATA: apr_day_snames 32
+DATA: apr_day_snames 28
 DATA: apr_debug_module_hooks PTR
 DATA: apr_global_hook_pool PTR
 DATA: apr_hook_debug_current PTR
 DATA: apr_hook_debug_enabled 4
 DATA: apr_hook_global_pool PTR
-DATA: apr_month_snames 64
+DATA: apr_month_snames 48
 data_behind 1 C N
 # data definitions
 DATA: environ PTR

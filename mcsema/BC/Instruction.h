@@ -74,6 +74,10 @@ class InstructionLifter : public remill::InstructionLifter {
   llvm::Value *mem_ref;
   llvm::Value *disp_ref;
   llvm::Value *imm_ref;
+
+  bool mem_ref_used;
+  bool disp_ref_used;
+  bool imm_ref_used;
 };
 
 }  // namespace mcsema

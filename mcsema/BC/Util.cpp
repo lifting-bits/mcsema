@@ -47,4 +47,22 @@ llvm::FunctionType *LiftedFunctionType(void) {
   return func_type;
 }
 
+// Translate `ea` into an LLVM value that is an address that points into the
+// lifted segment associated with `seg`.
+llvm::Constant *LiftEA(const NativeSegment *cfg_seg, uint64_t ea) {
+  CHECK(cfg_seg != nullptr);
+  CHECK(cfg_seg->ea <= ea);
+  CHECK(ea < (cfg_seg->ea + cfg_seg->size));
+
+  auto seg = gModule->getGlobalVariable(cfg_seg->lifted_name, true);
+  CHECK(seg != nullptr)
+      << "Cannot find global variable for segment " << cfg_seg->name
+      << " when trying to lift EA " << std::hex << ea;
+
+  auto offset = ea - cfg_seg->ea;
+  return llvm::ConstantExpr::getAdd(
+      seg->getInitializer(),
+      llvm::ConstantInt::get(gWordType, offset));
+}
+
 }  // namespace mcsema

@@ -219,6 +219,8 @@ def is_external_segment_by_flags(ea):
     if seg_type == idc.SEG_XTRN:
       _EXTERNAL_SEGMENTS.add(seg_ea)
       return True
+    else:
+      return False
   except:
     return False
 

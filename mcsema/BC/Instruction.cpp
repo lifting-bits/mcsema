@@ -53,7 +53,10 @@ InstructionLifter::InstructionLifter(const remill::IntrinsicTable *intrinsics_,
         block(nullptr),
         mem_ref(nullptr),
         disp_ref(nullptr),
-        imm_ref(nullptr) {}
+        imm_ref(nullptr),
+        mem_ref_used(false),
+        disp_ref_used(false),
+        imm_ref_used(false) {}
 
 // Lift a single instruction into a basic block.
 bool InstructionLifter::LiftIntoBlock(
@@ -65,7 +68,25 @@ bool InstructionLifter::LiftIntoBlock(
   imm_ref = GetMaskedAddress(ctx.cfg_inst->imm);
   disp_ref = GetMaskedAddress(ctx.cfg_inst->disp);
 
-  return this->remill::InstructionLifter::LiftIntoBlock(inst, block);
+  mem_ref_used = false;
+  disp_ref_used = false;
+  imm_ref_used = false;
+
+  auto ret = this->remill::InstructionLifter::LiftIntoBlock(inst, block);
+
+  CHECK(!mem_ref || mem_ref_used)
+      << "Unused mem reference to " << std::hex << ctx.cfg_inst->ea
+      << " in instruction at " << std::hex << inst.pc;
+
+  CHECK(!imm_ref || imm_ref_used)
+      << "Unused imm reference to " << std::hex << ctx.cfg_inst->ea
+      << " in instruction at " << std::hex << inst.pc;
+
+  CHECK(!disp_ref || disp_ref_used)
+      << "Unused disp reference to " << std::hex << ctx.cfg_inst->ea
+      << " in instruction at " << std::hex << inst.pc;
+
+  return ret;
 }
 
 llvm::Value *InstructionLifter::GetMaskedAddress(const NativeXref *cfg_xref) {
@@ -162,16 +183,7 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
         << "A non-function, non-variable cross-reference from "
         << std::hex << inst_ptr->pc << " to " << std::hex << cfg_xref->target_ea
         << " must be in a known segment.";
-
-    auto seg = gModule->getGlobalVariable(cfg_seg->lifted_name, true);
-    CHECK(seg != nullptr)
-        << "Cannot find global variable for segment " << cfg_seg->name
-        << " referenced by " << std::hex << inst_ptr->pc;
-
-    auto offset = cfg_xref->target_ea - cfg_seg->ea;
-    return ir.CreateAdd(
-        seg->getInitializer(),
-        llvm::ConstantInt::get(word_type, offset));
+    return LiftEA(cfg_seg, cfg_xref->target_ea);
   }
 }
 
@@ -180,6 +192,8 @@ llvm::Value *InstructionLifter::LiftImmediateOperand(
     llvm::Type *arg_type, remill::Operand &op) {
 
   if (imm_ref) {
+    imm_ref_used = true;
+
     llvm::DataLayout data_layout(gModule);
     auto arg_size = data_layout.getTypeSizeInBits(arg_type);
 
@@ -217,8 +231,14 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
 
   if ((mem.base_reg.name.empty() && mem.index_reg.name.empty()) ||
       (mem.base_reg.name == "PC" && mem.index_reg.name.empty())) {
+
     if (mem_ref) {
+      mem_ref_used = true;
       return mem_ref;
+
+    } else if (disp_ref) {
+      disp_ref_used = true;
+      return disp_ref;
     }
 
   } else {
@@ -232,6 +252,7 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
     // displacement, calculate the address operand stuff, then add the address
     // of the external back in. E.g. `mov rax, [extern_jump_table + rdi]`.
     if (disp_ref) {
+      disp_ref_used = true;
       mem.displacement = 0;
       auto dynamic_addr = this->remill::InstructionLifter::LiftAddressOperand(
           inst, block, op);

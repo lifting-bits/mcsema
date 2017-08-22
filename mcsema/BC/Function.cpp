@@ -131,23 +131,22 @@ static llvm::Function *FindFunction(TranslationContext &ctx,
                                     uint64_t target_pc) {
   if (ctx.cfg_inst->flow) {
     auto cfg_func = ctx.cfg_inst->flow->func;
-    CHECK(cfg_func && cfg_func->is_external)
-        << "Broken invariant. Flow targets must be to external functions.";
-
-    return GetLiftedToNativeExitPoint(cfg_func);
-
-  } else if (auto func = GetLiftedFunction(ctx.cfg_module, target_pc)) {
-    return func;
-
-  } else {
-    LOG(ERROR)
-        << "Cannot find target of instruction at " << std::hex
-        << ctx.cfg_inst->ea << "; the static target "
-        << std::hex << target_pc << " is not associated with a lifted"
-        << " subroutine, and it does not have a known call target.";
-
-    return ctx.lifter->intrinsics->error;
+    if (cfg_func && cfg_func->is_external) {
+      return GetLiftedToNativeExitPoint(cfg_func);
+    }
   }
+
+  if (auto func = GetLiftedFunction(ctx.cfg_module, target_pc)) {
+    return func;
+  }
+
+  LOG(ERROR)
+      << "Cannot find target of instruction at " << std::hex
+      << ctx.cfg_inst->ea << "; the static target "
+      << std::hex << target_pc << " is not associated with a lifted"
+      << " subroutine, and it does not have a known call target.";
+
+  return ctx.lifter->intrinsics->error;
 }
 
 // Get the basic block within this function associated with a specific program
@@ -227,9 +226,26 @@ static void LiftIndirectJump(TranslationContext &ctx,
 
   remill::AddTerminatingTailCall(fallback_block, fallback);
 
-  // TODO(pag): Handle offset tables.
   auto num_blocks = static_cast<unsigned>(block_map.size());
   auto switch_index = remill::LoadProgramCounter(block);
+
+  if (ctx.cfg_inst->offset_table) {
+    LOG(INFO)
+        << "Indirect jump at " << std::hex << ctx.cfg_inst->ea
+        << " is a jump through an offset table with offset "
+        << std::hex << ctx.cfg_inst->offset_table->target_ea;
+
+    llvm::IRBuilder<> ir(block);
+    switch_index = ir.CreateAdd(
+        ir.CreateSub(switch_index,
+                     LiftEA(ctx.cfg_inst->offset_table->target_segment,
+                            ctx.cfg_inst->offset_table->target_ea)),
+        llvm::ConstantInt::get(
+            gWordType, ctx.cfg_inst->offset_table->target_ea));
+
+    remill::StoreProgramCounter(block, switch_index);
+  }
+
   auto switch_inst = llvm::SwitchInst::Create(
       switch_index, fallback_block, num_blocks, block);
 

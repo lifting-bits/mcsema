@@ -145,15 +145,6 @@ def get_true_external_name(fn):
       fn = fn[:fn.find(en)]
       break
 
-  # In some cases we'll have something like a reference to `stderr_ptr` in
-  # the `.got` section, and that will have a pointer that is the actual
-  # external `stderr`.
-  ea = idc.LocByName(orig_fn)
-  if is_ELF_got_pointer_to_external(ea):
-    name = get_symbol_name(get_reference_target(ea))
-    if name:
-      fn = undecorate_external_name(name)
-
   # DEBUG("True name of {} at {:x} is {}".format(orig_fn, ea, fn))
   _FIXED_EXTERNAL_NAMES[orig_fn] = fn
   return fn
@@ -197,14 +188,8 @@ def parse_os_defs_file(df):
       (marker, symname, dsize) = l.split()
       if 'PTR' in dsize:
         dsize = get_address_size_in_bytes()
-      EMAP_DATA[symname] = int(dsize)
 
-      # Sometimes there will be things like `__gmon_start___ptr` which
-      # is really a pointer to the implementation of `__gmon_start__`.
-      if is_linux:
-        ptr_name = "{}_ptr".format(symname)
-        if idc.LocByName(symname):
-          _FIXED_EXTERNAL_NAMES[ptr_name] = symname
+      EMAP_DATA[symname] = int(dsize)
 
     else:
       fname = args = conv = ret = sign = None
@@ -251,16 +236,14 @@ def parse_os_defs_file(df):
           WEAK_SYMS.add(fname)
           WEAK_SYMS.add(imp_name)
 
-        ptr_name = "{}_ptr".format(fname)
-        if idc.LocByName(ptr_name):
-          _FIXED_EXTERNAL_NAMES[ptr_name] = fname
+        # ptr_name = "{}_ptr".format(fname)
+        # if idc.LocByName(ptr_name):
+        #   _FIXED_EXTERNAL_NAMES[ptr_name] = fname
 
   df.close()
 
 def is_external_reference(ea):
   """Returns `True` if `ea` references external data."""
-
-  # TODO(pag): Use `is_ELF_got_pointer_to_external`?
   return is_external_segment(ea) \
     or ea in EXTERNAL_VARS_TO_RECOVER \
     or ea in EXTERNAL_FUNCS_TO_RECOVER
@@ -448,13 +431,13 @@ def reference_target_type(ref):
   references. We fall back onto our external maps as an oracle for
   what the type should really be. This has happened with `pcre_free`
   references from Apache."""
-  if is_external_reference(ref.ea):
-    if ref.ea in EXTERNAL_VARS_TO_RECOVER:
-      return CFG_pb2.CodeReference.DataTarget
-    elif ref.ea in EXTERNAL_FUNCS_TO_RECOVER:
-      return CFG_pb2.CodeReference.CodeTarget
+  if ref.ea in EXTERNAL_VARS_TO_RECOVER:
+    return CFG_pb2.CodeReference.DataTarget
 
-  if is_code(ref.ea):
+  elif ref.ea in EXTERNAL_FUNCS_TO_RECOVER:
+    return CFG_pb2.CodeReference.CodeTarget
+
+  elif is_code(ref.ea):
     return CFG_pb2.CodeReference.CodeTarget
   else:
     return CFG_pb2.CodeReference.DataTarget
@@ -464,7 +447,12 @@ def reference_operand_type(ref):
   return _REFERENCE_OPERAND_TYPE[ref.type]
 
 def reference_location(ref):
-  if is_external_reference(ref.ea):
+  if ref.ea in EXTERNAL_VARS_TO_RECOVER:
+    return CFG_pb2.CodeReference.External
+  elif ref.ea in EXTERNAL_FUNCS_TO_RECOVER:
+    return CFG_pb2.CodeReference.External
+  elif is_external_segment_by_flags(ref.ea):
+    DEBUG("WARNING: Reference to {:x} is in an external segment, but is not an external var or function".format(ref.ea))
     return CFG_pb2.CodeReference.External
   else:
     return CFG_pb2.CodeReference.Internal
@@ -604,6 +592,17 @@ def recover_instruction_references(I, inst, addr):
   DEBUG_POP()
   DEBUG(" ".join(debug_info))
 
+def recover_instruction_offset_table(I, table):
+  """Recovers an offset table as a kind of reference."""
+  R = I.xrefs.add()
+  R.ea = table.offset
+  R.operand_type = CFG_pb2.CodeReference.OffsetTable
+  R.target_type = CFG_pb2.CodeReference.DataTarget
+  R.location = CFG_pb2.CodeReference.Internal
+  name = get_symbol_name(table.offset, allow_dummy=False)
+  if name:
+    R.name = name.format('utf-8')
+
 def recover_instruction(M, B, ea):
   """Recover an instruction, adding it to its parent block in the CFG."""
   inst, inst_bytes = decode_instruction(ea)
@@ -617,9 +616,8 @@ def recover_instruction(M, B, ea):
     I.local_noreturn = True
 
   table = get_jump_table(inst, PIE_MODE)
-  if table:
-    I.jump_table_addr = table.table_ea
-    I.offset_base_addr = table.offset
+  if table and table.offset:
+    recover_instruction_offset_table(I, table)
 
 def recover_basic_block(M, F, block_ea):
   """Add in a basic block to a specific function in the CFG."""
@@ -735,7 +733,7 @@ def recover_segment_variables(M, S, seg_ea, seg_end_ea):
     if ea < seg_ea or ea >= seg_end_ea:
       continue
 
-    if is_external_reference(ea):
+    if is_external_segment_by_flags(ea) or ea in EXTERNAL_VARS_TO_RECOVER:
       continue
 
     # Only add named internal variables if they are referenced.   
@@ -816,7 +814,7 @@ def recover_segment(M, seg_name, seg_ea, seg_end_ea):
   S.ea = seg_ea
   S.data = read_bytes_slowly(seg_ea, seg_end_ea)
   S.read_only = (seg.perm & idaapi.SEGPERM_WRITE) == 0
-  S.is_external = is_external_segment(seg_ea)
+  S.is_external = is_external_segment_by_flags(seg_ea)
   S.name = seg_name.format('utf-8')
 
   # Don't look for fixups in the code segment. These are all handled as
@@ -960,7 +958,6 @@ def identify_thunks(func_eas):
 
 def identify_external_symbols():
   """Try to identify external functions and variables."""
-  # Go try to find external variables.
   global _FIXED_EXTERNAL_NAMES
 
   DEBUG("Looking for external symbols")
@@ -969,21 +966,56 @@ def identify_external_symbols():
     if try_identify_as_external_function(ea) or is_code(ea):
       continue
 
-    elif is_external_reference(ea) or is_runtime_external_data_reference(ea):
-      extern_name = get_true_external_name(name)
-      if extern_name in EMAP_DATA:
-        DEBUG("Variable at {:x} is the external {}".format(ea, extern_name))
-        idc.MakeName(ea, extern_name)  # Rename it.
-        EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
+    elif is_ELF_got_pointer(ea):
+      target_ea = get_reference_target(ea)
+      target_name = get_true_external_name(get_symbol_name(target_ea))
+      
+      # Detect missing references.
+      if is_external_segment(target_ea):
+        if target_name not in EMAP_DATA and target_name not in EMAP:
+          DEBUG("ERROR: Missing external reference information for {} referenced at {:x}".format(
+              target_name, ea))
+          raise Exception()
+        elif target_name in EMAP_DATA:
+          EXTERNAL_VARS_TO_RECOVER[target_ea] = target_name
+        elif target_name in EMAP:
+          EXTERNAL_FUNCS_TO_RECOVER[target_ea] = target_name
 
       # Corner case, there is an external reference in the `.got` section
       # into internal data. This was observed in one binary where
       # `fec_scheme_str_ptr` was an entry in the `.got`, but pointed into the
       # `.data` section.
-      elif is_ELF_got_pointer(ea):
-        target_ea = get_reference_target(ea)
-        if not is_external_segment(target_ea):
-          _FIXED_EXTERNAL_NAMES[name] = get_symbol_name(target_ea)  # Hack :-(
+      else:
+        DEBUG("External-looking reference from {} at {:x} to {} at {:x} is actually internal".format(
+            name, ea, target_name, target_ea))
+
+        if ea in EXTERNAL_VARS_TO_RECOVER:
+          del EXTERNAL_VARS_TO_RECOVER[ea]
+
+        if ea in EXTERNAL_FUNCS_TO_RECOVER:
+          del EXTERNAL_FUNCS_TO_RECOVER[ea]
+
+        if ea in _FIXED_EXTERNAL_NAMES:
+          del _FIXED_EXTERNAL_NAMES[ea]
+
+        if target_name in EMAP_DATA:
+          del EMAP_DATA[target_name]
+
+        if target_name in EMAP:
+          del EMAP[target_name]
+
+    elif is_external_segment_by_flags(ea) or is_runtime_external_data_reference(ea):
+      extern_name = get_true_external_name(name)
+
+      if extern_name in EMAP_DATA:
+        DEBUG("Variable at {:x} is the external {}".format(ea, extern_name))
+        idc.MakeName(ea, extern_name)  # Rename it.
+        EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
+
+      elif extern_name in EMAP:
+        DEBUG("Function at {:x} is the external {}".format(ea, extern_name))
+        idc.MakeName(ea, extern_name)  # Rename it.
+        EXTERNAL_FUNCS_TO_RECOVER[ea] = extern_name
 
       else:
         # IDA sometimes does this dumb thing where it will actually have a bunch
@@ -1006,6 +1038,7 @@ def identify_external_symbols():
         idc.MakeName(ea, extern_name)  # Rename it.
         EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
         _FIXED_EXTERNAL_NAMES[ea] = extern_name
+
   DEBUG_POP()
 
 def identify_program_entrypoints(func_eas):

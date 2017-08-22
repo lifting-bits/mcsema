@@ -50,9 +50,9 @@ struct NativeInstruction {
   const NativeXref *mem;
   const NativeXref *imm;
   const NativeXref *disp;
+  const NativeXref *offset_table;
 
   bool does_not_return;
-  uint64_t offset_table;
 };
 
 struct NativeBlock {

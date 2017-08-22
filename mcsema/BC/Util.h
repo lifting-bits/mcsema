@@ -26,6 +26,7 @@
 namespace llvm {
 
 class BasicBlock;
+class Constant;
 class ConstantInt;
 class IntegerType;
 class LLVMContext;
@@ -34,6 +35,8 @@ class Module;
 }  // namespace llvm
 namespace mcsema {
 
+struct NativeSegment;
+
 extern llvm::LLVMContext *gContext;
 extern llvm::IntegerType *gWordType;
 extern llvm::Module *gModule;
@@ -41,6 +44,9 @@ extern llvm::Module *gModule;
 // Return the type of a lifted function.
 llvm::FunctionType *LiftedFunctionType(void);
 
+// Translate `ea` into an LLVM value that is an address that points into the
+// lifted segment associated with `seg`.
+llvm::Constant *LiftEA(const NativeSegment *seg, uint64_t ea);
 
 }  // namespace mcsema
 

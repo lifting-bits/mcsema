@@ -28,6 +28,7 @@ message CodeReference {
     MemoryOperand = 1;  // Absolute and PC-relative accesses.
     MemoryDisplacementOperand = 2;
     ControlFlowOperand = 3;  // E.g. Function call target.
+    OffsetTable = 4;  // For a jump table.
   }
 
   enum Location {
@@ -49,8 +50,6 @@ message Instruction {
   required  bytes           bytes = 2;
   repeated  CodeReference   xrefs = 3;
   optional  bool            local_noreturn = 4;
-  optional  int64           jump_table_addr = 5;
-  optional  int64           offset_base_addr = 6;
 }
 
 // A basic block of instructions inside of a function.

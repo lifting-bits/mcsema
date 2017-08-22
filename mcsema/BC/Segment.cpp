@@ -354,10 +354,6 @@ static void LazyInitXRef(const NativeXref *xref,
   llvm::IRBuilder<> ir(block);
   ir.SetInsertPoint(&block->front());
 
-  auto extern_ptr_type = llvm::PointerType::get(extern_addr_type, 0);
-  auto xref_target = ir.CreateLoad(
-      ir.CreateBitCast(extern_ptr_var, extern_ptr_type));
-
   auto seg = xref->segment->seg_var;
   auto region = xref->segment->region_var;
   if (seg->isConstant() || region->isConstant()) {
@@ -369,11 +365,17 @@ static void LazyInitXRef(const NativeXref *xref,
     region->setConstant(false);
   }
 
+  auto target_addr = ir.CreatePtrToInt(extern_ptr_var, gWordType);
+  if (xref->width < gArch->address_size) {
+    target_addr = ir.CreateTrunc(target_addr, extern_addr_type);
+  }
+
   auto offset = xref->ea - xref->segment->ea;
   auto disp = llvm::ConstantInt::get(gWordType, offset, false);
   auto addr_of_xref = llvm::ConstantExpr::getAdd(seg->getInitializer(), disp);
-  auto ptr_to_xref = ir.CreateIntToPtr(addr_of_xref, extern_ptr_type);
-  ir.CreateStore(xref_target, ptr_to_xref);
+  auto ptr_to_xref = ir.CreateIntToPtr(
+      addr_of_xref, llvm::PointerType::get(extern_addr_type, 0));
+  ir.CreateStore(target_addr, ptr_to_xref);
 }
 
 // Fill in the contents of the data segment.
@@ -438,6 +440,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
         } else {
           val = GetNativeToLiftedCallback(cfg_func);
         }
+
         val = llvm::ConstantExpr::getPtrToInt(val, gWordType);
         CHECK(val != nullptr)
             << "Can't insert cross reference to function "
@@ -454,21 +457,13 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
 
         val = var->getInitializer();
         if (!val) {
-
-          // TODO(pag): This can come up in a few cases, and will eventually
-          //            need runtime support to handle. The gist of the issue
-          //            is this that we have a reference in the data section
-          //            to an external global variable, but we can't splat in
-          //            a value for the cross-reference because it won't
-          //            be known until runtime. This is the type of thing in
-          //            libc that gets handled by constructor functions.
-          LOG(WARNING)
-              << "Likely external data cross-reference from " << std::hex
-              << xref->ea << " to " << cfg_var->name << " at " << std::hex
-              << cfg_var->ea << " (lifted as " << cfg_var->lifted_name
-              << ") does not have an initializer.";
-
           val = llvm::ConstantInt::get(val_type, 0);
+
+          LOG(INFO)
+              << "Adding runtime initializer for cross reference to variable "
+              << cfg_var->name << " at " << std::hex << cfg_seg_entry.first
+              << " in segment " << cfg_seg->name;
+
           LazyInitXRef(xref, var, val_type);
         }
 
