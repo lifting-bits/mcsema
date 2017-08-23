@@ -43,7 +43,7 @@
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
 
-DECLARE_bool(legacy_mode);
+DECLARE_string(pc_annotation);
 
 DEFINE_bool(explicit_args, false,
             "Should arguments be explicitly passed to external functions. "
@@ -188,7 +188,7 @@ static llvm::Function *ImplementNativeToLiftedCallback(
   ir.CreateCall(asm_func, asm_args);
   ir.CreateRetVoid();
 
-  if (FLAGS_legacy_mode) {
+  if (!FLAGS_pc_annotation.empty()) {
     legacy::AnnotateInsts(callback_func, cfg_func->ea);
   }
 
@@ -450,7 +450,7 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   llvm::ReturnInst::Create(
       *gContext, loader.LoadReturnValue(block, pc_type), block);
 
-  if (FLAGS_legacy_mode) {
+  if (!FLAGS_pc_annotation.empty()) {
     legacy::AnnotateInsts(func, cfg_func->ea);
   }
 
@@ -606,7 +606,7 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func_) {
     ImplementLiftedToNativeCallback(callback_func, extern_func, cfg_func);
   }
 
-  if (FLAGS_legacy_mode) {
+  if (!FLAGS_pc_annotation.empty()) {
     legacy::AnnotateInsts(callback_func, cfg_func->ea);
   }
   return callback_func;

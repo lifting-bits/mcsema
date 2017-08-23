@@ -58,6 +58,7 @@
 #include "mcsema/CFG/CFG.h"
 
 DECLARE_bool(legacy_mode);
+DECLARE_string(pc_annotation);
 
 namespace mcsema {
 namespace {
@@ -117,7 +118,7 @@ bool LiftCodeIntoModule(const NativeModule *cfg_module) {
 
   OptimizeModule();
 
-  if (FLAGS_legacy_mode) {
+  if (!FLAGS_pc_annotation.empty()) {
     legacy::PropagateInstAnnotations();
   }
 

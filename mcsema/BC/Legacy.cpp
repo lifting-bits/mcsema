@@ -36,6 +36,11 @@
 #include "mcsema/BC/Legacy.h"
 #include "mcsema/BC/Util.h"
 
+DEFINE_string(pc_annotation, "",
+              "Name of the metadata to apply to every LLVM instruction. The "
+              "metadata includes the approximate program counter of the "
+              "original instruction that produced the lifted bitcode.");
+
 namespace mcsema {
 namespace legacy {
 namespace {
@@ -58,8 +63,6 @@ static void ImplementErrorIntrinsic(const char *name) {
   ir.CreateRet(remill::NthArgument(func, remill::kMemoryPointerArgNum));
 }
 
-static const char * const kRealEIPAnnotation = "mcsema_real_eip";
-
 // Create the node for a `mcsema_real_eip` annotation.
 static llvm::MDNode *CreateInstAnnotation(llvm::Function *F, uint64_t addr) {
   auto addr_val = llvm::ConstantInt::get(gWordType, addr);
@@ -76,7 +79,7 @@ static unsigned AnnotationID(void) {
   static unsigned id = 0;
   if (!has_id) {
     has_id = true;
-    id = gContext->getMDKindID(kRealEIPAnnotation);
+    id = gContext->getMDKindID(FLAGS_pc_annotation);
   }
   return id;
 }

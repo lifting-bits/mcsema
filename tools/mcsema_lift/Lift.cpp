@@ -57,6 +57,7 @@ DECLARE_bool(version);
 DECLARE_bool(disable_optimizer);
 DECLARE_bool(keep_memops);
 DECLARE_bool(explicit_args);
+DECLARE_string(pc_annotation);
 
 DEFINE_bool(legacy_mode, false,
             "Try to make the output bitcode resemble the original McSema.");
@@ -109,12 +110,20 @@ int main(int argc, char *argv[]) {
 
   if (FLAGS_legacy_mode) {
     LOG_IF(WARNING, FLAGS_keep_memops)
-        << "Disabling --keep-memops in legacy mode.";
+        << "Disabling --keep_memops in legacy mode.";
     FLAGS_keep_memops = false;
 
     LOG_IF(WARNING, !FLAGS_explicit_args)
-        << "Enabling --explicit-args in legacy mode.";
+        << "Enabling --explicit_args in legacy mode.";
     FLAGS_explicit_args = true;
+
+    LOG_IF(WARNING, !FLAGS_pc_annotation.empty())
+        << "Changing --pc_annotation to mcsema_real_eip in legacy mode.";
+    FLAGS_pc_annotation = "mcsema_real_eip";
+
+    LOG_IF(WARNING, FLAGS_disable_optimizer)
+        << "Re-enabling the optimizer in legacy mode.";
+    FLAGS_disable_optimizer = false;
   }
 
   auto cfg_module = mcsema::ReadProtoBuf(
