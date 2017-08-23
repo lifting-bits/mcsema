@@ -726,7 +726,7 @@ def find_default_function_heads():
 
   return func_heads
 
-def recover_segment_variables(M, S, seg_ea, seg_end_ea):
+def recover_region_variables(M, S, seg_ea, seg_end_ea, exported_vars):
   """Look for named locations pointing into the data of this segment, and
   add them to the protobuf."""
   for ea, name in idautils.Names():
@@ -736,14 +736,14 @@ def recover_segment_variables(M, S, seg_ea, seg_end_ea):
     if is_external_segment_by_flags(ea) or ea in EXTERNAL_VARS_TO_RECOVER:
       continue
 
-    # Only add named internal variables if they are referenced.   
-    if is_referenced(ea):
+    # Only add named internal variables if they are referenced or exported. 
+    if is_referenced(ea) or ea in exported_vars:
       DEBUG("Variable {} at {:x}".format(name, ea))
       V = S.vars.add()
       V.ea = ea
       V.name = name.format('utf-8')
 
-def recover_segment_cross_references(M, S, seg_ea, seg_end_ea):
+def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
   """Goes through the segment and identifies fixups that need to be
   handled by the LLVM side of things."""
 
@@ -800,13 +800,16 @@ def recover_segment_cross_references(M, S, seg_ea, seg_end_ea):
       DEBUG("{}-byte reference at {:x} to {:x} ({}), next_ea={:x}".format(
           X.width, ea, target_ea, X.target_name, next_ea))
 
-def recover_segment(M, seg_name, seg_ea, seg_end_ea):
+def recover_region(M, seg_name, seg_ea, seg_end_ea, exported_vars):
   """Recover the data and cross-references from a segment. The data of a
   segment is stored verbatim within the protobuf, and accompanied by a
   series of variable and cross-reference entries."""
 
-  DEBUG("Recovering segment {} [{:x}, {:x})".format(
-      seg_name, seg_ea, seg_end_ea))
+  real_seg_name = idc.SegName(seg_ea)
+
+  DEBUG("Recovering {} in segment {} [{:x}, {:x})".format(
+      seg_name, real_seg_name, seg_ea, seg_end_ea))
+
   seg_size = seg_end_ea - seg_ea
   seg = idaapi.getseg(seg_ea)
 
@@ -815,7 +818,11 @@ def recover_segment(M, seg_name, seg_ea, seg_end_ea):
   S.data = read_bytes_slowly(seg_ea, seg_end_ea)
   S.read_only = (seg.perm & idaapi.SEGPERM_WRITE) == 0
   S.is_external = is_external_segment_by_flags(seg_ea)
-  S.name = seg_name.format('utf-8')
+  S.name = real_seg_name.format('utf-8')
+  S.is_exported = seg_ea in exported_vars
+
+  if seg_name != real_seg_name:
+    S.variable_name = seg_name.format('utf-8')
 
   # Don't look for fixups in the code segment. These are all handled as
   # `CodeReference`s and stored in the `Instruction`s themselves. We also
@@ -827,23 +834,26 @@ def recover_segment(M, seg_name, seg_ea, seg_end_ea):
     return  # Don't process xrefs or variables.
 
   DEBUG_PUSH()
-  recover_segment_cross_references(M, S, seg_ea, seg_end_ea)
-  recover_segment_variables(M, S, seg_ea, seg_end_ea)
+  recover_region_cross_references(M, S, seg_ea, seg_end_ea)
+  recover_region_variables(M, S, seg_ea, seg_end_ea, exported_vars)
   DEBUG_POP()
 
-def recover_segments(M, global_vars=[]):
+def recover_regions(M, exported_vars, global_vars=[]):
   """Recover all non-external segments into the CFG module. This will also
   recover global variables, specified in terms of a list of
   `(name, begin_ea, end_ea)` tuples, as their own segments."""
 
+  seg_names = {}
+
   # Collect the segment bounds to lift.
   seg_parts = collections.defaultdict(set)
   for seg_ea in idautils.Segments():
+    seg_names[seg_ea] = idc.SegName(seg_ea)
     if not is_external_segment_by_flags(seg_ea):
       seg_parts[seg_ea].add(seg_ea)
       seg_parts[seg_ea].add(idc.SegEnd(seg_ea))
 
-  # Treat global variables as segment begin/end points.
+  # Treat analysis-identified global variables as segment begin/end points.
   for var_name, begin_ea, end_ea in global_vars:
     if is_invalid_ea(begin_ea) or is_invalid_ea(end_ea):
       DEBUG("ERROR: Variable {} at [{:x}, {:x}) is not valid.".format(
@@ -856,18 +866,35 @@ def recover_segments(M, global_vars=[]):
       continue
 
     seg_ea = idc.SegStart(begin_ea)
-    if not is_invalid_ea(seg_ea):
-      seg_parts[seg_ea].add(begin_ea)
+    seg_name = idc.SegName(seg_ea)
 
-      if end_ea <= idc.SegEnd(seg_ea):
-        seg_parts[seg_ea].add(end_ea)
+    DEBUG("Splitting segment {} from {:x} to {:x} for global variable {}".format(
+        seg_name, begin_ea, end_ea, var_name))
+
+    seg_parts[seg_ea].add(begin_ea)
+    seg_names[begin_ea] = var_name
+
+    if end_ea <= idc.SegEnd(seg_ea):
+      seg_parts[seg_ea].add(end_ea)
+
+  # Treat exported variables as segment begin/end points.
+  for var_ea in exported_vars:
+    seg_ea = idc.SegStart(var_ea)
+    seg_name = idc.SegName(seg_ea)
+    var_name = get_symbol_name(var_ea)
+    seg_parts[seg_ea].add(var_ea)
+    seg_names[var_ea] = var_name
+    DEBUG("Splitting segment {} at {:x} for exported variable {}".format(
+        seg_name, var_ea, var_name))
 
   for seg_ea, eas in seg_parts.items():
     parts = list(sorted(list(eas)))
     seg_name = idc.SegName(seg_ea)
-
     for begin_ea, end_ea in zip(parts[:-1], parts[1:]):
-      recover_segment(M, seg_name, begin_ea, end_ea)
+      region_name = seg_name
+      if begin_ea in seg_names:
+        region_name = seg_names[begin_ea]
+      recover_region(M, region_name, begin_ea, end_ea, exported_vars)
 
 def recover_external_functions(M):
   """Recover the named external functions (e.g. `printf`) that are referenced
@@ -1046,16 +1073,26 @@ def identify_program_entrypoints(func_eas):
   externally visible function."""
   DEBUG("Looking for entrypoints")
   DEBUG_PUSH()
-  entrypoints = set()
+
+  exclude = set(["_start", "__libc_csu_fini", "__libc_csu_init", "main",
+                 "__data_start", "__dso_handle", "_IO_stdin_used"])
+
+  exported_funcs = set()
+  exported_vars = set()
+
   for index, ordinal, ea, name in idautils.Entries():
     assert ea != idc.BADADDR
-    if not is_internal_code(ea) or is_external_reference(ea):
-      DEBUG("Export {} at {:x} does not point to code; skipping".format(name, ea))
-      continue
-    func_eas.add(ea)
-    entrypoints.add(ea)
+    if not is_external_segment(ea):
+      if is_code(ea):
+        func_eas.add(ea)
+        if name not in exclude:
+          exported_funcs.add(ea)
+      else:
+        if name not in exclude and not is_runtime_external_data_reference(ea):
+          exported_vars.add(ea)
+
   DEBUG_POP()
-  return entrypoints
+  return exported_funcs, exported_vars
 
 def recover_module(entrypoint):
   global EMAP
@@ -1074,13 +1111,12 @@ def recover_module(entrypoint):
   identify_thunks(func_eas)
   identify_external_symbols()
   
-  #entrypoints = identify_program_entrypoints(func_eas)
-  entrypoints = set()  # TODO(pag): Re-enable this?????
+  exported_funcs, exported_vars = identify_program_entrypoints(func_eas)
   entry_ea = idc.LocByName(args.entrypoint)
   if is_invalid_ea(entry_ea):
     DEBUG("ERROR: Could not find entrypoint {}".format(args.entrypoint))
   else:
-    entrypoints.add(entry_ea)
+    exported_funcs.add(entry_ea)
 
   # Process and recover functions. 
   while len(func_eas) > 0:
@@ -1101,7 +1137,7 @@ def recover_module(entrypoint):
     if is_external_segment_by_flags(func_ea):
       continue
 
-    recover_function(M, func_ea, func_eas, entrypoints)
+    recover_function(M, func_ea, func_eas, exported_funcs)
     recovered_fns += 1
 
   if recovered_fns == 0:
@@ -1109,7 +1145,7 @@ def recover_module(entrypoint):
     return
 
   global_vars = []  # TODO(akshay): Pass in relevant info.
-  recover_segments(M, global_vars)
+  recover_regions(M, exported_vars, global_vars)
   recover_external_symbols(M)
 
   DEBUG("Recovered {0} functions.".format(recovered_fns))

@@ -56,14 +56,6 @@ DEFINE_string(libc_destructor, "",
               "function returns. For example, on GNU-based systems, this is "
               "typically `__libc_csu_fini`.");
 
-DEFINE_bool(partition_segments, false,
-            "Partition segments into separate variables, even if they are "
-            "contiguous in the binary. By default this is disabled and "
-            "the data of contiguous segments are concatenated together into a "
-            "global variable. This is the default just in case some code uses "
-            "the address of the beginning of one segment to represent the "
-            "logical end of a prior segment.");
-
 namespace mcsema {
 namespace {
 
@@ -136,77 +128,21 @@ static llvm::StructType *GetSegmentType(const NativeSegment *cfg_seg) {
 }
 
 // Declare a data segment, and return a global value pointing to that segment.
-static llvm::GlobalVariable *DeclareRegion(const SegmentMap &segments) {
-  std::vector<llvm::Type *> seg_types;
-
-  uint64_t min_ea = std::numeric_limits<uint64_t>::max();
-  uint64_t max_ea = 0;
-  auto is_read_only = true;
-
-  for (const auto &entry : segments) {
-    auto cfg_seg = entry.second;
-    auto type = GetSegmentType(cfg_seg);
-    seg_types.push_back(type);
-
-    auto seg_end_ea = cfg_seg->ea + cfg_seg->size;
-    min_ea = std::min(min_ea, cfg_seg->ea);
-    max_ea = std::max(max_ea, seg_end_ea);
-    is_read_only = is_read_only && cfg_seg->is_read_only;
-  }
-
-  // If a region contains both read-write and read-only segments, then we're
-  // going to have to convert the read-only segment into read-write.
-  //
-  // TODO(pag): What happens if a thread-local and non-thread-local segment
-  //            appear in the same region?
-  for (const auto &entry : segments) {
-    auto cfg_seg = entry.second;
-    auto seg_end_ea = cfg_seg->ea + cfg_seg->size;
-    LOG_IF(ERROR, cfg_seg->is_read_only && !is_read_only)
-        << "Adding read-only segment " << cfg_seg->name << " at ["
-        << std::hex << cfg_seg->ea << ", " << std::hex << seg_end_ea
-        << ") into non-read-only segment region [" << std::hex << min_ea
-        << ", " << std::hex << max_ea << ")";
-  }
-
-  std::stringstream ss;
-  ss << "region_" << std::hex << min_ea << "_" << std::hex << max_ea;
-  auto region_name = ss.str();
-  ss << "_type";
-
-  auto region_type = llvm::StructType::create(seg_types, ss.str(), true);
-
-  CHECK(nullptr != region_type)
-      << "Unable to create structure type for segment region ["
-      << std::hex << min_ea << ", " << std::hex << max_ea << ")";
-
-  // Declare the region as a large structure.
-  auto region = new llvm::GlobalVariable(
-      *gModule, region_type, is_read_only,
+static llvm::GlobalVariable *DeclareSegment(const NativeSegment *cfg_seg) {
+  auto seg_type = GetSegmentType(cfg_seg);
+  auto seg = new llvm::GlobalVariable(
+      *gModule, seg_type, cfg_seg->is_read_only,
       llvm::GlobalValue::InternalLinkage, nullptr,
-      region_name);
-  region->setAlignment(16);
+      cfg_seg->lifted_name);
 
-  // Go and declare the individual segments as variables, whose values are
-  // addresses into the region.
-  for (const auto &entry : segments) {
-    auto cfg_seg = entry.second;
-    auto offset = cfg_seg->ea - min_ea;
-
-    std::vector<llvm::Constant *> index_list;
-    index_list.push_back(llvm::ConstantInt::get(gWordType, offset));
-
-    auto ptr = llvm::ConstantExpr::getAdd(
-        llvm::ConstantExpr::getPtrToInt(region, gWordType),
-        llvm::ConstantInt::get(gWordType, offset));
-
-    cfg_seg->region_var = region;
-    cfg_seg->seg_var = new llvm::GlobalVariable(
-        *gModule, gWordType, true  /* isConstant */,
-        llvm::GlobalVariable::InternalLinkage,
-        ptr, cfg_seg->lifted_name);
+  if (cfg_seg->is_exported) {
+    seg->setLinkage(llvm::GlobalValue::ExternalLinkage);
+    seg->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
   }
-  return region;
+
+  cfg_seg->seg_var = seg;
+
+  return seg;
 }
 
 // Declare named variables that point into the data segment. The program being
@@ -234,20 +170,10 @@ static void DeclareVariables(const NativeModule *cfg_module) {
         << "Variable " << cfg_var->name << " at " << std::hex << cfg_var->ea
         << " is incorrectly assigned to the segment " << cfg_seg->name;
 
-    auto seg = gModule->getGlobalVariable(cfg_seg->lifted_name, true);
-    CHECK(seg != nullptr)
-        << "Cannot find segment variable " << cfg_seg->lifted_name
-        << " for segment " << cfg_seg->name;
-
-    auto offset = cfg_var->ea - cfg_seg->ea;
-    auto ptr = llvm::ConstantExpr::getAdd(
-        seg->getInitializer(),
-        llvm::ConstantInt::get(gWordType, offset));
-
     (void) new llvm::GlobalVariable(
         *gModule, gWordType, true  /* isConstant */,
         llvm::GlobalVariable::InternalLinkage,
-        ptr, cfg_var->lifted_name);
+        LiftEA(cfg_seg, cfg_var->ea), cfg_var->lifted_name);
   }
 }
 
@@ -355,14 +281,12 @@ static void LazyInitXRef(const NativeXref *xref,
   ir.SetInsertPoint(&block->front());
 
   auto seg = xref->segment->seg_var;
-  auto region = xref->segment->region_var;
-  if (seg->isConstant() || region->isConstant()) {
+  if (seg->isConstant()) {
     LOG(ERROR)
-        << "Marking " << region->getName().str() << " as non-constant to "
+        << "Marking " << seg->getName().str() << " as non-constant to "
         << "support lazy initialization of reference to " << xref->target_name
         << " from " << std::hex << xref->ea;
     seg->setConstant(false);
-    region->setConstant(false);
   }
 
   auto target_addr = ir.CreatePtrToInt(extern_ptr_var, gWordType);
@@ -370,11 +294,10 @@ static void LazyInitXRef(const NativeXref *xref,
     target_addr = ir.CreateTrunc(target_addr, extern_addr_type);
   }
 
-  auto offset = xref->ea - xref->segment->ea;
-  auto disp = llvm::ConstantInt::get(gWordType, offset, false);
-  auto addr_of_xref = llvm::ConstantExpr::getAdd(seg->getInitializer(), disp);
+  auto addr_of_xref = LiftEA(xref->segment, xref->ea);
   auto ptr_to_xref = ir.CreateIntToPtr(
       addr_of_xref, llvm::PointerType::get(extern_addr_type, 0));
+
   ir.CreateStore(target_addr, ptr_to_xref);
 }
 
@@ -469,11 +392,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
 
       // Pointer to an unnamed location inside of a data segment.
       } else {
-        auto seg = gModule->getGlobalVariable(
-            xref->target_segment->lifted_name, true);
-        auto offset = xref->target_ea - xref->target_segment->ea;
-        auto disp = llvm::ConstantInt::get(gWordType, offset, false);
-        val = llvm::ConstantExpr::getAdd(seg->getInitializer(), disp);
+        val = LiftEA(xref->target_segment, xref->target_ea);
       }
 
       // Scale and add the value in. We need to fit it to its original width.
@@ -497,78 +416,26 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
 }
 
 // Fill all the data segments in a given region.
-static void FillRegion(llvm::GlobalVariable *global, const SegmentMap &region) {
-  std::vector<llvm::Constant *> entry_vals;
-  auto region_type = llvm::dyn_cast<llvm::StructType>(
-      remill::GetValueType(global));
-
-  unsigned i = 0;
-  for (const auto &entry : region) {
-    auto cfg_seg = entry.second;
-    entry_vals.push_back(FillDataSegment(
-        cfg_seg,
-        llvm::dyn_cast<llvm::StructType>(region_type->getContainedType(i++))));
-  }
-
-  global->setInitializer(llvm::ConstantStruct::get(region_type, entry_vals));
-}
-
-using Region = std::vector<SegmentMap>;
-
-// We need to group together contiguous segments. It's sometimes the
-// case that code will reference the address immediately following a segment
-// as a way of bounding the segment using a less-than comparison. This ending
-// address can be the beginning of another segment, so we need to actually
-// make sure that we maintain the correct addresses.
-//
-// TODO(pag): This is very conservative. Can we make it less so by checking to
-//            see if there's a reference to the first byte of a segment that
-//            immediately follows another one, and if there's no such reference
-//            then treat them as part of different regions?
-//
-// TODO(pag): Read-only and read-write segments being in the same region.
-//
-// TODO(pag): Thread-local and global segments being in the same region.
-//
-// TODO(pag): Perhaps in the above cases, we can permit references to actually
-//            reference just beyond the end of a segment.
-static Region PartitionSegments(const NativeModule *cfg_module) {
-  Region groups;
-  groups.reserve(cfg_module->segments.size());
-
-  NativeSegment *last_seg = nullptr;
-  for (auto cfg_segment_entry : cfg_module->segments) {
-    auto cfg_seg = cfg_segment_entry.second;
-    if (!FLAGS_partition_segments &&
-        last_seg && (last_seg->ea + last_seg->size) == cfg_seg->ea) {
-      auto &prev_group = groups[groups.size() - 1];
-      prev_group[cfg_seg->ea] = cfg_seg;
-    } else {
-      SegmentMap new_group;
-      new_group[cfg_seg->ea] = cfg_seg;
-      groups.push_back(new_group);
-    }
-    last_seg = cfg_seg;
-  }
-  return groups;
+static void FillSegment(llvm::GlobalVariable *seg,
+                        const NativeSegment *cfg_seg) {
+  auto seg_type = llvm::dyn_cast<llvm::StructType>(remill::GetValueType(seg));
+  seg->setInitializer(FillDataSegment(cfg_seg, seg_type));
 }
 
 }  // namespace
 
 void AddDataSegments(const NativeModule *cfg_module) {
 
-  auto regions = PartitionSegments(cfg_module);
-  std::vector<llvm::GlobalVariable *> region_vars;
-
-  for (const auto &region : regions) {
-    region_vars.push_back(DeclareRegion(region));
+  std::vector<llvm::GlobalVariable *> seg_vars;
+  for (auto cfg_seg_entry : cfg_module->segments) {
+    seg_vars.push_back(DeclareSegment(cfg_seg_entry.second));
   }
 
   DeclareVariables(cfg_module);
 
   unsigned i = 0;
-  for (const auto &region : regions) {
-    FillRegion(region_vars[i++], region);
+  for (auto cfg_seg_entry : cfg_module->segments) {
+    FillSegment(seg_vars[i++], cfg_seg_entry.second);
   }
 }
 
@@ -576,6 +443,7 @@ void CallInitFiniCode(const NativeModule *cfg_module) {
   if (FLAGS_libc_constructor.empty() && FLAGS_libc_destructor.empty()) {
     return;
   }
+
   for (const auto &entry : cfg_module->ea_to_func) {
     auto cfg_func = entry.second;
     llvm::Function *callback = nullptr;

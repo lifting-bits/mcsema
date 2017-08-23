@@ -64,9 +64,16 @@ static std::string LiftedFunctionName(const Function &cfg_func) {
 
 static std::string LiftedSegmentName(const Segment &cfg_segment) {
   std::stringstream ss;
-  ss << "seg_" << std::hex << cfg_segment.ea();
-  if (cfg_segment.has_name()) {
-    ss << "_" << SaneName(cfg_segment.name());
+  if (cfg_segment.has_variable_name()) {
+    if (cfg_segment.is_exported()) {
+      ss << cfg_segment.variable_name();
+    } else {
+      ss << "seg_var_" << std::hex << cfg_segment.ea()
+         << "_" << SaneName(cfg_segment.variable_name());
+    }
+  } else {
+    ss << "seg_" << std::hex << cfg_segment.ea()
+       << "_" << SaneName(cfg_segment.name());
   }
   return ss.str();
 }
@@ -401,8 +408,8 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     segment->lifted_name = LiftedSegmentName(cfg_segment);
     segment->is_read_only = cfg_segment.read_only();
     segment->is_external = cfg_segment.is_external();
+    segment->is_exported = cfg_segment.is_exported();
     segment->seg_var = nullptr;
-    segment->region_var = nullptr;
 
     // Collect the variables.
     for (const auto &cfg_var : cfg_segment.vars()) {
@@ -414,6 +421,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       var->ea = static_cast<uint64_t>(cfg_var.ea());
       var->name = cfg_var.name();
       var->is_external = false;
+      var->is_exported = false;
       var->lifted_name = LiftedVarName(cfg_var);
       var->segment = segment;
 
@@ -448,6 +456,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     func->lifted_name = LiftedFunctionName(cfg_func);
     func->name = cfg_func.has_name() ? cfg_func.name() : func->lifted_name;
     func->blocks.reserve(static_cast<size_t>(cfg_func.blocks_size()));
+    func->is_exported = cfg_func.is_entrypoint();
 
     auto func_it = module->ea_to_func.find(func->ea);
     if (func_it != module->ea_to_func.end()) {
@@ -472,7 +481,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       delete dup_var;
     }
 
-    if (cfg_func.is_entrypoint()) {
+    if (func->is_exported) {
       CHECK(!func->name.empty())
           << "Exported function at address " << std::hex << func->ea
           << " does not have a name";
@@ -490,6 +499,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     var->ea = static_cast<uint64_t>(cfg_extern_var.ea());
     var->name = cfg_extern_var.name();
     var->is_external = true;
+    var->is_exported = true;
     var->lifted_name = var->name;
     var->is_weak = cfg_extern_var.is_weak();
     var->size = static_cast<uint64_t>(cfg_extern_var.size());
@@ -555,6 +565,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     func->name = cfg_extern_func.name();
     func->ea = static_cast<uint64_t>(cfg_extern_func.ea());
     func->is_external = true;
+    func->is_exported = true;
     func->is_weak = cfg_extern_func.is_weak();
     func->lifted_name = ExternalFuncName(cfg_extern_func);
     func->num_args = 0;

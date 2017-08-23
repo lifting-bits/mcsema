@@ -467,7 +467,7 @@ static llvm::Function *LiftFunction(
   lifted_func->removeFnAttr(llvm::Attribute::NoReturn);
   lifted_func->addFnAttr(llvm::Attribute::NoInline);
   lifted_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
-  lifted_func->setLinkage(llvm::GlobalValue::ExternalLinkage);
+  lifted_func->setLinkage(llvm::GlobalValue::InternalLinkage);
 
   TranslationContext ctx;
   std::unique_ptr<remill::InstructionLifter> lifter(

@@ -129,12 +129,14 @@ message Segment {
   required  bytes           data = 2;
   required  bool            read_only = 3;
   required  bool            is_external = 4;
-  
-  repeated  DataReference   xrefs = 5;
-  repeated  Variable        vars = 6;
 
-  // Section name, e.g. `.got`, `.text`, `.bss`, etc.
-  optional  string          name = 7;
+  required  string          name = 5;
+  optional  string          variable_name = 6;
+  required  bool            is_exported = 7;
+  
+  repeated  DataReference   xrefs = 8;
+  repeated  Variable        vars = 9;
+
 }
 
 message Module {

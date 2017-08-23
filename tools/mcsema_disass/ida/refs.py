@@ -143,18 +143,18 @@ def _try_create_array(ea, max_num_entries=8):
   return True
 
 # Return `True` if `ea` is nearby to other heads.
-def _is_near_another_head(ea, bounds):
+def _nearest_head(ea, bounds):
   seg_ea = idc.SegStart(ea)
   seg_end_ea = idc.SegEnd(ea)
   next_head_ea = idc.NextHead(ea, seg_end_ea)
   if not is_invalid_ea(next_head_ea) and bounds >= (next_head_ea - ea):
-    return True
+    return next_head_ea
 
   prev_head_ea = idc.PrevHead(ea, seg_ea)
   if not is_invalid_ea(prev_head_ea) and bounds >= (ea - prev_head_ea):
-    return True
+    return prev_head_ea
 
-  return False
+  return idc.BADADDR
 
 _POSSIBLE_REFS = set()
 _REFS = {}
@@ -193,9 +193,29 @@ def _try_get_arm_ref_addr(inst, op, op_val, all_refs):
 
   return _BAD_ARM_REF_OFF
 
+# Returns `True` if `ea` looks like it points into the middle of an instruction.
+def _is_ea_into_bad_code(ea, binary_is_pie):
+  if not is_code(ea):
+    return False
+
+  import flow  # Circular dependency!
+  term_inst = flow.find_linear_terminator(ea)
+  if not term_inst:
+    return True
+
+  succs = list(flow.get_static_successors(idc.BADADDR, term_inst, binary_is_pie))
+  if not succs:
+    return True
+
+  for succ_ea in succs:
+    if is_invalid_ea(succ_ea):
+      return True
+
+  return False
+
 # Try to recognize an operand as a reference candidate when a target fixup
 # is not available.
-def _get_ref_candidate(inst, op, all_refs):
+def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
   global _POSSIBLE_REFS, _ENABLE_CACHING
 
   ref = None
@@ -209,12 +229,10 @@ def _get_ref_candidate(inst, op, all_refs):
   else:
     return None
 
-
-  #TODO(artem): we should have a class that has ref heuristics
-  # and put ARM related refs in the ARM class, and X86 in the x86 class
-  #
-  # that will avoid these awkward `if IS_ARM` and the comments
-  # about x86 / amd64 stuff
+  # TODO(artem): We should have a class that has ref heuristics and put ARM
+  #              related refs in the ARM class, and X86 in the x86 class that
+  #              will avoid these awkward `if IS_ARM` and the comments about
+  #              x86 / amd64 stuff.
   if IS_ARM:
     addr_val, mask = _try_get_arm_ref_addr(inst, op, addr_val, all_refs)
   
@@ -242,10 +260,12 @@ def _get_ref_candidate(inst, op, all_refs):
     all_refs.add(addr_val)
 
   # Same as above, `idal64` can miss things that `idaq` gets.
-  if addr_val not in all_refs and _is_near_another_head(addr_val, 512):
-    DEBUG("WARNING: Adding reference from {:x} to {:x}, which is near other heads".format(
-        inst.ea, addr_val))
-    all_refs.add(addr_val)
+  if addr_val not in all_refs:
+    nearest_head_ea = _nearest_head(addr_val, 128)
+    if not is_invalid_ea(nearest_head_ea) and not _is_ea_into_bad_code(nearest_head_ea, binary_is_pie):
+      DEBUG("WARNING: Adding reference from {:x} to {:x}, which is near other heads".format(
+          inst.ea, addr_val))
+      all_refs.add(addr_val)
 
   # # Same as above, `idal64` can miss things that `idaq` gets.
   # if addr_val not in all_refs and _try_create_array(addr_val):
@@ -355,7 +375,7 @@ def get_instruction_references(arg, binary_is_pie=False):
     if op.offb in offset_to_ref:
       ref = offset_to_ref[op.offb]
     else:
-      ref = _get_ref_candidate(inst, op, all_refs)
+      ref = _get_ref_candidate(inst, op, all_refs, binary_is_pie)
 
     if not ref or not idc.GetFlags(ref.ea):
       continue

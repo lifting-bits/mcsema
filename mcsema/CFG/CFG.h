@@ -77,7 +77,9 @@ struct NativeObject {
   uint64_t ea;
   std::string name;  // Name in the binary.
   std::string lifted_name;  // Name in the bitcode.
+
   bool is_external;
+  bool is_exported;
 
   void ForwardTo(NativeObject *dest) const;
   const NativeObject *Get(void) const;
@@ -150,10 +152,12 @@ struct NativeSegment : public NativeObject {
   // blobs of bytes. The ordering of entries is significant.
   std::map<uint64_t, Entry> entries;
 
-  llvm::GlobalVariable *seg_var;
-  llvm::GlobalVariable *region_var;
+  mutable llvm::GlobalVariable *seg_var;
 };
 
+// NOTE(pag): Using an `std::map` (as opposed to an `std::unordered_map`) is
+//            intentional so that we can get the ordering of `NativeSegment`s
+//            by their `ea`s.
 using SegmentMap = std::map<uint64_t, NativeSegment *>;
 
 struct NativeModule {

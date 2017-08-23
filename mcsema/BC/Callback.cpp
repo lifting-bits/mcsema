@@ -191,6 +191,12 @@ static llvm::Function *ImplementNativeToLiftedCallback(
   if (FLAGS_legacy_mode) {
     legacy::AnnotateInsts(callback_func, cfg_func->ea);
   }
+
+  if (cfg_func->is_exported) {
+    callback_func->setLinkage(llvm::GlobalValue::ExternalLinkage);
+    callback_func->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
+  }
+
   return callback_func;
 }
 
@@ -550,9 +556,13 @@ static void ImplementExplicitArgsExitPoint(
 // Get a callback function for an internal function that can be referenced by
 // internal code.
 llvm::Function *GetNativeToLiftedCallback(const NativeObject *cfg_func) {
-  std::stringstream ss;
-  ss << "callback_" << cfg_func->lifted_name;
-  return GetOrCreateCallback(cfg_func, ss.str());
+  if (cfg_func->is_exported) {
+    return GetNativeToLiftedEntryPoint(cfg_func);
+  } else {
+    std::stringstream ss;
+    ss << "callback_" << cfg_func->lifted_name;
+    return GetOrCreateCallback(cfg_func, ss.str());
+  }
 }
 
 // Get a callback function for an internal function.

@@ -61,7 +61,7 @@ llvm::Constant *LiftEA(const NativeSegment *cfg_seg, uint64_t ea) {
 
   auto offset = ea - cfg_seg->ea;
   return llvm::ConstantExpr::getAdd(
-      seg->getInitializer(),
+      llvm::ConstantExpr::getPtrToInt(seg, gWordType),
       llvm::ConstantInt::get(gWordType, offset));
 }
 

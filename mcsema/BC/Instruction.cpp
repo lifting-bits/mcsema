@@ -168,23 +168,27 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
     // internal locations inside of the segments.
     } else {
       auto global = gModule->getGlobalVariable(cfg_var->lifted_name, true);
-      CHECK(global != nullptr)
-          << "Can't resolve reference to internal variable "
-          << cfg_var->lifted_name << " from " << std::hex << inst_ptr->pc;
+      if (global) {
+        // TODO(pag): We could actually use a load of the segment variable, but
+        //            it's constant, and optimization may just end up eliding
+        //            the load.
+        return global->getInitializer();
+      } else {
+        LOG(ERROR)
+            << "Can't resolve reference to internal variable "
+            << cfg_var->lifted_name << " from " << std::hex << inst_ptr->pc;
 
-      // TODO(pag): We could actually use a load of the segment variable, but
-      //            it's constant, and optimization may just end up eliding
-      //            the load.
-      return global->getInitializer();
+        // Falls through.
+      }
     }
-  } else {
-    auto cfg_seg = cfg_xref->target_segment;
-    CHECK(cfg_seg != nullptr)
-        << "A non-function, non-variable cross-reference from "
-        << std::hex << inst_ptr->pc << " to " << std::hex << cfg_xref->target_ea
-        << " must be in a known segment.";
-    return LiftEA(cfg_seg, cfg_xref->target_ea);
   }
+
+  CHECK(cfg_xref->target_segment != nullptr)
+      << "A non-function, non-variable cross-reference from "
+      << std::hex << inst_ptr->pc << " to " << std::hex << cfg_xref->target_ea
+      << " must be in a known segment.";
+
+  return LiftEA(cfg_xref->target_segment, cfg_xref->target_ea);
 }
 
 llvm::Value *InstructionLifter::LiftImmediateOperand(
