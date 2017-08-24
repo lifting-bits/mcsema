@@ -768,10 +768,6 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
     if is_jump_table_entry(ea):
       continue
 
-    if 0x320e08 == ea:
-      DEBUG("!!! ea = {:x} is ref? {} ref target = {:x}".format(
-          ea, is_reference(ea), get_reference_target(ea)))
-
     if not is_reference(ea):
       continue
 
@@ -1040,12 +1036,12 @@ def identify_external_symbols():
 
       if extern_name in EMAP_DATA:
         DEBUG("Variable at {:x} is the external {}".format(ea, extern_name))
-        idc.MakeName(ea, extern_name)  # Rename it.
+        set_symbol_name(ea, extern_name)
         EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
 
       elif extern_name in EMAP:
         DEBUG("Function at {:x} is the external {}".format(ea, extern_name))
-        idc.MakeName(ea, extern_name)  # Rename it.
+        set_symbol_name(ea, extern_name)
         EXTERNAL_FUNCS_TO_RECOVER[ea] = extern_name
 
       else:
@@ -1066,7 +1062,7 @@ def identify_external_symbols():
         DEBUG("WARNING: Adding variable {} at {:x} as external".format(
             extern_name, ea))
 
-        idc.MakeName(ea, extern_name)  # Rename it.
+        set_symbol_name(ea, extern_name)  # Rename it.
         EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
         _FIXED_EXTERNAL_NAMES[ea] = extern_name
 
@@ -1087,6 +1083,11 @@ def identify_program_entrypoints(func_eas):
   for index, ordinal, ea, name in idautils.Entries():
     assert ea != idc.BADADDR
     if not is_external_segment(ea):
+      sym_name = get_symbol_name(ea, allow_dummy=False)
+      if not sym_name:
+        DEBUG("WEIRD: Forcing entrypoint {:x} name to be {}".format(ea, name))
+        set_symbol_name(ea, name)
+
       if is_code(ea):
         func_eas.add(ea)
         if name not in exclude:
@@ -1292,7 +1293,7 @@ if __name__ == "__main__":
           try_mark_as_code(ea)
         if is_code(ea):
           try_mark_as_function(ea)
-          idc.MakeName(ea, name)
+          set_symbol_name(ea, name)
       idaapi.autoWait()
     
     M = recover_module(args.entrypoint)

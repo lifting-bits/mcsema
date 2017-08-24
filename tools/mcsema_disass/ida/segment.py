@@ -17,7 +17,7 @@ from table import *
 
 def is_sane_reference(target_ea):
   """Returns `True` if `target_ea` looks like the address of some code/data."""
-  if target_ea == idc.BADADDR:
+  if is_invalid_ea(target_ea):
     return False
 
   target_flags = idc.GetFlags(target_ea)
@@ -30,8 +30,9 @@ def is_sane_reference(target_ea):
     if idc.isHead(target_flags) or idc.isTail(target_flags):
       return True
 
-  if is_block_or_instruction_head(target_ea):
-    return True
+  else:
+    if is_block_or_instruction_head(target_ea):
+      return True
 
   return is_referenced(target_ea)
 
@@ -177,13 +178,17 @@ def remaining_item_size(ea):
   assert (head_ea + size) >= ea
   return (head_ea + size) - ea
 
-def find_missing_xrefs_in_segment(seg_ea, seg_end_ea):
+def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
   """Look for cross-refernces that were missed by IDA. This function assumes
   a natural alignments for pointers (i.e. 4- or 8-byte alignment)."""
 
   seg_ea = (seg_ea + 3) & ~3  # Align to a 4-byte boundary.
 
   try_qwords = get_address_size_in_bits() == 64
+  try_dwords = True
+  if try_qwords and binary_is_pie:
+    try_dwords = False
+
   pointer_size = try_qwords and 8 or 4
   ea, next_ea = idc.BADADDR, seg_ea
 
@@ -207,6 +212,10 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea):
       assert ea < next_ea
       continue
 
+    fixup_ea = idc.GetFixupTgtOff(ea)
+    if binary_is_pie and not is_sane_reference(fixup_ea):
+      continue
+
     # Try to read it as an 8-byte pointer.
     if try_qwords and (ea + 8) <= seg_end_ea:
       target_ea = read_qword(ea)
@@ -217,8 +226,9 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea):
         continue
 
     # Try to read it as a 4-byte pointer.
-    if (ea + 4) <= seg_end_ea:
+    if try_dwords and (ea + 4) <= seg_end_ea:
       target_ea = read_dword(ea)
+      fixup_ea = idc.GetFixupTgtOff(ea)
       if is_sane_reference(target_ea):
         DEBUG("Adding dword reference from {:x} to {:x}".format(ea, target_ea))
         make_xref(ea, target_ea, idc.MakeDword, 4)
@@ -233,7 +243,7 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea):
 
   DEBUG("Stopping scan at {:x}".format(ea))
 
-def find_missing_xrefs_in_code_segment(seg_ea, seg_end_ea):
+def find_missing_xrefs_in_code_segment(seg_ea, seg_end_ea, binary_is_pie):
   """Looks for data cross-references in a code segment."""
   DEBUG_PUSH()
   ea, next_ea = seg_ea, seg_ea
@@ -264,7 +274,7 @@ def find_missing_xrefs_in_code_segment(seg_ea, seg_end_ea):
     flags = idc.GetFlags(ea)
     if idc.isData(flags):
       next_ea = ea + idc.ItemSize(ea)
-      find_missing_xrefs_in_segment(ea, next_ea)
+      find_missing_xrefs_in_segment(ea, next_ea, binary_is_pie)
       continue
 
     else:
@@ -319,7 +329,7 @@ def process_segments(binary_is_pie):
       if not binary_is_pie and is_external_segment(seg_ea):
         DEBUG("Looking for cross-references in segment {} [{:x}, {:x})".format(
             seg_name, seg_ea, seg_end_ea))
-        find_missing_xrefs_in_code_segment(seg_ea, seg_end_ea)
+        find_missing_xrefs_in_code_segment(seg_ea, seg_end_ea, binary_is_pie)
       continue
 
     DEBUG("Looking for strings in segment {} [{:x}, {:x})".format(
@@ -328,16 +338,11 @@ def process_segments(binary_is_pie):
     find_missing_strings_in_segment(seg_ea, seg_end_ea)
     DEBUG_POP()
 
-    # Ignore PIE binaries when scanning for cross-references that IDA may
-    # have missed. The idea here is that there would be no hard-coded cross-
-    # referenced addresses -- instead they would be offsets that are
-    # indistinguishable from numbers.
-    if not binary_is_pie:
-      DEBUG("Looking for cross-references in segment {} [{:x}, {:x})".format(
-        seg_name, seg_ea, seg_end_ea))
-      DEBUG_PUSH()
-      find_missing_xrefs_in_segment(seg_ea, seg_end_ea)
-      DEBUG_POP()
+    DEBUG("Looking for cross-references in segment {} [{:x}, {:x})".format(
+      seg_name, seg_ea, seg_end_ea))
+    DEBUG_PUSH()
+    find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie)
+    DEBUG_POP()
 
   # Okay, hopefully by this point we've been able to introduce more information
   # so that IDA can better find references. We'll enable caching of instruction

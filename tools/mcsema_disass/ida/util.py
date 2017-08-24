@@ -101,17 +101,14 @@ def mark_as_not_code(ea):
   _NOT_INST_EAS.add(ea)
 
 def read_bytes_slowly(start, end):
-  bytestr = ""
+  bytestr = []
   for i in xrange(start, end):
     if idc.hasValue(idc.GetFlags(i)):
       bt = idc.Byte(i)
-      bytestr += chr(bt)
+      bytestr.append(chr(bt))
     else:
-      #virtual size may be bigger than size on disk
-      #pad with nulls
-      #DEBUG("Failed on {0:x}".format(i))
-      bytestr += "\x00"
-  return bytestr
+      bytestr.append("\x00")
+  return "".join(bytestr)
 
 def read_byte(ea):
   byte = read_bytes_slowly(ea, ea + 1)
@@ -292,10 +289,25 @@ def get_address_size_in_bits():
 def get_address_size_in_bytes():
   return get_address_size_in_bits() / 8
 
+_FORCED_NAMES = {}
+
+# Tries to set the name of a symbol. IDA can be pretty dumb when symbol names
+# conflict with register names, so we have the backup path of splatting things
+# into a dictionary.
+def set_symbol_name(ea, name):
+  flags = idaapi.SN_PUBLIC | idaapi.SN_NOCHECK | idaapi.SN_NON_AUTO
+  if not idc.MakeNameEx(ea, name, flags):
+    global _FORCED_NAMES
+    _FORCED_NAMES[ea] = name
+
 # Tries to get the name of a symbol.
 def get_symbol_name(from_ea, ea=None, allow_dummy=False):
   if ea is None:
     ea = from_ea
+
+  global _FORCED_NAMES
+  if ea in _FORCED_NAMES:
+    return _FORCED_NAMES[ea]
 
   flags = idc.GetFlags(ea)
   if not allow_dummy and idaapi.has_dummy_name(flags):
@@ -369,6 +381,14 @@ def is_noreturn_function(ea):
 _IGNORE_DREF = (lambda x: [idc.BADADDR])
 _IGNORE_CREF = (lambda x, y: [idc.BADADDR])
 
+def _stop_looking_for_xrefs(ea):
+  if is_code(ea):
+    return True
+
+  addr_size = get_address_size_in_bytes()
+  item_size = idc.ItemSize(ea)
+  return item_size > addr_size
+
 def _xref_generator(ea, get_first, get_next):
   target_ea = get_first(ea)
   while not is_invalid_ea(target_ea):
@@ -380,6 +400,9 @@ def _drefs_from(ea):
   if not is_invalid_ea(fixup_ea) and not is_code(fixup_ea):
     yield fixup_ea
 
+  if _stop_looking_for_xrefs(ea):
+    return
+
   for target_ea in _xref_generator(ea, idaapi.get_first_dref_from, idaapi.get_next_dref_from):
     if target_ea != fixup_ea:
       yield target_ea
@@ -389,6 +412,9 @@ def _crefs_from(ea):
   if not is_invalid_ea(fixup_ea) and is_code(fixup_ea):
     yield fixup_ea
 
+  if _stop_looking_for_xrefs(ea):
+    return
+
   for target_ea in _xref_generator(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from):
     if target_ea != fixup_ea:
       yield target_ea
@@ -397,6 +423,9 @@ def _xrefs_from(ea):
   fixup_ea = idc.GetFixupTgtOff(ea)
   if not is_invalid_ea(fixup_ea):
     yield fixup_ea
+
+  if _stop_looking_for_xrefs(ea):
+    return
 
   for target_ea in _drefs_from(ea):
     if target_ea != fixup_ea:
