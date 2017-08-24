@@ -295,7 +295,7 @@ _FORCED_NAMES = {}
 # conflict with register names, so we have the backup path of splatting things
 # into a dictionary.
 def set_symbol_name(ea, name):
-  flags = idaapi.SN_PUBLIC | idaapi.SN_NOCHECK | idaapi.SN_NON_AUTO
+  flags = idaapi.SN_PUBLIC | idaapi.SN_NOCHECK | idaapi.SN_NON_AUTO | idaapi.SN_NOWARN
   if not idc.MakeNameEx(ea, name, flags):
     global _FORCED_NAMES
     _FORCED_NAMES[ea] = name

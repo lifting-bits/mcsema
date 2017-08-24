@@ -236,10 +236,6 @@ def parse_os_defs_file(df):
           WEAK_SYMS.add(fname)
           WEAK_SYMS.add(imp_name)
 
-        # ptr_name = "{}_ptr".format(fname)
-        # if idc.LocByName(ptr_name):
-        #   _FIXED_EXTERNAL_NAMES[ptr_name] = fname
-
   df.close()
 
 def is_external_reference(ea):

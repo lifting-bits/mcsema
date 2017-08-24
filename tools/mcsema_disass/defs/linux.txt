@@ -1548,6 +1548,7 @@ aspell_word_list_empty 1 C N
 aspell_word_list_size 1 C N
 __asprintf 16 C N
 asprintf 16 C N
+__asprintf_chk 16 C N
 ass_add_font 4 C N
 ass_alloc_event 1 C N
 ass_alloc_style 1 C N
@@ -37269,3 +37270,53 @@ __vfprintf_chk 4 C N
 # used for netcat test
 __recvfrom_chk 7 C N
 __poll_chk 4 C N
+
+security_getenforce 0 C N
+security_setenforce 1 C N
+security_deny_unknown 0 C N
+getseuserbyname 3 C N
+getcon 1 C N
+getprevcon 1 C N
+getpidcon 2 C N
+getpeercon 2 C N
+setcon 1 C N
+get_ordered_context_list 3 C N
+get_ordered_context_list_with_level 4 C N
+get_default_context 3 C N
+get_default_context_with_level 4 C N
+get_default_context_with_role 4 C N
+get_default_context_with_rolelevel 5 C N
+query_user_context 2 C N
+manual_user_enter_context 2 C N
+get_default_type 2 C N
+getfscreatecon 1 C N
+setfscreatecon 1 C N
+matchpathcon_init 1 C N
+matchpathcon_init_prefix 2 C N
+matchpathcon_fini 0 C N
+matchpathcon 3 C N
+matchpathcon_index 3 C N
+
+security_compute_av 5 C N
+security_compute_av_flags 5 C N
+security_compute_create 4 C N
+security_compute_relabel 4 C N
+security_compute_member 4 C N
+security_compute_user 3 C N
+security_get_initial_context 2 C N
+selinux_check_passwd_access 1 C N
+checkPasswdAccess 1 C N
+
+getexeccon 1 C N
+setexeccon 1 C N
+rpm_execcon 4 C N
+
+setfilecon 2 C N
+lsetfilecon 2 C N
+fsetfilecon2 C N
+
+is_selinux_enabled 1 C N
+is_selinux_mls_enabled 1 C N
+
+_getshort 1 C N
+_getlong 1 C N
