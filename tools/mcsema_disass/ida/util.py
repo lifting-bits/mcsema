@@ -366,20 +366,83 @@ def is_noreturn_function(ea):
          (flags & idaapi.FUNC_NORET) and \
          "cxa_throw" not in get_symbol_name(ea)
 
+_IGNORE_DREF = (lambda x: [idc.BADADDR])
+_IGNORE_CREF = (lambda x, y: [idc.BADADDR])
+
+def _xref_generator(ea, get_first, get_next):
+  target_ea = get_first(ea)
+  while not is_invalid_ea(target_ea):
+    yield target_ea
+    target_ea = get_next(ea, target_ea)
+
+def _drefs_from(ea):
+  fixup_ea = idc.GetFixupTgtOff(ea)
+  if not is_invalid_ea(fixup_ea) and not is_code(fixup_ea):
+    yield fixup_ea
+
+  for target_ea in _xref_generator(ea, idaapi.get_first_dref_from, idaapi.get_next_dref_from):
+    if target_ea != fixup_ea:
+      yield target_ea
+
+def _crefs_from(ea):
+  fixup_ea = idc.GetFixupTgtOff(ea)
+  if not is_invalid_ea(fixup_ea) and is_code(fixup_ea):
+    yield fixup_ea
+
+  for target_ea in _xref_generator(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from):
+    if target_ea != fixup_ea:
+      yield target_ea
+
+def _xrefs_from(ea):
+  fixup_ea = idc.GetFixupTgtOff(ea)
+  if not is_invalid_ea(fixup_ea):
+    yield fixup_ea
+
+  for target_ea in _drefs_from(ea):
+    if target_ea != fixup_ea:
+      yield target_ea
+
+  for target_ea in _crefs_from(ea):
+    if target_ea != fixup_ea:
+      yield target_ea
+
+def _drefs_to(ea):
+  for source_ea in _xref_generator(ea, idaapi.get_first_dref_to, idaapi.get_next_dref_to):
+    yield source_ea
+
+def _crefs_to(ea):
+  for source_ea in _xref_generator(ea, idaapi.get_first_cref_to, idaapi.get_next_cref_to):
+    yield source_ea
+
+def _xrefs_to(ea):
+  for source_ea in _drefs_to(ea):
+    yield source_ea
+
+  for source_ea in _crefs_to(ea):
+    yield source_ea
+
+def _reference_checker(ea, dref_finder=_IGNORE_DREF, cref_finder=_IGNORE_CREF):
+  """Looks for references to/from `ea`, and does some sanity checks on what
+  IDA returns."""
+  for ref_ea in dref_finder(ea):
+    return True
+
+  for ref_ea in cref_finder(ea):
+    return True
+
+  return False
+
 def remove_all_refs(ea):
   """Remove all references to something."""
   assert False
-  dref_eas = list(idautils.DataRefsFrom(ea))
-  cref_eas0 = list(idautils.CodeRefsFrom(ea, False))
-  cref_eas1 = list(idautils.CodeRefsFrom(ea, True))
+  dref_eas = list(_drefs_from(ea))
+  cref_eas = list(_crefs_from(ea))
 
   for ref_ea in dref_eas:
     idaapi.del_dref(ea, ref_ea)
 
-  for ref_ea in cref_eas0:
+  for ref_ea in cref_eas:
     idaapi.del_cref(ea, ref_ea, False)
-
-  for ref_ea in cref_eas1:
     idaapi.del_cref(ea, ref_ea, True)
 
 def is_thunk(ea):
@@ -387,40 +450,16 @@ def is_thunk(ea):
   flags = idc.GetFunctionFlags(ea)
   return 0 < flags and 0 != (flags & idaapi.FUNC_THUNK)
 
-_IGNORE_DREF = (lambda x: [idc.BADADDR])
-_IGNORE_CREF = (lambda x, y: [idc.BADADDR])
-
-def _reference_checker(ea, dref_finder=_IGNORE_DREF, cref_finder=_IGNORE_CREF):
-  """Looks for references to/from `ea`, and does some sanity checks on what
-  IDA returns."""
-  for ref_ea in dref_finder(ea):
-    if not is_invalid_ea(ref_ea):
-      return True
-
-  for ref_ea in cref_finder(ea, True):
-    if not is_invalid_ea(ref_ea):
-      return True
-
-  for ref_ea in cref_finder(ea, False):
-    if not is_invalid_ea(ref_ea):
-      return True
-      
-  return False
-
 def is_referenced(ea):
   """Returns `True` if the data at `ea` is referenced by something else."""
-  return _reference_checker(ea, idautils.DataRefsTo, idautils.CodeRefsTo)
+  return _reference_checker(ea, _drefs_to, _crefs_to)
 
 def is_referenced_by(ea, by_ea):
-  for ref_ea in idautils.DataRefsTo(ea):
+  for ref_ea in _drefs_to(ea):
     if ref_ea == by_ea:
       return True
 
-  for ref_ea in idautils.CodeRefsTo(ea, True):
-    if ref_ea == by_ea:
-      return True
-
-  for ref_ea in idautils.CodeRefsTo(ea, False):
+  for ref_ea in _crefs_to(ea):
     if ref_ea == by_ea:
       return True
 
@@ -445,9 +484,8 @@ def is_reference(ea):
   if is_invalid_ea(ea):
     return False
 
-  for target in idautils.XrefsFrom(ea):
-    if ea == target.frm and not is_invalid_ea(target.to):
-      return True
+  for target in _xrefs_from(ea):
+    return True
 
   return is_runtime_external_data_reference(ea)
 
@@ -456,29 +494,19 @@ def is_data_reference(ea):
   if is_invalid_ea(ea):
     return False
 
-  for target_ea in idautils.DataRefsFrom(ea):
-    if not is_invalid_ea(target_ea):
-      return True
+  for target_ea in _drefs_from(ea):
+    return True
 
   return is_runtime_external_data_reference(ea)
 
 def has_flow_to_code(ea):
-  """Returns `True` if there are and control flows to the instruction at 
+  """Returns `True` if there are any control flows to the instruction at 
   `ea`."""
   return _reference_checker(ea, cref_finder=idautils.CodeRefsTo)
 
 def get_reference_target(ea):
-  for ref_ea in idautils.DataRefsFrom(ea):
-    if not is_invalid_ea(ref_ea):
-      return ref_ea
-
-  for ref_ea in idautils.CodeRefsFrom(ea, True):
-    if not is_invalid_ea(ref_ea):
-      return ref_ea
-
-  for ref_ea in idautils.CodeRefsFrom(ea, False):
-    if not is_invalid_ea(ref_ea):
-      return ref_ea
+  for ref_ea in _xrefs_from(ea):
+    return ref_ea
 
   # This is kind of funny, but it works with how we understand external
   # variable references from the CFG production and LLVM side. Really,

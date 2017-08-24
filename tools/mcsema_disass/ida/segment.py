@@ -192,11 +192,11 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea):
     if is_invalid_ea(ea):
       break
 
-    item_size = max(1, remaining_item_size(ea))  # Guarantee forward progress.
     flags = idc.GetFlags(ea)
 
     # Jump over strings.
     if has_string_type(ea):
+      item_size = max(1, remaining_item_size(ea))  # Guarantee forward progress.
       next_ea = ea + item_size
       DEBUG("Found string at {:x}, jumping to {:x}".format(ea, next_ea))
       continue

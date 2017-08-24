@@ -768,6 +768,10 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
     if is_jump_table_entry(ea):
       continue
 
+    if 0x320e08 == ea:
+      DEBUG("!!! ea = {:x} is ref? {} ref target = {:x}".format(
+          ea, is_reference(ea), get_reference_target(ea)))
+
     if not is_reference(ea):
       continue
 
