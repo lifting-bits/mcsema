@@ -746,15 +746,19 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
   # Go through and look for the fixups. We start at `seg_ea - 1` because we
   # always try to find the *next* fixup/heads, and if there's one right at
   # the beginning of the segment then we don't want to jump to the second one.
-  max_xref_width = get_address_size_in_bits() / 8
+  global PIE_MODE
+
+  max_xref_width = get_address_size_in_bytes()
+  min_xref_width = PIE_MODE and max_xref_width or 4
+
   ea, next_ea = seg_ea, seg_ea
   while next_ea < seg_end_ea:
     ea = next_ea
-
-    xref_width = min(max(idc.ItemSize(ea), 4), max_xref_width)
+    item_size = idc.ItemSize(ea)
+    xref_width = min(max(item_size, 4), max_xref_width)
     next_ea = min(ea + xref_width,
-            # idc.GetNextFixupEA(ea),
-            idc.NextHead(ea, seg_end_ea))
+                  # idc.GetNextFixupEA(ea),
+                  idc.NextHead(ea, seg_end_ea))
 
     # We don't want to fill the jump table bytes with their actual
     # code cross-references. This is because we can't get the address
@@ -764,24 +768,27 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
     if is_jump_table_entry(ea):
       continue
 
-    if not is_reference(ea):
-      continue
-
     # Note: it's possible that `ea == target_ea`. This happens with
     #     external references to things like `stderr`, where there's 
     #     an internal slot, whose value is filled in at runtime. 
     target_ea = get_reference_target(ea)
-    
     if is_invalid_ea(target_ea):
-      DEBUG("ERROR: Reference at {:x} is not a reference.".format(ea))
-      continue
-
-    # Probably `idc.BADADDR`, or some really small number.
-    elif not idc.GetFlags(target_ea):
       continue
 
     elif (ea % 4) != 0:
-      DEBUG("ERROR: Unaligned reference at {:x} to {:x}".format(ea, target_ea))
+      DEBUG("WARNING: Unaligned reference at {:x} to {:x}".format(ea, target_ea))
+      continue
+
+    elif item_size < min_xref_width:
+      DEBUG("WARNING: Ingorning {}-byte item that looks like at reference from {:x} to {:x}; it needs to be at least {} bytes".format(
+          item_size, ea, target_ea, min_xref_width))
+      continue
+
+    # Probably some really small number.
+    elif not idc.GetFlags(target_ea):
+      DEBUG("WARNING: No information about target {:x} from {:x}".format(
+          target_ea, ea))
+      continue
 
     else:
       X = S.xrefs.add()
@@ -820,6 +827,13 @@ def recover_region(M, seg_name, seg_ea, seg_end_ea, exported_vars):
 
   seg_size = seg_end_ea - seg_ea
   seg = idaapi.getseg(seg_ea)
+
+  # An item spans two regions. This may mean that there's a reference into
+  # the middle of an item. This happens with strings.
+  item_size = idc.ItemSize(seg_end_ea - 1)
+  if 1 < item_size:
+    DEBUG("  WARNING: Segment should probably include {} more bytes".format(
+        item_size - 1))
 
   S = M.segments.add()
   S.ea = seg_ea

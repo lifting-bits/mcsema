@@ -36,25 +36,6 @@ def is_sane_reference(target_ea):
 
   return is_referenced(target_ea)
 
-def make_xref(from_ea, to_ea, xref_constructor, xref_size):
-  """Force the data at `from_ea` to reference the data at `to_ea`."""
-  if not idc.GetFlags(to_ea) or is_invalid_ea(to_ea):
-    DEBUG("  Not making reference (A) from {:x} to {:x}".format(from_ea, to_ea))
-    return
-
-  make_head(from_ea)
-  
-  # If we can't make a head, then it probably means that we're at the
-  # end of the binary, e.g. the last thing in the `.extern` segment.
-  if not make_head(from_ea + xref_size):
-    assert idc.BADADDR == idc.SegStart(from_ea + xref_size)
-
-  xref_constructor(from_ea)
-  if not is_code(from_ea):
-    idc.add_dref(from_ea, to_ea, idc.XREF_USER|idc.dr_O)
-  else: 
-    DEBUG("  Not making reference (C) from {:x} to {:x}".format(from_ea, to_ea))
-
 def is_read_only_segment(ea):
   seg_ea = idc.SegStart(ea)
   seg = idaapi.getseg(seg_ea)
@@ -236,7 +217,8 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
         continue
 
     if is_reference(ea) and not is_runtime_external_data_reference(ea):
-      DEBUG("WARNING!!! Undefining reference at {:x}".format(ea))
+      DEBUG("WARNING: Undefining reference at {:x} to insane target {:x}".format(
+          ea, target_ea))
       idaapi.do_unknown_range(ea, 4, idc.DOUNK_EXPAND)
     
     next_ea = ea + 4

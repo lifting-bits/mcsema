@@ -84,6 +84,11 @@ def is_code(ea):
   seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
   return seg_type == idc.SEG_CODE
 
+def is_read_only_segment(ea):
+  mask_perms = idaapi.SEGPERM_WRITE | idaapi.SEGPERM_READ
+  perms = idc.GetSegmentAttr(ea, idc.SEGATTR_PERM)
+  return idaapi.SEGPERM_READ == (perms & mask_perms)
+
 def is_tls_segment(ea):
   try:
     seg_name = idc.SegName(ea)
@@ -404,6 +409,31 @@ def is_noreturn_function(ea):
          (flags & idaapi.FUNC_NORET) and \
          "cxa_throw" not in get_symbol_name(ea)
 
+_XREFS_FROM = collections.defaultdict(set)
+_XREFS_TO = collections.defaultdict(set)
+
+def make_xref(from_ea, to_ea, xref_constructor, xref_size):
+  """Force the data at `from_ea` to reference the data at `to_ea`."""
+  if not idc.GetFlags(to_ea) or is_invalid_ea(to_ea):
+    DEBUG("  Not making reference (A) from {:x} to {:x}".format(from_ea, to_ea))
+    return
+
+  make_head(from_ea)
+
+  _XREFS_FROM[from_ea].add(to_ea)
+  _XREFS_TO[to_ea].add(from_ea)
+
+  # If we can't make a head, then it probably means that we're at the
+  # end of the binary, e.g. the last thing in the `.extern` segment.
+  if not make_head(from_ea + xref_size):
+    assert idc.BADADDR == idc.SegStart(from_ea + xref_size)
+
+  xref_constructor(from_ea)
+  if not is_code(from_ea):
+    idc.add_dref(from_ea, to_ea, idc.XREF_USER|idc.dr_O)
+  else: 
+    DEBUG("  Not making reference (C) from {:x} to {:x}".format(from_ea, to_ea))
+
 _IGNORE_DREF = (lambda x: [idc.BADADDR])
 _IGNORE_CREF = (lambda x, y: [idc.BADADDR])
 
@@ -422,43 +452,69 @@ def _xref_generator(ea, get_first, get_next):
     target_ea = get_next(ea, target_ea)
 
 def _drefs_from(ea):
+  flags = idc.GetFlags(ea)
+  if idc.isCode(flags):
+    return
+
   fixup_ea = idc.GetFixupTgtOff(ea)
+  seen = False
   if not is_invalid_ea(fixup_ea) and not is_code(fixup_ea):
+    seen = True
     yield fixup_ea
 
-  if _stop_looking_for_xrefs(ea):
+  if seen and _stop_looking_for_xrefs(ea):
     return
 
   for target_ea in _xref_generator(ea, idaapi.get_first_dref_from, idaapi.get_next_dref_from):
     if target_ea != fixup_ea:
+      seen = True
+      yield target_ea
+
+  if not seen and ea in _XREFS_FROM:
+    for target_ea in _XREFS_FROM[ea]:
       yield target_ea
 
 def _crefs_from(ea):
+  flags = idc.GetFlags(ea)
+  if not idc.isCode(flags):
+    return
+
   fixup_ea = idc.GetFixupTgtOff(ea)
+  seen = False
   if not is_invalid_ea(fixup_ea) and is_code(fixup_ea):
+    seen = True
     yield fixup_ea
 
-  if _stop_looking_for_xrefs(ea):
+  if seen and _stop_looking_for_xrefs(ea):
     return
 
   for target_ea in _xref_generator(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from):
     if target_ea != fixup_ea:
+      seen = True
+      yield target_ea
+
+  if not seen and ea in _XREFS_FROM:
+    for target_ea in _XREFS_FROM[ea]:
       yield target_ea
 
 def _xrefs_from(ea):
   fixup_ea = idc.GetFixupTgtOff(ea)
+  seen = False
   if not is_invalid_ea(fixup_ea):
+    seen = True
     yield fixup_ea
 
-  if _stop_looking_for_xrefs(ea):
+  if seen and _stop_looking_for_xrefs(ea):
     return
 
   for target_ea in _drefs_from(ea):
     if target_ea != fixup_ea:
+      seen = True
       yield target_ea
 
   for target_ea in _crefs_from(ea):
     if target_ea != fixup_ea:
+      seen = True
       yield target_ea
 
 def _drefs_to(ea):
