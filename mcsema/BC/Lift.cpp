@@ -73,6 +73,7 @@ static void ExportFunction(const NativeModule *cfg_module) {
 
     LOG(INFO)
         << "Exporting function " << cfg_func->name;
+
     auto ep = GetNativeToLiftedEntryPoint(cfg_func);
     ep->setLinkage(llvm::GlobalValue::ExternalLinkage);
     ep->setVisibility(llvm::GlobalValue::DefaultVisibility);
@@ -84,13 +85,14 @@ static void ExportFunction(const NativeModule *cfg_module) {
 static void ExportVariables(const NativeModule *cfg_module) {
   for (auto ea : cfg_module->exported_vars) {
     auto cfg_var = cfg_module->ea_to_var.at(ea)->Get();
-    auto var = gModule->getNamedAlias(cfg_var->lifted_name);
+    auto var = gModule->getGlobalVariable(cfg_var->lifted_name);
     CHECK(var != nullptr)
         << "Cannot find lifted version of exported variable "
         << cfg_var->name;
 
     var->setName(cfg_var->name);
     var->setLinkage(llvm::GlobalValue::ExternalLinkage);
+    var->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
   }
 }
 

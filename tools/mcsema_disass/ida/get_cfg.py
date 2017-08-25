@@ -782,9 +782,6 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
 
     elif (ea % 4) != 0:
       DEBUG("ERROR: Unaligned reference at {:x} to {:x}".format(ea, target_ea))
-    
-    #elif is_runtime_external_data_reference(ea):
-    #  DEBUG("Not embedding reference to {:x} at {:x}".format(target_ea, ea))
 
     else:
       X = S.xrefs.add()
@@ -793,8 +790,23 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
       X.target_ea = target_ea
       X.target_name = get_symbol_name(target_ea)
       X.target_is_code = is_code(target_ea)
-      DEBUG("{}-byte reference at {:x} to {:x} ({}), next_ea={:x}".format(
-          X.width, ea, target_ea, X.target_name, next_ea))
+
+      # A cross-reference to some TLS data. Because each thread has its own
+      # instance of the data, this reference ends up actually being an offset
+      # from a thread base pointer. In x86, this tends to be the base of one of
+      # the segment registers, e.g. `fs` or `gs`. On the McSema side, we fill in
+      # this xref lazily by computing the offset.
+      if is_tls(target_ea):
+        X.target_fixup_kind = CFG_pb2.DataReference.OffsetFromThreadBase
+        DEBUG("{}-byte TLS offset at {:x} to {:x} ({})".format(
+            X.width, ea, target_ea, X.target_name))
+
+      # A cross-reference to a 'single' thing, where the fixup that we create
+      # will be an absolute address to the targeted variable/function.
+      else:
+        X.target_fixup_kind = CFG_pb2.DataReference.Absolute
+        DEBUG("{}-byte reference at {:x} to {:x} ({})".format(
+            X.width, ea, target_ea, X.target_name))
 
 def recover_region(M, seg_name, seg_ea, seg_end_ea, exported_vars):
   """Recover the data and cross-references from a segment. The data of a
@@ -814,6 +826,7 @@ def recover_region(M, seg_name, seg_ea, seg_end_ea, exported_vars):
   S.data = read_bytes_slowly(seg_ea, seg_end_ea)
   S.read_only = (seg.perm & idaapi.SEGPERM_WRITE) == 0
   S.is_external = is_external_segment_by_flags(seg_ea)
+  S.is_thread_local = is_tls_segment(seg_ea)
   S.name = real_seg_name.format('utf-8')
   S.is_exported = seg_ea in exported_vars
 
@@ -919,15 +932,19 @@ def recover_external_variables(M):
   global EXTERNAL_VARS_TO_RECOVER, WEAK_SYMS
 
   for ea, name in EXTERNAL_VARS_TO_RECOVER.items():
-    DEBUG("Recovering extern variable {} at {:x}".format(name, ea))
     EV = M.external_vars.add()
     EV.ea = ea
     EV.name = name.format('utf-8')
     EV.is_weak = idaapi.is_weak_name(ea) or (name in WEAK_SYMS)
+    EV.is_thread_local = is_tls(ea)
     if name in EMAP_DATA:
       EV.size = EMAP_DATA[name]
     else:
       EV.size = idc.ItemSize(ea)
+    if EV.is_thread_local:
+      DEBUG("Recovering extern TLS variable {} at {:x}".format(name, ea))
+    else:
+      DEBUG("Recovering extern variable {} at {:x}".format(name, ea))
 
 def recover_external_symbols(M):
   recover_external_functions(M)
@@ -985,6 +1002,7 @@ def identify_external_symbols():
 
   DEBUG("Looking for external symbols")
   DEBUG_PUSH()
+  
   for ea, name in idautils.Names():
     if try_identify_as_external_function(ea) or is_code(ea):
       continue
@@ -998,7 +1016,34 @@ def identify_external_symbols():
         if target_name not in EMAP_DATA and target_name not in EMAP:
           DEBUG("ERROR: Missing external reference information for {} referenced at {:x}".format(
               target_name, ea))
-          raise Exception()
+
+          target_flags = idc.GetFlags(target_ea)
+          
+          # The missing reference looks like code, so add it to the EMAP with
+          # 16 arguments (probably enough, eh?), and assume it uses the cdecl
+          # calling convention.
+          #
+          # NOTE(pag): We use `idc.isCode` and not `is_code` because the latter
+          #            operates at the segment granularity, and `target_ea` will
+          #            likely point into the `extern` section. Individual
+          #            entries in the extern section can have 
+          if idc.isCode(target_flags):
+            DEBUG("WARNING: Adding external {} at {:x} as an external code reference".format(
+                target_name, ea))
+            EMAP[target_name] = (16, CFG_pb2.ExternalFunction.CallerCleanup, "N")
+
+            imp_name = "__imp_{}".format(target_name)
+            if idc.LocByName(imp_name):
+              _FIXED_EXTERNAL_NAMES[imp_name] = target_name
+              WEAK_SYMS.add(target_name)
+              WEAK_SYMS.add(imp_name)
+
+          # The 
+          else:
+            DEBUG("WARNING: Adding external {} at {:x} as an external data reference".format(
+                target_name, ea))
+            EMAP_DATA[target_name] = 8  # TODO(pag): Made up, based on max pointer size.
+
         elif target_name in EMAP_DATA:
           EXTERNAL_VARS_TO_RECOVER[target_ea] = target_name
         elif target_name in EMAP:

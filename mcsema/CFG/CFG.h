@@ -28,6 +28,7 @@
 #include <llvm/IR/CallingConv.h>
 
 namespace llvm {
+class Constant;
 class GlobalVariable;
 }  // namespace llvm
 namespace mcsema {
@@ -80,6 +81,7 @@ struct NativeObject {
 
   bool is_external;
   bool is_exported;
+  bool is_thread_local;
 
   void ForwardTo(NativeObject *dest) const;
   const NativeObject *Get(void) const;
@@ -89,12 +91,17 @@ struct NativeObject {
 // Function that is defined inside the binary.
 struct NativeFunction : public NativeObject {
  public:
+  NativeFunction(void);
+
   std::unordered_map<uint64_t, const NativeBlock *> blocks;
+  llvm::Function *function;
 };
 
 // Function that is defined outside of the binary.
 struct NativeExternalFunction : public NativeFunction {
  public:
+  NativeExternalFunction(void);
+
   bool is_weak;
   unsigned num_args;
   llvm::CallingConv::ID cc;
@@ -103,7 +110,10 @@ struct NativeExternalFunction : public NativeFunction {
 // Global variable defined inside of the lifted binary.
 struct NativeVariable : public NativeObject {
  public:
+  NativeVariable(void);
+
   const NativeSegment *segment;
+  mutable llvm::Constant *address;
 };
 
 // Global variable defined outside of the lifted binary.
@@ -116,6 +126,11 @@ struct NativeExternalVariable : public NativeVariable {
 // A cross-reference to something.
 struct NativeXref {
  public:
+  enum FixupKind {
+    kAbsoluteFixup,
+    kThreadLocalOffsetFixup
+  };
+
   uint64_t width;  // In bytes.
   uint64_t ea;  // Location of the xref within its segment.
   uint64_t mask;  // Bitmask to apply to this xref. Zero if none.
@@ -125,8 +140,10 @@ struct NativeXref {
   std::string target_name;
   const NativeSegment *target_segment;  // Target segment of the xref, if any.
 
-  const NativeObject *var;
-  const NativeObject *func;
+  FixupKind fixup_kind;
+
+  const NativeVariable *var;
+  const NativeFunction *func;
 };
 
 struct NativeBlob {

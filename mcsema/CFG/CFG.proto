@@ -93,23 +93,31 @@ message ExternalVariable {
   required  int64       ea = 2;    // E.g. address of the relocation in the binary.
   required  int32       size = 3;
   required  bool        is_weak = 4;
+  required  bool        is_thread_local = 5;
 }
 
 // A cross-reference contained within a data segment. This represents some
 // code- or data-reference embedded within the data segment.
 message DataReference {
-  
+ 
+  enum TargetFixupKind {
+    Absolute = 0;
+    OffsetFromThreadBase = 1;
+  };
+
   // Location of the cross-reference.
-  required  int64       ea = 1;
+  required  int64               ea = 1;
 
   // How many bytes wide is this cross-reference? Not to be confused with the
   // size of the data to which this reference points.
-  required  int32       width = 2;
+  required  int32               width = 2;
 
   // Information about the target of the cross-reference.
-  required  int64       target_ea = 4;
-  required  string      target_name = 5;
-  required  bool        target_is_code = 6;
+  required  int64               target_ea = 4;
+  required  string              target_name = 5;
+  required  bool                target_is_code = 6;
+    
+  required  TargetFixupKind     target_fixup_kind = 8;        
 }
 
 // Represents a named location within a data segment. Variables will often
@@ -133,9 +141,10 @@ message Segment {
   required  string          name = 5;
   optional  string          variable_name = 6;
   required  bool            is_exported = 7;
+  required  bool            is_thread_local = 8;
   
-  repeated  DataReference   xrefs = 8;
-  repeated  Variable        vars = 9;
+  repeated  DataReference   xrefs = 9;
+  repeated  Variable        vars = 10;
 
 }
 

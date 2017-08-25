@@ -21,6 +21,8 @@
 #include <list>
 #include <vector>
 
+#include <llvm/IR/IRBuilder.h>
+
 #include "mcsema/CFG/CFG.h"
 
 namespace llvm {
@@ -28,6 +30,7 @@ namespace llvm {
 class BasicBlock;
 class Constant;
 class ConstantInt;
+class Instruction;
 class IntegerType;
 class LLVMContext;
 class Module;
@@ -47,6 +50,9 @@ llvm::FunctionType *LiftedFunctionType(void);
 // Translate `ea` into an LLVM value that is an address that points into the
 // lifted segment associated with `seg`.
 llvm::Constant *LiftEA(const NativeSegment *seg, uint64_t ea);
+
+// Return the address of the base of the TLS data.
+llvm::Value *GetTLSBaseAddress(llvm::IRBuilder<> &ir);
 
 }  // namespace mcsema
 

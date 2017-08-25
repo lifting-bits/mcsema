@@ -117,26 +117,29 @@ static bool ResolveReference(NativeModule *module, NativeXref *xref) {
 
   auto var_it = module->ea_to_var.find(xref->target_ea);
   if (var_it != module->ea_to_var.end()) {
-    xref->var = var_it->second->Get();
+    xref->var = reinterpret_cast<const NativeVariable *>(var_it->second->Get());
     return true;
   }
 
   auto func_it = module->ea_to_func.find(xref->target_ea);
   if (func_it != module->ea_to_func.end()) {
-    xref->func = func_it->second->Get();
+    xref->func = reinterpret_cast<const NativeFunction *>(
+        func_it->second->Get());
     return true;
   }
 
   if (!xref->target_name.empty()) {
     auto var_name_it = module->name_to_extern_var.find(xref->target_name);
     if (var_name_it != module->name_to_extern_var.end()) {
-      xref->var = var_name_it->second->Get();
+      xref->var = reinterpret_cast<const NativeVariable *>(
+          var_name_it->second->Get());
       return true;
     }
 
     auto func_name_it = module->name_to_extern_func.find(xref->target_name);
     if (func_name_it != module->name_to_extern_func.end()) {
-      xref->func = func_name_it->second->Get();
+      xref->func = reinterpret_cast<const NativeFunction *>(
+          func_name_it->second->Get());
       return true;
     }
   }
@@ -346,7 +349,21 @@ NativeObject::NativeObject(void)
       ea(0),
       name(),
       lifted_name(),
-      is_external(false) {}
+      is_external(false),
+      is_exported(false),
+      is_thread_local(false) {}
+
+NativeFunction::NativeFunction(void)
+    : blocks() {}
+
+NativeExternalFunction::NativeExternalFunction(void)
+    : is_weak(false),
+      num_args(0),
+      cc(gArch->DefaultCallingConv()) {}
+
+NativeVariable::NativeVariable(void)
+    : segment(nullptr),
+      address(nullptr) {}
 
 void NativeObject::ForwardTo(NativeObject *dest) const {
   if (forward != this) {
@@ -369,6 +386,11 @@ NativeObject *NativeObject::Get(void) {
     forward = forward->Get();
   }
   return forward;
+}
+
+static void MergeVariables(NativeVariable *var, const NativeVariable *old_var) {
+  var->is_exported = var->is_exported || old_var->is_exported;
+  var->is_thread_local = var->is_thread_local || old_var->is_thread_local;
 }
 
 // Convert the protobuf into an in-memory data structure. This does a fair
@@ -409,6 +431,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     segment->is_read_only = cfg_segment.read_only();
     segment->is_external = cfg_segment.is_external();
     segment->is_exported = cfg_segment.is_exported();
+    segment->is_thread_local = cfg_segment.is_thread_local();
     segment->seg_var = nullptr;
 
     // Collect the variables.
@@ -420,8 +443,6 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       auto var = new NativeVariable;
       var->ea = static_cast<uint64_t>(cfg_var.ea());
       var->name = cfg_var.name();
-      var->is_external = false;
-      var->is_exported = false;
       var->lifted_name = LiftedVarName(cfg_var);
       var->segment = segment;
 
@@ -430,7 +451,9 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         LOG(ERROR)
             << "Duplicate (non-external) variable at " << std::hex << var->ea
             << " in segment " << segment->name;
-        delete ea_var_it->second;
+
+        MergeVariables(var, ea_var_it->second);
+        ea_var_it->second->ForwardTo(var);
       }
       module->ea_to_var[var->ea] = var;
 
@@ -452,7 +475,6 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
   for (const auto &cfg_func : cfg.funcs()) {
     auto func = new NativeFunction;
     func->ea = static_cast<uint64_t>(cfg_func.ea());
-    func->is_external = false;
     func->lifted_name = LiftedFunctionName(cfg_func);
     func->name = cfg_func.has_name() ? cfg_func.name() : func->lifted_name;
     func->blocks.reserve(static_cast<size_t>(cfg_func.blocks_size()));
@@ -489,6 +511,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       LOG(INFO)
           << "Exported function " << func->name << " at " << std::hex
           << func->ea << " is implemented by " << func->lifted_name;
+
       module->exported_funcs.insert(func->ea);
     }
   }
@@ -500,6 +523,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     var->name = cfg_extern_var.name();
     var->is_external = true;
     var->is_exported = true;
+    var->is_thread_local = cfg_extern_var.is_thread_local();
     var->lifted_name = var->name;
     var->is_weak = cfg_extern_var.is_weak();
     var->size = static_cast<uint64_t>(cfg_extern_var.size());
@@ -519,6 +543,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     auto extern_var_it = module->name_to_extern_var.find(var->name);
     if (extern_var_it != module->name_to_extern_var.end()) {
       auto dup_var = extern_var_it->second;
+      MergeVariables(var, dup_var);
       dup_var->ForwardTo(var);
 
       if (dup_var->ea != var->ea) {
@@ -538,6 +563,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     auto var_it = module->ea_to_var.find(var->ea);
     if (var_it != module->ea_to_var.end()) {
       auto dup_var = var_it->second;
+      MergeVariables(var, dup_var);
       dup_var->ForwardTo(var);
 
       if (dup_var->name != var->name) {
@@ -721,10 +747,20 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
           << xref->target_name << " at " << std::hex << xref->target_ea
           << " is too wide at " << xref->width << " bytes";
 
+      switch (cfg_xref.target_fixup_kind()) {
+        case DataReference_TargetFixupKind_Absolute:
+          xref->fixup_kind = NativeXref::kAbsoluteFixup;
+          break;
+        case DataReference_TargetFixupKind_OffsetFromThreadBase:
+          xref->fixup_kind = NativeXref::kThreadLocalOffsetFixup;
+          break;
+      }
+
       if (!ResolveReference(module, xref)) {
         delete xref;
         continue;
       }
+
       segment->entries[xref->ea] = {
           xref->ea, (xref->ea + xref->width), xref, nullptr};
     }

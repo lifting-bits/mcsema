@@ -19,6 +19,7 @@
 #include <sstream>
 #include <vector>
 
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
@@ -40,28 +41,35 @@ namespace {
 //
 // TODO(pag,car,artem): Handle floating point types eventually.
 static void DeclareExternal(
-    const NativeExternalFunction *nf) {
+    const NativeExternalFunction *cfg_func) {
 
-  std::vector<llvm::Type *> tys(nf->num_args, gWordType);
+  std::vector<llvm::Type *> tys(cfg_func->num_args, gWordType);
 
   auto extfun = llvm::Function::Create(
       llvm::FunctionType::get(gWordType, tys, false),
       llvm::GlobalValue::ExternalLinkage,
-      nf->name, gModule);
+      cfg_func->name, gModule);
 
-  if (nf->is_weak) {
+  if (cfg_func->is_weak) {
     extfun->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
   }
 
-  extfun->setCallingConv(nf->cc);
+  extfun->setCallingConv(cfg_func->cc);
   extfun->addFnAttr(llvm::Attribute::NoInline);
+}
+
+static llvm::GlobalValue::ThreadLocalMode ThreadLocalMode(
+    const NativeObject *cfg_obj) {
+  if (cfg_obj->is_thread_local) {
+    return llvm::GlobalValue::GeneralDynamicTLSModel;
+  } else {
+    return llvm::GlobalValue::NotThreadLocal;
+  }
 }
 
 }  // namespace
 
 // Declare external functions.
-//
-// TODO(pag): Calling conventions, argument counts, etc.
 void DeclareExternals(const NativeModule *cfg_module) {
   for (const auto &entry : cfg_module->name_to_extern_func) {
     auto cfg_func = reinterpret_cast<const NativeExternalFunction *>(
@@ -92,9 +100,12 @@ void DeclareExternals(const NativeModule *cfg_module) {
       auto var_type = llvm::Type::getIntNTy(
           *gContext, static_cast<unsigned>(cfg_var->size * 8));
 
-      (void) new llvm::GlobalVariable(
-          *gModule, var_type, false, llvm::GlobalValue::ExternalLinkage,
-          nullptr, cfg_var->name);
+      cfg_var->address = llvm::ConstantExpr::getPtrToInt(
+          new llvm::GlobalVariable(*gModule, var_type, false,
+                                   llvm::GlobalValue::ExternalLinkage,
+                                   nullptr, cfg_var->name, nullptr,
+                                   ThreadLocalMode(cfg_var)),
+          gWordType);
     }
   }
 }

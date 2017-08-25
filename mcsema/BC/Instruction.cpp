@@ -106,8 +106,7 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
   }
 
   llvm::IRBuilder<> ir(block);
-  if (cfg_xref->func) {
-    auto cfg_func = cfg_xref->func;
+  if (auto cfg_func = cfg_xref->func) {
     llvm::Function *func = nullptr;
     llvm::Value *func_val = nullptr;
 
@@ -141,7 +140,7 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
     //
     // TODO(pag): This is an awful hack for now that won't generalize.
     if (func->hasExternalWeakLinkage()) {
-      LOG(WARNING)
+      LOG(ERROR)
           << "Adding pseudo-load of weak function " << cfg_func->name
           << " at " << std::hex << inst_ptr->pc;
 
@@ -152,35 +151,15 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
 
     return ir.CreatePtrToInt(func_val, word_type);
 
-  } else if (cfg_xref->var) {
-    auto cfg_var = cfg_xref->var;
-
-    // External variables are declared as global variables.
-    if (cfg_var->is_external) {
-      auto global = gModule->getGlobalVariable(cfg_var->name, true);
-      CHECK(global != nullptr)
-          << "Can't resolve reference to external variable "
-          << cfg_var->name << " from " << std::hex << inst_ptr->pc;
-
-      return ir.CreatePtrToInt(global, word_type);
-
-    // Internal global variables are word-sized integers, whose values address
-    // internal locations inside of the segments.
-    } else {
-      auto global = gModule->getGlobalVariable(cfg_var->lifted_name, true);
-      if (global) {
-        // TODO(pag): We could actually use a load of the segment variable, but
-        //            it's constant, and optimization may just end up eliding
-        //            the load.
-        return global->getInitializer();
-      } else {
-        LOG(ERROR)
-            << "Can't resolve reference to internal variable "
-            << cfg_var->lifted_name << " from " << std::hex << inst_ptr->pc;
-
-        // Falls through.
-      }
+  } else if (auto cfg_var = cfg_xref->var) {
+    if (cfg_var->address) {
+      return cfg_var->address;
     }
+
+    LOG(ERROR)
+        << "Variable " << cfg_var->name << " at " << std::hex << cfg_var->ea
+        << " was not lifted.";
+    // Fall through.
   }
 
   CHECK(cfg_xref->target_segment != nullptr)

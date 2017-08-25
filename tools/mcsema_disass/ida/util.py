@@ -84,6 +84,32 @@ def is_code(ea):
   seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
   return seg_type == idc.SEG_CODE
 
+def is_tls_segment(ea):
+  try:
+    seg_name = idc.SegName(ea)
+    return seg_name in (".tbss", ".tdata", ".tls")
+  except:
+    return False
+
+# Returns `True` if `ea` looks like a thread-local thing.
+def is_tls(ea):
+  if is_invalid_ea(ea):
+    return False
+
+  if is_tls_segment(ea):
+    return True
+
+  # Something references `ea`, and that something is commented as being a
+  # `TLS-reference`. This comes up if you have an thread-local extern variable
+  # declared/used in a binary, and defined in a shared lib. There will be an
+  # offset variable.
+  for source_ea in _drefs_to(ea):
+    comment = idc.GetCommentEx(source_ea, 0)
+    if isinstance(comment, str) and "TLS-reference" in comment:
+      return True
+
+  return False
+
 # Mark an address as containing code.
 def try_mark_as_code(ea):
   return False

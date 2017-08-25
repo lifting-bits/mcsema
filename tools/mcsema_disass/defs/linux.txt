@@ -37313,7 +37313,7 @@ rpm_execcon 4 C N
 
 setfilecon 2 C N
 lsetfilecon 2 C N
-fsetfilecon2 C N
+fsetfilecon 2 C N
 
 is_selinux_enabled 1 C N
 is_selinux_mls_enabled 1 C N
