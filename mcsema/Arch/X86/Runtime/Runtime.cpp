@@ -46,7 +46,7 @@ extern "C" {
 // }
 
 Memory *__remill_sync_hyper_call(
-    Memory *mem, State &state, SyncHyperCall::Name call) {
+    State &state, Memory *mem, SyncHyperCall::Name call) {
   auto eax = state.gpr.rax.dword;
   auto ebx = state.gpr.rbx.dword;
   auto ecx = state.gpr.rcx.dword;
@@ -101,7 +101,7 @@ Memory *__remill_sync_hyper_call(
   return mem;
 }
 
-Memory *__mcsema_reg_tracer(Memory *memory, State &state, uintptr_t) {
+Memory *__mcsema_reg_tracer(State &state, addr_t, Memory *memory) {
   const char *format = nullptr;
   if (sizeof(void *) == 8) {
     fprintf(

@@ -51,9 +51,6 @@ llvm::FunctionType *LiftedFunctionType(void);
 // lifted segment associated with `seg`.
 llvm::Constant *LiftEA(const NativeSegment *seg, uint64_t ea);
 
-// Return the address of the base of the TLS data.
-llvm::Value *GetTLSBaseAddress(llvm::IRBuilder<> &ir);
-
 }  // namespace mcsema
 
 #endif  // MCSEMA_BC_UTIL_H_

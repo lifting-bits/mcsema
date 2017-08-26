@@ -36,6 +36,7 @@
 #include <remill/BC/Util.h>
 
 #include "mcsema/Arch/Arch.h"
+#include "mcsema/Arch/ABI.h"
 #include "mcsema/BC/Callback.h"
 #include "mcsema/BC/Segment.h"
 #include "mcsema/BC/Util.h"
@@ -306,6 +307,7 @@ static void LazyInitXRef(const NativeXref *xref, llvm::Type *extern_addr_type) {
           << "Cannot do thread-local fixup from " << std::hex << xref->ea
           << " to non-thread-local variable " << xref->target_name << " at "
           << std::hex << xref->target_ea;
+
       static llvm::Value *thread_base = nullptr;
       if (!thread_base) {
         thread_base = GetTLSBaseAddress(ir);

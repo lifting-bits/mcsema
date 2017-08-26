@@ -75,6 +75,9 @@ class CallingConvention {
   CallingConvention(void) = delete;
 };
 
+// Return the address of the base of the TLS data.
+llvm::Value *GetTLSBaseAddress(llvm::IRBuilder<> &ir);
+
 }  // namespace mcsema
 
 #endif  // MCSEMA_ARCH_ABI_H_
