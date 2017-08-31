@@ -26,7 +26,7 @@ import textwrap
 SUPPORTED_OS = ('linux', 'windows',)
 SUPPORTED_ARCH = ('x86', 'amd64', 'aarch64')
 
-def main(args=None):
+def main():
   arg_parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     epilog=textwrap.dedent("""\
@@ -76,6 +76,12 @@ def main(args=None):
     arg_parser.error("{} passed to --binary is not a valid file.".format(
         args.binary))
     return 1
+
+  if args.arch.endswith("_avx"):
+    args.arch = args.arch[:-4]
+
+  if args.arch.endswith("_avx512"):
+    args.arch = args.arch[:-7]
 
   if args.arch not in SUPPORTED_ARCH:
     arg_parser.error("{} passed to --arch is not supported. Valid options are: {}".format(
