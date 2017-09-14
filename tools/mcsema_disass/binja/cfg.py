@@ -158,6 +158,13 @@ def recover_section_vars(bv, pb_seg, sect):
         sect (binja.binaryview.Section)
     """
     for sym in bv.get_symbols():
+        # Ignore functions and externals
+        if sym.type in [SymbolType.FunctionSymbol,
+                        SymbolType.ImportedFunctionSymbol,
+                        SymbolType.ImportedDataSymbol,
+                        SymbolType.ImportAddressSymbol]:
+            continue
+
         if sect.start <= sym.address < sect.end:
             pb_segvar = pb_seg.vars.add()
             pb_segvar.ea = sym.address
@@ -296,6 +303,11 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
     func = bv.get_function_at(addr)
     if func is None:
         log.error('No function defined at 0x%x, skipping', addr)
+        return
+
+    if func.symbol.type == SymbolType.ImportedFunctionSymbol:
+        # Externals are recovered later, skip this
+        log.warn("Skipping external function '%s' in main CFG recovery", func.symbol.name)
         return
 
     # Initialize the protobuf for this function
