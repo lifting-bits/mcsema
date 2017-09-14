@@ -136,8 +136,7 @@ def recover_section_cross_references(bv, pb_seg, sect):
         xref = read_val(bv, addr)
 
         # TODO: probably need a better way of telling this is a ref
-        seg = bv.get_segment_at(xref)
-        if seg is None:
+        if not util.is_valid_addr(bv, xref):
             continue
 
         pb_ref = pb_seg.xrefs.add()
@@ -177,11 +176,56 @@ def recover_sections(bv, pb_mod):
         recover_section_cross_references(bv, pb_seg, sect)
 
 
+def is_local_noreturn(bv, il):
+    """
+    Args:
+        bv (binja.BinaryView)
+        il (binja.LowLevelILInstruction):
+
+    Returns:
+        bool
+    """
+    if il.operation in [LowLevelILOperation.LLIL_CALL,
+                        LowLevelILOperation.LLIL_JUMP,
+                        LowLevelILOperation.LLIL_GOTO]:
+        # Resolve the destination address
+        tgt_addr = None
+        dst = il.dest
+
+        # GOTOs have an il index as the arg
+        if isinstance(dst, int):
+            tgt_addr = il.function[dst].address
+
+        # Others will have an expression as the argument
+        elif isinstance(dst, binja.LowLevelILInstruction):
+            # Immediate address
+            if dst.operation in [LowLevelILOperation.LLIL_CONST,
+                                 LowLevelILOperation.LLIL_CONST_PTR]:
+                tgt_addr = dst.constant
+
+            # Register
+            elif dst.operation == LowLevelILOperation.LLIL_REG:
+                # Attempt to resolve the register value
+                func = il.function.source_function
+                reg_val = func.get_reg_value_at(il.address, dst.src)
+                if reg_val.type == RegisterValueType.ConstantValue:
+                    tgt_addr = reg_val.value
+
+        # If a target address was recovered, check if it's in a noreturn function
+        if tgt_addr is not None:
+            tgt_func = util.get_func_containing(bv, tgt_addr)
+            return not tgt_func.function_type.can_return
+
+    # Other instructions that terminate control flow
+    return il.operation in [LowLevelILOperation.LLIL_TRAP,
+                            LowLevelILOperation.LLIL_BP]
+
+
 def read_inst_bytes(bv, il):
     """ Get the opcode bytes for an instruction
     Args:
         bv (binja.BinaryView)
-        il (binaryninja.lowlevelil.LowLevelILInstruction)
+        il (binja.LowLevelILInstruction)
     Returns:
         str
     """
@@ -199,7 +243,8 @@ def recover_inst(bv, pb_inst, il):
     pb_inst.ea = il.address
     pb_inst.bytes = read_inst_bytes(bv, il)
 
-    op = il.operation
+    if is_local_noreturn(bv, il):
+        pb_inst.local_noreturn = True
 
 
 def add_block(pb_func, block):
@@ -260,9 +305,11 @@ def recover_cfg(bv, args):
     # Recover any discovered functions until there are none left
     while not TO_RECOVER.empty():
         addr = TO_RECOVER.get()
+
+        if addr in RECOVERED:
+            continue
         RECOVERED.add(addr)
 
-        log.debug('Recovering function at 0x%x', addr)
         recover_function(bv, pb_mod, addr)
 
     log.debug('Processing Segments')

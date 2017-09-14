@@ -98,6 +98,28 @@ def find_symbol_name(bv, addr):
     return ''
 
 
+def get_func_containing(bv, addr):
+    """ Finds the function, if any, containing the given address
+    Args:
+        bv (binja.BinaryView)
+        addr (int)
+
+    Returns:
+        binja.Function
+    """
+    funcs = bv.get_functions_containing(addr)
+    return funcs[0] if funcs is not None else None
+
+
+def is_external_ref(bv, addr):
+    sym = bv.get_symbol_at(addr)
+    return sym is not None and 'Import' in sym.type.name
+
+
+def is_valid_addr(bv, addr):
+    return bv.get_segment_at(addr) is not None
+
+
 def is_code(bv, addr):
     """Returns `True` if the given address lies in an executable segment"""
     return (bv.get_segment_at(addr).flags & SegmentFlag.SegmentExecutable) != 0
