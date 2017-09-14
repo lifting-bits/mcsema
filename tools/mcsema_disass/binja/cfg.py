@@ -9,6 +9,7 @@ from Queue import Queue
 
 import CFG_pb2
 import util
+import xrefs
 
 log = logging.getLogger(util.LOGNAME)
 
@@ -221,6 +222,26 @@ def is_local_noreturn(bv, il):
                             LowLevelILOperation.LLIL_BP]
 
 
+def add_xref(bv, pb_inst, target, optype):
+    xref = pb_inst.xrefs.add()
+    xref.ea = target
+    xref.operand_type = optype
+
+    sym_name = util.find_symbol_name(bv, target)
+    if len(sym_name) > 0:
+        xref.name = sym_name
+
+    xref.target_type = CFG_pb2.CodeReference.CodeTarget if util.is_code(bv, target) else \
+                       CFG_pb2.CodeReference.DataTarget
+
+    xref.location = CFG_pb2.CodeReference.External if util.is_external_ref(bv, target) else \
+                    CFG_pb2.CodeReference.Internal
+
+    # If the target happens to be a function, queue it for recovery
+    if bv.get_function_at(target) is not None:
+        queue_func(target)
+
+
 def read_inst_bytes(bv, il):
     """ Get the opcode bytes for an instruction
     Args:
@@ -242,6 +263,9 @@ def recover_inst(bv, pb_inst, il):
     """
     pb_inst.ea = il.address
     pb_inst.bytes = read_inst_bytes(bv, il)
+
+    for ref in xrefs.get_xrefs(bv, il):
+        add_xref(bv, pb_inst, ref.addr, ref.cfg_type)
 
     if is_local_noreturn(bv, il):
         pb_inst.local_noreturn = True
