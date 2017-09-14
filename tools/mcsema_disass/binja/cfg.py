@@ -10,6 +10,7 @@ from Queue import Queue
 import CFG_pb2
 import util
 import xrefs
+import jmptable
 
 log = logging.getLogger(util.LOGNAME)
 
@@ -269,6 +270,11 @@ def recover_inst(bv, pb_inst, il):
 
     if is_local_noreturn(bv, il):
         pb_inst.local_noreturn = True
+
+    table = jmptable.get_jmptable(bv, il)
+    if table is not None:
+        pb_inst.jump_table_addr = table.base_addr
+        pb_inst.offset_base_addr = table.rel_off
 
 
 def add_block(pb_func, block):
