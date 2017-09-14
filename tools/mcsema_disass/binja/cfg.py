@@ -1,7 +1,7 @@
 import binaryninja as binja
 from binaryninja.enums import (
-    SymbolType, TypeClass, CallingConventionName,
-    LowLevelILOperation
+    SymbolType, TypeClass,
+    LowLevelILOperation, RegisterValueType
 )
 import logging
 import os
@@ -22,6 +22,12 @@ CCONV_TYPES = {
     'C': CFG_pb2.ExternalFunction.CallerCleanup,
     'E': CFG_pb2.ExternalFunction.CalleeCleanup,
     'F': CFG_pb2.ExternalFunction.FastCall
+}
+
+BINJA_CCONV_TYPES = {
+    'cdecl': CFG_pb2.ExternalFunction.CallerCleanup,
+    'stdcall': CFG_pb2.ExternalFunction.CalleeCleanup,
+    'fastcall': CFG_pb2.ExternalFunction.FastCall
 }
 
 RECOVERED = set()
@@ -77,8 +83,12 @@ def recover_ext_func(bv, pb_mod, sym):
         pb_extfn.no_return = not ftype.can_return
         pb_extfn.is_weak = False  # TODO: figure out how to decide this
 
-        # TODO: binja only returns None for calling conventions?
-        pb_extfn.cc = CFG_pb2.ExternalFunction.CallerCleanup
+        # Assume cdecl if the type is unknown
+        cconv = ftype.calling_convention.name
+        if cconv in BINJA_CCONV_TYPES:
+            pb_extfn.cc = BINJA_CCONV_TYPES[cconv]
+        else:
+            pb_extfn.cc = CFG_pb2.ExternalFunction.CallerCleanup
 
 
 def recover_ext_var(bv, pb_mod, sym):
