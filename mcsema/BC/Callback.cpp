@@ -278,8 +278,10 @@ static llvm::Constant *CreateInitializedState(
 // indexed thing.
 static bool GetOffsetFromBasePtr(const llvm::GetElementPtrInst *gep_inst,
                                  uint64_t *offset_out) {
-  llvm::APInt offset(64, 0);
   llvm::DataLayout dl(gModule);
+  unsigned ptr_size = dl.getPointerSizeInBits();
+  llvm::APInt offset(ptr_size, 0);
+
   const auto found_offset = gep_inst->accumulateConstantOffset(dl, offset);
   if (found_offset) {
     *offset_out = offset.getZExtValue();

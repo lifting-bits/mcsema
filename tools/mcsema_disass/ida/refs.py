@@ -402,7 +402,14 @@ def get_instruction_references(arg, binary_is_pie=False):
         idaapi.del_cref(op_ea, op.value, False)
         continue
 
-      ref.type = Reference.IMMEDIATE
+      # In the special case of "ADR" and "ADRP" instructions for aarch64
+      # IDA infers the absolute immediate value to assign as op_type, rather
+      # than characterizing it as a displacement from PC
+      if idc.GetMnem(inst.ea) in ["ADRP", "ADR"]:
+         ref.type = Reference.DISPLACEMENT
+      else:
+         ref.type = Reference.IMMEDIATE
+
       ref.symbol = get_symbol_name(op_ea, ref.ea)
 
     # Displacement within a memory operand, excluding PC-relative
