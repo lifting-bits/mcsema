@@ -215,13 +215,21 @@ def parse_os_defs_file(df):
         continue
 
       ea = idc.LocByName(fname)
-      if not is_invalid_ea(ea) \
-      and not is_external_segment(ea) \
-      and not is_thunk(ea):
-        DEBUG("Not treating {} as external, it is defined at {:x}".format(
-            fname, ea))
-        INTERNALLY_DEFINED_EXTERNALS[fname] = ea
-        continue
+
+      if not is_invalid_ea(ea):
+        if not is_external_segment(ea) and not is_thunk(ea):
+          DEBUG("Not treating {} as external, it is defined at {:x}".format(
+              fname, ea))
+          INTERNALLY_DEFINED_EXTERNALS[fname] = ea
+          continue
+
+        # Misidentified and external.
+        flags = idc.GetFlags(ea)
+        if not idc.isCode(flags) and not idaapi.is_weak_name(ea):
+          DEBUG("ERROR: External {} at {:x} from definitions file is not a function".format(
+              fname, ea))
+          EMAP_DATA[fname] = 1
+          continue
 
       EMAP[fname] = (int(args), realconv, ret, sign)
 
@@ -561,6 +569,10 @@ def recover_instruction_references(I, inst, addr):
   debug_info = ["I: {:x}".format(addr)]
   refs = get_instruction_references(inst, PIE_MODE)
   for ref in refs:
+    if not ref.is_valid():
+      DEBUG("POSSIBLE ERROR: Invalid reference {} at instruction {:x}".format(
+          str(ref), inst.ea))
+      continue
 
     # Redirect the thunk target to the internal target.
     if ref.ea in INTERNAL_THUNK_EAS:
@@ -717,7 +729,7 @@ def find_default_function_heads():
       continue
 
     for func_ea in idautils.Functions(seg_ea, idc.SegEnd(seg_ea)):
-      if is_code(func_ea):
+      if is_code_by_flags(func_ea):
         func_heads.add(func_ea)
 
   return func_heads
@@ -725,11 +737,16 @@ def find_default_function_heads():
 def recover_region_variables(M, S, seg_ea, seg_end_ea, exported_vars):
   """Look for named locations pointing into the data of this segment, and
   add them to the protobuf."""
+  is_code_seg = is_code(seg_ea)
+
   for ea, name in idautils.Names():
     if ea < seg_ea or ea >= seg_end_ea:
       continue
 
     if is_external_segment_by_flags(ea) or ea in EXTERNAL_VARS_TO_RECOVER:
+      continue
+
+    if is_code_seg and is_code_by_flags(ea):
       continue
 
     # Only add named internal variables if they are referenced or exported. 
@@ -751,6 +768,8 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
   max_xref_width = get_address_size_in_bytes()
   min_xref_width = PIE_MODE and max_xref_width or 4
 
+  is_code_seg = is_code(seg_ea)
+
   ea, next_ea = seg_ea, seg_ea
   while next_ea < seg_end_ea:
     ea = next_ea
@@ -767,6 +786,13 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
     # LLVM side of things.
     if is_jump_table_entry(ea):
       continue
+
+    # Skip over instructions.
+    if is_code_seg:
+      flags = idc.GetFlags(ea)
+      if idc.isCode(flags):
+        next_ea = idc.NextHead(ea, seg_end_ea)
+        continue
 
     # Note: it's possible that `ea == target_ea`. This happens with
     #     external references to things like `stderr`, where there's 
@@ -846,15 +872,6 @@ def recover_region(M, seg_name, seg_ea, seg_end_ea, exported_vars):
 
   if seg_name != real_seg_name:
     S.variable_name = seg_name.format('utf-8')
-
-  # Don't look for fixups in the code segment. These are all handled as
-  # `CodeReference`s and stored in the `Instruction`s themselves. We also
-  # don't want to mark jump table entries embedded in the code section
-  # either (see comment below), so this captures that case as well.
-  seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
-  if seg_type == idc.SEG_CODE:
-    S.read_only = True  # Force this even if it's not true.
-    return  # Don't process xrefs or variables.
 
   DEBUG_PUSH()
   recover_region_cross_references(M, S, seg_ea, seg_end_ea)
@@ -1044,7 +1061,7 @@ def identify_external_symbols():
           if idc.isCode(target_flags):
             DEBUG("WARNING: Adding external {} at {:x} as an external code reference".format(
                 target_name, ea))
-            EMAP[target_name] = (16, CFG_pb2.ExternalFunction.CallerCleanup, "N")
+            EMAP[target_name] = (16, CFG_pb2.ExternalFunction.CallerCleanup, "N", None)
 
             imp_name = "__imp_{}".format(target_name)
             if idc.LocByName(imp_name):
@@ -1190,7 +1207,7 @@ def recover_module(entrypoint):
       DEBUG("ERROR: External function {:x} not previously identified".format(func_ea))
       continue
 
-    if not is_code(func_ea):
+    if not is_code_by_flags(func_ea):
       DEBUG("ERROR: Function EA not code: {:x}".format(func_ea))
       continue
 

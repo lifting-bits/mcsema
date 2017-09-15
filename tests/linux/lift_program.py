@@ -201,6 +201,8 @@ def main():
       '--log_file', log,
       is_pie and '--pie-mode' or '']
 
+  ida_args.extend(command_args)
+
   print " ".join(ida_args)
   ret = subprocess.call(ida_args)
   if ret:

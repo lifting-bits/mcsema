@@ -335,6 +335,14 @@ int main(void) {
   fprintf(out, "  push r14\n");
   fprintf(out, "  push r15\n");
 
+//  fprintf(out, "  push rcx\n");
+//  fprintf(out, "  push rdx\n");
+//  fprintf(out, "  push r8\n");
+//  fprintf(out, "  push r9\n");
+//  fprintf(out, "  push r10\n");
+//  fprintf(out, "  push r11\n");
+
+
   // Stash the return address stored on the native stack, the replace it
   // with the re-attach function.
   fprintf(out, "  mov r15, [rdi + %" PRIuMAX "]\n", __builtin_offsetof(State, RSP));
@@ -390,7 +398,7 @@ int main(void) {
   fprintf(out, "  movntdqa xmm14, [rdi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM14));
   fprintf(out, "  movntdqa xmm15, [rdi + %" PRIuMAX "]\n", __builtin_offsetof(State, XMM15));
 
-  // Swap out RSI.
+  // Swap out RDI.
   fprintf(out, "  mov rdi, [rdi + %" PRIuMAX "]\n", __builtin_offsetof(State, RDI));
 
   // Code above put the native target address (stored in RDI on entry to
@@ -461,6 +469,7 @@ int main(void) {
   PrintLoadFlags(out);  // Note: Clobbers RDX.
 
   // On the mcsema stack:
+  //     0    emulated return address.
   //     8    stashed r15
   //    16    stashed r14
   //    24    stashed r13
@@ -470,6 +479,15 @@ int main(void) {
 
   // Restore emulated return address.
   fprintf(out, "  pop QWORD PTR [rdi + %" PRIuMAX "]\n", __builtin_offsetof(State, RIP));
+
+//
+//  fprintf(out, "  pop r11\n");
+//  fprintf(out, "  pop r10\n");
+//  fprintf(out, "  pop r9\n");
+//  fprintf(out, "  pop r8\n");
+//  fprintf(out, "  pop rdx\n");
+//  fprintf(out, "  pop rcx\n");
+
 
   // Callee-saved registers.
   fprintf(out, "  pop r15\n");

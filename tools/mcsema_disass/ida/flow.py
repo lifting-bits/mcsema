@@ -284,7 +284,7 @@ def analyse_subroutine(sub_ea, binary_is_pie):
 
     seen_blocks.add(block_head_ea)
 
-    if not is_code(block_head_ea):
+    if not is_code_by_flags(block_head_ea):
       DEBUG("  Block head at {:08x} is not code.".format(block_head_ea))
       found_block_eas.discard(block_head_ea)
       continue

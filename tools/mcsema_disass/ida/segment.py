@@ -15,26 +15,48 @@
 from flow import *
 from table import *
 
-def is_sane_reference(target_ea):
+
+def is_sane_reference_target(ea):
   """Returns `True` if `target_ea` looks like the address of some code/data."""
-  if is_invalid_ea(target_ea):
+  if is_invalid_ea(ea):
     return False
 
-  target_flags = idc.GetFlags(target_ea)
-  if idaapi.isAlign(target_flags):
+  flags = idc.GetFlags(ea)
+  if idaapi.isAlign(flags):
     return False
 
-  if not is_code(target_ea):
-    # TODO(pag):  If it's a tail then it would be reasonable to check if it's
-    #             a pointer to a field in a struct. Not sure how to check that.
-    if idc.isHead(target_flags) or idc.isTail(target_flags):
-      return True
+  if idc.isHead(flags):
+    return True
 
-  else:
-    if is_block_or_instruction_head(target_ea):
-      return True
+  if has_string_type(ea):
+    return True
 
-  return is_referenced(target_ea)
+  if idc.isTail(flags):
+    head_ea = idc.PrevHead(ea)
+    if has_string_type(head_ea):
+      return True    
+
+  # TODO(pag): Check if it points at a logical element in an array, or at a
+  #            field of a struct.
+
+  if idc.isCode(flags):
+    return is_block_or_instruction_head(ea)
+
+  if is_referenced(ea):
+    return True
+
+  # NOTE(pag): We test `idc.isCode` above; this check looks to see if the
+  #            segment itself is a code segment. This check happens after
+  #            `is_referenced`, because we may have something like a vtable
+  #            embedded in a code segment.
+  if is_code(ea):
+    return False
+
+
+  item_size = idc.ItemSize(ea)
+
+  DEBUG("!!! target_ea = {:x} item_size = {}".format(ea, item_size))
+  return 1 != item_size 
 
 def is_read_only_segment(ea):
   seg_ea = idc.SegStart(ea)
@@ -59,11 +81,6 @@ def has_string_type(ea):
   if not is_read_only_segment(ea):
     return False
 
-  flags = idc.GetFlags(ea)
-  if 0 != (flags & idc.FF_UNK):
-    return False
-  elif 0 == (flags & idc.FF_STRU):
-    return False
   str_type = idc.GetStringType(ea)
   return (str_type is not None) and str_type != -1
 
@@ -117,35 +134,40 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
       next_ea = ea + 1
       continue
 
-    if not as_str or not len(as_str):
+    if as_str is None or not len(as_str):
       last_was_string = False
       continue
 
-    # This thing was referenced, and it may be a string.
-    if is_referenced(ea) and last_was_string and 1 == item_size and 1 < len(as_str):
+    # A bit aggressive, but lets try to make it into a string.
+    if last_was_string and 1 < len(as_str):
+      old_item_size = idc.ItemSize(ea)      
       if 1 != idc.MakeStr(ea, idc.BADADDR):
         last_was_string = False
         continue
+
       item_size = idc.ItemSize(ea)
       next_ea = ea + item_size
       last_was_string = True
+
+      if 1 != old_item_size or not is_referenced(ea):
+        DEBUG("WARNING: Made {:x} into a string of length {}".format(ea, item_size))
       continue
 
-    # Look for one string squashed between another. Compilers tend to place
-    # all strings together, and sometimes IDA misses some of the intermediate
-    # ones when they aren't directly referenced.
-    if last_was_string and next_is_string:
-      max_str_len = (next_head_ea - ea)
-      if 1 != idc.MakeStr(ea, idc.BADADDR):
-        last_was_string = False
-        continue
+    # # Look for one string squashed between another. Compilers tend to place
+    # # all strings together, and sometimes IDA misses some of the intermediate
+    # # ones when they aren't directly referenced.
+    # if last_was_string and next_is_string:
+    #   max_str_len = (next_head_ea - ea)
+    #   if 1 != idc.MakeStr(ea, idc.BADADDR):
+    #     last_was_string = False
+    #     continue
 
-      item_size = idc.ItemSize(ea)
-      DEBUG("Inferred string {} of length {} at {:x} to {:x}".format(
-          repr(as_str), item_size, ea, next_head_ea))
-      make_head(ea)
-      next_ea = ea + item_size
-      last_was_string = True
+    #   item_size = idc.ItemSize(ea)
+    #   DEBUG("Inferred string {} of length {} at {:x} to {:x}".format(
+    #       repr(as_str), item_size, ea, next_head_ea))
+    #   make_head(ea)
+    #   next_ea = ea + item_size
+    #   last_was_string = True
 
 def remaining_item_size(ea):
   flags = idc.GetFlags(ea)
@@ -173,6 +195,8 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
   pointer_size = try_qwords and 8 or 4
   ea, next_ea = idc.BADADDR, seg_ea
 
+  missing_refs = []
+
   while next_ea < seg_end_ea:
     ea, next_ea = next_ea, idc.BADADDR
     if is_invalid_ea(ea):
@@ -194,13 +218,15 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
       continue
 
     fixup_ea = idc.GetFixupTgtOff(ea)
-    if binary_is_pie and not is_sane_reference(fixup_ea):
+    if binary_is_pie and not is_sane_reference_target(fixup_ea):
       continue
+
+    qword_data, dword_data = 0, 0
 
     # Try to read it as an 8-byte pointer.
     if try_qwords and (ea + 8) <= seg_end_ea:
-      target_ea = read_qword(ea)
-      if is_sane_reference(target_ea):
+      target_ea = qword_data = read_qword(ea)
+      if is_sane_reference_target(target_ea):
         DEBUG("Adding qword reference from {:x} to {:x}".format(ea, target_ea))
         make_xref(ea, target_ea, idc.MakeQword, 8)
         next_ea = ea + 8
@@ -208,26 +234,40 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
 
     # Try to read it as a 4-byte pointer.
     if try_dwords and (ea + 4) <= seg_end_ea:
-      target_ea = read_dword(ea)
-      fixup_ea = idc.GetFixupTgtOff(ea)
-      if is_sane_reference(target_ea):
+      target_ea = dword_data = read_dword(ea)
+      if is_sane_reference_target(target_ea):
         DEBUG("Adding dword reference from {:x} to {:x}".format(ea, target_ea))
         make_xref(ea, target_ea, idc.MakeDword, 4)
         next_ea = ea + 4
         continue
 
-    if is_reference(ea) and not is_runtime_external_data_reference(ea):
-      DEBUG("WARNING: Undefining reference at {:x} to insane target {:x}".format(
+    # We've got a reference from here; it might actually be that we're inside
+    # of a larger thing (e.g. an array, or struct) and so this reference target
+    # doesn't belong to `ea`, but really a nearby `ea`. Let's go and remove it.
+    target_ea = get_reference_target(ea)
+    if not is_invalid_ea(target_ea) and 0 != (qword_data | dword_data):
+      DEBUG("WARNING: Removing likely in-object reference from nearby {:x} to {:x}".format(
           ea, target_ea))
       idaapi.do_unknown_range(ea, 4, idc.DOUNK_EXPAND)
-    
+
     next_ea = ea + 4
 
   DEBUG("Stopping scan at {:x}".format(ea))
 
+def _next_code_or_jt_ea(ea):
+  """Scan forward looking for the next non-data effective address."""
+  seg_end_ea = idc.SegEnd(ea)
+  while ea <= seg_end_ea:
+    flags = idc.GetFlags(ea)
+    if idc.isCode(flags):
+      break
+    if is_jump_table_entry(ea):
+      break
+    ea += 1
+  return ea
+
 def find_missing_xrefs_in_code_segment(seg_ea, seg_end_ea, binary_is_pie):
   """Looks for data cross-references in a code segment."""
-  DEBUG_PUSH()
   ea, next_ea = seg_ea, seg_ea
   while next_ea < seg_end_ea:
     ea = next_ea
@@ -253,9 +293,12 @@ def find_missing_xrefs_in_code_segment(seg_ea, seg_end_ea, binary_is_pie):
     #
     # Where the `LDR` references a nearby slot in the `.text` segment wherein
     # there is a reference to the real function.
+    #
+    # In x86, we see this behavior with embedded exception tables. This comes
+    # up a bunch in Windows binaries.
     flags = idc.GetFlags(ea)
     if idc.isData(flags):
-      next_ea = ea + idc.ItemSize(ea)
+      next_ea = _next_code_or_jt_ea(ea + 1)
       find_missing_xrefs_in_segment(ea, next_ea, binary_is_pie)
       continue
 
@@ -284,46 +327,37 @@ def process_segments(binary_is_pie):
 
   seg_eas = [ea for ea in idautils.Segments() if not is_invalid_ea(ea)]
 
-  # Start by going through all instructions. One result is that we should find
+  # Go through through the data segments and look for strings, and through the
+  # code segments and look for instructions. One result is that we should find
   # and identify jump tables, which we need to do so that we don't incorrectly
   # categorize some things as strings.
   for seg_ea in seg_eas:
     seg_name = idc.SegName(seg_ea)
     seg_end_ea = idc.SegEnd(seg_ea)
-    
     if is_code(seg_ea):
       DEBUG("Looking for instructions in segment {}".format(seg_name))
       DEBUG_PUSH()
       decode_segment_instructions(seg_ea, binary_is_pie)
-      assert is_code(seg_ea)
       DEBUG_POP()
     else:
-      DEBUG("Not looking for instructions in segment {}".format(seg_name))
+      DEBUG("Looking for strings in segment {} [{:x}, {:x})".format(
+          seg_name, seg_ea, seg_end_ea))
+      DEBUG_PUSH()
+      find_missing_strings_in_segment(seg_ea, seg_end_ea)
+      DEBUG_POP()
 
-  # Now go through through the data segments and look for strings and missing
-  # cross-references.
+  # Now go through through the data segments and find missing cross-references.
   for seg_ea in seg_eas:
     seg_name = idc.SegName(seg_ea)
     seg_end_ea = idc.SegEnd(seg_ea)
-
-    if is_code(seg_ea):
-      DEBUG("Not looking for strings in {}".format(seg_name))
-      if not binary_is_pie and is_external_segment(seg_ea):
-        DEBUG("Looking for cross-references in segment {} [{:x}, {:x})".format(
-            seg_name, seg_ea, seg_end_ea))
-        find_missing_xrefs_in_code_segment(seg_ea, seg_end_ea, binary_is_pie)
-      continue
-
-    DEBUG("Looking for strings in segment {} [{:x}, {:x})".format(
-        seg_name, seg_ea, seg_end_ea))
-    DEBUG_PUSH()
-    find_missing_strings_in_segment(seg_ea, seg_end_ea)
-    DEBUG_POP()
-
     DEBUG("Looking for cross-references in segment {} [{:x}, {:x})".format(
-      seg_name, seg_ea, seg_end_ea))
+        seg_name, seg_ea, seg_end_ea))
+
     DEBUG_PUSH()
-    find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie)
+    if is_code(seg_ea):
+      find_missing_xrefs_in_code_segment(seg_ea, seg_end_ea, binary_is_pie)
+    else:
+      find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie)
     DEBUG_POP()
 
   # Okay, hopefully by this point we've been able to introduce more information

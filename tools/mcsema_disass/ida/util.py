@@ -84,6 +84,16 @@ def is_code(ea):
   seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
   return seg_type == idc.SEG_CODE
 
+# A stricter form of `is_code`, where we also check whether IDA thinks something
+# is code. IDA is able to identify some things like embedded exception tables
+# in the code section as not truly being code.
+def is_code_by_flags(ea):
+  if not is_code(ea):
+    return False
+
+  flags = idc.GetFlags(ea)
+  return idc.isCode(flags)
+
 def is_read_only_segment(ea):
   mask_perms = idaapi.SEGPERM_WRITE | idaapi.SEGPERM_READ
   perms = idc.GetSegmentAttr(ea, idc.SEGATTR_PERM)
@@ -117,14 +127,10 @@ def is_tls(ea):
 
 # Mark an address as containing code.
 def try_mark_as_code(ea):
-  return False
-
-  if not is_code(ea):
-    seg_ea = idc.SegStart(ea)
-    if is_code(seg_ea):
-      idc.MakeCode(ea)
-      idaapi.autoWait()
-      return True
+  if is_code(ea) and not is_code_by_flags(ea):
+    idc.MakeCode(ea)
+    idaapi.autoWait()
+    return True
   return False
 
 def mark_as_not_code(ea):
@@ -428,11 +434,12 @@ def make_xref(from_ea, to_ea, xref_constructor, xref_size):
   if not make_head(from_ea + xref_size):
     assert idc.BADADDR == idc.SegStart(from_ea + xref_size)
 
+  idaapi.do_unknown_range(from_ea, xref_size, idc.DOUNK_EXPAND)
   xref_constructor(from_ea)
-  if not is_code(from_ea):
+  if not is_code_by_flags(from_ea):
     idc.add_dref(from_ea, to_ea, idc.XREF_USER|idc.dr_O)
   else: 
-    DEBUG("  Not making reference (C) from {:x} to {:x}".format(from_ea, to_ea))
+    DEBUG("  Not making reference (B) from {:x} to {:x}".format(from_ea, to_ea))
 
 _IGNORE_DREF = (lambda x: [idc.BADADDR])
 _IGNORE_CREF = (lambda x, y: [idc.BADADDR])

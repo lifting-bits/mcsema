@@ -48,6 +48,9 @@ class Reference(object):
       self.symbol or "0x{:x}".format(self.ea),
       mask_str)
 
+  def is_valid(self):
+    return self.type != self.INVALID
+
 # Try to determine if `ea` points at a field within a structure. This is a
 # heuristic for determining whether or not an immediate `ea` should actually
 # be treated as a reference. The intuition is that if it points into a logical

@@ -78,8 +78,22 @@ static const struct RegInfo gGprs[] = {
 
 #endif  // __x86_64__
 
+static bool gPrinting = false;
+static unsigned gRepCount = 0;
+
+VOID ClearReps(void) {
+  gRepCount = 0;
+}
+
+VOID CountReps(void) {
+  gRepCount++;
+}
+
 VOID PrintRegState(CONTEXT *ctx) {
-  static bool gPrinting = false;
+  if (gRepCount > 1) {
+    return;
+  }
+
   auto pc = PIN_GetContextReg(ctx, gGprs[0].reg);
   if (!gPrinting) {
     gPrinting = gEntrypoint.Value() == pc;
@@ -109,10 +123,27 @@ VOID PrintRegState(CONTEXT *ctx) {
 
 VOID InstrumentInstruction(INS ins, VOID *) {
   auto addr = INS_Address(ins);
-  if (addr >= gLowAddr && addr < gHighAddr &&
-      !(addr >= gLowExcludeAddr && addr < gHighExcludeAddr)) {
-  INS_InsertCall(
-      ins, IPOINT_BEFORE, (AFUNPTR)PrintRegState, IARG_CONTEXT, IARG_END);
+  
+  if (addr >= gLowAddr && addr < gHighAddr) {
+    
+    // A thunk; only include the address of the first instruction.
+    if (addr >= gLowExcludeAddr && addr < gHighExcludeAddr) {
+      INS_InsertCall(
+          ins, IPOINT_BEFORE, (AFUNPTR)CountReps, IARG_END);
+    
+    // Normal code.
+    } else {
+      if (INS_HasRealRep(ins)) {
+        INS_InsertCall(
+            ins, IPOINT_BEFORE, (AFUNPTR)CountReps, IARG_END);
+      } else {
+        INS_InsertCall(
+            ins, IPOINT_BEFORE, (AFUNPTR)ClearReps, IARG_END);
+      }
+    }
+
+    INS_InsertCall(
+        ins, IPOINT_BEFORE, (AFUNPTR)PrintRegState, IARG_CONTEXT, IARG_END);
   }
 }
 
