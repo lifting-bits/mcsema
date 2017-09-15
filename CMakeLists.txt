@@ -15,6 +15,9 @@
 project(mcsema)
 cmake_minimum_required (VERSION 3.2)
 
+set(CMAKE_CXX_STANDARD 14)
+add_compile_options(-std=c++14)
+
 set(MCSEMA_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
 
 # warnings and compiler settings
@@ -95,6 +98,13 @@ install(
   TARGETS ${MCSEMA_LIFT}
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib)
+
+if(DEFINED ENV{BUILD_MCSEMA_DYNINST_DISASS})
+  if($ENV{BUILD_MCSEMA_DYNINST_DISASS} EQUAL 1)
+    add_custom_target(generate-protobuf-files DEPENDS ${PROJECT_PROTOBUFSOURCEFILES})
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/dyninst/)
+  endif()
+endif()
   
 install(CODE
     "execute_process(COMMAND python ${PROJECT_SOURCE_DIR}/tools/setup.py install -f --prefix=${CMAKE_INSTALL_PREFIX})")
