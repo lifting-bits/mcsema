@@ -8,7 +8,7 @@ import util
 log = logging.getLogger(util.LOGNAME)
 
 
-class XRef:
+class XRef(object):
     IMMEDIATE = 0
     MEMORY = 1
     DISPLACEMENT = 2

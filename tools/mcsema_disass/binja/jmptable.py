@@ -9,7 +9,7 @@ import util
 log = logging.getLogger(util.LOGNAME)
 
 
-class JMPTable:
+class JMPTable(object):
     """ Simple container for jump table info """
     def __init__(self, bv, rel_base, targets, rel_off=0):
         self.rel_off = rel_off
