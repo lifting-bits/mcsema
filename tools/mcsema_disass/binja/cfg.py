@@ -262,7 +262,7 @@ def read_inst_bytes(bv, il):
     return bv.read(il.address, inst_len)
 
 
-def recover_inst(bv, pb_inst, il):
+def recover_inst(bv, pb_block, pb_inst, il):
     """
     Args:
         bv (binja.BinaryView)
@@ -282,6 +282,11 @@ def recover_inst(bv, pb_inst, il):
     if table is not None:
         pb_inst.jump_table_addr = table.base_addr
         pb_inst.offset_base_addr = table.rel_off
+
+        # Add any missing successors
+        for tgt in table.targets:
+            if tgt not in pb_block.successor_eas:
+                pb_block.successor_eas.append(tgt)
 
 
 def add_block(pb_func, block):
@@ -327,7 +332,7 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
             il = func.get_lifted_il_at(inst_addr)
 
             pb_inst = pb_block.instructions.add()
-            recover_inst(bv, pb_inst, il)
+            recover_inst(bv, pb_block, pb_inst, il)
             inst_addr += len(pb_inst.bytes)
 
 
@@ -419,5 +424,5 @@ def get_cfg(args):
     log.debug('Saving to file: %s', args.output)
     with open(args.output, 'wb') as f:
         f.write(pb_mod.SerializeToString())
-
+    print pb_mod
     return 0

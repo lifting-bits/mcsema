@@ -1,5 +1,7 @@
 import binaryninja as binja
-from binaryninja.enums import LowLevelILOperation, MediumLevelILOperation
+from binaryninja.enums import (
+    LowLevelILOperation, MediumLevelILOperation, RegisterValueType
+)
 import logging
 
 import util
@@ -9,13 +11,15 @@ log = logging.getLogger(util.LOGNAME)
 
 class JMPTable:
     """ Simple container for jump table info """
-    def __init__(self, bv, rel_base, rel_off=0):
+    def __init__(self, bv, rel_base, targets, rel_off=0):
         self.rel_off = rel_off
         self.rel_base = rel_base
 
         # Calculate the absolute base address
         mask = (1 << bv.address_size * 8) - 1
         self.base_addr = (self.rel_base + self.rel_off) & mask
+
+        self.targets = [t & mask for t in targets]
 
 
 def search_displ_base(il):
@@ -100,17 +104,23 @@ def get_jmptable(bv, il):
                                  LowLevelILOperation.LLIL_CONST_PTR]:
         return None
 
+    func = il.function.source_function
+    il_func = func.low_level_il
+
+    # Gather all targets of the jump in case binja didn't lift this to LLIL_JUMP_TO
+    successors = []
+    tgt_table = func.get_low_level_il_at(il.address).dest.possible_values
+    if tgt_table.type == RegisterValueType.LookupTableValue:
+        successors.extend(tgt_table.mapping.values())
+
     # Should be able to find table info now
     tbl = None
     log.debug('Searching for jump table info...')
 
     # Jumping to a register
     if il.dest.operation == LowLevelILOperation.LLIL_REG:
-        # TODO: the successors of a block with this case don't show up in headless, but work in the GUI/console
         # This is likely a relative offset table
         # Go up to MLIL and walk back a few instructions to find the values we need
-        func = il.function.source_function
-        il_func = func.low_level_il
         mlil_func = func.medium_level_il
 
         # (Roughly) find the MLIL instruction at this jump
@@ -128,7 +138,7 @@ def get_jmptable(bv, il):
 
                 # If it worked return the table info
                 if None not in [base, offset]:
-                    tbl = JMPTable(bv, base, offset)
+                    tbl = JMPTable(bv, base, successors, offset)
                     break
 
             # Keep walking back
@@ -139,7 +149,7 @@ def get_jmptable(bv, il):
         # Parse out the base address
         base = search_displ_base(il.dest)
         if base is not None:
-            tbl = JMPTable(bv, base)
+            tbl = JMPTable(bv, base, successors)
 
     if tbl is not None:
         log.debug('JumpTable @ 0x%x, Offset 0x%x', tbl.base_addr, tbl.rel_off)
