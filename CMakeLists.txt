@@ -29,7 +29,7 @@ list(APPEND PROJECT_INCLUDEDIRECTORIES ${Protobuf_INCLUDE_DIR})
 list(APPEND PROJECT_DEFINITIONS "GOOGLE_PROTOBUF_NO_RTTI")
 
 #
-# protobuf file generation 
+# protobuf file generation
 #
 
 # this function can't be told where to store the output files! we have to add the whole binary directory
@@ -38,7 +38,8 @@ protobuf_generate_cpp(PROJECT_PROTOBUFSOURCEFILES PROJECT_PROTOBUFHEADERFILES "$
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${CMAKE_CURRENT_BINARY_DIR})
 
 protobuf_generate_python(PROJECT_PROTOBUFPYTHONMODULE "${CMAKE_CURRENT_SOURCE_DIR}/mcsema/CFG/CFG.proto")
-add_custom_target(protobuf_python_module DEPENDS ${PROJECT_PROTOBUFPYTHONMODULE})
+add_custom_target(protobuf_python_module_ida   DEPENDS ${PROJECT_PROTOBUFPYTHONMODULE})
+add_custom_target(protobuf_python_module_binja DEPENDS ${PROJECT_PROTOBUFPYTHONMODULE})
 
 # disable -Werror on these file since they have been generated
 set_source_files_properties(${PROJECT_PROTOBUFSOURCEFILES} PROPERTIES COMPILE_FLAGS "-Wno-sign-conversion -Wno-shorten-64-to-32 -Wno-conversion")
@@ -55,9 +56,9 @@ add_executable(${MCSEMA_LIFT}
 
     mcsema/Arch/ABI.cpp
     mcsema/Arch/Arch.cpp
-    
+
     mcsema/CFG/CFG.cpp
-    
+
     mcsema/BC/Callback.cpp
     mcsema/BC/External.cpp
     mcsema/BC/Function.cpp
@@ -73,14 +74,20 @@ add_executable(${MCSEMA_LIFT}
 
 # Copy mcsema-disass in
 add_custom_command(
-    TARGET protobuf_python_module PRE_BUILD
+    TARGET protobuf_python_module_ida PRE_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida)
+
+add_custom_command(
+    TARGET protobuf_python_module_binja PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/binja)
 
 # this is needed for the #include directives with absolutes paths to work correctly; it must
 # also be set to PUBLIC since mcsema-lift includes some files directly
 list(APPEND PROJECT_INCLUDEDIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_dependencies(${MCSEMA_LIFT} semantics protobuf_python_module)
+add_dependencies(${MCSEMA_LIFT} semantics
+                                protobuf_python_module_ida
+                                protobuf_python_module_binja)
 
 target_link_libraries(${MCSEMA_LIFT} PRIVATE remill ${PROJECT_LIBRARIES})
 target_include_directories(${MCSEMA_LIFT} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIES})
@@ -95,6 +102,6 @@ install(
   TARGETS ${MCSEMA_LIFT}
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib)
-  
+
 install(CODE
     "execute_process(COMMAND python ${PROJECT_SOURCE_DIR}/tools/setup.py install -f --prefix=${CMAKE_INSTALL_PREFIX})")
