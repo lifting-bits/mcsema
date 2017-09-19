@@ -127,11 +127,6 @@ static void RunO3(void) {
   builder.SLPVectorize = false;
   builder.LoopVectorize = false;
 
-#if LLVM_VERSION_NUMBER >= LLVM_VERSION(3, 5)
-  builder.DisableTailCalls = false;  // Enable tail calls.
-  builder.LoadCombine = false;  // Don't allow load coalescing.
-#endif
-
   // TODO(pag): Not sure when these became available.
   // builder.MergeFunctions = false;  // Try to deduplicate functions.
   // builder.VerifyInput = false;

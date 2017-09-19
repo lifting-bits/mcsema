@@ -197,14 +197,20 @@ static llvm::Function *CreateMcSemaInitFiniImpl(
 
   auto i32_type = llvm::Type::getInt32Ty(*gContext);
   auto ptr_type = llvm::Type::getInt8PtrTy(*gContext);
-  auto el_type = llvm::StructType::get(
-      i32_type, func->getType(), ptr_type, nullptr);
-  auto el_init = llvm::ConstantStruct::get(
-      el_type,
-      llvm::ConstantInt::get(i32_type, 101),  // Lowest non-system priority.
-      func,
-      llvm::Constant::getNullValue(ptr_type),
-      nullptr);
+
+  // Type of an entry in the init/fini array.
+  std::vector<llvm::Type *> element_types;
+  element_types.push_back(i32_type);
+  element_types.push_back(func->getType());
+  element_types.push_back(ptr_type);
+  auto el_type = llvm::StructType::get(*gContext, element_types);
+
+  // Init/fini array entry.
+  std::vector<llvm::Constant *> element_inits;
+  element_inits.push_back(llvm::ConstantInt::get(i32_type, 101));
+  element_inits.push_back(func);
+  element_inits.push_back(llvm::Constant::getNullValue(ptr_type));
+  auto el_init = llvm::ConstantStruct::get(el_type, element_inits);
 
   std::vector<llvm::Constant *> new_elems;
 

@@ -400,7 +400,10 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
 
   remill::CloneFunctionInto(bb, func, value_map);
 
-  func->setAttributes(llvm::AttributeSet());
+  // NOTE(pag): Some versions of LLVM use `AttributeSet`, while others
+  //            use `AttributeList`.
+  decltype(func->getAttributes()) attr_set_or_list;
+  func->setAttributes(attr_set_or_list);
   func->addFnAttr(llvm::Attribute::NoInline);
   func->addFnAttr(llvm::Attribute::NoBuiltin);
 

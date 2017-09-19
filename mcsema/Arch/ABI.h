@@ -20,7 +20,7 @@
 #include <cstdint>
 #include <vector>
 
-#include <llvm/IR/CallingConv.h>
+#include "remill/BC/Compat/CallingConvention.h"
 
 namespace llvm {
 class Type;

@@ -445,6 +445,12 @@ _IGNORE_DREF = (lambda x: [idc.BADADDR])
 _IGNORE_CREF = (lambda x, y: [idc.BADADDR])
 
 def _stop_looking_for_xrefs(ea):
+  """This is a heuristic to decide whether or not we should stop looking for
+  cross-references. It is relevant to IDA structs, where IDA will treat structs
+  and everything in them as one single 'thing', and so all xrefs embedded within
+  a struct will actually be associated with the first EA of the struct. So
+  if we're in a struct or something like it, and the item size is bigger than
+  the address size, then we will assume it's actually in a struct."""
   if is_code(ea):
     return True
 
@@ -458,71 +464,91 @@ def _xref_generator(ea, get_first, get_next):
     yield target_ea
     target_ea = get_next(ea, target_ea)
 
-def _drefs_from(ea):
+def _drefs_from(ea, only_one=False):
   flags = idc.GetFlags(ea)
   if idc.isCode(flags):
     return
 
   fixup_ea = idc.GetFixupTgtOff(ea)
   seen = False
+  has_one = False
   if not is_invalid_ea(fixup_ea) and not is_code(fixup_ea):
-    seen = True
+    seen = only_one
+    has_one = True
     yield fixup_ea
 
-  if seen and _stop_looking_for_xrefs(ea):
+  if has_one and _stop_looking_for_xrefs(ea):
     return
 
   for target_ea in _xref_generator(ea, idaapi.get_first_dref_from, idaapi.get_next_dref_from):
     if target_ea != fixup_ea:
-      seen = True
+      seen = only_one
       yield target_ea
+      if seen:
+        return
 
   if not seen and ea in _XREFS_FROM:
     for target_ea in _XREFS_FROM[ea]:
       yield target_ea
+      seen = only_one
+      if seen:
+        return
 
-def _crefs_from(ea):
+def _crefs_from(ea, only_one=False):
   flags = idc.GetFlags(ea)
   if not idc.isCode(flags):
     return
 
   fixup_ea = idc.GetFixupTgtOff(ea)
   seen = False
+  has_one = False
   if not is_invalid_ea(fixup_ea) and is_code(fixup_ea):
-    seen = True
+    seen = only_one
+    has_one = True
     yield fixup_ea
 
-  if seen and _stop_looking_for_xrefs(ea):
+  if has_one and _stop_looking_for_xrefs(ea):
     return
 
   for target_ea in _xref_generator(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from):
     if target_ea != fixup_ea:
-      seen = True
+      seen = only_one
       yield target_ea
+      if seen:
+        return
 
   if not seen and ea in _XREFS_FROM:
     for target_ea in _XREFS_FROM[ea]:
+      seen = only_one
       yield target_ea
+      if seen:
+        return
 
-def _xrefs_from(ea):
+def _xrefs_from(ea, only_one=False):
   fixup_ea = idc.GetFixupTgtOff(ea)
   seen = False
+  has_one = False
   if not is_invalid_ea(fixup_ea):
-    seen = True
+    seen = only_one
+    has_one = True
     yield fixup_ea
 
-  if seen and _stop_looking_for_xrefs(ea):
+  if has_one and _stop_looking_for_xrefs(ea):
     return
 
-  for target_ea in _drefs_from(ea):
+  for target_ea in _drefs_from(ea, only_one):
     if target_ea != fixup_ea:
-      seen = True
+      seen = only_one
       yield target_ea
+      if seen:
+        return
 
-  for target_ea in _crefs_from(ea):
+  for target_ea in _crefs_from(ea, only_one):
     if target_ea != fixup_ea:
-      seen = True
+      seen = only_one
       yield target_ea
+      if seen:
+        return
 
 def _drefs_to(ea):
   for source_ea in _xref_generator(ea, idaapi.get_first_dref_to, idaapi.get_next_dref_to):

@@ -637,7 +637,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
 
     } else if (gArch->IsAMD64()) {
       if (is_windows) {
-        func->cc = llvm::CallingConv::X86_64_Win64;
+        func->cc = llvm::CallingConv::Win64;
       } else {
         func->cc = llvm::CallingConv::X86_64_SysV;
       }

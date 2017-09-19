@@ -208,7 +208,7 @@ static const ArgConstraint *ConstraintTable(llvm::CallingConv::ID cc) {
     };
     return &(kAmd64SysVArgs[0]);
 
-  } else if (llvm::CallingConv::X86_64_Win64 == cc) {
+  } else if (llvm::CallingConv::Win64 == cc) {
     static const ArgConstraint kAmd64Win64Args[] = {
         {"RCX", kIntegralLeast64},
         {"RDX", kIntegralLeast64},
@@ -301,7 +301,7 @@ static uint64_t DefaultUsedStackBytes(llvm::CallingConv::ID cc) {
     case llvm::CallingConv::X86_64_SysV:
       return 8;  // Size of return address on the stack.
 
-    case llvm::CallingConv::X86_64_Win64:
+    case llvm::CallingConv::Win64:
       return 8 + 32;  // Return address + shadow space.
 
     case llvm::CallingConv::X86_FastCall:
@@ -316,7 +316,7 @@ static uint64_t DefaultUsedStackBytes(llvm::CallingConv::ID cc) {
 
 static const char *IntReturnValVar(llvm::CallingConv::ID cc) {
   if (llvm::CallingConv::X86_64_SysV == cc ||
-      llvm::CallingConv::X86_64_Win64 == cc) {
+      llvm::CallingConv::Win64 == cc) {
     return "RAX";
 
   } else if (llvm::CallingConv::X86_StdCall == cc ||
@@ -341,7 +341,7 @@ static const char *IntReturnValVar(llvm::CallingConv::ID cc) {
 static const char *FloatReturnValVar(llvm::CallingConv::ID cc,
                                      llvm::Type *type) {
   if (llvm::CallingConv::X86_64_SysV == cc ||
-      llvm::CallingConv::X86_64_Win64 == cc) {
+      llvm::CallingConv::Win64 == cc) {
     return "XMM0";
 
   } else if (llvm::CallingConv::X86_StdCall == cc ||
@@ -684,7 +684,7 @@ void CallingConvention::AllocateReturnAddress(llvm::BasicBlock *block) {
 
     auto addr_size = gArch->address_size / 8;
 
-    if (llvm::CallingConv::X86_64_Win64 == cc) {
+    if (llvm::CallingConv::Win64 == cc) {
       CHECK(gArch->IsAMD64());
       addr_size += 32;  // Shadow space.
     }
