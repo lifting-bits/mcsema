@@ -108,12 +108,11 @@ VOID PrintRegState(CONTEXT *ctx) {
 
   std::stringstream ss;
   const char *sep = "";
-  const auto width = sizeof(void *) * 2;
   for (auto &gpr : gGprs) {
     ss
-        << sep << gpr.name << "=" << std::hex << std::setw(width)
-        << PIN_GetContextReg(ctx, gpr.reg) << std::setw(0);
-    sep = " ";
+        << sep << gpr.name << "=" << std::hex << std::setw(0)
+        << PIN_GetContextReg(ctx, gpr.reg);
+    sep = ",";
   }
 
   // `-add-reg-tracer` uses `printf`, so even though it's a bit weird, we'll

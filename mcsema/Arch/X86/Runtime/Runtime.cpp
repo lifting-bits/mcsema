@@ -106,12 +106,12 @@ Memory *__mcsema_reg_tracer(State &state, addr_t, Memory *memory) {
   if (sizeof(void *) == 8) {
     fprintf(
         stderr,
-        "RIP=%16" PRIx64 " RAX=%16" PRIx64 " RBX=%16" PRIx64
-        " RCX=%16" PRIx64 " RDX=%16" PRIx64 " RSI=%16" PRIx64
-        " RDI=%16" PRIx64 " RBP=%16" PRIx64 " RSP=%16" PRIx64
-        " R8=%16" PRIx64 " R9=%16" PRIx64 " R10=%16" PRIx64
-        " R11=%16" PRIx64 " R12=%16" PRIx64 " R13=%16" PRIx64
-        " R14=%16" PRIx64 " R15=%16" PRIx64 "\n",
+        "RIP=%" PRIx64 ",RAX=%" PRIx64 ",RBX=%" PRIx64
+        ",RCX=%" PRIx64 ",RDX=%" PRIx64 ",RSI=%" PRIx64
+        ",RDI=%" PRIx64 ",RBP=%" PRIx64 ",RSP=%" PRIx64
+        ",R8=%" PRIx64 ",R9=%" PRIx64 ",R10=%" PRIx64
+        ",R11=%" PRIx64 ",R12=%" PRIx64 ",R13=%" PRIx64
+        ",R14=%" PRIx64 ",R15=%" PRIx64 "\n",
 
         state.RIP, state.RAX, state.RBX, state.RCX, state.RDX, state.RSI,
         state.RDI, state.RBP, state.RSP, state.R8, state.R9, state.R10,
@@ -119,9 +119,9 @@ Memory *__mcsema_reg_tracer(State &state, addr_t, Memory *memory) {
   } else {
     fprintf(
         stderr,
-        "EIP=%8" PRIx32 " EAX=%8" PRIx32 " EBX=%8" PRIx32
-        " ECX=%8" PRIx32 " EDX=%8" PRIx32 " ESI=%8" PRIx32
-        " EDI=%8" PRIx32 " ESP=%8" PRIx32 " EBP=%8" PRIx32 "\n",
+        "EIP=%" PRIx32 ",EAX=%" PRIx32 ",EBX=%" PRIx32
+        ",ECX=%" PRIx32 ",EDX=%" PRIx32 ",ESI=%" PRIx32
+        ",EDI=%" PRIx32 ",ESP=%" PRIx32 ",EBP=%" PRIx32 "\n",
         state.EIP, state.EAX, state.EBX, state.ECX, state.EDX, state.ESI,
         state.EDI, state.EBP, state.ESP);
   }
