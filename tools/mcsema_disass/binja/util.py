@@ -177,3 +177,8 @@ def is_section_external(bv, sect):
 
     _INT_SECTIONS.add(sect.start)
     return False
+
+
+def is_tls_section(bv, addr):
+    sect_names = (sect.name for sect in bv.get_sections_at(addr))
+    return any(sect in ['.tbss', '.tdata', '.tls'] for sect in sect_names)

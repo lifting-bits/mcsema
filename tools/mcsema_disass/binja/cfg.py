@@ -86,8 +86,8 @@ def recover_ext_func(bv, pb_mod, sym):
         pb_extfn.is_weak = False  # TODO: figure out how to decide this
 
         # Assume cdecl if the type is unknown
-        cconv = ftype.calling_convention.name
-        if cconv in BINJA_CCONV_TYPES:
+        cconv = ftype.calling_convention
+        if cconv is not None and cconv.name in BINJA_CCONV_TYPES:
             pb_extfn.cc = BINJA_CCONV_TYPES[cconv]
         else:
             pb_extfn.cc = CFG_pb2.ExternalFunction.CallerCleanup
@@ -109,6 +109,7 @@ def recover_ext_var(bv, pb_mod, sym):
         pb_extvar.ea = sym.address
         pb_extvar.size = EXT_DATA_MAP[sym.name]
         pb_extvar.is_weak = False  # TODO: figure out how to decide this
+        pb_extvar.is_thread_local = util.is_tls_section(bv, sym.address)
     else:
         log.error('Unknown external var: %s', sym.name)
 
@@ -137,7 +138,6 @@ def recover_section_cross_references(bv, pb_seg, sect):
     for addr in xrange(sect.start, sect.end, entry_width):
         xref = read_val(bv, addr)
 
-        # TODO: probably need a better way of telling this is a ref
         if not util.is_valid_addr(bv, xref):
             continue
 
@@ -147,6 +147,11 @@ def recover_section_cross_references(bv, pb_seg, sect):
         pb_ref.target_ea = xref
         pb_ref.target_name = util.find_symbol_name(bv, xref)
         pb_ref.target_is_code = util.is_code(bv, xref)
+
+        if util.is_tls_section(bv, addr):
+            pb_ref.target_fixup_kind = CFG_pb2.DataReference.OffsetFromThreadBase
+        else:
+            pb_ref.target_fixup_kind = CFG_pb2.DataReference.Absolute
 
 
 def recover_section_vars(bv, pb_seg, sect):
@@ -180,6 +185,10 @@ def recover_sections(bv, pb_mod):
         pb_seg.data = bv.read(sect.start, sect.length)
         pb_seg.is_external = util.is_section_external(bv, sect)
         pb_seg.read_only = not util.is_readable(bv, sect.start)
+        pb_seg.is_thread_local = util.is_tls_section(bv, sect.start)
+
+        # TODO: split sections up so that globals are separate "segments"
+        pb_seg.is_exported = False
 
         recover_section_vars(bv, pb_seg, sect)
         recover_section_cross_references(bv, pb_seg, sect)
@@ -271,7 +280,6 @@ def recover_inst(bv, pb_block, pb_inst, il):
     """
     pb_inst.ea = il.address
     pb_inst.bytes = read_inst_bytes(bv, il)
-
     for ref in xrefs.get_xrefs(bv, il):
         add_xref(bv, pb_inst, ref.addr, ref.cfg_type)
 
@@ -280,8 +288,7 @@ def recover_inst(bv, pb_block, pb_inst, il):
 
     table = jmptable.get_jmptable(bv, il)
     if table is not None:
-        pb_inst.jump_table_addr = table.base_addr
-        pb_inst.offset_base_addr = table.rel_off
+        add_xref(bv, pb_inst, table.base_addr, CFG_pb2.CodeReference.OffsetTable)
 
         # Add any missing successors
         for tgt in table.targets:
