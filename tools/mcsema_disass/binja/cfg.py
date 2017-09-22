@@ -431,5 +431,5 @@ def get_cfg(args):
     log.debug('Saving to file: %s', args.output)
     with open(args.output, 'wb') as f:
         f.write(pb_mod.SerializeToString())
-    print pb_mod
+
     return 0
