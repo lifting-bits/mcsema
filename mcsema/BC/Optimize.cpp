@@ -18,6 +18,7 @@
 #include <glog/logging.h>
 
 #include <algorithm>
+#include <limits>
 #include <set>
 #include <unordered_set>
 #include <utility>
@@ -120,7 +121,8 @@ static void RunO3(void) {
   llvm::PassManagerBuilder builder;
   builder.OptLevel = 3;
   builder.SizeLevel = 2;
-  builder.Inliner = llvm::createFunctionInliningPass(100);
+  builder.Inliner = llvm::createFunctionInliningPass(
+      std::numeric_limits<int>::max());
   builder.LibraryInfo = TLI;  // Deleted by `llvm::~PassManagerBuilder`.
   builder.DisableUnrollLoops = false;  // Unroll loops!
   builder.DisableUnitAtATime = false;

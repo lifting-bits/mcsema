@@ -23,6 +23,7 @@
 #include "remill/BC/Lifter.h"
 
 namespace llvm {
+class Argument;
 class BasicBlock;
 class IntegerType;
 class Type;
@@ -54,12 +55,12 @@ class InstructionLifter : public remill::InstructionLifter {
   // Lift an immediate operand.
   llvm::Value *LiftImmediateOperand(
       remill::Instruction &inst, llvm::BasicBlock *block,
-      llvm::Type *arg_type, remill::Operand &op) override;
+      llvm::Argument *arg, remill::Operand &op) override;
 
   // Lift an indirect memory operand to a value.
   llvm::Value *LiftAddressOperand(
       remill::Instruction &inst, llvm::BasicBlock *block,
-      remill::Operand &mem) override;
+      llvm::Argument *arg, remill::Operand &mem) override;
 
  private:
 
