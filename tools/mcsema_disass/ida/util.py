@@ -471,7 +471,7 @@ def _drefs_from(ea, only_one=False):
 
   fixup_ea = idc.GetFixupTgtOff(ea)
   seen = False
-  has_one = False
+  has_one = only_one
   if not is_invalid_ea(fixup_ea) and not is_code(fixup_ea):
     seen = only_one
     has_one = True
@@ -481,7 +481,7 @@ def _drefs_from(ea, only_one=False):
     return
 
   for target_ea in _xref_generator(ea, idaapi.get_first_dref_from, idaapi.get_next_dref_from):
-    if target_ea != fixup_ea:
+    if (target_ea != fixup_ea) : # and not is_invalid_ea(fixup_ea):
       seen = only_one
       yield target_ea
       if seen:
@@ -501,7 +501,7 @@ def _crefs_from(ea, only_one=False):
 
   fixup_ea = idc.GetFixupTgtOff(ea)
   seen = False
-  has_one = False
+  has_one = only_one
   if not is_invalid_ea(fixup_ea) and is_code(fixup_ea):
     seen = only_one
     has_one = True
@@ -511,7 +511,7 @@ def _crefs_from(ea, only_one=False):
     return
 
   for target_ea in _xref_generator(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from):
-    if target_ea != fixup_ea:
+    if (target_ea != fixup_ea): # and not is_invalid_ea(fixup_ea):
       seen = only_one
       yield target_ea
       if seen:
@@ -649,7 +649,7 @@ def has_flow_to_code(ea):
   return _reference_checker(ea, cref_finder=idautils.CodeRefsTo)
 
 def get_reference_target(ea):
-  for ref_ea in _xrefs_from(ea):
+  for ref_ea in _xrefs_from(ea, True):
     return ref_ea
 
   # This is kind of funny, but it works with how we understand external
