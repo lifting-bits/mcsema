@@ -225,6 +225,10 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   xref->target_ea = static_cast<uint64_t>(cfg_ref.ea());
   xref->target_segment = FindSegment(module, xref->target_ea);
 
+  CHECK(xref->segment != nullptr)
+      << "Could not identify segment containing cross-reference from "
+      << std::hex << xref->ea << " to " << std::hex << xref->target_ea;
+
   if (cfg_ref.has_mask()) {
     xref->mask = static_cast<uint64_t>(cfg_ref.mask());
   }
