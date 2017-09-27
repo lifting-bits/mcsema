@@ -172,8 +172,8 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
 
 llvm::Value *InstructionLifter::LiftImmediateOperand(
     remill::Instruction &inst, llvm::BasicBlock *block,
-    llvm::Type *arg_type, remill::Operand &op) {
-
+    llvm::Argument *arg, remill::Operand &op) {
+  auto arg_type = arg->getType();
   if (imm_ref) {
     imm_ref_used = true;
 
@@ -182,7 +182,7 @@ llvm::Value *InstructionLifter::LiftImmediateOperand(
 
     CHECK(arg_size <= gArch->address_size)
         << "Immediate operand size " << op.size << " of "
-        << op.Debug() << " in instuction " << std::hex << inst.pc
+        << op.Serialize() << " in instuction " << std::hex << inst.pc
         << " is wider than the architecture pointer size ("
         << std::dec << gArch->address_size << ").";
 
@@ -195,13 +195,13 @@ llvm::Value *InstructionLifter::LiftImmediateOperand(
   }
 
   return this->remill::InstructionLifter::LiftImmediateOperand(
-      inst, block, arg_type, op);
+      inst, block, arg, op);
 }
 
 // Lift an indirect memory operand to a value.
 llvm::Value *InstructionLifter::LiftAddressOperand(
     remill::Instruction &inst, llvm::BasicBlock *block,
-    remill::Operand &op) {
+    llvm::Argument *arg, remill::Operand &op) {
 
   auto &mem = op.addr;
 
@@ -209,7 +209,7 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
   // we want to preserve it in the register state structure.
   if (mem.IsControlFlowTarget()) {
     return this->remill::InstructionLifter::LiftAddressOperand(
-        inst, block, op);
+        inst, block, arg, op);
   }
 
   if ((mem.base_reg.name.empty() && mem.index_reg.name.empty()) ||
@@ -227,7 +227,7 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
   } else {
     LOG_IF(ERROR, mem_ref != nullptr)
         << "IDA probably incorrectly decoded memory operand "
-        << op.Debug() << " of instruction " << std::hex << inst.pc
+        << op.Serialize() << " of instruction " << std::hex << inst.pc
         << " as an absolute memory reference when it should be treated as a "
         << "displacement memory reference.";
 
@@ -238,13 +238,14 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
       disp_ref_used = true;
       mem.displacement = 0;
       auto dynamic_addr = this->remill::InstructionLifter::LiftAddressOperand(
-          inst, block, op);
+          inst, block, arg, op);
       llvm::IRBuilder<> ir(block);
       return ir.CreateAdd(dynamic_addr, disp_ref);
     }
   }
 
-  return this->remill::InstructionLifter::LiftAddressOperand(inst, block, op);
+  return this->remill::InstructionLifter::LiftAddressOperand(
+      inst, block, arg, op);
 }
 
 }  // namespace mcsema
