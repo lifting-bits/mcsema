@@ -128,6 +128,12 @@ message Variable {
   required  string      name = 2;
 }
 
+message GlobalVar {
+    required int64      ea = 1;
+    required string     name = 2;
+    required int64      size = 3;
+}
+
 // The data section is a verbatim copy of all the data in a given segment. This
 // copy will be "instantiated" into the LLVM module as a packed struct, where
 // the elements of the struct will be opaque sequences of bytes interspered
@@ -156,4 +162,6 @@ message Module {
 
   repeated  ExternalFunction    external_funcs = 4;
   repeated  ExternalVariable    external_vars = 5;
+  
+  repeated	GlobalVar           global_vars = 8;
 }
