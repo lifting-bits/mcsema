@@ -115,7 +115,7 @@ def process_types(dwarf, typemap):
       size = get_size(die)
       if die.offset not in typemap :
         typemap[die.offset] = Type(name=name, size=size, type_offset=die.offset, tag=TYPE_ENUM.get(die.tag))
-        DEBUG("<{0:x}> {1}".format(die.offset, typemap.get(die.offset)))
+      DEBUG("<{0:x}> {1}".format(die.offset, typemap.get(die.offset)))
 
   def process_pointer_types(die):
     if die.tag in POINTER_TYPES:
@@ -127,9 +127,9 @@ def process_types(dwarf, typemap):
       else:
         name = 'void*'
         type_offset = 0
-        if die.offset not in typemap:
-          typemap[die.offset] = Type(name=name, size=die.cu['address_size'], type_offset=type_offset, tag=TYPE_ENUM.get(die.tag))
-          DEBUG("<{0:x}> {1}".format(die.offset, typemap.get(die.offset)))
+      if die.offset not in typemap:
+        typemap[die.offset] = Type(name=name, size=die.cu['address_size'], type_offset=type_offset, tag=TYPE_ENUM.get(die.tag))
+      DEBUG("<{0:x}> {1}".format(die.offset, typemap.get(die.offset)))
     
   def process_indirect_types(die):
     if die.tag in INDIRECT_TYPES:
@@ -146,9 +146,9 @@ def process_types(dwarf, typemap):
             tag = 0
             type_offset = 0
             name = get_name(die)
-            if die.offset not in typemap:
-              typemap[die.offset] = Type(name=name, size=-1, type_offset=type_offset, tag=tag)
-          DEBUG("<{0:x}> {1}".format(die.offset, typemap.get(die.offset)))
+          if die.offset not in typemap:
+            typemap[die.offset] = Type(name=name, size=-1, type_offset=type_offset, tag=tag)
+        DEBUG("<{0:x}> {1}".format(die.offset, typemap.get(die.offset)))
             
   def process_array_types(die):
     if die.tag in ARRAY_TYPES:
@@ -166,9 +166,9 @@ def process_types(dwarf, typemap):
                 index = index +1
                 size = size*index
                 break
-              if die.offset not in typemap:
-                typemap[die.offset] = Type(name=name, size=size, type_offset=type_offset, tag=TYPE_ENUM.get(die.tag))
-              DEBUG("<{0:x}> {1}".format(die.offset, typemap.get(die.offset)))
+        if die.offset not in typemap:
+          typemap[die.offset] = Type(name=name, size=size, type_offset=type_offset, tag=TYPE_ENUM.get(die.tag))
+        DEBUG("<{0:x}> {1}".format(die.offset, typemap.get(die.offset)))
             
   build_typemap(dwarf, process_direct_types)
   build_typemap(dwarf, process_indirect_types)
@@ -336,11 +336,13 @@ def process_dwarf_info(in_file, out_file):
     M.name = "GlobalVariable".format('utf-8')
         
     for key, value in GLOBAL_VARIABLES.iteritems():
-      if value["size"] != -1:
+      if value["size"] > 0:
         gvar = M.global_vars.add()
         gvar.name = value["name"]
         gvar.ea = value["addr"]
         gvar.size = value["size"]
+      else:
+        DEBUG("Look for {}".format(pprint.pformat(value)))
             
     with open(out_file, "w") as outf:
       outf.write(M.SerializeToString())
