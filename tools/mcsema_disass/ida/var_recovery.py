@@ -36,6 +36,7 @@ BASE_TYPES = [
   'DW_TAG_base_type',
   'DW_TAG_structure_type',
   'DW_TAG_union_type',
+  'DW_TAG_enumeration_type',
 ]
 
 INDIRECT_TYPES = [
@@ -43,6 +44,7 @@ INDIRECT_TYPES = [
   'DW_TAG_const_type',
   'DW_TAG_volatile_type',
   'DW_TAG_restrict_type',
+  'DW_TAG_subroutine_type',
 ]
 
 POINTER_TYPES = {
@@ -154,25 +156,27 @@ def process_types(dwarf, typemap):
     if die.tag in ARRAY_TYPES:
       if 'DW_AT_type' in die.attributes:
         offset = die.attributes['DW_AT_type'].value + die.cu.cu_offset
-        name = typemap[offset].name if offset in typemap else 'UNKNOWN'
-        type_offset = typemap[offset].type_offset if offset in typemap else 0
-        size = typemap[offset].size if offset in typemap else 0
-        # get sub range to get the array size
-        for child_die in die.iter_children():
-          if child_die.tag == 'DW_TAG_subrange_type':
-            if 'DW_AT_upper_bound' in child_die.attributes:
-              index = child_die.attributes['DW_AT_upper_bound'].value
-              if type(index) is int:
-                index = index +1
-                size = size*index
-                break
-        if die.offset not in typemap:
+        if offset in typemap:
+          name = typemap[offset].name if offset in typemap else 'UNKNOWN'
+          type_offset = typemap[offset].type_offset if offset in typemap else 0
+          size = typemap[offset].size if offset in typemap else 0
+          # get sub range to get the array size
+          for child_die in die.iter_children():
+            if child_die.tag == 'DW_TAG_subrange_type':
+              if 'DW_AT_upper_bound' in child_die.attributes:
+                index = child_die.attributes['DW_AT_upper_bound'].value
+                if type(index) is int:
+                  index = index +1
+                  size = size*index
+                  break
           typemap[die.offset] = Type(name=name, size=size, type_offset=type_offset, tag=TYPE_ENUM.get(die.tag))
-        DEBUG("<{0:x}> {1}".format(die.offset, typemap.get(die.offset)))
+          DEBUG("<{0:x}> {1}".format(die.offset, typemap.get(die.offset)))
             
   build_typemap(dwarf, process_direct_types)
   build_typemap(dwarf, process_indirect_types)
   build_typemap(dwarf, process_pointer_types)
+  build_typemap(dwarf, process_array_types)
+  build_typemap(dwarf, process_indirect_types)
   build_typemap(dwarf, process_array_types)
     
     
@@ -214,7 +218,7 @@ VARIABLE_STAT = {"type1": 0, "type2": 0}
 
 def address_lookup(g_ref, global_var_array):
   for value, gvar in GLOBAL_VARIABLES.iteritems():
-    if ((gvar['type'].tag == 1) or (gvar['type'].tag == 4)): # and ( gvar['name'] == "htracker"):
+    if ((gvar['type'].tag == 1) or (gvar['type'].tag == 4)):
       if gvar['addr'] == g_ref.address:
         address = gvar['addr']
         size = gvar['size']
@@ -229,7 +233,7 @@ def address_lookup(g_ref, global_var_array):
           DEBUG("Found {}".format(pprint.pformat(gvar)))
           VARIABLE_STAT["type1"] = VARIABLE_STAT["type1"] + 1
           return None
-    elif (gvar['type'].tag == 5) or (gvar['type'].tag == 2): # and gvar['name'] not in SYMBOL_BLACKLIST[os.path.basename(BINARY_FILE)]):
+    elif (gvar['type'].tag == 5) or (gvar['type'].tag == 2):
       base_address = gvar['addr']
       size = gvar['size']
       name = "recovered_global_{:0x}".format(base_address)
