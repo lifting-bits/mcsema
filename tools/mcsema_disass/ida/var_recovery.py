@@ -12,10 +12,11 @@ from enum import Enum
 try:
   from elftools.elf.elffile import ELFFile
   from elftools.common.py3compat import itervalues
-  from elftools.dwarf.descriptions import (describe_DWARF_expr, set_global_machine_arch)
-  from elftools.dwarf.descriptions import describe_attr_value
+  from elftools.dwarf.descriptions import (describe_DWARF_expr, set_global_machine_arch, describe_CFI_instructions)
+  from elftools.dwarf.descriptions import describe_attr_value, describe_reg_name
   from elftools.dwarf.locationlists import LocationEntry
   from elftools.common.py3compat import maxint, bytes2str, byte2int, int2byte
+  from elftools.dwarf.callframe import  instruction_name, CIE, FDE, ZERO
 except ImportError:
   print "Install pyelf tools"
 
@@ -31,6 +32,8 @@ Type = namedtuple('Type', ['name', 'size', 'type_offset', 'tag'])
 GLOBAL_VARIABLES = OrderedDict()
 
 TYPES_MAP = OrderedDict()
+
+EH_FRAMES = OrderedDict()
 
 BASE_TYPES = [
   'DW_TAG_base_type',
@@ -65,17 +68,26 @@ TYPE_ENUM = {
 }
 
 _DEBUG = False
-_DEBUG_FILE = sys.stderr
+_DEBUG_FILE = None
+_DEBUG_PREFIX = ""
 
 def DEBUG_INIT(file, flag):
   global _DEBUG
   global _DEBUG_FILE
   _DEBUG = flag
   _DEBUG_FILE = file
+  
+def DEBUG_PUSH():
+  global _DEBUG_PREFIX
+  _DEBUG_PREFIX += "  "
+
+def DEBUG_POP():
+  global _DEBUG_PREFIX
+  _DEBUG_PREFIX = _DEBUG_PREFIX[:-2]
 
 def DEBUG(s):
   if _DEBUG:
-    _DEBUG_FILE.write("{}\n".format(str(s)))
+    _DEBUG_FILE.write("{}{}\n".format(_DEBUG_PREFIX, str(s)))
 
 '''
     DIE attributes utilities 
@@ -100,7 +112,6 @@ def get_location(die):
     
 def get_types(die):
   if 'DW_AT_type' in die.attributes:
-    DEBUG("{}".format(die.attributes))
     offset = die.attributes['DW_AT_type'].value + die.cu.cu_offset
     if offset in TYPES_MAP:
       return (TYPES_MAP[offset], TYPES_MAP[offset].size, TYPES_MAP[offset].type_offset)
@@ -179,7 +190,6 @@ def process_types(dwarf, typemap):
   build_typemap(dwarf, process_indirect_types)
   build_typemap(dwarf, process_array_types)
     
-    
 def _process_dies(die, fn):
   fn(die)
   for child in die.iter_children():
@@ -189,30 +199,24 @@ def build_typemap(dwarf, fn):
   for CU in dwarf.iter_CUs():
     top = CU.get_top_DIE()
     _process_dies(top, fn)
-
-def readBytes(start, end):
-  DEBUG("binary file : {}".format(BINARY_FILE))
-  bytestr = ""
-  with open(BINARY_FILE, 'rb') as f:
-    elffile = ELFFile(f)
-    for section in elffile.iter_sections():
-      if section['sh_type'] == 'SHT_NOBITS':
-        DEBUG("Section '{}' has no data to dump.".format(section.name))
-        continue
-      if start in xrange(section['sh_addr'], section['sh_addr']+section['sh_size']):
-        sec_addr = section['sh_addr']
-        data = section.data()
-        for i in xrange(start, end):
-          bt = byte2int(data[i - sec_addr])
-          bytestr += int2byte(bt)
-        
-  if bytestr == "":
-    for i in xrange(start, end):
-      bytestr += "\x00"
-  return bytestr
+    
+def _process_frames_info(dwarf, cfi_entries, eh_frames):
+  for entry in cfi_entries:
+    if isinstance(entry, CIE):
+      pass
+    elif isinstance(entry, FDE):
+      pc = entry['initial_location']
+      if pc not in eh_frames:
+        eh_frames[pc] = entry
+    else:
+      continue
+  
+def process_frames(dwarf, eh_frames):
+  if dwarf.has_EH_CFI():
+    _process_frames_info(dwarf, dwarf.EH_CFI_entries(), eh_frames)
 
 def _create_global_var_entry(memory_ref, var_name):
-  return dict(addrs=set(), size=-1, name=var_name, type=None, data="\x00", safe=True)
+  return dict(addrs=set(), size=-1, name=var_name, type=None, safe=True)
 
 VARIABLE_STAT = {"type1": 0, "type2": 0}
 
@@ -224,13 +228,10 @@ def address_lookup(g_ref, global_var_array):
         size = gvar['size']
         if address not in global_var_array:
           global_var_array[address] = _create_global_var_entry(address, g_ref.var.name)
-          global_var_array[address]['data'] = g_ref.data
           global_var_array[address]['size'] = size
           global_var_array[address]['type'] = g_ref.var.ida_type
           for ref in g_ref.var.ref_eas:
-            global_var_array[address]['addrs'].add((ref.inst_addr, ref.offset))
-          DEBUG("Array Variable {}".format(pprint.pformat(global_var_array[address])))   
-          DEBUG("Found {}".format(pprint.pformat(gvar)))
+            global_var_array[address]['addrs'].add((ref.inst_addr, ref.offset)) 
           VARIABLE_STAT["type1"] = VARIABLE_STAT["type1"] + 1
           return None
     elif (gvar['type'].tag == 5) or (gvar['type'].tag == 2):
@@ -240,14 +241,11 @@ def address_lookup(g_ref, global_var_array):
       if g_ref.address in xrange(base_address, base_address + size):
         if base_address not in global_var_array:
           global_var_array[base_address] = _create_global_var_entry(base_address, name)
-          global_var_array[base_address]['data'] = readBytes(base_address, base_address + size)
           global_var_array[base_address]['size'] = size
           global_var_array[base_address]['type'] = g_ref.var.ida_type
           offset = g_ref.address - base_address
           for ref in g_ref.var.ref_eas:
             global_var_array[base_address]['addrs'].add((ref.inst_addr, offset))
-          DEBUG("Array Variable {}".format(pprint.pformat(global_var_array[base_address])))   
-          DEBUG("Found {}".format(pprint.pformat(gvar)))
           VARIABLE_STAT["type2"] = VARIABLE_STAT["type2"] + 1
           return None
   return None
@@ -263,7 +261,7 @@ def _print_die(die, section_offset):
         name = 'Unknown AT value: %x' % name
       DEBUG('    <%x>   %-18s: %s' % (attr.offset, name, describe_attr_value(attr, die, section_offset)))
 
-def _process_variable_tag(die, section_offset, global_var_data):
+def _process_variable_tag(die, section_offset, M, global_var_data):
   if die.tag != 'DW_TAG_variable':
     return
   name = get_name(die)
@@ -272,7 +270,6 @@ def _process_variable_tag(die, section_offset, global_var_data):
     if attr.form not in ('DW_FORM_data4', 'DW_FORM_data8', 'DW_FORM_sec_offset'):
       loc_expr = "{}".format(describe_DWARF_expr(attr.value, die.cu.structs)).split(':')
       if loc_expr[0][1:] == 'DW_OP_addr':
-        #_print_die(die, section_offset)   # DEBUG_ENABLE
         memory_ref = int(loc_expr[1][:-1][1:], 16)
         if memory_ref not in  global_var_data:
           global_var_data[memory_ref] = _create_variable_entry(name, die.offset)
@@ -282,10 +279,67 @@ def _process_variable_tag(die, section_offset, global_var_data):
           global_var_data[memory_ref]['type'] = type
           global_var_data[memory_ref]['size'] = size
           DEBUG("{}".format(pprint.pformat(global_var_data[memory_ref])))  # DEBUG_ENABLE
+   
+def _full_reg_name(regnum):
+  regname = describe_reg_name(regnum, None, False)
+  if regname:
+    return 'r%s (%s)' % (regnum, regname)
+  else:
+    return 'r%s' % regnum
+  
+"""
+  Process subprogram tag and recover the local variables
+"""  
+def _process_subprogram_tag(die, section_offset, M, global_var_data):
+  if die.tag != 'DW_TAG_subprogram':
+    return
+
+  F = M.funcs.add()
+  F.ea = 0
+  F.name = get_name(die)
+  F.is_entrypoint = 0
+  has_frame = False
+  frame_regname = ""
+  
+  if 'DW_AT_frame_base' in die.attributes:
+    frame_attr = die.attributes['DW_AT_frame_base']
+    has_frame = True
+    loc_expr = "{}".format(describe_DWARF_expr(frame_attr.value, die.cu.structs)).split(' ')
+    if loc_expr[0][1:][:-1] == "DW_OP_call_frame_cfa":
+      lowpc_attr = die.attributes['DW_AT_low_pc']
+      #DEBUG("loc_expr {0} {1:x}".format(loc_expr, lowpc_attr.value))
+      frame = EH_FRAMES[lowpc_attr.value] if lowpc_attr.value in EH_FRAMES else None
+      if frame:
+        DEBUG("{0:x}, {1}".format(frame['initial_location'], frame))
+        for instr in frame.instructions:
+          name = instruction_name(instr.opcode)
+          if name == 'DW_CFA_def_cfa_register':
+            frame_regname =  describe_reg_name(instr.args[0], None, False)
+
+  for child in die.iter_children():
+    if child.tag != 'DW_TAG_variable':
+      continue
+  
+    stackvar = F.stackvars.add()
+    stackvar.name = get_name(child)
+    stackvar.sp_offset = 0
+    stackvar.has_frame = has_frame
+    stackvar.regname = frame_regname
+    (type, size, offset) = get_types(child)
+    stackvar.size = size 
     
+    if 'DW_AT_location' in child.attributes:
+      attr = child.attributes['DW_AT_location']
+      if attr.form not in ('DW_FORM_data4', 'DW_FORM_data8', 'DW_FORM_sec_offset'):
+        loc_expr = "{}".format(describe_DWARF_expr(attr.value, child.cu.structs)).split(' ')
+        if loc_expr[0][1:][:-1] == 'DW_OP_fbreg':
+          offset = int(loc_expr[1][:-1])
+          stackvar.sp_offset = offset
+          
 DWARF_OPERATIONS = {
   #'DW_TAG_compile_unit': _process_compile_unit_tag,
-  'DW_TAG_variable' : _process_variable_tag
+  'DW_TAG_variable' : _process_variable_tag,
+  'DW_TAG_subprogram' : _process_subprogram_tag,
 }
 
 class CUnit(object):
@@ -296,21 +350,21 @@ class CUnit(object):
     self._section_offset = global_offset
     self._global_variable = dict()
         
-  def _process_child(self, child_die, global_var_data):
+  def _process_child(self, child_die, M, global_var_data):
     for child in child_die.iter_children():
       func_ = DWARF_OPERATIONS.get(child.tag)
       if func_:
-        func_(child, self._section_offset, global_var_data)
+        func_(child, self._section_offset, M, global_var_data)
         continue
-      self._process_child(child, global_var_data)
+      self._process_child(child, M, global_var_data)
         
-  def decode_control_unit(self, global_var_data):
+  def decode_control_unit(self, M, global_var_data):
     for child in self._die.iter_children():
       func_ = DWARF_OPERATIONS.get(child.tag)
       if func_:
-        func_(child, self._section_offset, global_var_data)
+        func_(child, self._section_offset, M, global_var_data)
         continue
-      self._process_child(child, global_var_data)
+      self._process_child(child, M, global_var_data)
       
 
 def process_dwarf_info(in_file, out_file):
@@ -325,19 +379,21 @@ def process_dwarf_info(in_file, out_file):
       DEBUG("{0} has no debug informations!".format(file))
       return False
         
+    M = CFG_pb2.Module()
+    M.name = "GlobalVariable".format('utf-8')
+    
+    set_global_machine_arch(f_elf.get_machine_arch())
     dwarf_info = f_elf.get_dwarf_info()
     process_types(dwarf_info, TYPES_MAP)    
+    process_frames(dwarf_info, EH_FRAMES)
     section_offset = dwarf_info.debug_info_sec.global_offset
-        
+    
     # Iterate through all the compile units
     for CU in dwarf_info.iter_CUs():
       DEBUG('Found a compile unit at offset {0}, length {1}'.format(CU.cu_offset, CU['unit_length']))
       top_DIE = CU.get_top_DIE()
       c_unit = CUnit(top_DIE, CU['unit_length'], CU.cu_offset, section_offset)
-      c_unit.decode_control_unit(GLOBAL_VARIABLES)
-        
-    M = CFG_pb2.Module()
-    M.name = "GlobalVariable".format('utf-8')
+      c_unit.decode_control_unit(M, GLOBAL_VARIABLES)
         
     for key, value in GLOBAL_VARIABLES.iteritems():
       if value["size"] > 0:
@@ -347,14 +403,18 @@ def process_dwarf_info(in_file, out_file):
         gvar.size = value["size"]
       else:
         DEBUG("Look for {}".format(pprint.pformat(value)))
+        
+    #for func in M.funcs:
+    #  DEBUG("Function name {}".format(func.name))
+    #  for sv in func.stackvars:
+    #    DEBUG_PUSH()
+    #    DEBUG("{} : {}, ".format(sv.name, sv.sp_offset))
+    #    DEBUG_POP()
+        
             
     with open(out_file, "w") as outf:
       outf.write(M.SerializeToString())
-    
-  DEBUG("Type Definitions:")
-  DEBUG("{}".format(pprint.pformat(TYPES_MAP)))
-  DEBUG("End Type Definitions:")
-    
+     
   DEBUG("Global Vars\n")
   DEBUG('Number of Global Vars: {0}'.format(len(GLOBAL_VARIABLES)))
   DEBUG("{}".format(pprint.pformat(GLOBAL_VARIABLES)))
@@ -370,11 +430,9 @@ def is_global_variable_reference(global_var, address):
   return False
 
 def add_global_variable_entry(M, ds):
-  DEBUG("Adding new symbol to global variables")
   for g in M.global_vars:
     start = g.address
     end = start + g.var.size
-    #DEBUG("add_global_variable_entry : start {0:x}, end {1:x}".format(start, end))
     if (ds.base_address >= start) and (ds.base_address < end):
       symbol = g.symbols.add()
       symbol.base_address = ds.base_address

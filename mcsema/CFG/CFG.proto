@@ -65,6 +65,7 @@ message Function {
   repeated  Block       blocks = 2;
   required  bool        is_entrypoint = 3;
   optional  string      name = 4;
+  repeated  StackVar    stackvars = 5;
 }
 
 // A function that is used or referenced within binary, but not implemented
@@ -126,6 +127,14 @@ message DataReference {
 message Variable {
   required  int64       ea = 1;
   required  string      name = 2;
+}
+
+message StackVar {
+    required string     name = 1;
+    required int64      sp_offset = 2;
+    required int64      size = 3;
+    required bool       has_frame = 4;
+    required string     regname = 5;
 }
 
 message GlobalVar {
