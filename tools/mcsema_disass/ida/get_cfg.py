@@ -24,6 +24,7 @@ import struct
 import traceback
 import collections
 import itertools
+import pprint
 
 # Bring in utility libraries.
 from util import *
@@ -1179,7 +1180,7 @@ def identify_program_entrypoints(func_eas):
   DEBUG_POP()
   return exported_funcs, exported_vars
 
-def recover_module(entrypoint):
+def recover_module(entrypoint, gvar_infile = None):
   global EMAP
   global EXTERNAL_FUNCS_TO_RECOVER
   global INTERNAL_THUNK_EAS
@@ -1230,6 +1231,15 @@ def recover_module(entrypoint):
     return
 
   global_vars = []  # TODO(akshay): Pass in relevant info.
+  
+  DEBUG("Global Variable {}".format(gvar_infile))
+  if gvar_infile is not None:
+    GM = CFG_pb2.Module()
+    GM.ParseFromString(gvar_infile.read())
+    count = 0
+    for gvar in GM.global_vars:
+      global_vars.append([gvar.name, gvar.ea, gvar.ea + gvar.size])
+      
   recover_regions(M, exported_vars, global_vars)
   recover_external_symbols(M)
 
@@ -1319,6 +1329,12 @@ if __name__ == "__main__":
       '--entrypoint',
       help="The entrypoint where disassembly should begin",
       required=True)
+  
+  parser.add_argument(
+      '--global_var',
+      type=argparse.FileType('r'),
+      default=None,
+      help="File containing the global variables to be lifted")
 
   args = parser.parse_args(args=idc.ARGV[1:])
 
@@ -1376,7 +1392,7 @@ if __name__ == "__main__":
           set_symbol_name(ea, name)
       idaapi.autoWait()
     
-    M = recover_module(args.entrypoint)
+    M = recover_module(args.entrypoint, args.global_var)
 
     DEBUG("Saving to: {0}".format(args.output.name))
     args.output.write(M.SerializeToString())
