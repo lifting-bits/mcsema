@@ -627,6 +627,8 @@ def recover_instruction(M, B, ea):
   if table and table.offset:
     recover_instruction_offset_table(I, table)
 
+  return I
+
 def recover_basic_block(M, F, block_ea):
   """Add in a basic block to a specific function in the CFG."""
   if is_external_segment_by_flags(block_ea):
@@ -640,17 +642,23 @@ def recover_basic_block(M, F, block_ea):
   
   B = F.blocks.add()
   B.ea = block_ea
-  B.successor_eas.extend(succ_eas)
 
   DEBUG_PUSH()
+  I = None
   for inst_ea in inst_eas:
-    recover_instruction(M, B, inst_ea)
+    I = recover_instruction(M, B, inst_ea)
+
 
   DEBUG_PUSH()
-  if len(succ_eas) > 0:
+  if I and I.local_noreturn:
+    DEBUG("Does not return")
+  
+  elif len(succ_eas) > 0:
+    B.successor_eas.extend(succ_eas)
     DEBUG("Successors: {}".format(", ".join("{0:x}".format(i) for i in succ_eas)))
   else:
     DEBUG("No successors")
+
   DEBUG_POP()
   DEBUG_POP()
 
