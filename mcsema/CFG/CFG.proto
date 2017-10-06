@@ -129,18 +129,24 @@ message Variable {
   required  string      name = 2;
 }
 
+message Reference {
+  required  int64    inst_addr = 1;
+  required  int64    offset = 2;
+}
+
 message StackVar {
-    required string     name = 1;
-    required int64      sp_offset = 2;
-    required int64      size = 3;
-    required bool       has_frame = 4;
-    required string     regname = 5;
+  required string     name = 1;
+  required int64      size = 2;
+  required int64      sp_offset = 3;
+  optional bool       has_frame = 4;
+  optional string     regname = 5;
+  repeated Reference  ref_eas = 6;
 }
 
 message GlobalVar {
-    required int64      ea = 1;
-    required string     name = 2;
-    required int64      size = 3;
+  required int64      ea = 1;
+  required string     name = 2;
+  required int64      size = 3;
 }
 
 // The data section is a verbatim copy of all the data in a given segment. This

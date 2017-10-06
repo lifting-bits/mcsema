@@ -32,6 +32,7 @@ from table import *
 from flow import *
 from refs import *
 from segment import *
+from collect_variable import *
 
 #hack for IDAPython to see google protobuf lib
 if os.path.isdir('/usr/lib/python2.7/dist-packages'):
@@ -681,6 +682,37 @@ def analyze_jump_table_targets(inst, new_eas, new_func_eas):
           table.table_ea, entry_addr, entry_target))
       new_eas.add(entry_target)
 
+def recover_variables(F, func_ea, BB):
+  '''
+  Collects stack variable data from all functions in the database.
+  '''
+  functions = list()
+  if is_code_by_flags(func_ea):
+    f_ea = idc.GetFunctionAttr(func_ea, idc.FUNCATTR_START)
+    f_vars = collect_function_vars(func_ea, BB)
+    functions.append({"ea":f_ea, "name":idc.Name(func_ea), "stackArgs":f_vars})
+
+  DEBUG("{0}".format(pprint.pformat(functions)))
+  
+  for offset in f_vars.keys():
+    if not f_vars[offset]["safe"]:
+      continue
+
+    var = F.stackvars.add()
+    var.sp_offset = offset
+    var.name = f_vars[offset]["name"]
+    var.size = f_vars[offset]["size"]
+    # add refs...
+    for i in f_vars[offset]["writes"]:
+      r = var.ref_eas.add()
+      r.inst_addr = i
+      r.offset = 0
+
+    for i in f_vars[offset]["reads"]:
+      r = var.ref_eas.add()
+      r.inst_addr = i
+      r.offset = 0
+
 _RECOVERED_FUNCS = set()
 
 def recover_function(M, func_ea, new_func_eas, entrypoints):
@@ -725,6 +757,7 @@ def recover_function(M, func_ea, new_func_eas, entrypoints):
     processed_blocks.add(block_ea)
     recover_basic_block(M, F, block_ea)
 
+  recover_variables(F, func_ea, processed_blocks)
   DEBUG_POP()
 
 def find_default_function_heads():
@@ -1335,6 +1368,11 @@ if __name__ == "__main__":
       type=argparse.FileType('r'),
       default=None,
       help="File containing the global variables to be lifted")
+
+  parser.add_argument(
+      '--stack_var',
+      default=False,
+      help="Flag to enable stack variable recovery")
 
   args = parser.parse_args(args=idc.ARGV[1:])
 
