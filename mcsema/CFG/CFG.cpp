@@ -65,7 +65,12 @@ static std::string LiftedFunctionName(const Function &cfg_func) {
 static std::string LiftedSegmentName(const Segment &cfg_segment) {
   std::stringstream ss;
   if (cfg_segment.has_variable_name()) {
-    if (cfg_segment.is_exported()) {
+    auto has_name = !cfg_segment.variable_name().empty();
+    LOG_IF(ERROR, !has_name)
+        << "CFG variable segment " << cfg_segment.name() << " at " << std::hex
+        << cfg_segment.ea() << std::dec << " has an empty name.";
+
+    if (has_name && cfg_segment.is_exported()) {
       ss << cfg_segment.variable_name();
     } else {
       ss << "seg_var_" << std::hex << cfg_segment.ea()

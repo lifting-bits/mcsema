@@ -59,7 +59,8 @@ llvm::Constant *LiftEA(const NativeSegment *cfg_seg, uint64_t ea) {
 
   auto seg = gModule->getGlobalVariable(cfg_seg->lifted_name, true);
   CHECK(seg != nullptr)
-      << "Cannot find global variable for segment " << cfg_seg->name
+      << "Cannot find global variable " << cfg_seg->lifted_name
+      << " for segment " << cfg_seg->name
       << " when trying to lift EA " << std::hex << ea;
 
   auto offset = ea - cfg_seg->ea;
