@@ -158,7 +158,12 @@ static std::vector<llvm::GlobalVariable *> FindISELs(void) {
 static void PrivatizeISELs(std::vector<llvm::GlobalVariable *> &isels) {
   for (auto isel : isels) {
     isel->setInitializer(nullptr);
-    isel->setLinkage(llvm::GlobalValue::InternalLinkage);
+    isel->setExternallyInitialized(false);
+    isel->setLinkage(llvm::GlobalValue::PrivateLinkage);
+
+    if (!isel->hasNUsesOrMore(2)) {
+      isel->eraseFromParent();
+    }
   }
 }
 
@@ -324,19 +329,11 @@ void OptimizeModule(void) {
   RemoveIntrinsics();
   LOG(INFO)
       << "Optimizing module.";
+
+  PrivatizeISELs(isels);
+
   if (!FLAGS_disable_optimizer) {
-    PrivatizeISELs(isels);
     RunO3();
-  } else {
-    remill::ForEachISel(
-        gModule, [&](llvm::GlobalVariable *, llvm::Function *sem) {
-          if (sem->hasNUsesOrMore(2)) {
-            sem->removeFnAttr(llvm::Attribute::InlineHint);
-            sem->removeFnAttr(llvm::Attribute::AlwaysInline);
-            sem->addFnAttr(llvm::Attribute::NoInline);
-          }
-        });
-    PrivatizeISELs(isels);
   }
 
   RemoveIntrinsics();
