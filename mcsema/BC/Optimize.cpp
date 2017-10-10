@@ -155,19 +155,10 @@ static std::vector<llvm::GlobalVariable *> FindISELs(void) {
 }
 
 // Remove the ISEL variables used for finding the instruction semantics.
-static void RemoveISELs(std::vector<llvm::GlobalVariable *> &isels) {
-  std::vector<llvm::GlobalVariable *> next_isels;
-  while (isels.size()) {
-    next_isels.clear();
-    for (auto isel : isels) {
-      isel->setLinkage(llvm::GlobalValue::InternalLinkage);
-      if (1 >= isel->getNumUses()) {
-        isel->eraseFromParent();
-      } else {
-        next_isels.push_back(isel);
-      }
-    }
-    isels.swap(next_isels);
+static void PrivatizeISELs(std::vector<llvm::GlobalVariable *> &isels) {
+  for (auto isel : isels) {
+    isel->setInitializer(nullptr);
+    isel->setLinkage(llvm::GlobalValue::InternalLinkage);
   }
 }
 
@@ -334,7 +325,7 @@ void OptimizeModule(void) {
   LOG(INFO)
       << "Optimizing module.";
   if (!FLAGS_disable_optimizer) {
-    RemoveISELs(isels);
+    PrivatizeISELs(isels);
     RunO3();
   } else {
     remill::ForEachISel(
@@ -345,7 +336,7 @@ void OptimizeModule(void) {
             sem->addFnAttr(llvm::Attribute::NoInline);
           }
         });
-    RemoveISELs(isels);
+    PrivatizeISELs(isels);
   }
 
   RemoveIntrinsics();

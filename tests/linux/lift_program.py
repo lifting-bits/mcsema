@@ -107,6 +107,12 @@ def main():
       default=False,
       required=False)
 
+  arg_parser.add_argument(
+      '--lift_only',
+      help='Only lift and nothing more?',
+      default=False,
+      required=False)
+
   args, command_args = arg_parser.parse_known_args()
 
   # Set up the workspace.
@@ -219,43 +225,44 @@ def main():
   ret = subprocess.call(mcsema_lift_args)
   if ret:
     return ret
- 
-  # Build up the command-line invocation to clang.
-  clang_args = [
-      os.path.join(args.libraries_dir, 'llvm', 'bin', 'clang++'),
-      '-rdynamic',
-      is_pie and '-fPIC' or '',
-      is_pie and '-pie' or '',
-      '-o', lifted_binary,
-      bitcode,
-      '/usr/local/lib/libmcsema_rt{}-{}.a'.format(
-          address_size, args.llvm_version),
-      '-lm']
+  
+  if not args.lift_only:
+    # Build up the command-line invocation to clang.
+    clang_args = [
+        os.path.join(args.libraries_dir, 'llvm', 'bin', 'clang++'),
+        '-rdynamic',
+        is_pie and '-fPIC' or '',
+        is_pie and '-pie' or '',
+        '-o', lifted_binary,
+        bitcode,
+        '/usr/local/lib/libmcsema_rt{}-{}.a'.format(
+            address_size, args.llvm_version),
+        '-lm']
 
-  for lib in libs:
-    clang_args.append(lib)
+    for lib in libs:
+      clang_args.append(lib)
 
-  # Compile back to an executable.
-  print " ".join(clang_args)
-  ret = subprocess.call(clang_args)
-  if ret:
-    return ret
+    # Compile back to an executable.
+    print " ".join(clang_args)
+    ret = subprocess.call(clang_args)
+    if ret:
+      return ret
 
-  # Create two scripts to run the original and native.
-  run_native = os.path.join(bin_dir, binary_name)
-  with open(run_native, "w") as f:
-    f.write("""#!/usr/bin/env bash
+    # Create two scripts to run the original and native.
+    run_native = os.path.join(bin_dir, binary_name)
+    with open(run_native, "w") as f:
+      f.write("""#!/usr/bin/env bash
 LD_LIBRARY_PATH={} {} "$@"
 """.format(lib_dir, binary))
 
-  run_lifted = os.path.join(bin_dir, "{}.lifted".format(binary_name))
-  with open(run_lifted, "w") as f:
-    f.write("""#!/usr/bin/env bash
+    run_lifted = os.path.join(bin_dir, "{}.lifted".format(binary_name))
+    with open(run_lifted, "w") as f:
+      f.write("""#!/usr/bin/env bash
 LD_LIBRARY_PATH={} {} "$@"
 """.format(lib_dir, lifted_binary))
 
-  make_executable(run_native)
-  make_executable(run_lifted)
+    make_executable(run_native)
+    make_executable(run_lifted)
 
   return 0
 
