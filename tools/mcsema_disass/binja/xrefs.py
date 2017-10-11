@@ -55,12 +55,16 @@ def get_xrefs(bv, il, reftype=XRef.IMMEDIATE):
         # Any xref in here will be a control flow target
         reftype = XRef.CONTROLFLOW
 
-    elif op == LowLevelILOperation.LLIL_LOAD:
+    elif op in [LowLevelILOperation.LLIL_LOAD,
+                LowLevelILOperation.LLIL_STORE]:
+
+        # Choose the correct operand to look at
+        mem_il = il.src if op == LowLevelILOperation.LLIL_LOAD else il.dest
+
         # Loading from memory
         # Check if we're using a displacement in this
-        if il.src.operation in [LowLevelILOperation.LLIL_CONST,
-                                LowLevelILOperation.LLIL_CONST_PTR,
-                                LowLevelILOperation.LLIL_REG]:
+        if mem_il.operation in [LowLevelILOperation.LLIL_CONST,
+                                LowLevelILOperation.LLIL_CONST_PTR]:
             # No displacement
             reftype = XRef.MEMORY
         else:
