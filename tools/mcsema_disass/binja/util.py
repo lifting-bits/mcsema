@@ -41,16 +41,22 @@ ENDIAN_TO_STRUCT = {
 
 def read_dword(bv, addr):
     # type: (binja.BinaryView, int) -> int
+    # Pad the data if fewer than 4 bytes are read
+    endianness = ENDIAN_TO_STRUCT[bv.endianness]
     data = bv.read(addr, 4)
-    fmt = '{}L'.format(ENDIAN_TO_STRUCT[bv.endianness])
-    return struct.unpack(fmt, data)[0]
+    padded_data = '{{:\x00{}4s}}'.format(endianness).format(data)
+    fmt = '{}L'.format(endianness)
+    return struct.unpack(fmt, padded_data)[0]
 
 
 def read_qword(bv, addr):
     # type: (binja.BinaryView, int) -> int
+    # Pad the data if fewer than 8 bytes are read
+    endianness = ENDIAN_TO_STRUCT[bv.endianness]
     data = bv.read(addr, 8)
-    fmt = '{}Q'.format(ENDIAN_TO_STRUCT[bv.endianness])
-    return struct.unpack(fmt, data)[0]
+    padded_data = '{{:\x00{}8s}}'.format(endianness).format(data)
+    fmt = '{}Q'.format(endianness)
+    return struct.unpack(fmt, padded_data)[0]
 
 
 def load_binary(path):
