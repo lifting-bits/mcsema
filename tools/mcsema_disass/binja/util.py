@@ -122,17 +122,20 @@ def is_valid_addr(bv, addr):
 
 def is_code(bv, addr):
     """Returns `True` if the given address lies in an executable segment"""
-    return (bv.get_segment_at(addr).flags & SegmentFlag.SegmentExecutable) != 0
+    seg = bv.get_segment_at(addr)
+    return seg is not None and seg.executable
 
 
 def is_readable(bv, addr):
     """Returns `True` if the given address lies in a readable segment"""
-    return (bv.get_segment_at(addr).flags & SegmentFlag.SegmentReadable) != 0
+    seg = bv.get_segment_at(addr)
+    return seg is not None and seg.writable
 
 
 def is_writeable(bv, addr):
     """Returns `True` if the given address lies in a writable segment"""
-    return (bv.get_segment_at(addr).flags & SegmentFlag.SegmentWritable) != 0
+    seg = bv.get_segment_at(addr)
+    return seg is not None and seg.readable
 
 
 def is_ELF(bv):
