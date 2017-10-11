@@ -114,14 +114,13 @@ Once we have the program's control flow information, we can translate it to LLVM
 
 Here is the command to translate the CFG into bitcode:
 
-    mcsema-lift -os linux -arch amd64 -cfg xz.cfg -entrypoint main -output xz.bc
+    mcsema-lift -os linux -arch amd64 -cfg xz.cfg -output xz.bc
 
 Let's explore the options one by one:
 
 * `-os linux`: The CFG came from a binary for the Linux operating system. Currently the valid options are `linux` or `windows`. This option is required for certain aspects of translation, like ABI compatibility for external functions, etc. 
 * `-arch amd64`: Use instruction semantics for the `amd64` architecture. Valid options are `x86` (32-bit x86 semantics) and `amd64` (64-bit x86).
 * `-cfg xz.cfg`: The input control flow graph to convert into bitcode.
-* `-entrypoint main`: The name of the entrypoint into the translated code. This should match the value used for `-entrypoint` specified to `mcsema-disass`.
 * `-output xz.bc`: Where to write the bitcode. If the `-output` option is not specified, the bitcode will be written to stdout.
 
 The `mcsema-lift` program will output a lot of debugging information to stdout and stderr. If everything is successful, the last two lines should be something similar to:
