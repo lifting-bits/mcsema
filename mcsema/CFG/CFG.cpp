@@ -876,18 +876,19 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         module->ea_to_func[static_cast<uint64_t>(cfg_func.ea())]);
 
     // Extract the stack variables associated with the function
-    for (const auto &stack_var : cfg_func.stackvars()) {
-      auto natSV = new NativeStackVariable;
+    for (const auto &stack_var : cfg_func.stack_vars()) {
+      auto nat_sv = new NativeStackVariable;
 
-      natSV->offset = stack_var.sp_offset();
-      natSV->size = stack_var.size();
-      natSV->ea = 0;
-      natSV->name = stack_var.name();
-      natSV->lifted_name = LiftedStackVariableName(stack_var);
-      func->stack_vars.push_back(natSV);
+      nat_sv->offset = stack_var.sp_offset();
+      nat_sv->size = stack_var.size();
+      nat_sv->ea = 0;
+      nat_sv->name = stack_var.name();
+      nat_sv->lifted_name = LiftedStackVariableName(stack_var);
+      nat_sv->llvm_var = nullptr;
+      func->stack_vars.push_back(nat_sv);
 
       for(auto ref_ea : stack_var.ref_eas()){
-        natSV->refs.push_back(ref_ea.inst_addr());
+        nat_sv->refs.push_back(ref_ea.inst_addr());
       }
     }
 
@@ -921,7 +922,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         }
 
         for (const auto &var : func->stack_vars) {
-          for (auto ref : var->get_refs()) {
+          for (auto ref : var->refs) {
             if (inst->ea == ref) {
               LOG(INFO) << "The stack variable references at : " << std::hex << inst->ea;
               inst->stack_var = var;

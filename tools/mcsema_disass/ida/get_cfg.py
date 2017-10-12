@@ -703,7 +703,7 @@ def recover_variables(F, func_ea, BB):
     if not f_vars[offset]["safe"]:
       continue
 
-    var = F.stackvars.add()
+    var = F.stack_vars.add()
     var.sp_offset = offset
     var.name = f_vars[offset]["name"]
     var.size = f_vars[offset]["size"]

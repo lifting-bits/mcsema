@@ -24,7 +24,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <list>
 
 #include <llvm/IR/CallingConv.h>
 
@@ -98,7 +97,7 @@ struct NativeFunction : public NativeObject {
   NativeFunction(void);
 
   std::unordered_map<uint64_t, const NativeBlock *> blocks;
-  std::list<struct NativeStackVariable *> stack_vars;
+  std::vector<struct NativeStackVariable *> stack_vars;
   llvm::Function *function;
 };
 
@@ -106,16 +105,10 @@ struct NativeStackVariable : public NativeObject {
  public:
   NativeStackVariable(void);
 
-  uint64_t  size;
-  int64_t  offset;
-  std::list<uint64_t>  refs;
-
+  uint64_t size;
+  int64_t offset;
+  std::vector<uint64_t> refs;
   mutable llvm::Value *llvm_var;
-
-  uint64_t get_offset(void) { return this->offset; }
-  std::string get_name(void) { return this->name; }
-  uint64_t get_size(void) { return this->size; }
-  std::list<uint64_t> &get_refs(void) { return this->refs; }
 };
 
 // Function that is defined outside of the binary.
