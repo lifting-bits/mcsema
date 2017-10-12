@@ -428,6 +428,20 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
   }
 }
 
+static void AllocStackVars(
+    llvm::BasicBlock *bb,
+    const NativeFunction *cfg_func){
+  auto func = bb->getParent();
+  llvm::IRBuilder<> ir(bb);
+  const std::list<NativeStackVariable *> &stack_vars = cfg_func->stack_vars;
+  for (auto s : stack_vars){
+    auto char_type = llvm::Type::getInt8Ty(func->getContext());
+    auto arr_type = llvm::ArrayType::get(char_type, s->get_size());
+    LOG(INFO) << "Inserting var " << s->get_name() << ", size " << s->get_size() << ", Func name " << cfg_func->name << " " << std::endl;
+    s->llvm_var  = ir.CreateAlloca(arr_type);
+  }
+}
+
 static llvm::Function *LiftFunction(
     const NativeModule *cfg_module, const NativeFunction *cfg_func) {
 
@@ -487,9 +501,14 @@ static llvm::Function *LiftFunction(
         *gContext, cfg_block->lifted_name, lifted_func);
   }
 
+  auto entryBlock = llvm::BasicBlock::Create(lifted_func->getContext(), "entryBlock", lifted_func);
+  AllocStackVars(entryBlock, cfg_func);
+  
   // Create a branch from the end of the entry block to the first block
   llvm::BranchInst::Create(ctx.ea_to_block[cfg_func->ea],
-                           &(lifted_func->front()));
+                           entryBlock);
+  llvm::BranchInst::Create(entryBlock, &(lifted_func->front()));
+
 
   for (auto block_info : cfg_func->blocks) {
     ctx.cfg_block = block_info.second;

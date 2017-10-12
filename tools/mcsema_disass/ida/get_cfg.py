@@ -53,6 +53,11 @@ EXTERNAL_VARS_TO_RECOVER = {}
 RECOVERED_EAS = set()
 ACCESSED_VIA_JMP = set()
 
+TO_RECOVER = {
+  "stack_var" : False,
+}
+
+
 # Map of external functions names to a tuple containing information like the
 # number of arguments and calling convention of the function.
 EMAP = {}
@@ -757,7 +762,9 @@ def recover_function(M, func_ea, new_func_eas, entrypoints):
     processed_blocks.add(block_ea)
     recover_basic_block(M, F, block_ea)
 
-  recover_variables(F, func_ea, processed_blocks)
+  if TO_RECOVER["stack_var"]:
+    recover_variables(F, func_ea, processed_blocks)
+    
   DEBUG_POP()
 
 def find_default_function_heads():
@@ -1370,7 +1377,8 @@ if __name__ == "__main__":
       help="File containing the global variables to be lifted")
 
   parser.add_argument(
-      '--stack_var',
+      '--stack-var',
+      action="store_true",
       default=False,
       help="Flag to enable stack variable recovery")
 
@@ -1390,6 +1398,9 @@ if __name__ == "__main__":
   if args.pie_mode:
     DEBUG("Using PIE mode.")
     PIE_MODE = True
+    
+  if args.stack_var:
+    TO_RECOVER["stack_var"] = True
 
   EMAP = {}
   EMAP_DATA = {}

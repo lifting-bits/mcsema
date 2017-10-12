@@ -97,6 +97,12 @@ static std::string ExternalFuncName(const ExternalFunction &cfg_func) {
   return ss.str();
 }
 
+static std::string LiftedStackVariableName(const StackVariable &cfg_stack) {
+  std::stringstream ss;
+  ss << "sv_" << SaneName(cfg_stack.name());
+  return ss.str();
+}
+
 // Find the segment containing the data at `ea`.
 static const NativeSegment *FindSegment(const NativeModule *module,
                                         uint64_t ea) {
@@ -368,6 +374,10 @@ NativeExternalFunction::NativeExternalFunction(void)
 NativeVariable::NativeVariable(void)
     : segment(nullptr),
       address(nullptr) {}
+
+NativeStackVariable::NativeStackVariable(void)
+    : size(0),
+      offset(0) {}
 
 void NativeObject::ForwardTo(NativeObject *dest) const {
   if (forward != this) {
@@ -865,6 +875,22 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     auto func = const_cast<NativeFunction *>(
         module->ea_to_func[static_cast<uint64_t>(cfg_func.ea())]);
 
+    // Extract the stack variables associated with the function
+    for (const auto &stack_var : cfg_func.stackvars()) {
+      auto natSV = new NativeStackVariable;
+
+      natSV->offset = stack_var.sp_offset();
+      natSV->size = stack_var.size();
+      natSV->ea = 0;
+      natSV->name = stack_var.name();
+      natSV->lifted_name = LiftedStackVariableName(stack_var);
+      func->stack_vars.push_back(natSV);
+
+      for(auto ref_ea : stack_var.ref_eas()){
+        natSV->refs.push_back(ref_ea.inst_addr());
+      }
+    }
+
     for (const auto &cfg_block : cfg_func.blocks()) {
       auto block = new NativeBlock;
       block->ea = static_cast<uint64_t>(cfg_block.ea());
@@ -888,9 +914,19 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         inst->mem = nullptr;
         inst->disp = nullptr;
         inst->offset_table = nullptr;
+        inst->stack_var = nullptr;
 
         for (const auto &cfg_ref : cfg_inst.xrefs()) {
           AddXref(module, inst, cfg_ref, pointer_size);
+        }
+
+        for (const auto &var : func->stack_vars) {
+          for (auto ref : var->get_refs()) {
+            if (inst->ea == ref) {
+              LOG(INFO) << "The stack variable references at : " << std::hex << inst->ea;
+              inst->stack_var = var;
+            }
+          }
         }
 
         block->instructions.push_back(inst);

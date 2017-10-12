@@ -205,6 +205,11 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
 
   auto &mem = op.addr;
 
+  if (ctx.cfg_inst->stack_var) {
+    llvm::IRBuilder<> ir(block);
+    return ir.CreatePtrToInt(ctx.cfg_inst->stack_var->llvm_var, word_type);
+  }
+
   // A higher layer will resolve any code refs; this is a static address and
   // we want to preserve it in the register state structure.
   if (mem.IsControlFlowTarget()) {
