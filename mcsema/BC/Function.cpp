@@ -436,9 +436,10 @@ static void AllocStackVars(
   const std::list<NativeStackVariable *> &stack_vars = cfg_func->stack_vars;
   for (auto s : stack_vars){
     auto char_type = llvm::Type::getInt8Ty(func->getContext());
-    auto arr_type = llvm::ArrayType::get(char_type, s->get_size());
+    auto int_type = llvm::Type::getInt64Ty(func->getContext());
+    auto value = llvm::ConstantInt::get(int_type, s->get_size());
     LOG(INFO) << "Inserting var " << s->get_name() << ", size " << s->get_size() << ", Func name " << cfg_func->name << " " << std::endl;
-    s->llvm_var  = ir.CreateAlloca(arr_type);
+    s->llvm_var  = ir.CreateAlloca(char_type, value, s->get_name());
   }
 }
 
