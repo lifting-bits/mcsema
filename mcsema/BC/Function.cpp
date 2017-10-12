@@ -502,14 +502,11 @@ static llvm::Function *LiftFunction(
         *gContext, cfg_block->lifted_name, lifted_func);
   }
 
-  auto entryBlock = llvm::BasicBlock::Create(lifted_func->getContext(), "entryBlock", lifted_func);
-  AllocStackVars(entryBlock, cfg_func);
+  // Allocate the stack variable recovered in the function
+  AllocStackVars(ctx.ea_to_block[cfg_func->ea], cfg_func);
   
-  // Create a branch from the end of the entry block to the first block
   llvm::BranchInst::Create(ctx.ea_to_block[cfg_func->ea],
-                           entryBlock);
-  llvm::BranchInst::Create(entryBlock, &(lifted_func->front()));
-
+                           &(lifted_func->front()));
 
   for (auto block_info : cfg_func->blocks) {
     ctx.cfg_block = block_info.second;
