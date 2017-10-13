@@ -215,6 +215,16 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
   // Check if the instruction is referring to stack variable
   if (ctx.cfg_inst->stack_var) {
     llvm::IRBuilder<> ir(block);
+    if(!mem.base_reg.name.empty() && !mem.index_reg.name.empty()) {
+      auto zero = llvm::ConstantInt::get(word_type, 0, false);
+      auto base = ir.CreatePtrToInt(ctx.cfg_inst->stack_var->llvm_var, word_type);
+      auto index = this->remill::InstructionLifter::LoadWordRegValOrZero(block, mem.index_reg.name, zero);
+      auto scale = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(mem.scale), true);
+
+      if (zero != index) {
+        return ir.CreateAdd(base, ir.CreateMul(index, scale));
+      }
+    }
     return ir.CreatePtrToInt(ctx.cfg_inst->stack_var->llvm_var, word_type);
   }
 
