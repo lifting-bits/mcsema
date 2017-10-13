@@ -31,6 +31,7 @@
 #include "Instruction.h"
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Instruction.h"
+#include "remill/BC/Util.h"
 
 #include "mcsema/Arch/Arch.h"
 
@@ -40,6 +41,50 @@
 #include "mcsema/BC/Util.h"
 
 #include "mcsema/CFG/CFG.h"
+
+namespace {
+
+// Load the address of a register.
+static llvm::Value *LoadRegAddress(llvm::BasicBlock *block,
+                                   std::string reg_name) {
+  return new llvm::LoadInst(
+      remill::FindVarInFunction(block->getParent(), reg_name), "", block);
+}
+
+// Load the value of a register.
+static llvm::Value *LoadRegValue(llvm::BasicBlock *block,
+                                 std::string reg_name) {
+  return new llvm::LoadInst(LoadRegAddress(block, reg_name), "", block);
+}
+
+static llvm::Value *LoadAddressRegValOrZero(llvm::BasicBlock *block,
+                                         const remill::Operand::Register &reg,
+                                         llvm::ConstantInt *zero) {
+  if (reg.name.empty()) {
+    return zero;
+  }
+
+  auto value = LoadRegValue(block, reg.name);
+  auto value_type = llvm::dyn_cast_or_null<llvm::IntegerType>(value->getType());
+  auto word_type = zero->getType();
+
+  CHECK(value_type)
+      << "Register " << reg.name << " expected to be an integer.";
+
+  auto value_size = value_type->getBitWidth();
+  auto word_size = word_type->getBitWidth();
+  CHECK(value_size <= word_size)
+      << "Register " << reg.name << " expected to be no larger than the "
+      << "machine word size (" << word_type->getBitWidth() << " bits).";
+
+  if (value_size < word_size) {
+    value = new llvm::ZExtInst(value, word_type, "", block);
+  }
+
+  return value;
+}
+
+}
 
 namespace mcsema {
 
@@ -218,7 +263,7 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
     if(!mem.base_reg.name.empty() && !mem.index_reg.name.empty()) {
       auto zero = llvm::ConstantInt::get(word_type, 0, false);
       auto base = ir.CreatePtrToInt(ctx.cfg_inst->stack_var->llvm_var, word_type);
-      auto index = this->remill::InstructionLifter::LoadWordRegValOrZero(block, mem.index_reg.name, zero);
+      auto index = LoadAddressRegValOrZero(block, mem.index_reg, zero);
       auto scale = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(mem.scale), true);
 
       if (zero != index) {
