@@ -202,8 +202,8 @@ function InstallUbuntuPackages
     # gcc-multilib required only for 32-bit integration tests
     # g++-multilib required to build 32-bit generated code
 
-    'gcc-multilib'
-    'g++-multilib'
+    'gcc-6-multilib'
+    'g++-6-multilib'
 
     # liblzma-dev needed for the xz integration test
     # libpcre3-dev needed for some integration tests
