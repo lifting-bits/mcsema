@@ -64,7 +64,7 @@ namespace mcsema {
 namespace {
 
 // Add entrypoint functions for any exported functions.
-static void ExportFunction(const NativeModule *cfg_module) {
+static void ExportFunctions(const NativeModule *cfg_module) {
   for (auto ea : cfg_module->exported_funcs) {
     auto cfg_func = cfg_module->ea_to_func.at(ea)->Get();
     CHECK(gModule->getFunction(cfg_func->lifted_name) != nullptr)
@@ -106,12 +106,19 @@ bool LiftCodeIntoModule(const NativeModule *cfg_module) {
   // so that cross-references to lifted code are handled.
   AddDataSegments(cfg_module);
 
+  // Lift the blocks of instructions into the declared functions.
   if (!DefineLiftedFunctions(cfg_module)) {
     return false;
   }
 
-  ExportFunction(cfg_module);
+  // Add entrypoint functions for any exported functions.
+  ExportFunctions(cfg_module);
+
+  // Export any variables that should be externally visible.
   ExportVariables(cfg_module);
+
+  // Generate code to call pre-`main` function static object constructors, and
+  // post-`main` functions destructors.
   CallInitFiniCode(cfg_module);
 
   if (FLAGS_legacy_mode) {
