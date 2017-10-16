@@ -33,7 +33,7 @@ class XRef(object):
         return '<XREF: 0x{:x} {}>'.format(self.addr, CFG_pb2.CodeReference.OperandType.Name(self.cfg_type))
 
 
-def get_xrefs(bv, il, reftype=XRef.IMMEDIATE):
+def get_xrefs(bv, il, reftype=XRef.IMMEDIATE, parent=None):
     """ Recursively gather xrefs in an IL instruction
 
     Args:
@@ -51,16 +51,28 @@ def get_xrefs(bv, il, reftype=XRef.IMMEDIATE):
 
     # Update reftype using il information
     op = il.operation
-    if op == LowLevelILOperation.LLIL_CALL:
+
+    # Some instruction types are ignored
+    if op in [LowLevelILOperation.LLIL_JUMP,
+              LowLevelILOperation.LLIL_JUMP_TO,
+              LowLevelILOperation.LLIL_UNIMPL,
+              LowLevelILOperation.LLIL_UNIMPL_MEM]:
+        return []
+
+    elif op == LowLevelILOperation.LLIL_CALL:
         # Any xref in here will be a control flow target
         reftype = XRef.CONTROLFLOW
 
-    elif op == LowLevelILOperation.LLIL_LOAD:
+    elif op in [LowLevelILOperation.LLIL_LOAD,
+                LowLevelILOperation.LLIL_STORE]:
+
+        # Choose the correct operand to look at
+        mem_il = il.src if op == LowLevelILOperation.LLIL_LOAD else il.dest
+
         # Loading from memory
         # Check if we're using a displacement in this
-        if il.src.operation in [LowLevelILOperation.LLIL_CONST,
-                                LowLevelILOperation.LLIL_CONST_PTR,
-                                LowLevelILOperation.LLIL_REG]:
+        if mem_il.operation in [LowLevelILOperation.LLIL_CONST,
+                                LowLevelILOperation.LLIL_CONST_PTR]:
             # No displacement
             reftype = XRef.MEMORY
         else:
@@ -70,10 +82,20 @@ def get_xrefs(bv, il, reftype=XRef.IMMEDIATE):
                 LowLevelILOperation.LLIL_CONST_PTR]:
         # Hit a value, if this is a reference we can save the xref
         if util.is_valid_addr(bv, il.constant):
+            # A displacement might be incorrectly classified as an immediate at this point
+            if reftype == XRef.IMMEDIATE:
+                # There's some other expression including this value
+                # look at the disassembly to figure out if this is actually a displacement
+                dis = bv.get_disassembly(il.address)
+                if '[' in dis and ']' in dis:
+                    # Fix the reftype depending on how this value is used
+                    reftype = XRef.MEMORY if parent.operation == LowLevelILOperation.LLIL_SET_REG else \
+                              XRef.DISPLACEMENT
+
             refs.append(XRef(il.constant, reftype))
 
     # Continue searching operands for xrefs
     for oper in il.operands:
-        refs.extend(get_xrefs(bv, oper, reftype))
+        refs.extend(get_xrefs(bv, oper, reftype, il))
 
     return refs

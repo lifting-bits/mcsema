@@ -41,16 +41,22 @@ ENDIAN_TO_STRUCT = {
 
 def read_dword(bv, addr):
     # type: (binja.BinaryView, int) -> int
+    # Pad the data if fewer than 4 bytes are read
+    endianness = ENDIAN_TO_STRUCT[bv.endianness]
     data = bv.read(addr, 4)
-    fmt = '{}L'.format(ENDIAN_TO_STRUCT[bv.endianness])
-    return struct.unpack(fmt, data)[0]
+    padded_data = '{{:\x00{}4s}}'.format(endianness).format(data)
+    fmt = '{}L'.format(endianness)
+    return struct.unpack(fmt, padded_data)[0]
 
 
 def read_qword(bv, addr):
     # type: (binja.BinaryView, int) -> int
+    # Pad the data if fewer than 8 bytes are read
+    endianness = ENDIAN_TO_STRUCT[bv.endianness]
     data = bv.read(addr, 8)
-    fmt = '{}Q'.format(ENDIAN_TO_STRUCT[bv.endianness])
-    return struct.unpack(fmt, data)[0]
+    padded_data = '{{:\x00{}8s}}'.format(endianness).format(data)
+    fmt = '{}Q'.format(endianness)
+    return struct.unpack(fmt, padded_data)[0]
 
 
 def load_binary(path):
@@ -122,17 +128,20 @@ def is_valid_addr(bv, addr):
 
 def is_code(bv, addr):
     """Returns `True` if the given address lies in an executable segment"""
-    return (bv.get_segment_at(addr).flags & SegmentFlag.SegmentExecutable) != 0
+    seg = bv.get_segment_at(addr)
+    return seg is not None and seg.executable
 
 
 def is_readable(bv, addr):
     """Returns `True` if the given address lies in a readable segment"""
-    return (bv.get_segment_at(addr).flags & SegmentFlag.SegmentReadable) != 0
+    seg = bv.get_segment_at(addr)
+    return seg is not None and seg.writable
 
 
 def is_writeable(bv, addr):
     """Returns `True` if the given address lies in a writable segment"""
-    return (bv.get_segment_at(addr).flags & SegmentFlag.SegmentWritable) != 0
+    seg = bv.get_segment_at(addr)
+    return seg is not None and seg.readable
 
 
 def is_ELF(bv):
