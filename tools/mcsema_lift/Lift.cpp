@@ -114,8 +114,8 @@ static void LoadLibraryIntoModule(void) {
     }
 
     auto dest_var = new llvm::GlobalVariable(
-        *mcsema::gModule, var.getValueType(), var.isConstant(),
-        var.getLinkage(), nullptr,
+        *mcsema::gModule, var.getType()->getElementType(),
+        var.isConstant(), var.getLinkage(), nullptr,
         var_name, nullptr, var.getThreadLocalMode(),
         var.getType()->getAddressSpace());
 
