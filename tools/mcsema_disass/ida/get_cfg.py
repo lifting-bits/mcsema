@@ -700,7 +700,7 @@ def recover_variables(F, func_ea, BB):
   DEBUG("{0}".format(pprint.pformat(functions)))
   
   for offset in f_vars.keys():
-    if not f_vars[offset]["safe"]:
+    if f_vars[offset]["safe"] is False:
       continue
 
     var = F.stack_vars.add()
@@ -710,13 +710,13 @@ def recover_variables(F, func_ea, BB):
     # add refs...
     for i in f_vars[offset]["writes"]:
       r = var.ref_eas.add()
-      r.inst_addr = i
-      r.offset = 0
+      r.inst_addr = i["ea"]
+      r.offset = i["offset"]
 
     for i in f_vars[offset]["reads"]:
       r = var.ref_eas.add()
-      r.inst_addr = i
-      r.offset = 0
+      r.inst_addr = i["ea"]
+      r.offset = i["offset"]
 
 _RECOVERED_FUNCS = set()
 
@@ -762,7 +762,7 @@ def recover_function(M, func_ea, new_func_eas, entrypoints):
     processed_blocks.add(block_ea)
     recover_basic_block(M, F, block_ea)
 
-  if TO_RECOVER["stack_var"]:
+  if TO_RECOVER["stack_var"] :
     recover_variables(F, func_ea, processed_blocks)
     
   DEBUG_POP()

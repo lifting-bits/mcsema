@@ -107,7 +107,7 @@ struct NativeStackVariable : public NativeObject {
 
   uint64_t size;
   int64_t offset;
-  std::vector<uint64_t> refs;
+  std::unordered_map<uint64_t, int64_t> refs;
   mutable llvm::Value *llvm_var;
 };
 

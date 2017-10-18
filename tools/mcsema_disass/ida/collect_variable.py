@@ -449,6 +449,28 @@ def _get_flags_from_bits(flag):
     if val:
       flags.add(val)
   return flags
+
+def _process_lea_instruction(inst_ea, func_variable):
+  insn = Instruction(inst_ea)
+  for opnd in insn.opearnds:
+    if opnd.has_phrase:
+      DEBUG("Operand is Phrase {}".format(opnd.text))
+      base_ = _translate_reg(opnd.base_reg) if opnd.base_reg else None
+      index_ = _translate_reg(opnd.index_reg) if opnd.index_reg else None
+      offset = _signed_from_unsigned(idc.GetOperandValue(inst_ea, opnd.index))
+      if len(func_variable["stackArgs"].keys()) == 0:
+        return
+    
+      if opnd.is_read:
+        read_on_stack = base_ if base_ == _stack_ptr or base_ == _base_ptr else None
+        if read_on_stack:
+          DEBUG("Operand is read base referent {0}, index {1}, offset {2}".format(base_, index_, offset)) 
+          start_ = min(func_variable["stackArgs"].keys(), key=lambda x:abs(x-offset))
+          end_ = start_ + func_variable["stackArgs"][start_]["size"]
+          if offset in range(start_, end_):
+            var_offset = offset - start_
+            func_variable["stackArgs"][start_]["reads"].append({"ea" :inst_ea, "offset" :var_offset})
+            func_variable["stackArgs"][start_]["safe"] = False
   
 def _process_instruction(inst_ea, func_variable):
   insn = Instruction(inst_ea)
@@ -458,36 +480,56 @@ def _process_instruction(inst_ea, func_variable):
       base_ = _translate_reg(opnd.base_reg) if opnd.base_reg else None
       index_ = _translate_reg(opnd.index_reg) if opnd.index_reg else None
       offset = _signed_from_unsigned(idc.GetOperandValue(inst_ea, opnd.index))
-      
+      if len(func_variable["stackArgs"].keys()) == 0:
+        return
+    
       if opnd.is_write:
         target_on_stack = base_ if base_ == _stack_ptr or base_ == _base_ptr else None
         if target_on_stack:
           DEBUG("Operand is write base {0}, index {1}, offset {2}".format(base_, index_, offset))
-          if offset in func_variable["stackArgs"].keys():
-            func_variable["stackArgs"][offset]["writes"].add(inst_ea)
-            func_variable["stackArgs"][offset]["safe"] = True
+          start_ = min(func_variable["stackArgs"].keys(), key=lambda x:abs(x-offset))
+          end_ = start_ + func_variable["stackArgs"][start_]["size"]
+          if offset in range(start_, end_):
+            var_offset = offset - start_
+            func_variable["stackArgs"][start_]["writes"].append({"ea" :inst_ea, "offset" :var_offset})
+            func_variable["stackArgs"][start_]["safe"] = True
             
       elif opnd.is_read:
         read_on_stack = base_ if base_ == _stack_ptr or base_ == _base_ptr else None
         if read_on_stack:
           DEBUG("Operand is read base {0}, index {1}, offset {2}".format(base_, index_, offset)) 
-          if offset in func_variable["stackArgs"].keys():
-            func_variable["stackArgs"][offset]["reads"].add(inst_ea)
-            func_variable["stackArgs"][offset]["safe"] = True
+          start_ = min(func_variable["stackArgs"].keys(), key=lambda x:abs(x-offset))
+          end_ = start_ + func_variable["stackArgs"][start_]["size"]
+          if offset in range(start_, end_):
+          #if offset in range(start_offset, end_offset):
+            var_offset = offset - start_
+            func_variable["stackArgs"][start_]["reads"].append({"ea" :inst_ea, "offset" :var_offset})
+            func_variable["stackArgs"][start_]["safe"] = True
       else:
         read_on_stack = base_ if base_ == _stack_ptr or base_ == _base_ptr else None
         if read_on_stack:
-          DEBUG("Operand is write base {0}, index {1}, offset {2}".format(base_, index_, offset))
-          if offset in func_variable["stackArgs"].keys():
-            func_variable["stackArgs"][offset]["flags"].add("LOCAL_REFERER")
+          DEBUG("Operand is write base referent {0}, index {1}, offset {2:x}".format(base_, index_, offset))
+          #if offset in func_variable["stackArgs"].keys():
+          start_ = min(func_variable["stackArgs"].keys(), key=lambda x:abs(x-offset))
+          end_ = start_ + func_variable["stackArgs"][start_]["size"]
+          if offset in range(start_, end_):
+            var_offset = offset - start_
+            func_variable["stackArgs"][start_]["flags"].add("LOCAL_REFERER")
             # collect which stack variable offset this variable points to
-            func_variable["stackArgs"][offset]["referent"].add(inst_ea)
+            func_variable["stackArgs"][start_]["referent"].append({"ea" :inst_ea, "offset" :var_offset})
+
   
 def _process_basic_block(f_ea, block_ea, func_variable):
 
   inst_eas, succ_eas = analyse_block(f_ea, block_ea, True)
   for inst_ea in inst_eas:
     DEBUG("Processing instruction at {0:x}".format(inst_ea))
+    #_funcs = {"lea":_process_lea_instruction
+    #          }
+    #func = _funcs.get(idc.GetMnem(inst_ea), None)
+    #if func:
+    #  func(inst_ea, func_variable)
+    #else:
     _process_instruction(inst_ea, func_variable)
 
 def build_stack_args(f):
@@ -520,17 +562,26 @@ def build_stack_args(f):
     if (memberName == " r" or memberName == " s"):
       #the return pointer and start pointer, who cares
       offset = idc.GetStrucNextOff(frame, offset)
+      DEBUG("Test Lifting stack {0} {1:x} delta {2:x} {3:x}".format(memberName, offset, delta, idc.GetMemberOffset(frame, "err_fmt")))
       continue
     memberSize = idc.GetMemberSize(frame, offset)
+    DEBUG("Lifting stack {0} {1:x} delta {2:x}".format(memberName, offset, delta))
+    if offset >= delta:
+      offset = idc.GetStrucNextOff(frame, offset)
+      continue
+    if (memberName in ["errstr"] ):
+      offset = idc.GetStrucNextOff(frame, offset)
+      continue
+    DEBUG("Actual Lifting stack {0} {1:x} delta {2:x}".format(memberName, offset, delta))
     memberFlag = idc.GetMemberFlag(frame, offset)
     #TODO: handle the case where a struct is encountered (FF_STRU flag)
     flag_str = _get_flags_from_bits(memberFlag)
     stackArgs[offset-delta] = {"name":memberName,
                                "size":memberSize,
                                "flags":flag_str,
-                               "writes":set(),
-                               "referent":set(),
-                               "reads":set(),
+                               "writes":list(),
+                               "referent":list(),
+                               "reads":list(),
                                "safe": False}
     offset = idc.GetStrucNextOff(frame, offset)
 
