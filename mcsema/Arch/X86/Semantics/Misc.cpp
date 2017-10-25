@@ -467,7 +467,20 @@ template<int width>
 static InstTransResult doCwd(llvm::BasicBlock *b) {
 
   // read ax or eax
-  llvm::Value *ax_val = R_READ<width>(b, llvm::X86::EAX);
+  llvm::Value *ax_val = NULL;
+  switch (width) {
+    case 16:
+      ax_val = R_READ<16>(b, llvm::X86::AX);
+      break;
+    case 32:
+      ax_val = R_READ<32>(b, llvm::X86::EAX);
+      break;
+    case 64:
+      ax_val = R_READ<64>(b, llvm::X86::RAX);
+      break;
+    default:
+      throw TErr(__LINE__, __FILE__, "Not supported width");
+  }
 
   // sign extend to twice width
   auto dt = llvm::Type::getIntNTy(b->getContext(), width * 2);
