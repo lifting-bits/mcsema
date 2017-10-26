@@ -194,6 +194,31 @@ def recover_sections(bv, pb_mod):
         recover_section_cross_references(bv, pb_seg, sect)
 
 
+def recover_globals(bv, pb_mod):
+    # Sort symbols by address so we can estimate size if needed
+    syms = sorted(bv.symbols.values(), key=lambda s: s.address)
+    for i, sym in enumerate(syms):
+        if sym.type == SymbolType.DataSymbol and not util.is_code(bv, sym.address):
+            log.debug('Recovering global %s @ 0x%x', sym.name, sym.address)
+            pb_gvar = pb_mod.global_vars.add()
+            pb_gvar.ea = sym.address
+            pb_gvar.name = sym.name
+
+            # Look at the variable type to determine size
+            data_var = bv.get_data_var_at(sym.address)
+            if data_var.type.type_class == TypeClass.VoidTypeClass:
+                # Estimate size based on the address of the next symbol
+                if sym is not syms[-1]:
+                    pb_gvar.size = syms[i + 1].address - sym.address
+                else:
+                    # Edge case for the last symbol
+                    # Take end of the section as the "next symbol" instead
+                    sec = util.get_section_at(bv, sym.address)
+                    pb_gvar.size = sec.end - sym.address
+            else:
+                pb_gvar.size = data_var.type.width
+
+
 def is_local_noreturn(bv, il):
     """
     Args:
@@ -365,6 +390,9 @@ def recover_cfg(bv, args):
         RECOVERED.add(addr)
 
         recover_function(bv, pb_mod, addr)
+
+    log.debug('Recovering Globals')
+    recover_globals(bv, pb_mod)
 
     log.debug('Processing Segments')
     recover_sections(bv, pb_mod)
