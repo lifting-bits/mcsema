@@ -336,6 +336,30 @@ def add_block(pb_func, block):
     return pb_block
 
 
+def recover_stack_vars(pb_func, func):
+    """
+    Args:
+        pb_func (CFG_pb2.Function)
+        func (binaryninja.function.Function)
+    """
+    # Go through all variables on the stack (in order of storage)
+    stack_vars = sorted(func.stack_layout, key=lambda var: var.storage)
+    for i, svar in enumerate(stack_vars):
+        pb_svar = pb_func.stackvars.add()
+        pb_svar.name = svar.name
+        pb_svar.sp_offset = svar.storage
+
+        if svar.type.type_class == TypeClass.VoidTypeClass:
+            # Estimate size based on the offset of the next variable
+            if svar is not stack_vars[-1]:
+                pb_svar.size = stack_vars[i + 1].storage - svar.storage
+            else:
+                # Edge case for the last variable, the offset is the size
+                pb_svar.size = svar.storage
+        else:
+            pb_svar.size = svar.type.width
+
+
 def recover_function(bv, pb_mod, addr, is_entry=False):
     func = bv.get_function_at(addr)
     if func is None:
@@ -366,6 +390,9 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
             pb_inst = pb_block.instructions.add()
             recover_inst(bv, pb_block, pb_inst, il)
             inst_addr += len(pb_inst.bytes)
+
+    # Recover stack variables
+    recover_stack_vars(pb_func, func)
 
 
 def recover_cfg(bv, args):
