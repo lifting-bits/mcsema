@@ -122,8 +122,10 @@ def get_section_at(bv, addr):
     if not is_valid_addr(bv, addr):
         return None
 
-    sects = bv.sections.values()
-    return next(sec for sec in sects if sec.start <= addr < sec.end)
+    for sec in bv.sections.values():
+        if sec.start <= addr < sec.end:
+            return sec
+    return None
 
 def is_external_ref(bv, addr):
     sym = bv.get_symbol_at(addr)
