@@ -888,8 +888,9 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       func->stack_vars.push_back(nat_sv);
 
       for(auto ref_ea : stack_var.ref_eas()){
-        nat_sv->refs[ref_ea.inst_addr()] = ref_ea.offset();
-        LOG(INFO) << "Retrive the ref ea : " << std::hex << ref_ea.inst_addr() << " offset " << ref_ea.offset() << std::endl;
+        nat_sv->refs[ref_ea.inst_ea()] = ref_ea.offset();
+        LOG(INFO) << "Retrive the ref ea : " << std::hex
+            << ref_ea.inst_ea() << std::dec << " offset " << ref_ea.offset();
       }
     }
 

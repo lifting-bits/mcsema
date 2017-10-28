@@ -57,7 +57,7 @@ static llvm::Value *LoadRegValue(llvm::BasicBlock *block,
   return new llvm::LoadInst(LoadRegAddress(block, reg_name), "", block);
 }
 
-static llvm::Value *LoadAddressRegValOrZero(llvm::BasicBlock *block,
+static llvm::Value *LoadAddressRegVal(llvm::BasicBlock *block,
                                          const remill::Operand::Register &reg,
                                          llvm::ConstantInt *zero) {
   if (reg.name.empty()) {
@@ -65,7 +65,7 @@ static llvm::Value *LoadAddressRegValOrZero(llvm::BasicBlock *block,
   }
 
   auto value = LoadRegValue(block, reg.name);
-  auto value_type = llvm::dyn_cast_or_null<llvm::IntegerType>(value->getType());
+  auto value_type = llvm::dyn_cast<llvm::IntegerType>(value->getType());
   auto word_type = zero->getType();
 
   CHECK(value_type)
@@ -260,20 +260,23 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
   // Check if the instruction is referring to stack variable
   if (ctx.cfg_inst->stack_var) {
     llvm::IRBuilder<> ir(block);
-    auto map_it = ctx.cfg_inst->stack_var->refs.find(ctx.cfg_inst->ea);
     auto base = ir.CreatePtrToInt(ctx.cfg_inst->stack_var->llvm_var, word_type);
-    auto var_offset = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(map_it->second), true);
-    base = ir.CreateAdd(base, var_offset);
-    LOG(INFO) << "Lifting stack variable access at : " << std::hex << map_it->first
-        << " var_offset " << map_it->second << " variable name " << ctx.cfg_inst->stack_var->name <<std::endl;
+    auto map_it = ctx.cfg_inst->stack_var->refs.find(ctx.cfg_inst->ea);
+    if ( map_it != ctx.cfg_inst->stack_var->refs.end()) {
+      auto var_offset = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(map_it->second), true);
+      base = ir.CreateAdd(base, var_offset);
+      LOG(INFO) << "Lifting stack variable access at : " << std::hex << map_it->first
+          << " var_offset " << map_it->second  << std::dec
+          << " variable name " << ctx.cfg_inst->stack_var->name;
 
-    if(!mem.base_reg.name.empty() && !mem.index_reg.name.empty()) {
-      auto zero = llvm::ConstantInt::get(word_type, 0, false);
-      auto index = LoadAddressRegValOrZero(block, mem.index_reg, zero);
-      auto scale = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(mem.scale), true);
+      if( !mem.base_reg.name.empty() && !mem.index_reg.name.empty()) {
+        auto zero = llvm::ConstantInt::get(word_type, 0, false);
+        auto index = LoadAddressRegVal(block, mem.index_reg, zero);
+        auto scale = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(mem.scale), true);
 
-      if (zero != index) {
-        return ir.CreateAdd(base, ir.CreateMul(index, scale));
+        if (zero != index) {
+          return ir.CreateAdd(base, ir.CreateMul(index, scale));
+        }
       }
     }
     return base;

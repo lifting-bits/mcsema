@@ -130,7 +130,7 @@ message Variable {
 }
 
 message Reference {
-  required  uint64   inst_addr = 1;
+  required  uint64   inst_ea = 1;
   required  int64    offset = 2;
 }
 
