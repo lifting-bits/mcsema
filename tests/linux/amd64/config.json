@@ -1,5 +1,12 @@
 {
     "_comment": "AMD64 architecture list of programs under test",
+    "aes-test": {
+        "_comment": "This tests inline ASM constructs work correctly by way of the AES instructions.",
+        "default": {
+            "args": []
+        }
+    },
+
     "hello": { 
         "_comment": "These are test names, in case each program has more than one test",
         "default": {
@@ -25,7 +32,7 @@
         "width test": {
             "args": ["--width=100", "-d", "/usr"]
         },
-        "recurisve option": {
+        "recursive option": {
             "_comment": "The --recursive option triggers a call that used to fail during cfg recovery",
             "args": ["--recursive", "--width=100", "-d", "/usr"]
         }
@@ -85,6 +92,30 @@
         "help arg": {
             "_comment": "nc -help",
             "args": ["-help"]
+        }
+    },
+
+    "globals": {
+        "_comment": "mcsema's handling of global variables",
+        "default": {
+            "_comment": "globals takes no arguments",
+            "args": []
+        }
+    },
+
+    "bts": {
+        "_comment": "mcsema's handling of BTS",
+        "default": {
+            "_comment": "bts takes no arguments",
+            "args": []
+        }
+    },
+
+    "data_array": {
+        "_comment": "array of function pointers",
+        "default": {
+            "_comment": "takes no arguments",
+            "args": []
         }
     }
 }

@@ -1,17 +1,3 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 CC=clang-3.8
 # adapted from:
 # http://stackoverflow.com/questions/18136918/how-to-get-current-relative-directory-of-your-makefile
@@ -23,7 +9,7 @@ OUTPUT_GEN=$(current_dir)/generate_expected_output.py
 ifdef MCSEMA_PATH
 	DISASS=$(MCSEMA_PATH)/mcsema-disass
 else
-	DISASS=$(current_dir)/../../bin/mcsema-disass
+	DISASS=$(current_dir)../../../../bin/mcsema-disass
 endif
 
 ifdef IDA_PATH
@@ -34,33 +20,52 @@ else
 	IDA64=~/ida-6.9/idal64
 endif
 
-SRCS=$(wildcard *.c)
-X86=$(addprefix x86/,$(SRCS:.c=.elf))
-X64=$(addprefix amd64/,$(SRCS:.c=.elf))
+INTEL_SRCS=$(wildcard x86_*.c)
+ALL_SRCS=$(wildcard all_*.c) 
+ARM_SRCS=$(wildcard arm_*.c)
 
-X86_CFGS=$(addprefix x86/,$(SRCS:.c=.cfg))
-X64_CFGS=$(addprefix amd64/,$(SRCS:.c=.cfg))
+X86=$(addprefix x86/, $(patsubst x86_%,%,$(INTEL_SRCS:.c=.elf))) $(addprefix x86/, $(patsubst all_%,%,$(ALL_SRCS:.c=.elf)))
+X64=$(addprefix amd64/,$(patsubst x86_%,%,$(INTEL_SRCS:.c=.elf))) $(addprefix amd64/, $(patsubst all_%,%,$(ALL_SRCS:.c=.elf)))
+AARCH64=$(addprefix aarch64/,$(patsubst arm_%,%,$(ARM_SRCS:.c=.elf))) $(addprefix aarch64/, $(patsubst all_%,%,$(ALL_SRCS:.c=.elf)))
+
+X86_CFGS=$(X86:.elf=.cfg)
+X64_CFGS=$(X64:.elf=.cfg)
+AARCH64_CFGS=$(AARCH64:.elf=.cfg)
 
 X86_ELFS=$(wildcard x86/*.elf)
 X64_ELFS=$(wildcard amd64/*.elf)
+AARCH64_ELFS=$(wildcard aarch64/*.elf)
 
 X86_ELFS_CFGS=$(X86_ELFS:.elf=.cfg)
 X64_ELFS_CFGS=$(X64_ELFS:.elf=.cfg)
+AARCH64_ELFS_CFGS=$(AARCH64_ELFS:.elf=.cfg)
 
 .PHONY: all clean
 
 # do not delete intermediate targets
 # we may want to examine these manually
-.PRECIOUS: x86/%.elf amd64/%.elf
+.PRECIOUS: x86/%.elf amd64/%.elf aarch64/%.elf
 
-all: outputs_amd64 outputs_x86
+all: outputs_amd64 outputs_x86 outputs_aarch64
 
 # Build an ELF from our source
-x86/%.elf: %.c
-	${CC} -m32 -o $@ $<
+x86/%.elf: x86_%.c
+	${CC} -maes -m32 -o $@ $<
 
-amd64/%.elf: %.c
-	${CC} -m64 -o $@ $<
+amd64/%.elf: x86_%.c
+	${CC} -maes -m64 -o $@ $<
+
+x86/%.elf: all_%.c
+	${CC} -maes -m32 -o $@ $<
+
+amd64/%.elf: all_%.c
+	${CC} -maes -m64 -o $@ $<
+
+aarch64/%.elf: all_%.c
+	${CC} -B/usr/aarch64-linux-gnu/bin/ --target=aarch64-arm-linux-gnu  -o $@ $<
+
+aarch64/%.elf: arm_%.c
+	${CC} -B/usr/aarch64-linux-gnu/bin/ --target=aarch64-arm-linux-gnu  -o $@ $<
 
 # Translate ELFs to CFG
 x86/%.cfg: x86/%.elf
@@ -69,18 +74,28 @@ x86/%.cfg: x86/%.elf
 amd64/%.cfg: amd64/%.elf
 	${DISASS} --disassembler ${IDA64} --arch amd64 --os linux --output $@ --binary $< --entrypoint main
 
+aarch64/%.cfg: aarch64/%.elf
+	${DISASS} --disassembler ${IDA64} --arch aarch64 --os linux --output $@ --binary $< --entrypoint main
+
 outputs_amd64: amd64/config.json $(X64_CFGS) $(X64_ELFS_CFGS)
 	$(OUTPUT_GEN) amd64/config.json amd64/expected_outputs.json
 
 outputs_x86: x86/config.json $(X86_CFGS) $(X86_ELFS_CFGS)
 	$(OUTPUT_GEN) x86/config.json x86/expected_outputs.json
 
+#TODO(artem): Generate outputs once we can detect execution on AArch64
+outputs_aarch64: $(AARCH64_CFGS) $(AARCH64_ELFS_CFGS)
+
 clean:
 	rm -f $(X86)
 	rm -f $(X86_CFGS)
 	rm -f $(X64)
 	rm -f $(X64_CFGS)
+	rm -f $(AARCH64)
+	rm -f $(AARCH64_CFGS)
 	rm -f $(X64_ELFS_CFGS)
 	rm -f $(X86_ELFS_CFGS)
+	rm -f $(AARCH64_ELFS_CFGS)
 	rm -f amd64/expected_outputs.json
 	rm -f x86/expected_outputs.json
+	rm -f aarch64/expected_outputs.json

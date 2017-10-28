@@ -1,17 +1,3 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import unittest
 import sys
 import tempfile
@@ -23,7 +9,13 @@ import platform
 import json
 import base64
 
-DEBUG = False
+DEBUG = True
+CLANG_VERSION = "4.0"
+
+def binary_name(s):
+  if platform.system().lower() == "windows":
+    return s+".exe"
+  return s
 
 def b64(f):
     """ Base64 encodes the file 'f' """
@@ -55,7 +47,7 @@ class LinuxTest(unittest.TestCase):
 
         self.my_dir = os.path.dirname(__file__)
         self.mcsema_lift = os.path.realpath(
-            os.path.join(self.my_dir, "../", "bin", "mcsema-lift"))
+            os.path.join(self.my_dir, "..", "..", "..", "bin", binary_name("mcsema-lift")))
 
         if self.on_test_os:
             # we can only rebuild binaries if we are running on the same OS
@@ -67,7 +59,8 @@ class LinuxTest(unittest.TestCase):
                     self.configs[arch] = json.load(jsonfile)
 
             try:
-                clang_file = subprocess.check_output(["which", "clang-3.8"])
+                global CLANG_VERSION
+                clang_file = subprocess.check_output(["which", "clang-{}".format(CLANG_VERSION)])
                 self.clang = clang_file.strip()
             except OSError as oe:
                 sys.stderr.write("Could not find clang-3.8: {}\n".format(str(oe)))
@@ -128,11 +121,11 @@ class LinuxTest(unittest.TestCase):
                 sys.stderr.write("\n")
             subprocess.check_call(shellargs, stderr=stderr or devnull, stdout=stdout or devnull, shell=True)
 
-    def _runAMD64Test(self, testname, entrypoint="main", buildargs=None):
-        self._runArchTest("amd64", testname, entrypoint, buildargs)
+    def _runAMD64Test(self, testname, entrypoint="main", buildargs=None, liftargs=None):
+        self._runArchTest("amd64", testname, entrypoint, buildargs, liftargs)
 
-    def _runX86Test(self, testname, entrypoint="main", buildargs=None):
-        self._runArchTest("x86", testname, entrypoint, buildargs)
+    def _runX86Test(self, testname, entrypoint="main", buildargs=None, liftargs=None):
+        self._runArchTest("x86", testname, entrypoint, buildargs, liftargs)
 
     def _compileBitcode(self, arch, infile, outfile, extra_args=None):
 
@@ -140,15 +133,8 @@ class LinuxTest(unittest.TestCase):
             "amd64": "libmcsema_rt64.a",
             "x86": "libmcsema_rt32.a", }
 
-        arch_bitcode_name = {
-            "amd64": "mcsema_semantics_amd64.bc",
-            "x86": "mcsema_semantics_x86.bc", }
-
         runtime_lib = os.path.realpath(
-            os.path.join(self.my_dir, "../", "lib", arch_lib_name[arch]))
-
-        bitcode_lib = os.path.realpath(
-            os.path.join(self.my_dir, "../", "lib", arch_bitcode_name[arch]))
+            os.path.join(self.my_dir, "..", "..", "..", "lib", arch_lib_name[arch]))
 
         flags = {
             "amd64": "-m64",
@@ -160,7 +146,6 @@ class LinuxTest(unittest.TestCase):
                 flags[arch],
                 "-o", outfile,
                 infile,
-                bitcode_lib,
                 runtime_lib,
                 "-lm", # this is usually needed by the external semantics
                 ]
@@ -216,7 +201,7 @@ class LinuxTest(unittest.TestCase):
             have_stderr = b64(stderr)
             self.assertEqual(have_stderr, testset[test]['expected_stderr'])
 
-    def _runArchTest(self, arch, testname, entrypoint, buildargs=None):
+    def _runArchTest(self, arch, testname, entrypoint, buildargs=None, liftargs=None):
         # sanity check #1: lifter is built
         self._sanityCheckFile(self.mcsema_lift)
         cfg_file = os.path.abspath( os.path.join(self.my_dir, "..", "tests", "linux", arch) )
@@ -233,8 +218,10 @@ class LinuxTest(unittest.TestCase):
                 "--arch", arch,
                 "--os", self.os,
                 "--cfg", cfg_file,
-                "--entrypoint", entrypoint,
                 "--output", bcfile,]
+
+        if liftargs:
+            args.extend(liftargs)
 
         # check that the lifter works in a timely fasion
         # and returns exit code 0
@@ -248,6 +235,13 @@ class LinuxTest(unittest.TestCase):
             elffile = os.path.join(self.archdirs[arch], testname + ".exe")
             self._compileBitcode(arch, bcfile, elffile, buildargs)
             self._checkInputs(arch, testname, elffile)
+
+    def testInlineAsm(self):
+        # The x86 test is producing slightly diferent output for printf
+        # reasons, so disable it for now.
+        #self._runX86Test("aes-test")
+        #self._runAMD64Test("aes-test", liftargs=["-ignore-unsupported"])
+        self._runAMD64Test("aes-test")
 
     def testHello(self):
         self._runX86Test("hello")
@@ -264,6 +258,18 @@ class LinuxTest(unittest.TestCase):
     def testswitch(self):
         self._runX86Test("switch")
         self._runAMD64Test("switch")
+
+    def testglobals(self):
+        self._runX86Test("globals")
+        self._runAMD64Test("globals")
+
+    def testbts(self):
+        self._runX86Test("bts")
+        self._runAMD64Test("bts")
+
+    def testdata_array(self):
+        self._runX86Test("data_array")
+        self._runAMD64Test("data_array")
 
     def testls(self):
         libs = ["-lrt",
