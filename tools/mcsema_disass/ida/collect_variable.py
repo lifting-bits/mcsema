@@ -365,6 +365,11 @@ elif idaapi.get_inf_structure().is_32bit():
 _base_ptr_format = "[{}+".format(_base_ptr)
 _stack_ptr_format = "[{}+".format(_stack_ptr)
 
+def floor_key(d, key):
+  L1 = list(k for k in d if k <= key)
+  if len(L1):
+    return max(L1)
+
 def _get_flags_from_bits(flag):
   '''
   Translates the flag field in structures (and elsewhere?) into a human readable
@@ -461,16 +466,10 @@ def _process_lea_instruction(inst_ea, func_variable):
       if len(func_variable["stackArgs"].keys()) == 0:
         return
     
-      if opnd.is_read:
-        read_on_stack = base_ if base_ == _stack_ptr or base_ == _base_ptr else None
-        if read_on_stack:
-          DEBUG("Operand is read base referent {0}, index {1}, offset {2}".format(base_, index_, offset)) 
-          start_ = min(func_variable["stackArgs"].keys(), key=lambda x:abs(x-offset))
-          end_ = start_ + func_variable["stackArgs"][start_]["size"]
-          if offset in range(start_, end_):
-            var_offset = offset - start_
-            func_variable["stackArgs"][start_]["reads"].append({"ea" :inst_ea, "offset" :var_offset})
-            func_variable["stackArgs"][start_]["safe"] = False
+      target_on_stack = base_ if base_ == _stack_ptr or base_ == _base_ptr else None
+      if target_on_stack == _base_ptr:
+        start_ = floor_key(func_variable["stackArgs"].keys(), offset)
+        func_variable["stackArgs"].pop(start_, None)
   
 def _process_instruction(inst_ea, func_variable):
   insn = Instruction(inst_ea)
@@ -485,52 +484,72 @@ def _process_instruction(inst_ea, func_variable):
     
       if opnd.is_write:
         target_on_stack = base_ if base_ == _stack_ptr or base_ == _base_ptr else None
-        if target_on_stack:
-          DEBUG("Operand is write base {0}, index {1}, offset {2}".format(base_, index_, offset))
-          start_ = min(func_variable["stackArgs"].keys(), key=lambda x:abs(x-offset))
-          end_ = start_ + func_variable["stackArgs"][start_]["size"]
-          if offset in range(start_, end_):
-            var_offset = offset - start_
-            func_variable["stackArgs"][start_]["writes"].append({"ea" :inst_ea, "offset" :var_offset})
-            func_variable["stackArgs"][start_]["safe"] = True
+        if target_on_stack == _base_ptr:
+          DEBUG("Operand is write base {0}, index {1}, offset {2} {3}".format(base_, index_, offset, func_variable["stackArgs"].keys()))
+          start_ = floor_key(func_variable["stackArgs"].keys(), offset)
+          if start_:
+            end_ = start_ + func_variable["stackArgs"][start_]["size"]
+            DEBUG("Start {0}, end {1}, keys {2}".format(start_, end_, func_variable["stackArgs"].keys()))
+            if offset in range(start_, end_):
+              var_offset = offset - start_
+              func_variable["stackArgs"][start_]["writes"].append({"ea" :inst_ea, "offset" :var_offset})
+              func_variable["stackArgs"][start_]["safe"] = True
+        else:
+          for key in func_variable["stackArgs"].keys():
+            if func_variable["stackArgs"][key]["name"] in opnd.text:
+              func_variable["stackArgs"][key]["safe"] = False
+              func_variable["stackArgs"].pop(key, None)
+              break
             
       elif opnd.is_read:
         read_on_stack = base_ if base_ == _stack_ptr or base_ == _base_ptr else None
-        if read_on_stack:
+        if read_on_stack == _base_ptr:
           DEBUG("Operand is read base {0}, index {1}, offset {2}".format(base_, index_, offset)) 
-          start_ = min(func_variable["stackArgs"].keys(), key=lambda x:abs(x-offset))
-          end_ = start_ + func_variable["stackArgs"][start_]["size"]
-          if offset in range(start_, end_):
-          #if offset in range(start_offset, end_offset):
-            var_offset = offset - start_
-            func_variable["stackArgs"][start_]["reads"].append({"ea" :inst_ea, "offset" :var_offset})
-            func_variable["stackArgs"][start_]["safe"] = True
+          start_ = floor_key(func_variable["stackArgs"].keys(), offset)
+          if start_:
+            end_ = start_ + func_variable["stackArgs"][start_]["size"]
+            DEBUG("Start {0}, end {1}, keys {2}".format(start_, end_, func_variable["stackArgs"].keys()))
+            if offset in range(start_, end_):
+              var_offset = offset - start_
+              func_variable["stackArgs"][start_]["reads"].append({"ea" :inst_ea, "offset" :var_offset})
+              func_variable["stackArgs"][start_]["safe"] = True
+        else:
+          for key in func_variable["stackArgs"].keys():
+            if func_variable["stackArgs"][key]["name"] in opnd.text:
+              func_variable["stackArgs"][key]["safe"] = False
+              func_variable["stackArgs"].pop(key, None)
+              break
       else:
         read_on_stack = base_ if base_ == _stack_ptr or base_ == _base_ptr else None
         if read_on_stack:
           DEBUG("Operand is write base referent {0}, index {1}, offset {2:x}".format(base_, index_, offset))
-          #if offset in func_variable["stackArgs"].keys():
-          start_ = min(func_variable["stackArgs"].keys(), key=lambda x:abs(x-offset))
-          end_ = start_ + func_variable["stackArgs"][start_]["size"]
-          if offset in range(start_, end_):
-            var_offset = offset - start_
-            func_variable["stackArgs"][start_]["flags"].add("LOCAL_REFERER")
-            # collect which stack variable offset this variable points to
-            func_variable["stackArgs"][start_]["referent"].append({"ea" :inst_ea, "offset" :var_offset})
+          start_ = floor_key(func_variable["stackArgs"].keys(), offset)
+          if start_:
+            end_ = start_ + func_variable["stackArgs"][start_]["size"]
+            if offset in range(start_, end_):
+              var_offset = offset - start_
+              func_variable["stackArgs"][start_]["flags"].add("LOCAL_REFERER")
+              func_variable["stackArgs"][start_]["referent"].append({"ea" :inst_ea, "offset" :var_offset})
 
   
 def _process_basic_block(f_ea, block_ea, func_variable):
 
   inst_eas, succ_eas = analyse_block(f_ea, block_ea, True)
   for inst_ea in inst_eas:
-    DEBUG("Processing instruction at {0:x}".format(inst_ea))
-    #_funcs = {"lea":_process_lea_instruction
-    #          }
-    #func = _funcs.get(idc.GetMnem(inst_ea), None)
-    #if func:
-    #  func(inst_ea, func_variable)
-    #else:
-    _process_instruction(inst_ea, func_variable)
+    _funcs = {"lea":_process_lea_instruction
+              }
+    func = _funcs.get(idc.GetMnem(inst_ea), None)
+    if func:
+      func(inst_ea, func_variable)
+    else:
+      _process_instruction(inst_ea, func_variable)
+
+
+RECOVER_DEBUG_FL = [
+    # stack variable tick and times_per_thread is causing
+    # problem while lifting Apache ATD's;
+    "status_handler" 
+    ]
 
 def build_stack_args(f):
   stackArgs = dict()
@@ -540,6 +559,16 @@ def build_stack_args(f):
   _uses_bp = 0 != (idc.GetFunctionFlags(f) & idc.FUNC_FRAME)
   frame = idc.GetFrame(f)
   if frame is None:
+    return stackArgs
+
+  func_type = idc.GetType(f)
+  if (func_type is not None) and ("(" in func_type):
+    args = func_type[ func_type.index('(')+1: func_type.rindex(')') ]
+    args_list = [ x.strip() for x in args.split(',')]
+    if "..." in args_list:
+      return stackArgs
+
+  if name in RECOVER_DEBUG_FL:
     return stackArgs
 
   #grab the offset of the stored frame pointer, so that
@@ -562,17 +591,11 @@ def build_stack_args(f):
     if (memberName == " r" or memberName == " s"):
       #the return pointer and start pointer, who cares
       offset = idc.GetStrucNextOff(frame, offset)
-      DEBUG("Test Lifting stack {0} {1:x} delta {2:x} {3:x}".format(memberName, offset, delta, idc.GetMemberOffset(frame, "err_fmt")))
       continue
     memberSize = idc.GetMemberSize(frame, offset)
-    DEBUG("Lifting stack {0} {1:x} delta {2:x}".format(memberName, offset, delta))
     if offset >= delta:
       offset = idc.GetStrucNextOff(frame, offset)
       continue
-    if (memberName in ["errstr"] ):
-      offset = idc.GetStrucNextOff(frame, offset)
-      continue
-    DEBUG("Actual Lifting stack {0} {1:x} delta {2:x}".format(memberName, offset, delta))
     memberFlag = idc.GetMemberFlag(frame, offset)
     #TODO: handle the case where a struct is encountered (FF_STRU flag)
     flag_str = _get_flags_from_bits(memberFlag)
@@ -597,7 +620,6 @@ def collect_function_vars(f, blockset):
   
   DEBUG_PUSH()
   stackArgs = build_stack_args(f)
-  
   processed_blocks = set()
   while len(blockset) > 0:
     block_ea = blockset.pop()
