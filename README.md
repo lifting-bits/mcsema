@@ -1,3 +1,6 @@
+# Important Update!
+**Version 2 of McSema will be released soon and is being actively developed in the [use_remill_semantics](https://github.com/trailofbits/mcsema/tree/use_remill_semantics) branch. Please switch to that branch!**
+
 # McSema [![Slack Chat](http://empireslacking.herokuapp.com/badge.svg)](https://empireslacking.herokuapp.com/)
 
 McSema lifts x86 and amd64 binaries to LLVM bitcode modules. McSema support both Linux and Windows binaries, and most x86 and amd64 instructions, including integer, FPU, and SSE operations.
