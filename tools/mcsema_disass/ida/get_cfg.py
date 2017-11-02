@@ -227,7 +227,8 @@ def parse_os_defs_file(df):
         # Misidentified and external.
         flags = idc.GetFlags(ea)
         if not idc.isCode(flags) and not idaapi.is_weak_name(ea):
-          DEBUG("WARNING: External {} at {:x} from definitions file is not a function".format(
+          # Refer to issue #308
+          DEBUG("WARNING: External {} at {:x} from definitions file may not be a function".format(
               fname, ea))
 
       EMAP[fname] = (int(args), realconv, ret, sign)
