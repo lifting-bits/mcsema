@@ -1,5 +1,5 @@
 # Important Update!
-**Version 2 of McSema will be released soon and is being actively developed in the [use_remill_semantics](https://github.com/trailofbits/mcsema/tree/use_remill_semantics) branch. Please switch to that branch!
+**Version 2 of McSema will be released soon and is being actively developed in the [use_remill_semantics](https://github.com/trailofbits/mcsema/tree/use_remill_semantics) branch. Please switch to that branch!**
 
 # McSema [![Slack Chat](http://empireslacking.herokuapp.com/badge.svg)](https://empireslacking.herokuapp.com/)
 
