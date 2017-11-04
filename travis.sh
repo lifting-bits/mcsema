@@ -141,6 +141,7 @@ linux_build() {
   fi
 
   export TRAILOFBITS_LIBRARIES=`realpath libraries`
+  export PATH="${TRAILOFBITS_LIBRARIES}/llvm/bin:${PATH}"
 
   printf " > Generating the project...\n"
   mkdir build > "${log_file}" 2>&1
@@ -160,7 +161,7 @@ linux_build() {
   fi
 
   printf " > Building...\n"
-  ( cd build && make -j `nproc` ) > "${log_file}" 2>&1
+  ( cd build && scan-build make -j `nproc` ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to build the project. Error output follows:\n"
     printf "===\n"
@@ -179,8 +180,8 @@ linux_build() {
 
   printf " > Build succeeded\n"
 
-  print "\n\n\nCalling the testing suite...\n"
-  ./tests/test_suite/start.py
+  printf "\n\n\nCalling the testing suite...\n"
+  ( cd ./remill/tools/mcsema/tests/test_suite && ./start.py )
 
   return $?
 }
