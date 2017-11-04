@@ -1,16 +1,6 @@
-cache:
-  timeout: 660
-  pip: true
-  custom_install: true
-  directories:
-    - sources
-
-matrix:
-  include:
-    - os: linux
-      dist: trusty
-      language: generic
-      sudo: required
+dist: xenial
+language: generic
+sudo: required
 
 before_install:
   - ./travis.sh "$TRAVIS_OS_NAME" initialize

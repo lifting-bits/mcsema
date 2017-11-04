@@ -57,9 +57,31 @@ osx_initialize() {
 }
 
 linux_build() {
-  printf "Building platform: linux\n"
+  local ubuntu_version=`cat /etc/issue | awk '{ print $2 }' | cut -d '.' -f 1-2 | tr -d '.'`
+  printf "Building platform: linux (ubuntu ${ubuntu_version})\n"
 
   local log_file=`mktemp`
+
+  printf " > Cleaning up...\n"
+  if [ -d "remill" ] ; then
+    rm -rf remill > "${log_file}" 2>&1
+    if [ $? -ne 0 ] ; then
+      printf " x Failed to remove the existing remill folder. Error output follows:\n"
+      printf "===\n"
+      cat "${log_file}"
+      return 1
+    fi
+  fi
+
+  if [ -d "build" ] ; then
+    rm -rf remill > "${log_file}" 2>&1
+    if [ $? -ne 0 ] ; then
+      printf " x Failed to remove the existing build folder. Error output follows:\n"
+      printf "===\n"
+      cat "${log_file}"
+      return 1
+    fi
+  fi
 
   printf " > Cloning remill...\n"
   git clone "https://github.com/trailofbits/remill.git" > "${log_file}" 2>&1
@@ -93,7 +115,7 @@ linux_build() {
 
   # acquire the cxx-common package
   printf " > Acquiring the cxx-common package...\n"
-  wget "https://s3.amazonaws.com/cxx-common/libraries-llvm40-ubuntu1404-amd64.tar.gz" > "${log_file}" 2>&1
+  wget "https://s3.amazonaws.com/cxx-common/libraries-llvm40-ubuntu${ubuntu_version}-amd64.tar.gz" > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to download the cxx-common package. Error output follows:\n"
     printf "===\n"
