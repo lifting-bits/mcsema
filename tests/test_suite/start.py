@@ -280,7 +280,7 @@ def execute_tests(toolset, test_list):
   
     print("")
 
-  return True
+  return False
 
 def lift_test_cfg(toolset, test):
   output_file_path = os.path.join(tempfile.gettempdir(), test.name() + "_" + test.architecture() + "_" + test.platform() + ".bc")

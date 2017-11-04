@@ -155,7 +155,7 @@ linux_build() {
     return 1
   fi
 
-  ( cd build && cmake -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_CXX_COMPILER=${CXX} -DCMAKE_CC_COMPILER=${CC} ../remill ) > "${log_file}" 2>&1
+  ( cd build && cmake -DCMAKE_VERBOSE_MAKEFILE=True ../remill ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to generate the project. Error output follows:\n"
     printf "===\n"
@@ -164,7 +164,7 @@ linux_build() {
   fi
 
   printf " > Building...\n"
-  ( cd build && scan-build make -j `nproc` ) > "${log_file}" 2>&1
+  ( cd build && scan-build --show-description --status-bugs make -j `nproc` ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to build the project. Error output follows:\n"
     printf "===\n"
