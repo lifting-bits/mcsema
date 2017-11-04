@@ -141,7 +141,7 @@ linux_build() {
   fi
 
   export TRAILOFBITS_LIBRARIES=`realpath libraries`
-  export PATH="${TRAILOFBITS_LIBRARIES}/llvm/bin:${PATH}"
+  export PATH="${TRAILOFBITS_LIBRARIES}/llvm/bin:${TRAILOFBITS_LIBRARIES}/cmake/bin:${TRAILOFBITS_LIBRARIES}/protobuf/bin:${PATH}"
 
   export CC="${TRAILOFBITS_LIBRARIES}/llvm/bin/clang"
   export CXX="${TRAILOFBITS_LIBRARIES}/llvm/bin/clang++"
@@ -155,7 +155,7 @@ linux_build() {
     return 1
   fi
 
-  ( cd build && cmake -DCMAKE_VERBOSE_MAKEFILE=True ../remill ) > "${log_file}" 2>&1
+  ( cd build && cmake -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_CXX_COMPILER=${CXX} -DCMAKE_CC_COMPILER=${CC} ../remill ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to generate the project. Error output follows:\n"
     printf "===\n"
