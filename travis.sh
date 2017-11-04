@@ -74,7 +74,7 @@ linux_build() {
   fi
 
   if [ -d "build" ] ; then
-    rm -rf remill > "${log_file}" 2>&1
+    rm -rf build > "${log_file}" 2>&1
     if [ $? -ne 0 ] ; then
       printf " x Failed to remove the existing build folder. Error output follows:\n"
       printf "===\n"
@@ -115,20 +115,29 @@ linux_build() {
 
   # acquire the cxx-common package
   printf " > Acquiring the cxx-common package...\n"
-  wget "https://s3.amazonaws.com/cxx-common/libraries-llvm40-ubuntu${ubuntu_version}-amd64.tar.gz" > "${log_file}" 2>&1
-  if [ $? -ne 0 ] ; then
-    printf " x Failed to download the cxx-common package. Error output follows:\n"
-    printf "===\n"
-    cat "${log_file}"
-    return 1
+
+  local cxx_common_tarball_name="libraries-llvm40-ubuntu${ubuntu_version}-amd64.tar.gz"
+  if [ ! -f "${cxx_common_tarball_name}" ] ; then
+    wget "https://s3.amazonaws.com/cxx-common/${cxx_common_tarball_name}" > "${log_file}" 2>&1
+    if [ $? -ne 0 ] ; then
+      printf " x Failed to download the cxx-common package. Error output follows:\n"
+      printf "===\n"
+      cat "${log_file}"
+      return 1
+    fi
   fi
 
-  tar xzf "libraries-llvm40-ubuntu1404-amd64.tar.gz" > "${log_file}" 2>&1
-  if [ $? -ne 0 ] ; then
-    printf " x The archive appears to be corrupted. Error output follows:\n"
-    printf "===\n"
-    cat "${log_file}"
-    return 1
+  if [ ! -d "libraries" ] ; then
+    tar xzf "${cxx_common_tarball_name}" > "${log_file}" 2>&1
+    if [ $? -ne 0 ] ; then
+      printf " x The archive appears to be corrupted. Error output follows:\n"
+      printf "===\n"
+      cat "${log_file}"
+
+      rm "${cxx_common_tarball_name}"
+      rm -rf libraries
+      return 1
+    fi
   fi
 
   export TRAILOFBITS_LIBRARIES=`realpath libraries`
@@ -142,7 +151,7 @@ linux_build() {
     return 1
   fi
 
-  ( cd build && cmake ../remill ) > "${log_file}" 2>&1
+  ( cd build && cmake -DCMAKE_VERBOSE_MAKEFILE=True ../remill ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to generate the project. Error output follows:\n"
     printf "===\n"
