@@ -143,6 +143,9 @@ linux_build() {
   export TRAILOFBITS_LIBRARIES=`realpath libraries`
   export PATH="${TRAILOFBITS_LIBRARIES}/llvm/bin:${PATH}"
 
+  export CC="${TRAILOFBITS_LIBRARIES}/llvm/bin/clang"
+  export CXX="${TRAILOFBITS_LIBRARIES}/llvm/bin/clang++"
+
   printf " > Generating the project...\n"
   mkdir build > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
