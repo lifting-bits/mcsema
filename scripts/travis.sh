@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
 
+# Copyright (c) 2017 Trail of Bits, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specifi
+
 main() {
   if [ $# -ne 2 ] ; then
     printf "Usage:\n\ttravis.sh <linux|osx> <initialize|build>\n"
@@ -102,7 +115,7 @@ linux_build() {
   fi
 
   printf " > Copying the mcsema folder...\n"
-  local file_list=( "docs" "generated" "mcsema" "tests" "tools" ".gdbinit" ".gitignore" ".travis.yml" "ACKNOWLEDGEMENTS.md" "CMakeLists.txt" "LICENSE" "README.md" "travis.sh")
+  local file_list=( "docs" "generated" "mcsema" "tests" "tools" ".gdbinit" ".gitignore" ".travis.yml" "ACKNOWLEDGEMENTS.md" "CMakeLists.txt" "LICENSE" "README.md" "scripts")
   for file_name in "${file_list[@]}" ; do
     cp -r "${file_name}" "remill/tools/mcsema" > "${log_file}" 2>&1
     if [ $? -ne 0 ] ; then

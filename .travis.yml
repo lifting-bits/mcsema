@@ -3,8 +3,8 @@ language: generic
 sudo: required
 
 before_install:
-  - ./travis.sh "$TRAVIS_OS_NAME" initialize
+  - ./scripts/travis.sh "$TRAVIS_OS_NAME" initialize
 
 install: true
 script:
-  - ./travis.sh "$TRAVIS_OS_NAME" build
+  - ./scripts/travis.sh "$TRAVIS_OS_NAME" build
