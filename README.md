@@ -90,11 +90,17 @@ sudo chown your_user:your_user /home/your_user/ida-6.7/python/lib/python27.zip
 
 The next step is to clone the [Remill](https://github.com/trailofbits/remill) repository. We then clone the McSema repository into the `tools` subdirectory of Remill. This is kind of like how Clang and LLVM are distributed separately, and the Clang source code needs to be put into LLVM's tools directory.
 
+**Notice that when building McSema you should always use a specific Remill commit hash (the one we test). This hash can be found in the .remill_commit_id file**.
+
 ```shell
-git clone --depth 1 https://github.com/trailofbits/remill.git
-pushd remill/tools
 git clone --depth 1 https://github.com/trailofbits/mcsema.git
-popd
+export REMILL_VERSION=`cat ./mcsema/.remill_commit_id`
+
+git clone --depth 1 https://github.com/trailofbits/remill.git
+cd remill
+git checkout -b temp $REMILL_VERSION
+
+mv ../mcsema tools
 ```
 
 #### Step 3: Build and install the code

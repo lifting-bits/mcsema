@@ -97,9 +97,25 @@ linux_build() {
   fi
 
   printf " > Cloning remill...\n"
+  local remill_commit_id=`cat .remill_commit_id`
+  if [ $? -ne 0 ] ; then
+    printf " x Failed to read the Remill commit id from file. Error output follows:\n"
+    printf "===\n"
+    cat "${log_file}"
+    return 1
+  fi
+
   git clone "https://github.com/trailofbits/remill.git" > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to clone the remill repository. Error output follows:\n"
+    printf "===\n"
+    cat "${log_file}"
+    return 1
+  fi
+
+  ( cd remill && git checkout -b temp $remill_commit_id ) > "${log_file}" 2>&1
+  if [ $? -ne 0 ] ; then
+    printf " x Failed to switch to the correct remill commit. Error output follows:\n"
     printf "===\n"
     cat "${log_file}"
     return 1
@@ -115,7 +131,7 @@ linux_build() {
   fi
 
   printf " > Copying the mcsema folder...\n"
-  local file_list=( "docs" "generated" "mcsema" "tests" "tools" ".gdbinit" ".gitignore" ".travis.yml" "ACKNOWLEDGEMENTS.md" "CMakeLists.txt" "LICENSE" "README.md" "scripts")
+  local file_list=( ".remill_commit_id" "docs" "generated" "mcsema" "tests" "tools" ".gdbinit" ".gitignore" ".travis.yml" "ACKNOWLEDGEMENTS.md" "CMakeLists.txt" "LICENSE" "README.md" "scripts")
   for file_name in "${file_list[@]}" ; do
     cp -r "${file_name}" "remill/tools/mcsema" > "${log_file}" 2>&1
     if [ $? -ne 0 ] ; then
