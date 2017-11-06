@@ -133,8 +133,8 @@ message StackVar {
     required string     name = 1;
     required int64      sp_offset = 2;
     required int64      size = 3;
-    required bool       has_frame = 4;
-    required string     regname = 5;
+    optional bool       has_frame = 4;
+    optional string     regname = 5;
 }
 
 message GlobalVar {

@@ -124,18 +124,20 @@ def recover_externals(bv, pb_mod):
             recover_ext_var(bv, pb_mod, sym)
 
 
-def recover_section_cross_references(bv, pb_seg, sect):
+def recover_section_cross_references(bv, pb_seg, real_sect, sect_start, sect_end):
     """ Find references to other code/data in this section
 
     Args:
         bv (binja.BinaryView)
         pb_seg (CFG_pb2.Segment)
-        sect (binja.binaryview.Section)
+        real_sect (binja.binaryview.Section)
+        sect_start (int)
+        sect_end (int)
     """
-    entry_width = util.clamp(sect.align, 4, bv.address_size)
+    entry_width = util.clamp(real_sect.align, 4, bv.address_size)
     read_val = {4: util.read_dword,
                 8: util.read_qword}[entry_width]
-    for addr in xrange(sect.start, sect.end, entry_width):
+    for addr in xrange(sect_start, sect_end, entry_width):
         xref = read_val(bv, addr)
 
         if not util.is_valid_addr(bv, xref):
@@ -154,13 +156,14 @@ def recover_section_cross_references(bv, pb_seg, sect):
             pb_ref.target_fixup_kind = CFG_pb2.DataReference.Absolute
 
 
-def recover_section_vars(bv, pb_seg, sect):
+def recover_section_vars(bv, pb_seg, sect_start, sect_end):
     """ Gather any symbols that point to data in this section
 
-    Args:
+    Args:x
         bv (binja.BinaryView)
         pb_seg (CFG_pb2.Segment)
-        sect (binja.binaryview.Section)
+        sect_start (int)
+        sect_end (int)
     """
     for sym in bv.get_symbols():
         # Ignore functions and externals
@@ -170,28 +173,80 @@ def recover_section_vars(bv, pb_seg, sect):
                         SymbolType.ImportAddressSymbol]:
             continue
 
-        if sect.start <= sym.address < sect.end:
+        if sect_start <= sym.address < sect_end:
             pb_segvar = pb_seg.vars.add()
             pb_segvar.ea = sym.address
             pb_segvar.name = sym.name
 
 
 def recover_sections(bv, pb_mod):
+    # Collect all address to split on
+    sec_addrs = set()
     for sect in bv.sections.values():
-        log.debug('Processing %s', sect.name)
+        sec_addrs.add(sect.start)
+        sec_addrs.add(sect.end)
+
+    global_starts = [gvar.ea for gvar in pb_mod.global_vars]
+    sec_addrs.update(global_starts)
+
+    # Process all the split segments
+    sec_splits = sorted(list(sec_addrs))
+    for start_addr, end_addr in zip(sec_splits[:-1], sec_splits[1:]):
+        real_sect = util.get_section_at(bv, start_addr)
+
+        # Ignore any gaps
+        if real_sect is None:
+            continue
+
+        log.debug('Processing %s from 0x%x to 0x%x', real_sect.name, start_addr, end_addr)
         pb_seg = pb_mod.segments.add()
-        pb_seg.name = sect.name
-        pb_seg.ea = sect.start
-        pb_seg.data = bv.read(sect.start, sect.length)
-        pb_seg.is_external = util.is_section_external(bv, sect)
-        pb_seg.read_only = not util.is_readable(bv, sect.start)
-        pb_seg.is_thread_local = util.is_tls_section(bv, sect.start)
+        pb_seg.name = real_sect.name
+        pb_seg.ea = start_addr
+        pb_seg.data = bv.read(start_addr, end_addr - start_addr)
+        pb_seg.is_external = util.is_section_external(bv, real_sect)
+        pb_seg.read_only = not util.is_readable(bv, start_addr)
+        pb_seg.is_thread_local = util.is_tls_section(bv, start_addr)
 
-        # TODO: split sections up so that globals are separate "segments"
-        pb_seg.is_exported = False
+        sym = bv.get_symbol_at(start_addr)
+        pb_seg.is_exported = sym is not None and start_addr in global_starts
+        if pb_seg.is_exported and sym.name != real_sect.name:
+            pb_seg.variable_name = sym.name
 
-        recover_section_vars(bv, pb_seg, sect)
-        recover_section_cross_references(bv, pb_seg, sect)
+        recover_section_vars(bv, pb_seg, start_addr, end_addr)
+        recover_section_cross_references(bv, pb_seg, real_sect, start_addr, end_addr)
+
+
+def recover_globals(bv, pb_mod):
+    # Sort symbols by address so we can estimate size if needed
+    syms = sorted(bv.symbols.values(), key=lambda s: s.address)
+    for i, sym in enumerate(syms):
+
+        # Binja picks up a couple of symbols outside of names sections
+        sect = util.get_section_at(bv, sym.address)
+        if sect is None:
+            continue
+
+        if sym.type == SymbolType.DataSymbol and \
+           not util.is_code(bv, sym.address) and \
+           not util.is_section_external(bv, sect):
+            log.debug('Recovering global %s @ 0x%x', sym.name, sym.address)
+            pb_gvar = pb_mod.global_vars.add()
+            pb_gvar.ea = sym.address
+            pb_gvar.name = sym.name
+
+            # Look at the variable type to determine size
+            data_var = bv.get_data_var_at(sym.address)
+            if data_var.type.type_class == TypeClass.VoidTypeClass:
+                # Estimate size based on the address of the next symbol
+                if sym is not syms[-1]:
+                    pb_gvar.size = syms[i + 1].address - sym.address
+                else:
+                    # Edge case for the last symbol
+                    # Take end of the section as the "next symbol" instead
+                    sec = util.get_section_at(bv, sym.address)
+                    pb_gvar.size = sec.end - sym.address
+            else:
+                pb_gvar.size = data_var.type.width
 
 
 def is_local_noreturn(bv, il):
@@ -311,6 +366,30 @@ def add_block(pb_func, block):
     return pb_block
 
 
+def recover_stack_vars(pb_func, func):
+    """
+    Args:
+        pb_func (CFG_pb2.Function)
+        func (binaryninja.function.Function)
+    """
+    # Go through all variables on the stack (in order of storage)
+    stack_vars = sorted(func.stack_layout, key=lambda var: var.storage)
+    for i, svar in enumerate(stack_vars):
+        pb_svar = pb_func.stackvars.add()
+        pb_svar.name = svar.name
+        pb_svar.sp_offset = svar.storage
+
+        if svar.type.type_class == TypeClass.VoidTypeClass:
+            # Estimate size based on the offset of the next variable
+            if svar is not stack_vars[-1]:
+                pb_svar.size = stack_vars[i + 1].storage - svar.storage
+            else:
+                # Edge case for the last variable, the offset is the size
+                pb_svar.size = svar.storage
+        else:
+            pb_svar.size = svar.type.width
+
+
 def recover_function(bv, pb_mod, addr, is_entry=False):
     func = bv.get_function_at(addr)
     if func is None:
@@ -342,6 +421,9 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
             recover_inst(bv, pb_block, pb_inst, il)
             inst_addr += len(pb_inst.bytes)
 
+    # Recover stack variables
+    recover_stack_vars(pb_func, func)
+
 
 def recover_cfg(bv, args):
     pb_mod = CFG_pb2.Module()
@@ -365,6 +447,9 @@ def recover_cfg(bv, args):
         RECOVERED.add(addr)
 
         recover_function(bv, pb_mod, addr)
+
+    log.debug('Recovering Globals')
+    recover_globals(bv, pb_mod)
 
     log.debug('Processing Segments')
     recover_sections(bv, pb_mod)

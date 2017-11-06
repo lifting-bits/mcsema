@@ -90,11 +90,17 @@ sudo chown your_user:your_user /home/your_user/ida-6.7/python/lib/python27.zip
 
 The next step is to clone the [Remill](https://github.com/trailofbits/remill) repository. We then clone the McSema repository into the `tools` subdirectory of Remill. This is kind of like how Clang and LLVM are distributed separately, and the Clang source code needs to be put into LLVM's tools directory.
 
+**Notice that when building McSema you should always use a specific Remill commit hash (the one we test). This hash can be found in the .remill_commit_id file**.
+
 ```shell
-git clone --depth 1 https://github.com/trailofbits/remill.git
-pushd remill/tools
 git clone --depth 1 https://github.com/trailofbits/mcsema.git
-popd
+export REMILL_VERSION=`cat ./mcsema/.remill_commit_id`
+
+git clone --depth 1 https://github.com/trailofbits/remill.git
+cd remill
+git checkout -b temp $REMILL_VERSION
+
+mv ../mcsema tools
 ```
 
 #### Step 3: Build and install the code
@@ -148,6 +154,10 @@ This is a hotly contested issue. We must explore the etymology of the name to fi
 ### Why do I need IDA Pro to use McSema?
 
 McSema's goal is binary to bitcode translation. Accurate disassembly and control flow recovery is a separate and difficult problem. IDA has already invested countless man-hours into getting disassembly right, and it only makes sense that we re-use existing work. We understand that not everyone can afford an IDA license. With the original release of McSema, we shipped our own tool recursive descent disassembler. It was never as good as IDA and it never would be. Maintaining the broken tool took away valuable development time from more important McSema work. We hope to eventually transition to more accessible control flow recovery frontends, such as Binary Ninja (we have a branch with [initial Binary Ninja support](https://github.com/trailofbits/mcsema/tree/getcfg_binja)). We very warmly welcome pull requests that implement new control flow recovery frontends. 
+
+### What is Remill and why does McSema need it?
+
+[Remill](https://github.com/trailofbits/remill) is a library that McSema uses to lift individual machine code instructions to LLVM IR. You can think of McSema being to Remill as Clang is to LLVM. Remill's scope is small: it focuses on instruction semantics only, and it provides semantics for x86, x86-64, and AArch64 instruction semantics. McSema's scope is much bigger: it focuses on lifting entire programs. To do so, McSema must lift the individual instructions, but there's a lot more to lifting programs than just the instructions; there are code and data cross-references, segments, etc. 
 
 ### I'm a student and I'd like to contribute to McSema. How can I help?
 

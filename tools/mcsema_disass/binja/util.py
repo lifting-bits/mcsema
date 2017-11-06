@@ -117,6 +117,16 @@ def get_func_containing(bv, addr):
     return funcs[0] if funcs is not None else None
 
 
+def get_section_at(bv, addr):
+    """Returns the section in the binary that contains the given address"""
+    if not is_valid_addr(bv, addr):
+        return None
+
+    for sec in bv.sections.values():
+        if sec.start <= addr < sec.end:
+            return sec
+    return None
+
 def is_external_ref(bv, addr):
     sym = bv.get_symbol_at(addr)
     return sym is not None and 'Import' in sym.type.name
