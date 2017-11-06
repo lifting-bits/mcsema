@@ -345,7 +345,13 @@ def compile_lifted_code(toolset, test, bitcode_path):
   exec_result = execute_with_timeout(command_line, 60)
 
   result = {}
-  result["output"] = "Exit code: " + exec_result["exit_code"] + "\nstdout:\n"  + exec_result["stdout"] + "\n\nstderr:\n" + exec_result["stderr"]
+
+  command_line_description = "Command line:\n"
+  for s in command_line:
+    command_line_description += s + " "
+  command_line_description += "\n"
+
+  result["output"] = command_line_description + "Exit code: " + exec_result["exit_code"] + "\nstdout:\n"  + exec_result["stdout"] + "\n\nstderr:\n" + exec_result["stderr"]
 
   if not exec_result["success"]:
     result["success"] = False
