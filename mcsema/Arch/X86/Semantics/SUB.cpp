@@ -323,8 +323,9 @@ GENERIC_TRANSLATION(SUB16ri8, doSubRI<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_REF(SUB16rm,
                         doSubRM<16>(ip, block, ADDR_NOREF(2), OP(0), OP(1)),
                         doSubRM<16>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
-GENERIC_TRANSLATION(SUB16rr, doSubRR<16>(ip, block, OP(1), OP(2), OP(0)))
-GENERIC_TRANSLATION(SUB16rr_REV, doSubRR<16>(ip, block, OP(1), OP(2), OP(0)))
+
+GENERIC_TRANSLATION(SUB16rr, doSubRR<16>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(SUB16rr_REV, doSubRR<16>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_REF(
     SUB32i32,
     doSubRI<32>(ip, block, llvm::MCOperand::createReg(llvm::X86::EAX), llvm::MCOperand::createReg(llvm::X86::EAX), OP(0)),
@@ -387,8 +388,8 @@ GENERIC_TRANSLATION(SUB8ri, doSubRI<8>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION_REF(SUB8rm,
                         doSubRM<8>(ip, block, ADDR_NOREF(2), OP(0), OP(1)),
                         doSubRM<8>(ip, block, MEM_REFERENCE(2), OP(0), OP(1)))
-GENERIC_TRANSLATION(SUB8rr, doSubRR<8>(ip, block, OP(1), OP(2), OP(0)))
-GENERIC_TRANSLATION(SUB8rr_REV, doSubRR<8>(ip, block, OP(1), OP(2), OP(0)))
+GENERIC_TRANSLATION(SUB8rr, doSubRR<8>(ip, block, OP(0), OP(1), OP(2)))
+GENERIC_TRANSLATION(SUB8rr_REV, doSubRR<8>(ip, block, OP(0), OP(1), OP(2)))
 GENERIC_TRANSLATION(
     SBB16i16,
     doSbbRI<16>(ip, block, llvm::MCOperand::createReg(llvm::X86::AX), OP(0), llvm::MCOperand::createReg(llvm::X86::AX)))
