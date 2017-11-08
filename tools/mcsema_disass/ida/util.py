@@ -537,7 +537,7 @@ def _crefs_from(ea, only_one=False, check_fixup=True):
 def _xrefs_from(ea, only_one=False):
   fixup_ea = idc.GetFixupTgtOff(ea)
   seen = False
-  has_one = False
+  has_one = only_one
   if not is_invalid_ea(fixup_ea):
     seen = only_one
     has_one = True
