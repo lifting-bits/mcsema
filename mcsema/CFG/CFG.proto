@@ -139,11 +139,11 @@ message StackVariable {
   required uint64     size = 2;
   required int64      sp_offset = 3;
   optional bool       has_frame = 4;
-  optional string     regname = 5;
+  optional string     reg_name = 5;
   repeated Reference  ref_eas = 6;
 }
 
-message GlobalVar {
+message GlobalVariable {
   required int64      ea = 1;
   required string     name = 2;
   required int64      size = 3;
@@ -178,5 +178,5 @@ message Module {
   repeated  ExternalFunction    external_funcs = 4;
   repeated  ExternalVariable    external_vars = 5;
   
-  repeated	GlobalVar           global_vars = 8;
+  repeated	GlobalVariable      global_vars = 8;
 }

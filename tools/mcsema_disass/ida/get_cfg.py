@@ -1371,13 +1371,13 @@ if __name__ == "__main__":
       required=True)
   
   parser.add_argument(
-      '--global_var',
+      '--recover-global-vars',
       type=argparse.FileType('r'),
       default=None,
       help="File containing the global variables to be lifted")
 
   parser.add_argument(
-      '--stack-var',
+      '--recover-stack-vars',
       action="store_true",
       default=False,
       help="Flag to enable stack variable recovery")
@@ -1399,7 +1399,7 @@ if __name__ == "__main__":
     DEBUG("Using PIE mode.")
     PIE_MODE = True
     
-  if args.stack_var:
+  if args.recover_stack_vars:
     TO_RECOVER["stack_var"] = True
 
   EMAP = {}
@@ -1441,7 +1441,7 @@ if __name__ == "__main__":
           set_symbol_name(ea, name)
       idaapi.autoWait()
     
-    M = recover_module(args.entrypoint, args.global_var)
+    M = recover_module(args.entrypoint, args.recover_global_vars)
 
     DEBUG("Saving to: {0}".format(args.output.name))
     args.output.write(M.SerializeToString())
