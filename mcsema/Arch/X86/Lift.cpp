@@ -48,7 +48,7 @@
 // currently used to turn non-conforming jump tables
 // into data sections
 //
-static void PreProcessInst(TranslationContext &ctx, llvm::BasicBlock *&block) {
+static bool PreProcessInst(TranslationContext &ctx, llvm::BasicBlock *&block) {
   auto ip = ctx.natI;
   auto &inst = ip->get_inst();
   // only add data sections for non-conformant jump tables
@@ -64,9 +64,13 @@ static void PreProcessInst(TranslationContext &ctx, llvm::BasicBlock *&block) {
       VA tbl_va = 0;
       auto jmptbl = ip->get_jump_table();
 
-      bool ok = addJumpTableDataSection(ctx, tbl_va, *jmptbl);
-
-      TASSERT(ok, "Could not add jump table data section!\n");
+      if (!addJumpTableDataSection(ctx, tbl_va, *jmptbl)) {
+        std::cerr
+            << "ERROR: Could not add jump table " << std::hex << tbl_va
+            << " to data section for instruction " << std::hex << ip->get_loc()
+            << std::endl;
+        return false;
+      }
 
       auto data_ref_va = static_cast<uint32_t>(tbl_va
           + (4 * jmptbl->getInitialEntry()));
@@ -74,6 +78,7 @@ static void PreProcessInst(TranslationContext &ctx, llvm::BasicBlock *&block) {
       ip->set_reference(NativeInst::MEMRef, data_ref_va);
       ip->set_ref_type(NativeInst::MEMRef, NativeInst::CFGDataRef);
     }
+    return true;
 
   // only add data references for unknown jump index table reads
   } else if (ip->has_jump_index_table() &&
@@ -82,15 +87,23 @@ static void PreProcessInst(TranslationContext &ctx, llvm::BasicBlock *&block) {
     VA idx_va = 0;
     JumpIndexTablePtr idxtbl = ip->get_jump_index_table();
 
-    bool ok = addJumpIndexTableDataSection(ctx, idx_va, *idxtbl);
-
-    TASSERT(ok, "Could not add jump index table data section!\n");
+    if (!addJumpIndexTableDataSection(ctx, idx_va, *idxtbl)) {
+      std::cerr
+          << "ERROR: Could not add jump index table " << std::hex << idx_va
+          << " to data section for instruction " << std::hex << ip->get_loc()
+          << std::endl;
+      return false;
+    }
 
     uint32_t data_ref_va = static_cast<uint32_t>(idx_va
         + idxtbl->getInitialEntry());
 
     ip->set_reference(NativeInst::MEMRef, data_ref_va);
     ip->set_ref_type(NativeInst::MEMRef, NativeInst::CFGDataRef);
+    return true;
+
+  } else {
+    return true;
   }
 }
 
@@ -98,6 +111,8 @@ InstTransResult X86LiftInstruction(
     TranslationContext &ctx, llvm::BasicBlock *&block,
     InstructionLifter *lifter) {
 
-  PreProcessInst(ctx, block);
+  if (!PreProcessInst(ctx, block)) {
+    return TranslateError;
+  }
   return lifter(ctx, block);
 }

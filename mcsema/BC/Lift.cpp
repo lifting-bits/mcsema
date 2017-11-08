@@ -83,6 +83,11 @@ static llvm::cl::opt<bool> AddBreakpoints(
         "specific lifted instruction is executed."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> DryRun(
+    "dry-run",
+    llvm::cl::desc("Try to see if lifting will work."),
+    llvm::cl::init(false));
+
 llvm::CallingConv::ID getLLVMCC(ExternalCodeRef::CallingConvention cc) {
   switch (cc) {
     case ExternalCodeRef::CallerCleanup:
@@ -210,6 +215,10 @@ static InstTransResult LiftInstIntoBlockImpl(TranslationContext &ctx,
   auto &inst = ctx.natI->get_inst();
 
   if (auto lifter = ArchGetInstructionLifter(inst)) {
+    if (DryRun) {
+      return ContinueBlock;
+    }
+
     auto itr = ArchLiftInstruction(ctx, block, lifter);
 
     if (TranslateError == itr || TranslateErrorUnsupported == itr) {
@@ -252,20 +261,24 @@ static InstTransResult LiftInstIntoBlock(TranslationContext &ctx,
   auto pc = ctx.natI->get_loc();
 
   // Update the program counter.
-  auto pc_ty = llvm::Type::getIntNTy(block->getContext(), ArchAddressSize());
-  GENERIC_MC_WRITEREG(
-      block,
-      llvm::X86::EIP,
-      llvm::ConstantInt::get(pc_ty, pc));
+  //
+  // TODO(pag): Remove `llvm::X86::EIP` in place of something not x86-specific.
+  if (!DryRun) {
+    auto pc_ty = llvm::Type::getIntNTy(block->getContext(), ArchAddressSize());
+    GENERIC_MC_WRITEREG(
+        block,
+        llvm::X86::EIP,
+        llvm::ConstantInt::get(pc_ty, pc));
+  }
 
   // At the beginning of the block, make a call to a dummy function with the
   // same name as the block. This function call cannot be optimized away, and
   // so it serves as a useful marker for where we are.
-  if (AddBreakpoints) {
+  if (AddBreakpoints && !DryRun) {
     CreateInstrBreakpoint(block, pc);
   }
 
-  if (AddTracer) {
+  if (AddTracer && !DryRun) {
     AddRegStateTracer(block);
   }
 
@@ -273,7 +286,7 @@ static InstTransResult LiftInstIntoBlock(TranslationContext &ctx,
 
   // we need to loop over this function and find any un-annotated instructions.
   // then we annotate each instruction
-  if (doAnnotation) {
+  if (doAnnotation && !DryRun) {
     AnnotateInsts(ctx.F, pc);
   }
 
@@ -282,24 +295,33 @@ static InstTransResult LiftInstIntoBlock(TranslationContext &ctx,
 
 static bool LiftBlockIntoFunction(TranslationContext &ctx) {
   auto didError = false;
+  auto &context = ctx.F->getContext();
 
-  //first, either create or look up the LLVM basic block for this native
-  //block. we are either creating it for the first time, or, we are
-  //going to look up a blank block
+  // First, either create or look up the LLVM basic block for this native
+  // block. we are either creating it for the first time, or, we are
+  // going to look up a blank block.
   auto block_name = ctx.natB->get_name();
   auto curLLVMBlock = ctx.va_to_bb[ctx.natB->get_base()];
 
-  //then, create a basic block for every follow of this block, if we do not
-  //already have that basic block in our LLVM CFG
+  // Then, create a basic block for every follow of this block, if we do not
+  // already have that basic block in our LLVM CFG.
   const auto &follows = ctx.natB->get_follows();
   for (auto succ_block_va : follows) {
     if (!ctx.va_to_bb.count(succ_block_va)) {
-      throw TErr(__LINE__, __FILE__, "Missing successor block!");
+      std::cerr << "ERROR: Missing successor block " << std::hex
+                << succ_block_va << " of block " << std::hex
+                << ctx.natB->get_base() << " in function " << std::hex
+                << ctx.natF->get_start() << std::endl;
+      
+      auto missing_block = llvm::BasicBlock::Create(context, "", ctx.F);
+      new llvm::UnreachableInst(context, missing_block);
+
+      ctx.va_to_bb[succ_block_va] = missing_block;
     }
   }
 
-  //now, go through each statement and translate it into LLVM IR
-  //statements that branch SHOULD be the last statement in a block
+  // Now, go through each statement and translate it into LLVM IR
+  // statements that branch SHOULD be the last statement in a block.
   for (auto inst : ctx.natB->get_insts()) {
     ctx.natI = inst;
     switch (LiftInstIntoBlock(ctx, curLLVMBlock, true)) {
@@ -317,6 +339,10 @@ static bool LiftBlockIntoFunction(TranslationContext &ctx) {
     }
   }
 done:
+  
+  if (DryRun) {
+    return didError;
+  }
 
   if (curLLVMBlock->getTerminator()) {
     return didError;
@@ -328,7 +354,7 @@ done:
   if (follows.size() == 1) {
     llvm::BranchInst::Create(ctx.va_to_bb[follows.front()], curLLVMBlock);
   } else {
-    new llvm::UnreachableInst(curLLVMBlock->getContext(), curLLVMBlock);
+    new llvm::UnreachableInst(context, curLLVMBlock);
   }
 
   return didError;
@@ -339,7 +365,9 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
   auto &C = M->getContext();
   auto F = M->getFunction(func->get_name());
   if (!F) {
-    throw TErr(__LINE__, __FILE__, "Could not get func " + func->get_name());
+    std::cout << "ERROR: Function " << func->get_name()
+              << " doesn't exist!" << std::endl;
+    return false;
   }
 
   if (!F->empty()) {
@@ -396,8 +424,6 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
     }
     return false;
   }
-
-  
 }
 
 struct DataSectionVar {
@@ -646,6 +672,12 @@ bool LiftCodeIntoModule(NativeModulePtr natMod, llvm::Module *M) {
   InitExternalData(natMod, M);
   InitExternalCode(natMod, M);
   InsertDataSections(natMod, M);
+
+  if (DryRun) {
+    IgnoreUnsupportedInsts = true;
+    InjectInlineAsm = false;
+  }
   
-  return LiftFunctionsIntoModule(natMod, M);
+  auto ret = LiftFunctionsIntoModule(natMod, M);
+  return DryRun ? false : ret;
 }
