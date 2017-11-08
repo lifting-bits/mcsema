@@ -202,10 +202,18 @@ void F_CLEAR(llvm::BasicBlock *b, MCSemaRegs flag);
 llvm::Value *makeCallbackForLocalFunction(llvm::Module *M, VA local_target);
 
 void dataSectionToTypesContents(const std::list<DataSection> &globaldata,
+                                const std::list<NativeGlobalVarPtr> &nativeglobalvars,
                                 const DataSection &ds, llvm::Module *M,
                                 std::vector<llvm::Constant *>& secContents,
                                 std::vector<llvm::Type *>& data_section_types,
                                 bool convert_to_callback);
+
+bool dataSectionToGlobalVar(const std::list<DataSection> &globaldata,
+                            const std::list<NativeGlobalVarPtr> &nativeglobalvars,
+                            llvm::Module *M, NativeGlobalVarPtr nGV,
+                            std::vector<llvm::Constant *> &secContents,
+                            std::vector<llvm::Type *> &data_section_types,
+                            bool convert_to_callback);
 
 
 #define OP(x) inst.getOperand(x)

@@ -115,7 +115,7 @@ static bool addTableDataSection(TranslationContext &ctx, VA &newVA,
 
   std::vector<llvm::Type *> data_section_types;
   std::vector<llvm::Constant *> secContents;
-  dataSectionToTypesContents(natMod->getData(), *ds, M, secContents,
+  dataSectionToTypesContents(natMod->getData(), natMod->global_variables, *ds, M, secContents,
                              data_section_types, false);
 
   st_opaque->setBody(data_section_types, true);

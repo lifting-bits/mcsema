@@ -246,6 +246,14 @@ bool NativeInst::has_external_ref(void) const {
   return this->has_ext_call_target() || this->has_ext_data_ref();
 }
 
+void NativeInst::set_mem_var(NativeVarPtr t) {
+  this->mem_var = t;
+  this->has_mem_var = true;
+}
+
+NativeVarPtr NativeInst::get_mem_var(void) const {
+  return this->mem_var;
+}
 bool NativeInst::has_rip_relative(void) const {
   return this->hasRIP;
 }
@@ -335,6 +343,7 @@ NativeInst::NativeInst(VA v, uint8_t l, const llvm::MCInst &inst, Prefix k)
       mem_reference(0),
       mem_ref_type(CFGDataRef),
       has_mem_reference(false),
+      has_mem_var(false),
       len(l),
       jump_table(false),
       jump_index_table(false),
@@ -439,6 +448,17 @@ std::vector<uint8_t> DataSection::getBytes(void) const {
   return all_bytes;
 }
 
+const std::list<DataSectionEntry> &NativeGlobalVar::getEntries(void) const {
+  return this->entries;
+}
+
+void NativeGlobalVar::addEntry(const DataSectionEntry &dse) {
+  this->entries.push_back(dse);
+  if (this->base == NO_BASE || this->base > dse.getBase()) {
+    this->base = dse.getBase();
+  }
+}
+
 NativeEntrySymbol::NativeEntrySymbol(const std::string &name_, VA addr_)
     : addr(addr_),
       name(name_),
@@ -533,6 +553,15 @@ NativeBlockPtr NativeFunction::block_from_base(VA base) {
   auto block_it = blocks.find(base);
   TASSERT(block_it != blocks.end(), "Block not found");
   return block_it->second;
+}
+
+void NativeFunction::add_stackvar(NativeStackVarPtr s) {
+    // TODO: add refs
+    if(s->get_type().find("FUNC_ARG_REF") == std::string::npos)
+    {
+      this->stackvars.push_back(s);
+    }
+    return;
 }
 
 NativeBlock::NativeBlock(VA b)
@@ -656,6 +685,11 @@ void NativeModule::addEntryPoint(const NativeEntrySymbol &ep) {
 bool NativeModule::is64Bit(void) const {
   return 64 == ArchAddressSize();
 }
+
+void NativeModule::addGlobalVariables(
+    const std::list<NativeGlobalVarPtr> & global_vars) {
+  this->global_variables = global_vars;
+} 
 
 void NativeModule::addOffsetTables(
     const std::list<MCSOffsetTablePtr> & tables) {
@@ -877,6 +911,7 @@ static NativeInstPtr DecodeInst(
 
 static NativeInstPtr DeserializeInst(
     const ::Instruction &inst,
+    const std::list<NativeGlobalVarPtr> &globalvars, 
     const std::list<ExternalCodeRefPtr> &extcode) {
   VA addr = inst.inst_addr();
   auto tr_tgt = static_cast<VA>(inst.true_target());
@@ -948,6 +983,14 @@ static NativeInstPtr DeserializeInst(
     ip->set_ref_reloc_type(NativeInst::MEMRef, ref, ro, rt);
   }
 
+  for (auto g : globalvars) {
+    for (auto ref : g->get_refs()) {
+      if (ref == addr) {
+        ip->set_mem_var(g);
+      }
+    }
+  }
+
   if (inst.has_jump_table()) {
     // create new jump table
 
@@ -994,15 +1037,112 @@ static NativeInstPtr DeserializeInst(
   return ip;
 }
 
+static bool GetSectionForDataAddr(
+    const std::list<DataSection> &dataSecs, VA data_addr,
+    DataSection &section) {
+
+  for (auto &dt : dataSecs) {
+    VA start = dt.getBase();
+    VA end = start + dt.getSize();
+
+    if (data_addr >= start && data_addr < end) {
+      section = dt;
+      return true;
+    }
+  }
+  return false;
+}
+
+static DataSectionEntry DeserializeDataSymbol(const ::DataSymbol &ds);
+static DataSectionEntry makeDSEBlob(const std::vector<uint8_t> &bytes,
+                                    uint64_t start,  // offset in bytes vector
+                                    uint64_t end,  // offset in bytes vector
+                                    uint64_t base_va);  // virtual address these bytes are based at
+
+static NativeGlobalVarPtr DeserializeGlobalVar(
+    const ::GlobalVar &globalvar, std::list<DataSection> data_sections) {
+  ::Variable var = globalvar.var();
+  DataSection section;
+  const auto &dt = globalvar.data();
+  std::vector<uint8_t> local_bytes(dt.begin(), dt.end());
+
+  NativeGlobalVarPtr natGV =
+    new NativeGlobalVar(var.size(), var.name(), var.ida_type(), globalvar.address());
+
+  for (auto ref_ea : var.ref_eas()) {
+    natGV->add_ref(ref_ea.inst_addr(), ref_ea.offset());
+  }
+
+  auto found = GetSectionForDataAddr(data_sections, globalvar.address(), section);
+
+  if (found) {
+    auto bytes = section.getBytes();
+    uint64_t base_address =  section.getBase();
+    uint64_t end_address = globalvar.address() + natGV->get_size();
+    uint64_t cur_pos =  globalvar.address();
+
+    // assumes symbols are in-order
+    for (int i = 0; i < globalvar.symbols_size(); i++) {
+      DataSectionEntry dse_sym = DeserializeDataSymbol(globalvar.symbols(i));
+      auto dse_base = dse_sym.getBase();
+
+      std::cerr << "cur_pos: " << std::hex << cur_pos << std::endl
+                << "dse_base: " << std::hex << dse_base << std::endl;
+
+      // symbol next to blob
+      if (dse_base > cur_pos) {
+        natGV->addEntry(makeDSEBlob(bytes, cur_pos - base_address, dse_base - base_address, cur_pos));
+        natGV->addEntry(dse_sym);
+
+        cur_pos = dse_base + dse_sym.getSize();
+        std::cerr << "new_cur_pos: " << std::hex << cur_pos << std::endl;
+
+        // symbols next to each other
+      } else if (dse_base == cur_pos) {
+        natGV->addEntry(dse_sym);
+        cur_pos = dse_base + dse_sym.getSize();
+        std::cerr << "new_cur_pos2: " << std::hex << cur_pos << std::endl;
+
+      } else {
+        std::cerr
+            << __FILE__ << ":" << __LINE__ << std::endl
+            << "Deserialized an out-of-order symbol!" << std::endl;
+        throw TErr(__LINE__, __FILE__, "Deserialized an out-of-order symbol!");
+      }
+    }
+
+    // there is a data blob after the last symbol
+    // or there are no symbols
+    if (cur_pos < end_address) {
+      natGV->addEntry(makeDSEBlob(bytes, cur_pos - base_address, end_address - base_address, cur_pos));
+    }
+  }
+  return natGV;
+}
+static NativeStackVarPtr DeserializeStackVar(
+    const ::StackVar &stackvar) {
+  ::Variable var = stackvar.var();
+  NativeStackVarPtr natSV =
+    new NativeStackVar(var.size(), var.name(), var.ida_type(), stackvar.sp_offset());
+
+  for(auto ref_ea : var.ref_eas())
+  {
+    natSV->add_ref(ref_ea.inst_addr());
+  }
+
+  return natSV;
+}
+
 static NativeBlockPtr DeserializeBlock(
     const ::Block &block,
+    const std::list<NativeGlobalVarPtr> &globalvars, 
     const std::list<ExternalCodeRefPtr> &extcode) {
 
   auto block_va = static_cast<VA>(block.base_address());
   NativeBlockPtr natB = NativeBlockPtr(new NativeBlock(block_va));
 
   for (auto &inst : block.insts()) {
-    auto native_inst = DeserializeInst(inst, extcode);
+    auto native_inst = DeserializeInst(inst, globalvars, extcode);
     if (!native_inst) {
       std::cerr
           << "Unable to deserialize block at " << std::hex
@@ -1021,6 +1161,7 @@ static NativeBlockPtr DeserializeBlock(
 
 static NativeFunctionPtr DeserializeNativeFunc(
     const ::Function &func,
+    const std::list<NativeGlobalVarPtr> &globalvars, 
     const std::list<ExternalCodeRefPtr> &extcode) {
 
   NativeFunction *nf = nullptr;
@@ -1030,9 +1171,23 @@ static NativeFunctionPtr DeserializeNativeFunc(
     nf = new NativeFunction(func.entry_address());
   }
 
+  // read any recovered function local variables from this function
+  for(auto stackvar : func.stackvars()) {
+    auto native_stackvar = DeserializeStackVar(stackvar);
+    if (!native_stackvar)
+    {
+      std::cerr
+        << "Unable to deserialize stack variable at " << std::hex
+	<< func.entry_address() << std::endl;
+      return nullptr;
+    }
+    nf->add_stackvar(native_stackvar);
+  }
+
+
   //read all the blocks from this function
   for (auto &block : func.blocks()) {
-    auto native_block = DeserializeBlock(block, extcode);
+    auto native_block = DeserializeBlock(block, globalvars, extcode);
     if (!native_block) {
       std::cerr
           << "Unable to deserialize function at " << std::hex
@@ -1167,8 +1322,7 @@ static void DeserializeData(const ::Data &d, DataSection &ds) {
   // there is a data blob after the last symbol
   // or there are no symbols
   if (cur_pos < base_address + bytes.size()) {
-    ds.addEntry(
-        makeDSEBlob(bytes, cur_pos - base_address, bytes.size(), cur_pos));
+    ds.addEntry(makeDSEBlob(bytes, cur_pos - base_address, bytes.size(), cur_pos));
   }
 }
 
@@ -1194,6 +1348,7 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
   std::list<ExternalCodeRefPtr> extern_funcs;
   std::list<ExternalDataRefPtr> extern_data;
   std::list<DataSection> data_sections;
+  std::list<NativeGlobalVarPtr> global_variables;
   std::list<MCSOffsetTablePtr> offset_tables;
 
   std::cerr << "Deserializing externs..." << std::endl;
@@ -1201,21 +1356,27 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
     extern_funcs.push_back(DeserializeExternFunc(external_func));
   }
 
-  std::cerr << "Deserializing functions..." << std::endl;
-  for (const auto &internal_func : proto.internal_funcs()) {
-    auto natf = DeserializeNativeFunc(internal_func, extern_funcs);
-    if (!natf) {
-      std::cerr << "Unable to deserialize module." << std::endl;
-      return nullptr;
-    }
-    native_funcs[static_cast<VA>(internal_func.entry_address())] = natf;
-  }
 
   std::cerr << "Deserializing data..." << std::endl;
   for (auto &internal_data_elem : proto.internal_data()) {
     DataSection ds;
     DeserializeData(internal_data_elem, ds);
     data_sections.push_back(ds);
+  }
+
+  std::cerr << "Deserializing global variables..." << std::endl;
+  for (const auto &global_variable : proto.global_vars()) {
+    global_variables.push_back(DeserializeGlobalVar(global_variable, data_sections));
+  }
+
+  std::cerr << "Deserializing functions..." << std::endl;
+  for (const auto &internal_func : proto.internal_funcs()) {
+    auto natf = DeserializeNativeFunc(internal_func, global_variables, extern_funcs);
+    if (!natf) {
+      std::cerr << "Unable to deserialize module." << std::endl;
+      return nullptr;
+    }
+    native_funcs[static_cast<VA>(internal_func.entry_address())] = natf;
   }
 
   std::cerr << "Deserializing external data..." << std::endl;
@@ -1259,6 +1420,9 @@ NativeModulePtr ReadProtoBuf(const std::string &file_name) {
 
   std::cerr << "Adding Offset Tables..." << std::endl;
   m->addOffsetTables(offset_tables);
+
+  std::cerr << "Adding Global Variables..." << std::endl;
+  m->addGlobalVariables(global_variables);
 
   // set entry points for the module
   std::cerr << "Adding entry points..." << std::endl;

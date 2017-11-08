@@ -590,7 +590,9 @@ static InstTransResult translate_MOV64mi32(TranslationContext &ctx,
   auto natM = ctx.natM;
   auto &inst = ip->get_inst();
 
-  if (ip->has_code_ref()) {
+  if (ip->has_code_ref() && ip->has_imm_reference) {
+    // if(!ip->has_imm_reference) { something went wrong with the CFG extraction}
+    // fallback to do mov add_noref
     llvm::Value *addrInt = IMM_AS_DATA_REF(block, natM, ip);
     if (ip->has_mem_reference) {
       ret = doMIMovV<64>(ip, block, MEM_REFERENCE(0), addrInt);
@@ -951,7 +953,14 @@ static InstTransResult translate_MOV32rm(TranslationContext &ctx,
   auto &inst = ip->get_inst();
 
   if (ip->has_external_ref()) {
-    llvm::Value *addrInt = getValueForExternal<32>(F->getParent(), ip, block);
+    llvm::Value* addrInt = nullptr;
+    auto ptrsize = ArchPointerSize(M);
+
+    if(Pointer32 == ptrsize) {
+      addrInt = getValueForExternal<32>(F->getParent(), ip, block);
+    } else if(Pointer64 == ptrsize) {
+      addrInt = getValueForExternal<64>(F->getParent(), ip, block);
+    }
     ret = doRMMov<32>(ip, block, addrInt, OP(0));
     TASSERT(addrInt != NULL, "Could not get address for external");
     return ContinueBlock;

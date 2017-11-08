@@ -741,6 +741,8 @@ GENERIC_TRANSLATION(PUSHA32, doPushAV<32>(ip, block));
 //        doPushRMM<32>(ip, block, MEM_REFERENCE(0)));
 GENERIC_TRANSLATION_REF(PUSHi8, doPushI<8>(ip, block, OP(0)),
                         doPushV<8>(ip, block, MEM_REFERENCE(0) ))
+GENERIC_TRANSLATION_REF(PUSH64i8, doPushI<64>(ip, block, OP(0)),
+                        doPushV<64>(ip, block, MEM_REFERENCE(0) ))
 GENERIC_TRANSLATION_REF(PUSHi16, doPushI<16>(ip, block, OP(0)),
                         doPushV<16>(ip, block, MEM_REFERENCE(0) ))
 GENERIC_TRANSLATION_REF(POP32rmm, doPopM<32>(ip, block, ADDR_NOREF(0)),
@@ -770,6 +772,7 @@ void Stack_populateDispatchMap(DispatchMap &m) {
   m[llvm::X86::PUSH64rmr] = translate_PUSH64r;  // TODO(pag): Is this right??
   m[llvm::X86::PUSH64rmm] = translate_PUSH64rmm;
   m[llvm::X86::PUSH64i8] = translate_PUSHi8;
+  m[llvm::X86::PUSH64i8] = translate_PUSH64i8;
   m[llvm::X86::PUSH64i32] = translate_PUSHi32;
 
   m[llvm::X86::POP64r] = translate_POP64r;

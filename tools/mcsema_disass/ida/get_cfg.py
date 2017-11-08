@@ -22,7 +22,6 @@ import traceback
 import collections
 import itertools
 
-
 #hack for IDAPython to see google protobuf lib
 if os.path.isdir('/usr/lib/python2.7/dist-packages'):
     sys.path.append('/usr/lib/python2.7/dist-packages')
@@ -36,7 +35,7 @@ tools_disass_dir = os.path.dirname(tools_disass_ida_dir)
 # Note: The bootstrap file will copy CFG_pb2.py into this dir!!
 import CFG_pb2
 
-_DEBUG = False
+_DEBUG = True
 _DEBUG_FILE = sys.stderr
 
 EXTERNALS = set()
@@ -125,6 +124,11 @@ EXTERNAL_NAMES = [
 EXTERNAL_DATA_COMMENTS = [
         "Copy of shared data",
         ]
+
+TO_RECOVER = {
+  "stack_vars" : False,
+  "global_vars" : False
+}
 
 def DEBUG(s):
     global _DEBUG, _DEBUG_FILE
@@ -1770,7 +1774,48 @@ def processDataSegments(M, new_eas):
             end = idc.SegEnd(ea)
             populateDataSegment(M, start, end, new_eas)
 
-def recoverFunctionFromSet(M, F, blockset, new_eas):
+def getInstructionSize(ea):
+    insn = idautils.DecodeInstruction(ea)
+    return insn.size
+
+def recoverStackVars(F, BB):
+    from var_recovery import collect_ida
+    from var_recovery import parse_ida_types
+
+    # pull info from IDA
+    stack_locals = collect_ida.collect_stack_vars(F, BB, {}) # functionWrapper?
+
+    # TODO: convert flags/type info
+    #stack_locals_typed = map(parse_ida_types.parse_type, stack_locals)
+
+    # add to M
+    for offset in stack_locals.keys():
+      var = F.stackvars.add()
+      var.sp_offset = offset
+      var.var.name = stack_locals[offset]["name"]
+      var.var.size = stack_locals[offset]["size"] 
+      var.var.ida_type = " | ".join(stack_locals[offset]["flags"])
+      # add refs... 
+      for i in stack_locals[offset]["writes"]:
+        r = var.var.ref_eas.add()
+        r.inst_addr = i
+        #r.opd_idx = -1
+      for i in stack_locals[offset]["reads"]:
+        r = var.var.ref_eas.add()
+        r.inst_addr = i
+        #r.opd_idx = -1
+
+# TODO restructure so we aren't calling collect_func_vars twice
+def recoverGlobalVars(F, BB, global_var_data):
+    from var_recovery import collect_ida
+    from var_recovery import parse_ida_types
+  
+    # pull info from IDA
+    collect_ida.collect_global_vars(F, BB, global_var_data) # functionWrapper?
+
+    return
+
+def recoverFunctionFromSet(M, F, blockset, new_eas, global_var_data):
     processed_blocks = set()
 
     while len(blockset) > 0:
@@ -1795,15 +1840,21 @@ def recoverFunctionFromSet(M, F, blockset, new_eas):
             # sometimes there is junk after a terminator due to off-by-ones in
             # IDAPython. Ignore them.
             insn_t, _ = _decode_instruction(head)
+            prevHead = head
             if endBlock or isRet(insn_t) or isTrap(insn_t):
                 break
-            prevHead = head
 
         DEBUG("Ending insn at: {0:x}".format(prevHead))
+        # process global & stack variables
+        # idaapi.FlowChart(...) causes hang;
+        if TO_RECOVER["stack_vars"]:
+            recoverStackVars(F, block)
+        if TO_RECOVER["global_vars"]:
+            recoverGlobalVars(F, block, global_var_data)
 
-def recoverFunction(M, F, fnea, new_eas):
+def recoverFunction(M, F, fnea, new_eas, global_var_data):
     blockset = getFunctionBlocks(fnea)
-    recoverFunctionFromSet(M, F, blockset, new_eas)
+    recoverFunctionFromSet(M, F, blockset, new_eas, global_var_data)
 
 class Block:
     def __init__(self, startEA):
@@ -1954,6 +2005,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
     global EMAP
     M = CFG_pb2.Module()
     M.module_name = idc.GetInputFile()
+    global_var_data = dict()
     DEBUG("PROCESSING: {0}".format(M.module_name))
 
     our_entries = []
@@ -1970,7 +2022,6 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
     processDataSegments(M, new_eas)
 
     for name in to_recover:
-
         if name in exports:
             ea = exports[name]
         else:
@@ -2001,7 +2052,7 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
         F = entryPointHandler(M, fea, fname, exports_are_apis)
 
         RECOVERED_EAS.add(fea)
-        recoverFunction(M, F, fea, new_eas)
+        recoverFunction(M, F, fea, new_eas, global_var_data)
 
         recovered_fns += 1
 
@@ -2017,13 +2068,45 @@ def recoverCfg(to_recover, outf, exports_are_apis=False):
         DEBUG("Recovering: {0}".format(hex(cur_ea)))
         RECOVERED_EAS.add(cur_ea)
 
-        recoverFunction(M, F, cur_ea, new_eas)
+        recoverFunction(M, F, cur_ea, new_eas, global_var_data)
 
         recovered_fns += 1
 
     if recovered_fns == 0:
         DEBUG("COULD NOT RECOVER ANY FUNCTIONS")
         return
+
+    '''add global variables to protobuf'''
+    if TO_RECOVER["global_vars"]:
+        for g, val in global_var_data.iteritems():
+          DEBUG("processing global var {}".format(val["name"]))
+          if val["safe"] is False:
+              DEBUG("dropping global variable {}, marked unsafe".format(val["name"]))
+              continue
+          var = M.global_vars.add()
+          var.address = val["offset"]
+          var.var.name = "recovered_global_{:0x}".format(g)
+          var.data= val["data"]
+          var.var.size = {
+              'dt_byte':1,
+              'dt_word':2,
+              'dt_dword':4,
+              'dt_float':4,
+              'dt_double':8,
+              'dt_qword':8}.get(val["type"], 0)
+          var.var.ida_type = val["type"] # TODO: IDA agnostic type
+          for i in val["writes"]: # reads vs writes? do we care?
+            r = var.var.ref_eas.add()
+            r.inst_addr = i
+            r.offset = 0
+          for i in val["reads"]:
+            r = var.var.ref_eas.add()
+            r.inst_addr = i
+            r.offset = 0
+          for i in val["addrs"]:
+            r = var.var.ref_eas.add()
+            r.inst_addr = i
+            r.offset = 0
 
     mypath = path.dirname(__file__)
     processExternals(M)
@@ -2297,12 +2380,35 @@ if __name__ == "__main__":
     parser.add_argument("--pie-mode", action="store_true", default=False,
         help="Assume all immediate values are constants (useful for ELFs built with -fPIE")
 
+    parser.add_argument("--stack-vars", action="store_true",
+        default=False,
+        help="Attempt to recover local stack variable information"
+        )
+
+    parser.add_argument("--global-vars", action="store_true",
+        default=False,
+        help="Attempt to recover global variable information"
+        )
+    
+    # this is temporary switch; Figure out a better way to do it
+    parser.add_argument("--process-dwarf", action="store_true",
+        default=False,
+        help="Attempt to process the dwarf information for variable recovery"
+        )
+
+
     args = parser.parse_args(args=idc.ARGV[1:])
 
     if args.log_file != os.devnull:
         _DEBUG = True
         _DEBUG_FILE = args.log_file
         DEBUG("Debugging is enabled.")
+        # debug_info section does not get recognised with 
+        isdwarf = ((SegByName(".debug_info'") != idc.BADADDR) or (SegByName(".zdebug_info'") != idc.BADADDR) or (args.process_dwarf))
+        from var_recovery import collect_ida
+        if isdwarf is True:
+            DEBUG("Dwarf information is available.")
+        collect_ida.DEBUG_INIT(_DEBUG_FILE, _DEBUG, isdwarf)
 
     addr_size = {"x86": 32, "amd64": 64}.get(args.arch, 0)
     ADDRESS_SIZE = addr_size
@@ -2346,6 +2452,13 @@ if __name__ == "__main__":
         DEBUG("Could not open file of exports to lift. See source for details")
         idc.Exit(-1)
 
+    # global and stack vars may need to be intertwined in terms of functionality, depending on what schemes/heuristics are developed
+    if args.stack_vars:
+      TO_RECOVER["stack_vars"] = True
+
+    if args.global_vars:
+      TO_RECOVER["global_vars"] = True
+
     # for batch mode: ensure IDA is done processing
     DEBUG("Using Batch mode.")
     analysis_flags = idc.GetShortPrm(idc.INF_START_AF)
@@ -2373,6 +2486,11 @@ if __name__ == "__main__":
 
         if args.entrypoint:
             eps.extend(args.entrypoint)
+
+        if args.stack_vars:
+            DEBUG("Attempting to recover stack variable information...")
+            from var_recovery import collect_ida
+            collect_ida.print_func_vars()
 
         assert len(eps) > 0, "Need to have at least one entry point to lift"
 

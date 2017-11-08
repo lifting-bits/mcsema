@@ -13,7 +13,7 @@ setup(name="mcsema-disass",
       author="Trail of Bits",
       author_email="mcsema@trailofbits.com",
       license='BSD 3-clause "New" or "Revised License"',
-      packages=['mcsema_disass', 'mcsema_disass.ida', 'mcsema_disass.defs'],
+      packages=['mcsema_disass', 'mcsema_disass.ida', 'mcsema_disass.defs', 'mcsema_disass.ida.var_recovery'],
       package_data={
         "mcsema_disass.defs": ["linux.txt", "windows.txt"]},
       entry_points={

@@ -43,6 +43,7 @@
 
 #include <llvm/Support/CommandLine.h>
 
+#include <iostream>
 #include <vector>
 
 #include "mcsema/Arch/Arch.h"
@@ -334,6 +335,46 @@ done:
   return didError;
 }
 
+static void AllocStackVars(llvm::Function *F, llvm::BasicBlock *begin, NativeFunctionPtr func)
+{
+  llvm::Instruction *cur = begin->getFirstNonPHI();
+
+  std::list<NativeStackVarPtr> stackvars = func->get_stackvars();
+
+  llvm::Type *t;
+  for (auto s : stackvars)
+  {
+    switch(s->get_size())
+    {
+      t = NULL; // debugging; probably should choose a better failure value
+      case 1:
+        t = llvm::Type::getInt8Ty(F->getContext());
+        break;
+      case 2:
+        t = llvm::Type::getInt16Ty(F->getContext());
+        break;
+      case 4:
+        t = llvm::Type::getInt32Ty(F->getContext());
+        break;
+      case 8:
+        t = llvm::Type::getInt64Ty(F->getContext());
+        break;
+      default:
+        // ignore this one
+        continue;
+    }
+    // alloca
+    if(t != NULL)
+    {
+      std::cout << "Inserting var " << s->get_name() << ", size " << s->get_size() << " (ida_type " << s->get_type() <<")" << std::endl;
+      llvm::Instruction *v = new llvm::AllocaInst(t, s->get_name(), cur);
+      s->set_llvm_var(v);
+      cur = v;
+    }
+
+  }
+}
+
 static bool InsertFunctionIntoModule(NativeModulePtr mod,
                                      NativeFunctionPtr func, llvm::Module *M) {
   auto &C = M->getContext();
@@ -351,6 +392,7 @@ static bool InsertFunctionIntoModule(NativeModulePtr mod,
 
   auto entryBlock = llvm::BasicBlock::Create(F->getContext(), "entry", F);
   ArchAllocRegisterVars(entryBlock);
+  AllocStackVars(F, entryBlock, func);
 
   TranslationContext ctx;
   ctx.natM = mod;
@@ -406,12 +448,20 @@ struct DataSectionVar {
   llvm::GlobalVariable *var;
 };
 
+struct GlobalSectionVar {
+  NativeGlobalVarPtr nGV;
+  llvm::StructType *opaque_type;
+  llvm::GlobalVariable *var;
+};
+
 static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
 
   auto &globaldata = natMod->getData();
+  auto &nativeglobalvars = natMod->global_variables;
   //insert all global data before we insert the CFG
 
   std::vector<DataSectionVar> gvars;
+  std::vector<GlobalSectionVar> global_vars;
 
   // pre-create references to all data sections
   // as later we may have data references that are
@@ -438,6 +488,21 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
     gvars.push_back({&dt, st_opaque, g});
   }
 
+  for (auto nGV : nativeglobalvars) {
+    auto st_opaque = llvm::StructType::create(M->getContext());
+    if(st_opaque == nullptr) continue;
+    llvm::GlobalVariable *g = new llvm::GlobalVariable(/*Module=*/*M,
+                                                    /*Type=*/st_opaque,
+                                                    /*isConstant=*/false,
+                                                    /*Linkage=*/llvm::GlobalValue::InternalLinkage,
+                                                    /*Initializer=*/nullptr,
+                                                    /*Name=*/nGV->get_name());
+
+    global_vars.push_back({nGV, st_opaque, g});
+  }
+
+
+
   // actually populate the data sections
   for (auto &var : gvars) {
 
@@ -448,7 +513,7 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
     // the global variable
     std::vector<llvm::Type *> data_section_types;
 
-    dataSectionToTypesContents(globaldata, *var.section, M, secContents,
+    dataSectionToTypesContents(globaldata, nativeglobalvars, *var.section, M, secContents,
                                data_section_types, true);
 
     // fill in the opaque structure with actual members
@@ -462,6 +527,22 @@ static bool InsertDataSections(NativeModulePtr natMod, llvm::Module *M) {
     var.var->setInitializer(cst);
 
   }
+
+    // create and initialize the native global variables
+  for (auto &var : global_vars) {
+    std::vector<llvm::Type *> data_section_types;
+    std::vector<llvm::Constant *> secContents;
+
+    auto is_exist = dataSectionToGlobalVar(globaldata, nativeglobalvars, M, var.nGV, secContents,
+                                           data_section_types, true);
+
+    var.opaque_type->setBody(data_section_types, true);
+    auto cst = llvm::ConstantStruct::get(var.opaque_type, secContents);
+    var.var->setAlignment(ArchPointerSize(M)/8);
+    var.var->setInitializer(cst);
+    var.nGV->set_llvm_var(var.var);
+  }
+
   return true;
 }
 
@@ -486,6 +567,41 @@ void RenameLiftedFunctions(NativeModulePtr natMod, llvm::Module *M,
     }
   }
 }
+
+static void InitLiftedGlobals(NativeModulePtr natMod, llvm::Module *M) {
+
+  for (auto nGV : natMod->global_variables) {
+    std::vector<llvm::Type *> data_section_types;
+    std::vector<llvm::Constant *> secContents;
+    auto st_opaque = llvm::StructType::create(M->getContext());
+    if(st_opaque == nullptr) continue;
+    auto charTy = llvm::Type::getInt8Ty(M->getContext());
+    auto blob = nGV->getBytes();
+    auto arrT = llvm::ArrayType::get(charTy, blob.size());
+    std::vector<llvm::Constant *> array_elements;
+    for (auto cur : blob) {
+        array_elements.push_back(llvm::ConstantInt::get(charTy, cur));
+    }
+    auto arr = llvm::ConstantArray::get(arrT, array_elements);
+    secContents.push_back(arr);
+    data_section_types.push_back(arr->getType());
+
+    st_opaque->setBody(data_section_types, true);
+    auto cst = llvm::ConstantStruct::get(st_opaque, secContents);
+
+    llvm::GlobalVariable *g = new llvm::GlobalVariable(/*Module=*/*M,
+                                                    /*Type=*/st_opaque,
+                                                    /*isConstant=*/false,
+                                                    /*Linkage=*/llvm::GlobalValue::InternalLinkage,
+                                                    /*Initializer=*/cst,
+                                                    /*Name=*/nGV->get_name());
+
+    g->setAlignment(4); // ???
+    nGV->set_llvm_var(g);
+  }
+}
+
+
 
 static void InitLiftedFunctions(NativeModulePtr natMod, llvm::Module *M) {
   for (auto &f : natMod->get_funcs()) {
@@ -642,6 +758,7 @@ static bool LiftFunctionsIntoModule(NativeModulePtr natMod, llvm::Module *M) {
 }
 
 bool LiftCodeIntoModule(NativeModulePtr natMod, llvm::Module *M) {
+  //InitLiftedGlobals(natMod, M);
   InitLiftedFunctions(natMod, M);
   InitExternalData(natMod, M);
   InitExternalCode(natMod, M);
