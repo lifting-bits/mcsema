@@ -366,7 +366,7 @@ def is_thunk_by_flags(ea):
   ea_name = get_function_name(ea)
   inst, _ = decode_instruction(ea)
   if not inst:
-    DEBUG("{} at {:x} is a thunk with no code??".format(ea_name, ea))
+    DEBUG("WARNING: {} at {:x} is a thunk with no code??".format(ea_name, ea))
     return _INVALID_THUNK_ADDR
 
   # Recursively find thunk-to-thunks.
@@ -383,8 +383,6 @@ def is_thunk_by_flags(ea):
 
   if not is_external_reference(ea):
     return _INVALID_THUNK_ADDR
-
-  DEBUG("??? ea={:x} name={}".format(ea, ea_name))
 
   return True, targ_ea
 
@@ -590,9 +588,6 @@ def recover_instruction_references(I, inst, addr):
 
     if Reference.CODE == ref.type:
       is_thunk, thunk_target_ea, thunk_name = try_get_thunk_name(ref.ea)
-      if "setlocale" in ref.symbol:
-
-        DEBUG("!! is_thunk={} thunk_name={} ".format(is_thunk, thunk_name))
       if is_thunk:
         ref.ea = thunk_target_ea
         ref.symbol = thunk_name
