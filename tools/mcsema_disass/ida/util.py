@@ -415,8 +415,10 @@ def is_noreturn_function(ea):
          (flags & idaapi.FUNC_NORET) and \
          "cxa_throw" not in get_symbol_name(ea)
 
-_XREFS_FROM = collections.defaultdict(set)
-_XREFS_TO = collections.defaultdict(set)
+_CREFS_FROM = collections.defaultdict(set)
+_DREFS_FROM = collections.defaultdict(set)
+_CREFS_TO = collections.defaultdict(set)
+_DREFS_TO = collections.defaultdict(set)
 
 def make_xref(from_ea, to_ea, xref_constructor, xref_size):
   """Force the data at `from_ea` to reference the data at `to_ea`."""
@@ -426,8 +428,12 @@ def make_xref(from_ea, to_ea, xref_constructor, xref_size):
 
   make_head(from_ea)
 
-  _XREFS_FROM[from_ea].add(to_ea)
-  _XREFS_TO[to_ea].add(from_ea)
+  if is_code(from_ea):
+    _CREFS_FROM[from_ea].add(to_ea)
+    _CREFS_TO[to_ea].add(from_ea)
+  else:
+    _DREFS_FROM[from_ea].add(to_ea)
+    _DREFS_TO[to_ea].add(from_ea)
 
   # If we can't make a head, then it probably means that we're at the
   # end of the binary, e.g. the last thing in the `.extern` segment.
@@ -451,8 +457,12 @@ def _stop_looking_for_xrefs(ea):
   a struct will actually be associated with the first EA of the struct. So
   if we're in a struct or something like it, and the item size is bigger than
   the address size, then we will assume it's actually in a struct."""
+  
+  if is_external_segment(ea):
+    return False
+
   if is_code(ea):
-    return True
+    return False
 
   addr_size = get_address_size_in_bytes()
   item_size = idc.ItemSize(ea)
@@ -464,61 +474,61 @@ def _xref_generator(ea, get_first, get_next):
     yield target_ea
     target_ea = get_next(ea, target_ea)
 
-def _drefs_from(ea, only_one=False):
-  flags = idc.GetFlags(ea)
-  if idc.isCode(flags):
-    return
-
-  fixup_ea = idc.GetFixupTgtOff(ea)
+def _drefs_from(ea, only_one=False, check_fixup=True):
   seen = False
   has_one = only_one
-  if not is_invalid_ea(fixup_ea) and not is_code(fixup_ea):
-    seen = only_one
-    has_one = True
-    yield fixup_ea
+  fixup_ea = idc.BADADDR
+  if check_fixup:
+    fixup_ea = idc.GetFixupTgtOff(ea)
+    if not is_invalid_ea(fixup_ea) and not is_code(fixup_ea):
+      seen = only_one
+      has_one = True
+      yield fixup_ea
 
-  if has_one and _stop_looking_for_xrefs(ea):
-    return
+    if has_one and _stop_looking_for_xrefs(ea):
+      return
 
   for target_ea in _xref_generator(ea, idaapi.get_first_dref_from, idaapi.get_next_dref_from):
-    if (target_ea != fixup_ea) : # and not is_invalid_ea(fixup_ea):
+    if target_ea != fixup_ea and not is_invalid_ea(target_ea):
       seen = only_one
       yield target_ea
       if seen:
         return
 
-  if not seen and ea in _XREFS_FROM:
-    for target_ea in _XREFS_FROM[ea]:
+  if not seen and ea in _DREFS_FROM:
+    for target_ea in _DREFS_FROM[ea]:
       yield target_ea
       seen = only_one
       if seen:
         return
 
-def _crefs_from(ea, only_one=False):
+def _crefs_from(ea, only_one=False, check_fixup=True):
   flags = idc.GetFlags(ea)
   if not idc.isCode(flags):
     return
 
-  fixup_ea = idc.GetFixupTgtOff(ea)
+  fixup_ea = idc.BADADDR
   seen = False
   has_one = only_one
-  if not is_invalid_ea(fixup_ea) and is_code(fixup_ea):
-    seen = only_one
-    has_one = True
-    yield fixup_ea
+  if check_fixup:
+    fixup_ea = idc.GetFixupTgtOff(ea)
+    if not is_invalid_ea(fixup_ea) and is_code(fixup_ea):
+      seen = only_one
+      has_one = True
+      yield fixup_ea
 
-  if has_one and _stop_looking_for_xrefs(ea):
-    return
+    if has_one and _stop_looking_for_xrefs(ea):
+      return
 
   for target_ea in _xref_generator(ea, idaapi.get_first_cref_from, idaapi.get_next_cref_from):
-    if (target_ea != fixup_ea): # and not is_invalid_ea(fixup_ea):
+    if target_ea != fixup_ea and not is_invalid_ea(target_ea):
       seen = only_one
       yield target_ea
       if seen:
         return
 
-  if not seen and ea in _XREFS_FROM:
-    for target_ea in _XREFS_FROM[ea]:
+  if not seen and ea in _CREFS_FROM:
+    for target_ea in _CREFS_FROM[ea]:
       seen = only_one
       yield target_ea
       if seen:
@@ -527,7 +537,7 @@ def _crefs_from(ea, only_one=False):
 def _xrefs_from(ea, only_one=False):
   fixup_ea = idc.GetFixupTgtOff(ea)
   seen = False
-  has_one = False
+  has_one = only_one
   if not is_invalid_ea(fixup_ea):
     seen = only_one
     has_one = True
@@ -536,14 +546,14 @@ def _xrefs_from(ea, only_one=False):
   if has_one and _stop_looking_for_xrefs(ea):
     return
 
-  for target_ea in _drefs_from(ea, only_one):
+  for target_ea in _drefs_from(ea, only_one, check_fixup=False):
     if target_ea != fixup_ea:
       seen = only_one
       yield target_ea
       if seen:
         return
 
-  for target_ea in _crefs_from(ea, only_one):
+  for target_ea in _crefs_from(ea, only_one, check_fixup=False):
     if target_ea != fixup_ea:
       seen = only_one
       yield target_ea

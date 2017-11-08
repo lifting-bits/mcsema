@@ -284,21 +284,22 @@ def undecorate_external_name(fn):
 
 _ELF_THUNKS = {}
 _NOT_ELF_THUNKS = set()
-_INVALID_THUNK = (False, None)
+_INVALID_THUNK = (False, idc.BADADDR, "")
+_INVALID_THUNK_ADDR = (False, idc.BADADDR)
 
 def is_ELF_thunk_by_structure(ea):
   """Try to manually identify an ELF thunk by its structure."""
-  global _INVALID_THUNK
+  global _INVALID_THUNK_ADDR
 
   if ".plt" not in idc.SegName(ea).lower():
-    return _INVALID_THUNK
+    return _INVALID_THUNK_ADDR
 
   # Scan through looking for a branch, either direct or indirect.
   inst = None
   for i in range(4):  # 1 is good enough for x86, 4 for aarch64.
     inst, _ = decode_instruction(ea)
     if not inst:
-      return _INVALID_THUNK
+      return _INVALID_THUNK_ADDR
     # elif is_direct_jump(inst):
     #   ea = get_direct_branch_target(inst)
     #   inst = None
@@ -310,7 +311,7 @@ def is_ELF_thunk_by_structure(ea):
       inst = None
 
   if not inst:
-    return _INVALID_THUNK
+    return _INVALID_THUNK_ADDR
 
   target_ea = get_reference_target(inst.ea)
   if ".got.plt" == idc.SegName(target_ea).lower():
@@ -344,9 +345,9 @@ def is_ELF_thunk_by_structure(ea):
   #     extern:0031F388                 extrn qsort:near 
 
   if is_invalid_ea(target_ea):
-    return _INVALID_THUNK
+    return _INVALID_THUNK_ADDR
   
-  return True, undecorate_external_name(get_function_name(target_ea))
+  return True, target_ea
 
 def is_thunk_by_flags(ea):
   """Try to identify a thunk based off of the IDA flags. This isn't actually
@@ -356,16 +357,16 @@ def is_thunk_by_flags(ea):
   another thunk, then the former thing is treated as a thunk. The former
   thing will not actually follow the 'structured' form matched above, so
   we'll try to recursively match to the 'final' referenced thunk."""
-  global _INVALID_THUNK
+  global _INVALID_THUNK_ADDR
 
   if not is_thunk(ea):
-    return _INVALID_THUNK
+    return _INVALID_THUNK_ADDR
   
   ea_name = get_function_name(ea)
   inst, _ = decode_instruction(ea)
   if not inst:
-    DEBUG("{} at {:x} is a thunk with no code??".format(ea_name, ea))
-    return _INVALID_THUNK
+    DEBUG("WARNING: {} at {:x} is a thunk with no code??".format(ea_name, ea))
+    return _INVALID_THUNK_ADDR
 
   # Recursively find thunk-to-thunks.
   if is_direct_jump(inst) or is_direct_function_call(inst):
@@ -375,14 +376,14 @@ def is_thunk_by_flags(ea):
       targ_thunk_name = get_symbol_name(ea, targ_ea)
       DEBUG("Found thunk-to-thunk {:x} -> {:x}: {} to {}".format(
           ea, targ_ea, ea_name, targ_thunk_name))
-      return True, targ_thunk_name
+      return True, targ_ea
     
     DEBUG("ERROR? targ_ea={:x} is not thunk".format(targ_ea))
 
   if not is_external_reference(ea):
-    return _INVALID_THUNK
+    return _INVALID_THUNK_ADDR
 
-  return True, undecorate_external_name(ea_name)
+  return True, targ_ea
 
 def try_get_thunk_name(ea):
   """Try to figure out if a function is actually a thunk, i.e. a function
@@ -401,19 +402,24 @@ def try_get_thunk_name(ea):
   # Try two approaches to detecting whether or not
   # something is a thunk.
   is_thunk = False
+  target_ea = idc.BADADDR
   if IS_ELF:
-    is_thunk, name = is_ELF_thunk_by_structure(ea)
+    is_thunk, target_ea = is_ELF_thunk_by_structure(ea)
 
   if not is_thunk:
-    is_thunk, name = is_thunk_by_flags(ea)
+    is_thunk, target_ea = is_thunk_by_flags(ea)
   
   if not is_thunk:
     _NOT_ELF_THUNKS.add(ea)
     return _INVALID_THUNK
 
   else:
-    _ELF_THUNKS[ea] = (is_thunk, name)
-    return is_thunk, name
+    name = get_function_name(target_ea)
+    name = undecorate_external_name(name)
+    name = get_true_external_name(name)
+    ret = (is_thunk, target_ea, name)
+    _ELF_THUNKS[ea] = ret
+    return ret
 
 def is_start_of_function(ea):
   """Returns `True` if `ea` is the start of a function."""
@@ -578,6 +584,12 @@ def recover_instruction_references(I, inst, addr):
     if ref.ea in INTERNAL_THUNK_EAS:
       ref.ea = INTERNAL_THUNK_EAS[ref.ea]
       ref.symbol = get_symbol_name(ref.ea)
+
+    if Reference.CODE == ref.type:
+      is_thunk, thunk_target_ea, thunk_name = try_get_thunk_name(ref.ea)
+      if is_thunk:
+        ref.ea = thunk_target_ea
+        ref.symbol = thunk_name
 
     target_type = reference_target_type(ref)
     location = reference_location(ref)
@@ -1002,10 +1014,10 @@ def try_identify_as_external_function(ea):
   # First, check if it's a thunk. Some thunks are not location in exported
   # sections. Sometimes there are thunk-to-thunks, where there's a function
   # whose only instruction is a direct jump to the real thunk.
-  is_thunk, thunk_name = try_get_thunk_name(ea)
+  is_thunk, thunk_target_ea, thunk_name = try_get_thunk_name(ea)
   name = None
   if is_thunk:
-    name = get_true_external_name(thunk_name)
+    name = thunk_name
 
   elif is_external_segment(ea):
     name = get_true_external_name(get_function_name(ea))
@@ -1030,9 +1042,10 @@ def identify_thunks(func_eas):
   DEBUG("Looking for thunks")
   DEBUG_PUSH()
   for func_ea in func_eas:
-    is_thunk, name = try_get_thunk_name(func_ea)
+    is_thunk, thunk_target_ea, name = try_get_thunk_name(func_ea)
     if is_thunk:
-      DEBUG("Found thunk for {} at {:x}".format(name, func_ea))
+      DEBUG("Found thunk for {} targeting {:x} at {:x}".format(
+          name, thunk_target_ea, func_ea))
   DEBUG_POP()
 
 def identify_external_symbols():

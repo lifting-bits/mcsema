@@ -517,9 +517,12 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
     return;
   }
 
-  llvm::IRBuilder<> ir(block);
-
   auto val_type = ret_val->getType();
+  if (val_type->isVoidTy()) {
+    return;
+  }
+
+  llvm::IRBuilder<> ir(block);
   auto val_var = ReturnValVar(cc, val_type);
 
   // If it's a pointer then convert it to a pointer-sized integer.
