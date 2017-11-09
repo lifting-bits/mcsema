@@ -19,7 +19,10 @@
 
 namespace llvm {
 namespace CallingConv {
+#if !(LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5)
   using ID = unsigned;
+#endif
+
   enum {
     McSemaCall = 144
   };

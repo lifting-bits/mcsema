@@ -243,7 +243,10 @@ static llvm::Constant *CreateInitializedState(
   // Treat structures as bags of things that can be individually indexed.
   } else if (auto struct_type = llvm::dyn_cast<llvm::StructType>(type)) {
     std::vector<llvm::Constant *> elems;
-    for (const auto field_type : struct_type->elements()) {
+
+    // LLVM 3.5: The StructType::elements() method does not exists!
+    auto struct_type_elements = makeArrayRef(struct_type->element_begin(), struct_type->element_end());
+    for (const auto field_type : struct_type_elements) {
       elems.push_back(
           CreateInitializedState(field_type, sp_val,
                                  sp_offset, curr_offset));
