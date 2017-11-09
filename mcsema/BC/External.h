@@ -17,12 +17,10 @@
 #ifndef MCSEMA_BC_EXTERNAL_H_
 #define MCSEMA_BC_EXTERNAL_H_
 
+#include <llvm/IR/CallingConv.h>
+
 namespace llvm {
 namespace CallingConv {
-#if !(LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 5)
-  using ID = unsigned;
-#endif
-
   enum {
     McSemaCall = 144
   };
