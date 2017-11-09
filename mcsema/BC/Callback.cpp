@@ -245,7 +245,7 @@ static llvm::Constant *CreateInitializedState(
     std::vector<llvm::Constant *> elems;
 
     // LLVM 3.5: The StructType::elements() method does not exists!
-    auto struct_type_elements = makeArrayRef(struct_type->element_begin(), struct_type->element_end());
+    auto struct_type_elements = llvm::makeArrayRef(struct_type->element_begin(), struct_type->element_end());
     for (const auto field_type : struct_type_elements) {
       elems.push_back(
           CreateInitializedState(field_type, sp_val,
