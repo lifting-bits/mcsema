@@ -330,7 +330,7 @@ def compile_lifted_code(toolset, test, bitcode_path):
   else:
     mcsema_runtime_path = toolset["libmcsema_rt32"]
 
-  command_line = [toolset["clang"], "-rdynamic", "-o", output_file_path, bitcode_path, mcsema_runtime_path, "-Wno-override-module"]
+  command_line = [toolset["clang"], "-rdynamic", "-o", output_file_path, bitcode_path, mcsema_runtime_path, "-Wno-unknown-warning-option", "-Wno-override-module"]
   if len(test.cpp_flags()) != 0:
     command_line += test.cpp_flags()
 
