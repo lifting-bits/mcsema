@@ -86,7 +86,7 @@ linux_build() {
     
     printf " > Cleaning up...\n"
     if [ -d "remill" ] ; then
-      rm -rf remill > "${log_file}" 2>&1
+      sudo rm -rf remill > "${log_file}" 2>&1
       if [ $? -ne 0 ] ; then
         printf " x Failed to remove the existing remill folder. Error output follows:\n"
         printf "===\n"
@@ -96,7 +96,7 @@ linux_build() {
     fi
 
     if [ -d "build" ] ; then
-      rm -rf build > "${log_file}" 2>&1
+      sudo rm -rf build > "${log_file}" 2>&1
       if [ $? -ne 0 ] ; then
         printf " x Failed to remove the existing build folder. Error output follows:\n"
         printf "===\n"
@@ -106,7 +106,7 @@ linux_build() {
     fi
 
     if [ -d "libraries" ] ; then
-      rm -rf libraries > "${log_file}" 2>&1
+      sudo rm -rf libraries > "${log_file}" 2>&1
       if [ $? -ne 0 ] ; then
         printf " x Failed to remove the existing libraries folder. Error output follows:\n"
         printf "===\n"
