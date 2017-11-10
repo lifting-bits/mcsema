@@ -73,18 +73,20 @@ linux_build() {
   local original_path="${PATH}"
   local log_file=`mktemp`
 
-  llvm_version_list=( "35" "40" )
+  llvm_version_list=( "35" "36" "37" "38" "39" "40" "50" )
   for llvm_version in "${llvm_version_list[@]}" ; do
-    printf "Running CI tests for LLVM version ${llvm_version}...\n"
+    printf "#\n"
+    printf "# Running CI tests for LLVM version ${llvm_version}...\n"
+    printf "#\n\n"
 
-    printf " > Resetting the environment...\n"
+    printf " > Cleaning up the environment variables...\n"
     export PATH="${original_path}"
 
     unset TRAILOFBITS_LIBRARIES
     unset CC
     unset CXX
     
-    printf " > Cleaning up...\n"
+    printf " > Cleaning up the build folders...\n"
     if [ -d "remill" ] ; then
       sudo rm -rf remill > "${log_file}" 2>&1
       if [ $? -ne 0 ] ; then
