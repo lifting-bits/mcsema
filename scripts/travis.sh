@@ -69,6 +69,7 @@ osx_initialize() {
   return 1
 }
 
+# Travis: do not delete the cxxcommon folder, because it is configured to be cached!
 linux_build() {
   local original_path="${PATH}"
   local log_file=`mktemp`
@@ -196,9 +197,19 @@ linux_build_helper() {
   # acquire the cxx-common package
   printf " > Acquiring the cxx-common package: LLVM${llvm_version}/Ubuntu ${ubuntu_version}\n"
 
+  if [ ! -d "cxxcommon" ] ; then
+    mkdir "cxxcommon" > "${log_file}" 2>&1
+    if [ $? -ne 0 ] ; then
+        printf " x Failed to create the cxxcommon folder. Error output follows:\n"
+        printf "===\n"
+        cat "${log_file}"
+        return 1
+    fi
+  fi
+
   local cxx_common_tarball_name="libraries-llvm${llvm_version}-ubuntu${ubuntu_version}-amd64.tar.gz"
   if [ ! -f "${cxx_common_tarball_name}" ] ; then
-    wget "https://s3.amazonaws.com/cxx-common/${cxx_common_tarball_name}" > "${log_file}" 2>&1
+    ( cd "cxxcommon" && wget "https://s3.amazonaws.com/cxx-common/${cxx_common_tarball_name}" ) > "${log_file}" 2>&1
     if [ $? -ne 0 ] ; then
       printf " x Failed to download the cxx-common package. Error output follows:\n"
       printf "===\n"
@@ -208,13 +219,13 @@ linux_build_helper() {
   fi
 
   if [ ! -d "libraries" ] ; then
-    tar xzf "${cxx_common_tarball_name}" > "${log_file}" 2>&1
+    tar xzf "cxxcommon/${cxx_common_tarball_name}" > "${log_file}" 2>&1
     if [ $? -ne 0 ] ; then
       printf " x The archive appears to be corrupted. Error output follows:\n"
       printf "===\n"
       cat "${log_file}"
 
-      rm "${cxx_common_tarball_name}"
+      rm "cxxcommon/${cxx_common_tarball_name}"
       rm -rf libraries
       return 1
     fi

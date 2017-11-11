@@ -46,6 +46,7 @@ tools/regtrace/obj-intel64/*
 
 third_party/*
 generated/*
+cxxcommon
 
 tools/build/*
 tools/dist/*
