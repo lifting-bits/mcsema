@@ -455,7 +455,7 @@ def _get_flags_from_bits(flag):
       flags.add(val)
   return flags
 
-def _process_lea_instruction(inst_ea, func_variable):
+def _process_lea_instruction(inst_ea, func_variable, f_name):
   insn = Instruction(inst_ea)
   for opnd in insn.opearnds:
     if opnd.has_phrase:
@@ -470,12 +470,12 @@ def _process_lea_instruction(inst_ea, func_variable):
       if target_on_stack == _base_ptr:
         start_ = floor_key(func_variable["stackArgs"].keys(), offset)
         func_variable["stackArgs"].pop(start_, None)
+        DEBUG("LEA instruction at {0:x}, variable offset {1} function {2}".format(inst_ea, start_, f_name))
   
 def _process_instruction(inst_ea, func_variable):
   insn = Instruction(inst_ea)
   for opnd in insn.opearnds:
     if opnd.has_phrase:
-      DEBUG("Operand is Phrase {}".format(opnd.text))
       base_ = _translate_reg(opnd.base_reg) if opnd.base_reg else None
       index_ = _translate_reg(opnd.index_reg) if opnd.index_reg else None
       offset = _signed_from_unsigned(idc.GetOperandValue(inst_ea, opnd.index))
@@ -485,11 +485,9 @@ def _process_instruction(inst_ea, func_variable):
       if opnd.is_write:
         target_on_stack = base_ if base_ == _stack_ptr or base_ == _base_ptr else None
         if target_on_stack == _base_ptr:
-          DEBUG("Operand is write base {0}, index {1}, offset {2} {3}".format(base_, index_, offset, func_variable["stackArgs"].keys()))
           start_ = floor_key(func_variable["stackArgs"].keys(), offset)
           if start_:
             end_ = start_ + func_variable["stackArgs"][start_]["size"]
-            DEBUG("Start {0}, end {1}, keys {2}".format(start_, end_, func_variable["stackArgs"].keys()))
             if offset in range(start_, end_):
               var_offset = offset - start_
               func_variable["stackArgs"][start_]["writes"].append({"ea" :inst_ea, "offset" :var_offset})
@@ -504,11 +502,9 @@ def _process_instruction(inst_ea, func_variable):
       elif opnd.is_read:
         read_on_stack = base_ if base_ == _stack_ptr or base_ == _base_ptr else None
         if read_on_stack == _base_ptr:
-          DEBUG("Operand is read base {0}, index {1}, offset {2}".format(base_, index_, offset)) 
           start_ = floor_key(func_variable["stackArgs"].keys(), offset)
           if start_:
             end_ = start_ + func_variable["stackArgs"][start_]["size"]
-            DEBUG("Start {0}, end {1}, keys {2}".format(start_, end_, func_variable["stackArgs"].keys()))
             if offset in range(start_, end_):
               var_offset = offset - start_
               func_variable["stackArgs"][start_]["reads"].append({"ea" :inst_ea, "offset" :var_offset})
@@ -522,7 +518,6 @@ def _process_instruction(inst_ea, func_variable):
       else:
         read_on_stack = base_ if base_ == _stack_ptr or base_ == _base_ptr else None
         if read_on_stack:
-          DEBUG("Operand is write base referent {0}, index {1}, offset {2:x}".format(base_, index_, offset))
           start_ = floor_key(func_variable["stackArgs"].keys(), offset)
           if start_:
             end_ = start_ + func_variable["stackArgs"][start_]["size"]
@@ -533,22 +528,20 @@ def _process_instruction(inst_ea, func_variable):
 
   
 def _process_basic_block(f_ea, block_ea, func_variable):
-
+  name = idc.Name(f_ea)
   inst_eas, succ_eas = analyse_block(f_ea, block_ea, True)
   for inst_ea in inst_eas:
-    _funcs = {"lea":_process_lea_instruction
-              }
-    func = _funcs.get(idc.GetMnem(inst_ea), None)
-    if func:
-      func(inst_ea, func_variable)
-    else:
-      _process_instruction(inst_ea, func_variable)
+    _process_instruction(inst_ea, func_variable)
 
 
 RECOVER_DEBUG_FL = [
     # stack variable tick and times_per_thread is causing
     # problem while lifting Apache ATD's;
-    "status_handler" 
+    "dso_load",
+    "send_brigade_nonblocking", 
+    "ap_file_walk",
+    "prompt_book_view",
+    "ap_lingering_close", 
     ]
 
 def build_stack_args(f):
