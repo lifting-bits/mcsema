@@ -528,7 +528,6 @@ def _process_instruction(inst_ea, func_variable):
 
   
 def _process_basic_block(f_ea, block_ea, func_variable):
-  name = idc.Name(f_ea)
   inst_eas, succ_eas = analyse_block(f_ea, block_ea, True)
   for inst_ea in inst_eas:
     _process_instruction(inst_ea, func_variable)
@@ -539,9 +538,6 @@ RECOVER_DEBUG_FL = [
     # problem while lifting Apache ATD's;
     "dso_load",
     "send_brigade_nonblocking", 
-    "ap_file_walk",
-    "prompt_book_view",
-    "ap_lingering_close", 
     ]
 
 def build_stack_args(f):
