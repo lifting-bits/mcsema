@@ -77,7 +77,7 @@ static void PrintLoadFlags(FILE * out) {
   // Get the RFlags.
   fprintf(out, "  pushfq\n");
   fprintf(out, "  pop rdx\n");
-  fprintf(out, "  mov [rdi + %" PRIuMAX "], rdi\n", __builtin_offsetof(State, rflag));
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], rdx\n", __builtin_offsetof(State, rflag));
 
   // Clear our the `ArithFlags` struct, which is 16 bytes.
   fprintf(out, "  mov QWORD PTR [rdi + %" PRIuMAX "], 0\n", __builtin_offsetof(State, aflag));

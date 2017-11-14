@@ -1,22 +1,14 @@
 dist: trusty
 language: generic
-os: 
-  - linux
-compiler:
-  - gcc
+sudo: required
+install: true
+
+cache:
+  directories:
+  - cxxcommon
+
 before_install:
-  - sudo apt-get update -yqq
-  - sudo apt-get install -y git python2.7 wget realpath build-essential libtinfo-dev gcc-multilib g++-multilib lsb-release
-  - cd ../
-  - git clone https://github.com/trailofbits/remill.git
-  - mv mcsema remill/tools
-install:
-  - ./remill/scripts/build.sh
-before_script:
-  - cd remill-build
-  - make build_x86_tests
+  - ./scripts/travis.sh "$TRAVIS_OS_NAME" initialize
+
 script:
-  - make test
-notifications:
-  slack:
-    secure: g1Nm7C7TYKg4RjDJ5cwuEcgKXfOAmVOu51adTPLBLGzZcCbCrkwQgI39ZycsalaACSnC8iNvqSCbRfZIA5mkDZ7VADaiZgLoWjq3RQzJmWgwGhhtyRkbtiicBnowTL5hIEiMOv6RnKlbB7M2OwzRiS07+FQXrK24hz+qm6zPptw=
+  - ./scripts/travis.sh "$TRAVIS_OS_NAME" build

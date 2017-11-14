@@ -17,11 +17,14 @@
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
+#include <iomanip>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <sstream>
-#include <iomanip>
 
+#include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 
@@ -52,6 +55,9 @@ DEFINE_string(cfg, "", "Path to the CFG file containing code to lift.");
 
 DEFINE_string(output, "", "Output bitcode file name.");
 
+DEFINE_string(library, "", "Path to an LLVM bitcode or IR file that contains "
+                           "external library definitions.");
+
 DECLARE_bool(version);
 
 DECLARE_bool(disable_optimizer);
@@ -69,6 +75,52 @@ static void PrintVersion(void) {
       << "This is mcsema-lift version: " << MCSEMA_VERSION_STRING << std::endl
       << "Built from branch: " << MCSEMA_BRANCH_NAME << std::endl
       << "Using LLVM " << LLVM_VERSION_STRING << std::endl;
+}
+
+// Load in a separate bitcode or IR library, and copy function and variable
+// declarations from that library into our module. We can use this feature
+// to provide better type information to McSema.
+static void LoadLibraryIntoModule(void) {
+  std::unique_ptr<llvm::Module> lib(
+      remill::LoadModuleFromFile(mcsema::gContext, FLAGS_library));
+
+  // Declare the functions from the library in McSema's target module.
+  for (auto &func : *lib) {
+    auto func_name = func.getName();
+    if (func_name.startswith("__mcsema") || func_name.startswith("__remill")) {
+      continue;
+    }
+    if (mcsema::gModule->getFunction(func_name)) {
+      continue;
+    }
+
+    auto dest_func = llvm::Function::Create(
+        func.getFunctionType(), func.getLinkage(),
+        func_name, mcsema::gModule);
+
+    dest_func->copyAttributesFrom(&func);
+    dest_func->setVisibility(func.getVisibility());
+  }
+
+  // Declare the global variables from the library in McSema's target module.
+  for (auto &var : lib->globals()) {
+    auto var_name = var.getName();
+    if (var_name.startswith("__mcsema") || var_name.startswith("__remill")) {
+      continue;
+    }
+
+    if (mcsema::gModule->getGlobalVariable(var_name)) {
+      continue;
+    }
+
+    auto dest_var = new llvm::GlobalVariable(
+        *mcsema::gModule, var.getType()->getElementType(),
+        var.isConstant(), var.getLinkage(), nullptr,
+        var_name, nullptr, var.getThreadLocalMode(),
+        var.getType()->getAddressSpace());
+
+    dest_var->copyAttributesFrom(&var);
+  }
 }
 
 }  // namespace
@@ -130,6 +182,10 @@ int main(int argc, char *argv[]) {
       FLAGS_cfg, (mcsema::gArch->address_size / 8));
   mcsema::gModule = remill::LoadTargetSemantics(mcsema::gContext);
   mcsema::gArch->PrepareModule(mcsema::gModule);
+
+  if (!FLAGS_library.empty()) {
+    LoadLibraryIntoModule();
+  }
 
   CHECK(mcsema::LiftCodeIntoModule(cfg_module))
       << "Unable to lift CFG from " << FLAGS_cfg << " into module "

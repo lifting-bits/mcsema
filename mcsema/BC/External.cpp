@@ -93,19 +93,22 @@ void DeclareExternals(const NativeModule *cfg_module) {
     auto cfg_var = reinterpret_cast<const NativeExternalVariable *>(
         entry.second->Get());
 
-    if (!gModule->getGlobalVariable(cfg_var->name)) {
+    auto ll_var = gModule->getGlobalVariable(cfg_var->name);
+    if (!ll_var) {
       LOG(INFO)
           << "Adding external variable " << cfg_var->name;
 
       auto var_type = llvm::Type::getIntNTy(
           *gContext, static_cast<unsigned>(cfg_var->size * 8));
 
-      cfg_var->address = llvm::ConstantExpr::getPtrToInt(
-          new llvm::GlobalVariable(*gModule, var_type, false,
-                                   llvm::GlobalValue::ExternalLinkage,
-                                   nullptr, cfg_var->name, nullptr,
-                                   ThreadLocalMode(cfg_var)),
-          gWordType);
+      ll_var = new llvm::GlobalVariable(*gModule, var_type, false,
+                                        llvm::GlobalValue::ExternalLinkage,
+                                        nullptr, cfg_var->name, nullptr,
+                                        ThreadLocalMode(cfg_var));
+    }
+
+    if (!cfg_var->address) {
+      cfg_var->address = llvm::ConstantExpr::getPtrToInt(ll_var, gWordType);
     }
   }
 }

@@ -120,16 +120,17 @@ bool InstructionLifter::LiftIntoBlock(
   auto ret = this->remill::InstructionLifter::LiftIntoBlock(inst, block);
 
   CHECK(!mem_ref || mem_ref_used)
-      << "Unused mem reference to " << std::hex << ctx.cfg_inst->ea
-      << " in instruction at " << std::hex << inst.pc;
+      << "Unused mem reference to " << std::hex << ctx.cfg_inst->mem->target_ea
+      << " in instruction at " << std::hex << inst.pc << std::dec;
 
   CHECK(!imm_ref || imm_ref_used)
-      << "Unused imm reference to " << std::hex << ctx.cfg_inst->ea
-      << " in instruction at " << std::hex << inst.pc;
+      << "Unused imm reference to " << std::hex << ctx.cfg_inst->imm->target_ea
+      << " in instruction at " << std::hex << inst.pc << std::dec;
 
   CHECK(!disp_ref || disp_ref_used)
-      << "Unused disp reference to " << std::hex << ctx.cfg_inst->ea
-      << " in instruction at " << std::hex << inst.pc;
+      << "Unused disp reference to " << std::hex
+      << ctx.cfg_inst->disp->target_ea
+      << " in instruction at " << std::hex << inst.pc << std::dec;
 
   return ret;
 }

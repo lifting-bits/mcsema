@@ -470,6 +470,8 @@ void AddDataSegments(const NativeModule *cfg_module) {
   }
 }
 
+// Generate code to call pre-`main` function static object constructors, and
+// post-`main` functions destructors.
 void CallInitFiniCode(const NativeModule *cfg_module) {
   if (FLAGS_libc_constructor.empty() && FLAGS_libc_destructor.empty()) {
     return;

@@ -110,25 +110,21 @@ If header files are available that declare these external functions, these files
 
 ## Translation to Bitcode
 
-Once we have the program's control flow information, we can translate it to LLVM bitcode using `mcsema-lift`. 
+Once we have the program's control flow information, we can translate it to LLVM bitcode using `mcsema-lift-4.0`. The `4.0` here is the version of the LLVM toolchain being used. McSema can be built to use LLVM version 3.6 and up.
 
 Here is the command to translate the CFG into bitcode:
 
-    mcsema-lift -os linux -arch amd64 -cfg xz.cfg -entrypoint main -output xz.bc
+    mcsema-lift-4.0 --os linux --arch amd64 --cfg xz.cfg --output xz.bc
 
 Let's explore the options one by one:
 
-* `-os linux`: The CFG came from a binary for the Linux operating system. Currently the valid options are `linux` or `windows`. This option is required for certain aspects of translation, like ABI compatibility for external functions, etc. 
-* `-arch amd64`: Use instruction semantics for the `amd64` architecture. Valid options are `x86` (32-bit x86 semantics) and `amd64` (64-bit x86).
-* `-cfg xz.cfg`: The input control flow graph to convert into bitcode.
-* `-entrypoint main`: The name of the entrypoint into the translated code. This should match the value used for `-entrypoint` specified to `mcsema-disass`.
-* `-output xz.bc`: Where to write the bitcode. If the `-output` option is not specified, the bitcode will be written to stdout.
+* `--os linux`: The CFG came from a binary for the Linux operating system. Currently the valid options are `linux` or `windows`. This option is required for certain aspects of translation, like ABI compatibility for external functions, etc. 
+* `--arch amd64`: Use instruction semantics for the `amd64` architecture. Valid options are `x86` and `x86_avx` (32-bit x86 semantics), `amd64` and `amd64_avx` (64-bit x86), and `aarch64` (64-bit ARMv8).
+* `--cfg xz.cfg`: The input control flow graph to convert into bitcode.
+* `--output xz.bc`: Where to write the bitcode. If the `--output` option is not specified, the bitcode will be written to stdout.
 
-The `mcsema-lift` program will output a lot of debugging information to stdout and stderr. If everything is successful, the last two lines should be something similar to:
+The `mcsema-lift-4.0` program may print out errors or warnings to `stderr`. Oftentimes these are not critical. The full lift log can be found in `/tmp/mcsema-lift-4.0.INFO`, and this is a link to a process/thread-ID-specific file. Make sure to clean out these log files if you use `mcsema-lift-4.0` a lot!
 
-    Adding entry point: main
-    main is implemented by sub_4026c0
-    
 And there will be a generated bitcode file in the output location we specified:
 
     $ ls -lh xz.bc
@@ -138,18 +134,17 @@ And there will be a generated bitcode file in the output location we specified:
 
 The new bitcode can be used for a variety of purposes ranging from informational analyses to hardening and transformation. Eventually, though, you may want to re-create a new, working binary. Here is how to do that.
 
-First, you'll need mcsema's runtime libraries that are generated during installation; these are typically located in `<mcsema installation directory>/lib`. You will also need to link against any libraries that the original program was linked against. For this example, make sure that the liblzma-dev package is installed on your machine:
+First, you'll need McSema's runtime libraries that are generated during installation. These are located at the installation prefix of McSema, typically in `/usr/local` on Unix machines. Alternatively, these can be found in the Remill build directory, under `tools/mcsema/mcsema/Arch/X86/Runtime` (for X86). You will also need to link against any libraries that the original program was linked against. For this example, make sure that the liblzma-dev package is installed on your machine:
 
     $ sudo apt-get install liblzma-dev
     
-As of this writing, mcsema outputs bitcode suitable for clang 3.8, and that is the recommended version for rebuilding binaries. A [compatibility script for clang 3.5](https://github.com/trailofbits/mcsema/blob/master/tools/llvm_38_to_35.sh) bitcode is available, but it is experimental and should only be used as a last resort.
+When Remill/McSema is installed, so should a prefixed version of clang for the build toolchain. For example, building Remill/McSema with the LLVM 4.0 toolchain should also install `remill-clang-4.0`. If not, you can always find the toolchain-specific version of the LLVM binaries and libraries in the Remill build directory, under `libraries/llvm/bin`.
 
 Now, let's re-create a new `xz` binary and see it in action!
 
-    $ clang-3.8 -m64 -O3 -o xz.new xz.bc ${MCSEMA_DIR}/lib/libmcsema_rt64.a -llzma 
+    $ remill-clang-4.0 -rdynamic -O3 -o xz.new xz.bc /usr/local/lib/libmcsema_rt64-4.0.a -llzma 
     
-This is a fairly ordinary clang command line; the only thing of note is `${MCSEMA_DIR}/lib/libmcsema_rt64.a`, which is the path to the aforementioned runtime libraries. The `libmcsema_rt64.a` is the library to use for 64-bit bitcode, and `libmcsema_rt32.a` is the library to use for 32-bit bitcode. On Windows, these libraries are named `mcsema_rt64.lib` and `mcsema_rt32.lib`, respectively.
-
+This is a fairly ordinary clang command line; the only thing of note is `/usr/local/lib/libmcsema_rt64-4.0.a`, which is the path to the aforementioned runtime libraries. The `libmcsema_rt64-4.0.a` is the library to use for 64-bit bitcode using the LLVM 4.0 toolchain, and `libmcsema_rt32-4.0.a` is the library to use for 32-bit bitcode using the LLVM 4.0 toolchain. On Windows, these libraries are named `mcsema_rt64-4.0.lib` and `mcsema_rt32-4.0.lib`, respectively.
 
 We can verify that our new binary, `xz.new`, works, and compresses output that can be read by `unxz`:
 

@@ -155,19 +155,15 @@ static std::vector<llvm::GlobalVariable *> FindISELs(void) {
 }
 
 // Remove the ISEL variables used for finding the instruction semantics.
-static void RemoveISELs(std::vector<llvm::GlobalVariable *> &isels) {
-  std::vector<llvm::GlobalVariable *> next_isels;
-  while (isels.size()) {
-    next_isels.clear();
-    for (auto isel : isels) {
-      isel->setLinkage(llvm::GlobalValue::InternalLinkage);
-      if (1 >= isel->getNumUses()) {
-        isel->eraseFromParent();
-      } else {
-        next_isels.push_back(isel);
-      }
+static void PrivatizeISELs(std::vector<llvm::GlobalVariable *> &isels) {
+  for (auto isel : isels) {
+    isel->setInitializer(nullptr);
+    isel->setExternallyInitialized(false);
+    isel->setLinkage(llvm::GlobalValue::PrivateLinkage);
+
+    if (!isel->hasNUsesOrMore(2)) {
+      isel->eraseFromParent();
     }
-    isels.swap(next_isels);
   }
 }
 
@@ -333,19 +329,11 @@ void OptimizeModule(void) {
   RemoveIntrinsics();
   LOG(INFO)
       << "Optimizing module.";
+
+  PrivatizeISELs(isels);
+
   if (!FLAGS_disable_optimizer) {
-    RemoveISELs(isels);
     RunO3();
-  } else {
-    remill::ForEachISel(
-        gModule, [&](llvm::GlobalVariable *, llvm::Function *sem) {
-          if (sem->hasNUsesOrMore(2)) {
-            sem->removeFnAttr(llvm::Attribute::InlineHint);
-            sem->removeFnAttr(llvm::Attribute::AlwaysInline);
-            sem->addFnAttr(llvm::Attribute::NoInline);
-          }
-        });
-    RemoveISELs(isels);
   }
 
   RemoveIntrinsics();

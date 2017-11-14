@@ -1,0 +1,1 @@
+A program that tests x86 string instructions such as lodsb, scasb and stosb.
