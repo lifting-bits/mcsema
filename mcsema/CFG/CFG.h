@@ -34,6 +34,7 @@ class GlobalVariable;
 namespace mcsema {
 
 struct NativeVariable;
+struct NativeStackVariable;
 struct NativeFunction;
 
 struct NativeExternalVariable;
@@ -52,6 +53,8 @@ struct NativeInstruction {
   const NativeXref *imm;
   const NativeXref *disp;
   const NativeXref *offset_table;
+
+  const NativeStackVariable *stack_var;
 
   bool does_not_return;
 };
@@ -94,7 +97,18 @@ struct NativeFunction : public NativeObject {
   NativeFunction(void);
 
   std::unordered_map<uint64_t, const NativeBlock *> blocks;
+  std::vector<struct NativeStackVariable *> stack_vars;
   llvm::Function *function;
+};
+
+struct NativeStackVariable : public NativeObject {
+ public:
+  NativeStackVariable(void);
+
+  uint64_t size;
+  int64_t offset;
+  std::unordered_map<uint64_t, int64_t> refs;
+  mutable llvm::Value *llvm_var;
 };
 
 // Function that is defined outside of the binary.

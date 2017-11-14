@@ -31,6 +31,7 @@
 #include "Instruction.h"
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Instruction.h"
+#include "remill/BC/Util.h"
 
 #include "mcsema/Arch/Arch.h"
 
@@ -40,6 +41,50 @@
 #include "mcsema/BC/Util.h"
 
 #include "mcsema/CFG/CFG.h"
+
+namespace {
+
+// Load the address of a register.
+static llvm::Value *LoadRegAddress(llvm::BasicBlock *block,
+                                   std::string reg_name) {
+  return new llvm::LoadInst(
+      remill::FindVarInFunction(block->getParent(), reg_name), "", block);
+}
+
+// Load the value of a register.
+static llvm::Value *LoadRegValue(llvm::BasicBlock *block,
+                                 std::string reg_name) {
+  return new llvm::LoadInst(LoadRegAddress(block, reg_name), "", block);
+}
+
+static llvm::Value *LoadAddressRegVal(llvm::BasicBlock *block,
+                                         const remill::Operand::Register &reg,
+                                         llvm::ConstantInt *zero) {
+  if (reg.name.empty()) {
+    return zero;
+  }
+
+  auto value = LoadRegValue(block, reg.name);
+  auto value_type = llvm::dyn_cast<llvm::IntegerType>(value->getType());
+  auto word_type = zero->getType();
+
+  CHECK(value_type)
+      << "Register " << reg.name << " expected to be an integer.";
+
+  auto value_size = value_type->getBitWidth();
+  auto word_size = word_type->getBitWidth();
+  CHECK(value_size <= word_size)
+      << "Register " << reg.name << " expected to be no larger than the "
+      << "machine word size (" << word_type->getBitWidth() << " bits).";
+
+  if (value_size < word_size) {
+    value = new llvm::ZExtInst(value, word_type, "", block);
+  }
+
+  return value;
+}
+
+}
 
 namespace mcsema {
 
@@ -211,6 +256,29 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
   if (mem.IsControlFlowTarget()) {
     return this->remill::InstructionLifter::LiftAddressOperand(
         inst, block, arg, op);
+  }
+
+  // Check if the instruction is referring to stack variable
+  if (ctx.cfg_inst->stack_var) {
+    llvm::IRBuilder<> ir(block);
+    auto base = ir.CreatePtrToInt(ctx.cfg_inst->stack_var->llvm_var, word_type);
+    auto map_it = ctx.cfg_inst->stack_var->refs.find(ctx.cfg_inst->ea);
+    if (map_it != ctx.cfg_inst->stack_var->refs.end()) {
+      auto var_offset = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(map_it->second), true);
+      base = ir.CreateAdd(base, var_offset);
+      LOG(INFO)
+        << "Lifting stack variable access at : " << std::hex << map_it->first
+        << " var_offset " << map_it->second  << std::dec
+        << " variable name " << ctx.cfg_inst->stack_var->name;
+
+      if (!mem.index_reg.name.empty()) {
+        auto zero = llvm::ConstantInt::get(word_type, 0, false);
+        auto index = LoadAddressRegVal(block, mem.index_reg, zero);
+        auto scale = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(mem.scale), true);
+        return ir.CreateAdd(base, ir.CreateMul(index, scale));
+      }
+    }
+    return base;
   }
 
   if ((mem.base_reg.name.empty() && mem.index_reg.name.empty()) ||

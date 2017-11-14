@@ -428,6 +428,44 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
   }
 }
 
+static void AllocStackVars(
+    llvm::BasicBlock *bb,
+    const NativeFunction *cfg_func){
+  auto func = bb->getParent();
+  llvm::IRBuilder<> ir(bb);
+  llvm::Value *value = nullptr;
+  llvm::Type *type = nullptr;
+
+  for (auto s : cfg_func->stack_vars){
+    switch(s->size){
+      case 1:
+        type = llvm::Type::getInt8Ty(func->getContext());
+        value = llvm::ConstantInt::get(gWordType, 1);
+        break;
+      case 2:
+        type = llvm::Type::getInt16Ty(func->getContext());
+        value = llvm::ConstantInt::get(gWordType, 1);
+        break;
+      case 4:
+        type = llvm::Type::getInt32Ty(func->getContext());
+        value = llvm::ConstantInt::get(gWordType, 1);
+        break;
+      case 8:
+        type = llvm::Type::getInt64Ty(func->getContext());
+        value = llvm::ConstantInt::get(gWordType, 1);
+        break;
+      default:
+        type = llvm::Type::getInt8Ty(func->getContext());
+        value = llvm::ConstantInt::get(gWordType, s->size);
+        break;
+    }
+    LOG(INFO)
+      << "Inserting variable " << s->name << ", size "
+      << s->size << ", Func name " << cfg_func->name;
+    s->llvm_var = ir.CreateAlloca(type, value, s->name);
+  }
+}
+
 static llvm::Function *LiftFunction(
     const NativeModule *cfg_module, const NativeFunction *cfg_func) {
 
@@ -487,7 +525,10 @@ static llvm::Function *LiftFunction(
         *gContext, cfg_block->lifted_name, lifted_func);
   }
 
-  // Create a branch from the end of the entry block to the first block
+  // Allocate the stack variable recovered in the function
+  auto entry_block = ctx.ea_to_block[cfg_func->ea];
+  AllocStackVars(entry_block, cfg_func);
+  
   llvm::BranchInst::Create(ctx.ea_to_block[cfg_func->ea],
                            &(lifted_func->front()));
 
