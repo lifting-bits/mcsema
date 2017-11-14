@@ -377,7 +377,8 @@ NativeVariable::NativeVariable(void)
 
 NativeStackVariable::NativeStackVariable(void)
     : size(0),
-      offset(0) {}
+      offset(0),
+      llvm_var(nullptr){}
 
 void NativeObject::ForwardTo(NativeObject *dest) const {
   if (forward != this) {

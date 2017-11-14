@@ -432,39 +432,36 @@ static void AllocStackVars(
     llvm::BasicBlock *bb,
     const NativeFunction *cfg_func){
   auto func = bb->getParent();
-  auto word_type = llvm::Type::getInt64Ty(func->getContext());
   llvm::IRBuilder<> ir(bb);
   llvm::Value *value = nullptr;
   llvm::Type *type = nullptr;
 
   for (auto s : cfg_func->stack_vars){
-    switch(s->size)
-    {
+    switch(s->size){
       case 1:
-    	  type = llvm::Type::getInt8Ty(func->getContext());
-    	  value = llvm::ConstantInt::get(word_type, 1);
-    	  break;
+        type = llvm::Type::getInt8Ty(func->getContext());
+        value = llvm::ConstantInt::get(gWordType, 1);
+        break;
       case 2:
-    	  type = llvm::Type::getInt16Ty(func->getContext());
-          value = llvm::ConstantInt::get(word_type, 1);
-          break;
+        type = llvm::Type::getInt16Ty(func->getContext());
+        value = llvm::ConstantInt::get(gWordType, 1);
+        break;
       case 4:
-    	  type = llvm::Type::getInt32Ty(func->getContext());
-    	  value = llvm::ConstantInt::get(word_type, 1);
-    	  break;
+        type = llvm::Type::getInt32Ty(func->getContext());
+        value = llvm::ConstantInt::get(gWordType, 1);
+        break;
       case 8:
-    	  type = llvm::Type::getInt64Ty(func->getContext());
-    	  value = llvm::ConstantInt::get(word_type, 1);
-    	  break;
+        type = llvm::Type::getInt64Ty(func->getContext());
+        value = llvm::ConstantInt::get(gWordType, 1);
+        break;
       default:
-    	  type = llvm::Type::getInt8Ty(func->getContext());
-    	  value = llvm::ConstantInt::get(word_type, s->size);
-    	  break;
+        type = llvm::Type::getInt8Ty(func->getContext());
+        value = llvm::ConstantInt::get(gWordType, s->size);
+        break;
     }
     LOG(INFO)
-          << "Inserting variable " << s->name << ", size "
-          << s->size << ", Func name " << cfg_func->name;
-
+      << "Inserting variable " << s->name << ", size "
+      << s->size << ", Func name " << cfg_func->name;
     s->llvm_var = ir.CreateAlloca(type, value, s->name);
   }
 }
