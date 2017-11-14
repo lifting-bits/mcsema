@@ -262,15 +262,15 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
     llvm::IRBuilder<> ir(block);
     auto base = ir.CreatePtrToInt(ctx.cfg_inst->stack_var->llvm_var, word_type);
     auto map_it = ctx.cfg_inst->stack_var->refs.find(ctx.cfg_inst->ea);
-    if ( map_it != ctx.cfg_inst->stack_var->refs.end()) {
+    if (map_it != ctx.cfg_inst->stack_var->refs.end()) {
       auto var_offset = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(map_it->second), true);
       base = ir.CreateAdd(base, var_offset);
       LOG(INFO)
-      	  << "Lifting stack variable access at : " << std::hex << map_it->first
-          << " var_offset " << map_it->second  << std::dec
-          << " variable name " << ctx.cfg_inst->stack_var->name;
+        << "Lifting stack variable access at : " << std::hex << map_it->first
+        << " var_offset " << map_it->second  << std::dec
+        << " variable name " << ctx.cfg_inst->stack_var->name;
 
-      if(!mem.index_reg.name.empty()) {
+      if (!mem.index_reg.name.empty()) {
         auto zero = llvm::ConstantInt::get(word_type, 0, false);
         auto index = LoadAddressRegVal(block, mem.index_reg, zero);
         auto scale = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(mem.scale), true);
