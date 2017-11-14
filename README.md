@@ -12,8 +12,8 @@ McSema and `remill` were developed and are maintained by Trail of Bits, funded b
 
 ## Build status
 
-|       | master |
-| ----- | ------ |
+|       | master                                   |
+| ----- | ---------------------------------------- |
 | Linux | [![Build Status](https://travis-ci.org/trailofbits/mcsema.svg?branch=master)](https://travis-ci.org/trailofbits/mcsema) |
 
 ## Features
@@ -41,22 +41,22 @@ Why would anyone translate binaries *back* to bitcode?
 
 ## Dependencies
 
-| Name | Version |
-| ---- | ------- |
-| [Git](https://git-scm.com/) | Latest |
-| [CMake](https://cmake.org/) | 3.2+ |
-| [Google Protobuf](https://github.com/google/protobuf) | 2.6.1 |
-| [Google Flags](https://github.com/google/glog) | Latest |
-| [Google Log](https://github.com/google/glog) | Latest |
-| [Google Test](https://github.com/google/googletest) | Latest |
-| [Intel XED](https://github.com/intelxed/xed) | Latest |
-| [LLVM](http://llvm.org/) | 3.6+ |
-| [Clang](http://clang.llvm.org/) | 3.6+ (3.9 if using Visual Studio 2015) |
-| [Python](https://www.python.org/) | 2.7 |
-| [Python Package Index](https://pypi.python.org/pypi) | Latest |
-| [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
-| [IDA Pro](https://www.hex-rays.com/products/ida) | 6.7+ |
-| [Visual Studio](https://www.visualstudio.com/downloads/) | 2013+ (Windows Only) |
+| Name                                     | Version                                |
+| ---------------------------------------- | -------------------------------------- |
+| [Git](https://git-scm.com/)              | Latest                                 |
+| [CMake](https://cmake.org/)              | 3.2+                                   |
+| [Google Protobuf](https://github.com/google/protobuf) | 2.6.1                                  |
+| [Google Flags](https://github.com/google/glog) | Latest                                 |
+| [Google Log](https://github.com/google/glog) | Latest                                 |
+| [Google Test](https://github.com/google/googletest) | Latest                                 |
+| [Intel XED](https://github.com/intelxed/xed) | Latest                                 |
+| [LLVM](http://llvm.org/)                 | 3.6+                                   |
+| [Clang](http://clang.llvm.org/)          | 3.6+ (3.9 if using Visual Studio 2015) |
+| [Python](https://www.python.org/)        | 2.7                                    |
+| [Python Package Index](https://pypi.python.org/pypi) | Latest                                 |
+| [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0                                  |
+| [IDA Pro](https://www.hex-rays.com/products/ida) | 6.7+                                   |
+| [Visual Studio](https://www.visualstudio.com/downloads/) | 2013+ (Windows Only)                   |
 
 ## Getting and building the McSema code
 
@@ -142,7 +142,7 @@ This will install McSema _globally_. Once installed, you may use `mcsema-disass`
 * [McSema command line reference](docs/CommandLineReference.md)
 * [Common Errors](docs/CommonErrors.md) and [Debugging Tips](docs/DebuggingTips.md)
 * [How to add support for a new instruction](https://github.com/trailofbits/remill/blob/master/docs/ADD_AN_INSTRUCTION.md)
-* [How to use McSema: A walkthrough](docs/McsemaWalkthrough.md)
+* [How to use McSema: A walkthrough](docs/McSemaWalkthrough.md)
 * [Life of an instruction](docs/LifeOfAnInstruction.md)
 * [Limitations](docs/Limitations.md)
 * [Navigating the source code](docs/NavigatingTheCode.md)
