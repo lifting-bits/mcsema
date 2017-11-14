@@ -1,8 +1,14 @@
 # McSema [![Slack Chat](http://empireslacking.herokuapp.com/badge.svg)](https://empireslacking.herokuapp.com/)
 
-McSema lifts x86 and amd64 binaries to LLVM bitcode modules. McSema support both Linux and Windows binaries, and most x86 and amd64 instructions, including integer, X87, MMX, SSE and AVX operations.
+McSema is an executable lifter. It translates ("lifts") executable binaries from native machine code to LLVM bitcode. LLVM bitcode is an [intermediate representation](https://en.wikipedia.org/wiki/Intermediate_representation) form of a program that was originally created for the [retargetable LLVM compiler](https://llvm.org), but which is also very useful for performing program analysis methods that would not be possible to perform on an executable binary directly.
 
-McSema is separated into two conceptual parts: control flow recovery and instruction translation. Control flow recovery is performed using the `mcsema-disass` tool, which uses IDA Pro to disassemble a binary file and produces a control flow graph. Instruction translation is performed using the `mcsema-lift` tool, which converts the control flow graph into LLVM bitcode.
+McSema enables analysts to find and retroactively harden binary programs against security bugs, independently validate vendor source code, and generate application tests with high code coverage. McSema isn’t just for static analysis. The lifted LLVM bitcode can also be [fuzzed with libFuzzer](https://github.com/trailofbits/mcsema/blob/master/docs/UsingLibFuzzer.md), an LLVM-based instrumented fuzzer that would otherwise require the target source code. The lifted bitcode can even be [compiled](https://github.com/trailofbits/mcsema/blob/master/docs/UsingLibFuzzer.md) back into a [runnable program](https://github.com/trailofbits/mcsema/blob/master/docs/McsemaWalkthrough.md)! This is a procedure known as static binary rewriting, binary translation, or binary recompilation.
+
+McSema supports lifting both Linux (ELF) and Windows (PE) executables, and understands most x86 and amd64 instructions, including integer, X87, MMX, SSE and AVX operations. AARCH64 (ARMv8) instruction support is in active development. For a full list of which instructions are supported and which are not, you can use the `mcsema-lift --list-supported` command.
+
+Using McSema is a two-step process: control flow recovery, and instruction translation. Control flow recovery is performed using the `mcsema-disass` tool, which relies on IDA Pro to disassemble a binary file and produce a control flow graph. Instruction translation is then performed using the `mcsema-lift` tool, which converts the control flow graph into LLVM bitcode. Under the hood, the instruction translation capability of `mcsema-lift` is implemented in the [`remill` library](https://github.com/trailofbits/remill). The development of `remill` was a result of refactoring and improvements to McSema, and was first introduced with McSema version 2.0.0. Read more about `remill` [below](#FAQ).
+
+McSema and `remill` were developed and are maintained by Trail of Bits, funded by and used in research for DARPA and the US Department of Defense.
 
 ## Build status
 
@@ -12,20 +18,20 @@ McSema is separated into two conceptual parts: control flow recovery and instruc
 
 ## Features
 
-* Translates 32- and 64-bit Linux ELF and Windows PE binaries to bitcode, including executables and shared libraries for each platform.
+* Lifts 32- and 64-bit Linux ELF and Windows PE binaries to bitcode, including executables and shared libraries for each platform.
 * Supports a large subset of x86 and x86-64 instructions, including most integer, X87, MMX, SSE, and AVX operations.
-* Runs on both Windows and Linux, and can translate Linux binaries on Windows and Windows binaries on Linux.
+* McSema runs on Windows and Linux and has been tested on Windows 7, 10, Ubuntu (14.04, 16.04), and openSUSE.
+* McSema can cross-lift: it can translate Linux binaries on Windows, or Windows binaries on Linux.
 * Output bitcode is compatible with the LLVM toolchain (versions 3.5 and up).
 * Translated bitcode can be analyzed or [recompiled as a new, working executable](docs/McsemaWalkthrough.md) with functionality identical to the original.
-* McSema runs on Windows and Linux and has been tested on Windows 7, 10, Ubuntu (14.04, 16.04), and openSUSE.
 
-## Using Mcsema
+## Use-cases
 
 Why would anyone translate binaries *back* to bitcode?
 
-* **Binary Patching And Modification**. Lifting to LLVM IR lets you cleanly modify the target program. You can run obfuscation or hardening passes, add features, remove features, rewrite features, or even fix that pesky typo, grammatical error, or insane logic. When done, your new creation can be recompiled to a new binary sporting all those changes. In the [Cyber Grand Challenge](https://blog.trailofbits.com/2015/07/15/how-we-fared-in-the-cyber-grand-challenge/), we were able to use mcsema to translate challenge binaries to bitcode, insert memory safety checks, and then re-emit working binaries.
+* **Binary Patching And Modification**. Lifting to LLVM IR lets you cleanly modify the target program. You can run obfuscation or hardening passes, add features, remove features, rewrite features, or even fix that pesky typo, grammatical error, or insane logic. When done, your new creation can be recompiled to a new binary sporting all those changes. In the [Cyber Grand Challenge](https://blog.trailofbits.com/2015/07/15/how-we-fared-in-the-cyber-grand-challenge/), we were able to use McSema to translate challenge binaries to bitcode, insert memory safety checks, and then re-emit working binaries.
 
-* **Symbolic Execution with KLEE**. [KLEE](https://klee.github.io/) operates on LLVM bitcode, usually generated by providing source to the LLVM toolchain. Mcsema can lift a binary to LLVM bitcode, [permitting KLEE to operate on previously unavailable targets](https://blog.trailofbits.com/2014/12/04/close-encounters-with-symbolic-execution-part-2/).
+* **Symbolic Execution with KLEE**. [KLEE](https://klee.github.io/) operates on LLVM bitcode, usually generated by providing source to the LLVM toolchain. McSema can lift a binary to LLVM bitcode, [permitting KLEE to operate on previously unavailable targets](https://blog.trailofbits.com/2014/12/04/close-encounters-with-symbolic-execution-part-2/).
 
 * **Re-use existing LLVM-based tools**. KLEE is not the only tool that becomes available for use on bitcode. It is possible to run LLVM optimization passes and other LLVM-based tools like [libFuzzer](http://llvm.org/docs/LibFuzzer.html) on [lifted bitcode](docs/UsingLibFuzzer.md).
 
@@ -35,7 +41,7 @@ Why would anyone translate binaries *back* to bitcode?
 
 ## Dependencies
 
-| Name | Version | 
+| Name | Version |
 | ---- | ------- |
 | [Git](https://git-scm.com/) | Latest |
 | [CMake](https://cmake.org/) | 3.2+ |
@@ -46,13 +52,13 @@ Why would anyone translate binaries *back* to bitcode?
 | [Intel XED](https://github.com/intelxed/xed) | Latest |
 | [LLVM](http://llvm.org/) | 3.6+ |
 | [Clang](http://clang.llvm.org/) | 3.6+ (3.9 if using Visual Studio 2015) |
-| [Python](https://www.python.org/) | 2.7 | 
+| [Python](https://www.python.org/) | 2.7 |
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
 | [IDA Pro](https://www.hex-rays.com/products/ida) | 6.7+ |
 | [Visual Studio](https://www.visualstudio.com/downloads/) | 2013+ (Windows Only) |
 
-## Getting and building the code
+## Getting and building the McSema code
 
 ### On Linux
 
@@ -78,10 +84,10 @@ sudo pip install 'protobuf==3.2.0'
 
 Note: If you are using IDA on 64 bit Ubuntu and your IDA install does not use the system Python, you can add the `protobuf` library manually to IDA's zip of modules.
 
-```
+```shell
 # Python module dir is generally in /usr/lib or /usr/local/lib
 touch /path/to/python2.7/dist-packages/google/__init__.py
-cd /path/to/lib/python2.7/dist-packages/              
+cd /path/to/lib/python2.7/dist-packages/
 sudo zip -rv /path/to/ida-6.X/python/lib/python27.zip google/
 sudo chown your_user:your_user /home/your_user/ida-6.7/python/lib/python27.zip
 ```
@@ -90,7 +96,7 @@ sudo chown your_user:your_user /home/your_user/ida-6.7/python/lib/python27.zip
 
 The next step is to clone the [Remill](https://github.com/trailofbits/remill) repository. We then clone the McSema repository into the `tools` subdirectory of Remill. This is kind of like how Clang and LLVM are distributed separately, and the Clang source code needs to be put into LLVM's tools directory.
 
-**Notice that when building McSema you should always use a specific Remill commit hash (the one we test). This hash can be found in the .remill_commit_id file**.
+**Notice that when building McSema, you should always use a specific Remill commit hash (the one we test). This hash can be found in the .remill_commit_id file**.
 
 ```shell
 git clone --depth 1 https://github.com/trailofbits/mcsema.git
@@ -103,23 +109,23 @@ git checkout -b temp $REMILL_VERSION
 mv ../mcsema tools
 ```
 
-#### Step 3: Build and install the code
+#### Step 3: Build McSema
 
-McSema is a kind of sub-project of Remill, kind of like how Clang is a sub-project of LLVM. To that end, we invoke Remill's build script, and it will build both Remill and McSema. It will also download all remaining dependencies needed by Remill.
+McSema is a kind of sub-project of Remill, similar to how Clang is a sub-project of LLVM. To that end, we invoke Remill's build script to build both Remill and McSema. It will also download all remaining dependencies needed by Remill.
 
 The following script will build Remill and McSema into the `remill-build` directory, which will be placed in the current working directory.
 
-```
+```shell
 ./remill/scripts/build.sh
 ```
 
 This script accepts several additional command line options:
 
- - `--prefix PATH`: Install files to `PATH`. By default, `PATH` is `/usr/local`.
- - `--llvm-version MAJOR.MINOR`: Download pre-built dependencies for LLVM version MAJOR.MINOR. The default is to use LLVM 4.0.
- - `--build-dir PATH`: Produce all intermediate build files in `PATH`. By default, `PATH` is `$CWD/remill-build`.
- - `--use-system-compiler`: Compile Remill+McSema using the system compiler toolchain (typically the GCC). 
- 
+* `--prefix PATH`: Install files to `PATH`. By default, `PATH` is `/usr/local`.
+* `--llvm-version MAJOR.MINOR`: Download pre-built dependencies for LLVM version MAJOR.MINOR. The default is to use LLVM 4.0.
+* `--build-dir PATH`: Produce all intermediate build files in `PATH`. By default, `PATH` is `$CWD/remill-build`.
+* `--use-system-compiler`: Compile Remill+McSema using the system compiler toolchain (typically the GCC).
+
 #### Step 4: Install McSema
 
 The next step is to build the code.
@@ -133,13 +139,14 @@ This will install McSema _globally_. Once installed, you may use `mcsema-disass`
 
 ## Additional Documentation
 
-- [Common Errors](docs/CommonErrors.md) and [Debugging Tips](docs/DebuggingTips.md)
-- [How to implement the semantics of an instruction](https://github.com/trailofbits/remill/blob/master/docs/ADD_AN_INSTRUCTION.md)
-- [How to use mcsema: A walkthrough](docs/McsemaWalkthrough.md)
-- [Life of an instruction](docs/LifeOfAnInstruction.md)
-- [Limitations](docs/Limitations.md)
-- [Navigating the source code](docs/NavigatingTheCode.md)
-- [Using Mcsema with libFuzzer](docs/UsingLibFuzzer.md)
+* [McSema command line reference](docs/CommandLineReference.md)
+* [Common Errors](docs/CommonErrors.md) and [Debugging Tips](docs/DebuggingTips.md)
+* [How to add support for a new instruction](https://github.com/trailofbits/remill/blob/master/docs/ADD_AN_INSTRUCTION.md)
+* [How to use McSema: A walkthrough](docs/McsemaWalkthrough.md)
+* [Life of an instruction](docs/LifeOfAnInstruction.md)
+* [Limitations](docs/Limitations.md)
+* [Navigating the source code](docs/NavigatingTheCode.md)
+* [Using McSema with libFuzzer](docs/UsingLibFuzzer.md)
 
 ## Getting help
 
@@ -147,18 +154,18 @@ If you are experiencing problems with McSema or just want to learn more and cont
 
 ## FAQ
 
-### How do you pronounce McSema and where did the name come from?
+### How do you pronounce McSema and where did the name come from
 
-This is a hotly contested issue. We must explore the etymology of the name to find an answer. The "Mc" in McSema was originally a contraction of the words "Machine Code." At that time, McSema used LLVM's instruction decoder to take machine code bytes, and turn them into `llvm::MCInst` data structures. It is possible that "MC" in that case is pronounced em-see. Alas, even those who understand the origin of the name pronounce it as if it were related to America's favorite fast food joint.
+This is a hotly contested issue. We must explore the etymology of the name to find an answer. The "Mc" in McSema was originally a contraction of the words "Machine Code," and the "sema" is short for "semantics." At that time, McSema used LLVM's instruction decoder to take machine code bytes, and turn them into `llvm::MCInst` data structures. It is possible that "MC" in that case is pronounced em-see. Alas, even those who understand the origin of the name pronounce it as if it were related to America's favorite fast food joint.
 
-### Why do I need IDA Pro to use McSema?
+### Why do I need IDA Pro to use McSema
 
-McSema's goal is binary to bitcode translation. Accurate disassembly and control flow recovery is a separate and difficult problem. IDA has already invested countless man-hours into getting disassembly right, and it only makes sense that we re-use existing work. We understand that not everyone can afford an IDA license. With the original release of McSema, we shipped our own tool recursive descent disassembler. It was never as good as IDA and it never would be. Maintaining the broken tool took away valuable development time from more important McSema work. We hope to eventually transition to more accessible control flow recovery frontends, such as Binary Ninja (we have a branch with [initial Binary Ninja support](https://github.com/trailofbits/mcsema/tree/getcfg_binja)). We very warmly welcome pull requests that implement new control flow recovery frontends. 
+McSema's goal is binary to bitcode translation. Accurate disassembly and control flow recovery is a separate and difficult problem. IDA has already invested countless hours of engineering into getting disassembly right, and it only makes sense that we re-use existing work. We understand that not everyone can afford an IDA license. With the original release of McSema, we shipped our own recursive-descent disassembler. It was never as good as IDA, and it never would be. Maintaining the broken tool took away valuable development time from more important McSema work. We hope to eventually transition to more accessible control flow recovery front-ends, such as Binary Ninja (we have a branch with [initial Binary Ninja support](https://github.com/trailofbits/mcsema/tree/getcfg_binja)). We very warmly welcome pull requests that implement support for new control flow recovery front-ends.
 
-### What is Remill and why does McSema need it?
+### What is Remill, and why does McSema need it
 
-[Remill](https://github.com/trailofbits/remill) is a library that McSema uses to lift individual machine code instructions to LLVM IR. You can think of McSema being to Remill as Clang is to LLVM. Remill's scope is small: it focuses on instruction semantics only, and it provides semantics for x86, x86-64, and AArch64 instruction semantics. McSema's scope is much bigger: it focuses on lifting entire programs. To do so, McSema must lift the individual instructions, but there's a lot more to lifting programs than just the instructions; there are code and data cross-references, segments, etc. 
+[Remill](https://github.com/trailofbits/remill) is a library that McSema uses to lift individual machine code instructions to LLVM IR. You can think of McSema being to Remill as Clang is to LLVM. Remill's scope is small: it focuses on instruction semantics only, and it provides semantics for x86, x86-64, and AArch64 instruction semantics. McSema's scope is much bigger: it focuses on lifting entire programs. To do so, McSema must lift the individual instructions, but there's a lot more to lifting programs than just the instructions; there are code and data cross-references, segments, etc.
 
-### I'm a student and I'd like to contribute to McSema. How can I help?
+### I'm a student and I'd like to contribute to McSema: how can I help
 
 We would love to take you on as an intern to help improve McSema. We have several project ideas labelled `intern_project` in [the issues tracker](https://github.com/trailofbits/mcsema/issues?q=is%3Aissue+is%3Aopen+label%3Aintern_project). You are not limited to those items: if you think of a great feature you want in McSema, let us know and we will sponsor it. Simply contact us on our [Slack channel](https://empireslacking.herokuapp.com/) or via mcsema@trailofbits.com and let us know what you'd want to work on and why.

@@ -4,15 +4,15 @@ This document describes the structure of the McSema codebase, where to find thin
 
 There are three high-level steps to using McSema:
 
- 1. [Disassembling a program binary and producing a CFG file](#disass)
- 2. [Lifting the CFG file into LLVM bitcode](#lift)
- 3. Compiling the LLVM bitcode into a runnable binary
+1. [Disassembling a program binary and producing a CFG file](#disass)
+2. [Lifting the CFG file into LLVM bitcode](#lift)
+3. Compiling the LLVM bitcode into a runnable binary
 
 ## File Layout
 
-First, let's familiarize ourselve with essentials of the file layout of McSema.
+First, let's familiarize ourselves with essentials of the file layout of McSema.
 
-```
+```shell
 ┌── mcsema
 │   ├── Arch
 │   │   ├── ...             : Architecture-neutral files
@@ -33,7 +33,7 @@ First, let's familiarize ourselve with essentials of the file layout of McSema.
 │       └── CFG.proto       : CFG file format description
 └── tools
     ├── mcsema_disass       : mcsema-disass front-end, makes CFG files
-    │   ├── binja           : 
+    │   ├── binja           :
     │   │   └── ...         : Binary Ninja backend for mcsema-disass
     │   ├── defs
     │   │   ├── linux.txt   : List of known external library functions on Linux
@@ -44,7 +44,7 @@ First, let's familiarize ourselve with essentials of the file layout of McSema.
     │   └── __main__.py
     ├── mcsema_lift
     │   └── Lift.cpp        : mcsema-lift front-end, makes bitcode from CFG files
-    └── regtrace            : Intel PIN tool for identifying divergences in lifted code 
+    └── regtrace            : Intel PIN tool for identifying divergences in lifted code
 ```
 
 ## <a id="disass"></a> Producing a CFG file
@@ -61,10 +61,10 @@ The front-end is responsible for invoking the backend and disassembly engine. Th
 
 The most important high-level structures recorded in the CFG file are:
 
- - `Function`: functions in the binary with concrete implementations. The `Function` message contains all basic blocks and instructions of the function. A common example of this would be a program's `main` function.
- - `Segment`: Data stored in the program binary. This includes things like global variables and `static` storage duration-defined variables in C/C++ code. 
- - `ExternalFunction`: functions called but not defined by the program. A common example of this would be libc functions like `malloc`, `strlen`, etc.
- - `ExternalVariable`: data referenced but not defined by the program. An example of this would be the `getopt` C library's `optind` variable. You can things of these being like `extern`-declared global variables.
+- `Function`: functions in the binary with concrete implementations. The `Function` message contains all basic blocks and instructions of the function. A common example of this would be a program's `main` function.
+- `Segment`: Data stored in the program binary. This includes things like global variables and `static` storage duration-defined variables in C/C++ code.
+- `ExternalFunction`: functions called but not defined by the program. A common example of this would be libc functions like `malloc`, `strlen`, etc.
+- `ExternalVariable`: data referenced but not defined by the program. An example of this would be the `getopt` C library's `optind` variable. You can things of these being like `extern`-declared global variables.
 
 `mcsema-lift-M.m` (where `M` is the major LLVM version, and `m` is the minor LLVM version, e.g. `mcsema-lift-4.0`) has different ways of turning each of the above structures into LLVM bitcode.
 
@@ -72,10 +72,10 @@ The most important high-level structures recorded in the CFG file are:
 
 The `mcsema-lift-M.m` command is used to lift CFG files to LLVM bitcode. The four most important arguments to `mcsema-lift` are:
 
- 1. `--os`: The operating system of the code being lifted. In practice, each binary format is specific to an operating system. ELF files are for Linux, Mach-O files for macOS, and DLL files for Windows. This is one of `linux`, `macos`, or `windows`.
- 2. `--arch`: The architecture of the code being lifted. This is one of `x86`, `x86_avx`, `amd64`, `amd64_avx`, or `aarch64`.
- 3. `--cfg`: The path for the CFG file produced by `mcsema-disass`.
- 4. `--output`: The path to the bitcode file to save/produce.
+  1.`--os`: The operating system of the code being lifted. In practice, each binary format is specific to an operating system. ELF files are for Linux, Mach-O files for macOS, and DLL files for Windows. This is one of `linux`, `macos`, or `windows`.
+  2.`--arch`: The architecture of the code being lifted. This is one of `x86`, `x86_avx`, `amd64`, `amd64_avx`, or `aarch64`.
+  3.`--cfg`: The path for the CFG file produced by `mcsema-disass`.
+  4.`--output`: The path to the bitcode file to save/produce.
 
 The above arguments instruct the [lifter](/tools/mcsema_lift/Lift.cpp) on how to configure the bitcode file.
 
@@ -97,7 +97,7 @@ bool LiftCodeIntoModule(const NativeModule *cfg_module) {
   // Segments are inserted after the lifted function declarations are added
   // so that cross-references to lifted code are handled.
   AddDataSegments(cfg_module);
-  
+
   // Lift the blocks of instructions into the declared functions.
   if (!DefineLiftedFunctions(cfg_module)) {
     return false;
