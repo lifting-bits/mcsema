@@ -375,19 +375,17 @@ def recover_stack_vars(pb_func, func):
     # Go through all variables on the stack (in order of storage)
     stack_vars = sorted(func.stack_layout, key=lambda var: var.storage)
     for i, svar in enumerate(stack_vars):
-        pb_svar = pb_func.stackvars.add()
+        pb_svar = pb_func.stack_vars.add()
         pb_svar.name = svar.name
         pb_svar.sp_offset = svar.storage
 
-        if svar.type.type_class == TypeClass.VoidTypeClass:
-            # Estimate size based on the offset of the next variable
-            if svar is not stack_vars[-1]:
-                pb_svar.size = stack_vars[i + 1].storage - svar.storage
-            else:
-                # Edge case for the last variable, the offset is the size
-                pb_svar.size = svar.storage
+        # Var types in binja don't account for arrays
+        # Estimate size based on the offset of the next variable
+        if svar is not stack_vars[-1]:
+            pb_svar.size = stack_vars[i + 1].storage - svar.storage
         else:
-            pb_svar.size = svar.type.width
+            # Edge case for the last variable, the offset is the size
+            pb_svar.size = svar.storage
 
 
 def recover_function(bv, pb_mod, addr, is_entry=False):
