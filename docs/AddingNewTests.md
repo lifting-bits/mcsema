@@ -10,7 +10,7 @@ Translation is a two step process: first there is CFG recovery, and then transcr
 
 Translation is correct if the following hold:
 
-* Mcsema exits cleanly while translating the binary (e.g. exit code 0).
+* McSema exits cleanly while translating the binary (e.g. exit code 0).
 * The translated bitcode is emitted to a file.
 * The bitcode can be re-built to a translated executable.
 * The translated executable produces identical output (both on stdin and stderr) as the original.
@@ -255,4 +255,4 @@ To be determined once the integration test system has been ported to Windows, bu
 
 ## Unit Tests
 
-Currently in flux as we are re-doing the unit testing framework.
+We write and execute unit tests for Remill using Google Test, which serves as the unit testing framework for McSema. Every instruction semantic added to Remill is tested with multiple test cases in native assembly, such that we compare the execution results of the native assembly with the results of the equivalent lifted version. See the [Remill repository](https://github.com/trailofbits/remill) for more information.

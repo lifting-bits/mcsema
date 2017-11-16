@@ -137,6 +137,10 @@ sudo make install
 
 This will install McSema _globally_. Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcsema-lift-4.0` for lifting the disassembled binaries. If you specified `--llvm-version 3.6` to the `build.sh` script, then you would use `mcsema-lift-3.6`.
 
+#### Step 5: Verifying Your McSema Installation
+
+In order to verify that McSema works correctly as built, head on over to [the documentation on integration tests](docs/AddingNewTests.md). Check that you can run the tests and that they pass.
+
 ## Additional Documentation
 
 * [McSema command line reference](docs/CommandLineReference.md)
