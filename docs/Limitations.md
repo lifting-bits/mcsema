@@ -1,6 +1,6 @@
-# Limitations 
+# Limitations
 
-The McSema toolset currently has some limitations which limit what programs it is able to translate to LLVM. 
+The McSema toolset currently has some limitations which limit what programs it is able to translate to LLVM.
 
 ## Building and Running
 
@@ -18,7 +18,7 @@ McSema's CFG recovery depends on IDA Pro being accurate. Sometimes its not. We a
 
 ### Self-modifying code
 
-The translator is not designed to accommodate self-modifying code directly. An approach is possible to model its effects, where the modifications are described in a native control flow graph as branches to a new basic block, however this could be difficult to construct. 
+The translator is not designed to accommodate self-modifying code directly. An approach is possible to model its effects, where the modifications are described in a native control flow graph as branches to a new basic block, however this could be difficult to construct.
 
 ### Raw Binaries
 
@@ -42,7 +42,7 @@ The most conservative approach will greatly increase code size and reduce speed.
 
 ### External Function ABIs
 
-We assume that external function ABIs are the default for the platform and processor combination of the target. While the ABI of internal functions inside a program does not matter, the ABI of external functions has to conform to the specification for the target platform. 
+We assume that external function ABIs are the default for the platform and processor combination of the target. While the ABI of internal functions inside a program does not matter, the ABI of external functions has to conform to the specification for the target platform.
 
 External functions that take floating point arguments, or return floating point values are not yet supported, but there is no technical limitation peventing it; the glue code enabling this has just not been written. Pull requests are welcome.
 
@@ -50,16 +50,14 @@ External functions that take floating point arguments, or return floating point 
 
 Appliations that use the x87 FPU should run and report similar results, although sometimes at a lower precision. The x87 FPU is modelled using operations on `double` (64-bit floating point numbers), whereas the real hardware operates on `long double`s (80-bit floating point). Operating on `double`s was a deliberate design decision to improve the portability of the lifted bitcode.
 
-#### Precision and Rounding Control 
+#### Precision and Rounding Control
 
 Lifted bitcode does not explicitly represent the current FPU precision or rounding modes. Instead, it queries/controls the current FPU precision via standardized libc functions.
 
-#### Last Instruction Pointer 
+#### Last Instruction Pointer
 
 The last instruction pointer of the FPU is not modelled. Anything that reads this field and performs logic on it is self-referential code that we currently do not support.
 
-### Memory Segmentation 
+### Memory Segmentation
 
 McSema supports common segment prefixes that are used with TLS code, such as `fs` and `gs`. Setting the value of a segment register is not directly supported, but instead handled via `__remill_sync_hyper_call`.
-
-
