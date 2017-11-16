@@ -59,7 +59,7 @@ InstructionLifter::InstructionLifter(const remill::IntrinsicTable *intrinsics_,
         imm_ref_used(false) {}
 
 // Lift a single instruction into a basic block.
-bool InstructionLifter::LiftIntoBlock(
+remill::LiftStatus InstructionLifter::LiftIntoBlock(
     remill::Instruction &inst, llvm::BasicBlock *block_) {
 
   inst_ptr = &inst;
@@ -72,22 +72,34 @@ bool InstructionLifter::LiftIntoBlock(
   disp_ref_used = false;
   imm_ref_used = false;
 
-  auto ret = this->remill::InstructionLifter::LiftIntoBlock(inst, block);
+  auto status = this->remill::InstructionLifter::LiftIntoBlock(inst, block);
 
-  CHECK(!mem_ref || mem_ref_used)
-      << "Unused mem reference to " << std::hex << ctx.cfg_inst->mem->target_ea
-      << " in instruction at " << std::hex << inst.pc << std::dec;
+  // If we have semantics for the instruction, then make sure that we were
+  // able to match cross-reference information to the instruction's operands.
+  if (remill::kLiftedInstruction == status) {
+    if (mem_ref && !mem_ref_used) {
+      LOG(FATAL)
+          << "Unused memory reference operand to " << std::hex
+          << ctx.cfg_inst->mem->target_ea << " in instruction "
+          << inst.Serialize() << std::dec;
+    }
 
-  CHECK(!imm_ref || imm_ref_used)
-      << "Unused imm reference to " << std::hex << ctx.cfg_inst->imm->target_ea
-      << " in instruction at " << std::hex << inst.pc << std::dec;
+    if (imm_ref && !imm_ref_used) {
+      LOG(FATAL)
+          << "Unused immediate operand reference to " << std::hex
+          << ctx.cfg_inst->imm->target_ea << " in instruction "
+          << inst.Serialize() << std::dec;
+    }
 
-  CHECK(!disp_ref || disp_ref_used)
-      << "Unused disp reference to " << std::hex
-      << ctx.cfg_inst->disp->target_ea
-      << " in instruction at " << std::hex << inst.pc << std::dec;
+    if (disp_ref && !disp_ref_used) {
+      LOG(FATAL)
+          << "Unused displacement operand reference to " << std::hex
+          << ctx.cfg_inst->disp->target_ea << " in instruction "
+          << inst.Serialize() << std::dec;
+    }
+  }
 
-  return ret;
+  return status;
 }
 
 llvm::Value *InstructionLifter::GetMaskedAddress(const NativeXref *cfg_xref) {

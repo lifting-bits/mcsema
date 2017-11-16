@@ -44,8 +44,8 @@ Why would anyone translate binaries *back* to bitcode?
 | [Google Log](https://github.com/google/glog) | Latest |
 | [Google Test](https://github.com/google/googletest) | Latest |
 | [Intel XED](https://github.com/intelxed/xed) | Latest |
-| [LLVM](http://llvm.org/) | 3.6+ |
-| [Clang](http://clang.llvm.org/) | 3.6+ (3.9 if using Visual Studio 2015) |
+| [LLVM](http://llvm.org/) | 3.5+ |
+| [Clang](http://clang.llvm.org/) | 3.5+ (3.9 if using Visual Studio 2015) |
 | [Python](https://www.python.org/) | 2.7 | 
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
