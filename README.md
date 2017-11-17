@@ -41,24 +41,24 @@ Why would anyone translate binaries *back* to bitcode?
 
 ## Dependencies
 
-| Name                                     | Version                                |
-| ---------------------------------------- | -------------------------------------- |
-| [Git](https://git-scm.com/)              | Latest                                 |
-| [CMake](https://cmake.org/)              | 3.2+                                   |
-| [Google Protobuf](https://github.com/google/protobuf) | 2.6.1                                  |
-| [Google Flags](https://github.com/google/glog) | Latest                                 |
-| [Google Log](https://github.com/google/glog) | Latest                                 |
-| [Google Test](https://github.com/google/googletest) | Latest                                 |
-| [Intel XED](https://github.com/intelxed/xed) | Latest                                 |
-| [LLVM](http://llvm.org/)                 | 3.6+                                   |
-| [Clang](http://clang.llvm.org/)          | 3.6+ (3.9 if using Visual Studio 2015) |
-| [Python](https://www.python.org/)        | 2.7                                    |
-| [Python Package Index](https://pypi.python.org/pypi) | Latest                                 |
-| [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0                                  |
-| [IDA Pro](https://www.hex-rays.com/products/ida) | 6.7+                                   |
-| [Visual Studio](https://www.visualstudio.com/downloads/) | 2013+ (Windows Only)                   |
+| Name | Version | 
+| ---- | ------- |
+| [Git](https://git-scm.com/) | Latest |
+| [CMake](https://cmake.org/) | 3.2+ |
+| [Google Protobuf](https://github.com/google/protobuf) | 2.6.1 |
+| [Google Flags](https://github.com/google/glog) | Latest |
+| [Google Log](https://github.com/google/glog) | Latest |
+| [Google Test](https://github.com/google/googletest) | Latest |
+| [Intel XED](https://github.com/intelxed/xed) | Latest |
+| [LLVM](http://llvm.org/) | 3.5+ |
+| [Clang](http://clang.llvm.org/) | 3.5+ (3.9 if using Visual Studio 2015) |
+| [Python](https://www.python.org/) | 2.7 | 
+| [Python Package Index](https://pypi.python.org/pypi) | Latest |
+| [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
+| [IDA Pro](https://www.hex-rays.com/products/ida) | 6.7+ |
+| [Visual Studio](https://www.visualstudio.com/downloads/) | 2013+ (Windows Only) |
 
-## Getting and building the McSema code
+## Getting and building the code
 
 ### On Linux
 

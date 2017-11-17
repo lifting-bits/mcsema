@@ -129,8 +129,9 @@ static void InlineSubFuncCall(llvm::BasicBlock *block,
 // function.
 static llvm::Function *FindFunction(TranslationContext &ctx,
                                     uint64_t target_pc) {
+  const NativeFunction *cfg_func = nullptr;
   if (ctx.cfg_inst->flow) {
-    auto cfg_func = ctx.cfg_inst->flow->func;
+    cfg_func = ctx.cfg_inst->flow->func;
     if (cfg_func && cfg_func->is_external) {
       return GetLiftedToNativeExitPoint(cfg_func);
     }
@@ -140,11 +141,25 @@ static llvm::Function *FindFunction(TranslationContext &ctx,
     return func;
   }
 
+  if (cfg_func) {
+    auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
+    if (lifted_func) {
+      LOG(WARNING)
+          << "Cannot find target of instruction at " << std::hex
+          << ctx.cfg_inst->ea << "; the static target "
+          << std::hex << target_pc << " is not associated with a lifted"
+          << " subroutine, but is associated with the function at " << std::hex
+          << cfg_func->ea << std::dec << " in the CFG.";
+
+      return lifted_func;
+    }
+  }
+
   LOG(ERROR)
       << "Cannot find target of instruction at " << std::hex
       << ctx.cfg_inst->ea << "; the static target "
       << std::hex << target_pc << " is not associated with a lifted"
-      << " subroutine, and it does not have a known call target.";
+      << " subroutine, and it does not have a known call target." << std::dec;
 
   return ctx.lifter->intrinsics->error;
 }
@@ -363,8 +378,7 @@ static bool LiftInstIntoBlock(TranslationContext &ctx,
     InlineSubFuncCall(block, GetBreakPoint(inst_addr));
   }
 
-  CHECK(ctx.lifter->LiftIntoBlock(inst, block))
-      << "Can't lift instruction " << inst.Serialize();
+  ctx.lifter->LiftIntoBlock(inst, block);
 
   auto ret = true;
   if (TryLiftTerminator(ctx, block, inst)) {
@@ -422,6 +436,7 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
           << "Block " << std::hex << block_pc << " has no terminator, and"
           << " instruction at " << std::hex << ctx.cfg_inst->ea
           << " is not a local no-return function call.";
+
       remill::AddTerminatingTailCall(
           block, ctx.lifter->intrinsics->missing_block);
     }

@@ -30,6 +30,9 @@
 static const size_t kStackSize = 1UL << 20UL;
 
 static void PrintStoreFlags(FILE * out) {
+  // FPU control.
+  fprintf(out, "  fnstcw WORD PTR [rdi + %" PRIuMAX "]\n", __builtin_offsetof(State, x87.fxsave.cwd));
+
   fprintf(out, "  pushfq\n");
   fprintf(out, "  mov edx, 0xcd5\n");
   fprintf(out, "  not rdx\n");
@@ -74,6 +77,11 @@ static void PrintStoreFlags(FILE * out) {
 }
 
 static void PrintLoadFlags(FILE * out) {
+  // FPU control.
+  fprintf(out, "  push dx\n");
+  fprintf(out, "  fldcw WORD PTR [rsp]\n");
+  fprintf(out, "  pop WORD PTR [rdi + %" PRIuMAX "]\n", __builtin_offsetof(State, x87.fxsave.cwd));
+
   // Get the RFlags.
   fprintf(out, "  pushfq\n");
   fprintf(out, "  pop rdx\n");
