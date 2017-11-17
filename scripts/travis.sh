@@ -52,7 +52,7 @@ linux_initialize() {
   fi
 
   printf " > Installing the required packages...\n"
-  sudo apt-get install -qqy python2.7 build-essential realpath python-setuptools git python2.7 wget libtinfo-dev gcc-multilib g++-multilib lsb-release liblzma-dev
+  sudo apt-get install -qqy python2.7 build-essential realpath python-setuptools git python2.7 wget libtinfo-dev gcc-multilib g++-multilib lsb-release liblzma-dev zlib1g-dev
   if [ $? -ne 0 ] ; then
     printf " x Could not install the required dependencies\n"
     return 1
@@ -69,32 +69,84 @@ osx_initialize() {
   return 1
 }
 
+# Travis: do not delete the cxxcommon folder, because it is configured to be cached!
 linux_build() {
-  local ubuntu_version=`cat /etc/issue | awk '{ print $2 }' | cut -d '.' -f 1-2 | tr -d '.'`
-  printf "Building platform: linux (ubuntu ${ubuntu_version})\n"
-
+  local original_path="${PATH}"
   local log_file=`mktemp`
 
-  printf " > Cleaning up...\n"
-  if [ -d "remill" ] ; then
-    rm -rf remill > "${log_file}" 2>&1
+  llvm_version_list=( "35" "36" "37" "38" "39" "40" "50" )
+  for llvm_version in "${llvm_version_list[@]}" ; do
+    printf "#\n"
+    printf "# Running CI tests for LLVM version ${llvm_version}...\n"
+    printf "#\n\n"
+
+    printf " > Cleaning up the environment variables...\n"
+    export PATH="${original_path}"
+
+    unset TRAILOFBITS_LIBRARIES
+    unset CC
+    unset CXX
+    
+    printf " > Cleaning up the build folders...\n"
+    if [ -d "remill" ] ; then
+      sudo rm -rf remill > "${log_file}" 2>&1
+      if [ $? -ne 0 ] ; then
+        printf " x Failed to remove the existing remill folder. Error output follows:\n"
+        printf "===\n"
+        cat "${log_file}"
+        return 1
+      fi
+    fi
+
+    if [ -d "build" ] ; then
+      sudo rm -rf build > "${log_file}" 2>&1
+      if [ $? -ne 0 ] ; then
+        printf " x Failed to remove the existing build folder. Error output follows:\n"
+        printf "===\n"
+        cat "${log_file}"
+        return 1
+      fi
+    fi
+
+    if [ -d "libraries" ] ; then
+      sudo rm -rf libraries > "${log_file}" 2>&1
+      if [ $? -ne 0 ] ; then
+        printf " x Failed to remove the existing libraries folder. Error output follows:\n"
+        printf "===\n"
+        cat "${log_file}"
+        return 1
+      fi
+    fi
+
+    linux_build_helper "${llvm_version}"
     if [ $? -ne 0 ] ; then
-      printf " x Failed to remove the existing remill folder. Error output follows:\n"
-      printf "===\n"
-      cat "${log_file}"
+      printf " ! One or more tests have failed for LLVM ${llvm_version}\n"
       return 1
     fi
+
+    printf "\n\n"
+  done
+
+  return $?
+}
+
+osx_build() {
+  printf "Building for platform: osx\n"
+
+  printf " x This platform is not yet supported\n"
+  return 1
+}
+
+linux_build_helper() {
+  if [ $# -ne 1 ] ; then
+    printf "Usage:\n\tlinux_build_helper <llvm_version>\n\nllvm_version: 35, 40, ...\n"
+    return 1
   fi
 
-  if [ -d "build" ] ; then
-    rm -rf build > "${log_file}" 2>&1
-    if [ $? -ne 0 ] ; then
-      printf " x Failed to remove the existing build folder. Error output follows:\n"
-      printf "===\n"
-      cat "${log_file}"
-      return 1
-    fi
-  fi
+  local llvm_version="$1"
+  local ubuntu_version=`cat /etc/issue | awk '{ print $2 }' | cut -d '.' -f 1-2 | tr -d '.'`
+
+  local log_file=`mktemp`
 
   printf " > Cloning remill...\n"
   local remill_commit_id=`cat .remill_commit_id`
@@ -143,11 +195,21 @@ linux_build() {
   done
 
   # acquire the cxx-common package
-  printf " > Acquiring the cxx-common package...\n"
+  printf " > Acquiring the cxx-common package: LLVM${llvm_version}/Ubuntu ${ubuntu_version}\n"
 
-  local cxx_common_tarball_name="libraries-llvm40-ubuntu${ubuntu_version}-amd64.tar.gz"
+  if [ ! -d "cxxcommon" ] ; then
+    mkdir "cxxcommon" > "${log_file}" 2>&1
+    if [ $? -ne 0 ] ; then
+        printf " x Failed to create the cxxcommon folder. Error output follows:\n"
+        printf "===\n"
+        cat "${log_file}"
+        return 1
+    fi
+  fi
+
+  local cxx_common_tarball_name="libraries-llvm${llvm_version}-ubuntu${ubuntu_version}-amd64.tar.gz"
   if [ ! -f "${cxx_common_tarball_name}" ] ; then
-    wget "https://s3.amazonaws.com/cxx-common/${cxx_common_tarball_name}" > "${log_file}" 2>&1
+    ( cd "cxxcommon" && wget "https://s3.amazonaws.com/cxx-common/${cxx_common_tarball_name}" ) > "${log_file}" 2>&1
     if [ $? -ne 0 ] ; then
       printf " x Failed to download the cxx-common package. Error output follows:\n"
       printf "===\n"
@@ -157,13 +219,13 @@ linux_build() {
   fi
 
   if [ ! -d "libraries" ] ; then
-    tar xzf "${cxx_common_tarball_name}" > "${log_file}" 2>&1
+    tar xzf "cxxcommon/${cxx_common_tarball_name}" > "${log_file}" 2>&1
     if [ $? -ne 0 ] ; then
       printf " x The archive appears to be corrupted. Error output follows:\n"
       printf "===\n"
       cat "${log_file}"
 
-      rm "${cxx_common_tarball_name}"
+      rm "cxxcommon/${cxx_common_tarball_name}"
       rm -rf libraries
       return 1
     fi
@@ -193,7 +255,14 @@ linux_build() {
   fi
 
   printf " > Building...\n"
-  ( cd build && scan-build --show-description --status-bugs make -j `nproc` ) > "${log_file}" 2>&1
+  if [ "${llvm_version:0:1}" != "4" ] ; then
+    printf " i Clang static analyzer not supported on this LLVM release\n"
+    ( cd build && make -j `nproc` ) > "${log_file}" 2>&1
+  else
+    printf " i Clang static analyzer enabled\n"
+    ( cd build && scan-build --show-description --status-bugs make -j `nproc` ) > "${log_file}" 2>&1
+  fi
+
   if [ $? -ne 0 ] ; then
     printf " x Failed to build the project. Error output follows:\n"
     printf "===\n"
@@ -215,14 +284,7 @@ linux_build() {
   printf "\n\n\nCalling the testing suite...\n"
   ( cd ./remill/tools/mcsema/tests/test_suite && ./start.py )
 
-  return $?
-}
-
-osx_build() {
-  printf "Building for platform: osx\n"
-
-  printf " x This platform is not yet supported\n"
-  return 1
+  return 0
 }
 
 main $@

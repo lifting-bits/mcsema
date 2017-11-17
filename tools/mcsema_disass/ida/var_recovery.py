@@ -320,13 +320,13 @@ def _process_subprogram_tag(die, section_offset, M, global_var_data):
     if child.tag != 'DW_TAG_variable':
       continue
   
-    stackvar = F.stackvars.add()
+    stackvar = F.stack_vars.add()
     stackvar.name = get_name(child)
     stackvar.sp_offset = 0
     stackvar.has_frame = has_frame
     stackvar.regname = frame_regname
     (type, size, offset) = get_types(child)
-    stackvar.size = size 
+    stackvar.size = size if size > 0 else 0
     
     if 'DW_AT_location' in child.attributes:
       attr = child.attributes['DW_AT_location']

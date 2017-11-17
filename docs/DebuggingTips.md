@@ -1,8 +1,8 @@
-# Things have gone wrong, now what?
+# Things have gone wrong, now what
 
 This document describes some approaches to debugging the lifted bitcode produced by McSema on Linux. This document does not describe [how to add missing instructions](AddAnInstruction.md), or how to [resolve common errors](CommonErrors.md).
 
-#### Terminology
+## Terminology
 
 This document uses the term "original binary" to mean the binary that was disassembled using `mcsema-disass`. This document uses "native code" to mean machine code in the original binary.
 
@@ -14,7 +14,7 @@ There are a few helpers for using GDB to debug lifted bitcode. Some setup before
 
 First, open up `~/.gdbinit`, add the below code to that file, and save it.
 
-```
+```gdb
 set history filename ~/.gdb_history
 set history save
 set history size 4096
@@ -36,15 +36,15 @@ Finally, `set language c++` tells GDB that the source code that you will be debu
 
 There are opportunities and drawbacks to debugging lifted code.
 
-**Drawbacks**
+### Drawbacks
 
- - Lifted code is more verbose than native code. An instruction from the original binary may be represented by tens of instructions in the lifted code.
- - Lifted code does not contain the useful debug information that may allow one to view the source code associated with some bits of machine code.
+* Lifted code is more verbose than native code. An instruction from the original binary may be represented by tens of instructions in the lifted code.
+* Lifted code does not contain the useful debug information that may allow one to view the source code associated with some bits of machine code.
 
-**Opportunities**
+### Opportunities
 
- - The [`RegState`](/mcsema/Arch/X86/Runtime/State.h) is stored in memory. The advantage to this is that one can set data breakpoints (hardware watchpoints) on individual registers in the state structure. This is incredibly useful if you have a [time-travelling debugger](http://undo.io/products/undodb/).
- - Lifted bitcode can be instrumented using the LLVM toolchain. Some useful-for-debugging instrumentations come built-in to `mcsema-lift`. 
+* The [`RegState`](/mcsema/Arch/X86/Runtime/State.h) is stored in memory. The advantage to this is that one can set data breakpoints (hardware watchpoints) on individual registers in the state structure. This is incredibly useful if you have a [time-travelling debugger](http://undo.io/products/undodb/).
+* Lifted bitcode can be instrumented using the LLVM toolchain. Some useful-for-debugging instrumentations come built-in to `mcsema-lift`.
 
 #### Built-in instrumentation
 
@@ -56,9 +56,9 @@ One of the aforementioned drawbacks when trying to debug lifted code is that it 
 
 That is why there is the `-add-breakpoints` option. The idea is that, just as you can say `b *0x402a00` to set a breakpoint on an instruction in the original binary, you can also do `b breakpoint_402a00` to set a breakpoint on the location of an "original instruction", but in the lifted binary.
 
-Native code | Lifted code with breakpoint functions
-:----------:|:-------------------------:
-![Native code](images/breakpoint_orig_code.png) | ![Lifted code](images/breakpoint.png)
+|               Native code                | Lifted code with breakpoint functions |
+| :--------------------------------------: | :-----------------------------------: |
+| ![Native code](images/breakpoint_orig_code.png) | ![Lifted code](images/breakpoint.png) |
 
 On the left we see two instructions from the native code. On the right, we see the lifted code associated with the first and part of the second native instruction. Interspersed between the two are the `breakpoint_` functions. These breakpoint functions are "serializing" instructions. We can be certain that the `RegState` structure is in a consistent state at each call to a `breakpoint_` function. That is, the contents of the `RegState` struct at `breakpoint_402a00` in the lifted code should mostly match the native register state at `0x402a00` in the original binary.
 
@@ -68,16 +68,16 @@ Here's an example of using the `print-reg-state-64` GDB command in conjunction w
 
 First, we set a breakpoint at `breakpoint_402a00` in `/tmp/ls_lifted`. The lifted state at this point will correspond to the native state at `0x402a00` in `/bin/ls`.
 
-```
+```gdb
 (gdb) b breakpoint_402a00
 Breakpoint 1 at 0x4f9160
 ```
 
 Second, run the program until the breakpoint is hit.
 
-```
+```gdb
 (gdb) r
-Starting program: /tmp/ls_lifted 
+Starting program: /tmp/ls_lifted
 [Thread debugging using libthread_db enabled]
 Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
 Breakpoint 1, 0x00000000004f9160 in breakpoint_402a00 ()
@@ -85,7 +85,7 @@ Breakpoint 1, 0x00000000004f9160 in breakpoint_402a00 ()
 
 We're now stopped at the `breakpoint_402a00` and can inspect the values of the `RegState` structure.
 
-```
+```gdb
 (gdb) print-reg-state-64
              emulated                   native
 rip     0x0000000000402a00        0x00000000004f9160
@@ -105,16 +105,16 @@ r12     0x0000000000402670        0x0000000000402670
 r13     0x00007fffffffdda0        0xde7accccde7acccc
 r14     0x0000000000000000        0x0000000000000000
 r15     0x0000000000000000        0x00007ffff7ebb810
-(gdb) 
+(gdb)
 ```
 
 Here, lets go see what things look like in the original `/bin/ls` program at the same place.
 
-```
+```gdb
 (gdb) b *0x402a00
 Breakpoint 1 at 0x402a00
 (gdb) r
-Starting program: /bin/ls 
+Starting program: /bin/ls
 [Thread debugging using libthread_db enabled]
 Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
 
@@ -143,7 +143,7 @@ Things won't perfectly match up, especially near the beginning of the execution 
 
 This is a nifty way of visually seeing if things match up with your expectations. Though, not everything is printed out at this point. For example, if you're observing that lifted execution goes one way, while native execution goes the other, then you may want to inspect the `EFLAGS` register to see what's going on. There's a command for that too!
 
-```
+```gdb
 (gdb) print-flags-64
 eflags [PF AF ZF ]
 ```
@@ -156,21 +156,22 @@ The below example is based on using UndoDB. This example is contrived, but shows
 
 Let's say we're in `sub_40eca0` and we want to know who initializes the value of first argument, stored in register `rdi`. We can see from the picture on the right that the function `sub_40eca0` is called from many places.
 
-Function `sub_40eca0` using `rdi` | Callers of `sub_40eca0`
----------------------------------:|:------------------------ 
-![Function using RDI](images/rdi_in_called_function.png) | ![Function using RDI](images/sources_of_rdi.png)
+|        Function `sub_40eca0` using `rdi` | Callers of `sub_40eca0`                  |
+| ---------------------------------------: | :--------------------------------------- |
+| ![Function using RDI](images/rdi_in_called_function.png) | ![Function using RDI](images/sources_of_rdi.png) |
 
 Now we get to take advantage of one of our opportunities: we can set data breakpoints on registers in the `RegState` structure! Let's go find the source of `rdi` given a call to `sub_40eca0`.
 
 First, we get the address of `rdi` within the `RegState` structure.
-```
+
+```gdb
 (gdb) addr-of-rdi
 &(RegState::rdi) = 0x00007ffff7ebb840
 ```
 
 Then, we set a hardware watchpoint, and reverse-execute.
 
-```
+```gdb
 (undodb-gdb) reverse-continue
 Continuing.
 Hardware watchpoint 1: *0x00007f0334483840
@@ -233,7 +234,7 @@ So we have a trace of the lifted program, and we'd like to discover where it div
 
 #### Collecting native traces with PIN
 
-One way to drill down on divergences is by comparing the lifted trace with a ground truth: a trace recorded from a native program execution. We can do this with the [`regtrace` PIN tool](/mcsema/tools/regtrace/README.md). The first step is to [download and install PIN](https://software.intel.com/en-us/articles/pintool-downloads) before we can use the PIN tool. 
+One way to drill down on divergences is by comparing the lifted trace with a ground truth: a trace recorded from a native program execution. We can do this with the [`regtrace` PIN tool](/mcsema/tools/regtrace/README.md). The first step is to [download and install PIN](https://software.intel.com/en-us/articles/pintool-downloads) before we can use the PIN tool.
 
 The next step to using the PIN tool is to build it!
 
@@ -345,7 +346,7 @@ So, the value of `RDI` should be `0x25` but instead it is `0x0`. We can step bac
 
 The value of `RDI` comes from `R15`, but unfortunately there's a lot of predecessors. We can deal with this by working backward through our trace, figuring out the location of the last assignment to `R15`. I'm going to cheat and use reverse execution.
 
-```shell
+```gdb
 (undodb-gdb) addr-of-r15
 &(RegState::r15) = 0x00007f8d4ff1d890
 (undodb-gdb) watch *0x00007f8d4ff1d890
@@ -367,13 +368,13 @@ rip     0x000000000040b710        0x00000000004c4c26
 0x7f8d4ff1d940: 0 0 0 0
 ```
 
-This tells us that the value of `R15` was changed at instruction `0x40b710`, shown below. 
+This tells us that the value of `R15` was changed at instruction `0x40b710`, shown below.
 
 ![Source of r15](images/source_of_r15.png)
 
 The `cvttss2si` instruction is pretty complicated. Let's see what should have happened in the native execution.
 
-```shell
+```gdb
 (undodb-gdb) b *0x40b710
 Breakpoint 2 at 0x40b710
 (undodb-gdb) reverse-continue
@@ -390,7 +391,7 @@ $2 = {v4_float = {37.5, 0, 0, 0}, ...}
 
 Looks like we can see a difference in the values of `XMM0` compared. In the lifted trace, the first float is a `0`, but in the native trace, the value is `37.5`, which converted to an integer is `0x25`. We're going to need to work backward again.
 
-```shell
+```gdb
 (undodb-gdb) addr-of-xmm0-64
 &(RegState::xmm0) = 0x00007f8d4ff1d940
 (undodb-gdb) watch *0x00007f8d4ff1d940
@@ -412,7 +413,7 @@ rip     0x0000000000402190        0x0000000000514ea6
 
 Oof. We've found ourselves in one of the attach/detach routines (`__mcsema_attach_ret`) for transitioning between lifted code and native code. These routines are tricky.
 
-When we see an `__mcsema_attach_ret`, what it's really meaning is that at some earlier point, lifted code called into some native library code. This lifted-to-native transition happens via the `__mcsema_detach_call` or `__mcsema_detach_call_value` functions. Eventually that native code needs to transition back to lifted code. This is achieved by setting up a special return address on the stack, `__mcsema_attach_ret`. When native code returns, it returns to `__mcsema_attach_ret`, which marshals native register state back into the `RegState` structure, and continues on in lifted code. 
+When we see an `__mcsema_attach_ret`, what it's really meaning is that at some earlier point, lifted code called into some native library code. This lifted-to-native transition happens via the `__mcsema_detach_call` or `__mcsema_detach_call_value` functions. Eventually that native code needs to transition back to lifted code. This is achieved by setting up a special return address on the stack, `__mcsema_attach_ret`. When native code returns, it returns to `__mcsema_attach_ret`, which marshals native register state back into the `RegState` structure, and continues on in lifted code.
 
 Alright, lets step back and attack this problem from the native side. Looking back at our control-flow graph, we can see that `XMM0` is modified by a `divss` instruction.
 
@@ -420,7 +421,7 @@ Alright, lets step back and attack this problem from the native side. Looking ba
 
 Let's confirm that the `divss` instruction at `0x40b6d6` is really the source of the `37.5` number.
 
-```shell
+```gdb
 (undodb-gdb) b *0x40b6d6
 Breakpoint 3 at 0x40b6d6
 (undodb-gdb) reverse-continue
@@ -437,7 +438,7 @@ $7 = 37.499999437500009
 
 Yup, it is. Our reverse-execution based on a watchpoint on `&(RegState::XMM0)` led us astray. Lets go back to the breakpoint approach, and see what things look like at `breakpoint_40b6d6`.
 
-```shell
+```gdb
 (undodb-gdb) c
 Continuing.
 
@@ -468,7 +469,7 @@ So this is sort of encouraging. `XMM1` contains the correct value of `0.80000001
 
 OK we're in business. The `pxor xmm0, xmm0` clears out the `XMM0` register, then the `cvtsi2ss` converts `R15` into a `float`, and stores it into `XMM0`. Lets step back to the `cvtsi2ss` and compare lifted to native.
 
-```shell
+```gdb
 (undodb-gdb) b breakpoint_40b6d1
 Breakpoint 6 at 0x50f6b0
 (undodb-gdb) reverse-continue
@@ -483,7 +484,7 @@ r15     0x000000000000001e        0xde7accccde7acccc
 
 And in the native code.
 
-```shell
+```gdb
 (undodb-gdb) b *0x40b6d1
 Breakpoint 4 at 0x40b6d1
 (undodb-gdb) reverse-continue
@@ -506,7 +507,7 @@ So, it will take a signed integer in `R15`, convert it into a `float`, and store
 
 What we're seeing here is that `R15` is converted into a `double`, then storing that to the low 8 bytes of `XMM0`, then clearing out the high 8 bytes of `XMM0`. This doesn't sound right! Let's confirm that this is indeed what is happening.
 
-```shell
+```gdb
 (undodb-gdb) b *0x4c4879
 Breakpoint 7 at 0x4c4879
 (undodb-gdb) c
@@ -524,7 +525,7 @@ Alright, we have confirmation, the lifted code for `cvtsi2ss` is definitely doin
 First, we'll figure out what LLVM opcode implements this instruction.
 
 ```shell
-pag@sloth:~/Code/mcsema/build$ echo "cvtsi2ss xmm0, r15" | llvm-mc-3.8 -x86-asm-syntax=intel -show-inst 
+pag@sloth:~/Code/mcsema/build$ echo "cvtsi2ss xmm0, r15" | llvm-mc-3.8 -x86-asm-syntax=intel -show-inst
   .text
   cvtsi2ssq %r15, %xmm0     # <MCInst #670 CVTSI2SS64rr
                             #  <MCOperand Reg:126>
@@ -549,14 +550,14 @@ We can also disassemble (using `llvm-dis-3.8`) the lifted bitcode file and look 
 
 What we are seeing is that the semantics function `translate_CVTSI2SS64rr` is using `64` for target floating point width when calling `doCVTSI2SrV`. The `doCVTSI2SrV` function
 
- 1. Calls the `INT_TO_FP_TO_INT<64>` helper function with the value of `R15`.
- 2. `INT_TO_FP_TO_INT<64>` converts `R15` to a `width`-sized floating point number (in our case, a 64-bit float, i.e. a `double`).
- 3. `INT_TO_FP_TO_INT<64>` reinterprets that value as an integer (without a format change).
- 4. `doCVTSI2SrV` writes that 64-bit integer (containing a float) to `XMM0`, which zero extends the 64-bit integer into a 128-bit integer.
+1.Calls the `INT_TO_FP_TO_INT<64>` helper function with the value of `R15`.
+2.`INT_TO_FP_TO_INT<64>` converts `R15` to a `width`-sized floating point number (in our case, a 64-bit float, i.e. a `double`).
+3.`INT_TO_FP_TO_INT<64>` reinterprets that value as an integer (without a format change).
+4.`doCVTSI2SrV` writes that 64-bit integer (containing a float) to `XMM0`, which zero extends the 64-bit integer into a 128-bit integer.
 
 Clearly we should have called `doCVTSI2SrV<32>` instead of `doCVTSI2SrV<64>`, so that `INT_TO_FP_TO_INT<width=32>` would do a narrower conversion.
 
-Let's make this change, rebuild and install mcsema, re-run `mcsema-lift`, compile the new bitcode, and hope for the best. Here's what the new bitcode looks like after the fix:
+Let's make this change, rebuild and install McSema, re-run `mcsema-lift`, compile the new bitcode, and hope for the best. Here's what the new bitcode looks like after the fix:
 
 ```llvm
   call void @breakpoint_40b6d1(%RegState* %0), !mcsema_real_eip !14434
@@ -567,7 +568,6 @@ Let's make this change, rebuild and install mcsema, re-run `mcsema-lift`, compil
   store volatile i128 %668, i128* %XMM0_write, !mcsema_real_eip !14434
   br label %block_40b6d6, !mcsema_real_eip !14435
 ```
-
 
 #### Closing comments
 

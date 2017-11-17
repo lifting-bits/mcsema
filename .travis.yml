@@ -1,10 +1,14 @@
 dist: trusty
 language: generic
 sudo: required
+install: true
+
+cache:
+  directories:
+  - cxxcommon
 
 before_install:
   - ./scripts/travis.sh "$TRAVIS_OS_NAME" initialize
 
-install: true
 script:
   - ./scripts/travis.sh "$TRAVIS_OS_NAME" build

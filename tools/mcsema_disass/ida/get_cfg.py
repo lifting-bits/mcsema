@@ -32,6 +32,7 @@ from table import *
 from flow import *
 from refs import *
 from segment import *
+from collect_variable import *
 
 #hack for IDAPython to see google protobuf lib
 if os.path.isdir('/usr/lib/python2.7/dist-packages'):
@@ -51,6 +52,11 @@ EXTERNAL_VARS_TO_RECOVER = {}
 
 RECOVERED_EAS = set()
 ACCESSED_VIA_JMP = set()
+
+TO_RECOVER = {
+  "stack_var" : False,
+}
+
 
 # Map of external functions names to a tuple containing information like the
 # number of arguments and calling convention of the function.
@@ -692,6 +698,37 @@ def analyze_jump_table_targets(inst, new_eas, new_func_eas):
           table.table_ea, entry_addr, entry_target))
       new_eas.add(entry_target)
 
+def recover_variables(F, func_ea, BB):
+  '''
+  Collects stack variable data from all functions in the database.
+  '''
+  functions = list()
+  if is_code_by_flags(func_ea):
+    f_ea = idc.GetFunctionAttr(func_ea, idc.FUNCATTR_START)
+    f_vars = collect_function_vars(func_ea, BB)
+    functions.append({"ea":f_ea, "name":idc.Name(func_ea), "stackArgs":f_vars})
+
+  DEBUG("{0}".format(pprint.pformat(functions)))
+  
+  for offset in f_vars.keys():
+    if f_vars[offset]["safe"] is False:
+        continue
+
+    var = F.stack_vars.add()
+    var.sp_offset = offset
+    var.name = f_vars[offset]["name"]
+    var.size = f_vars[offset]["size"]
+    # add refs...
+    for i in f_vars[offset]["writes"]:
+      r = var.ref_eas.add()
+      r.inst_ea = i["ea"]
+      r.offset = i["offset"]
+
+    for i in f_vars[offset]["reads"]:
+      r = var.ref_eas.add()
+      r.inst_ea = i["ea"]
+      r.offset = i["offset"]
+
 _RECOVERED_FUNCS = set()
 
 def recover_function(M, func_ea, new_func_eas, entrypoints):
@@ -736,6 +773,9 @@ def recover_function(M, func_ea, new_func_eas, entrypoints):
     processed_blocks.add(block_ea)
     recover_basic_block(M, F, block_ea)
 
+  if TO_RECOVER["stack_var"]:
+    recover_variables(F, func_ea, processed_blocks)
+    
   DEBUG_POP()
 
 def find_default_function_heads():
@@ -1343,10 +1383,16 @@ if __name__ == "__main__":
       required=True)
   
   parser.add_argument(
-      '--global_var',
+      '--recover-global-vars',
       type=argparse.FileType('r'),
       default=None,
       help="File containing the global variables to be lifted")
+
+  parser.add_argument(
+      '--recover-stack-vars',
+      action="store_true",
+      default=False,
+      help="Flag to enable stack variable recovery")
 
   args = parser.parse_args(args=idc.ARGV[1:])
 
@@ -1364,6 +1410,9 @@ if __name__ == "__main__":
   if args.pie_mode:
     DEBUG("Using PIE mode.")
     PIE_MODE = True
+    
+  if args.recover_stack_vars:
+    TO_RECOVER["stack_var"] = True
 
   EMAP = {}
   EMAP_DATA = {}
@@ -1404,7 +1453,7 @@ if __name__ == "__main__":
           set_symbol_name(ea, name)
       idaapi.autoWait()
     
-    M = recover_module(args.entrypoint, args.global_var)
+    M = recover_module(args.entrypoint, args.recover_global_vars)
 
     DEBUG("Saving to: {0}".format(args.output.name))
     args.output.write(M.SerializeToString())
