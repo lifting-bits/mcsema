@@ -239,9 +239,23 @@ def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
   if IS_ARM:
     addr_val, mask = _try_get_arm_ref_addr(inst, op, addr_val, all_refs)
   
-  seg_ea = idc.SegStart(addr_val)
-  if is_invalid_ea(seg_ea):
-    return None
+  if is_invalid_ea(addr_val):
+    
+    # The `addr_val` that we get might actually be a value that is relative to
+    # a base address. For example, in IDA we might see:
+    #
+    #     mov     eax, ds:rva off_1400022FC[r9+r8*4]
+    #
+    # And we'd get `addr_val` as `0x22FC`, which isn't a valid EA. Here we
+    # detect this and fixup the `addr_val` to include the relative base
+    # of `0x140000000`.
+    info = idaapi.refinfo_t()
+    if idaapi.get_refinfo(inst.ea, op.n, info) and info.is_rvaoff():
+      addr_val += info.base
+      if is_invalid_ea(addr_val):
+        return None
+    else:
+      return None
   
   if addr_val not in all_refs and is_head(addr_val):
     all_refs.add(addr_val)
@@ -369,18 +383,21 @@ def get_instruction_references(arg, binary_is_pie=False):
       ref = Reference(targ_ea, ea - inst.ea)
       offset_to_ref[ref.offset] = ref
 
+
   refs = []
   for i, op in enumerate(inst.Operands):
     if not op.type:
       continue
 
     op_ea = inst.ea + op.offb
+    ref = None
     if op.offb in offset_to_ref:
       ref = offset_to_ref[op.offb]
-    else:
+    
+    if not ref or is_invalid_ea(ref.ea):
       ref = _get_ref_candidate(inst, op, all_refs, binary_is_pie)
 
-    if not ref or not idc.GetFlags(ref.ea):
+    if not ref or is_invalid_ea(ref.ea):
       continue
 
     # Immediate constant, may be the absolute address of a data reference.

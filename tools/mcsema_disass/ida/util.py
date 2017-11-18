@@ -534,7 +534,7 @@ def _crefs_from(ea, only_one=False, check_fixup=True):
       if seen:
         return
 
-def _xrefs_from(ea, only_one=False):
+def xrefs_from(ea, only_one=False):
   fixup_ea = idc.GetFixupTgtOff(ea)
   seen = False
   has_one = only_one
@@ -638,7 +638,7 @@ def is_reference(ea):
   if is_invalid_ea(ea):
     return False
 
-  for target in _xrefs_from(ea):
+  for target in xrefs_from(ea):
     return True
 
   return is_runtime_external_data_reference(ea)
@@ -659,7 +659,7 @@ def has_flow_to_code(ea):
   return _reference_checker(ea, cref_finder=idautils.CodeRefsTo)
 
 def get_reference_target(ea):
-  for ref_ea in _xrefs_from(ea, True):
+  for ref_ea in xrefs_from(ea, True):
     return ref_ea
 
   # This is kind of funny, but it works with how we understand external

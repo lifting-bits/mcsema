@@ -642,7 +642,7 @@ def recover_instruction(M, B, ea):
     I.local_noreturn = True
 
   table = get_jump_table(inst, PIE_MODE)
-  if table and table.offset:
+  if table and table.offset and not is_invalid_ea(table.offset):
     recover_instruction_offset_table(I, table)
 
   return I

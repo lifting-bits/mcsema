@@ -490,11 +490,12 @@ void CallInitFiniCode(const NativeModule *cfg_module) {
 
     } else if (FLAGS_libc_destructor.size() &&
                FLAGS_libc_destructor == cfg_func->name) {
+      callback = GetNativeToLiftedCallback(cfg_func);
       auto fini_func = GetOrCreateMcSemaDestructor();
       insert_point = &(fini_func->front().front());
     }
 
-    if (insert_point) {
+    if (insert_point && callback) {
       llvm::IRBuilder<> ir(insert_point);
       ir.CreateCall(callback);
     }

@@ -70,7 +70,6 @@ class JumpTableBuilder(object):
   def read_entry(self, entry_ea):
     data = (self._READERS[self.entry_size])(entry_ea)
     data += self.offset
-    data &= ((1 << (self.entry_size * 8)) - 1)
     return data
 
 def get_default_jump_table_entries(builder):
@@ -213,18 +212,78 @@ def try_get_simple_jump_table_reader(builder):
 
   return False
 
+def try_convert_table_offset_to_ea(offset):
+  """Try to convert a jump table offset into a valid ea, but only if it is
+  near the base of an existing segment. See Issue #321."""
+  next_seg = idaapi.get_next_seg(offset)
+  if not next_seg:
+    return False
+  
+  next_seg_ea = next_seg.startEA
+  if 0x1000 > (next_seg_ea - offset):
+    return False
+
+  seg_name = idc.SegName(next_seg_ea)
+  next_seg_end_ea = idc.SegEnd(next_seg_ea)
+  new_seg_ea = offset & ~0xFFF
+  res = idaapi.set_segm_start(next_seg_ea, new_seg_ea, idc.SEGMOD_KEEP)
+  if not res:
+    DEBUG("ERROR: Could not resize {} from [{:x},{:x}) to [{:x},{:x})".format(
+        seg_name, next_seg_ea, next_seg_end_ea, new_seg_ea, next_seg_end_ea))
+    return False
+  else:
+    DEBUG("WARNING: Resized {} from [{:x},{:x}) to [{:x},{:x})".format(
+        seg_name, next_seg_ea, next_seg_end_ea, new_seg_ea, next_seg_end_ea))
+    return True
+
 def get_ida_jump_table_reader(builder, si):
   """Try to trust IDA's ability to recognize a jump table and its entries,
   and return an appropriate jump table entry reader."""
+  SWI_SUBTRACT = 0x00020000
+
   builder.table_ea = si.jumps
+  DEBUG("IDA inferred jump table base: {:x}".format(builder.table_ea))
+
+  builder.entry_size = si.get_jtable_element_size()
+  if (si.flags & idaapi.SWI_JMP_INV) == idaapi.SWI_JMP_INV:
+    builder.entry_size *= -1
+
+  DEBUG("IDA inferred jump table entry size: {}".format(builder.entry_size))
 
   # Check if this is an offset based jump table, and if so, create an
   # appropriate wrapper that uses the displacement from the table base
   # address to find the actual jump target.
   if (si.flags & idaapi.SWI_ELBASE) == idaapi.SWI_ELBASE:
     builder.offset = si.elbase
+    
+    # Figure out if we need to subtract the offset instead of add it.
+    if (si.flags & SWI_SUBTRACT) == SWI_SUBTRACT:
+      builder.offset *= -1
 
-  builder.entry_size = si.get_jtable_element_size()
+    DEBUG("IDA inferred jump table offset: {:x}".format(builder.offset))
+
+    # NOTE(pag): Converting this base to a real address is likely not correct,
+    #            hence commenting it out. The jump table in question had
+    #            entries like:
+    #
+    #     dd offset msetTab00 - 140000000h; jump table for switch statement
+    #
+    #            And then the code would add back in the `0x140000000`. The
+    #            way we lift jump tables is to `switch` on the original EAs,
+    #            because we can get the address of lifted LLVM basic blocks,
+    #            so we need to make sure that the lifted computation and the
+    #            original computation produce the same EAs for the jump targets,
+    #            and converting the offset to be valid would be incorrect.
+    #
+    # # See Issue #321. The offset ea may end up being nearby the beginning of
+    # # the `.text` segment, e.g. `0x1400000000` is the offset, but the `.text`
+    # # begins at `0x1400001000`.
+    # if is_invalid_ea(builder.offset):
+    #   DEBUG("WARNING: Table offset {:x} is not a valid address".format(
+    #       builder.offset))
+    #   try_convert_table_offset_to_ea(builder.offset)
+
+
   return True
 
 def get_manual_jump_table_reader(builder):
@@ -232,12 +291,13 @@ def get_manual_jump_table_reader(builder):
   even if it's not explicitly referenced in the current instruction.
   This handles the case where we see something like a `mov` or an `lea`
   of the table base address that happens before the actual `jmp`."""
+  ret = False
   next_inst_ea = builder.jump_ea
   for i in xrange(5):
     inst_ea = next_inst_ea
     next_inst_ea = idc.PrevHead(inst_ea)
     if inst_ea == idc.BADADDR:
-      return False
+      break
 
     refs = get_instruction_references(inst_ea, builder.binary_is_pie)
     if not len(refs):
@@ -251,9 +311,14 @@ def get_manual_jump_table_reader(builder):
       continue
 
     if try_get_simple_jump_table_reader(builder):
-      return True
+      ret = True
+      break
   
-  return False
+  DEBUG("Reader inferred jump table base: {:x}".format(builder.table_ea))
+  if builder.offset:
+    DEBUG("Reader inferred jump table offset: {:x}".format(builder.offset))
+
+  return ret
 
 def get_jump_table_reader(builder):
   """Returns the size of a jump table entry, as well as a reader function
