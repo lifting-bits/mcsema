@@ -67,9 +67,16 @@ class JumpTableBuilder(object):
     self.binary_is_pie = binary_is_pie
     self.candidate_target_eas = []
 
+    # Mask the computed target to have about the same number of bits as
+    # the jump instruction itself.
+    self.target_mask = 0xFFFFFFFFFFFFFFFF
+    if (self.jump_ea & 0xFFFFFFFF) == self.jump_ea:
+      self.target_mask = 0xFFFFFFFF
+
   def read_entry(self, entry_ea):
     data = (self._READERS[self.entry_size])(entry_ea)
     data += self.offset
+    data &= self.target_mask
     return data
 
 def get_default_jump_table_entries(builder):
@@ -99,6 +106,7 @@ def get_num_jump_table_entries(builder):
   # initial bounds for candidate jump table targets.
   min_ea, max_ea = get_function_bounds(builder.jump_ea)
   orig_min_ea, orig_max_ea = min_ea, max_ea
+  
   # Treat the current set of targets as candidates, even if the source of
   # those targets is IDA. We will assume that jump table entries point within
   # a given function, or within nearby functions that IDA believes to be
@@ -239,12 +247,12 @@ def try_convert_table_offset_to_ea(offset):
 def get_ida_jump_table_reader(builder, si):
   """Try to trust IDA's ability to recognize a jump table and its entries,
   and return an appropriate jump table entry reader."""
-  SWI_SUBTRACT = 0x00020000
 
   builder.table_ea = si.jumps
   DEBUG("IDA inferred jump table base: {:x}".format(builder.table_ea))
 
   builder.entry_size = si.get_jtable_element_size()
+
   if (si.flags & idaapi.SWI_JMP_INV) == idaapi.SWI_JMP_INV:
     builder.entry_size *= -1
 
@@ -257,7 +265,7 @@ def get_ida_jump_table_reader(builder, si):
     builder.offset = si.elbase
     
     # Figure out if we need to subtract the offset instead of add it.
-    if (si.flags & SWI_SUBTRACT) == SWI_SUBTRACT:
+    if (si.flags2 & idaapi.SWI2_SUBTRACT) == idaapi.SWI2_SUBTRACT:
       builder.offset *= -1
 
     DEBUG("IDA inferred jump table offset: {:x}".format(builder.offset))

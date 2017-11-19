@@ -430,9 +430,9 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
   if (!block->getTerminator()) {
     if (!ctx.cfg_inst || ctx.cfg_inst->does_not_return) {
       LOG_IF(ERROR, !ctx.cfg_inst)
-          << "Block " << std::hex << block_pc << std::dec
-          << " has no instructions; this could be because of an incorrectly "
-          << "disassembled jump table.";
+          << "Block " << std::hex << block_pc << " in function "
+          << ctx.cfg_func->ea << std::dec << " has no instructions; "
+          << "this could be because of an incorrectly disassembled jump table.";
 
       remill::AddTerminatingTailCall(block, ctx.lifter->intrinsics->error);
 
