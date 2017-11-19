@@ -185,6 +185,9 @@ def is_indirect_jump(arg):
 def is_function_call(arg):
   return instruction_personality(arg) in (PERSONALITY_DIRECT_CALL, PERSONALITY_INDIRECT_CALL)
 
+def is_indirect_function_call(arg):
+  return instruction_personality(arg) == PERSONALITY_INDIRECT_CALL
+
 def is_direct_function_call(arg):
   return instruction_personality(arg) == PERSONALITY_DIRECT_CALL
 
@@ -246,7 +249,16 @@ def decode_instruction(ea):
 _NOT_EXTERNAL_SEGMENTS = set([idc.BADADDR])
 _EXTERNAL_SEGMENTS = set()
 
+def segment_contains_external_function_pointers(seg_ea):
+  """Returns `True` if a segment contains pointers to external functions."""
+  try:
+    seg_name = idc.SegName(seg_ea)
+    return seg_name.lower() in (".idata", ".plt.got")
+  except:
+    return False
+
 def is_external_segment_by_flags(ea):
+  """Returns `True` if IDA believes that `ea` belongs to an external segment."""
   try:
     seg_ea = idc.SegStart(ea)
     seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)

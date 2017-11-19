@@ -158,6 +158,29 @@ llvm::Value *InstructionLifter::GetMaskedAddress(const NativeXref *cfg_xref) {
   return ir.CreateAnd(addr, mask);
 }
 
+// Returns `true` if a given cross-reference is self-referential. That is,
+// we'll have something like `jmp cs:EnterCriticalSection`, which references
+// `EnterCriticalSection` in the `.idata` section of a PE file. But this
+// location is our only "place" for the external `EnterCriticalSection`, so
+// we point it back at itself.
+static bool IsSelfReferential(const NativeXref *cfg_xref) {
+  if (!cfg_xref->target_segment) {
+    return false;
+  }
+
+  auto it = cfg_xref->target_segment->entries.find(cfg_xref->target_ea);
+  if (it == cfg_xref->target_segment->entries.end()) {
+    return false;
+  }
+
+  const auto &entry = it->second;
+  if (!entry.xref) {
+    return false;
+  }
+
+  return entry.xref->target_ea == entry.ea;
+}
+
 llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
   if (!cfg_xref) {
     return nullptr;
@@ -173,14 +196,26 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
     // native code as a callback, and so native code calling it must be able
     // to swap into the lifted context.
     if (cfg_func->is_external) {
-      func = gModule->getFunction(cfg_func->name);
+      if (IsSelfReferential(cfg_xref)) {
+        LOG(WARNING)
+            << "Reference from " << std::hex << cfg_xref->ea
+            << " to self-referential function reference "
+            << cfg_xref->target_name << " at " << cfg_xref->target_ea
+            << " being lifted as address into "
+            << cfg_xref->target_segment->name << std::dec;
+
+        return LiftEA(cfg_xref->target_segment, cfg_xref->target_ea);
+
+      } else {
+        func = gModule->getFunction(cfg_func->name);
+      }
     } else {
       func = GetNativeToLiftedCallback(cfg_func);
     }
 
     CHECK(func != nullptr)
         << "Can't resolve reference to function "
-        << cfg_func->name << " from " << std::hex << inst_ptr->pc;
+        << cfg_func->name << " from " << std::hex << inst_ptr->pc << std::dec;
 
     func_val = func;
 
@@ -200,7 +235,7 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
     if (func->hasExternalWeakLinkage()) {
       LOG(ERROR)
           << "Adding pseudo-load of weak function " << cfg_func->name
-          << " at " << std::hex << inst_ptr->pc;
+          << " at " << std::hex << inst_ptr->pc << std::dec;
 
       auto temp_loc = ir.CreateAlloca(func->getType());
       ir.CreateStore(func, temp_loc);
@@ -216,13 +251,13 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
 
     LOG(ERROR)
         << "Variable " << cfg_var->name << " at " << std::hex << cfg_var->ea
-        << " was not lifted.";
+        << std::dec << " was not lifted.";
     // Fall through.
   }
 
   CHECK(cfg_xref->target_segment != nullptr)
       << "A non-function, non-variable cross-reference from "
-      << std::hex << inst_ptr->pc << " to " << std::hex << cfg_xref->target_ea
+      << std::hex << inst_ptr->pc << " to " << cfg_xref->target_ea << std::dec
       << " must be in a known segment.";
 
   return LiftEA(cfg_xref->target_segment, cfg_xref->target_ea);

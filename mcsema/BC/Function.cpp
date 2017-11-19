@@ -122,6 +122,21 @@ static void InlineSubFuncCall(llvm::BasicBlock *block,
   (void) new llvm::StoreInst(call, mem_ptr, block);
 }
 
+// Find an external function associated with
+static llvm::Function *DevirtualizeIndirectFlow(
+    TranslationContext &ctx, llvm::Function *fallback) {
+  if (ctx.cfg_inst->flow) {
+    if (auto cfg_func = ctx.cfg_inst->flow->func) {
+      if (cfg_func->is_external) {
+        return GetLiftedToNativeExitPoint(cfg_func);
+      } else {
+        return gModule->getFunction(cfg_func->lifted_name);
+      }
+    }
+  }
+  return fallback;
+}
+
 // Try to find a function. We start by assuming that `target_pc` is an
 // absolute address for the function. This is usually the case for direct
 // function calls internal to a binary. However, if the function is actually
@@ -129,6 +144,7 @@ static void InlineSubFuncCall(llvm::BasicBlock *block,
 // function.
 static llvm::Function *FindFunction(TranslationContext &ctx,
                                     uint64_t target_pc) {
+
   const NativeFunction *cfg_func = nullptr;
   if (ctx.cfg_inst->flow) {
     cfg_func = ctx.cfg_inst->flow->func;
@@ -137,7 +153,8 @@ static llvm::Function *FindFunction(TranslationContext &ctx,
     }
   }
 
-  if (auto func = GetLiftedFunction(ctx.cfg_module, target_pc)) {
+  auto func = GetLiftedFunction(ctx.cfg_module, target_pc);
+  if (func) {
     return func;
   }
 
@@ -218,10 +235,11 @@ static void LiftConditionalBranch(TranslationContext &ctx,
 static void LiftIndirectJump(TranslationContext &ctx,
                              llvm::BasicBlock *block,
                              remill::Instruction &inst) {
+
+  auto fallback = DevirtualizeIndirectFlow(
+      ctx, GetLiftedToNativeExitPoint(kExitPointJump));
+
   std::unordered_map<uint64_t, llvm::BasicBlock *> block_map;
-
-  auto fallback = GetLiftedToNativeExitPoint(kExitPointJump);
-
   for (auto target_ea : ctx.cfg_block->successor_eas) {
     block_map[target_ea] = GetOrCreateBlock(ctx, target_ea);
     fallback = ctx.lifter->intrinsics->missing_block;
@@ -231,8 +249,8 @@ static void LiftIndirectJump(TranslationContext &ctx,
   // call, so just go native.
   if (block_map.empty()) {
     LOG(INFO)
-        << "Indirect jump at " << std::hex << inst.pc << " looks like"
-        << std::dec << "a thunk; falling back to " << fallback->getName().str();
+        << "Indirect jump at " << std::hex << inst.pc << std::dec
+        << " looks like a thunk; falling back to " << fallback->getName().str();
     remill::AddTerminatingTailCall(block, fallback);
     return;
   }
@@ -323,7 +341,9 @@ static bool TryLiftTerminator(TranslationContext &ctx,
 
     case remill::Instruction::kCategoryIndirectFunctionCall:
       InlineSubFuncCall(
-          block, GetLiftedToNativeExitPoint(kExitPointFunctionCall));
+          block,
+          DevirtualizeIndirectFlow(
+              ctx, GetLiftedToNativeExitPoint(kExitPointFunctionCall)));
       return false;
 
     case remill::Instruction::kCategoryFunctionReturn:
