@@ -23,16 +23,16 @@ def usage(executable):
 def check_prerequisites():
     if not os.path.isdir("cparser"):
         print "[+] cparser project not found, cloning cparser"
-        return subprocess.call(["git", "clone", "https://github.com/GarretReece/cparser.git"])
+        return subprocess.call(["git", "clone", "https://github.com/pgoodman/cparser.git"])
     return 0
 
 def process_single_file(filename):
     '''given a filename, runs that file the the preprocessor, post processor, and std def generator. 
     Returns the text of the resulting std def'''
-    gcc_subproc = subprocess.Popen(["gcc", "-E", filename], stdout=subprocess.PIPE)
-    post_proc = subprocess.Popen(["python","cparser/post_process_header.py"], stdin=gcc_subproc.stdout, stdout=subprocess.PIPE)
-    make_def_proc = subprocess.Popen(["python","cparser/make_std_defs.py"], stdin=post_proc.stdout, stdout=subprocess.PIPE)
-    gcc_subproc.stdout.close()
+    cc_subproc = subprocess.Popen(["cc", "-E", filename], stdout=subprocess.PIPE)
+    post_proc = subprocess.Popen(["python", "cparser/post_process_header.py"], stdin=cc_subproc.stdout, stdout=subprocess.PIPE)
+    make_def_proc = subprocess.Popen(["python", "cparser/make_std_defs.py"], stdin=post_proc.stdout, stdout=subprocess.PIPE)
+    cc_subproc.stdout.close()
     post_proc.stdout.close()
     make_def_stdout = make_def_proc.communicate()[0]
     return make_def_stdout

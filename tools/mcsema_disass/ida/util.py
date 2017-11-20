@@ -344,10 +344,11 @@ _FORCED_NAMES = {}
 # conflict with register names, so we have the backup path of splatting things
 # into a dictionary.
 def set_symbol_name(ea, name):
+  global _FORCED_NAMES
+
   flags = idaapi.SN_PUBLIC | idaapi.SN_NOCHECK | idaapi.SN_NON_AUTO | idaapi.SN_NOWARN
-  if not idc.MakeNameEx(ea, name, flags):
-    global _FORCED_NAMES
-    _FORCED_NAMES[ea] = name
+  _FORCED_NAMES[ea] = name
+  idc.MakeNameEx(ea, name, flags)  
 
 # Tries to get the name of a symbol.
 def get_symbol_name(from_ea, ea=None, allow_dummy=False):
@@ -486,7 +487,7 @@ def _xref_generator(ea, get_first, get_next):
     yield target_ea
     target_ea = get_next(ea, target_ea)
 
-def _drefs_from(ea, only_one=False, check_fixup=True):
+def drefs_from(ea, only_one=False, check_fixup=True):
   seen = False
   has_one = only_one
   fixup_ea = idc.BADADDR
@@ -514,7 +515,7 @@ def _drefs_from(ea, only_one=False, check_fixup=True):
       if seen:
         return
 
-def _crefs_from(ea, only_one=False, check_fixup=True):
+def crefs_from(ea, only_one=False, check_fixup=True):
   flags = idc.GetFlags(ea)
   if not idc.isCode(flags):
     return
@@ -558,14 +559,14 @@ def xrefs_from(ea, only_one=False):
   if has_one and _stop_looking_for_xrefs(ea):
     return
 
-  for target_ea in _drefs_from(ea, only_one, check_fixup=False):
+  for target_ea in drefs_from(ea, only_one, check_fixup=False):
     if target_ea != fixup_ea:
       seen = only_one
       yield target_ea
       if seen:
         return
 
-  for target_ea in _crefs_from(ea, only_one, check_fixup=False):
+  for target_ea in crefs_from(ea, only_one, check_fixup=False):
     if target_ea != fixup_ea:
       seen = only_one
       yield target_ea
@@ -601,8 +602,8 @@ def _reference_checker(ea, dref_finder=_IGNORE_DREF, cref_finder=_IGNORE_CREF):
 def remove_all_refs(ea):
   """Remove all references to something."""
   assert False
-  dref_eas = list(_drefs_from(ea))
-  cref_eas = list(_crefs_from(ea))
+  dref_eas = list(drefs_from(ea))
+  cref_eas = list(crefs_from(ea))
 
   for ref_ea in dref_eas:
     idaapi.del_dref(ea, ref_ea)
@@ -660,7 +661,7 @@ def is_data_reference(ea):
   if is_invalid_ea(ea):
     return False
 
-  for target_ea in _drefs_from(ea):
+  for target_ea in drefs_from(ea):
     return True
 
   return is_runtime_external_data_reference(ea)
