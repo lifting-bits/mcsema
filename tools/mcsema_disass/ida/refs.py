@@ -331,29 +331,6 @@ def memop_is_actually_displacement(inst):
 # Return the set of all references from `ea` to anything.
 def get_all_references_from(ea):
   return set(xrefs_from(ea))
-  # all_refs = set()
-  # for ref_ea in idautils.DataRefsFrom(ea):
-  #   if not is_invalid_ea(ref_ea):
-  #     all_refs.add(ref_ea)
-  #   else:
-  #     #DEBUG("Found an invalid ref from {:x} to {:x}".format(ea, ref_ea))
-  #     pass
-
-  # for ref_ea in idautils.CodeRefsFrom(ea, 0):
-  #   if not is_invalid_ea(ref_ea):
-  #     all_refs.add(ref_ea)
-  #   else:
-  #     #DEBUG("We found an invalid ref from {:x} to {:x}".format(ea, ref_ea))
-  #     pass
-
-  # for ref_ea in idautils.CodeRefsFrom(ea, 1):
-  #   if not is_invalid_ea(ref_ea):
-  #     all_refs.add(ref_ea)
-  #   else:
-  #     #DEBUG("We found an invalid ref from {:x} to {:x}".format(ea, ref_ea))
-  #     pass
-
-  # return all_refs
 
 # This is a real hack. It can take a few tries to really find references, so
 # we'll only enable reference caching after we do some processing of segments.
