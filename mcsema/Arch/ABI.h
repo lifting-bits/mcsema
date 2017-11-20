@@ -43,6 +43,8 @@ class CallingConvention {
   void StoreArguments(llvm::BasicBlock *block,
                       const std::vector<llvm::Value *> &arg_vals);
 
+  void FreeArguments(llvm::BasicBlock *block);
+
   void AllocateReturnAddress(llvm::BasicBlock *block);
   void FreeReturnAddress(llvm::BasicBlock *block);
 
@@ -68,6 +70,7 @@ class CallingConvention {
   llvm::CallingConv::ID cc;
   uint64_t used_reg_bitmap;
   uint64_t num_loaded_stack_bytes;
+  uint64_t num_stored_stack_bytes;
   const char * const sp_name;
   const char * const tp_name;
   const ArgConstraint *reg_table;
