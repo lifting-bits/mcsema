@@ -19,14 +19,15 @@ _JUMP_TABLE_ENTRY = {}
 
 class JumpTable(object):
   """Represents generic info known about a particular jump table."""
-  __slots__ = ('inst_ea', 'entry_size', 'table_ea', 'offset', 'entries')
 
   def __init__(self, builder, entries):
     global _FIRST_JUMP_TABLE_ENTRY, _JUMP_TABLE_ENTRY
     self.inst_ea = builder.jump_ea
     self.table_ea = builder.table_ea
     self.offset = builder.offset
+    self.offset_mult = builder.offset_mult
     self.entry_size = builder.entry_size
+    self.entry_mult = builder.entry_mult
     self.entries = entries
 
     max_ea = self.table_ea
@@ -60,8 +61,10 @@ class JumpTableBuilder(object):
 
   def __init__(self, inst, binary_is_pie):
     self.entry_size = 0
+    self.entry_mult = 1
     self.table_ea = idc.BADADDR
     self.offset = 0
+    self.offset_mult = 1
     self.jump_ea = inst.ea
     self.inst = inst
     self.binary_is_pie = binary_is_pie
@@ -69,8 +72,12 @@ class JumpTableBuilder(object):
 
   def read_entry(self, entry_ea):
     data = (self._READERS[self.entry_size])(entry_ea)
-    data += self.offset
     data &= ((1 << (self.entry_size * 8)) - 1)
+    data += self.offset * self.offset_mult
+    data &= 0xFFFFFFFFFFFFFFFF
+    if 4 == self.entry_size and (self.offset & 0xFFFFFFFF) == self.offset:
+      data &= 0xFFFFFFFF
+
     return data
 
 def get_default_jump_table_entries(builder):
@@ -100,6 +107,7 @@ def get_num_jump_table_entries(builder):
   # initial bounds for candidate jump table targets.
   min_ea, max_ea = get_function_bounds(builder.jump_ea)
   orig_min_ea, orig_max_ea = min_ea, max_ea
+
   # Treat the current set of targets as candidates, even if the source of
   # those targets is IDA. We will assume that jump table entries point within
   # a given function, or within nearby functions that IDA believes to be
@@ -141,7 +149,7 @@ def get_num_jump_table_entries(builder):
   entry_addr = builder.table_ea
   for i in xrange(max_i):
     entry_data = builder.read_entry(entry_addr)
-    next_entry_addr = entry_addr + builder.entry_size
+    next_entry_addr = entry_addr + (builder.entry_size * builder.entry_mult)
 
     # We will have already checked, or assumed, the sanity of the first
     # `curr_num_targets` entries of the table.
@@ -201,30 +209,107 @@ def try_get_simple_jump_table_reader(builder):
 
   # Try the offset table based approach first, as it's likely to be more
   # constrained.
-  for offset in (builder.table_ea, 0):
-    for size in sizes:
-      builder.offset = offset
-      builder.entry_size = size
-      target_ea = builder.read_entry(builder.table_ea)
+  for offset in (builder.table_ea, builder.table_ea, 0):
+    for offset_mult in (1, -1):
+      for entry_mult in (1, -1):
+        for size in sizes:
+          builder.offset = offset
+          builder.offset_mult = offset_mult
+          builder.entry_size = size
+          builder.entry_mult = entry_mult
 
-      if min_ea <= target_ea < max_ea \
-      and is_block_or_instruction_head(target_ea):
-        return True
+          target_ea = builder.read_entry(builder.table_ea)
+
+          if min_ea > target_ea or max_ea <= target_ea:
+            continue
+
+          if not is_block_or_instruction_head(target_ea):
+            continue
+
+          # Read the second entry from the table as a way of verifying our
+          # guesses on things like the offset multiplier and entry multiplier.
+          next_entry_addr = builder.table_ea + \
+                            (builder.entry_size * builder.entry_mult)
+
+          target_ea = builder.read_entry(next_entry_addr)
+          if min_ea <= target_ea < max_ea and \
+             is_block_or_instruction_head(target_ea):
+             return True
 
   return False
+
+def try_convert_table_offset_to_ea(offset):
+  """Try to convert a jump table offset into a valid ea, but only if it is
+  near the base of an existing segment. See Issue #321."""
+  next_seg = idaapi.get_next_seg(offset)
+  if not next_seg:
+    return False
+  
+  next_seg_ea = next_seg.startEA
+  if 0x1000 > (next_seg_ea - offset):
+    return False
+
+  seg_name = idc.SegName(next_seg_ea)
+  next_seg_end_ea = idc.SegEnd(next_seg_ea)
+  new_seg_ea = offset & ~0xFFF
+  res = idaapi.set_segm_start(next_seg_ea, new_seg_ea, idc.SEGMOD_KEEP)
+  if not res:
+    DEBUG("ERROR: Could not resize {} from [{:x},{:x}) to [{:x},{:x})".format(
+        seg_name, next_seg_ea, next_seg_end_ea, new_seg_ea, next_seg_end_ea))
+    return False
+  else:
+    DEBUG("WARNING: Resized {} from [{:x},{:x}) to [{:x},{:x})".format(
+        seg_name, next_seg_ea, next_seg_end_ea, new_seg_ea, next_seg_end_ea))
+    return True
 
 def get_ida_jump_table_reader(builder, si):
   """Try to trust IDA's ability to recognize a jump table and its entries,
   and return an appropriate jump table entry reader."""
+
   builder.table_ea = si.jumps
+  DEBUG("IDA inferred jump table base: {:x}".format(builder.table_ea))
+
+  builder.entry_size = si.get_jtable_element_size()
+
+  if (si.flags & idaapi.SWI_JMP_INV) == idaapi.SWI_JMP_INV:
+    builder.entry_mult = -1
+
+  DEBUG("IDA inferred jump table entry size: {}".format(builder.entry_size))
 
   # Check if this is an offset based jump table, and if so, create an
   # appropriate wrapper that uses the displacement from the table base
   # address to find the actual jump target.
   if (si.flags & idaapi.SWI_ELBASE) == idaapi.SWI_ELBASE:
     builder.offset = si.elbase
+    
+    # Figure out if we need to subtract the offset instead of add it.
+    if (si.flags2 & idaapi.SWI2_SUBTRACT) == idaapi.SWI2_SUBTRACT:
+      builder.offset_mult = -1
 
-  builder.entry_size = si.get_jtable_element_size()
+    DEBUG("IDA inferred jump table offset: {:x}".format(builder.offset))
+
+    # NOTE(pag): Converting this base to a real address is likely not correct,
+    #            hence commenting it out. The jump table in question had
+    #            entries like:
+    #
+    #     dd offset msetTab00 - 140000000h; jump table for switch statement
+    #
+    #            And then the code would add back in the `0x140000000`. The
+    #            way we lift jump tables is to `switch` on the original EAs,
+    #            because we can get the address of lifted LLVM basic blocks,
+    #            so we need to make sure that the lifted computation and the
+    #            original computation produce the same EAs for the jump targets,
+    #            and converting the offset to be valid would be incorrect.
+    #
+    # # See Issue #321. The offset ea may end up being nearby the beginning of
+    # # the `.text` segment, e.g. `0x1400000000` is the offset, but the `.text`
+    # # begins at `0x1400001000`.
+    # if is_invalid_ea(builder.offset):
+    #   DEBUG("WARNING: Table offset {:x} is not a valid address".format(
+    #       builder.offset))
+    #   try_convert_table_offset_to_ea(builder.offset)
+
+
   return True
 
 def get_manual_jump_table_reader(builder):
@@ -232,12 +317,13 @@ def get_manual_jump_table_reader(builder):
   even if it's not explicitly referenced in the current instruction.
   This handles the case where we see something like a `mov` or an `lea`
   of the table base address that happens before the actual `jmp`."""
+  ret = False
   next_inst_ea = builder.jump_ea
   for i in xrange(5):
     inst_ea = next_inst_ea
     next_inst_ea = idc.PrevHead(inst_ea)
     if inst_ea == idc.BADADDR:
-      return False
+      break
 
     refs = get_instruction_references(inst_ea, builder.binary_is_pie)
     if not len(refs):
@@ -248,12 +334,19 @@ def get_manual_jump_table_reader(builder):
 
     # Don't treat things like thunks to be tables.
     if is_thunk(builder.table_ea) or is_external_segment(builder.table_ea):
+      builder.table_ea = idc.BADADDR
       continue
 
     if try_get_simple_jump_table_reader(builder):
-      return True
+      ret = True
+      break
   
-  return False
+  if ret:
+    DEBUG("Reader inferred jump table base: {:x}".format(builder.table_ea))
+    if builder.offset:
+      DEBUG("Reader inferred jump table offset: {:x}".format(builder.offset))
+
+  return ret
 
 def get_jump_table_reader(builder):
   """Returns the size of a jump table entry, as well as a reader function
@@ -326,7 +419,7 @@ def get_jump_table(inst, binary_is_pie=False):
     entry_data = builder.read_entry(entry_addr)
     entries[entry_addr] = entry_data
     DEBUG("  {:x} => {:x}".format(entry_addr, entry_data))
-    entry_addr += builder.entry_size
+    entry_addr += builder.entry_size * builder.entry_mult
 
   table = JumpTable(builder, entries)
   _JMP_THROUGH_TABLE_INFO[builder.jump_ea] = table

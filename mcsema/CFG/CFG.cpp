@@ -270,7 +270,7 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   } else if (!xref->target_segment) {
     LOG(WARNING)
         << "Reference from " << std::hex << inst->ea
-        << " to " << std::hex << xref->target_ea
+        << " to " << xref->target_ea << std::dec
         << " targets an unrecovered segment not resolved to a real symbol.";
 
     xref_is_external = true;
@@ -278,7 +278,7 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   } else {
     LOG(WARNING)
         << "Reference from " << std::hex << inst->ea
-        << " to " << std::hex << xref->target_ea
+        << " to " << xref->target_ea << std::dec
         << " targets the segment " << xref->target_segment->name
         << " but was not resolved to a named symbol.";
     xref_is_external = xref->segment->is_external ||
@@ -287,20 +287,46 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
 
   CHECK(!xref_is_external || !xref->target_name.empty())
       << "External reference from " << std::hex << inst->ea
-      << " to " << std::hex << xref->target_ea << " does not have a name!";
+      << " to " << xref->target_ea << std::dec << " does not have a name!";
 
   // Does the CFG reference target type agree with the resolved code/data
   // nature of the xref?
   if (cfg_ref.target_type() == CodeReference_TargetType_CodeTarget) {
     LOG_IF(WARNING, nullptr == xref->func)
         << "Code cross-reference from " << std::hex << inst->ea
-        << " to " << std::hex << xref->target_ea
+        << " to " << std::hex << xref->target_ea << std::dec
         << " is not actually a code cross-reference";
   } else {
+
+    // NOTE(pag): This will come up a lot with the `.idata` section in PE
+    //            binaries. We'll have things like:
+    //
+    //    .idata:1400110E8 ; void __stdcall EnterCriticalSection(...)
+    //    .idata:1400110E8                 extrn EnterCriticalSection:qword
+    //
+    //            And so we'll only really have this one location to represent
+    //            both the function `EnterCriticalSection`, and the pointer to
+    //            the function (this is a bit like the `.got.plt` section of
+    //            ELF binaries, but they have an addition `.extern` section).
+    //            So we'll end up with code that does something like:
+    //
+    //    jmp cs:EnterCriticalSection
+    //
+    //            And we'll say it's got a data AND flow reference to
+    //            `EnterCriticalSection`. But the data reference itself looks
+    //            like it should be a code reference, because we implement this
+    //            type of reference as (from a mcsema-disass log):
+    //
+    //    8-byte reference at 1400110e8 to 1400110e8 (EnterCriticalSection)
+    //
+    //            That is, it's self-referential. It's illogical for us to
+    //            eventually lift the `cs:EnterCriticalSection` operand of this
+    //            instruction as loading the bytes of the instruction itself,
+    //            though.
     LOG_IF(WARNING, nullptr != xref->func)
         << "Data cross-reference from " << std::hex << inst->ea
-        << " to " << std::hex << xref->target_ea
-        << "is actually a code cross-reference";
+        << " to " << xref->target_ea << std::dec
+        << " is actually a code cross-reference";
   }
 
   // Does the CFG reference target location agree with the resolved
@@ -311,11 +337,11 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   if (cfg_ref.location() == CodeReference_Location_External) {
     LOG_IF(WARNING, !xref_is_external)
         << "External reference from " << std::hex << inst->ea
-        << " to " << std::hex << xref->target_ea << " is actually internal";
+        << " to " << xref->target_ea << std::dec << " is actually internal";
   } else {
     LOG_IF(WARNING, xref_is_external)
         << "Internal reference from " << std::hex << inst->ea
-        << " to " << std::hex << xref->target_ea << " (" << xref->target_name
+        << " to " << xref->target_ea << std::dec << " (" << xref->target_name
         << ") is actually external";
   }
 
@@ -323,35 +349,35 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
     case CodeReference_OperandType_ImmediateOperand:
       LOG_IF(ERROR, inst->imm != nullptr)
           << "Overwriting existing immediate reference at instruction "
-          << std::hex << inst->ea;
+          << std::hex << inst->ea << std::dec;
       inst->imm = xref;
       break;
 
     case CodeReference_OperandType_MemoryOperand:
       LOG_IF(ERROR, inst->mem != nullptr)
           << "Overwriting existing absolute reference at instruction "
-          << std::hex << inst->ea;
+          << std::hex << inst->ea << std::dec;
       inst->mem = xref;
       break;
 
     case CodeReference_OperandType_MemoryDisplacementOperand:
       LOG_IF(ERROR, inst->disp != nullptr)
           << "Overwriting existing displacement reference at instruction "
-          << std::hex << inst->ea;
+          << std::hex << inst->ea << std::dec;
       inst->disp = xref;
       break;
 
     case CodeReference_OperandType_ControlFlowOperand:
       LOG_IF(ERROR, inst->flow != nullptr)
           << "Overwriting existing flow reference at instruction "
-          << std::hex << inst->ea;
+          << std::hex << inst->ea << std::dec;
       inst->flow = xref;
       break;
 
     case CodeReference_OperandType_OffsetTable:
       LOG_IF(ERROR, inst->offset_table != nullptr)
           << "Overwriting existing offset table reference at instruction "
-          << std::hex << inst->ea;
+          << std::hex << inst->ea << std::dec;
       inst->offset_table = xref;
       break;
   }
@@ -369,7 +395,8 @@ NativeObject::NativeObject(void)
       is_thread_local(false) {}
 
 NativeFunction::NativeFunction(void)
-    : blocks() {}
+    : blocks(),
+      function(nullptr) {}
 
 NativeExternalFunction::NativeExternalFunction(void)
     : is_weak(false),
@@ -457,7 +484,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     // Collect the variables.
     for (const auto &cfg_var : cfg_segment.vars()) {
       CHECK(!cfg_var.name().empty())
-          << "Unnamed variable at " << std::hex << cfg_var.ea()
+          << "Unnamed variable at " << std::hex << cfg_var.ea() << std::dec
           << " in segment " << segment->name;
 
       auto var = new NativeVariable;
@@ -470,7 +497,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       if (ea_var_it != module->ea_to_var.end()) {
         LOG(ERROR)
             << "Duplicate (non-external) variable at " << std::hex << var->ea
-            << " in segment " << segment->name;
+            << std::dec << " in segment " << segment->name;
 
         MergeVariables(var, ea_var_it->second);
         ea_var_it->second->ForwardTo(var);
@@ -478,14 +505,15 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       module->ea_to_var[var->ea] = var;
 
       LOG(INFO)
-          << "Found variable " << var->name << " at " << std::hex << var->ea;
+          << "Found variable " << var->name << " at " << std::hex
+          << var->ea << std::dec;
     }
 
     module->segments[segment->ea] = segment;
 
     LOG(INFO)
         << "Found segment " << segment->name << " [" << std::hex << segment->ea
-        << ", " << std::hex << (segment->ea + segment->size) << ")";
+        << ", " << (segment->ea + segment->size) << std::dec << ")";
   }
 
   // Bring in the functions, although not their blocks or instructions. This
@@ -503,21 +531,23 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     auto func_it = module->ea_to_func.find(func->ea);
     if (func_it != module->ea_to_func.end()) {
       LOG(ERROR)
-          << "Duplicate function at " << std::hex << func->ea;
+          << "Duplicate function at " << std::hex << func->ea << std::dec;
       delete func_it->second;
     }
 
     module->ea_to_func[func->ea] = func;
 
     LOG(INFO)
-        << "Found function " << func->name << " at " << std::hex << func->ea;
+        << "Found function " << func->name << " at " << std::hex
+        << func->ea << std::dec;
 
     auto var_it = module->ea_to_var.find(func->ea);
     if (var_it != module->ea_to_var.end()) {
       auto dup_var = var_it->second;
       LOG(ERROR)
           << "Function " << func->name << " at " << std::hex << func->ea
-          << " is also defined as an internal variable " << dup_var->name;
+          << std::dec << " is also defined as an internal variable "
+          << dup_var->name;
       module->ea_to_var.erase(var_it);
       module->exported_vars.erase(func->ea);
       delete dup_var;
@@ -525,12 +555,12 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
 
     if (func->is_exported) {
       CHECK(!func->name.empty())
-          << "Exported function at address " << std::hex << func->ea
+          << "Exported function at address " << std::hex << func->ea << std::dec
           << " does not have a name";
 
       LOG(INFO)
           << "Exported function " << func->name << " at " << std::hex
-          << func->ea << " is implemented by " << func->lifted_name;
+          << func->ea << std::dec << " is implemented by " << func->lifted_name;
 
       module->exported_funcs.insert(func->ea);
     }
@@ -550,13 +580,13 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
 
     LOG(INFO)
         << "Found external variable " << var->name << " at "
-        << std::hex << var->ea;
+        << std::hex << var->ea << std::dec;
 
     CHECK(!var->name.empty())
-        << "Unnamed external variable at " << std::hex << var->ea;
+        << "Unnamed external variable at " << std::hex << var->ea << std::dec;
 
     CHECK(!module->ea_to_func.count(var->ea))
-        << "Internal function at " << std::hex << var->ea
+        << "Internal function at " << std::hex << var->ea << std::dec
         << " has the same name as the external variable " << var->name;
 
     // Look for two extern variables with the same name.
@@ -569,13 +599,13 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       if (dup_var->ea != var->ea) {
         LOG(WARNING)
             << "External variable " << var->name << " at " << std::hex
-            << var->ea << " is also defined at " << dup_var->ea;
+            << var->ea << " is also defined at " << dup_var->ea << std::dec;
         module->ea_to_var[dup_var->ea] = var;
       } else {
         LOG(ERROR)
             << "External variable " << var->name << " at " << std::hex
             << var->ea << " has the same name of external variable at "
-            << std::hex << dup_var->ea;
+            << dup_var->ea << std::dec;
       }
     }
 
@@ -589,12 +619,12 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       if (dup_var->name != var->name) {
         LOG(ERROR)
             << "External variable " << var->name << " at " << std::hex
-            << var->ea << " is also defined as " << dup_var->name;
+            << var->ea << std::dec << " is also defined as " << dup_var->name;
         module->name_to_extern_var[dup_var->name] = var;
       } else {
         LOG(ERROR)
             << "External variable " << var->name << " at " << std::hex
-            << var->ea << " is defined twice";
+            << var->ea << std::dec << " is defined twice";
       }
 
       // Note:  Intentional leak, not doing `delete dup_var`. Could be solved
@@ -619,7 +649,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
 
     LOG(INFO)
         << "Found external function " << func->name << " at "
-        << std::hex << func->ea;
+        << std::hex << func->ea << std::dec;
 
     if (cfg_extern_func.has_argument_count()) {
       func->num_args = static_cast<unsigned>(cfg_extern_func.argument_count());

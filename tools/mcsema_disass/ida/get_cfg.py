@@ -77,8 +77,9 @@ OS_NAME = ""
 # Set of substrings that can be found inside of symbol names that are usually
 # signs that the symbol is external. For example, `stderr@@GLIBC_2.2.5` is
 # really the external `stderr`, so we want to be able to chop out the `@@...`
-# part to resolve the "true" name,
-EXTERNAL_NAMES = ("@@GLIBC_",)
+# part to resolve the "true" name. There are a lot of `@@` variants in PE files,
+# e.g. `@@QEAU_..`, `@@AEAV..`, though these are likely for name mangling.
+EXTERNAL_NAMES = ("@@GLIBC_", )
 
 _NOT_ELF_BEGIN_EAS = (0xffffffffL, 0xffffffffffffffffL)
 
@@ -121,6 +122,19 @@ def is_ELF_got_pointer_to_external(ea):
 
 _FIXED_EXTERNAL_NAMES = {}
 
+def demangled_name(name):
+  """Tries to demangle a functin name."""
+  try:
+    dname = idc.Demangle(name, idc.GetLongPrm(INF_SHORT_DN))
+    if dname and len(dname) and "::" not in dname:
+      dname = dname.split("(")[0]
+      dname = dname.split(" ")[-1]
+      if dname:
+        return dname
+    return name
+  except:
+    return name
+
 def get_true_external_name(fn):
   """Tries to get the 'true' name of `fn`. This removes things like
   ELF-versioning from symbols."""
@@ -137,6 +151,10 @@ def get_true_external_name(fn):
   if fn in EMAP_DATA:
     return fn
 
+  # Try to demangle the name, but don't do it if looks like there's a C++
+  # namespace.
+  fn = demangled_name(fn)
+
   # TODO(pag): Is this a macOS or Windows thing?
   if not is_linked_ELF_program() and fn[0] == '_':
     return fn[1:]
@@ -152,7 +170,9 @@ def get_true_external_name(fn):
       fn = fn[:fn.find(en)]
       break
 
-  # DEBUG("True name of {} at {:x} is {}".format(orig_fn, ea, fn))
+  if orig_fn != fn:
+    DEBUG("True name of {} is {}".format(orig_fn, fn))
+  
   _FIXED_EXTERNAL_NAMES[orig_fn] = fn
   return fn
 
@@ -230,11 +250,22 @@ def parse_os_defs_file(df):
           INTERNALLY_DEFINED_EXTERNALS[fname] = ea
           continue
 
-        # Misidentified and external.
+        # Misidentified and external. This comes up often in PE binaries, for
+        # example, we will have the following:
+        #
+        #   .idata:01400110E8 ; void __stdcall EnterCriticalSection(...)
+        #   .idata:01400110E8     extrn EnterCriticalSection:qword
+        #
+        # Really, we want to try this as code.
         flags = idc.GetFlags(ea)
         if not idc.isCode(flags) and not idaapi.is_weak_name(ea):
+          seg_name = idc.SegName(ea).lower()
+          if ".idata" in seg_name:
+            EXTERNAL_FUNCS_TO_RECOVER[ea] = fname
+
           # Refer to issue #308
-          DEBUG("WARNING: External {} at {:x} from definitions file may not be a function".format(
+          else:
+            DEBUG("WARNING: External {} at {:x} from definitions file may not be a function".format(
               fname, ea))
 
       EMAP[fname] = (int(args), realconv, ret, sign)
@@ -450,8 +481,9 @@ def reference_target_type(ref):
   if ref.ea in EXTERNAL_VARS_TO_RECOVER:
     return CFG_pb2.CodeReference.DataTarget
 
-  elif ref.ea in EXTERNAL_FUNCS_TO_RECOVER:
-    return CFG_pb2.CodeReference.CodeTarget
+  # TODO(pag): 
+  #elif ref.ea in EXTERNAL_FUNCS_TO_RECOVER:
+  #  return CFG_pb2.CodeReference.CodeTarget
 
   elif is_code(ref.ea):
     return CFG_pb2.CodeReference.CodeTarget
@@ -516,7 +548,7 @@ def format_instruction_reference(ref):
       mask_end,
       ref.HasField('name') and ref.name or "")
 
-def recover_instruction_references(I, inst, addr):
+def recover_instruction_references(I, inst, addr, refs):
   """Add the memory/code reference information from this instruction
   into the CFG format. The LLVM side of things needs to be able to
   match instruction operands to references to internal/external
@@ -579,7 +611,6 @@ def recover_instruction_references(I, inst, addr):
   """
   DEBUG_PUSH()
   debug_info = ["I: {:x}".format(addr)]
-  refs = get_instruction_references(inst, PIE_MODE)
   for ref in refs:
     if not ref.is_valid():
       DEBUG("POSSIBLE ERROR: Invalid reference {} at instruction {:x}".format(
@@ -620,14 +651,43 @@ def recover_instruction_references(I, inst, addr):
 
 def recover_instruction_offset_table(I, table):
   """Recovers an offset table as a kind of reference."""
+  DEBUG("Offset-based jump table")
   R = I.xrefs.add()
   R.ea = table.offset
   R.operand_type = CFG_pb2.CodeReference.OffsetTable
   R.target_type = CFG_pb2.CodeReference.DataTarget
   R.location = CFG_pb2.CodeReference.Internal
-  name = get_symbol_name(table.offset, allow_dummy=False)
+  name = get_symbol_name(table.offset * table.offset_mult, allow_dummy=False)
   if name:
     R.name = name.format('utf-8')
+
+def try_recovery_external_flow(I, inst, refs):
+  """We have somehting like:
+  
+      jmp     cs:EnterCriticalSection
+  
+  Where `EnterCriticalSection` is in the `.idata` section and is filled in at
+  load time to contain the real address of the external
+  `EnterCriticalSection`."""
+  if not (is_indirect_jump(inst) or is_indirect_function_call(inst)) or \
+     not refs or len(refs) > 1:
+    return
+
+  ref = refs[0]
+  if ref.type == Reference.CODE or ref.ea not in EXTERNAL_FUNCS_TO_RECOVER:
+    return
+
+  R = I.xrefs.add()
+  R.ea = ref.ea
+  R.name = EXTERNAL_FUNCS_TO_RECOVER[ref.ea].format('utf-8')
+  R.operand_type = CFG_pb2.CodeReference.ControlFlowOperand
+  R.target_type = CFG_pb2.CodeReference.CodeTarget
+  R.location = CFG_pb2.CodeReference.External
+
+  if is_indirect_jump(inst):
+    DEBUG("Tail-calls external {}".format(R.name))
+  else:
+    DEBUG("Calls external {}".format(R.name))
 
 def recover_instruction(M, B, ea):
   """Recover an instruction, adding it to its parent block in the CFG."""
@@ -636,14 +696,24 @@ def recover_instruction(M, B, ea):
   I = B.instructions.add()
   I.ea = ea  # May not be `inst.ea` because of prefix coalescing.
   I.bytes = inst_bytes
-  recover_instruction_references(I, inst, ea)
+
+  refs = get_instruction_references(inst, PIE_MODE)
+  recover_instruction_references(I, inst, ea, refs)
 
   if is_noreturn_inst(inst):
     I.local_noreturn = True
 
+
+  DEBUG_PUSH()
   table = get_jump_table(inst, PIE_MODE)
-  if table and table.offset:
+  if table and table.offset and \
+     not is_invalid_ea(table.offset * table.offset_mult):
     recover_instruction_offset_table(I, table)
+
+  if not table:
+    try_recovery_external_flow(I, inst, refs)
+
+  DEBUG_POP()
 
   return I
 
@@ -829,6 +899,8 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
   min_xref_width = PIE_MODE and max_xref_width or 4
 
   is_code_seg = is_code(seg_ea)
+  seg_name = idc.SegName(seg_ea)
+  has_func_pointers = segment_contains_external_function_pointers(seg_ea)
 
   ea, next_ea = seg_ea, seg_ea
   while next_ea < seg_end_ea:
@@ -854,10 +926,24 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
         next_ea = idc.NextHead(ea, seg_end_ea)
         continue
 
+    target_ea = get_reference_target(ea)
+
+    # Handle entries in the `.got.plt` and `.idata` segments. In ELF binaries,
+    # this looks like:
+    #
+    #     .got.plt:000000000032E058 off_32E058      dq offset getenv
+    #
+    # In PE binaries, this looks like:
+    #
+    #     .idata:00000001400110D8 ; DWORD __stdcall GetLastError()
+    #     .idata:00000001400110D8                 extrn GetLastError:qword
+    if is_invalid_ea(target_ea):
+      if has_func_pointers and ea in EXTERNAL_FUNCS_TO_RECOVER:
+        target_ea = ea
+
     # Note: it's possible that `ea == target_ea`. This happens with
     #     external references to things like `stderr`, where there's 
     #     an internal slot, whose value is filled in at runtime. 
-    target_ea = get_reference_target(ea)
     if is_invalid_ea(target_ea):
       continue
 
@@ -882,7 +968,11 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
       X.width = xref_width
       X.target_ea = target_ea
       X.target_name = get_symbol_name(target_ea)
-      X.target_is_code = is_code(target_ea)
+      X.target_is_code = is_code(target_ea) or \
+                         target_ea in EXTERNAL_FUNCS_TO_RECOVER
+
+      if is_external_segment(X.target_ea):
+        X.target_name = get_true_external_name(X.target_name)
 
       # A cross-reference to some TLS data. Because each thread has its own
       # instance of the data, this reference ends up actually being an offset
@@ -901,41 +991,40 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
         DEBUG("{}-byte reference at {:x} to {:x} ({})".format(
             X.width, ea, target_ea, X.target_name))
 
-def recover_region(M, seg_name, seg_ea, seg_end_ea, exported_vars):
+def recover_region(M, region_name, region_ea, region_end_ea, exported_vars):
   """Recover the data and cross-references from a segment. The data of a
   segment is stored verbatim within the protobuf, and accompanied by a
   series of variable and cross-reference entries."""
 
-  real_seg_name = idc.SegName(seg_ea)
+  seg_name = idc.SegName(region_ea)
 
-  DEBUG("Recovering {} in segment {} [{:x}, {:x})".format(
-      seg_name, real_seg_name, seg_ea, seg_end_ea))
+  DEBUG("Recovering region {} [{:x}, {:x}) in segment {}".format(
+      region_name, region_ea, region_end_ea, seg_name))
 
-  seg_size = seg_end_ea - seg_ea
-  seg = idaapi.getseg(seg_ea)
+  seg = idaapi.getseg(region_ea)
 
   # An item spans two regions. This may mean that there's a reference into
   # the middle of an item. This happens with strings.
-  item_size = idc.ItemSize(seg_end_ea - 1)
+  item_size = idc.ItemSize(region_end_ea - 1)
   if 1 < item_size:
-    DEBUG("  WARNING: Segment should probably include {} more bytes".format(
+    DEBUG("  ERROR: Segment should probably include {} more bytes".format(
         item_size - 1))
 
   S = M.segments.add()
-  S.ea = seg_ea
-  S.data = read_bytes_slowly(seg_ea, seg_end_ea)
+  S.ea = region_ea
+  S.data = read_bytes_slowly(region_ea, region_end_ea)
   S.read_only = (seg.perm & idaapi.SEGPERM_WRITE) == 0
-  S.is_external = is_external_segment_by_flags(seg_ea)
-  S.is_thread_local = is_tls_segment(seg_ea)
-  S.name = real_seg_name.format('utf-8')
-  S.is_exported = seg_ea in exported_vars
+  S.is_external = is_external_segment_by_flags(region_ea)
+  S.is_thread_local = is_tls_segment(region_ea)
+  S.name = seg_name.format('utf-8')
+  S.is_exported = region_ea in exported_vars
 
-  if seg_name != real_seg_name:
-    S.variable_name = seg_name.format('utf-8')
+  if region_name != seg_name:
+    S.variable_name = region_name.format('utf-8')
 
   DEBUG_PUSH()
-  recover_region_cross_references(M, S, seg_ea, seg_end_ea)
-  recover_region_variables(M, S, seg_ea, seg_end_ea, exported_vars)
+  recover_region_cross_references(M, S, region_ea, region_end_ea)
+  recover_region_variables(M, S, region_ea, region_end_ea, exported_vars)
   DEBUG_POP()
 
 def recover_regions(M, exported_vars, global_vars=[]):
@@ -948,8 +1037,11 @@ def recover_regions(M, exported_vars, global_vars=[]):
   # Collect the segment bounds to lift.
   seg_parts = collections.defaultdict(set)
   for seg_ea in idautils.Segments():
-    seg_names[seg_ea] = idc.SegName(seg_ea)
-    if not is_external_segment_by_flags(seg_ea):
+    seg_name = idc.SegName(seg_ea)
+    seg_names[seg_ea] = seg_name
+
+    if not is_external_segment_by_flags(seg_ea) or \
+       segment_contains_external_function_pointers(seg_ea):
       seg_parts[seg_ea].add(seg_ea)
       seg_parts[seg_ea].add(idc.SegEnd(seg_ea))
 
