@@ -237,6 +237,9 @@ static const ArgConstraint *ConstraintTable(llvm::CallingConv::ID cc) {
     };
     return &(kX86ThisCallArgs[0]);
 
+  } else if (llvm::CallingConv::X86_StdCall == cc) {
+    return &(kNoArgs[0]);  // stdcall takes all args on the stack.
+
   } else if (llvm::CallingConv::C == cc) {
     if (gArch->IsX86()) {
       return &(kNoArgs[0]);  // cdecl takes all args on the stack.
@@ -393,6 +396,7 @@ CallingConvention::CallingConvention(llvm::CallingConv::ID cc_)
     : cc(cc_),
       used_reg_bitmap(0),
       num_loaded_stack_bytes(DefaultUsedStackBytes(cc)),
+      num_stored_stack_bytes(0),
       sp_name(StackPointerName()),
       tp_name(ThreadPointerName()),
       reg_table(ConstraintTable(cc)) {}
@@ -670,9 +674,29 @@ void CallingConvention::StoreArguments(
     // Bump the stack pointer.
     alloc_size = std::max<uint64_t>(alloc_size, addr_size);
     sp = ir.CreateSub(sp, llvm::ConstantInt::get(gWordType, alloc_size));
+    num_stored_stack_bytes += alloc_size;
   }
 
   ir.CreateStore(memory, memory_ref);  // Update the memory pointer.
+
+  StoreStackPointer(block, sp);
+}
+
+void CallingConvention::FreeArguments(llvm::BasicBlock *block) {
+  if (!num_stored_stack_bytes) {
+    return;
+  }
+
+  if (llvm::CallingConv::X86_StdCall == cc ||
+      llvm::CallingConv::X86_ThisCall == cc) {
+    return;  // Callee cleanup.
+  }
+
+  auto sp = LoadStackPointer(block);
+
+  llvm::IRBuilder<> ir(block);
+  sp = ir.CreateAdd(
+      sp, llvm::ConstantInt::get(gWordType, num_stored_stack_bytes));
 
   StoreStackPointer(block, sp);
 }

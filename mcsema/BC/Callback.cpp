@@ -552,6 +552,7 @@ static void ImplementExplicitArgsExitPoint(
   }
 
   loader.FreeReturnAddress(block);
+  loader.FreeArguments(block);
 
   llvm::IRBuilder<> ir(block);
   loader.StoreReturnValue(block, ir.CreateCall(extern_func, call_args));
