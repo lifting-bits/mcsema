@@ -1040,10 +1040,19 @@ def recover_regions(M, exported_vars, global_vars=[]):
     seg_name = idc.SegName(seg_ea)
     seg_names[seg_ea] = seg_name
 
-    if not is_external_segment_by_flags(seg_ea) or \
-       segment_contains_external_function_pointers(seg_ea):
+    if (not is_external_segment_by_flags(seg_ea) or \
+       segment_contains_external_function_pointers(seg_ea)) and \
+       not (is_constructor_segment(seg_ea) or is_destructor_segment(seg_ea)):
       seg_parts[seg_ea].add(seg_ea)
       seg_parts[seg_ea].add(idc.SegEnd(seg_ea))
+
+    if is_constructor_segment(seg_ea):
+      seg_parts[seg_ea].add(seg_ea)
+      end_ea =  idc.SegEnd(seg_ea)
+      if is_destructor_segment(end_ea):
+        seg_parts[seg_ea].add(idc.SegEnd(end_ea))
+      else:
+        seg_parts[seg_ea].add(end_ea)
 
   # Treat analysis-identified global variables as segment begin/end points.
   for var_name, begin_ea, end_ea in global_vars:

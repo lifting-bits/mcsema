@@ -302,6 +302,20 @@ def is_external_segment(ea):
   _NOT_EXTERNAL_SEGMENTS.add(seg_ea)
   return False
 
+def is_constructor_segment(ea):
+  seg_ea = idc.SegStart(ea)
+  seg_name = idc.SegName(seg_ea).lower()
+  if seg_name in [".init_array", ".ctor"]:
+    return True
+  return False
+
+def is_destructor_segment(ea):
+  seg_ea = idc.SegStart(ea)
+  seg_name = idc.SegName(seg_ea).lower()
+  if seg_name in [".fini_array", ".dtor"]:
+    return True
+  return False
+
 def is_internal_code(ea):
   if is_invalid_ea(ea):
     return False

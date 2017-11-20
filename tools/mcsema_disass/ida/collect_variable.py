@@ -235,16 +235,16 @@ class Operand(object):
     """Name of the register used in the operand."""
     if self.has_phrase:
       size = get_native_size()
-    return get_register_name(self.reg_id, size)
+      return get_register_name(self.reg_id, size)
 
-    if self.type.is_reg:
+    if self.is_reg:
       return get_register_name(self.reg_id, self.size)
 
   @property
   def regs(self):
     if self.has_phrase:
       return set(reg for reg in (self.base, self.index) if reg)
-    elif self.type.is_reg:
+    elif self.is_reg:
       return {get_register_name(self.reg_id, self.size)}
     else:
       return set()
@@ -525,6 +525,12 @@ def _process_instruction(inst_ea, func_variable):
               var_offset = offset - start_
               func_variable["stackArgs"][start_]["flags"].add("LOCAL_REFERER")
               func_variable["stackArgs"][start_]["referent"].append({"ea" :inst_ea, "offset" :var_offset})
+    #elif opnd.is_reg:
+    #  opnd_reg = _translate_reg(opnd.base_reg) if opnd.reg else None
+    #  target_on_stack = opnd_reg if opnd_reg == _stack_ptr or opnd_reg == _base_ptr else None
+    #  if target_on_stack:
+    #    DEBUG("Accessing the stack at {0:x}".format(inst_ea))
+      
 
   
 def _process_basic_block(f_ea, block_ea, func_variable):
@@ -536,8 +542,8 @@ def _process_basic_block(f_ea, block_ea, func_variable):
 RECOVER_DEBUG_FL = [
     # stack variable tick and times_per_thread is causing
     # problem while lifting Apache ATD's;
-    "dso_load",
-    "send_brigade_nonblocking", 
+    #"dso_load",
+    "send_brigade_nonblocking",
     ]
 
 def build_stack_args(f):
