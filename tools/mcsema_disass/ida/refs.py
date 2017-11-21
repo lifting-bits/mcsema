@@ -224,6 +224,7 @@ def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
   ref = None
   addr_val = idc.BADADDR
   mask = 0
+  is_memop = idc.o_mem == op.type
 
   if idc.o_imm == op.type:
     addr_val = op.value
@@ -239,6 +240,9 @@ def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
   if IS_ARM:
     addr_val, mask = _try_get_arm_ref_addr(inst, op, addr_val, all_refs)
   
+  info = idaapi.refinfo_t()
+  has_ref_info = idaapi.get_refinfo(inst.ea, op.n, info) == 1
+
   if is_invalid_ea(addr_val):
     
     # The `addr_val` that we get might actually be a value that is relative to
@@ -249,14 +253,17 @@ def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
     # And we'd get `addr_val` as `0x22FC`, which isn't a valid EA. Here we
     # detect this and fixup the `addr_val` to include the relative base
     # of `0x140000000`.
-    info = idaapi.refinfo_t()
-    if idaapi.get_refinfo(inst.ea, op.n, info) and info.is_rvaoff():
+    if has_ref_info and info.is_rvaoff():
       addr_val += info.base
       if is_invalid_ea(addr_val):
         return None
     else:
       return None
   
+  # The address is a direct memory reference.
+  if addr_val not in all_refs and is_memop:
+    all_refs.add(addr_val)
+
   if addr_val not in all_refs and is_head(addr_val):
     all_refs.add(addr_val)
 
@@ -297,8 +304,8 @@ def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
         inst.ea, addr_val))
 
   if addr_val not in all_refs:
-    DEBUG("POSSIBLE ERROR: Not adding reference from {:x} to {:x}".format(
-        inst.ea, addr_val))
+    DEBUG("POSSIBLE ERROR: Not adding reference from {:x} to {:x}; candidates were {}; operand type is {}, has ref info is {}".format(
+        inst.ea, addr_val, " ".join("{:x}".format(r) for r in all_refs), op.type, has_ref_info))
     _POSSIBLE_REFS.add(addr_val)
     return None
 
@@ -323,29 +330,7 @@ def memop_is_actually_displacement(inst):
 
 # Return the set of all references from `ea` to anything.
 def get_all_references_from(ea):
-  all_refs = set()
-  for ref_ea in idautils.DataRefsFrom(ea):
-    if not is_invalid_ea(ref_ea):
-      all_refs.add(ref_ea)
-    else:
-      #DEBUG("Found an invalid ref from {:x} to {:x}".format(ea, ref_ea))
-      pass
-
-  for ref_ea in idautils.CodeRefsFrom(ea, 0):
-    if not is_invalid_ea(ref_ea):
-      all_refs.add(ref_ea)
-    else:
-      #DEBUG("We found an invalid ref from {:x} to {:x}".format(ea, ref_ea))
-      pass
-
-  for ref_ea in idautils.CodeRefsFrom(ea, 1):
-    if not is_invalid_ea(ref_ea):
-      all_refs.add(ref_ea)
-    else:
-      #DEBUG("We found an invalid ref from {:x} to {:x}".format(ea, ref_ea))
-      pass
-
-  return all_refs
+  return set(xrefs_from(ea))
 
 # This is a real hack. It can take a few tries to really find references, so
 # we'll only enable reference caching after we do some processing of segments.
@@ -382,7 +367,6 @@ def get_instruction_references(arg, binary_is_pie=False):
       all_refs.add(targ_ea)
       ref = Reference(targ_ea, ea - inst.ea)
       offset_to_ref[ref.offset] = ref
-
 
   refs = []
   for i, op in enumerate(inst.Operands):
