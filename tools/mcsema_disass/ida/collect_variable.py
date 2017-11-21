@@ -525,13 +525,6 @@ def _process_instruction(inst_ea, func_variable):
               var_offset = offset - start_
               func_variable["stackArgs"][start_]["flags"].add("LOCAL_REFERER")
               func_variable["stackArgs"][start_]["referent"].append({"ea" :inst_ea, "offset" :var_offset})
-    #elif opnd.is_reg:
-    #  opnd_reg = _translate_reg(opnd.base_reg) if opnd.reg else None
-    #  target_on_stack = opnd_reg if opnd_reg == _stack_ptr or opnd_reg == _base_ptr else None
-    #  if target_on_stack:
-    #    DEBUG("Accessing the stack at {0:x}".format(inst_ea))
-      
-
   
 def _process_basic_block(f_ea, block_ea, func_variable):
   inst_eas, succ_eas = analyse_block(f_ea, block_ea, True)
