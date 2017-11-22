@@ -303,6 +303,7 @@ def is_external_segment(ea):
   return False
 
 def is_constructor_segment(ea):
+  """Returns `True` if the segment containing `ea` belongs to global constructor section"""
   seg_ea = idc.SegStart(ea)
   seg_name = idc.SegName(seg_ea).lower()
   if seg_name in [".init_array", ".ctor"]:
@@ -310,6 +311,7 @@ def is_constructor_segment(ea):
   return False
 
 def is_destructor_segment(ea):
+  """Returns `True` if the segment containing `ea` belongs to global destructor section"""
   seg_ea = idc.SegStart(ea)
   seg_name = idc.SegName(seg_ea).lower()
   if seg_name in [".fini_array", ".dtor"]:
