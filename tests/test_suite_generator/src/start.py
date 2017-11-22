@@ -300,7 +300,8 @@ def lift_test_cfg(toolset, test):
 
   command_line = [toolset["mcsema-lift"], "--arch", test.architecture(),
                   "--os", test.platform(), "--cfg", test.cfg_path(),
-                  "--output", output_file_path]
+                  "--output", output_file_path, "--libc_constructor", "init",
+                  "--libc_destructor", "fini"]
 
   exec_result = execute_with_timeout(command_line, 1200)
 

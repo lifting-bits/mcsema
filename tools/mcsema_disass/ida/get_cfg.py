@@ -1052,6 +1052,7 @@ def recover_regions(M, exported_vars, global_vars=[]):
       if is_destructor_segment(end_ea):
         seg_parts[seg_ea].add(idc.SegEnd(end_ea))
       else:
+        DEBUG("WARNING: Global constructor and destructor sections are not adjacent!")
         seg_parts[seg_ea].add(end_ea)
 
   # Treat analysis-identified global variables as segment begin/end points.
