@@ -1060,8 +1060,8 @@ def recover_regions(M, exported_vars, global_vars=[]):
     # .init_array:0000000000201D70 _init_array     segment para public 'DATA' use64
     # .init_array:0000000000201D70                 assume cs:_init_array
     # .init_array:0000000000201D70                 ;org 201D70h
-    # .init_array:0000000000201D70 off_201D70      dq offset sub_C40       ; DATA XREF: LOAD:00000000000000F8↑o
-    # .init_array:0000000000201D70                                         ; LOAD:0000000000000210↑o ...
+    # .init_array:0000000000201D70 off_201D70      dq offset sub_C40
+    # .init_array:0000000000201D70
     # .init_array:0000000000201D78                 dq offset sub_10E5
     # .init_array:0000000000201D78 _init_array     ends
     #
@@ -1071,7 +1071,7 @@ def recover_regions(M, exported_vars, global_vars=[]):
     # .fini_array:0000000000201D80 _fini_array     segment para public 'DATA' use64
     # .fini_array:0000000000201D80                 assume cs:_fini_array
     # .fini_array:0000000000201D80                 ;org 201D80h
-    # .fini_array:0000000000201D80 off_201D80      dq offset sub_C00       ; DATA XREF: init+19↑o
+    # .fini_array:0000000000201D80 off_201D80      dq offset sub_C00
     # .fini_array:0000000000201D80 _fini_array     ends
     #
     # .text:0000000000001160 ; void init(void)
