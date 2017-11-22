@@ -1041,19 +1041,72 @@ def recover_regions(M, exported_vars, global_vars=[]):
     seg_names[seg_ea] = seg_name
 
     if (not is_external_segment_by_flags(seg_ea) or \
-       segment_contains_external_function_pointers(seg_ea)) and \
-       not (is_constructor_segment(seg_ea) or is_destructor_segment(seg_ea)):
+        segment_contains_external_function_pointers(seg_ea)) and \
+        not (is_constructor_segment(seg_ea) or is_destructor_segment(seg_ea)):
       seg_parts[seg_ea].add(seg_ea)
       seg_parts[seg_ea].add(idc.SegEnd(seg_ea))
+
+    # Issue #330
+    # Fix for an imporatnt feature - static storage allocation of the objects in C++, where
+    # the constructor gets invoked before the main and it typically calls the 'init/__libc_csu_init' function.
+    #
+    # The function iterate over the array conatined in .init_array initializing the global constructor/destructor
+    # function pointers using the symbol `off_201D70` and `off_201D80` as the array bounds as shown below. These
+    # symbols falls in section `.init_array` and `.fini_array` correspondingly.
+    #
+    # .init_array:0000000000201D70 ; ELF Initialization Function Table
+    # .init_array:0000000000201D70 ; ===========================================================================
+    # .init_array:0000000000201D70 ; Segment type: Pure data
+    # .init_array:0000000000201D70 _init_array     segment para public 'DATA' use64
+    # .init_array:0000000000201D70                 assume cs:_init_array
+    # .init_array:0000000000201D70                 ;org 201D70h
+    # .init_array:0000000000201D70 off_201D70      dq offset sub_C40       ; DATA XREF: LOAD:00000000000000F8↑o
+    # .init_array:0000000000201D70                                         ; LOAD:0000000000000210↑o ...
+    # .init_array:0000000000201D78                 dq offset sub_10E5
+    # .init_array:0000000000201D78 _init_array     ends
+    #
+    # .fini_array:0000000000201D80 ; ELF Termination Function Table
+    # .fini_array:0000000000201D80 ; ===========================================================================
+    # .fini_array:0000000000201D80 ; Segment type: Pure data
+    # .fini_array:0000000000201D80 _fini_array     segment para public 'DATA' use64
+    # .fini_array:0000000000201D80                 assume cs:_fini_array
+    # .fini_array:0000000000201D80                 ;org 201D80h
+    # .fini_array:0000000000201D80 off_201D80      dq offset sub_C00       ; DATA XREF: init+19↑o
+    # .fini_array:0000000000201D80 _fini_array     ends
+    #
+    # .text:0000000000001160 ; void init(void)
+    # .text:0000000000001160                 push    r15
+    # .text:0000000000001162                 mov     r15d, edi
+    # .text:0000000000001165                 push    r14
+    # .text:0000000000001167                 mov     r14, rsi
+    # .text:000000000000116A                 push    r13
+    # .text:000000000000116C                 mov     r13, rdx
+    # .text:000000000000116F                 push    r12
+    # .text:0000000000001171                 lea     r12, off_201D70
+    # .text:0000000000001178                 push    rbp
+    # .text:0000000000001179                 lea     rbp, off_201D80
+    # .text:0000000000001180                 push    rbx
+    # .text:0000000000001181                 sub     rbp, r12
+    # .text:0000000000001184                 xor     ebx, ebx
+    # .text:0000000000001186                 sar     rbp, 3
+    # .text:000000000000118A                 sub     rsp, 8
+    # .text:000000000000118E                 call    _init_proc
+    # ...
+    # Extracting these sections as different LLVM GlobalVariable will not gurantee the adjucency placement in
+    # recompiled binary. Hence it should be lifted as one LLVM GlobalVariable if they are adjacent.
 
     if is_constructor_segment(seg_ea):
       seg_parts[seg_ea].add(seg_ea)
       end_ea =  idc.SegEnd(seg_ea)
       if is_destructor_segment(end_ea):
         seg_parts[seg_ea].add(idc.SegEnd(end_ea))
+        DEBUG("WARNING: Global constructor and destructor sections are adjacent!")
       else:
-        DEBUG("WARNING: Global constructor and destructor sections are not adjacent!")
         seg_parts[seg_ea].add(end_ea)
+        fini_ea = get_destructor_segment()
+        if fini_ea:
+          seg_parts[fini_ea].add(fini_ea)
+          seg_parts[fini_ea].add(idc.SegEnd(fini_ea))
 
   # Treat analysis-identified global variables as segment begin/end points.
   for var_name, begin_ea, end_ea in global_vars:
