@@ -143,10 +143,10 @@ class Operand(object):
       self._base_id = base_
       self._displ = offset
                
-  def _get_datatype_size(dtype):
+  def _get_datatype_size(self, dtype):
     return OPND_DTYPE_TO_SIZE.get(dtype,0)
             
-  def _get_datatypestr_from_dtyp(dt_dtyp):
+  def _get_datatypestr_from_dtyp(self, dt_dtyp):
     return OPND_DTYPE_STR.get(dt_dtyp,"")
     
   @property
@@ -159,7 +159,7 @@ class Operand(object):
     
   @property
   def size(self):
-    return _get_datatype_size(self._operand.dtyp)
+    return self._get_datatype_size(self._operand.dtyp)
     
   @property
   def text(self):
@@ -167,7 +167,7 @@ class Operand(object):
     
   @property
   def dtype(self):
-    return _get_datatypestr_from_dtyp(self._operand.dtyp)
+    return self._get_datatypestr_from_dtyp(self._operand.dtyp)
         
   @property
   def index(self):
@@ -237,14 +237,14 @@ class Operand(object):
       size = get_native_size()
     return get_register_name(self.reg_id, size)
 
-    if self.type.is_reg:
+    if self.is_reg:
       return get_register_name(self.reg_id, self.size)
 
   @property
   def regs(self):
     if self.has_phrase:
       return set(reg for reg in (self.base, self.index) if reg)
-    elif self.type.is_reg:
+    elif self.is_reg:
       return {get_register_name(self.reg_id, self.size)}
     else:
       return set()
@@ -311,8 +311,6 @@ class Instruction(object):
     return self._insn.get_canon_mnem()
     
     
-
-
 def _signed_from_unsigned64(val):
   if val & 0x8000000000000000:
     return -0x10000000000000000 + val
@@ -532,13 +530,7 @@ def _process_basic_block(f_ea, block_ea, func_variable):
   for inst_ea in inst_eas:
     _process_instruction(inst_ea, func_variable)
 
-
-RECOVER_DEBUG_FL = [
-    # stack variable tick and times_per_thread is causing
-    # problem while lifting Apache ATD's;
-    "dso_load",
-    "send_brigade_nonblocking", 
-    ]
+_FUNC_BLACK_LIST = set()
 
 def build_stack_args(f):
   stackArgs = dict()
@@ -557,7 +549,7 @@ def build_stack_args(f):
     if "..." in args_list:
       return stackArgs
 
-  if name in RECOVER_DEBUG_FL:
+  if name in _FUNC_BLACK_LIST:
     return stackArgs
 
   #grab the offset of the stored frame pointer, so that
@@ -599,16 +591,44 @@ def build_stack_args(f):
 
   return stackArgs
 
-def collect_function_vars(f, blockset):
+def is_instruction_safe(inst_ea, f_name):
+  use_base_ptr = False
+  use_stack_ptr = False
+  insn = Instruction(inst_ea)
+  if insn.mnemonic in ["push"]:
+    return True
+
+  for opnd in insn.opearnds:
+    if opnd.is_read and opnd.is_reg:
+      for reg in opnd.regs:
+        if _translate_reg(reg) == _base_ptr:
+          use_base_ptr = True
+    if opnd.is_write and opnd.is_reg:
+      for reg in opnd.regs:
+        if _translate_reg(reg) == _stack_ptr:
+          use_stack_ptr = True
+
+  if use_base_ptr and not use_stack_ptr:
+    DEBUG("SV_DEBUG: Instrctions {0:x} {1} {2}".format(inst_ea, opnd.regs, f_name))
+    return False
+  return True
+
+def is_function_safe(func_ea, blockset):
+  f_name = get_symbol_name(func_ea)
+  for block_ea in blockset:
+    inst_eas, succ_eas = analyse_block(func_ea, block_ea, True)
+    for inst_ea in inst_eas:
+      if not is_instruction_safe(inst_ea, f_name):
+        return False
+  return True
+
+def collect_function_vars(func_ea, blockset):
   stackArgs = dict()
-  name = idc.Name(f)
-  start = idc.GetFunctionAttr(f, idc.FUNCATTR_START)
-  end = idc.GetFunctionAttr(f, idc.FUNCATTR_END)
-  _locals = idc.GetFunctionAttr(f, idc.FUNCATTR_FRSIZE)
-  _uses_bp = 0 != (idc.GetFunctionFlags(f) & idc.FUNC_FRAME)
-  
   DEBUG_PUSH()
-  stackArgs = build_stack_args(f)
+  if not is_function_safe(func_ea, blockset):
+    _FUNC_BLACK_LIST.add(get_symbol_name(func_ea))
+
+  stackArgs = build_stack_args(func_ea)
   processed_blocks = set()
   while len(blockset) > 0:
     block_ea = blockset.pop()
@@ -617,8 +637,34 @@ def collect_function_vars(f, blockset):
       continue
 
     processed_blocks.add(block_ea)
-    _process_basic_block(f, block_ea, {"name":name, "stackArgs": stackArgs, "uses_bp":_uses_bp})
+    _process_basic_block(func_ea, block_ea, {"stackArgs": stackArgs})
 
   DEBUG_POP()
   
   return stackArgs
+
+def recover_variables(F, func_ea, blockset):
+  functions = list()
+  f_name = get_symbol_name(func_ea)
+  if is_code_by_flags(func_ea):
+    f_ea = idc.GetFunctionAttr(func_ea, idc.FUNCATTR_START)
+    f_vars = collect_function_vars(func_ea, blockset)
+    functions.append({"ea":f_ea, "name":f_name, "stackArgs":f_vars})
+
+  for offset in f_vars.keys():
+    if f_vars[offset]["safe"] is False:
+      continue
+
+    var = F.stack_vars.add()
+    var.sp_offset = offset
+    var.name = f_vars[offset]["name"]
+    var.size = f_vars[offset]["size"]
+    for i in f_vars[offset]["writes"]:
+      r = var.ref_eas.add()
+      r.inst_ea = i["ea"]
+      r.offset = i["offset"]
+
+    for i in f_vars[offset]["reads"]:
+      r = var.ref_eas.add()
+      r.inst_ea = i["ea"]
+      r.offset = i["offset"]
