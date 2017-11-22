@@ -298,6 +298,8 @@ def execute_tests(toolset, test_list):
 def lift_test_cfg(toolset, test):
   output_file_path = os.path.join(tempfile.gettempdir(), test.name() + "_" + test.architecture() + "_" + test.platform() + ".bc")
 
+  # Reference docs/CommandLineReference.md
+  # In stripped ELFs, the libc_constructor/libc_destructor functions are init/fini
   command_line = [toolset["mcsema-lift"], "--arch", test.architecture(),
                   "--os", test.platform(), "--cfg", test.cfg_path(),
                   "--output", output_file_path, "--libc_constructor", "init",

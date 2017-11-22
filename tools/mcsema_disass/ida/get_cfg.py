@@ -1046,8 +1046,7 @@ def recover_regions(M, exported_vars, global_vars=[]):
       seg_parts[seg_ea].add(seg_ea)
       seg_parts[seg_ea].add(idc.SegEnd(seg_ea))
 
-    # Issue #330
-    # Fix for an imporatnt feature - static storage allocation of the objects in C++, where
+    # Fix for an important feature - static storage allocation of the objects in C++, where
     # the constructor gets invoked before the main and it typically calls the 'init/__libc_csu_init' function.
     #
     # The function iterate over the array conatined in .init_array initializing the global constructor/destructor
@@ -1092,7 +1091,7 @@ def recover_regions(M, exported_vars, global_vars=[]):
     # .text:000000000000118A                 sub     rsp, 8
     # .text:000000000000118E                 call    _init_proc
     # ...
-    # Extracting these sections as different LLVM GlobalVariable will not gurantee the adjucency placement in
+    # Extracting these sections as different LLVM GlobalVariable will not guarantee the adjacency placement in
     # recompiled binary. Hence it should be lifted as one LLVM GlobalVariable if they are adjacent.
 
     if is_constructor_segment(seg_ea):
