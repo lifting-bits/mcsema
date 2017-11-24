@@ -364,4 +364,32 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
       inst, block, arg, op);
 }
 
+// Lift a register operand to a value.
+llvm::Value *InstructionLifter::LiftRegisterOperand(
+    remill::Instruction &inst, llvm::BasicBlock *block,
+    llvm::Argument *arg, remill::Operand &op) {
+
+  auto &reg = op.reg;
+
+  // Check if the instruction is referring to stack variable
+  if (ctx.cfg_inst->stack_var) {
+    if (!std::strcmp(const_cast<const char*>(reg.name.c_str()), "RBP")) {
+      llvm::IRBuilder<> ir(block);
+      auto reg_value = ir.CreatePtrToInt(ctx.cfg_inst->stack_var->llvm_var, word_type);
+      auto map_it = ctx.cfg_inst->stack_var->refs.find(ctx.cfg_inst->ea);
+      if (map_it != ctx.cfg_inst->stack_var->refs.end()) {
+        auto var_offset = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(map_it->second), true);
+        reg_value = ir.CreateAdd(reg_value, var_offset);
+      }
+      LOG(INFO)
+        << "InstructionLifter::LiftRegisterOperand : " << std::hex
+        << ctx.cfg_inst->ea << std::dec << " " << reg.name;
+      return reg_value;
+    }
+  }
+
+  return this->remill::InstructionLifter::LiftRegisterOperand(
+      inst, block, arg, op);
+}
+
 }  // namespace mcsema
