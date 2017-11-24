@@ -582,7 +582,6 @@ def build_stack_variable(func_ea):
     frame_size = idc.GetFunctionAttr(func_ea, idc.FUNCATTR_FRSIZE)
     flag_str = ""
     member_offset = _signed_from_unsigned(offset) - delta
-    DEBUG("Function Stack {0} {1} {2} {3}".format(f_name, member_offset, delta, _signed_from_unsigned(offset)))
     stack_vars[member_offset] = {"name":f_name,
                                  "size":frame_size,
                                  "flags":flag_str,
@@ -635,7 +634,7 @@ def collect_function_vars(func_ea, blockset):
   if is_function_unsafe(func_ea, blockset):
     _FUNC_UNSAFE_LIST.add(get_symbol_name(func_ea))
 
-  # Check for the variadic function type; Add the variadic functions
+  # Check for the variadic function type; Add the variadic function
   # to the list of unsafe functions
   func_type = idc.GetType(func_ea)
   if (func_type is not None) and ("(" in func_type):
@@ -673,7 +672,6 @@ def recover_variables(F, func_ea, blockset):
   f_vars = collect_function_vars(func_ea, blockset)
   functions.append({"ea":f_ea, "name":f_name, "stackArgs":f_vars})
 
-  DEBUG("Stack Variable {}".format(pprint.pformat(functions)))
   for offset in f_vars.keys():
     if f_vars[offset]["safe"] is False:
       continue
