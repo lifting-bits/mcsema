@@ -453,23 +453,6 @@ def _get_flags_from_bits(flag):
       flags.add(val)
   return flags
 
-def _process_lea_instruction(inst_ea, func_variable, f_name):
-  insn = Instruction(inst_ea)
-  for opnd in insn.opearnds:
-    if opnd.has_phrase:
-      DEBUG("Operand is Phrase {}".format(opnd.text))
-      base_ = _translate_reg(opnd.base_reg) if opnd.base_reg else None
-      index_ = _translate_reg(opnd.index_reg) if opnd.index_reg else None
-      offset = _signed_from_unsigned(idc.GetOperandValue(inst_ea, opnd.index))
-      if len(func_variable["stackArgs"].keys()) == 0:
-        return
-    
-      target_on_stack = base_ if base_ == _stack_ptr or base_ == _base_ptr else None
-      if target_on_stack == _base_ptr:
-        start_ = floor_key(func_variable["stackArgs"].keys(), offset)
-        func_variable["stackArgs"].pop(start_, None)
-        DEBUG("LEA instruction at {0:x}, variable offset {1} function {2}".format(inst_ea, start_, f_name))
-  
 def _process_instruction(inst_ea, func_variable):
   insn = Instruction(inst_ea)
   for opnd in insn.opearnds:
@@ -528,6 +511,8 @@ def _process_instruction(inst_ea, func_variable):
       if insn.mnemonic in ["push"]:
         continue
 
+      # The register operand such as `add %rax %rbp` will not have the offset value
+      # It is set as 0 since we are looking to replace %rbp with %frame = ...
       offset = 0 #_signed_from_unsigned(idc.GetOperandValue(inst_ea, opnd.index))
       if len(func_variable["stack_vars"].keys()) == 0:
         return
@@ -555,14 +540,6 @@ def build_stack_variable(func_ea):
   frame = idc.GetFrame(func_ea)
   if not frame:
     return stack_vars
-
-  # Check for the variadic function type
-  func_type = idc.GetType(func_ea)
-  if (func_type is not None) and ("(" in func_type):
-    args = func_type[ func_type.index('(')+1: func_type.rindex(')') ]
-    args_list = [ x.strip() for x in args.split(',')]
-    if "..." in args_list:
-      return stack_vars
 
   f_name = get_symbol_name(func_ea)
   #grab the offset of the stored frame pointer, so that
@@ -657,6 +634,15 @@ def collect_function_vars(func_ea, blockset):
   DEBUG_PUSH()
   if is_function_unsafe(func_ea, blockset):
     _FUNC_UNSAFE_LIST.add(get_symbol_name(func_ea))
+
+  # Check for the variadic function type; Add the variadic functions
+  # to the list of unsafe functions
+  func_type = idc.GetType(func_ea)
+  if (func_type is not None) and ("(" in func_type):
+    args = func_type[ func_type.index('(')+1: func_type.rindex(')') ]
+    args_list = [ x.strip() for x in args.split(',')]
+    if "..." in args_list:
+      _FUNC_UNSAFE_LIST.add(get_symbol_name(func_ea))
 
   stack_vars = build_stack_variable(func_ea)
   processed_blocks = set()
