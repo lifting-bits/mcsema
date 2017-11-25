@@ -599,8 +599,8 @@ def is_instruction_unsafe(inst_ea, func_ea):
   _uses_bp = False
   insn = Instruction(inst_ea)
 
-  # Special case checks for function prologue which prepares
-  # the function for stack and register use
+  # Special case check for function prologue which prepares
+  # the function for stack and register uses
   #     push    rbp
   #     mov     rbp, rsp
   #     ...

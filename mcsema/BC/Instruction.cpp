@@ -84,20 +84,18 @@ static llvm::Value *LoadAddressRegVal(llvm::BasicBlock *block,
   return value;
 }
 
-static bool IsFramePointerReg(const remill::Operand::Register &reg) {
+static bool IsFramePointerReg(
+            const remill::Operand::Register &reg) {
 
   if (reg.name.empty()) {
     return false;
   }
 
-  if (mcsema::gArch->IsAMD64()) {
-    if (std::strcmp(reg.name.c_str(), "RBP")) {
+  if (mcsema::gArch->IsAMD64() && \
+      !std::strcmp(reg.name.c_str(), "RBP")) {
       return true;
-    }
-  } else {
-    if (std::strcmp(reg.name.c_str(), "EBP")) {
+  } else if (!std::strcmp(reg.name.c_str(), "EBP")) {
       return true;
-    }
   }
   return false;
 }
@@ -392,7 +390,7 @@ llvm::Value *InstructionLifter::LiftRegisterOperand(
   // Check if the instruction is referring to the base pointer which
   // might be accessing stack variable indirectly
   if (ctx.cfg_inst->stack_var) {
-    if (!IsFramePointerReg(reg)) {
+    if (IsFramePointerReg(reg)) {
       llvm::IRBuilder<> ir(block);
       auto variable = ir.CreatePtrToInt(ctx.cfg_inst->stack_var->llvm_var, word_type);
       auto map_it = ctx.cfg_inst->stack_var->refs.find(ctx.cfg_inst->ea);
