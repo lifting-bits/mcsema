@@ -568,12 +568,12 @@ def build_stack_variable(func_ea):
       member_flag = idc.GetMemberFlag(frame, offset)
       flag_str = _get_flags_from_bits(member_flag)
       member_offset = offset-delta
-      stack_vars[member_offset] = {"name":member_name,
-                                  "size":member_size,
-                                  "flags":flag_str,
-                                  "writes":list(),
-                                  "referent":list(),
-                                  "reads":list(),
+      stack_vars[member_offset] = {"name": member_name,
+                                  "size": member_size,
+                                  "flags": flag_str,
+                                  "writes": list(),
+                                  "referent": list(),
+                                  "reads": list(),
                                   "safe": False }
 
       offset = idc.GetStrucNextOff(frame, offset)
@@ -582,12 +582,12 @@ def build_stack_variable(func_ea):
     frame_size = idc.GetFunctionAttr(func_ea, idc.FUNCATTR_FRSIZE)
     flag_str = ""
     member_offset = _signed_from_unsigned(offset) - delta
-    stack_vars[member_offset] = {"name":f_name,
-                                 "size":frame_size,
-                                 "flags":flag_str,
-                                 "writes":list(),
-                                 "referent":list(),
-                                 "reads":list(),
+    stack_vars[member_offset] = {"name": f_name,
+                                 "size": frame_size,
+                                 "flags": flag_str,
+                                 "writes": list(),
+                                 "referent": list(),
+                                 "reads": list(),
                                  "safe": False }
 
   return stack_vars
@@ -599,8 +599,8 @@ def is_instruction_unsafe(inst_ea, func_ea):
   _uses_bp = False
   insn = Instruction(inst_ea)
 
-  # Special case the checks for function prologue which prepares the
-  # function for stack and register uses.
+  # Special case checks for function prologue which prepares
+  # the function for stack and register use
   #     push    rbp
   #     mov     rbp, rsp
   #     ...
