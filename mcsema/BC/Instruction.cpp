@@ -92,9 +92,9 @@ static bool IsFramePointerReg(
   }
 
   if (mcsema::gArch->IsAMD64()) {
-    return !std::strcmp(reg.name.c_str(), "RBP");
+    return reg.name == "RBP";
   } else if (mcsema::gArch->IsX86()) {
-    return !std::strcmp(reg.name.c_str(), "EBP");
+    return reg.name == "EBP";
   }
   return false;
 }
