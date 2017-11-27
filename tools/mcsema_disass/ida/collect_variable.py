@@ -235,7 +235,7 @@ class Operand(object):
     """Name of the register used in the operand."""
     if self.has_phrase:
       size = get_native_size()
-    return get_register_name(self.reg_id, size)
+      return get_register_name(self.reg_id, size)
 
     if self.is_reg:
       return get_register_name(self.reg_id, self.size)
