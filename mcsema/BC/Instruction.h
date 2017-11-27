@@ -62,6 +62,11 @@ class InstructionLifter : public remill::InstructionLifter {
       remill::Instruction &inst, llvm::BasicBlock *block,
       llvm::Argument *arg, remill::Operand &mem) override;
 
+  // Lift a register operand to a value.
+  llvm::Value *LiftRegisterOperand(
+      remill::Instruction &inst, llvm::BasicBlock *block,
+      llvm::Argument *arg, remill::Operand &reg) override;
+
  private:
 
   llvm::Value *GetAddress(const NativeXref *cfg_xref);

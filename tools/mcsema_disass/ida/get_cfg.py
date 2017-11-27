@@ -768,37 +768,6 @@ def analyze_jump_table_targets(inst, new_eas, new_func_eas):
           table.table_ea, entry_addr, entry_target))
       new_eas.add(entry_target)
 
-def recover_variables(F, func_ea, BB):
-  '''
-  Collects stack variable data from all functions in the database.
-  '''
-  functions = list()
-  if is_code_by_flags(func_ea):
-    f_ea = idc.GetFunctionAttr(func_ea, idc.FUNCATTR_START)
-    f_vars = collect_function_vars(func_ea, BB)
-    functions.append({"ea":f_ea, "name":idc.Name(func_ea), "stackArgs":f_vars})
-
-  DEBUG("{0}".format(pprint.pformat(functions)))
-  
-  for offset in f_vars.keys():
-    if f_vars[offset]["safe"] is False:
-        continue
-
-    var = F.stack_vars.add()
-    var.sp_offset = offset
-    var.name = f_vars[offset]["name"]
-    var.size = f_vars[offset]["size"]
-    # add refs...
-    for i in f_vars[offset]["writes"]:
-      r = var.ref_eas.add()
-      r.inst_ea = i["ea"]
-      r.offset = i["offset"]
-
-    for i in f_vars[offset]["reads"]:
-      r = var.ref_eas.add()
-      r.inst_ea = i["ea"]
-      r.offset = i["offset"]
-
 _RECOVERED_FUNCS = set()
 
 def recover_function(M, func_ea, new_func_eas, entrypoints):

@@ -324,7 +324,7 @@ def _process_subprogram_tag(die, section_offset, M, global_var_data):
     stackvar.name = get_name(child)
     stackvar.sp_offset = 0
     stackvar.has_frame = has_frame
-    stackvar.regname = frame_regname
+    stackvar.reg_name = frame_regname
     (type, size, offset) = get_types(child)
     stackvar.size = size if size > 0 else 0
     

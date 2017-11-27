@@ -84,6 +84,21 @@ static llvm::Value *LoadAddressRegVal(llvm::BasicBlock *block,
   return value;
 }
 
+static bool IsFramePointerReg(
+            const remill::Operand::Register &reg) {
+
+  if (reg.name.empty()) {
+    return false;
+  }
+
+  if (mcsema::gArch->IsAMD64()) {
+    return reg.name == "RBP";
+  } else if (mcsema::gArch->IsX86()) {
+    return reg.name == "EBP";
+  }
+  return false;
+}
+
 }
 
 namespace mcsema {
@@ -361,6 +376,35 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
   }
 
   return this->remill::InstructionLifter::LiftAddressOperand(
+      inst, block, arg, op);
+}
+
+// Lift the register operand to a value.
+llvm::Value *InstructionLifter::LiftRegisterOperand(
+    remill::Instruction &inst, llvm::BasicBlock *block,
+    llvm::Argument *arg, remill::Operand &op) {
+
+  auto &reg = op.reg;
+
+  // Check if the instruction is referring to the base pointer which
+  // might be accessing stack variable indirectly
+  if (ctx.cfg_inst->stack_var) {
+    if (IsFramePointerReg(reg)) {
+      llvm::IRBuilder<> ir(block);
+      auto variable = ir.CreatePtrToInt(ctx.cfg_inst->stack_var->llvm_var, word_type);
+      auto map_it = ctx.cfg_inst->stack_var->refs.find(ctx.cfg_inst->ea);
+      if (map_it != ctx.cfg_inst->stack_var->refs.end()) {
+        auto var_offset = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(map_it->second), true);
+        variable = ir.CreateAdd(variable, var_offset);
+      }
+      LOG(INFO)
+          << "Lifting stack variable reference at : " << std::hex
+          << ctx.cfg_inst->ea << std::dec;
+      return variable;
+    }
+  }
+
+  return this->remill::InstructionLifter::LiftRegisterOperand(
       inst, block, arg, op);
 }
 
