@@ -1224,7 +1224,9 @@ def identify_external_symbols():
 
     elif is_ELF_got_pointer(ea):
       target_ea = get_reference_target(ea)
-      target_name = get_true_external_name(get_symbol_name(target_ea))
+      # idc.Demangle (...) gives incorrect name for the external data objects
+      # only de-mangle the name of the external functions
+      target_name = get_true_external_name(get_symbol_name(target_ea)) if is_code(target_ea) else get_symbol_name(target_ea)
       
       # Detect missing references.
       if is_external_segment(target_ea):
@@ -1288,7 +1290,9 @@ def identify_external_symbols():
           del EMAP[target_name]
 
     elif is_external_segment_by_flags(ea) or is_runtime_external_data_reference(ea):
-      extern_name = get_true_external_name(name)
+      # idc.Demangle (...) gives incorrect name for the external data objects
+      # only de-mangle the name of the external functions
+      extern_name = get_true_external_name(name) if is_code(ea) else name
 
       if extern_name in EMAP_DATA:
         DEBUG("Variable at {:x} is the external {}".format(ea, extern_name))
@@ -1310,7 +1314,7 @@ def identify_external_symbols():
         comment = idc.GetCommentEx(ea, 0) or ""
         for comment_line in comment.split("\n"):
           comment_line = comment_line.replace(";", "").strip()
-          found_name = get_true_external_name(comment_line)
+          found_name = get_true_external_name(comment_line) if is_code(ea) else comment_line
           if found_name in EMAP_DATA:
             extern_name = found_name
             break
