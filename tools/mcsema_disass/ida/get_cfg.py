@@ -129,13 +129,13 @@ def demangled_name(name):
     if dname and len(dname) and "::" not in dname:
       dname = dname.split("(")[0]
       dname = dname.split(" ")[-1]
-      if dname:
+      if re.match(r"^[a-zA-Z0-9_]+$", dname):
         return dname
     return name
   except:
     return name
 
-def get_true_external_name(fn):
+def get_true_external_name(fn, demangle=True):
   """Tries to get the 'true' name of `fn`. This removes things like
   ELF-versioning from symbols."""
   if not fn:
@@ -153,7 +153,8 @@ def get_true_external_name(fn):
 
   # Try to demangle the name, but don't do it if looks like there's a C++
   # namespace.
-  fn = demangled_name(fn)
+  if demangle:
+    fn = demangled_name(fn)
 
   # TODO(pag): Is this a macOS or Windows thing?
   if not is_linked_ELF_program() and fn[0] == '_':
@@ -1224,9 +1225,7 @@ def identify_external_symbols():
 
     elif is_ELF_got_pointer(ea):
       target_ea = get_reference_target(ea)
-      # idc.Demangle (...) gives incorrect name for the external data objects
-      # only de-mangle the name of the external functions
-      target_name = get_true_external_name(get_symbol_name(target_ea)) if is_code(target_ea) else get_symbol_name(target_ea)
+      target_name = get_true_external_name(get_symbol_name(target_ea))
       
       # Detect missing references.
       if is_external_segment(target_ea):
@@ -1292,7 +1291,7 @@ def identify_external_symbols():
     elif is_external_segment_by_flags(ea) or is_runtime_external_data_reference(ea):
       # idc.Demangle (...) gives incorrect name for the external data objects
       # only de-mangle the name of the external functions
-      extern_name = get_true_external_name(name) if is_code(ea) else name
+      extern_name = get_true_external_name(name, is_code(ea))
 
       if extern_name in EMAP_DATA:
         DEBUG("Variable at {:x} is the external {}".format(ea, extern_name))
@@ -1314,7 +1313,7 @@ def identify_external_symbols():
         comment = idc.GetCommentEx(ea, 0) or ""
         for comment_line in comment.split("\n"):
           comment_line = comment_line.replace(";", "").strip()
-          found_name = get_true_external_name(comment_line) if is_code(ea) else comment_line
+          found_name = get_true_external_name(comment_line, is_code(ea))
           if found_name in EMAP_DATA:
             extern_name = found_name
             break
