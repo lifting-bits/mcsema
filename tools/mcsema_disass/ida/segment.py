@@ -153,6 +153,9 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
         DEBUG("WARNING: Made {:x} into a string of length {}".format(ea, item_size))
       continue
 
+    # Clear the `last_was_string` flag
+    last_was_string = False
+
     # # Look for one string squashed between another. Compilers tend to place
     # # all strings together, and sometimes IDA misses some of the intermediate
     # # ones when they aren't directly referenced.
