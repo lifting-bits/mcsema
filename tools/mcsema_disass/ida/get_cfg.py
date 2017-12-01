@@ -1291,7 +1291,7 @@ def identify_external_symbols():
     elif is_external_segment_by_flags(ea) or is_runtime_external_data_reference(ea):
       # idc.Demangle (...) gives incorrect name for the external data objects
       # only de-mangle the name of the external functions
-      extern_name = get_true_external_name(name, is_code(ea))
+      extern_name = get_true_external_name(name, demangle=is_code(ea))
 
       if extern_name in EMAP_DATA:
         DEBUG("Variable at {:x} is the external {}".format(ea, extern_name))
@@ -1313,7 +1313,7 @@ def identify_external_symbols():
         comment = idc.GetCommentEx(ea, 0) or ""
         for comment_line in comment.split("\n"):
           comment_line = comment_line.replace(";", "").strip()
-          found_name = get_true_external_name(comment_line, is_code(ea))
+          found_name = get_true_external_name(comment_line, demangle=is_code(ea))
           if found_name in EMAP_DATA:
             extern_name = found_name
             break
