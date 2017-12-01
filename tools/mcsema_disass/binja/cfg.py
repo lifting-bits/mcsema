@@ -1,3 +1,4 @@
+import argparse
 import binaryninja as binja
 from binaryninja.enums import (
     SymbolType, TypeClass,
@@ -37,6 +38,10 @@ BINJA_CCONV_TYPES = {
 
 RECOVERED = set()
 TO_RECOVER = Queue()
+
+RECOVER_OPTS = {
+    'stack_vars': False
+}
 
 
 def queue_func(addr):
@@ -368,10 +373,14 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
 
             pb_inst = pb_block.instructions.add()
             recover_inst(bv, pb_block, pb_inst, il)
-            vars.find_stack_var_refs(bv, inst, il, var_refs)
+
+            # Find any references to stack vars in this instruction
+            if RECOVER_OPTS['stack_vars']:
+                vars.find_stack_var_refs(bv, inst, il, var_refs)
 
     # Recover stack variables
-    vars.recover_stack_vars(pb_func, func, var_refs)
+    if RECOVER_OPTS['stack_vars']:
+        vars.recover_stack_vars(pb_func, func, var_refs)
 
 
 def recover_cfg(bv, args):
@@ -438,7 +447,20 @@ def parse_defs_file(bv, path):
                 EXT_MAP[fname] = (int(args), CCONV_TYPES[cconv], ret, sign)
 
 
-def get_cfg(args):
+def get_cfg(args, fixed_args):
+    # Parse any additional args
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--recover-stack-vars',
+                        help='Flag to enable stack variable recovery',
+                        default=False,
+                        action='store_true')
+
+    extra_args = parser.parse_args(fixed_args)
+
+    if extra_args.recover_stack_vars:
+        RECOVER_OPTS['stack_vars'] = True
+
     # Setup logger
     util.init_logger(args.log_file)
 

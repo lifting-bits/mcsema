@@ -146,7 +146,7 @@ def main():
         ret = 1
     elif 'binja' in args.disassembler or 'binaryninja' in args.disassembler:
       from binja.cfg import get_cfg
-      ret = get_cfg(args)
+      ret = get_cfg(args, fixed_command_args)
     else:
       arg_parser.error("{} passed to --disassembler is not known.".format(
           args.disassembler))

@@ -76,6 +76,7 @@ def _sp_name(bv):
 
 
 def _bp_name(bv):
+    # TODO(krx): this is currently specific to x86/amd64
     return 'rbp' if _sp_name(bv) == 'rsp' else 'ebp'
 
 
