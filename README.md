@@ -23,7 +23,7 @@ McSema and `remill` were developed and are maintained by Trail of Bits, funded b
 * McSema runs on Windows and Linux and has been tested on Windows 7, 10, Ubuntu (14.04, 16.04), and openSUSE.
 * McSema can cross-lift: it can translate Linux binaries on Windows, or Windows binaries on Linux.
 * Output bitcode is compatible with the LLVM toolchain (versions 3.5 and up).
-* Translated bitcode can be analyzed or [recompiled as a new, working executable](docs/McsemaWalkthrough.md) with functionality identical to the original.
+* Translated bitcode can be analyzed or [recompiled as a new, working executable](docs/McSemaWalkthrough.md) with functionality identical to the original.
 
 ## Use-cases
 
