@@ -42,6 +42,8 @@
 
 #include "mcsema/CFG/CFG.h"
 
+namespace mcsema {
+
 namespace {
 
 // Load the address of a register.
@@ -84,8 +86,7 @@ static llvm::Value *LoadAddressRegVal(llvm::BasicBlock *block,
   return value;
 }
 
-static bool IsFramePointerReg(
-            const remill::Operand::Register &reg) {
+static bool IsFramePointerReg(const remill::Operand::Register &reg) {
 
   if (reg.name.empty()) {
     return false;
@@ -99,9 +100,7 @@ static bool IsFramePointerReg(
   return false;
 }
 
-}
-
-namespace mcsema {
+}  // namespace
 
 InstructionLifter::~InstructionLifter(void) {}
 
@@ -326,7 +325,8 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
     auto base = ir.CreatePtrToInt(ctx.cfg_inst->stack_var->llvm_var, word_type);
     auto map_it = ctx.cfg_inst->stack_var->refs.find(ctx.cfg_inst->ea);
     if (map_it != ctx.cfg_inst->stack_var->refs.end()) {
-      auto var_offset = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(map_it->second), true);
+      auto var_offset = llvm::ConstantInt::get(
+          word_type, static_cast<uint64_t>(map_it->second), true);
       base = ir.CreateAdd(base, var_offset);
       LOG(INFO)
         << "Lifting stack variable access at : " << std::hex << map_it->first
@@ -336,7 +336,8 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
       if (!mem.index_reg.name.empty()) {
         auto zero = llvm::ConstantInt::get(word_type, 0, false);
         auto index = LoadAddressRegVal(block, mem.index_reg, zero);
-        auto scale = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(mem.scale), true);
+        auto scale = llvm::ConstantInt::get(
+            word_type, static_cast<uint64_t>(mem.scale), true);
         return ir.CreateAdd(base, ir.CreateMul(index, scale));
       }
     }
@@ -391,10 +392,12 @@ llvm::Value *InstructionLifter::LiftRegisterOperand(
   if (ctx.cfg_inst->stack_var) {
     if (IsFramePointerReg(reg)) {
       llvm::IRBuilder<> ir(block);
-      auto variable = ir.CreatePtrToInt(ctx.cfg_inst->stack_var->llvm_var, word_type);
+      auto variable = ir.CreatePtrToInt(
+          ctx.cfg_inst->stack_var->llvm_var, word_type);
       auto map_it = ctx.cfg_inst->stack_var->refs.find(ctx.cfg_inst->ea);
       if (map_it != ctx.cfg_inst->stack_var->refs.end()) {
-        auto var_offset = llvm::ConstantInt::get(word_type, static_cast<uint64_t>(map_it->second), true);
+        auto var_offset = llvm::ConstantInt::get(
+            word_type, static_cast<uint64_t>(map_it->second), true);
         variable = ir.CreateAdd(variable, var_offset);
       }
       LOG(INFO)
