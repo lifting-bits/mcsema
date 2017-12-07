@@ -51,12 +51,11 @@ Why would anyone translate binaries *back* to bitcode?
 | [Google Test](https://github.com/google/googletest) | Latest |
 | [Intel XED](https://github.com/intelxed/xed) | Latest |
 | [LLVM](http://llvm.org/) | 3.5+ |
-| [Clang](http://clang.llvm.org/) | 3.5+ (3.9 if using Visual Studio 2015) |
+| [Clang](http://clang.llvm.org/) | 3.5+ |
 | [Python](https://www.python.org/) | 2.7 | 
 | [Python Package Index](https://pypi.python.org/pypi) | Latest |
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
 | [IDA Pro](https://www.hex-rays.com/products/ida) | 6.7+ |
-| [Visual Studio](https://www.visualstudio.com/downloads/) | 2013+ (Windows Only) |
 
 ## Getting and building the code
 
@@ -102,7 +101,7 @@ The next step is to clone the [Remill](https://github.com/trailofbits/remill) re
 git clone --depth 1 https://github.com/trailofbits/mcsema.git
 export REMILL_VERSION=`cat ./mcsema/.remill_commit_id`
 
-git clone --depth 1 https://github.com/trailofbits/remill.git
+git clone https://github.com/trailofbits/remill.git
 cd remill
 git checkout -b temp $REMILL_VERSION
 
