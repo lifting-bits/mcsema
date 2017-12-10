@@ -73,22 +73,38 @@ sudo apt-get install \
      python2.7 python-pip \
      build-essential \
      gcc-multilib g++-multilib \
-     realpath
-
-sudo pip install --upgrade pip
-sudo pip install 'protobuf==3.2.0'
+     realpath python-virtualenv
 ```
 
+If you are going to be using IDA Pro for CFG recovery also do the following:
+
+```shell
+sudo dpkg --add-architecture i386
+sudo apt-get install zip zlib1g-dev:i386
+```
+#### Step 1.5 (Optional): Create a virtualenv for your mcsema installation
+
+Using a [virtualenv](https://virtualenv.pypa.io/en/stable/) ensures that your mcsema installation does not interfere with other software packages. This setup is especially helpful if you are hacking on mcsema and want to avoid clobbering a global, working version with development code.
+
+```shell
+mkdir mcsema-ve
+virtualenv mcsema-ve
+cd mcsema-ve
+source bin/activate
+``` 
 ##### Fixing IDA Pro's Python installation (Ubuntu 14.04)
 
 Note: If you are using IDA on 64 bit Ubuntu and your IDA install does not use the system Python, you can add the `protobuf` library manually to IDA's zip of modules.
 
 ```shell
 # Python module dir is generally in /usr/lib or /usr/local/lib
-touch /path/to/python2.7/dist-packages/google/__init__.py
-cd /path/to/lib/python2.7/dist-packages/
-sudo zip -rv /path/to/ida-6.X/python/lib/python27.zip google/
-sudo chown your_user:your_user /home/your_user/ida-6.7/python/lib/python27.zip
+IDAPYTHON=/home/$USER/ida-6.9/python/lib/python27.zip
+GOOGLEMODULE=$(python -c "import os; import sys; import google; sys.stdout.write(os.path.dirname(google.__file__))")
+pushd ${GOOGLEMODULE}/..
+chmod +w ${IDAPYTHON}
+zip -rv ${IDAPYTHON} google/
+chmod -w ${IDAPYTHON}
+popd
 ```
 
 #### Step 2: Clone the repository
@@ -103,7 +119,7 @@ export REMILL_VERSION=`cat ./mcsema/.remill_commit_id`
 
 git clone https://github.com/trailofbits/remill.git
 cd remill
-git checkout -b temp $REMILL_VERSION
+git checkout -b temp ${REMILL_VERSION}
 
 mv ../mcsema tools
 ```
@@ -115,10 +131,17 @@ McSema is a kind of sub-project of Remill, similar to how Clang is a sub-project
 The following script will build Remill and McSema into the `remill-build` directory, which will be placed in the current working directory.
 
 ```shell
-./remill/scripts/build.sh
+if [ -z "${VIRTUAL_ENV}" ]
+then
+  # no virtualenv; global install for all users
+  ./scripts/build.sh
+else
+  # found a virtualenv; local install
+  ./scripts/build.sh --prefix $(realpath ../)
+fi
 ```
 
-This script accepts several additional command line options:
+This script accepts several command line options:
 
 * `--prefix PATH`: Install files to `PATH`. By default, `PATH` is `/usr/local`.
 * `--llvm-version MAJOR.MINOR`: Download pre-built dependencies for LLVM version MAJOR.MINOR. The default is to use LLVM 4.0.
@@ -131,10 +154,17 @@ The next step is to build the code.
 
 ```shell
 cd remill-build
-sudo make install
+if [ -z "${VIRTUAL_ENV}" ]
+then
+  # no virtualenv; global install for all users requires sudo
+  sudo make install
+else
+  # found a virtualenv; local install does not need root
+  make install
+fi
 ```
 
-This will install McSema _globally_. Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcsema-lift-4.0` for lifting the disassembled binaries. If you specified `--llvm-version 3.6` to the `build.sh` script, then you would use `mcsema-lift-3.6`.
+Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcsema-lift-4.0` for lifting the disassembled binaries. If you specified `--llvm-version 3.6` to the `build.sh` script, then you would use `mcsema-lift-3.6`.
 
 #### Step 5: Verifying Your McSema Installation
 
