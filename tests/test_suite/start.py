@@ -160,6 +160,7 @@ def acquire_toolset():
 
   llvm_version = subprocess.check_output([toolset["clang"], "--version"]).split(" ")[2]
   print(" i Found LLVM version: " + llvm_version)
+  print("   in: {}".format(os.path.dirname(toolset["clang"])))
 
   mcsema_llvm_version = llvm_version[0:3]
   print(" i Using the following mcsema tools: " + mcsema_llvm_version)
@@ -168,18 +169,29 @@ def acquire_toolset():
   if toolset["mcsema-lift"] is None:
     print(" x Failed to locate mcsema-lift-" + mcsema_llvm_version)
     return None
+  else:
+    print(" i Found mcsema-lift in: {}".format(toolset["mcsema-lift"]))
 
-  toolset["mcsema-disass"] = spawn.find_executable("mcsema-disass")
+  mcsema_root = os.path.realpath(os.path.join(
+    os.path.dirname(toolset["mcsema-lift"]), ".."))
+
+  toolset["mcsema-disass"] = os.path.join(
+    mcsema_root, "bin", "mcsema-disass")
+
   if toolset["mcsema-disass"] is None:
     print(" x Failed to locate mcsema-disass")
     return None
+  else:
+    print(" i Found mcsema-disass in: {}".format(toolset["mcsema-disass"]))
 
   if sys.platform == "linux" or sys.platform == "linux2" or sys.platform == "darwin":
-    toolset["libmcsema_rt32"] = "/usr/local/lib/libmcsema_rt32-" + mcsema_llvm_version + ".a"
-    toolset["libmcsema_rt64"] = "/usr/local/lib/libmcsema_rt64-" + mcsema_llvm_version + ".a"
+    lib_suffix = ".a"
   else:
-    toolset["libmcsema_rt32"] = "C:\\mcsema\\lib\\mcsema_rt32-" + mcsema_llvm_version + ".lib"
-    toolset["libmcsema_rt64"] = "C:\\mcsema\\lib\\mcsema_rt64-" + mcsema_llvm_version + ".lib"
+    # assumes this must be Windows
+    lib_suffix = ".lib"
+
+  toolset["libmcsema_rt32"] = os.path.join(mcsema_root, "lib", "libmcsema_rt32-" + mcsema_llvm_version + lib_suffix)
+  toolset["libmcsema_rt64"] = os.path.join(mcsema_root, "lib", "libmcsema_rt64-" + mcsema_llvm_version + lib_suffix)
 
   if not os.path.isfile(toolset["libmcsema_rt32"]):
     print(" x Failed to locate the 32-bit mcsema runtime")
@@ -274,6 +286,7 @@ def execute_tests(toolset, test_list):
     if not result["success"]:
       failed_test_list[test.name() + " (" + test.platform() + "/" + test.architecture() + ")"] = result["output"]
       print("    ! Test failed\n")
+      print("    ! Exe file: {}".format(recompiled_exe_path))
       continue
 
     print("    i Test passed\n")
