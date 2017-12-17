@@ -33,6 +33,7 @@ from flow import *
 from refs import *
 from segment import *
 from collect_variable import *
+from exception import *
 
 #hack for IDAPython to see google protobuf lib
 if os.path.isdir('/usr/lib/python2.7/dist-packages'):
@@ -1466,6 +1467,7 @@ def recover_module(entrypoint, gvar_infile = None):
       
   recover_regions(M, exported_vars, global_vars)
   recover_external_symbols(M)
+  recover_exception_table(M)
 
   DEBUG("Recovered {0} functions.".format(recovered_fns))
   return M

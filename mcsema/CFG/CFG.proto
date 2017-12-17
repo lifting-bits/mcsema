@@ -134,6 +134,13 @@ message Reference {
   required  int64    offset = 2;
 }
 
+message ExceptionFrame {
+  required uint64     start_ea = 1;
+  required uint64     end_ea = 2;
+  required uint64     lp_ea = 3;
+  required uint64     action = 4;
+}
+
 message StackVariable {
   required string     name = 1;
   required uint64     size = 2;
@@ -178,5 +185,7 @@ message Module {
   repeated  ExternalFunction    external_funcs = 4;
   repeated  ExternalVariable    external_vars = 5;
   
-  repeated	GlobalVariable      global_vars = 8;
+  repeated  GlobalVariable      global_vars = 8;
+
+  repeated  ExceptionFrame      eh_frame = 9;
 }
