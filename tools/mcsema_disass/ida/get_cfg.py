@@ -796,6 +796,7 @@ def recover_function(M, func_ea, new_func_eas, entrypoints):
     DEBUG("Recovering {:x}".format(func_ea))
 
   DEBUG_PUSH()
+  get_exception_entries(F, func_ea)
   blockset, term_insts = analyse_subroutine(func_ea, PIE_MODE)
 
   for term_inst in term_insts:
@@ -1413,7 +1414,7 @@ def recover_module(entrypoint, gvar_infile = None):
     if "main" == args.entrypoint and IS_ELF:
       entry_ea = find_main_in_ELF_file()
 
-  recover_exception_table(M)
+  recover_exception_table()
   process_segments(PIE_MODE)
 
   func_eas = find_default_function_heads()

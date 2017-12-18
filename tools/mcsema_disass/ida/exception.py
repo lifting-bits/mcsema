@@ -12,12 +12,18 @@ import collections
 import itertools
 import pprint
 
+from collections import namedtuple
+
 # Bring in utility libraries.
 from util import *
 
 _INFO = idaapi.get_inf_structure()
 
+frame_entry = namedtuple('frame_entry', ['cs_start', 'cs_end', 'cs_lp', 'cs_action'])
+
+
 _FUNC_UNWIND_FRAME_EAS = set()
+_FUNC_LSDA_ENTRIES = dict()
 
 if _INFO.is_64bit():
   PTRSIZE = 8
@@ -175,11 +181,51 @@ def make_reloff(ea, base, subtract = False):
   ri.init(flag, base)
   idaapi.op_offset_ex(ea, 0, ri)
 
-def format_lsda(M, ea, start_ea = None, range = None,  sjlj = False):
+def _create_frame_entry(start = None, end = None, lp = None, action = None):
+    return frame_entry(start, end, lp, action)
+
+def format_lsda_action(action_tbl, type_addr, type_enc, act_id):
+  if action_tbl == idc.BADADDR:
+    return
+
+  act_ea = action_tbl + act_id - 1
+  ar_filter,ea2 = read_enc_value(act_ea, DW_EH_PE_sleb128)
+  ar_disp,  ea3 = read_enc_value(ea2, DW_EH_PE_sleb128)
+
+  if ar_filter == 0:
+    addcmt = "cleanup"
+  else:
+    if type_addr == idc.BADADDR:
+      addcmt = "no type table?!"
+    else:
+      if ar_filter > 0:
+        # catch expression
+        type_slot = type_addr - ar_filter * enc_size(type_enc)
+        type_ea, eatmp = read_enc_value(type_slot, type_enc)
+        addcmt = "catch type typeinfo = %08X" % (type_ea)
+      else:
+        # exception spec list
+        type_slot = type_addr - ar_filter - 1
+        addcmt = "exception spec index list = %08X" % (type_slot)
+
+  DEBUG("ea {:x}: ar_filter[{}]: {} ({})".format(act_ea, act_id, ar_filter, addcmt))
+  if ar_disp == 0:
+    addcmt = "end"
+  else:
+    next_ea = ea2 + ar_disp
+    next_act = next_ea - act_ea + act_id
+    addcmt = "next: %d => %08X" % (next_act, next_ea)
+
+  DEBUG("ea {:x}: ar_disp[{}]: {} ({})".format(ea2, act_id, ar_disp, addcmt))
+
+
+def format_lsda(ea, start_ea = None, range = None,  sjlj = False):
   """  Decode the LSDA (Language specific data section)
   """
+  lsda_entries = set()
   lpstart_enc, ea = read_byte(ea), ea + 1
   func_ea = start_ea
+
   if lpstart_enc != DW_EH_PE_omit:
     lpstart, ea2 = read_enc_value(ea, lpstart_enc)
     DEBUG("ea {0:x}: LP start: {1:x}".format(ea, val))
@@ -207,9 +253,6 @@ def format_lsda(M, ea, start_ea = None, range = None,  sjlj = False):
   
   actions = []
   while ea < action_tbl:
-    EH = M.eh_frame.add()
-    EH.func_ea = func_ea
-    EH.range_len = range
     if sjlj:
       cs_lp, ea2 = read_enc_val(ea, DW_EH_PE_uleb128, True)
       cs_action, ea3 = read_enc_value(ea2, DW_EH_PE_uleb128)
@@ -225,9 +268,6 @@ def format_lsda(M, ea, start_ea = None, range = None,  sjlj = False):
       if lpstart != None:
         cs_start += lpstart
         cs_lp = cs_lp + lpstart if cs_lp != 0 else cs_lp
-        EH.start_ea = cs_start
-        EH.end_ea = cs_start + cs_len
-        EH.lp_ea = cs_lp
 
         DEBUG("ea {:x}: cs_start[{}] = {:x}  ({})".format(ea, i, cs_start, get_symbol_name(func_ea)))
         DEBUG("ea {:x}: cs_len[{:x}] = {} (end = {:x})".format(ea2, i, cs_len, cs_start + cs_len))
@@ -247,45 +287,14 @@ def format_lsda(M, ea, start_ea = None, range = None,  sjlj = False):
     else:
       addcmt = "{:x}".format(action_tbl + cs_action - 1)
       actions.append(cs_action)
-    EH.action = 0
+
+    format_lsda_action(action_tbl, type_addr, type_enc, cs_action)
+
+    lsda_entries.add(_create_frame_entry(cs_start, cs_start + cs_len, cs_lp, cs_action))
     DEBUG("ea {:x}: cs_action[{}] = {} ({})".format(act_ea, i, cs_action, addcmt))
     i += 1
-  
-  actions2 = []
-  while len(actions):
-    act = actions.pop()
-    if not act in actions2:
-      act_ea = action_tbl + act - 1
-      # print "action %d -> %08X" % (act, act_ea)
-      actions2.append(act)
-      ar_filter,ea2 = read_enc_value(act_ea, DW_EH_PE_sleb128)
-      ar_disp,  ea3 = read_enc_value(ea2, DW_EH_PE_sleb128)
-      if ar_filter == 0:
-        addcmt = "cleanup"
-      else:
-        if type_addr == idc.BADADDR:
-          addcmt = "no type table?!"
-        else:
-          if ar_filter > 0:
-            # catch expression
-            type_slot = type_addr - ar_filter * enc_size(type_enc)
-            type_ea, eatmp = read_enc_value(type_slot, type_enc)
-            addcmt = "catch type typeinfo = %08X" % (type_ea)
-          else:
-            # exception spec list
-            type_slot = ttype_addr - ar_filter - 1
-            addcmt = "exception spec index list = %08X" % (type_slot)
-          
-      DEBUG("ea {:x}: ar_filter[{}]: {} ({})".format(act_ea, act, ar_filter, addcmt))
-      if ar_disp == 0:
-        addcmt = "end"
-      else:
-        next_ea = ea2 + ar_disp
-        next_act = next_ea - act_ea + act
-        addcmt = "next: %d => %08X" % (next_act, next_ea)
-        actions.append(next_act)
-        
-      DEBUG("ea {:x}: ar_disp[{}]: {} ({})".format(ea2, act, ar_disp, addcmt))
+
+  _FUNC_LSDA_ENTRIES[func_ea] = lsda_entries
 
 class AugmentationData:
   def __init__(self):
@@ -306,7 +315,7 @@ class EHRecord:
 
 _AUGM_PARAM = dict()
 
-def format_entries(M, ea):
+def format_entries(ea):
   """ Check the types of entries CIE/FDE recover them
   """
   start_ea = ea
@@ -403,13 +412,13 @@ def format_entries(M, ea):
         DEBUG("ea {0:x}: LSDA pointer {1:x}".format(ea, lsda_ptr))
         DEBUG_PUSH()
         if lsda_ptr:
-          format_lsda(M, lsda_ptr, init_loc, range_len, False)
+          format_lsda(lsda_ptr, init_loc, range_len, False)
         DEBUG_POP()
         ea = ea2
 
   return end_ea
 
-def recover_frame_entries(M, seg_ea):
+def recover_frame_entries(seg_ea):
   if seg_ea == idc.BADADDR:
     return
 
@@ -417,28 +426,31 @@ def recover_frame_entries(M, seg_ea):
   ea = idc.SegStart(seg_ea)
   end_ea = idc.SegEnd(seg_ea)
   while ea != idc.BADADDR and ea < end_ea:
-    ea = format_entries(M, ea)
+    ea = format_entries(ea)
 
-def recover_exception_table(M):
+def recover_exception_table():
   """ Recover the CIE and FDE entries from the segment .eh_frame
   """
-  DEBUG("Recover exception table entries")
   seg_eas = [ea for ea in idautils.Segments() if not is_invalid_ea(ea)]
   
   for seg_ea in seg_eas:
     seg_name = idc.SegName(seg_ea)
     if seg_name in [".eh_frame", "__eh_frame"]:
-      recover_frame_entries(M, seg_ea)
+      recover_frame_entries(seg_ea)
       break
 
-def get_exception_entries(M, func_ea):
-  eh_data = set()
-  for entry in M.eh_frame:
-    if entry.func_ea == func_ea:
-      eh_data.add((entry.start_ea, entry.end_ea, entry.lp_ea))
-      DEBUG("Exception Handling data in func {}".format(get_symbol_name(func_ea)))
+def get_exception_entries(F, func_ea):
+  has_unwind_frame = func_ea in _FUNC_LSDA_ENTRIES.keys()
+  if has_unwind_frame:
+    lsda_entries = _FUNC_LSDA_ENTRIES[func_ea]
+    for entry in lsda_entries:
+      EH = F.eh_frame.add()
+      EH.func_ea = func_ea
+      EH.start_ea = entry.cs_start
+      EH.end_ea = entry.cs_end
+      EH.lp_ea = entry.cs_lp
+      EH.action = entry.cs_action
 
-  return eh_data
 
 def fix_function_bounds(min_ea, max_ea):
   DEBUG("Frame items {}".format(len(_FUNC_UNWIND_FRAME_EAS)))
