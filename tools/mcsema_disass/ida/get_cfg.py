@@ -1413,7 +1413,9 @@ def recover_module(entrypoint, gvar_infile = None):
     if "main" == args.entrypoint and IS_ELF:
       entry_ea = find_main_in_ELF_file()
 
+  recover_exception_table(M)
   process_segments(PIE_MODE)
+
   func_eas = find_default_function_heads()
 
   recovered_fns = 0
@@ -1467,7 +1469,6 @@ def recover_module(entrypoint, gvar_infile = None):
       
   recover_regions(M, exported_vars, global_vars)
   recover_external_symbols(M)
-  recover_exception_table(M)
 
   DEBUG("Recovered {0} functions.".format(recovered_fns))
   return M

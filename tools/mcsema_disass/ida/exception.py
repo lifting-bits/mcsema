@@ -14,12 +14,10 @@ import pprint
 
 # Bring in utility libraries.
 from util import *
-from table import *
-from flow import *
-from refs import *
-from segment import *
 
 _INFO = idaapi.get_inf_structure()
+
+_FUNC_UNWIND_FRAME_EAS = set()
 
 if _INFO.is_64bit():
   PTRSIZE = 8
@@ -177,14 +175,17 @@ def make_reloff(ea, base, subtract = False):
   ri.init(flag, base)
   idaapi.op_offset_ex(ea, 0, ri)
 
-def format_lsda(M, ea, lpstart = None, sjlj = False):
+def format_lsda(M, ea, start_ea = None, range = None,  sjlj = False):
   """  Decode the LSDA (Language specific data section)
   """
   lpstart_enc, ea = read_byte(ea), ea + 1
+  func_ea = start_ea
   if lpstart_enc != DW_EH_PE_omit:
     lpstart, ea2 = read_enc_value(ea, lpstart_enc)
     DEBUG("ea {0:x}: LP start: {1:x}".format(ea, val))
     ea = ea2
+  else:
+    lpstart = start_ea
 
   type_enc, ea = read_byte(ea), ea + 1
   type_addr = idc.BADADDR
@@ -204,9 +205,11 @@ def format_lsda(M, ea, lpstart = None, sjlj = False):
   ea = ea2
   i = 0
   
-  EH = M.eh_frame.add()
   actions = []
   while ea < action_tbl:
+    EH = M.eh_frame.add()
+    EH.func_ea = func_ea
+    EH.range_len = range
     if sjlj:
       cs_lp, ea2 = read_enc_val(ea, DW_EH_PE_uleb128, True)
       cs_action, ea3 = read_enc_value(ea2, DW_EH_PE_uleb128)
@@ -225,8 +228,8 @@ def format_lsda(M, ea, lpstart = None, sjlj = False):
         EH.start_ea = cs_start
         EH.end_ea = cs_start + cs_len
         EH.lp_ea = cs_lp
-      
-        DEBUG("ea {:x}: cs_start[{}] = {:x}".format(ea, i, cs_start))
+
+        DEBUG("ea {:x}: cs_start[{}] = {:x}  ({})".format(ea, i, cs_start, get_symbol_name(func_ea)))
         DEBUG("ea {:x}: cs_len[{:x}] = {} (end = {:x})".format(ea2, i, cs_len, cs_start + cs_len))
         DEBUG("ea {:x}: cs_lp[{}] = {:x}".format(ea3, i, cs_lp))
         DEBUG_PUSH()
@@ -266,7 +269,6 @@ def format_lsda(M, ea, lpstart = None, sjlj = False):
           if ar_filter > 0:
             # catch expression
             type_slot = type_addr - ar_filter * enc_size(type_enc)
-            #idc.MakeComm(type_slot, "Type index %d" % ar_filter)
             type_ea, eatmp = read_enc_value(type_slot, type_enc)
             addcmt = "catch type typeinfo = %08X" % (type_ea)
           else:
@@ -318,7 +320,7 @@ def format_entries(M, ea):
   
   cie_id, ea = read_dword(ea), ea + 4
   is_cie = cie_id == 0
-  entry.type = ["FIE", "CDE"][is_cie]
+  entry.type = ["FDE", "CIE"][is_cie]
   DEBUG("ea {0:x}: type {1} size {2}".format(start_ea, entry.type, size))
 
   if is_cie:
@@ -376,21 +378,21 @@ def format_entries(M, ea):
     if cie_ea in _AUGM_PARAM:
       aug_data = _AUGM_PARAM[cie_ea]
     else:
-      DEBUG("{0:x} : CIE {1:x} not present?!".format(base_ea, cie_ea))
       return idc.BADADDR
   
     make_reloff(base_ea, base_ea, True)
     DEBUG("ea {0:x}: CIE pointer".format(base_ea))
     
     init_loc, ea2 = read_enc_value(ea, aug_data.fde_encoding)
-    DEBUG("ea {0:x}: initial location={1:x}".format(ea, init_loc))
+    DEBUG("ea {0:x}: PC begin={1:x}".format(ea, init_loc))
     
     ea = ea2
     range_len, ea2 = read_enc_value(ea, aug_data.fde_encoding & 0x0F)
-    DEBUG("ea {:x}: range length={:x} (end={:x})".format(ea, range_len, range_len + init_loc))
+    DEBUG("ea {:x}: PC range = {:x} (PC end={:x})".format(ea, range_len, range_len + init_loc))
 
     if range_len:
       make_reloff(ea, init_loc)
+      _FUNC_UNWIND_FRAME_EAS.add((init_loc, range_len))
     
     ea = ea2
     lsda_ptr = 0
@@ -401,16 +403,10 @@ def format_entries(M, ea):
         DEBUG("ea {0:x}: LSDA pointer {1:x}".format(ea, lsda_ptr))
         DEBUG_PUSH()
         if lsda_ptr:
-          format_lsda(M, lsda_ptr, init_loc, False)
+          format_lsda(M, lsda_ptr, init_loc, range_len, False)
         DEBUG_POP()
         ea = ea2
-    
-    instr_length = end_ea - ea
-    if instr_length > 0:
-      make_array(ea, instr_length)
-    else:
-      DEBUG("ea {0:x}: invalid insn_len = {1}?!".format(ea, instr_length))
-      
+
   return end_ea
 
 def recover_frame_entries(M, seg_ea):
@@ -426,6 +422,7 @@ def recover_frame_entries(M, seg_ea):
 def recover_exception_table(M):
   """ Recover the CIE and FDE entries from the segment .eh_frame
   """
+  DEBUG("Recover exception table entries")
   seg_eas = [ea for ea in idautils.Segments() if not is_invalid_ea(ea)]
   
   for seg_ea in seg_eas:
@@ -433,3 +430,20 @@ def recover_exception_table(M):
     if seg_name in [".eh_frame", "__eh_frame"]:
       recover_frame_entries(M, seg_ea)
       break
+
+def get_exception_entries(M, func_ea):
+  eh_data = set()
+  for entry in M.eh_frame:
+    if entry.func_ea == func_ea:
+      eh_data.add((entry.start_ea, entry.end_ea, entry.lp_ea))
+      DEBUG("Exception Handling data in func {}".format(get_symbol_name(func_ea)))
+
+  return eh_data
+
+def fix_function_bounds(min_ea, max_ea):
+  DEBUG("Frame items {}".format(len(_FUNC_UNWIND_FRAME_EAS)))
+  for func_ea, range in _FUNC_UNWIND_FRAME_EAS:
+    if func_ea == min_ea:
+      DEBUG("Exception Handling data in func {} {:x}".format(get_symbol_name(min_ea), func_ea + range))
+      return func_ea, func_ea + range
+  return min_ea, max_ea

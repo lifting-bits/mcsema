@@ -135,10 +135,12 @@ message Reference {
 }
 
 message ExceptionFrame {
-  required uint64     start_ea = 1;
-  required uint64     end_ea = 2;
-  required uint64     lp_ea = 3;
-  required uint64     action = 4;
+  required uint64     func_ea = 1;
+  required uint64     range_len = 2;
+  required uint64     start_ea = 3;
+  required uint64     end_ea = 4;
+  required uint64     lp_ea = 5;
+  required uint64     action = 6;
 }
 
 message StackVariable {
