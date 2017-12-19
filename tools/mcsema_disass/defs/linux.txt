@@ -31,6 +31,7 @@ DATA: _etext PTR
 DATA: end PTR
 DATA: _end PTR
 
+
 __assert_fail 4 C Y
 __cxa_atexit 5 C N
 __cxa_guard_acquire 5 C N
@@ -26501,6 +26502,7 @@ SSL_version 1 C N
 SSL_want 1 C N
 SSL_write 3 C N
 __stack_chk_fail 0 C Y
+DATA: __stack_chk_guard PTR
 standend 0 C N
 standout 0 C N
 start_color 0 C N
