@@ -50,7 +50,7 @@ message Instruction {
   required  bytes           bytes = 2;
   repeated  CodeReference   xrefs = 3;
   optional  bool            local_noreturn = 4;
-  required  uint64          lp_ea = 5;     // Address of the landing pad
+  optional  uint64          lp_ea = 5;     // Address of the landing pad
 }
 
 // A basic block of instructions inside of a function.
