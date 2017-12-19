@@ -50,7 +50,7 @@ message Instruction {
   required  bytes           bytes = 2;
   repeated  CodeReference   xrefs = 3;
   optional  bool            local_noreturn = 4;
-  optional  uint64          lp_ea = 5;
+  required  uint64          lp_ea = 5;     // Address of the landing pad
 }
 
 // A basic block of instructions inside of a function.
@@ -137,11 +137,17 @@ message Reference {
 }
 
 message ExceptionFrame {
+
+  enum Action {
+    Cleanup = 0;
+    Catch = 1;
+  }
+
   required uint64     func_ea = 1;
   required uint64     start_ea = 3;
   required uint64     end_ea = 4;
   required uint64     lp_ea = 5;
-  required uint64     action = 6;
+  required Action     action = 6;
 }
 
 message StackVariable {

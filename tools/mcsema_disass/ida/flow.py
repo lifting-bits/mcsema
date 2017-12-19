@@ -313,7 +313,9 @@ def analyse_subroutine(sub_ea, binary_is_pie):
 
     term_insts.add(term_inst)
 
-    # Add instructions next to term_instr for recovery if it has missing flow
+    # Check the instruction next to term_instr for recovery, if it has missing flow
+    # IDA heuristics misses the landing pad and exception blocks in some cases; Linear
+    # scan identifies the missing blocks and recover them
     next_ea = term_inst.ea + len(inst_bytes)
     if next_ea not in _FUNC_HEAD_EAS and next_ea not in _BLOCK_HEAD_EAS:
       block_head_eas.add(next_ea)

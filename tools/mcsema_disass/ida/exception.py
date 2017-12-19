@@ -34,8 +34,6 @@ frame_entry = namedtuple('frame_entry', ['cs_start', 'cs_end', 'cs_lp', 'cs_acti
 _FUNC_UNWIND_FRAME_EAS = set()
 _FUNC_LSDA_ENTRIES = dict()
 
-  PTRSIZE = get_address_size_in_bits()/8
-
 DW_EH_PE_ptr       = 0x00
 DW_EH_PE_uleb128   = 0x01
 DW_EH_PE_udata2    = 0x02
@@ -87,7 +85,7 @@ def enc_size(enc):
   """
   fmt = enc & 0x0F
   if fmt == DW_EH_PE_ptr:
-    return get_address_size_in_bits()/8
+    return get_address_size_in_bytes()
   elif fmt in [DW_EH_PE_sdata2, DW_EH_PE_udata2]:
     return 2
   elif fmt in [DW_EH_PE_sdata4, DW_EH_PE_udata4]:
@@ -99,6 +97,8 @@ def enc_size(enc):
   return 0
 
 def read_enc_value(ea, enc):
+  """ Read encoded value
+  """
   if enc == DW_EH_PE_omit:
     DEBUG("Error in read_enc_val {0:x}".format(ea))
     return idc.BADADDR, idc.BADADDR
@@ -108,7 +108,7 @@ def read_enc_value(ea, enc):
   
   if fmt == DW_EH_PE_ptr:
     val = read_pointer(ea)
-    ea += get_address_size_in_bits()/8
+    ea += get_address_size_in_bytes()
       
   elif fmt in [DW_EH_PE_uleb128, DW_EH_PE_sleb128]:
     val, ea = read_leb128(ea, fmt == DW_EH_PE_sleb128)
@@ -134,7 +134,7 @@ def read_enc_value(ea, enc):
       val = sign_extn(val, 64)
       
   else:
-    DEBUG("{0:x}: don't know how to handle encoding {1:x}".format(start, enc))
+    DEBUG("{0:x}: don't know how to handle {1:x}".format(start, enc))
     return idc.BADADDR, idc.BADADDR
 
   if mod == DW_EH_PE_pcrel:   
@@ -143,12 +143,12 @@ def read_enc_value(ea, enc):
       val &= (1<<(get_address_size_in_bits())) - 1
   
   elif mod != DW_EH_PE_absptr:
-    DEBUG("{0:x}: don't know how to handle encoding {1:x}".format(start, enc))
+    DEBUG("{0:x}: don't know how to handle {1:x}".format(start, enc))
     return BADADDR, BADADDR
 
   if (enc & DW_EH_PE_indirect) and val != 0:
     if not idc.isLoaded(val):
-      DEBUG("{0:x}: trying to dereference invalid pointer {1:x}".format(start, val))
+      DEBUG("{0:x}: dereference invalid pointer {1:x}".format(start, val))
       return idc.BADADDR, idc.BADADDR
     val = read_pointer(val)
 
@@ -158,6 +158,8 @@ def _create_frame_entry(start = None, end = None, lp = None, action = None):
     return frame_entry(start, end, lp, action)
 
 def format_lsda_action(action_tbl, type_addr, type_enc, act_id):
+  """ Recover the exception actions and type info
+  """
   if action_tbl == idc.BADADDR:
     return
 
@@ -167,61 +169,62 @@ def format_lsda_action(action_tbl, type_addr, type_enc, act_id):
   #DEBUG("ea {:x}: ar_disp[{}]: {} ({:x})".format(act_ea, act_id, ar_disp, ar_filter))
   return ar_disp, ar_filter
 
-def format_lsda(lsda_ptr, start_ea = None, range = None,  sjlj = False):
-  """  Decode the LSDA (Language specific data section)
+def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
+  """  Recover the language specific data area
   """
   lsda_entries = set()
   lpstart_enc, ea = read_byte(lsda_ptr), lsda_ptr + 1
-
   if lpstart_enc != DW_EH_PE_omit:
-    lpstart, ea2 = read_enc_value(ea, lpstart_enc)
-    ea = ea2
+    lpstart, next_ea = read_enc_value(ea, lpstart_enc)
+    ea = next_ea
   else:
     lpstart = start_ea
 
+  # get the type encoding and type address associated with the exception handling blocks
   type_enc, ea = read_byte(ea), ea + 1
   type_addr = idc.BADADDR
   
   if type_enc != DW_EH_PE_omit:
-    type_off, ea2 = read_enc_value(ea, DW_EH_PE_uleb128)
-    type_addr = ea2 + type_off
-    #DEBUG("ea {:x}: Type offset: {:x} -> {:x}".format(ea, type_off, type_addr))
-    ea = ea2
+    type_off, next_ea = read_enc_value(ea, DW_EH_PE_uleb128)
+    type_addr = next_ea + type_off
+    ea = next_ea
 
-  cs_enc, ea = read_byte(ea), ea + 1
-  cs_len, ea2 = read_enc_value(ea, DW_EH_PE_uleb128)
-  action_tbl = ea2 + cs_len
-  #DEBUG("ea {:x}: call site table length: {:x} action table start: {:x}".format(ea, cs_len, action_tbl))
-  ea = ea2
+  cs_enc, next_ea = read_byte(ea), ea + 1
+  ea = next_ea
+  cs_len, next_ea = read_enc_value(ea, DW_EH_PE_uleb128)
+  action_tbl = next_ea + cs_len
+  ea = next_ea
+
   i = 0
-  
-  actions = []
   while ea < action_tbl:
     if sjlj:
-      cs_lp, ea2 = read_enc_val(ea, DW_EH_PE_uleb128, True)
-      cs_action, ea3 = read_enc_value(ea2, DW_EH_PE_uleb128)
+      cs_lp, next_ea = read_enc_val(ea, DW_EH_PE_uleb128, True)
+      act_ea = next_ea
+      cs_action, next_ea = read_enc_value(next_ea, DW_EH_PE_uleb128)
       DEBUG("ea {:x}: cs_lp[{}] = {}".format(ea, i, cs_lp))
-      act_ea = ea2
-      ea = ea3
+      ea = next_ea
     else:
-      cs_start, ea2 = read_enc_value(ea, cs_enc)
-      cs_len,   ea3 = read_enc_value(ea2, cs_enc & 0x0F)
-      cs_lp,    ea4 = read_enc_value(ea3, cs_enc)
-      cs_action,ea5 = read_enc_value(ea4, DW_EH_PE_uleb128)
+      cs_start, next_ea = read_enc_value(ea, cs_enc)
+      cs_start += lpstart
+      DEBUG("ea {:x}: cs_start[{}] = {:x}  ({})".format(ea, i, cs_start, get_symbol_name(start_ea)))
+      ea = next_ea
       
-      if lpstart != None:
-        cs_start += lpstart
-        cs_lp = cs_lp + lpstart if cs_lp != 0 else cs_lp
+      cs_len, next_ea = read_enc_value(ea, cs_enc & 0x0F)
+      DEBUG("ea {:x}: cs_len[{:x}] = {} (end = {:x})".format(ea, i, cs_len, cs_start + cs_len))
+      ea = next_ea
 
-        DEBUG("ea {:x}: cs_start[{}] = {:x}  ({})".format(ea, i, cs_start, get_symbol_name(start_ea)))
-        DEBUG("ea {:x}: cs_len[{:x}] = {} (end = {:x})".format(ea2, i, cs_len, cs_start + cs_len))
-        DEBUG("ea {:x}: cs_lp[{}] = {:x}".format(ea3, i, cs_lp))
-        DEBUG_PUSH()
-        DEBUG("Landing pad for {0:x}..{1:x}".format(cs_start, cs_start + cs_len))
-        DEBUG_POP()
+      cs_lp, next_ea = read_enc_value(ea, cs_enc)
+      cs_lp = cs_lp + lpstart if cs_lp != 0 else cs_lp
+      act_ea = next_ea
+      DEBUG("ea {:x}: cs_lp[{}] = {:x}".format(ea, i, cs_lp))
+      ea = next_ea
 
-      act_ea = ea4
-      ea = ea5
+      cs_action, next_ea = read_enc_value(ea, DW_EH_PE_uleb128)
+      ea = next_ea
+
+      DEBUG_PUSH()
+      DEBUG("Landing pad for {0:x}..{1:x}".format(cs_start, cs_start + cs_len))
+      DEBUG_POP()
 
     if cs_action != 0:
       ar_disp, ar_filter = format_lsda_action(action_tbl, type_addr, type_enc, cs_action)
@@ -315,7 +318,7 @@ def format_entries(ea):
     pc_begin, ea2 = read_enc_value(ea, aug_data.fde_encoding)
     #DEBUG("ea {0:x}: CIE pointer".format(base_ea))  
     #DEBUG("ea {0:x}: PC begin={1:x}".format(ea, pc_begin))
-    
+
     ea = ea2
     range_len, ea2 = read_enc_value(ea, aug_data.fde_encoding & 0x0F)
     #DEBUG("ea {:x}: PC range = {:x} (PC end={:x})".format(ea, range_len, range_len + pc_begin))
@@ -357,7 +360,7 @@ def recover_exception_table():
       recover_frame_entries(seg_ea)
       break
 
-def get_exception_entries(F, func_ea):
+def recover_exception_entries(F, func_ea):
   has_unwind_frame = func_ea in _FUNC_LSDA_ENTRIES.keys()
   if has_unwind_frame:
     lsda_entries = _FUNC_LSDA_ENTRIES[func_ea]
@@ -373,11 +376,10 @@ def get_exception_entries(F, func_ea):
 def fix_function_bounds(min_ea, max_ea):
   for func_ea, range in _FUNC_UNWIND_FRAME_EAS:
     if func_ea == min_ea:
-      #DEBUG("Exception Handling data in func {} {:x}".format(get_symbol_name(min_ea), func_ea + range))
       return func_ea, func_ea + range
   return min_ea, max_ea
 
-def get_exception_lp(F, insn_ea):
+def get_exception_landingpad(F, insn_ea):
   has_lp = F.ea in _FUNC_LSDA_ENTRIES.keys()
   if has_lp:
     lsda_entries = _FUNC_LSDA_ENTRIES[F.ea]

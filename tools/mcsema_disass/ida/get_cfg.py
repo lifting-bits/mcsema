@@ -738,7 +738,9 @@ def recover_basic_block(M, F, block_ea):
   for inst_ea in inst_eas:
     I = recover_instruction(M, B, inst_ea)
     if I:
-      I.lp_ea = get_exception_lp(F, inst_ea)
+      # Get the landing pad associated with the instructions;
+      # 0 if no landing pad associated
+      I.lp_ea = get_exception_landingpad(F, inst_ea)
 
   DEBUG_PUSH()
   if I and I.local_noreturn:
@@ -797,7 +799,8 @@ def recover_function(M, func_ea, new_func_eas, entrypoints):
     DEBUG("Recovering {:x}".format(func_ea))
 
   DEBUG_PUSH()
-  get_exception_entries(F, func_ea)
+  # Update the protobuf with the recovered eh_frame entries
+  recover_exception_entries(F, func_ea)
   blockset, term_insts = analyse_subroutine(func_ea, PIE_MODE)
 
   for term_inst in term_insts:
