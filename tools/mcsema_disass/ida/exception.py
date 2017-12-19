@@ -1,5 +1,19 @@
 #!/usr/bin/env python
 
+# Copyright (c) 2017 Trail of Bits, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import idautils
 import idaapi
 import idc
@@ -13,22 +27,14 @@ import itertools
 import pprint
 
 from collections import namedtuple
-
 # Bring in utility libraries.
 from util import *
 
-_INFO = idaapi.get_inf_structure()
-
 frame_entry = namedtuple('frame_entry', ['cs_start', 'cs_end', 'cs_lp', 'cs_action'])
-
-
 _FUNC_UNWIND_FRAME_EAS = set()
 _FUNC_LSDA_ENTRIES = dict()
 
-if _INFO.is_64bit():
-  PTRSIZE = 8
-else:
-  PTRSIZE = 4
+  PTRSIZE = get_address_size_in_bits()/8
 
 DW_EH_PE_ptr       = 0x00
 DW_EH_PE_uleb128   = 0x01
@@ -50,8 +56,6 @@ DW_EH_PE_aligned   = 0x50
 DW_EH_PE_indirect  = 0x80
 DW_EH_PE_omit      = 0xFF
 
-# sign extend b low bits in x
-# from "Bit Twiddling Hacks"
 def sign_extn(x, b):
   m = 1 << (b - 1)
   x = x & ((1 << b) - 1)
@@ -72,28 +76,6 @@ def read_string(ea):
   idaapi.make_ascii_string(ea, slen, idc.ASCSTR_C)
   return s, ea + slen
 
-def read_leb128(ea, signed):
-  """ Read LEB128 encoded data
-  """
-  # https://en.wikipedia.org/wiki/LEB128
-  val = 0
-  shift = 0
-  while True:
-    byte = idc.Byte(ea)
-    val |= (byte & 0x7F)<<shift
-    shift += 7
-    ea += 1
-    if (byte & 0x80) == 0:
-      break
-  
-    if shift > 64:
-      DEBUG("Bad leb128 encoding at {0:x}".format(ea - shift/7))
-      return idc.BADADDR
-  
-  if signed and (byte & 0x40):
-    val -= (1<<shift)
-  return val, ea
-
 def read_uleb128(ea):
   return read_leb128(ea, False)
 
@@ -105,7 +87,7 @@ def enc_size(enc):
   """
   fmt = enc & 0x0F
   if fmt == DW_EH_PE_ptr:
-    return PTRSIZE
+    return get_address_size_in_bits()/8
   elif fmt in [DW_EH_PE_sdata2, DW_EH_PE_udata2]:
     return 2
   elif fmt in [DW_EH_PE_sdata4, DW_EH_PE_udata4]:
@@ -126,7 +108,7 @@ def read_enc_value(ea, enc):
   
   if fmt == DW_EH_PE_ptr:
     val = read_pointer(ea)
-    ea += PTRSIZE
+    ea += get_address_size_in_bits()/8
       
   elif fmt in [DW_EH_PE_uleb128, DW_EH_PE_sleb128]:
     val, ea = read_leb128(ea, fmt == DW_EH_PE_sleb128)
@@ -157,9 +139,8 @@ def read_enc_value(ea, enc):
 
   if mod == DW_EH_PE_pcrel:   
     if val != 0:
-      make_reloff(start, start)
       val += start
-      val &= (1<<(PTRSIZE*8)) - 1
+      val &= (1<<(get_address_size_in_bits())) - 1
   
   elif mod != DW_EH_PE_absptr:
     DEBUG("{0:x}: don't know how to handle encoding {1:x}".format(start, enc))
@@ -173,14 +154,6 @@ def read_enc_value(ea, enc):
 
   return val, ea
 
-def make_reloff(ea, base, subtract = False):
-  ri = idaapi.refinfo_t()
-  flag = idaapi.REF_OFF32|idaapi.REFINFO_NOBASE
-  if subtract:
-    flag |= idaapi.REFINFO_SUBTRACT
-  ri.init(flag, base)
-  idaapi.op_offset_ex(ea, 0, ri)
-
 def _create_frame_entry(start = None, end = None, lp = None, action = None):
     return frame_entry(start, end, lp, action)
 
@@ -191,44 +164,17 @@ def format_lsda_action(action_tbl, type_addr, type_enc, act_id):
   act_ea = action_tbl + act_id - 1
   ar_filter,ea2 = read_enc_value(act_ea, DW_EH_PE_sleb128)
   ar_disp,  ea3 = read_enc_value(ea2, DW_EH_PE_sleb128)
+  #DEBUG("ea {:x}: ar_disp[{}]: {} ({:x})".format(act_ea, act_id, ar_disp, ar_filter))
+  return ar_disp, ar_filter
 
-  if ar_filter == 0:
-    addcmt = "cleanup"
-  else:
-    if type_addr == idc.BADADDR:
-      addcmt = "no type table?!"
-    else:
-      if ar_filter > 0:
-        # catch expression
-        type_slot = type_addr - ar_filter * enc_size(type_enc)
-        type_ea, eatmp = read_enc_value(type_slot, type_enc)
-        addcmt = "catch type typeinfo = %08X" % (type_ea)
-      else:
-        # exception spec list
-        type_slot = type_addr - ar_filter - 1
-        addcmt = "exception spec index list = %08X" % (type_slot)
-
-  DEBUG("ea {:x}: ar_filter[{}]: {} ({})".format(act_ea, act_id, ar_filter, addcmt))
-  if ar_disp == 0:
-    addcmt = "end"
-  else:
-    next_ea = ea2 + ar_disp
-    next_act = next_ea - act_ea + act_id
-    addcmt = "next: %d => %08X" % (next_act, next_ea)
-
-  DEBUG("ea {:x}: ar_disp[{}]: {} ({})".format(ea2, act_id, ar_disp, addcmt))
-
-
-def format_lsda(ea, start_ea = None, range = None,  sjlj = False):
+def format_lsda(lsda_ptr, start_ea = None, range = None,  sjlj = False):
   """  Decode the LSDA (Language specific data section)
   """
   lsda_entries = set()
-  lpstart_enc, ea = read_byte(ea), ea + 1
-  func_ea = start_ea
+  lpstart_enc, ea = read_byte(lsda_ptr), lsda_ptr + 1
 
   if lpstart_enc != DW_EH_PE_omit:
     lpstart, ea2 = read_enc_value(ea, lpstart_enc)
-    DEBUG("ea {0:x}: LP start: {1:x}".format(ea, val))
     ea = ea2
   else:
     lpstart = start_ea
@@ -239,15 +185,13 @@ def format_lsda(ea, start_ea = None, range = None,  sjlj = False):
   if type_enc != DW_EH_PE_omit:
     type_off, ea2 = read_enc_value(ea, DW_EH_PE_uleb128)
     type_addr = ea2 + type_off
-    DEBUG("ea {:x}: Type offset: {:x} -> {:x}".format(ea, type_off, type_addr))
-    make_reloff(ea, ea2)
+    #DEBUG("ea {:x}: Type offset: {:x} -> {:x}".format(ea, type_off, type_addr))
     ea = ea2
 
   cs_enc, ea = read_byte(ea), ea + 1
   cs_len, ea2 = read_enc_value(ea, DW_EH_PE_uleb128)
   action_tbl = ea2 + cs_len
-  DEBUG("ea {:x}: call site table length: {:x} action table start: {:x}".format(ea, cs_len, action_tbl))
-  make_reloff(ea, ea2)
+  #DEBUG("ea {:x}: call site table length: {:x} action table start: {:x}".format(ea, cs_len, action_tbl))
   ea = ea2
   i = 0
   
@@ -269,32 +213,24 @@ def format_lsda(ea, start_ea = None, range = None,  sjlj = False):
         cs_start += lpstart
         cs_lp = cs_lp + lpstart if cs_lp != 0 else cs_lp
 
-        DEBUG("ea {:x}: cs_start[{}] = {:x}  ({})".format(ea, i, cs_start, get_symbol_name(func_ea)))
+        DEBUG("ea {:x}: cs_start[{}] = {:x}  ({})".format(ea, i, cs_start, get_symbol_name(start_ea)))
         DEBUG("ea {:x}: cs_len[{:x}] = {} (end = {:x})".format(ea2, i, cs_len, cs_start + cs_len))
         DEBUG("ea {:x}: cs_lp[{}] = {:x}".format(ea3, i, cs_lp))
         DEBUG_PUSH()
         DEBUG("Landing pad for {0:x}..{1:x}".format(cs_start, cs_start + cs_len))
         DEBUG_POP()
 
-      if lpstart != None:
-        make_reloff(ea, lpstart)
-        if cs_lp != 0:
-          make_reloff(ea3, lpstart)
       act_ea = ea4
       ea = ea5
-    if cs_action == 0:
-      addcmt = "no action"
-    else:
-      addcmt = "{:x}".format(action_tbl + cs_action - 1)
-      actions.append(cs_action)
 
-    format_lsda_action(action_tbl, type_addr, type_enc, cs_action)
+    if cs_action != 0:
+      ar_disp, ar_filter = format_lsda_action(action_tbl, type_addr, type_enc, cs_action)
 
     lsda_entries.add(_create_frame_entry(cs_start, cs_start + cs_len, cs_lp, cs_action))
-    DEBUG("ea {:x}: cs_action[{}] = {} ({})".format(act_ea, i, cs_action, addcmt))
+    DEBUG("ea {:x}: cs_action[{}] = {}".format(act_ea, i, cs_action))
     i += 1
 
-  _FUNC_LSDA_ENTRIES[func_ea] = lsda_entries
+  _FUNC_LSDA_ENTRIES[start_ea] = lsda_entries
 
 class AugmentationData:
   def __init__(self):
@@ -323,35 +259,29 @@ def format_entries(ea):
   if size == 0:
     return idc.BADADDR
 
-  make_reloff(start_ea, ea)
   end_ea = ea + size
   entry = EHRecord()
   
   cie_id, ea = read_dword(ea), ea + 4
   is_cie = cie_id == 0
   entry.type = ["FDE", "CIE"][is_cie]
-  DEBUG("ea {0:x}: type {1} size {2}".format(start_ea, entry.type, size))
+  #DEBUG("ea {0:x}: type {1} size {2}".format(start_ea, entry.type, size))
 
   if is_cie:
     entry.version, ea = read_byte(ea), ea + 1
-    DEBUG("ea {0:x}: version {0}".format(ea, entry.version))
-    
     entry.aug_string, ea = read_string(ea)
-    DEBUG("ea {0:x}: augmentation string {1}".format(ea, entry.aug_string))
-    
     entry.code_align, ea = read_uleb128(ea)
-    DEBUG("ea {0:x}: code alignment factor {1}".format(ea, entry.code_align))
-    
     entry.data_align, ea = read_uleb128(ea)
-    DEBUG("ea {0:x}: data alignment factor {1}".format(ea, entry.data_align))
-    
     if entry.version == 1:
       entry.retn_reg, ea = read_byte(ea), ea + 1
     else:
       entry.retn_reg, ea = read_uleb128(ea)
+    #DEBUG("ea {0:x}: version {0}".format(ea, entry.version))
+    #DEBUG("ea {0:x}: augmentation string {1}".format(ea, entry.aug_string))
+    #DEBUG("ea {0:x}: code alignment factor {1}".format(ea, entry.code_align))
+    #DEBUG("ea {0:x}: data alignment factor {1}".format(ea, entry.data_align))
+    #DEBUG("ea {0:x}: return register {1}".format(ea, entry.retn_reg))
     
-    DEBUG("ea {0:x}: return register {1}".format(ea, entry.retn_reg))
-          
     aug_data = AugmentationData()
 
     if entry.aug_string[0:1]=='z':
@@ -364,57 +294,45 @@ def format_entries(ea):
         elif s == 'P':                    
           enc, ea = read_byte(ea), ea + 1
           aug_data.personality_ptr, ea2 = read_enc_value(ea, enc)
-          DEBUG("ea {0:x}: personality function {1:x}".format(ea, aug_data.personality_ptr))
+          #DEBUG("ea {0:x}: personality function {1:x}".format(ea, aug_data.personality_ptr))
           ea = ea2
         elif s == 'R':
           aug_data.fde_encoding, ea = read_byte(ea), ea + 1
         else:
-          DEBUG("ea {0:x}: unhandled string char {1}".format(ea, s))
+          #DEBUG("ea {0:x}: unhandled string char {1}".format(ea, s))
           return idc.BADADDR
-    
-    instr_length = end_ea - ea
-    if instr_length > 0:
-      make_array(ea, instr_length)
-    else:
-      DEBUG("ea {0:x}: invalid insn_len {1}?!".format(ea, instr_length))
-    
+
     _AUGM_PARAM[start_ea] = aug_data
-  
+
   else:
     base_ea = ea - 4
     cie_ea = base_ea - cie_id
-  
     if cie_ea in _AUGM_PARAM:
       aug_data = _AUGM_PARAM[cie_ea]
     else:
       return idc.BADADDR
-  
-    make_reloff(base_ea, base_ea, True)
-    DEBUG("ea {0:x}: CIE pointer".format(base_ea))
-    
-    init_loc, ea2 = read_enc_value(ea, aug_data.fde_encoding)
-    DEBUG("ea {0:x}: PC begin={1:x}".format(ea, init_loc))
+
+    pc_begin, ea2 = read_enc_value(ea, aug_data.fde_encoding)
+    #DEBUG("ea {0:x}: CIE pointer".format(base_ea))  
+    #DEBUG("ea {0:x}: PC begin={1:x}".format(ea, pc_begin))
     
     ea = ea2
     range_len, ea2 = read_enc_value(ea, aug_data.fde_encoding & 0x0F)
-    DEBUG("ea {:x}: PC range = {:x} (PC end={:x})".format(ea, range_len, range_len + init_loc))
+    #DEBUG("ea {:x}: PC range = {:x} (PC end={:x})".format(ea, range_len, range_len + pc_begin))
 
     if range_len:
-      make_reloff(ea, init_loc)
-      _FUNC_UNWIND_FRAME_EAS.add((init_loc, range_len))
+      _FUNC_UNWIND_FRAME_EAS.add((pc_begin, range_len))
     
     ea = ea2
-    lsda_ptr = 0
     if aug_data.aug_present:
       aug_len, ea = read_uleb128(ea)
       if aug_data.lsda_encoding != DW_EH_PE_omit:
         lsda_ptr, ea2 = read_enc_value(ea, aug_data.lsda_encoding)
-        DEBUG("ea {0:x}: LSDA pointer {1:x}".format(ea, lsda_ptr))
+        #DEBUG("ea {0:x}: LSDA pointer {1:x}".format(ea, lsda_ptr))
         DEBUG_PUSH()
         if lsda_ptr:
-          format_lsda(lsda_ptr, init_loc, range_len, False)
+          format_lsda(lsda_ptr, pc_begin, range_len, False)
         DEBUG_POP()
-        ea = ea2
 
   return end_ea
 
@@ -453,9 +371,17 @@ def get_exception_entries(F, func_ea):
 
 
 def fix_function_bounds(min_ea, max_ea):
-  DEBUG("Frame items {}".format(len(_FUNC_UNWIND_FRAME_EAS)))
   for func_ea, range in _FUNC_UNWIND_FRAME_EAS:
     if func_ea == min_ea:
-      DEBUG("Exception Handling data in func {} {:x}".format(get_symbol_name(min_ea), func_ea + range))
+      #DEBUG("Exception Handling data in func {} {:x}".format(get_symbol_name(min_ea), func_ea + range))
       return func_ea, func_ea + range
   return min_ea, max_ea
+
+def get_exception_lp(F, insn_ea):
+  has_lp = F.ea in _FUNC_LSDA_ENTRIES.keys()
+  if has_lp:
+    lsda_entries = _FUNC_LSDA_ENTRIES[F.ea]
+    for entry in lsda_entries:
+      if insn_ea >= entry.cs_start and insn_ea <= entry.cs_end:
+        return entry.cs_lp
+  return 0

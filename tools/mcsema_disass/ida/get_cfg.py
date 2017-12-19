@@ -737,7 +737,8 @@ def recover_basic_block(M, F, block_ea):
   I = None
   for inst_ea in inst_eas:
     I = recover_instruction(M, B, inst_ea)
-
+    if I:
+      I.lp_ea = get_exception_lp(F, inst_ea)
 
   DEBUG_PUSH()
   if I and I.local_noreturn:
