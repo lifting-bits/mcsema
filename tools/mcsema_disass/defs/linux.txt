@@ -37422,3 +37422,15 @@ socketpair 4 C N
 syslog 16 C N
 vsyslog 3 C N
 writev 3 C N
+
+context_new 1 C N
+context_str 1 C N
+context_free 1 C N
+context_type_get 1 C N
+context_range_get 1 C N
+context_role_get 1 C N
+context_user_get 1 C N
+context_type_set 2 C N
+context_range_set 2 C N
+context_role_set 2 C N
+context_user_set 2 C N
