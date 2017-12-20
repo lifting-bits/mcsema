@@ -152,6 +152,11 @@ def read_byte(ea):
   byte = ord(byte) 
   return byte
 
+def read_word(ea):
+  bytestr = read_bytes_slowly(ea, ea + 2)
+  word = struct.unpack("<L", bytestr)[0]
+  return word
+
 def read_dword(ea):
   bytestr = read_bytes_slowly(ea, ea + 4)
   dword = struct.unpack("<L", bytestr)[0]
@@ -161,6 +166,33 @@ def read_qword(ea):
   bytestr = read_bytes_slowly(ea, ea + 8)
   qword = struct.unpack("<Q", bytestr)[0]
   return qword
+
+def read_leb128(ea, signed):
+  """ Read LEB128 encoded data
+  """
+  val = 0
+  shift = 0
+  while True:
+    byte = idc.Byte(ea)
+    val |= (byte & 0x7F) << shift
+    shift += 7
+    ea += 1
+    if (byte & 0x80) == 0:
+      break
+
+    if shift > 64:
+      DEBUG("Bad leb128 encoding at {0:x}".format(ea - shift/7))
+      return idc.BADADDR
+
+  if signed and (byte & 0x40):
+    val -= (1<<shift)
+  return val, ea
+
+def read_pointer(ea):
+  if _INFO.is_64bit():
+    return read_qword(ea)
+  else:
+    return read_dword(ea)
 
 def instruction_personality(arg):
   global PERSONALITIES
