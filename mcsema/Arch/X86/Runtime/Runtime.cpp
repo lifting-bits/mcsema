@@ -233,6 +233,162 @@ Memory *__remill_atomic_end(Memory * memory) {
   return memory;
 }
 
+Memory *__remill_compare_exchange_memory_8(
+    Memory *memory, addr_t addr, uint8_t &expected, uint8_t desired) {
+  expected = __sync_val_compare_and_swap(
+      reinterpret_cast<uint8_t *>(addr), expected, desired);
+  return memory;
+}
+
+Memory *__remill_compare_exchange_memory_16(
+    Memory *memory, addr_t addr, uint16_t &expected, uint16_t desired) {
+  expected =  __sync_val_compare_and_swap(
+      reinterpret_cast<uint16_t *>(addr), expected, desired);
+  return memory;
+}
+
+Memory *__remill_compare_exchange_memory_32(
+    Memory *memory, addr_t addr, uint32_t &expected, uint32_t desired) {
+  expected = __sync_val_compare_and_swap(
+      reinterpret_cast<uint32_t *>(addr), expected, desired);
+  return memory;
+}
+
+Memory *__remill_compare_exchange_memory_64(
+    Memory *memory, addr_t addr, uint64_t &expected, uint64_t desired) {
+  expected = __sync_val_compare_and_swap(
+      reinterpret_cast<uint64_t *>(addr), expected, desired);
+  return memory;
+}
+
+#ifdef _GXX_EXPERIMENTAL_CXX0X__
+Memory *__remill_compare_exchange_memory_128(
+    Memory *memory, addr_t addr, uint128_t &expected, uint128_t &desired) {
+  expected = __sync_val_compare_and_swap(
+      reinterpret_cast<uint128_t *>(addr), expected, desired);
+  return memory;
+}
+#endif
+
+Memory *__remill_fetch_and_add_8(
+    Memory *memory, addr_t addr, uint8_t &value) {
+  value = __sync_fetch_and_add(reinterpret_cast<uint8_t*>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_add_16(
+    Memory *memory, addr_t addr, uint16_t &value) {
+  value =  __sync_fetch_and_add(reinterpret_cast<uint16_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_add_32(
+    Memory *memory, addr_t addr, uint32_t &value) {
+  value = __sync_fetch_and_add(reinterpret_cast<uint32_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_add_64(
+    Memory *memory, addr_t addr, uint64_t &value) {
+  value = __sync_fetch_and_add(reinterpret_cast<uint64_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_sub_8(
+    Memory *memory, addr_t addr, uint8_t &value) {
+  value = __sync_fetch_and_sub(reinterpret_cast<uint8_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_sub_16(
+    Memory *memory, addr_t addr, uint16_t &value) {
+  value =  __sync_fetch_and_sub(reinterpret_cast<uint16_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_sub_32(
+    Memory *memory, addr_t addr, uint32_t &value) {
+  value = __sync_fetch_and_sub(reinterpret_cast<uint32_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_sub_64(
+    Memory *memory, addr_t addr, uint64_t &value) {
+  value = __sync_fetch_and_sub(reinterpret_cast<uint64_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_or_8(
+    Memory *memory, addr_t addr, uint8_t &value) {
+  value = __sync_fetch_and_or(reinterpret_cast<uint8_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_or_16(
+    Memory *memory, addr_t addr, uint16_t &value) {
+  value =  __sync_fetch_and_or(reinterpret_cast<uint16_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_or_32(
+    Memory *memory, addr_t addr, uint32_t &value) {
+  value = __sync_fetch_and_or(reinterpret_cast<uint32_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_or_64(
+    Memory *memory, addr_t addr, uint64_t &value) {
+  value = __sync_fetch_and_or(reinterpret_cast<uint64_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_and_8(
+    Memory *memory, addr_t addr, uint8_t &value) {
+  value = __sync_fetch_and_and(reinterpret_cast<uint8_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_and_16(
+    Memory *memory, addr_t addr, uint16_t &value) {
+  value =  __sync_fetch_and_and(reinterpret_cast<uint16_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_and_32(
+    Memory *memory, addr_t addr, uint32_t &value) {
+  value = __sync_fetch_and_and(reinterpret_cast<uint32_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_and_64(
+    Memory *memory, addr_t addr, uint64_t &value) {
+  value = __sync_fetch_and_and(reinterpret_cast<uint64_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_xor_8(
+    Memory *memory, addr_t addr, uint8_t &value) {
+  value = __sync_fetch_and_xor(reinterpret_cast<uint8_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_xor_16(
+    Memory *memory, addr_t addr, uint16_t &value) {
+  value =  __sync_fetch_and_xor(reinterpret_cast<uint16_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_xor_32(
+    Memory *memory, addr_t addr, uint32_t &value) {
+  value = __sync_fetch_and_xor(reinterpret_cast<uint32_t *>(addr), value);
+  return memory;
+}
+
+Memory *__remill_fetch_and_xor_64(
+    Memory *memory, addr_t addr, uint64_t &value) {
+  value = __sync_fetch_and_xor(reinterpret_cast<uint64_t *>(addr), value);
+  return memory;
+}
 
 int __remill_fpu_exception_test_and_clear(int read_mask, int clear_mask) {
   auto except = std::fetestexcept(read_mask);
