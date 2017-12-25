@@ -296,7 +296,7 @@ Memory *__remill_fetch_and_add_64(
 
 Memory *__remill_fetch_and_sub_8(
     Memory *memory, addr_t addr, uint8_t &value) {
-  value = __sync_fetch_and_sub(reinterpret_cast<uint8_t*>(addr), value);
+  value = __sync_fetch_and_sub(reinterpret_cast<uint8_t *>(addr), value);
   return memory;
 }
 
