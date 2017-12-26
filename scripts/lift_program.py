@@ -107,6 +107,13 @@ def main():
       default=False,
       required=False)
 
+  arg_parser.add_argument(
+      '--legacy_mode',
+      help='Are we producing legacy mode bitcode?',
+      default=False,
+      required=False,
+      action='store_true')
+
   args, command_args = arg_parser.parse_known_args()
 
   # Set up the workspace.
@@ -215,11 +222,19 @@ def main():
       '--os', os_name,
       '--cfg', cfg,
       '--output', bitcode]
+
+  if args.legacy_mode:
+    mcsema_lift_args.append('--legacy_mode')
+
   print " ".join(mcsema_lift_args)
   ret = subprocess.call(mcsema_lift_args)
   if ret:
     return ret
- 
+  
+  # Not compiling a binary.
+  if args.legacy_mode:
+    return 0
+
   # Build up the command-line invocation to clang.
   clang_args = [
       os.path.join(args.libraries_dir, 'llvm', 'bin', 'clang++'),
