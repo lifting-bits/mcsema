@@ -36,6 +36,9 @@ def lift_binary(args, binary):
       '--workspace_dir', args.workspace_dir,
       '--binary', binary]
 
+  if args.legacy_mode:
+    lift_args.append('--legacy_mode')
+
   binary_name = os.path.basename(binary)
   sub_stdout_path = os.path.join(
       args.workspace_dir, "{}.stdout".format(binary_name))
@@ -79,6 +82,13 @@ def main():
       help='Number of concurrent workers for the lifting job',
       default=1,
       type=int)
+
+  arg_parser.add_argument(
+      '--legacy_mode',
+      help='Are we producing legacy mode bitcode?',
+      default=False,
+      required=False,
+      action='store_true')
 
   args, command_args = arg_parser.parse_known_args()
 
