@@ -23,6 +23,7 @@ DISASS_DIR = os.path.dirname(BINJA_DIR)
 
 EXT_MAP = {}
 EXT_DATA_MAP = {}
+JMP_TABLES = []
 
 CCONV_TYPES = {
     'C': CFG_pb2.ExternalFunction.CallerCleanup,
@@ -149,6 +150,10 @@ def recover_section_cross_references(bv, pb_seg, real_sect, sect_start, sect_end
         xref = read_val(bv, addr)
 
         if not util.is_valid_addr(bv, xref):
+            continue
+
+        # Skip this xref if it's a jmp table entry
+        if any(xref in tbl.targets for tbl in JMP_TABLES):
             continue
 
         pb_ref = pb_seg.xrefs.add()
@@ -318,7 +323,8 @@ def recover_inst(bv, pb_block, pb_inst, il):
 
     table = jmptable.get_jmptable(bv, il)
     if table is not None:
-        add_xref(bv, pb_inst, table.base_addr, CFG_pb2.CodeReference.OffsetTable)
+        add_xref(bv, pb_inst, table.base_addr, CFG_pb2.CodeReference.MemoryDisplacementOperand)
+        JMP_TABLES.append(table)
 
         # Add any missing successors
         for tgt in table.targets:
