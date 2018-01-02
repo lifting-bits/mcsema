@@ -1,6 +1,6 @@
 import binaryninja as binja
 from binaryninja.enums import (
-    Endianness, LowLevelILOperation
+    Endianness, LowLevelILOperation, SectionSemantics
 )
 import inspect
 import logging
@@ -138,6 +138,15 @@ def is_valid_addr(bv, addr):
 
 
 def is_code(bv, addr):
+    """Returns `True` if the given address lies in a code section"""
+    # This is a bit more specific than checking if a segment is executable,
+    # Binja will classify a section as ReadOnlyCode or ReadOnlyData, though
+    # both sections are still in an executable segment
+    sec = get_section_at(bv, addr)
+    return sec is not None and sec.semantics == SectionSemantics.ReadOnlyCodeSectionSemantics
+
+
+def is_executable(bv, addr):
     """Returns `True` if the given address lies in an executable segment"""
     seg = bv.get_segment_at(addr)
     return seg is not None and seg.executable

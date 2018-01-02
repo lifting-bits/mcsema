@@ -65,10 +65,12 @@ def recover_ext_func(bv, pb_mod, sym):
         sym (binaryninja.types.Symbol)
     """
     if sym.name in EXT_MAP:
-        log.debug('Found defined external function: %s', sym.name)
+        log.debug('Found defined external function: %s @ 0x%x', sym.name, sym.address)
 
         args, cconv, ret, sign = EXT_MAP[sym.name]
         func = bv.get_function_at(sym.address)
+        if func is None:
+            return
 
         pb_extfn = pb_mod.external_funcs.add()
         pb_extfn.name = sym.name
@@ -80,7 +82,7 @@ def recover_ext_func(bv, pb_mod, sym):
         pb_extfn.is_weak = False  # TODO: figure out how to decide this
 
     else:
-        log.warn('Unknown external function: %s', sym.name)
+        log.warn('Unknown external function: %s @ 0x%x', sym.name, sym.address)
         log.warn('Attempting to recover manually')
 
         func = bv.get_function_at(sym.address)

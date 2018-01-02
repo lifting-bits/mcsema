@@ -20,7 +20,7 @@ def recover_globals(bv, pb_mod):
             continue
 
         if sym.type == SymbolType.DataSymbol and \
-           not util.is_code(bv, sym.address) and \
+           not util.is_executable(bv, sym.address) and \
            not util.is_section_external(bv, sect):
             log.debug('Recovering global %s @ 0x%x', sym.name, sym.address)
             pb_gvar = pb_mod.global_vars.add()
