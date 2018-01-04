@@ -66,7 +66,7 @@ message Function {
   repeated  Block       blocks = 2;
   required  bool        is_entrypoint = 3;
   optional  string      name = 4;
-  repeated  StackVariable	stack_vars = 5;
+  repeated  StackVariable      stack_vars = 5;
   repeated  ExceptionFrame     eh_frame = 6;
 }
 

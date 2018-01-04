@@ -34,6 +34,8 @@ frame_entry = namedtuple('frame_entry', ['cs_start', 'cs_end', 'cs_lp', 'cs_acti
 _FUNC_UNWIND_FRAME_EAS = set()
 _FUNC_LSDA_ENTRIES = dict()
 
+_EXCEPTION_BLOCKS_EAS = dict()
+
 DW_EH_PE_ptr       = 0x00
 DW_EH_PE_uleb128   = 0x01
 DW_EH_PE_udata2    = 0x02
@@ -53,6 +55,11 @@ DW_EH_PE_funcrel   = 0x40
 DW_EH_PE_aligned   = 0x50
 DW_EH_PE_indirect  = 0x80
 DW_EH_PE_omit      = 0xFF
+
+class EHBlocks(object):
+  def __init__(self, start_ea, end_ea):
+    self.start_ea = start_ea
+    self.end_ea = end_ea
 
 def sign_extn(x, b):
   m = 1 << (b - 1)
@@ -169,10 +176,24 @@ def format_lsda_action(action_tbl, type_addr, type_enc, act_id):
   #DEBUG("ea {:x}: ar_disp[{}]: {} ({:x})".format(act_ea, act_id, ar_disp, ar_filter))
   return ar_disp, ar_filter
 
+def create_block_entries(start_ea, heads):
+  index = 0
+  block_set = set()
+  for entry in heads:
+    if entry == 0:
+      continue
+    if index < len(heads) - 1:
+      block = EHBlocks(entry, heads[index + 1])
+      block_set.add(block)
+    index = index + 1
+
+  _EXCEPTION_BLOCKS_EAS[start_ea] = block_set
+
 def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
   """  Recover the language specific data area
   """
   lsda_entries = set()
+  heads = set()
   lpstart_enc, ea = read_byte(lsda_ptr), lsda_ptr + 1
   if lpstart_enc != DW_EH_PE_omit:
     lpstart, next_ea = read_enc_value(ea, lpstart_enc)
@@ -208,16 +229,20 @@ def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
       cs_start += lpstart
       DEBUG("ea {:x}: cs_start[{}] = {:x}  ({})".format(ea, i, cs_start, get_symbol_name(start_ea)))
       ea = next_ea
+      heads.add(cs_start)
       
       cs_len, next_ea = read_enc_value(ea, cs_enc & 0x0F)
+      cs_end = cs_start + cs_len
       DEBUG("ea {:x}: cs_len[{:x}] = {} (end = {:x})".format(ea, i, cs_len, cs_start + cs_len))
       ea = next_ea
+      heads.add(cs_end)
 
       cs_lp, next_ea = read_enc_value(ea, cs_enc)
       cs_lp = cs_lp + lpstart if cs_lp != 0 else cs_lp
       act_ea = next_ea
       DEBUG("ea {:x}: cs_lp[{}] = {:x}".format(ea, i, cs_lp))
       ea = next_ea
+      heads.add(cs_lp)
 
       cs_action, next_ea = read_enc_value(ea, DW_EH_PE_uleb128)
       ea = next_ea
@@ -233,6 +258,7 @@ def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
     DEBUG("ea {:x}: cs_action[{}] = {}".format(act_ea, i, cs_action))
     i += 1
 
+  create_block_entries(start_ea, sorted(heads))
   _FUNC_LSDA_ENTRIES[start_ea] = lsda_entries
 
 class AugmentationData:
@@ -279,12 +305,7 @@ def format_entries(ea):
       entry.retn_reg, ea = read_byte(ea), ea + 1
     else:
       entry.retn_reg, ea = read_uleb128(ea)
-    #DEBUG("ea {0:x}: version {0}".format(ea, entry.version))
-    #DEBUG("ea {0:x}: augmentation string {1}".format(ea, entry.aug_string))
-    #DEBUG("ea {0:x}: code alignment factor {1}".format(ea, entry.code_align))
-    #DEBUG("ea {0:x}: data alignment factor {1}".format(ea, entry.data_align))
-    #DEBUG("ea {0:x}: return register {1}".format(ea, entry.retn_reg))
-    
+
     aug_data = AugmentationData()
 
     if entry.aug_string[0:1]=='z':
@@ -387,3 +408,10 @@ def get_exception_landingpad(F, insn_ea):
       if insn_ea >= entry.cs_start and insn_ea <= entry.cs_end:
         return entry.cs_lp
   return 0
+
+def get_exception_chunks(sub_ea):
+  has_block = sub_ea in _EXCEPTION_BLOCKS_EAS.keys()
+  if has_block:
+    block_set = _EXCEPTION_BLOCKS_EAS[sub_ea]
+    for block in block_set:
+      yield block.start_ea, block.end_ea

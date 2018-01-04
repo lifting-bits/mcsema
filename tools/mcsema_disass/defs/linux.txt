@@ -28749,7 +28749,7 @@ _Unwind_GetIPInfo 2 C N
 _Unwind_GetLanguageSpecificData 1 C N
 _Unwind_GetRegionStart 1 C N
 _Unwind_RaiseException 1 C N
-_Unwind_Resume 1 C N
+_Unwind_Resume 1 C Y
 _Unwind_SetGR 3 C N
 _Unwind_SetIP 2 C N
 unwrap_hash_lookup 3 C N

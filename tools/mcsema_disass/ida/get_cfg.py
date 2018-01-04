@@ -58,7 +58,6 @@ TO_RECOVER = {
   "stack_var" : False,
 }
 
-
 # Map of external functions names to a tuple containing information like the
 # number of arguments and calling convention of the function.
 EMAP = {}
@@ -271,6 +270,8 @@ def parse_os_defs_file(df):
               fname, ea))
 
       EMAP[fname] = (int(args), realconv, ret, sign)
+      if ret == 'Y':
+        noreturn_external_function(fname, int(args), realconv, ret, sign)
 
       # Sometimes there will be things like `__imp___gmon_start__` which
       # is really the implementation of `__gmon_start__`, where that is
