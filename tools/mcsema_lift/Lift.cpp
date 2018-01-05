@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-#include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 
 #include <iomanip>
 #include <iostream>
 #include <memory>
-#include <sstream>
 #include <string>
+#include <sstream>
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
@@ -37,16 +37,16 @@
 #include "mcsema/BC/Util.h"
 
 #ifndef LLVM_VERSION_STRING
-#define LLVM_VERSION_STRING LLVM_VERSION_MAJOR << "." << LLVM_VERSION_MINOR
+# define LLVM_VERSION_STRING LLVM_VERSION_MAJOR << "." << LLVM_VERSION_MINOR
 #endif
 
 #ifndef MCSEMA_VERSION_STRING
-#define MCSEMA_VERSION_STRING "unknown"
-#endif // MCSEMA_VERSION_STRING
+# define MCSEMA_VERSION_STRING "unknown"
+#endif  // MCSEMA_VERSION_STRING
 
 #ifndef MCSEMA_BRANCH_NAME
-#define MCSEMA_BRANCH_NAME "unknown"
-#endif // MCSEMA_BRANCH_NAME
+# define MCSEMA_BRANCH_NAME "unknown"
+#endif  // MCSEMA_BRANCH_NAME
 
 DECLARE_string(arch);
 DECLARE_string(os);
@@ -58,7 +58,6 @@ DEFINE_string(output, "", "Output bitcode file name.");
 DEFINE_string(library, "", "Path to an LLVM bitcode or IR file that contains "
                            "external library definitions.");
 
-DECLARE_bool(list_supported);
 DECLARE_bool(version);
 
 DECLARE_bool(disable_optimizer);
@@ -66,18 +65,18 @@ DECLARE_bool(keep_memops);
 DECLARE_bool(explicit_args);
 DECLARE_string(pc_annotation);
 
-DEFINE_bool(legacy_mode, false,
-            "Try to make the output bitcode resemble the original McSema.");
 DEFINE_bool(list_supported, false,
             "List instructions that can be lifted.");
+DEFINE_bool(legacy_mode, false,
+            "Try to make the output bitcode resemble the original McSema.");
 
 namespace {
 
 static void PrintVersion(void) {
-  std::cout << "This is mcsema-lift version: " << MCSEMA_VERSION_STRING
-            << std::endl
-            << "Built from branch: " << MCSEMA_BRANCH_NAME << std::endl
-            << "Using LLVM " << LLVM_VERSION_STRING << std::endl;
+  std::cout
+      << "This is mcsema-lift version: " << MCSEMA_VERSION_STRING << std::endl
+      << "Built from branch: " << MCSEMA_BRANCH_NAME << std::endl
+      << "Using LLVM " << LLVM_VERSION_STRING << std::endl;
 }
 
 // Print a list of instructions that Remill can lift.
@@ -106,7 +105,8 @@ static void LoadLibraryIntoModule(void) {
     }
 
     auto dest_func = llvm::Function::Create(
-        func.getFunctionType(), func.getLinkage(), func_name, mcsema::gModule);
+        func.getFunctionType(), func.getLinkage(),
+        func_name, mcsema::gModule);
 
     dest_func->copyAttributesFrom(&func);
     dest_func->setVisibility(func.getVisibility());
@@ -124,20 +124,20 @@ static void LoadLibraryIntoModule(void) {
     }
 
     auto dest_var = new llvm::GlobalVariable(
-        *mcsema::gModule, var.getType()->getElementType(), var.isConstant(),
-        var.getLinkage(), nullptr, var_name, nullptr, var.getThreadLocalMode(),
+        *mcsema::gModule, var.getType()->getElementType(),
+        var.isConstant(), var.getLinkage(), nullptr,
+        var_name, nullptr, var.getThreadLocalMode(),
         var.getType()->getAddressSpace());
 
     dest_var->copyAttributesFrom(&var);
   }
 }
 
-} // namespace
+}  // namespace
 
 int main(int argc, char *argv[]) {
   std::stringstream ss;
-  ss << std::endl
-     << std::endl
+  ss << std::endl << std::endl
      << "  " << argv[0] << " \\" << std::endl
      << "    --output OUTPUT_BC_FILE \\" << std::endl
      << "    --arch ARCH_NAME \\" << std::endl
@@ -206,10 +206,12 @@ int main(int argc, char *argv[]) {
      // Try to produce bitcode that looks like McSema version 1. This enables
      // `--explicit_args` and `--pc_annotation`.
      << "    [--legacy_mode] \\" << std::endl
-     << "    [--version] \\" << std::endl
-
+     
      // Print a list of the instructions that can be lifted.
      << "    [--list-supported]" << std::endl
+
+     // Print the version and exit.
+     << "    [--version]" << std::endl
      << std::endl;
 
   google::InitGoogleLogging(argv[0]);
@@ -221,18 +223,20 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
   }
 
-  CHECK(!FLAGS_os.empty()) << "Must specify an operating system name to --os.";
+  CHECK(!FLAGS_os.empty())
+      << "Must specify an operating system name to --os.";
 
   CHECK(!FLAGS_arch.empty())
       << "Must specify a machine code architecture name to --arch.";
 
-  CHECK(!FLAGS_cfg.empty()) << "Must specify the path to a CFG file to --cfg.";
+  CHECK(!FLAGS_cfg.empty())
+      << "Must specify the path to a CFG file to --cfg.";
 
   mcsema::gContext = new llvm::LLVMContext;
 
   CHECK(mcsema::InitArch(FLAGS_os, FLAGS_arch))
-      << "Cannot initialize for arch " << FLAGS_arch << " and OS " << FLAGS_os
-      << std::endl;
+      << "Cannot initialize for arch " << FLAGS_arch
+      << " and OS " << FLAGS_os << std::endl;
 
   if (FLAGS_legacy_mode) {
     LOG_IF(WARNING, FLAGS_keep_memops)
@@ -252,8 +256,8 @@ int main(int argc, char *argv[]) {
     FLAGS_disable_optimizer = false;
   }
 
-  auto cfg_module =
-      mcsema::ReadProtoBuf(FLAGS_cfg, (mcsema::gArch->address_size / 8));
+  auto cfg_module = mcsema::ReadProtoBuf(
+      FLAGS_cfg, (mcsema::gArch->address_size / 8));
   mcsema::gModule = remill::LoadTargetSemantics(mcsema::gContext);
   mcsema::gArch->PrepareModule(mcsema::gModule);
 
