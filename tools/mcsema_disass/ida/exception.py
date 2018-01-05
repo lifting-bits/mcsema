@@ -173,6 +173,11 @@ def format_lsda_action(action_tbl, type_addr, type_enc, act_id):
   act_ea = action_tbl + act_id - 1
   ar_filter,ea2 = read_enc_value(act_ea, DW_EH_PE_sleb128)
   ar_disp,  ea3 = read_enc_value(ea2, DW_EH_PE_sleb128)
+  
+  if ar_filter > 0:
+    type_slot = type_addr - ar_filter * enc_size(type_enc)
+    type_ea, eatmp = read_enc_value(type_slot, type_enc)
+    DEBUG("catch type typeinfo = {:x} {}".format(type_ea, get_symbol_name(type_ea)))
   #DEBUG("ea {:x}: ar_disp[{}]: {} ({:x})".format(act_ea, act_id, ar_disp, ar_filter))
   return ar_disp, ar_filter
 
@@ -183,7 +188,7 @@ def create_block_entries(start_ea, heads):
     if entry == 0:
       continue
     if index < len(heads) - 1:
-      block = EHBlocks(entry, heads[index + 1])
+      block = EHBlocks(heads[index], heads[index + 1])
       block_set.add(block)
     index = index + 1
 
@@ -405,7 +410,7 @@ def get_exception_landingpad(F, insn_ea):
   if has_lp:
     lsda_entries = _FUNC_LSDA_ENTRIES[F.ea]
     for entry in lsda_entries:
-      if insn_ea >= entry.cs_start and insn_ea <= entry.cs_end:
+      if insn_ea >= entry.cs_start and insn_ea < entry.cs_end:
         return entry.cs_lp
   return 0
 

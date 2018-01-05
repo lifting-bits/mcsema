@@ -130,8 +130,6 @@ static void InlineSubFuncInvoke(llvm::BasicBlock *block,
   auto invoke = llvm::InvokeInst::Create(
       sub, ifnormal, ifexception, remill::LiftedFunctionArgs(block), "", block);
   invoke->setCallingConv(sub->getCallingConv());
-  auto mem_ptr = remill::LoadMemoryPointerRef(block);
-  (void) new llvm::StoreInst(invoke, mem_ptr, block);
 }
 
 // Find an external function associated with
@@ -231,6 +229,12 @@ static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
 static void LiftExceptionFrameLP(TranslationContext &ctx,
                                  const NativeFunction *cfg_func) {
 
+  llvm::Function* personality = llvm::Function::Create(
+      llvm::FunctionType::get(llvm::Type::getInt32Ty(*gContext), true),
+      llvm::Function::ExternalLinkage, "__gxx_personality_v0", gModule);
+  auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
+  lifted_func->setPersonalityFn(personality);
+
   for (auto &entry : cfg_func->eh_frame) {
     if (entry->action == 0) {
       std::stringstream ss;
@@ -244,28 +248,11 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       auto lpad = ir.CreateLandingPad(exn_type, 1, "cleanup.lpad");
       lpad->setCleanup(true);
       auto lp_entry = ctx.ea_to_block[entry->lp_ea];
-      landing_bb->dump();
+      //landing_bb->dump();
       if (nullptr != lp_entry) {
         ir.CreateBr(lp_entry);
-        ctx.ea_to_block[entry->lp_ea] = landing_bb;
+        ctx.lp_to_block[entry->lp_ea] = landing_bb;
       }
-      /*
-      auto exctn_0  = ir.CreateExtractValue(lpad, 0);
-      auto store_loc_0 = ir.CreateAlloca(exctn_0->getType());
-      ir.CreateStore(exctn_0, store_loc_0);
-      auto exctn_1 = ir.CreateExtractValue(lpad, 1);
-      auto store_loc_1 = ir.CreateAlloca(exctn_1->getType());
-      ir.CreateStore(exctn_1, store_loc_1);
-      ir.CreateCall(end_catch);
-
-      auto load_loc_0 = ir.CreateLoad(store_loc_0);
-      auto load_loc_1 = ir.CreateLoad(store_loc_1);
-      auto array = ir.CreateInsertValue(llvm::UndefValue::get(exn_type), load_loc_0, 0);
-      array = ir.CreateInsertValue(array, load_loc_1, 1);
-
-      ir.CreateResume(array);
-      ir.CreateUnreachable();
-       */
     } else if (entry->action == 1) {
       std::stringstream ss;
       if (entry->lp_ea == 0) continue;
@@ -275,17 +262,19 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       llvm::IRBuilder<> ir(landing_bb);
       auto exn_type = llvm::StructType::get(llvm::Type::getInt8PtrTy(*gContext),
                                             llvm::Type::getInt32Ty(*gContext), nullptr);
-      ir.CreateLandingPad(exn_type, 1, "catch.lpad");
+      auto lpi = ir.CreateLandingPad(exn_type, 1, "catch.lpad");
+      lpi->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
+      LOG(INFO) << "Landing pad number of Operand [0] " << lpi->getNumClauses() << std::endl;
       auto lp_entry = ctx.ea_to_block[entry->lp_ea];
-      landing_bb->dump();
+      //landing_bb->dump();
       if (nullptr != lp_entry) {
         ir.CreateBr(lp_entry);
-        ctx.ea_to_block[entry->lp_ea] = landing_bb;
+        ctx.lp_to_block[entry->lp_ea] = landing_bb;
       }
     }
   }
-
 }
+
 
 // Lift both targets of a conditional branch into a branch in the bitcode,
 // where each side of the branch tail-calls to the functions associated with
@@ -401,11 +390,11 @@ static bool TryLiftTerminator(TranslationContext &ctx,
             << "Function " << ctx.lifted_func->getName().str()
             << " calls " << targ_func->getName().str()
             << " at " << std::hex << inst.pc << std::dec;
-        if ((ctx.cfg_inst->lp_ea == 0) || (ctx.ea_to_block[ctx.cfg_inst->lp_ea] == nullptr)) {
+        if ((ctx.cfg_inst->lp_ea == 0) || (ctx.lp_to_block[ctx.cfg_inst->lp_ea] == nullptr)) {
           InlineSubFuncCall(block, targ_func);
         } else {
-          llvm::BasicBlock *exception_block = ctx.ea_to_block[ctx.cfg_inst->lp_ea];
-          llvm::BasicBlock *normal_block = GetOrCreateBlock(ctx, inst.next_pc);
+          auto exception_block = ctx.lp_to_block[ctx.cfg_inst->lp_ea];
+          auto normal_block = GetOrCreateBlock(ctx, inst.next_pc);
           InlineSubFuncInvoke(block, targ_func, normal_block, exception_block);
         }
 
@@ -644,7 +633,7 @@ static llvm::Function *LiftFunction(
   // Allocate the stack variable recovered in the function
   auto entry_block = ctx.ea_to_block[cfg_func->ea];
   AllocStackVars(entry_block, cfg_func);
-  
+
   LiftExceptionFrameLP(ctx, cfg_func);
 
   llvm::BranchInst::Create(ctx.ea_to_block[cfg_func->ea],
@@ -723,6 +712,7 @@ bool DefineLiftedFunctions(const NativeModule *cfg_module) {
           << std::dec;
       return false;
     }
+    //lifted_func->dump();
     func_pass_manager.run(*lifted_func);
   }
 
