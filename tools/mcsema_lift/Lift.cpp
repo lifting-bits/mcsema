@@ -65,6 +65,8 @@ DECLARE_bool(keep_memops);
 DECLARE_bool(explicit_args);
 DECLARE_string(pc_annotation);
 
+DEFINE_bool(list_supported, false,
+            "List instructions that can be lifted.");
 DEFINE_bool(legacy_mode, false,
             "Try to make the output bitcode resemble the original McSema.");
 
@@ -75,6 +77,14 @@ static void PrintVersion(void) {
       << "This is mcsema-lift version: " << MCSEMA_VERSION_STRING << std::endl
       << "Built from branch: " << MCSEMA_BRANCH_NAME << std::endl
       << "Using LLVM " << LLVM_VERSION_STRING << std::endl;
+}
+
+// Print a list of instructions that Remill can lift.
+static void PrintSupportedInstructions(void) {
+  remill::ForEachISel(mcsema::gModule,
+                      [=](llvm::GlobalVariable *isel, llvm::Function *) {
+                        std::cout << isel->getName().str() << std::endl;
+                      });
 }
 
 // Load in a separate bitcode or IR library, and copy function and variable
@@ -196,6 +206,11 @@ int main(int argc, char *argv[]) {
      // Try to produce bitcode that looks like McSema version 1. This enables
      // `--explicit_args` and `--pc_annotation`.
      << "    [--legacy_mode] \\" << std::endl
+     
+     // Print a list of the instructions that can be lifted.
+     << "    [--list-supported]" << std::endl
+
+     // Print the version and exit.
      << "    [--version]" << std::endl
      << std::endl;
 
@@ -245,6 +260,10 @@ int main(int argc, char *argv[]) {
       FLAGS_cfg, (mcsema::gArch->address_size / 8));
   mcsema::gModule = remill::LoadTargetSemantics(mcsema::gContext);
   mcsema::gArch->PrepareModule(mcsema::gModule);
+
+  if (FLAGS_list_supported) {
+    PrintSupportedInstructions();
+  }
 
   if (!FLAGS_library.empty()) {
     LoadLibraryIntoModule();
