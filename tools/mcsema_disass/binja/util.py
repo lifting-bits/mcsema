@@ -7,6 +7,7 @@ import logging
 import magic
 import re
 import struct
+from collections import defaultdict
 
 LOGNAME = 'binja.cfg'
 log = logging.getLogger(LOGNAME)
@@ -268,3 +269,37 @@ def search_displ_base(il):
     if res is not None:
         # Interpret the string representation to avoid sign issues
         return int(res.tokens[0].text, 16)
+
+
+def is_jump_tail_call(bv, il):
+    """ Returns `True` if the given il is a jump to another function """
+    return il.operation == LowLevelILOperation.LLIL_JUMP and \
+           il.dest.operation == LowLevelILOperation.LLIL_CONST_PTR and \
+           bv.get_function_at(il.dest.constant) is not None
+
+
+def collect_il_groups(il_func):
+    """ Gather all il instructions grouped by address
+    Some instructions (cmov, set, etc.) get expanded into multiple il
+    instructions when lifted, but `Function.get_lifted_il_at` will only return the first
+    of all the il instructions at an address. This will group all the il instructions
+    into a map of address to expanded instructions as follows:
+
+    {
+        addr1 => [single il instruction],
+        addr2 => [expanded il 1, expanded il 2, ...],
+        ...
+    }
+
+    Args:
+        il_func: IL function to gather all il groups from
+
+    Returns:
+        dict: Map from address to all IL instructions at that address
+
+    """
+    il_map = defaultdict(list)
+    for blk in il_func:
+        for il in blk:
+            il_map[il.address].append(il)
+    return il_map
