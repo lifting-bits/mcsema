@@ -50,6 +50,7 @@ message Instruction {
   required  bytes           bytes = 2;
   repeated  CodeReference   xrefs = 3;
   optional  bool            local_noreturn = 4;
+  optional  uint64          lp_ea = 5;     // Address of the landing pad
 }
 
 // A basic block of instructions inside of a function.
@@ -66,6 +67,7 @@ message Function {
   required  bool        is_entrypoint = 3;
   optional  string      name = 4;
   repeated  StackVariable	stack_vars = 5;
+  repeated  ExceptionFrame     eh_frame = 6;
 }
 
 // A function that is used or referenced within binary, but not implemented
@@ -134,6 +136,20 @@ message Reference {
   required  int64    offset = 2;
 }
 
+message ExceptionFrame {
+
+  enum Action {
+    Cleanup = 0;
+    Catch = 1;
+  }
+
+  required uint64     func_ea = 1;
+  required uint64     start_ea = 3;
+  required uint64     end_ea = 4;
+  required uint64     lp_ea = 5;
+  required Action     action = 6;
+}
+
 message StackVariable {
   required string     name = 1;
   required uint64     size = 2;
@@ -178,5 +194,5 @@ message Module {
   repeated  ExternalFunction    external_funcs = 4;
   repeated  ExternalVariable    external_vars = 5;
   
-  repeated	GlobalVariable      global_vars = 8;
+  repeated  GlobalVariable      global_vars = 8;
 }

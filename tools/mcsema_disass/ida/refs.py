@@ -202,7 +202,7 @@ def _is_ea_into_bad_code(ea, binary_is_pie):
     return False
 
   import flow  # Circular dependency!
-  term_inst = flow.find_linear_terminator(ea)
+  term_inst, _ = flow.find_linear_terminator(ea)
   if not term_inst:
     return True
 

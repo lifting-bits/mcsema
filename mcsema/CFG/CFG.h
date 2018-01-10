@@ -46,6 +46,7 @@ struct NativeXref;
 struct NativeInstruction {
  public:
   uint64_t ea;
+  uint64_t lp_ea;
   std::string bytes;
 
   const NativeXref *flow;

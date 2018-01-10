@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from table import *
+from exception import *
 
 # Addresses of the first instruction in a function.
 _FUNC_HEAD_EAS = set()
@@ -79,7 +80,7 @@ def find_linear_terminator(ea, max_num=256):
   if term_inst:
     _TERMINATOR_EAS.add(term_ea)
 
-  return term_inst
+  return term_inst, inst_bytes
 
 def get_direct_branch_target(arg):
   """Tries to 'force' get the target of a direct or conditional branch.
@@ -249,6 +250,7 @@ def find_default_block_heads(sub_ea):
           _MISSING_FLOWS[sub_ea].add(ea)
       ea = idc.NextHead(ea, max_ea)
 
+
   _DEFAULT_BLOCK_HEAD_EAS[sub_ea] = heads
 
   return heads
@@ -299,7 +301,7 @@ def analyse_subroutine(sub_ea, binary_is_pie):
       continue
 
     #log.debug("Found block head at {:08x}".format(block_head_ea))
-    term_inst = find_linear_terminator(block_head_ea)
+    term_inst, inst_bytes = find_linear_terminator(block_head_ea)
     if not term_inst:
       DEBUG("  Block at {:x} has no terminator!".format(block_head_ea))
       found_block_eas.remove(block_head_ea)
@@ -310,6 +312,14 @@ def analyse_subroutine(sub_ea, binary_is_pie):
       continue
 
     term_insts.add(term_inst)
+
+    # Check the instruction next to term_instr for recovery, if it has missing flow
+    # IDA heuristics misses the landing pad and exception blocks in some cases; Linear
+    # scan identifies the missing blocks and recover them
+    next_ea = term_inst.ea + len(inst_bytes)
+    if next_ea not in _FUNC_HEAD_EAS and next_ea not in _BLOCK_HEAD_EAS:
+      block_head_eas.add(next_ea)
+
     #log.debug("Linear terminator of {:08x} is {:08x}".format(
     #    block_head_ea, term_inst.ea))
 
