@@ -100,6 +100,11 @@ static void LoadLibraryIntoModule(void) {
     if (func_name.startswith("__mcsema") || func_name.startswith("__remill")) {
       continue;
     }
+
+    if (!func.hasExternalLinkage()) {
+      continue;
+    }
+
     if (mcsema::gModule->getFunction(func_name)) {
       continue;
     }
@@ -116,6 +121,10 @@ static void LoadLibraryIntoModule(void) {
   for (auto &var : lib->globals()) {
     auto var_name = var.getName();
     if (var_name.startswith("__mcsema") || var_name.startswith("__remill")) {
+      continue;
+    }
+
+    if (!var.hasExternalLinkage()) {
       continue;
     }
 
