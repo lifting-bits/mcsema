@@ -1325,12 +1325,13 @@ def identify_external_symbols():
             extern_name = found_name
             break
 
-        DEBUG("WARNING: Adding variable {} at {:x} as external".format(
-            extern_name, ea))
+        if extern_name != "__gxx_personality_v0":
+          DEBUG("WARNING: Adding variable {} at {:x} as external".format(
+              extern_name, ea))
 
-        set_symbol_name(ea, extern_name)  # Rename it.
-        EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
-        _FIXED_EXTERNAL_NAMES[ea] = extern_name
+          set_symbol_name(ea, extern_name)  # Rename it.
+          EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
+          _FIXED_EXTERNAL_NAMES[ea] = extern_name
 
   DEBUG_POP()
 

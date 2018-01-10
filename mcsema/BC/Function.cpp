@@ -229,11 +229,23 @@ static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
 static void LiftExceptionFrameLP(TranslationContext &ctx,
                                  const NativeFunction *cfg_func) {
 
-  llvm::Function* personality = llvm::Function::Create(
-      llvm::FunctionType::get(llvm::Type::getInt32Ty(*gContext), true),
-      llvm::Function::ExternalLinkage, "__gxx_personality_v0", gModule);
-  auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
-  lifted_func->setPersonalityFn(personality);
+  if (cfg_func->eh_frame.size() > 0) {
+
+    // The personality function `__gxx_personality_v0` is lifted as global variable. Erase the
+    // variable before declaring it as the function.
+    if (auto llvm_used = gModule->getGlobalVariable("__gxx_personality_v0")) {
+      llvm_used->eraseFromParent();
+    }
+
+    auto personality = llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getInt32Ty(*gContext), true),
+        llvm::Function::ExternalLinkage, "__gxx_personality_v0", gModule);
+
+    auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
+    lifted_func->addFnAttr(llvm::Attribute::UWTable);
+    lifted_func->removeFnAttr(llvm::Attribute::NoUnwind);
+    lifted_func->setPersonalityFn(personality);
+  }
 
   for (auto &entry : cfg_func->eh_frame) {
     if (entry->action == 0) {
@@ -247,6 +259,21 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
                                             llvm::Type::getInt32Ty(*gContext), nullptr);
       auto lpad = ir.CreateLandingPad(exn_type, 1, "cleanup.lpad");
       lpad->setCleanup(true);
+
+      auto exctn_0  = ir.CreateExtractValue(lpad, 0);
+      auto store_loc_0 = ir.CreateAlloca(exctn_0->getType());
+      ir.CreateStore(exctn_0, store_loc_0);
+
+      auto exctn_1 = ir.CreateExtractValue(lpad, 1);
+      auto store_loc_1 = ir.CreateAlloca(exctn_1->getType());
+      ir.CreateStore(exctn_1, store_loc_1);
+
+      /*auto load_loc_0 = ir.CreateLoad(store_loc_0);
+      auto load_loc_1 = ir.CreateLoad(store_loc_1);
+      auto array = ir.CreateInsertValue(llvm::UndefValue::get(exn_type), load_loc_0, 0);
+      array = ir.CreateInsertValue(array, load_loc_1, 1);
+      ir.CreateResume(array);
+       */
       auto lp_entry = ctx.ea_to_block[entry->lp_ea];
       //landing_bb->dump();
       if (nullptr != lp_entry) {
@@ -262,9 +289,20 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       llvm::IRBuilder<> ir(landing_bb);
       auto exn_type = llvm::StructType::get(llvm::Type::getInt8PtrTy(*gContext),
                                             llvm::Type::getInt32Ty(*gContext), nullptr);
-      auto lpi = ir.CreateLandingPad(exn_type, 1, "catch.lpad");
-      lpi->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
-      LOG(INFO) << "Landing pad number of Operand [0] " << lpi->getNumClauses() << std::endl;
+      auto lpad = ir.CreateLandingPad(exn_type, 1, "catch.lpad");
+
+      //catch (...)
+      // Set tne clause to catch all kind of exceptions
+      lpad->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
+      LOG(INFO) << "Landing pad number of Operand [0] " << lpad->getNumClauses() << std::endl;
+      auto exctn_0  = ir.CreateExtractValue(lpad, 0);
+      auto store_loc_0 = ir.CreateAlloca(exctn_0->getType());
+      ir.CreateStore(exctn_0, store_loc_0);
+
+      auto exctn_1 = ir.CreateExtractValue(lpad, 1);
+      auto store_loc_1 = ir.CreateAlloca(exctn_1->getType());
+      ir.CreateStore(exctn_1, store_loc_1);
+
       auto lp_entry = ctx.ea_to_block[entry->lp_ea];
       //landing_bb->dump();
       if (nullptr != lp_entry) {
