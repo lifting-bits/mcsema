@@ -552,11 +552,15 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
     if (size < gArch->address_size) {
       val_type = gWordType;
       ret_val = ir.CreateZExt(ret_val, val_type);
-    } else {
-      CHECK(size <= gArch->address_size)
-          << "Cannot store value of type "
+
+    } else if (size > gArch->address_size) {
+      LOG(ERROR)
+          << "Truncating value of type "
           << remill::LLVMThingToString(val_type)
-          << " into variable " << val_var;
+          << " to store it into variable " << val_var
+          << " of type " << remill::LLVMThingToString(gWordType);
+      ret_val = ir.CreateTrunc(ret_val, gWordType);
+      val_type = gWordType;
     }
 
   // Storing a `float` into an x87 register, convert it to a `double`.
