@@ -15,32 +15,78 @@
 
 SCRIPTS_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 MAZE_DIR=$( cd "$( dirname "${SCRIPTS_DIR}" )" && pwd )
-IDA_DIR=/opt/ida-6.9/
+DISASSEMBLER=/opt/ida-6.9/idal64
 
-mcsema-disass \
-    --os linux \
-    --arch x86 \
-    --disassembler "${IDA_DIR}/idal" \
-    --log_file /tmp/log \
-    --entrypoint main \
-    --output "${MAZE_DIR}/cfg/maze.x86.cfg" \
-    --binary "${MAZE_DIR}/bin/maze.x86"
+function Disassemble {
 
-mcsema-disass \
-    --os linux \
-    --arch amd64 \
-    --disassembler "${IDA_DIR}/idal64" \
-    --log_file /tmp/log \
-    --entrypoint main \
-    --output "${MAZE_DIR}/cfg/maze.amd64.cfg" \
-    --binary "${MAZE_DIR}/bin/maze.amd64"
+  printf "[+] Disassembling ${MAZE_DIR}/bin/maze.amd64\n"
+  mcsema-disass \
+      --os linux \
+      --arch amd64 \
+      --disassembler "${DISASSEMBLER}" \
+      --log_file /tmp/log \
+      --entrypoint main \
+      --output "${MAZE_DIR}/cfg/maze.amd64.cfg" \
+      --binary "${MAZE_DIR}/bin/maze.amd64"
 
+  if [[ $? -ne 0 ]] ; then
+    printf "[x] Error disassembling ${MAZE_DIR}/bin/maze.amd64\n"
+    return 1
+  else
+    printf " i  Saved CFG to ${MAZE_DIR}/cfg/maze.amd64.cfg\n"
+  fi
 
-mcsema-disass \
-    --os linux \
-    --arch aarch64 \
-    --disassembler "${IDA_DIR}/idal64" \
-    --log_file /tmp/log \
-    --entrypoint main \
-    --output "${MAZE_DIR}/cfg/maze.aarch64.cfg" \
-    --binary "${MAZE_DIR}/bin/maze.aarch64"
+  printf "[+] Disassembling ${MAZE_DIR}/bin/maze.aarch64\n"
+  mcsema-disass \
+      --os linux \
+      --arch aarch64 \
+      --disassembler "${DISASSEMBLER}" \
+      --log_file /tmp/log \
+      --entrypoint main \
+      --output "${MAZE_DIR}/cfg/maze.aarch64.cfg" \
+      --binary "${MAZE_DIR}/bin/maze.aarch64"
+
+  if [[ $? -ne 0 ]] ; then
+    printf "[x] Error disassembling ${MAZE_DIR}/bin/maze.aarch64\n"
+    return 1
+  else
+    printf " i  Saved CFG to ${MAZE_DIR}/cfg/maze.aarch64.cfg\n"
+  fi
+
+  return 0
+}
+
+function main {
+  while [[ $# -gt 0 ]] ; do
+    key="$1"
+
+    case $key in
+
+      # Change the default installation prefix.
+      --disassembler)
+        DISASSEMBLER=$(python -c "import os; import sys; sys.stdout.write(os.path.abspath('${2}'))")
+        printf "[+] New disassembler path is ${DISASSEMBLER}\n"
+        shift # past argument
+      ;;
+
+      *)
+        # unknown option
+        printf "[x] Unknown option: ${key}\n"
+        return 1
+      ;;
+    esac
+
+    shift # past argument or value
+  done
+
+  if [[ ! -f "${DISASSEMBLER}" ]] ; then
+    printf "[x] Disassembler ${DISASSEMBLER} does not exist. Please specify it manually using --disassembler.\n"
+    return 1
+  fi
+
+  Disassemble
+  return $?
+}
+
+main $@
+exit $?

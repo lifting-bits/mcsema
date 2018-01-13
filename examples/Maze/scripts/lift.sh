@@ -19,20 +19,17 @@ KLEE_WS_DIR=$(pwd)
 
 mkdir -p "${MAZE_DIR}/bc"
 
+# Look for `libc.bc`. This file is automatically created by the `build_klee.sh`
+# script in Remill, so that we can make the lifted bitcode more dependable via
+# the `--library` option.
 LIB_ARGS=
 if [[ -f "${KLEE_WS_DIR}/libc.bc" ]] ; then
   LIB_ARGS="--library ${KLEE_WS_DIR}/libc.bc"
 else
-  printf "WARNING: Could not find klee-uclibc\n"
+  printf "[x] WARNING: Could not find klee-uclibc library bitcode.\n"
 fi
 
-mcsema-lift-3.9 \
-    --os linux \
-    --arch x86 \
-    --cfg "${MAZE_DIR}/cfg/maze.x86.cfg" \
-    --output "${MAZE_DIR}/bc/maze.x86.bc" \
-    --explicit_args \
-    ${LIB_ARGS}
+printf "[+] Lifting ${MAZE_DIR}/cfg/maze.amd64.cfg\n"
 
 mcsema-lift-3.9 \
     --os linux \
@@ -42,6 +39,14 @@ mcsema-lift-3.9 \
     --explicit_args \
     ${LIB_ARGS}
 
+if [[ $? -ne 0 ]] ; then
+  printf "[x] Could not lift ${MAZE_DIR}/cfg/maze.amd64.cfg\n"
+else
+  printf " i  Saved bitcode to ${MAZE_DIR}/bc/maze.amd64.bc\n"
+fi
+
+printf "[+] Lifting ${MAZE_DIR}/cfg/maze.aarch64.cfg\n"
+
 mcsema-lift-3.9 \
     --os linux \
     --arch aarch64 \
@@ -50,3 +55,8 @@ mcsema-lift-3.9 \
     --explicit_args \
     ${LIB_ARGS}
 
+if [[ $? -ne 0 ]] ; then
+  printf "[x] Could not lift ${MAZE_DIR}/cfg/maze.aarch64.cfg\n"
+else
+  printf " i  Saved bitcode to ${MAZE_DIR}/bc/maze.aarch64.bc\n"
+fi
