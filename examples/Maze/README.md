@@ -80,7 +80,7 @@ sudo pip install --upgrade pip
 sudo pip install 'protobuf==3.2.0'
 ```
 
-The first step is to clone [Remill](https://github.com/trailofbits/remill).
+Now that we have the dependencies we need, we should clone [Remill](https://github.com/trailofbits/remill).
 
 ```bash
 cd /data
