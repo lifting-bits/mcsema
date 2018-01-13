@@ -59,6 +59,8 @@ class CallingConvention {
     return sp_name;
   }
 
+  void StoreThreadPointer(llvm::BasicBlock *block, llvm::Value *new_val);
+
   const char *ThreadPointerVarName(void) const {
     return tp_name;
   }

@@ -19,12 +19,12 @@ IDA_DIR=/opt/ida-6.9/
 
 mcsema-disass \
     --os linux \
-    --arch aarch64 \
-    --disassembler "${IDA_DIR}/idal64" \
+    --arch x86 \
+    --disassembler "${IDA_DIR}/idal" \
     --log_file /tmp/log \
     --entrypoint main \
-    --output "${MAZE_DIR}/cfg/maze.aarch64.cfg" \
-    --binary "${MAZE_DIR}/bin/maze.aarch64"
+    --output "${MAZE_DIR}/cfg/maze.x86.cfg" \
+    --binary "${MAZE_DIR}/bin/maze.x86"
 
 mcsema-disass \
     --os linux \
@@ -35,12 +35,12 @@ mcsema-disass \
     --output "${MAZE_DIR}/cfg/maze.amd64.cfg" \
     --binary "${MAZE_DIR}/bin/maze.amd64"
 
+
 mcsema-disass \
     --os linux \
-    --arch x86 \
-    --disassembler "${IDA_DIR}/idal" \
+    --arch aarch64 \
+    --disassembler "${IDA_DIR}/idal64" \
     --log_file /tmp/log \
     --entrypoint main \
-    --output "${MAZE_DIR}/cfg/maze.x86.cfg" \
-    --binary "${MAZE_DIR}/bin/maze.x86"
-
+    --output "${MAZE_DIR}/cfg/maze.aarch64.cfg" \
+    --binary "${MAZE_DIR}/bin/maze.aarch64"

@@ -21,6 +21,8 @@
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/InstIterator.h>
+#include <llvm/IR/InlineAsm.h>
+#include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/LLVMContext.h>
@@ -65,7 +67,11 @@ DEFINE_bool(add_reg_tracer, false,
 DEFINE_bool(add_breakpoints, false,
             "Add 'breakpoint' functions between every lifted instruction. This "
             "allows one to set a breakpoint, in the lifted code, just before a "
-            "specific lifted instruction is executed.");
+            "specific lifted instruction is executed. This is a debugging aid.");
+
+DEFINE_bool(check_pcs_at_breakpoints, false,
+            "Check whether or not the emulated program counter is correct at "
+            "each injected 'breakpoint' function. This is a debugging aid.");
 
 namespace mcsema {
 namespace {
@@ -85,21 +91,54 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
   ss << "breakpoint_" << std::hex << pc;
 
   auto func_name = ss.str();
-  auto bp = gModule->getFunction(func_name);
-  if (!bp) {
-    bp = llvm::Function::Create(
-        LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
-        func_name, gModule);
-
-    // Make sure to keep this function around (along with `ExternalLinkage`).
-    bp->addFnAttr(llvm::Attribute::OptimizeNone);
-    bp->addFnAttr(llvm::Attribute::NoInline);
-    bp->removeFnAttr(llvm::Attribute::ReadNone);
-
-    llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", bp));
-    ir.CreateRet(remill::NthArgument(bp, remill::kMemoryPointerArgNum));
+  auto func = gModule->getFunction(func_name);
+  if (func) {
+    return func;
   }
-  return bp;
+
+  func = llvm::Function::Create(
+      LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
+      func_name, gModule);
+
+  // Make sure to keep this function around (along with `ExternalLinkage`).
+  func->addFnAttr(llvm::Attribute::OptimizeNone);
+  func->addFnAttr(llvm::Attribute::NoInline);
+  func->removeFnAttr(llvm::Attribute::ReadNone);
+  func->addFnAttr(llvm::Attribute::ArgMemOnly);
+
+  auto state_ptr = remill::NthArgument(func, remill::kStatePointerArgNum);
+  auto state_ptr_type = state_ptr->getType();
+
+  llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", func));
+
+  if (FLAGS_check_pcs_at_breakpoints) {
+    auto trap = llvm::Intrinsic::getDeclaration(gModule, llvm::Intrinsic::trap);
+    auto are_eq = ir.CreateICmpEQ(
+        remill::NthArgument(func, remill::kPCArgNum),
+        llvm::ConstantInt::get(gWordType, pc));
+
+    auto not_eq_bb = llvm::BasicBlock::Create(*gContext, "", func);
+    auto eq_bb = llvm::BasicBlock::Create(*gContext, "", func);
+    ir.CreateCondBr(are_eq, eq_bb, not_eq_bb);
+
+    ir.SetInsertPoint(not_eq_bb);
+    ir.CreateCall(trap);
+    ir.CreateUnreachable();
+
+    ir.SetInsertPoint(eq_bb);
+  }
+
+  // Basically some empty inline assembly that tells the compiler not to
+  // optimize away the `state` pointer before each `breakpoint_XXX` function.
+  auto asm_func_type = llvm::FunctionType::get(
+      llvm::Type::getVoidTy(*gContext), state_ptr_type);
+
+  auto asm_func = llvm::InlineAsm::get(
+      asm_func_type, "", "*m,~{dirflag},~{fpsr},~{flags}", true);
+
+  ir.CreateCall(asm_func, state_ptr);
+  ir.CreateRet(remill::NthArgument(func, remill::kMemoryPointerArgNum));
+  return func;
 }
 
 // Tries to get the lifted function beginning at `pc`.

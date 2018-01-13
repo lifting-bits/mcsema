@@ -223,6 +223,35 @@ static llvm::Constant *InitialStackPointerValue(void) {
   return llvm::ConstantExpr::getPtrToInt(gep, gWordType);
 }
 
+// Create an array of data for holding thread-local storage.
+static llvm::Constant *InitialThreadLocalStorage(void) {
+  static llvm::Constant *tls = nullptr;
+  if (tls) {
+    return tls;
+  }
+
+  auto tls_type = llvm::ArrayType::get(
+      gWordType, 4096 / (gArch->address_size / 8));
+
+  auto tls_var = new llvm::GlobalVariable(
+    *gModule, tls_type, false, llvm::GlobalValue::InternalLinkage,
+    llvm::Constant::getNullValue(tls_type), "__mcsema_tls");
+
+  std::vector<llvm::Constant *> indexes(2);
+  indexes[0] = llvm::ConstantInt::get(gWordType, 0);
+  indexes[1] = indexes[0];
+
+#if LLVM_VERSION_NUMBER <= LLVM_VERSION(3, 6)
+  auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(tls, indexes);
+#else
+  auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      nullptr, tls_var, indexes);
+#endif
+
+  tls = llvm::ConstantExpr::getPtrToInt(gep, gWordType);
+  return tls;
+}
+
 // Create a state structure with everything zero-initialized, except for the
 // stack pointer.
 static llvm::Constant *CreateInitializedState(
@@ -419,6 +448,8 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
 
   CallingConvention loader(gArch->DefaultCallingConv());
 
+  loader.StoreThreadPointer(block, InitialThreadLocalStorage());
+
   // Save off the old stack pointer for later.
   auto old_sp = loader.LoadStackPointer(block);
 
@@ -431,18 +462,6 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
 
   // Allocate any space needed on the stack for a return address.
   loader.AllocateReturnAddress(block);
-
-//  // Set up the thread pointer, if any.
-//  if (auto tp_name = loader.ThreadPointerVarName()) {
-//    auto get_tp = llvm::Intrinsic::getDeclaration(
-//        gModule, llvm::Intrinsic::thread_pointer);
-//    if (get_tp) {
-//      llvm::IRBuilder<> ir(block);
-//      ir.CreateStore(
-//          ir.CreatePtrToInt(ir.CreateCall(get_tp), gWordType),
-//          ir.CreateLoad(remill::FindVarInFunction(func, tp_name)));
-//    }
-//  }
 
   // Call the lifted function.
   std::vector<llvm::Value *> args(3);
@@ -543,7 +562,8 @@ static void ImplementExplicitArgsExitPoint(
 
   auto block = &(callback_func->back());
 
-  // create call to function and args
+  // The emulated code already set up the machine state with the arguments for
+  // the external, so we need to go and read out the arguments.
   std::vector<llvm::Value *> call_args;
   for (auto i = 0U; i < cfg_func->num_args; i++) {
     llvm::Type *param_type = nullptr;
@@ -553,6 +573,9 @@ static void ImplementExplicitArgsExitPoint(
     call_args.push_back(loader.LoadNextArgument(block, param_type));
   }
 
+  // Now that we've read the argument values, we want to free up the space that
+  // the emulated caller set up, so that when we eventually return, things are
+  // in the expected state.
   loader.FreeReturnAddress(block);
   loader.FreeArguments(block);
 

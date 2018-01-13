@@ -87,15 +87,16 @@ static void PrintSupportedInstructions(void) {
                       });
 }
 
+static std::unique_ptr<llvm::Module> gLibrary;
+
 // Load in a separate bitcode or IR library, and copy function and variable
 // declarations from that library into our module. We can use this feature
 // to provide better type information to McSema.
 static void LoadLibraryIntoModule(void) {
-  std::unique_ptr<llvm::Module> lib(
-      remill::LoadModuleFromFile(mcsema::gContext, FLAGS_library));
+  gLibrary.reset(remill::LoadModuleFromFile(mcsema::gContext, FLAGS_library));
 
   // Declare the functions from the library in McSema's target module.
-  for (auto &func : *lib) {
+  for (auto &func : *gLibrary) {
     auto func_name = func.getName();
     if (func_name.startswith("__mcsema") || func_name.startswith("__remill")) {
       continue;
@@ -118,7 +119,7 @@ static void LoadLibraryIntoModule(void) {
   }
 
   // Declare the global variables from the library in McSema's target module.
-  for (auto &var : lib->globals()) {
+  for (auto &var : gLibrary->globals()) {
     auto var_name = var.getName();
     if (var_name.startswith("__mcsema") || var_name.startswith("__remill")) {
       continue;
@@ -139,6 +140,23 @@ static void LoadLibraryIntoModule(void) {
         var.getType()->getAddressSpace());
 
     dest_var->copyAttributesFrom(&var);
+  }
+}
+
+// Remove unused functions and globals brought in from the library.
+static void UnloadLibraryFromModule(void) {
+  for (auto &func : *gLibrary) {
+    auto our_func = mcsema::gModule->getFunction(func.getName());
+    if (our_func && !our_func->hasNUsesOrMore(1)) {
+      our_func->eraseFromParent();
+    }
+  }
+
+  for (auto &var : gLibrary->globals()) {
+    auto our_var = mcsema::gModule->getGlobalVariable(var.getName());
+    if (our_var && !our_var->hasNUsesOrMore(1)) {
+      our_var->eraseFromParent();
+    }
   }
 }
 
@@ -282,7 +300,13 @@ int main(int argc, char *argv[]) {
       << "Unable to lift CFG from " << FLAGS_cfg << " into module "
       << FLAGS_output;
 
+  if (!FLAGS_library.empty()) {
+    UnloadLibraryFromModule();
+    gLibrary.reset(nullptr);
+  }
+
   remill::StoreModuleToFile(mcsema::gModule, FLAGS_output);
+
   google::ShutDownCommandLineFlags();
   google::ShutdownGoogleLogging();
 
