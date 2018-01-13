@@ -414,12 +414,27 @@ def get_manual_jump_table_reader(builder):
       # addresses and computation, and `switch` based on that, so we need to
       # make sure that the original basic block address shows up in the lifted
       # bitcode.
-      
-      #DEBUG("WARNING: Removing reference from {:x} to block {:x}".format(
-      #    inst_block_ea, block_ea))
-      #remove_instruction_reference(inst_block_ea, block_ea)
 
-  return ret
+      DEBUG("WARNING: Removing reference from {:x} to block {:x}".format(
+          inst_block_ea, block_ea))
+      remove_instruction_reference(inst_block_ea, block_ea)
+
+  # NOTE(pag): For now we disable this jump table detection, even if it seems
+  #            like we find the table. This is because we don't yet have a good
+  #            way of dealing with the `ADD X0, X1, W0,SXTW#2`, which scales
+  #            the read table entry out by shifting it left by two. Besides
+  #            that, the following code actually works reasonably well. To
+  #            account for this, on the C++ side, we augment jump table
+  #            `switch`es to target blocks that are not referenced by the
+  #            successor lists of any other blocks.
+  #
+  #            It is also pretty important to make sure that we remove the
+  #            instruction reference. If/when we have good support for this
+  #            kind of jump table, then the above call to
+  #            `remove_instruction_reference` has to be removed so that the
+  #            various things that the C++ side of things does to handle offset-
+  #            based jump tables works. 
+  return False
 
 def get_jump_table_reader(builder):
   """Returns the size of a jump table entry, as well as a reader function

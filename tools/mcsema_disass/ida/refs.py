@@ -194,6 +194,39 @@ def remove_instruction_reference(from_ea, to_ea):
   if found:
     _REFS[from_ea] = tuple(new_refs)
 
+def _get_arm_ref_candidate(mask, op_val, op_str, all_refs):
+  global _BAD_ARM_REF_OFF
+
+  try:
+    op_name = op_str.split("@")[0][1:]  # `#asc_400E5C@PAGE` -> `asc_400E5C`.
+    ref_ea = idc.LocByName(op_name)
+    if (ref_ea & mask) == op_val:
+      return ref_ea, mask
+  except:
+    pass
+
+  # NOTE(pag): We deal with candidates because it's possible that this
+  #            instruction will have multiple references. In the case of
+  #            `@PAGE`-based offsets, it's problematic when the wrong base
+  #            is matched, because it really throws off the C++ side of things
+  #            because the arrangement of the lifted data being on the same
+  #            page is not guaranteed.
+
+  candidates = set()
+  for ref_ea in all_refs:
+    if (ref_ea & mask) == op_val:
+      candidates.add(ref_ea)
+      return ref_ea, mask
+
+  if len(candidates):
+    for candidate_ea in candidates:
+      if candidate_ea == op_val:
+        return candidate_ea, mask
+
+    return candidates.pop(), mask
+
+  return _BAD_ARM_REF_OFF
+
 # Try to handle `@PAGE` and `@PAGEOFF` references, resolving them to their
 # 'intended' address.
 #
@@ -209,18 +242,10 @@ def _try_get_arm_ref_addr(inst, op, op_val, all_refs):
   op_str = idc.GetOpnd(inst.ea, op.n)
 
   if '@PAGEOFF' in op_str:
-    mask = 0x0fff
-    for ref_ea in all_refs:
-      if (ref_ea & mask) == op_val:
-        return ref_ea, mask
-    DEBUG("Found @PAGEOFF-based reference at {:x} but could not match it in all_refs".format(inst.ea));
+    return _get_arm_ref_candidate(0x0fff, op_val, op_str, all_refs)
 
   elif '@PAGE' in op_str:
-    mask = 0x0fffff000
-    for ref_ea in all_refs:
-      if (ref_ea & mask) == op_val:
-        return ref_ea, mask
-    DEBUG("Found @PAGE-based reference at {:x} but could not match it in all_refs".format(inst.ea));
+    return _get_arm_ref_candidate(0x0fffff000, op_val, op_str, all_refs)
 
   elif not is_invalid_ea(op_val) and inst.get_canon_mnem().lower() == "adr":
     return op_val, 0

@@ -242,7 +242,7 @@ static llvm::Constant *InitialThreadLocalStorage(void) {
   indexes[1] = indexes[0];
 
 #if LLVM_VERSION_NUMBER <= LLVM_VERSION(3, 6)
-  auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(tls, indexes);
+  auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(tls_var, indexes);
 #else
   auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(
       nullptr, tls_var, indexes);

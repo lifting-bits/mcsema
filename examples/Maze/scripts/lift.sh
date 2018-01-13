@@ -48,8 +48,5 @@ mcsema-lift-3.9 \
     --cfg "${MAZE_DIR}/cfg/maze.aarch64.cfg" \
     --output "${MAZE_DIR}/bc/maze.aarch64.bc" \
     --explicit_args \
-    --add_breakpoints \
-    --check_pcs_at_breakpoints \
-    --disable_optimizer \
     ${LIB_ARGS}
 

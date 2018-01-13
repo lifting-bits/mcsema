@@ -69,7 +69,7 @@ DEFINE_bool(add_breakpoints, false,
             "allows one to set a breakpoint, in the lifted code, just before a "
             "specific lifted instruction is executed. This is a debugging aid.");
 
-DEFINE_bool(check_pcs_at_breakpoints, false,
+DEFINE_bool(check_pc_at_breakpoints, false,
             "Check whether or not the emulated program counter is correct at "
             "each injected 'breakpoint' function. This is a debugging aid.");
 
@@ -104,14 +104,19 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
   func->addFnAttr(llvm::Attribute::OptimizeNone);
   func->addFnAttr(llvm::Attribute::NoInline);
   func->removeFnAttr(llvm::Attribute::ReadNone);
+
+#if LLVM_VERSION_NUMBER < LLVM_VERSION(3, 7)
+  func->addFnAttr(llvm::Attribute::ReadOnly);
+#else
   func->addFnAttr(llvm::Attribute::ArgMemOnly);
+#endif
 
   auto state_ptr = remill::NthArgument(func, remill::kStatePointerArgNum);
   auto state_ptr_type = state_ptr->getType();
 
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", func));
 
-  if (FLAGS_check_pcs_at_breakpoints) {
+  if (FLAGS_check_pc_at_breakpoints) {
     auto trap = llvm::Intrinsic::getDeclaration(gModule, llvm::Intrinsic::trap);
     auto are_eq = ir.CreateICmpEQ(
         remill::NthArgument(func, remill::kPCArgNum),
@@ -161,7 +166,7 @@ static void InlineSubFuncCall(llvm::BasicBlock *block,
   (void) new llvm::StoreInst(call, mem_ptr, block);
 }
 
-// Find an external function associated with
+// Find an external function associated with this indirect jump.
 static llvm::Function *DevirtualizeIndirectFlow(
     TranslationContext &ctx, llvm::Function *fallback) {
   if (ctx.cfg_inst->flow) {
@@ -275,13 +280,45 @@ static void LiftIndirectJump(TranslationContext &ctx,
                              llvm::BasicBlock *block,
                              remill::Instruction &inst) {
 
-  auto fallback = DevirtualizeIndirectFlow(
-      ctx, GetLiftedToNativeExitPoint(kExitPointJump));
+  auto exit_point = GetLiftedToNativeExitPoint(kExitPointJump);
+  auto fallback = DevirtualizeIndirectFlow(ctx, exit_point);
 
   std::unordered_map<uint64_t, llvm::BasicBlock *> block_map;
   for (auto target_ea : ctx.cfg_block->successor_eas) {
     block_map[target_ea] = GetOrCreateBlock(ctx, target_ea);
     fallback = ctx.lifter->intrinsics->missing_block;
+  }
+
+  if (exit_point == fallback) {
+
+    // If we have no targets, then a reasonable target turns out to be the next
+    // program counter.
+    if (block_map.empty()) {
+      block_map[inst.next_pc] = GetOrCreateBlock(ctx, inst.next_pc);
+    }
+
+    // Build up a set of all reachable blocks that were known at disassembly
+    // time so that we can find blocks that have no predecessors.
+    std::unordered_set<uint64_t> succ_eas;
+    succ_eas.insert(ctx.cfg_func->ea);
+    for (auto block_entry : ctx.cfg_func->blocks) {
+      auto cfg_block = block_entry.second;
+      succ_eas.insert(cfg_block->successor_eas.begin(),
+                      cfg_block->successor_eas.end());
+    }
+
+    // We'll augment our block map to also target unreachable blocks, just in
+    // case our disassembly failed to find some of the targets.
+    for (auto block_entry : ctx.cfg_func->blocks) {
+      auto target_ea = block_entry.first;
+      if (!succ_eas.count(target_ea)) {
+        LOG(WARNING)
+            << "Adding block " << std::hex << target_ea
+            << " with no predecessors as additional target of the "
+            << " indirect jump at " << inst.pc << std::dec;
+        block_map[target_ea] = GetOrCreateBlock(ctx, target_ea);
+      }
+    }
   }
 
   // We have no jump table information, so assume that it's an indirect tail
@@ -583,7 +620,6 @@ static llvm::Function *LiftFunction(
   lifted_func->removeFnAttr(llvm::Attribute::NoReturn);
   lifted_func->addFnAttr(llvm::Attribute::NoInline);
   lifted_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
-  lifted_func->setLinkage(llvm::GlobalValue::InternalLinkage);
 
   TranslationContext ctx;
   std::unique_ptr<remill::InstructionLifter> lifter(
@@ -595,6 +631,10 @@ static llvm::Function *LiftFunction(
   ctx.cfg_block = nullptr;
   ctx.cfg_inst = nullptr;
   ctx.lifted_func = lifted_func;
+
+  std::unordered_set<uint64_t> referenced_blocks;
+  referenced_blocks.insert(cfg_func->ea);
+
 
   // Create basic blocks for each basic block in the original function.
   for (auto block_info : cfg_func->blocks) {
