@@ -126,7 +126,7 @@ The build script from step 2 will have compiled KLEE into the `/tmp/klee_ws/klee
 
 ### Step 5: Example ouput
 
-We know that the answer to the maze is `ssssddddwwaawwddddssssddwwww`, so we can check to see if KLEE found it by running `ktest-tool` on all of the `.ktest`-suffixed files in the KLEE's output file directory (`klee-last` as a symlink to the most recently produced output directory).
+We know that the answer to the maze is `ssssddddwwaawwddddssssddwwww`, so we can check to see if KLEE found it by running `ktest-tool` on all of the `.ktest`-suffixed files in the KLEE's output file directory (`klee-last` is a symlink to the most recently produced output directory).
 
 ```bash
 for f in /data/remill/tools/mcsema/examples/Maze/bc/klee-last/*.ktest ; do
