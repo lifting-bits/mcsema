@@ -229,7 +229,7 @@ def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
     if cs_action != 0:
       ar_disp, ar_filter = format_lsda_action(action_tbl, type_addr, type_enc, cs_action)
 
-    lsda_entries.add(_create_frame_entry(cs_start, cs_start + cs_len, cs_lp, cs_action))
+    lsda_entries.add(_create_frame_entry(cs_start, cs_start + cs_len, cs_lp, cs_action != 0))
     DEBUG("ea {:x}: cs_action[{}] = {}".format(act_ea, i, cs_action))
     i += 1
 
