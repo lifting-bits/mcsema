@@ -101,10 +101,10 @@ void DeclareExternals(const NativeModule *cfg_module) {
       auto var_type = llvm::Type::getIntNTy(
           *gContext, static_cast<unsigned>(cfg_var->size * 8));
 
+      auto linkage = llvm::GlobalValue::ExternalLinkage;
       ll_var = new llvm::GlobalVariable(*gModule, var_type, false,
-                                        llvm::GlobalValue::ExternalLinkage,
-                                        nullptr, cfg_var->name, nullptr,
-                                        ThreadLocalMode(cfg_var));
+                                        linkage, nullptr, cfg_var->name,
+                                        nullptr, ThreadLocalMode(cfg_var));
     }
 
     if (!cfg_var->address) {
