@@ -212,7 +212,7 @@ static llvm::Constant *InitialStackPointerValue(void) {
   std::vector<llvm::Constant *> indexes(2);
   indexes[0] = llvm::ConstantInt::get(gWordType, 0);
   indexes[1] = llvm::ConstantInt::get(
-      gWordType, stack_type->getNumElements() - 2);
+      gWordType, stack_type->getNumElements() - 8);
 
 #if LLVM_VERSION_NUMBER <= LLVM_VERSION(3, 6)
   auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(stack, indexes);
