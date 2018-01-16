@@ -924,7 +924,7 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
       continue
 
     elif (ea % 4) != 0:
-      DEBUG("WARNING: Unaligned reference at {:x} to {:x}".format(ea, target_ea))
+      DEBUG("WARNING: Ignoring unaligned reference at {:x} to {:x}".format(ea, target_ea))
       continue
 
     elif item_size < min_xref_width:

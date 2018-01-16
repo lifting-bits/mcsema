@@ -16,7 +16,7 @@ from flow import *
 from table import *
 
 
-def is_sane_reference_target(ea):
+def is_sane_reference_target(ea, from_ea=idc.BADADDR):
   """Returns `True` if `target_ea` looks like the address of some code/data."""
   if is_invalid_ea(ea):
     return False
@@ -52,11 +52,11 @@ def is_sane_reference_target(ea):
   if is_code(ea):
     return False
 
+  return True
+  # item_size = idc.ItemSize(ea)
 
-  item_size = idc.ItemSize(ea)
-
-  DEBUG("!!! target_ea = {:x} item_size = {}".format(ea, item_size))
-  return 1 != item_size 
+  # DEBUG("!!! from_ea = {:x} target_ea = {:x} item_size = {}".format(from_ea, ea, item_size))
+  # return 1 != item_size 
 
 def is_read_only_segment(ea):
   seg_ea = idc.SegStart(ea)
@@ -138,20 +138,20 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
       last_was_string = False
       continue
 
-    # A bit aggressive, but lets try to make it into a string.
-    if last_was_string and 1 < len(as_str):
-      old_item_size = idc.ItemSize(ea)      
-      if 1 != idc.MakeStr(ea, idc.BADADDR):
-        last_was_string = False
-        continue
+    # # A bit aggressive, but lets try to make it into a string.
+    # if last_was_string and 1 < len(as_str):
+    #   old_item_size = idc.ItemSize(ea)      
+    #   if 1 != idc.MakeStr(ea, idc.BADADDR):
+    #     last_was_string = False
+    #     continue
 
-      item_size = idc.ItemSize(ea)
-      next_ea = ea + item_size
-      last_was_string = True
+    #   item_size = idc.ItemSize(ea)
+    #   next_ea = ea + item_size
+    #   last_was_string = True
 
-      if 1 != old_item_size or not is_referenced(ea):
-        DEBUG("WARNING: Made {:x} into a string of length {}".format(ea, item_size))
-      continue
+    #   if 1 != old_item_size or not is_referenced(ea):
+    #     DEBUG("WARNING: Made {:x} into a string of length {}".format(ea, item_size))
+    #   continue
 
     # Clear the `last_was_string` flag
     last_was_string = False
@@ -207,12 +207,12 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
 
     flags = idc.GetFlags(ea)
 
-    # Jump over strings.
-    if has_string_type(ea):
-      item_size = max(1, remaining_item_size(ea))  # Guarantee forward progress.
-      next_ea = ea + item_size
-      DEBUG("Found string at {:x}, jumping to {:x}".format(ea, next_ea))
-      continue
+    ## Jump over strings.
+    #if has_string_type(ea):
+    #  item_size = max(1, remaining_item_size(ea))  # Guarantee forward progress.
+    #  next_ea = ea + item_size
+    #  DEBUG("Found string at {:x}, jumping to {:x}".format(ea, next_ea))
+    #  continue
 
     if (ea % 4) != 0:
       next_ea = (ea + 3) & ~3
@@ -221,7 +221,7 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
       continue
 
     fixup_ea = idc.GetFixupTgtOff(ea)
-    if binary_is_pie and not is_sane_reference_target(fixup_ea):
+    if binary_is_pie and not is_sane_reference_target(fixup_ea, from_ea=ea):
       continue
 
     qword_data, dword_data = 0, 0
@@ -229,7 +229,7 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
     # Try to read it as an 8-byte pointer.
     if try_qwords and (ea + 8) <= seg_end_ea:
       target_ea = qword_data = read_qword(ea)
-      if is_sane_reference_target(target_ea):
+      if is_sane_reference_target(target_ea, from_ea=ea):
         DEBUG("Adding qword reference from {:x} to {:x}".format(ea, target_ea))
         make_xref(ea, target_ea, idc.MakeQword, 8)
         next_ea = ea + 8
@@ -238,7 +238,7 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
     # Try to read it as a 4-byte pointer.
     if try_dwords and (ea + 4) <= seg_end_ea:
       target_ea = dword_data = read_dword(ea)
-      if is_sane_reference_target(target_ea):
+      if is_sane_reference_target(target_ea, from_ea=ea):
         DEBUG("Adding dword reference from {:x} to {:x}".format(ea, target_ea))
         make_xref(ea, target_ea, idc.MakeDword, 4)
         next_ea = ea + 4
