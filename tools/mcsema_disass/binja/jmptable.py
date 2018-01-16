@@ -22,31 +22,6 @@ class JMPTable(object):
         self.targets = [t & mask for t in targets]
 
 
-def search_displ_base(il):
-    """ Searches for the base address used in a phrase+displacement
-    ex: dword [eax * 4 + 0x08040000] -> 0x08040000
-
-    Args:
-        il (binja.LowLevelILInstruction): Instruction to parse
-
-    Returns:
-        int: base address
-    """
-    # The il may be inside a LLIL_LOAD
-    if il.operation == LowLevelILOperation.LLIL_LOAD:
-        return search_displ_base(il.src)
-
-    # Continue left/right at an ADD
-    if il.operation == LowLevelILOperation.LLIL_ADD:
-        return (search_displ_base(il.left) or
-                search_displ_base(il.right))
-
-    # Terminate when constant is found
-    if il.operation == LowLevelILOperation.LLIL_CONST:
-        return il.constant
-
-    log.debug('Reached end of expr: %s', il)
-
 
 def search_mlil_displ(il, ptr=False, _neg=False):
     """ Searches for a MLIL_CONST[_PTR] as a child of an ADD or SUB
@@ -147,7 +122,7 @@ def get_jmptable(bv, il):
     # Full jump expression
     else:
         # Parse out the base address
-        base = search_displ_base(il.dest)
+        base = util.search_displ_base(il.dest)
         if base is not None:
             tbl = JMPTable(bv, base, successors)
 

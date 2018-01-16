@@ -1,6 +1,6 @@
 import binaryninja as binja
 from binaryninja.enums import (
-    Endianness, SegmentFlag
+    Endianness, LowLevelILOperation, SectionSemantics
 )
 import inspect
 import logging
@@ -127,6 +127,7 @@ def get_section_at(bv, addr):
             return sec
     return None
 
+
 def is_external_ref(bv, addr):
     sym = bv.get_symbol_at(addr)
     return sym is not None and 'Import' in sym.type.name
@@ -137,6 +138,15 @@ def is_valid_addr(bv, addr):
 
 
 def is_code(bv, addr):
+    """Returns `True` if the given address lies in a code section"""
+    # This is a bit more specific than checking if a segment is executable,
+    # Binja will classify a section as ReadOnlyCode or ReadOnlyData, though
+    # both sections are still in an executable segment
+    sec = get_section_at(bv, addr)
+    return sec is not None and sec.semantics == SectionSemantics.ReadOnlyCodeSectionSemantics
+
+
+def is_executable(bv, addr):
     """Returns `True` if the given address lies in an executable segment"""
     seg = bv.get_segment_at(addr)
     return seg is not None and seg.executable
@@ -201,3 +211,60 @@ def is_section_external(bv, sect):
 def is_tls_section(bv, addr):
     sect_names = (sect.name for sect in bv.get_sections_at(addr))
     return any(sect in ['.tbss', '.tdata', '.tls'] for sect in sect_names)
+
+
+def _search_phrase_op(il, target_op):
+    """ Helper for finding parts of a phrase[+displacement] il """
+    op = il.operation
+
+    # Handle starting points
+    if op == LowLevelILOperation.LLIL_SET_REG:
+        return _search_phrase_op(il.src, target_op)
+
+    if op == LowLevelILOperation.LLIL_STORE:
+        return _search_phrase_op(il.dest, target_op)
+
+    # The phrase il may be inside a LLIL_LOAD
+    if op == LowLevelILOperation.LLIL_LOAD:
+        return _search_phrase_op(il.src, target_op)
+
+    # Continue left/right at an ADD
+    if op == LowLevelILOperation.LLIL_ADD:
+        return (_search_phrase_op(il.left, target_op) or
+                _search_phrase_op(il.right, target_op))
+
+    # Terminate when constant is found
+    if op == target_op:
+        return il
+
+
+def search_phrase_reg(il):
+    """ Searches for the register used in a phrase
+    ex: dword [ebp + 0x8] -> ebp
+
+    Args:
+        il (binja.LowLevelILInstruction): Instruction to parse
+
+    Returns:
+        str: register name
+    """
+    res = _search_phrase_op(il, LowLevelILOperation.LLIL_REG)
+    if res is not None:
+        return res.src.name
+
+
+def search_displ_base(il):
+    """ Searches for the base address used in a phrase[+displacement]
+    ex: dword [eax * 4 + 0x08040000] -> 0x08040000
+        dword [ebp + 0x8] -> 0x8
+
+    Args:
+        il (binja.LowLevelILInstruction): Instruction to parse
+
+    Returns:
+        int: base address
+    """
+    res = _search_phrase_op(il, LowLevelILOperation.LLIL_CONST)
+    if res is not None:
+        # Interpret the string representation to avoid sign issues
+        return int(res.tokens[0].text, 16)

@@ -1,16 +1,20 @@
+import argparse
 import binaryninja as binja
 from binaryninja.enums import (
     SymbolType, TypeClass,
-    LowLevelILOperation, RegisterValueType
+    LowLevelILOperation, RegisterValueType,
+    InstructionTextTokenType
 )
 import logging
 import os
 from Queue import Queue
+from collections import defaultdict
 
 import CFG_pb2
 import util
 import xrefs
 import jmptable
+import vars
 
 log = logging.getLogger(util.LOGNAME)
 
@@ -19,6 +23,7 @@ DISASS_DIR = os.path.dirname(BINJA_DIR)
 
 EXT_MAP = {}
 EXT_DATA_MAP = {}
+JMP_TABLES = []
 
 CCONV_TYPES = {
     'C': CFG_pb2.ExternalFunction.CallerCleanup,
@@ -34,6 +39,10 @@ BINJA_CCONV_TYPES = {
 
 RECOVERED = set()
 TO_RECOVER = Queue()
+
+RECOVER_OPTS = {
+    'stack_vars': False
+}
 
 
 def queue_func(addr):
@@ -56,10 +65,12 @@ def recover_ext_func(bv, pb_mod, sym):
         sym (binaryninja.types.Symbol)
     """
     if sym.name in EXT_MAP:
-        log.debug('Found defined external function: %s', sym.name)
+        log.debug('Found defined external function: %s @ 0x%x', sym.name, sym.address)
 
         args, cconv, ret, sign = EXT_MAP[sym.name]
         func = bv.get_function_at(sym.address)
+        if func is None:
+            return
 
         pb_extfn = pb_mod.external_funcs.add()
         pb_extfn.name = sym.name
@@ -71,7 +82,7 @@ def recover_ext_func(bv, pb_mod, sym):
         pb_extfn.is_weak = False  # TODO: figure out how to decide this
 
     else:
-        log.warn('Unknown external function: %s', sym.name)
+        log.warn('Unknown external function: %s @ 0x%x', sym.name, sym.address)
         log.warn('Attempting to recover manually')
 
         func = bv.get_function_at(sym.address)
@@ -141,6 +152,10 @@ def recover_section_cross_references(bv, pb_seg, real_sect, sect_start, sect_end
         xref = read_val(bv, addr)
 
         if not util.is_valid_addr(bv, xref):
+            continue
+
+        # Skip this xref if it's a jmp table entry
+        if any(xref in tbl.targets for tbl in JMP_TABLES):
             continue
 
         pb_ref = pb_seg.xrefs.add()
@@ -214,39 +229,6 @@ def recover_sections(bv, pb_mod):
 
         recover_section_vars(bv, pb_seg, start_addr, end_addr)
         recover_section_cross_references(bv, pb_seg, real_sect, start_addr, end_addr)
-
-
-def recover_globals(bv, pb_mod):
-    # Sort symbols by address so we can estimate size if needed
-    syms = sorted(bv.symbols.values(), key=lambda s: s.address)
-    for i, sym in enumerate(syms):
-
-        # Binja picks up a couple of symbols outside of names sections
-        sect = util.get_section_at(bv, sym.address)
-        if sect is None:
-            continue
-
-        if sym.type == SymbolType.DataSymbol and \
-           not util.is_code(bv, sym.address) and \
-           not util.is_section_external(bv, sect):
-            log.debug('Recovering global %s @ 0x%x', sym.name, sym.address)
-            pb_gvar = pb_mod.global_vars.add()
-            pb_gvar.ea = sym.address
-            pb_gvar.name = sym.name
-
-            # Look at the variable type to determine size
-            data_var = bv.get_data_var_at(sym.address)
-            if data_var.type.type_class == TypeClass.VoidTypeClass:
-                # Estimate size based on the address of the next symbol
-                if sym is not syms[-1]:
-                    pb_gvar.size = syms[i + 1].address - sym.address
-                else:
-                    # Edge case for the last symbol
-                    # Take end of the section as the "next symbol" instead
-                    sec = util.get_section_at(bv, sym.address)
-                    pb_gvar.size = sec.end - sym.address
-            else:
-                pb_gvar.size = data_var.type.width
 
 
 def is_local_noreturn(bv, il):
@@ -343,7 +325,8 @@ def recover_inst(bv, pb_block, pb_inst, il):
 
     table = jmptable.get_jmptable(bv, il)
     if table is not None:
-        add_xref(bv, pb_inst, table.base_addr, CFG_pb2.CodeReference.OffsetTable)
+        add_xref(bv, pb_inst, table.base_addr, CFG_pb2.CodeReference.MemoryDisplacementOperand)
+        JMP_TABLES.append(table)
 
         # Add any missing successors
         for tgt in table.targets:
@@ -366,30 +349,6 @@ def add_block(pb_func, block):
     return pb_block
 
 
-def recover_stack_vars(pb_func, func):
-    """
-    Args:
-        pb_func (CFG_pb2.Function)
-        func (binaryninja.function.Function)
-    """
-    # Go through all variables on the stack (in order of storage)
-    stack_vars = sorted(func.stack_layout, key=lambda var: var.storage)
-    for i, svar in enumerate(stack_vars):
-        pb_svar = pb_func.stackvars.add()
-        pb_svar.name = svar.name
-        pb_svar.sp_offset = svar.storage
-
-        if svar.type.type_class == TypeClass.VoidTypeClass:
-            # Estimate size based on the offset of the next variable
-            if svar is not stack_vars[-1]:
-                pb_svar.size = stack_vars[i + 1].storage - svar.storage
-            else:
-                # Edge case for the last variable, the offset is the size
-                pb_svar.size = svar.storage
-        else:
-            pb_svar.size = svar.type.width
-
-
 def recover_function(bv, pb_mod, addr, is_entry=False):
     func = bv.get_function_at(addr)
     if func is None:
@@ -409,20 +368,27 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
     pb_func.name = func.symbol.name
 
     # Recover all basic blocks
+    var_refs = defaultdict(list)
     for block in func:
         pb_block = add_block(pb_func, block)
 
         # Recover every instruction in the block
-        inst_addr = block.start
-        while inst_addr < block.end:
-            il = func.get_lifted_il_at(inst_addr)
+        for inst in block.disassembly_text:
+            # Skip over anything that isn't an instruction
+            if inst.tokens[0].type != InstructionTextTokenType.InstructionToken:
+                continue
+            il = func.get_lifted_il_at(inst.address)
 
             pb_inst = pb_block.instructions.add()
             recover_inst(bv, pb_block, pb_inst, il)
-            inst_addr += len(pb_inst.bytes)
+
+            # Find any references to stack vars in this instruction
+            if RECOVER_OPTS['stack_vars']:
+                vars.find_stack_var_refs(bv, inst, il, var_refs)
 
     # Recover stack variables
-    recover_stack_vars(pb_func, func)
+    if RECOVER_OPTS['stack_vars']:
+        vars.recover_stack_vars(pb_func, func, var_refs)
 
 
 def recover_cfg(bv, args):
@@ -449,7 +415,7 @@ def recover_cfg(bv, args):
         recover_function(bv, pb_mod, addr)
 
     log.debug('Recovering Globals')
-    recover_globals(bv, pb_mod)
+    vars.recover_globals(bv, pb_mod)
 
     log.debug('Processing Segments')
     recover_sections(bv, pb_mod)
@@ -489,7 +455,20 @@ def parse_defs_file(bv, path):
                 EXT_MAP[fname] = (int(args), CCONV_TYPES[cconv], ret, sign)
 
 
-def get_cfg(args):
+def get_cfg(args, fixed_args):
+    # Parse any additional args
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--recover-stack-vars',
+                        help='Flag to enable stack variable recovery',
+                        default=False,
+                        action='store_true')
+
+    extra_args = parser.parse_args(fixed_args)
+
+    if extra_args.recover_stack_vars:
+        RECOVER_OPTS['stack_vars'] = True
+
     # Setup logger
     util.init_logger(args.log_file)
 
