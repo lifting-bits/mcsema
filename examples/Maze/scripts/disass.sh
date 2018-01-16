@@ -13,44 +13,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCRIPTS_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-MAZE_DIR=$( cd "$( dirname "${SCRIPTS_DIR}" )" && pwd )
+MCSEMA_EXAMPLES_MAZE_SCRIPTS_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+MCSEMA_EXAMPLES_MAZE_DIR=$( cd "$( dirname "${MCSEMA_EXAMPLES_MAZE_SCRIPTS_DIR}" )" && pwd )
+MCSEMA_EXAMPLES_DIR=$( cd "$( dirname "${MCSEMA_EXAMPLES_MAZE_DIR}" )" && pwd )
+MCSEMA_DIR=$( cd "$( dirname "${MCSEMA_EXAMPLES_DIR}" )" && pwd )
 DISASSEMBLER=/opt/ida-6.9/idal64
 
 function Disassemble {
 
-  printf "[+] Disassembling ${MAZE_DIR}/bin/maze.amd64\n"
+  printf "[+] Disassembling ${MCSEMA_EXAMPLES_MAZE_DIR}/bin/maze.amd64\n"
   mcsema-disass \
       --os linux \
       --arch amd64 \
       --disassembler "${DISASSEMBLER}" \
       --log_file /tmp/log \
       --entrypoint main \
-      --output "${MAZE_DIR}/cfg/maze.amd64.cfg" \
-      --binary "${MAZE_DIR}/bin/maze.amd64"
+      --output "${MCSEMA_EXAMPLES_MAZE_DIR}/cfg/maze.amd64.cfg" \
+      --binary "${MCSEMA_EXAMPLES_MAZE_DIR}/bin/maze.amd64" \
+      --log_file /tmp/log.amd64
 
   if [[ $? -ne 0 ]] ; then
-    printf "[x] Error disassembling ${MAZE_DIR}/bin/maze.amd64\n"
+    printf "[x] Error disassembling ${MCSEMA_EXAMPLES_MAZE_DIR}/bin/maze.amd64\n"
     return 1
   else
-    printf " i  Saved CFG to ${MAZE_DIR}/cfg/maze.amd64.cfg\n"
+    printf " i  Saved CFG to ${MCSEMA_EXAMPLES_MAZE_DIR}/cfg/maze.amd64.cfg\n"
   fi
 
-  printf "[+] Disassembling ${MAZE_DIR}/bin/maze.aarch64\n"
+  printf "[+] Disassembling ${MCSEMA_EXAMPLES_MAZE_DIR}/bin/maze.aarch64\n"
   mcsema-disass \
       --os linux \
       --arch aarch64 \
       --disassembler "${DISASSEMBLER}" \
       --log_file /tmp/log \
       --entrypoint main \
-      --output "${MAZE_DIR}/cfg/maze.aarch64.cfg" \
-      --binary "${MAZE_DIR}/bin/maze.aarch64"
+      --output "${MCSEMA_EXAMPLES_MAZE_DIR}/cfg/maze.aarch64.cfg" \
+      --binary "${MCSEMA_EXAMPLES_MAZE_DIR}/bin/maze.aarch64" \
+      --log_file /tmp/log.aarch64
 
   if [[ $? -ne 0 ]] ; then
-    printf "[x] Error disassembling ${MAZE_DIR}/bin/maze.aarch64\n"
+    printf "[x] Error disassembling ${MCSEMA_EXAMPLES_MAZE_DIR}/bin/maze.aarch64\n"
     return 1
   else
-    printf " i  Saved CFG to ${MAZE_DIR}/cfg/maze.aarch64.cfg\n"
+    printf " i  Saved CFG to ${MCSEMA_EXAMPLES_MAZE_DIR}/cfg/maze.aarch64.cfg\n"
   fi
 
   return 0
