@@ -32,8 +32,16 @@ class XRef(object):
   def __repr__(self):
     return '<XREF: 0x{:x} {}>'.format(self.addr, CFG_pb2.CodeReference.OperandType.Name(self.cfg_type))
 
+  def __eq__(self, other):
+    if not isinstance(other, XRef):
+      return NotImplemented
+    return self.addr == other.addr and \
+         self.type == other.type
 
-_NO_XREFS = tuple()
+  def __hash__(self):
+    return hash((self.addr, self.type))
+
+_NO_XREFS = set()
 
 _IGNORED_XREF_OP_TYPES = (LowLevelILOperation.LLIL_JUMP,
                           LowLevelILOperation.LLIL_JUMP_TO,
@@ -53,10 +61,11 @@ def get_xrefs(bv, il, reftype=XRef.IMMEDIATE, parent=None):
   Args:
     bv (binja.BinaryView)
     il (binja.LowLevelILInstruction)
-    reftype
+    reftype (int)
+    parent (binja.LowLevelILInstruction)
 
   Returns:
-    tuple[XRef]
+    set[XRef]
   """
   global _NO_XREFS, _IGNORED_XREF_OP_TYPES, _CONST_XREF_OF_TYPES
   global _LOAD_STORE_OP_TYPES
@@ -64,7 +73,7 @@ def get_xrefs(bv, il, reftype=XRef.IMMEDIATE, parent=None):
   if not isinstance(il, binja.LowLevelILInstruction):
     return _NO_XREFS
 
-  refs = []
+  refs = set()
 
   # There's some other expression including this value
   # look at the disassembly to figure out if this is actually a displacement
@@ -77,6 +86,12 @@ def get_xrefs(bv, il, reftype=XRef.IMMEDIATE, parent=None):
 
   # Update reftype using il information
   op = il.operation
+
+  # Detect a tail call target
+  # This is the only instance where a LLIL_JUMP is considered
+  if util.is_jump_tail_call(bv, il):
+    log.debug('Tail call detected @ 0x%x', il.address)
+    return get_xrefs(bv, il.dest, XRef.CONTROLFLOW, il)
 
   # Some instruction types are ignored
   if op in _IGNORED_XREF_OP_TYPES:
@@ -99,22 +114,33 @@ def get_xrefs(bv, il, reftype=XRef.IMMEDIATE, parent=None):
     else:
       reftype = XRef.DISPLACEMENT
 
+    # In a load/store, only the operand that references memory gets the new reftype
+    # The other operand(s) start at the default (immediate) again
+    refs.update(get_xrefs(bv, mem_il, reftype, il))
+    for oper in il.operands:
+      if oper != mem_il:
+        refs.update(get_xrefs(bv, oper))
+    return refs
+
   elif op in _CONST_XREF_OP_TYPES:
     # Hit a value, if this is a reference we can save the xref
     if util.is_valid_addr(bv, il.constant):
       # A displacement might be incorrectly classified as an immediate at this point
-      if reftype == XRef.IMMEDIATE:  
+      if reftype == XRef.IMMEDIATE and parent is not None:
+        # There's some other expression including this value
+        # look at the disassembly to figure out if this is actually a displacement
+        dis = bv.get_disassembly(il.address)
         if '[' in dis and ']' in dis:
           # Fix the reftype depending on how this value is used
-          if parent and parent.operation == LowLevelILOperation.LLIL_SET_REG:
+          if parent.operation == LowLevelILOperation.LLIL_SET_REG:
             reftype = XRef.MEMORY
           else:
             reftype = XRef.DISPLACEMENT
 
-      refs.append(XRef(il.constant, reftype))
+      refs.add(XRef(il.constant, reftype))
 
   # Continue searching operands for xrefs
   for oper in il.operands:
-    refs.extend(get_xrefs(bv, oper, reftype, il))
+    refs.update(get_xrefs(bv, oper, reftype, il))
 
-  return tuple(refs)
+  return refs

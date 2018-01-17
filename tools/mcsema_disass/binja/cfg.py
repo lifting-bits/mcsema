@@ -367,7 +367,7 @@ def read_inst_bytes(bv, il):
   return bv.read(il.address, inst_len)
 
 
-def recover_inst(bv, pb_block, pb_inst, il):
+def recover_inst(bv, pb_block, pb_inst, il, all_il):
   """
   Args:
     bv (binja.BinaryView)
@@ -376,12 +376,25 @@ def recover_inst(bv, pb_block, pb_inst, il):
   """
   pb_inst.ea = il.address
   pb_inst.bytes = read_inst_bytes(bv, il)
+
+  # Search all il instructions at the current address for xrefs
+  refs = set()
+  for il_exp in all_il:
+    refs.update(xrefs.get_xrefs(bv, il_exp))
+  
   debug_refs = []
-  for ref in xrefs.get_xrefs(bv, il):
+
+  # Add all discovered xrefs to pb_inst
+  for ref in refs:
     debug_refs.append(add_xref(bv, pb_inst, ref.addr, ref.cfg_type))
 
   if is_local_noreturn(bv, il):
     pb_inst.local_noreturn = True
+
+  # Add the target of a tail call as a successor
+  if util.is_jump_tail_call(bv, il):
+    tgt = il.dest.constant
+    pb_block.successor_eas.append(tgt)
 
   table = jmptable.get_jmptable(bv, il)
   if table is not None:
@@ -412,6 +425,33 @@ def add_block(pb_func, block):
   return pb_block
 
 
+def fix_tail_call_targets(bv, func):
+  """
+  Binja will "inline" tail calls into the current function, resulting in the
+  same blocks appearing in multiple functions. This detects if this happened
+  and defines a function at the first inlined block so nothing is duplicated
+
+  Args:
+    bv (binja.BinaryView)
+    func (binja.Function)
+  """
+  for block in func.basic_blocks:
+    # This will return a list of all basic blocks starting at the same address
+    # The same block appearing in different functions (after inlining)
+    # will appear as multiple `BasicBlock`s
+    all_blocks = bv.get_basic_blocks_at(block.start)
+
+    # There should only be a single block found
+    if len(all_blocks) > 1:
+      log.debug('Block 0x%x exists in multiple functions, defining a new function here', block.start)
+
+      # Define a function here and reanalyze
+      # All blocks contained in this new function will not be picked up
+      # in the remainder of this loop after analysis
+      bv.add_function(block.start)
+      bv.update_analysis_and_wait()
+
+
 def recover_function(bv, pb_mod, addr, is_entry=False):
   func = bv.get_function_at(addr)
   if func is None:
@@ -432,6 +472,7 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
   pb_func.name = func.symbol.name
 
   # Recover all basic blocks
+  il_groups = util.collect_il_groups(func.lifted_il)
   var_refs = defaultdict(list)
   for block in func:
     DEBUG_PUSH()
@@ -443,9 +484,10 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
       if inst.tokens[0].type != InstructionTextTokenType.InstructionToken:
         continue
       il = func.get_lifted_il_at(inst.address)
+      all_il = il_groups[inst.address]
 
       pb_inst = pb_block.instructions.add()
-      recover_inst(bv, pb_block, pb_inst, il)
+      recover_inst(bv, pb_block, pb_inst, il, all_il)
 
       # Find any references to stack vars in this instruction
       if RECOVER_OPTS['stack_vars']:
