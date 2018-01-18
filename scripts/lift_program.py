@@ -177,7 +177,10 @@ def main():
     if os.path.exists(sym_name):
       os.remove(sym_name)
 
-    os.symlink(library, sym_name)
+    try:
+      os.symlink(library, sym_name)
+    except:
+      pass
 
     print "cp {} {}".format(path, library)
     print "chmod a+x {}".format(library)

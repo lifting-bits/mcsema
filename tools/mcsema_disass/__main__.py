@@ -28,6 +28,31 @@ SUPPORTED_ARCH = ('x86', 'x86_avx', 'x86_avx512',
                   'amd64', 'amd64_avx', 'amd64_avx512',
                   'aarch64')
 
+# Make sure we can do an `import binaryninja`.
+def _find_binary_ninja(path_to_binaryninja):
+  try:
+    import binaryninja
+    return True
+  except:
+    pass
+
+  if not os.path.isfile(path_to_binaryninja):
+    return False
+
+  if not os.access(path_to_binaryninja, os.X_OK):
+    return False
+
+  binja_dir = os.path.dirname(path_to_binaryninja)
+  sys.path.append(binja_dir)
+  sys.path.append(os.path.join(binja_dir, "python"))
+
+  try:
+    import binaryninja
+    return True
+  except:
+    return False
+
+
 def main():
   arg_parser = argparse.ArgumentParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -145,8 +170,10 @@ def main():
         os.unlink(args.output)
         ret = 1
     elif 'binja' in args.disassembler or 'binaryninja' in args.disassembler:
+      if not _find_binary_ninja(args.disassembler):
+        arg_parser.error("Could not `import binaryninja`. Is it in your PYTHONPATH?")
       from binja.cfg import get_cfg
-      ret = get_cfg(args)
+      ret = get_cfg(args, fixed_command_args)
     else:
       arg_parser.error("{} passed to --disassembler is not known.".format(
           args.disassembler))
