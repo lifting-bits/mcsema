@@ -80,6 +80,9 @@ def _get_aarch64_partial_xref(bv, func, il, dis):
   """" Figure out the final destination referenced by an ADRP+ADD instruction
   combination on AArch64."""
 
+  if func.arch.name != 'aarch64':
+    return None
+
   if il.address in _AARCH64_ADRP_XREFS:
     return _AARCH64_ADRP_XREFS[il.address]
 
@@ -103,13 +106,11 @@ def _get_aarch64_partial_xref(bv, func, il, dis):
   return _AARCH64_ADRP_XREFS[il.address]
 
 
-_LAST_UNUSED_REFS = None
-
 def get_xrefs(bv, func, il):
   global _LAST_UNUSED_REFS
 
+  refs = set()
   dis = bv.get_disassembly(il.address)
-  refs = _LAST_UNUSED_REFS or set()
 
   # TODO(pag): This is an ugly hack for the ADRP instruction on AArch64.
   ref = _get_aarch64_partial_xref(bv, func, il, dis)
@@ -119,7 +120,7 @@ def get_xrefs(bv, func, il):
     reftype = XRef.IMMEDIATE
 
     # PC-relative displacement for AArch64's `adr` instruction.
-    if dis.startswith('adr '):
+    if func.arch.name == 'aarch64' and dis.startswith('adr '):
       reftype = XRef.DISPLACEMENT
 
     _fill_xrefs_internal(bv, il, refs, reftype)
@@ -150,12 +151,7 @@ def get_xrefs(bv, func, il):
       else:
         refs.add(ref)  # Add it back in.
 
-  if len(refs):
-    _LAST_UNUSED_REFS = None
-    return refs
-  else:
-    _LAST_UNUSED_REFS = refs
-    return _NO_XREFS 
+  return refs
 
 
 def _fill_xrefs_internal(bv, il, refs, reftype=XRef.IMMEDIATE, parent=None):
@@ -182,9 +178,9 @@ def _fill_xrefs_internal(bv, il, refs, reftype=XRef.IMMEDIATE, parent=None):
   # Detect a tail call target
   # This is the only instance where a LLIL_JUMP is considered
   if util.is_jump_tail_call(bv, il):
-    target = get_jump_tail_call_target(bv, il)
-    DEBUG('Tail call from {:x} to {:x}'.format(il.address, target.address))
-    return _fill_xrefs_internal(bv, il.dest, XRef.CONTROLFLOW, il)
+    target = util.get_jump_tail_call_target(bv, il)
+    DEBUG('Tail call from {:x} to {:x}'.format(il.address, target.start))
+    return _fill_xrefs_internal(bv, il.dest, refs, XRef.CONTROLFLOW, il)
 
   # Some instruction types are ignored
   if op in _IGNORED_XREF_OP_TYPES:
