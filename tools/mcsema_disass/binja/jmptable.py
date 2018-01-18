@@ -1,10 +1,24 @@
+# Copyright (c) 2017 Trail of Bits, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import binaryninja as binja
 from binaryninja.enums import (
   LowLevelILOperation, MediumLevelILOperation, RegisterValueType
 )
 import logging
-
 import util
+from debug import *
 
 log = logging.getLogger(util.LOGNAME)
 
@@ -50,7 +64,7 @@ def search_mlil_displ(il, ptr=False, _neg=False):
   if il.operation == const_type:
     return il.constant * (-1 if _neg else 1)
 
-  log.debug('Reached end of expr: %s', il)
+  # DEBUG('Reached end of expr: {}'.format(il))
 
 
 def get_jmptable(bv, il):
@@ -90,7 +104,6 @@ def get_jmptable(bv, il):
 
   # Should be able to find table info now
   tbl = None
-  log.debug('Searching for jump table info...')
 
   # Jumping to a register
   if il.dest.operation == LowLevelILOperation.LLIL_REG:
@@ -127,5 +140,5 @@ def get_jmptable(bv, il):
       tbl = JMPTable(bv, base, successors)
 
   if tbl is not None:
-    log.debug('JumpTable @ 0x%x, Offset 0x%x', tbl.base_addr, tbl.rel_off)
+    DEBUG("Found jump table at {:x} with offset {:x}".format(tbl.base_addr, tbl.rel_off))
   return tbl

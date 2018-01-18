@@ -242,10 +242,10 @@ def _try_get_arm_ref_addr(inst, op, op_val, all_refs):
   op_str = idc.GetOpnd(inst.ea, op.n)
 
   if '@PAGEOFF' in op_str:
-    return _get_arm_ref_candidate(0x0fff, op_val, op_str, all_refs)
+    return _get_arm_ref_candidate(4095, op_val, op_str, all_refs)
 
   elif '@PAGE' in op_str:
-    return _get_arm_ref_candidate(0x0fffff000, op_val, op_str, all_refs)
+    return _get_arm_ref_candidate(-4096L, op_val, op_str, all_refs)
 
   elif not is_invalid_ea(op_val) and inst.get_canon_mnem().lower() == "adr":
     return op_val, 0

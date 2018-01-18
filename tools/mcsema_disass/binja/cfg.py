@@ -1,3 +1,17 @@
+# Copyright (c) 2017 Trail of Bits, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
 import binaryninja as binja
 from binaryninja.enums import (
@@ -15,6 +29,7 @@ import util
 import xrefs
 import jmptable
 import vars
+from debug import *
 
 log = logging.getLogger(util.LOGNAME)
 
@@ -43,25 +58,6 @@ TO_RECOVER = Queue()
 RECOVER_OPTS = {
   'stack_vars': False
 }
-
-_DEBUG_PREFIX = ""
-
-def DEBUG_PUSH():
-  global _DEBUG_PREFIX
-  _DEBUG_PREFIX += "  "
-
-def DEBUG_POP():
-  global _DEBUG_PREFIX
-  _DEBUG_PREFIX = _DEBUG_PREFIX[:-2]
-
-def DEBUG(s):
-  log.debug("{}{}".format(_DEBUG_PREFIX, str(s)))
-
-def WARN(s):
-  log.warn("{}{}".format(_DEBUG_PREFIX, str(s)))
-
-def ERROR(s):
-  log.error("{}{}".format(_DEBUG_PREFIX, str(s)))
 
 def queue_func(addr):
   if addr not in RECOVERED:
@@ -324,10 +320,15 @@ _CFG_INST_XREF_TYPE_TO_NAME = {
 }
 
 
-def add_xref(bv, pb_inst, target, optype):
+def add_xref(bv, pb_inst, target, mask, optype):
   xref = pb_inst.xrefs.add()
   xref.ea = target
   xref.operand_type = optype
+
+  debug_mask = ""
+  if mask:
+    xref.mask = mask
+    debug_mask = " & {:x}".format(mask)
 
   sym_name = util.find_symbol_name(bv, target)
   if len(sym_name) > 0:
@@ -353,7 +354,8 @@ def add_xref(bv, pb_inst, target, optype):
 
   debug_op = _CFG_INST_XREF_TYPE_TO_NAME[optype]
 
-  return "({} {} {} {:x} {})".format(debug_type, debug_op, debug_loc, target, sym_name)
+  return "({} {} {} {:x}{} {})".format(
+      debug_type, debug_op, debug_loc, target, debug_mask, sym_name)
 
 def read_inst_bytes(bv, il):
   """ Get the opcode bytes for an instruction
@@ -367,12 +369,14 @@ def read_inst_bytes(bv, il):
   return bv.read(il.address, inst_len)
 
 
-def recover_inst(bv, pb_block, pb_inst, il, all_il):
+def recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last):
   """
   Args:
     bv (binja.BinaryView)
     pb_inst (CFG_pb2.Instruction)
     il (binaryninja.lowlevelil.LowLevelILInstruction)
+    all_il (list): Collection of all il instructions at this address
+             (e.g. all instructions expanded from a cmov)
   """
   pb_inst.ea = il.address
   pb_inst.bytes = read_inst_bytes(bv, il)
@@ -380,13 +384,13 @@ def recover_inst(bv, pb_block, pb_inst, il, all_il):
   # Search all il instructions at the current address for xrefs
   refs = set()
   for il_exp in all_il:
-    refs.update(xrefs.get_xrefs(bv, il_exp))
+    refs.update(xrefs.get_xrefs(bv, func, il_exp))
   
   debug_refs = []
 
   # Add all discovered xrefs to pb_inst
   for ref in refs:
-    debug_refs.append(add_xref(bv, pb_inst, ref.addr, ref.cfg_type))
+    debug_refs.append(add_xref(bv, pb_inst, ref.addr, ref.mask, ref.cfg_type))
 
   if is_local_noreturn(bv, il):
     pb_inst.local_noreturn = True
@@ -398,7 +402,7 @@ def recover_inst(bv, pb_block, pb_inst, il, all_il):
 
   table = jmptable.get_jmptable(bv, il)
   if table is not None:
-    debug_refs.append(add_xref(bv, pb_inst, table.base_addr, CFG_pb2.CodeReference.MemoryDisplacementOperand))
+    debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.MemoryDisplacementOperand))
     JMP_TABLES.append(table)
 
     # Add any missing successors
@@ -407,6 +411,12 @@ def recover_inst(bv, pb_block, pb_inst, il, all_il):
         pb_block.successor_eas.append(tgt)
 
   DEBUG("I: {:x} {}".format(il.address, " ".join(debug_refs)))
+
+  if is_last:
+    if len(pb_block.successor_eas):
+      DEBUG("  Successors: {}".format(", ".join("{:x}".format(ea) for ea in pb_block.successor_eas)))
+    else:
+      DEBUG("  No successors")
 
 
 def add_block(pb_func, block):
@@ -478,8 +488,10 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
     DEBUG_PUSH()
     pb_block = add_block(pb_func, block)
     DEBUG_PUSH()
+    
     # Recover every instruction in the block
-    for inst in block.disassembly_text:
+    insts = list(block.disassembly_text)
+    for inst in insts:
       # Skip over anything that isn't an instruction
       if inst.tokens[0].type != InstructionTextTokenType.InstructionToken:
         continue
@@ -487,11 +499,12 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
       all_il = il_groups[inst.address]
 
       pb_inst = pb_block.instructions.add()
-      recover_inst(bv, pb_block, pb_inst, il, all_il)
+      recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last=inst==insts[-1])
 
       # Find any references to stack vars in this instruction
       if RECOVER_OPTS['stack_vars']:
         vars.find_stack_var_refs(bv, inst, il, var_refs)
+
     DEBUG_POP()
     DEBUG_POP()
 

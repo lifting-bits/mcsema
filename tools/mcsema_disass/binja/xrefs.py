@@ -1,9 +1,24 @@
+# Copyright (c) 2017 Trail of Bits, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import binaryninja as binja
 from binaryninja.enums import LowLevelILOperation
 import logging
 
 import CFG_pb2
 import util
+from debug import *
 
 log = logging.getLogger(util.LOGNAME)
 
@@ -21,9 +36,10 @@ class XRef(object):
     CONTROLFLOW  : CFG_pb2.CodeReference.ControlFlowOperand
   }
 
-  def __init__(self, addr, reftype):
+  def __init__(self, addr, reftype, mask=0):
     self.addr = addr
     self.type = reftype
+    self.mask = mask
 
   @property
   def cfg_type(self):
@@ -55,7 +71,94 @@ _CONST_XREF_OP_TYPES = (LowLevelILOperation.LLIL_CONST,
 _LOAD_STORE_OP_TYPES = (LowLevelILOperation.LLIL_LOAD,
                         LowLevelILOperation.LLIL_STORE)
 
-def get_xrefs(bv, il, reftype=XRef.IMMEDIATE, parent=None):
+_CONST_OR_CONST_PTR_TYPES = (binja.RegisterValueType.ConstantValue,
+                             binja.RegisterValueType.ConstantPointerValue)
+
+_AARCH64_ADRP_XREFS = {}
+
+def _get_aarch64_partial_xref(bv, func, il, dis):
+  """" Figure out the final destination referenced by an ADRP+ADD instruction
+  combination on AArch64."""
+
+  if il.address in _AARCH64_ADRP_XREFS:
+    return _AARCH64_ADRP_XREFS[il.address]
+
+  if not dis.startswith('adrp '):
+    return None
+
+  next_address = il.address + bv.get_instruction_length(il.address)
+  next_dis = bv.get_disassembly(next_address)
+  if not next_dis.startswith('add '):
+    return None
+
+  next_il = func.get_low_level_il_at(next_address)
+  value = next_il.get_reg_value_after(next_il.dest)
+
+  if value.type not in _CONST_OR_CONST_PTR_TYPES:
+    return None
+
+  _AARCH64_ADRP_XREFS[il.address] = XRef(value.value, XRef.DISPLACEMENT, mask=-4096L)
+  _AARCH64_ADRP_XREFS[next_address] = XRef(value.value, XRef.IMMEDIATE, mask=4095)
+
+  return _AARCH64_ADRP_XREFS[il.address]
+
+
+_LAST_UNUSED_REFS = None
+
+def get_xrefs(bv, func, il):
+  global _LAST_UNUSED_REFS
+
+  dis = bv.get_disassembly(il.address)
+  refs = _LAST_UNUSED_REFS or set()
+
+  # TODO(pag): This is an ugly hack for the ADRP instruction on AArch64.
+  ref = _get_aarch64_partial_xref(bv, func, il, dis)
+  if ref is not None:
+    refs.add(ref)
+  else:
+    reftype = XRef.IMMEDIATE
+
+    # PC-relative displacement for AArch64's `adr` instruction.
+    if dis.startswith('adr '):
+      reftype = XRef.DISPLACEMENT
+
+    _fill_xrefs_internal(bv, il, refs, reftype)
+
+    # TODO(pag): Another ugly hack to deal with a specific flavor of jump
+    #            table that McSema doesn't handle very well. The specific form
+    #            is:
+    #
+    #    .text:00000000004009AC ADRP            X1, #asc_400E5C@PAGE ; "\b"
+    #    .text:00000000004009B0 ADD             X1, X1, #asc_400E5C@PAGEOFF ; "\b"
+    #    .text:00000000004009B4 LDR             W0, [X1,W0,UXTW#2]
+    #    .text:00000000004009B8 ADR             X1, loc_4009C4   <-- point to a block
+    #    .text:00000000004009BC ADD             X0, X1, W0,SXTW#2
+    #    .text:00000000004009C0 BR              X0
+    #
+    #            We don't have good ways of referencing basic blocks, so if we
+    #            left the reference from `4009B8` to `4009C4`, then that would
+    #            be computed in terms of the location in memory of the copied
+    #            `.text` segment in the lifted binary.
+    #
+    #            We could handle this via a jump-offset table with offset of
+    #            `4009B8`, but we don't yet support this variant of jump table
+    #            in jmptable.py.
+    if dis.startswith('adr ') and len(refs):
+      ref = refs.pop()
+      if util.is_code(bv, ref.addr) and not bv.get_function_at(ref.addr):
+        DEBUG("WARNING: Omitting reference to non-function code address {:x}".format(ref.addr))
+      else:
+        refs.add(ref)  # Add it back in.
+
+  if len(refs):
+    _LAST_UNUSED_REFS = None
+    return refs
+  else:
+    _LAST_UNUSED_REFS = refs
+    return _NO_XREFS 
+
+
+def _fill_xrefs_internal(bv, il, refs, reftype=XRef.IMMEDIATE, parent=None):
   """ Recursively gather xrefs in an IL instruction
 
   Args:
@@ -73,25 +176,15 @@ def get_xrefs(bv, il, reftype=XRef.IMMEDIATE, parent=None):
   if not isinstance(il, binja.LowLevelILInstruction):
     return _NO_XREFS
 
-  refs = set()
-
-  # There's some other expression including this value
-  # look at the disassembly to figure out if this is actually a displacement
-  dis = bv.get_disassembly(il.address)
-
-  # # ADRP instruction on AArch64.
-  # if dis.startswith('adrp '):
-  #   print hex(il.address), dis, il.dest
-
-
   # Update reftype using il information
   op = il.operation
 
   # Detect a tail call target
   # This is the only instance where a LLIL_JUMP is considered
   if util.is_jump_tail_call(bv, il):
-    log.debug('Tail call detected @ 0x%x', il.address)
-    return get_xrefs(bv, il.dest, XRef.CONTROLFLOW, il)
+    target = get_jump_tail_call_target(bv, il)
+    DEBUG('Tail call from {:x} to {:x}'.format(il.address, target.address))
+    return _fill_xrefs_internal(bv, il.dest, XRef.CONTROLFLOW, il)
 
   # Some instruction types are ignored
   if op in _IGNORED_XREF_OP_TYPES:
@@ -116,11 +209,10 @@ def get_xrefs(bv, il, reftype=XRef.IMMEDIATE, parent=None):
 
     # In a load/store, only the operand that references memory gets the new reftype
     # The other operand(s) start at the default (immediate) again
-    refs.update(get_xrefs(bv, mem_il, reftype, il))
+    _fill_xrefs_internal(bv, mem_il, refs, reftype, il)
     for oper in il.operands:
       if oper != mem_il:
-        refs.update(get_xrefs(bv, oper))
-    return refs
+        _fill_xrefs_internal(bv, oper, refs)
 
   elif op in _CONST_XREF_OP_TYPES:
     # Hit a value, if this is a reference we can save the xref
@@ -141,6 +233,4 @@ def get_xrefs(bv, il, reftype=XRef.IMMEDIATE, parent=None):
 
   # Continue searching operands for xrefs
   for oper in il.operands:
-    refs.update(get_xrefs(bv, oper, reftype, il))
-
-  return refs
+    _fill_xrefs_internal(bv, oper, refs, reftype, il)
