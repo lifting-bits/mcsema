@@ -65,6 +65,8 @@ DECLARE_bool(keep_memops);
 DECLARE_bool(explicit_args);
 DECLARE_string(pc_annotation);
 
+DEFINE_bool(list_supported, false,
+            "List instructions that can be lifted.");
 DEFINE_bool(legacy_mode, false,
             "Try to make the output bitcode resemble the original McSema.");
 
@@ -77,19 +79,33 @@ static void PrintVersion(void) {
       << "Using LLVM " << LLVM_VERSION_STRING << std::endl;
 }
 
+// Print a list of instructions that Remill can lift.
+static void PrintSupportedInstructions(void) {
+  remill::ForEachISel(mcsema::gModule,
+                      [=](llvm::GlobalVariable *isel, llvm::Function *) {
+                        std::cout << isel->getName().str() << std::endl;
+                      });
+}
+
+static std::unique_ptr<llvm::Module> gLibrary;
+
 // Load in a separate bitcode or IR library, and copy function and variable
 // declarations from that library into our module. We can use this feature
 // to provide better type information to McSema.
 static void LoadLibraryIntoModule(void) {
-  std::unique_ptr<llvm::Module> lib(
-      remill::LoadModuleFromFile(mcsema::gContext, FLAGS_library));
+  gLibrary.reset(remill::LoadModuleFromFile(mcsema::gContext, FLAGS_library));
 
   // Declare the functions from the library in McSema's target module.
-  for (auto &func : *lib) {
+  for (auto &func : *gLibrary) {
     auto func_name = func.getName();
     if (func_name.startswith("__mcsema") || func_name.startswith("__remill")) {
       continue;
     }
+
+    if (!func.hasExternalLinkage()) {
+      continue;
+    }
+
     if (mcsema::gModule->getFunction(func_name)) {
       continue;
     }
@@ -103,9 +119,13 @@ static void LoadLibraryIntoModule(void) {
   }
 
   // Declare the global variables from the library in McSema's target module.
-  for (auto &var : lib->globals()) {
+  for (auto &var : gLibrary->globals()) {
     auto var_name = var.getName();
     if (var_name.startswith("__mcsema") || var_name.startswith("__remill")) {
+      continue;
+    }
+
+    if (!var.hasExternalLinkage()) {
       continue;
     }
 
@@ -123,6 +143,23 @@ static void LoadLibraryIntoModule(void) {
   }
 }
 
+// Remove unused functions and globals brought in from the library.
+static void UnloadLibraryFromModule(void) {
+  for (auto &func : *gLibrary) {
+    auto our_func = mcsema::gModule->getFunction(func.getName());
+    if (our_func && !our_func->hasNUsesOrMore(1)) {
+      our_func->eraseFromParent();
+    }
+  }
+
+  for (auto &var : gLibrary->globals()) {
+    auto our_var = mcsema::gModule->getGlobalVariable(var.getName());
+    if (our_var && !our_var->hasNUsesOrMore(1)) {
+      our_var->eraseFromParent();
+    }
+  }
+}
+
 }  // namespace
 
 int main(int argc, char *argv[]) {
@@ -133,6 +170,74 @@ int main(int argc, char *argv[]) {
      << "    --arch ARCH_NAME \\" << std::endl
      << "    --os OS_NAME \\" << std::endl
      << "    --cfg CFG_FILE \\" << std::endl
+
+     // This option is very useful for debugging McSema-lifted bitcode. It
+     // injects so-called breakpoint functions before every lifted instruction.
+     // For example, the the instruction at PC `0xf00` is lifted, then this
+     // option will inject a call to `breakpoint_f00`. With this feature, we
+     // can add breakpoints in a debugger on these breakpoint functions, and
+     // know that they correspond to locations in the original program.
+     << "    [--add_breakpoints] \\" << std::endl
+
+     // This option injects a function call before every lifted instruction.
+     // This function is implemented in the McSema runtime and it prints the
+     // values of the general purpose registers to `stderr`.
+     << "    [--add_reg_tracer] \\" << std::endl
+
+     // This option tells McSema not to optimize the bitcode. This is useful
+     // for debugging, especially in conjunction with `--add_breakpoints`.
+     << "    [--disable_optimizer] \\" << std::endl
+
+     // This option tells McSema not to lower Remill's memory access intrinsic
+     // functions into LLVM `load` and `store` instructions.
+     << "    [--keep_memops] \\" << std::endl
+
+     // There are roughly two ways of using McSema-lifted bitcode. The default
+     // use case is to compile the bitcode into an executable that behaves like
+     // the original program. The other use case is to do some kind of static
+     // analysis, e.g. with KLEE. In this use case, calls to external functions
+     // are emulated so that we also try to explicitly lift parameter passing.
+     // This mode of passing arguments explicitly is enabled by
+     // `--explicit_args`, and in situations where we have no knowledge of the
+     // argument counts expected by an external function, we fall back on
+     // passing `--explicit_args_count` number of arguments to that function.
+     << "    [--explicit_args] \\" << std::endl
+     << "    [--explicit_args_count NUM_ARGS_FOR_EXTERNALS] \\" << std::endl
+
+     // This option is most useful when using `--explicit_args` (or
+     // `--legacy_mode`, which enables `--explicit_args`). In general, McSema
+     // doesn't have type information about externals, and so it assumes all
+     // externals operate on integer-typed arguments, and return integer values.
+     // This is wrong in many ways, but tends to work out about 80% of the time.
+     // To get McSema better information about externals, one should create a
+     // C or C++ file with the declarations of the externals (perhaps by
+     // `#include`ing standard headers). Then, should add to this file something
+     // like:
+     //         __attribute__((used))
+     //         void *__mcsema_used_funcs[] = {
+     //           (void *) external_func_name_1,
+     //           (void *) external_func_name_2,
+     //           ...
+     //         };
+     // And compile this file to bitcode using `remill-clang-M.m` (Major.minor).
+     // This bitcode file will then be the source of type information for
+     // McSema.
+     << "    [--library BITCODE_FILE] \\" << std::endl
+
+     // Annotate each LLVM IR instruction with some metadata that includes the
+     // original program counter. The name of the LLVM metadats is
+     // `PC_METADATA_ID`. This is enabled by default with `--legacy_mode`,
+     // which sets `--pc_annotation` to be `mcsema_real_eip`.
+     << "    [--pc_annotation PC_METADATA_ID] \\" << std::endl
+
+     // Try to produce bitcode that looks like McSema version 1. This enables
+     // `--explicit_args` and `--pc_annotation`.
+     << "    [--legacy_mode] \\" << std::endl
+     
+     // Print a list of the instructions that can be lifted.
+     << "    [--list-supported]" << std::endl
+
+     // Print the version and exit.
      << "    [--version]" << std::endl
      << std::endl;
 
@@ -183,6 +288,10 @@ int main(int argc, char *argv[]) {
   mcsema::gModule = remill::LoadTargetSemantics(mcsema::gContext);
   mcsema::gArch->PrepareModule(mcsema::gModule);
 
+  if (FLAGS_list_supported) {
+    PrintSupportedInstructions();
+  }
+
   if (!FLAGS_library.empty()) {
     LoadLibraryIntoModule();
   }
@@ -191,7 +300,13 @@ int main(int argc, char *argv[]) {
       << "Unable to lift CFG from " << FLAGS_cfg << " into module "
       << FLAGS_output;
 
+  if (!FLAGS_library.empty()) {
+    UnloadLibraryFromModule();
+    gLibrary.reset(nullptr);
+  }
+
   remill::StoreModuleToFile(mcsema::gModule, FLAGS_output);
+
   google::ShutDownCommandLineFlags();
   google::ShutdownGoogleLogging();
 

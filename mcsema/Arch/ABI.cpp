@@ -421,6 +421,40 @@ const char *CallingConvention::GetVarForNextArgument(llvm::Type *val_type) {
   return nullptr;
 }
 
+static llvm::Function *ReadIntFromMemFunc(uint64_t size_bytes) {
+  if (8 == size_bytes) {
+    return gModule->getFunction("__remill_read_memory_64");
+  } else if (4 == size_bytes) {
+    return gModule->getFunction("__remill_read_memory_32");
+  } else if (2 == size_bytes) {
+    return gModule->getFunction("__remill_read_memory_16");
+  } else if (1 == size_bytes) {
+    return gModule->getFunction("__remill_read_memory_8");
+  } else {
+    LOG(FATAL)
+        << "Cannot find function to read " << size_bytes
+        << "-byte integer from memory.";
+    return nullptr;
+  }
+}
+
+static llvm::Function *WriteIntToMemFunc(uint64_t size_bytes) {
+  if (8 == size_bytes) {
+    return gModule->getFunction("__remill_write_memory_64");
+  } else if (4 == size_bytes) {
+    return gModule->getFunction("__remill_write_memory_32");
+  } else if (2 == size_bytes) {
+    return gModule->getFunction("__remill_write_memory_16");
+  } else if (1 == size_bytes) {
+    return gModule->getFunction("__remill_write_memory_8");
+  } else {
+    LOG(FATAL)
+        << "Cannot find function to read " << size_bytes
+        << "-byte integer from memory.";
+    return nullptr;
+  }
+}
+
 llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
                                                  llvm::Type *goal_type) {
   if (!goal_type) {
@@ -466,28 +500,8 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
     val = ir.CreateCall(gModule->getFunction("__remill_read_memory_f32"), args);
 
   } else if (goal_type->isIntegerTy()) {
-    llvm::Function *func = nullptr;
-    if (8 == alloc_size) {
-      func = gModule->getFunction("__remill_read_memory_64");
-
-    } else if (4 == alloc_size) {
-      func = gModule->getFunction("__remill_read_memory_32");
-
-    } else if (2 == alloc_size) {
-      func = gModule->getFunction("__remill_read_memory_16");
-
-    } else if (1 == alloc_size) {
-      func = gModule->getFunction("__remill_read_memory_8");
-
-    } else {
-      LOG(FATAL)
-          << "Can't handle reading an " << alloc_size << "-byte integer "
-          << "argument from the stack (base type: "
-          << remill::LLVMThingToString(goal_type) << ")";
-      return nullptr;
-    }
-
-    val = ir.CreateCall(func, args);
+    auto read_mem = ReadIntFromMemFunc(alloc_size);
+    val = ir.CreateCall(read_mem, args);
     if (dl.getTypeSizeInBits(goal_type) <
         dl.getTypeAllocSizeInBits(goal_type)) {
       val = ir.CreateTrunc(val, goal_type);
@@ -552,11 +566,15 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
     if (size < gArch->address_size) {
       val_type = gWordType;
       ret_val = ir.CreateZExt(ret_val, val_type);
-    } else {
-      CHECK(size <= gArch->address_size)
-          << "Cannot store value of type "
+
+    } else if (size > gArch->address_size) {
+      LOG(ERROR)
+          << "Truncating value of type "
           << remill::LLVMThingToString(val_type)
-          << " into variable " << val_var;
+          << " to store it into variable " << val_var
+          << " of type " << remill::LLVMThingToString(gWordType);
+      ret_val = ir.CreateTrunc(ret_val, gWordType);
+      val_type = gWordType;
     }
 
   // Storing a `float` into an x87 register, convert it to a `double`.
@@ -631,18 +649,7 @@ void CallingConvention::StoreArguments(
       func = gModule->getFunction("__remill_write_memory_f32");
 
     } else if (arg_type->isIntegerTy()) {
-      if (8 == alloc_size) {
-        func = gModule->getFunction("__remill_write_memory_64");
-
-      } else if (4 == alloc_size) {
-        func = gModule->getFunction("__remill_write_memory_32");
-
-      } else if (2 == alloc_size) {
-        func = gModule->getFunction("__remill_write_memory_16");
-
-      } else if (1 == alloc_size) {
-        func = gModule->getFunction("__remill_write_memory_8");
-      }
+      func = WriteIntToMemFunc(alloc_size);
 
       if (dl.getTypeSizeInBits(arg_type) <
           dl.getTypeAllocSizeInBits(arg_type)) {
@@ -730,15 +737,24 @@ void CallingConvention::AllocateReturnAddress(llvm::BasicBlock *block) {
 
 void CallingConvention::FreeReturnAddress(llvm::BasicBlock *block) {
   if (gArch->IsAArch64()) {
-    return;  // Return address is passed through the link pointer.
+    auto x30 = remill::FindVarInFunction(block, "X30");
+    llvm::IRBuilder<> ir(block);
+    auto ret_addr = ir.CreateLoad(ir.CreateLoad(x30));
+    remill::StoreProgramCounter(block, ret_addr);
 
   // The stack grows down on x86/amd64.
   } else if (gArch->IsX86() || gArch->IsAMD64()) {
     llvm::IRBuilder<> ir(block);
     auto addr_size = gArch->address_size / 8;
     auto addr_size_bytes = llvm::ConstantInt::get(gWordType, addr_size);
+    auto sp = LoadStackPointer(block);
+    auto read_ret_addr = ReadIntFromMemFunc(addr_size);
+    llvm::Value *read_ret_addr_args[] = {remill::LoadMemoryPointer(block), sp};
+    auto ret_addr = ir.CreateCall(read_ret_addr, read_ret_addr_args);
+    remill::StoreProgramCounter(block, ret_addr);
+
     StoreStackPointer(
-        block, ir.CreateAdd(LoadStackPointer(block), addr_size_bytes));
+        block, ir.CreateAdd(sp, addr_size_bytes));
 
   } else {
     LOG(FATAL)
@@ -771,9 +787,25 @@ llvm::Value *CallingConvention::LoadStackPointer(llvm::BasicBlock *block) {
 void CallingConvention::StoreStackPointer(llvm::BasicBlock *block,
                                           llvm::Value *new_val) {
   llvm::IRBuilder<> ir(block);
+  auto val_type = new_val->getType();
+  if (val_type->isPointerTy()) {
+    new_val = ir.CreatePtrToInt(new_val, gWordType);
+  }
   ir.CreateStore(
       new_val,
-      ir.CreateLoad(remill::FindVarInFunction(block, sp_name)));
+      ir.CreateLoad(remill::FindVarInFunction(block, StackPointerVarName())));
+}
+
+void CallingConvention::StoreThreadPointer(llvm::BasicBlock *block,
+                                           llvm::Value *new_val) {
+  llvm::IRBuilder<> ir(block);
+  auto val_type = new_val->getType();
+  if (val_type->isPointerTy()) {
+    new_val = ir.CreatePtrToInt(new_val, gWordType);
+  }
+  ir.CreateStore(
+      new_val,
+      ir.CreateLoad(remill::FindVarInFunction(block, ThreadPointerVarName())));
 }
 
 // Return the address of the base of the TLS data.

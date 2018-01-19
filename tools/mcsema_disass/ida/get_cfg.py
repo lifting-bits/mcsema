@@ -33,6 +33,7 @@ from flow import *
 from refs import *
 from segment import *
 from collect_variable import *
+from exception import *
 
 #hack for IDAPython to see google protobuf lib
 if os.path.isdir('/usr/lib/python2.7/dist-packages'):
@@ -736,7 +737,10 @@ def recover_basic_block(M, F, block_ea):
   I = None
   for inst_ea in inst_eas:
     I = recover_instruction(M, B, inst_ea)
-
+    if I:
+      # Get the landing pad associated with the instructions;
+      # 0 if no landing pad associated
+      I.lp_ea = get_exception_landingpad(F, inst_ea)
 
   DEBUG_PUSH()
   if I and I.local_noreturn:
@@ -795,6 +799,8 @@ def recover_function(M, func_ea, new_func_eas, entrypoints):
     DEBUG("Recovering {:x}".format(func_ea))
 
   DEBUG_PUSH()
+  # Update the protobuf with the recovered eh_frame entries
+  recover_exception_entries(F, func_ea)
   blockset, term_insts = analyse_subroutine(func_ea, PIE_MODE)
 
   for term_inst in term_insts:
@@ -1412,7 +1418,9 @@ def recover_module(entrypoint, gvar_infile = None):
     if "main" == args.entrypoint and IS_ELF:
       entry_ea = find_main_in_ELF_file()
 
+  recover_exception_table()
   process_segments(PIE_MODE)
+
   func_eas = find_default_function_heads()
 
   recovered_fns = 0

@@ -147,7 +147,17 @@ def get_num_jump_table_entries(builder):
   # now lets go and check all the targets
   max_i = max(curr_num_targets, 1024)
   entry_addr = builder.table_ea
+  table_seg_ea = idc.SegStart(builder.table_ea)
   for i in xrange(max_i):
+
+    # Make sure we don't read across a segment (e.g. if the jump table is the
+    # last thing in our current segment).
+    try:
+      if table_seg_ea != idc.SegStart(entry_addr):
+        break
+    except:
+      break
+
     entry_data = builder.read_entry(entry_addr)
     next_entry_addr = entry_addr + (builder.entry_size * builder.entry_mult)
 
@@ -209,7 +219,7 @@ def try_get_simple_jump_table_reader(builder):
 
   # Try the offset table based approach first, as it's likely to be more
   # constrained.
-  for offset in (builder.table_ea, builder.table_ea, 0):
+  for offset in (builder.table_ea, builder.table_ea, builder.offset):
     for offset_mult in (1, -1):
       for entry_mult in (1, -1):
         for size in sizes:
@@ -319,15 +329,21 @@ def get_manual_jump_table_reader(builder):
   of the table base address that happens before the actual `jmp`."""
   ret = False
   next_inst_ea = builder.jump_ea
+  found_ref_eas = set()
   for i in xrange(5):
     inst_ea = next_inst_ea
     next_inst_ea = idc.PrevHead(inst_ea)
     if inst_ea == idc.BADADDR:
       break
 
+    elif builder.jump_ea != inst_ea and is_control_flow(inst_ea):
+      break
+
     refs = get_instruction_references(inst_ea, builder.binary_is_pie)
     if not len(refs):
       continue
+
+    found_ref_eas.add((inst_ea, refs[0].ea))
 
     builder.table_ea = refs[0].ea
     builder.offset = 0
@@ -345,8 +361,80 @@ def get_manual_jump_table_reader(builder):
     DEBUG("Reader inferred jump table base: {:x}".format(builder.table_ea))
     if builder.offset:
       DEBUG("Reader inferred jump table offset: {:x}".format(builder.offset))
+    return ret
 
-  return ret
+  if len(found_ref_eas) < 2:
+    return ret
+
+  # We're going to try to recognize a jump table of the form:
+  #
+  #    .text:00000000004009AC ADRP            X1, #asc_400E5C@PAGE ; "\b"
+  #    .text:00000000004009B0 ADD             X1, X1, #asc_400E5C@PAGEOFF ; "\b"
+  #    .text:00000000004009B4 LDR             W0, [X1,W0,UXTW#2]
+  #    .text:00000000004009B8 ADR             X1, loc_4009C4
+  #    .text:00000000004009BC ADD             X0, X1, W0,SXTW#2
+  #    .text:00000000004009C0 BR              X0
+  #
+  # Where it's a table of offsets (`asc_400E5C`), and the base offset is
+  # the basic block `loc_4009C4`.
+  min_ea, max_ea = get_function_bounds(builder.jump_ea)
+
+  inst_block_ea = idc.BADADDR
+  block_ea = idc.BADADDR
+
+  for inst_ea, ref_ea in found_ref_eas:
+    if is_code_by_flags(ref_ea) and min_ea <= ref_ea < max_ea:
+      inst_block_ea = inst_ea
+      block_ea = ref_ea
+      break
+
+  if idc.BADADDR == block_ea:
+    return ret
+
+  found_ref_eas.remove((inst_block_ea, block_ea))
+
+  # The idea here is that we want to trick the jump table reader into thinking
+  # that the offset of the jump table is a basic block.
+  for inst_ea, ref_ea in found_ref_eas:
+    builder.table_ea = ref_ea
+    builder.offset = block_ea
+    ret = try_get_simple_jump_table_reader(builder)
+    if ret:
+      break
+
+  if ret:
+    DEBUG("Reader inferred jump table base: {:x}".format(builder.table_ea))
+    if builder.offset == block_ea:
+      DEBUG("Reader inferred jump table offset is the block {:x}".format(
+          builder.offset))
+      
+      # McSema-lifted bitcode doesn't really have a good way of getting the
+      # address of a basic block, and even so, we don't really want that either.
+      # The way our jump table lifting works is to preserve the original
+      # addresses and computation, and `switch` based on that, so we need to
+      # make sure that the original basic block address shows up in the lifted
+      # bitcode.
+
+      DEBUG("WARNING: Removing reference from {:x} to block {:x}".format(
+          inst_block_ea, block_ea))
+      remove_instruction_reference(inst_block_ea, block_ea)
+
+  # NOTE(pag): For now we disable this jump table detection, even if it seems
+  #            like we find the table. This is because we don't yet have a good
+  #            way of dealing with the `ADD X0, X1, W0,SXTW#2`, which scales
+  #            the read table entry out by shifting it left by two. Besides
+  #            that, the following code actually works reasonably well. To
+  #            account for this, on the C++ side, we augment jump table
+  #            `switch`es to target blocks that are not referenced by the
+  #            successor lists of any other blocks.
+  #
+  #            It is also pretty important to make sure that we remove the
+  #            instruction reference. If/when we have good support for this
+  #            kind of jump table, then the above call to
+  #            `remove_instruction_reference` has to be removed so that the
+  #            various things that the C++ side of things does to handle offset-
+  #            based jump tables works. 
+  return False
 
 def get_jump_table_reader(builder):
   """Returns the size of a jump table entry, as well as a reader function

@@ -946,6 +946,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       for (const auto &cfg_inst : cfg_block.instructions()) {
         auto inst = new NativeInstruction;
         inst->ea = static_cast<uint64_t>(cfg_inst.ea());
+        inst->lp_ea = static_cast<uint64_t>(cfg_inst.lp_ea());
         inst->bytes = cfg_inst.bytes();
         inst->does_not_return = cfg_inst.has_local_noreturn();
         inst->imm = nullptr;

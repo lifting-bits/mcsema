@@ -20,7 +20,9 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/InstIterator.h>
+#include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/LLVMContext.h>
@@ -45,6 +47,7 @@
 #include "remill/BC/ABI.h"
 #include "remill/BC/IntrinsicTable.h"
 #include "remill/BC/Lifter.h"
+#include "remill/BC/Util.h"
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Callback.h"
@@ -58,6 +61,7 @@
 #include "mcsema/CFG/CFG.h"
 
 DECLARE_bool(legacy_mode);
+DECLARE_bool(explicit_args);
 DECLARE_string(pc_annotation);
 
 namespace mcsema {
@@ -96,6 +100,64 @@ static void ExportVariables(const NativeModule *cfg_module) {
   }
 }
 
+// Handle the GCC stack protector. Normally we'd do this in `External.cpp`,
+// but it seems like optimizing a global that is `AvailableExternallyLinkage`
+// with an initializer somewhere in the code (in our case, a `LazyInitXref`),
+// results in the linkage being changed to `ExternalLinkage`. We want
+// `AvailableExternallyLinkage` for the sake of something like KLEE.
+static void DefineGCCStackGuard(void) {
+  if (auto stack_guard = gModule->getGlobalVariable("__stack_chk_guard")) {
+    stack_guard->setInitializer(
+        llvm::Constant::getNullValue(stack_guard->getType()->getElementType()));
+    stack_guard->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
+  }
+}
+
+// Define the function `__mcsema_debug_get_reg_state`. Normally this is part of
+// the McSema runtime, but if we are lifting with `--explicit_args`, and are
+// also compiling the lifted bitcode back to native, then we may not use the
+// runtime and so might not have this useful debugging function available to us.
+static void DefineDebugGetRegState(void) {
+  auto get_reg_state = gModule->getFunction("__mcsema_debug_get_reg_state");
+  if (get_reg_state) {
+    return;
+  }
+
+  auto reg_state = gModule->getGlobalVariable("__mcsema_reg_state", true);
+  if (!reg_state) {
+    return;
+  }
+
+  auto state_ptr_type = reg_state->getType();
+  auto reg_func_type = llvm::FunctionType::get(state_ptr_type, false);
+  get_reg_state = llvm::Function::Create(
+      reg_func_type, llvm::GlobalValue::ExternalWeakLinkage,
+      "__mcsema_debug_get_reg_state", gModule);
+
+  llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", get_reg_state));
+  ir.CreateRet(reg_state);
+
+  get_reg_state->addFnAttr(llvm::Attribute::NoInline);
+  get_reg_state->addFnAttr(llvm::Attribute::OptimizeNone);
+}
+
+// Define some of the remill error intrinsics.
+static void DefineErrorIntrinsics(llvm::FunctionType *lifted_func_type) {
+  const char *func_names[] = {"__remill_error", "__remill_missing_block"};
+  auto trap = llvm::Intrinsic::getDeclaration(gModule, llvm::Intrinsic::trap);
+  for (auto func_name : func_names) {
+    auto func = gModule->getFunction(func_name);
+    if (!func) {
+      continue;
+    }
+    if (func->isDeclaration()) {
+      llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", func));
+      ir.CreateCall(trap);
+      ir.CreateUnreachable();
+    }
+  }
+}
+
 }  // namespace
 
 bool LiftCodeIntoModule(const NativeModule *cfg_module) {
@@ -105,6 +167,8 @@ bool LiftCodeIntoModule(const NativeModule *cfg_module) {
   // Segments are inserted after the lifted function declarations are added
   // so that cross-references to lifted code are handled.
   AddDataSegments(cfg_module);
+
+  auto lifted_func_type = remill::LiftedFunctionType(gModule);
 
   // Lift the blocks of instructions into the declared functions.
   if (!DefineLiftedFunctions(cfg_module)) {
@@ -126,6 +190,12 @@ bool LiftCodeIntoModule(const NativeModule *cfg_module) {
   }
 
   OptimizeModule();
+
+  if (FLAGS_explicit_args) {
+    DefineGCCStackGuard();
+    DefineDebugGetRegState();
+    DefineErrorIntrinsics(lifted_func_type);
+  }
 
   if (!FLAGS_pc_annotation.empty()) {
     legacy::PropagateInstAnnotations();

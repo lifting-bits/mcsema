@@ -6,128 +6,37 @@ define print-rip
   dont-repeat
 end
 
-define print-reg-state-64
+set $__rax_offset = 2216
+set $__flags_offset = 2064
+set $__xmm0_offset = 16
+
+define print-reg-state-amd64
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
   printf "             emulated                   native\n"
-  printf "rip     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2408)), $rip
-  printf "rax     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2152)), $rax
-  printf "rbx     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2168)), $rbx
-  printf "rcx     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2184)), $rcx
-  printf "rdx     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2200)), $rdx
-  printf "rsi     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2216)), $rsi
-  printf "rdi     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2232)), $rdi
-  printf "rbp     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2264)), $rbp
-  printf "rsp     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2248)), $rsp
-  printf "r8      0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2280)), $r8
-  printf "r9      0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2296)), $r9
-  printf "r10     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2312)), $r10
-  printf "r11     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2328)), $r11
-  printf "r12     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2344)), $r12
-  printf "r13     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2360)), $r13
-  printf "r14     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2376)), $r14
-  printf "r15     0x%016lx        0x%016lx\n", *((unsigned long long *)($rptr + 2392)), $r15
+  set $__rax_ptr = $rptr + $__rax_offset
+  printf "rip     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 16 * 16)), $rip
+  printf "rax     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 0 * 16)), $rax
+  printf "rbx     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 1 * 16)), $rbx
+  printf "rcx     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 2 * 16)), $rcx
+  printf "rdx     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 3 * 16)), $rdx
+  printf "rsi     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 4 * 16)), $rsi
+  printf "rdi     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 5 * 16)), $rdi
+  printf "rsp     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 6 * 16)), $rsp
+  printf "rbp     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 7 * 16)), $rbp
+  printf "r8      0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 8 * 16)), $r8
+  printf "r9      0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 9 * 16)), $r9
+  printf "r10     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 10 * 16)), $r10
+  printf "r11     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 11 * 16)), $r11
+  printf "r12     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 12 * 16)), $r12
+  printf "r13     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 13 * 16)), $r13
+  printf "r14     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 14 * 16)), $r14
+  printf "r15     0x%016lx        0x%016lx\n", *((unsigned long long *)($__rax_ptr + 15 * 16)), $r15
   dont-repeat
 end
 
-define addr-of-xmm0-64
+define print-flags-amd64
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm0) = 0x%016lx\n", $rptr + 16
-  dont-repeat
-end
-
-define addr-of-xmm1-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm1) = 0x%016lx\n", $rptr + 80
-  dont-repeat
-end
-
-define addr-of-xmm2-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm2) = 0x%016lx\n", $rptr + 144
-  dont-repeat
-end
-
-define addr-of-xmm3-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm3) = 0x%016lx\n", $rptr + 208
-  dont-repeat
-end
-
-define addr-of-xmm4-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm4) = 0x%016lx\n", $rptr + 272
-  dont-repeat
-end
-
-define addr-of-xmm5-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm5) = 0x%016lx\n", $rptr + 336
-  dont-repeat
-end
-
-define addr-of-xmm6-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm6) = 0x%016lx\n", $rptr + 400
-  dont-repeat
-end
-
-define addr-of-xmm7-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm7) = 0x%016lx\n", $rptr + 464
-  dont-repeat
-end
-
-define addr-of-xmm8-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm8) = 0x%016lx\n", $rptr + 528
-  dont-repeat
-end
-
-define addr-of-xmm9-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm9) = 0x%016lx\n", $rptr + 592
-  dont-repeat
-end
-
-define addr-of-xmm10-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm10) = 0x%016lx\n", $rptr + 656
-  dont-repeat
-end
-
-define addr-of-xmm11-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm11) = 0x%016lx\n", $rptr + 720
-  dont-repeat
-end
-
-define addr-of-xmm12-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm12) = 0x%016lx\n", $rptr + 784
-  dont-repeat
-end
-
-define addr-of-xmm13-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm13) = 0x%016lx\n", $rptr + 848
-  dont-repeat
-end
-
-define addr-of-xmm14-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm14) = 0x%016lx\n", $rptr + 912
-  dont-repeat
-end
-
-define addr-of-xmm15-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&(RegState::xmm15) = 0x%016lx\n", $rptr + 976
-  dont-repeat
-end
-
-define print-flags-64
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  set $flptr = (char *) ($rptr + 0x810)
+  set $flptr = (char *) ($rptr + $__flags_offset)
   printf "eflags ["
   if $flptr[1]
     printf "CF "
@@ -154,122 +63,105 @@ define print-flags-64
   dont-repeat
 end
 
-define print-reg-state-32
-  set $rptr = ((unsigned (*)(void))__mcsema_debug_get_reg_state)()
-  printf "         emulated           native\n"
-  printf "eip     0x%08lx        0x%016lx\n", *((unsigned long long *)($rptr + 2408)), $eip
-  printf "eax     0x%08lx        0x%016lx\n", *((unsigned long long *)($rptr + 2152)), $eax
-  printf "ebx     0x%08lx        0x%016lx\n", *((unsigned long long *)($rptr + 2168)), $ebx
-  printf "ecx     0x%08lx        0x%016lx\n", *((unsigned long long *)($rptr + 2184)), $ecx
-  printf "edx     0x%08lx        0x%016lx\n", *((unsigned long long *)($rptr + 2200)), $edx
-  printf "esi     0x%08lx        0x%016lx\n", *((unsigned long long *)($rptr + 2216)), $esi
-  printf "edi     0x%08lx        0x%016lx\n", *((unsigned long long *)($rptr + 2232)), $edi
-  printf "ebp     0x%08lx        0x%016lx\n", *((unsigned long long *)($rptr + 2264)), $ebp
-  printf "esp     0x%08lx        0x%016lx\n", *((unsigned long long *)($rptr + 2248)), $esp
+define print-flags-x86
+  print-flags-amd64
+end
+
+define print-reg-state-x86
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "             emulated                   native\n"
+  set $__rax_ptr = $rptr + $__rax_offset
+  printf "eip     0x%08x        0x%08x\n", *((unsigned *)($__rax_ptr + 16 * 16)), (unsigned) $pc
+  printf "eax     0x%08x        0x%08x\n", *((unsigned *)($__rax_ptr + 0 * 16)), $eax
+  printf "ebx     0x%08x        0x%08x\n", *((unsigned *)($__rax_ptr + 1 * 16)), $ebx
+  printf "ecx     0x%08x        0x%08x\n", *((unsigned *)($__rax_ptr + 2 * 16)), $ecx
+  printf "edx     0x%08x        0x%08x\n", *((unsigned *)($__rax_ptr + 3 * 16)), $edx
+  printf "esi     0x%08x        0x%08x\n", *((unsigned *)($__rax_ptr + 4 * 16)), $esi
+  printf "edi     0x%08x        0x%08x\n", *((unsigned *)($__rax_ptr + 5 * 16)), $edi
+  printf "esp     0x%08x        0x%08x\n", *((unsigned *)($__rax_ptr + 6 * 16)), $esp
+  printf "ebp     0x%08x        0x%08x\n", *((unsigned *)($__rax_ptr + 7 * 16)), $ebp
+  dont-repeat
+end
+
+set $__x0_offset = 544
+
+define print-reg-state-aarch64
+  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
+  printf "\temulated\n"
+  set $__x0_ptr = $rptr + $__x0_offset
+  set $__i = 0
+  while $__i < 31
+    printf "x%d\t0x%016lx\t&x%d = 0x%lx\n", $__i, *((unsigned long long *)($__x0_ptr + $__i * 16)), $__i, $__x0_ptr + $__i * 16
+    set $__i = $__i + 1
+  end
+  
+  printf "sp\t0x%016lx\n", *((unsigned long long *)($__x0_ptr + $__i * 16))
+  set $__i = $__i + 1
+  printf "pc\t0x%016lx\t&pc = 0x%lx\n", *((unsigned long long *)($__x0_ptr + $__i * 16)), $__x0_ptr + $__i * 16
   dont-repeat
 end
 
 
 define addr-of-rip
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&rip = 0x%016lx\n", $rptr + 2408
+  set $__rax_ptr = $rptr + $__rax_offset
+  printf "&rip = 0x%016lx\n", $__rax_ptr + 16 * 16
   dont-repeat
 end
 
 define addr-of-rax
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&rax = 0x%016lx\n", $rptr + 2152
+  set $__rax_ptr = $rptr + $__rax_offset
+  printf "&rax = 0x%016lx\n", $__rax_ptr + 0 * 16
   dont-repeat
 end
 
 define addr-of-rbx
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&rbx = 0x%016lx\n", $rptr + 2168
+  set $__rax_ptr = $rptr + $__rax_offset
+  printf "&rbx = 0x%016lx\n", $__rax_ptr + 1 * 16
   dont-repeat
 end
 
 define addr-of-rcx
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&rcx = 0x%016lx\n", $rptr + 2184
+  set $__rax_ptr = $rptr + $__rax_offset
+  printf "&rcx = 0x%016lx\n", $__rax_ptr + 2 * 16
   dont-repeat
 end
 
 define addr-of-rdx
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&rdx = 0x%016lx\n", $rptr + 2200
+  set $__rax_ptr = $rptr + $__rax_offset
+  printf "&rdx = 0x%016lx\n", $__rax_ptr + 3 * 16
   dont-repeat
 end
 
 define addr-of-rsi
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&rsi = 0x%016lx\n", $rptr + 2216
+  set $__rax_ptr = $rptr + $__rax_offset
+  printf "&rsi = 0x%016lx\n", $__rax_ptr + 4 * 16
   dont-repeat
 end
 
 define addr-of-rdi
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&rdi = 0x%016lx\n", $rptr + 2232
-  dont-repeat
-end
-
-define addr-of-rbp
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&rbp = 0x%016lx\n", $rptr + 2264
+  set $__rax_ptr = $rptr + $__rax_offset
+  printf "&rdi = 0x%016lx\n", $__rax_ptr + 5 * 16
   dont-repeat
 end
 
 define addr-of-rsp
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&rsp = 0x%016lx\n", $rptr + 2248
+  set $__rax_ptr = $rptr + $__rax_offset
+  printf "&rsp = 0x%016lx\n", $__rax_ptr + 6 * 16
   dont-repeat
 end
 
-
-define addr-of-r8
+define addr-of-rbp
   set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&r8 = 0x%016lx\n", $rptr + 2280
-  dont-repeat
-end
-
-define addr-of-r9
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&r9 = 0x%016lx\n", $rptr + 2296
-  dont-repeat
-end
-
-define addr-of-r10
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&r10 = 0x%016lx\n", $rptr + 2312
-  dont-repeat
-end
-
-define addr-of-r11
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&r11 = 0x%016lx\n", $rptr + 2328
-  dont-repeat
-end
-
-define addr-of-r12
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&r12 = 0x%016lx\n", $rptr + 2344
-  dont-repeat
-end
-
-define addr-of-r13
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&r13 = 0x%016lx\n", $rptr + 2360
-  dont-repeat
-end
-
-define addr-of-r14
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&r14 = 0x%016lx\n", $rptr + 2376
-  dont-repeat
-end
-
-define addr-of-r15
-  set $rptr = ((unsigned long long (*)(void))__mcsema_debug_get_reg_state)()
-  printf "&r15 = 0x%016lx\n", $rptr + 2392
+  set $__rax_ptr = $rptr + $__rax_offset
+  printf "&rbp = 0x%016lx\n", $__rax_ptr + 7 * 16
   dont-repeat
 end
 

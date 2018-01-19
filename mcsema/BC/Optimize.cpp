@@ -79,8 +79,7 @@ static void ReplaceUndefIntrinsic(llvm::Function *function) {
 
 static void RemoveFunction(llvm::Function *func) {
   if (!func->hasNUsesOrMore(1)) {
-    func->removeFromParent();
-    delete func;
+    func->eraseFromParent();
   }
 }
 
@@ -177,21 +176,38 @@ static void RemoveIntrinsics(void) {
   // we'll try to get the optimizer to inline it on our behalf, which should
   // drop some references :-D
   if (auto remill_used = gModule->getFunction("__remill_mark_as_used")) {
-    if (remill_used->isDeclaration()) {
-      remill_used->setLinkage(llvm::GlobalValue::InternalLinkage);
-      remill_used->removeFnAttr(llvm::Attribute::NoInline);
-      remill_used->addFnAttr(llvm::Attribute::InlineHint);
-      remill_used->addFnAttr(llvm::Attribute::AlwaysInline);
-      auto block = llvm::BasicBlock::Create(*gContext, "", remill_used);
-      (void) llvm::ReturnInst::Create(*gContext, block);
+    std::vector<llvm::CallInst *> uses;
+    for (auto use : remill_used->users()) {
+      if (auto call = llvm::dyn_cast<llvm::CallInst>(use)) {
+        uses.push_back(call);
+      }
     }
+
+    for (auto call : uses) {
+      call->eraseFromParent();
+    }
+
+    if (remill_used->hasNUsesOrMore(1)) {
+      if (remill_used->isDeclaration()) {
+        remill_used->setLinkage(llvm::GlobalValue::InternalLinkage);
+        remill_used->removeFnAttr(llvm::Attribute::NoInline);
+        remill_used->addFnAttr(llvm::Attribute::InlineHint);
+        remill_used->addFnAttr(llvm::Attribute::AlwaysInline);
+        auto block = llvm::BasicBlock::Create(*gContext, "", remill_used);
+        (void) llvm::ReturnInst::Create(*gContext, block);
+      }
+    }
+
+    RemoveFunction(remill_used);
   }
 
-  RemoveFunction("__remill_intrinsics");
+//  if (auto intrinsics = gModule->getFunction("__remill_intrinsics")) {
+//    intrinsics->eraseFromParent();
+//  }
+
   RemoveFunction("__remill_basic_block");
-  RemoveFunction("__remill_mark_as_used");
   RemoveFunction("__remill_defer_inlining");
-  RemoveFunction("__remill_mark_as_used");
+  RemoveFunction("__remill_intrinsics");
 }
 
 static void ReplaceBarrier(const char *name) {
