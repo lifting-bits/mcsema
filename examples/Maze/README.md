@@ -74,7 +74,8 @@ sudo apt-get install \
      libtinfo-dev \
      lsb-release \
      realpath \
-     z3
+     z3 libz3-dev \
+     libncurses5-dev
 
 sudo pip install --upgrade pip
 sudo pip install 'protobuf==3.2.0'
