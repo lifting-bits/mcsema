@@ -84,7 +84,7 @@ sudo pip install 'protobuf==3.2.0'
 Now that we have the dependencies we need, we should clone [Remill](https://github.com/trailofbits/remill).
 
 ```bash
-cd /data
+cd ~/data
 git clone git@github.com:trailofbits/remill.git
 ```
 
@@ -100,7 +100,7 @@ cd /tmp/klee_ws
 Now to invoke our build script within `/tmp/klee_ws`, which is where Remill, McSema, and KLEE will be compiled.
 
 ```bash
-/data/remill/scripts/build_klee.sh
+~/data/remill/scripts/build_klee.sh
 ```
 
 ### Step 3: Lift the Maze binaries
@@ -108,7 +108,7 @@ Now to invoke our build script within `/tmp/klee_ws`, which is where Remill, McS
 From within the KLEE workspace `/tmp/klee_ws`, run the [lifting script](scripts/lift.sh). This script invokes `mcsema-lift-3.9` on the provided [CFG files](cfg). If you have IDA Pro, then you can reproduce these steps manually by invoking the [disassembly script](scripts/disass.sh).
 
 ```bash
-/data/remill/tools/mcsema/examples/Maze/scripts/lift.sh
+~/data/remill/tools/mcsema/examples/Maze/scripts/lift.sh
 ```
 
 This script will likely print out some error messages. That is okay. McSema will always try to produce bitcode, and it will warn you when something seems erroneous in the CFG file.
@@ -118,11 +118,11 @@ This script will likely print out some error messages. That is okay. McSema will
 The build script from step 2 will have compiled KLEE into the `/tmp/klee_ws/klee-build/` directory. We can run the KLEE using the following commands. If things work, then there will be a lot of funny looking output.
 
 ```bash
-./klee-build/bin/klee -posix-runtime -libc=uclibc -allow-external-sym-calls /data/remill/tools/mcsema/examples/Maze/bc/maze.amd64.bc -sym-stdin 28
+./klee-build/bin/klee -posix-runtime -libc=uclibc -allow-external-sym-calls ~/data/remill/tools/mcsema/examples/Maze/bc/maze.amd64.bc -sym-stdin 28
 ```
 
 ```bash
-./klee-build/bin/klee -posix-runtime -libc=uclibc -allow-external-sym-calls /data/remill/tools/mcsema/examples/Maze/bc/maze.aarch64.bc -sym-stdin 28
+./klee-build/bin/klee -posix-runtime -libc=uclibc -allow-external-sym-calls ~/data/remill/tools/mcsema/examples/Maze/bc/maze.aarch64.bc -sym-stdin 28
 ```
 
 ### Step 5: Example ouput
@@ -130,7 +130,7 @@ The build script from step 2 will have compiled KLEE into the `/tmp/klee_ws/klee
 We know that the answer to the maze is `ssssddddwwaawwddddssssddwwww`, so we can check to see if KLEE found it by running `ktest-tool` on all of the `.ktest`-suffixed files in the KLEE's output file directory (`klee-last` is a symlink to the most recently produced output directory).
 
 ```bash
-for f in /data/remill/tools/mcsema/examples/Maze/bc/klee-last/*.ktest ; do
+for f in ~/data/remill/tools/mcsema/examples/Maze/bc/klee-last/*.ktest ; do
   ./klee-build/bin/ktest-tool $f | grep ssssddddwwaawwddddssssddwwww &>/dev/null ;
   if [[ $? -eq 0 ]] ; then
     FOUND_TEST=$f
@@ -142,8 +142,8 @@ done
 The output we get should be something like the following:
 
 ```
-ktest file : '/data/remill/tools/mcsema/examples/Maze/bc/klee-last/test000301.ktest'
-args       : ['/data/remill/tools/mcsema/examples/Maze/bc/maze.aarch64.bc', '-sym-stdin', '28']
+ktest file : '~/data/remill/tools/mcsema/examples/Maze/bc/klee-last/test000301.ktest'
+args       : ['~/data/remill/tools/mcsema/examples/Maze/bc/maze.aarch64.bc', '-sym-stdin', '28']
 num objects: 3
 object    0: name: 'stdin'
 object    0: size: 28
