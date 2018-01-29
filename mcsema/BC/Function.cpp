@@ -248,9 +248,10 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
   }
 
   for (auto &entry : cfg_func->eh_frame) {
+    if (entry->lp_ea == 0) continue;
+
     if (entry->action == 0) {
       std::stringstream ss;
-      if (entry->lp_ea == 0) continue;
       ss << "cleanup_landingpad_" << std::hex << entry->lp_ea;
       llvm::BasicBlock *landing_bb = llvm::BasicBlock::Create(
           *gContext, ss.str(), ctx.lifted_func);
@@ -282,7 +283,6 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       }
     } else if (entry->action == 1) {
       std::stringstream ss;
-      if (entry->lp_ea == 0) continue;
       ss << "catch_landingpad_" << std::hex << entry->lp_ea;
       llvm::BasicBlock *landing_bb = llvm::BasicBlock::Create(
           *gContext, ss.str(), ctx.lifted_func);
@@ -295,20 +295,19 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       // Set tne clause to catch all kind of exceptions
       lpad->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
       LOG(INFO) << "Landing pad number of Operand [0] " << lpad->getNumClauses() << std::endl;
-      auto exctn_0  = ir.CreateExtractValue(lpad, 0);
-      auto store_loc_0 = ir.CreateAlloca(exctn_0->getType());
-      ir.CreateStore(exctn_0, store_loc_0);
 
-      auto exctn_1 = ir.CreateExtractValue(lpad, 1);
-      auto store_loc_1 = ir.CreateAlloca(exctn_1->getType());
-      ir.CreateStore(exctn_1, store_loc_1);
+      auto handler = gModule->getFunction("__remill_exception_ret");
+      if (handler != nullptr) {
+        ir.CreateCall(handler);
+      }
 
       auto lp_entry = ctx.ea_to_block[entry->lp_ea];
-      //landing_bb->dump();
-      if (nullptr != lp_entry) {
-        ir.CreateBr(lp_entry);
-        ctx.lp_to_block[entry->lp_ea] = landing_bb;
+      if(lp_entry == nullptr) {
+        lp_entry = GetOrCreateBlock(ctx, entry->lp_ea);
       }
+      ir.CreateBr(lp_entry);
+      ctx.lp_to_block[entry->lp_ea] = landing_bb;
+      //landing_bb->dump();
     }
   }
 }
@@ -728,7 +727,7 @@ void DeclareLiftedFunctions(const NativeModule *cfg_module) {
 // in from cloning the `__remill_basic_block` function.
 bool DefineLiftedFunctions(const NativeModule *cfg_module) {
   llvm::legacy::FunctionPassManager func_pass_manager(gModule);
-  func_pass_manager.add(llvm::createCFGSimplificationPass());
+  //func_pass_manager.add(llvm::createCFGSimplificationPass());
   func_pass_manager.add(llvm::createPromoteMemoryToRegisterPass());
   func_pass_manager.add(llvm::createReassociatePass());
   func_pass_manager.add(llvm::createDeadStoreEliminationPass());
