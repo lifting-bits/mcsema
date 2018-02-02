@@ -68,6 +68,7 @@ DEFINE_bool(add_breakpoints, false,
             "specific lifted instruction is executed.");
 
 namespace mcsema {
+
 namespace {
 
 static llvm::Function *GetRegTracer(void) {
@@ -126,9 +127,28 @@ static void InlineSubFuncCall(llvm::BasicBlock *block,
 // result of the function
 static void InlineSubFuncInvoke(llvm::BasicBlock *block,
                                 llvm::Function *sub, llvm::BasicBlock *ifnormal,
-                                llvm::BasicBlock *ifexception) {
-  auto invoke = llvm::InvokeInst::Create(
-      sub, ifnormal, ifexception, remill::LiftedFunctionArgs(block), "", block);
+                                llvm::BasicBlock *ifexception, const NativeFunction *cfg_func) {
+  llvm::IRBuilder <> ir(block);
+  auto sub_1 = gModule->getFunction("__mcsema_get_rsp");
+  if (sub_1 == nullptr) {
+    sub_1 = llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), true), llvm::GlobalValue::ExternalLinkage,
+        "__mcsema_get_rsp", gModule);
+  }
+  auto call_rsp = ir.CreateCall(sub_1);
+  ir.CreateStore(call_rsp, cfg_func->rsp_var);
+
+  auto sub_2 = gModule->getFunction("__mcsema_get_rbp");
+  if (sub_2 == nullptr) {
+    sub_2 = llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), true), llvm::GlobalValue::ExternalLinkage,
+        "__mcsema_get_rbp", gModule);
+  }
+  auto call_rbp = ir.CreateCall(sub_2);
+  ir.CreateStore(call_rbp, cfg_func->rbp_var);
+
+  auto invoke = ir.CreateInvoke(
+      sub, ifnormal, ifexception, remill::LiftedFunctionArgs(block), "");
   invoke->setCallingConv(sub->getCallingConv());
 }
 
@@ -296,9 +316,13 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       lpad->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
       LOG(INFO) << "Landing pad number of Operand [0] " << lpad->getNumClauses() << std::endl;
 
+      std::vector<llvm::Value *> args(2);
+      args[0] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext), cfg_func->rsp_var);
+      args[1] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext), cfg_func->rbp_var);
+
       auto handler = gModule->getFunction("__remill_exception_ret");
       if (handler != nullptr) {
-        ir.CreateCall(handler);
+        ir.CreateCall(handler, args);
       }
 
       auto lp_entry = ctx.ea_to_block[entry->lp_ea];
@@ -432,7 +456,7 @@ static bool TryLiftTerminator(TranslationContext &ctx,
         } else {
           auto exception_block = ctx.lp_to_block[ctx.cfg_inst->lp_ea];
           auto normal_block = GetOrCreateBlock(ctx, inst.next_pc);
-          InlineSubFuncInvoke(block, targ_func, normal_block, exception_block);
+          InlineSubFuncInvoke(block, targ_func, normal_block, exception_block, ctx.cfg_func);
         }
 
       } else {
@@ -606,6 +630,9 @@ static void AllocStackVars(llvm::BasicBlock *bb,
     // TODO(kumarak): Alignment of `alloca`s?
     s->llvm_var = ir.CreateAlloca(array_type, array_size, s->name);
   }
+
+  cfg_func->rsp_var = ir.CreateAlloca(llvm::Type::getInt64Ty(*gContext), llvm::ConstantInt::get(gWordType, 1), "rsp_store");
+  cfg_func->rbp_var =ir.CreateAlloca(llvm::Type::getInt64Ty(*gContext), llvm::ConstantInt::get(gWordType, 1), "rbp_store");
 }
 
 static llvm::Function *LiftFunction(

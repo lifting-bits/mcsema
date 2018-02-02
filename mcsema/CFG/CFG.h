@@ -102,6 +102,8 @@ struct NativeFunction : public NativeObject {
   std::vector<struct NativeStackVariable *> stack_vars;
   std::vector<struct NativeExceptionFrame *> eh_frame;
   llvm::Function *function;
+  mutable llvm::Value *rsp_var;
+  mutable llvm::Value *rbp_var;
 };
 
 struct NativeStackVariable : public NativeObject {

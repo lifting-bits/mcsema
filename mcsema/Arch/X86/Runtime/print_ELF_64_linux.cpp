@@ -717,6 +717,13 @@ int main(void) {
    fprintf(out, "  mov [rdi + %" PRIuMAX "], rcx\n", __builtin_offsetof(State, RCX));
    fprintf(out, "  mov [rdi + %" PRIuMAX "], rdx\n", __builtin_offsetof(State, RDX));
 
+   fprintf(out, "  mov rax, fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "]\n", __builtin_offsetof(State, RDI));
+   fprintf(out, "  mov [rdi + %" PRIuMAX "], rax\n", __builtin_offsetof(State, RSP));
+   fprintf(out, "  add QWORD PTR [rdi + %" PRIuMAX "], 8\n", __builtin_offsetof(State, RSP));
+
+   fprintf(out, "  mov rax, fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "]\n", __builtin_offsetof(State, RSI));
+   fprintf(out, "  mov [rdi + %" PRIuMAX "], rax\n", __builtin_offsetof(State, RBP));
+
 
    fprintf(out, "  mov [rdi + %" PRIuMAX "], r8\n", __builtin_offsetof(State, R8));
    fprintf(out, "  mov [rdi + %" PRIuMAX "], r9\n", __builtin_offsetof(State, R9));
@@ -752,7 +759,33 @@ int main(void) {
    fprintf(out, "  .cfi_endproc\n");
    fprintf(out, "\n");
 
+   fprintf(out, "  .globl __mcsema_get_rsp\n");
+   fprintf(out, "  .type __mcsema_get_rsp,@function\n");
+   fprintf(out, "__mcsema_get_rsp:\n");
+   fprintf(out, "  .cfi_startproc\n");
+   fprintf(out, "  mov rax, fs:[0]\n");
+   fprintf(out, "  lea rdx, [__mcsema_reg_state@TPOFF]\n");
+   fprintf(out, "  lea rax, [rax + rdx]\n");
+   fprintf(out, "  mov rax, [rax + %" PRIuMAX "]\n", __builtin_offsetof(State, RSP));
+   fprintf(out, "  ret\n");
+   fprintf(out, ".Lfunc_end20:\n");
+   fprintf(out, "  .size __mcsema_get_rsp,.Lfunc_end20-__mcsema_get_rsp\n");
+   fprintf(out, "  .cfi_endproc\n");
+   fprintf(out, "\n");
 
+   fprintf(out, "  .globl __mcsema_get_rbp\n");
+   fprintf(out, "  .type __mcsema_get_rbp,@function\n");
+   fprintf(out, "__mcsema_get_rbp:\n");
+   fprintf(out, "  .cfi_startproc\n");
+   fprintf(out, "  mov rax, fs:[0]\n");
+   fprintf(out, "  lea rdx, [__mcsema_reg_state@TPOFF]\n");
+   fprintf(out, "  lea rax, [rax + rdx]\n");
+   fprintf(out, "  mov rax, [rax + %" PRIuMAX "]\n", __builtin_offsetof(State, RBP));
+   fprintf(out, "  ret\n");
+   fprintf(out, ".Lfunc_end21:\n");
+   fprintf(out, "  .size __mcsema_get_rbp,.Lfunc_end21-__mcsema_get_rbp\n");
+   fprintf(out, "  .cfi_endproc\n");
+   fprintf(out, "\n");
 
   // Implements `__mcsema_debug_get_reg_state`. This is useful when debugging in
   // gdb.
