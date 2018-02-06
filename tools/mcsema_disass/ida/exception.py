@@ -276,15 +276,15 @@ def format_entries(ea):
   if is_cie:
     entry.version, ea = read_byte(ea), ea + 1
     entry.aug_string, ea = read_string(ea)
+    if entry.aug_string is None:
+      return end_ea
+
     entry.code_align, ea = read_uleb128(ea)
     entry.data_align, ea = read_uleb128(ea)
     if entry.version == 1:
       entry.retn_reg, ea = read_byte(ea), ea + 1
     else:
       entry.retn_reg, ea = read_uleb128(ea)
-
-    if entry.aug_string is None:
-      return end_ea
     
     aug_data = AugmentationData()
 
