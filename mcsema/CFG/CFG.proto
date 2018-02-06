@@ -148,6 +148,7 @@ message ExceptionFrame {
   required uint64     end_ea = 4;
   required uint64     lp_ea = 5;
   required Action     action = 6;
+  repeated ExternalVariable ttype = 7;
 }
 
 message StackVariable {
