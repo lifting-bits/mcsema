@@ -69,10 +69,13 @@ def make_array(ea, size):
 
 def read_string(ea):
   s = idc.GetString(ea, -1, idc.ASCSTR_C)
-  slen = len(s)+1
-  idc.MakeUnknown(ea, slen, idc.DOUNK_SIMPLE)
-  idaapi.make_ascii_string(ea, slen, idc.ASCSTR_C)
-  return s, ea + slen
+  if s:
+    slen = len(s)+1
+    idc.MakeUnknown(ea, slen, idc.DOUNK_SIMPLE)
+    idaapi.make_ascii_string(ea, slen, idc.ASCSTR_C)
+    return s, ea + slen
+  else:
+    return s, ea
 
 def read_uleb128(ea):
   return read_leb128(ea, False)
@@ -273,17 +276,15 @@ def format_entries(ea):
   if is_cie:
     entry.version, ea = read_byte(ea), ea + 1
     entry.aug_string, ea = read_string(ea)
+    if entry.aug_string is None:
+      return end_ea
+
     entry.code_align, ea = read_uleb128(ea)
     entry.data_align, ea = read_uleb128(ea)
     if entry.version == 1:
       entry.retn_reg, ea = read_byte(ea), ea + 1
     else:
       entry.retn_reg, ea = read_uleb128(ea)
-    #DEBUG("ea {0:x}: version {0}".format(ea, entry.version))
-    #DEBUG("ea {0:x}: augmentation string {1}".format(ea, entry.aug_string))
-    #DEBUG("ea {0:x}: code alignment factor {1}".format(ea, entry.code_align))
-    #DEBUG("ea {0:x}: data alignment factor {1}".format(ea, entry.data_align))
-    #DEBUG("ea {0:x}: return register {1}".format(ea, entry.retn_reg))
     
     aug_data = AugmentationData()
 
