@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright (c) 2017 Trail of Bits, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -110,6 +111,27 @@ def main():
   arg_parser.add_argument(
       '--legacy_mode',
       help='Are we producing legacy mode bitcode?',
+      default=False,
+      required=False,
+      action='store_true')
+
+  arg_parser.add_argument(
+      '--add_reg_tracer',
+      help='Add register trace printer to the bitcode?',
+      default=False,
+      required=False,
+      action='store_true')
+
+  arg_parser.add_argument(
+      '--add_breakpoints',
+      help='Add breakpoint instructions into the lifted bitcode?',
+      default=False,
+      required=False,
+      action='store_true')
+
+  arg_parser.add_argument(
+      '--check_pc_at_breakpoints',
+      help='Should we check that the emulated PC is correct at breakpoint functions?',
       default=False,
       required=False,
       action='store_true')
@@ -228,6 +250,14 @@ def main():
 
   if args.legacy_mode:
     mcsema_lift_args.append('--legacy_mode')
+
+  if args.add_breakpoints:
+    mcsema_lift_args.append('--add_breakpoints')
+    if args.check_pc_at_breakpoints:
+      mcsema_lift_args.append('--check_pc_at_breakpoints')
+
+  if args.add_reg_tracer:
+    mcsema_lift_args.append('--add_reg_tracer')
 
   print " ".join(mcsema_lift_args)
   ret = subprocess.call(mcsema_lift_args)
