@@ -174,6 +174,66 @@ Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcs
 
 In order to verify that McSema works correctly as built, head on over to [the documentation on integration tests](tests/MakingTests.md). Check that you can run the tests and that they pass.
 
+### On Windows
+
+#### Step 1: Toolchain
+**IMPORTANT**: Always add to PATH for all users when the option is available!
+
+* Visual Studio 2017: https://www.visualstudio.com/thank-you-downloading-visual-studio/?sku=Community&rel=15
+* CMake: https://cmake.org/files/v3.11/cmake-3.11.0-rc1-win64-x64.msi
+* Python 2.7 (x64): https://www.python.org/ftp/python/2.7.14/python-2.7.14.amd64.msi
+* LLVM 5.0.1 (x64): http://releases.llvm.org/5.0.1/LLVM-5.0.1-win64.exe
+
+Once you have finished installing everything, some additional steps are required:
+1. Open the Visual Studio 2017 Installer from the menu, and install the v140 toolset under "Individual Components"
+2. Run the LLVM install script: C:\Program Files\LLVM\tools\msbuild\install.bat (run CMD with administrator privileges!)
+3. Install python-magic-bin: https://pypi.python.org/pypi/python-magic-bin/0.4.14 (pip install file_name.whl)
+
+Please note that we will not be able to provide support if you are using other Visual Studio versions.
+
+#### Step 2: Obtaining the source code
+```
+git clone https://github.com/trailofbits/remill.git --depth=1
+cd remill/tools
+git clone https://github.com/trailofbits/mcsema.git --depth=1
+```
+
+Note that for production usage you should use a specific remill commit (remill/tools/mcsema/.remill_commit_id)
+
+```
+git fetch --unshallow
+git checkout -b production <remill_commit_id>
+```
+
+#### Step 3: Dependencies
+You can either build them yourself using our [cxx-common](https://github.com/trailofbits/cxx-common) dependency manager or download a pre-built package.
+
+Binaries (extract to C:\Projects\tob_libraries)
+* [LLVM 5](https://s3.amazonaws.com/cxx-common/libraries-llvm50-windows10-amd64.7z)
+
+#### Step 4: Building
+```
+mkdir remill_build
+cd remill_build
+
+cmake -G "Visual Studio 15 2017 Win64" -T LLVM-vs2014 -DCMAKE_BUILD_TYPE=Release -DLIBRARY_REPOSITORY_ROOT=C:\Projects\tob_libraries ..\remill
+cmake --build . --config Release -- /maxcpucount:4
+```
+
+#### Step 5: Installing
+```
+cmake --build . --config Release --target install
+```
+
+You should now have the following directories: C:\mcsema, C:\remill.
+
+Add the following folders to your PATH environment variable:
+* C:\remill\bin
+* C:\mcsema\Scripts
+* C:\mcsema\bin
+
+Also update your PYTHONPATH: C:\mcsema\Lib\site-packages
+
 ## Additional Documentation
 
 * [McSema command line reference](docs/CommandLineReference.md)
