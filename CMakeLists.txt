@@ -23,10 +23,12 @@ FindAndSelectClangCompiler()
 set(MCSEMA_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
 
 # warnings and compiler settings
-set(PROJECT_CXXFLAGS
-  ${GLOBAL_CXXFLAGS} -Werror -Wconversion -pedantic 
-  -Wno-unreachable-code-return 
-)
+if(NOT DEFINED WIN32)
+  set(PROJECT_CXXFLAGS
+    ${GLOBAL_CXXFLAGS} -Werror -Wconversion -pedantic 
+    -Wno-unreachable-code-return 
+  )
+endif()
 
 # protobuf
 find_package(Protobuf REQUIRED)
@@ -50,7 +52,7 @@ protobuf_generate_python(PROJECT_PROTOBUFPYTHONMODULE
   "${CMAKE_CURRENT_SOURCE_DIR}/mcsema/CFG/CFG.proto"
 )
 
-add_custom_target(protobuf_python_module_ida 
+add_custom_target(protobuf_python_module_ida
   DEPENDS ${PROJECT_PROTOBUFPYTHONMODULE}
 )
 
@@ -96,12 +98,16 @@ add_executable(${MCSEMA_LIFT}
 
 # Copy mcsema-disass in
 add_custom_command(
-  TARGET protobuf_python_module_ida PRE_BUILD
+  TARGET protobuf_python_module_ida POST_BUILD
+  DEPENDS {PROJECT_PROTOBUFPYTHONMODULE}
+  #OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida/CFG_pb2.py
   COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida
 )
 
 add_custom_command(
-  TARGET protobuf_python_module_binja PRE_BUILD
+  TARGET protobuf_python_module_binja POST_BUILD
+  DEPENDS {PROJECT_PROTOBUFPYTHONMODULE}
+  #OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida/CFG_pb2.py
   COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/binja
 )
 
@@ -127,15 +133,29 @@ endif()
 #TODO(kumarak): Disable the ABI libraries build till we don't have script to automate the generation of `ABI_libc.h`. Use pre-build library to test the --abi_libraries flag
 #add_subdirectory(mcsema/OS/Linux)
 
+if(DEFINED WIN32)
+  set(install_folder "${CMAKE_INSTALL_PREFIX}/mcsema")
+else()
+  set(install_folder "${CMAKE_INSTALL_PREFIX}")
+endif()
+
 install(
   TARGETS ${MCSEMA_LIFT}
-  RUNTIME DESTINATION bin
-  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION "${install_folder}/bin"
+  LIBRARY DESTINATION "${install_folder}/lib"
 )
 
-install(CODE
-  "execute_process(COMMAND python ${PROJECT_SOURCE_DIR}/tools/setup.py install -f --prefix=${CMAKE_INSTALL_PREFIX})"
-)
+if(DEFINED WIN32)
+  string(REPLACE "/" "\\" windows_install_path "${install_folder}")
+
+  install(CODE
+    "execute_process(COMMAND windows_setup_launcher.bat \"${windows_install_path}\" WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tools)"
+  )
+else()
+  install(CODE
+    "execute_process(COMMAND python ${PROJECT_SOURCE_DIR}/tools/setup.py install -f --prefix=${install_folder})"
+  )
+endif()
 
 add_subdirectory(examples)
-    
+

@@ -18,6 +18,12 @@ if (NOT TARGET remill)
   message(FATAL_ERROR "The remill target does not exists!")
 endif ()
 
+if(DEFINED WIN32)
+  set(install_folder "${CMAKE_INSTALL_PREFIX}/mcsema")
+else()
+  set(install_folder "${CMAKE_INSTALL_PREFIX}")
+endif()
+
 # Create the Windows runtimes
 if(WIN32 AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   #TODO(artem): find clang for windows compiler and build
@@ -111,7 +117,7 @@ else()
 
   install(
     TARGETS ${MCSMEMA_RT32}
-    ARCHIVE DESTINATION lib
+    ARCHIVE DESTINATION "${install_folder}/lib"
   )
  
   # only do 64-bit binaries on 64-bit platforms
@@ -194,7 +200,7 @@ else()
 
     install(
       TARGETS ${MCSMEMA_RT64}
-      ARCHIVE DESTINATION lib
+      ARCHIVE DESTINATION "${install_folder}/lib"
     )
   endif()
 endif()
