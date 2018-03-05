@@ -146,7 +146,6 @@ static void InlineSubFuncInvoke(llvm::BasicBlock *block,
   }
   auto call_rbp = ir.CreateCall(sub_2);
   ir.CreateStore(call_rbp, cfg_func->rbp_var);
-
   auto invoke = ir.CreateInvoke(
       sub, ifnormal, ifexception, remill::LiftedFunctionArgs(block), "");
   invoke->setCallingConv(sub->getCallingConv());
@@ -289,14 +288,8 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       auto store_loc_1 = ir.CreateAlloca(exctn_1->getType());
       ir.CreateStore(exctn_1, store_loc_1);
 
-      /*auto load_loc_0 = ir.CreateLoad(store_loc_0);
-      auto load_loc_1 = ir.CreateLoad(store_loc_1);
-      auto array = ir.CreateInsertValue(llvm::UndefValue::get(exn_type), load_loc_0, 0);
-      array = ir.CreateInsertValue(array, load_loc_1, 1);
-      ir.CreateResume(array);
-       */
       auto lp_entry = ctx.ea_to_block[entry->lp_ea];
-      //landing_bb->dump();
+     // landing_bb->dump();
       if (nullptr != lp_entry) {
         ir.CreateBr(lp_entry);
         ctx.lp_to_block[entry->lp_ea] = landing_bb;
@@ -456,7 +449,9 @@ static bool TryLiftTerminator(TranslationContext &ctx,
         } else {
           auto exception_block = ctx.lp_to_block[ctx.cfg_inst->lp_ea];
           auto normal_block = GetOrCreateBlock(ctx, inst.next_pc);
+          ctx.ea_to_block[inst.next_pc] = normal_block;
           InlineSubFuncInvoke(block, targ_func, normal_block, exception_block, ctx.cfg_func);
+          return true;
         }
 
       } else {
@@ -754,7 +749,7 @@ void DeclareLiftedFunctions(const NativeModule *cfg_module) {
 // in from cloning the `__remill_basic_block` function.
 bool DefineLiftedFunctions(const NativeModule *cfg_module) {
   llvm::legacy::FunctionPassManager func_pass_manager(gModule);
-  //func_pass_manager.add(llvm::createCFGSimplificationPass());
+  func_pass_manager.add(llvm::createCFGSimplificationPass());
   func_pass_manager.add(llvm::createPromoteMemoryToRegisterPass());
   func_pass_manager.add(llvm::createReassociatePass());
   func_pass_manager.add(llvm::createDeadStoreEliminationPass());

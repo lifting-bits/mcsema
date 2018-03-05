@@ -200,9 +200,16 @@ def create_block_entries(start_ea, heads):
   for entry in heads:
     if entry == 0:
       continue
+  
     if index < len(heads) - 1:
-      block = EHBlocks(heads[index], heads[index + 1])
-      block_set.add(block)
+      ea = heads[index]
+      while heads[index] <= ea < heads[index + 1]:
+        inst, _ = decode_instruction(ea)
+        if not inst:
+          break
+        block = EHBlocks(ea, ea + inst.size)
+        ea = ea + inst.size
+        block_set.add(block)
     index = index + 1
 
   _EXCEPTION_BLOCKS_EAS[start_ea] = block_set
@@ -249,7 +256,7 @@ def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
       DEBUG("ea {:x}: cs_start[{}] = {:x}  ({})".format(ea, i, cs_start, get_symbol_name(start_ea)))
       ea = next_ea
       heads.add(cs_start)
-      heads.add(cs_start + cs_len)
+      #heads.add(cs_start + cs_len)
       
       cs_len, next_ea = read_enc_value(ea, cs_enc & 0x0F)
       cs_end = cs_start + cs_len
@@ -283,7 +290,6 @@ def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
   action_list = format_lsda_action(action_tbl, actions, type_addr, type_enc, cs_action)
 
   create_block_entries(start_ea, sorted(heads))
-  #create_block_entries(start_ea, sorted(heads))
   _FUNC_LSDA_ENTRIES[start_ea] = (lsda_entries, action_list)
 
 class AugmentationData:

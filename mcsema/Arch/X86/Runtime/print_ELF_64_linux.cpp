@@ -822,7 +822,7 @@ int main(void) {
   fprintf(out, ".Lexception0:\n");
   fprintf(out, "\t.byte   255\n");
   fprintf(out, "\t.byte   3\n");
-  fprintf(out, "\t.byte   73\n");
+  fprintf(out, "\t.byte   46\n");
   fprintf(out, "\t.byte   3\n");
   fprintf(out, "\t.byte   26\n");
 
