@@ -15,8 +15,8 @@
 project(mcsema)
 cmake_minimum_required(VERSION 3.2)
 
-include("${CMAKE_SOURCE_DIR}/cmake/settings.cmake")
-include("${CMAKE_SOURCE_DIR}/cmake/utils.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/settings.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
 
 FindAndSelectClangCompiler()
 
@@ -100,14 +100,12 @@ add_executable(${MCSEMA_LIFT}
 add_custom_command(
   TARGET protobuf_python_module_ida POST_BUILD
   DEPENDS {PROJECT_PROTOBUFPYTHONMODULE}
-  #OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida/CFG_pb2.py
   COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida
 )
 
 add_custom_command(
   TARGET protobuf_python_module_binja POST_BUILD
   DEPENDS {PROJECT_PROTOBUFPYTHONMODULE}
-  #OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/ida/CFG_pb2.py
   COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_PROTOBUFPYTHONMODULE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/binja
 )
 
@@ -120,7 +118,56 @@ add_dependencies(${MCSEMA_LIFT}
   protobuf_python_module_binja
 )
 
-target_link_libraries(${MCSEMA_LIFT} PRIVATE remill ${PROJECT_LIBRARIES})
+#
+# libraries
+#
+
+# remill
+if(NOT TARGET remill)
+  if("${PLATFORM_NAME}" STREQUAL "windows")
+    set(REMILL_FINDPACKAGE_HINTS HINTS "${CMAKE_INSTALL_PREFIX}/remill/lib")
+  endif()
+
+  find_package(remill REQUIRED ${REMILL_FINDPACKAGE_HINTS})
+endif()
+
+list(APPEND PROJECT_LIBRARIES remill)
+
+# llvm
+find_package(LLVM REQUIRED CONFIG HINTS ${FINDPACKAGE_LLVM_HINTS})
+
+string(REPLACE "." ";" LLVM_VERSION_LIST ${LLVM_PACKAGE_VERSION})
+list(GET LLVM_VERSION_LIST 0 LLVM_MAJOR_VERSION)
+list(GET LLVM_VERSION_LIST 1 LLVM_MINOR_VERSION)
+
+set(LLVM_LIBRARIES
+  LLVMCore LLVMSupport LLVMAnalysis LLVMipo LLVMIRReader
+  LLVMBitReader LLVMBitWriter LLVMTransformUtils LLVMScalarOpts
+  LLVMLTO
+)
+
+list(APPEND PROJECT_LIBRARIES ${LLVM_LIBRARIES})
+list(APPEND PROJECT_DEFINITIONS ${LLVM_DEFINITIONS})
+list(APPEND PROJECT_INCLUDEDIRECTORIES ${LLVM_INCLUDE_DIRS})
+
+# xed
+find_package(XED REQUIRED)
+list(APPEND PROJECT_LIBRARIES ${XED_LIBRARIES})
+list(APPEND PROJECT_INCLUDEDIRECTORIES ${XED_INCLUDE_DIRS})
+
+# google log module
+find_package(glog REQUIRED)
+list(APPEND PROJECT_LIBRARIES glog::glog)
+
+# gflags
+find_package(gflags REQUIRED)
+list(APPEND PROJECT_LIBRARIES gflags)
+
+#
+# target settings
+#
+
+target_link_libraries(${MCSEMA_LIFT} PRIVATE ${PROJECT_LIBRARIES})
 target_include_directories(${MCSEMA_LIFT} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIES})
 target_compile_definitions(${MCSEMA_LIFT} PUBLIC ${PROJECT_DEFINITIONS})
 target_compile_options(${MCSEMA_LIFT} PRIVATE ${PROJECT_CXXFLAGS})
