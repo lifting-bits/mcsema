@@ -12,9 +12,13 @@
   set PYTHONPATH=%install_folder%\Lib\site-packages
   set install_log=%TEMP%\%RANDOM%
 
-  md "%PYTHONPATH%"
-  if errorlevel 1 (
-    echo Failed to create the site-packages folder in %PYTHONPATH%
+  if not exist "%PYTHONPATH%\\" (
+    echo Creating %PYTHONPATH%
+    md "%PYTHONPATH%"
+    if errorlevel 1 (
+      echo Failed to create the site-packages folder in %PYTHONPATH%
+      exit /B 1
+    )
   )
 
   echo Installing mcsema-disass

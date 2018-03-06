@@ -196,11 +196,17 @@ if(DEFINED WIN32)
   string(REPLACE "/" "\\" windows_install_path "${install_folder}")
 
   install(CODE
-    "execute_process(COMMAND windows_setup_launcher.bat \"${windows_install_path}\" WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tools)"
+    "execute_process(COMMAND windows_setup_launcher.bat \"${windows_install_path}\" WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tools RESULT_VARIABLE exit_code)
+    if(NOT exit_code EQUAL 0)
+      message(FATAL_ERROR \"Failed to install the Python package\")
+    endif()"
   )
 else()
   install(CODE
-    "execute_process(COMMAND python ${PROJECT_SOURCE_DIR}/tools/setup.py install -f --prefix=${install_folder})"
+    "execute_process(COMMAND python ${PROJECT_SOURCE_DIR}/tools/setup.py install -f --prefix=${install_folder} RESULT_VARIABLE exit_code)
+    if(NOT exit_code EQUAL 0)
+      message(FATAL_ERROR \"Failed to install the Python package\")
+    endif()"
   )
 endif()
 
