@@ -58,6 +58,9 @@ DEFINE_string(output, "", "Output bitcode file name.");
 DEFINE_string(library, "", "Path to an LLVM bitcode or IR file that contains "
                            "external library definitions.");
 
+DEFINE_string(abi_library, "", "Path to an LLVM bitcode or IR file that contains "
+                               "external library definitions for the C++ ABI.");
+
 DECLARE_bool(version);
 
 DECLARE_bool(disable_optimizer);
@@ -92,8 +95,8 @@ static std::unique_ptr<llvm::Module> gLibrary;
 // Load in a separate bitcode or IR library, and copy function and variable
 // declarations from that library into our module. We can use this feature
 // to provide better type information to McSema.
-static void LoadLibraryIntoModule(void) {
-  gLibrary.reset(remill::LoadModuleFromFile(mcsema::gContext, FLAGS_library));
+static void LoadLibraryIntoModule(const std::string &path) {
+  gLibrary.reset(remill::LoadModuleFromFile(mcsema::gContext, path));
 
   // Declare the functions from the library in McSema's target module.
   for (auto &func : *gLibrary) {
@@ -283,6 +286,14 @@ int main(int argc, char *argv[]) {
     FLAGS_disable_optimizer = false;
   }
 
+  mcsema::gModule = remill::LoadTargetSemantics(mcsema::gContext);
+
+  // Load in a special library before CFG processing. This affects the
+  // renaming of exported functions.
+  if (!FLAGS_abi_library.empty()) {
+    LoadLibraryIntoModule(FLAGS_abi_library);
+  }
+
   auto cfg_module = mcsema::ReadProtoBuf(
       FLAGS_cfg, (mcsema::gArch->address_size / 8));
   mcsema::gModule = remill::LoadTargetSemantics(mcsema::gContext);
@@ -293,7 +304,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (!FLAGS_library.empty()) {
-    LoadLibraryIntoModule();
+    LoadLibraryIntoModule(FLAGS_library);
   }
 
   CHECK(mcsema::LiftCodeIntoModule(cfg_module))
