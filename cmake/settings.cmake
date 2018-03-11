@@ -108,12 +108,6 @@ macro(main)
     endif()
   endif()
 
-  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    set(IS_AMD64_MACHINE true)
-  else()
-    set(IS_AMD64_MACHINE false)
-  endif()
-
   if(UNIX)
     if(APPLE)
       set(PLATFORM_NAME "macos")
