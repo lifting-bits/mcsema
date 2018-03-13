@@ -40,6 +40,8 @@ namespace {
 // `uintptr_t external(uintptr_t arg0, uintptr_t arg1, ...);`.
 //
 // TODO(pag,car,artem): Handle floating point types eventually.
+//
+// NOTE: Using the `--library` option mitigates these problems somewhat.
 static void DeclareExternal(
     const NativeExternalFunction *cfg_func) {
 
