@@ -130,8 +130,9 @@ static void DefineDebugGetRegState(void) {
 
   auto state_ptr_type = reg_state->getType();
   auto reg_func_type = llvm::FunctionType::get(state_ptr_type, false);
+  // ExternalWeakLinkage causes crash with --explicit_args. The function is not available in the library
   get_reg_state = llvm::Function::Create(
-      reg_func_type, llvm::GlobalValue::ExternalWeakLinkage,
+      reg_func_type, llvm::GlobalValue::ExternalLinkage,
       "__mcsema_debug_get_reg_state", gModule);
 
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", get_reg_state));
