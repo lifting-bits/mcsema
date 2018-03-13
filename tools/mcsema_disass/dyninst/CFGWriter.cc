@@ -176,18 +176,13 @@ void CFGWriter::writeBlock(ParseAPI::Block *block, ParseAPI::Function *func,
   for (auto p : instructions) {
     InstructionAPI::Instruction *instruction = p.second.get();
 
-    bool isLast = true;
-    if (++it != instructions.end())
-      isLast = false;
-
-    writeInstruction(instruction, ip, cfgBlock, isLast);
+    writeInstruction(instruction, ip, cfgBlock);
     ip += instruction->size();
   }
 }
 
 void CFGWriter::writeInstruction(InstructionAPI::Instruction *instruction,
-                                 Address addr, mcsema::Block *cfgBlock,
-                                 bool isLast) {
+                                 Address addr, mcsema::Block *cfgBlock) {
   // Add a new instruction to the protocol buffer
 
   mcsema::Instruction *cfgInstruction = cfgBlock->add_instructions();
@@ -206,14 +201,12 @@ void CFGWriter::writeInstruction(InstructionAPI::Instruction *instruction,
 
   cfgInstruction->set_ea(addr);
 
-  if (isLast) {
-    cfgInstruction->set_local_noreturn(!isLast);
-  } // TODO: local_no_return is basically ignored
-
   // Handle the instruction's operands
 
   std::vector<InstructionAPI::Operand> operands;
   instruction->getOperands(operands);
+
+  /*TODO: local no_return on instructions*/
 
   if (instruction->getCategory() == InstructionAPI::c_CallInsn)
     handleCallInstruction(instruction, addr, cfgInstruction);

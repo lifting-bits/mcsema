@@ -35,8 +35,7 @@ private:
                   Dyninst::ParseAPI::Function *func,
                   mcsema::Function *cfgInternalFunc);
   void writeInstruction(Dyninst::InstructionAPI::Instruction *instruction,
-                        Dyninst::Address addr, mcsema::Block *cfgBlock,
-                        bool isLast);
+                        Dyninst::Address addr, mcsema::Block *cfgBlock);
   void handleCallInstruction(Dyninst::InstructionAPI::Instruction *instruction,
                              Dyninst::Address addr,
                              mcsema::Instruction *cfgInstruction);

@@ -524,7 +524,7 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
 
   const auto &follows = ctx.cfg_block->successor_eas;
   if (!block->getTerminator()) {
-    if (!ctx.cfg_inst) {
+    if (!ctx.cfg_inst || ctx.cfg_inst->does_not_return) {
       LOG_IF(ERROR, !ctx.cfg_inst)
           << "Block " << std::hex << block_pc << " in function "
           << ctx.cfg_func->ea << std::dec << " has no instructions; "
