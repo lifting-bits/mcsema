@@ -55,11 +55,8 @@ DEFINE_string(cfg, "", "Path to the CFG file containing code to lift.");
 
 DEFINE_string(output, "", "Output bitcode file name.");
 
-DEFINE_string(library, "", "Path to an LLVM bitcode or IR file that contains "
-                           "external library definitions.");
-
 DEFINE_string(abi_library, "", "Path to an LLVM bitcode or IR file that contains "
-                               "external library definitions for the C++ ABI.");
+                               "external library definitions for the C/C++ ABI.");
 
 DECLARE_bool(version);
 
@@ -207,9 +204,7 @@ int main(int argc, char *argv[]) {
      << "    [--explicit_args] \\" << std::endl
      << "    [--explicit_args_count NUM_ARGS_FOR_EXTERNALS] \\" << std::endl
 
-     // This option is most useful when using `--explicit_args` (or
-     // `--legacy_mode`, which enables `--explicit_args`). In general, McSema
-     // doesn't have type information about externals, and so it assumes all
+     // McSema doesn't have type information about externals, and so it assumes all
      // externals operate on integer-typed arguments, and return integer values.
      // This is wrong in many ways, but tends to work out about 80% of the time.
      // To get McSema better information about externals, one should create a
@@ -217,7 +212,7 @@ int main(int argc, char *argv[]) {
      // `#include`ing standard headers). Then, should add to this file something
      // like:
      //         __attribute__((used))
-     //         void *__mcsema_used_funcs[] = {
+     //         void *__mcsema_externs[] = {
      //           (void *) external_func_name_1,
      //           (void *) external_func_name_2,
      //           ...
@@ -225,7 +220,7 @@ int main(int argc, char *argv[]) {
      // And compile this file to bitcode using `remill-clang-M.m` (Major.minor).
      // This bitcode file will then be the source of type information for
      // McSema.
-     << "    [--library BITCODE_FILE] \\" << std::endl
+     << "    [--abi_library BITCODE_FILE] \\" << std::endl
 
      // Annotate each LLVM IR instruction with some metadata that includes the
      // original program counter. The name of the LLVM metadats is
@@ -303,15 +298,11 @@ int main(int argc, char *argv[]) {
     PrintSupportedInstructions();
   }
 
-  if (!FLAGS_library.empty()) {
-    LoadLibraryIntoModule(FLAGS_library);
-  }
-
   CHECK(mcsema::LiftCodeIntoModule(cfg_module))
       << "Unable to lift CFG from " << FLAGS_cfg << " into module "
       << FLAGS_output;
 
-  if (!FLAGS_library.empty()) {
+  if (!FLAGS_abi_library.empty()) {
     UnloadLibraryFromModule();
     gLibrary.reset(nullptr);
   }
