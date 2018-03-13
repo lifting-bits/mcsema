@@ -47,6 +47,11 @@ void __cxa_pure_virtual(void);
 void __cxa_call_unexpected (void*) __attribute__((noreturn));
 char* __cxa_demangle(const char* mangled_name, char* output_buffer, size_t* length, int* status);
 void* __dynamic_cast(const void* __src_ptr, const __class_type_info* __src_type, const __class_type_info* __dst_type, ptrdiff_t __src2dst);
+
+void *malloc(size_t size);
+void *realloc(void *ptr, size_t size);
+void free(void *ptr);
+void *memset(void *str, int c, size_t n);
 }  // extern C
 
 __attribute__((used))
@@ -89,4 +94,8 @@ void *__mcsema_externs[] = {
   reinterpret_cast<void *>(__cxa_pure_virtual),
   reinterpret_cast<void *>(__cxa_call_unexpected),
   reinterpret_cast<void *>(__cxa_demangle),
+  reinterpret_cast<void *>(malloc),
+  reinterpret_cast<void *>(realloc),
+  reinterpret_cast<void *>(free),
+  reinterpret_cast<void *>(memset),
 };
