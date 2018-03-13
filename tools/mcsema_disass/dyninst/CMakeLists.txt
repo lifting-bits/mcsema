@@ -27,7 +27,8 @@ add_executable(mcsema-dyninst-disass
 add_dependencies(mcsema-dyninst-disass generate-protobuf-files)
 
 target_link_libraries(mcsema-dyninst-disass dyninstAPI symtabAPI parseAPI common instructionAPI protobuf)
-set_property(TARGET mcsema-dyninst-disass APPEND PROPERTY CMAKE_CXX_FLAGS -frtti -std=gnu++1y)
+set_property(TARGET mcsema-dyninst-disass APPEND PROPERTY CMAKE_CXX_FLAGS -frtti)
+set_target_properties(mcsema-dyninst-disass PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)
 
 install(
   TARGETS mcsema-dyninst-disass
