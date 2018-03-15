@@ -600,8 +600,8 @@ int main(void) {
     // Stashed memory pointer (for returning).
     fprintf(out, "  pop rax\n");  // Alignment.
     fprintf(out, "  pop rax\n");
-    fprintf(out, "  mov QWORD PTR [rsp], rax\n");
-    fprintf(out, "  pop rax\n");
+    //fprintf(out, "  mov QWORD PTR [rsp], rax\n");
+    //fprintf(out, "  pop rax\n");
     fprintf(out, "  jmp __cxa_rethrow\n");
 
     fprintf(out, ".Lfunc_end7:\n");
@@ -697,9 +697,9 @@ int main(void) {
    fprintf(out, "\n");
 
 
-   fprintf(out, "  .globl __remill_exception_ret\n");
-   fprintf(out, "  .type __remill_exception_ret,@function\n");
-   fprintf(out, "__remill_exception_ret:\n");
+   fprintf(out, "  .globl __mcsema_exception_ret\n");
+   fprintf(out, "  .type __mcsema_exception_ret,@function\n");
+   fprintf(out, "__mcsema_exception_ret:\n");
    fprintf(out, ".Lfunc_begin10:\n");
    fprintf(out, ".cfi_startproc\n");
 
@@ -755,7 +755,7 @@ int main(void) {
    fprintf(out, "  ret\n");
    fprintf(out, "  ud2\n");
    fprintf(out, ".Lfunc_end10:\n");
-   fprintf(out, "  .size __remill_exception_ret,.Lfunc_end10-__remill_exception_ret\n");
+   fprintf(out, "  .size __mcsema_exception_ret,.Lfunc_end10-__mcsema_exception_ret\n");
    fprintf(out, "  .cfi_endproc\n");
    fprintf(out, "\n");
 

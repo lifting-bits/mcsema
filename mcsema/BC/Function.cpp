@@ -310,14 +310,19 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       LOG(INFO) << "Landing pad number of Operand [0] " << lpad->getNumClauses() << std::endl;
 
       std::vector<llvm::Value *> args(2);
+      llvm::Type* args_type[] = {llvm::Type::getInt64Ty(*gContext), llvm::Type::getInt64Ty(*gContext)};
+
       args[0] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext), cfg_func->rsp_var);
       args[1] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext), cfg_func->rbp_var);
 
-      auto handler = gModule->getFunction("__remill_exception_ret");
-      if (handler != nullptr) {
-        ir.CreateCall(handler, args);
+      auto handler = gModule->getFunction("__mcsema_exception_ret");
+      if (handler == nullptr) {
+        handler = llvm::Function::Create(
+            llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext), args_type, false),
+            llvm::Function::ExternalWeakLinkage, "__mcsema_exception_ret", gModule);
+        handler->addFnAttr(llvm::Attribute::NoReturn);
       }
-
+      ir.CreateCall(handler, args);
       auto lp_entry = ctx.ea_to_block[entry->lp_ea];
       if(lp_entry == nullptr) {
         lp_entry = GetOrCreateBlock(ctx, entry->lp_ea);
@@ -749,7 +754,7 @@ void DeclareLiftedFunctions(const NativeModule *cfg_module) {
 // in from cloning the `__remill_basic_block` function.
 bool DefineLiftedFunctions(const NativeModule *cfg_module) {
   llvm::legacy::FunctionPassManager func_pass_manager(gModule);
-  func_pass_manager.add(llvm::createCFGSimplificationPass());
+  //func_pass_manager.add(llvm::createCFGSimplificationPass());
   func_pass_manager.add(llvm::createPromoteMemoryToRegisterPass());
   func_pass_manager.add(llvm::createReassociatePass());
   func_pass_manager.add(llvm::createDeadStoreEliminationPass());
