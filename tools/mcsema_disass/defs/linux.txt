@@ -11,7 +11,7 @@ __cxa_guard_abort 1 C N
 __cxa_throw 3 C N
 __cxa_end_catch 0 C N
 __cxa_begin_catch 1 C N
-__cxa_allocate_exception 0 C N
+__cxa_allocate_exception 1 C N
 __cxa_free_exception 0 C N
 __cxa_atexit 0 C N
 __cxa_get_exception_ptr 1 C N
@@ -30,6 +30,7 @@ DATA: _etext PTR
 
 DATA: end PTR
 DATA: _end PTR
+
 
 __assert_fail 4 C Y
 __cxa_atexit 5 C N

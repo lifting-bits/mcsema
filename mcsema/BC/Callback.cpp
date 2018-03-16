@@ -223,6 +223,35 @@ static llvm::Constant *InitialStackPointerValue(void) {
   return llvm::ConstantExpr::getPtrToInt(gep, gWordType);
 }
 
+// Create an array of data for holding thread-local storage.
+static llvm::Constant *InitialThreadLocalStorage(void) {
+  static llvm::Constant *tls = nullptr;
+  if (tls) {
+    return tls;
+  }
+
+  auto tls_type = llvm::ArrayType::get(
+      gWordType, 4096 / (gArch->address_size / 8));
+
+  auto tls_var = new llvm::GlobalVariable(
+      *gModule, tls_type, false, llvm::GlobalValue::InternalLinkage,
+      llvm::Constant::getNullValue(tls_type), "__mcsema_tls");
+
+  std::vector<llvm::Constant *> indexes(2);
+  indexes[0] = llvm::ConstantInt::get(gWordType, 0);
+  indexes[1] = indexes[0];
+
+#if LLVM_VERSION_NUMBER <= LLVM_VERSION(3, 6)
+  auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(tls_var, indexes);
+#else
+  auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      nullptr, tls_var, indexes);
+#endif
+
+  tls = llvm::ConstantExpr::getPtrToInt(gep, gWordType);
+  return tls;
+}
+
 // Create a state structure with everything zero-initialized, except for the
 // stack pointer.
 static llvm::Constant *CreateInitializedState(
@@ -419,6 +448,8 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
 
   CallingConvention loader(gArch->DefaultCallingConv());
 
+  loader.StoreThreadPointer(block, InitialThreadLocalStorage());
+
   // Save off the old stack pointer for later.
   auto old_sp = loader.LoadStackPointer(block);
 
@@ -534,7 +565,14 @@ static void ImplementExplicitArgsExitPoint(
   auto num_params = func_type->getNumParams();
   CallingConvention loader(cfg_func->cc);
 
-  if (num_params != cfg_func->num_args) {
+  if (num_params > cfg_func->num_args) {
+    LOG(ERROR)
+        << "Function " << cfg_func->name << " may be incorrectly "
+        << "specified in the CFG with " << cfg_func->num_args
+        << " whereas the bitcode function has " << num_params
+        << ": " << remill::LLVMThingToString(extern_func);
+
+  } else if (num_params != cfg_func->num_args) {
     CHECK(num_params < cfg_func->num_args && func_type->isVarArg())
         << "Function " << remill::LLVMThingToString(extern_func)
         << " is expected to be able to take " << cfg_func->num_args
@@ -542,10 +580,11 @@ static void ImplementExplicitArgsExitPoint(
   }
 
   auto block = &(callback_func->back());
+  auto actual_num_args = std::max<unsigned>(num_params, cfg_func->num_args);
 
   // create call to function and args
   std::vector<llvm::Value *> call_args;
-  for (auto i = 0U; i < cfg_func->num_args; i++) {
+  for (auto i = 0U; i < actual_num_args; i++) {
     llvm::Type *param_type = nullptr;
     if (i < num_params) {
       param_type = func_type->getParamType(i);

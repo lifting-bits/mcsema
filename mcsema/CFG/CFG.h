@@ -132,6 +132,7 @@ struct NativeExternalFunction : public NativeFunction {
  public:
   NativeExternalFunction(void);
 
+  bool is_explicit;
   bool is_weak;
   unsigned num_args;
   llvm::CallingConv::ID cc;
