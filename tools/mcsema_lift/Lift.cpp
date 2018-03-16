@@ -94,7 +94,7 @@ static std::unique_ptr<llvm::Module> gLibrary;
 // to provide better type information to McSema.
 static void LoadLibraryIntoModule(const std::string &path) {
   gLibrary.reset(remill::LoadModuleFromFile(mcsema::gContext, path));
-  mcsema::gArch->PrepareModule(gLibrary);
+  mcsema::gArch->PrepareModuleDataLayout(gLibrary);
 
   // Declare the functions from the library in McSema's target module.
   for (auto &func : *gLibrary) {
