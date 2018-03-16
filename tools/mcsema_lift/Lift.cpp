@@ -94,6 +94,7 @@ static std::unique_ptr<llvm::Module> gLibrary;
 // to provide better type information to McSema.
 static void LoadLibraryIntoModule(const std::string &path) {
   gLibrary.reset(remill::LoadModuleFromFile(mcsema::gContext, path));
+  mcsema::gArch->PrepareModule(gLibrary);
 
   // Declare the functions from the library in McSema's target module.
   for (auto &func : *gLibrary) {
@@ -282,6 +283,7 @@ int main(int argc, char *argv[]) {
   }
 
   mcsema::gModule = remill::LoadTargetSemantics(mcsema::gContext);
+  mcsema::gArch->PrepareModule(mcsema::gModule);
 
   // Load in a special library before CFG processing. This affects the
   // renaming of exported functions.
@@ -291,8 +293,6 @@ int main(int argc, char *argv[]) {
 
   auto cfg_module = mcsema::ReadProtoBuf(
       FLAGS_cfg, (mcsema::gArch->address_size / 8));
-  mcsema::gModule = remill::LoadTargetSemantics(mcsema::gContext);
-  mcsema::gArch->PrepareModule(mcsema::gModule);
 
   if (FLAGS_list_supported) {
     PrintSupportedInstructions();
