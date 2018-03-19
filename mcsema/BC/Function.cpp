@@ -672,6 +672,7 @@ static llvm::Function *LiftFunction(
   lifted_func->removeFnAttr(llvm::Attribute::AlwaysInline);
   lifted_func->removeFnAttr(llvm::Attribute::InlineHint);
   lifted_func->removeFnAttr(llvm::Attribute::NoReturn);
+  lifted_func->removeFnAttr(llvm::Attribute::NoUnwind);
   lifted_func->addFnAttr(llvm::Attribute::NoInline);
   lifted_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
   lifted_func->setLinkage(llvm::GlobalValue::InternalLinkage);

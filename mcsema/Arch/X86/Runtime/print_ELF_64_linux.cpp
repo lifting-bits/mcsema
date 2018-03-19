@@ -329,8 +329,8 @@ int main(void) {
   fprintf(out, "  .cfi_startproc\n");
 
   // Add personality function to unwind the stack; Get the associated landing pad
-  fprintf(out, "  .cfi_personality 3, __gxx_personality_v0\n");
-  fprintf(out, "  .cfi_lsda 3, .Lexception0\n");
+  //fprintf(out, "  .cfi_personality 3, __gxx_personality_v0\n");
+  //fprintf(out, "  .cfi_lsda 3, .Lexception0\n");
 
   // Stash the memory pointer. This is probably actually nothing. But for
   // generality, we will store and return it, as is expected by the prototype
@@ -817,7 +817,7 @@ int main(void) {
   fprintf(out, "__remill_function_return:\n");
   fprintf(out, "  ud2\n");
 
-
+#if 0
   fprintf(out, ".section        .gcc_except_table,\"a\",@progbits\n");
   fprintf(out, ".Lexception0:\n");
   fprintf(out, "\t.byte   255\n");
@@ -839,6 +839,7 @@ int main(void) {
   fprintf(out, "\t.byte   1\n");
   fprintf(out, "\t.byte   0\n");
   fprintf(out, "\t.long   0\n");
+#endif
   return 0;
 }
 

@@ -56,6 +56,7 @@ static void DeclareExternal(
 
   extfun->setCallingConv(cfg_func->cc);
   extfun->addFnAttr(llvm::Attribute::NoInline);
+  extfun->removeFnAttr(llvm::Attribute::NoUnwind);
 }
 
 static llvm::GlobalValue::ThreadLocalMode ThreadLocalMode(

@@ -212,7 +212,7 @@ static llvm::Constant *InitialStackPointerValue(void) {
   std::vector<llvm::Constant *> indexes(2);
   indexes[0] = llvm::ConstantInt::get(gWordType, 0);
   indexes[1] = llvm::ConstantInt::get(
-      gWordType, stack_type->getNumElements() - 2);
+      gWordType, stack_type->getNumElements() - 8);
 
 #if LLVM_VERSION_NUMBER <= LLVM_VERSION(3, 6)
   auto gep = llvm::ConstantExpr::getInBoundsGetElementPtr(stack, indexes);
@@ -524,6 +524,7 @@ static void ImplementLiftedToNativeCallback(
     const NativeExternalFunction *cfg_func) {
 
   callback_func->addFnAttr(llvm::Attribute::NoInline);
+  callback_func->removeFnAttr(llvm::Attribute::NoUnwind);
 
   auto block = llvm::BasicBlock::Create(*gContext, "", callback_func);
 
@@ -555,6 +556,7 @@ static void ImplementExplicitArgsExitPoint(
   callback_func->removeFnAttr(llvm::Attribute::NoInline);
   callback_func->addFnAttr(llvm::Attribute::InlineHint);
   callback_func->addFnAttr(llvm::Attribute::AlwaysInline);
+  callback_func->removeFnAttr(llvm::Attribute::NoUnwind);
 
   LOG(INFO)
       << "Generating " << cfg_func->num_args
@@ -647,7 +649,7 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func_) {
 
   // Pass through the memory and state pointers, and pass the destination
   // (native external function address) as the PC argument.
-  if (FLAGS_explicit_args) {
+  if (FLAGS_explicit_args || cfg_func->is_explicit) {
     ImplementExplicitArgsExitPoint(callback_func, extern_func, cfg_func);
 
   // We are going from lifted to native code. We don't need an assembly stub
