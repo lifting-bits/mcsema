@@ -164,7 +164,33 @@ def read_enc_value(ea, enc):
 def _create_frame_entry(start = None, end = None, lp = None, action = None):
     return frame_entry(start, end, lp, action)
 
-def format_lsda_action(action_tbl, actions, type_addr, type_enc, act_id):
+def format_lsda_action(action_tbl, type_addr, type_enc, act_id):
+  """ Recover the exception actions and type info
+  """
+  action_list = []
+  if action_tbl == idc.BADADDR:
+    return
+
+  act_ea = action_tbl + act_id - 1
+  ar_filter,ea2 = read_enc_value(act_ea, DW_EH_PE_sleb128)
+  ar_disp,  ea3 = read_enc_value(ea2, DW_EH_PE_sleb128)
+  
+  if ar_filter > 0:
+    type_slot = type_addr - ar_filter * enc_size(type_enc)
+    type_ea, eatmp = read_enc_value(type_slot, type_enc)
+    DEBUG("catch type typeinfo = {:x} {}".format(type_ea, get_symbol_name(type_ea)))
+
+  if ar_disp == 0:
+    return
+
+  next_ea = ea2 + ar_disp
+  next_act = next_ea - act_ea + act_id
+
+  #action_list.append((ar_disp, ar_filter, type_ea))
+  #DEBUG("ea {:x}: ar_disp[{}]: {} ({:x})".format(act_ea, act_id, ar_disp, ar_filter))
+  #return action_list
+
+def format_lsda_actions(action_tbl, actions, type_addr, type_enc, act_id):
   """ Recover the exception actions and type info
   """
   action_list = []
@@ -182,6 +208,7 @@ def format_lsda_action(action_tbl, actions, type_addr, type_enc, act_id):
       type_slot = type_addr - ar_filter * enc_size(type_enc)
       type_ea, eatmp = read_enc_value(type_slot, type_enc)
       DEBUG("catch type typeinfo = {:x} {}".format(type_ea, get_symbol_name(type_ea)))
+      action_list.append((ar_disp, ar_filter, type_ea))
 
     if ar_disp == 0:
       continue
@@ -190,7 +217,6 @@ def format_lsda_action(action_tbl, actions, type_addr, type_enc, act_id):
     next_act = next_ea - act_ea + act_id
     actions.append(next_act)
 
-    action_list.append((ar_disp, ar_filter, type_ea))
   #DEBUG("ea {:x}: ar_disp[{}]: {} ({:x})".format(act_ea, act_id, ar_disp, ar_filter))
   return action_list
 
@@ -243,6 +269,7 @@ def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
 
   i = 0
   actions = []
+  action_list = []
   while ea < action_tbl:
     if sjlj:
       cs_lp, next_ea = read_enc_val(ea, DW_EH_PE_uleb128, True)
@@ -256,7 +283,7 @@ def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
       DEBUG("ea {:x}: cs_start[{}] = {:x}  ({})".format(ea, i, cs_start, get_symbol_name(start_ea)))
       ea = next_ea
       heads.add(cs_start)
-      #heads.add(cs_start + cs_len)
+      heads.add(cs_start + cs_len)
       
       cs_len, next_ea = read_enc_value(ea, cs_enc & 0x0F)
       cs_end = cs_start + cs_len
@@ -287,7 +314,7 @@ def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
     i += 1
 
   #if cs_action != 0:
-  action_list = format_lsda_action(action_tbl, actions, type_addr, type_enc, cs_action)
+  action_list = format_lsda_actions(action_tbl, actions, type_addr, type_enc, cs_action)
 
   create_block_entries(start_ea, sorted(heads))
   _FUNC_LSDA_ENTRIES[start_ea] = (lsda_entries, action_list)
@@ -416,6 +443,7 @@ def recover_exception_entries(F, func_ea):
   has_unwind_frame = func_ea in _FUNC_LSDA_ENTRIES.keys()
   if has_unwind_frame:
     lsda_entries, action_list = _FUNC_LSDA_ENTRIES[func_ea]
+
     for entry in lsda_entries:
       EH = F.eh_frame.add()
       EH.func_ea = func_ea

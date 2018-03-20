@@ -125,6 +125,7 @@ struct NativeExceptionFrame : public NativeObject {
   uint64_t lp_ea;
   uint64_t action;
   mutable llvm::Value *lp_var;
+  std::vector<NativeExternalVariable *> ttype;
 };
 
 // Function that is defined outside of the binary.

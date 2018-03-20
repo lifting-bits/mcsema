@@ -294,7 +294,7 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
         ir.CreateBr(lp_entry);
         ctx.lp_to_block[entry->lp_ea] = landing_bb;
       }
-    } else if (entry->action == 1) {
+    } else if (entry->action > 0) {
       std::stringstream ss;
       ss << "catch_landingpad_" << std::hex << entry->lp_ea;
       llvm::BasicBlock *landing_bb = llvm::BasicBlock::Create(
@@ -306,8 +306,12 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
 
       //catch (...)
       // Set tne clause to catch all kind of exceptions
-      lpad->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
       LOG(INFO) << "Landing pad number of Operand [0] " << lpad->getNumClauses() << std::endl;
+
+      for (auto type : entry->ttype) {
+        lpad->addClause(gModule->getGlobalVariable(type->name));
+      }
+      //lpad->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
 
       std::vector<llvm::Value *> args(2);
       llvm::Type* args_type[] = {llvm::Type::getInt64Ty(*gContext), llvm::Type::getInt64Ty(*gContext)};

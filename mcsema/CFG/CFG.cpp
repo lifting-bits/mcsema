@@ -950,6 +950,21 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       frame_var->end_ea = entry.end_ea();
       frame_var->lp_ea = entry.lp_ea();
       frame_var->action = entry.action();
+
+      // List all the types of the landing pad
+      for (const auto &extern_var : entry.ttype()) {
+        auto var = new NativeExternalVariable;
+        var->ea = static_cast<uint64_t>(extern_var.ea());
+        var->name = extern_var.name();
+        var->is_external = true;
+        var->is_exported = true;
+        var->is_thread_local = extern_var.is_thread_local();
+        var->lifted_name = var->name;
+        var->is_weak = extern_var.is_weak();
+        var->size = static_cast<uint64_t>(extern_var.size());
+        frame_var->ttype.insert(frame_var->ttype.begin(), var);
+       }
+
       func->eh_frame.push_back(frame_var);
     }
 
