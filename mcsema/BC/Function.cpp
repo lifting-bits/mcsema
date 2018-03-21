@@ -256,9 +256,13 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       llvm_used->eraseFromParent();
     }
 
-    auto personality = llvm::Function::Create(
-        llvm::FunctionType::get(llvm::Type::getInt32Ty(*gContext), true),
-        llvm::Function::ExternalLinkage, "__gxx_personality_v0", gModule);
+    auto personality = gModule->getFunction("__gxx_personality_v0");
+
+    if (personality == nullptr) {
+      personality = llvm::Function::Create(
+          llvm::FunctionType::get(llvm::Type::getInt32Ty(*gContext), true),
+          llvm::Function::ExternalLinkage, "__gxx_personality_v0", gModule);
+    }
 
     auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
     lifted_func->addFnAttr(llvm::Attribute::UWTable);
@@ -294,7 +298,7 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
         ir.CreateBr(lp_entry);
         ctx.lp_to_block[entry->lp_ea] = landing_bb;
       }
-    } else if (entry->action > 0) {
+    } else if (entry->action) {
       std::stringstream ss;
       ss << "catch_landingpad_" << std::hex << entry->lp_ea;
       llvm::BasicBlock *landing_bb = llvm::BasicBlock::Create(
@@ -306,12 +310,12 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
 
       //catch (...)
       // Set tne clause to catch all kind of exceptions
-      LOG(INFO) << "Landing pad number of Operand [0] " << lpad->getNumClauses() << std::endl;
-
       for (auto type : entry->ttype) {
-        lpad->addClause(gModule->getGlobalVariable(type->name));
+        if (type->ea)
+          lpad->addClause(gModule->getGlobalVariable(type->name));
+        //else
+        //  lpad->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
       }
-      //lpad->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
 
       std::vector<llvm::Value *> args(2);
       llvm::Type* args_type[] = {llvm::Type::getInt64Ty(*gContext), llvm::Type::getInt64Ty(*gContext)};
@@ -337,7 +341,6 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
     }
   }
 }
-
 
 // Lift both targets of a conditional branch into a branch in the bitcode,
 // where each side of the branch tail-calls to the functions associated with
