@@ -183,7 +183,7 @@ linux_build_helper() {
   fi
 
   printf " > Copying the mcsema folder...\n"
-  local file_list=( ".remill_commit_id" "docs" "generated" "mcsema" "tests" "tools" ".gdbinit" ".gitignore" ".travis.yml" "ACKNOWLEDGEMENTS.md" "CMakeLists.txt" "LICENSE" "README.md" "scripts")
+  local file_list=( ".remill_commit_id" "docs" "examples" "generated" "mcsema" "tests" "tools" ".gdbinit" ".gitignore" ".travis.yml" "ACKNOWLEDGEMENTS.md" "CMakeLists.txt" "LICENSE" "README.md" "scripts")
   for file_name in "${file_list[@]}" ; do
     cp -r "${file_name}" "remill/tools/mcsema" > "${log_file}" 2>&1
     if [ $? -ne 0 ] ; then
@@ -282,6 +282,7 @@ linux_build_helper() {
   printf " > Build succeeded\n"
 
   printf "\n\n\nCalling the integration test suite...\n"
+  local test_log_file=`mktemp`
   ( cd ./remill/tools/mcsema/tests/test_suite && ./start.py ) > "${test_log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed the integration test suite:\n"
