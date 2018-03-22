@@ -234,8 +234,8 @@ static llvm::Constant *InitialThreadLocalStorage(void) {
       gWordType, 4096 / (gArch->address_size / 8));
 
   auto tls_var = new llvm::GlobalVariable(
-    *gModule, tls_type, false, llvm::GlobalValue::InternalLinkage,
-    llvm::Constant::getNullValue(tls_type), "__mcsema_tls");
+      *gModule, tls_type, false, llvm::GlobalValue::InternalLinkage,
+      llvm::Constant::getNullValue(tls_type), "__mcsema_tls");
 
   std::vector<llvm::Constant *> indexes(2);
   indexes[0] = llvm::ConstantInt::get(gWordType, 0);
@@ -553,7 +553,14 @@ static void ImplementExplicitArgsExitPoint(
   auto num_params = func_type->getNumParams();
   CallingConvention loader(cfg_func->cc);
 
-  if (num_params != cfg_func->num_args) {
+  if (num_params > cfg_func->num_args) {
+    LOG(ERROR)
+        << "Function " << cfg_func->name << " may be incorrectly "
+        << "specified in the CFG with " << cfg_func->num_args
+        << " whereas the bitcode function has " << num_params
+        << ": " << remill::LLVMThingToString(extern_func);
+
+  } else if (num_params != cfg_func->num_args) {
     CHECK(num_params < cfg_func->num_args && func_type->isVarArg())
         << "Function " << remill::LLVMThingToString(extern_func)
         << " is expected to be able to take " << cfg_func->num_args
@@ -561,11 +568,11 @@ static void ImplementExplicitArgsExitPoint(
   }
 
   auto block = &(callback_func->back());
+  auto actual_num_args = std::max<unsigned>(num_params, cfg_func->num_args);
 
-  // The emulated code already set up the machine state with the arguments for
-  // the external, so we need to go and read out the arguments.
+  // create call to function and args
   std::vector<llvm::Value *> call_args;
-  for (auto i = 0U; i < cfg_func->num_args; i++) {
+  for (auto i = 0U; i < actual_num_args; i++) {
     llvm::Type *param_type = nullptr;
     if (i < num_params) {
       param_type = func_type->getParamType(i);
@@ -631,7 +638,7 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func_) {
 
   // Pass through the memory and state pointers, and pass the destination
   // (native external function address) as the PC argument.
-  if (FLAGS_explicit_args) {
+  if (FLAGS_explicit_args || cfg_func->is_explicit) {
     ImplementExplicitArgsExitPoint(callback_func, extern_func, cfg_func);
 
   // We are going from lifted to native code. We don't need an assembly stub
