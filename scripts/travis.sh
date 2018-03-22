@@ -282,6 +282,7 @@ linux_build_helper() {
   printf " > Build succeeded\n"
 
   printf "\n\n\nCalling the integration test suite...\n"
+  local test_log_file=`mktemp`
   ( cd ./remill/tools/mcsema/tests/test_suite && ./start.py ) > "${test_log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed the integration test suite:\n"
