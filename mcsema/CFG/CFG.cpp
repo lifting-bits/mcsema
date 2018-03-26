@@ -962,7 +962,8 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         var->lifted_name = var->name;
         var->is_weak = extern_var.is_weak();
         var->size = static_cast<uint64_t>(extern_var.size());
-        frame_var->ttype.insert(frame_var->ttype.begin(), var);
+        frame_var->ttype.insert(frame_var->ttype.begin() + (extern_var.size()-1), var);
+        //frame_var->ttype.push_back(var);
        }
 
       func->eh_frame.push_back(frame_var);

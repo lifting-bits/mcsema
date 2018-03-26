@@ -304,17 +304,29 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       llvm::BasicBlock *landing_bb = llvm::BasicBlock::Create(
           *gContext, ss.str(), ctx.lifted_func);
       llvm::IRBuilder<> ir(landing_bb);
+      auto num_clauses = entry->ttype.size();
       auto exn_type = llvm::StructType::get(llvm::Type::getInt8PtrTy(*gContext),
                                             llvm::Type::getInt32Ty(*gContext), nullptr);
-      auto lpad = ir.CreateLandingPad(exn_type, 1, "catch.lpad");
+      auto lpad = ir.CreateLandingPad(exn_type, static_cast<unsigned int>(num_clauses), "catch.lpad");
+      unsigned int catch_all = false;
 
       //catch (...)
       // Set tne clause to catch all kind of exceptions
-      for (auto type : entry->ttype) {
-        if (type->ea)
-          lpad->addClause(gModule->getGlobalVariable(type->name));
-        //else
-        //  lpad->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
+      /**
+       * The type indices in exception table are reversed for some of the binaries. In such case, the
+       * wrong exception handler may get called.
+       * TODO: Fix the wrong indices in the exception table.
+       */
+      for (auto type = entry->ttype.rbegin(); type != entry->ttype.rend(); type++) {
+        if ((*type)->ea) {
+          lpad->addClause(gModule->getGlobalVariable((*type)->name));
+        } else {
+          catch_all = true;
+        }
+      }
+
+      if (catch_all) {
+        lpad->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
       }
 
       std::vector<llvm::Value *> args(2);

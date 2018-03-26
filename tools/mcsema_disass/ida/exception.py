@@ -207,7 +207,7 @@ def format_lsda_actions(action_tbl, actions, type_addr, type_enc, act_id):
     if ar_filter > 0:
       type_slot = type_addr - ar_filter * enc_size(type_enc)
       type_ea, eatmp = read_enc_value(type_slot, type_enc)
-      DEBUG("catch type typeinfo = {:x} {}".format(type_ea, get_symbol_name(type_ea)))
+      DEBUG("catch type typeinfo = {:x} {} {}".format(type_ea, get_symbol_name(type_ea), ar_filter))
       action_list.append((ar_disp, ar_filter, type_ea))
 
     if ar_disp == 0:
@@ -456,7 +456,7 @@ def recover_exception_entries(F, func_ea):
         AC = EH.ttype.add()
         AC.ea = type_ea
         AC.name = get_symbol_name(type_ea)
-        AC.size = 8
+        AC.size = ar_filter
         AC.is_weak = False
         AC.is_thread_local = False
 
