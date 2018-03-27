@@ -230,8 +230,8 @@ def find_default_block_heads(sub_ea):
       DEBUG("  chunk [{:x}, {:x})".format(chunk_start_ea, chunk_end_ea))
 
     for eh_start_ea, eh_end_ea in get_exception_chunks(sub_ea):
-      _BLOCK_HEAD_EAS.add(eh_start_ea)
-      heads.add(eh_start_ea)
+      _BLOCK_HEAD_EAS.update([eh_start_ea, eh_end_ea])
+      heads.update([eh_start_ea, eh_end_ea])
       DEBUG("  exception chunks [{:x}, {:x})".format(eh_start_ea, eh_end_ea))
 
   # Look for possibly good jump table target candidates. We will use this
