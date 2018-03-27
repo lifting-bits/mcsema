@@ -55,7 +55,10 @@ DEFINE_string(cfg, "", "Path to the CFG file containing code to lift.");
 
 DEFINE_string(output, "", "Output bitcode file name.");
 
-static const char kPathDelimeter = ';';
+// Using ',' as it will work well enough on Windows and Linux
+// Other suggestions were ':', which is a path character on Windows
+// and ';', which is an end of statement escape on Linux shells
+static const char kPathDelimeter = ',';
 DEFINE_string(abi_libraries, "", "Path to one or more bitcode files that contain "
                                "external library definitions for the C/C++ ABI.");
 
