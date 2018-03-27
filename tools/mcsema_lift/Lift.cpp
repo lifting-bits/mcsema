@@ -55,7 +55,8 @@ DEFINE_string(cfg, "", "Path to the CFG file containing code to lift.");
 
 DEFINE_string(output, "", "Output bitcode file name.");
 
-DEFINE_string(abi_library, "", "Path to an LLVM bitcode or IR file that contains "
+static const char kPathDelimeter = ';';
+DEFINE_string(abi_libraries, "", "Path to one or more bitcode files that contain "
                                "external library definitions for the C/C++ ABI.");
 
 DECLARE_bool(version);
@@ -85,6 +86,22 @@ static void PrintSupportedInstructions(void) {
                       [=](llvm::GlobalVariable *isel, llvm::Function *) {
                         std::cout << isel->getName().str() << std::endl;
                       });
+}
+
+// simple function to split a string on a delimeter
+// used to separate comma separated arguments
+std::vector<std::string>
+split(const std::string &s, const char delim) {
+
+	std::vector<std::string> res;
+	std::string rem;
+	std::istringstream instream(s);
+
+	while(std::getline(instream, rem, delim)) {
+		res.push_back(rem);
+	}
+
+	return res;
 }
 
 static std::unique_ptr<llvm::Module> gLibrary;
@@ -221,7 +238,12 @@ int main(int argc, char *argv[]) {
      // And compile this file to bitcode using `remill-clang-M.m` (Major.minor).
      // This bitcode file will then be the source of type information for
      // McSema.
-     << "    [--abi_library BITCODE_FILE] \\" << std::endl
+     //
+     // One may want multiple such files, such as one for libc, one for exception
+     // handling and one for zlib, and so on. McSema supports loading multiple
+     // ABI library definitions via a ';' separated list of paths
+     << "    [--abi_libraries BITCODE_FILE[" << kPathDelimeter <<
+        "BITCODE_FILE" << kPathDelimeter << "...] ] \\" << std::endl
 
      // Annotate each LLVM IR instruction with some metadata that includes the
      // original program counter. The name of the LLVM metadats is
@@ -287,8 +309,12 @@ int main(int argc, char *argv[]) {
 
   // Load in a special library before CFG processing. This affects the
   // renaming of exported functions.
-  if (!FLAGS_abi_library.empty()) {
-    LoadLibraryIntoModule(FLAGS_abi_library);
+  if (!FLAGS_abi_libraries.empty()) {
+    auto abi_libs = split(FLAGS_abi_libraries, kPathDelimeter);
+    for(const auto &abi_lib : abi_libs) {
+      LOG(INFO) << "Loading ABI Library: " << abi_lib << "\n";
+      LoadLibraryIntoModule(abi_lib);
+    }
   }
 
   auto cfg_module = mcsema::ReadProtoBuf(
@@ -302,7 +328,7 @@ int main(int argc, char *argv[]) {
       << "Unable to lift CFG from " << FLAGS_cfg << " into module "
       << FLAGS_output;
 
-  if (!FLAGS_abi_library.empty()) {
+  if (!FLAGS_abi_libraries.empty()) {
     UnloadLibraryFromModule();
     gLibrary.reset(nullptr);
   }
