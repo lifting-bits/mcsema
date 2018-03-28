@@ -215,6 +215,11 @@ def acquire_toolset():
 def execute_tests(toolset, test_list):
   print("Starting...\n")
 
+  test_directory = tempfile.mkdtemp(
+      prefix="mcsema_test_",
+      dir=os.path.dirname(os.path.realpath(__file__)))
+  print(" > Saving results to: " + test_directory)
+
   failed_test_list = {}
 
   for test in test_list:
@@ -246,7 +251,7 @@ def execute_tests(toolset, test_list):
 
     print("\n   Testing...")
     
-    result = lift_test_cfg(toolset, test)
+    result = lift_test_cfg(test_directory, toolset, test)
     if result["success"]:
       print("    +"),
     else:
@@ -263,7 +268,7 @@ def execute_tests(toolset, test_list):
       continue
 
     bitcode_path = result["bitcode_path"]
-    result = compile_lifted_code(toolset, test, bitcode_path)
+    result = compile_lifted_code(test_directory, toolset, test, bitcode_path)
     if result["success"]:
       print("    +"),
     else:
@@ -276,7 +281,7 @@ def execute_tests(toolset, test_list):
       continue
 
     recompiled_exe_path = result["recompiled_exe_path"]
-    result = execute_compiled_bitcode(toolset, test, recompiled_exe_path)
+    result = execute_compiled_bitcode(test_directory, toolset, test, recompiled_exe_path)
     if result["success"]:
       print("    +"),
     else:
@@ -308,8 +313,8 @@ def execute_tests(toolset, test_list):
 
   return False
 
-def lift_test_cfg(toolset, test):
-  output_file_path = os.path.join(tempfile.gettempdir(), test.name() + "_" + test.architecture() + "_" + test.platform() + ".bc")
+def lift_test_cfg(test_directory, toolset, test):
+  output_file_path = os.path.join(test_directory, test.name() + "_" + test.architecture() + "_" + test.platform() + ".bc")
 
   # Reference docs/CommandLineReference.md
   # In stripped ELFs, the libc_constructor/libc_destructor functions are init/fini
@@ -332,14 +337,14 @@ def lift_test_cfg(toolset, test):
 
   return result
 
-def compile_lifted_code(toolset, test, bitcode_path):
+def compile_lifted_code(test_directory, toolset, test, bitcode_path):
   if test.architecture() != "amd64":
     result = {}
     result["success"] = False
     result["output"] = "Not yet supported"
     return result
 
-  output_file_path = os.path.join(tempfile.gettempdir(), test.name())
+  output_file_path = os.path.join(test_directory, test.name())
 
   if test.architecture() == "amd64" or test.architecture() == "aarch64":
     mcsema_runtime_path = toolset["libmcsema_rt64"]
@@ -378,8 +383,8 @@ def compile_lifted_code(toolset, test, bitcode_path):
 
   return result
 
-def execute_compiled_bitcode(toolset, test, recompiled_exe_path):
-  output_file_path = os.path.join(tempfile.gettempdir(), test.name() + "_" + test.architecture() + "_" + test.platform() + "_stdout_test")
+def execute_compiled_bitcode(test_directory, toolset, test, recompiled_exe_path):
+  output_file_path = os.path.join(test_directory, test.name() + "_" + test.architecture() + "_" + test.platform() + "_stdout_test")
 
   output = ""
   if test.input() is None:
@@ -417,6 +422,7 @@ def execute_compiled_bitcode(toolset, test, recompiled_exe_path):
 def execute_with_timeout(args, timeout):
   result = {}
 
+  print("   > Executing: " + " ".join(args))
   program_stdout = tempfile.NamedTemporaryFile()
   program_stderr = tempfile.NamedTemporaryFile()
 
