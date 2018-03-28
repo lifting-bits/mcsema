@@ -10,7 +10,7 @@ void* __cxa_allocate_exception(size_t thrown_size);
 void __cxa_free_exception(void * thrown_exception) ;
 void* __cxa_allocate_dependent_exception() ;
 void __cxa_free_dependent_exception (void* dependent_exception);
-void __cxa_throw(void* thrown_exception, struct std::type_info * tinfo, void (*dest)(void*));
+void __cxa_throw(void* thrown_exception, class std::type_info * tinfo, void (*dest)(void*));
 void* __cxa_get_exception_ptr(void* exceptionObject);
 void* __cxa_begin_catch(void* exceptionObject);
 void __cxa_end_catch();
