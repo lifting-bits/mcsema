@@ -1,0 +1,1 @@
+Test constructor and destructor ELF features for C++ programs

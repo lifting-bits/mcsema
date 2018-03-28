@@ -38,7 +38,6 @@ void foo() {
 
 void *theThread(void *parm)
 {
-  int  rc;
   thread_parm_t  *gData;
   gData = (thread_parm_t*)parm;
   tls_data1 = gData->data1;
