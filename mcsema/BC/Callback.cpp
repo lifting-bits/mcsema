@@ -463,18 +463,6 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   // Allocate any space needed on the stack for a return address.
   loader.AllocateReturnAddress(block);
 
-//  // Set up the thread pointer, if any.
-//  if (auto tp_name = loader.ThreadPointerVarName()) {
-//    auto get_tp = llvm::Intrinsic::getDeclaration(
-//        gModule, llvm::Intrinsic::thread_pointer);
-//    if (get_tp) {
-//      llvm::IRBuilder<> ir(block);
-//      ir.CreateStore(
-//          ir.CreatePtrToInt(ir.CreateCall(get_tp), gWordType),
-//          ir.CreateLoad(remill::FindVarInFunction(func, tp_name)));
-//    }
-//  }
-
   // Call the lifted function.
   std::vector<llvm::Value *> args(3);
   args[remill::kMemoryPointerArgNum] = remill::LoadMemoryPointer(block);
@@ -594,6 +582,9 @@ static void ImplementExplicitArgsExitPoint(
     call_args.push_back(loader.LoadNextArgument(block, param_type));
   }
 
+  // Now that we've read the argument values, we want to free up the space that
+  // the emulated caller set up, so that when we eventually return, things are
+  // in the expected state.
   loader.FreeReturnAddress(block);
   loader.FreeArguments(block);
 

@@ -374,13 +374,45 @@ static void LiftIndirectJump(TranslationContext &ctx,
                              llvm::BasicBlock *block,
                              remill::Instruction &inst) {
 
-  auto fallback = DevirtualizeIndirectFlow(
-      ctx, GetLiftedToNativeExitPoint(kExitPointJump));
+  auto exit_point = GetLiftedToNativeExitPoint(kExitPointJump);
+  auto fallback = DevirtualizeIndirectFlow(ctx, exit_point);
 
   std::unordered_map<uint64_t, llvm::BasicBlock *> block_map;
   for (auto target_ea : ctx.cfg_block->successor_eas) {
     block_map[target_ea] = GetOrCreateBlock(ctx, target_ea);
     fallback = ctx.lifter->intrinsics->missing_block;
+  }
+
+  if (exit_point == fallback) {
+
+    // If we have no targets, then a reasonable target turns out to be the next
+    // program counter.
+    if (block_map.empty()) {
+      block_map[inst.next_pc] = GetOrCreateBlock(ctx, inst.next_pc);
+    }
+
+    // Build up a set of all reachable blocks that were known at disassembly
+    // time so that we can find blocks that have no predecessors.
+    std::unordered_set<uint64_t> succ_eas;
+    succ_eas.insert(ctx.cfg_func->ea);
+    for (auto block_entry : ctx.cfg_func->blocks) {
+      auto cfg_block = block_entry.second;
+      succ_eas.insert(cfg_block->successor_eas.begin(),
+                      cfg_block->successor_eas.end());
+    }
+
+    // We'll augment our block map to also target unreachable blocks, just in
+    // case our disassembly failed to find some of the targets.
+    for (auto block_entry : ctx.cfg_func->blocks) {
+      auto target_ea = block_entry.first;
+      if (!succ_eas.count(target_ea)) {
+        LOG(WARNING)
+            << "Adding block " << std::hex << target_ea
+            << " with no predecessors as additional target of the "
+            << " indirect jump at " << inst.pc << std::dec;
+        block_map[target_ea] = GetOrCreateBlock(ctx, target_ea);
+      }
+    }
   }
 
   // We have no jump table information, so assume that it's an indirect tail
@@ -707,6 +739,10 @@ static llvm::Function *LiftFunction(
   ctx.cfg_inst = nullptr;
   ctx.lifted_func = lifted_func;
 
+  std::unordered_set<uint64_t> referenced_blocks;
+  referenced_blocks.insert(cfg_func->ea);
+
+
   // Create basic blocks for each basic block in the original function.
   for (auto block_info : cfg_func->blocks) {
     auto cfg_block = block_info.second;
@@ -731,11 +767,11 @@ static llvm::Function *LiftFunction(
   // Check the sanity of things.
   for (auto block_info : ctx.ea_to_block) {
     auto block = block_info.second;
-    //block->dump();
     CHECK(block->getTerminator() != nullptr)
         << "Lifted block " << std::hex << block_info.first
         << " has no terminator!" << std::dec;
   }
+
   return lifted_func;
 }
 
@@ -796,7 +832,6 @@ bool DefineLiftedFunctions(const NativeModule *cfg_module) {
           << std::dec;
       return false;
     }
-    //lifted_func->dump();
     func_pass_manager.run(*lifted_func);
   }
 
