@@ -245,6 +245,10 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
     // `__gmon_start__`, which is likely to be an ELF thunk. So we throw in
     // an extra layer of indirection here.
     //
+#if 0
+    // TODO(akshayk): Discuss a better solution to handle the weak external functions
+    // It causes the garbage address for _ZNSt12out_of_rangeD1Ev
+
     // TODO(pag): This is an awful hack for now that won't generalize.
     if (func->hasExternalWeakLinkage()) {
       LOG(ERROR)
@@ -255,6 +259,7 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
       ir.CreateStore(func, temp_loc);
       func_val = temp_loc;
     }
+#endif
 
     return ir.CreatePtrToInt(func_val, word_type);
 
