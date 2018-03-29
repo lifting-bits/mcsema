@@ -61,6 +61,12 @@ _ZNSsD1Ev 1 C N
 _ZNSsC1ERKSs 2 C N
 _ZNKSt11logic_error4whatEv 1 C N
 _ZNSt12out_of_rangeD1Ev 1 C N
+_ZNSt13runtime_errorC1ERKSs 2 C N
+_ZNKSt13runtime_error4whatEv 1 C N
+_ZNSt13runtime_errorD1Ev 1 C N
+_ZNSt9exceptionD2Ev 1 C N
+_ZNSt9exceptionD1Ev 1 C N
+_ZNKSt9exception4whatEv 1 C N
 
 a2d_ASN1_OBJECT 4 C N
 a2i_ASN1_ENUMERATED 4 C N
