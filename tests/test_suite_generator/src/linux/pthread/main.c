@@ -18,6 +18,10 @@
 #include <stdlib.h>
 #include <pthread.h>
 
+static pthread_cond_t gCond;
+static pthread_mutex_t gLock;
+static int gFlag = 0;
+
 __thread int tls_data1;
 __thread int tls_data2;
 
@@ -38,12 +42,19 @@ void foo() {
 
 void *theThread(void *parm)
 {
-  int  rc;
   thread_parm_t  *gData;
+
+  pthread_mutex_lock(&gLock);
+  pthread_cond_wait(&gCond, &gLock);
+
+  gFlag += 1;
+
   gData = (thread_parm_t*)parm;
   tls_data1 = gData->data1;
   tls_data2 = gData->data2;
   foo();
+
+  pthread_mutex_unlock(&gLock);
   return NULL;
 }
 
@@ -53,6 +64,8 @@ int main(int argc, char **argv) {
   thread_parm_t gData[2];
 
   printf("Create threads\n");
+  pthread_mutex_init(&gLock, NULL);
+  pthread_cond_init(&gCond, NULL);
   for (i=0; i < 2; i++) {
     gData[i].data1 = i;
     gData[i].data2 = (i+1)*2;
@@ -63,7 +76,12 @@ int main(int argc, char **argv) {
     }
   }
 
+  // synchronize output. this gets printed before threads print
   printf("Wait for the threads to complete, and release their resources\n");
+  fflush(stdout);
+  while (gFlag < 2) {
+    pthread_cond_signal(&gCond);
+  }
   for (i=0; i < 2; i++) {
     rc = pthread_join(thread[i], NULL);
     if (rc) {

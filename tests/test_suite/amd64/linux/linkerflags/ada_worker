@@ -1,1 +1,1 @@
--lm -lgnat -lpthread -lgnarl
+-lgnat;-lgnarl

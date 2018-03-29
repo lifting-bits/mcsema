@@ -114,6 +114,31 @@ class Test(object):
   def linker_flags(self):
     return self._linker_flags
 
+  def compare_output(self, actual):
+    """
+    Compare actual to expected output. 
+    This function has a looser definition that strict equality (frequency count)
+    to work with multithreaded applications that may output in different order
+    on every execution.
+    """
+    expected = self.output()
+
+    # First check: exact output match. 
+    if actual == expected:
+      return True
+
+    # do frequency count of every character in the string
+    def freq_count(string):
+      freq_table = {}
+      for c in string:
+        freq = freq_table.get(c, 0)
+        freq += 1
+        freq_table[c] = freq
+
+      return freq_table
+
+    return freq_count(actual) == freq_count(expected)
+
 def main():
   toolset = acquire_toolset()
   if toolset is None:
@@ -411,7 +436,7 @@ def execute_compiled_bitcode(test_directory, toolset, test, recompiled_exe_path)
       output += exec_result["stdout"] + exec_result["stderr"]
 
   result = {}
-  result["success"] = output == test.output()
+  result["success"] = test.compare_output(output)
   if not result["success"]:
     result["output"] = "Output:\n" + output + "\n\nExpected:\n" + test.output()
   else:
