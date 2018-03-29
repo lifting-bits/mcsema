@@ -11,18 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specifi
 
-project(pthread1)
+enable_language(ADA)
+project(ada_thread)
 cmake_minimum_required(VERSION 3.2)
 
-set(PROJECT_CXXFLAGS -Wall -Werror)
-set(PROJECT_LDFLAGS -lpthread)
-
 set(PROJECT_SOURCEFILES
-  main.c
+  ada_thread.adb
+)
+
+set(PROJECT_LINKERFLAGS
+  -lgnat
+  -lgnarl
 )
 
 GenerateTest(${PROJECT_NAME}
-  SOURCES ${PROJECT_SOURCEFILES}
-  CXXFLAGS ${PROJECT_CXXFLAGS}
-  LINKERFLAGS ${PROJECT_LDFLAGS}
+    SOURCES ${PROJECT_SOURCEFILES}
+    LINKERFLAGS ${PROJECT_LINKERFLAGS}
 )

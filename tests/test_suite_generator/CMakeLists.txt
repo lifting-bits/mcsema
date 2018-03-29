@@ -16,6 +16,8 @@
 # see: https://cmake.org/Bug/view.php?id=14841
 set(CLANG_PATH "$ENV{TRAILOFBITS_LIBRARIES}/llvm/bin/clang")
 set(CLANGXX_PATH "$ENV{TRAILOFBITS_LIBRARIES}/llvm/bin/clang++")
+set(CMAKE_ADA_COMPILER_ID_RUN 1)
+
 if (NOT "${CMAKE_CXX_COMPILER}" STREQUAL "${CLANGXX_PATH}")
   set(CMAKE_CXX_COMPILER "${CLANGXX_PATH}")
 endif ()
@@ -266,6 +268,12 @@ function (GenerateTest target_name)
   endforeach ()
 
   foreach (architecture ${ARCHITECTURE_LIST})
+    if("${source_file_list}" MATCHES "\.adb")
+      if(${architecture} STREQUAL "x86")
+        message(" > skipping x86 support for ADA target: ${target_name}")
+        continue()
+      endif()
+    endif()
     message(" > ${target_name} (${architecture})")
     set(current_target_name "${target_name}_${architecture}")
 
