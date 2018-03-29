@@ -15,6 +15,7 @@ project(cpp_constructor)
 cmake_minimum_required(VERSION 3.2)
 
 set(PROJECT_CXXFLAGS -Wall -Werror)
+set(PROJECT_LINKERFLAGS -s)
 
 set(PROJECT_SOURCEFILES
   main.cpp
@@ -23,4 +24,5 @@ set(PROJECT_SOURCEFILES
 GenerateTest(${PROJECT_NAME}
   SOURCES ${PROJECT_SOURCEFILES}
   CXXFLAGS ${PROJECT_CXXFLAGS}
+  LINKERFLAGS ${PROJECT_LINKERFLAGS}
 )
