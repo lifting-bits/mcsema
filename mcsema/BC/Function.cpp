@@ -310,8 +310,11 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
 
     auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
     lifted_func->addFnAttr(llvm::Attribute::UWTable);
+    lifted_func->addFnAttr(llvm::Attribute::OptimizeNone);
     lifted_func->removeFnAttr(llvm::Attribute::NoUnwind);
+#if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 7)
     lifted_func->setPersonalityFn(personality);
+#endif
   }
 
   for (auto &entry : cfg_func->eh_frame) {
@@ -325,7 +328,12 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       llvm::IRBuilder<> ir(landing_bb);
       auto exn_type = llvm::StructType::get(llvm::Type::getInt8PtrTy(*gContext),
                                             llvm::Type::getInt32Ty(*gContext), nullptr);
+#if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
       auto lpad = ir.CreateLandingPad(exn_type, 1, "cleanup.lpad");
+#else
+      auto personality = gModule->getFunction("__gxx_personality_v0");
+      auto lpad = ir.CreateLandingPad(exn_type, personality, 1, "cleanup.lpad");
+#endif
       lpad->setCleanup(true);
 
       auto exctn_0  = ir.CreateExtractValue(lpad, 0);
@@ -351,7 +359,12 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       auto num_clauses = entry->ttype.size();
       auto exn_type = llvm::StructType::get(llvm::Type::getInt8PtrTy(*gContext),
                                             llvm::Type::getInt32Ty(*gContext), nullptr);
+#if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
       auto lpad = ir.CreateLandingPad(exn_type, static_cast<unsigned int>(num_clauses), "catch.lpad");
+#else
+      auto personality = gModule->getFunction("__gxx_personality_v0");
+      auto lpad = ir.CreateLandingPad(exn_type, personality, static_cast<unsigned int>(num_clauses), "catch.lpad");
+#endif
       unsigned int catch_all = false;
 
       //catch (...)
@@ -376,8 +389,13 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       std::vector<llvm::Value *> args(2);
       llvm::Type* args_type[] = {llvm::Type::getInt64Ty(*gContext), llvm::Type::getInt64Ty(*gContext)};
 
+#if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
       args[0] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext), cfg_func->rsp_var);
       args[1] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext), cfg_func->rbp_var);
+#else
+      args[0] = ir.CreateLoad(cfg_func->rsp_var, true);
+      args[1] = ir.CreateLoad(cfg_func->rbp_var, true);
+#endif
 
       auto handler = gModule->getFunction("__mcsema_exception_ret");
       if (handler == nullptr) {
@@ -769,6 +787,7 @@ static llvm::Function *LiftFunction(
   lifted_func->removeFnAttr(llvm::Attribute::NoReturn);
   lifted_func->removeFnAttr(llvm::Attribute::NoUnwind);
   lifted_func->addFnAttr(llvm::Attribute::NoInline);
+  lifted_func->addFnAttr(llvm::Attribute::OptimizeNone);
   lifted_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
 
   TranslationContext ctx;
