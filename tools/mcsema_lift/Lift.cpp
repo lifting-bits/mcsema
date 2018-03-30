@@ -55,7 +55,11 @@ DEFINE_string(cfg, "", "Path to the CFG file containing code to lift.");
 
 DEFINE_string(output, "", "Output bitcode file name.");
 
-DEFINE_string(abi_library, "", "Path to an LLVM bitcode or IR file that contains "
+// Using ',' as it will work well enough on Windows and Linux
+// Other suggestions were ':', which is a path character on Windows
+// and ';', which is an end of statement escape on Linux shells
+static const char kPathDelimeter = ',';
+DEFINE_string(abi_libraries, "", "Path to one or more bitcode files that contain "
                                "external library definitions for the C/C++ ABI.");
 
 DECLARE_bool(version);
@@ -65,6 +69,8 @@ DECLARE_bool(keep_memops);
 DECLARE_bool(explicit_args);
 DECLARE_string(pc_annotation);
 
+DEFINE_bool(list_supported, false,
+            "List instructions that can be lifted.");
 DEFINE_bool(legacy_mode, false,
             "Try to make the output bitcode resemble the original McSema.");
 
@@ -77,6 +83,30 @@ static void PrintVersion(void) {
       << "Using LLVM " << LLVM_VERSION_STRING << std::endl;
 }
 
+// Print a list of instructions that Remill can lift.
+static void PrintSupportedInstructions(void) {
+  remill::ForEachISel(mcsema::gModule,
+                      [=](llvm::GlobalVariable *isel, llvm::Function *) {
+                        std::cout << isel->getName().str() << std::endl;
+                      });
+}
+
+// simple function to split a string on a delimeter
+// used to separate comma separated arguments
+std::vector<std::string>
+split(const std::string &s, const char delim) {
+
+	std::vector<std::string> res;
+	std::string rem;
+	std::istringstream instream(s);
+
+	while(std::getline(instream, rem, delim)) {
+		res.push_back(rem);
+	}
+
+	return res;
+}
+
 static std::unique_ptr<llvm::Module> gLibrary;
 
 // Load in a separate bitcode or IR library, and copy function and variable
@@ -84,6 +114,7 @@ static std::unique_ptr<llvm::Module> gLibrary;
 // to provide better type information to McSema.
 static void LoadLibraryIntoModule(const std::string &path) {
   gLibrary.reset(remill::LoadModuleFromFile(mcsema::gContext, path));
+  mcsema::gArch->PrepareModuleDataLayout(gLibrary);
 
   // Declare the functions from the library in McSema's target module.
   for (auto &func : *gLibrary) {
@@ -210,7 +241,12 @@ int main(int argc, char *argv[]) {
      // And compile this file to bitcode using `remill-clang-M.m` (Major.minor).
      // This bitcode file will then be the source of type information for
      // McSema.
-     << "    [--abi_library BITCODE_FILE] \\" << std::endl
+     //
+     // One may want multiple such files, such as one for libc, one for exception
+     // handling and one for zlib, and so on. McSema supports loading multiple
+     // ABI library definitions via a ';' separated list of paths
+     << "    [--abi_libraries BITCODE_FILE[" << kPathDelimeter <<
+        "BITCODE_FILE" << kPathDelimeter << "...] ] \\" << std::endl
 
      // Annotate each LLVM IR instruction with some metadata that includes the
      // original program counter. The name of the LLVM metadats is
@@ -272,24 +308,30 @@ int main(int argc, char *argv[]) {
   }
 
   mcsema::gModule = remill::LoadTargetSemantics(mcsema::gContext);
+  mcsema::gArch->PrepareModule(mcsema::gModule);
 
   // Load in a special library before CFG processing. This affects the
   // renaming of exported functions.
-  if (!FLAGS_abi_library.empty()) {
-    LoadLibraryIntoModule(FLAGS_abi_library);
+  if (!FLAGS_abi_libraries.empty()) {
+    auto abi_libs = split(FLAGS_abi_libraries, kPathDelimeter);
+    for(const auto &abi_lib : abi_libs) {
+      LOG(INFO) << "Loading ABI Library: " << abi_lib << "\n";
+      LoadLibraryIntoModule(abi_lib);
+    }
   }
 
   auto cfg_module = mcsema::ReadProtoBuf(
       FLAGS_cfg, (mcsema::gArch->address_size / 8));
-  mcsema::gModule = remill::LoadTargetSemantics(mcsema::gContext);
-  mcsema::gArch->PrepareModule(mcsema::gModule);
 
+  if (FLAGS_list_supported) {
+    PrintSupportedInstructions();
+  }
 
   CHECK(mcsema::LiftCodeIntoModule(cfg_module))
       << "Unable to lift CFG from " << FLAGS_cfg << " into module "
       << FLAGS_output;
 
-  if (!FLAGS_abi_library.empty()) {
+  if (!FLAGS_abi_libraries.empty()) {
     UnloadLibraryFromModule();
     gLibrary.reset(nullptr);
   }

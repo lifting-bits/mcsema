@@ -15,6 +15,7 @@
  */
 
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 
 #include <cctype>
 #include <iostream>
@@ -38,6 +39,8 @@
 #include "mcsema/BC/External.h"
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
+
+DECLARE_bool(explicit_args);
 
 namespace mcsema {
 namespace {
@@ -653,7 +656,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     func->ea = static_cast<uint64_t>(cfg_extern_func.ea());
     func->is_external = true;
     func->is_exported = true;
-    func->is_explicit = (nullptr != gModule->getFunction(func->name));
+    func->is_explicit = FLAGS_explicit_args || nullptr != gModule->getFunction(func->name);
     func->is_weak = cfg_extern_func.is_weak();
     func->lifted_name = ExternalFuncName(cfg_extern_func);
     func->num_args = 0;

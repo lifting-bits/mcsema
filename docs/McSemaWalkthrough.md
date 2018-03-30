@@ -21,7 +21,7 @@ This binary was chosen since it has complex features, it was easy to verify that
 
 This guide assumes that you are working on a Linux system, have already built and installed a working version of McSema, and that `mcsema-lift` and `mcsema-disass` are in your execution path. We assume that the McSema repository was cloned into `$MCSEMA_DIR`.
 
-The guide also assumes that you have working version of IDA Pro, which is required for control flow recovery.
+The guide also assumes that you have working version of IDA Pro, which is required for control flow recovery.  Note that IDA Pro will not function until it has been launched once in standalone mode and the EULA pop-up has been accepted.  If using IDA Pro 7, the legacy x86 32-bit version should be installed as the 64-bit version is not yet supported.
 
 For clarity, we assume that all operations happen in `~/mcsema`, but any directory will work.
 

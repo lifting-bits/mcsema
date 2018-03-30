@@ -114,6 +114,31 @@ class Test(object):
   def linker_flags(self):
     return self._linker_flags
 
+  def compare_output(self, actual):
+    """
+    Compare actual to expected output. 
+    This function has a looser definition that strict equality (frequency count)
+    to work with multithreaded applications that may output in different order
+    on every execution.
+    """
+    expected = self.output()
+
+    # First check: exact output match. 
+    if actual == expected:
+      return True
+
+    # do frequency count of every character in the string
+    def freq_count(string):
+      freq_table = {}
+      for c in string:
+        freq = freq_table.get(c, 0)
+        freq += 1
+        freq_table[c] = freq
+
+      return freq_table
+
+    return freq_count(actual) == freq_count(expected)
+
 def main():
   toolset = acquire_toolset()
   if toolset is None:
@@ -160,6 +185,7 @@ def acquire_toolset():
 
   llvm_version = subprocess.check_output([toolset["clang"], "--version"]).split(" ")[2]
   print(" i Found LLVM version: " + llvm_version)
+  print("   in: {}".format(os.path.dirname(toolset["clang"])))
 
   mcsema_llvm_version = llvm_version[0:3]
   print(" i Using the following mcsema tools: " + mcsema_llvm_version)
@@ -168,18 +194,29 @@ def acquire_toolset():
   if toolset["mcsema-lift"] is None:
     print(" x Failed to locate mcsema-lift-" + mcsema_llvm_version)
     return None
+  else:
+    print(" i Found mcsema-lift in: {}".format(toolset["mcsema-lift"]))
 
-  toolset["mcsema-disass"] = spawn.find_executable("mcsema-disass")
+  mcsema_root = os.path.realpath(os.path.join(
+    os.path.dirname(toolset["mcsema-lift"]), ".."))
+
+  toolset["mcsema-disass"] = os.path.join(
+    mcsema_root, "bin", "mcsema-disass")
+
   if toolset["mcsema-disass"] is None:
     print(" x Failed to locate mcsema-disass")
     return None
+  else:
+    print(" i Found mcsema-disass in: {}".format(toolset["mcsema-disass"]))
 
   if sys.platform == "linux" or sys.platform == "linux2" or sys.platform == "darwin":
-    toolset["libmcsema_rt32"] = "/usr/local/lib/libmcsema_rt32-" + mcsema_llvm_version + ".a"
-    toolset["libmcsema_rt64"] = "/usr/local/lib/libmcsema_rt64-" + mcsema_llvm_version + ".a"
+    lib_suffix = ".a"
   else:
-    toolset["libmcsema_rt32"] = "C:\\mcsema\\lib\\mcsema_rt32-" + mcsema_llvm_version + ".lib"
-    toolset["libmcsema_rt64"] = "C:\\mcsema\\lib\\mcsema_rt64-" + mcsema_llvm_version + ".lib"
+    # assumes this must be Windows
+    lib_suffix = ".lib"
+
+  toolset["libmcsema_rt32"] = os.path.join(mcsema_root, "lib", "libmcsema_rt32-" + mcsema_llvm_version + lib_suffix)
+  toolset["libmcsema_rt64"] = os.path.join(mcsema_root, "lib", "libmcsema_rt64-" + mcsema_llvm_version + lib_suffix)
 
   if not os.path.isfile(toolset["libmcsema_rt32"]):
     print(" x Failed to locate the 32-bit mcsema runtime")
@@ -202,6 +239,11 @@ def acquire_toolset():
 
 def execute_tests(toolset, test_list):
   print("Starting...\n")
+
+  test_directory = tempfile.mkdtemp(
+      prefix="mcsema_test_",
+      dir=os.path.dirname(os.path.realpath(__file__)))
+  print(" > Saving results to: " + test_directory)
 
   failed_test_list = {}
 
@@ -234,7 +276,7 @@ def execute_tests(toolset, test_list):
 
     print("\n   Testing...")
     
-    result = lift_test_cfg(toolset, test)
+    result = lift_test_cfg(test_directory, toolset, test)
     if result["success"]:
       print("    +"),
     else:
@@ -251,7 +293,7 @@ def execute_tests(toolset, test_list):
       continue
 
     bitcode_path = result["bitcode_path"]
-    result = compile_lifted_code(toolset, test, bitcode_path)
+    result = compile_lifted_code(test_directory, toolset, test, bitcode_path)
     if result["success"]:
       print("    +"),
     else:
@@ -264,7 +306,7 @@ def execute_tests(toolset, test_list):
       continue
 
     recompiled_exe_path = result["recompiled_exe_path"]
-    result = execute_compiled_bitcode(toolset, test, recompiled_exe_path)
+    result = execute_compiled_bitcode(test_directory, toolset, test, recompiled_exe_path)
     if result["success"]:
       print("    +"),
     else:
@@ -274,6 +316,7 @@ def execute_tests(toolset, test_list):
     if not result["success"]:
       failed_test_list[test.name() + " (" + test.platform() + "/" + test.architecture() + ")"] = result["output"]
       print("    ! Test failed\n")
+      print("    ! Exe file: {}".format(recompiled_exe_path))
       continue
 
     print("    i Test passed\n")
@@ -295,8 +338,8 @@ def execute_tests(toolset, test_list):
 
   return False
 
-def lift_test_cfg(toolset, test):
-  output_file_path = os.path.join(tempfile.gettempdir(), test.name() + "_" + test.architecture() + "_" + test.platform() + ".bc")
+def lift_test_cfg(test_directory, toolset, test):
+  output_file_path = os.path.join(test_directory, test.name() + "_" + test.architecture() + "_" + test.platform() + ".bc")
 
   # Reference docs/CommandLineReference.md
   # In stripped ELFs, the libc_constructor/libc_destructor functions are init/fini
@@ -319,14 +362,14 @@ def lift_test_cfg(toolset, test):
 
   return result
 
-def compile_lifted_code(toolset, test, bitcode_path):
+def compile_lifted_code(test_directory, toolset, test, bitcode_path):
   if test.architecture() != "amd64":
     result = {}
     result["success"] = False
     result["output"] = "Not yet supported"
     return result
 
-  output_file_path = os.path.join(tempfile.gettempdir(), test.name())
+  output_file_path = os.path.join(test_directory, test.name())
 
   if test.architecture() == "amd64" or test.architecture() == "aarch64":
     mcsema_runtime_path = toolset["libmcsema_rt64"]
@@ -365,8 +408,8 @@ def compile_lifted_code(toolset, test, bitcode_path):
 
   return result
 
-def execute_compiled_bitcode(toolset, test, recompiled_exe_path):
-  output_file_path = os.path.join(tempfile.gettempdir(), test.name() + "_" + test.architecture() + "_" + test.platform() + "_stdout_test")
+def execute_compiled_bitcode(test_directory, toolset, test, recompiled_exe_path):
+  output_file_path = os.path.join(test_directory, test.name() + "_" + test.architecture() + "_" + test.platform() + "_stdout_test")
 
   output = ""
   if test.input() is None:
@@ -393,7 +436,7 @@ def execute_compiled_bitcode(toolset, test, recompiled_exe_path):
       output += exec_result["stdout"] + exec_result["stderr"]
 
   result = {}
-  result["success"] = output == test.output()
+  result["success"] = test.compare_output(output)
   if not result["success"]:
     result["output"] = "Output:\n" + output + "\n\nExpected:\n" + test.output()
   else:
@@ -404,6 +447,7 @@ def execute_compiled_bitcode(toolset, test, recompiled_exe_path):
 def execute_with_timeout(args, timeout):
   result = {}
 
+  print("   > Executing: " + " ".join(args))
   program_stdout = tempfile.NamedTemporaryFile()
   program_stderr = tempfile.NamedTemporaryFile()
 

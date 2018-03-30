@@ -805,7 +805,6 @@ def recover_function(M, func_ea, new_func_eas, entrypoints):
   # Update the protobuf with the recovered eh_frame entries
   if RECOVER_EHTABLE is True:
     recover_exception_entries(F, func_ea)
-
   blockset, term_insts = analyse_subroutine(func_ea, PIE_MODE)
 
   for term_inst in term_insts:
