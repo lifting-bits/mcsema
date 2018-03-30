@@ -140,7 +140,11 @@ static void RunO3(void) {
     func_manager.run(func);
   }
   func_manager.doFinalization();
+#if 0
+  // TODO(akshayk): The module optimization pass replaces the basic block with
+  // unreachable instruction. Look into this.
   module_manager.run(*gModule);
+#endif
 }
 
 // Get a list of all ISELs.

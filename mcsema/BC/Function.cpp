@@ -102,7 +102,6 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
       func_name, gModule);
 
   // Make sure to keep this function around (along with `ExternalLinkage`).
-  func->addFnAttr(llvm::Attribute::OptimizeNone);
   func->addFnAttr(llvm::Attribute::NoInline);
   func->removeFnAttr(llvm::Attribute::ReadNone);
 
@@ -872,7 +871,7 @@ void DeclareLiftedFunctions(const NativeModule *cfg_module) {
 // in from cloning the `__remill_basic_block` function.
 bool DefineLiftedFunctions(const NativeModule *cfg_module) {
   llvm::legacy::FunctionPassManager func_pass_manager(gModule);
-  //func_pass_manager.add(llvm::createCFGSimplificationPass());
+  func_pass_manager.add(llvm::createCFGSimplificationPass());
   func_pass_manager.add(llvm::createPromoteMemoryToRegisterPass());
   func_pass_manager.add(llvm::createReassociatePass());
   func_pass_manager.add(llvm::createDeadStoreEliminationPass());
