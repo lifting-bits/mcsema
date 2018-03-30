@@ -808,18 +808,6 @@ void CallingConvention::StoreThreadPointer(llvm::BasicBlock *block,
       ir.CreateLoad(remill::FindVarInFunction(block, ThreadPointerVarName())));
 }
 
-void CallingConvention::StoreThreadPointer(llvm::BasicBlock *block,
-                                           llvm::Value *new_val) {
-  llvm::IRBuilder<> ir(block);
-  auto val_type = new_val->getType();
-  if (val_type->isPointerTy()) {
-    new_val = ir.CreatePtrToInt(new_val, gWordType);
-  }
-  ir.CreateStore(
-      new_val,
-      ir.CreateLoad(remill::FindVarInFunction(block, ThreadPointerVarName())));
-}
-
 // Return the address of the base of the TLS data.
 llvm::Value *GetTLSBaseAddress(llvm::IRBuilder<> &ir) {
   enum {
