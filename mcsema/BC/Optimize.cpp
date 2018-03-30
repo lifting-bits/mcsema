@@ -118,7 +118,10 @@ static void RunO3(void) {
   TLI->disableAllFunctions();  // `-fno-builtin`.
 
   llvm::PassManagerBuilder builder;
-  builder.OptLevel = 3;
+
+  // TODO(akshayk): Reduced optimization level to avoid replacing basic block with
+  // the unreachable instruction. Discuss the possible solution.
+  builder.OptLevel = 0;
   builder.SizeLevel = 2;
   builder.Inliner = llvm::createFunctionInliningPass(
       std::numeric_limits<int>::max());
@@ -140,11 +143,7 @@ static void RunO3(void) {
     func_manager.run(func);
   }
   func_manager.doFinalization();
-#if 0
-  // TODO(akshayk): The module optimization pass replaces the basic block with
-  // unreachable instruction. Look into this.
   module_manager.run(*gModule);
-#endif
 }
 
 // Get a list of all ISELs.

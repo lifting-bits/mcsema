@@ -41,6 +41,14 @@ class Test(object):
     if not os.path.isfile(self._binary_path):
       raise IOError("The binary file does not exists")
 
+    tob_lib_repository = os.environ["TRAILOFBITS_LIBRARIES"]
+    clang_path = os.path.join(tob_lib_repository, "llvm", "bin", "clang")
+    llvm_version = subprocess.check_output([clang_path, "--version"]).split(" ")[2][0:3]
+    self._abi_path = os.path.join(self._root_path, "ABI", "abi-" + llvm_version + ".bc")
+    if not os.path.isfile(self._abi_path):
+      print self._abi_path
+      raise IOError("The abi file does not exists")
+
     stdout_path = os.path.join(self._root_path, "stdout", self._name)
     if not os.path.isfile(stdout_path):
       raise IOError("The stdout file does not exists")
@@ -89,6 +97,9 @@ class Test(object):
 
   def binary_path(self):
     return self._binary_path
+
+  def abi_path(self):
+    return self._abi_path
 
   def bitcode_path(self):
     return self._bitcode_path
@@ -350,7 +361,7 @@ def lift_test_cfg(test_directory, toolset, test):
   command_line = [toolset["mcsema-lift"], "--arch", test.architecture(),
                   "--os", test.platform(), "--cfg", test.cfg_path(),
                   "--output", output_file_path, "--libc_constructor", "init",
-                  "--libc_destructor", "fini"]
+                  "--libc_destructor", "fini", "--abi_libraries", test.abi_path()]
 
   exec_result = execute_with_timeout(command_line, 1200)
 
