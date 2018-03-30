@@ -401,7 +401,6 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
         handler = llvm::Function::Create(
             llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext), args_type, false),
             llvm::Function::ExternalWeakLinkage, "__mcsema_exception_ret", gModule);
-        handler->addFnAttr(llvm::Attribute::NoReturn);
       }
       ir.CreateCall(handler, args);
       auto lp_entry = ctx.ea_to_block[entry->lp_ea];

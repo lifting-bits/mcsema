@@ -121,7 +121,7 @@ static void RunO3(void) {
 
   // TODO(akshayk): Reduced optimization level to avoid replacing basic block with
   // the unreachable instruction. Discuss the possible solution.
-  builder.OptLevel = 0;
+  builder.OptLevel = 3;
   builder.SizeLevel = 2;
   builder.Inliner = llvm::createFunctionInliningPass(
       std::numeric_limits<int>::max());
