@@ -1,0 +1,10 @@
+Throw test finished! 0
+  Throwing out_of_range()
+Catching: out_of_range out_of_range comment
+Throw test finished! 4
+Catching: double
+Throw test finished! 2
+  Throwing runtime_error()
+Catching: runtime_error runtime_error comment
+Throw test finished! 6
+Throw test finished! 0
