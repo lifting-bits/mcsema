@@ -192,12 +192,14 @@ install(
   LIBRARY DESTINATION "${install_folder}/lib"
 )
 
+set(python_package_installer "${CMAKE_CURRENT_SOURCE_DIR}/tools/setup_launcher")
+
 if(DEFINED WIN32)
   string(REPLACE "/" "\\" python_package_install_path "${install_folder}")
-  set(python_package_installer "windows_setup_launcher.bat")
+  set(python_package_installer "${python_package_installer}.bat")
 else()
   set(python_package_install_path "${install_folder}")
-  set(python_package_installer "setup_launcher.sh")
+  set(python_package_installer "${python_package_installer}.sh")
 endif()
 
 install(CODE
