@@ -51,8 +51,13 @@ macro(main)
   # compiler and linker flags
   #
 
-  # enable c++14 for all targets
-  set(CMAKE_CXX_STANDARD 14)
+  # Globally set the required C++ standard
+  if(WIN32)
+    set(CMAKE_CXX_STANDARD 14)
+  else()
+    set(CMAKE_CXX_STANDARD 11)
+  endif()
+
   set(CMAKE_CXX_EXTENSIONS OFF)
 
   if(WIN32)
