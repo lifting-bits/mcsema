@@ -102,8 +102,8 @@ struct NativeFunction : public NativeObject {
   std::vector<struct NativeStackVariable *> stack_vars;
   std::vector<struct NativeExceptionFrame *> eh_frame;
   llvm::Function *function;
-  mutable llvm::Value *rsp_var;
-  mutable llvm::Value *rbp_var;
+  mutable llvm::Value *stack_ptr_var;
+  mutable llvm::Value *frame_ptr_var;
 };
 
 struct NativeStackVariable : public NativeObject {
@@ -125,7 +125,7 @@ struct NativeExceptionFrame : public NativeObject {
   uint64_t lp_ea;
   uint64_t action;
   mutable llvm::Value *lp_var;
-  std::vector<NativeExternalVariable *> ttype;
+  std::vector<NativeExternalVariable *> type_var;
 };
 
 // Function that is defined outside of the binary.
