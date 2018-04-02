@@ -60,6 +60,10 @@ TO_RECOVER = {
 
 RECOVER_EHTABLE = False
 
+PERSONALITY_FUNCTIONS = [
+    "__gxx_personality_v0",
+    ]
+
 # Map of external functions names to a tuple containing information like the
 # number of arguments and calling convention of the function.
 EMAP = {}
@@ -1328,7 +1332,7 @@ def identify_external_symbols():
             extern_name = found_name
             break
 
-        if extern_name != "__gxx_personality_v0":
+        if extern_name not in PERSONALITY_FUNCTIONS:
           DEBUG("WARNING: Adding variable {} at {:x} as external".format(
               extern_name, ea))
 

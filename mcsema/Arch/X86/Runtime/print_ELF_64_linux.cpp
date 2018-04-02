@@ -585,10 +585,10 @@ int main(void) {
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 
-  // Implements `__mcsema_get_rsp`. Returns the stack pointer register.
-  fprintf(out, "  .globl __mcsema_get_rsp\n");
-  fprintf(out, "  .type __mcsema_get_rsp,@function\n");
-  fprintf(out, "__mcsema_get_rsp:\n");
+  // Implements `__mcsema_get_sp`. Returns the stack pointer register.
+  fprintf(out, "  .globl __mcsema_get_sp\n");
+  fprintf(out, "  .type __mcsema_get_sp,@function\n");
+  fprintf(out, "__mcsema_get_sp:\n");
   fprintf(out, "  .cfi_startproc\n");
   fprintf(out, "  mov rax, fs:[0]\n");
   fprintf(out, "  lea rdx, [__mcsema_reg_state@TPOFF]\n");
@@ -596,14 +596,14 @@ int main(void) {
   fprintf(out, "  mov rax, [rax + %" PRIuMAX "]\n", __builtin_offsetof(State, RSP));
   fprintf(out, "  ret\n");
   fprintf(out, ".Lfunc_end20:\n");
-  fprintf(out, "  .size __mcsema_get_rsp,.Lfunc_end20-__mcsema_get_rsp\n");
+  fprintf(out, "  .size __mcsema_get_sp,.Lfunc_end20-__mcsema_get_sp\n");
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 
-  // Implements `__mcsema_get_rbp`. Returns the base pointer register.
-  fprintf(out, "  .globl __mcsema_get_rbp\n");
-  fprintf(out, "  .type __mcsema_get_rbp,@function\n");
-  fprintf(out, "__mcsema_get_rbp:\n");
+  // Implements `__mcsema_get_bp`. Returns the base pointer register.
+  fprintf(out, "  .globl __mcsema_get_bp\n");
+  fprintf(out, "  .type __mcsema_get_bp,@function\n");
+  fprintf(out, "__mcsema_get_bp:\n");
   fprintf(out, "  .cfi_startproc\n");
   fprintf(out, "  mov rax, fs:[0]\n");
   fprintf(out, "  lea rdx, [__mcsema_reg_state@TPOFF]\n");
@@ -611,7 +611,7 @@ int main(void) {
   fprintf(out, "  mov rax, [rax + %" PRIuMAX "]\n", __builtin_offsetof(State, RBP));
   fprintf(out, "  ret\n");
   fprintf(out, ".Lfunc_end21:\n");
-  fprintf(out, "  .size __mcsema_get_rbp,.Lfunc_end21-__mcsema_get_rbp\n");
+  fprintf(out, "  .size __mcsema_get_bp,.Lfunc_end21-__mcsema_get_bp\n");
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 

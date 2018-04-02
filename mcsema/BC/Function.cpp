@@ -173,20 +173,20 @@ static void InlineSubFuncInvoke(llvm::BasicBlock *block,
                                 llvm::Function *sub, llvm::BasicBlock *ifnormal,
                                 llvm::BasicBlock *ifexception, const NativeFunction *cfg_func) {
   llvm::IRBuilder <> ir(block);
-  auto sub_1 = gModule->getFunction("__mcsema_get_rsp");
+  auto sub_1 = gModule->getFunction("__mcsema_get_sp");
   if (sub_1 == nullptr) {
     sub_1 = llvm::Function::Create(
         llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), true), llvm::GlobalValue::ExternalLinkage,
-        "__mcsema_get_rsp", gModule);
+        "__mcsema_get_sp", gModule);
   }
   auto call_rsp = ir.CreateCall(sub_1);
   ir.CreateStore(call_rsp, cfg_func->rsp_var);
 
-  auto sub_2 = gModule->getFunction("__mcsema_get_rbp");
+  auto sub_2 = gModule->getFunction("__mcsema_get_bp");
   if (sub_2 == nullptr) {
     sub_2 = llvm::Function::Create(
         llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), true), llvm::GlobalValue::ExternalLinkage,
-        "__mcsema_get_rbp", gModule);
+        "__mcsema_get_bp", gModule);
   }
   auto call_rbp = ir.CreateCall(sub_2);
   ir.CreateStore(call_rbp, cfg_func->rbp_var);
@@ -561,7 +561,7 @@ static bool TryLiftTerminator(TranslationContext &ctx,
             << "Function " << ctx.lifted_func->getName().str()
             << " calls " << targ_func->getName().str()
             << " at " << std::hex << inst.pc << std::dec;
-        if ((ctx.cfg_inst->lp_ea == 0) || (ctx.lp_to_block[ctx.cfg_inst->lp_ea] == nullptr)) {
+        if (!ctx.cfg_inst->lp_ea) {
           InlineSubFuncCall(block, targ_func);
         } else {
           auto exception_block = ctx.lp_to_block[ctx.cfg_inst->lp_ea];
