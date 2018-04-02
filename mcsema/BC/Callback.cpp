@@ -512,7 +512,6 @@ static void ImplementLiftedToNativeCallback(
     const NativeExternalFunction *cfg_func) {
 
   callback_func->addFnAttr(llvm::Attribute::NoInline);
-  callback_func->removeFnAttr(llvm::Attribute::NoUnwind);
 
   auto block = llvm::BasicBlock::Create(*gContext, "", callback_func);
 

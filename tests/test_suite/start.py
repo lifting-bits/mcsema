@@ -46,8 +46,7 @@ class Test(object):
     llvm_version = subprocess.check_output([clang_path, "--version"]).split(" ")[2][0:3]
     self._abi_path = os.path.join(self._root_path, "ABI", "abi-" + llvm_version + ".bc")
     if not os.path.isfile(self._abi_path):
-      print self._abi_path
-      raise IOError("The abi file does not exists")
+      print self._abi_path +" The abi file does not exists"
 
     stdout_path = os.path.join(self._root_path, "stdout", self._name)
     if not os.path.isfile(stdout_path):

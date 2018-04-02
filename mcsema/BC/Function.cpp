@@ -104,6 +104,7 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
   // Make sure to keep this function around (along with `ExternalLinkage`).
   func->addFnAttr(llvm::Attribute::NoInline);
   func->removeFnAttr(llvm::Attribute::ReadNone);
+  func->addFnAttr(llvm::Attribute::OptimizeNone);
 
 #if LLVM_VERSION_NUMBER < LLVM_VERSION(3, 7)
   func->addFnAttr(llvm::Attribute::ReadOnly);
@@ -295,8 +296,8 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
 
     // The personality function `__gxx_personality_v0` is lifted as global variable. Erase the
     // variable before declaring it as the function.
-    if (auto llvm_used = gModule->getGlobalVariable("__gxx_personality_v0")) {
-      llvm_used->eraseFromParent();
+    if (auto personality_func_var = gModule->getGlobalVariable("__gxx_personality_v0")) {
+      personality_func_var->eraseFromParent();
     }
 
     auto personality = gModule->getFunction("__gxx_personality_v0");
@@ -311,7 +312,7 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
     lifted_func->addFnAttr(llvm::Attribute::UWTable);
     lifted_func->addFnAttr(llvm::Attribute::OptimizeNone);
     lifted_func->removeFnAttr(llvm::Attribute::NoUnwind);
-#if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 7)
+#if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
     lifted_func->setPersonalityFn(personality);
 #endif
   }
@@ -785,7 +786,6 @@ static llvm::Function *LiftFunction(
   lifted_func->removeFnAttr(llvm::Attribute::NoReturn);
   lifted_func->removeFnAttr(llvm::Attribute::NoUnwind);
   lifted_func->addFnAttr(llvm::Attribute::NoInline);
-  lifted_func->addFnAttr(llvm::Attribute::OptimizeNone);
   lifted_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
 
   TranslationContext ctx;

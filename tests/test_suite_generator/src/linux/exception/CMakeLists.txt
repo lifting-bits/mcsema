@@ -15,7 +15,6 @@ project(exception_test)
 cmake_minimum_required(VERSION 3.2)
 
 set(PROJECT_CXXFLAGS -Wall -Werror)
-set(PROJECT_LDFLAGS -lpthread)
 
 set(PROJECT_SOURCEFILES
   main.cpp
@@ -24,5 +23,5 @@ set(PROJECT_SOURCEFILES
 GenerateTest(${PROJECT_NAME}
   SOURCES ${PROJECT_SOURCEFILES}
   CXXFLAGS ${PROJECT_CXXFLAGS}
-  LDFLAGS ${PROJECT_LDFLAGS}
+  LDFLAGS ${PROJECT_LINKERFLAGS}
 )
