@@ -123,7 +123,7 @@ struct NativeExceptionFrame : public NativeObject {
   uint64_t start_ea;
   uint64_t end_ea;
   uint64_t lp_ea;
-  uint64_t action;
+  uint64_t action_index;
   mutable llvm::Value *lp_var;
   std::vector<NativeExternalVariable *> type_var;
 };

@@ -336,7 +336,7 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       continue;
     }
 
-    if (!entry->action) {
+    if (!entry->action_index) {
       std::stringstream ss;
       ss << "cleanup_landingpad_" << std::hex << entry->lp_ea;
       auto landing_bb = llvm::BasicBlock::Create(*gContext, ss.str(), ctx.lifted_func);
@@ -359,11 +359,16 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
       auto store_loc_1 = ir.CreateAlloca(exct_value_1->getType());
       ir.CreateStore(exct_value_1, store_loc_1);
 
-      auto lp_entry = ctx.ea_to_block[entry->lp_ea];
-      if (nullptr != lp_entry) {
-        ir.CreateBr(lp_entry);
-        ctx.lp_to_block[entry->lp_ea] = landing_bb;
-      }
+      // if `ctx.ea_to_block.count(entry->lp_ea) == 0`, the landing pad basic block
+      // might not be recovered. Throw a warning in such case.
+      LOG_IF(ERROR, !ctx.ea_to_block.count(entry->lp_ea))
+          << "Missing block at " << std::hex << entry->lp_ea
+          << " for exception landing pad from " << entry->start_ea << std::dec;
+
+      auto lp_entry = GetOrCreateBlock(ctx, entry->lp_ea);
+      ir.CreateBr(lp_entry);
+      ctx.lp_to_block[entry->lp_ea] = landing_bb;
+
     } else {
       std::stringstream ss;
       ss << "catch_landingpad_" << std::hex << entry->lp_ea;

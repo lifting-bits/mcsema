@@ -423,7 +423,7 @@ NativeExceptionFrame::NativeExceptionFrame()
     : start_ea(0),
       end_ea(0),
       lp_ea(0),
-      action(0),
+      action_index(0),
       lp_var(nullptr){}
 
 void NativeObject::ForwardTo(NativeObject *dest) const {
@@ -952,7 +952,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       frame_var->start_ea = entry.start_ea();
       frame_var->end_ea = entry.end_ea();
       frame_var->lp_ea = entry.lp_ea();
-      frame_var->action = entry.action();
+      frame_var->action_index = entry.action();
 
       // List all the types of the landing pad
       for (const auto &extern_var : entry.ttype()) {
