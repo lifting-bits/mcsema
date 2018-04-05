@@ -99,7 +99,8 @@ if ("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
 endif()
 
 #TODO(artem): this may need some logic to select only ABIs compatible with current os/arch
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/OS/Linux)
+#TODO(kumarak): Disable the ABI libraries build till we don't have script to automate the generation of `ABI_libc.h`. Use pre-build library to test the --abi_libraries flag
+#add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/OS/Linux)
 
 install(
   TARGETS ${MCSEMA_LIFT}
