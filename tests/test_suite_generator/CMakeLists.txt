@@ -11,6 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specifi
 
+# CMAKE_C_COMPILER or CMAKE_CXX_COMPILER *must* be set before project()
+# otherwise it causes infinite loops for some cmake versions
+# see: https://cmake.org/Bug/view.php?id=14841
+set(CLANG_PATH "$ENV{TRAILOFBITS_LIBRARIES}/llvm/bin/clang")
+set(CLANGXX_PATH "$ENV{TRAILOFBITS_LIBRARIES}/llvm/bin/clang++")
+set(CMAKE_ADA_COMPILER_ID_RUN 1)
+
+if (NOT "${CMAKE_CXX_COMPILER}" STREQUAL "${CLANGXX_PATH}")
+  set(CMAKE_CXX_COMPILER "${CLANGXX_PATH}")
+endif ()
+if (NOT "${CMAKE_C_COMPILER}" STREQUAL "${CLANG_PATH}")
+  set(CMAKE_C_COMPILER "${CLANG_PATH}")
+endif ()
+
 project(mcsema_test_suite)
 cmake_minimum_required(VERSION 3.5)
 
@@ -254,6 +268,12 @@ function (GenerateTest target_name)
   endforeach ()
 
   foreach (architecture ${ARCHITECTURE_LIST})
+    if("${source_file_list}" MATCHES "\.adb")
+      if(${architecture} STREQUAL "x86")
+        message(" > skipping x86 support for ADA target: ${target_name}")
+        continue()
+      endif()
+    endif()
     message(" > ${target_name} (${architecture})")
     set(current_target_name "${target_name}_${architecture}")
 
@@ -330,18 +350,11 @@ if ("${MCSEMADISASS_PATH}" STREQUAL "MCSEMADISASS_PATH-NOTFOUND")
   message(FATAL_ERROR "Failed to locate the mcsema-disass executable!")
 endif ()
 
-set(CLANG_PATH "$ENV{TRAILOFBITS_LIBRARIES}/llvm/bin/clang++")
-
 message("Toolset")
 message(" > mcsema-lift: ${MCSEMALIFT_PATH}")
 message(" > clang: ${CLANG_PATH}")
 message(" > idal64: ${IDAL64_PATH}")
 message(" > mcsema-disass: ${MCSEMADISASS_PATH}")
-
-if (NOT "${CMAKE_CXX_COMPILER}" STREQUAL "${CLANG_PATH}")
-  set(CMAKE_CXX_COMPILER "${CLANG_PATH}")
-  set(CMAKE_C_COMPILER "${CLANG_PATH}")
-endif ()
 
 set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/test_suite")
 

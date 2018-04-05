@@ -105,7 +105,7 @@ int main(int argc, char * argv[]) {
 
   pthread_t pro_th;
   pthread_t cons_th;
-  pthread_create(&pro_th, NULL, producer, iter_counter);
+  pthread_create(&pro_th, NULL, producer, reinterpret_cast<void*>(iter_counter));
   pthread_create(&cons_th, NULL, consumer, NULL);
   pthread_join(pro_th, NULL);
   pthread_join(cons_th, NULL);
