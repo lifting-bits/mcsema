@@ -73,7 +73,7 @@ DEFINE_bool(check_pc_at_breakpoints, false,
             "Check whether or not the emulated program counter is correct at "
             "each injected 'breakpoint' function. This is a debugging aid.");
 
-DEFINE_string(personalityfn, "__gxx_personality_v0",
+DEFINE_string(exception_personalityfn, "__gxx_personality_v0",
               "Add a personality function for lifting exception handling "
               "routine. Assigned __gxx_personality_v0 as default for c++ ABTs.");
 
@@ -84,9 +84,23 @@ namespace mcsema {
 namespace {
 
 // Get the personality function of exception handling ABIs.
-// Default initializes to libstdc++ function `__gxx_personality_v0`
-static std::string GetPersonalityFunction(void) {
-  return FLAGS_personalityfn;
+// For libstdc++ it will be reference to `__gxx_personality_v0`
+static llvm::Function *GetPersonalityFunction(void) {
+  auto personalityfn_name = FLAGS_exception_personalityfn;
+
+  // The personality function is lifted as global variable. Check and erase the
+  // variable before declaring it as the function.
+  if (auto personalityfn = gModule->getGlobalVariable(personalityfn_name)) {
+    personalityfn->eraseFromParent();
+  }
+
+  auto personalityfn = gModule->getFunction(personalityfn_name);
+  if (personalityfn == nullptr) {
+    personalityfn = llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getInt32Ty(*gContext), true),
+        llvm::Function::ExternalLinkage, personalityfn_name, gModule);
+  }
+  return personalityfn;
 }
 
 static llvm::Function *GetRegTracer(void) {
@@ -394,26 +408,13 @@ static void CreateLandingPad(TranslationContext &ctx,
 static void LiftExceptionFrameLP(TranslationContext &ctx,
                                  const NativeFunction *cfg_func) {
   if (cfg_func->eh_frame.size() > 0) {
-    // The personality function is lifted as global variable. Check and erase the
-    // variable before declaring it as the function.
-    if (auto personality_func_var = gModule->getGlobalVariable(
-                                      GetPersonalityFunction())) {
-      personality_func_var->eraseFromParent();
-    }
-
-    auto personality = gModule->getFunction(GetPersonalityFunction());
-    if (personality == nullptr) {
-      personality = llvm::Function::Create(
-          llvm::FunctionType::get(llvm::Type::getInt32Ty(*gContext), true),
-          llvm::Function::ExternalLinkage, GetPersonalityFunction(), gModule);
-    }
-
+    auto personalityfn = GetPersonalityFunction();
     auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
     lifted_func->addFnAttr(llvm::Attribute::UWTable);
     lifted_func->addFnAttr(llvm::Attribute::OptimizeNone);
     lifted_func->removeFnAttr(llvm::Attribute::NoUnwind);
 #if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
-    lifted_func->setPersonalityFn(personality);
+    lifted_func->setPersonalityFn(personalityfn);
 #endif
   }
 
