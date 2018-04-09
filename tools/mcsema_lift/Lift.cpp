@@ -261,6 +261,10 @@ int main(int argc, char *argv[]) {
      // Print a list of the instructions that can be lifted.
      << "    [--list-supported]" << std::endl
 
+     // Assign the personality function for exception handling ABIs. It is
+     // `__gxx_personality_v0` for libstdc++ and `__gnat_personality_v0` for ADA ABIs.
+     << "    [--personalityfn]" << std::endl
+
      // Print the version and exit.
      << "    [--version]" << std::endl
      << std::endl;

@@ -73,11 +73,21 @@ DEFINE_bool(check_pc_at_breakpoints, false,
             "Check whether or not the emulated program counter is correct at "
             "each injected 'breakpoint' function. This is a debugging aid.");
 
-#define PERSONALITY_FUNCTION  "__gxx_personality_v0"
+DEFINE_string(personalityfn, "__gxx_personality_v0",
+              "Add a personality function for lifting exception handling "
+              "routine. Assigned __gxx_personality_v0 as default for c++ ABTs.");
+
+
 
 namespace mcsema {
 
 namespace {
+
+// Get the personality function of exception handling ABIs.
+// Default initializes to libstdc++ function `__gxx_personality_v0`
+static std::string GetPersonalityFunction(void) {
+  return FLAGS_personalityfn;
+}
 
 static llvm::Function *GetRegTracer(void) {
   auto reg_tracer = gModule->getFunction("__mcsema_reg_tracer");
@@ -158,13 +168,20 @@ static llvm::Function *GetLiftedFunction(const NativeModule *cfg_module,
   return nullptr;
 }
 
+// The exception handling prologue function clears the stack and set the
+// stack and frame pointer correctly before jumping to the handler routine.
 static llvm::Function *GetExceptionHandlerPrologue(void) {
   auto exception_handler = gModule->getFunction("__mcsema_exception_ret");
   if (exception_handler == nullptr) {
-    llvm::Type* args_type[] = {llvm::Type::getInt64Ty(*gContext), llvm::Type::getInt64Ty(*gContext)};
+    llvm::Type* args_type[] = {
+        llvm::Type::getInt64Ty(*gContext),
+        llvm::Type::getInt64Ty(*gContext)
+    };
+    auto func_type = llvm::FunctionType::get(
+        llvm::Type::getVoidTy(*gContext), args_type, false);
     exception_handler = llvm::Function::Create(
-        llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext), args_type, false),
-        llvm::Function::ExternalWeakLinkage, "__mcsema_exception_ret", gModule);
+        func_type, llvm::Function::ExternalWeakLinkage,
+        "__mcsema_exception_ret", gModule);
   }
   return exception_handler;
 }
@@ -188,18 +205,20 @@ static void InlineSubFuncInvoke(llvm::BasicBlock *block,
                                 llvm::BasicBlock *ifexception, const NativeFunction *cfg_func) {
   llvm::IRBuilder <> ir(block);
   auto get_sp_func = gModule->getFunction("__mcsema_get_sp");
-  if (get_sp_func == nullptr) {
+  if (!get_sp_func) {
     get_sp_func = llvm::Function::Create(
-        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), true), llvm::GlobalValue::ExternalLinkage,
+        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), true),
+        llvm::GlobalValue::ExternalLinkage,
         "__mcsema_get_sp", gModule);
   }
   auto sp_var = ir.CreateCall(get_sp_func);
   ir.CreateStore(sp_var, cfg_func->stack_ptr_var);
 
   auto get_bp_func = gModule->getFunction("__mcsema_get_bp");
-  if (get_bp_func == nullptr) {
+  if (!get_bp_func) {
     get_bp_func = llvm::Function::Create(
-        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), true), llvm::GlobalValue::ExternalLinkage,
+        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), true),
+        llvm::GlobalValue::ExternalLinkage,
         "__mcsema_get_bp", gModule);
   }
   auto bp_var = ir.CreateCall(get_bp_func);
@@ -303,23 +322,90 @@ static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
   return block;
 }
 
+
+static void CreateLandingPad(TranslationContext &ctx,
+                             struct NativeExceptionFrame *eh_entry) {
+  std::stringstream ss;
+  auto is_catch = (eh_entry->action_index != 0);
+  ss << "landingpad_" << std::hex << eh_entry->lp_ea;
+  auto landing_bb = llvm::BasicBlock::Create(
+      *gContext, ss.str(), ctx.lifted_func);
+
+  llvm::IRBuilder<> ir(landing_bb);
+  auto exn_type = llvm::StructType::get(llvm::Type::getInt8PtrTy(*gContext),
+                                        llvm::Type::getInt32Ty(*gContext),
+                                        nullptr);
+
+#if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
+  auto lpad = ir.CreateLandingPad(exn_type, 1, ss.str());
+#else
+  auto personality = gModule->getFunction(PERSONALITY_FUNCTION);
+  auto lpad = ir.CreateLandingPad(exn_type, personality, 1, ss.str());
+#endif
+
+  if(!is_catch) {
+    lpad->setCleanup(true);
+  }
+
+  if(is_catch) {
+    auto catch_all = false;
+    // The type indices in exception table are reversed for some of the binaries.
+    // In such case, the wrong exception handler may get called.
+    // #398 (https://github.com/trailofbits/mcsema/issues/398)
+    // TODO(kumarak): Fix the wrong indices in the exception table for catch all
+    for (auto type = eh_entry->type_var.rbegin(); type != eh_entry->type_var.rend(); type++) {
+      if ((*type)->ea) {
+        lpad->addClause(gModule->getGlobalVariable((*type)->name));
+      } else {
+        catch_all = true;
+      }
+    }
+
+    if (catch_all) {
+      lpad->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
+    }
+
+    std::vector<llvm::Value *> args(2);
+#if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
+    args[0] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext),
+                            ctx.cfg_func->stack_ptr_var);
+    args[1] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext),
+                            ctx.cfg_func->frame_ptr_var);
+#else
+    args[0] = ir.CreateLoad(ctx.cfg_func->sp_var, true);
+    args[1] = ir.CreateLoad(ctx.cfg_func->bp_var, true);
+#endif
+    auto handler = GetExceptionHandlerPrologue();
+    ir.CreateCall(handler, args);
+  }
+
+  // if `ctx.ea_to_block.count(entry->lp_ea) == 0`, the landing pad basic block
+  // has not been recovered. Throw a warning in such case.
+  LOG_IF(ERROR, !ctx.ea_to_block.count(eh_entry->lp_ea))
+      << "Missing block at " << std::hex << eh_entry->lp_ea
+      << " for exception landing pad from " << eh_entry->start_ea << std::dec;
+
+  auto lp_entry = GetOrCreateBlock(ctx, eh_entry->lp_ea);
+  ir.CreateBr(lp_entry);
+  ctx.lp_to_block[eh_entry->lp_ea] = landing_bb;
+}
+
+
 static void LiftExceptionFrameLP(TranslationContext &ctx,
                                  const NativeFunction *cfg_func) {
-
   if (cfg_func->eh_frame.size() > 0) {
-
-    // The personality function `__gxx_personality_v0` is lifted as global variable. Erase the
+    // The personality function is lifted as global variable. Check and erase the
     // variable before declaring it as the function.
-    if (auto personality_func_var = gModule->getGlobalVariable(PERSONALITY_FUNCTION)) {
+    if (auto personality_func_var = gModule->getGlobalVariable(
+                                      GetPersonalityFunction())) {
       personality_func_var->eraseFromParent();
     }
 
-    auto personality = gModule->getFunction(PERSONALITY_FUNCTION);
-
+    auto personality = gModule->getFunction(GetPersonalityFunction());
     if (personality == nullptr) {
       personality = llvm::Function::Create(
           llvm::FunctionType::get(llvm::Type::getInt32Ty(*gContext), true),
-          llvm::Function::ExternalLinkage, PERSONALITY_FUNCTION, gModule);
+          llvm::Function::ExternalLinkage, GetPersonalityFunction(), gModule);
     }
 
     auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
@@ -332,90 +418,8 @@ static void LiftExceptionFrameLP(TranslationContext &ctx,
   }
 
   for (auto &entry : cfg_func->eh_frame) {
-    if (!entry->lp_ea) {
-      continue;
-    }
-
-    if (!entry->action_index) {
-      std::stringstream ss;
-      ss << "cleanup_landingpad_" << std::hex << entry->lp_ea;
-      auto landing_bb = llvm::BasicBlock::Create(*gContext, ss.str(), ctx.lifted_func);
-      llvm::IRBuilder<> ir(landing_bb);
-      auto exn_type = llvm::StructType::get(llvm::Type::getInt8PtrTy(*gContext),
-                                            llvm::Type::getInt32Ty(*gContext), nullptr);
-#if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
-      auto lpad = ir.CreateLandingPad(exn_type, 1, "cleanup.lpad");
-#else
-      auto personality = gModule->getFunction(PERSONALITY_FUNCTION);
-      auto lpad = ir.CreateLandingPad(exn_type, personality, 1, "cleanup.lpad");
-#endif
-      lpad->setCleanup(true);
-
-      auto exct_value_0  = ir.CreateExtractValue(lpad, 0);
-      auto store_loc_0 = ir.CreateAlloca(exct_value_0->getType());
-      ir.CreateStore(exct_value_0, store_loc_0);
-
-      auto exct_value_1 = ir.CreateExtractValue(lpad, 1);
-      auto store_loc_1 = ir.CreateAlloca(exct_value_1->getType());
-      ir.CreateStore(exct_value_1, store_loc_1);
-
-      // if `ctx.ea_to_block.count(entry->lp_ea) == 0`, the landing pad basic block
-      // might not be recovered. Throw a warning in such case.
-      LOG_IF(ERROR, !ctx.ea_to_block.count(entry->lp_ea))
-          << "Missing block at " << std::hex << entry->lp_ea
-          << " for exception landing pad from " << entry->start_ea << std::dec;
-
-      auto lp_entry = GetOrCreateBlock(ctx, entry->lp_ea);
-      ir.CreateBr(lp_entry);
-      ctx.lp_to_block[entry->lp_ea] = landing_bb;
-
-    } else {
-      std::stringstream ss;
-      ss << "catch_landingpad_" << std::hex << entry->lp_ea;
-      auto landing_bb = llvm::BasicBlock::Create(*gContext, ss.str(), ctx.lifted_func);
-      llvm::IRBuilder<> ir(landing_bb);
-      auto num_clauses = entry->type_var.size();
-      auto exn_type = llvm::StructType::get(llvm::Type::getInt8PtrTy(*gContext),
-                                            llvm::Type::getInt32Ty(*gContext), nullptr);
-#if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
-      auto lpad = ir.CreateLandingPad(exn_type, static_cast<unsigned int>(num_clauses), "catch.lpad");
-#else
-      auto personality = gModule->getFunction(PERSONALITY_FUNCTION);
-      auto lpad = ir.CreateLandingPad(exn_type, personality, static_cast<unsigned int>(num_clauses), "catch.lpad");
-#endif
-      auto catch_all = false;
-
-      // The type indices in exception table are reversed for some of the binaries. In such case, the
-      // wrong exception handler may get called.
-      // TODO(kumarak): Fix the wrong indices in the exception table.
-      for (auto type = entry->type_var.rbegin(); type != entry->type_var.rend(); type++) {
-        if ((*type)->ea) {
-          lpad->addClause(gModule->getGlobalVariable((*type)->name));
-        } else {
-          catch_all = true;
-        }
-      }
-
-      if (catch_all) {
-        lpad->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
-      }
-
-      std::vector<llvm::Value *> args(2);
-#if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
-      args[0] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext), cfg_func->stack_ptr_var);
-      args[1] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext), cfg_func->frame_ptr_var);
-#else
-      args[0] = ir.CreateLoad(cfg_func->sp_var, true);
-      args[1] = ir.CreateLoad(cfg_func->bp_var, true);
-#endif
-      auto handler = GetExceptionHandlerPrologue();
-      ir.CreateCall(handler, args);
-      auto lp_entry = ctx.ea_to_block[entry->lp_ea];
-      if(lp_entry == nullptr) {
-        lp_entry = GetOrCreateBlock(ctx, entry->lp_ea);
-      }
-      ir.CreateBr(lp_entry);
-      ctx.lp_to_block[entry->lp_ea] = landing_bb;
+    if (entry->lp_ea) {
+      CreateLandingPad(ctx, entry);
     }
   }
 }

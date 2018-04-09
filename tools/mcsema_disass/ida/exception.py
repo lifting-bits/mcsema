@@ -211,7 +211,8 @@ def format_lsda_actions(action_tbl, actions, type_addr, type_enc, act_id):
       type_slot = type_addr - ar_filter * enc_size(type_enc)
       type_ea, eatmp = read_enc_value(type_slot, type_enc)
       DEBUG("catch type typeinfo = {:x} {} {}".format(type_ea, get_symbol_name(type_ea), ar_filter))
-      action_list.append((ar_disp, ar_filter, type_ea))
+      if (ar_disp, ar_filter, type_ea) not in action_list:
+        action_list.append((ar_disp, ar_filter, type_ea))
 
     if ar_disp == 0:
       continue
@@ -286,7 +287,6 @@ def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
       DEBUG("ea {:x}: cs_start[{}] = {:x}  ({})".format(ea, i, cs_start, get_symbol_name(start_ea)))
       ea = next_ea
       heads.add(cs_start)
-      heads.add(cs_start + cs_len)
       
       cs_len, next_ea = read_enc_value(ea, cs_enc & 0x0F)
       cs_end = cs_start + cs_len
@@ -465,7 +465,6 @@ def recover_exception_entries(F, func_ea):
         AC.size = ar_filter
         AC.is_weak = False
         AC.is_thread_local = False
-
 
 def fix_function_bounds(min_ea, max_ea):
   for func_ea, range in _FUNC_UNWIND_FRAME_EAS:
