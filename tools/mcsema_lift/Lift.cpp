@@ -263,7 +263,7 @@ int main(int argc, char *argv[]) {
 
      // Assign the personality function for exception handling ABIs. It is
      // `__gxx_personality_v0` for libstdc++ and `__gnat_personality_v0` for ADA ABIs.
-     << "    [--exception_personalityfn]" << std::endl
+     << "    [--exception_personality_func]" << std::endl
 
      // Print the version and exit.
      << "    [--version]" << std::endl

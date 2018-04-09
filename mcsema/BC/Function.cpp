@@ -73,7 +73,7 @@ DEFINE_bool(check_pc_at_breakpoints, false,
             "Check whether or not the emulated program counter is correct at "
             "each injected 'breakpoint' function. This is a debugging aid.");
 
-DEFINE_string(exception_personalityfn, "__gxx_personality_v0",
+DEFINE_string(exception_personality_func, "__gxx_personality_v0",
               "Add a personality function for lifting exception handling "
               "routine. Assigned __gxx_personality_v0 as default for c++ ABTs.");
 
@@ -86,7 +86,7 @@ namespace {
 // Get the personality function of exception handling ABIs.
 // For libstdc++ it will be reference to `__gxx_personality_v0`
 static llvm::Function *GetPersonalityFunction(void) {
-  auto personalityfn_name = FLAGS_exception_personalityfn;
+  auto personalityfn_name = FLAGS_exception_personality_func;
 
   // The personality function is lifted as global variable. Check and erase the
   // variable before declaring it as the function.
