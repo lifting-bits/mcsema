@@ -86,21 +86,21 @@ namespace {
 // Get the personality function of exception handling ABIs.
 // For libstdc++ it will be reference to `__gxx_personality_v0`
 static llvm::Function *GetPersonalityFunction(void) {
-  auto personalityfn_name = FLAGS_exception_personality_func;
+  const auto &personality_func_name = FLAGS_exception_personality_func;
 
   // The personality function is lifted as global variable. Check and erase the
   // variable before declaring it as the function.
-  if (auto personalityfn = gModule->getGlobalVariable(personalityfn_name)) {
-    personalityfn->eraseFromParent();
+  if (auto personality_func = gModule->getGlobalVariable(personality_func_name)) {
+    personality_func->eraseFromParent();
   }
 
-  auto personalityfn = gModule->getFunction(personalityfn_name);
-  if (personalityfn == nullptr) {
-    personalityfn = llvm::Function::Create(
+  auto personality_func = gModule->getFunction(personality_func_name);
+  if (personality_func == nullptr) {
+    personality_func = llvm::Function::Create(
         llvm::FunctionType::get(llvm::Type::getInt32Ty(*gContext), true),
-        llvm::Function::ExternalLinkage, personalityfn_name, gModule);
+        llvm::Function::ExternalLinkage, personality_func_name, gModule);
   }
-  return personalityfn;
+  return personality_func;
 }
 
 static llvm::Function *GetRegTracer(void) {
@@ -215,30 +215,30 @@ static void InlineSubFuncCall(llvm::BasicBlock *block,
 // result of the function. It also needs to stash the stack and frame pointer which
 // can be restored before handling the exception handler.
 static void InlineSubFuncInvoke(llvm::BasicBlock *block,
-                                llvm::Function *sub, llvm::BasicBlock *ifnormal,
-                                llvm::BasicBlock *ifexception, const NativeFunction *cfg_func) {
+                                llvm::Function *sub, llvm::BasicBlock *if_normal,
+                                llvm::BasicBlock *if_exception, const NativeFunction *cfg_func) {
   llvm::IRBuilder <> ir(block);
-  auto get_sp_func = gModule->getFunction("__mcsema_get_sp");
+  auto get_sp_func = gModule->getFunction("__mcsema_get_stack_pointer");
   if (!get_sp_func) {
     get_sp_func = llvm::Function::Create(
         llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), true),
         llvm::GlobalValue::ExternalLinkage,
-        "__mcsema_get_sp", gModule);
+        "__mcsema_get_stack_pointer", gModule);
   }
   auto sp_var = ir.CreateCall(get_sp_func);
   ir.CreateStore(sp_var, cfg_func->stack_ptr_var);
 
-  auto get_bp_func = gModule->getFunction("__mcsema_get_bp");
+  auto get_bp_func = gModule->getFunction("__mcsema_get_frame_pointer");
   if (!get_bp_func) {
     get_bp_func = llvm::Function::Create(
         llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), true),
         llvm::GlobalValue::ExternalLinkage,
-        "__mcsema_get_bp", gModule);
+        "__mcsema_get_frame_pointer", gModule);
   }
   auto bp_var = ir.CreateCall(get_bp_func);
   ir.CreateStore(bp_var, cfg_func->frame_ptr_var);
   auto invoke = ir.CreateInvoke(
-      sub, ifnormal, ifexception, remill::LiftedFunctionArgs(block), "");
+      sub, if_normal, if_exception, remill::LiftedFunctionArgs(block), "");
   invoke->setCallingConv(sub->getCallingConv());
 }
 
@@ -353,8 +353,8 @@ static void CreateLandingPad(TranslationContext &ctx,
 #if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
   auto lpad = ir.CreateLandingPad(exn_type, 1, ss.str());
 #else
-  auto personality = gModule->getFunction(PERSONALITY_FUNCTION);
-  auto lpad = ir.CreateLandingPad(exn_type, personality, 1, ss.str());
+  const auto &personality_func_name = FLAGS_exception_personality_func;
+  auto lpad = ir.CreateLandingPad(exn_type, personality_func_name, 1, ss.str());
 #endif
 
   if(!is_catch) {
@@ -386,8 +386,8 @@ static void CreateLandingPad(TranslationContext &ctx,
     args[1] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext),
                             ctx.cfg_func->frame_ptr_var);
 #else
-    args[0] = ir.CreateLoad(ctx.cfg_func->sp_var, true);
-    args[1] = ir.CreateLoad(ctx.cfg_func->bp_var, true);
+    args[0] = ir.CreateLoad(ctx.cfg_func->stack_ptr_var, true);
+    args[1] = ir.CreateLoad(ctx.cfg_func->frame_ptr_var, true);
 #endif
     auto handler = GetExceptionHandlerPrologue();
     ir.CreateCall(handler, args);
@@ -408,13 +408,13 @@ static void CreateLandingPad(TranslationContext &ctx,
 static void LiftExceptionFrameLP(TranslationContext &ctx,
                                  const NativeFunction *cfg_func) {
   if (cfg_func->eh_frame.size() > 0) {
-    auto personalityfn = GetPersonalityFunction();
+    auto personality_func = GetPersonalityFunction();
     auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
     lifted_func->addFnAttr(llvm::Attribute::UWTable);
     lifted_func->addFnAttr(llvm::Attribute::OptimizeNone);
     lifted_func->removeFnAttr(llvm::Attribute::NoUnwind);
 #if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
-    lifted_func->setPersonalityFn(personalityfn);
+    lifted_func->setPersonalityFn(personality_func);
 #endif
   }
 
@@ -753,8 +753,13 @@ static void AllocStackVars(llvm::BasicBlock *bb,
     s->llvm_var = ir.CreateAlloca(array_type, array_size, s->name);
   }
 
-  cfg_func->stack_ptr_var = ir.CreateAlloca(llvm::Type::getInt64Ty(*gContext), llvm::ConstantInt::get(gWordType, 1), "stack_ptr_var");
-  cfg_func->frame_ptr_var =ir.CreateAlloca(llvm::Type::getInt64Ty(*gContext), llvm::ConstantInt::get(gWordType, 1), "frame_ptr_var");
+  cfg_func->stack_ptr_var = ir.CreateAlloca(
+      llvm::Type::getInt64Ty(*gContext),
+      llvm::ConstantInt::get(gWordType, 1), "stack_ptr_var");
+
+  cfg_func->frame_ptr_var = ir.CreateAlloca(
+      llvm::Type::getInt64Ty(*gContext),
+      llvm::ConstantInt::get(gWordType, 1), "frame_ptr_var");
 }
 
 static llvm::Function *LiftFunction(
