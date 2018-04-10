@@ -538,7 +538,7 @@ int main(void) {
   fprintf(out, "  lea rdi, QWORD PTR [rsi + rdi]\n");
 
   // General purpose registers.
-  fprintf(out, "  mov [rdi + %" PRIuMAX "], rax\n", __builtin_offsetof(State, RAX));
+  //fprintf(out, "  mov [rdi + %" PRIuMAX "], rax\n", __builtin_offsetof(State, RAX));
   fprintf(out, "  mov [rdi + %" PRIuMAX "], rbx\n", __builtin_offsetof(State, RBX));
   fprintf(out, "  mov [rdi + %" PRIuMAX "], rcx\n", __builtin_offsetof(State, RCX));
   fprintf(out, "  mov [rdi + %" PRIuMAX "], rdx\n", __builtin_offsetof(State, RDX));
@@ -585,7 +585,7 @@ int main(void) {
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 
-  // Implements `__mcsema_get_sp`. Returns the stack pointer register.
+  // Implements `__mcsema_get_stack_pointer`. Returns the stack pointer register.
   fprintf(out, "  .globl __mcsema_get_stack_pointer\n");
   fprintf(out, "  .type __mcsema_get_stack_pointer,@function\n");
   fprintf(out, "__mcsema_get_stack_pointer:\n");
@@ -597,7 +597,7 @@ int main(void) {
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 
-  // Implements `__mcsema_get_bp`. Returns the base pointer register.
+  // Implements `__mcsema_get_frame_pointer`. Returns the base pointer register.
   fprintf(out, "  .globl __mcsema_get_frame_pointer\n");
   fprintf(out, "  .type __mcsema_get_frame_pointer,@function\n");
   fprintf(out, "__mcsema_get_frame_pointer:\n");
@@ -606,6 +606,19 @@ int main(void) {
   fprintf(out, "  ret\n");
   fprintf(out, ".Lfunc_end21:\n");
   fprintf(out, "  .size __mcsema_get_frame_pointer,.Lfunc_end21-__mcsema_get_frame_pointer\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  // Implements `__mcsema_get_frame_pointer`. Returns the base pointer register.
+  fprintf(out, "  .globl __mcsema_get_type_index\n");
+  fprintf(out, "  .type __mcsema_get_type_index,@function\n");
+  fprintf(out, "__mcsema_get_type_index:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "], rax\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov rax, rdx\n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end22:\n");
+  fprintf(out, "  .size __mcsema_get_type_index,.Lfunc_end22-__mcsema_get_type_index\n");
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 

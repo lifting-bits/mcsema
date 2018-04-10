@@ -189,7 +189,8 @@ static llvm::Function *GetExceptionHandlerPrologue(void) {
   if (exception_handler == nullptr) {
     llvm::Type* args_type[] = {
         llvm::Type::getInt64Ty(*gContext),
-        llvm::Type::getInt64Ty(*gContext)
+        llvm::Type::getInt64Ty(*gContext),
+        llvm::Type::getInt32Ty(*gContext)
     };
     auto func_type = llvm::FunctionType::get(
         llvm::Type::getVoidTy(*gContext), args_type, false);
@@ -216,12 +217,13 @@ static void InlineSubFuncCall(llvm::BasicBlock *block,
 // can be restored before handling the exception handler.
 static void InlineSubFuncInvoke(llvm::BasicBlock *block,
                                 llvm::Function *sub, llvm::BasicBlock *if_normal,
-                                llvm::BasicBlock *if_exception, const NativeFunction *cfg_func) {
+                                llvm::BasicBlock *if_exception,
+                                const NativeFunction *cfg_func) {
   llvm::IRBuilder <> ir(block);
   auto get_sp_func = gModule->getFunction("__mcsema_get_stack_pointer");
   if (!get_sp_func) {
     get_sp_func = llvm::Function::Create(
-        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), true),
+        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), false),
         llvm::GlobalValue::ExternalLinkage,
         "__mcsema_get_stack_pointer", gModule);
   }
@@ -231,7 +233,7 @@ static void InlineSubFuncInvoke(llvm::BasicBlock *block,
   auto get_bp_func = gModule->getFunction("__mcsema_get_frame_pointer");
   if (!get_bp_func) {
     get_bp_func = llvm::Function::Create(
-        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), true),
+        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), false),
         llvm::GlobalValue::ExternalLinkage,
         "__mcsema_get_frame_pointer", gModule);
   }
@@ -362,32 +364,94 @@ static void CreateLandingPad(TranslationContext &ctx,
   }
 
   if(is_catch) {
+    std::stringstream g_variable_name;
+    std::vector<llvm::Constant *>array_value_const;
     auto catch_all = false;
+    unsigned long catch_all_index = 0;
+
     // The type indices in exception table are reversed for some of the binaries.
     // In such case, the wrong exception handler may get called.
     // #398 (https://github.com/trailofbits/mcsema/issues/398)
     // TODO(kumarak): Fix the wrong indices in the exception table for catch all
-    for (auto type = eh_entry->type_var.rbegin(); type != eh_entry->type_var.rend(); type++) {
-      if ((*type)->ea) {
-        lpad->addClause(gModule->getGlobalVariable((*type)->name));
+    for (auto index = eh_entry->type_var.size(); index > 0; index--) {
+      auto type = eh_entry->type_var[index];
+      if (type->ea) {
+        lpad->addClause(gModule->getGlobalVariable(type->name));
+        auto value = llvm::ConstantInt::get(
+            llvm::Type::getInt32Ty(*gContext), index);
+        array_value_const.push_back(value);
       } else {
         catch_all = true;
+        catch_all_index = index;
       }
     }
 
     if (catch_all) {
       lpad->addClause(llvm::Constant::getNullValue(ir.getInt8PtrTy()));
+      array_value_const.push_back(llvm::ConstantInt::get(
+          llvm::Type::getInt32Ty(*gContext), catch_all_index));
     }
 
-    std::vector<llvm::Value *> args(2);
+    // Create the global array to store the type indices of original binary.
+    // It is required to map the type indices in the exception table of
+    // lifted binary to the original. The runtime routine does an array
+    // lookup and fixes the index value for exception type (update the `RDX` register).
+    //
+    // E.g.
+    //  `gvar_landingpad_xxxxxx = global [5 x i32] [i32 0, i32 4, i32 1, i32 2, i32 3]`
+    //
+    // The `gvar_landingpad_xxxxxx` will be associated with the landing pad. The variable
+    // array index represents the index in lifted binary and the value at the corresponsing
+    // index maps it in the original.
+    // The `0` index value is a dummy, and it is used to avoid further index computation.
+    //
+
+    g_variable_name << "gvar_landingpad_" << std::hex << eh_entry->lp_ea;
+    auto array_type = llvm::ArrayType::get(
+        llvm::Type::getInt32Ty(*gContext), eh_entry->type_var.size()+1);
+
+    if (!gModule->getOrInsertGlobal(g_variable_name.str(), array_type)) {
+      LOG_IF(ERROR, 1)
+          << "Can't create the global variable " << g_variable_name
+          << " for the landing pad at" << std::hex << eh_entry->lp_ea << std::dec;
+    }
+
+    auto gvar_landingpad = gModule->getGlobalVariable(g_variable_name.str());
+    gvar_landingpad->setLinkage(llvm::GlobalValue::ExternalLinkage);
+
+    // Set the dummy value for index `0`
+    array_value_const.push_back(llvm::ConstantInt::get(
+        llvm::Type::getInt32Ty(*gContext), 0));
+    std::reverse(array_value_const.begin(),array_value_const.end());
+    llvm::ArrayRef<llvm::Constant *> array_value(array_value_const);
+    llvm::Constant* const_array = llvm::ConstantArray::get(array_type, array_value);
+    gvar_landingpad->setInitializer(const_array);
+
+    auto get_index_func = gModule->getFunction("__mcsema_get_type_index");
+    if (!get_index_func) {
+      get_index_func = llvm::Function::Create(
+          llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), false),
+          llvm::GlobalValue::ExternalWeakLinkage,
+          "__mcsema_get_type_index", gModule);
+    }
+    auto bp_var = ir.CreateCall(get_index_func);
+
+    // Get the type index from the original binary and set the `RDX` register
+    llvm::ArrayRef<llvm::Value *> indices = {llvm::ConstantInt::get(
+        llvm::Type::getInt32Ty(*gContext), 0), bp_var};
+    auto var_value = ir.CreateGEP(gvar_landingpad, indices);
+
+    std::vector<llvm::Value *> args(3);
 #if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
     args[0] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext),
                             ctx.cfg_func->stack_ptr_var);
     args[1] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext),
                             ctx.cfg_func->frame_ptr_var);
+    args[2] = ir.CreateLoad(llvm::Type::getInt32Ty(*gContext), var_value);
 #else
     args[0] = ir.CreateLoad(ctx.cfg_func->stack_ptr_var, true);
     args[1] = ir.CreateLoad(ctx.cfg_func->frame_ptr_var, true);
+    args[2] = ir.CreateLoad(var_value, true);
 #endif
     auto handler = GetExceptionHandlerPrologue();
     ir.CreateCall(handler, args);
