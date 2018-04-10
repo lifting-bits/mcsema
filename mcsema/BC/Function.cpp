@@ -353,8 +353,8 @@ static void CreateLandingPad(TranslationContext &ctx,
 #if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
   auto lpad = ir.CreateLandingPad(exn_type, 1, ss.str());
 #else
-  const auto &personality_func_name = FLAGS_exception_personality_func;
-  auto lpad = ir.CreateLandingPad(exn_type, personality_func_name, 1, ss.str());
+  auto personality_func = GetPersonalityFunction();
+  auto lpad = ir.CreateLandingPad(exn_type, personality_func, 1, ss.str());
 #endif
 
   if(!is_catch) {
@@ -828,7 +828,7 @@ static llvm::Function *LiftFunction(
   // Allocate the stack variable recovered in the function
   auto entry_block = ctx.ea_to_block[cfg_func->ea];
   AllocStackVars(entry_block, cfg_func);
-
+  // Lift the landing pad if there are exception frames recovered
   LiftExceptionFrameLP(ctx, cfg_func);
 
   llvm::BranchInst::Create(ctx.ea_to_block[cfg_func->ea],

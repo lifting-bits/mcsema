@@ -62,6 +62,7 @@ RECOVER_EHTABLE = False
 
 PERSONALITY_FUNCTIONS = [
     "__gxx_personality_v0",
+    "__gnat_personality_v0"
     ]
 
 # Map of external functions names to a tuple containing information like the

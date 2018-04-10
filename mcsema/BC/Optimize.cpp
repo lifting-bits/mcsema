@@ -118,7 +118,6 @@ static void RunO3(void) {
   TLI->disableAllFunctions();  // `-fno-builtin`.
 
   llvm::PassManagerBuilder builder;
-
   builder.OptLevel = 3;
   builder.SizeLevel = 2;
   builder.Inliner = llvm::createFunctionInliningPass(
