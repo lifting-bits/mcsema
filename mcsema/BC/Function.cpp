@@ -408,12 +408,12 @@ static void CreateLandingPad(TranslationContext &ctx,
 static void LiftExceptionFrameLP(TranslationContext &ctx,
                                  const NativeFunction *cfg_func) {
   if (cfg_func->eh_frame.size() > 0) {
-    auto personality_func = GetPersonalityFunction();
     auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
     lifted_func->addFnAttr(llvm::Attribute::UWTable);
     lifted_func->addFnAttr(llvm::Attribute::OptimizeNone);
     lifted_func->removeFnAttr(llvm::Attribute::NoUnwind);
 #if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
+    auto personality_func = GetPersonalityFunction();
     lifted_func->setPersonalityFn(personality_func);
 #endif
   }
