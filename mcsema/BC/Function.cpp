@@ -201,6 +201,20 @@ static llvm::Function *GetExceptionHandlerPrologue(void) {
   return exception_handler;
 }
 
+// `__mcsema_get_type_index` function returns the RDX register holding
+// the exception type index. It also saves the RAX register state.
+static llvm::Function *GetExceptionTypeIndex(void) {
+  auto get_index_func = gModule->getFunction("__mcsema_get_type_index");
+  if (!get_index_func) {
+    get_index_func = llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), false),
+        llvm::GlobalValue::ExternalWeakLinkage,
+        "__mcsema_get_type_index", gModule);
+  }
+
+  return get_index_func;
+}
+
 // Add a call to another function, and then update the memory pointer with the
 // result of the function.
 static void InlineSubFuncCall(llvm::BasicBlock *block,
@@ -342,6 +356,10 @@ static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
 static void CreateLandingPad(TranslationContext &ctx,
                              struct NativeExceptionFrame *eh_entry) {
   std::stringstream ss;
+
+  auto dword_type = llvm::Type::getInt32Ty(*gContext);
+  // `__mcsema_exception_ret` argument list
+  std::vector<llvm::Value *> args(3);
   auto is_catch = (eh_entry->action_index != 0);
   ss << "landingpad_" << std::hex << eh_entry->lp_ea;
   auto landing_bb = llvm::BasicBlock::Create(
@@ -359,9 +377,7 @@ static void CreateLandingPad(TranslationContext &ctx,
   auto lpad = ir.CreateLandingPad(exn_type, personality_func, 1, ss.str());
 #endif
 
-  if(!is_catch) {
-    lpad->setCleanup(true);
-  }
+  lpad->setCleanup(!is_catch);
 
   if(is_catch) {
     std::stringstream g_variable_name;
@@ -369,10 +385,6 @@ static void CreateLandingPad(TranslationContext &ctx,
     auto catch_all = false;
     unsigned long catch_all_index = 0;
 
-    // The type indices in exception table are reversed for some of the binaries.
-    // In such case, the wrong exception handler may get called.
-    // #398 (https://github.com/trailofbits/mcsema/issues/398)
-    // TODO(kumarak): Fix the wrong indices in the exception table for catch all
     for (auto index = eh_entry->type_var.size(); index > 0; index--) {
       auto type = eh_entry->type_var[index];
       if (type->ea) {
@@ -392,6 +404,11 @@ static void CreateLandingPad(TranslationContext &ctx,
           llvm::Type::getInt32Ty(*gContext), catch_all_index));
     }
 
+    // The type indices in exception table are reversed for some of the binaries.
+    // In such case, the wrong exception handler may get called.
+    // #398 (https://github.com/trailofbits/mcsema/issues/398)
+    // TODO(kumarak): Fix the wrong indices in the exception table for catch all
+
     // Create the global array to store the type indices of original binary.
     // It is required to map the type indices in the exception table of
     // lifted binary to the original. The runtime routine does an array
@@ -408,7 +425,7 @@ static void CreateLandingPad(TranslationContext &ctx,
 
     g_variable_name << "gvar_landingpad_" << std::hex << eh_entry->lp_ea;
     auto array_type = llvm::ArrayType::get(
-        llvm::Type::getInt32Ty(*gContext), eh_entry->type_var.size()+1);
+        dword_type, eh_entry->type_var.size()+1);
 
     if (!gModule->getOrInsertGlobal(g_variable_name.str(), array_type)) {
       LOG_IF(ERROR, 1)
@@ -420,28 +437,20 @@ static void CreateLandingPad(TranslationContext &ctx,
     gvar_landingpad->setLinkage(llvm::GlobalValue::ExternalLinkage);
 
     // Set the dummy value for index `0`
-    array_value_const.push_back(llvm::ConstantInt::get(
-        llvm::Type::getInt32Ty(*gContext), 0));
+    array_value_const.push_back(llvm::ConstantInt::get(dword_type, 0));
+
     std::reverse(array_value_const.begin(), array_value_const.end());
     llvm::ArrayRef<llvm::Constant *> array_value(array_value_const);
     llvm::Constant* const_array = llvm::ConstantArray::get(array_type, array_value);
     gvar_landingpad->setInitializer(const_array);
-
-    auto get_index_func = gModule->getFunction("__mcsema_get_type_index");
-    if (!get_index_func) {
-      get_index_func = llvm::Function::Create(
-          llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), false),
-          llvm::GlobalValue::ExternalWeakLinkage,
-          "__mcsema_get_type_index", gModule);
-    }
-    auto bp_var = ir.CreateCall(get_index_func);
+    auto bp_var = ir.CreateCall(GetExceptionTypeIndex());
 
     // Get the type index from the original binary and set the `RDX` register
     llvm::ArrayRef<llvm::Value *> indices = {llvm::ConstantInt::get(
         llvm::Type::getInt32Ty(*gContext), 0), bp_var};
     auto var_value = ir.CreateGEP(gvar_landingpad, indices);
 
-    std::vector<llvm::Value *> args(3);
+
 #if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
     args[0] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext),
                             ctx.cfg_func->stack_ptr_var);
@@ -453,18 +462,9 @@ static void CreateLandingPad(TranslationContext &ctx,
     args[1] = ir.CreateLoad(ctx.cfg_func->frame_ptr_var, true);
     args[2] = ir.CreateLoad(var_value, true);
 #endif
-    auto handler = GetExceptionHandlerPrologue();
-    ir.CreateCall(handler, args);
+
   } else {
-    auto get_index_func = gModule->getFunction("__mcsema_get_type_index");
-    if (!get_index_func) {
-      get_index_func = llvm::Function::Create(
-          llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), false),
-          llvm::GlobalValue::ExternalWeakLinkage,
-          "__mcsema_get_type_index", gModule);
-    }
-    auto bp_var = ir.CreateCall(get_index_func);
-    std::vector<llvm::Value *> args(3);
+    auto bp_var = ir.CreateCall(GetExceptionTypeIndex());
 #if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
     args[0] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext),
                             ctx.cfg_func->stack_ptr_var);
@@ -474,11 +474,12 @@ static void CreateLandingPad(TranslationContext &ctx,
 #else
     args[0] = ir.CreateLoad(ctx.cfg_func->stack_ptr_var, true);
     args[1] = ir.CreateLoad(ctx.cfg_func->frame_ptr_var, true);
-    args[2] = bp_var;
+    args[2] = ir.CreateTruncOrBitCast(bp_var, llvm::Type::getInt32Ty(*gContext));
 #endif
-    auto handler = GetExceptionHandlerPrologue();
-    ir.CreateCall(handler, args);
   }
+
+  auto handler = GetExceptionHandlerPrologue();
+  ir.CreateCall(handler, args);
 
   // if `ctx.ea_to_block.count(entry->lp_ea) == 0`, the landing pad basic block
   // has not been recovered. Throw a warning in such case.
