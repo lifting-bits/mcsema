@@ -422,7 +422,7 @@ static void CreateLandingPad(TranslationContext &ctx,
     // Set the dummy value for index `0`
     array_value_const.push_back(llvm::ConstantInt::get(
         llvm::Type::getInt32Ty(*gContext), 0));
-    std::reverse(array_value_const.begin(),array_value_const.end());
+    std::reverse(array_value_const.begin(), array_value_const.end());
     llvm::ArrayRef<llvm::Constant *> array_value(array_value_const);
     llvm::Constant* const_array = llvm::ConstantArray::get(array_type, array_value);
     gvar_landingpad->setInitializer(const_array);
@@ -452,6 +452,29 @@ static void CreateLandingPad(TranslationContext &ctx,
     args[0] = ir.CreateLoad(ctx.cfg_func->stack_ptr_var, true);
     args[1] = ir.CreateLoad(ctx.cfg_func->frame_ptr_var, true);
     args[2] = ir.CreateLoad(var_value, true);
+#endif
+    auto handler = GetExceptionHandlerPrologue();
+    ir.CreateCall(handler, args);
+  } else {
+    auto get_index_func = gModule->getFunction("__mcsema_get_type_index");
+    if (!get_index_func) {
+      get_index_func = llvm::Function::Create(
+          llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), false),
+          llvm::GlobalValue::ExternalWeakLinkage,
+          "__mcsema_get_type_index", gModule);
+    }
+    auto bp_var = ir.CreateCall(get_index_func);
+    std::vector<llvm::Value *> args(3);
+#if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
+    args[0] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext),
+                            ctx.cfg_func->stack_ptr_var);
+    args[1] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext),
+                            ctx.cfg_func->frame_ptr_var);
+    args[2] = ir.CreateTruncOrBitCast(bp_var, llvm::Type::getInt32Ty(*gContext));
+#else
+    args[0] = ir.CreateLoad(ctx.cfg_func->stack_ptr_var, true);
+    args[1] = ir.CreateLoad(ctx.cfg_func->frame_ptr_var, true);
+    args[2] = bp_var;
 #endif
     auto handler = GetExceptionHandlerPrologue();
     ir.CreateCall(handler, args);
