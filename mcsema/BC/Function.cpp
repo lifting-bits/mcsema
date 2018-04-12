@@ -185,12 +185,13 @@ static llvm::Function *GetLiftedFunction(const NativeModule *cfg_module,
 // The exception handling prologue function clears the stack and set the
 // stack and frame pointer correctly before jumping to the handler routine.
 static llvm::Function *GetExceptionHandlerPrologue(void) {
+  auto dword_type = llvm::Type::getInt32Ty(*gContext);
   auto exception_handler = gModule->getFunction("__mcsema_exception_ret");
   if (exception_handler == nullptr) {
     llvm::Type* args_type[] = {
-        llvm::Type::getInt64Ty(*gContext),
-        llvm::Type::getInt64Ty(*gContext),
-        llvm::Type::getInt32Ty(*gContext)
+        gWordType,
+        gWordType,
+        dword_type
     };
     auto func_type = llvm::FunctionType::get(
         llvm::Type::getVoidTy(*gContext), args_type, false);
@@ -207,7 +208,7 @@ static llvm::Function *GetExceptionTypeIndex(void) {
   auto get_index_func = gModule->getFunction("__mcsema_get_type_index");
   if (!get_index_func) {
     get_index_func = llvm::Function::Create(
-        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), false),
+        llvm::FunctionType::get(gWordType, false),
         llvm::GlobalValue::ExternalWeakLinkage,
         "__mcsema_get_type_index", gModule);
   }
@@ -237,7 +238,7 @@ static void InlineSubFuncInvoke(llvm::BasicBlock *block,
   auto get_sp_func = gModule->getFunction("__mcsema_get_stack_pointer");
   if (!get_sp_func) {
     get_sp_func = llvm::Function::Create(
-        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), false),
+        llvm::FunctionType::get(gWordType, false),
         llvm::GlobalValue::ExternalLinkage,
         "__mcsema_get_stack_pointer", gModule);
   }
@@ -247,7 +248,7 @@ static void InlineSubFuncInvoke(llvm::BasicBlock *block,
   auto get_bp_func = gModule->getFunction("__mcsema_get_frame_pointer");
   if (!get_bp_func) {
     get_bp_func = llvm::Function::Create(
-        llvm::FunctionType::get(llvm::Type::getInt64Ty(*gContext), false),
+        llvm::FunctionType::get(gWordType, false),
         llvm::GlobalValue::ExternalLinkage,
         "__mcsema_get_frame_pointer", gModule);
   }
@@ -389,8 +390,7 @@ static void CreateLandingPad(TranslationContext &ctx,
       auto type = eh_entry->type_var[index];
       if (type->ea) {
         lpad->addClause(gModule->getGlobalVariable(type->name));
-        auto value = llvm::ConstantInt::get(
-            llvm::Type::getInt32Ty(*gContext), index);
+        auto value = llvm::ConstantInt::get(dword_type, index);
         array_value_const.push_back(value);
       } else {
         catch_all = true;
@@ -422,7 +422,6 @@ static void CreateLandingPad(TranslationContext &ctx,
     // index maps it in the original.
     // The `0` index value is a dummy, and it is used to avoid further index computation.
     //
-
     g_variable_name << "gvar_landingpad_" << std::hex << eh_entry->lp_ea;
     auto array_type = llvm::ArrayType::get(
         dword_type, eh_entry->type_var.size()+1);
@@ -443,20 +442,20 @@ static void CreateLandingPad(TranslationContext &ctx,
     llvm::ArrayRef<llvm::Constant *> array_value(array_value_const);
     llvm::Constant* const_array = llvm::ConstantArray::get(array_type, array_value);
     gvar_landingpad->setInitializer(const_array);
-    auto bp_var = ir.CreateCall(GetExceptionTypeIndex());
+    auto type_index_value = ir.CreateCall(GetExceptionTypeIndex());
 
     // Get the type index from the original binary and set the `RDX` register
-    llvm::ArrayRef<llvm::Value *> indices = {llvm::ConstantInt::get(
-        llvm::Type::getInt32Ty(*gContext), 0), bp_var};
+    llvm::ArrayRef<llvm::Value *> indices = {
+        llvm::ConstantInt::get(dword_type, 0),
+        type_index_value
+    };
     auto var_value = ir.CreateGEP(gvar_landingpad, indices);
 
 
 #if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
-    args[0] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext),
-                            ctx.cfg_func->stack_ptr_var);
-    args[1] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext),
-                            ctx.cfg_func->frame_ptr_var);
-    args[2] = ir.CreateLoad(llvm::Type::getInt32Ty(*gContext), var_value);
+    args[0] = ir.CreateLoad(gWordType, ctx.cfg_func->stack_ptr_var);
+    args[1] = ir.CreateLoad(gWordType, ctx.cfg_func->frame_ptr_var);
+    args[2] = ir.CreateLoad(dword_type, var_value);
 #else
     args[0] = ir.CreateLoad(ctx.cfg_func->stack_ptr_var, true);
     args[1] = ir.CreateLoad(ctx.cfg_func->frame_ptr_var, true);
@@ -464,17 +463,15 @@ static void CreateLandingPad(TranslationContext &ctx,
 #endif
 
   } else {
-    auto bp_var = ir.CreateCall(GetExceptionTypeIndex());
+    auto type_index_value = ir.CreateCall(GetExceptionTypeIndex());
 #if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
-    args[0] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext),
-                            ctx.cfg_func->stack_ptr_var);
-    args[1] = ir.CreateLoad(llvm::Type::getInt64Ty(*gContext),
-                            ctx.cfg_func->frame_ptr_var);
-    args[2] = ir.CreateTruncOrBitCast(bp_var, llvm::Type::getInt32Ty(*gContext));
+    args[0] = ir.CreateLoad(gWordType, ctx.cfg_func->stack_ptr_var);
+    args[1] = ir.CreateLoad(gWordType, ctx.cfg_func->frame_ptr_var);
+    args[2] = ir.CreateTruncOrBitCast(type_index_value, dword_type);
 #else
     args[0] = ir.CreateLoad(ctx.cfg_func->stack_ptr_var, true);
     args[1] = ir.CreateLoad(ctx.cfg_func->frame_ptr_var, true);
-    args[2] = ir.CreateTruncOrBitCast(bp_var, llvm::Type::getInt32Ty(*gContext));
+    args[2] = ir.CreateTruncOrBitCast(type_index_value, dword_type);
 #endif
   }
 

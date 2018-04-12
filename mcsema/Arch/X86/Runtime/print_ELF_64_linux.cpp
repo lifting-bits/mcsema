@@ -609,7 +609,7 @@ int main(void) {
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 
-  // Implements `__mcsema_get_frame_pointer`. Returns the base pointer register.
+  // Implements `__mcsema_get_type_index`. Returns the base pointer register.
   fprintf(out, "  .globl __mcsema_get_type_index\n");
   fprintf(out, "  .type __mcsema_get_type_index,@function\n");
   fprintf(out, "__mcsema_get_type_index:\n");
