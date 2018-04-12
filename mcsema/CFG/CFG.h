@@ -35,6 +35,7 @@ namespace mcsema {
 
 struct NativeVariable;
 struct NativeStackVariable;
+struct NativeExceptionFrame;
 struct NativeFunction;
 
 struct NativeExternalVariable;
@@ -99,7 +100,10 @@ struct NativeFunction : public NativeObject {
 
   std::unordered_map<uint64_t, const NativeBlock *> blocks;
   std::vector<struct NativeStackVariable *> stack_vars;
+  std::vector<struct NativeExceptionFrame *> eh_frame;
   llvm::Function *function;
+  mutable llvm::Value *stack_ptr_var;
+  mutable llvm::Value *frame_ptr_var;
 };
 
 struct NativeStackVariable : public NativeObject {
@@ -110,6 +114,18 @@ struct NativeStackVariable : public NativeObject {
   int64_t offset;
   std::unordered_map<uint64_t, int64_t> refs;
   mutable llvm::Value *llvm_var;
+};
+
+struct NativeExceptionFrame : public NativeObject {
+ public:
+  NativeExceptionFrame(void);
+
+  uint64_t start_ea;
+  uint64_t end_ea;
+  uint64_t lp_ea;
+  uint64_t action_index;
+  mutable llvm::Value *lp_var;
+  std::unordered_map<uint64_t, NativeExternalVariable *> type_var;
 };
 
 // Function that is defined outside of the binary.

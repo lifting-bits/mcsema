@@ -543,6 +543,7 @@ static void ImplementExplicitArgsExitPoint(
   callback_func->removeFnAttr(llvm::Attribute::NoInline);
   callback_func->addFnAttr(llvm::Attribute::InlineHint);
   callback_func->addFnAttr(llvm::Attribute::AlwaysInline);
+  callback_func->removeFnAttr(llvm::Attribute::NoUnwind);
 
   LOG(INFO)
       << "Generating " << cfg_func->num_args

@@ -419,6 +419,13 @@ NativeStackVariable::NativeStackVariable(void)
       offset(0),
       llvm_var(nullptr){}
 
+NativeExceptionFrame::NativeExceptionFrame()
+    : start_ea(0),
+      end_ea(0),
+      lp_ea(0),
+      action_index(0),
+      lp_var(nullptr){}
+
 void NativeObject::ForwardTo(NativeObject *dest) const {
   if (forward != this) {
     forward->ForwardTo(dest);
@@ -936,6 +943,32 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         LOG(INFO) << "Retrive the ref ea : " << std::hex
             << ref_ea.inst_ea() << std::dec << " offset " << ref_ea.offset();
       }
+    }
+
+    // Extract the eh_frame entries associated with the function
+    for (const auto &entry : cfg_func.eh_frame()) {
+      auto frame_var = new NativeExceptionFrame;
+
+      frame_var->start_ea = entry.start_ea();
+      frame_var->end_ea = entry.end_ea();
+      frame_var->lp_ea = entry.lp_ea();
+      frame_var->action_index = entry.action();
+
+      // List all the types of the landing pad
+      for (const auto &extern_var : entry.ttype()) {
+        auto var = new NativeExternalVariable;
+        var->ea = static_cast<uint64_t>(extern_var.ea());
+        var->name = extern_var.name();
+        var->is_external = true;
+        var->is_exported = true;
+        var->is_thread_local = extern_var.is_thread_local();
+        var->lifted_name = var->name;
+        var->is_weak = extern_var.is_weak();
+        var->size = static_cast<uint64_t>(extern_var.size());
+        frame_var->type_var[static_cast<uint64_t>(extern_var.size())] = var;
+       }
+
+      func->eh_frame.push_back(frame_var);
     }
 
     for (const auto &cfg_block : cfg_func.blocks()) {

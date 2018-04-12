@@ -325,6 +325,7 @@ int main(void) {
   fprintf(out, "  .globl __remill_function_call\n");
   fprintf(out, "  .type __remill_function_call,@function\n");
   fprintf(out, "__remill_function_call:\n");
+  fprintf(out, ".Lfunc_begin5:\n");
   fprintf(out, "  .cfi_startproc\n");
 
   // Stash the memory pointer. This is probably actually nothing. But for
@@ -413,6 +414,7 @@ int main(void) {
   // `__remill_function_call`) on the stack, just below the return address,
   // which is now `__mcsema_attach_ret`), so we can `ret` and go to our
   // intended target.
+  fprintf(out, ".Ltmp1000:\n");
   fprintf(out, "  ret\n");
 
   fprintf(out, ".Lfunc_end5:\n");
@@ -515,6 +517,110 @@ int main(void) {
   fprintf(out, "  .cfi_endproc\n");
   fprintf(out, "\n");
 
+  // Implements `__mcsema_exception_ret`. It gets called after the exception returns to the handler.
+  // It sets the native stack and base pointers correctly after cleaning the stack. It also save the native
+  // registers state.
+  // Arguments: RDI -> stack pointer
+  //            RSI -> base pointer
+
+  fprintf(out, "  .globl __mcsema_exception_ret\n");
+  fprintf(out, "  .type __mcsema_exception_ret,@function\n");
+  fprintf(out, "__mcsema_exception_ret:\n");
+  fprintf(out, ".Lfunc_begin10:\n");
+  fprintf(out, ".cfi_startproc\n");
+
+  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "], rdi\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "], rsi\n", __builtin_offsetof(State, RSI));
+
+  fprintf(out, "  mov rdi, QWORD PTR fs:[0]\n");
+  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "], rdi\n", __builtin_offsetof(State, FS_BASE));
+  fprintf(out, "  lea rsi, [__mcsema_reg_state@TPOFF]\n");
+  fprintf(out, "  lea rdi, QWORD PTR [rsi + rdi]\n");
+
+  // General purpose registers.
+  //fprintf(out, "  mov [rdi + %" PRIuMAX "], rax\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], rbx\n", __builtin_offsetof(State, RBX));
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], rcx\n", __builtin_offsetof(State, RCX));
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], rdx\n", __builtin_offsetof(State, RDX));
+
+  // Sets the native stack and base pointers
+  fprintf(out, "  mov rax, fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "]\n", __builtin_offsetof(State, RDI));
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], rax\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  add QWORD PTR [rdi + %" PRIuMAX "], 8\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  mov rax, fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "]\n", __builtin_offsetof(State, RSI));
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], rax\n", __builtin_offsetof(State, RBP));
+
+
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], r8\n", __builtin_offsetof(State, R8));
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], r9\n", __builtin_offsetof(State, R9));
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], r10\n", __builtin_offsetof(State, R10));
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], r11\n", __builtin_offsetof(State, R11));
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], r12\n", __builtin_offsetof(State, R12));
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], r13\n", __builtin_offsetof(State, R13));
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], r14\n", __builtin_offsetof(State, R14));
+  fprintf(out, "  mov [rdi + %" PRIuMAX "], r15\n", __builtin_offsetof(State, R15));
+
+  // XMM registers.
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm0\n", __builtin_offsetof(State, XMM0));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm1\n", __builtin_offsetof(State, XMM1));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm2\n", __builtin_offsetof(State, XMM2));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm3\n", __builtin_offsetof(State, XMM3));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm4\n", __builtin_offsetof(State, XMM4));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm5\n", __builtin_offsetof(State, XMM5));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm6\n", __builtin_offsetof(State, XMM6));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm7\n", __builtin_offsetof(State, XMM7));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm8\n", __builtin_offsetof(State, XMM8));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm9\n", __builtin_offsetof(State, XMM9));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm10\n", __builtin_offsetof(State, XMM10));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm11\n", __builtin_offsetof(State, XMM11));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm12\n", __builtin_offsetof(State, XMM12));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm13\n", __builtin_offsetof(State, XMM13));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm14\n", __builtin_offsetof(State, XMM14));
+  fprintf(out, "  movntdq [rdi + %" PRIuMAX "], xmm15\n", __builtin_offsetof(State, XMM15));
+
+  fprintf(out, "  ret\n");
+  fprintf(out, "  ud2\n");
+  fprintf(out, ".Lfunc_end10:\n");
+  fprintf(out, "  .size __mcsema_exception_ret,.Lfunc_end10-__mcsema_exception_ret\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  // Implements `__mcsema_get_stack_pointer`. Returns the stack pointer register.
+  fprintf(out, "  .globl __mcsema_get_stack_pointer\n");
+  fprintf(out, "  .type __mcsema_get_stack_pointer,@function\n");
+  fprintf(out, "__mcsema_get_stack_pointer:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  mov rax, fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "]\n", __builtin_offsetof(State, RSP));
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end20:\n");
+  fprintf(out, "  .size __mcsema_get_stack_pointer,.Lfunc_end20-__mcsema_get_stack_pointer\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  // Implements `__mcsema_get_frame_pointer`. Returns the base pointer register.
+  fprintf(out, "  .globl __mcsema_get_frame_pointer\n");
+  fprintf(out, "  .type __mcsema_get_frame_pointer,@function\n");
+  fprintf(out, "__mcsema_get_frame_pointer:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  mov rax, fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "]\n", __builtin_offsetof(State, RBP));
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end21:\n");
+  fprintf(out, "  .size __mcsema_get_frame_pointer,.Lfunc_end21-__mcsema_get_frame_pointer\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
+
+  // Implements `__mcsema_get_type_index`. Returns the base pointer register.
+  fprintf(out, "  .globl __mcsema_get_type_index\n");
+  fprintf(out, "  .type __mcsema_get_type_index,@function\n");
+  fprintf(out, "__mcsema_get_type_index:\n");
+  fprintf(out, "  .cfi_startproc\n");
+  fprintf(out, "  mov fs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "], rax\n", __builtin_offsetof(State, RAX));
+  fprintf(out, "  mov rax, rdx\n");
+  fprintf(out, "  ret\n");
+  fprintf(out, ".Lfunc_end22:\n");
+  fprintf(out, "  .size __mcsema_get_type_index,.Lfunc_end22-__mcsema_get_type_index\n");
+  fprintf(out, "  .cfi_endproc\n");
+  fprintf(out, "\n");
 
   // Implements `__mcsema_debug_get_reg_state`. This is useful when debugging in
   // gdb.

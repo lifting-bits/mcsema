@@ -58,6 +58,12 @@ TO_RECOVER = {
   "stack_var" : False,
 }
 
+RECOVER_EHTABLE = False
+
+PERSONALITY_FUNCTIONS = [
+    "__gxx_personality_v0",
+    "__gnat_personality_v0"
+    ]
 
 # Map of external functions names to a tuple containing information like the
 # number of arguments and calling convention of the function.
@@ -271,6 +277,8 @@ def parse_os_defs_file(df):
               fname, ea))
 
       EMAP[fname] = (int(args), realconv, ret, sign)
+      if ret == 'Y':
+        noreturn_external_function(fname, int(args), realconv, ret, sign)
 
       # Sometimes there will be things like `__imp___gmon_start__` which
       # is really the implementation of `__gmon_start__`, where that is
@@ -737,9 +745,9 @@ def recover_basic_block(M, F, block_ea):
   I = None
   for inst_ea in inst_eas:
     I = recover_instruction(M, B, inst_ea)
-    if I:
-      # Get the landing pad associated with the instructions;
-      # 0 if no landing pad associated
+    # Get the landing pad associated with the instructions;
+    # 0 if no landing pad associated
+    if RECOVER_EHTABLE is True and I:
       I.lp_ea = get_exception_landingpad(F, inst_ea)
 
   DEBUG_PUSH()
@@ -800,7 +808,8 @@ def recover_function(M, func_ea, new_func_eas, entrypoints):
 
   DEBUG_PUSH()
   # Update the protobuf with the recovered eh_frame entries
-  recover_exception_entries(F, func_ea)
+  if RECOVER_EHTABLE is True:
+    recover_exception_entries(F, func_ea)
   blockset, term_insts = analyse_subroutine(func_ea, PIE_MODE)
 
   for term_inst in term_insts:
@@ -821,7 +830,7 @@ def recover_function(M, func_ea, new_func_eas, entrypoints):
 
   if TO_RECOVER["stack_var"]:
     recover_variables(F, func_ea, processed_blocks)
-    
+
   DEBUG_POP()
 
 def find_default_function_heads():
@@ -1324,12 +1333,13 @@ def identify_external_symbols():
             extern_name = found_name
             break
 
-        DEBUG("WARNING: Adding variable {} at {:x} as external".format(
-            extern_name, ea))
+        if extern_name not in PERSONALITY_FUNCTIONS:
+          DEBUG("WARNING: Adding variable {} at {:x} as external".format(
+              extern_name, ea))
 
-        set_symbol_name(ea, extern_name)  # Rename it.
-        EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
-        _FIXED_EXTERNAL_NAMES[ea] = extern_name
+          set_symbol_name(ea, extern_name)  # Rename it.
+          EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
+          _FIXED_EXTERNAL_NAMES[ea] = extern_name
 
   DEBUG_POP()
 
@@ -1418,7 +1428,9 @@ def recover_module(entrypoint, gvar_infile = None):
     if "main" == args.entrypoint and IS_ELF:
       entry_ea = find_main_in_ELF_file()
 
-  recover_exception_table()
+  if RECOVER_EHTABLE:
+    recover_exception_table()
+
   process_segments(PIE_MODE)
 
   func_eas = find_default_function_heads()
@@ -1541,6 +1553,12 @@ if __name__ == "__main__":
       default=False,
       help="Flag to enable stack variable recovery")
 
+  parser.add_argument(
+      '--recover-exception',
+      action="store_true",
+      default=False,
+      help="Flag to enable the exception handler recovery")
+
   args = parser.parse_args(args=idc.ARGV[1:])
 
   if args.log_file != os.devnull:
@@ -1560,6 +1578,9 @@ if __name__ == "__main__":
     
   if args.recover_stack_vars:
     TO_RECOVER["stack_var"] = True
+
+  if args.recover_exception:
+    RECOVER_EHTABLE = True
 
   EMAP = {}
   EMAP_DATA = {}

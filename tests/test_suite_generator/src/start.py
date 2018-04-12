@@ -41,6 +41,13 @@ class Test(object):
     if not os.path.isfile(self._binary_path):
       raise IOError("The binary file does not exists")
 
+    tob_lib_repository = os.environ["TRAILOFBITS_LIBRARIES"]
+    clang_path = os.path.join(tob_lib_repository, "llvm", "bin", "clang")
+    llvm_version = subprocess.check_output([clang_path, "--version"]).split(" ")[2][0:3]
+    self._abi_path = os.path.join(self._root_path, "ABI", "abi-" + llvm_version + ".bc")
+    if not os.path.isfile(self._abi_path):
+      print self._abi_path +" The abi file does not exists"
+
     stdout_path = os.path.join(self._root_path, "stdout", self._name)
     if not os.path.isfile(stdout_path):
       raise IOError("The stdout file does not exists")
@@ -89,6 +96,9 @@ class Test(object):
 
   def binary_path(self):
     return self._binary_path
+
+  def abi_path(self):
+    return self._abi_path
 
   def bitcode_path(self):
     return self._bitcode_path
@@ -174,6 +184,10 @@ def acquire_toolset():
   toolset["clang"] = os.path.join(tob_lib_repository, "llvm", "bin", "clang")
   if sys.platform == "win32":
     toolset["clang"] += ".exe"
+
+  toolset["clang++"] = os.path.join(tob_lib_repository, "llvm", "bin", "clang++")
+  if sys.platform == "win32":
+    toolset["clang++"] += ".exe"
 
   toolset["llvm-link"] = os.path.join(tob_lib_repository, "llvm", "bin", "llvm-link")
   if sys.platform == "win32":
@@ -346,7 +360,7 @@ def lift_test_cfg(test_directory, toolset, test):
   command_line = [toolset["mcsema-lift"], "--arch", test.architecture(),
                   "--os", test.platform(), "--cfg", test.cfg_path(),
                   "--output", output_file_path, "--libc_constructor", "init",
-                  "--libc_destructor", "fini"]
+                  "--libc_destructor", "fini", "--abi_libraries", test.abi_path()]
 
   exec_result = execute_with_timeout(command_line, 1200)
 
@@ -376,7 +390,7 @@ def compile_lifted_code(test_directory, toolset, test, bitcode_path):
   else:
     mcsema_runtime_path = toolset["libmcsema_rt32"]
 
-  command_line = [toolset["clang"], "-rdynamic", "-o", output_file_path, bitcode_path, mcsema_runtime_path, "-Wno-unknown-warning-option", "-Wno-override-module"]
+  command_line = [toolset["clang++"], "-rdynamic", "-o", output_file_path, bitcode_path, mcsema_runtime_path, "-Wno-unknown-warning-option", "-Wno-override-module"]
   if len(test.cpp_flags()) != 0:
     command_line += test.cpp_flags()
 
