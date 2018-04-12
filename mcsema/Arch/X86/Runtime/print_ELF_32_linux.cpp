@@ -474,7 +474,7 @@ int main(void) {
   fprintf(out, "  mov edi, DWORD PTR gs:[0]\n");
   fprintf(out, "  mov gs:[__mcsema_reg_state@TPOFF + %" PRIuMAX "], edi\n", __builtin_offsetof(State, FS_BASE));
   fprintf(out, "  lea esi, [__mcsema_reg_state@TPOFF]\n");
-  fprintf(out, "  lea edi, QWORD PTR [esi + edi]\n");
+  fprintf(out, "  lea edi, DWORD PTR [esi + edi]\n");
 
   // General purpose registers.
   //fprintf(out, "  mov [edi + %" PRIuMAX "], eax\n", __builtin_offsetof(State, EAX));
