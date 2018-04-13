@@ -431,7 +431,7 @@ static void CreateLandingPad(TranslationContext &ctx,
           << std::dec;
     }
 
-    auto gvar_landingpad = gModule->getGlobalVariable(g_variable_name_ss.str());
+    auto gvar_landingpad = gModule->getGlobalVariable(g_variable_name);
     gvar_landingpad->setLinkage(llvm::GlobalValue::ExternalLinkage);
 
     // Set the dummy value for index `0`
