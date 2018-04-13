@@ -406,12 +406,6 @@ static void CreateLandingPad(TranslationContext &ctx,
           llvm::Type::getInt32Ty(*gContext), catch_all_index));
     }
 
-    // The type indices in exception table are reversed for some of the
-    // binaries. In such case, the wrong exception handler may get called.
-    // See: Issue #398 (https://github.com/trailofbits/mcsema/issues/398)
-    //
-    // TODO(kumarak): Fix the wrong indices in the exception table for catch all
-
     // Create the global array to store the type indices of original binary.
     // It is required to map the type indices in the exception table of
     // lifted binary to the original. The runtime routine does an array
@@ -668,7 +662,8 @@ static bool TryLiftTerminator(TranslationContext &ctx,
           auto exception_block = ctx.lp_to_block[ctx.cfg_inst->lp_ea];
           auto normal_block = GetOrCreateBlock(ctx, inst.next_pc);
           ctx.ea_to_block[inst.next_pc] = normal_block;
-          InlineSubFuncInvoke(block, targ_func, normal_block, exception_block, ctx.cfg_func);
+          InlineSubFuncInvoke(block, targ_func, normal_block, exception_block,
+                              ctx.cfg_func);
           return true;
         }
 
@@ -1004,6 +999,5 @@ bool DefineLiftedFunctions(const NativeModule *cfg_module) {
   func_pass_manager.doFinalization();
   return true;
 }
-
 
 }  // namespace mcsema
