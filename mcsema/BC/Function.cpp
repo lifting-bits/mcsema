@@ -366,10 +366,12 @@ static void CreateLandingPad(TranslationContext &ctx,
   auto landing_bb = llvm::BasicBlock::Create(
       *gContext, ss.str(), ctx.lifted_func);
 
+  std::vector<llvm::Type *> elem_types = {
+      llvm::Type::getInt8PtrTy(*gContext), dword_type};
+
+  // TODO(akshayk): Should this struct be packed?
   llvm::IRBuilder<> ir(landing_bb);
-  auto exn_type = llvm::StructType::get(llvm::Type::getInt8PtrTy(*gContext),
-                                        llvm::Type::getInt32Ty(*gContext),
-                                        nullptr);
+  auto exn_type = llvm::StructType::get(*gContext, elem_types, false);
 
 #if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
   auto lpad = ir.CreateLandingPad(exn_type, 1, ss.str());
@@ -381,7 +383,7 @@ static void CreateLandingPad(TranslationContext &ctx,
   lpad->setCleanup(!is_catch);
 
   if(is_catch) {
-    std::stringstream g_variable_name;
+    std::stringstream g_variable_name_ss;
     std::vector<llvm::Constant *>array_value_const;
     auto catch_all = false;
     unsigned long catch_all_index = 0;
@@ -404,35 +406,38 @@ static void CreateLandingPad(TranslationContext &ctx,
           llvm::Type::getInt32Ty(*gContext), catch_all_index));
     }
 
-    // The type indices in exception table are reversed for some of the binaries.
-    // In such case, the wrong exception handler may get called.
-    // #398 (https://github.com/trailofbits/mcsema/issues/398)
+    // The type indices in exception table are reversed for some of the
+    // binaries. In such case, the wrong exception handler may get called.
+    // See: Issue #398 (https://github.com/trailofbits/mcsema/issues/398)
+    //
     // TODO(kumarak): Fix the wrong indices in the exception table for catch all
 
     // Create the global array to store the type indices of original binary.
     // It is required to map the type indices in the exception table of
     // lifted binary to the original. The runtime routine does an array
-    // lookup and fixes the index value for exception type (update the `RDX` register).
+    // lookup and fixes the index value for exception type (update the
+    // RDX register).
     //
     // E.g.
     //  `gvar_landingpad_xxxxxx = global [5 x i32] [i32 0, i32 4, i32 1, i32 2, i32 3]`
     //
-    // The `gvar_landingpad_xxxxxx` will be associated with the landing pad. The variable
-    // array index represents the index in lifted binary and the value at the corresponsing
-    // index maps it in the original.
-    // The `0` index value is a dummy, and it is used to avoid further index computation.
-    //
-    g_variable_name << "gvar_landingpad_" << std::hex << eh_entry->lp_ea;
+    // The `gvar_landingpad_xxxxxx` will be associated with the landing pad.
+    // The variable array index represents the index in lifted binary and the
+    // value at the corresponding index maps it in the original. The `0` index
+    // value is a dummy, and it is used to avoid further index computation.
+    g_variable_name_ss << "gvar_landingpad_" << std::hex << eh_entry->lp_ea;
+    auto g_variable_name = g_variable_name_ss.str();
     auto array_type = llvm::ArrayType::get(
-        dword_type, eh_entry->type_var.size()+1);
+        dword_type, eh_entry->type_var.size() + 1);
 
-    if (!gModule->getOrInsertGlobal(g_variable_name.str(), array_type)) {
+    if (!gModule->getOrInsertGlobal(g_variable_name, array_type)) {
       LOG_IF(ERROR, 1)
           << "Can't create the global variable " << g_variable_name
-          << " for the landing pad at" << std::hex << eh_entry->lp_ea << std::dec;
+          << " for the landing pad at" << std::hex << eh_entry->lp_ea
+          << std::dec;
     }
 
-    auto gvar_landingpad = gModule->getGlobalVariable(g_variable_name.str());
+    auto gvar_landingpad = gModule->getGlobalVariable(g_variable_name_ss.str());
     gvar_landingpad->setLinkage(llvm::GlobalValue::ExternalLinkage);
 
     // Set the dummy value for index `0`
@@ -440,7 +445,8 @@ static void CreateLandingPad(TranslationContext &ctx,
 
     std::reverse(array_value_const.begin(), array_value_const.end());
     llvm::ArrayRef<llvm::Constant *> array_value(array_value_const);
-    llvm::Constant* const_array = llvm::ConstantArray::get(array_type, array_value);
+    llvm::Constant* const_array = llvm::ConstantArray::get(
+        array_type, array_value);
     gvar_landingpad->setInitializer(const_array);
     auto type_index_value = ir.CreateCall(GetExceptionTypeIndex());
 
