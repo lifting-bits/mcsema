@@ -43,28 +43,28 @@ There are opportunities and drawbacks to debugging lifted code.
 
 ### Opportunities
 
-* The [`RegState`](/mcsema/Arch/X86/Runtime/State.h) is stored in memory. The advantage to this is that one can set data breakpoints (hardware watchpoints) on individual registers in the state structure. This is incredibly useful if you have a [time-travelling debugger](http://undo.io/products/undodb/).
+* The [`State`](https://github.com/trailofbits/remill/blob/master/remill/Arch/X86/Runtime/State.h) is stored in memory. The advantage to this is that one can set data breakpoints (hardware watchpoints) on individual registers in the state structure. This is incredibly useful if you have a [time-travelling debugger](http://undo.io/products/undodb/).
 * Lifted bitcode can be instrumented using the LLVM toolchain. Some useful-for-debugging instrumentations come built-in to `mcsema-lift`.
 
 #### Built-in instrumentation
 
-`mcsema-lift` comes with two useful instrumentations that can help during debugging: `-add-breakpoints` and `-add-reg-tracer`.
+`mcsema-lift` comes with two useful instrumentations that can help during debugging: `--add_breakpoints` and `--add_reg_tracer`.
 
-### Breakpoint functions with `-add-breakpoints`
+### Breakpoint functions with `--add_breakpoints`
 
 One of the aforementioned drawbacks when trying to debug lifted code is that it is more verbose. This verbosity makes things hard if you're trying to debug the translation of a specific instruction in the original binary, or if you're trying to pause execution at a specific spot.
 
-That is why there is the `-add-breakpoints` option. The idea is that, just as you can say `b *0x402a00` to set a breakpoint on an instruction in the original binary, you can also do `b breakpoint_402a00` to set a breakpoint on the location of an "original instruction", but in the lifted binary.
+That is why there is the `--add_breakpoints` option. The idea is that, just as you can say `b *0x402a00` to set a breakpoint on an instruction in the original binary, you can also do `b breakpoint_402a00` to set a breakpoint on the location of an "original instruction", but in the lifted binary.
 
 |               Native code                | Lifted code with breakpoint functions |
 | :--------------------------------------: | :-----------------------------------: |
 | ![Native code](images/breakpoint_orig_code.png) | ![Lifted code](images/breakpoint.png) |
 
-On the left we see two instructions from the native code. On the right, we see the lifted code associated with the first and part of the second native instruction. Interspersed between the two are the `breakpoint_` functions. These breakpoint functions are "serializing" instructions. We can be certain that the `RegState` structure is in a consistent state at each call to a `breakpoint_` function. That is, the contents of the `RegState` struct at `breakpoint_402a00` in the lifted code should mostly match the native register state at `0x402a00` in the original binary.
+On the left we see two instructions from the native code. On the right, we see the lifted code associated with the first and part of the second native instruction. Interspersed between the two are the `breakpoint_` functions. These breakpoint functions are "serializing" instructions. We can be certain that the `State` structure is in a consistent state at each call to a `breakpoint_` function. That is, the contents of the `State` struct at `breakpoint_402a00` in the lifted code should mostly match the native register state at `0x402a00` in the original binary.
 
 #### Example
 
-Here's an example of using the `print-reg-state-64` GDB command in conjunction with the breakpoint feature.
+Here's an example of using the `print-reg-state-amd64` GDB command in conjunction with the breakpoint feature. There are `-x86` and `-aarch64` variants of `print-reg-state` as well.
 
 First, we set a breakpoint at `breakpoint_402a00` in `/tmp/ls_lifted`. The lifted state at this point will correspond to the native state at `0x402a00` in `/bin/ls`.
 
@@ -83,10 +83,10 @@ Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
 Breakpoint 1, 0x00000000004f9160 in breakpoint_402a00 ()
 ```
 
-We're now stopped at the `breakpoint_402a00` and can inspect the values of the `RegState` structure.
+We're now stopped at the `breakpoint_402a00` and can inspect the values of the `State` structure.
 
 ```gdb
-(gdb) print-reg-state-64
+(gdb) print-reg-state-amd64
              emulated                   native
 rip     0x0000000000402a00        0x00000000004f9160
 rax     0x000000000040399d        0x000000000040399d
@@ -144,7 +144,7 @@ Things won't perfectly match up, especially near the beginning of the execution 
 This is a nifty way of visually seeing if things match up with your expectations. Though, not everything is printed out at this point. For example, if you're observing that lifted execution goes one way, while native execution goes the other, then you may want to inspect the `EFLAGS` register to see what's going on. There's a command for that too!
 
 ```gdb
-(gdb) print-flags-64
+(gdb) print-flags-amd64
 eflags [PF AF ZF ]
 ```
 
@@ -160,13 +160,13 @@ Let's say we're in `sub_40eca0` and we want to know who initializes the value of
 | ---------------------------------------: | :--------------------------------------- |
 | ![Function using RDI](images/rdi_in_called_function.png) | ![Function using RDI](images/sources_of_rdi.png) |
 
-Now we get to take advantage of one of our opportunities: we can set data breakpoints on registers in the `RegState` structure! Let's go find the source of `rdi` given a call to `sub_40eca0`.
+Now we get to take advantage of one of our opportunities: we can set data breakpoints on registers in the `State` structure! Let's go find the source of `rdi` given a call to `sub_40eca0`.
 
-First, we get the address of `rdi` within the `RegState` structure.
+First, we get the address of `rdi` within the `State` structure.
 
 ```gdb
 (gdb) addr-of-rdi
-&(RegState::rdi) = 0x00007ffff7ebb840
+&rdi = 0x00007ffff7ebb840
 ```
 
 Then, we set a hardware watchpoint, and reverse-execute.
@@ -181,13 +181,13 @@ New value = 32207024
 0x00000000004d27eb in sub_40eca0 ()
 ```
 
-Great! You can now investigate the register state here with `print-reg-state-64`, and potentially work your way back by setting more watchpoints. It's useful to coordinate this workflow with IDA Pro or Binary Ninja to visually see where you are.
+Great! You can now investigate the register state here with `print-reg-state-amd64`, and potentially work your way back by setting more watchpoints. It's useful to coordinate this workflow with IDA Pro or Binary Ninja to visually see where you are.
 
 One reason why this approach can be successful is that it can be applied from where the bug occurs, and used to work back from there. This example was contrived; a better solution would have been to look at a backtrace on entry to `sub_40eca0` to see who the caller is. This technique is more effectively applied when working backward through complex control flows.
 
-### Register tracing with `-add-reg-tracer`
+### Register tracing with `--add_reg_tracer`
 
-A second option to `mcsema-lift` is `-add-reg-tracer`. This will inject function calls before every lifted instruction (similar to `-add-breakpoints`). The called function prints out the values of the general purpose registers stored in the `RegState` structure.
+A second option to `mcsema-lift` is `--add_reg_tracer`. This will inject function calls before every lifted instruction (similar to `--add_breakpoints`). The called function prints out the values of the general purpose registers stored in the `State` structure.
 
 #### Collecting lifted traces
 
@@ -199,16 +199,16 @@ First, disassemble the program.
 mcsema-disass --arch amd64 --os linux --disassembler /opt/ida-6.9/idal64 --output /tmp/ls.cfg --binary /bin/ls --log_file /dev/stderr --entrypoint main
 ```
 
-Then, lift it, adding in the `-add-reg-tracer` option.
+Then, lift it, adding in the `--add_reg_tracer` option.
 
 ```shell
-mcsema-lift --arch amd64 --os linux --cfg /tmp/ls.cfg --output /tmp/ls.bc --entrypoint main -add-reg-tracer
+mcsema-lift-3.0 --arch amd64 --os linux --cfg /tmp/ls.cfg --output /tmp/ls.bc --entrypoint main --add_reg_tracer
 ```
 
 Finally, compile it back to a program.
 
 ```shell
-clang-3.8 -O3 -o /tmp/ls_lifted /home/pag/Code/mcsema/lib/libmcsema_rt64.a /tmp/ls.bc -lpthread -ldl -lpcre /lib/x86_64-linux-gnu/libselinux.so.1
+remill-clang-3.8 -O3 -o /tmp/ls_lifted /home/pag/Code/mcsema/lib/libmcsema_rt64-3.8.a /tmp/ls.bc -lpthread -ldl -lpcre /lib/x86_64-linux-gnu/libselinux.so.1
 ```
 
 Now we can run it and see an example of the output.
@@ -292,7 +292,7 @@ I use Meld Diff Viewer, so what I usually look for in the diff is the blue secti
 
 So what we see above is that there is a `jbe 0x40adf8`, and in the lifted code, it goes down the taken path to `0x40adf8`, whereas the native code goes down the not-taken path to `0x40ad7a`.
 
-First, we'll lift a second copy of this binary using the `-add-breakpoints` option and not the `-add-reg-tracer`. Then we'll whip open the debugger and try to figure out this issue.
+First, we'll lift a second copy of this binary using the `--add_breakpoints` option and not the `--add_reg_tracer`. Then we'll whip open the debugger and try to figure out this issue.
 
 ```shell
 pag@sloth:~/Code/mcsema/build$ undodb-gdb /tmp/ls_lifted_bp
@@ -304,7 +304,7 @@ Breakpoint 1 at 0x4f0fc0
 ...
 
 Breakpoint 1, 0x00000000004f0fc0 in breakpoint_40ad74 ()
-(undodb-gdb) print-flags-64
+(undodb-gdb) print-flags-amd64
 eflags [CF AF SF ]
 ```
 
@@ -348,7 +348,7 @@ The value of `RDI` comes from `R15`, but unfortunately there's a lot of predeces
 
 ```gdb
 (undodb-gdb) addr-of-r15
-&(RegState::r15) = 0x00007f8d4ff1d890
+&r15 = 0x00007f8d4ff1d890
 (undodb-gdb) watch *0x00007f8d4ff1d890
 Hardware watchpoint 2: *0x00007f8d4ff1d890
 (undodb-gdb) reverse-continue
@@ -358,12 +358,12 @@ Hardware watchpoint 2: *0x00007f8d4ff1d890
 Old value = 0
 New value = 30
 0x00000000004c4c26 in sub_40B5B0 ()
-(undodb-gdb) print-reg-state-64
+(undodb-gdb) print-reg-state-amd64
              emulated                   native
 rip     0x000000000040b710        0x00000000004c4c26
 ...
 (undodb-gdb) addr-of-xmm0
-&(RegState::xmm0) = 0x00007f8d4ff1d940
+&xmm0 = 0x00007f8d4ff1d940
 (undodb-gdb) x/4f 0x00007f8d4ff1d940
 0x7f8d4ff1d940: 0 0 0 0
 ```
@@ -393,7 +393,7 @@ Looks like we can see a difference in the values of `XMM0` compared. In the lift
 
 ```gdb
 (undodb-gdb) addr-of-xmm0-64
-&(RegState::xmm0) = 0x00007f8d4ff1d940
+&xmm0 = 0x00007f8d4ff1d940
 (undodb-gdb) watch *0x00007f8d4ff1d940
 Hardware watchpoint 3: *0x00007f8d4ff1d940
 (undodb-gdb) reverse-continue
@@ -413,7 +413,7 @@ rip     0x0000000000402190        0x0000000000514ea6
 
 Oof. We've found ourselves in one of the attach/detach routines (`__mcsema_attach_ret`) for transitioning between lifted code and native code. These routines are tricky.
 
-When we see an `__mcsema_attach_ret`, what it's really meaning is that at some earlier point, lifted code called into some native library code. This lifted-to-native transition happens via the `__mcsema_detach_call` or `__mcsema_detach_call_value` functions. Eventually that native code needs to transition back to lifted code. This is achieved by setting up a special return address on the stack, `__mcsema_attach_ret`. When native code returns, it returns to `__mcsema_attach_ret`, which marshals native register state back into the `RegState` structure, and continues on in lifted code.
+When we see an `__mcsema_attach_ret`, what it's really meaning is that at some earlier point, lifted code called into some native library code. This lifted-to-native transition happens via the `__mcsema_detach_call` or `__mcsema_detach_call_value` functions. Eventually that native code needs to transition back to lifted code. This is achieved by setting up a special return address on the stack, `__mcsema_attach_ret`. When native code returns, it returns to `__mcsema_attach_ret`, which marshals native register state back into the `State` structure, and continues on in lifted code.
 
 Alright, lets step back and attack this problem from the native side. Looking back at our control-flow graph, we can see that `XMM0` is modified by a `divss` instruction.
 
@@ -436,7 +436,7 @@ $6 = {0.800000012, 0, 0, 0}
 $7 = 37.499999437500009
 ```
 
-Yup, it is. Our reverse-execution based on a watchpoint on `&(RegState::XMM0)` led us astray. Lets go back to the breakpoint approach, and see what things look like at `breakpoint_40b6d6`.
+Yup, it is. Our reverse-execution based on a watchpoint on `&(State::XMM0)` led us astray. Lets go back to the breakpoint approach, and see what things look like at `breakpoint_40b6d6`.
 
 ```gdb
 (undodb-gdb) c
@@ -451,10 +451,10 @@ Continuing.
 
 Breakpoint 4, 0x000000000050f6c0 in breakpoint_40b6d6 ()
 ...
-(undodb-gdb) addr-of-xmm0-64
-&(RegState::xmm0) = 0x00007f8d4ff1d940
-(undodb-gdb) addr-of-xmm1-64
-&(RegState::xmm1) = 0x00007f8d4ff1d950
+(undodb-gdb) addr-of-xmm0
+&xmm0 = 0x00007f8d4ff1d940
+(undodb-gdb) addr-of-xmm1
+&xmm1 = 0x00007f8d4ff1d950
 (undodb-gdb) x/f 0x00007f8d4ff1d940
 0x7f8d4ff1d940: 0
 (undodb-gdb) x/f 0x00007f8d4ff1d940
@@ -497,7 +497,7 @@ r15            0x1e 30
 ...
 ```
 
-Amazing! The `RegState::R15` in the lifted code and `R15` in the native code match up. This tells us that there is a bug in the semantics of `cvtsi2ss`! Alright, what does this instruction even do?
+Amazing! The `State::R15` in the lifted code and `R15` in the native code match up. This tells us that there is a bug in the semantics of `cvtsi2ss`! Alright, what does this instruction even do?
 
 ![cvtsi2ss docs](images/cvtsi2ss_doc.png)
 
@@ -514,13 +514,15 @@ Breakpoint 7 at 0x4c4879
 Continuing.
 
 Breakpoint 7, 0x00000000004c4879 in sub_40B5B0 ()
-(undodb-gdb) addr-of-xmm0-64
-&(RegState::xmm0) = 0x00007f8d4ff1d940
+(undodb-gdb) addr-of-xmm0
+&(State::xmm0) = 0x00007f8d4ff1d940
 (undodb-gdb) p *(double *)0x00007f8d4ff1d940
 $4 = 30
 ```
 
 Alright, we have confirmation, the lifted code for `cvtsi2ss` is definitely doing the wrong thing. Time to see the C++ code implementing this instruction.
+
+**NOTE:** How McSema lifts instructions has changed since this walkthrough was originally written. The remainder of this document has been preserved for posterity. Instruction semantics are no longer implemented within McSema, and are instead implemented (and tested) in the [Remill](https://github.com/trailofbits/remill) project.
 
 First, we'll figure out what LLVM opcode implements this instruction.
 
@@ -539,7 +541,7 @@ We can find the instruction dispatcher for this function in [SSE semantics code]
 We can also disassemble (using `llvm-dis-3.8`) the lifted bitcode file and look directly at the LLVM IR to see what is produced.
 
 ```llvm
-  call void @breakpoint_40b6d1(%RegState* %0), !mcsema_real_eip !14434
+  call void @breakpoint_40b6d1(%Memory *%memory, %State* %0, i64 %pc), !mcsema_real_eip !14434
   %665 = load i64, i64* %R15_read, !mcsema_real_eip !14434
   %666 = sitofp i64 %665 to double, !mcsema_real_eip !14434
   %667 = bitcast double %666 to i64, !mcsema_real_eip !14434
@@ -550,17 +552,17 @@ We can also disassemble (using `llvm-dis-3.8`) the lifted bitcode file and look 
 
 What we are seeing is that the semantics function `translate_CVTSI2SS64rr` is using `64` for target floating point width when calling `doCVTSI2SrV`. The `doCVTSI2SrV` function
 
-1.Calls the `INT_TO_FP_TO_INT<64>` helper function with the value of `R15`.
-2.`INT_TO_FP_TO_INT<64>` converts `R15` to a `width`-sized floating point number (in our case, a 64-bit float, i.e. a `double`).
-3.`INT_TO_FP_TO_INT<64>` reinterprets that value as an integer (without a format change).
-4.`doCVTSI2SrV` writes that 64-bit integer (containing a float) to `XMM0`, which zero extends the 64-bit integer into a 128-bit integer.
+ 1. Calls the `INT_TO_FP_TO_INT<64>` helper function with the value of `R15`.
+ 2. `INT_TO_FP_TO_INT<64>` converts `R15` to a `width`-sized floating point number (in our case, a 64-bit float, i.e. a `double`).
+ 3. `INT_TO_FP_TO_INT<64>` reinterprets that value as an integer (without a format change).
+ 4. `doCVTSI2SrV` writes that 64-bit integer (containing a float) to `XMM0`, which zero extends the 64-bit integer into a 128-bit integer.
 
 Clearly we should have called `doCVTSI2SrV<32>` instead of `doCVTSI2SrV<64>`, so that `INT_TO_FP_TO_INT<width=32>` would do a narrower conversion.
 
 Let's make this change, rebuild and install McSema, re-run `mcsema-lift`, compile the new bitcode, and hope for the best. Here's what the new bitcode looks like after the fix:
 
 ```llvm
-  call void @breakpoint_40b6d1(%RegState* %0), !mcsema_real_eip !14434
+  call void @breakpoint_40b6d1(%Memory *memory, %State* %0, i64 %pc), !mcsema_real_eip !14434
   %665 = load i64, i64* %R15_read, !mcsema_real_eip !14434
   %666 = sitofp i64 %665 to float, !mcsema_real_eip !14434
   %667 = bitcast float %666 to i32, !mcsema_real_eip !14434
