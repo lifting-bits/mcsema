@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specifi
 
-project(exception_test)
+project(exception)
 cmake_minimum_required(VERSION 3.2)
 
 set(PROJECT_CXXFLAGS -Wall -Werror)
@@ -23,5 +23,5 @@ set(PROJECT_SOURCEFILES
 GenerateTest(${PROJECT_NAME}
   SOURCES ${PROJECT_SOURCEFILES}
   CXXFLAGS ${PROJECT_CXXFLAGS}
-  LDFLAGS ${PROJECT_LINKERFLAGS}
+  LINKERFLAGS ${PROJECT_LINKERFLAGS}
 )
