@@ -281,6 +281,20 @@ linux_build_helper() {
 
   printf " > Build succeeded\n"
 
+  printf " > Building Integration Test Suite...\n"
+  pushd ./remill/tools/mcsema/tests/test_suite_generator
+  mkdir build
+  ( cd build && cmake -DCMAKE_VERBOSE_MAKEFILE=True .. ) > "${log_file}" 2>&1
+  if [ $? -ne 0 ] ; then
+    printf " x Failed to generate test suite project. Error output follows:\n"
+    printf "===\n"
+    cat "${log_file}"
+    return 1
+  fi
+  popd
+
+  #TODO(artem): Call the generated test suite, not the pre-made one
+  #TODO(artem): eliminate pre-made test suite once we always generate it
   printf "\n\n\nCalling the integration test suite...\n"
   local test_log_file=`mktemp`
   ( cd ./remill/tools/mcsema/tests/test_suite && ./start.py ) > "${test_log_file}" 2>&1
@@ -290,6 +304,7 @@ linux_build_helper() {
     cat "${test_log_file}"
     return 1
   fi
+
 
   return 0
 }
