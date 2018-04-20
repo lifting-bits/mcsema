@@ -140,12 +140,16 @@ function (ExportCFG target_name architecture binary_path)
 
   set(output_file "${target_name}_${architecture}.cfg")
 
-  add_custom_command(
-    OUTPUT "${output_file}"
-    COMMAND "${MCSEMADISASS_PATH}" --disassembler "${IDAL64_PATH}" --arch "${architecture}" --os "${platform}" --binary "${binary_path}" --output "${output_file}" --entrypoint main
-    DEPENDS "${binary_path}"
-    VERBATIM
-  )
+  if ("${IDAL64_PATH}" STREQUAL "IDAL64_PATH-NOTFOUND")
+    #TODO(artem): Read CFG from pre-built CFG repository
+  else ()
+    add_custom_command(
+      OUTPUT "${output_file}"
+      COMMAND "${MCSEMADISASS_PATH}" --disassembler "${IDAL64_PATH}" --arch "${architecture}" --os "${platform}" --binary "${binary_path}" --output "${output_file}" --entrypoint main
+      DEPENDS "${binary_path}"
+      VERBATIM
+    )
+  endif ()
 
   add_custom_target("${target_name}_${architecture}_cfg" ALL DEPENDS "${output_file}")
   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${output_file}" DESTINATION "${architecture}/${platform}/cfg" RENAME "${target_name}")
@@ -342,7 +346,8 @@ endif ()
 
 find_program(IDAL64_PATH "idal64")
 if ("${IDAL64_PATH}" STREQUAL "IDAL64_PATH-NOTFOUND")
-  message(FATAL_ERROR "Failed to locate the idal64 executable!")
+  message(WARNING "Failed to locate the idal64 executable! Will not test CFG recovery.")
+  #TODO(artem): Check if we are using pre-built CFGs, and if not, throw a FATAL_ERROR
 endif ()
 
 find_program(MCSEMADISASS_PATH "mcsema-disass")
