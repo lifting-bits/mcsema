@@ -141,7 +141,17 @@ function (ExportCFG target_name architecture binary_path)
   set(output_file "${target_name}_${architecture}.cfg")
 
   if ("${IDAL64_PATH}" STREQUAL "IDAL64_PATH-NOTFOUND")
-    #TODO(artem): Read CFG from pre-built CFG repository
+    #Read CFG from pre-built CFG repository
+    #configure_file("${MCSEMA_PREBUILT_CFG_PATH}/${architecture}/${platform}/cfg/${target_name}"
+    #               "${output_file}"
+    #               COPYONLY)
+    add_custom_command(
+      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${output_file}"
+      COMMAND cmake -E copy
+        "${MCSEMA_PREBUILT_CFG_PATH}/${architecture}/${platform}/cfg/${target_name}"
+        "${CMAKE_CURRENT_BINARY_DIR}/${output_file}"
+      DEPENDS "${MCSEMA_PREBUILT_CFG_PATH}/${architecture}/${platform}/cfg/${target_name}"
+    )
   else ()
     add_custom_command(
       OUTPUT "${output_file}"
@@ -347,7 +357,13 @@ endif ()
 find_program(IDAL64_PATH "idal64")
 if ("${IDAL64_PATH}" STREQUAL "IDAL64_PATH-NOTFOUND")
   message(WARNING "Failed to locate the idal64 executable! Will not test CFG recovery.")
-  #TODO(artem): Check if we are using pre-built CFGs, and if not, throw a FATAL_ERROR
+  if(NOT DEFINED MCSEMA_PREBUILT_CFG_PATH)
+    message(FATAL_ERROR "IDAL64_PATH is not defined and MCSEMA_PREBUILT_CFG_PATH is not defined (use -DMCSEMA_PREBUILT_CFG_PATH=<path>)")
+  endif()
+  get_filename_component(MCSEMA_PREBUILT_CFG_PATH "${MCSEMA_PREBUILT_CFG_PATH}" ABSOLUTE)
+  if(NOT EXISTS "${MCSEMA_PREBUILT_CFG_PATH}")
+    message(FATAL_ERROR "IDA64_PATH not found and I could not find path for prebuilt CFGs. Looked in: ${MCSEMA_PREBUILT_CFG_PATH}")
+  endif()
 endif ()
 
 find_program(MCSEMADISASS_PATH "mcsema-disass")
@@ -358,7 +374,11 @@ endif ()
 message("Toolset")
 message(" > mcsema-lift: ${MCSEMALIFT_PATH}")
 message(" > clang: ${CLANG_PATH}")
-message(" > idal64: ${IDAL64_PATH}")
+if (NOT "${IDAL64_PATH}" STREQUAL "IDAL64_PATH-NOTFOUND")
+  message(" > idal64: ${IDAL64_PATH}")
+else()
+  message(" > using prebuilt cfgs: ${MCSEMA_PREBUILT_CFG_PATH}")
+endif ()
 message(" > mcsema-disass: ${MCSEMADISASS_PATH}")
 
 set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/test_suite")
