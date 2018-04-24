@@ -62,11 +62,28 @@ void CFGWriter::skipFunction(const std::string &name) {
 }
 
 void CFGWriter::write() {
+  writeExternalVariables();
   writeGlobalVariables();
   writeInternalFunctions();
   writeExternalFunctions();
   writeInternalData();
   m_module.set_name(m_moduleName);
+}
+
+void CFGWriter::writeExternalVariables() {
+  std::vector<SymtabAPI::Symbol *> symbols;
+  m_symtab.getAllSymbolsByType(symbols, SymtabAPI::Symbol::ST_OBJECT);
+  for (const auto &s : symbols) {
+    if (s->isInDynSymtab()) {
+      m_externalVars.insert(s);
+      auto extVar = m_module.add_external_vars();
+      extVar->set_name(s->getPrettyName());
+      extVar->set_ea(s->getOffset());
+      extVar->set_size(s->getSize());
+      extVar->set_is_weak(false);
+      extVar->set_is_thread_local(false);
+    }
+  }
 }
 
 void CFGWriter::writeGlobalVariables() {
@@ -323,9 +340,19 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
     return;
   }
 
-  std::cerr << "error: unable to resolve call instruction at 0x" << std::hex
-            << addr << std::dec << std::endl;
-  throw std::runtime_error{"unresolved call instruction"};
+  /* TODO: It is quite probable we are dealing with function pointer here.*/
+  std::cout << "Unable to resolve call instruction at 0x" << std::hex << addr
+            << std::dec << ", fallback guess is that it is xref on code target"
+            << std::endl;
+  target -= 5;
+
+  auto cfgCodeRef = cfgInstruction->add_xrefs();
+  cfgCodeRef->set_target_type(mcsema::CodeReference::CodeTarget);
+  cfgCodeRef->set_operand_type(mcsema::CodeReference::ControlFlowOperand);
+  cfgCodeRef->set_location(mcsema::CodeReference::Internal);
+  cfgCodeRef->set_ea(target);
+
+  return;
 }
 
 void CFGWriter::handleNonCallInstruction(
@@ -387,8 +414,28 @@ void CFGWriter::handleNonCallInstruction(
         auto cfgCodeRef = cfgInstruction->add_xrefs();
         cfgCodeRef->set_target_type(mcsema::CodeReference::DataTarget);
         cfgCodeRef->set_operand_type(mcsema::CodeReference::MemoryOperand);
-        cfgCodeRef->set_location(mcsema::CodeReference::Internal);
         cfgCodeRef->set_ea(a);
+
+        SymtabAPI::Symbol *target;
+        for (auto &s : m_externalVars) {
+          if (s->getOffset() == a) {
+            target = s;
+            break;
+          }
+        }
+
+        if (target) {
+          cfgCodeRef->set_location(mcsema::CodeReference::External);
+          try {
+            cfgCodeRef->set_name(target->getPrettyName());
+          } catch (std::exception &er) {
+            std::cout << "There were problems with getPrettyName() with " << a
+                      << std::endl;
+            cfgCodeRef->set_name("var_" + std::to_string(a));
+          }
+        } else {
+          cfgCodeRef->set_location(mcsema::CodeReference::Internal);
+        }
       }
     }
   }

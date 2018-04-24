@@ -7,6 +7,8 @@
 #include <Expression.h>
 #include <Symtab.h>
 
+#include <unordered_set>
+
 class CFGWriter {
 public:
   CFGWriter(mcsema::Module &m, const std::string &moduleName,
@@ -29,6 +31,7 @@ private:
   void writeDataVariables(Dyninst::SymtabAPI::Region *region,
                           mcsema::Segment *segment);
 
+  void writeExternalVariables();
   void writeGlobalVariables();
   void writeInternalFunctions();
   void writeBlock(Dyninst::ParseAPI::Block *block,
@@ -61,6 +64,7 @@ private:
   std::set<std::string> m_skipFuncs;
 
   std::set<Dyninst::SymtabAPI::Symbol *> m_globalVars;
+  std::unordered_set<Dyninst::SymtabAPI::Symbol *> m_externalVars;
 
   SectionManager m_sectionMgr;
   std::vector<Dyninst::SymtabAPI::relocationEntry> m_relocations;
