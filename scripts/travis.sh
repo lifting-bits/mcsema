@@ -22,8 +22,6 @@ main() {
   local platform_name="$1"
   local operation_type="$2"
 
-  export TRAILOFBITS_LIBRARIES=`realpath libraries`
-
   if [[ "${platform_name}" != "osx" && "${platform_name}" != "linux" ]] ; then
     printf "Invalid platform: ${platform_name}\n"
     return 1
@@ -85,8 +83,6 @@ linux_initialize() {
     printf " x Could not install the required dependencies\n"
     return 1
   fi
-
-  install_ada_support
 
   printf " > The system has been successfully initialized\n"
   return 0
@@ -263,10 +259,15 @@ linux_build_helper() {
     fi
   fi
 
+  export TRAILOFBITS_LIBRARIES=`realpath libraries`
   export PATH="${TRAILOFBITS_LIBRARIES}/llvm/bin:${TRAILOFBITS_LIBRARIES}/cmake/bin:${TRAILOFBITS_LIBRARIES}/protobuf/bin:${PATH}"
 
   export CC="${TRAILOFBITS_LIBRARIES}/llvm/bin/clang"
   export CXX="${TRAILOFBITS_LIBRARIES}/llvm/bin/clang++"
+
+  # need TRAILOFBITS_LIBRARIES installed before we can
+  # add ada support to cmake
+  install_ada_support
 
   printf " > Generating the project...\n"
   mkdir build > "${log_file}" 2>&1
