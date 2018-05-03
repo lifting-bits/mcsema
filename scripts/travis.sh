@@ -284,7 +284,7 @@ linux_build_helper() {
   printf " > Building Integration Test Suite...\n"
   pushd ./remill/tools/mcsema/tests/test_suite_generator
   mkdir build
-  ( cd build && cmake -DMCSEMA_PREBUILT_CFG_PATH=$(pwd)/generated/prebuilt_cfg -DCMAKE_VERBOSE_MAKEFILE=True .. ) > "${log_file}" 2>&1
+  ( cd build && cmake -DMCSEMA_PREBUILT_CFG_PATH=$(pwd)/../generated/prebuilt_cfg -DCMAKE_VERBOSE_MAKEFILE=True .. ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to generate test suite project. Error output follows:\n"
     printf "===\n"
