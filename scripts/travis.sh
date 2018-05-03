@@ -41,6 +41,14 @@ main() {
   fi
 }
 
+install_ada_support() {
+  printf " > Installing ADA Langauge support for CMake"
+  git clone git@github.com:offa/cmake-ada.git
+  pushd cmake-ada
+  sudo cmake -P install.cmake
+  popd
+}
+
 linux_initialize() {
   printf "Initializing platform: linux\n"
 
@@ -58,6 +66,8 @@ linux_initialize() {
     return 1
   fi
 
+  install_ada_support
+
   printf " > The system has been successfully initialized\n"
   return 0
 }
@@ -73,6 +83,8 @@ osx_initialize() {
 linux_build() {
   local original_path="${PATH}"
   local log_file=`mktemp`
+
+  # set up ada support for cmake
 
   llvm_version_list=( "35" "36" "37" "38" "39" "40" "50" )
   for llvm_version in "${llvm_version_list[@]}" ; do
