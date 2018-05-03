@@ -43,9 +43,25 @@ main() {
 
 install_ada_support() {
   printf " > Installing ADA Langauge support for CMake"
-  git clone git@github.com:offa/cmake-ada.git
+  git clone "https://github.com/offa/cmake-ada.git" > "${log_file}" 2>&1
+
+  if [ $? -ne 0 ] ; then
+    printf " x Failed to clone the cmake-ada repository. Error output follows:\n"
+    printf "===\n"
+    cat "${log_file}"
+    return 1
+  fi
+
   pushd cmake-ada
+
   sudo cmake -P install.cmake
+  if [ $? -ne 0 ] ; then
+    printf " x Failed to install cmake ada support. Error output follows:\n"
+    printf "===\n"
+    cat "${log_file}"
+    return 1
+  fi
+
   popd
 }
 
