@@ -42,7 +42,9 @@ main() {
 }
 
 install_ada_support() {
-  printf " > Installing ADA Langauge support for CMake"
+  local log_file=`mktemp`
+
+  printf " > Installing ADA Langauge support for CMake\n"
   git clone "https://github.com/offa/cmake-ada.git" > "${log_file}" 2>&1
 
   if [ $? -ne 0 ] ; then
