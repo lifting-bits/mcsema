@@ -22,6 +22,8 @@ main() {
   local platform_name="$1"
   local operation_type="$2"
 
+  export TRAILOFBITS_LIBRARIES=`realpath libraries`
+
   if [[ "${platform_name}" != "osx" && "${platform_name}" != "linux" ]] ; then
     printf "Invalid platform: ${platform_name}\n"
     return 1
@@ -56,7 +58,7 @@ install_ada_support() {
 
   pushd cmake-ada
 
-  sudo cmake -P install.cmake
+  sudo ${TRAILOFBITS_LIBRARIES}/cmake/bin/cmake -P install.cmake
   if [ $? -ne 0 ] ; then
     printf " x Failed to install cmake ada support. Error output follows:\n"
     printf "===\n"
@@ -261,7 +263,6 @@ linux_build_helper() {
     fi
   fi
 
-  export TRAILOFBITS_LIBRARIES=`realpath libraries`
   export PATH="${TRAILOFBITS_LIBRARIES}/llvm/bin:${TRAILOFBITS_LIBRARIES}/cmake/bin:${TRAILOFBITS_LIBRARIES}/protobuf/bin:${PATH}"
 
   export CC="${TRAILOFBITS_LIBRARIES}/llvm/bin/clang"
