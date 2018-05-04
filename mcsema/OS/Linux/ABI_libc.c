@@ -787,11 +787,11 @@ void *__mcsema_externs[] = {
   //BuiltIn(int) memcmp(Pointer(Attributed(const , BuiltIn(void))), Pointer(Attributed(const , BuiltIn(void))), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
   (void *)(memcmp),
   //Pointer(BuiltIn(void)) memchr(Pointer(Attributed(const , BuiltIn(void))), BuiltIn(int), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
-  (void *)(memchr),
+//  (void *)(memchr),
   //Pointer(BuiltIn(void)) rawmemchr(Pointer(Attributed(const , BuiltIn(void))), BuiltIn(int));
-  (void *)(rawmemchr),
+ // (void *)(rawmemchr),
   //Pointer(BuiltIn(void)) memrchr(Pointer(Attributed(const , BuiltIn(void))), BuiltIn(int), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
-  (void *)(memrchr),
+//  (void *)(memrchr),
   //Pointer(BuiltIn(char)) strcpy(Pointer(restrict BuiltIn(char)), Pointer(restrict Attributed(const , BuiltIn(char))));
   (void *)(strcpy),
   //Pointer(BuiltIn(char)) strncpy(Pointer(restrict BuiltIn(char)), Pointer(restrict Attributed(const , BuiltIn(char))), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
@@ -817,19 +817,19 @@ void *__mcsema_externs[] = {
   //Pointer(BuiltIn(char)) strndup(Pointer(Attributed(const , BuiltIn(char))), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
   (void *)(strndup),
   //Pointer(BuiltIn(char)) strchr(Pointer(Attributed(const , BuiltIn(char))), BuiltIn(int));
-  (void *)(strchr),
+//  (void *)(strchr),
   //Pointer(BuiltIn(char)) strrchr(Pointer(Attributed(const , BuiltIn(char))), BuiltIn(int));
-  (void *)(strrchr),
+//  (void *)(strrchr),
   //Pointer(BuiltIn(char)) strchrnul(Pointer(Attributed(const , BuiltIn(char))), BuiltIn(int));
-  (void *)(strchrnul),
+//  (void *)(strchrnul),
   //Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))) strcspn(Pointer(Attributed(const , BuiltIn(char))), Pointer(Attributed(const , BuiltIn(char))));
   (void *)(strcspn),
   //Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))) strspn(Pointer(Attributed(const , BuiltIn(char))), Pointer(Attributed(const , BuiltIn(char))));
   (void *)(strspn),
   //Pointer(BuiltIn(char)) strpbrk(Pointer(Attributed(const , BuiltIn(char))), Pointer(Attributed(const , BuiltIn(char))));
-  (void *)(strpbrk),
+//  (void *)(strpbrk),
   //Pointer(BuiltIn(char)) strstr(Pointer(Attributed(const , BuiltIn(char))), Pointer(Attributed(const , BuiltIn(char))));
-  (void *)(strstr),
+//  (void *)(strstr),
   //Pointer(BuiltIn(char)) strtok(Pointer(restrict BuiltIn(char)), Pointer(restrict Attributed(const , BuiltIn(char))));
   (void *)(strtok),
   //Pointer(BuiltIn(char)) __strtok_r(Pointer(restrict BuiltIn(char)), Pointer(restrict Attributed(const , BuiltIn(char))), Pointer(restrict Pointer(BuiltIn(char))));
@@ -837,7 +837,7 @@ void *__mcsema_externs[] = {
   //Pointer(BuiltIn(char)) strtok_r(Pointer(restrict BuiltIn(char)), Pointer(restrict Attributed(const , BuiltIn(char))), Pointer(restrict Pointer(BuiltIn(char))));
   (void *)(strtok_r),
   //Pointer(BuiltIn(char)) strcasestr(Pointer(Attributed(const , BuiltIn(char))), Pointer(Attributed(const , BuiltIn(char))));
-  (void *)(strcasestr),
+//  (void *)(strcasestr),
   //Pointer(BuiltIn(void)) memmem(Pointer(Attributed(const , BuiltIn(void))), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))), Pointer(Attributed(const , BuiltIn(void))), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
   (void *)(memmem),
   //Pointer(BuiltIn(void)) __mempcpy(Pointer(restrict BuiltIn(void)), Pointer(restrict Attributed(const , BuiltIn(void))), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
@@ -863,9 +863,9 @@ void *__mcsema_externs[] = {
   //BuiltIn(int) bcmp(Pointer(Attributed(const , BuiltIn(void))), Pointer(Attributed(const , BuiltIn(void))), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
   (void *)(bcmp),
   //Pointer(BuiltIn(char)) index(Pointer(Attributed(const , BuiltIn(char))), BuiltIn(int));
-  (void *)(index),
+//  (void *)(index),
   //Pointer(BuiltIn(char)) rindex(Pointer(Attributed(const , BuiltIn(char))), BuiltIn(int));
-  (void *)(rindex),
+//  (void *)(rindex),
   //BuiltIn(int) ffs(BuiltIn(int));
   (void *)(ffs),
   //BuiltIn(int) ffsl(BuiltIn(long));
