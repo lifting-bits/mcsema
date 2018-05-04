@@ -42,7 +42,7 @@
 #include <rpcsvc/nlm_prot.h>
 #include <rpcsvc/nis.h>
 #include <rpcsvc/nis_callback.h>
-#include <rpcsvc/yppasswd.h>
+//#include <rpcsvc/yppasswd.h>
 #include <rpcsvc/key_prot.h>
 #include <rpcsvc/rusers.h>
 #include <rpcsvc/nislib.h>
@@ -52,10 +52,10 @@
 #include <rpcsvc/bootparam.h>
 #include <rpcsvc/ypupd.h>
 #include <rpcsvc/rstat.h>
-#include <rpcsvc/yp.h>
-#include <rpcsvc/nfs_prot.h>
+//#include <rpcsvc/yp.h>
+//#include <rpcsvc/nfs_prot.h>
 #include <rpcsvc/rquota.h>
-#include <rpcsvc/yp_prot.h>
+//#include <rpcsvc/yp_prot.h>
 #include <rpcsvc/bootparam_prot.h>
 #include <netipx/ipx.h>
 #include <_G_config.h>
@@ -222,7 +222,7 @@
 #include <printf.h>
 #include <monetary.h>
 #include <mntent.h>
-#include <regexp.h>
+//#include <regexp.h>
 #include <langinfo.h>
 #include <regex.h>
 #include <re_comp.h>
