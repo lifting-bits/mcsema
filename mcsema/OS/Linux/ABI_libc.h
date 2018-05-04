@@ -125,7 +125,7 @@
 #include <x86_64-linux-gnu/sys/sysmacros.h>
 #include <x86_64-linux-gnu/sys/param.h>
 #include <x86_64-linux-gnu/sys/reboot.h>
-#include <x86_64-linux-gnu/sys/kdaemon.h>
+//#include <x86_64-linux-gnu/sys/kdaemon.h>
 #include <x86_64-linux-gnu/sys/auxv.h>
 #include <x86_64-linux-gnu/sys/file.h>
 #include <x86_64-linux-gnu/sys/sysctl.h>
@@ -152,7 +152,7 @@
 #include <x86_64-linux-gnu/gnu/stubs.h>
 #include <x86_64-linux-gnu/gnu/stubs-64.h>
 #include <x86_64-linux-gnu/gnu/libc-version.h>
-#include <x86_64-linux-gnu/gnu/option-groups.h>
+//#include <x86_64-linux-gnu/gnu/option-groups.h>
 #include <x86_64-linux-gnu/gnu/lib-names.h>
 #include <x86_64-linux-gnu/fpu_control.h>
 #include <string.h>

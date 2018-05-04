@@ -31,7 +31,7 @@ set(CURRENT_OS linux)
 
 set(LINUXABI_INCLUDEDIRECTORIES ${CMAKE_SOURCE_DIR})
 
-function (language add_runtime_helper target_name target_arch address_bit_size)
+function (add_runtime_helper language target_name target_arch address_bit_size)
     message(" > Generating ${CURRENT_OS} ABI target: ${target_name}")
 
 		# example name: ABI_libc_x86.bc

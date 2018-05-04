@@ -1049,7 +1049,7 @@ void *__mcsema_externs[] = {
   //BuiltIn(int) __finite(BuiltIn(double));
   (void *)(__finite),
   //BuiltIn(int) isinf(BuiltIn(double));
-  (void *)(isinf),
+//  (void *)(isinf),
   //BuiltIn(int) finite(BuiltIn(double));
   (void *)(finite),
   //BuiltIn(double) drem(BuiltIn(double), BuiltIn(double));
@@ -1071,7 +1071,7 @@ void *__mcsema_externs[] = {
   //BuiltIn(int) __isnan(BuiltIn(double));
   (void *)(__isnan),
   //BuiltIn(int) isnan(BuiltIn(double));
-  (void *)(isnan),
+//  (void *)(isnan),
   //BuiltIn(double) j0(BuiltIn(double));
   (void *)(j0),
   //BuiltIn(double) __j0(BuiltIn(double));
@@ -2418,7 +2418,7 @@ void *__mcsema_externs[] = {
   //BuiltIn(void) psiginfo(Pointer(Attributed(const , Use(TypeDef(siginfo_t, Struct(struct anon_struct_172))))), Pointer(Attributed(const , BuiltIn(char))));
   (void *)(psiginfo),
   //BuiltIn(int) __sigpause(BuiltIn(int), BuiltIn(int));
-  (void *)(__sigpause),
+//  (void *)(__sigpause),
   //BuiltIn(int) sigpause(BuiltIn(int));
   (void *)(sigpause),
   //BuiltIn(int) sigblock(BuiltIn(int));
@@ -3716,7 +3716,7 @@ void *__mcsema_externs[] = {
   //BuiltIn(int) reboot(BuiltIn(int));
   (void *)(reboot),
   //BuiltIn(int) bdflush(BuiltIn(int), BuiltIn(long));
-  (void *)(bdflush),
+//  (void *)(bdflush),
   //Attributed(unsigned , BuiltIn(long)) getauxval(Attributed(unsigned , BuiltIn(long)));
   (void *)(getauxval),
   //BuiltIn(int) flock(BuiltIn(int), BuiltIn(int));
