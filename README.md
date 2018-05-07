@@ -177,12 +177,10 @@ In order to verify that McSema works correctly as built, head on over to [the do
 ### On Windows
 
 #### Step 1: Toolchain
-**IMPORTANT**: Always add to PATH for all users when the option is available!
-
 * Visual Studio 2017: https://www.visualstudio.com/thank-you-downloading-visual-studio/?sku=Community&rel=15
-* CMake: https://cmake.org/files/v3.11/cmake-3.11.0-rc1-win64-x64.msi
-* Python 2.7 (x64): https://www.python.org/ftp/python/2.7.14/python-2.7.14.amd64.msi
-* LLVM 5.0.1 (x64): http://releases.llvm.org/5.0.1/LLVM-5.0.1-win64.exe
+* CMake (add to PATH): https://cmake.org/files/v3.11/cmake-3.11.0-rc1-win64-x64.msi
+* Python 2.7 x64 (add to PATH)): https://www.python.org/ftp/python/2.7.14/python-2.7.14.amd64.msi
+* LLVM 5.0.1 x64 (do NOT add to PATH)): http://releases.llvm.org/5.0.1/LLVM-5.0.1-win64.exe
 
 Once you have finished installing everything, some additional steps are required:
 1. Open the Visual Studio 2017 Installer from the menu, and install the v140 toolset under "Individual Components"
@@ -207,6 +205,7 @@ git checkout -b production <remill_commit_id>
 
 #### Step 3: Dependencies
 You can either build them yourself using our [cxx-common](https://github.com/trailofbits/cxx-common) dependency manager or download a pre-built package.
+Only the LLVM 5.0.1 package is supported right now, and you should build it using the Visual Studio 2017 Win64 generator with the LLVM 5.0.1 toolchain. The cxx-common script will automatically take care of this requirement.
 
 Binaries (extract to C:\Projects\tob_libraries)
 * [LLVM 5](https://s3.amazonaws.com/cxx-common/libraries-llvm50-windows10-amd64.7z)
