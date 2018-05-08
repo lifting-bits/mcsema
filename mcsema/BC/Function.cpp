@@ -163,7 +163,7 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
   // Basically some empty inline assembly that tells the compiler not to
   // optimize away the `state` pointer before each `breakpoint_XXX` function.
   auto asm_func_type = llvm::FunctionType::get(
-      llvm::Type::getVoidTy(*gContext), state_ptr_type);
+      llvm::Type::getVoidTy(*gContext), state_ptr_type, false);
 
   auto asm_func = llvm::InlineAsm::get(
       asm_func_type, "", "*m,~{dirflag},~{fpsr},~{flags}", true);
