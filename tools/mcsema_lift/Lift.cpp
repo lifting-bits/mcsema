@@ -174,7 +174,11 @@ static void UnloadLibraryFromModule(void) {
   }
 
   for (auto &var : gLibrary->globals()) {
-    auto our_var = mcsema::gModule->getGlobalVariable(var.getName());
+    auto var_name = var.getName();
+    if(var_name.startswith("llvm.global")) {
+      continue;
+    }
+    auto our_var = mcsema::gModule->getGlobalVariable(var_name);
     if (our_var && !our_var->hasNUsesOrMore(1)) {
       our_var->eraseFromParent();
     }
