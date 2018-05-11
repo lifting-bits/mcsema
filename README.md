@@ -69,6 +69,7 @@ sudo apt-get upgrade
 
 sudo apt-get install \
      git \
+     curl \
      cmake \
      python2.7 python-pip python-virtualenv \
      wget \
