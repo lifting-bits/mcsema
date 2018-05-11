@@ -21,31 +21,31 @@ def is_sane_reference_target(ea):
   if is_invalid_ea(ea):
     return False
 
-  flags = idc.GetFlags(ea)
-  if idaapi.isAlign(flags):
+  flags = idc.get_full_flags(ea)
+  if idaapi.is_align(flags):
     return False
 
-  if idc.isHead(flags):
+  if idc.is_head(flags):
     return True
 
   if has_string_type(ea):
     return True
 
-  if idc.isTail(flags):
-    head_ea = idc.PrevHead(ea)
+  if idc.is_tail(flags):
+    head_ea = idc.prev_head(ea)
     if has_string_type(head_ea):
       return True    
 
   # TODO(pag): Check if it points at a logical element in an array, or at a
   #            field of a struct.
 
-  if idc.isCode(flags):
+  if idc.is_code(flags):
     return is_block_or_instruction_head(ea)
 
   if is_referenced(ea):
     return True
 
-  # NOTE(pag): We test `idc.isCode` above; this check looks to see if the
+  # NOTE(pag): We test `idc.is_code` above; this check looks to see if the
   #            segment itself is a code segment. This check happens after
   #            `is_referenced`, because we may have something like a vtable
   #            embedded in a code segment.
@@ -53,13 +53,13 @@ def is_sane_reference_target(ea):
     return False
 
 
-  item_size = idc.ItemSize(ea)
+  item_size = idc.get_item_size(ea)
 
   DEBUG("!!! target_ea = {:x} item_size = {}".format(ea, item_size))
   return 1 != item_size 
 
 def is_read_only_segment(ea):
-  seg_ea = idc.SegStart(ea)
+  seg_ea = idc.get_segm_start(ea)
   seg = idaapi.getseg(seg_ea)
 
   if not seg:
@@ -81,7 +81,7 @@ def has_string_type(ea):
   if not is_read_only_segment(ea):
     return False
 
-  str_type = idc.GetStringType(ea)
+  str_type = idc.get_str_type(ea)
   return (str_type is not None) and str_type != -1
 
 def next_reasonable_head(ea, max_ea):
@@ -92,9 +92,9 @@ def next_reasonable_head(ea, max_ea):
 
   TODO(pag): Investigate using `idc.NextNotTail(ea)`."""
   while ea < max_ea:
-    ea = idc.NextHead(ea, max_ea)
-    flags = idc.GetFlags(ea)
-    if not idaapi.isAlign(flags):
+    ea = idc.next_head(ea, max_ea)
+    flags = idc.get_full_flags(ea)
+    if not idaapi.is_align(flags):
       return ea
 
   return idc.BADADDR
@@ -102,21 +102,21 @@ def next_reasonable_head(ea, max_ea):
 def find_missing_strings_in_segment(seg_ea, seg_end_ea):
   """Try to find and mark missing strings in this segment."""
   global _NOT_STRING_TYPE_EAS
-  end_ea = idc.SegEnd(seg_ea)
+  end_ea = idc.get_segm_end(seg_ea)
   ea, next_ea = seg_ea, seg_ea
   last_was_string = False
 
   while next_ea < end_ea:
     next_head_ea = next_reasonable_head(next_ea, seg_end_ea)
     ea, next_ea = next_ea, next_head_ea
-    item_size = idc.ItemSize(ea)
+    item_size = idc.get_item_size(ea)
     if is_jump_table_entry(ea):
       DEBUG("Found jump table at {:x}, jumping to {:x}".format(ea, next_ea))
       continue
 
     next_is_string = has_string_type(next_head_ea)
 
-    as_str = idc.GetString(ea, -1, -1)
+    as_str = idc.get_strlit_contents(ea, -1, -1)
     if has_string_type(ea):
       if as_str is not None and len(as_str):
         next_ea = ea + item_size
@@ -140,12 +140,12 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
 
     # A bit aggressive, but lets try to make it into a string.
     if last_was_string and 1 < len(as_str):
-      old_item_size = idc.ItemSize(ea)      
-      if 1 != idc.MakeStr(ea, idc.BADADDR):
+      old_item_size = idc.get_item_size(ea)      
+      if 1 != idc.create_strlit(ea, idc.BADADDR):
         last_was_string = False
         continue
 
-      item_size = idc.ItemSize(ea)
+      item_size = idc.get_item_size(ea)
       next_ea = ea + item_size
       last_was_string = True
 
@@ -161,11 +161,11 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
     # # ones when they aren't directly referenced.
     # if last_was_string and next_is_string:
     #   max_str_len = (next_head_ea - ea)
-    #   if 1 != idc.MakeStr(ea, idc.BADADDR):
+    #   if 1 != idc.create_strlit(ea, idc.BADADDR):
     #     last_was_string = False
     #     continue
 
-    #   item_size = idc.ItemSize(ea)
+    #   item_size = idc.get_item_size(ea)
     #   DEBUG("Inferred string {} of length {} at {:x} to {:x}".format(
     #       repr(as_str), item_size, ea, next_head_ea))
     #   make_head(ea)
@@ -173,12 +173,12 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
     #   last_was_string = True
 
 def remaining_item_size(ea):
-  flags = idc.GetFlags(ea)
-  size = idc.ItemSize(ea)
-  if idc.isHead(flags):
+  flags = idc.get_full_flags(ea)
+  size = idc.get_item_size(ea)
+  if idc.is_head(flags):
     return size
 
-  head_ea = idc.PrevHead(ea, max(0, ea - size))
+  head_ea = idc.prev_head(ea, max(0, ea - size))
   if is_invalid_ea(head_ea):
     return 0
   assert (head_ea + size) >= ea
@@ -205,7 +205,7 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
     if is_invalid_ea(ea):
       break
 
-    flags = idc.GetFlags(ea)
+    flags = idc.get_full_flags(ea)
 
     # Jump over strings.
     if has_string_type(ea):
@@ -220,7 +220,7 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
       assert ea < next_ea
       continue
 
-    fixup_ea = idc.GetFixupTgtOff(ea)
+    fixup_ea = idc.get_fixup_target_off(ea)
     if binary_is_pie and not is_sane_reference_target(fixup_ea):
       continue
 
@@ -231,7 +231,7 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
       target_ea = qword_data = read_qword(ea)
       if is_sane_reference_target(target_ea):
         DEBUG("Adding qword reference from {:x} to {:x}".format(ea, target_ea))
-        make_xref(ea, target_ea, idc.MakeQword, 8)
+        make_xref(ea, target_ea, idc.FF_QWORD, 8)
         next_ea = ea + 8
         continue
 
@@ -240,7 +240,7 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
       target_ea = dword_data = read_dword(ea)
       if is_sane_reference_target(target_ea):
         DEBUG("Adding dword reference from {:x} to {:x}".format(ea, target_ea))
-        make_xref(ea, target_ea, idc.MakeDword, 4)
+        make_xref(ea, target_ea, idc.FF_DWORD, 4)
         next_ea = ea + 4
         continue
 
@@ -259,10 +259,10 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
 
 def _next_code_or_jt_ea(ea):
   """Scan forward looking for the next non-data effective address."""
-  seg_end_ea = idc.SegEnd(ea)
+  seg_end_ea = idc.get_segm_end(ea)
   while ea <= seg_end_ea:
-    flags = idc.GetFlags(ea)
-    if idc.isCode(flags):
+    flags = idc.get_full_flags(ea)
+    if idc.is_code(flags):
       break
     if is_jump_table_entry(ea):
       break
@@ -299,14 +299,14 @@ def find_missing_xrefs_in_code_segment(seg_ea, seg_end_ea, binary_is_pie):
     #
     # In x86, we see this behavior with embedded exception tables. This comes
     # up a bunch in Windows binaries.
-    flags = idc.GetFlags(ea)
-    if idc.isData(flags):
+    flags = idc.get_full_flags(ea)
+    if idc.is_data(flags):
       next_ea = _next_code_or_jt_ea(ea + 1)
       find_missing_xrefs_in_segment(ea, next_ea, binary_is_pie)
       continue
 
     else:
-      next_ea = idc.NextHead(ea)
+      next_ea = idc.next_head(ea)
       continue
 
   DEBUG_POP()
@@ -315,7 +315,7 @@ def decode_segment_instructions(seg_ea, binary_is_pie):
   """Tries to find all jump tables ahead of time. A side-effect of this is to
   create a decoded instruction and jump table cache. The other side-effect is
   that the decoding of jump tables will *remove* some cross-references."""
-  seg_end_ea = idc.SegEnd(seg_ea)
+  seg_end_ea = idc.get_segm_end(seg_ea)
   for head_ea in idautils.Heads(seg_ea, seg_end_ea):
     inst, _ = decode_instruction(head_ea)
     get_instruction_references(inst, binary_is_pie)
@@ -335,8 +335,8 @@ def process_segments(binary_is_pie):
   # and identify jump tables, which we need to do so that we don't incorrectly
   # categorize some things as strings.
   for seg_ea in seg_eas:
-    seg_name = idc.SegName(seg_ea)
-    seg_end_ea = idc.SegEnd(seg_ea)
+    seg_name = idc.get_segm_name(seg_ea)
+    seg_end_ea = idc.get_segm_end(seg_ea)
     if is_code(seg_ea):
       DEBUG("Looking for instructions in segment {}".format(seg_name))
       DEBUG_PUSH()
@@ -351,8 +351,8 @@ def process_segments(binary_is_pie):
 
   # Now go through through the data segments and find missing cross-references.
   for seg_ea in seg_eas:
-    seg_name = idc.SegName(seg_ea)
-    seg_end_ea = idc.SegEnd(seg_ea)
+    seg_name = idc.get_segm_name(seg_ea)
+    seg_end_ea = idc.get_segm_end(seg_ea)
     DEBUG("Looking for cross-references in segment {} [{:x}, {:x})".format(
         seg_name, seg_ea, seg_end_ea))
 

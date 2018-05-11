@@ -68,17 +68,17 @@ def sign_extn(x, b):
 
 def make_array(ea, size):
   if ea != idc.BADADDR and ea != 0:
-    flags = idc.GetFlags(ea)
-    if not idc.isByte(flags) or idc.ItemSize(ea) != 1:
-      idc.MakeUnknown(ea, 1, idc.DOUNK_SIMPLE)
+    flags = idc.idc.get_full_flags(ea)
+    if not idc.isByte(flags) or idc.get_item_size(ea) != 1:
+      idc.del_items(ea, idc.DOUNK_SIMPLE, 1)
       idc.MakeByte(ea)
     idc.MakeArray(ea, size)
 
 def read_string(ea):
-  s = idc.GetString(ea, -1, idc.ASCSTR_C)
+  s = idc.get_strlit_contents(ea, -1, idc.ASCSTR_C)
   if s:
     slen = len(s)+1
-    idc.MakeUnknown(ea, slen, idc.DOUNK_SIMPLE)
+    idc.del_items(ea, idc.DOUNK_SIMPLE, slen)
     idaapi.make_ascii_string(ea, slen, idc.ASCSTR_C)
     return s, ea + slen
   else:
@@ -428,9 +428,9 @@ def recover_frame_entries(seg_ea):
   if seg_ea == idc.BADADDR:
     return
 
-  DEBUG("Recover entries from section : {}".format(idc.SegName(seg_ea)))
-  ea = idc.SegStart(seg_ea)
-  end_ea = idc.SegEnd(seg_ea)
+  DEBUG("Recover entries from section : {}".format(idc.get_segm_name(seg_ea)))
+  ea = idc.get_segm_start(seg_ea)
+  end_ea = idc.get_segm_end(seg_ea)
   while ea != idc.BADADDR and ea < end_ea:
     ea = format_entries(ea)
 
@@ -440,7 +440,7 @@ def recover_exception_table():
   seg_eas = [ea for ea in idautils.Segments() if not is_invalid_ea(ea)]
   
   for seg_ea in seg_eas:
-    seg_name = idc.SegName(seg_ea)
+    seg_name = idc.get_segm_name(seg_ea)
     if seg_name in [".eh_frame", "__eh_frame"]:
       recover_frame_entries(seg_ea)
       break

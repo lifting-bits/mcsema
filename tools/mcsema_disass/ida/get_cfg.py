@@ -93,7 +93,7 @@ _NOT_ELF_BEGIN_EAS = (0xffffffffL, 0xffffffffffffffffL)
 # Returns `True` if this is an ELF binary (as opposed to an ELF object file).
 def is_linked_ELF_program():
   global _NOT_ELF_BEGIN_EAS
-  return IS_ELF and idc.BeginEA() not in _NOT_ELF_BEGIN_EAS
+  return IS_ELF and idc.get_inf_attr(INF_START_EA) not in _NOT_ELF_BEGIN_EAS
 
 def is_ELF_got_pointer(ea):
   """Returns `True` if this is a pointer to a pointer stored in the
@@ -102,7 +102,7 @@ def is_ELF_got_pointer(ea):
   the external function `__gmon_start__`. We don't want to treat
   `__gmon_start___ptr` as external because it is really a sort of local
   variable that will will resolve with a data cross-reference."""
-  seg_name = idc.SegName(ea).lower()
+  seg_name = idc.get_segm_name(ea).lower()
   if ".got" not in seg_name:
     return False
 
@@ -249,7 +249,7 @@ def parse_os_defs_file(df):
         DEBUG("ERROR: Unknown return type {} in {}".format(ret, l))
         continue
 
-      ea = idc.LocByName(fname)
+      ea = idc.get_name_ea_simple(fname)
 
       if not is_invalid_ea(ea):
         if not is_external_segment(ea) and not is_thunk(ea):
@@ -265,9 +265,9 @@ def parse_os_defs_file(df):
         #   .idata:01400110E8     extrn EnterCriticalSection:qword
         #
         # Really, we want to try this as code.
-        flags = idc.GetFlags(ea)
-        if not idc.isCode(flags) and not idaapi.is_weak_name(ea):
-          seg_name = idc.SegName(ea).lower()
+        flags = idc.get_full_flags(ea)
+        if not idc.is_code(flags) and not idaapi.is_weak_name(ea):
+          seg_name = idc.get_segm_name(ea).lower()
           if ".idata" in seg_name:
             EXTERNAL_FUNCS_TO_RECOVER[ea] = fname
 
@@ -286,7 +286,7 @@ def parse_os_defs_file(df):
       if is_linux:
         imp_name = "__imp_{}".format(fname)
 
-        if idc.LocByName(imp_name):
+        if idc.get_name_ea_simple(imp_name):
           _FIXED_EXTERNAL_NAMES[imp_name] = fname
           WEAK_SYMS.add(fname)
           WEAK_SYMS.add(imp_name)
@@ -338,7 +338,7 @@ def is_ELF_thunk_by_structure(ea):
   """Try to manually identify an ELF thunk by its structure."""
   global _INVALID_THUNK_ADDR
 
-  if ".plt" not in idc.SegName(ea).lower():
+  if ".plt" not in idc.get_segm_name(ea).lower():
     return _INVALID_THUNK_ADDR
 
   # Scan through looking for a branch, either direct or indirect.
@@ -361,7 +361,7 @@ def is_ELF_thunk_by_structure(ea):
     return _INVALID_THUNK_ADDR
 
   target_ea = get_reference_target(inst.ea)
-  if ".got.plt" == idc.SegName(target_ea).lower():
+  if ".got.plt" == idc.get_segm_name(target_ea).lower():
     target_ea = get_reference_target(target_ea)
 
   # For AArch64, the thunk structure is something like:
@@ -473,8 +473,8 @@ def is_start_of_function(ea):
   if not is_code(ea):
     return False
 
-  name = idc.GetFunctionName(ea) or idc.GetTrueName(ea)
-  return ea == idc.LocByName(name)
+  name = idc.get_func_name(ea) or idc.GetTrueName(ea)
+  return ea == idc.get_name_ea_simple(name)
 
 _REFERENCE_OPERAND_TYPE = {
   Reference.IMMEDIATE: CFG_pb2.CodeReference.ImmediateOperand,
@@ -839,11 +839,11 @@ def find_default_function_heads():
   will help distinguish block heads."""
   func_heads = set()
   for seg_ea in idautils.Segments():
-    seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
+    seg_type = idc.get_segm_attr(seg_ea, idc.SEGATTR_TYPE)
     if seg_type != idc.SEG_CODE:
       continue
 
-    for func_ea in idautils.Functions(seg_ea, idc.SegEnd(seg_ea)):
+    for func_ea in idautils.Functions(seg_ea, idc.get_segm_end(seg_ea)):
       if is_code_by_flags(func_ea):
         func_heads.add(func_ea)
 
@@ -884,17 +884,17 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
   min_xref_width = PIE_MODE and max_xref_width or 4
 
   is_code_seg = is_code(seg_ea)
-  seg_name = idc.SegName(seg_ea)
+  seg_name = idc.get_segm_name(seg_ea)
   has_func_pointers = segment_contains_external_function_pointers(seg_ea)
 
   ea, next_ea = seg_ea, seg_ea
   while next_ea < seg_end_ea:
     ea = next_ea
-    item_size = idc.ItemSize(ea)
+    item_size = idc.get_item_size(ea)
     xref_width = min(max(item_size, 4), max_xref_width)
     next_ea = min(ea + xref_width,
                   # idc.GetNextFixupEA(ea),
-                  idc.NextHead(ea, seg_end_ea))
+                  idc.next_head(ea, seg_end_ea))
 
     # We don't want to fill the jump table bytes with their actual
     # code cross-references. This is because we can't get the address
@@ -906,9 +906,9 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
 
     # Skip over instructions.
     if is_code_seg:
-      flags = idc.GetFlags(ea)
-      if idc.isCode(flags):
-        next_ea = idc.NextHead(ea, seg_end_ea)
+      flags = idc.get_full_flags(ea)
+      if idc.is_code(flags):
+        next_ea = idc.next_head(ea, seg_end_ea)
         continue
 
     target_ea = get_reference_target(ea)
@@ -942,7 +942,7 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
       continue
 
     # Probably some really small number.
-    elif not idc.GetFlags(target_ea):
+    elif not idc.get_full_flags(target_ea):
       DEBUG("WARNING: No information about target {:x} from {:x}".format(
           target_ea, ea))
       continue
@@ -981,7 +981,7 @@ def recover_region(M, region_name, region_ea, region_end_ea, exported_vars):
   segment is stored verbatim within the protobuf, and accompanied by a
   series of variable and cross-reference entries."""
 
-  seg_name = idc.SegName(region_ea)
+  seg_name = idc.get_segm_name(region_ea)
 
   DEBUG("Recovering region {} [{:x}, {:x}) in segment {}".format(
       region_name, region_ea, region_end_ea, seg_name))
@@ -990,7 +990,7 @@ def recover_region(M, region_name, region_ea, region_end_ea, exported_vars):
 
   # An item spans two regions. This may mean that there's a reference into
   # the middle of an item. This happens with strings.
-  item_size = idc.ItemSize(region_end_ea - 1)
+  item_size = idc.get_item_size(region_end_ea - 1)
   if 1 < item_size:
     DEBUG("  ERROR: Segment should probably include {} more bytes".format(
         item_size - 1))
@@ -1022,14 +1022,14 @@ def recover_regions(M, exported_vars, global_vars=[]):
   # Collect the segment bounds to lift.
   seg_parts = collections.defaultdict(set)
   for seg_ea in idautils.Segments():
-    seg_name = idc.SegName(seg_ea)
+    seg_name = idc.get_segm_name(seg_ea)
     seg_names[seg_ea] = seg_name
 
     if (not is_external_segment_by_flags(seg_ea) or \
         segment_contains_external_function_pointers(seg_ea)) and \
         not (is_constructor_segment(seg_ea) or is_destructor_segment(seg_ea)):
       seg_parts[seg_ea].add(seg_ea)
-      seg_parts[seg_ea].add(idc.SegEnd(seg_ea))
+      seg_parts[seg_ea].add(idc.get_segm_end(seg_ea))
 
     # Fix for an important feature - static storage allocation of the objects in C++, where
     # the constructor gets invoked before the main and it typically calls the 'init/__libc_csu_init' function.
@@ -1081,16 +1081,16 @@ def recover_regions(M, exported_vars, global_vars=[]):
 
     if is_constructor_segment(seg_ea):
       seg_parts[seg_ea].add(seg_ea)
-      end_ea =  idc.SegEnd(seg_ea)
+      end_ea =  idc.get_segm_end(seg_ea)
       if is_destructor_segment(end_ea):
-        seg_parts[seg_ea].add(idc.SegEnd(end_ea))
+        seg_parts[seg_ea].add(idc.get_segm_end(end_ea))
         DEBUG("WARNING: Global constructor and destructor sections are adjacent!")
       else:
         seg_parts[seg_ea].add(end_ea)
         fini_ea = get_destructor_segment()
         if fini_ea:
           seg_parts[fini_ea].add(fini_ea)
-          seg_parts[fini_ea].add(idc.SegEnd(fini_ea))
+          seg_parts[fini_ea].add(idc.get_segm_end(fini_ea))
 
   # Treat analysis-identified global variables as segment begin/end points.
   for var_name, begin_ea, end_ea in global_vars:
@@ -1104,8 +1104,8 @@ def recover_regions(M, exported_vars, global_vars=[]):
           var_name, begin_ea, end_ea))
       continue
 
-    seg_ea = idc.SegStart(begin_ea)
-    seg_name = idc.SegName(seg_ea)
+    seg_ea = idc.get_segm_start(begin_ea)
+    seg_name = idc.get_segm_name(seg_ea)
 
     DEBUG("Splitting segment {} from {:x} to {:x} for global variable {}".format(
         seg_name, begin_ea, end_ea, var_name))
@@ -1113,13 +1113,13 @@ def recover_regions(M, exported_vars, global_vars=[]):
     seg_parts[seg_ea].add(begin_ea)
     seg_names[begin_ea] = var_name
 
-    if end_ea <= idc.SegEnd(seg_ea):
+    if end_ea <= idc.get_segm_end(seg_ea):
       seg_parts[seg_ea].add(end_ea)
 
   # Treat exported variables as segment begin/end points.
   for var_ea in exported_vars:
-    seg_ea = idc.SegStart(var_ea)
-    seg_name = idc.SegName(seg_ea)
+    seg_ea = idc.get_segm_start(var_ea)
+    seg_name = idc.get_segm_name(seg_ea)
     var_name = get_symbol_name(var_ea)
     seg_parts[seg_ea].add(var_ea)
     seg_names[var_ea] = var_name
@@ -1128,7 +1128,7 @@ def recover_regions(M, exported_vars, global_vars=[]):
 
   for seg_ea, eas in seg_parts.items():
     parts = list(sorted(list(eas)))
-    seg_name = idc.SegName(seg_ea)
+    seg_name = idc.get_segm_name(seg_ea)
     for begin_ea, end_ea in zip(parts[:-1], parts[1:]):
       region_name = seg_name
       if begin_ea in seg_names:
@@ -1170,7 +1170,7 @@ def recover_external_variables(M):
     if name in EMAP_DATA:
       EV.size = EMAP_DATA[name]
     else:
-      EV.size = idc.ItemSize(ea)
+      EV.size = idc.get_item_size(ea)
     if EV.is_thread_local:
       DEBUG("Recovering extern TLS variable {} at {:x}".format(name, ea))
     else:
@@ -1248,23 +1248,23 @@ def identify_external_symbols():
           DEBUG("ERROR: Missing external reference information for {} referenced at {:x}".format(
               target_name, ea))
 
-          target_flags = idc.GetFlags(target_ea)
+          target_flags = idc.get_full_flags(target_ea)
           
           # The missing reference looks like code, so add it to the EMAP with
           # 16 arguments (probably enough, eh?), and assume it uses the cdecl
           # calling convention.
           #
-          # NOTE(pag): We use `idc.isCode` and not `is_code` because the latter
+          # NOTE(pag): We use `idc.is_code` and not `is_code` because the latter
           #            operates at the segment granularity, and `target_ea` will
           #            likely point into the `extern` section. Individual
           #            entries in the extern section can have 
-          if idc.isCode(target_flags):
+          if idc.is_code(target_flags):
             DEBUG("WARNING: Adding external {} at {:x} as an external code reference".format(
                 target_name, ea))
             EMAP[target_name] = (16, CFG_pb2.ExternalFunction.CallerCleanup, "N", None)
 
             imp_name = "__imp_{}".format(target_name)
-            if idc.LocByName(imp_name):
+            if idc.get_name_ea_simple(imp_name):
               _FIXED_EXTERNAL_NAMES[imp_name] = target_name
               WEAK_SYMS.add(target_name)
               WEAK_SYMS.add(imp_name)
@@ -1380,9 +1380,9 @@ def find_main_in_ELF_file():
   ELF binaries, where one of the parameters is the `main` function. IDA will
   helpfully comment it as such."""
 
-  start_ea = idc.LocByName("_start")
+  start_ea = idc.get_name_ea_simple("_start")
   if is_invalid_ea(start_ea):
-    start_ea = idc.LocByName("start")
+    start_ea = idc.get_name_ea_simple("start")
     if is_invalid_ea(start_ea):
       return idc.BADADDR
 
@@ -1404,7 +1404,7 @@ def find_main_in_ELF_file():
           if not main:
             continue
 
-          if main and main.startEA == main_ea:
+          if main and main.start_ea == main_ea:
             set_symbol_name(main_ea, "main")
             DEBUG("Found main at {:x}".format(main_ea))
             return main_ea
@@ -1417,10 +1417,10 @@ def recover_module(entrypoint, gvar_infile = None):
   global INTERNAL_THUNK_EAS
 
   M = CFG_pb2.Module()
-  M.name = idc.GetInputFile().format('utf-8')
+  M.name = idc.get_root_filename().format('utf-8')
   DEBUG("Recovering module {}".format(M.name))
 
-  entry_ea = idc.LocByName(args.entrypoint)
+  entry_ea = idc.get_name_ea_simple(args.entrypoint)
 
   # If the entrypoint is `main`, then we'll try to find `main` via another
   # means.
@@ -1569,8 +1569,8 @@ if __name__ == "__main__":
   if addr_size != get_address_size_in_bits():
     DEBUG("Arch {} address size does not match IDA's available bitness {}! Did you mean to use idal64?".format(
         args.arch, get_address_size_in_bits()))
-    idc.ChangeConfig("ABANDON_DATABASE=YES")
-    idc.Exit(-1)
+    idc.process_config_line("ABANDON_DATABASE=YES")
+    idc.qexit(-1)
 
   if args.pie_mode:
     DEBUG("Using PIE mode.")
@@ -1599,12 +1599,12 @@ if __name__ == "__main__":
 
   # Turn off "automatically make offset" heuristic, and set some
   # other sane defaults.
-  idc.SetShortPrm(idc.INF_START_AF, 0xdfff)
-  idc.SetShortPrm(idc.INF_AF2, 0xfffd)
+  idc.set_inf_attr(idc.INF_AF, 0xdfff)
+  idc.set_inf_attr(idc.INF_AF2, 0xfffd)
 
   # Ensure that IDA is done processing
   DEBUG("Using Batch mode.")
-  idaapi.autoWait()
+  idaapi.auto_wait()
 
   DEBUG("Starting analysis")
   try:
@@ -1619,7 +1619,7 @@ if __name__ == "__main__":
         if is_code(ea):
           try_mark_as_function(ea)
           set_symbol_name(ea, name)
-      idaapi.autoWait()
+      idaapi.auto_wait()
     
     M = recover_module(args.entrypoint, args.recover_global_vars)
 
@@ -1631,5 +1631,5 @@ if __name__ == "__main__":
     DEBUG(traceback.format_exc())
   
   DEBUG("Done analysis!")
-  idc.ChangeConfig("ABANDON_DATABASE=YES")
-  idc.Exit(0)
+  idc.process_config_line("ABANDON_DATABASE=YES")
+  idc.qexit(0)
