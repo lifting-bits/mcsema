@@ -77,7 +77,8 @@ sudo apt-get install \
      gcc-multilib g++-multilib \
      libtinfo-dev \
      lsb-release \
-     realpath 
+     realpath \
+     zlib1g-dev
 ```
 
 If you are going to be using IDA Pro for CFG recovery also do the following:
