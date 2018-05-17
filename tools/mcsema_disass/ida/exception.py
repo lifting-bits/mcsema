@@ -68,7 +68,7 @@ def sign_extn(x, b):
 
 def make_array(ea, size):
   if ea != idc.BADADDR and ea != 0:
-    flags = idc.idc.get_full_flags(ea)
+    flags = idc.get_full_flags(ea)
     if not idc.isByte(flags) or idc.get_item_size(ea) != 1:
       idc.del_items(ea, idc.DOUNK_SIMPLE, 1)
       idc.MakeByte(ea)
