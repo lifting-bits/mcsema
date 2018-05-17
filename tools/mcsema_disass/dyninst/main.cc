@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
 
   auto inputFile = argParser.getInputFiles().front();
 
-  printCFG(inputFile);
+ // printCFG(inputFile);
   // Load external symbol definitions (for now, only functions)
 
   ExternalFunctionManager extFuncMgr;
@@ -145,7 +145,7 @@ int main(int argc, char **argv) {
 
   // Write the CFG information to m
 
-  CFGWriter cfgWriter(m, inputFile, *symtab, *codeObj, extFuncMgr);
+  CFGWriter cfgWriter(m, inputFile, *symtab, *symtabCS, *codeObj, extFuncMgr);
   cfgWriter.write();
 
   // Dump the CFG file in a human-readable format if requested

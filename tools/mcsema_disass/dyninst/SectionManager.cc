@@ -23,12 +23,5 @@ bool SectionManager::isData(Address a) const {
 bool SectionManager::isCode(Address a) const { return !isData(a); }
 
 std::set<Region *> SectionManager::getDataRegions() const {
-  std::set<Region *> result;
-
-  for (Region *r : m_regions) {
-    // if (r->isText ())
-    result.insert(r);
-  }
-
-  return result;
+  return m_regions;
 }

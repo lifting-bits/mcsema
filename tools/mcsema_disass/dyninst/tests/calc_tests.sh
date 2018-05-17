@@ -6,20 +6,16 @@ function run_case() {
 
 set -e
 
-if [ $1 == "help" ]; 
-    then echo "\$1 dissas \$2 std_defs \$3 lift \$4 lib_dir"; exit;
-fi
-
 disass=$1
 lift=$3
 lib_dir=$4
 std_def=$2
 
-$CC calc.c 
-$disass -o calc.cfg --std-defs $std_def a.out
-$lift --arch amd64 --os linux --cfg calc.cfg --output calc.bc
+clang-4.0 calc.c 
+$disass -o calc.cfg --std-defs $std_def a.out >/dev/null 2>&1
+$lift --arch amd64 --os linux --cfg calc.cfg --output calc.bc >/dev/null 2>&1
 
-$CC -m64 -o calc_lifted.out calc.bc $lib_dir/libmcsema_rt64-4.0.a -lm
+clang-4.0 -m64 -o calc_lifted.out calc.bc $lib_dir/libmcsema_rt64-4.0.a -lm
 
 prefix="calc_inputs"
 run_case $prefix/input1.txt

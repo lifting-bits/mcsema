@@ -1,3 +1,22 @@
+__gxx_personality_v0 0 C N
+_ZNSt11logic_errorC2ERKS_ 1 C N
+_ZNSt12out_of_rangeC1ERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE 2 C N
+_ZNSt13runtime_errorC1ERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE 2 C N
+_ZNSt13runtime_errorC1ERKS_ 1 C N
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEC1EPKcRKS3_ 2 C N
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEED1Ev 0 C N
+_ZNSt8ios_base4InitC1Ev 0 C N
+_ZNSt8ios_base4InitD1Ev 0 C N
+
+_ZNSirsERi 0 C N
+_ZSt20__throw_out_of_rangePKc 1 C N
+_ZSt24__throw_invalid_argumentPKc 1 C N
+_ZNKSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE5c_strEv 0 C N
+
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEC1ERKS4_ 2 C N
+_ZStlsIcSt11char_traitsIcESaIcEERSt13basic_ostreamIT_T0_ES7_RKNSt7__cxx1112basic_stringIS4_S5_T1_EE 4 C N
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEC1EOS4_ 2 C N
+
 _ZdlPv 2 C N
 _ZdaPv 2 C N
 _Znam 2 C N
@@ -11,8 +30,8 @@ __cxa_guard_abort 1 C N
 __cxa_throw 3 C N
 __cxa_end_catch 0 C N
 __cxa_begin_catch 1 C N
-__cxa_allocate_exception 0 C N
-__cxa_free_exception 0 C N
+__cxa_allocate_exception 1 C N
+__cxa_free_exception 1 C N
 __cxa_atexit 0 C N
 __cxa_get_exception_ptr 1 C N
 __cxa_pure_virtual 0 C N
@@ -40,11 +59,11 @@ _ITM_deregisterTMCloneTable 5 C N
 _ITM_registerTMCloneTable 5 C N
 __libc_start_main 5 C N
 _ZdaPv 5 C N
-_ZdlPv 5 C N
+_ZdlPv 1 C N
 _Znam 5 C N
 _ZNSt8__detail15_List_node_base7_M_hookEPS0_ 5 C N
 _ZNSt8__detail15_List_node_base9_M_unhookEv 5 C N
-_Znwm 5 C N
+_Znwm 1 C N
 _ZSt17__throw_bad_allocv 5 C N
 _ZSt18_Rb_tree_decrementPSt18_Rb_tree_node_base 5 C N
 _ZSt18_Rb_tree_incrementPKSt18_Rb_tree_node_base 5 C N
@@ -53,7 +72,21 @@ _ZSt20__throw_length_errorPKc 5 C N
 _ZSt24__throw_out_of_range_fmtPKcz 5 C N
 _ZSt28_Rb_tree_rebalance_for_erasePSt18_Rb_tree_node_baseRS_ 5 C N
 _ZSt29_Rb_tree_insert_and_rebalancebPSt18_Rb_tree_node_baseS0_RS_ 5 C N
-
+_ZNSaIcEC1Ev 1 C N
+_ZNSsC1EPKcRKSaIcE 3 C N
+_ZNSt12out_of_rangeC1ERKSs 4 C N
+_ZNSaIcED1Ev 1 C N
+_ZNSsD1Ev 1 C N
+_ZNSsC1ERKSs 2 C N
+_ZNKSt11logic_error4whatEv 1 C N
+_ZNSt12out_of_rangeD1Ev 1 C N
+_ZNSt13runtime_errorC1ERKSs 2 C N
+_ZNKSt13runtime_error4whatEv 1 C N
+_ZNSt13runtime_errorD1Ev 1 C N
+_ZNSt9exceptionD2Ev 1 C N
+_ZNSt9exceptionD1Ev 1 C N
+_ZNKSt9exception4whatEv 1 C N
+_ZSt9terminatev 1 C N
 
 a2d_ASN1_OBJECT 4 C N
 a2i_ASN1_ENUMERATED 4 C N
@@ -28751,7 +28784,7 @@ _Unwind_GetIPInfo 2 C N
 _Unwind_GetLanguageSpecificData 1 C N
 _Unwind_GetRegionStart 1 C N
 _Unwind_RaiseException 1 C N
-_Unwind_Resume 1 C N
+_Unwind_Resume 1 C Y
 _Unwind_SetGR 3 C N
 _Unwind_SetIP 2 C N
 unwrap_hash_lookup 3 C N

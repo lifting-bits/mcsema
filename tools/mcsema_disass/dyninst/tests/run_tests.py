@@ -12,6 +12,8 @@ disass = None
 lift = None
 lib_dir = None
 std_defs = None
+c_cc = "clang-4.0"
+c_cxx = "clang++-4.0"
 
 class LinuxTest (unittest.TestCase):
     def setUp (self):
@@ -27,6 +29,15 @@ class LinuxTest (unittest.TestCase):
         shutil.rmtree (self.test_dir)
 
     def runTest (self, filename, *args):
+        ignore, ext = os.path.splitext(filename)
+
+        std = ""
+        if ext == ".cpp":
+            self.cc = c_cxx
+            std = "-std=c++1z"
+        else: 
+            self.cc = c_cc
+        
         shutil.copy (filename, self.test_dir)
 
         source = self.test_dir + "/" + filename
@@ -35,7 +46,7 @@ class LinuxTest (unittest.TestCase):
         exe = self.test_dir + "/" + filename + ".exe"
 
         # Build the C file
-        subprocess.check_output ([ self.cc, source, "-o", exe ], stderr = subprocess.STDOUT)
+        subprocess.check_output ([ self.cc, std, source, "-o", exe, "-lpthread" ], stderr = subprocess.STDOUT)
 
         # Generate the expected output
         expected_output = subprocess.check_output ([ exe ] + list (args), stderr = subprocess.STDOUT)
@@ -47,18 +58,22 @@ class LinuxTest (unittest.TestCase):
         # Lift it
         bc = self.test_dir + "/" + filename + ".bc"
         subprocess.check_call ([ lift, "-os", "linux", "-arch", "amd64", "-cfg", cfg,
+                                    "-libc_constructor", "__libc_csu_init",
+                                    "-libc_destructor", "__libc_csu_fini",
                                     "-output", bc ], stderr = subprocess.STDOUT)
 
         # Recompile it
         rcexe = self.test_dir + "/" + filename + ".rc-exe"
         lib = lib_dir + "libmcsema_rt64-4.0.a"
-        subprocess.check_call ([self.cc, bc, "-o", rcexe, lib])
+        subprocess.check_call ([self.cc, bc, "-o", rcexe, lib, "-lpthread"])
 
         # Generate actual output
         actual_output = subprocess.check_output ([ rcexe ] + list (args), stderr = subprocess.STDOUT)
 
         # Check the output
-        self.assertEqual (expected_output, actual_output)
+        if filename != "pthread.cpp":
+            self.assertEqual (expected_output, actual_output)
+        self.assertEqual (len(expected_output), len(actual_output))
 
         os.remove (source)
         os.remove (exe)
@@ -137,6 +152,25 @@ class LinuxTest (unittest.TestCase):
 
     def test_global_array (self):
         self.runTest("global_array.c")
+
+    def test_qsort (self):
+        self.runTest("qsort.c")
+
+    def test_cpp_global_var (self):
+        self.runTest("global_var.cpp")
+
+    def test_pthread (self):
+        self.runTest("pthread.cpp")
+
+    def test_iostream_basics (self):
+        self.runTest("iostream_basics.cpp")
+
+    def test_operator_new (self):
+        self.runTest("operator_new.cpp")
+
+    def test_template_function_ptrs (self):
+        self.runTest("template_function_ptrs.cpp", "42")
+        self.runTest("template_function_ptrs.cpp", "-543")
 
     def test_libfoo_so (self):
         # This test needs special handling because it builds a shared library

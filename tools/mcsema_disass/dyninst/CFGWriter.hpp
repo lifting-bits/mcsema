@@ -4,30 +4,28 @@
 #include "SectionManager.hpp"
 #include <CFG.pb.h>
 #include <CodeObject.h>
+#include <Dereference.h>
 #include <Expression.h>
+#include <Instruction.h>
 #include <Symtab.h>
 
+#include <unordered_map>
 #include <unordered_set>
 
 class CFGWriter {
 public:
   CFGWriter(mcsema::Module &m, const std::string &moduleName,
             Dyninst::SymtabAPI::Symtab &symtab,
+            Dyninst::ParseAPI::SymtabCodeSource &symCodeSrc,
             Dyninst::ParseAPI::CodeObject &codeObj,
             const ExternalFunctionManager &extFuncMgr);
-
-  // Causes the function called "name" to be skipped (see below)
-  void skipFunction(const std::string &name);
 
   void write();
 
 private:
-  // Some internal functions (such as __libc_csu_init) tend to cause
-  // problems when disassembling. When the lifted code gets
-  // recompiled, the linker will add those functions again, anyways,
-  // so we just skip them here. This function returns true iff the
-  // function called "name" should be skipped.
+  /* Don't want to include all functions in binary */
   bool shouldSkipFunction(const std::string &name) const;
+
   void writeDataVariables(Dyninst::SymtabAPI::Region *region,
                           mcsema::Segment *segment);
 
@@ -48,24 +46,51 @@ private:
                            mcsema::Instruction *cfgInstruction);
   void writeExternalFunctions();
   void writeInternalData();
+  void writeRelocations(Dyninst::SymtabAPI::Region *, mcsema::Segment *);
 
+  void immediateNonCall(Dyninst::InstructionAPI::Immediate *imm,
+                        Dyninst::Address addr,
+                        mcsema::Instruction *cfgInstruction);
+  void dereferenceNonCall(Dyninst::InstructionAPI::Dereference *,
+                          Dyninst::Address, mcsema::Instruction *);
+
+  std::string getXrefName(Dyninst::Address addr);
+  void xrefsInSegment(Dyninst::SymtabAPI::Region *region,
+                      mcsema::Segment *segment);
+  bool isNoReturn(const std::string &str);
+  void getNoReturns();
+
+  void checkDisplacement(Dyninst::InstructionAPI::Instruction *,
+                         mcsema::Instruction *);
   bool isExternal(Dyninst::Address addr) const;
   const std::string &getExternalName(Dyninst::Address addr) const;
+
+  /* Tries to work out RegisterAST if there's some reference */
   bool tryEval(Dyninst::InstructionAPI::Expression *expr,
                const Dyninst::Address ip, Dyninst::Address &result) const;
 
+  /* Dyninst related objects */
   mcsema::Module &m_module;
   std::string m_moduleName;
   Dyninst::SymtabAPI::Symtab &m_symtab;
   Dyninst::ParseAPI::CodeObject &m_codeObj;
-  const ExternalFunctionManager &m_extFuncMgr;
+  Dyninst::ParseAPI::SymtabCodeSource &m_codeSource;
 
-  std::map<Dyninst::Offset, std::string> m_funcMap;
+  /* After -abi-libraries are fully embraced in master branch, this can go out
+   */
+  const ExternalFunctionManager &m_extFuncMgr;
+  SectionManager m_sectionMgr;
+
   std::set<std::string> m_skipFuncs;
 
-  std::set<Dyninst::SymtabAPI::Symbol *> m_globalVars;
-  std::unordered_set<Dyninst::SymtabAPI::Symbol *> m_externalVars;
+  std::unordered_map<Dyninst::Offset, std::string> m_funcMap;
+  std::unordered_map<Dyninst::Address, Dyninst::SymtabAPI::Symbol *>
+      m_globalVars;
+  std::unordered_map<Dyninst::Address, Dyninst::SymtabAPI::Symbol *>
+      m_externalVars;
+  std::unordered_map<Dyninst::Address, Dyninst::SymtabAPI::Symbol *>
+      m_segmentVars;
 
-  SectionManager m_sectionMgr;
   std::vector<Dyninst::SymtabAPI::relocationEntry> m_relocations;
+  std::unordered_set<std::string> m_noreturnFunctions;
 };

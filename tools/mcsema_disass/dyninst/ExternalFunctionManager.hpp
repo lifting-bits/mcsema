@@ -2,9 +2,9 @@
 
 #include "ExternalFunc.hpp"
 #include <istream>
-#include <map>
 #include <set>
 #include <string>
+#include <unordered_map>
 
 class ExternalFunctionManager {
 public:
@@ -41,6 +41,6 @@ public:
   std::set<ExternalFunc> getAllUsed() const;
 
 private:
-  std::map<std::string, ExternalFunc> m_extFuncs;
+  std::unordered_map<std::string, ExternalFunc> m_extFuncs;
   std::set<std::string> m_usedFuncs;
 };

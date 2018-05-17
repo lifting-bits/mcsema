@@ -44,13 +44,9 @@ $ mcsema-dyninst-disass -o out.cfg --std-defs [...]/mcsema/tools/mcsema_disass/d
 mcsema-dyninst-disass can also accept additional external symbol definitions from the command line; use ```--help``` for a full list of available options.
 
 ## Known limitations
-
-* Does not work very well at all yet with the new protobuf format
+Pull request fixing bugs or implementing missing features are welcomed!
 * Can *only* handle 64-bit ELF files
 * Has *only* been tested on Linux
-* Does not yet have proper support for external data symbols
-* Cannot handle unstripped binaries yet
+* Exceptions are ignored 
+* Virtual methods ( late bind ) do now work completely
 * Still needs lots of debugging, corner-case handling, ...
-
-* Some functions do not work yet (for example fgets())
-* Unkown status of C++ code
