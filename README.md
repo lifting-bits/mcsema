@@ -6,7 +6,7 @@ McSema enables analysts to find and retroactively harden binary programs against
 
 McSema supports lifting both Linux (ELF) and Windows (PE) executables, and understands most x86 and amd64 instructions, including integer, X87, MMX, SSE and AVX operations. AARCH64 (ARMv8) instruction support is in active development.
 
-Using McSema is a two-step process: control flow recovery, and instruction translation. Control flow recovery is performed using the `mcsema-disass` tool, which relies on IDA Pro to disassemble a binary file and produce a control flow graph. Instruction translation is then performed using the `mcsema-lift` tool, which converts the control flow graph into LLVM bitcode. Under the hood, the instruction translation capability of `mcsema-lift` is implemented in the [`remill` library](https://github.com/trailofbits/remill). The development of `remill` was a result of refactoring and improvements to McSema, and was first introduced with McSema version 2.0.0. Read more about `remill` [below](#FAQ).
+Using McSema is a two-step process: control flow recovery, and instruction translation. Control flow recovery is performed using the `mcsema-disass` tool, which relies on IDA Pro to disassemble a binary file and produce a control flow graph. Instruction translation is then performed using the `mcsema-lift` tool, which converts the control flow graph into LLVM bitcode. Under the hood, the instruction translation capability of `mcsema-lift` is implemented in the [`remill` library](https://github.com/trailofbits/remill). The development of `remill` was a result of refactoring and improvements to McSema, and was first introduced with McSema version 2.0.0. Read more about `remill` [here](https://github.com/trailofbits/remill).
 
 McSema and `remill` were developed and are maintained by Trail of Bits, funded by and used in research for DARPA and the US Department of Defense.
 
@@ -69,6 +69,7 @@ sudo apt-get upgrade
 
 sudo apt-get install \
      git \
+     curl \
      cmake \
      python2.7 python-pip python-virtualenv \
      wget \
@@ -76,7 +77,8 @@ sudo apt-get install \
      gcc-multilib g++-multilib \
      libtinfo-dev \
      lsb-release \
-     realpath 
+     realpath \
+     zlib1g-dev
 ```
 
 If you are going to be using IDA Pro for CFG recovery also do the following:
@@ -172,7 +174,7 @@ Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcs
 
 #### Step 5: Verifying Your McSema Installation
 
-In order to verify that McSema works correctly as built, head on over to [the documentation on integration tests](docs/AddingNewTests.md). Check that you can run the tests and that they pass.
+In order to verify that McSema works correctly as built, head on over to [the documentation on integration tests](tests/MakingTests.md). Check that you can run the tests and that they pass.
 
 ## Additional Documentation
 

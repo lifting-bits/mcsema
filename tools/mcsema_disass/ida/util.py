@@ -24,6 +24,9 @@ _DEBUG_FILE = None
 _DEBUG_PREFIX = ""
 _INFO = idaapi.get_inf_structure()
 
+# Map of the external functions names which does not return to a tuple containing information
+# like the number of agruments and calling convention of the function.
+_NORETURN_EXTERNAL_FUNC = {}
 
 IS_ARM = "ARM" in _INFO.procName
 
@@ -475,6 +478,21 @@ def get_function_bounds(ea):
     max_ea = min(max_ea, func.endEA)
 
   return min_ea, max_ea
+
+def noreturn_external_function(fname, args, realconv, ret, sign):
+  """ Update the map of external functions which does not return; The basic
+      block terminates on seeing a call to the functions
+  """
+  global _NORETURN_EXTERNAL_FUNC
+
+  if fname:
+    _NORETURN_EXTERNAL_FUNC[fname] = (args, realconv, ret, sign)
+
+def is_noreturn_external_function(ea):
+  """Returns `True` if ea refers to an external function which does not return.
+  """
+  target_ea = get_reference_target(ea)
+  return get_symbol_name(target_ea) in _NORETURN_EXTERNAL_FUNC
 
 def is_noreturn_function(ea):
   """Returns `True` if the function at `ea` is a no-return function."""
