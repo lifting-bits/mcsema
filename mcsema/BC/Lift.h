@@ -43,6 +43,7 @@ struct TranslationContext {
   const NativeInstruction *cfg_inst;
   llvm::Function *lifted_func;
   std::unordered_map<uint64_t, llvm::BasicBlock *> ea_to_block;
+  std::unordered_map<uint64_t, llvm::BasicBlock *> lp_to_block;
 };
 
 bool LiftCodeIntoModule(const NativeModule *cfg_module);

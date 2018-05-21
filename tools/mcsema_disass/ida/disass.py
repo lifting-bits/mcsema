@@ -21,6 +21,11 @@ import subprocess
 import sys
 import traceback
 
+try:
+  from shlex import quote
+except:
+  from pipes import quote
+
 def execute(args, command_args):
   """Execute IDA Pro as a subprocess, passing this file in as a batch-mode
   script for IDA to run. This forwards along arguments passed to `mcsema-disass`
@@ -55,10 +60,10 @@ def execute(args, command_args):
   script_cmd.extend(command_args)  # Extra, script-specific arguments.
 
   cmd = []
-  cmd.append(args.disassembler)  # Path to IDA.
+  cmd.append(quote(args.disassembler))  # Path to IDA.
   cmd.append("-B")  # Batch mode.
   cmd.append("-S\"{}\"".format(" ".join(script_cmd)))
-  cmd.append(args.binary)
+  cmd.append(quote(args.binary))
 
   try:
     with open(os.devnull, "w") as devnull:

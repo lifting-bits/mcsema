@@ -41,6 +41,15 @@ class Test(object):
     if not os.path.isfile(self._binary_path):
       raise IOError("The binary file does not exists")
 
+    tob_lib_repository = os.environ["TRAILOFBITS_LIBRARIES"]
+    clang_path = os.path.join(tob_lib_repository, "llvm", "bin", "clang")
+    llvm_version = subprocess.check_output([clang_path, "--version"]).split(" ")[2][0:3]
+
+    self._abi_path = os.path.join(self._root_path, "ABI", "abi" + ".bc")
+    self._abi_src = os.path.join(self._root_path, "ABI", "ABI_exceptions" + ".cpp")
+    if not os.path.isfile(self._abi_src):
+      print self._abi_src +" The abi file does not exists"
+
     stdout_path = os.path.join(self._root_path, "stdout", self._name)
     if not os.path.isfile(stdout_path):
       raise IOError("The stdout file does not exists")
@@ -90,6 +99,12 @@ class Test(object):
   def binary_path(self):
     return self._binary_path
 
+  def abi_path(self):
+    return self._abi_path
+
+  def abi_src(self):
+    return self._abi_src
+
   def bitcode_path(self):
     return self._bitcode_path
 
@@ -113,6 +128,31 @@ class Test(object):
 
   def linker_flags(self):
     return self._linker_flags
+
+  def compare_output(self, actual):
+    """
+    Compare actual to expected output. 
+    This function has a looser definition that strict equality (frequency count)
+    to work with multithreaded applications that may output in different order
+    on every execution.
+    """
+    expected = self.output()
+
+    # First check: exact output match. 
+    if actual == expected:
+      return True
+
+    # do frequency count of every character in the string
+    def freq_count(string):
+      freq_table = {}
+      for c in string:
+        freq = freq_table.get(c, 0)
+        freq += 1
+        freq_table[c] = freq
+
+      return freq_table
+
+    return freq_count(actual) == freq_count(expected)
 
 def main():
   toolset = acquire_toolset()
@@ -149,6 +189,10 @@ def acquire_toolset():
   toolset["clang"] = os.path.join(tob_lib_repository, "llvm", "bin", "clang")
   if sys.platform == "win32":
     toolset["clang"] += ".exe"
+
+  toolset["clang++"] = os.path.join(tob_lib_repository, "llvm", "bin", "clang++")
+  if sys.platform == "win32":
+    toolset["clang++"] += ".exe"
 
   toolset["llvm-link"] = os.path.join(tob_lib_repository, "llvm", "bin", "llvm-link")
   if sys.platform == "win32":
@@ -215,6 +259,11 @@ def acquire_toolset():
 def execute_tests(toolset, test_list):
   print("Starting...\n")
 
+  test_directory = tempfile.mkdtemp(
+      prefix="mcsema_test_",
+      dir=os.path.dirname(os.path.realpath(__file__)))
+  print(" > Saving results to: " + test_directory)
+
   failed_test_list = {}
 
   for test in test_list:
@@ -243,10 +292,12 @@ def execute_tests(toolset, test_list):
       desc_line = desc_line.strip()
       if desc_line:
         print("   " + desc_line)
-
-    print("\n   Testing...")
     
-    result = lift_test_cfg(toolset, test)
+    print("\n   Testing...")
+    print("\n  Generating abi library...")
+
+    result = gen_abi_lib(test_directory, toolset, test)
+    result = lift_test_cfg(test_directory, toolset, test)
     if result["success"]:
       print("    +"),
     else:
@@ -263,7 +314,7 @@ def execute_tests(toolset, test_list):
       continue
 
     bitcode_path = result["bitcode_path"]
-    result = compile_lifted_code(toolset, test, bitcode_path)
+    result = compile_lifted_code(test_directory, toolset, test, bitcode_path)
     if result["success"]:
       print("    +"),
     else:
@@ -276,7 +327,7 @@ def execute_tests(toolset, test_list):
       continue
 
     recompiled_exe_path = result["recompiled_exe_path"]
-    result = execute_compiled_bitcode(toolset, test, recompiled_exe_path)
+    result = execute_compiled_bitcode(test_directory, toolset, test, recompiled_exe_path)
     if result["success"]:
       print("    +"),
     else:
@@ -308,15 +359,32 @@ def execute_tests(toolset, test_list):
 
   return False
 
-def lift_test_cfg(toolset, test):
-  output_file_path = os.path.join(tempfile.gettempdir(), test.name() + "_" + test.architecture() + "_" + test.platform() + ".bc")
+def gen_abi_lib(test_directory, toolset, test):
+  if test.architecture() == "amd64":
+    cxxflag = "-m64"
+  else:
+    cxxflag = "-m32"
+
+  output_file_path = os.path.join(test_directory, test.name())
+  command_line = [toolset["clang++"], cxxflag, "-S","-emit-llvm", "-o", test.abi_path(), test.abi_src(), "-std=c++11"]
+  exec_result = execute_with_timeout(command_line, 60)
+  result = {}
+  if not exec_result["success"]:
+    result["success"] = False
+  else:
+    result["success"] = True
+
+  return result
+
+def lift_test_cfg(test_directory, toolset, test):
+  output_file_path = os.path.join(test_directory, test.name() + "_" + test.architecture() + "_" + test.platform() + ".bc")
 
   # Reference docs/CommandLineReference.md
   # In stripped ELFs, the libc_constructor/libc_destructor functions are init/fini
   command_line = [toolset["mcsema-lift"], "--arch", test.architecture(),
                   "--os", test.platform(), "--cfg", test.cfg_path(),
                   "--output", output_file_path, "--libc_constructor", "init",
-                  "--libc_destructor", "fini"]
+                  "--libc_destructor", "fini", "--abi_libraries", test.abi_path()]
 
   exec_result = execute_with_timeout(command_line, 1200)
 
@@ -332,21 +400,21 @@ def lift_test_cfg(toolset, test):
 
   return result
 
-def compile_lifted_code(toolset, test, bitcode_path):
+def compile_lifted_code(test_directory, toolset, test, bitcode_path):
   if test.architecture() != "amd64":
     result = {}
     result["success"] = False
     result["output"] = "Not yet supported"
     return result
 
-  output_file_path = os.path.join(tempfile.gettempdir(), test.name())
+  output_file_path = os.path.join(test_directory, test.name())
 
   if test.architecture() == "amd64" or test.architecture() == "aarch64":
     mcsema_runtime_path = toolset["libmcsema_rt64"]
   else:
     mcsema_runtime_path = toolset["libmcsema_rt32"]
 
-  command_line = [toolset["clang"], "-rdynamic", "-o", output_file_path, bitcode_path, mcsema_runtime_path, "-Wno-unknown-warning-option", "-Wno-override-module"]
+  command_line = [toolset["clang++"], "-rdynamic", "-o", output_file_path, bitcode_path, mcsema_runtime_path, "-Wno-unknown-warning-option", "-Wno-override-module"]
   if len(test.cpp_flags()) != 0:
     command_line += test.cpp_flags()
 
@@ -378,8 +446,8 @@ def compile_lifted_code(toolset, test, bitcode_path):
 
   return result
 
-def execute_compiled_bitcode(toolset, test, recompiled_exe_path):
-  output_file_path = os.path.join(tempfile.gettempdir(), test.name() + "_" + test.architecture() + "_" + test.platform() + "_stdout_test")
+def execute_compiled_bitcode(test_directory, toolset, test, recompiled_exe_path):
+  output_file_path = os.path.join(test_directory, test.name() + "_" + test.architecture() + "_" + test.platform() + "_stdout_test")
 
   output = ""
   if test.input() is None:
@@ -406,7 +474,7 @@ def execute_compiled_bitcode(toolset, test, recompiled_exe_path):
       output += exec_result["stdout"] + exec_result["stderr"]
 
   result = {}
-  result["success"] = output == test.output()
+  result["success"] = test.compare_output(output)
   if not result["success"]:
     result["output"] = "Output:\n" + output + "\n\nExpected:\n" + test.output()
   else:
@@ -417,6 +485,7 @@ def execute_compiled_bitcode(toolset, test, recompiled_exe_path):
 def execute_with_timeout(args, timeout):
   result = {}
 
+  print("   > Executing: " + " ".join(args))
   program_stdout = tempfile.NamedTemporaryFile()
   program_stderr = tempfile.NamedTemporaryFile()
 

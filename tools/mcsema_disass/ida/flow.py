@@ -14,6 +14,7 @@
 
 from table import *
 from exception import *
+from refs import *
 
 # Addresses of the first instruction in a function.
 _FUNC_HEAD_EAS = set()
@@ -228,6 +229,11 @@ def find_default_block_heads(sub_ea):
       heads.add(chunk_start_ea)
       DEBUG("  chunk [{:x}, {:x})".format(chunk_start_ea, chunk_end_ea))
 
+    for eh_start_ea, eh_end_ea in get_exception_chunks(sub_ea):
+      _BLOCK_HEAD_EAS.update([eh_start_ea, eh_end_ea])
+      heads.update([eh_start_ea, eh_end_ea])
+      DEBUG("  exception chunks [{:x}, {:x})".format(eh_start_ea, eh_end_ea))
+
   # Look for possibly good jump table target candidates. We will use this
   # information in `get_static_successors` when we come across an indirect
   # jump with no known targets (i.e. not a jump table). In that case, we
@@ -286,7 +292,8 @@ def analyse_subroutine(sub_ea, binary_is_pie):
 
     seen_blocks.add(block_head_ea)
 
-    if not is_code_by_flags(block_head_ea):
+    # The exception handling blocks are not identified as code with tight checks
+    if not is_code(block_head_ea): #is_code_by_flags(block_head_ea):
       DEBUG("  Block head at {:08x} is not code.".format(block_head_ea))
       found_block_eas.discard(block_head_ea)
       continue

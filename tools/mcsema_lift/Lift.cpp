@@ -55,8 +55,12 @@ DEFINE_string(cfg, "", "Path to the CFG file containing code to lift.");
 
 DEFINE_string(output, "", "Output bitcode file name.");
 
-DEFINE_string(library, "", "Path to an LLVM bitcode or IR file that contains "
-                           "external library definitions.");
+// Using ',' as it will work well enough on Windows and Linux
+// Other suggestions were ':', which is a path character on Windows
+// and ';', which is an end of statement escape on Linux shells
+static const char kPathDelimeter = ',';
+DEFINE_string(abi_libraries, "", "Path to one or more bitcode files that contain "
+                               "external library definitions for the C/C++ ABI.");
 
 DECLARE_bool(version);
 
@@ -87,13 +91,30 @@ static void PrintSupportedInstructions(void) {
                       });
 }
 
+// simple function to split a string on a delimeter
+// used to separate comma separated arguments
+std::vector<std::string>
+split(const std::string &s, const char delim) {
+
+	std::vector<std::string> res;
+	std::string rem;
+	std::istringstream instream(s);
+
+	while(std::getline(instream, rem, delim)) {
+		res.push_back(rem);
+	}
+
+	return res;
+}
+
 static std::unique_ptr<llvm::Module> gLibrary;
 
 // Load in a separate bitcode or IR library, and copy function and variable
 // declarations from that library into our module. We can use this feature
 // to provide better type information to McSema.
-static void LoadLibraryIntoModule(void) {
-  gLibrary.reset(remill::LoadModuleFromFile(mcsema::gContext, FLAGS_library));
+static void LoadLibraryIntoModule(const std::string &path) {
+  gLibrary.reset(remill::LoadModuleFromFile(mcsema::gContext, path));
+  mcsema::gArch->PrepareModuleDataLayout(gLibrary);
 
   // Declare the functions from the library in McSema's target module.
   for (auto &func : *gLibrary) {
@@ -153,7 +174,11 @@ static void UnloadLibraryFromModule(void) {
   }
 
   for (auto &var : gLibrary->globals()) {
-    auto our_var = mcsema::gModule->getGlobalVariable(var.getName());
+    auto var_name = var.getName();
+    if(var_name.startswith("llvm.global")) {
+      continue;
+    }
+    auto our_var = mcsema::gModule->getGlobalVariable(var_name);
     if (our_var && !our_var->hasNUsesOrMore(1)) {
       our_var->eraseFromParent();
     }
@@ -204,9 +229,7 @@ int main(int argc, char *argv[]) {
      << "    [--explicit_args] \\" << std::endl
      << "    [--explicit_args_count NUM_ARGS_FOR_EXTERNALS] \\" << std::endl
 
-     // This option is most useful when using `--explicit_args` (or
-     // `--legacy_mode`, which enables `--explicit_args`). In general, McSema
-     // doesn't have type information about externals, and so it assumes all
+     // McSema doesn't have type information about externals, and so it assumes all
      // externals operate on integer-typed arguments, and return integer values.
      // This is wrong in many ways, but tends to work out about 80% of the time.
      // To get McSema better information about externals, one should create a
@@ -214,7 +237,7 @@ int main(int argc, char *argv[]) {
      // `#include`ing standard headers). Then, should add to this file something
      // like:
      //         __attribute__((used))
-     //         void *__mcsema_used_funcs[] = {
+     //         void *__mcsema_externs[] = {
      //           (void *) external_func_name_1,
      //           (void *) external_func_name_2,
      //           ...
@@ -222,7 +245,12 @@ int main(int argc, char *argv[]) {
      // And compile this file to bitcode using `remill-clang-M.m` (Major.minor).
      // This bitcode file will then be the source of type information for
      // McSema.
-     << "    [--library BITCODE_FILE] \\" << std::endl
+     //
+     // One may want multiple such files, such as one for libc, one for exception
+     // handling and one for zlib, and so on. McSema supports loading multiple
+     // ABI library definitions via a ';' separated list of paths
+     << "    [--abi_libraries BITCODE_FILE[" << kPathDelimeter <<
+        "BITCODE_FILE" << kPathDelimeter << "...] ] \\" << std::endl
 
      // Annotate each LLVM IR instruction with some metadata that includes the
      // original program counter. The name of the LLVM metadats is
@@ -236,6 +264,10 @@ int main(int argc, char *argv[]) {
      
      // Print a list of the instructions that can be lifted.
      << "    [--list-supported]" << std::endl
+
+     // Assign the personality function for exception handling ABIs. It is
+     // `__gxx_personality_v0` for libstdc++ and `__gnat_personality_v0` for ADA ABIs.
+     << "    [--exception_personality_func]" << std::endl
 
      // Print the version and exit.
      << "    [--version]" << std::endl
@@ -283,24 +315,31 @@ int main(int argc, char *argv[]) {
     FLAGS_disable_optimizer = false;
   }
 
-  auto cfg_module = mcsema::ReadProtoBuf(
-      FLAGS_cfg, (mcsema::gArch->address_size / 8));
   mcsema::gModule = remill::LoadTargetSemantics(mcsema::gContext);
   mcsema::gArch->PrepareModule(mcsema::gModule);
 
-  if (FLAGS_list_supported) {
-    PrintSupportedInstructions();
+  // Load in a special library before CFG processing. This affects the
+  // renaming of exported functions.
+  if (!FLAGS_abi_libraries.empty()) {
+    auto abi_libs = split(FLAGS_abi_libraries, kPathDelimeter);
+    for(const auto &abi_lib : abi_libs) {
+      LOG(INFO) << "Loading ABI Library: " << abi_lib << "\n";
+      LoadLibraryIntoModule(abi_lib);
+    }
   }
 
-  if (!FLAGS_library.empty()) {
-    LoadLibraryIntoModule();
+  auto cfg_module = mcsema::ReadProtoBuf(
+      FLAGS_cfg, (mcsema::gArch->address_size / 8));
+
+  if (FLAGS_list_supported) {
+    PrintSupportedInstructions();
   }
 
   CHECK(mcsema::LiftCodeIntoModule(cfg_module))
       << "Unable to lift CFG from " << FLAGS_cfg << " into module "
       << FLAGS_output;
 
-  if (!FLAGS_library.empty()) {
+  if (!FLAGS_abi_libraries.empty()) {
     UnloadLibraryFromModule();
     gLibrary.reset(nullptr);
   }
