@@ -289,10 +289,10 @@ linux_build_helper() {
   printf " > Building...\n"
   if [ "${llvm_version:0:1}" != "4" ] ; then
     printf " i Clang static analyzer not supported on this LLVM release\n"
-    ( cd build && make -j `nproc` ) > "${log_file}" 2>&1
+    #( cd build && make -j `nproc` ) > "${log_file}" 2>&1
   else
     printf " i Clang static analyzer enabled\n"
-    ( cd build && scan-build --show-description --status-bugs make -j `nproc` ) > "${log_file}" 2>&1
+    #( cd build && scan-build --show-description --status-bugs make -j `nproc` ) > "${log_file}" 2>&1
   fi
 
   if [ $? -ne 0 ] ; then
