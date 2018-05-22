@@ -43,10 +43,11 @@ class Test(object):
 
     tob_lib_repository = os.environ["TRAILOFBITS_LIBRARIES"]
     clang_path = os.path.join(tob_lib_repository, "llvm", "bin", "clang")
-    llvm_version = subprocess.check_output([clang_path, "--version"]).split(" ")[2][0:3]
-    self._abi_path = os.path.join(self._root_path, "ABI", "abi-" + llvm_version + ".bc")
-    if not os.path.isfile(self._abi_path):
-      print self._abi_path +" The abi file does not exists"
+
+    self._abi_path = os.path.join(self._root_path, "ABI", "abi" + ".bc")
+    self._abi_src = os.path.join(self._root_path, "ABI", "ABI_exceptions" + ".cpp")
+    if not os.path.isfile(self._abi_src):
+      print self._abi_src +" The abi file does not exists"
 
     stdout_path = os.path.join(self._root_path, "stdout", self._name)
     if not os.path.isfile(stdout_path):
@@ -99,6 +100,9 @@ class Test(object):
 
   def abi_path(self):
     return self._abi_path
+
+  def abi_src(self):
+    return self._abi_src
 
   def bitcode_path(self):
     return self._bitcode_path
@@ -287,9 +291,11 @@ def execute_tests(toolset, test_list):
       desc_line = desc_line.strip()
       if desc_line:
         print("   " + desc_line)
-
-    print("\n   Testing...")
     
+    print("\n   Testing...")
+    print("\n  Generating abi library...")
+
+    result = gen_abi_lib(test_directory, toolset, test)
     result = lift_test_cfg(test_directory, toolset, test)
     if result["success"]:
       print("    +"),
@@ -351,6 +357,23 @@ def execute_tests(toolset, test_list):
     print("")
 
   return False
+
+def gen_abi_lib(test_directory, toolset, test):
+  if test.architecture() == "amd64":
+    cxxflag = "-m64"
+  else:
+    cxxflag = "-m32"
+
+  output_file_path = os.path.join(test_directory, test.name())
+  command_line = [toolset["clang++"], cxxflag, "-S","-emit-llvm", "-o", test.abi_path(), test.abi_src(), "-std=c++11"]
+  exec_result = execute_with_timeout(command_line, 60)
+  result = {}
+  if not exec_result["success"]:
+    result["success"] = False
+  else:
+    result["success"] = True
+
+  return result
 
 def lift_test_cfg(test_directory, toolset, test):
   output_file_path = os.path.join(test_directory, test.name() + "_" + test.architecture() + "_" + test.platform() + ".bc")

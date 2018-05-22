@@ -442,14 +442,15 @@ static void CreateLandingPad(TranslationContext &ctx,
     llvm::Constant* const_array = llvm::ConstantArray::get(
         array_type, array_value);
     gvar_landingpad->setInitializer(const_array);
-    auto type_index_value = ir.CreateCall(GetExceptionTypeIndex());
+    auto type_index_value2 = ir.CreateCall(GetExceptionTypeIndex());
+    auto type_index_value1 = llvm::ConstantInt::get(dword_type, 0);
 
     // Get the type index from the original binary and set the `RDX` register
-    llvm::ArrayRef<llvm::Value *> indices = {
-        llvm::ConstantInt::get(dword_type, 0),
-        type_index_value
-    };
-    auto var_value = ir.CreateGEP(gvar_landingpad, indices);
+    std::vector<llvm::Value *> array_index_vec;
+    array_index_vec.push_back(type_index_value1);
+    array_index_vec.push_back(type_index_value2);
+
+    auto var_value = ir.CreateGEP(gvar_landingpad, array_index_vec);
 
 
 #if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
