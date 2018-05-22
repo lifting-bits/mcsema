@@ -296,9 +296,8 @@ def execute_tests(toolset, test_list):
       desc_line = desc_line.strip()
       if desc_line:
         print("   " + desc_line)
-
-    print("\n   Testing...")
     
+    print("\n   Testing...")
     result = lift_test_cfg(test_directory, toolset, test)
     if result["success"]:
       print("    +"),

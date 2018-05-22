@@ -130,6 +130,30 @@ Memory *__mcsema_reg_tracer(State &state, addr_t, Memory *memory) {
   return memory;
 }
 
+// Read/write to I/O ports.
+uint8_t __remill_read_io_port_8(Memory *, addr_t) {
+  abort();
+}
+
+uint16_t __remill_read_io_port_16(Memory *, addr_t) {
+  abort();
+}
+
+uint32_t __remill_read_io_port_32(Memory *, addr_t) {
+  abort();
+}
+
+Memory *__remill_write_io_port_8(Memory *, addr_t, uint8_t) {
+  abort();
+}
+
+Memory *__remill_write_io_port_16(Memory *, addr_t, uint16_t) {
+  abort();
+}
+
+Memory *__remill_write_io_port_32(Memory *, addr_t, uint32_t) {
+  abort();
+}
 
 // Memory read intrinsics.
 uint8_t __remill_read_memory_8(Memory *, addr_t addr) {

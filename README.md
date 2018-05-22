@@ -69,6 +69,7 @@ sudo apt-get upgrade
 
 sudo apt-get install \
      git \
+     curl \
      cmake \
      python2.7 python-pip python-virtualenv \
      wget \
@@ -76,7 +77,8 @@ sudo apt-get install \
      gcc-multilib g++-multilib \
      libtinfo-dev \
      lsb-release \
-     realpath 
+     realpath \
+     zlib1g-dev
 ```
 
 If you are going to be using IDA Pro for CFG recovery also do the following:

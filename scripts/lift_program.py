@@ -20,6 +20,11 @@ import stat
 import subprocess
 import tempfile
 
+try:
+  from shlex import quote
+except:
+  from pipes import quote
+
 def binary_info(binary):
   res = subprocess.check_output(['file', binary])
   is_pie = 'LSB shared object' in res
@@ -204,11 +209,11 @@ def main():
       'mcsema-disass',
       '--arch', arch,
       '--os', os_name,
-      '--binary', binary,
-      '--output', cfg,
+      '--binary', quote(binary),
+      '--output', quote(cfg),
       '--entrypoint', 'main',
-      '--disassembler', os.path.join(args.ida_dir, ida_version),
-      '--log_file', log,
+      '--disassembler', quote(os.path.join(args.ida_dir, ida_version)),
+      '--log_file', quote(log),
       is_pie and '--pie-mode' or '']
 
   ida_args.extend(command_args)
