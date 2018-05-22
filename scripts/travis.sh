@@ -41,32 +41,6 @@ main() {
   fi
 }
 
-install_ada_support() {
-  local log_file=`mktemp`
-
-  printf " > Installing ADA Langauge support for CMake\n"
-  git clone "https://github.com/offa/cmake-ada.git" > "${log_file}" 2>&1
-
-  if [ $? -ne 0 ] ; then
-    printf " x Failed to clone the cmake-ada repository. Error output follows:\n"
-    printf "===\n"
-    cat "${log_file}"
-    return 1
-  fi
-
-  pushd cmake-ada
-
-  sudo ${TRAILOFBITS_LIBRARIES}/cmake/bin/cmake -P install.cmake
-  if [ $? -ne 0 ] ; then
-    printf " x Failed to install cmake ada support. Error output follows:\n"
-    printf "===\n"
-    cat "${log_file}"
-    return 1
-  fi
-
-  popd
-}
-
 linux_initialize() {
   printf "Initializing platform: linux\n"
 
@@ -265,10 +239,6 @@ linux_build_helper() {
   export CC="${TRAILOFBITS_LIBRARIES}/llvm/bin/clang"
   export CXX="${TRAILOFBITS_LIBRARIES}/llvm/bin/clang++"
 
-  # need TRAILOFBITS_LIBRARIES installed before we can
-  # add ada support to cmake
-  install_ada_support
-
   printf " > Generating the project...\n"
   mkdir build > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
@@ -342,8 +312,6 @@ linux_build_helper() {
 
   popd
 
-  #TODO(artem): Call the generated test suite, not the pre-made one
-  #TODO(artem): eliminate pre-made test suite once we always generate it
   printf "\n\n\nCalling the integration test suite...\n"
   local test_log_file=`mktemp`
   ( cd ./remill/tools/mcsema/tests/test_suite_generator/test_suite && ./start.py ) > "${test_log_file}" 2>&1
