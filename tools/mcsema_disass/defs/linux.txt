@@ -31,7 +31,6 @@ DATA: _etext PTR
 DATA: end PTR
 DATA: _end PTR
 
-DATA: _ZTVN10__cxxabiv117__class_type_infoE PTR
 
 __assert_fail 4 C Y
 __cxa_atexit 5 C N
