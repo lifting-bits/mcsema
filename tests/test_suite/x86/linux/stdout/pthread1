@@ -1,7 +1,0 @@
-Create threads
-Wait for the threads to complete, and release their resources
-foo(), tls data=0 2
-bar(), tls data=0 2
-foo(), tls data=1 4
-bar(), tls data=1 4
-Main completed

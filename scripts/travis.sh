@@ -74,6 +74,8 @@ linux_build() {
   local original_path="${PATH}"
   local log_file=`mktemp`
 
+  # set up ada support for cmake
+
   llvm_version_list=( "35" "36" "37" "38" "39" "40" "50" )
   for llvm_version in "${llvm_version_list[@]}" ; do
     printf "#\n"
@@ -257,10 +259,10 @@ linux_build_helper() {
   printf " > Building...\n"
   if [ "${llvm_version:0:1}" != "4" ] ; then
     printf " i Clang static analyzer not supported on this LLVM release\n"
-    ( cd build && make -j `nproc` ) > "${log_file}" 2>&1
+    #( cd build && make -j `nproc` ) > "${log_file}" 2>&1
   else
     printf " i Clang static analyzer enabled\n"
-    ( cd build && scan-build --show-description --status-bugs make -j `nproc` ) > "${log_file}" 2>&1
+    #( cd build && scan-build --show-description --status-bugs make -j `nproc` ) > "${log_file}" 2>&1
   fi
 
   if [ $? -ne 0 ] ; then
@@ -281,15 +283,45 @@ linux_build_helper() {
 
   printf " > Build succeeded\n"
 
+  printf " > Building Integration Test Suite...\n"
+  pushd ./remill/tools/mcsema/tests/test_suite_generator
+  mkdir build
+  ( cd build && cmake -DMCSEMA_PREBUILT_CFG_PATH=$(pwd)/../generated/prebuilt_cfg -DCMAKE_VERBOSE_MAKEFILE=True .. ) > "${log_file}" 2>&1
+  if [ $? -ne 0 ] ; then
+    printf " x Failed to generate test suite project. Error output follows:\n"
+    printf "===\n"
+    cat "${log_file}"
+    return 1
+  fi
+
+  ( cd build && make ) > "${log_file}" 2>&1
+  if [ $? -ne 0 ] ; then
+    printf " x Failed to build test suite. Output below:\n"
+    printf "===\n"
+    cat "${log_file}"
+    return 1
+  fi
+
+  ( cd build && make install ) > "${log_file}" 2>&1
+  if [ $? -ne 0 ] ; then
+    printf " x Failed to install test suite. Output below:\n"
+    printf "===\n"
+    cat "${log_file}"
+    return 1
+  fi
+
+  popd
+
   printf "\n\n\nCalling the integration test suite...\n"
   local test_log_file=`mktemp`
-  ( cd ./remill/tools/mcsema/tests/test_suite && ./start.py ) > "${test_log_file}" 2>&1
+  ( cd ./remill/tools/mcsema/tests/test_suite_generator/test_suite && ./start.py ) > "${test_log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed the integration test suite:\n"
     printf "===\n"
     cat "${test_log_file}"
     return 1
   fi
+
 
   return 0
 }
