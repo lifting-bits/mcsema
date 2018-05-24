@@ -299,7 +299,8 @@ def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
       act_ea = next_ea
       DEBUG("ea {:x}: cs_lp[{}] = {:x}".format(ea, i, cs_lp))
       ea = next_ea
-      heads.add(cs_lp)
+      if cs_lp != 0:
+        heads.add(cs_lp)
 
       cs_action, next_ea = read_enc_value(ea, DW_EH_PE_uleb128)
       ea = next_ea

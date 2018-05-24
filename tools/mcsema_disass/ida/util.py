@@ -426,7 +426,7 @@ def get_symbol_name(from_ea, ea=None, allow_dummy=False):
 
   name = ""
   try:
-    name = name or idc.get_name(ea, calc_gtn_flags(from_ea, ea))
+    name = name or idc.get_name(ea, 0) #calc_gtn_flags(from_ea, ea))
   except:
     pass
 
@@ -699,7 +699,7 @@ def remove_all_refs(ea):
 def is_thunk(ea):
   """Returns true if some address is a known to IDA to be a thunk."""
   flags = idc.get_func_attr(ea, idc.FUNCATTR_FLAGS)
-  return 0 < flags and 0 != (flags & idaapi.FUNC_THUNK)
+  return (idc.BADADDR != flags) and 0 < flags and 0 != (flags & 0x00000080L)
 
 def is_referenced(ea):
   """Returns `True` if the data at `ea` is referenced by something else."""
