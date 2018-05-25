@@ -305,7 +305,8 @@ def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
   info = idaapi.refinfo_t()
   has_ref_info = ida_nalt.get_refinfo(info, inst.ea, op.n) == 1
 
-  if is_invalid_ea(addr_val):
+  if is_invalid_ea(addr_val) \
+    or idc.get_segm_name(idc.get_segm_start(addr_val)) in ["LOAD"]:
     
     # The `addr_val` that we get might actually be a value that is relative to
     # a base address. For example, in IDA we might see:
