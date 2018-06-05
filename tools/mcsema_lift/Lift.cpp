@@ -284,7 +284,7 @@ int main(int argc, char *argv[]) {
 
   if (FLAGS_os.empty() || FLAGS_arch.empty() || FLAGS_cfg.empty()){
     std::cout << ss.str() << std::endl;
-    return EXIT_SUCCESS;
+    return EXIT_FAILURE;
   }
 
   CHECK(!FLAGS_os.empty())
