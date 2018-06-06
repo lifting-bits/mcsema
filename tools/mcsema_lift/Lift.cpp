@@ -282,6 +282,11 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
   }
 
+  if (FLAGS_os.empty() || FLAGS_arch.empty() || FLAGS_cfg.empty()){
+    std::cout << google::ProgramUsage() << std::endl;
+    return EXIT_FAILURE;
+  }
+
   CHECK(!FLAGS_os.empty())
       << "Must specify an operating system name to --os.";
 
