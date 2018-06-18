@@ -100,7 +100,7 @@ endif()
 
 #TODO(artem): this may need some logic to select only ABIs compatible with current os/arch
 #TODO(kumarak): Disable the ABI libraries build till we don't have script to automate the generation of `ABI_libc.h`. Use pre-build library to test the --abi_libraries flag
-if (LINUX)
+if(UNIX AND NOT APPLE)
   add_subdirectory(mcsema/OS/Linux)
 endif()
 
