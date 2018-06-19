@@ -29,7 +29,7 @@ mcsema-dyninst-disass comes with a few test cases. To try them out, make sure yo
 $ ./run_tests.py -h
 ```
 
-provides an overview of the required command line options. Supplied with the proper arguments, the script will then proceed to build, disassemble, lift and recompile the test programs in a temporary directory, each time running both the original as well as the recompiled binary and then passing the test iff the outputs match.
+provides an overview of the required command line options. Supplied with the proper arguments, the script will then proceed to build, disassemble, lift and recompile the test programs in a temporary directory, each time running both the original as well as the recompiled binary and then passing the test iff the outputs match. Python 2.7 won't work, implemented with Python 3.5 in mind.
 
 ## Using mcsema-dyninst-disass
 
@@ -47,6 +47,6 @@ mcsema-dyninst-disass can also accept additional external symbol definitions fro
 Pull request fixing bugs or implementing missing features are welcomed!
 * Can *only* handle 64-bit ELF files
 * Has *only* been tested on Linux
-* Exceptions are ignored 
-* Virtual methods ( late bind ) do now work completely
+* Stripped binaries are not handled correctly
+* Exceptions are ignored ( work in progress )
 * Still needs lots of debugging, corner-case handling, ...

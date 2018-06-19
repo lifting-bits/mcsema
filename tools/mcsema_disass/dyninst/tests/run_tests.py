@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# Python 2.7 won't work. Implemented with Python 3.5
+
 import unittest
 import os
 import tempfile
@@ -24,6 +26,7 @@ class LinuxTest (unittest.TestCase):
 
         self.test_dir = tempfile.mkdtemp ()
         self.cc = "clang-4.0"
+        self.input = ""
 
     def tearDown (self):
         shutil.rmtree (self.test_dir)
@@ -31,11 +34,11 @@ class LinuxTest (unittest.TestCase):
     def runTest (self, filename, *args):
         ignore, ext = os.path.splitext(filename)
 
-        std = ""
         if ext == ".cpp":
             self.cc = c_cxx
             std = "-std=c++1z"
         else: 
+            std = ""
             self.cc = c_cc
         
         shutil.copy (filename, self.test_dir)
@@ -46,10 +49,11 @@ class LinuxTest (unittest.TestCase):
         exe = self.test_dir + "/" + filename + ".exe"
 
         # Build the C file
-        subprocess.check_output ([ self.cc, std, source, "-o", exe, "-lpthread" ], stderr = subprocess.STDOUT)
+        subprocess.check_output ([ self.cc, std, source, "-o", exe, "-lpthread", "-lm" ], stderr = subprocess.STDOUT)
 
         # Generate the expected output
-        expected_output = subprocess.check_output ([ exe ] + list (args), stderr = subprocess.STDOUT)
+        expected_output = subprocess.check_output ([ exe ] + list (args), stderr = subprocess.STDOUT,
+                input=self.input.encode())
         
         # Disassemble the binary
         cfg = self.test_dir + "/" + filename + ".cfg"
@@ -65,10 +69,11 @@ class LinuxTest (unittest.TestCase):
         # Recompile it
         rcexe = self.test_dir + "/" + filename + ".rc-exe"
         lib = lib_dir + "libmcsema_rt64-4.0.a"
-        subprocess.check_call ([self.cc, bc, "-o", rcexe, lib, "-lpthread"])
+        subprocess.check_call ([self.cc, bc, "-o", rcexe, lib, "-lpthread", "-lm"])
 
         # Generate actual output
-        actual_output = subprocess.check_output ([ rcexe ] + list (args), stderr = subprocess.STDOUT)
+        actual_output = subprocess.check_output ([ rcexe ] + list (args), stderr = subprocess.STDOUT,
+                input=self.input.encode())
 
         # Check the output
         if filename != "pthread.cpp":
@@ -80,6 +85,11 @@ class LinuxTest (unittest.TestCase):
         os.remove (cfg)
         os.remove (bc)
         os.remove (rcexe)
+    
+    def get_input (self, filename):
+        with open(filename, 'r') as myfile:
+              data = myfile.read()
+        self.input = data
 
     def test_all_data_array (self):
         self.runTest ("all_data_array.c")
@@ -168,9 +178,25 @@ class LinuxTest (unittest.TestCase):
     def test_operator_new (self):
         self.runTest("operator_new.cpp")
 
+    def test_virtual_method (self):
+        self.runTest("virtual.cpp")
+        self.runTest("virtual_simpler.cpp")
+
     def test_template_function_ptrs (self):
         self.runTest("template_function_ptrs.cpp", "42")
         self.runTest("template_function_ptrs.cpp", "-543")
+    
+    def test_calc (self):
+        for f in ["inputs/input1.txt", "inputs/input2.txt","inputs/input3.txt","inputs/input4.txt"]:
+            self.get_input(f)
+            self.runTest("calc.c")
+            self.input = ""
+    def test_struct_func_ptr (self):
+        for i in ["4", "44", "57", "109"]:
+            self.input = i;
+            self.runTest("struct_func_ptr.cpp")
+            self.input = ""
+    
 
     def test_libfoo_so (self):
         # This test needs special handling because it builds a shared library
