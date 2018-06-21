@@ -29,6 +29,7 @@ import pprint
 from collections import namedtuple
 # Bring in utility libraries.
 from util import *
+from rtti import *
 
 frame_entry = namedtuple('frame_entry', ['cs_start', 'cs_end', 'cs_lp', 'cs_action'])
 _FUNC_UNWIND_FRAME_EAS = set()
@@ -60,11 +61,6 @@ class EHBlocks(object):
   def __init__(self, start_ea, end_ea):
     self.start_ea = start_ea
     self.end_ea = end_ea
-
-def sign_extn(x, b):
-  m = 1 << (b - 1)
-  x = x & ((1 << b) - 1)
-  return (x ^ m) - m
 
 def make_array(ea, size):
   if ea != idc.BADADDR and ea != 0:
@@ -444,6 +440,9 @@ def recover_exception_table():
     if seg_name in [".eh_frame", "__eh_frame"]:
       recover_frame_entries(seg_ea)
       break
+
+  # Parse RTTI information
+  recover_rtti()
 
 def recover_exception_entries(F, func_ea):
   has_unwind_frame = func_ea in _FUNC_LSDA_ENTRIES.keys()
