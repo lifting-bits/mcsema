@@ -307,73 +307,17 @@ static llvm::Constant *CreateInitializedState(
   }
 }
 
-// Convert the index sequence of a GEP inst into a byte offset, representing
-// how many bytes of displacement there are between the base pointer and the
-// indexed thing.
-static bool GetOffsetFromBasePtr(const llvm::GetElementPtrInst *gep_inst,
-                                 uint64_t *offset_out) {
-  llvm::DataLayout dl(gModule);
-  unsigned ptr_size = dl.getPointerSizeInBits();
-  llvm::APInt offset(ptr_size, 0);
-
-  const auto found_offset = gep_inst->accumulateConstantOffset(dl, offset);
-  if (found_offset) {
-    *offset_out = offset.getZExtValue();
-  }
-  return found_offset;
-}
-
 // Figure ouf the byte offset of the stack pointer register in the `State`
 // structure.
 static uint64_t GetStackPointerOffset(void) {
   CallingConvention cc(gArch->DefaultCallingConv());
-  auto bb = remill::BasicBlockFunction(gModule);
-  auto sp_alloca = llvm::dyn_cast<llvm::AllocaInst>(
-      remill::FindVarInFunction(bb, cc.StackPointerVarName()));
+  std::string sp_name(cc.StackPointerVarName());
+  auto reg = gArch->RegisterByName(sp_name);
+  CHECK(reg != nullptr)
+      << "Could not identify stack pointer " << sp_name
+      << " register in State structure";
 
-  llvm::Value *sp = nullptr;
-
-  LOG(INFO)
-      << "Stack pointer alloca: " << remill::LLVMThingToString(sp_alloca);
-
-  // The `__remill_basic_block` will have something like this:
-  //    sp = getelementptr inbounds ...
-  //    SP = alloca i64*
-  //    store sp, SP
-  for (auto user : sp_alloca->users()) {
-    if (auto store_inst = llvm::dyn_cast<llvm::StoreInst>(user)) {
-      CHECK(!sp);
-      sp = store_inst->getValueOperand();
-    }
-  }
-
-  CHECK(sp != nullptr);
-
-  // Now iteratively accumulate the offset, following through GEPs and bitcasts.
-  uint64_t offset = 0;
-  do {
-    LOG(INFO)
-        << "Next stack pointer value: " << remill::LLVMThingToString(sp);
-
-    if (auto gep = llvm::dyn_cast<llvm::GetElementPtrInst>(sp)) {
-      uint64_t gep_offset = 0;
-      CHECK(GetOffsetFromBasePtr(gep, &gep_offset));
-      offset += gep_offset;
-      sp = gep->getPointerOperand();
-
-    } else if (auto c = llvm::dyn_cast<llvm::CastInst>(sp)) {
-      sp = c->getOperand(0);
-
-    } else {
-      sp = nullptr;
-    }
-  } while (sp != nullptr);
-
-  LOG(INFO)
-      << "Stack pointer " << cc.StackPointerVarName() << " is at byte offset "
-      << offset << " within State structure.";
-
-  return offset;
+  return reg->offset;
 }
 
 // Create a global register state pointer to pass to lifted functions.

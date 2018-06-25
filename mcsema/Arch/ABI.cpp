@@ -464,8 +464,7 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
   llvm::IRBuilder<> ir(block);
 
   if (auto reg_var_name = GetVarForNextArgument(goal_type)) {
-    auto reg_ptr_ptr = remill::FindVarInFunction(block, reg_var_name);
-    auto reg_ptr = ir.CreateLoad(reg_ptr_ptr);
+    auto reg_ptr = remill::FindVarInFunction(block, reg_var_name);
     return ir.CreateLoad(
         ir.CreateBitCast(reg_ptr, llvm::PointerType::get(goal_type, 0)));
   }
@@ -585,8 +584,7 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
     }
   }
 
-  llvm::Value *dest_loc = ir.CreateLoad(
-      remill::FindVarInFunction(block, val_var));
+  llvm::Value *dest_loc = remill::FindVarInFunction(block, val_var);
 
   // Clear out whatever was already there.
   auto storage_type = llvm::dyn_cast<llvm::PointerType>(
@@ -610,8 +608,7 @@ void CallingConvention::StoreArguments(
   for (auto arg_val : arg_vals) {
     auto arg_type = arg_val->getType();
     if (auto reg_var_name = GetVarForNextArgument(arg_type)) {
-      auto reg_ptr_ptr = remill::FindVarInFunction(block, reg_var_name);
-      auto reg_ptr = ir.CreateLoad(reg_ptr_ptr);
+      auto reg_ptr = remill::FindVarInFunction(block, reg_var_name);
       ir.CreateStore(
           arg_val,
           ir.CreateBitCast(reg_ptr, llvm::PointerType::get(arg_type, 0)));
@@ -739,7 +736,7 @@ void CallingConvention::FreeReturnAddress(llvm::BasicBlock *block) {
   if (gArch->IsAArch64()) {
     auto x30 = remill::FindVarInFunction(block, "X30");
     llvm::IRBuilder<> ir(block);
-    auto ret_addr = ir.CreateLoad(ir.CreateLoad(x30));
+    auto ret_addr = ir.CreateLoad(x30);
     remill::StoreProgramCounter(block, ret_addr);
 
   // The stack grows down on x86/amd64.
@@ -774,14 +771,13 @@ llvm::Value *CallingConvention::LoadReturnValue(llvm::BasicBlock *block,
 
   auto val_var = ReturnValVar(cc, val_type);
   return ir.CreateLoad(ir.CreateBitCast(
-      ir.CreateLoad(remill::FindVarInFunction(block, val_var)),
+      remill::FindVarInFunction(block, val_var),
       llvm::PointerType::get(val_type, 0)));
 }
 
 llvm::Value *CallingConvention::LoadStackPointer(llvm::BasicBlock *block) {
   llvm::IRBuilder<> ir(block);
-  return ir.CreateLoad(ir.CreateLoad(
-      remill::FindVarInFunction(block, sp_name)));
+  return ir.CreateLoad(remill::FindVarInFunction(block, sp_name));
 }
 
 void CallingConvention::StoreStackPointer(llvm::BasicBlock *block,
@@ -793,7 +789,7 @@ void CallingConvention::StoreStackPointer(llvm::BasicBlock *block,
   }
   ir.CreateStore(
       new_val,
-      ir.CreateLoad(remill::FindVarInFunction(block, StackPointerVarName())));
+      remill::FindVarInFunction(block, StackPointerVarName()));
 }
 
 void CallingConvention::StoreThreadPointer(llvm::BasicBlock *block,
@@ -805,7 +801,7 @@ void CallingConvention::StoreThreadPointer(llvm::BasicBlock *block,
   }
   ir.CreateStore(
       new_val,
-      ir.CreateLoad(remill::FindVarInFunction(block, ThreadPointerVarName())));
+      remill::FindVarInFunction(block, ThreadPointerVarName()));
 }
 
 // Return the address of the base of the TLS data.
