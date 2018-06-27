@@ -430,7 +430,13 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
       if (val_size > gArch->address_size) {
         val = llvm::ConstantExpr::getZExt(val, val_type);
       } else if (val_size < gArch->address_size) {
-        val = llvm::ConstantExpr::getTrunc(val, val_type);
+        /* The pointer truncation was generating wrong assembly which was
+         * not getting recompiled. Change it to Lazy initialization with
+         * correct size
+         */
+        LazyInitXRef(xref, val_type);
+        val = llvm::ConstantInt::get(val_type, 0);
+        //val = llvm::ConstantExpr::getTrunc(val, val_type);
       }
 
       CHECK(val->getType() == entry_type)
