@@ -49,8 +49,7 @@ namespace {
 // Load the address of a register.
 static llvm::Value *LoadRegAddress(llvm::BasicBlock *block,
                                    std::string reg_name) {
-  return new llvm::LoadInst(
-      remill::FindVarInFunction(block->getParent(), reg_name), "", block);
+  return remill::FindVarInFunction(block->getParent(), reg_name);
 }
 
 // Load the value of a register.

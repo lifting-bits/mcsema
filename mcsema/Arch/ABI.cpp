@@ -777,7 +777,7 @@ llvm::Value *CallingConvention::LoadReturnValue(llvm::BasicBlock *block,
 
 llvm::Value *CallingConvention::LoadStackPointer(llvm::BasicBlock *block) {
   llvm::IRBuilder<> ir(block);
-  return ir.CreateLoad(remill::FindVarInFunction(block, sp_name));
+  return ir.CreateLoad(remill::FindVarInFunction(block, sp_name, false));
 }
 
 void CallingConvention::StoreStackPointer(llvm::BasicBlock *block,
