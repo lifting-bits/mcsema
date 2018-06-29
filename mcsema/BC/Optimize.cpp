@@ -48,6 +48,7 @@
 #include "remill/Arch/Arch.h"
 #include "remill/BC/ABI.h"
 #include "remill/BC/Compat/TargetLibraryInfo.h"
+#include "remill/BC/DeadStoreEliminator.h"
 #include "remill/BC/Util.h"
 
 #include "mcsema/Arch/Arch.h"
@@ -349,7 +350,10 @@ void OptimizeModule(void) {
   PrivatizeISELs(isels);
 
   if (!FLAGS_disable_optimizer) {
+    auto bb_func = remill::BasicBlockFunction(gModule);
+    auto slots = remill::StateSlots(gModule);
     RunO3();
+    remill::RemoveDeadStores(gModule, bb_func, slots);
   }
 
   RemoveIntrinsics();

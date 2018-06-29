@@ -128,9 +128,9 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
       func_name, gModule);
 
   // Make sure to keep this function around (along with `ExternalLinkage`).
-  func->addFnAttr(llvm::Attribute::NoInline);
   func->removeFnAttr(llvm::Attribute::ReadNone);
   func->addFnAttr(llvm::Attribute::OptimizeNone);
+  func->addFnAttr(llvm::Attribute::NoInline);
 
 #if LLVM_VERSION_NUMBER < LLVM_VERSION(3, 7)
   func->addFnAttr(llvm::Attribute::ReadOnly);
