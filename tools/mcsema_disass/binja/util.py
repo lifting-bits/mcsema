@@ -248,6 +248,16 @@ def _search_phrase_op(il, target_op):
     return (_search_phrase_op(il.left, target_op) or
         _search_phrase_op(il.right, target_op))
 
+      # Continue left/right at an ADD
+  if op == LowLevelILOperation.LLIL_SUB:
+    return (_search_phrase_op(il.left, target_op) or
+        _search_phrase_op(il.right, target_op))
+
+    # Continue left/right at an ADD
+  if op == LowLevelILOperation.LLIL_CMP_E:
+    return (_search_phrase_op(il.left, target_op) or
+        _search_phrase_op(il.right, target_op))
+
   # Terminate when constant is found
   if op == target_op:
     return il
