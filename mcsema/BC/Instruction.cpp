@@ -99,6 +99,20 @@ static bool IsFramePointerReg(const remill::Operand::Register &reg) {
   return false;
 }
 
+static bool IsStackPointerReg(const remill::Operand::Register &reg) {
+
+  if (reg.name.empty()) {
+    return false;
+  }
+
+  if (mcsema::gArch->IsAMD64()) {
+    return reg.name == "RSP";
+  } else if (mcsema::gArch->IsX86()) {
+    return reg.name == "ESP";
+  }
+  return false;
+}
+
 }  // namespace
 
 InstructionLifter::~InstructionLifter(void) {}
@@ -394,7 +408,8 @@ llvm::Value *InstructionLifter::LiftRegisterOperand(
   // Check if the instruction is referring to the base pointer which
   // might be accessing stack variable indirectly
   if (ctx.cfg_inst->stack_var) {
-    if (IsFramePointerReg(reg)) {
+    if ((IsFramePointerReg(reg) || IsStackPointerReg(reg))
+        && (op.action == remill::Operand::kActionRead)) {
       llvm::IRBuilder<> ir(block);
       auto variable = ir.CreatePtrToInt(
           ctx.cfg_inst->stack_var->llvm_var, word_type);
