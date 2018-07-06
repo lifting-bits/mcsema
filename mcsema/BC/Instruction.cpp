@@ -110,7 +110,7 @@ static bool IsStackPointerReg(const remill::Operand::Register &reg) {
   } else if (mcsema::gArch->IsX86()) {
     return reg.name == "ESP";
   } else if (mcsema::gArch->IsAArch64()) {
-    return reg.name.find("SP_EL") != std::string::npos;
+    return reg.name == "SP" || reg.name == "WSP";
   }
   return false;
 }
