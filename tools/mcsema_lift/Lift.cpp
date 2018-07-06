@@ -93,8 +93,7 @@ static void PrintSupportedInstructions(void) {
 
 // simple function to split a string on a delimeter
 // used to separate comma separated arguments
-std::vector<std::string>
-split(const std::string &s, const char delim) {
+static std::vector<std::string> Split(const std::string &s, const char delim) {
 
 	std::vector<std::string> res;
 	std::string rem;
@@ -109,11 +108,41 @@ split(const std::string &s, const char delim) {
 
 static std::unique_ptr<llvm::Module> gLibrary;
 
+#define _S(x) #x
+#define S(x) _S(x)
+#define MAJOR_MINOR S(LLVM_VERSION_MAJOR) "." S(LLVM_VERSION_MINOR)
+
+static const char *gABISearchPaths[] = {
+    // TODO(pag): Use build and CMake install dirs to find the libraries too.
+    "/usr/local/share/mcsema/" MAJOR_MINOR "/ABI/",
+    "/usr/share/mcsema/" MAJOR_MINOR "/ABI/",
+    "/share/mcsema/" MAJOR_MINOR "/ABI/",
+};
+
 // Load in a separate bitcode or IR library, and copy function and variable
 // declarations from that library into our module. We can use this feature
 // to provide better type information to McSema.
 static void LoadLibraryIntoModule(const std::string &path) {
-  gLibrary.reset(remill::LoadModuleFromFile(mcsema::gContext, path));
+  gLibrary.reset(remill::LoadModuleFromFile(mcsema::gContext, path, true));
+
+  // Go searching for a library.
+  if (!gLibrary) {
+    for (auto base_path : gABISearchPaths) {
+      std::stringstream ss;
+      ss <<  base_path << FLAGS_os << "/ABI_" << path << "_"
+         << FLAGS_arch << ".bc";
+      const auto inferred_path = ss.str();
+      gLibrary.reset(remill::LoadModuleFromFile(
+          mcsema::gContext, inferred_path, true));
+      if (gLibrary) {
+        break;
+      }
+    }
+  }
+
+  LOG_IF(FATAL, !gLibrary)
+      << "Could not load ABI library " << path;
+
   mcsema::gArch->PrepareModuleDataLayout(gLibrary);
 
   // Declare the functions from the library in McSema's target module.
@@ -326,9 +355,10 @@ int main(int argc, char *argv[]) {
   // Load in a special library before CFG processing. This affects the
   // renaming of exported functions.
   if (!FLAGS_abi_libraries.empty()) {
-    auto abi_libs = split(FLAGS_abi_libraries, kPathDelimeter);
+    auto abi_libs = Split(FLAGS_abi_libraries, kPathDelimeter);
     for(const auto &abi_lib : abi_libs) {
-      LOG(INFO) << "Loading ABI Library: " << abi_lib << "\n";
+      LOG(INFO)
+          << "Loading ABI Library: " << abi_lib;
       LoadLibraryIntoModule(abi_lib);
     }
   }
