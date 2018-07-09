@@ -175,6 +175,7 @@ static const char *ThreadPointerName(void) {
   return tp_name;
 }
 
+
 static const ArgConstraint *ConstraintTable(llvm::CallingConv::ID cc) {
   static const ArgConstraint kNoArgs[] = {
      {nullptr, kInvalidKind},
@@ -342,10 +343,11 @@ static const char *IntReturnValVar(llvm::CallingConv::ID cc) {
 }
 
 static const char *FloatReturnValVar(llvm::CallingConv::ID cc,
-                                     llvm::Type *type) {
+                                     llvm::Type *type, size_t index) {
   if (llvm::CallingConv::X86_64_SysV == cc ||
       llvm::CallingConv::Win64 == cc) {
-    return "XMM0";
+    static const char* regs[2] = {"XMM0", "XMM1"};
+    return regs[index];
 
   } else if (llvm::CallingConv::X86_StdCall == cc ||
              llvm::CallingConv::X86_FastCall == cc ||
@@ -374,13 +376,14 @@ static const char *FloatReturnValVar(llvm::CallingConv::ID cc,
   return nullptr;
 }
 
-static const char *ReturnValVar(llvm::CallingConv::ID cc, llvm::Type *type) {
+static const char *ReturnValVar(llvm::CallingConv::ID cc, llvm::Type *type, size_t index = 0) {
   if (type->isPointerTy() || type->isIntegerTy()) {
     return IntReturnValVar(cc);
   } else if (type->isX86_FP80Ty()) {
-    return "ST0";
+    static const char* regs[2] = { "ST0", "ST1"};
+    return regs[index];
   } else if (type->isFloatTy() || type->isDoubleTy()) {
-    return FloatReturnValVar(cc, type);
+    return FloatReturnValVar(cc, type, index);
   } else {
     LOG(FATAL)
         << "Cannot decide where to put return value of type "
@@ -528,6 +531,30 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
   return val;
 }
 
+llvm::Type* retrieveArgumentType( llvm::Type* original_type, unsigned index ) {
+  // float complex may look as <2xfloat>
+  if ( auto seq_type = llvm::dyn_cast< llvm::SequentialType >(original_type) ) {
+    return seq_type->getElementType();
+  //long double complex may look as { x86_fp80, x86_fp80 }
+  } else if ( auto struct_type = llvm::dyn_cast< llvm::StructType >(original_type) ) {
+    return struct_type->getElementType( index );
+  } else {
+    return original_type;
+  }
+}
+
+
+// llvm::CompositeType as common parent does not provide getNumElements
+uint64_t getNumberOfElements( llvm::Type* original_type ) {
+  if ( auto seq_type = llvm::dyn_cast< llvm::SequentialType >(original_type) ) {
+    return seq_type->getNumElements();
+  } else if ( auto struct_type = llvm::dyn_cast< llvm::StructType >(original_type) ) {
+    return struct_type->getNumElements();
+  } else {
+    return 1;
+  }
+}
+
 void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
                                          llvm::Value *ret_val) {
   if (!ret_val) {
@@ -540,60 +567,70 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
   }
 
   llvm::IRBuilder<> ir(block);
-  auto val_var = ReturnValVar(cc, val_type);
+  for (unsigned i = 0; i < getNumberOfElements(val_type); ++i) {
+    auto ret_type = retrieveArgumentType(val_type, i);
+    auto val_var = ReturnValVar(cc, ret_type, i);
+    llvm::Value* target_val = ret_val;
 
-  // If it's a pointer then convert it to a pointer-sized integer.
-  if (val_type->isPointerTy()) {
-    ret_val = ir.CreatePtrToInt(ret_val, gWordType);
-    val_type = gWordType;
-  }
-
-  // If it's an 80-bit float then convert it to a double.
-  if (val_type->isX86_FP80Ty()) {
-    val_type = llvm::Type::getDoubleTy(*gContext);
-    ret_val = ir.CreateFPTrunc(ret_val, val_type);
-  }
-
-  CHECK(val_type->isIntegerTy() || val_type->isFloatTy() ||
-        val_type->isDoubleTy());
-
-  llvm::DataLayout dl(gModule);
-
-  // Canonicalize integer return values into address-sized values.
-  if (val_type->isIntegerTy()) {
-    auto size = dl.getTypeSizeInBits(val_type);
-    if (size < gArch->address_size) {
-      val_type = gWordType;
-      ret_val = ir.CreateZExt(ret_val, val_type);
-
-    } else if (size > gArch->address_size) {
-      LOG(ERROR)
-          << "Truncating value of type "
-          << remill::LLVMThingToString(val_type)
-          << " to store it into variable " << val_var
-          << " of type " << remill::LLVMThingToString(gWordType);
-      ret_val = ir.CreateTrunc(ret_val, gWordType);
-      val_type = gWordType;
+    if ( auto vectorTy = llvm::dyn_cast<llvm::VectorType>(val_type) ) {
+      target_val = ir.CreateExtractElement( ret_val, i );
+    } else if ( auto structTy = llvm::dyn_cast<llvm::StructType>(val_type) ) {
+      target_val = ir.CreateExtractValue( ret_val, i );
     }
 
-  // Storing a `float` into an x87 register, convert it to a `double`.
-  } else if (val_type->isFloatTy()) {
-    if (val_var && !strcmp("ST0", val_var)) {
-      val_type = llvm::Type::getDoubleTy(*gContext);
-      ret_val = ir.CreateFPExt(ret_val, val_type);
+    // If it's a pointer then convert it to a pointer-sized integer.
+    if (ret_type->isPointerTy()) {
+      target_val = ir.CreatePtrToInt(target_val, gWordType);
+      ret_type = gWordType;
     }
+
+    // If it's an 80-bit float then convert it to a double.
+    if (ret_type->isX86_FP80Ty()) {
+      ret_type = llvm::Type::getDoubleTy(*gContext);
+      target_val = ir.CreateFPTrunc(target_val, ret_type);
+    }
+
+    CHECK(ret_type->isIntegerTy() || ret_type->isFloatTy() ||
+          ret_type->isDoubleTy());
+
+    llvm::DataLayout dl(gModule);
+
+    // Canonicalize integer return values into address-sized values.
+    if (ret_type->isIntegerTy()) {
+      auto size = dl.getTypeSizeInBits(ret_type);
+      if (size < gArch->address_size) {
+        ret_type = gWordType;
+        target_val = ir.CreateZExt(target_val, ret_type);
+
+      } else if (size > gArch->address_size) {
+        LOG(ERROR)
+            << "Truncating value of type "
+            << remill::LLVMThingToString(ret_type)
+            << " to store it into variable " << val_var
+            << " of type " << remill::LLVMThingToString(gWordType);
+        target_val = ir.CreateTrunc(target_val, gWordType);
+        ret_type = gWordType;
+      }
+
+    // Storing a `float` into an x87 register, convert it to a `double`.
+    } else if (ret_type->isFloatTy()) {
+      if (val_var && val_var[0] == 'S' && val_var[1] == 'T') {
+        ret_type = llvm::Type::getDoubleTy(*gContext);
+        target_val = ir.CreateFPExt(target_val, ret_type);
+      }
+    }
+
+    llvm::Value *dest_loc = remill::FindVarInFunction(block, val_var);
+
+    // Clear out whatever was already there.
+    auto storage_type = llvm::dyn_cast<llvm::PointerType>(
+        dest_loc->getType())->getElementType();
+    ir.CreateStore(llvm::Constant::getNullValue(storage_type), dest_loc);
+
+    // Add in the new value.
+    dest_loc = ir.CreateBitCast(dest_loc, llvm::PointerType::get(ret_type, 0));
+    ir.CreateStore(target_val, dest_loc);
   }
-
-  llvm::Value *dest_loc = remill::FindVarInFunction(block, val_var);
-
-  // Clear out whatever was already there.
-  auto storage_type = llvm::dyn_cast<llvm::PointerType>(
-      dest_loc->getType())->getElementType();
-  ir.CreateStore(llvm::Constant::getNullValue(storage_type), dest_loc);
-
-  // Add in the new value.
-  dest_loc = ir.CreateBitCast(dest_loc, llvm::PointerType::get(val_type, 0));
-  ir.CreateStore(ret_val, dest_loc);
 }
 
 void CallingConvention::StoreArguments(
