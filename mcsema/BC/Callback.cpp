@@ -61,6 +61,8 @@ DEFINE_uint64(explicit_args_stack_size, 4096 * 256  /* 1 MiB */,
               "Size of the stack of the emulated program when the program "
               "is lifted using --explicit_args.");
 
+DECLARE_bool(stack_protector);
+
 namespace mcsema {
 namespace {
 
@@ -385,6 +387,10 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   func->addFnAttr(llvm::Attribute::NoInline);
   func->addFnAttr(llvm::Attribute::NoBuiltin);
 
+  if (FLAGS_stack_protector) {
+    func->addFnAttr(llvm::Attribute::StackProtectReq);
+  }
+
   // Remove the `return` in code cloned from `__remill_basic_block`.
   auto block = &(func->front());
   auto term = block->getTerminator();
@@ -488,6 +494,10 @@ static void ImplementExplicitArgsExitPoint(
   callback_func->addFnAttr(llvm::Attribute::InlineHint);
   callback_func->addFnAttr(llvm::Attribute::AlwaysInline);
   callback_func->removeFnAttr(llvm::Attribute::NoUnwind);
+
+  if (FLAGS_stack_protector) {
+    callback_func->addFnAttr(llvm::Attribute::StackProtectReq);
+  }
 
   LOG(INFO)
       << "Generating " << cfg_func->num_args
