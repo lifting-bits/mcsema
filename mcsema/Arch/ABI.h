@@ -67,6 +67,7 @@ class CallingConvention {
 
  private:
 
+  llvm::Value* LoadNextSimpleArgument( llvm::BasicBlock*, llvm::Type*);
   const char *GetVarForNextArgument(llvm::Type *val_type);
 
   llvm::CallingConv::ID cc;
