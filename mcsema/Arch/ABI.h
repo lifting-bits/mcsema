@@ -36,7 +36,8 @@ class CallingConvention {
   explicit CallingConvention(llvm::CallingConv::ID cc_);
 
   llvm::Value *LoadNextArgument(llvm::BasicBlock *block,
-                                llvm::Type *goal_type=nullptr);
+                                llvm::Type *goal_type=nullptr,
+                                bool isByVal = false);
 
   void StoreReturnValue(llvm::BasicBlock *block, llvm::Value *ret_val);
 
@@ -67,7 +68,8 @@ class CallingConvention {
 
  private:
 
-  llvm::Value* LoadNextSimpleArgument( llvm::BasicBlock*, llvm::Type*);
+  llvm::Value* LoadNextSimpleArgument(llvm::BasicBlock* block,
+      llvm::Type* goal_type);
   const char *GetVarForNextArgument(llvm::Type *val_type);
 
   llvm::CallingConv::ID cc;

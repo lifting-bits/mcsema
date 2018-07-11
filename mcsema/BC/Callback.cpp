@@ -529,10 +529,14 @@ static void ImplementExplicitArgsExitPoint(
   std::vector<llvm::Value *> call_args;
   for (auto i = 0U; i < actual_num_args; i++) {
     llvm::Type *param_type = nullptr;
+    auto arg_iter = extern_func->arg_begin();
+    bool isByVal = false;
     if (i < num_params) {
       param_type = func_type->getParamType(i);
+      isByVal = arg_iter->hasByValAttr();
+      ++arg_iter;
     }
-    call_args.push_back(loader.LoadNextArgument(block, param_type));
+    call_args.push_back(loader.LoadNextArgument(block, param_type, isByVal));
   }
 
   // Now that we've read the argument values, we want to free up the space that

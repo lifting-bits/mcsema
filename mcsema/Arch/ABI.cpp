@@ -458,7 +458,8 @@ static llvm::Function *WriteIntToMemFunc(uint64_t size_bytes) {
   }
 }
 
-llvm::Value* CallingConvention::LoadNextSimpleArgument(llvm::BasicBlock* block, llvm::Type* goal_type) {
+llvm::Value* CallingConvention::LoadNextSimpleArgument(llvm::BasicBlock* block,
+    llvm::Type* goal_type) {
   if (!goal_type) {
     goal_type = gWordType;
   }
@@ -531,7 +532,8 @@ llvm::Value* CallingConvention::LoadNextSimpleArgument(llvm::BasicBlock* block, 
 
 
 llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
-                                                 llvm::Type *target_type) {
+                                                 llvm::Type *target_type,
+                                                 bool isByVal) {
   if (!target_type) {
     target_type = gWordType;
   }
@@ -541,10 +543,11 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
   std::vector<llvm::Value*> underlying_values;
   llvm::Type* goal_type = target_type;
 
-  if (auto ptr_type = llvm::dyn_cast<llvm::PointerType>(target_type)) {
-      goal_type = ptr_type->getElementType();
+  if (target_type->isPointerTy() && !isByVal) {
+    return LoadNextSimpleArgument(block, target_type);
+  } else if (auto ptr_type = llvm::dyn_cast<llvm::PointerType>(target_type)){
+    goal_type = ptr_type->getElementType();
   }
-
   if (auto vector_type = llvm::dyn_cast<llvm::VectorType>(goal_type)) {
 
     llvm::Type* under_type = vector_type->getElementType();
@@ -555,29 +558,17 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
 
     for (uint64_t i = 0; i < underlying_values.size(); ++i) {
       last_val = ir.CreateInsertElement(last_val, underlying_values[i],
-          llvm::ConstantInt::get(llvm::Type::getInt32Ty(*gContext), i));
+          llvm::ConstantInt::get(llvm::Type::getInt64Ty(*gContext), i));
+      last_val->dump();
     }
     return last_val;
 
-  } else if (auto struct_type = llvm::dyn_cast<llvm::StructType>(goal_type)) {
-    if (!struct_type->isOpaque()) {
-
-      for (unsigned i = 0; i < struct_type->getNumElements(); ++i) {
-        llvm::Type* under_type = struct_type->getElementType(i);
-        underlying_values.push_back(LoadNextSimpleArgument(block, under_type));
-      }
-      auto alloca = ir.CreateAlloca(struct_type);
-
-      for (unsigned i = 0; i < underlying_values.size(); ++i) {
-        auto gep = ir.CreateGEP(alloca, {
-            llvm::ConstantInt::get(llvm::Type::getInt32Ty(*gContext), 0),
-            llvm::ConstantInt::get(llvm::Type::getInt32Ty(*gContext), 1)} );
-        ir.CreateStore(underlying_values[i], gep);
-      }
-      if (!target_type->isPointerTy())
-        return ir.CreateLoad(alloca);
-      return alloca;
-    }
+  } else if (isByVal) {
+    // byval attribute says that caller makes a copy of argument on the stack
+    auto stack_ptr = LoadStackPointer(block);
+    auto offset = llvm::ConstantInt::get(gWordType, num_loaded_stack_bytes);
+    auto addr = ir.CreateAdd(stack_ptr, offset);
+    return ir.CreateIntToPtr(addr, target_type);
   }
   return LoadNextSimpleArgument(block, target_type);
 }
