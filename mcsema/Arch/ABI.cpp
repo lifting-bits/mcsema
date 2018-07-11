@@ -569,7 +569,9 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
       auto alloca = ir.CreateAlloca(struct_type);
 
       for (unsigned i = 0; i < underlying_values.size(); ++i) {
-        auto gep = ir.CreateStructGEP(struct_type, alloca, i);
+        auto gep = ir.CreateGEP(alloca, {
+            llvm::ConstantInt::get(llvm::Type::getInt32Ty(*gContext), 0),
+            llvm::ConstantInt::get(llvm::Type::getInt32Ty(*gContext), 1)} );
         ir.CreateStore(underlying_values[i], gep);
       }
       if (!target_type->isPointerTy())
@@ -595,8 +597,8 @@ llvm::Type* RetrieveArgumentType(llvm::Type* original_type, unsigned index) {
 
 // llvm::CompositeType as common parent does not provide getNumElements
 uint64_t GetNumberOfElements(llvm::Type* original_type) {
-  if (auto seq_type = llvm::dyn_cast<llvm::SequentialType>(original_type)) {
-    return seq_type->getNumElements();
+  if (auto vec_type = llvm::dyn_cast<llvm::VectorType>(original_type)) {
+    return vec_type->getNumElements();
   } else if (auto struct_type = llvm::dyn_cast<llvm::StructType>(original_type)) {
     return struct_type->getNumElements();
   } else {
@@ -621,9 +623,10 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
     auto val_var = ReturnValVar(cc, ret_type, i);
     llvm::Value* target_val = ret_val;
 
-    if (auto vector_type = llvm::dyn_cast<llvm::VectorType>(val_type)) {
-      target_val = ir.CreateExtractElement(ret_val, i);
-    } else if (auto struct_type = llvm::dyn_cast<llvm::StructType>(val_type)) {
+    if (val_type->isVectorTy()) {
+      target_val = ir.CreateExtractElement(ret_val,
+          llvm::ConstantInt::get(llvm::Type::getInt32Ty(*gContext), i));
+    } else if (val_type->isStructTy()) {
       target_val = ir.CreateExtractValue(ret_val, i);
     }
 
