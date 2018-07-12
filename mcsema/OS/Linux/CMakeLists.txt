@@ -14,7 +14,7 @@
 
 
 if (NOT TARGET remill)
-		# Remill's  CMake definitions are required to build to bitcode
+	# Remill's  CMake definitions are required to build to bitcode
     message(FATAL_ERROR "The remill target does not exists!")
 endif ()
 
@@ -34,16 +34,17 @@ set(LINUXABI_INCLUDEDIRECTORIES ${CMAKE_SOURCE_DIR})
 function (add_runtime_helper language target_name target_arch address_bit_size)
     message(" > Generating ${CURRENT_OS} ABI target: ${target_name}")
 
-		# example name: ABI_libc_x86.bc
-		set(full_name ${target_name}_${target_arch})
+	# example name: ABI_libc_x86.bc
+	set(full_name ${target_name}_${target_arch})
 
-		# remove this warning as the ABI libraries need to capture deprecated declarations
-		set_source_files_properties(${target_name}.${language} PROPERTIES COMPILE_FLAGS "-Wno-deprecated-declarations")
-    add_runtime(${full_name} SOURCES ${target_name}.${language} ADDRESS_SIZE ${address_bit_size})
-
-    target_include_directories(${full_name} PRIVATE ${LINUXABI_INCLUDEDIRECTORIES})
-
-    install(TARGETS ${full_name} DESTINATION "share/mcsema/${REMILL_LLVM_VERSION}/ABI/${CURRENT_OS}")
+	# remove this warning as the ABI libraries need to capture deprecated declarations
+	set_source_files_properties(${target_name}.${language} PROPERTIES COMPILE_FLAGS "-Wno-deprecated-declarations")
+    add_runtime(${full_name}
+        SOURCES ${target_name}.${language}
+        ADDRESS_SIZE ${address_bit_size}
+        BCFLAGS -std=c++0x
+        INCLUDEDIRECTORIES ${LINUXABI_INCLUDEDIRECTORIES}
+        INSTALLDESTINATION "share/mcsema/${REMILL_LLVM_VERSION}/ABI/${CURRENT_OS}")
 
 endfunction ()
 
