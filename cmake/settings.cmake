@@ -17,7 +17,7 @@ macro(main)
   if(DEFINED WIN32)
     set(CMAKE_INSTALL_PREFIX "C:/")
   else()
-    set(CMAKE_INSTALL_PREFIX "/usr")
+    set(CMAKE_INSTALL_PREFIX "/usr/local")
   endif()
 
   message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
