@@ -394,6 +394,9 @@ static const char *ReturnValVar(llvm::CallingConv::ID cc, llvm::Type *type, size
 }
 
 static llvm::Type* RetrieveArgumentType(llvm::Type *original_type, unsigned index) {
+  if (original_type->isPointerTy()) {
+    return original_type;
+  }
   // float complex may look as <2xfloat>
   if (auto seq_type = llvm::dyn_cast<llvm::SequentialType>(original_type)) {
     return seq_type->getElementType();
