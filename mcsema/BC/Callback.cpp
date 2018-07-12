@@ -530,13 +530,13 @@ static void ImplementExplicitArgsExitPoint(
   for (auto i = 0U; i < actual_num_args; i++) {
     llvm::Type *param_type = nullptr;
     auto arg_iter = extern_func->arg_begin();
-    bool isByVal = false;
+    bool is_byval = false;
     if (i < num_params) {
       param_type = func_type->getParamType(i);
-      isByVal = arg_iter->hasByValAttr();
+      is_byval = arg_iter->hasByValAttr();
       ++arg_iter;
     }
-    call_args.push_back(loader.LoadNextArgument(block, param_type, isByVal));
+    call_args.push_back(loader.LoadNextArgument(block, param_type, is_byval));
   }
 
   // Now that we've read the argument values, we want to free up the space that

@@ -346,7 +346,7 @@ static const char *FloatReturnValVar(llvm::CallingConv::ID cc,
                                      llvm::Type *type, size_t index) {
   if (llvm::CallingConv::X86_64_SysV == cc ||
       llvm::CallingConv::Win64 == cc) {
-    static const char* regs[2] = {"XMM0", "XMM1"};
+    static const char *regs[2] = {"XMM0", "XMM1"};
     return regs[index];
 
   } else if (llvm::CallingConv::X86_StdCall == cc ||
@@ -380,7 +380,7 @@ static const char *ReturnValVar(llvm::CallingConv::ID cc, llvm::Type *type, size
   if (type->isPointerTy() || type->isIntegerTy()) {
     return IntReturnValVar(cc);
   } else if (type->isX86_FP80Ty()) {
-    static const char* regs[2] = {"ST0", "ST1"};
+    static const char *regs[2] = {"ST0", "ST1"};
     return regs[index];
   } else if (type->isFloatTy() || type->isDoubleTy()) {
     return FloatReturnValVar(cc, type, index);
@@ -390,6 +390,29 @@ static const char *ReturnValVar(llvm::CallingConv::ID cc, llvm::Type *type, size
         << remill::LLVMThingToString(type) << " for calling convention "
         << cc;
     return nullptr;
+  }
+}
+
+static llvm::Type* RetrieveArgumentType(llvm::Type *original_type, unsigned index) {
+  // float complex may look as <2xfloat>
+  if (auto seq_type = llvm::dyn_cast<llvm::SequentialType>(original_type)) {
+    return seq_type->getElementType();
+  //long double complex may look as { x86_fp80, x86_fp80 }
+  } else if (auto struct_type = llvm::dyn_cast<llvm::StructType>(original_type)) {
+    return struct_type->getElementType(index);
+  } else {
+    return original_type;
+  }
+}
+
+// llvm::CompositeType as common parent does not provide getNumElements
+static uint64_t GetNumberOfElements(llvm::Type* original_type) {
+  if (auto vec_type = llvm::dyn_cast<llvm::VectorType>(original_type)) {
+    return vec_type->getNumElements();
+  } else if (auto struct_type = llvm::dyn_cast<llvm::StructType>(original_type)) {
+    return struct_type->getNumElements();
+  } else {
+    return 1;
   }
 }
 
@@ -458,8 +481,8 @@ static llvm::Function *WriteIntToMemFunc(uint64_t size_bytes) {
   }
 }
 
-llvm::Value* CallingConvention::LoadNextSimpleArgument(llvm::BasicBlock* block,
-    llvm::Type* goal_type) {
+llvm::Value* CallingConvention::LoadNextSimpleArgument(llvm::BasicBlock *block,
+    llvm::Type *goal_type) {
   if (!goal_type) {
     goal_type = gWordType;
   }
@@ -530,10 +553,9 @@ llvm::Value* CallingConvention::LoadNextSimpleArgument(llvm::BasicBlock* block,
   return val;
 }
 
-
 llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
                                                  llvm::Type *target_type,
-                                                 bool isByVal) {
+                                                 bool is_byval) {
   if (!target_type) {
     target_type = gWordType;
   }
@@ -541,29 +563,30 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
   llvm::IRBuilder<> ir(block);
 
   std::vector<llvm::Value*> underlying_values;
-  llvm::Type* goal_type = target_type;
+  llvm::Type *goal_type = target_type;
 
-  if (target_type->isPointerTy() && !isByVal) {
+  if (target_type->isPointerTy() && !is_byval) {
     return LoadNextSimpleArgument(block, target_type);
   } else if (auto ptr_type = llvm::dyn_cast<llvm::PointerType>(target_type)){
     goal_type = ptr_type->getElementType();
   }
   if (auto vector_type = llvm::dyn_cast<llvm::VectorType>(goal_type)) {
 
-    llvm::Type* under_type = vector_type->getElementType();
+    llvm::Type *under_type = vector_type->getElementType();
     for (uint64_t i = 0; i < vector_type->getNumElements(); ++i) {
       underlying_values.push_back(LoadNextSimpleArgument(block, under_type));
     }
-    llvm::Value* last_val = llvm::Constant::getNullValue(goal_type);
+    llvm::Value *last_val = llvm::Constant::getNullValue(goal_type);
 
+    auto int64_type = llvm::Type::getInt64Ty(*gContext);
     for (uint64_t i = 0; i < underlying_values.size(); ++i) {
-      last_val = ir.CreateInsertElement(last_val, underlying_values[i],
-          llvm::ConstantInt::get(llvm::Type::getInt64Ty(*gContext), i));
-      last_val->dump();
+      last_val = ir.CreateInsertElement(
+          last_val, underlying_values[i],
+          llvm::ConstantInt::get(int64_type, i));
     }
     return last_val;
 
-  } else if (isByVal) {
+  } else if (is_byval) {
     // byval attribute says that caller makes a copy of argument on the stack
     auto stack_ptr = LoadStackPointer(block);
     auto offset = llvm::ConstantInt::get(gWordType, num_loaded_stack_bytes);
@@ -571,30 +594,6 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
     return ir.CreateIntToPtr(addr, target_type);
   }
   return LoadNextSimpleArgument(block, target_type);
-}
-
-llvm::Type* RetrieveArgumentType(llvm::Type* original_type, unsigned index) {
-  // float complex may look as <2xfloat>
-  if (auto seq_type = llvm::dyn_cast<llvm::SequentialType>(original_type)) {
-    return seq_type->getElementType();
-  //long double complex may look as { x86_fp80, x86_fp80 }
-  } else if (auto struct_type = llvm::dyn_cast<llvm::StructType>(original_type)) {
-    return struct_type->getElementType(index);
-  } else {
-    return original_type;
-  }
-}
-
-
-// llvm::CompositeType as common parent does not provide getNumElements
-uint64_t GetNumberOfElements(llvm::Type* original_type) {
-  if (auto vec_type = llvm::dyn_cast<llvm::VectorType>(original_type)) {
-    return vec_type->getNumElements();
-  } else if (auto struct_type = llvm::dyn_cast<llvm::StructType>(original_type)) {
-    return struct_type->getNumElements();
-  } else {
-    return 1;
-  }
 }
 
 void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
@@ -609,13 +608,15 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
   }
 
   llvm::IRBuilder<> ir(block);
+
   for (unsigned i = 0; i < GetNumberOfElements(val_type); ++i) {
     auto ret_type = RetrieveArgumentType(val_type, i);
     auto val_var = ReturnValVar(cc, ret_type, i);
     llvm::Value* target_val = ret_val;
 
     if (val_type->isVectorTy()) {
-      target_val = ir.CreateExtractElement(ret_val,
+      target_val = ir.CreateExtractElement(
+          ret_val,
           llvm::ConstantInt::get(llvm::Type::getInt32Ty(*gContext), i));
     } else if (val_type->isStructTy()) {
       target_val = ir.CreateExtractValue(ret_val, i);
@@ -663,6 +664,17 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
       }
     }
 
+    // <2xfloat> stores both floats in xmm0 on 64bit
+    if (ret_type->isFloatTy() && i == 1
+        && GetNumberOfElements(val_type) == 2
+        && gArch->IsAMD64()) {
+      llvm::Value *dest_loc = remill::FindVarInFunction(block, "XMM0");
+      dest_loc = ir.CreateBitCast(dest_loc, llvm::PointerType::get(ret_type, 0));
+      dest_loc = ir.CreateGEP(dest_loc, llvm::ConstantInt::get(llvm::Type::getInt64Ty(*gContext), 1));
+      ir.CreateStore(target_val, dest_loc);
+      return;
+    }
+
     llvm::Value *dest_loc = remill::FindVarInFunction(block, val_var);
 
     // Clear out whatever was already there.
@@ -674,6 +686,7 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
     dest_loc = ir.CreateBitCast(dest_loc, llvm::PointerType::get(ret_type, 0));
     ir.CreateStore(target_val, dest_loc);
   }
+
 }
 
 void CallingConvention::StoreArguments(
