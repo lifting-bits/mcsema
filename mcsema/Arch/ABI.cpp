@@ -318,9 +318,12 @@ static uint64_t DefaultUsedStackBytes(llvm::CallingConv::ID cc) {
   }
 }
 
-static const char *IntReturnValVar(llvm::CallingConv::ID cc) {
-  if (llvm::CallingConv::X86_64_SysV == cc ||
-      llvm::CallingConv::Win64 == cc) {
+static const char *IntReturnValVar(llvm::CallingConv::ID cc,
+    size_t index) {
+  if (llvm::CallingConv::X86_64_SysV == cc) {
+    static const char *regs[2] = {"RAX", "RDX"};
+    return regs[index];
+  } else if (llvm::CallingConv::Win64 == cc) {
     return "RAX";
 
   } else if (llvm::CallingConv::X86_StdCall == cc ||
@@ -378,7 +381,7 @@ static const char *FloatReturnValVar(llvm::CallingConv::ID cc,
 
 static const char *ReturnValVar(llvm::CallingConv::ID cc, llvm::Type *type, size_t index = 0) {
   if (type->isPointerTy() || type->isIntegerTy()) {
-    return IntReturnValVar(cc);
+    return IntReturnValVar(cc, index);
   } else if (type->isX86_FP80Ty()) {
     static const char *regs[2] = {"ST0", "ST1"};
     return regs[index];
@@ -484,7 +487,8 @@ static llvm::Function *WriteIntToMemFunc(uint64_t size_bytes) {
   }
 }
 
-llvm::Value* CallingConvention::LoadNextSimpleArgument(llvm::BasicBlock *block,
+llvm::Value* CallingConvention::LoadNextSimpleArgument(
+    llvm::BasicBlock *block,
     llvm::Type *goal_type) {
   if (!goal_type) {
     goal_type = gWordType;
