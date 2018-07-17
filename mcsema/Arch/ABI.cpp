@@ -175,7 +175,6 @@ static const char *ThreadPointerName(void) {
   return tp_name;
 }
 
-
 static const ArgConstraint *ConstraintTable(llvm::CallingConv::ID cc) {
   static const ArgConstraint kNoArgs[] = {
      {nullptr, kInvalidKind},
@@ -319,7 +318,7 @@ static uint64_t DefaultUsedStackBytes(llvm::CallingConv::ID cc) {
 }
 
 static const char *IntReturnValVar(llvm::CallingConv::ID cc,
-    size_t index) {
+                                   size_t index) {
   if (llvm::CallingConv::X86_64_SysV == cc) {
     static const char *regs[2] = {"RAX", "RDX"};
     return regs[index];
@@ -380,7 +379,7 @@ static const char *FloatReturnValVar(llvm::CallingConv::ID cc,
 }
 
 static const char *ReturnValVar(llvm::CallingConv::ID cc, llvm::Type *type,
-    size_t index=0) {
+                                size_t index=0) {
   if (type->isPointerTy() || type->isIntegerTy()) {
     return IntReturnValVar(cc, index);
   } else if (type->isX86_FP80Ty()) {
@@ -581,8 +580,30 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
   if (auto vector_type = llvm::dyn_cast<llvm::VectorType>(goal_type)) {
 
     llvm::Type *under_type = vector_type->getElementType();
-    for (uint64_t i = 0; i < vector_type->getNumElements(); ++i) {
-      underlying_values.push_back(LoadNextSimpleArgument(block, under_type));
+    auto vector_size = vector_type->getNumElements();
+
+    // 2 consecutive floats (<2xfloat>) will be packed in
+    // one xmm register
+    // If function takes too many arguments,
+    // it will become pointer with byval attribute instead
+    if (under_type->isFloatTy() && gArch->IsAMD64() &&
+        vector_size == 2) {
+      auto reg_var_name = GetVarForNextArgument(under_type);
+      CHECK(reg_var_name) << "Unable to find register with packed float";
+      
+      auto reg_ptr = remill::FindVarInFunction(block, reg_var_name);
+      auto xmm = ir.CreateBitCast(reg_ptr, llvm::PointerType::get(under_type, 0));
+      underlying_values.push_back(ir.CreateLoad(xmm));
+      
+      auto int64_type = llvm::Type::getInt64Ty(*gContext);
+      auto second_part = ir.CreateGEP(xmm,
+          llvm::ConstantInt::get(int64_type, 1));
+      underlying_values.push_back(ir.CreateLoad(second_part));
+
+    } else {
+      for (uint64_t i = 0; i < vector_size; ++i) {
+        underlying_values.push_back(LoadNextSimpleArgument(block, under_type));
+      }
     }
     llvm::Value *last_val = llvm::Constant::getNullValue(goal_type);
 
