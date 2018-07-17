@@ -26,8 +26,8 @@ void FooFloat() {
   float real_part = crealf(result);
   float imag_part = cimagf(result);
 
-  int int_real = static_cast<int>(real_part);
-  int int_imag = static_cast<int>(imag_part);
+  int int_real = (int) real_part;
+  int int_imag = (int) imag_part;
   printf("%i %i\n", int_real, int_imag);
   if (int_real == 77 && int_imag == 0) puts("Okay");
   else puts("Nok");
@@ -37,8 +37,8 @@ void FooFloat() {
   real_part = crealf(result);
   imag_part = cimagf(result);
 
-  int_real = static_cast<int>(real_part);
-  int_imag = static_cast<int>(imag_part);
+  int_real = (int) real_part;
+  int_imag = (int) imag_part;
   printf("%i %i\n", int_real, int_imag);
   
   if (int_real == 0 && int_imag == -33) puts("Okay");
@@ -53,8 +53,8 @@ void FooDouble() {
   double real_part = creal(result);
   double imag_part = cimag(result);
 
-  int int_real = static_cast<int>(real_part);
-  int int_imag = static_cast<int>(imag_part);
+  int int_real = (int) real_part;
+  int int_imag = (int) imag_part;
   printf("%i %i\n", int_real, int_imag);
   if (int_real == 77 && int_imag == 0) puts("Okay");
   else puts("Nok");
@@ -64,8 +64,8 @@ void FooDouble() {
   real_part = creal(result);
   imag_part = cimag(result);
 
-  int_real = static_cast<int>(real_part);
-  int_imag = static_cast<int>(imag_part);
+  int_real = (int) real_part;
+  int_imag = (int) imag_part;
   
   printf("%i %i\n", int_real, int_imag);
   if (int_real == 0 && int_imag == -33) puts("Okay");
