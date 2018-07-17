@@ -379,7 +379,8 @@ static const char *FloatReturnValVar(llvm::CallingConv::ID cc,
   return nullptr;
 }
 
-static const char *ReturnValVar(llvm::CallingConv::ID cc, llvm::Type *type, size_t index = 0) {
+static const char *ReturnValVar(llvm::CallingConv::ID cc, llvm::Type *type,
+    size_t index=0) {
   if (type->isPointerTy() || type->isIntegerTy()) {
     return IntReturnValVar(cc, index);
   } else if (type->isX86_FP80Ty()) {
@@ -598,6 +599,7 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
     auto stack_ptr = LoadStackPointer(block);
     auto offset = llvm::ConstantInt::get(gWordType, num_loaded_stack_bytes);
     auto addr = ir.CreateAdd(stack_ptr, offset);
+    num_loaded_stack_bytes += gArch->address_size;
     return ir.CreateIntToPtr(addr, target_type);
   }
   return LoadNextSimpleArgument(block, target_type);
@@ -672,9 +674,9 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
     }
 
     // <2xfloat> stores both floats in xmm0 on 64bit
-    if (ret_type->isFloatTy() && i == 1
-        && GetNumberOfElements(val_type) == 2
-        && gArch->IsAMD64()) {
+    if (ret_type->isFloatTy() && i == 1 &&
+        GetNumberOfElements(val_type) == 2 &&
+        gArch->IsAMD64()) {
       llvm::Value *dest_loc = remill::FindVarInFunction(block, "XMM0");
       dest_loc = ir.CreateBitCast(dest_loc, llvm::PointerType::get(ret_type, 0));
       dest_loc = ir.CreateGEP(dest_loc, llvm::ConstantInt::get(llvm::Type::getInt64Ty(*gContext), 1));

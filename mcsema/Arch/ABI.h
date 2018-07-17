@@ -68,7 +68,7 @@ class CallingConvention {
 
  private:
 
-  llvm::Value* LoadNextSimpleArgument(llvm::BasicBlock *block,
+  llvm::Value *LoadNextSimpleArgument(llvm::BasicBlock *block,
       llvm::Type *goal_type);
   const char *GetVarForNextArgument(llvm::Type *val_type);
 
