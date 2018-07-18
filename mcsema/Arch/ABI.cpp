@@ -344,6 +344,7 @@ static const char *IntReturnValVar(llvm::CallingConv::ID cc,
   return nullptr;
 }
 
+// TODO(lukas): rework index
 static const char *FloatReturnValVar(llvm::CallingConv::ID cc,
                                      llvm::Type *type, size_t index) {
   if (llvm::CallingConv::X86_64_SysV == cc ||
@@ -400,11 +401,7 @@ static llvm::Type* RetrieveArgumentType(llvm::Type *original_type, unsigned inde
   if (original_type->isPointerTy()) {
     return original_type;
   }
-  // float complex may look as <2xfloat>
-  if (auto seq_type = llvm::dyn_cast<llvm::SequentialType>(original_type)) {
-    return seq_type->getElementType();
-  //long double complex may look as { x86_fp80, x86_fp80 }
-  } else if (auto struct_type = llvm::dyn_cast<llvm::StructType>(original_type)) {
+  if (auto struct_type = llvm::dyn_cast<llvm::StructType>(original_type)) {
     return struct_type->getElementType(index);
   } else {
     return original_type;
@@ -413,9 +410,7 @@ static llvm::Type* RetrieveArgumentType(llvm::Type *original_type, unsigned inde
 
 // llvm::CompositeType as common parent does not provide getNumElements
 static uint64_t GetNumberOfElements(llvm::Type* original_type) {
-  if (auto vec_type = llvm::dyn_cast<llvm::VectorType>(original_type)) {
-    return vec_type->getNumElements();
-  } else if (auto struct_type = llvm::dyn_cast<llvm::StructType>(original_type)) {
+  if (auto struct_type = llvm::dyn_cast<llvm::StructType>(original_type)) {
     return struct_type->getNumElements();
   } else {
     return 1;
@@ -487,7 +482,49 @@ static llvm::Function *WriteIntToMemFunc(uint64_t size_bytes) {
   }
 }
 
-llvm::Value* CallingConvention::LoadNextSimpleArgument(
+llvm::Value* InsertIntoVector(llvm::BasicBlock *block,
+                              llvm::VectorType *goal_type,
+                              llvm::Value *reg_ptr, size_t count) {
+
+  llvm::IRBuilder<> ir(block);
+  llvm::Value *last_val = llvm::Constant::getNullValue(goal_type);
+  for (size_t i = 0; i < count; ++i) {
+    auto offset = ir.CreateGEP(reg_ptr, GetConstantInt(64, i));
+    auto load = ir.CreateLoad(offset);
+    last_val = ir.CreateInsertElement(last_val, load,
+        GetConstantInt(64, i));
+  }
+  return last_val;
+
+}
+
+// TODO(lukas): Some smart table to decide which vector regs to use
+llvm::Value *CallingConvention::LoadVectorArgument(
+    llvm::BasicBlock *block,
+    llvm::VectorType *goal_type) {
+
+  llvm::IRBuilder<> ir(block);
+  auto under_type = goal_type->getElementType();
+  auto number_of_elements = goal_type->getNumElements();
+
+  if (under_type->isFloatTy()) {
+    LOG_IF(FATAL, number_of_elements != 2)
+      << "Cannot decide how to load value of type "
+      << remill::LLVMThingToString(goal_type);
+
+    auto reg_var_name = GetVarForNextArgument(under_type);
+    auto reg_ptr = remill::FindVarInFunction(block, reg_var_name);
+    reg_ptr = ir.CreateBitCast(reg_ptr,
+        llvm::PointerType::get(under_type, 0));
+    return InsertIntoVector(block, goal_type, reg_ptr, 2);
+  }
+
+  LOG(FATAL) << "Cannot decide how to load value of type "
+    << remill::LLVMThingToString(goal_type);
+}
+
+
+llvm::Value *CallingConvention::LoadNextSimpleArgument(
     llvm::BasicBlock *block,
     llvm::Type *goal_type) {
   if (!goal_type) {
@@ -495,6 +532,12 @@ llvm::Value* CallingConvention::LoadNextSimpleArgument(
   }
 
   llvm::IRBuilder<> ir(block);
+
+  // Vector type means there will be something packed
+  // and need special handling
+  if (auto vector_type = llvm::dyn_cast<llvm::VectorType>(goal_type)) {
+    return LoadVectorArgument(block, vector_type);
+  }
 
   if (auto reg_var_name = GetVarForNextArgument(goal_type)) {
     auto reg_ptr = remill::FindVarInFunction(block, reg_var_name);
@@ -574,56 +617,75 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
 
   if (target_type->isPointerTy() && !is_byval) {
     return LoadNextSimpleArgument(block, target_type);
-  } else if (auto ptr_type = llvm::dyn_cast<llvm::PointerType>(target_type)){
-    goal_type = ptr_type->getElementType();
   }
-  if (auto vector_type = llvm::dyn_cast<llvm::VectorType>(goal_type)) {
-
-    llvm::Type *under_type = vector_type->getElementType();
-    auto vector_size = vector_type->getNumElements();
-
-    // 2 consecutive floats (<2xfloat>) will be packed in
-    // one xmm register
-    // If function takes too many arguments,
-    // it will become pointer with byval attribute instead
-    if (under_type->isFloatTy() && gArch->IsAMD64() &&
-        vector_size == 2) {
-      auto reg_var_name = GetVarForNextArgument(under_type);
-      CHECK(reg_var_name) << "Unable to find register with packed float";
-      
-      auto reg_ptr = remill::FindVarInFunction(block, reg_var_name);
-      auto xmm = ir.CreateBitCast(reg_ptr, llvm::PointerType::get(under_type, 0));
-      underlying_values.push_back(ir.CreateLoad(xmm));
-      
-      auto int64_type = llvm::Type::getInt64Ty(*gContext);
-      auto second_part = ir.CreateGEP(xmm,
-          llvm::ConstantInt::get(int64_type, 1));
-      underlying_values.push_back(ir.CreateLoad(second_part));
-
-    } else {
-      for (uint64_t i = 0; i < vector_size; ++i) {
-        underlying_values.push_back(LoadNextSimpleArgument(block, under_type));
-      }
+  if (auto struct_type = llvm::dyn_cast<llvm::StructType>(goal_type)) {
+    std::vector<llvm::Value*> underlying_values;
+    for (unsigned i = 0; i < struct_type->getNumElements(); ++i) {
+      llvm::Type *under_type = struct_type->getElementType(i);
+      underlying_values.push_back(
+          LoadNextSimpleArgument(block, under_type));
     }
-    llvm::Value *last_val = llvm::Constant::getNullValue(goal_type);
 
-    auto int64_type = llvm::Type::getInt64Ty(*gContext);
-    for (uint64_t i = 0; i < underlying_values.size(); ++i) {
-      last_val = ir.CreateInsertElement(
-          last_val, underlying_values[i],
-          llvm::ConstantInt::get(int64_type, i));
+    llvm::IRBuilder<> ir(block);
+    auto alloca = ir.CreateAlloca(target_type);
+    for (unsigned i = 0; i < underlying_values.size(); ++i) {
+      auto gep = ir.CreateGEP(alloca,
+          {GetConstantInt(64, 0), GetConstantInt(64, i)});
+      ir.CreateStore(underlying_values[i], gep);
     }
-    return last_val;
-
+    return ir.CreateLoad(alloca);
   } else if (is_byval) {
     // byval attribute says that caller makes a copy of argument on the stack
     auto stack_ptr = LoadStackPointer(block);
     auto offset = llvm::ConstantInt::get(gWordType, num_loaded_stack_bytes);
     auto addr = ir.CreateAdd(stack_ptr, offset);
-    num_loaded_stack_bytes += gArch->address_size;
+
+    llvm::DataLayout dl(gModule);
+    auto ptr_type = llvm::dyn_cast<llvm::PointerType>(target_type);
+
+    num_loaded_stack_bytes += dl.getTypeAllocSize(ptr_type->getElementType());
     return ir.CreateIntToPtr(addr, target_type);
   }
   return LoadNextSimpleArgument(block, target_type);
+}
+
+
+void ExtractFromVector(llvm::BasicBlock *block,
+                              llvm::Value *ret_val,
+                              llvm::Value *reg_ptr, size_t count) {
+
+  llvm::IRBuilder<> ir(block);
+
+  for (size_t i = 0; i < count; ++i) {
+    auto offset = ir.CreateGEP(reg_ptr, GetConstantInt(64, i));
+    auto extract = ir.CreateExtractElement(ret_val, GetConstantInt(64, i));
+    ir.CreateStore(extract, offset);
+  }
+}
+
+// TODO(lukas): Some smart table to look up used which registers to use,
+// ideally shared together with Load function.
+void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
+                                            llvm::Value *ret_val,
+                                            llvm::VectorType *goal_type) {
+  llvm::IRBuilder<> ir(block);
+  auto under_type = goal_type->getElementType();
+  auto number_of_elements = goal_type->getNumElements();
+
+  if (under_type->isFloatTy()) {
+    LOG_IF(FATAL, number_of_elements != 2)
+      << "Cannot decide where to put return value of type "
+      << remill::LLVMThingToString(goal_type);
+
+    llvm::Value *dest_loc = remill::FindVarInFunction(block, "XMM0");
+    dest_loc = ir.CreateBitCast(dest_loc,
+        llvm::PointerType::get(under_type, 0));
+    ExtractFromVector(block, ret_val, dest_loc, 2);
+    return;
+  }
+
+  LOG(FATAL) << "Cannot decide where to put return value of type "
+      << remill::LLVMThingToString(goal_type);
 }
 
 void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
@@ -640,69 +702,61 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
   llvm::IRBuilder<> ir(block);
 
   for (unsigned i = 0; i < GetNumberOfElements(val_type); ++i) {
-    auto ret_type = RetrieveArgumentType(val_type, i);
-    auto val_var = ReturnValVar(cc, ret_type, i);
     llvm::Value* target_val = ret_val;
 
-    if (val_type->isVectorTy()) {
-      target_val = ir.CreateExtractElement(
-          ret_val,
-          llvm::ConstantInt::get(llvm::Type::getInt32Ty(*gContext), i));
-    } else if (val_type->isStructTy()) {
+    if (val_type->isStructTy()) {
       target_val = ir.CreateExtractValue(ret_val, i);
     }
+    auto under_type = RetrieveArgumentType(val_type, i);
+
+    if (auto vector_type = llvm::dyn_cast<llvm::VectorType>(under_type)) {
+      StoreVectorRetValue(block, target_val, vector_type);
+      continue;
+    }
+
+    auto val_var = ReturnValVar(cc, under_type, i);
+
 
     // If it's a pointer then convert it to a pointer-sized integer.
-    if (ret_type->isPointerTy()) {
+    if (under_type->isPointerTy()) {
       target_val = ir.CreatePtrToInt(target_val, gWordType);
-      ret_type = gWordType;
+      under_type = gWordType;
     }
 
     // If it's an 80-bit float then convert it to a double.
-    if (ret_type->isX86_FP80Ty()) {
-      ret_type = llvm::Type::getDoubleTy(*gContext);
-      target_val = ir.CreateFPTrunc(target_val, ret_type);
+    if (under_type->isX86_FP80Ty()) {
+      under_type = llvm::Type::getDoubleTy(*gContext);
+      target_val = ir.CreateFPTrunc(target_val, under_type);
     }
 
-    CHECK(ret_type->isIntegerTy() || ret_type->isFloatTy() ||
-          ret_type->isDoubleTy());
+    CHECK(under_type->isIntegerTy() || under_type->isFloatTy() ||
+          under_type->isDoubleTy());
 
     llvm::DataLayout dl(gModule);
 
     // Canonicalize integer return values into address-sized values.
-    if (ret_type->isIntegerTy()) {
-      auto size = dl.getTypeSizeInBits(ret_type);
+    if (under_type->isIntegerTy()) {
+      auto size = dl.getTypeSizeInBits(under_type);
       if (size < gArch->address_size) {
-        ret_type = gWordType;
-        target_val = ir.CreateZExt(target_val, ret_type);
+        under_type = gWordType;
+        target_val = ir.CreateZExt(target_val, under_type);
 
       } else if (size > gArch->address_size) {
         LOG(ERROR)
             << "Truncating value of type "
-            << remill::LLVMThingToString(ret_type)
+            << remill::LLVMThingToString(under_type)
             << " to store it into variable " << val_var
             << " of type " << remill::LLVMThingToString(gWordType);
         target_val = ir.CreateTrunc(target_val, gWordType);
-        ret_type = gWordType;
+        under_type = gWordType;
       }
 
     // Storing a `float` into an x87 register, convert it to a `double`.
-    } else if (ret_type->isFloatTy()) {
+    } else if (under_type->isFloatTy()) {
       if (val_var && val_var[0] == 'S' && val_var[1] == 'T') {
-        ret_type = llvm::Type::getDoubleTy(*gContext);
-        target_val = ir.CreateFPExt(target_val, ret_type);
+        under_type = llvm::Type::getDoubleTy(*gContext);
+        target_val = ir.CreateFPExt(target_val, under_type);
       }
-    }
-
-    // <2xfloat> stores both floats in xmm0 on 64bit
-    if (ret_type->isFloatTy() && i == 1 &&
-        GetNumberOfElements(val_type) == 2 &&
-        gArch->IsAMD64()) {
-      llvm::Value *dest_loc = remill::FindVarInFunction(block, "XMM0");
-      dest_loc = ir.CreateBitCast(dest_loc, llvm::PointerType::get(ret_type, 0));
-      dest_loc = ir.CreateGEP(dest_loc, llvm::ConstantInt::get(llvm::Type::getInt64Ty(*gContext), 1));
-      ir.CreateStore(target_val, dest_loc);
-      return;
     }
 
     llvm::Value *dest_loc = remill::FindVarInFunction(block, val_var);
@@ -713,7 +767,7 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
     ir.CreateStore(llvm::Constant::getNullValue(storage_type), dest_loc);
 
     // Add in the new value.
-    dest_loc = ir.CreateBitCast(dest_loc, llvm::PointerType::get(ret_type, 0));
+    dest_loc = ir.CreateBitCast(dest_loc, llvm::PointerType::get(under_type, 0));
     ir.CreateStore(target_val, dest_loc);
   }
 

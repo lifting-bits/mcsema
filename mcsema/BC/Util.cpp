@@ -41,6 +41,10 @@ llvm::LLVMContext *gContext = nullptr;
 llvm::IntegerType *gWordType = nullptr;
 llvm::Module *gModule = nullptr;
 
+llvm::Value *GetConstantInt(uint64_t size, uint64_t value) {
+  return llvm::ConstantInt::get(llvm::Type::getInt64Ty(*gContext), value);
+}
+
 // Return the type of a lifted function.
 llvm::FunctionType *LiftedFunctionType(void) {
   static llvm::FunctionType *func_type = nullptr;

@@ -67,9 +67,14 @@ class CallingConvention {
   }
 
  private:
+  void StoreVectorRetValue(llvm::BasicBlock *block,
+                           llvm::Value* ret_val,
+                           llvm::VectorType *goal_type);
 
+  llvm::Value *LoadVectorArgument(llvm::BasicBlock *block,
+                                  llvm::VectorType *goal_type);
   llvm::Value *LoadNextSimpleArgument(llvm::BasicBlock *block,
-      llvm::Type *goal_type);
+                                      llvm::Type *goal_type);
   const char *GetVarForNextArgument(llvm::Type *val_type);
 
   llvm::CallingConv::ID cc;

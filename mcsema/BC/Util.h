@@ -44,6 +44,9 @@ extern llvm::LLVMContext *gContext;
 extern llvm::IntegerType *gWordType;
 extern llvm::Module *gModule;
 
+
+llvm::Value *GetConstantInt(uint64_t size, uint64_t value);
+
 // Return the type of a lifted function.
 llvm::FunctionType *LiftedFunctionType(void);
 
@@ -51,6 +54,8 @@ llvm::FunctionType *LiftedFunctionType(void);
 // lifted segment associated with `seg`.
 llvm::Constant *LiftEA(const NativeSegment *seg, uint64_t ea);
 
+void DebugPrint(llvm::BasicBlock *block, llvm::Value *value=nullptr,
+    std::string message = "");
 }  // namespace mcsema
 
 #endif  // MCSEMA_BC_UTIL_H_
