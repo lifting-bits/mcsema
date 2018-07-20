@@ -27,7 +27,10 @@ class Type;
 }  // namespace llvm
 namespace mcsema {
 
-struct ArgConstraint;
+struct ArgConstraint {
+  std::string var_name;
+  const int accepted_val_kinds;
+};
 
 // Generic functions for reading/writing to the register/stack state in a way
 // that respects a supplied calling convention.
@@ -75,17 +78,22 @@ class CallingConvention {
                                   llvm::VectorType *goal_type);
   llvm::Value *LoadNextSimpleArgument(llvm::BasicBlock *block,
                                       llvm::Type *goal_type);
+
   const char *GetVarForNextArgument(llvm::Type *val_type);
+  const char *GetVarForNextReturn(llvm::Type *val_type);
+  const char *GetVarImpl(llvm::Type *val_type,
+                         const std::vector<ArgConstraint> &table,
+                         uint64_t &bitmap);
 
   llvm::CallingConv::ID cc;
   uint64_t used_reg_bitmap;
+  uint64_t used_return_bitmap;
   uint64_t num_loaded_stack_bytes;
   uint64_t num_stored_stack_bytes;
-  uint64_t num_vector_regs_used;
   const char * const sp_name;
   const char * const tp_name;
-  const ArgConstraint *reg_table;
-
+  const std::vector<ArgConstraint> reg_table;
+  const std::vector<ArgConstraint> return_table;
   CallingConvention(void) = delete;
 };
 

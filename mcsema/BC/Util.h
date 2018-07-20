@@ -54,8 +54,6 @@ llvm::FunctionType *LiftedFunctionType(void);
 // lifted segment associated with `seg`.
 llvm::Constant *LiftEA(const NativeSegment *seg, uint64_t ea);
 
-void DebugPrint(llvm::BasicBlock *block, llvm::Value *value=nullptr,
-    std::string message = "");
 }  // namespace mcsema
 
 #endif  // MCSEMA_BC_UTIL_H_

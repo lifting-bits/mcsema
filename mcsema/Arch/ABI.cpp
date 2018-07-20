@@ -50,14 +50,10 @@ enum ValueKind {
   kF32 = (1 << 4),
   kF64 = (1 << 5),
   kF80 = (1 << 6),
+  kVec = (1 << 7),
 
   kIntegralLeast32 = kI8 | kI16 | kI32,
   kIntegralLeast64 = kI8 | kI16 | kI32 | kI64,
-};
-
-struct ArgConstraint {
-  const char *var_name;
-  const int accepted_val_kinds;
 };
 
 namespace {
@@ -66,6 +62,8 @@ static ValueKind KindOfValue(llvm::Type *type) {
   if (!type || type->isPointerTy()) {
     return (32 == gArch->address_size) ? kI32 : kI64;
 
+  } else if (type->isVectorTy()) {
+    return kVec;
   } else if (type->isIntegerTy()) {
     llvm::DataLayout dl(gModule);
     switch (dl.getTypeAllocSize(type)) {
@@ -175,77 +173,106 @@ static const char *ThreadPointerName(void) {
   return tp_name;
 }
 
-static const ArgConstraint *ConstraintTable(llvm::CallingConv::ID cc) {
-  static const ArgConstraint kNoArgs[] = {
-     {nullptr, kInvalidKind},
- };
+static uint64_t GetVectorRegSize() {
+  switch (gArch->arch_name) {
+    case remill::kArchAMD64:
+    case remill::kArchX86:
+      return 16;
+    case remill::kArchAMD64_AVX:
+    case remill::kArchX86_AVX:
+      return 32;
+    case remill::kArchAMD64_AVX512:
+    case remill::kArchX86_AVX512:
+      return 64;
+    default:
+      LOG(FATAL) << "Unkown vector register size for arch other than amd64, x86";
+   }
+}
 
+static const char *GetVectorRegisterBase(size_t& number) {
+  switch(gArch->arch_name) {
+    case remill::kArchAMD64_AVX:
+      number = 16;
+      return "YMM";
+    case remill::kArchX86_AVX:
+      number = 8;
+      return "YMM";
+    case remill::kArchAMD64_AVX512:
+      number = 32;
+      return "ZMM";
+    case remill::kArchX86_AVX512:
+      number = 8;
+      return "ZMM";
+    case remill::kArchAMD64:
+      number = 8;
+      return "XMM";
+    default:
+      LOG(FATAL) << "Trying to use vector registers "
+        << "with something else than x86, amd64";
+  }
+}
+
+//TODO(lukas): vector registers for other archs
+static std::vector<ArgConstraint> ConstraintTable(llvm::CallingConv::ID cc) {
+  const ArgConstraint kNoArgs = {"", kInvalidKind};
   if (llvm::CallingConv::X86_64_SysV == cc) {
-    static const ArgConstraint kAmd64SysVArgs[] = {
-        {"RDI", kIntegralLeast64},
-        {"RSI", kIntegralLeast64},
-        {"RDX", kIntegralLeast64},
-        {"RCX", kIntegralLeast64},
-        {"R8", kIntegralLeast64},
-        {"R9", kIntegralLeast64},
-        {"XMM0", kF32 | kF64},
-        {"XMM1", kF32 | kF64},
-        {"XMM2", kF32 | kF64},
-        {"XMM3", kF32 | kF64},
-        {"XMM4", kF32 | kF64},
-        {"XMM5", kF32 | kF64},
-        {"XMM6", kF32 | kF64},
-        {"XMM7", kF32 | kF64},
-        {"XMM8", kF32 | kF64},
-        {"XMM9", kF32 | kF64},
-        {"XMM10", kF32 | kF64},
-        {"XMM11", kF32 | kF64},
-        {"XMM12", kF32 | kF64},
-        {"XMM13", kF32 | kF64},
-        {"XMM14", kF32 | kF64},
-        {"XMM15", kF32 | kF64},
-        {nullptr, kInvalidKind},
+    std::vector<ArgConstraint> kAmd64SysVArgs = {
+      {"RDI", kIntegralLeast64},
+      {"RSI", kIntegralLeast64},
+      {"RDX", kIntegralLeast64},
+      {"RCX", kIntegralLeast64},
+      {"R8", kIntegralLeast64},
+      {"R9", kIntegralLeast64}
     };
-    return &(kAmd64SysVArgs[0]);
+    size_t size = 0;
+    std::string vector_base_name = GetVectorRegisterBase(size);
+    for (unsigned i = 0; i < size; ++i) {
+      auto name = vector_base_name + std::to_string(i);
+      kAmd64SysVArgs.push_back({name, kF32 | kF64 | kVec});
+    }
+    kAmd64SysVArgs.push_back(kNoArgs);
+    return kAmd64SysVArgs;
 
   } else if (llvm::CallingConv::Win64 == cc) {
-    static const ArgConstraint kAmd64Win64Args[] = {
-        {"RCX", kIntegralLeast64},
-        {"RDX", kIntegralLeast64},
-        {"R8", kIntegralLeast64},
-        {"R9", kIntegralLeast64},
-        {"XMM0", kF32 | kF64},
-        {"XMM1", kF32 | kF64},
-        {"XMM2", kF32 | kF64},
-        {"XMM3", kF32 | kF64},
-        {nullptr, kInvalidKind},
+    std::vector<ArgConstraint> kAmd64Win64Args = {
+      {"RCX", kIntegralLeast64},
+      {"RDX", kIntegralLeast64},
+      {"R8", kIntegralLeast64},
+      {"R9", kIntegralLeast64}
     };
-    return &(kAmd64Win64Args[0]);
+    size_t size = 0;
+    std::string vector_base_name = GetVectorRegisterBase(size);
+    for (unsigned i = 0; i < size; ++i) {
+      auto name = vector_base_name + std::to_string(i);
+      kAmd64Win64Args.push_back({name, kF32 | kF64 | kVec});
+    }
+    kAmd64Win64Args.push_back(kNoArgs);
+    return kAmd64Win64Args;
 
   } else if (llvm::CallingConv::X86_FastCall == cc) {
-    static const ArgConstraint kX86FastCallArgs[] = {
+    std::vector<ArgConstraint> kX86FastCallArgs = {
         {"ECX", kIntegralLeast32},
         {"EDX", kIntegralLeast32},
         {nullptr, kInvalidKind},
     };
-    return &(kX86FastCallArgs[0]);
+    return kX86FastCallArgs;
 
   } else if (llvm::CallingConv::X86_ThisCall == cc) {
-    static const ArgConstraint kX86ThisCallArgs[] = {
+    std::vector<ArgConstraint> kX86ThisCallArgs = {
         {"ECX", kIntegralLeast32},
         {nullptr, kInvalidKind},
     };
-    return &(kX86ThisCallArgs[0]);
+    return kX86ThisCallArgs;
 
   } else if (llvm::CallingConv::X86_StdCall == cc) {
-    return &(kNoArgs[0]);  // stdcall takes all args on the stack.
+    return std::vector<ArgConstraint> {kNoArgs};  // stdcall takes all args on the stack.
 
   } else if (llvm::CallingConv::C == cc) {
     if (gArch->IsX86()) {
-      return &(kNoArgs[0]);  // cdecl takes all args on the stack.
+      return {kNoArgs};  // cdecl takes all args on the stack.
 
     } else if (gArch->IsAArch64()) {
-      static const ArgConstraint kAArch64Args[] = {
+      std::vector<ArgConstraint> kAArch64Args = {
           {"X0", kIntegralLeast64},
           {"X1", kIntegralLeast64},
           {"X2", kIntegralLeast64},
@@ -290,13 +317,74 @@ static const ArgConstraint *ConstraintTable(llvm::CallingConv::ID cc) {
 
           {nullptr, kInvalidKind},
       };
-      return &(kAArch64Args[0]);
+      return kAArch64Args;
     }
   }
 
   LOG(FATAL)
       << "Unknown ABI/calling convention: " << cc;
-  return &(kNoArgs[0]);
+  return {kNoArgs};
+}
+
+static std::vector<ArgConstraint> ReturnRegsTable(llvm::CallingConv::ID cc) {
+  std::vector<ArgConstraint> table;
+
+  if (llvm::CallingConv::X86_64_SysV == cc) {
+    table.push_back({"RAX", kIntegralLeast64});
+    table.push_back({"RDX", kIntegralLeast64});
+
+  } else if (llvm::CallingConv::Win64 == cc) {
+    table.push_back({"RAX", kIntegralLeast64});
+
+  } else if (llvm::CallingConv::X86_StdCall == cc ||
+             llvm::CallingConv::X86_FastCall == cc ||
+             llvm::CallingConv::X86_ThisCall == cc) {
+    table.push_back({"EAX", kIntegralLeast32});
+
+  } else if (llvm::CallingConv::C == cc) {
+    if (gArch->IsX86()) {
+      table.push_back({"EAX", kIntegralLeast32});  // cdecl.
+
+    } else if (gArch->IsAArch64()) {
+      table.push_back({"X0", kIntegralLeast64});
+    }
+  }
+
+  // note(lukas): Not sure how many vector regs can be used for return,
+  // but it looks possibly all of them
+  if (llvm::CallingConv::X86_64_SysV == cc) {
+    size_t size = 0;
+    std::string vector_base_name = GetVectorRegisterBase(size);
+    for (unsigned i = 0; i < size; ++i) {
+      auto name = vector_base_name + std::to_string(i);
+      table.push_back({name, kF32 | kF64 | kVec});
+    }
+  } else if (llvm::CallingConv::Win64 == cc) {
+    size_t size = 0;
+    std::string vector_base_name = GetVectorRegisterBase(size);
+    for (unsigned i = 0; i < size; ++i) {
+      auto name = vector_base_name + std::to_string(i);
+      table.push_back({name, kF32 | kF64 | kVec});
+    }
+  } else if (llvm::CallingConv::X86_StdCall == cc ||
+             llvm::CallingConv::X86_FastCall == cc ||
+             llvm::CallingConv::X86_ThisCall == cc) {
+    table.push_back({"ST0", kF32 | kF64 });
+
+  } else if (llvm::CallingConv::C == cc) {
+    if (gArch->IsX86()) {
+      table.push_back({"EAX", kF32});  // cdecl.
+
+    } else if (gArch->IsAArch64()) {
+      table.push_back({"D0", kF64});
+      table.push_back({"S0", kF32});
+    }
+  }
+  // TODO(lukas): Tide everything here up!
+  table.push_back({"ST0", kF80 });
+  table.push_back({"ST1", kF80});
+  table.push_back({"", kInvalidKind});
+  return table;
 }
 
 static uint64_t DefaultUsedStackBytes(llvm::CallingConv::ID cc) {
@@ -314,86 +402,6 @@ static uint64_t DefaultUsedStackBytes(llvm::CallingConv::ID cc) {
 
     default:
       return 0;
-  }
-}
-
-static const char *IntReturnValVar(llvm::CallingConv::ID cc,
-                                   size_t index) {
-  if (llvm::CallingConv::X86_64_SysV == cc) {
-    static const char *regs[2] = {"RAX", "RDX"};
-    return regs[index];
-  } else if (llvm::CallingConv::Win64 == cc) {
-    return "RAX";
-
-  } else if (llvm::CallingConv::X86_StdCall == cc ||
-             llvm::CallingConv::X86_FastCall == cc ||
-             llvm::CallingConv::X86_ThisCall == cc) {
-    return "EAX";
-
-  } else if (llvm::CallingConv::C == cc) {
-    if (gArch->IsX86()) {
-      return "EAX";  // cdecl.
-
-    } else if (gArch->IsAArch64()) {
-      return "X0";
-    }
-  }
-
-  LOG(FATAL)
-      << "Unknown ABI/calling convention: " << cc;
-  return nullptr;
-}
-
-// TODO(lukas): rework index
-static const char *FloatReturnValVar(llvm::CallingConv::ID cc,
-                                     llvm::Type *type, size_t index) {
-  if (llvm::CallingConv::X86_64_SysV == cc ||
-      llvm::CallingConv::Win64 == cc) {
-    static const char *regs[2] = {"XMM0", "XMM1"};
-    return regs[index];
-
-  } else if (llvm::CallingConv::X86_StdCall == cc ||
-             llvm::CallingConv::X86_FastCall == cc ||
-             llvm::CallingConv::X86_ThisCall == cc) {
-    return "ST0";
-
-  } else if (llvm::CallingConv::C == cc) {
-    if (gArch->IsX86()) {
-      return "EAX";  // cdecl.
-
-    } else if (gArch->IsAArch64()) {
-      if (type->isDoubleTy()) {
-        return "D0";
-      } else {
-        CHECK(type->isFloatTy());
-        return "S0";
-      }
-    }
-  }
-
-  LOG(FATAL)
-      << "Cannot decide where to put return value of type "
-      << remill::LLVMThingToString(type) << " for calling convention "
-      << cc;
-
-  return nullptr;
-}
-
-static const char *ReturnValVar(llvm::CallingConv::ID cc, llvm::Type *type,
-                                size_t index=0) {
-  if (type->isPointerTy() || type->isIntegerTy()) {
-    return IntReturnValVar(cc, index);
-  } else if (type->isX86_FP80Ty()) {
-    static const char *regs[2] = {"ST0", "ST1"};
-    return regs[index];
-  } else if (type->isFloatTy() || type->isDoubleTy()) {
-    return FloatReturnValVar(cc, type, index);
-  } else {
-    LOG(FATAL)
-        << "Cannot decide where to put return value of type "
-        << remill::LLVMThingToString(type) << " for calling convention "
-        << cc;
-    return nullptr;
   }
 }
 
@@ -417,54 +425,50 @@ static uint64_t GetNumberOfElements(llvm::Type* original_type) {
   }
 }
 
-const char *GetVectorRegisterBase(size_t& size) {
-  switch(gArch->arch_name) {
-    case remill::kArchAMD64_AVX:
-    case remill::kArchX86_AVX:
-      size = 32;
-      return "YMM";
-    case remill::kArchAMD64_AVX512:
-    case remill::kArchX86_AVX512:
-      size = 64;
-      return "ZMM";
-    case remill::kArchAMD64:
-      size = 16;
-      return "XMM";
-    default:
-      return nullptr;
-  }
-}
-
 }  // namespace
 
 CallingConvention::CallingConvention(llvm::CallingConv::ID cc_)
     : cc(cc_),
       used_reg_bitmap(0),
+      used_return_bitmap(0),
       num_loaded_stack_bytes(DefaultUsedStackBytes(cc)),
       num_stored_stack_bytes(0),
-      num_vector_regs_used(0),
       sp_name(StackPointerName()),
       tp_name(ThreadPointerName()),
-      reg_table(ConstraintTable(cc)) {}
+      reg_table(ConstraintTable(cc)),
+      return_table(ReturnRegsTable(cc)) {}
 
 // Scan through the register table. If we can match this argument request
 // to a register then do so.
-const char *CallingConvention::GetVarForNextArgument(llvm::Type *val_type) {
+const char *CallingConvention::GetVarImpl(
+    llvm::Type *val_type,
+    const std::vector<ArgConstraint> &table,
+    uint64_t &bitmap) {
+
   auto val_kind = KindOfValue(val_type);
   for (uint64_t i = 0; ; ++i) {
-    const auto &reg_loc = reg_table[i];
-    if (!reg_loc.var_name) {
+    const auto &reg_loc = table[i];
+    if (reg_loc.var_name.empty()) {
       break;
     }
     if (val_kind == (reg_loc.accepted_val_kinds & val_kind)) {
       auto mask = 1ULL << i;
-      if (!(used_reg_bitmap & mask)) {
-        used_reg_bitmap |= mask;
-        return reg_loc.var_name;
+      if (!(bitmap & mask)) {
+        bitmap |= mask;
+        //TODO(lukas): Return string
+        return reg_loc.var_name.c_str();
       }
     }
   }
   return nullptr;
+}
+
+const char *CallingConvention::GetVarForNextArgument(llvm::Type *val_type) {
+  return GetVarImpl(val_type, reg_table, used_reg_bitmap);
+}
+
+const char *CallingConvention::GetVarForNextReturn(llvm::Type *val_type) {
+  return GetVarImpl(val_type, return_table, used_return_bitmap);
 }
 
 static llvm::Function *ReadIntFromMemFunc(uint64_t size_bytes) {
@@ -527,24 +531,7 @@ llvm::Value *CallingConvention::LoadVectorArgument(
   auto under_type = goal_type->getElementType();
   auto num_elements = goal_type->getNumElements();
 
-  if (under_type->isFloatTy()) {
-    LOG_IF(FATAL, num_elements != 2)
-      << "Cannot decide how to load value of type "
-      << remill::LLVMThingToString(goal_type);
-
-    auto reg_var_name = GetVarForNextArgument(under_type);
-    auto reg_ptr = remill::FindVarInFunction(block, reg_var_name);
-    reg_ptr = ir.CreateBitCast(reg_ptr,
-        llvm::PointerType::get(under_type, 0));
-    return InsertIntoVector(block, base_value, reg_ptr, 2);
-  }
-
-  size_t reg_size = 0;
-  const char *reg_base_name = GetVectorRegisterBase(reg_size);
-
-  LOG_IF(FATAL, !reg_base_name)
-    << "Cannot decide on which vector register to use to store "
-    << remill::LLVMThingToString(goal_type);
+  size_t reg_size = GetVectorRegSize();
 
   llvm::DataLayout dl(gModule);
   auto element_size = dl.getTypeAllocSize(under_type);
@@ -552,17 +539,19 @@ llvm::Value *CallingConvention::LoadVectorArgument(
   int32_t remaining = static_cast<int32_t>(num_elements);
 
   for ( unsigned i = 0; remaining > 0; ++i, remaining -= reg_size) {
-    auto reg_var_name = reg_base_name + std::to_string(i);
+    //auto reg_var_name = reg_base_name + std::to_string(i);
+    auto reg_var_name = GetVarForNextArgument(goal_type);
+    LOG(INFO) << reg_var_name;
 
     llvm::Value *dest_loc = remill::FindVarInFunction(block, reg_var_name);
     dest_loc = ir.CreateBitCast(dest_loc,
         llvm::PointerType::get(under_type, 0));
 
     auto count = std::min(reg_element_capacity, static_cast<size_t>(remaining));
+    LOG(INFO) << count << " " << reg_element_capacity << " " << element_size;
     base_value = InsertIntoVector(block, base_value, dest_loc,
         count, i * reg_element_capacity);
   }
-
   return base_value;
 }
 
@@ -715,24 +704,7 @@ void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
   auto under_type = goal_type->getElementType();
   auto num_elements = goal_type->getNumElements();
 
-  if (under_type->isFloatTy()) {
-    LOG_IF(FATAL, num_elements != 2)
-      << "Cannot decide where to put return value of type "
-      << remill::LLVMThingToString(goal_type);
-    //TODO
-    llvm::Value *dest_loc = remill::FindVarInFunction(block, "XMM0");
-    dest_loc = ir.CreateBitCast(dest_loc,
-        llvm::PointerType::get(under_type, 0));
-    ExtractFromVector(block, ret_val, dest_loc, 2);
-    return;
-  }
-
-  size_t reg_size = 0;
-  const char *reg_base_name = GetVectorRegisterBase(reg_size);
-  LOG_IF(FATAL, !reg_base_name)
-    << "Cannot decide on which vector register to use to store "
-    << remill::LLVMThingToString(goal_type);
-
+  size_t reg_size = GetVectorRegSize();
   llvm::DataLayout dl(gModule);
 
   uint64_t element_size = dl.getTypeAllocSize(under_type);
@@ -740,8 +712,7 @@ void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
   int32_t remaining = static_cast<int32_t>(num_elements);
 
   for ( unsigned i = 0; remaining > 0; ++i, remaining -= reg_element_capacity) {
-    //TODO(lukas): Smarter
-    auto reg_var_name = reg_base_name + std::to_string(i);
+    auto reg_var_name = GetVarForNextReturn(goal_type);
     llvm::Value *dest_loc = remill::FindVarInFunction(block, reg_var_name);
 
     // Clear out whatever was already there
@@ -783,8 +754,8 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
       continue;
     }
 
-    auto val_var = ReturnValVar(cc, under_type, i);
-
+    //auto val_var = ReturnValVar(cc, under_type, i);
+    auto val_var = GetVarForNextReturn(under_type);
 
     // If it's a pointer then convert it to a pointer-sized integer.
     if (under_type->isPointerTy()) {
@@ -1015,7 +986,8 @@ llvm::Value *CallingConvention::LoadReturnValue(llvm::BasicBlock *block,
     val_type = gWordType;
   }
 
-  auto val_var = ReturnValVar(cc, val_type);
+  //auto val_var = ReturnValVar(cc, val_type);
+  auto val_var = GetVarForNextReturn(val_type);
   return ir.CreateLoad(ir.CreateBitCast(
       remill::FindVarInFunction(block, val_var),
       llvm::PointerType::get(val_type, 0)));
