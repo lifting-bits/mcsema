@@ -81,6 +81,7 @@ class CallingConvention {
   uint64_t used_reg_bitmap;
   uint64_t num_loaded_stack_bytes;
   uint64_t num_stored_stack_bytes;
+  uint64_t num_vector_regs_used;
   const char * const sp_name;
   const char * const tp_name;
   const ArgConstraint *reg_table;

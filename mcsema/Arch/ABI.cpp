@@ -417,6 +417,24 @@ static uint64_t GetNumberOfElements(llvm::Type* original_type) {
   }
 }
 
+const char *GetVectorRegisterBase(size_t& size) {
+  switch(gArch->arch_name) {
+    case remill::kArchAMD64_AVX:
+    case remill::kArchX86_AVX:
+      size = 32;
+      return "YMM";
+    case remill::kArchAMD64_AVX512:
+    case remill::kArchX86_AVX512:
+      size = 64;
+      return "ZMM";
+    case remill::kArchAMD64:
+      size = 16;
+      return "XMM";
+    default:
+      return nullptr;
+  }
+}
+
 }  // namespace
 
 CallingConvention::CallingConvention(llvm::CallingConv::ID cc_)
@@ -424,6 +442,7 @@ CallingConvention::CallingConvention(llvm::CallingConv::ID cc_)
       used_reg_bitmap(0),
       num_loaded_stack_bytes(DefaultUsedStackBytes(cc)),
       num_stored_stack_bytes(0),
+      num_vector_regs_used(0),
       sp_name(StackPointerName()),
       tp_name(ThreadPointerName()),
       reg_table(ConstraintTable(cc)) {}
@@ -483,32 +502,33 @@ static llvm::Function *WriteIntToMemFunc(uint64_t size_bytes) {
 }
 
 llvm::Value* InsertIntoVector(llvm::BasicBlock *block,
-                              llvm::VectorType *goal_type,
-                              llvm::Value *reg_ptr, size_t count) {
+                              llvm::Value *base_value,
+                              llvm::Value *reg_ptr,
+                              size_t count, size_t start=0) {
 
   llvm::IRBuilder<> ir(block);
-  llvm::Value *last_val = llvm::Constant::getNullValue(goal_type);
   for (size_t i = 0; i < count; ++i) {
     auto offset = ir.CreateGEP(reg_ptr, GetConstantInt(64, i));
     auto load = ir.CreateLoad(offset);
-    last_val = ir.CreateInsertElement(last_val, load,
-        GetConstantInt(64, i));
+    base_value = ir.CreateInsertElement(base_value, load,
+        GetConstantInt(64, i + start));
   }
-  return last_val;
+  return base_value;
 
 }
 
-// TODO(lukas): Some smart table to decide which vector regs to use
 llvm::Value *CallingConvention::LoadVectorArgument(
     llvm::BasicBlock *block,
     llvm::VectorType *goal_type) {
 
   llvm::IRBuilder<> ir(block);
+  llvm::Value *base_value = llvm::Constant::getNullValue(goal_type);
+
   auto under_type = goal_type->getElementType();
-  auto number_of_elements = goal_type->getNumElements();
+  auto num_elements = goal_type->getNumElements();
 
   if (under_type->isFloatTy()) {
-    LOG_IF(FATAL, number_of_elements != 2)
+    LOG_IF(FATAL, num_elements != 2)
       << "Cannot decide how to load value of type "
       << remill::LLVMThingToString(goal_type);
 
@@ -516,11 +536,34 @@ llvm::Value *CallingConvention::LoadVectorArgument(
     auto reg_ptr = remill::FindVarInFunction(block, reg_var_name);
     reg_ptr = ir.CreateBitCast(reg_ptr,
         llvm::PointerType::get(under_type, 0));
-    return InsertIntoVector(block, goal_type, reg_ptr, 2);
+    return InsertIntoVector(block, base_value, reg_ptr, 2);
   }
 
-  LOG(FATAL) << "Cannot decide how to load value of type "
+  size_t reg_size = 0;
+  const char *reg_base_name = GetVectorRegisterBase(reg_size);
+
+  LOG_IF(FATAL, !reg_base_name)
+    << "Cannot decide on which vector register to use to store "
     << remill::LLVMThingToString(goal_type);
+
+  llvm::DataLayout dl(gModule);
+  auto element_size = dl.getTypeAllocSize(under_type);
+  size_t reg_element_capacity = reg_size / element_size;
+  int32_t remaining = static_cast<int32_t>(num_elements);
+
+  for ( unsigned i = 0; remaining > 0; ++i, remaining -= reg_size) {
+    auto reg_var_name = reg_base_name + std::to_string(i);
+
+    llvm::Value *dest_loc = remill::FindVarInFunction(block, reg_var_name);
+    dest_loc = ir.CreateBitCast(dest_loc,
+        llvm::PointerType::get(under_type, 0));
+
+    auto count = std::min(reg_element_capacity, static_cast<size_t>(remaining));
+    base_value = InsertIntoVector(block, base_value, dest_loc,
+        count, i * reg_element_capacity);
+  }
+
+  return base_value;
 }
 
 
@@ -652,31 +695,31 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
 
 void ExtractFromVector(llvm::BasicBlock *block,
                               llvm::Value *ret_val,
-                              llvm::Value *reg_ptr, size_t count) {
+                              llvm::Value *reg_ptr,
+                              size_t count, size_t start=0) {
 
   llvm::IRBuilder<> ir(block);
 
   for (size_t i = 0; i < count; ++i) {
     auto offset = ir.CreateGEP(reg_ptr, GetConstantInt(64, i));
-    auto extract = ir.CreateExtractElement(ret_val, GetConstantInt(64, i));
+    auto extract = ir.CreateExtractElement(ret_val,
+        GetConstantInt(64, i + start));
     ir.CreateStore(extract, offset);
   }
 }
 
-// TODO(lukas): Some smart table to look up used which registers to use,
-// ideally shared together with Load function.
 void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
                                             llvm::Value *ret_val,
                                             llvm::VectorType *goal_type) {
   llvm::IRBuilder<> ir(block);
   auto under_type = goal_type->getElementType();
-  auto number_of_elements = goal_type->getNumElements();
+  auto num_elements = goal_type->getNumElements();
 
   if (under_type->isFloatTy()) {
-    LOG_IF(FATAL, number_of_elements != 2)
+    LOG_IF(FATAL, num_elements != 2)
       << "Cannot decide where to put return value of type "
       << remill::LLVMThingToString(goal_type);
-
+    //TODO
     llvm::Value *dest_loc = remill::FindVarInFunction(block, "XMM0");
     dest_loc = ir.CreateBitCast(dest_loc,
         llvm::PointerType::get(under_type, 0));
@@ -684,8 +727,34 @@ void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
     return;
   }
 
-  LOG(FATAL) << "Cannot decide where to put return value of type "
-      << remill::LLVMThingToString(goal_type);
+  size_t reg_size = 0;
+  const char *reg_base_name = GetVectorRegisterBase(reg_size);
+  LOG_IF(FATAL, !reg_base_name)
+    << "Cannot decide on which vector register to use to store "
+    << remill::LLVMThingToString(goal_type);
+
+  llvm::DataLayout dl(gModule);
+
+  uint64_t element_size = dl.getTypeAllocSize(under_type);
+  size_t reg_element_capacity = reg_size / element_size;
+  int32_t remaining = static_cast<int32_t>(num_elements);
+
+  for ( unsigned i = 0; remaining > 0; ++i, remaining -= reg_element_capacity) {
+    //TODO(lukas): Smarter
+    auto reg_var_name = reg_base_name + std::to_string(i);
+    llvm::Value *dest_loc = remill::FindVarInFunction(block, reg_var_name);
+
+    // Clear out whatever was already there
+    auto storage_type = llvm::dyn_cast<llvm::PointerType>(
+        dest_loc->getType())->getElementType();
+    ir.CreateStore(llvm::Constant::getNullValue(storage_type), dest_loc);
+
+    dest_loc = ir.CreateBitCast(dest_loc,
+        llvm::PointerType::get(under_type, 0));
+
+    auto count = std::min(reg_element_capacity, static_cast<size_t>(remaining));
+    ExtractFromVector(block, ret_val, dest_loc, count , i * reg_element_capacity);
+  }
 }
 
 void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
