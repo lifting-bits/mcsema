@@ -185,12 +185,16 @@ static uint64_t GetVectorRegSize() {
     case remill::kArchX86_AVX512:
       return 64;
     default:
-      LOG(FATAL) << "Unkown vector register size for arch other than amd64, x86";
+      LOG(FATAL)
+        << "Unkown vector register size for arch other than amd64, x86";
    }
 }
 
 static const char *GetVectorRegisterBase(size_t& number) {
   switch(gArch->arch_name) {
+    case remill::kArchAMD64:
+      number = 8;
+      return "XMM";
     case remill::kArchAMD64_AVX:
       number = 16;
       return "YMM";
@@ -203,16 +207,14 @@ static const char *GetVectorRegisterBase(size_t& number) {
     case remill::kArchX86_AVX512:
       number = 8;
       return "ZMM";
-    case remill::kArchAMD64:
-      number = 8;
-      return "XMM";
+
     default:
-      LOG(FATAL) << "Trying to use vector registers "
-        << "with something else than x86, amd64";
+      LOG(FATAL)
+        << "Vector registers not supported for chosen architecture";
   }
 }
 
-//TODO(lukas): vector registers for other archs
+//TODO(lukas): set vector registers for other archs different than x86, amd64
 static std::vector<ArgConstraint> ConstraintTable(llvm::CallingConv::ID cc) {
   const ArgConstraint kNoArgs = {"", kInvalidKind};
   if (llvm::CallingConv::X86_64_SysV == cc) {
@@ -226,7 +228,7 @@ static std::vector<ArgConstraint> ConstraintTable(llvm::CallingConv::ID cc) {
     };
     size_t size = 0;
     std::string vector_base_name = GetVectorRegisterBase(size);
-    for (unsigned i = 0; i < size; ++i) {
+    for (unsigned i = 0; i < 8; ++i) {
       auto name = vector_base_name + std::to_string(i);
       kAmd64SysVArgs.push_back({name, kF32 | kF64 | kVec});
     }
@@ -242,7 +244,7 @@ static std::vector<ArgConstraint> ConstraintTable(llvm::CallingConv::ID cc) {
     };
     size_t size = 0;
     std::string vector_base_name = GetVectorRegisterBase(size);
-    for (unsigned i = 0; i < size; ++i) {
+    for (unsigned i = 0; i < 4; ++i) {
       auto name = vector_base_name + std::to_string(i);
       kAmd64Win64Args.push_back({name, kF32 | kF64 | kVec});
     }
@@ -328,61 +330,48 @@ static std::vector<ArgConstraint> ConstraintTable(llvm::CallingConv::ID cc) {
 
 static std::vector<ArgConstraint> ReturnRegsTable(llvm::CallingConv::ID cc) {
   std::vector<ArgConstraint> table;
-
   if (llvm::CallingConv::X86_64_SysV == cc) {
     table.push_back({"RAX", kIntegralLeast64});
     table.push_back({"RDX", kIntegralLeast64});
+    size_t size = 0;
+    std::string vector_base_name = GetVectorRegisterBase(size);
+    for (unsigned i = 0; i < size; ++i) {
+      auto name = vector_base_name + std::to_string(i);
+      table.push_back({name, kF32 | kF64 | kVec});
+    }
+    table.push_back({"ST0", kF80});
+    table.push_back({"ST1", kF80});
 
   } else if (llvm::CallingConv::Win64 == cc) {
     table.push_back({"RAX", kIntegralLeast64});
+    size_t size = 0;
+    std::string vector_base_name = GetVectorRegisterBase(size);
+    for (unsigned i = 0; i < size; ++i) {
+      auto name = vector_base_name + std::to_string(i);
+      table.push_back({name, kF32 | kF64 | kVec});
+    }
+    table.push_back({"ST0", kF32 | kF64 |kF80});
 
   } else if (llvm::CallingConv::X86_StdCall == cc ||
              llvm::CallingConv::X86_FastCall == cc ||
              llvm::CallingConv::X86_ThisCall == cc) {
     table.push_back({"EAX", kIntegralLeast32});
+    table.push_back({"ST0", kF32 | kF64 | kF80});
 
   } else if (llvm::CallingConv::C == cc) {
     if (gArch->IsX86()) {
-      table.push_back({"EAX", kIntegralLeast32});  // cdecl.
+      table.push_back({"EAX", kIntegralLeast32 | kF32});  // cdecl.
 
     } else if (gArch->IsAArch64()) {
       table.push_back({"X0", kIntegralLeast64});
-    }
-  }
-
-  // note(lukas): Not sure how many vector regs can be used for return,
-  // but it looks possibly all of them
-  if (llvm::CallingConv::X86_64_SysV == cc) {
-    size_t size = 0;
-    std::string vector_base_name = GetVectorRegisterBase(size);
-    for (unsigned i = 0; i < size; ++i) {
-      auto name = vector_base_name + std::to_string(i);
-      table.push_back({name, kF32 | kF64 | kVec});
-    }
-  } else if (llvm::CallingConv::Win64 == cc) {
-    size_t size = 0;
-    std::string vector_base_name = GetVectorRegisterBase(size);
-    for (unsigned i = 0; i < size; ++i) {
-      auto name = vector_base_name + std::to_string(i);
-      table.push_back({name, kF32 | kF64 | kVec});
-    }
-  } else if (llvm::CallingConv::X86_StdCall == cc ||
-             llvm::CallingConv::X86_FastCall == cc ||
-             llvm::CallingConv::X86_ThisCall == cc) {
-    table.push_back({"ST0", kF32 | kF64 });
-
-  } else if (llvm::CallingConv::C == cc) {
-    if (gArch->IsX86()) {
-      table.push_back({"EAX", kF32});  // cdecl.
-
-    } else if (gArch->IsAArch64()) {
       table.push_back({"D0", kF64});
       table.push_back({"S0", kF32});
     }
+  } else {
+    LOG(FATAL)
+      << "Unknown ABI/calling convention: " << cc;
   }
-  // TODO(lukas): Tide everything here up!
-  table.push_back({"ST0", kF80 });
-  table.push_back({"ST1", kF80});
+
   table.push_back({"", kInvalidKind});
   return table;
 }
@@ -455,7 +444,6 @@ const char *CallingConvention::GetVarImpl(
       auto mask = 1ULL << i;
       if (!(bitmap & mask)) {
         bitmap |= mask;
-        //TODO(lukas): Return string
         return reg_loc.var_name.c_str();
       }
     }
@@ -521,6 +509,10 @@ llvm::Value* InsertIntoVector(llvm::BasicBlock *block,
 
 }
 
+// In llvm types that are expected to go into vector registers will
+// be of vector type, for example: <2 x float> will go into one %xmm.
+// External library must be compiled for the same architecture that
+// is passed to mcsema-lift, otherwise types may be wrong.
 llvm::Value *CallingConvention::LoadVectorArgument(
     llvm::BasicBlock *block,
     llvm::VectorType *goal_type) {
@@ -539,16 +531,15 @@ llvm::Value *CallingConvention::LoadVectorArgument(
   int32_t remaining = static_cast<int32_t>(num_elements);
 
   for ( unsigned i = 0; remaining > 0; ++i, remaining -= reg_size) {
-    //auto reg_var_name = reg_base_name + std::to_string(i);
     auto reg_var_name = GetVarForNextArgument(goal_type);
-    LOG(INFO) << reg_var_name;
+    LOG_IF(FATAL, !reg_var_name)
+      << "Could not find available vector register";
 
     llvm::Value *dest_loc = remill::FindVarInFunction(block, reg_var_name);
     dest_loc = ir.CreateBitCast(dest_loc,
         llvm::PointerType::get(under_type, 0));
 
     auto count = std::min(reg_element_capacity, static_cast<size_t>(remaining));
-    LOG(INFO) << count << " " << reg_element_capacity << " " << element_size;
     base_value = InsertIntoVector(block, base_value, dest_loc,
         count, i * reg_element_capacity);
   }
@@ -565,8 +556,6 @@ llvm::Value *CallingConvention::LoadNextSimpleArgument(
 
   llvm::IRBuilder<> ir(block);
 
-  // Vector type means there will be something packed
-  // and need special handling
   if (auto vector_type = llvm::dyn_cast<llvm::VectorType>(goal_type)) {
     return LoadVectorArgument(block, vector_type);
   }
@@ -668,6 +657,7 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
     return ir.CreateLoad(alloca);
   } else if (is_byval) {
     // byval attribute says that caller makes a copy of argument on the stack
+    // this happens if type of argument is bigger than 128 bits.
     auto stack_ptr = LoadStackPointer(block);
     auto offset = llvm::ConstantInt::get(gWordType, num_loaded_stack_bytes);
     auto addr = ir.CreateAdd(stack_ptr, offset);
@@ -713,6 +703,8 @@ void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
 
   for ( unsigned i = 0; remaining > 0; ++i, remaining -= reg_element_capacity) {
     auto reg_var_name = GetVarForNextReturn(goal_type);
+    LOG_IF(FATAL, !reg_var_name)
+      << "Could not find available vector register";
     llvm::Value *dest_loc = remill::FindVarInFunction(block, reg_var_name);
 
     // Clear out whatever was already there

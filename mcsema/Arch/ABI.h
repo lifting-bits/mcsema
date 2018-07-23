@@ -71,7 +71,7 @@ class CallingConvention {
 
  private:
   void StoreVectorRetValue(llvm::BasicBlock *block,
-                           llvm::Value* ret_val,
+                           llvm::Value *ret_val,
                            llvm::VectorType *goal_type);
 
   llvm::Value *LoadVectorArgument(llvm::BasicBlock *block,
