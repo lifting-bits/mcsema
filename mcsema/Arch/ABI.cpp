@@ -746,8 +746,10 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
       continue;
     }
 
-    //auto val_var = ReturnValVar(cc, under_type, i);
     auto val_var = GetVarForNextReturn(under_type);
+    LOG_IF(FATAL, !val_var)
+      << "Could not store return type "
+      << remill::LLVMThingToString(val_type);
 
     // If it's a pointer then convert it to a pointer-sized integer.
     if (under_type->isPointerTy()) {
