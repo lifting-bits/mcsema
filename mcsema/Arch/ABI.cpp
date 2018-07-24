@@ -17,6 +17,7 @@
 #include <glog/logging.h>
 
 #include <algorithm>
+#include <utility>
 #include <vector>
 
 #include <llvm/IR/BasicBlock.h>
@@ -214,10 +215,45 @@ static VectorRegistersInfo GetVectorRegisterInfo() {
   }
 }
 
-//TODO(lukas): set vector registers for other archs different than x86, amd64
-static std::vector<ArgConstraint> ConstraintTable(llvm::CallingConv::ID cc) {
-  const ArgConstraint kNoArgs = {"", kInvalidKind};
-  if (llvm::CallingConv::X86_64_SysV == cc) {
+//TODO(lukas): kVec flag for AArch64
+struct CallingConventionInfo {
+  using ConstraintTable = std::vector<ArgConstraint>;
+
+  const ConstraintTable &GetArgumentTable(
+      llvm::CallingConv::ID cc) const {
+    for (const auto &t : arg_tables) {
+      if (t.first == cc) return t.second;
+    }
+    LOG(FATAL)
+        << "Unknown ABI/calling convention: " << cc;
+  }
+
+  const ConstraintTable &GetReturnTable(
+      llvm::CallingConv::ID cc) const {
+    for (const auto &t : ret_tables) {
+      if (t.first == cc) return t.second;
+    }
+    LOG(FATAL)
+        << "Unknown ABI/calling convention: " << cc;
+  }
+
+  static const CallingConventionInfo &Instance() {
+    static CallingConventionInfo instance;
+    return instance;
+  }
+
+  CallingConventionInfo(const CallingConventionInfo &) = delete;
+  void operator=(const CallingConventionInfo &) = delete;
+
+ private:
+  CallingConventionInfo() {
+    CreateArgumentsConstraintTables();
+    CreateReturnConstraintTable();
+  }
+
+  void CreateArgumentsConstraintTables() {
+    const auto &vector_reg_info = GetVectorRegisterInfo();
+    std::string vector_base_name = vector_reg_info.base_name;
     std::vector<ArgConstraint> kAmd64SysVArgs = {
       {"RDI", kIntegralLeast64},
       {"RSI", kIntegralLeast64},
@@ -226,52 +262,53 @@ static std::vector<ArgConstraint> ConstraintTable(llvm::CallingConv::ID cc) {
       {"R8", kIntegralLeast64},
       {"R9", kIntegralLeast64}
     };
-    const auto &vector_reg_info = GetVectorRegisterInfo();
-    std::string vector_base_name = vector_reg_info.base_name;
+
     for (unsigned i = 0; i < 8; ++i) {
       auto name = vector_base_name + std::to_string(i);
       kAmd64SysVArgs.push_back({name, kF32 | kF64 | kVec});
     }
     kAmd64SysVArgs.push_back(kNoArgs);
-    return kAmd64SysVArgs;
+    arg_tables.emplace_back(llvm::CallingConv::X86_64_SysV,
+                            std::move(kAmd64SysVArgs));
 
-  } else if (llvm::CallingConv::Win64 == cc) {
     std::vector<ArgConstraint> kAmd64Win64Args = {
       {"RCX", kIntegralLeast64},
       {"RDX", kIntegralLeast64},
       {"R8", kIntegralLeast64},
       {"R9", kIntegralLeast64}
     };
-    const auto& vector_reg_info = GetVectorRegisterInfo();
-    std::string vector_base_name = vector_reg_info.base_name;
-    for (unsigned i = 0; i < 4; ++i) {
+
+    for (auto i = 0U; i < 4; ++i) {
       auto name = vector_base_name + std::to_string(i);
       kAmd64Win64Args.push_back({name, kF32 | kF64 | kVec});
     }
     kAmd64Win64Args.push_back(kNoArgs);
-    return kAmd64Win64Args;
+    arg_tables.emplace_back(llvm::CallingConv::Win64,
+                            std::move(kAmd64Win64Args));
 
-  } else if (llvm::CallingConv::X86_FastCall == cc) {
     std::vector<ArgConstraint> kX86FastCallArgs = {
         {"ECX", kIntegralLeast32},
         {"EDX", kIntegralLeast32},
-        {nullptr, kInvalidKind},
+        kNoArgs
     };
-    return kX86FastCallArgs;
+    arg_tables.emplace_back(llvm::CallingConv::X86_FastCall,
+                            std::move(kX86FastCallArgs));
 
-  } else if (llvm::CallingConv::X86_ThisCall == cc) {
     std::vector<ArgConstraint> kX86ThisCallArgs = {
         {"ECX", kIntegralLeast32},
-        {nullptr, kInvalidKind},
+        kNoArgs
     };
-    return kX86ThisCallArgs;
+    arg_tables.emplace_back(llvm::CallingConv::X86_ThisCall,
+                            std::move(kX86ThisCallArgs));
 
-  } else if (llvm::CallingConv::X86_StdCall == cc) {
-    return std::vector<ArgConstraint> {kNoArgs};  // stdcall takes all args on the stack.
+    // stdcall takes all args on the stack.
+    arg_tables.emplace_back(llvm::CallingConv::X86_StdCall,
+                            ConstraintTable{kNoArgs});
 
-  } else if (llvm::CallingConv::C == cc) {
-    if (gArch->IsX86()) {
-      return {kNoArgs};  // cdecl takes all args on the stack.
+    if(gArch->IsX86()) {
+      // cdecl takes all args on the stack.
+      arg_tables.emplace_back(llvm::CallingConv::C,
+                              ConstraintTable{kNoArgs});
 
     } else if (gArch->IsAArch64()) {
       std::vector<ArgConstraint> kAArch64Args = {
@@ -319,66 +356,79 @@ static std::vector<ArgConstraint> ConstraintTable(llvm::CallingConv::ID cc) {
 
           {nullptr, kInvalidKind},
       };
-      return kAArch64Args;
+      arg_tables.emplace_back(llvm::CallingConv::C,
+                              std::move(kAArch64Args));
     }
   }
 
-  LOG(FATAL)
-      << "Unknown ABI/calling convention: " << cc;
-  return {kNoArgs};
-}
-
-static std::vector<ArgConstraint> ReturnRegsTable(llvm::CallingConv::ID cc) {
-  std::vector<ArgConstraint> table;
-  if (llvm::CallingConv::X86_64_SysV == cc) {
-    table.push_back({"RAX", kIntegralLeast64});
-    table.push_back({"RDX", kIntegralLeast64});
-
+  void CreateReturnConstraintTable() {
     const auto &vector_reg_info = GetVectorRegisterInfo();
     size_t size = vector_reg_info.num_vec_regs;
     std::string vector_base_name = vector_reg_info.base_name;
-    for (unsigned i = 0; i < size; ++i) {
+
+    ConstraintTable sysV64_table = {
+      {"RAX", kIntegralLeast64},
+      {"RDX", kIntegralLeast64}
+    };
+
+    for (auto i = 0U; i < size; ++i) {
       auto name = vector_base_name + std::to_string(i);
-      table.push_back({name, kF32 | kF64 | kVec});
+      sysV64_table.push_back({name, kF32 | kF64 | kVec});
     }
-    table.push_back({"ST0", kF80});
-    table.push_back({"ST1", kF80});
+    sysV64_table.push_back({"ST0", kF80});
+    sysV64_table.push_back({"ST1", kF80});
+    sysV64_table.push_back(kNoArgs);
+    ret_tables.emplace_back(llvm::CallingConv::X86_64_SysV,
+                            std::move(sysV64_table));
 
-  } else if (llvm::CallingConv::Win64 == cc) {
-    table.push_back({"RAX", kIntegralLeast64});
-
-    const auto &vector_reg_info = GetVectorRegisterInfo();
-    size_t size = vector_reg_info.num_vec_regs;
-    std::string vector_base_name = vector_reg_info.base_name;
-    for (unsigned i = 0; i < size; ++i) {
+    ConstraintTable win64_table = {{"RAX", kIntegralLeast64}};
+    for (auto i = 0U; i < size; ++i) {
       auto name = vector_base_name + std::to_string(i);
-      table.push_back({name, kF32 | kF64 | kVec});
+      win64_table.push_back({name, kF32 | kF64 | kVec});
     }
-    table.push_back({"ST0", kF32 | kF64 |kF80});
+    win64_table.push_back({"ST0", kF80});
+    win64_table.push_back(kNoArgs);
+    ret_tables.emplace_back(llvm::CallingConv::Win64,
+                            std::move(win64_table));
 
-  } else if (llvm::CallingConv::X86_StdCall == cc ||
-             llvm::CallingConv::X86_FastCall == cc ||
-             llvm::CallingConv::X86_ThisCall == cc) {
-    table.push_back({"EAX", kIntegralLeast32});
-    table.push_back({"ST0", kF32 | kF64 | kF80});
+    ConstraintTable x86_table = {
+      {"EAX", kIntegralLeast32},
+      {"ST0", kF80},
+      kNoArgs
+    };
+    ret_tables.emplace_back(llvm::CallingConv::X86_StdCall,
+                            x86_table);
+    ret_tables.emplace_back(llvm::CallingConv::X86_FastCall,
+                            x86_table);
+    ret_tables.emplace_back(llvm::CallingConv::X86_ThisCall,
+                            std::move(x86_table));
 
-  } else if (llvm::CallingConv::C == cc) {
     if (gArch->IsX86()) {
-      table.push_back({"EAX", kIntegralLeast32 | kF32});  // cdecl.
+      ConstraintTable cdecl_table = {
+        {"EAX", kIntegralLeast32 | kF32},
+        {"ST0", kF80},
+        kNoArgs
+      };
+      ret_tables.emplace_back(llvm::CallingConv::C,
+                              std::move(cdecl_table));
 
     } else if (gArch->IsAArch64()) {
-      table.push_back({"X0", kIntegralLeast64});
-      table.push_back({"D0", kF64});
-      table.push_back({"S0", kF32});
+      ConstraintTable AArch64_table = {
+        {"X0", kIntegralLeast64},
+        {"D0", kF64},
+        {"S0", kF32},
+        kNoArgs
+      };
+      ret_tables.emplace_back(llvm::CallingConv::C,
+                              std::move(AArch64_table));
     }
-  } else {
-    LOG(FATAL)
-      << "Unknown ABI/calling convention: " << cc;
   }
 
-  table.push_back({"", kInvalidKind});
-  return table;
-}
+  std::vector<std::pair<llvm::CallingConv::ID, ConstraintTable>> arg_tables;
+  std::vector<std::pair<llvm::CallingConv::ID, ConstraintTable>> ret_tables;
+  const ArgConstraint kNoArgs = {"", kInvalidKind};
+
+};
 
 static uint64_t DefaultUsedStackBytes(llvm::CallingConv::ID cc) {
   switch (cc) {
@@ -463,8 +513,8 @@ CallingConvention::CallingConvention(llvm::CallingConv::ID cc_)
       num_stored_stack_bytes(0),
       sp_name(StackPointerName()),
       tp_name(ThreadPointerName()),
-      reg_table(ConstraintTable(cc)),
-      return_table(ReturnRegsTable(cc)) {}
+      reg_table(CallingConventionInfo::Instance().GetArgumentTable(cc)),
+      return_table(CallingConventionInfo::Instance().GetReturnTable(cc)) {}
 
 // Scan through the register table. If we can match this argument request
 // to a register then do so.

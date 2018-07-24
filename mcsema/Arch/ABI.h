@@ -92,8 +92,8 @@ class CallingConvention {
   uint64_t num_stored_stack_bytes;
   const char * const sp_name;
   const char * const tp_name;
-  const std::vector<ArgConstraint> reg_table;
-  const std::vector<ArgConstraint> return_table;
+  const std::vector<ArgConstraint> &reg_table;
+  const std::vector<ArgConstraint> &return_table;
   CallingConvention(void) = delete;
 };
 
