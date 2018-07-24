@@ -22,6 +22,8 @@ from collections import namedtuple
 import binaryninja as binja
 import mcsema_disass.ida.CFG_pb2
 
+from z3 import (UGT, ULT, And, Array, BitVec, BitVecSort, Concat, Extract, LShR, Not, Or, Solver, ZeroExt, simplify, unsat)
+
 # Debug logging utilities
 _DEBUG = False
 _DEBUG_FILE = None
@@ -51,6 +53,29 @@ def DEBUG(s):
             b) Set of possible values in a memory location
             c) Set of possible values in the register passed as arguments
 """
+
+def create_BitVec(ssa_var, size):
+  return BitVec('{}#{}'.format(ssa_var.var.name, ssa_var.version), size * 8 if size else 1)
+
+def identify_byte(var, function):
+  if isinstance(var, binja.SSAVariable):
+    possible_values = function[1].get_ssa_var_possible_values(var)
+    size = function[function.get_ssa_var_definition(var)].size
+  else:
+    possible_values = var.possible_values
+    size = var.size
+
+  #DEBUG("identify_byte {} {}".format(possible_values, len(possible_values.ranges)))
+  if (possible_values.type == binja.RegisterValueType.UnsignedRangeValue):
+    value_range = possible_values.ranges[0]
+    start = value_range.start
+    end = value_range.end
+    step = value_range.step
+
+    for i in range(size):
+      if (start, end, step) == (0, (0xff << (8 * i)), (1 << (8 * i))):
+        return value_range
+
 
 def convert_signed32(num):
   num = num & 0xFFFFFFFF
@@ -96,11 +121,23 @@ POSSIBLE_MEMORY_STATE = dict()
     Gather the definition of variables in the use-def chain; Find all addresses in the way
 """
 
+"""
+    Data Structure to gather information about the list of variables an instruction is using 
+"""
+INSTRUCTIONS_TO_VARIABLE = dict()
+FUNCTION_PARAMETERS = dict()
+
 def get_ssa_def(mlil, var):
   """ Gets the IL that defines var in the SSA form of mlil """
-  return mlil.ssa_form[mlil.ssa_form.get_ssa_var_definition(var)]
+  try:
+    return mlil[mlil.get_ssa_var_definition(var)]
+  except IndexError:
+    return None
 
 def gather_defs(mlil, defs):
+  if mlil is None:
+    return
+
   defs.add(mlil.address)
   op = mlil.operation
 
@@ -115,8 +152,24 @@ def gather_defs(mlil, defs):
       gather_defs(get_ssa_def(mlil.function, var), defs)
 
   if hasattr(mlil, 'src') and isinstance(mlil.src, binja.MediumLevelILInstruction):
-    gather_defs(il.src, defs)
+    gather_defs(mlil.src, defs)
 
+""" Collects the ssa variables used in the instruction
+"""
+def collect_variables(bv, instr):
+  variables = []
+
+  for operand in instr.prefix_operands:
+    if isinstance(operand, binja.SSAVariable):
+      variables.append(operand)
+    elif isinstance(operand, list):
+      for element in operand:
+        if isinstance(element, binja.SSAVariable):
+          variables.append(element)
+        elif isinstance(element, binja.MediumLevelILInstruction):
+          variables += collect_variables(bv, element)
+
+  return variables
 
 Type = namedtuple('Type', ['name', 'size', 'type_offset', 'tag'])
 
@@ -130,8 +183,9 @@ class MLILVisitor(object):
 
   def visit(self, expr):
     method_name = 'visit_{}'.format(expr.operation.name)
+    DEBUG("visit {}".format(method_name))
     if hasattr(self, method_name):
-      value = getattr(self, method_name)(expression)
+      value = getattr(self, method_name)(expr)
     else:
       value = None
     return value
@@ -142,14 +196,19 @@ class VariableModeler(MLILVisitor):
     self.address_size = address_size
     self.var = var
     self.function = var.function
+    self.visited = set()
+    self.to_visit = list()
+
 
   def model_variable(self):
     var_def = self.function.get_ssa_var_definition(self.var.src)
+    DEBUG("model_variable {} {} {}".format(self.var.src, self.function, var_def))
     self.to_visit.append(var_def)
 
     while self.to_visit:
       idx = self.to_visit.pop()
       if idx is not None:
+        DEBUG("visit {}".format(self.function[idx]))
         self.visit(self.function[idx])
 
   def visit_MLIL_CONST(self, expr):
@@ -159,6 +218,8 @@ class VariableModeler(MLILVisitor):
     pass
 
   def visit_MLIL_SET_VAR(self, expr):
+    DEBUG("visit_MLIL_SET_VAR : {}".format(expr))
+    src = self.visit(expr.src)
     pass
 
   def visit_MLIL_LOAD(self, expr):
@@ -166,6 +227,25 @@ class VariableModeler(MLILVisitor):
 
   def visit_MLIL_STORE(self, expr):
     pass
+
+  def visit_MLIL_SET_VAR_SSA(self, expr):
+    DEBUG("visit_MLIL_SET_VAR_SSA : {}".format(expr))
+    src = self.visit(expr.src)
+    pass
+
+  def visit_MLIL_VAR_SSA(self, expr):
+    if expr.src not in self.visited:
+      DEBUG("visit_MLIL_VAR_SSA : {}".format(expr))
+      var_def = expr.function.get_ssa_var_definition(expr.src)
+      if var_def is not None:
+        self.to_visit.append(var_def)
+
+    src = create_BitVec(expr.src, expr.size)
+    DEBUG("visit_MLIL_VAR_SSA : {}".format(src))
+    value_range = identify_byte(expr, self.function)
+    DEBUG("visit_MLIL_VAR_SSA  value_range : {}".format(value_range))
+
+    #return src
 
 class ILInstruction(object):
   def __init__(self, bv, insn_il):
@@ -206,9 +286,8 @@ def handle_store(bv, func, insn):
 
       src_value = addr
     elif operand_type == "expr":
-      value = insn_src.operands[i]
+      value = insn_src.operands[index]
       DEBUG("handle_store: evalue expr {} @ {}".format(value, func.name))
-
     index += 1
 
   index = 0
@@ -251,14 +330,16 @@ def handle_instruction_ssa(bv, func, insn):
   if insn is None or  not is_executable(bv, insn.address):
     return
 
+  INSTRUCTIONS_TO_VARIABLE[insn.address] = collect_variables(bv, insn)
   DEBUG("{:x} : {} operation name {}".format(insn.address, str(insn), insn.operation.name))
   DEBUG("{:x} : {} operation name {}".format(insn.address, str(insn.ssa_form), insn.ssa_form.operation.name))
+  DEBUG("Collected variable at insn {:x} : {}".format(insn.address, pprint.pformat(INSTRUCTIONS_TO_VARIABLE[insn.address])))
 
   # Remove the check for variable reference. It does not check
   # if any global variable is getting referenced at insn
-  #dv = bv.get_data_var_at(insn.address)
-  #if dv is not None:
-  #  DEBUG("Insn refer to variable at {}".format(bv.get_data_var_at(insn.address)))
+  dv = bv.get_data_var_at(insn.address)
+  if dv is not None:
+    DEBUG("Insn refer to variable at {}".format(bv.get_data_var_at(insn.address)))
 
   if insn.operation ==  binja.MediumLevelILOperation.MLIL_STORE_SSA:
     # handle destination operand
@@ -283,6 +364,12 @@ def handle_instruction_ssa(bv, func, insn):
         result = func.medium_level_il.get_ssa_var_uses(var)
         for instr in result:
           DEBUG("Operation MLIL_SET_VAR var read uses : {} ".format(func.medium_level_il[instr]))
+
+   #elif insn.operation == binja.MediumLevelILOperation.MLIL
+
+    #ssa_defs = set()
+    #gather_defs(insn, ssa_defs)
+    #DEBUG("Gather defs {}".format(pprint.pformat(ssa_defs)))
 
 def handle_instruction(bv, func, insn):
   DEBUG("{:x} : {} operation name {}".format(insn.address, str(insn), insn.operation.name))
@@ -314,6 +401,23 @@ def handle_instruction(bv, func, insn):
       for instr in result:
         DEBUG("Operation MLIL_SET_VAR var definitions : {} ".format(func.medium_level_il[instr]))
 
+def handle_function_refernces(bv, func):
+  """ Find refernces of the function and get the parameters 
+      and calculate possible values
+  """
+  if func is None:
+    return
+
+  for ref in bv.get_code_refs(func.start):
+    DEBUG("Function {} is getting referenced at {:x}".format(func.name, ref.address))
+    param1 = func.get_parameter_at(ref.address, None, 0)
+    param2 = func.get_parameter_at(ref.address, None, 1)
+    DEBUG("param1 {} param2 {}".format(param1, param2))
+
+    rdi = func.get_reg_value_at(ref.address, 'rdi')
+    DEBUG("Register rdi {}".format(rdi))
+
+
 def handle_function(bv, func):
   if func is None:
     return
@@ -323,6 +427,8 @@ def handle_function(bv, func):
     return
 
   DEBUG("{:x} {}".format(func.start, func.name))
+
+  handle_function_refernces(bv, func)
 
   dump_ssa_form(bv, func)
   bb = func.medium_level_il.basic_blocks
@@ -345,6 +451,13 @@ def handle_function(bv, func):
     bb_visited.append(block)
   DEBUG_POP()
 
+def get_instruction_at_addr(bv, func, addr):
+  for bb in func.low_level_il.basic_blocks:
+    for insn in bb:
+      if insn.address == addr:
+        if insn.medium_level_il != None:
+          return insn.medium_level_il.ssa_form
+
 def identify_data_variable(bv):
   DEBUG("Looking for data variables {}".format(len(bv.sections)))
   DEBUG_PUSH()
@@ -361,17 +474,74 @@ def identify_data_variable(bv):
       next_var = bv.get_next_data_var_after(var)
       if next_var == var:
         break
+
       size = next_var - var
       dv = bv.get_data_var_at(var)
       if dv is not None:
         DEBUG("Global Variable address {:x} type {} auto discovered {}".format(var, type(dv), dv))
         VARIABLES_TO_RECOVER[var] = _create_variable_entry("global_var_{:x}".format(var), convert_signed32(var), size)
-      var = next_var
+        for ref in bv.get_code_refs(var):
+          DEBUG("Data reference at {} {:x}".format(ref.function, ref.address))
+          DEBUG("Instructions : {}".format(get_instruction_at_addr(bv, ref.function, ref.address)))
+        var = next_var
 
     size = next_var - var
     if dv is not None:
       VARIABLES_TO_RECOVER[var] = _create_variable_entry("recovered_global_{:x}".format(var), convert_signed32(var), size)
   DEBUG_POP()
+
+"""
+    1) Get the list of functions and the entry functions
+    2) Walk through the list of functions and get the list of possible arguments getting passed
+    3) Remove the function from list and perform analysis again
+"""
+
+def collect_functions_arguments(bv, func):
+  if func is None:
+    return
+
+  num_params = len(func.parameter_vars)
+  start_addr = func.start
+  if start_addr in FUNCTION_PARAMETERS.keys():
+    func_params = FUNCTION_PARAMETERS[start_addr]
+  else:
+    func_params = list()
+
+  DEBUG("Number of possible parameter in the functions {} {}".format(func.name, num_params))
+
+  for ref in bv.get_code_refs(start_addr):
+    ref_function = ref.function
+    insn_mlil = ref_function.get_low_level_il_at(ref.address).medium_level_il
+    insn_mlil_ssa = insn_mlil.ssa_form if insn_mlil is not None else None
+    if insn_mlil_ssa is None:
+      continue 
+
+    DEBUG("Function referred : {} {}".format(ref_function, insn_mlil.ssa_form if insn_mlil is not None else insn_mlil))
+    num_params = len(insn_mlil_ssa.params) if insn_mlil_ssa.params is not None else 0
+    for index in range(num_params):
+      if insn_mlil_ssa is not None:
+        param = insn_mlil_ssa.params[index]
+        DEBUG("param {} : {} {}".format(index, param, param.operation))
+
+        possible_values = param.possible_values
+        DEBUG("param possible values {}".format(possible_values))
+
+        if len(func_params) > index:
+          value_set = func_params[index]
+          value_set.add(param)
+          func_params[index] = value_set
+        else:
+          value_set = set()
+          value_set.add(param)
+          func_params.append(value_set)
+        
+        if possible_values.type != binja.RegisterValueType.UndeterminedValue:
+          continue
+
+        model = VariableModeler(param, bv.address_size)
+        model.model_variable()
+
+    FUNCTION_PARAMETERS[start_addr] = func_params
 
 def main(binfile, outfile):
   bv = binja.BinaryViewType.get_view_of_file(binfile)
@@ -381,8 +551,12 @@ def main(binfile, outfile):
   DEBUG("Entry points {:x} {}".format(bv.entry_point, bv.entry_function.name))
   
   entry_func = bv.entry_function
-  identify_data_variable(bv)
+  #identify_data_variable(bv)
   
+  for func in bv.functions:
+    collect_functions_arguments(bv, func)
+  
+  DEBUG("Function arguments {} ".format(pprint.pformat(FUNCTION_PARAMETERS)))
   for func in bv.functions:
     handle_function(bv, func)
     
@@ -398,8 +572,8 @@ def updateCFG(outfile):
     entry = VARIABLES_TO_RECOVER[key]
     var = M.global_vars.add()
     var.ea = key
-    #var.name = entry['name']
-    #var.size = entry['size']
+    var.name = entry['name']
+    var.size = entry['size']
     
   with open(outfile, "w") as outf:
     outf.write(M.SerializeToString())
