@@ -187,7 +187,7 @@ static uint64_t GetVectorRegSize(void) {
       return 64;
     default:
       LOG(FATAL)
-        << "Unkown vector register size for arch other than amd64, x86";
+          << "Unkown vector register size for arch other than amd64, x86";
    }
 }
 
@@ -198,8 +198,6 @@ struct VectorRegistersInfo {
 
 static VectorRegistersInfo GetVectorRegisterInfo() {
   switch(gArch->arch_name) {
-    case remill::kArchAMD64:
-      return {"XMM", 8};
     case remill::kArchAMD64_AVX:
       return {"YMM", 16};
     case remill::kArchX86_AVX:
@@ -208,10 +206,10 @@ static VectorRegistersInfo GetVectorRegisterInfo() {
       return {"ZMM", 32};
     case remill::kArchX86_AVX512:
       return {"ZMM", 8};
-
     default:
-      LOG(FATAL)
-        << "Vector registers not supported for chosen architecture";
+      return {"XMM", 8};
+      LOG(INFO)
+          << "AVX extension was not chosen, fallback to XMM registers";
   }
 }
 
@@ -770,10 +768,11 @@ void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
     ir.CreateStore(llvm::Constant::getNullValue(storage_type), dest_loc);
 
     dest_loc = ir.CreateBitCast(dest_loc,
-        llvm::PointerType::get(under_type, 0));
+                                llvm::PointerType::get(under_type, 0));
 
     auto count = std::min(reg_element_capacity, static_cast<size_t>(remaining));
-    ExtractFromVector(block, ret_val, dest_loc, count , i * reg_element_capacity);
+    auto already_done = i * reg_element_capacity;
+    ExtractFromVector(block, ret_val, dest_loc, count, already_done);
   }
 }
 
