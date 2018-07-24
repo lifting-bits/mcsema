@@ -173,7 +173,7 @@ static const char *ThreadPointerName(void) {
   return tp_name;
 }
 
-static uint64_t GetVectorRegSize() {
+static uint64_t GetVectorRegSize(void) {
   switch (gArch->arch_name) {
     case remill::kArchAMD64:
     case remill::kArchX86:
@@ -190,23 +190,23 @@ static uint64_t GetVectorRegSize() {
    }
 }
 
-static const char *GetVectorRegisterBase(size_t& number) {
+struct VectorRegistersInfo {
+  const char* base_name;
+  size_t num_vec_regs;
+};
+
+static VectorRegistersInfo GetVectorRegisterInfo() {
   switch(gArch->arch_name) {
     case remill::kArchAMD64:
-      number = 8;
-      return "XMM";
+      return {"XMM", 8};
     case remill::kArchAMD64_AVX:
-      number = 16;
-      return "YMM";
+      return {"YMM", 16};
     case remill::kArchX86_AVX:
-      number = 8;
-      return "YMM";
+      return {"YMM", 8};
     case remill::kArchAMD64_AVX512:
-      number = 32;
-      return "ZMM";
+      return {"ZMM", 32};
     case remill::kArchX86_AVX512:
-      number = 8;
-      return "ZMM";
+      return {"ZMM", 8};
 
     default:
       LOG(FATAL)
@@ -226,8 +226,8 @@ static std::vector<ArgConstraint> ConstraintTable(llvm::CallingConv::ID cc) {
       {"R8", kIntegralLeast64},
       {"R9", kIntegralLeast64}
     };
-    size_t size = 0;
-    std::string vector_base_name = GetVectorRegisterBase(size);
+    const auto &vector_reg_info = GetVectorRegisterInfo();
+    std::string vector_base_name = vector_reg_info.base_name;
     for (unsigned i = 0; i < 8; ++i) {
       auto name = vector_base_name + std::to_string(i);
       kAmd64SysVArgs.push_back({name, kF32 | kF64 | kVec});
@@ -242,8 +242,8 @@ static std::vector<ArgConstraint> ConstraintTable(llvm::CallingConv::ID cc) {
       {"R8", kIntegralLeast64},
       {"R9", kIntegralLeast64}
     };
-    size_t size = 0;
-    std::string vector_base_name = GetVectorRegisterBase(size);
+    const auto& vector_reg_info = GetVectorRegisterInfo();
+    std::string vector_base_name = vector_reg_info.base_name;
     for (unsigned i = 0; i < 4; ++i) {
       auto name = vector_base_name + std::to_string(i);
       kAmd64Win64Args.push_back({name, kF32 | kF64 | kVec});
@@ -333,8 +333,10 @@ static std::vector<ArgConstraint> ReturnRegsTable(llvm::CallingConv::ID cc) {
   if (llvm::CallingConv::X86_64_SysV == cc) {
     table.push_back({"RAX", kIntegralLeast64});
     table.push_back({"RDX", kIntegralLeast64});
-    size_t size = 0;
-    std::string vector_base_name = GetVectorRegisterBase(size);
+
+    const auto &vector_reg_info = GetVectorRegisterInfo();
+    size_t size = vector_reg_info.num_vec_regs;
+    std::string vector_base_name = vector_reg_info.base_name;
     for (unsigned i = 0; i < size; ++i) {
       auto name = vector_base_name + std::to_string(i);
       table.push_back({name, kF32 | kF64 | kVec});
@@ -344,8 +346,10 @@ static std::vector<ArgConstraint> ReturnRegsTable(llvm::CallingConv::ID cc) {
 
   } else if (llvm::CallingConv::Win64 == cc) {
     table.push_back({"RAX", kIntegralLeast64});
-    size_t size = 0;
-    std::string vector_base_name = GetVectorRegisterBase(size);
+
+    const auto &vector_reg_info = GetVectorRegisterInfo();
+    size_t size = vector_reg_info.num_vec_regs;
+    std::string vector_base_name = vector_reg_info.base_name;
     for (unsigned i = 0; i < size; ++i) {
       auto name = vector_base_name + std::to_string(i);
       table.push_back({name, kF32 | kF64 | kVec});
@@ -413,6 +417,41 @@ static uint64_t GetNumberOfElements(llvm::Type* original_type) {
     return 1;
   }
 }
+
+static void ExtractFromVector(llvm::BasicBlock *block,
+                              llvm::Value *ret_val,
+                              llvm::Value *reg_ptr,
+                              size_t count,
+                              size_t start=0) {
+
+  llvm::IRBuilder<> ir(block);
+
+  for (size_t i = 0; i < count; ++i) {
+    auto offset = ir.CreateGEP(reg_ptr, GetConstantInt(64, i));
+    auto extract = ir.CreateExtractElement(ret_val,
+        GetConstantInt(64, i + start));
+    ir.CreateStore(extract, offset);
+  }
+}
+
+static llvm::Value* InsertIntoVector(llvm::BasicBlock *block,
+                                     llvm::Value *base_value,
+                                     llvm::Value *reg_ptr,
+                                     size_t count,
+                                     size_t start=0) {
+
+  llvm::IRBuilder<> ir(block);
+  for (size_t i = 0; i < count; ++i) {
+    auto offset = ir.CreateGEP(reg_ptr, GetConstantInt(64, i));
+    auto load = ir.CreateLoad(offset);
+    base_value = ir.CreateInsertElement(
+        base_value,
+        load,
+        GetConstantInt(64, i + start));
+  }
+  return base_value;
+}
+
 
 }  // namespace
 
@@ -493,22 +532,6 @@ static llvm::Function *WriteIntToMemFunc(uint64_t size_bytes) {
   }
 }
 
-llvm::Value* InsertIntoVector(llvm::BasicBlock *block,
-                              llvm::Value *base_value,
-                              llvm::Value *reg_ptr,
-                              size_t count, size_t start=0) {
-
-  llvm::IRBuilder<> ir(block);
-  for (size_t i = 0; i < count; ++i) {
-    auto offset = ir.CreateGEP(reg_ptr, GetConstantInt(64, i));
-    auto load = ir.CreateLoad(offset);
-    base_value = ir.CreateInsertElement(base_value, load,
-        GetConstantInt(64, i + start));
-  }
-  return base_value;
-
-}
-
 // In llvm types that are expected to go into vector registers will
 // be of vector type, for example: <2 x float> will go into one %xmm.
 // External library must be compiled for the same architecture that
@@ -530,14 +553,14 @@ llvm::Value *CallingConvention::LoadVectorArgument(
   size_t reg_element_capacity = reg_size / element_size;
   int32_t remaining = static_cast<int32_t>(num_elements);
 
-  for ( unsigned i = 0; remaining > 0; ++i, remaining -= reg_size) {
+  for (auto i = 0U; remaining > 0; ++i, remaining -= reg_size) {
     auto reg_var_name = GetVarForNextArgument(goal_type);
     LOG_IF(FATAL, !reg_var_name)
       << "Could not find available vector register";
 
     llvm::Value *dest_loc = remill::FindVarInFunction(block, reg_var_name);
     dest_loc = ir.CreateBitCast(dest_loc,
-        llvm::PointerType::get(under_type, 0));
+                                llvm::PointerType::get(under_type, 0));
 
     auto count = std::min(reg_element_capacity, static_cast<size_t>(remaining));
     base_value = InsertIntoVector(block, base_value, dest_loc,
@@ -648,13 +671,13 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
     }
 
     llvm::IRBuilder<> ir(block);
-    auto alloca = ir.CreateAlloca(target_type);
+    auto alloc_struct = ir.CreateAlloca(target_type);
     for (unsigned i = 0; i < underlying_values.size(); ++i) {
-      auto gep = ir.CreateGEP(alloca,
+      auto gep = ir.CreateGEP(alloc_struct,
           {GetConstantInt(64, 0), GetConstantInt(64, i)});
       ir.CreateStore(underlying_values[i], gep);
     }
-    return ir.CreateLoad(alloca);
+    return ir.CreateLoad(alloc_struct);
   } else if (is_byval) {
     // byval attribute says that caller makes a copy of argument on the stack
     // this happens if type of argument is bigger than 128 bits.
@@ -671,22 +694,6 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
   return LoadNextSimpleArgument(block, target_type);
 }
 
-
-void ExtractFromVector(llvm::BasicBlock *block,
-                              llvm::Value *ret_val,
-                              llvm::Value *reg_ptr,
-                              size_t count, size_t start=0) {
-
-  llvm::IRBuilder<> ir(block);
-
-  for (size_t i = 0; i < count; ++i) {
-    auto offset = ir.CreateGEP(reg_ptr, GetConstantInt(64, i));
-    auto extract = ir.CreateExtractElement(ret_val,
-        GetConstantInt(64, i + start));
-    ir.CreateStore(extract, offset);
-  }
-}
-
 void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
                                             llvm::Value *ret_val,
                                             llvm::VectorType *goal_type) {
@@ -701,10 +708,10 @@ void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
   size_t reg_element_capacity = reg_size / element_size;
   int32_t remaining = static_cast<int32_t>(num_elements);
 
-  for ( unsigned i = 0; remaining > 0; ++i, remaining -= reg_element_capacity) {
+  for (auto i = 0U; remaining > 0; ++i, remaining -= reg_element_capacity) {
     auto reg_var_name = GetVarForNextReturn(goal_type);
     LOG_IF(FATAL, !reg_var_name)
-      << "Could not find available vector register";
+        << "Could not find available vector register";
     llvm::Value *dest_loc = remill::FindVarInFunction(block, reg_var_name);
 
     // Clear out whatever was already there
@@ -748,8 +755,8 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
 
     auto val_var = GetVarForNextReturn(under_type);
     LOG_IF(FATAL, !val_var)
-      << "Could not store return type "
-      << remill::LLVMThingToString(val_type);
+        << "Could not store return type "
+        << remill::LLVMThingToString(val_type);
 
     // If it's a pointer then convert it to a pointer-sized integer.
     if (under_type->isPointerTy()) {
