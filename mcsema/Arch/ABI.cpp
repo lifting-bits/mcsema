@@ -213,7 +213,7 @@ static VectorRegistersInfo GetVectorRegisterInfo() {
   }
 }
 
-//TODO(lukas): kVec flag for AArch64
+//TODO(lukas): Test kVec flag for AArch64
 struct CallingConventionInfo {
   using ConstraintTable = std::vector<ArgConstraint>;
 
@@ -351,9 +351,13 @@ struct CallingConventionInfo {
           {"D29", kF32 | kF64},
           {"D30", kF32 | kF64},
           {"D31", kF32 | kF64},
-
-          {nullptr, kInvalidKind},
       };
+
+      for(auto i = 0U; i < 8; ++i) {
+        auto vec_reg_name = "V" + std::to_string(i);
+        kAArch64Args.push_back({vec_reg_name, kVec});
+      }
+      kAArch64Args.push_back(kNoArgs);
       arg_tables.emplace_back(llvm::CallingConv::C,
                               std::move(kAArch64Args));
     }
@@ -500,28 +504,13 @@ static llvm::Value* InsertIntoVector(llvm::BasicBlock *block,
   return base_value;
 }
 
-
-}  // namespace
-
-CallingConvention::CallingConvention(llvm::CallingConv::ID cc_)
-    : cc(cc_),
-      used_reg_bitmap(0),
-      used_return_bitmap(0),
-      num_loaded_stack_bytes(DefaultUsedStackBytes(cc)),
-      num_stored_stack_bytes(0),
-      sp_name(StackPointerName()),
-      tp_name(ThreadPointerName()),
-      reg_table(CallingConventionInfo::Instance().GetArgumentTable(cc)),
-      return_table(CallingConventionInfo::Instance().GetReturnTable(cc)) {}
-
 // Scan through the register table. If we can match this argument request
 // to a register then do so.
-const char *CallingConvention::GetVarImpl(
-    llvm::Type *val_type,
+static const char *GetVarImpl(
+    ValueKind val_kind,
     const std::vector<ArgConstraint> &table,
     uint64_t &bitmap) {
 
-  auto val_kind = KindOfValue(val_type);
   for (uint64_t i = 0; ; ++i) {
     const auto &reg_loc = table[i];
     if (reg_loc.var_name.empty()) {
@@ -538,12 +527,38 @@ const char *CallingConvention::GetVarImpl(
   return nullptr;
 }
 
+}  // namespace
+
+CallingConvention::CallingConvention(llvm::CallingConv::ID cc_)
+    : cc(cc_),
+      used_reg_bitmap(0),
+      used_return_bitmap(0),
+      num_loaded_stack_bytes(DefaultUsedStackBytes(cc)),
+      num_stored_stack_bytes(0),
+      sp_name(StackPointerName()),
+      tp_name(ThreadPointerName()),
+      reg_table(CallingConventionInfo::Instance().GetArgumentTable(cc)),
+      return_table(CallingConventionInfo::Instance().GetReturnTable(cc)) {}
+
+// TODO(lukas): Test win64 calling convention
 const char *CallingConvention::GetVarForNextArgument(llvm::Type *val_type) {
-  return GetVarImpl(val_type, reg_table, used_reg_bitmap);
+  auto val_kind = KindOfValue(val_type);
+  auto next_var = GetVarImpl(val_kind, reg_table, used_reg_bitmap);
+
+  // Win64 calling convention chooses one from pair
+  // {gpr, xmm} and leaves the second one empty
+  //
+  // For example call of function foo(int32, float, int32)
+  // will fill registers %rcx, %xmm1, %r8
+  if (llvm::CallingConv::Win64 == cc) {
+    val_kind = (val_kind == kIntegralLeast64) ? kF64 : kIntegralLeast64;
+    GetVarImpl(val_kind, reg_table, used_reg_bitmap);
+  }
+  return next_var;
 }
 
 const char *CallingConvention::GetVarForNextReturn(llvm::Type *val_type) {
-  return GetVarImpl(val_type, return_table, used_return_bitmap);
+  return GetVarImpl(KindOfValue(val_type), return_table, used_return_bitmap);
 }
 
 static llvm::Function *ReadIntFromMemFunc(uint64_t size_bytes) {

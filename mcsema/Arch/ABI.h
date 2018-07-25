@@ -81,9 +81,6 @@ class CallingConvention {
 
   const char *GetVarForNextArgument(llvm::Type *val_type);
   const char *GetVarForNextReturn(llvm::Type *val_type);
-  const char *GetVarImpl(llvm::Type *val_type,
-                         const std::vector<ArgConstraint> &table,
-                         uint64_t &bitmap);
 
   llvm::CallingConv::ID cc;
   uint64_t used_reg_bitmap;
