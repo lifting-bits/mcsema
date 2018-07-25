@@ -1,4 +1,4 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Ceopyright (c) 2017 Trail of Bits, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,6 +72,7 @@ add_executable(${MCSEMA_LIFT}
     tools/mcsema_lift/Lift.cpp
 )
 
+
 # Copy mcsema-disass in
 add_custom_command(
     TARGET protobuf_python_module_ida PRE_BUILD
@@ -109,8 +110,15 @@ install(
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib)
 
+# target for dyninst frontend
+if (DEFINED ENV{BUILD_MCSEMA_DYNINST_DISASS})
+    if($ENV{BUILD_MCSEMA_DYNINST_DISASS} EQUAL 1)
+        add_custom_target(generate-protobuf-files DEPENDS ${PROJECT_PROTOBUFSOURCEFILES})
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/dyninst)
+    endif()
+endif()
+
 install(CODE
     "execute_process(COMMAND python ${PROJECT_SOURCE_DIR}/tools/setup.py install -f --prefix=${CMAKE_INSTALL_PREFIX})")
 
 add_subdirectory(examples)
-    
