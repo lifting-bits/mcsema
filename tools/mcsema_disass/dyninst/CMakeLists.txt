@@ -15,13 +15,13 @@ set_source_files_properties(
   )
 
 add_executable(mcsema-dyninst-disass
-  main.cc
-  ArgParser.cc
+  main.cpp
+  ArgParser.cpp
   ${PROJECT_PROTOBUFSOURCEFILES}
-  CFGWriter.cc
-  ExternalFunc.cc
-  ExternalFunctionManager.cc
-  SectionManager.cc
+  CFGWriter.cpp
+  ExternalFunc.cpp
+  ExternalFunctionManager.cpp
+  SectionManager.cpp
   )
 
 add_dependencies(mcsema-dyninst-disass generate-protobuf-files)
