@@ -185,6 +185,8 @@ static uint64_t GetVectorRegSize(void) {
     case remill::kArchAMD64_AVX512:
     case remill::kArchX86_AVX512:
       return 64;
+    case remill::kArchAArch64LittleEndian:
+      return 16;
     default:
       LOG(FATAL)
           << "Unkown vector register size for arch other than amd64, x86";
@@ -198,6 +200,8 @@ struct VectorRegistersInfo {
 
 static VectorRegistersInfo GetVectorRegisterInfo() {
   switch(gArch->arch_name) {
+    case remill::kArchAArch64LittleEndian:
+      return {"V", 32};
     case remill::kArchAMD64_AVX:
       return {"YMM", 16};
     case remill::kArchX86_AVX:
@@ -254,62 +258,61 @@ struct CallingConventionInfo {
   void CreateArgumentsConstraintTables(void) {
     const auto &vector_reg_info = GetVectorRegisterInfo();
     const auto &vector_base_name = vector_reg_info.base_name;
-    std::vector<ArgConstraint> amd64_sysv_args = {
-      {"RDI", kIntegralLeast64},
-      {"RSI", kIntegralLeast64},
-      {"RDX", kIntegralLeast64},
-      {"RCX", kIntegralLeast64},
-      {"R8", kIntegralLeast64},
-      {"R9", kIntegralLeast64}
-    };
+    if (gArch->IsAMD64()) {
+      std::vector<ArgConstraint> amd64_sysv_args = {
+        {"RDI", kIntegralLeast64},
+        {"RSI", kIntegralLeast64},
+        {"RDX", kIntegralLeast64},
+        {"RCX", kIntegralLeast64},
+        {"R8", kIntegralLeast64},
+        {"R9", kIntegralLeast64}
+      };
 
-    for (unsigned i = 0; i < 8; ++i) {
-      auto name = vector_base_name + std::to_string(i);
-      amd64_sysv_args.push_back({name, kF32 | kF64 | kVec});
-    }
-    amd64_sysv_args.push_back(kNoArgs);
-    arg_tables.emplace_back(llvm::CallingConv::X86_64_SysV,
-                            std::move(amd64_sysv_args));
+      for (unsigned i = 0; i < 8; ++i) {
+        auto name = vector_base_name + std::to_string(i);
+        amd64_sysv_args.push_back({name, kF32 | kF64 | kVec});
+      }
+      amd64_sysv_args.push_back(kNoArgs);
+      arg_tables.emplace_back(llvm::CallingConv::X86_64_SysV,
+                              std::move(amd64_sysv_args));
 
-    std::vector<ArgConstraint> amd64_win64_args = {
-      {"RCX", kIntegralLeast64},
-      {"RDX", kIntegralLeast64},
-      {"R8", kIntegralLeast64},
-      {"R9", kIntegralLeast64}
-    };
+      std::vector<ArgConstraint> amd64_win64_args = {
+        {"RCX", kIntegralLeast64},
+        {"RDX", kIntegralLeast64},
+        {"R8", kIntegralLeast64},
+        {"R9", kIntegralLeast64}
+      };
 
-    for (auto i = 0U; i < 4; ++i) {
-      auto name = vector_base_name + std::to_string(i);
-      amd64_win64_args.push_back({name, kF32 | kF64 | kVec});
-    }
-    amd64_win64_args.push_back(kNoArgs);
-    arg_tables.emplace_back(llvm::CallingConv::Win64,
-                            std::move(amd64_win64_args));
+      for (auto i = 0U; i < 4; ++i) {
+        auto name = vector_base_name + std::to_string(i);
+        amd64_win64_args.push_back({name, kF32 | kF64 | kVec});
+      }
+      amd64_win64_args.push_back(kNoArgs);
+      arg_tables.emplace_back(llvm::CallingConv::Win64,
+                              std::move(amd64_win64_args));
+    } else if (gArch->IsX86()) {
+      std::vector<ArgConstraint> x86_fast_call_args = {
+          {"ECX", kIntegralLeast32},
+          {"EDX", kIntegralLeast32},
+          kNoArgs
+      };
+      arg_tables.emplace_back(llvm::CallingConv::X86_FastCall,
+                              std::move(x86_fast_call_args));
 
-    std::vector<ArgConstraint> x86_fast_call_args = {
-        {"ECX", kIntegralLeast32},
-        {"EDX", kIntegralLeast32},
-        kNoArgs
-    };
-    arg_tables.emplace_back(llvm::CallingConv::X86_FastCall,
-                            std::move(x86_fast_call_args));
+      std::vector<ArgConstraint> x86_this_call_args = {
+          {"ECX", kIntegralLeast32},
+          kNoArgs
+      };
+      arg_tables.emplace_back(llvm::CallingConv::X86_ThisCall,
+                              std::move(x86_this_call_args));
 
-    std::vector<ArgConstraint> x86_this_call_args = {
-        {"ECX", kIntegralLeast32},
-        kNoArgs
-    };
-    arg_tables.emplace_back(llvm::CallingConv::X86_ThisCall,
-                            std::move(x86_this_call_args));
+      // stdcall takes all args on the stack.
+      arg_tables.emplace_back(llvm::CallingConv::X86_StdCall,
+                              ConstraintTable{kNoArgs});
 
-    // stdcall takes all args on the stack.
-    arg_tables.emplace_back(llvm::CallingConv::X86_StdCall,
-                            ConstraintTable{kNoArgs});
-
-    if(gArch->IsX86()) {
       // cdecl takes all args on the stack.
       arg_tables.emplace_back(llvm::CallingConv::C,
                               ConstraintTable{kNoArgs});
-
     } else if (gArch->IsAArch64()) {
       std::vector<ArgConstraint> aarch64_args = {
           {"X0", kIntegralLeast64},
@@ -356,7 +359,7 @@ struct CallingConventionInfo {
       };
 
       for(auto i = 0U; i < 8; ++i) {
-        auto vec_reg_name = "V" + std::to_string(i);
+        auto vec_reg_name = vector_base_name + std::to_string(i);
         aarch64_args.push_back({vec_reg_name, kVec});
       }
       aarch64_args.push_back(kNoArgs);
@@ -370,44 +373,44 @@ struct CallingConventionInfo {
     size_t size = vector_reg_info.num_vec_regs;
     const auto &vector_base_name = vector_reg_info.base_name;
 
-    ConstraintTable sysv64_table = {
-      {"RAX", kIntegralLeast64},
-      {"RDX", kIntegralLeast64}
-    };
+    if (gArch->IsAMD64()) {
+      ConstraintTable sysv64_table = {
+        {"RAX", kIntegralLeast64},
+        {"RDX", kIntegralLeast64}
+      };
 
-    for (auto i = 0U; i < size; ++i) {
-      auto name = vector_base_name + std::to_string(i);
-      sysv64_table.push_back({name, kF32 | kF64 | kVec});
-    }
-    sysv64_table.push_back({"ST0", kF80});
-    sysv64_table.push_back({"ST1", kF80});
-    sysv64_table.push_back(kNoArgs);
-    ret_tables.emplace_back(llvm::CallingConv::X86_64_SysV,
-                            std::move(sysv64_table));
+      for (auto i = 0U; i < size; ++i) {
+        auto name = vector_base_name + std::to_string(i);
+        sysv64_table.push_back({name, kF32 | kF64 | kVec});
+      }
+      sysv64_table.push_back({"ST0", kF80});
+      sysv64_table.push_back({"ST1", kF80});
+      sysv64_table.push_back(kNoArgs);
+      ret_tables.emplace_back(llvm::CallingConv::X86_64_SysV,
+                              std::move(sysv64_table));
 
-    ConstraintTable win64_table = {{"RAX", kIntegralLeast64}};
-    for (auto i = 0U; i < size; ++i) {
-      auto name = vector_base_name + std::to_string(i);
-      win64_table.push_back({name, kF32 | kF64 | kVec});
-    }
-    win64_table.push_back({"ST0", kF80});
-    win64_table.push_back(kNoArgs);
-    ret_tables.emplace_back(llvm::CallingConv::Win64,
-                            std::move(win64_table));
+      ConstraintTable win64_table = {{"RAX", kIntegralLeast64}};
+      for (auto i = 0U; i < size; ++i) {
+        auto name = vector_base_name + std::to_string(i);
+        win64_table.push_back({name, kF32 | kF64 | kVec});
+      }
+      win64_table.push_back({"ST0", kF80});
+      win64_table.push_back(kNoArgs);
+      ret_tables.emplace_back(llvm::CallingConv::Win64,
+                              std::move(win64_table));
+    } else if (gArch->IsX86()) {
+      ConstraintTable x86_table = {
+        {"EAX", kIntegralLeast32},
+        {"ST0", kF80},
+        kNoArgs
+      };
+      ret_tables.emplace_back(llvm::CallingConv::X86_StdCall,
+                              x86_table);
+      ret_tables.emplace_back(llvm::CallingConv::X86_FastCall,
+                              x86_table);
+      ret_tables.emplace_back(llvm::CallingConv::X86_ThisCall,
+                              std::move(x86_table));
 
-    ConstraintTable x86_table = {
-      {"EAX", kIntegralLeast32},
-      {"ST0", kF80},
-      kNoArgs
-    };
-    ret_tables.emplace_back(llvm::CallingConv::X86_StdCall,
-                            x86_table);
-    ret_tables.emplace_back(llvm::CallingConv::X86_FastCall,
-                            x86_table);
-    ret_tables.emplace_back(llvm::CallingConv::X86_ThisCall,
-                            std::move(x86_table));
-
-    if (gArch->IsX86()) {
       ConstraintTable cdecl_table = {
         {"EAX", kIntegralLeast32 | kF32},
         {"ST0", kF80},
@@ -488,7 +491,7 @@ static void ExtractFromVector(llvm::BasicBlock *block,
   }
 }
 
-static llvm::Value* InsertIntoVector(llvm::BasicBlock *block,
+static llvm::Value *InsertIntoVector(llvm::BasicBlock *block,
                                      llvm::Value *base_value,
                                      llvm::Value *reg_ptr,
                                      size_t count,
@@ -621,7 +624,7 @@ llvm::Value *CallingConvention::LoadVectorArgument(
   for (auto i = 0U; remaining > 0; ++i, remaining -= reg_size) {
     auto reg_var_name = GetVarForNextArgument(goal_type);
     LOG_IF(FATAL, !reg_var_name)
-      << "Could not find available vector register";
+        << "Could not find available vector register";
 
     llvm::Value *dest_loc = remill::FindVarInFunction(block, reg_var_name);
     dest_loc = ir.CreateBitCast(dest_loc,
@@ -629,7 +632,7 @@ llvm::Value *CallingConvention::LoadVectorArgument(
 
     auto count = std::min(reg_element_capacity, static_cast<size_t>(remaining));
     base_value = InsertIntoVector(block, base_value, dest_loc,
-        count, i * reg_element_capacity);
+                                  count, i * reg_element_capacity);
   }
   return base_value;
 }
