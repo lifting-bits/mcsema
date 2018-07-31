@@ -527,9 +527,9 @@ static void ImplementExplicitArgsExitPoint(
 
   // create call to function and args
   std::vector<llvm::Value *> call_args;
+  auto arg_iter = extern_func->arg_begin();
   for (auto i = 0U; i < actual_num_args; i++) {
     llvm::Type *param_type = nullptr;
-    auto arg_iter = extern_func->arg_begin();
     bool is_byval = false;
     if (i < num_params) {
       param_type = func_type->getParamType(i);
