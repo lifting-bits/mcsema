@@ -22,30 +22,8 @@ from collections import namedtuple
 import binaryninja as binja
 import mcsema_disass.ida.CFG_pb2
 
-from z3 import (UGT, ULT, And, Array, BitVec, BitVecSort, Concat, Extract, LShR, Not, Or, Solver, ZeroExt, simplify, unsat)
-
-# Debug logging utilities
-_DEBUG = False
-_DEBUG_FILE = None
-_DEBUG_PREFIX = ""
-
-def DEBUG_INIT(file, flag):
-  global _DEBUG
-  global _DEBUG_FILE
-  _DEBUG = flag
-  _DEBUG_FILE = file
-  
-def DEBUG_PUSH():
-  global _DEBUG_PREFIX
-  _DEBUG_PREFIX += "  "
-
-def DEBUG_POP():
-  global _DEBUG_PREFIX
-  _DEBUG_PREFIX = _DEBUG_PREFIX[:-2]
-
-def DEBUG(s):
-  if _DEBUG:
-    _DEBUG_FILE.write("{}{}\n".format(_DEBUG_PREFIX, str(s)))
+from binja_var_recovery.util import *
+from binja_var_recovery.il_instructions import *
 
 """
    step 1 : Generate the points-to set for the global variables
@@ -54,8 +32,9 @@ def DEBUG(s):
             c) Set of possible values in the register passed as arguments
 """
 
-def create_BitVec(ssa_var, size):
-  return BitVec('{}#{}'.format(ssa_var.var.name, ssa_var.version), size * 8 if size else 1)
+VARIABLES_TO_RECOVER = dict()
+
+POSSIBLE_MEMORY_STATE = dict()
 
 def identify_byte(var, function):
   if isinstance(var, binja.SSAVariable):
@@ -65,7 +44,6 @@ def identify_byte(var, function):
     possible_values = var.possible_values
     size = var.size
 
-  #DEBUG("identify_byte {} {}".format(possible_values, len(possible_values.ranges)))
   if (possible_values.type == binja.RegisterValueType.UnsignedRangeValue):
     value_range = possible_values.ranges[0]
     start = value_range.start
@@ -76,56 +54,8 @@ def identify_byte(var, function):
       if (start, end, step) == (0, (0xff << (8 * i)), (1 << (8 * i))):
         return value_range
 
-
-def convert_signed32(num):
-  num = num & 0xFFFFFFFF
-  return (num ^ 0x80000000) - 0x80000000
-  
-def is_valid_addr(bv, addr):
-  return bv.get_segment_at(addr) is not None
-  
-def is_invalid_addr(bv, addr):
-  return bv.get_segment_at(addr) is None
-  
-def get_section_at(bv, addr):
-  if is_invalid_addr(bv, addr):
-    return None
-
-  for sec in bv.sections.values():
-    if sec.start <= addr < sec.end:
-      return sec
-  return None
-
-def is_executable(bv, addr):
-  seg = bv.get_segment_at(addr)
-  return seg is not None and seg.executable
-
-def is_readable(bv, addr):
-  seg = bv.get_segment_at(addr)
-  return seg is not None and seg.writable
-
-def is_writeable(bv, addr):
-  seg = bv.get_segment_at(addr)
-  return seg is not None and seg.readable
-
-def is_ELF(bv):
-  return bv.view_type == 'ELF'
-
-def is_PE(bv):
-  return bv.view_type == 'PE'
-
-VARIABLES_TO_RECOVER = dict()
-POSSIBLE_MEMORY_STATE = dict()
-
-"""
-    Gather the definition of variables in the use-def chain; Find all addresses in the way
-"""
-
-"""
-    Data Structure to gather information about the list of variables an instruction is using 
-"""
 INSTRUCTIONS_TO_VARIABLE = dict()
-FUNCTION_PARAMETERS = dict()
+FUNCTION_TO_SSA_VARIABLE = dict()
 
 def get_ssa_def(mlil, var):
   """ Gets the IL that defines var in the SSA form of mlil """
@@ -171,160 +101,9 @@ def collect_variables(bv, instr):
 
   return variables
 
-Type = namedtuple('Type', ['name', 'size', 'type_offset', 'tag'])
 
-def _create_variable_entry(name, addr, size=0, offset=0):
-  return dict(name=name, offset=offset, type=Type(None, None, None, None), size=size, addr=addr, is_global=True)
-
-class MLILVisitor(object):
-  """ Class functions to visit medium IL"""
-  def __init__(self):
-    super(MLILVisitor, self).__init__()
-
-  def visit(self, expr):
-    method_name = 'visit_{}'.format(expr.operation.name)
-    DEBUG("visit {}".format(method_name))
-    if hasattr(self, method_name):
-      value = getattr(self, method_name)(expr)
-    else:
-      value = None
-    return value
-
-class VariableModeler(MLILVisitor):
-  def __init__(self, var, address_size):
-    super(VariableModeler, self).__init__()
-    self.address_size = address_size
-    self.var = var
-    self.function = var.function
-    self.visited = set()
-    self.to_visit = list()
-
-
-  def model_variable(self):
-    var_def = self.function.get_ssa_var_definition(self.var.src)
-    DEBUG("model_variable {} {} {}".format(self.var.src, self.function, var_def))
-    self.to_visit.append(var_def)
-
-    while self.to_visit:
-      idx = self.to_visit.pop()
-      if idx is not None:
-        DEBUG("visit {}".format(self.function[idx]))
-        self.visit(self.function[idx])
-
-  def visit_MLIL_CONST(self, expr):
-    return expr.constant
-
-  def visit_MLIL_VAR(self, expr):
-    pass
-
-  def visit_MLIL_SET_VAR(self, expr):
-    DEBUG("visit_MLIL_SET_VAR : {}".format(expr))
-    src = self.visit(expr.src)
-    pass
-
-  def visit_MLIL_LOAD(self, expr):
-    pass
-
-  def visit_MLIL_STORE(self, expr):
-    pass
-
-  def visit_MLIL_SET_VAR_SSA(self, expr):
-    DEBUG("visit_MLIL_SET_VAR_SSA : {}".format(expr))
-    src = self.visit(expr.src)
-    pass
-
-  def visit_MLIL_VAR_SSA(self, expr):
-    if expr.src not in self.visited:
-      DEBUG("visit_MLIL_VAR_SSA : {}".format(expr))
-      var_def = expr.function.get_ssa_var_definition(expr.src)
-      if var_def is not None:
-        self.to_visit.append(var_def)
-
-    src = create_BitVec(expr.src, expr.size)
-    DEBUG("visit_MLIL_VAR_SSA : {}".format(src))
-    value_range = identify_byte(expr, self.function)
-    DEBUG("visit_MLIL_VAR_SSA  value_range : {}".format(value_range))
-
-    #return src
-
-class ILInstruction(object):
-  def __init__(self, bv, insn_il):
-    self.insn = insn_il
-
-def dump_ssa_form(bv, func):
-  if func is None:
-    return
-
-  index = 0
-  size = len(func.medium_level_il.ssa_form)
-  DEBUG("Dump the ssa form of function {} for analysis; size {}".format(func.name, size))
-
-  while index < size:
-    insn = func.medium_level_il.ssa_form[index]
-    DEBUG("{} : {:x} {}".format(index+1, insn.address, insn))
-    index += 1
-
-
-def handle_store(bv, func, insn):
-  index = 0
-  src_value = 0
-  dest_addr = 0
-  insn_src = insn.src
-  insn_dest = insn.dest
-
-  # Handle the instruction src to check what value is getting written in the
-  operands = binja.MediumLevelILInstruction.ILOperations[insn_src.operation]
-  for operand in operands:
-    name, operand_type = operand
-    if operand_type == "int":
-      value = insn_src.operands[index]
-      addr = convert_signed32(value)
-      DEBUG("handle_store: src operand value {:x} @ {}".format(addr, func.name))
-      dv = bv.get_data_var_at(addr)
-      if dv is not None:
-        DEBUG("Source operand referring to variable at {:x}".format(addr))
-
-      src_value = addr
-    elif operand_type == "expr":
-      value = insn_src.operands[index]
-      DEBUG("handle_store: evalue expr {} @ {}".format(value, func.name))
-    index += 1
-
-  index = 0
-  operands = binja.MediumLevelILInstruction.ILOperations[insn_dest.operation]
-  for operand in operands:
-    name, operand_type = operand
-    if operand_type == "int":
-      value = insn_dest.operands[index]
-      DEBUG("{} {:x}".format(func.name, convert_signed32(value)))
-      addr = convert_signed32(value)
-      dest_addr = addr
-      dv = bv.get_data_var_at(addr)
-      if dv is not None:
-        VARIABLES_TO_RECOVER[addr] = _create_variable_entry("recovered_global_{:x}".format(addr), addr)
-    index += 1
-
-  if dest_addr != 0:
-    if dest_addr in POSSIBLE_MEMORY_STATE.keys():
-      possible_value = POSSIBLE_MEMORY_STATE[dest_addr]
-      possible_value.add(src_value)
-    else:
-      possible_value = set()
-      possible_value.add(src_value)
-      POSSIBLE_MEMORY_STATE[dest_addr] = possible_value
-
-def handle_load(bv, func, insn):
-  i = 0
-  operands = binja.MediumLevelILInstruction.ILOperations[insn.operation]
-  for operand in operands:
-    name, operand_type = operand
-    if operand_type == "int":
-      value = insn.operands[i]
-      DEBUG("{} {:x}".format(func.name, convert_signed32(value)))
-      addr = convert_signed32(value)
-      dv = bv.get_data_var_at(addr)
-      if dv is not None:
-        VARIABLES_TO_RECOVER[addr] = _create_variable_entry("recovered_global_{:x}".format(addr), addr)
+def _create_variable_entry(name, addr, size=0):
+  return dict(name=name, size=size, addr=addr, is_global=True, refs=set())
 
 def handle_instruction_ssa(bv, func, insn):
   if insn is None or  not is_executable(bv, insn.address):
@@ -365,58 +144,6 @@ def handle_instruction_ssa(bv, func, insn):
         for instr in result:
           DEBUG("Operation MLIL_SET_VAR var read uses : {} ".format(func.medium_level_il[instr]))
 
-   #elif insn.operation == binja.MediumLevelILOperation.MLIL
-
-    #ssa_defs = set()
-    #gather_defs(insn, ssa_defs)
-    #DEBUG("Gather defs {}".format(pprint.pformat(ssa_defs)))
-
-def handle_instruction(bv, func, insn):
-  DEBUG("{:x} : {} operation name {}".format(insn.address, str(insn), insn.operation.name))
-  DEBUG("{:x} : {} operation name {}".format(insn.address, str(insn.ssa_form), insn.ssa_form.operation.name))
-
-  if insn is None:
-    return
-
-  # Remove the check for variable reference. It does not check
-  # if any global variable is getting referenced at insn
-  #dv = bv.get_data_var_at(insn.address)
-  #if dv is not None:
-  #  DEBUG("Insn refer to variable at {}".format(bv.get_data_var_at(insn.address)))
-
-  if insn.operation ==  binja.MediumLevelILOperation.MLIL_STORE:
-    # handle destination operand
-    value = insn.dest
-    handle_store(bv, func, value)
-
-  elif insn.operation ==  binja.MediumLevelILOperation.MLIL_LOAD:
-    value = insn.src
-    handle_store(bv, func, value)
-
-  elif insn.operation == binja.MediumLevelILOperation.MLIL_SET_VAR:
-    vars_written = insn.vars_written
-    DEBUG("Operation MLIL_SET_VAR insn : {} vars: {} possible values {}".format(insn, pprint.pformat(vars_written), insn.src.value))
-    for var in vars_written:
-      result = func.medium_level_il.get_var_definitions(var)
-      for instr in result:
-        DEBUG("Operation MLIL_SET_VAR var definitions : {} ".format(func.medium_level_il[instr]))
-
-def handle_function_refernces(bv, func):
-  """ Find refernces of the function and get the parameters 
-      and calculate possible values
-  """
-  if func is None:
-    return
-
-  for ref in bv.get_code_refs(func.start):
-    DEBUG("Function {} is getting referenced at {:x}".format(func.name, ref.address))
-    param1 = func.get_parameter_at(ref.address, None, 0)
-    param2 = func.get_parameter_at(ref.address, None, 1)
-    DEBUG("param1 {} param2 {}".format(param1, param2))
-
-    rdi = func.get_reg_value_at(ref.address, 'rdi')
-    DEBUG("Register rdi {}".format(rdi))
-
 
 def handle_function(bv, func):
   if func is None:
@@ -430,7 +157,8 @@ def handle_function(bv, func):
 
   handle_function_refernces(bv, func)
 
-  dump_ssa_form(bv, func)
+  dump_mlil_ssa(bv, func)
+  dump_llil_ssa(bv, func)
   bb = func.medium_level_il.basic_blocks
   bb_visited = list()
   bb_to_visit = set()
@@ -451,15 +179,59 @@ def handle_function(bv, func):
     bb_visited.append(block)
   DEBUG_POP()
 
-def get_instruction_at_addr(bv, func, addr):
-  for bb in func.low_level_il.basic_blocks:
-    for insn in bb:
-      if insn.address == addr:
-        if insn.medium_level_il != None:
-          return insn.medium_level_il.ssa_form
+"""
+    1) Get the list of functions and the entry functions
+    2) Walk through the list of functions and get the list of possible arguments getting passed
+    3) Remove the function from list and perform analysis again
+"""
+
+def recover_instruction(bv, func, insn, to_visit):
+  if insn is None or not is_executable(bv, insn.address):
+    return
+
+  #DEBUG("{:x} : {} operation name {}".format(insn.address, str(insn), insn.operation.name))
+  mlil_insn = ILInstruction(bv, func, insn)
+  mlil_insn.process_instruction()
+
+def recover_function(bv, func, to_visit):
+  """ Process the function and collect the function which should be visited next
+  """
+  if func is None:
+    return
+  
+  index = 0
+  DEBUG("{:x} {}".format(func.start, func.name))
+  size = len(func.medium_level_il.ssa_form)
+
+  func_obj = Function(bv, func)
+  if func_obj is None:
+    return
+
+  FUNCTION_OBJECTS[func.start] = func_obj
+  func_obj.collect_parameters()
+  DEBUG_PUSH()
+  while index < size:
+    insn = func.medium_level_il.ssa_form[index]
+    DEBUG("{} : {:x} {} operation {} ".format(index+1, insn.address, insn, insn.operation.name))
+    recover_instruction(bv, func, insn, to_visit)
+    if insn.operation == binja.LowLevelILOperation.LLIL_CALL_SSA:
+      dest = insn.dest
+      if dest.operation == binja.LowLevelILOperation.LLIL_CONST_PTR:
+        called_function = bv.get_function_at(dest.constant)
+        DEBUG("{} : {}".format(index+1, called_function))
+        if called_function is not None:
+          to_visit.append(called_function.start)
+    index += 1
+  DEBUG_POP()
 
 def identify_data_variable(bv):
-  DEBUG("Looking for data variables {}".format(len(bv.sections)))
+  """ Recover the data variables from the segments identified by binja; The size of
+      variables may not be correct and safe to recover.
+  """
+  if bv is None:
+    return
+
+  DEBUG("Looking for data variables {}".format(len(bv.sections)))  
   DEBUG_PUSH()
   
   for seg in bv.sections.values():
@@ -470,101 +242,67 @@ def identify_data_variable(bv):
     var = addr
     next_var = None
     while True:
-      VARIABLES_TO_RECOVER[var] = 0
       next_var = bv.get_next_data_var_after(var)
       if next_var == var:
         break
 
       size = next_var - var
       dv = bv.get_data_var_at(var)
-      if dv is not None:
-        DEBUG("Global Variable address {:x} type {} auto discovered {}".format(var, type(dv), dv))
-        VARIABLES_TO_RECOVER[var] = _create_variable_entry("global_var_{:x}".format(var), convert_signed32(var), size)
-        for ref in bv.get_code_refs(var):
-          DEBUG("Data reference at {} {:x}".format(ref.function, ref.address))
-          DEBUG("Instructions : {}".format(get_instruction_at_addr(bv, ref.function, ref.address)))
-        var = next_var
+      #DEBUG("Global Variable address {:x} and type {}".format(var, type(dv)))
+      VARIABLES_TO_RECOVER[var] = _create_variable_entry("global_var_{:x}".format(var), convert_signed32(var), size)
+      for ref in bv.get_code_refs(var):
+        #DEBUG("Data reference at {} {:x}".format(ref.function, ref.address))
+        llil = ref.function.get_low_level_il_at(ref.address)
+        VARIABLES_TO_RECOVER[var]["refs"].add(ref)
+
+      var = next_var
 
     size = next_var - var
     if dv is not None:
       VARIABLES_TO_RECOVER[var] = _create_variable_entry("recovered_global_{:x}".format(var), convert_signed32(var), size)
   DEBUG_POP()
 
-"""
-    1) Get the list of functions and the entry functions
-    2) Walk through the list of functions and get the list of possible arguments getting passed
-    3) Remove the function from list and perform analysis again
-"""
-
-def collect_functions_arguments(bv, func):
-  if func is None:
-    return
-
-  num_params = len(func.parameter_vars)
-  start_addr = func.start
-  if start_addr in FUNCTION_PARAMETERS.keys():
-    func_params = FUNCTION_PARAMETERS[start_addr]
-  else:
-    func_params = list()
-
-  DEBUG("Number of possible parameter in the functions {} {}".format(func.name, num_params))
-
-  for ref in bv.get_code_refs(start_addr):
-    ref_function = ref.function
-    insn_mlil = ref_function.get_low_level_il_at(ref.address).medium_level_il
-    insn_mlil_ssa = insn_mlil.ssa_form if insn_mlil is not None else None
-    if insn_mlil_ssa is None:
-      continue 
-
-    DEBUG("Function referred : {} {}".format(ref_function, insn_mlil.ssa_form if insn_mlil is not None else insn_mlil))
-    num_params = len(insn_mlil_ssa.params) if insn_mlil_ssa.params is not None else 0
-    for index in range(num_params):
-      if insn_mlil_ssa is not None:
-        param = insn_mlil_ssa.params[index]
-        DEBUG("param {} : {} {}".format(index, param, param.operation))
-
-        possible_values = param.possible_values
-        DEBUG("param possible values {}".format(possible_values))
-
-        if len(func_params) > index:
-          value_set = func_params[index]
-          value_set.add(param)
-          func_params[index] = value_set
-        else:
-          value_set = set()
-          value_set.add(param)
-          func_params.append(value_set)
-        
-        if possible_values.type != binja.RegisterValueType.UndeterminedValue:
-          continue
-
-        model = VariableModeler(param, bv.address_size)
-        model.model_variable()
-
-    FUNCTION_PARAMETERS[start_addr] = func_params
-
+# main function
 def main(binfile, outfile):
+  """ Function which recover the variables from the medium-level IL instructions;
+      1) Get the data variables and populate the list with possible sizes and references; The data variables
+         recovered may not be having the correct size which should get fixed at later point 
+  """
   bv = binja.BinaryViewType.get_view_of_file(binfile)
   bv.update_analysis_and_wait()
   
   DEBUG("Analysis file {} loaded...".format(binfile))
   DEBUG("Entry points {:x} {}".format(bv.entry_point, bv.entry_function.name))
   
+  identify_data_variable(bv)
   entry_func = bv.entry_function
-  #identify_data_variable(bv)
+  
+  to_visit = list()
+  visited = set()
+  
+  recover_function(bv, entry_func, to_visit)
+  visited.add(entry_func.start)
   
   for func in bv.functions:
-    collect_functions_arguments(bv, func)
-  
-  DEBUG("Function arguments {} ".format(pprint.pformat(FUNCTION_PARAMETERS)))
-  for func in bv.functions:
-    handle_function(bv, func)
+    if func.start in visited:
+      continue
+    
+    to_visit.append(func.start)
+    while len(to_visit) > 0:
+      func_addr = to_visit.pop(0)
+      visit_func = bv.get_function_at(func_addr)
+      recover_function(bv, visit_func, to_visit)
+      visited.add(func_addr)
     
   updateCFG(outfile)
   DEBUG("Number of global variables recovered with Naive approach {}".format(len(VARIABLES_TO_RECOVER)))
+  DEBUG("Number of global variables passed as params {}".format(len(VARIABLE_AS_PARAMS)))
   DEBUG("Possible memory state {}".format(pprint.pformat(POSSIBLE_MEMORY_STATE)))
 
+
 def updateCFG(outfile):
+  """ Update the CFG file with the recovered global variables
+  """
   M = mcsema_disass.ida.CFG_pb2.Module()
   M.name = "GlobalVariables".format('utf-8')
 
@@ -577,7 +315,7 @@ def updateCFG(outfile):
     
   with open(outfile, "w") as outf:
     outf.write(M.SerializeToString())
-  
+
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument("--log_file", type=argparse.FileType('w'),
@@ -595,7 +333,7 @@ if __name__ == '__main__':
   args = parser.parse_args(sys.argv[1:])
   
   if args.log_file:
-    DEBUG_INIT(args.log_file, True)
+    INIT_DEBUG_FILE(args.log_file)
     DEBUG("Debugging is enabled.")
   
   BINARY_FILE = args.binary

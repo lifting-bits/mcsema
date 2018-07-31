@@ -1,0 +1,75 @@
+# Copyright (c) 2018 Trail of Bits, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import collections
+import struct
+
+_DEBUG_FILE = None
+_DEBUG_PREFIX = ""
+
+def INIT_DEBUG_FILE(file):
+  global _DEBUG_FILE
+  _DEBUG_FILE = file
+
+def DEBUG_PUSH():
+  global _DEBUG_PREFIX
+  _DEBUG_PREFIX += "  "
+
+def DEBUG_POP():
+  global _DEBUG_PREFIX
+  _DEBUG_PREFIX = _DEBUG_PREFIX[:-2]
+
+def DEBUG(s):
+  global _DEBUG_FILE
+  if _DEBUG_FILE:
+    _DEBUG_FILE.write("{}{}\n".format(_DEBUG_PREFIX, str(s)))
+
+def convert_signed32(num):
+  num = num & 0xFFFFFFFF
+  return (num ^ 0x80000000) - 0x80000000
+
+def is_valid_addr(bv, addr):
+  return bv.get_segment_at(addr) is not None
+  
+def is_invalid_addr(bv, addr):
+  return bv.get_segment_at(addr) is None
+  
+def get_section_at(bv, addr):
+  if is_invalid_addr(bv, addr):
+    return None
+
+  for sec in bv.sections.values():
+    if sec.start <= addr < sec.end:
+      return sec
+  return None
+
+def is_executable(bv, addr):
+  seg = bv.get_segment_at(addr)
+  return seg is not None and seg.executable
+
+def is_readable(bv, addr):
+  seg = bv.get_segment_at(addr)
+  return seg is not None and seg.writable
+
+def is_writeable(bv, addr):
+  seg = bv.get_segment_at(addr)
+  return seg is not None and seg.readable
+
+def is_ELF(bv):
+  return bv.view_type == 'ELF'
+
+def is_PE(bv):
+  return bv.view_type == 'PE'
+
+  
