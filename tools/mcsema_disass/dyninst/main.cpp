@@ -1,7 +1,7 @@
-#include "ArgParser.h"
 #include "CFGWriter.h"
 #include "ExternalFunctionManager.h"
 #include "SectionManager.h"
+
 #include <CodeObject.h>
 #include <Dereference.h>
 #include <Function.h>
@@ -17,98 +17,73 @@
 #include <map>
 #include <sstream>
 
+#include <glog/logging.h>
+#include <gflags/gflags.h>
+
+DEFINE_string(std_defs, "", "Path to file containing external definitions");
+DEFINE_bool(dump_cfg, false, "Dump produced cfg on stdout");
+DEFINE_bool(pretty_print, true, "Pretty printf the dumped cfg");
+DEFINE_string(output_file, "", "Path to output file");
+DEFINE_string(input_file, "", "Path to binary to be disassembled");
+
 using namespace Dyninst;
 
-void printCFG(const std::string &inputFile) {
-  std::ofstream out("output.txt");
-  auto symtabCS =
-      std::make_unique<ParseAPI::SymtabCodeSource>((char *)inputFile.c_str());
-  auto codeObj = std::make_unique<ParseAPI::CodeObject>(symtabCS.get());
+const char kPathDelim = ',';
 
-  std::map<Dyninst::Address, bool> seen;
+namespace {
 
-  codeObj->parse();
+static std::vector<std::string> Split(const std::string &s, const char delim) {
+  std::vector<std::string> res;
+  std::string rem;
+  std::istringstream instream(s);
 
-  const ParseAPI::CodeObject::funclist &all = codeObj->funcs();
-
-  out << "digraph G {" << std::endl;
-
-  int i = 0;
-  for (auto f : all) {
-    // Dyninst::ParseAPI::Function* f = *fit;
-
-    out << "\t subgraph cluster_" << i << " { \n\t\t label=\"" << f->name()
-        << "\"; \n\t\t color=blue;" << std::endl;
-
-    out << "\t\t\"" << std::hex << f->addr() << std::dec << "\" [shape=box";
-
-    if (f->retstatus() == Dyninst::ParseAPI::NORETURN) {
-      out << ",color=red";
-    }
-    out << "]" << std::endl;
-
-    out << "\t\t\"" << std::hex << f->addr() << std::dec << "\" [label = \""
-        << f->name() << "\\n"
-        << std::hex << f->addr() << std::dec << "\"];" << std::endl;
-
-    std::stringstream edgeoutput;
-
-    for (auto b : f->blocks()) {
-      if (seen.find(b->start()) != seen.end())
-        continue;
-
-      seen[b->start()] = true;
-      out << "\t\t\"" << std::hex << b->start() << std::dec << "\";"
-          << std::endl;
-
-      for (auto &it : b->targets()) {
-        std::string s;
-        if (it->type() == Dyninst::ParseAPI::CALL)
-          s = " [color=blue]";
-        else if (it->type() == Dyninst::ParseAPI::RET)
-          s = " [color=green]";
-
-        edgeoutput << "\t\"" << std::hex << it->src()->start() << "\" -> \""
-                   << it->trg()->start() << "\"" << s << std::endl;
-      }
-    }
-
-    out << "\t}" << std::endl;
-
-    out << edgeoutput.str() << std::endl;
+  while(std::getline(instream, rem, delim)) {
+    res.push_back(rem);
   }
-  out << "}" << std::endl;
+
+  return res;
+}
+
 }
 
 int main(int argc, char **argv) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
+  std::stringstream ss;
+  ss << "  " << argv[0] << "\\" << std::endl
+     << "    --o OUTPUT CFG FILE \\" << std::endl
+     << "    --std_defs FILE_NAME[" << kPathDelim <<
+        "FILE_NAME,...] \\" << std::endl
+
+     << "    [--pretty_print] \\" << std::endl
+     << "    [--dump_cfg] \\" << std::endl;
+
   // Parse the command line arguments
+  google::InitGoogleLogging(argv[0]);
+  google::SetUsageMessage(ss.str());
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  //FLAGS_logtostderr = 1;
 
-  ArgParser argParser(argc, argv);
+  CHECK(!FLAGS_input_file.empty()) << "Input file need to be specified";
+  auto inputFile = FLAGS_input_file;
 
-  // We need exactly one input file
-
-  if (argParser.getInputFiles().size() < 1)
-    throw std::runtime_error{"need exactly one input file"};
-  else if (argParser.getInputFiles().size() > 1)
-    throw std::runtime_error{"more than one input file specified"};
-
-  auto inputFile = argParser.getInputFiles().front();
-
-  printCFG(inputFile);
   // Load external symbol definitions (for now, only functions)
-
   ExternalFunctionManager extFuncMgr;
 
-  for (auto stdDefFile : argParser.getStdDefFiles()) {
-    std::ifstream file(stdDefFile);
-    extFuncMgr.addExternalSymbols(file);
+  if (!FLAGS_std_defs.empty()) {
+    auto std_defs = Split(FLAGS_std_defs, kPathDelim);
+    for (const auto &file_name : std_defs) {
+      LOG(INFO) << "Loading file containing external definitions";
+      auto file = std::ifstream{file_name};
+      extFuncMgr.addExternalSymbols(file);
+    }
   }
 
+  //TODO(lukas): Check how it is parsed
+  /*
   for (const auto &extSymDef : argParser.getAddExtSyms())
     extFuncMgr.addExternalSymbol(extSymDef);
-
+  */
   extFuncMgr.clearUsed();
 
   // Set up Dyninst stuff
@@ -139,38 +114,26 @@ int main(int argc, char **argv) {
       extFuncMgr.markAsUsed(p.second);
   }
 
-  // This is the main Protobuf object we will write into
+  if (FLAGS_output_file.empty()) {
+    LOG(ERROR) << "No output file provided, output is not written into file!";
+  }
+  std::ofstream out{FLAGS_output_file};
+  if (!out) {
+    LOG(FATAL) << "Problem while opening output file";
+  }
+
 
   mcsema::Module m;
-
-  // Write the CFG information to m
 
   CFGWriter cfgWriter(m, inputFile, *symtab, *symtabCS, *codeObj, extFuncMgr);
   cfgWriter.write();
 
   // Dump the CFG file in a human-readable format if requested
-
+  if (FLAGS_dump_cfg) {
       std::cout << std::hex << m.DebugString() << std::endl;
+  }
 
-  // Output CFG file
-
-  std::string outputFile;
-
-  if (argParser.getOutputFiles().size() == 1) {
-    auto outputFile = argParser.getOutputFiles().front();
-    std::ofstream out(outputFile.c_str());
-    m.SerializeToOstream(&out);
-  } else if (argParser.getOutputFiles().size() > 1)
-    throw std::runtime_error{"multiple output files specified"};
-  /* The else block is omitted intentionally. The user might not
-   * want the CFG file, maybe because he only wants to see the
-   * human-readable format and is not interested in the CFG file.
-   * However, we do issue a warning if no output is generated at
-   * all.
-   */
-  else if ((argParser.getOutputFiles().size() < 1) &&
-           (argParser.getDumpCfg() == false))
-    std::cerr << "warning: no output generated" << std::endl;
+  m.SerializeToOstream(&out);
 
   google::protobuf::ShutdownProtobufLibrary();
 
