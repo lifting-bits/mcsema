@@ -272,7 +272,6 @@ struct CallingConventionInfo {
         auto name = vector_base_name + std::to_string(i);
         amd64_sysv_args.push_back({name, kF32 | kF64 | kVec});
       }
-      amd64_sysv_args.push_back(kNoArgs);
       arg_tables.emplace_back(llvm::CallingConv::X86_64_SysV,
                               std::move(amd64_sysv_args));
 
@@ -287,32 +286,29 @@ struct CallingConventionInfo {
         auto name = vector_base_name + std::to_string(i);
         amd64_win64_args.push_back({name, kF32 | kF64 | kVec});
       }
-      amd64_win64_args.push_back(kNoArgs);
       arg_tables.emplace_back(llvm::CallingConv::Win64,
                               std::move(amd64_win64_args));
     } else if (gArch->IsX86()) {
       std::vector<ArgConstraint> x86_fast_call_args = {
           {"ECX", kIntegralLeast32},
           {"EDX", kIntegralLeast32},
-          kNoArgs
       };
       arg_tables.emplace_back(llvm::CallingConv::X86_FastCall,
                               std::move(x86_fast_call_args));
 
       std::vector<ArgConstraint> x86_this_call_args = {
           {"ECX", kIntegralLeast32},
-          kNoArgs
       };
       arg_tables.emplace_back(llvm::CallingConv::X86_ThisCall,
                               std::move(x86_this_call_args));
 
       // stdcall takes all args on the stack.
       arg_tables.emplace_back(llvm::CallingConv::X86_StdCall,
-                              ConstraintTable{kNoArgs});
+                              ConstraintTable{});
 
       // cdecl takes all args on the stack.
       arg_tables.emplace_back(llvm::CallingConv::C,
-                              ConstraintTable{kNoArgs});
+                              ConstraintTable{});
     } else if (gArch->IsAArch64()) {
       std::vector<ArgConstraint> aarch64_args = {
           {"X0", kIntegralLeast64},
@@ -362,7 +358,6 @@ struct CallingConventionInfo {
         auto vec_reg_name = vector_base_name + std::to_string(i);
         aarch64_args.push_back({vec_reg_name, kVec});
       }
-      aarch64_args.push_back(kNoArgs);
       arg_tables.emplace_back(llvm::CallingConv::C,
                               std::move(aarch64_args));
     }
@@ -385,7 +380,6 @@ struct CallingConventionInfo {
       }
       sysv64_table.push_back({"ST0", kF80});
       sysv64_table.push_back({"ST1", kF80});
-      sysv64_table.push_back(kNoArgs);
       ret_tables.emplace_back(llvm::CallingConv::X86_64_SysV,
                               std::move(sysv64_table));
 
@@ -395,14 +389,12 @@ struct CallingConventionInfo {
         win64_table.push_back({name, kF32 | kF64 | kVec});
       }
       win64_table.push_back({"ST0", kF80});
-      win64_table.push_back(kNoArgs);
       ret_tables.emplace_back(llvm::CallingConv::Win64,
                               std::move(win64_table));
     } else if (gArch->IsX86()) {
       ConstraintTable x86_table = {
         {"EAX", kIntegralLeast32},
         {"ST0", kF80},
-        kNoArgs
       };
       ret_tables.emplace_back(llvm::CallingConv::X86_StdCall,
                               x86_table);
@@ -414,7 +406,6 @@ struct CallingConventionInfo {
       ConstraintTable cdecl_table = {
         {"EAX", kIntegralLeast32 | kF32},
         {"ST0", kF80},
-        kNoArgs
       };
       ret_tables.emplace_back(llvm::CallingConv::C,
                               std::move(cdecl_table));
@@ -424,7 +415,6 @@ struct CallingConventionInfo {
         {"X0", kIntegralLeast64},
         {"D0", kF64},
         {"S0", kF32},
-        kNoArgs
       };
       ret_tables.emplace_back(llvm::CallingConv::C,
                               std::move(AArch64_table));
@@ -433,7 +423,6 @@ struct CallingConventionInfo {
 
   std::vector<std::pair<llvm::CallingConv::ID, ConstraintTable>> arg_tables;
   std::vector<std::pair<llvm::CallingConv::ID, ConstraintTable>> ret_tables;
-  const ArgConstraint kNoArgs = {"", kInvalidKind};
 
 };
 
@@ -516,11 +505,8 @@ static const char *GetVarImpl(
     const std::vector<ArgConstraint> &table,
     uint64_t &bitmap) {
 
-  for (uint64_t i = 0; ; ++i) {
+  for (auto i = 0U; i < table.size(); ++i) {
     const auto &reg_loc = table[i];
-    if (reg_loc.var_name.empty()) {
-      break;
-    }
     if (val_kind == (reg_loc.accepted_val_kinds & val_kind)) {
       auto mask = 1ULL << i;
       if (!(bitmap & mask)) {
