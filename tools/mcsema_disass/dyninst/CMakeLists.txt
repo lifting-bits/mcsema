@@ -9,14 +9,15 @@ find_package(Dyninst REQUIRED)
 include_directories(${DYNINST_INCLUDE_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../../)
 
+set(MCSEMA_DYNINST_DISASS mcsema-dyninst-disass)
+
 set_source_files_properties(
   ${PROJECT_PROTOBUFSOURCEFILES}
   PROPERTIES GENERATED TRUE
   )
 
-add_executable(mcsema-dyninst-disass
+add_executable(${MCSEMA_DYNINST_DISASS}
   main.cpp
-  ArgParser.cpp
   ${PROJECT_PROTOBUFSOURCEFILES}
   CFGWriter.cpp
   ExternalFunc.cpp
@@ -24,13 +25,14 @@ add_executable(mcsema-dyninst-disass
   SectionManager.cpp
   )
 
-add_dependencies(mcsema-dyninst-disass generate-protobuf-files)
+add_dependencies(${MCSEMA_DYNINST_DISASS} generate-protobuf-files)
 
-target_link_libraries(mcsema-dyninst-disass dyninstAPI symtabAPI parseAPI common instructionAPI protobuf)
-set_property(TARGET mcsema-dyninst-disass APPEND PROPERTY CMAKE_CXX_FLAGS -frtti)
-set_target_properties(mcsema-dyninst-disass PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)
+target_link_libraries(${MCSEMA_DYNINST_DISASS} PRIVATE dyninstAPI symtabAPI parseAPI common instructionAPI protobuf)
+target_link_libraries(${MCSEMA_DYNINST_DISASS} PRIVATE ${PROJECT_LIBRARIES})
+set_property(TARGET ${MCSEMA_DYNINST_DISASS} APPEND PROPERTY CMAKE_CXX_FLAGS -frtti)
+set_target_properties(${MCSEMA_DYNINST_DISASS} PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)
 
 install(
-  TARGETS mcsema-dyninst-disass
+  TARGETS ${MCSEMA_DYNINST_DISASS}
   RUNTIME DESTINATION bin
   )
