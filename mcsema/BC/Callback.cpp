@@ -355,6 +355,23 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
     num_args = 3;
   }
 
+  // These function needs to be created with 0 arguments, otherwise
+  // lift could crash when using both --explicit_args
+  // and --libc_constructor (issue #424)
+  const static std::array<4,std::string> zero_argument_functions = {{
+    "__libc_csu_init",
+    "__libc_csu_fini",
+    "init",
+    "fini"
+  }};
+
+  for (const auto &zero_func_name : zero_argument_functions) {
+    if (cfg_func->name == zero_func_name) {
+      num_args = 0;
+      break;
+    }
+  }
+
   // The the lifted function type so that we can get things like the memory
   // pointer type and stuff.
   auto bb = remill::BasicBlockFunction(gModule);
