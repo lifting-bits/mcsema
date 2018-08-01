@@ -358,7 +358,7 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   // These function needs to be created with 0 arguments, otherwise
   // lift could crash when using both --explicit_args
   // and --libc_constructor (issue #424)
-  const static std::array<4,std::string> zero_argument_functions = {{
+  const static std::array<std::string, 4> zero_argument_functions = {{
     "__libc_csu_init",
     "__libc_csu_fini",
     "init",
@@ -676,6 +676,13 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
   llvm::IRBuilder<> ir(block);
   loader.StoreReturnValue(
       block, ir.CreateCall(ir.CreateIntToPtr(pc, func_ptr_ty), call_args));
+
+
+  // This means that indirect call happened and caller pushed his return
+  // address, which he expects callee will pop. However callee is one
+  // of entrypoints, which freezes the %rsp, so we need to pop it
+  // for callee
+  loader.FreeReturnAddress(block);
 
   ir.CreateRet(remill::LoadMemoryPointer(block));
 
