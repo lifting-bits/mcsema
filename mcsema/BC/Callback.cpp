@@ -207,10 +207,13 @@ static llvm::Constant *InitialStackPointerValue(void) {
   auto stack_type = llvm::ArrayType::get(
       gWordType, FLAGS_explicit_args_stack_size / (gArch->address_size / 8));
 
-  auto stack = new llvm::GlobalVariable(
-      *gModule, stack_type, false, llvm::GlobalValue::InternalLinkage,
-      llvm::Constant::getNullValue(stack_type), "__mcsema_stack");
-
+  static llvm::GlobalVariable *stack = nullptr;
+  if (!stack) {
+    stack = new llvm::GlobalVariable(
+        *gModule, stack_type, false, llvm::GlobalValue::InternalLinkage,
+        llvm::Constant::getNullValue(stack_type), "__mcsema_stack");
+    stack->setThreadLocal(true);
+  }
   std::vector<llvm::Constant *> indexes(2);
   indexes[0] = llvm::ConstantInt::get(gWordType, 0);
   indexes[1] = llvm::ConstantInt::get(
@@ -238,6 +241,7 @@ static llvm::Constant *InitialThreadLocalStorage(void) {
   auto tls_var = new llvm::GlobalVariable(
       *gModule, tls_type, false, llvm::GlobalValue::InternalLinkage,
       llvm::Constant::getNullValue(tls_type), "__mcsema_tls");
+  tls_var->setThreadLocal(true);
 
   std::vector<llvm::Constant *> indexes(2);
   indexes[0] = llvm::ConstantInt::get(gWordType, 0);
@@ -266,7 +270,8 @@ static llvm::Constant *CreateInitializedState(
   if (type->isIntegerTy() || type->isFloatingPointTy()) {
     if (sp_offset == curr_offset) {
       CHECK(type == sp_val->getType());
-      return sp_val;
+      return llvm::Constant::getNullValue(type);
+      //return sp_val;
     } else {
       return llvm::Constant::getNullValue(type);
     }
@@ -341,9 +346,67 @@ static llvm::GlobalVariable *GetStatePointer(void) {
   state_ptr = new llvm::GlobalVariable(
       *gModule, state_type, false, llvm::GlobalValue::InternalLinkage,
       state_init, "__mcsema_reg_state");
+  state_ptr->setThreadLocal(true);
   return state_ptr;
 }
 
+static llvm::Function *CreateVerifyRegState(void) {
+  auto *func_type = llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext),
+                                            {}, false);
+  llvm::Constant *c_func = gModule->getOrInsertFunction(
+      "__mcsema_verify_reg_state",
+      func_type);
+  auto func = llvm::dyn_cast<llvm::Function>(c_func);
+  CHECK(func) << "Could not cast "
+      << remill::LLVMThingToString(c_func)
+      << " to llvm::Function *";
+
+  auto sp_offset = GetStackPointerOffset();
+  auto reg_state = GetStatePointer();
+
+  auto entry_block = llvm::BasicBlock::Create(*gContext, "entry", func);
+  auto is_null_block = llvm::BasicBlock::Create(*gContext, "is_null", func);
+  auto end_block = llvm::BasicBlock::Create(*gContext, "end", func);
+  llvm::IRBuilder<> ir(entry_block);
+
+  // Need to find out where stack pointer is and known information is
+  // byte offset in state structure
+  auto byte_ty = llvm::Type::getInt8PtrTy(*gContext);
+  unsigned ptr_size = static_cast<unsigned>(gArch->address_size);
+  auto reg_ptr_ty = llvm::PointerType::getIntNPtrTy(*gContext, ptr_size);
+
+  //TODO(lukas): remove after abi_libraries patch gets merged into master
+  auto GetConstantInt = [&](unsigned size, uint64_t value) {
+    return llvm::ConstantInt::get(llvm::Type::getIntNTy(*gContext, size), value);
+  };
+  auto casted_reg_state = ir.CreateBitCast(reg_state, byte_ty);
+  auto rsp = ir.CreateGEP(casted_reg_state,
+                          GetConstantInt(64, sp_offset));
+  auto casted_rsp = ir.CreateBitCast(rsp, reg_ptr_ty);
+  auto rsp_val = ir.CreateLoad(casted_rsp,
+                               llvm::Type::getIntNTy(*gContext, ptr_size));
+  auto comparison = ir.CreateICmpEQ(rsp_val, GetConstantInt(ptr_size, 0));
+  ir.CreateCondBr(comparison, is_null_block, end_block);
+
+  // Stack pointer is pointing at nothing, so we need to set it up
+  ir.SetInsertPoint(is_null_block);
+  ir.CreateStore(InitialStackPointerValue(), casted_rsp);
+  ir.CreateBr(end_block);
+
+  // Last block just returns void
+  ir.SetInsertPoint(end_block);
+  ir.CreateRetVoid();
+
+  return func;
+}
+
+llvm::Function *GetVerifyRegState(void) {
+  static llvm::Function *func = nullptr;
+  if (!func) {
+    func = CreateVerifyRegState();
+  }
+  return func;
+}
 // Implements a stub for an externally defined function in such a way that
 // the external is explicitly called, and arguments from the modeled CPU
 // state are passed into the external.
@@ -403,6 +466,10 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   func->setAttributes(attr_set_or_list);
   func->addFnAttr(llvm::Attribute::NoInline);
   func->addFnAttr(llvm::Attribute::NoBuiltin);
+
+  auto &func_inst_list = func->getEntryBlock().getInstList();
+  auto verify_func = GetVerifyRegState();
+  llvm::CallInst::Create(verify_func, {}, "", &*func_inst_list.begin());
 
   if (FLAGS_stack_protector) {
     func->addFnAttr(llvm::Attribute::StackProtectReq);
@@ -511,6 +578,10 @@ static void ImplementExplicitArgsExitPoint(
   callback_func->addFnAttr(llvm::Attribute::InlineHint);
   callback_func->addFnAttr(llvm::Attribute::AlwaysInline);
   callback_func->removeFnAttr(llvm::Attribute::NoUnwind);
+
+  auto &func_inst_list = callback_func->getEntryBlock().getInstList();
+  auto verify_func = GetVerifyRegState();
+  llvm::CallInst::Create(verify_func, {}, "", &*func_inst_list.begin());
 
   if (FLAGS_stack_protector) {
     callback_func->addFnAttr(llvm::Attribute::StackProtectReq);
@@ -676,7 +747,6 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
   llvm::IRBuilder<> ir(block);
   loader.StoreReturnValue(
       block, ir.CreateCall(ir.CreateIntToPtr(pc, func_ptr_ty), call_args));
-
 
   // This means that indirect call happened and caller pushed his return
   // address, which he expects callee will pop. However callee is one
