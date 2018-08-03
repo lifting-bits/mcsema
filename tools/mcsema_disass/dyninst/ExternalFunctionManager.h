@@ -1,10 +1,31 @@
 #pragma once
 
-#include "ExternalFunc.h"
+#include <CFG.pb.h>
+
 #include <istream>
 #include <unordered_map>
 #include <set>
 #include <string>
+#include <experimental/optional>
+
+struct ExternalFunction {
+  using CfgCC = mcsema::ExternalFunction::CallingConvention;
+
+  enum class CallingConvention {
+    CallerCleanup = 0,
+    CalleeCleanup = 1,
+    FastCall = 2
+  };
+
+  std::string symbol_name;
+  CallingConvention cc = CallingConvention::CallerCleanup;
+  bool has_return = true;
+  std::int32_t arg_count = 0;
+  bool is_weak = false;
+  std::experimental::optional<std::string> signature = {};
+
+  CfgCC CfgCallingConvention() const;
+};
 
 class ExternalFunctionManager {
 public:
@@ -14,7 +35,7 @@ public:
    */
 
   // Registers a function called "name" with info "func"
-  void addExternalSymbol(const std::string &name, const ExternalFunc &func);
+  void addExternalSymbol(const std::string &name, const ExternalFunction &func);
 
   // Parses s as if it were a line in a function definitions file
   void addExternalSymbol(const std::string &s);
@@ -30,7 +51,7 @@ public:
 
   // Returns the information stored for the function called "name"
   // and throws an exception if no such function can be found.
-  const ExternalFunc &getExternalFunction(const std::string &name);
+  const ExternalFunction &getExternalFunction(const std::string &name);
 
   /* The following methods can be used to keep track of the external
    * functions that are actually called somewhere. This can greatly
@@ -38,9 +59,9 @@ public:
    */
   void clearUsed();
   void markAsUsed(const std::string &name);
-  std::set<ExternalFunc> getAllUsed( std::vector<std::string>& uknowns) const;
+  std::vector<ExternalFunction> getAllUsed( std::vector<std::string>& uknowns) const;
 
 private:
-  std::unordered_map<std::string, ExternalFunc> m_extFuncs;
-  std::set<std::string> m_usedFuncs;
+  std::unordered_map<std::string, ExternalFunction> external_funcs;
+  std::set<std::string> used_funcs;
 };
