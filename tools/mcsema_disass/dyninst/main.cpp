@@ -23,8 +23,8 @@
 DEFINE_string(std_defs, "", "Path to file containing external definitions");
 DEFINE_bool(dump_cfg, false, "Dump produced cfg on stdout");
 DEFINE_bool(pretty_print, true, "Pretty printf the dumped cfg");
-DEFINE_string(output_file, "", "Path to output file");
-DEFINE_string(input_file, "", "Path to binary to be disassembled");
+DEFINE_string(output, "", "Path to output file");
+DEFINE_string(binary, "", "Path to binary to be disassembled");
 
 using namespace Dyninst;
 
@@ -51,7 +51,8 @@ int main(int argc, char **argv) {
 
   std::stringstream ss;
   ss << "  " << argv[0] << "\\" << std::endl
-     << "    --o OUTPUT CFG FILE \\" << std::endl
+     << "    --binary INPUT_FILE \\" << std::endl
+     << "    --output OUTPUT CFG FILE \\" << std::endl
      << "    --std_defs FILE_NAME[" << kPathDelim <<
         "FILE_NAME,...] \\" << std::endl
 
@@ -64,8 +65,8 @@ int main(int argc, char **argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   //FLAGS_logtostderr = 1;
 
-  CHECK(!FLAGS_input_file.empty()) << "Input file need to be specified";
-  auto inputFile = FLAGS_input_file;
+  CHECK(!FLAGS_binary.empty()) << "Input file need to be specified";
+  auto inputFile = FLAGS_binary;
 
   // Load external symbol definitions (for now, only functions)
   ExternalFunctionManager extFuncMgr;
@@ -114,10 +115,10 @@ int main(int argc, char **argv) {
       extFuncMgr.markAsUsed(p.second);
   }
 
-  if (FLAGS_output_file.empty()) {
+  if (FLAGS_output.empty()) {
     LOG(ERROR) << "No output file provided, output is not written into file!";
   }
-  std::ofstream out{FLAGS_output_file};
+  std::ofstream out{FLAGS_output};
   if (!out) {
     LOG(FATAL) << "Problem while opening output file";
   }
