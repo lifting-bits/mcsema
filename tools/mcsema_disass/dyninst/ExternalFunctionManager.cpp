@@ -12,12 +12,12 @@ ExternalFunction::CfgCC ExternalFunction::CfgCallingConvention() const {
   }
 }
 
-void ExternalFunctionManager::addExternalSymbol(const std::string &name,
+void ExternalFunctionManager::AddExternalSymbol(const std::string &name,
                                                 const ExternalFunction &func) {
   external_funcs[name] = func;
 }
 
-void ExternalFunctionManager::addExternalSymbol(const std::string &s) {
+void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
   if (s.empty())
     return; // Empty line
   else if (s.front() == '#')
@@ -96,35 +96,35 @@ void ExternalFunctionManager::addExternalSymbol(const std::string &s) {
   throw std::runtime_error{"error while parsing symbol definition"};
 }
 
-void ExternalFunctionManager::addExternalSymbols(std::istream &s) {
+void ExternalFunctionManager::AddExternalSymbols(std::istream &s) {
   while (!s.eof()) {
     std::string line;
     std::getline(s, line);
-    addExternalSymbol(line);
+    AddExternalSymbol(line);
   }
 }
 
-void ExternalFunctionManager::removeExternalSymbol(const std::string &name) {
+void ExternalFunctionManager::RemoveExternalSymbol(const std::string &name) {
   external_funcs.erase(name);
   used_funcs.erase(name);
 }
 
-bool ExternalFunctionManager::isExternal(const std::string &name) const {
+bool ExternalFunctionManager::IsExternal(const std::string &name) const {
   return external_funcs.find(name) != external_funcs.end();
 }
 
 const ExternalFunction &
-ExternalFunctionManager::getExternalFunction(const std::string &name) {
+ExternalFunctionManager::GetExternalFunction(const std::string &name) {
   return external_funcs.at(name);
 }
 
-void ExternalFunctionManager::clearUsed() { used_funcs.clear(); }
+void ExternalFunctionManager::ClearUsed() { used_funcs.clear(); }
 
-void ExternalFunctionManager::markAsUsed(const std::string &name) {
+void ExternalFunctionManager::MarkAsUsed(const std::string &name) {
   used_funcs.insert(name);
 }
 
-std::vector<ExternalFunction> ExternalFunctionManager::getAllUsed(
+std::vector<ExternalFunction> ExternalFunctionManager::GetAllUsed(
     std::vector<std::string>& unknowns) const {
 
   std::vector<ExternalFunction> result;

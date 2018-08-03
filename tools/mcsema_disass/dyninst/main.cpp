@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
     for (const auto &file_name : std_defs) {
       LOG(INFO) << "Loading file containing external definitions";
       auto file = std::ifstream{file_name};
-      extFuncMgr.addExternalSymbols(file);
+      extFuncMgr.AddExternalSymbols(file);
     }
   }
 
@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
   for (const auto &extSymDef : argParser.getAddExtSyms())
     extFuncMgr.addExternalSymbol(extSymDef);
   */
-  extFuncMgr.clearUsed();
+  extFuncMgr.ClearUsed();
 
   // Set up Dyninst stuff
 
@@ -112,7 +112,7 @@ int main(int argc, char **argv) {
 
     // Only mark external functions
     if (!(symtab->findFunctionsByName(fs, p.second)))
-      extFuncMgr.markAsUsed(p.second);
+      extFuncMgr.MarkAsUsed(p.second);
   }
 
   if (FLAGS_output.empty()) {
