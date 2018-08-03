@@ -258,62 +258,6 @@ static llvm::Constant *InitialThreadLocalStorage(void) {
   return tls;
 }
 
-// Create a state structure with everything zero-initialized, except for the
-// stack pointer.
-static llvm::Constant *CreateInitializedState(
-    llvm::Type *type, llvm::Constant *sp_val,
-    uint64_t sp_offset, uint64_t curr_offset=0) {
-
-  llvm::DataLayout dl(gModule);
-
-  // Integers and floats are units.
-  if (type->isIntegerTy() || type->isFloatingPointTy()) {
-    if (sp_offset == curr_offset) {
-      CHECK(type == sp_val->getType());
-      return llvm::Constant::getNullValue(type);
-      //return sp_val;
-    } else {
-      return llvm::Constant::getNullValue(type);
-    }
-
-  // Treat structures as bags of things that can be individually indexed.
-  } else if (auto struct_type = llvm::dyn_cast<llvm::StructType>(type)) {
-    std::vector<llvm::Constant *> elems;
-
-    // LLVM 3.5: The StructType::elements() method does not exists!
-    auto struct_type_elements = llvm::makeArrayRef(
-        struct_type->element_begin(), struct_type->element_end());
-
-    for (const auto field_type : struct_type_elements) {
-      elems.push_back(
-          CreateInitializedState(field_type, sp_val,
-                                 sp_offset, curr_offset));
-      curr_offset += dl.getTypeAllocSize(field_type);
-    }
-    return llvm::ConstantStruct::get(struct_type, elems);
-
-  // Visit each element of the array.
-  } else if (auto array_type = llvm::dyn_cast<llvm::ArrayType>(type)) {
-    auto num_elems = array_type->getArrayNumElements();
-    auto element_type = array_type->getArrayElementType();
-    auto element_size = dl.getTypeAllocSize(element_type);
-    std::vector<llvm::Constant *> elems;
-    for (uint64_t i = 0; i < num_elems; ++i) {
-      elems.push_back(
-          CreateInitializedState(element_type, sp_val,
-                                 sp_offset, curr_offset));
-      curr_offset += element_size;
-    }
-    return llvm::ConstantArray::get(array_type, elems);
-
-  } else {
-    LOG(FATAL)
-        << "Unsupported type in state structure: "
-        << remill::LLVMThingToString(type);
-    return llvm::Constant::getNullValue(type);
-  }
-}
-
 // Figure ouf the byte offset of the stack pointer register in the `State`
 // structure.
 static uint64_t GetStackPointerOffset(void) {
@@ -340,9 +284,10 @@ static llvm::GlobalVariable *GetStatePointer(void) {
   auto state_type = llvm::dyn_cast<llvm::PointerType>(
       state_ptr_type)->getElementType();
 
-  auto state_init = CreateInitializedState(
-      state_type, InitialStackPointerValue(), GetStackPointerOffset());
-
+  // State is initialized with zeroes. Each callback/entrypoint set
+  // appropriate value to stack pointer. This is needed because of
+  // thread_local
+  auto state_init = llvm::ConstantAggregateZero::get(state_type);
   state_ptr = new llvm::GlobalVariable(
       *gModule, state_type, false, llvm::GlobalValue::InternalLinkage,
       state_init, "__mcsema_reg_state");
@@ -405,10 +350,10 @@ static llvm::Function *CreateVerifyRegState(void) {
 //              Maybe VerifyStackPointer?
 //              Opened to suggestions.
 
-// Because of possible paralelism, both global stack and state must be
+// Because of possible parallelism, both global stack and state must be
 // thread_local. However after new thread is created, its stack and state
 // are initialized to default values.
-// Which means that state is zeroinitialized
+// Which means that state is zero initialized
 // This function verifies that the stack pointer points to some location
 // and if not then sets it up to point into stack with default offset
 llvm::Function *GetVerifyRegState(void) {
