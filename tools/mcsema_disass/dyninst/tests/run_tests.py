@@ -57,17 +57,19 @@ class LinuxTest (unittest.TestCase):
 
         # Disassemble the binary
         cfg = self.test_dir + "/" + filename + ".cfg"
-        subprocess.check_call ([ disass, "--binary", exe,
+        subprocess.check_call ([ disass,
+                                 "--binary", exe,
                                  "--output", cfg,
                                  "--std_defs", std_defs ])
 
         # Lift it
         bc = self.test_dir + "/" + filename + ".bc"
         subprocess.check_call ([ lift, "-os", "linux", "-arch", "amd64", "-cfg", cfg,
+                                    "-disable_optimizer", "true",
                                     "-libc_constructor", "__libc_csu_init",
                                     "-libc_destructor", "__libc_csu_fini",
                                     "-explicit_args", "true",
-                                    "-explicit_args_count", "8",
+                                    "-explicit_args_count", "5",
                                     "-abi_libraries", "libc.bc,qsort.bc,printf.bc",
                                     "-disable_dead_store_elimination", "true",
                                     "-disable_register_forwarding", "true",
@@ -97,6 +99,10 @@ class LinuxTest (unittest.TestCase):
         with open(filename, 'r') as myfile:
               data = myfile.read()
         self.input = data
+
+    def test_qsort_function_ptrs (self):
+        self.runTest("qsort_function_ptrs.cpp", "23")
+        self.runTest("qsort_function_ptrs.cpp", "43")
 
     def test_complex_numbers (self):
         self.runTest("complex_numbers.c")
@@ -238,10 +244,10 @@ class LinuxTest (unittest.TestCase):
         expected_output = subprocess.check_output ([ exe ], stderr = subprocess.STDOUT)
 
         cfg = self.test_dir + "/" + filename + ".cfg"
-        subprocess.check_call ([ disass, "--input_file", exe,
-                                 "--output_file", cfg,
+        subprocess.check_call ([ disass,
+                                 "--binary", so,
+                                 "--output", cfg,
                                  "--std_defs", std_defs ])
-
 
         bc = self.test_dir + "/" + filename + ".bc"
         subprocess.check_output ([ lift, "-os", "linux", "-arch", "amd64", "-cfg", cfg,
