@@ -57,8 +57,8 @@ class LinuxTest (unittest.TestCase):
 
         # Disassemble the binary
         cfg = self.test_dir + "/" + filename + ".cfg"
-        subprocess.check_call ([ disass, "--input_file", exe,
-                                 "--output_file", cfg,
+        subprocess.check_call ([ disass, "--binary", exe,
+                                 "--output", cfg,
                                  "--std_defs", std_defs ])
 
         # Lift it
@@ -235,8 +235,8 @@ class LinuxTest (unittest.TestCase):
         expected_output = subprocess.check_output ([ exe ], stderr = subprocess.STDOUT)
 
         cfg = self.test_dir + "/" + filename + ".cfg"
-        subprocess.check_call ([ disass, "--input_file", exe,
-                                 "--output_file", cfg,
+        subprocess.check_call ([ disass, "--binary", exe,
+                                 "--output", cfg,
                                  "--std_defs", std_defs ])
 
         bc = self.test_dir + "/" + filename + ".bc"

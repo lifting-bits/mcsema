@@ -57,8 +57,8 @@ class LinuxTest (unittest.TestCase):
 
         # Disassemble the binary
         cfg = self.test_dir + "/" + filename + ".cfg"
-        subprocess.check_call ([ disass, "--input_file", exe,
-                                 "--output_file", cfg,
+        subprocess.check_call ([ disass, "--binary", exe,
+                                 "--output", cfg,
                                  "--std_defs", std_defs ])
 
         # Lift it
