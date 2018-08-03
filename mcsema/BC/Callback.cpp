@@ -364,6 +364,7 @@ llvm::Function *GetVerifyRegState(void) {
   return func;
 }
 
+// Inserts call to __mcsema_verify_reg_state as first instruction in function
 void InsertVerifyFunction(llvm::Function *func) {
   auto &first_inst = func->front().front();
   auto verify_func = GetVerifyRegState();
@@ -709,7 +710,7 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
 
   // This means that indirect call happened and caller pushed his return
   // address, which he expects callee will pop. However callee is one
-  // of entrypoints, which freezes the %rsp, so we need to pop it
+  // of entrypoints/callbacks, which freeze the %rsp, so we need to pop it
   // for callee
   loader.FreeReturnAddress(block);
 
