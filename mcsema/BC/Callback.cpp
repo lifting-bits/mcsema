@@ -377,7 +377,8 @@ static llvm::Function *CreateVerifyRegState(void) {
 
   //TODO(lukas): remove after abi_libraries patch gets merged into master
   auto GetConstantInt = [&](unsigned size, uint64_t value) {
-    return llvm::ConstantInt::get(llvm::Type::getIntNTy(*gContext, size), value);
+    return llvm::ConstantInt::get(
+        llvm::Type::getIntNTy(*gContext, size), value);
   };
   auto casted_reg_state = ir.CreateBitCast(reg_state, byte_ty);
   auto rsp = ir.CreateGEP(casted_reg_state,
@@ -400,6 +401,16 @@ static llvm::Function *CreateVerifyRegState(void) {
   return func;
 }
 
+// TODO(lukas): VerifyRegState is probably not the best name.
+//              Maybe VerifyStackPointer?
+//              Opened to suggestions.
+
+// Because of possible paralelism, both global stack and state must be
+// thread_local. However after new thread is created, its stack and state
+// are initialized to default values.
+// Which means that state is zeroinitialized
+// This function verifies that the stack pointer points to some location
+// and if not then sets it up to point into stack with default offset
 llvm::Function *GetVerifyRegState(void) {
   static llvm::Function *func = nullptr;
   if (!func) {
@@ -407,6 +418,13 @@ llvm::Function *GetVerifyRegState(void) {
   }
   return func;
 }
+
+void InsertVerifyFunction(llvm::Function *func) {
+  auto &first_inst = func->front().front();
+  auto verify_func = GetVerifyRegState();
+  llvm::CallInst::Create(verify_func, {}, "", &first_inst);
+}
+
 // Implements a stub for an externally defined function in such a way that
 // the external is explicitly called, and arguments from the modeled CPU
 // state are passed into the external.
@@ -467,9 +485,7 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   func->addFnAttr(llvm::Attribute::NoInline);
   func->addFnAttr(llvm::Attribute::NoBuiltin);
 
-  auto &func_inst_list = func->getEntryBlock().getInstList();
-  auto verify_func = GetVerifyRegState();
-  llvm::CallInst::Create(verify_func, {}, "", &*func_inst_list.begin());
+  InsertVerifyFunction(func);
 
   if (FLAGS_stack_protector) {
     func->addFnAttr(llvm::Attribute::StackProtectReq);
@@ -579,9 +595,7 @@ static void ImplementExplicitArgsExitPoint(
   callback_func->addFnAttr(llvm::Attribute::AlwaysInline);
   callback_func->removeFnAttr(llvm::Attribute::NoUnwind);
 
-  auto &func_inst_list = callback_func->getEntryBlock().getInstList();
-  auto verify_func = GetVerifyRegState();
-  llvm::CallInst::Create(verify_func, {}, "", &*func_inst_list.begin());
+  InsertVerifyFunction(callback_func);
 
   if (FLAGS_stack_protector) {
     callback_func->addFnAttr(llvm::Attribute::StackProtectReq);
