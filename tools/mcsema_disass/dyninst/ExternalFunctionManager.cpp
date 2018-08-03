@@ -1,9 +1,20 @@
 #include "ExternalFunctionManager.h"
 #include <iostream>
 
+ExternalFunction::CfgCC ExternalFunction::CfgCallingConvention() const {
+  switch (cc) {
+  case CallingConvention::CallerCleanup:
+    return mcsema::ExternalFunction::CallerCleanup;
+  case CallingConvention::CalleeCleanup:
+    return mcsema::ExternalFunction::CalleeCleanup;
+  default:
+    return mcsema::ExternalFunction::FastCall;
+  }
+}
+
 void ExternalFunctionManager::addExternalSymbol(const std::string &name,
-                                                const ExternalFunc &func) {
-  m_extFuncs[name] = func;
+                                                const ExternalFunction &func) {
+  external_funcs[name] = func;
 }
 
 void ExternalFunctionManager::addExternalSymbol(const std::string &s) {
@@ -29,14 +40,14 @@ void ExternalFunctionManager::addExternalSymbol(const std::string &s) {
 
       if (n != std::string::npos) {
         char cc = rest.front();
-        ExternalFunc::CallingConvention callConv;
+        ExternalFunction::CallingConvention callConv;
 
         if (cc == 'C')
-          callConv = ExternalFunc::CallingConvention::CallerCleanup;
+          callConv = ExternalFunction::CallingConvention::CallerCleanup;
         else if (cc == 'E')
-          callConv = ExternalFunc::CallingConvention::CalleeCleanup;
+          callConv = ExternalFunction::CallingConvention::CalleeCleanup;
         else if (cc == 'F')
-          callConv = ExternalFunc::CallingConvention::FastCall;
+          callConv = ExternalFunction::CallingConvention::FastCall;
         else {
           std::cerr << "Error while parsing symbol definition \"" << s
                     << "\": unknown calling convention '" << cc << "'"
@@ -67,10 +78,10 @@ void ExternalFunctionManager::addExternalSymbol(const std::string &s) {
           throw std::runtime_error{"error while parsing symbol definition"};
         }
 
-        ExternalFunc func(symbolName, callConv, !noReturn, noReturn, argCount,
-                          false /* TODO? */, signature);
+        ExternalFunction func{symbolName, callConv, !noReturn, argCount,
+                          false /* TODO? */, signature};
 
-        m_extFuncs[symbolName] = func;
+        external_funcs[symbolName] = func;
         return;
       }
     } else {
@@ -94,31 +105,33 @@ void ExternalFunctionManager::addExternalSymbols(std::istream &s) {
 }
 
 void ExternalFunctionManager::removeExternalSymbol(const std::string &name) {
-  m_extFuncs.erase(name);
-  m_usedFuncs.erase(name);
+  external_funcs.erase(name);
+  used_funcs.erase(name);
 }
 
 bool ExternalFunctionManager::isExternal(const std::string &name) const {
-  return m_extFuncs.find(name) != m_extFuncs.end();
+  return external_funcs.find(name) != external_funcs.end();
 }
 
-const ExternalFunc &
+const ExternalFunction &
 ExternalFunctionManager::getExternalFunction(const std::string &name) {
-  return m_extFuncs.at(name);
+  return external_funcs.at(name);
 }
 
-void ExternalFunctionManager::clearUsed() { m_usedFuncs.clear(); }
+void ExternalFunctionManager::clearUsed() { used_funcs.clear(); }
 
 void ExternalFunctionManager::markAsUsed(const std::string &name) {
-  m_usedFuncs.insert(name);
+  used_funcs.insert(name);
 }
 
-std::set<ExternalFunc> ExternalFunctionManager::getAllUsed( std::vector<std::string>& unknowns) const {
-  std::set<ExternalFunc> result;
+std::vector<ExternalFunction> ExternalFunctionManager::getAllUsed(
+    std::vector<std::string>& unknowns) const {
 
-  for (auto name : m_usedFuncs) {
+  std::vector<ExternalFunction> result;
+
+  for (auto name : used_funcs) {
     try {
-      result.insert(m_extFuncs.at(name));
+      result.push_back(external_funcs.at(name));
     } catch (const std::out_of_range &oor) {
       unknowns.push_back(name);
     }

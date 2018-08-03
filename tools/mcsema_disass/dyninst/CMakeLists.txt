@@ -1,8 +1,8 @@
 if (NOT UNIX)
   message (ERROR "The Dyninst frontend currently does not support this OS")
 else ()
-  add_compile_options(-frtti -std=c++1z)
-  set (CMAKE_CXX_FLAGS "-std=c++1z")
+  add_compile_options(-frtti -std=c++14)
+  set (CMAKE_CXX_FLAGS "-std=c++14")
 endif ()
 
 find_package(Dyninst REQUIRED)
@@ -20,7 +20,6 @@ add_executable(${MCSEMA_DYNINST_DISASS}
   main.cpp
   ${PROJECT_PROTOBUFSOURCEFILES}
   CFGWriter.cpp
-  ExternalFunc.cpp
   ExternalFunctionManager.cpp
   SectionManager.cpp
   )

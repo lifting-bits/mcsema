@@ -435,7 +435,7 @@ void CFGWriter::handleNonCallInstruction(
     auto expr = op.getValue();
 
     if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr.get())) {
-        immediateNonCall( imm, addr, cfgInstruction );      
+        immediateNonCall( imm, addr, cfgInstruction );
     } else if (auto deref =
                    dynamic_cast<InstructionAPI::Dereference *>(expr.get())) {
         dereferenceNonCall( deref, addr, cfgInstruction );
@@ -447,7 +447,7 @@ void CFGWriter::handleNonCallInstruction(
             auto cfgCodeRef = AddCodeXref( cfgInstruction, CodeReference::DataTarget, CodeReference::MemoryOperand,
                 CodeReference::Internal, a, getXrefName( a ) );
             if ( isExternal( a ) || m_externalVars.find( a ) != m_externalVars.end() )
-                cfgCodeRef->set_location( CodeReference::External );        
+                cfgCodeRef->set_location( CodeReference::External );
         }
     }
   }
@@ -458,8 +458,7 @@ void CFGWriter::writeExternalFunctions() {
   std::vector<std::string> unknown;
   auto known = m_extFuncMgr.getAllUsed( unknown );
   for (auto &name : unknown) {
-    known.insert( {name, ExternalFunc::CallingConvention::CallerCleanup,
-        true, false, 0, false} );
+    known.push_back({name});
     std::cout << "Possibly unknown external " << name << std::endl;
   }
   for (auto &func : known) {
@@ -467,7 +466,7 @@ void CFGWriter::writeExternalFunctions() {
     bool found = false;
 
     for (auto p : m_codeObj.cs()->linkage()) {
-      if (p.second == func.symbolName()) {
+      if (p.second == func.symbol_name) {
         found = true;
         a = p.first;
         break;
@@ -479,13 +478,13 @@ void CFGWriter::writeExternalFunctions() {
 
     auto cfgExtFunc = m_module.add_external_funcs();
 
-    cfgExtFunc->set_name(func.symbolName());
+    cfgExtFunc->set_name(func.symbol_name);
     cfgExtFunc->set_ea(a);
-    cfgExtFunc->set_cc(func.cfgCallingConvention());
-    cfgExtFunc->set_has_return(func.hasReturn());
-    cfgExtFunc->set_no_return(func.noReturn());
-    cfgExtFunc->set_argument_count(func.argumentCount());
-    cfgExtFunc->set_is_weak(func.isWeak());
+    cfgExtFunc->set_cc(func.CfgCallingConvention());
+    cfgExtFunc->set_has_return(func.has_return);
+    cfgExtFunc->set_no_return(!func.has_return);
+    cfgExtFunc->set_argument_count(func.arg_count);
+    cfgExtFunc->set_is_weak(func.is_weak);
   }
 }
 
@@ -494,10 +493,10 @@ void CFGWriter::xrefsInSegment( SymtabAPI::Region* region, mcsema::Segment* segm
 
     std::uint64_t* offset = ( std::uint64_t* )region->getPtrToRawData();
     for ( int j = 0; j < region->getDiskSize(); j += 8, offset++ ) {
-        
+
         SymtabAPI::Function* func;
         if ( !m_symtab.findFuncByEntryOffset( func, *offset ) ) continue;
-        
+
         auto xref = segment->add_xrefs();
         xref->set_ea( region->getMemOffset()  + j );
         xref->set_width( 8 );
