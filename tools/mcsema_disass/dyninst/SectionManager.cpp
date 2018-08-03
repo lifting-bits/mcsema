@@ -3,13 +3,13 @@
 using namespace Dyninst;
 using namespace SymtabAPI;
 
-void SectionManager::addRegion(Region *r) {
-  if (m_regions.find(r) == m_regions.end())
-    m_regions.insert(r);
+void SectionManager::AddRegion(Region *r) {
+  if (regions.find(r) == regions.end())
+    regions.insert(r);
 }
 
-bool SectionManager::isData(Address a) const {
-  auto dataRegions{getDataRegions()};
+bool SectionManager::IsData(Address a) const {
+  const auto &dataRegions{GetDataRegions()};
   const Offset o = (const Offset)a;
 
   for (auto r : dataRegions) {
@@ -20,8 +20,10 @@ bool SectionManager::isData(Address a) const {
   return false;
 }
 
-bool SectionManager::isCode(Address a) const { return !isData(a); }
+bool SectionManager::IsCode(Address a) const {
+  return !IsData(a);
+}
 
-std::set<Region *> SectionManager::getDataRegions() const {
-  return m_regions;
+std::set<Region *> SectionManager::GetDataRegions() const {
+  return regions;
 }

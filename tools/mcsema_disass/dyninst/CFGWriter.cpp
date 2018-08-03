@@ -18,29 +18,29 @@
 using namespace Dyninst;
 using namespace mcsema;
 
-CFGWriter::CFGWriter(mcsema::Module &m, const std::string &moduleName,
+CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
                      SymtabAPI::Symtab &symtab,
                      ParseAPI::SymtabCodeSource &symCodeSrc,
                      ParseAPI::CodeObject &codeObj,
                      const ExternalFunctionManager &extFuncMgr)
-    : m_module(m),
-      m_moduleName(moduleName),
-      m_symtab(symtab),
-      m_codeSource(symCodeSrc),
-      m_codeObj(codeObj),
-      m_extFuncMgr(extFuncMgr) {
-  // Populate m_funcMap
+    : module(m),
+      module_name(module_name),
+      symtab(symtab),
+      code_source(symCodeSrc),
+      code_object(codeObj),
+      ext_func_manager(extFuncMgr) {
+  // Populate func_map
 
   std::vector<SymtabAPI::Function *> functions;
-  m_symtab.getAllFunctions(functions);
+  symtab.getAllFunctions(functions);
 
   for (auto func : functions) {
-    m_funcMap[func->getOffset()] = *(func->mangled_names_begin());
+    func_map[func->getOffset()] = *(func->mangled_names_begin());
   }
 
-  // Populate m_skipFuncs with some functions known to cause problems
+  // Populate skip_funcss with some functions known to cause problems
 
-  m_skipFuncs = {
+  skip_funcss = {
                  "_fini",
                  "__libc_start_main"
                  };
@@ -49,12 +49,12 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &moduleName,
   symtab.getAllRegions(regions);
 
   for (auto reg : regions) {
-      m_sectionMgr.addRegion(reg);
+      section_manager.AddRegion(reg);
   }
 
   for (auto reg : regions) {
     if (reg->getRegionName() == ".text") {
-      m_relocations = reg->getRelocations();
+      relocations = reg->getRelocations();
     }
   }
 
@@ -69,18 +69,18 @@ void CFGWriter::write() {
   writeInternalFunctions();
   writeExternalFunctions();
 
-  m_module.set_name(m_moduleName);
+  module.set_name(module_name);
 }
 
 void CFGWriter::writeExternalVariables() {
   std::vector<SymtabAPI::Symbol *> symbols;
-  m_symtab.getAllSymbolsByType(symbols, SymtabAPI::Symbol::ST_OBJECT);
+  symtab.getAllSymbolsByType(symbols, SymtabAPI::Symbol::ST_OBJECT);
 
   for (const auto &s : symbols) {
     if (s->isInDynSymtab()) {
-      m_externalVars.insert( { s->getOffset(), s } );
+      external_vars.insert( { s->getOffset(), s } );
 
-      auto extVar = m_module.add_external_vars();
+      auto extVar = module.add_external_vars();
       extVar->set_name(s->getMangledName());
       extVar->set_ea(s->getOffset());
       extVar->set_size(s->getSize());
@@ -96,17 +96,17 @@ void CFGWriter::writeGlobalVariables() {
     if (a->getRegion() && (a->getRegion()->getRegionName() == ".bss" ||
                            a->getRegion()->getRegionName() == ".rodata")) {
 
-      auto globalVar = m_module.add_global_vars();
+      auto globalVar = module.add_global_vars();
       globalVar->set_ea(a->getOffset());
       globalVar->set_name(a->getMangledName());
       globalVar->set_size(a->getSize());
-      m_globalVars.insert({a->getOffset(), a});
+      global_vars.insert({a->getOffset(), a});
     }
   }
 }
 
 bool CFGWriter::shouldSkipFunction(const std::string &name) const {
-  return m_skipFuncs.find(name) != m_skipFuncs.end();
+  return skip_funcss.find(name) != skip_funcss.end();
 }
 
 void CFGWriter::writeInternalFunctions() {
@@ -125,7 +125,7 @@ void CFGWriter::writeInternalFunctions() {
         "__libc_start_main"
     };
 
-  for (ParseAPI::Function *func : m_codeObj.funcs()) {
+  for (ParseAPI::Function *func : code_object.funcs()) {
     if (shouldSkipFunction(func->name()))
       continue;
     else if (isExternal(func->entry()->start()))
@@ -135,7 +135,7 @@ void CFGWriter::writeInternalFunctions() {
 
     // Add an entry in the protocol buffer
 
-    auto cfgInternalFunc = m_module.add_funcs();
+    auto cfgInternalFunc = module.add_funcs();
 
     ParseAPI::Block *entryBlock = func->entry();
     cfgInternalFunc->set_ea(entryBlock->start());
@@ -146,8 +146,8 @@ void CFGWriter::writeInternalFunctions() {
     for (ParseAPI::Block *block : func->blocks())
       writeBlock(block, func, cfgInternalFunc);
 
-    if (m_funcMap.find(func->addr()) != m_funcMap.end()) {
-      cfgInternalFunc->set_name(m_funcMap[func->addr()]);
+    if (func_map.find(func->addr()) != func_map.end()) {
+      cfgInternalFunc->set_name(func_map[func->addr()]);
     }
   }
 }
@@ -284,30 +284,30 @@ void CFGWriter::checkDisplacement(Dyninst::InstructionAPI::Instruction *instruct
 }
 
 void CFGWriter::getNoReturns() {
-    for ( auto f : m_codeObj.funcs() ) {
+    for ( auto f : code_object.funcs() ) {
         if ( f->retstatus() == ParseAPI::NORETURN )
-            m_noreturnFunctions.insert( f->name() );
+            no_ret_funcs.insert( f->name() );
     }
 }
 
 bool CFGWriter::isNoReturn( const std::string& name ) {
-    return m_noreturnFunctions.find( name ) != m_noreturnFunctions.end();
+    return no_ret_funcs.find( name ) != no_ret_funcs.end();
 }
 
 
 std::string CFGWriter::getXrefName( Address addr ) {
-    auto func = m_funcMap.find( addr );
-    if ( func != m_funcMap.end() ) return func->second;
+    auto func = func_map.find( addr );
+    if ( func != func_map.end() ) return func->second;
 
-    auto extVar = m_externalVars.find( addr );
-    if ( extVar != m_externalVars.end() ) return extVar->second->getMangledName();
+    auto extVar = external_vars.find( addr );
+    if ( extVar != external_vars.end() ) return extVar->second->getMangledName();
 
-    auto globalVar = m_globalVars.find( addr );
-    if ( globalVar != m_globalVars.end() ) return globalVar->second->getMangledName();
+    auto globalVar = global_vars.find( addr );
+    if ( globalVar != global_vars.end() ) return globalVar->second->getMangledName();
 
 
-    auto segmentVar = m_segmentVars.find( addr );
-    if ( segmentVar != m_segmentVars.end() ) return segmentVar->second->getMangledName();
+    auto segmentVar = segment_vars.find( addr );
+    if ( segmentVar != segment_vars.end() ) return segmentVar->second->getMangledName();
 
     return "__mcsema_unknown";
 }
@@ -338,11 +338,11 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
     }
   }
 
-  if (m_relocations.size() > 0) {
-    auto entry = *(m_relocations.begin());
+  if (relocations.size() > 0) {
+    auto entry = *(relocations.begin());
     bool found = false;
 
-    for (auto ent : m_relocations) {
+    for (auto ent : relocations) {
       if (ent.rel_addr() == (addr + size + 1)) {
         entry = ent;
         found = true;
@@ -380,7 +380,7 @@ void CFGWriter::immediateNonCall( InstructionAPI::Immediate* imm,
         Address addr, mcsema::Instruction* cfgInstruction ) {
 
     Address a = imm->eval().convert<Address>();
-    auto allSymsAtOffset = m_symtab.findSymbolByOffset(a);
+    auto allSymsAtOffset = symtab.findSymbolByOffset(a);
     bool isRef = false;
 
     if (allSymsAtOffset.size() > 0) {
@@ -406,7 +406,7 @@ void CFGWriter::immediateNonCall( InstructionAPI::Immediate* imm,
                                     a, getXrefName(a));
 
       if (isExternal(a) ||
-          m_externalVars.find(a) != m_externalVars.end()) {
+          external_vars.find(a) != external_vars.end()) {
             cfgCodeRef->set_location(CodeReference::External);
       }
   }
@@ -435,7 +435,7 @@ void CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
                                       CodeReference::MemoryOperand,
                                       CodeReference::Internal, a,
                                       getXrefName( a ) );
-        if (isExternal(a) || m_externalVars.find(a) != m_externalVars.end())
+        if (isExternal(a) || external_vars.find(a) != external_vars.end())
             cfgCodeRef->set_location( CodeReference::External );
       }
 }
@@ -474,7 +474,7 @@ void CFGWriter::handleNonCallInstruction(
                         CodeReference::Internal, a,
                         getXrefName(a));
         if (isExternal(a) ||
-          m_externalVars.find(a) != m_externalVars.end()) {
+          external_vars.find(a) != external_vars.end()) {
           cfgCodeRef->set_location(CodeReference::External);
         }
       }
@@ -485,7 +485,7 @@ void CFGWriter::handleNonCallInstruction(
 
 void CFGWriter::writeExternalFunctions() {
   std::vector<std::string> unknown;
-  auto known = m_extFuncMgr.GetAllUsed( unknown );
+  auto known = ext_func_manager.GetAllUsed( unknown );
   for (auto &name : unknown) {
     known.push_back({name});
     std::cout << "Possibly unknown external " << name << std::endl;
@@ -494,7 +494,7 @@ void CFGWriter::writeExternalFunctions() {
     Address a;
     bool found = false;
 
-    for (auto p : m_codeObj.cs()->linkage()) {
+    for (auto p : code_object.cs()->linkage()) {
       if (p.second == func.symbol_name) {
         found = true;
         a = p.first;
@@ -505,7 +505,7 @@ void CFGWriter::writeExternalFunctions() {
     if (!found) {
       throw std::runtime_error{"unresolved external function call"};
     }
-    auto cfgExtFunc = m_module.add_external_funcs();
+    auto cfgExtFunc = module.add_external_funcs();
 
     cfgExtFunc->set_name(func.symbol_name);
     cfgExtFunc->set_ea(a);
@@ -524,7 +524,7 @@ void CFGWriter::xrefsInSegment(SymtabAPI::Region* region,
 
   for (int j = 0; j < region->getDiskSize(); j += 8, offset++) {
     SymtabAPI::Function* func;
-    if (!m_symtab.findFuncByEntryOffset(func, *offset)){
+    if (!symtab.findFuncByEntryOffset(func, *offset)){
       continue;
     }
 
@@ -557,7 +557,7 @@ void CFGWriter::writeRelocations(SymtabAPI::Region* region,
   const auto &relocations = region->getRelocations();
 
   for (auto reloc : relocations) {
-    for (auto f : m_codeObj.funcs()) {
+    for (auto f : code_object.funcs()) {
       if (f->entry()->start() == reloc.getDynSym()->getOffset()) {
         auto cfgSymbol = cfgInternalData->add_xrefs();
         cfgSymbol->set_ea(reloc.rel_addr());
@@ -576,7 +576,7 @@ void CFGWriter::writeRelocations(SymtabAPI::Region* region,
 }
 
 void CFGWriter::writeInternalData() {
-  auto dataRegions = m_sectionMgr.getDataRegions();
+  auto dataRegions = section_manager.GetDataRegions();
 
   for (auto region : dataRegions) {
     // Sanity check
@@ -587,7 +587,7 @@ void CFGWriter::writeInternalData() {
     if ( region->getRegionName() == ".fini_array" ) {
       continue;
     }
-    auto cfgInternalData = m_module.add_segments();
+    auto cfgInternalData = module.add_segments();
 
     std::string data;
     writeRawData(data, region);
@@ -595,7 +595,7 @@ void CFGWriter::writeInternalData() {
     // .init & .fini should be together
     if ( region->getRegionName() == ".init_array" ) {
       SymtabAPI::Region* fini;
-      m_symtab.findRegion( fini, ".fini_array" );
+      symtab.findRegion( fini, ".fini_array" );
       writeRawData( data, fini );
       writeDataVariables(fini, cfgInternalData);
 
@@ -623,13 +623,13 @@ void CFGWriter::writeInternalData() {
 void CFGWriter::writeDataVariables(Dyninst::SymtabAPI::Region *region,
                                    mcsema::Segment *segment) {
   std::vector<SymtabAPI::Symbol *> vars;
-  m_symtab.getAllSymbolsByType(vars, SymtabAPI::Symbol::ST_OBJECT);
+  symtab.getAllSymbolsByType(vars, SymtabAPI::Symbol::ST_OBJECT);
 
   for (auto &a : vars) {
     if ((a->getRegion() && a->getRegion() == region) ||
         (a->getOffset() == region->getMemOffset())) {
 
-      if (m_externalVars.find(a->getOffset()) != m_externalVars.end()) {
+      if (external_vars.find(a->getOffset()) != external_vars.end()) {
         continue;
       }
 
@@ -637,7 +637,7 @@ void CFGWriter::writeDataVariables(Dyninst::SymtabAPI::Region *region,
       var->set_ea(a->getOffset());
       var->set_name(a->getMangledName());
 
-      m_segmentVars.insert({a->getOffset(), a});
+      segment_vars.insert({a->getOffset(), a});
     }
   }
 }
@@ -645,11 +645,11 @@ void CFGWriter::writeDataVariables(Dyninst::SymtabAPI::Region *region,
 
 bool CFGWriter::isExternal(Address addr) const {
   bool is = false;
-  if (m_codeObj.cs()->linkage().find(addr) != m_codeObj.cs()->linkage().end()) {
-    is = m_extFuncMgr.IsExternal(m_codeObj.cs()->linkage()[addr]);
+  if (code_object.cs()->linkage().find(addr) != code_object.cs()->linkage().end()) {
+    is = ext_func_manager.IsExternal(code_object.cs()->linkage()[addr]);
   }
 
-  if (m_externalVars.find(addr) != m_externalVars.end()) {
+  if (external_vars.find(addr) != external_vars.end()) {
     is  = true;
   }
 
@@ -657,7 +657,7 @@ bool CFGWriter::isExternal(Address addr) const {
 }
 
 const std::string &CFGWriter::getExternalName(Address addr) const {
-  return m_codeObj.cs()->linkage().at(addr);
+  return code_object.cs()->linkage().at(addr);
 }
 
 bool CFGWriter::tryEval(InstructionAPI::Expression *expr,

@@ -5,14 +5,14 @@
 
 class SectionManager {
 public:
-  void addRegion(Dyninst::SymtabAPI::Region *r);
+  void AddRegion(Dyninst::SymtabAPI::Region *r);
 
-  bool isData(Dyninst::Address a) const;
-  bool isCode(Dyninst::Address a) const;
+  bool IsData(Dyninst::Address a) const;
+  bool IsCode(Dyninst::Address a) const;
 
-  std::set<Dyninst::SymtabAPI::Region *> getDataRegions() const;
-  std::set<Dyninst::SymtabAPI::Region *> getAllRegions() { return m_regions; }
+  std::set<Dyninst::SymtabAPI::Region *> GetDataRegions() const;
+  std::set<Dyninst::SymtabAPI::Region *> GetAllRegions() { return regions; }
 
 private:
-  std::set<Dyninst::SymtabAPI::Region *> m_regions;
+  std::set<Dyninst::SymtabAPI::Region *> regions;
 };
