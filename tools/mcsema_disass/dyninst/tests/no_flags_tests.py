@@ -57,7 +57,8 @@ class LinuxTest (unittest.TestCase):
 
         # Disassemble the binary
         cfg = self.test_dir + "/" + filename + ".cfg"
-        subprocess.check_call ([ disass, "--binary", exe,
+        subprocess.check_call ([ disass,
+                                 "--binary", exe,
                                  "--output", cfg,
                                  "--std_defs", std_defs ])
 
@@ -98,6 +99,10 @@ class LinuxTest (unittest.TestCase):
               data = myfile.read()
         self.input = data
 
+
+    def test_qsort_function_ptrs (self):
+        self.runTest("qsort_function_ptrs.cpp", "23")
+        self.runTest("qsort_function_ptrs.cpp", "43")
 
     def test_complex_numbers (self):
         self.runTest("complex_numbers.c")
@@ -235,7 +240,8 @@ class LinuxTest (unittest.TestCase):
         expected_output = subprocess.check_output ([ exe ], stderr = subprocess.STDOUT)
 
         cfg = self.test_dir + "/" + filename + ".cfg"
-        subprocess.check_call ([ disass, "--binary", exe,
+        subprocess.check_call ([ disass,
+                                 "--binary", so,
                                  "--output", cfg,
                                  "--std_defs", std_defs ])
 
