@@ -15,7 +15,7 @@
 
 class CFGWriter {
 public:
-  CFGWriter(mcsema::Module &m, const std::string &moduleName,
+  CFGWriter(mcsema::Module &m, const std::string &module_name,
             Dyninst::SymtabAPI::Symtab &symtab,
             Dyninst::ParseAPI::SymtabCodeSource &symCodeSrc,
             Dyninst::ParseAPI::CodeObject &codeObj,
@@ -24,7 +24,7 @@ public:
   void write();
 
 private:
-  /* Don't want to include all functions in binary */ 
+  /* Don't want to include all functions in binary */
   bool shouldSkipFunction(const std::string &name) const;
 
   void writeDataVariables(Dyninst::SymtabAPI::Region *region,
@@ -47,45 +47,51 @@ private:
                            mcsema::Instruction *cfgInstruction);
   void writeExternalFunctions();
   void writeInternalData();
-  void writeRelocations( Dyninst::SymtabAPI::Region*, mcsema::Segment* );
-  
-  void immediateNonCall( Dyninst::InstructionAPI::Immediate* imm, Dyninst::Address addr, mcsema::Instruction* cfgInstruction);
-  void dereferenceNonCall( Dyninst::InstructionAPI::Dereference*, Dyninst::Address, mcsema::Instruction*);
+  void writeRelocations(Dyninst::SymtabAPI::Region*, mcsema::Segment *);
+
+  void immediateNonCall(Dyninst::InstructionAPI::Immediate *imm,
+                        Dyninst::Address addr,
+                        mcsema::Instruction *cfgInstruction);
+  void dereferenceNonCall(Dyninst::InstructionAPI::Dereference *,
+                          Dyninst::Address,
+                          mcsema::Instruction *);
 
 
-  std::string getXrefName( Dyninst::Address addr );
-  void xrefsInSegment( Dyninst::SymtabAPI::Region* region, mcsema::Segment* segment );  
+  std::string getXrefName(Dyninst::Address addr);
+  void xrefsInSegment(Dyninst::SymtabAPI::Region *region,
+                      mcsema::Segment *segment );
   bool isNoReturn( const std::string& str);
-  void getNoReturns(); 
+  void getNoReturns();
 
-  void checkDisplacement( Dyninst::InstructionAPI::Instruction*, mcsema::Instruction*);
+  void checkDisplacement(Dyninst::InstructionAPI::Instruction *,
+                         mcsema::Instruction *);
   bool isExternal(Dyninst::Address addr) const;
   const std::string &getExternalName(Dyninst::Address addr) const;
-  
+
   /* Tries to work out RegisterAST if there's some reference */
   bool tryEval(Dyninst::InstructionAPI::Expression *expr,
-               const Dyninst::Address ip, Dyninst::Address &result) const;
+               const Dyninst::Address ip,
+               Dyninst::Address &result) const;
 
 
   /* Dyninst related objects */
-  mcsema::Module &m_module;
-  std::string m_moduleName;
-  Dyninst::SymtabAPI::Symtab &m_symtab;
-  Dyninst::ParseAPI::CodeObject &m_codeObj;
-  Dyninst::ParseAPI::SymtabCodeSource &m_codeSource;
-  
-  /* After -abi-libraries are fully embraced in master branch, this can go out */
-  const ExternalFunctionManager &m_extFuncMgr;
-  SectionManager m_sectionMgr;
+  mcsema::Module &module;
+  std::string module_name;
+  Dyninst::SymtabAPI::Symtab &symtab;
+  Dyninst::ParseAPI::CodeObject &code_object;
+  Dyninst::ParseAPI::SymtabCodeSource &code_source;
 
-  std::set<std::string> m_skipFuncs;
-  
-  std::unordered_map<Dyninst::Offset, std::string> m_funcMap;
-  std::unordered_map< Dyninst::Address, Dyninst::SymtabAPI::Symbol *> m_globalVars;
-  std::unordered_map< Dyninst::Address, Dyninst::SymtabAPI::Symbol *> m_externalVars;
-  std::unordered_map< Dyninst::Address, Dyninst::SymtabAPI::Symbol *> m_segmentVars;
-  
-  
-  std::vector<Dyninst::SymtabAPI::relocationEntry> m_relocations;
-  std::unordered_set<std::string> m_noreturnFunctions; 
+  /* After -abi-libraries are fully embraced in master branch, this can go out */
+  const ExternalFunctionManager &ext_func_manager;
+  SectionManager section_manager;
+
+  std::set<std::string> skip_funcss;
+
+  std::unordered_map<Dyninst::Offset, std::string> func_map;
+  std::unordered_map< Dyninst::Address, Dyninst::SymtabAPI::Symbol *> global_vars;
+  std::unordered_map< Dyninst::Address, Dyninst::SymtabAPI::Symbol *> external_vars;
+  std::unordered_map< Dyninst::Address, Dyninst::SymtabAPI::Symbol *> segment_vars;
+
+  std::vector<Dyninst::SymtabAPI::relocationEntry> relocations;
+  std::unordered_set<std::string> no_ret_funcs;
 };
