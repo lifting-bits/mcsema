@@ -4897,6 +4897,9 @@ void *__mcsema_externs[] = {
   (void *)(setfsent),
   //BuiltIn(void) endfsent();
   (void *)(endfsent),
+#if defined(__amd64__) || defined(_M_AMD64)
+  //NOTE(artem): These are only present on amd64 (yes, even the x32). The i386 equivalent is la_i86_gnu_*
+  //NOTE(artem): The proper way to handle this is to have per-os libc files, or to avoid architecture specific headers when generating ABI_libc.c
   //Use(TypeDef(Elf64_Addr, Use(TypeDef(uint64_t, Attributed(unsigned , BuiltIn(long)))))) la_x86_64_gnu_pltenter(Pointer(Use(TypeDef(Elf64_Sym, Struct(struct anon_struct_477)))), Attributed(unsigned , BuiltIn(int)), Pointer(Use(TypeDef(uintptr_t, Attributed(unsigned , BuiltIn(long))))), Pointer(Use(TypeDef(uintptr_t, Attributed(unsigned , BuiltIn(long))))), Pointer(Use(TypeDef(La_x86_64_regs, Struct(struct La_x86_64_regs)))), Pointer(Attributed(unsigned , BuiltIn(int))), Pointer(Attributed(const , BuiltIn(char))), Pointer(BuiltIn(long)));
   (void *)(la_x86_64_gnu_pltenter),
   //Attributed(unsigned , BuiltIn(int)) la_x86_64_gnu_pltexit(Pointer(Use(TypeDef(Elf64_Sym, Struct(struct anon_struct_477)))), Attributed(unsigned , BuiltIn(int)), Pointer(Use(TypeDef(uintptr_t, Attributed(unsigned , BuiltIn(long))))), Pointer(Use(TypeDef(uintptr_t, Attributed(unsigned , BuiltIn(long))))), Pointer(Attributed(const , Use(TypeDef(La_x86_64_regs, Struct(struct La_x86_64_regs))))), Pointer(Use(TypeDef(La_x86_64_retval, Struct(struct La_x86_64_retval)))), Pointer(Attributed(const , BuiltIn(char))));
@@ -4905,6 +4908,7 @@ void *__mcsema_externs[] = {
   (void *)(la_x32_gnu_pltenter),
   //Attributed(unsigned , BuiltIn(int)) la_x32_gnu_pltexit(Pointer(Use(TypeDef(Elf32_Sym, Struct(struct anon_struct_476)))), Attributed(unsigned , BuiltIn(int)), Pointer(Use(TypeDef(uintptr_t, Attributed(unsigned , BuiltIn(long))))), Pointer(Use(TypeDef(uintptr_t, Attributed(unsigned , BuiltIn(long))))), Pointer(Attributed(const , Use(TypeDef(La_x86_64_regs, Struct(struct La_x86_64_regs))))), Pointer(Use(TypeDef(La_x86_64_retval, Struct(struct La_x86_64_retval)))), Pointer(Attributed(const , BuiltIn(char))));
   (void *)(la_x32_gnu_pltexit),
+#endif
   // skipping because function pointer args: dl_iterate_phdr
   //Attributed(unsigned , BuiltIn(int)) la_version(Attributed(unsigned , BuiltIn(int)));
   (void *)(la_version),
