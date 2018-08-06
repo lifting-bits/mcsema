@@ -219,6 +219,33 @@ static VectorRegistersInfo GetVectorRegisterInfo() {
 struct CallingConventionInfo {
   using ConstraintTable = std::vector<ArgConstraint>;
 
+  struct PackedReturnInfo {
+    std::vector<std::string> names;
+    llvm::Type *unit_ptr_type;
+    const ValueKind accepted_kinds;
+  };
+
+  // Sometimes types will get returned in several registers, even though
+  // there is no indication of it in function signature
+  static const PackedReturnInfo &GetPackedReturn(ValueKind val_kind) {
+    static const PackedReturnInfo not_found = {{}, nullptr, kInvalidKind};
+    auto ptr_size = static_cast<unsigned>(gArch->address_size);
+
+    if (gArch->IsX86()) {
+      static const std::vector<PackedReturnInfo> return_info = {
+        {{"EAX", "EDX"},
+        llvm::Type::getIntNPtrTy(*gContext, ptr_size),
+        kI64},
+      };
+      for (const auto &entry : return_info) {
+        if (entry.accepted_kinds & val_kind) {
+          return entry;
+        }
+      }
+    }
+    return not_found;
+  }
+
   const ConstraintTable &GetArgumentTable(
       llvm::CallingConv::ID cc) const {
     for (const auto &t : arg_tables) {
@@ -518,6 +545,36 @@ static const char *GetVarImpl(
   return nullptr;
 }
 
+static void StorePackedType(llvm::BasicBlock *block, llvm::Value *ret_val) {
+  const auto &regs = CallingConventionInfo::GetPackedReturn(
+      KindOfValue(ret_val->getType()));
+
+  CHECK(!regs.names.empty() || regs.accepted_kinds == kInvalidKind)
+      << "Could not store return type "
+      << remill::LLVMThingToString(ret_val->getType());
+
+  llvm::IRBuilder<> ir(block);
+
+  // Need to get ptr to some type smaller than actual type is, as
+  // it will be split into multiple registers
+  auto ret_val_alloca = ir.CreateAlloca(ret_val->getType());
+  ir.CreateStore(ret_val, ret_val_alloca);
+  auto ptr_ret_val = ir.CreateBitCast(ret_val_alloca, regs.unit_ptr_type);
+
+  for (auto i = 0U; i < regs.names.size(); ++i) {
+    // Get partial value from offset
+    auto partial_value_ptr = ir.CreateGEP(ptr_ret_val, GetConstantInt(64, i));
+    auto partial_value = ir.CreateLoad(partial_value_ptr);
+
+    llvm::Value *dest_loc = remill::FindVarInFunction(block, regs.names[i]);
+
+    // Store actual value
+    dest_loc = ir.CreateBitCast(dest_loc,
+                                regs.unit_ptr_type);
+    ir.CreateStore(partial_value, dest_loc);
+  }
+}
+
 }  // namespace
 
 CallingConvention::CallingConvention(llvm::CallingConv::ID cc_)
@@ -809,9 +866,18 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
     }
 
     auto val_var = GetVarForNextReturn(under_type);
-    LOG_IF(FATAL, !val_var)
-        << "Could not store return type "
-        << remill::LLVMThingToString(val_type);
+
+    // If register was not found in default table it's possible the value
+    // has to be split into multiple registers
+    if (!val_var) {
+      CHECK(GetNumberOfElements(val_type) == 1)
+          << "Cannot decide how to store "
+          << remill::LLVMThingToString(under_type)
+          << " part of " << remill::LLVMThingToString(val_type);
+
+      StorePackedType(block, ret_val);
+      return;
+    }
 
     // If it's a pointer then convert it to a pointer-sized integer.
     if (under_type->isPointerTy()) {
