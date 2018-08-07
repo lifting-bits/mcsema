@@ -86,7 +86,7 @@ OS_NAME = ""
 # really the external `stderr`, so we want to be able to chop out the `@@...`
 # part to resolve the "true" name. There are a lot of `@@` variants in PE files,
 # e.g. `@@QEAU_..`, `@@AEAV..`, though these are likely for name mangling.
-EXTERNAL_NAMES = ("@@GLIBC_", )
+EXTERNAL_NAMES = ("@@GLIBC_", "@@GLIBCXX_", )
 
 _NOT_ELF_BEGIN_EAS = (0xffffffffL, 0xffffffffffffffffL)
 

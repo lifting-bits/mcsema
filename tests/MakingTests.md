@@ -5,14 +5,6 @@ All modifications should happen to `test_suite_generator`
 
 ## Building `test_suite_generator`:
 
-Install ADA Langauge Support for CMake:
-
-```sh
-git clone git@github.com:offa/cmake-ada.git
-cd cmake-ada
-sudo cmake -P install.cmake
-```
-
 Build the tests:
 
 ```sh

@@ -1,4 +1,9 @@
+
+
 # McSema [![Slack Chat](http://empireslacking.herokuapp.com/badge.svg)](https://empireslacking.herokuapp.com/)
+<p align="center">
+     <img src="docs/images/mcsema_logo.png" />
+</p>
 
 McSema is an executable lifter. It translates ("lifts") executable binaries from native machine code to LLVM bitcode. LLVM bitcode is an [intermediate representation](https://en.wikipedia.org/wiki/Intermediate_representation) form of a program that was originally created for the [retargetable LLVM compiler](https://llvm.org), but which is also very useful for performing program analysis methods that would not be possible to perform on an executable binary directly.
 
@@ -207,4 +212,4 @@ McSema's goal is binary to bitcode translation. Accurate disassembly and control
 
 ### I'm a student and I'd like to contribute to McSema: how can I help
 
-We would love to take you on as an intern to help improve McSema. We have several project ideas labelled `intern_project` in [the issues tracker](https://github.com/trailofbits/mcsema/issues?q=is%3Aissue+is%3Aopen+label%3Aintern_project). You are not limited to those items: if you think of a great feature you want in McSema, let us know and we will sponsor it. Simply contact us on our [Slack channel](https://empireslacking.herokuapp.com/) or via mcsema@trailofbits.com and let us know what you'd want to work on and why.
+We would love to take you on as an intern to help improve McSema. We have several project ideas labelled [`intern project`](https://github.com/trailofbits/mcsema/labels/intern%20project), as well as having smaller scale to-dos labelled under [`good first issue`](https://github.com/trailofbits/mcsema/labels/good%20first%20issue) and [`help wanted`](https://github.com/trailofbits/mcsema/labels/help%20wanted) on our issue tracker. You are not limited to those items: if you think of a great feature you want in McSema, let us know and we will sponsor it. Simply contact us on our [Slack channel](https://empireslacking.herokuapp.com/) or via mcsema@trailofbits.com and let us know what you'd want to work on and why.

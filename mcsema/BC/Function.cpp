@@ -77,7 +77,9 @@ DEFINE_string(exception_personality_func, "__gxx_personality_v0",
               "Add a personality function for lifting exception handling "
               "routine. Assigned __gxx_personality_v0 as default for c++ ABTs.");
 
-
+DEFINE_bool(stack_protector, false, "Annotate functions so that if the bitcode "
+            "is compiled with -fstack-protector-all then the stack protection "
+            "guards will be added.");
 
 namespace mcsema {
 
@@ -128,9 +130,9 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
       func_name, gModule);
 
   // Make sure to keep this function around (along with `ExternalLinkage`).
-  func->addFnAttr(llvm::Attribute::NoInline);
   func->removeFnAttr(llvm::Attribute::ReadNone);
   func->addFnAttr(llvm::Attribute::OptimizeNone);
+  func->addFnAttr(llvm::Attribute::NoInline);
 
 #if LLVM_VERSION_NUMBER < LLVM_VERSION(3, 7)
   func->addFnAttr(llvm::Attribute::ReadOnly);
@@ -163,7 +165,7 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
   // Basically some empty inline assembly that tells the compiler not to
   // optimize away the `state` pointer before each `breakpoint_XXX` function.
   auto asm_func_type = llvm::FunctionType::get(
-      llvm::Type::getVoidTy(*gContext), state_ptr_type);
+      llvm::Type::getVoidTy(*gContext), state_ptr_type, false);
 
   auto asm_func = llvm::InlineAsm::get(
       asm_func_type, "", "*m,~{dirflag},~{fpsr},~{flags}", true);
@@ -353,7 +355,7 @@ static llvm::BasicBlock *GetOrCreateBlock(TranslationContext &ctx,
   return block;
 }
 
-
+// Create a landing pad basic block.
 static void CreateLandingPad(TranslationContext &ctx,
                              struct NativeExceptionFrame *eh_entry) {
   std::stringstream ss;
@@ -442,14 +444,15 @@ static void CreateLandingPad(TranslationContext &ctx,
     llvm::Constant* const_array = llvm::ConstantArray::get(
         array_type, array_value);
     gvar_landingpad->setInitializer(const_array);
-    auto type_index_value = ir.CreateCall(GetExceptionTypeIndex());
+    auto type_index_value2 = ir.CreateCall(GetExceptionTypeIndex());
+    auto type_index_value1 = llvm::ConstantInt::get(dword_type, 0);
 
     // Get the type index from the original binary and set the `RDX` register
-    llvm::ArrayRef<llvm::Value *> indices = {
-        llvm::ConstantInt::get(dword_type, 0),
-        type_index_value
-    };
-    auto var_value = ir.CreateGEP(gvar_landingpad, indices);
+    std::vector<llvm::Value *> array_index_vec;
+    array_index_vec.push_back(type_index_value1);
+    array_index_vec.push_back(type_index_value2);
+
+    auto var_value = ir.CreateGEP(gvar_landingpad, array_index_vec);
 
 
 #if LLVM_VERSION_NUMBER > LLVM_VERSION(3, 6)
@@ -489,7 +492,7 @@ static void CreateLandingPad(TranslationContext &ctx,
   ctx.lp_to_block[eh_entry->lp_ea] = landing_bb;
 }
 
-
+// Lift landing pads within the function.
 static void LiftExceptionFrameLP(TranslationContext &ctx,
                                  const NativeFunction *cfg_func) {
   if (cfg_func->eh_frame.size() > 0) {
@@ -889,6 +892,10 @@ static llvm::Function *LiftFunction(
   lifted_func->addFnAttr(llvm::Attribute::NoInline);
   lifted_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
 
+  if (FLAGS_stack_protector) {
+    lifted_func->addFnAttr(llvm::Attribute::StackProtectReq);
+  }
+
   TranslationContext ctx;
   std::unique_ptr<remill::InstructionLifter> lifter(
       new InstructionLifter(intrinsics.get(), ctx));
@@ -914,7 +921,8 @@ static llvm::Function *LiftFunction(
   // Allocate the stack variable recovered in the function
   auto entry_block = ctx.ea_to_block[cfg_func->ea];
   AllocStackVars(entry_block, cfg_func);
-  // Lift the landing pad if there are exception frames recovered
+
+  // Lift the landing pad if there are exception frames recovered.
   LiftExceptionFrameLP(ctx, cfg_func);
 
   llvm::BranchInst::Create(ctx.ea_to_block[cfg_func->ea],

@@ -1,0 +1,1 @@
+A simple test of raising/throwing C++ exceptions
