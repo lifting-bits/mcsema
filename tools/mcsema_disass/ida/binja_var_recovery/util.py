@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import collections
 import struct
 
@@ -34,6 +35,12 @@ def DEBUG(s):
   global _DEBUG_FILE
   if _DEBUG_FILE:
     _DEBUG_FILE.write("{}{}\n".format(_DEBUG_PREFIX, str(s)))
+    _DEBUG_FILE.flush()
+
+def DEBUG_FLUSH():
+  global _DEBUG_FILE
+  if _DEBUG_FILE:
+    _DEBUG_FILE.flush()
 
 def convert_signed32(num):
   num = num & 0xFFFFFFFF
@@ -71,5 +78,11 @@ def is_ELF(bv):
 
 def is_PE(bv):
   return bv.view_type == 'PE'
+
+def is_data_variable(bv, addr):
+  seg = bv.get_segment_at(addr)
+  if seg == None:
+    return False
+  return (seg.executable == False)
 
   

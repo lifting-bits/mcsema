@@ -13,218 +13,11 @@
 # limitations under the License.
 
 import pprint
+import collections
 import binaryninja as binja
 from binja_var_recovery.util import *
-
-FUNCTION_OBJECTS = dict()
-VARIABLE_AS_PARAMS = dict()
-
-class ILVisitor(object):
-  """ Class functions to visit medium-level IL"""
-  def __init__(self):
-    super(ILVisitor, self).__init__()
-
-  def visit(self, expr):
-    method_name = 'visit_{}'.format(expr.operation.name)
-    DEBUG("calling... {}".format(method_name))
-    if hasattr(self, method_name):
-      value = getattr(self, method_name)(expr)
-    else:
-      value = None
-    return value
-
-  def visit_MLIL_CONST(self, expr):
-    DEBUG("visit_MLIL_CONST : {}".format(expr))
-    return expr.constant
-
-  def visit_MLIL_CONST_PTR(self, expr):
-    DEBUG("visit_MLIL_CONST_PTR : {}".format(expr))
-    return expr.constant
-
-  def visit_MLIL_VAR(self, expr):
-    pass
-
-  def visit_MLIL_ZX(self, expr):
-    src = self.visit(expr.src)
-    DEBUG("visit_MLIL_ZX : {}".format(src))
-    return src
-
-  def visit_MLIL_SET_VAR(self, expr):
-    DEBUG("visit_MLIL_SET_VAR : {}".format(expr))
-    src = self.visit(expr.src)
-    pass
-
-  def visit_MLIL_LOAD(self, expr):
-    pass
-
-  def visit_MLIL_STORE(self, expr):
-    pass
-
-  def visit_MLIL_SET_VAR_SSA(self, expr):
-    pass
-
-  def visit_MLIL_VAR_SSA(self, expr):
-    pass
-
-class SSAVariable(ILVisitor):
-  def __init__(self, var, address_size, func=None):
-    super(SSAVariable, self).__init__()
-    self.address_size = address_size
-    self.var = var
-    if isinstance(var, binja.MediumLevelILInstruction):
-      self.function = var.function
-    else:
-      self.function = func.medium_level_il.ssa_form
-    self.visited = set()
-    self.to_visit = list()
-    self.value_set = set()
-
-  def get_values(self):
-    if isinstance(self.var, binja.MediumLevelILInstruction):
-      var_def = self.function.get_ssa_var_definition(self.var.src)
-    else:
-      var_def = self.function.get_ssa_var_definition(self.var)
-    
-    self.to_visit.append(var_def)
-    while self.to_visit:
-      idx = self.to_visit.pop()
-      if idx is not None:
-        DEBUG("visit {}".format(self.function[idx]))
-        self.visit(self.function[idx])
-
-    return self.value_set
-
-  def visit_MLIL_SET_VAR_ALIASED(self, expr):
-    DEBUG("visit_MLIL_SET_VAR_ALIASED: {}".format(expr))
-    src = self.visit(expr.src)
-    return src
-
-  def visit_MLIL_SET_VAR_SSA(self, expr):
-    ssa_var = expr.dest
-    if isinstance(ssa_var, binja.SSAVariable):
-      possible_value = expr.get_ssa_var_possible_values(ssa_var)
-      if possible_value.type != binja.RegisterValueType.UndeterminedValue:
-        self.value_set.add(possible_value)
-        DEBUG("visit_MLIL_SET_VAR_SSA: possible values {}".format(possible_value))
-      else:
-        src = self.visit(expr.src)
-    else:
-      DEBUG("visit_MLIL_SET_VAR_SSA: Warning! The dest is not ssa variable")
-
-    return self.value_set
-
-  def visit_MLIL_VAR_SSA(self, expr):
-    """ Get the possible value of the ssa variable
-    """
-    ssa_var = expr.src
-    if isinstance(ssa_var, binja.SSAVariable):
-      possible_value = expr.get_ssa_var_possible_values(ssa_var)
-      
-      if possible_value.type == binja.RegisterValueType.EntryValue:
-        func = expr.function
-        DEBUG("Variable name register {} {:x}".format(possible_value.reg, func.current_address))
-        self.value_set.add(possible_value)
-        return self.value_set
-
-      elif possible_value.type == binja.RegisterValueType.ConstantValue:
-        DEBUG("Variable constant value {:x}".format(possible_value.value))
-        self.value_set.add(possible_value)
-        return self.value_set
-
-      elif possible_value.type == binja.RegisterValueType.UndeterminedValue:
-        DEBUG("Undetermined value {} {}".format(possible_value, ssa_var.var.name))
-        if ssa_var.var.name == "__return_addr":
-          self.value_set.add(ssa_var)
-          return self.value_set
-
-    if expr.src not in self.visited:
-      var_def = expr.function.get_ssa_var_definition(expr.src)
-      if var_def is not None:
-        self.to_visit.append(var_def)
-
-  def visit_MLIL_LOAD_SSA(self, expr):
-    """ Resolve the SSA Variable performing memory load
-    """
-    DEBUG("visit_MLIL_LOAD_SSA {}".format(expr))
-    isrc = expr.src
-    operands = binja.MediumLevelILInstruction.ILOperations[isrc.operation]
-
-
-class Function(object):
-  """ The function objects
-  """
-  def __init__(self, bv, func):
-    self.bv = bv
-    self.func = func
-    self.start_addr = func.start
-    self.params = list()
-    self.ssa_variables = collections.defaultdict(list)
-
-  def collect_parameters(self):
-    if self.func is None:
-      return
-
-    num_params = len(self.func.parameter_vars)
-    for ref in self.bv.get_code_refs(self.start_addr):
-      ref_function = ref.function
-      insn_il = ref_function.get_low_level_il_at(ref.address).medium_level_il
-      insn_il_ssa = insn_il.ssa_form if insn_il is not None else None
-      if insn_il_ssa is None:
-        continue
-      
-      DEBUG("Function referred : {} {}".format(ref_function, insn_il_ssa))
-      if not hasattr(insn_il_ssa, "params"):
-        continue
-
-      if isinstance(insn_il_ssa.params, binja.MediumLevelILInstruction):
-        continue
-
-      num_params = len(insn_il_ssa.params) if insn_il_ssa is not None else 0
-      for index in range(num_params):
-        if insn_il_ssa is not None:
-          param = insn_il_ssa.params[index]
-          possible_value = param.possible_values
-          DEBUG("param {} : {} {} possible_values {}".format(index, param, param.operation, possible_value))
-          
-          if possible_value.type != binja.RegisterValueType.UndeterminedValue:
-            param_value = str(possible_value)
-          else:
-            ssa_var = SSAVariable(param, self.bv.address_size)
-            value_set = ssa_var.get_values()
-            DEBUG("param value_set  {}".format(value_set))
-            param_value = param
-          
-          if len(self.params) > index:
-            value_set = self.params[index]
-            value_set.add(param_value)
-            self.params[index] = value_set
-          else:
-            value_set = set()
-            value_set.add(param_value)
-            self.params.append(value_set)
-
-      DEBUG("collect_parameters {}".format(pprint.pformat(self.params)))
-      # Collect the const ptr from the passed variables
-      for args in self.params:
-        DEBUG("parameter  {}".format(pprint.pformat(args)))
-        for item in args:
-          DEBUG("parameter 1  {}".format(pprint.pformat(item)))
-          if isinstance(item, binja.PossibleValueSet):
-            if item.type == binja.RegisterValueType.ConstantPointerValue:
-              VARIABLE_AS_PARAMS[item.value] = 1
-
-  def add_ssa_variables(self, var, value_set):
-    try:
-      self.ssa_variables[var].append(value_set)
-    except KeyError:
-      DEBUG("Variable Key is not found {}".format(var))
-    DEBUG("add_ssa_variables {}".format(pprint.pformat(self.ssa_variables)))
-
-  def print_ssa_variables(self):
-    if len(self.ssa_variables) == 0:
-      return
-    
-    DEBUG("SSA Variables in the function {}".format(pprint.pformat(self.ssa_variables)))
+from binja_var_recovery.il_variable import *
+from binja_var_recovery.il_function import *
 
 class ILInstruction(object):
   def __init__(self, bv, func, insn_il):
@@ -232,9 +25,134 @@ class ILInstruction(object):
     self.address = insn_il.address
     self.bv = bv
     self.function = func
+    self.func_obj = FUNCTION_OBJECTS[func.start]
     self.ssa_variables = collections.defaultdict(list)
+
+  def get_ssa_var_possible_values(self, ssa_var):
+    if ssa_var is None:
+      return None
+
+    var_name = "{}#{}".format(ssa_var.var.name, ssa_var.version)
+    possible_value = self.insn.get_ssa_var_possible_values(ssa_var)
+    if possible_value.type == binja.RegisterValueType.EntryValue:
+      value_set = self.func_obj.get_entry_register(possible_value.reg)
+      DEBUG("value_set {} ".format(pprint.pformat(value_set)))
+      self.ssa_variables[var_name].append(value_set)
+    elif possible_value.type != binja.RegisterValueType.UndeterminedValue:
+      self.ssa_variables[var_name].append(possible_value)
+    else:
+      var = SSAVariable(ssa_var, self.bv.address_size, self.function)
+      self.ssa_variables[var_name].append(var.get_values())
+
+    return var_name, self.ssa_variables[var_name]
+
+  def MLIL_IF(self, expr):
+    pass
+
+  def MLIL_SET_VAR_SSA(self, expr):
+    if isinstance(expr.dest, binja.SSAVariable):
+      var_name, value_set = self.get_ssa_var_possible_values(expr.dest)
+      self.func_obj.add_ssa_variables(var_name, value_set, self.insn)
+      DEBUG("MLIL_SET_VAR_SSA {} value set {}".format(expr, pprint.pformat(value_set)))
+
+  def MLIL_VAR_SSA(self, expr):
+    DEBUG("MLIL_VAR_SSA {}".format(expr))
+    if isinstance(expr.src, binja.SSAVariable):
+      var_name, value_set = self.get_ssa_var_possible_values(expr.src)
+      self.func_obj.add_ssa_variables(var_name, value_set, self.insn)
+
+  def MLIL_CONST(self, expr):
+    DEBUG("MLIL_CONST {}".format(expr))
+    return expr.constant
+
+  def MLIL_CONST_PTR(self, expr):
+    DEBUG("MLIL_CONST_PTR {}".format(expr))
+    return expr.constant
+
+  def MLIL_RET(self, expr):
+    DEBUG("MLIL_RET {}".format(expr))
+    isrc = expr.src
+    for item in isrc:
+      if item.operation == binja.MediumLevelILOperation.MLIL_VAR_SSA:
+        ssa_var = item.src
+        possible_value = expr.get_ssa_var_possible_values(ssa_var)
+        DEBUG("Expr {} {}".format(item, possible_value))
+        if possible_value.type == binja.RegisterValueType.EntryValue:
+          value_set = self.func_obj.get_entry_register(possible_value.reg)
+          DEBUG("value_set {} ".format(pprint.pformat(value_set)))
+          
+  def MLIL_STORE_SSA(self, expr):
+    DEBUG("MLIL_STORE_SSA {}".format(expr))
+    # handle the expr destination
+    if isinstance(expr.dest, binja.MediumLevelILInstruction):
+      idest = expr.dest
+      DEBUG("MLIL_STORE_SSA idest {} type {}".format(idest, idest.operation.name))
+      if idest.operation == binja.MediumLevelILOperation.MLIL_VAR_SSA:
+        ssa_var = idest.src
+        possible_values = idest.get_ssa_var_possible_values(ssa_var)
+        if possible_values.type == binja.RegisterValueType.ConstantPointerValue:
+          value = possible_values.value
+          DEBUG("MLIL_STORE_SSA {}".format(value))
+        else:
+          DEBUG("MLIL_STORE_SSA {}".format(possible_values))
+      elif idest.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+        value = idest.constant
+        size = expr.size
+        DEBUG("MLIL_STORE_SSA {:x} size {}".format(value, size))
+        VARIABLE_ALIAS_SET.add(value, value + size)
+      elif idest.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+        pass
+
+    isrc = expr.src
+    operation_name = "{}".format(isrc.operation.name)
+    if hasattr(self, operation_name):
+      getattr(self, operation_name)(isrc)
+
+  def MLIL_LOAD_SSA(self, expr):
+    DEBUG("MLIL_LOAD_SSA {}".format(expr))
+    # handle the expr source
+    if isinstance(expr.src, binja.MediumLevelILInstruction):
+      isrc = expr.src
+      op = isrc.operation
+      if op == binja.MediumLevelILOperation.MLIL_VAR_SSA:
+        ssa_var = isrc.src
+        possible_values = isrc.get_ssa_var_possible_values(ssa_var)
+        if possible_values.type == binja.RegisterValueType.ConstantPointerValue:
+          value = possible_values.value
+          DEBUG("MLIL_LOAD_SSA {}".format(value))
+        else:
+          DEBUG("MLIL_LOAD_SSA {}".format(possible_values))
+
+      elif op == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+        value = isrc.constant
+        size = isrc.size
+        DEBUG("MLIL_LOAD_SSA {} size {}".format(value, size))
+    #operation_name = "{}".format(isrc.operation.name)
+    #if hasattr(self, operation_name):
+    #  getattr(self, operation_name)(isrc)
+
+    operation_name = "{}".format(expr.dest.operation.name)
+    if hasattr(self, operation_name):
+      getattr(self, operation_name)(expr.dest)
+
+  def MLIL_CALL_SSA(self, expr):
+    DEBUG("MLIL_CALL_SSA {}".format(expr))
+    if isinstance(expr.params, binja.MediumLevelILInstruction):
+      return
+
+    for index in range(len(expr.params)):
+      parameter = expr.params[index]
+      possible_value = parameter.possible_values
     
+      if possible_value.type != binja.RegisterValueType.UndeterminedValue:
+        DEBUG("param value_set  {}".format(possible_value))
+      else:
+        ssa_var = SSAVariable(parameter.src, self.bv.address_size, self.function)
+        ssa_value = ssa_var.get_values()
+        DEBUG("param value_set  {}".format(ssa_value))
+
   def process_instruction(self):
+    var_name = None
     insn_op = self.insn.operation
     if insn_op == binja.MediumLevelILOperation.MLIL_SET_VAR_SSA:
       if isinstance(self.insn.dest, binja.SSAVariable):
@@ -247,6 +165,7 @@ class ILInstruction(object):
           var = SSAVariable(self.insn.dest, self.bv.address_size, self.function)
           var_name = "{}#{}".format(ssa_var.var.name, ssa_var.version)
           self.ssa_variables[var_name].append(var.get_values())
+        self.func_obj.add_ssa_variables(var_name, self.ssa_variables[var_name], self.insn)
 
     elif insn_op ==  binja.MediumLevelILOperation.MLIL_STORE_SSA:
       insn_dest = self.insn.dest
@@ -260,7 +179,6 @@ class ILInstruction(object):
       insn_src = self.insn.src
       for ssa_var in insn_src:
         possible_value = self.insn.get_ssa_var_possible_values(ssa_var)
-        DEBUG("VAR_PHI {} {}".format(ssa_var, possible_value))
         if possible_value.type == binja.RegisterValueType.UndeterminedValue:
           var = SSAVariable(ssa_var, self.bv.address_size, self.function)
           value_set = var.get_values()
@@ -268,10 +186,10 @@ class ILInstruction(object):
           self.ssa_variables[var_name].append(value_set)
         else:
           var_name = "{}#{}".format(ssa_var.var.name, ssa_var.version)
-          self.ssa_variables[var_name].append(possible_value) 
+          self.ssa_variables[var_name].append(possible_value)
+        self.func_obj.add_ssa_variables(var_name, self.ssa_variables[var_name], self.insn)
 
     elif insn_op  == binja.MediumLevelILOperation.MLIL_SET_VAR_ALIASED:
-      DEBUG("MLIL_SET_VAR_ALIASED {} {}".format(type(self.insn.src), self.insn.dest))
       if isinstance(self.insn.dest, binja.SSAVariable):
         ssa_var = self.insn.dest
         possible_values = self.insn.get_ssa_var_possible_values(ssa_var)
@@ -282,12 +200,11 @@ class ILInstruction(object):
           var = SSAVariable(self.insn.dest, self.bv.address_size, self.function)
           var_name = "{}#{}".format(ssa_var.var.name, ssa_var.version)
           self.ssa_variables[var_name].append(var.get_values())
+        self.func_obj.add_ssa_variables(var_name, self.ssa_variables[var_name], self.insn)
 
       elif isinstance(self.insn.src, binja.MediumLevelILInstruction):
         var = SSAVariable(self.insn.src, self.bv.address_size)
         value = var.get_values()
-
-    DEBUG("process_instruction {}".format(pprint.pformat(self.ssa_variables)))
   
   def handle_store(self):
     index = 0
