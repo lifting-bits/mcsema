@@ -545,13 +545,18 @@ static const char *GetVarImpl(
   return nullptr;
 }
 
-static void StorePackedType(llvm::BasicBlock *block, llvm::Value *ret_val) {
+// In special cases one type can be returned via two registers
+static bool TryStorePackedType(llvm::BasicBlock *block, llvm::Value *ret_val) {
   const auto &regs = CallingConventionInfo::GetPackedReturn(
       KindOfValue(ret_val->getType()));
 
-  CHECK(!regs.names.empty() || regs.accepted_kinds == kInvalidKind)
+  if (regs.names.empty() || regs.accepted_kinds == kInvalidKind) {
+    LOG(INFO)
       << "Could not store return type "
-      << remill::LLVMThingToString(ret_val->getType());
+      << remill::LLVMThingToString(ret_val->getType())
+      << " as packed type";
+    return false;
+  }
 
   llvm::IRBuilder<> ir(block);
 
@@ -573,6 +578,7 @@ static void StorePackedType(llvm::BasicBlock *block, llvm::Value *ret_val) {
                                 regs.unit_ptr_type);
     ir.CreateStore(partial_value, dest_loc);
   }
+  return true;
 }
 
 }  // namespace
@@ -867,16 +873,18 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
 
     auto val_var = GetVarForNextReturn(under_type);
 
-    // If register was not found in default table it's possible the value
-    // has to be split into multiple registers
+    // If register was not found in default table it's possible
+    // that we are dealing with some special corner case
     if (!val_var) {
-      CHECK(GetNumberOfElements(val_type) == 1)
+      if (GetNumberOfElements(val_type) == 1 &&
+          TryStorePackedType(block, ret_val)) {
+        return;
+      }
+
+      LOG(FATAL)
           << "Cannot decide how to store "
           << remill::LLVMThingToString(under_type)
           << " part of " << remill::LLVMThingToString(val_type);
-
-      StorePackedType(block, ret_val);
-      return;
     }
 
     // If it's a pointer then convert it to a pointer-sized integer.
