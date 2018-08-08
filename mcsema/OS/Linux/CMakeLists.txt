@@ -34,7 +34,7 @@ function(add_runtime_helper target_name source_file address_bit_size)
   add_runtime(${target_name}
     SOURCES ${source_file}
     ADDRESS_SIZE ${address_bit_size}
-    BCFLAGS "-m${address_bit_size}" "-std=${required_cpp_standard}" "-Wno-deprecated-declarations"
+    BCFLAGS "-xc" "-m${address_bit_size}" "-std=c11" "-Wno-deprecated-declarations"
     INCLUDEDIRECTORIES "${CMAKE_SOURCE_DIR}"
     INSTALLDESTINATION "${install_folder}"
     DEPENDENCIES ${ARGN}

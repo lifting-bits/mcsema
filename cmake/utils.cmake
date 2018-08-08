@@ -1,6 +1,3 @@
-# This is an exact copy of the cmake/utils.cmake file in the Remill
-# repository; you are encouraged to keep them in sync
-
 cmake_minimum_required(VERSION 3.2)
 
 function(FindAndSelectClangCompiler)
@@ -26,25 +23,33 @@ function(FindAndSelectClangCompiler)
   if(NOT DEFINED CMAKE_C_COMPILER)
     if(DEFINED LLVM_INSTALL_PREFIX)
       set(CMAKE_C_COMPILER "${LLVM_INSTALL_PREFIX}/bin/clang${executable_extension}"
-        CACHE PATH "Path to clang binary." PARENT_SCOPE)
+        CACHE PATH "Path to clang binary." FORCE)
     else()
       set(CMAKE_C_COMPILER "clang" PARENT_SCOPE)
     endif()
+  endif()
+  
+  if (NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "Clang" AND NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "AppleClang")
+    message(FATAL_ERROR "Remill and its dependent libraries must be compiled with Clang.")
   endif()
 
   if(NOT DEFINED CMAKE_CXX_COMPILER)
     if(DEFINED LLVM_INSTALL_PREFIX)
       set(CMAKE_CXX_COMPILER "${LLVM_INSTALL_PREFIX}/bin/clang++${executable_extension}"
-        CACHE PATH "Path to clang++ binary." PARENT_SCOPE)
+        CACHE PATH "Path to clang++ binary." FORCE)
     else()
       set(CMAKE_CXX_COMPILER "clang++${executable_extension}" PARENT_SCOPE)
     endif()
+  endif()
+  
+  if (NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+    message(FATAL_ERROR "Remill and its dependent libraries must be compiled with Clang.")
   endif()
 
   if(NOT DEFINED CMAKE_ASM_COMPILER)
     if(DEFINED LLVM_INSTALL_PREFIX)
       set(CMAKE_ASM_COMPILER "${LLVM_INSTALL_PREFIX}/bin/clang++${executable_extension}"
-        CACHE PATH "Path to assembler (aka clang) binary." PARENT_SCOPE)
+        CACHE PATH "Path to assembler (aka clang) binary." FORCE)
     else()
       set(CMAKE_ASM_COMPILER ${CMAKE_CXX_COMPILER} PARENT_SCOPE)
     endif()
@@ -53,7 +58,7 @@ function(FindAndSelectClangCompiler)
   if(NOT DEFINED CMAKE_LLVM_LINK)
     if(DEFINED LLVM_INSTALL_PREFIX)
       set(CMAKE_LLVM_LINK "${LLVM_INSTALL_PREFIX}/bin/llvm-link${executable_extension}"
-        CACHE PATH "Path to llvm-link binary." PARENT_SCOPE)
+        CACHE PATH "Path to llvm-link binary." FORCE)
     else()
       set(CMAKE_LLVM_LINK "llvm-link${executable_extension}" PARENT_SCOPE)
     endif()
