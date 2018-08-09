@@ -66,7 +66,8 @@ int main(int argc, char **argv) {
   //FLAGS_logtostderr = 1;
 
   CHECK(!FLAGS_binary.empty()) << "Input file need to be specified";
-  auto inputFile = FLAGS_binary;
+  auto inputStr = FLAGS_binary;
+  auto inputFile = const_cast<char *>(inputStr.data());
 
   // Load external symbol definitions (for now, only functions)
   ExternalFunctionManager extFuncMgr;
@@ -90,17 +91,14 @@ int main(int argc, char **argv) {
   // Set up Dyninst stuff
 
   auto symtabCS =
-      std::make_shared<ParseAPI::SymtabCodeSource>((char *)inputFile.c_str());
-  if (!symtabCS)
-    return 1;
+      std::make_shared<ParseAPI::SymtabCodeSource>(inputFile);
+  CHECK(symtabCS) << "Error during creation of ParseAPI::SymtabCodeSource!";
 
   auto symtab = symtabCS->getSymtabObject();
-  if (!symtab)
-    return 1;
+  CHECK(symtab) << "Error during creation of SymtabObject";
 
   auto codeObj = std::make_shared<ParseAPI::CodeObject>(symtabCS.get());
-  if (!codeObj)
-    return 1;
+  CHECK(codeObj) << "Error during creation of ParseAPI::CodeObject";
 
   codeObj->parse();
 
@@ -126,7 +124,7 @@ int main(int argc, char **argv) {
 
   mcsema::Module m;
 
-  CFGWriter cfgWriter(m, inputFile, *symtab, *symtabCS, *codeObj, extFuncMgr);
+  CFGWriter cfgWriter(m, FLAGS_binary, *symtab, *symtabCS, *codeObj, extFuncMgr);
   cfgWriter.write();
 
   // Dump the CFG file in a human-readable format if requested

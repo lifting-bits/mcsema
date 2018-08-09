@@ -10,9 +10,9 @@ void SectionManager::AddRegion(Region *r) {
 
 bool SectionManager::IsData(Address a) const {
   const auto &dataRegions{GetDataRegions()};
-  const Offset o = (const Offset)a;
+  const Offset o = static_cast<const Offset>(a);
 
-  for (auto r : dataRegions) {
+  for (auto &r : dataRegions) {
     if (r->isOffsetInRegion(o))
       return true;
   }
