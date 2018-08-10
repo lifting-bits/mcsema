@@ -29,7 +29,6 @@ import pprint
 from collections import namedtuple
 # Bring in utility libraries.
 from util import *
-from rtti import *
 
 frame_entry = namedtuple('frame_entry', ['cs_start', 'cs_end', 'cs_lp', 'cs_action'])
 _FUNC_UNWIND_FRAME_EAS = set()
@@ -440,9 +439,6 @@ def recover_exception_table():
     if seg_name in [".eh_frame", "__eh_frame"]:
       recover_frame_entries(seg_ea)
       break
-
-  # Parse RTTI information
-  recover_rtti()
 
 def recover_exception_entries(F, func_ea):
   has_unwind_frame = func_ea in _FUNC_LSDA_ENTRIES.keys()
