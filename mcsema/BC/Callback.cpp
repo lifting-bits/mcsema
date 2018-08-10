@@ -541,8 +541,6 @@ static void ImplementExplicitArgsExitPoint(
   callback_func->addFnAttr(llvm::Attribute::AlwaysInline);
   callback_func->removeFnAttr(llvm::Attribute::NoUnwind);
 
-  InsertVerifyFunction(callback_func);
-
   if (FLAGS_stack_protector) {
     callback_func->addFnAttr(llvm::Attribute::StackProtectReq);
   }
