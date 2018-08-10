@@ -682,11 +682,8 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
 
   remill::CloneBlockFunctionInto(callback_func);
 
-  // Always inline so that static analyses of the bitcode don't need to dive
-  // into an extra function just to see the intended call.
-  callback_func->removeFnAttr(llvm::Attribute::NoInline);
-  callback_func->addFnAttr(llvm::Attribute::InlineHint);
-  callback_func->addFnAttr(llvm::Attribute::AlwaysInline);
+  // We don't want this function to be inlined, since it was causing problems
+  // with llvm optimizations run by runO3
 
   CallingConvention loader(gArch->DefaultCallingConv());
 
