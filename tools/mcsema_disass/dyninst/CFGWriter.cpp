@@ -23,6 +23,35 @@ DECLARE_string(entrypoint);
 using namespace Dyninst;
 using namespace mcsema;
 
+namespace {
+  Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
+                                   Address start,
+                                   size_t index) {
+    for (auto func : code_object.funcs()) {
+      if (func->addr() == start) {
+        auto entry_block = func->entry();
+
+        using Insn = std::map<Offset, InstructionAPI::Instruction::Ptr>;
+        Insn instructions;
+        entry_block->getInsns(instructions);
+        auto callq = std::prev(instructions.end(), 2 + index);
+
+        auto second_operand = callq->second.get()->getOperand(1);
+        auto operand_value = dynamic_cast<InstructionAPI::Immediate *>(second_operand.getValue().get());
+        Address offset = operand_value->eval().convert<Address>();
+        code_object.parse(offset, true);
+        LOG(INFO) << "Retrieving info from _start at index " << index
+                  << " got addr 0x" << std::hex << offset << std::dec;
+        return offset;
+      }
+    }
+    LOG(FATAL) << "Was not able to retrieve info from _start at index "
+               << index;
+  }
+
+
+} //namespace
+
 CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
                      SymtabAPI::Symtab &symtab,
                      ParseAPI::SymtabCodeSource &symCodeSrc,
@@ -47,6 +76,7 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
 
   std::vector<SymtabAPI::Function *> functions;
   symtab.getAllFunctions(functions);
+  bool is_stripped = (functions.size()) ? false : true;
 
   std::vector<SymtabAPI::Region *> regions;
   symtab.getAllRegions(regions);
@@ -59,38 +89,24 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
   // passed to __libc_start_main as last argument from _start, which we can
   // find, because it is entrypoint
   code_object.parse(entry_point, true);
-  Address main_offset = 0;
+  Address main_offset = TryRetrieveAddrFromStart(code_object, entry_point, 0);
+  Address ctor_offset = TryRetrieveAddrFromStart(code_object, entry_point, 1);
+  Address dtor_offset = TryRetrieveAddrFromStart(code_object, entry_point, 2);
 
   // TODO(lukas): Check if there's a better way
-  for (auto func : code_object.funcs()) {
-    if (func->addr() == entry_point) {
-      auto entry_block = func->entry();
 
-      using Insn = std::map<Offset, InstructionAPI::Instruction::Ptr>;
-      Insn instructions;
-      entry_block->getInsns(instructions);
-      auto callq = std::prev(instructions.end(), 2);
-
-      auto second_operand = callq->second.get()->getOperand(1);
-      auto operand_value = dynamic_cast<InstructionAPI::Immediate *>(second_operand.getValue().get());
-      main_offset = operand_value->eval().convert<Address>();
-      LOG(INFO) << "Main is " << std::hex << main_offset << std::dec;
-      code_object.parse(main_offset, true);
-    }
-  }
   CHECK(main_offset) << "Entrypoint with name "
                      << FLAGS_entrypoint
                      <<" was not found!";
 
   for (auto func : code_object.funcs()) {
-    if (func->addr() == main_offset) {
-      func_map[func->addr()] = FLAGS_entrypoint;
-    } else {
-      func_map[func->addr()] = func->name();
-    }
-    LOG(INFO) << "Found function "
-              << func_map[func->addr()]
-              << " at " << std::hex << func->addr() << std::dec;
+    func_map[func->addr()] = func->name();
+  }
+  func_map[main_offset] = FLAGS_entrypoint;
+
+  if (is_stripped) {
+    func_map[ctor_offset] = "init";
+    func_map[dtor_offset] = "fini";
   }
 
   for (auto reg : regions) {
