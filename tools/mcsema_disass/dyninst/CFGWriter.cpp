@@ -462,7 +462,7 @@ void CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
                                    Address addr,
                                    mcsema::Instruction* cfgInstruction) {
 
-       std::vector<InstructionAPI::InstructionAST::Ptr> children;
+      std::vector<InstructionAPI::InstructionAST::Ptr> children;
       deref->getChildren(children);
       auto expr = dynamic_cast<InstructionAPI::Expression *>(children[0].get());
 
@@ -487,6 +487,61 @@ void CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
 }
 
 
+void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
+                           Address addr) {
+  auto func = func_map.find(addr);
+  if (func != func_map.end()) {
+    auto code_ref = AddCodeXref(cfg_instruction,
+                                  CodeReference::CodeTarget,
+                                  CodeReference::ControlFlowOperand,
+                                  CodeReference::Internal, addr,
+                                  func->second);
+    if (isExternal(addr)) {
+      code_ref->set_location(CodeReference::External);
+    }
+    LOG(INFO) << "Function xref";
+    return;
+  }
+
+  auto g_var = global_vars.find(addr);
+  if (g_var != global_vars.end()) {
+    auto code_ref = AddCodeXref(cfg_instruction,
+                                  CodeReference::DataTarget,
+                                  CodeReference::MemoryOperand,
+                                  CodeReference::Internal, addr,
+                                  g_var->second->getMangledName());
+    LOG(INFO) << "Global var xref";
+    return;
+  }
+
+  auto s_var = segment_vars.find(addr);
+  if (s_var != segment_vars.end()) {
+    auto code_ref = AddCodeXref(cfg_instruction,
+                                  CodeReference::DataTarget,
+                                  CodeReference::MemoryOperand,
+                                  CodeReference::Internal, addr,
+                                  s_var->second->getMangledName());
+    LOG(INFO) << "Segment var xref";
+    return;
+  }
+
+  auto ext_var = external_vars.find(addr);
+  if (ext_var != external_vars.end()) {
+    auto code_ref = AddCodeXref(cfg_instruction,
+                                  CodeReference::DataTarget,
+                                  CodeReference::MemoryOperand,
+                                  CodeReference::External, addr,
+                                  s_var->second->getMangledName());
+    LOG(INFO) << "External var xref";
+    return;
+  }
+  LOG(INFO) << "Could not recognize xref anywhere falling to default";
+  auto code_ref = AddCodeXref(cfg_instruction,
+                                CodeReference::DataTarget,
+                                CodeReference::MemoryOperand,
+                                CodeReference::Internal, addr);
+}
+
 void CFGWriter::handleNonCallInstruction(
     Dyninst::InstructionAPI::Instruction *instruction,
     Address addr,
@@ -510,20 +565,25 @@ void CFGWriter::handleNonCallInstruction(
         auto bf = dynamic_cast<InstructionAPI::BinaryFunction *>(expr.get())) {
 
       // 268 stands for lea
+      // 8 stands for jump
       auto instruction_id = instruction->getOperation().getID();
-      if (instruction_id != 268) {
-        continue;
-      }
-      Address a;
-      if( tryEval(expr.get(), addr, a)) {
-        auto cfgCodeRef = AddCodeXref(cfgInstruction,
-                        CodeReference::DataTarget,
-                        CodeReference::MemoryOperand,
-                        CodeReference::Internal, a,
-                        getXrefName(a));
-        if (isExternal(a) ||
-          external_vars.find(a) != external_vars.end()) {
-          cfgCodeRef->set_location(CodeReference::External);
+      if (instruction_id == 268) {
+        Address a;
+        //addr -= instruction->size();
+        if( tryEval(expr.get(), addr, a)) {
+          handleXref(cfgInstruction, a);
+        }
+      } else if (instruction_id == 8) {
+        Address a;
+        if (tryEval(expr.get(), addr - instruction->size(), a)) {
+          auto code_ref = AddCodeXref(cfgInstruction,
+                                      CodeReference::CodeTarget,
+                                      CodeReference::ControlFlowOperand,
+                                      CodeReference::Internal, a);
+          if (isExternal(a)) {
+            code_ref->set_location(CodeReference::External);
+            code_ref->set_name(getXrefName(a));
+          }
         }
       }
     }
@@ -576,17 +636,22 @@ void CFGWriter::xrefsInSegment(SymtabAPI::Region* region,
   auto offset = static_cast<std::uint64_t*>(region->getPtrToRawData());
 
   for (int j = 0; j < region->getDiskSize(); j += 8, offset++) {
-    SymtabAPI::Function* func;
-    if (!symtab.findFuncByEntryOffset(func, *offset)){
+    //SymtabAPI::Function* func;
+    //if (!symtab.findFuncByEntryOffset(func, *offset)){
+    //  continue;
+    //}
+    auto func = func_map.find(*offset);
+    if (func == func_map.end()) {
       continue;
     }
 
+    LOG(INFO) << "Founf xref at " << region->getMemOffset() + j;
     auto xref = segment->add_xrefs();
     xref->set_ea(region->getMemOffset() + j);
     //TODO(lukas): Probably should not be hardcoded
     xref->set_width(8);
     xref->set_target_ea(*offset);
-    xref->set_target_name(func->getName());
+    xref->set_target_name(func->second);
     xref->set_target_is_code(true); // TODO: Check
     xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
   }

@@ -57,6 +57,7 @@ private:
                           Dyninst::Address,
                           mcsema::Instruction *);
 
+  void handleXref(mcsema::Instruction *, Dyninst::Address);
 
   std::string getXrefName(Dyninst::Address addr);
   void xrefsInSegment(Dyninst::SymtabAPI::Region *region,
