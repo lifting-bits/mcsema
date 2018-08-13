@@ -13,7 +13,12 @@
 
 #include <ArchSpecificFormatters.h>
 
+#include <glog/logging.h>
+#include <gflags/gflags.h>
+
 #include "Util.h"
+
+DECLARE_string(entrypoint);
 
 using namespace Dyninst;
 using namespace mcsema;
@@ -22,34 +27,70 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
                      SymtabAPI::Symtab &symtab,
                      ParseAPI::SymtabCodeSource &symCodeSrc,
                      ParseAPI::CodeObject &codeObj,
-                     const ExternalFunctionManager &extFuncMgr)
+                     const ExternalFunctionManager &extFuncMgr,
+                     Address entry_point)
     : module(m),
       module_name(module_name),
       symtab(symtab),
       code_source(symCodeSrc),
       code_object(codeObj),
-      ext_func_manager(extFuncMgr) {
-  // Populate func_map
-
-  std::vector<SymtabAPI::Function *> functions;
-  symtab.getAllFunctions(functions);
-
-  for (auto func : functions) {
-    func_map[func->getOffset()] = *(func->mangled_names_begin());
-  }
+      ext_func_manager(extFuncMgr),
+      entry_point(entry_point) {
 
   // Populate skip_funcss with some functions known to cause problems
-
   skip_funcss = {
                  "_fini",
                  "__libc_start_main"
                  };
+
+  // Populate func_map
+
+  std::vector<SymtabAPI::Function *> functions;
+  symtab.getAllFunctions(functions);
 
   std::vector<SymtabAPI::Region *> regions;
   symtab.getAllRegions(regions);
 
   for (auto reg : regions) {
       section_manager.AddRegion(reg);
+  }
+
+  // We need to get main! Heuristic for stripped binaries is that main is
+  // passed to __libc_start_main as last argument from _start, which we can
+  // find, because it is entrypoint
+  code_object.parse(entry_point, true);
+  Address main_offset = 0;
+
+  // TODO(lukas): Check if there's a better way
+  for (auto func : code_object.funcs()) {
+    if (func->addr() == entry_point) {
+      auto entry_block = func->entry();
+
+      using Insn = std::map<Offset, InstructionAPI::Instruction::Ptr>;
+      Insn instructions;
+      entry_block->getInsns(instructions);
+      auto callq = std::prev(instructions.end(), 2);
+
+      auto second_operand = callq->second.get()->getOperand(1);
+      auto operand_value = dynamic_cast<InstructionAPI::Immediate *>(second_operand.getValue().get());
+      main_offset = operand_value->eval().convert<Address>();
+      LOG(INFO) << "Main is " << std::hex << main_offset << std::dec;
+      code_object.parse(main_offset, true);
+    }
+  }
+  CHECK(main_offset) << "Entrypoint with name "
+                     << FLAGS_entrypoint
+                     <<" was not found!";
+
+  for (auto func : code_object.funcs()) {
+    if (func->addr() == main_offset) {
+      func_map[func->addr()] = FLAGS_entrypoint;
+    } else {
+      func_map[func->addr()] = func->name();
+    }
+    LOG(INFO) << "Found function "
+              << func_map[func->addr()]
+              << " at " << std::hex << func->addr() << std::dec;
   }
 
   for (auto reg : regions) {
@@ -62,12 +103,12 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
 }
 
 void CFGWriter::write() {
+  writeExternalFunctions();
   writeExternalVariables();
   writeInternalData();
   writeGlobalVariables();
 
   writeInternalFunctions();
-  writeExternalFunctions();
 
   module.set_name(module_name);
 }
@@ -76,6 +117,7 @@ void CFGWriter::writeExternalVariables() {
   std::vector<SymtabAPI::Symbol *> symbols;
   symtab.getAllSymbolsByType(symbols, SymtabAPI::Symbol::ST_OBJECT);
 
+  LOG(INFO) << "Writing " << symbols.size() << " external variables";
   for (const auto &s : symbols) {
     if (s->isInDynSymtab()) {
       external_vars.insert( { s->getOffset(), s } );
@@ -95,7 +137,8 @@ void CFGWriter::writeGlobalVariables() {
   for (auto &a : vars) {
     if (a->getRegion() && (a->getRegion()->getRegionName() == ".bss" ||
                            a->getRegion()->getRegionName() == ".rodata")) {
-
+      LOG(INFO) << "Found global variable " << a->getMangledName()
+                << " at " << std::hex << a->getOffset() << std::dec;
       auto globalVar = module.add_global_vars();
       globalVar->set_ea(a->getOffset());
       globalVar->set_name(a->getMangledName());
@@ -130,8 +173,8 @@ void CFGWriter::writeInternalFunctions() {
       continue;
     else if (isExternal(func->entry()->start()))
       continue;
-    else if (func->name().substr(0, 4) == "targ")
-      continue;
+    //else if (func->name().substr(0, 4) == "targ")
+    //  continue;
 
     // Add an entry in the protocol buffer
 
@@ -227,10 +270,13 @@ void CFGWriter::writeInstruction(InstructionAPI::Instruction *instruction,
   std::vector<InstructionAPI::Operand> operands;
   instruction->getOperands(operands);
 
-  if (instruction->getCategory() == InstructionAPI::c_CallInsn)
+  if (instruction->getCategory() == InstructionAPI::c_CallInsn) {
+    LOG(INFO) << "Call " << addr;
     handleCallInstruction(instruction, addr, cfgInstruction);
-  else
+  } else {
+    LOG(INFO) << "NoCall " << addr;
     handleNonCallInstruction(instruction, addr, cfgInstruction);
+  }
 }
 
 bool getDisplacement(InstructionAPI::Instruction *instruction,
@@ -462,8 +508,10 @@ void CFGWriter::handleNonCallInstruction(
       dereferenceNonCall( deref, addr, cfgInstruction);
     } else if (
         auto bf = dynamic_cast<InstructionAPI::BinaryFunction *>(expr.get())) {
-    // 268 stands for lea
-      if (instruction->getOperation().getID() != 268) {
+
+      // 268 stands for lea
+      auto instruction_id = instruction->getOperation().getID();
+      if (instruction_id != 268) {
         continue;
       }
       Address a;
@@ -486,10 +534,15 @@ void CFGWriter::handleNonCallInstruction(
 void CFGWriter::writeExternalFunctions() {
   std::vector<std::string> unknown;
   auto known = ext_func_manager.GetAllUsed( unknown );
+  LOG(INFO) << "Found " << known.size() << " external functions";
+  LOG(INFO) << "Found " << unknown.size()
+            << "possibly unknown external functions";
+
   for (auto &name : unknown) {
     known.push_back({name});
-    std::cout << "Possibly unknown external " << name << std::endl;
+    LOG(INFO) << "Possibly unknown external " << name;
   }
+
   for (auto &func : known) {
     Address a;
     bool found = false;

@@ -78,8 +78,12 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
           throw std::runtime_error{"error while parsing symbol definition"};
         }
 
+        bool is_weak = false;
+        if (symbolName == "__gmon_start__") {
+          is_weak = true;
+        }
         ExternalFunction func{symbolName, callConv, !noReturn, argCount,
-                          false /* TODO? */, signature};
+                              is_weak, signature};
 
         external_funcs[symbolName] = func;
         return;

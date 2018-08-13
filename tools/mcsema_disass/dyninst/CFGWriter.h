@@ -19,7 +19,8 @@ public:
             Dyninst::SymtabAPI::Symtab &symtab,
             Dyninst::ParseAPI::SymtabCodeSource &symCodeSrc,
             Dyninst::ParseAPI::CodeObject &codeObj,
-            const ExternalFunctionManager &extFuncMgr);
+            const ExternalFunctionManager &extFuncMgr,
+            Dyninst::Address entry_addres);
 
   void write();
 
@@ -77,6 +78,7 @@ private:
   /* Dyninst related objects */
   mcsema::Module &module;
   std::string module_name;
+
   Dyninst::SymtabAPI::Symtab &symtab;
   Dyninst::ParseAPI::CodeObject &code_object;
   Dyninst::ParseAPI::SymtabCodeSource &code_source;
@@ -94,4 +96,5 @@ private:
 
   std::vector<Dyninst::SymtabAPI::relocationEntry> relocations;
   std::unordered_set<std::string> no_ret_funcs;
+  Dyninst::Address entry_point;
 };
