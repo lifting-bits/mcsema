@@ -1,11 +1,15 @@
 #include "SectionManager.h"
 
+#include <glog/logging.h>
+
 using namespace Dyninst;
 using namespace SymtabAPI;
 
 void SectionManager::AddRegion(Region *r) {
-  if (regions.find(r) == regions.end())
+  if (regions.find(r) == regions.end()) {
+    LOG(INFO) << "Inserting section " << r->getRegionName();
     regions.insert(r);
+  }
 }
 
 bool SectionManager::IsData(Address a) const {
@@ -13,8 +17,9 @@ bool SectionManager::IsData(Address a) const {
   const Offset o = static_cast<const Offset>(a);
 
   for (auto &r : dataRegions) {
-    if (r->isOffsetInRegion(o))
+    if (r->isOffsetInRegion(o)) {
       return true;
+    }
   }
 
   return false;
