@@ -14,9 +14,11 @@
 
 import pprint
 import collections
+from Queue import Queue
 import binaryninja as binja
 from binja_var_recovery.util import *
 from binja_var_recovery.il_variable import *
+from binja_var_recovery.il_instructions import *
 
 PARAM_REGISTERS = {
   "rdi" : 0,
@@ -25,6 +27,15 @@ PARAM_REGISTERS = {
   "rcx" : 3,
   "r8"  : 4,
   "r9"  : 5
+  }
+
+PARAM_REGISTERS_INDEX = {
+  0 : "rdi",
+  1 : "rsi",
+  2 : "rdx",
+  3 : "rcx",
+  4 : "r8",
+  5 : "r9"
   }
 
 SYMBOLIC_VALUE = {
@@ -36,6 +47,13 @@ SYMBOLIC_VALUE = {
   "r9"  : 0xFFFFFFFFFFFFFFFF,
   }
 
+RECOVERED = set()
+TO_RECOVER = Queue()
+
+def queue_func(addr):
+  if addr not in RECOVERED:
+    TO_RECOVER.put(addr)
+
 class Function(object):
   """ The function objects
   """
@@ -44,8 +62,9 @@ class Function(object):
     self.func = func
     self.start_addr = func.start
     self.params = list()
-    self.ssa_variables = collections.defaultdict(list)
+    self.ssa_variables = collections.defaultdict(set)
     self.num_params = 0
+    self.return_set = set()
 
   def add_ssa_variables(self, var_name, value, insn):
     if var_name in self.ssa_variables.keys():
@@ -103,14 +122,14 @@ class Function(object):
         if possible_value.type != binja.RegisterValueType.UndeterminedValue:
           value_set.add(possible_value)
         else:
-          ssa_var = SSAVariable(parameter.src, self.bv.address_size, ref_function)
+          ssa_var = SSAVariable(self.bv, parameter.src, self.bv.address_size, ref_function)
           ssa_value = ssa_var.get_values()
           DEBUG("param value_set  {}".format(ssa_value))
           for item in ssa_value:
             value_set.add(item)
 
     DEBUG_POP() 
-    #DEBUG("collect_parameters {}".format(pprint.pformat(self.params)))
+    DEBUG("collect_parameters {}".format(pprint.pformat(self.params)))
     for args in self.params:
       for item in args:
         if isinstance(item, binja.PossibleValueSet):
@@ -126,12 +145,53 @@ class Function(object):
   def get_entry_register(self, register):
     if register is None:
       return
-  
+
     try:
       value_set = self.params[PARAM_REGISTERS[register]]
       return value_set
     except KeyError:
       return None
+    except IndexError:
+      return None
+
+  def print_parameters(self):
+    size = len(self.params)
+    for index in range(size):
+      try:
+        DEBUG("{} : {}".format(PARAM_REGISTERS_INDEX[index], pprint.pformat(self.params[index])))
+      except KeyError:
+        pass
+
+  def recover_instructions(self):
+    index = 0
+    DEBUG("{:x} {}".format(self.func.start, self.func.name))
+    size = len(self.func.medium_level_il.ssa_form)
+      
+    DEBUG_PUSH()
+    while index < size:
+      insn = self.func.medium_level_il.ssa_form[index]
+      DEBUG("{} : {:x} {} operation {} ".format(index+1, insn.address, insn, insn.operation.name))
+      if not is_executable(self.bv, insn.address):
+        index += 1
+        continue
+
+      DEBUG_PUSH()
+      mlil_insn = ILInstruction(self.bv, self.func, insn)
+      operation_name = "{}".format(insn.operation.name)
+      if hasattr(mlil_insn, operation_name):
+        getattr(mlil_insn, operation_name)(insn)
+      else:
+        DEBUG("Instruction operation {} is not supported!".format(operation_name))
+      DEBUG_POP()
+
+      if insn.operation == binja.MediumLevelILOperation.MLIL_CALL_SSA:
+        dest = insn.dest
+        if dest.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+          called_function = self.bv.get_function_at(dest.constant)
+          if called_function is not None:
+            queue_func(called_function.start)
+      index += 1
+    DEBUG_POP()
 
 def create_function(bv, func):
   if func.symbol.type == binja.SymbolType.ImportedFunctionSymbol:

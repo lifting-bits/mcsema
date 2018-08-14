@@ -43,11 +43,15 @@ class VariableAliasSet(object):
   def __repr__(self):
     string = "{ "
     for k in sorted(self.ALIAS_SET.keys()):
-      string += "({:x} : {:x})".format(k, self.ALIAS_SET[k])
+      size = self.ALIAS_SET[k] - k
+      if size > 0:
+        string += "({:x} {})".format(k, self.ALIAS_SET[k] - k)
     string += " }"
     return string
     
 VARIABLE_ALIAS_SET = VariableAliasSet()
+DATA_VARIABLES_SET = VariableAliasSet()
+
 SSA_VARIABLE_VALUESET = collections.defaultdict(dict)
 
 class PossibleValueSet(object):
@@ -70,9 +74,10 @@ class ILVisitor(object):
     return value
 
 class SSAVariable(ILVisitor):
-  def __init__(self, var, address_size, func=None):
+  def __init__(self, bv, var, address_size, func=None):
     super(SSAVariable, self).__init__()
     self.address_size = address_size
+    self.bv = bv
     self.var = var
     self.function = func.medium_level_il.ssa_form
     self.var_name = "{}#{}".format(var.var.name, var.version)
@@ -131,7 +136,6 @@ class SSAVariable(ILVisitor):
           self.value_set.add(possible_value)
       elif possible_value.type != binja.RegisterValueType.UndeterminedValue:
         self.value_set.add(possible_value)
-        DEBUG("visit_MLIL_SET_VAR_SSA: possible values {}".format(possible_value))
       else:
         src = self.visit(expr.src)
     else:
@@ -159,7 +163,6 @@ class SSAVariable(ILVisitor):
           var_def = expr.function.get_ssa_var_definition(expr.src)
           if var_def is not None:
             self.to_visit.append(var_def)
-
     return self.value_set
 
   def visit_MLIL_LOAD_SSA(self, expr):
@@ -186,7 +189,7 @@ class SSAVariable(ILVisitor):
     if right:
       for item in right:
         values.add(item)
-    DEBUG("visit_MLIL_ADD values {} ".format(values))
+    DEBUG("visit_MLIL_ADD values {} ".format(str(left) + str(right)))
     return values
 
   def visit_MLIL_VAR_PHI(self, expr):
@@ -205,3 +208,21 @@ class SSAVariable(ILVisitor):
         #var_def = expr.function.get_ssa_var_definition(ssa_var)
         #if var_def is not None:
         #self.to_visit.append(var_def)
+
+  def visit_MLIL_CALL_SSA(self, expr):
+    """ Resolve the SSA variables referring to the function calls
+    """
+    values = set()
+    idest = expr.dest
+    if idest.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR or \
+      idest.operation == binja.MediumLevelILOperation.MLIL_CONST:
+      called_function = self.bv.get_function_at(idest.constant)
+      if called_function != None and called_function.can_return:
+        if called_function.symbol.type == binja.SymbolType.ImportedFunctionSymbol:
+          DEBUG("Skipping external function '{}'".format(called_function.symbol.name))
+          values.update(["<ReturnValueExternal {:x}>".format(called_function.symbol.address)])
+        else:
+          DEBUG("Warning! handle function '{}'".format(called_function.symbol.name))
+          values.update(["<ReturnValueInternal {:x}>".format(called_function.symbol.address)])
+    DEBUG("visit_MLIL_CALL_SSA expr src {} ".format(expr))
+    return values
