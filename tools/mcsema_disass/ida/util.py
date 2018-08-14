@@ -69,7 +69,7 @@ def xrange(begin, end=None, step=1):
 _NOT_INST_EAS = set()
 
 # sign extension to the given bits
-def sign_extn(x, b):
+def sign_extend(x, b):
   m = 1 << (b - 1)
   x = x & ((1 << b) - 1)
   return (x ^ m) - m

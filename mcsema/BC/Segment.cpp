@@ -430,7 +430,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
       if (val_size > gArch->address_size) {
         val = llvm::ConstantExpr::getZExt(val, val_type);
       } else if (val_size < gArch->address_size) {
-        if(xref->var) {
+        if (xref->var) {
           /* Pointer truncation is generating the weird code for static
            * initialization of segment variables which is causing problem
            * during recompilations. Use Lazy initialization of the variable

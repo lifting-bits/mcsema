@@ -1371,7 +1371,6 @@ def identify_program_entrypoints(func_eas):
         # if there is an instance of "Copy of shared data" in the segment, split it at the
         # symbol boundary. This is to avoid the cross references of these runtime external
         # variables in the lifted segment variables.
-        # #if name not in exclude: #and not is_runtime_external_data_reference(ea):
         if name not in exclude:
           exported_vars.add(ea)
 
