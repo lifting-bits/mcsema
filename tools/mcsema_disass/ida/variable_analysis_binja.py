@@ -151,23 +151,14 @@ def updateCFG(outfile):
   M = mcsema_disass.ida.CFG_pb2.Module()
   M.name = "GlobalVariables".format('utf-8')
 
-  blacklist_file = "blacklist.txt"
-  BLACKLIST_VECTOR = dict()
-
-  with open(blacklist_file, "r") as bfile:
-    lines = bfile.readlines()
-    for l in lines:
-      ea = long(l, 16)
-      BLACKLIST_VECTOR[ea] = 1
 
   for key in sorted(VARIABLE_ALIAS_SET.ALIAS_SET.iterkeys()):
-    if key not in BLACKLIST_VECTOR.keys():
-      value = VARIABLE_ALIAS_SET.ALIAS_SET[key]
-      size = value - key
-      var = M.global_vars.add()
-      var.ea = key
-      var.name = "global_var_{:x}".format(key)
-      var.size = size #entry['size'] This is dummy size since it does not get used by get_cfg in IDA
+    value = VARIABLE_ALIAS_SET.ALIAS_SET[key]
+    size = value - key
+    var = M.global_vars.add()
+    var.ea = key
+    var.name = "global_var_{:x}".format(key)
+    var.size = size #entry['size'] This is dummy size since it does not get used by get_cfg in IDA
     
   with open(outfile, "w") as outf:
     outf.write(M.SerializeToString())
