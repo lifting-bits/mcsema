@@ -201,7 +201,10 @@ def instruction_personality(arg):
   global PERSONALITIES
   if isinstance(arg, (int, long)):
     arg, _ = decode_instruction(arg)
-  p = PERSONALITIES[arg.itype]
+  try:
+    p = PERSONALITIES[arg.itype]
+  except AttributeError:
+    p = PERSONALITY_NORMAL
 
   return fixup_personality(arg, p)
 
