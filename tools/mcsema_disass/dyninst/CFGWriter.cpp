@@ -121,6 +121,7 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
 void CFGWriter::write() {
   writeExternalFunctions();
   writeExternalVariables();
+  LOG(INFO) << "Writing internal data";
   writeInternalData();
   writeGlobalVariables();
 
@@ -889,14 +890,34 @@ void CFGWriter::ResolveCrossXrefs() {
   }
 }
 
+void writeBssXrefs(SymtabAPI::Region *region,
+                   mcsema::Segment *segment,
+                   const CFGWriter::SymbolMap &externals) {
+  for (auto &external : externals) {
+    LOG(INFO) << "Trying " << std::hex << external.first << std::dec;
+    if (IsInRegion(region, external.first)) {
+      LOG(INFO) << "\tWriting " << std::hex << external.first << std::dec;
+      auto cfg_xref = segment->add_xrefs();
+      cfg_xref->set_ea(external.first);
+      cfg_xref->set_width(8);
+      cfg_xref->set_target_ea(external.first);
+      cfg_xref->set_target_name(external.second);
+      cfg_xref->set_target_is_code(false);
+      cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+    }
+  }
+}
+
 void CFGWriter::writeInternalData() {
   auto dataRegions = section_manager.GetDataRegions();
 
   for (auto region : dataRegions) {
     // Sanity check
+    LOG(INFO) << "Writing region " << region->getRegionName();
     if (region->getMemSize() <= 0) {
       continue;
     }
+    LOG(INFO) << "Passed sanity check " << region->getRegionName();
 
     if ( region->getRegionName() == ".fini_array" ) {
       continue;
@@ -929,8 +950,12 @@ void CFGWriter::writeInternalData() {
 
     xrefsInSegment( region, cfgInternalData );
 
+    if (region->getRegionName() == ".bss") {
+      writeBssXrefs(region, cfgInternalData, external_vars);
+    }
+
     if (region->getRegionName() == ".got.plt")
-      writeRelocations( region, cfgInternalData );
+      writeRelocations(region, cfgInternalData);
   }
   ResolveCrossXrefs();
 }
