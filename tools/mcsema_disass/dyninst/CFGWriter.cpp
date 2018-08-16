@@ -136,7 +136,7 @@ void CFGWriter::writeExternalVariables() {
   LOG(INFO) << "Writing " << symbols.size() << " external variables";
   for (const auto &s : symbols) {
     if (s->isInDynSymtab()) {
-      external_vars.insert( { s->getOffset(), s } );
+      external_vars.insert( { s->getOffset(), s->getMangledName() } );
 
       auto extVar = module.add_external_vars();
       extVar->set_name(s->getMangledName());
@@ -159,7 +159,7 @@ void CFGWriter::writeGlobalVariables() {
       globalVar->set_ea(a->getOffset());
       globalVar->set_name(a->getMangledName());
       globalVar->set_size(a->getSize());
-      global_vars.insert({a->getOffset(), a});
+      global_vars.insert({a->getOffset(), a->getMangledName()});
     }
   }
 }
@@ -360,10 +360,10 @@ std::string CFGWriter::getXrefName( Address addr ) {
     if ( func != func_map.end() ) return func->second;
 
     auto extVar = external_vars.find( addr );
-    if ( extVar != external_vars.end() ) return extVar->second->getMangledName();
+    if ( extVar != external_vars.end() ) return extVar->second;
 
     auto globalVar = global_vars.find( addr );
-    if ( globalVar != global_vars.end() ) return globalVar->second->getMangledName();
+    if ( globalVar != global_vars.end() ) return globalVar->second;
 
 
     auto segmentVar = segment_vars.find( addr );
@@ -522,7 +522,7 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                                   CodeReference::DataTarget,
                                   CodeReference::MemoryOperand,
                                   CodeReference::Internal, addr,
-                                  g_var->second->getMangledName());
+                                  g_var->second);
     return;
   }
 
@@ -542,7 +542,7 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                                   CodeReference::DataTarget,
                                   CodeReference::MemoryOperand,
                                   CodeReference::External, addr,
-                                  ext_var->second->getMangledName());
+                                  ext_var->second);
     return;
   }
   LOG(INFO) << "Could not recognize xref anywhere falling to default";
