@@ -25,6 +25,7 @@ DEFINE_bool(dump_cfg, false, "Dump produced cfg on stdout");
 DEFINE_bool(pretty_print, true, "Pretty printf the dumped cfg");
 DEFINE_string(output, "", "Path to output file");
 DEFINE_string(binary, "", "Path to binary to be disassembled");
+DEFINE_string(entrypoint, "main", "Name of entrypoint function");
 
 using namespace Dyninst;
 
@@ -42,6 +43,16 @@ static std::vector<std::string> Split(const std::string &s, const char delim) {
   }
 
   return res;
+}
+
+//TODO(lukas): This works only for 64btit elf atm
+Address GetEntryPoint(const std::string& filename) {
+  std::ifstream bin{filename, std::ios::binary};
+  bin.seekg(0x18);
+  std::uint64_t main_addr;
+  bin.read(reinterpret_cast<char *>(&main_addr), sizeof(main_addr));
+  std::cout << std::hex << main_addr << std::dec << std::endl;
+  return main_addr;
 }
 
 }
@@ -70,23 +81,23 @@ int main(int argc, char **argv) {
   auto inputFile = const_cast<char *>(inputStr.data());
 
   // Load external symbol definitions (for now, only functions)
-  ExternalFunctionManager extFuncMgr;
+  ExternalFunctionManager extern_func_manager;
 
   if (!FLAGS_std_defs.empty()) {
     auto std_defs = Split(FLAGS_std_defs, kPathDelim);
-    for (const auto &file_name : std_defs) {
+    for (const auto &filename : std_defs) {
       LOG(INFO) << "Loading file containing external definitions";
-      auto file = std::ifstream{file_name};
-      extFuncMgr.AddExternalSymbols(file);
+      auto file = std::ifstream{filename};
+      extern_func_manager.AddExternalSymbols(file);
     }
   }
 
   //TODO(lukas): Check how it is parsed
   /*
   for (const auto &extSymDef : argParser.getAddExtSyms())
-    extFuncMgr.addExternalSymbol(extSymDef);
+    extern_func_manager.addExternalSymbol(extSymDef);
   */
-  extFuncMgr.ClearUsed();
+  extern_func_manager.ClearUsed();
 
   // Set up Dyninst stuff
 
@@ -94,13 +105,23 @@ int main(int argc, char **argv) {
       std::make_shared<ParseAPI::SymtabCodeSource>(inputFile);
   CHECK(symtabCS) << "Error during creation of ParseAPI::SymtabCodeSource!";
 
-  auto symtab = symtabCS->getSymtabObject();
-  CHECK(symtab) << "Error during creation of SymtabObject";
+
 
   auto codeObj = std::make_shared<ParseAPI::CodeObject>(symtabCS.get());
   CHECK(codeObj) << "Error during creation of ParseAPI::CodeObject";
 
   codeObj->parse();
+
+  // If binary is stripped we need to try some speculative parsing
+  // We try both options that DynInst provides
+  auto idiom = Dyninst::ParseAPI::GapParsingType::PreambleMatching;
+  for (auto &reg : symtabCS->regions()) {
+    codeObj->parseGaps(reg, idiom);
+    codeObj->parseGaps(reg);
+  }
+
+  auto symtab = symtabCS->getSymtabObject();
+  CHECK(symtab) << "Error during creation of SymtabObject";
 
   // Mark the functions that appear in the module as used (so that
   // they will be listed as external symbols in the CFG file)
@@ -110,7 +131,7 @@ int main(int argc, char **argv) {
 
     // Only mark external functions
     if (!(symtab->findFunctionsByName(fs, p.second)))
-      extFuncMgr.MarkAsUsed(p.second);
+      extern_func_manager.MarkAsUsed(p.second);
   }
 
   if (FLAGS_output.empty()) {
@@ -122,15 +143,18 @@ int main(int argc, char **argv) {
   }
 
 
+  auto entry = GetEntryPoint(FLAGS_binary);
+
   mcsema::Module m;
 
-  CFGWriter cfgWriter(m, FLAGS_binary, *symtab, *symtabCS, *codeObj, extFuncMgr);
+  CFGWriter cfgWriter(m, FLAGS_binary, *symtab, *symtabCS,
+      *codeObj, extern_func_manager, entry);
   cfgWriter.write();
 
   // Dump the CFG file in a human-readable format if requested
-  if (FLAGS_dump_cfg) {
+  //if (FLAGS_dump_cfg) {
       std::cout << std::hex << m.DebugString() << std::endl;
-  }
+  //}
 
   m.SerializeToOstream(&out);
 
