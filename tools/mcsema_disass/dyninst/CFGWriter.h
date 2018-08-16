@@ -23,7 +23,13 @@ public:
             Dyninst::Address entry_addres);
 
   void write();
+  using SymbolMap = std::unordered_map<Dyninst::Offset, std::string>;
 
+  struct CrossXref {
+    Dyninst::Address ea;
+    Dyninst::Address target_ea;
+    mcsema::Segment *segment;
+  };
 private:
   /* Don't want to include all functions in binary */
   bool shouldSkipFunction(const std::string &name) const;
@@ -47,7 +53,9 @@ private:
                            Dyninst::Address addr,
                            mcsema::Instruction *cfgInstruction);
 
-
+  bool handleDataXref(mcsema::Segment *segment,
+                      Dyninst::Address ea,
+                      Dyninst::Address target);
   void ResolveCrossXrefs();
   void tryParseVariables(Dyninst::SymtabAPI::Region *, mcsema::Segment *);
 
@@ -96,18 +104,14 @@ private:
   std::set<std::string> skip_funcss;
 
   std::unordered_map<Dyninst::Offset, std::string> func_map;
-  std::unordered_map< Dyninst::Address, Dyninst::SymtabAPI::Symbol *> global_vars;
-  std::unordered_map< Dyninst::Address, Dyninst::SymtabAPI::Symbol *> external_vars;
-  std::unordered_map< Dyninst::Address, std::string> segment_vars;
+  std::unordered_map<Dyninst::Address, Dyninst::SymtabAPI::Symbol *> global_vars;
+  std::unordered_map<Dyninst::Address, Dyninst::SymtabAPI::Symbol *> external_vars;
+  std::unordered_map<Dyninst::Address, std::string> segment_vars;
 
   std::vector<Dyninst::SymtabAPI::relocationEntry> relocations;
   std::unordered_set<std::string> no_ret_funcs;
   Dyninst::Address entry_point;
 
-  struct CrossXref {
-    Dyninst::Address ea;
-    Dyninst::Address target_ea;
-    mcsema::Segment *segment;
-  };
   std::vector<CrossXref> cross_xrefs;
+  std::unordered_set<Dyninst::Address> found_xref;
 };
