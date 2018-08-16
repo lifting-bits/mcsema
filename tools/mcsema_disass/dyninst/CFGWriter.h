@@ -46,6 +46,11 @@ private:
   handleNonCallInstruction(Dyninst::InstructionAPI::Instruction *instruction,
                            Dyninst::Address addr,
                            mcsema::Instruction *cfgInstruction);
+
+
+  void ResolveCrossXrefs();
+  void tryParseVariables(Dyninst::SymtabAPI::Region *, mcsema::Segment *);
+
   void writeExternalFunctions();
   void writeInternalData();
   void writeRelocations(Dyninst::SymtabAPI::Region*, mcsema::Segment *);
@@ -93,9 +98,16 @@ private:
   std::unordered_map<Dyninst::Offset, std::string> func_map;
   std::unordered_map< Dyninst::Address, Dyninst::SymtabAPI::Symbol *> global_vars;
   std::unordered_map< Dyninst::Address, Dyninst::SymtabAPI::Symbol *> external_vars;
-  std::unordered_map< Dyninst::Address, Dyninst::SymtabAPI::Symbol *> segment_vars;
+  std::unordered_map< Dyninst::Address, std::string> segment_vars;
 
   std::vector<Dyninst::SymtabAPI::relocationEntry> relocations;
   std::unordered_set<std::string> no_ret_funcs;
   Dyninst::Address entry_point;
+
+  struct CrossXref {
+    Dyninst::Address ea;
+    Dyninst::Address target_ea;
+    mcsema::Segment *segment;
+  };
+  std::vector<CrossXref> cross_xrefs;
 };

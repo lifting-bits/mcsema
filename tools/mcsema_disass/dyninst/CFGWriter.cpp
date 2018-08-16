@@ -17,7 +17,7 @@
 #include <gflags/gflags.h>
 
 #include "Util.h"
-
+#include <cstdio>
 DECLARE_string(entrypoint);
 
 using namespace Dyninst;
@@ -287,10 +287,8 @@ void CFGWriter::writeInstruction(InstructionAPI::Instruction *instruction,
   instruction->getOperands(operands);
 
   if (instruction->getCategory() == InstructionAPI::c_CallInsn) {
-    LOG(INFO) << "Call " << addr;
     handleCallInstruction(instruction, addr, cfgInstruction);
   } else {
-    LOG(INFO) << "NoCall " << addr;
     handleNonCallInstruction(instruction, addr, cfgInstruction);
   }
 }
@@ -369,7 +367,7 @@ std::string CFGWriter::getXrefName( Address addr ) {
 
 
     auto segmentVar = segment_vars.find( addr );
-    if ( segmentVar != segment_vars.end() ) return segmentVar->second->getMangledName();
+    if ( segmentVar != segment_vars.end() ) return segmentVar->second;
 
     return "__mcsema_unknown";
 }
@@ -515,7 +513,6 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
     if (isExternal(addr)) {
       code_ref->set_location(CodeReference::External);
     }
-    LOG(INFO) << "Function xref";
     return;
   }
 
@@ -526,7 +523,6 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                                   CodeReference::MemoryOperand,
                                   CodeReference::Internal, addr,
                                   g_var->second->getMangledName());
-    LOG(INFO) << "Global var xref";
     return;
   }
 
@@ -536,8 +532,7 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                                   CodeReference::DataTarget,
                                   CodeReference::MemoryOperand,
                                   CodeReference::Internal, addr,
-                                  s_var->second->getMangledName());
-    LOG(INFO) << "Segment var xref";
+                                  s_var->second);
     return;
   }
 
@@ -547,8 +542,7 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                                   CodeReference::DataTarget,
                                   CodeReference::MemoryOperand,
                                   CodeReference::External, addr,
-                                  s_var->second->getMangledName());
-    LOG(INFO) << "External var xref";
+                                  ext_var->second->getMangledName());
     return;
   }
   LOG(INFO) << "Could not recognize xref anywhere falling to default";
@@ -556,6 +550,9 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                                 CodeReference::DataTarget,
                                 CodeReference::MemoryOperand,
                                 CodeReference::Internal, addr);
+  if (isExternal(addr)) {
+    code_ref->set_location(CodeReference::External);
+  }
 }
 
 void CFGWriter::handleNonCallInstruction(
@@ -646,30 +643,154 @@ void CFGWriter::writeExternalFunctions() {
   }
 }
 
-void CFGWriter::xrefsInSegment(SymtabAPI::Region* region,
-                               mcsema::Segment* segment) {
-  auto ea = region->getMemOffset();
+bool IsInRegion(SymtabAPI::Region *r, Address a) {
+  if (a < r->getMemOffset()) return false;
+  if (a > (r->getMemOffset() + r->getMemSize())) return false;
+  return true;
+}
+
+bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
+  for (auto &r : code_source.regions()) {
+    if (r->contains(a)) {
+      return true;
+    }
+  }
+  LOG(INFO) << std::hex << a << std::dec << " is not contained in code_source";
+  return false;
+}
+
+
+//TODO(lukas): This is finding vars actually?
+void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *segment) {
+  std::string base_name = region->getRegionName();
+  static int counter = 0;
+  static int unnamed = 0;
+  auto offset = static_cast<char *>(region->getPtrToRawData());
+  auto end = offset + region->getDiskSize();
+
+  for (int j = 0; j < region->getDiskSize(); j += 1, offset++) {
+    CHECK(region->getMemOffset() + j == region->getDiskOffset() + j) << "Disk and mem";
+    //aligment
+    if (j % 8 != 0) {
+      continue;
+    }
+    if (*offset == 0) {
+      continue;
+    }
+    uint64_t size = j;
+    while (*offset != 0) {
+      ++j;
+      ++offset;
+      if (offset + size == end) return;
+    }
+
+    auto diff = j - size;
+    if (diff <= 4 && diff >= 3) {
+      auto int_ptr = offset - diff;
+      uint64_t partials[diff];
+      uint64_t sum  = 0;
+      for (int byte = 0; byte < diff; ++byte) {
+        partials[byte] = *(offset + byte);
+        sum += (partials[byte] << (byte * 8));
+      }
+      auto tmp_ptr = reinterpret_cast<std::uint64_t *>(static_cast<uint8_t *>(region->getPtrToRawData()) + size);
+
+      auto var = segment_vars.find(*tmp_ptr);
+      if (var != segment_vars.end()) {
+        LOG(INFO) << "\tFound segment var xref at " << region->getMemOffset() + size;
+        LOG(INFO) << "Pointing to " << *tmp_ptr;
+        auto xref = segment->add_xrefs();
+        xref->set_ea(region->getMemOffset() + size);
+        //TODO(lukas): Probably should not be hardcoded
+        xref->set_width(8);
+        xref->set_target_ea(*tmp_ptr);
+        xref->set_target_name(var->second);
+        xref->set_target_is_code(false); // TODO: Check
+        xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+        //padding
+        j += 8;
+        continue;
+      } else if (IsInRegion(region, *tmp_ptr)) {
+        LOG(INFO) << "\tFound unnamed xref at " << region->getMemOffset() + size;
+        LOG(INFO) << "Pointing to " << *tmp_ptr;
+        std::string name = base_name + "_unnamed_" + std::to_string(++unnamed);
+
+        auto xref = segment->add_xrefs();
+        xref->set_ea(region->getMemOffset() + size);
+        //TODO(lukas): Probably should not be hardcoded
+        xref->set_width(8);
+        xref->set_target_ea(*tmp_ptr);
+        xref->set_target_name(name);
+        xref->set_target_is_code(false); // TODO: Check
+        xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+        //padding
+        j += 8;
+
+        //Now add target as var
+        auto cfg_var = segment->add_vars();
+        cfg_var->set_name(name);
+        cfg_var->set_ea(*tmp_ptr);
+        segment_vars.insert({*tmp_ptr, name});
+        continue;
+      } else if (IsInBinary(code_source, *tmp_ptr)) {
+        LOG(INFO) << "Cross xref " << std::hex << *tmp_ptr << std::dec;
+        cross_xrefs.push_back({region->getMemOffset() + size, *tmp_ptr, segment});
+      }
+    }
+    std::string name = base_name + "_" + std::to_string(counter);
+    ++counter;
+    auto var = segment->add_vars();
+    var->set_ea(region->getMemOffset() + size);
+    var->set_name(name);
+    segment_vars.insert({region->getMemOffset() + size, name});
+    std::string tmp;
+    char * dummy = static_cast<char *>(region->getPtrToRawData()) + size;
+    while (dummy < offset) {
+      tmp += *dummy;
+      ++dummy;
+    }
+    LOG(INFO) << "Var: " << name << "\n\t" << tmp;
+  }
+}
+
+void CFGWriter::xrefsInSegment(SymtabAPI::Region *region,
+                               mcsema::Segment *segment) {
+
   auto offset = static_cast<std::uint64_t*>(region->getPtrToRawData());
 
   for (int j = 0; j < region->getDiskSize(); j += 8, offset++) {
+
     //SymtabAPI::Function* func;
     //if (!symtab.findFuncByEntryOffset(func, *offset)){
     //  continue;
     //}
     auto func = func_map.find(*offset);
-    if (func == func_map.end()) {
-      continue;
+    if (func != func_map.end()) {
+      LOG(INFO) << "Founf func xref at " << region->getMemOffset() + j;
+      auto xref = segment->add_xrefs();
+      xref->set_ea(region->getMemOffset() + j);
+      //TODO(lukas): Probably should not be hardcoded
+      xref->set_width(8);
+      xref->set_target_ea(*offset);
+      xref->set_target_name(func->second);
+      xref->set_target_is_code(true); // TODO: Check
+      xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
     }
 
-    LOG(INFO) << "Founf xref at " << region->getMemOffset() + j;
-    auto xref = segment->add_xrefs();
-    xref->set_ea(region->getMemOffset() + j);
-    //TODO(lukas): Probably should not be hardcoded
-    xref->set_width(8);
-    xref->set_target_ea(*offset);
-    xref->set_target_name(func->second);
-    xref->set_target_is_code(true); // TODO: Check
-    xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+    auto var = segment_vars.find(*offset);
+    if (var != segment_vars.end()) {
+      LOG(INFO) << "Founf segment var xref at " << region->getMemOffset() + j;
+      auto xref = segment->add_xrefs();
+      xref->set_ea(region->getMemOffset() + j);
+      //TODO(lukas): Probably should not be hardcoded
+      xref->set_width(8);
+      xref->set_target_ea(*offset);
+      xref->set_target_name(var->second);
+      xref->set_target_is_code(false); // TODO: Check
+      xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+    }
+
+
   }
 }
 
@@ -706,6 +827,29 @@ void CFGWriter::writeRelocations(SymtabAPI::Region* region,
         break;
       }
     }
+  }
+}
+
+void CFGWriter::ResolveCrossXrefs() {
+  for (auto &xref : cross_xrefs) {
+    auto g_var = global_vars.find(xref.target_ea);
+    if (g_var != global_vars.end()) {
+      LOG(ERROR) << "It is to global";
+      continue;
+    }
+
+    auto s_var = segment_vars.find(xref.target_ea);
+    if (s_var != segment_vars.end()) {
+      auto cfg_xref = xref.segment->add_xrefs();
+      cfg_xref->set_target_name(s_var->second);
+      cfg_xref->set_ea(xref.ea);
+      cfg_xref->set_target_ea(xref.target_ea);
+      cfg_xref->set_target_is_code(false);
+      cfg_xref->set_width(8);
+      cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+      continue;
+    }
+    LOG(WARNING) << std::hex << xref.ea << " is unresolved, targeting " << xref.target_ea << std::dec;
   }
 }
 
@@ -752,6 +896,7 @@ void CFGWriter::writeInternalData() {
     if (region->getRegionName() == ".got.plt")
       writeRelocations( region, cfgInternalData );
   }
+  ResolveCrossXrefs();
 }
 
 void CFGWriter::writeDataVariables(Dyninst::SymtabAPI::Region *region,
@@ -771,8 +916,13 @@ void CFGWriter::writeDataVariables(Dyninst::SymtabAPI::Region *region,
       var->set_ea(a->getOffset());
       var->set_name(a->getMangledName());
 
-      segment_vars.insert({a->getOffset(), a});
+      segment_vars.insert({a->getOffset(), a->getMangledName()});
     }
+  }
+  if (region->getRegionName() == ".rodata" ||
+      region->getRegionName() == ".data") {
+    LOG(INFO) << "Speculative parse of " << region->getRegionName();
+    tryParseVariables(region, segment);
   }
 }
 
