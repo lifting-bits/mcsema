@@ -683,41 +683,26 @@ bool CFGWriter::handleDataXref(mcsema::Segment *segment,
   CrossXref xref = {ea, target, segment};
 
   if (FishForXref(segment_vars ,xref)) {
-    found_xref.insert(target);
+    found_xref.insert(ea);
     return true;
   }
 
   if (FishForXref(func_map, xref)) {
-    found_xref.insert(target);
+    found_xref.insert(ea);
     return true;
   }
 
+  if (FishForXref(external_vars, xref)) {
+    found_xref.insert(ea);
+    return true;
+  }
+
+  if (FishForXref(global_vars, xref)) {
+    found_xref.insert(ea);
+    return true;
+  }
   return false;
-  /*auto var = segment_vars.find(a);
-  if (var != segment_vars.end()) {
-    auto xref = segment->add_xrefs();
-    xref->set_ea(target);
-    xref->set_width(8);
-    xref->set_target_ea(a);
-    xref->set_target_name(var->second);
-    xref->set_target_is_code(false); // TODO: Check
-    xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
-    return true;
-  }
 
-  auto func = func_map.find(a);
-  if (func != func_map.end()) {
-    auto xref = segment->add_xrefs();
-    xref->set_ea(target);
-    //TODO(lukas): Probably should not be hardcoded
-    xref->set_width(8);
-    xref->set_target_ea(a);
-    xref->set_target_name(func->second);
-    xref->set_target_is_code(true); // TODO: Check
-    xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
-    found_xref.insert(target);
-    return true;
-  }*/
 }
 
 //TODO(lukas): This is finding vars actually?
@@ -725,15 +710,12 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
   std::string base_name = region->getRegionName();
   static int counter = 0;
   static int unnamed = 0;
-  auto offset = static_cast<char *>(region->getPtrToRawData());
+  auto offset = static_cast<uint8_t *>(region->getPtrToRawData());
   auto end = offset + region->getDiskSize();
 
-  for (int j = 0; j < region->getDiskSize(); j += 1, offset++) {
+  for (int j = 0; j < region->getDiskSize(); j += 1, ++offset) {
     CHECK(region->getMemOffset() + j == region->getDiskOffset() + j) << "Disk and mem";
-    //aligment
-    /*if (j % 8 != 0) {
-      continue;
-    }*/
+
     if (*offset == 0) {
       continue;
     }
@@ -746,18 +728,12 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
 
     auto diff = j - size;
     if (diff <= 4 && diff >= 3) {
-      auto int_ptr = offset - diff;
-      uint64_t partials[diff];
-      uint64_t sum  = 0;
-      for (int byte = 0; byte < diff; ++byte) {
-        partials[byte] = *(offset + byte);
-        sum += (partials[byte] << (byte * 8));
-      }
+
       auto tmp_ptr = reinterpret_cast<std::uint64_t *>(static_cast<uint8_t *>(region->getPtrToRawData()) + size);
       if (handleDataXref(segment, region->getMemOffset() + size, *tmp_ptr)) {
+        LOG(INFO) << "Fished up " << std::hex << *tmp_ptr << std::dec;
         continue;
       }
-
 
       if (IsInRegion(region, *tmp_ptr)) {
         LOG(INFO) << "\tFound unnamed xref at " << region->getMemOffset() + size;
@@ -772,8 +748,6 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
         xref->set_target_name(name);
         xref->set_target_is_code(false); // TODO: Check
         xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
-        //padding
-        j += 8;
 
         //Now add target as var
         auto cfg_var = segment->add_vars();
@@ -785,6 +759,7 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
       } else if (IsInBinary(code_source, *tmp_ptr)) {
         LOG(INFO) << "Cross xref " << std::hex << *tmp_ptr << std::dec;
         cross_xrefs.push_back({region->getMemOffset() + size, *tmp_ptr, segment});
+        continue;
       }
     }
     std::string name = base_name + "_" + std::to_string(counter);
@@ -793,13 +768,6 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
     var->set_ea(region->getMemOffset() + size);
     var->set_name(name);
     segment_vars.insert({region->getMemOffset() + size, name});
-    std::string tmp;
-    char * dummy = static_cast<char *>(region->getPtrToRawData()) + size;
-    while (dummy < offset) {
-      tmp += *dummy;
-      ++dummy;
-    }
-    LOG(INFO) << "Var: " << name << "\n\t" << tmp;
   }
 }
 

@@ -78,7 +78,7 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
           throw std::runtime_error{"error while parsing symbol definition"};
         }
 
-        bool is_weak = false;
+        bool is_weak = true;
         if (symbolName == "__gmon_start__") {
           is_weak = true;
         }
