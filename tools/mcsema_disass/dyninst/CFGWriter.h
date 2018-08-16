@@ -103,9 +103,9 @@ private:
 
   std::set<std::string> skip_funcss;
 
-  std::unordered_map<Dyninst::Offset, std::string> func_map;
-  std::unordered_map<Dyninst::Address, Dyninst::SymtabAPI::Symbol *> global_vars;
-  std::unordered_map<Dyninst::Address, Dyninst::SymtabAPI::Symbol *> external_vars;
+  std::unordered_map<Dyninst::Address, std::string> func_map;
+  std::unordered_map<Dyninst::Address, std::string> global_vars;
+  std::unordered_map<Dyninst::Address, std::string> external_vars;
   std::unordered_map<Dyninst::Address, std::string> segment_vars;
 
   std::vector<Dyninst::SymtabAPI::relocationEntry> relocations;
