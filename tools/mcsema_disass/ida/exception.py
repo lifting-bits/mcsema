@@ -61,11 +61,6 @@ class EHBlocks(object):
     self.start_ea = start_ea
     self.end_ea = end_ea
 
-def sign_extn(x, b):
-  m = 1 << (b - 1)
-  x = x & ((1 << b) - 1)
-  return (x ^ m) - m
-
 def make_array(ea, size):
   if ea != idc.BADADDR and ea != 0:
     flags = idc.GetFlags(ea)
@@ -129,19 +124,19 @@ def read_enc_value(ea, enc):
     val = read_word(ea)
     ea += 2
     if fmt == DW_EH_PE_sdata2:
-      val = sign_extn(val, 16)
+      val = sign_extend(val, 16)
       
   elif fmt in [DW_EH_PE_sdata4, DW_EH_PE_udata4]:
     val = read_dword(ea)
     ea += 4
     if fmt == DW_EH_PE_sdata4:
-      val = sign_extn(val, 32)
+      val = sign_extend(val, 32)
       
   elif fmt in [DW_EH_PE_sdata8, DW_EH_PE_udata8]:
     val = read_qword(ea)
     ea += 8
     if f == DW_EH_PE_sdata8:
-      val = sign_extn(val, 64)
+      val = sign_extend(val, 64)
       
   else:
     DEBUG("{0:x}: don't know how to handle {1:x}".format(start, enc))
