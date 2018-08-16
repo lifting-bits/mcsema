@@ -13,6 +13,8 @@ public:
   std::set<Dyninst::SymtabAPI::Region *> GetDataRegions() const;
   std::set<Dyninst::SymtabAPI::Region *> GetAllRegions() { return regions; }
 
+  Dyninst::SymtabAPI::Region *getRodata() { return rodata; }
 private:
+  Dyninst::SymtabAPI::Region *rodata;
   std::set<Dyninst::SymtabAPI::Region *> regions;
 };

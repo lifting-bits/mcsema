@@ -8,6 +8,9 @@ using namespace SymtabAPI;
 void SectionManager::AddRegion(Region *r) {
   if (regions.find(r) == regions.end()) {
     LOG(INFO) << "Inserting section " << r->getRegionName();
+    if (r->getRegionName() == ".rodata") {
+      rodata = r;
+    }
     regions.insert(r);
   }
 }
