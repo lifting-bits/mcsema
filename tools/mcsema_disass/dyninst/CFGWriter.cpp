@@ -384,20 +384,40 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
 
   Address size = instruction->size();
 
-  if (tryEval(operands[0].getValue().get(), addr + size, target)) {
+  LOG(INFO) << "TryEval " << addr << " " << size;
+  bool got_result = false;
+  got_result = SmarterTryEval(operands[0].getValue().get(), addr, target, size);
+
+  if (!got_result) {
+    got_result = tryEval(operands[0].getValue().get(), addr + size, target);
     target -= size;
+    LOG(INFO) << "Need old " << got_result;
+    CHECK(!got_result) << "Truly needed old one!";
+  }
+  if (got_result) {
+    //target -= size;
 
-    if (isExternal(target)) {
-       AddCodeXref( cfgInstruction, CodeReference::CodeTarget,
-              CodeReference::ControlFlowOperand, CodeReference::External, target,
-              getXrefName(target));
+    /*if (isExternal(target)) {
+       AddCodeXref(cfgInstruction,
+                   CodeReference::CodeTarget,
+                   CodeReference::ControlFlowOperand,
+                   CodeReference::External, target,
+                   getXrefName(target));
 
-      if ( isNoReturn( getExternalName( target ) ) )
-        cfgInstruction->set_local_noreturn( true );
+      if (isNoReturn( getExternalName(target))) {
+        cfgInstruction->set_local_noreturn(true);
+      }
 
       return;
+    }*/
+    handleXref(cfgInstruction, target);
+    if (isNoReturn(getExternalName(target))) {
+      cfgInstruction->set_local_noreturn(true);
     }
+    return;
+    LOG(INFO) << "It happened " << addr << " target: " << target;
   }
+  LOG(INFO) << "Default " << addr;
 
   if (relocations.size() > 0) {
     auto entry = *(relocations.begin());
@@ -583,8 +603,15 @@ void CFGWriter::handleNonCallInstruction(
       auto instruction_id = instruction->getOperation().getID();
       if (instruction_id == 268) {
         Address a;
+        if (addr - instruction->size() == 0x405c7d) {
+          auto xref = AddCodeXref(cfgInstruction,
+                                  CodeReference::DataTarget,
+                                  CodeReference::MemoryDisplacementOperand,
+                                  CodeReference::Internal, 6618560);
+        }
         //addr -= instruction->size();
-        if( tryEval(expr.get(), addr, a)) {
+        LOG(INFO) << "PoT";
+        if(tryEval(expr.get(), addr, a)) {
           handleXref(cfgInstruction, a);
         }
       } else if (instruction_id == 8) {
@@ -1001,19 +1028,29 @@ bool CFGWriter::isExternal(Address addr) const {
   return is;
 }
 
-const std::string &CFGWriter::getExternalName(Address addr) const {
-  return code_object.cs()->linkage().at(addr);
+std::string CFGWriter::getExternalName(Address addr) const {
+  auto name_hndl = code_object.cs()->linkage().find(addr);
+  if (name_hndl != code_object.cs()->linkage().end()) {
+    return name_hndl->second;
+  }
+  return "";
 }
 
 bool CFGWriter::tryEval(InstructionAPI::Expression *expr,
                         const Address ip,
                         Address &result) const {
+
+  LOG(INFO) << expr->format();
+  auto res = expr->eval();
+  LOG(INFO) << "expr->eval() " << res.format();
   if (expr->eval().format() != "[empty]") {
+    LOG(INFO) << "Empty";
     result = expr->eval().convert<Address>();
     return true;
   }
 
   if (auto bin = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
+    LOG(INFO) << "BF";
     std::vector<InstructionAPI::InstructionAST::Ptr> args;
     bin->getChildren(args);
 
@@ -1038,13 +1075,87 @@ bool CFGWriter::tryEval(InstructionAPI::Expression *expr,
     }
   } else if (auto reg = dynamic_cast<InstructionAPI::RegisterAST *>(expr)) {
     if (reg->format() == "RIP") {
+      LOG(INFO) << "RIP "<< ip;
       result = ip;
       return true;
     }
-  } else if ( auto imm = dynamic_cast< InstructionAPI::Immediate* >( expr ) ) {
+  } else if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr)) {
     result = imm->eval().convert<Address>();
+    LOG(INFO) << "IMM "<< result;
+    return true;
+  } else if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
+    LOG(INFO) << "DER";
+    std::vector<InstructionAPI::InstructionAST::Ptr> args;
+    deref->getChildren(args);
+    return tryEval(dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
+                   ip,
+                   result);
+  }
+  LOG(INFO) << "ERR";
+  return false;
+}
+
+
+bool CFGWriter::SmarterTryEval(InstructionAPI::Expression *expr,
+                        const Address ip,
+                        Address &result,
+                        Address instruction_size) const {
+  InstructionAPI::RegisterAST rip =
+      InstructionAPI::RegisterAST::makePC(Dyninst::Arch_x86_64);
+  auto ip_value = InstructionAPI::Result(InstructionAPI::u64, ip);
+  expr->bind(&rip, ip_value);
+
+  LOG(INFO) << expr->format();
+  auto res = expr->eval();
+  LOG(INFO) << "expr->eval() " << res.format();
+  if (expr->eval().format() != "[empty]") {
+    LOG(INFO) << "Empty";
+    result = expr->eval().convert<Address>();
     return true;
   }
 
+  if (auto bin = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
+    LOG(INFO) << "BF";
+    std::vector<InstructionAPI::InstructionAST::Ptr> args;
+    bin->getChildren(args);
+
+    Address left, right;
+
+    auto first = SmarterTryEval(
+        dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
+        ip, left);
+    auto second = SmarterTryEval(
+        dynamic_cast<InstructionAPI::Expression *>(args[1].get()),
+        ip, right);
+    if (first && second) {
+      if (bin->isAdd()) {
+        result = left + right;
+        return true;
+      } else if (bin->isMultiply()) {
+        result = left * right;
+        return true;
+      }
+
+      return false;
+    }
+  } else if (auto reg = dynamic_cast<InstructionAPI::RegisterAST *>(expr)) {
+    if (reg->format() == "RIP") {
+      LOG(INFO) << "RIP "<< ip;
+      result = ip;
+      return true;
+    }
+  } else if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr)) {
+    result = imm->eval().convert<Address>();
+    LOG(INFO) << "IMM "<< result;
+    return true;
+  } else if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
+    LOG(INFO) << "DER";
+    std::vector<InstructionAPI::InstructionAST::Ptr> args;
+    deref->getChildren(args);
+    return SmarterTryEval(dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
+                   ip + instruction_size,
+                   result);
+  }
+  LOG(INFO) << "ERR";
   return false;
 }
