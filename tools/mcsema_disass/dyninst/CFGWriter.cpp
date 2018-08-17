@@ -687,22 +687,32 @@ bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
   return false;
 }
 
+void WriteDataXref(const CFGWriter::CrossXref &xref,
+                   const std::string &name="",
+                   bool is_code=false,
+                   uint64_t width=8) {
+  auto cfg_xref = xref.segment->add_xrefs();
+  cfg_xref->set_ea(xref.ea);
+  cfg_xref->set_width(width);
+  cfg_xref->set_target_ea(xref.target_ea);
+  cfg_xref->set_target_name(name);
+  cfg_xref->set_target_is_code(is_code);
+  cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+}
 
 bool FishForXref(CFGWriter::SymbolMap vars,
                  const CFGWriter::CrossXref &xref,
                  bool is_code=false, uint64_t width=8) {
   auto var = vars.find(xref.target_ea);
   if (var != vars.end()) {
-    auto cfg_xref = xref.segment->add_xrefs();
-    cfg_xref->set_ea(xref.ea);
-    cfg_xref->set_width(width);
-    cfg_xref->set_target_ea(xref.target_ea);
-    cfg_xref->set_target_name(var->second);
-    cfg_xref->set_target_is_code(is_code);
-    cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+    WriteDataXref(xref, var->second, is_code, width);
     return true;
   }
   return false;
+}
+
+bool CFGWriter::handleDataXref(const CFGWriter::CrossXref &xref) {
+  return handleDataXref(xref.segment, xref.ea, xref.target_ea);
 }
 
 bool CFGWriter::handleDataXref(mcsema::Segment *segment,
@@ -764,18 +774,9 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
       }
 
       if (IsInRegion(region, *tmp_ptr)) {
-        LOG(INFO) << "\tFound unnamed xref at " << region->getMemOffset() + size;
-        LOG(INFO) << "Pointing to " << *tmp_ptr;
         std::string name = base_name + "_unnamed_" + std::to_string(++unnamed);
-
-        auto xref = segment->add_xrefs();
-        xref->set_ea(region->getMemOffset() + size);
-        //TODO(lukas): Probably should not be hardcoded
-        xref->set_width(8);
-        xref->set_target_ea(*tmp_ptr);
-        xref->set_target_name(name);
-        xref->set_target_is_code(false); // TODO: Check
-        xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+        WriteDataXref({region->getMemOffset() + size, *tmp_ptr, segment},
+                      name);
 
         //Now add target as var
         auto cfg_var = segment->add_vars();
@@ -784,6 +785,7 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
         segment_vars.insert({*tmp_ptr, name});
         found_xref.insert(region->getMemOffset() + size);
         continue;
+
       } else if (IsInBinary(code_source, *tmp_ptr)) {
         LOG(INFO) << "Cross xref " << std::hex << *tmp_ptr << std::dec;
         cross_xrefs.push_back({region->getMemOffset() + size, *tmp_ptr, segment});
@@ -811,50 +813,11 @@ void CFGWriter::xrefsInSegment(SymtabAPI::Region *region,
   auto offset = static_cast<std::uint64_t*>(region->getPtrToRawData());
 
   for (int j = 0; j < region->getDiskSize(); j += 8, offset++) {
-
-    //SymtabAPI::Function* func;
-    //if (!symtab.findFuncByEntryOffset(func, *offset)){
-    //  continue;
-    //}
-    auto func = func_map.find(*offset);
-    if (func != func_map.end()) {
-      if (found_xref.count(region->getMemOffset() +j)) {
-        LOG(WARNING) << "Dual xref detected!";
-        continue;
-      } else {
-        LOG(WARNING) << "Unique";
-      }
-      LOG(INFO) << "Founf func xref at " << region->getMemOffset() + j;
-      auto xref = segment->add_xrefs();
-      xref->set_ea(region->getMemOffset() + j);
-      //TODO(lukas): Probably should not be hardcoded
-      xref->set_width(8);
-      xref->set_target_ea(*offset);
-      xref->set_target_name(func->second);
-      xref->set_target_is_code(true); // TODO: Check
-      xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+    if (found_xref.count(region->getMemOffset() +j)) {
+      LOG(WARNING) << "Dual xref detected!";
+      continue;
     }
-
-    auto var = segment_vars.find(*offset);
-    if (var != segment_vars.end()) {
-      if (found_xref.count(region->getMemOffset() +j)) {
-        LOG(WARNING) << "Dual xref detected!";
-        continue;
-      } else {
-        LOG(WARNING) << "Unique";
-      }
-      LOG(INFO) << "Founf segment var xref at " << region->getMemOffset() + j;
-      auto xref = segment->add_xrefs();
-      xref->set_ea(region->getMemOffset() + j);
-      //TODO(lukas): Probably should not be hardcoded
-      xref->set_width(8);
-      xref->set_target_ea(*offset);
-      xref->set_target_name(var->second);
-      xref->set_target_is_code(false); // TODO: Check
-      xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
-    }
-
-
+    handleDataXref(segment, region->getMemOffset() + j, *offset);
   }
 }
 
@@ -872,22 +835,13 @@ void writeRawData(std::string& data, SymtabAPI::Region* region) {
 }
 
 void CFGWriter::writeRelocations(SymtabAPI::Region* region,
-                                 mcsema::Segment* cfgInternalData) {
+                                 mcsema::Segment* segment) {
   const auto &relocations = region->getRelocations();
 
   for (auto reloc : relocations) {
     for (auto f : code_object.funcs()) {
       if (f->entry()->start() == reloc.getDynSym()->getOffset()) {
-        auto cfgSymbol = cfgInternalData->add_xrefs();
-        cfgSymbol->set_ea(reloc.rel_addr());
-        //TODO(lukas): Probably should not be hardcoded
-        cfgSymbol->set_width(8);
-        cfgSymbol->set_target_ea(reloc.getDynSym()->getOffset());
-        cfgSymbol->set_target_name(f->name());
-        cfgSymbol->set_target_is_code(true);
-
-        cfgSymbol->set_target_fixup_kind(mcsema::DataReference::Absolute);
-
+        handleDataXref(segment, reloc.rel_addr(), reloc.getDynSym()->getOffset());
         break;
       }
     }
@@ -901,7 +855,7 @@ void CFGWriter::ResolveCrossXrefs() {
       LOG(ERROR) << "It is to global";
       continue;
     }
-
+/*
     auto s_var = segment_vars.find(xref.target_ea);
     if (s_var != segment_vars.end()) {
       auto cfg_xref = xref.segment->add_xrefs();
@@ -912,8 +866,10 @@ void CFGWriter::ResolveCrossXrefs() {
       cfg_xref->set_width(8);
       cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
       continue;
+    }*/
+    if(!handleDataXref(xref)) {
+      LOG(WARNING) << std::hex << xref.ea << " is unresolved, targeting " << xref.target_ea << std::dec;
     }
-    LOG(WARNING) << std::hex << xref.ea << " is unresolved, targeting " << xref.target_ea << std::dec;
   }
 }
 

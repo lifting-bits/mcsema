@@ -53,6 +53,7 @@ private:
                            Dyninst::Address addr,
                            mcsema::Instruction *cfgInstruction);
 
+  bool handleDataXref(const CFGWriter::CrossXref &xref);
   bool handleDataXref(mcsema::Segment *segment,
                       Dyninst::Address ea,
                       Dyninst::Address target);
