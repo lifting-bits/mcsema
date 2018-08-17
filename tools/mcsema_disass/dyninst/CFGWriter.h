@@ -81,14 +81,18 @@ private:
   void checkDisplacement(Dyninst::InstructionAPI::Instruction *,
                          mcsema::Instruction *);
   bool isExternal(Dyninst::Address addr) const;
-  const std::string &getExternalName(Dyninst::Address addr) const;
+  std::string getExternalName(Dyninst::Address addr) const;
 
   /* Tries to work out RegisterAST if there's some reference */
   bool tryEval(Dyninst::InstructionAPI::Expression *expr,
                const Dyninst::Address ip,
                Dyninst::Address &result) const;
 
-
+  // #iamverysmart
+  bool SmarterTryEval(Dyninst::InstructionAPI::Expression *expr,
+               const Dyninst::Address ip,
+               Dyninst::Address &result,
+               Dyninst::Address instruction_size=0) const;
   /* Dyninst related objects */
   mcsema::Module &module;
   std::string module_name;
