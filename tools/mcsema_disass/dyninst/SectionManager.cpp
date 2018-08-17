@@ -5,13 +5,30 @@
 using namespace Dyninst;
 using namespace SymtabAPI;
 
+Dyninst::SymtabAPI::Region *
+SectionManager::getRegion(const std::string &name) {
+  for (auto r : regions) {
+    if (r->getRegionName() == name) {
+      return r;
+    }
+  }
+  LOG(FATAL) << "Could not fetch section with name " << name;
+}
+
 void SectionManager::AddRegion(Region *r) {
   if (regions.find(r) == regions.end()) {
     LOG(INFO) << "Inserting section " << r->getRegionName();
     if (r->getRegionName() == ".rodata") {
       rodata = r;
+    } else if (r->getRegionName() == ".text") {
+      text = r;
     }
     regions.insert(r);
+    for (auto &to_write_region : to_write_regions) {
+      if (r->getRegionName() == to_write_region) {
+        data_regions.insert(r);
+      }
+    }
   }
 }
 

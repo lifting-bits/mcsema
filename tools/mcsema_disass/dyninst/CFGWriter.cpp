@@ -50,6 +50,11 @@ namespace {
   }
 
 
+  bool IsInRegion(SymtabAPI::Region *r, Address a) {
+    if (a < r->getMemOffset()) return false;
+    if (a > (r->getMemOffset() + r->getMemSize())) return false;
+    return true;
+  }
 } //namespace
 
 CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
@@ -190,8 +195,12 @@ void CFGWriter::writeInternalFunctions() {
       continue;
     else if (isExternal(func->entry()->start()))
       continue;
-    //else if (func->name().substr(0, 4) == "targ")
-    //  continue;
+    // We want to ignore the .got.plt stubs, since they are not needed
+    // and cfg file would grow significantly
+    else if (IsInRegion(section_manager.getRegion(".got.plt"),
+                        func->entry()->start())) {
+      continue;
+    }
 
     // Add an entry in the protocol buffer
 
@@ -671,11 +680,6 @@ void CFGWriter::writeExternalFunctions() {
   }
 }
 
-bool IsInRegion(SymtabAPI::Region *r, Address a) {
-  if (a < r->getMemOffset()) return false;
-  if (a > (r->getMemOffset() + r->getMemSize())) return false;
-  return true;
-}
 
 bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
   for (auto &r : code_source.regions()) {
@@ -855,21 +859,35 @@ void CFGWriter::ResolveCrossXrefs() {
       LOG(ERROR) << "It is to global";
       continue;
     }
-/*
-    auto s_var = segment_vars.find(xref.target_ea);
-    if (s_var != segment_vars.end()) {
-      auto cfg_xref = xref.segment->add_xrefs();
-      cfg_xref->set_target_name(s_var->second);
-      cfg_xref->set_ea(xref.ea);
-      cfg_xref->set_target_ea(xref.target_ea);
-      cfg_xref->set_target_is_code(false);
-      cfg_xref->set_width(8);
-      cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
-      continue;
-    }*/
+
     if(!handleDataXref(xref)) {
       LOG(WARNING) << std::hex << xref.ea << " is unresolved, targeting " << xref.target_ea << std::dec;
     }
+    // If it's xref into .text it's highly possible it is
+    // entrypoint of some function that was missed by speculative parse.
+    // Let's try to parse it now
+    /*
+    bool resolved = false;
+    if (IsInRegion(section_manager.getText(), xref.target_ea)) {
+      code_object.parse(xref.target_ea, false);
+      for (auto func : code_object.funcs()) {
+        if (func_map.count(func->addr())) {
+          continue;
+        }
+        LOG(INFO) << std::hex <<func->name() << " at 0x" << func->addr()
+                  << " found via xref 0x" << xref.ea << std::dec;
+        func_map[func->addr()] = func->name();
+        if (func->addr() == xref.target_ea) {
+          resolved = true;
+          WriteDataXref(xref, func->name(), true);
+        }
+
+      }
+    }
+    LOG_IF(WARNING, !resolved)
+        << std::hex << "Xref at 0x" << xref.ea
+        << " targeting 0x" << xref.target_ea << std::dec;
+    */
   }
 }
 
