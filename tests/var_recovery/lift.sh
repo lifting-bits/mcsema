@@ -31,13 +31,18 @@ function clean_check
 {
   echo "Cleaning old output..."
   local in_file=${1}
-  rm -rf ${OUT_DIR}/${in_file}.cfg ${OUT_DIR}/${in_file}.bc ${OUT_DIR}/${in_file}_out.txt ${OUT_DIR}/${in_file}_lifted*
+  rm -rf  ${OUT_DIR}/${in_file}_vars.protobuf \
+          ${OUT_DIR}/${in_file}.cfg \
+          ${OUT_DIR}/${in_file}.bc \
+          ${OUT_DIR}/${in_file}_out.txt \
+          ${OUT_DIR}/${in_file}_lifted* \
+          ${OUT_DIR}/${in_file}_vars_{nd,dbg}.log
 }
 
 function recover_globals_nodebug
 {
 	local in_file=${1}
-  local outname=${OUT_DIR}/global_nodebug.protobuf
+  local outname=${OUT_DIR}/${in_file}_vars.protobuf
 
   echo "Recovering Globals (without debug info)..."
   echo "  From file: " ${IN_DIR}/${in_file}
@@ -46,13 +51,13 @@ function recover_globals_nodebug
 	python ${MCSEMA_SRC}/tools/mcsema/tools/mcsema_disass/ida/variable_analysis_binja.py --binary \
 	  ${IN_DIR}/${in_file} \
 		--out ${outname} \
-		--log_file ${OUT_DIR}/global_nodebug.log --entrypoint main
+		--log_file ${OUT_DIR}/${in_file}_vars_nd.log --entrypoint main
 }
 
 function recover_globals_debug
 {
 	local in_file=${1}
-  local outname=${OUT_DIR}/global_debug.protobuf
+  local outname=${OUT_DIR}/${in_file}_vars.protobuf
 
   echo "Recovering Globals (with dwarf)..."
   echo "  From file: " ${IN_DIR}/${in_file}
@@ -60,7 +65,7 @@ function recover_globals_debug
   rm -f ${outname}
   python ${MCSEMA_SRC}/tools/mcsema/tools/mcsema_disass/ida/var_recovery.py --binary ${IN_DIR}/${in_file} \
     --out ${outname} \
-    --log_file ${OUT_DIR}/global_debug.log
+    --log_file ${OUT_DIR}/${in_file}_vars_dbg.log
 }
 
 function recover_cfg
@@ -76,7 +81,7 @@ function recover_cfg
 		--log_file ${OUT_DIR}/${in_file}_out.txt \
 		--recover-stack-vars \
 		--recover-global-vars \
-		${OUT_DIR}/global.protobuf \
+		${OUT_DIR}/${in_file}_vars.protobuf \
 		--recover-exception
 }
 
