@@ -2,9 +2,11 @@ import sys
 import logging
 import mcsema_disass.ida.CFG_pb2 as CFG_pb2
 
-logging.basicConfig(filename="variable.log", level=logging.INFO)
+logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
 LOGGER.addHandler(logging.NullHandler())
+# do not log for now
+logging.disable(logging.INFO)
 
 def read_globals(M):
   global_variables = dict()
@@ -63,7 +65,7 @@ if __name__ == "__main__":
 
       if li[1] != ri[1]:
         disagreements += 1
-        sys.stdout.write("\tVariables at {:x} disagree on size. {:x} vs. {:x}\n".format(li[1], ri[1]))
+        sys.stdout.write("\tVariables at {:x} disagree on size. {:x} [left] vs. {:x} [right]\n".format(k, li[1], ri[1]))
 
     sys.stdout.write("Total size disagreements: {}\n".format(disagreements))
 
