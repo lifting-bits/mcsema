@@ -24,8 +24,12 @@ def hex_string(s):
 
 if __name__ == "__main__":
   if len(sys.argv) != 3:
-    print "Usage: %s <protobuf_left> <protobuf_right>"
+    print "Usage: %s <protobuf_nodebug> <protobuf_dwarf>"
   else:
+    sys.stdout.write("Comparing NODEBUG [{}] vs. DWARF [{}]\n".format(
+      sys.argv[1],
+      sys.argv[2]))
+
     pleft_globals, pright_globals = None, None
     M = CFG_pb2.Module()
     with open(sys.argv[1], 'rb') as pleft:
@@ -47,11 +51,11 @@ if __name__ == "__main__":
 
     both = left_keys.intersection(right_keys)
 
-    sys.stdout.write("Globals in left but *not* right: {}\n".format(len(unique_left)))
+    sys.stdout.write("Globals in NODEBUG but *not* in DWARF: {}\n".format(len(unique_left)))
     if unique_left:
       sys.stdout.write("\t{}\n".format(hex_string(unique_left)))
 
-    sys.stdout.write("Globals in right but *not* left: {}\n".format(len(unique_right)))
+    sys.stdout.write("Globals in DWARF but *not* NODEBUG: {}\n".format(len(unique_right)))
     if unique_right:
       sys.stdout.write("\t{}\n".format(hex_string(unique_right)))
 
@@ -65,7 +69,7 @@ if __name__ == "__main__":
 
       if li[1] != ri[1]:
         disagreements += 1
-        sys.stdout.write("\tVariables at {:x} disagree on size. {:x} [left] vs. {:x} [right]\n".format(k, li[1], ri[1]))
+        sys.stdout.write("\tVariables at {:x} disagree on size. {:x} [NODEBUG] vs. {:x} [DWARF]\n".format(k, li[1], ri[1]))
 
     sys.stdout.write("Total size disagreements: {}\n".format(disagreements))
 

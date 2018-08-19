@@ -81,7 +81,7 @@ function clean_check
           ${OUT_DIR}/${in_file}.bc \
           ${OUT_DIR}/${in_file}_out.txt \
           ${OUT_DIR}/${in_file}_lifted* \
-          ${OUT_DIR}/${in_file}_vars_{nd,dbg}.log
+          ${OUT_DIR}/${in_file}_*.log
 }
 
 function recover_globals_nodebug
@@ -193,12 +193,15 @@ function compare_globals
   local EXAMPLES=$( ls -1d src/linux/* | cut -f 3 -d '/' )
   for ex in ${EXAMPLES}
   do
+    local logfile=bin/${arch}/linux/${ex}_compare.log
     echo "Comparing globals for ${ex}"
-    python compare_globals.py bin/${arch}/linux/${ex}_${arch}_nd_vars.protobuf bin/${arch}/linux/${ex}_${arch}_debug_vars.protobuf > bin/${arch}/linux/${ex}_compare.log
+    python compare_globals.py bin/${arch}/linux/${ex}_${arch}_nd_vars.protobuf bin/${arch}/linux/${ex}_${arch}_debug_vars.protobuf > ${logfile}
     if [ $? -ne 0 ]
     then
       echo "Failed to compare globals for ${ex}"
       exit 1
+    else
+      echo "Saved log to: [${logfile}]"
     fi
   done
 }
