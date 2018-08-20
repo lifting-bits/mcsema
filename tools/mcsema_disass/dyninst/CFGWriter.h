@@ -25,10 +25,11 @@ public:
   void write();
   using SymbolMap = std::unordered_map<Dyninst::Offset, std::string>;
 
+  template<typename CFGUnit=mcsema::Segment>
   struct CrossXref {
     Dyninst::Address ea;
     Dyninst::Address target_ea;
-    mcsema::Segment *segment;
+    CFGUnit *segment;
 
     bool operator==(const CrossXref &other) {
       return ea == other.ea && target_ea == other.target_ea;
@@ -61,7 +62,7 @@ private:
                            Dyninst::Address addr,
                            mcsema::Instruction *cfgInstruction);
 
-  bool handleDataXref(const CFGWriter::CrossXref &xref);
+  bool handleDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref);
   bool handleDataXref(mcsema::Segment *segment,
                       Dyninst::Address ea,
                       Dyninst::Address target);
@@ -125,7 +126,8 @@ private:
   std::unordered_set<std::string> no_ret_funcs;
   Dyninst::Address entry_point;
 
-  std::vector<CrossXref> cross_xrefs;
+  std::vector<CrossXref<mcsema::Segment>> cross_xrefs;
   std::unordered_set<Dyninst::Address> found_xref;
-  std::map<Dyninst::Address, CrossXref> code_xrefs_to_resolve;
+  std::map<Dyninst::Address, CrossXref<mcsema::Segment>> code_xrefs_to_resolve;
+  std::map<Dyninst::Address, CrossXref<mcsema::Instruction>> inst_xrefs_to_resolve;
 };
