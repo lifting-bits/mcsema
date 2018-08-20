@@ -29,6 +29,14 @@ public:
     Dyninst::Address ea;
     Dyninst::Address target_ea;
     mcsema::Segment *segment;
+
+    bool operator==(const CrossXref &other) {
+      return ea == other.ea && target_ea == other.target_ea;
+    }
+
+    bool operator!=(const CrossXref &other) {
+      return *this != other;
+    }
   };
 private:
   /* Don't want to include all functions in binary */
@@ -119,4 +127,5 @@ private:
 
   std::vector<CrossXref> cross_xrefs;
   std::unordered_set<Dyninst::Address> found_xref;
+  std::map<Dyninst::Address, CrossXref> code_xrefs_to_resolve;
 };
