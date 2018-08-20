@@ -24,37 +24,63 @@ using namespace Dyninst;
 using namespace mcsema;
 
 namespace {
-  Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
-                                   Address start,
-                                   size_t index) {
-    for (auto func : code_object.funcs()) {
-      if (func->addr() == start) {
-        auto entry_block = func->entry();
 
-        using Insn = std::map<Offset, InstructionAPI::Instruction::Ptr>;
-        Insn instructions;
-        entry_block->getInsns(instructions);
-        auto callq = std::prev(instructions.end(), 2 + index);
+Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
+                                 Address start,
+                                 size_t index) {
+  for (auto func : code_object.funcs()) {
+    if (func->addr() == start) {
+      auto entry_block = func->entry();
 
-        auto second_operand = callq->second.get()->getOperand(1);
-        auto operand_value = dynamic_cast<InstructionAPI::Immediate *>(second_operand.getValue().get());
-        Address offset = operand_value->eval().convert<Address>();
-        code_object.parse(offset, true);
-        LOG(INFO) << "Retrieving info from _start at index " << index
-                  << " got addr 0x" << std::hex << offset << std::dec;
-        return offset;
-      }
+      using Insn = std::map<Offset, InstructionAPI::Instruction::Ptr>;
+      Insn instructions;
+      entry_block->getInsns(instructions);
+      auto callq = std::prev(instructions.end(), 2 + index);
+
+      auto second_operand = callq->second.get()->getOperand(1);
+      auto operand_value = dynamic_cast<InstructionAPI::Immediate *>(second_operand.getValue().get());
+      Address offset = operand_value->eval().convert<Address>();
+      code_object.parse(offset, true);
+      LOG(INFO) << "Retrieving info from _start at index " << index
+                << " got addr 0x" << std::hex << offset << std::dec;
+      return offset;
     }
-    LOG(FATAL) << "Was not able to retrieve info from _start at index "
-               << index;
   }
+  LOG(FATAL) << "Was not able to retrieve info from _start at index "
+             << index;
+}
 
 
-  bool IsInRegion(SymtabAPI::Region *r, Address a) {
-    if (a < r->getMemOffset()) return false;
-    if (a > (r->getMemOffset() + r->getMemSize())) return false;
+bool IsInRegion(SymtabAPI::Region *r, Address a) {
+  if (a < r->getMemOffset()) return false;
+  if (a > (r->getMemOffset() + r->getMemSize())) return false;
+  return true;
+}
+
+void WriteDataXref(const CFGWriter::CrossXref &xref,
+                   const std::string &name="",
+                   bool is_code=false,
+                   uint64_t width=8) {
+  auto cfg_xref = xref.segment->add_xrefs();
+  cfg_xref->set_ea(xref.ea);
+  cfg_xref->set_width(width);
+  cfg_xref->set_target_ea(xref.target_ea);
+  cfg_xref->set_target_name(name);
+  cfg_xref->set_target_is_code(is_code);
+  cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+}
+
+bool FishForXref(CFGWriter::SymbolMap vars,
+                 const CFGWriter::CrossXref &xref,
+                 bool is_code=false, uint64_t width=8) {
+  auto var = vars.find(xref.target_ea);
+  if (var != vars.end()) {
+    WriteDataXref(xref, var->second, is_code, width);
     return true;
   }
+  return false;
+}
+
 } //namespace
 
 CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
@@ -131,7 +157,31 @@ void CFGWriter::write() {
   writeGlobalVariables();
 
   writeInternalFunctions();
+  LOG(WARNING) << code_xrefs_to_resolve.size() << " code xrefs is unresolved!";
+  for (auto &a : code_xrefs_to_resolve) {
+    LOG(WARNING) << "\t" << a.first;
+    code_object.parse(a.first, false);
+    WriteDataXref(a.second, "", true);
+  }
+  for (auto func : code_object.funcs()) {
+    if (code_xrefs_to_resolve.find(func->addr()) != code_xrefs_to_resolve.end()) {
+      func_map[func->addr()] = func->name();
+      auto cfgInternalFunc = module.add_funcs();
 
+      ParseAPI::Block *entryBlock = func->entry();
+      cfgInternalFunc->set_ea(entryBlock->start());
+
+      cfgInternalFunc->set_is_entrypoint(func);
+
+      for (ParseAPI::Block *block : func->blocks()) {
+        writeBlock(block, func, cfgInternalFunc);
+      }
+
+      cfgInternalFunc->set_name(func_map[func->addr()]);
+      LOG(INFO) << "Added " << func->name() << " into module, found via xref";
+    }
+
+  }
   module.set_name(module_name);
 }
 
@@ -301,6 +351,7 @@ void CFGWriter::writeInstruction(InstructionAPI::Instruction *instruction,
   } else {
     handleNonCallInstruction(instruction, addr, cfgInstruction);
   }
+  code_xrefs_to_resolve.erase(addr);
 }
 
 bool getDisplacement(InstructionAPI::Instruction *instruction,
@@ -420,6 +471,10 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
       return;
     }*/
     handleXref(cfgInstruction, target);
+    auto xref = cfgInstruction->mutable_xrefs(0);
+    xref->set_target_type(CodeReference::CodeTarget);
+    xref->set_operand_type(CodeReference::ControlFlowOperand);
+
     if (isNoReturn(getExternalName(target))) {
       cfgInstruction->set_local_noreturn(true);
     }
@@ -619,7 +674,6 @@ void CFGWriter::handleNonCallInstruction(
                                   CodeReference::Internal, 6618560);
         }
         //addr -= instruction->size();
-        LOG(INFO) << "PoT";
         if(tryEval(expr.get(), addr, a)) {
           handleXref(cfgInstruction, a);
         }
@@ -633,6 +687,14 @@ void CFGWriter::handleNonCallInstruction(
           if (isExternal(a)) {
             code_ref->set_location(CodeReference::External);
             code_ref->set_name(getXrefName(a));
+          } else if (IsInRegion(section_manager.getRegion(".text"), a)) {
+            std::set<ParseAPI::CodeRegion *> regions;
+            code_source.findRegions(a, regions);
+            CHECK(regions.size() == 1) << "Overlaping regions in ELF!";
+
+            std::vector<std::string> names;
+            (*regions.begin())->names(a, names);
+            LOG_IF(WARNING, names.empty()) << "Empty names on addr " << a << " 0x" << std::hex << a << std::endl;
           }
         }
       }
@@ -691,29 +753,6 @@ bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
   return false;
 }
 
-void WriteDataXref(const CFGWriter::CrossXref &xref,
-                   const std::string &name="",
-                   bool is_code=false,
-                   uint64_t width=8) {
-  auto cfg_xref = xref.segment->add_xrefs();
-  cfg_xref->set_ea(xref.ea);
-  cfg_xref->set_width(width);
-  cfg_xref->set_target_ea(xref.target_ea);
-  cfg_xref->set_target_name(name);
-  cfg_xref->set_target_is_code(is_code);
-  cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
-}
-
-bool FishForXref(CFGWriter::SymbolMap vars,
-                 const CFGWriter::CrossXref &xref,
-                 bool is_code=false, uint64_t width=8) {
-  auto var = vars.find(xref.target_ea);
-  if (var != vars.end()) {
-    WriteDataXref(xref, var->second, is_code, width);
-    return true;
-  }
-  return false;
-}
 
 bool CFGWriter::handleDataXref(const CFGWriter::CrossXref &xref) {
   return handleDataXref(xref.segment, xref.ea, xref.target_ea);
@@ -866,15 +905,18 @@ void CFGWriter::ResolveCrossXrefs() {
     // If it's xref into .text it's highly possible it is
     // entrypoint of some function that was missed by speculative parse.
     // Let's try to parse it now
-    /*
-    bool resolved = false;
-    if (IsInRegion(section_manager.getText(), xref.target_ea)) {
-      code_object.parse(xref.target_ea, false);
+
+    if (IsInRegion(section_manager.getText(), xref.target_ea) &&
+        IsInRegion(section_manager.getRegion(".text"), xref.target_ea)) {
+          //WriteDataXref(xref, "", true);
+          code_xrefs_to_resolve.insert({xref.target_ea, xref});
+    }
+      /*code_object.parse(xref.target_ea, true);
       for (auto func : code_object.funcs()) {
         if (func_map.count(func->addr())) {
           continue;
         }
-        LOG(INFO) << std::hex <<func->name() << " at 0x" << func->addr()
+        LOG(INFO) <<func->name() << "DEBUG at 0x" << func->addr()
                   << " found via xref 0x" << xref.ea << std::dec;
         func_map[func->addr()] = func->name();
         if (func->addr() == xref.target_ea) {
