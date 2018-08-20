@@ -118,8 +118,8 @@ function (GenerateTest target_name)
     set_target_properties("${current_target_name}" PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${architecture}/${platform}")
     set_target_properties("${current_target_name}" PROPERTIES SUFFIX "")
 
-    target_compile_options("${current_target_name}" PRIVATE ${additional_flags} ${cxx_flag_list})
-    target_link_libraries("${current_target_name}" PRIVATE ${additional_flags} ${linker_flag_list} "-g3")
+    target_compile_options("${current_target_name}" PRIVATE ${additional_flags} ${cxx_flag_list} "-g3")
+    target_link_libraries("${current_target_name}" PRIVATE ${additional_flags} ${linker_flag_list})
     install(TARGETS "${current_target_name}" DESTINATION "${architecture}/${platform}")
     ################### end debug #############################
 
