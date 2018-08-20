@@ -51,6 +51,9 @@ class ILInstruction(object):
   def MLIL_IF(self, expr):
     pass
 
+  def MLIL_GOTO(self, expr):
+    pass
+
   def MLIL_SET_VAR_SSA(self, expr):
     if isinstance(expr.dest, binja.SSAVariable):
       var_name, value_set = self.get_ssa_var_possible_values(expr.dest)
