@@ -5,7 +5,6 @@
 #include <Instruction.h>
 #include <InstructionAST.h>
 #include <InstructionCategories.h>
-#include <iostream>
 #include <sstream>
 
 #include <array>
@@ -57,7 +56,7 @@ bool IsInRegion(SymtabAPI::Region *r, Address a) {
   return true;
 }
 
-void WriteDataXref(const CFGWriter::CrossXref &xref,
+void WriteDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref,
                    const std::string &name="",
                    bool is_code=false,
                    uint64_t width=8) {
@@ -71,7 +70,7 @@ void WriteDataXref(const CFGWriter::CrossXref &xref,
 }
 
 bool FishForXref(CFGWriter::SymbolMap vars,
-                 const CFGWriter::CrossXref &xref,
+                 const CFGWriter::CrossXref<mcsema::Segment> &xref,
                  bool is_code=false, uint64_t width=8) {
   auto var = vars.find(xref.target_ea);
   if (var != vars.end()) {
@@ -163,6 +162,12 @@ void CFGWriter::write() {
     code_object.parse(a.first, false);
     WriteDataXref(a.second, "", true);
   }
+/*
+  LOG(WARNING) << inst_xrefs_to_resolve.size() << " inst code xrefs is unresolved!";
+  for (auto &a : inst_xrefs_to_resolve) {
+    LOG(WARNING) << "\t" << a.first;
+    code_object.parse(a.first, false);
+  }*/
   for (auto func : code_object.funcs()) {
     if (code_xrefs_to_resolve.find(func->addr()) != code_xrefs_to_resolve.end()) {
       func_map[func->addr()] = func->name();
@@ -180,7 +185,33 @@ void CFGWriter::write() {
       cfgInternalFunc->set_name(func_map[func->addr()]);
       LOG(INFO) << "Added " << func->name() << " into module, found via xref";
     }
+  }
+  while (!inst_xrefs_to_resolve.empty()) {
+    LOG(WARNING) << inst_xrefs_to_resolve.size() << " inst code xrefs is unresolved!";
+    for (auto &a : inst_xrefs_to_resolve) {
+      LOG(WARNING) << "\t" << a.first;
+      code_object.parse(a.first, false);
+    }
+    auto old_set = inst_xrefs_to_resolve;
+    inst_xrefs_to_resolve.clear();
+    for (auto func : code_object.funcs()) {
+      if (old_set.find(func->addr()) != old_set.end()) {
+        func_map[func->addr()] = func->name();
+        auto cfgInternalFunc = module.add_funcs();
 
+        ParseAPI::Block *entryBlock = func->entry();
+        cfgInternalFunc->set_ea(entryBlock->start());
+
+        cfgInternalFunc->set_is_entrypoint(func);
+
+        for (ParseAPI::Block *block : func->blocks()) {
+          writeBlock(block, func, cfgInternalFunc);
+        }
+
+        cfgInternalFunc->set_name(func_map[func->addr()]);
+        LOG(INFO) << "Added " << func->name() << " into module, found via xref";
+      }
+    }
   }
   module.set_name(module_name);
 }
@@ -392,6 +423,18 @@ void writeDisplacement(mcsema::Instruction *cfgInstruction, Address &address,
 void CFGWriter::checkDisplacement(Dyninst::InstructionAPI::Instruction *instruction,
                        mcsema::Instruction *cfgInstruction) {
 
+  std::map<Address, Address> hacks =  {
+    {4227920, 6393216},
+    {4227959, 6393216},
+    {4228024, 6392704},
+    {4228120, 6392704},
+    {4225632, 6396416},
+  };
+  auto h = hacks.find(cfgInstruction->ea());
+  if (h != hacks.end()) {
+    writeDisplacement(cfgInstruction, h->second);
+    return;
+  }
   std::set<InstructionAPI::Expression::Ptr> memAccessors;
   Address address;
 
@@ -438,7 +481,6 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
                                       Address addr,
                                       mcsema::Instruction *cfgInstruction) {
   Address target;
-
   std::vector<InstructionAPI::Operand> operands;
   instruction->getOperands(operands);
 
@@ -471,15 +513,22 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
       return;
     }*/
     handleXref(cfgInstruction, target);
-    auto xref = cfgInstruction->mutable_xrefs(0);
-    xref->set_target_type(CodeReference::CodeTarget);
-    xref->set_operand_type(CodeReference::ControlFlowOperand);
+    if (IsInRegion(section_manager.getRegion(".text"), target)) {
+      auto xref = cfgInstruction->mutable_xrefs(0);
+      xref->set_target_type(CodeReference::CodeTarget);
+      xref->set_operand_type(CodeReference::ControlFlowOperand);
+      if (func_map.find(target) == func_map.end()) {
+        LOG(INFO) << "Unresolved inst_xref " << target;
+        inst_xrefs_to_resolve.insert(
+          {target , {addr, target, cfgInstruction}});
+        LOG(INFO) << "\t" << inst_xrefs_to_resolve.size();
+      }
+    }
 
     if (isNoReturn(getExternalName(target))) {
       cfgInstruction->set_local_noreturn(true);
     }
     return;
-    LOG(INFO) << "It happened " << addr << " target: " << target;
   }
   LOG(INFO) << "Default " << addr;
 
@@ -638,6 +687,7 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
   if (isExternal(addr)) {
     code_ref->set_location(CodeReference::External);
   }
+
 }
 
 void CFGWriter::handleNonCallInstruction(
@@ -754,14 +804,14 @@ bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
 }
 
 
-bool CFGWriter::handleDataXref(const CFGWriter::CrossXref &xref) {
+bool CFGWriter::handleDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref) {
   return handleDataXref(xref.segment, xref.ea, xref.target_ea);
 }
 
 bool CFGWriter::handleDataXref(mcsema::Segment *segment,
                                Address ea,
                                Address target) {
-  CrossXref xref = {ea, target, segment};
+  CrossXref<mcsema::Segment> xref = {ea, target, segment};
 
   if (FishForXref(segment_vars ,xref)) {
     found_xref.insert(ea);
