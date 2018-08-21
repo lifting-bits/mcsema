@@ -51,8 +51,20 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
 
 
 bool IsInRegion(SymtabAPI::Region *r, Address a) {
-  if (a < r->getMemOffset()) return false;
-  if (a > (r->getMemOffset() + r->getMemSize())) return false;
+  if (r->getRegionName() == ".bss") {
+    LOG(INFO) << ".bss 0x" << std::hex << r->getMemOffset() << " - 0x" << r->getMemOffset() + r->getMemSize();
+    LOG(INFO) << std::hex << "\tAsking 0x" << a;
+    LOG(INFO) << std::hex << a - r->getMemOffset();
+    LOG(INFO) << std::hex << r->getMemOffset() + r->getMemSize() - a;
+  }
+  if (a < r->getMemOffset()) {
+    LOG(INFO) << "BOTTOM";
+    return false;
+  }
+  if (a > (r->getMemOffset() + r->getMemSize())) {
+    LOG(INFO) << "TOP";
+    return false;
+  }
   return true;
 }
 
@@ -940,6 +952,9 @@ bool CFGWriter::handleDataXref(mcsema::Segment *segment,
 //TODO(lukas): This is finding vars actually?
 void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *segment) {
   std::string base_name = region->getRegionName();
+  LOG(INFO)
+      << std::hex << "Region " << base_name << " from 0x" << region->getMemOffset()
+      << " to 0x" << region->getMemOffset() + region->getMemSize() << std::dec;
   static int counter = 0;
   static int unnamed = 0;
   auto offset = static_cast<uint8_t *>(region->getPtrToRawData());
@@ -958,18 +973,25 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
       if (offset + size == end) return;
     }
 
+    uint64_t off = size % 4;
     auto diff = j - size;
-    if (diff <= 4 && diff >= 3) {
+    if (diff + off <= 4) {
+      diff += off;
+    }
+    LOG(INFO) << "Trying 0x" << std::hex << region->getMemOffset() + size
+              << " j: 0x" << j << " off 0x" << off
+              << " diff: 0x" << diff << " size 0x" << size << std::dec;
+    if (diff <= 4 && diff  >= 3) {
 
-      auto tmp_ptr = reinterpret_cast<std::uint64_t *>(static_cast<uint8_t *>(region->getPtrToRawData()) + size);
-      if (handleDataXref(segment, region->getMemOffset() + size, *tmp_ptr)) {
-        LOG(INFO) << "Fished up " << std::hex << *tmp_ptr << std::dec;
+      auto tmp_ptr = reinterpret_cast<std::uint64_t *>(static_cast<uint8_t *>(region->getPtrToRawData()) + size - off);
+      if (handleDataXref(segment, region->getMemOffset() + size - off, *tmp_ptr)) {
+        LOG(INFO) << "Fished up " << std::hex << region->getMemOffset() + size << " " << *tmp_ptr << std::dec;
         continue;
       }
 
       if (IsInRegion(region, *tmp_ptr)) {
         std::string name = base_name + "_unnamed_" + std::to_string(++unnamed);
-        WriteDataXref({region->getMemOffset() + size, *tmp_ptr, segment},
+        WriteDataXref({region->getMemOffset() + size - off, *tmp_ptr, segment},
                       name);
 
         //Now add target as var
@@ -977,13 +999,16 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
         cfg_var->set_name(name);
         cfg_var->set_ea(*tmp_ptr);
         segment_vars.insert({*tmp_ptr, name});
-        found_xref.insert(region->getMemOffset() + size);
+        found_xref.insert(region->getMemOffset() + size - off);
         continue;
 
       } else if (IsInBinary(code_source, *tmp_ptr)) {
-        LOG(INFO) << "Cross xref " << std::hex << *tmp_ptr << std::dec;
+        LOG(INFO) << "Cross xref " << std::hex << region->getMemOffset() + size - off << " " << *tmp_ptr << std::dec;
         cross_xrefs.push_back({region->getMemOffset() + size, *tmp_ptr, segment});
         continue;
+      } else if (IsInRegion(section_manager.getRegion(".bss"), *tmp_ptr)) {
+        LOG(INFO) << "Xref into bss " << std::hex << region->getMemOffset() + size - off << " " << *tmp_ptr << std::dec;
+        WriteDataXref({region->getMemOffset() + size - off, *tmp_ptr, segment});
       }
     }
     std::string name = base_name + "_" + std::to_string(counter);
