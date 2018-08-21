@@ -54,10 +54,6 @@ DATA_VARIABLES_SET = VariableAliasSet()
 
 SSA_VARIABLE_VALUESET = collections.defaultdict(dict)
 
-class PossibleValueSet(object):
-  def __init__(self, value):
-    self.type = type
-    self.value = value
 
 class ILVisitor(object):
   """ Class functions to visit medium-level IL"""
@@ -67,7 +63,6 @@ class ILVisitor(object):
   def visit(self, expr):
     method_name = 'visit_{}'.format(expr.operation.name)
     if hasattr(self, method_name):
-      #DEBUG("method `{}` getting called.".format(method_name))
       value = getattr(self, method_name)(expr)
     else:
       DEBUG("Warning! method `{}` not found.".format(method_name))
@@ -157,7 +152,16 @@ class SSAVariable(ILVisitor):
     if isinstance(ssa_var, binja.SSAVariable):
       p_value = expr.get_ssa_var_possible_values(ssa_var)
       
-      if p_value.type != binja.RegisterValueType.UndeterminedValue:
+      if p_value.type == binja.RegisterValueType.EntryValue:
+        reg_name = p_value.reg
+        try:
+          func_obj = FUNCTION_OBJECTS[self.func_start]
+          values = func_obj.get_entry_register(reg_name)
+          for item in values:
+            values_set.add(item)
+        except KeyError:
+          values_set.add(p_value)
+      elif p_value.type != binja.RegisterValueType.UndeterminedValue:
         values_set.add(p_value)
       else:
         if ssa_var.var.name == "__return_addr":
@@ -189,11 +193,16 @@ class SSAVariable(ILVisitor):
     """
     values_set = set()
     left = self.visit(expr.left)
-    values_set.update(left)
-      
     right = self.visit(expr.right)
-    values_set.update(right)
-    DEBUG("visit_MLIL_ADD values {} ".format(str(left) + str(right)))
+    expr_str = ""
+    for item in left:
+      expr_str += str(item)
+    expr_str += " + "
+    for item in right:
+      expr_str += str(item)
+
+    values_set.add(expr_str)
+    DEBUG("visit_MLIL_ADD values {} ".format(values_set))
     return values_set
 
   def visit_MLIL_VAR_PHI(self, expr):

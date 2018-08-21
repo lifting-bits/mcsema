@@ -71,7 +71,10 @@ class Function(object):
     self.regs["fsbase"].add("%fsbase0")
     self.regs["gsbase"].add("%gsbase0")
 
-  def update_register(self, name, value):
+  def update_register(self, reg_name, value):
+    if reg_name is None:
+      return
+
     try:
       if isinstance(value, set):
         self.regs[reg_name].update(value)
@@ -126,7 +129,11 @@ class Function(object):
 
       for index in range(len(insn_il_ssa.params)):
         parameter = insn_il_ssa.params[index]
-        reg_name = PARAM_REGISTERS_INDEX[index]
+        try:
+          reg_name = PARAM_REGISTERS_INDEX[index]
+        except KeyError:
+          reg_name = None
+
         if parameter.operation in [binja.MediumLevelILOperation.MLIL_CONST, binja.MediumLevelILOperation.MLIL_CONST_PTR]:
           p_value = parameter.possible_values
         else:
@@ -135,21 +142,20 @@ class Function(object):
 
         if p_value.type in [binja.RegisterValueType.ConstantValue, binja.RegisterValueType.ConstantPointerValue]:
           value_set.add(p_value.value)
-          self.regs[reg_name].add(p_value.value)
+          self.update_register(reg_name, p_value.value)
         elif p_value.type == binja.RegisterValueType.EntryValue:
           reg_value = self.regs[p_value.reg]
-          self.regs[reg_name].update(reg_value)
+          self.update_register(reg_name, reg_value)
           value_set.update(reg_value)
         elif p_value.type != binja.RegisterValueType.UndeterminedValue:
           value_set.add(p_value)
-          self.regs[reg_name].add(p_value)
+          self.update_register(reg_name, p_value)
         else:
           ssa_var = SSAVariable(self.bv, parameter.src, self.bv.address_size, ref_function)
           ssa_value = ssa_var.get_values()
-          self.regs[reg_name].update(ssa_value)
+          self.update_register(reg_name, ssa_value)
           for item in ssa_value:
             value_set.add(item)
-
     DEBUG_POP()
 
     if len(self.params) == 0:
