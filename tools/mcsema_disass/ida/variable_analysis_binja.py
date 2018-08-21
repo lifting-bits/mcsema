@@ -19,6 +19,12 @@ import collections
 import argparse
 import pprint
 from collections import namedtuple
+try:
+  import manticore
+  MANTICORE_FLAG = True
+except ImportError:
+  MANTICORE_FLAG = False
+
 import binaryninja as binja
 import mcsema_disass.ida.CFG_pb2
 from binja_var_recovery.util import *
@@ -61,11 +67,14 @@ def recover_function(bv, addr, is_entry=False):
     return
 
   DEBUG("Recovering function {} at {:x}".format(func.symbol.name, addr))
-  func_obj = FUNCTION_OBJECTS[func.start]
-  if func_obj != None:
-    func_obj.print_parameters()
-    func_obj.recover_instructions()
-    func_obj.print_ssa_variables()
+  try:
+    func_obj = FUNCTION_OBJECTS[func.start]
+    if func_obj != None:
+      func_obj.print_parameters()
+      func_obj.recover_instructions()
+      func_obj.print_ssa_variables()
+  except KeyError:
+    pass
 
 def identify_data_variable(bv):
   """ Recover the data variables from the segments identified by binja; The size of
@@ -102,6 +111,37 @@ def identify_data_variable(bv):
       DATA_VARIABLES_SET.add(var, next_var)
   DEBUG_POP()
 
+def collect_exported_symbols(bv):
+  syms = sorted(bv.symbols.values(), key=lambda s: s.address)
+  for i, sym in enumerate(syms):
+    sect = get_section_at(bv, sym.address)
+    if sect is None:
+      continue
+
+    if sym.type == binja.SymbolType.DataSymbol and \
+      not is_executable(bv, sym.address) and \
+      not is_section_external(bv, sect):
+      DEBUG('Recovering exported global {} @ {:x}'.format(sym.name, sym.address))
+      VARIABLE_ALIAS_SET.add(sym.address, sym.address+8)
+
+def manticore_install(bv, args):
+  def print_regs(func_name, cpu):
+    _debug_str = "{} RDI {:x}, RSI {:x}, RAX {:x}, RBX {:x}, RCX {:x}, RDX {:x}, R8 {:x}, R9 {:x}, R10 {:x}, R11 {:x}, R12 {:x}, R13 {:x}, R14 {:x}, R15 {:x}".format( \
+                func_name, cpu.RDI, cpu.RSI, cpu.RAX, cpu.RBX, cpu.RCX, cpu.RDX, cpu.R8, cpu.R9, cpu.R10, cpu.R11, cpu.R12, cpu.R13, cpu.R14, cpu.R15)
+    DEBUG(_debug_str)
+
+  m = manticore.Manticore(args.binary)
+  for func in bv.functions:
+    hook_pc = func.start
+    @m.hook(hook_pc)
+    def hook(state):
+      cpu = state.cpu
+      func_addr = cpu.RIP
+      func = bv.get_function_at(func_addr)
+      print_regs(func.name, cpu)
+
+  m.run()
+
 # main function
 def main(args):
   """ Function which recover the variables from the medium-level IL instructions;
@@ -116,12 +156,18 @@ def main(args):
   entry_symbol = bv.get_symbols_by_name(args.entrypoint)[0]
   DEBUG("Entry points {:x} {} {} ".format(entry_symbol.address, entry_symbol.name, len(bv.functions)))
 
+  DEBUG("entry points {}".format(pprint.pformat(bv.entry_point)))
+
+  collect_exported_symbols(bv)
   # Get all the data variables from the data segments
   identify_data_variable(bv)
 
   # Create function objects and collect its references
   for func in bv.functions:
     create_function(bv, func)
+
+  #if MANTICORE_FLAG:
+  #  manticore_install(bv, args)
 
   entry_addr = entry_symbol.address
   recover_function(bv, entry_addr, is_entry=True)

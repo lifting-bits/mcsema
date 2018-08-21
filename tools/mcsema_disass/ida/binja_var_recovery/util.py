@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 import io
 import collections
 import struct
@@ -41,6 +42,27 @@ def DEBUG_FLUSH():
   global _DEBUG_FILE
   if _DEBUG_FILE:
     _DEBUG_FILE.flush()
+
+PARAM_REGISTERS = {
+  "rdi" : 0,
+  "rsi" : 1,
+  "rdx" : 2,
+  "rcx" : 3,
+  "r8"  : 4,
+  "r9"  : 5,
+  }
+
+PARAM_REGISTERS_INDEX = {
+  0 : "rdi",
+  1 : "rsi",
+  2 : "rdx",
+  3 : "rcx",
+  4 : "r8",
+  5 : "r9",
+  6 : "stk0",
+  7 : "stk1",
+  8 : "stk2"
+  }
 
 def convert_signed32(num):
   num = num & 0xFFFFFFFF
@@ -85,4 +107,22 @@ def is_data_variable(bv, addr):
     return False
   return (seg.executable == False)
 
+# Caching results of is_section_external
+_EXT_SECTIONS = set()
+_INT_SECTIONS = set()
+
+def is_section_external(bv, sect):
+  if sect.start in _EXT_SECTIONS:
+    return True
+
+  if sect.start in _INT_SECTIONS:
+    return False
+
+  if is_ELF(bv):
+    if re.search(r'\.(got|plt)', sect.name):
+      _EXT_SECTIONS.add(sect.start)
+      return True
+
+  _INT_SECTIONS.add(sect.start)
+  return False
   

@@ -20,24 +20,6 @@ from binja_var_recovery.util import *
 from binja_var_recovery.il_variable import *
 from binja_var_recovery.il_instructions import *
 
-PARAM_REGISTERS = {
-  "rdi" : 0,
-  "rsi" : 1,
-  "rdx" : 2,
-  "rcx" : 3,
-  "r8"  : 4,
-  "r9"  : 5
-  }
-
-PARAM_REGISTERS_INDEX = {
-  0 : "rdi",
-  1 : "rsi",
-  2 : "rdx",
-  3 : "rcx",
-  4 : "r8",
-  5 : "r9"
-  }
-
 SYMBOLIC_VALUE = {
   "rdi" : 0xFFFFFFFFFFFFFFFF,
   "rsi" : 0xFFFFFFFFFFFFFFFF,
@@ -65,12 +47,43 @@ class Function(object):
     self.ssa_variables = collections.defaultdict(set)
     self.num_params = 0
     self.return_set = set()
+    self.regs = collections.defaultdict(set)
+
+  def init_registers(self):
+    self.regs["rax"].add("%rax0")
+    self.regs["rbx"].add("%rbx0")
+    self.regs["rcx"].add("%rcx0")
+    self.regs["rdx"].add("%rdx0")
+    self.regs["rdi"].add("%rdi0")
+    self.regs["rsi"].add("%rsi0")
+    self.regs["rsp"].add("%rsp0")
+    self.regs["rbp"].add("%rbp0")
+
+    self.regs["r8"].add("%r80")
+    self.regs["r9"].add("%r90")
+    self.regs["r10"].add("%r100")
+    self.regs["r11"].add("%r110")
+    self.regs["r12"].add("%r120")
+    self.regs["r13"].add("%r130")
+    self.regs["r14"].add("%r140")
+    self.regs["r15"].add("%r150")
+
+    self.regs["fsbase"].add("%fsbase0")
+    self.regs["gsbase"].add("%gsbase0")
+
+  def update_register(self, name, value):
+    try:
+      if isinstance(value, set):
+        self.regs[reg_name].update(value)
+      else:
+        self.regs[reg_name].add(value)
+    except KeyError:
+      pass
 
   def add_ssa_variables(self, var_name, value, insn):
     if var_name in self.ssa_variables.keys():
       variable = self.ssa_variables[var_name]
       variable["value"].append(value)
-      variable["insn_def"] = insn
     else:
       variable = dict(value=list(), insn_def=insn)
       variable["value"].append(value)
@@ -102,7 +115,7 @@ class Function(object):
       if insn_il is None or \
         insn_il.ssa_form is None:
         continue
-      
+
       insn_il_ssa = insn_il.ssa_form
       DEBUG("Function referred : {} {} num params {}".format(ref_function, insn_il_ssa, self.num_params))
       if not hasattr(insn_il_ssa, "params"):
@@ -113,31 +126,44 @@ class Function(object):
 
       for index in range(len(insn_il_ssa.params)):
         parameter = insn_il_ssa.params[index]
+        reg_name = PARAM_REGISTERS_INDEX[index]
         if parameter.operation in [binja.MediumLevelILOperation.MLIL_CONST, binja.MediumLevelILOperation.MLIL_CONST_PTR]:
-          possible_value = parameter.possible_values
+          p_value = parameter.possible_values
         else:
-          possible_value = parameter.get_ssa_var_possible_values(parameter.src)
+          p_value = parameter.get_ssa_var_possible_values(parameter.src)
         value_set = self.params[index]
-    
-        if possible_value.type != binja.RegisterValueType.UndeterminedValue:
-          value_set.add(possible_value)
+
+        if p_value.type in [binja.RegisterValueType.ConstantValue, binja.RegisterValueType.ConstantPointerValue]:
+          value_set.add(p_value.value)
+          self.regs[reg_name].add(p_value.value)
+        elif p_value.type == binja.RegisterValueType.EntryValue:
+          reg_value = self.regs[p_value.reg]
+          self.regs[reg_name].update(reg_value)
+          value_set.update(reg_value)
+        elif p_value.type != binja.RegisterValueType.UndeterminedValue:
+          value_set.add(p_value)
+          self.regs[reg_name].add(p_value)
         else:
           ssa_var = SSAVariable(self.bv, parameter.src, self.bv.address_size, ref_function)
           ssa_value = ssa_var.get_values()
-          DEBUG("param value_set  {}".format(ssa_value))
+          self.regs[reg_name].update(ssa_value)
           for item in ssa_value:
             value_set.add(item)
 
-    DEBUG_POP() 
+    DEBUG_POP()
+
+    if len(self.params) == 0:
+      return
+
     DEBUG("collect_parameters {}".format(pprint.pformat(self.params)))
     for args in self.params:
       for item in args:
         if isinstance(item, binja.PossibleValueSet):
           if (item.type == binja.RegisterValueType.ConstantPointerValue \
-            or item.type == binja.RegisterValueType.ConstantValue) \
-            and is_data_variable(self.bv, item.value):
-            DEBUG("Data Variable at address {:x}".format(item.value))
-            VARIABLE_ALIAS_SET.add(item.value, item.value + 8)
+            or item.type == binja.RegisterValueType.ConstantValue):
+            if is_data_variable(self.bv, item.value):
+              DEBUG("Data Variable at address {:x}".format(item.value))
+              VARIABLE_ALIAS_SET.add(item.value, item.value + 8)
 
   def print_ssa_variables(self):
     DEBUG("SSA Variables in the function {}".format(pprint.pformat(self.ssa_variables)))
@@ -147,12 +173,13 @@ class Function(object):
       return
 
     try:
-      value_set = self.params[PARAM_REGISTERS[register]]
+      #value_set = self.params[PARAM_REGISTERS[register]]
+      value_set = self.regs[register]
       return value_set
     except KeyError:
-      return None
+      return set()
     except IndexError:
-      return None
+      return set()
 
   def print_parameters(self):
     size = len(self.params)
@@ -203,5 +230,6 @@ def create_function(bv, func):
     return
 
   FUNCTION_OBJECTS[func.start] = func_obj
+  func_obj.init_registers()
   func_obj.set_params_count()
   func_obj.collect_parameters()

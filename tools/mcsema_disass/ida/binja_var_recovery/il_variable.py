@@ -67,10 +67,11 @@ class ILVisitor(object):
   def visit(self, expr):
     method_name = 'visit_{}'.format(expr.operation.name)
     if hasattr(self, method_name):
+      #DEBUG("method `{}` getting called.".format(method_name))
       value = getattr(self, method_name)(expr)
     else:
       DEBUG("Warning! method `{}` not found.".format(method_name))
-      value = None
+      value = set()
     return value
 
 class SSAVariable(ILVisitor):
@@ -84,21 +85,22 @@ class SSAVariable(ILVisitor):
     self.func_start = func.start
     self.visited = set()
     self.to_visit = list()
-    self.value_set = set()
 
   def get_values(self):
     var_def = self.function.get_ssa_var_definition(self.var)
     self.to_visit.append(var_def)
+    values_set = set()
+
     while self.to_visit:
       idx = self.to_visit.pop()
       if idx is not None:
         DEBUG("visit {}".format(self.function[idx]))
-        self.visit(self.function[idx])
+        ssa_value = self.visit(self.function[idx])
+        values_set.update(ssa_value)
 
     SSA_VARIABLE_VALUESET[self.func_start][self.var_name] = set()
-    for item in self.value_set:
-      SSA_VARIABLE_VALUESET[self.func_start][self.var_name].add(item)
-    return self.value_set
+    SSA_VARIABLE_VALUESET[self.func_start][self.var_name].update(values_set)
+    return values_set
 
   def visit_MLIL_CONST(self, expr):
     values = set()
@@ -122,52 +124,57 @@ class SSAVariable(ILVisitor):
     return values
 
   def visit_MLIL_SET_VAR_SSA(self, expr):
+    """
+    """
+    values_set = set()
     ssa_var = expr.dest
     if isinstance(ssa_var, binja.SSAVariable):
-      possible_value = expr.get_ssa_var_possible_values(ssa_var)
-      if possible_value.type == binja.RegisterValueType.EntryValue:
-        reg_name = possible_value.reg
+      p_value = expr.get_ssa_var_possible_values(ssa_var)
+      if p_value.type == binja.RegisterValueType.EntryValue:
+        reg_name = p_value.reg
         try:
           func_obj = FUNCTION_OBJECTS[self.func_start]
           values = func_obj.get_entry_register(reg_name)
           for item in values:
-            self.value_set.add(item)
-        except:
-          self.value_set.add(possible_value)
-      elif possible_value.type != binja.RegisterValueType.UndeterminedValue:
-        self.value_set.add(possible_value)
+            values_set.add(item)
+        except KeyError:
+          values_set.add(p_value)
+      elif p_value.type != binja.RegisterValueType.UndeterminedValue:
+        values_set.add(p_value)
       else:
         src = self.visit(expr.src)
+        values_set.update(src)
     else:
       DEBUG("visit_MLIL_SET_VAR_SSA: Warning! The dest is not ssa variable")
 
-    return self.value_set
+    return values_set
 
   def visit_MLIL_VAR_SSA(self, expr):
     """ Get the possible value of the ssa variable
     """
-    value_set = set()
+    values_set = set()
     ssa_var = expr.src
     if isinstance(ssa_var, binja.SSAVariable):
-      possible_value = expr.get_ssa_var_possible_values(ssa_var)
+      p_value = expr.get_ssa_var_possible_values(ssa_var)
       
-      if possible_value.type != binja.RegisterValueType.UndeterminedValue:
-        self.value_set.add(possible_value)
-        return self.value_set
+      if p_value.type != binja.RegisterValueType.UndeterminedValue:
+        values_set.add(p_value)
       else:
         if ssa_var.var.name == "__return_addr":
-          self.value_set.add(ssa_var)
-          return self.value_set
+          values_set.add(ssa_var)
 
-        elif expr.src not in self.visited:
-          var_def = expr.function.get_ssa_var_definition(expr.src)
+        elif ssa_var not in self.visited:
+          var_def = expr.function.get_ssa_var_definition(ssa_var)
           if var_def is not None:
-            self.to_visit.append(var_def)
-    return self.value_set
+            ssa_value = self.visit(self.function[var_def])
+            values_set.update(ssa_value)
+
+    return values_set
 
   def visit_MLIL_LOAD_SSA(self, expr):
     """ Resolve the SSA Variable performing memory load
     """
+    values_set = set()
     isrc = expr.src
     if isrc.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR or \
       isrc.operation == binja.MediumLevelILOperation.MLIL_CONST:
@@ -175,39 +182,37 @@ class SSAVariable(ILVisitor):
     else:
       memory = self.visit(isrc)
       DEBUG("visit_MLIL_LOAD_SSA {} {} operations {}".format(expr.src, memory, isrc.operation))
+    return values_set
 
   def visit_MLIL_ADD(self, expr):
     """ Resolve the SSA variable used in the addition expression
     """
-    values = set()
+    values_set = set()
     left = self.visit(expr.left)
-    if left:
-      for item in left:
-        values.add(item)
+    values_set.update(left)
       
     right = self.visit(expr.right)
-    if right:
-      for item in right:
-        values.add(item)
+    values_set.update(right)
     DEBUG("visit_MLIL_ADD values {} ".format(str(left) + str(right)))
-    return values
+    return values_set
 
   def visit_MLIL_VAR_PHI(self, expr):
     """ Resolve the MLIL_VAR_PHI operation
         Handling VAR_PHI causing the circular dependency; Disable it if the variable value is undef
     """
     DEBUG("visit_MLIL_VAR_PHI expr {} ".format(expr.src))
+    values_set = set()
     for ssa_var in expr.src:
       possible_value = expr.get_ssa_var_possible_values(ssa_var)
 
       if possible_value.type != binja.RegisterValueType.UndeterminedValue:
-        self.value_set.add(possible_value)
-        return self.value_set
+        values_set.add(possible_value)
       else:
-        self.value_set.add(ssa_var)
+        values_set.add(ssa_var)
         #var_def = expr.function.get_ssa_var_definition(ssa_var)
         #if var_def is not None:
         #self.to_visit.append(var_def)
+    return values_set
 
   def visit_MLIL_CALL_SSA(self, expr):
     """ Resolve the SSA variables referring to the function calls
@@ -224,5 +229,6 @@ class SSAVariable(ILVisitor):
         else:
           DEBUG("Warning! handle function '{}'".format(called_function.symbol.name))
           values.update(["<ReturnValueInternal {:x}>".format(called_function.symbol.address)])
-    DEBUG("visit_MLIL_CALL_SSA expr src {} ".format(expr))
+
+    #DEBUG("visit_MLIL_CALL_SSA expr {} values {}".format(expr, values))
     return values
