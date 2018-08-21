@@ -27,9 +27,9 @@ public:
 
   template<typename CFGUnit=mcsema::Segment>
   struct CrossXref {
-    Dyninst::Address ea;
-    Dyninst::Address target_ea;
-    CFGUnit *segment;
+    Dyninst::Address ea = 0;
+    Dyninst::Address target_ea = 0;
+    CFGUnit *segment = nullptr;
 
     bool operator==(const CrossXref &other) {
       return ea == other.ea && target_ea == other.target_ea;
@@ -73,10 +73,10 @@ private:
   void writeInternalData();
   void writeRelocations(Dyninst::SymtabAPI::Region*, mcsema::Segment *);
 
-  void immediateNonCall(Dyninst::InstructionAPI::Immediate *imm,
+  Dyninst::Address immediateNonCall(Dyninst::InstructionAPI::Immediate *imm,
                         Dyninst::Address addr,
                         mcsema::Instruction *cfgInstruction);
-  void dereferenceNonCall(Dyninst::InstructionAPI::Dereference *,
+  Dyninst::Address dereferenceNonCall(Dyninst::InstructionAPI::Dereference *,
                           Dyninst::Address,
                           mcsema::Instruction *);
 

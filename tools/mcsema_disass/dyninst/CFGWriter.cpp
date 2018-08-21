@@ -80,6 +80,16 @@ bool FishForXref(CFGWriter::SymbolMap vars,
   return false;
 }
 
+bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
+  for (auto &r : code_source.regions()) {
+    if (r->contains(a)) {
+      return true;
+    }
+  }
+  LOG(INFO) << std::hex << a << std::dec << " is not contained in code_source";
+  return false;
+}
+
 } //namespace
 
 CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
@@ -159,7 +169,7 @@ void CFGWriter::write() {
   LOG(WARNING) << code_xrefs_to_resolve.size() << " code xrefs is unresolved!";
   for (auto &a : code_xrefs_to_resolve) {
     LOG(WARNING) << "\t" << a.first;
-    code_object.parse(a.first, false);
+    code_object.parse(a.first, true);
     WriteDataXref(a.second, "", true);
   }
 /*
@@ -390,7 +400,9 @@ bool getDisplacement(InstructionAPI::Instruction *instruction,
                      Address &address) {
   bool found = false;
 
+  LOG(INFO) << "Checking for displacement at " << instruction->format() << " " << operands.size();
   for (auto &op : operands) {
+    LOG(INFO) << "\t" << op->format();
     if (auto binFunc =
             dynamic_cast<InstructionAPI::BinaryFunction *>(op.get())) {
 
@@ -403,9 +415,12 @@ bool getDisplacement(InstructionAPI::Instruction *instruction,
           found = true;
       }
 
-      if (auto addr =
-              dynamic_cast<InstructionAPI::Immediate *>(operands[0].get()))
-        address = addr->eval().convert<Address>();
+      for (auto &a : operands) {
+        if (auto addr =
+                dynamic_cast<InstructionAPI::Immediate *>(operands[0].get())) {
+          address = addr->eval().convert<Address>();
+        }
+      }
     }
   }
   return found && address;
@@ -422,19 +437,24 @@ void writeDisplacement(mcsema::Instruction *cfgInstruction, Address &address,
 
 void CFGWriter::checkDisplacement(Dyninst::InstructionAPI::Instruction *instruction,
                        mcsema::Instruction *cfgInstruction) {
-
+/*
   std::map<Address, Address> hacks =  {
     {4227920, 6393216},
     {4227959, 6393216},
     {4228024, 6392704},
     {4228120, 6392704},
     {4225632, 6396416},
+    {4205546, 6619584},
+    {4239621, 6600064},
+    {4239647, 6600064},
+    {4239727, 6600064},
+    {4206022, 6619584},
   };
   auto h = hacks.find(cfgInstruction->ea());
   if (h != hacks.end()) {
     writeDisplacement(cfgInstruction, h->second);
     return;
-  }
+  }*/
   std::set<InstructionAPI::Expression::Ptr> memAccessors;
   Address address;
 
@@ -445,6 +465,49 @@ void CFGWriter::checkDisplacement(Dyninst::InstructionAPI::Instruction *instruct
   instruction->getMemoryWriteOperands(memAccessors);
   if (getDisplacement(instruction, memAccessors, address))
     writeDisplacement(cfgInstruction, address );
+
+  /**LOG(INFO) << "Alternative for " << cfgInstruction->ea();
+  std::vector<InstructionAPI::Operand> operands;
+  instruction->getOperands(operands);
+  for (auto &op : operands) {
+    Address displacement = 0;
+    LOG(INFO) << "\t" << op.format(Arch_x86_64);
+    if (auto bin_func = dynamic_cast<InstructionAPI::BinaryFunction *>(op.getValue().get())) {
+      LOG(INFO) << "BF " << bin_func->format(InstructionAPI::formatStyle::defaultStyle);
+      std::vector<InstructionAPI::InstructionAST::Ptr> inner_operands;
+      bin_func->getChildren(inner_operands);
+      for (auto &inner_op : inner_operands) {
+        if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(inner_op.get())) {
+          displacement += imm->eval().convert<Address>();
+        }
+      }
+    } else if (auto reg_ast = dynamic_cast<InstructionAPI::RegisterAST *>(op.getValue().get())) {
+      LOG(INFO) << "REG_AST " << reg_ast->format(InstructionAPI::formatStyle::defaultStyle);
+    } else if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(op.getValue().get())) {
+      LOG(INFO) << "DEREF " << deref->format(InstructionAPI::formatStyle::defaultStyle);
+      std::vector<InstructionAPI::InstructionAST::Ptr> inner_operands;
+      deref->getChildren(inner_operands);
+      for (auto &inner_op : inner_operands) {
+        if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(inner_op.get())) {
+          displacement += imm->eval().convert<Address>();
+        } else if (auto bin_func = dynamic_cast<InstructionAPI::BinaryFunction *>(inner_op.get())) {
+          LOG(INFO) << "BF " << bin_func->format(InstructionAPI::formatStyle::defaultStyle);
+          std::vector<InstructionAPI::InstructionAST::Ptr> inner_operands;
+          bin_func->getChildren(inner_operands);
+          for (auto &inner_op : inner_operands) {
+            if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(inner_op.get())) {
+              displacement += imm->eval().convert<Address>();
+            }
+          }
+        }
+      }
+
+    }
+    LOG(INFO) << "Displacement is " << displacement;
+    if (displacement > 0) {
+      writeDisplacement(cfgInstruction, displacement);
+    }
+  }*/
 }
 
 void CFGWriter::getNoReturns() {
@@ -570,68 +633,74 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
               target, name);
 }
 
-void CFGWriter::immediateNonCall( InstructionAPI::Immediate* imm,
+Address CFGWriter::immediateNonCall( InstructionAPI::Immediate* imm,
         Address addr, mcsema::Instruction* cfgInstruction ) {
 
-    Address a = imm->eval().convert<Address>();
-    auto allSymsAtOffset = symtab.findSymbolByOffset(a);
-    bool isRef = false;
+  Address a = imm->eval().convert<Address>();
+  auto allSymsAtOffset = symtab.findSymbolByOffset(a);
+  bool isRef = false;
 
-    if (allSymsAtOffset.size() > 0) {
-      for (auto symbol : allSymsAtOffset) {
-        if (symbol->getType() == SymtabAPI::Symbol::ST_OBJECT)
-          isRef = true;
+  if (allSymsAtOffset.size() > 0) {
+    for (auto symbol : allSymsAtOffset) {
+      if (symbol->getType() == SymtabAPI::Symbol::ST_OBJECT) {
+        isRef = true;
       }
     }
-
-    // TODO: This is ugly hack from previous PR, but it works for now
-    if (a > 0x1000) {
-      isRef = true;
-    }
-    if (a > 0xffffffffffffff00) {
-      isRef = false;
-    }
-
-    if (isRef) {
-      auto cfgCodeRef = AddCodeXref(cfgInstruction,
-                                    CodeReference::DataTarget,
-                                    CodeReference::ImmediateOperand,
-                                    CodeReference::Internal,
-                                    a, getXrefName(a));
-
-      if (isExternal(a) ||
-          external_vars.find(a) != external_vars.end()) {
-            cfgCodeRef->set_location(CodeReference::External);
-      }
   }
+
+  // TODO: This is ugly hack from previous PR, but it works for now
+  if (a > 0x10000) {
+    isRef = true;
+  }
+  if (a > 0xffffffffffffff00) {
+    isRef = false;
+  }
+
+  if (isRef) {
+    auto cfgCodeRef = AddCodeXref(cfgInstruction,
+                                CodeReference::DataTarget,
+                                CodeReference::ImmediateOperand,
+                                CodeReference::Internal,
+                                a, getXrefName(a));
+
+    if (isExternal(a) ||
+      external_vars.find(a) != external_vars.end()) {
+        cfgCodeRef->set_location(CodeReference::External);
+    }
+    return a;
+  }
+  return 0;
 }
 
-void CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
+Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
                                    Address addr,
                                    mcsema::Instruction* cfgInstruction) {
 
-      std::vector<InstructionAPI::InstructionAST::Ptr> children;
-      deref->getChildren(children);
-      auto expr = dynamic_cast<InstructionAPI::Expression *>(children[0].get());
+  std::vector<InstructionAPI::InstructionAST::Ptr> children;
+  deref->getChildren(children);
+  auto expr = dynamic_cast<InstructionAPI::Expression *>(children[0].get());
 
-      if (!expr) {
-        throw std::runtime_error{"expected expression"};
-      }
+  if (!expr) {
+    throw std::runtime_error{"expected expression"};
+  }
 
-      Address a;
-      if (tryEval(expr, addr, a)) {
-        if (a > 0xffffffffffffff00) {
-          return;
-        }
+  Address a;
+  if (tryEval(expr, addr, a)) {
+    if (a > 0xffffffffffffff00) {
+      return 0;
+    }
 
-        auto cfgCodeRef = AddCodeXref(cfgInstruction,
-                                      CodeReference::DataTarget,
-                                      CodeReference::MemoryOperand,
-                                      CodeReference::Internal, a,
-                                      getXrefName( a ) );
-        if (isExternal(a) || external_vars.find(a) != external_vars.end())
-            cfgCodeRef->set_location( CodeReference::External );
-      }
+    auto cfgCodeRef = AddCodeXref(cfgInstruction,
+                                  CodeReference::DataTarget,
+                                  CodeReference::MemoryOperand,
+                                  CodeReference::Internal, a,
+                                  getXrefName( a ) );
+    if (isExternal(a) || external_vars.find(a) != external_vars.end()) {
+      cfgCodeRef->set_location( CodeReference::External );
+    }
+    return a;
+  }
+  return 0;
 }
 
 
@@ -700,15 +769,16 @@ void CFGWriter::handleNonCallInstruction(
 
   // RIP already points to the next instruction
   addr += instruction->size();
-
+  Address direct_values[2] = {0, 0};
+  auto i = 0U;
   for (auto op : operands) {
     auto expr = op.getValue();
 
     if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr.get())) {
-      immediateNonCall( imm, addr, cfgInstruction);
+      direct_values[i] = immediateNonCall( imm, addr, cfgInstruction);
     } else if (
         auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr.get())) {
-      dereferenceNonCall( deref, addr, cfgInstruction);
+      direct_values[i] = dereferenceNonCall( deref, addr, cfgInstruction);
     } else if (
         auto bf = dynamic_cast<InstructionAPI::BinaryFunction *>(expr.get())) {
 
@@ -717,15 +787,16 @@ void CFGWriter::handleNonCallInstruction(
       auto instruction_id = instruction->getOperation().getID();
       if (instruction_id == 268) {
         Address a;
-        if (addr - instruction->size() == 0x405c7d) {
+        /*if (addr - instruction->size() == 0x405c7d) {
           auto xref = AddCodeXref(cfgInstruction,
                                   CodeReference::DataTarget,
                                   CodeReference::MemoryDisplacementOperand,
                                   CodeReference::Internal, 6618560);
-        }
+        }*/
         //addr -= instruction->size();
         if(tryEval(expr.get(), addr, a)) {
           handleXref(cfgInstruction, a);
+          direct_values[i] = a;
         }
       } else if (instruction_id == 8) {
         Address a;
@@ -737,16 +808,23 @@ void CFGWriter::handleNonCallInstruction(
           if (isExternal(a)) {
             code_ref->set_location(CodeReference::External);
             code_ref->set_name(getXrefName(a));
-          } else if (IsInRegion(section_manager.getRegion(".text"), a)) {
-            std::set<ParseAPI::CodeRegion *> regions;
-            code_source.findRegions(a, regions);
-            CHECK(regions.size() == 1) << "Overlaping regions in ELF!";
-
-            std::vector<std::string> names;
-            (*regions.begin())->names(a, names);
-            LOG_IF(WARNING, names.empty()) << "Empty names on addr " << a << " 0x" << std::hex << a << std::endl;
           }
+          direct_values[i] = a;
         }
+      }
+    }
+  ++i;
+  }
+  if (direct_values[0] && direct_values[1]) {
+    addr -= instruction->size();
+    LOG(INFO) << "Found possible sneaky store";
+    LOG(INFO) << "\t" << addr << " " <<direct_values[0] << " " << direct_values[1];
+    if (IsInRegion(section_manager.getRegion(".text"), direct_values[1]) &&
+        IsInRegion(section_manager.getRegion(".bss"), direct_values[0])) {
+      LOG(INFO) << "Storing address from .text into .bss";
+      if (func_map.find(direct_values[0]) == func_map.end()) {
+        LOG(INFO) << "\tAnd it is unknown!";
+        inst_xrefs_to_resolve.insert({direct_values[1], {}});
       }
     }
   }
@@ -791,18 +869,6 @@ void CFGWriter::writeExternalFunctions() {
     cfgExtFunc->set_is_weak(func.is_weak);
   }
 }
-
-
-bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
-  for (auto &r : code_source.regions()) {
-    if (r->contains(a)) {
-      return true;
-    }
-  }
-  LOG(INFO) << std::hex << a << std::dec << " is not contained in code_source";
-  return false;
-}
-
 
 bool CFGWriter::handleDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref) {
   return handleDataXref(xref.segment, xref.ea, xref.target_ea);
