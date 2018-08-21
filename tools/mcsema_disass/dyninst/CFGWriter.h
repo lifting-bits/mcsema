@@ -88,7 +88,7 @@ private:
   bool isNoReturn( const std::string& str);
   void getNoReturns();
 
-  void checkDisplacement(Dyninst::InstructionAPI::Instruction *,
+  void checkDisplacement(Dyninst::InstructionAPI::Expression *,
                          mcsema::Instruction *);
   bool isExternal(Dyninst::Address addr) const;
   std::string getExternalName(Dyninst::Address addr) const;

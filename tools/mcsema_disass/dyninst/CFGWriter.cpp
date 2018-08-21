@@ -435,7 +435,21 @@ void writeDisplacement(mcsema::Instruction *cfgInstruction, Address &address,
           address, name );
 }
 
-void CFGWriter::checkDisplacement(Dyninst::InstructionAPI::Instruction *instruction,
+Address Helper(Dyninst::InstructionAPI::Expression *expr) {
+  if (auto bin_func = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
+    LOG(INFO) << "BF " << bin_func->format(InstructionAPI::formatStyle::defaultStyle);
+    std::vector<InstructionAPI::InstructionAST::Ptr> inner_operands;
+    bin_func->getChildren(inner_operands);
+    for (auto &inner_op : inner_operands) {
+      if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(inner_op.get())) {
+        return imm->eval().convert<Address>();
+      }
+    }
+  }
+  return 0;
+}
+
+void CFGWriter::checkDisplacement(Dyninst::InstructionAPI::Expression *expr,
                        mcsema::Instruction *cfgInstruction) {
 /*
   std::map<Address, Address> hacks =  {
@@ -455,6 +469,7 @@ void CFGWriter::checkDisplacement(Dyninst::InstructionAPI::Instruction *instruct
     writeDisplacement(cfgInstruction, h->second);
     return;
   }*/
+  /*
   std::set<InstructionAPI::Expression::Ptr> memAccessors;
   Address address;
 
@@ -465,6 +480,28 @@ void CFGWriter::checkDisplacement(Dyninst::InstructionAPI::Instruction *instruct
   instruction->getMemoryWriteOperands(memAccessors);
   if (getDisplacement(instruction, memAccessors, address))
     writeDisplacement(cfgInstruction, address );
+  */
+  if (cfgInstruction->xrefs_size()) {
+    LOG(INFO) << "Avoiding clobbering with xrefs!";
+    return;
+  }
+  if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
+    std::vector<InstructionAPI::InstructionAST::Ptr> inner_operands;
+    deref->getChildren(inner_operands);
+    for (auto &op : inner_operands) {
+      if (auto inner_expr = dynamic_cast<InstructionAPI::Expression *>(op.get())) {
+        auto displacement = Helper(inner_expr);
+        if (displacement) {
+          writeDisplacement(cfgInstruction, displacement);
+        }
+      }
+    }
+  } else {
+    auto displacement = Helper(expr);
+    if (displacement) {
+      writeDisplacement(cfgInstruction, displacement);
+    }
+  }
 
   /**LOG(INFO) << "Alternative for " << cfgInstruction->ea();
   std::vector<InstructionAPI::Operand> operands;
@@ -485,9 +522,7 @@ void CFGWriter::checkDisplacement(Dyninst::InstructionAPI::Instruction *instruct
       LOG(INFO) << "REG_AST " << reg_ast->format(InstructionAPI::formatStyle::defaultStyle);
     } else if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(op.getValue().get())) {
       LOG(INFO) << "DEREF " << deref->format(InstructionAPI::formatStyle::defaultStyle);
-      std::vector<InstructionAPI::InstructionAST::Ptr> inner_operands;
-      deref->getChildren(inner_operands);
-      for (auto &inner_op : inner_operands) {
+            for (auto &inner_op : inner_operands) {
         if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(inner_op.get())) {
           displacement += imm->eval().convert<Address>();
         } else if (auto bin_func = dynamic_cast<InstructionAPI::BinaryFunction *>(inner_op.get())) {
@@ -813,7 +848,8 @@ void CFGWriter::handleNonCallInstruction(
         }
       }
     }
-  ++i;
+    ++i;
+    checkDisplacement(expr.get(), cfgInstruction);
   }
   if (direct_values[0] && direct_values[1]) {
     addr -= instruction->size();
@@ -828,7 +864,6 @@ void CFGWriter::handleNonCallInstruction(
       }
     }
   }
-  checkDisplacement(instruction, cfgInstruction);
 }
 
 void CFGWriter::writeExternalFunctions() {
