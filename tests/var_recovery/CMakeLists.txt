@@ -123,32 +123,59 @@ function (GenerateTest target_name)
     install(TARGETS "${current_target_name}" DESTINATION "${architecture}/${platform}")
     ################### end debug #############################
 
-    #GenerateBinaryOutput("${target_name}" $<TARGET_FILE:${current_target_name}> "${architecture}")
-
-    #if ("${architecture}" STREQUAL "amd64" OR "${architecture}" STREQUAL "x86")
-    #  ExportCFG("${target_name}" "${architecture}" $<TARGET_FILE:${current_target_name}>)
-
-    #  add_custom_command(
-    #    OUTPUT "${current_target_name}.bc"
-    #    COMMAND "${MCSEMALIFT_PATH}" --arch "${architecture}" --os "${platform}" --cfg "${current_target_name}.cfg" --output "${current_target_name}.bc"
-    #    DEPENDS "${current_target_name}.cfg"
-    #    VERBATIM
-    #  )
-  
-    #  add_custom_target("${current_target_name}_bc" ALL DEPENDS "${current_target_name}.bc")
-
-    #  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${current_target_name}.bc" DESTINATION "${architecture}/${platform}/bc" RENAME "${target_name}")
-    #endif ()
-
-
   endforeach ()
 endfunction ()
 
 
+set(GenerateTestBinaryUsage "GenerateTest(target_name ARCH <architecture> DEBUG <debug binary> NODEBUG <nodebug binary>)")
+function (GenerateTestBinary target_name)
+  if ("${target_name}" STREQUAL "")
+    message(WARNING "The target name is missing")
+    message(FATAL_ERROR "${GenerateTestBinaryUsage}")
+  endif ()
 
+  get_filename_component(platform "${CMAKE_CURRENT_SOURCE_DIR}" DIRECTORY)
+  get_filename_component(platform "${platform}" NAME)
 
+  foreach (parameter ${ARGN})
+    if ("${parameter}" STREQUAL "DEBUG")
+      set(state "${parameter}")
+      continue ()
 
+    elseif ("${parameter}" STREQUAL "NODEBUG")
+      set(state "${parameter}")
+      continue ()
 
+    elseif ("${parameter}" STREQUAL "ARCH")
+      set(state "${parameter}")
+      continue ()
+
+    endif ()
+
+    if ("${state}" STREQUAL "DEBUG")
+      set(debug_binary "${parameter}")
+
+    elseif ("${state}" STREQUAL "NODEBUG")
+      set(nodebug_binary "${parameter}")
+
+    elseif ("${state}" STREQUAL "ARCH")
+      set(architecture "${parameter}")
+    endif ()
+  endforeach ()
+
+  ######## NODEBUG #############
+  set(current_target_name "${target_name}_${architecture}_nd")
+  message(" > ${current_target_name}")
+  install(PROGRAMS "${nodebug_binary}" DESTINATION "${architecture}/${platform}" RENAME "${current_target_name}" )
+  ############## end nodebug ###############
+
+  ############### debug #######################
+  set(current_target_name "${target_name}_${architecture}_debug")
+  message(" > ${current_target_name}")
+  install(PROGRAMS "${debug_binary}" DESTINATION "${architecture}/${platform}" RENAME "${current_target_name}" )
+  ################### end debug #############################
+
+endfunction ()
 
 set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 
