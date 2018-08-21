@@ -30,8 +30,6 @@ import mcsema_disass.ida.CFG_pb2
 from binja_var_recovery.util import *
 from binja_var_recovery.il_function import *
 
-
-
 VARIABLES_TO_RECOVER = dict()
 
 POSSIBLE_MEMORY_STATE = dict()
@@ -69,11 +67,14 @@ def recover_function(bv, addr, is_entry=False):
     return
 
   DEBUG("Recovering function {} at {:x}".format(func.symbol.name, addr))
-  func_obj = FUNCTION_OBJECTS[func.start]
-  if func_obj != None:
-    func_obj.print_parameters()
-    func_obj.recover_instructions()
-    func_obj.print_ssa_variables()
+  try:
+    func_obj = FUNCTION_OBJECTS[func.start]
+    if func_obj != None:
+      func_obj.print_parameters()
+      func_obj.recover_instructions()
+      func_obj.print_ssa_variables()
+  except KeyError:
+    pass
 
 def identify_data_variable(bv):
   """ Recover the data variables from the segments identified by binja; The size of
@@ -110,6 +111,19 @@ def identify_data_variable(bv):
       DATA_VARIABLES_SET.add(var, next_var)
   DEBUG_POP()
 
+def collect_exported_symbols(bv):
+  syms = sorted(bv.symbols.values(), key=lambda s: s.address)
+  for i, sym in enumerate(syms):
+    sect = get_section_at(bv, sym.address)
+    if sect is None:
+      continue
+
+    if sym.type == binja.SymbolType.DataSymbol and \
+      not is_executable(bv, sym.address) and \
+      not is_section_external(bv, sect):
+      DEBUG('Recovering exported global {} @ {:x}'.format(sym.name, sym.address))
+      VARIABLE_ALIAS_SET.add(sym.address, sym.address+8)
+
 def manticore_install(bv, args):
   def print_regs(func_name, cpu):
     _debug_str = "{} RDI {:x}, RSI {:x}, RAX {:x}, RBX {:x}, RCX {:x}, RDX {:x}, R8 {:x}, R9 {:x}, R10 {:x}, R11 {:x}, R12 {:x}, R13 {:x}, R14 {:x}, R15 {:x}".format( \
@@ -142,6 +156,9 @@ def main(args):
   entry_symbol = bv.get_symbols_by_name(args.entrypoint)[0]
   DEBUG("Entry points {:x} {} {} ".format(entry_symbol.address, entry_symbol.name, len(bv.functions)))
 
+  DEBUG("entry points {}".format(pprint.pformat(bv.entry_point)))
+
+  collect_exported_symbols(bv)
   # Get all the data variables from the data segments
   identify_data_variable(bv)
 

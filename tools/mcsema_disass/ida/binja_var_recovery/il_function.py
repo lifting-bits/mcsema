@@ -20,24 +20,6 @@ from binja_var_recovery.util import *
 from binja_var_recovery.il_variable import *
 from binja_var_recovery.il_instructions import *
 
-PARAM_REGISTERS = {
-  "rdi" : 0,
-  "rsi" : 1,
-  "rdx" : 2,
-  "rcx" : 3,
-  "r8"  : 4,
-  "r9"  : 5
-  }
-
-PARAM_REGISTERS_INDEX = {
-  0 : "rdi",
-  1 : "rsi",
-  2 : "rdx",
-  3 : "rcx",
-  4 : "r8",
-  5 : "r9"
-  }
-
 SYMBOLIC_VALUE = {
   "rdi" : 0xFFFFFFFFFFFFFFFF,
   "rsi" : 0xFFFFFFFFFFFFFFFF,
@@ -68,23 +50,35 @@ class Function(object):
     self.regs = collections.defaultdict(set)
 
   def init_registers(self):
-    self.regs["rax"].add(-1)
-    self.regs["rbx"].add(-1)
-    self.regs["rcx"].add(-1)
-    self.regs["rdx"].add(-1)
-    self.regs["rdi"].add(-1)
-    self.regs["rsi"].add(-1)
+    self.regs["rax"].add("%rax0")
+    self.regs["rbx"].add("%rbx0")
+    self.regs["rcx"].add("%rcx0")
+    self.regs["rdx"].add("%rdx0")
+    self.regs["rdi"].add("%rdi0")
+    self.regs["rsi"].add("%rsi0")
+    self.regs["rsp"].add("%rsp0")
+    self.regs["rbp"].add("%rbp0")
 
-    self.regs["r8"].add(-1)
-    self.regs["r9"].add(-1)
-    self.regs["r10"].add(-1)
-    self.regs["r11"].add(-1)
-    self.regs["r12"].add(-1)
-    self.regs["r13"].add(-1)
-    self.regs["r14"].add(-1)
+    self.regs["r8"].add("%r80")
+    self.regs["r9"].add("%r90")
+    self.regs["r10"].add("%r100")
+    self.regs["r11"].add("%r110")
+    self.regs["r12"].add("%r120")
+    self.regs["r13"].add("%r130")
+    self.regs["r14"].add("%r140")
+    self.regs["r15"].add("%r150")
 
-    self.regs["fsbase"].add(-1)
-    self.regs["gsbase"].add(-1)
+    self.regs["fsbase"].add("%fsbase0")
+    self.regs["gsbase"].add("%gsbase0")
+
+  def update_register(self, name, value):
+    try:
+      if isinstance(value, set):
+        self.regs[reg_name].update(value)
+      else:
+        self.regs[reg_name].add(value)
+    except KeyError:
+      pass
 
   def add_ssa_variables(self, var_name, value, insn):
     if var_name in self.ssa_variables.keys():
@@ -132,6 +126,7 @@ class Function(object):
 
       for index in range(len(insn_il_ssa.params)):
         parameter = insn_il_ssa.params[index]
+        reg_name = PARAM_REGISTERS_INDEX[index]
         if parameter.operation in [binja.MediumLevelILOperation.MLIL_CONST, binja.MediumLevelILOperation.MLIL_CONST_PTR]:
           p_value = parameter.possible_values
         else:
@@ -140,15 +135,18 @@ class Function(object):
 
         if p_value.type in [binja.RegisterValueType.ConstantValue, binja.RegisterValueType.ConstantPointerValue]:
           value_set.add(p_value.value)
+          self.regs[reg_name].add(p_value.value)
         elif p_value.type == binja.RegisterValueType.EntryValue:
           reg_value = self.regs[p_value.reg]
+          self.regs[reg_name].update(reg_value)
           value_set.update(reg_value)
         elif p_value.type != binja.RegisterValueType.UndeterminedValue:
           value_set.add(p_value)
+          self.regs[reg_name].add(p_value)
         else:
           ssa_var = SSAVariable(self.bv, parameter.src, self.bv.address_size, ref_function)
           ssa_value = ssa_var.get_values()
-          DEBUG("param value_set  {}".format(ssa_value))
+          self.regs[reg_name].update(ssa_value)
           for item in ssa_value:
             value_set.add(item)
 
@@ -175,7 +173,8 @@ class Function(object):
       return
 
     try:
-      value_set = self.params[PARAM_REGISTERS[register]]
+      #value_set = self.params[PARAM_REGISTERS[register]]
+      value_set = self.regs[register]
       return value_set
     except KeyError:
       return set()
