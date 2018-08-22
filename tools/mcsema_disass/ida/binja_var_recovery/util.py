@@ -105,6 +105,12 @@ def is_data_variable(bv, addr):
   seg = bv.get_segment_at(addr)
   if seg == None:
     return False
+
+  sect = get_section_at(bv, addr)
+  if is_ELF(bv):
+    if re.search(r'\.(init|fini)', sect.name):
+      return False
+
   return (seg.executable == False)
 
 # Caching results of is_section_external

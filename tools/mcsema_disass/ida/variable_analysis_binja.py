@@ -67,14 +67,14 @@ def recover_function(bv, addr, is_entry=False):
     return
 
   DEBUG("Recovering function {} at {:x}".format(func.symbol.name, addr))
-  try:
-    func_obj = FUNCTION_OBJECTS[func.start]
-    if func_obj != None:
-      func_obj.print_parameters()
-      func_obj.recover_instructions()
-      func_obj.print_ssa_variables()
-  except KeyError:
-    pass
+
+  f_handle = FUNCTION_OBJECTS[func.start]
+  if f_handle is None:
+    return
+
+  f_handle.print_parameters()
+  f_handle.recover_instructions()
+  f_handle.analysis()
 
 def identify_data_variable(bv):
   """ Recover the data variables from the segments identified by binja; The size of
@@ -119,6 +119,7 @@ def collect_exported_symbols(bv):
       continue
 
     if sym.type == binja.SymbolType.DataSymbol and \
+      is_data_variable(bv, sym.address) and \
       not is_executable(bv, sym.address) and \
       not is_section_external(bv, sect):
       DEBUG('Recovering exported global {} @ {:x}'.format(sym.name, sym.address))
@@ -152,11 +153,10 @@ def main(args):
   bv.update_analysis_and_wait()
   
   DEBUG("Analysis file {} loaded...".format(args.binary))
+  DEBUG("Number of functions {}".format(len(bv.functions)))
   
   entry_symbol = bv.get_symbols_by_name(args.entrypoint)[0]
   DEBUG("Entry points {:x} {} {} ".format(entry_symbol.address, entry_symbol.name, len(bv.functions)))
-
-  DEBUG("entry points {}".format(pprint.pformat(bv.entry_point)))
 
   collect_exported_symbols(bv)
   # Get all the data variables from the data segments

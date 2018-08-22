@@ -226,6 +226,13 @@ class Function(object):
       index += 1
     DEBUG_POP()
 
+  def analysis(self):
+    DEBUG("Analysis function {}".format(self.func.name))
+    if self.func.name != "renuild_conf_hash":
+      return
+    size = len(self.func.medium_level_il.ssa_form)
+    pass
+
 def create_function(bv, func):
   if func.symbol.type == binja.SymbolType.ImportedFunctionSymbol:
     return

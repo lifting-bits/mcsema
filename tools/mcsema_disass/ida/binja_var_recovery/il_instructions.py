@@ -192,28 +192,33 @@ class ILInstruction(object):
       for index in range(len(expr.params)):
         parameter = expr.params[index]
         p_value = parameter.possible_values
-        reg_name = PARAM_REGISTERS_INDEX[index]
+
+        try:
+          reg_name = PARAM_REGISTERS_INDEX[index]
+        except KeyError:
+          reg_name = None
 
         if p_value.type == binja.RegisterValueType.ConstantPointerValue:
           if is_data_variable(self.bv, p_value.value):
             VARIABLE_ALIAS_SET.add(p_value.value, p_value.value + 8)
             if called_function_object:
-              called_function_object.regs[reg_name].add(p_value.value)
+              called_function_object.update_register(reg_name, p_value.value)
 
         elif p_value.type == binja.RegisterValueType.ConstantValue:
           if is_data_variable(self.bv, p_value.value):
             VARIABLE_ALIAS_SET.add(p_value.value, p_value.value + 8)
             if called_function_object:
-              called_function_object.regs[reg_name].add(p_value.value)
+              called_function_object.update_register(reg_name, p_value.value)
 
         elif p_value.type != binja.RegisterValueType.UndeterminedValue:
           if called_function_object:
-            called_function_object.regs[reg_name].add(p_value)
+            called_function_object.update_register(reg_name, p_value)
         else:
           ssa_var = SSAVariable(self.bv, parameter.src, self.bv.address_size, self.function)
           ssa_value = ssa_var.get_values()
           if called_function_object:
-            called_function_object.regs[reg_name].update(ssa_value)
+            called_function_object.update_register(reg_name, ssa_value)
+
           DEBUG("param values  {}".format(ssa_value))
 
       ssa_vars_output = expr.output.vars_written
