@@ -49,7 +49,6 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
              << index;
 }
 
-
 bool IsInRegion(SymtabAPI::Region *r, Address a) {
   if (r->getRegionName() == ".bss") {
     LOG(INFO) << ".bss 0x" << std::hex << r->getMemOffset() << " - 0x" << r->getMemOffset() + r->getMemSize();
@@ -66,6 +65,15 @@ bool IsInRegion(SymtabAPI::Region *r, Address a) {
     return false;
   }
   return true;
+}
+
+bool IsInRegions(const std::vector<SymtabAPI::Region *> &regions, Address a) {
+  for (auto &r : regions) {
+    if (IsInRegion(r, a)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void WriteDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref,
@@ -866,9 +874,16 @@ void CFGWriter::handleNonCallInstruction(
   if (direct_values[0] && direct_values[1]) {
     addr -= instruction->size();
     LOG(INFO) << "Found possible sneaky store";
-    LOG(INFO) << "\t" << addr << " " <<direct_values[0] << " " << direct_values[1];
+    LOG(INFO) << "\t" << addr << " " << direct_values[0] << " " << direct_values[1];
+    bool is_somewhere_reasonable = IsInRegions(
+        {
+          section_manager.getRegion(".bss"),
+          section_manager.getRegion(".data"),
+          section_manager.getRegion(".rodata"),
+        },
+        direct_values[0]);
     if (IsInRegion(section_manager.getRegion(".text"), direct_values[1]) &&
-        IsInRegion(section_manager.getRegion(".bss"), direct_values[0])) {
+        is_somewhere_reasonable) {
       LOG(INFO) << "Storing address from .text into .bss";
       if (func_map.find(direct_values[0]) == func_map.end()) {
         LOG(INFO) << "\tAnd it is unknown!";
