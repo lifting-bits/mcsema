@@ -1051,7 +1051,18 @@ void CFGWriter::xrefsInSegment(SymtabAPI::Region *region,
       LOG(WARNING) << "Dual xref detected!";
       continue;
     }
-    handleDataXref(segment, region->getMemOffset() + j, *offset);
+    LOG(INFO)
+      << std::hex << "Trying to resolve xref from " << region->getRegionName()
+      << " at 0x" <<region->getMemOffset() + j << " targeting 0x" << *offset;
+    //handleDataXref(segment, region->getMemOffset() + j, *offset);
+    if (!handleDataXref(segment, region->getMemOffset() + j, *offset)) {
+      LOG(INFO) << "Did not resolve it, try to search in .text";
+      if (IsInRegion(section_manager.getRegion(".text"), *offset)) {
+        LOG(INFO) << "Xref is pointing into .text";
+        code_xrefs_to_resolve.insert({*offset,{region->getMemOffset() + j, *offset, segment}});
+        //WriteDataXref({region->getMemOffset() + j, *offset, segment});
+      }
+    }
   }
 }
 
