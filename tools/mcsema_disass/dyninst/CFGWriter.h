@@ -23,7 +23,7 @@ public:
             Dyninst::Address entry_addres);
 
   void write();
-  using SymbolMap = std::unordered_map<Dyninst::Offset, std::string>;
+  using SymbolMap = std::unordered_map<Dyninst::Address, std::string>;
 
   template<typename CFGUnit=mcsema::Segment>
   struct CrossXref {
@@ -121,6 +121,7 @@ private:
   std::unordered_map<Dyninst::Address, std::string> global_vars;
   std::unordered_map<Dyninst::Address, std::string> external_vars;
   std::unordered_map<Dyninst::Address, std::string> segment_vars;
+  SymbolMap external_functions;
 
   std::vector<Dyninst::SymtabAPI::relocationEntry> relocations;
   std::unordered_set<std::string> no_ret_funcs;
