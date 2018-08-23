@@ -28,23 +28,59 @@ bool SmarterTryEval(InstructionAPI::Expression *expr,
                         const Address ip,
                         Address &result,
                         Address instruction_size=0) {
-  InstructionAPI::RegisterAST rip =
+  /*InstructionAPI::RegisterAST rip =
       InstructionAPI::RegisterAST::makePC(Dyninst::Arch_x86_64);
   auto ip_value = InstructionAPI::Result(InstructionAPI::u64, ip);
   expr->bind(&rip, ip_value);
-
+*/
   LOG(INFO) << expr->format();
-  auto res = expr->eval();
+  /*auto res = expr->eval();
   if (expr->eval().format() != "[empty]") {
+    LOG(INFO) << "Returned smart";
     result = expr->eval().convert<Address>();
     return true;
-  }
-  if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
+  }*/
+  if (auto bin = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
+    LOG(INFO) << "BF";
+    std::vector<InstructionAPI::InstructionAST::Ptr> args;
+    bin->getChildren(args);
+
+    Address left, right;
+
+    auto first = SmarterTryEval(
+        dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
+        ip, left, instruction_size);
+    auto second = SmarterTryEval(
+        dynamic_cast<InstructionAPI::Expression *>(args[1].get()),
+        ip, right, instruction_size);
+    if (first && second) {
+      if (bin->isAdd()) {
+        result = left + right;
+        return true;
+      } else if (bin->isMultiply()) {
+        result = left * right;
+        return true;
+      }
+
+      return false;
+    }
+  }  else if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr)) {
+    LOG(INFO) << "IMM";
+    result = imm->eval().convert<Address>();
+    return true;
+  } else if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
+    LOG(INFO) << "DEREF";
     std::vector<InstructionAPI::InstructionAST::Ptr> args;
     deref->getChildren(args);
     return SmarterTryEval(dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
                    ip + instruction_size,
                    result);
+  } else if (auto reg = dynamic_cast<InstructionAPI::RegisterAST *>(expr)) {
+    if (reg->format() == "RIP") {
+      LOG(INFO) << "RIP " << ip << " + " << instruction_size;
+      result = ip;
+      return true;
+    }
   }
   return false;
 }
@@ -62,6 +98,7 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
       using Insn = std::map<Offset, InstructionAPI::Instruction::Ptr>;
       Insn instructions;
       entry_block->getInsns(instructions);
+      //TODO(lukas): rename
       auto callq = std::prev(instructions.end(), 2 + index);
 
       LOG(INFO) << "Current rip 0x" << std::hex << callq->first;
@@ -70,7 +107,12 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
       LOG(INFO) << second_operand.format(Arch_x86_64);
 
       Address offset = 0;
-      if (!SmarterTryEval(second_operand.getValue().get(), callq->first, offset, callq->second->size())) {
+      //lea
+      auto rip = callq->first;
+      if (callq->second->getOperation().getID() == 268) {
+        rip += callq->second->size();
+      }
+      if (!SmarterTryEval(second_operand.getValue().get(), rip, offset, callq->second->size())) {
         LOG(FATAL) << "Could not eval basic start addresses!";
       }
       code_object.parse(offset, true);
@@ -196,10 +238,12 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
   LOG(INFO) << "Function at " << main_offset << " is " << FLAGS_entrypoint;
 
   if (func_map[ctor_offset].substr(0, 4) == "targ") {
+    LOG(INFO) << "Renaming 0x:" << std::hex << ctor_offset << " to init";
     func_map[ctor_offset] = "init";
   }
 
   if (func_map[dtor_offset].substr(0, 4) == "targ") {
+    LOG(INFO) << "Renaming 0x:" << std::hex << dtor_offset << " to fini";
     func_map[dtor_offset] = "fini";
   }
 
@@ -335,7 +379,10 @@ void CFGWriter::writeInternalFunctions() {
         "__do_global_dtors_aux",
         "__libc_csu_fini",
         "_fini",
-        "__libc_start_main"
+        "__libc_start_main",
+        "_GLOBAL__sub_I_main.cpp",
+        "__cxx_global_var_init",
+        "__cxa_finalize",
     };
 
   for (ParseAPI::Function *func : code_object.funcs()) {
@@ -485,7 +532,7 @@ bool getDisplacement(InstructionAPI::Instruction *instruction,
 
 void writeDisplacement(mcsema::Instruction *cfgInstruction, Address &address,
         const std::string& name = "") {
-  if ( !address ) return;
+  if ( address <= 0 ) return;
 
   AddCodeXref( cfgInstruction, CodeReference::DataTarget,
           CodeReference::MemoryDisplacementOperand, CodeReference::Internal,
@@ -907,6 +954,10 @@ void CFGWriter::handleNonCallInstruction(
         //addr -= instruction->size();
         if(tryEval(expr.get(), addr, a)) {
           handleXref(cfgInstruction, a);
+          if (IsInRegion(section_manager.getRegion(".text"), a)) {
+            auto xref = cfgInstruction->mutable_xrefs(cfgInstruction->xrefs_size() - 1);
+            xref->set_operand_type(CodeReference::MemoryOperand);
+          }
           direct_values[i] = a;
         }
       } else if (instruction_id == 8) {
@@ -1250,9 +1301,24 @@ void CFGWriter::writeInternalData() {
     cfgInternalData->set_is_exported(false);      /* TODO: As for now, ignored */
     cfgInternalData->set_is_thread_local(false); /* TODO: As for now, ignored */
 
-    writeDataVariables(region, cfgInternalData);
 
-    xrefsInSegment( region, cfgInternalData );
+    std::set<std::string> dont_parse = {
+      ".eh_frame",
+      ".rela.dyn",
+      ".rela.plt",
+      ".dynamic",
+      ".dynstr",
+      ".dynsym",
+      ".got",
+      ".got.plt",
+      ".plt",
+      ",plt.got",
+    };
+    if (dont_parse.find(region->getRegionName()) == dont_parse.end()) {
+      writeDataVariables(region, cfgInternalData);
+
+      xrefsInSegment( region, cfgInternalData );
+    }
 
     if (region->getRegionName() == ".bss") {
       writeBssXrefs(region, cfgInternalData, external_vars);
@@ -1269,8 +1335,8 @@ void CFGWriter::writeInternalData() {
       for (auto &reloc : relocs) {
         LOG(INFO) << "Entry:\n\ttarget: " << reloc.target_addr()
                   << "\n\trel: "  << reloc.rel_addr()
-                  << "\n\taddend: " << reloc.addend()
-                  << "\n\tname: " << reloc.getDynSym()->getMangledName();
+                  << "\n\taddend: " << reloc.addend();
+                  //<< "\n\tname: " << reloc.getDynSym()->getMangledName();
       }
     }
   }
