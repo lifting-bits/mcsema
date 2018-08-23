@@ -24,25 +24,101 @@ using namespace mcsema;
 
 namespace {
 
+bool SmarterTryEval(InstructionAPI::Expression *expr,
+                        const Address ip,
+                        Address &result,
+                        Address instruction_size=0) {
+  InstructionAPI::RegisterAST rip =
+      InstructionAPI::RegisterAST::makePC(Dyninst::Arch_x86_64);
+  auto ip_value = InstructionAPI::Result(InstructionAPI::u64, ip);
+  expr->bind(&rip, ip_value);
+
+  LOG(INFO) << expr->format();
+  auto res = expr->eval();
+  if (expr->eval().format() != "[empty]") {
+    result = expr->eval().convert<Address>();
+    return true;
+  }
+/*
+  if (auto bin = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
+    LOG(INFO) << "BF";
+    std::vector<InstructionAPI::InstructionAST::Ptr> args;
+    bin->getChildren(args);
+
+    Address left, right;
+
+    auto first = SmarterTryEval(
+        dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
+        ip, left);
+    auto second = SmarterTryEval(
+        dynamic_cast<InstructionAPI::Expression *>(args[1].get()),
+        ip, right);
+    if (first && second) {
+      if (bin->isAdd()) {
+        result = left + right;
+        return true;
+      } else if (bin->isMultiply()) {
+        result = left * right;
+        return true;
+      }
+
+      return false;
+    }
+  } else if (auto reg = dynamic_cast<InstructionAPI::RegisterAST *>(expr)) {
+    if (reg->format() == "RIP") {
+      result = ip;
+      return true;
+    }
+  } else if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr)) {
+    result = imm->eval().convert<Address>();
+    return true;
+  } else */if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
+    std::vector<InstructionAPI::InstructionAST::Ptr> args;
+    deref->getChildren(args);
+    return SmarterTryEval(dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
+                   ip + instruction_size,
+                   result);
+  }
+  return false;
+}
+
 Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
                                  Address start,
                                  size_t index) {
   for (auto func : code_object.funcs()) {
     if (func->addr() == start) {
+
       auto entry_block = func->entry();
+      LOG(INFO) << "Start 0x" << std::hex << start
+                << " end 0x" << entry_block->end();
 
       using Insn = std::map<Offset, InstructionAPI::Instruction::Ptr>;
       Insn instructions;
       entry_block->getInsns(instructions);
       auto callq = std::prev(instructions.end(), 2 + index);
 
+      LOG(INFO) << "Current rip 0x" << std::hex << callq->first;
+
       auto second_operand = callq->second.get()->getOperand(1);
-      auto operand_value = dynamic_cast<InstructionAPI::Immediate *>(second_operand.getValue().get());
-      Address offset = operand_value->eval().convert<Address>();
-      code_object.parse(offset, true);
+      LOG(INFO) << second_operand.format(Arch_x86_64);
+
+      // no-pie binary will have it like mov 0x42, %r8
+      /*if (auto operand_value = dynamic_cast<InstructionAPI::Immediate *>(second_operand.getValue().get())) {
+        LOG(INFO) << operand_value->format(InstructionAPI::formatStyle::defaultStyle) << " " << index;
+        Address offset = operand_value->eval().convert<Address>();
+        code_object.parse(offset, true);
+        LOG(INFO) << "Retrieving info from _start at index " << index
+                  << " got addr 0x" << std::hex << offset << std::dec;
+        return offset;
+      } else {*/
+      Address offset = 0;
+      if (!SmarterTryEval(second_operand.getValue().get(), callq->first, offset, callq->second->size())) {
+        LOG(FATAL) << "Could not eval basic start addresses!";
+      }
       LOG(INFO) << "Retrieving info from _start at index " << index
                 << " got addr 0x" << std::hex << offset << std::dec;
       return offset;
+      //}
     }
   }
   LOG(FATAL) << "Was not able to retrieve info from _start at index "
@@ -1342,66 +1418,4 @@ bool CFGWriter::tryEval(InstructionAPI::Expression *expr,
 }
 
 
-bool CFGWriter::SmarterTryEval(InstructionAPI::Expression *expr,
-                        const Address ip,
-                        Address &result,
-                        Address instruction_size) const {
-  InstructionAPI::RegisterAST rip =
-      InstructionAPI::RegisterAST::makePC(Dyninst::Arch_x86_64);
-  auto ip_value = InstructionAPI::Result(InstructionAPI::u64, ip);
-  expr->bind(&rip, ip_value);
 
-  LOG(INFO) << expr->format();
-  auto res = expr->eval();
-  LOG(INFO) << "expr->eval() " << res.format();
-  if (expr->eval().format() != "[empty]") {
-    LOG(INFO) << "Empty";
-    result = expr->eval().convert<Address>();
-    return true;
-  }
-
-  if (auto bin = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
-    LOG(INFO) << "BF";
-    std::vector<InstructionAPI::InstructionAST::Ptr> args;
-    bin->getChildren(args);
-
-    Address left, right;
-
-    auto first = SmarterTryEval(
-        dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
-        ip, left);
-    auto second = SmarterTryEval(
-        dynamic_cast<InstructionAPI::Expression *>(args[1].get()),
-        ip, right);
-    if (first && second) {
-      if (bin->isAdd()) {
-        result = left + right;
-        return true;
-      } else if (bin->isMultiply()) {
-        result = left * right;
-        return true;
-      }
-
-      return false;
-    }
-  } else if (auto reg = dynamic_cast<InstructionAPI::RegisterAST *>(expr)) {
-    if (reg->format() == "RIP") {
-      LOG(INFO) << "RIP "<< ip;
-      result = ip;
-      return true;
-    }
-  } else if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr)) {
-    result = imm->eval().convert<Address>();
-    LOG(INFO) << "IMM "<< result;
-    return true;
-  } else if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
-    LOG(INFO) << "DER";
-    std::vector<InstructionAPI::InstructionAST::Ptr> args;
-    deref->getChildren(args);
-    return SmarterTryEval(dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
-                   ip + instruction_size,
-                   result);
-  }
-  LOG(INFO) << "ERR";
-  return false;
-}

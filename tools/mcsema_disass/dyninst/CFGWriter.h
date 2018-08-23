@@ -99,10 +99,11 @@ private:
                Dyninst::Address &result) const;
 
   // #iamverysmart
-  bool SmarterTryEval(Dyninst::InstructionAPI::Expression *expr,
+  /*bool SmarterTryEval(Dyninst::InstructionAPI::Expression *expr,
                const Dyninst::Address ip,
                Dyninst::Address &result,
                Dyninst::Address instruction_size=0) const;
+               */
   /* Dyninst related objects */
   mcsema::Module &module;
   std::string module_name;
