@@ -39,40 +39,7 @@ bool SmarterTryEval(InstructionAPI::Expression *expr,
     result = expr->eval().convert<Address>();
     return true;
   }
-/*
-  if (auto bin = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
-    LOG(INFO) << "BF";
-    std::vector<InstructionAPI::InstructionAST::Ptr> args;
-    bin->getChildren(args);
-
-    Address left, right;
-
-    auto first = SmarterTryEval(
-        dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
-        ip, left);
-    auto second = SmarterTryEval(
-        dynamic_cast<InstructionAPI::Expression *>(args[1].get()),
-        ip, right);
-    if (first && second) {
-      if (bin->isAdd()) {
-        result = left + right;
-        return true;
-      } else if (bin->isMultiply()) {
-        result = left * right;
-        return true;
-      }
-
-      return false;
-    }
-  } else if (auto reg = dynamic_cast<InstructionAPI::RegisterAST *>(expr)) {
-    if (reg->format() == "RIP") {
-      result = ip;
-      return true;
-    }
-  } else if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr)) {
-    result = imm->eval().convert<Address>();
-    return true;
-  } else */if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
+  if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
     std::vector<InstructionAPI::InstructionAST::Ptr> args;
     deref->getChildren(args);
     return SmarterTryEval(dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
@@ -102,19 +69,11 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
       auto second_operand = callq->second.get()->getOperand(1);
       LOG(INFO) << second_operand.format(Arch_x86_64);
 
-      // no-pie binary will have it like mov 0x42, %r8
-      /*if (auto operand_value = dynamic_cast<InstructionAPI::Immediate *>(second_operand.getValue().get())) {
-        LOG(INFO) << operand_value->format(InstructionAPI::formatStyle::defaultStyle) << " " << index;
-        Address offset = operand_value->eval().convert<Address>();
-        code_object.parse(offset, true);
-        LOG(INFO) << "Retrieving info from _start at index " << index
-                  << " got addr 0x" << std::hex << offset << std::dec;
-        return offset;
-      } else {*/
       Address offset = 0;
       if (!SmarterTryEval(second_operand.getValue().get(), callq->first, offset, callq->second->size())) {
         LOG(FATAL) << "Could not eval basic start addresses!";
       }
+      code_object.parse(offset, true);
       LOG(INFO) << "Retrieving info from _start at index " << index
                 << " got addr 0x" << std::hex << offset << std::dec;
       return offset;
@@ -126,18 +85,10 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
 }
 
 bool IsInRegion(SymtabAPI::Region *r, Address a) {
-  if (r->getRegionName() == ".bss") {
-    LOG(INFO) << ".bss 0x" << std::hex << r->getMemOffset() << " - 0x" << r->getMemOffset() + r->getMemSize();
-    LOG(INFO) << std::hex << "\tAsking 0x" << a;
-    LOG(INFO) << std::hex << a - r->getMemOffset();
-    LOG(INFO) << std::hex << r->getMemOffset() + r->getMemSize() - a;
-  }
   if (a < r->getMemOffset()) {
-    LOG(INFO) << "BOTTOM";
     return false;
   }
   if (a > (r->getMemOffset() + r->getMemSize())) {
-    LOG(INFO) << "TOP";
     return false;
   }
   return true;
@@ -176,6 +127,7 @@ bool FishForXref(CFGWriter::SymbolMap vars,
   return false;
 }
 
+//TODO(lukas): Investigate, this ignores .bss?
 bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
   for (auto &r : code_source.regions()) {
     if (r->contains(a)) {
@@ -241,6 +193,7 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
     LOG(INFO) << func->addr() << " " << func->name();
   }
   func_map[main_offset] = FLAGS_entrypoint;
+  LOG(INFO) << "Function at " << main_offset << " is " << FLAGS_entrypoint;
 
   if (func_map[ctor_offset].substr(0, 4) == "targ") {
     func_map[ctor_offset] = "init";
@@ -281,7 +234,8 @@ void CFGWriter::write() {
     code_object.parse(a.first, false);
   }*/
   for (auto func : code_object.funcs()) {
-    if (code_xrefs_to_resolve.find(func->addr()) != code_xrefs_to_resolve.end()) {
+    if (code_xrefs_to_resolve.find(func->addr()) != code_xrefs_to_resolve.end() &&
+        func_map.find(func->addr()) == func_map.end()) {
       func_map[func->addr()] = func->name();
       auto cfgInternalFunc = module.add_funcs();
 
@@ -307,7 +261,8 @@ void CFGWriter::write() {
     auto old_set = inst_xrefs_to_resolve;
     inst_xrefs_to_resolve.clear();
     for (auto func : code_object.funcs()) {
-      if (old_set.find(func->addr()) != old_set.end()) {
+      if (old_set.find(func->addr()) != old_set.end() &&
+          func_map.find(func->addr()) == func_map.end()) {
         func_map[func->addr()] = func->name();
         auto cfgInternalFunc = module.add_funcs();
 
@@ -1303,8 +1258,21 @@ void CFGWriter::writeInternalData() {
       writeBssXrefs(region, cfgInternalData, external_vars);
     }
 
-    if (region->getRegionName() == ".got.plt")
+    if (region->getRegionName() == ".got.plt") {
       writeRelocations(region, cfgInternalData);
+    }
+
+    if (region->getRegionName() == ".rela.plt" ||
+        region->getRegionName() == ".rela.dyn") {
+      LOG(INFO) << "Dumping content of: " << region->getRegionName();
+      auto relocs = region->getRelocations();
+      for (auto &reloc : relocs) {
+        LOG(INFO) << "Entry:\n\ttarget: " << reloc.target_addr()
+                  << "\n\trel: "  << reloc.rel_addr()
+                  << "\n\taddend: " << reloc.addend()
+                  << "\n\tname: " << reloc.getDynSym()->getMangledName();
+      }
+    }
   }
   ResolveCrossXrefs();
 }
