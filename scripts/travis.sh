@@ -65,8 +65,9 @@ linux_initialize() {
                             g++-multilib \
                             lsb-release \
                             liblzma-dev \
-                            zlib1g-dev \
-                            libc6:i386 \
+                            zlib1g-dev
+
+  sudo apt-get install -qqy libc6:i386 \
                             libstdc++6:i386 \
                             zlib1g-dev:i386 \
                             liblzma-dev:i386 \
