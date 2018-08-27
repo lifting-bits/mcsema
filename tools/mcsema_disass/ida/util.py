@@ -93,7 +93,7 @@ def is_code(ea):
 
   seg_ea = idc.get_segm_start(ea)
   seg_type = idc.get_segm_attr(seg_ea, idc.SEGATTR_TYPE)
-  return seg_type == idc.SEG_CODE
+  return (seg_type == idc.SEG_CODE)
 
 # A stricter form of `is_code`, where we also check whether IDA thinks something
 # is code. IDA is able to identify some things like embedded exception tables
@@ -254,7 +254,8 @@ def instruction_ends_block(arg):
 def is_invalid_ea(ea):
   """Returns `True` if `ea` is not valid, i.e. it doesn't point into any
   valid segment."""
-  if idc.BADADDR == ea:
+  if (idc.BADADDR == ea) or \
+    (idc.get_segm_name(ea) == "LOAD"):
     return True
 
   try:
