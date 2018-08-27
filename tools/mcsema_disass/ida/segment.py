@@ -139,7 +139,7 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
       continue
 
     # A bit aggressive, but lets try to make it into a string.
-    if last_was_string and 1 < len(as_str):
+    if last_was_string and 1 < len(as_str) and not is_reference(ea):
       old_item_size = idc.get_item_size(ea)      
       if 1 != idc.create_strlit(ea, idc.BADADDR):
         last_was_string = False
