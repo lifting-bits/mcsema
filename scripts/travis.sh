@@ -45,6 +45,7 @@ linux_initialize() {
   printf "Initializing platform: linux\n"
 
   printf " > Updating the system...\n"
+  sudo dpkg --add-architecture i386
   sudo apt-get -qq update
   if [ $? -ne 0 ] ; then
     printf " x The package database could not be updated\n"
@@ -52,7 +53,24 @@ linux_initialize() {
   fi
 
   printf " > Installing the required packages...\n"
-  sudo apt-get install -qqy python2.7 build-essential realpath python-setuptools git python2.7 wget libtinfo-dev gcc-multilib g++-multilib lsb-release liblzma-dev zlib1g-dev gnat
+  sudo apt-get install -qqy python2.7 \
+                            build-essential \
+                            realpath \
+                            python-setuptools \
+                            git \
+                            python2.7 \
+                            wget \
+                            libtinfo-dev \
+                            gcc-multilib \
+                            g++-multilib \
+                            lsb-release \
+                            liblzma-dev \
+                            zlib1g-dev \
+                            libc6:i386 \
+                            libstdc++6:i386 \
+                            zlib1g-dev:i386 \
+                            liblzma-dev:i386 \
+                            libtinfo-dev:i386 
   if [ $? -ne 0 ] ; then
     printf " x Could not install the required dependencies\n"
     return 1
