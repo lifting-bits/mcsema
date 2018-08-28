@@ -11,7 +11,18 @@
 
 #include <unordered_set>
 #include <unordered_map>
+#include <sstream>
 
+using SymbolMap = std::unordered_map<Dyninst::Address, std::string>;
+
+struct MagicSection {
+  std::string name = "magic_section";
+  std::stringstream data;
+  Dyninst::Address start_ea = 0;
+  uint64_t size = 0;
+
+  std::vector<mcsema::ExternalVariable *> ext_vars;
+};
 
 class CFGWriter {
 public:
@@ -23,7 +34,6 @@ public:
             Dyninst::Address entry_addres);
 
   void write();
-  using SymbolMap = std::unordered_map<Dyninst::Address, std::string>;
 
   template<typename CFGUnit=mcsema::Segment>
   struct CrossXref {
@@ -72,6 +82,7 @@ private:
   void writeExternalFunctions();
   void writeInternalData();
   void writeRelocations(Dyninst::SymtabAPI::Region*, mcsema::Segment *);
+  void writeGOT(Dyninst::SymtabAPI::Region*, mcsema::Segment *);
 
   Dyninst::Address immediateNonCall(Dyninst::InstructionAPI::Immediate *imm,
                         Dyninst::Address addr,
@@ -132,4 +143,7 @@ private:
   std::unordered_set<Dyninst::Address> found_xref;
   std::map<Dyninst::Address, CrossXref<mcsema::Segment>> code_xrefs_to_resolve;
   std::map<Dyninst::Address, CrossXref<mcsema::Instruction>> inst_xrefs_to_resolve;
+
+  MagicSection magic_section;
+  int ptr_byte_size = 8;
 };
