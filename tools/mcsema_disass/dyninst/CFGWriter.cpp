@@ -19,6 +19,8 @@
 #include <cstdio>
 DECLARE_string(entrypoint);
 
+DECLARE_bool(pie_mode);
+
 using namespace Dyninst;
 using namespace mcsema;
 
@@ -158,7 +160,7 @@ void WriteDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref,
   cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
 }
 
-bool FishForXref(CFGWriter::SymbolMap vars,
+bool FishForXref(SymbolMap vars,
                  const CFGWriter::CrossXref<mcsema::Segment> &xref,
                  bool is_code=false, uint64_t width=8) {
   auto var = vars.find(xref.target_ea);
@@ -255,6 +257,15 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
   }
 
   getNoReturns();
+
+  //TODO(lukas): Move out
+  Address highest = 0;
+  for (auto reg : regions) {
+    highest = std::max(reg->getMemOffset() + reg->getMemSize(), highest);
+  }
+  highest += 0x420;
+  LOG(INFO) << "Magic section starts at 0x" << std::hex << highest;
+  magic_section.start_ea = highest;
 }
 
 void CFGWriter::write() {
@@ -333,10 +344,32 @@ void CFGWriter::writeExternalVariables() {
   LOG(INFO) << "Writing " << symbols.size() << " external variables";
   for (const auto &s : symbols) {
     if (s->isInDynSymtab()) {
-      LOG_IF(WARNING,!s->getOffset())
-          << "External var has no ea! " << s->getMangledName();
-      LOG_IF(WARNING, !s->getSize())
-          << "External var has no size! " << s->getMangledName();
+      // Most likely relocation. So as IDA we can also make up some addr
+      if (!s->getOffset() && !s->getSize()) {
+        LOG(WARNING)
+            << "External var has no ea! " << s->getMangledName();
+        LOG(WARNING)
+            << "External var has no size! " << s->getMangledName();
+
+        Address unreal_ea = magic_section.start_ea + magic_section.size;
+        auto extVar = module.add_external_vars();
+        extVar->set_name(s->getMangledName());
+        extVar->set_ea(unreal_ea);
+
+        extVar->set_size(ptr_byte_size);
+
+        //TODO(lukas): This needs some checks
+        extVar->set_is_weak(false);
+        extVar->set_is_thread_local(false);
+
+        magic_section.size += ptr_byte_size;
+        for (int i = 0; i < ptr_byte_size; ++i) {
+          magic_section.data << "\0";
+        }
+        external_vars.insert( { unreal_ea, s->getMangledName() } );
+        magic_section.ext_vars.push_back(extVar);
+        continue;
+      }
       external_vars.insert( { s->getOffset(), s->getMangledName() } );
 
       auto extVar = module.add_external_vars();
@@ -546,7 +579,10 @@ bool getDisplacement(InstructionAPI::Instruction *instruction,
 */
 void writeDisplacement(mcsema::Instruction *cfgInstruction, Address &address,
         const std::string& name = "") {
-  if (address <= 0) return;
+  // Addres is uint64_t and in CFG ea is int64_t
+  if (static_cast<int64_t>(address) <= 0) {
+    return;
+  }
 
   AddCodeXref( cfgInstruction, CodeReference::DataTarget,
           CodeReference::MemoryDisplacementOperand, CodeReference::Internal,
@@ -803,6 +839,7 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
     }
     return a;
   }
+
   return 0;
 }
 
@@ -891,16 +928,20 @@ void CFGWriter::handleNonCallInstruction(
   // have that function parsed
   Address direct_values[2] = {0, 0};
   auto i = 0U;
+  LOG(INFO) << instruction->format() << " at 0x" << std::hex << addr - instruction->size();
   for (auto op : operands) {
     auto expr = op.getValue();
-
+    LOG(INFO) << expr->format();
     if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr.get())) {
+      LOG(INFO) << "Dealing with Immidiate as op at 0x" << std::hex << addr - instruction->size();
       direct_values[i] = immediateNonCall( imm, addr, cfgInstruction);
     } else if (
         auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr.get())) {
+      LOG(INFO) << "Dealing with Dereference as op at 0x" << std::hex << addr - instruction->size();
       direct_values[i] = dereferenceNonCall( deref, addr, cfgInstruction);
     } else if (
         auto bf = dynamic_cast<InstructionAPI::BinaryFunction *>(expr.get())) {
+      LOG(INFO) << "Dealing with BinaryFunction as op at 0x" << std::hex << addr - instruction->size();
 
       // 268 stands for lea
       // 8 stands for jump
@@ -923,7 +964,8 @@ void CFGWriter::handleNonCallInstruction(
           }
           direct_values[i] = a;
         }
-      } else if (instruction_id == 8) {
+      //} else if (instruction_id == 8) {
+      } else if (instruction->getCategory() == InstructionAPI::c_BranchInsn) {
         Address a;
         if (tryEval(expr.get(), addr - instruction->size(), a)) {
           auto code_ref = AddCodeXref(cfgInstruction,
@@ -937,6 +979,18 @@ void CFGWriter::handleNonCallInstruction(
           direct_values[i] = a;
         }
       }
+    } else {
+      /*if (FLAGS_pie_mode &&
+          instruction->getCategory() == InstructionAPI::c_BranchInsn) {
+        //if (operands.size() == 1 ) {
+          //EXPERIMENTAL(lukas): things like jmpq *%rdx need Offset table xref
+          auto xref = cfgInstruction->add_xrefs();
+          xref->set_target_type(CodeReference::DataTarget);
+          xref->set_operand_type(CodeReference::OffsetTable);
+          xref->set_location(CodeReference::Internal);
+          xref->set_ea(4100);
+        }*/
+      //}
     }
     ++i;
     checkDisplacement(expr.get(), cfgInstruction);
@@ -1156,9 +1210,68 @@ void writeRawData(std::string& data, SymtabAPI::Region* region) {
 
 //TODO(lukas): Relic of old PR, not sure if needed
 //             -fPIC & -pie?
-void CFGWriter::writeRelocations(SymtabAPI::Region* region,
+void CFGWriter::writeGOT(SymtabAPI::Region* region,
                                  mcsema::Segment* segment) {
-  const auto &relocations = region->getRelocations();
+  auto rela_dyn = section_manager.getRegion(".rela.dyn");
+  if (!rela_dyn || !FLAGS_pie_mode) {
+    return;
+  }
+  const auto &relocations = rela_dyn->getRelocations();
+
+  for (auto reloc : relocations) {
+    bool found = false;
+    LOG(INFO) << "Trying to resolve reloc " << reloc.name();
+    for (auto ext_var : magic_section.ext_vars) {
+      if (reloc.name() == ext_var->name()) {
+        LOG(INFO) << "Xref in .got io external living in magic_section";
+        auto xref = segment->add_xrefs();
+        xref->set_target_name(ext_var->name());
+        xref->set_ea(reloc.rel_addr());
+        xref->set_target_ea(ext_var->ea());
+        xref->set_target_is_code(false);
+        xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+        xref->set_width(ptr_byte_size);
+        found = true;
+      }
+    }
+    if (!found && !reloc.name().empty()) {
+      LOG(WARNING)
+          << "Giving magic_space to" << reloc.name();
+
+      Address unreal_ea = magic_section.start_ea + magic_section.size;
+      //auto extVar = module.add_external_vars();
+      //extVar->set_name(reloc.name());
+      //extVar->set_ea(unreal_ea);
+
+      //extVar->set_size(ptr_byte_size);
+
+      //TODO(lukas): This needs some checks
+      //extVar->set_is_weak(false);
+      //extVar->set_is_thread_local(false);
+
+      magic_section.size += ptr_byte_size;
+      for (int i = 0; i < ptr_byte_size; ++i) {
+        magic_section.data << "\0";
+      }
+      //external_vars.insert( { unreal_ea, reloc.name() } );
+      //magic_section.ext_vars.push_back(extVar);
+
+      auto xref = segment->add_xrefs();
+      xref->set_target_name(reloc.name());
+      xref->set_ea(reloc.rel_addr());
+      xref->set_target_ea(unreal_ea);
+      xref->set_target_is_code(true);
+      xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+      xref->set_width(ptr_byte_size);
+    }
+  }
+}
+
+void CFGWriter::writeRelocations(SymtabAPI::Region* region,
+                         mcsema::Segment *segment) {
+
+  auto rela_dyn = region;
+  const auto &relocations = rela_dyn->getRelocations();
 
   for (auto reloc : relocations) {
     for (auto f : code_object.funcs()) {
@@ -1168,6 +1281,52 @@ void CFGWriter::writeRelocations(SymtabAPI::Region* region,
         break;
       }
     }
+    /*
+    bool found = false;
+    LOG(INFO) << "Trying to resolve reloc " << reloc.name();
+    for (auto ext_var : magic_section.ext_vars) {
+      if (reloc.name() == ext_var->name()) {
+        LOG(INFO) << "Xref in .got to external living in magic_section";
+        auto xref = segment->add_xrefs();
+        xref->set_target_name(ext_var->name());
+        xref->set_ea(reloc.rel_addr());
+        xref->set_target_ea(ext_var->ea());
+        xref->set_target_is_code(false);
+        xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+        xref->set_width(ptr_byte_size);
+        found = true;
+      }
+    }
+    if (!found && !reloc.name().empty()) {
+      LOG(WARNING)
+          << "Giving magic_space to" << reloc.name();
+
+      Address unreal_ea = magic_section.start_ea + magic_section.size;
+      //auto extVar = module.add_external_vars();
+      //extVar->set_name(reloc.name());
+      //extVar->set_ea(unreal_ea);
+
+      //extVar->set_size(ptr_byte_size);
+
+      //TODO(lukas): This needs some checks
+      //extVar->set_is_weak(false);
+      //extVar->set_is_thread_local(false);
+
+      magic_section.size += ptr_byte_size;
+      for (int i = 0; i < ptr_byte_size; ++i) {
+        magic_section.data << "\0";
+      }
+      //external_vars.insert( { unreal_ea, reloc.name() } );
+      //magic_section.ext_vars.push_back(extVar);
+
+      auto xref = segment->add_xrefs();
+      xref->set_target_name(reloc.name());
+      xref->set_ea(reloc.rel_addr());
+      xref->set_target_ea(unreal_ea);
+      xref->set_target_is_code(true);
+      xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+      xref->set_width(ptr_byte_size);
+    }*/
   }
 }
 
@@ -1197,7 +1356,7 @@ void CFGWriter::ResolveCrossXrefs() {
 
 void writeBssXrefs(SymtabAPI::Region *region,
                    mcsema::Segment *segment,
-                   const CFGWriter::SymbolMap &externals) {
+                   const SymbolMap &externals) {
   for (auto &external : externals) {
     if (IsInRegion(region, external.first)) {
       auto cfg_xref = segment->add_xrefs();
@@ -1219,8 +1378,8 @@ void CFGWriter::writeInternalData() {
 
   for (auto region : dataRegions) {
     std::set<std::string> no_parse = {
-      ".rela.dyn",
-      ".rela.plt",
+      //".rela.dyn",
+      //".rela.plt",
       ".dynamic",
       ".dynstr",
       ".dynsym",
@@ -1293,9 +1452,14 @@ void CFGWriter::writeInternalData() {
       writeRelocations(region, cfgInternalData);
     }
 
+    if (region->getRegionName() == ".got") {
+      writeGOT(region, cfgInternalData);
+    }
+
     //TODO(lukas): Debug print, remove on release
     if (region->getRegionName() == ".rela.plt" ||
-        region->getRegionName() == ".rela.dyn") {
+        region->getRegionName() == ".rela.dyn" ||
+        region->getRegionName() == ".got") {
       LOG(INFO) << "Dumping content of: " << region->getRegionName();
       auto relocs = region->getRelocations();
       for (auto &reloc : relocs) {
