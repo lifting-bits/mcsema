@@ -469,7 +469,7 @@ def get_instruction_references(arg, binary_is_pie=False):
       # In the special case of "ADR" and "ADRP" instructions for aarch64
       # IDA infers the absolute immediate value to assign as op_type, rather
       # than characterizing it as a displacement from PC
-      if idc.GetMnem(inst.ea) in ["ADRP", "ADR"]:
+      if idc.print_insn_mnem(inst.ea) in ["ADRP", "ADR"]:
          ref.type = Reference.DISPLACEMENT
       else:
          ref.type = Reference.IMMEDIATE
