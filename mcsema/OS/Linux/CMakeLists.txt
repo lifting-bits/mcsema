@@ -32,7 +32,7 @@ function(add_runtime_helper target_name source_file address_bit_size)
   endif()
 
   if("${source_file}" MATCHES "\.c$")
-    set(bc_build_flags "-xc" "-m${address_bit_size}" "-std=c11" "-Wno-deprecated-declarations")
+    set(bc_build_flags "-xc" "-m${address_bit_size}" "-std=gnu11" "-Wno-deprecated-declarations")
   elseif("${source_file}" MATCHES "\.cpp$")
     set(bc_build_flags "-xc++" "-m${address_bit_size}" "-std=gnu++14" "-Wno-deprecated-declarations")
   else()
