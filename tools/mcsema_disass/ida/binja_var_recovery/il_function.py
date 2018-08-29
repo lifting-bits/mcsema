@@ -209,6 +209,8 @@ class Function(object):
         getattr(mlil_insn, operation_name)(insn)
       else:
         DEBUG("Instruction operation {} is not supported!".format(operation_name))
+
+      mlil_insn.analyse_memory()
       DEBUG_POP()
 
       if insn.operation == binja.MediumLevelILOperation.MLIL_CALL_SSA:
@@ -284,22 +286,6 @@ class Function(object):
       if has_addr_ref == False:
         DEBUG("Size of the variable @ {:x} {}".format(var, self.bv.address_size))
 
-  def analysis_memory(self):
-    """ Heauristic analysis of direct memory operations
-    """
-    index = 0
-    size = len(self.func.medium_level_il.ssa_form)
-
-    DEBUG_PUSH()
-    while index < size:
-      insn = self.func.medium_level_il.ssa_form[index]
-      if self.is_memory_operation(insn):
-        variables = self.get_data_variable(insn)
-        if len(variables) > 0:
-          self.memory_size_heauristic(insn, variables)
-      index += 1
-    DEBUG_POP()
-
 def recover_function(bv, addr, is_entry=False):
   """ Process the function and collect the function which should be visited next
   """
@@ -320,7 +306,6 @@ def recover_function(bv, addr, is_entry=False):
   f_handle.collect_parameters()
   f_handle.print_parameters()
   f_handle.recover_instructions()
-  f_handle.analysis_memory()
 
 def create_function(bv, func):
   if func.symbol.type == binja.SymbolType.ImportedFunctionSymbol:

@@ -51,27 +51,6 @@ def identify_exported_symbols(bv):
 
   DEBUG('Number of exported global variables {}'.format(len(VARIABLE_ALIAS_SET)))
 
-#def recover_function(bv, addr, is_entry=False):
-#  """ Process the function and collect the function which should be visited next
-#  """
-#  func = bv.get_function_at(addr)
-#  if func is None:
-#    return
-#
-#  if func.symbol.type == binja.SymbolType.ImportedFunctionSymbol:
-#    DEBUG("Skipping external function '{}'".format(func.symbol.name))
-#    return
-#
-#  DEBUG("Recovering function {} at {:x}".format(func.symbol.name, addr))
-#
-#  f_handle = FUNCTION_OBJECTS[func.start]
-#  if f_handle is None:
-#    return
-#
-#  f_handle.print_parameters()
-#  f_handle.recover_instructions()
-#  f_handle.analysis()
-
 def identify_data_variable(bv):
   """ Recover the data variables from the segments identified by binja; The size of
       variables may not be correct and safe to recover.
@@ -195,7 +174,11 @@ def updateCFG(bv, outfile):
     try:
       var.size = variable_list[index+1] - key
     except IndexError:
-      var.size = 0
+      sec = get_section_at(bv, key)
+      if sec is not None:
+        var.size = sec.end - key
+      else:
+        var.size = 0 
     
     
   with open(outfile, "w") as outf:

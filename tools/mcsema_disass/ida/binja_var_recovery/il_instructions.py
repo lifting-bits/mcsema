@@ -117,6 +117,92 @@ class ILInstruction(object):
           return token.value
     return None
 
+  def get_variable_size(self, expr):
+    operands = binja.MediumLevelILInstruction.ILOperations[expr.operation]
+    index = 0
+    for operand in operands:
+      name, operand_type = operand
+      if operand_type == "int":
+        return self.bv.address_size
+      elif operand_type == "float":
+        return self.bv.address_size
+      elif operand_type == "expr":
+        opd = expr.operands[index]
+        if opd.operation == binja.MediumLevelILOperation.MLIL_STORE_SSA or \
+          opd.operation == binja.MediumLevelILOperation.MLIL_LOAD_SSA:
+          return opd.size
+        else:
+          return self.get_variable_size(opd)
+      index += 1
+    return expr.size
+
+  def is_memory_operation(self, expr):
+    if expr is None:
+      return False
+
+    if expr.operation == binja.MediumLevelILOperation.MLIL_CALL_SSA:
+      return False
+
+    for token in expr.tokens:
+      if token.type == binja.InstructionTextTokenType.RegisterToken:
+        return True
+    return False
+
+  def memory_heauristic_analysis(self, insn, variable):
+    dv = self.bv.get_data_var_at(variable)
+    prev_dv = self.bv.get_previous_data_var_before(variable)
+
+    dv_refs = list()
+    dv_func_set = set()
+    for ref in self.bv.get_code_refs(variable):
+      llil = ref.function.get_low_level_il_at(ref.address)
+      if llil is None:
+        continue
+
+      mlil = llil.medium_level_il
+      if mlil is not None:
+        dv_refs.append(mlil.ssa_form)
+        dv_func_set.add(ref.function.start)
+
+    # Check if there is a reference by address to the data variable
+    for insn in dv_refs:
+      if not self.is_memory_operation(insn):
+        return
+
+    if prev_dv is None:
+      return
+
+    prev_dv_func_set = set()
+    for ref in self.bv.get_code_refs(prev_dv):
+      llil = ref.function.get_low_level_il_at(ref.address)
+      if llil is None:
+        continue
+
+      mlil = llil.medium_level_il
+      if mlil is not None:
+        prev_dv_func_set.add(ref.function.start)
+
+    if prev_dv_func_set == dv_func_set:
+      return
+  
+    VARIABLE_ALIAS_SET[variable].add(variable + self.get_variable_size(insn))
+    VARIABLE_ALIAS_SET[variable + self.get_variable_size(insn)].add(variable)
+    DEBUG("Size of the variable @ {:x} {}".format(variable, self.bv.address_size))
+
+  def analyse_memory(self):
+    """ Heauristic analysis of direct memory operations
+    """
+    if self.insn is None:
+      return
+
+    if self.insn.operation == binja.MediumLevelILOperation.MLIL_CALL_SSA:
+      return
+
+    if self.is_memory_operation(self.insn):
+      var_addr = self.get_variable_addr(self.insn)
+      if var_addr != None:
+        self.memory_heauristic_analysis(self.insn, var_addr)
+
   def mlil_const(self, expr):
     return expr.constant
 

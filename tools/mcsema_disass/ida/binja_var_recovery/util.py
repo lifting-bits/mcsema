@@ -138,4 +138,3 @@ def is_section_external(bv, sect):
 
   _INT_SECTIONS.add(sect.start)
   return False
-  
