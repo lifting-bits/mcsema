@@ -115,6 +115,7 @@ if (DEFINED ENV{BUILD_MCSEMA_DYNINST_DISASS})
     if($ENV{BUILD_MCSEMA_DYNINST_DISASS} EQUAL 1)
         add_custom_target(generate-protobuf-files DEPENDS ${PROJECT_PROTOBUFSOURCEFILES})
         add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/dyninst)
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/dyninst_devel)
     endif()
 endif()
 
