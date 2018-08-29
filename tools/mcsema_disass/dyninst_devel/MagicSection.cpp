@@ -36,7 +36,8 @@ mcsema::ExternalFunction *MagicSection::WriteExternalFunction(
 	Dyninst::Address unreal_ea = AllocSpace(ptr_byte_size);
 	function.imag_ea = unreal_ea;
   real_to_imag.insert({function.ea, unreal_ea});
-	return function.Write(module);
+	ext_funcs.push_back(function.Write(module));
+  return ext_funcs.back();
 }
 
 Dyninst::Address MagicSection::AllocSpace(uint64_t byte_width) {
@@ -47,4 +48,11 @@ Dyninst::Address MagicSection::AllocSpace(uint64_t byte_width) {
 	}
 
 	return unreal_ea;
+}
+
+Dyninst::Address MagicSection::GetAllocated(Dyninst::Address ea) {
+  auto entry = real_to_imag.find(ea);
+  CHECK(entry == real_to_imag.end())
+      << "Trying to get magicSection address for not registered ea";
+  return entry->second;
 }
