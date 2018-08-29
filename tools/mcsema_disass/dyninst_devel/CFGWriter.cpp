@@ -188,7 +188,7 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
                      SymtabAPI::Symtab &symtab,
                      ParseAPI::SymtabCodeSource &symCodeSrc,
                      ParseAPI::CodeObject &codeObj,
-                     const ExternalFunctionManager &extFuncMgr,
+                     ExternalFunctionManager &extFuncMgr,
                      Address entry_point)
     : module(m),
       module_name(module_name),
@@ -687,7 +687,7 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
     // fills it with defaults. We need to check and correct it if needed
     if (IsInRegion(section_manager.getRegion(".text"), target)) {
       auto xref = cfgInstruction->mutable_xrefs(0);
-      xref->set_target_type(CodeReference::CodeTarget);
+      //xref->set_target_type(CodeReference::CodeTarget);
       xref->set_operand_type(CodeReference::ControlFlowOperand);
 
       // It is pointing in .text and not to a function?
@@ -833,6 +833,17 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
 void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                            Address addr) {
   LOG(INFO) << "HandleXref to " << addr;
+  if (auto func = magic_section.GetExternalFunction(addr)) {
+    LOG(INFO) << "Code xref to func in magic_section at " << addr;
+    auto code_ref = AddCodeXref(cfg_instruction,
+                                CodeReference::DataTarget,
+                                CodeReference::ControlFlowOperand,
+                                CodeReference::External,
+                                func->ea(),
+                                func->name());
+    return;
+  }
+
   auto func = func_map.find(addr);
   if (func != func_map.end()) {
     LOG(INFO) << "Code xref to func at " << addr;
@@ -881,9 +892,10 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
   if (ext_func != external_functions.end()) {
     LOG(INFO) << "Code xref to ext_func at " << addr;
     auto code_ref = AddCodeXref(cfg_instruction,
-                                  CodeReference::CodeTarget,
+                                  CodeReference::DataTarget,
                                   CodeReference::ControlFlowOperand,
-                                  CodeReference::External, addr,
+                                  CodeReference::External,
+                                  magic_section.GetAllocated(addr),
                                   ext_func->second);
     return;
   }
@@ -958,6 +970,7 @@ void CFGWriter::handleNonCallInstruction(
                                       CodeReference::CodeTarget,
                                       CodeReference::ControlFlowOperand,
                                       CodeReference::Internal, a);
+          //handleXref(cfgInstruction, a);
           if (isExternal(a)) {
             code_ref->set_location(CodeReference::External);
             code_ref->set_name(getXrefName(a));
@@ -1061,7 +1074,7 @@ bool CFGWriter::handleDataXref(mcsema::Segment *segment,
     return true;
   }
 
-  if (FishForXref(func_map, xref)) {
+  if (FishForXref(func_map, xref, true)) {
     found_xref.insert(ea);
     return true;
   }
@@ -1197,6 +1210,20 @@ void writeRawData(std::string& data, SymtabAPI::Region* region) {
   }
 }
 
+void WriteAsRaw(std::string& data, uint64_t number, int64_t offset) {
+  LOG(INFO) << "Writing raw " << number << " to offset " << offset;
+  if (offset < 0) {
+    LOG(FATAL) << "Trying yo write raw on negative offset";
+  }
+  if (offset + 3 >= data.size()) {
+    LOG(WARNING) << "AsRaw would overwrite stuff";
+    data.resize(offset + 3, '\0');
+  }
+  for (int i = 0; i < 4; ++i) {
+    data[offset + i] = (number >> (i * 8));
+  }
+}
+
 //TODO(lukas): Relic of old PR, not sure if needed
 //             -fPIC & -pie?
 void CFGWriter::writeGOT(SymtabAPI::Region* region,
@@ -1207,7 +1234,12 @@ void CFGWriter::writeGOT(SymtabAPI::Region* region,
   }
   const auto &relocations = rela_dyn->getRelocations();
 
+  auto old_data = segment->mutable_data();
+  std::string data{*old_data};
   for (auto reloc : relocations) {
+    if (!IsInRegion(region, reloc.rel_addr())) {
+      continue;
+    }
     bool found = false;
     LOG(INFO) << "Trying to resolve reloc " << reloc.name();
     for (auto ext_var : magic_section.ext_vars) {
@@ -1221,6 +1253,7 @@ void CFGWriter::writeGOT(SymtabAPI::Region* region,
         xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
         xref->set_width(ptr_byte_size);
         found = true;
+        WriteAsRaw(data, ext_var->ea(), reloc.rel_addr() - segment->ea());
       }
     }
     if (!found && !reloc.name().empty()) {
@@ -1235,13 +1268,76 @@ void CFGWriter::writeGOT(SymtabAPI::Region* region,
       xref->set_target_is_code(true);
       xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
       xref->set_width(ptr_byte_size);
+      WriteAsRaw(data, unreal_ea, reloc.rel_addr() - segment->ea());
+
+      if (reloc.name() == "__gmon_start__") {
+        auto cfg_external_func = module.add_external_funcs();
+
+        cfg_external_func->set_name(reloc.name());
+        cfg_external_func->set_ea(unreal_ea);
+        cfg_external_func->set_cc(mcsema::ExternalFunction::CallerCleanup);
+        cfg_external_func->set_has_return(true);
+        cfg_external_func->set_no_return(false);
+        cfg_external_func->set_argument_count(0);
+        cfg_external_func->set_is_weak(true);
+
+
+      } else if (ext_func_manager.IsExternal(reloc.name())) {
+        auto func = ext_func_manager.GetExternalFunction(reloc.name());
+        func.imag_ea = unreal_ea;
+        func.WriteHelper(module, unreal_ea);
+      }
     }
   }
+  for (int i = 0; i < data.size(); ++i) {
+    LOG(INFO) << std::hex << +static_cast<uint8_t>((data)[i]);
+  }
+  segment->set_data(data);
 }
 
 void CFGWriter::writeRelocations(SymtabAPI::Region* region,
                          mcsema::Segment *segment) {
 
+  auto rela_dyn = section_manager.getRegion(".rela.plt");
+  if (!rela_dyn || !FLAGS_pie_mode) {
+    return;
+  }
+  const auto &relocations = rela_dyn->getRelocations();
+  auto data = segment->mutable_data();
+
+  for (auto reloc : relocations) {
+    bool found = false;
+    LOG(INFO) << "Trying to resolve reloc " << reloc.name();
+    for (auto ext_func : magic_section.ext_funcs) {
+      if (reloc.name() == ext_func->name()) {
+        LOG(INFO) << "Xref in .got io external living in magic_section";
+        auto xref = segment->add_xrefs();
+        xref->set_target_name(ext_func->name());
+        xref->set_ea(reloc.rel_addr());
+        xref->set_target_ea(ext_func->ea());
+        xref->set_target_is_code(true);
+        xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+        xref->set_width(ptr_byte_size);
+        found = true;
+        WriteAsRaw(*data, ext_func->ea(), reloc.rel_addr() - segment->ea());
+      }
+    }
+    /*
+    if (!found && !reloc.name().empty()) {
+      LOG(WARNING)
+          << "Giving magic_space to" << reloc.name();
+
+      auto unreal_ea = magic_section.AllocSpace(ptr_byte_size);
+      auto xref = segment->add_xrefs();
+      xref->set_target_name(reloc.name());
+      xref->set_ea(reloc.rel_addr());
+      xref->set_target_ea(unreal_ea);
+      xref->set_target_is_code(true);
+      xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+      xref->set_width(ptr_byte_size);
+    }*/
+  }
+  /*
   auto rela_dyn = region;
   const auto &relocations = rela_dyn->getRelocations();
 
@@ -1253,53 +1349,7 @@ void CFGWriter::writeRelocations(SymtabAPI::Region* region,
         break;
       }
     }
-    /*
-    bool found = false;
-    LOG(INFO) << "Trying to resolve reloc " << reloc.name();
-    for (auto ext_var : magic_section.ext_vars) {
-      if (reloc.name() == ext_var->name()) {
-        LOG(INFO) << "Xref in .got to external living in magic_section";
-        auto xref = segment->add_xrefs();
-        xref->set_target_name(ext_var->name());
-        xref->set_ea(reloc.rel_addr());
-        xref->set_target_ea(ext_var->ea());
-        xref->set_target_is_code(false);
-        xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
-        xref->set_width(ptr_byte_size);
-        found = true;
-      }
-    }
-    if (!found && !reloc.name().empty()) {
-      LOG(WARNING)
-          << "Giving magic_space to" << reloc.name();
-
-      Address unreal_ea = magic_section.start_ea + magic_section.size;
-      //auto extVar = module.add_external_vars();
-      //extVar->set_name(reloc.name());
-      //extVar->set_ea(unreal_ea);
-
-      //extVar->set_size(ptr_byte_size);
-
-      //TODO(lukas): This needs some checks
-      //extVar->set_is_weak(false);
-      //extVar->set_is_thread_local(false);
-
-      magic_section.size += ptr_byte_size;
-      for (int i = 0; i < ptr_byte_size; ++i) {
-        magic_section.data << "\0";
-      }
-      //external_vars.insert( { unreal_ea, reloc.name() } );
-      //magic_section.ext_vars.push_back(extVar);
-
-      auto xref = segment->add_xrefs();
-      xref->set_target_name(reloc.name());
-      xref->set_ea(reloc.rel_addr());
-      xref->set_target_ea(unreal_ea);
-      xref->set_target_is_code(true);
-      xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
-      xref->set_width(ptr_byte_size);
-    }*/
-  }
+    */
 }
 
 void CFGWriter::ResolveCrossXrefs() {

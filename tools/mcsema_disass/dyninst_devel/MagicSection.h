@@ -8,6 +8,8 @@
 
 #include <CFG.pb.h>
 
+#include <glog/logging.h>
+
 class ExternalFunction;
 
 struct MagicSection {
@@ -17,6 +19,25 @@ struct MagicSection {
                              ExternalFunction &function);
 
   Dyninst::Address AllocSpace(uint64_t byte_width=8);
+
+  Dyninst::Address GetAllocated(Dyninst::Address ea);
+
+  mcsema::ExternalFunction *GetExternalFunction(Dyninst::Address real_ea) {
+    auto ea = real_to_imag.find(real_ea);
+    if (ea == real_to_imag.end()) {
+      LOG(INFO) << "Addr was not even allocated";
+      return nullptr;
+    }
+
+    for (auto &func : ext_funcs) {
+      if (func->ea() == ea->second) {
+        return func;
+      }
+    }
+    LOG(WARNING) << "Did not find external function in MagicSection despite"
+                 << " that addr was allocated";
+    return nullptr;
+  }
 
   //TODO(lukas): Rework as ctor
   void init(Dyninst::Address start_ea, int ptr_byte_size=8) {

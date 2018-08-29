@@ -57,7 +57,7 @@ public:
 
   // Returns the information stored for the function called "name"
   // and throws an exception if no such function can be found.
-  const ExternalFunction &GetExternalFunction(const std::string &name);
+  ExternalFunction &GetExternalFunction(const std::string &name);
 
   /* The following methods can be used to keep track of the external
    * functions that are actually called somewhere. This can greatly

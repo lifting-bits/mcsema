@@ -139,7 +139,7 @@ bool ExternalFunctionManager::IsExternal(const std::string &name) const {
   return external_funcs.find(name) != external_funcs.end();
 }
 
-const ExternalFunction &
+ExternalFunction &
 ExternalFunctionManager::GetExternalFunction(const std::string &name) {
   return external_funcs.at(name);
 }

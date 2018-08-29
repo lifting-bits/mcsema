@@ -23,7 +23,7 @@ public:
             Dyninst::SymtabAPI::Symtab &symtab,
             Dyninst::ParseAPI::SymtabCodeSource &symCodeSrc,
             Dyninst::ParseAPI::CodeObject &codeObj,
-            const ExternalFunctionManager &extFuncMgr,
+            ExternalFunctionManager &extFuncMgr,
             Dyninst::Address entry_addres);
 
   void write();
@@ -117,7 +117,7 @@ private:
   Dyninst::ParseAPI::SymtabCodeSource &code_source;
 
   /* After -abi-libraries are fully embraced in master branch, this can go out */
-  const ExternalFunctionManager &ext_func_manager;
+  ExternalFunctionManager &ext_func_manager;
   SectionManager section_manager;
 
   std::set<std::string> skip_funcss;
