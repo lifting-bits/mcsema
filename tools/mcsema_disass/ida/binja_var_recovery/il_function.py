@@ -115,8 +115,7 @@ class Function(object):
     for ref in self.bv.get_code_refs(self.start_addr):
       ref_function = ref.function
       insn_il = ref_function.get_low_level_il_at(ref.address).medium_level_il
-      if insn_il is None or \
-        insn_il.ssa_form is None:
+      if (insn_il is None) or (insn_il.ssa_form is None):
         continue
 
       insn_il_ssa = insn_il.ssa_form
@@ -129,47 +128,42 @@ class Function(object):
 
       for index in range(len(insn_il_ssa.params)):
         parameter = insn_il_ssa.params[index]
-        try:
-          reg_name = PARAM_REGISTERS_INDEX[index]
-        except KeyError:
-          reg_name = None
 
-        if parameter.operation in [binja.MediumLevelILOperation.MLIL_CONST, binja.MediumLevelILOperation.MLIL_CONST_PTR]:
+        if parameter.operation in [ binja.MediumLevelILOperation.MLIL_CONST,
+                                   binja.MediumLevelILOperation.MLIL_CONST_PTR ]:
           p_value = parameter.possible_values
         else:
           p_value = parameter.get_ssa_var_possible_values(parameter.src)
+
         value_set = self.params[index]
 
-        if p_value.type in [binja.RegisterValueType.ConstantValue, binja.RegisterValueType.ConstantPointerValue]:
+        if p_value.type in [ binja.RegisterValueType.ConstantValue,
+                            binja.RegisterValueType.ConstantPointerValue ]:
           value_set.add(p_value.value)
-          self.update_register(reg_name, p_value.value)
-        elif p_value.type == binja.RegisterValueType.EntryValue:
-          reg_value = self.regs[p_value.reg]
-          self.update_register(reg_name, reg_value)
-          value_set.update(reg_value)
-        elif p_value.type != binja.RegisterValueType.UndeterminedValue:
-          value_set.add(p_value)
-          self.update_register(reg_name, p_value)
-        else:
-          ssa_var = SSAVariable(self.bv, parameter.src, self.bv.address_size, ref_function)
-          ssa_value = ssa_var.get_values()
-          self.update_register(reg_name, ssa_value)
-          for item in ssa_value:
-            value_set.add(item)
+        #self.update_register(reg_name, p_value.value)
+        #elif p_value.type == binja.RegisterValueType.EntryValue:
+        #  reg_value = self.regs[p_value.reg]
+        #  self.update_register(reg_name, reg_value)
+        #  value_set.update(reg_value)
+        #elif p_value.type != binja.RegisterValueType.UndeterminedValue:
+        #  value_set.add(p_value)
+        #  self.update_register(reg_name, p_value)
+        #else:
+        #  ssa_var = SSAVariable(self.bv, parameter.src, self.bv.address_size, ref_function)
+        #  ssa_value = ssa_var.get_values()
+        #  self.update_register(reg_name, ssa_value)
+        #  for item in ssa_value:
+        #    value_set.add(item)
     DEBUG_POP()
 
-    if len(self.params) == 0:
-      return
-
-    DEBUG("collect_parameters {}".format(pprint.pformat(self.params)))
-    for args in self.params:
-      for item in args:
-        if isinstance(item, binja.PossibleValueSet):
-          if (item.type == binja.RegisterValueType.ConstantPointerValue \
-            or item.type == binja.RegisterValueType.ConstantValue):
-            if is_data_variable(self.bv, item.value):
-              DEBUG("Data Variable at address {:x}".format(item.value))
-              VARIABLE_ALIAS_SET.add(item.value, item.value + 8)
+  def get_param_register(self, reg_name):
+    try:
+      index = PARAM_REGISTERS[reg_name.lower()]
+      return self.params[index]
+    except KeyError:
+      return set()
+    except IndexError:
+      return set()
 
   def print_ssa_variables(self):
     DEBUG("SSA Variables in the function {}".format(pprint.pformat(self.ssa_variables)))
@@ -210,7 +204,7 @@ class Function(object):
 
       DEBUG_PUSH()
       mlil_insn = ILInstruction(self.bv, self.func, insn)
-      operation_name = "{}".format(insn.operation.name)
+      operation_name = "{}".format(insn.operation.name.lower())
       if hasattr(mlil_insn, operation_name):
         getattr(mlil_insn, operation_name)(insn)
       else:
@@ -226,23 +220,116 @@ class Function(object):
       index += 1
     DEBUG_POP()
 
-  def analysis(self):
-    DEBUG("Analysis function {}".format(self.func.name))
-    if self.func.name != "renuild_conf_hash":
-      return
+  def is_memory_operation(self, expr):
+    if expr is None:
+      return False
+
+    if expr.operation == binja.MediumLevelILOperation.MLIL_CALL_SSA:
+      return False
+
+    for token in expr.tokens:
+      if token.type == binja.InstructionTextTokenType.RegisterToken:
+        return True
+    return False
+
+  def get_data_variable(self, expr):
+    dv_set = set()
+    if expr is None:
+      return dv_set
+
+    for token in expr.tokens:
+      if token.type == binja.InstructionTextTokenType.PossibleAddressToken:
+        if is_data_variable(self.bv, token.value):
+          dv_set.add(token.value)
+    return dv_set
+
+  def previous_dv(self, func, var):
+    prev_dv = self.bv.get_previous_data_var_before(var)
+    if prev_dv is None:
+      return False
+
+    for ref in self.bv.get_code_refs(prev_dv):
+      if ref.function.start == func.start:
+        return True
+
+    return False
+  def memory_size_heauristic(self, insn, variables):
+    for var in variables:
+      has_addr_ref = False
+      dv = self.bv.get_data_var_at(var)
+      if dv is None:
+        continue
+
+      DEBUG("Size of the variable 1 @ {:x} {}".format(var, self.bv.address_size))
+      mlil_refs = list()
+      for ref in self.bv.get_code_refs(var):
+        llil = ref.function.get_low_level_il_at(ref.address)
+        if llil is None:
+          continue
+
+        mlil = llil.medium_level_il
+        if mlil is not None:
+          mlil_refs.append((ref.function, mlil.ssa_form))
+
+      func_refs = list()
+      # Check if there is a reference by address to the data variable
+      for func, insn in mlil_refs:
+        if not self.is_memory_operation(insn):
+          has_addr_ref = True
+          break
+
+        if self.previous_dv(func, var):
+          has_addr_ref = True
+
+      if has_addr_ref == False:
+        DEBUG("Size of the variable @ {:x} {}".format(var, self.bv.address_size))
+
+  def analysis_memory(self):
+    """ Heauristic analysis of direct memory operations
+    """
+    index = 0
     size = len(self.func.medium_level_il.ssa_form)
-    pass
+
+    DEBUG_PUSH()
+    while index < size:
+      insn = self.func.medium_level_il.ssa_form[index]
+      if self.is_memory_operation(insn):
+        variables = self.get_data_variable(insn)
+        if len(variables) > 0:
+          self.memory_size_heauristic(insn, variables)
+      index += 1
+    DEBUG_POP()
+
+def recover_function(bv, addr, is_entry=False):
+  """ Process the function and collect the function which should be visited next
+  """
+  func = bv.get_function_at(addr)
+  if func is None:
+    return
+
+  if func.symbol.type == binja.SymbolType.ImportedFunctionSymbol:
+    DEBUG("Skipping external function '{}'".format(func.symbol.name))
+    return
+
+  DEBUG("Recovering function {} at {:x}".format(func.symbol.name, addr))
+
+  f_handle = FUNCTION_OBJECTS[func.start]
+  if f_handle is None:
+    return
+
+  f_handle.collect_parameters()
+  f_handle.print_parameters()
+  f_handle.recover_instructions()
+  f_handle.analysis_memory()
 
 def create_function(bv, func):
   if func.symbol.type == binja.SymbolType.ImportedFunctionSymbol:
     return
 
   DEBUG("Processing... {:x} {}".format(func.start, func.name))
-  func_obj = Function(bv, func)
-  if func_obj is None:
+  f_handler = Function(bv, func)
+  if f_handler is None:
     return
 
-  FUNCTION_OBJECTS[func.start] = func_obj
-  func_obj.init_registers()
-  func_obj.set_params_count()
-  func_obj.collect_parameters()
+  FUNCTION_OBJECTS[func.start] = f_handler
+  f_handler.set_params_count()

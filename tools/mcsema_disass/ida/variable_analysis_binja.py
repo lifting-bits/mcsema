@@ -34,47 +34,43 @@ VARIABLES_TO_RECOVER = dict()
 
 POSSIBLE_MEMORY_STATE = dict()
 
-def identify_byte(var, function):
-  if isinstance(var, binja.SSAVariable):
-    possible_values = function[1].get_ssa_var_possible_values(var)
-    size = function[function.get_ssa_var_definition(var)].size
-  else:
-    possible_values = var.possible_values
-    size = var.size
+DATA_VARIABLE_XREFS = collections.defaultdict(set)
 
-  if (possible_values.type == binja.RegisterValueType.UnsignedRangeValue):
-    value_range = possible_values.ranges[0]
-    start = value_range.start
-    end = value_range.end
-    step = value_range.step
+def identify_exported_symbols(bv):
+  syms = sorted(bv.symbols.values(), key=lambda s: s.address)
+  for i, sym in enumerate(syms):
+    sect = get_section_at(bv, sym.address)
+    if sect is None:
+      continue
 
-    for i in range(size):
-      if (start, end, step) == (0, (0xff << (8 * i)), (1 << (8 * i))):
-        return value_range
+    if sym.type == binja.SymbolType.DataSymbol and \
+      is_data_variable(bv, sym.address) and \
+      not is_executable(bv, sym.address) and \
+      not is_section_external(bv, sect):
+      VARIABLE_ALIAS_SET[sym.address].add(sym.address + bv.address_size)
 
-def _create_variable_entry(name, addr, size=0):
-  return dict(name=name, size=size, addr=addr, is_global=True, refs=set())
+  DEBUG('Number of exported global variables {}'.format(len(VARIABLE_ALIAS_SET)))
 
-def recover_function(bv, addr, is_entry=False):
-  """ Process the function and collect the function which should be visited next
-  """
-  func = bv.get_function_at(addr)
-  if func is None:
-    return
-
-  if func.symbol.type == binja.SymbolType.ImportedFunctionSymbol:
-    DEBUG("Skipping external function '{}'".format(func.symbol.name))
-    return
-
-  DEBUG("Recovering function {} at {:x}".format(func.symbol.name, addr))
-
-  f_handle = FUNCTION_OBJECTS[func.start]
-  if f_handle is None:
-    return
-
-  f_handle.print_parameters()
-  f_handle.recover_instructions()
-  f_handle.analysis()
+#def recover_function(bv, addr, is_entry=False):
+#  """ Process the function and collect the function which should be visited next
+#  """
+#  func = bv.get_function_at(addr)
+#  if func is None:
+#    return
+#
+#  if func.symbol.type == binja.SymbolType.ImportedFunctionSymbol:
+#    DEBUG("Skipping external function '{}'".format(func.symbol.name))
+#    return
+#
+#  DEBUG("Recovering function {} at {:x}".format(func.symbol.name, addr))
+#
+#  f_handle = FUNCTION_OBJECTS[func.start]
+#  if f_handle is None:
+#    return
+#
+#  f_handle.print_parameters()
+#  f_handle.recover_instructions()
+#  f_handle.analysis()
 
 def identify_data_variable(bv):
   """ Recover the data variables from the segments identified by binja; The size of
@@ -99,31 +95,25 @@ def identify_data_variable(bv):
         break
 
       size = next_var - var
+      if not is_data_variable(bv, var):
+        var = next_var  
+        continue
+    
       dv = bv.get_data_var_at(var)
       #DEBUG("Global Variable address {:x} and type {}".format(var, type(dv)))
       DATA_VARIABLES_SET.add(var, next_var)
       for ref in bv.get_code_refs(var):
         llil = ref.function.get_low_level_il_at(ref.address)
+        if llil is not None:
+          mlil = llil.medium_level_il
+          if mlil:
+            DATA_VARIABLE_XREFS[mlil.address].update({var, mlil})
       var = next_var
 
     size = next_var - var
     if dv is not None:
       DATA_VARIABLES_SET.add(var, next_var)
   DEBUG_POP()
-
-def collect_exported_symbols(bv):
-  syms = sorted(bv.symbols.values(), key=lambda s: s.address)
-  for i, sym in enumerate(syms):
-    sect = get_section_at(bv, sym.address)
-    if sect is None:
-      continue
-
-    if sym.type == binja.SymbolType.DataSymbol and \
-      is_data_variable(bv, sym.address) and \
-      not is_executable(bv, sym.address) and \
-      not is_section_external(bv, sect):
-      DEBUG('Recovering exported global {} @ {:x}'.format(sym.name, sym.address))
-      VARIABLE_ALIAS_SET.add(sym.address, sym.address+8)
 
 def manticore_install(bv, args):
   def print_regs(func_name, cpu):
@@ -158,7 +148,8 @@ def main(args):
   entry_symbol = bv.get_symbols_by_name(args.entrypoint)[0]
   DEBUG("Entry points {:x} {} {} ".format(entry_symbol.address, entry_symbol.name, len(bv.functions)))
 
-  collect_exported_symbols(bv)
+  # recover the exported symbols from the binary
+  identify_exported_symbols(bv)
   # Get all the data variables from the data segments
   identify_data_variable(bv)
 
@@ -180,31 +171,32 @@ def main(args):
       recover_function(bv, addr)
       bv.remove_function(bv.get_function_at(addr))
 
-    if TO_RECOVER.qsize() == 0 and len(bv.functions) > 0:
-      queue_func(bv.functions[0].start)
+      if TO_RECOVER.qsize() == 0 and len(bv.functions) > 0:
+        queue_func(bv.functions[0].start)
 
-  updateCFG(args.out)
+  updateCFG(bv, args.out)
   DEBUG("Global variables recovered {}".format(VARIABLE_ALIAS_SET))
   DEBUG("Data variables from binja {}".format(DATA_VARIABLES_SET))
 
-  DEBUG("SSA Variable value set {}".format(pprint.pformat(SSA_VARIABLE_VALUESET)))
-  #DEBUG("Possible memory state {}".format(pprint.pformat(POSSIBLE_MEMORY_STATE)))
+def get_variable_size(bv, var):
+  pass
 
-
-def updateCFG(outfile):
+def updateCFG(bv, outfile):
   """ Update the CFG file with the recovered global variables
   """
   M = mcsema_disass.ida.CFG_pb2.Module()
   M.name = "GlobalVariables".format('utf-8')
 
-
-  for key in sorted(VARIABLE_ALIAS_SET.ALIAS_SET.iterkeys()):
-    value = VARIABLE_ALIAS_SET.ALIAS_SET[key]
-    size = value - key
+  variable_list = sorted(VARIABLE_ALIAS_SET.iterkeys())
+  for index, key in enumerate(variable_list):
     var = M.global_vars.add()
     var.ea = key
     var.name = "global_var_{:x}".format(key)
-    var.size = size #entry['size'] This is dummy size since it does not get used by get_cfg in IDA
+    try:
+      var.size = variable_list[index+1] - key
+    except IndexError:
+      var.size = 0
+    
     
   with open(outfile, "w") as outf:
     outf.write(M.SerializeToString())

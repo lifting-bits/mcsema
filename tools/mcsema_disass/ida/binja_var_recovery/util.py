@@ -59,10 +59,17 @@ PARAM_REGISTERS_INDEX = {
   3 : "rcx",
   4 : "r8",
   5 : "r9",
-  6 : "stk0",
-  7 : "stk1",
-  8 : "stk2"
   }
+
+def set_comments(bv, addr, str):
+  functions = bv.get_functions_containing(addr)
+  if functions is None:
+    return
+
+  for func in functions:
+    old_str = func.get_comment_at(addr)
+    new_str = old_str + " ; " + str
+    func.set_comment_at(addr, new_str)
 
 def convert_signed32(num):
   num = num & 0xFFFFFFFF
@@ -107,7 +114,7 @@ def is_data_variable(bv, addr):
     return False
 
   sect = get_section_at(bv, addr)
-  if is_ELF(bv):
+  if sect is not None and is_ELF(bv):
     if re.search(r'\.(init|fini)', sect.name):
       return False
 

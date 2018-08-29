@@ -26,80 +26,247 @@ class ILInstruction(object):
     self.address = insn_il.address
     self.bv = bv
     self.function = func
-    self.func_obj = FUNCTION_OBJECTS[func.start]
+    self.f_handler = FUNCTION_OBJECTS[func.start]
     self.ssa_variables = collections.defaultdict(set)
 
-  def get_ssa_var_possible_values(self, ssa_var):
-    if ssa_var is None:
+  def get_ssa_var_values(self, ssa_var):
+    if isinstance(ssa_var, binja.SSAVariable):
+      p_value = self.function.medium_level_il.get_ssa_var_value(ssa_var)
+      return p_value
+    else:
       return None
 
-    var_name = "{}#{}".format(ssa_var.var.name, ssa_var.version)
-    p_value = self.insn.get_ssa_var_possible_values(ssa_var)
-    if p_value.type == binja.RegisterValueType.EntryValue:
-      value_set = self.func_obj.get_entry_register(p_value.reg)
-      if value_set is None:
-        self.ssa_variables[var_name].add(p_value)
+  def get_ssa_var_possible_values(self, ssa_var):
+    value_set = set()
+    if isinstance(ssa_var, binja.SSAVariable):
+      p_value = self.insn.get_ssa_var_possible_values(ssa_var)
+      if p_value.type == binja.RegisterValueType.EntryValue:
+        value_set = self.func_obj.get_entry_register(p_value.reg)
+
+      elif p_value.type != binja.RegisterValueType.UndeterminedValue:
+        pass
       else:
-        self.ssa_variables[var_name].update(value_set)
-    elif p_value.type != binja.RegisterValueType.UndeterminedValue:
-      self.ssa_variables[var_name].add(p_value)
+        var = SSAVariable(self.bv, ssa_var, self.bv.address_size, self.function)
+    return value_set
+
+  def evaluate_expression(self, expr):
+    expr_value_set = set()
+    if expr is None:
+      return
+    operation_name = "{}".format(expr.operation.name.lower())
+    if hasattr(self, operation_name):
+      ssa_values = getattr(self, operation_name)(expr)
     else:
-      var = SSAVariable(self.bv, ssa_var, self.bv.address_size, self.function)
-      self.ssa_variables[var_name].update(var.get_values())
+      DEBUG("Instruction operation {} is not supported!".format(operation_name))
+      ssa_values = set()
 
-    return var_name, self.ssa_variables[var_name]
+    expr_value_set.update(ssa_values)
+    return expr_value_set
 
-  def MLIL_IF(self, expr):
-    pass
+  def forward_analysis(self, ssa_var):
+    # Collect all the alias ssa variables associated
+    indices = set()
+    vars_uses = self.function.medium_level_il.get_ssa_var_uses(ssa_var)
+    for index in vars_uses:
+      insn = self.function.medium_level_il[index].ssa_form
+      #set_comments(self.bv, self.insn.address, "forward analysis index : {} {}".format(index, insn.operation.name))
+      if insn is None:
+        continue
 
-  def MLIL_GOTO(self, expr):
-    pass
+      if insn.operation == binja.MediumLevelILOperation.MLIL_SET_VAR_SSA or \
+        insn.operation == binja.MediumLevelILOperation.MLIL_SET_VAR_SSA_FIELD or \
+        insn.operation == binja.MediumLevelILOperation.MLIL_VAR_PHI :
+        indices.add(index)
+        vars_written = insn.vars_written
+        for ssa_var in vars_written:
+          indices.update(self.forward_analysis(ssa_var))
 
-  def MLIL_SET_VAR_SSA(self, expr):
-    if isinstance(expr.dest, binja.SSAVariable):
-      var_name, value_set = self.get_ssa_var_possible_values(expr.dest)
-      self.func_obj.add_ssa_variables(var_name, value_set, self.insn)
-      DEBUG("{} -> {}".format(var_name, value_set))
-    else:
-      DEBUG("MLIL_SET_VAR_SSA {}".format(expr))
+    return sorted(indices)
 
-  def MLIL_SET_VAR_ALIASED(self, expr):
-    if isinstance(expr.dest, binja.SSAVariable):
-      var_name, value_set = self.get_ssa_var_possible_values(expr.dest)
-      self.func_obj.add_ssa_variables(var_name, value_set, self.insn)
-      DEBUG("{} -> {}".format(var_name, value_set))
-    else:
-      DEBUG("MLIL_SET_VAR_ALIASED {}".format(expr))
+  def backward_analysis(self, ssa_var):
+    var_handler = SSAVariable(self.bv, ssa_var, self.bv.address_size, self.function)
+    set_comments(self.bv, self.insn.address, "test backward analysis 1 : {}".format(var_handler.variable_name()))
+    return var_handler.backward_analysis(self.insn)
 
-  def MLIL_VAR_SSA(self, expr):
-    DEBUG("MLIL_VAR_SSA {}".format(expr))
-    if isinstance(expr.src, binja.SSAVariable):
-      var_name, value_set = self.get_ssa_var_possible_values(expr.src)
-      self.func_obj.add_ssa_variables(var_name, value_set, self.insn)
-      for entry in value_set:
-        DEBUG("MLIL_VAR_SSA {}".format(entry))
+  def has_memory_version(self, insn):
+    if insn.ssa_memory_version > 0:
+      return True
 
-  def MLIL_CONST(self, expr):
-    DEBUG("MLIL_CONST {}".format(expr))
+    mem0_insn = self.function.medium_level_il.get_ssa_memory_uses(0)
+    if insn in mem0_insn:
+      return True
+
+    return False
+
+  def has_memory_operation(self, insn):
+    if insn is None:
+      return False
+
+    for token in insn.tokens:
+      if token.type == binja.InstructionTextTokenType.RegisterToken:
+        return True
+    return False
+
+  def get_variable_addr(self, expr):
+    if expr is None:
+      return None
+
+    for token in expr.tokens:
+      if token.type == binja.InstructionTextTokenType.PossibleAddressToken:
+        if is_data_variable(self.bv, token.value):
+          return token.value
+    return None
+
+  def mlil_const(self, expr):
     return expr.constant
 
-  def MLIL_CONST_PTR(self, expr):
-    DEBUG("MLIL_CONST_PTR {}".format(expr))
+  def mlil_const_ptr(self, expr):
     return expr.constant
 
-  def MLIL_RET(self, expr):
-    DEBUG("MLIL_RET {}".format(expr))
+  def mlil_var_ssa(self, expr):
+    pass
+
+  def mlil_set_var_ssa(self, expr):
+    variable_values = set()
+    src_value_set = set()
     isrc = expr.src
-    for item in isrc:
-      if item.operation == binja.MediumLevelILOperation.MLIL_VAR_SSA:
-        ssa_var = item.src
-        possible_value = expr.get_ssa_var_possible_values(ssa_var)
-        DEBUG("Expr {} {}".format(item, possible_value))
-        if possible_value.type == binja.RegisterValueType.EntryValue:
-          value_set = self.func_obj.get_entry_register(possible_value.reg)
-          DEBUG("value_set {} ".format(pprint.pformat(value_set)))
-          self.func_obj.return_set.update(value_set)
+    idest = expr.dest
+    vars_read = self.insn.vars_read
+    vars_written = self.insn.vars_written
+
+    for var in vars_read:
+      if isinstance(var, binja.SSAVariable):
+        ssa_value = self.backward_analysis(var)
+        set_comments(self.bv, self.insn.address, "test backward analysis : {} {}".format(var, ssa_value))
+
+    if len(vars_written) > 1:
+      DEBUG("Warning! vars_written > 1 for operation MLIL_SET_VAR_SSA")
+
+    if isrc.operation == binja.MediumLevelILOperation.MLIL_CONST or \
+      isrc.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+      set_comments(self.bv, self.insn.address, "isrc : {:x}".format(isrc.constant))
+      src_value_set.add(isrc.constant)
+      #for var in vars_written:
+      #  self.forward_analysis(var)
+
+    elif isrc.operation == binja.MediumLevelILOperation.MLIL_VAR_SSA or \
+      isrc.operation == binja.MediumLevelILOperation.MLIL_VAR_SSA_FIELD:
+      if isrc.src in self.f_handler.ssa_variables.keys():
+        ssa_value = self.f_handler.ssa_variables[isrc.src]
+        src_value_set.update(ssa_value)
+      else:
+        ssa_value = self.get_ssa_var_values(isrc.src)
+        if ssa_value != None:
+          src_value_set.add(ssa_value)
+
+    elif isrc.operation == binja.MediumLevelILOperation.MLIL_ZX:
+      src = isrc.src
+      if src.operation == binja.MediumLevelILOperation.MLIL_VAR_SSA or \
+        src.operation == binja.MediumLevelILOperation.MLIL_VAR_SSA_FIELD:
+        if src.src in self.f_handler.ssa_variables.keys():
+          ssa_value = self.f_handler.ssa_variables[src.src]
+          src_value_set.update(ssa_value)
+        else:
+          ssa_value = self.get_ssa_var_values(src.src)
+          if ssa_value != None:
+            src_value_set.add(ssa_value)
+
+    elif isrc.operation == binja.MediumLevelILOperation.MLIL_LSL:
+      ssa_value = self.evaluate_expression(isrc)
+      src_value_set.update(ssa_value)
+
+    else:
+      set_comments(self.bv, self.insn.address, "isrc operation {}".format(isrc.operation.name))
+      for var in vars_read:
+        ssa_value = self.get_ssa_var_values(var)
+        if ssa_value != None:
+          ssa_value = self.backward_analysis(var)
+          set_comments(self.bv, self.insn.address, "vars_read : {} {}".format(var, ssa_value))
+
+    for var in vars_written:
+      self.f_handler.ssa_variables[var].update(src_value_set)
+      set_comments(self.bv, self.insn.address, "vars_written : {} {}".format(var, src_value_set))
+
+  def mlil_set_var_ssa_field(self, expr):
+    variable_values = set()
+    src_value_set = set()
+    isrc = expr.src
+    idest = expr.dest
+    vars_read = self.insn.vars_read
+    vars_written = self.insn.vars_written
+    
+    for var in vars_read:
+      ssa_value = self.backward_analysis(var)
+      set_comments(self.bv, self.insn.address, "test backward analysis : {} {}".format(var, ssa_value))
+    
+    if len(vars_written) > 1:
+      DEBUG("Warning! vars_written > 1 for operation MLIL_SET_VAR_SSA_FIELD")
+    
+    # Check if the variable is assigned a constant value. Not preserving the bitfields 
+    # not update during assignments
+    if isrc.operation == binja.MediumLevelILOperation.MLIL_CONST or \
+      isrc.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+      set_comments(self.bv, self.insn.address, "isrc : {:x}".format(isrc.constant))
+      src_value_set.add(isrc.constant)
+      #for var in vars_written:
+      #  indices = self.forward_analysis(var)
+      # set_comments(self.bv, self.insn.address, "forward analysis index : {}".format(indices))
+
+    else:
+      for var in vars_read:
+        ssa_value = self.get_ssa_var_values(var)
+        if ssa_value != None:
+          src_value_set.add(ssa_value)
+          ssa_value = self.backward_analysis(var)
+          set_comments(self.bv, self.insn.address, "vars_read : {} {}".format(var, ssa_value))
+    
+    for var in vars_written:
+      self.f_handler.ssa_variables[var].update(src_value_set)
+      set_comments(self.bv, self.insn.address, "vars_written : {} {}".format(var, src_value_set))
+  
+  def mlil_load_ssa(self, expr):
+    pass
+
+  def mlil_if(self, expr):
+    if self.has_memory_version(expr) is True:
+      cond = expr.condition
+      # Handle both direct and indirect memory accesses
+      var = self.get_variable_addr(cond)
+      if var is None:
+        DEBUG("Warning! return expr is None expr {}".format(cond))
+      else:
+        VARIABLE_ALIAS_SET[var].add(var)
+
+  def mlil_goto(self, expr):
+    pass
+
+  def mlil_ret(self, expr):
+    value_set = set()
+    isrc_list = expr.src
+    for isrc in isrc_list:
+      if isrc.operation == binja.MediumLevelILOperation.MLIL_VAR_SSA:
+        ssa_var = isrc.src
+        ssa_value = self.get_ssa_var_values(ssa_var)
+        if ssa_value.type == binja.RegisterValueType.ConstantValue or \
+          ssa_value.type == binja.RegisterValueType.ConstantPointerValue:
+          value_set.add(ssa_value.value)
+        else:
+          value_set.add(str(ssa_value))
           
+      elif isrc.operation == binja.MediumLevelILOperation.MLIL_CONST or \
+        isrc.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+        value_set.add(isrc.constant)
+        
+      else:
+        expr_values = self.evaluate_expression(isrc)
+        value_set.update(expr_values)
+    
+    DEBUG("mlil_ret expr {}  value_set {} ".format(expr, value_set))
+    return value_set  
+
+  def mlil_noret(self, expr):
+    return set()
+
   def MLIL_STORE_SSA(self, expr):
     DEBUG("MLIL_STORE_SSA {}".format(expr))
     # handle the expr destination
@@ -118,7 +285,7 @@ class ILInstruction(object):
         value = idest.constant
         size = expr.size
         DEBUG("MLIL_STORE_SSA {:x} size {}".format(value, size))
-        VARIABLE_ALIAS_SET.add(value, value + size)
+        VARIABLE_ALIAS_SET[value] = value + size
       elif idest.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
         pass
 
@@ -131,7 +298,7 @@ class ILInstruction(object):
         size = expr.size
         DEBUG("MLIL_STORE_SSA {:x} size {}".format(value, size))
         if is_data_variable(self.bv, value):
-          VARIABLE_ALIAS_SET.add(value, value + size)
+          VARIABLE_ALIAS_SET[value] = value + size
       else:
         operation_name = "{}".format(isrc.operation.name)
         if hasattr(self, operation_name):
@@ -200,13 +367,13 @@ class ILInstruction(object):
 
         if p_value.type == binja.RegisterValueType.ConstantPointerValue:
           if is_data_variable(self.bv, p_value.value):
-            VARIABLE_ALIAS_SET.add(p_value.value, p_value.value + 8)
+            VARIABLE_ALIAS_SET[p_value.value] = p_value.value + 8
             if called_function_object:
               called_function_object.update_register(reg_name, p_value.value)
 
         elif p_value.type == binja.RegisterValueType.ConstantValue:
           if is_data_variable(self.bv, p_value.value):
-            VARIABLE_ALIAS_SET.add(p_value.value, p_value.value + 8)
+            VARIABLE_ALIAS_SET[p_value.value] = p_value.value + 8
             if called_function_object:
               called_function_object.update_register(reg_name, p_value.value)
 

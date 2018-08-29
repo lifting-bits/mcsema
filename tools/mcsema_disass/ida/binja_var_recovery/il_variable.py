@@ -48,12 +48,12 @@ class VariableAliasSet(object):
         string += "({:x} {})".format(k, self.ALIAS_SET[k] - k)
     string += " }"
     return string
-    
-VARIABLE_ALIAS_SET = VariableAliasSet()
+
+VARIABLE_ALIAS_SET = collections.defaultdict(set)
+
 DATA_VARIABLES_SET = VariableAliasSet()
 
 SSA_VARIABLE_VALUESET = collections.defaultdict(dict)
-
 
 class ILVisitor(object):
   """ Class functions to visit medium-level IL"""
@@ -61,7 +61,7 @@ class ILVisitor(object):
     super(ILVisitor, self).__init__()
 
   def visit(self, expr):
-    method_name = 'visit_{}'.format(expr.operation.name)
+    method_name = 'visit_{}'.format(expr.operation.name.lower())
     if hasattr(self, method_name):
       value = getattr(self, method_name)(expr)
     else:
@@ -69,58 +69,244 @@ class ILVisitor(object):
       value = set()
     return value
 
+""" SSA variable class provides support for backward analysis and
+    get the value set for the ssa variables
+"""
 class SSAVariable(ILVisitor):
   def __init__(self, bv, var, address_size, func=None):
     super(SSAVariable, self).__init__()
     self.address_size = address_size
     self.bv = bv
     self.var = var
-    self.function = func.medium_level_il.ssa_form
-    self.var_name = "{}#{}".format(var.var.name, var.version)
+    self.function = func
     self.func_start = func.start
+    self.f_handler = FUNCTION_OBJECTS[func.start]
     self.visited = set()
     self.to_visit = list()
+    self.comments = ""
+    self.insn = None
 
-  def get_values(self):
-    var_def = self.function.get_ssa_var_definition(self.var)
+  def variable_name(self):
+    return "{}#{}".format(self.var.var.name, self.var.version)
+
+  def has_data_variable(self, values):
+    for item in values:
+      if is_data_variable(item):
+        return True
+    return False
+
+  def backward_analysis(self, insn):
+    var_def = self.function.medium_level_il.ssa_form.get_ssa_var_definition(self.var)
     self.to_visit.append(var_def)
     values_set = set()
 
+    self.insn = insn
+    set_comments(self.bv, insn.address, "test backward analysis 2 : {}".format(var_def))
     while self.to_visit:
       idx = self.to_visit.pop()
       if idx is not None:
-        DEBUG("visit {}".format(self.function[idx]))
-        ssa_value = self.visit(self.function[idx])
+        DEBUG("visit {}".format(self.function.medium_level_il.ssa_form[idx]))
+        ssa_value = self.visit(self.function.medium_level_il.ssa_form[idx])
         values_set.update(ssa_value)
 
-    SSA_VARIABLE_VALUESET[self.func_start][self.var_name] = set()
-    SSA_VARIABLE_VALUESET[self.func_start][self.var_name].update(values_set)
+    set_comments(self.bv, insn.address, "test backward analysis 3 : {}".format(self.comments))
     return values_set
 
-  def visit_MLIL_CONST(self, expr):
+  def visit_mlil_const(self, expr):
     values = set()
-    values.add("<const {:x}>".format(expr.constant))
+    values.add(expr.constant)
     return values
 
-  def visit_MLIL_CONST_PTR(self, expr):
+  def visit_mlil_const_ptr(self, expr):
     values = set()
-    values.add("<const ptr {:x}>".format(expr.constant))
+    values.add(expr.constant)
     return values
 
-  def visit_MLIL_SET_VAR_ALIASED(self, expr):
-    DEBUG("visit_MLIL_SET_VAR_ALIASED: {}".format(expr))
-    src = self.visit(expr.src)
-    return src
+  def visit_mlil_var_ssa(self, expr):
+    """ Get the possible value of the ssa variable
+    """
+    self.comments += " inside function visit_mlil_var_ssa {}; ".format(expr)
+    values_set = set()
+    vars_read = expr.vars_read
+    vars_written = expr.vars_written
+    # Abort with exception if vars_written > 0
+    if len(vars_written) > 0:
+      sys.exit("Error! visit_mlil_var_ssa vars_written is not 0")
 
-  def visit_MLIL_VAR_ALIASED(self, expr):
-    DEBUG("visit_MLIL_VAR_ALIASED: {}".format(expr))
-    values = set()
-    values.add(expr.src)
-    return values
+    for ssa_var in vars_read:
+      p_value = self.function.medium_level_il.ssa_form.get_ssa_var_value(ssa_var)
+      if p_value.type == binja.RegisterValueType.ConstantValue or \
+        p_value.type == binja.RegisterValueType.ConstantPointerValue:
+        values_set.add(p_value.value)
+      elif p_value.type == binja.RegisterValueType.EntryValue:
+        ssa_value = self.f_handler.get_param_register(p_value.reg)
+        values_set.update(ssa_value)
+      else:
+        var_handler = SSAVariable(self.bv, ssa_var,  self.bv.address_size, self.function)
+        ssa_value = var_handler.backward_analysis(self.insn)
+        values_set.update(ssa_value)
+
+    return values_set
+
+  def visit_mlil_var_ssa_field(self, expr):
+    """ Get the possible value of the ssa variable
+    """
+    self.comments += " inside function visit_mlil_var_ssa_field {};".format(expr)
+    values_set = set()
+    vars_read = expr.vars_read
+    vars_written = expr.vars_written
+
+    # Abort with exception if vars_written > 0
+    if len(vars_written) > 0:
+      sys.exit("Error! visit_mlil_var_ssa vars_written is not 0")
+
+    for ssa_var in vars_read:
+      p_value = self.function.medium_level_il.ssa_form.get_ssa_var_value(ssa_var)
+      if p_value.type == binja.RegisterValueType.ConstantValue or \
+        p_value.type == binja.RegisterValueType.ConstantPointerValue:
+        values_set.add(p_value.value)
+      elif p_value.type == binja.RegisterValueType.EntryValue:
+        ssa_value = self.f_handler.get_param_register(p_value.reg)
+        values_set.update(ssa_value)
+      elif p_value.type != binja.RegisterValueType.UndeterminedValue:
+        values_set.add(str(p_value))  
+      else:
+        var_handler = SSAVariable(self.bv, ssa_var,  self.bv.address_size, self.function)
+        ssa_value = var_handler.backward_analysis(self.insn)
+        values_set.update(ssa_value)
+
+    return values_set
+
+  def visit_mlil_set_var_ssa(self, expr):
+    values_set = set()
+    vars_written = expr.vars_written
+    # Abort with exception if vars_written > 1
+    if len(vars_written) > 1:
+      sys.exit("Error! visit_mlil_set_var_ssa vars_written is not 1")
+      
+    isrc = expr.src
+    if isrc.operation == binja.MediumLevelILOperation.MLIL_CONST or \
+      isrc.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+      values_set.add(isrc.constant)
+
+    else:
+      values = self.visit(isrc)
+      if values is not None:
+        values_set.update(values)
+
+    return values_set
+
+  def visit_mlil_set_var_ssa_field(self, expr):
+    self.comments += " inside function visit_mlil_set_var_ssa_field {}; ".format(expr)
+    values_set = set()
+    vars_written = expr.vars_written
+    
+    # Abort with exception if vars_written > 1
+    if len(vars_written) > 1:
+      sys.exit("Error! visit_mlil_set_var_ssa_field vars_written is not 1")
+      
+    isrc = expr.src
+    if isrc.operation == binja.MediumLevelILOperation.MLIL_CONST or \
+      isrc.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+      values_set.add(isrc.constant)
+
+    else:
+      values = self.visit(isrc)
+      values_set.update(values)
+
+    return values_set
+
+  def visit_mlil_zx(self, expr):
+    self.comments += " inside function visit_mlil_zx; "
+    isrc = expr.src
+    return self.visit(isrc)
+
+  def visit_mlil_sx(self, expr):
+    self.comments += " inside function visit_mlil_sx; "
+    isrc = expr.src
+    return self.visit(isrc)
+
+  def visit_mlil_lsl(self, expr):
+    self.comments += " inside function visit_mlil_lsl; "
+    right_op = 0 
+    value_set = set()
+    left_value_set = set()
+    
+    i_left = expr.left
+    i_right = expr.right
+    if i_right.operation == binja.MediumLevelILOperation.MLIL_CONST or \
+      i_right.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+      self.comments += "lsl right operand {}; ".format(i_right.constant)
+      right_op = i_right.constant
+    else:
+      ssa_values = self.visit(i_left)
+      if len(ssa_values) > 0:
+        right_op = max(ssa_values)
+
+    left_value_set = self.visit(i_left)
+    for item in left_value_set:
+      value_set.add(item << right_op)
+
+    return value_set
+
+  def visit_mlil_lsr(self, expr):
+    self.comments += " inside function visit_mlil_lsr; "
+    right_op = 0 
+    value_set = set()
+    left_value_set = set()
+
+    i_left = expr.left
+    i_right = expr.right
+    if i_right.operation == binja.MediumLevelILOperation.MLIL_CONST or \
+      i_right.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+      self.comments += "lsl right operand {}; ".format(i_right.constant)
+      right_op = i_right.constant
+    else:
+      ssa_values = self.visit(i_left)
+      if len(ssa_values) > 0:
+        right_op = min(ssa_values)
+
+    left_value_set = self.visit(i_left)
+    for item in left_value_set:
+      value_set.add(item << right_op)
+
+    return value_set
+
+  def visit_mlil_add(self, expr):
+    self.comments += " inside function visit_mlil_add; "
+    value_set = set()
+    left_value_set = set()
+    right_value_set = set()
+    
+    i_left = expr.left
+    i_right = expr.right
+    if i_left.operation == binja.MediumLevelILOperation.MLIL_CONST or \
+      i_left.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+      left_value_set.add(i_left.constant)
+      self.comments += "mlil_add left operand {}; ".format(i_left.constant)
+      
+    else: 
+      left_value_set = self.visit(i_left)
+      
+    if i_right.operation == binja.MediumLevelILOperation.MLIL_CONST or \
+      i_right.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+      right_value_set.add(i_right.constant)
+      self.comments += "mlil_add right operand {}; ".format(i_right.constant)
+      
+    else:
+      right_value_set = self.visit(i_right)
+      
+    if len(right_value_set) > 0:
+      max_offset = max(right_value_set)
+    else:
+      max_offset = 0
+    
+    for item in left_value_set:
+      value_set.add(item + max_offset) 
+      
+    return value_set
 
   def visit_MLIL_SET_VAR_SSA(self, expr):
-    """
-    """
     values_set = set()
     ssa_var = expr.dest
     if isinstance(ssa_var, binja.SSAVariable):
