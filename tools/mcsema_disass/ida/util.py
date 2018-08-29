@@ -68,6 +68,12 @@ def xrange(begin, end=None, step=1):
 
 _NOT_INST_EAS = set()
 
+# sign extension to the given bits
+def sign_extend(x, b):
+  m = 1 << (b - 1)
+  x = x & ((1 << b) - 1)
+  return (x ^ m) - m
+
 # Returns `True` if `ea` belongs to some code segment.
 #
 # TODO(pag): This functon is extra aggressive, in that it doesn't strictly
@@ -201,7 +207,10 @@ def instruction_personality(arg):
   global PERSONALITIES
   if isinstance(arg, (int, long)):
     arg, _ = decode_instruction(arg)
-  p = PERSONALITIES[arg.itype]
+  try:
+    p = PERSONALITIES[arg.itype]
+  except AttributeError:
+    p = PERSONALITY_NORMAL
 
   return fixup_personality(arg, p)
 
