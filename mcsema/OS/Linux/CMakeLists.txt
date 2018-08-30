@@ -12,47 +12,50 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+cmake_minimum_required(VERSION 3.2)
+project(linux_abi)
 
-if (NOT TARGET remill)
-		# Remill's  CMake definitions are required to build to bitcode
-    message(FATAL_ERROR "The remill target does not exists!")
-endif ()
+function(add_runtime_helper target_name source_file address_bit_size)
+  message(" > Generating Linux ABI target: ${target_name}")
 
-# Fix behavior of CMAKE_CXX_STANDARD when targeting macOS.
-if (POLICY CMP0025)
-  cmake_policy(SET CMP0025 NEW)
-endif ()
+  # Visual C++ requires C++14
+  if(WIN32)
+    set(required_cpp_standard "c++14")
+  else()
+    set(required_cpp_standard "c++11")
+  endif()
 
-cmake_minimum_required (VERSION 3.2)
-project(linux_abi BC)
+  if(DEFINED WIN32)
+    set(install_folder "${CMAKE_INSTALL_PREFIX}/mcsema/${REMILL_LLVM_VERSION}/ABI/linux")
+  else()
+    set(install_folder "${CMAKE_INSTALL_PREFIX}/share/mcsema/${REMILL_LLVM_VERSION}/ABI/linux")
+  endif()
 
-# Define OS ahead of time so ports to other OSes are easier
-set(CURRENT_OS linux)
+  if("${source_file}" MATCHES "\.c$")
+    set(bc_build_flags "-xc" "-m${address_bit_size}" "-std=gnu11" "-Wno-deprecated-declarations")
+  elseif("${source_file}" MATCHES "\.cpp$")
+    set(bc_build_flags "-xc++" "-m${address_bit_size}" "-std=gnu++14" "-Wno-deprecated-declarations")
+  else()
+    # assume defaults work
+    message(WARNING " > WARNING: Unknown file extension for ${source_file}")
+    set(bc_build_flags "")
+  endif()
 
-set(LINUXABI_INCLUDEDIRECTORIES ${CMAKE_SOURCE_DIR})
+  message("Build flags: ${bc_build_flags}")
+  add_runtime(${target_name}
+    SOURCES ${source_file}
+    ADDRESS_SIZE ${address_bit_size}
+    BCFLAGS ${bc_build_flags}
+    INCLUDEDIRECTORIES "${CMAKE_SOURCE_DIR}"
+    INSTALLDESTINATION "${install_folder}"
+    DEPENDENCIES ${ARGN}
+  )
+endfunction()
 
-function (add_runtime_helper language target_name target_arch address_bit_size)
-    message(" > Generating ${CURRENT_OS} ABI target: ${target_name}")
+add_runtime_helper(ABI_exceptions_x86 "ABI_exceptions.cpp" 32)
+add_runtime_helper(ABI_libc_x86 "ABI_libc.c" 32 "ABI_libc.h")
 
-		# example name: ABI_libc_x86.bc
-		set(full_name ${target_name}_${target_arch})
-
-		# remove this warning as the ABI libraries need to capture deprecated declarations
-		set_source_files_properties(${target_name}.${language} PROPERTIES COMPILE_FLAGS "-Wno-deprecated-declarations")
-    add_runtime(${full_name} SOURCES ${target_name}.${language} ADDRESS_SIZE ${address_bit_size})
-
-    target_include_directories(${full_name} PRIVATE ${LINUXABI_INCLUDEDIRECTORIES})
-
-    install(TARGETS ${full_name} DESTINATION "share/mcsema/${REMILL_LLVM_VERSION}/ABI/${CURRENT_OS}")
-
-endfunction ()
-
-# X86 ABIs
-add_runtime_helper(cpp ABI_exceptions x86 32)
-add_runtime_helper(c ABI_libc x86 32)
-
-if (CMAKE_SIZEOF_VOID_P EQUAL 8)
-    # AMD64 ABIs
-    add_runtime_helper(cpp ABI_exceptions amd64 64)
-    add_runtime_helper(c ABI_libc amd64 64)
-endif ()
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  add_runtime_helper(ABI_exceptions_amd64 "ABI_exceptions.cpp" 64)
+  add_runtime_helper(ABI_libc_amd64 "ABI_libc.c" 64 "ABI_libc.h")
+endif()
