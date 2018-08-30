@@ -182,7 +182,7 @@ class ILInstruction(object):
       if mlil is not None:
         prev_dv_func_set.add(ref.function.start)
 
-    if prev_dv_func_set == dv_func_set:
+    if sorted(prev_dv_func_set) >= sorted(dv_func_set):
       return
   
     VARIABLE_ALIAS_SET[variable].add(variable + self.get_variable_size(insn))
