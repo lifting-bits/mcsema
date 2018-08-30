@@ -96,6 +96,7 @@ add_executable(${MCSEMA_LIFT}
   tools/mcsema_lift/Lift.cpp
 )
 
+
 # Copy mcsema-disass in
 add_custom_command(
   TARGET protobuf_python_module_ida POST_BUILD
@@ -202,6 +203,14 @@ if(DEFINED WIN32)
 else()
   set(python_package_install_path "${install_folder}")
   set(python_package_installer "${python_package_installer}.sh")
+endif()
+
+# target for dyninst frontend
+if (DEFINED ENV{BUILD_MCSEMA_DYNINST_DISASS})
+    if($ENV{BUILD_MCSEMA_DYNINST_DISASS} EQUAL 1)
+        add_custom_target(generate-protobuf-files DEPENDS ${PROJECT_PROTOBUFSOURCEFILES})
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/dyninst)
+    endif()
 endif()
 
 install(CODE

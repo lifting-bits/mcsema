@@ -1,3 +1,22 @@
+__gxx_personality_v0 0 C N
+_ZNSt11logic_errorC2ERKS_ 1 C N
+_ZNSt12out_of_rangeC1ERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE 2 C N
+_ZNSt13runtime_errorC1ERKNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE 2 C N
+_ZNSt13runtime_errorC1ERKS_ 1 C N
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEC1EPKcRKS3_ 2 C N
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEED1Ev 0 C N
+_ZNSt8ios_base4InitC1Ev 0 C N
+_ZNSt8ios_base4InitD1Ev 0 C N
+
+_ZNSirsERi 0 C N
+_ZSt20__throw_out_of_rangePKc 1 C N
+_ZSt24__throw_invalid_argumentPKc 1 C N
+_ZNKSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEE5c_strEv 0 C N
+
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEC1ERKS4_ 2 C N
+_ZStlsIcSt11char_traitsIcESaIcEERSt13basic_ostreamIT_T0_ES7_RKNSt7__cxx1112basic_stringIS4_S5_T1_EE 4 C N
+_ZNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEC1EOS4_ 2 C N
+
 _ZdlPv 2 C N
 _ZdaPv 2 C N
 _Znam 2 C N
@@ -40,11 +59,11 @@ _ITM_deregisterTMCloneTable 5 C N
 _ITM_registerTMCloneTable 5 C N
 __libc_start_main 5 C N
 _ZdaPv 5 C N
-_ZdlPv 5 C N
+_ZdlPv 1 C N
 _Znam 5 C N
 _ZNSt8__detail15_List_node_base7_M_hookEPS0_ 5 C N
 _ZNSt8__detail15_List_node_base9_M_unhookEv 5 C N
-_Znwm 5 C N
+_Znwm 1 C N
 _ZSt17__throw_bad_allocv 5 C N
 _ZSt18_Rb_tree_decrementPSt18_Rb_tree_node_base 5 C N
 _ZSt18_Rb_tree_incrementPKSt18_Rb_tree_node_base 5 C N
