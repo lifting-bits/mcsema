@@ -207,10 +207,13 @@ static llvm::Constant *InitialStackPointerValue(void) {
   auto stack_type = llvm::ArrayType::get(
       gWordType, FLAGS_explicit_args_stack_size / (gArch->address_size / 8));
 
-  auto stack = new llvm::GlobalVariable(
-      *gModule, stack_type, false, llvm::GlobalValue::InternalLinkage,
-      llvm::Constant::getNullValue(stack_type), "__mcsema_stack");
-
+  static llvm::GlobalVariable *stack = nullptr;
+  if (!stack) {
+    stack = new llvm::GlobalVariable(
+        *gModule, stack_type, false, llvm::GlobalValue::InternalLinkage,
+        llvm::Constant::getNullValue(stack_type), "__mcsema_stack");
+    stack->setThreadLocal(true);
+  }
   std::vector<llvm::Constant *> indexes(2);
   indexes[0] = llvm::ConstantInt::get(gWordType, 0);
   indexes[1] = llvm::ConstantInt::get(
@@ -238,6 +241,7 @@ static llvm::Constant *InitialThreadLocalStorage(void) {
   auto tls_var = new llvm::GlobalVariable(
       *gModule, tls_type, false, llvm::GlobalValue::InternalLinkage,
       llvm::Constant::getNullValue(tls_type), "__mcsema_tls");
+  tls_var->setThreadLocal(true);
 
   std::vector<llvm::Constant *> indexes(2);
   indexes[0] = llvm::ConstantInt::get(gWordType, 0);
@@ -252,61 +256,6 @@ static llvm::Constant *InitialThreadLocalStorage(void) {
 
   tls = llvm::ConstantExpr::getPtrToInt(gep, gWordType);
   return tls;
-}
-
-// Create a state structure with everything zero-initialized, except for the
-// stack pointer.
-static llvm::Constant *CreateInitializedState(
-    llvm::Type *type, llvm::Constant *sp_val,
-    uint64_t sp_offset, uint64_t curr_offset=0) {
-
-  llvm::DataLayout dl(gModule);
-
-  // Integers and floats are units.
-  if (type->isIntegerTy() || type->isFloatingPointTy()) {
-    if (sp_offset == curr_offset) {
-      CHECK(type == sp_val->getType());
-      return sp_val;
-    } else {
-      return llvm::Constant::getNullValue(type);
-    }
-
-  // Treat structures as bags of things that can be individually indexed.
-  } else if (auto struct_type = llvm::dyn_cast<llvm::StructType>(type)) {
-    std::vector<llvm::Constant *> elems;
-
-    // LLVM 3.5: The StructType::elements() method does not exists!
-    auto struct_type_elements = llvm::makeArrayRef(
-        struct_type->element_begin(), struct_type->element_end());
-
-    for (const auto field_type : struct_type_elements) {
-      elems.push_back(
-          CreateInitializedState(field_type, sp_val,
-                                 sp_offset, curr_offset));
-      curr_offset += dl.getTypeAllocSize(field_type);
-    }
-    return llvm::ConstantStruct::get(struct_type, elems);
-
-  // Visit each element of the array.
-  } else if (auto array_type = llvm::dyn_cast<llvm::ArrayType>(type)) {
-    auto num_elems = array_type->getArrayNumElements();
-    auto element_type = array_type->getArrayElementType();
-    auto element_size = dl.getTypeAllocSize(element_type);
-    std::vector<llvm::Constant *> elems;
-    for (uint64_t i = 0; i < num_elems; ++i) {
-      elems.push_back(
-          CreateInitializedState(element_type, sp_val,
-                                 sp_offset, curr_offset));
-      curr_offset += element_size;
-    }
-    return llvm::ConstantArray::get(array_type, elems);
-
-  } else {
-    LOG(FATAL)
-        << "Unsupported type in state structure: "
-        << remill::LLVMThingToString(type);
-    return llvm::Constant::getNullValue(type);
-  }
 }
 
 // Figure ouf the byte offset of the stack pointer register in the `State`
@@ -335,13 +284,91 @@ static llvm::GlobalVariable *GetStatePointer(void) {
   auto state_type = llvm::dyn_cast<llvm::PointerType>(
       state_ptr_type)->getElementType();
 
-  auto state_init = CreateInitializedState(
-      state_type, InitialStackPointerValue(), GetStackPointerOffset());
-
+  // State is initialized with zeroes. Each callback/entrypoint set
+  // appropriate value to stack pointer. This is needed because of
+  // thread_local
+  auto state_init = llvm::ConstantAggregateZero::get(state_type);
   state_ptr = new llvm::GlobalVariable(
       *gModule, state_type, false, llvm::GlobalValue::InternalLinkage,
       state_init, "__mcsema_reg_state");
+  state_ptr->setThreadLocal(true);
   return state_ptr;
+}
+
+static llvm::Function *CreateVerifyRegState(void) {
+  auto *func_type = llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext),
+                                            {}, false);
+  llvm::Constant *c_func = gModule->getOrInsertFunction(
+      "__mcsema_verify_reg_state",
+      func_type);
+  auto func = llvm::dyn_cast<llvm::Function>(c_func);
+  CHECK(func) << "Could not cast "
+      << remill::LLVMThingToString(c_func)
+      << " to llvm::Function *";
+
+  auto sp_offset = GetStackPointerOffset();
+  auto reg_state = GetStatePointer();
+
+  auto entry_block = llvm::BasicBlock::Create(*gContext, "entry", func);
+  auto is_null_block = llvm::BasicBlock::Create(*gContext, "is_null", func);
+  auto end_block = llvm::BasicBlock::Create(*gContext, "end", func);
+  llvm::IRBuilder<> ir(entry_block);
+
+  // Need to find out where stack pointer is and known information is
+  // byte offset in state structure
+  auto byte_ty = llvm::Type::getInt8PtrTy(*gContext);
+  unsigned ptr_size = static_cast<unsigned>(gArch->address_size);
+  auto reg_ptr_ty = llvm::PointerType::getIntNPtrTy(*gContext, ptr_size);
+
+  //TODO(lukas): remove after abi_libraries patch gets merged into master
+  auto GetConstantInt = [&](unsigned size, uint64_t value) {
+    return llvm::ConstantInt::get(
+        llvm::Type::getIntNTy(*gContext, size), value);
+  };
+  auto casted_reg_state = ir.CreateBitCast(reg_state, byte_ty);
+  auto rsp = ir.CreateGEP(casted_reg_state,
+                          GetConstantInt(64, sp_offset));
+  auto casted_rsp = ir.CreateBitCast(rsp, reg_ptr_ty);
+  auto rsp_val = ir.CreateLoad(casted_rsp,
+                               llvm::Type::getIntNTy(*gContext, ptr_size));
+  auto comparison = ir.CreateICmpEQ(rsp_val, GetConstantInt(ptr_size, 0));
+  ir.CreateCondBr(comparison, is_null_block, end_block);
+
+  // Stack pointer is pointing at nothing, so we need to set it up
+  ir.SetInsertPoint(is_null_block);
+  ir.CreateStore(InitialStackPointerValue(), casted_rsp);
+  ir.CreateBr(end_block);
+
+  // Last block just returns void
+  ir.SetInsertPoint(end_block);
+  ir.CreateRetVoid();
+
+  return func;
+}
+
+// TODO(lukas): VerifyRegState is probably not the best name.
+//              Maybe VerifyStackPointer?
+//              Opened to suggestions.
+
+// Because of possible parallelism, both global stack and state must be
+// thread_local. However after new thread is created, its stack and state
+// are initialized to default values.
+// Which means that state is zero initialized
+// This function verifies that the stack pointer points to some location
+// and if not then sets it up to point into stack with default offset
+llvm::Function *GetVerifyRegState(void) {
+  static llvm::Function *func = nullptr;
+  if (!func) {
+    func = CreateVerifyRegState();
+  }
+  return func;
+}
+
+// Inserts call to __mcsema_verify_reg_state as first instruction in function
+void InsertVerifyFunction(llvm::Function *func) {
+  auto &first_inst = func->front().front();
+  auto verify_func = GetVerifyRegState();
+  llvm::CallInst::Create(verify_func, {}, "", &first_inst);
 }
 
 // Implements a stub for an externally defined function in such a way that
@@ -353,6 +380,23 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   auto num_args = FLAGS_explicit_args_count;
   if (name == "main") {
     num_args = 3;
+  }
+
+  // These function needs to be created with 0 arguments, otherwise
+  // lift could crash when using both --explicit_args
+  // and --libc_constructor (issue #424)
+  const static std::array<std::string, 4> zero_argument_functions = {{
+    "__libc_csu_init",
+    "__libc_csu_fini",
+    "init",
+    "fini"
+  }};
+
+  for (const auto &zero_func_name : zero_argument_functions) {
+    if (cfg_func->name == zero_func_name) {
+      num_args = 0;
+      break;
+    }
   }
 
   // The the lifted function type so that we can get things like the memory
@@ -386,6 +430,8 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   func->setAttributes(attr_set_or_list);
   func->addFnAttr(llvm::Attribute::NoInline);
   func->addFnAttr(llvm::Attribute::NoBuiltin);
+
+  InsertVerifyFunction(func);
 
   if (FLAGS_stack_protector) {
     func->addFnAttr(llvm::Attribute::StackProtectReq);
@@ -638,11 +684,8 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
 
   remill::CloneBlockFunctionInto(callback_func);
 
-  // Always inline so that static analyses of the bitcode don't need to dive
-  // into an extra function just to see the intended call.
-  callback_func->removeFnAttr(llvm::Attribute::NoInline);
-  callback_func->addFnAttr(llvm::Attribute::InlineHint);
-  callback_func->addFnAttr(llvm::Attribute::AlwaysInline);
+  // We don't want this function to be inlined, since it was causing problems
+  // with llvm optimizations run by runO3
 
   CallingConvention loader(gArch->DefaultCallingConv());
 
@@ -663,6 +706,12 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
   llvm::IRBuilder<> ir(block);
   loader.StoreReturnValue(
       block, ir.CreateCall(ir.CreateIntToPtr(pc, func_ptr_ty), call_args));
+
+  // This means that indirect call happened and caller pushed his return
+  // address, which he expects callee will pop. However callee is one
+  // of entrypoints/callbacks, which freeze the %rsp, so we need to pop it
+  // for callee
+  loader.FreeReturnAddress(block);
 
   ir.CreateRet(remill::LoadMemoryPointer(block));
 
