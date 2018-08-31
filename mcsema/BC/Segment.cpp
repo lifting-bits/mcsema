@@ -483,11 +483,48 @@ void AddDataSegments(const NativeModule *cfg_module) {
   }
 }
 
+// Try to deduce what constructor and destructor functions should be used
+bool DetectAndSetInitFiniCode(const NativeModule *cfg_module) {
+  // init_fini_pairs.size % 2 == 0 must hold
+  // constructor is first
+  std::vector<std::pair<std::string, bool>> init_fini_pairs = {
+    // Stripped binaries
+    {"init", false},
+    {"fini", false},
+
+    // Not stripped binaries
+    {"__libc_csu_init", false},
+    {"__libc_csu_fini", false},
+  };
+
+  for (const auto &cfg_func : cfg_module->ea_to_func) {
+    for (auto &init_fini_func : init_fini_pairs) {
+      if (cfg_func.second->name ==  init_fini_func.first) {
+        init_fini_func.second = true;
+      }
+    }
+  }
+
+  for (auto i = 0U; i < init_fini_pairs.size(); i += 2) {
+    if (init_fini_pairs[i].second && init_fini_pairs[i + 1].second) {
+      FLAGS_libc_constructor = init_fini_pairs[i].first;
+      FLAGS_libc_destructor = init_fini_pairs[i + 1].first;
+      LOG(INFO) << "Deduced libc ctor/dtor to "
+                << FLAGS_libc_constructor << " / "
+                << FLAGS_libc_destructor;
+      return true;
+    }
+  }
+  return false;
+}
+
 // Generate code to call pre-`main` function static object constructors, and
 // post-`main` functions destructors.
 void CallInitFiniCode(const NativeModule *cfg_module) {
   if (FLAGS_libc_constructor.empty() && FLAGS_libc_destructor.empty()) {
-    return;
+    if (!DetectAndSetInitFiniCode(cfg_module)) {
+      return;
+    }
   }
 
   for (const auto &entry : cfg_module->ea_to_func) {
