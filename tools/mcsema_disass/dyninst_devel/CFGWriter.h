@@ -23,8 +23,7 @@ public:
             Dyninst::SymtabAPI::Symtab &symtab,
             Dyninst::ParseAPI::SymtabCodeSource &symCodeSrc,
             Dyninst::ParseAPI::CodeObject &codeObj,
-            ExternalFunctionManager &extFuncMgr,
-            Dyninst::Address entry_addres);
+            ExternalFunctionManager &extFuncMgr);
 
   void write();
 
@@ -84,7 +83,7 @@ private:
                           Dyninst::Address,
                           mcsema::Instruction *);
 
-  void handleXref(mcsema::Instruction *, Dyninst::Address);
+  bool handleXref(mcsema::Instruction *, Dyninst::Address, bool force=true);
 
   std::string getXrefName(Dyninst::Address addr);
   void xrefsInSegment(Dyninst::SymtabAPI::Region *region,
