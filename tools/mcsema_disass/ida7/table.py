@@ -31,12 +31,12 @@ class JumpTable(object):
     self.entries = entries
 
     max_ea = self.table_ea
-    data_flags = (4 == self.entry_size) and idc.FF_DWRD or idc.FF_QWRD
+    data_flags = (4 == self.entry_size) and idc.FF_DWORD or idc.FF_QWORD
 
     # Update IDA's understanding of the flow of control out of the jump
     # instruction, as well as references to/from the table.
     for entry_ea, target_ea in entries.items():
-      idc.AddCodeXref(self.inst_ea, target_ea, idc.XREF_USER | idc.fl_JN)
+      idc.add_cref(self.inst_ea, target_ea, idc.XREF_USER | idc.fl_JN)
       max_ea = max(max_ea, entry_ea + self.entry_size)
     
     # Make sure each entry is seen as referenced.
@@ -51,7 +51,7 @@ class JumpTable(object):
       _FIRST_JUMP_TABLE_ENTRY[ea_into_table] = self.table_ea
 
     _JUMP_TABLE_ENTRY[self.table_ea] = self
-    idaapi.autoWait()
+    idaapi.auto_wait()
 
 class JumpTableBuilder(object):
   _READERS = {
@@ -85,7 +85,7 @@ def get_default_jump_table_entries(builder):
   recognize a jump table. If IDA doesn't recognize the table, then we
   say that there are 0 entries, but we also return what we have inferred
   to be the first entry."""
-  si = idaapi.get_switch_info_ex(builder.jump_ea)
+  si = ida_nalt.get_switch_info(builder.jump_ea)
   if si:
     next_addr = builder.table_ea
     for i in xrange(si.get_jtable_size()):
@@ -147,13 +147,13 @@ def get_num_jump_table_entries(builder):
   # now lets go and check all the targets
   max_i = max(curr_num_targets, 1024)
   entry_addr = builder.table_ea
-  table_seg_ea = idc.SegStart(builder.table_ea)
+  table_seg_ea = idc.get_segm_start(builder.table_ea)
   for i in xrange(max_i):
 
     # Make sure we don't read across a segment (e.g. if the jump table is the
     # last thing in our current segment).
     try:
-      if table_seg_ea != idc.SegStart(entry_addr):
+      if table_seg_ea != idc.get_segm_start(entry_addr):
         break
     except:
       break
@@ -255,12 +255,12 @@ def try_convert_table_offset_to_ea(offset):
   if not next_seg:
     return False
   
-  next_seg_ea = next_seg.startEA
+  next_seg_ea = next_seg.start_ea
   if 0x1000 > (next_seg_ea - offset):
     return False
 
-  seg_name = idc.SegName(next_seg_ea)
-  next_seg_end_ea = idc.SegEnd(next_seg_ea)
+  seg_name = idc.get_segm_name(next_seg_ea)
+  next_seg_end_ea = idc.get_segm_end(next_seg_ea)
   new_seg_ea = offset & ~0xFFF
   res = idaapi.set_segm_start(next_seg_ea, new_seg_ea, idc.SEGMOD_KEEP)
   if not res:
@@ -332,7 +332,7 @@ def get_manual_jump_table_reader(builder):
   found_ref_eas = set()
   for i in xrange(5):
     inst_ea = next_inst_ea
-    next_inst_ea = idc.PrevHead(inst_ea)
+    next_inst_ea = idc.prev_head(inst_ea)
     if inst_ea == idc.BADADDR:
       break
 
@@ -439,7 +439,7 @@ def get_manual_jump_table_reader(builder):
 def get_jump_table_reader(builder):
   """Returns the size of a jump table entry, as well as a reader function
   that can extract entries."""
-  si = idaapi.get_switch_info_ex(builder.jump_ea)
+  si = ida_nalt.get_switch_info(builder.jump_ea)
   if si:
     return get_ida_jump_table_reader(builder, si)
 

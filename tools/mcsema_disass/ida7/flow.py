@@ -48,7 +48,7 @@ def try_mark_as_function(address):
   if not idaapi.add_func(address, idc.BADADDR):
     return False
 
-  idaapi.autoWait()
+  idaapi.auto_wait()
   return True
 
 def find_linear_terminator(ea, max_num=256):
@@ -149,7 +149,7 @@ def get_static_successors(sub_ea, inst, binary_is_pie):
       for target_ea in missing_flows:
         if not has_flow_to_code(target_ea):
           DEBUG("Assuming that jump at {:x} targets block {:x} with missing flow.")
-          idc.AddCodeXref(inst.ea, target_ea, idc.XREF_USER | idc.fl_JN)
+          idc.add_cref(inst.ea, target_ea, idc.XREF_USER | idc.fl_JN)
           target_eas.add(target_ea)
 
     for target_ea in target_eas:
@@ -210,7 +210,7 @@ def find_default_block_heads(sub_ea):
   _FUNC_HEAD_EAS.add(sub_ea)
   heads = set([sub_ea])
 
-  seg_start, seg_end = idc.SegStart(sub_ea), idc.SegEnd(sub_ea)
+  seg_start, seg_end = idc.get_segm_start(sub_ea), idc.get_segm_end(sub_ea)
   min_ea, max_ea = get_function_bounds(sub_ea)
 
   DEBUG("Default block heads for function {:x} with loose bounds [{:x}, {:x})".format(
@@ -219,10 +219,10 @@ def find_default_block_heads(sub_ea):
   f = idaapi.get_func(sub_ea)
   if f:
     for b in idaapi.FlowChart(f):
-      if min_ea <= b.startEA < max_ea:
-        _BLOCK_HEAD_EAS.add(b.startEA)
-        heads.add(b.startEA)
-        DEBUG("  block [{:x}, {:x})".format(b.startEA, b.endEA))
+      if min_ea <= b.start_ea < max_ea:
+        _BLOCK_HEAD_EAS.add(b.start_ea)
+        heads.add(b.start_ea)
+        DEBUG("  block [{:x}, {:x})".format(b.start_ea, b.end_ea))
 
     for chunk_start_ea, chunk_end_ea in idautils.Chunks(sub_ea):
       _BLOCK_HEAD_EAS.add(chunk_start_ea)
@@ -254,7 +254,7 @@ def find_default_block_heads(sub_ea):
               ea, sub_ea))
 
           _MISSING_FLOWS[sub_ea].add(ea)
-      ea = idc.NextHead(ea, max_ea)
+      ea = idc.next_head(ea, max_ea)
 
 
   _DEFAULT_BLOCK_HEAD_EAS[sub_ea] = heads

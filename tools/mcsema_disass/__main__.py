@@ -154,10 +154,23 @@ def main():
 
   ret = 1
   try:
-    if 'ida' in args.disassembler:
+    if 'idat' in args.disassembler:
+      import ida7.disass
+      ret = ida7.disass.execute(args, fixed_command_args)
+      # in case IDA somehow says success, but no output was generated
+      if not os.path.isfile(args.output):
+        sys.stderr.write("Could not generate a CFG. Try using the --log_file option to see an error log.\n")
+        ret = 1
+
+      # The disassembler script probably threw an exception
+      if 0 == os.path.getsize(args.output):
+        sys.stderr.write("Generated an invalid (zero-sized) CFG. Please use the --log_file option to see an error log.\n")
+        # remove the zero-sized file
+        os.unlink(args.output)
+        ret = 1
+    elif 'ida' in args.disassembler:
       import ida.disass
       ret = ida.disass.execute(args, fixed_command_args)
-
       # in case IDA somehow says success, but no output was generated
       if not os.path.isfile(args.output):
         sys.stderr.write("Could not generate a CFG. Try using the --log_file option to see an error log.\n")

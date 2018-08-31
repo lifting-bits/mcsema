@@ -61,24 +61,19 @@ class EHBlocks(object):
     self.start_ea = start_ea
     self.end_ea = end_ea
 
-def sign_extn(x, b):
-  m = 1 << (b - 1)
-  x = x & ((1 << b) - 1)
-  return (x ^ m) - m
-
 def make_array(ea, size):
   if ea != idc.BADADDR and ea != 0:
-    flags = idc.GetFlags(ea)
-    if not idc.isByte(flags) or idc.ItemSize(ea) != 1:
-      idc.MakeUnknown(ea, 1, idc.DOUNK_SIMPLE)
+    flags = idc.get_full_flags(ea)
+    if not idc.isByte(flags) or idc.get_item_size(ea) != 1:
+      idc.del_items(ea, idc.DOUNK_SIMPLE, 1)
       idc.MakeByte(ea)
     idc.MakeArray(ea, size)
 
 def read_string(ea):
-  s = idc.GetString(ea, -1, idc.ASCSTR_C)
+  s = idc.get_strlit_contents(ea, -1, idc.ASCSTR_C)
   if s:
     slen = len(s)+1
-    idc.MakeUnknown(ea, slen, idc.DOUNK_SIMPLE)
+    idc.del_items(ea, idc.DOUNK_SIMPLE, slen)
     idaapi.make_ascii_string(ea, slen, idc.ASCSTR_C)
     return s, ea + slen
   else:
@@ -129,19 +124,19 @@ def read_enc_value(ea, enc):
     val = read_word(ea)
     ea += 2
     if fmt == DW_EH_PE_sdata2:
-      val = sign_extn(val, 16)
+      val = sign_extend(val, 16)
       
   elif fmt in [DW_EH_PE_sdata4, DW_EH_PE_udata4]:
     val = read_dword(ea)
     ea += 4
     if fmt == DW_EH_PE_sdata4:
-      val = sign_extn(val, 32)
+      val = sign_extend(val, 32)
       
   elif fmt in [DW_EH_PE_sdata8, DW_EH_PE_udata8]:
     val = read_qword(ea)
     ea += 8
     if f == DW_EH_PE_sdata8:
-      val = sign_extn(val, 64)
+      val = sign_extend(val, 64)
       
   else:
     DEBUG("{0:x}: don't know how to handle {1:x}".format(start, enc))
@@ -299,7 +294,8 @@ def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
       act_ea = next_ea
       DEBUG("ea {:x}: cs_lp[{}] = {:x}".format(ea, i, cs_lp))
       ea = next_ea
-      heads.add(cs_lp)
+      if cs_lp != 0:
+        heads.add(cs_lp)
 
       cs_action, next_ea = read_enc_value(ea, DW_EH_PE_uleb128)
       ea = next_ea
@@ -428,9 +424,9 @@ def recover_frame_entries(seg_ea):
   if seg_ea == idc.BADADDR:
     return
 
-  DEBUG("Recover entries from section : {}".format(idc.SegName(seg_ea)))
-  ea = idc.SegStart(seg_ea)
-  end_ea = idc.SegEnd(seg_ea)
+  DEBUG("Recover entries from section : {}".format(idc.get_segm_name(seg_ea)))
+  ea = idc.get_segm_start(seg_ea)
+  end_ea = idc.get_segm_end(seg_ea)
   while ea != idc.BADADDR and ea < end_ea:
     ea = format_entries(ea)
 
@@ -440,7 +436,7 @@ def recover_exception_table():
   seg_eas = [ea for ea in idautils.Segments() if not is_invalid_ea(ea)]
   
   for seg_ea in seg_eas:
-    seg_name = idc.SegName(seg_ea)
+    seg_name = idc.get_segm_name(seg_ea)
     if seg_name in [".eh_frame", "__eh_frame"]:
       recover_frame_entries(seg_ea)
       break

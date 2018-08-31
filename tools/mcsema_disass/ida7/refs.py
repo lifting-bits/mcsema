@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import ida_bytes
+import ida_nalt
 from util import *
 
 class Reference(object):
@@ -56,26 +58,26 @@ class Reference(object):
 # be treated as a reference. The intuition is that if it points into a logical
 # location, then we should treat it as a reference.
 def _is_address_of_struct_field(ea):
-  prev_head_ea = idc.PrevHead(ea)
+  prev_head_ea = idc.prev_head(ea)
 
   if is_invalid_ea(prev_head_ea):
     return False
 
-  prev_item_size = idc.ItemSize(prev_head_ea)
+  prev_item_size = idc.get_item_size(prev_head_ea)
   if ea >= (prev_head_ea + prev_item_size):
     return False
 
   # Try to get a type for the last item head.
-  flags = idaapi.getFlags(ea)
-  ti = idaapi.opinfo_t()
-  oi = idaapi.get_opinfo(ea, 0, flags, ti)
+  flags = ida_bytes.get_full_flags(ea)
+  ti = ida_nalt.opinfo_t()
+  oi = ida_bytes.get_opinfo(ti, ea, 0, flags)
   if not oi:
     return False
 
   # Get the size of the struct, and keep going if the suze of the previous
   # item is a multiple of the struct's size (e.g. one struct or an array
   # of that struct).
-  struct_size = idc.GetStrucSize(oi.tid)
+  struct_size = idc.get_struc_size(oi.tid)
   if not struct_size or 0 != (prev_item_size % struct_size):
     return False
 
@@ -85,7 +87,7 @@ def _is_address_of_struct_field(ea):
   arr_index = int((ea - prev_head_ea) / struct_size)
   struct_begin_ea = (arr_index & struct_size) + prev_head_ea
   off_in_struct = ea - struct_begin_ea
-  if not idc.GetMemberName(oi.tid, off_in_struct):
+  if not idc.get_member_name(oi.tid, off_in_struct):
     return False
 
   field_begin_ea = struct_begin_ea + off_in_struct
@@ -98,10 +100,15 @@ def _is_address_of_struct_field(ea):
 
   return True
 
-_MAKE_ARRAY_ENTRY = {
-  4: idc.MakeDword,
-  8: idc.MakeQword
-}
+def _make_array_entry(ea, item_size):
+  if item_size == 4:
+    item_type = idc.FF_DWORD
+  elif item_size == 8:
+    item_type = idc.FF_QWORD
+  else:
+    raise ValueError("Invalid item size")
+
+  ida_bytes.create_data(ea, item_type, item_size, ida_idaapi.BADADDR)
 
 # Try to create an array at `ea`, that extends into something that also looks
 # like an array down the line. The idea is that sometimes there are arrays,
@@ -118,14 +125,12 @@ _MAKE_ARRAY_ENTRY = {
 #            zero, and if the next entry is non-zero, then everything up to it
 #            should be non-zero.
 def _try_create_array(ea, max_num_entries=8):
-  global _MAKE_ARRAY_ENTRY
-
-  seg_end_ea = idc.SegEnd(ea)
-  next_head_ea = idc.NextHead(ea, seg_end_ea)
+  seg_end_ea = idc.get_segm_end(ea)
+  next_head_ea = idc.next_head(ea, seg_end_ea)
   if is_invalid_ea(next_head_ea):
     return False
 
-  item_size = idc.ItemSize(next_head_ea)
+  item_size = idc.get_item_size(next_head_ea)
   diff = next_head_ea - ea
   
   if item_size not in (4, 8) \
@@ -133,7 +138,7 @@ def _try_create_array(ea, max_num_entries=8):
   or max_num_entries < (diff / item_size):
     return False
 
-  next_next_head_ea = idc.NextHead(next_head_ea, seg_end_ea)
+  next_next_head_ea = idc.next_head(next_head_ea, seg_end_ea)
   if is_invalid_ea(next_head_ea):
     return False
 
@@ -141,19 +146,19 @@ def _try_create_array(ea, max_num_entries=8):
     return False
 
   for entry_ea in xrange(ea, next_head_ea, item_size):
-    _MAKE_ARRAY_ENTRY[item_size](entry_ea)
+    _make_array_entry(entry_ea, item_size)
 
   return True
 
 # Return `True` if `ea` is nearby to other heads.
 def _nearest_head(ea, bounds):
-  seg_ea = idc.SegStart(ea)
-  seg_end_ea = idc.SegEnd(ea)
-  next_head_ea = idc.NextHead(ea, seg_end_ea)
+  seg_ea = idc.get_segm_start(ea)
+  seg_end_ea = idc.get_segm_end(ea)
+  next_head_ea = idc.next_head(ea, seg_end_ea)
   if not is_invalid_ea(next_head_ea) and bounds >= (next_head_ea - ea):
     return next_head_ea
 
-  prev_head_ea = idc.PrevHead(ea, seg_ea)
+  prev_head_ea = idc.prev_head(ea, seg_ea)
   if not is_invalid_ea(prev_head_ea) and bounds >= (ea - prev_head_ea):
     return prev_head_ea
 
@@ -199,7 +204,7 @@ def _get_arm_ref_candidate(mask, op_val, op_str, all_refs):
 
   try:
     op_name = op_str.split("@")[0][1:]  # `#asc_400E5C@PAGE` -> `asc_400E5C`.
-    ref_ea = idc.LocByName(op_name)
+    ref_ea = idc.get_name_ea_simple(op_name)
     if (ref_ea & mask) == op_val:
       return ref_ea, mask
   except:
@@ -298,9 +303,10 @@ def _get_ref_candidate(inst, op, all_refs, binary_is_pie):
     addr_val, mask = _try_get_arm_ref_addr(inst, op, addr_val, all_refs)
 
   info = idaapi.refinfo_t()
-  has_ref_info = idaapi.get_refinfo(inst.ea, op.n, info) == 1
+  has_ref_info = ida_nalt.get_refinfo(info, inst.ea, op.n) == 1
 
-  if is_invalid_ea(addr_val):
+  if is_invalid_ea(addr_val) \
+    or idc.get_segm_name(idc.get_segm_start(addr_val)) in ["LOAD"]:
     
     # The `addr_val` that we get might actually be a value that is relative to
     # a base address. For example, in IDA we might see:
@@ -419,14 +425,14 @@ def get_instruction_references(arg, binary_is_pie=False):
   offset_to_ref = {}
   all_refs = get_all_references_from(inst.ea)
   for ea in xrange(inst.ea, inst.ea + inst.size):
-    targ_ea = idc.GetFixupTgtOff(ea)
+    targ_ea = idc.get_fixup_target_off(ea)
     if not is_invalid_ea(targ_ea):
       all_refs.add(targ_ea)
       ref = Reference(targ_ea, ea - inst.ea)
       offset_to_ref[ref.offset] = ref
 
   refs = []
-  for i, op in enumerate(inst.Operands):
+  for i, op in enumerate(inst.ops):
     if not op.type:
       continue
 
@@ -444,11 +450,11 @@ def get_instruction_references(arg, binary_is_pie=False):
     # Immediate constant, may be the absolute address of a data reference.
     if idc.o_imm == op.type:
       seg_begin = idaapi.getseg(ref.ea)
-      seg_end = idaapi.getseg(ref.ea + idc.ItemSize(ref.ea) - 1)
+      seg_end = idaapi.getseg(ref.ea + idc.get_item_size(ref.ea) - 1)
 
       # If the immediate constant is not within a segment, or crosses
       # two segments then don't treat it as a reference.
-      if not seg_begin or not seg_end or seg_begin.startEA != seg_end.startEA:
+      if not seg_begin or not seg_end or seg_begin.start_ea != seg_end.start_ea:
         idaapi.del_dref(op_ea, op.value)
         idaapi.del_cref(op_ea, op.value, False)
         continue
@@ -463,7 +469,7 @@ def get_instruction_references(arg, binary_is_pie=False):
       # In the special case of "ADR" and "ADRP" instructions for aarch64
       # IDA infers the absolute immediate value to assign as op_type, rather
       # than characterizing it as a displacement from PC
-      if idc.GetMnem(inst.ea) in ["ADRP", "ADR"]:
+      if idc.print_insn_mnem(inst.ea) in ["ADRP", "ADR"]:
          ref.type = Reference.DISPLACEMENT
       else:
          ref.type = Reference.IMMEDIATE

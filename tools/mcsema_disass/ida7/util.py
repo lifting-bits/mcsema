@@ -19,6 +19,8 @@ import idc
 import itertools
 import struct
 import inspect
+import ida_ua
+import ida_bytes
 
 _DEBUG_FILE = None
 _DEBUG_PREFIX = ""
@@ -68,10 +70,16 @@ def xrange(begin, end=None, step=1):
 
 _NOT_INST_EAS = set()
 
+# sign extension to the given bits
+def sign_extend(x, b):
+  m = 1 << (b - 1)
+  x = x & ((1 << b) - 1)
+  return (x ^ m) - m
+
 # Returns `True` if `ea` belongs to some code segment.
 #
 # TODO(pag): This functon is extra aggressive, in that it doesn't strictly
-#            trust the `idc.isCode`. I have observed cases where data in
+#            trust the `idc.is_code`. I have observed cases where data in
 #            `.bss` is treated as code and I am not sure why. Perhaps adding
 #            a reference to the data did this.
 #
@@ -83,9 +91,9 @@ def is_code(ea):
   if is_invalid_ea(ea):
     return False
 
-  seg_ea = idc.SegStart(ea)
-  seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
-  return seg_type == idc.SEG_CODE
+  seg_ea = idc.get_segm_start(ea)
+  seg_type = idc.get_segm_attr(seg_ea, idc.SEGATTR_TYPE)
+  return (seg_type == idc.SEG_CODE)
 
 # A stricter form of `is_code`, where we also check whether IDA thinks something
 # is code. IDA is able to identify some things like embedded exception tables
@@ -94,17 +102,17 @@ def is_code_by_flags(ea):
   if not is_code(ea):
     return False
 
-  flags = idc.GetFlags(ea)
-  return idc.isCode(flags)
+  flags = idc.get_full_flags(ea)
+  return idc.is_code(flags)
 
 def is_read_only_segment(ea):
   mask_perms = idaapi.SEGPERM_WRITE | idaapi.SEGPERM_READ
-  perms = idc.GetSegmentAttr(ea, idc.SEGATTR_PERM)
+  perms = idc.get_segm_attr(ea, idc.SEGATTR_PERM)
   return idaapi.SEGPERM_READ == (perms & mask_perms)
 
 def is_tls_segment(ea):
   try:
-    seg_name = idc.SegName(ea)
+    seg_name = idc.get_segm_name(ea)
     return seg_name in (".tbss", ".tdata", ".tls")
   except:
     return False
@@ -132,7 +140,7 @@ def is_tls(ea):
 def try_mark_as_code(ea):
   if is_code(ea) and not is_code_by_flags(ea):
     idc.MakeCode(ea)
-    idaapi.autoWait()
+    idaapi.auto_wait()
     return True
   return False
 
@@ -143,8 +151,8 @@ def mark_as_not_code(ea):
 def read_bytes_slowly(start, end):
   bytestr = []
   for i in xrange(start, end):
-    if idc.hasValue(idc.GetFlags(i)):
-      bt = idc.Byte(i)
+    if idc.has_value(idc.get_full_flags(i)):
+      bt = idc.get_wide_byte(i)
       bytestr.append(chr(bt))
     else:
       bytestr.append("\x00")
@@ -176,7 +184,7 @@ def read_leb128(ea, signed):
   val = 0
   shift = 0
   while True:
-    byte = idc.Byte(ea)
+    byte = idc.get_wide_byte(ea)
     val |= (byte & 0x7F) << shift
     shift += 7
     ea += 1
@@ -201,7 +209,10 @@ def instruction_personality(arg):
   global PERSONALITIES
   if isinstance(arg, (int, long)):
     arg, _ = decode_instruction(arg)
-  p = PERSONALITIES[arg.itype]
+  try:
+    p = PERSONALITIES[arg.itype]
+  except AttributeError:
+    p = PERSONALITY_NORMAL
 
   return fixup_personality(arg, p)
 
@@ -243,11 +254,12 @@ def instruction_ends_block(arg):
 def is_invalid_ea(ea):
   """Returns `True` if `ea` is not valid, i.e. it doesn't point into any
   valid segment."""
-  if idc.BADADDR == ea:
+  if (idc.BADADDR == ea) or \
+    (idc.get_segm_name(ea) == "LOAD"):
     return True
 
   try:
-    idc.GetSegmentAttr(idc.SegStart(ea), idc.SEGATTR_TYPE)
+    idc.get_segm_attr(idc.get_segm_start(ea), idc.SEGATTR_TYPE)
     return False  # If we get here, then it must be a valid ea!
   except:
     return True
@@ -263,8 +275,9 @@ def decode_instruction(ea):
   if ea in _NOT_INST_EAS:
     return _BAD_INSTRUCTION
 
-  decoded_inst = idautils.DecodeInstruction(ea)
-  if not decoded_inst:
+  decoded_inst = ida_ua.insn_t()
+  inslen = ida_ua.decode_insn(decoded_inst, ea)
+  if inslen <= 0:
     _NOT_INST_EAS.add(ea)
     return _BAD_INSTRUCTION
 
@@ -287,7 +300,7 @@ _EXTERNAL_SEGMENTS = set()
 def segment_contains_external_function_pointers(seg_ea):
   """Returns `True` if a segment contains pointers to external functions."""
   try:
-    seg_name = idc.SegName(seg_ea)
+    seg_name = idc.get_segm_name(seg_ea)
     return seg_name.lower() in (".idata", ".plt.got")
   except:
     return False
@@ -295,8 +308,8 @@ def segment_contains_external_function_pointers(seg_ea):
 def is_external_segment_by_flags(ea):
   """Returns `True` if IDA believes that `ea` belongs to an external segment."""
   try:
-    seg_ea = idc.SegStart(ea)
-    seg_type = idc.GetSegmentAttr(seg_ea, idc.SEGATTR_TYPE)
+    seg_ea = idc.get_segm_start(ea)
+    seg_type = idc.get_segm_attr(seg_ea, idc.SEGATTR_TYPE)
     if seg_type == idc.SEG_XTRN:
       _EXTERNAL_SEGMENTS.add(seg_ea)
       return True
@@ -310,7 +323,7 @@ def is_external_segment(ea):
   external references."""
   global _NOT_EXTERNAL_SEGMENTS
 
-  seg_ea = idc.SegStart(ea)
+  seg_ea = idc.get_segm_start(ea)
   if seg_ea in _NOT_EXTERNAL_SEGMENTS:
     return False
 
@@ -322,7 +335,7 @@ def is_external_segment(ea):
     return True
 
   ext_types = []
-  seg_name = idc.SegName(seg_ea).lower()
+  seg_name = idc.get_segm_name(seg_ea).lower()
   
   if IS_ELF:
     if ".got" in seg_name or ".plt" in seg_name:
@@ -339,16 +352,16 @@ def is_external_segment(ea):
 
 def is_constructor_segment(ea):
   """Returns `True` if the segment containing `ea` belongs to global constructor section"""
-  seg_ea = idc.SegStart(ea)
-  seg_name = idc.SegName(seg_ea).lower()
+  seg_ea = idc.get_segm_start(ea)
+  seg_name = idc.get_segm_name(seg_ea).lower()
   if seg_name in [".init_array", ".ctor"]:
     return True
   return False
 
 def is_destructor_segment(ea):
   """Returns `True` if the segment containing `ea` belongs to global destructor section"""
-  seg_ea = idc.SegStart(ea)
-  seg_name = idc.SegName(seg_ea).lower()
+  seg_ea = idc.get_segm_start(ea)
+  seg_name = idc.get_segm_name(seg_ea).lower()
   if seg_name in [".fini_array", ".dtor"]:
     return True
   return False
@@ -356,7 +369,7 @@ def is_destructor_segment(ea):
 def get_destructor_segment():
   """Returns the start address of the global destructor section"""
   for seg_ea in idautils.Segments():
-    seg_name = idc.SegName(seg_ea).lower()
+    seg_name = idc.get_segm_name(seg_ea).lower()
     if seg_name in [".fini_array", ".dtor"]:
       return seg_ea;
 
@@ -372,8 +385,8 @@ def is_internal_code(ea):
 
   # find stray 0x90 (NOP) bytes in .text that IDA 
   # thinks are data items.
-  flags = idc.GetFlags(ea)
-  if idaapi.isAlign(flags):
+  flags = idc.get_full_flags(ea)
+  if idaapi.is_align(flags):
     if not try_mark_as_code(ea):
       return False
     return True
@@ -383,7 +396,7 @@ def is_internal_code(ea):
 def is_block_or_instruction_head(ea):
   """Returns `True` if `ea` looks like it's the beginning of an actual
   instruction."""
-  return is_internal_code(ea) and idc.ItemHead(ea) == ea
+  return is_internal_code(ea) and idc.get_item_head(ea) == ea
 
 def get_address_size_in_bits():
   """Returns the available address size."""
@@ -406,7 +419,7 @@ def set_symbol_name(ea, name):
 
   flags = idaapi.SN_PUBLIC | idaapi.SN_NOCHECK | idaapi.SN_NON_AUTO | idaapi.SN_NOWARN
   _FORCED_NAMES[ea] = name
-  idc.MakeNameEx(ea, name, flags)  
+  idc.set_name(ea, name, flags)  
 
 # Tries to get the name of a symbol.
 def get_symbol_name(from_ea, ea=None, allow_dummy=False):
@@ -417,18 +430,18 @@ def get_symbol_name(from_ea, ea=None, allow_dummy=False):
   if ea in _FORCED_NAMES:
     return _FORCED_NAMES[ea]
 
-  flags = idc.GetFlags(ea)
+  flags = idc.get_full_flags(ea)
   if not allow_dummy and idaapi.has_dummy_name(flags):
     return ""
 
   name = ""
   try:
-    name = name or idc.GetTrueNameEx(from_ea, ea)
+    name = name or idc.get_name(ea, 0) #calc_gtn_flags(from_ea, ea))
   except:
     pass
 
   try:
-    name = name or idc.GetFunctionName(ea)
+    name = name or idc.get_func_name(ea)
   except:
     pass
 
@@ -451,7 +464,7 @@ def get_function_bounds(ea):
              It may be worth to return an object here that can we queried
              for membership using the `__in__` method.
   """
-  seg_start, seg_end = idc.SegStart(ea), idc.SegEnd(ea)
+  seg_start, seg_end = idc.get_segm_start(ea), idc.get_segm_end(ea)
   min_ea = seg_start
   max_ea = seg_end
 
@@ -459,23 +472,23 @@ def get_function_bounds(ea):
     return ea, ea
 
   # Get an upper bound using the next function.
-  next_func_ea = idc.NextFunction(ea)
+  next_func_ea = idc.get_next_func(ea)
   if not is_invalid_ea(next_func_ea):
     max_ea = min(next_func_ea, max_ea)
 
   # Get a lower bound using the previous function.
-  prev_func_ea = idc.PrevFunction(ea)
+  prev_func_ea = idc.get_prev_func(ea)
   if not is_invalid_ea(prev_func_ea):
     min_ea = max(min_ea, prev_func_ea)
     prev_func = idaapi.get_func(prev_func_ea)
-    if prev_func and prev_func.endEA < ea:
-      min_ea = max(min_ea, prev_func.endEA)
+    if prev_func and prev_func.end_ea < ea:
+      min_ea = max(min_ea, prev_func.end_ea)
 
   # Try to tighten the bounds using the function containing `ea`.
   func = idaapi.get_func(ea)
   if func:
-    min_ea = max(min_ea, func.startEA)
-    max_ea = min(max_ea, func.endEA)
+    min_ea = max(min_ea, func.start_ea)
+    max_ea = min(max_ea, func.end_ea)
 
   return min_ea, max_ea
 
@@ -496,7 +509,7 @@ def is_noreturn_external_function(ea):
 
 def is_noreturn_function(ea):
   """Returns `True` if the function at `ea` is a no-return function."""
-  flags = idc.GetFunctionFlags(ea)
+  flags = idc.get_func_attr(ea, idc.FUNCATTR_FLAGS)
   return 0 < flags and \
          (flags & idaapi.FUNC_NORET) and \
          "cxa_throw" not in get_symbol_name(ea)
@@ -506,9 +519,9 @@ _DREFS_FROM = collections.defaultdict(set)
 _CREFS_TO = collections.defaultdict(set)
 _DREFS_TO = collections.defaultdict(set)
 
-def make_xref(from_ea, to_ea, xref_constructor, xref_size):
+def make_xref(from_ea, to_ea, data_type, xref_size):
   """Force the data at `from_ea` to reference the data at `to_ea`."""
-  if not idc.GetFlags(to_ea) or is_invalid_ea(to_ea):
+  if not idc.get_full_flags(to_ea) or is_invalid_ea(to_ea):
     DEBUG("  Not making reference (A) from {:x} to {:x}".format(from_ea, to_ea))
     return
 
@@ -524,10 +537,18 @@ def make_xref(from_ea, to_ea, xref_constructor, xref_size):
   # If we can't make a head, then it probably means that we're at the
   # end of the binary, e.g. the last thing in the `.extern` segment.
   if not make_head(from_ea + xref_size):
-    assert idc.BADADDR == idc.SegStart(from_ea + xref_size)
+    assert idc.BADADDR == idc.get_segm_start(from_ea + xref_size)
 
-  idaapi.do_unknown_range(from_ea, xref_size, idc.DOUNK_EXPAND)
-  xref_constructor(from_ea)
+  ida_bytes.del_items(from_ea, idc.DELIT_EXPAND, xref_size)
+
+  if data_type == idc.FF_QWORD:
+    data_size = 8
+  elif data_type == idc.FF_DWORD:
+    data_size = 4
+  else:
+    raise ValueError("Invalid data type")
+
+  idc.create_data(from_ea, data_type, data_size, idaapi.BADADDR)
   if not is_code_by_flags(from_ea):
     idc.add_dref(from_ea, to_ea, idc.XREF_USER|idc.dr_O)
   else: 
@@ -551,7 +572,7 @@ def _stop_looking_for_xrefs(ea):
     return False
 
   addr_size = get_address_size_in_bytes()
-  item_size = idc.ItemSize(ea)
+  item_size = idc.get_item_size(ea)
   return item_size > addr_size
 
 def _xref_generator(ea, get_first, get_next):
@@ -565,7 +586,7 @@ def drefs_from(ea, only_one=False, check_fixup=True):
   has_one = only_one
   fixup_ea = idc.BADADDR
   if check_fixup:
-    fixup_ea = idc.GetFixupTgtOff(ea)
+    fixup_ea = idc.get_fixup_target_off(ea)
     if not is_invalid_ea(fixup_ea) and not is_code(fixup_ea):
       seen = only_one
       has_one = True
@@ -589,15 +610,15 @@ def drefs_from(ea, only_one=False, check_fixup=True):
         return
 
 def crefs_from(ea, only_one=False, check_fixup=True):
-  flags = idc.GetFlags(ea)
-  if not idc.isCode(flags):
+  flags = idc.get_full_flags(ea)
+  if not idc.is_code(flags):
     return
 
   fixup_ea = idc.BADADDR
   seen = False
   has_one = only_one
   if check_fixup:
-    fixup_ea = idc.GetFixupTgtOff(ea)
+    fixup_ea = idc.get_fixup_target_off(ea)
     if not is_invalid_ea(fixup_ea) and is_code(fixup_ea):
       seen = only_one
       has_one = True
@@ -621,7 +642,7 @@ def crefs_from(ea, only_one=False, check_fixup=True):
         return
 
 def xrefs_from(ea, only_one=False):
-  fixup_ea = idc.GetFixupTgtOff(ea)
+  fixup_ea = idc.get_fixup_target_off(ea)
   seen = False
   has_one = only_one
   if not is_invalid_ea(fixup_ea):
@@ -687,8 +708,8 @@ def remove_all_refs(ea):
 
 def is_thunk(ea):
   """Returns true if some address is a known to IDA to be a thunk."""
-  flags = idc.GetFunctionFlags(ea)
-  return 0 < flags and 0 != (flags & idaapi.FUNC_THUNK)
+  flags = idc.get_func_attr(ea, idc.FUNCATTR_FLAGS)
+  return (idc.BADADDR != flags) and 0 < flags and 0 != (flags & 0x00000080L)
 
 def is_referenced(ea):
   """Returns `True` if the data at `ea` is referenced by something else."""
@@ -763,13 +784,14 @@ def get_reference_target(ea):
   return idc.BADADDR
 
 def is_head(ea):
-  return idc.isHead(idc.GetFlags(ea))
+  return idc.is_head(idc.get_full_flags(ea))
 
 # Make the data at `ea` into a head.
 def make_head(ea):
-  flags = idc.GetFlags(ea)
-  if not idc.isHead(flags):
-    idc.SetFlags(ea, flags | idc.FF_DATA)
-    idaapi.autoWait()
+  flags = idc.get_full_flags(ea)
+  if not idc.is_head(flags):
+    # idc.SetFlags(ea, flags | idc.FF_DATA)
+    idc.create_data(ea, idc.FF_BYTE, 1, idc.BADADDR)
+    idaapi.auto_wait()
     return is_head(ea)
   return True

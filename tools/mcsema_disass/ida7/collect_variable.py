@@ -67,7 +67,6 @@ OPND_DTYPE_STR = {
   12:'dt_bitfild',
   13:'dt_string',
   14:'dt_unicode',
-  15:'dt_3byte',
   16:'dt_ldbl',
   17:'dt_byte32',
   18:'dt_byte64'
@@ -82,7 +81,6 @@ OPND_DTYPE_TO_SIZE = {
   idaapi.dt_qword: 8,
   idaapi.dt_byte16: 16,
   idaapi.dt_fword: 6,
-  idaapi.dt_3byte: 3,
   idaapi.dt_byte32: 32,
   idaapi.dt_byte64: 64,
 }
@@ -287,7 +285,7 @@ class Instruction(object):
     
   def _make_operands(self):
     operands = []
-    for index, opnd in enumerate(self._insn.Operands):
+    for index, opnd in enumerate(self._insn.ops):
       if opnd.type == idaapi.o_void:
         break
       operands.append(Operand(opnd,
@@ -429,8 +427,8 @@ def _get_flags_from_bits(flag):
     'MASK':4026531840,
     0:'FF_BYTE',
     268435456:'FF_WORD',
-    536870912:'FF_DWRD',
-    805306368:'FF_QWRD',
+    536870912:'FF_DWORD',
+    805306368:'FF_QWORD',
     1073741824:'FF_TBYT',
     1342177280:'FF_ASCI',
     1610612736:'FF_STRU',
@@ -537,7 +535,7 @@ _FUNC_UNSAFE_LIST = set()
 def build_stack_variable(func_ea):
   stack_vars = dict()
 
-  frame = idc.GetFrame(func_ea)
+  frame = idc.get_func_attr(func_ea, idc.FUNCATTR_FRAME)
   if not frame:
     return stack_vars
 
@@ -550,19 +548,19 @@ def build_stack_variable(func_ea):
     delta = 0
 
   if f_name not in _FUNC_UNSAFE_LIST:
-    offset = idc.GetFirstMember(frame)
+    offset = idc.get_first_member(frame)
     while -1 != _signed_from_unsigned(offset):
-      member_name = idc.GetMemberName(frame, offset)
+      member_name = idc.get_member_name(frame, offset)
       if member_name is None:
-        offset = idc.GetStrucNextOff(frame, offset)
+        offset = idc.get_next_offset(frame, offset)
         continue
       if (member_name == " r" or member_name == " s"):
-        offset = idc.GetStrucNextOff(frame, offset)
+        offset = idc.get_next_offset(frame, offset)
         continue
 
       member_size = idc.GetMemberSize(frame, offset)
       if offset >= delta:
-        offset = idc.GetStrucNextOff(frame, offset)
+        offset = idc.get_next_offset(frame, offset)
         continue
 
       member_flag = idc.GetMemberFlag(frame, offset)
@@ -576,10 +574,10 @@ def build_stack_variable(func_ea):
                                   "reads": list(),
                                   "safe": False }
 
-      offset = idc.GetStrucNextOff(frame, offset)
+      offset = idc.get_next_offset(frame, offset)
   else:
-    offset = idc.GetFirstMember(frame)
-    frame_size = idc.GetFunctionAttr(func_ea, idc.FUNCATTR_FRSIZE)
+    offset = idc.get_first_member(frame)
+    frame_size = idc.get_func_attr(func_ea, idc.FUNCATTR_FRSIZE)
     flag_str = ""
     member_offset = _signed_from_unsigned(offset) - delta
     stack_vars[member_offset] = {"name": f_name,
@@ -663,12 +661,12 @@ def recover_variables(F, func_ea, blockset):
   """
   # Checks for the stack frame; return if it is None
   if not is_code_by_flags(func_ea) or \
-      not idc.GetFrame(func_ea):
+      not idc.get_func_attr(func_ea, idc.FUNCATTR_FRAME):
     return
 
   functions = list()
   f_name = get_symbol_name(func_ea)
-  f_ea = idc.GetFunctionAttr(func_ea, idc.FUNCATTR_START)
+  f_ea = idc.get_func_attr(func_ea, idc.FUNCATTR_START)
   f_vars = collect_function_vars(func_ea, blockset)
   functions.append({"ea":f_ea, "name":f_name, "stackArgs":f_vars})
 
