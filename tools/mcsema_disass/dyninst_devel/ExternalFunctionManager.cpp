@@ -1,5 +1,7 @@
 #include "ExternalFunctionManager.h"
+
 #include <iostream>
+#include <glog/logging.h>
 
 mcsema::ExternalFunction *ExternalFunction::WriteHelper(
     mcsema::Module &module,
@@ -74,7 +76,7 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
           std::cerr << "Error while parsing symbol definition \"" << s
                     << "\": unknown calling convention '" << cc << "'"
                     << std::endl;
-          throw std::runtime_error{"error while parsing symbol definition"};
+          LOG(FATAL) << "Error while parsing symbol definition";
         }
 
         rest = rest.substr(n + 1);
@@ -97,7 +99,7 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
           std::cerr << "Error while parsing symbol definition \"" << s
                     << "\": unknown return type specifier '" << noReturn << "'"
                     << std::endl;
-          throw std::runtime_error{"error while parsing symbol definition"};
+          LOG(FATAL) << "Error while parsing symbol definition";
         }
 
         bool is_weak = true;
@@ -111,15 +113,14 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
         return;
       }
     } else {
-      throw std::runtime_error{
-          "internal McSema call convention is no longer supported"};
+      LOG(FATAL) << "Internal McSema call convention is no longer supported";
     }
   }
 
   std::cerr << "Error while parsing symbol definition \"" << s
             << "\": ill-formed symbol definition" << std::endl;
 
-  throw std::runtime_error{"error while parsing symbol definition"};
+  LOG(FATAL) << "Error while parsing symbol definition";
 }
 
 void ExternalFunctionManager::AddExternalSymbols(std::istream &s) {

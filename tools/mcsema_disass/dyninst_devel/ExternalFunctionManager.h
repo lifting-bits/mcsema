@@ -56,7 +56,7 @@ public:
   bool IsExternal(const std::string &name) const;
 
   // Returns the information stored for the function called "name"
-  // and throws an exception if no such function can be found.
+  // and LOG(FATAL) if no such function can be found.
   ExternalFunction &GetExternalFunction(const std::string &name);
 
   /* The following methods can be used to keep track of the external

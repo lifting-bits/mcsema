@@ -188,15 +188,13 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
                      SymtabAPI::Symtab &symtab,
                      ParseAPI::SymtabCodeSource &symCodeSrc,
                      ParseAPI::CodeObject &codeObj,
-                     ExternalFunctionManager &extFuncMgr,
-                     Address entry_point)
+                     ExternalFunctionManager &extFuncMgr)
     : module(m),
       module_name(module_name),
       symtab(symtab),
       code_source(symCodeSrc),
       code_object(codeObj),
-      ext_func_manager(extFuncMgr),
-      entry_point(entry_point) {
+      ext_func_manager(extFuncMgr) {
 
   // Populate skip_funcss with some functions known to cause problems
   skip_funcss = {
@@ -208,7 +206,7 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
 
   std::vector<SymtabAPI::Function *> functions;
   symtab.getAllFunctions(functions);
-  bool is_stripped = (functions.size()) ? false : true;
+  bool is_stripped = symtab.isStripped();
   LOG(INFO) << "Binary is stripped: " << is_stripped;
 
   std::vector<SymtabAPI::Region *> regions;
@@ -218,9 +216,11 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
       section_manager.AddRegion(reg);
   }
 
+
   // We need to get main! Heuristic for stripped binaries is that main is
   // passed to __libc_start_main as last argument from _start, which we can
   // find, because it is entrypoint
+  entry_point = symtab.getEntryOffset();
   code_object.parse(entry_point, true);
   Address main_offset = TryRetrieveAddrFromStart(code_object, entry_point, 0);
   Address ctor_offset = TryRetrieveAddrFromStart(code_object, entry_point, 1);
@@ -741,7 +741,7 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
 
   auto name = getXrefName(target);
   if (name == "__mcsema_unknown") {
-    return;
+    name = "";
   }
   AddCodeXref(cfgInstruction,
               CodeReference::CodeTarget,
@@ -785,14 +785,18 @@ Address CFGWriter::immediateNonCall( InstructionAPI::Immediate* imm,
         external_vars.find(a) != external_vars.end()) {
         cfgCodeRef->set_location(CodeReference::External);
     }
-    if (getXrefName(a) == "__mcsema_unknown" &&
-        IsInRegion(section_manager.getRegion(".text"), a)) {
-      LOG(INFO) << std::hex
-                << "IMM may be working with new function starting at" << a;
-      inst_xrefs_to_resolve.insert({a, {}});
+    //if (handleXref(cfgInstruction, a, true)) {
+    //  auto xref = cfgInstruction->mutable_xrefs(cfgInstruction->xrefs_size() - 1);
+    //  xref->set_operand_type(CodeReference::ImmediateOperand);
+      if (getXrefName(a) == "__mcsema_unknown" &&
+          IsInRegion(section_manager.getRegion(".text"), a)) {
+        LOG(INFO) << std::hex
+                  << "IMM may be working with new function starting at" << a;
+        inst_xrefs_to_resolve.insert({a, {}});
+      }
+      return a;
     }
-    return a;
-  }
+  //}
   return 0;
 }
 
@@ -804,9 +808,7 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
   deref->getChildren(children);
   auto expr = dynamic_cast<InstructionAPI::Expression *>(children[0].get());
 
-  if (!expr) {
-    throw std::runtime_error{"expected expression"};
-  }
+  CHECK(expr) << "Expected expression";
 
   Address a;
   if (tryEval(expr, addr, a)) {
@@ -830,8 +832,9 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
 }
 
 
-void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
-                           Address addr) {
+bool CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
+                           Address addr,
+                           bool force) {
   LOG(INFO) << "HandleXref to " << addr;
   if (auto func = magic_section.GetExternalFunction(addr)) {
     LOG(INFO) << "Code xref to func in magic_section at " << addr;
@@ -841,7 +844,7 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                                 CodeReference::External,
                                 func->ea(),
                                 func->name());
-    return;
+    return true;
   }
 
   auto func = func_map.find(addr);
@@ -855,7 +858,7 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
     if (isExternal(addr)) {
       code_ref->set_location(CodeReference::External);
     }
-    return;
+    return true;
   }
 
   auto g_var = global_vars.find(addr);
@@ -865,7 +868,7 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                                   CodeReference::MemoryOperand,
                                   CodeReference::Internal, addr,
                                   g_var->second);
-    return;
+    return true;
   }
 
   auto s_var = segment_vars.find(addr);
@@ -875,7 +878,7 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                                   CodeReference::MemoryOperand,
                                   CodeReference::Internal, addr,
                                   s_var->second);
-    return;
+    return true;
   }
 
   auto ext_var = external_vars.find(addr);
@@ -886,7 +889,7 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                                   CodeReference::MemoryOperand,
                                   CodeReference::External, addr,
                                   ext_var->second);
-    return;
+    return true;
   }
   auto ext_func = external_functions.find(addr);
   if (ext_func != external_functions.end()) {
@@ -897,17 +900,20 @@ void CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                                   CodeReference::External,
                                   magic_section.GetAllocated(addr),
                                   ext_func->second);
-    return;
+    return true;
   }
-  LOG(INFO) << "Could not recognize xref anywhere falling to default";
-  auto code_ref = AddCodeXref(cfg_instruction,
-                                CodeReference::DataTarget,
-                                CodeReference::MemoryOperand,
-                                CodeReference::Internal, addr);
-  if (isExternal(addr)) {
-    code_ref->set_location(CodeReference::External);
+  if (force) {
+    LOG(INFO) << "Could not recognize xref anywhere falling to default";
+    auto code_ref = AddCodeXref(cfg_instruction,
+                                  CodeReference::DataTarget,
+                                  CodeReference::MemoryOperand,
+                                  CodeReference::Internal, addr);
+    if (isExternal(addr)) {
+      code_ref->set_location(CodeReference::External);
+    }
+    return true;
   }
-
+  return false;
 }
 
 void CFGWriter::handleNonCallInstruction(
@@ -1040,10 +1046,8 @@ void CFGWriter::writeExternalFunctions() {
       }
     }
 
-    if (!found) {
-      throw std::runtime_error{"unresolved external function call"};
-    }
-    LOG(INFO) << "\tat: " << a;
+    CHECK(found) << "Unresolved external function call";
+
     func.ea = a;
     external_functions.insert({a, func.symbol_name});
     magic_section.WriteExternalFunction(module, func);
