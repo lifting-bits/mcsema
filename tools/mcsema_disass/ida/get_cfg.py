@@ -86,7 +86,7 @@ OS_NAME = ""
 # really the external `stderr`, so we want to be able to chop out the `@@...`
 # part to resolve the "true" name. There are a lot of `@@` variants in PE files,
 # e.g. `@@QEAU_..`, `@@AEAV..`, though these are likely for name mangling.
-EXTERNAL_NAMES = ("@@GLIBC_", "@@GLIBCXX_", )
+EXTERNAL_NAMES = ("@@GLIBC_", "@@GLIBCXX_", "@@CXXABI_", "@@GCC_")
 
 _NOT_ELF_BEGIN_EAS = (0xffffffffL, 0xffffffffffffffffL)
 
@@ -1368,7 +1368,10 @@ def identify_program_entrypoints(func_eas):
         if name not in exclude:
           exported_funcs.add(ea)
       else:
-        if name not in exclude and not is_runtime_external_data_reference(ea):
+        # if there is an instance of "Copy of shared data" in the segment, split it at the
+        # symbol boundary. This is to avoid the cross references of these runtime external
+        # variables in the lifted segment variables.
+        if name not in exclude:
           exported_vars.add(ea)
 
   DEBUG_POP()
