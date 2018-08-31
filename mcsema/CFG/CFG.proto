@@ -69,7 +69,9 @@ message CodeReference {
   required  OperandType operand_type = 2;
   required  Location    location = 3;
   required  int64       ea = 4;
-  //TODO(lukas): ?
+
+  // For aarch64, since instruction are 32-bit and there may be the need to
+  // build up 64-bit address
   optional  int64       mask = 5;
   optional  string      name = 6;
 }
@@ -119,7 +121,7 @@ message ExternalFunction {
   }
 
   required  string            name = 1;
-  // Address of relocation. Other entry with ea of trunk can be added as well
+  // Address of relocation. Other entry with ea of thunk can be added as well
   required  int64             ea = 2;
 
   required  CallingConvention cc = 3;
@@ -146,7 +148,7 @@ message ExternalVariable {
   code- or data-reference embedded within the data segment.
   for example piece of .data:
 
-  0x00400f80 800c4000 00000000 e00c4000 00000000 ..@.......@.....
+  0x00400f80: 800c4000 00000000 e00c4000 00000000 ..@.......@.....
 
   There are 2 references: at 0x400f80 targeting 400c80 which is in .text
                           at 0x400f88 targeting 400ce0 which is in .text
@@ -186,8 +188,8 @@ message DataReference {
   For example
 
   Hex dump of section '.rodata':
-  0x000009c0 01000200 476c6f62 616c0056 61726961 ....Global.Varia
-  0x000009d0 626c6520 6e616d65 2025730a 00636c61 ble name %s..cla
+  0x000009c0: 01000200 476c6f62 616c0056 61726961 ....Global.Varia
+  0x000009d0: 626c6520 6e616d65 2025730a 00636c61 ble name %s..cla
 
   At 0x9c4 beginning of variable can be seen
 */
