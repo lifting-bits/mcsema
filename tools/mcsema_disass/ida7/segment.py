@@ -232,19 +232,19 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
     if try_qwords and (ea + 8) <= seg_end_ea:
       target_ea = qword_data = read_qword(ea)
       if is_sane_reference_target(target_ea):
-        DEBUG("Adding qword reference from {:x} to {:x}".format(ea, target_ea))
-        make_xref(ea, target_ea, idc.FF_QWORD, 8)
-        next_ea = ea + 8
-        continue
+        if make_xref(ea, target_ea, idc.FF_QWORD, 8):
+          DEBUG("Adding qword reference from {:x} to {:x}".format(ea, target_ea))
+          next_ea = ea + 8
+          continue
 
     # Try to read it as a 4-byte pointer.
     if try_dwords and (ea + 4) <= seg_end_ea:
       target_ea = dword_data = read_dword(ea)
       if is_sane_reference_target(target_ea):
-        DEBUG("Adding dword reference from {:x} to {:x}".format(ea, target_ea))
-        make_xref(ea, target_ea, idc.FF_DWORD, 4)
-        next_ea = ea + 4
-        continue
+        if make_xref(ea, target_ea, idc.FF_DWORD, 4):
+          DEBUG("Adding dword reference from {:x} to {:x}".format(ea, target_ea))
+          next_ea = ea + 4
+          continue
 
     # We've got a reference from here; it might actually be that we're inside
     # of a larger thing (e.g. an array, or struct) and so this reference target

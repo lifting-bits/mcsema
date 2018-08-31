@@ -523,7 +523,7 @@ def make_xref(from_ea, to_ea, data_type, xref_size):
   """Force the data at `from_ea` to reference the data at `to_ea`."""
   if not idc.get_full_flags(to_ea) or is_invalid_ea(to_ea):
     DEBUG("  Not making reference (A) from {:x} to {:x}".format(from_ea, to_ea))
-    return
+    return False
 
   make_head(from_ea)
 
@@ -536,8 +536,9 @@ def make_xref(from_ea, to_ea, data_type, xref_size):
 
   # If we can't make a head, then it probably means that we're at the
   # end of the binary, e.g. the last thing in the `.extern` segment.
+  # or in the middle of structure. Return False in such case
   if not make_head(from_ea + xref_size):
-    assert idc.BADADDR == idc.get_segm_start(from_ea + xref_size)
+    return False
 
   ida_bytes.del_items(from_ea, idc.DELIT_EXPAND, xref_size)
 
@@ -553,6 +554,8 @@ def make_xref(from_ea, to_ea, data_type, xref_size):
     idc.add_dref(from_ea, to_ea, idc.XREF_USER|idc.dr_O)
   else: 
     DEBUG("  Not making reference (B) from {:x} to {:x}".format(from_ea, to_ea))
+
+  return True
 
 _IGNORE_DREF = (lambda x: [idc.BADADDR])
 _IGNORE_CREF = (lambda x, y: [idc.BADADDR])
