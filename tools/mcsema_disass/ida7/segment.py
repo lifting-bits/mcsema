@@ -139,7 +139,12 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
       continue
 
     # The references of variable are getting identified and converted
-    # into string
+    # into string; avoid that
+    if last_was_string and  is_reference(ea):
+      item_size = idc.ItemSize(ea)
+      next_ea = ea + item_size
+      last_was_string = False
+
     # A bit aggressive, but lets try to make it into a string.
     if last_was_string and 1 < len(as_str) and not is_reference(ea):
       old_item_size = idc.get_item_size(ea)      
