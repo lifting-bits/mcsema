@@ -743,6 +743,24 @@ def is_runtime_external_data_reference(ea):
   else:
     return False
 
+def is_external_vtable_reference(ea):
+  """ It checks the references of external vtable in the .bss section, where
+      it is referred as the `Copy of shared data`. There is no way to resolve
+      the cross references for these vtable as the target address will only
+      appear during runtime.
+
+      It is introduced to avoid lazy initilization of runtime typeinfo variables
+      which gets referred by the user-defined exception types.
+  """
+  if not is_runtime_external_data_reference(ea):
+    return False
+
+  comment = idc.GetCommentEx(ea, 0)
+  if comment and "Alternative name is '`vtable" in comment:
+    return True
+  else:
+    return
+
 def is_reference(ea):
   """Returns `True` if the `ea` references something else."""
   if is_invalid_ea(ea):

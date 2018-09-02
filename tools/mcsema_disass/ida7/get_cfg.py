@@ -890,7 +890,10 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
   ea, next_ea = seg_ea, seg_ea
   while next_ea < seg_end_ea:
     ea = next_ea
-    item_size = idc.get_item_size(ea)
+    # The item size is 1 in some of the cases where it refer to the external data. The
+    # references in such cases get ignored. Assign the address size if there is reference
+    # to the external data.
+    item_size = idc.get_item_size(ea) if not is_runtime_external_data_reference(ea) else get_address_size_in_bytes()
     xref_width = min(max(item_size, 4), max_xref_width)
     next_ea = min(ea + xref_width,
                   # idc.GetNextFixupEA(ea),
@@ -1368,10 +1371,18 @@ def identify_program_entrypoints(func_eas):
         if name not in exclude:
           exported_funcs.add(ea)
       else:
-        # if there is an instance of "Copy of shared data" in the segment, split it at the
-        # symbol boundary. This is to avoid the cross references of these runtime external
-        # variables in the lifted segment variables.
-        if name not in exclude:
+        # If there is reference to the external vtable in the segment, add it
+        # as the exported variables. This is required to preserve the typeinfo
+        # of the user-define exception type variables. The lazy initilization
+        # of the vtable screw up the associated types.
+        # It checks for the following vtable variables:
+        #      __ZTVSt9type_info,
+        #      __ZTVN10__cxxabiv117__class_type_infoE,
+        #      __ZTVN10__cxxabiv120__si_class_type_infoE,
+        #      __ZTVN10__cxxabiv121__vmi_class_type_infoE
+        if name not in exclude and \
+          not is_runtime_external_data_reference(ea) or \
+          is_external_vtable_reference(ea):
           exported_vars.add(ea)
 
   DEBUG_POP()
