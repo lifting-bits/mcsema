@@ -26,7 +26,7 @@ DEFINE_bool(pretty_print, true, "Pretty printf the dumped cfg");
 DEFINE_string(output, "", "Path to output file");
 DEFINE_string(binary, "", "Path to binary to be disassembled");
 DEFINE_string(entrypoint, "main", "Name of entrypoint function");
-DEFINE_bool(pie_mode, false, "Experimental support for pie");
+DEFINE_bool(pie_mode, true, "Experimental support for pie");
 
 using namespace Dyninst;
 
@@ -46,6 +46,7 @@ static std::vector<std::string> Split(const std::string &s, const char delim) {
   return res;
 }
 
+/*
 //TODO(lukas): This works only for 64btit elf atm
 Address GetEntryPoint(const std::string& filename) {
   std::ifstream bin{filename, std::ios::binary};
@@ -55,7 +56,7 @@ Address GetEntryPoint(const std::string& filename) {
   std::cout << std::hex << main_addr << std::dec << std::endl;
   return main_addr;
 }
-
+*/
 }
 
 int main(int argc, char **argv) {
@@ -75,30 +76,28 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   google::SetUsageMessage(ss.str());
   google::ParseCommandLineFlags(&argc, &argv, true);
-//FLAGS_logtostderr = 1;
+  //FLAGS_logtostderr = 1;
 
   CHECK(!FLAGS_binary.empty()) << "Input file need to be specified";
   auto inputStr = FLAGS_binary;
   auto inputFile = const_cast<char *>(inputStr.data());
 
   // Load external symbol definitions (for now, only functions)
-  ExternalFunctionManager extern_func_manager;
-
   if (!FLAGS_std_defs.empty()) {
     auto std_defs = Split(FLAGS_std_defs, kPathDelim);
     for (const auto &filename : std_defs) {
       LOG(INFO) << "Loading file containing external definitions";
       auto file = std::ifstream{filename};
-      extern_func_manager.AddExternalSymbols(file);
+      gExt_func_manager->AddExternalSymbols(file);
     }
   }
 
   //TODO(lukas): Check how it is parsed
   /*
   for (const auto &extSymDef : argParser.getAddExtSyms())
-    extern_func_manager.addExternalSymbol(extSymDef);
+    gExt_func_manager->addExternalSymbol(extSymDef);
   */
-  extern_func_manager.ClearUsed();
+  gExt_func_manager->ClearUsed();
 
   // Set up Dyninst stuff
 
@@ -132,7 +131,7 @@ int main(int argc, char **argv) {
 
     // Only mark external functions
     if (!(symtab->findFunctionsByName(fs, p.second)))
-      extern_func_manager.MarkAsUsed(p.second);
+      gExt_func_manager->MarkAsUsed(p.second);
   }
 
   if (FLAGS_output.empty()) {
@@ -144,12 +143,12 @@ int main(int argc, char **argv) {
   }
 
 
-  auto entry = GetEntryPoint(FLAGS_binary);
+  //auto entry = GetEntryPoint(FLAGS_binary);
 
   mcsema::Module m;
 
   CFGWriter cfgWriter(m, FLAGS_binary, *symtab, *symtabCS,
-      *codeObj, extern_func_manager, entry);
+      *codeObj);
   cfgWriter.write();
 
   // Dump the CFG file in a human-readable format if requested
