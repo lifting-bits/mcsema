@@ -24,6 +24,8 @@ DECLARE_bool(pie_mode);
 using namespace Dyninst;
 using namespace mcsema;
 
+mcsema::Module gModule;
+
 namespace {
 
 bool SmarterTryEval(InstructionAPI::Expression *expr,
@@ -213,7 +215,7 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
   symtab.getAllRegions(regions);
 
   for (auto reg : regions) {
-      section_manager.AddRegion(reg);
+      gSection_manager->AddRegion(reg);
   }
 
 
@@ -423,7 +425,7 @@ void CFGWriter::writeInternalFunctions() {
       continue;
     // We want to ignore the .got.plt stubs, since they are not needed
     // and cfg file would grow significantly
-    else if (IsInRegion(section_manager.getRegion(".got.plt"),
+    else if (IsInRegion(gSection_manager->getRegion(".got.plt"),
                         func->entry()->start())) {
       continue;
     }
@@ -685,7 +687,7 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
     handleXref(cfgInstruction, target);
     // What can happen is that we get xref somewhere in the .text and handleXref
     // fills it with defaults. We need to check and correct it if needed
-    if (IsInRegion(section_manager.getRegion(".text"), target)) {
+    if (IsInRegion(gSection_manager->getRegion(".text"), target)) {
       auto xref = cfgInstruction->mutable_xrefs(0);
       //xref->set_target_type(CodeReference::CodeTarget);
       xref->set_operand_type(CodeReference::ControlFlowOperand);
@@ -789,7 +791,7 @@ Address CFGWriter::immediateNonCall( InstructionAPI::Immediate* imm,
     //  auto xref = cfgInstruction->mutable_xrefs(cfgInstruction->xrefs_size() - 1);
     //  xref->set_operand_type(CodeReference::ImmediateOperand);
       if (getXrefName(a) == "__mcsema_unknown" &&
-          IsInRegion(section_manager.getRegion(".text"), a)) {
+          IsInRegion(gSection_manager->getRegion(".text"), a)) {
         LOG(INFO) << std::hex
                   << "IMM may be working with new function starting at" << a;
         inst_xrefs_to_resolve.insert({a, {}});
@@ -961,7 +963,7 @@ void CFGWriter::handleNonCallInstruction(
         //addr -= instruction->size();
         if(tryEval(expr.get(), addr, a)) {
           handleXref(cfgInstruction, a);
-          if (IsInRegion(section_manager.getRegion(".text"), a)) {
+          if (IsInRegion(gSection_manager->getRegion(".text"), a)) {
             // get last one and change it to code
             auto xref = cfgInstruction->mutable_xrefs(cfgInstruction->xrefs_size() - 1);
             xref->set_operand_type(CodeReference::MemoryOperand);
@@ -1004,12 +1006,12 @@ void CFGWriter::handleNonCallInstruction(
     addr -= instruction->size();
     bool is_somewhere_reasonable = IsInRegions(
         {
-          section_manager.getRegion(".bss"),
-          section_manager.getRegion(".data"),
-          section_manager.getRegion(".rodata"),
+          gSection_manager->getRegion(".bss"),
+          gSection_manager->getRegion(".data"),
+          gSection_manager->getRegion(".rodata"),
         },
         direct_values[0]);
-    if (IsInRegion(section_manager.getRegion(".text"), direct_values[1]) &&
+    if (IsInRegion(gSection_manager->getRegion(".text"), direct_values[1]) &&
         is_somewhere_reasonable) {
       LOG(INFO) << "Storing address from .text into .bss";
       if (func_map.find(direct_values[0]) == func_map.end()) {
@@ -1158,7 +1160,7 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
                               *tmp_ptr,
                               segment});
         continue;
-      } else if (IsInRegion(section_manager.getRegion(".bss"), *tmp_ptr)) {
+      } else if (IsInRegion(gSection_manager->getRegion(".bss"), *tmp_ptr)) {
         LOG(INFO) << "Xref into bss " << std::hex
                   << region->getMemOffset() + size - off << " " << *tmp_ptr;
         WriteDataXref({region->getMemOffset() + size - off,
@@ -1193,7 +1195,7 @@ void CFGWriter::xrefsInSegment(SymtabAPI::Region *region,
     if (!handleDataXref(segment, region->getMemOffset() + j, *offset)) {
       LOG(INFO) << "Did not resolve it, try to search in .text";
 
-      if (IsInRegion(section_manager.getRegion(".text"), *offset)) {
+      if (IsInRegion(gSection_manager->getRegion(".text"), *offset)) {
         LOG(INFO) << "Xref is pointing into .text";
         code_xrefs_to_resolve.insert({*offset,{region->getMemOffset() + j, *offset, segment}});
       }
@@ -1232,7 +1234,7 @@ void WriteAsRaw(std::string& data, uint64_t number, int64_t offset) {
 //             -fPIC & -pie?
 void CFGWriter::writeGOT(SymtabAPI::Region* region,
                                  mcsema::Segment* segment) {
-  auto rela_dyn = section_manager.getRegion(".rela.dyn");
+  auto rela_dyn = gSection_manager->getRegion(".rela.dyn");
   if (!rela_dyn || !FLAGS_pie_mode) {
     return;
   }
@@ -1302,7 +1304,7 @@ void CFGWriter::writeGOT(SymtabAPI::Region* region,
 void CFGWriter::writeRelocations(SymtabAPI::Region* region,
                          mcsema::Segment *segment) {
 
-  auto rela_dyn = section_manager.getRegion(".rela.plt");
+  auto rela_dyn = gSection_manager->getRegion(".rela.plt");
   if (!rela_dyn || !FLAGS_pie_mode) {
     return;
   }
@@ -1373,8 +1375,8 @@ void CFGWriter::ResolveCrossXrefs() {
     // entrypoint of some function that was missed by speculative parse.
     // Let's try to parse it now
 
-    if (IsInRegion(section_manager.getText(), xref.target_ea) &&
-        IsInRegion(section_manager.getRegion(".text"), xref.target_ea)) {
+    if (IsInRegion(gSection_manager->getText(), xref.target_ea) &&
+        IsInRegion(gSection_manager->getRegion(".text"), xref.target_ea)) {
           code_xrefs_to_resolve.insert({xref.target_ea, xref});
     }
   }
@@ -1400,7 +1402,7 @@ void writeBssXrefs(SymtabAPI::Region *region,
 //             .rodata, .data are parsed twice!
 //             Use tryParse for all data sections
 void CFGWriter::writeInternalData() {
-  auto dataRegions = section_manager.GetDataRegions();
+  auto dataRegions = gSection_manager->GetDataRegions();
 
   for (auto region : dataRegions) {
     std::set<std::string> no_parse = {

@@ -118,7 +118,7 @@ private:
 
   /* After -abi-libraries are fully embraced in master branch, this can go out */
   ExternalFunctionManager &ext_func_manager;
-  SectionManager section_manager;
+  //SectionManager section_manager;
 
   std::set<std::string> skip_funcss;
 
