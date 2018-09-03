@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <memory>
 
 #include <CFG.pb.h>
 
@@ -9,6 +10,10 @@
 
 #include "MagicSection.h"
 
+class DisassContext;
+
+extern mcsema::Module gModule;
+extern std::unique_ptr<DisassContext> gDisassContext;
 
 template<typename CFGUnit=mcsema::Segment *>
 struct CrossXref {
@@ -82,8 +87,6 @@ struct DisassContext {
     return false;
   }
 };
-
-extern DisassContext gDisassContext;
 
 template<typename Ins>
 auto AddCodeXref(Ins &instruction,

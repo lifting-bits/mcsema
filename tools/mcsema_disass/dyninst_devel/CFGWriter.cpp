@@ -532,37 +532,7 @@ void CFGWriter::writeInstruction(InstructionAPI::Instruction *instruction,
   code_xrefs_to_resolve.erase(addr);
 }
 
-/* DEPRECATED
-bool getDisplacement(InstructionAPI::Instruction *instruction,
-                     std::set<InstructionAPI::Expression::Ptr> &operands,
-                     Address &address) {
-  bool found = false;
 
-  LOG(INFO) << "Checking for displacement at " << instruction->format() << " " << operands.size();
-  for (auto &op : operands) {
-    if (auto binFunc =
-            dynamic_cast<InstructionAPI::BinaryFunction *>(op.get())) {
-
-      std::vector<InstructionAPI::InstructionAST::Ptr> operands;
-      binFunc->getChildren(operands);
-
-      for (auto &a : operands) {
-        if (auto second =
-                dynamic_cast<InstructionAPI::BinaryFunction *>(a.get()))
-          found = true;
-      }
-
-      for (auto &a : operands) {
-        if (auto addr =
-                dynamic_cast<InstructionAPI::Immediate *>(operands[0].get())) {
-          address = addr->eval().convert<Address>();
-        }
-      }
-    }
-  }
-  return found && address;
-}
-*/
 void writeDisplacement(mcsema::Instruction *cfgInstruction, Address &address,
         const std::string& name = "") {
   // Addres is uint64_t and in CFG ea is int64_t
@@ -672,16 +642,7 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
 
   LOG(INFO) << "TryEval " << addr << " " << size;
   bool got_result = false;
-  got_result = SmarterTryEval(operands[0].getValue().get(), addr, target, size);
-
-  if (!got_result) {
-    got_result = tryEval(operands[0].getValue().get(), addr + size, target);
-    target -= size;
-    //TODO(lukas): Move this out on release!
-    LOG(INFO) << "Need old " << got_result;
-    CHECK(!got_result) << "Truly needed old one!";
-  }
-  if (got_result) {
+  if (SmarterTryEval(operands[0].getValue().get(), addr, target, size)) {
     handleXref(cfgInstruction, target);
     // What can happen is that we get xref somewhere in the .text and handleXref
     // fills it with defaults. We need to check and correct it if needed
@@ -811,11 +772,11 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
   CHECK(expr) << "Expected expression";
 
   Address a;
-  if (tryEval(expr, addr, a)) {
+  if (SmarterTryEval(expr, addr, a)) {
     //TODO(lukas): Possibly wrong with -pie & -fPIC?
-    if (a > 0xffffffffffffff00) {
+    /*if (a > 0xffffffffffffff00) {
       return 0;
-    }
+    }*/
 
     auto cfgCodeRef = AddCodeXref(cfgInstruction,
                                   CodeReference::DataTarget,
@@ -959,7 +920,7 @@ void CFGWriter::handleNonCallInstruction(
                                   CodeReference::Internal, 6618560);
         }*/
         //addr -= instruction->size();
-        if(tryEval(expr.get(), addr, a)) {
+        if(SmarterTryEval(expr.get(), addr, a)) {
           handleXref(cfgInstruction, a);
           if (IsInRegion(gSection_manager->getRegion(".text"), a)) {
             // get last one and change it to code
@@ -971,7 +932,7 @@ void CFGWriter::handleNonCallInstruction(
       //} else if (instruction_id == 8) {
       } else if (instruction->getCategory() == InstructionAPI::c_BranchInsn) {
         Address a;
-        if (tryEval(expr.get(), addr - instruction->size(), a)) {
+        if (SmarterTryEval(expr.get(), addr - instruction->size(), a)) {
           auto code_ref = AddCodeXref(cfgInstruction,
                                       CodeReference::CodeTarget,
                                       CodeReference::ControlFlowOperand,
