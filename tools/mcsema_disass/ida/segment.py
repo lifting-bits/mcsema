@@ -138,15 +138,8 @@ def find_missing_strings_in_segment(seg_ea, seg_end_ea):
       last_was_string = False
       continue
 
-    # The references of variable are getting identified and converted
-    # into string; avoid that
-    if last_was_string and  is_reference(ea):
-      item_size = idc.ItemSize(ea)
-      next_ea = ea + item_size
-      last_was_string = False
-
     # A bit aggressive, but lets try to make it into a string.
-    if last_was_string and 1 < len(as_str):
+    if last_was_string and 1 < len(as_str) and (ea not in RTTI_REFERENCE_TABLE.keys()):
       old_item_size = idc.ItemSize(ea)
       if 1 != idc.MakeStr(ea, idc.BADADDR):
         last_was_string = False

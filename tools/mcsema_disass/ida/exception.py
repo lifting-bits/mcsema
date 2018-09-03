@@ -440,6 +440,8 @@ def recover_exception_table():
       recover_frame_entries(seg_ea)
       break
 
+  recover_rtti()
+
 def recover_exception_entries(F, func_ea):
   has_unwind_frame = func_ea in _FUNC_LSDA_ENTRIES.keys()
   if has_unwind_frame:
@@ -482,3 +484,98 @@ def get_exception_chunks(sub_ea):
     block_set = _EXCEPTION_BLOCKS_EAS[sub_ea]
     for block in block_set:
       yield block.start_ea, block.end_ea
+
+
+""" Recover the RTTI information which can't be detected by IDA 6.9
+"""
+
+typeinfo_names = [
+ "_ZTVSt9type_info",
+ "_ZTVN10__cxxabiv117__class_type_infoE",
+ "_ZTVN10__cxxabiv120__si_class_type_infoE",
+ "_ZTVN10__cxxabiv121__vmi_class_type_infoE",
+]
+
+EXTERNAL_NAMES = ("@@GLIBCXX_", "@@CXXABI_")
+
+def get_stripped_name(name):
+  for en in EXTERNAL_NAMES:
+    if en in name:
+      name = name[:name.find(en)]
+  return name
+
+def _create_reference_object(name, ea, offset):
+  return dict(name=name, addr=ea, offset=offset)
+
+def get_alternative_symnbol_name(ea):
+  comment = idc.GetCommentEx(ea, 0) or ""
+  for comment_line in comment.split("\n"):
+    comment_line = comment_line.replace(";", "").strip()
+    mstr = comment_line.split("'")
+    return mstr[1] + "'" + mstr[2]
+  return None
+
+def convert_to_bytes(value):
+  is64 = get_address_size_in_bytes() == 8
+  if is64:
+    sv = struct.pack("<Q", value)
+  else:
+    sv = struct.pack("<I", value)
+  return " ".join("%02X" % ord(c) for c in sv)
+
+def first(val):
+  return idc.FindBinary(0, idc.SEARCH_CASE|idc.SEARCH_DOWN, convert_to_bytes(val))
+
+def next(val, ref):
+  return idc.FindBinary(ref+1, idc.SEARCH_CASE|idc.SEARCH_DOWN, convert_to_bytes(val))
+
+def find_xrefs(addr):
+  lrefs = list(idautils.DataRefsTo(addr))
+  if len(lrefs) == 0:
+    lrefs = list(idautils.refs(addr, first, next))
+
+  lrefs = [r for r in lrefs if not idc.isCode(idc.GetFlags(r))]
+  return lrefs
+
+def get_type_info(ea):
+  tis = read_pointer(ea + get_address_size_in_bytes())
+  if is_invalid_ea(tis):
+    return idc.BADADDR
+  name = idc.GetString(tis)
+  if name == None or len(name) == 0:
+    return idc.BADADDR, name
+
+  ea2 = ea + 2*get_address_size_in_bytes()
+  return ea2, name
+
+def get_si_type_info(ea):
+  ea2, name = get_type_info(ea)
+  pbase = read_pointer(ea2)
+  RTTI_REFERENCE_TABLE[ea2] = _create_reference_object(get_alternative_symnbol_name(pbase), pbase, 0)
+  ea2 += get_address_size_in_bytes()
+  return ea2
+
+def get_typeinfo_refs(name, ea):
+  if ea == idc.BADADDR:
+    return
+
+  ea2 = ea
+  if idaapi.is_spec_ea(ea2):
+    xrefs = find_xrefs(ea2)
+    ea2 += get_address_size_in_bytes()*2
+    xrefs.extend(find_xrefs(ea2))
+  else:
+    ea2 += get_address_size_in_bytes()*2
+    xrefs = find_xrefs(ea2)
+
+  for x in xrefs:
+    if not is_invalid_ea(x):
+      value = read_pointer(x)
+      offset = value - ea if value > ea else 0
+      RTTI_REFERENCE_TABLE[x] = _create_reference_object(name, ea, offset)
+      ea3 = get_si_type_info(x)
+
+def recover_rtti():
+  for index, ordinal, ea, name in idautils.Entries():
+    if get_stripped_name(name) in typeinfo_names:
+      get_typeinfo_refs(name, ea)

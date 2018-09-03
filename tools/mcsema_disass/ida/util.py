@@ -28,6 +28,8 @@ _INFO = idaapi.get_inf_structure()
 # like the number of agruments and calling convention of the function.
 _NORETURN_EXTERNAL_FUNC = {}
 
+RTTI_REFERENCE_TABLE = collections.defaultdict()
+
 IS_ARM = "ARM" in _INFO.procName
 
 # True if we are running on an ELF file.
