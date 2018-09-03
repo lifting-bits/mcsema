@@ -1,9 +1,89 @@
+#pragma once
+
 #include <string>
 
 #include <CFG.pb.h>
 
 #include <Symtab.h>
+#include <dyntypes.h>
 
+#include "MagicSection.h"
+
+
+template<typename CFGUnit=mcsema::Segment *>
+struct CrossXref {
+  Dyninst::Address ea = 0;
+  Dyninst::Address target_ea = 0;
+  CFGUnit segment = nullptr;
+
+  bool operator==(const CrossXref<CFGUnit> &other) {
+    return ea == other.ea && target_ea == other.target_ea;
+  }
+
+  bool operator!=(const CrossXref<CFGUnit> &other) {
+    return *this != other;
+  }
+
+  mcsema::DataReference *WriteDataXref(
+      const std::string &name="",
+      bool is_code=false,
+      uint64_t width=8) {
+    auto cfg_xref = segment->add_xrefs();
+    cfg_xref->set_ea(ea);
+    cfg_xref->set_width(width);
+    cfg_xref->set_target_ea(target_ea);
+    cfg_xref->set_target_name(name);
+    cfg_xref->set_target_is_code(is_code);
+    // TODO(lukas): This will almost certainly cause problems once
+    cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+    return cfg_xref;
+  }
+};
+
+// We want to remember a lot of things, to make lookup easier later on
+// It could be avoided since all info can be reached from mcsema::Module
+// but it would be much slower and more ugly
+struct DisassContext {
+  template<typename T>
+  using SymbolMap = std::unordered_map<Dyninst::Address, T>;
+
+  // TODO(lukas): I want heterogeneous container :'{!
+  SymbolMap<mcsema::Function *> func_map;
+  SymbolMap<mcsema::GlobalVariable *> global_vars;
+  SymbolMap<mcsema::ExternalVariable *> external_vars;
+  SymbolMap<mcsema::Variable *> segment_vars;
+  SymbolMap<mcsema::ExternalFunction *> external_funcs;
+  SymbolMap<mcsema::DataReference *> data_xrefs;
+
+  MagicSection magic_section;
+
+  template<typename Container, typename CFGUnit>
+  bool FishForXref(const Container &facts,
+                   CrossXref<CFGUnit> &xref,
+                   bool is_code=false,
+                   uint64_t width=8) {
+    auto fact = facts.find(xref.target_ea);
+    if (fact != facts.end()) {
+      xref.WriteDataXref(fact->second->name(), is_code, width);
+      // TODO(lukas): Store into known xrefs
+      return true;
+    }
+    return false;
+  }
+
+  bool handleDataXref(CrossXref<mcsema::Segment *> &xref) {
+    if (FishForXref(global_vars, xref) ||
+        FishForXref(external_vars, xref) ||
+        FishForXref(segment_vars, xref) ||
+        FishForXref(external_funcs, xref, true)) {
+        //FishForXref(data_xrefs, xref)) {
+      return true;
+    }
+    return false;
+  }
+};
+
+extern DisassContext gDisassContext;
 
 template<typename Ins>
 auto AddCodeXref(Ins &instruction,
