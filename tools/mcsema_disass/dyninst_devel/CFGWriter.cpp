@@ -252,7 +252,7 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
 
   for (auto reg : regions) {
     if (reg->getRegionName() == ".text") {
-      relocations = reg->getRelocations();
+      //relocations = reg->getRelocations();
     }
   }
 
