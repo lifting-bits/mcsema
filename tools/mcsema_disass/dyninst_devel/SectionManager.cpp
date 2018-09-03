@@ -9,7 +9,7 @@
 using namespace Dyninst;
 using namespace SymtabAPI;
 
-std::unique_ptr<SectionManager> gSection_manager = std::make_unique<SectionManager>();
+std::unique_ptr<SectionManager> gSection_manager(new SectionManager);
 
 std::set<Region *> SectionManager::GetAllRegions() {
   std::set<Region *> result;

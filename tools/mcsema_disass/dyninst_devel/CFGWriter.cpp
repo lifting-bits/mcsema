@@ -189,14 +189,12 @@ bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
 CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
                      SymtabAPI::Symtab &symtab,
                      ParseAPI::SymtabCodeSource &symCodeSrc,
-                     ParseAPI::CodeObject &codeObj,
-                     ExternalFunctionManager &extFuncMgr)
+                     ParseAPI::CodeObject &codeObj)
     : module(m),
       module_name(module_name),
       symtab(symtab),
       code_source(symCodeSrc),
-      code_object(codeObj),
-      ext_func_manager(extFuncMgr) {
+      code_object(codeObj) {
 
   // Populate skip_funcss with some functions known to cause problems
   skip_funcss = {
@@ -1025,7 +1023,7 @@ void CFGWriter::handleNonCallInstruction(
 
 void CFGWriter::writeExternalFunctions() {
   std::vector<std::string> unknown;
-  auto known = ext_func_manager.GetAllUsed( unknown );
+  auto known = gExt_func_manager->GetAllUsed( unknown );
   LOG(INFO) << "Found " << known.size() << " external functions";
   LOG(INFO) << "Found " << unknown.size()
             << "possibly unknown external functions";
@@ -1288,8 +1286,8 @@ void CFGWriter::writeGOT(SymtabAPI::Region* region,
         cfg_external_func->set_is_weak(true);
 
 
-      } else if (ext_func_manager.IsExternal(reloc.name())) {
-        auto func = ext_func_manager.GetExternalFunction(reloc.name());
+      } else if (gExt_func_manager->IsExternal(reloc.name())) {
+        auto func = gExt_func_manager->GetExternalFunction(reloc.name());
         func.imag_ea = unreal_ea;
         func.WriteHelper(module, unreal_ea);
       }
@@ -1531,7 +1529,7 @@ void CFGWriter::writeDataVariables(Dyninst::SymtabAPI::Region *region,
 bool CFGWriter::isExternal(Address addr) const {
   bool is = false;
   if (code_object.cs()->linkage().find(addr) != code_object.cs()->linkage().end()) {
-    is = ext_func_manager.IsExternal(code_object.cs()->linkage()[addr]);
+    is = gExt_func_manager->IsExternal(code_object.cs()->linkage()[addr]);
   }
 
   if (external_vars.find(addr) != external_vars.end()) {

@@ -23,8 +23,8 @@ public:
   CFGWriter(mcsema::Module &m, const std::string &module_name,
             Dyninst::SymtabAPI::Symtab &symtab,
             Dyninst::ParseAPI::SymtabCodeSource &symCodeSrc,
-            Dyninst::ParseAPI::CodeObject &codeObj,
-            ExternalFunctionManager &extFuncMgr);
+            Dyninst::ParseAPI::CodeObject &codeObj);
+            //ExternalFunctionManager &extFuncMgr);
 
   void write();
 
@@ -117,7 +117,7 @@ private:
   Dyninst::ParseAPI::SymtabCodeSource &code_source;
 
   /* After -abi-libraries are fully embraced in master branch, this can go out */
-  ExternalFunctionManager &ext_func_manager;
+  //ExternalFunctionManager &ext_func_manager;
   //SectionManager section_manager;
 
   std::set<std::string> skip_funcss;
