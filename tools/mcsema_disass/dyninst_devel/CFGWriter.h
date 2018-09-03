@@ -14,6 +14,7 @@
 #include <sstream>
 
 #include "MagicSection.h"
+#include "Util.h"
 
 using SymbolMap = std::unordered_map<Dyninst::Address, std::string>;
 
@@ -125,10 +126,10 @@ private:
   std::unordered_map<Dyninst::Address, std::string> global_vars;
   std::unordered_map<Dyninst::Address, std::string> external_vars;
   std::unordered_map<Dyninst::Address, std::string> segment_vars;
-  std::unordered_map<Dyninst::Address, Dyninst::Address> real_to_imag;
+  //std::unordered_map<Dyninst::Address, Dyninst::Address> real_to_imag;
   SymbolMap external_functions;
 
-  std::vector<Dyninst::SymtabAPI::relocationEntry> relocations;
+  //std::vector<Dyninst::SymtabAPI::relocationEntry> relocations;
   std::unordered_set<std::string> no_ret_funcs;
   Dyninst::Address entry_point;
 
