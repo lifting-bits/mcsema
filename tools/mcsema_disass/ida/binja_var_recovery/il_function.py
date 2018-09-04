@@ -210,7 +210,7 @@ class Function(object):
       else:
         DEBUG("Instruction operation {} is not supported!".format(operation_name))
 
-      mlil_insn.analyse_memory()
+      #mlil_insn.analyse_memory()
       DEBUG_POP()
 
       if insn.operation == binja.MediumLevelILOperation.MLIL_CALL_SSA:
@@ -255,36 +255,6 @@ class Function(object):
         return True
 
     return False
-  def memory_size_heauristic(self, insn, variables):
-    for var in variables:
-      has_addr_ref = False
-      dv = self.bv.get_data_var_at(var)
-      if dv is None:
-        continue
-
-      DEBUG("Size of the variable 1 @ {:x} {}".format(var, self.bv.address_size))
-      mlil_refs = list()
-      for ref in self.bv.get_code_refs(var):
-        llil = ref.function.get_low_level_il_at(ref.address)
-        if llil is None:
-          continue
-
-        mlil = llil.medium_level_il
-        if mlil is not None:
-          mlil_refs.append((ref.function, mlil.ssa_form))
-
-      func_refs = list()
-      # Check if there is a reference by address to the data variable
-      for func, insn in mlil_refs:
-        if not self.is_memory_operation(insn):
-          has_addr_ref = True
-          break
-
-        if self.previous_dv(func, var):
-          has_addr_ref = True
-
-      if has_addr_ref == False:
-        DEBUG("Size of the variable @ {:x} {}".format(var, self.bv.address_size))
 
 def recover_function(bv, addr, is_entry=False):
   """ Process the function and collect the function which should be visited next

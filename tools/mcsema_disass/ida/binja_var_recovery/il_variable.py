@@ -19,6 +19,17 @@ from binja_var_recovery.util import *
 
 FUNCTION_OBJECTS = collections.defaultdict()
 
+class Values(object):
+  def __init__(self, addr, type):
+    self.address = addr
+    self.type = type
+
+  def __str__(self):
+    return "<{:x}, {}>".format(self.address, self.type)
+
+  def __repr__(self):
+    return "<{:x}, {}>".format(self.address, self.type)
+
 class VariableAliasSet(object):
   def __init__(self):
     self.ALIAS_SET = collections.defaultdict(int)
@@ -306,61 +317,6 @@ class SSAVariable(ILVisitor):
       
     return value_set
 
-  def visit_MLIL_SET_VAR_SSA(self, expr):
-    values_set = set()
-    ssa_var = expr.dest
-    if isinstance(ssa_var, binja.SSAVariable):
-      p_value = expr.get_ssa_var_possible_values(ssa_var)
-      if p_value.type == binja.RegisterValueType.EntryValue:
-        reg_name = p_value.reg
-        try:
-          func_obj = FUNCTION_OBJECTS[self.func_start]
-          values = func_obj.get_entry_register(reg_name)
-          for item in values:
-            values_set.add(item)
-        except KeyError:
-          values_set.add(p_value)
-      elif p_value.type != binja.RegisterValueType.UndeterminedValue:
-        values_set.add(p_value)
-      else:
-        src = self.visit(expr.src)
-        values_set.update(src)
-    else:
-      DEBUG("visit_MLIL_SET_VAR_SSA: Warning! The dest is not ssa variable")
-
-    return values_set
-
-  def visit_MLIL_VAR_SSA(self, expr):
-    """ Get the possible value of the ssa variable
-    """
-    values_set = set()
-    ssa_var = expr.src
-    if isinstance(ssa_var, binja.SSAVariable):
-      p_value = expr.get_ssa_var_possible_values(ssa_var)
-      
-      if p_value.type == binja.RegisterValueType.EntryValue:
-        reg_name = p_value.reg
-        try:
-          func_obj = FUNCTION_OBJECTS[self.func_start]
-          values = func_obj.get_entry_register(reg_name)
-          for item in values:
-            values_set.add(item)
-        except KeyError:
-          values_set.add(p_value)
-      elif p_value.type != binja.RegisterValueType.UndeterminedValue:
-        values_set.add(p_value)
-      else:
-        if ssa_var.var.name == "__return_addr":
-          values_set.add(ssa_var)
-
-        elif ssa_var not in self.visited:
-          var_def = expr.function.get_ssa_var_definition(ssa_var)
-          if var_def is not None:
-            ssa_value = self.visit(self.function[var_def])
-            values_set.update(ssa_value)
-
-    return values_set
-
   def visit_MLIL_LOAD_SSA(self, expr):
     """ Resolve the SSA Variable performing memory load
     """
@@ -425,5 +381,4 @@ class SSAVariable(ILVisitor):
           DEBUG("Warning! handle function '{}'".format(called_function.symbol.name))
           values.update(["<ReturnValueInternal {:x}>".format(called_function.symbol.address)])
 
-    #DEBUG("visit_MLIL_CALL_SSA expr {} values {}".format(expr, values))
     return values

@@ -36,12 +36,15 @@ def DEBUG(s):
   global _DEBUG_FILE
   if _DEBUG_FILE:
     _DEBUG_FILE.write("{}{}\n".format(_DEBUG_PREFIX, str(s)))
-    _DEBUG_FILE.flush()
 
-def DEBUG_FLUSH():
-  global _DEBUG_FILE
-  if _DEBUG_FILE:
-    _DEBUG_FILE.flush()
+MEMORY_REFS = collections.defaultdict()
+
+ADDRESS_REFS = collections.defaultdict()
+
+EXPORTED_REFS = collections.defaultdict()
+
+DIRECT_ADDRESS_META = "d"
+INDIRECT_ADDRESS_META = "i"
 
 PARAM_REGISTERS = {
   "rdi" : 0,

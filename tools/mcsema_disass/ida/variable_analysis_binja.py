@@ -32,8 +32,6 @@ from binja_var_recovery.il_function import *
 
 VARIABLES_TO_RECOVER = dict()
 
-POSSIBLE_MEMORY_STATE = dict()
-
 DATA_VARIABLE_XREFS = collections.defaultdict(set)
 
 def identify_exported_symbols(bv):
@@ -48,7 +46,7 @@ def identify_exported_symbols(bv):
       not is_executable(bv, sym.address) and \
       not is_section_external(bv, sect):
       VARIABLE_ALIAS_SET[sym.address].add(sym.address + bv.address_size)
-
+      EXPORTED_REFS[sym.address] = sym.address
   DEBUG('Number of exported global variables {}'.format(len(VARIABLE_ALIAS_SET)))
 
 def identify_data_variable(bv):
@@ -79,7 +77,6 @@ def identify_data_variable(bv):
         continue
     
       dv = bv.get_data_var_at(var)
-      #DEBUG("Global Variable address {:x} and type {}".format(var, type(dv)))
       DATA_VARIABLES_SET.add(var, next_var)
       for ref in bv.get_code_refs(var):
         llil = ref.function.get_low_level_il_at(ref.address)
@@ -157,8 +154,41 @@ def main(args):
   DEBUG("Global variables recovered {}".format(VARIABLE_ALIAS_SET))
   DEBUG("Data variables from binja {}".format(DATA_VARIABLES_SET))
 
-def get_variable_size(bv, var):
-  pass
+def get_variable_size(bv, next_var, var):
+  sec = get_section_at(bv, var)
+  if sec.end > next_var:
+    return next_var - var
+  else:
+    return sec.end - var
+
+def generate_variable_list(bv):
+  """ Generate the list of variables from the recovered memory refs,
+      address refs and the list of exported symbols. It also calculate
+      the size of the variables.
+  """
+  g_variables = collections.defaultdict()
+  for ref in EXPORTED_REFS.keys():
+    g_variables[ref] = 0
+
+  for ref in ADDRESS_REFS.keys():
+    g_variables[ref] = 0
+
+  for ref in MEMORY_REFS.keys():
+    size = MEMORY_REFS[ref]
+    g_variables[ref] = size
+    next_ref = ref + size
+    next_ref = next_ref if next_ref % 4 else (next_ref/4 + 1)*4
+
+  variable_list = sorted(g_variables.iterkeys())
+  for index, addr in enumerate(variable_list):
+    try:
+      size = get_variable_size(bv, variable_list[index+1], addr)
+    except IndexError:
+      sec = get_section_at(bv, addr)
+      size = get_variable_size(bv, sec.end, addr)
+    g_variables[addr] = size
+
+  return g_variables
 
 def updateCFG(bv, outfile):
   """ Update the CFG file with the recovered global variables
@@ -166,21 +196,13 @@ def updateCFG(bv, outfile):
   M = mcsema_disass.ida.CFG_pb2.Module()
   M.name = "GlobalVariables".format('utf-8')
 
-  variable_list = sorted(VARIABLE_ALIAS_SET.iterkeys())
-  for index, key in enumerate(variable_list):
+  g_variables = generate_variable_list(bv)
+  for key in sorted(g_variables.iterkeys()):
     var = M.global_vars.add()
     var.ea = key
     var.name = "global_var_{:x}".format(key)
-    try:
-      var.size = variable_list[index+1] - key
-    except IndexError:
-      sec = get_section_at(bv, key)
-      if sec is not None:
-        var.size = sec.end - key
-      else:
-        var.size = 0 
-    
-    
+    var.size = g_variables[key]
+
   with open(outfile, "w") as outf:
     outf.write(M.SerializeToString())
 
