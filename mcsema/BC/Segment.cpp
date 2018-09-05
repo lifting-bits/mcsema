@@ -430,7 +430,20 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
       if (val_size > gArch->address_size) {
         val = llvm::ConstantExpr::getZExt(val, val_type);
       } else if (val_size < gArch->address_size) {
-        val = llvm::ConstantExpr::getTrunc(val, val_type);
+        if (xref->var) {
+          /* Pointer truncation is generating the weird code for static
+           * initialization of segment variables which is causing problem
+           * during recompilations. Use Lazy initialization of the variable
+           * `segXXXX__gcc_except_table`.
+           * Wrongly generated static initializer looks like following:
+           * `.long   _ZTI12out_of_range&-1`
+           * `.long   _ZTI17special_condition&-1`
+           */
+          LazyInitXRef(xref, val_type);
+          val = llvm::ConstantInt::get(val_type, 0);
+        } else {
+          val = llvm::ConstantExpr::getTrunc(val, val_type);
+        }
       }
 
       CHECK(val->getType() == entry_type)
@@ -470,11 +483,48 @@ void AddDataSegments(const NativeModule *cfg_module) {
   }
 }
 
+// Try to deduce what constructor and destructor functions should be used
+bool DetectAndSetInitFiniCode(const NativeModule *cfg_module) {
+  // init_fini_pairs.size % 2 == 0 must hold
+  // constructor is first
+  std::vector<std::pair<std::string, bool>> init_fini_pairs = {
+    // Stripped binaries
+    {"init", false},
+    {"fini", false},
+
+    // Not stripped binaries
+    {"__libc_csu_init", false},
+    {"__libc_csu_fini", false},
+  };
+
+  for (const auto &cfg_func : cfg_module->ea_to_func) {
+    for (auto &init_fini_func : init_fini_pairs) {
+      if (cfg_func.second->name ==  init_fini_func.first) {
+        init_fini_func.second = true;
+      }
+    }
+  }
+
+  for (auto i = 0U; i < init_fini_pairs.size(); i += 2) {
+    if (init_fini_pairs[i].second && init_fini_pairs[i + 1].second) {
+      FLAGS_libc_constructor = init_fini_pairs[i].first;
+      FLAGS_libc_destructor = init_fini_pairs[i + 1].first;
+      LOG(INFO) << "Deduced libc ctor/dtor to "
+                << FLAGS_libc_constructor << " / "
+                << FLAGS_libc_destructor;
+      return true;
+    }
+  }
+  return false;
+}
+
 // Generate code to call pre-`main` function static object constructors, and
 // post-`main` functions destructors.
 void CallInitFiniCode(const NativeModule *cfg_module) {
   if (FLAGS_libc_constructor.empty() && FLAGS_libc_destructor.empty()) {
-    return;
+    if (!DetectAndSetInitFiniCode(cfg_module)) {
+      return;
+    }
   }
 
   for (const auto &entry : cfg_module->ea_to_func) {

@@ -9,14 +9,20 @@
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# See the License for the specifi
 
-project(examples)
-cmake_minimum_required (VERSION 3.2)
+project(complex_numbers)
+cmake_minimum_required(VERSION 3.2)
 
-if(DEFINED WIN32)
-  message(STATUS "Skipping the Maze example")
-else()
-  add_executable(maze Maze/Maze.c)
-endif()
+set(PROJECT_CXXFLAGS -Wall -Werror)
+set(PROJECT_LINKERFLAGS -lm)
+
+set(PROJECT_SOURCEFILES
+  complex_numbers.c
+)
+
+GenerateTest(${PROJECT_NAME}
+  SOURCES ${PROJECT_SOURCEFILES}
+  CXXFLAGS ${PROJECT_CXXFLAGS}
+  LINKERFLAGS ${PROJECT_LINKERFLAGS}
+)
