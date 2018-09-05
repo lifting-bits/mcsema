@@ -44,6 +44,9 @@ extern llvm::LLVMContext *gContext;
 extern llvm::IntegerType *gWordType;
 extern llvm::Module *gModule;
 
+
+llvm::Value *GetConstantInt(unsigned size, uint64_t value);
+
 // Return the type of a lifted function.
 llvm::FunctionType *LiftedFunctionType(void);
 

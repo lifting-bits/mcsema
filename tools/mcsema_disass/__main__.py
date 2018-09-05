@@ -155,9 +155,11 @@ def main():
   ret = 1
   try:
     if 'ida' in args.disassembler:
-      import ida.disass
-      ret = ida.disass.execute(args, fixed_command_args)
-
+      if 'idat' in args.disassembler:
+        import ida7.disass as disass
+      else:
+        import ida.disass as disass
+      ret = disass.execute(args, fixed_command_args)
       # in case IDA somehow says success, but no output was generated
       if not os.path.isfile(args.output):
         sys.stderr.write("Could not generate a CFG. Try using the --log_file option to see an error log.\n")
