@@ -72,7 +72,6 @@ class ILInstruction(object):
       return
     operation_name = "{}".format(expr.operation.name.lower())
     if hasattr(self, operation_name):
-      DEBUG("Calling operation {}".format(operation_name))
       ssa_values = getattr(self, operation_name)(expr)
     else:
       DEBUG("Instruction operation {} is not supported!".format(operation_name))
@@ -182,7 +181,6 @@ class ILInstruction(object):
         return None
 
     DEBUG("Variable into alias set 1 @ {:x}".format(variable, self.bv.address_size))
-    DEBUG("Variable into alias set 2 @ {:x}".format(variable + self.get_variable_size(insn), self.bv.address_size))
     return self.get_variable_size(insn)
 
   def analyse_memory(self):
@@ -264,7 +262,7 @@ class ILInstruction(object):
 
     if len(expr.vars_written) > 1:
       DEBUG("Warning! vars_written > 1 for operation MLIL_SET_VAR_SSA_FIELD")
-    
+
     # Check if the variable is assigned a constant value. Not preserving the bitfields 
     # not update during assignments
     if isrc.operation == binja.MediumLevelILOperation.MLIL_CONST or \
@@ -301,7 +299,7 @@ class ILInstruction(object):
       else:
         expr_values = self.evaluate_expression(isrc)
         value_set.update(expr_values)
-    
+
     DEBUG("mlil_ret expr {}  value_set {} ".format(expr, value_set))
     return value_set  
 
@@ -315,8 +313,8 @@ class ILInstruction(object):
       dest_memory = idest.constant
       if is_data_variable(self.bv, dest_memory):
         if self.variable_size_heuristic(self.insn, dest_memory) is not None:
-          DEBUG("Found variable memory {:x}".format(dest_memory))
-          MEMORY_REFS[dest_memory] = expr.size
+          DEBUG("Found variable memory {:x} size {:x} {:x}".format(dest_memory, idest.size, isrc.size))
+          MEMORY_REFS[dest_memory] = isrc.size
 
     else:
       dest_memory_set = self.evaluate_expression(idest)
@@ -330,8 +328,8 @@ class ILInstruction(object):
       src_memory = isrc.constant
       if is_data_variable(self.bv, src_memory):
         if self.variable_size_heuristic(self.insn, src_memory) is not None:
-          DEBUG("Found variable memory {:x}".format(src_memory))
-          MEMORY_REFS[src_memory] = expr.size
+          DEBUG("Found variable memory {:x} size {:x}".format(src_memory, isrc.size))
+          MEMORY_REFS[src_memory] = isrc.size
     else:
       memory_set = self.evaluate_expression(isrc)
       DEBUG("mlil_load_ssa expression : {} {}".format(isrc, memory_set))
@@ -348,6 +346,8 @@ class ILInstruction(object):
         3) Compute the possible global variable access
     """
     expr_value_set = set()
+    left_values = set()
+    right_values = set()
     vars_read = expr.vars_read
     for var in vars_read:
       if isinstance(var, binja.SSAVariable):
@@ -359,41 +359,32 @@ class ILInstruction(object):
     # Handle left operand
     if expr.left.operation == binja.MediumLevelILOperation.MLIL_CONST or \
       expr.left.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
-      left_values = expr.left.constant
-      if is_data_variable(self.bv, left_values):
-        ADDRESS_REFS[left_values] = 0
+      left_values.add(expr.left.constant)
+      if is_data_variable(self.bv, expr.left.constant):
+        ADDRESS_REFS[expr.left.constant] = 0
 
     else:
       left_values = self.evaluate_expression(expr.left)
 
-    # Handle right operand
     if expr.right.operation == binja.MediumLevelILOperation.MLIL_CONST or \
       expr.right.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
-      right_values = expr.right.constant
-      if is_data_variable(self.bv, right_values):
-        ADDRESS_REFS[right_values] = 0
+      right_values.add(expr.right.constant)
+      if is_data_variable(self.bv, expr.right.constant):
+        ADDRESS_REFS[expr.right.constant] = 0
     else:
       right_values = self.evaluate_expression(expr.right)
 
-    if isinstance(left_values, long):
-      if is_data_variable(self.bv, left_values):
-        if "<undetermined>" not in right_values and len(right_values) > 0:
-          max_size = max(right_values)
-          DEBUG("mlil_add Found memory with size {:x} -> {}".format(left_values, max_size))
-          expr_value_set.add(left_values + max_size)
+    for lvalue in left_values:
+      for rvalue in right_values:
+        DEBUG("mlil_add rvalue {} {} lvalue {} {}".format(rvalue, type(rvalue), lvalue, type(lvalue)))
+        if not isinstance(lvalue, str) and not isinstance(rvalue, str):
+          if is_data_variable(self.bv, lvalue):
+            build_alias_set(self.bv, lvalue + rvalue, lvalue)
+          if is_data_variable(self.bv, rvalue):
+            build_alias_set(self.bv, lvalue + rvalue, rvalue)
+          expr_value_set.add(lvalue + rvalue)
         else:
           expr_value_set.add("<undetermined>")
-
-    elif isinstance(right_values, long):
-      if is_data_variable(self.bv, right_values):
-        if "<undetermined>" not in left_values and len(left_values) > 0:
-          max_size = max(left_values)
-          DEBUG("mlil_add Found memory with size {:x} -> {}".format(right_values, max_size))
-          expr_value_set.add(right_values + max_size)
-        else:
-          expr_value_set.add("<undetermined>")
-    else:
-      pass
 
     DEBUG("mlil_add expr_value_set {}".format(expr_value_set))
     return expr_value_set

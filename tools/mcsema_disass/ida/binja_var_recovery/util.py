@@ -43,6 +43,8 @@ ADDRESS_REFS = collections.defaultdict()
 
 EXPORTED_REFS = collections.defaultdict()
 
+ALIAS_SET_REFS = collections.defaultdict()
+
 DIRECT_ADDRESS_META = "d"
 INDIRECT_ADDRESS_META = "i"
 
@@ -141,3 +143,29 @@ def is_section_external(bv, sect):
 
   _INT_SECTIONS.add(sect.start)
   return False
+
+def build_alias_set(bv, new_addr, addr):
+  """ Build the alias set from the source addresses which helps in
+      computing the minimum size of the variables.
+  """
+  if not is_data_variable(bv, new_addr):
+    return
+
+  if addr in ALIAS_SET_REFS.keys():
+    src_addr = ALIAS_SET_REFS[addr]
+    ALIAS_SET_REFS[new_addr] = src_addr
+  else:
+    ALIAS_SET_REFS[new_addr] = addr
+
+  DEBUG("Generated alias set {:x} <- {:x}".format(new_addr, ALIAS_SET_REFS[new_addr]))
+
+def build_variable_set(bv):
+  g_variables = collections.defaultdict()
+  for key in ALIAS_SET_REFS.keys():
+    base_addr = ALIAS_SET_REFS[key]
+    size = key - base_addr
+    g_variables[base_addr] = size
+
+  DEBUG("Variables from alias set")
+  for addr in g_variables.keys():
+    DEBUG("{:x} -> {:x}".format(addr, g_variables[addr]))

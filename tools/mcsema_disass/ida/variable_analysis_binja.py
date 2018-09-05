@@ -116,6 +116,7 @@ def main(args):
          recovered may not be having the correct size which should get fixed at later point 
   """
   bv = binja.BinaryViewType.get_view_of_file(args.binary)
+  bv.add_analysis_option("linearsweep")
   bv.update_analysis_and_wait()
   
   DEBUG("Analysis file {} loaded...".format(args.binary))
@@ -147,12 +148,14 @@ def main(args):
       recover_function(bv, addr)
       bv.remove_function(bv.get_function_at(addr))
 
-      if TO_RECOVER.qsize() == 0 and len(bv.functions) > 0:
-        queue_func(bv.functions[0].start)
+    while TO_RECOVER.empty() and (len(bv.functions) > 0):
+      if not queue_func(bv.functions[0].start):
+        bv.remove_function(bv.functions[0])
 
+  DEBUG("Number of functions {} {}".format(len(bv.functions), TO_RECOVER.qsize()))
+
+  build_variable_set(bv)
   updateCFG(bv, args.out)
-  DEBUG("Global variables recovered {}".format(VARIABLE_ALIAS_SET))
-  DEBUG("Data variables from binja {}".format(DATA_VARIABLES_SET))
 
 def get_variable_size(bv, next_var, var):
   sec = get_section_at(bv, var)
@@ -177,12 +180,13 @@ def generate_variable_list(bv):
     size = MEMORY_REFS[ref]
     g_variables[ref] = size
     next_ref = ref + size
-    next_ref = next_ref if next_ref % 4 else (next_ref/4 + 1)*4
+    next_ref = next_ref if (next_ref % 4 == 0) else (next_ref/4 + 1)*4
+    g_variables[next_ref] = 0
 
   variable_list = sorted(g_variables.iterkeys())
   for index, addr in enumerate(variable_list):
     try:
-      size = get_variable_size(bv, variable_list[index+1], addr)
+      size = g_variables[addr] if g_variables[addr] != 0 else get_variable_size(bv, variable_list[index+1], addr)
     except IndexError:
       sec = get_section_at(bv, addr)
       size = get_variable_size(bv, sec.end, addr)

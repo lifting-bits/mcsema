@@ -20,21 +20,15 @@ from binja_var_recovery.util import *
 from binja_var_recovery.il_variable import *
 from binja_var_recovery.il_instructions import *
 
-SYMBOLIC_VALUE = {
-  "rdi" : 0xFFFFFFFFFFFFFFFF,
-  "rsi" : 0xFFFFFFFFFFFFFFFF,
-  "rdx" : 0xFFFFFFFFFFFFFFFF,
-  "rcx" : 0xFFFFFFFFFFFFFFFF,
-  "r8"  : 0xFFFFFFFFFFFFFFFF,
-  "r9"  : 0xFFFFFFFFFFFFFFFF,
-  }
-
 RECOVERED = set()
 TO_RECOVER = Queue()
 
 def queue_func(addr):
   if addr not in RECOVERED:
     TO_RECOVER.put(addr)
+    return True
+  else:
+    return False
 
 class Function(object):
   """ The function objects
@@ -93,6 +87,8 @@ class Function(object):
       self.ssa_variables[var_name] = variable
 
   def set_params_count(self):
+    """ Set the number of function parameters
+    """
     if self.func is None:
       return
 
@@ -107,6 +103,10 @@ class Function(object):
       self.num_params = len(insn_il_ssa.params) if len(insn_il_ssa.params) > self.num_params else self.num_params
 
   def collect_parameters(self):
+    """ Traverse through the references of the function and recover the function
+        parameters. It is the possible values of the entry registers. If the parameters
+        can't be resolved it gets assigned '<undetermined>' as value
+    """
     if self.func is None:
       return
 
@@ -140,20 +140,10 @@ class Function(object):
         if p_value.type in [ binja.RegisterValueType.ConstantValue,
                             binja.RegisterValueType.ConstantPointerValue ]:
           value_set.add(p_value.value)
-        #self.update_register(reg_name, p_value.value)
-        #elif p_value.type == binja.RegisterValueType.EntryValue:
-        #  reg_value = self.regs[p_value.reg]
-        #  self.update_register(reg_name, reg_value)
-        #  value_set.update(reg_value)
-        #elif p_value.type != binja.RegisterValueType.UndeterminedValue:
-        #  value_set.add(p_value)
-        #  self.update_register(reg_name, p_value)
-        #else:
-        #  ssa_var = SSAVariable(self.bv, parameter.src, self.bv.address_size, ref_function)
-        #  ssa_value = ssa_var.get_values()
-        #  self.update_register(reg_name, ssa_value)
-        #  for item in ssa_value:
-        #    value_set.add(item)
+          # build the alias set from the constant value
+          build_alias_set(self.bv, p_value.value, p_value.value)
+        else:
+          value_set.add("<undetermined>")
     DEBUG_POP()
 
   def get_param_register(self, reg_name):
@@ -173,7 +163,6 @@ class Function(object):
       return
 
     try:
-      #value_set = self.params[PARAM_REGISTERS[register]]
       value_set = self.regs[register]
       return value_set
     except KeyError:
@@ -190,6 +179,9 @@ class Function(object):
         pass
 
   def recover_instructions(self):
+    """ It creates the instruction objects and process them for the variable
+        analysis.
+    """
     index = 0
     DEBUG("{:x} {}".format(self.func.start, self.func.name))
     size = len(self.func.medium_level_il.ssa_form)
@@ -209,8 +201,6 @@ class Function(object):
         getattr(mlil_insn, operation_name)(insn)
       else:
         DEBUG("Instruction operation {} is not supported!".format(operation_name))
-
-      #mlil_insn.analyse_memory()
       DEBUG_POP()
 
       if insn.operation == binja.MediumLevelILOperation.MLIL_CALL_SSA:
@@ -221,40 +211,6 @@ class Function(object):
             queue_func(called_function.start)
       index += 1
     DEBUG_POP()
-
-  def is_memory_operation(self, expr):
-    if expr is None:
-      return False
-
-    if expr.operation == binja.MediumLevelILOperation.MLIL_CALL_SSA:
-      return False
-
-    for token in expr.tokens:
-      if token.type == binja.InstructionTextTokenType.RegisterToken:
-        return True
-    return False
-
-  def get_data_variable(self, expr):
-    dv_set = set()
-    if expr is None:
-      return dv_set
-
-    for token in expr.tokens:
-      if token.type == binja.InstructionTextTokenType.PossibleAddressToken:
-        if is_data_variable(self.bv, token.value):
-          dv_set.add(token.value)
-    return dv_set
-
-  def previous_dv(self, func, var):
-    prev_dv = self.bv.get_previous_data_var_before(var)
-    if prev_dv is None:
-      return False
-
-    for ref in self.bv.get_code_refs(prev_dv):
-      if ref.function.start == func.start:
-        return True
-
-    return False
 
 def recover_function(bv, addr, is_entry=False):
   """ Process the function and collect the function which should be visited next
@@ -269,9 +225,10 @@ def recover_function(bv, addr, is_entry=False):
 
   DEBUG("Recovering function {} at {:x}".format(func.symbol.name, addr))
 
+  if func.start not in FUNCTION_OBJECTS.keys():
+    return None
+
   f_handle = FUNCTION_OBJECTS[func.start]
-  if f_handle is None:
-    return
 
   f_handle.collect_parameters()
   f_handle.print_parameters()
