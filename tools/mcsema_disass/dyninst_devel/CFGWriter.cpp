@@ -1089,7 +1089,7 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
       ++offset;
       if (region->getMemOffset() + j == end) {
         LOG(INFO) << "Hit end of region";
-        return;
+        break;
       }
     }
 
@@ -1137,6 +1137,7 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
         WriteDataXref({region->getMemOffset() + size - off,
                       *tmp_ptr,
                       segment});
+        continue;
       }
     }
     std::string name = base_name + "_" + std::to_string(counter);
