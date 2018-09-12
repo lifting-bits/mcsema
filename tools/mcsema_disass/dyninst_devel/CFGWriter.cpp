@@ -1127,7 +1127,7 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
       } else if (IsInBinary(code_source, *tmp_ptr)) {
         LOG(INFO) << "Cross xref " << std::hex
                   << region->getMemOffset() + size - off << " " << *tmp_ptr;
-        cross_xrefs.push_back({region->getMemOffset() + size,
+        cross_xrefs.push_back({region->getMemOffset() + size - off,
                               *tmp_ptr,
                               segment});
         continue;
