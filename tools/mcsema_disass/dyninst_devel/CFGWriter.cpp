@@ -354,26 +354,26 @@ void CFGWriter::writeExternalVariables() {
 
         auto external_var = magic_section.WriteExternalVariable(
             module, s->getMangledName());
-        external_vars.insert({external_var->ea(), s->getMangledName()});
+        gDisassContext->external_vars.insert({external_var->ea(), external_var});
         continue;
       }
-      external_vars.insert({s->getOffset(), s->getMangledName()});
 
-      auto extVar = module.add_external_vars();
-      extVar->set_name(s->getMangledName());
-      extVar->set_ea(s->getOffset());
+      auto external_var = module.add_external_vars();
+      gDisassContext->external_vars.insert({s->getOffset(), external_var});
+      external_var->set_name(s->getMangledName());
+      external_var->set_ea(s->getOffset());
 
       //TODO(lukas): This is to generate syntactically valid llvm
       //             Other than that probably won't work
       if (s->getSize()) {
-        extVar->set_size(s->getSize());
+        external_var->set_size(s->getSize());
       } else {
-        extVar->set_size(8);
+        external_var->set_size(8);
       }
 
       //TODO(lukas): This needs some checks
-      extVar->set_is_weak(false);
-      extVar->set_is_thread_local(false);
+      external_var->set_is_weak(false);
+      external_var->set_is_thread_local(false);
     }
   }
 }
@@ -385,11 +385,11 @@ void CFGWriter::writeGlobalVariables() {
                            a->getRegion()->getRegionName() == ".rodata")) {
       LOG(INFO) << "Found global variable " << a->getMangledName()
                 << " at " << std::hex << a->getOffset() << std::dec;
-      auto globalVar = module.add_global_vars();
-      globalVar->set_ea(a->getOffset());
-      globalVar->set_name(a->getMangledName());
-      globalVar->set_size(a->getSize());
-      global_vars.insert({a->getOffset(), a->getMangledName()});
+      auto global_var = module.add_global_vars();
+      global_var->set_ea(a->getOffset());
+      global_var->set_name(a->getMangledName());
+      global_var->set_size(a->getSize());
+      gDisassContext->global_vars.insert({a->getOffset(), global_var});
     }
   }
 }
@@ -610,14 +610,14 @@ std::string CFGWriter::getXrefName(Address addr) {
     return func->second;
   }
 
-  auto extVar = external_vars.find(addr);
-  if (extVar != external_vars.end()) {
-    return extVar->second;
+  auto extVar = gDisassContext->external_vars.find(addr);
+  if (extVar != gDisassContext->external_vars.end()) {
+    return extVar->second->name();
   }
 
-  auto globalVar = global_vars.find(addr);
-  if (globalVar != global_vars.end()) {
-    return globalVar->second;
+  auto globalVar = gDisassContext->global_vars.find(addr);
+  if (globalVar != gDisassContext->global_vars.end()) {
+    return globalVar->second->name();
   }
 
 
@@ -744,7 +744,7 @@ Address CFGWriter::immediateNonCall( InstructionAPI::Immediate* imm,
                                 a, getXrefName(a));
 
     if (isExternal(a) ||
-        external_vars.find(a) != external_vars.end()) {
+        gDisassContext->external_vars.find(a) != gDisassContext->external_vars.end()) {
         cfgCodeRef->set_location(CodeReference::External);
     }
     //if (handleXref(cfgInstruction, a, true)) {
@@ -784,7 +784,7 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
                                   CodeReference::MemoryOperand,
                                   CodeReference::Internal, a,
                                   getXrefName(a));
-    if (isExternal(a) || external_vars.find(a) != external_vars.end()) {
+    if (isExternal(a) || gDisassContext->external_vars.find(a) != gDisassContext->external_vars.end()) {
       cfgCodeRef->set_location(CodeReference::External);
     }
     return a;
@@ -823,13 +823,13 @@ bool CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
     return true;
   }
 
-  auto g_var = global_vars.find(addr);
-  if (g_var != global_vars.end()) {
+  auto g_var = gDisassContext->global_vars.find(addr);
+  if (g_var != gDisassContext->global_vars.end()) {
     auto code_ref = AddCodeXref(cfg_instruction,
                                   CodeReference::DataTarget,
                                   CodeReference::MemoryOperand,
                                   CodeReference::Internal, addr,
-                                  g_var->second);
+                                  g_var->second->name());
     return true;
   }
 
@@ -843,14 +843,14 @@ bool CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
     return true;
   }
 
-  auto ext_var = external_vars.find(addr);
-  if (ext_var != external_vars.end()) {
+  auto ext_var = gDisassContext->external_vars.find(addr);
+  if (ext_var != gDisassContext->external_vars.end()) {
     LOG(INFO) << "Code xref to ext_var at " << addr;
     auto code_ref = AddCodeXref(cfg_instruction,
                                   CodeReference::DataTarget,
                                   CodeReference::MemoryOperand,
                                   CodeReference::External, addr,
-                                  ext_var->second);
+                                  ext_var->second->name());
     return true;
   }
   auto ext_func = external_functions.find(addr);
@@ -1039,6 +1039,7 @@ bool CFGWriter::handleDataXref(mcsema::Segment *segment,
     found_xref.insert(ea);
     return true;
   }*/
+  // segment_vars, external_vars, global_vars
   if (gDisassContext->HandleDataXref(context_xref)) {
     found_xref.insert(ea);
     return true;
@@ -1049,15 +1050,15 @@ bool CFGWriter::handleDataXref(mcsema::Segment *segment,
     return true;
   }
 
-  if (FishForXref(external_vars, xref)) {
+  /*if (FishForXref(gDisassContext->external_vars, xref)) {
     found_xref.insert(ea);
     return true;
-  }
+  }*/
 
-  if (FishForXref(global_vars, xref)) {
+  /* if (FishForXref(gDisassContext->global_vars, xref)) {
     found_xref.insert(ea);
     return true;
-  }
+  }*/
   return false;
 
 }
@@ -1324,8 +1325,8 @@ void CFGWriter::writeRelocations(SymtabAPI::Region* region,
 
 void CFGWriter::ResolveCrossXrefs() {
   for (auto &xref : cross_xrefs) {
-    auto g_var = global_vars.find(xref.target_ea);
-    if (g_var != global_vars.end()) {
+    auto g_var = gDisassContext->global_vars.find(xref.target_ea);
+    if (g_var != gDisassContext->global_vars.end()) {
       LOG(ERROR)
           << "CrossXref is targeting global variable and was not resolved earlier!";
       continue;
@@ -1346,16 +1347,16 @@ void CFGWriter::ResolveCrossXrefs() {
   }
 }
 
-void writeBssXrefs(SymtabAPI::Region *region,
+  void writeBssXrefs(SymtabAPI::Region *region,
                    mcsema::Segment *segment,
-                   const SymbolMap &externals) {
+                   const DisassContext::SymbolMap<mcsema::ExternalVariable *> &externals) {
   for (auto &external : externals) {
     if (IsInRegion(region, external.first)) {
       auto cfg_xref = segment->add_xrefs();
       cfg_xref->set_ea(external.first);
       cfg_xref->set_width(8);
       cfg_xref->set_target_ea(external.first);
-      cfg_xref->set_target_name(external.second);
+      cfg_xref->set_target_name(external.second->name());
       cfg_xref->set_target_is_code(false);
       cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
     }
@@ -1437,7 +1438,7 @@ void CFGWriter::writeInternalData() {
     }
 
     if (region->getRegionName() == ".bss") {
-      writeBssXrefs(region, cfgInternalData, external_vars);
+      writeBssXrefs(region, cfgInternalData, gDisassContext->external_vars);
     }
 
     if (region->getRegionName() == ".got.plt") {
@@ -1473,7 +1474,7 @@ void CFGWriter::writeDataVariables(Dyninst::SymtabAPI::Region *region,
     if ((a->getRegion() && a->getRegion() == region) ||
         (a->getOffset() == region->getMemOffset())) {
 
-      if (external_vars.find(a->getOffset()) != external_vars.end()) {
+      if (gDisassContext->external_vars.find(a->getOffset()) != gDisassContext->external_vars.end()) {
         continue;
       }
 
@@ -1498,7 +1499,7 @@ bool CFGWriter::isExternal(Address addr) const {
     is = gExt_func_manager->IsExternal(code_object.cs()->linkage()[addr]);
   }
 
-  if (external_vars.find(addr) != external_vars.end()) {
+  if (gDisassContext->external_vars.find(addr) != gDisassContext->external_vars.end()) {
     is  = true;
   }
 
