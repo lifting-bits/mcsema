@@ -240,16 +240,14 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
   func_map[main_offset] = FLAGS_entrypoint;
   LOG(INFO) << "Function at " << main_offset << " is " << FLAGS_entrypoint;
 
-  if (func_map[ctor_offset].substr(0, 4) == "targ") {
+  // We need to give libc ctor/dtor names
+  if (symtab.isStripped()) {
     LOG(INFO) << "Renaming 0x:" << std::hex << ctor_offset << " to init";
     func_map[ctor_offset] = "init";
-  }
 
-  if (func_map[dtor_offset].substr(0, 4) == "targ") {
     LOG(INFO) << "Renaming 0x:" << std::hex << dtor_offset << " to fini";
     func_map[dtor_offset] = "fini";
   }
-
 
   for (auto reg : regions) {
     if (reg->getRegionName() == ".text") {
