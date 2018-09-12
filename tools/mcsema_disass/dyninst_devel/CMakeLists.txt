@@ -23,6 +23,7 @@ add_executable(${MCSEMA_DYNINST_DISASS}
   ExternalFunctionManager.cpp
   SectionManager.cpp
   MagicSection.cpp
+  Util.cpp
   )
 
 add_dependencies(${MCSEMA_DYNINST_DISASS} generate-protobuf-files)

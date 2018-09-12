@@ -123,8 +123,8 @@ private:
   std::set<std::string> skip_funcss;
 
   std::unordered_map<Dyninst::Address, std::string> func_map;
-  std::unordered_map<Dyninst::Address, std::string> global_vars;
-  std::unordered_map<Dyninst::Address, std::string> external_vars;
+  //std::unordered_map<Dyninst::Address, std::string> global_vars;
+  //std::unordered_map<Dyninst::Address, std::string> external_vars;
   //std::unordered_map<Dyninst::Address, std::string> segment_vars;
   //std::unordered_map<Dyninst::Address, Dyninst::Address> real_to_imag;
   SymbolMap external_functions;
