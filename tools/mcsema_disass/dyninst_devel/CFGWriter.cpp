@@ -1153,9 +1153,16 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
 void CFGWriter::xrefsInSegment(SymtabAPI::Region *region,
                                mcsema::Segment *segment) {
 
+  // Both are using something smarter, as they may contain other
+  // data as static strings
+  if (region->getRegionName() == ".data" ||
+      region->getRegionName() == ".rodata") {
+    return;
+  }
   auto offset = static_cast<std::uint64_t*>(region->getPtrToRawData());
 
   for (int j = 0; j < region->getDiskSize(); j += 8, offset++) {
+    // Just so we know, there was something shady
     if (found_xref.count(region->getMemOffset() + j)) {
       LOG(WARNING) << "Dual xref detected!";
       continue;
@@ -1169,7 +1176,8 @@ void CFGWriter::xrefsInSegment(SymtabAPI::Region *region,
 
       if (IsInRegion(gSection_manager->getRegion(".text"), *offset)) {
         LOG(INFO) << "Xref is pointing into .text";
-        code_xrefs_to_resolve.insert({*offset,{region->getMemOffset() + j, *offset, segment}});
+        code_xrefs_to_resolve.insert(
+            {*offset,{region->getMemOffset() + j, *offset, segment}});
       }
     }
   }
@@ -1347,9 +1355,9 @@ void CFGWriter::ResolveCrossXrefs() {
     // entrypoint of some function that was missed by speculative parse.
     // Let's try to parse it now
 
-    if (IsInRegion(gSection_manager->getText(), xref.target_ea) &&
-        IsInRegion(gSection_manager->getRegion(".text"), xref.target_ea)) {
-          code_xrefs_to_resolve.insert({xref.target_ea, xref});
+    if (IsInRegion(gSection_manager->getRegion(".text"), xref.target_ea)) {
+      LOG(INFO) << "\tIs acturally targeting something in .text!";
+      code_xrefs_to_resolve.insert({xref.target_ea, xref});
     }
   }
 }
