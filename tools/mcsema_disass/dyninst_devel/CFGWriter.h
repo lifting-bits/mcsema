@@ -127,7 +127,7 @@ private:
   //std::unordered_map<Dyninst::Address, std::string> external_vars;
   //std::unordered_map<Dyninst::Address, std::string> segment_vars;
   //std::unordered_map<Dyninst::Address, Dyninst::Address> real_to_imag;
-  SymbolMap external_functions;
+  //SymbolMap external_functions;
 
   //std::vector<Dyninst::SymtabAPI::relocationEntry> relocations;
   std::unordered_set<std::string> no_ret_funcs;

@@ -851,15 +851,15 @@ bool CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                                   ext_var->second->name());
     return true;
   }
-  auto ext_func = external_functions.find(addr);
-  if (ext_func != external_functions.end()) {
+  auto ext_func = gDisassContext->external_funcs.find(addr);
+  if (ext_func != gDisassContext->external_funcs.end()) {
     LOG(INFO) << "Code xref to ext_func at " << addr;
     auto code_ref = AddCodeXref(cfg_instruction,
                                   CodeReference::DataTarget,
                                   CodeReference::ControlFlowOperand,
                                   CodeReference::External,
                                   magic_section.GetAllocated(addr),
-                                  ext_func->second);
+                                  ext_func->second->name());
     return true;
   }
   if (force) {
@@ -1009,8 +1009,8 @@ void CFGWriter::writeExternalFunctions() {
     CHECK(found) << "Unresolved external function call";
 
     func.ea = a;
-    external_functions.insert({a, func.symbol_name});
-    magic_section.WriteExternalFunction(module, func);
+    auto cfg_external_func = magic_section.WriteExternalFunction(module, func);
+    gDisassContext->external_funcs.insert({a, cfg_external_func});
     /*auto cfgExtFunc = module.add_external_funcs();
 
     cfgExtFunc->set_name(func.symbol_name);
