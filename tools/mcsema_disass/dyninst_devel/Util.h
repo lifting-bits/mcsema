@@ -16,16 +16,16 @@ extern mcsema::Module gModule;
 extern std::unique_ptr<DisassContext> gDisassContext;
 
 template<typename CFGUnit=mcsema::Segment *>
-struct CrossXref {
+struct ContextCrossXref {
   Dyninst::Address ea = 0;
   Dyninst::Address target_ea = 0;
   CFGUnit segment = nullptr;
 
-  bool operator==(const CrossXref<CFGUnit> &other) {
+  bool operator==(const ContextCrossXref<CFGUnit> &other) {
     return ea == other.ea && target_ea == other.target_ea;
   }
 
-  bool operator!=(const CrossXref<CFGUnit> &other) {
+  bool operator!=(const ContextCrossXref<CFGUnit> &other) {
     return *this != other;
   }
 
@@ -64,7 +64,7 @@ struct DisassContext {
 
   template<typename Container, typename CFGUnit>
   bool FishForXref(const Container &facts,
-                   CrossXref<CFGUnit> &xref,
+                   ContextCrossXref<CFGUnit> &xref,
                    bool is_code=false,
                    uint64_t width=8) {
     auto fact = facts.find(xref.target_ea);
@@ -76,7 +76,7 @@ struct DisassContext {
     return false;
   }
 
-  bool handleDataXref(CrossXref<mcsema::Segment *> &xref) {
+  bool HandleDataXref(ContextCrossXref<mcsema::Segment *> &xref) {
     if (FishForXref(global_vars, xref) ||
         FishForXref(external_vars, xref) ||
         FishForXref(segment_vars, xref) ||

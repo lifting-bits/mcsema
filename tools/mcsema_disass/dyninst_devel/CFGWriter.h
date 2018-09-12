@@ -125,7 +125,7 @@ private:
   std::unordered_map<Dyninst::Address, std::string> func_map;
   std::unordered_map<Dyninst::Address, std::string> global_vars;
   std::unordered_map<Dyninst::Address, std::string> external_vars;
-  std::unordered_map<Dyninst::Address, std::string> segment_vars;
+  //std::unordered_map<Dyninst::Address, std::string> segment_vars;
   //std::unordered_map<Dyninst::Address, Dyninst::Address> real_to_imag;
   SymbolMap external_functions;
 
@@ -138,6 +138,6 @@ private:
   std::map<Dyninst::Address, CrossXref<mcsema::Segment>> code_xrefs_to_resolve;
   std::map<Dyninst::Address, CrossXref<mcsema::Instruction>> inst_xrefs_to_resolve;
 
-  MagicSection magic_section;
+  MagicSection& magic_section;
   int ptr_byte_size = 8;
 };

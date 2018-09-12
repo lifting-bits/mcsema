@@ -194,7 +194,8 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
       module_name(module_name),
       symtab(symtab),
       code_source(symCodeSrc),
-      code_object(codeObj) {
+      code_object(codeObj),
+      magic_section(gDisassContext->magic_section) {
 
   // Populate skip_funcss with some functions known to cause problems
   skip_funcss = {
@@ -620,9 +621,9 @@ std::string CFGWriter::getXrefName(Address addr) {
   }
 
 
-  auto segmentVar = segment_vars.find(addr);
-  if (segmentVar != segment_vars.end()) {
-    return segmentVar->second;
+  auto segmentVar = gDisassContext->segment_vars.find(addr);
+  if (segmentVar != gDisassContext->segment_vars.end()) {
+    return segmentVar->second->name();
   }
 
   // Sometimes things have no name but they are still xrefs
@@ -832,13 +833,13 @@ bool CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
     return true;
   }
 
-  auto s_var = segment_vars.find(addr);
-  if (s_var != segment_vars.end()) {
+  auto s_var = gDisassContext->segment_vars.find(addr);
+  if (s_var != gDisassContext->segment_vars.end()) {
     auto code_ref = AddCodeXref(cfg_instruction,
                                   CodeReference::DataTarget,
                                   CodeReference::MemoryOperand,
                                   CodeReference::Internal, addr,
-                                  s_var->second);
+                                  s_var->second->name());
     return true;
   }
 
@@ -1033,8 +1034,12 @@ bool CFGWriter::handleDataXref(mcsema::Segment *segment,
                                Address ea,
                                Address target) {
   CrossXref<mcsema::Segment> xref = {ea, target, segment};
-
-  if (FishForXref(segment_vars ,xref)) {
+  ContextCrossXref<mcsema::Segment *> context_xref = {ea, target, segment};
+  /*if (FishForXref(gDisassContext->segment_vars ,xref)) {
+    found_xref.insert(ea);
+    return true;
+  }*/
+  if (gDisassContext->HandleDataXref(context_xref)) {
     found_xref.insert(ea);
     return true;
   }
@@ -1108,7 +1113,7 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
         auto cfg_var = segment->add_vars();
         cfg_var->set_name(name);
         cfg_var->set_ea(*tmp_ptr);
-        segment_vars.insert({*tmp_ptr, name});
+        gDisassContext->segment_vars.insert({*tmp_ptr, cfg_var});
         found_xref.insert(region->getMemOffset() + size - off);
         continue;
 
@@ -1132,7 +1137,7 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
     auto var = segment->add_vars();
     var->set_ea(region->getMemOffset() + size);
     var->set_name(name);
-    segment_vars.insert({region->getMemOffset() + size, name});
+    gDisassContext->segment_vars.insert({region->getMemOffset() + size, var});
   }
 }
 
@@ -1476,7 +1481,7 @@ void CFGWriter::writeDataVariables(Dyninst::SymtabAPI::Region *region,
       var->set_ea(a->getOffset());
       var->set_name(a->getMangledName());
 
-      segment_vars.insert({a->getOffset(), a->getMangledName()});
+      gDisassContext->segment_vars.insert({a->getOffset(), var});
     }
   }
   if (region->getRegionName() == ".rodata" ||
