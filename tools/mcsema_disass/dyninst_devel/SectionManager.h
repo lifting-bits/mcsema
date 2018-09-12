@@ -26,19 +26,9 @@ public:
   std::set<Dyninst::SymtabAPI::Region *> GetDataRegions();
   std::set<Dyninst::SymtabAPI::Region *> GetAllRegions();
 
-  Dyninst::SymtabAPI::Region *getRodata() { return rodata; }
-  Dyninst::SymtabAPI::Region *getText() { return text; }
-
   Dyninst::SymtabAPI::Region *getRegion(const std::string &name);
 
-  static SectionManager &Instance(void) {
-    static SectionManager instance;
-    return instance;
-  }
 private:
-  Dyninst::SymtabAPI::Region *text;
-  Dyninst::SymtabAPI::Region *rodata;
-
   std::vector<Section> regions;
 };
 
