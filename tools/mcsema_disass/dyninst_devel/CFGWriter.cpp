@@ -153,6 +153,7 @@ void WriteDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref,
                    const std::string &name="",
                    bool is_code=false,
                    uint64_t width=8) {
+  LOG(INFO) << "\tWriting xref targeting 0x" << std::hex << xref.target_ea;
   auto cfg_xref = xref.segment->add_xrefs();
   cfg_xref->set_ea(xref.ea);
   cfg_xref->set_width(width);
@@ -1064,12 +1065,15 @@ bool CFGWriter::handleDataXref(mcsema::Segment *segment,
 //TODO(lukas): This is finding vars actually?
 void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *segment) {
   std::string base_name = region->getRegionName();
+  auto offset = static_cast<uint8_t *>(region->getPtrToRawData());
+  auto end = region->getMemOffset() + region->getMemSize();
+
   LOG(INFO) << "Trying to parse region " << region->getRegionName()
             << " for xrefs & vars";
+  LOG(INFO) << "Starts at 0x" << std::hex << region->getMemOffset()
+            << " ends at 0x" << end;
   static int counter = 0;
   static int unnamed = 0;
-  auto offset = static_cast<uint8_t *>(region->getPtrToRawData());
-  auto end = offset + region->getDiskSize();
 
   for (int j = 0; j < region->getDiskSize(); j += 1, ++offset) {
     CHECK(region->getMemOffset() + j == region->getDiskOffset() + j)
@@ -1078,11 +1082,15 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
     if (*offset == 0) {
       continue;
     }
+    LOG(INFO) << "Nonzero at 0x" << std::hex << region->getMemOffset() + j;
     uint64_t size = j;
     while (*offset != 0) {
       ++j;
       ++offset;
-      if (offset + size == end) return;
+      if (region->getMemOffset() + j == end) {
+        LOG(INFO) << "Hit end of region";
+        return;
+      }
     }
 
     uint64_t off = size % 4;
@@ -1133,6 +1141,7 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
     }
     std::string name = base_name + "_" + std::to_string(counter);
     ++counter;
+    LOG(INFO) << "\tAdding var " << name << " at 0x" << std::hex << region->getMemOffset() + size;
     auto var = segment->add_vars();
     var->set_ea(region->getMemOffset() + size);
     var->set_name(name);

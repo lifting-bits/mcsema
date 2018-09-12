@@ -33,6 +33,7 @@ struct ContextCrossXref {
       const std::string &name="",
       bool is_code=false,
       uint64_t width=8) {
+    LOG(INFO) << "\tFound xref targeting " << std::hex << target_ea;
     auto cfg_xref = segment->add_xrefs();
     cfg_xref->set_ea(ea);
     cfg_xref->set_width(width);
