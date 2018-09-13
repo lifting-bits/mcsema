@@ -81,11 +81,22 @@ struct DisassContext {
     if (FishForXref(global_vars, xref) ||
         FishForXref(external_vars, xref) ||
         FishForXref(segment_vars, xref) ||
+        FishForXref(func_map, xref, true) ||
         FishForXref(external_funcs, xref, true)) {
         //FishForXref(data_xrefs, xref)) {
       return true;
     }
     return false;
+  }
+
+  mcsema::Function *getInternalFunction(Dyninst::Address ea) {
+    auto internal_func = func_map.find(ea);
+    if (internal_func == func_map.end()) {
+      LOG(INFO) << "There is no internal function in DisassContext with ea 0x"
+                 << std::hex << ea;
+      return nullptr;
+    }
+    return internal_func->second;
   }
 };
 
