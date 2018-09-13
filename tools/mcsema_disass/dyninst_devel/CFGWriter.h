@@ -102,12 +102,6 @@ private:
                const Dyninst::Address ip,
                Dyninst::Address &result) const;
 
-  // #iamverysmart
-  /*bool SmarterTryEval(Dyninst::InstructionAPI::Expression *expr,
-               const Dyninst::Address ip,
-               Dyninst::Address &result,
-               Dyninst::Address instruction_size=0) const;
-               */
   /* Dyninst related objects */
   mcsema::Module &module;
   std::string module_name;
@@ -120,18 +114,7 @@ private:
   //ExternalFunctionManager &ext_func_manager;
   //SectionManager section_manager;
 
-  std::set<std::string> skip_funcss;
-
-  std::unordered_map<Dyninst::Address, std::string> func_map;
-  //std::unordered_map<Dyninst::Address, std::string> global_vars;
-  //std::unordered_map<Dyninst::Address, std::string> external_vars;
-  //std::unordered_map<Dyninst::Address, std::string> segment_vars;
-  //std::unordered_map<Dyninst::Address, Dyninst::Address> real_to_imag;
-  //SymbolMap external_functions;
-
-  //std::vector<Dyninst::SymtabAPI::relocationEntry> relocations;
   std::unordered_set<std::string> no_ret_funcs;
-  Dyninst::Address entry_point;
 
   std::vector<CrossXref<mcsema::Segment>> cross_xrefs;
   std::unordered_set<Dyninst::Address> found_xref;
