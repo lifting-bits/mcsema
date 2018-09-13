@@ -185,6 +185,13 @@ bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
   return false;
 }
 
+// Modifies gDisassContext
+void RenameFunc(Dyninst::Address ea, const std::string& new_name) {
+  LOG(INFO) << "Renaming 0x:" << std::hex << ea << " to " << new_name;
+  auto internal_func = gDisassContext->getInternalFunction(ea);
+  internal_func->set_name(new_name);
+}
+
 } //namespace
 
 CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
@@ -199,11 +206,11 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
       magic_section(gDisassContext->magic_section) {
 
   // Populate skip_funcss with some functions known to cause problems
-  skip_funcss = {
+  /*skip_funcss = {
                  "_fini",
                  "__libc_start_main"
                  };
-
+  */
   // Populate func_map
 
   std::vector<SymtabAPI::Function *> functions;
@@ -222,7 +229,7 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
   // We need to get main! Heuristic for stripped binaries is that main is
   // passed to __libc_start_main as last argument from _start, which we can
   // find, because it is entrypoint
-  entry_point = symtab.getEntryOffset();
+  Address entry_point = symtab.getEntryOffset();
   code_object.parse(entry_point, true);
   Address main_offset = TryRetrieveAddrFromStart(code_object, entry_point, 0);
   Address ctor_offset = TryRetrieveAddrFromStart(code_object, entry_point, 1);
@@ -235,29 +242,27 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
                      <<" was not found!";
 
   for (auto func : code_object.funcs()) {
-    func_map[func->addr()] = func->name();
+    auto cfg_internal_func = module.add_funcs();
+    cfg_internal_func->set_name(func->name());
+    cfg_internal_func->set_ea(func->addr());
+    cfg_internal_func->set_is_entrypoint(false);
+    gDisassContext->func_map.insert({func->addr(), cfg_internal_func});
     LOG(INFO) << func->addr() << " " << func->name();
   }
-  func_map[main_offset] = FLAGS_entrypoint;
-  LOG(INFO) << "Function at " << main_offset << " is " << FLAGS_entrypoint;
+
+  // give entrypoint correct name, most likely main
+  RenameFunc(main_offset, FLAGS_entrypoint);
 
   // We need to give libc ctor/dtor names
   if (symtab.isStripped()) {
-    LOG(INFO) << "Renaming 0x:" << std::hex << ctor_offset << " to init";
-    func_map[ctor_offset] = "init";
-
-    LOG(INFO) << "Renaming 0x:" << std::hex << dtor_offset << " to fini";
-    func_map[dtor_offset] = "fini";
-  }
-
-  for (auto reg : regions) {
-    if (reg->getRegionName() == ".text") {
-      //relocations = reg->getRelocations();
-    }
+    RenameFunc(ctor_offset, "init");
+    RenameFunc(dtor_offset, "fini");
   }
 
   getNoReturns();
 
+  // Calculate where can magic section start without
+  // potentialy overwriting part of the binary
   //TODO(lukas): Move out
   Address highest = 0;
   for (auto reg : regions) {
@@ -284,12 +289,13 @@ void CFGWriter::write() {
     WriteDataXref(a.second, "", true);
   }
 
+  // TODO(lukas): Code repetition
   for (auto func : code_object.funcs()) {
     if (code_xrefs_to_resolve.find(func->addr()) != code_xrefs_to_resolve.end() &&
-        func_map.find(func->addr()) == func_map.end()) {
+        !gDisassContext->getInternalFunction(func->addr())) {
 
-      func_map[func->addr()] = func->name();
       auto cfgInternalFunc = module.add_funcs();
+      gDisassContext->func_map.insert({func->addr(), cfgInternalFunc});
 
       ParseAPI::Block *entryBlock = func->entry();
       cfgInternalFunc->set_ea(entryBlock->start());
@@ -300,7 +306,7 @@ void CFGWriter::write() {
         writeBlock(block, func, cfgInternalFunc);
       }
 
-      cfgInternalFunc->set_name(func_map[func->addr()]);
+      cfgInternalFunc->set_name(func->name());
       LOG(INFO) << "Added " << func->name() << " into module, found via xref";
     }
   }
@@ -315,10 +321,10 @@ void CFGWriter::write() {
     inst_xrefs_to_resolve.clear();
     for (auto func : code_object.funcs()) {
       if (old_set.find(func->addr()) != old_set.end() &&
-          func_map.find(func->addr()) == func_map.end()) {
+          !gDisassContext->getInternalFunction(func->addr())) {
 
-        func_map[func->addr()] = func->name();
         auto cfgInternalFunc = module.add_funcs();
+        gDisassContext->func_map.insert({func->addr(), cfgInternalFunc});
 
         ParseAPI::Block *entryBlock = func->entry();
         cfgInternalFunc->set_ea(entryBlock->start());
@@ -329,7 +335,7 @@ void CFGWriter::write() {
           writeBlock(block, func, cfgInternalFunc);
         }
 
-        cfgInternalFunc->set_name(func_map[func->addr()]);
+        cfgInternalFunc->set_name(func->name());
         LOG(INFO) << "Added " << func->name() << " into module, found via xref";
       }
     }
@@ -344,7 +350,7 @@ void CFGWriter::writeExternalVariables() {
   LOG(INFO) << "Writing " << symbols.size() << " external variables";
   for (const auto &s : symbols) {
     if (s->isInDynSymtab()) {
-      // Most likely relocation. So as IDA we can also make up some addr
+      // Most likely relocation. So as IDA we can also make up some addresses
       if (!s->getOffset() && !s->getSize()) {
         LOG(WARNING)
             << "External var has no ea! " << s->getMangledName();
@@ -367,7 +373,7 @@ void CFGWriter::writeExternalVariables() {
       if (s->getSize()) {
         external_var->set_size(s->getSize());
       } else {
-        external_var->set_size(8);
+        external_var->set_size(ptr_byte_size);
       }
 
       //TODO(lukas): This needs some checks
@@ -393,10 +399,6 @@ void CFGWriter::writeGlobalVariables() {
   }
 }
 
-bool CFGWriter::shouldSkipFunction(const std::string &name) const {
-  return skip_funcss.find(name) != skip_funcss.end();
-}
-
 void CFGWriter::writeInternalFunctions() {
     // I don't want this to be in recompiled binary as compiler will
     // add them as well, sub_* is enough
@@ -417,10 +419,9 @@ void CFGWriter::writeInternalFunctions() {
     };
 
   for (ParseAPI::Function *func : code_object.funcs()) {
-    if (shouldSkipFunction(func->name()))
+   if (isExternal(func->entry()->start())) {
       continue;
-    else if (isExternal(func->entry()->start()))
-      continue;
+   }
     // We want to ignore the .got.plt stubs, since they are not needed
     // and cfg file would grow significantly
     else if (IsInRegion(gSection_manager->getRegion(".got.plt"),
@@ -428,20 +429,17 @@ void CFGWriter::writeInternalFunctions() {
       continue;
     }
 
-    auto cfgInternalFunc = module.add_funcs();
+    auto cfgInternalFunc = gDisassContext->getInternalFunction(func->addr());
 
     ParseAPI::Block *entryBlock = func->entry();
-    cfgInternalFunc->set_ea(entryBlock->start());
+    CHECK(entryBlock->start() == cfgInternalFunc->ea())
+        << "Start of the block is not equal to function ea";
 
     cfgInternalFunc->set_is_entrypoint(
         notEntryPoints.find(func->name()) == notEntryPoints.end());
 
     for (ParseAPI::Block *block : func->blocks()) {
       writeBlock(block, func, cfgInternalFunc);
-    }
-
-    if (func_map.find(func->addr()) != func_map.end()) {
-      cfgInternalFunc->set_name(func_map[func->addr()]);
     }
   }
 }
@@ -561,6 +559,7 @@ Address DisplacementHelper(Dyninst::InstructionAPI::Expression *expr) {
   return 0;
 }
 
+// TODO(lukas): It has to actually point at something to be MDO
 void CFGWriter::checkDisplacement(Dyninst::InstructionAPI::Expression *expr,
                        mcsema::Instruction *cfgInstruction) {
 
@@ -604,9 +603,9 @@ bool CFGWriter::isNoReturn(const std::string &name) {
 //TODO(lukas): This one should be replaced in favor of
 //             function of the type handleXref or FishFor*
 std::string CFGWriter::getXrefName(Address addr) {
-  auto func = func_map.find(addr);
-  if (func != func_map.end()) {
-    return func->second;
+  auto func = gDisassContext->func_map.find(addr);
+  if (func != gDisassContext->func_map.end()) {
+    return func->second->name();
   }
 
   auto extVar = gDisassContext->external_vars.find(addr);
@@ -653,7 +652,7 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
 
       // It is pointing in .text and not to a function?
       // That's weird, quite possibly we are missing a function!
-      if (func_map.find(target) == func_map.end()) {
+      if (!gDisassContext->getInternalFunction(target)) {
         LOG(INFO) << "Unresolved inst_xref " << target;
         inst_xrefs_to_resolve.insert(
           {target , {addr, target, cfgInstruction}});
@@ -773,17 +772,14 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
 
   Address a;
   if (SmarterTryEval(expr, addr, a)) {
-    //TODO(lukas): Possibly wrong with -pie & -fPIC?
-    /*if (a > 0xffffffffffffff00) {
-      return 0;
-    }*/
-
     auto cfgCodeRef = AddCodeXref(cfgInstruction,
                                   CodeReference::DataTarget,
                                   CodeReference::MemoryOperand,
                                   CodeReference::Internal, a,
                                   getXrefName(a));
-    if (isExternal(a) || gDisassContext->external_vars.find(a) != gDisassContext->external_vars.end()) {
+    if (isExternal(a) ||
+        gDisassContext->external_vars.find(a) !=
+            gDisassContext->external_vars.end()) {
       cfgCodeRef->set_location(CodeReference::External);
     }
     return a;
@@ -792,7 +788,8 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
   return 0;
 }
 
-
+// Handling only CODEXREFS!
+// TODO(lukas): gDisassContext should be responsible for this
 bool CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                            Address addr,
                            bool force) {
@@ -808,14 +805,14 @@ bool CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
     return true;
   }
 
-  auto func = func_map.find(addr);
-  if (func != func_map.end()) {
+  auto func = gDisassContext->func_map.find(addr);
+  if (func != gDisassContext->func_map.end()) {
     LOG(INFO) << "Code xref to func at " << addr;
     auto code_ref = AddCodeXref(cfg_instruction,
                                   CodeReference::CodeTarget,
                                   CodeReference::ControlFlowOperand,
                                   CodeReference::Internal, addr,
-                                  func->second);
+                                  func->second->name());
     if (isExternal(addr)) {
       code_ref->set_location(CodeReference::External);
     }
@@ -961,6 +958,9 @@ void CFGWriter::handleNonCallInstruction(
     ++i;
     checkDisplacement(expr.get(), cfgInstruction);
   }
+
+  // We may be storing some address wich is quite possibly entrypoint of
+  // something we should treat as function in cfg
   if (direct_values[0] && direct_values[1]) {
     addr -= instruction->size();
     bool is_somewhere_reasonable = IsInRegions(
@@ -973,7 +973,7 @@ void CFGWriter::handleNonCallInstruction(
     if (IsInRegion(gSection_manager->getRegion(".text"), direct_values[1]) &&
         is_somewhere_reasonable) {
       LOG(INFO) << "Storing address from .text into .bss";
-      if (func_map.find(direct_values[0]) == func_map.end()) {
+      if (!gDisassContext->getInternalFunction(direct_values[0])) {
         LOG(INFO)
             << "\tAnd it is not parsed yet, storing it to be resolved later!";
         inst_xrefs_to_resolve.insert({direct_values[1], {}});
@@ -1015,34 +1015,14 @@ bool CFGWriter::handleDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref
 bool CFGWriter::handleDataXref(mcsema::Segment *segment,
                                Address ea,
                                Address target) {
-  CrossXref<mcsema::Segment> xref = {ea, target, segment};
   ContextCrossXref<mcsema::Segment *> context_xref = {ea, target, segment};
-  /*if (FishForXref(gDisassContext->segment_vars ,xref)) {
-    found_xref.insert(ea);
-    return true;
-  }*/
+
   // segment_vars, external_vars, global_vars
   if (gDisassContext->HandleDataXref(context_xref)) {
     found_xref.insert(ea);
     return true;
   }
-
-  if (FishForXref(func_map, xref, true)) {
-    found_xref.insert(ea);
-    return true;
-  }
-
-  /*if (FishForXref(gDisassContext->external_vars, xref)) {
-    found_xref.insert(ea);
-    return true;
-  }*/
-
-  /* if (FishForXref(gDisassContext->global_vars, xref)) {
-    found_xref.insert(ea);
-    return true;
-  }*/
   return false;
-
 }
 
 //TODO(lukas): This is finding vars actually?
@@ -1251,7 +1231,6 @@ void CFGWriter::writeGOT(SymtabAPI::Region* region,
         cfg_external_func->set_argument_count(0);
         cfg_external_func->set_is_weak(true);
 
-
       } else if (gExt_func_manager->IsExternal(reloc.name())) {
         auto func = gExt_func_manager->GetExternalFunction(reloc.name());
         func.imag_ea = unreal_ea;
@@ -1292,34 +1271,7 @@ void CFGWriter::writeRelocations(SymtabAPI::Region* region,
         WriteAsRaw(*data, ext_func->ea(), reloc.rel_addr() - segment->ea());
       }
     }
-    /*
-    if (!found && !reloc.name().empty()) {
-      LOG(WARNING)
-          << "Giving magic_space to" << reloc.name();
-
-      auto unreal_ea = magic_section.AllocSpace(ptr_byte_size);
-      auto xref = segment->add_xrefs();
-      xref->set_target_name(reloc.name());
-      xref->set_ea(reloc.rel_addr());
-      xref->set_target_ea(unreal_ea);
-      xref->set_target_is_code(true);
-      xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
-      xref->set_width(ptr_byte_size);
-    }*/
   }
-  /*
-  auto rela_dyn = region;
-  const auto &relocations = rela_dyn->getRelocations();
-
-  for (auto reloc : relocations) {
-    for (auto f : code_object.funcs()) {
-      if (f->entry()->start() == reloc.getDynSym()->getOffset()) {
-        handleDataXref(
-            segment, reloc.rel_addr(), reloc.getDynSym()->getOffset());
-        break;
-      }
-    }
-    */
 }
 
 void CFGWriter::ResolveCrossXrefs() {
@@ -1346,7 +1298,7 @@ void CFGWriter::ResolveCrossXrefs() {
   }
 }
 
-  void writeBssXrefs(SymtabAPI::Region *region,
+void writeBssXrefs(SymtabAPI::Region *region,
                    mcsema::Segment *segment,
                    const DisassContext::SymbolMap<mcsema::ExternalVariable *> &externals) {
   for (auto &external : externals) {
@@ -1362,9 +1314,10 @@ void CFGWriter::ResolveCrossXrefs() {
   }
 }
 
-//TODO(lukas): We are writing & parsing more than is required!
-//             .rodata, .data are parsed twice!
-//             Use tryParse for all data sections
+// Write content of sections, try to parse for xrefs and vars
+// .rodata, .data have special treatment, since there can be string
+// variables and such
+// Write things into gDisassContext
 void CFGWriter::writeInternalData() {
   auto dataRegions = gSection_manager->GetDataRegions();
 
