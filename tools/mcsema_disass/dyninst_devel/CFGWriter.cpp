@@ -28,33 +28,23 @@ mcsema::Module gModule;
 
 namespace {
 
-bool SmarterTryEval(InstructionAPI::Expression *expr,
+bool TryEval(InstructionAPI::Expression *expr,
                         const Address ip,
                         Address &result,
                         Address instruction_size=0) {
-  /*InstructionAPI::RegisterAST rip =
-      InstructionAPI::RegisterAST::makePC(Dyninst::Arch_x86_64);
-  auto ip_value = InstructionAPI::Result(InstructionAPI::u64, ip);
-  expr->bind(&rip, ip_value);
-*/
-  LOG(INFO) << expr->format();
-  /*auto res = expr->eval();
-  if (expr->eval().format() != "[empty]") {
-    LOG(INFO) << "Returned smart";
-    result = expr->eval().convert<Address>();
-    return true;
-  }*/
+
+  LOG(INFO) << "Trying to evaluate: " << expr->format();
+
   if (auto bin = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
-    LOG(INFO) << "BF";
     std::vector<InstructionAPI::InstructionAST::Ptr> args;
     bin->getChildren(args);
 
     Address left, right;
 
-    auto first = SmarterTryEval(
+    auto first = TryEval(
         dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
         ip, left, instruction_size);
-    auto second = SmarterTryEval(
+    auto second = TryEval(
         dynamic_cast<InstructionAPI::Expression *>(args[1].get()),
         ip, right, instruction_size);
     if (first && second) {
@@ -69,19 +59,16 @@ bool SmarterTryEval(InstructionAPI::Expression *expr,
       return false;
     }
   }  else if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr)) {
-    LOG(INFO) << "IMM";
     result = imm->eval().convert<Address>();
     return true;
   } else if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
-    LOG(INFO) << "DEREF";
     std::vector<InstructionAPI::InstructionAST::Ptr> args;
     deref->getChildren(args);
-    return SmarterTryEval(dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
+    return TryEval(dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
                    ip + instruction_size,
                    result);
   } else if (auto reg = dynamic_cast<InstructionAPI::RegisterAST *>(expr)) {
     if (reg->format() == "RIP") {
-      LOG(INFO) << "RIP " << ip << " + " << instruction_size;
       result = ip;
       return true;
     }
@@ -116,7 +103,7 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
       if (callq->second->getOperation().getID() == 268) {
         rip += callq->second->size();
       }
-      if (!SmarterTryEval(second_operand.getValue().get(), rip, offset, callq->second->size())) {
+      if (!TryEval(second_operand.getValue().get(), rip, offset, callq->second->size())) {
         LOG(FATAL) << "Could not eval basic start addresses!";
       }
       code_object.parse(offset, true);
@@ -203,7 +190,8 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
       symtab(symtab),
       code_source(symCodeSrc),
       code_object(codeObj),
-      magic_section(gDisassContext->magic_section) {
+      magic_section(gDisassContext->magic_section),
+      ptr_byte_size(symtab.getAddressWidth()){
 
   // Populate skip_funcss with some functions known to cause problems
   /*skip_funcss = {
@@ -237,9 +225,7 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
 
   // TODO(lukas): Check if there's a better way
 
-  CHECK(main_offset) << "Entrypoint with name "
-                     << FLAGS_entrypoint
-                     <<" was not found!";
+  CHECK(main_offset) << "Entrypoint was not found!";
 
   for (auto func : code_object.funcs()) {
     auto cfg_internal_func = module.add_funcs();
@@ -247,7 +233,8 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
     cfg_internal_func->set_ea(func->addr());
     cfg_internal_func->set_is_entrypoint(false);
     gDisassContext->func_map.insert({func->addr(), cfg_internal_func});
-    LOG(INFO) << func->addr() << " " << func->name();
+    LOG(INFO) << "Found internal function at 0x" << func->addr()
+              << " with name " << func->name();
   }
 
   // give entrypoint correct name, most likely main
@@ -294,19 +281,19 @@ void CFGWriter::write() {
     if (code_xrefs_to_resolve.find(func->addr()) != code_xrefs_to_resolve.end() &&
         !gDisassContext->getInternalFunction(func->addr())) {
 
-      auto cfgInternalFunc = module.add_funcs();
-      gDisassContext->func_map.insert({func->addr(), cfgInternalFunc});
+      auto cfg_internal_func = module.add_funcs();
+      gDisassContext->func_map.insert({func->addr(), cfg_internal_func});
 
       ParseAPI::Block *entryBlock = func->entry();
-      cfgInternalFunc->set_ea(entryBlock->start());
+      cfg_internal_func->set_ea(entryBlock->start());
 
-      cfgInternalFunc->set_is_entrypoint(func);
+      cfg_internal_func->set_is_entrypoint(func);
 
       for (ParseAPI::Block *block : func->blocks()) {
-        writeBlock(block, func, cfgInternalFunc);
+        writeBlock(block, func, cfg_internal_func);
       }
 
-      cfgInternalFunc->set_name(func->name());
+      cfg_internal_func->set_name(func->name());
       LOG(INFO) << "Added " << func->name() << " into module, found via xref";
     }
   }
@@ -323,19 +310,19 @@ void CFGWriter::write() {
       if (old_set.find(func->addr()) != old_set.end() &&
           !gDisassContext->getInternalFunction(func->addr())) {
 
-        auto cfgInternalFunc = module.add_funcs();
-        gDisassContext->func_map.insert({func->addr(), cfgInternalFunc});
+        auto cfg_internal_func = module.add_funcs();
+        gDisassContext->func_map.insert({func->addr(), cfg_internal_func});
 
         ParseAPI::Block *entryBlock = func->entry();
-        cfgInternalFunc->set_ea(entryBlock->start());
+        cfg_internal_func->set_ea(entryBlock->start());
 
-        cfgInternalFunc->set_is_entrypoint(func);
+        cfg_internal_func->set_is_entrypoint(func);
 
         for (ParseAPI::Block *block : func->blocks()) {
-          writeBlock(block, func, cfgInternalFunc);
+          writeBlock(block, func, cfg_internal_func);
         }
 
-        cfgInternalFunc->set_name(func->name());
+        cfg_internal_func->set_name(func->name());
         LOG(INFO) << "Added " << func->name() << " into module, found via xref";
       }
     }
@@ -429,17 +416,17 @@ void CFGWriter::writeInternalFunctions() {
       continue;
     }
 
-    auto cfgInternalFunc = gDisassContext->getInternalFunction(func->addr());
+    auto cfg_internal_func = gDisassContext->getInternalFunction(func->addr());
 
     ParseAPI::Block *entryBlock = func->entry();
-    CHECK(entryBlock->start() == cfgInternalFunc->ea())
+    CHECK(entryBlock->start() == cfg_internal_func->ea())
         << "Start of the block is not equal to function ea";
 
-    cfgInternalFunc->set_is_entrypoint(
+    cfg_internal_func->set_is_entrypoint(
         notEntryPoints.find(func->name()) == notEntryPoints.end());
 
     for (ParseAPI::Block *block : func->blocks()) {
-      writeBlock(block, func, cfgInternalFunc);
+      writeBlock(block, func, cfg_internal_func);
     }
   }
 }
@@ -447,10 +434,10 @@ void CFGWriter::writeInternalFunctions() {
 
 //TODO(lukas): This one is basically unchanged from original PR.
 void CFGWriter::writeBlock(ParseAPI::Block *block, ParseAPI::Function *func,
-                           mcsema::Function *cfgInternalFunc) {
+                           mcsema::Function *cfg_internal_func) {
 
-  mcsema::Block *cfgBlock = cfgInternalFunc->add_blocks();
-  cfgBlock->set_ea(block->start());
+  mcsema::Block *cfg_block = cfg_internal_func->add_blocks();
+  cfg_block->set_ea(block->start());
 
   // Set outgoing edges
   for (auto edge : block->targets()) {
@@ -485,7 +472,7 @@ void CFGWriter::writeBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     }
 
     if (!found)
-      cfgBlock->add_successor_eas(edge->trg()->start());
+      cfg_block->add_successor_eas(edge->trg()->start());
   }
 
   // Write instructions
@@ -498,32 +485,32 @@ void CFGWriter::writeBlock(ParseAPI::Block *block, ParseAPI::Function *func,
   for (auto p : instructions) {
     InstructionAPI::Instruction *instruction = p.second.get();
 
-    writeInstruction(instruction, ip, cfgBlock);
+    writeInstruction(instruction, ip, cfg_block);
     ip += instruction->size();
   }
 
 }
 
 void CFGWriter::writeInstruction(InstructionAPI::Instruction *instruction,
-                                 Address addr, mcsema::Block *cfgBlock) {
+                                 Address addr, mcsema::Block *cfg_block) {
 
-  mcsema::Instruction *cfgInstruction = cfgBlock->add_instructions();
+  mcsema::Instruction *cfg_instruction = cfg_block->add_instructions();
 
   std::string instBytes;
   for (int offset = 0; offset < instruction->size(); ++offset) {
     instBytes += (int)instruction->rawByte(offset);
   }
 
-  cfgInstruction->set_bytes(instBytes);
-  cfgInstruction->set_ea(addr);
+  cfg_instruction->set_bytes(instBytes);
+  cfg_instruction->set_ea(addr);
 
   std::vector<InstructionAPI::Operand> operands;
   instruction->getOperands(operands);
 
   if (instruction->getCategory() == InstructionAPI::c_CallInsn) {
-    handleCallInstruction(instruction, addr, cfgInstruction);
+    handleCallInstruction(instruction, addr, cfg_instruction);
   } else {
-    handleNonCallInstruction(instruction, addr, cfgInstruction);
+    handleNonCallInstruction(instruction, addr, cfg_instruction);
   }
   //TODO(lukas): We just found it, no need to bother with it?
   //             But what if it needs to be start of function?
@@ -531,14 +518,14 @@ void CFGWriter::writeInstruction(InstructionAPI::Instruction *instruction,
 }
 
 
-void writeDisplacement(mcsema::Instruction *cfgInstruction, Address &address,
+void writeDisplacement(mcsema::Instruction *cfg_instruction, Address &address,
         const std::string& name = "") {
   // Addres is uint64_t and in CFG ea is int64_t
   if (static_cast<int64_t>(address) <= 0) {
     return;
   }
 
-  AddCodeXref( cfgInstruction, CodeReference::DataTarget,
+  AddCodeXref( cfg_instruction, CodeReference::DataTarget,
           CodeReference::MemoryDisplacementOperand, CodeReference::Internal,
           address, name );
 }
@@ -561,11 +548,11 @@ Address DisplacementHelper(Dyninst::InstructionAPI::Expression *expr) {
 
 // TODO(lukas): It has to actually point at something to be MDO
 void CFGWriter::checkDisplacement(Dyninst::InstructionAPI::Expression *expr,
-                       mcsema::Instruction *cfgInstruction) {
+                       mcsema::Instruction *cfg_instruction) {
 
   //TODO(lukas): This is possibly incorrect attempt to cull down amount of
   //             "false" xrefs of type MemoryDisplacement
-  if (cfgInstruction->xrefs_size()) {
+  if (cfg_instruction->xrefs_size()) {
     LOG(INFO) << "Avoiding clobbering with xrefs!";
     return;
   }
@@ -577,13 +564,13 @@ void CFGWriter::checkDisplacement(Dyninst::InstructionAPI::Expression *expr,
       if (auto inner_expr = dynamic_cast<InstructionAPI::Expression *>(op.get())) {
         auto displacement = DisplacementHelper(inner_expr);
         if (displacement) {
-          writeDisplacement(cfgInstruction, displacement);
+          writeDisplacement(cfg_instruction, displacement);
         }
       }
     }
   } else {
     if (auto displacement = DisplacementHelper(expr)) {
-      writeDisplacement(cfgInstruction, displacement);
+      writeDisplacement(cfg_instruction, displacement);
     }
   }
 }
@@ -632,7 +619,7 @@ std::string CFGWriter::getXrefName(Address addr) {
 //TODO(lukas): This is hacky af
 void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
                                       Address addr,
-                                      mcsema::Instruction *cfgInstruction) {
+                                      mcsema::Instruction *cfg_instruction) {
   Address target;
   std::vector<InstructionAPI::Operand> operands;
   instruction->getOperands(operands);
@@ -641,12 +628,13 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
 
   LOG(INFO) << "TryEval " << addr << " " << size;
   bool got_result = false;
-  if (SmarterTryEval(operands[0].getValue().get(), addr, target, size)) {
-    handleXref(cfgInstruction, target);
+  if (TryEval(operands[0].getValue().get(), addr, target, size)) {
+    handleXref(cfg_instruction, target);
+
     // What can happen is that we get xref somewhere in the .text and handleXref
     // fills it with defaults. We need to check and correct it if needed
     if (IsInRegion(gSection_manager->getRegion(".text"), target)) {
-      auto xref = cfgInstruction->mutable_xrefs(0);
+      auto xref = cfg_instruction->mutable_xrefs(0);
       //xref->set_target_type(CodeReference::CodeTarget);
       xref->set_operand_type(CodeReference::ControlFlowOperand);
 
@@ -655,55 +643,23 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
       if (!gDisassContext->getInternalFunction(target)) {
         LOG(INFO) << "Unresolved inst_xref " << target;
         inst_xrefs_to_resolve.insert(
-          {target , {addr, target, cfgInstruction}});
+          {target , {addr, target, cfg_instruction}});
       }
     }
 
     if (isNoReturn(getExternalName(target))) {
-      cfgInstruction->set_local_noreturn(true);
+      cfg_instruction->set_local_noreturn(true);
     }
     return;
   }
 
-
-  // Below is territory still occupied by old PR and I am not sure what to do
-  // with it.
-  // It didn't work without it, but it does now, magic?
-  // Keeping it to see how relocs were used
   LOG(INFO) << "CallInst fallback to default " << addr;
-/*
-  if (relocations.size() > 0) {
-    auto entry = *(relocations.begin());
-    bool found = false;
-
-    for (auto ent : relocations) {
-      if (ent.rel_addr() == (addr + size + 1)) {
-        entry = ent;
-        found = true;
-        break;
-      }
-    }
-
-    if (!((!found) || (found && !entry.getDynSym()->getRegion()))) {
-        Offset off = entry.getDynSym()->getOffset();
-
-        AddCodeXref(cfgInstruction,
-                    CodeReference::CodeTarget,
-                    CodeReference::ControlFlowOperand,
-                    CodeReference::Internal,
-                    off);
-      return;
-    }
-  }
-*/
-  // TODO: This is when things like callq %*rcx happen, not sure yet how to deal
-  // with it correctly, this seems to work good enough for now
 
   auto name = getXrefName(target);
   if (name == "__mcsema_unknown") {
     name = "";
   }
-  AddCodeXref(cfgInstruction,
+  AddCodeXref(cfg_instruction,
               CodeReference::CodeTarget,
               CodeReference::ControlFlowOperand,
               CodeReference::Internal,
@@ -711,7 +667,7 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
 }
 
 Address CFGWriter::immediateNonCall( InstructionAPI::Immediate* imm,
-        Address addr, mcsema::Instruction* cfgInstruction ) {
+        Address addr, mcsema::Instruction* cfg_instruction ) {
 
   Address a = imm->eval().convert<Address>();
   auto allSymsAtOffset = symtab.findSymbolByOffset(a);
@@ -735,7 +691,7 @@ Address CFGWriter::immediateNonCall( InstructionAPI::Immediate* imm,
   }
 
   if (isRef) {
-    auto cfgCodeRef = AddCodeXref(cfgInstruction,
+    auto cfgCodeRef = AddCodeXref(cfg_instruction,
                                 CodeReference::DataTarget,
                                 CodeReference::ImmediateOperand,
                                 CodeReference::Internal,
@@ -745,8 +701,8 @@ Address CFGWriter::immediateNonCall( InstructionAPI::Immediate* imm,
         gDisassContext->external_vars.find(a) != gDisassContext->external_vars.end()) {
         cfgCodeRef->set_location(CodeReference::External);
     }
-    //if (handleXref(cfgInstruction, a, true)) {
-    //  auto xref = cfgInstruction->mutable_xrefs(cfgInstruction->xrefs_size() - 1);
+    //if (handleXref(cfg_instruction, a, true)) {
+    //  auto xref = cfg_instruction->mutable_xrefs(cfg_instruction->xrefs_size() - 1);
     //  xref->set_operand_type(CodeReference::ImmediateOperand);
       if (getXrefName(a) == "__mcsema_unknown" &&
           IsInRegion(gSection_manager->getRegion(".text"), a)) {
@@ -762,7 +718,7 @@ Address CFGWriter::immediateNonCall( InstructionAPI::Immediate* imm,
 
 Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
                                    Address addr,
-                                   mcsema::Instruction* cfgInstruction) {
+                                   mcsema::Instruction* cfg_instruction) {
 
   std::vector<InstructionAPI::InstructionAST::Ptr> children;
   deref->getChildren(children);
@@ -771,8 +727,8 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
   CHECK(expr) << "Expected expression";
 
   Address a;
-  if (SmarterTryEval(expr, addr, a)) {
-    auto cfgCodeRef = AddCodeXref(cfgInstruction,
+  if (TryEval(expr, addr, a)) {
+    auto cfg_code_xref = AddCodeXref(cfg_instruction,
                                   CodeReference::DataTarget,
                                   CodeReference::MemoryOperand,
                                   CodeReference::Internal, a,
@@ -780,7 +736,7 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
     if (isExternal(a) ||
         gDisassContext->external_vars.find(a) !=
             gDisassContext->external_vars.end()) {
-      cfgCodeRef->set_location(CodeReference::External);
+      cfg_code_xref->set_location(CodeReference::External);
     }
     return a;
   }
@@ -877,7 +833,7 @@ bool CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
 void CFGWriter::handleNonCallInstruction(
     Dyninst::InstructionAPI::Instruction *instruction,
     Address addr,
-    mcsema::Instruction *cfgInstruction) {
+    mcsema::Instruction *cfg_instruction) {
 
   std::vector<InstructionAPI::Operand> operands;
   instruction->getOperands(operands);
@@ -896,11 +852,11 @@ void CFGWriter::handleNonCallInstruction(
     LOG(INFO) << expr->format();
     if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr.get())) {
       LOG(INFO) << "Dealing with Immidiate as op at 0x" << std::hex << addr - instruction->size();
-      direct_values[i] = immediateNonCall( imm, addr, cfgInstruction);
+      direct_values[i] = immediateNonCall( imm, addr, cfg_instruction);
     } else if (
         auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr.get())) {
       LOG(INFO) << "Dealing with Dereference as op at 0x" << std::hex << addr - instruction->size();
-      direct_values[i] = dereferenceNonCall( deref, addr, cfgInstruction);
+      direct_values[i] = dereferenceNonCall( deref, addr, cfg_instruction);
     } else if (
         auto bf = dynamic_cast<InstructionAPI::BinaryFunction *>(expr.get())) {
       LOG(INFO) << "Dealing with BinaryFunction as op at 0x" << std::hex << addr - instruction->size();
@@ -910,31 +866,24 @@ void CFGWriter::handleNonCallInstruction(
       auto instruction_id = instruction->getOperation().getID();
       if (instruction_id == 268) {
         Address a;
-        /*if (addr - instruction->size() == 0x405c7d) {
-          auto xref = AddCodeXref(cfgInstruction,
-                                  CodeReference::DataTarget,
-                                  CodeReference::MemoryDisplacementOperand,
-                                  CodeReference::Internal, 6618560);
-        }*/
-        //addr -= instruction->size();
-        if(SmarterTryEval(expr.get(), addr, a)) {
-          handleXref(cfgInstruction, a);
+
+        if(TryEval(expr.get(), addr, a)) {
+          handleXref(cfg_instruction, a);
           if (IsInRegion(gSection_manager->getRegion(".text"), a)) {
             // get last one and change it to code
-            auto xref = cfgInstruction->mutable_xrefs(cfgInstruction->xrefs_size() - 1);
+            auto xref = cfg_instruction->mutable_xrefs(cfg_instruction->xrefs_size() - 1);
             xref->set_operand_type(CodeReference::MemoryOperand);
           }
           direct_values[i] = a;
         }
-      //} else if (instruction_id == 8) {
       } else if (instruction->getCategory() == InstructionAPI::c_BranchInsn) {
         Address a;
-        if (SmarterTryEval(expr.get(), addr - instruction->size(), a)) {
-          auto code_ref = AddCodeXref(cfgInstruction,
+        if (TryEval(expr.get(), addr - instruction->size(), a)) {
+          auto code_ref = AddCodeXref(cfg_instruction,
                                       CodeReference::CodeTarget,
                                       CodeReference::ControlFlowOperand,
                                       CodeReference::Internal, a);
-          //handleXref(cfgInstruction, a);
+          //handleXref(cfg_instruction, a);
           if (isExternal(a)) {
             code_ref->set_location(CodeReference::External);
             code_ref->set_name(getXrefName(a));
@@ -942,21 +891,9 @@ void CFGWriter::handleNonCallInstruction(
           direct_values[i] = a;
         }
       }
-    } else {
-      /*if (FLAGS_pie_mode &&
-          instruction->getCategory() == InstructionAPI::c_BranchInsn) {
-        //if (operands.size() == 1 ) {
-          //EXPERIMENTAL(lukas): things like jmpq *%rdx need Offset table xref
-          auto xref = cfgInstruction->add_xrefs();
-          xref->set_target_type(CodeReference::DataTarget);
-          xref->set_operand_type(CodeReference::OffsetTable);
-          xref->set_location(CodeReference::Internal);
-          xref->set_ea(4100);
-        }*/
-      //}
     }
     ++i;
-    checkDisplacement(expr.get(), cfgInstruction);
+    checkDisplacement(expr.get(), cfg_instruction);
   }
 
   // We may be storing some address wich is quite possibly entrypoint of
@@ -1343,7 +1280,7 @@ void CFGWriter::writeInternalData() {
     if ( region->getRegionName() == ".fini_array" ) {
       continue;
     }
-    auto cfgInternalData = module.add_segments();
+    auto cfg_internal_data = module.add_segments();
 
     std::string data;
     writeRawData(data, region);
@@ -1353,19 +1290,19 @@ void CFGWriter::writeInternalData() {
       SymtabAPI::Region* fini;
       symtab.findRegion( fini, ".fini_array" );
       writeRawData( data, fini );
-      writeDataVariables(fini, cfgInternalData);
+      writeDataVariables(fini, cfg_internal_data);
 
-      xrefsInSegment( fini, cfgInternalData );
+      xrefsInSegment( fini, cfg_internal_data );
     }
 
-    cfgInternalData->set_ea(region->getMemOffset());
-    cfgInternalData->set_data(data);
-    cfgInternalData->set_read_only(region->getRegionPermissions() ==
+    cfg_internal_data->set_ea(region->getMemOffset());
+    cfg_internal_data->set_data(data);
+    cfg_internal_data->set_read_only(region->getRegionPermissions() ==
                                    SymtabAPI::Region::RP_R);
-    cfgInternalData->set_is_external(false);
-    cfgInternalData->set_name(region->getRegionName());
-    cfgInternalData->set_is_exported(false);      /* TODO: As for now, ignored */
-    cfgInternalData->set_is_thread_local(false); /* TODO: As for now, ignored */
+    cfg_internal_data->set_is_external(false);
+    cfg_internal_data->set_name(region->getRegionName());
+    cfg_internal_data->set_is_exported(false);      /* TODO: As for now, ignored */
+    cfg_internal_data->set_is_thread_local(false); /* TODO: As for now, ignored */
 
 
     std::set<std::string> dont_parse = {
@@ -1384,21 +1321,21 @@ void CFGWriter::writeInternalData() {
       ".jcr",
     };
     if (dont_parse.find(region->getRegionName()) == dont_parse.end()) {
-      writeDataVariables(region, cfgInternalData);
+      writeDataVariables(region, cfg_internal_data);
 
-      xrefsInSegment( region, cfgInternalData );
+      xrefsInSegment( region, cfg_internal_data );
     }
 
     if (region->getRegionName() == ".bss") {
-      writeBssXrefs(region, cfgInternalData, gDisassContext->external_vars);
+      writeBssXrefs(region, cfg_internal_data, gDisassContext->external_vars);
     }
 
     if (region->getRegionName() == ".got.plt") {
-      writeRelocations(region, cfgInternalData);
+      writeRelocations(region, cfg_internal_data);
     }
 
     if (region->getRegionName() == ".got") {
-      writeGOT(region, cfgInternalData);
+      writeGOT(region, cfg_internal_data);
     }
 
     //TODO(lukas): Debug print, remove on release
@@ -1464,64 +1401,4 @@ std::string CFGWriter::getExternalName(Address addr) const {
     return name_hndl->second;
   }
   return "";
-}
-
-// Replace in favor of smartEval
-bool CFGWriter::tryEval(InstructionAPI::Expression *expr,
-                        const Address ip,
-                        Address &result) const {
-
-  LOG(INFO) << expr->format();
-  auto res = expr->eval();
-  LOG(INFO) << "expr->eval() " << res.format();
-  if (expr->eval().format() != "[empty]") {
-    LOG(INFO) << "Empty";
-    result = expr->eval().convert<Address>();
-    return true;
-  }
-
-  if (auto bin = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
-    LOG(INFO) << "BF";
-    std::vector<InstructionAPI::InstructionAST::Ptr> args;
-    bin->getChildren(args);
-
-    Address left, right;
-
-    auto first = tryEval(
-        dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
-        ip, left);
-    auto second = tryEval(
-        dynamic_cast<InstructionAPI::Expression *>(args[1].get()),
-        ip, right);
-    if (first && second) {
-      if (bin->isAdd()) {
-        result = left + right;
-        return true;
-      } else if (bin->isMultiply()) {
-        result = left * right;
-        return true;
-      }
-
-      return false;
-    }
-  } else if (auto reg = dynamic_cast<InstructionAPI::RegisterAST *>(expr)) {
-    if (reg->format() == "RIP") {
-      LOG(INFO) << "RIP "<< ip;
-      result = ip;
-      return true;
-    }
-  } else if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr)) {
-    result = imm->eval().convert<Address>();
-    LOG(INFO) << "IMM "<< result;
-    return true;
-  } else if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
-    LOG(INFO) << "DER";
-    std::vector<InstructionAPI::InstructionAST::Ptr> args;
-    deref->getChildren(args);
-    return tryEval(dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
-                   ip,
-                   result);
-  }
-  LOG(INFO) << "ERR";
-  return false;
 }
