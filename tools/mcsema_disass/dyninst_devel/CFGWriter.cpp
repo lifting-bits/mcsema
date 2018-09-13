@@ -986,13 +986,6 @@ void CFGWriter::writeExternalFunctions() {
   std::vector<std::string> unknown;
   auto known = gExt_func_manager->GetAllUsed( unknown );
   LOG(INFO) << "Found " << known.size() << " external functions";
-  LOG(INFO) << "Found " << unknown.size()
-            << "possibly unknown external functions";
-
-  for (auto &name : unknown) {
-    known.push_back({name});
-    LOG(INFO) << "Possibly unknown external " << name;
-  }
 
   for (auto &func : known) {
     LOG(INFO) << "External function " << func.symbol_name;
@@ -1007,21 +1000,11 @@ void CFGWriter::writeExternalFunctions() {
       }
     }
 
-    CHECK(found) << "Unresolved external function call";
+    CHECK(found) << "External function was not found in CodeSource::linkage()";
 
     func.ea = a;
     auto cfg_external_func = magic_section.WriteExternalFunction(module, func);
     gDisassContext->external_funcs.insert({a, cfg_external_func});
-    /*auto cfgExtFunc = module.add_external_funcs();
-
-    cfgExtFunc->set_name(func.symbol_name);
-    cfgExtFunc->set_ea(a);
-    cfgExtFunc->set_cc(func.CfgCallingConvention());
-    cfgExtFunc->set_has_return(func.has_return);
-    cfgExtFunc->set_no_return(!func.has_return);
-    cfgExtFunc->set_argument_count(func.arg_count);
-    cfgExtFunc->set_is_weak(func.is_weak);
-    */
   }
 }
 
