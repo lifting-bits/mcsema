@@ -1,6 +1,5 @@
 #include "ExternalFunctionManager.h"
 
-#include <iostream>
 #include <glog/logging.h>
 
 std::unique_ptr<ExternalFunctionManager> gExt_func_manager(new ExternalFunctionManager);
@@ -44,12 +43,13 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &name,
 }
 
 void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
-  if (s.empty())
+  if (s.empty()) {
     return; // Empty line
-  else if (s.front() == '#')
+  } else if (s.front() == '#') {
     return; // Comment line
-  else if (s.substr(0, 5) == "DATA:")
+  } else if (s.substr(0, 5) == "DATA:") {
     return; // Refers to external data, not a function
+  }
 
   std::string rest = s;
   int n = rest.find(' ');
@@ -68,17 +68,16 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
         char cc = rest.front();
         ExternalFunction::CallingConvention callConv;
 
-        if (cc == 'C')
+        if (cc == 'C') {
           callConv = ExternalFunction::CallingConvention::CallerCleanup;
-        else if (cc == 'E')
+        } else if (cc == 'E') {
           callConv = ExternalFunction::CallingConvention::CalleeCleanup;
-        else if (cc == 'F')
+        } else if (cc == 'F') {
           callConv = ExternalFunction::CallingConvention::FastCall;
-        else {
-          std::cerr << "Error while parsing symbol definition \"" << s
-                    << "\": unknown calling convention '" << cc << "'"
-                    << std::endl;
-          LOG(FATAL) << "Error while parsing symbol definition";
+        } else {
+          LOG(FATAL) << "Error while parsing symbol definition \"" << s
+                     << "\": unknown calling convention '" << cc << "'"
+                     << std::endl;
         }
 
         rest = rest.substr(n + 1);
@@ -89,29 +88,27 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
         if (n != std::string::npos) {
           ret = rest.substr(0, 1);
           signature = rest.substr(2);
-        } else
+        } else {
           ret = rest;
+        }
 
         bool noReturn;
-        if (ret == "N")
+        if (ret == "N") {
           noReturn = false;
-        else if (ret == "Y")
+        } else if (ret == "Y") {
           noReturn = true;
-        else {
-          std::cerr << "Error while parsing symbol definition \"" << s
-                    << "\": unknown return type specifier '" << noReturn << "'"
-                    << std::endl;
-          LOG(FATAL) << "Error while parsing symbol definition";
+        } else {
+          LOG(FATAL) << "Error while parsing symbol definition \"" << s
+                     << "\": unknown return type specifier '" << noReturn << "'"
+                     << std::endl;
         }
 
         bool is_weak = true;
-        if (symbolName == "__gmon_start__") {
-          is_weak = true;
-        }
+
         ExternalFunction func{symbolName, callConv, !noReturn, argCount,
                               is_weak, signature};
 
-        external_funcs[symbolName] = func;
+        external_funcs[symbolName] = std::move(func);
         return;
       }
     } else {
@@ -119,16 +116,13 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
     }
   }
 
-  std::cerr << "Error while parsing symbol definition \"" << s
-            << "\": ill-formed symbol definition" << std::endl;
-
-  LOG(FATAL) << "Error while parsing symbol definition";
+  LOG(FATAL) << "Error while parsing symbol definition \"" << s
+             << "\": ill-formed symbol definition" << std::endl;
 }
 
 void ExternalFunctionManager::AddExternalSymbols(std::istream &s) {
-  while (!s.eof()) {
-    std::string line;
-    std::getline(s, line);
+  std::string line;
+  while (std::getline(s, line)) {
     AddExternalSymbol(line);
   }
 }
@@ -144,7 +138,10 @@ bool ExternalFunctionManager::IsExternal(const std::string &name) const {
 
 ExternalFunction &
 ExternalFunctionManager::GetExternalFunction(const std::string &name) {
-  return external_funcs.at(name);
+  auto external_func = external_funcs.find(name);
+  CHECK(external_func != external_funcs.end())
+      << "External function " << name << " not found in manager";
+  return external_func->second;
 }
 
 void ExternalFunctionManager::ClearUsed() { used_funcs.clear(); }
@@ -159,11 +156,15 @@ std::vector<ExternalFunction> ExternalFunctionManager::GetAllUsed(
   std::vector<ExternalFunction> result;
 
   for (auto name : used_funcs) {
-    try {
-      result.push_back(external_funcs.at(name));
-    } catch (const std::out_of_range &oor) {
-      unknowns.push_back(name);
+    auto external_func = external_funcs.find(name);
+    if (external_func == external_funcs.end()) {
+      LOG(INFO) << "External function " << name
+                << " not found in file with external definitions";
+      result.push_back({name});
+      continue;
     }
+    result.push_back(external_funcs.at(name));
+    unknowns.push_back(name);
   }
 
   return result;
