@@ -24,9 +24,10 @@ mkdir -p "${MAZE_DIR}/bc"
 # the `--library` option.
 LIB_ARGS=
 if [[ -f "${KLEE_WS_DIR}/libc.bc" ]] ; then
-  LIB_ARGS="--library ${KLEE_WS_DIR}/libc.bc"
+  LIB_ARGS="--abi_libraries ${KLEE_WS_DIR}/libc.bc"
 else
   printf "[x] WARNING: Could not find klee-uclibc library bitcode.\n"
+  LIB_ARGS="--abi_libraries libc"
 fi
 
 printf "[+] Lifting ${MAZE_DIR}/cfg/maze.amd64.cfg\n"

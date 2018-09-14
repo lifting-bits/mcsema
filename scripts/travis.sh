@@ -267,7 +267,7 @@ linux_build_helper() {
     return 1
   fi
 
-  ( cd build && cmake -DCMAKE_VERBOSE_MAKEFILE=True ../remill ) > "${log_file}" 2>&1
+  ( cd build && cmake -DMCSEMA_DISABLED_ABI_LIBRARIES:STRING="" -DCMAKE_VERBOSE_MAKEFILE=True ../remill ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to generate the project. Error output follows:\n"
     printf "===\n"

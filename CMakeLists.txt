@@ -178,9 +178,38 @@ endif()
 
 #TODO(artem): this may need some logic to select only ABIs compatible with current os/arch
 #TODO(kumarak): Disable the ABI libraries build till we don't have script to automate the generation of `ABI_libc.h`. Use pre-build library to test the --abi_libraries flag
-if(UNIX AND NOT APPLE)
-  add_subdirectory(mcsema/OS/Linux)
+function(GetABILibraryList)
+  file(GLOB abi_library_list RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/mcsema/OS" "${CMAKE_CURRENT_SOURCE_DIR}/mcsema/OS/*")
+  set(GetABILibraryList_Output ${abi_library_list} PARENT_SCOPE)
+endfunction()
+
+if(NOT MCSEMA_ABI_LIBRARY_LIST_INITIALIZED)
+  GetABILibraryList()
+  set(MCSEMA_DISABLED_ABI_LIBRARIES ${GetABILibraryList_Output} CACHE
+    STRING "A semicolon-separated list of disabled ABI libraries"
+  )
+
+  set(MCSEMA_ABI_LIBRARY_LIST_INITIALIZED ON CACHE INTERNAL
+    "Whether the abi library list has been initialized or not"
+  )
 endif()
+
+message(STATUS "Disabled ABI libraries: ${MCSEMA_DISABLED_ABI_LIBRARIES}")
+message(STATUS "You can change this setting with -DMCSEMA_DISABLED_ABI_LIBRARIES:STRING=\"Name1;Name2\"")
+
+GetABILibraryList()
+foreach(abi_library_name ${GetABILibraryList_Output})
+  set(abi_library_path "mcsema/OS/${abi_library_name}")
+
+  list(FIND MCSEMA_DISABLED_ABI_LIBRARIES "${abi_library_name}" abi_lib_index)
+  if(NOT ${abi_lib_index} EQUAL -1)
+    message(STATUS "Skipping ABI library: ${abi_library_path}") 
+    continue()
+  endif()
+
+  message(STATUS "Adding ABI library: ${abi_library_path}")
+  add_subdirectory("${abi_library_path}")
+endforeach()
 
 if(DEFINED WIN32)
   set(install_folder "${CMAKE_INSTALL_PREFIX}/mcsema")
