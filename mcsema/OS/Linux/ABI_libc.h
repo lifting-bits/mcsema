@@ -88,7 +88,7 @@ extern char *gets(char *s);
 #include <x86_64-linux-gnu/sys/mtio.h>
 #include <x86_64-linux-gnu/sys/ttychars.h>
 #include <x86_64-linux-gnu/sys/select.h>
-#include <x86_64-linux-gnu/sys/ultrasound.h>
+//#include <x86_64-linux-gnu/sys/ultrasound.h>
 #include <x86_64-linux-gnu/sys/times.h>
 #include <x86_64-linux-gnu/sys/un.h>
 #include <x86_64-linux-gnu/sys/eventfd.h>
