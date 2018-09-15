@@ -31,6 +31,8 @@
 #pragma clang diagnostic ignored "-Wshorten-64-to-32"
 #include <CFG.pb.h>
 #pragma clang diagnostic pop
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <google/protobuf/io/coded_stream.h>
 
 #include "remill/Arch/Arch.h"
 #include "remill/OS/OS.h"
@@ -468,8 +470,11 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
   CHECK(fstream.good())
       << "Unable to open CFG file " << file_name;
 
+  google::protobuf::io::IstreamInputStream pstream (&fstream);
+  google::protobuf::io::CodedInputStream cstream (&pstream);
+  cstream.SetTotalBytesLimit(512 * 1024 * 1024, -1);
   Module cfg;
-  CHECK(cfg.ParseFromIstream(&fstream))
+  CHECK(cfg.ParseFromCodedStream(&cstream))
       << "Unable to read module from CFG file " << file_name;
 
   LOG(INFO)
