@@ -470,8 +470,8 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
   CHECK(fstream.good())
       << "Unable to open CFG file " << file_name;
 
-  google::protobuf::io::IstreamInputStream pstream (&fstream);
-  google::protobuf::io::CodedInputStream cstream (&pstream);
+  google::protobuf::io::IstreamInputStream pstream(&fstream);
+  google::protobuf::io::CodedInputStream cstream(&pstream);
   cstream.SetTotalBytesLimit(512 * 1024 * 1024, -1);
   Module cfg;
   CHECK(cfg.ParseFromCodedStream(&cstream))
