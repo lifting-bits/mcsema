@@ -7,6 +7,7 @@
 
 #include <Symtab.h>
 #include <dyntypes.h>
+#include <type_traits>
 
 #include "MagicSection.h"
 
@@ -14,6 +15,18 @@ class DisassContext;
 
 extern mcsema::Module gModule;
 extern std::unique_ptr<DisassContext> gDisassContext;
+
+
+template<class T, class... Rest>
+inline constexpr bool is_any = (std::is_same<T, Rest>::value && ...);
+
+
+mcsema::CodeReference *AddCodeXref(mcsema::Instruction * instruction,
+                 mcsema::CodeReference::TargetType tarTy,
+                 mcsema::CodeReference_OperandType opTy,
+                 mcsema::CodeReference_Location location,
+                 Dyninst::Address addr,
+                 const std::string &name="");
 
 template<typename CFGUnit=mcsema::Segment *>
 struct ContextCrossXref {
@@ -63,14 +76,15 @@ struct DisassContext {
 
   MagicSection magic_section;
 
-  template<typename Container, typename CFGUnit>
+  template<typename Container>
   bool FishForXref(const Container &facts,
-                   ContextCrossXref<CFGUnit> &xref,
+                   ContextCrossXref<mcsema::Segment *> &xref,
                    bool is_code=false,
                    uint64_t width=8) {
     auto fact = facts.find(xref.target_ea);
     if (fact != facts.end()) {
-      xref.WriteDataXref(fact->second->name(), is_code, width);
+      auto cfg_xref = xref.WriteDataXref(fact->second->name(), is_code, width);
+      data_xrefs.insert({cfg_xref->ea(), cfg_xref});
       // TODO(lukas): Store into known xrefs
       return true;
     }
@@ -84,6 +98,95 @@ struct DisassContext {
         FishForXref(func_map, xref, true) ||
         FishForXref(external_funcs, xref, true)) {
         //FishForXref(data_xrefs, xref)) {
+      data_xrefs.insert({static_cast<Dyninst::Address>(xref.ea), xref.segment->mutable_xrefs(xref.segment->xrefs_size() - 1)});
+      return true;
+    }
+    return false;
+  }
+
+  template<typename Base, typename Container>
+  bool FishForXref(const Container &facts,
+                   const ContextCrossXref<mcsema::Instruction *> &xref) {
+
+    auto fact = facts.find(xref.target_ea);
+    if (fact == facts.end()) {
+      return false;
+    }
+
+
+    if constexpr (std::is_same<Base, mcsema::Function *>()) {
+      AddCodeXref(xref.segment,
+                  mcsema::CodeReference::DataTarget,
+                  mcsema::CodeReference::ControlFlowOperand,
+                  mcsema::CodeReference::Internal,
+                  fact->second->ea(),
+                  fact->second->name());
+      return true;
+    } else if constexpr (std::is_same<Base, mcsema::ExternalFunction *>()) {
+      // TODO(lukas) mapping to magic_section
+      AddCodeXref(xref.segment,
+                  mcsema::CodeReference::DataTarget,
+                  mcsema::CodeReference::ControlFlowOperand,
+                  mcsema::CodeReference::External,
+                  fact->second->ea(),
+                  fact->second->name());
+      return true;
+    } else if constexpr (std::is_same<Base, mcsema::GlobalVariable *>()) {
+      AddCodeXref(xref.segment,
+                  mcsema::CodeReference::DataTarget,
+                  mcsema::CodeReference::MemoryOperand,
+                  mcsema::CodeReference::Internal,
+                  fact->second->ea(),
+                  fact->second->name());
+      return true;
+    } else if constexpr (std::is_same<Base, mcsema::Variable *>()) {
+      AddCodeXref(xref.segment,
+                  mcsema::CodeReference::DataTarget,
+                  mcsema::CodeReference::MemoryOperand,
+                  mcsema::CodeReference::Internal,
+                  fact->second->ea(),
+                  fact->second->name());
+      return true;
+    } else if constexpr (std::is_same<Base, mcsema::ExternalVariable *>()) {
+      AddCodeXref(xref.segment,
+                  mcsema::CodeReference::DataTarget,
+                  mcsema::CodeReference::MemoryOperand,
+                  mcsema::CodeReference::External,
+                  fact->second->ea(),
+                  fact->second->name());
+      return true;
+    } else if constexpr (std::is_same<Base, mcsema::DataReference *>()) {
+      AddCodeXref(xref.segment,
+                  mcsema::CodeReference::DataTarget,
+                  mcsema::CodeReference::MemoryOperand,
+                  mcsema::CodeReference::Internal,
+                  fact->second->ea());
+      return true;
+    }
+    return false;
+  }
+
+  bool HandleCodeXref(const ContextCrossXref<mcsema::Instruction *> &xref, bool force=true) {
+    ContextCrossXref<mcsema::Instruction *> ext_func_cross_xref = {
+      xref.ea, magic_section.GetAllocated(xref.target_ea), xref.segment
+    };
+    if (FishForXref<mcsema::GlobalVariable *>(global_vars, xref) ||
+        FishForXref<mcsema::ExternalVariable *>(external_vars, xref) ||
+        FishForXref<mcsema::Variable *>(segment_vars, xref) ||
+        FishForXref<mcsema::Function *>(func_map, xref) ||
+        FishForXref<mcsema::ExternalFunction *>(external_funcs, ext_func_cross_xref) ||
+        FishForXref<mcsema::DataReference *>(data_xrefs, xref)) {
+      return true;
+    }
+    LOG(INFO) << "Could not regonize xref anywhere target_ea 0x"
+              << std::hex << xref.target_ea;
+    if (force) {
+      LOG(INFO) << "\tForcing it";
+      AddCodeXref(xref.segment,
+                  mcsema::CodeReference::DataTarget,
+                  mcsema::CodeReference::MemoryOperand,
+                  mcsema::CodeReference::Internal,
+                  xref.target_ea);
       return true;
     }
     return false;
@@ -100,20 +203,3 @@ struct DisassContext {
   }
 };
 
-template<typename Ins>
-auto AddCodeXref(Ins &instruction,
-                 mcsema::CodeReference::TargetType tarTy,
-                 mcsema::CodeReference_OperandType opTy,
-                 mcsema::CodeReference_Location location,
-                 Dyninst::Address addr,
-                 const std::string &name="") {
-
-    auto xref = instruction->add_xrefs();
-    xref->set_target_type(tarTy);
-    xref->set_operand_type(opTy);
-    xref->set_location(location);
-    xref->set_ea(addr);
-    if (!name.empty())
-        xref->set_name(name);
-    return xref;
-}

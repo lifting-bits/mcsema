@@ -140,7 +140,8 @@ void WriteDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref,
                    const std::string &name="",
                    bool is_code=false,
                    uint64_t width=8) {
-  LOG(INFO) << "\tWriting xref targeting 0x" << std::hex << xref.target_ea;
+  LOG(INFO) << "\tWriting xref targeting 0x" << std::hex
+            << xref.target_ea << " at 0x" << xref.ea;
   auto cfg_xref = xref.segment->add_xrefs();
   cfg_xref->set_ea(xref.ea);
   cfg_xref->set_width(width);
@@ -148,6 +149,7 @@ void WriteDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref,
   cfg_xref->set_target_name(name);
   cfg_xref->set_target_is_code(is_code);
   cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+  gDisassContext->data_xrefs.insert({static_cast<Dyninst::Address>(xref.ea), cfg_xref});
 }
 
 bool FishForXref(SymbolMap vars,
@@ -749,7 +751,7 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
 bool CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
                            Address addr,
                            bool force) {
-  LOG(INFO) << "HandleXref to " << addr;
+  /*LOG(INFO) << "HandleXref to " << addr;
   if (auto func = magic_section.GetExternalFunction(addr)) {
     LOG(INFO) << "Code xref to func in magic_section at " << addr;
     auto code_ref = AddCodeXref(cfg_instruction,
@@ -827,7 +829,8 @@ bool CFGWriter::handleXref(mcsema::Instruction *cfg_instruction,
     }
     return true;
   }
-  return false;
+  return false;*/
+  return gDisassContext->HandleCodeXref({0, addr, cfg_instruction}, force);
 }
 
 void CFGWriter::handleNonCallInstruction(
