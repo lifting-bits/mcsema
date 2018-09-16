@@ -40,6 +40,7 @@
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Callback.h"
 #include "mcsema/BC/Legacy.h"
+#include "mcsema/BC/Segment.h"
 #include "mcsema/BC/Util.h"
 #include "mcsema/CFG/CFG.h"
 
@@ -102,7 +103,7 @@ static llvm::Function *ImplementNativeToLiftedCallback(
   // state into lifted code. The inline assembly saves a pointer to the lifted
   // function and the original lifted function's address (from the CFG), and
   // then jumps into `__mcsema_attach_call`, which does the low-level
-  // marshalling of native register state into the `State` structure.
+  // marshaling of native register state into the `State` structure.
   std::stringstream asm_str;
   switch (gArch->arch_name) {
     case remill::kArchInvalid:
@@ -169,14 +170,42 @@ static llvm::Function *ImplementNativeToLiftedCallback(
       asm_func_type, asm_str.str(), "*m,*m,~{dirflag},~{fpsr},~{flags}",
       true /* hasSideEffects */);
 
-  llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", callback_func));
+  // Make an initializer function that first calls `__mcsema_early_init`,
+  // then calls the lifted bitcode function. When lifting C++ code, often
+  // you will get weak functions, e.g. `std::string::data()`, implemented
+  // in the main binary, and depended on by libraries that are loaded and
+  // initialized before the main binary's constructors. This results in
+  // a re-entrancy bug, where the dynamic loader will link a native library's
+  // use of a C++ symbol against an exported version of it in the lifted
+  // binary, and then lifted code gets called too early. Normally, the lazy
+  // initialization of cross-references happens in `__mcsema_constructor`,
+  // but we need to also have it happen here just in case lifted code gets
+  // called before `__mcsema_constructor` is invoked.
+  auto func_wrapper = llvm::Function::Create(
+      func->getFunctionType(), llvm::GlobalValue::InternalLinkage,
+      "", gModule);
+  auto arg_it = func_wrapper->arg_begin();
+
+  llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", func_wrapper));
+  llvm::Value *func_args[3];
+  func_args[0] = &*arg_it++;
+  func_args[1] = &*arg_it++;
+  func_args[2] = &*arg_it++;
+
+  ir.CreateCall(GetOrCreateMcSemaInitializer());
+  auto call = ir.CreateCall(func, func_args);
+  call->setTailCall(true);
+  ir.CreateRet(call);
+
+  // Back to the asm attach callback thunk...
+  ir.SetInsertPoint(llvm::BasicBlock::Create(*gContext, "", callback_func));
 
   // It's easier to deal with memory references in inline assembly in static
   // and relocatable binaries, but the cost is that we have to produce these
   // otherwise useless global variables.
   asm_args.push_back(new llvm::GlobalVariable(
-      *gModule, func->getType(), true, llvm::GlobalValue::InternalLinkage,
-      func));
+      *gModule, func_wrapper->getType(), true /* isConstant */,
+      llvm::GlobalValue::InternalLinkage, func_wrapper));
 
   static llvm::GlobalVariable *attach_func_ptr = nullptr;
   if (!attach_func_ptr) {
@@ -448,6 +477,11 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
 
   // Save off the old stack pointer for later.
   auto old_sp = loader.LoadStackPointer(block);
+
+  // Call the `__mcsema_early_init` function to make sure all lazy cross-
+  // reference initializers have been installed before any lifted bitcode
+  // is executed.
+  llvm::CallInst::Create(GetOrCreateMcSemaInitializer(), "", block);
 
   // Send in argument values.
   std::vector<llvm::Value *> explicit_args;
