@@ -738,7 +738,6 @@ static bool LiftInstIntoBlock(TranslationContext &ctx,
     InlineSubFuncCall(block, GetBreakPoint(inst_addr));
   }
 
-  LOG(ERROR) << inst.Serialize();
   ctx.lifter->LiftIntoBlock(inst, block);
 
   auto ret = true;
