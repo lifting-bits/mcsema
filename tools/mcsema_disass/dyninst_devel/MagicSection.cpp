@@ -52,7 +52,9 @@ Dyninst::Address MagicSection::AllocSpace(uint64_t byte_width) {
 
 Dyninst::Address MagicSection::GetAllocated(Dyninst::Address ea) {
   auto entry = real_to_imag.find(ea);
-  CHECK(entry == real_to_imag.end())
-      << "Trying to get magicSection address for not registered ea";
+  if (entry == real_to_imag.end()) {
+     LOG(INFO) << "Trying to get magicSection address for not registered ea";
+     return 0;
+  }
   return entry->second;
 }
