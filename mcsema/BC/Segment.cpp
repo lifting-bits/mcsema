@@ -502,8 +502,8 @@ llvm::Function *GetOrCreateMcSemaInitializer(void) {
 
     auto bool_type = llvm::Type::getInt1Ty(*gContext);
     auto check_var = new llvm::GlobalVariable(
-        *gModule, bool_type, false, llvm::GlobalValue::InternalLinkage);
-    check_var->setInitializer(llvm::Constant::getNullValue(bool_type));
+        *gModule, bool_type, false, llvm::GlobalValue::InternalLinkage,
+        llvm::Constant::getNullValue(bool_type));
 
     auto entry = llvm::BasicBlock::Create(*gContext, "", gInitFunc);
     auto already_done = llvm::BasicBlock::Create(*gContext, "", gInitFunc);
