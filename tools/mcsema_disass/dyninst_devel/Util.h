@@ -29,23 +29,23 @@ mcsema::CodeReference *AddCodeXref(mcsema::Instruction * instruction,
                  const std::string &name="");
 
 template<typename CFGUnit=mcsema::Segment *>
-struct ContextCrossXref {
+struct CrossXref {
   Dyninst::Address ea = 0;
   Dyninst::Address target_ea = 0;
   CFGUnit segment = nullptr;
 
-  bool operator==(const ContextCrossXref<CFGUnit> &other) {
+  bool operator==(const CrossXref<CFGUnit> &other) {
     return ea == other.ea && target_ea == other.target_ea;
   }
 
-  bool operator!=(const ContextCrossXref<CFGUnit> &other) {
+  bool operator!=(const CrossXref<CFGUnit> &other) {
     return *this != other;
   }
 
   mcsema::DataReference *WriteDataXref(
       const std::string &name="",
       bool is_code=false,
-      uint64_t width=8) {
+      uint64_t width=8) const {
     LOG(INFO) << "\tFound xref targeting " << std::hex << target_ea;
     auto cfg_xref = segment->add_xrefs();
     cfg_xref->set_ea(ea);
@@ -78,7 +78,7 @@ struct DisassContext {
 
   template<typename Container>
   bool FishForXref(const Container &facts,
-                   ContextCrossXref<mcsema::Segment *> &xref,
+                   CrossXref<mcsema::Segment *> &xref,
                    bool is_code=false,
                    uint64_t width=8) {
     auto fact = facts.find(xref.target_ea);
@@ -91,7 +91,7 @@ struct DisassContext {
     return false;
   }
 
-  bool HandleDataXref(ContextCrossXref<mcsema::Segment *> &xref) {
+  bool HandleDataXref(CrossXref<mcsema::Segment *> &xref) {
     if (FishForXref(global_vars, xref) ||
         FishForXref(external_vars, xref) ||
         FishForXref(segment_vars, xref) ||
@@ -106,7 +106,7 @@ struct DisassContext {
 
   template<typename Base, typename Container>
   bool FishForXref(const Container &facts,
-                   const ContextCrossXref<mcsema::Instruction *> &xref) {
+                   const CrossXref<mcsema::Instruction *> &xref) {
 
     auto fact = facts.find(xref.target_ea);
     if (fact == facts.end()) {
@@ -166,8 +166,8 @@ struct DisassContext {
     return false;
   }
 
-  bool HandleCodeXref(const ContextCrossXref<mcsema::Instruction *> &xref, bool force=true) {
-    ContextCrossXref<mcsema::Instruction *> ext_func_cross_xref = {
+  bool HandleCodeXref(const CrossXref<mcsema::Instruction *> &xref, bool force=true) {
+    CrossXref<mcsema::Instruction *> ext_func_cross_xref = {
       xref.ea, magic_section.GetAllocated(xref.target_ea), xref.segment
     };
     if (FishForXref<mcsema::GlobalVariable *>(global_vars, xref) ||

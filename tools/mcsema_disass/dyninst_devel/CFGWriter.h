@@ -27,7 +27,7 @@ public:
             //ExternalFunctionManager &extFuncMgr);
 
   void write();
-
+/*
   template<typename CFGUnit=mcsema::Segment>
   struct CrossXref {
     Dyninst::Address ea = 0;
@@ -42,6 +42,7 @@ public:
       return *this != other;
     }
   };
+  */
 private:
   /* Don't want to include all functions in binary */
   bool shouldSkipFunction(const std::string &name) const;
@@ -65,12 +66,15 @@ private:
                            Dyninst::Address addr,
                            mcsema::Instruction *cfgInstruction);
 
-  bool handleDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref);
+  bool handleDataXref(const CrossXref<mcsema::Segment *> &xref);
   bool handleDataXref(mcsema::Segment *segment,
-                      Dyninst::Address ea,
+                     Dyninst::Address ea,
                       Dyninst::Address target);
   void ResolveCrossXrefs();
   void tryParseVariables(Dyninst::SymtabAPI::Region *, mcsema::Segment *);
+
+  void writeFunction(Dyninst::ParseAPI::Function *func,
+                     mcsema::Function *cfg_internal_func);
 
   void writeExternalFunctions();
   void writeInternalData();
@@ -111,10 +115,10 @@ private:
 
   std::unordered_set<std::string> no_ret_funcs;
 
-  std::vector<CrossXref<mcsema::Segment>> cross_xrefs;
+  std::vector<CrossXref<mcsema::Segment *>> cross_xrefs;
   std::unordered_set<Dyninst::Address> found_xref;
-  std::map<Dyninst::Address, CrossXref<mcsema::Segment>> code_xrefs_to_resolve;
-  std::map<Dyninst::Address, CrossXref<mcsema::Instruction>> inst_xrefs_to_resolve;
+  std::map<Dyninst::Address, CrossXref<mcsema::Segment *>> code_xrefs_to_resolve;
+  std::map<Dyninst::Address, CrossXref<mcsema::Instruction *>> inst_xrefs_to_resolve;
 
   MagicSection& magic_section;
   int ptr_byte_size = 8;

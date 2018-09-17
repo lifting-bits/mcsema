@@ -110,7 +110,6 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
       LOG(INFO) << "Retrieving info from _start at index " << index
                 << " got addr 0x" << std::hex << offset << std::dec;
       return offset;
-      //}
     }
   }
   LOG(FATAL) << "Was not able to retrieve info from _start at index "
@@ -136,11 +135,11 @@ bool IsInRegions(const std::vector<SymtabAPI::Region *> &regions, Address a) {
   return false;
 }
 
-void WriteDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref,
+void WriteDataXref(const CrossXref<mcsema::Segment *> &xref,
                    const std::string &name="",
                    bool is_code=false,
                    uint64_t width=8) {
-  LOG(INFO) << "\tWriting xref targeting 0x" << std::hex
+  /*LOG(INFO) << "\tWriting xref targeting 0x" << std::hex
             << xref.target_ea << " at 0x" << xref.ea;
   auto cfg_xref = xref.segment->add_xrefs();
   cfg_xref->set_ea(xref.ea);
@@ -148,12 +147,13 @@ void WriteDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref,
   cfg_xref->set_target_ea(xref.target_ea);
   cfg_xref->set_target_name(name);
   cfg_xref->set_target_is_code(is_code);
-  cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+  cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);*/
+  auto cfg_xref = xref.WriteDataXref(name, is_code, width);
   gDisassContext->data_xrefs.insert({static_cast<Dyninst::Address>(xref.ea), cfg_xref});
 }
-
+/*
 bool FishForXref(SymbolMap vars,
-                 const CFGWriter::CrossXref<mcsema::Segment> &xref,
+                 const CrossXref<mcsema::Segment *> &xref,
                  bool is_code=false, uint64_t width=8) {
   auto var = vars.find(xref.target_ea);
   if (var != vars.end()) {
@@ -161,7 +161,7 @@ bool FishForXref(SymbolMap vars,
     return true;
   }
   return false;
-}
+}*/
 
 //TODO(lukas): Investigate, this ignores .bss?
 bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
@@ -262,6 +262,23 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
   magic_section.init(highest, ptr_byte_size);
 }
 
+void CFGWriter::writeFunction(Dyninst::ParseAPI::Function *func,
+                              mcsema::Function *cfg_internal_func) {
+  gDisassContext->func_map.insert({func->addr(), cfg_internal_func});
+
+  ParseAPI::Block *entryBlock = func->entry();
+  cfg_internal_func->set_ea(entryBlock->start());
+
+  cfg_internal_func->set_is_entrypoint(func);
+
+  for (ParseAPI::Block *block : func->blocks()) {
+    writeBlock(block, func, cfg_internal_func);
+  }
+
+  cfg_internal_func->set_name(func->name());
+  LOG(INFO) << "Added " << func->name() << " into module, found via xref";
+}
+
 void CFGWriter::write() {
   writeExternalFunctions();
   writeExternalVariables();
@@ -277,6 +294,7 @@ void CFGWriter::write() {
     code_object.parse(a.first, true);
     WriteDataXref(a.second, "", true);
   }
+  ResolveCrossXrefs();
 
   // TODO(lukas): Code repetition
   for (auto func : code_object.funcs()) {
@@ -284,7 +302,8 @@ void CFGWriter::write() {
         !gDisassContext->getInternalFunction(func->addr())) {
 
       auto cfg_internal_func = module.add_funcs();
-      gDisassContext->func_map.insert({func->addr(), cfg_internal_func});
+      writeFunction(func, cfg_internal_func);
+      /*gDisassContext->func_map.insert({func->addr(), cfg_internal_func});
 
       ParseAPI::Block *entryBlock = func->entry();
       cfg_internal_func->set_ea(entryBlock->start());
@@ -296,7 +315,7 @@ void CFGWriter::write() {
       }
 
       cfg_internal_func->set_name(func->name());
-      LOG(INFO) << "Added " << func->name() << " into module, found via xref";
+      LOG(INFO) << "Added " << func->name() << " into module, found via xref";*/
     }
   }
 
@@ -313,7 +332,8 @@ void CFGWriter::write() {
           !gDisassContext->getInternalFunction(func->addr())) {
 
         auto cfg_internal_func = module.add_funcs();
-        gDisassContext->func_map.insert({func->addr(), cfg_internal_func});
+        writeFunction(func, cfg_internal_func);
+        /*gDisassContext->func_map.insert({func->addr(), cfg_internal_func});
 
         ParseAPI::Block *entryBlock = func->entry();
         cfg_internal_func->set_ea(entryBlock->start());
@@ -325,7 +345,7 @@ void CFGWriter::write() {
         }
 
         cfg_internal_func->set_name(func->name());
-        LOG(INFO) << "Added " << func->name() << " into module, found via xref";
+        LOG(INFO) << "Added " << func->name() << " into module, found via xref";*/
       }
     }
   }
@@ -948,14 +968,14 @@ void CFGWriter::writeExternalFunctions() {
   }
 }
 
-bool CFGWriter::handleDataXref(const CFGWriter::CrossXref<mcsema::Segment> &xref) {
+bool CFGWriter::handleDataXref(const CrossXref<mcsema::Segment *> &xref) {
   return handleDataXref(xref.segment, xref.ea, xref.target_ea);
 }
 
 bool CFGWriter::handleDataXref(mcsema::Segment *segment,
                                Address ea,
                                Address target) {
-  ContextCrossXref<mcsema::Segment *> context_xref = {ea, target, segment};
+  CrossXref<mcsema::Segment *> context_xref = {ea, target, segment};
 
   // segment_vars, external_vars, global_vars
   if (gDisassContext->HandleDataXref(context_xref)) {
@@ -1354,7 +1374,6 @@ void CFGWriter::writeInternalData() {
       }
     }
   }
-  ResolveCrossXrefs();
 }
 
 void CFGWriter::writeDataVariables(Dyninst::SymtabAPI::Region *region,

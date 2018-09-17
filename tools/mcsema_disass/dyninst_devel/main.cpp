@@ -10,7 +10,6 @@
 #include <Symtab.h>
 #include <Variable.h>
 #include <fstream>
-#include <iostream>
 #include <memory>
 
 #include <CFG.h>
