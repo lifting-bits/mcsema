@@ -93,10 +93,11 @@ struct DisassContext {
 
   bool HandleDataXref(CrossXref<mcsema::Segment *> &xref) {
     if (FishForXref(global_vars, xref) ||
+        FishForXref(external_funcs, xref, true) ||
         FishForXref(external_vars, xref) ||
         FishForXref(segment_vars, xref) ||
-        FishForXref(func_map, xref, true) ||
-        FishForXref(external_funcs, xref, true)) {
+        FishForXref(func_map, xref, true)) {
+
         //FishForXref(data_xrefs, xref)) {
       data_xrefs.insert({static_cast<Dyninst::Address>(xref.ea), xref.segment->mutable_xrefs(xref.segment->xrefs_size() - 1)});
       return true;
@@ -128,7 +129,7 @@ struct DisassContext {
                   mcsema::CodeReference::DataTarget,
                   mcsema::CodeReference::ControlFlowOperand,
                   mcsema::CodeReference::External,
-                  fact->second->ea(),
+                  magic_section.GetAllocated(fact->second->ea()),
                   fact->second->name());
       return true;
     } else if constexpr (std::is_same<Base, mcsema::GlobalVariable *>()) {
@@ -171,10 +172,10 @@ struct DisassContext {
       xref.ea, magic_section.GetAllocated(xref.target_ea), xref.segment
     };
     if (FishForXref<mcsema::GlobalVariable *>(global_vars, xref) ||
+        FishForXref<mcsema::ExternalFunction *>(external_funcs, xref) ||
         FishForXref<mcsema::ExternalVariable *>(external_vars, xref) ||
         FishForXref<mcsema::Variable *>(segment_vars, xref) ||
         FishForXref<mcsema::Function *>(func_map, xref) ||
-        FishForXref<mcsema::ExternalFunction *>(external_funcs, ext_func_cross_xref) ||
         FishForXref<mcsema::DataReference *>(data_xrefs, xref)) {
       return true;
     }
