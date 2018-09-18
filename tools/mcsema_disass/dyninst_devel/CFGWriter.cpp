@@ -291,14 +291,14 @@ void CFGWriter::write() {
   //Handle new functions found via various xrefs, mostly in stripped binary
   LOG(INFO) << code_xrefs_to_resolve.size() << " code xrefs is unresolved!";
   for (auto &a : code_xrefs_to_resolve) {
-    code_object.parse(a.first, true);
     WriteDataXref(a.second, "", true);
+    code_object.parse(a.first, true);
   }
-  ResolveCrossXrefs();
 
   // TODO(lukas): Code repetition
   for (auto func : code_object.funcs()) {
-    if (code_xrefs_to_resolve.find(func->addr()) != code_xrefs_to_resolve.end() &&
+    auto code_xref = code_xrefs_to_resolve.find(func->addr());
+    if (code_xref != code_xrefs_to_resolve.end() &&
         !gDisassContext->getInternalFunction(func->addr())) {
 
       auto cfg_internal_func = module.add_funcs();
@@ -675,7 +675,7 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
     return;
   }
 
-  LOG(INFO) << "CallInst fallback to default " << addr;
+  LOG(INFO) << "CallInst fallback to default 0x" << std::hex <<  addr;
 
   auto name = getXrefName(target);
   if (name == "__mcsema_unknown") {
@@ -1374,6 +1374,7 @@ void CFGWriter::writeInternalData() {
       }
     }
   }
+  ResolveCrossXrefs();
 }
 
 void CFGWriter::writeDataVariables(Dyninst::SymtabAPI::Region *region,
