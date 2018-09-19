@@ -1186,7 +1186,7 @@ def recover_external_symbols(M):
   recover_external_functions(M)
   recover_external_variables(M)
 
-def try_identify_as_external_function(ea):
+def try_identify_as_external_function(ea, name=None):
   """Try to identify a function as being an external function."""
   global EXTERNAL_FUNCS_TO_RECOVER, EMAP
 
@@ -1200,14 +1200,14 @@ def try_identify_as_external_function(ea):
   # sections. Sometimes there are thunk-to-thunks, where there's a function
   # whose only instruction is a direct jump to the real thunk.
   is_thunk, thunk_target_ea, thunk_name = try_get_thunk_name(ea)
-  name = None
+
   if is_thunk:
     name = thunk_name
 
   elif is_external_segment(ea):
     name = get_true_external_name(get_function_name(ea))
 
-  else:
+  elif not name:
     return False
 
   # We've got a thunk with an implementation already done.
