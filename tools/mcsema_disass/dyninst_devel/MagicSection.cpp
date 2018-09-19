@@ -34,7 +34,9 @@ mcsema::ExternalFunction *MagicSection::WriteExternalFunction(
   CHECK(start_ea) << "Magic section cannot start with 0!";
 
 	Dyninst::Address unreal_ea = AllocSpace(ptr_byte_size);
-	function.imag_ea = unreal_ea;
+	LOG(INFO) << "External function " << function.symbol_name << " at 0x" << std::hex
+            << function.ea << " got magic_address at 0x" << unreal_ea;
+  function.imag_ea = unreal_ea;
   real_to_imag.insert({function.ea, unreal_ea});
 	ext_funcs.push_back(function.Write(module));
   return ext_funcs.back();
