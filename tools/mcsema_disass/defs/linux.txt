@@ -37453,4 +37453,6 @@ context_role_set 2 C N
 context_user_set 2 C N
 
 __gxx_personality_v0 0 C N
+g_free 1 C N
+g_object_unref 1 C N
 
