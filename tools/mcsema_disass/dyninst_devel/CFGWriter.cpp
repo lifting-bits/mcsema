@@ -33,8 +33,6 @@ bool TryEval(InstructionAPI::Expression *expr,
                         Address &result,
                         Address instruction_size=0) {
 
-  LOG(INFO) << "Trying to evaluate: " << expr->format();
-
   if (auto bin = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
     std::vector<InstructionAPI::InstructionAST::Ptr> args;
     bin->getChildren(args);
@@ -76,9 +74,14 @@ bool TryEval(InstructionAPI::Expression *expr,
   return false;
 }
 
+// Find call to __libc_start_main@plt and try to recover addresses from it
 Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
                                  Address start,
                                  size_t index) {
+  if (!start) {
+    LOG(WARNING) << "Binary starts at 0x0";
+    return 0;
+  }
   for (auto func : code_object.funcs()) {
     if (func->addr() == start) {
 
@@ -89,22 +92,30 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
       using Insn = std::map<Offset, InstructionAPI::Instruction::Ptr>;
       Insn instructions;
       entry_block->getInsns(instructions);
-      //TODO(lukas): rename
-      auto callq = std::prev(instructions.end(), 2 + index);
+      auto call = std::prev(instructions.end(), 1);
+      if (call->second->getCategory() != InstructionAPI::c_CallInsn &&
+          call->second->getCategory() != InstructionAPI::c_BranchInsn) {
+        LOG(WARNING) << "Instruction at 0x" << std::hex << call->first
+                     << " is not call nor branching";
+        return 0;
+      }
 
-      LOG(INFO) << "Current rip 0x" << std::hex << callq->first;
+      auto mov_inst = std::prev(call, 1 + index);
+      LOG(INFO) << "Current rip 0x" << std::hex << mov_inst->first;
 
-      auto second_operand = callq->second.get()->getOperand(1);
+      auto second_operand = mov_inst->second.get()->getOperand(1);
       LOG(INFO) << second_operand.format(Arch_x86_64);
 
       Address offset = 0;
-      //lea
-      auto rip = callq->first;
-      if (callq->second->getOperation().getID() == 268) {
-        rip += callq->second->size();
+
+      // in -pie binaries it will be calculated using lea
+      auto rip = mov_inst->first;
+      if (mov_inst->second->getOperation().getID() == 268) {
+        rip += mov_inst->second->size();
       }
-      if (!TryEval(second_operand.getValue().get(), rip, offset, callq->second->size())) {
-        LOG(FATAL) << "Could not eval basic start addresses!";
+      if (!TryEval(second_operand.getValue().get(), rip, offset, mov_inst->second->size())) {
+        LOG(WARNING) << "Could not eval basic start addresses!";
+        return 0;
       }
       code_object.parse(offset, true);
       LOG(INFO) << "Retrieving info from _start at index " << index
@@ -112,8 +123,9 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
       return offset;
     }
   }
-  LOG(FATAL) << "Was not able to retrieve info from _start at index "
-             << index;
+  LOG(WARNING) << "Was not able to retrieve info from _start at index "
+               << index;
+  return 0;
 }
 
 bool IsInRegion(SymtabAPI::Region *r, Address a) {
@@ -139,29 +151,11 @@ void WriteDataXref(const CrossXref<mcsema::Segment *> &xref,
                    const std::string &name="",
                    bool is_code=false,
                    uint64_t width=8) {
-  /*LOG(INFO) << "\tWriting xref targeting 0x" << std::hex
-            << xref.target_ea << " at 0x" << xref.ea;
-  auto cfg_xref = xref.segment->add_xrefs();
-  cfg_xref->set_ea(xref.ea);
-  cfg_xref->set_width(width);
-  cfg_xref->set_target_ea(xref.target_ea);
-  cfg_xref->set_target_name(name);
-  cfg_xref->set_target_is_code(is_code);
-  cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);*/
+
   auto cfg_xref = xref.WriteDataXref(name, is_code, width);
   gDisassContext->data_xrefs.insert({static_cast<Dyninst::Address>(xref.ea), cfg_xref});
 }
-/*
-bool FishForXref(SymbolMap vars,
-                 const CrossXref<mcsema::Segment *> &xref,
-                 bool is_code=false, uint64_t width=8) {
-  auto var = vars.find(xref.target_ea);
-  if (var != vars.end()) {
-    WriteDataXref(xref, var->second, is_code, width);
-    return true;
-  }
-  return false;
-}*/
+
 
 //TODO(lukas): Investigate, this ignores .bss?
 bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
@@ -178,6 +172,9 @@ bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
 void RenameFunc(Dyninst::Address ea, const std::string& new_name) {
   LOG(INFO) << "Renaming 0x:" << std::hex << ea << " to " << new_name;
   auto internal_func = gDisassContext->getInternalFunction(ea);
+  if (!internal_func) {
+    return;
+  }
   internal_func->set_name(new_name);
 }
 
@@ -195,18 +192,7 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
       magic_section(gDisassContext->magic_section),
       ptr_byte_size(symtab.getAddressWidth()){
 
-  // Populate skip_funcss with some functions known to cause problems
-  /*skip_funcss = {
-                 "_fini",
-                 "__libc_start_main"
-                 };
-  */
-  // Populate func_map
-
-  std::vector<SymtabAPI::Function *> functions;
-  symtab.getAllFunctions(functions);
-  bool is_stripped = symtab.isStripped();
-  LOG(INFO) << "Binary is stripped: " << is_stripped;
+  LOG(INFO) << "Binary is stripped: " << symtab.isStripped();
 
   std::vector<SymtabAPI::Region *> regions;
   symtab.getAllRegions(regions);
@@ -219,33 +205,57 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
   // We need to get main! Heuristic for stripped binaries is that main is
   // passed to __libc_start_main as last argument from _start, which we can
   // find, because it is entrypoint
+
+  // This does NOT return 0 for shared libraries
   Address entry_point = symtab.getEntryOffset();
-  code_object.parse(entry_point, true);
+
+  LOG(INFO) << "Entry offset is 0x" << std::hex << entry_point;
+  if (entry_point) {
+    code_object.parse(entry_point, true);
+  }
   Address main_offset = TryRetrieveAddrFromStart(code_object, entry_point, 0);
   Address ctor_offset = TryRetrieveAddrFromStart(code_object, entry_point, 1);
   Address dtor_offset = TryRetrieveAddrFromStart(code_object, entry_point, 2);
 
-  // TODO(lukas): Check if there's a better way
+  LOG_IF(WARNING, main_offset) << "Entrypoint was not found!";
 
-  CHECK(main_offset) << "Entrypoint was not found!";
-
+  // TODO(lukas): When lifting shared library internal functions that needs
+  // to be entrypoints are demangled by ParseAPI, which is really unfortunate
   for (auto func : code_object.funcs()) {
     auto cfg_internal_func = module.add_funcs();
-    cfg_internal_func->set_name(func->name());
+
+    SymtabAPI::Function *symtab_func;
+    if (symtab.findFuncByEntryOffset(symtab_func, func->addr())) {
+      LOG(INFO) << "Taking mangled name from symtab";
+      cfg_internal_func->set_name(*(symtab_func->mangled_names_begin()));
+      auto beg = symtab_func->mangled_names_begin();
+      while (beg != symtab_func->mangled_names_end()) {
+        LOG(INFO) << "\t" << *beg;
+        ++beg;
+      }
+    } else {
+      cfg_internal_func->set_name(func->name());
+    }
     cfg_internal_func->set_ea(func->addr());
     cfg_internal_func->set_is_entrypoint(false);
     gDisassContext->func_map.insert({func->addr(), cfg_internal_func});
     LOG(INFO) << "Found internal function at 0x" << func->addr()
-              << " with name " << func->name();
+              << " with name " << cfg_internal_func->name();
   }
 
   // give entrypoint correct name, most likely main
-  RenameFunc(main_offset, FLAGS_entrypoint);
+  if (main_offset) {
+    RenameFunc(main_offset, FLAGS_entrypoint);
+  }
 
   // We need to give libc ctor/dtor names
   if (symtab.isStripped()) {
-    RenameFunc(ctor_offset, "init");
-    RenameFunc(dtor_offset, "fini");
+    if (ctor_offset) {
+      RenameFunc(ctor_offset, "init");
+    }
+    if (dtor_offset) {
+      RenameFunc(dtor_offset, "fini");
+    }
   }
 
   getNoReturns();
@@ -429,12 +439,15 @@ void CFGWriter::writeInternalFunctions() {
 
   for (ParseAPI::Function *func : code_object.funcs()) {
    if (isExternal(func->entry()->start())) {
-      continue;
+     LOG(INFO) << "Function " << func->name() << " is getting skipped";
+     continue;
    }
     // We want to ignore the .got.plt stubs, since they are not needed
     // and cfg file would grow significantly
     else if (IsInRegion(gSection_manager->getRegion(".got.plt"),
                         func->entry()->start())) {
+     LOG(INFO) << "Function " << func->name()
+               << " is getting skipped because it is .got.pl stub";
       continue;
     }
 
@@ -446,6 +459,9 @@ void CFGWriter::writeInternalFunctions() {
 
     cfg_internal_func->set_is_entrypoint(
         notEntryPoints.find(func->name()) == notEntryPoints.end());
+    LOG(INFO) << "Function " << cfg_internal_func->name() << " at 0x"
+              << std::hex << cfg_internal_func->ea()
+              << " is entry point? "<< cfg_internal_func->is_entrypoint();
 
     for (ParseAPI::Block *block : func->blocks()) {
       writeBlock(block, func, cfg_internal_func);
