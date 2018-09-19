@@ -263,16 +263,42 @@ static void InlineSubFuncInvoke(llvm::BasicBlock *block,
 
 // Find an external function associated with this indirect jump.
 static llvm::Function *DevirtualizeIndirectFlow(
+    const NativeFunction *cfg_func, llvm::Function *fallback) {
+  if (cfg_func->is_external) {
+    return GetLiftedToNativeExitPoint(cfg_func);
+  } else if (auto func = gModule->getFunction(cfg_func->lifted_name)) {
+    return func;
+  } else {
+    return fallback;
+  }
+}
+
+// Find an external function associated with this indirect jump.
+static llvm::Function *DevirtualizeIndirectFlow(
     TranslationContext &ctx, llvm::Function *fallback) {
   if (ctx.cfg_inst->flow) {
     if (auto cfg_func = ctx.cfg_inst->flow->func) {
-      if (cfg_func->is_external) {
-        return GetLiftedToNativeExitPoint(cfg_func);
-      } else {
-        return gModule->getFunction(cfg_func->lifted_name);
+      return DevirtualizeIndirectFlow(cfg_func, fallback);
+    }
+  }
+
+  // This is a bit sketchy, but let's assume that it might be a thunk
+  // (e.g in the PLT). If so, then we're doing a jump through a loaded
+  // pointer, where the pointer will be fixed up with an external EA,
+  // i.e. there should be a cross-reference entry at the target pointing
+  // to the destination function.
+  if (auto mem = ctx.cfg_inst->mem) {
+    auto seg = mem->target_segment;
+    auto target_ea_ptr_ea = mem->target_ea;
+    auto entry_it = seg->entries.find(target_ea_ptr_ea);
+    if (entry_it != seg->entries.end()) {
+      const NativeSegment::Entry &entry = entry_it->second;
+      if (entry.xref && entry.xref->func) {
+        return DevirtualizeIndirectFlow(entry.xref->func, fallback);
       }
     }
   }
+
   return fallback;
 }
 
@@ -544,8 +570,8 @@ static void LiftIndirectJump(TranslationContext &ctx,
 
   if (exit_point == fallback) {
 
-    // If we have no targets, then a reasonable target turns out to be the next
-    // program counter.
+    // If we have no targets, then a reasonable target turns out to be the
+    // next program counter (if we assume that it's a jump table.).
     if (block_map.empty()) {
       block_map[inst.next_pc] = GetOrCreateBlock(ctx, inst.next_pc);
     }
