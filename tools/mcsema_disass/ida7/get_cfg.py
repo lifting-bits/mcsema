@@ -979,6 +979,9 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
         DEBUG("{}-byte reference at {:x} to {:x} ({})".format(
             X.width, ea, target_ea, X.target_name))
 
+        try_identify_as_external_function(target_ea, X.target_name)
+
+
 def recover_region(M, region_name, region_ea, region_end_ea, exported_vars):
   """Recover the data and cross-references from a segment. The data of a
   segment is stored verbatim within the protobuf, and accompanied by a
