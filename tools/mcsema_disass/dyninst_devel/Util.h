@@ -10,6 +10,7 @@
 #include <type_traits>
 
 #include "MagicSection.h"
+#include "SectionManager.h"
 
 class DisassContext;
 
@@ -64,7 +65,7 @@ struct CrossXref {
 // but it would be much slower and more ugly
 struct DisassContext {
   template<typename T>
-  using SymbolMap = std::unordered_map<Dyninst::Address, T>;
+  using SymbolMap = std::map<Dyninst::Address, T>;
 
   // TODO(lukas): I want heterogeneous container :'{!
   SymbolMap<mcsema::Function *> func_map;
@@ -74,6 +75,7 @@ struct DisassContext {
   SymbolMap<mcsema::ExternalFunction *> external_funcs;
   SymbolMap<mcsema::DataReference *> data_xrefs;
 
+  std::vector<Dyninst::Address> segment_eas;
   MagicSection magic_section;
 
   template<typename Container>
@@ -116,6 +118,7 @@ struct DisassContext {
 
 
     if constexpr (std::is_same<Base, mcsema::Function *>()) {
+      LOG(INFO) << "\tResolved as internal function";
       AddCodeXref(xref.segment,
                   mcsema::CodeReference::DataTarget,
                   mcsema::CodeReference::ControlFlowOperand,
@@ -124,15 +127,17 @@ struct DisassContext {
                   fact->second->name());
       return true;
     } else if constexpr (std::is_same<Base, mcsema::ExternalFunction *>()) {
-      // TODO(lukas) mapping to magic_section
+      // Mapping to magic_section
+      LOG(INFO) << "\tResolved as ext function";
       AddCodeXref(xref.segment,
                   mcsema::CodeReference::DataTarget,
                   mcsema::CodeReference::ControlFlowOperand,
                   mcsema::CodeReference::External,
-                  magic_section.GetAllocated(fact->second->ea()),
+                  magic_section.GetAllocated(xref.target_ea),
                   fact->second->name());
       return true;
     } else if constexpr (std::is_same<Base, mcsema::GlobalVariable *>()) {
+      LOG(INFO) << "\tResolved as global variable";
       AddCodeXref(xref.segment,
                   mcsema::CodeReference::DataTarget,
                   mcsema::CodeReference::MemoryOperand,
@@ -141,6 +146,7 @@ struct DisassContext {
                   fact->second->name());
       return true;
     } else if constexpr (std::is_same<Base, mcsema::Variable *>()) {
+      LOG(INFO) << "\tResolved as segment variable";
       AddCodeXref(xref.segment,
                   mcsema::CodeReference::DataTarget,
                   mcsema::CodeReference::MemoryOperand,
@@ -149,14 +155,20 @@ struct DisassContext {
                   fact->second->name());
       return true;
     } else if constexpr (std::is_same<Base, mcsema::ExternalVariable *>()) {
+      Dyninst::Address addr = magic_section.GetAllocated(xref.target_ea);
+      LOG(INFO) << "\tResolved as external variable";
+      if (!addr) {
+        addr = fact->second->ea();
+      }
       AddCodeXref(xref.segment,
                   mcsema::CodeReference::DataTarget,
                   mcsema::CodeReference::MemoryOperand,
                   mcsema::CodeReference::External,
-                  fact->second->ea(),
+                  addr,
                   fact->second->name());
       return true;
     } else if constexpr (std::is_same<Base, mcsema::DataReference *>()) {
+      LOG(INFO) << "\tResolved as data xref";
       AddCodeXref(xref.segment,
                   mcsema::CodeReference::DataTarget,
                   mcsema::CodeReference::MemoryOperand,
@@ -168,9 +180,8 @@ struct DisassContext {
   }
 
   bool HandleCodeXref(const CrossXref<mcsema::Instruction *> &xref, bool force=true) {
-    CrossXref<mcsema::Instruction *> ext_func_cross_xref = {
-      xref.ea, magic_section.GetAllocated(xref.target_ea), xref.segment
-    };
+    LOG(INFO) << "Trying to resolve 0x" << std::hex << xref.ea << " -> 0x"
+              << xref.target_ea;
     if (FishForXref<mcsema::GlobalVariable *>(global_vars, xref) ||
         FishForXref<mcsema::ExternalFunction *>(external_funcs, xref) ||
         FishForXref<mcsema::ExternalVariable *>(external_vars, xref) ||
@@ -179,8 +190,36 @@ struct DisassContext {
         FishForXref<mcsema::DataReference *>(data_xrefs, xref)) {
       return true;
     }
+
+    // If one string is a proper substring, there can be reference to middle
+    // of a variable
+    // E.g printf("%s: %s\n", "partial string test", "string test");
+    // .rodata will contain only partial string test and proper offset
+    // will be used when "string test" is needed
+    if (gSection_manager->IsInRegions({".data", ".rodata", ".bss"}, xref.target_ea)) {
+      LOG(INFO) << "\tIn .rodata or .data";
+      AddCodeXref(xref.segment,
+                  mcsema::CodeReference::DataTarget,
+                  mcsema::CodeReference::MemoryOperand,
+                  mcsema::CodeReference::Internal,
+                  xref.target_ea);
+      return true;
+    }
+
+    // Beginning of .jcr in framme_dummy for example
+    for (auto a : segment_eas) {
+      if (a == xref.target_ea) {
+        LOG(INFO) << "\tEa of segment";
+        AddCodeXref(xref.segment,
+                    mcsema::CodeReference::DataTarget,
+                    mcsema::CodeReference::MemoryOperand,
+                    mcsema::CodeReference::Internal,
+                    xref.target_ea);
+        return true;
+      }
+    }
     LOG(INFO) << "Could not regonize xref anywhere target_ea 0x"
-              << std::hex << xref.target_ea;
+            << std::hex << xref.target_ea;
     if (force) {
       LOG(INFO) << "\tForcing it";
       AddCodeXref(xref.segment,

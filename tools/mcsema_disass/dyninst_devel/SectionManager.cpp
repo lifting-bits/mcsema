@@ -9,7 +9,44 @@
 using namespace Dyninst;
 using namespace SymtabAPI;
 
+namespace {
+  bool IsInRegion(SymtabAPI::Region *r, Address a) {
+    if (a < r->getMemOffset()) {
+      return false;
+    }
+    if (a > (r->getMemOffset() + r->getMemSize())) {
+      return false;
+    }
+    return true;
+  }
+
+  bool IsInRegions(const std::vector<SymtabAPI::Region *> &regions, Address a) {
+    for (auto &r : regions) {
+      if (IsInRegion(r, a)) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+
+
 std::unique_ptr<SectionManager> gSection_manager(new SectionManager);
+
+bool SectionManager::IsInRegions(std::vector<std::string> sections,
+                                  Dyninst::Address addr) {
+  for (auto s : regions) {
+    for (auto& name : sections) {
+      if (name == s.region->getRegionName()) {
+        if (IsInRegion(s.region, addr)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
 
 std::set<Region *> SectionManager::GetAllRegions() {
   std::set<Region *> result;
