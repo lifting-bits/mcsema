@@ -23,6 +23,8 @@ public:
   bool IsData(Dyninst::Address a);
   bool IsCode(Dyninst::Address a);
 
+  bool IsInRegions(std::vector<std::string> sections, Dyninst::Address addr);
+
   std::set<Dyninst::SymtabAPI::Region *> GetDataRegions();
   std::set<Dyninst::SymtabAPI::Region *> GetAllRegions();
 
