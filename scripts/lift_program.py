@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright (c) 2017 Trail of Bits, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -92,8 +93,8 @@ def main():
       required=True)
 
   arg_parser.add_argument(
-      '--ida_dir',
-      help='Directory containing IDA binaries.',
+      '--disassembler',
+      help='Path to disassembler, or just "binja", if installed.',
       required=True)
 
   arg_parser.add_argument(
@@ -118,6 +119,12 @@ def main():
       default=False,
       required=False,
       action='store_true')
+
+  arg_parser.add_argument(
+      '--extra_args',
+      help='A space-delimited list of any extra arguments to pass to the lifter.',
+      default="",
+      required=False)
 
   args, command_args = arg_parser.parse_known_args()
 
@@ -165,7 +172,7 @@ def main():
   if not os.path.isfile(binary):
     shutil.copyfile(args.binary, binary)
     make_executable(binary)
-  
+
   # Copy the shared libraries into the workspace's object directory, and then
   # add symbolic links from the workspace's library directory into the object
   # directory.
@@ -173,7 +180,7 @@ def main():
   for name, path in binary_libraries(binary):
     path_hash = hash_file(path)
     library = os.path.join(obj_dir, "{}.so".format(path_hash))
-    
+
     if not os.path.isfile(library):
       shutil.copyfile(path, library)
       make_executable(library)
@@ -198,28 +205,34 @@ def main():
   binary_name = os.path.basename(args.binary)
   address_size, arch, is_pie = binary_info(binary)
 
-  ida_version = {
-    "x86_avx": "idal",
-    "amd64_avx": "idal64",
-    "aarch64": "idal64"
-  }[arch]
+  # Disassembler Seetings
+  da = ''
+  if ('binja' == args.disassembler) or 'binaryninja' == 'binja' == args.disassembler:
+    da = 'binja'
+  else:
+    ida_version = {
+      "x86_avx": "idal",
+      "amd64_avx": "idal64",
+      "aarch64": "idal64"
+    }[arch]
+    da = quote(os.path.join(args.disassembler, ida_version))
 
   # Disassemble the binary.
-  ida_args = [
+  disass_args = [
       'mcsema-disass',
       '--arch', arch,
       '--os', os_name,
       '--binary', quote(binary),
       '--output', quote(cfg),
       '--entrypoint', 'main',
-      '--disassembler', quote(os.path.join(args.ida_dir, ida_version)),
-      '--log_file', quote(log),
-      is_pie and '--pie-mode' or '']
+      '--disassembler', da,
+      '--log_file', quote(log)]#,
+#      is_pie and '--pie-mode' or '']
 
-  ida_args.extend(command_args)
+  disass_args.extend(command_args)
 
-  print " ".join(ida_args)
-  ret = subprocess.call(ida_args)
+  print " ".join(disass_args)
+  ret = subprocess.call(disass_args)
   if ret:
     return ret
 
@@ -231,6 +244,10 @@ def main():
       '--cfg', cfg,
       '--output', bitcode]
 
+  if args.extra_args != "":
+    for arg in args.extra_args.split(' '):
+      mcsema_lift_args.append(arg)
+
   if args.legacy_mode:
     mcsema_lift_args.append('--legacy_mode')
 
@@ -238,7 +255,7 @@ def main():
   ret = subprocess.call(mcsema_lift_args)
   if ret:
     return ret
-  
+
   # Not compiling a binary.
   if args.legacy_mode:
     return 0
