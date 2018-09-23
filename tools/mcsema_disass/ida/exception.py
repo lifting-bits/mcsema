@@ -507,12 +507,15 @@ def get_stripped_name(name):
 def _create_reference_object(name, ea, offset):
   return dict(name=name, addr=ea, offset=offset)
 
-def get_alternative_symnbol_name(ea):
+def get_alternative_symbol_name(ea):
   comment = idc.GetCommentEx(ea, 0) or ""
   for comment_line in comment.split("\n"):
     comment_line = comment_line.replace(";", "").strip()
+    if not comment_line:
+      continue
     mstr = comment_line.split("'")
-    return mstr[1] + "'" + mstr[2]
+    if 3 <= len(mstr):
+      return mstr[1] + "'" + mstr[2]
   return None
 
 def convert_to_bytes(value):
@@ -551,7 +554,7 @@ def get_type_info(ea):
 def get_si_type_info(ea):
   ea2, name = get_type_info(ea)
   pbase = read_pointer(ea2)
-  RTTI_REFERENCE_TABLE[ea2] = _create_reference_object(get_alternative_symnbol_name(pbase), pbase, 0)
+  RTTI_REFERENCE_TABLE[ea2] = _create_reference_object(get_alternative_symbol_name(pbase), pbase, 0)
   ea2 += get_address_size_in_bytes()
   return ea2
 
