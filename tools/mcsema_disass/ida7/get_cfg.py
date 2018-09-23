@@ -979,6 +979,9 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
         DEBUG("{}-byte reference at {:x} to {:x} ({})".format(
             X.width, ea, target_ea, X.target_name))
 
+        try_identify_as_external_function(target_ea, X.target_name)
+
+
 def recover_region(M, region_name, region_ea, region_end_ea, exported_vars):
   """Recover the data and cross-references from a segment. The data of a
   segment is stored verbatim within the protobuf, and accompanied by a
@@ -1183,7 +1186,7 @@ def recover_external_symbols(M):
   recover_external_functions(M)
   recover_external_variables(M)
 
-def try_identify_as_external_function(ea):
+def try_identify_as_external_function(ea, name=None):
   """Try to identify a function as being an external function."""
   global EXTERNAL_FUNCS_TO_RECOVER, EMAP
 
@@ -1197,14 +1200,14 @@ def try_identify_as_external_function(ea):
   # sections. Sometimes there are thunk-to-thunks, where there's a function
   # whose only instruction is a direct jump to the real thunk.
   is_thunk, thunk_target_ea, thunk_name = try_get_thunk_name(ea)
-  name = None
+
   if is_thunk:
     name = thunk_name
 
   elif is_external_segment(ea):
     name = get_true_external_name(get_function_name(ea))
 
-  else:
+  elif not name:
     return False
 
   # We've got a thunk with an implementation already done.

@@ -28,12 +28,12 @@ except:
 
 def binary_info(binary):
   res = subprocess.check_output(['file', binary])
-  is_pie = 'LSB shared object' in res
+  is_pie = 'LSB shared object' in res or 'Mach-O 64' in res
   address_size = 64
 
   if 'aarch64' in res:
     arch = 'aarch64'
-  elif 'x86-64' in res:
+  elif 'x86-64' in res or 'x86_64' in res:
     arch = 'amd64_avx'
   elif 'x86' in res:
     arch = 'x86_avx'
