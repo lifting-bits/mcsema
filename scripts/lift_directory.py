@@ -32,9 +32,13 @@ def lift_binary(args, binary):
       os.path.join(os.path.dirname(__file__), 'lift_program.py'),
       '--libraries_dir', args.libraries_dir,
       '--llvm_version', args.llvm_version,
-      '--ida_dir', args.ida_dir,
+      '--disassembler', args.disassembler,
       '--workspace_dir', args.workspace_dir,
       '--binary', binary]
+
+  if args.extra_args != "":
+    for arg in args.extra_args.split(','):
+      lift_args.append(arg)
 
   if args.legacy_mode:
     lift_args.append('--legacy_mode')
@@ -63,8 +67,8 @@ def main():
       required=True)
 
   arg_parser.add_argument(
-      '--ida_dir',
-      help='Directory containing IDA binaries.',
+      '--disassembler',
+      help='Path to disassembler, or just "binja", if installed.',
       required=True)
 
   arg_parser.add_argument(
@@ -89,6 +93,14 @@ def main():
       default=False,
       required=False,
       action='store_true')
+
+  arg_parser.add_argument(
+      '--extra_args',
+      '--list',
+      nargs='+',
+      help='A space-delimited list of any extra arguments to pass to the lifter.',
+      default="",
+      required=False)
 
   args, command_args = arg_parser.parse_known_args()
 
