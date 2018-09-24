@@ -653,7 +653,7 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
       }
     }
 
-    if (isNoReturn(getExternalName(target))) {
+    if (isNoReturn(cfg_instruction->mutable_xrefs(0)->name())) {
       cfg_instruction->set_local_noreturn(true);
     }
     return;
@@ -696,17 +696,9 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
   CHECK(expr) << "Expected expression";
 
   Address a;
+  // TODO(lukas): Possibly may discover new functions?
   if (TryEval(expr, addr, a)) {
-    auto cfg_code_xref = AddCodeXref(cfg_instruction,
-                                  CodeReference::DataTarget,
-                                  CodeReference::MemoryOperand,
-                                  CodeReference::Internal, a,
-                                  getXrefName(a));
-    if (isExternal(a) ||
-        gDisassContext->external_vars.find(a) !=
-            gDisassContext->external_vars.end()) {
-      cfg_code_xref->set_location(CodeReference::External);
-    }
+    gDisassContext->HandleCodeXref({addr, a, cfg_instruction});
     return a;
   }
 
@@ -731,6 +723,8 @@ void CFGWriter::handleNonCallInstruction(
   instruction->getOperands(operands);
 
   // RIP already points to the next instruction
+  // Except sometimes DynInst thinks it doesn't
+  // and construct an AST with + |instruction|
   addr += instruction->size();
 
   // Sometimes some .text address is stored somewhere in data segment.
@@ -741,20 +735,18 @@ void CFGWriter::handleNonCallInstruction(
   LOG(INFO) << instruction->format() << " at 0x" << std::hex << addr - instruction->size();
   for (auto op : operands) {
     auto expr = op.getValue();
-    LOG(INFO) << expr->format();
     if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr.get())) {
-      LOG(INFO) << "Dealing with Immidiate as op at 0x" << std::hex << addr - instruction->size();
-      direct_values[i] = immediateNonCall( imm, addr, cfg_instruction);
+      LOG(INFO) << "\tDealing with Immidiate as op";
+      direct_values[i] = immediateNonCall(imm, addr, cfg_instruction);
     } else if (
         auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr.get())) {
-      LOG(INFO) << "Dealing with Dereference as op at 0x" << std::hex << addr - instruction->size();
-      direct_values[i] = dereferenceNonCall( deref, addr, cfg_instruction);
+      LOG(INFO) << "\tDealing with Dereference as op";
+      direct_values[i] = dereferenceNonCall(deref, addr, cfg_instruction);
     } else if (
         auto bf = dynamic_cast<InstructionAPI::BinaryFunction *>(expr.get())) {
-      LOG(INFO) << "Dealing with BinaryFunction as op at 0x" << std::hex << addr - instruction->size();
+      LOG(INFO) << "Dealing with BinaryFunction as op";
 
       // 268 stands for lea
-      // 8 stands for jump
       auto instruction_id = instruction->getOperation().getID();
       if (instruction_id == 268) {
         Address a;
@@ -770,15 +762,12 @@ void CFGWriter::handleNonCallInstruction(
         }
       } else if (instruction->getCategory() == InstructionAPI::c_BranchInsn) {
         Address a;
+        // This has + |instruction| in AST
         if (TryEval(expr.get(), addr - instruction->size(), a)) {
-          auto code_ref = AddCodeXref(cfg_instruction,
-                                      CodeReference::CodeTarget,
-                                      CodeReference::ControlFlowOperand,
-                                      CodeReference::Internal, a);
-          //handleXref(cfg_instruction, a);
-          if (isExternal(a)) {
-            code_ref->set_location(CodeReference::External);
-            code_ref->set_name(getXrefName(a));
+          if (gDisassContext->HandleCodeXref({0, a, cfg_instruction})) {
+            auto cfg_xref = cfg_instruction->mutable_xrefs(cfg_instruction->xrefs_size() - 1);
+            cfg_xref->set_target_type(CodeReference::CodeTarget);
+            cfg_xref->set_operand_type(CodeReference::ControlFlowOperand);
           }
           direct_values[i] = a;
         }
@@ -792,16 +781,11 @@ void CFGWriter::handleNonCallInstruction(
   // something we should treat as function in cfg
   if (direct_values[0] && direct_values[1]) {
     addr -= instruction->size();
-    bool is_somewhere_reasonable = IsInRegions(
-        {
-          gSection_manager->getRegion(".bss"),
-          gSection_manager->getRegion(".data"),
-          gSection_manager->getRegion(".rodata"),
-        },
+    bool is_somewhere_reasonable = gSection_manager->IsInRegions(
+        {".bss", ".data", ".rodata"},
         direct_values[0]);
     if (IsInRegion(gSection_manager->getRegion(".text"), direct_values[1]) &&
         is_somewhere_reasonable) {
-      LOG(INFO) << "Storing address from .text into .bss";
       if (!gDisassContext->getInternalFunction(direct_values[0])) {
         LOG(INFO)
             << "\tAnd it is not parsed yet, storing it to be resolved later!";
@@ -1183,7 +1167,7 @@ void CFGWriter::writeInternalData() {
     cfg_internal_data->set_is_exported(false);      /* TODO: As for now, ignored */
     cfg_internal_data->set_is_thread_local(false); /* TODO: As for now, ignored */
 
-
+    // TODO(lukas): We probably don't need to parse these?
     std::set<std::string> dont_parse = {
       ".eh_frame",
       ".rela.dyn",
@@ -1205,14 +1189,17 @@ void CFGWriter::writeInternalData() {
       xrefsInSegment( region, cfg_internal_data );
     }
 
+    // IDA output of .bss produced some "self xrefs"
     if (region->getRegionName() == ".bss") {
       writeBssXrefs(region, cfg_internal_data, gDisassContext->external_vars);
     }
 
+    // Apply relocations of external functions
     if (region->getRegionName() == ".got.plt") {
       writeRelocations(region, cfg_internal_data);
     }
 
+    // Apply relocations of external variables if needed
     if (region->getRegionName() == ".got") {
       writeGOT(region, cfg_internal_data);
     }
@@ -1229,7 +1216,8 @@ void CFGWriter::writeDataVariables(Dyninst::SymtabAPI::Region *region,
     if ((a->getRegion() && a->getRegion() == region) ||
         (a->getOffset() == region->getMemOffset())) {
 
-      if (gDisassContext->external_vars.find(a->getOffset()) != gDisassContext->external_vars.end()) {
+      if (gDisassContext->external_vars.find(a->getOffset()) !=
+          gDisassContext->external_vars.end()) {
         continue;
       }
 
@@ -1249,7 +1237,7 @@ void CFGWriter::writeDataVariables(Dyninst::SymtabAPI::Region *region,
 
 
 bool CFGWriter::isExternal(Address addr) const {
-  bool is = false;
+/*  bool is = false;
   if (code_object.cs()->linkage().find(addr) != code_object.cs()->linkage().end()) {
     is = gExt_func_manager->IsExternal(code_object.cs()->linkage()[addr]);
   }
@@ -1259,6 +1247,9 @@ bool CFGWriter::isExternal(Address addr) const {
   }
 
   return is;
+*/
+  return gDisassContext->external_vars.find(addr) != gDisassContext->external_vars.end() ||
+         gDisassContext->external_funcs.find(addr) != gDisassContext->external_funcs.end();
 }
 
 std::string CFGWriter::getExternalName(Address addr) const {
