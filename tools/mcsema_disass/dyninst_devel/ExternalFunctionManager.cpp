@@ -2,7 +2,8 @@
 
 #include <glog/logging.h>
 
-std::unique_ptr<ExternalFunctionManager> gExt_func_manager(new ExternalFunctionManager);
+std::unique_ptr<ExternalFunctionManager>
+    gExtFuncManager(new ExternalFunctionManager);
 
 mcsema::ExternalFunction *ExternalFunction::WriteHelper(
     mcsema::Module &module,
