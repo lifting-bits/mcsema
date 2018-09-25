@@ -45,17 +45,6 @@ static std::vector<std::string> Split(const std::string &s, const char delim) {
   return res;
 }
 
-/*
-//TODO(lukas): This works only for 64btit elf atm
-Address GetEntryPoint(const std::string& filename) {
-  std::ifstream bin{filename, std::ios::binary};
-  bin.seekg(0x18);
-  std::uint64_t main_addr;
-  bin.read(reinterpret_cast<char *>(&main_addr), sizeof(main_addr));
-  std::cout << std::hex << main_addr << std::dec << std::endl;
-  return main_addr;
-}
-*/
 }
 
 int main(int argc, char **argv) {
@@ -91,20 +80,11 @@ int main(int argc, char **argv) {
     }
   }
 
-  //TODO(lukas): Check how it is parsed
-  /*
-  for (const auto &extSymDef : argParser.getAddExtSyms())
-    gExt_func_manager->addExternalSymbol(extSymDef);
-  */
-  gExt_func_manager->ClearUsed();
-
   // Set up Dyninst stuff
 
   auto symtabCS =
       std::make_shared<ParseAPI::SymtabCodeSource>(inputFile);
   CHECK(symtabCS) << "Error during creation of ParseAPI::SymtabCodeSource!";
-
-
 
   auto codeObj = std::make_shared<ParseAPI::CodeObject>(symtabCS.get());
   CHECK(codeObj) << "Error during creation of ParseAPI::CodeObject";
@@ -141,9 +121,6 @@ int main(int argc, char **argv) {
     LOG(FATAL) << "Problem while opening output file";
   }
 
-
-  //auto entry = GetEntryPoint(FLAGS_binary);
-
   mcsema::Module m;
 
   CFGWriter cfgWriter(m, FLAGS_binary, *symtab, *symtabCS,
@@ -151,9 +128,9 @@ int main(int argc, char **argv) {
   cfgWriter.write();
 
   // Dump the CFG file in a human-readable format if requested
-  //if (FLAGS_dump_cfg) {
-      std::cout << std::hex << m.DebugString() << std::endl;
-  //}
+  if (FLAGS_dump_cfg) {
+    std::cout << std::hex << m.DebugString() << std::endl;
+  }
 
   m.SerializeToOstream(&out);
 
