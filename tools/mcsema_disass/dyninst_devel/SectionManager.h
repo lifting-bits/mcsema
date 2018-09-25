@@ -12,8 +12,6 @@ namespace mcsema {
 struct Section {
   Dyninst::SymtabAPI::Region *region;
   std::string name;
-  mcsema::Segment *cfg_segment = nullptr;
-  bool should_write = true;
 };
 
 class SectionManager {
@@ -23,15 +21,20 @@ public:
   bool IsData(Dyninst::Address a);
   bool IsCode(Dyninst::Address a);
 
+  bool IsInRegion(Dyninst::SymtabAPI::Region *r, Dyninst::Address a);
   bool IsInRegions(std::vector<std::string> sections, Dyninst::Address addr);
+  bool IsInRegion(const std::string& region, Dyninst::Address addr);
+  bool IsInBinary(Dyninst::Address addr);
 
   std::set<Dyninst::SymtabAPI::Region *> GetDataRegions();
   std::set<Dyninst::SymtabAPI::Region *> GetAllRegions();
 
-  Dyninst::SymtabAPI::Region *getRegion(const std::string &name);
+  Dyninst::SymtabAPI::Region *GetRegion(const std::string &name);
 
 private:
+  // There won't be big enough number of regions to justify
+  // std::map
   std::vector<Section> regions;
 };
 
-extern std::unique_ptr<SectionManager> gSection_manager;
+extern std::unique_ptr<SectionManager> gSectionManager;

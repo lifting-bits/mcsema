@@ -196,7 +196,7 @@ struct DisassContext {
     // E.g printf("%s: %s\n", "partial string test", "string test");
     // .rodata will contain only partial string test and proper offset
     // will be used when "string test" is needed
-    if (gSection_manager->IsInRegions({".data", ".rodata", ".bss"}, xref.target_ea)) {
+    if (gSectionManager->IsInRegions({".data", ".rodata", ".bss"}, xref.target_ea)) {
       LOG(INFO) << "\tIn .rodata or .data";
       AddCodeXref(xref.segment,
                   mcsema::CodeReference::DataTarget,
