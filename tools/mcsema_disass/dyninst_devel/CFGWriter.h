@@ -24,25 +24,9 @@ public:
             Dyninst::SymtabAPI::Symtab &symtab,
             Dyninst::ParseAPI::SymtabCodeSource &symCodeSrc,
             Dyninst::ParseAPI::CodeObject &codeObj);
-            //ExternalFunctionManager &extFuncMgr);
 
   void write();
-/*
-  template<typename CFGUnit=mcsema::Segment>
-  struct CrossXref {
-    Dyninst::Address ea = 0;
-    Dyninst::Address target_ea = 0;
-    CFGUnit *segment = nullptr;
 
-    bool operator==(const CrossXref &other) {
-      return ea == other.ea && target_ea == other.target_ea;
-    }
-
-    bool operator!=(const CrossXref &other) {
-      return *this != other;
-    }
-  };
-  */
 private:
   /* Don't want to include all functions in binary */
   bool shouldSkipFunction(const std::string &name) const;
@@ -116,7 +100,6 @@ private:
   std::unordered_set<std::string> no_ret_funcs;
 
   std::vector<CrossXref<mcsema::Segment *>> cross_xrefs;
-  std::unordered_set<Dyninst::Address> found_xref;
   std::map<Dyninst::Address, CrossXref<mcsema::Segment *>> code_xrefs_to_resolve;
   std::map<Dyninst::Address, CrossXref<mcsema::Instruction *>> inst_xrefs_to_resolve;
 

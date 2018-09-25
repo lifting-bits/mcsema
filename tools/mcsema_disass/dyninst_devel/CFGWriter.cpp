@@ -832,7 +832,6 @@ bool CFGWriter::handleDataXref(mcsema::Segment *segment,
 
   // segment_vars, external_vars, global_vars
   if (gDisassContext->HandleDataXref(context_xref)) {
-    found_xref.insert(ea);
     return true;
   }
   return false;
@@ -897,7 +896,6 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
         cfg_var->set_name(name);
         cfg_var->set_ea(*tmp_ptr);
         gDisassContext->segment_vars.insert({*tmp_ptr, cfg_var});
-        found_xref.insert(region->getMemOffset() + size - off);
         continue;
 
       } else if (IsInBinary(code_source, *tmp_ptr)) {
@@ -932,19 +930,15 @@ void CFGWriter::xrefsInSegment(SymtabAPI::Region *region,
 
   for (int j = 0; j < region->getDiskSize(); j += 8, offset++) {
     // Just so we know, there was something shady
-    if (found_xref.count(region->getMemOffset() + j)) {
-      LOG(WARNING) << "Dual xref detected!";
-      continue;
-    }
     LOG(INFO)
       << std::hex << "Trying to resolve xref from " << region->getRegionName()
       << " at 0x" <<region->getMemOffset() + j << " targeting 0x" << *offset;
 
     if (!handleDataXref(segment, region->getMemOffset() + j, *offset)) {
-      LOG(INFO) << "Did not resolve it, try to search in .text";
+      LOG(INFO) << "\tDid not resolve it, try to search in .text";
 
       if (IsInRegion(gSection_manager->getRegion(".text"), *offset)) {
-        LOG(INFO) << "Xref is pointing into .text";
+        LOG(INFO) << "\tXref is pointing into .text";
         code_xrefs_to_resolve.insert(
             {*offset,{region->getMemOffset() + j, *offset, segment}});
       }
@@ -965,6 +959,8 @@ void writeRawData(std::string& data, SymtabAPI::Region* region) {
   }
 }
 
+// Writes into section on specified offset
+// If offset points beyond section, it is resized to contain it
 void WriteAsRaw(std::string& data, uint64_t number, int64_t offset) {
   LOG(INFO) << "Writing raw " << number << " to offset " << offset;
   if (offset < 0) {
@@ -999,16 +995,17 @@ void CFGWriter::writeGOT(SymtabAPI::Region* region,
     LOG(INFO) << "Trying to resolve reloc " << reloc.name();
     for (auto ext_var : magic_section.ext_vars) {
       if (reloc.name() == ext_var->name()) {
-        LOG(INFO) << "Writing xref in got 0x" << std::hex
+        LOG(INFO) << "Writing cfg_xref in got 0x" << std::hex
                   << reloc.rel_addr() << " -> 0x" << ext_var->ea();
-        auto xref = segment->add_xrefs();
-        xref->set_target_name(ext_var->name());
-        xref->set_ea(reloc.rel_addr());
-        xref->set_target_ea(ext_var->ea());
-        xref->set_target_is_code(false);
-        xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
-        xref->set_width(ptr_byte_size);
+        auto cfg_xref = segment->add_xrefs();
+        cfg_xref->set_target_name(ext_var->name());
+        cfg_xref->set_ea(reloc.rel_addr());
+        cfg_xref->set_target_ea(ext_var->ea());
+        cfg_xref->set_target_is_code(false);
+        cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+        cfg_xref->set_width(ptr_byte_size);
         found = true;
+        gDisassContext->data_xrefs.insert({reloc.rel_addr(), cfg_xref});
         WriteAsRaw(data, ext_var->ea(), reloc.rel_addr() - segment->ea());
       }
     }
@@ -1017,13 +1014,14 @@ void CFGWriter::writeGOT(SymtabAPI::Region* region,
           << "Giving magic_space to" << reloc.name();
 
       auto unreal_ea = magic_section.AllocSpace(ptr_byte_size);
-      auto xref = segment->add_xrefs();
-      xref->set_target_name(reloc.name());
-      xref->set_ea(reloc.rel_addr());
-      xref->set_target_ea(unreal_ea);
-      xref->set_target_is_code(true);
-      xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
-      xref->set_width(ptr_byte_size);
+      auto cfg_xref = segment->add_xrefs();
+      cfg_xref->set_target_name(reloc.name());
+      cfg_xref->set_ea(reloc.rel_addr());
+      cfg_xref->set_target_ea(unreal_ea);
+      cfg_xref->set_target_is_code(true);
+      cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
+      cfg_xref->set_width(ptr_byte_size);
+      gDisassContext->data_xrefs.insert({reloc.rel_addr(), cfg_xref});
       WriteAsRaw(data, unreal_ea, reloc.rel_addr() - segment->ea());
 
     if (gExt_func_manager->IsExternal(reloc.name())) {
