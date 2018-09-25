@@ -28,9 +28,6 @@ public:
   void write();
 
 private:
-  /* Don't want to include all functions in binary */
-  bool shouldSkipFunction(const std::string &name) const;
-
   void writeDataVariables(Dyninst::SymtabAPI::Region *region,
                           mcsema::Segment *segment);
 

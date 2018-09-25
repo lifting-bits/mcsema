@@ -9,42 +9,43 @@
 using namespace Dyninst;
 using namespace SymtabAPI;
 
-namespace {
-  bool IsInRegion(SymtabAPI::Region *r, Address a) {
-    if (a < r->getMemOffset()) {
-      return false;
-    }
-    if (a > (r->getMemOffset() + r->getMemSize())) {
-      return false;
-    }
-    return true;
-  }
+std::unique_ptr<SectionManager> gSectionManager(new SectionManager);
 
-  bool IsInRegions(const std::vector<SymtabAPI::Region *> &regions, Address a) {
-    for (auto &r : regions) {
-      if (IsInRegion(r, a)) {
-        return true;
-      }
-    }
+bool SectionManager::IsInRegion(SymtabAPI::Region *r, Address a) {
+  if (a < r->getMemOffset()) {
     return false;
   }
+  if (a > (r->getMemOffset() + r->getMemSize())) {
+    return false;
+  }
+  return true;
 }
 
-
-
-std::unique_ptr<SectionManager> gSection_manager(new SectionManager);
+bool SectionManager::IsInRegion(const std::string &region_name, Address addr) {
+  return IsInRegion(GetRegion(region_name), addr);
+}
 
 bool SectionManager::IsInRegions(std::vector<std::string> sections,
                                   Dyninst::Address addr) {
-  for (auto s : regions) {
-    for (auto& name : sections) {
-      if (name == s.region->getRegionName()) {
+  for (auto &s : regions) {
+    for (auto &name : sections) {
+      if (name == s.name) {
         if (IsInRegion(s.region, addr)) {
           return true;
         }
       }
     }
   }
+  return false;
+}
+
+bool SectionManager::IsInBinary(Dyninst::Address addr) {
+  for (auto &s : regions) {
+    if (IsInRegion(s.region, addr)) {
+      return true;
+    }
+  }
+  LOG(INFO) << std::hex << "0x" << addr << " is not contained in binary";
   return false;
 }
 
@@ -57,7 +58,7 @@ std::set<Region *> SectionManager::GetAllRegions() {
 }
 
 Dyninst::SymtabAPI::Region *
-SectionManager::getRegion(const std::string &name) {
+SectionManager::GetRegion(const std::string &name) {
   for (auto &r : regions) {
     if (r.name == name) {
       return r.region;
@@ -84,9 +85,7 @@ void SectionManager::AddRegion(Region *r) {
       should_write = false;
     }
   }
-  mcsema::Segment *cfg_segment =
-    (should_write) ? gModule.add_segments() : nullptr;
-  regions.push_back({r, r->getRegionName(), cfg_segment, should_write});
+  regions.push_back({r, r->getRegionName()});
 }
 
 bool SectionManager::IsData(Address a) {

@@ -125,25 +125,6 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
   return 0;
 }
 
-bool IsInRegion(SymtabAPI::Region *r, Address a) {
-  if (a < r->getMemOffset()) {
-    return false;
-  }
-  if (a > (r->getMemOffset() + r->getMemSize())) {
-    return false;
-  }
-  return true;
-}
-
-bool IsInRegions(const std::vector<SymtabAPI::Region *> &regions, Address a) {
-  for (auto &r : regions) {
-    if (IsInRegion(r, a)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 void WriteDataXref(const CrossXref<mcsema::Segment *> &xref,
                    const std::string &name="",
                    bool is_code=false,
@@ -155,8 +136,9 @@ void WriteDataXref(const CrossXref<mcsema::Segment *> &xref,
 
 
 //TODO(lukas): Investigate, this ignores .bss?
+/*
 bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
-  for (auto &r : gSection_manager->GetDataRegions()) {
+  for (auto &r : gSectionManager->GetDataRegions()) {
     if (IsInRegion(r, a)) {
       return true;
     }
@@ -164,7 +146,7 @@ bool IsInBinary(ParseAPI::CodeSource &code_source, Address a) {
   LOG(INFO) << std::hex << a << std::dec << " is not contained in code_source";
   return false;
 }
-
+*/
 // Modifies gDisassContext
 void RenameFunc(Dyninst::Address ea, const std::string& new_name) {
   LOG(INFO) << "Renaming 0x:" << std::hex << ea << " to " << new_name;
@@ -195,7 +177,7 @@ CFGWriter::CFGWriter(mcsema::Module &m, const std::string &module_name,
   symtab.getAllRegions(regions);
 
   for (auto reg : regions) {
-      gSection_manager->AddRegion(reg);
+      gSectionManager->AddRegion(reg);
       if (reg->getMemOffset()) {
         gDisassContext->segment_eas.push_back(reg->getMemOffset());
       }
@@ -412,8 +394,8 @@ void CFGWriter::writeInternalFunctions() {
    }
     // We want to ignore the .got.plt stubs, since they are not needed
     // and cfg file would grow significantly
-    else if (IsInRegion(gSection_manager->getRegion(".got.plt"),
-                        func->entry()->start())) {
+    else if (gSectionManager->IsInRegion(".got.plt",
+                                          func->entry()->start())) {
      LOG(INFO) << "Function " << func->name()
                << " is getting skipped because it is .got.pl stub";
       continue;
@@ -639,7 +621,7 @@ void CFGWriter::handleCallInstruction(InstructionAPI::Instruction *instruction,
 
     // What can happen is that we get xref somewhere in the .text and handleXref
     // fills it with defaults. We need to check and correct it if needed
-    if (IsInRegion(gSection_manager->getRegion(".text"), target)) {
+    if (gSectionManager->IsInRegion(".text", target)) {
       auto xref = cfg_instruction->mutable_xrefs(0);
       //xref->set_target_type(CodeReference::CodeTarget);
       xref->set_operand_type(CodeReference::ControlFlowOperand);
@@ -665,7 +647,7 @@ Address CFGWriter::immediateNonCall( InstructionAPI::Immediate* imm,
 
   Address a = imm->eval().convert<Address>();
   if (!gDisassContext->HandleCodeXref({addr, a, cfg_instruction}, false)) {
-    if (IsInRegion(gSection_manager->getRegion(".text"), a)) {
+    if (gSectionManager->IsInRegion(".text", a)) {
       auto cfgCodeRef = AddCodeXref(cfg_instruction,
                             CodeReference::DataTarget,
                             CodeReference::ImmediateOperand,
@@ -753,7 +735,7 @@ void CFGWriter::handleNonCallInstruction(
 
         if(TryEval(expr.get(), addr, a)) {
           handleXref(cfg_instruction, a);
-          if (IsInRegion(gSection_manager->getRegion(".text"), a)) {
+          if (gSectionManager->IsInRegion(".text", a)) {
             // get last one and change it to code
             auto xref = cfg_instruction->mutable_xrefs(cfg_instruction->xrefs_size() - 1);
             xref->set_operand_type(CodeReference::MemoryOperand);
@@ -781,10 +763,10 @@ void CFGWriter::handleNonCallInstruction(
   // something we should treat as function in cfg
   if (direct_values[0] && direct_values[1]) {
     addr -= instruction->size();
-    bool is_somewhere_reasonable = gSection_manager->IsInRegions(
+    bool is_somewhere_reasonable = gSectionManager->IsInRegions(
         {".bss", ".data", ".rodata"},
         direct_values[0]);
-    if (IsInRegion(gSection_manager->getRegion(".text"), direct_values[1]) &&
+    if (gSectionManager->IsInRegion(".text", direct_values[1]) &&
         is_somewhere_reasonable) {
       if (!gDisassContext->getInternalFunction(direct_values[0])) {
         LOG(INFO)
@@ -884,7 +866,7 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
         continue;
       }
 
-      if (IsInRegion(region, *tmp_ptr)) {
+      if (gSectionManager->IsInRegion(region, *tmp_ptr)) {
         std::string name = base_name + "_unnamed_" + std::to_string(++unnamed);
         WriteDataXref({region->getMemOffset() + size - off,
                       *tmp_ptr,
@@ -898,7 +880,7 @@ void CFGWriter::tryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
         gDisassContext->segment_vars.insert({*tmp_ptr, cfg_var});
         continue;
 
-      } else if (IsInBinary(code_source, *tmp_ptr)) {
+      } else if (gSectionManager->IsInBinary(*tmp_ptr)) {
         LOG(INFO) << "Cross xref " << std::hex
                   << region->getMemOffset() + size - off << " " << *tmp_ptr;
         cross_xrefs.push_back({region->getMemOffset() + size - off,
@@ -937,7 +919,7 @@ void CFGWriter::xrefsInSegment(SymtabAPI::Region *region,
     if (!handleDataXref(segment, region->getMemOffset() + j, *offset)) {
       LOG(INFO) << "\tDid not resolve it, try to search in .text";
 
-      if (IsInRegion(gSection_manager->getRegion(".text"), *offset)) {
+      if (gSectionManager->IsInRegion(".text", *offset)) {
         LOG(INFO) << "\tXref is pointing into .text";
         code_xrefs_to_resolve.insert(
             {*offset,{region->getMemOffset() + j, *offset, segment}});
@@ -979,7 +961,7 @@ void WriteAsRaw(std::string& data, uint64_t number, int64_t offset) {
 //             -fPIC & -pie?
 void CFGWriter::writeGOT(SymtabAPI::Region* region,
                                  mcsema::Segment* segment) {
-  auto rela_dyn = gSection_manager->getRegion(".rela.dyn");
+  auto rela_dyn = gSectionManager->GetRegion(".rela.dyn");
   if (!rela_dyn || !FLAGS_pie_mode) {
     return;
   }
@@ -988,7 +970,7 @@ void CFGWriter::writeGOT(SymtabAPI::Region* region,
   auto old_data = segment->mutable_data();
   std::string data{*old_data};
   for (auto reloc : relocations) {
-    if (!IsInRegion(region, reloc.rel_addr())) {
+    if (!gSectionManager->IsInRegion(region, reloc.rel_addr())) {
       continue;
     }
     bool found = false;
@@ -1040,7 +1022,7 @@ void CFGWriter::writeGOT(SymtabAPI::Region* region,
 void CFGWriter::writeRelocations(SymtabAPI::Region* region,
                          mcsema::Segment *segment) {
 
-  auto rela_dyn = gSection_manager->getRegion(".rela.plt");
+  auto rela_dyn = gSectionManager->GetRegion(".rela.plt");
   if (!rela_dyn || !FLAGS_pie_mode) {
     return;
   }
@@ -1080,7 +1062,7 @@ void CFGWriter::ResolveCrossXrefs() {
     if(!handleDataXref(xref)) {
       LOG(INFO) << std::hex << xref.ea << " is unresolved, targeting "
                 << xref.target_ea;
-      if (gSection_manager->IsInRegions({".data", ".rodata", ".bss"}, xref.target_ea)) {
+      if (gSectionManager->IsInRegions({".data", ".rodata", ".bss"}, xref.target_ea)) {
         LOG(INFO) << "It is pointing into data sections, assuming it is xref";
         WriteDataXref(xref);
       }
@@ -1089,7 +1071,7 @@ void CFGWriter::ResolveCrossXrefs() {
     // entrypoint of some function that was missed by speculative parse.
     // Let's try to parse it now
 
-    if (IsInRegion(gSection_manager->getRegion(".text"), xref.target_ea)) {
+    if (gSectionManager->IsInRegion(".text", xref.target_ea)) {
       LOG(INFO) << "\tIs acturally targeting something in .text!";
       code_xrefs_to_resolve.insert({xref.target_ea, xref});
     }
@@ -1100,7 +1082,7 @@ void writeBssXrefs(SymtabAPI::Region *region,
                    mcsema::Segment *segment,
                    const DisassContext::SymbolMap<mcsema::ExternalVariable *> &externals) {
   for (auto &external : externals) {
-    if (IsInRegion(region, external.first)) {
+    if (gSectionManager->IsInRegion(region, external.first)) {
       auto cfg_xref = segment->add_xrefs();
       cfg_xref->set_ea(external.first);
       cfg_xref->set_width(8);
@@ -1117,12 +1099,12 @@ void writeBssXrefs(SymtabAPI::Region *region,
 // variables and such
 // Write things into gDisassContext
 void CFGWriter::writeInternalData() {
-  auto dataRegions = gSection_manager->GetDataRegions();
+  auto dataRegions = gSectionManager->GetDataRegions();
 
   for (auto region : dataRegions) {
+
+    // IDA does not include some of these, so neither should we
     std::set<std::string> no_parse = {
-      //".rela.dyn",
-      //".rela.plt",
       ".dynamic",
       ".dynstr",
       ".dynsym",
