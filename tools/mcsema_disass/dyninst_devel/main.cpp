@@ -26,6 +26,8 @@ DEFINE_string(output, "", "Path to output file");
 DEFINE_string(binary, "", "Path to binary to be disassembled");
 DEFINE_string(entrypoint, "main", "Name of entrypoint function");
 DEFINE_bool(pie_mode, true, "Experimental support for pie");
+DEFINE_string(arch, "", "NOT IMPLEMENTED YET");
+DEFINE_string(os, "", "NOT IMPLEMENTED YET");
 
 using namespace Dyninst;
 
@@ -47,6 +49,19 @@ static std::vector<std::string> Split(const std::string &s, const char delim) {
 
 }
 
+/* There is a global context right now consisting of two groups
+ * - gflags
+ * - global object
+ *    + gDisassContext -> Xref accounting and magic section
+ *    + gSectionManager
+ *    + gExtFuncManager
+ *   this part can most likely be included in CFGWriter later on
+ *
+ * Parsing itself is managed by CFGWriter::Write(),
+ * which is not reentrant!
+ * Main itself is not reentrant, for multiple disasses multiple executions are
+ * required (or reseting whole global context to initial values, not impl yet).
+*/
 int main(int argc, char **argv) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
@@ -67,50 +82,49 @@ int main(int argc, char **argv) {
   //FLAGS_logtostderr = 1;
 
   CHECK(!FLAGS_binary.empty()) << "Input file need to be specified";
-  auto inputStr = FLAGS_binary;
-  auto inputFile = const_cast<char *>(inputStr.data());
+  auto input_string = FLAGS_binary;
+  auto input_file = const_cast<char *>(input_string.data());
 
-  // Load external symbol definitions (for now, only functions)
+  // Load external symbol definitions
   if (!FLAGS_std_defs.empty()) {
     auto std_defs = Split(FLAGS_std_defs, kPathDelim);
     for (const auto &filename : std_defs) {
       LOG(INFO) << "Loading file containing external definitions";
       auto file = std::ifstream{filename};
-      gExt_func_manager->AddExternalSymbols(file);
+      gExtFuncManager->AddExternalSymbols(file);
     }
   }
 
   // Set up Dyninst stuff
+  auto symtab_cs =
+      std::make_shared<ParseAPI::SymtabCodeSource>(input_file);
+  CHECK(symtab_cs) << "Error during creation of ParseAPI::SymtabCodeSource!";
 
-  auto symtabCS =
-      std::make_shared<ParseAPI::SymtabCodeSource>(inputFile);
-  CHECK(symtabCS) << "Error during creation of ParseAPI::SymtabCodeSource!";
+  auto code_object = std::make_shared<ParseAPI::CodeObject>(symtab_cs.get());
+  CHECK(code_object) << "Error during creation of ParseAPI::CodeObject";
 
-  auto codeObj = std::make_shared<ParseAPI::CodeObject>(symtabCS.get());
-  CHECK(codeObj) << "Error during creation of ParseAPI::CodeObject";
-
-  codeObj->parse();
+  code_object->parse();
 
   // If binary is stripped we need to try some speculative parsing
   // We try both options that DynInst provides
   auto idiom = Dyninst::ParseAPI::GapParsingType::PreambleMatching;
-  for (auto &reg : symtabCS->regions()) {
-    codeObj->parseGaps(reg, idiom);
-    codeObj->parseGaps(reg);
+  for (auto &reg : symtab_cs->regions()) {
+    code_object->parseGaps(reg, idiom);
+    code_object->parseGaps(reg);
   }
 
-  auto symtab = symtabCS->getSymtabObject();
+  auto symtab = symtab_cs->getSymtabObject();
   CHECK(symtab) << "Error during creation of SymtabObject";
 
   // Mark the functions that appear in the module as used (so that
   // they will be listed as external symbols in the CFG file)
 
-  for (auto p : codeObj->cs()->linkage()) {
+  for (auto p : code_object->cs()->linkage()) {
     std::vector<SymtabAPI::Function *> fs;
 
     // Only mark external functions
     if (!(symtab->findFunctionsByName(fs, p.second)))
-      gExt_func_manager->MarkAsUsed(p.second);
+      gExtFuncManager->MarkAsUsed(p.second);
   }
 
   if (FLAGS_output.empty()) {
@@ -123,9 +137,8 @@ int main(int argc, char **argv) {
 
   mcsema::Module m;
 
-  CFGWriter cfgWriter(m, FLAGS_binary, *symtab, *symtabCS,
-      *codeObj);
-  cfgWriter.write();
+  CFGWriter cfg_writer(m, *symtab, *symtab_cs, *code_object);
+  cfg_writer.Write();
 
   // Dump the CFG file in a human-readable format if requested
   if (FLAGS_dump_cfg) {

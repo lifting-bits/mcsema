@@ -10,7 +10,7 @@
 #include <memory>
 
 class ExternalFunctionManager;
-extern std::unique_ptr<ExternalFunctionManager> gExt_func_manager;
+extern std::unique_ptr<ExternalFunctionManager> gExtFuncManager;
 
 struct ExternalFunction {
   using CfgCC = mcsema::ExternalFunction::CallingConvention;

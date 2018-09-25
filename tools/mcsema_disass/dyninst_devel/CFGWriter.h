@@ -20,47 +20,47 @@ using SymbolMap = std::unordered_map<Dyninst::Address, std::string>;
 
 class CFGWriter {
 public:
-  CFGWriter(mcsema::Module &m, const std::string &module_name,
+  CFGWriter(mcsema::Module &m,
             Dyninst::SymtabAPI::Symtab &symtab,
             Dyninst::ParseAPI::SymtabCodeSource &symCodeSrc,
             Dyninst::ParseAPI::CodeObject &codeObj);
 
-  void write();
+  void Write();
 
 private:
-  void writeDataVariables(Dyninst::SymtabAPI::Region *region,
+  void WriteDataVariables(Dyninst::SymtabAPI::Region *region,
                           mcsema::Segment *segment);
 
-  void writeExternalVariables();
-  void writeGlobalVariables();
-  void writeInternalFunctions();
-  void writeBlock(Dyninst::ParseAPI::Block *block,
+  void WriteExternalVariables();
+  void WriteGlobalVariables();
+  void WriteInternalFunctions();
+  void WriteBlock(Dyninst::ParseAPI::Block *block,
                   Dyninst::ParseAPI::Function *func,
                   mcsema::Function *cfgInternalFunc);
-  void  writeInstruction(Dyninst::InstructionAPI::Instruction *instruction,
+  void  WriteInstruction(Dyninst::InstructionAPI::Instruction *instruction,
                         Dyninst::Address addr, mcsema::Block *cfgBlock);
-  void handleCallInstruction(Dyninst::InstructionAPI::Instruction *instruction,
+  void HandleCallInstruction(Dyninst::InstructionAPI::Instruction *instruction,
                              Dyninst::Address addr,
                              mcsema::Instruction *cfgInstruction);
   void
-  handleNonCallInstruction(Dyninst::InstructionAPI::Instruction *instruction,
+  HandleNonCallInstruction(Dyninst::InstructionAPI::Instruction *instruction,
                            Dyninst::Address addr,
                            mcsema::Instruction *cfgInstruction);
 
-  bool handleDataXref(const CrossXref<mcsema::Segment *> &xref);
-  bool handleDataXref(mcsema::Segment *segment,
+  bool HandleDataXref(const CrossXref<mcsema::Segment *> &xref);
+  bool HandleDataXref(mcsema::Segment *segment,
                      Dyninst::Address ea,
                       Dyninst::Address target);
   void ResolveCrossXrefs();
-  void tryParseVariables(Dyninst::SymtabAPI::Region *, mcsema::Segment *);
+  void TryParseVariables(Dyninst::SymtabAPI::Region *, mcsema::Segment *);
 
-  void writeFunction(Dyninst::ParseAPI::Function *func,
+  void WriteFunction(Dyninst::ParseAPI::Function *func,
                      mcsema::Function *cfg_internal_func);
 
-  void writeExternalFunctions();
-  void writeInternalData();
-  void writeRelocations(Dyninst::SymtabAPI::Region*, mcsema::Segment *);
-  void writeGOT(Dyninst::SymtabAPI::Region*, mcsema::Segment *);
+  void WriteExternalFunctions();
+  void WriteInternalData();
+  void WriteRelocations(Dyninst::SymtabAPI::Region*, mcsema::Segment *);
+  void WriteGOT(Dyninst::SymtabAPI::Region*, mcsema::Segment *);
 
   Dyninst::Address immediateNonCall(Dyninst::InstructionAPI::Immediate *imm,
                         Dyninst::Address addr,
@@ -69,30 +69,23 @@ private:
                           Dyninst::Address,
                           mcsema::Instruction *);
 
-  bool handleXref(mcsema::Instruction *, Dyninst::Address, bool force=true);
+  bool HandleXref(mcsema::Instruction *, Dyninst::Address, bool force=true);
 
-  std::string getXrefName(Dyninst::Address addr);
-  void xrefsInSegment(Dyninst::SymtabAPI::Region *region,
+  void XrefsInSegment(Dyninst::SymtabAPI::Region *region,
                       mcsema::Segment *segment );
-  bool isNoReturn( const std::string& str);
-  void getNoReturns();
+  bool IsNoReturn( const std::string& str);
+  void GetNoReturns();
 
-  void checkDisplacement(Dyninst::InstructionAPI::Expression *,
+  void CheckDisplacement(Dyninst::InstructionAPI::Expression *,
                          mcsema::Instruction *);
-  bool isExternal(Dyninst::Address addr) const;
-  std::string getExternalName(Dyninst::Address addr) const;
+  bool IsExternal(Dyninst::Address addr) const;
+
+  mcsema::Module &module;
 
   /* Dyninst related objects */
-  mcsema::Module &module;
-  std::string module_name;
-
   Dyninst::SymtabAPI::Symtab &symtab;
   Dyninst::ParseAPI::CodeObject &code_object;
   Dyninst::ParseAPI::SymtabCodeSource &code_source;
-
-  /* After -abi-libraries are fully embraced in master branch, this can go out */
-  //ExternalFunctionManager &ext_func_manager;
-  //SectionManager section_manager;
 
   std::unordered_set<std::string> no_ret_funcs;
 
