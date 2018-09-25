@@ -790,6 +790,7 @@ void CFGWriter::TryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
             << " for xrefs & vars";
   LOG(INFO) << "Starts at 0x" << std::hex << region->getMemOffset()
             << " ends at 0x" << end;
+  // Some random names
   static int counter = 0;
   static int unnamed = 0;
 
@@ -800,7 +801,8 @@ void CFGWriter::TryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
     if (*offset == 0) {
       continue;
     }
-    LOG(INFO) << "Nonzero at 0x" << std::hex << region->getMemOffset() + j;
+
+    // Read until next zero
     uint64_t size = j;
     while (*offset != 0) {
       ++j;
@@ -811,42 +813,41 @@ void CFGWriter::TryParseVariables(SymtabAPI::Region *region, mcsema::Segment *se
       }
     }
 
+    // Zero was found, but it may have been something like
+    // 04 bc 00 00 so zero is still valid part of address
     uint64_t off = size % 4;
     auto diff = j - size;
     if (diff + off <= 4) {
       diff += off;
     }
-    //TODO(lukas): -fPIC & -pie ?
     if (diff <= 4 && diff  >= 3) {
 
       auto tmp_ptr = reinterpret_cast<std::uint64_t *>(static_cast<uint8_t *>(
             region->getPtrToRawData()) + size - off);
-      if (HandleDataXref(segment, region->getMemOffset() + size - off, *tmp_ptr)) {
+      Dyninst::Address target_ea = *tmp_ptr;
+      Dyninst::Address ea = region->getMemOffset() + size - off;
+
+      if (HandleDataXref(segment, ea, target_ea)) {
         LOG(INFO) << "Fished up " << std::hex
                   << region->getMemOffset() + size << " " << *tmp_ptr;
         continue;
       }
 
-      if (gSectionManager->IsInRegion(region, *tmp_ptr)) {
+      if (gSectionManager->IsInRegion(region, target_ea)) {
         std::string name = base_name + "_unnamed_" + std::to_string(++unnamed);
-        WriteDataXref({region->getMemOffset() + size - off,
-                      *tmp_ptr,
-                      segment},
-                      name);
+        WriteDataXref({ea, target_ea, segment}, name);
 
-        //Now add target as var
+        //Now add target as var because it was not before
         auto cfg_var = segment->add_vars();
         cfg_var->set_name(name);
-        cfg_var->set_ea(*tmp_ptr);
-        gDisassContext->segment_vars.insert({*tmp_ptr, cfg_var});
+        cfg_var->set_ea(target_ea);
+        gDisassContext->segment_vars.insert({target_ea, cfg_var});
         continue;
 
-      } else if (gSectionManager->IsInBinary(*tmp_ptr)) {
-        LOG(INFO) << "Cross xref " << std::hex
-                  << region->getMemOffset() + size - off << " " << *tmp_ptr;
-        cross_xrefs.push_back({region->getMemOffset() + size - off,
-                              *tmp_ptr,
-                              segment});
+      } else if (gSectionManager->IsInBinary(target_ea)) {
+        LOG(INFO) << "Cross xref 0x" << std::hex
+                  << ea << " -> 0x" << target_ea;
+        cross_xrefs.push_back({ea, target_ea, segment});
         continue;
       }
     }
