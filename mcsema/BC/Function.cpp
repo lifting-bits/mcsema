@@ -289,6 +289,14 @@ static llvm::Function *DevirtualizeIndirectFlow(
   // to the destination function.
   if (auto mem = ctx.cfg_inst->mem) {
     auto seg = mem->target_segment;
+
+    // In case there is a variable that has some default value, e.g. can
+    // be recognized both as xref and var on the same ea
+    // However later it can be changed to different value, so we can't
+    // devirtualize it (issue #474)
+    if (!mem->segment->is_read_only) {
+      return fallback;
+    }
     auto target_ea_ptr_ea = mem->target_ea;
     auto entry_it = seg->entries.find(target_ea_ptr_ea);
     if (entry_it != seg->entries.end()) {
