@@ -1074,7 +1074,7 @@ void WriteBssXrefs(
   for (auto &external : externals) {
     if (gSectionManager->IsInRegion(region, external.first)) {
       WriteDataXref({external.first, external.first, segment},
-                    external.second->name);
+                    external.second->name());
     }
   }
 }
