@@ -1,8 +1,9 @@
 if (NOT UNIX)
   message (ERROR "The Dyninst frontend currently does not support this OS")
 else ()
-  add_compile_options(-frtti -std=c++14)
-  set (CMAKE_CXX_FLAGS "-std=c++14")
+  add_compile_options(-frtti -std=c++1z)
+  set (CMAKE_CXX_FLAGS "-frtti")
+  set (CMAKE_CXX_FLAGS "-std=c++1z")
 endif ()
 
 find_package(Dyninst REQUIRED)
@@ -22,6 +23,8 @@ add_executable(${MCSEMA_DYNINST_DISASS}
   CFGWriter.cpp
   ExternalFunctionManager.cpp
   SectionManager.cpp
+  MagicSection.cpp
+  Util.cpp
   )
 
 add_dependencies(${MCSEMA_DYNINST_DISASS} generate-protobuf-files)
@@ -29,7 +32,7 @@ add_dependencies(${MCSEMA_DYNINST_DISASS} generate-protobuf-files)
 target_link_libraries(${MCSEMA_DYNINST_DISASS} PRIVATE dyninstAPI symtabAPI parseAPI common instructionAPI protobuf)
 target_link_libraries(${MCSEMA_DYNINST_DISASS} PRIVATE ${PROJECT_LIBRARIES})
 set_property(TARGET ${MCSEMA_DYNINST_DISASS} APPEND PROPERTY CMAKE_CXX_FLAGS -frtti)
-set_target_properties(${MCSEMA_DYNINST_DISASS} PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)
+set_target_properties(${MCSEMA_DYNINST_DISASS} PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)
 
 install(
   TARGETS ${MCSEMA_DYNINST_DISASS}

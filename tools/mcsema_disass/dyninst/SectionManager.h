@@ -3,37 +3,38 @@
 #include <Symtab.h>
 #include <set>
 #include <array>
+#include <memory>
+
+namespace mcsema {
+  class Segment;
+}
+
+struct Section {
+  Dyninst::SymtabAPI::Region *region;
+  std::string name;
+};
 
 class SectionManager {
 public:
   void AddRegion(Dyninst::SymtabAPI::Region *r);
 
-  bool IsData(Dyninst::Address a) const;
-  bool IsCode(Dyninst::Address a) const;
+  bool IsData(Dyninst::Address a);
+  bool IsCode(Dyninst::Address a);
 
-  std::set<Dyninst::SymtabAPI::Region *> GetDataRegions() const;
-  std::set<Dyninst::SymtabAPI::Region *> GetAllRegions() { return regions; }
+  bool IsInRegion(Dyninst::SymtabAPI::Region *r, Dyninst::Address a);
+  bool IsInRegions(std::vector<std::string> sections, Dyninst::Address addr);
+  bool IsInRegion(const std::string& region, Dyninst::Address addr);
+  bool IsInBinary(Dyninst::Address addr);
 
-  Dyninst::SymtabAPI::Region *getRodata() { return rodata; }
-  Dyninst::SymtabAPI::Region *getText() { return text; }
+  std::set<Dyninst::SymtabAPI::Region *> GetDataRegions();
+  std::set<Dyninst::SymtabAPI::Region *> GetAllRegions();
 
-  Dyninst::SymtabAPI::Region *getRegion(const std::string &name);
+  Dyninst::SymtabAPI::Region *GetRegion(const std::string &name);
 
 private:
-  Dyninst::SymtabAPI::Region *text;
-  Dyninst::SymtabAPI::Region *rodata;
-  std::set<Dyninst::SymtabAPI::Region *> regions;
-
-  std::array<std::string, 9> to_write_regions = {
-    ".data",
-    ".bss",
-    ".plt",
-    ".init",
-    ".got.plt",
-    ".eh_frame_hdr",
-    ".rodata",
-    ".fini",
-    ".text"
-  };
-  std::set<Dyninst::SymtabAPI::Region *> data_regions;
+  // There won't be big enough number of regions to justify
+  // std::map
+  std::vector<Section> regions;
 };
+
+extern std::unique_ptr<SectionManager> gSectionManager;

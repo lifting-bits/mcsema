@@ -49,7 +49,7 @@ class LinuxTest (unittest.TestCase):
         exe = self.test_dir + "/" + filename + ".exe"
 
         # Build the C file
-        subprocess.check_output ([ self.cc, std, source, "-o", exe, "-lpthread", "-lm", "-s" ], stderr = subprocess.STDOUT)
+        subprocess.check_output ([ self.cc, std, source, "-o", exe, "-fPIC", "-pie", "-lpthread", "-lm", "-s" ], stderr = subprocess.STDOUT)
 
         # Generate the expected output
         expected_output = subprocess.check_output ([ exe ] + list (args), stderr = subprocess.STDOUT,
@@ -58,6 +58,7 @@ class LinuxTest (unittest.TestCase):
         # Disassemble the binary
         cfg = self.test_dir + "/" + filename + ".cfg"
         subprocess.check_call ([ disass,
+                                 "--pie_mode", "true",
                                  "--binary", exe,
                                  "--output", cfg,
                                  "--std_defs", std_defs ])
@@ -65,11 +66,12 @@ class LinuxTest (unittest.TestCase):
         # Lift it
         bc = self.test_dir + "/" + filename + ".bc"
         subprocess.check_call ([ lift, "-os", "linux", "-arch", "amd64", "-cfg", cfg,
+                                    #"-disable_optimizer", "true",
                                     #"-libc_constructor", "init",
                                     #"-libc_destructor", "fini",
                                     #"-explicit_args", "true",
-                                    #"-explicit_args_count", "8",
-                                    "-abi_libraries", "libc.bc",#qsort.bc",#,printf.bc",
+                                    #"-explicit_args_count", "5",
+                                    "-abi_libraries", "libc.bc",#qsort.bc",printf.bc",
                                     #"-disable_dead_store_elimination", "true",
                                     #"-disable_register_forwarding", "true",
                                     "-output", bc ], stderr = subprocess.STDOUT)
@@ -77,7 +79,7 @@ class LinuxTest (unittest.TestCase):
         # Recompile it
         rcexe = self.test_dir + "/" + filename + ".rc-exe"
         lib = lib_dir + "libmcsema_rt64-4.0.a"
-        subprocess.check_call ([self.cc, bc, "-o", rcexe, lib, "-lpthread", "-lm"])
+        subprocess.check_call ([self.cc, bc, "-o", rcexe, lib, "-fPIC", "-pie", "-lpthread", "-lm"])
 
         # Generate actual output
         actual_output = subprocess.check_output ([ rcexe ] + list (args), stderr = subprocess.STDOUT,
@@ -99,7 +101,6 @@ class LinuxTest (unittest.TestCase):
               data = myfile.read()
         self.input = data
 
-
     def test_qsort_function_ptrs (self):
         self.runTest("qsort_function_ptrs.cpp", "23")
         self.runTest("qsort_function_ptrs.cpp", "43")
@@ -107,9 +108,13 @@ class LinuxTest (unittest.TestCase):
     def test_complex_numbers (self):
         self.runTest("complex_numbers.c")
 
-    def test_complex_numbers_partial (self):
+    def test_complex_long_double (self):
         self.runTest("complex_long_double.c")
+
+    def test_complex_double (self):
         self.runTest("complex_double.c")
+
+    def test_complex_float (self):
         self.runTest("complex_float.c")
 
     def test_all_data_array (self):
