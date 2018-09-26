@@ -7,6 +7,10 @@
 #include <set>
 #include <string>
 #include <experimental/optional>
+#include <memory>
+
+class ExternalFunctionManager;
+extern std::unique_ptr<ExternalFunctionManager> gExtFuncManager;
 
 struct ExternalFunction {
   using CfgCC = mcsema::ExternalFunction::CallingConvention;
@@ -24,7 +28,13 @@ struct ExternalFunction {
   bool is_weak = false;
   std::experimental::optional<std::string> signature = {};
 
+  // Dyninst::Address
+  uint64_t ea = 0;
+  uint64_t imag_ea = 0;
   CfgCC CfgCallingConvention() const;
+
+  mcsema::ExternalFunction *Write(mcsema::Module &module);
+  mcsema::ExternalFunction *WriteHelper(mcsema::Module &module, uint64_t ea);
 };
 
 class ExternalFunctionManager {
@@ -50,8 +60,8 @@ public:
   bool IsExternal(const std::string &name) const;
 
   // Returns the information stored for the function called "name"
-  // and throws an exception if no such function can be found.
-  const ExternalFunction &GetExternalFunction(const std::string &name);
+  // and LOG(FATAL) if no such function can be found.
+  ExternalFunction &GetExternalFunction(const std::string &name);
 
   /* The following methods can be used to keep track of the external
    * functions that are actually called somewhere. This can greatly

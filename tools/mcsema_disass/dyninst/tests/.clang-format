@@ -1,0 +1,12 @@
+---
+Language:        Cpp
+BasedOnStyle:  WebKit
+AllowShortBlocksOnASingleLine: true
+BreakBeforeBraces: Attach
+BreakConstructorInitializersBeforeComma: false
+DerivePointerAlignment: true
+PointerAlignment: Middle
+Standard:        Cpp11
+TabWidth:        4
+UseTab:          ForIndentation
+...

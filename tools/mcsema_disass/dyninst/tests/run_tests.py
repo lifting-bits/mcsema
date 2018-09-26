@@ -65,14 +65,14 @@ class LinuxTest (unittest.TestCase):
         # Lift it
         bc = self.test_dir + "/" + filename + ".bc"
         subprocess.check_call ([ lift, "-os", "linux", "-arch", "amd64", "-cfg", cfg,
-                                    "-disable_optimizer", "true",
-                                    "-libc_constructor", "__libc_csu_init",
-                                    "-libc_destructor", "__libc_csu_fini",
-                                    "-explicit_args", "true",
-                                    "-explicit_args_count", "5",
-                                    "-abi_libraries", "libc.bc,qsort.bc,printf.bc",
-                                    "-disable_dead_store_elimination", "true",
-                                    "-disable_register_forwarding", "true",
+                                    #"-disable_optimizer", "true",
+                                    #"-libc_constructor", "__libc_csu_init",
+                                    #"-libc_destructor", "__libc_csu_fini",
+                                    #"-explicit_args", "true",
+                                    #"-explicit_args_count", "5",
+                                    "-abi_libraries", "libc.bc",#qsort.bc",printf.bc",
+                                    #"-disable_dead_store_elimination", "true",
+                                    #"-disable_register_forwarding", "true",
                                     "-output", bc ], stderr = subprocess.STDOUT)
 
         # Recompile it
@@ -226,6 +226,9 @@ class LinuxTest (unittest.TestCase):
         self.runTest("fmodf.cpp")
         self.runTest("printf_floats.cpp")
 
+    #def test_gzip(self):
+    #    self.runBinTest("gzip", "--help")
+
     def test_libfoo_so (self):
         # This test needs special handling because it builds a shared library
 
@@ -278,6 +281,66 @@ class LinuxTest (unittest.TestCase):
         os.remove (bc)
         os.remove (obj)
         os.remove (rcexe)
+
+    def runBinTest (self, filename, *args):
+        ignore, ext = os.path.splitext(filename)
+
+        shutil.copy (filename, self.test_dir)
+
+        source = self.test_dir + "/" + filename
+
+        # The ".exe" suffix is arbitrary
+        exe = self.test_dir + "/" + filename
+
+        # Build the C file
+        #subprocess.check_output ([ self.cc, std, source, "-o", exe, "-lpthread", "-lm" ], stderr = subprocess.STDOUT)
+
+        # Generate the expected output
+        expected_output = subprocess.check_output ([ exe ] + list (args), stderr = subprocess.STDOUT,
+                input=self.input.encode())
+
+        # Disassemble the binary
+        cfg = self.test_dir + "/" + filename + ".cfg"
+        subprocess.check_call ([ disass,
+                                 "--binary", exe,
+                                 "--output", cfg,
+                                 "--std_defs", std_defs ])
+
+        # Lift it
+        bc = self.test_dir + "/" + filename + ".bc"
+        subprocess.check_call ([ lift, "-os", "linux", "-arch", "amd64", "-cfg", cfg,
+                                    #"-disable_optimizer", "true",
+                                    "-libc_constructor", "init",
+                                    "-libc_destructor", "fini",
+                                    #"-explicit_args", "true",
+                                    #"-explicit_args_count", "5",
+                                    "-abi_libraries", "libc.bc",#qsort.bc",printf.bc",
+                                    #"-disable_dead_store_elimination", "true",
+                                    #"-disable_register_forwarding", "true",
+                                    "-output", bc ], stderr = subprocess.STDOUT)
+
+        # Recompile it
+        rcexe = self.test_dir + "/" + filename + ".rc-exe"
+        lib = lib_dir + "libmcsema_rt64-4.0.a"
+        subprocess.check_call ([self.cc, bc, "-o", rcexe, lib, "-lpthread", "-lm"])
+
+        # Generate actual output
+        actual_output = subprocess.check_output ([ rcexe ] + list (args), stderr = subprocess.STDOUT,
+                input=self.input.encode())
+
+        # Check the output
+        if filename != "pthread.cpp":
+            self.assertEqual (expected_output, actual_output)
+        self.assertEqual (len(expected_output), len(actual_output))
+
+        os.remove (source)
+        os.remove (exe)
+        os.remove (cfg)
+        os.remove (bc)
+        os.remove (rcexe)
+
+
+
 
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser (
