@@ -14,20 +14,18 @@
 
 class DisassContext;
 
-extern mcsema::Module gModule;
 extern std::unique_ptr<DisassContext> gDisassContext;
-
 
 template<class T, class... Rest>
 inline constexpr bool is_any = (std::is_same<T, Rest>::value && ...);
 
-
-mcsema::CodeReference *AddCodeXref(mcsema::Instruction * instruction,
-                 mcsema::CodeReference::TargetType tarTy,
-                 mcsema::CodeReference_OperandType opTy,
-                 mcsema::CodeReference_Location location,
-                 Dyninst::Address addr,
-                 const std::string &name="");
+mcsema::CodeReference *AddCodeXref(
+    mcsema::Instruction * instruction,
+    mcsema::CodeReference::TargetType tarTy,
+    mcsema::CodeReference_OperandType opTy,
+    mcsema::CodeReference_Location location,
+    Dyninst::Address addr,
+    const std::string &name="");
 
 template<typename CFGUnit=mcsema::Segment *>
 struct CrossXref {
@@ -68,6 +66,9 @@ struct DisassContext {
   using SymbolMap = std::map<Dyninst::Address, T>;
 
   // TODO(lukas): I want heterogeneous container :'{!
+  //              FishXref would be nice and there could be
+  //              a function Contain<typename T>(Address) instead
+  //              of manual lookup
   SymbolMap<mcsema::Function *> func_map;
   SymbolMap<mcsema::GlobalVariable *> global_vars;
   SymbolMap<mcsema::ExternalVariable *> external_vars;
@@ -87,7 +88,8 @@ struct DisassContext {
     if (fact != facts.end()) {
       auto cfg_xref = xref.WriteDataXref(fact->second->name(), is_code, width);
       data_xrefs.insert({cfg_xref->ea(), cfg_xref});
-      LOG(INFO) << "\tResolved 0x" << std::hex << xref.ea << " -> 0x" << xref.target_ea;
+      LOG(INFO) << "\tResolved 0x" << std::hex << xref.ea
+                << " -> 0x" << xref.target_ea;
       return true;
     }
     return false;
@@ -100,8 +102,9 @@ struct DisassContext {
         FishForXref(segment_vars, xref) ||
         FishForXref(func_map, xref, true)) {
 
-        //FishForXref(data_xrefs, xref)) {
-      data_xrefs.insert({static_cast<Dyninst::Address>(xref.ea), xref.segment->mutable_xrefs(xref.segment->xrefs_size() - 1)});
+      auto cfg_xref =
+          xref.segment->mutable_xrefs(xref.segment->xrefs_size() - 1);
+      data_xrefs.insert({static_cast<Dyninst::Address>(xref.ea), cfg_xref});
       return true;
     }
     return false;
@@ -179,7 +182,10 @@ struct DisassContext {
     return false;
   }
 
-  bool HandleCodeXref(const CrossXref<mcsema::Instruction *> &xref, bool force=true) {
+  // If force=true function writes the xref even if target_ea
+  // cannot be resolved in something reasonable
+  bool HandleCodeXref(const CrossXref<mcsema::Instruction *> &xref,
+                      bool force=false) {
     LOG(INFO) << "Trying to resolve 0x" << std::hex << xref.ea << " -> 0x"
               << xref.target_ea;
     if (FishForXref<mcsema::GlobalVariable *>(global_vars, xref) ||
@@ -196,7 +202,8 @@ struct DisassContext {
     // E.g printf("%s: %s\n", "partial string test", "string test");
     // .rodata will contain only partial string test and proper offset
     // will be used when "string test" is needed
-    if (gSectionManager->IsInRegions({".data", ".rodata", ".bss"}, xref.target_ea)) {
+    if (gSectionManager->IsInRegions({".data", ".rodata", ".bss"},
+                                     xref.target_ea)) {
       LOG(INFO) << "\tIn .rodata or .data";
       AddCodeXref(xref.segment,
                   mcsema::CodeReference::DataTarget,
