@@ -14,8 +14,8 @@ You won't need IDA Pro to run mcsema-dyninst-disass, but Git, CMake, Google Prot
 Assuming that you've installed Dyninst to ```/usr/local/```, you need to export the following environment variables:
 
 ```shell
-$ export CMAKE_PREFIX_PATH=/usr/local/lib/cmake/Dyninst
-$ export BUILD_MCSEMA_DYNINST_DISASS=1
+export CMAKE_PREFIX_PATH=/usr/local/lib/cmake/Dyninst
+export BUILD_MCSEMA_DYNINST_DISASS=1
 ```
 
 The ```CMAKE_PREFIX_PATH``` environment variable tells CMake where to find the necessary Dyninst files, and the ```BUILD_MCSEMA_DYNINST_DISASS``` environment variable will cause the top-level CMakeLists.txt file to descend into the subdirectory where this frontend resides (otherwise it won't get built).
@@ -27,7 +27,7 @@ Now, you should be able to build this frontend along with McSema using the ```bu
 mcsema-dyninst-disass comes with a few test cases. To try them out, make sure you have built both this frontend as well as mcsema-lift. Then, chdir to ```mcsema/tools/mcsema_disass/dyninst/tests``` (in the source code tree), where you will find a Python script ```run_tests.py```.
 
 ```shell
-$ ./run_tests.py -h
+./run_tests.py -h
 ```
 
 provides an overview of the required command line options. Supplied with the proper arguments, the script will then proceed to build, disassemble, lift and recompile the test programs in a temporary directory, each time running both the original as well as the recompiled binary and then passing the test iff the outputs match. Python 2.7 won't work, implemented with Python 3.5 in mind.
@@ -40,6 +40,8 @@ mcsema-dyninst-disass replaces the IDA Pro frontend in the sense that both take 
 Pull request fixing bugs or implementing missing features are welcomed!
 * Tested *only* 64-bit ELF files, but there should not be fundamental problem with 32-bit
 * Has *only* been tested on Linux
+* Shared library are not lifted correctly, although error may be in mcsema itself
+* Long switch tables that get converted to tables are not caught in posidion independent code
 * Exceptions are ignored ( work in progress )
 * Still needs lots of debugging, corner-case handling, ...
 
