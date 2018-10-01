@@ -228,11 +228,13 @@ CFGWriter::CFGWriter(mcsema::Module &m,
   }
 
   // We need to give libc ctor/dtor names
-  if (ctor_offset) {
-    RenameFunc(ctor_offset, "init");
-  }
-  if (dtor_offset) {
-    RenameFunc(dtor_offset, "fini");
+  if (symtab.isStripped()) {
+    if (ctor_offset) {
+      RenameFunc(ctor_offset, "init");
+    }
+    if (dtor_offset) {
+      RenameFunc(dtor_offset, "fini");
+    }
   }
 
   GetNoReturns();
