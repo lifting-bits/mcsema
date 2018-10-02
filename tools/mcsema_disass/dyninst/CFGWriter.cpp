@@ -131,18 +131,6 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
   return 0;
 }
 
-mcsema::DataReference *WriteDataXref(
-    const CrossXref<mcsema::Segment *> &xref,
-    const std::string &name="",
-    bool is_code=false,
-    uint64_t width=8) {
-
-  auto cfg_xref = xref.WriteDataXref(name, is_code, width);
-  gDisassContext->data_xrefs.insert(
-      {static_cast<Dyninst::Address>(xref.ea), cfg_xref});
-  return cfg_xref;
-}
-
 // Modifies gDisassContext
 void RenameFunc(Dyninst::Address ea, const std::string& new_name) {
   LOG(INFO) << "Renaming 0x:" << std::hex << ea << " to " << new_name;
@@ -279,7 +267,7 @@ void CFGWriter::Write() {
   //Handle new functions found via various xrefs, mostly in stripped binary
   LOG(INFO) << code_xrefs_to_resolve.size() << " code xrefs is unresolved!";
   for (auto &a : code_xrefs_to_resolve) {
-    WriteDataXref(a.second, "", true);
+    gDisassContext->WriteAndAccount(a.second, true);
     code_object.parse(a.first, true);
   }
 
@@ -865,7 +853,7 @@ void CFGWriter::TryParseVariables(SymtabAPI::Region *region,
 
       if (gSectionManager->IsInRegion(region, target_ea)) {
         std::string name = base_name + "_unnamed_" + std::to_string(++unnamed);
-        WriteDataXref({ea, target_ea, segment}, name);
+        gDisassContext->WriteAndAccount({ea, target_ea, segment, name});
 
         //Now add target as var because it was not before
         auto cfg_var = segment->add_vars();
@@ -979,11 +967,11 @@ void CFGWriter::WriteGOT(SymtabAPI::Region* region,
       if (reloc.name() == ext_var->name()) {
         LOG(INFO) << "Writing cfg_xref in got 0x" << std::hex
                   << reloc.rel_addr() << " -> 0x" << ext_var->ea();
-        auto cfg_xref = WriteDataXref(
-            {reloc.rel_addr(),
+        auto cfg_xref = gDisassContext->WriteAndAccount({
+             reloc.rel_addr(),
              static_cast<Dyninst::Address>(ext_var->ea()),
-             cfg_segment},
-            ext_var->name());
+             cfg_segment,
+             ext_var->name()});
         found = true;
         gDisassContext->data_xrefs.insert({reloc.rel_addr(), cfg_xref});
         WriteAsRaw(data, ext_var->ea(), reloc.rel_addr() - cfg_segment->ea());
@@ -994,9 +982,8 @@ void CFGWriter::WriteGOT(SymtabAPI::Region* region,
           << "Giving magic_space to" << reloc.name();
 
       auto unreal_ea = magic_section.AllocSpace(ptr_byte_size);
-      auto cfg_xref = WriteDataXref(
-          {reloc.rel_addr(), unreal_ea, cfg_segment},
-          reloc.name(),
+      auto cfg_xref = gDisassContext->WriteAndAccount(
+          {reloc.rel_addr(), unreal_ea, cfg_segment, reloc.name()},
           true);
       WriteAsRaw(data, unreal_ea, reloc.rel_addr() - cfg_segment->ea());
 
@@ -1029,11 +1016,11 @@ void CFGWriter::WriteRelocations(SymtabAPI::Region* region,
       if (reloc.name() == ext_func->name()) {
         LOG(INFO) << "Writing xref in got 0x" << std::hex
                   << reloc.rel_addr() << " -> 0x" << ext_func->ea();
-        WriteDataXref(
-            {reloc.rel_addr(),
-             static_cast<Dyninst::Address>(ext_func->ea()),
-             segment},
-            ext_func->name());
+        gDisassContext->WriteAndAccount({
+            reloc.rel_addr(),
+            static_cast<Dyninst::Address>(ext_func->ea()),
+            segment,
+            ext_func->name()});
         WriteAsRaw(*data, ext_func->ea(), reloc.rel_addr() - segment->ea());
       }
     }
@@ -1055,7 +1042,7 @@ void CFGWriter::ResolveCrossXrefs() {
       if (gSectionManager->IsInRegions({".data", ".rodata", ".bss"},
                                        xref.target_ea)) {
         LOG(INFO) << "It is pointing into data sections, assuming it is xref";
-        WriteDataXref(xref);
+        gDisassContext->WriteAndAccount(xref);
       }
     }
     // If it's xref into .text it's highly possible it is
@@ -1075,8 +1062,8 @@ void WriteBssXrefs(
     const DisassContext::SymbolMap<mcsema::ExternalVariable *> &externals) {
   for (auto &external : externals) {
     if (gSectionManager->IsInRegion(region, external.first)) {
-      WriteDataXref({external.first, external.first, segment},
-                    external.second->name());
+      gDisassContext->WriteAndAccount(
+          {external.first, external.first, segment, external.second->name()});
     }
   }
 }
