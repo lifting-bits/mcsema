@@ -32,6 +32,7 @@ struct CrossXref {
   Dyninst::Address ea = 0;
   Dyninst::Address target_ea = 0;
   CFGUnit segment = nullptr;
+  std::string target_name;
 
   bool operator==(const CrossXref<CFGUnit> &other) {
     return ea == other.ea && target_ea == other.target_ea;
@@ -42,7 +43,6 @@ struct CrossXref {
   }
 
   mcsema::DataReference *WriteDataXref(
-      const std::string &name="",
       bool is_code=false,
       uint64_t width=8) const {
     LOG(INFO) << "\tFound xref targeting " << std::hex << target_ea;
@@ -50,7 +50,7 @@ struct CrossXref {
     cfg_xref->set_ea(ea);
     cfg_xref->set_width(width);
     cfg_xref->set_target_ea(target_ea);
-    cfg_xref->set_target_name(name);
+    cfg_xref->set_target_name(target_name);
     cfg_xref->set_target_is_code(is_code);
     // TODO(lukas): This will almost certainly cause problems once
     cfg_xref->set_target_fixup_kind(mcsema::DataReference::Absolute);
@@ -79,6 +79,15 @@ struct DisassContext {
   std::vector<Dyninst::Address> segment_eas;
   MagicSection magic_section;
 
+  // Writes and stores xref.ea into known data_xrefs
+  mcsema::DataReference *WriteAndAccount(CrossXref<mcsema::Segment *> xref,
+                                         bool is_code=false,
+                                         uint64_t width=8) {
+    auto cfg_xref = xref.WriteDataXref(is_code, width);
+    data_xrefs.insert({xref.ea, cfg_xref});
+    return cfg_xref;
+  }
+
   template<typename Container>
   bool FishForXref(const Container &facts,
                    CrossXref<mcsema::Segment *> &xref,
@@ -86,8 +95,8 @@ struct DisassContext {
                    uint64_t width=8) {
     auto fact = facts.find(xref.target_ea);
     if (fact != facts.end()) {
-      auto cfg_xref = xref.WriteDataXref(fact->second->name(), is_code, width);
-      data_xrefs.insert({cfg_xref->ea(), cfg_xref});
+      xref.target_name = fact->second->name();
+      WriteAndAccount(xref,is_code, width);
       LOG(INFO) << "\tResolved 0x" << std::hex << xref.ea
                 << " -> 0x" << xref.target_ea;
       return true;
