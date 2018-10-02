@@ -386,7 +386,7 @@ void CFGWriter::WriteInternalFunctions() {
     else if (gSectionManager->IsInRegion(".got.plt",
                                           func->entry()->start())) {
      LOG(INFO) << "Function " << func->name()
-               << " is getting skipped because it is .got.pl stub";
+               << " is getting skipped because it is .got.plt stub";
       continue;
     }
 
@@ -398,9 +398,6 @@ void CFGWriter::WriteInternalFunctions() {
 
     cfg_internal_func->set_is_entrypoint(
         not_entrypoints.find(func->name()) == not_entrypoints.end());
-    LOG(INFO) << "Function " << cfg_internal_func->name() << " at 0x"
-              << std::hex << cfg_internal_func->ea()
-              << " is entry point? "<< cfg_internal_func->is_entrypoint();
 
     for (ParseAPI::Block *block : func->blocks()) {
       WriteBlock(block, func, cfg_internal_func);
@@ -495,16 +492,16 @@ void CFGWriter::WriteInstruction(InstructionAPI::Instruction *instruction,
 }
 
 
-void WriteDisplacement(mcsema::Instruction *cfg_instruction, Address &address,
-        const std::string& name = "") {
-  // Addres is uint64_t and in CFG ea is int64_t
-  if (static_cast<int64_t>(address) <= 0) {
-    return;
-  }
+void WriteDisplacement(mcsema::Instruction *cfg_instruction, Address &address) {
 
-  AddCodeXref( cfg_instruction, CodeReference::DataTarget,
-          CodeReference::MemoryDisplacementOperand, CodeReference::Internal,
-          address, name );
+  if (gDisassContext->HandleCodeXref(
+      {static_cast<Address>(cfg_instruction->ea()),
+      address, cfg_instruction})) {
+
+    auto cfg_xref =
+        cfg_instruction->mutable_xrefs(cfg_instruction->xrefs_size() - 1);
+    cfg_xref->set_operand_type(CodeReference::MemoryDisplacementOperand);
+  }
 }
 
 // For instruction to have MemoryDisplacement it has among other things
@@ -523,7 +520,6 @@ Address DisplacementHelper(Dyninst::InstructionAPI::Expression *expr) {
   return 0;
 }
 
-// TODO(lukas): It has to actually point at something to be MDO
 void CFGWriter::CheckDisplacement(Dyninst::InstructionAPI::Expression *expr,
                                   mcsema::Instruction *cfg_instruction) {
 
