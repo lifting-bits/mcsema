@@ -25,6 +25,7 @@ add_executable(${MCSEMA_DYNINST_DISASS}
   SectionManager.cpp
   MagicSection.cpp
   Util.cpp
+  OffsetTable.cpp
   )
 
 add_dependencies(${MCSEMA_DYNINST_DISASS} generate-protobuf-files)
