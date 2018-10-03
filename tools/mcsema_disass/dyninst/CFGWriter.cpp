@@ -431,7 +431,6 @@ void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     }
 
     // Handle recursive calls
-
     found = false;
 
     if (edge->trg()->start() == func->entry()->start()) {
@@ -583,6 +582,7 @@ void CFGWriter::HandleCallInstruction(InstructionAPI::Instruction *instruction,
     // fills it with defaults. We need to check and correct it if needed
     if (gSectionManager->IsInRegion(".text", target)) {
       auto xref = cfg_instruction->mutable_xrefs(0);
+
       //xref->set_target_type(CodeReference::CodeTarget);
       xref->set_operand_type(CodeReference::ControlFlowOperand);
 
@@ -648,11 +648,10 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
   return 0;
 }
 
-// Handling only CODEXREFS!
+//TODO(lukas): Remove
 bool CFGWriter::HandleXref(mcsema::Instruction *cfg_instruction,
                            Address addr,
                            bool force) {
-
   return gDisassContext->HandleCodeXref({0, addr, cfg_instruction}, force);
 }
 
@@ -776,20 +775,6 @@ void CFGWriter::WriteExternalFunctions() {
   }
 }
 
-bool CFGWriter::HandleDataXref(const CrossXref<mcsema::Segment *> &xref) {
-  return HandleDataXref(xref.segment, xref.ea, xref.target_ea);
-}
-
-bool CFGWriter::HandleDataXref(mcsema::Segment *segment,
-                               Address ea,
-                               Address target) {
-  CrossXref<mcsema::Segment *> context_xref = {ea, target, segment};
-  if (gDisassContext->HandleDataXref(context_xref)) {
-    return true;
-  }
-  return false;
-}
-
 //TODO(lukas): This is finding vars actually?
 void CFGWriter::TryParseVariables(SymtabAPI::Region *region,
                                   mcsema::Segment *segment) {
@@ -835,13 +820,15 @@ void CFGWriter::TryParseVariables(SymtabAPI::Region *region,
       diff += off;
     }
 
+    // Check if it is small enough to be a one reference and try to match it
+    // against the rest of the binary to see if it truly is a reference
     if (diff <= 4 && diff  >= 3) {
       auto tmp_ptr = reinterpret_cast<std::uint64_t *>(static_cast<uint8_t *>(
             region->getPtrToRawData()) + size - off);
       Dyninst::Address target_ea = *tmp_ptr;
       Dyninst::Address ea = region->getMemOffset() + size - off;
 
-      if (HandleDataXref(segment, ea, target_ea)) {
+      if (gDisassContext->HandleDataXref({ea, target_ea, segment})) {
         LOG(INFO) << "Fished up " << std::hex
                   << region->getMemOffset() + size << " " << *tmp_ptr;
         continue;
@@ -866,6 +853,9 @@ void CFGWriter::TryParseVariables(SymtabAPI::Region *region,
       }
     }
 
+    // Now we know it is not a simple xref, but it still may be an OffsetTable
+    // which is a jump table (for example from switch statement)
+
     std::string name = base_name + "_" + std::to_string(counter);
     ++counter;
     LOG(INFO) << "\tAdding var " << name << " at 0x"
@@ -889,12 +879,8 @@ void CFGWriter::XrefsInSegment(SymtabAPI::Region *region,
   auto offset = static_cast<std::uint64_t*>(region->getPtrToRawData());
 
   for (int j = 0; j < region->getDiskSize(); j += 8, offset++) {
-    // Just so we know, there was something shady
-    LOG(INFO)
-      << std::hex << "Trying to resolve xref from " << region->getRegionName()
-      << " at 0x" <<region->getMemOffset() + j << " targeting 0x" << *offset;
-
-    if (!HandleDataXref(segment, region->getMemOffset() + j, *offset)) {
+    if (!gDisassContext->HandleDataXref(
+          {region->getMemOffset() + j, *offset, segment})) {
       LOG(INFO) << "\tDid not resolve it, try to search in .text";
 
       if (gSectionManager->IsInRegion(".text", *offset)) {
@@ -1032,9 +1018,7 @@ void CFGWriter::ResolveCrossXrefs() {
       continue;
     }
 
-    if(!HandleDataXref(xref)) {
-      LOG(INFO) << std::hex << xref.ea << " is unresolved, targeting "
-                << xref.target_ea;
+    if(!gDisassContext->HandleDataXref(xref)) {
       if (gSectionManager->IsInRegions({".data", ".rodata", ".bss"},
                                        xref.target_ea)) {
         LOG(INFO) << "It is pointing into data sections, assuming it is xref";

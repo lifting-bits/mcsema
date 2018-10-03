@@ -104,7 +104,9 @@ struct DisassContext {
     return false;
   }
 
-  bool HandleDataXref(CrossXref<mcsema::Segment *> &xref) {
+  bool HandleDataXref(CrossXref<mcsema::Segment *> xref) {
+    LOG(INFO) << "Trying to resolve xref 0x" << std::hex << xref.ea
+              << " -> 0x" << xref.target_ea;
     if (FishForXref(global_vars, xref) ||
         FishForXref(external_funcs, xref, true) ||
         FishForXref(external_vars, xref) ||
