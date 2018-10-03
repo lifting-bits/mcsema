@@ -16,6 +16,7 @@
 #include <gflags/gflags.h>
 
 #include "Util.h"
+#include "OffsetTable.h"
 #include <cstdio>
 
 DECLARE_string(entrypoint);
@@ -823,7 +824,7 @@ void CFGWriter::TryParseVariables(SymtabAPI::Region *region,
     // Check if it is small enough to be a one reference and try to match it
     // against the rest of the binary to see if it truly is a reference
     if (diff <= 4 && diff  >= 3) {
-      auto tmp_ptr = reinterpret_cast<std::uint64_t *>(static_cast<uint8_t *>(
+      auto tmp_ptr = reinterpret_cast<uint64_t *>(static_cast<uint8_t *>(
             region->getPtrToRawData()) + size - off);
       Dyninst::Address target_ea = *tmp_ptr;
       Dyninst::Address ea = region->getMemOffset() + size - off;
@@ -855,6 +856,16 @@ void CFGWriter::TryParseVariables(SymtabAPI::Region *region,
 
     // Now we know it is not a simple xref, but it still may be an OffsetTable
     // which is a jump table (for example from switch statement)
+
+    Address ea = region->getMemOffset() + size;
+    auto *ptr_to_value = reinterpret_cast<int32_t *>(
+        static_cast<uint8_t *>(region->getPtrToRawData()) + size);
+
+    // TODO(lukas): Store it & use it
+    auto table = OffsetTable::Parse(ea, ptr_to_value, region, j - size);
+    if (table) {
+      continue;
+    }
 
     std::string name = base_name + "_" + std::to_string(counter);
     ++counter;
