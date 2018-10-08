@@ -19,17 +19,6 @@ from binja_var_recovery.util import *
 
 FUNCTION_OBJECTS = collections.defaultdict()
 
-class Values(object):
-  def __init__(self, addr, type):
-    self.address = addr
-    self.type = type
-
-  def __str__(self):
-    return "<{:x}, {}>".format(self.address, self.type)
-
-  def __repr__(self):
-    return "<{:x}, {}>".format(self.address, self.type)
-
 class VariableAliasSet(object):
   def __init__(self):
     self.ALIAS_SET = collections.defaultdict(int)

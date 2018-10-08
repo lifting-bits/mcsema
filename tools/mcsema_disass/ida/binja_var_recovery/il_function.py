@@ -15,7 +15,7 @@
 import pprint
 import collections
 from Queue import Queue
-import binaryninja as binja
+from binaryninja import *
 from binja_var_recovery.util import *
 from binja_var_recovery.il_variable import *
 from binja_var_recovery.il_instructions import *
@@ -42,28 +42,6 @@ class Function(object):
     self.num_params = 0
     self.return_set = set()
     self.regs = collections.defaultdict(set)
-
-  def init_registers(self):
-    self.regs["rax"].add("%rax0")
-    self.regs["rbx"].add("%rbx0")
-    self.regs["rcx"].add("%rcx0")
-    self.regs["rdx"].add("%rdx0")
-    self.regs["rdi"].add("%rdi0")
-    self.regs["rsi"].add("%rsi0")
-    self.regs["rsp"].add("%rsp0")
-    self.regs["rbp"].add("%rbp0")
-
-    self.regs["r8"].add("%r80")
-    self.regs["r9"].add("%r90")
-    self.regs["r10"].add("%r100")
-    self.regs["r11"].add("%r110")
-    self.regs["r12"].add("%r120")
-    self.regs["r13"].add("%r130")
-    self.regs["r14"].add("%r140")
-    self.regs["r15"].add("%r150")
-
-    self.regs["fsbase"].add("%fsbase0")
-    self.regs["gsbase"].add("%gsbase0")
 
   def update_register(self, reg_name, value):
     if reg_name is None:
@@ -107,6 +85,14 @@ class Function(object):
         parameters. It is the possible values of the entry registers. If the parameters
         can't be resolved it gets assigned '<undetermined>' as value
     """
+    def called_function(bv, insn):
+      if insn.operation == binja.MediumLevelILOperation.MLIL_CALL_SSA:
+        dest = insn.dest
+        if dest.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+          called_function = self.bv.get_function_at(dest.constant)
+          if called_function is not None:
+            return called_function.start
+
     if self.func is None:
       return
 
@@ -119,6 +105,9 @@ class Function(object):
         continue
 
       insn_il_ssa = insn_il.ssa_form
+      if called_function(self.bv, insn_il_ssa) != self.start_addr:
+        continue
+
       DEBUG("Function referred : {} {} num params {}".format(ref_function, insn_il_ssa, self.num_params))
       if not hasattr(insn_il_ssa, "params"):
         continue
@@ -141,7 +130,7 @@ class Function(object):
                             binja.RegisterValueType.ConstantPointerValue ]:
           value_set.add(p_value.value)
           # build the alias set from the constant value
-          build_alias_set(self.bv, p_value.value, p_value.value)
+          add_to_aliasset(self.bv, p_value.value, p_value.value)
         else:
           value_set.add("<undetermined>")
     DEBUG_POP()
@@ -178,7 +167,7 @@ class Function(object):
       except KeyError:
         pass
 
-  def recover_instructions(self):
+  def recover_mlil(self):
     """ It creates the instruction objects and process them for the variable
         analysis.
     """
@@ -211,6 +200,37 @@ class Function(object):
             queue_func(called_function.start)
       index += 1
     DEBUG_POP()
+    
+  def recover_llil(self):
+    index = 0
+    DEBUG("{:x} {}".format(self.func.start, self.func.name))
+    size = len(self.func.low_level_il.ssa_form)
+      
+    DEBUG_PUSH()
+    while index < size:
+      insn = self.func.low_level_il.ssa_form[index]
+      DEBUG("{} : {:x} {} operation {} ".format(index+1, insn.address, insn, insn.operation.name))
+      if not is_executable(self.bv, insn.address):
+        index += 1
+        continue
+
+      DEBUG_PUSH()
+      mlil_insn = ILInstruction(self.bv, self.func, insn)
+      operation_name = "{}".format(insn.operation.name.lower())
+      if hasattr(mlil_insn, operation_name):
+        getattr(mlil_insn, operation_name)(insn)
+      else:
+        DEBUG("Instruction operation {} is not supported!".format(operation_name))
+      DEBUG_POP()
+      
+      if is_call(self.bv, insn):
+        target = call_target(self.bv, insn)
+        if target is not None:
+          queue_func(target)
+          DEBUG("Call target {:x}".format(target))
+
+      index += 1
+    DEBUG_POP()
 
 def recover_function(bv, addr, is_entry=False):
   """ Process the function and collect the function which should be visited next
@@ -232,7 +252,8 @@ def recover_function(bv, addr, is_entry=False):
 
   f_handle.collect_parameters()
   f_handle.print_parameters()
-  f_handle.recover_instructions()
+  #f_handle.recover_mlil()
+  f_handle.recover_llil()
 
 def create_function(bv, func):
   if func.symbol.type == binja.SymbolType.ImportedFunctionSymbol:
