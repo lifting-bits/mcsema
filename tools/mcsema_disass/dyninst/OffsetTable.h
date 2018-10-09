@@ -1,6 +1,8 @@
+#pragma once
+
 #include <dyntypes.h>
 #include <set>
-#include <utility>
+#include <map>
 
 #include <experimental/optional>
 
@@ -16,6 +18,19 @@ struct OffsetTable {
       Dyninst::SymtabAPI::Region *region,
       size_t size);
 
+  Dyninst::Address ea() const {
+    return start_ea;
+  }
+
+  bool contains(Dyninst::Address addr) const;
+  std::experimental::optional<Dyninst::Address> Match(
+      const std::set<Dyninst::Address> &succ,
+      const std::set<Dyninst::Address> &xrefs) const;
+
+  OffsetTable Recompute(Dyninst::Address new_start_ea) const;
+
+  bool Match(const std::set<Dyninst::Address> &targets) const;
+  //bool SubsetMatch(const std::set<Dyninst::Address> &targets) const;
 private:
   OffsetTable(Dyninst::Address start_ea,
               Dyninst::SymtabAPI::Region *region,
@@ -26,6 +41,8 @@ private:
   size_t size;
 
   // For now I want them ordered {ea, in form start_ea - *ea - 1}
-  std::set<std::pair<Dyninst::Address, Dyninst::Address>> entries;
+  std::map<Dyninst::Address, Dyninst::Address> entries;
+  // Set of all values in entries
+  std::set<Dyninst::Address> targets;
 
 };

@@ -142,6 +142,45 @@ void RenameFunc(Dyninst::Address ea, const std::string& new_name) {
   internal_func->set_name(new_name);
 }
 
+void ResolveOffsetTable(const std::set<Dyninst::Address> &successors,
+                        mcsema::Block *cfg_block,
+                        const std::vector<OffsetTable> offset_tables) {
+  // For 2 targets offset table should not be generated?
+  if (successors.size() < 3) {
+    return;
+  }
+
+  LOG(INFO) << "Checking for offset table xref in " << offset_tables.size();
+
+  // Find all xrefs inside this block so they can be matched against offsetTable
+  std::set<Dyninst::Address> block_xrefs;
+  for (const auto &cfg_inst : cfg_block->instructions()) {
+    for (const auto &cfg_xref : cfg_inst.xrefs()) {
+      block_xrefs.insert(cfg_xref.ea());
+    }
+  }
+
+  std::experimental::optional<Dyninst::Address> table_ea;
+  for (const auto &table : offset_tables) {
+    table_ea = table.Match(successors, block_xrefs);
+    if (table_ea) {
+      break;
+    }
+  }
+
+  if (table_ea) {
+    LOG(INFO) << "Block contains reference to offset table at 0x"
+              << std::hex << table_ea.value();
+    auto cfg_inst = cfg_block->mutable_instructions(
+        cfg_block->instructions_size() - 1);
+    if (!cfg_inst->xrefs_size()) {
+      AddCodeXref(cfg_inst, CodeReference::DataTarget, CodeReference::OffsetTable,
+                  CodeReference::Internal, table_ea.value());
+    }
+  }
+
+}
+
 } //namespace
 
 CFGWriter::CFGWriter(mcsema::Module &m,
@@ -167,7 +206,6 @@ CFGWriter::CFGWriter(mcsema::Module &m,
       }
   }
 
-
   // We need to get main! Heuristic for stripped binaries is that main is
   // passed to __libc_start_main as last argument from _start, which we can
   // find, because it is entrypoint
@@ -179,6 +217,7 @@ CFGWriter::CFGWriter(mcsema::Module &m,
   if (entry_point) {
     code_object.parse(entry_point, true);
   }
+
   Address main_offset = TryRetrieveAddrFromStart(code_object, entry_point, 0);
   Address ctor_offset = TryRetrieveAddrFromStart(code_object, entry_point, 1);
   Address dtor_offset = TryRetrieveAddrFromStart(code_object, entry_point, 2);
@@ -415,6 +454,7 @@ void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
   cfg_block->set_ea(block->start());
 
   // Set outgoing edges
+  std::set<Address> successors;
   for (auto edge : block->targets()) {
 
     // Is this block part of the current function?
@@ -445,12 +485,14 @@ void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
       }
     }
 
-    if (!found)
+    if (!found) {
+      successors.insert(edge->trg()->start());
       cfg_block->add_successor_eas(edge->trg()->start());
+    }
   }
 
-  // Write instructions
 
+  // Write instructions
   std::map<Offset, InstructionAPI::Instruction::Ptr> instructions;
   block->getInsns(instructions);
 
@@ -463,6 +505,10 @@ void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     ip += instruction->size();
   }
 
+  LOG(INFO) << "Block at 0x" << std::hex << block->start() << std::dec
+            << " has " << successors.size() << " successors";
+
+  ResolveOffsetTable(successors, cfg_block, offset_tables);
 }
 
 void CFGWriter::WriteInstruction(InstructionAPI::Instruction *instruction,
@@ -861,9 +907,11 @@ void CFGWriter::TryParseVariables(SymtabAPI::Region *region,
     auto *ptr_to_value = reinterpret_cast<int32_t *>(
         static_cast<uint8_t *>(region->getPtrToRawData()) + size);
 
-    // TODO(lukas): Store it & use it
-    auto table = OffsetTable::Parse(ea, ptr_to_value, region, j - size);
+    auto alligment = (ea + j - size) % 4;
+    auto table = OffsetTable::Parse(ea, ptr_to_value, region, j - size - alligment);
     if (table) {
+      offset_tables.push_back(std::move(table.value()));
+      j -= alligment;
       continue;
     }
 
