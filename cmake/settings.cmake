@@ -14,10 +14,12 @@ macro(main)
   endif()
 
   # overwrite the default install prefix
-  if(DEFINED WIN32)
-    set(CMAKE_INSTALL_PREFIX "C:/")
-  else()
-    set(CMAKE_INSTALL_PREFIX "/usr/local")
+  if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    if(DEFINED WIN32)
+      set(CMAKE_INSTALL_PREFIX "C:/")
+    else()
+      set(CMAKE_INSTALL_PREFIX "/usr/local")
+    endif()
   endif()
 
   message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")

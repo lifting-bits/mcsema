@@ -65,8 +65,7 @@ _IGNORED_XREF_OP_TYPES = (LowLevelILOperation.LLIL_JUMP,
                           LowLevelILOperation.LLIL_UNIMPL_MEM)
 
 
-_CONST_XREF_OP_TYPES = (LowLevelILOperation.LLIL_CONST,
-                        LowLevelILOperation.LLIL_CONST_PTR)
+_CONST_XREF_OP_TYPES = [LowLevelILOperation.LLIL_CONST_PTR]
 
 _LOAD_STORE_OP_TYPES = (LowLevelILOperation.LLIL_LOAD,
                         LowLevelILOperation.LLIL_STORE)

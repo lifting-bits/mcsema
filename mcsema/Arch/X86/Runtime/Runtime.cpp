@@ -29,22 +29,22 @@
 extern "C" {
 
 // Debug registers.
-uint64_t gDR0;
-uint64_t gDR1;
-uint64_t gDR2;
-uint64_t gDR3;
-uint64_t gDR4;
-uint64_t gDR5;
-uint64_t gDR6;
-uint64_t gDR7;
+uint64_t DR0;
+uint64_t DR1;
+uint64_t DR2;
+uint64_t DR3;
+uint64_t DR4;
+uint64_t DR5;
+uint64_t DR6;
+uint64_t DR7;
 
 // Control regs.
-CR0Reg gCR0;
-CR1Reg gCR1;
-CR2Reg gCR2;
-CR3Reg gCR3;
-CR4Reg gCR4;
-CR8Reg gCR8;
+CR0Reg CR0;
+CR1Reg CR1;
+CR2Reg CR2;
+CR3Reg CR3;
+CR4Reg CR4;
+CR8Reg CR8;
 
 // enum : size_t {
 //   kStackSize = 1UL << 20UL

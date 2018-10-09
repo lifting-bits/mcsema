@@ -192,7 +192,13 @@ static llvm::Function *CreateMcSemaInitFiniImpl(
       llvm::GlobalValue::InternalLinkage,
       func_name, gModule);
 
-  llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", func));
+  auto bool_type = llvm::Type::getInt1Ty(*gContext);
+  auto check_var = new llvm::GlobalVariable(
+      bool_type, false, llvm::GlobalValue::InternalLinkage);
+  check_var->setInitializer(llvm::Constant::getNullValue(bool_type));
+
+  auto entry = llvm::BasicBlock::Create(*gContext, "", func);
+  llvm::IRBuilder<> ir(entry);
   ir.CreateRetVoid();
 
   auto i32_type = llvm::Type::getInt32Ty(*gContext);
@@ -250,6 +256,11 @@ static llvm::Function *GetOrCreateMcSemaConstructor(void) {
   if (!gInitFunc) {
     gInitFunc = CreateMcSemaInitFiniImpl(
         "__mcsema_constructor", "llvm.global_ctors");
+
+    // Make sure that the `__mcsema_constructor` calls the xref initializer
+    // as it's first thing.
+    llvm::IRBuilder<> ir(&(gInitFunc->front().front()));
+    ir.CreateCall(GetOrCreateMcSemaInitializer());
   }
   return gInitFunc;
 }
@@ -281,9 +292,10 @@ static llvm::Function *GetOrCreateMcSemaDestructor(void) {
 // handle them by emulating this runtime initialization. We create a special
 // constructor function of our own, `__mcsema_constructor`, that will contain
 // code that can do these initializations.
-static void LazyInitXRef(const NativeXref *xref, llvm::Type *extern_addr_type) {
-  auto init_func = GetOrCreateMcSemaConstructor();
-  llvm::BasicBlock *block = &init_func->front();
+static void LazyInitXRef(const NativeXref *xref, llvm::Type *extern_addr_type,
+                         llvm::Constant *target_addr_const) {
+  auto init_func = GetOrCreateMcSemaInitializer();
+  llvm::BasicBlock *block = &init_func->back();
   llvm::IRBuilder<> ir(block);
   ir.SetInsertPoint(&block->front());
 
@@ -296,11 +308,19 @@ static void LazyInitXRef(const NativeXref *xref, llvm::Type *extern_addr_type) {
     seg->setConstant(false);
   }
 
-  llvm::Value *target_addr = xref->var->address;
+  if (!target_addr_const || target_addr_const->isNullValue()) {
+    LOG_IF(FATAL, !xref->var)
+        << "Cannot perform lazy relocation of non-variable cross-reference "
+        << "from " << std::hex << xref->ea << " to " << xref->target_ea
+        << std::dec << " (" << xref->target_name << ")";
+    target_addr_const = xref->var->address;
+  }
+
+  llvm::Value *target_addr = target_addr_const;
 
   switch (xref->fixup_kind) {
     case NativeXref::kAbsoluteFixup: {
-      CHECK(!xref->var->is_thread_local)
+      CHECK(!xref->var || !xref->var->is_thread_local)
           << "Cannot do absolute fixup from " << std::hex << xref->ea
           << " to thread-local variable " << xref->target_name << " at "
           << std::hex << xref->target_ea;
@@ -309,6 +329,11 @@ static void LazyInitXRef(const NativeXref *xref, llvm::Type *extern_addr_type) {
     }
 
     case NativeXref::kThreadLocalOffsetFixup: {
+      CHECK(xref->var != nullptr)
+          << "Non-variable thread-local cross-reference from "
+          << std::hex << xref->ea << " to " << xref->target_ea << std::dec
+          << " (" << xref->target_name << ")";
+
       CHECK(xref->var->is_thread_local)
           << "Cannot do thread-local fixup from " << std::hex << xref->ea
           << " to non-thread-local variable " << xref->target_name << " at "
@@ -410,8 +435,8 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
               << "Adding runtime initializer for cross reference to variable "
               << cfg_var->name << " at " << std::hex << cfg_seg_entry.first
               << " in segment " << cfg_seg->name;
-          LazyInitXRef(xref, val_type);
-          val = llvm::ConstantInt::get(gWordType, 0);
+          LazyInitXRef(xref, val_type, val);
+          val = llvm::Constant::getNullValue(gWordType);
         } else {
           val = cfg_var->address;
         }
@@ -429,21 +454,17 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
       // Scale and add the value in. We need to fit it to its original width.
       if (val_size > gArch->address_size) {
         val = llvm::ConstantExpr::getZExt(val, val_type);
+
+      // Pointer truncation is generating the weird code for static
+      // initialization of segment variables which is causing problem
+      // during recompilations. Use Lazy initialization of the variable
+      //    segXXXX__gcc_except_table
+      // Wrongly generated static initializer looks like following:
+      //    .long   _ZTI12out_of_range&-1
+      //    .long   _ZTI17special_condition&-1
       } else if (val_size < gArch->address_size) {
-        if (xref->var) {
-          /* Pointer truncation is generating the weird code for static
-           * initialization of segment variables which is causing problem
-           * during recompilations. Use Lazy initialization of the variable
-           * `segXXXX__gcc_except_table`.
-           * Wrongly generated static initializer looks like following:
-           * `.long   _ZTI12out_of_range&-1`
-           * `.long   _ZTI17special_condition&-1`
-           */
-          LazyInitXRef(xref, val_type);
-          val = llvm::ConstantInt::get(val_type, 0);
-        } else {
-          val = llvm::ConstantExpr::getTrunc(val, val_type);
-        }
+        LazyInitXRef(xref, val_type, val);
+        val = llvm::ConstantInt::getNullValue(val_type);
       }
 
       CHECK(val->getType() == entry_type)
@@ -467,6 +488,42 @@ static void FillSegment(llvm::GlobalVariable *seg,
 }
 
 }  // namespace
+
+llvm::Function *GetOrCreateMcSemaInitializer(void) {
+  static llvm::Function *gInitFunc = nullptr;
+  if (!gInitFunc) {
+    LOG(INFO)
+          << "Creating __mcsema_early_init function to pre-initialize runtime.";
+
+    gInitFunc = llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext), false),
+        llvm::GlobalValue::InternalLinkage,
+        "__mcsema_early_init", gModule);
+
+    auto bool_type = llvm::Type::getInt1Ty(*gContext);
+    auto check_var = new llvm::GlobalVariable(
+        *gModule, bool_type, false, llvm::GlobalValue::InternalLinkage,
+        llvm::Constant::getNullValue(bool_type));
+
+    auto entry = llvm::BasicBlock::Create(*gContext, "", gInitFunc);
+    auto already_done = llvm::BasicBlock::Create(*gContext, "", gInitFunc);
+    auto lazy_xref = llvm::BasicBlock::Create(*gContext, "", gInitFunc);
+
+    llvm::IRBuilder<> ir(entry);
+
+    auto guard = ir.CreateLoad(check_var, true);
+    ir.CreateCondBr(guard, already_done, lazy_xref);
+
+    ir.SetInsertPoint(already_done);
+    ir.CreateRetVoid();
+
+    // Last basic block will have lazy xrefs injected into it.
+    ir.SetInsertPoint(lazy_xref);
+    ir.CreateStore(llvm::ConstantInt::get(bool_type, 1), check_var, true);
+    ir.CreateRetVoid();
+  }
+  return gInitFunc;
+}
 
 void AddDataSegments(const NativeModule *cfg_module) {
 
