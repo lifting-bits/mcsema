@@ -8,33 +8,33 @@ std::unique_ptr<ExternalFunctionManager>
 mcsema::ExternalFunction *ExternalFunction::WriteHelper(
     mcsema::Module &module,
     uint64_t ea) {
-	auto cfg_external_func = module.add_external_funcs();
+  auto cfg_external_func = module.add_external_funcs();
 
-	cfg_external_func->set_name(symbol_name);
-	cfg_external_func->set_ea(ea);
-	cfg_external_func->set_cc(CfgCallingConvention());
-	cfg_external_func->set_has_return(has_return);
-	cfg_external_func->set_no_return(!has_return);
-	cfg_external_func->set_argument_count(arg_count);
-	cfg_external_func->set_is_weak(is_weak);
+  cfg_external_func->set_name(symbol_name);
+  cfg_external_func->set_ea(ea);
+  cfg_external_func->set_cc(CfgCallingConvention());
+  cfg_external_func->set_has_return(has_return);
+  cfg_external_func->set_no_return(!has_return);
+  cfg_external_func->set_argument_count(arg_count);
+  cfg_external_func->set_is_weak(is_weak);
 
   return cfg_external_func;
 }
 
 mcsema::ExternalFunction *ExternalFunction::Write(
     mcsema::Module &module) {
-	WriteHelper(module, ea);
-	return WriteHelper(module, imag_ea);
+  WriteHelper(module, ea);
+  return WriteHelper(module, imag_ea);
 }
 
 ExternalFunction::CfgCC ExternalFunction::CfgCallingConvention() const {
   switch (cc) {
-  case CallingConvention::CallerCleanup:
-    return mcsema::ExternalFunction::CallerCleanup;
-  case CallingConvention::CalleeCleanup:
-    return mcsema::ExternalFunction::CalleeCleanup;
-  default:
-    return mcsema::ExternalFunction::FastCall;
+    case CallingConvention::CallerCleanup:
+      return mcsema::ExternalFunction::CallerCleanup;
+    case CallingConvention::CalleeCleanup:
+      return mcsema::ExternalFunction::CalleeCleanup;
+    default:
+      return mcsema::ExternalFunction::FastCall;
   }
 }
 
