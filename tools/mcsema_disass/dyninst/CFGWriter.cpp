@@ -5,8 +5,9 @@
 #include <Instruction.h>
 #include <InstructionAST.h>
 #include <InstructionCategories.h>
-#include <sstream>
+#include <Type.h>
 
+#include <sstream>
 #include <array>
 #include <iterator>
 
@@ -294,6 +295,9 @@ void CFGWriter::WriteFunction(Dyninst::ParseAPI::Function *func,
 
   cfg_internal_func->set_name(func->name());
   LOG(INFO) << "Added " << func->name() << " into module, found via xref";
+
+  // No need to search for local variables, this is only used when
+  // binary is stripped
 }
 
 void CFGWriter::Write() {
@@ -340,7 +344,35 @@ void CFGWriter::Write() {
       }
     }
   }
+
+  WriteLocalVariables();
   module.set_name(FLAGS_binary);
+}
+
+
+// TODO(lukas): Need to get all xrefs for local variable
+void CFGWriter::WriteLocalVariables() {
+  // We need to get SymtabAPI version of functions
+  std::vector<SymtabAPI::Function *> funcs;
+  symtab.getAllFunctions(funcs);
+  for (auto func : funcs) {
+    auto cfg_func = gDisassContext->func_map.find(func->getOffset());
+    if (cfg_func == gDisassContext->func_map.end()) {
+      continue;
+    }
+
+    std::vector<SymtabAPI::localVar *> locals;
+    func->getLocalVariables(locals);
+    for (auto local : locals) {
+      auto cfg_var = cfg_func->second->add_stack_vars();
+      cfg_var->set_name(local->getName());
+      cfg_var->set_size(local->getType()->getSize());
+      auto location_list = local->getLocationLists();
+      for (auto &location : location_list) {
+        cfg_var->set_sp_offset(location.frameOffset);
+      }
+    }
+  }
 }
 
 void CFGWriter::WriteExternalVariables() {
@@ -417,10 +449,10 @@ void CFGWriter::WriteInternalFunctions() {
     };
 
   for (ParseAPI::Function *func : code_object.funcs()) {
-   if (IsExternal(func->entry()->start())) {
-     LOG(INFO) << "Function " << func->name() << " is getting skipped";
-     continue;
-   }
+    if (IsExternal(func->entry()->start())) {
+      LOG(INFO) << "Function " << func->name() << " is getting skipped";
+      continue;
+    }
     // We want to ignore the .got.plt stubs, since they are not needed
     // and cfg file would grow significantly
     else if (gSectionManager->IsInRegion(".got.plt",
