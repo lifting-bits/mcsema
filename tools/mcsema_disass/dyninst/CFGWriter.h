@@ -35,6 +35,7 @@ private:
   void WriteExternalVariables();
   void WriteGlobalVariables();
   void WriteInternalFunctions();
+  void WriteLocalVariables();
   void WriteBlock(Dyninst::ParseAPI::Block *block,
                   Dyninst::ParseAPI::Function *func,
                   mcsema::Function *cfgInternalFunc);
