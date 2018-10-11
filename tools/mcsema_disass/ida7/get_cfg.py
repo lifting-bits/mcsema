@@ -107,9 +107,6 @@ def is_ELF_got_pointer(ea):
     return False
 
   name = get_symbol_name(ea)
-  if not name.endswith("_ptr"):
-    return False
-
   target_ea = get_reference_target(ea)
   target_name = get_true_external_name(get_symbol_name(target_ea))
 
