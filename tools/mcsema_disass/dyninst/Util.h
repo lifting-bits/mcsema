@@ -12,7 +12,7 @@
 #include "MagicSection.h"
 #include "SectionManager.h"
 
-class DisassContext;
+struct DisassContext;
 
 extern std::unique_ptr<DisassContext> gDisassContext;
 
@@ -32,7 +32,7 @@ struct CrossXref {
   Dyninst::Address ea = 0;
   Dyninst::Address target_ea = 0;
   CFGUnit segment = nullptr;
-  std::string target_name;
+  std::string target_name = {};
 
   bool operator==(const CrossXref<CFGUnit> &other) {
     return ea == other.ea && target_ea == other.target_ea;

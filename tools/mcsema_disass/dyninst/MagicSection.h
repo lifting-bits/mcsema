@@ -10,7 +10,7 @@
 
 #include <glog/logging.h>
 
-class ExternalFunction;
+struct ExternalFunction;
 
 struct MagicSection {
   mcsema::ExternalVariable *WriteExternalVariable(mcsema::Module &module,
