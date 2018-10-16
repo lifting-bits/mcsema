@@ -363,14 +363,29 @@ void CFGWriter::WriteLocalVariables() {
 
     std::vector<SymtabAPI::localVar *> locals;
     func->getLocalVariables(locals);
+
+    // getParams resets the vector passed to it
+    std::vector<SymtabAPI::localVar *> params;
+    func->getParams(params);
+    for (auto a : params) {
+      locals.push_back(a);
+    }
+
     for (auto local : locals) {
       auto cfg_var = cfg_func->second->add_stack_vars();
       cfg_var->set_name(local->getName());
       cfg_var->set_size(local->getType()->getSize());
       auto location_list = local->getLocationLists();
+
+      LOG(INFO)
+          << std::hex << "Found local variable with name " << local->getName()
+          << " with size: " << local->getType()->getSize();
+
       for (auto &location : location_list) {
         cfg_var->set_sp_offset(location.frameOffset);
+        LOG(INFO) << std::hex << "\tat sp_offset: 0x" << location.frameOffset;
       }
+
     }
   }
 }
