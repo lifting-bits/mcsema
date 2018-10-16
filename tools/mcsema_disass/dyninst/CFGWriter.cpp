@@ -190,8 +190,8 @@ CFGWriter::CFGWriter(mcsema::Module &m,
                      ParseAPI::CodeObject &codeObj)
     : module(m),
       symtab(symtab),
-      code_source(symCodeSrc),
       code_object(codeObj),
+      code_source(symCodeSrc),
       magic_section(gDisassContext->magic_section),
       ptr_byte_size(symtab.getAddressWidth()){
 
@@ -653,7 +653,7 @@ void CFGWriter::HandleCallInstruction(InstructionAPI::Instruction *instruction,
 
   LOG(INFO) << "Trying to resolve call instruction at 0x"
             << std::hex << cfg_instruction->ea();
-  bool got_result = false;
+
   if (TryEval(operands[0].getValue().get(), addr, target, size)) {
     HandleXref(cfg_instruction, target);
 
@@ -688,11 +688,11 @@ Address CFGWriter::immediateNonCall(InstructionAPI::Immediate* imm,
   Address a = imm->eval().convert<Address>();
   if (!gDisassContext->HandleCodeXref({addr, a, cfg_instruction}, false)) {
     if (gSectionManager->IsInRegion(".text", a)) {
-      auto cfgCodeRef = AddCodeXref(cfg_instruction,
-                                    CodeReference::DataTarget,
-                                    CodeReference::ImmediateOperand,
-                                    CodeReference::Internal,
-                                    a);
+      AddCodeXref(cfg_instruction,
+        CodeReference::DataTarget,
+        CodeReference::ImmediateOperand,
+        CodeReference::Internal,
+        a);
       LOG(INFO) << std::hex
                 << "IMM may be working with new function starting at" << a;
       inst_xrefs_to_resolve.insert({a, {}});
@@ -871,7 +871,7 @@ void CFGWriter::TryParseVariables(SymtabAPI::Region *region,
   static int counter = 0;
   static int unnamed = 0;
 
-  for (int j = 0; j < region->getDiskSize(); j += 1, ++offset) {
+  for (auto j = 0U; j < region->getDiskSize(); j += 1, ++offset) {
     CHECK(region->getMemOffset() + j == region->getDiskOffset() + j)
         << "Memory offset != Disk offset, investigate!";
 
@@ -969,7 +969,7 @@ void CFGWriter::XrefsInSegment(SymtabAPI::Region *region,
   }
   auto offset = static_cast<std::uint64_t*>(region->getPtrToRawData());
 
-  for (int j = 0; j < region->getDiskSize(); j += 8, offset++) {
+  for (auto j = 0U; j < region->getDiskSize(); j += 8, offset++) {
     if (!gDisassContext->HandleDataXref(
           {region->getMemOffset() + j, *offset, segment})) {
       LOG(INFO) << "\tDid not resolve it, try to search in .text";
@@ -999,7 +999,6 @@ void WriteRawData(std::string& data, SymtabAPI::Region* region) {
 // Writes into section on specified offset
 // If offset points beyond section, it is resized to contain it
 void WriteAsRaw(std::string& data, uint64_t number, int64_t offset) {
-  LOG(INFO) << "Writing raw " << number << " to offset " << offset;
 
   if (offset < 0) {
     LOG(FATAL) << "Trying yo Write raw on negative offset";
@@ -1055,7 +1054,7 @@ void CFGWriter::WriteGOT(SymtabAPI::Region* region,
           << "Giving magic_space to" << reloc.name();
 
       auto unreal_ea = magic_section.AllocSpace(ptr_byte_size);
-      auto cfg_xref = gDisassContext->WriteAndAccount(
+      gDisassContext->WriteAndAccount(
           {reloc.rel_addr(), unreal_ea, cfg_segment, reloc.name()},
           true);
       WriteAsRaw(data, unreal_ea, reloc.rel_addr() - cfg_segment->ea());
@@ -1067,7 +1066,7 @@ void CFGWriter::WriteGOT(SymtabAPI::Region* region,
       }
     }
   }
-  for (int i = 0; i < data.size(); ++i) {
+  for (auto i = 0U; i < data.size(); ++i) {
     LOG(INFO) << std::hex << +static_cast<uint8_t>((data)[i]);
   }
   cfg_segment->set_data(data);
