@@ -1,5 +1,8 @@
 #include "CFGWriter.h"
 
+#include "Util.h"
+#include "SectionParser.h"
+
 #include <Dereference.h>
 #include <Function.h>
 #include <Instruction.h>
@@ -11,14 +14,8 @@
 #include <array>
 #include <iterator>
 
-#include <ArchSpecificFormatters.h>
-
 #include <glog/logging.h>
 #include <gflags/gflags.h>
-
-#include "Util.h"
-#include "OffsetTable.h"
-#include <cstdio>
 
 DECLARE_string(entrypoint);
 DECLARE_string(binary);
@@ -869,134 +866,7 @@ void CFGWriter::WriteExternalFunctions() {
   }
 }
 
-//TODO(lukas): This is finding vars actually?
-void CFGWriter::TryParseVariables(SymtabAPI::Region *region,
-                                  mcsema::Segment *segment) {
 
-  std::string base_name = region->getRegionName();
-  auto offset = static_cast<uint8_t *>(region->getPtrToRawData());
-  auto end = region->getMemOffset() + region->getMemSize();
-
-  LOG(INFO) << "Trying to parse region " << region->getRegionName()
-            << " for xrefs & vars";
-  LOG(INFO) << "Starts at 0x" << std::hex << region->getMemOffset()
-            << " ends at 0x" << end;
-
-  // Some random names
-  static int counter = 0;
-  static int unnamed = 0;
-
-  for (auto j = 0U; j < region->getDiskSize(); j += 1, ++offset) {
-    CHECK(region->getMemOffset() + j == region->getDiskOffset() + j)
-        << "Memory offset != Disk offset, investigate!";
-
-    if (*offset == 0) {
-      continue;
-    }
-
-    // Read until next zero
-    uint64_t size = j;
-    while (*offset != 0) {
-      ++j;
-      ++offset;
-      if (region->getMemOffset() + j == end) {
-        LOG(INFO) << "Hit end of region";
-        break;
-      }
-    }
-
-    // Zero was found, but it may have been something like
-    // 04 bc 00 00 so zero is still valid part of address
-    uint64_t off = size % 4;
-    auto diff = j - size;
-
-    if (diff + off <= 4) {
-      diff += off;
-    }
-
-    // Check if it is small enough to be a one reference and try to match it
-    // against the rest of the binary to see if it truly is a reference
-    if (diff <= 4 && diff  >= 3) {
-      auto tmp_ptr = reinterpret_cast<uint64_t *>(static_cast<uint8_t *>(
-            region->getPtrToRawData()) + size - off);
-      Dyninst::Address target_ea = *tmp_ptr;
-      Dyninst::Address ea = region->getMemOffset() + size - off;
-
-      if (gDisassContext->HandleDataXref({ea, target_ea, segment})) {
-        LOG(INFO) << "Fished up " << std::hex
-                  << region->getMemOffset() + size << " " << *tmp_ptr;
-        continue;
-      }
-
-      if (gSectionManager->IsInRegion(region, target_ea)) {
-        std::string name = base_name + "_unnamed_" + std::to_string(++unnamed);
-        gDisassContext->WriteAndAccount({ea, target_ea, segment, name});
-
-        //Now add target as var because it was not before
-        auto cfg_var = segment->add_vars();
-        cfg_var->set_name(name);
-        cfg_var->set_ea(target_ea);
-        gDisassContext->segment_vars.insert({target_ea, cfg_var});
-        continue;
-
-      } else if (gSectionManager->IsInBinary(target_ea)) {
-        LOG(INFO) << "Cross xref 0x" << std::hex
-                  << ea << " -> 0x" << target_ea;
-        cross_xrefs.push_back({ea, target_ea, segment});
-        continue;
-      }
-    }
-
-    // Now we know it is not a simple xref, but it still may be an OffsetTable
-    // which is a jump table (for example from switch statement)
-
-    Address ea = region->getMemOffset() + size;
-    auto *ptr_to_value = reinterpret_cast<int32_t *>(
-        static_cast<uint8_t *>(region->getPtrToRawData()) + size);
-
-    auto alligment = (ea + j - size) % 4;
-    auto table = OffsetTable::Parse(ea, ptr_to_value, region, j - size - alligment);
-    if (table) {
-      offset_tables.push_back(std::move(table.value()));
-      j -= alligment;
-      continue;
-    }
-
-    std::string name = base_name + "_" + std::to_string(counter);
-    ++counter;
-    LOG(INFO) << "\tAdding var " << name << " at 0x"
-              << std::hex << region->getMemOffset() + size;
-    auto var = segment->add_vars();
-    var->set_ea(region->getMemOffset() + size);
-    var->set_name(name);
-    gDisassContext->segment_vars.insert({region->getMemOffset() + size, var});
-  }
-}
-
-void CFGWriter::XrefsInSegment(SymtabAPI::Region *region,
-                               mcsema::Segment *segment) {
-
-  // Both are using something smarter, as they may contain other
-  // data as static strings
-  if (region->getRegionName() == ".data" ||
-      region->getRegionName() == ".rodata") {
-    return;
-  }
-  auto offset = static_cast<std::uint64_t*>(region->getPtrToRawData());
-
-  for (auto j = 0U; j < region->getDiskSize(); j += 8, offset++) {
-    if (!gDisassContext->HandleDataXref(
-          {region->getMemOffset() + j, *offset, segment})) {
-      LOG(INFO) << "\tDid not resolve it, try to search in .text";
-
-      if (gSectionManager->IsInRegion(".text", *offset)) {
-        LOG(INFO) << "\tXref is pointing into .text";
-        code_xrefs_to_resolve.insert(
-            {*offset,{region->getMemOffset() + j, *offset, segment}});
-      }
-    }
-  }
-}
 
 void WriteRawData(std::string& data, SymtabAPI::Region* region) {
   auto i = 0U;
@@ -1114,33 +984,6 @@ void CFGWriter::WriteRelocations(SymtabAPI::Region* region,
   }
 }
 
-void CFGWriter::ResolveCrossXrefs() {
-  for (auto &xref : cross_xrefs) {
-    auto g_var = gDisassContext->global_vars.find(xref.target_ea);
-    if (g_var != gDisassContext->global_vars.end()) {
-      LOG(ERROR)
-          << "CrossXref is targeting global variable, was not resolved earlier!";
-      continue;
-    }
-
-    if(!gDisassContext->HandleDataXref(xref)) {
-      if (gSectionManager->IsInRegions({".data", ".rodata", ".bss"},
-                                       xref.target_ea)) {
-        LOG(INFO) << "It is pointing into data sections, assuming it is xref";
-        gDisassContext->WriteAndAccount(xref);
-      }
-    }
-    // If it's xref into .text it's highly possible it is
-    // entrypoint of some function that was missed by speculative parse.
-    // Let's try to parse it now
-
-    if (gSectionManager->IsInRegion(".text", xref.target_ea)) {
-      LOG(INFO) << "\tIs acturally targeting something in .text!";
-      code_xrefs_to_resolve.insert({xref.target_ea, xref});
-    }
-  }
-}
-
 void WriteBssXrefs(
     SymtabAPI::Region *region,
     mcsema::Segment *segment,
@@ -1159,6 +1002,7 @@ void WriteBssXrefs(
 // Writes things into gDisassContext
 void CFGWriter::WriteInternalData() {
   auto dataRegions = gSectionManager->GetDataRegions();
+  SectionParser section_parser(gDisassContext.get(), *gSectionManager);
 
   for (auto region : dataRegions) {
 
@@ -1192,9 +1036,9 @@ void CFGWriter::WriteInternalData() {
       SymtabAPI::Region* fini;
       symtab.findRegion(fini, ".fini_array");
       WriteRawData(data, fini);
-      WriteDataVariables(fini, cfg_internal_data);
+      WriteDataVariables(fini, cfg_internal_data, section_parser);
 
-      XrefsInSegment(fini, cfg_internal_data);
+      section_parser.XrefsInSegment(fini, cfg_internal_data);
     }
 
     cfg_internal_data->set_ea(region->getMemOffset());
@@ -1206,7 +1050,6 @@ void CFGWriter::WriteInternalData() {
     cfg_internal_data->set_is_exported(false);      /* TODO: As for now, ignored */
     cfg_internal_data->set_is_thread_local(false); /* TODO: As for now, ignored */
 
-    // TODO(lukas): We probably don't need to parse these?
     std::set<std::string> dont_parse = {
       ".eh_frame",
       ".rela.dyn",
@@ -1222,10 +1065,11 @@ void CFGWriter::WriteInternalData() {
       ".gcc_except_table",
       ".jcr",
     };
-    if (dont_parse.find(region->getRegionName()) == dont_parse.end()) {
-      WriteDataVariables(region, cfg_internal_data);
 
-      XrefsInSegment( region, cfg_internal_data );
+    if (dont_parse.find(region->getRegionName()) == dont_parse.end()) {
+      WriteDataVariables(region, cfg_internal_data, section_parser);
+
+      section_parser.XrefsInSegment( region, cfg_internal_data );
     }
 
     // IDA output of .bss produced some "self xrefs"
@@ -1243,11 +1087,13 @@ void CFGWriter::WriteInternalData() {
       WriteGOT(region, cfg_internal_data);
     }
   }
-  ResolveCrossXrefs();
+  code_xrefs_to_resolve = section_parser.ResolveCrossXrefs();
+  offset_tables = section_parser.GetOffsetTables();
 }
 
 void CFGWriter::WriteDataVariables(Dyninst::SymtabAPI::Region *region,
-                                   mcsema::Segment *segment) {
+                                   mcsema::Segment *segment,
+                                   SectionParser &section_parser) {
   std::vector<SymtabAPI::Symbol *> vars;
   symtab.getAllSymbolsByType(vars, SymtabAPI::Symbol::ST_OBJECT);
 
@@ -1270,7 +1116,7 @@ void CFGWriter::WriteDataVariables(Dyninst::SymtabAPI::Region *region,
   if (region->getRegionName() == ".rodata" ||
       region->getRegionName() == ".data") {
     LOG(INFO) << "Speculative parse of " << region->getRegionName();
-    TryParseVariables(region, segment);
+    section_parser.ParseVariables(region, segment);
   }
 }
 

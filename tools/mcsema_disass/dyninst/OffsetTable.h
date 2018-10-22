@@ -11,6 +11,7 @@ namespace Dyninst::SymtabAPI {
 }
 
 // Holds information about possible jump tables
+// For 64, and possibly 32, bit ELF
 struct OffsetTable {
   static std::experimental::optional<OffsetTable> Parse(
       Dyninst::Address start_ea,

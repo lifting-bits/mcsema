@@ -1,7 +1,11 @@
 #pragma once
 
-#include "ExternalFunctionManager.h"
 #include "SectionManager.h"
+#include "ExternalFunctionManager.h"
+#include "MagicSection.h"
+#include "Util.h"
+#include "OffsetTable.h"
+
 #include <CFG.pb.h>
 #include <CodeObject.h>
 #include <Expression.h>
@@ -13,11 +17,9 @@
 #include <unordered_map>
 #include <sstream>
 
-#include "MagicSection.h"
-#include "Util.h"
-#include "OffsetTable.h"
-
 using SymbolMap = std::unordered_map<Dyninst::Address, std::string>;
+
+struct SectionParser;
 
 class CFGWriter {
 public:
@@ -30,7 +32,8 @@ public:
 
 private:
   void WriteDataVariables(Dyninst::SymtabAPI::Region *region,
-                          mcsema::Segment *segment);
+                          mcsema::Segment *segment,
+                          SectionParser &section_parser);
 
   void WriteExternalVariables();
   void WriteGlobalVariables();
@@ -39,7 +42,7 @@ private:
   void WriteBlock(Dyninst::ParseAPI::Block *block,
                   Dyninst::ParseAPI::Function *func,
                   mcsema::Function *cfgInternalFunc);
-  void  WriteInstruction(Dyninst::InstructionAPI::Instruction *instruction,
+  void WriteInstruction(Dyninst::InstructionAPI::Instruction *instruction,
                          Dyninst::Address addr, mcsema::Block *cfgBlock);
   void HandleCallInstruction(Dyninst::InstructionAPI::Instruction *instruction,
                              Dyninst::Address addr,
@@ -48,9 +51,6 @@ private:
   HandleNonCallInstruction(Dyninst::InstructionAPI::Instruction *instruction,
                            Dyninst::Address addr,
                            mcsema::Instruction *cfgInstruction);
-
-  void ResolveCrossXrefs();
-  void TryParseVariables(Dyninst::SymtabAPI::Region *, mcsema::Segment *);
 
   void WriteFunction(Dyninst::ParseAPI::Function *func,
                      mcsema::Function *cfg_internal_func);
@@ -69,9 +69,7 @@ private:
 
   bool HandleXref(mcsema::Instruction *, Dyninst::Address, bool force=true);
 
-  void XrefsInSegment(Dyninst::SymtabAPI::Region *region,
-                      mcsema::Segment *segment );
-  bool IsNoReturn( const std::string& str);
+  bool IsNoReturn(const std::string& str);
   void GetNoReturns();
 
   void CheckDisplacement(Dyninst::InstructionAPI::Expression *,
@@ -87,11 +85,12 @@ private:
 
   std::unordered_set<std::string> no_ret_funcs;
 
-  std::vector<CrossXref<mcsema::Segment *>> cross_xrefs;
   std::map<Dyninst::Address, CrossXref<mcsema::Segment *>> code_xrefs_to_resolve;
   std::map<Dyninst::Address, CrossXref<mcsema::Instruction *>> inst_xrefs_to_resolve;
 
+  // Binary format dependent
   std::vector<OffsetTable> offset_tables;
+
   MagicSection &magic_section;
   int ptr_byte_size = 8;
 };

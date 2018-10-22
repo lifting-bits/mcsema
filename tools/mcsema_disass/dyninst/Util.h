@@ -105,8 +105,6 @@ struct DisassContext {
   }
 
   bool HandleDataXref(CrossXref<mcsema::Segment *> xref) {
-    LOG(INFO) << "Trying to resolve xref 0x" << std::hex << xref.ea
-              << " -> 0x" << xref.target_ea;
     if (FishForXref(global_vars, xref) ||
         FishForXref(external_funcs, xref, true) ||
         FishForXref(external_vars, xref) ||
@@ -197,8 +195,6 @@ struct DisassContext {
   // cannot be resolved in something reasonable
   bool HandleCodeXref(const CrossXref<mcsema::Instruction *> &xref,
                       bool force=false) {
-    LOG(INFO) << "Trying to resolve 0x" << std::hex << xref.ea << " -> 0x"
-              << xref.target_ea;
     if (FishForXref<mcsema::GlobalVariable *>(global_vars, xref) ||
         FishForXref<mcsema::ExternalFunction *>(external_funcs, xref) ||
         FishForXref<mcsema::ExternalVariable *>(external_vars, xref) ||
