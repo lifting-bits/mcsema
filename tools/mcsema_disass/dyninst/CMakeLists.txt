@@ -23,6 +23,7 @@ add_executable(${MCSEMA_DYNINST_DISASS}
   CFGWriter.cpp
   ExternalFunctionManager.cpp
   SectionManager.cpp
+  SectionParser.cpp
   MagicSection.cpp
   Util.cpp
   OffsetTable.cpp
