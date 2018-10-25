@@ -13,6 +13,63 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specifi
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+SOURCE_DIR="${SCRIPT_DIR}/../"
+
+install_binja () {
+  # this file is the decrypted version and placed there by the
+  # before-install action in .travis.yml
+  local BINJA_TARGZ="${SCRIPT_DIR}/mcsema_binja.tar.gz"
+	local BINJA_INSTALL="${SOURCE_DIR}/binaryninja"
+
+  # make sure our PYTHONPATH is setup for binja
+  export PYTHONPATH=${BINJA_INSTALL}/python
+	python2.7 -c "import binaryninja" 2>/dev/null
+	if [ ! "$?" = "0" ]; then
+		if [ ! -e ${BINJA_INSTALL}/python/binaryninja/__init__.py ]; then
+
+			echo "Extracting Binary Ninja" && \
+        tar -xzf ${BINJA_TARGZ} -C ${SOURCE_DIR} && \
+        echo "Extracted to ${SOURCE_DIR}"
+
+			if [ ! "$?" = "0" ]; then
+				echo "FAILED: Binja extraction failed"
+				return 1
+			fi
+
+		else
+			echo "Found a copy of Binja, skipping install, using existing copy"
+		fi
+
+		if [ ! -e ${HOME}/.binaryninja/license.dat ]; then
+			echo "Could not find Binja license, checking for ~/.binaryninja"
+			if [ ! -e ${HOME}/.binaryninja ]; then
+				echo "~/.binaryninja does not exist, creating directory..."
+				mkdir ${HOME}/.binaryninja
+			fi
+
+			echo "Copying our CI Binja license to ${HOME}/.binaryninja/license.dat"
+			cp ${BINJA_INSTALL}/mcsema_binja_license.txt ${HOME}/.binaryninja/license.dat
+		else
+			echo "Found existing Binja license, ignoring..."
+		fi
+
+    # sanity check the install
+    python2.7 -c "import binaryninja" 2>/dev/null
+    if [ ! "$?" = "0" ]; then
+      echo "FAILED: still can't use Binary Ninja, aborting"
+      return 1
+    else
+      echo "BinaryNinja installed successfully"
+    fi
+
+	else
+		echo "Binja already exists; skipping..."
+	fi
+
+  return 0
+}
+
 main() {
   if [ $# -ne 2 ] ; then
     printf "Usage:\n\ttravis.sh <linux|osx> <initialize|build>\n"
@@ -76,6 +133,12 @@ linux_initialize() {
                             libtinfo-dev:i386 
   if [ $? -ne 0 ] ; then
     printf " x Could not install the required dependencies\n"
+    return 1
+  fi
+
+  install_binja
+  if [ $? -ne 0 ] ; then
+    printf " x Could not install binary ninja"
     return 1
   fi
 
