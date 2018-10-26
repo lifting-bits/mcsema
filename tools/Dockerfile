@@ -32,8 +32,8 @@ WORKDIR /home/user
 #  their disassembler (IDA/BN) #
 ################################
 # But, as an example:
-# ADD binja/binaryninja/ /root/binaryninja/
-# ADD binja/.binaryninja/ /root/.binaryninja/
+# ADD local-relative/path/to/binaryninja/ /root/binaryninja/
+# ADD local-relative/path/to/.binaryninja/ /root/.binaryninja/ # <- Make sure there's no `lastrun` file
 # RUN /root/binaryninja/scripts/linux-setup.sh
 
 
