@@ -1,7 +1,7 @@
 # Using this file:
 # 1. wget https://raw.githubusercontent.com/trailofbits/mcsema/master/tools/Dockerfile
 # 2. docker build -t=mcsema .
-# 3. docker run --rm -it --privileged --ipc=host -v "${PWD}":/home/user/local mcsema
+# 3. docker run --rm -it --ipc=host -v "${PWD}":/home/user/local mcsema
 
 FROM ubuntu:18.04
 

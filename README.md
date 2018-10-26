@@ -101,7 +101,7 @@ RUN /root/binaryninja/scripts/linux-setup.sh
 #### Step 3: Build & Run Dockerfile
 
 This will build the container for you and run it with your local directory mounted into the container (at /home/user/local) such that your work in the container is saved locally: 
-`docker build -t=mcsema . && docker run --rm -it --privileged --ipc=host -v "${PWD}":/home/user/local mcsema`
+`docker build -t=mcsema . && docker run --rm -it --ipc=host -v "${PWD}":/home/user/local mcsema`
 
 ### On Linux
 
