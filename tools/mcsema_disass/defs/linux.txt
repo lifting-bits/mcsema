@@ -20486,6 +20486,7 @@ pthread_getschedparam 3 C N
 pthread_getspecific 1 C N
 pthread_join 2 C N
 pthread_key_create 2 C N
+__pthread_key_create 2 C N
 pthread_key_delete 1 C N
 pthread_kill 2 C N
 pthread_mutexattr_destroy 1 C N
@@ -37450,3 +37451,8 @@ context_type_set 2 C N
 context_range_set 2 C N
 context_role_set 2 C N
 context_user_set 2 C N
+
+__gxx_personality_v0 0 C N
+g_free 1 C N
+g_object_unref 1 C N
+

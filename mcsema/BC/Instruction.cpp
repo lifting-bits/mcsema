@@ -121,7 +121,7 @@ InstructionLifter::~InstructionLifter(void) {}
 
 InstructionLifter::InstructionLifter(const remill::IntrinsicTable *intrinsics_,
                                      TranslationContext &ctx_)
-      : remill::InstructionLifter(gWordType, intrinsics_),
+      : remill::InstructionLifter(gArch, intrinsics_),
         ctx(ctx_),
         inst_ptr(nullptr),
         block(nullptr),

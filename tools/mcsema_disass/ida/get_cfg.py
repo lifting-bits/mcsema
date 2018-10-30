@@ -86,7 +86,7 @@ OS_NAME = ""
 # really the external `stderr`, so we want to be able to chop out the `@@...`
 # part to resolve the "true" name. There are a lot of `@@` variants in PE files,
 # e.g. `@@QEAU_..`, `@@AEAV..`, though these are likely for name mangling.
-EXTERNAL_NAMES = ("@@GLIBC_", "@@GLIBCXX_", )
+EXTERNAL_NAMES = ("@@GLIBC_", "@@GLIBCXX_", "@@CXXABI_", "@@GCC_")
 
 _NOT_ELF_BEGIN_EAS = (0xffffffffL, 0xffffffffffffffffL)
 
@@ -107,9 +107,6 @@ def is_ELF_got_pointer(ea):
     return False
 
   name = get_symbol_name(ea)
-  if not name.endswith("_ptr"):
-    return False
-
   target_ea = get_reference_target(ea)
   target_name = get_true_external_name(get_symbol_name(target_ea))
 
@@ -890,7 +887,10 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
   ea, next_ea = seg_ea, seg_ea
   while next_ea < seg_end_ea:
     ea = next_ea
-    item_size = idc.ItemSize(ea)
+    # The item size is 1 in some of the cases where it refer to the external data. The
+    # references in such cases get ignored. Assign the address size if there is reference
+    # to the external data.
+    item_size = idc.ItemSize(ea) if not is_runtime_external_data_reference(ea) else get_address_size_in_bytes()
     xref_width = min(max(item_size, 4), max_xref_width)
     next_ea = min(ea + xref_width,
                   # idc.GetNextFixupEA(ea),
@@ -975,6 +975,9 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
         X.target_fixup_kind = CFG_pb2.DataReference.Absolute
         DEBUG("{}-byte reference at {:x} to {:x} ({})".format(
             X.width, ea, target_ea, X.target_name))
+
+        try_identify_as_external_function(target_ea, X.target_name)
+
 
 def recover_region(M, region_name, region_ea, region_end_ea, exported_vars):
   """Recover the data and cross-references from a segment. The data of a
@@ -1180,7 +1183,7 @@ def recover_external_symbols(M):
   recover_external_functions(M)
   recover_external_variables(M)
 
-def try_identify_as_external_function(ea):
+def try_identify_as_external_function(ea, name=None):
   """Try to identify a function as being an external function."""
   global EXTERNAL_FUNCS_TO_RECOVER, EMAP
 
@@ -1194,14 +1197,14 @@ def try_identify_as_external_function(ea):
   # sections. Sometimes there are thunk-to-thunks, where there's a function
   # whose only instruction is a direct jump to the real thunk.
   is_thunk, thunk_target_ea, thunk_name = try_get_thunk_name(ea)
-  name = None
+
   if is_thunk:
     name = thunk_name
 
   elif is_external_segment(ea):
     name = get_true_external_name(get_function_name(ea))
 
-  else:
+  elif not name:
     return False
 
   # We've got a thunk with an implementation already done.
@@ -1368,7 +1371,18 @@ def identify_program_entrypoints(func_eas):
         if name not in exclude:
           exported_funcs.add(ea)
       else:
-        if name not in exclude and not is_runtime_external_data_reference(ea):
+        # If there is reference to the external vtable in the segment, add it
+        # as the exported variables. This is required to preserve the typeinfo
+        # of the user-define exception type variables. The lazy initilization
+        # of the vtable screw up the associated types.
+        # It checks for the following vtable variables:
+        #      __ZTVSt9type_info,
+        #      __ZTVN10__cxxabiv117__class_type_infoE,
+        #      __ZTVN10__cxxabiv120__si_class_type_infoE,
+        #      __ZTVN10__cxxabiv121__vmi_class_type_infoE
+        if name not in exclude and \
+          not is_runtime_external_data_reference(ea) or \
+          is_external_vtable_reference(ea):
           exported_vars.add(ea)
 
   DEBUG_POP()

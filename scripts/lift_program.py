@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright (c) 2017 Trail of Bits, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,12 +28,12 @@ except:
 
 def binary_info(binary):
   res = subprocess.check_output(['file', binary])
-  is_pie = 'LSB shared object' in res
+  is_pie = 'LSB shared object' in res or 'Mach-O 64' in res
   address_size = 64
 
   if 'aarch64' in res:
     arch = 'aarch64'
-  elif 'x86-64' in res:
+  elif 'x86-64' in res or 'x86_64' in res:
     arch = 'amd64_avx'
   elif 'x86' in res:
     arch = 'x86_avx'
@@ -82,18 +83,13 @@ def main():
   arg_parser = argparse.ArgumentParser()
 
   arg_parser.add_argument(
-      '--libraries_dir',
-      help='Path to directory in which the cxx-common libraries are unpacked',
-      required=True)
-
-  arg_parser.add_argument(
       '--llvm_version',
       help='Version number MAJOR.MINOR of the LLVM toolchain',
       required=True)
 
   arg_parser.add_argument(
-      '--ida_dir',
-      help='Directory containing IDA binaries.',
+      '--disassembler',
+      help='Path to disassembler, or just "binja", if installed.',
       required=True)
 
   arg_parser.add_argument(
@@ -107,6 +103,12 @@ def main():
       required=True)
 
   arg_parser.add_argument(
+      '--clang',
+      help='Path to clang, if not using remill-clang',
+      required=False,
+      default="")
+
+  arg_parser.add_argument(
       '--dry_run',
       help='Should the actual commands be executed?',
       default=False,
@@ -118,6 +120,12 @@ def main():
       default=False,
       required=False,
       action='store_true')
+
+  arg_parser.add_argument(
+      '--extra_args',
+      help='A space-delimited list of any extra arguments to pass to the lifter.',
+      default="",
+      required=False)
 
   args, command_args = arg_parser.parse_known_args()
 
@@ -165,7 +173,7 @@ def main():
   if not os.path.isfile(binary):
     shutil.copyfile(args.binary, binary)
     make_executable(binary)
-  
+
   # Copy the shared libraries into the workspace's object directory, and then
   # add symbolic links from the workspace's library directory into the object
   # directory.
@@ -173,7 +181,7 @@ def main():
   for name, path in binary_libraries(binary):
     path_hash = hash_file(path)
     library = os.path.join(obj_dir, "{}.so".format(path_hash))
-    
+
     if not os.path.isfile(library):
       shutil.copyfile(path, library)
       make_executable(library)
@@ -198,28 +206,34 @@ def main():
   binary_name = os.path.basename(args.binary)
   address_size, arch, is_pie = binary_info(binary)
 
-  ida_version = {
-    "x86_avx": "idal",
-    "amd64_avx": "idal64",
-    "aarch64": "idal64"
-  }[arch]
+  # Disassembler Seetings
+  da = ''
+  if ('binja' == args.disassembler) or 'binaryninja' == 'binja' == args.disassembler:
+    da = 'binja'
+  else:
+    ida_version = {
+      "x86_avx": "idal",
+      "amd64_avx": "idal64",
+      "aarch64": "idal64"
+    }[arch]
+    da = quote(os.path.join(args.disassembler, ida_version))
 
   # Disassemble the binary.
-  ida_args = [
+  disass_args = [
       'mcsema-disass',
       '--arch', arch,
       '--os', os_name,
       '--binary', quote(binary),
       '--output', quote(cfg),
       '--entrypoint', 'main',
-      '--disassembler', quote(os.path.join(args.ida_dir, ida_version)),
-      '--log_file', quote(log),
-      is_pie and '--pie-mode' or '']
+      '--disassembler', da,
+      '--log_file', quote(log)]#,
+#      is_pie and '--pie-mode' or '']
 
-  ida_args.extend(command_args)
+  disass_args.extend(command_args)
 
-  print " ".join(ida_args)
-  ret = subprocess.call(ida_args)
+  print " ".join(disass_args)
+  ret = subprocess.call(disass_args)
   if ret:
     return ret
 
@@ -231,6 +245,10 @@ def main():
       '--cfg', cfg,
       '--output', bitcode]
 
+  if args.extra_args != "":
+    for arg in args.extra_args.split(' '):
+      mcsema_lift_args.append(arg)
+
   if args.legacy_mode:
     mcsema_lift_args.append('--legacy_mode')
 
@@ -238,22 +256,28 @@ def main():
   ret = subprocess.call(mcsema_lift_args)
   if ret:
     return ret
-  
+
   # Not compiling a binary.
   if args.legacy_mode:
     return 0
 
   # Build up the command-line invocation to clang.
-  clang_args = [
-      os.path.join(args.libraries_dir, 'llvm', 'bin', 'clang++'),
-      '-rdynamic',
-      is_pie and '-fPIC' or '',
-      is_pie and '-pie' or '',
-      '-o', lifted_binary,
-      bitcode,
-      '/usr/local/lib/libmcsema_rt{}-{}.a'.format(
-          address_size, args.llvm_version),
-      '-lm']
+  clang_args = []
+
+  if (args.clang != ""):
+    clang_args = [os.path.join(args.clang)]
+  else:
+    clang_args = [os.path.join('remill-clang-{}'.format(args.llvm_version))]
+
+  clang_args += [
+    '-rdynamic',
+    is_pie and '-fPIC' or '',
+    is_pie and '-pie' or '',
+    '-o', lifted_binary,
+    bitcode,
+    '/usr/local/lib/libmcsema_rt{}-{}.a'.format(
+        address_size, args.llvm_version),
+    '-lm']
 
   for lib in libs:
     clang_args.append(lib)

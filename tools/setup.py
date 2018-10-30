@@ -26,7 +26,7 @@ setup(name="mcsema-disass",
       author="Trail of Bits",
       author_email="mcsema@trailofbits.com",
       license='Apache 2.0',
-      packages=['mcsema_disass', 'mcsema_disass.ida', 'mcsema_disass.defs', 'mcsema_disass.binja'],
+      packages=['mcsema_disass', 'mcsema_disass.ida', 'mcsema_disass.ida7', 'mcsema_disass.defs', 'mcsema_disass.binja'],
       install_requires=['protobuf==3.2.0', 'python-magic'],
       package_data={
         "mcsema_disass.defs": ["linux.txt", "windows.txt"]},

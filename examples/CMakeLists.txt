@@ -15,4 +15,8 @@
 project(examples)
 cmake_minimum_required (VERSION 3.2)
 
-add_executable(maze Maze/Maze.c)
+if(DEFINED WIN32)
+  message(STATUS "Skipping the Maze example")
+else()
+  add_executable(maze Maze/Maze.c)
+endif()

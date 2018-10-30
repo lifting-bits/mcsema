@@ -28,6 +28,8 @@ _INFO = idaapi.get_inf_structure()
 # like the number of agruments and calling convention of the function.
 _NORETURN_EXTERNAL_FUNC = {}
 
+RTTI_REFERENCE_TABLE = collections.defaultdict()
+
 IS_ARM = "ARM" in _INFO.procName
 
 # True if we are running on an ELF file.
@@ -67,6 +69,12 @@ def xrange(begin, end=None, step=1):
     return iter(itertools.count().next, begin)
 
 _NOT_INST_EAS = set()
+
+# sign extension to the given bits
+def sign_extend(x, b):
+  m = 1 << (b - 1)
+  x = x & ((1 << b) - 1)
+  return (x ^ m) - m
 
 # Returns `True` if `ea` belongs to some code segment.
 #
@@ -201,7 +209,10 @@ def instruction_personality(arg):
   global PERSONALITIES
   if isinstance(arg, (int, long)):
     arg, _ = decode_instruction(arg)
-  p = PERSONALITIES[arg.itype]
+  try:
+    p = PERSONALITIES[arg.itype]
+  except AttributeError:
+    p = PERSONALITY_NORMAL
 
   return fixup_personality(arg, p)
 
@@ -718,6 +729,24 @@ def is_runtime_external_data_reference(ea):
     return True
   else:
     return False
+
+def is_external_vtable_reference(ea):
+  """ It checks the references of external vtable in the .bss section, where
+      it is referred as the `Copy of shared data`. There is no way to resolve
+      the cross references for these vtable as the target address will only
+      appear during runtime.
+
+      It is introduced to avoid lazy initilization of runtime typeinfo variables
+      which gets referred by the user-defined exception types.
+  """
+  if not is_runtime_external_data_reference(ea):
+    return False
+
+  comment = idc.GetCommentEx(ea, 0)
+  if comment and "Alternative name is '`vtable" in comment:
+    return True
+  else:
+    return
 
 def is_reference(ea):
   """Returns `True` if the `ea` references something else."""
