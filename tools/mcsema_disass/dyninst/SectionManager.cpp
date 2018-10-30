@@ -64,7 +64,8 @@ SectionManager::GetRegion(const std::string &name) {
       return r.region;
     }
   }
-  LOG(FATAL) << "Could not fetch section with name " << name;
+  LOG(ERROR) << "Could not fetch section with name " << name;
+  return nullptr;
 }
 
 void SectionManager::AddRegion(Region *r) {
