@@ -56,8 +56,8 @@ def select(version):
   print("Updated:\t%s" % date)
   print("Notes:\n\n-----\n%s" % version.notes)
   print(version.update())
-  print("Installing...")
-  if is_update_installation_pending:
+  if is_update_installation_pending():
+    print("Installing...")
     #note that the GUI will be launched after update but should still do the upgrade headless
     install_pending_update()
   # forward updating won't work without reloading
