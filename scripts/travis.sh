@@ -63,6 +63,9 @@ install_binja () {
       echo "BinaryNinja installed successfully"
     fi
 
+    echo "Updating Binary Ninja to Dev Channel latest"
+    python2.7 ${SCRIPT_DIR}/update_binja.py
+
 	else
 		echo "Binja already exists; skipping..."
 	fi
