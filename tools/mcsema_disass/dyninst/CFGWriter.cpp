@@ -445,19 +445,20 @@ void CFGWriter::WriteInternalFunctions() {
     // I don't want this to be in recompiled binary as compiler will
     // add them as well, sub_* is enough
     std::unordered_set< std::string > not_entrypoints = {
-        "register_tm_clones",
-        "deregister_tm_clones",
-        "__libc_csu_init",
-        "frame_dummy",
-        "_init",
-        "_start",
-        "__do_global_dtors_aux",
-        "__libc_csu_fini",
-        "_fini",
-        "__libc_start_main",
-        "_GLOBAL__sub_I_main.cpp",
-        "__cxx_global_var_init",
-        "__cxa_finalize",
+      "_dl_relocate_static_pie",
+      "register_tm_clones",
+      "deregister_tm_clones",
+      "__libc_csu_init",
+      "frame_dummy",
+      "_init",
+      "_start",
+      "__do_global_dtors_aux",
+      "__libc_csu_fini",
+      "_fini",
+      "__libc_start_main",
+      "_GLOBAL__sub_I_main.cpp",
+      "__cxx_global_var_init",
+      "__cxa_finalize",
     };
 
   for (ParseAPI::Function *func : code_object.funcs()) {
@@ -530,8 +531,12 @@ void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     }
 
     if (!found) {
-      successors.insert(edge->trg()->start());
-      cfg_block->add_successor_eas(edge->trg()->start());
+      // TODO(lukas): Exception handling
+      // For now ignore catch blocks
+      if (edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CATCH) {
+        successors.insert(edge->trg()->start());
+        cfg_block->add_successor_eas(edge->trg()->start());
+      }
     }
   }
 
@@ -977,7 +982,7 @@ void CFGWriter::WriteRelocations(SymtabAPI::Region* region,
             reloc.rel_addr(),
             static_cast<Dyninst::Address>(ext_func->ea()),
             segment,
-            ext_func->name()});
+            ext_func->name()}, true);
         WriteAsRaw(*data, ext_func->ea(), reloc.rel_addr() - segment->ea());
       }
     }
