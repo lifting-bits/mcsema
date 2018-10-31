@@ -6,8 +6,10 @@
 
 #include <experimental/optional>
 
-namespace Dyninst::SymtabAPI {
-  class Region;
+namespace Dyninst {
+  namespace SymtabAPI {
+    class Region;
+  }
 }
 
 // Holds information about possible jump tables
