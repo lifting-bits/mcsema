@@ -4,11 +4,14 @@
 #include "SectionParser.h"
 
 #include <Dereference.h>
+#include <BinaryFunction.h>
+#include <Immediate.h>
 #include <Function.h>
 #include <Instruction.h>
 #include <InstructionAST.h>
 #include <InstructionCategories.h>
 #include <Type.h>
+#include <entryIDs.h>
 
 #include <sstream>
 #include <array>
@@ -111,7 +114,7 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
       // in -pie binaries it will be calculated using lea
       // and it generates unintuitive AST
       auto rip = mov_inst->first;
-      if (mov_inst->second->getOperation().getID() == 268) {
+      if (mov_inst->second->getOperation().getID() == entryID::e_lea) {
         rip += mov_inst->second->size();
       }
       if (!TryEval(second_operand.getValue().get(), rip, offset,
@@ -533,7 +536,12 @@ void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     if (!found) {
       // TODO(lukas): Exception handling
       // For now ignore catch blocks
-      if (edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CATCH) {
+      LOG(INFO) << "Edge 0x" << std::hex << block->start()
+                << " -> 0x" << edge->trg()->start()
+                << " of type " << edge->type();
+      if (edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CATCH &&
+          edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::RET &&
+          edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CALL) {
         successors.insert(edge->trg()->start());
         cfg_block->add_successor_eas(edge->trg()->start());
       }
@@ -769,7 +777,6 @@ void CFGWriter::HandleNonCallInstruction(
   // have that function parsed
   Address direct_values[2] = {0, 0};
   auto i = 0U;
-  LOG(INFO) << instruction->format() << " at 0x" << std::hex << addr - instruction->size();
   for (auto op : operands) {
     auto expr = op.getValue();
 
@@ -786,9 +793,8 @@ void CFGWriter::HandleNonCallInstruction(
         auto bf = dynamic_cast<InstructionAPI::BinaryFunction *>(expr.get())) {
       LOG(INFO) << "Dealing with BinaryFunction as op";
 
-      // 268 stands for lea
       auto instruction_id = instruction->getOperation().getID();
-      if (instruction_id == 268) {
+      if (instruction_id == entryID::e_lea) {
         Address a;
 
         if(TryEval(expr.get(), addr, a)) {
