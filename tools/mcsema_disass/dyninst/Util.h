@@ -16,8 +16,6 @@ struct DisassContext;
 
 extern std::unique_ptr<DisassContext> gDisassContext;
 
-template<class T, class... Rest>
-inline constexpr bool is_any = (std::is_same<T, Rest>::value && ...);
 
 mcsema::CodeReference *AddCodeXref(
     mcsema::Instruction * instruction,
@@ -119,7 +117,84 @@ struct DisassContext {
     return false;
   }
 
-  template<typename Base, typename Container>
+  bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
+                 mcsema::Function *fact) {
+    LOG(INFO) << "\tResolved as internal function";
+    AddCodeXref(xref.segment,
+                mcsema::CodeReference::DataTarget,
+                mcsema::CodeReference::ControlFlowOperand,
+                mcsema::CodeReference::Internal,
+                fact->ea(),
+                fact->name());
+    return true;
+  }
+
+  bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
+                 mcsema::GlobalVariable *fact) {
+    LOG(INFO) << "\tResolved as global variable";
+    AddCodeXref(xref.segment,
+                mcsema::CodeReference::DataTarget,
+                mcsema::CodeReference::MemoryOperand,
+                mcsema::CodeReference::Internal,
+                fact->ea(),
+                fact->name());
+    return true;
+  }
+
+  bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
+                 mcsema::ExternalFunction *fact) {
+    // Mapping to magic_section
+    LOG(INFO) << "\tResolved as ext function";
+    AddCodeXref(xref.segment,
+                mcsema::CodeReference::DataTarget,
+                mcsema::CodeReference::ControlFlowOperand,
+                mcsema::CodeReference::External,
+                magic_section.GetAllocated(xref.target_ea),
+                fact->name());
+    return true;
+  }
+
+  bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
+                 mcsema::Variable *fact) {
+    LOG(INFO) << "\tResolved as segment variable";
+    AddCodeXref(xref.segment,
+                mcsema::CodeReference::DataTarget,
+                mcsema::CodeReference::MemoryOperand,
+                mcsema::CodeReference::Internal,
+                fact->ea(),
+                fact->name());
+    return true;
+  }
+
+  bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
+                 mcsema::ExternalVariable *fact) {
+    Dyninst::Address addr = magic_section.GetAllocated(xref.target_ea);
+    LOG(INFO) << "\tResolved as external variable";
+    if (!addr) {
+      addr = fact->ea();
+    }
+    AddCodeXref(xref.segment,
+                mcsema::CodeReference::DataTarget,
+                mcsema::CodeReference::MemoryOperand,
+                mcsema::CodeReference::External,
+                addr,
+                fact->name());
+    return true;
+  }
+
+
+  bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
+                 mcsema::DataReference *fact) {
+    LOG(INFO) << "\tResolved as data xref";
+    AddCodeXref(xref.segment,
+                mcsema::CodeReference::DataTarget,
+                mcsema::CodeReference::MemoryOperand,
+                mcsema::CodeReference::Internal,
+                fact->ea());
+    return true;
+  }
+
+  template<typename Container>
   bool FishForXref(const Container &facts,
                    const CrossXref<mcsema::Instruction *> &xref) {
 
@@ -128,79 +203,19 @@ struct DisassContext {
       return false;
     }
 
-
-    if constexpr (std::is_same<Base, mcsema::Function *>()) {
-      LOG(INFO) << "\tResolved as internal function";
-      AddCodeXref(xref.segment,
-                  mcsema::CodeReference::DataTarget,
-                  mcsema::CodeReference::ControlFlowOperand,
-                  mcsema::CodeReference::Internal,
-                  fact->second->ea(),
-                  fact->second->name());
-      return true;
-    } else if constexpr (std::is_same<Base, mcsema::ExternalFunction *>()) {
-      // Mapping to magic_section
-      LOG(INFO) << "\tResolved as ext function";
-      AddCodeXref(xref.segment,
-                  mcsema::CodeReference::DataTarget,
-                  mcsema::CodeReference::ControlFlowOperand,
-                  mcsema::CodeReference::External,
-                  magic_section.GetAllocated(xref.target_ea),
-                  fact->second->name());
-      return true;
-    } else if constexpr (std::is_same<Base, mcsema::GlobalVariable *>()) {
-      LOG(INFO) << "\tResolved as global variable";
-      AddCodeXref(xref.segment,
-                  mcsema::CodeReference::DataTarget,
-                  mcsema::CodeReference::MemoryOperand,
-                  mcsema::CodeReference::Internal,
-                  fact->second->ea(),
-                  fact->second->name());
-      return true;
-    } else if constexpr (std::is_same<Base, mcsema::Variable *>()) {
-      LOG(INFO) << "\tResolved as segment variable";
-      AddCodeXref(xref.segment,
-                  mcsema::CodeReference::DataTarget,
-                  mcsema::CodeReference::MemoryOperand,
-                  mcsema::CodeReference::Internal,
-                  fact->second->ea(),
-                  fact->second->name());
-      return true;
-    } else if constexpr (std::is_same<Base, mcsema::ExternalVariable *>()) {
-      Dyninst::Address addr = magic_section.GetAllocated(xref.target_ea);
-      LOG(INFO) << "\tResolved as external variable";
-      if (!addr) {
-        addr = fact->second->ea();
-      }
-      AddCodeXref(xref.segment,
-                  mcsema::CodeReference::DataTarget,
-                  mcsema::CodeReference::MemoryOperand,
-                  mcsema::CodeReference::External,
-                  addr,
-                  fact->second->name());
-      return true;
-    } else if constexpr (std::is_same<Base, mcsema::DataReference *>()) {
-      LOG(INFO) << "\tResolved as data xref";
-      AddCodeXref(xref.segment,
-                  mcsema::CodeReference::DataTarget,
-                  mcsema::CodeReference::MemoryOperand,
-                  mcsema::CodeReference::Internal,
-                  fact->second->ea());
-      return true;
-    }
-    return false;
+    return WriteFact(xref, fact->second);
   }
 
   // If force=true function writes the xref even if target_ea
   // cannot be resolved in something reasonable
   bool HandleCodeXref(const CrossXref<mcsema::Instruction *> &xref,
                       bool force=false) {
-    if (FishForXref<mcsema::GlobalVariable *>(global_vars, xref) ||
-        FishForXref<mcsema::ExternalFunction *>(external_funcs, xref) ||
-        FishForXref<mcsema::ExternalVariable *>(external_vars, xref) ||
-        FishForXref<mcsema::Variable *>(segment_vars, xref) ||
-        FishForXref<mcsema::Function *>(func_map, xref) ||
-        FishForXref<mcsema::DataReference *>(data_xrefs, xref)) {
+    if (FishForXref(global_vars, xref) ||
+        FishForXref(external_funcs, xref) ||
+        FishForXref(external_vars, xref) ||
+        FishForXref(segment_vars, xref) ||
+        FishForXref(func_map, xref) ||
+        FishForXref(data_xrefs, xref)) {
       return true;
     }
 
