@@ -7,7 +7,7 @@ Later this code was picked up and reworked to what you currently see. As of now 
 
 ## Dependencies
 
-You won't need IDA Pro to run mcsema-dyninst-disass, but Git, CMake, Google Protobuf and Python are still required (see the top-level McSema README.md file for details). In addition to those requirements, you will need to build and install DyninstAPI. It is available in source code form [on GitHub](https://github.com/dyninst/dyninst). Follow the instructions there on how to build and install DyninstAPI before proceeding to the next step.
+You won't need IDA Pro to run mcsema-dyninst-disass, but Git, CMake, Google Protobuf and Python are still required (see the top-level McSema README.md file for details). In addition to those requirements, you will need to build and install DyninstAPI. It is available in source code form [on GitHub](https://github.com/dyninst/dyninst). Follow the instructions there on how to build and install DyninstAPI before proceeding to the next step. Tested version is from the branch 9.3.x.
 
 ## Building mcsema-dyninst-disass
 
@@ -21,6 +21,7 @@ export BUILD_MCSEMA_DYNINST_DISASS=1
 The ```CMAKE_PREFIX_PATH``` environment variable tells CMake where to find the necessary Dyninst files, and the ```BUILD_MCSEMA_DYNINST_DISASS``` environment variable will cause the top-level CMakeLists.txt file to descend into the subdirectory where this frontend resides (otherwise it won't get built).
 
 Now, you should be able to build this frontend along with McSema using the ```build.sh``` script from the remill repository. Please see the top-level McSema README.md file for details.
+Compiler with C++14 support is required.
 
 ## Running the tests
 
