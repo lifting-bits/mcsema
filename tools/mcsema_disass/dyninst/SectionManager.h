@@ -14,7 +14,7 @@ struct Section {
   std::string name;
 };
 
-class SectionManager {
+struct SectionManager {
 public:
   void AddRegion(Dyninst::SymtabAPI::Region *r);
 

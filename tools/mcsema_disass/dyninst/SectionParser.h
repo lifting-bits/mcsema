@@ -7,12 +7,12 @@ struct SectionManager;
 
 namespace Dyninst {
   namespace SymtabAPI {
-    struct Region;
+    class Region;
   }
 }
 
 namespace mcsema {
-  struct Segment;
+  class Segment;
 }
 
 
