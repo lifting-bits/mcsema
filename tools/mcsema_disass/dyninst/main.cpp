@@ -157,9 +157,9 @@ int main(int argc, char **argv) {
   cfg_writer.Write();
 
   // Dump the CFG file in a human-readable format if requested
-  //if (FLAGS_dump_cfg) {
+  if (FLAGS_dump_cfg) {
     std::cout << std::hex << m.DebugString() << std::endl;
- // }
+  }
 
   m.SerializeToOstream(&out);
 
