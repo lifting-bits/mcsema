@@ -66,3 +66,6 @@ package
 *.deb
 *.rpm
 # Clang, which is tracked independently.
+
+# Ignore local binary ninja installations
+binaryninja
