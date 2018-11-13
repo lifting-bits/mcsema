@@ -29,8 +29,16 @@ def is_exported_symbol(bv, sym):
     return True
   return False
 
+def get_symbols(bv):
+  for syms in bv.symbols.values():
+    if isinstance(syms, Symbol):
+      yield (syms)
+    else:
+      for entry in syms:
+        yield (entry)
+
 def identify_exported_symbols(bv):
-  syms = sorted(bv.symbols.values(), key=lambda s: s.address)
+  syms = sorted(get_symbols(bv), key=lambda s: s.address)
   for i, sym in enumerate(syms):
     sect = get_section_at(bv, sym.address)
     if sect is None:
@@ -49,6 +57,7 @@ def main(args):
   bv = BinaryViewType.get_view_of_file(args.binary)
   bv.add_analysis_option("linearsweep")
   bv.update_analysis_and_wait()
+  process_binary(bv, args.binary)
   
   DEBUG("Analysis file {} loaded...".format(args.binary))
   DEBUG("Number of functions {}".format(len(bv.functions)))
@@ -71,6 +80,7 @@ def main(args):
     addr = TO_RECOVER.get()
     if addr not in RECOVERED:
       RECOVERED.add(addr)
+      DEBUG("STAT -> Recovering {} out of {} functions...".format(len(RECOVERED), len(bv.functions)))
       recover_function(bv, addr)
   
     if TO_RECOVER.empty() and (len(bv.functions) > 0):
@@ -80,9 +90,8 @@ def main(args):
           break
 
   DEBUG("Number of functions {} {}".format(len(bv.functions), TO_RECOVER.qsize()))
-
-  build_variable_set(bv)
   updateCFG(bv, args.out)
+  print_variables(bv)
 
 def get_variable_size(bv, next_var, var):
   sec = get_section_at(bv, var)
@@ -94,21 +103,16 @@ def get_variable_size(bv, next_var, var):
     return sec.end - var
 
 def generate_variable_list(bv):
-  """ Generate the list of variables from the recovered memory refs,
-      address refs and the list of exported symbols. It also calculate
-      the size of the variables.
-  """
   g_variables = collections.defaultdict()
-  for ref in EXPORTED_REFS.keys():
-    g_variables[ref] = 0
+  for ref, size in get_dynamic_symbol(bv):
+    g_variables[ref] = size
 
-  for ref in sorted(ADDRESS_REFS.keys()):
-    g_variables[ref] = 0
-    DEBUG("Address ref : {:x} size 0".format(ref))
-
-  for ref in sorted(MEMORY_REFS.iterkeys()):
-    size = MEMORY_REFS[ref]
+  for ref, size in get_memory_refs(bv):
     DEBUG("Memory ref : {:x} size {:x}".format(ref, size))
+    g_variables[ref] = size
+    
+  for ref, size in get_address_refs(bv):
+    DEBUG("Address ref : {:x} size 0".format(ref))
     g_variables[ref] = size
 
   variable_list = sorted(g_variables.iterkeys())
@@ -117,9 +121,12 @@ def generate_variable_list(bv):
       size = get_variable_size(bv, variable_list[index+1], addr)
     except IndexError:
       sec = get_section_at(bv, addr)
+      if sec is None:
+        continue
       size = get_variable_size(bv, sec.end, addr)
     g_variables[addr] = size
 
+  DEBUG("Number of global symbols {}".format(len(g_variables)))
   return g_variables
 
 def updateCFG(bv, outfile):
@@ -161,6 +168,5 @@ if __name__ == '__main__':
   if args.log_file:
     INIT_DEBUG_FILE(args.log_file)
     DEBUG("Debugging is enabled.")
-  
-  BINARY_FILE = args.binary
+
   main(args)
