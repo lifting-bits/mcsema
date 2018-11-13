@@ -44,11 +44,122 @@ SectionParser::CrossXrefMap SectionParser::ResolveCrossXrefs() {
   return unresolved_code_xrefs;
 }
 
+bool SectionParser::TryXref(uint64_t offset,
+                            Dyninst::SymtabAPI::Region *region,
+                            mcsema::Segment *cfg_segment) {
+  // Allignment
+  if (offset % 8) {
+    return false;
+  }
+
+  auto *reader = reinterpret_cast<uint64_t *>(
+      static_cast<uint8_t *>(region->getPtrToRawData()) + offset);
+  Dyninst::Address target_ea = *reader;
+  Dyninst::Address ea = region->getMemOffset() + offset;
+  LOG(INFO) << std::hex << ea << " = reader => " << target_ea;
+
+  if (disass_context->HandleDataXref({ea, target_ea, cfg_segment})) {
+    LOG(INFO) << "Fished up " << std::hex
+              << region->getMemOffset() + offset << " => " << target_ea;
+    return true;
+  }
+
+  if (section_manager.IsInRegion(region, target_ea)) {
+    std::string name = region->getRegionName() + "_unnamed_" +
+                       std::to_string(++unnamed);
+    disass_context->WriteAndAccount({ea, target_ea, cfg_segment, name});
+
+    //Now add target as var because it was not before
+    auto cfg_var = cfg_segment->add_vars();
+    cfg_var->set_name(name);
+    cfg_var->set_ea(target_ea);
+    disass_context->segment_vars.insert({target_ea, cfg_var});
+    return true;
+
+  } else if (section_manager.IsInBinary(target_ea)) {
+    LOG(INFO) << "Cross xref 0x" << std::hex
+              << ea << " -> 0x" << target_ea;
+    cross_xrefs.push_back({ea, target_ea, cfg_segment});
+    return true;
+  }
+  return false;
+}
+
+bool SectionParser::TryOffsetTable(uint64_t &offset,
+                                   Dyninst::SymtabAPI::Region *region) {
+  // Allignment
+  if (offset % 4) {
+    return false;
+  }
+  Dyninst::Address ea = region->getMemOffset() + offset;
+  auto *reader =
+    reinterpret_cast<uint32_t *>(
+    static_cast<uint8_t *>(region->getPtrToRawData()) + offset);
+  auto entry_reader = reader;
+  // While it is a valid offset
+  // TODO(lukas): Last entry can actually be an xref
+  auto size = 0U;
+  while (section_manager.IsInRegion(".text", ea - ~(*entry_reader)) &&
+         size + offset < region->getMemSize()) {
+    size += 4;
+    ++entry_reader;
+  }
+
+  // Try to build the table from it, depending on number of entries shoudl succeed.
+  auto table = OffsetTable::Parse(ea, reinterpret_cast<int32_t *>(reader),
+                                  region, size);
+  if (table) {
+    offset_tables.push_back(std::move(table.value()));
+    offset += size;
+    return true;
+  }
+  return false;
+}
+
+bool SectionParser::TryVar(uint64_t &offset,
+                           Dyninst::SymtabAPI::Region *region,
+                           mcsema::Segment *cfg_segment) {
+  auto *byte_reader =
+    reinterpret_cast<uint8_t *>(
+    static_cast<uint8_t *>(region->getPtrToRawData()) + offset);
+
+  auto entry = 4;
+  while(!*byte_reader && offset < region->getMemSize() && entry) {
+    ++offset;
+    --entry;
+  }
+  if (!entry || offset >= region->getMemSize()) {
+    return false;
+  }
+
+  auto size = 0U;
+  while (*byte_reader && size + offset < region->getMemSize()) {
+    ++byte_reader;
+    ++size;
+  }
+
+  std::string name = region->getRegionName() + "_" + std::to_string(++counter);
+  LOG(INFO) << "Found var " << name << " at 0x"
+            << std::hex << region->getMemOffset() + offset << " of size "
+            << std::dec << size;
+  auto var = cfg_segment->add_vars();
+  var->set_ea(region->getMemOffset() + offset);
+  var->set_name(name);
+  disass_context->segment_vars.insert({region->getMemOffset() +  offset, var});
+
+  // Clean all 0s that may have been added due to mem allign
+  while (!*byte_reader && size + offset < region->getMemSize() && ((offset + size) % 8)) {
+    ++byte_reader;
+    ++size;
+  }
+  offset += size;
+  return true;
+}
+
+// WIP: Read it like human being not a student of comspi
 void SectionParser::ParseVariables(Dyninst::SymtabAPI::Region *region,
                                    mcsema::Segment *segment) {
 
-  std::string base_name = region->getRegionName();
-  auto offset = static_cast<uint8_t *>(region->getPtrToRawData());
   auto end = region->getMemOffset() + region->getMemSize();
 
   LOG(INFO) << "Trying to parse region " << region->getRegionName()
@@ -56,90 +167,21 @@ void SectionParser::ParseVariables(Dyninst::SymtabAPI::Region *region,
   LOG(INFO) << "Starts at 0x" << std::hex << region->getMemOffset()
             << " ends at 0x" << end;
 
-  for (auto j = 0U; j < region->getDiskSize(); j += 1, ++offset) {
-    CHECK(region->getMemOffset() + j == region->getDiskOffset() + j)
-        << "Memory offset != Disk offset, investigate!";
+  for (uint64_t offset = 0U; offset < region->getMemSize();) {
+    CHECK(region->getMemOffset() + offset == region->getDiskOffset() + offset)
+        << "Memory reader != Disk reader, investigate!";
 
-    if (*offset == 0) {
+    LOG(INFO) << std::hex << region->getMemOffset() + offset << std::endl;
+    if (TryXref(offset, region, segment)) {
+      offset += 8;
       continue;
     }
 
-    // Read until next zero
-    uint64_t size = j;
-    while (*offset != 0) {
-      ++j;
-      ++offset;
-      if (region->getMemOffset() + j == end) {
-        LOG(INFO) << "Hit end of region";
-        break;
-      }
-    }
-
-    // Zero was found, but it may have been something like
-    // 04 bc 00 00 so zero is still valid part of address
-    uint64_t off = size % 4;
-    auto diff = j - size;
-
-    if (diff + off <= 4) {
-      diff += off;
-    }
-
-    // Check if it is small enough to be a one reference and try to match it
-    // against the rest of the binary to see if it truly is a reference
-    if (diff <= 4 && diff  >= 3) {
-      auto tmp_ptr = reinterpret_cast<uint64_t *>(static_cast<uint8_t *>(
-            region->getPtrToRawData()) + size - off);
-      Dyninst::Address target_ea = *tmp_ptr;
-      Dyninst::Address ea = region->getMemOffset() + size - off;
-
-      if (disass_context->HandleDataXref({ea, target_ea, segment})) {
-        LOG(INFO) << "Fished up " << std::hex
-                  << region->getMemOffset() + size << " " << *tmp_ptr;
-        continue;
-      }
-
-      if (section_manager.IsInRegion(region, target_ea)) {
-        std::string name = base_name + "_unnamed_" + std::to_string(++unnamed);
-        disass_context->WriteAndAccount({ea, target_ea, segment, name});
-
-        //Now add target as var because it was not before
-        auto cfg_var = segment->add_vars();
-        cfg_var->set_name(name);
-        cfg_var->set_ea(target_ea);
-        disass_context->segment_vars.insert({target_ea, cfg_var});
-        continue;
-
-      } else if (section_manager.IsInBinary(target_ea)) {
-        LOG(INFO) << "Cross xref 0x" << std::hex
-                  << ea << " -> 0x" << target_ea;
-        cross_xrefs.push_back({ea, target_ea, segment});
-        continue;
-      }
-    }
-
-    // Now we know it is not a simple xref, but it still may be an OffsetTable
-    // which is a jump table (for example from switch statement)
-
-    Dyninst::Address ea = region->getMemOffset() + size;
-    auto *ptr_to_value = reinterpret_cast<int32_t *>(
-        static_cast<uint8_t *>(region->getPtrToRawData()) + size);
-
-    auto alligment = (ea + j - size) % 4;
-    auto table = OffsetTable::Parse(ea, ptr_to_value, region, j - size - alligment);
-    if (table) {
-      offset_tables.push_back(std::move(table.value()));
-      j -= alligment;
+    if (TryOffsetTable(offset, region)) {
       continue;
     }
 
-    std::string name = base_name + "_" + std::to_string(counter);
-    ++counter;
-    LOG(INFO) << "\tAdding var " << name << " at 0x"
-              << std::hex << region->getMemOffset() + size;
-    auto var = segment->add_vars();
-    var->set_ea(region->getMemOffset() + size);
-    var->set_name(name);
-    disass_context->segment_vars.insert({region->getMemOffset() + size, var});
+    TryVar(offset, region, segment);
   }
 }
 
@@ -157,8 +199,6 @@ void SectionParser::XrefsInSegment(Dyninst::SymtabAPI::Region *region,
   for (auto j = 0U; j < region->getDiskSize(); j += 8, offset++) {
     if (!disass_context->HandleDataXref(
           {region->getMemOffset() + j, *offset, segment})) {
-      LOG(INFO) << "\tDid not resolve it, try to search in .text";
-
       if (section_manager.IsInRegion(".text", *offset)) {
         LOG(INFO) << "\tXref is pointing into .text";
         unresolved_code_xrefs.insert(

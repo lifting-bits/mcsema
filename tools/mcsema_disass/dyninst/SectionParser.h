@@ -63,6 +63,14 @@ private:
   DisassContext *disass_context;
   SectionManager &section_manager;
 
+  bool TryXref(uint64_t offset, Dyninst::SymtabAPI::Region *region,
+               mcsema::Segment *cfg_segment);
+  bool TryOffsetTable(uint64_t &offset,
+                      Dyninst::SymtabAPI::Region *region);
+  bool TryVar(uint64_t &offset,
+              Dyninst::SymtabAPI::Region *region,
+              mcsema::Segment *cfg_segment);
+
   // For variable names
   int unnamed = 0;
   int counter = 0;
