@@ -123,10 +123,12 @@ std::experimental::optional<OffsetTable> OffsetTable::Parse(
       it_ea += 4, ++reader) {
 
     // Get what is that entry truly pointing to
-    auto target_ea = start_ea - ~(*reader) - 1;
+    auto target_ea = table.start_ea - ~(*reader) - 1;
     if (gSectionManager->IsInRegion(".text", target_ea)) {
       table.targets.insert({target_ea});
       table.entries.insert({it_ea, target_ea});
+    } else if (target_ea == start_ea) {
+      table.start_ea += 4;
     } else {
       // It doesn't point into text, it is not a jump table
       return {};
@@ -142,5 +144,6 @@ std::experimental::optional<OffsetTable> OffsetTable::Parse(
 
   LOG(INFO) << "Parse offset table starting at 0x" << std::hex << start_ea
             << " containing " << std::dec << table.entries.size();
+
   return {std::move(table)};
 }
