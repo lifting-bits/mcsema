@@ -28,6 +28,9 @@ using namespace SymtabAPI;
 std::unique_ptr<SectionManager> gSectionManager(new SectionManager);
 
 bool SectionManager::IsInRegion(SymtabAPI::Region *r, Address a) {
+  if (!r) {
+    return false;
+  }
   if (a < r->getMemOffset()) {
     return false;
   }
@@ -80,7 +83,7 @@ SectionManager::GetRegion(const std::string &name) {
       return r.region;
     }
   }
-  LOG(ERROR) << "Could not fetch section with name " << name;
+  LOG(INFO) << "Could not fetch section with name " << name;
   return nullptr;
 }
 
@@ -124,4 +127,22 @@ bool SectionManager::IsCode(Address a) {
 
 std::set<Region *> SectionManager::GetDataRegions() {
   return GetAllRegions();
+}
+
+std::vector<Dyninst::SymtabAPI::Symbol *>
+SectionManager::GetExternalRelocs(Dyninst::SymtabAPI::Symbol::SymbolType type) {
+  std::vector<Dyninst::SymtabAPI::Symbol *> vars;
+  for (auto &region : regions) {
+    for (auto &reloc : region.region->getRelocations()) {
+      auto symbol = reloc.getDynSym();
+      if (!symbol) {
+        continue;
+      }
+      if (symbol->getType() == type) {
+        LOG(INFO) << "Found relocation of " << symbol->getMangledName();
+        vars.push_back(symbol);
+      }
+    }
+  }
+  return vars;
 }

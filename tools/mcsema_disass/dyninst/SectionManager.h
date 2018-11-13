@@ -28,6 +28,7 @@ namespace mcsema {
 struct Section {
   Dyninst::SymtabAPI::Region *region;
   std::string name;
+  mcsema::Segment *cfg_segment;
 };
 
 struct SectionManager {
@@ -46,6 +47,27 @@ public:
   std::set<Dyninst::SymtabAPI::Region *> GetAllRegions();
 
   Dyninst::SymtabAPI::Region *GetRegion(const std::string &name);
+
+  std::vector<Dyninst::SymtabAPI::Symbol *> GetExternalRelocs(
+      Dyninst::SymtabAPI::Symbol::SymbolType type);
+
+  void SetCFG(Dyninst::SymtabAPI::Region *reg,
+              mcsema::Segment *segment) {
+    for (auto &r : regions) {
+      if (r.region == reg) {
+        r.cfg_segment = segment;
+      }
+    }
+  }
+
+  mcsema::Segment *GetCFG(Dyninst::SymtabAPI::Region *reg) {
+    for (auto &r : regions) {
+      if (r.region == reg) {
+        return r.cfg_segment;
+      }
+    }
+    return nullptr;
+  }
 
 private:
   // There won't be big enough number of regions to justify
