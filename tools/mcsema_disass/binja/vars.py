@@ -40,12 +40,19 @@ def recover_globals(bv, pb_mod):
   # Sort symbols by address so we can estimate size if needed
   # TODO(krx): I'd prefer to find a better way to identify globals
   # than going through and filtering all variable symbols in certain sections
-  syms = sorted(bv.symbols.values(), key=lambda s: s.address)
+  syms = []
+  for sym in bv.symbols.values():
+    if isinstance(sym, list):
+      for dup_sym in sym:
+        syms.append(dup_sym)
+    else:
+      syms.append(sym)
+
   for i, sym in enumerate(syms):
     if sym.name in SYM_IGNORE:
       continue
 
-    # Binja picks up a couple of symbols outside of names sections
+    # Binja picks up a couple of symbols outside of named sections
     sect = util.get_section_at(bv, sym.address)
     if sect is None:
       continue
