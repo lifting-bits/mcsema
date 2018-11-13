@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <memory>
 
@@ -97,6 +98,7 @@ struct DisassContext {
   mcsema::DataReference *WriteAndAccount(CrossXref<mcsema::Segment *> xref,
                                          bool is_code=false,
                                          uint64_t width=8) {
+    width = std::min(width, 8ul);
     auto cfg_xref = xref.WriteDataXref(is_code, width);
     data_xrefs.insert({xref.ea, cfg_xref});
     return cfg_xref;

@@ -408,45 +408,54 @@ void CFGWriter::WriteLocalVariables() {
 
 void CFGWriter::WriteExternalVariables() {
   std::vector<SymtabAPI::Symbol *> symbols;
-  symtab.getAllSymbolsByType(symbols, SymtabAPI::Symbol::ST_OBJECT);
+  symbols = gSectionManager->GetExternalRelocs(
+      Dyninst::SymtabAPI::Symbol::SymbolType::ST_OBJECT);
 
   LOG(INFO) << "Writing " << symbols.size() << " external variables";
   for (const auto &s : symbols) {
-    if (s->isInDynSymtab()) {
-
-      // Most likely relocation. So as IDA we can also make up some addresses
-      if (!s->getOffset() && !s->getSize()) {
-        LOG(INFO) << "External var " << s->getMangledName()
-                  << " had no ea, allocating it in magic section";
-        auto external_var = magic_section.WriteExternalVariable(
-            module, s->getMangledName());
-        gDisassContext->external_vars.insert({external_var->ea(), external_var});
-        continue;
-      }
-
-      auto external_var = module.add_external_vars();
-      gDisassContext->external_vars.insert({s->getOffset(), external_var});
-      external_var->set_name(s->getMangledName());
-      external_var->set_ea(s->getOffset());
-
-      //TODO(lukas): This is to generate syntactically valid llvm
-      //             Other than that probably won't work
-      if (s->getSize()) {
-        external_var->set_size(s->getSize());
-      } else {
-        external_var->set_size(ptr_byte_size);
-      }
-
-      //TODO(lukas): This needs some checks
-      external_var->set_is_weak(false);
-      external_var->set_is_thread_local(false);
+    // Is this dynamic?
+    if (!s->isInDynSymtab()) {
+      continue;
     }
+
+    // Most likely relocation. So as IDA we can also make up some addresses
+    if (!s->getOffset() && !s->getSize()) {
+      LOG(INFO) << "External var " << s->getMangledName()
+                << " had no ea, allocating it in magic section";
+      auto external_var = magic_section.WriteExternalVariable(
+          module, s->getMangledName());
+      gDisassContext->external_vars.insert({external_var->ea(), external_var});
+      continue;
+    }
+
+    auto external_var = module.add_external_vars();
+    gDisassContext->external_vars.insert({s->getOffset(), external_var});
+    external_var->set_name(s->getMangledName());
+    external_var->set_ea(s->getOffset());
+
+    //TODO(lukas): This is to generate syntactically valid llvm
+    //             Other than that probably won't work
+    if (s->getSize()) {
+      external_var->set_size(s->getSize());
+    } else {
+      external_var->set_size(ptr_byte_size);
+    }
+
+    //TODO(lukas): This needs some checks
+    external_var->set_is_weak(
+        s->getLinkage() == Dyninst::SymtabAPI::Symbol::SymbolLinkage::SL_WEAK);
+    external_var->set_is_thread_local(false);
+
   }
 }
 
 void CFGWriter::WriteGlobalVariables() {
   std::vector<SymtabAPI::Symbol *> vars;
+  symtab.getAllSymbolsByType(vars, SymtabAPI::Symbol::ST_OBJECT);
   for (auto &a : vars) {
+    if (!a->isInSymtab() || gDisassContext->external_vars.count(a->getOffset())) {
+      continue;
+    }
     if (a->getRegion() && (a->getRegion()->getRegionName() == ".bss" ||
                            a->getRegion()->getRegionName() == ".rodata")) {
       LOG(INFO) << "Found global variable " << a->getMangledName()
@@ -487,7 +496,7 @@ void CFGWriter::WriteInternalFunctions() {
     }
     // We want to ignore the .got.plt stubs, since they are not needed
     // and cfg file would grow significantly
-    else if (gSectionManager->IsInRegion(".got.plt",
+    else if (gSectionManager->IsInRegions({".got.plt"},
                                           func->entry()->start())) {
      LOG(INFO) << "Function " << func->name()
                << " is getting skipped because it is .got.plt stub";
@@ -571,10 +580,10 @@ void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
 
   Address ip = block->start();
 
-  for (auto p : instructions) {
-    InstructionAPI::Instruction *instruction = p.second.get();
+  for (auto p = instructions.begin(); p != instructions.end();) {
+    InstructionAPI::Instruction *instruction = p->second.get();
 
-    WriteInstruction(instruction, ip, cfg_block);
+    WriteInstruction(instruction, ip, cfg_block, (++p) == instructions.end());
     ip += instruction->size();
   }
 
@@ -585,7 +594,8 @@ void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
 }
 
 void CFGWriter::WriteInstruction(InstructionAPI::Instruction *instruction,
-                                 Address addr, mcsema::Block *cfg_block) {
+                                 Address addr, mcsema::Block *cfg_block,
+                                 bool is_last) {
 
   mcsema::Instruction *cfg_instruction = cfg_block->add_instructions();
 
@@ -601,9 +611,9 @@ void CFGWriter::WriteInstruction(InstructionAPI::Instruction *instruction,
   instruction->getOperands(operands);
 
   if (instruction->getCategory() == InstructionAPI::c_CallInsn) {
-    HandleCallInstruction(instruction, addr, cfg_instruction);
+    HandleCallInstruction(instruction, addr, cfg_instruction, is_last);
   } else {
-    HandleNonCallInstruction(instruction, addr, cfg_instruction);
+    HandleNonCallInstruction(instruction, addr, cfg_instruction, cfg_block, is_last);
   }
   //TODO(lukas): We just found it, no need to bother with it?
   //             But what if it needs to be start of function?
@@ -685,7 +695,8 @@ bool CFGWriter::IsNoReturn(const std::string &name) {
 //TODO(lukas): This is hacky
 void CFGWriter::HandleCallInstruction(InstructionAPI::Instruction *instruction,
                                       Address addr,
-                                      mcsema::Instruction *cfg_instruction) {
+                                      mcsema::Instruction *cfg_instruction,
+                                      bool is_last) {
   Address target;
   std::vector<InstructionAPI::Operand> operands;
   instruction->getOperands(operands);
@@ -694,7 +705,7 @@ void CFGWriter::HandleCallInstruction(InstructionAPI::Instruction *instruction,
 
   LOG(INFO) << "Trying to resolve call instruction at 0x"
             << std::hex << cfg_instruction->ea();
-
+  LOG(INFO) << instruction->format();
   if (TryEval(operands[0].getValue().get(), addr, target, size)) {
     HandleXref(cfg_instruction, target);
 
@@ -778,7 +789,9 @@ bool CFGWriter::HandleXref(mcsema::Instruction *cfg_instruction,
 void CFGWriter::HandleNonCallInstruction(
     Dyninst::InstructionAPI::Instruction *instruction,
     Address addr,
-    mcsema::Instruction *cfg_instruction) {
+    mcsema::Instruction *cfg_instruction,
+    mcsema::Block *cfg_block,
+    bool is_last) {
 
   std::vector<InstructionAPI::Operand> operands;
   instruction->getOperands(operands);
@@ -827,10 +840,20 @@ void CFGWriter::HandleNonCallInstruction(
 
       } else if (instruction->getCategory() == InstructionAPI::c_BranchInsn) {
         Address a;
-
         // This has + |instruction| in AST
         if (TryEval(expr.get(), addr - instruction->size(), a)) {
-
+          LOG(INFO) << "Eval'd as " << a;
+          if (is_last) {
+            for (auto succ : cfg_block->successor_eas()) {
+              if (a == succ) {
+                AddCodeXref(cfg_instruction,
+                            mcsema::CodeReference::CodeTarget,
+                            mcsema::CodeReference::ControlFlowOperand,
+                            mcsema::CodeReference::Internal,
+                            a);
+              }
+            }
+          }
           // ea is not really that important
           // in CrossXref<mcsema::Instruction *>
           if (gDisassContext->HandleCodeXref({0, a, cfg_instruction})) {
@@ -869,8 +892,12 @@ void CFGWriter::HandleNonCallInstruction(
 
 void CFGWriter::WriteExternalFunctions() {
   std::vector<std::string> unknown;
+  auto symbols = gSectionManager->GetExternalRelocs(
+      Dyninst::SymtabAPI::Symbol::SymbolType::ST_FUNCTION);
+
   auto known = gExtFuncManager->GetAllUsed( unknown );
-  LOG(INFO) << "Found " << known.size() << " external functions";
+  LOG(INFO) << "Found " << known.size() << " known external functions and "
+            << unknown.size() << " unknown";
 
   for (auto &func : known) {
     LOG(INFO) << "External function " << func.symbol_name;
@@ -885,7 +912,7 @@ void CFGWriter::WriteExternalFunctions() {
       }
     }
 
-    CHECK(found) << "External function was not found in CodeSource::linkage()";
+    LOG_IF(WARNING, !found) << "External function was not found in CodeSource::linkage()";
 
     func.ea = a;
     auto cfg_external_func = magic_section.WriteExternalFunction(module, func);
@@ -955,7 +982,7 @@ void CFGWriter::WriteGOT(SymtabAPI::Region* region,
              reloc.rel_addr(),
              static_cast<Dyninst::Address>(ext_var->ea()),
              cfg_segment,
-             ext_var->name()});
+             ext_var->name()}, false);
         found = true;
         gDisassContext->data_xrefs.insert({reloc.rel_addr(), cfg_xref});
         WriteAsRaw(data, ext_var->ea(), reloc.rel_addr() - cfg_segment->ea());
@@ -1004,7 +1031,7 @@ void CFGWriter::WriteRelocations(SymtabAPI::Region* region,
             reloc.rel_addr(),
             static_cast<Dyninst::Address>(ext_func->ea()),
             segment,
-            ext_func->name()}, true);
+            ext_func->name()});
         WriteAsRaw(*data, ext_func->ea(), reloc.rel_addr() - segment->ea());
       }
     }
@@ -1018,7 +1045,8 @@ void WriteBssXrefs(
   for (auto &external : externals) {
     if (gSectionManager->IsInRegion(region, external.first)) {
       gDisassContext->WriteAndAccount(
-          {external.first, external.first, segment, external.second->name()});
+          {external.first, external.first, segment, external.second->name()},
+          false, external.second->size());
     }
   }
 }
@@ -1054,6 +1082,7 @@ void CFGWriter::WriteInternalData() {
       continue;
     }
     auto cfg_internal_data = module.add_segments();
+    gSectionManager->SetCFG(region, cfg_internal_data);
 
     std::string data;
     WriteRawData(data, region);
@@ -1089,6 +1118,7 @@ void CFGWriter::WriteInternalData() {
       ".plt",
       ".plt.got",
       ".gnu.hash",
+      ".gnu.version",
       ".gcc_except_table",
       ".jcr",
     };
