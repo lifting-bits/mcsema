@@ -612,14 +612,6 @@ def get_cfg(args, fixed_args):
   # Load the binary in binja
   bv = util.load_binary(args.binary)
 
-  # Once for good measure.
-  bv.add_analysis_option("linearsweep")
-  bv.update_analysis_and_wait()
-
-  # Twice for good luck!
-  bv.add_analysis_option("linearsweep")
-  bv.update_analysis_and_wait()
-
   # Collect all paths to defs files
   log.debug('Parsing definitions files')
   def_paths = set(map(os.path.abspath, extra_args.std_defs))
