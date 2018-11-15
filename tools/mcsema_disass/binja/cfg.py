@@ -53,15 +53,10 @@ BINJA_CCONV_TYPES = {
 }
 
 RECOVERED = set()
-TO_RECOVER = Queue()
 
 RECOVER_OPTS = {
   'stack_vars': False
 }
-
-def queue_func(addr):
-  if addr not in RECOVERED:
-    TO_RECOVER.put(addr)
 
 
 def func_has_return_type(func):
@@ -147,8 +142,12 @@ def recover_externals(bv, pb_mod):
     if sym.type == SymbolType.ImportedFunctionSymbol:
       recover_ext_func(bv, pb_mod, sym)
 
-    if sym.type == SymbolType.ImportedDataSymbol:
+    elif sym.type == SymbolType.ImportedDataSymbol:
       recover_ext_var(bv, pb_mod, sym)
+
+  #  elif sym.type == SymbolType.ImportAddressSymbol:
+  #    pass  # I don't think we need to do anything for these?
+
   DEBUG_POP()
 
 _BYTE_WIDTH_NAME = {4: "dword", 8: "qword"}
@@ -228,6 +227,7 @@ def recover_section_vars(bv, pb_seg, sect_start, sect_end):
 
   DEBUG_POP()
 
+
 def recover_sections(bv, pb_mod):
   # Collect all address to split on
   sec_addrs = set()
@@ -267,6 +267,7 @@ def recover_sections(bv, pb_mod):
     recover_section_cross_references(bv, pb_seg, real_sect, start_addr, end_addr)
 
 
+# TODO : I think this can be simplified/more robust
 def is_local_noreturn(bv, il):
   """
   Args:
@@ -305,7 +306,8 @@ def is_local_noreturn(bv, il):
     # If a target address was recovered, check if it's in a noreturn function
     if tgt_addr is not None:
       tgt_func = util.get_func_containing(bv, tgt_addr)
-      return not tgt_func.function_type.can_return
+      if tgt_func is not None:
+        return not tgt_func.function_type.can_return
 
   # Other instructions that terminate control flow
   return il.operation in [LowLevelILOperation.LLIL_TRAP,
@@ -316,7 +318,8 @@ _CFG_INST_XREF_TYPE_TO_NAME = {
     CFG_pb2.CodeReference.ImmediateOperand: "imm",
     CFG_pb2.CodeReference.MemoryOperand: "mem",
     CFG_pb2.CodeReference.MemoryDisplacementOperand: "disp",
-    CFG_pb2.CodeReference.ControlFlowOperand: "flow"
+    CFG_pb2.CodeReference.ControlFlowOperand: "flow",
+    CFG_pb2.CodeReference.OffsetTable: "ofst",
 }
 
 
@@ -348,14 +351,11 @@ def add_xref(bv, pb_inst, target, mask, optype):
     xref.location = CFG_pb2.CodeReference.Internal
     debug_loc = "internal"
 
-  # If the target happens to be a function, queue it for recovery
-  if bv.get_function_at(target) is not None:
-    queue_func(target)
-
   debug_op = _CFG_INST_XREF_TYPE_TO_NAME[optype]
 
   return "({} {} {} {:x}{} {})".format(
       debug_type, debug_op, debug_loc, target, debug_mask, sym_name)
+
 
 def read_inst_bytes(bv, il):
   """ Get the opcode bytes for an instruction
@@ -377,6 +377,7 @@ def recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last):
     il (binaryninja.lowlevelil.LowLevelILInstruction)
     all_il (list): Collection of all il instructions at this address
              (e.g. all instructions expanded from a cmov)
+    is_last (bool)
   """
   pb_inst.ea = il.address
   pb_inst.bytes = read_inst_bytes(bv, il)
@@ -386,9 +387,8 @@ def recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last):
   for il_exp in all_il:
     refs.update(xrefs.get_xrefs(bv, func, il_exp))
 
-  debug_refs = []
-
   # Add all discovered xrefs to pb_inst
+  debug_refs = []
   for ref in refs:
     debug_refs.append(add_xref(bv, pb_inst, ref.addr, ref.mask, ref.cfg_type))
 
@@ -400,9 +400,19 @@ def recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last):
     tgt = il.dest.constant
     pb_block.successor_eas.append(tgt)
 
+  # table = jmptable.get_jmptable(bv, il)
+  # if table is not None:
+  #   debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.MemoryDisplacementOperand))
+  #   JMP_TABLES.append(table)
+
+  # With new recovery mechanism:?
   table = jmptable.get_jmptable(bv, il)
   if table is not None:
     debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.MemoryDisplacementOperand))
+    # if is_offset:
+    #   debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.OffsetTable))
+    # else:
+    #   debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.DataTarget))
     JMP_TABLES.append(table)
 
     # Add any missing successors
@@ -473,33 +483,32 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
     log.warn("Skipping external function '%s' in main CFG recovery", func.symbol.name)
     return
 
-  # Initialize the protobuf for this function
   DEBUG("Recovering function {} at {:x}".format(func.symbol.name, addr))
 
+  # Initialize the protobuf for this function
   pb_func = pb_mod.funcs.add()
   pb_func.ea = addr
-  pb_func.is_entrypoint = is_entry
+  pb_func.is_entrypoint = is_entry  # TODO : or exported function
   pb_func.name = func.symbol.name
 
   # Recover all basic blocks
   il_groups = util.collect_il_groups(func.lifted_il)
   var_refs = defaultdict(list)
-  for block in func:
+  for bb in func:
     DEBUG_PUSH()
-    pb_block = add_block(pb_func, block)
+    pb_block = add_block(pb_func, bb)
     DEBUG_PUSH()
-
-    # Recover every instruction in the block
-    insts = list(block.disassembly_text)
-    for inst in insts:
+    
+    # Recover every instruction in the basic block (bb)
+    for inst in bb.disassembly_text:
       # Skip over anything that isn't an instruction
       if inst.tokens[0].type != InstructionTextTokenType.InstructionToken:
         continue
+
       il = func.get_lifted_il_at(inst.address)
       all_il = il_groups[inst.address]
-
       pb_inst = pb_block.instructions.add()
-      recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last=inst==insts[-1])
+      recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last=(inst.address == bb.end))
 
       # Find any references to stack vars in this instruction
       if RECOVER_OPTS['stack_vars']:
@@ -513,6 +522,7 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
     vars.recover_stack_vars(pb_func, func, var_refs)
 
 
+# Actual recovery function
 def recover_cfg(bv, args):
   pb_mod = CFG_pb2.Module()
   pb_mod.name = os.path.basename(bv.file.filename)
@@ -522,19 +532,15 @@ def recover_cfg(bv, args):
     log.fatal('Entrypoint not found: %s', args.entrypoint)
   entry_addr = bv.symbols[args.entrypoint].address
 
-  # Recover the entrypoint func separately
+  # Recover all functions
   log.debug('Recovering CFG')
-  recover_function(bv, pb_mod, entry_addr, is_entry=True)
+  for func in bv.functions:
+    addr = func.start
 
-  # Recover any discovered functions until there are none left
-  while not TO_RECOVER.empty():
-    addr = TO_RECOVER.get()
-
-    if addr in RECOVERED:
-      continue
-    RECOVERED.add(addr)
-
-    recover_function(bv, pb_mod, addr)
+    # if addr not in RECOVERED and func.symbol.type is not SymbolType.ImportedFunctionSymbol:
+    if addr not in RECOVERED:
+      RECOVERED.add(addr)
+      recover_function(bv, pb_mod, addr, is_entry=(addr == entry_addr))
 
   log.debug('Recovering Globals')
   vars.recover_globals(bv, pb_mod)
@@ -577,6 +583,7 @@ def parse_defs_file(bv, path):
         EXT_MAP[fname] = (int(args), CCONV_TYPES[cconv], ret, sign)
 
 
+# Entrypoint for CFG recovery
 def get_cfg(args, fixed_args):
   # Parse any additional args
   parser = argparse.ArgumentParser()

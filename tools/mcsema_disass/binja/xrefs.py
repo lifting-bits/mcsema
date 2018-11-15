@@ -115,6 +115,7 @@ def get_xrefs(bv, func, il):
   ref = _get_aarch64_partial_xref(bv, func, il, dis)
   if ref is not None:
     refs.add(ref)
+    return refs
   else:
     reftype = XRef.IMMEDIATE
 
@@ -150,7 +151,7 @@ def get_xrefs(bv, func, il):
       else:
         refs.add(ref)  # Add it back in.
 
-  return refs
+    return refs
 
 
 def _fill_xrefs_internal(bv, il, refs, reftype=XRef.IMMEDIATE, parent=None):
