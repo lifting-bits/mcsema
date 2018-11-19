@@ -13,6 +13,66 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specifi
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+SOURCE_DIR="${SCRIPT_DIR}/../"
+
+install_binja () {
+  # this file is the decrypted version and placed there by the
+  # before-install action in .travis.yml
+  local BINJA_TARGZ="${SCRIPT_DIR}/mcsema_binja.tar.gz"
+	local BINJA_INSTALL="${SOURCE_DIR}/binaryninja"
+
+  # make sure our PYTHONPATH is setup for binja
+  export PYTHONPATH=${BINJA_INSTALL}/python
+	python2.7 -c "import binaryninja" 2>/dev/null
+	if [ ! "$?" = "0" ]; then
+		if [ ! -e ${BINJA_INSTALL}/python/binaryninja/__init__.py ]; then
+
+			echo "Extracting Binary Ninja" && \
+        tar -xzf ${BINJA_TARGZ} -C ${SOURCE_DIR} && \
+        echo "Extracted to ${SOURCE_DIR}"
+
+			if [ ! "$?" = "0" ]; then
+				echo "FAILED: Binja extraction failed"
+				return 1
+			fi
+
+		else
+			echo "Found a copy of Binja, skipping install, using existing copy"
+		fi
+
+		if [ ! -e ${HOME}/.binaryninja/license.dat ]; then
+			echo "Could not find Binja license, checking for ~/.binaryninja"
+			if [ ! -e ${HOME}/.binaryninja ]; then
+				echo "~/.binaryninja does not exist, creating directory..."
+				mkdir ${HOME}/.binaryninja
+			fi
+
+			echo "Copying our CI Binja license to ${HOME}/.binaryninja/license.dat"
+			cp ${BINJA_INSTALL}/mcsema_binja_license.txt ${HOME}/.binaryninja/license.dat
+		else
+			echo "Found existing Binja license, ignoring..."
+		fi
+
+    # sanity check the install
+    python2.7 -c "import binaryninja" 2>/dev/null
+    if [ ! "$?" = "0" ]; then
+      echo "FAILED: still can't use Binary Ninja, aborting"
+      return 1
+    else
+      echo "BinaryNinja installed successfully"
+    fi
+
+    echo "Updating Binary Ninja to Dev Channel latest"
+    python2.7 ${SCRIPT_DIR}/update_binja.py
+
+	else
+		echo "Binja already exists; skipping..."
+	fi
+
+  return 0
+}
+
 main() {
   if [ $# -ne 2 ] ; then
     printf "Usage:\n\ttravis.sh <linux|osx> <initialize|build>\n"
@@ -45,6 +105,7 @@ linux_initialize() {
   printf "Initializing platform: linux\n"
 
   printf " > Updating the system...\n"
+  sudo dpkg --add-architecture i386
   sudo apt-get -qq update
   if [ $? -ne 0 ] ; then
     printf " x The package database could not be updated\n"
@@ -52,9 +113,35 @@ linux_initialize() {
   fi
 
   printf " > Installing the required packages...\n"
-  sudo apt-get install -qqy python2.7 build-essential realpath python-setuptools git python2.7 wget libtinfo-dev gcc-multilib g++-multilib lsb-release liblzma-dev zlib1g-dev gnat
+  sudo apt-get install -qqy python2.7 \
+                            build-essential \
+                            realpath \
+                            python-setuptools \
+                            git \
+                            python2.7 \
+                            wget \
+                            libtinfo-dev \
+                            gcc-multilib \
+                            g++-multilib \
+                            lsb-release \
+                            liblzma-dev \
+                            zlib1g-dev \
+                            libprotobuf-dev \
+                            protobuf-compiler
+
+  sudo apt-get install -qqy libc6:i386 \
+                            libstdc++6:i386 \
+                            zlib1g-dev:i386 \
+                            liblzma-dev:i386 \
+                            libtinfo-dev:i386 
   if [ $? -ne 0 ] ; then
     printf " x Could not install the required dependencies\n"
+    return 1
+  fi
+
+  install_binja
+  if [ $? -ne 0 ] ; then
+    printf " x Could not install binary ninja"
     return 1
   fi
 
@@ -185,7 +272,7 @@ linux_build_helper() {
   fi
 
   printf " > Copying the mcsema folder...\n"
-  local file_list=( ".remill_commit_id" "docs" "examples" "generated" "mcsema" "tests" "tools" ".gdbinit" ".gitignore" ".travis.yml" "ACKNOWLEDGEMENTS.md" "CMakeLists.txt" "LICENSE" "README.md" "scripts")
+  local file_list=( "cmake" "tools" "examples" "scripts" "tests" "docs" "mcsema" "generated" ".remill_commit_id" "CMakeLists.txt" "README.md" "CONTRIBUTING.md" ".gdbinit" "LICENSE" "ACKNOWLEDGEMENTS.md" ".gitignore" ".travis.yml" )
   for file_name in "${file_list[@]}" ; do
     cp -r "${file_name}" "remill/tools/mcsema" > "${log_file}" 2>&1
     if [ $? -ne 0 ] ; then
@@ -248,7 +335,7 @@ linux_build_helper() {
     return 1
   fi
 
-  ( cd build && cmake -DCMAKE_VERBOSE_MAKEFILE=True ../remill ) > "${log_file}" 2>&1
+  ( cd build && cmake -DMCSEMA_DISABLED_ABI_LIBRARIES:STRING="" -DCMAKE_VERBOSE_MAKEFILE=True ../remill ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to generate the project. Error output follows:\n"
     printf "===\n"

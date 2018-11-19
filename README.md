@@ -44,6 +44,25 @@ Why would anyone translate binaries *back* to bitcode?
 
 * **Write one set of analysis tools**. Lifting to LLVM IR means that one set of analysis tools can work on both the source and the binary. Maintaining a single set of tools saves development time and effort, and allows for a single set of better tools.
 
+## Comparison with other machine code to LLVM bitcode lifters
+|   | McSema | [dagger](https://github.com/repzret/dagger) | [llvm-mctoll](https://github.com/Microsoft/llvm-mctoll) | [retdec](https://github.com/avast-tl/retdec) | [reopt](https://github.com/GaloisInc/reopt) | [rev.ng](https://github.com/revng/revamb) | [bin2llvm](https://github.com/cojocar/bin2llvm) | [fcd](https://github.com/zneak/fcd) | [RevGen](https://github.com/S2E/tools/tree/master/tools) | [Fracture](https://github.com/draperlaboratory/fracture) | [libbeauty](https://github.com/jcdutton/libbeauty) |
+|  ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
+|  Actively maintained? | Yes | No | Yes | Yes | Yes | No | Maybe | Maybe | Maybe | No | Yes |
+|  Commercial support available? | Yes | No | No | No | Maybe | No | No | No | No | Maybe | No |
+|  LLVM versions | 3.5 - current | 5 | current | 3.9.1 | 3.8 |  | 3.2 | 4 | 3.9 | 3.4 | 6 |
+|  Builds with CI? | Yes | No | No | Yes | No | No | Yes | Maybe | Maybe | No | No |
+|  32-bit architectures | x86 | x86 | ARM | x86, ARM, MIPS, PIC32, PowerPC |  | ARM, MIPS | S2E | S2E | S2E | ARM, x86 |  |
+|  64-bit architectures | x86-64, AArch64 | x86-64 | x86-64 |  | x86-64 | x86-64 |  | S2E | S2E | PowerPC | x86-64 |
+|  Control-flow recovery | IDA Pro, Binary Ninja, DynInst | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | McSema | Ad-hoc | Ad-hoc |
+|  File formats | ELF, PE | ELF, Mach-O |  | ELF, PE, Mach-O, COFF, AR, Intel HEX, Raw | ELF | ELF | ELF |  | ELF, PE | ELF, Mach-O (maybe) | ELF |
+|  Bitcode is executable? | Yes | Yes | Yes | Yes | Yes | Yes | No | No | CGC | No | No |
+|  C++ exceptions suport? | Yes | No | No | No | No | Indirectly | No | No | No | No | Maybe |
+|  Lifts stack variables? | Yes | No | Maybe | Yes | No | No | No | Yes | No | No | Maybe |
+|  Lifts global variables? | Yes | Maybe | Yes | Yes | No | Maybe | No | No | No | Yes | Maybe |
+|  Has a test suite? | Yes | No | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No |
+
+**Note:** We label some architectures as "S2E" to mean any architecture supported by the S2E system. A system using "McSema" for control-flow recovery (e.g. RevGen) uses McSema's CFG.proto format for recovering control-flow. In the case of RevGen, only bitcode produced from DARPA Cyber Grand Challenge (CGC) binaries is executable.
+
 ## Dependencies
 
 | Name | Version | 
@@ -180,6 +199,65 @@ Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcs
 #### Step 5: Verifying Your McSema Installation
 
 In order to verify that McSema works correctly as built, head on over to [the documentation on integration tests](tests/MakingTests.md). Check that you can run the tests and that they pass.
+
+### On Windows
+
+#### Step 1: Toolchain
+* Visual Studio 2017: https://www.visualstudio.com/thank-you-downloading-visual-studio/?sku=Community&rel=15
+* CMake (add to PATH): https://cmake.org/files/v3.11/cmake-3.11.0-rc1-win64-x64.msi
+* Python 2.7 x64 (add to PATH)): https://www.python.org/ftp/python/2.7.14/python-2.7.14.amd64.msi
+* LLVM 5.0.1 x64 (do NOT add to PATH)): http://releases.llvm.org/5.0.1/LLVM-5.0.1-win64.exe
+
+Once you have finished installing everything, some additional steps are required:
+1. Open the Visual Studio 2017 Installer from the menu, and install the v140 toolset under "Individual Components"
+2. Run the LLVM install script: C:\Program Files\LLVM\tools\msbuild\install.bat (run CMD with administrator privileges!)
+3. Install python-magic-bin: https://pypi.python.org/pypi/python-magic-bin/0.4.14 (pip install file_name.whl)
+
+Please note that we will not be able to provide support if you are using other Visual Studio versions.
+
+#### Step 2: Obtaining the source code
+```
+git clone https://github.com/trailofbits/remill.git --depth=1
+cd remill/tools
+git clone https://github.com/trailofbits/mcsema.git --depth=1
+```
+
+Note that for production usage you should use a specific remill commit (remill/tools/mcsema/.remill_commit_id)
+
+```
+git fetch --unshallow
+git checkout -b production <remill_commit_id>
+```
+
+#### Step 3: Dependencies
+You can either build them yourself using our [cxx-common](https://github.com/trailofbits/cxx-common) dependency manager or download a pre-built package.
+Only the LLVM 5.0.1 package is supported right now, and you should build it using the Visual Studio 2017 Win64 generator with the LLVM 5.0.1 toolchain. The cxx-common script will automatically take care of this requirement.
+
+Binaries (extract to C:\Projects\tob_libraries)
+* [LLVM 5](https://s3.amazonaws.com/cxx-common/libraries-llvm50-windows10-amd64.7z)
+
+#### Step 4: Building
+```
+mkdir remill_build
+cd remill_build
+
+cmake -G "Visual Studio 15 2017 Win64" -T LLVM-vs2014 -DCMAKE_BUILD_TYPE=Release -DLIBRARY_REPOSITORY_ROOT=C:\Projects\tob_libraries ..\remill
+cmake --build . --config Release -- /maxcpucount:4
+```
+
+#### Step 5: Installing
+```
+cmake --build . --config Release --target install
+```
+
+You should now have the following directories: C:\mcsema, C:\remill.
+
+Add the following folders to your PATH environment variable:
+* C:\remill\bin
+* C:\mcsema\Scripts
+* C:\mcsema\bin
+
+Also update your PYTHONPATH: C:\mcsema\Lib\site-packages
 
 ## Additional Documentation
 

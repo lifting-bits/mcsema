@@ -9,6 +9,8 @@
 #define _REGEX_RE_COMP
 #define _BSD_SOURCE 1
 
+// needed to handle gets since it is deprecated
+extern char *gets(char *s); 
 
 #include <nfs/nfs.h>
 #include <mcheck.h>
@@ -86,7 +88,7 @@
 #include <x86_64-linux-gnu/sys/mtio.h>
 #include <x86_64-linux-gnu/sys/ttychars.h>
 #include <x86_64-linux-gnu/sys/select.h>
-#include <x86_64-linux-gnu/sys/ultrasound.h>
+//#include <x86_64-linux-gnu/sys/ultrasound.h>
 #include <x86_64-linux-gnu/sys/times.h>
 #include <x86_64-linux-gnu/sys/un.h>
 #include <x86_64-linux-gnu/sys/eventfd.h>
