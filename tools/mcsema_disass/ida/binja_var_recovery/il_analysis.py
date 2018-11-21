@@ -72,6 +72,18 @@ class Value(object):
     else:
       return self
 
+  def __hash__(self):
+    return hash(self.__repr__())
+
+  def __eq__(self, other):
+    if isinstance(self, Value):
+      return (self.__repr__() == other.__repr__())
+    else:
+      return False
+
+  def __ne__(self, other):
+    return not self.__eq__(self)
+
 class SymbolicValue(Value):
   def __init__(self, bv, sym_value, offset=0):
     super(SymbolicValue, self).__init__(bv, 0)
@@ -115,6 +127,18 @@ class SymbolicValue(Value):
       return SymbolicValue(self.bv, self.sym_value + " >> " + "{}".format(hex(other.address)), self.offset)
     else:
       return self
+
+  def __hash__(self):
+    return hash(self.__repr__())
+
+  def __eq__(self, other):
+    if isinstance(self, SymbolicValue):
+      return (self.__repr__() == other.__repr__())
+    else:
+      return False
+
+  def __ne__(self, other):
+    return not self.__eq__(self)
 
 def is_subset(s1, s2):
   for item in s2:
