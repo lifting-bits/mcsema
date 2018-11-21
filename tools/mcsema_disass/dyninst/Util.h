@@ -127,9 +127,11 @@ struct DisassContext {
         FishForXref(segment_vars, xref) ||
         FishForXref(func_map, xref, true)) {
 
+      if (xref.segment->xrefs_size()) {
       auto cfg_xref =
           xref.segment->mutable_xrefs(xref.segment->xrefs_size() - 1);
       data_xrefs.insert({static_cast<Dyninst::Address>(xref.ea), cfg_xref});
+      }
       return true;
     }
     return false;
@@ -232,8 +234,8 @@ struct DisassContext {
         FishForXref(external_funcs, xref) ||
         FishForXref(external_vars, xref) ||
         FishForXref(segment_vars, xref) ||
-        FishForXref(func_map, xref) ||
-        FishForXref(data_xrefs, xref)) {
+        FishForXref(data_xrefs, xref) ||
+        FishForXref(func_map, xref)) {
       return true;
     }
 

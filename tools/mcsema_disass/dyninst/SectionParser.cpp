@@ -37,7 +37,6 @@ SectionParser::CrossXrefMap SectionParser::ResolveCrossXrefs() {
     // Let's try to parse it now
 
     if (section_manager.IsInRegion(".text", xref.target_ea)) {
-      LOG(INFO) << "\tIs acturally targeting something in .text!";
       unresolved_code_xrefs.insert({xref.target_ea, xref});
     }
   }
@@ -69,11 +68,12 @@ bool SectionParser::TryXref(uint64_t offset,
                        std::to_string(++unnamed);
     disass_context->WriteAndAccount({ea, target_ea, cfg_segment, name});
 
+    // TODO(lukas): If we once try lift variables again
     //Now add target as var because it was not before
-    auto cfg_var = cfg_segment->add_vars();
-    cfg_var->set_name(name);
-    cfg_var->set_ea(target_ea);
-    disass_context->segment_vars.insert({target_ea, cfg_var});
+    //auto cfg_var = cfg_segment->add_vars();
+    //cfg_var->set_name(name);
+    //cfg_var->set_ea(target_ea);
+    //disass_context->segment_vars.insert({target_ea, cfg_var});
     return true;
 
   } else if (section_manager.IsInBinary(target_ea)) {
@@ -142,10 +142,11 @@ bool SectionParser::TryVar(uint64_t &offset,
   LOG(INFO) << "Found var " << name << " at 0x"
             << std::hex << region->getMemOffset() + offset << " of size "
             << std::dec << size;
-  auto var = cfg_segment->add_vars();
-  var->set_ea(region->getMemOffset() + offset);
-  var->set_name(name);
-  disass_context->segment_vars.insert({region->getMemOffset() +  offset, var});
+  // TODO(lukas): Var related
+  //auto var = cfg_segment->add_vars();
+  //var->set_ea(region->getMemOffset() + offset);
+  //var->set_name(name);
+  //disass_context->segment_vars.insert({region->getMemOffset() +  offset, var});
 
   // Clean all 0s that may have been added due to mem allign
   while (!*byte_reader && size + offset < region->getMemSize() && ((offset + size) % 8)) {
@@ -181,7 +182,11 @@ void SectionParser::ParseVariables(Dyninst::SymtabAPI::Region *region,
       continue;
     }
 
-    TryVar(offset, region, segment);
+    //TryVar(offset, region, segment);
+    ++offset;
+    while (offset % 4) {
+      ++offset;
+    }
   }
 }
 
@@ -190,10 +195,7 @@ void SectionParser::XrefsInSegment(Dyninst::SymtabAPI::Region *region,
 
   // Both are using something smarter, as they may contain other
   // data as static strings
-  if (region->getRegionName() == ".data" ||
-      region->getRegionName() == ".rodata") {
-    return;
-  }
+
   auto offset = static_cast<std::uint64_t*>(region->getPtrToRawData());
 
   for (auto j = 0U; j < region->getDiskSize(); j += 8, offset++) {

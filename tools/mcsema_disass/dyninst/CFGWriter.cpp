@@ -212,6 +212,7 @@ CFGWriter::CFGWriter(mcsema::Module &m,
       ptr_byte_size(symtab.getAddressWidth()){
 
   LOG(INFO) << "Binary is stripped: " << symtab.isStripped();
+  LOG(INFO) << "Pie_mode: " << FLAGS_pie_mode;
 
   std::vector<SymtabAPI::Region *> regions;
   symtab.getAllRegions(regions);
@@ -320,8 +321,9 @@ void CFGWriter::Write() {
   WriteExternalFunctions();
   WriteExternalVariables();
   WriteInternalData();
-  WriteGlobalVariables();
+  //WriteGlobalVariables();
 
+  SweepStubs();
   WriteInternalFunctions();
 
   //Handle new functions found via various xrefs, mostly in stripped binary
@@ -364,7 +366,6 @@ void CFGWriter::Write() {
   WriteLocalVariables();
   module.set_name(FLAGS_binary);
 }
-
 
 // TODO(lukas): Need to get all xrefs for local variable
 void CFGWriter::WriteLocalVariables() {
@@ -469,6 +470,33 @@ void CFGWriter::WriteGlobalVariables() {
   }
 }
 
+
+// Get information from plt stubs about which external should be called.
+// Other frontends do call to external rather than stub, so we should simulate
+// this as well
+void CFGWriter::SweepStubs() {
+  for (ParseAPI::Function *func : code_object.funcs()) {
+    if (gSectionManager->IsInRegions({".plt.got"}, func->entry()->start())) {
+      auto inst =  func->entry()->getInsn(func->addr());
+      if (inst->getCategory() == InstructionAPI::c_BranchInsn) {
+        Dyninst::Address xref_addr = 0;
+        TryEval(inst->getOperand(0).getValue().get(), func->addr(), xref_addr, inst->size());
+        auto cfg_xref = gDisassContext->data_xrefs.find(xref_addr);
+        if (cfg_xref == gDisassContext->data_xrefs.end()) {
+          continue;
+        }
+        auto cfg_ext_func = gDisassContext->external_funcs.find(cfg_xref->second->target_ea());
+        if (cfg_ext_func == gDisassContext->external_funcs.end()) {
+          continue;
+        }
+        magic_section.AllocSpace(func->addr(), cfg_ext_func->second->ea());
+        gDisassContext->external_funcs.insert({func->addr(), cfg_ext_func->second});
+      }
+    }
+  }
+}
+
+
 void CFGWriter::WriteInternalFunctions() {
     // I don't want this to be in recompiled binary as compiler will
     // add them as well, sub_* is enough
@@ -496,7 +524,7 @@ void CFGWriter::WriteInternalFunctions() {
     }
     // We want to ignore the .got.plt stubs, since they are not needed
     // and cfg file would grow significantly
-    else if (gSectionManager->IsInRegions({".got.plt"},
+    else if (gSectionManager->IsInRegions({".got.plt", "plt.got"},
                                           func->entry()->start())) {
      LOG(INFO) << "Function " << func->name()
                << " is getting skipped because it is .got.plt stub";
@@ -615,8 +643,7 @@ void CFGWriter::WriteInstruction(InstructionAPI::Instruction *instruction,
   } else {
     HandleNonCallInstruction(instruction, addr, cfg_instruction, cfg_block, is_last);
   }
-  //TODO(lukas): We just found it, no need to bother with it?
-  //             But what if it needs to be start of function?
+
   code_xrefs_to_resolve.erase(addr);
 }
 
@@ -783,6 +810,16 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
 bool CFGWriter::HandleXref(mcsema::Instruction *cfg_instruction,
                            Address addr,
                            bool force) {
+  if (gDisassContext->HandleCodeXref({0, addr, cfg_instruction}, false)) {
+    return true;
+  }
+
+  if (gSectionManager->IsInRegion(".text", addr) &&
+      !gDisassContext->getInternalFunction(addr)) {
+    inst_xrefs_to_resolve.insert({addr, {static_cast<Dyninst::Address>(cfg_instruction->ea()),
+                                         addr, cfg_instruction}});
+  }
+
   return gDisassContext->HandleCodeXref({0, addr, cfg_instruction}, force);
 }
 
@@ -792,6 +829,13 @@ void CFGWriter::HandleNonCallInstruction(
     mcsema::Instruction *cfg_instruction,
     mcsema::Block *cfg_block,
     bool is_last) {
+
+
+  if (FLAGS_pie_mode && instruction->getOperation().getID() == entryID::e_test) {
+    LOG(INFO) << std::hex << "Shouldn't contain xref at 0x"
+              << addr << std::dec << ": " << instruction->format();
+    return;
+  }
 
   std::vector<InstructionAPI::Operand> operands;
   instruction->getOperands(operands);
@@ -810,9 +854,16 @@ void CFGWriter::HandleNonCallInstruction(
     auto expr = op.getValue();
 
     if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr.get())) {
-      LOG(INFO) << "\tDealing with Immidiate as op";
-      direct_values[i] = immediateNonCall(imm, addr, cfg_instruction);
-
+      if (FLAGS_pie_mode) {
+        if (instruction->getOperation().getID() != entryID::e_cmp &&
+            instruction->getOperation().getID() != entryID::e_and) {
+          direct_values[i] = immediateNonCall(imm, addr, cfg_instruction);
+        } else {
+          direct_values[i] = 0;
+        }
+      } else {
+          direct_values[i] = immediateNonCall(imm, addr, cfg_instruction);
+      }
     } else if (
         auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr.get())) {
       LOG(INFO) << "\tDealing with Dereference as op";
@@ -920,8 +971,6 @@ void CFGWriter::WriteExternalFunctions() {
   }
 }
 
-
-
 void WriteRawData(std::string& data, SymtabAPI::Region* region) {
   auto i = 0U;
 
@@ -959,7 +1008,7 @@ void CFGWriter::WriteGOT(SymtabAPI::Region* region,
                                  mcsema::Segment* cfg_segment) {
   auto rela_dyn = gSectionManager->GetRegion(".rela.dyn");
 
-  if (!rela_dyn || !FLAGS_pie_mode) {
+  if (!rela_dyn) {
     return;
   }
   const auto &relocations = rela_dyn->getRelocations();
@@ -1001,7 +1050,8 @@ void CFGWriter::WriteGOT(SymtabAPI::Region* region,
     if (gExtFuncManager->IsExternal(reloc.name())) {
         auto func = gExtFuncManager->GetExternalFunction(reloc.name());
         func.imag_ea = unreal_ea;
-        func.WriteHelper(module, unreal_ea);
+        auto cfg_func = func.WriteHelper(module, unreal_ea);
+        gDisassContext->external_funcs.insert({unreal_ea, cfg_func});
       }
     }
   }
@@ -1015,7 +1065,7 @@ void CFGWriter::WriteRelocations(SymtabAPI::Region* region,
                          mcsema::Segment *segment) {
 
   auto rela_dyn = gSectionManager->GetRegion(".rela.plt");
-  if (!rela_dyn || !FLAGS_pie_mode) {
+  if (!rela_dyn) {
     return;
   }
   const auto &relocations = rela_dyn->getRelocations();
@@ -1046,7 +1096,7 @@ void WriteBssXrefs(
     if (gSectionManager->IsInRegion(region, external.first)) {
       gDisassContext->WriteAndAccount(
           {external.first, external.first, segment, external.second->name()},
-          false, external.second->size());
+          false/*, external.second->size()*/);
     }
   }
 }
@@ -1159,19 +1209,24 @@ void CFGWriter::WriteDataVariables(Dyninst::SymtabAPI::Region *region,
         (a->getOffset() == region->getMemOffset())) {
 
       if (gDisassContext->external_vars.find(a->getOffset()) !=
-          gDisassContext->external_vars.end()) {
+          gDisassContext->external_vars.end() ||
+          gDisassContext->segment_vars.count(a->getOffset())) {
         continue;
       }
 
+      // TODO(lukas): Var recovery related
+      /*
       auto var = segment->add_vars();
       var->set_ea(a->getOffset());
       var->set_name(a->getMangledName());
       LOG(INFO) << "Added var 0x" << std::hex << a->getOffset();
       gDisassContext->segment_vars.insert({a->getOffset(), var});
+      */
     }
   }
   if (region->getRegionName() == ".rodata" ||
-      region->getRegionName() == ".data") {
+      region->getRegionName() == ".data" ||
+      region->getRegionName() == ".data.rel.ro") {
     LOG(INFO) << "Speculative parse of " << region->getRegionName();
     section_parser.ParseVariables(region, segment);
   }

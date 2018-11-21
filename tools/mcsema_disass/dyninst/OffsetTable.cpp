@@ -38,7 +38,7 @@ std::experimental::optional<Dyninst::Address> OffsetTable::Match(
     const std::set<Dyninst::Address> &succs,
     const std::set<Dyninst::Address> &xrefs) const {
 
-  if (xrefs.count(start_ea) && Match(succs)) {
+  if (Match(succs)) {
     return start_ea;
   }
 

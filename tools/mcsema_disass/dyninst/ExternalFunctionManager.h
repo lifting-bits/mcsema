@@ -55,6 +55,7 @@ struct ExternalFunction {
 
 class ExternalFunctionManager {
 public:
+  using ExternalFunction = ExternalFunction;
   /* The following methods can be used to register external
    * functions with the ExternalFunctionManager. If the same name is
    * used multiple times, the information will be overwritten.
