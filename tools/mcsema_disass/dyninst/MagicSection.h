@@ -38,6 +38,11 @@ struct MagicSection {
 
   Dyninst::Address GetAllocated(Dyninst::Address ea);
 
+  bool AllocSpace(Dyninst::Address real, Dyninst::Address original) {
+    real_to_imag.insert({real, original});
+    return true;
+  }
+
   mcsema::ExternalFunction *GetExternalFunction(Dyninst::Address real_ea) {
     auto ea = real_to_imag.find(real_ea);
     if (ea == real_to_imag.end()) {

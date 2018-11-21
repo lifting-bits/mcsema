@@ -53,6 +53,7 @@ private:
 
   void WriteExternalVariables();
   void WriteGlobalVariables();
+  void SweepStubs();
   void WriteInternalFunctions();
   void WriteLocalVariables();
   void WriteBlock(Dyninst::ParseAPI::Block *block,

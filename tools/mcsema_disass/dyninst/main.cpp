@@ -41,7 +41,7 @@ DEFINE_bool(pretty_print, true, "Pretty printf the dumped cfg");
 DEFINE_string(output, "", "Path to output file");
 DEFINE_string(binary, "", "Path to binary to be disassembled");
 DEFINE_string(entrypoint, "main", "Name of entrypoint function");
-DEFINE_bool(pie_mode, true, "Experimental support for pie");
+DEFINE_bool(pie_mode, false, "Need to be true for pie binaries");
 DEFINE_string(arch, "", "NOT IMPLEMENTED YET");
 DEFINE_string(os, "", "NOT IMPLEMENTED YET");
 

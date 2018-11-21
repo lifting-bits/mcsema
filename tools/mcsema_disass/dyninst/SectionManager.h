@@ -69,6 +69,15 @@ public:
     return nullptr;
   }
 
+  Section *GetSection(const std::string &name) {
+    for (auto &r : regions) {
+      if (r.name == name) {
+        return &r;
+      }
+    }
+    return nullptr;
+  }
+
 private:
   // There won't be big enough number of regions to justify
   // std::map
