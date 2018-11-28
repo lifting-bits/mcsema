@@ -140,7 +140,7 @@ function (ExportCFG target_name architecture binary_path)
 
   set(output_file "${target_name}_${architecture}.cfg")
 
-  if ("${IDAL64_PATH}" STREQUAL "IDAL64_PATH-NOTFOUND")
+  if ("${IDAT64_PATH}" STREQUAL "IDAT64_PATH-NOTFOUND")
     #Read CFG from pre-built CFG repository
     #configure_file("${MCSEMA_PREBUILT_CFG_PATH}/${architecture}/${platform}/cfg/${target_name}"
     #               "${output_file}"
@@ -155,7 +155,7 @@ function (ExportCFG target_name architecture binary_path)
   else ()
     add_custom_command(
       OUTPUT "${output_file}"
-      COMMAND "${MCSEMADISASS_PATH}" --disassembler "${IDAL64_PATH}" --arch "${architecture}" --os "${platform}" --binary "${binary_path}" --output "${output_file}" --entrypoint main
+      COMMAND "${MCSEMADISASS_PATH}" --disassembler "${IDAT64_PATH}" --arch "${architecture}" --os "${platform}" --binary "${binary_path}" --output "${output_file}" --entrypoint main
       DEPENDS "${binary_path}"
       VERBATIM
     )
@@ -354,11 +354,11 @@ if ("${MCSEMALIFT_PATH}" STREQUAL "MCSEMALIFT_PATH-NOTFOUND")
   message(FATAL_ERROR "Failed to locate the mcsema-lift${LLVM_VERSION_SUFFIX} executable!")
 endif ()
 
-find_program(IDAL64_PATH "idal64")
-if ("${IDAL64_PATH}" STREQUAL "IDAL64_PATH-NOTFOUND")
-  message(WARNING "Failed to locate the idal64 executable! Will not test CFG recovery.")
+find_program(IDAT64_PATH "idat64")
+if ("${IDAT64_PATH}" STREQUAL "IDAT64_PATH-NOTFOUND")
+  message(WARNING "Failed to locate the idat64 executable! Will not test CFG recovery.")
   if(NOT DEFINED MCSEMA_PREBUILT_CFG_PATH)
-    message(FATAL_ERROR "IDAL64_PATH is not defined and MCSEMA_PREBUILT_CFG_PATH is not defined (use -DMCSEMA_PREBUILT_CFG_PATH=<path>)")
+    message(FATAL_ERROR "IDAT64_PATH is not defined and MCSEMA_PREBUILT_CFG_PATH is not defined (use -DMCSEMA_PREBUILT_CFG_PATH=<path>)")
   endif()
   get_filename_component(MCSEMA_PREBUILT_CFG_PATH "${MCSEMA_PREBUILT_CFG_PATH}" ABSOLUTE)
   if(NOT EXISTS "${MCSEMA_PREBUILT_CFG_PATH}")
@@ -374,8 +374,8 @@ endif ()
 message("Toolset")
 message(" > mcsema-lift: ${MCSEMALIFT_PATH}")
 message(" > clang: ${CLANG_PATH}")
-if (NOT "${IDAL64_PATH}" STREQUAL "IDAL64_PATH-NOTFOUND")
-  message(" > idal64: ${IDAL64_PATH}")
+if (NOT "${IDAT64_PATH}" STREQUAL "IDAT64_PATH-NOTFOUND")
+  message(" > idat64: ${IDAT64_PATH}")
 else()
   message(" > using prebuilt cfgs: ${MCSEMA_PREBUILT_CFG_PATH}")
 endif ()

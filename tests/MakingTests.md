@@ -12,15 +12,24 @@ cd test_suite_generator
 mkdir build
 cd build
 export TRAILOFBITS_LIBRARIES=<path to remill libraries>
-export IDAL64_PATH=<path to idal64>
-export CMAKE_PROGRAM_PATH=$(dirname ${IDAL64_PATH})
+export IDAT64_PATH=<path to idat64>
+export CMAKE_PROGRAM_PATH=$(dirname ${IDAT64_PATH})
 cmake ..
 make
 make install #install to ../test_suite
 
 #example: 
 #export TRAILOFBITS_LIBRARIES=/store/artem/git/remill/remill-build/libraries/
-#export IDAL64_PATH=/home/artem/ida-6.9/idal64
-#export CMAKE_PROGRAM_PATH=$(dirname ${IDAL64_PATH})
+#export IDAT64_PATH=/home/artem/ida-7.1/idat64
+#export CMAKE_PROGRAM_PATH=$(dirname ${IDAT64_PATH})
 #cmake ..
+```
+
+# Running the tests
+
+After building and installing, you can do:
+
+```sh
+cd test_suite_generator/test_suite
+python2 start.py
 ```
