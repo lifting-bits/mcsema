@@ -1,4 +1,4 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2018 Trail of Bits, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import binaryninja as binja
 from binaryninja.enums import (
   SymbolType, TypeClass, InstructionTextTokenType,
   LowLevelILOperation
 )
 
-import logging
+from cfg import EXT_DATA_MAP
 import util
-from debug import *
+import log
 
-log = logging.getLogger(util.LOGNAME)
 
 SYM_IGNORE = [
   '__data_start',
@@ -34,6 +32,27 @@ SYM_IGNORE = [
   '__elf_header',
   '_DYNAMIC'
 ]
+
+
+def recover_ext_var(bv, pb_mod, sym):
+  """ Recover external variable information
+
+  Args:
+    bv (binja.BinaryView)
+    pb_mod (CFG_pb2.Module)
+    sym (binja.types.Symbol)
+  """
+  if sym.name in EXT_DATA_MAP:
+    log.debug("Recovering external variable {} at {:x}".format(sym.name, sym.address))
+
+    pb_extvar = pb_mod.external_vars.add()
+    pb_extvar.name = sym.name
+    pb_extvar.ea = sym.address
+    pb_extvar.size = EXT_DATA_MAP[sym.name]
+    pb_extvar.is_weak = False  # TODO: figure out how to decide this
+    pb_extvar.is_thread_local = util.is_tls_section(bv, sym.address)
+  else:
+    log.debug("Unknown external variable {} at {:x}".format(sym.name, sym.address))
 
 
 def recover_globals(bv, pb_mod):
@@ -158,3 +177,33 @@ def find_stack_var_refs(bv, inst, il, var_refs):
   # If this is accessing a local var, save the ref info
   if reg in [_sp_name(bv), _bp_name(bv)]:
     var_refs[var_name].append((il.address, off))
+
+
+def recover_section_vars(bv, pb_seg, sect_start, sect_end):
+  """ Gather any symbols that point to data in this section
+
+  Args:x
+    bv (binja.BinaryView)
+    pb_seg (CFG_pb2.Segment)
+    sect_start (int)
+    sect_end (int)
+  """
+
+  log.debug("Recovering variables in [{:x}, {:x}) of section {}".format(
+      sect_start, sect_end, pb_seg.name))
+  log.push()
+  for sym in bv.get_symbols():
+    # Ignore functions and externals
+    if sym.type in [SymbolType.FunctionSymbol,
+            SymbolType.ImportedFunctionSymbol,
+            SymbolType.ImportedDataSymbol,
+            SymbolType.ImportAddressSymbol]:
+      continue
+
+    if sect_start <= sym.address < sect_end:
+      log.debug("Adding variable {} at {:x}".format(sym.name, sym.address))
+      pb_segvar = pb_seg.vars.add()
+      pb_segvar.ea = sym.address
+      pb_segvar.name = sym.name
+
+  log.pop()

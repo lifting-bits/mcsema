@@ -1,4 +1,4 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2018 Trail of Bits, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import binaryninja as binja
 from binaryninja.enums import (
   LowLevelILOperation, MediumLevelILOperation, RegisterValueType
 )
-import logging
-import util
-from debug import *
 
-log = logging.getLogger(util.LOGNAME)
+JMP_TABLES = []
+
+import util
+import log
 
 
 class JMPTable(object):
@@ -34,7 +33,6 @@ class JMPTable(object):
     self.base_addr = (self.rel_base + self.rel_off) & mask
 
     self.targets = [t & mask for t in targets]
-
 
 
 def search_mlil_displ(il, ptr=False, _neg=False):
@@ -140,5 +138,5 @@ def get_jmptable(bv, il):
       tbl = JMPTable(bv, base, successors)
 
   if tbl is not None:
-    DEBUG("Found jump table at {:x} with offset {:x}".format(tbl.base_addr, tbl.rel_off))
+    log.debug("Found jump table at {:x} with offset {:x}".format(tbl.base_addr, tbl.rel_off))
   return tbl
