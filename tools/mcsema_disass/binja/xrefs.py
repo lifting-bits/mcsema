@@ -1,4 +1,4 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2018 Trail of Bits, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,13 +14,39 @@
 
 import binaryninja as binja
 from binaryninja.enums import LowLevelILOperation
-import logging
 
+from jmptable import JMP_TABLES
 import CFG_pb2
 import util
-from debug import *
+import log
 
-log = logging.getLogger(util.LOGNAME)
+_BYTE_WIDTH_NAME = {4: "dword", 8: "qword"}
+
+_NO_XREFS = set()
+
+_IGNORED_XREF_OP_TYPES = (LowLevelILOperation.LLIL_JUMP,
+                          LowLevelILOperation.LLIL_JUMP_TO,
+                          LowLevelILOperation.LLIL_UNIMPL,
+                          LowLevelILOperation.LLIL_UNIMPL_MEM)
+
+
+_CONST_XREF_OP_TYPES = [LowLevelILOperation.LLIL_CONST_PTR]
+
+_LOAD_STORE_OP_TYPES = (LowLevelILOperation.LLIL_LOAD,
+                        LowLevelILOperation.LLIL_STORE)
+
+_CONST_OR_CONST_PTR_TYPES = (binja.RegisterValueType.ConstantValue,
+                             binja.RegisterValueType.ConstantPointerValue)
+
+_AARCH64_ADRP_XREFS = {}
+
+_CFG_INST_XREF_TYPE_TO_NAME = {
+    CFG_pb2.CodeReference.ImmediateOperand: "imm",
+    CFG_pb2.CodeReference.MemoryOperand: "mem",
+    CFG_pb2.CodeReference.MemoryDisplacementOperand: "disp",
+    CFG_pb2.CodeReference.ControlFlowOperand: "flow",
+    CFG_pb2.CodeReference.OffsetTable: "ofst",
+}
 
 
 class XRef(object):
@@ -30,8 +56,8 @@ class XRef(object):
   CONTROLFLOW = 3
 
   TYPE_TO_CFG = {
-    IMMEDIATE  : CFG_pb2.CodeReference.ImmediateOperand,
-    MEMORY     : CFG_pb2.CodeReference.MemoryOperand,
+    IMMEDIATE    : CFG_pb2.CodeReference.ImmediateOperand,
+    MEMORY       : CFG_pb2.CodeReference.MemoryOperand,
     DISPLACEMENT : CFG_pb2.CodeReference.MemoryDisplacementOperand,
     CONTROLFLOW  : CFG_pb2.CodeReference.ControlFlowOperand
   }
@@ -57,23 +83,40 @@ class XRef(object):
   def __hash__(self):
     return hash((self.addr, self.type))
 
-_NO_XREFS = set()
 
-_IGNORED_XREF_OP_TYPES = (LowLevelILOperation.LLIL_JUMP,
-                          LowLevelILOperation.LLIL_JUMP_TO,
-                          LowLevelILOperation.LLIL_UNIMPL,
-                          LowLevelILOperation.LLIL_UNIMPL_MEM)
+def add_xref(bv, pb_inst, target, mask, optype):
+  xref = pb_inst.xrefs.add()
+  xref.ea = target
+  xref.operand_type = optype
 
+  debug_mask = ""
+  if mask:
+    xref.mask = mask
+    debug_mask = " & {:x}".format(mask)
 
-_CONST_XREF_OP_TYPES = [LowLevelILOperation.LLIL_CONST_PTR]
+  sym_name = util.find_symbol_name(bv, target)
+  if len(sym_name) > 0:
+    xref.name = sym_name
 
-_LOAD_STORE_OP_TYPES = (LowLevelILOperation.LLIL_LOAD,
-                        LowLevelILOperation.LLIL_STORE)
+  if util.is_code(bv, target):
+    xref.target_type = CFG_pb2.CodeReference.CodeTarget
+    debug_type = "code"
+  else:
+    xref.target_type = CFG_pb2.CodeReference.DataTarget
+    debug_type = "data"
 
-_CONST_OR_CONST_PTR_TYPES = (binja.RegisterValueType.ConstantValue,
-                             binja.RegisterValueType.ConstantPointerValue)
+  if util.is_external_ref(bv, target):
+    xref.location = CFG_pb2.CodeReference.External
+    debug_loc = "external"
+  else:
+    xref.location = CFG_pb2.CodeReference.Internal
+    debug_loc = "internal"
 
-_AARCH64_ADRP_XREFS = {}
+  debug_op = _CFG_INST_XREF_TYPE_TO_NAME[optype]
+
+  return "({} {} {} {:x}{} {})".format(
+      debug_type, debug_op, debug_loc, target, debug_mask, sym_name)
+
 
 def _get_aarch64_partial_xref(bv, func, il, dis):
   """" Figure out the final destination referenced by an ADRP+ADD instruction
@@ -179,7 +222,7 @@ def _fill_xrefs_internal(bv, il, refs, reftype=XRef.IMMEDIATE, parent=None):
   # This is the only instance where a LLIL_JUMP is considered
   if util.is_jump_tail_call(bv, il):
     target = util.get_jump_tail_call_target(bv, il)
-    DEBUG('Tail call from {:x} to {:x}'.format(il.address, target.start))
+    log.debug('Tail call from {:x} to {:x}'.format(il.address, target.start))
     return _fill_xrefs_internal(bv, il.dest, refs, XRef.CONTROLFLOW, il)
 
   # Some instruction types are ignored
@@ -230,3 +273,49 @@ def _fill_xrefs_internal(bv, il, refs, reftype=XRef.IMMEDIATE, parent=None):
   # Continue searching operands for xrefs
   for oper in il.operands:
     _fill_xrefs_internal(bv, oper, refs, reftype, il)
+
+
+def recover_section_cross_references(bv, pb_seg, real_sect, sect_start, sect_end):
+  """ Find references to other code/data in this section
+
+  Args:
+    bv (binja.BinaryView)
+    pb_seg (CFG_pb2.Segment)
+    real_sect (binja.binaryview.Section)
+    sect_start (int)
+    sect_end (int)
+  """
+  entry_width = util.clamp(real_sect.align, 4, bv.address_size)
+  read_val = {4: util.read_dword,
+              8: util.read_qword}[entry_width]
+
+  log.debug("Recovering references in [{:x}, {:x}) of section {}".format(
+      sect_start, sect_end, real_sect.name))
+
+  log.push()
+  for addr in xrange(sect_start, sect_end, entry_width):
+    xref = read_val(bv, addr)
+
+    if not util.is_valid_addr(bv, xref):
+      continue
+
+    # Skip this xref if it's a jmp table entry
+    if any(xref in tbl.targets for tbl in JMP_TABLES):
+      continue
+
+    width_name = _BYTE_WIDTH_NAME.get(entry_width, "{}-byte".format(entry_width))
+    log.debug("Adding {} reference from {:x} to {:x}".format(width_name, addr, xref))
+
+    pb_ref = pb_seg.xrefs.add()
+    pb_ref.ea = addr
+    pb_ref.width = entry_width
+    pb_ref.target_ea = xref
+    pb_ref.target_name = util.find_symbol_name(bv, xref)
+    pb_ref.target_is_code = util.is_code(bv, xref)
+
+    if util.is_tls_section(bv, addr):
+      pb_ref.target_fixup_kind = CFG_pb2.DataReference.OffsetFromThreadBase
+    else:
+      pb_ref.target_fixup_kind = CFG_pb2.DataReference.Absolute
+
+  log.pop()
