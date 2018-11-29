@@ -15,7 +15,9 @@
 import binaryninja as binja
 from binaryninja.enums import LowLevelILOperation
 
+from functions import RECOVERED, TO_RECOVER
 from jmptable import JMP_TABLES
+from cfg import RECOVER_OPTS
 import CFG_pb2
 import util
 import log
@@ -111,6 +113,11 @@ def add_xref(bv, pb_inst, target, mask, optype):
   else:
     xref.location = CFG_pb2.CodeReference.Internal
     debug_loc = "internal"
+
+  if RECOVER_OPTS["manual_recursive_descent"]:
+    if bv.get_function_at(target) is not None:
+      if target not in RECOVERED:
+        TO_RECOVER.put(target)
 
   debug_op = _CFG_INST_XREF_TYPE_TO_NAME[optype]
 

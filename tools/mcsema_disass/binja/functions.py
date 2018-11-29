@@ -13,11 +13,15 @@
 # limitations under the License.
 
 from collections import defaultdict
+from Queue import Queue
 
 from binaryninja.enums import (
   SymbolType, TypeClass,
   InstructionTextTokenType
 )
+
+RECOVERED = set()
+TO_RECOVER = Queue()
 
 from cfg import EXT_MAP, RECOVER_OPTS
 import jmptable
@@ -26,8 +30,6 @@ import xrefs
 import util
 import log
 
-RECOVERED = set()
-
 BINJA_CCONV_TYPES = {
   'cdecl': CFG_pb2.ExternalFunction.CallerCleanup,
   'stdcall': CFG_pb2.ExternalFunction.CalleeCleanup,
@@ -35,21 +37,31 @@ BINJA_CCONV_TYPES = {
 }
 
 
+# Entrypoint for actual function recovery
 def recover_functions(bv, pb_mod, entrypoint):
   # Find the chosen entrypoint in the binary
   if entrypoint not in bv.symbols:
     log.fatal('Entrypoint not found: %s', entrypoint)
   entry_addr = bv.symbols[entrypoint].address
 
-  # Recover all functions
   log.pop()
-  for func in bv.functions:
-    addr = func.start
+  if RECOVER_OPTS["manual_recursive_descent"]:
+    # Impliment recursive descent
+    TO_RECOVER.put(entry_addr)
 
-    # if addr not in RECOVERED and func.symbol.type is not SymbolType.ImportedFunctionSymbol:
-    if addr not in RECOVERED:
-      RECOVERED.add(addr)
+    while not TO_RECOVER.empty():
+      addr = TO_RECOVER.get()
+      if addr not in RECOVERED:
+        RECOVERED.add(addr)
+        recover_function(bv, pb_mod, addr, is_entry=(addr == entry_addr))
+
+  else:
+    # Recover all functions
+    for func in bv.functions:
+      addr = func.start
+      # if func.symbol.type is not SymbolType.ImportedFunctionSymbol:
       recover_function(bv, pb_mod, addr, is_entry=(addr == entry_addr))
+
   log.push()
 
 
