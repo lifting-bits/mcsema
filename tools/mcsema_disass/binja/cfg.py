@@ -21,7 +21,8 @@ EXT_MAP = {}
 EXT_DATA_MAP = {}
 
 RECOVER_OPTS = {
-  'stack_vars': False
+  'stack_vars': False,
+  'manual_recursive_descent': True
 }
 
 # Internal Imports
