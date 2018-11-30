@@ -20,10 +20,10 @@ import os
 EXT_MAP = {}
 EXT_DATA_MAP = {}
 
-RECOVER_OPTS = {
-  'stack_vars': False,
-  'manual_recursive_descent': True
-}
+RECOVER_OPTS = {}
+# Defaults:
+  # 'stack_vars': False,
+  # 'manual_recursive_descent': False
 
 # Internal Imports
 import functions
@@ -38,7 +38,6 @@ def get_cfg(args, fixed_args):
 
   # Parse any additional args
   parser = argparse.ArgumentParser()
-
   parser.add_argument(
       '--recover-stack-vars',
       help='Flag to enable stack variable recovery',
@@ -47,15 +46,21 @@ def get_cfg(args, fixed_args):
 
   parser.add_argument(
       "--std-defs",
-      action='append',
-      type=str,
+      help="std_defs file: definitions and calling conventions of imported functions and data",
       default=[],
-      help="std_defs file: definitions and calling conventions of imported functions and data")
+      action='append',
+      type=str)
 
+  parser.add_argument(
+      '--manual-recursive-descent',
+      help='Flag to enable function recovery via manual recursive descent',
+      default=False,
+      action='store_true')
   extra_args = parser.parse_args(fixed_args)
 
-  if extra_args.recover_stack_vars:
-    RECOVER_OPTS['stack_vars'] = True
+  # Recover options
+  RECOVER_OPTS['stack_vars'] = extra_args.recover_stack_vars
+  RECOVER_OPTS['manual_recursive_descent'] = extra_args.manual_recursive_descent
 
   # Setup logger
   log.init(args.log_file)
