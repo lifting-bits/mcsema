@@ -56,11 +56,17 @@ def get_cfg(args, fixed_args):
       help='Flag to enable function recovery via manual recursive descent',
       default=False,
       action='store_true')
+  parser.add_argument(
+      '--do-not-recover',
+      help='Space-deliminated list of function names not to recover',
+      nargs='+',
+      default=[])
   extra_args = parser.parse_args(fixed_args)
 
   # Recover options
   RECOVER_OPTS['stack_vars'] = extra_args.recover_stack_vars
   RECOVER_OPTS['manual_recursive_descent'] = extra_args.manual_recursive_descent
+  functions.DO_NOT_RECOVER += extra_args.do_not_recover
 
   # Setup logger
   log.init(args.log_file)
