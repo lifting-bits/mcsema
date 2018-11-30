@@ -197,7 +197,7 @@ def get_xrefs(bv, func, il):
     if dis.startswith('adr ') and len(refs):
       ref = refs.pop()
       if util.is_code(bv, ref.addr) and not bv.get_function_at(ref.addr):
-        DEBUG("WARNING: Omitting reference to non-function code address {:x}".format(ref.addr))
+        log.debug("WARNING: Omitting reference to non-function code address {:x}".format(ref.addr))
       else:
         refs.add(ref)  # Add it back in.
 
