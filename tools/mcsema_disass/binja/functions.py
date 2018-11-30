@@ -23,6 +23,19 @@ from binaryninja.enums import (
 RECOVERED = set()
 TO_RECOVER = Queue()
 
+DO_NOT_RECOVER = [
+  # "_init",
+  # "_start",
+  # "_dl_relocate_static_pie",
+  # "deregister_tm_clones",
+  # "register_tm_clones",
+  # "__do_global_dtors_aux",
+  # "frame_dummy",
+  # "__libc_csu_init",
+  # "__libc_csu_fini",
+  # "_fini"
+]
+
 from cfg import EXT_MAP, RECOVER_OPTS
 import jmptable
 import CFG_pb2
@@ -56,10 +69,9 @@ def recover_functions(bv, pb_mod, entrypoint):
         recover_function(bv, pb_mod, addr, is_entry=(addr == entry_addr))
 
   else:
-    # Recover all functions
+    # Recover all the functions
     for func in bv.functions:
       addr = func.start
-      # if func.symbol.type is not SymbolType.ImportedFunctionSymbol:
       recover_function(bv, pb_mod, addr, is_entry=(addr == entry_addr))
 
   log.push()
@@ -67,6 +79,10 @@ def recover_functions(bv, pb_mod, entrypoint):
 
 def recover_function(bv, pb_mod, addr, is_entry=False):
   func = bv.get_function_at(addr)
+
+  if func.symbol.name in DO_NOT_RECOVER:
+    return
+
   if func is None:
     log.error('No function defined at 0x%x, skipping', addr)
     return
