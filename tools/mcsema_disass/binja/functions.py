@@ -57,7 +57,6 @@ def recover_functions(bv, pb_mod, entrypoint):
     log.fatal('Entrypoint not found: %s', entrypoint)
   entry_addr = bv.symbols[entrypoint].address
 
-  log.pop()
   if RECOVER_OPTS["manual_recursive_descent"]:
     # Impliment recursive descent
     TO_RECOVER.put(entry_addr)
@@ -74,59 +73,77 @@ def recover_functions(bv, pb_mod, entrypoint):
       addr = func.start
       recover_function(bv, pb_mod, addr, is_entry=(addr == entry_addr))
 
-  log.push()
-
 
 def recover_function(bv, pb_mod, addr, is_entry=False):
+  """
+  """
   func = bv.get_function_at(addr)
 
   if func.symbol.name in DO_NOT_RECOVER:
+    log.debug("Skipping function {} at {:x} per command-line arguments".format(func.symbol.name, addr))
     return
-
-  if func is None:
+  elif func is None:
     log.error('No function defined at 0x%x, skipping', addr)
     return
-
-  if func.symbol.type == SymbolType.ImportedFunctionSymbol:
+  elif func.symbol.type == SymbolType.ImportedFunctionSymbol:
     # Externals are recovered later, skip this
     log.warn("Skipping external function '%s' in main CFG recovery", func.symbol.name)
     return
 
   log.debug("Recovering function {} at {:x}".format(func.symbol.name, addr))
 
-  # Initialize the protobuf for this function
-  pb_func = pb_mod.funcs.add()
-  pb_func.ea = addr
-  pb_func.is_entrypoint = is_entry  # TODO : or exported function
-  pb_func.name = func.symbol.name
-
   # Recover all basic blocks
-  il_groups = util.collect_il_groups(func.lifted_il)
-  var_refs = defaultdict(list)
-  for bb in func:
-    pb_block = add_block(pb_func, bb)
-    log.push()
-
-    # Recover every instruction in the basic block (bb)
-    for inst in bb.disassembly_text:
-      # Skip over anything that isn't an instruction
-      if inst.tokens[0].type != InstructionTextTokenType.InstructionToken:
-        continue
-
-      il = func.get_lifted_il_at(inst.address)
-      all_il = il_groups[inst.address]
-      pb_inst = pb_block.instructions.add()
-      recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last=(inst.address == bb.end))
-
-      # Find any references to stack vars in this instruction
-      if RECOVER_OPTS['stack_vars']:
-        vars.find_stack_var_refs(bv, inst, il, var_refs)
-
-    log.pop()
+  log.pop()
+  pb_func, var_refs = recover_blocks(func, pb_mod, is_entry)
+  log.push()
 
   # Recover stack variables
   if RECOVER_OPTS['stack_vars']:
     vars.recover_stack_vars(pb_func, func, var_refs)
+
+
+def recover_blocks(func, pb_mod, is_entry):
+  """
+  Args:
+  bv (binja.BinaryView)
+  func (binja.Function) 
+  pb_func
+  """
+  # Initialize the protobuf for this function
+  pb_func = pb_mod.funcs.add()
+  pb_func.ea = func.start
+  pb_func.is_entrypoint = is_entry  # TODO : or exported function
+  pb_func.name = func.symbol.name
+
+  il_groups = util.collect_il_groups(func.lifted_il)
+  var_refs = defaultdict(list)
+  for bb in func:
+    recover_block(bb, pb_func, il_groups, var_refs)
+
+    return pb_func, var_refs
+
+
+def recover_block(bb, pb_func, il_groups, var_refs):
+  log.debug("BB: {:x}".format(bb.start))
+  pb_block = pb_func.blocks.add()
+  pb_block.ea = bb.start
+  pb_block.successor_eas.extend(edge.target.start for edge in bb.outgoing_edges)
+
+  # Recover every instruction in the basic block (bb)
+  for inst in bb.disassembly_text:
+    # Skip over anything that isn't an instruction
+    if inst.tokens[0].type != InstructionTextTokenType.InstructionToken:
+      continue
+
+    il = bb.function.get_lifted_il_at(inst.address)
+    all_il = il_groups[inst.address]
+    pb_inst = pb_block.instructions.add()
+
+    recover_inst(bb.view, bb.function, pb_block, pb_inst, il, all_il, is_last=(inst.address == bb.end))
+
+    # Find any references to stack vars in this instruction
+    if RECOVER_OPTS['stack_vars']:
+      vars.find_stack_var_refs(bb.view, inst, il, var_refs)
 
 
 def recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last):
@@ -160,25 +177,7 @@ def recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last):
     tgt = il.dest.constant
     pb_block.successor_eas.append(tgt)
 
-  # table = jmptable.get_jmptable(bv, il)
-  # if table is not None:
-  #   debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.MemoryDisplacementOperand))
-  #   JMP_TABLES.append(table)
-
-  # With new recovery mechanism:?
-  table = jmptable.get_jmptable(bv, il)
-  if table is not None:
-    debug_refs.append(xrefs.add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.MemoryDisplacementOperand))
-    # if is_offset:
-    #   debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.OffsetTable))
-    # else:
-    #   debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.DataTarget))
-    jmptable.JMP_TABLES.append(table)
-
-    # Add any missing successors
-    for tgt in table.targets:
-      if tgt not in pb_block.successor_eas:
-        pb_block.successor_eas.append(tgt)
+  recover_table(bv, pb_inst, pb_block, debug_refs, il)
 
   log.debug("I: {:x} {}".format(il.address, " ".join(debug_refs)))
 
@@ -189,20 +188,28 @@ def recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last):
       log.debug("  No successors")
 
 
-def add_block(pb_func, block):
-  """
-  Args:
-    pb_func (CFG_pb2.Function)
-    block (binaryninja.basicblock.BasicBlock)
+def recover_table(bv, pb_inst, pb_block, debug_refs, il):
+  # table = jmptable.get_jmptable(bv, il)
+  # if table is not None:
+  #   debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.MemoryDisplacementOperand))
+  #   JMP_TABLES.append(table)
 
-  Returns:
-    CFG_pb2.Block
-  """
-  log.debug("BB: {:x}".format(block.start))
-  pb_block = pb_func.blocks.add()
-  pb_block.ea = block.start
-  pb_block.successor_eas.extend(edge.target.start for edge in block.outgoing_edges)
-  return pb_block
+  # With new recovery mechanism:?
+  table = jmptable.get_jmptable(bv, il)
+  if table is None:
+    return
+
+  debug_refs.append(xrefs.add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.MemoryDisplacementOperand))
+  # if is_offset:
+  #   debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.OffsetTable))
+  # else:
+  #   debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.DataTarget))
+  jmptable.JMP_TABLES.append(table)
+
+  # Add any missing successors
+  for tgt in table.targets:
+    if tgt not in pb_block.successor_eas:
+      pb_block.successor_eas.append(tgt)
 
 
 def recover_ext_func(bv, pb_mod, sym):
