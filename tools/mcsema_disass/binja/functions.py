@@ -120,7 +120,7 @@ def recover_blocks(func, pb_mod, is_entry):
   for bb in func:
     recover_block(bb, pb_func, il_groups, var_refs)
 
-    return pb_func, var_refs
+  return pb_func, var_refs
 
 
 def recover_block(bb, pb_func, il_groups, var_refs):
