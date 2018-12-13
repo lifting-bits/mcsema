@@ -83,6 +83,26 @@ Why would anyone translate binaries *back* to bitcode?
 
 ## Getting and building the code
 
+### Docker
+
+#### Step 1: Download Dockerfile
+
+`wget https://raw.githubusercontent.com/trailofbits/mcsema/master/tools/Dockerfile`
+
+#### Step 2: Add your disassembler
+
+Currently IDA and BinaryNinja are supported for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice, but an example of installing BinaryNinja is provided (remember for Docker that paths need to be relative to where you built from):
+```
+ADD local-relative/path/to/binaryninja/ /root/binaryninja/
+ADD local-relative/path/to/.binaryninja/ /root/.binaryninja/ # <- Make sure there's no `lastrun` file
+RUN /root/binaryninja/scripts/linux-setup.sh
+```
+
+#### Step 3: Build & Run Dockerfile
+
+This will build the container for you and run it with your local directory mounted into the container (at /home/user/local) such that your work in the container is saved locally: 
+`docker build -t=mcsema . && docker run --rm -it --ipc=host -v "${PWD}":/home/user/local mcsema`
+
 ### On Linux
 
 #### Step 1: Install dependencies
