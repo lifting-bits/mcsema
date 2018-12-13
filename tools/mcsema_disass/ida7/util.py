@@ -537,8 +537,14 @@ def make_xref(from_ea, to_ea, data_type, xref_size):
   # If we can't make a head, then it probably means that we're at the
   # end of the binary, e.g. the last thing in the `.extern` segment.
   # or in the middle of structure. Return False in such case
-  if not make_head(from_ea + xref_size):
-    return False
+  #
+  # NOTE(artem): Commenting out since this breaks recovery of C++ applications
+  # with IDA7. The failure occurs when processign references in .init_array
+  # when the below code is enabled, those references are not treated as
+  # references because make_head fails.
+  #
+  #if not make_head(from_ea + xref_size):
+  #  return False
 
   ida_bytes.del_items(from_ea, idc.DELIT_EXPAND, xref_size)
 
