@@ -331,11 +331,22 @@ def decode_segment_instructions(seg_ea, binary_is_pie):
   for funcea in idautils.Functions(seg_ea, seg_end_ea):
     find_default_block_heads(funcea)
 
+
+# NOTE(artem): IDA7 will add "LOAD" segments for parts of the program
+# loaded into memory but not defined in a section. Ignore these since
+# for normal compiler generated applications they provide no benefit
+# but add lots of extra noise
+def is_invalid_or_load_segment(ea):
+  """Returns true if the segment's start ea is invalid, or if it's
+     a "LOAD" segment made by IDA7"""
+  seg_name = idc.get_segm_name(ea)
+  return is_invalid_ea(ea) or "LOAD" == seg_name
+
 def process_segments(binary_is_pie):
   """Pre-process a segment and try to fill in as many cross-references
   as is possible."""
 
-  seg_eas = [ea for ea in idautils.Segments() if not is_invalid_ea(ea)]
+  seg_eas = [ea for ea in idautils.Segments() if not is_invalid_or_load_segment(ea)]
 
   # Go through through the data segments and look for strings, and through the
   # code segments and look for instructions. One result is that we should find
