@@ -360,33 +360,6 @@ def clamp(val, vmin, vmax):
   return min(vmax, max(vmin, val))
 
 
-def collect_il_groups(il_func):
-  """ Gather all il instructions grouped by address
-  Some instructions (cmov, set, etc.) get expanded into multiple il
-  instructions when lifted, but `Function.get_lifted_il_at` will only return the first
-  of all the il instructions at an address. This will group all the il instructions
-  into a map of address to expanded instructions as follows:
-
-  {
-    addr1 => [single il instruction],
-    addr2 => [expanded il 1, expanded il 2, ...],
-    ...
-  }
-
-  Args:
-    il_func: IL function to gather all il groups from
-
-  Returns:
-    dict: Map from address to all IL instructions at that address
-
-  """
-  il_map = defaultdict(list)
-  for blk in il_func:
-    for il in blk:
-      il_map[il.address].append(il)
-  return il_map
-
-
 def recover_sections(bv, pb_mod):
   # Collect all address to split on
   sec_addrs = set()
