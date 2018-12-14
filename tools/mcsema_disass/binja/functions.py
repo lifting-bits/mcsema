@@ -115,15 +115,14 @@ def recover_blocks(func, pb_mod, is_entry):
   pb_func.is_entrypoint = is_entry  # TODO : or exported function
   pb_func.name = func.symbol.name
 
-  il_groups = util.collect_il_groups(func.lifted_il)
   var_refs = defaultdict(list)
   for bb in func:
-    recover_block(bb, pb_func, il_groups, var_refs)
+    recover_block(bb, pb_func, var_refs)
 
   return pb_func, var_refs
 
 
-def recover_block(bb, pb_func, il_groups, var_refs):
+def recover_block(bb, pb_func, var_refs):
   log.debug("BB: {:x}".format(bb.start))
   pb_block = pb_func.blocks.add()
   pb_block.ea = bb.start
@@ -135,18 +134,17 @@ def recover_block(bb, pb_func, il_groups, var_refs):
     if inst.tokens[0].type != InstructionTextTokenType.InstructionToken:
       continue
 
-    il = bb.function.get_low_level_il_at(inst.address)
-    all_il = il_groups[inst.address]
+    lifted_il = bb.function.get_lifted_il_at(inst.address)
     pb_inst = pb_block.instructions.add()
 
-    recover_inst(bb.view, bb.function, pb_block, pb_inst, il, all_il, is_last=(inst.address == bb.end))
+    recover_inst(bb.view, bb.function, pb_block, pb_inst, lifted_il, is_last=(inst.address == bb.end))
 
     # Find any references to stack vars in this instruction
     if RECOVER_OPTS['stack_vars']:
-      vars.find_stack_var_refs(bb.view, inst, il, var_refs)
+      vars.find_stack_var_refs(bb.view, inst, lifted_il, var_refs)
 
 
-def recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last):
+def recover_inst(bv, func, pb_block, pb_inst, lifted_il, is_last):
   """
   Args:
     bv (binja.BinaryView)
@@ -156,12 +154,18 @@ def recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last):
              (e.g. all instructions expanded from a cmov)
     is_last (bool)
   """
-  pb_inst.ea = il.address
-  pb_inst.bytes = bv.read(il.address, bv.get_instruction_length(il.address))
+  pb_inst.ea = lifted_il.address
+  pb_inst.bytes = bv.read(lifted_il.address, bv.get_instruction_length(lifted_il.address))
 
   # Search all il instructions at the current address for xrefs
   refs = set()
-  for il_exp in all_il:
+
+  llil = lifted_il.function.source_function.get_low_level_il_at(lifted_il.address)
+  try:
+      iter(llil)
+  except TypeError:
+      llil = [llil]
+  for il_exp in llil:
     refs.update(xrefs.get_xrefs(bv, func, il_exp))
 
   # Add all discovered xrefs to pb_inst
@@ -169,17 +173,17 @@ def recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last):
   for ref in refs:
     debug_refs.append(xrefs.add_xref(bv, pb_inst, ref.addr, ref.mask, ref.cfg_type))
 
-  if util.is_local_noreturn(bv, il):
+  if util.is_local_noreturn(bv, lifted_il):
     pb_inst.local_noreturn = True
 
   # Add the target of a tail call as a successor
-  if util.is_jump_tail_call(bv, il):
-    tgt = il.dest.constant
+  if util.is_jump_tail_call(bv, lifted_il):
+    tgt = lifted_il.dest.constant
     pb_block.successor_eas.append(tgt)
 
-  recover_table(bv, pb_inst, pb_block, debug_refs, il)
+  recover_table(bv, pb_inst, pb_block, debug_refs, llil[0])
 
-  log.debug("I: {:x} {}".format(il.address, " ".join(debug_refs)))
+  log.debug("I: {:x} {}".format(lifted_il.address, " ".join(debug_refs)))
 
   if is_last:
     if len(pb_block.successor_eas):
