@@ -135,7 +135,7 @@ def recover_block(bb, pb_func, il_groups, var_refs):
     if inst.tokens[0].type != InstructionTextTokenType.InstructionToken:
       continue
 
-    il = bb.function.get_lifted_il_at(inst.address)
+    il = bb.function.get_low_level_il_at(inst.address)
     all_il = il_groups[inst.address]
     pb_inst = pb_block.instructions.add()
 
@@ -199,7 +199,7 @@ def recover_table(bv, pb_inst, pb_block, debug_refs, il):
   if table is None:
     return
 
-  debug_refs.append(xrefs.add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.MemoryDisplacementOperand))
+  debug_refs.append(xrefs.add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.OffsetTable))
   # if is_offset:
   #   debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.OffsetTable))
   # else:
