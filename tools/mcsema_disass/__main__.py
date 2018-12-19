@@ -99,13 +99,6 @@ def main():
       help="The entrypoint where disassembly should begin",
       required=True)
 
-  arg_parser.add_argument(
-      "--std-defs",
-      action='append',
-      type=str,
-      default=[],
-      help="std_defs file: definitions and calling conventions of imported functions and data")
-
   args, command_args = arg_parser.parse_known_args()
 
   if not os.path.isfile(args.binary):
