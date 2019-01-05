@@ -586,6 +586,13 @@ def get_cfg(args, fixed_args):
       help='Flag to enable stack variable recovery',
       default=False,
       action='store_true')
+ 
+  parser.add_argument(
+      "--std-defs",
+      action='append',
+      type=str,
+      default=[],
+      help="std_defs file: definitions and calling conventions of imported functions and data")
 
   extra_args = parser.parse_args(fixed_args)
 
