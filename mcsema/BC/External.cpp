@@ -78,7 +78,7 @@ void DeclareExternals(const NativeModule *cfg_module) {
     CHECK(cfg_func->is_external)
         << "Trying to declare function " << cfg_func->name << " as external.";
 
-    CHECK_EQ(cfg_func->name, cfg_func->lifted_name);
+    CHECK_NE(cfg_func->name, cfg_func->lifted_name);
 
     // The "actual" external function.
     if (!gModule->getFunction(cfg_func->name)) {
