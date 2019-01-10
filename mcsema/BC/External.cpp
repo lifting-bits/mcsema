@@ -124,17 +124,7 @@ void DeclareExternals(const NativeModule *cfg_module) {
             *gContext, static_cast<unsigned>(cfg_var->size * 8));
           break;
         
-        // An array of bytes      
-        case 3:
-        case 5:
-        case 6:
-        case 7:
-        case 9:
-        case 11:
-        case 12:
-        case 13:
-        case 14:
-        case 15:
+        // An array of bytes
         default: {
           auto byte_type = llvm::Type::getInt8Ty(*gContext);
           var_type = llvm::ArrayType::get(byte_type, static_cast<unsigned>(cfg_var->size));
