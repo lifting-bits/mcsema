@@ -78,7 +78,7 @@ void DeclareExternals(const NativeModule *cfg_module) {
     CHECK(cfg_func->is_external)
         << "Trying to declare function " << cfg_func->name << " as external.";
 
-    CHECK(cfg_func->name != cfg_func->lifted_name);
+    CHECK_EQ(cfg_func->name, cfg_func->lifted_name);
 
     // The "actual" external function.
     if (!gModule->getFunction(cfg_func->name)) {
@@ -94,15 +94,15 @@ void DeclareExternals(const NativeModule *cfg_module) {
         entry.second->Get());
 
     auto ll_var = gModule->getGlobalVariable(cfg_var->name);
-    bool is_array = false;
     if (!ll_var) {
       LOG(INFO)
           << "Adding external variable " << cfg_var->name;
 
       llvm::Type* var_type = nullptr;
 
-      CHECK(0 != cfg_var->size) << "The size of the external variable ["
-        << cfg_var->name << "] cannot be zero";
+      CHECK_NE(0, cfg_var->size)
+          << "The size of the external variable ["
+          << cfg_var->name << "] cannot be zero";
 
       // Handle external variables of up to 128 bits as intgers
       // Anything else is treated as an array of bytes
@@ -110,43 +110,43 @@ void DeclareExternals(const NativeModule *cfg_module) {
         case 0:
           // Why is this zero length? This should never happen
           // Attempt a fix and output a warning
-          LOG(ERROR) << "The variable [" << cfg_var->name <<
-            "] has size of zero. Assuming it should be size 1";
+          LOG(ERROR)
+              << "The variable [" << cfg_var->name
+              << "] has size of zero. Assuming it should be size 1";
           var_type = llvm::Type::getInt8Ty(*gContext);
           break;
         case 1: // 8 bit integer
         case 2: // 16 bit integer
-        case 3:
         case 4: // 32 bit integer
+        case 8: // 64 bit integer
+        case 16: // 128 bit integer
+          var_type = llvm::Type::getIntNTy(
+            *gContext, static_cast<unsigned>(cfg_var->size * 8));
+          break;
+        
+        // An array of bytes      
+        case 3:
         case 5:
         case 6:
         case 7:
-        case 8: // 64 bit integer
         case 9:
         case 11:
         case 12:
         case 13:
         case 14:
         case 15:
-        case 16: // 128 bit integer
-          var_type = llvm::Type::getIntNTy(
-            *gContext, static_cast<unsigned>(cfg_var->size * 8));
+        default: {
+          auto byte_type = llvm::Type::getInt8Ty(*gContext);
+          var_type = llvm::ArrayType::get(byte_type, static_cast<unsigned>(cfg_var->size));
           break;
-
-        default: // An array of bytes
-          {
-            auto byte_type = llvm::Type::getInt8Ty(*gContext);
-            var_type = llvm::ArrayType::get(byte_type, static_cast<unsigned>(cfg_var->size));
-            is_array = true;
-            break;
-          }
+        }
       }
 
       auto linkage = llvm::GlobalValue::ExternalLinkage;
       ll_var = new llvm::GlobalVariable(*gModule, var_type, false,
                                         linkage, nullptr, cfg_var->name,
                                         nullptr, ThreadLocalMode(cfg_var));
-      if(is_array) {
+      if (cfg_var->ea) {
         ll_var->setAlignment(1 << __builtin_ctzl(cfg_var->ea));
       }
     }
