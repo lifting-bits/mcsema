@@ -1175,9 +1175,9 @@ def recover_external_variables(M):
     else:
       EV.size = idc.get_item_size(ea)
     if EV.is_thread_local:
-      DEBUG("Recovering extern TLS variable {} at {:x}".format(name, ea))
+      DEBUG("Recovering extern TLS variable {} at {:x} [size: {}]".format(name, ea, EV.size))
     else:
-      DEBUG("Recovering extern variable {} at {:x}".format(name, ea))
+      DEBUG("Recovering extern variable {} at {:x} [size: {}]".format(name, ea, EV.size))
 
 def recover_external_symbols(M):
   recover_external_functions(M)
