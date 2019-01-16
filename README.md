@@ -44,6 +44,25 @@ Why would anyone translate binaries *back* to bitcode?
 
 * **Write one set of analysis tools**. Lifting to LLVM IR means that one set of analysis tools can work on both the source and the binary. Maintaining a single set of tools saves development time and effort, and allows for a single set of better tools.
 
+## Comparison with other machine code to LLVM bitcode lifters
+|   | McSema | [dagger](https://github.com/repzret/dagger) | [llvm-mctoll](https://github.com/Microsoft/llvm-mctoll) | [retdec](https://github.com/avast-tl/retdec) | [reopt](https://github.com/GaloisInc/reopt) | [rev.ng](https://github.com/revng/revamb) | [bin2llvm](https://github.com/cojocar/bin2llvm) | [fcd](https://github.com/zneak/fcd) | [RevGen](https://github.com/S2E/tools/tree/master/tools) | [Fracture](https://github.com/draperlaboratory/fracture) | [libbeauty](https://github.com/jcdutton/libbeauty) |
+|  ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
+|  Actively maintained? | Yes | No | Yes | Yes | Yes | No | Maybe | Maybe | Maybe | No | Yes |
+|  Commercial support available? | Yes | No | No | No | Maybe | No | No | No | No | Maybe | No |
+|  LLVM versions | 3.5 - current | 5 | current | 3.9.1 | 3.8 |  | 3.2 | 4 | 3.9 | 3.4 | 6 |
+|  Builds with CI? | Yes | No | No | Yes | No | No | Yes | Maybe | Maybe | No | No |
+|  32-bit architectures | x86 | x86 | ARM | x86, ARM, MIPS, PIC32, PowerPC |  | ARM, MIPS | S2E | S2E | S2E | ARM, x86 |  |
+|  64-bit architectures | x86-64, AArch64 | x86-64 | x86-64 |  | x86-64 | x86-64 |  | S2E | S2E | PowerPC | x86-64 |
+|  Control-flow recovery | IDA Pro, Binary Ninja, DynInst | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | McSema | Ad-hoc | Ad-hoc |
+|  File formats | ELF, PE | ELF, Mach-O |  | ELF, PE, Mach-O, COFF, AR, Intel HEX, Raw | ELF | ELF | ELF |  | ELF, PE | ELF, Mach-O (maybe) | ELF |
+|  Bitcode is executable? | Yes | Yes | Yes | Yes | Yes | Yes | No | No | CGC | No | No |
+|  C++ exceptions suport? | Yes | No | No | No | No | Indirectly | No | No | No | No | Maybe |
+|  Lifts stack variables? | Yes | No | Maybe | Yes | No | No | No | Yes | No | No | Maybe |
+|  Lifts global variables? | Yes | Maybe | Yes | Yes | No | Maybe | No | No | No | Yes | Maybe |
+|  Has a test suite? | Yes | No | Yes | Yes | Yes | Yes | Yes | Yes | No | Yes | No |
+
+**Note:** We label some architectures as "S2E" to mean any architecture supported by the S2E system. A system using "McSema" for control-flow recovery (e.g. RevGen) uses McSema's CFG.proto format for recovering control-flow. In the case of RevGen, only bitcode produced from DARPA Cyber Grand Challenge (CGC) binaries is executable.
+
 ## Dependencies
 
 | Name | Version | 
@@ -63,6 +82,26 @@ Why would anyone translate binaries *back* to bitcode?
 | [IDA Pro](https://www.hex-rays.com/products/ida) | 6.7+ |
 
 ## Getting and building the code
+
+### Docker
+
+#### Step 1: Download Dockerfile
+
+`wget https://raw.githubusercontent.com/trailofbits/mcsema/master/tools/Dockerfile`
+
+#### Step 2: Add your disassembler
+
+Currently IDA and BinaryNinja are supported for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice, but an example of installing BinaryNinja is provided (remember for Docker that paths need to be relative to where you built from):
+```
+ADD local-relative/path/to/binaryninja/ /root/binaryninja/
+ADD local-relative/path/to/.binaryninja/ /root/.binaryninja/ # <- Make sure there's no `lastrun` file
+RUN /root/binaryninja/scripts/linux-setup.sh
+```
+
+#### Step 3: Build & Run Dockerfile
+
+This will build the container for you and run it with your local directory mounted into the container (at /home/user/local) such that your work in the container is saved locally: 
+`docker build -t=mcsema . && docker run --rm -it --ipc=host -v "${PWD}":/home/user/local mcsema`
 
 ### On Linux
 

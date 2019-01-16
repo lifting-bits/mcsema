@@ -107,9 +107,6 @@ def is_ELF_got_pointer(ea):
     return False
 
   name = get_symbol_name(ea)
-  if not name.endswith("_ptr"):
-    return False
-
   target_ea = get_reference_target(ea)
   target_name = get_true_external_name(get_symbol_name(target_ea))
 
@@ -1178,9 +1175,9 @@ def recover_external_variables(M):
     else:
       EV.size = idc.get_item_size(ea)
     if EV.is_thread_local:
-      DEBUG("Recovering extern TLS variable {} at {:x}".format(name, ea))
+      DEBUG("Recovering extern TLS variable {} at {:x} [size: {}]".format(name, ea, EV.size))
     else:
-      DEBUG("Recovering extern variable {} at {:x}".format(name, ea))
+      DEBUG("Recovering extern variable {} at {:x} [size: {}]".format(name, ea, EV.size))
 
 def recover_external_symbols(M):
   recover_external_functions(M)

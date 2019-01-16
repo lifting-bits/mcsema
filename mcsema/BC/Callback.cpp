@@ -181,9 +181,12 @@ static llvm::Function *ImplementNativeToLiftedCallback(
   // initialization of cross-references happens in `__mcsema_constructor`,
   // but we need to also have it happen here just in case lifted code gets
   // called before `__mcsema_constructor` is invoked.
+  std::stringstream func_wrapper_name;
+  func_wrapper_name << callback_name;
+  func_wrapper_name << "_wrapper";
   auto func_wrapper = llvm::Function::Create(
       func->getFunctionType(), llvm::GlobalValue::InternalLinkage,
-      "", gModule);
+	  func_wrapper_name.str(), gModule);
   auto arg_it = func_wrapper->arg_begin();
 
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", func_wrapper));

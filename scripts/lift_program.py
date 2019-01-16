@@ -83,11 +83,6 @@ def main():
   arg_parser = argparse.ArgumentParser()
 
   arg_parser.add_argument(
-      '--libraries_dir',
-      help='Path to directory in which the cxx-common libraries are unpacked',
-      required=True)
-
-  arg_parser.add_argument(
       '--llvm_version',
       help='Version number MAJOR.MINOR of the LLVM toolchain',
       required=True)
@@ -106,6 +101,12 @@ def main():
       '--binary',
       help='Path to the binary to be lifted',
       required=True)
+
+  arg_parser.add_argument(
+      '--clang',
+      help='Path to clang, if not using remill-clang',
+      required=False,
+      default="")
 
   arg_parser.add_argument(
       '--dry_run',
@@ -261,16 +262,22 @@ def main():
     return 0
 
   # Build up the command-line invocation to clang.
-  clang_args = [
-      os.path.join(args.libraries_dir, 'llvm', 'bin', 'clang++'),
-      '-rdynamic',
-      is_pie and '-fPIC' or '',
-      is_pie and '-pie' or '',
-      '-o', lifted_binary,
-      bitcode,
-      '/usr/local/lib/libmcsema_rt{}-{}.a'.format(
-          address_size, args.llvm_version),
-      '-lm']
+  clang_args = []
+
+  if (args.clang != ""):
+    clang_args = [os.path.join(args.clang)]
+  else:
+    clang_args = [os.path.join('remill-clang-{}'.format(args.llvm_version))]
+
+  clang_args += [
+    '-rdynamic',
+    is_pie and '-fPIC' or '',
+    is_pie and '-pie' or '',
+    '-o', lifted_binary,
+    bitcode,
+    '/usr/local/lib/libmcsema_rt{}-{}.a'.format(
+        address_size, args.llvm_version),
+    '-lm']
 
   for lib in libs:
     clang_args.append(lib)
