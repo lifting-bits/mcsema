@@ -1,4 +1,4 @@
-dist: trusty
+dist: xenial
 language: generic
 sudo: required
 install: true
