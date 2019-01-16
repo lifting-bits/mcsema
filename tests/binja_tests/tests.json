@@ -1,0 +1,15 @@
+[
+  {
+    "name"              : "print_character",
+    "files"             : [
+      "src/print_character.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o print_character print_character.c -no-pie",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary print_character --manual-recursive-descent --do-not-recover __data_start __dso_handle _IO_stdin_used __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "a"
+  }
+]
