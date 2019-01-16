@@ -22,15 +22,16 @@ import util
 import log
 
 
+# Linker errors that pop up can usually be solved by ignoring the symbol here
 SYM_IGNORE = [
-  '__data_start',
-  '__dso_handle',
-  '__init_array_start',
-  '__init_array_end',
-  '__TMC_END__',
-  '__JCR_END__',
-  '__elf_header',
-  '_DYNAMIC'
+#   '__data_start',
+#   '__dso_handle',
+#   '__init_array_start',
+#   '__init_array_end',
+#   '__TMC_END__',
+#   '__JCR_END__',
+#   '__elf_header',
+#   '_DYNAMIC',
 ]
 
 
