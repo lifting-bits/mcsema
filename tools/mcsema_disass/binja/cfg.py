@@ -61,12 +61,19 @@ def get_cfg(args, fixed_args):
       help='Space-deliminated list of function names not to recover',
       nargs='+',
       default=[])
+  parser.add_argument(
+      '--ignore-symbols',
+      help='Space-deliminated list of symbol names not to recover',
+      nargs='+',
+      default=[])
   extra_args = parser.parse_args(fixed_args)
 
   # Recover options
   RECOVER_OPTS['stack_vars'] = extra_args.recover_stack_vars
   RECOVER_OPTS['manual_recursive_descent'] = extra_args.manual_recursive_descent
   functions.DO_NOT_RECOVER += extra_args.do_not_recover
+  vars.SYM_IGNORE += extra_args.do_not_recover
+
 
   # Setup logger
   log.init(args.log_file)
