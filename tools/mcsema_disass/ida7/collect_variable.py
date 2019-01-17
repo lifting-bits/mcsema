@@ -308,14 +308,13 @@ class Instruction(object):
   def mnemonic(self):
     return self._insn.get_canon_mnem()
     
-    
 def _signed_from_unsigned64(val):
-  if val & 0x8000000000000000:
+  if (val > 0) and (val & 0x8000000000000000):
     return -0x10000000000000000 + val
   return val
 
 def _signed_from_unsigned32(val):
-  if val & 0x80000000:
+  if  (val > 0) and (val & 0x80000000):
     return -0x100000000 + val
   return val
 
