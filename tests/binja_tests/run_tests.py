@@ -71,4 +71,6 @@ if __name__ == '__main__':
       for line in test[2].split("\n"):
         print("    " + line)
 
-  print(f"{len(passed)} out of {len(test_data)} tests passed ({len(passed)/len(test_data):.1%}).") 
+  print(f"{len(passed)} out of {len(test_data)} tests passed ({len(passed)/len(test_data):.1%}).")
+
+  return (len(failed) != 0)
