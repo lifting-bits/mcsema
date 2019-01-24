@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2019   Trail of Bits, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -409,6 +409,14 @@ linux_build_helper() {
     return 1
   fi
 
+  printf "\n\n\nCalling the BinaryNinja recovery backend test suite...\n"
+  ( cd ./remill/tools/mcsema/tests/binja_tests/ && ./run_tests.py ) > "${test_log_file}" 2>&1
+  if [ $? -ne 0 ] ; then
+    printf " x Failed the BinaryNinja recovery backend test suite:\n"
+    printf "===\n"
+    cat "${test_log_file}"
+    # return 1  # TODO(kyle) : actually fail on errors ... just get the tests running for now
+  fi
 
   return 0
 }
