@@ -308,16 +308,17 @@ class Instruction(object):
   def mnemonic(self):
     return self._insn.get_canon_mnem()
     
-    
 def _signed_from_unsigned64(val):
-  if val & 0x8000000000000000:
-    return -0x10000000000000000 + val
-  return val
+  return struct.unpack('q', struct.pack('Q', val & 0xFFFFFFFFFFFFFFFF))[0]
+  #if (val & 0x8000000000000000):
+  #  return val - (1 << size)
+  #return val
 
 def _signed_from_unsigned32(val):
-  if val & 0x80000000:
-    return -0x100000000 + val
-  return val
+  return struct.unpack('l', struct.pack('L', val & 0xFFFFFFFF))[0]
+  #if  (val > 0) and (val & 0x80000000):
+  #  return -0x100000000 + val
+  #return val
 
 def _mark_function_args_ms64(referers, dereferences, func_var_data):
   for reg in ["rcx", "rdx", "r8", "r9"]:

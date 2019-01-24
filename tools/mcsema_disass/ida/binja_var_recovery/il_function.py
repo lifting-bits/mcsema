@@ -40,13 +40,15 @@ class Function(object):
     self.params = list()
     self.ssa_variables = collections.defaultdict(set)
     self.num_params = 0
-    self.return_set = set()
+    self.return_set = set([SymbolicValue(self.bv, "Return {}".format(hex(func.start)), 0)])
     self.regs = collections.defaultdict(set)
+
+  def get_return_set(self):
+    return self.return_set
 
   def update_register(self, reg_name, value):
     if reg_name is None:
       return
-
     try:
       if isinstance(value, set):
         self.regs[reg_name].update(value)
@@ -76,64 +78,57 @@ class Function(object):
       insn_il_ssa = insn_il.ssa_form if insn_il is not None else None
       if (insn_il_ssa is None or not hasattr(insn_il_ssa, "params")):
         continue
-      if isinstance(insn_il_ssa.params, binja.MediumLevelILInstruction):
+      if isinstance(insn_il_ssa.params, MediumLevelILInstruction):
         continue
       self.num_params = len(insn_il_ssa.params) if len(insn_il_ssa.params) > self.num_params else self.num_params
 
   def collect_parameters(self):
-    """ Traverse through the references of the function and recover the function
-        parameters. It is the possible values of the entry registers. If the parameters
-        can't be resolved it gets assigned '<undetermined>' as value
-    """
-    def called_function(bv, insn):
-      if insn.operation == binja.MediumLevelILOperation.MLIL_CALL_SSA:
-        dest = insn.dest
-        if dest.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
-          called_function = self.bv.get_function_at(dest.constant)
-          if called_function is not None:
-            return called_function.start
-
-    if self.func is None:
-      return
+    def global_varname(bv, func, ssa_var):
+      return "{}_{}#{}".format(func.name, ssa_var.reg.name, ssa_var.version)
 
     DEBUG_PUSH()
     self.params = [set() for i in range(self.num_params)]
     for ref in self.bv.get_code_refs(self.start_addr):
       ref_function = ref.function
-      insn_il = ref_function.get_low_level_il_at(ref.address).medium_level_il
-      if (insn_il is None) or (insn_il.ssa_form is None):
+      insn_il = ref_function.get_low_level_il_at(ref.address)
+      if not is_call(self.bv, insn_il):
         continue
 
-      insn_il_ssa = insn_il.ssa_form
-      if called_function(self.bv, insn_il_ssa) != self.start_addr:
-        continue
-
-      DEBUG("Function referred : {} {} num params {}".format(ref_function, insn_il_ssa, self.num_params))
-      if not hasattr(insn_il_ssa, "params"):
-        continue
-
-      if isinstance(insn_il_ssa.params, binja.MediumLevelILInstruction):
-        continue
-
-      for index in range(len(insn_il_ssa.params)):
-        parameter = insn_il_ssa.params[index]
-
-        if parameter.operation in [ binja.MediumLevelILOperation.MLIL_CONST,
-                                   binja.MediumLevelILOperation.MLIL_CONST_PTR ]:
-          p_value = parameter.possible_values
-        else:
-          p_value = parameter.get_ssa_var_possible_values(parameter.src)
-
-        value_set = self.params[index]
-
-        if p_value.type in [ binja.RegisterValueType.ConstantValue,
-                            binja.RegisterValueType.ConstantPointerValue ]:
-          value_set.add(p_value.value)
-          # build the alias set from the constant value
-          add_to_aliasset(self.bv, p_value.value, p_value.value)
-        else:
-          value_set.add("<undetermined>")
+      DEBUG("Function referred : {} {}".format(ref_function, insn_il.ssa_form))
+      for pparam in get_call_params(self.bv, insn_il.ssa_form):
+        ssa_reg = pparam.src
+        var_handler = SSARegister(self.bv, ssa_reg, ref_function)
+        ssa_values = var_handler.backward_analysis(insn_il)
+        DEBUG("{} -> {}".format(global_varname(self.bv, ref_function, ssa_reg), ssa_values))
+        SSAVariableSet[global_varname(self.bv, ref_function, ssa_reg)].update(ssa_values)
+        target = call_target(self.bv, insn_il)
+        if isinstance(target, long):
+          func = self.bv.get_function_at(target)
+          if func:
+            variable_name = "{}_{}#0".format(func.name, ssa_reg.reg.name)
+            SSAVariableSet[variable_name].update(ssa_values)
+            DEBUG("{} -> {}".format(variable_name, ssa_values))
     DEBUG_POP()
+
+  def collect_returnset(self):
+    index = 0
+    size = len(self.func.low_level_il.ssa_form)
+    DEBUG_PUSH()
+    while index < size:
+      insn = self.func.low_level_il.ssa_form[index]
+      if not is_executable(self.bv, insn.address):
+        index += 1
+        continue
+
+      if insn.operation == LowLevelILOperation.LLIL_RET:
+        llil_insn = ILInstruction(self.bv, self.func, insn)
+        operation_name = "{}".format(insn.operation.name.lower())
+        if hasattr(llil_insn, operation_name):
+          self.return_set = getattr(llil_insn, operation_name)(insn)
+        DEBUG("Function returnset {} {}".format(self.return_set, insn.operation.name))
+      index += 1
+    DEBUG_POP()
+    pass
 
   def get_param_register(self, reg_name):
     try:
@@ -143,9 +138,6 @@ class Function(object):
       return set()
     except IndexError:
       return set()
-
-  def print_ssa_variables(self):
-    DEBUG("SSA Variables in the function {}".format(pprint.pformat(self.ssa_variables)))
 
   def get_entry_register(self, register):
     if register is None:
@@ -192,9 +184,9 @@ class Function(object):
         DEBUG("Instruction operation {} is not supported!".format(operation_name))
       DEBUG_POP()
 
-      if insn.operation == binja.MediumLevelILOperation.MLIL_CALL_SSA:
+      if insn.operation == MediumLevelILOperation.MLIL_CALL_SSA:
         dest = insn.dest
-        if dest.operation == binja.MediumLevelILOperation.MLIL_CONST_PTR:
+        if dest.operation == MediumLevelILOperation.MLIL_CONST_PTR:
           called_function = self.bv.get_function_at(dest.constant)
           if called_function is not None:
             queue_func(called_function.start)
@@ -215,10 +207,10 @@ class Function(object):
         continue
 
       DEBUG_PUSH()
-      mlil_insn = ILInstruction(self.bv, self.func, insn)
+      llil_insn = ILInstruction(self.bv, self.func, insn)
       operation_name = "{}".format(insn.operation.name.lower())
-      if hasattr(mlil_insn, operation_name):
-        getattr(mlil_insn, operation_name)(insn)
+      if hasattr(llil_insn, operation_name):
+        getattr(llil_insn, operation_name)(insn)
       else:
         DEBUG("Instruction operation {} is not supported!".format(operation_name))
       DEBUG_POP()
@@ -227,8 +219,6 @@ class Function(object):
         target = call_target(self.bv, insn)
         if target is not None:
           queue_func(target)
-          DEBUG("Call target {:x}".format(target))
-
       index += 1
     DEBUG_POP()
 
@@ -239,7 +229,7 @@ def recover_function(bv, addr, is_entry=False):
   if func is None:
     return
 
-  if func.symbol.type == binja.SymbolType.ImportedFunctionSymbol:
+  if func.symbol.type == SymbolType.ImportedFunctionSymbol:
     DEBUG("Skipping external function '{}'".format(func.symbol.name))
     return
 
@@ -251,12 +241,11 @@ def recover_function(bv, addr, is_entry=False):
   f_handle = FUNCTION_OBJECTS[func.start]
 
   f_handle.collect_parameters()
-  f_handle.print_parameters()
-  #f_handle.recover_mlil()
+  f_handle.collect_returnset()
   f_handle.recover_llil()
 
 def create_function(bv, func):
-  if func.symbol.type == binja.SymbolType.ImportedFunctionSymbol:
+  if func.symbol.type == SymbolType.ImportedFunctionSymbol:
     return
 
   DEBUG("Processing... {:x} {}".format(func.start, func.name))
