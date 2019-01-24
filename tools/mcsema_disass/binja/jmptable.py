@@ -1,4 +1,4 @@
-# Copyright (c) 2018 Trail of Bits, Inc.
+# Copyright (c) 2019 Trail of Bits, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,15 +28,8 @@ class JMPTable(object):
   """ Simple container for jump table info """
   def __init__(self, bv, rel_base, targets, rel_off=0):
     self.rel_off = rel_off
-    # self.rel_base = rel_base
     self.base_addr = rel_base
     self.targets = targets
-
-    # Calculate the absolute base address
-    # mask = (1 << bv.address_size * 8) - 1
-    # self.base_addr = (self.rel_base + self.rel_off) & mask
-
-    # self.targets = [t & mask for t in targets]
 
 
 def search_ssa_mlil_displ(il, ptr=False, _neg=False):
