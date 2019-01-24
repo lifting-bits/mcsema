@@ -1,4 +1,4 @@
-# Copyright (c) 2018 Trail of Bits, Inc.
+# Copyright (c) 2019 Trail of Bits, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -193,21 +193,11 @@ def recover_inst(bv, func, pb_block, pb_inst, lifted_il, is_last):
 
 
 def recover_table(bv, pb_inst, pb_block, debug_refs, il):
-  # table = jmptable.get_jmptable(bv, il)
-  # if table is not None:
-  #   debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.MemoryDisplacementOperand))
-  #   JMP_TABLES.append(table)
-
-  # With new recovery mechanism:?
   table = jmptable.get_jmptable(bv, il)
   if table is None:
     return
 
   debug_refs.append(xrefs.add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.OffsetTable))
-  # if is_offset:
-  #   debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.OffsetTable))
-  # else:
-  #   debug_refs.append(add_xref(bv, pb_inst, table.base_addr, 0, CFG_pb2.CodeReference.DataTarget))
   jmptable.JMP_TABLES.append(table)
 
   # Add any missing successors
