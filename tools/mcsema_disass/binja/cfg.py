@@ -56,11 +56,13 @@ def get_cfg(args, fixed_args):
       help='Flag to enable function recovery via manual recursive descent',
       default=False,
       action='store_true')
+
   parser.add_argument(
       '--do-not-recover',
       help='Space-deliminated list of function names not to recover',
       nargs='+',
       default=[])
+
   parser.add_argument(
       '--ignore-symbols',
       help='Space-deliminated list of symbol names not to recover',

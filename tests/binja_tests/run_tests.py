@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import json
 import tempfile
 import subprocess
@@ -73,4 +74,4 @@ if __name__ == '__main__':
 
   print(f"{len(passed)} out of {len(test_data)} tests passed ({len(passed)/len(test_data):.1%}).")
 
-  return (len(failed) != 0)
+  sys.exit(len(failed) != 0)
