@@ -250,9 +250,8 @@ Note that for production usage you should use a specific remill commit (`remill/
 
 ```
 cd remill
-cat tools/mcsema/.remill_commit_id
 git fetch --unshallow
-git checkout -b production <remill_commit_id>
+git checkout -b production `cat tools/mcsema/.remill_commit_id `
 ```
 
 #### Step 3: Dependencies
