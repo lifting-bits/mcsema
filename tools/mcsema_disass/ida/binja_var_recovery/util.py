@@ -17,6 +17,12 @@ import io
 import collections
 import struct
 
+try:
+  from elftools.elf.elffile import ELFFile
+  from elftools.elf.sections import SymbolTableSection
+except ImportError:
+  print "Install pyelf tools"
+
 _DEBUG_FILE = None
 _DEBUG_PREFIX = ""
 
@@ -37,31 +43,15 @@ def DEBUG(s):
   if _DEBUG_FILE:
     _DEBUG_FILE.write("{}{}\n".format(_DEBUG_PREFIX, str(s)))
 
+dynamic_symbols = collections.defaultdict()
+
 MEMORY_REFS = collections.defaultdict()
 
 ADDRESS_REFS = collections.defaultdict()
 
 EXPORTED_REFS = collections.defaultdict()
 
-ALIAS_SET_REFS = collections.defaultdict(set)
-
-PARAM_REGISTERS = {
-  "rdi" : 0,
-  "rsi" : 1,
-  "rdx" : 2,
-  "rcx" : 3,
-  "r8"  : 4,
-  "r9"  : 5,
-  }
-
-PARAM_REGISTERS_INDEX = {
-  0 : "rdi",
-  1 : "rsi",
-  2 : "rdx",
-  3 : "rcx",
-  4 : "r8",
-  5 : "r9",
-  }
+VARIABLE_SET_REFS = collections.defaultdict()
 
 def set_comments(bv, addr, str):
   functions = bv.get_functions_containing(addr)
@@ -110,6 +100,18 @@ def is_ELF(bv):
 def is_PE(bv):
   return bv.view_type == 'PE'
 
+def is_data_variable_section(bv, addr):
+  seg = bv.get_segment_at(addr)
+  if seg == None:
+    return False
+
+  sect = get_section_at(bv, addr)
+  if sect is not None and is_ELF(bv):
+    if re.search(r'\.(init|fini|got|plt)', sect.name):
+      return False
+
+  return (seg.executable == False)
+
 def is_data_variable(bv, addr):
   seg = bv.get_segment_at(addr)
   if seg == None:
@@ -117,8 +119,11 @@ def is_data_variable(bv, addr):
 
   sect = get_section_at(bv, addr)
   if sect is not None and is_ELF(bv):
-    if re.search(r'\.(init|fini)', sect.name):
+    if re.search(r'\.(init|fini|got|plt)', sect.name):
       return False
+
+  if is_dynamic_range_lookup(bv, addr):
+    return False
 
   return (seg.executable == False)
 
@@ -140,20 +145,69 @@ def is_section_external(bv, sect):
 
   _INT_SECTIONS.add(sect.start)
   return False
-   
-def add_to_aliasset(bv, addr, src):
+
+def is_dynamic_range_lookup(bv, addr):
+  for sym in sorted(dynamic_symbols.keys()):
+    if sym <= addr < sym + dynamic_symbols[sym]:
+      return True
+  return False
+
+def process_binary(bv, binfile):
+  with open(binfile, 'rb') as f:
+    elffile = ELFFile(f)
+    symbol_tables = [s for s in elffile.iter_sections() if isinstance(s, SymbolTableSection)]
+
+    for section in symbol_tables:
+      if not isinstance(section, SymbolTableSection):
+        continue
+
+      if section['sh_entsize'] == 0:
+        continue
+
+      for nsym, symbol in enumerate(section.iter_symbols()):
+        sym_addr = symbol['st_value']
+        sym_size = symbol['st_size']
+        if is_data_variable_section(bv, sym_addr):
+          dynamic_symbols[sym_addr] = sym_size
+
+def set_variables(bv, addr, size):
   if not is_data_variable(bv, addr):
     return
+  try:
+    curr_size = VARIABLE_SET_REFS[addr]
+    if size > curr_size:
+      VARIABLE_SET_REFS[addr] = size
+  except KeyError:
+    VARIABLE_SET_REFS[addr] = size
 
-  ALIAS_SET_REFS[src].add(addr)
-
-def build_variable_set(bv):
+def print_variables(bv):
   g_variables = collections.defaultdict()
-  for key in ALIAS_SET_REFS.keys():
-    addrs = ALIAS_SET_REFS[key]
-    size = max(addrs) - key
+  for key in VARIABLE_SET_REFS.keys():
+    size = VARIABLE_SET_REFS[key]
     g_variables[key] = size
 
-  DEBUG("Variables from alias set")
+  DEBUG("Variables set")
   for addr in g_variables.keys():
     DEBUG("{:x} -> {:x}".format(addr, g_variables[addr]))
+
+def get_dynamic_symbol(bv):
+  sym_table = sorted(dynamic_symbols.keys())
+  for sym in sym_table:
+    size = dynamic_symbols[sym]
+    yield (sym, size)
+    yield (sym +size, 0)
+    
+def get_memory_refs(bv):
+  memory_refs = sorted(MEMORY_REFS.keys())
+  for ref in memory_refs:
+    size = MEMORY_REFS[ref]
+    if is_dynamic_range_lookup(bv, ref):
+      continue
+    yield (ref, size)
+    
+def get_address_refs(bv):
+  xrefs = sorted(ADDRESS_REFS.keys())
+  for ref in xrefs:
+    if is_dynamic_range_lookup(bv, ref):
+      continue
+    yield (ref, 0)
