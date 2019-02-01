@@ -6,13 +6,8 @@
       "../../scripts/lift_program.py"
     ],
     "setup_commands"    : [
-<<<<<<< HEAD
-      "gcc -o print_character print_character.c -no-pie",
-      "./lift_program.py --disassembler binja --workspace_dir ./workspace --binary print_character --manual-recursive-descent --do-not-recover __data_start __dso_handle _IO_stdin_used __GNU_EH_FRAME_HDR"
-=======
       "gcc -o switch_statement switch_statement.c -no-pie",
       "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary switch_statement --manual-recursive-descent --do-not-recover __data_start _IO_stdin_used __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
->>>>>>> Add some tests
     ],
     "test_command"      : "./workspace/lifted_obj/*",
     "expected_output"   : "0\n1\n2\n3\n4\n5\n6\n7\n8\n0\n0\n0\n0\n"
@@ -24,13 +19,8 @@
       "../../scripts/lift_program.py"
     ],
     "setup_commands"    : [
-<<<<<<< HEAD
-      "gcc -o switch_statement switch_statement.c -no-pie",
-      "./lift_program.py --disassembler binja --workspace_dir ./workspace --binary switch_statement --manual-recursive-descent --do-not-recover __data_start _IO_stdin_used __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
-=======
       "gcc -o test_binary all_data_array.c",
       "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
->>>>>>> Add some tests
     ],
     "test_command"      : "./workspace/lifted_obj/*",
     "expected_output"   : "hrm: 72\nhrm: 8\ndiv: 9\nso answer: 4\n"
