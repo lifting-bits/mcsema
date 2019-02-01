@@ -1,28 +1,524 @@
 [
   {
-    "name"              : "print_character",
-    "files"             : [
-      "src/print_character.c",
-      "../../scripts/lift_program.py"
-    ],
-    "setup_commands"    : [
-      "gcc -o print_character print_character.c -no-pie",
-      "./lift_program.py --disassembler binja --workspace_dir ./workspace --binary print_character --manual-recursive-descent --do-not-recover __data_start __dso_handle _IO_stdin_used __GNU_EH_FRAME_HDR"
-    ],
-    "test_command"      : "./workspace/lifted_obj/*",
-    "expected_output"   : "a"
-  },
-  {
     "name"              : "switch_statement",
     "files"             : [
       "src/switch_statement.c",
       "../../scripts/lift_program.py"
     ],
     "setup_commands"    : [
+<<<<<<< HEAD
+      "gcc -o print_character print_character.c -no-pie",
+      "./lift_program.py --disassembler binja --workspace_dir ./workspace --binary print_character --manual-recursive-descent --do-not-recover __data_start __dso_handle _IO_stdin_used __GNU_EH_FRAME_HDR"
+=======
       "gcc -o switch_statement switch_statement.c -no-pie",
-      "./lift_program.py --disassembler binja --workspace_dir ./workspace --binary switch_statement --manual-recursive-descent --do-not-recover __data_start _IO_stdin_used __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary switch_statement --manual-recursive-descent --do-not-recover __data_start _IO_stdin_used __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+>>>>>>> Add some tests
     ],
     "test_command"      : "./workspace/lifted_obj/*",
     "expected_output"   : "0\n1\n2\n3\n4\n5\n6\n7\n8\n0\n0\n0\n0\n"
+  },
+  {
+    "name"              : "all_data_array",
+    "files"             : [
+      "src/aiethel/all_data_array.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+<<<<<<< HEAD
+      "gcc -o switch_statement switch_statement.c -no-pie",
+      "./lift_program.py --disassembler binja --workspace_dir ./workspace --binary switch_statement --manual-recursive-descent --do-not-recover __data_start _IO_stdin_used __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+=======
+      "gcc -o test_binary all_data_array.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+>>>>>>> Add some tests
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "hrm: 72\nhrm: 8\ndiv: 9\nso answer: 4\n"
+  },
+  {
+    "name"              : "all_globals",
+    "files"             : [
+      "src/aiethel/all_globals.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary all_globals.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "hi"
+  },
+  {
+    "name"              : "all_stringpool",
+    "files"             : [
+      "src/aiethel/all_stringpool.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary all_stringpool.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "partial string test: string test\n"
+  },
+  {
+    "name"              : "all_switch",
+    "files"             : [
+      "src/aiethel/all_switch.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary all_switch.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/* 0; ./workspace/lifted_obj/* 1; ./workspace/lifted_obj/* 2; ./workspace/lifted_obj/* 4; ./workspace/lifted_obj/* 6; ./workspace/lifted_obj/* 12; ./workspace/lifted_obj/* 13; ./workspace/lifted_obj/* 19; ./workspace/lifted_obj/* 255; ./workspace/lifted_obj/* 74633; ./workspace/lifted_obj/* 74634; ./workspace/lifted_obj/* 74635; ./workspace/lifted_obj/* 74636; ./workspace/lifted_obj/* 74637; ./workspace/lifted_obj/* 74639; ./workspace/lifted_obj/* 74640; ./workspace/lifted_obj/* 74641; ./workspace/lifted_obj/* 74642; ./workspace/lifted_obj/* 74643; ./workspace/lifted_obj/* 99999;",
+
+    "expected_output"   : "Input was zero\nInput was one\nInput was two\nInput was four\nInput was six\nInput was twelve\nInput was thirteen\nInput was nineteen\nInput was two hundred fifty-five\nReally big input:  0x12389\nReally big input:  0x1238A\nReally big input:  0x1238B\nReally big input:  0x1238C\nReally big input:  0x1238D\nReally big input:  0x1238F\nReally big input:  0x12390\nReally big input:  0x12391\nReally big input:  0x12392\nReally big input:  0x12393\nUnknown input: 99999\n"
+  },
+  {
+    "name"              : "array",
+    "files"             : [
+      "src/aiethel/array.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary array.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "Result: 90\n"
+  },
+  {
+    "name"              : "bubblesort",
+    "files"             : [
+      "src/aiethel/bubblesort.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary bubblesort.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/* 50",
+    "expected_output"   : "Before sorting the list is: \n50 49 48 47 46 45 44 43 42 41 40 39 38 37 36 35 34 33 32 31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 \nAfter sorting the list is: \n1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 \n"
+  },
+  {
+    "name"              : "complex_double",
+    "files"             : [
+      "src/aiethel/complex_double.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary complex_double.c -lm",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "-3 6\n42.419999\n\t-3.074932 + 6.718850i\n"
+  },
+  {
+    "name"              : "complex_float",
+    "files"             : [
+      "src/aiethel/complex_float.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary complex_float.c -no-pie -lm",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "1 0\nNOK img!\nNOK real!\n42.419999\n\t1.000000 + 0.000001i\n"
+  },
+  {
+    "name"              : "complex_long_double",
+    "files"             : [
+      "src/aiethel/complex_long_double.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary complex_long_double.c -no-pie -lm",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : ""
+  },
+  {
+    "name"              : "complex_numbers",
+    "files"             : [
+      "src/aiethel/complex_numbers.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary complex_numbers.c -no-pie -lm",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "-2147483648 -2147483648\nNok\n-2147483648 -2147483648\nNok\n77 0\nOkay\n0 -33\nOkay\n"
+  },
+  {
+    "name"              : "dot_product",
+    "files"             : [
+      "src/aiethel/dot_product.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary dot_product.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "33\n"
+  },
+  {
+    "name"              : "fibonacci",
+    "files"             : [
+      "src/aiethel/fibonacci.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary fibonacci.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/* 30",
+    "expected_output"   : "832040\n"
+  },
+  {
+    "name"              : "fmodf",
+    "files"             : [
+      "src/aiethel/fmodf.cpp",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "g++ -o test_binary fmodf.cpp -no-pie",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "Begin 123.456001 2 4\n***\n0.000000\nNok.\n0.000000\nNok.\n0.300000\nNok.\n0.200000\nNok.\n0.400000\nOkay.\n"
+  },
+  {
+    "name"              : "global_array",
+    "files"             : [
+      "src/aiethel/global_array.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary global_array.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "1\n2\n3\n3\n2\n1\n1\n2\n3\n42\n"
+  },
+  {
+    "name"              : "global_var",
+    "files"             : [
+      "src/aiethel/global_var.cpp",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "g++ -o test_binary global_var.cpp -no-pie",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : ""
+  },
+  {
+    "name"              : "globals_and_io",
+    "files"             : [
+      "src/aiethel/globals_and_io.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary globals_and_io.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "hi\n42, 44\n"
+  },
+  {
+    "name"              : "helloworld",
+    "files"             : [
+      "src/aiethel/helloworld.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary helloworld.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "Hello, world!\nHello, world!\nAnd now from printf()!\nCalculated 54\n"
+  },
+  {
+    "name"              : "iostream_basics",
+    "files"             : [
+      "src/aiethel/iostream_basics.cpp",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "g++ -o test_binary iostream_basics.cpp -no-pie",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : ""
+  },
+  {
+    "name"              : "libfoo",
+    "files"             : [
+      "src/aiethel/libfoo_foo.c",
+      "src/aiethel/libfoo_test.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -c libfoo_foo.c",
+      "gcc -o test_binary libfoo_test.c libfoo_foo.o",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "foo(): 42 (should be: 42)\nbar(15): 57 (should be: 57)\nbaz(): 51 (should be: 51)\ntest(6): 21 (should be: 21)\n"
+  },
+  {
+    "name"              : "local-array",
+    "files"             : [
+      "src/aiethel/local-array.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary local-array.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "result now: 1\nresult now: 3\nresult now: 6\nresult now: 10\nresult now: 15\nresult now: 21\nresult now: 28\nresult now: 36\nresult now: 45\nresult now: 55\nfinal result: 55\n"
+  },
+  {
+    "name"              : "matrix_vector_mult",
+    "files"             : [
+      "src/aiethel/matrix_vector_mult.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary matrix_vector_mult.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "c = ( 51, 117, 183 )^T\n"
+  },
+  {
+    "name"              : "open_close_dir",
+    "files"             : [
+      "src/aiethel/open_close_dir.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "mkdir test_dir",
+      "gcc -o test_binary open_close_dir.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/* test_dir; ./workspace/lifted_obj/* bad_test_dir",
+    "expected_output"   : "errno: 0\nopendir: No such file or directory\nerrno: 22\n"
+  },
+  {
+    "name"              : "operator_new",
+    "files"             : [
+      "src/aiethel/operator_new.cpp",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "g++ -o test_binary operator_new.cpp -no-pie",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : ""
+  },
+  {
+    "name"              : "pointers",
+    "files"             : [
+      "src/aiethel/pointers.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary pointers.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "  x: 93\n *y: 93\n**z: 93\n"
+  },
+  {
+    "name"              : "printf_floats",
+    "files"             : [
+      "src/aiethel/printf_floats.cpp",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "g++ -o test_binary printf_floats.cpp",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "Hello 4.40 4.41 -30 4.42 4.43 4.44 4.45 4.46 30 4.47 and World!\n"
+  },
+  {
+    "name"              : "pthread",
+    "files"             : [
+      "src/aiethel/pthread.cpp",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "g++ -o test_binary pthread.cpp -lpthread -no-pie",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "Create threads\nWait for the threads to complete, and release their resources\nfoo(), tls data=0 2\nbar(), tls data=0 2\nfoo(), tls data=1 4\nbar(), tls data=1 4\nMain completed\n"
+  },
+  {
+    "name"              : "qsort",
+    "files"             : [
+      "src/aiethel/qsort.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary qsort.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "Sorted: -2  F 5  F 6  F 8  F 10  F 12  F \n"
+  },
+  {
+    "name"              : "qsort_function_ptrs",
+    "files"             : [
+      "src/aiethel/qsort_function_ptrs.cpp",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "g++ -o test_binary qsort_function_ptrs.cpp -no-pie",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/* 13",
+    "expected_output"   : "Iter: 0 	base: 4\nIter: 1 	base: 46\nIter: 2 	base: 50\nIter: 3 	base: 50\nIter: 4 	base: 51\nIter: 5 	base: 53\nIter: 6 	base: 95\nIter: 7 	base: 99\nIter: 8 	base: 99\nIter: 9 	base: 100\nIter: 10 	base: 102\nIter: 11 	base: 144\nIter: 12 	base: 148\nBefore sort:\n  2	42	4	0	1\nComparing:\n  Arg1 2\n  Arg2 42\nComparing:\n  Arg1 0\n  Arg2 1\nComparing:\n  Arg1 4\n  Arg2 0\nComparing:\n  Arg1 4\n  Arg2 1\nComparing:\n  Arg1 2\n  Arg2 0\nComparing:\n  Arg1 2\n  Arg2 1\nComparing:\n  Arg1 2\n  Arg2 4\nComparing:\n  Arg1 42\n  Arg2 4\nSorted:\n  0	1	2	4	42\n"
+  },
+  {
+    "name"              : "rand_and_strtol",
+    "files"             : [
+      "src/aiethel/rand_and_strtol.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary rand_and_strtol.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "11 : 11\nrand: 1358590890\nstr: \"2030300 This is a test\"\nNumber: 2030300\nRemainder: \" This is a test\"\n"
+  },
+  {
+    "name"              : "readdir",
+    "files"             : [
+      "src/aiethel/readdir.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "mkdir test_dir",
+      "gcc -o test_binary readdir.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/* test_dir; ./workspace/lifted_obj/* bad_dir",
+    "expected_output"   : "found test_dir\nfailed to find bad_dir\n"
+  },
+  {
+    "name"              : "simple_exit",
+    "files"             : [
+      "src/aiethel/simple_exit.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary simple_exit.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : ""
+  },
+  {
+    "name"              : "simple_for_loop",
+    "files"             : [
+      "src/aiethel/simple_for_loop.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary simple_for_loop.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "i: 85\n"
+  },
+  {
+    "name"              : "simple_main",
+    "files"             : [
+      "src/aiethel/simple_main.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary simple_main.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : ""
+  },
+  {
+    "name"              : "struct",
+    "files"             : [
+      "src/aiethel/struct.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary struct.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "Book title:   C Programming\nBook author:  Nuha Ali\nBook subject: C Programming Tutorial\nBook book_id: 6495407\n\nBook title:   Telecom Billing\nBook author:  Zara Ali\nBook subject: Telecom Billing Tutorial\nBook book_id: 6495700\n\n"
+  },
+  {
+    "name"              : "struct_func_ptr",
+    "files"             : [
+      "src/aiethel/struct_func_ptr.cpp",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "g++ -o test_binary struct_func_ptr.cpp -no-pie",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "echo 1 | ./workspace/lifted_obj/*; echo 2 | ./workspace/lifted_obj/*",
+    "expected_output"   : "Foo: hello\nBoo: world"
+  },
+  {
+    "name"              : "virtual",
+    "files"             : [
+      "src/aiethel/virtual.cpp",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "g++ -o test_binary virtual.cpp -no-pie",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "Parent is setting name!\nCalm person was born\nParent is setting name!\nAngry person was born\nI am angry! I am: Ivan\nAnd so shout happened\nStory is now over\n"
+  },
+  {
+    "name"              : "virtual_simpler",
+    "files"             : [
+      "src/aiethel/virtual_simpler.cpp",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "g++ -o test_binary virtual_simpler.cpp -no-pie",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "Parent is setting name!\nI am angry! I am: Ivan\n"
+  },
+  {
+    "name"              : "x86_bts",
+    "files"             : [
+      "src/aiethel/x86_bts.c",
+      "../../scripts/lift_program.py"
+    ],
+    "setup_commands"    : [
+      "gcc -o test_binary x86_bts.c",
+      "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
+    ],
+    "test_command"      : "./workspace/lifted_obj/*",
+    "expected_output"   : "x is: deadbee8\n"
   }
 ]
