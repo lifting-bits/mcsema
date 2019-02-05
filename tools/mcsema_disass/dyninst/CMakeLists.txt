@@ -44,7 +44,7 @@ add_executable(${MCSEMA_DYNINST_DISASS}
   OffsetTable.cpp
   )
 
-target_link_libraries(${MCSEMA_DYNINST_DISASS} PRIVATE dyninstAPI symtabAPI parseAPI common instructionAPI )
+target_link_libraries(${MCSEMA_DYNINST_DISASS} PRIVATE symtabAPI parseAPI instructionAPI common)
 target_link_libraries(${MCSEMA_DYNINST_DISASS} PRIVATE ${PROJECT_LIBRARIES})
 target_include_directories(${MCSEMA_DYNINST_DISASS} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIES})
 target_compile_definitions(${MCSEMA_DYNINST_DISASS} PUBLIC ${PROJECT_DEFINITIONS})
