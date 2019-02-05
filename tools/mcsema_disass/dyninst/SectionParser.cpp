@@ -55,7 +55,6 @@ bool SectionParser::TryXref(uint64_t offset,
       static_cast<uint8_t *>(region->getPtrToRawData()) + offset);
   Dyninst::Address target_ea = *reader;
   Dyninst::Address ea = region->getMemOffset() + offset;
-  LOG(INFO) << std::hex << ea << " = reader => " << target_ea;
 
   if (disass_context->HandleDataXref({ea, target_ea, cfg_segment})) {
     LOG(INFO) << "Fished up " << std::hex
@@ -157,7 +156,6 @@ bool SectionParser::TryVar(uint64_t &offset,
   return true;
 }
 
-// WIP: Read it like human being not a student of comspi
 void SectionParser::ParseVariables(Dyninst::SymtabAPI::Region *region,
                                    mcsema::Segment *segment) {
 

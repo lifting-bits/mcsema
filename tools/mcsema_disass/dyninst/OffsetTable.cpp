@@ -136,13 +136,10 @@ std::experimental::optional<OffsetTable> OffsetTable::Parse(
   }
 
   if (table.entries.size() < 3) {
-    LOG(INFO) << "0x" << std::hex << start_ea
-              << " contains only " << std::dec << table.entries.size()
-              << " therefore is probably not offset table";
     return {};
   }
 
-  LOG(INFO) << "Parse offset table starting at 0x" << std::hex << start_ea
+  LOG(INFO) << "Parsed offset table starting at 0x" << std::hex << start_ea
             << " containing " << std::dec << table.entries.size();
 
   return {std::move(table)};

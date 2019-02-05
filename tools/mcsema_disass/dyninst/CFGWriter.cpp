@@ -643,8 +643,7 @@ void CFGWriter::WriteInstruction(InstructionAPI::Instruction *instruction,
   } else {
     HandleNonCallInstruction(instruction, addr, cfg_instruction, cfg_block, is_last);
   }
-
-  code_xrefs_to_resolve.erase(addr);
+    code_xrefs_to_resolve.erase(addr);
 }
 
 
@@ -682,8 +681,6 @@ void CFGWriter::CheckDisplacement(Dyninst::InstructionAPI::Expression *expr,
   //TODO(lukas): This is possibly incorrect attempt to cull down amount of
   //             "false" xrefs of type MemoryDisplacement
   if (cfg_instruction->xrefs_size()) {
-    LOG(INFO) << "Avoiding clobbering with xrefs 0x"
-              << std::hex << cfg_instruction->ea();
     return;
   }
   if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
@@ -730,9 +727,6 @@ void CFGWriter::HandleCallInstruction(InstructionAPI::Instruction *instruction,
 
   Address size = instruction->size();
 
-  LOG(INFO) << "Trying to resolve call instruction at 0x"
-            << std::hex << cfg_instruction->ea();
-  LOG(INFO) << instruction->format();
   if (TryEval(operands[0].getValue().get(), addr, target, size)) {
     HandleXref(cfg_instruction, target);
 
@@ -777,7 +771,6 @@ Address CFGWriter::immediateNonCall(InstructionAPI::Immediate* imm,
       inst_xrefs_to_resolve.insert({a, {}});
       return a;
     }
-    LOG(INFO) << "Not forcing target 0x" << std::hex << a;
     return 0;
   }
   auto cfg_code_xref = cfg_instruction->mutable_xrefs(cfg_instruction->xrefs_size() - 1);
@@ -989,11 +982,10 @@ void WriteRawData(std::string& data, SymtabAPI::Region* region) {
 void WriteAsRaw(std::string& data, uint64_t number, int64_t offset) {
 
   if (offset < 0) {
-    LOG(FATAL) << "Trying yo Write raw on negative offset";
+    LOG(FATAL) << "Trying to Write raw on negative offset";
   }
 
   if (offset + 3 >= data.size()) {
-    LOG(WARNING) << "AsRaw would overWrite stuff";
     data.resize(offset + 3, '\0');
   }
 
@@ -1055,9 +1047,7 @@ void CFGWriter::WriteGOT(SymtabAPI::Region* region,
       }
     }
   }
-  for (auto i = 0U; i < data.size(); ++i) {
-    LOG(INFO) << std::hex << +static_cast<uint8_t>((data)[i]);
-  }
+
   cfg_segment->set_data(data);
 }
 
@@ -1126,7 +1116,6 @@ void CFGWriter::WriteInternalData() {
     if (region->getMemSize() <= 0) {
       continue;
     }
-    LOG(INFO) << "Passed sanity check " << region->getRegionName();
 
     if (region->getRegionName() == ".fini_array") {
       continue;
