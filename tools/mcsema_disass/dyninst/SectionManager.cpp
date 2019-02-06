@@ -64,7 +64,6 @@ bool SectionManager::IsInBinary(Dyninst::Address addr) {
       return true;
     }
   }
-  LOG(INFO) << std::hex << "0x" << addr << " is not contained in binary";
   return false;
 }
 

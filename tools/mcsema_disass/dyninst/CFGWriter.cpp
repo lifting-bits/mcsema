@@ -19,19 +19,20 @@
 #include "Util.h"
 #include "SectionParser.h"
 
-#include <Dereference.h>
+#include <algorithm>
+#include <array>
+#include <iterator>
+#include <sstream>
+
 #include <BinaryFunction.h>
+#include <Dereference.h>
+#include <entryIDs.h>
 #include <Immediate.h>
 #include <Function.h>
 #include <Instruction.h>
 #include <InstructionAST.h>
 #include <InstructionCategories.h>
 #include <Type.h>
-#include <entryIDs.h>
-
-#include <sstream>
-#include <array>
-#include <iterator>
 
 #include <glog/logging.h>
 #include <gflags/gflags.h>
@@ -151,7 +152,6 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
 
 // Modifies gDisassContext
 void RenameFunc(Dyninst::Address ea, const std::string& new_name) {
-  LOG(INFO) << "Renaming 0x:" << std::hex << ea << " to " << new_name;
   auto internal_func = gDisassContext->getInternalFunction(ea);
   if (!internal_func) {
     return;
@@ -166,8 +166,6 @@ void ResolveOffsetTable(const std::set<Dyninst::Address> &successors,
   if (successors.size() < 3) {
     return;
   }
-
-  LOG(INFO) << "Checking for offset table xref in " << offset_tables.size();
 
   // Find all xrefs inside this block so they can be matched against offsetTable
   std::set<Dyninst::Address> block_xrefs;
@@ -240,7 +238,7 @@ CFGWriter::CFGWriter(mcsema::Module &m,
   Address ctor_offset = TryRetrieveAddrFromStart(code_object, entry_point, 1);
   Address dtor_offset = TryRetrieveAddrFromStart(code_object, entry_point, 2);
 
-  LOG_IF(WARNING, main_offset) << "Entrypoint was not found!";
+  LOG_IF(WARNING, !main_offset) << "Entrypoint was not found!";
 
   // TODO(lukas): When lifting shared library internal functions that needs
   // to be entrypoints are demangled by ParseAPI, which is really unfortunate
@@ -589,9 +587,6 @@ void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     if (!found) {
       // TODO(lukas): Exception handling
       // For now ignore catch blocks
-      LOG(INFO) << "Edge 0x" << std::hex << block->start()
-                << " -> 0x" << edge->trg()->start()
-                << " of type " << edge->type();
       if (edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CATCH &&
           edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::RET &&
           edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CALL) {
@@ -601,6 +596,20 @@ void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     }
   }
 
+
+  // Fact that |successors| must be 3 or more is just a heurestic.
+  // It is possible 2 is good enough
+  if (successors.size() > 2) {
+
+    bool all = std::all_of(successors.cbegin(), successors.cend(), [&](auto succ){
+        return code_xrefs_to_resolve.count(succ);
+    });
+    if (all) {
+      for (const auto &succ : successors) {
+        code_xrefs_to_resolve.erase(succ);
+      }
+    }
+  }
 
   // Write instructions
   std::map<Offset, InstructionAPI::Instruction::Ptr> instructions;
@@ -643,7 +652,6 @@ void CFGWriter::WriteInstruction(InstructionAPI::Instruction *instruction,
   } else {
     HandleNonCallInstruction(instruction, addr, cfg_instruction, cfg_block, is_last);
   }
-    code_xrefs_to_resolve.erase(addr);
 }
 
 
@@ -823,13 +831,6 @@ void CFGWriter::HandleNonCallInstruction(
     mcsema::Block *cfg_block,
     bool is_last) {
 
-
-  if (FLAGS_pie_mode && instruction->getOperation().getID() == entryID::e_test) {
-    LOG(INFO) << std::hex << "Shouldn't contain xref at 0x"
-              << addr << std::dec << ": " << instruction->format();
-    return;
-  }
-
   std::vector<InstructionAPI::Operand> operands;
   instruction->getOperands(operands);
 
@@ -848,23 +849,17 @@ void CFGWriter::HandleNonCallInstruction(
 
     if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr.get())) {
       if (FLAGS_pie_mode) {
-        if (instruction->getOperation().getID() != entryID::e_cmp &&
-            instruction->getOperation().getID() != entryID::e_and) {
-          direct_values[i] = immediateNonCall(imm, addr, cfg_instruction);
-        } else {
-          direct_values[i] = 0;
-        }
+        direct_values[i] = 0;
       } else {
-          direct_values[i] = immediateNonCall(imm, addr, cfg_instruction);
+        direct_values[i] = immediateNonCall(imm, addr, cfg_instruction);
       }
     } else if (
         auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr.get())) {
-      LOG(INFO) << "\tDealing with Dereference as op";
+
       direct_values[i] = dereferenceNonCall(deref, addr, cfg_instruction);
 
     } else if (
         auto bf = dynamic_cast<InstructionAPI::BinaryFunction *>(expr.get())) {
-      LOG(INFO) << "Dealing with BinaryFunction as op";
 
       auto instruction_id = instruction->getOperation().getID();
       if (instruction_id == entryID::e_lea) {
@@ -886,7 +881,6 @@ void CFGWriter::HandleNonCallInstruction(
         Address a;
         // This has + |instruction| in AST
         if (TryEval(expr.get(), addr - instruction->size(), a)) {
-          LOG(INFO) << "Eval'd as " << a;
           if (is_last) {
             for (auto succ : cfg_block->successor_eas()) {
               if (a == succ) {
