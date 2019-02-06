@@ -139,7 +139,6 @@ struct DisassContext {
 
   bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
                  mcsema::Function *fact) {
-    LOG(INFO) << "\tResolved as internal function";
     AddCodeXref(xref.segment,
                 mcsema::CodeReference::DataTarget,
                 mcsema::CodeReference::ControlFlowOperand,
@@ -151,7 +150,6 @@ struct DisassContext {
 
   bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
                  mcsema::GlobalVariable *fact) {
-    LOG(INFO) << "\tResolved as global variable";
     AddCodeXref(xref.segment,
                 mcsema::CodeReference::DataTarget,
                 mcsema::CodeReference::MemoryOperand,
@@ -164,7 +162,6 @@ struct DisassContext {
   bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
                  mcsema::ExternalFunction *fact) {
     // Mapping to magic_section
-    LOG(INFO) << "\tResolved as ext function";
     AddCodeXref(xref.segment,
                 mcsema::CodeReference::DataTarget,
                 mcsema::CodeReference::ControlFlowOperand,
@@ -176,7 +173,6 @@ struct DisassContext {
 
   bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
                  mcsema::Variable *fact) {
-    LOG(INFO) << "\tResolved as segment variable";
     AddCodeXref(xref.segment,
                 mcsema::CodeReference::DataTarget,
                 mcsema::CodeReference::MemoryOperand,
@@ -189,7 +185,6 @@ struct DisassContext {
   bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
                  mcsema::ExternalVariable *fact) {
     Dyninst::Address addr = magic_section.GetAllocated(xref.target_ea);
-    LOG(INFO) << "\tResolved as external variable";
     if (!addr) {
       addr = fact->ea();
     }
@@ -205,7 +200,6 @@ struct DisassContext {
 
   bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
                  mcsema::DataReference *fact) {
-    LOG(INFO) << "\tResolved as data xref";
     AddCodeXref(xref.segment,
                 mcsema::CodeReference::DataTarget,
                 mcsema::CodeReference::MemoryOperand,
@@ -246,7 +240,6 @@ struct DisassContext {
     // will be used when "string test" is needed
     if (gSectionManager->IsInRegions({".data", ".rodata", ".bss"},
                                      xref.target_ea)) {
-      LOG(INFO) << "\tIn .rodata or .data";
       AddCodeXref(xref.segment,
                   mcsema::CodeReference::DataTarget,
                   mcsema::CodeReference::MemoryOperand,
@@ -258,7 +251,6 @@ struct DisassContext {
     // Beginning of .jcr in framme_dummy for example
     for (auto a : segment_eas) {
       if (a == xref.target_ea) {
-        LOG(INFO) << "\tEa of segment";
         AddCodeXref(xref.segment,
                     mcsema::CodeReference::DataTarget,
                     mcsema::CodeReference::MemoryOperand,
@@ -267,10 +259,10 @@ struct DisassContext {
         return true;
       }
     }
-    LOG(INFO) << "Could not regonize xref anywhere target_ea 0x"
-            << std::hex << xref.target_ea;
+
     if (force) {
-      LOG(INFO) << "\tForcing it";
+      LOG(INFO) << "Could not regonize xref anywhere target_ea 0x"
+                << std::hex << xref.target_ea << " forcing it";
       AddCodeXref(xref.segment,
                   mcsema::CodeReference::DataTarget,
                   mcsema::CodeReference::MemoryOperand,
@@ -284,8 +276,6 @@ struct DisassContext {
   mcsema::Function *getInternalFunction(Dyninst::Address ea) {
     auto internal_func = func_map.find(ea);
     if (internal_func == func_map.end()) {
-      LOG(INFO) << "There is no internal function in DisassContext with ea 0x"
-                 << std::hex << ea;
       return nullptr;
     }
     return internal_func->second;

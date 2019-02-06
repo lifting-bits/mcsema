@@ -28,7 +28,6 @@ SectionParser::CrossXrefMap SectionParser::ResolveCrossXrefs() {
     if(!disass_context->HandleDataXref(xref)) {
       if (section_manager.IsInRegions({".data", ".rodata", ".bss"},
                                        xref.target_ea)) {
-        LOG(INFO) << "It is pointing into data sections, assuming it is xref";
         disass_context->WriteAndAccount(xref);
       }
     }
@@ -37,6 +36,7 @@ SectionParser::CrossXrefMap SectionParser::ResolveCrossXrefs() {
     // Let's try to parse it now
 
     if (section_manager.IsInRegion(".text", xref.target_ea)) {
+      LOG(INFO) << std::hex << xref.target_ea << " is unresolved";
       unresolved_code_xrefs.insert({xref.target_ea, xref});
     }
   }
@@ -75,9 +75,7 @@ bool SectionParser::TryXref(uint64_t offset,
     //disass_context->segment_vars.insert({target_ea, cfg_var});
     return true;
 
-  } else if (section_manager.IsInBinary(target_ea)) {
-    LOG(INFO) << "Cross xref 0x" << std::hex
-              << ea << " -> 0x" << target_ea;
+  } else if (target_ea && section_manager.IsInBinary(target_ea)) {
     cross_xrefs.push_back({ea, target_ea, cfg_segment});
     return true;
   }
@@ -170,7 +168,6 @@ void SectionParser::ParseVariables(Dyninst::SymtabAPI::Region *region,
     CHECK(region->getMemOffset() + offset == region->getDiskOffset() + offset)
         << "Memory reader != Disk reader, investigate!";
 
-    LOG(INFO) << std::hex << region->getMemOffset() + offset << std::endl;
     if (TryXref(offset, region, segment)) {
       offset += 8;
       continue;
