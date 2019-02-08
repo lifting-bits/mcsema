@@ -81,6 +81,8 @@ Why would anyone translate binaries *back* to bitcode?
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
 | [IDA Pro](https://www.hex-rays.com/products/ida) | 6.7+ |
 
+Note: Use of BinaryNinja as a control-flow recovery backend as an alternative to IDA Pro is currently a work in progress.  The BinaryNinja-specific test suite can be found in tests/binja_tests, the execution of which can provide an up-to-date metric on the progress of that support (currently most C programs will work).
+
 ## Getting and building the code
 
 ### Docker
@@ -91,7 +93,7 @@ Why would anyone translate binaries *back* to bitcode?
 
 #### Step 2: Add your disassembler
 
-Currently IDA and BinaryNinja are supported for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice, but an example of installing BinaryNinja is provided (remember for Docker that paths need to be relative to where you built from):
+It's left as an exercise to the reader to install your disassembler of choice in the container, but an example of installing BinaryNinja is provided (remember for Docker that paths need to be relative to where you built from):
 ```
 ADD local-relative/path/to/binaryninja/ /root/binaryninja/
 ADD local-relative/path/to/.binaryninja/ /root/.binaryninja/ # <- Make sure there's no `lastrun` file
@@ -315,7 +317,7 @@ This is a hotly contested issue. We must explore the etymology of the name to fi
 
 ### Why do I need IDA Pro to use McSema
 
-McSema's goal is binary to bitcode translation. Accurate disassembly and control flow recovery is a separate and difficult problem. IDA has already invested countless hours of engineering into getting disassembly right, and it only makes sense that we re-use existing work. We understand that not everyone can afford an IDA license. With the original release of McSema, we shipped our own recursive-descent disassembler. It was never as good as IDA, and it never would be. Maintaining the broken tool took away valuable development time from more important McSema work. We hope to eventually transition to more accessible control flow recovery front-ends, such as Binary Ninja (we have a branch with [experimental Binary Ninja support](https://github.com/trailofbits/mcsema/tree/binja_cfg_updates/tools/mcsema_disass/binja)). We very warmly welcome pull requests that implement support for new control flow recovery front-ends.
+McSema's goal is binary to bitcode translation. Accurate disassembly and control flow recovery is a separate and difficult problem. IDA has already invested countless hours of engineering into getting disassembly right, and it only makes sense that we re-use existing work. We understand that not everyone can afford an IDA license. With the original release of McSema, we shipped our own recursive-descent disassembler. It was never as good as IDA, and it never would be. Maintaining the broken tool took away valuable development time from more important McSema work. We hope to eventually transition to more accessible control flow recovery front-ends, such as BinaryNinja (currently a work in progress; support in an unstable form is provided). We very warmly welcome pull requests that implement support for new control flow recovery front-ends.
 
 ### What is Remill, and why does McSema need it
 
