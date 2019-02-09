@@ -246,12 +246,12 @@ git clone https://github.com/trailofbits/remill.git --depth=1
 git clone https://github.com/trailofbits/mcsema.git --depth=1 remill/tools/mcsema
 ```
 
-Note that for production usage you should use a specific remill commit (`remill/tools/mcsema/.remill_commit_id`) when building mcsema
+Note that for production usage you should always use a specific remill commit (`remill/tools/mcsema/.remill_commit_id`) when building mcsema. At the time of writing, it is however best to use HEAD (or at least make sure that commit `e7795be` is present in the remill branch).
 
 ```
 cd remill
 git fetch --unshallow
-git checkout -b production `cat tools/mcsema/.remill_commit_id `
+git checkout -b production `cat tools/mcsema/.remill_commit_id`
 ```
 
 #### Step 3: Dependencies
