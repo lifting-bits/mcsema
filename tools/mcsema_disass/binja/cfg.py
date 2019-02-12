@@ -385,7 +385,7 @@ def recover_inst(bv, func, pb_block, pb_inst, il, all_il, is_last):
   refs = set()
   for il_exp in all_il:
     refs.update(xrefs.get_xrefs(bv, func, il_exp))
-  
+
   debug_refs = []
 
   # Add all discovered xrefs to pb_inst
@@ -488,7 +488,7 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
     DEBUG_PUSH()
     pb_block = add_block(pb_func, block)
     DEBUG_PUSH()
-    
+
     # Recover every instruction in the block
     insts = list(block.disassembly_text)
     for inst in insts:
@@ -587,6 +587,13 @@ def get_cfg(args, fixed_args):
       default=False,
       action='store_true')
 
+  parser.add_argument(
+      "--std-defs",
+      action='append',
+      type=str,
+      default=[],
+      help="std_defs file: definitions and calling conventions of imported functions and data")
+
   extra_args = parser.parse_args(fixed_args)
 
   if extra_args.recover_stack_vars:
@@ -608,7 +615,7 @@ def get_cfg(args, fixed_args):
 
   # Collect all paths to defs files
   log.debug('Parsing definitions files')
-  def_paths = set(map(os.path.abspath, args.std_defs))
+  def_paths = set(map(os.path.abspath, extra_args.std_defs))
   def_paths.add(os.path.join(DISASS_DIR, 'defs', '{}.txt'.format(args.os)))  # default defs file
 
   # Parse all of the defs files
