@@ -175,7 +175,7 @@ void ResolveOffsetTable(const std::set<Dyninst::Address> &successors,
     }
   }
 
-  std::experimental::optional<Dyninst::Address> table_ea;
+  Maybe<Dyninst::Address> table_ea;
   for (const auto &table : offset_tables) {
     table_ea = table.Match(successors, block_xrefs);
     if (table_ea) {

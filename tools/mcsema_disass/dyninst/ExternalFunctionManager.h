@@ -19,11 +19,12 @@
 #include <CFG.pb.h>
 
 #include <istream>
-#include <unordered_map>
-#include <set>
-#include <string>
-#include <experimental/optional>
 #include <memory>
+#include <string>
+#include <set>
+#include <unordered_map>
+
+#include "Maybe.h"
 
 class ExternalFunctionManager;
 extern std::unique_ptr<ExternalFunctionManager> gExtFuncManager;
@@ -42,7 +43,7 @@ struct ExternalFunction {
   bool has_return = true;
   std::int32_t arg_count = 0;
   bool is_weak = false;
-  std::experimental::optional<std::string> signature = {};
+  Maybe<std::string> signature = {};
 
   // Dyninst::Address
   uint64_t ea = 0;

@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-#include "OffsetTable.h"
-
-#include <Symtab.h>
-
 #include <glog/logging.h>
 
 #include <algorithm>
 
+#include <Symtab.h>
+
+#include "OffsetTable.h"
 #include "SectionManager.h"
 
 bool OffsetTable::contains(Dyninst::Address addr) const {
@@ -34,7 +33,7 @@ bool OffsetTable::contains(Dyninst::Address addr) const {
   return true;
 }
 
-std::experimental::optional<Dyninst::Address> OffsetTable::Match(
+Maybe<Dyninst::Address> OffsetTable::Match(
     const std::set<Dyninst::Address> &succs,
     const std::set<Dyninst::Address> &xrefs) const {
 
@@ -104,7 +103,7 @@ bool OffsetTable::Match(const std::set<Dyninst::Address> &succs) const {
 }
 
 // This is just a bunch of 64-bit ELF specific heuristics
-std::experimental::optional<OffsetTable> OffsetTable::Parse(
+Maybe<OffsetTable> OffsetTable::Parse(
     Dyninst::Address start_ea,
     int32_t *reader,
     Dyninst::SymtabAPI::Region *region,

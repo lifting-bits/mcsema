@@ -17,10 +17,11 @@
 #pragma once
 
 #include <dyntypes.h>
-#include <set>
-#include <map>
 
-#include <experimental/optional>
+#include <map>
+#include <set>
+
+#include "Maybe.h"
 
 namespace Dyninst {
   namespace SymtabAPI {
@@ -31,7 +32,7 @@ namespace Dyninst {
 // Holds information about possible jump tables
 // For 64, and possibly 32, bit ELF
 struct OffsetTable {
-  static std::experimental::optional<OffsetTable> Parse(
+  static Maybe<OffsetTable> Parse(
       Dyninst::Address start_ea,
       int32_t *reader,
       Dyninst::SymtabAPI::Region *region,
@@ -42,18 +43,22 @@ struct OffsetTable {
   }
 
   bool contains(Dyninst::Address addr) const;
-  std::experimental::optional<Dyninst::Address> Match(
+  Maybe<Dyninst::Address> Match(
       const std::set<Dyninst::Address> &succ,
       const std::set<Dyninst::Address> &xrefs) const;
 
   OffsetTable Recompute(Dyninst::Address new_start_ea) const;
 
   bool Match(const std::set<Dyninst::Address> &targets) const;
-  //bool SubsetMatch(const std::set<Dyninst::Address> &targets) const;
+
+  // TODO: This only exists so that Maybe<OffsetTable> can be constructed
+  OffsetTable() = default;
+
 private:
   OffsetTable(Dyninst::Address start_ea,
               Dyninst::SymtabAPI::Region *region,
               size_t size) : start_ea(start_ea), region(region), size(size) {}
+
 
   Dyninst::Address start_ea;
   Dyninst::SymtabAPI::Region *region;

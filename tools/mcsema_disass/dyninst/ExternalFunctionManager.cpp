@@ -100,7 +100,7 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
         rest = rest.substr(n + 1);
         n = rest.find(' ');
         std::string ret;
-        std::experimental::optional<std::string> signature;
+        Maybe<std::string> signature;
 
         if (n != std::string::npos) {
           ret = rest.substr(0, 1);
