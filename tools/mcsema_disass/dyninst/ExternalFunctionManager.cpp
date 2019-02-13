@@ -116,7 +116,7 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
           noReturn = true;
         } else {
           LOG(FATAL) << "Error while parsing symbol definition \"" << s
-                     << "\": unknown return type specifier '" << noReturn << "'"
+                     << "\": unknown return type specifier '" << ret << "'"
                      << std::endl;
         }
 
