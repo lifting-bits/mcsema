@@ -34,7 +34,13 @@ class StackFormatter(logging.Formatter):
 
 def init(log_file):
   formatter = StackFormatter('[%(levelname)s] %(indent)s%(message)s')
-  handler = logging.FileHandler(log_file)
+
+  handler = None
+  if not log_file == "":
+    handler = logging.FileHandler(log_file)
+  else:
+    handler = logging.StreamHandler()
+
   handler.setFormatter(formatter)
 
   _log.addHandler(handler)
