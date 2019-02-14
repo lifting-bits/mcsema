@@ -45,7 +45,6 @@ struct NativeSegment;
 struct NativeXref;
 
 struct NativeInstruction {
- public:
   uint64_t ea = 0;
   uint64_t lp_ea = 0;
   std::string bytes;
@@ -62,7 +61,6 @@ struct NativeInstruction {
 };
 
 struct NativeBlock {
- public:
   uint64_t ea = 0;
   std::string lifted_name;
   std::vector<const NativeInstruction *> instructions;
@@ -74,7 +72,6 @@ struct NativeBlock {
 // have meaningful and unique effective addresses, usually pointing to
 // some kind of relocation section within the binary.
 struct NativeObject {
- public:
   NativeObject(void);
 
   // Forwarding pointer to resolve duplicates and such.
@@ -95,7 +92,6 @@ struct NativeObject {
 
 // Function that is defined inside the binary.
 struct NativeFunction : public NativeObject {
- public:
   std::unordered_map<uint64_t, const NativeBlock *> blocks;
   std::vector<struct NativeStackVariable *> stack_vars;
   std::vector<struct NativeExceptionFrame *> eh_frame;
@@ -105,7 +101,6 @@ struct NativeFunction : public NativeObject {
 };
 
 struct NativeStackVariable : public NativeObject {
- public:
   uint64_t size = 0;
   int64_t offset = 0;
   std::unordered_map<uint64_t, int64_t> refs;
@@ -113,7 +108,6 @@ struct NativeStackVariable : public NativeObject {
 };
 
 struct NativeExceptionFrame : public NativeObject {
- public:
   uint64_t start_ea = 0;
   uint64_t end_ea = 0;
   uint64_t lp_ea = 0;
@@ -124,7 +118,6 @@ struct NativeExceptionFrame : public NativeObject {
 
 // Function that is defined outside of the binary.
 struct NativeExternalFunction : public NativeFunction {
- public:
   NativeExternalFunction(void);
 
   bool is_explicit = false;
@@ -135,21 +128,18 @@ struct NativeExternalFunction : public NativeFunction {
 
 // Global variable defined inside of the lifted binary.
 struct NativeVariable : public NativeObject {
- public:
   const NativeSegment *segment = nullptr;
   mutable llvm::Constant *address = nullptr;
 };
 
 // Global variable defined outside of the lifted binary.
 struct NativeExternalVariable : public NativeVariable {
- public:
   uint64_t size = 0;
   bool is_weak;
 };
 
 // A cross-reference to something.
 struct NativeXref {
- public:
   enum FixupKind {
     kAbsoluteFixup,
     kThreadLocalOffsetFixup
@@ -171,13 +161,11 @@ struct NativeXref {
 };
 
 struct NativeBlob {
- public:
   uint64_t ea = 0;
   std::string data;
 };
 
 struct NativeSegment : public NativeObject {
- public:
   struct Entry {
     Entry(void) = default;
     Entry(uint64_t, uint64_t, NativeXref *, NativeBlob *);
@@ -204,7 +192,6 @@ struct NativeSegment : public NativeObject {
 using SegmentMap = std::map<uint64_t, NativeSegment *>;
 
 struct NativeModule {
- public:
   std::unordered_set<uint64_t> exported_vars;
   std::unordered_set<uint64_t> exported_funcs;
 
