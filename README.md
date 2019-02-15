@@ -221,32 +221,37 @@ Once installed, you may use `mcsema-disass` for disassembling binaries, and `mcs
 In order to verify that McSema works correctly as built, head on over to [the documentation on integration tests](tests/MakingTests.md). Check that you can run the tests and that they pass.
 
 ### On Windows
+#### Step 1: Installing the toolchain
+**Visual Studio**
+1. Download the "Build Tools for Visual Studio 2017" installer from the following page: https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2017
+2. Run the setup and select "Visual C++ build tools"
 
-#### Step 1: Toolchain
-* Visual Studio 2017: https://www.visualstudio.com/thank-you-downloading-visual-studio/?sku=Community&rel=15
-* CMake (add to PATH): https://cmake.org/files/v3.11/cmake-3.11.0-rc1-win64-x64.msi
-* Python 2.7 x64 (add to PATH)): https://www.python.org/ftp/python/2.7.14/python-2.7.14.amd64.msi
-* LLVM 5.0.1 x64 (do NOT add to PATH)): http://releases.llvm.org/5.0.1/LLVM-5.0.1-win64.exe
+**LLVM**
+1. Get the LLVM 7.0.1 (x64) installer from the LLVM download page: http://releases.llvm.org
+2. Do **NOT** enable "Add to PATH"
+3. Download the LLVM integration addon from the VS marketplace: https://marketplace.visualstudio.com/items?itemName=LLVMExtensions.llvm-toolchain
+4. Extract the '.vsix' archive as a ZIP archive, and copy the files within the `$VCTargets` folder to `C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\Common7\IDE\VC\VCTargets`
 
-Once you have finished installing everything, some additional steps are required:
-1. Open the Visual Studio 2017 Installer from the menu, and install the v140 toolset under "Individual Components"
-2. Run the LLVM install script: C:\Program Files\LLVM\tools\msbuild\install.bat (run CMD with administrator privileges!)
-3. Install python-magic-bin: https://pypi.python.org/pypi/python-magic-bin/0.4.14 (pip install file_name.whl)
+**Python**
+1. Get the latest Python 2.7 (X64) installer from the official download page: https://www.python.org/downloads/windows/
+2. Enable "Add to PATH" when possible
 
-Please note that we will not be able to provide support if you are using other Visual Studio versions.
+**CMake**
+1. Download the CMake (x64) installer from https://cmake.org/download
+2. Enable "Add to PATH" when possible
 
 #### Step 2: Obtaining the source code
 ```
 git clone https://github.com/trailofbits/remill.git --depth=1
-cd remill/tools
-git clone https://github.com/trailofbits/mcsema.git --depth=1
+git clone https://github.com/trailofbits/mcsema.git --depth=1 remill/tools/mcsema
 ```
 
-Note that for production usage you should use a specific remill commit (remill/tools/mcsema/.remill_commit_id)
+Note that for production usage you should always use a specific remill commit (`remill/tools/mcsema/.remill_commit_id`) when building mcsema. At the time of writing, it is however best to use HEAD (or at least make sure that commit `e7795be` is present in the remill branch).
 
 ```
+cd remill
 git fetch --unshallow
-git checkout -b production <remill_commit_id>
+git checkout -b production `cat tools/mcsema/.remill_commit_id`
 ```
 
 #### Step 3: Dependencies
@@ -257,12 +262,20 @@ Binaries (extract to C:\Projects\tob_libraries)
 * [LLVM 5](https://s3.amazonaws.com/cxx-common/libraries-llvm50-windows10-amd64.7z)
 
 #### Step 4: Building
+Make sure to always execute the `vcvars64.bat` script from the "x64 Native Tools Command Prompt": `C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvars64.bat`.
+
 ```
 mkdir remill_build
 cd remill_build
 
-cmake -G "Visual Studio 15 2017 Win64" -T LLVM-vs2014 -DCMAKE_BUILD_TYPE=Release -DLIBRARY_REPOSITORY_ROOT=C:\Projects\tob_libraries ..\remill
+cmake -G "Visual Studio 15 2017" -T llvm -A x64 -DCMAKE_BUILD_TYPE=Release -DLIBRARY_REPOSITORY_ROOT=C:\Projects\tob_libraries -DCMAKE_INSTALL_PREFIX=C:\ ..\remill
 cmake --build . --config Release -- /maxcpucount:4
+```
+
+If you are using a recent CMake version (> 3.13) you can also use the newly introduced cross-platform `-j` parameter:
+
+```
+cmake --build . --config Release -j 4
 ```
 
 #### Step 5: Installing
