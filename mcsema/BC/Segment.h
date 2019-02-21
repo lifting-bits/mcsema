@@ -18,6 +18,7 @@
 #define MCSEMA_BC_SEGMENT_H_
 
 #include <vector>
+#include <utility>
 
 namespace llvm {
 class Function;

@@ -138,7 +138,7 @@ static llvm::GlobalValue::ThreadLocalMode ThreadLocalMode(
 }
 
 // Declare a data segment, and return a global value pointing to that segment.
-static void DeclareSegment(const NativeSegment *cfg_seg) {
+static llvm::GlobalVariable *DeclareSegment(const NativeSegment *cfg_seg) {
   auto seg_type = GetSegmentType(cfg_seg);
   auto seg = new llvm::GlobalVariable(
       *gModule, seg_type, cfg_seg->is_read_only,
@@ -154,6 +154,7 @@ static void DeclareSegment(const NativeSegment *cfg_seg) {
   }
 
   cfg_seg->seg_var = seg;
+  return seg;
 }
 
 // Declare named variables that point into the data segment. The program being
