@@ -85,7 +85,7 @@ Note: Use of BinaryNinja as a control-flow recovery backend as an alternative to
 
 ## Getting and building the code
 
-### Docker
+### With Docker
 
 #### Step 1: Download Dockerfile
 
@@ -300,6 +300,26 @@ Add the following folders to your PATH environment variable:
 * C:\mcsema\bin
 
 Also update your PYTHONPATH: C:\mcsema\Lib\site-packages
+
+### Installing BinaryNinja Plugin (Experimental Support)
+
+This is not needed for using the BinaryNinja control-flow recovery backend in a headless environment.  This is only necessary for people who do not have a commercial BinaryNinja license - the personal/student license.
+
+#### Step One: Dependencies
+
+Refer to the instructions above for installing the dependencies for your system.
+
+Make sure that BinaryNinja is installed and that you're on the dev branch (this sometimes breaks things but BinaryNinja support overall is still a WIP/experimental):
+ - Go to `Edit -> Preferences`
+ - Wait for the updates at the bottom to load
+ - Under the `Updates -> Update channel` drop down menu select `Binary Ninja Development Build`  
+
+#### Step Two: Plugin
+
+In your user's BinaryNinja plugin folder, you need to install our plugin.
+
+The plugin lives in `remill/tools/mcsema/tools/mcsema_disass/binja` and needs to be copied (recursively) or symlinked to your plugin folder.  For example, the default location on linux is `.binaryninja/plugins`.  This is different than the plugins folder in your main BinaryNinja installation directory.
+
 
 ## Additional Documentation
 
