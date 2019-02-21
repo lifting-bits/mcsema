@@ -161,14 +161,14 @@ static void DefineErrorIntrinsics(llvm::FunctionType *lifted_func_type) {
 }  // namespace
 
 bool LiftCodeIntoModule(const NativeModule *cfg_module) {
-  DeclareDataSegments(cfg_module);
+  auto seg_vars = DeclareDataSegments(cfg_module);
 
   DeclareExternals(cfg_module);
   DeclareLiftedFunctions(cfg_module);
 
   // Segments are inserted after the lifted function declarations are added
   // so that cross-references to lifted code are handled.
-  DefineDataSegments(cfg_module);
+  DefineDataSegments(seg_vars);
 
   auto lifted_func_type = remill::LiftedFunctionType(gModule);
 

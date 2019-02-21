@@ -526,20 +526,23 @@ llvm::Function *GetOrCreateMcSemaInitializer(void) {
   return gInitFunc;
 }
 
-void DeclareDataSegments(const NativeModule *cfg_module) {
+SegVarList DeclareDataSegments(
+    const NativeModule *cfg_module) {
+  SegVarList vars;
+  vars.reserve(cfg_module->segments.size());
+
   for (auto cfg_seg_entry : cfg_module->segments) {
-    DeclareSegment(cfg_seg_entry.second);
+    vars.emplace_back(cfg_seg_entry.second,
+                      DeclareSegment(cfg_seg_entry.second));
   }
 
   DeclareVariables(cfg_module);
+  return vars;
 }
 
-void DefineDataSegments(const NativeModule *cfg_module) {
-  for (auto cfg_seg_entry : cfg_module->segments) {
-    auto seg_var = gModule->getGlobalVariable(
-        cfg_seg_entry.second->lifted_name, true  /* AllowInternal */);
-    CHECK_NOTNULL(seg_var);
-    FillSegment(seg_var, cfg_seg_entry.second);
+void DefineDataSegments(const SegVarList &vars) {
+  for (auto seg_var : vars) {
+    FillSegment(seg_var.second, seg_var.first);
   }
 }
 
