@@ -138,7 +138,7 @@ static llvm::GlobalValue::ThreadLocalMode ThreadLocalMode(
 }
 
 // Declare a data segment, and return a global value pointing to that segment.
-static llvm::GlobalVariable *DeclareSegment(const NativeSegment *cfg_seg) {
+static void DeclareSegment(const NativeSegment *cfg_seg) {
   auto seg_type = GetSegmentType(cfg_seg);
   auto seg = new llvm::GlobalVariable(
       *gModule, seg_type, cfg_seg->is_read_only,
@@ -154,7 +154,6 @@ static llvm::GlobalVariable *DeclareSegment(const NativeSegment *cfg_seg) {
   }
 
   cfg_seg->seg_var = seg;
-  return seg;
 }
 
 // Declare named variables that point into the data segment. The program being
@@ -483,8 +482,9 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
 }
 
 // Fill all the data segments in a given region.
-static void FillSegment(llvm::GlobalVariable *seg,
-                        const NativeSegment *cfg_seg) {
+static void FillSegment(const NativeSegment *cfg_seg) {
+  auto seg = cfg_seg->seg_var;
+  CHECK_NOTNULL(seg);
   auto seg_type = llvm::dyn_cast<llvm::StructType>(remill::GetValueType(seg));
   seg->setInitializer(FillDataSegment(cfg_seg, seg_type));
 }
@@ -527,23 +527,17 @@ llvm::Function *GetOrCreateMcSemaInitializer(void) {
   return gInitFunc;
 }
 
-SegVarList DeclareDataSegments(
-    const NativeModule *cfg_module) {
-  SegVarList vars;
-  vars.reserve(cfg_module->segments.size());
-
+void DeclareDataSegments(const NativeModule *cfg_module) {
   for (auto cfg_seg_entry : cfg_module->segments) {
-    vars.emplace_back(cfg_seg_entry.second,
-                      DeclareSegment(cfg_seg_entry.second));
+    DeclareSegment(cfg_seg_entry.second);
   }
 
   DeclareVariables(cfg_module);
-  return vars;
 }
 
-void DefineDataSegments(const SegVarList &vars) {
-  for (auto seg_var : vars) {
-    FillSegment(seg_var.second, seg_var.first);
+void DefineDataSegments(const NativeModule *cfg_module) {
+  for (auto cfg_seg_entry : cfg_module->segments) {
+    FillSegment(cfg_seg_entry.second);
   }
 }
 

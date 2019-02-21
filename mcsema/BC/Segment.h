@@ -17,26 +17,18 @@
 #ifndef MCSEMA_BC_SEGMENT_H_
 #define MCSEMA_BC_SEGMENT_H_
 
-#include <vector>
-#include <utility>
 
 namespace llvm {
 class Function;
-class GlobalVariable;
 }  // namespace llvm
 namespace mcsema {
 
 struct NativeModule;
-struct NativeSegment;
 
 llvm::Function *GetOrCreateMcSemaInitializer(void);
 
-using SegVarList = std::vector<std::pair<NativeSegment *, llvm::GlobalVariable *>>;
-
-SegVarList DeclareDataSegments(const NativeModule *cfg_module);
-
-void DefineDataSegments(const SegVarList &vars);
-
+void DeclareDataSegments(const NativeModule *cfg_module);
+void DefineDataSegments(const NativeModule *cfg_module);
 void CallInitFiniCode(const NativeModule *cfg_module);
 
 }  // namespace mcsema

@@ -161,14 +161,18 @@ static void DefineErrorIntrinsics(llvm::FunctionType *lifted_func_type) {
 }  // namespace
 
 bool LiftCodeIntoModule(const NativeModule *cfg_module) {
-  auto seg_vars = DeclareDataSegments(cfg_module);
+  // Segments are declared first, in the event that one of the segments is
+  // exported, which happens frequently in ELFs with things in IDA which
+  // are marked as "Copy of shared data".
+  DeclareDataSegments(cfg_module);
 
   DeclareExternals(cfg_module);
   DeclareLiftedFunctions(cfg_module);
 
-  // Segments are inserted after the lifted function declarations are added
-  // so that cross-references to lifted code are handled.
-  DefineDataSegments(seg_vars);
+  // Segments are only filled in after the lifted function declarations,
+  // external vars, and segments are declared so that cross-references to
+  // lifted things can be resolved.
+  DefineDataSegments(cfg_module);
 
   auto lifted_func_type = remill::LiftedFunctionType(gModule);
 
