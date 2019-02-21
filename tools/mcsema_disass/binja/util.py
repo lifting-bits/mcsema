@@ -401,8 +401,6 @@ def recover_sections(bv, pb_mod):
 
 def recover_externals(bv, pb_mod):
   """Recover info about all external symbols"""
-  log.debug("Recovering externals")
-  log.push()
   for sym in bv.get_symbols():
     if sym.type == SymbolType.ImportedFunctionSymbol:
       functions.recover_ext_func(bv, pb_mod, sym)

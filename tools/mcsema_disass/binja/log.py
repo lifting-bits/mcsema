@@ -39,7 +39,8 @@ def init(log_file):
   if not log_file == "":
     handler = logging.FileHandler(log_file)
   else:
-    handler = logging.StreamHandler()
+    from sys import stdout
+    handler = logging.StreamHandler(stdout)
 
   handler.setFormatter(formatter)
 

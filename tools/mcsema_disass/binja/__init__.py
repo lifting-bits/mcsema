@@ -99,6 +99,7 @@ def prepare_to_recover(bv):
       default_name
     )
 
+  # Collect symbols marked through the GUI to not be recovered
   dnr_funcs = []
   dnr_syms  = []
 
@@ -197,10 +198,11 @@ def sym_not_in_dnr(bv, addr):
     not sym_in_dnr(bv, addr)
 
 
-bn.PluginCommand.register_for_function('Do Not Recover Function', 'Do Not Recover Function', dnr_func, is_valid=func_not_in_dnr)
-bn.PluginCommand.register_for_function('Do Recover Function', 'Do Recover Function', dnr_func_undo, is_valid=func_in_dnr)
+# The "\\" puts everything under a submenu option
+bn.PluginCommand.register_for_function('McSema Disass\\Do Not Recover Function', '', dnr_func, is_valid=func_not_in_dnr)
+bn.PluginCommand.register_for_function('McSema Disass\\Do Recover Function', '', dnr_func_undo, is_valid=func_in_dnr)
 
-bn.PluginCommand.register_for_address('Do Not Recover Symbol', 'Do Not Recover Symbol', dnr_sym, is_valid=sym_not_in_dnr)
-bn.PluginCommand.register_for_address('Do Recover Symbol', 'Do Recover Symbol', dnr_sym_undo, is_valid=sym_in_dnr)
+bn.PluginCommand.register_for_address('McSema Disass\\Do Not Recover Symbol', '', dnr_sym, is_valid=sym_not_in_dnr)
+bn.PluginCommand.register_for_address('McSema Disass\\Do Recover Symbol', '', dnr_sym_undo, is_valid=sym_in_dnr)
 
-bn.PluginCommand.register('Disassemble Binary', 'Disassemble Binary', prepare_to_recover)
+bn.PluginCommand.register('McSema Disass\\Recover Binary', '', prepare_to_recover)
