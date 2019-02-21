@@ -93,7 +93,8 @@ void DeclareExternals(const NativeModule *cfg_module) {
     auto cfg_var = reinterpret_cast<const NativeExternalVariable *>(
         entry.second->Get());
 
-    auto ll_var = gModule->getGlobalVariable(cfg_var->name);
+    auto ll_var = gModule->getGlobalVariable(cfg_var->name,
+                                             true  /* AllowInternal */);
     if (!ll_var) {
       LOG(INFO)
           << "Adding external variable " << cfg_var->name;

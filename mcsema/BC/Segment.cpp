@@ -537,7 +537,7 @@ void DeclareDataSegments(const NativeModule *cfg_module) {
 void DefineDataSegments(const NativeModule *cfg_module) {
   for (auto cfg_seg_entry : cfg_module->segments) {
     auto seg_var = gModule->getGlobalVariable(
-        cfg_seg_entry.second->lifted_name);
+        cfg_seg_entry.second->lifted_name, true  /* AllowInternal */);
     CHECK_NOTNULL(seg_var);
     FillSegment(seg_var, cfg_seg_entry.second);
   }
