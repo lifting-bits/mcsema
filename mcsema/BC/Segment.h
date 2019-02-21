@@ -26,7 +26,8 @@ struct NativeModule;
 
 llvm::Function *GetOrCreateMcSemaInitializer(void);
 
-void AddDataSegments(const NativeModule *cfg_module);
+void DeclareDataSegments(const NativeModule *cfg_module);
+void DefineDataSegments(const NativeModule *cfg_module);
 
 void CallInitFiniCode(const NativeModule *cfg_module);
 

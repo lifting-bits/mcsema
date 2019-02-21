@@ -138,21 +138,22 @@ static llvm::GlobalValue::ThreadLocalMode ThreadLocalMode(
 }
 
 // Declare a data segment, and return a global value pointing to that segment.
-static llvm::GlobalVariable *DeclareSegment(const NativeSegment *cfg_seg) {
+static void DeclareSegment(const NativeSegment *cfg_seg) {
   auto seg_type = GetSegmentType(cfg_seg);
   auto seg = new llvm::GlobalVariable(
       *gModule, seg_type, cfg_seg->is_read_only,
       llvm::GlobalValue::InternalLinkage, nullptr,
       cfg_seg->lifted_name, nullptr, ThreadLocalMode(cfg_seg));
 
+  CHECK_EQ(seg->getName().str(), cfg_seg->lifted_name)
+      << "Segment variable '" << cfg_seg->lifted_name
+      << "' was already defined";
+
   if (cfg_seg->is_exported) {
     seg->setLinkage(llvm::GlobalValue::ExternalLinkage);
-    seg->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
   }
 
   cfg_seg->seg_var = seg;
-
-  return seg;
 }
 
 // Declare named variables that point into the data segment. The program being
@@ -525,18 +526,20 @@ llvm::Function *GetOrCreateMcSemaInitializer(void) {
   return gInitFunc;
 }
 
-void AddDataSegments(const NativeModule *cfg_module) {
-
-  std::vector<llvm::GlobalVariable *> seg_vars;
+void DeclareDataSegments(const NativeModule *cfg_module) {
   for (auto cfg_seg_entry : cfg_module->segments) {
-    seg_vars.push_back(DeclareSegment(cfg_seg_entry.second));
+    DeclareSegment(cfg_seg_entry.second);
   }
 
   DeclareVariables(cfg_module);
+}
 
-  unsigned i = 0;
+void DefineDataSegments(const NativeModule *cfg_module) {
   for (auto cfg_seg_entry : cfg_module->segments) {
-    FillSegment(seg_vars[i++], cfg_seg_entry.second);
+    auto seg_var = gModule->getGlobalVariable(
+        cfg_seg_entry.second->lifted_name);
+    CHECK_NOTNULL(seg_var);
+    FillSegment(seg_var, cfg_seg_entry.second);
   }
 }
 
