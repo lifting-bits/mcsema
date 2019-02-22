@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specifi
 
-project(exception_test)
+project(exceptions_simple_exception_test)
 cmake_minimum_required(VERSION 3.2)
 
 set(PROJECT_CXXFLAGS -Wall -Werror -std=c++11)
