@@ -145,7 +145,7 @@ static void DeclareSegment(const NativeSegment *cfg_seg) {
       llvm::GlobalValue::InternalLinkage, nullptr,
       cfg_seg->lifted_name, nullptr, ThreadLocalMode(cfg_seg));
 
-  CHECK_EQ(seg->getName().str(), cfg_seg->lifted_name)
+  LOG_IF(ERROR, seg->getName().str() != cfg_seg->lifted_name)
       << "Segment variable '" << cfg_seg->lifted_name
       << "' was already defined";
 
