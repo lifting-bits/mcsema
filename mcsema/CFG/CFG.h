@@ -201,6 +201,7 @@ struct NativeSegment : public NativeObject {
   // blobs of bytes. The ordering of entries is significant.
   std::map<uint64_t, Entry> entries;
 
+  mutable bool needs_initializer;
   mutable llvm::GlobalVariable *seg_var;
 };
 

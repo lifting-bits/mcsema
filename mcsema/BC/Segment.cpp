@@ -83,7 +83,7 @@ static bool IsZero(const NativeSegment *cfg_seg) {
       return false;
     }
   }
-  return false;
+  return true;
 }
 
 // The type of the segment is a packed structure that is a sequence of opaque
@@ -137,23 +137,46 @@ static llvm::GlobalValue::ThreadLocalMode ThreadLocalMode(
   }
 }
 
-// Declare a data segment, and return a global value pointing to that segment.
-static void DeclareSegment(const NativeSegment *cfg_seg) {
+static llvm::GlobalVariable *GlobalVariable(
+    const NativeSegment *cfg_seg, std::string lifted_name) {
   auto seg_type = GetSegmentType(cfg_seg);
-  auto seg = new llvm::GlobalVariable(
+
+  auto seg_var = new llvm::GlobalVariable(
       *gModule, seg_type, cfg_seg->is_read_only,
       llvm::GlobalValue::InternalLinkage, nullptr,
-      cfg_seg->lifted_name, nullptr, ThreadLocalMode(cfg_seg));
-
-  LOG_IF(ERROR, seg->getName().str() != cfg_seg->lifted_name)
-      << "Segment variable '" << cfg_seg->lifted_name
-      << "' was already defined";
+      lifted_name, nullptr, ThreadLocalMode(cfg_seg));
 
   if (cfg_seg->is_exported) {
-    seg->setLinkage(llvm::GlobalValue::ExternalLinkage);
+    seg_var->setLinkage(llvm::GlobalValue::ExternalLinkage);
   }
 
-  cfg_seg->seg_var = seg;
+  return seg_var;
+}
+
+// Declare a data segment, and return a global value pointing to that segment.
+static void DeclareSegment(const NativeSegment *cfg_seg) {
+  cfg_seg->seg_var = gModule->getGlobalVariable(cfg_seg->lifted_name);
+
+  if (cfg_seg->seg_var) {
+
+    // If there is a variable with the same name, rename the variable
+    // and set the needs_initializer flag;
+    std::stringstream ss;
+    ss << "var_" << cfg_seg->lifted_name;
+    cfg_seg->seg_var = GlobalVariable(cfg_seg, ss.str());
+
+    LOG(ERROR)
+        << "Segment variable '" << cfg_seg->lifted_name
+        << "' was already defined";
+
+    // If the variable is exported and zero initialized (not having xrefs),
+    // No need to initialize these variables
+    if (cfg_seg->is_exported && IsZero(cfg_seg)) {
+      cfg_seg->needs_initializer = false;
+    }
+  } else {
+    cfg_seg->seg_var = GlobalVariable(cfg_seg, cfg_seg->lifted_name);
+  }
 }
 
 // Declare named variables that point into the data segment. The program being
@@ -484,9 +507,11 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
 // Fill all the data segments in a given region.
 static void FillSegment(const NativeSegment *cfg_seg) {
   auto seg = cfg_seg->seg_var;
-  CHECK_NOTNULL(seg);
-  auto seg_type = llvm::dyn_cast<llvm::StructType>(remill::GetValueType(seg));
-  seg->setInitializer(FillDataSegment(cfg_seg, seg_type));
+  if (cfg_seg->needs_initializer) {
+    CHECK_NOTNULL(seg);
+    auto seg_type = llvm::dyn_cast<llvm::StructType>(remill::GetValueType(seg));
+    seg->setInitializer(FillDataSegment(cfg_seg, seg_type));
+  }
 }
 
 }  // namespace
