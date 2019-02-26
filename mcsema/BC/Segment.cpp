@@ -158,21 +158,22 @@ static void DeclareSegment(const NativeSegment *cfg_seg) {
   cfg_seg->seg_var = gModule->getGlobalVariable(cfg_seg->lifted_name);
 
   if (cfg_seg->seg_var) {
-
-    // If there is a variable with the same name, rename the variable
-    // and set the needs_initializer flag;
-    std::stringstream ss;
-    ss << "var_" << cfg_seg->lifted_name;
-    cfg_seg->seg_var = GlobalVariable(cfg_seg, ss.str());
-
-    LOG(ERROR)
-        << "Segment variable '" << cfg_seg->lifted_name
-        << "' was already defined";
-
     // If the variable is exported and zero initialized (not having xrefs),
     // No need to initialize these variables
-    if (cfg_seg->is_exported && IsZero(cfg_seg)) {
-      cfg_seg->needs_initializer = false;
+    if (cfg_seg->is_exported && cfg_seg->seg_var->hasExternalLinkage()) {
+      cfg_seg->needs_initializer = !IsZero(cfg_seg);
+    } else {
+      // If there is a variable with the same name, rename the variable
+      // and set the needs_initializer flag;
+      std::stringstream ss;
+      ss << "internal_" << cfg_seg->lifted_name;
+      cfg_seg->seg_var = GlobalVariable(cfg_seg, ss.str());
+
+      LOG(ERROR)
+          << "Segment variable '" << cfg_seg->lifted_name
+          << "' was already defined";
+
+      cfg_seg->needs_initializer = true;
     }
   } else {
     cfg_seg->seg_var = GlobalVariable(cfg_seg, cfg_seg->lifted_name);
@@ -510,6 +511,10 @@ static void FillSegment(const NativeSegment *cfg_seg) {
   if (cfg_seg->needs_initializer) {
     CHECK_NOTNULL(seg);
     auto seg_type = llvm::dyn_cast<llvm::StructType>(remill::GetValueType(seg));
+
+    // This might be null if there are two lifted variables with same name and one of them is exported
+    // and the exported variable is having xrefs or notnull.
+    CHECK_NOTNULL(seg_type);
     seg->setInitializer(FillDataSegment(cfg_seg, seg_type));
   }
 }
