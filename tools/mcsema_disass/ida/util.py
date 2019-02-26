@@ -30,6 +30,8 @@ _NORETURN_EXTERNAL_FUNC = {}
 
 RTTI_REFERENCE_TABLE = collections.defaultdict()
 
+FUNC_LSDA_ENTRIES = collections.defaultdict()
+
 IS_ARM = "ARM" in _INFO.procName
 
 # True if we are running on an ELF file.
@@ -508,8 +510,10 @@ def is_noreturn_external_function(ea):
 def is_noreturn_function(ea):
   """Returns `True` if the function at `ea` is a no-return function."""
   flags = idc.GetFunctionFlags(ea)
+  DEBUG("idaapi flags {:x} {:x} ea {:x}".format(flags, idaapi.FUNC_NORET, ea))
   return 0 < flags and \
          (flags & idaapi.FUNC_NORET) and \
+         ea not in FUNC_LSDA_ENTRIES.keys() and \
          "cxa_throw" not in get_symbol_name(ea)
 
 _CREFS_FROM = collections.defaultdict(set)

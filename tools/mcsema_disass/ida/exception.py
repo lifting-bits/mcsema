@@ -32,7 +32,6 @@ from util import *
 
 frame_entry = namedtuple('frame_entry', ['cs_start', 'cs_end', 'cs_lp', 'cs_action'])
 _FUNC_UNWIND_FRAME_EAS = set()
-_FUNC_LSDA_ENTRIES = dict()
 
 _EXCEPTION_BLOCKS_EAS = dict()
 
@@ -315,7 +314,7 @@ def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
   action_list = format_lsda_actions(action_tbl, actions, type_addr, type_enc, cs_action)
 
   create_block_entries(start_ea, sorted(heads))
-  _FUNC_LSDA_ENTRIES[start_ea] = (lsda_entries, action_list)
+  FUNC_LSDA_ENTRIES[start_ea] = (lsda_entries, action_list)
 
 class AugmentationData:
   def __init__(self):
@@ -443,9 +442,9 @@ def recover_exception_table():
   recover_rtti()
 
 def recover_exception_entries(F, func_ea):
-  has_unwind_frame = func_ea in _FUNC_LSDA_ENTRIES.keys()
+  has_unwind_frame = func_ea in FUNC_LSDA_ENTRIES.keys()
   if has_unwind_frame:
-    lsda_entries, action_list = _FUNC_LSDA_ENTRIES[func_ea]
+    lsda_entries, action_list = FUNC_LSDA_ENTRIES[func_ea]
 
     for entry in lsda_entries:
       EH = F.eh_frame.add()
@@ -470,9 +469,9 @@ def fix_function_bounds(min_ea, max_ea):
   return min_ea, max_ea
 
 def get_exception_landingpad(F, insn_ea):
-  has_lp = F.ea in _FUNC_LSDA_ENTRIES.keys()
+  has_lp = F.ea in FUNC_LSDA_ENTRIES.keys()
   if has_lp:
-    lsda_entries, action_list = _FUNC_LSDA_ENTRIES[F.ea]
+    lsda_entries, action_list = FUNC_LSDA_ENTRIES[F.ea]
     for entry in lsda_entries:
       if insn_ea >= entry.cs_start and insn_ea < entry.cs_end:
         return entry.cs_lp
