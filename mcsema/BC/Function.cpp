@@ -899,6 +899,7 @@ static llvm::Function *LiftFunction(
   auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
   CHECK(nullptr != lifted_func)
       << "Could not find declaration for " << cfg_func->lifted_name;
+  cfg_func->function = lifted_func;
 
   // This can happen due to deduplication of functions during the
   // CFG decoding process. In practice, though, that only really
