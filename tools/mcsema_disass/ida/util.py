@@ -510,7 +510,6 @@ def is_noreturn_external_function(ea):
 def is_noreturn_function(ea):
   """Returns `True` if the function at `ea` is a no-return function."""
   flags = idc.GetFunctionFlags(ea)
-  DEBUG("idaapi flags {:x} {:x} ea {:x}".format(flags, idaapi.FUNC_NORET, ea))
   return 0 < flags and \
          (flags & idaapi.FUNC_NORET) and \
          ea not in FUNC_LSDA_ENTRIES.keys() and \
