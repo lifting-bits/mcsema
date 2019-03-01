@@ -470,7 +470,7 @@ def is_start_of_function(ea):
   if not is_code(ea):
     return False
 
-  name = idc.get_func_name(ea) or idc.GetTrueName(ea)
+  name = idc.GetTrueName(ea) or idc.get_func_name(ea)
   return ea == idc.get_name_ea_simple(name)
 
 _REFERENCE_OPERAND_TYPE = {
@@ -789,7 +789,9 @@ def recover_function(M, func_ea, new_func_eas, entrypoints):
 
   _RECOVERED_FUNCS.add(func_ea)
 
-  if not is_start_of_function(func_ea):
+  # `func_ea` could be the entrypoint but may not be identified
+  # as the start of the function.
+  if not is_start_of_function(func_ea): # and func_ea not in entrypoints:
     DEBUG("{:x} is not a function! Not recovering.".format(func_ea))
     return
 
@@ -1441,7 +1443,6 @@ def recover_module(entrypoint, gvar_infile = None):
   DEBUG("Recovering module {}".format(M.name))
 
   entry_ea = idc.get_name_ea_simple(args.entrypoint)
-
   # If the entrypoint is `main`, then we'll try to find `main` via another
   # means.
   if is_invalid_ea(entry_ea):
