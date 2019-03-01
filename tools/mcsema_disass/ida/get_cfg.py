@@ -470,7 +470,7 @@ def is_start_of_function(ea):
   if not is_code(ea):
     return False
 
-  name = idc.GetFunctionName(ea) or idc.GetTrueName(ea)
+  name = idc.GetTrueName(ea) or idc.GetFunctionName(ea)
   return ea == idc.LocByName(name)
 
 _REFERENCE_OPERAND_TYPE = {
