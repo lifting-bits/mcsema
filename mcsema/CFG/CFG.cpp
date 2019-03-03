@@ -470,6 +470,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     }
     segment->lifted_name = LiftedSegmentName(cfg_segment);
     segment->is_read_only = cfg_segment.read_only();
+    segment->needs_initializer = true;
     segment->is_external = cfg_segment.is_external();
     segment->is_exported = cfg_segment.is_exported();
     segment->is_thread_local = cfg_segment.is_thread_local();
