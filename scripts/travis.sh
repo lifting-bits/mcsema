@@ -360,7 +360,7 @@ linux_build_helper() {
   fi
 
   printf " > Installing...\n"
-  ( cd build && sudo make install ) > "${log_file}" 2>&1
+  ( cd build && sudo make install -j `nproc` ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to install the project. Error output follows:\n"
     printf "===\n"
@@ -381,7 +381,7 @@ linux_build_helper() {
     return 1
   fi
 
-  ( cd build && make ) > "${log_file}" 2>&1
+  ( cd build && make -j `nproc` ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to build test suite. Output below:\n"
     printf "===\n"
