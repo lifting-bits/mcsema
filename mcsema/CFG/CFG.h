@@ -45,25 +45,23 @@ struct NativeSegment;
 struct NativeXref;
 
 struct NativeInstruction {
- public:
-  uint64_t ea;
-  uint64_t lp_ea;
+  uint64_t ea = 0;
+  uint64_t lp_ea = 0;
   std::string bytes;
 
-  const NativeXref *flow;
-  const NativeXref *mem;
-  const NativeXref *imm;
-  const NativeXref *disp;
-  const NativeXref *offset_table;
+  const NativeXref *flow = nullptr;
+  const NativeXref *mem = nullptr;
+  const NativeXref *imm = nullptr;
+  const NativeXref *disp = nullptr;
+  const NativeXref *offset_table = nullptr;
 
-  const NativeStackVariable *stack_var;
+  const NativeStackVariable *stack_var = nullptr;
 
   bool does_not_return;
 };
 
 struct NativeBlock {
- public:
-  uint64_t ea;
+  uint64_t ea = 0;
   std::string lifted_name;
   std::vector<const NativeInstruction *> instructions;
   std::unordered_set<uint64_t> successor_eas;
@@ -74,19 +72,18 @@ struct NativeBlock {
 // have meaningful and unique effective addresses, usually pointing to
 // some kind of relocation section within the binary.
 struct NativeObject {
- public:
   NativeObject(void);
 
   // Forwarding pointer to resolve duplicates and such.
   mutable NativeObject *forward;
 
-  uint64_t ea;
+  uint64_t ea = 0;
   std::string name;  // Name in the binary.
   std::string lifted_name;  // Name in the bitcode.
 
-  bool is_external;
-  bool is_exported;
-  bool is_thread_local;
+  bool is_external = false;
+  bool is_exported = false;
+  bool is_thread_local = false;
 
   void ForwardTo(NativeObject *dest) const;
   const NativeObject *Get(void) const;
@@ -95,113 +92,99 @@ struct NativeObject {
 
 // Function that is defined inside the binary.
 struct NativeFunction : public NativeObject {
- public:
-  NativeFunction(void);
-
   std::unordered_map<uint64_t, const NativeBlock *> blocks;
   std::vector<struct NativeStackVariable *> stack_vars;
   std::vector<struct NativeExceptionFrame *> eh_frame;
-  llvm::Function *function;
-  mutable llvm::Value *stack_ptr_var;
-  mutable llvm::Value *frame_ptr_var;
+  mutable llvm::Function *function = nullptr;
+  mutable llvm::Value *stack_ptr_var = nullptr;
+  mutable llvm::Value *frame_ptr_var = nullptr;
 };
 
 struct NativeStackVariable : public NativeObject {
- public:
-  NativeStackVariable(void);
-
-  uint64_t size;
-  int64_t offset;
+  uint64_t size = 0;
+  int64_t offset = 0;
   std::unordered_map<uint64_t, int64_t> refs;
-  mutable llvm::Value *llvm_var;
+  mutable llvm::Value *llvm_var = nullptr;
 };
 
 struct NativeExceptionFrame : public NativeObject {
- public:
-  NativeExceptionFrame(void);
-
-  uint64_t start_ea;
-  uint64_t end_ea;
-  uint64_t lp_ea;
-  uint64_t action_index;
-  mutable llvm::Value *lp_var;
+  uint64_t start_ea = 0;
+  uint64_t end_ea = 0;
+  uint64_t lp_ea = 0;
+  uint64_t action_index = 0;
+  mutable llvm::Value *lp_var = nullptr;
   std::unordered_map<uint64_t, NativeExternalVariable *> type_var;
 };
 
 // Function that is defined outside of the binary.
 struct NativeExternalFunction : public NativeFunction {
- public:
   NativeExternalFunction(void);
 
-  bool is_explicit;
-  bool is_weak;
-  unsigned num_args;
+  bool is_explicit = false;
+  bool is_weak = false;
+  unsigned num_args = 0;
   llvm::CallingConv::ID cc;
 };
 
 // Global variable defined inside of the lifted binary.
 struct NativeVariable : public NativeObject {
- public:
-  NativeVariable(void);
-
-  const NativeSegment *segment;
-  mutable llvm::Constant *address;
+  const NativeSegment *segment = nullptr;
+  mutable llvm::Constant *address = nullptr;
 };
 
 // Global variable defined outside of the lifted binary.
 struct NativeExternalVariable : public NativeVariable {
- public:
-  uint64_t size;
+  uint64_t size = 0;
   bool is_weak;
 };
 
 // A cross-reference to something.
 struct NativeXref {
- public:
   enum FixupKind {
     kAbsoluteFixup,
     kThreadLocalOffsetFixup
   };
 
-  uint64_t width;  // In bytes.
-  uint64_t ea;  // Location of the xref within its segment.
-  uint64_t mask;  // Bitmask to apply to this xref. Zero if none.
-  const NativeSegment *segment;  // Segment containing the xref.
+  uint64_t width = 0;  // In bytes.
+  uint64_t ea = 0;  // Location of the xref within its segment.
+  uint64_t mask = 0;  // Bitmask to apply to this xref. Zero if none.
+  const NativeSegment *segment = nullptr;  // Segment containing the xref.
 
-  uint64_t target_ea;
+  uint64_t target_ea = 0;
   std::string target_name;
-  const NativeSegment *target_segment;  // Target segment of the xref, if any.
+  const NativeSegment *target_segment = nullptr;  // Target segment of the xref, if any.
 
   FixupKind fixup_kind;
 
-  const NativeVariable *var;
-  const NativeFunction *func;
+  const NativeVariable *var = nullptr;
+  const NativeFunction *func = nullptr;
 };
 
 struct NativeBlob {
- public:
-  uint64_t ea;
+  uint64_t ea = 0;
   std::string data;
 };
 
 struct NativeSegment : public NativeObject {
- public:
   struct Entry {
-   public:
-    uint64_t ea;
-    uint64_t next_ea;
-    const NativeXref *xref;
-    const NativeBlob *blob;
+    Entry(void) = default;
+    Entry(uint64_t, uint64_t, NativeXref *, NativeBlob *);
+
+    uint64_t ea = 0;
+    uint64_t next_ea = 0;
+    const NativeXref *xref = nullptr;
+    const NativeBlob *blob = nullptr;
   };
 
-  uint64_t size;
-  bool is_read_only;
+  uint64_t size = 0;
+  bool is_read_only = false;
 
   // Partition of entries, which are either cross-references, or opaque
   // blobs of bytes. The ordering of entries is significant.
   std::map<uint64_t, Entry> entries;
 
-  mutable llvm::GlobalVariable *seg_var;
+  mutable bool needs_initializer = true;
+  mutable llvm::GlobalVariable *seg_var = nullptr;
 };
 
 // NOTE(pag): Using an `std::map` (as opposed to an `std::unordered_map`) is
@@ -210,7 +193,6 @@ struct NativeSegment : public NativeObject {
 using SegmentMap = std::map<uint64_t, NativeSegment *>;
 
 struct NativeModule {
- public:
   std::unordered_set<uint64_t> exported_vars;
   std::unordered_set<uint64_t> exported_funcs;
 

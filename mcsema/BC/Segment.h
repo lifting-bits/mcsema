@@ -17,6 +17,7 @@
 #ifndef MCSEMA_BC_SEGMENT_H_
 #define MCSEMA_BC_SEGMENT_H_
 
+
 namespace llvm {
 class Function;
 }  // namespace llvm
@@ -26,8 +27,8 @@ struct NativeModule;
 
 llvm::Function *GetOrCreateMcSemaInitializer(void);
 
-void AddDataSegments(const NativeModule *cfg_module);
-
+void DeclareDataSegments(const NativeModule *cfg_module);
+void DefineDataSegments(const NativeModule *cfg_module);
 void CallInitFiniCode(const NativeModule *cfg_module);
 
 }  // namespace mcsema

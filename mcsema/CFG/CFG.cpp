@@ -394,39 +394,14 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
 }  // namespace
 
 NativeObject::NativeObject(void)
-    : forward(this),
-      ea(0),
-      name(),
-      lifted_name(),
-      is_external(false),
-      is_exported(false),
-      is_thread_local(false) {}
-
-NativeFunction::NativeFunction(void)
-    : blocks(),
-      function(nullptr) {}
+    : forward(this) {}
 
 NativeExternalFunction::NativeExternalFunction(void)
-    : is_explicit(false),
-      is_weak(false),
-      num_args(0),
-      cc(gArch->DefaultCallingConv()) {}
+    : cc(gArch->DefaultCallingConv()) {}
 
-NativeVariable::NativeVariable(void)
-    : segment(nullptr),
-      address(nullptr) {}
-
-NativeStackVariable::NativeStackVariable(void)
-    : size(0),
-      offset(0),
-      llvm_var(nullptr){}
-
-NativeExceptionFrame::NativeExceptionFrame()
-    : start_ea(0),
-      end_ea(0),
-      lp_ea(0),
-      action_index(0),
-      lp_var(nullptr){}
+NativeSegment::Entry::Entry(
+    uint64_t o_ea, uint64_t o_next_ea, NativeXref *o_xref, NativeBlob *o_blob) :
+  ea(o_ea), next_ea(o_next_ea), xref(o_xref), blob(o_blob) {}
 
 void NativeObject::ForwardTo(NativeObject *dest) const {
   if (forward != this) {
@@ -495,6 +470,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     }
     segment->lifted_name = LiftedSegmentName(cfg_segment);
     segment->is_read_only = cfg_segment.read_only();
+    segment->needs_initializer = true;
     segment->is_external = cfg_segment.is_external();
     segment->is_exported = cfg_segment.is_exported();
     segment->is_thread_local = cfg_segment.is_thread_local();

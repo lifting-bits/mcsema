@@ -424,15 +424,17 @@ static void CreateLandingPad(TranslationContext &ctx,
     auto catch_all = false;
     unsigned long catch_all_index = 0;
 
-    for (auto index = eh_entry->type_var.size(); index > 0; index--) {
-      auto type = eh_entry->type_var[index];
+    for (auto &it : eh_entry->type_var) {
+      // Check the ttype variables are not null
+      auto type = it.second;
+      CHECK_NOTNULL(type);
       if (type->ea) {
         lpad->addClause(gModule->getGlobalVariable(type->name));
-        auto value = llvm::ConstantInt::get(dword_type, index);
+        auto value = llvm::ConstantInt::get(dword_type, type->size);
         array_value_const.push_back(value);
       } else {
         catch_all = true;
-        catch_all_index = index;
+        catch_all_index = type->size;
       }
     }
 
@@ -899,6 +901,7 @@ static llvm::Function *LiftFunction(
   auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
   CHECK(nullptr != lifted_func)
       << "Could not find declaration for " << cfg_func->lifted_name;
+  cfg_func->function = lifted_func;
 
   // This can happen due to deduplication of functions during the
   // CFG decoding process. In practice, though, that only really
