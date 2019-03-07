@@ -22,53 +22,41 @@ install_binja () {
   local BINJA_TARGZ="${SCRIPT_DIR}/mcsema_binja.tar.gz"
 	local BINJA_INSTALL="${SOURCE_DIR}/binaryninja"
 
-  # make sure our PYTHONPATH is setup for binja
-  export PYTHONPATH=${BINJA_INSTALL}/python
-	python2.7 -c "import binaryninja" 2>/dev/null
-	if [ ! "$?" = "0" ]; then
-		if [ ! -e ${BINJA_INSTALL}/python/binaryninja/__init__.py ]; then
+  echo "Extracting Binary Ninja" && \
+    tar -xzf ${BINJA_TARGZ} -C ${SOURCE_DIR} && \
+    echo "Extracted to ${SOURCE_DIR}"
 
-			echo "Extracting Binary Ninja" && \
-        tar -xzf ${BINJA_TARGZ} -C ${SOURCE_DIR} && \
-        echo "Extracted to ${SOURCE_DIR}"
+  if [ ! "$?" = "0" ]; then
+    echo "FAILED: Binja extraction failed"
+    return 1
+  fi
 
-			if [ ! "$?" = "0" ]; then
-				echo "FAILED: Binja extraction failed"
-				return 1
-			fi
-
-		else
-			echo "Found a copy of Binja, skipping install, using existing copy"
-		fi
-
-		if [ ! -e ${HOME}/.binaryninja/license.dat ]; then
-			echo "Could not find Binja license, checking for ~/.binaryninja"
-			if [ ! -e ${HOME}/.binaryninja ]; then
-				echo "~/.binaryninja does not exist, creating directory..."
-				mkdir ${HOME}/.binaryninja
-			fi
-
-			echo "Copying our CI Binja license to ${HOME}/.binaryninja/license.dat"
-			cp ${BINJA_INSTALL}/mcsema_binja_license.txt ${HOME}/.binaryninja/license.dat
-		else
-			echo "Found existing Binja license, ignoring..."
-		fi
-
-    # sanity check the install
-    python2.7 -c "import binaryninja" 2>/dev/null
-    if [ ! "$?" = "0" ]; then
-      echo "FAILED: still can't use Binary Ninja, aborting"
-      return 1
-    else
-      echo "BinaryNinja installed successfully"
+  if [ ! -e ${HOME}/.binaryninja/license.dat ]; then
+    echo "Could not find Binja license, checking for ~/.binaryninja"
+    if [ ! -e ${HOME}/.binaryninja ]; then
+      echo "~/.binaryninja does not exist, creating directory..."
+      mkdir ${HOME}/.binaryninja
     fi
 
-    echo "Updating Binary Ninja to Dev Channel latest"
-    python2.7 ${SCRIPT_DIR}/update_binja.py
+    echo "Copying our CI Binja license to ${HOME}/.binaryninja/license.dat"
+    cp ${BINJA_INSTALL}/mcsema_binja_license.txt ${HOME}/.binaryninja/license.dat
+  else
+    echo "Found existing Binja license, ignoring..."
+  fi
 
-	else
-		echo "Binja already exists; skipping..."
-	fi
+  ${BINJA_INSTALL}/scripts/linux-setup.sh
+
+  # sanity check the install
+  python2.7 -c "import binaryninja" 2>/dev/null
+  if [ ! "$?" = "0" ]; then
+    echo "FAILED: can't use Binary Ninja, aborting"
+    return 1
+  else
+    echo "BinaryNinja installed successfully"
+  fi
+
+  echo "Updating Binary Ninja to Dev Channel latest"
+  python2.7 ${SCRIPT_DIR}/update_binja.py
 
   return 0
 }
@@ -103,6 +91,12 @@ main() {
 
 linux_initialize() {
   printf "Initializing platform: linux\n"
+  printf " > Adding Python3.6...\n"
+  sudo add-apt-repository -y ppa:deadsnakes/ppa
+  if [ $? -ne 0 ] ; then
+    printf " x Python3.6 could not be added\n"
+    return 1
+  fi
 
   printf " > Updating the system...\n"
   sudo dpkg --add-architecture i386
@@ -118,7 +112,7 @@ linux_initialize() {
                             realpath \
                             python-setuptools \
                             git \
-                            python2.7 \
+                            python3.6 \
                             wget \
                             libtinfo-dev \
                             gcc-multilib \
@@ -410,7 +404,7 @@ linux_build_helper() {
   fi
 
   printf "\n\n\nCalling the BinaryNinja recovery backend test suite...\n"
-  ( cd ./remill/tools/mcsema/tests/binja_tests/ && ./run_tests.py ) > "${test_log_file}" 2>&1
+  ( cd ./remill/tools/mcsema/tests/binja_tests/ && python3.6 run_tests.py ) > "${test_log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed the BinaryNinja recovery backend test suite:\n"
     printf "===\n"

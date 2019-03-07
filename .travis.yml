@@ -1,7 +1,11 @@
 dist: xenial
-language: generic
 sudo: required
 install: true
+
+language: generic
+python:
+  - "2.7"
+  - "3.5"
 
 cache:
   directories:

@@ -59,7 +59,10 @@ def select(version):
   if is_update_installation_pending():
     print("Installing...")
     #note that the GUI will be launched after update but should still do the upgrade headless
-    install_pending_update()
+    try:
+      install_pending_update()
+    except IOError:
+      print("UI Failed to start.  This is okay.")
   # forward updating won't work without reloading
   sys.exit()
 
