@@ -3,10 +3,10 @@
 import os
 import sys
 import json
+import argparse
 import tempfile
 import subprocess
 from multiprocessing import Pool
-
 
 def run_test(test):
   with tempfile.TemporaryDirectory() as workdir:
@@ -21,6 +21,11 @@ def run_test(test):
       # Run setup commands
       for cmd in test["setup_commands"]:
         output += cmd + "\n"
+
+        if "lift_program" in cmd:
+          print("Lifting Program")
+          cmd += f" --llvm_version {llvm_version[0]}.{llvm_version[1]}"
+          print(cmd)
         output += subprocess.check_output(cmd.split(" "), cwd=workdir, stderr=subprocess.STDOUT).decode("charmap")
 
       # Run test command
@@ -40,6 +45,17 @@ def run_test(test):
 
 
 if __name__ == '__main__':
+  # Parse any additional args
+  parser = argparse.ArgumentParser()
+  parser.add_argument(
+      '--llvm_version',
+      required=True,
+      help='LLVM Version Used')
+  args = parser.parse_args()
+
+  global llvm_version
+  llvm_version = args.llvm_version
+
   with open('tests.json') as f:
     tests = json.load(f)
 

@@ -404,7 +404,7 @@ linux_build_helper() {
   fi
 
   printf "\n\n\nCalling the BinaryNinja recovery backend test suite...\n"
-  ( cd ./remill/tools/mcsema/tests/binja_tests/ && python3.6 run_tests.py ) > "${test_log_file}" 2>&1
+  ( cd ./remill/tools/mcsema/tests/binja_tests/ && python3.6 run_tests.py --llvm_version ${llvm_version} ) > "${test_log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed the BinaryNinja recovery backend test suite:\n"
     printf "===\n"
