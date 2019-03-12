@@ -1,6 +1,3 @@
-# This is an exact copy of the cmake/settings.cmake file in the Remill
-# repository; you are encouraged to keep them in sync
-
 # This is only executed once; use a macro (and not a function) so that
 # everything defined here does not end up in a separate namespace
 macro(main)
@@ -88,15 +85,21 @@ macro(main)
     set(GLOBAL_CXXFLAGS
       -Wall -Wextra -Wno-unused-parameter -Wno-c++98-compat
       -Wno-unreachable-code-return -Wno-nested-anon-types
-      -Wno-extended-offsetof -Wgnu-alignof-expression
-      -Wno-gnu-anonymous-struct -Wno-gnu-designator
-      -Wno-variadic-macros -Wno-gnu-zero-variadic-macro-arguments
-      -Wno-gnu-statement-expression -Wno-return-type-c-linkage
+      -Wno-extended-offsetof
+      -Wno-variadic-macros -Wno-return-type-c-linkage
       -Wno-c99-extensions -Wno-ignored-attributes -Wno-unused-local-typedef
       -Wno-unknown-pragmas -Wno-unknown-warning-option -fPIC
       -fno-omit-frame-pointer -fvisibility-inlines-hidden -fno-exceptions
-      -fno-asynchronous-unwind-tables -fno-rtti
+      -fno-asynchronous-unwind-tables
     )
+    
+    if ("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_C_COMPILER_ID}" STREQUAL "AppleClang")
+      set(GLOBAL_CXXFLAGS
+        ${GLOBAL_CXXFLAGS}
+        -Wgnu-alignof-expression -Wno-gnu-anonymous-struct -Wno-gnu-designator
+        -Wno-gnu-zero-variadic-macro-arguments -Wno-gnu-statement-expression
+      )
+    endif()
 
     # debug symbols
     if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
