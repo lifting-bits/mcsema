@@ -162,8 +162,8 @@ linux_build() {
   local log_file=`mktemp`
 
   # set up ada support for cmake
-  # Old supported versions: "35" "36" "37" "38" "39" 
-  llvm_version_list=( "40" "50" "60" )
+  # Old supported versions: "35" "36" "37" "38" "39" "40" 
+  llvm_version_list=( "50" "60" )
   for llvm_version in "${llvm_version_list[@]}" ; do
     printf "#\n"
     printf "# Running CI tests for LLVM version ${llvm_version}...\n"
