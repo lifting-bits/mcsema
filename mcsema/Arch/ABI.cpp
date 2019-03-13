@@ -673,7 +673,7 @@ llvm::Value *CallingConvention::LoadVectorArgument(
   const size_t num_elements = goal_type->getNumElements();
   const ssize_t element_size = static_cast<ssize_t>(
       dl.getTypeAllocSize(under_type));
-  const ssize_t reg_size = GetVectorRegSize();
+  const ssize_t reg_size = static_cast<ssize_t>(GetVectorRegSize());
   const ssize_t reg_element_capacity = reg_size / element_size;
   ssize_t remaining = static_cast<ssize_t>(num_elements);
 
