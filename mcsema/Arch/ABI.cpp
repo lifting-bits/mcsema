@@ -189,8 +189,10 @@ static uint64_t GetVectorRegSize(void) {
       return 16;
     default:
       LOG(FATAL)
-          << "Unkown vector register size for arch other than amd64, x86";
-   }
+          << "Unknown vector register size for arch "
+          << GetArchName(gArch->arch_name);
+      return 0;
+  }
 }
 
 struct VectorRegistersInfo {
@@ -215,7 +217,7 @@ static VectorRegistersInfo GetVectorRegisterInfo() {
   }
 }
 
-//TODO(lukas): Test kVec flag for AArch64
+// TODO(lukas): Test kVec flag for AArch64
 struct CallingConventionInfo {
   using ConstraintTable = std::vector<ArgConstraint>;
 
@@ -255,6 +257,7 @@ struct CallingConventionInfo {
     }
     LOG(FATAL)
         << "Unknown ABI/calling convention: " << cc;
+    return gInvalidTable;
   }
 
   const ConstraintTable &GetReturnTable(
@@ -266,6 +269,7 @@ struct CallingConventionInfo {
     }
     LOG(FATAL)
         << "Unknown ABI/calling convention: " << cc;
+    return gInvalidTable;
   }
 
   static const CallingConventionInfo &Instance(void) {
@@ -451,7 +455,11 @@ struct CallingConventionInfo {
   std::vector<std::pair<llvm::CallingConv::ID, ConstraintTable>> arg_tables;
   std::vector<std::pair<llvm::CallingConv::ID, ConstraintTable>> ret_tables;
 
+  static const ConstraintTable gInvalidTable;
 };
+
+const CallingConventionInfo::ConstraintTable
+CallingConventionInfo::gInvalidTable;
 
 static uint64_t DefaultUsedStackBytes(llvm::CallingConv::ID cc) {
   switch (cc) {
@@ -660,17 +668,15 @@ llvm::Value *CallingConvention::LoadVectorArgument(
   llvm::IRBuilder<> ir(block);
   llvm::Value *base_value = llvm::Constant::getNullValue(goal_type);
 
-  auto under_type = goal_type->getElementType();
-  auto num_elements = goal_type->getNumElements();
-
-  size_t reg_size = GetVectorRegSize();
-
+  llvm::Type *under_type = goal_type->getElementType();
   llvm::DataLayout dl(gModule);
-  auto element_size = dl.getTypeAllocSize(under_type);
-  size_t reg_element_capacity = reg_size / element_size;
-  int32_t remaining = static_cast<int32_t>(num_elements);
+  const size_t num_elements = goal_type->getNumElements();
+  const size_t reg_size = GetVectorRegSize();
+  const auto element_size = dl.getTypeAllocSize(under_type);
+  const size_t reg_element_capacity = reg_size / element_size;
+  size_t remaining = num_elements;
 
-  for (auto i = 0U; remaining > 0; ++i, remaining -= reg_size) {
+  for (size_t i = 0; remaining > 0; ++i, remaining -= reg_size) {
     auto reg_var_name = GetVarForNextArgument(goal_type);
     LOG_IF(FATAL, !reg_var_name)
         << "Could not find available vector register";
@@ -679,7 +685,7 @@ llvm::Value *CallingConvention::LoadVectorArgument(
     dest_loc = ir.CreateBitCast(dest_loc,
                                 llvm::PointerType::get(under_type, 0));
 
-    auto count = std::min(reg_element_capacity, static_cast<size_t>(remaining));
+    const auto count = std::min(reg_element_capacity, remaining);
     base_value = InsertIntoVector(block, base_value, dest_loc,
                                   count, i * reg_element_capacity);
   }
@@ -779,6 +785,7 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
   if (target_type->isPointerTy() && !is_byval) {
     return LoadNextSimpleArgument(block, target_type);
   }
+
   if (auto struct_type = llvm::dyn_cast<llvm::StructType>(goal_type)) {
     std::vector<llvm::Value*> underlying_values;
     for (unsigned i = 0; i < struct_type->getNumElements(); ++i) {
@@ -790,11 +797,12 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
     llvm::IRBuilder<> ir(block);
     auto alloc_struct = ir.CreateAlloca(target_type);
     for (unsigned i = 0; i < underlying_values.size(); ++i) {
-      auto gep = ir.CreateGEP(alloc_struct,
-          {GetConstantInt(64, 0), GetConstantInt(64, i)});
+      llvm::Value *offsets[] = {GetConstantInt(64, 0), GetConstantInt(64, i)};
+      auto gep = ir.CreateGEP(alloc_struct, offsets);
       ir.CreateStore(underlying_values[i], gep);
     }
     return ir.CreateLoad(alloc_struct);
+
   } else if (is_byval) {
     // byval attribute says that caller makes a copy of argument on the stack
     // this happens if type of argument is bigger than 128 bits.
@@ -808,6 +816,7 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
     num_loaded_stack_bytes += dl.getTypeAllocSize(ptr_type->getElementType());
     return ir.CreateIntToPtr(addr, target_type);
   }
+
   return LoadNextSimpleArgument(block, target_type);
 }
 
