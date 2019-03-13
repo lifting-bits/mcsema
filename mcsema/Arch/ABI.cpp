@@ -671,12 +671,13 @@ llvm::Value *CallingConvention::LoadVectorArgument(
   llvm::Type *under_type = goal_type->getElementType();
   llvm::DataLayout dl(gModule);
   const size_t num_elements = goal_type->getNumElements();
-  const size_t reg_size = GetVectorRegSize();
-  const auto element_size = dl.getTypeAllocSize(under_type);
-  const size_t reg_element_capacity = reg_size / element_size;
-  size_t remaining = num_elements;
+  const ssize_t element_size = static_cast<ssize_t>(
+      dl.getTypeAllocSize(under_type));
+  const ssize_t reg_size = GetVectorRegSize();
+  const ssize_t reg_element_capacity = reg_size / element_size;
+  ssize_t remaining = static_cast<ssize_t>(num_elements);
 
-  for (size_t i = 0; remaining > 0; ++i, remaining -= reg_size) {
+  for (ssize_t i = 0; remaining > 0; ++i, remaining -= reg_size) {
     auto reg_var_name = GetVarForNextArgument(goal_type);
     LOG_IF(FATAL, !reg_var_name)
         << "Could not find available vector register";
@@ -686,8 +687,10 @@ llvm::Value *CallingConvention::LoadVectorArgument(
                                 llvm::PointerType::get(under_type, 0));
 
     const auto count = std::min(reg_element_capacity, remaining);
-    base_value = InsertIntoVector(block, base_value, dest_loc,
-                                  count, i * reg_element_capacity);
+    base_value = InsertIntoVector(
+        block, base_value, dest_loc,
+        static_cast<size_t>(count),
+        static_cast<size_t>(i * reg_element_capacity));
   }
   return base_value;
 }
@@ -828,12 +831,13 @@ void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
   llvm::DataLayout dl(gModule);
 
   const size_t num_elements = goal_type->getNumElements();
-  const size_t reg_size = GetVectorRegSize();
-  const size_t element_size = dl.getTypeAllocSize(under_type);
-  const size_t reg_element_capacity = reg_size / element_size;
-  size_t remaining = num_elements;
+  const ssize_t reg_size = static_cast<ssize_t>(GetVectorRegSize());
+  const ssize_t element_size = static_cast<ssize_t>(
+      dl.getTypeAllocSize(under_type));
+  const ssize_t reg_element_capacity = reg_size / element_size;
+  ssize_t remaining = static_cast<ssize_t>(num_elements);
 
-  for (size_t i = 0U; remaining > 0; ++i, remaining -= reg_element_capacity) {
+  for (ssize_t i = 0U; remaining > 0; ++i, remaining -= reg_element_capacity) {
     auto reg_var_name = GetVarForNextReturn(goal_type);
     LOG_IF(FATAL, !reg_var_name)
         << "Could not find available vector register";
@@ -849,7 +853,9 @@ void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
 
     const auto count = std::min(reg_element_capacity, remaining);
     const auto already_done = i * reg_element_capacity;
-    ExtractFromVector(block, ret_val, dest_loc, count, already_done);
+    ExtractFromVector(block, ret_val, dest_loc,
+                      static_cast<size_t>(count),
+                      static_cast<size_t>(already_done));
   }
 }
 
