@@ -22,10 +22,14 @@ FindAndSelectClangCompiler()
 
 set(MCSEMA_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
 
+option(MCSEMA_ENABLE_RUNTIME "Should runtimes for re-compilation of bitcode be produced?" ON)
+
 # warnings and compiler settings
 if(NOT DEFINED WIN32)
   set(PROJECT_CXXFLAGS
-    ${GLOBAL_CXXFLAGS} -Werror -Wconversion -pedantic 
+    ${GLOBAL_CXXFLAGS}
+    -Wconversion
+    -pedantic 
     -Wno-unreachable-code-return 
   )
 endif()
@@ -172,7 +176,7 @@ target_include_directories(${MCSEMA_LIFT} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTO
 target_compile_definitions(${MCSEMA_LIFT} PUBLIC ${PROJECT_DEFINITIONS})
 target_compile_options(${MCSEMA_LIFT} PRIVATE ${PROJECT_CXXFLAGS})
 
-if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "x86_64" AND MCSEMA_ENABLE_RUNTIME)
   add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mcsema/Arch/X86/Runtime)
 endif()
 
