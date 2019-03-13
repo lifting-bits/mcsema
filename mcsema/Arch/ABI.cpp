@@ -824,17 +824,16 @@ void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
                                             llvm::Value *ret_val,
                                             llvm::VectorType *goal_type) {
   llvm::IRBuilder<> ir(block);
-  auto under_type = goal_type->getElementType();
-  auto num_elements = goal_type->getNumElements();
-
-  size_t reg_size = GetVectorRegSize();
+  llvm::Type *under_type = goal_type->getElementType();
   llvm::DataLayout dl(gModule);
 
-  uint64_t element_size = dl.getTypeAllocSize(under_type);
-  size_t reg_element_capacity = reg_size / element_size;
-  int32_t remaining = static_cast<int32_t>(num_elements);
+  const size_t num_elements = goal_type->getNumElements();
+  const size_t reg_size = GetVectorRegSize();
+  const size_t element_size = dl.getTypeAllocSize(under_type);
+  const size_t reg_element_capacity = reg_size / element_size;
+  size_t remaining = num_elements;
 
-  for (auto i = 0U; remaining > 0; ++i, remaining -= reg_element_capacity) {
+  for (size_t i = 0U; remaining > 0; ++i, remaining -= reg_element_capacity) {
     auto reg_var_name = GetVarForNextReturn(goal_type);
     LOG_IF(FATAL, !reg_var_name)
         << "Could not find available vector register";
@@ -848,8 +847,8 @@ void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
     dest_loc = ir.CreateBitCast(dest_loc,
                                 llvm::PointerType::get(under_type, 0));
 
-    auto count = std::min(reg_element_capacity, static_cast<size_t>(remaining));
-    auto already_done = i * reg_element_capacity;
+    const auto count = std::min(reg_element_capacity, remaining);
+    const auto already_done = i * reg_element_capacity;
     ExtractFromVector(block, ret_val, dest_loc, count, already_done);
   }
 }
