@@ -9,17 +9,22 @@ main() {
   local install_folder="$1"
 
   printf "Looking for the Python interpreter\n"
-  which python2 > /dev/null 2>&1
+  which python2.7 > /dev/null 2>&1
   if [ $? -eq 0 ] ; then
-    local python_interpreter="python2"
+    local python_interpreter="python2.7"
   else
-    which python > /dev/null 2>&1
+    which python2 > /dev/null 2>&1
     if [ $? -ne 0 ] ; then
-      printf " x Failed to find a Python interpreter\n"
-      return 1
+      which python > /dev/null 2>&1
+      if [ $? -ne 0 ] ; then
+        printf " x Failed to find a Python interpreter\n"
+        return 1
+      else
+        local python_interpreter="python"
+      fi
+    else
+      local python_interpreter="python2"
     fi
-
-    local python_interpreter="python"
   fi
 
   local python_version=`"${python_interpreter}" --version 2>&1 | awk '{ print $2 }' | cut -d '.' -f 1-2`
