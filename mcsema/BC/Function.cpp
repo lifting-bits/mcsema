@@ -32,8 +32,6 @@
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/Type.h>
 
-#include <llvm/Transforms/Scalar.h>
-
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
@@ -42,6 +40,7 @@
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Instruction.h"
 #include "remill/BC/ABI.h"
+#include "remill/BC/Compat/ScalarTransforms.h"
 #include "remill/BC/IntrinsicTable.h"
 #include "remill/BC/Lifter.h"
 #include "remill/BC/Util.h"
