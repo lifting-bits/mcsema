@@ -40,6 +40,7 @@
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Instruction.h"
 #include "remill/BC/ABI.h"
+#include "remill/BC/Compat/ScalarTransforms.h"
 #include "remill/BC/IntrinsicTable.h"
 #include "remill/BC/Lifter.h"
 #include "remill/BC/Util.h"
@@ -47,7 +48,6 @@
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Callback.h"
-#include "mcsema/BC/Compat/ScalarTransforms.h"
 #include "mcsema/BC/Function.h"
 #include "mcsema/BC/Instruction.h"
 #include "mcsema/BC/Legacy.h"
