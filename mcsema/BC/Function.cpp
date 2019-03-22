@@ -32,9 +32,6 @@
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/Type.h>
 
-#include <llvm/Transforms/Scalar.h>
-#include <llvm/Transforms/Utils.h>
-
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
@@ -50,6 +47,7 @@
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Callback.h"
+#include "mcsema/BC/Compat/ScalarTransforms.h"
 #include "mcsema/BC/Function.h"
 #include "mcsema/BC/Instruction.h"
 #include "mcsema/BC/Legacy.h"
