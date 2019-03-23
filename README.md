@@ -49,7 +49,7 @@ Why would anyone translate binaries *back* to bitcode?
 |  ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
 |  Actively maintained? | Yes | No | Yes | Yes | Yes | No | Maybe | Maybe | Maybe | No | Yes |
 |  Commercial support available? | Yes | No | No | No | Maybe | No | No | No | No | Maybe | No |
-|  LLVM versions | 3.5 - current | 5 | current | 3.9.1 | 3.8 |  | 3.2 | 4 | 3.9 | 3.4 | 6 |
+|  LLVM versions | 3.5 - current | 5 | current | 3.9.1 | 3.8 | 3.8 | 3.2 | 4 | 3.9 | 3.4 | 6 |
 |  Builds with CI? | Yes | No | No | Yes | No | No | Yes | Maybe | Maybe | No | No |
 |  32-bit architectures | x86 | x86 | ARM | x86, ARM, MIPS, PIC32, PowerPC |  | ARM, MIPS | S2E | S2E | S2E | ARM, x86 |  |
 |  64-bit architectures | x86-64, AArch64 | x86-64 | x86-64 |  | x86-64 | x86-64 |  | S2E | S2E | PowerPC | x86-64 |
