@@ -16,7 +16,6 @@
 
 #include "CFGWriter.h"
 #include "ExternalFunctionManager.h"
-#include "SectionManager.h"
 
 #include <CodeObject.h>
 #include <Dereference.h>
@@ -101,13 +100,14 @@ int main(int argc, char **argv) {
   auto input_string = FLAGS_binary;
   auto input_file = const_cast<char *>(input_string.data());
 
+  ExternalFunctionManager extFuncManager;
   // Load external symbol definitions
   if (!FLAGS_std_defs.empty()) {
     auto std_defs = Split(FLAGS_std_defs, kPathDelim);
     for (const auto &filename : std_defs) {
       LOG(INFO) << "Loading file containing external definitions";
       auto file = std::ifstream{filename};
-      gExtFuncManager->AddExternalSymbols(file);
+      extFuncManager.AddExternalSymbols(file);
     }
   }
 
@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
 
     // Only mark external functions
     if (!(symtab->findFunctionsByName(fs, p.second)))
-      gExtFuncManager->MarkAsUsed(p.second);
+      extFuncManager.MarkAsUsed(p.second);
   }
 
   if (FLAGS_output.empty()) {
@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
 
   mcsema::Module m;
 
-  CFGWriter cfg_writer(m, *symtab, *symtab_cs, *code_object);
+  CFGWriter cfg_writer(m, *symtab, *symtab_cs, *code_object, extFuncManager);
   cfg_writer.Write();
 
   // Dump the CFG file in a human-readable format if requested

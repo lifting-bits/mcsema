@@ -200,12 +200,14 @@ void ResolveOffsetTable(const std::set<Dyninst::Address> &successors,
 
 CFGWriter::CFGWriter(mcsema::Module &m,
                      SymtabAPI::Symtab &symtab,
-                     ParseAPI::SymtabCodeSource &symCodeSrc,
-                     ParseAPI::CodeObject &codeObj)
+                     ParseAPI::SymtabCodeSource &sym_code_src,
+                     ParseAPI::CodeObject &code_obj,
+                     ExternalFunctionManager &ext_funcs)
     : module(m),
       symtab(symtab),
-      code_object(codeObj),
-      code_source(symCodeSrc),
+      code_object(code_obj),
+      code_source(sym_code_src),
+      ext_funcs_m(ext_funcs),
       magic_section(gDisassContext->magic_section),
       ptr_byte_size(symtab.getAddressWidth()){
 
@@ -933,7 +935,7 @@ void CFGWriter::WriteExternalFunctions() {
   auto symbols = gSectionManager->GetExternalRelocs(
       Dyninst::SymtabAPI::Symbol::SymbolType::ST_FUNCTION);
 
-  auto known = gExtFuncManager->GetAllUsed( unknown );
+  auto known = ext_funcs_m.GetAllUsed( unknown );
   LOG(INFO) << "Found " << known.size() << " known external functions and "
             << unknown.size() << " unknown";
 
@@ -1033,8 +1035,8 @@ void CFGWriter::WriteGOT(SymtabAPI::Region* region,
           true);
       WriteAsRaw(data, unreal_ea, reloc.rel_addr() - cfg_segment->ea());
 
-    if (gExtFuncManager->IsExternal(reloc.name())) {
-        auto func = gExtFuncManager->GetExternalFunction(reloc.name());
+    if (ext_funcs_m.IsExternal(reloc.name())) {
+        auto func = ext_funcs_m.GetExternalFunction(reloc.name());
         func.imag_ea = unreal_ea;
         auto cfg_func = func.WriteHelper(module, unreal_ea);
         gDisassContext->external_funcs.insert({unreal_ea, cfg_func});

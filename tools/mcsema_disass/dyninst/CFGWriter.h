@@ -42,7 +42,8 @@ public:
   CFGWriter(mcsema::Module &m,
             Dyninst::SymtabAPI::Symtab &symtab,
             Dyninst::ParseAPI::SymtabCodeSource &symCodeSrc,
-            Dyninst::ParseAPI::CodeObject &codeObj);
+            Dyninst::ParseAPI::CodeObject &codeObj,
+            ExternalFunctionManager &extFuncM);
 
   void Write();
 
@@ -103,6 +104,8 @@ private:
   Dyninst::SymtabAPI::Symtab &symtab;
   Dyninst::ParseAPI::CodeObject &code_object;
   Dyninst::ParseAPI::SymtabCodeSource &code_source;
+
+  ExternalFunctionManager ext_funcs_m;
 
   std::unordered_set<std::string> no_ret_funcs;
 
