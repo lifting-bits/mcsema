@@ -35,15 +35,12 @@ struct SectionManager {
 public:
   void AddRegion(Dyninst::SymtabAPI::Region *r);
 
-  bool IsData(Dyninst::Address a);
-  bool IsCode(Dyninst::Address a);
-
   bool IsInRegion(Dyninst::SymtabAPI::Region *r, Dyninst::Address a);
   bool IsInRegions(std::vector<std::string> sections, Dyninst::Address addr);
   bool IsInRegion(const std::string& region, Dyninst::Address addr);
+
   bool IsInBinary(Dyninst::Address addr);
 
-  std::set<Dyninst::SymtabAPI::Region *> GetDataRegions();
   std::set<Dyninst::SymtabAPI::Region *> GetAllRegions();
 
   Dyninst::SymtabAPI::Region *GetRegion(const std::string &name);

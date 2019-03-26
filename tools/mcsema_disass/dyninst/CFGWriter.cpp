@@ -1092,7 +1092,7 @@ void WriteBssXrefs(
 // variables and such
 // Writes things into gDisassContext
 void CFGWriter::WriteInternalData() {
-  auto dataRegions = gSectionManager->GetDataRegions();
+  auto dataRegions = gSectionManager->GetAllRegions();
   SectionParser section_parser(gDisassContext.get(), *gSectionManager);
 
   for (auto region : dataRegions) {

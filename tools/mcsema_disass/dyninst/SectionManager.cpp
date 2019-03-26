@@ -107,27 +107,6 @@ void SectionManager::AddRegion(Region *r) {
   regions.push_back({r, r->getRegionName()});
 }
 
-bool SectionManager::IsData(Address a) {
-  const auto &dataRegions{GetDataRegions()};
-  const Offset o = static_cast<const Offset>(a);
-
-  for (auto &r : dataRegions) {
-    if (r->isOffsetInRegion(o)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-bool SectionManager::IsCode(Address a) {
-  return !IsData(a);
-}
-
-std::set<Region *> SectionManager::GetDataRegions() {
-  return GetAllRegions();
-}
-
 std::vector<Dyninst::SymtabAPI::Symbol *>
 SectionManager::GetExternalRelocs(Dyninst::SymtabAPI::Symbol::SymbolType type) {
   std::vector<Dyninst::SymtabAPI::Symbol *> vars;
