@@ -15,7 +15,7 @@
  */
 
 #include "CFGWriter.h"
-
+#include "Maybe.h"
 #include "Util.h"
 #include "SectionParser.h"
 
@@ -51,58 +51,50 @@ mcsema::Module gModule;
 namespace {
 
 // Try to eval Dyninst expression
-bool TryEval(InstructionAPI::Expression *expr,
+Maybe<Address> TryEval(InstructionAPI::Expression *expr,
                         const Address ip,
-                        Address &result,
                         Address instruction_size=0) {
 
   if (auto bin = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
     std::vector<InstructionAPI::InstructionAST::Ptr> args;
     bin->getChildren(args);
 
-    Address left, right;
-
-    auto first = TryEval(
+    auto left = TryEval(
         dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
-        ip, left, instruction_size);
-    auto second = TryEval(
+        ip, instruction_size);
+    auto right = TryEval(
         dynamic_cast<InstructionAPI::Expression *>(args[1].get()),
-        ip, right, instruction_size);
+        ip, instruction_size);
 
-    if (!(first && second)) {
-      return false;
+    if (!(left && right)) {
+      return {};
     }
 
     if (bin->isAdd()) {
-      result = left + right;
-      return true;
+      return {*left + *right};
     }
 
     if (bin->isMultiply()) {
-      result = left * right;
-      return true;
+      return {*left * *right};
     }
 
   }
 
   if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr)) {
-    result = imm->eval().convert<Address>();
-    return true;
+    return {imm->eval().convert<Address>()};
   }
   if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
     std::vector<InstructionAPI::InstructionAST::Ptr> args;
     deref->getChildren(args);
     return TryEval(dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
-                   ip + instruction_size,
-                   result);
+                   ip + instruction_size);
   }
   if (auto reg = dynamic_cast<InstructionAPI::RegisterAST *>(expr)) {
     if (reg->format() == "RIP") {
-      result = ip;
-      return true;
+      return {ip};
     }
   }
-  return false;
+  return {};
 }
 
 // Find call to __libc_start_main@plt and try to recover addresses from it
@@ -134,7 +126,6 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
       auto mov_inst = std::prev(call, 1 + index);
       auto second_operand = mov_inst->second.get()->getOperand(1);
 
-      Address offset = 0;
 
       // in -pie binaries it will be calculated using lea
       // and it generates unintuitive AST
@@ -142,15 +133,18 @@ Address TryRetrieveAddrFromStart(ParseAPI::CodeObject &code_object,
       if (mov_inst->second->getOperation().getID() == entryID::e_lea) {
         rip += mov_inst->second->size();
       }
-      if (!TryEval(second_operand.getValue().get(), rip, offset,
-                   mov_inst->second->size())) {
+      auto offset =
+        TryEval(second_operand.getValue().get(), rip, mov_inst->second->size());
+
+      if (!offset) {
         LOG(WARNING) << "Could not eval basic start addresses!";
         return 0;
       }
-      code_object.parse(offset, true);
+
+      code_object.parse(*offset, true);
       LOG(INFO) << "Retrieving info from _start at index " << index
-                << " got addr 0x" << std::hex << offset << std::dec;
-      return offset;
+                << " got addr 0x" << std::hex << *offset << std::dec;
+      return *offset;
     }
   }
   LOG(WARNING) << "Was not able to retrieve info from _start at index "
@@ -486,14 +480,19 @@ void CFGWriter::SweepStubs() {
   for (ParseAPI::Function *func : code_object.funcs()) {
     if (gSectionManager->IsInRegions({".plt.got"}, func->entry()->start())) {
       auto inst =  func->entry()->getInsn(func->addr());
+
       if (inst->getCategory() == InstructionAPI::c_BranchInsn) {
-        Dyninst::Address xref_addr = 0;
-        TryEval(inst->getOperand(0).getValue().get(), func->addr(), xref_addr, inst->size());
-        auto cfg_xref = gDisassContext->data_xrefs.find(xref_addr);
+        auto xref_addr = TryEval(
+            inst->getOperand(0).getValue().get(),
+            func->addr(), inst->size());
+        auto cfg_xref = gDisassContext->data_xrefs.find(*xref_addr);
         if (cfg_xref == gDisassContext->data_xrefs.end()) {
           continue;
         }
-        auto cfg_ext_func = gDisassContext->external_funcs.find(cfg_xref->second->target_ea());
+
+        auto cfg_ext_func =
+          gDisassContext->external_funcs.find(cfg_xref->second->target_ea());
+
         if (cfg_ext_func == gDisassContext->external_funcs.end()) {
           continue;
         }
@@ -739,36 +738,37 @@ void CFGWriter::HandleCallInstruction(InstructionAPI::Instruction *instruction,
                                       Address addr,
                                       mcsema::Instruction *cfg_instruction,
                                       bool is_last) {
-  Address target;
   std::vector<InstructionAPI::Operand> operands;
   instruction->getOperands(operands);
 
   Address size = instruction->size();
 
-  if (TryEval(operands[0].getValue().get(), addr, target, size)) {
-    HandleXref(cfg_instruction, target);
-
-    // What can happen is that we get xref somewhere in the .text and HandleXref
-    // fills it with defaults. We need to check and correct it if needed
-    if (gSectionManager->IsInRegion(".text", target)) {
-      auto xref = cfg_instruction->mutable_xrefs(0);
-
-      //xref->set_target_type(CodeReference::CodeTarget);
-      xref->set_operand_type(CodeReference::ControlFlowOperand);
-
-      // It is pointing in .text and not to a function?
-      // That's weird, quite possibly we are missing a function!
-      if (!gDisassContext->getInternalFunction(target)) {
-        LOG(INFO) << "Unresolved inst_xref " << target;
-        inst_xrefs_to_resolve.insert(
-          {target , {addr, target, cfg_instruction}});
-      }
-    }
-
-    if (IsNoReturn(cfg_instruction->mutable_xrefs(0)->name())) {
-      cfg_instruction->set_local_noreturn(true);
-    }
+  auto target = TryEval(operands[0].getValue().get(), addr, size);
+  if (!target) {
     return;
+  }
+
+  HandleXref(cfg_instruction, *target);
+
+  // What can happen is that we get xref somewhere in the .text and HandleXref
+  // fills it with defaults. We need to check and correct it if needed
+  if (gSectionManager->IsInRegion(".text", *target)) {
+    auto xref = cfg_instruction->mutable_xrefs(0);
+
+    //xref->set_target_type(CodeReference::CodeTarget);
+    xref->set_operand_type(CodeReference::ControlFlowOperand);
+
+    // It is pointing in .text and not to a function?
+    // That's weird, quite possibly we are missing a function!
+    if (!gDisassContext->getInternalFunction(*target)) {
+      LOG(INFO) << "Unresolved inst_xref " << *target;
+      inst_xrefs_to_resolve.insert(
+        {*target , {addr, *target, cfg_instruction}});
+    }
+  }
+
+  if (IsNoReturn(cfg_instruction->mutable_xrefs(0)->name())) {
+    cfg_instruction->set_local_noreturn(true);
   }
 }
 
@@ -807,14 +807,15 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
 
   CHECK(expr) << "Expected expression";
 
-  Address a;
   // TODO(lukas): Possibly may discover new functions?
-  if (TryEval(expr, addr, a)) {
-    gDisassContext->HandleCodeXref({addr, a, cfg_instruction});
-    return a;
+  auto a = TryEval(expr, addr);
+  if (!a) {
+    return 0;
   }
 
-  return 0;
+  gDisassContext->HandleCodeXref({addr, *a, cfg_instruction});
+  return *a;
+
 }
 
 //TODO(lukas): Remove
@@ -873,44 +874,41 @@ void CFGWriter::HandleNonCallInstruction(
 
       auto instruction_id = instruction->getOperation().getID();
       if (instruction_id == entryID::e_lea) {
-        Address a;
+        if (auto a = TryEval(expr.get(), addr)) {
+          HandleXref(cfg_instruction, *a);
 
-        if(TryEval(expr.get(), addr, a)) {
-          HandleXref(cfg_instruction, a);
-
-          if (gSectionManager->IsInRegion(".text", a)) {
+          if (gSectionManager->IsInRegion(".text", *a)) {
             // get last one and change it to code
             auto xref = cfg_instruction->mutable_xrefs(
                 cfg_instruction->xrefs_size() - 1);
             xref->set_operand_type(CodeReference::MemoryOperand);
           }
-          direct_values[i] = a;
+          direct_values[i] = *a;
         }
 
       } else if (instruction->getCategory() == InstructionAPI::c_BranchInsn) {
-        Address a;
         // This has + |instruction| in AST
-        if (TryEval(expr.get(), addr - instruction->size(), a)) {
+        if (auto a = TryEval(expr.get(), addr - instruction->size())) {
           if (is_last) {
             for (auto succ : cfg_block->successor_eas()) {
-              if (a == succ) {
+              if (*a == succ) {
                 AddCodeXref(cfg_instruction,
                             mcsema::CodeReference::CodeTarget,
                             mcsema::CodeReference::ControlFlowOperand,
                             mcsema::CodeReference::Internal,
-                            a);
+                            *a);
               }
             }
           }
           // ea is not really that important
           // in CrossXref<mcsema::Instruction *>
-          if (gDisassContext->HandleCodeXref({0, a, cfg_instruction})) {
+          if (gDisassContext->HandleCodeXref({0, *a, cfg_instruction})) {
             auto cfg_xref = cfg_instruction->mutable_xrefs(
                 cfg_instruction->xrefs_size() - 1);
             cfg_xref->set_target_type(CodeReference::CodeTarget);
             cfg_xref->set_operand_type(CodeReference::ControlFlowOperand);
           }
-          direct_values[i] = a;
+          direct_values[i] = *a;
         }
       }
     }
