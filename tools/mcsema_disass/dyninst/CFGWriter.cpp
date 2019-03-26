@@ -670,9 +670,8 @@ void WriteDisplacement(mcsema::Instruction *cfg_instruction, Address &address) {
       {static_cast<Address>(cfg_instruction->ea()),
       address, cfg_instruction})) {
 
-    auto cfg_xref =
-        cfg_instruction->mutable_xrefs(cfg_instruction->xrefs_size() - 1);
-    cfg_xref->set_operand_type(CodeReference::MemoryDisplacementOperand);
+    GetLastXref(cfg_instruction)->set_operand_type(
+        CodeReference::MemoryDisplacementOperand);
   }
 }
 
@@ -791,8 +790,7 @@ Address CFGWriter::immediateNonCall(InstructionAPI::Immediate* imm,
     }
     return 0;
   }
-  auto cfg_code_xref = cfg_instruction->mutable_xrefs(cfg_instruction->xrefs_size() - 1);
-  cfg_code_xref->set_operand_type(CodeReference::ImmediateOperand);
+  GetLastXref(cfg_instruction)->set_operand_type(CodeReference::ImmediateOperand);
   return a;
 
 }
@@ -859,14 +857,11 @@ void CFGWriter::HandleNonCallInstruction(
     auto expr = op.getValue();
 
     if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr.get())) {
-      if (FLAGS_pie_mode) {
-        direct_values[i] = 0;
-      } else {
-        direct_values[i] = immediateNonCall(imm, addr, cfg_instruction);
-      }
+      direct_values[i] =
+        (FLAGS_pie_mode) ? 0 : immediateNonCall(imm, addr, cfg_instruction);
+
     } else if (
         auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr.get())) {
-
       direct_values[i] = dereferenceNonCall(deref, addr, cfg_instruction);
 
     } else if (
@@ -879,9 +874,7 @@ void CFGWriter::HandleNonCallInstruction(
 
           if (gSectionManager->IsInRegion(".text", *a)) {
             // get last one and change it to code
-            auto xref = cfg_instruction->mutable_xrefs(
-                cfg_instruction->xrefs_size() - 1);
-            xref->set_operand_type(CodeReference::MemoryOperand);
+            GetLastXref(cfg_instruction)->set_operand_type(CodeReference::MemoryOperand);
           }
           direct_values[i] = *a;
         }
@@ -903,8 +896,7 @@ void CFGWriter::HandleNonCallInstruction(
           // ea is not really that important
           // in CrossXref<mcsema::Instruction *>
           if (gDisassContext->HandleCodeXref({0, *a, cfg_instruction})) {
-            auto cfg_xref = cfg_instruction->mutable_xrefs(
-                cfg_instruction->xrefs_size() - 1);
+            auto cfg_xref = GetLastXref(cfg_instruction);
             cfg_xref->set_target_type(CodeReference::CodeTarget);
             cfg_xref->set_operand_type(CodeReference::ControlFlowOperand);
           }

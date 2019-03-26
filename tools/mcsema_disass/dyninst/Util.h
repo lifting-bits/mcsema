@@ -33,6 +33,10 @@ struct DisassContext;
 
 extern std::unique_ptr<DisassContext> gDisassContext;
 
+inline mcsema::CodeReference *GetLastXref(mcsema::Instruction *cfg_inst) {
+  CHECK(cfg_inst->xrefs_size() >= 1) << "Cannot retrieve last xref when there is none";
+  return cfg_inst->mutable_xrefs(cfg_inst->xrefs_size() - 1);
+}
 
 mcsema::CodeReference *AddCodeXref(
     mcsema::Instruction * instruction,
