@@ -153,8 +153,7 @@ int main(int argc, char **argv) {
 
   mcsema::Module m;
 
-  CFGWriter cfg_writer(m, *symtab, *symtab_cs, *code_object, extFuncManager);
-  cfg_writer.Write();
+  CFGWriter(m, *symtab, *code_object, extFuncManager).Write();
 
   // Dump the CFG file in a human-readable format if requested
   if (FLAGS_dump_cfg) {

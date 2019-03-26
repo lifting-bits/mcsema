@@ -46,11 +46,11 @@ mcsema::CodeReference *AddCodeXref(
     Dyninst::Address addr,
     const std::string &name="");
 
-template<typename CFGUnit=mcsema::Segment *>
+template<typename CFGUnit=mcsema::Segment>
 struct CrossXref {
   Dyninst::Address ea = 0;
   Dyninst::Address target_ea = 0;
-  CFGUnit segment = nullptr;
+  CFGUnit *segment = nullptr;
   std::string target_name = {};
 
   bool operator==(const CrossXref<CFGUnit> &other) {
@@ -99,7 +99,7 @@ struct DisassContext {
   MagicSection magic_section;
 
   // Writes and stores xref.ea into known data_xrefs
-  mcsema::DataReference *WriteAndAccount(CrossXref<mcsema::Segment *> xref,
+  mcsema::DataReference *WriteAndAccount(CrossXref<mcsema::Segment> xref,
                                          bool is_code=false,
                                          uint64_t width=8) {
     width = std::min(width, 8ul);
@@ -110,7 +110,7 @@ struct DisassContext {
 
   template<typename Container>
   bool FishForXref(const Container &facts,
-                   CrossXref<mcsema::Segment *> &xref,
+                   CrossXref<mcsema::Segment> &xref,
                    bool is_code=false,
                    uint64_t width=8) {
     auto fact = facts.find(xref.target_ea);
@@ -124,7 +124,7 @@ struct DisassContext {
     return false;
   }
 
-  bool HandleDataXref(CrossXref<mcsema::Segment *> xref) {
+  bool HandleDataXref(CrossXref<mcsema::Segment> xref) {
     if (FishForXref(global_vars, xref) ||
         FishForXref(external_funcs, xref, true) ||
         FishForXref(external_vars, xref) ||
@@ -141,7 +141,7 @@ struct DisassContext {
     return false;
   }
 
-  bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
+  bool WriteFact(const CrossXref<mcsema::Instruction> &xref,
                  mcsema::Function *fact) {
     AddCodeXref(xref.segment,
                 mcsema::CodeReference::DataTarget,
@@ -152,7 +152,7 @@ struct DisassContext {
     return true;
   }
 
-  bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
+  bool WriteFact(const CrossXref<mcsema::Instruction> &xref,
                  mcsema::GlobalVariable *fact) {
     AddCodeXref(xref.segment,
                 mcsema::CodeReference::DataTarget,
@@ -163,7 +163,7 @@ struct DisassContext {
     return true;
   }
 
-  bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
+  bool WriteFact(const CrossXref<mcsema::Instruction> &xref,
                  mcsema::ExternalFunction *fact) {
     // Mapping to magic_section
     AddCodeXref(xref.segment,
@@ -175,7 +175,7 @@ struct DisassContext {
     return true;
   }
 
-  bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
+  bool WriteFact(const CrossXref<mcsema::Instruction> &xref,
                  mcsema::Variable *fact) {
     AddCodeXref(xref.segment,
                 mcsema::CodeReference::DataTarget,
@@ -186,7 +186,7 @@ struct DisassContext {
     return true;
   }
 
-  bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
+  bool WriteFact(const CrossXref<mcsema::Instruction> &xref,
                  mcsema::ExternalVariable *fact) {
     Dyninst::Address addr = magic_section.GetAllocated(xref.target_ea);
     if (!addr) {
@@ -202,7 +202,7 @@ struct DisassContext {
   }
 
 
-  bool WriteFact(const CrossXref<mcsema::Instruction *> &xref,
+  bool WriteFact(const CrossXref<mcsema::Instruction> &xref,
                  mcsema::DataReference *fact) {
     AddCodeXref(xref.segment,
                 mcsema::CodeReference::DataTarget,
@@ -214,7 +214,7 @@ struct DisassContext {
 
   template<typename Container>
   bool FishForXref(const Container &facts,
-                   const CrossXref<mcsema::Instruction *> &xref) {
+                   const CrossXref<mcsema::Instruction> &xref) {
 
     auto fact = facts.find(xref.target_ea);
     if (fact == facts.end()) {
@@ -226,7 +226,7 @@ struct DisassContext {
 
   // If force=true function writes the xref even if target_ea
   // cannot be resolved in something reasonable
-  bool HandleCodeXref(const CrossXref<mcsema::Instruction *> &xref,
+  bool HandleCodeXref(const CrossXref<mcsema::Instruction> &xref,
                       bool force=false) {
     if (FishForXref(global_vars, xref) ||
         FishForXref(external_funcs, xref) ||

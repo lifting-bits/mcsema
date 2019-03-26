@@ -41,7 +41,6 @@ class CFGWriter {
 public:
   CFGWriter(mcsema::Module &m,
             Dyninst::SymtabAPI::Symtab &symtab,
-            Dyninst::ParseAPI::SymtabCodeSource &symCodeSrc,
             Dyninst::ParseAPI::CodeObject &codeObj,
             ExternalFunctionManager &extFuncM);
 
@@ -103,14 +102,13 @@ private:
   /* Dyninst related objects */
   Dyninst::SymtabAPI::Symtab &symtab;
   Dyninst::ParseAPI::CodeObject &code_object;
-  Dyninst::ParseAPI::SymtabCodeSource &code_source;
 
   ExternalFunctionManager ext_funcs_m;
 
   std::unordered_set<std::string> no_ret_funcs;
 
-  std::map<Dyninst::Address, CrossXref<mcsema::Segment *>> code_xrefs_to_resolve;
-  std::map<Dyninst::Address, CrossXref<mcsema::Instruction *>> inst_xrefs_to_resolve;
+  std::map<Dyninst::Address, CrossXref<mcsema::Segment>> code_xrefs_to_resolve;
+  std::map<Dyninst::Address, CrossXref<mcsema::Instruction>> inst_xrefs_to_resolve;
 
   // Binary format dependent
   std::vector<OffsetTable> offset_tables;

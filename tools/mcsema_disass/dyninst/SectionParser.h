@@ -34,7 +34,7 @@ namespace mcsema {
 
 
 struct SectionParser {
-  using CrossXrefMap = std::map<Dyninst::Address, CrossXref<mcsema::Segment *>>;
+  using CrossXrefMap = std::map<Dyninst::Address, CrossXref<mcsema::Segment>>;
 
   SectionParser(DisassContext *disass_context,
                 SectionManager &section_manager) :
@@ -75,7 +75,7 @@ private:
   int unnamed = 0;
   int counter = 0;
 
-  std::vector<CrossXref<mcsema::Segment *>> cross_xrefs;
+  std::vector<CrossXref<mcsema::Segment>> cross_xrefs;
   CrossXrefMap unresolved_code_xrefs;
   std::vector<OffsetTable> offset_tables;
 };

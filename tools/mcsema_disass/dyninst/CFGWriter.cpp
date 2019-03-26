@@ -202,13 +202,11 @@ void ResolveOffsetTable(const std::set<Dyninst::Address> &successors,
 
 CFGWriter::CFGWriter(mcsema::Module &m,
                      SymtabAPI::Symtab &symtab,
-                     ParseAPI::SymtabCodeSource &sym_code_src,
                      ParseAPI::CodeObject &code_obj,
                      ExternalFunctionManager &ext_funcs)
     : module(m),
       symtab(symtab),
       code_object(code_obj),
-      code_source(sym_code_src),
       ext_funcs_m(ext_funcs),
       magic_section(gDisassContext->magic_section),
       ptr_byte_size(symtab.getAddressWidth()){
@@ -353,8 +351,7 @@ void CFGWriter::Write() {
       code_object.parse(a.first, false);
     }
 
-    auto old_set = inst_xrefs_to_resolve;
-    inst_xrefs_to_resolve.clear();
+    auto old_set = std::move(inst_xrefs_to_resolve);
     for (auto func : code_object.funcs()) {
       if (old_set.find(func->addr()) != old_set.end() &&
           !gDisassContext->getInternalFunction(func->addr())) {
@@ -706,8 +703,7 @@ void CFGWriter::CheckDisplacement(Dyninst::InstructionAPI::Expression *expr,
     for (auto &op : inner_operands) {
       if (auto inner_expr =
               dynamic_cast<InstructionAPI::Expression *>(op.get())) {
-        auto displacement = DisplacementHelper(inner_expr);
-        if (displacement) {
+        if (auto displacement = DisplacementHelper(inner_expr)) {
           WriteDisplacement(cfg_instruction, displacement);
         }
       }
@@ -779,10 +775,10 @@ Address CFGWriter::immediateNonCall(InstructionAPI::Immediate* imm,
   if (!gDisassContext->HandleCodeXref({addr, a, cfg_instruction}, false)) {
     if (gSectionManager->IsInRegion(".text", a)) {
       AddCodeXref(cfg_instruction,
-        CodeReference::DataTarget,
-        CodeReference::ImmediateOperand,
-        CodeReference::Internal,
-        a);
+                  CodeReference::DataTarget,
+                  CodeReference::ImmediateOperand,
+                  CodeReference::Internal,
+                  a);
       LOG(INFO) << std::hex
                 << "IMM may be working with new function starting at" << a;
       inst_xrefs_to_resolve.insert({a, {}});
@@ -894,7 +890,7 @@ void CFGWriter::HandleNonCallInstruction(
             }
           }
           // ea is not really that important
-          // in CrossXref<mcsema::Instruction *>
+          // in CrossXref<mcsema::Instruction>
           if (gDisassContext->HandleCodeXref({0, *a, cfg_instruction})) {
             auto cfg_xref = GetLastXref(cfg_instruction);
             cfg_xref->set_target_type(CodeReference::CodeTarget);
