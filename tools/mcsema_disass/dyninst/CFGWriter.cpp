@@ -68,27 +68,35 @@ bool TryEval(InstructionAPI::Expression *expr,
     auto second = TryEval(
         dynamic_cast<InstructionAPI::Expression *>(args[1].get()),
         ip, right, instruction_size);
-    if (first && second) {
-      if (bin->isAdd()) {
-        result = left + right;
-        return true;
-      } else if (bin->isMultiply()) {
-        result = left * right;
-        return true;
-      }
 
+    if (!(first && second)) {
       return false;
     }
-  }  else if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr)) {
+
+    if (bin->isAdd()) {
+      result = left + right;
+      return true;
+    }
+
+    if (bin->isMultiply()) {
+      result = left * right;
+      return true;
+    }
+
+  }
+
+  if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(expr)) {
     result = imm->eval().convert<Address>();
     return true;
-  } else if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
+  }
+  if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
     std::vector<InstructionAPI::InstructionAST::Ptr> args;
     deref->getChildren(args);
     return TryEval(dynamic_cast<InstructionAPI::Expression *>(args[0].get()),
                    ip + instruction_size,
                    result);
-  } else if (auto reg = dynamic_cast<InstructionAPI::RegisterAST *>(expr)) {
+  }
+  if (auto reg = dynamic_cast<InstructionAPI::RegisterAST *>(expr)) {
     if (reg->format() == "RIP") {
       result = ip;
       return true;
@@ -1098,7 +1106,7 @@ void CFGWriter::WriteInternalData() {
   for (auto region : dataRegions) {
 
     // IDA does not include some of these, so neither should we
-    std::set<std::string> no_parse = {
+    static std::set<std::string> no_parse = {
       ".dynamic",
       ".dynstr",
       ".dynsym",
@@ -1107,6 +1115,7 @@ void CFGWriter::WriteInternalData() {
     if (no_parse.find(region->getRegionName()) != no_parse.end()) {
       continue;
     }
+
     // Sanity check
     LOG(INFO) << "Writing region " << region->getRegionName();
     if (region->getMemSize() <= 0) {
@@ -1141,7 +1150,7 @@ void CFGWriter::WriteInternalData() {
     cfg_internal_data->set_is_exported(false);      /* TODO: As for now, ignored */
     cfg_internal_data->set_is_thread_local(false); /* TODO: As for now, ignored */
 
-    std::set<std::string> dont_parse = {
+    static std::set<std::string> dont_parse = {
       ".eh_frame",
       ".rela.dyn",
       ".rela.plt",
@@ -1219,6 +1228,7 @@ void CFGWriter::WriteDataVariables(Dyninst::SymtabAPI::Region *region,
 
 
 bool CFGWriter::IsExternal(Address addr) const {
-  return gDisassContext->external_vars.find(addr) != gDisassContext->external_vars.end() ||
-         gDisassContext->external_funcs.find(addr) != gDisassContext->external_funcs.end();
+  return
+    gDisassContext->external_vars.find(addr) != gDisassContext->external_vars.end() ||
+    gDisassContext->external_funcs.find(addr) != gDisassContext->external_funcs.end();
 }
