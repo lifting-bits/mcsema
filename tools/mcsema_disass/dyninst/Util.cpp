@@ -32,6 +32,3 @@ mcsema::CodeReference *AddCodeXref(mcsema::Instruction * instruction,
         xref->set_name(name);
     return xref;
 }
-
-
-std::unique_ptr<DisassContext> gDisassContext(new DisassContext);

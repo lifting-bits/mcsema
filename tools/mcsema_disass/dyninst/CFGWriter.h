@@ -110,9 +110,10 @@ private:
   std::map<Dyninst::Address, CrossXref<mcsema::Segment>> code_xrefs_to_resolve;
   std::map<Dyninst::Address, CrossXref<mcsema::Instruction>> inst_xrefs_to_resolve;
 
-  // Binary format dependent
   std::vector<OffsetTable> offset_tables;
 
+  // magic_section is handle into ctx, needs to be initialized in this order
+  DisassContext ctx;
   MagicSection &magic_section;
   int ptr_byte_size = 8;
 };

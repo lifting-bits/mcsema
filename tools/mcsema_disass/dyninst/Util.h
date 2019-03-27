@@ -31,8 +31,6 @@
 
 struct DisassContext;
 
-extern std::unique_ptr<DisassContext> gDisassContext;
-
 template< typename T >
 auto *GetLastXref(T *cfg) {
   CHECK(cfg->xrefs_size() >= 1) << "Cannot retrieve last xref when there is none";
