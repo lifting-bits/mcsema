@@ -163,7 +163,7 @@ void RenameFunc(Dyninst::Address ea, const std::string& new_name) {
 
 void ResolveOffsetTable(const std::set<Dyninst::Address> &successors,
                         mcsema::Block *cfg_block,
-                        const std::vector<OffsetTable> offset_tables) {
+                        const std::vector<OffsetTable> &offset_tables) {
   // For 2 targets offset table should not be generated?
   if (successors.size() < 3) {
     return;
