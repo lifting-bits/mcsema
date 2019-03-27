@@ -39,7 +39,11 @@ public:
   bool IsInRegions(std::vector<std::string> sections, Dyninst::Address addr);
   bool IsInRegion(const std::string& region, Dyninst::Address addr);
 
+  // Is it in .text?
+  bool IsCode(Dyninst::Address addr);
+
   bool IsInBinary(Dyninst::Address addr);
+
 
   std::set<Dyninst::SymtabAPI::Region *> GetAllRegions();
 

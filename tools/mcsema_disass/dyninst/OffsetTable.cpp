@@ -123,7 +123,7 @@ Maybe<OffsetTable> OffsetTable::Parse(
 
     // Get what is that entry truly pointing to
     auto target_ea = table.start_ea - ~(*reader) - 1;
-    if (gSectionManager->IsInRegion(".text", target_ea)) {
+    if (gSectionManager->IsCode(target_ea)) {
       table.targets.insert({target_ea});
       table.entries.insert({it_ea, target_ea});
     } else if (target_ea == start_ea) {

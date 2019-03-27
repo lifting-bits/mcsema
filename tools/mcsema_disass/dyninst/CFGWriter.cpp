@@ -747,7 +747,7 @@ void CFGWriter::HandleCallInstruction(InstructionAPI::Instruction *instruction,
 
   // What can happen is that we get xref somewhere in the .text and HandleXref
   // fills it with defaults. We need to check and correct it if needed
-  if (gSectionManager->IsInRegion(".text", *target)) {
+  if (gSectionManager->IsCode(*target)) {
     auto xref = cfg_instruction->mutable_xrefs(0);
 
     //xref->set_target_type(CodeReference::CodeTarget);
@@ -773,7 +773,7 @@ Address CFGWriter::immediateNonCall(InstructionAPI::Immediate* imm,
 
   Address a = imm->eval().convert<Address>();
   if (!ctx.HandleCodeXref({addr, a, cfg_instruction}, false)) {
-    if (gSectionManager->IsInRegion(".text", a)) {
+    if (gSectionManager->IsCode(a)) {
       AddCodeXref(cfg_instruction,
                   CodeReference::DataTarget,
                   CodeReference::ImmediateOperand,
@@ -820,7 +820,7 @@ bool CFGWriter::HandleXref(mcsema::Instruction *cfg_instruction,
     return true;
   }
 
-  if (gSectionManager->IsInRegion(".text", addr) &&
+  if (gSectionManager->IsCode(addr) &&
       !ctx.getInternalFunction(addr)) {
     inst_xrefs_to_resolve.insert({addr, {static_cast<Dyninst::Address>(cfg_instruction->ea()),
                                          addr, cfg_instruction}});
@@ -868,7 +868,7 @@ void CFGWriter::HandleNonCallInstruction(
         if (auto a = TryEval(expr.get(), addr)) {
           HandleXref(cfg_instruction, *a);
 
-          if (gSectionManager->IsInRegion(".text", *a)) {
+          if (gSectionManager->IsCode(*a)) {
             // get last one and change it to code
             GetLastXref(cfg_instruction)->set_operand_type(CodeReference::MemoryOperand);
           }
@@ -912,7 +912,7 @@ void CFGWriter::HandleNonCallInstruction(
         {".bss", ".data", ".rodata"},
         direct_values[0]);
 
-    if (gSectionManager->IsInRegion(".text", direct_values[1]) &&
+    if (gSectionManager->IsCode(direct_values[1]) &&
         is_in_data) {
 
       if (!ctx.getInternalFunction(direct_values[0])) {

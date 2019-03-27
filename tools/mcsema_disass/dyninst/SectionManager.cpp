@@ -58,6 +58,10 @@ bool SectionManager::IsInRegions(std::vector<std::string> sections,
   return false;
 }
 
+bool SectionManager::IsCode(Dyninst::Address addr) {
+  return IsInRegion(".text", addr);
+}
+
 bool SectionManager::IsInBinary(Dyninst::Address addr) {
   for (auto &s : regions) {
     if (IsInRegion(s.region, addr)) {
