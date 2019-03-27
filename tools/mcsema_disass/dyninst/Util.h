@@ -33,9 +33,10 @@ struct DisassContext;
 
 extern std::unique_ptr<DisassContext> gDisassContext;
 
-inline mcsema::CodeReference *GetLastXref(mcsema::Instruction *cfg_inst) {
-  CHECK(cfg_inst->xrefs_size() >= 1) << "Cannot retrieve last xref when there is none";
-  return cfg_inst->mutable_xrefs(cfg_inst->xrefs_size() - 1);
+template< typename T >
+auto *GetLastXref(T *cfg) {
+  CHECK(cfg->xrefs_size() >= 1) << "Cannot retrieve last xref when there is none";
+  return cfg->mutable_xrefs(cfg->xrefs_size() - 1);
 }
 
 mcsema::CodeReference *AddCodeXref(
@@ -132,9 +133,8 @@ struct DisassContext {
         FishForXref(func_map, xref, true)) {
 
       if (xref.segment->xrefs_size()) {
-      auto cfg_xref =
-          xref.segment->mutable_xrefs(xref.segment->xrefs_size() - 1);
-      data_xrefs.insert({static_cast<Dyninst::Address>(xref.ea), cfg_xref});
+        data_xrefs.insert(
+            {static_cast<Dyninst::Address>(xref.ea), GetLastXref(xref.segment)});
       }
       return true;
     }
