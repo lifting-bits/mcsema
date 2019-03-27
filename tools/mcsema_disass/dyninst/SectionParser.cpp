@@ -96,14 +96,15 @@ bool SectionParser::TryOffsetTable(uint64_t &offset,
   // While it is a valid offset
   // TODO(lukas): Last entry can actually be an xref
   auto size = 0U;
-  while (section_manager.IsInRegion(".text", ea - ~(*entry_reader)) &&
+  while (section_manager.IsCode(ea - ~(*entry_reader)) &&
          size + offset < region->getMemSize()) {
     size += 4;
     ++entry_reader;
   }
 
   // Try to build the table from it, depending on number of entries shoudl succeed.
-  auto table = OffsetTable::Parse(ea, reinterpret_cast<int32_t *>(reader),
+  auto table = OffsetTable::Parse(section_manager, ea,
+                                  reinterpret_cast<int32_t *>(reader),
                                   region, size);
   if (table) {
     offset_tables.push_back(std::move(table.value()));

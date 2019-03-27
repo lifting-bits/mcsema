@@ -104,6 +104,7 @@ bool OffsetTable::Match(const std::set<Dyninst::Address> &succs) const {
 
 // This is just a bunch of 64-bit ELF specific heuristics
 Maybe<OffsetTable> OffsetTable::Parse(
+    const SectionManager &section_m,
     Dyninst::Address start_ea,
     int32_t *reader,
     Dyninst::SymtabAPI::Region *region,
@@ -123,7 +124,7 @@ Maybe<OffsetTable> OffsetTable::Parse(
 
     // Get what is that entry truly pointing to
     auto target_ea = table.start_ea - ~(*reader) - 1;
-    if (gSectionManager->IsCode(target_ea)) {
+    if (section_m.IsCode(target_ea)) {
       table.targets.insert({target_ea});
       table.entries.insert({it_ea, target_ea});
     } else if (target_ea == start_ea) {

@@ -27,7 +27,7 @@ using namespace SymtabAPI;
 
 std::unique_ptr<SectionManager> gSectionManager(new SectionManager);
 
-bool SectionManager::IsInRegion(SymtabAPI::Region *r, Address a) {
+bool SectionManager::IsInRegion(const SymtabAPI::Region *r, Address a) const {
   if (!r) {
     return false;
   }
@@ -40,12 +40,12 @@ bool SectionManager::IsInRegion(SymtabAPI::Region *r, Address a) {
   return true;
 }
 
-bool SectionManager::IsInRegion(const std::string &region_name, Address addr) {
+bool SectionManager::IsInRegion(const std::string &region_name, Address addr) const {
   return IsInRegion(GetRegion(region_name), addr);
 }
 
 bool SectionManager::IsInRegions(std::vector<std::string> sections,
-                                  Dyninst::Address addr) {
+                                  Dyninst::Address addr) const {
   for (auto &s : regions) {
     for (auto &name : sections) {
       if (name == s.name) {
@@ -58,11 +58,11 @@ bool SectionManager::IsInRegions(std::vector<std::string> sections,
   return false;
 }
 
-bool SectionManager::IsCode(Dyninst::Address addr) {
+bool SectionManager::IsCode(Dyninst::Address addr) const {
   return IsInRegion(".text", addr);
 }
 
-bool SectionManager::IsInBinary(Dyninst::Address addr) {
+bool SectionManager::IsInBinary(Dyninst::Address addr) const {
   for (auto &s : regions) {
     if (IsInRegion(s.region, addr)) {
       return true;
@@ -79,18 +79,18 @@ std::set<Region *> SectionManager::GetAllRegions() {
   return result;
 }
 
-Dyninst::SymtabAPI::Region *
-SectionManager::GetRegion(const std::string &name) {
-  for (auto &r : regions) {
-    if (r.name == name) {
-      return r.region;
-    }
-  }
-  LOG(INFO) << "Could not fetch section with name " << name;
-  return nullptr;
+
+const Dyninst::SymtabAPI::Region *
+SectionManager::GetRegion(const std::string &name) const {
+  return GetRegion_impl<const Dyninst::SymtabAPI::Region *>(*this, name);
 }
 
-void SectionManager::AddRegion(Region *r) {
+Dyninst::SymtabAPI::Region *
+SectionManager::GetRegion(const std::string &name) {
+  return GetRegion_impl<Dyninst::SymtabAPI::Region *>(*this, name);
+}
+
+void SectionManager::AddRegion(Dyninst::SymtabAPI::Region *r) {
   for (auto &s : regions) {
     if (s.name == r->getRegionName()) {
       LOG(INFO) << "Trying to add duplicite section into manager "
