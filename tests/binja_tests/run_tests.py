@@ -23,9 +23,7 @@ def run_test(test):
         output += cmd + "\n"
 
         if "lift_program" in cmd:
-          print("Lifting Program")
           cmd += f" --llvm_version {llvm_version[0]}.{llvm_version[1]}"
-          print(cmd)
         output += subprocess.check_output(cmd.split(" "), cwd=workdir, stderr=subprocess.STDOUT).decode("charmap")
 
       # Run test command
