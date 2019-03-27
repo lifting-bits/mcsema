@@ -100,5 +100,3 @@ private:
 
   std::vector<Section> regions;
 };
-
-extern std::unique_ptr<SectionManager> gSectionManager;

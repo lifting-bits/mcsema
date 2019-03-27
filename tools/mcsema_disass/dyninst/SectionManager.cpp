@@ -21,11 +21,8 @@
 
 #include <glog/logging.h>
 
-
 using namespace Dyninst;
 using namespace SymtabAPI;
-
-std::unique_ptr<SectionManager> gSectionManager(new SectionManager);
 
 bool SectionManager::IsInRegion(const SymtabAPI::Region *r, Address a) const {
   if (!r) {

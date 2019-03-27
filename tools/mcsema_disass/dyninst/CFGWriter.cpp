@@ -217,7 +217,7 @@ CFGWriter::CFGWriter(mcsema::Module &m,
   symtab.getAllRegions(regions);
 
   for (auto reg : regions) {
-      gSectionManager->AddRegion(reg);
+      section_m.AddRegion(reg);
       if (reg->getMemOffset()) {
         ctx.segment_eas.push_back(reg->getMemOffset());
       }
@@ -407,7 +407,7 @@ void CFGWriter::WriteLocalVariables() {
 
 void CFGWriter::WriteExternalVariables() {
   std::vector<SymtabAPI::Symbol *> symbols;
-  symbols = gSectionManager->GetExternalRelocs(
+  symbols = section_m.GetExternalRelocs(
       Dyninst::SymtabAPI::Symbol::SymbolType::ST_OBJECT);
 
   LOG(INFO) << "Writing " << symbols.size() << " external variables";
@@ -474,7 +474,7 @@ void CFGWriter::WriteGlobalVariables() {
 // this as well
 void CFGWriter::SweepStubs() {
   for (ParseAPI::Function *func : code_object.funcs()) {
-    if (gSectionManager->IsInRegions({".plt.got"}, func->entry()->start())) {
+    if (section_m.IsInRegions({".plt.got"}, func->entry()->start())) {
       auto inst =  func->entry()->getInsn(func->addr());
 
       if (inst->getCategory() == InstructionAPI::c_BranchInsn) {
@@ -527,7 +527,7 @@ void CFGWriter::WriteInternalFunctions() {
     }
     // We want to ignore the .got.plt stubs, since they are not needed
     // and cfg file would grow significantly
-    else if (gSectionManager->IsInRegions({".got.plt", "plt.got"},
+    else if (section_m.IsInRegions({".got.plt", "plt.got"},
                                           func->entry()->start())) {
      LOG(INFO) << "Function " << func->name()
                << " is getting skipped because it is .got.plt stub";
@@ -661,11 +661,12 @@ void CFGWriter::WriteInstruction(InstructionAPI::Instruction *instruction,
 
 
 void WriteDisplacement(
-    DisassContext &ctx, mcsema::Instruction *cfg_instruction, Address &address) {
+    DisassContext &ctx, SectionManager &section_m,
+    mcsema::Instruction *cfg_instruction, Address &address) {
 
   if (ctx.HandleCodeXref(
       {static_cast<Address>(cfg_instruction->ea()),
-      address, cfg_instruction})) {
+      address, cfg_instruction}, section_m)) {
 
     GetLastXref(cfg_instruction)->set_operand_type(
         CodeReference::MemoryDisplacementOperand);
@@ -704,13 +705,13 @@ void CFGWriter::CheckDisplacement(Dyninst::InstructionAPI::Expression *expr,
       if (auto inner_expr =
               dynamic_cast<InstructionAPI::Expression *>(op.get())) {
         if (auto displacement = DisplacementHelper(inner_expr)) {
-          WriteDisplacement(ctx, cfg_instruction, displacement);
+          WriteDisplacement(ctx, section_m, cfg_instruction, displacement);
         }
       }
     }
   } else {
     if (auto displacement = DisplacementHelper(expr)) {
-      WriteDisplacement(ctx, cfg_instruction, displacement);
+      WriteDisplacement(ctx, section_m, cfg_instruction, displacement);
     }
   }
 }
@@ -747,7 +748,7 @@ void CFGWriter::HandleCallInstruction(InstructionAPI::Instruction *instruction,
 
   // What can happen is that we get xref somewhere in the .text and HandleXref
   // fills it with defaults. We need to check and correct it if needed
-  if (gSectionManager->IsCode(*target)) {
+  if (section_m.IsCode(*target)) {
     auto xref = cfg_instruction->mutable_xrefs(0);
 
     //xref->set_target_type(CodeReference::CodeTarget);
@@ -772,8 +773,8 @@ Address CFGWriter::immediateNonCall(InstructionAPI::Immediate* imm,
                                     mcsema::Instruction* cfg_instruction ) {
 
   Address a = imm->eval().convert<Address>();
-  if (!ctx.HandleCodeXref({addr, a, cfg_instruction}, false)) {
-    if (gSectionManager->IsCode(a)) {
+  if (!ctx.HandleCodeXref({addr, a, cfg_instruction}, section_m, false)) {
+    if (section_m.IsCode(a)) {
       AddCodeXref(cfg_instruction,
                   CodeReference::DataTarget,
                   CodeReference::ImmediateOperand,
@@ -807,7 +808,7 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
     return 0;
   }
 
-  ctx.HandleCodeXref({addr, *a, cfg_instruction});
+  ctx.HandleCodeXref({addr, *a, cfg_instruction}, section_m);
   return *a;
 
 }
@@ -816,17 +817,18 @@ Address CFGWriter::dereferenceNonCall(InstructionAPI::Dereference* deref,
 bool CFGWriter::HandleXref(mcsema::Instruction *cfg_instruction,
                            Address addr,
                            bool force) {
-  if (ctx.HandleCodeXref({0, addr, cfg_instruction}, false)) {
+  if (ctx.HandleCodeXref({0, addr, cfg_instruction}, section_m, false)) {
     return true;
   }
 
-  if (gSectionManager->IsCode(addr) &&
+  if (section_m.IsCode(addr) &&
       !ctx.getInternalFunction(addr)) {
-    inst_xrefs_to_resolve.insert({addr, {static_cast<Dyninst::Address>(cfg_instruction->ea()),
-                                         addr, cfg_instruction}});
+    inst_xrefs_to_resolve.insert(
+        {addr, {static_cast<Dyninst::Address>(cfg_instruction->ea()),
+        addr, cfg_instruction}});
   }
 
-  return ctx.HandleCodeXref({0, addr, cfg_instruction}, force);
+  return ctx.HandleCodeXref({0, addr, cfg_instruction}, section_m, force);
 }
 
 void CFGWriter::HandleNonCallInstruction(
@@ -868,7 +870,7 @@ void CFGWriter::HandleNonCallInstruction(
         if (auto a = TryEval(expr.get(), addr)) {
           HandleXref(cfg_instruction, *a);
 
-          if (gSectionManager->IsCode(*a)) {
+          if (section_m.IsCode(*a)) {
             // get last one and change it to code
             GetLastXref(cfg_instruction)->set_operand_type(CodeReference::MemoryOperand);
           }
@@ -891,7 +893,7 @@ void CFGWriter::HandleNonCallInstruction(
           }
           // ea is not really that important
           // in CrossXref<mcsema::Instruction>
-          if (ctx.HandleCodeXref({0, *a, cfg_instruction})) {
+          if (ctx.HandleCodeXref({0, *a, cfg_instruction}, section_m)) {
             auto cfg_xref = GetLastXref(cfg_instruction);
             cfg_xref->set_target_type(CodeReference::CodeTarget);
             cfg_xref->set_operand_type(CodeReference::ControlFlowOperand);
@@ -908,11 +910,11 @@ void CFGWriter::HandleNonCallInstruction(
   // something we should treat as function in cfg
   if (direct_values[0] && direct_values[1]) {
     addr -= instruction->size();
-    bool is_in_data = gSectionManager->IsInRegions(
+    bool is_in_data = section_m.IsInRegions(
         {".bss", ".data", ".rodata"},
         direct_values[0]);
 
-    if (gSectionManager->IsCode(direct_values[1]) &&
+    if (section_m.IsCode(direct_values[1]) &&
         is_in_data) {
 
       if (!ctx.getInternalFunction(direct_values[0])) {
@@ -926,7 +928,7 @@ void CFGWriter::HandleNonCallInstruction(
 
 void CFGWriter::WriteExternalFunctions() {
   std::vector<std::string> unknown;
-  auto symbols = gSectionManager->GetExternalRelocs(
+  auto symbols = section_m.GetExternalRelocs(
       Dyninst::SymtabAPI::Symbol::SymbolType::ST_FUNCTION);
 
   auto known = ext_funcs_m.GetAllUsed( unknown );
@@ -988,7 +990,7 @@ void WriteAsRaw(std::string& data, uint64_t number, int64_t offset) {
 //             -fPIC & -pie?
 void CFGWriter::WriteGOT(SymtabAPI::Region* region,
                                  mcsema::Segment* cfg_segment) {
-  auto rela_dyn = gSectionManager->GetRegion(".rela.dyn");
+  auto rela_dyn = section_m.GetRegion(".rela.dyn");
 
   if (!rela_dyn) {
     return;
@@ -998,7 +1000,7 @@ void CFGWriter::WriteGOT(SymtabAPI::Region* region,
   auto old_data = cfg_segment->mutable_data();
   std::string data{*old_data};
   for (auto reloc : relocations) {
-    if (!gSectionManager->IsInRegion(region, reloc.rel_addr())) {
+    if (!section_m.IsInRegion(region, reloc.rel_addr())) {
       continue;
     }
 
@@ -1044,7 +1046,7 @@ void CFGWriter::WriteGOT(SymtabAPI::Region* region,
 void CFGWriter::WriteRelocations(SymtabAPI::Region* region,
                          mcsema::Segment *segment) {
 
-  auto rela_dyn = gSectionManager->GetRegion(".rela.plt");
+  auto rela_dyn = section_m.GetRegion(".rela.plt");
   if (!rela_dyn) {
     return;
   }
@@ -1070,10 +1072,11 @@ void CFGWriter::WriteRelocations(SymtabAPI::Region* region,
 
 void WriteBssXrefs(
     DisassContext &ctx,
+    SectionManager &section_m,
     SymtabAPI::Region *region,
     mcsema::Segment *segment) {
   for (auto &external : ctx.external_vars) {
-    if (gSectionManager->IsInRegion(region, external.first)) {
+    if (section_m.IsInRegion(region, external.first)) {
       ctx.WriteAndAccount(
           {external.first, external.first, segment, external.second->name()},
           false/*, external.second->size()*/);
@@ -1085,8 +1088,8 @@ void WriteBssXrefs(
 // .rodata, .data have special treatment, since there can be string
 // variables and such
 void CFGWriter::WriteInternalData() {
-  auto dataRegions = gSectionManager->GetAllRegions();
-  SectionParser section_parser(&ctx, *gSectionManager);
+  auto dataRegions = section_m.GetAllRegions();
+  SectionParser section_parser(&ctx, section_m);
 
   for (auto region : dataRegions) {
 
@@ -1111,7 +1114,7 @@ void CFGWriter::WriteInternalData() {
       continue;
     }
     auto cfg_internal_data = module.add_segments();
-    gSectionManager->SetCFG(region, cfg_internal_data);
+    section_m.SetCFG(region, cfg_internal_data);
 
     std::string data;
     WriteRawData(data, region);
@@ -1160,7 +1163,7 @@ void CFGWriter::WriteInternalData() {
 
     // IDA output of .bss produced some "self xrefs"
     if (region->getRegionName() == ".bss") {
-      WriteBssXrefs(ctx, region, cfg_internal_data);
+      WriteBssXrefs(ctx, section_m, region, cfg_internal_data);
     }
 
     // Apply relocations of external functions

@@ -225,6 +225,7 @@ struct DisassContext {
   // If force=true function writes the xref even if target_ea
   // cannot be resolved in something reasonable
   bool HandleCodeXref(const CrossXref<mcsema::Instruction> &xref,
+                      SectionManager &section_m,
                       bool force=false) {
     if (FishForXref(global_vars, xref) ||
         FishForXref(external_funcs, xref) ||
@@ -240,8 +241,8 @@ struct DisassContext {
     // E.g printf("%s: %s\n", "partial string test", "string test");
     // .rodata will contain only partial string test and proper offset
     // will be used when "string test" is needed
-    if (gSectionManager->IsInRegions({".data", ".rodata", ".bss"},
-                                     xref.target_ea)) {
+    if (section_m.IsInRegions({".data", ".rodata", ".bss"},
+                              xref.target_ea)) {
       AddCodeXref(xref.segment,
                   mcsema::CodeReference::DataTarget,
                   mcsema::CodeReference::MemoryOperand,

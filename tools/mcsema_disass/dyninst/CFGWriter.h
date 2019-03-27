@@ -104,6 +104,7 @@ private:
   Dyninst::ParseAPI::CodeObject &code_object;
 
   ExternalFunctionManager ext_funcs_m;
+  SectionManager section_m;
 
   std::unordered_set<std::string> no_ret_funcs;
 
