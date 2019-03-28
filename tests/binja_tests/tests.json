@@ -378,7 +378,7 @@
       "./lift_program.py --llvm_version 4.0 --disassembler binja --workspace_dir ./workspace --binary test_binary --manual-recursive-descent --do-not-recover _DYNAMIC _IO_stdin_used __data_start __dso_handle __TMC_END__ __GNU_EH_FRAME_HDR"
     ],
     "test_command"      : "./workspace/lifted_obj/* 13",
-    "expected_output"   : "Iter: 0 	base: 4\nIter: 1 	base: 46\nIter: 2 	base: 50\nIter: 3 	base: 50\nIter: 4 	base: 51\nIter: 5 	base: 53\nIter: 6 	base: 95\nIter: 7 	base: 99\nIter: 8 	base: 99\nIter: 9 	base: 100\nIter: 10 	base: 102\nIter: 11 	base: 144\nIter: 12 	base: 148\nBefore sort:\n  2	42	4	0	1\nComparing:\n  Arg1 2\n  Arg2 42\nComparing:\n  Arg1 0\n  Arg2 1\nComparing:\n  Arg1 4\n  Arg2 0\nComparing:\n  Arg1 4\n  Arg2 1\nComparing:\n  Arg1 2\n  Arg2 0\nComparing:\n  Arg1 2\n  Arg2 1\nComparing:\n  Arg1 2\n  Arg2 4\nComparing:\n  Arg1 42\n  Arg2 4\nSorted:\n  0	1	2	4	42\n"
+    "expected_output"   : "Iter: 0 \tbase: 4\nIter: 1 \tbase: 46\nIter: 2 \tbase: 50\nIter: 3 \tbase: 50\nIter: 4 \tbase: 51\nIter: 5 \tbase: 53\nIter: 6 \tbase: 95\nIter: 7 \tbase: 99\nIter: 8 \tbase: 99\nIter: 9 \tbase: 100\nIter: 10 \tbase: 102\nIter: 11 \tbase: 144\nIter: 12 \tbase: 148\nBefore sort:\n\t2\t42\t4\t0\t1\nComparing:\n\tArg1 2\n\tArg2 42\nComparing:\n\tArg1 0\n\tArg2 1\nComparing:\n\tArg1 4\n\tArg2 0\nComparing:\n\tArg1 4\n\tArg2 1\nComparing:\n\tArg1 2\n\tArg2 0\nComparing:\n\tArg1 2\n\tArg2 1\nComparing:\n\tArg1 2\n\tArg2 4\nComparing:\n\tArg1 42\n\tArg2 4\nSorted:\n\t0\t1\t2\t4\t42\n"
   },
   {
     "name"              : "rand_and_strtol",
