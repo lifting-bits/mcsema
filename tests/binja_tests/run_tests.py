@@ -9,6 +9,9 @@ import subprocess
 from multiprocessing import Pool
 
 
+os.environ['PYTHONUNBUFFERED'] = "1"
+
+
 def run_test(test):
   with tempfile.TemporaryDirectory() as workdir:
 
@@ -21,18 +24,18 @@ def run_test(test):
 
       # Run setup commands
       for cmd in test["setup_commands"]:
-        output += cmd + "\n"
+        output = cmd + "\n"
 
         if "lift_program" in cmd:
           cmd += f" --llvm_version {llvm_version[0]}.{llvm_version[1]}"
-        output += subprocess.check_output(cmd.split(" "), cwd=workdir, stderr=subprocess.STDOUT).decode("charmap")
+        output += subprocess.check_output(cmd.split(" "), cwd=workdir, stderr=subprocess.STDOUT, universal_newlines=True)
 
       # Run test command
-      output += test["test_command"] + "\n"
-      output = subprocess.check_output(test["test_command"], cwd=workdir, stderr=subprocess.STDOUT, shell=True).decode("charmap")
+      output = test["test_command"] + "\n"
+      output = subprocess.check_output(test["test_command"], cwd=workdir, stderr=subprocess.STDOUT, shell=True, universal_newlines=True)
 
     except subprocess.CalledProcessError as e:  # If any of the terminal commands fail
-      return (False, test["name"], output + e.output.decode("charmap"))
+      return (False, test["name"], output + e.output)
 
     if output == test["expected_output"]:
       return (True, test["name"])
