@@ -262,12 +262,10 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   }
 
   bool xref_is_external = false;
-  bool xref_is_code = false;
 
   // Does the XREF think its target is external?
   if (xref->func) {
     xref_is_external = xref->func->is_external;
-    xref_is_code = true;
 
   } else if (xref->var) {
     xref_is_external = xref->var->is_external;

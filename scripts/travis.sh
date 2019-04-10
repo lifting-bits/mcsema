@@ -156,8 +156,8 @@ linux_build() {
   local log_file=`mktemp`
 
   # set up ada support for cmake
-  # Old supported versions: "35" "36" "37" "38" "39" 
-  llvm_version_list=( "40" "50" "60" )
+  # Old supported versions: "35" "36" "37" "38" "39" "40" 
+  llvm_version_list=( "50" "60" )
   for llvm_version in "${llvm_version_list[@]}" ; do
     printf "#\n"
     printf "# Running CI tests for LLVM version ${llvm_version}...\n"
@@ -354,7 +354,7 @@ linux_build_helper() {
   fi
 
   printf " > Installing...\n"
-  ( cd build && sudo make install ) > "${log_file}" 2>&1
+  ( cd build && sudo make install -j `nproc` ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to install the project. Error output follows:\n"
     printf "===\n"
@@ -375,7 +375,7 @@ linux_build_helper() {
     return 1
   fi
 
-  ( cd build && make ) > "${log_file}" 2>&1
+  ( cd build && make -j `nproc` ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to build test suite. Output below:\n"
     printf "===\n"

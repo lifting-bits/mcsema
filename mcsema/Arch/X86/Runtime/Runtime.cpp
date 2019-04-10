@@ -26,6 +26,14 @@
 #include "remill/Arch/X86/Runtime/State.h"
 #include "mcsema/Arch/X86/Runtime/Registers.h"
 
+#ifndef PRIx64
+# define PRIx64 "llx"
+#endif
+
+#ifndef PRIx32
+# define PRIx32 "x"
+#endif
+
 extern "C" {
 
 // Debug registers.
