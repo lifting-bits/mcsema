@@ -239,9 +239,8 @@ else()
 endif()
 
 # target for dyninst frontend
-if (DEFINED ENV{BUILD_MCSEMA_DYNINST_DISASS})
-    if($ENV{BUILD_MCSEMA_DYNINST_DISASS} EQUAL 1)
-        add_custom_target(generate-protobuf-files DEPENDS ${PROJECT_PROTOBUFSOURCEFILES})
+if (DEFINED BUILD_MCSEMA_DYNINST_DISASS)
+    if(${BUILD_MCSEMA_DYNINST_DISASS} EQUAL 1)
         add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/dyninst)
     endif()
 endif()
