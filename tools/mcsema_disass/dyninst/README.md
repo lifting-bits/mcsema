@@ -7,7 +7,7 @@ Later this code was picked up and reworked to what you currently see. As of now 
 
 ## Dependencies
 
-You won't need IDA Pro to run mcsema-dyninst-disass, but Git, CMake, Google Protobuf and Python are still required (see the top-level McSema README.md file for details). In addition to those requirements, you will need to build and install DyninstAPI. It is available in source code form [on GitHub](https://github.com/dyninst/dyninst). Follow the instructions there on how to build and install DyninstAPI before proceeding to the next step. Tested version is from the branch 9.3.x.
+You won't need IDA Pro to run mcsema-dyninst-disass, but Git, CMake, Google Protobuf and Python are still required (see the top-level McSema README.md file for details). In addition to those requirements, you will need to build and install DyninstAPI. It is available in source code form [on GitHub](https://github.com/dyninst/dyninst). Follow the instructions there on how to build and install DyninstAPI before proceeding to the next step. Use version from the branch 9.3.x.
 
 ## Building mcsema-dyninst-disass
 
@@ -15,12 +15,11 @@ Assuming that you've installed Dyninst to ```/usr/local/```, you need to export 
 
 ```shell
 export CMAKE_PREFIX_PATH=/usr/local/lib/cmake/Dyninst
-export BUILD_MCSEMA_DYNINST_DISASS=1
 ```
 
-The ```CMAKE_PREFIX_PATH``` environment variable tells CMake where to find the necessary Dyninst files, and the ```BUILD_MCSEMA_DYNINST_DISASS``` environment variable will cause the top-level CMakeLists.txt file to descend into the subdirectory where this frontend resides (otherwise it won't get built).
+The ```CMAKE_PREFIX_PATH``` environment variable tells CMake where to find the necessary Dyninst files.
 
-Now, you should be able to build this frontend along with McSema using the ```build.sh``` script from the remill repository. Please see the top-level McSema README.md file for details.
+Now, you should be able to build this frontend along with McSema using the ```build.sh --dyninst-frontend``` (sets ```BUILD_MCSEMA_DYNINST_DISASS``` variable in cmake) script from the remill repository. Please see the top-level McSema README.md file for details.
 Compiler with C++14 support is required.
 
 ## Running the tests
@@ -35,7 +34,7 @@ provides an overview of the required command line options. Supplied with the pro
 
 ## Using mcsema-dyninst-disass
 
-mcsema-dyninst-disass replaces the IDA Pro frontend in the sense that both take a binary file as input and produce a Google Protocol Buffer file as output. The output can then be fed into mcsema-lift for further processing.
+mcsema-dyninst-disass replaces the IDA Pro frontend in the sense that both take a binary file as input and produce a Google Protocol Buffer file as output. The output can then be fed into mcsema-lift for further processing. Command line arguments are the same as for other frontends.
 
 ## Known limitations
 Pull request fixing bugs or implementing missing features are welcomed!
@@ -44,27 +43,4 @@ Pull request fixing bugs or implementing missing features are welcomed!
 * Shared library are not lifted correctly
 * Exceptions are ignored - it just needs to be implement, PR is welcomed.
 * Binaries with debug info provides info about local variables, which is retrieved. What needs to be done is get all references to these locals. This is not provided by Dyninst and needs to be computed.
-* Still needs lots of testing, debugging, corner-case handling, ...
-
-## How does it work
-* First thing is getting address of main and init/fini in case that binary is stripped.
-* External function are retrieved based on information provided by DyninstAPI
-    * This may not cover every external function. In case that there is later a symbol in relocations we have no information about, we first check std-defs provided by user. This is unpleasant, since it would nice to get rid of it.
-    * For each function relocations are computed with ea out of binary
-* External variables are written with relocation out of binary only if Dyninst have no information about them except for name (ea and size are both 0)
-* Next are sections.
-    * Some information about variables in them may be provided by symtab
-    * Global offset family is written including relocations got from externals, so output is the same as IDA fronend
-    * .data and .rodata use following technique to search for xrefs and variables:
-        * Read from first no-zero to zero. If it is small enough try to check if it is pointer at something we already know about. If not add it to be resolved later. If it's big, we say it's variable.
-        * Heuristics to recognize jump tables.
-    * Other region are for now just read by 8bytes and checked for xrefs, ignoring possible variables.
-* After all section are written, xrefs that were put aside are resolved. If they don't point to anything they are probably variable.
-* Exceptions are references into .text section which may point some function we don't have due to binary being stripped. Therefore we try mark target of those xrefs as function entries.
-* Global variables are fully dependent on info from Dyninst
-* Internal function are written last
-    * References matched against external functions/vars, here Dyninst gets address of thunk so there is need to recalculate it to relocation
-    * Other possible targets are other xrefs from segments, global variables and other functions.
-    * If none is matched we assume we just missed some and say it is xref anyway. This seems to work, but is not the best solution.
-    * After each block check if it uses jump table.
-* After functions are parsed and written there could be some xrefs pointing into .text unresolved, so they are probably other functions we missed. We continue to parse until fixpoint over set of these xrefs is calculated.
+* Still needs lots of testing, debugging, corner-case handling, any feedback in form of issues or PRs is welcomed!
