@@ -299,6 +299,10 @@ Add the following folders to your PATH environment variable:
 
 Also update your PYTHONPATH: C:\mcsema\Lib\site-packages
 
+### Dyninst frontend
+
+Dyninst frontend can be build with ```./build.sh --dyninst-frontend```. More information can be found in ```tools/mcsema_disass/dyninst/README.md```.
+
 ## Additional Documentation
 
 * [McSema command line reference](docs/CommandLineReference.md)
@@ -323,6 +327,7 @@ This is a hotly contested issue. We must explore the etymology of the name to fi
 ### Why do I need IDA Pro to use McSema
 
 McSema's goal is binary to bitcode translation. Accurate disassembly and control flow recovery is a separate and difficult problem. IDA has already invested countless hours of engineering into getting disassembly right, and it only makes sense that we re-use existing work. We understand that not everyone can afford an IDA license. With the original release of McSema, we shipped our own recursive-descent disassembler. It was never as good as IDA, and it never would be. Maintaining the broken tool took away valuable development time from more important McSema work. We hope to eventually transition to more accessible control flow recovery front-ends, such as Binary Ninja (we have a branch with [experimental Binary Ninja support](https://github.com/trailofbits/mcsema/tree/binja_cfg_updates/tools/mcsema_disass/binja)). We very warmly welcome pull requests that implement support for new control flow recovery front-ends.
+There exists a [front-end using open-source Dyninst](https://github.com/trailofbits/mcsema/tree/binja_cfg_updates/tools/mcsema_disass/dyninst) disassembler. Although it is not as refined as the front-ends using proprietary disassemblers, it can be used to lift some non-trivial binaries.
 
 ### What is Remill, and why does McSema need it
 
