@@ -53,10 +53,14 @@ def is_sane_reference_target(ea):
     return False
 
 
-  item_size = idc.ItemSize(ea)
+  #item_size = idc.ItemSize(ea)
 
-  DEBUG("!!! target_ea = {:x} item_size = {}".format(ea, item_size))
-  return 1 != item_size 
+  #DEBUG("!!! target_ea = {:x} item_size = {}".format(ea, item_size))
+  #return 1 != item_size 
+  #NOTE(artem): Above lines commented out since they caused problems
+  # and we cannot determine what they fixed. If this code has problems
+  # again, consider a solution that handles both cases properly
+  return True
 
 def is_read_only_segment(ea):
   seg_ea = idc.SegStart(ea)
