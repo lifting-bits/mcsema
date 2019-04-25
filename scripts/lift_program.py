@@ -227,7 +227,7 @@ def main():
       '--output', quote(cfg),
       '--entrypoint', 'main',
       '--disassembler', da,
-      '--log_file', quote(log)]]
+      '--log_file', quote(log)]
 
   if is_pie:
     disass_args.append("--pie-mode")
