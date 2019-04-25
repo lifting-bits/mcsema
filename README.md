@@ -231,8 +231,6 @@ In order to verify that McSema works correctly as built, head on over to [the do
 **LLVM**
 1. Get the LLVM 7.0.1 (x64) installer from the LLVM download page: http://releases.llvm.org
 2. Do **NOT** enable "Add to PATH"
-3. Download the LLVM integration addon from the VS marketplace: https://marketplace.visualstudio.com/items?itemName=LLVMExtensions.llvm-toolchain
-4. Extract the '.vsix' archive as a ZIP archive, and copy the files within the `$VCTargets` folder to `C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\Common7\IDE\VC\VCTargets`
 
 **Python**
 1. Get the latest Python 2.7 (X64) installer from the official download page: https://www.python.org/downloads/windows/
@@ -257,8 +255,17 @@ git checkout -b production `cat tools/mcsema/.remill_commit_id`
 ```
 
 #### Step 3: Dependencies
-You can either build them yourself using our [cxx-common](https://github.com/trailofbits/cxx-common) dependency manager or download a pre-built package.
-Only the LLVM 5.0.1 package is supported right now, and you should build it using the Visual Studio 2017 Win64 generator with the LLVM 5.0.1 toolchain. The cxx-common script will automatically take care of this requirement.
+First, set up LLVM Toolchain Support for Visual Studio 2017 Build Tools. There is a script in remill to automate this for you.
+```
+cd C:\Projects\remill\scripts\windows (or wherever you cloned remill)
+powershell -nologo -executionpolicy bypass -File llvm_toolchain_vs2017.ps1
+```
+
+Next, its time to fetch library dependencies. You can either build them yourself using our [cxx-common](https://github.com/trailofbits/cxx-common) dependency manager or download a pre-built package.
+
+There are two versions of LLVM used by remill and mcsema. One version (currently 7.0.1) builds remill and mcsema. Another version (currently 5.0.1) is used to build the translation semantics. 
+
+On Windows, only the LLVM 5.0.1 package is supported for building semantics. If you build it yourself, use the Visual Studio 2017 Win64 generator with the LLVM 5.0.1 toolchain. The cxx-common script will automatically take care of this requirement.
 
 Binaries (extract to C:\Projects\tob_libraries)
 * [LLVM 5](https://s3.amazonaws.com/cxx-common/libraries-llvm50-windows10-amd64.7z)
