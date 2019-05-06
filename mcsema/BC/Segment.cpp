@@ -491,7 +491,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
         if (xref->var != nullptr) {
           LazyInitXRef(xref, val_type, val);
           val = llvm::ConstantInt::getNullValue(val_type);
-        }else {
+        } else {
           val = llvm::ConstantExpr::getTrunc(val, val_type);
         }
       }
