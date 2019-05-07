@@ -74,7 +74,7 @@ def get_cfg(args, fixed_args):
   RECOVER_OPTS['stack_vars'] = extra_args.recover_stack_vars
   RECOVER_OPTS['manual_recursive_descent'] = extra_args.manual_recursive_descent
   functions.DO_NOT_RECOVER += extra_args.do_not_recover
-  vars.SYM_IGNORE += extra_args.do_not_recover
+  vars.SYM_IGNORE += extra_args.ignore_symbols
 
 
   # Setup logger
@@ -89,7 +89,7 @@ def get_cfg(args, fixed_args):
   util.parse_defs_files(bv, args.os, extra_args.std_defs)
 
   # Recover cfg
-  log.debug('Starting recivery')
+  log.debug('Starting recovery')
   log.push()
   pb_mod = CFG_pb2.Module()
   pb_mod.name = os.path.basename(bv.file.filename)
