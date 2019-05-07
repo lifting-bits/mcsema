@@ -500,7 +500,10 @@ def parse_defs_file(bv, path):
         EXT_DATA_MAP[dname] = int(dsize)
       else:
         # (name) (# args) (cconv) (ret) [(sign) | None]
-        fname, args, cconv, ret, sign = (line.split() + [None])[:5]
+        try:
+          fname, args, cconv, ret, sign = (line.split() + [None])[:5]
+        except:
+          continue
 
         if cconv not in CCONV_TYPES:
           log.fatal('Unknown calling convention: %s', cconv)
