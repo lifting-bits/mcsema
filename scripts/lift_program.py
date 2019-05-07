@@ -229,7 +229,7 @@ def main():
       '--disassembler', da,
       '--log_file', quote(log)]
 
-  if is_pie:
+  if is_pie and not da == 'binja':
     disass_args.append("--pie-mode")
 
   disass_args.extend(command_args)
