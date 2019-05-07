@@ -90,7 +90,6 @@ def load_binary(path):
   bv.update_analysis_and_wait()
   log.debug('Binary analysed')
 
-
   # NOTE: at the moment binja will not load a binary
   # that doesn't have an entry point
   if len(bv) == 0:
@@ -161,17 +160,17 @@ def _search_phrase_op(il, target_op):
   # Continue left/right at an ADD
   if op == LowLevelILOperation.LLIL_ADD:
     return (_search_phrase_op(il.left, target_op) or
-        _search_phrase_op(il.right, target_op))
+            _search_phrase_op(il.right, target_op))
 
   # Continue left/right at an ADD
   if op == LowLevelILOperation.LLIL_SUB:
     return (_search_phrase_op(il.left, target_op) or
-        _search_phrase_op(il.right, target_op))
+            _search_phrase_op(il.right, target_op))
 
     # Continue left/right at an ADD
   if op == LowLevelILOperation.LLIL_CMP_E:
     return (_search_phrase_op(il.left, target_op) or
-        _search_phrase_op(il.right, target_op))
+            _search_phrase_op(il.right, target_op))
 
   # Terminate when constant is found
   if op == target_op:
@@ -193,7 +192,7 @@ def search_phrase_reg(il):
     return res.src.name
 
 
-def search_displ_base(il):
+def search_displacement_base(il):
   """ Searches for the base address used in a phrase[+displacement]
   ex: dword [eax * 4 + 0x08040000] -> 0x08040000
     dword [ebp + 0x8] -> 0x8
@@ -216,10 +215,82 @@ def get_jump_tail_call_target(bv, il):
   Returns:
     binja.Function
   """
+
+  il = il[0]
+  bb = get_basic_block(bv, il)
+
   try:
-    return bv.get_function_at(il.dest.constant)
-  except:
+    return bv.get_function_at(bb.function.get_low_level_il_at(il.address).dest.constant)
+  except AttributeError:
     return None
+
+
+def get_basic_block(bv, il):
+  # Should work eventually, currently a bug in binja
+  # bb = il.il_basic_block
+
+  bb = bv.get_basic_blocks_at(il.address)
+
+  if len(bb) > 1:
+    for b in bb:
+      if b.arch == il.function.arch:
+        bb = b
+  else:
+    bb = bb[0]
+
+  return bb
+
+
+def get_il_basic_block(il):
+  for bb in il.function:
+    if bb.start <= il.instr_index and il.instr_index < bb.end:
+      return bb
+  return None
+
+
+def get_targets(il):
+  try:
+    return [e.to_value for e in il.dest.possible_values.table]
+  except:
+    """ If there is no targets, it's not a form of jump """
+    return None
+
+
+# Recover all LLIL for a single instruction (for `rep movsb` and similar)
+def get_all_lifted_il(bv, il, all_il=[]):
+  func = il.function
+  index = il.instr_index
+
+  while func[index].address == il.address:
+    llil = func[index]
+    if index not in all_il:
+      all_il.append(index)
+
+    if llil.operation is binja.LowLevelILOperation.LLIL_IF:
+      inst = func[llil.operands[1]]
+      if inst.address == il.address and inst.instr_index not in all_il:
+        get_all_lifted_il(bv, inst, all_il)
+
+      inst = func[llil.operands[2]]
+      if inst.address == il.address and inst.instr_index not in all_il:
+        get_all_lifted_il(bv, inst, all_il)
+
+    elif llil.operation is binja.LowLevelILOperation.LLIL_GOTO:
+      inst = func[llil.dest]
+      if inst.address == il.address and inst.instr_index not in all_il:
+        get_all_lifted_il(bv, inst, all_il)
+
+    if index + 1 < get_il_basic_block(llil).end:
+      index += 1
+    else:
+      break
+
+    try:
+      func[index]
+    except IndexError:
+      break
+
+  return [func[i] for i in all_il]
 
 
 ######## Boolean Getters ########
@@ -273,11 +344,35 @@ def is_tls_section(bv, addr):
   return any(sect in ['.tbss', '.tdata', '.tls'] for sect in sect_names)
 
 
-def is_jump_tail_call(bv, il):
+def is_jump_tail_call(bv, all_il):
   """ Returns `True` if the given il is a jump to another function """
-  return il.operation == LowLevelILOperation.LLIL_JUMP and \
-         il.dest.operation == LowLevelILOperation.LLIL_CONST_PTR and \
-         get_jump_tail_call_target(bv, il) is not None
+  il = all_il[0]
+  bb = get_basic_block(bv, il)
+
+  if bb.function.get_low_level_il_at(il.address).operation is binja.LowLevelILOperation.LLIL_TAILCALL:
+    return True
+  return False
+
+
+def xref_in_all_il(all_il):
+  for il in all_il:
+    if xref_in_il(il):
+      return True
+  return False
+
+
+def xref_in_il(il):
+  for token in il.tokens:
+    if token.type in [binja.InstructionTextTokenType.PossibleAddressToken,
+                      binja.InstructionTextTokenType.IndirectImportToken,
+                      binja.InstructionTextTokenType.ImportToken,
+                      binja.InstructionTextTokenType.FieldNameToken,
+                      binja.InstructionTextTokenType.ExternalSymbolToken,
+                      binja.InstructionTextTokenType.DataSymbolToken,
+                      binja.InstructionTextTokenType.CodeSymbolToken,
+                      binja.InstructionTextTokenType.CodeRelativeAddressToken]:
+      return True
+  return False
 
 
 def is_section_external(bv, sect):
@@ -307,51 +402,8 @@ def is_section_external(bv, sect):
   return False
 
 
-# TODO : I think this can be simplified/more robust
-def is_local_noreturn(bv, il):
-  """
-  Args:
-    bv (binja.BinaryView)
-    il (binja.LowLevelILInstruction):
-
-  Returns:
-    bool
-  """
-  if il.operation in [LowLevelILOperation.LLIL_CALL,
-            LowLevelILOperation.LLIL_JUMP,
-            LowLevelILOperation.LLIL_GOTO]:
-    # Resolve the destination address
-    tgt_addr = None
-    dst = il.dest
-
-    # GOTOs have an il index as the arg
-    if isinstance(dst, int):
-      tgt_addr = il.function[dst].address
-
-    # Others will have an expression as the argument
-    elif isinstance(dst, binja.LowLevelILInstruction):
-      # Immediate address
-      if dst.operation in [LowLevelILOperation.LLIL_CONST,
-                 LowLevelILOperation.LLIL_CONST_PTR]:
-        tgt_addr = dst.constant
-
-      # Register
-      elif dst.operation == LowLevelILOperation.LLIL_REG:
-        # Attempt to resolve the register value
-        func = il.function.source_function
-        reg_val = func.get_reg_value_at(il.address, dst.src)
-        if reg_val.type == RegisterValueType.ConstantValue:
-          tgt_addr = reg_val.value
-
-    # If a target address was recovered, check if it's in a noreturn function
-    if tgt_addr is not None:
-      tgt_func = get_func_containing(bv, tgt_addr)
-      if tgt_func is not None:
-        return not tgt_func.function_type.can_return
-
-  # Other instructions that terminate control flow
-  return il.operation in [LowLevelILOperation.LLIL_TRAP,
-              LowLevelILOperation.LLIL_BP]
+def is_end_of_block(address, bb):
+  return address+bb.view.get_instruction_length(address) == bb.end
 
 
 ######## Other Helper Functions ########
@@ -407,7 +459,7 @@ def recover_externals(bv, pb_mod):
 
     elif sym.type == SymbolType.ImportedDataSymbol:
       vars.recover_ext_var(bv, pb_mod, sym)
-    
+
     # Todo: Don't hardcode, but this gets the tests working for now
     elif sym.name in ["stdin", "stdout", "stderr"]:
       vars.recover_ext_var(bv, pb_mod, sym)

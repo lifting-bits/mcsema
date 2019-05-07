@@ -61,6 +61,7 @@ def pop():
 def debug(s, *args):
   _log.debug("  {}{}".format(_DEBUG_PREFIX, str(s) % args))
 
+
 def fatal(s, *args):
   _log.fatal("  {}{}".format(_DEBUG_PREFIX, str(s) % args))
 

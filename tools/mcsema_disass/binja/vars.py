@@ -24,14 +24,14 @@ import log
 
 # Linker errors that pop up can usually be solved by ignoring the symbol here
 SYM_IGNORE = [
-#   '__data_start',
-#   '__dso_handle',
-#   '__init_array_start',
-#   '__init_array_end',
-#   '__TMC_END__',
-#   '__JCR_END__',
-#   '__elf_header',
-#   '_DYNAMIC',
+    #   '__data_start',
+    #   '__dso_handle',
+    #   '__init_array_start',
+    #   '__init_array_end',
+    #   '__TMC_END__',
+    #   '__JCR_END__',
+    #   '__elf_header',
+    #   '_DYNAMIC',
 ]
 
 
@@ -173,7 +173,7 @@ def find_stack_var_refs(bv, inst, il, var_refs):
 
   # Pull out info about the phrase in this instruction
   reg = util.search_phrase_reg(il)
-  off = util.search_displ_base(il) or 0
+  off = util.search_displacement_base(il) or 0
 
   # If this is accessing a local var, save the ref info
   if reg in [_sp_name(bv), _bp_name(bv)]:
@@ -196,9 +196,9 @@ def recover_section_vars(bv, pb_seg, sect_start, sect_end):
   for sym in bv.get_symbols():
     # Ignore functions and externals
     if sym.type in [SymbolType.FunctionSymbol,
-            SymbolType.ImportedFunctionSymbol,
-            SymbolType.ImportedDataSymbol,
-            SymbolType.ImportAddressSymbol]:
+                    SymbolType.ImportedFunctionSymbol,
+                    SymbolType.ImportedDataSymbol,
+                    SymbolType.ImportAddressSymbol]:
       continue
 
     if sect_start <= sym.address < sect_end:

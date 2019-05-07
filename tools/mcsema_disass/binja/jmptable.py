@@ -26,13 +26,14 @@ import log
 
 class JMPTable(object):
   """ Simple container for jump table info """
+
   def __init__(self, bv, rel_base, targets, rel_off=0):
     self.rel_off = rel_off
     self.base_addr = rel_base
     self.targets = targets
 
 
-def search_ssa_mlil_displ(il, ptr=False, _neg=False):
+def search_ssa_mlil_displacement(il, ptr=False, _neg=False):
   """ Searches for a MLIL_CONST[_PTR] as a child of an ADD or SUB
 
   Args:
@@ -45,13 +46,13 @@ def search_ssa_mlil_displ(il, ptr=False, _neg=False):
   """
   # The il may be inside a MLIL_LOAD
   if il.operation == MediumLevelILOperation.MLIL_LOAD:
-    return search_ssa_mlil_displ(il.src, ptr, _neg)
+    return search_ssa_mlil_displacement(il.src, ptr, _neg)
 
   # Continue left/right for ADD/SUB only
   elif il.operation in [MediumLevelILOperation.MLIL_ADD, MediumLevelILOperation.MLIL_SUB]:
     _neg = (il.operation == MediumLevelILOperation.MLIL_SUB)
-    return (search_ssa_mlil_displ(il.left, ptr, _neg) or
-            search_ssa_mlil_displ(il.right, ptr, _neg))
+    return (search_ssa_mlil_displacement(il.left, ptr, _neg) or
+            search_ssa_mlil_displacement(il.right, ptr, _neg))
 
   # Terminate when we find a constant
   const_type = MediumLevelILOperation.MLIL_CONST_PTR if ptr else MediumLevelILOperation.MLIL_CONST
@@ -71,6 +72,25 @@ def get_jmptable(bv, il):
   Returns:
     JMPTable: Jump table info if found, None otherwise
   """
+
+  # It's not a jump or a jump table if it's not at the end of a block
+  basic_block = util.get_basic_block(bv, il)
+  if not util.is_end_of_block(il.address, basic_block):
+    return None
+
+  # Needs to have more than one outgoing edge?
+  outgoing_edges = basic_block.outgoing_edges
+  if len(outgoing_edges) <= 2:
+    return None
+
+  # There needs to be more than no inderect branches?
+  indirect_branch_count = 0
+  for oe in outgoing_edges:
+    if oe.type is binja.BranchType.IndirectBranch:
+      indirect_branch_count += 1
+  if indirect_branch_count > 1:
+    return None
+
   func = il.function.source_function
   mlil_func = func.medium_level_il
   llil_func = func.low_level_il
@@ -78,16 +98,13 @@ def get_jmptable(bv, il):
   llil_inst_idx = llil_func.get_instruction_start(il.address)
   mlil_inst_idx = llil_func.get_medium_level_il_instruction_index(llil_inst_idx)
 
-  try:
-    targets = [e.to_value for e in il.dest.possible_values.table]
-  except:
-    """ If there is no targets, it's not a form of jump """
-    return None
+  targets = util.get_targets(il)
 
   # Should be able to find table info now
   tbl = None
 
   # Jumping to a register
+  print(il)
   if il.dest.operation == LowLevelILOperation.LLIL_REG:
     # This is likely a relative offset table
     ssa_mlil_func = func.medium_level_il.ssa_form
@@ -104,14 +121,14 @@ def get_jmptable(bv, il):
     ssa_mlil_jmp_var_def = ssa_mlil_func[ssa_mlil_func.get_ssa_var_definition(jmp_var)]
 
     # Possible jump table info here, try parsing it
-    base = search_ssa_mlil_displ(ssa_mlil_jmp_var_def.src, ptr=True)
+    base = search_ssa_mlil_displacement(ssa_mlil_jmp_var_def.src, ptr=True)
     offset = 0
 
     # If parsing worked, identify table type and return
 
     # Most common case:
-     # 2. add table entry to table_base
-     # 1. load from table_base + offset
+    # 2. add table entry to table_base
+    # 1. load from table_base + offset
 
     # 2:
     if ssa_mlil_jmp_var_def.src.operation is binja.MediumLevelILOperation.MLIL_ADD and \
@@ -145,7 +162,7 @@ def get_jmptable(bv, il):
   # Full jump expression
   else:
     # Parse out the base address
-    base = util.search_displ_base(il.dest)
+    base = util.search_displacement_base(il.dest)
     if base is not None:
       tbl = JMPTable(bv, base, targets)
 

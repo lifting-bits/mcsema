@@ -22,8 +22,8 @@ EXT_DATA_MAP = {}
 
 RECOVER_OPTS = {}
 # Defaults:
-  # 'stack_vars': False,
-  # 'manual_recursive_descent': False
+# 'stack_vars': False,
+# 'manual_recursive_descent': False
 
 # Internal Imports
 import functions
@@ -59,13 +59,13 @@ def get_cfg(args, fixed_args):
 
   parser.add_argument(
       '--do-not-recover',
-      help='Space-deliminated list of function names not to recover',
+      help='Space-delimited list of function names not to recover',
       nargs='+',
       default=[])
 
   parser.add_argument(
       '--ignore-symbols',
-      help='Space-deliminated list of symbol names not to recover',
+      help='Space-delimited list of symbol names not to recover',
       nargs='+',
       default=[])
   extra_args = parser.parse_args(fixed_args)
@@ -75,7 +75,6 @@ def get_cfg(args, fixed_args):
   RECOVER_OPTS['manual_recursive_descent'] = extra_args.manual_recursive_descent
   functions.DO_NOT_RECOVER += extra_args.do_not_recover
   vars.SYM_IGNORE += extra_args.ignore_symbols
-
 
   # Setup logger
   log.init(args.log_file)

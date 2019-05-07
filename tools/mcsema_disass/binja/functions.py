@@ -58,7 +58,7 @@ def recover_functions(bv, pb_mod, entrypoint):
   entry_addr = bv.symbols[entrypoint].address
 
   if RECOVER_OPTS["manual_recursive_descent"]:
-    # Impliment recursive descent
+    # Implement recursive descent
     TO_RECOVER.put(entry_addr)
 
     while not TO_RECOVER.empty():
@@ -79,18 +79,18 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
   """
   func = bv.get_function_at(addr)
 
-  if func.symbol.name in DO_NOT_RECOVER:
-    log.debug("Skipping function {} at {:x} per command-line arguments".format(func.symbol.name, addr))
+  if func.symbol.full_name in DO_NOT_RECOVER:
+    log.debug("Skipping function {} at {:x} per command-line arguments".format(func.symbol.full_name, addr))
     return
   elif func is None:
     log.error('No function defined at 0x%x, skipping', addr)
     return
   elif func.symbol.type == SymbolType.ImportedFunctionSymbol:
     # Externals are recovered later, skip this
-    log.warn("Skipping external function '%s' in main CFG recovery", func.symbol.name)
+    log.warn("Skipping external function '%s' in main CFG recovery", func.symbol.full_name)
     return
 
-  log.debug("Recovering function {} at {:x}".format(func.symbol.name, addr))
+  log.debug("Recovering function {} at {:x}".format(func.symbol.full_name, addr))
 
   # Recover all basic blocks
   log.pop()
@@ -106,7 +106,7 @@ def recover_blocks(func, pb_mod, is_entry):
   """
   Args:
   bv (binja.BinaryView)
-  func (binja.Function) 
+  func (binja.Function)
   pb_func
   """
   # Initialize the protobuf for this function
@@ -129,22 +129,48 @@ def recover_block(bb, pb_func, var_refs):
   pb_block.successor_eas.extend(edge.target.start for edge in bb.outgoing_edges)
 
   # Recover every instruction in the basic block (bb)
+  recovered_addresses = []  # Track what's been recovered as to skip duplicates
   for inst in bb.disassembly_text:
-    # Skip over anything that isn't an instruction
-    if inst.tokens[0].type != InstructionTextTokenType.InstructionToken:
+    if inst.address in recovered_addresses:
       continue
+    else:
+      recovered_addresses.append(inst.address)
 
     lifted_il = bb.function.get_lifted_il_at(inst.address)
-    pb_inst = pb_block.instructions.add()
+    all_lil = util.get_all_lifted_il(bb.view, lifted_il, [])
 
-    recover_inst(bb.view, bb.function, pb_block, pb_inst, lifted_il, is_last=(inst.address == bb.end))
+    pb_inst = pb_block.instructions.add()
+    if util.is_end_of_block(inst.address, bb):
+      recover_inst_last(bb.view, bb.function, pb_block, pb_inst, all_lil, inst.address)
+    else:
+      recover_inst(bb.view, bb.function, pb_block, pb_inst, all_lil, inst.address)
 
     # Find any references to stack vars in this instruction
     if RECOVER_OPTS['stack_vars']:
       vars.find_stack_var_refs(bb.view, inst, lifted_il, var_refs)
 
 
-def recover_inst(bv, func, pb_block, pb_inst, lifted_il, is_last):
+def recover_inst_last(bv, func, pb_block, pb_inst, lifted_il, address):
+  recover_inst(bv, func, pb_block, pb_inst, lifted_il, address)
+
+  # Is noreturn?
+  bb = util.get_basic_block(bv, lifted_il[0])
+  if not bb.can_exit:
+    pb_inst.local_noreturn = True
+
+  # Is tailcall? : Add the target of a tail call as a successor
+  if util.is_jump_tail_call(bv, lifted_il):
+    target = util.get_jump_tail_call_target(bv, lifted_il)
+    if target is not None:
+      pb_block.successor_eas.append(target.start)
+
+  if len(pb_block.successor_eas):
+    log.debug("  Successors: {}".format(", ".join("{:x}".format(ea) for ea in pb_block.successor_eas)))
+  else:
+    log.debug("  No successors")
+
+
+def recover_inst(bv, func, pb_block, pb_inst, lifted_il, address):
   """
   Args:
     bv (binja.BinaryView)
@@ -152,44 +178,22 @@ def recover_inst(bv, func, pb_block, pb_inst, lifted_il, is_last):
     il (binaryninja.lowlevelil.LowLevelILInstruction)
     all_il (list): Collection of all il instructions at this address
              (e.g. all instructions expanded from a cmov)
-    is_last (bool)
   """
-  pb_inst.ea = lifted_il.address
-  pb_inst.bytes = bv.read(lifted_il.address, bv.get_instruction_length(lifted_il.address))
+  pb_inst.ea = address
+  pb_inst.bytes = bv.read(address, bv.get_instruction_length(address))
 
   # Search all il instructions at the current address for xrefs
-  refs = set()
-
-  llil = lifted_il.function.source_function.get_low_level_il_at(lifted_il.address)
-  try:
-      iter(llil)
-  except TypeError:
-      llil = [llil]
-  for il_exp in llil:
-    refs.update(xrefs.get_xrefs(bv, func, il_exp))
+  refs = xrefs.get_xrefs(bv, func, lifted_il, address)
 
   # Add all discovered xrefs to pb_inst
   debug_refs = []
   for ref in refs:
     debug_refs.append(xrefs.add_xref(bv, pb_inst, ref.addr, ref.mask, ref.cfg_type))
 
-  if util.is_local_noreturn(bv, lifted_il):
-    pb_inst.local_noreturn = True
+  # References jump table?
+  recover_table(bv, pb_inst, pb_block, debug_refs, lifted_il[0])
 
-  # Add the target of a tail call as a successor
-  if util.is_jump_tail_call(bv, lifted_il):
-    tgt = lifted_il.dest.constant
-    pb_block.successor_eas.append(tgt)
-
-  recover_table(bv, pb_inst, pb_block, debug_refs, llil[0])
-
-  log.debug("I: {:x} {}".format(lifted_il.address, " ".join(debug_refs)))
-
-  if is_last:
-    if len(pb_block.successor_eas):
-      log.debug("  Successors: {}".format(", ".join("{:x}".format(ea) for ea in pb_block.successor_eas)))
-    else:
-      log.debug("  No successors")
+  log.debug("I: {:x} {}".format(address, " ".join(debug_refs)))
 
 
 def recover_table(bv, pb_inst, pb_block, debug_refs, il):
@@ -229,7 +233,11 @@ def recover_ext_func(bv, pb_mod, sym):
     pb_extfn.ea = sym.address
     pb_extfn.argument_count = args
     pb_extfn.cc = cconv
-    pb_extfn.has_return = func.function_type.return_value.type_class != TypeClass.VoidTypeClass
+
+    pb_extfn.has_return = False
+    # pb_extfn.has_return = func.function_type.return_value.type_class != TypeClass.VoidTypeClass
+    # log.debug('Has return?' + str(pb_extfn.has_return))
+
     pb_extfn.no_return = ret == 'Y'
     pb_extfn.is_weak = False  # TODO: figure out how to decide this
 
