@@ -8,6 +8,7 @@ import tempfile
 import subprocess
 from multiprocessing import Pool
 
+
 def run_test(test):
   with tempfile.TemporaryDirectory() as workdir:
 
@@ -37,9 +38,9 @@ def run_test(test):
       return (True, test["name"])
     else:
       return (False, test["name"],
-        "Output didn't match:\n" +
-        f"  Expected:  '{test['expected_output']}'\n" +
-        f"  Generated: '{output}'\n")
+              "Output didn't match:\n" +
+              f"  Expected:  '{test['expected_output']}'\n" +
+              f"  Generated: '{output}'\n")
 
 
 if __name__ == '__main__':
