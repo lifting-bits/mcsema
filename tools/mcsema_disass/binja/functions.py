@@ -15,6 +15,7 @@
 from collections import defaultdict
 from Queue import Queue
 
+import binaryninja as bn
 from binaryninja.enums import (
   SymbolType, TypeClass,
   InstructionTextTokenType
@@ -78,6 +79,10 @@ def recover_function(bv, pb_mod, addr, is_entry=False):
   """
   """
   func = bv.get_function_at(addr)
+
+  if func.analysis_skipped:
+    func.analysis_skip_override = bn.FunctionAnalysisSkipOverride.NeverSkipFunctionAnalysis
+    bv.update_analysis_and_wait()
 
   if func.symbol.full_name in DO_NOT_RECOVER:
     log.debug("Skipping function {} at {:x} per command-line arguments".format(func.symbol.full_name, addr))
