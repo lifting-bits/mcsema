@@ -16,7 +16,7 @@ from binaryninja.enums import (
   LowLevelILOperation, MediumLevelILOperation, RegisterValueType
 )
 
-import binaryninja as binja
+import binaryninja as bn
 
 JMP_TABLES = []
 
@@ -37,7 +37,7 @@ def search_ssa_mlil_displacement(il, ptr=False, _neg=False):
   """ Searches for a MLIL_CONST[_PTR] as a child of an ADD or SUB
 
   Args:
-    il (binja.LowLevelILInstruction): Instruction to parse
+    il (bn.LowLevelILInstruction): Instruction to parse
     ptr (bool): Searches for CONST_PTR instead of CONST if True
     _neg (bool): Used internally to negate the final output if needed
 
@@ -66,8 +66,8 @@ def get_jmptable(bv, il):
   """ Gathers jump table information (if any) being referenced at the given il
 
   Args:
-    bv (binja.BinaryView)
-    il (binja.LowLevelILInstruction)
+    bv (bn.BinaryView)
+    il (bn.LowLevelILInstruction)
 
   Returns:
     JMPTable: Jump table info if found, None otherwise
@@ -86,7 +86,7 @@ def get_jmptable(bv, il):
   # There needs to be more than no inderect branches?
   indirect_branch_count = 0
   for oe in outgoing_edges:
-    if oe.type is binja.BranchType.IndirectBranch:
+    if oe.type is bn.BranchType.IndirectBranch:
       indirect_branch_count += 1
   if indirect_branch_count > 1:
     return None
@@ -131,18 +131,18 @@ def get_jmptable(bv, il):
     # 1. load from table_base + offset
 
     # 2:
-    if ssa_mlil_jmp_var_def.src.operation is binja.MediumLevelILOperation.MLIL_ADD and \
-       binja.MediumLevelILOperation.MLIL_CONST_PTR in [ssa_mlil_jmp_var_def.src.left.operation, ssa_mlil_jmp_var_def.src.right.operation]:
+    if ssa_mlil_jmp_var_def.src.operation is bn.MediumLevelILOperation.MLIL_ADD and \
+       bn.MediumLevelILOperation.MLIL_CONST_PTR in [ssa_mlil_jmp_var_def.src.left.operation, ssa_mlil_jmp_var_def.src.right.operation]:
 
       offset_base = ssa_mlil_jmp_var_def.src.address
 
       add_pointer = None
       left_add_pointer = False
 
-      if ssa_mlil_jmp_var_def.src.left.operation is binja.MediumLevelILOperation.MLIL_CONST_PTR:
+      if ssa_mlil_jmp_var_def.src.left.operation is bn.MediumLevelILOperation.MLIL_CONST_PTR:
         add_pointer = ssa_mlil_jmp_var_def.src.left.constant
         left_add_pointer = True
-      if ssa_mlil_jmp_var_def.src.right.operation is binja.MediumLevelILOperation.MLIL_CONST_PTR:
+      if ssa_mlil_jmp_var_def.src.right.operation is bn.MediumLevelILOperation.MLIL_CONST_PTR:
         add_pointer = ssa_mlil_jmp_var_def.src.right.constant
 
       # 1:
@@ -173,20 +173,20 @@ def get_jmptable(bv, il):
 
 def check_if_load_from_table(ssa_var, func):
   # This is what we're looking for
-  if ssa_var.operation is binja.MediumLevelILOperation.MLIL_LOAD_SSA:
-    if ssa_var.src.left.operation is binja.MediumLevelILOperation.MLIL_CONST_PTR:
+  if ssa_var.operation is bn.MediumLevelILOperation.MLIL_LOAD_SSA:
+    if ssa_var.src.left.operation is bn.MediumLevelILOperation.MLIL_CONST_PTR:
       return (True, ssa_var.src.left.constant)
-    elif ssa_var.src.right.operation is binja.MediumLevelILOperation.MLIL_CONST_PTR:
+    elif ssa_var.src.right.operation is bn.MediumLevelILOperation.MLIL_CONST_PTR:
       return (True, ssa_var.src.right.constant)
     else:
       return (False, 0)
 
   # Filter through some instruction types
-  elif ssa_var.operation in [binja.MediumLevelILOperation.MLIL_SX, binja.MediumLevelILOperation.MLIL_ZX]:
+  elif ssa_var.operation in [bn.MediumLevelILOperation.MLIL_SX, bn.MediumLevelILOperation.MLIL_ZX]:
     return check_if_load_from_table(ssa_var.src, func)
 
   # If it is a variable, find the definition
-  elif ssa_var.operation in [binja.MediumLevelILOperation.MLIL_VAR_SSA, binja.MediumLevelILOperation.MLIL_VAR_SSA_FIELD]:
+  elif ssa_var.operation in [bn.MediumLevelILOperation.MLIL_VAR_SSA, bn.MediumLevelILOperation.MLIL_VAR_SSA_FIELD]:
     # Get the variable is definition, will except if it is the original definition
     try:
       ssa_def = func[func.get_ssa_var_definition(ssa_var.src)]

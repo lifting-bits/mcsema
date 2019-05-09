@@ -14,7 +14,7 @@
 
 from enum import Enum
 
-import binaryninja as binja
+import binaryninja as bn
 from binaryninja.enums import LowLevelILOperation
 
 from functions import RECOVERED, TO_RECOVER
@@ -33,8 +33,8 @@ _IGNORED_XREF_OP_TYPES = (LowLevelILOperation.LLIL_JUMP,
                           LowLevelILOperation.LLIL_UNIMPL)
 
 
-_CONST_OR_CONST_PTR_TYPES = (binja.RegisterValueType.ConstantValue,
-                             binja.RegisterValueType.ConstantPointerValue)
+_CONST_OR_CONST_PTR_TYPES = (bn.RegisterValueType.ConstantValue,
+                             bn.RegisterValueType.ConstantPointerValue)
 
 _AARCH64_ADRP_XREFS = {}
 
@@ -137,8 +137,8 @@ def _get_xrefs(bv, all_il, address, reftype=XRef.Type.IMMEDIATE):
   """ Gathers xrefs in a Lifted IL instruction
 
   Args:
-    bv (binja.BinaryView)
-    il (binja.LowLevelILInstruction)
+    bv (bn.BinaryView)
+    il (bn.LowLevelILInstruction)
     reftype (XRef.Type)
 
   Returns:
@@ -170,10 +170,10 @@ def _get_xref_for_lifted_il(bv, lifted_il, refs, reftype, parent=None):
   """ Recursively gather xrefs in an IL instruction
 
   Args:
-    bv (binja.BinaryView)
-    il (binja.LowLevelILInstruction)
+    bv (bn.BinaryView)
+    il (bn.LowLevelILInstruction)
     reftype (int)
-    parent (binja.LowLevelILInstruction)
+    parent (bn.LowLevelILInstruction)
 
   Returns:
     set[XRef]
@@ -303,9 +303,9 @@ def recover_section_cross_references(bv, pb_seg, real_sect, sect_start, sect_end
   """ Find references to other code/data in this section
 
   Args:
-    bv (binja.BinaryView)
+    bv (bn.BinaryView)
     pb_seg (CFG_pb2.Segment)
-    real_sect (binja.binaryview.Section)
+    real_sect (bn.binaryview.Section)
     sect_start (int)
     sect_end (int)
   """

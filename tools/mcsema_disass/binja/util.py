@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import binaryninja as binja
+import binaryninja as bn
 from binaryninja.enums import (
   Endianness, LowLevelILOperation, SectionSemantics, RegisterValueType, SymbolType
 )
@@ -51,7 +51,7 @@ CCONV_TYPES = {
 ######## Binary Stuff ########
 
 def read_dword(bv, addr):
-  # type: (binja.BinaryView, int) -> int
+  # type: (bn.BinaryView, int) -> int
   # Pad the data if fewer than 4 bytes are read
   endianness = ENDIAN_TO_STRUCT[bv.endianness]
   data = bv.read(addr, 4)
@@ -61,7 +61,7 @@ def read_dword(bv, addr):
 
 
 def read_qword(bv, addr):
-  # type: (binja.BinaryView, int) -> int
+  # type: (bn.BinaryView, int) -> int
   # Pad the data if fewer than 8 bytes are read
   endianness = ENDIAN_TO_STRUCT[bv.endianness]
   data = bv.read(addr, 8)
@@ -73,13 +73,13 @@ def read_qword(bv, addr):
 def load_binary(path):
   magic_type = magic.from_file(path)
   if 'ELF' in magic_type:
-    bv_type = binja.BinaryViewType['ELF']
+    bv_type = bn.BinaryViewType['ELF']
   elif 'PE32' in magic_type:
-    bv_type = binja.BinaryViewType['PE']
+    bv_type = bn.BinaryViewType['PE']
   elif 'Mach-O' in magic_type:
-    bv_type = binja.BinaryViewType['Mach-O']
+    bv_type = bn.BinaryViewType['Mach-O']
   else:
-    bv_type = binja.BinaryViewType['Raw']
+    bv_type = bn.BinaryViewType['Raw']
 
     # Can't do anything with Raw type
     log.fatal('Unknown binary type: "{}", exiting'.format(magic_type))
@@ -105,7 +105,7 @@ def find_symbol_name(bv, addr):
   """Attempt to find a symbol for a given address
 
   Args:
-    bv (binja.BinaryView)
+    bv (bn.BinaryView)
     addr (int): Address the symbol should point to
 
   Returns:
@@ -121,11 +121,11 @@ def find_symbol_name(bv, addr):
 def get_func_containing(bv, addr):
   """ Finds the function, if any, containing the given address
   Args:
-    bv (binja.BinaryView)
+    bv (bn.BinaryView)
     addr (int)
 
   Returns:
-    binja.Function
+    bn.Function
   """
   funcs = bv.get_functions_containing(addr)
   return funcs[0] if funcs is not None else None
@@ -182,7 +182,7 @@ def search_phrase_reg(il):
   ex: dword [ebp + 0x8] -> ebp
 
   Args:
-    il (binja.LowLevelILInstruction): Instruction to parse
+    il (bn.LowLevelILInstruction): Instruction to parse
 
   Returns:
     str: register name
@@ -198,7 +198,7 @@ def search_displacement_base(il):
     dword [ebp + 0x8] -> 0x8
 
   Args:
-    il (binja.LowLevelILInstruction): Instruction to parse
+    il (bn.LowLevelILInstruction): Instruction to parse
 
   Returns:
     int: base address
@@ -213,7 +213,7 @@ def get_jump_tail_call_target(bv, il):
   """ Get the target function of a tail-call.
 
   Returns:
-    binja.Function
+    bn.Function
   """
 
   il = il[0]
@@ -266,7 +266,7 @@ def get_all_lifted_il(bv, il, all_il=[]):
     if index not in all_il:
       all_il.append(index)
 
-    if llil.operation is binja.LowLevelILOperation.LLIL_IF:
+    if llil.operation is bn.LowLevelILOperation.LLIL_IF:
       inst = func[llil.operands[1]]
       if inst.address == il.address and inst.instr_index not in all_il:
         get_all_lifted_il(bv, inst, all_il)
@@ -275,7 +275,7 @@ def get_all_lifted_il(bv, il, all_il=[]):
       if inst.address == il.address and inst.instr_index not in all_il:
         get_all_lifted_il(bv, inst, all_il)
 
-    elif llil.operation is binja.LowLevelILOperation.LLIL_GOTO:
+    elif llil.operation is bn.LowLevelILOperation.LLIL_GOTO:
       inst = func[llil.dest]
       if inst.address == il.address and inst.instr_index not in all_il:
         get_all_lifted_il(bv, inst, all_il)
@@ -349,7 +349,7 @@ def is_jump_tail_call(bv, all_il):
   il = all_il[0]
   bb = get_basic_block(bv, il)
 
-  if bb.function.get_low_level_il_at(il.address).operation is binja.LowLevelILOperation.LLIL_TAILCALL:
+  if bb.function.get_low_level_il_at(il.address).operation is bn.LowLevelILOperation.LLIL_TAILCALL:
     return True
   return False
 
@@ -363,14 +363,14 @@ def xref_in_all_il(all_il):
 
 def xref_in_il(il):
   for token in il.tokens:
-    if token.type in [binja.InstructionTextTokenType.PossibleAddressToken,
-                      binja.InstructionTextTokenType.IndirectImportToken,
-                      binja.InstructionTextTokenType.ImportToken,
-                      binja.InstructionTextTokenType.FieldNameToken,
-                      binja.InstructionTextTokenType.ExternalSymbolToken,
-                      binja.InstructionTextTokenType.DataSymbolToken,
-                      binja.InstructionTextTokenType.CodeSymbolToken,
-                      binja.InstructionTextTokenType.CodeRelativeAddressToken]:
+    if token.type in [bn.InstructionTextTokenType.PossibleAddressToken,
+                      bn.InstructionTextTokenType.IndirectImportToken,
+                      bn.InstructionTextTokenType.ImportToken,
+                      bn.InstructionTextTokenType.FieldNameToken,
+                      bn.InstructionTextTokenType.ExternalSymbolToken,
+                      bn.InstructionTextTokenType.DataSymbolToken,
+                      bn.InstructionTextTokenType.CodeSymbolToken,
+                      bn.InstructionTextTokenType.CodeRelativeAddressToken]:
       return True
   return False
 
@@ -379,8 +379,8 @@ def is_section_external(bv, sect):
   """Returns `True` if the given section contains only external references
 
   Args:
-    bv (binja.BinaryView)
-    sect (binja.binaryview.Section)
+    bv (bn.BinaryView)
+    sect (bn.binaryview.Section)
   """
   if sect.start in _EXT_SECTIONS:
     return True
