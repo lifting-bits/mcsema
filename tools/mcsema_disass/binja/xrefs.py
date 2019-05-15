@@ -155,9 +155,10 @@ def _get_xrefs(bv, all_il, address, reftype=XRef.Type.IMMEDIATE):
   # This is the only instance where a LLIL_JUMP is considered
   if util.is_jump_tail_call(bv, all_il):
     target = util.get_jump_tail_call_target(bv, all_il)
-    log.debug('Tail call from {:x} to {:x}'.format(address, target.start))
-    refs.add(XRef(target.start, XRef.Type.CONTROLFLOW))
-    return refs
+    if target is not None:
+      log.debug('Tail call from {:x} to {:x}'.format(address, target.start))
+      refs.add(XRef(target.start, XRef.Type.CONTROLFLOW))
+      return refs
 
   for il in all_il:
     if util.xref_in_il(il):
