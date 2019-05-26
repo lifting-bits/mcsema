@@ -55,6 +55,26 @@ llvm::FunctionType *LiftedFunctionType(void) {
 }
 
 // Translate `ea` into an LLVM value that is an address that points into the
+// external variable
+llvm::Constant *LiftExternalEA(const NativeExternalVariable *cfg_ext,
+                               uint64_t ea) {
+  LOG(INFO) << "external variable is " << std::hex << cfg_ext->ea << " ea is "
+            << std::hex << ea << "\n";
+  CHECK(cfg_ext != nullptr);
+  CHECK(cfg_ext->ea <= ea);
+  CHECK(ea < (cfg_ext->ea + cfg_ext->size));
+
+  auto ext_var = gModule->getGlobalVariable(cfg_ext->name, true);
+  CHECK(ext_var != nullptr) << "Cannot find external variable" << cfg_ext->name
+                            << " when trying to lift EA " << std::hex << ea;
+
+  auto offset = ea - cfg_ext->ea;
+  return llvm::ConstantExpr::getAdd(
+      llvm::ConstantExpr::getPtrToInt(ext_var, gWordType),
+      llvm::ConstantInt::get(gWordType, offset));
+}
+
+// Translate `ea` into an LLVM value that is an address that points into the
 // lifted segment associated with `seg`.
 llvm::Constant *LiftEA(const NativeSegment *cfg_seg, uint64_t ea) {
   CHECK(cfg_seg != nullptr);

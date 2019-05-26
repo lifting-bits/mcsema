@@ -294,6 +294,9 @@ llvm::Value *InstructionLifter::GetAddress(const NativeXref *cfg_xref) {
       << std::hex << inst_ptr->pc << " to " << cfg_xref->target_ea << std::dec
       << " must be in a known segment.";
 
+  if (cfg_xref->externalVar) {
+    return LiftExternalEA(cfg_xref->externalVar, cfg_xref->target_ea);
+  }
   return LiftEA(cfg_xref->target_segment, cfg_xref->target_ea);
 }
 

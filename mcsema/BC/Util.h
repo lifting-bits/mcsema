@@ -53,6 +53,7 @@ llvm::FunctionType *LiftedFunctionType(void);
 // Translate `ea` into an LLVM value that is an address that points into the
 // lifted segment associated with `seg`.
 llvm::Constant *LiftEA(const NativeSegment *seg, uint64_t ea);
+llvm::Constant *LiftExternalEA(const NativeExternalVariable *, uint64_t);
 
 }  // namespace mcsema
 

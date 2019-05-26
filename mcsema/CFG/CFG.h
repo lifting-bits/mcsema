@@ -129,6 +129,7 @@ struct NativeExternalFunction : public NativeFunction {
 // Global variable defined inside of the lifted binary.
 struct NativeVariable : public NativeObject {
   const NativeSegment *segment = nullptr;
+  const NativeExternalVariable *externalVariable = nullptr;
   mutable llvm::Constant *address = nullptr;
 };
 
@@ -158,6 +159,7 @@ struct NativeXref {
 
   const NativeVariable *var = nullptr;
   const NativeFunction *func = nullptr;
+  const NativeExternalVariable *externalVar = nullptr;
 };
 
 struct NativeBlob {
@@ -204,7 +206,7 @@ struct NativeModule {
       name_to_extern_func;
 
   // Represent global and external variables.
-  std::unordered_map<uint64_t, const NativeVariable *> ea_to_var;
+  std::unordered_map<uint64_t, NativeVariable *> ea_to_var;
   std::unordered_map<std::string, const NativeExternalVariable *>
       name_to_extern_var;
 

@@ -57,6 +57,8 @@ def execute(args, command_args):
   script_cmd.append(args.os)
   script_cmd.append("--entrypoint")
   script_cmd.append(args.entrypoint)
+  script_cmd.append("--binary")
+  script_cmd.append(args.binary)
   script_cmd.extend(command_args)  # Extra, script-specific arguments.
 
   cmd = []

@@ -26,6 +26,10 @@ import collections
 import itertools
 import pprint
 
+### fix mcsema external symbol
+from elftools.elf.elffile import ELFFile
+### fix mcsema external symbol
+
 # Bring in utility libraries.
 from util import *
 from table import *
@@ -48,8 +52,13 @@ tools_disass_dir = os.path.dirname(tools_disass_ida_dir)
 # Note: The bootstrap file will copy CFG_pb2.py into this dir!!
 import CFG_pb2
 
+binary_path = None
+
 EXTERNAL_FUNCS_TO_RECOVER = {}
 EXTERNAL_VARS_TO_RECOVER = {}
+
+## Added to store the external variable size
+EXTERNAL_VARS_SIZE = {}
 
 RECOVERED_EAS = set()
 ACCESSED_VIA_JMP = set()
@@ -89,6 +98,28 @@ OS_NAME = ""
 EXTERNAL_NAMES = ("@@GLIBC_", "@@GLIBCXX_", "@@CXXABI_", "@@GCC_")
 
 _NOT_ELF_BEGIN_EAS = (0xffffffffL, 0xffffffffffffffffL)
+
+## Added function to handle the dynsym section by elftoos,
+## which can get the external variable's size
+def extract_external_size():
+    DEBUG("Looking for the external variable and it's size")
+    global EXTERNAL_VARS_SIZE
+    if binary_path == None:
+        return
+    openFile = open(binary_path, 'rb')
+    elf = ELFFile(openFile)
+    dynsym = elf.get_section_by_name('.dynsym')
+    for i in range(dynsym.num_symbols()):
+        sym = dynsym.get_symbol(i)
+        symName = sym.name
+        symSize = sym.entry['st_size']
+        symValue = sym.entry['st_value']
+        symType = sym.entry['st_info']['type']
+        if 'STT_OBJECT' == symType and symSize > 0 and symValue != 0:
+            EXTERNAL_VARS_SIZE[symName] = symSize
+            DEBUG("External variable %s at addr %x, size 0x%x" % (symName, symValue, symSize))
+
+
 
 # Returns `True` if this is an ELF binary (as opposed to an ELF object file).
 def is_linked_ELF_program():
@@ -1152,6 +1183,9 @@ def recover_external_functions(M):
 
   for ea, name in EXTERNAL_FUNCS_TO_RECOVER.items():
     DEBUG("Recovering extern function {} at {:x}".format(name, ea))
+    if name not in EMAP:
+        DEBUG("Warning: external function %s not in EMAP" % (name))
+        continue
     args, conv, ret, sign = EMAP[name]
     E = M.external_funcs.add()
     E.name = name.format('utf-8')
@@ -1179,6 +1213,8 @@ def recover_external_variables(M):
     EV.is_thread_local = is_tls(ea)
     if name in EMAP_DATA:
       EV.size = EMAP_DATA[name]
+    elif name in EXTERNAL_VARS_SIZE:
+      EV.size = EXTERNAL_VARS_SIZE[name]
     else:
       EV.size = idc.get_item_size(ea)
     if EV.is_thread_local:
@@ -1350,6 +1386,49 @@ def identify_external_symbols():
           set_symbol_name(ea, extern_name)  # Rename it.
           EXTERNAL_VARS_TO_RECOVER[ea] = extern_name
           _FIXED_EXTERNAL_NAMES[ea] = extern_name
+  
+  ### fix mcsema external symbols start
+  openFile = open(binary_path, 'rb')
+  elf = ELFFile(openFile)
+
+  ## get the .dynsym section
+  dynsym = elf.get_section_by_name('.dynsym')
+  
+  ## iter over the .dynsym section
+  for i in range(dynsym.num_symbols()):
+      sym = dynsym.get_symbol(i)
+      symName = sym.name
+      symType = sym.entry['st_info']['type']
+      symValue = sym.entry['st_value']
+      if symValue == 0:
+          continue
+      
+      ## If the symbol is defined internally, skip it
+      if symName in INTERNALLY_DEFINED_EXTERNALS:
+          DEBUG("Warning: The external symbol %s at address %x is defined internally" % (symName, symValue))
+          continue
+
+      if 'STT_FUNC' == symType:
+          if '_fini' == symName or '_init' == symName:
+              continue
+
+         # if symName in INTERNALLY_DEFINED_EXTERNALS or \
+         #         symValue in EXTERNAL_FUNC_TO_RECOVER:
+         #     continue
+
+          if symValue in EXTERNAL_FUNCS_TO_RECOVER:
+              continue
+
+          EXTERNAL_FUNCS_TO_RECOVER[symValue] = symName
+          DEBUG("WARNING: Adding external function %s that mcsema can't find" % symName)
+
+      if 'STT_OBJECT' == symType:
+          if symValue in EXTERNAL_VARS_TO_RECOVER.keys():
+              continue
+          EXTERNAL_VARS_TO_RECOVER[symValue] = symName
+          DEBUG("WARNING: Adding external variable %s that mcsema can't find" % symName)
+
+  ### fix mcsema external symbols end
 
   DEBUG_POP()
 
@@ -1460,6 +1539,7 @@ def recover_module(entrypoint, gvar_infile = None):
 
   identify_thunks(func_eas)
   identify_external_symbols()
+  extract_external_size()
   
   exported_funcs, exported_vars = identify_program_entrypoints(func_eas)
 
@@ -1580,11 +1660,20 @@ if __name__ == "__main__":
       default=False,
       help="Flag to enable the exception handler recovery")
 
+  parser.add_argument(
+      '--binary',
+      required=True,
+      help="The path of binary file")
+
+  global binary_path
   args = parser.parse_args(args=idc.ARGV[1:])
 
   if args.log_file != os.devnull:
     INIT_DEBUG_FILE(args.log_file)
     DEBUG("Debugging is enabled.")
+
+  binary_path = args.binary
+  DEBUG("The binary path is %s" % binary_path)
 
   addr_size = {"x86": 32, "amd64": 64, "aarch64": 64}.get(args.arch, 0)
   if addr_size != get_address_size_in_bits():

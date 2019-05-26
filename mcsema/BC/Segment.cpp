@@ -201,7 +201,13 @@ static void DeclareVariables(const NativeModule *cfg_module) {
         << "Variable " << cfg_var->name << " at " << std::hex << cfg_var->ea
         << " is incorrectly assigned to the segment " << cfg_seg->name;
 
-    cfg_var->address = LiftEA(cfg_seg, cfg_var->ea);
+    if (cfg_var->externalVariable) {
+      LOG(INFO) << "Declare variable variable at " << std::hex << cfg_var->ea
+                << " in external variable " << cfg_var->externalVariable->name
+                << " address is " << std::hex << cfg_var->externalVariable->ea;
+      cfg_var->address = LiftExternalEA(cfg_var->externalVariable, cfg_var->ea);
+    } else
+      cfg_var->address = LiftEA(cfg_seg, cfg_var->ea);
   }
 }
 
@@ -472,9 +478,14 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
             << " in segment " << cfg_seg->name;
 
       // Pointer to an unnamed location inside of a data segment.
+      } else if (xref->externalVar) {
+        val = LiftExternalEA(xref->externalVar, xref->target_ea);
       } else {
         val = LiftEA(xref->target_segment, xref->target_ea);
       }
+      // else {
+      //   val = LiftEA(xref->target_segment, xref->target_ea);
+      //}
 
       // Scale and add the value in. We need to fit it to its original width.
       if (val_size > gArch->address_size) {

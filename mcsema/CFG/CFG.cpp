@@ -129,6 +129,19 @@ static const NativeSegment *FindSegment(const NativeModule *module,
   return nullptr;
 }
 
+// Find the External Variable containing the data at `ea`
+static const NativeExternalVariable *
+FindExternalVariable(const NativeModule *module, uint64_t ea) {
+  for (const auto &entry : module->name_to_extern_var) {
+    auto ext_var = entry.second;
+    auto ext_var_end = ext_var->ea + ext_var->size;
+    if (ext_var->ea <= ea && ea < ext_var_end) {
+      return ext_var;
+    }
+  }
+  return nullptr;
+}
+
 // Resolve `xref` to a location.
 static bool ResolveReference(NativeModule *module, NativeXref *xref) {
   xref->var = nullptr;
@@ -167,7 +180,7 @@ static bool ResolveReference(NativeModule *module, NativeXref *xref) {
   for (const auto &entry : module->ea_to_var) {
     auto var = entry.second;
     if (var->name == xref->target_name) {
-      auto final_var = reinterpret_cast<const NativeVariable *>(var->Get());
+      auto final_var = reinterpret_cast<NativeVariable *>(var->Get());
       xref->var = final_var;
       xref->target_segment = final_var->segment;
       module->ea_to_var[xref->target_ea] = final_var;
@@ -206,6 +219,9 @@ static bool ResolveReference(NativeModule *module, NativeXref *xref) {
         << xref->target_segment->name << " has no name.";
     return true;
   }
+  if (xref->externalVar) {
+    return true;
+  }
 
   if (xref->target_name.empty()) {
     LOG(ERROR)
@@ -239,6 +255,12 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   xref->segment = FindSegment(module, xref->ea);
   xref->target_ea = static_cast<uint64_t>(cfg_ref.ea());
   xref->target_segment = FindSegment(module, xref->target_ea);
+  xref->externalVar = FindExternalVariable(module, xref->target_ea);
+  if (xref->externalVar) {
+    LOG(INFO) << "Cross reference at " << std::hex << xref->ea
+              << " pointing to " << std::hex << xref->target_ea
+              << " is in external variable " << xref->externalVar->name;
+  }
 
   CHECK(xref->segment != nullptr)
       << "Could not identify segment containing cross-reference from "
@@ -624,6 +646,17 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     module->name_to_extern_var[var->name] = var;
   }
 
+  for (auto &entry : module->ea_to_var) {
+    auto variable = entry.second;
+    variable->externalVariable = FindExternalVariable(module, variable->ea);
+    if (variable->externalVariable) {
+      LOG(INFO) << "variable " << variable->name << " address " << std::hex
+                << variable->ea << "in external variable "
+                << variable->externalVariable->name << " address " << std::hex
+                << variable->externalVariable->ea << "\n";
+    }
+  }
+
   // Bring in the external functions.
   for (const auto &cfg_extern_func : cfg.external_funcs()) {
     auto func = new NativeExternalFunction;
@@ -781,6 +814,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       xref->target_ea = static_cast<uint64_t>(cfg_xref.target_ea());
       xref->target_name = cfg_xref.target_name();
       xref->target_segment = FindSegment(module, xref->target_ea);
+      xref->externalVar = FindExternalVariable(module, xref->target_ea);
 
       CHECK(xref->width <= pointer_size)
           << "Cross reference at " << std::hex << xref->ea << " to "
