@@ -263,7 +263,7 @@ static llvm::Function *CreateMcSemaInitFiniImpl(
   auto arr_type = llvm::ArrayType::get(el_type, new_elems.size());
   auto arr_init = llvm::ConstantArray::get(arr_type, new_elems);
   auto arr = new llvm::GlobalVariable(
-      *gModule, arr_type, true /* isConstant */,
+      *gModule, arr_type, false /* isConstant */,
       llvm::GlobalVariable::AppendingLinkage,
       arr_init, global_ctors ? "__mcsema.temp_array" : arr_name);
 
