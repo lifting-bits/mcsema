@@ -735,7 +735,7 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
 
   auto pc = remill::LoadProgramCounter(block);
   auto func_ptr_ty = llvm::PointerType::get(
-      llvm::FunctionType::get(call_args[0]->getType(), arg_types, false), 0);
+      llvm::FunctionType::get(remill::AddressType(gModule), arg_types, false), 0);
 
   llvm::IRBuilder<> ir(block);
   loader.StoreReturnValue(
