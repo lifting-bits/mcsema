@@ -721,9 +721,6 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
 
   remill::CloneBlockFunctionInto(callback_func);
 
-  // We don't want this function to be inlined, since it was causing problems
-  // with llvm optimizations run by runO3
-
   CallingConvention loader(gArch->DefaultCallingConv());
 
   auto block = &(callback_func->back());
