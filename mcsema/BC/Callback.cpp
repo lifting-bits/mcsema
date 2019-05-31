@@ -431,6 +431,14 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
     }
   }
 
+  // Get correct return type -> i32 for main
+  auto ret_type = [&]() -> llvm::Type* {
+    if (name == "main") {
+      return llvm::Type::getInt32Ty(*gContext);
+    }
+    return remill::AddressType(gModule);
+  }();
+
   // The the lifted function type so that we can get things like the memory
   // pointer type and stuff.
   auto bb = remill::BasicBlockFunction(gModule);
@@ -445,7 +453,7 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
 
   std::vector<llvm::Type *> arg_types(num_args, pc_type);
 
-  auto func_type = llvm::FunctionType::get(pc_type, arg_types, false);
+  auto func_type = llvm::FunctionType::get(ret_type, arg_types, false);
   auto func = llvm::Function::Create(
       func_type, llvm::GlobalValue::InternalLinkage, name, gModule);
 
@@ -509,8 +517,10 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   loader.StoreStackPointer(block, old_sp);
 
   // Extract and return the return value from the state structure/memory.
-  llvm::ReturnInst::Create(
-      *gContext, loader.LoadReturnValue(block, pc_type), block);
+  auto ret = loader.LoadReturnValue(block, pc_type);
+  auto casted = llvm::CastInst::CreateTruncOrBitCast(
+      ret, func_type->getReturnType(), "", block);
+  llvm::ReturnInst::Create(*gContext, casted, block);
 
   if (!FLAGS_pc_annotation.empty()) {
     legacy::AnnotateInsts(func, cfg_func->ea);
