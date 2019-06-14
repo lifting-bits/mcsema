@@ -163,10 +163,6 @@ static bool ResolveReference(NativeModule *module, NativeXref *xref) {
     }
   }
 
-  if (xref->target_segment) {
-    return true;
-  }
-
   // Try to recover by finding a local variable.
   for (const auto &entry : module->ea_to_var) {
     auto var = entry.second;

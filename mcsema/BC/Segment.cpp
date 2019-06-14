@@ -263,7 +263,7 @@ static llvm::Function *CreateMcSemaInitFiniImpl(
   auto arr_type = llvm::ArrayType::get(el_type, new_elems.size());
   auto arr_init = llvm::ConstantArray::get(arr_type, new_elems);
   auto arr = new llvm::GlobalVariable(
-      *gModule, arr_type, true /* isConstant */,
+      *gModule, arr_type, false /* isConstant */,
       llvm::GlobalVariable::AppendingLinkage,
       arr_init, global_ctors ? "__mcsema.temp_array" : arr_name);
 
@@ -488,8 +488,12 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
       //    .long   _ZTI12out_of_range&-1
       //    .long   _ZTI17special_condition&-1
       } else if (val_size < gArch->address_size) {
-        LazyInitXRef(xref, val_type, val);
-        val = llvm::ConstantInt::getNullValue(val_type);
+        if (xref->var != nullptr) {
+          LazyInitXRef(xref, val_type, val);
+          val = llvm::ConstantInt::getNullValue(val_type);
+        } else {
+          val = llvm::ConstantExpr::getTrunc(val, val_type);
+        }
       }
 
       CHECK(val->getType() == entry_type)
