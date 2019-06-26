@@ -17,8 +17,11 @@ import argparse
 import os
 import shutil
 import sys
+import subprocess
 
 tags_dir="tags"
+so_dir="shared_libs"
+bin_dir="bin"
 
 new = 0
 exclusive = 1
@@ -57,7 +60,7 @@ def create_batch_dir(batch, policy):
     if batch_name not in os.listdir():
         print(" > Batch name is unique")
         make_dir(batch_name)
-        return new
+        return batch_name
 
     print(" > Batch with same name already exists")
     print(" > Selected policy is " + policy)
@@ -70,6 +73,47 @@ def create_batch_dir(batch, policy):
         else:
             print(" > Batch folder is not sane, remove manually")
             sys.exit(1)
+    return batch_name
+
+def binary_libraries(binary):
+    try:
+        res = subprocess.check_output(['ldd', binary]).decode()
+    except:
+        print(" \t[W] ldd failed for " + binary)
+        return
+
+    for line in res.split("\n"):
+        if "=>" not in line:
+            continue
+        name, path_and_addr = line.split(" => ")
+        path_and_addr = path_and_addr.strip(" ")
+        if not path_and_addr.startswith("/"):
+            continue
+
+        lib = " ".join(path_and_addr.split(" ")[:-1])
+        lib = os.path.realpath(lib)
+
+        if os.path.isfile(lib):
+            yield name.strip(), lib
+
+
+def update_shared_libraries(binary):
+    for name, path in binary_libraries(binary):
+        if name in os.listdir(so_dir):
+            continue
+
+        sym_name = os.path.join(so_dir, name)
+
+        try:
+            print(" \t> " + sym_name + " => " + path)
+            os.symlink(path, sym_name)
+        except:
+            pass
+
+def get_cfg(binary, batch_folder):
+    bin_path = os.path.join(bin_dir, binary)
+    print(" > Processing " + bin_path)
+    update_shared_libraries(bin_path)
 
 
 def main():
@@ -113,10 +157,14 @@ def main():
     print( command_args )
 
     print("Checking batch name")
-    create_batch_dir(args.batch, args.batch_policy)
+    batch_dir = create_batch_dir(args.batch, args.batch_policy)
 
     print("Select all binaries, specified by flavors")
     binaries = get_binaries_from_flavours(args.flavors)
+
+    print("Iterating over binaries")
+    for b in binaries:
+        get_cfg(b, batch_dir)
 
     return 0
 
