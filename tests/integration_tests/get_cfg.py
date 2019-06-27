@@ -135,10 +135,8 @@ def binary_info(binary):
     return address_size, arch, is_pie
 
 
-def dyninst_frontend(binary, batch_folder, args):
+def dyninst_frontend(binary ,cfg, args):
     address_size, arch, is_pie = binary_info(binary)
-
-    cfg = os.path.join(batch_folder, os.path.basename(binary) + ".cfg")
 
     disass_args = [
         "mcsema-dyninst-disass",
@@ -165,11 +163,12 @@ def dyninst_frontend(binary, batch_folder, args):
 # TODO: We may want for each file to be lifted in separate directory and on a copy
 # (in the case frontend is broken and modifies the original itself)
 def get_cfg(binary, batch_folder, args, lifter):
+    cfg = os.path.join(batch_folder, os.path.basename(binary) + ".cfg")
     bin_path = os.path.join(bin_dir, binary)
     print(" > Processing " + bin_path)
     update_shared_libraries(bin_path)
 
-    return lifter(bin_path, batch_folder, args)
+    return lifter(bin_path, cfg, args)
 
 
 def get_lifter(disass):
