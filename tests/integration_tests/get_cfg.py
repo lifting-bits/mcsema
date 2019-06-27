@@ -75,6 +75,7 @@ def create_batch_dir(batch, policy):
             sys.exit(1)
     return batch_name
 
+# From lift_program.py
 def binary_libraries(binary):
     try:
         res = subprocess.check_output(['ldd', binary]).decode()
@@ -110,10 +111,34 @@ def update_shared_libraries(binary):
         except:
             pass
 
+# From lift_program.py
+# Most likely there will be only x86-64 binaries for the time being,
+# but it won't hurt to have it in place once we decide to add another tests
+def binary_info(binary):
+    res = subprocess.check_output(['file', binary])
+    is_pie = 'LSB shared object' in res or 'Mach-O 64' in res
+    address_size = 64
+
+    if 'aarch64' in res:
+        arch = 'aarch64'
+    elif 'x86-64' in res or 'x86_64' in res:
+        arch = 'amd64_avx'
+    elif 'x86' in res:
+        arch = 'x86_avx'
+        address_size = 32
+    else:
+        raise Exception("Unknown architecture for file type {}".format(res))
+
+    return address_size, arch, is_pie
+
+
+
 def get_cfg(binary, batch_folder):
     bin_path = os.path.join(bin_dir, binary)
     print(" > Processing " + bin_path)
     update_shared_libraries(bin_path)
+
+
 
 
 def main():
