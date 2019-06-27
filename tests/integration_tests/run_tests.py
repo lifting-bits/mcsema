@@ -23,7 +23,10 @@ lib_dir = None
 
 batches = []
 shared_lib_dir = None
-libc_dir = None
+libc = None
+
+results = {}
+total = {}
 
 def check_arguments(args):
     if not os.path.isfile (args.lift):
@@ -49,7 +52,15 @@ def check_arguments(args):
     if not os.path.isdir (args.libc_dir):
         print ("{} passed to --libc_dir is not a valid directory".format(args.libc_dir))
         sys.exit (1)
-    libc_dir = args.libc_dir
+
+    libc = ''
+    for lib_name in os.listdir(args.libc_dir):
+        if lib_name.endswith(".bc"):
+            libc += os.path.join(args.libc_dir, lib_name + ',')
+
+    print("--abi_libraries files:")
+    print(libc)
+
 
     # TODO: This whole snippet can be done using argparser and some actions
     if args.batch is not None:
