@@ -22,7 +22,7 @@ lift = None
 lib_dir = None
 
 batches = []
-shared_lib_dir = None
+shared_libs = None
 libc = None
 
 results = {}
@@ -47,7 +47,12 @@ def check_arguments(args):
     if not os.path.isdir (args.shared_lib_dir):
         print("{} passed to --shared_lib_dir is not a valid directory".format(args.shared_lib_dir))
         sys.exit (1)
-    shared_lib_dir = args.shared_lib_dir
+
+    shared_libs = []
+    for lib_name in os.listdir(args.shared_lib_dir):
+        shared_libs.append(os.path.join(args.shared_lib_dir, lib_name ))
+
+    print(shared_libs)
 
     if not os.path.isdir (args.libc_dir):
         print ("{} passed to --libc_dir is not a valid directory".format(args.libc_dir))
