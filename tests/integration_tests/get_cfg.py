@@ -163,8 +163,7 @@ def dyninst_frontend(binary ,cfg, args):
 
 # TODO: We may want for each file to be lifted in separate directory and on a copy
 # (in the case frontend is broken and modifies the original itself)
-def get_cfg(binary, batch_folder, args, lifter):
-    cfg = os.path.join(batch_folder, os.path.basename(binary) + ".cfg")
+def get_cfg(binary, cfg, args, lifter):
     bin_path = os.path.join(bin_dir, binary)
     print(" > Processing " + bin_path)
     update_shared_libraries(bin_path)
@@ -232,7 +231,11 @@ def main():
 
     print("Iterating over binaries")
     for b in binaries:
-        get_cfg(b, batch_dir, args, get_lifter(args.disass))
+        cfg = os.path.join(batch_dir, b + ".cfg")
+        if args.batch_policy == "C" and os.path.isfile(cfg):
+            print(" \t> " + cfg + " is already present, not updating")
+        else:
+            get_cfg(b, cfg, args, get_lifter(args.disass))
 
     return 0
 
