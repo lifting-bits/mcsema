@@ -41,8 +41,8 @@ def make_dir(path):
 
 def is_batch_dir_sane(batch_name):
     for filename in os.listdir(batch_name):
-        filename, extension =  os.path.splitext(batch_name)
-        if extension != "cfg" or os.path.isdir(filename):
+        name, extension =  os.path.splitext(filename)
+        if extension != ".cfg" or os.path.isdir(filename):
             return False
     return True
 
