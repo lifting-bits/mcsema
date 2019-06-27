@@ -18,6 +18,9 @@ import os
 import shutil
 import sys
 import subprocess
+import tempfile
+from shlex import quote
+
 
 tags_dir="tags"
 so_dir="shared_libs"
@@ -115,7 +118,7 @@ def update_shared_libraries(binary):
 # Most likely there will be only x86-64 binaries for the time being,
 # but it won't hurt to have it in place once we decide to add another tests
 def binary_info(binary):
-    res = subprocess.check_output(['file', binary])
+    res = subprocess.check_output(['file', binary]).decode()
     is_pie = 'LSB shared object' in res or 'Mach-O 64' in res
     address_size = 64
 
@@ -132,14 +135,48 @@ def binary_info(binary):
     return address_size, arch, is_pie
 
 
+def dyninst_frontend(binary, batch_folder, args):
+    address_size, arch, is_pie = binary_info(binary)
 
-def get_cfg(binary, batch_folder):
+    cfg = os.path.join(batch_folder, os.path.basename(binary) + ".cfg")
+
+    disass_args = [
+        "mcsema-dyninst-disass",
+        "--arch", arch,
+        # TODO: Portability
+        "--os", "linux",
+        "--binary", quote(binary),
+        "--output", quote(cfg),
+        "--entrypoint", "main",
+        "--std_defs", args.std_defs ]
+
+    if is_pie:
+        disass_args.append("--pie_mode")
+        # TODO: May not be needed
+        disass_args.append("true")
+
+    print(" \t> " + " ".join(disass_args))
+    ret = subprocess.call(disass_args)
+    if ret:
+        return ret
+    return True
+
+
+# TODO: We may want for each file to be lifted in separate directory and on a copy
+# (in the case frontend is broken and modifies the original itself)
+def get_cfg(binary, batch_folder, args, lifter):
     bin_path = os.path.join(bin_dir, binary)
     print(" > Processing " + bin_path)
     update_shared_libraries(bin_path)
 
+    return lifter(bin_path, batch_folder, args)
 
 
+def get_lifter(disass):
+    if disass == "dyninst":
+        return dyninst_frontend
+    print(" > Support for chosen frontend was not implemented yet!")
+    sys.exit(1)
 
 def main():
     arg_parser = argparse.ArgumentParser()
@@ -177,6 +214,12 @@ def main():
         default="D",
         required=False)
 
+    arg_parser.add_argument(
+        "--std_defs",
+        help="In case frontend still supports/needs it, can be found with McSema sources",
+        default="../../tools/mcsema_disass/defs/linux.txt",
+        required=False)
+
     args, command_args = arg_parser.parse_known_args()
     print( args )
     print( command_args )
@@ -189,7 +232,7 @@ def main():
 
     print("Iterating over binaries")
     for b in binaries:
-        get_cfg(b, batch_dir)
+        get_cfg(b, batch_dir, args, get_lifter(args.disass))
 
     return 0
 
