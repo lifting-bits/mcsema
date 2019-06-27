@@ -26,10 +26,11 @@ tags_dir="tags"
 so_dir="shared_libs"
 bin_dir="bin"
 
-fail = 0
-success = 1
-ignored = 2
+FAIL = 0
+SUCCESS = 1
+IGNORED = 2
 
+MESSAGES = { FAIL: "Fail", SUCCESS: "Success", IGNORED: "Skipped" }
 def make_dir(path):
     print(" > Creating directory: " + path)
     try:
@@ -157,8 +158,8 @@ def dyninst_frontend(binary ,cfg, args):
     print(" \t> " + " ".join(disass_args))
     ret = subprocess.call(disass_args)
     if ret:
-        return ret
-    return True
+        return FAIL
+    return SUCCESS
 
 
 # TODO: We may want for each file to be lifted in separate directory and on a copy
@@ -170,12 +171,29 @@ def get_cfg(binary, cfg, args, lifter):
 
     return lifter(bin_path, cfg, args)
 
-
+# TODO: Handle other frontends
 def get_lifter(disass):
     if disass == "dyninst":
         return dyninst_frontend
     print(" > Support for chosen frontend was not implemented yet!")
     sys.exit(1)
+
+def print_result(result):
+    print("Results:")
+    stat = dict()
+    for key, val in result.items():
+        print("\t" + key + " " + MESSAGES[val])
+        if val in stat:
+            stat[val] += 1
+        else:
+            stat[val] = 1
+    print("Total:")
+    for key, val in MESSAGES.items():
+        print(val)
+        if key not in stat:
+            print(0)
+        else:
+            print(stat[key])
 
 def main():
     arg_parser = argparse.ArgumentParser()
@@ -229,13 +247,17 @@ def main():
     print("Select all binaries, specified by flavors")
     binaries = get_binaries_from_flavours(args.flavors)
 
+    result = dict()
     print("Iterating over binaries")
     for b in binaries:
         cfg = os.path.join(batch_dir, b + ".cfg")
         if args.batch_policy == "C" and os.path.isfile(cfg):
             print(" \t> " + cfg + " is already present, not updating")
+            result[b] = IGNORED
         else:
-            get_cfg(b, cfg, args, get_lifter(args.disass))
+            result[b] = get_cfg(b, cfg, args, get_lifter(args.disass))
+
+    print_result(result)
 
     return 0
 
