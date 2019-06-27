@@ -26,8 +26,9 @@ tags_dir="tags"
 so_dir="shared_libs"
 bin_dir="bin"
 
-new = 0
-exclusive = 1
+fail = 0
+success = 1
+ignored = 2
 
 def make_dir(path):
     print(" > Creating directory: " + path)
