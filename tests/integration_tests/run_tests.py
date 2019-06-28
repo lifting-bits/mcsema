@@ -17,9 +17,15 @@
 import argparse
 import os
 import sys
+import subprocess
+from subprocess import CalledProcessError
+import tempfile
+
+llvm_version = 0
 
 lift = None
 lib_dir = None
+recompiled_dir = "recompiled"
 
 batches = []
 shared_libs = None
@@ -28,44 +34,52 @@ libc = None
 results = {}
 total = {}
 
+# Fill global variables
 def check_arguments(args):
-    if not os.path.isfile (args.lift):
+    if not os.path.isfile(args.lift):
         print("{} passed to --lift is not a valid file".format(args.lift))
         sys.exit (1)
+    global lift
     lift = args.lift
 
-    if not os.path.isdir (args.lib_dir):
+    global llvm_version
+    prefix, sep, llvm_version = lift.rpartition('-')
+
+    if not os.path.isdir(args.lib_dir):
         print ("{} passed to --lib_dir is not a valid directory".format(args.lib_dir))
         sys.exit (1)
+    global lib_dir
     lib_dir = args.lib_dir
 
-    if not os.path.isdir (args.bin_dir):
+    if not os.path.isdir(args.bin_dir):
         print("{} passed to --bin_dir is not a valid directory".format(args.bin_dir))
         sys.exit (1)
     bin_dir = os.path.abspath(args.bin_dir)
 
-    if not os.path.isdir (args.shared_lib_dir):
+    if not os.path.isdir(args.shared_lib_dir):
         print("{} passed to --shared_lib_dir is not a valid directory".format(args.shared_lib_dir))
         sys.exit (1)
 
+    global shared_libs
     shared_libs = []
     for lib_name in os.listdir(args.shared_lib_dir):
         shared_libs.append(os.path.join(args.shared_lib_dir, lib_name ))
 
+    print(" > Shared libraries: ")
     print(shared_libs)
 
-    if not os.path.isdir (args.libc_dir):
+    if not os.path.isdir(args.libc_dir):
         print ("{} passed to --libc_dir is not a valid directory".format(args.libc_dir))
         sys.exit (1)
 
+    global libc
     libc = ''
     for lib_name in os.listdir(args.libc_dir):
         if lib_name.endswith(".bc"):
             libc += os.path.join(args.libc_dir, lib_name + ',')
 
-    print("--abi_libraries files:")
+    print(" > --abi_libraries files:")
     print(libc)
-
 
     # TODO: This whole snippet can be done using argparser and some actions
     if args.batch is not None:
@@ -86,6 +100,54 @@ def check_arguments(args):
     if not batches:
         print("No batch is selected, exiting")
         sys.exit(0)
+
+    print(batches)
+
+
+def exec_and_log_fail(args):
+    pipes = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    std_out, std_err = pipes.communicate()
+    ret_code = pipes.returncode
+
+    if ret_code:
+        print("** stdout:")
+        print(stdout)
+        print("** stderr:")
+        print(stderr)
+        return False
+    return True
+
+
+
+
+def build_test(cfg, build_dir):
+    print("Lifting " + cfg)
+
+    # Create build directory for given test case
+    binary_base_name = os.path.splitext(os.path.basename(cfg))[0]
+    bc = os.path.join( build_dir, binary_base_name + ".bc")
+
+    # TODO: arch type
+    lift_args = [ lift,
+                  "-os", "linux",
+                  "-arch", "amd64",
+                  "-cfg", cfg,
+                  "-abi_libraries", libc,
+                  "-output", bc ]
+
+    if not exec_and_log_fail(lift_args):
+        return False
+
+    # Recompile it
+    lifted = os.path.join(build_dir, binary_base_name + ".recompiled")
+    lib = lib_dir + "/"+ "libmcsema_rt64-{}.a".format(llvm_version)
+
+
+    recompile_args =[ "clang-{}".format(llvm_version), bc,
+                      "-o", lifted, lib,
+                      "-lpthread", "-lm", "-llzma", "-ldl"] + shared_libs
+    return exec_and_log_fail(recompile_args)
+
 
 def main():
     arg_parser = argparse.ArgumentParser (
@@ -132,6 +194,16 @@ def main():
 
     args, command_args = arg_parser.parse_known_args ()
     check_arguments(args)
+
+    # Create directory to store recompiled binaries
+    # TemporaryDirectory() is not used, since we may want to have a look at recompiled code,
+    # maybe we want some --preserve option
+    test_dir = tempfile.mkdtemp(dir=os.getcwd())
+
+    for batch in batches:
+        print(" > Handling : " + batch)
+        for f in os.listdir(batch):
+            build_test(os.path.join(batch, f), test_dir)
 
 if __name__ == '__main__':
    main()
