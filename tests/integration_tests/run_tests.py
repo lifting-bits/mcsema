@@ -20,10 +20,13 @@ import sys
 import subprocess
 from subprocess import CalledProcessError
 import tempfile
+import unittest
+
 
 llvm_version = 0
 
 lift = None
+bin_dir = "bin"
 lib_dir = None
 recompiled_dir = "recompiled"
 
@@ -31,8 +34,21 @@ batches = []
 shared_libs = None
 libc = None
 
+
 results = {}
 total = {}
+
+class TCData:
+    def __init__(self, b, basename = None, bin_p = None, recompiled_p = None):
+        self.binary = bin_p
+        self.recompiled = recompiled_p
+        self.basename = basename
+
+    def is_recompiled(self):
+        return self.recompiled is not None
+
+def get_recompiled_name(name):
+    return name + ".recompiled"
 
 # Fill global variables
 def check_arguments(args):
@@ -136,18 +152,19 @@ def build_test(cfg, build_dir):
                   "-output", bc ]
 
     if not exec_and_log_fail(lift_args):
-        return False
+        return None
 
     # Recompile it
-    lifted = os.path.join(build_dir, binary_base_name + ".recompiled")
+    lifted = os.path.join(build_dir, get_recompiled_name(binary_base_name))
     lib = lib_dir + "/"+ "libmcsema_rt64-{}.a".format(llvm_version)
 
 
     recompile_args =[ "clang-{}".format(llvm_version), bc,
                       "-o", lifted, lib,
                       "-lpthread", "-lm", "-llzma", "-ldl"] + shared_libs
-    return exec_and_log_fail(recompile_args)
-
+    if not exec_and_log_fail(recompile_args):
+        return None
+    return lifted
 
 def main():
     arg_parser = argparse.ArgumentParser (
