@@ -34,9 +34,7 @@ batches = []
 shared_libs = None
 libc = None
 
-
-results = {}
-total = {}
+playground = None
 
 class TCData:
     def __init__(self, b, basename = None, bin_p = None, recompiled_p = None):
@@ -217,10 +215,22 @@ def main():
     # maybe we want some --preserve option
     test_dir = tempfile.mkdtemp(dir=os.getcwd())
 
+    cases = {}
     for batch in batches:
         print(" > Handling : " + batch)
         for f in os.listdir(batch):
-            build_test(os.path.join(batch, f), test_dir)
+            recompiled = build_test(os.path.join(batch, f), test_dir)
+            basename = os.path.splitext(f)[0]
+            tc = TCData(basename,
+                        os.path.join(bin_dir, basename),
+                        recompiled)
+            cases[basename] = tc
+
+    suite = unittest.TestLoader().loadTestsFromTestCase(LinuxTest)
+    unittest.TextTestRunner(verbosity = 2).run(suite)
+
+    if playground is not None:
+        playground = shutil.rmtree(playground)
 
 if __name__ == '__main__':
    main()
