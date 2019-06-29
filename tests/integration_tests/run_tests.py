@@ -15,10 +15,12 @@
 # limitations under the License.
 
 import argparse
+import filecmp
 import os
-import sys
+import shutil
 import subprocess
 from subprocess import CalledProcessError
+import sys
 import tempfile
 import unittest
 
@@ -34,10 +36,10 @@ batches = []
 shared_libs = None
 libc = None
 
-playground = None
+cases = {}
 
 class TCData:
-    def __init__(self, b, basename = None, bin_p = None, recompiled_p = None):
+    def __init__(self, basename = None, bin_p = None, recompiled_p = None):
         self.binary = bin_p
         self.recompiled = recompiled_p
         self.basename = basename
@@ -46,7 +48,7 @@ class TCData:
         return self.recompiled is not None
 
 def get_recompiled_name(name):
-    return name + ".recompiled"
+    return name
 
 # Fill global variables
 def check_arguments(args):
@@ -164,6 +166,98 @@ def build_test(cfg, build_dir):
         return None
     return lifted
 
+
+
+
+class BaseTest(unittest.TestCase):
+    def setUp(self):
+        self.t_bin = tempfile.mkdtemp(dir=os.getcwd(), prefix="bin_t")
+        self.t_recompiled = tempfile.mkdtemp(dir=os.getcwd(), prefix="recompiled_t")
+        self.saved_cwd = os.getcwd()
+
+    def tearDown(self):
+        os.chdir(self.saved_cwd)
+        shutil.rmtree(self.t_bin)
+        shutil.rmtree(self.t_recompiled)
+
+    # It should be guaranteed that cases contains TCData
+    def runTest(self, filename, args, files):
+        tc = cases[filename]
+
+        # These cannot be returned from main
+        original_ret = 2048
+        lifted_ret = 2048
+
+        expected_output = "__mcsema_error"
+        actual_output = "__mcsema_error"
+
+        if files:
+            print("Copying test files:")
+            for f in files:
+                base_name = os.path.basename(f)
+                f_name = os.path.join(self.t_recompiled, base_name)
+                b_name = os.path.join(self.t_bin, base_name)
+                shutil.copyfile(f, f_name)
+                shutil.copyfile(f, b_name)
+            print("Test files copied")
+
+        # Generate the expected output
+        os.chdir(self.t_bin)
+
+        original_pipes = subprocess.Popen(
+                [tc.binary] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        original_std_out, original_std_err = original_pipes.communicate()
+        original_ret = original_pipes.returncode
+
+
+        # Generate actual output
+        os.chdir(self.t_recompiled)
+
+        lifted_pipes = subprocess.Popen(
+                [tc.recompiled] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        lifted_std_out, lifted_std_err = lifted_pipes.communicate()
+        lifted_ret = lifted_pipes.returncode
+
+        self.assertEqual(original_ret, lifted_ret)
+        self.assertEqual(
+                original_std_out,
+                lifted_std_out)
+        self.assertEqual(
+                original_std_err,
+                lifted_std_err)
+
+    def check_files(self, name):
+        base_name = os.path.basename(name)
+        actual = os.path.join(self.t_recompiled, base_name)
+        expected = os.path.join(self.t_bin, base_name)
+        self.assertTrue(filecmp.cmp(expected, actual))
+
+
+    def wrapper(self, filename, args, files):
+        #total[ filename ] += 1
+        self.runTest(filename, args, files)
+        #results[ filename ] += 1
+
+
+class EchoTest(BaseTest):
+
+    def test_hello(self):
+        self.assertTrue(True)
+
+    def test_echo_h( self ):
+        self.wrapper("echo", ["/-help"], [] )
+
+    def test_cat_1( self ):
+        self.wrapper("cat", ["data.txt"], ["inputs/data.txt"])
+
+    def test_gzip_compress( self ):
+        self.wrapper( "gzip", ["-f", "./data.txt"], ["inputs/data.txt"] )
+        self.check_files("data.txt.gz")
+
+
+
+
+
 def main():
     arg_parser = argparse.ArgumentParser (
         formatter_class = argparse.RawDescriptionHelpFormatter)
@@ -215,22 +309,18 @@ def main():
     # maybe we want some --preserve option
     test_dir = tempfile.mkdtemp(dir=os.getcwd())
 
-    cases = {}
     for batch in batches:
         print(" > Handling : " + batch)
         for f in os.listdir(batch):
             recompiled = build_test(os.path.join(batch, f), test_dir)
             basename = os.path.splitext(f)[0]
             tc = TCData(basename,
-                        os.path.join(bin_dir, basename),
+                        os.path.join(os.getcwd(), os.path.join(bin_dir, basename)),
                         recompiled)
             cases[basename] = tc
 
-    suite = unittest.TestLoader().loadTestsFromTestCase(LinuxTest)
+    suite = unittest.TestLoader().loadTestsFromTestCase(EchoTest)
     unittest.TextTestRunner(verbosity = 2).run(suite)
-
-    if playground is not None:
-        playground = shutil.rmtree(playground)
 
 if __name__ == '__main__':
    main()
