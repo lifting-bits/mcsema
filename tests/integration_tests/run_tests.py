@@ -53,6 +53,7 @@ def get_recompiled_name(name):
     return name
 
 # Fill global variables
+# TODO: Rework, this is really ugly
 def check_arguments(args):
     if not os.path.isfile(args.lift):
         print("{} passed to --lift is not a valid file".format(args.lift))
@@ -137,7 +138,9 @@ def exec_and_log_fail(args):
 
 
 
-
+# Recompile the binary from lifted .bc
+# Return None in case error happens
+# Otherwise return path to the newly created binary
 def build_test(cfg, build_dir):
     print("Lifting " + cfg)
 
@@ -169,9 +172,10 @@ def build_test(cfg, build_dir):
     return lifted
 
 
-
-
+# Base class for tests, provides basic lift functionality
+# Classes that inherit from it only need to specify the tests themselves
 class BaseTest(unittest.TestCase):
+    # Create directories where the test will be executed
     def setUp(self):
         self.t_bin = tempfile.mkdtemp(dir=os.getcwd(), prefix="bin_t")
         self.t_recompiled = tempfile.mkdtemp(dir=os.getcwd(), prefix="recompiled_t")
@@ -182,8 +186,13 @@ class BaseTest(unittest.TestCase):
         shutil.rmtree(self.t_bin)
         shutil.rmtree(self.t_recompiled)
 
-    # It should be guaranteed that cases contains TCData
+    # Execute the test
+    # A little hack is used -> binary & recompiled binary paths are stored in cases
+    # under filename as key
+    # TODO: Solve it somehow better
+    # Compares only stdout + stderr + return value!
     def runTest(self, filename, args, files):
+        # It should be guaranteed that cases contains TCData
         tc = cases[filename]
 
         # Unfortunately there is no way to create files in respective test dirs
@@ -199,7 +208,6 @@ class BaseTest(unittest.TestCase):
 
         expected_output = "__mcsema_error"
         actual_output = "__mcsema_error"
-
 
         if files:
             print("Copying test files:")
@@ -228,6 +236,7 @@ class BaseTest(unittest.TestCase):
         lifted_std_out, lifted_std_err = lifted_pipes.communicate()
         lifted_ret = lifted_pipes.returncode
 
+        # Asserts on stderr, stdout, return value
         self.assertEqual(original_ret, lifted_ret)
         self.assertEqual(
                 original_std_out,
@@ -236,19 +245,20 @@ class BaseTest(unittest.TestCase):
                 original_std_err,
                 lifted_std_err)
 
+    # Compare files created as by-products of tests (e.g output of gzip)
     def check_files(self, name):
         base_name = os.path.basename(name)
         actual = os.path.join(self.t_recompiled, base_name)
         expected = os.path.join(self.t_bin, base_name)
         self.assertTrue(filecmp.cmp(expected, actual))
 
-
+    # Wrapper around tests, probably useless
     def wrapper(self, filename, args, files):
-        #total[ filename ] += 1
         self.runTest(filename, args, files)
-        #results[ filename ] += 1
 
-
+# IMPORTANT: Each test must obey following naming convention!
+# class name = name of the tested binary + _suite
+# This fact is later used to dynamically select only tests that should be run
 class echo_suite(BaseTest):
 
     def test_echo_h( self ):
@@ -344,25 +354,30 @@ def main():
     # maybe we want some --preserve option
     test_dir = tempfile.mkdtemp(dir=os.getcwd())
 
-    names = []
+    loader = unittest.TestLoader()
+    suite_cases = []
+
     for batch in batches:
         print(" > Handling : " + batch)
         for f in os.listdir(batch):
             recompiled = build_test(os.path.join(batch, f), test_dir)
+
+            # Lift failed for some reason, ignore this case
+            if recompiled is None:
+                continue
             basename = os.path.splitext(f)[0]
             tc = TCData(basename,
                         os.path.join(os.getcwd(), os.path.join(bin_dir, basename)),
                         recompiled)
             cases[basename] = tc
-            names.append(basename + "_suite")
 
-    loader = unittest.TestLoader()
-    l = []
-    for name in names:
-        suite = loader.loadTestsFromTestCase(globals()[name])
-        l.append(suite)
-    suite = unittest.TestSuite(l)
+            # Dynamically load only test cases for binaries that were successfully lifted
+            # Therefore ignored are fails and binaries not present in a batch
+            # TODO: Solve missing test case class
+            suite_name = basename + "_suite"
+            suite_cases.append(loader.loadTestsFromTestCase(globals()[suite_name]))
 
+    suite = unittest.TestSuite(suite_cases)
     unittest.TextTestRunner(verbosity = 2).run(suite)
 
 if __name__ == '__main__':
