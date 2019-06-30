@@ -43,6 +43,8 @@ class TCData:
         self.binary = bin_p
         self.recompiled = recompiled_p
         self.basename = basename
+        self.total = 0
+        self.success = 0
 
     def is_recompiled(self):
         return self.recompiled is not None
@@ -184,12 +186,20 @@ class BaseTest(unittest.TestCase):
     def runTest(self, filename, args, files):
         tc = cases[filename]
 
+        # Unfortunately there is no way to create files in respective test dirs
+        # in setUp since filename is not available there
+        # We need to have binaries themselves in the directories, because --help often prints
+        # the whole path
+        os.symlink(tc.binary, os.path.join(self.t_bin, filename))
+        os.symlink(tc.recompiled, os.path.join(self.t_recompiled, filename))
+
         # These cannot be returned from main
         original_ret = 2048
         lifted_ret = 2048
 
         expected_output = "__mcsema_error"
         actual_output = "__mcsema_error"
+
 
         if files:
             print("Copying test files:")
@@ -205,7 +215,7 @@ class BaseTest(unittest.TestCase):
         os.chdir(self.t_bin)
 
         original_pipes = subprocess.Popen(
-                [tc.binary] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+                [filename] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         original_std_out, original_std_err = original_pipes.communicate()
         original_ret = original_pipes.returncode
 
@@ -214,7 +224,7 @@ class BaseTest(unittest.TestCase):
         os.chdir(self.t_recompiled)
 
         lifted_pipes = subprocess.Popen(
-                [tc.recompiled] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+                [filename] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         lifted_std_out, lifted_std_err = lifted_pipes.communicate()
         lifted_ret = lifted_pipes.returncode
 
@@ -239,23 +249,48 @@ class BaseTest(unittest.TestCase):
         #results[ filename ] += 1
 
 
-class EchoTest(BaseTest):
-
-    def test_hello(self):
-        self.assertTrue(True)
+class echo_suite(BaseTest):
 
     def test_echo_h( self ):
-        self.wrapper("echo", ["/-help"], [] )
+        self.wrapper("echo", ["--help"], [] )
+    def test_echo_v( self ):
+        self.wrapper("echo", ["--version"], [] )
+    def test_echo_hello( self ):
+        self.wrapper("echo", ["Hello world!"], [] )
 
-    def test_cat_1( self ):
-        self.wrapper("cat", ["data.txt"], ["inputs/data.txt"])
+
+class gzip_suite(BaseTest):
+
+    def test_gzip_v( self ):
+        self.wrapper( "gzip", ["--version"], [] )
+
+    def test_gzip_h( self ):
+        self.wrapper( "gzip", ["--help"], [] )
+
+    def test_gzip_does_not_exists( self ):
+        self.wrapper( "gzip", ["asda"], [] )
 
     def test_gzip_compress( self ):
         self.wrapper( "gzip", ["-f", "./data.txt"], ["inputs/data.txt"] )
         self.check_files("data.txt.gz")
 
+    def test_gzip_decompress( self ):
+        self.wrapper( "gzip", ["-df", "./dec_data.txt.gz"], ["inputs/dec_data.txt.gz"] )
+        self.check_files("dec_data.txt")
 
+    def test_gzip_l( self ):
+        self.wrapper( "gzip", ["-l", "./dec_data.txt.gz"], ["inputs/dec_data.txt.gz"] )
 
+class cat_suite(BaseTest):
+
+    def test_cat_h( self ):
+        self.wrapper("cat", ["--help"], [] )
+    def test_cat_v( self ):
+        self.wrapper("cat", ["--version"], [] )
+    def test_cat_1( self ):
+        self.wrapper("cat", ["data.txt"], ["inputs/data.txt"])
+    def test_cat_n( self ):
+        self.wrapper("cat", ["-n", "data.txt"], ["inputs/data.txt"])
 
 
 def main():
@@ -309,6 +344,7 @@ def main():
     # maybe we want some --preserve option
     test_dir = tempfile.mkdtemp(dir=os.getcwd())
 
+    names = []
     for batch in batches:
         print(" > Handling : " + batch)
         for f in os.listdir(batch):
@@ -318,8 +354,15 @@ def main():
                         os.path.join(os.getcwd(), os.path.join(bin_dir, basename)),
                         recompiled)
             cases[basename] = tc
+            names.append(basename + "_suite")
 
-    suite = unittest.TestLoader().loadTestsFromTestCase(EchoTest)
+    loader = unittest.TestLoader()
+    l = []
+    for name in names:
+        suite = loader.loadTestsFromTestCase(globals()[name])
+        l.append(suite)
+    suite = unittest.TestSuite(l)
+
     unittest.TextTestRunner(verbosity = 2).run(suite)
 
 if __name__ == '__main__':
