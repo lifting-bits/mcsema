@@ -49,8 +49,22 @@ class TCData:
     def is_recompiled(self):
         return self.recompiled is not None
 
+    # TODO: Maybe rework as tabular?
+    def print(self):
+        print(self.basename)
+        if not self.is_recompiled():
+            print("\tRecompilation failed: ERROR")
+            return
+
+        print("\t" + str(self.success) + "/" + str(self.total))
+
 def get_recompiled_name(name):
     return name
+
+# Print results of tests
+def print_results(t_cases):
+    for key, val in t_cases.items():
+        val.print()
 
 # Fill global variables
 # TODO: Rework, this is really ugly
@@ -252,9 +266,11 @@ class BaseTest(unittest.TestCase):
         expected = os.path.join(self.t_bin, base_name)
         self.assertTrue(filecmp.cmp(expected, actual))
 
-    # Wrapper around tests, probably useless
+    # Wrapper around tests, used for test counting
     def wrapper(self, filename, args, files):
+        cases[filename].total += 1
         self.runTest(filename, args, files)
+        cases[filename].success += 1
 
 # IMPORTANT: Each test must obey following naming convention!
 # class name = name of the tested binary + _suite
@@ -302,7 +318,8 @@ class cat_suite(BaseTest):
     def test_cat_n( self ):
         self.wrapper("cat", ["-n", "data.txt"], ["inputs/data.txt"])
 
-
+# Right now batches are combined, maybe it would make sense to separate batches from each other
+# that can be useful when comparing performance of frontends
 def main():
     arg_parser = argparse.ArgumentParser (
         formatter_class = argparse.RawDescriptionHelpFormatter)
@@ -362,14 +379,15 @@ def main():
         for f in os.listdir(batch):
             recompiled = build_test(os.path.join(batch, f), test_dir)
 
-            # Lift failed for some reason, ignore this case
-            if recompiled is None:
-                continue
             basename = os.path.splitext(f)[0]
             tc = TCData(basename,
                         os.path.join(os.getcwd(), os.path.join(bin_dir, basename)),
                         recompiled)
             cases[basename] = tc
+
+            # Lift failed for some reason, ignore this case
+            if recompiled is None:
+                continue
 
             # Dynamically load only test cases for binaries that were successfully lifted
             # Therefore ignored are fails and binaries not present in a batch
@@ -379,6 +397,8 @@ def main():
 
     suite = unittest.TestSuite(suite_cases)
     unittest.TextTestRunner(verbosity = 2).run(suite)
+
+    print_results(cases)
 
 if __name__ == '__main__':
    main()
