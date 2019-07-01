@@ -287,9 +287,6 @@ class BaseTest(unittest.TestCase):
 
 class BasicTest(BaseTest):
 
-    def setUp(self):
-        super().setUp()
-
     def test_help(self):
         self.wrapper(["--help"], [])
 
