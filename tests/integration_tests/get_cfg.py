@@ -110,6 +110,10 @@ def binary_libraries(binary):
 
 
 def update_shared_libraries(binary):
+    if not os.path.isdir(so_dir):
+        print(" > Creating " + so_dir)
+        os.mkdir(so_dir)
+
     for name, path in binary_libraries(binary):
         if name in os.listdir(so_dir):
             continue
