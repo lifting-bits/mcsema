@@ -230,6 +230,9 @@ class BaseTest(unittest.TestCase):
         # It should be guaranteed that cases contains TCData
         tc = cases[filename]
 
+        # To avoid calling system-wide installed binaries
+        filename = './' + filename
+
         # Unfortunately there is no way to create files in respective test dirs
         # in setUp since filename is not available there
         # We need to have binaries themselves in the directories, because --help often prints
