@@ -246,7 +246,7 @@ def main():
     arg_parser.add_argument(
         "--disass",
         help='Frontend tobe used: ida | binja | dyninst',
-        choices=["ida", "binja", "dyninst"]
+        choices=["ida", "binja", "dyninst"],
         required=True)
 
     arg_parser.add_argument(
