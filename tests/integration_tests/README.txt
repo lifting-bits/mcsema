@@ -16,6 +16,7 @@ Directory structure:
 
 get_cfg.py # script to create new cfg files
 run_tests.py # runs the selected batches
+populate.py # tries to copy binaries from `/bin` or `/usr/bin` based on tags files
 bin
   |- base_test
   |- ... rest of tested binaries
