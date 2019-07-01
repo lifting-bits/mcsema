@@ -243,11 +243,6 @@ def main():
     arg_parser = argparse.ArgumentParser()
 
     arg_parser.add_argument(
-        "--llvm-version",
-        help="Version number MAJOR.MINOR of the LLVM toolchain",
-        required=True)
-
-    arg_parser.add_argument(
         "--disass",
         help='Frontend tobe used: ida | binja | dyninst',
         choices=["ida", "binja", "dyninst"],
