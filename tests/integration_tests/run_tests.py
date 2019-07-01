@@ -201,6 +201,19 @@ class BaseTest(unittest.TestCase):
         shutil.rmtree(self.t_bin)
         shutil.rmtree(self.t_recompiled)
 
+    # Copy input files for tests
+    # This is separate function in case some test case needs special handling
+    def copy_files(self, filename, args, files):
+        if files:
+            for f in files:
+                base_name = os.path.basename(f)
+                full_name = os.path.join(input_dir, f)
+                f_name = os.path.join(self.t_recompiled, base_name)
+                b_name = os.path.join(self.t_bin, base_name)
+                shutil.copyfile(full_name, f_name)
+                shutil.copyfile(full_name, b_name)
+
+
     # Execute the test
     # A little hack is used -> binary & recompiled binary paths are stored in cases
     # under filename as key
@@ -224,16 +237,7 @@ class BaseTest(unittest.TestCase):
         expected_output = "__mcsema_error"
         actual_output = "__mcsema_error"
 
-        if files:
-            print("Copying test files:")
-            for f in files:
-                base_name = os.path.basename(f)
-                full_name = os.path.join(input_dir, f)
-                f_name = os.path.join(self.t_recompiled, base_name)
-                b_name = os.path.join(self.t_bin, base_name)
-                shutil.copyfile(full_name, f_name)
-                shutil.copyfile(full_name, b_name)
-            print("Test files copied")
+        self.copy_files(filename, args, files)
 
         # Generate the expected output
         os.chdir(self.t_bin)
