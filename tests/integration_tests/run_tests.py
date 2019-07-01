@@ -335,13 +335,13 @@ class readelf_suite(BaseTest):
         self.wrapper( "readelf", ["--version"], [] )
     def test_readelf_all( self ):
         self.wrapper(
-                "readelf", ["--all", "./example_main.out"], ["/example_main.out"])
+                "readelf", ["--all", "./example_main.out"], ["example_main.out"])
     def test_readelf_syms( self ):
         self.wrapper(
-                "readelf", ["--syms", "./example_main.out"], ["/example_main.out"])
+                "readelf", ["--syms", "./example_main.out"], ["example_main.out"])
     def test_readelf_relocs( self ):
         self.wrapper(
-                "readelf", ["--relocs", "./example_main.out"], ["/example_main.out"])
+                "readelf", ["--relocs", "./example_main.out"], ["example_main.out"])
     def test_readelf_x_rodata( self ):
         self.wrapper(
             "readelf",
@@ -353,6 +353,79 @@ class readelf_suite(BaseTest):
             "readelf",
             ["-d", "./example_main.out"],
             ["/example_main.out"])
+
+
+class ls_suite(BaseTest):
+    def test_ls( self ):
+        self.wrapper("ls", ["--adssdaadad"], [])
+    def test_ls_v( self ):
+        self.wrapper("ls", ["--version"], [])
+    def test_ls_help( self ):
+        self.wrapper("ls", ["--help"], [])
+    def test_ls_exists( self ):
+        self.wrapper("ls", ["~/bin"], [])
+    def test_ls_does_not_exists( self ):
+        self.wrapper("ls", ["dadadadadad"], [])
+
+class awk_suite(BaseTest):
+    def test_awk_h( self ):
+        self.wrapper("awk", ["--help"], [] )
+    def test_awk_v( self ):
+        self.wrapper("awk", ["--version"], [] )
+
+class bash_suite(BaseTest):
+    def test_bash_h( self ):
+        self.wrapper("bash", ["--help"], [] )
+    def test_bash_v( self ):
+        self.wrapper("bash", ["--version"], [] )
+
+class grep_suite(BaseTest):
+    def test_grep_h( self ):
+        self.wrapper("grep", ["--help"], [] )
+    def test_grep_v( self ):
+        self.wrapper("grep", ["--version"], [] )
+    def test_grep_test_non_ex( self ):
+        self.wrapper("grep", ["TMP", "./dummy.txt"], ["dummy.txt"])
+    def test_grep_test_exists( self ):
+        self.wrapper("grep", ["TEST", "./dummy.txt"], ["dummy.txt"])
+    def test_grep_i( self ):
+        self.wrapper("grep", ["-i","TeSt", "./dummy.txt"], ["dummy.txt"])
+
+class ld_suite(BaseTest):
+    def test_ld_h( self ):
+        self.wrapper("ld", ["--help"], [] )
+    def test_ld_v( self ):
+        self.wrapper("ld", ["--version"], [] )
+
+class perl_suite(BaseTest):
+    def test_perl_h( self ):
+        self.wrapper("perl", ["--help"], [] )
+    def test_perl_v( self ):
+        self.wrapper("perl", ["--version"], [] )
+
+class sed_suite(BaseTest):
+    def test_sed_h( self ):
+        self.wrapper("sed", ["--help"], [] )
+    def test_sed_v( self ):
+        self.wrapper("sed", ["--version"], [] )
+    def test_sef_del_f_line( self ):
+        self.wrapper("sed", ["-e", "1d", "dummy.txt"], ["dummy.txt"])
+    def test_sef_del_token_line( self ):
+        self.wrapper("sed", ["-e", "/REGEX/d", "dummy.txt"], ["dummy.txt"])
+    def test_sef_del_unex_token_line( self ):
+        self.wrapper("sed", ["-e", "/REGES/d", "dummy.txt"], ["dummy.txt"])
+
+class xz_suite(BaseTest):
+    def test_xz_h( self ):
+        self.wrapper("xz", ["--help"], [] )
+    def test_xz_v( self ):
+        self.wrapper("xz", ["--version"], [] )
+    def test_xz_c( self ):
+        self.f_name = "xz"
+        self.wrapper("xz", ["-f", "./data.txt"], ["data.txt"])
+        self.check_files("data.txt.xz")
+    def test_xz_d_stdout( self ):
+        self.wrapper("xz", ["-cd","./xz_res.txt.xz"], ["xz_res.txt.xz"])
 
 
 # Right now batches are combined, maybe it would make sense to separate batches from each other
