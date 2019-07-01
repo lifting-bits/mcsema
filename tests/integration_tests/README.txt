@@ -2,6 +2,7 @@ New attempt to create a better test suite. In development process, use at your o
 
 Use:
 * First create a batch of cfg file using `get_cfg.py` -- you can select flavors to run only subset of all tests (they are specified in `tags` directory).
+  + tag all will get cfg for every file in `bin`
 * Once batch is created `run_tests.py` can be run
 
 Extending test:

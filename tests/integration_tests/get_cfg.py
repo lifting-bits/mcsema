@@ -26,11 +26,14 @@ tags_dir="tags"
 so_dir="shared_libs"
 bin_dir="bin"
 
+ALL_TAG="all"
+
 FAIL = 0
 SUCCESS = 1
 IGNORED = 2
 
 MESSAGES = { FAIL: "Fail", SUCCESS: "Success", IGNORED: "Skipped" }
+
 def make_dir(path):
     print(" > Creating directory: " + path)
     try:
@@ -49,12 +52,15 @@ def is_batch_dir_sane(batch_name):
 def get_binaries_from_flavours(flavors):
     binaries = []
 
+    # We want to get cfg for everything
+    get_all = ALL_TAG in flavors
+
     for filename in os.listdir(tags_dir):
         binary_name = filename.split('.')[0]
 
         with open(os.path.join(tags_dir, filename)) as f:
             for line in f:
-                if line.rstrip("\n") in flavors:
+                if get_all or line.rstrip("\n") in flavors:
                     print(" > Selecting " + binary_name)
                     binaries.append(binary_name)
                     break
