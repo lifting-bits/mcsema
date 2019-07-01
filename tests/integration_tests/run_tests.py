@@ -30,6 +30,7 @@ llvm_version = 0
 lift = None
 bin_dir = "bin"
 lib_dir = None
+input_dir = "inputs"
 recompiled_dir = "recompiled"
 
 batches = []
@@ -227,10 +228,11 @@ class BaseTest(unittest.TestCase):
             print("Copying test files:")
             for f in files:
                 base_name = os.path.basename(f)
+                full_name = os.path.join(input_dir, f)
                 f_name = os.path.join(self.t_recompiled, base_name)
                 b_name = os.path.join(self.t_bin, base_name)
-                shutil.copyfile(f, f_name)
-                shutil.copyfile(f, b_name)
+                shutil.copyfile(full_name, f_name)
+                shutil.copyfile(full_name, b_name)
             print("Test files copied")
 
         # Generate the expected output
@@ -297,15 +299,15 @@ class gzip_suite(BaseTest):
         self.wrapper( "gzip", ["asda"], [] )
 
     def test_gzip_compress( self ):
-        self.wrapper( "gzip", ["-f", "./data.txt"], ["inputs/data.txt"] )
+        self.wrapper( "gzip", ["-f", "./data.txt"], ["data.txt"] )
         self.check_files("data.txt.gz")
 
     def test_gzip_decompress( self ):
-        self.wrapper( "gzip", ["-df", "./dec_data.txt.gz"], ["inputs/dec_data.txt.gz"] )
+        self.wrapper( "gzip", ["-df", "./dec_data.txt.gz"], ["dec_data.txt.gz"] )
         self.check_files("dec_data.txt")
 
     def test_gzip_l( self ):
-        self.wrapper( "gzip", ["-l", "./dec_data.txt.gz"], ["inputs/dec_data.txt.gz"] )
+        self.wrapper( "gzip", ["-l", "./dec_data.txt.gz"], ["dec_data.txt.gz"] )
 
 class cat_suite(BaseTest):
 
@@ -314,9 +316,36 @@ class cat_suite(BaseTest):
     def test_cat_v( self ):
         self.wrapper("cat", ["--version"], [] )
     def test_cat_1( self ):
-        self.wrapper("cat", ["data.txt"], ["inputs/data.txt"])
+        self.wrapper("cat", ["data.txt"], ["data.txt"])
     def test_cat_n( self ):
-        self.wrapper("cat", ["-n", "data.txt"], ["inputs/data.txt"])
+        self.wrapper("cat", ["-n", "data.txt"], ["data.txt"])
+
+class readelf_suite(BaseTest):
+    def test_readelf_h( self ):
+        self.wrapper( "readelf", ["--help"], [] )
+    def test_readelf_v( self ):
+        self.wrapper( "readelf", ["--version"], [] )
+    def test_readelf_all( self ):
+        self.wrapper(
+                "readelf", ["--all", "./example_main.out"], ["/example_main.out"])
+    def test_readelf_syms( self ):
+        self.wrapper(
+                "readelf", ["--syms", "./example_main.out"], ["/example_main.out"])
+    def test_readelf_relocs( self ):
+        self.wrapper(
+                "readelf", ["--relocs", "./example_main.out"], ["/example_main.out"])
+    def test_readelf_x_rodata( self ):
+        self.wrapper(
+            "readelf",
+            ["-x", ".rodata", "./example_main.out"],
+            ["/example_main.out"])
+
+    def test_readelf_d( self ):
+        self.wrapper(
+            "readelf",
+            ["-d", "./example_main.out"],
+            ["/example_main.out"])
+
 
 # Right now batches are combined, maybe it would make sense to separate batches from each other
 # that can be useful when comparing performance of frontends
