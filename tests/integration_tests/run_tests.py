@@ -196,6 +196,9 @@ def build_test(cfg, build_dir):
 class BaseTest(unittest.TestCase):
     # Create directories where the test will be executed
     def setUp(self):
+        # Parse name of the classes that inherits and get prefix that is actual name of binary
+        self.name = type(self).__name__.rsplit('_')[0]
+
         self.t_bin = tempfile.mkdtemp(dir=os.getcwd(), prefix="bin_t")
         self.t_recompiled = tempfile.mkdtemp(dir=os.getcwd(), prefix="recompiled_t")
         self.saved_cwd = os.getcwd()
@@ -277,155 +280,113 @@ class BaseTest(unittest.TestCase):
         self.assertTrue(filecmp.cmp(expected, actual))
 
     # Wrapper around tests, used for test counting
-    def wrapper(self, filename, args, files):
-        cases[filename].total += 1
-        self.run_test(filename, args, files)
-        cases[filename].success += 1
+    def wrapper(self, args, files):
+        cases[self.name].total += 1
+        self.run_test(self.name, args, files)
+        cases[self.name].success += 1
+
+class BasicTest(BaseTest):
+
+    def setUp(self):
+        super().setUp()
+
+    def test_help(self):
+        self.wrapper(["--help"], [])
+
+    def test_version(self):
+        self.wrapper(["--version"], [])
 
 # IMPORTANT: Each test must obey following naming convention!
 # class name = name of the tested binary + _suite
 # This fact is later used to dynamically select only tests that should be run
-class echo_suite(BaseTest):
+class echo_suite(BasicTest):
 
-    def test_echo_h( self ):
-        self.wrapper("echo", ["--help"], [] )
-    def test_echo_v( self ):
-        self.wrapper("echo", ["--version"], [] )
-    def test_echo_hello( self ):
-        self.wrapper("echo", ["Hello world!"], [] )
+    def test_echo_hello(self):
+        self.wrapper(["Hello world!"], [] )
 
 
-class gzip_suite(BaseTest):
+class gzip_suite(BasicTest):
 
-    def test_gzip_v( self ):
-        self.wrapper( "gzip", ["--version"], [] )
+    def test_gzip_does_not_exists(self):
+        self.wrapper(["asda"], [])
 
-    def test_gzip_h( self ):
-        self.wrapper( "gzip", ["--help"], [] )
-
-    def test_gzip_does_not_exists( self ):
-        self.wrapper( "gzip", ["asda"], [] )
-
-    def test_gzip_compress( self ):
-        self.wrapper( "gzip", ["-f", "./data.txt"], ["data.txt"] )
+    def test_gzip_compress(self):
+        self.wrapper(["-f", "./data.txt"], ["data.txt"])
         self.check_files("data.txt.gz")
 
-    def test_gzip_decompress( self ):
-        self.wrapper( "gzip", ["-df", "./dec_data.txt.gz"], ["dec_data.txt.gz"] )
+    def test_gzip_decompress(self):
+        self.wrapper(["-df", "./dec_data.txt.gz"], ["dec_data.txt.gz"])
         self.check_files("dec_data.txt")
 
-    def test_gzip_l( self ):
-        self.wrapper( "gzip", ["-l", "./dec_data.txt.gz"], ["dec_data.txt.gz"] )
+    def test_gzip_l(self):
+        self.wrapper(["-l", "./dec_data.txt.gz"], ["dec_data.txt.gz"])
 
-class cat_suite(BaseTest):
+class cat_suite(BasicTest):
+    def test_cat_1(self):
+        self.wrapper(["data.txt"], ["data.txt"])
+    def test_cat_n(self):
+        self.wrapper(["-n", "data.txt"], ["data.txt"])
 
-    def test_cat_h( self ):
-        self.wrapper("cat", ["--help"], [] )
-    def test_cat_v( self ):
-        self.wrapper("cat", ["--version"], [] )
-    def test_cat_1( self ):
-        self.wrapper("cat", ["data.txt"], ["data.txt"])
-    def test_cat_n( self ):
-        self.wrapper("cat", ["-n", "data.txt"], ["data.txt"])
-
-class readelf_suite(BaseTest):
-    def test_readelf_h( self ):
-        self.wrapper( "readelf", ["--help"], [] )
-    def test_readelf_v( self ):
-        self.wrapper( "readelf", ["--version"], [] )
-    def test_readelf_all( self ):
+class readelf_suite(BasicTest):
+    def test_readelf_all(self):
+        self.wrapper(["--all", "./example_main.out"], ["example_main.out"])
+    def test_readelf_syms(self):
+        self.wrapper(["--syms", "./example_main.out"], ["example_main.out"])
+    def test_readelf_relocs(self):
+        self.wrapper(["--relocs", "./example_main.out"], ["example_main.out"])
+    def test_readelf_x_rodata(self):
         self.wrapper(
-                "readelf", ["--all", "./example_main.out"], ["example_main.out"])
-    def test_readelf_syms( self ):
-        self.wrapper(
-                "readelf", ["--syms", "./example_main.out"], ["example_main.out"])
-    def test_readelf_relocs( self ):
-        self.wrapper(
-                "readelf", ["--relocs", "./example_main.out"], ["example_main.out"])
-    def test_readelf_x_rodata( self ):
-        self.wrapper(
-            "readelf",
             ["-x", ".rodata", "./example_main.out"],
             ["/example_main.out"])
 
-    def test_readelf_d( self ):
+    def test_readelf_d(self):
         self.wrapper(
-            "readelf",
             ["-d", "./example_main.out"],
             ["/example_main.out"])
 
 
-class ls_suite(BaseTest):
-    def test_ls( self ):
-        self.wrapper("ls", ["--adssdaadad"], [])
-    def test_ls_v( self ):
-        self.wrapper("ls", ["--version"], [])
-    def test_ls_help( self ):
-        self.wrapper("ls", ["--help"], [])
-    def test_ls_exists( self ):
-        self.wrapper("ls", ["~/bin"], [])
-    def test_ls_does_not_exists( self ):
-        self.wrapper("ls", ["dadadadadad"], [])
+class ls_suite(BasicTest):
+    def test_ls(self):
+        self.wrapper(["--adssdaadad"], [])
+    def test_ls_exists(self):
+        self.wrapper(["~/bin"], [])
+    def test_ls_does_not_exists(self):
+        self.wrapper(["dadadadadad"], [])
 
-class awk_suite(BaseTest):
-    def test_awk_h( self ):
-        self.wrapper("awk", ["--help"], [] )
-    def test_awk_v( self ):
-        self.wrapper("awk", ["--version"], [] )
+class awk_suite(BasicTest):
+    pass
 
-class bash_suite(BaseTest):
-    def test_bash_h( self ):
-        self.wrapper("bash", ["--help"], [] )
-    def test_bash_v( self ):
-        self.wrapper("bash", ["--version"], [] )
+class bash_suite(BasicTest):
+    pass
 
-class grep_suite(BaseTest):
-    def test_grep_h( self ):
-        self.wrapper("grep", ["--help"], [] )
-    def test_grep_v( self ):
-        self.wrapper("grep", ["--version"], [] )
-    def test_grep_test_non_ex( self ):
-        self.wrapper("grep", ["TMP", "./dummy.txt"], ["dummy.txt"])
-    def test_grep_test_exists( self ):
-        self.wrapper("grep", ["TEST", "./dummy.txt"], ["dummy.txt"])
-    def test_grep_i( self ):
-        self.wrapper("grep", ["-i","TeSt", "./dummy.txt"], ["dummy.txt"])
+class grep_suite(BasicTest):
+    def test_grep_test_non_ex(self):
+        self.wrapper(["TMP", "./dummy.txt"], ["dummy.txt"])
+    def test_grep_test_exists(self):
+        self.wrapper(["TEST", "./dummy.txt"], ["dummy.txt"])
+    def test_grep_i(self):
+        self.wrapper(["-i","TeSt", "./dummy.txt"], ["dummy.txt"])
 
-class ld_suite(BaseTest):
-    def test_ld_h( self ):
-        self.wrapper("ld", ["--help"], [] )
-    def test_ld_v( self ):
-        self.wrapper("ld", ["--version"], [] )
+class ld_suite(BasicTest):
+    pass
 
-class perl_suite(BaseTest):
-    def test_perl_h( self ):
-        self.wrapper("perl", ["--help"], [] )
-    def test_perl_v( self ):
-        self.wrapper("perl", ["--version"], [] )
+class perl_suite(BasicTest):
+    pass
 
-class sed_suite(BaseTest):
-    def test_sed_h( self ):
-        self.wrapper("sed", ["--help"], [] )
-    def test_sed_v( self ):
-        self.wrapper("sed", ["--version"], [] )
-    def test_sef_del_f_line( self ):
-        self.wrapper("sed", ["-e", "1d", "dummy.txt"], ["dummy.txt"])
-    def test_sef_del_token_line( self ):
-        self.wrapper("sed", ["-e", "/REGEX/d", "dummy.txt"], ["dummy.txt"])
-    def test_sef_del_unex_token_line( self ):
-        self.wrapper("sed", ["-e", "/REGES/d", "dummy.txt"], ["dummy.txt"])
+class sed_suite(BasicTest):
+    def test_sef_del_f_line(self):
+        self.wrapper(["-e", "1d", "dummy.txt"], ["dummy.txt"])
+    def test_sef_del_token_line(self):
+        self.wrapper(["-e", "/REGEX/d", "dummy.txt"], ["dummy.txt"])
+    def test_sef_del_unex_token_line(self):
+        self.wrapper(["-e", "/REGES/d", "dummy.txt"], ["dummy.txt"])
 
-class xz_suite(BaseTest):
-    def test_xz_h( self ):
-        self.wrapper("xz", ["--help"], [] )
-    def test_xz_v( self ):
-        self.wrapper("xz", ["--version"], [] )
-    def test_xz_c( self ):
-        self.f_name = "xz"
-        self.wrapper("xz", ["-f", "./data.txt"], ["data.txt"])
+class xz_suite(BasicTest):
+    def test_xz_c(self):
+        self.wrapper(["-f", "./data.txt"], ["data.txt"])
         self.check_files("data.txt.xz")
-    def test_xz_d_stdout( self ):
-        self.wrapper("xz", ["-cd","./xz_res.txt.xz"], ["xz_res.txt.xz"])
+    def test_xz_d_stdout(self):
+        self.wrapper(["-cd","./xz_res.txt.xz"], ["xz_res.txt.xz"])
 
 
 # Right now batches are combined, maybe it would make sense to separate batches from each other
