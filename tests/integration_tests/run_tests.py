@@ -57,6 +57,10 @@ class TCData:
             print("\tRecompilation failed: ERROR")
             return
 
+        if self.total == 0:
+            print("\tNo tests were executed")
+            return
+
         print("\t" + str(self.success) + "/" + str(self.total))
 
 def get_recompiled_name(name):
@@ -426,7 +430,14 @@ def main():
             # Therefore ignored are fails and binaries not present in a batch
             # TODO: Solve missing test case class
             suite_name = basename + "_suite"
-            suite_cases.append(loader.loadTestsFromTestCase(globals()[suite_name]))
+
+            try:
+                tc_class = globals()[suite_name]
+                suite_cases.append(loader.loadTestsFromTestCase(tc_class))
+            except KeyError:
+                print(" > " + suite_name + " was not found in module!")
+                print(" > Skipping test")
+                continue
 
     suite = unittest.TestSuite(suite_cases)
     unittest.TextTestRunner(verbosity = 2).run(suite)
