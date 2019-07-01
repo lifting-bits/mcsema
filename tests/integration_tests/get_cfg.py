@@ -219,6 +219,8 @@ def get_cfg(binary, cfg, args, lifter):
 def get_lifter(disass):
     if disass == "dyninst":
         return dyninst_frontend
+    if disass == "ida":
+        return ida_frontend
     print(" > Support for chosen frontend was not implemented yet!")
     sys.exit(1)
 
