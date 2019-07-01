@@ -288,6 +288,7 @@ class BaseTest(unittest.TestCase):
         self.run_test(self.name, args, files)
         cases[self.name].success += 1
 
+# Implements two invocations that are usually tested on everything
 class BasicTest(BaseTest):
 
     def test_help(self):
