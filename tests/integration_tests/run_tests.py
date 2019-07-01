@@ -219,7 +219,7 @@ class BaseTest(unittest.TestCase):
     # under filename as key
     # TODO: Solve it somehow better
     # Compares only stdout + stderr + return value!
-    def runTest(self, filename, args, files):
+    def run_test(self, filename, args, files):
         # It should be guaranteed that cases contains TCData
         tc = cases[filename]
 
@@ -275,7 +275,7 @@ class BaseTest(unittest.TestCase):
     # Wrapper around tests, used for test counting
     def wrapper(self, filename, args, files):
         cases[filename].total += 1
-        self.runTest(filename, args, files)
+        self.run_test(filename, args, files)
         cases[filename].success += 1
 
 # IMPORTANT: Each test must obey following naming convention!
