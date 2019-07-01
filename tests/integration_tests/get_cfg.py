@@ -143,7 +143,7 @@ def binary_info(binary):
     return address_size, arch, is_pie
 
 
-def dyninst_frontend(binary ,cfg, args):
+def dyninst_frontend(binary, cfg, args):
     address_size, arch, is_pie = binary_info(binary)
 
     disass_args = [
@@ -166,6 +166,40 @@ def dyninst_frontend(binary ,cfg, args):
     if ret:
         return FAIL
     return SUCCESS
+
+# TODO: Testing REQUIRED
+def ida_frontend(binary, cfg, args):
+    address_size, arch, is_pie = binary_info(binary)
+
+    ida_version = {
+        "x86_avx": "idal",
+        "amd64_avx": "idal64",
+        "aarch64": "idal64"
+    }[arch]
+
+    da = quote(os.path.join(args.path_to_disass, ida_version))
+
+    disass_args = [
+        'mcsema_disass',
+        '--arch', arch,
+        '--os', 'linux',
+        '--binary', quote(binary),
+        '--output', quote(cfg),
+        '--entrypoint', 'main',
+        '--disassembler', da]
+
+    if is_pie:
+        disass_args.append("--pie_mode")
+
+    print(" \t> " + " ".join(disass_args))
+    ret = subprocess.call(disass_args)
+    if ret:
+        return FAIL
+    return SUCCESS
+
+def binja_frontend(binary, cfg, args):
+    print(" > Not implemented")
+    sys.exit(1)
 
 
 # TODO: We may want for each file to be lifted in separate directory and on a copy
@@ -211,8 +245,14 @@ def main():
 
     arg_parser.add_argument(
         "--disass",
-        help='Path to disassembler, or just "binja" (if installed) or "dyninst"',
+        help='Frontend tobe used: ida | binja | dyninst',
+        choices=["ida", "binja", "dyninst"]
         required=True)
+
+    arg_parser.add_argument(
+        "--path_to_disass",
+        help="Path to disassembler, needed in case ida is chosen as frontend",
+        required=False)
 
     arg_parser.add_argument(
         "--flavors",
