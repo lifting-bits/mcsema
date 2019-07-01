@@ -38,6 +38,10 @@ def main():
     locations = [ "/usr/bin", "/bin"]
 
     current = set()
+    # If `bin` does not exist create it first
+    if not os.path.isdir(bin_dir):
+        os.mkdir(bin_dir)
+
     for f in os.listdir(bin_dir):
         current.add(f)
 
