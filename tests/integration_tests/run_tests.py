@@ -74,6 +74,9 @@ def print_results(t_cases):
 # Fill global variables
 # TODO: Rework, this is really ugly
 def check_arguments(args):
+    if args.lift_args[0] == "--":
+        args.lift_args = args.lift_args[1:]
+
     if not os.path.isfile(args.lift):
         print("{} passed to --lift is not a valid file".format(args.lift))
         sys.exit (1)
@@ -160,7 +163,7 @@ def exec_and_log_fail(args):
 # Recompile the binary from lifted .bc
 # Return None in case error happens
 # Otherwise return path to the newly created binary
-def build_test(cfg, build_dir):
+def build_test(cfg, build_dir, extra_args):
     print("Lifting " + cfg)
 
     # Create build directory for given test case
@@ -177,6 +180,9 @@ def build_test(cfg, build_dir):
 
     if not exec_and_log_fail(lift_args):
         return None
+
+    lift_args += extra_args
+    print(lift_args)
 
     # Recompile it
     lifted = os.path.join(build_dir, get_recompiled_name(binary_base_name))
@@ -393,7 +399,7 @@ class xz_suite(BasicTest):
 # Right now batches are combined, maybe it would make sense to separate batches from each other
 # that can be useful when comparing performance of frontends
 def main():
-    arg_parser = argparse.ArgumentParser (
+    arg_parser = argparse.ArgumentParser(
         formatter_class = argparse.RawDescriptionHelpFormatter)
 
     arg_parser.add_argument('--lift',
@@ -434,8 +440,11 @@ def main():
                             help = 'Do not run any tests',
                             required = False)
 
+    arg_parser.add_argument('lift_args',
+                            help = "Additional arguments passed to mcsema-lift",
+                            nargs = argparse.REMAINDER)
 
-    args, command_args = arg_parser.parse_known_args ()
+    args, command_args = arg_parser.parse_known_args()
     check_arguments(args)
 
     # Create directory to store recompiled binaries
@@ -449,7 +458,7 @@ def main():
     for batch in batches:
         print(" > Handling : " + batch)
         for f in os.listdir(batch):
-            recompiled = build_test(os.path.join(batch, f), test_dir)
+            recompiled = build_test(os.path.join(batch, f), test_dir, args.lift_args )
 
             basename = os.path.splitext(f)[0]
             tc = TCData(basename,
