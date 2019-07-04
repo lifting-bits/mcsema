@@ -152,9 +152,9 @@ def exec_and_log_fail(args):
 
     if ret_code:
         print("** stdout:")
-        print(stdout)
+        print(std_out)
         print("** stderr:")
-        print(stderr)
+        print(std_err)
         return False
     return True
 
