@@ -74,7 +74,7 @@ def print_results(t_cases):
 # Fill global variables
 # TODO: Rework, this is really ugly
 def check_arguments(args):
-    if args.lift_args[0] == "--":
+    if args.lift_args and args.lift_args[0] == "--":
         args.lift_args = args.lift_args[1:]
 
     if not os.path.isfile(args.lift):
