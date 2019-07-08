@@ -176,14 +176,6 @@ def dyninst_frontend(binary, cfg, args):
 def ida_frontend(binary, cfg, args):
     address_size, arch, is_pie = binary_info(binary)
 
-    ida_version = {
-        "x86_avx": "idal",
-        "amd64_avx": "idal64",
-        "aarch64": "idal64"
-    }[arch]
-
-    da = quote(os.path.join(args.path_to_disass, ida_version))
-
     disass_args = [
         'mcsema-disass',
         '--arch', arch,
@@ -191,7 +183,7 @@ def ida_frontend(binary, cfg, args):
         '--binary', quote(binary),
         '--output', quote(cfg),
         '--entrypoint', 'main',
-        '--disassembler', da]
+        '--disassembler', args.path_to_disass]
 
     if is_pie:
         disass_args.append("--pie_mode")
@@ -254,6 +246,7 @@ def main():
     arg_parser.add_argument(
         "--path_to_disass",
         help="Path to disassembler, needed in case ida is chosen as frontend",
+        default=None,
         required=False)
 
     arg_parser.add_argument(
@@ -286,8 +279,15 @@ def main():
         required=False)
 
     args, command_args = arg_parser.parse_known_args()
-    print( args )
-    print( command_args )
+
+
+    if args.disass == "ida":
+        if args.path_to_disass is None:
+            print("IDA frontend is selected but --path_to_disass is not")
+            sys.exit(1)
+        if not os.path.isfile(args.path_to_disass):
+            print("IDA frontend is selected but --path_to_disass is not a file")
+            sys.exit(1)
 
     print("Checking batch name")
     batch_dir = create_batch_dir(args.batch, args.batch_policy)
