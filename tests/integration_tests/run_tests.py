@@ -146,6 +146,7 @@ def check_arguments(args):
 
 
 def exec_and_log_fail(args):
+    print(args)
     pipes = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     std_out, std_err = pipes.communicate()
     ret_code = pipes.returncode
@@ -177,12 +178,10 @@ def build_test(cfg, build_dir, extra_args):
                   "-cfg", cfg,
                   "-abi_libraries", libc,
                   "-output", bc ]
+    lift_args += extra_args
 
     if not exec_and_log_fail(lift_args):
         return None
-
-    lift_args += extra_args
-    print(lift_args)
 
     # Recompile it
     lifted = os.path.join(build_dir, get_recompiled_name(binary_base_name))
