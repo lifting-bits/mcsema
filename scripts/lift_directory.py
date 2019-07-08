@@ -50,7 +50,7 @@ def lift_binary(args, binary):
       args.workspace_dir, "{}.stderr".format(binary_name))
   with open(sub_stdout_path, "w") as sub_stdout:
     with open(sub_stderr_path, "w") as sub_stderr:
-      print " ".join(lift_args)
+      print(" ".join(lift_args))
       return subprocess.call(lift_args, stdout=sub_stdout, stderr=sub_stderr)
 
 def main():
@@ -132,7 +132,7 @@ def main():
   ret = 0
   for binary, ret_code in ret_codes.items():
     if ret_code.get():
-      print "Error lifting {}".format(binary)
+      print("Error lifting {}".format(binary))
       ret = 1
   #except:
   #  pool.terminate()

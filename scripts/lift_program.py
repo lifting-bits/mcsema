@@ -139,14 +139,14 @@ def main():
   bc_dir = os.path.join(args.workspace_dir, 'bc')
   log_dir = os.path.join(args.workspace_dir, 'log')
 
-  print "mkdir -p {}".format(args.workspace_dir)
-  print "mkdir -p {}".format(bin_dir)
-  print "mkdir -p {}".format(lifted_obj_dir)
-  print "mkdir -p {}".format(lib_dir)
-  print "mkdir -p {}".format(obj_dir)
-  print "mkdir -p {}".format(cfg_dir)
-  print "mkdir -p {}".format(bc_dir)
-  print "mkdir -p {}".format(log_dir)
+  print("mkdir -p {}".format(args.workspace_dir))
+  print("mkdir -p {}".format(bin_dir))
+  print("mkdir -p {}".format(lifted_obj_dir))
+  print("mkdir -p {}".format(lib_dir))
+  print("mkdir -p {}".format(obj_dir))
+  print("mkdir -p {}".format(cfg_dir))
+  print("mkdir -p {}".format(bc_dir))
+  print("mkdir -p {}".format(log_dir))
 
   make_directory(args.workspace_dir)
   make_directory(bin_dir)
@@ -168,8 +168,8 @@ def main():
   log = os.path.join(log_dir, "{}.log".format(path_hash))
 
   # Copy the binary into the workspace's object directory.
-  print "cp {} {}".format(path, binary)
-  print "chmod a+x {}".format(binary)
+  print("cp {} {}".format(path, binary))
+  print("chmod a+x {}".format(binary))
   if not os.path.isfile(binary):
     shutil.copyfile(args.binary, binary)
     make_executable(binary)
@@ -195,10 +195,10 @@ def main():
     except:
       pass
 
-    print "cp {} {}".format(path, library)
-    print "chmod a+x {}".format(library)
-    print "rm {}".format(sym_name)
-    print "ln {} {}".format(library, sym_name)
+    print("cp {} {}".format(path, library))
+    print("chmod a+x {}".format(library))
+    print("rm {}".format(sym_name))
+    print("ln {} {}".format(library, sym_name))
 
     libs.append(sym_name)
 
@@ -234,7 +234,7 @@ def main():
 
   disass_args.extend(command_args)
 
-  print " ".join(disass_args)
+  print(" ".join(disass_args))
   ret = subprocess.call(disass_args)
   if ret:
     return ret
@@ -254,7 +254,7 @@ def main():
   if args.legacy_mode:
     mcsema_lift_args.append('--legacy_mode')
 
-  print " ".join(mcsema_lift_args)
+  print(" ".join(mcsema_lift_args))
   ret = subprocess.call(mcsema_lift_args)
   if ret:
     return ret
@@ -285,7 +285,7 @@ def main():
     clang_args.append(lib)
 
   # Compile back to an executable.
-  print " ".join(clang_args)
+  print(" ".join(clang_args))
   ret = subprocess.call(clang_args)
   if ret:
     return ret
