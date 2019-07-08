@@ -185,7 +185,7 @@ def ida_frontend(binary, cfg, args):
     da = quote(os.path.join(args.path_to_disass, ida_version))
 
     disass_args = [
-        'mcsema_disass',
+        'mcsema-disass',
         '--arch', arch,
         '--os', 'linux',
         '--binary', quote(binary),
