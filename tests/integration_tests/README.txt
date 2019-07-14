@@ -37,11 +37,68 @@ python get_cfg.py --disass dyninst --flavors echo --batch first_batch --batch_po
 3) Once batch is created `run_tests.py` can be run
 
 Extending test:
+
 To extend tests (for new binary B) several things should be provided:
-* binary B should be stored in `bin` folder, currently compiling from sources is not supported
+
+Do not use "." (dot) in the name of the tested binaries! (Use "_" or something else)
+* binary B should be stored in `bin` folder (`compile.py` or `populate.py` can be used)
 * appropriate tags should be specified in `tags` folder (`tags/B.tag`)
 * in `run_tests.py` special class names `B_suite` (correct naming is important!) should be
   implemented -> the actual tests are specified here
+
+There are two classes new B_suite can inherit from:
+* `BaseTest` - provides all the necessary methods to do the actual testing (setup, input setup,
+  execution, actual comparison, cleanup) -- it is not necessary the new suite inherits from this
+  class but it is recommended
+* `BasicTest` - provides tests for `--help` and `--version` invocations, which are typical uses
+  of many binaries
+
+Example of the test class hierarchy:
+
+    BaseTest
+   _____|_____
+   |         |
+BasicTest   custom_binary_suite
+   |
+readelf_suite
+
+For each invocation of the binary separate method in the B_suite should be implemented:
+We already have:
+
+```
+class B_suite(BaseTest):
+  pass
+```
+
+Let's say we want to test invocation with `--help` as command line argument, therefore we need to
+add a method to `B_suite`. It is important the name of the method starts with `test_` since
+`unittest` is used.
+
+```
+class B_suite(BaseTest):
+  def test_help(self):
+    self.wrapper(["--help"], [])
+
+```
+
+`BaseTest::wrapper` is used since it does some statistics over the suite.
+First argument are the command line arguments,
+second are the files that may be used by the program (the file must reside in `inputs`).
+
+In the case the invocation creates file as byproduct, the method needs to be slightly modified:
+
+```
+def test_output(self):
+  self.wrapper(["--input data.txt", "--outout data.compressed"], ["data.txt"])
+  self.check_files("data.compressed")
+```
+Both original and recompiled binary create their own version of `data.compressed` and these files
+are compared. In case they are different the test is a failure.
+
+Please note that `data.txt` must be inside `inputs` folder, i.e.`inputs/data.txt` must exist.
+
+
+TODO: Test cases currently do not support programs that interact with user (stdin)
 
 
 Directory structure:
