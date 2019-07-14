@@ -183,6 +183,7 @@ def ida_frontend(binary, cfg, args):
         '--binary', quote(binary),
         '--output', quote(cfg),
         '--entrypoint', 'main',
+        '--log_file', quote(cfg + ",log"),
         '--disassembler', args.path_to_disass]
 
     if is_pie:
