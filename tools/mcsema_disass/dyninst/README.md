@@ -19,7 +19,7 @@ export CMAKE_PREFIX_PATH=/usr/local/lib/cmake/Dyninst
 
 The ```CMAKE_PREFIX_PATH``` environment variable tells CMake where to find the necessary Dyninst files.
 
-Now, you should be able to build this frontend along with McSema by setting cmake variable ```BUILD_MCSEMA_DYNINST_DISASS``` to `1` (You can easily modify the build script in `remill/scripts/build.sh`). Please see the top-level McSema README.md file for details on how to build whole McSema.
+Now, you should be able to build this frontend along with McSema by setting cmake variable ```BUILD_MCSEMA_DYNINST_DISASS``` to `1` (You can easily modify the build script in `remill/scripts/build.sh`). Please see the top-level McSema README.md file for details on how to build McSema itself.
 Compiler with C++14 support is required.
 
 ## Using mcsema-dyninst-disass
