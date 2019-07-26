@@ -20,6 +20,8 @@ else ()
   set (CMAKE_CXX_FLAGS "-std=c++14")
 endif ()
 
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
 find_package(Dyninst REQUIRED)
 include_directories(${DYNINST_INCLUDE_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../../)
