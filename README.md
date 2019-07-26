@@ -304,7 +304,7 @@ Also update your PYTHONPATH: C:\mcsema\Lib\site-packages
 
 ### Dyninst frontend
 
-Dyninst frontend can be build with ```./build.sh --dyninst-frontend```. More information can be found in ```tools/mcsema_disass/dyninst/README.md```.
+Dyninst frontend can be automatically build with cmake variable `BUILD_MCSEMA_DYNINST_DISASS` set to `1`. More information can be found in ```tools/mcsema_disass/dyninst/README.md```.
 
 ## Additional Documentation
 
