@@ -1,4 +1,4 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2018 Trail of Bits, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -99,6 +99,7 @@ add_executable(${MCSEMA_LIFT}
 
   tools/mcsema_lift/Lift.cpp
 )
+
 
 # Copy mcsema-disass in
 add_custom_command(
@@ -235,6 +236,13 @@ if(DEFINED WIN32)
 else()
   set(python_package_install_path "${install_folder}")
   set(python_package_installer "${python_package_installer}.sh")
+endif()
+
+# target for dyninst frontend
+if (DEFINED BUILD_MCSEMA_DYNINST_DISASS)
+    if(${BUILD_MCSEMA_DYNINST_DISASS} EQUAL 1)
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/dyninst)
+    endif()
 endif()
 
 install(CODE
