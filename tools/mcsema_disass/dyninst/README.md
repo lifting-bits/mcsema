@@ -7,7 +7,7 @@ Later this code was picked up and reworked to what you currently see. As of now 
 
 ## Dependencies
 
-You won't need IDA Pro to run mcsema-dyninst-disass, but Git, CMake, Google Protobuf and Python are still required (see the top-level McSema README.md file for details). In addition to those requirements, you will need to build and install DyninstAPI. It is available in source code form [on GitHub](https://github.com/dyninst/dyninst). Follow the instructions there on how to build and install DyninstAPI before proceeding to the next step. Use version from the branch 9.3.x.
+You won't need IDA Pro to run mcsema-dyninst-disass, but Git, CMake, Google Protobuf and Python are still required (see the top-level McSema README.md file for details). In addition to those requirements, you will need to build and install DyninstAPI. It is available in source code form [on GitHub](https://github.com/dyninst/dyninst). Follow the instructions there on how to build and install DyninstAPI before proceeding to the next step. Use version from the branch 9.3.2.
 
 ## Building mcsema-dyninst-disass
 
@@ -21,16 +21,6 @@ The ```CMAKE_PREFIX_PATH``` environment variable tells CMake where to find the n
 
 Now, you should be able to build this frontend along with McSema using the ```build.sh --dyninst-frontend``` (sets ```BUILD_MCSEMA_DYNINST_DISASS``` variable in cmake) script from the remill repository. Please see the top-level McSema README.md file for details.
 Compiler with C++14 support is required.
-
-## Running the tests
-
-mcsema-dyninst-disass comes with a few test cases. To try them out, make sure you have built both this frontend as well as mcsema-lift. Then, chdir to ```mcsema/tools/mcsema_disass/dyninst/tests``` (in the source code tree), where you will find a Python script ```run_tests.py```.
-
-```shell
-./run_tests.py -h
-```
-
-provides an overview of the required command line options. Supplied with the proper arguments, the script will then proceed to build, disassemble, lift and recompile the test programs in a temporary directory, each time running both the original as well as the recompiled binary and then passing the test iff the outputs match. Python 2.7 won't work, implemented with Python 3.5 in mind.
 
 ## Using mcsema-dyninst-disass
 
