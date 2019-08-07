@@ -36,7 +36,7 @@ def compilation(std, f):
         return
 
     out = os.path.join(bin_dir, basename)
-    args = [cc, os.path.join(src_dir, f), '-o', out]
+    args = [cc, os.path.join(src_dir, f), '-o', out, '-lm', '-lpthread']
     if cc == cxx_comp:
         args += ['-std=' + std]
 
