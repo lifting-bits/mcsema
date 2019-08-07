@@ -302,6 +302,11 @@ class BasicTest(BaseTest):
     def test_version(self):
         self.wrapper(["--version"], [])
 
+class JustRunTest(BaseTest):
+
+    def test_just_run(self):
+        self.wrapper([], [])
+
 # IMPORTANT: Each test must obey following naming convention!
 # class name = name of the tested binary + _suite
 # This fact is later used to dynamically select only tests that should be run
@@ -395,6 +400,24 @@ class xz_suite(BasicTest):
         self.wrapper(["-cd","./xz_res.txt.xz"], ["xz_res.txt.xz"])
 
 
+def init():
+    CreateJustRunSuites([
+        "complex_numbers", "complex_long_double", "complex_double", "complex_foat",
+        "all_data_array", "all_globals", "all_stringpool",
+        "array", "dot_product", "helloworld", "local-array", "matrix_vector_mult",
+        "pointers", "rand_and_strtol",
+        "simple_array", "simple_exit", "simple_for_loop", "simple_main",
+        "struct", "x86_bts", "globals_and_io", "global_array", "qsort",
+        "global_var", "pthread", "iostream_basics", "operator_new", "virtual", "virtual_simpler",
+        "fmodf", "printf_floats"])
+
+
+def CreateJustRunSuites(binaries):
+    for b in binaries:
+        suite_name = b + "_suite"
+        suite = type(suite_name, (JustRunTest,), dict())
+        globals()[suite_name] = suite
+
 # Right now batches are combined, maybe it would make sense to separate batches from each other
 # that can be useful when comparing performance of frontends
 def main():
@@ -445,6 +468,8 @@ def main():
 
     args, command_args = arg_parser.parse_known_args()
     check_arguments(args)
+
+    init()
 
     # Create directory to store recompiled binaries
     # TemporaryDirectory() is not used, since we may want to have a look at recompiled code,
