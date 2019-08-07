@@ -50,8 +50,14 @@ def is_batch_dir_sane(batch_name):
             return False
     return True
 
+def is_valid_binary(binary_name):
+    bin_path = os.path.join(bin_dir, binary_name)
+    return os.path.isfile(bin_path)
+
+# Return (list of filtered names, number of files that are missing)
 def get_binaries_from_flavours(flavors):
     binaries = []
+    missing = 0
 
     # We want to get cfg for everything
     get_all = ALL_TAG in flavors
@@ -62,10 +68,14 @@ def get_binaries_from_flavours(flavors):
         with open(os.path.join(tags_dir, filename)) as f:
             for line in f:
                 if get_all or line.rstrip("\n") in flavors:
+                    if not is_valid_binary(binary_name):
+                        print(" > Skipping " + binary_name + " : file missing")
+                        missing = missing + 1
+                        break
                     print(" > Selecting " + binary_name)
                     binaries.append(binary_name)
                     break
-    return binaries
+    return (binaries, missing)
 
 def create_batch_dir(batch, policy):
     batch_name = batch + "_cfg"
@@ -204,7 +214,7 @@ def binja_frontend(binary, cfg, args):
 # (in the case frontend is broken and modifies the original itself)
 def get_cfg(binary, cfg, args, lifter):
     bin_path = os.path.join(bin_dir, binary)
-    print(" > Processing " + bin_path)
+    print("\n > Processing " + bin_path)
     update_shared_libraries(bin_path)
 
     return lifter(bin_path, cfg, args)
@@ -218,11 +228,11 @@ def get_lifter(disass):
     print(" > Support for chosen frontend was not implemented yet!")
     sys.exit(1)
 
-def print_result(result):
+def print_result(result, missing):
     print("Results:")
     stat = dict()
     for key, val in result.items():
-        print("\t" + key + " " + MESSAGES[val])
+        print("\t" + key + " ... " + MESSAGES[val])
         if val in stat:
             stat[val] += 1
         else:
@@ -234,6 +244,8 @@ def print_result(result):
             print(0)
         else:
             print(stat[key])
+    print("Missing:")
+    print(missing)
 
 def main():
     arg_parser = argparse.ArgumentParser()
@@ -294,7 +306,7 @@ def main():
     batch_dir = create_batch_dir(args.batch, args.batch_policy)
 
     print("Select all binaries, specified by flavors")
-    binaries = get_binaries_from_flavours(args.flavors)
+    binaries, missing = get_binaries_from_flavours(args.flavors)
 
     result = dict()
     print("Iterating over binaries")
@@ -306,7 +318,7 @@ def main():
         else:
             result[b] = get_cfg(b, cfg, args, get_lifter(args.disass))
 
-    print_result(result)
+    print_result(result, missing)
 
     return 0
 
