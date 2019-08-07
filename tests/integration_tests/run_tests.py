@@ -302,11 +302,6 @@ class BasicTest(BaseTest):
     def test_version(self):
         self.wrapper(["--version"], [])
 
-class JustRunTest(BaseTest):
-
-    def test_just_run(self):
-        self.wrapper([], [])
-
 # IMPORTANT: Each test must obey following naming convention!
 # class name = name of the tested binary + _suite
 # This fact is later used to dynamically select only tests that should be run
@@ -410,13 +405,29 @@ def init():
         "struct", "x86_bts", "globals_and_io", "global_array", "qsort",
         "global_var", "pthread", "iostream_basics", "operator_new", "virtual", "virtual_simpler",
         "fmodf", "printf_floats"])
+    CreateSimpleRunnerSuites({
+        "qsort_function_ptrs": [["23"], ["43"]],
+        "all_switch": [["12"], ["15"]]
+        })
+
+def CreateSimpleSuite(binary, args):
+    suite_name = binary + "_suite"
+    counter = 0
+    methods = dict()
+    for case in args:
+        methods["test" + str(counter)] = lambda x: x.wrapper(case, [])
+        counter = counter + 1
+    globals()[suite_name] = type(suite_name, (BaseTest,), methods)
 
 
 def CreateJustRunSuites(binaries):
     for b in binaries:
-        suite_name = b + "_suite"
-        suite = type(suite_name, (JustRunTest,), dict())
-        globals()[suite_name] = suite
+        CreateSimpleSuite(b, [[]])
+
+#binaries are map from binary names to list of arguments to be passed on cmd
+def CreateSimpleRunnerSuites(binaries):
+    for b, args in binaries.items():
+        CreateSimpleSuite(b, args)
 
 # Right now batches are combined, maybe it would make sense to separate batches from each other
 # that can be useful when comparing performance of frontends
