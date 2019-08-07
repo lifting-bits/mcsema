@@ -407,7 +407,12 @@ def init():
         "fmodf", "printf_floats"])
     CreateSimpleRunnerSuites({
         "qsort_function_ptrs": [["23"], ["43"]],
-        "all_switch": [["12"], ["15"]]
+        "all_switch": [["12"], ["15"]],
+        "bubblesort": [["12"], ["14"], ["0"]],
+        "fibonacci": [["12"], ["26"]],
+        "open_close_dir": [["/usr"], ["/qeqdadafaf"]],
+        "readdir": [["readdir.c"], ["/tmp"], ["file-that-does-not-exist"]],
+        "template_function_ptrs": [["42"], ["-543"]],
         })
 
 def CreateSimpleSuite(binary, args):
