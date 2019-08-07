@@ -202,7 +202,7 @@ class BaseTest(unittest.TestCase):
     # Create directories where the test will be executed
     def setUp(self):
         # Parse name of the classes that inherits and get prefix that is actual name of binary
-        self.name = type(self).__name__.rsplit('_')[0]
+        self.name = type(self).__name__.rsplit('_', 1)[0]
 
         self.t_bin = tempfile.mkdtemp(dir=os.getcwd(), prefix="bin_t")
         self.t_recompiled = tempfile.mkdtemp(dir=os.getcwd(), prefix="recompiled_t")
