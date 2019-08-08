@@ -19,6 +19,7 @@ import subprocess
 from subprocess import CalledProcessError
 import tempfile
 import unittest
+import io
 
 # Base class for tests, provides basic lift functionality
 # Classes that inherit from it only need to specify the tests themselves
@@ -81,26 +82,25 @@ class BaseTest(unittest.TestCase):
 
         self.copy_files(filename, args, files)
 
-        with open(stdin, 'r') as stdin_f:
+        # Generate the expected output
+        os.chdir(self.t_bin)
 
-            # Generate the expected output
-            os.chdir(self.t_bin)
+        original_pipes = subprocess.Popen(
+                [filename] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        original_std_out, original_std_err = original_pipes.communicate(input=stdin)
+        original_ret = original_pipes.returncode
 
-            original_pipes = subprocess.Popen(
-                    [filename] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE,
-                                       stdin = stdin_f)
-            original_std_out, original_std_err = original_pipes.communicate()
-            original_ret = original_pipes.returncode
+        stdin.seek(0)
 
+        # Generate actual output
+        os.chdir(self.t_recompiled)
 
-            # Generate actual output
-            os.chdir(self.t_recompiled)
+        lifted_pipes = subprocess.Popen(
+                [filename] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        lifted_std_out, lifted_std_err = lifted_pipes.communicate(input=stdin)
+        lifted_ret = lifted_pipes.returncode
 
-            lifted_pipes = subprocess.Popen(
-                    [filename] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE,
-                                       stdin = stdin_f)
-            lifted_std_out, lifted_std_err = lifted_pipes.communicate()
-            lifted_ret = lifted_pipes.returncode
+        stdin.seek(0)
 
         # Asserts on stderr, stdout, return value
         self.assertEqual(original_ret, lifted_ret)
@@ -120,12 +120,21 @@ class BaseTest(unittest.TestCase):
 
     # Wrapper around tests, used for test counting
     def wrapper(self, args, files):
-        self.wrapper_with_stdin(args, files, 'stdin/empty.stdin')
+        self.wrapper_string_stdin(args, files, "")
 
-    def wrapper_with_stdin(self, args, files, stdin):
+    def wrapper_file_stdin(self, args, files, stdin):
+        with open(stdin, 'r') as stdin_f:
+            self.wrapper_impl(args, files, stdin_f)
+
+    def wrapper_string_stdin(self, args, files, stdin):
+        print(stdin)
+        self.wrapper_impl(args, files, io.StringIO(stdin))
+
+    def wrapper_impl(self, args, files, stdin):
         BaseTest.cases[self.name].total += 1
         self.run_test(self.name, args, files, stdin)
         BaseTest.cases[self.name].success += 1
+
 
 
 
@@ -230,7 +239,7 @@ class xz_suite(BasicTest):
     def test_xz_d_stdout(self):
         self.wrapper(["-cd","./xz_res.txt.xz"], ["xz_res.txt.xz"])
 
-
+# TODO(Aiethel): We probably want this to be on demand, once it really grows
 def init():
     CreateJustRunSuites([
         "complex_numbers", "complex_long_double", "complex_double", "complex_foat",
@@ -241,6 +250,7 @@ def init():
         "struct", "x86_bts", "globals_and_io", "global_array", "qsort",
         "global_var", "pthread", "iostream_basics", "operator_new", "virtual", "virtual_simpler",
         "fmodf", "printf_floats"])
+
     CreateSimpleRunnerSuites({
         "qsort_function_ptrs": [["23"], ["43"]],
         "all_switch": [["12"], ["15"]],
@@ -251,14 +261,28 @@ def init():
         "template_function_ptrs": [["42"], ["-543"]],
         })
 
+    StdinFromString({
+        "struct_func_ptr" : ["4\n4\n", "5\n5\n"]
+        })
+
 def CreateSimpleSuite(binary, args):
     suite_name = binary + "_suite"
     counter = 0
     methods = dict()
     for case in args:
-        methods["test" + str(counter)] = lambda x: x.wrapper(case, [])
+        methods["test_" + str(counter)] = lambda x,case=case: x.wrapper(case, [])
         counter = counter + 1
     globals()[suite_name] = type(suite_name, (BaseTest,), methods)
+
+def StdinFromString(binaries):
+    for binary, stdins in binaries.items():
+        suite_name = binary + "_suite"
+        counter = 0
+        methods = dict()
+        for case in stdins:
+            methods["test_" + str(counter)] = lambda x, c=case: x.wrapper_string_stdin([], [], c)
+            counter = counter + 1
+        globals()[suite_name] = type(suite_name, (BaseTest,), methods)
 
 
 def CreateJustRunSuites(binaries):

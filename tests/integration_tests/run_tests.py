@@ -145,7 +145,6 @@ def check_arguments(args):
 
 
 def exec_and_log_fail(args):
-    print(args)
     pipes = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     std_out, std_err = pipes.communicate()
     ret_code = pipes.returncode
@@ -283,8 +282,9 @@ def main():
                 print(" > Skipping test")
                 continue
 
+    print()
     suite = unittest.TestSuite(suite_cases)
-    unittest.TextTestRunner(verbosity = 2).run(suite)
+    result = unittest.TextTestRunner(verbosity = 0).run(suite)
 
     print_results(tests.BaseTest.cases)
 
