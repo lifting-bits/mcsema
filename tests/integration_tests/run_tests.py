@@ -231,7 +231,7 @@ class BaseTest(unittest.TestCase):
     # under filename as key
     # TODO: Solve it somehow better
     # Compares only stdout + stderr + return value!
-    def run_test(self, filename, args, files):
+    def run_test(self, filename, args, files, stdin):
         # It should be guaranteed that cases contains TCData
         tc = cases[filename]
 
@@ -254,22 +254,26 @@ class BaseTest(unittest.TestCase):
 
         self.copy_files(filename, args, files)
 
-        # Generate the expected output
-        os.chdir(self.t_bin)
+        with open(stdin, 'r') as stdin_f:
 
-        original_pipes = subprocess.Popen(
-                [filename] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        original_std_out, original_std_err = original_pipes.communicate()
-        original_ret = original_pipes.returncode
+            # Generate the expected output
+            os.chdir(self.t_bin)
+
+            original_pipes = subprocess.Popen(
+                    [filename] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE,
+                                       stdin = stdin_f)
+            original_std_out, original_std_err = original_pipes.communicate()
+            original_ret = original_pipes.returncode
 
 
-        # Generate actual output
-        os.chdir(self.t_recompiled)
+            # Generate actual output
+            os.chdir(self.t_recompiled)
 
-        lifted_pipes = subprocess.Popen(
-                [filename] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        lifted_std_out, lifted_std_err = lifted_pipes.communicate()
-        lifted_ret = lifted_pipes.returncode
+            lifted_pipes = subprocess.Popen(
+                    [filename] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE,
+                                       stdin = stdin_f)
+            lifted_std_out, lifted_std_err = lifted_pipes.communicate()
+            lifted_ret = lifted_pipes.returncode
 
         # Asserts on stderr, stdout, return value
         self.assertEqual(original_ret, lifted_ret)
@@ -289,9 +293,14 @@ class BaseTest(unittest.TestCase):
 
     # Wrapper around tests, used for test counting
     def wrapper(self, args, files):
+        self.wrapper_with_stdin(args, files, 'stdin/empty.stdin')
+
+    def wrapper_with_stdin(self, args, files, stdin):
         cases[self.name].total += 1
-        self.run_test(self.name, args, files)
+        self.run_test(self.name, args, files, stdin)
         cases[self.name].success += 1
+
+
 
 # Implements two invocations that are usually tested on everything
 class BasicTest(BaseTest):
