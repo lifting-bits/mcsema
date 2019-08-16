@@ -329,6 +329,7 @@ static llvm::GlobalVariable *GetStatePointer(void) {
   return state_ptr;
 }
 
+// note(lukas): We don't need to annotate, it will always be inlined
 static llvm::Function *CreateVerifyRegState(void) {
   auto *func_type = llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext),
                                             {}, false);
@@ -379,10 +380,6 @@ static llvm::Function *CreateVerifyRegState(void) {
 
   return func;
 }
-
-// TODO(lukas): VerifyRegState is probably not the best name.
-//              Maybe VerifyStackPointer?
-//              Opened to suggestions.
 
 // Because of possible parallelism, both global stack and state must be
 // thread_local. However after new thread is created, its stack and state
