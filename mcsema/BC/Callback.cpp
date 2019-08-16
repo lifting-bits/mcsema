@@ -33,6 +33,7 @@
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Name.h"
 #include "remill/BC/ABI.h"
+#include "remill/BC/Annotate.h"
 #include "remill/BC/Util.h"
 #include "remill/BC/Version.h"
 
@@ -76,6 +77,7 @@ static llvm::Function *GetAttachCallFunc(void) {
         callback_type, llvm::GlobalValue::ExternalLinkage,
         "__mcsema_attach_call", gModule);
     handler->addFnAttr(llvm::Attribute::NoInline);
+    remill::Annotate<remill::McSemaHelper>(handler);
   }
   return handler;
 }
@@ -758,6 +760,8 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
   loader.FreeReturnAddress(block);
 
   ir.CreateRet(remill::LoadMemoryPointer(block));
+
+  remill::Annotate<remill::McSemaHelper>(callback_func);
 
   return callback_func;
 }
