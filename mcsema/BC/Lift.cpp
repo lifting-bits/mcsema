@@ -45,6 +45,7 @@
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Instruction.h"
 #include "remill/BC/ABI.h"
+#include "remill/BC/Annotate.h"
 #include "remill/BC/IntrinsicTable.h"
 #include "remill/BC/Lifter.h"
 #include "remill/BC/Util.h"
@@ -81,6 +82,10 @@ static void ExportFunctions(const NativeModule *cfg_module) {
     auto ep = GetNativeToLiftedEntryPoint(cfg_func);
     ep->setLinkage(llvm::GlobalValue::ExternalLinkage);
     ep->setVisibility(llvm::GlobalValue::DefaultVisibility);
+
+    remill::TieFunctions(ep, gModule->getFunction(cfg_func->lifted_name));
+    remill::Annotate<remill::EntrypointFunction>(ep);
+
   }
 }
 
