@@ -355,14 +355,9 @@ static llvm::Function *CreateVerifyRegState(void) {
   unsigned ptr_size = static_cast<unsigned>(gArch->address_size);
   auto reg_ptr_ty = llvm::PointerType::getIntNPtrTy(*gContext, ptr_size);
 
-  //TODO(lukas): remove after abi_libraries patch gets merged into master
-  auto GetConstantInt = [&](unsigned size, uint64_t value) {
-    return llvm::ConstantInt::get(
-        llvm::Type::getIntNTy(*gContext, size), value);
-  };
+
   auto casted_reg_state = ir.CreateBitCast(reg_state, byte_ty);
-  auto rsp = ir.CreateGEP(casted_reg_state,
-                          GetConstantInt(64, sp_offset));
+  auto rsp = ir.CreateGEP(casted_reg_state, ir.getInt64(sp_offset));
   auto casted_rsp = ir.CreateBitCast(rsp, reg_ptr_ty);
   auto rsp_val = ir.CreateLoad(casted_rsp,
                                llvm::Type::getIntNTy(*gContext, ptr_size));
