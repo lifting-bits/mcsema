@@ -81,7 +81,7 @@ Why would anyone translate binaries *back* to bitcode?
 | [python-protobuf](https://pypi.python.org/pypi/protobuf) | 3.2.0 |
 | [IDA Pro](https://www.hex-rays.com/products/ida) | 7.1+ |
 | [Binary Ninja](https://binary.ninja/) | Latest |
-| [Dyninst](https://www.dyninst.org/) | Latest |
+| [Dyninst](https://www.dyninst.org/) | 9.3.2 |
 
 ## Getting and building the code
 
