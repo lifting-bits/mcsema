@@ -611,8 +611,9 @@ CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
       // TODO(lukas): Exception handling
       // For now ignore catch blocks
      if (edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CATCH &&
-          edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::RET &&
-          edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CALL) {
+         edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::RET &&
+         edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CALL) {
+
         successors.insert(edge->trg()->start());
         cfg_block->add_successor_eas(edge->trg()->start());
       }
@@ -627,6 +628,7 @@ CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     bool all = std::all_of(successors.cbegin(), successors.cend(), [&](auto succ){
         return code_xrefs_to_resolve.count(succ);
     });
+
     if (all) {
       for (const auto &succ : successors) {
         code_xrefs_to_resolve.erase(succ);
@@ -712,6 +714,7 @@ void WriteDisplacement(
 // For instruction to have MemoryDisplacement it has among other things
 // be of type BinaryFunction
 Address DisplacementHelper(Dyninst::InstructionAPI::Expression *expr) {
+
   if (auto bin_func = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
     std::vector<InstructionAPI::InstructionAST::Ptr> inner_operands;
     bin_func->getChildren(inner_operands);
@@ -722,6 +725,7 @@ Address DisplacementHelper(Dyninst::InstructionAPI::Expression *expr) {
       }
     }
   }
+
   return 0;
 }
 
@@ -733,19 +737,24 @@ void CFGWriter::CheckDisplacement(Dyninst::InstructionAPI::Expression *expr,
   if (cfg_instruction->xrefs_size()) {
     return;
   }
+
   if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
     std::vector<InstructionAPI::InstructionAST::Ptr> inner_operands;
     deref->getChildren(inner_operands);
 
     for (auto &op : inner_operands) {
+
       if (auto inner_expr =
               dynamic_cast<InstructionAPI::Expression *>(op.get())) {
+
         if (auto displacement = DisplacementHelper(inner_expr)) {
           WriteDisplacement(ctx, section_m, cfg_instruction, displacement);
         }
       }
     }
+
   } else {
+
     if (auto displacement = DisplacementHelper(expr)) {
       WriteDisplacement(ctx, section_m, cfg_instruction, displacement);
     }
@@ -816,6 +825,7 @@ Address CFGWriter::immediateNonCall(InstructionAPI::Immediate* imm,
                   CodeReference::ImmediateOperand,
                   CodeReference::Internal,
                   a);
+
       LOG(INFO) << std::hex
                 << "IMM may be working with new function starting at" << a;
       inst_xrefs_to_resolve.insert({a, {}});
@@ -823,6 +833,7 @@ Address CFGWriter::immediateNonCall(InstructionAPI::Immediate* imm,
     }
     return 0;
   }
+
   GetLastXref(cfg_instruction)->set_operand_type(CodeReference::ImmediateOperand);
   return a;
 
@@ -914,6 +925,7 @@ void CFGWriter::HandleNonCallInstruction(
         }
 
       } else if (instruction->getCategory() == InstructionAPI::c_BranchInsn) {
+
         // This has + |instruction| in AST
         if (auto a = TryEval(expr.get(), addr - instruction->size())) {
           if (is_last) {
@@ -928,6 +940,7 @@ void CFGWriter::HandleNonCallInstruction(
               }
             }
           }
+
           // ea is not really that important
           // in CrossXref<mcsema::Instruction>
           if (ctx.HandleCodeXref({0, *a, cfg_instruction}, section_m)) {
@@ -939,6 +952,7 @@ void CFGWriter::HandleNonCallInstruction(
         }
       }
     }
+
     ++i;
     CheckDisplacement(expr.get(), cfg_instruction);
   }
