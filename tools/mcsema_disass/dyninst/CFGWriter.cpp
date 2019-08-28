@@ -607,17 +607,6 @@ CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     // Handle recursive calls
     found = false;
 
-    if (edge->trg()->start() == func->entry()->start()) {
-      for (auto call_edge : func->callEdges()) {
-        if ((call_edge->src()->start() == block->start()) &&
-            (call_edge->trg()->start() == func->entry()->start())) {
-          // Looks like a recursive call, so no block_follows edge here
-          found = true;
-          break;
-        }
-      }
-    }
-
     if (!found) {
       // TODO(lukas): Exception handling
       // For now ignore catch blocks
