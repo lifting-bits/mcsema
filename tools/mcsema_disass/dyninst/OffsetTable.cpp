@@ -71,7 +71,10 @@ OffsetTable OffsetTable::Recompute(Dyninst::Address new_start_ea) const {
 
 // Tries to match with taking into account that it can be in the middle
 bool OffsetTable::Match(const std::set<Dyninst::Address> &succs) const {
-  CHECK(!targets.empty()) << "Trying to match offset table with no targets";
+  if (targets.empty()) {
+    DLOG(WARNING) << "Trying to match offset table with no targets";
+    return false;
+  }
 
   // Does it contain every successor?
   for (const auto &s : succs) {
