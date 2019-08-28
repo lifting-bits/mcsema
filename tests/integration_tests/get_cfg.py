@@ -142,7 +142,7 @@ def update_shared_libraries(binary):
 # but it won't hurt to have it in place once we decide to add another tests
 def binary_info(binary):
     res = subprocess.check_output(['file', binary]).decode()
-    is_pie = 'LSB shared object' in res or 'Mach-O 64' in res
+    is_pie = 'LSB shared object' in res or 'Mach-O 64' in res or 'LSB pie executable' in res
     address_size = 64
 
     if 'aarch64' in res:
