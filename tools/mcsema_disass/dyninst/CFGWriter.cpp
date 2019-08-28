@@ -621,7 +621,7 @@ CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     if (!found) {
       // TODO(lukas): Exception handling
       // For now ignore catch blocks
-      if (edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CATCH &&
+     if (edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CATCH &&
           edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::RET &&
           edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CALL) {
         successors.insert(edge->trg()->start());
