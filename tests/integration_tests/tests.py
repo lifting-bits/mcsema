@@ -188,12 +188,12 @@ class readelf_suite(BasicTest):
     def test_readelf_x_rodata(self):
         self.wrapper(
             ["-x", ".rodata", "./example_main.out"],
-            ["/example_main.out"])
+            ["example_main.out"])
 
     def test_readelf_d(self):
         self.wrapper(
             ["-d", "./example_main.out"],
-            ["/example_main.out"])
+            ["example_main.out"])
 
 
 class ls_suite(BasicTest):
