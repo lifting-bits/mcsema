@@ -752,12 +752,12 @@ void CFGWriter::CheckDisplacement(Dyninst::InstructionAPI::Expression *expr,
         }
       }
     }
+    return;
+  }
 
-  } else {
 
-    if (auto displacement = DisplacementHelper(expr)) {
-      WriteDisplacement(ctx, section_m, cfg_instruction, displacement);
-    }
+  if (auto displacement = DisplacementHelper(expr)) {
+    WriteDisplacement(ctx, section_m, cfg_instruction, displacement);
   }
 }
 
