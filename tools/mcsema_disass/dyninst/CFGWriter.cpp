@@ -565,12 +565,13 @@ void CFGWriter::WriteFunctionBlocks(ParseAPI::Function *func,
         for (auto bb : f->blocks()) {
           // This may require calling WriteFunctionBlocks, possible CFG bloat?
           WriteBlock(bb, f, cfg_internal_func, written);
+          unknown.erase(f->addr());
         }
       }
     }
+    CHECK(unknown.empty()) << "Unresolved succ of bb was not match to a func";
 }
 
-//TODO(lukas): This one is basically unchanged from original PR.
 std::set<Address>
 CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
                       mcsema::Function *cfg_internal_func,
@@ -586,8 +587,12 @@ CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
   written.insert(block);
   cfg_block->set_ea(block->start());
 
-  // Set outgoing edges
+
+  std::map<Offset, InstructionAPI::Instruction::Ptr> instructions;
+  block->getInsns(instructions);
+
   std::set<Address> successors;
+
   for (auto edge : block->targets()) {
 
     // Is this block part of the current function?
@@ -600,22 +605,39 @@ CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
       }
     }
 
-    if ((!found) || (edge->trg()->start() == -1)) {
-      continue;
-    }
+    // TODO(lukas): Exception handling
+    // For now ignore catch blocks
+    if (edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CATCH &&
+        edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::RET &&
+        edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CALL) {
 
-    // Handle recursive calls
-    found = false;
+      auto next = edge->trg()->start();
+      auto last_inst = std::prev(instructions.end())->second;
+      auto rip = std::prev(instructions.end())->first;
 
-    if (!found) {
-      // TODO(lukas): Exception handling
-      // For now ignore catch blocks
-     if (edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CATCH &&
-         edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::RET &&
-         edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CALL) {
+      // Try to compute succ manually, as it can happen that ParseAPI returns -1
+      auto manual = TryEval(last_inst->getOperand(0).getValue().get(),
+                            rip, last_inst->size());
 
-        successors.insert(edge->trg()->start());
-        cfg_block->add_successor_eas(edge->trg()->start());
+      // We cannot statically tell anything about this edge
+      if (!manual && next == -1) {
+        continue;
+      }
+
+      auto target = (next == -1) ? *manual : next;
+
+      // There cannot be succs outside of code section
+      if (!section_m.IsCode(target)) {
+        continue;
+      }
+
+      successors.insert(target);
+      cfg_block->add_successor_eas(target);
+
+      // We did not find it yet is direct jump -> it is probably beginning of some other
+      // function. Target is returned to caller
+      if (edge->type() == Dyninst::ParseAPI::EdgeTypeEnum::DIRECT && !found) {
+        unresolved_edges.insert(target);
       }
     }
   }
@@ -636,10 +658,6 @@ CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     }
   }
 
-  // Write instructions
-  std::map<Offset, InstructionAPI::Instruction::Ptr> instructions;
-  block->getInsns(instructions);
-
   Address ip = block->start();
 
   for (auto p = instructions.begin(); p != instructions.end();) {
@@ -647,23 +665,6 @@ CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
 
     WriteInstruction(instruction, ip, cfg_block, (++p) == instructions.end());
     ip += instruction->size();
-  }
-
-
-  // Sometimes for last jump in block trg() does not hold the target
-  // We try to resolve it - if it is possible, we return it to the caller to handle
-  auto last_inst = std::prev(instructions.end())->second;
-  auto rip = std::prev(instructions.end())->first;
-  if (last_inst->getCategory() ==
-      InstructionAPI::InsnCategory::c_BranchInsn && !successors.size()) {
-
-    auto next = TryEval(last_inst->getOperand(0).getValue().get(),
-                        rip, last_inst->size());
-
-    if (next && section_m.IsCode(*next)) {
-      unresolved_edges.insert(*next);
-      cfg_block->add_successor_eas(*next);
-    }
   }
 
   LOG(INFO) << "Block at 0x" << std::hex << block->start() << std::dec
