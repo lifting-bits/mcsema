@@ -535,7 +535,7 @@ void CFGWriter::WriteInternalFunctions() {
     auto cfg_internal_func = ctx.getInternalFunction(func->addr());
 
     ParseAPI::Block *entryBlock = func->entry();
-    CHECK(entryBlock->start() == cfg_internal_func->ea())
+    CHECK(entryBlock->start() == static_cast<Address>(cfg_internal_func->ea()))
         << "Start of the block is not equal to function ea";
 
     cfg_internal_func->set_is_entrypoint(
@@ -689,7 +689,7 @@ void CFGWriter::WriteInstruction(InstructionAPI::Instruction *instruction,
   mcsema::Instruction *cfg_instruction = cfg_block->add_instructions();
 
   std::string instBytes;
-  for (int offset = 0; offset < instruction->size(); ++offset) {
+  for (auto offset = 0U; offset < instruction->size(); ++offset) {
     instBytes += (int)instruction->rawByte(offset);
   }
 
@@ -928,7 +928,8 @@ void CFGWriter::HandleNonCallInstruction(
         // This has + |instruction| in AST
         if (auto a = TryEval(expr.get(), addr - instruction->size())) {
           if (is_last) {
-            for (auto succ : cfg_block->successor_eas()) {
+            // No auto, since signedness
+            for (Address succ : cfg_block->successor_eas()) {
               if (*a == succ) {
                 AddCodeXref(cfg_instruction,
                             mcsema::CodeReference::CodeTarget,
@@ -1024,7 +1025,7 @@ void WriteAsRaw(std::string& data, uint64_t number, int64_t offset) {
     LOG(FATAL) << "Trying to Write raw on negative offset";
   }
 
-  if (offset + 3 >= data.size()) {
+  if (static_cast<std::string::size_type>(offset) + 3 >= data.size()) {
     data.resize(offset + 3, '\0');
   }
 
