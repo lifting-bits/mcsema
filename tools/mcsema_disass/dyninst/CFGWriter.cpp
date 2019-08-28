@@ -305,9 +305,7 @@ void CFGWriter::WriteFunction(Dyninst::ParseAPI::Function *func,
 
   cfg_internal_func->set_is_entrypoint(func);
 
-  for (ParseAPI::Block *block : func->blocks()) {
-    WriteBlock(block, func, cfg_internal_func);
-  }
+  WriteFunctionBlocks(func, cfg_internal_func);
 
   cfg_internal_func->set_name(func->name());
   LOG(INFO) << "Added " << func->name() << " into module, found via xref";
@@ -543,18 +541,49 @@ void CFGWriter::WriteInternalFunctions() {
     cfg_internal_func->set_is_entrypoint(
         not_entrypoints.find(func->name()) == not_entrypoints.end());
 
-    for (ParseAPI::Block *block : func->blocks()) {
-      WriteBlock(block, func, cfg_internal_func);
-    }
+    WriteFunctionBlocks(func, cfg_internal_func);
   }
 }
 
+// Sometimes Dyninst finds block that ends with instruction in form of
+// jmpq absolute_address
+// and does not properly set the successor. We check if the target is parsed as
+// function already and if yes we add the whole function into the current one
+void CFGWriter::WriteFunctionBlocks(ParseAPI::Function *func,
+                                    mcsema::Function *cfg_internal_func) {
+
+    std::set<ParseAPI::Block *> written;
+    std::set<Address> unknown;
+    for (ParseAPI::Block *block : func->blocks()) {
+      auto found = WriteBlock(block, func, cfg_internal_func, written);
+      unknown.insert(found.begin(), found.end());
+    }
+
+    // TODO: More efficient implementation
+    for (auto &f : code_object.funcs()) {
+      if (unknown.count(f->addr())) {
+        for (auto bb : f->blocks()) {
+          // This may require calling WriteFunctionBlocks, possible CFG bloat?
+          WriteBlock(bb, f, cfg_internal_func, written);
+        }
+      }
+    }
+}
 
 //TODO(lukas): This one is basically unchanged from original PR.
-void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
-                           mcsema::Function *cfg_internal_func) {
+std::set<Address>
+CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
+                      mcsema::Function *cfg_internal_func,
+                      std::set<ParseAPI::Block *> &written) {
+
+  if (written.count(block)) {
+    return {};
+  }
+
+  std::set<Address> unresolved_edges;
 
   mcsema::Block *cfg_block = cfg_internal_func->add_blocks();
+  written.insert(block);
   cfg_block->set_ea(block->start());
 
   // Set outgoing edges
@@ -629,10 +658,28 @@ void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     ip += instruction->size();
   }
 
+
+  // Sometimes for last jump in block trg() does not hold the target
+  // We try to resolve it - if it is possible, we return it to the caller to handle
+  auto last_inst = std::prev(instructions.end())->second;
+  auto rip = std::prev(instructions.end())->first;
+  if (last_inst->getCategory() ==
+      InstructionAPI::InsnCategory::c_BranchInsn && !successors.size()) {
+
+    auto next = TryEval(last_inst->getOperand(0).getValue().get(),
+                        rip, last_inst->size());
+
+    if (next && section_m.IsCode(*next)) {
+      unresolved_edges.insert(*next);
+      cfg_block->add_successor_eas(*next);
+    }
+  }
+
   LOG(INFO) << "Block at 0x" << std::hex << block->start() << std::dec
             << " has " << successors.size() << " successors";
 
   ResolveOffsetTable(successors, cfg_block, offset_tables);
+  return unresolved_edges;
 }
 
 void CFGWriter::WriteInstruction(InstructionAPI::Instruction *instruction,

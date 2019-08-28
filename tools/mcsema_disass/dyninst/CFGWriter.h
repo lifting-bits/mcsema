@@ -56,9 +56,16 @@ private:
   void SweepStubs();
   void WriteInternalFunctions();
   void WriteLocalVariables();
-  void WriteBlock(Dyninst::ParseAPI::Block *block,
-                  Dyninst::ParseAPI::Function *func,
-                  mcsema::Function *cfgInternalFunc);
+
+  void WriteFunctionBlocks(Dyninst::ParseAPI::Function *func,
+                           mcsema::Function *cfg_internal_func);
+
+  std::set<Dyninst::Address> WriteBlock(
+      Dyninst::ParseAPI::Block *block,
+      Dyninst::ParseAPI::Function *func,
+      mcsema::Function *cfg_internal_func,
+      std::set<Dyninst::ParseAPI::Block *> &written);
+
   void WriteInstruction(Dyninst::InstructionAPI::Instruction *instruction,
                         Dyninst::Address addr, mcsema::Block *cfgBlock,
                         bool is_last=false);
