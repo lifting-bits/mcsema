@@ -595,16 +595,6 @@ CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
 
   for (auto edge : block->targets()) {
 
-    // Is this block part of the current function?
-    bool found = false;
-
-    for (auto bl : func->blocks()) {
-      if (bl->start() == edge->trg()->start()) {
-        found = true;
-        break;
-      }
-    }
-
     // TODO(lukas): Exception handling
     // For now ignore catch blocks
     if (edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CATCH &&
@@ -636,7 +626,8 @@ CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
 
       // We did not find it yet is direct jump -> it is probably beginning of some other
       // function. Target is returned to caller
-      if (edge->type() == Dyninst::ParseAPI::EdgeTypeEnum::DIRECT && !found) {
+      if (edge->type() == Dyninst::ParseAPI::EdgeTypeEnum::DIRECT &&
+          !func->contains(edge->trg())) {
         unresolved_edges.insert(target);
       }
     }
