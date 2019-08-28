@@ -928,18 +928,6 @@ void CFGWriter::HandleNonCallInstruction(
 
         // This has + |instruction| in AST
         if (auto a = TryEval(expr.get(), addr - instruction->size())) {
-          if (is_last) {
-            // No auto, since signedness
-            for (Address succ : cfg_block->successor_eas()) {
-              if (*a == succ) {
-                AddCodeXref(cfg_instruction,
-                            mcsema::CodeReference::CodeTarget,
-                            mcsema::CodeReference::ControlFlowOperand,
-                            mcsema::CodeReference::Internal,
-                            *a);
-              }
-            }
-          }
 
           // ea is not really that important
           // in CrossXref<mcsema::Instruction>
