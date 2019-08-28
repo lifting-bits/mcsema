@@ -954,7 +954,11 @@ void CFGWriter::HandleNonCallInstruction(
     }
 
     ++i;
-    CheckDisplacement(expr.get(), cfg_instruction);
+
+    // If we can get value, it is almost certainly not a displacement
+    if (!TryEval(expr.get(), addr, instruction->size())) {
+      CheckDisplacement(expr.get(), cfg_instruction);
+    }
   }
 
   // We may be storing some address wich is quite possibly entrypoint of
