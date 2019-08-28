@@ -60,12 +60,16 @@ OffsetTable OffsetTable::Recompute(Dyninst::Address new_start_ea) const {
   OffsetTable table(new_start_ea, region, size - diff);
 
   auto it = entries.find(new_start_ea);
+
   while (it != entries.end()) {
+
     Dyninst::Address recalculated_target = it->second + diff;
+
     table.entries.insert({it->first, recalculated_target});
     table.targets.insert(recalculated_target);
     ++it;
   }
+
   return table;
 }
 
@@ -83,8 +87,8 @@ bool OffsetTable::Match(const std::set<Dyninst::Address> &succs) const {
     }
   }
 
-  // This offset table contains all targets, but now we need to check
-  // they are really part of one table
+  // For big contiguous tables there might be some need to check if the entries are
+  // close enough, but for now this solution works
   auto entry = entries.begin();
   while (!succs.count(entry->second)) {
     ++entry;
@@ -93,16 +97,7 @@ bool OffsetTable::Match(const std::set<Dyninst::Address> &succs) const {
     }
   }
 
-  // We encountered first one, now we need to iterate all the known ones
-  while (!(entry == entries.end()) && succs.count(entry->second)) {
-    ++entry;
-  }
-
-  while (!(entry == entries.end()) && !succs.count(entry->second)) {
-    ++entry;
-  }
-
-  return entry == entries.end();
+  return true;
 }
 
 // This is just a bunch of 64-bit ELF specific heuristics
@@ -127,11 +122,14 @@ Maybe<OffsetTable> OffsetTable::Parse(
 
     // Get what is that entry truly pointing to
     auto target_ea = table.start_ea - ~(*reader) - 1;
+
     if (section_m.IsCode(target_ea)) {
       table.targets.insert({target_ea});
       table.entries.insert({it_ea, target_ea});
+
     } else if (target_ea == start_ea) {
       table.start_ea += 4;
+
     } else {
       // It doesn't point into text, it is not a jump table
       return {};
@@ -143,7 +141,8 @@ Maybe<OffsetTable> OffsetTable::Parse(
   }
 
   LOG(INFO) << "Parsed offset table starting at 0x" << std::hex << start_ea
-            << " containing " << std::dec << table.entries.size();
+            << " -> " << table.entries.size() * 4 + start_ea << " (contains "
+            << std::dec << table.entries.size() << ")";
 
   return {std::move(table)};
 }
