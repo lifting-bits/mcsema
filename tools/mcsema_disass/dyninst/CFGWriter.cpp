@@ -658,9 +658,6 @@ CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     ip += instruction->size();
   }
 
-  LOG(INFO) << "Block at 0x" << std::hex << block->start() << std::dec
-            << " has " << successors.size() << " successors";
-
   ResolveOffsetTable(successors, cfg_block, offset_tables);
   return unresolved_edges;
 }
