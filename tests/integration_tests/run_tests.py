@@ -16,6 +16,7 @@
 
 import argparse
 import filecmp
+import operator
 import os
 import shutil
 import subprocess
@@ -25,6 +26,7 @@ import tempfile
 import unittest
 
 import tests
+import colors
 
 llvm_version = 0
 
@@ -49,25 +51,26 @@ class TCData:
     def is_recompiled(self):
         return self.recompiled is not None
 
-    # TODO: Maybe rework as tabular?
     def print(self):
-        print(self.basename)
+        print("{:<30s}".format(self.basename), end=" ")
         if not self.is_recompiled():
             print("\tRecompilation failed: ERROR")
             return
 
         if self.total == 0:
-            print("\tNo tests were executed")
+            print(colors.Colors.MAGNETA + "\tNo tests were executed" + colors.clean())
             return
 
-        print("\t" + str(self.success) + "/" + str(self.total))
+        print(colors.get_result_color(self.total, self.success) +
+              "{:>5s}".format(str(self.success) + "/" + str(self.total)) +
+              colors.clean())
 
 def get_recompiled_name(name):
     return name
 
 # Print results of tests
 def print_results(t_cases):
-    for key, val in t_cases.items():
+    for key, val in sorted(t_cases.items(), key = operator.itemgetter(0)):
         val.print()
 
 # Fill global variables
@@ -105,7 +108,7 @@ def check_arguments(args):
     for lib_name in os.listdir(args.shared_lib_dir):
         shared_libs.append(os.path.join(args.shared_lib_dir, lib_name ))
 
-    print(" > Shared libraries: ")
+    print("\n > Shared libraries: ")
     print(shared_libs)
 
     if not os.path.isdir(args.libc_dir):
@@ -118,7 +121,7 @@ def check_arguments(args):
         if lib_name.endswith(".bc"):
             libc += os.path.join(args.libc_dir, lib_name + ',')
 
-    print(" > --abi_libraries files:")
+    print("\n > --abi_libraries files:")
     print(libc)
 
     # TODO: This whole snippet can be done using argparser and some actions
@@ -255,7 +258,7 @@ def main():
     suite_cases = []
 
     for batch in batches:
-        print(" > Handling : " + batch)
+        print("\n > Handling : " + batch)
         for f in os.listdir(batch):
             recompiled = build_test(os.path.join(batch, f), test_dir, args.lift_args )
 
@@ -279,7 +282,7 @@ def main():
                 suite_cases.append(loader.loadTestsFromTestCase(tc_class))
             except KeyError:
                 print(" > " + suite_name + " was not found in module!")
-                print(" > Skipping test")
+                print(colors.Colors.BG_YELLOW + " > Skipping test" + colors.clean())
                 continue
 
     print()

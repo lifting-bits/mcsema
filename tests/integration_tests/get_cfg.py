@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import argparse
+import operator
 import os
 import shutil
 import sys
@@ -22,6 +23,7 @@ import subprocess
 import tempfile
 from shlex import quote
 
+import colors
 
 tags_dir="tags"
 so_dir="shared_libs"
@@ -34,6 +36,8 @@ SUCCESS = 1
 IGNORED = 2
 
 MESSAGES = { FAIL: "Fail", SUCCESS: "Success", IGNORED: "Skipped" }
+
+INDENT = 2
 
 def make_dir(path):
     print(" > Creating directory: " + path)
@@ -69,7 +73,9 @@ def get_binaries_from_flavours(flavors):
             for line in f:
                 if get_all or line.rstrip("\n") in flavors:
                     if not is_valid_binary(binary_name):
-                        print(" > Skipping " + binary_name + " : file missing")
+                        print(colors.Colors.BG_YELLOW +
+                              " > Skipping " + binary_name + " : file missing" +
+                              colors.clean())
                         missing = missing + 1
                         break
                     print(" > Selecting " + binary_name)
@@ -176,7 +182,9 @@ def dyninst_frontend(binary, cfg, args):
         # TODO: May not be needed
         disass_args.append("true")
 
-    print(" \t> " + " ".join(disass_args))
+    # TODO: This is too verbose for normal output
+    #print(" \t> " + " ".join(disass_args))
+
     ret = subprocess.call(disass_args)
     if ret:
         return FAIL
@@ -214,6 +222,7 @@ def binja_frontend(binary, cfg, args):
 # (in the case frontend is broken and modifies the original itself)
 def get_cfg(binary, cfg, args, lifter):
     bin_path = os.path.join(bin_dir, binary)
+
     print("\n > Processing " + bin_path)
     update_shared_libraries(bin_path)
 
@@ -229,23 +238,24 @@ def get_lifter(disass):
     sys.exit(1)
 
 def print_result(result, missing):
-    print("Results:")
+    print("\nResults:")
     stat = dict()
-    for key, val in result.items():
-        print("\t" + key + " ... " + MESSAGES[val])
+    for key, val in sorted(result.items(), key=operator.itemgetter(0)):
+        print(key.ljust(30).rjust(30 + INDENT) + colors.get_bin_result(val) +
+              (MESSAGES[val]).rjust(5) + colors.clean())
         if val in stat:
             stat[val] += 1
         else:
             stat[val] = 1
-    print("Total:")
+    print("\nTotal:")
     for key, val in MESSAGES.items():
         print(val)
         if key not in stat:
-            print(0)
+            print(" " * INDENT, str(0))
         else:
-            print(stat[key])
-    print("Missing:")
-    print(missing)
+            print(" " * INDENT, stat[key])
+    print("\nMissing:")
+    print(" " * INDENT, missing)
 
 def main():
     arg_parser = argparse.ArgumentParser()
@@ -309,7 +319,7 @@ def main():
     binaries, missing = get_binaries_from_flavours(args.flavors)
 
     result = dict()
-    print("Iterating over binaries")
+    print("\nIterating over binaries")
     for b in binaries:
         cfg = os.path.join(batch_dir, b + ".cfg")
         if args.batch_policy == "C" and os.path.isfile(cfg):
