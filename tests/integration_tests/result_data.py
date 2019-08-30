@@ -3,6 +3,7 @@ import operator
 
 import colors
 
+UNKNOWN = 0
 RUN = 1
 FAIL = 2
 ERROR = 3
@@ -47,6 +48,14 @@ class TCData:
             for case, val in sorted(self.cases.items(), key = operator.itemgetter(0)):
                 print(" " * 2, _color_mapping[val](case))
 
+    def get(self, test_case):
+        return self.cases.get(test_case, UNKNOWN)
+
+    def outer_get(self, name, test_case):
+        if self and name == self.basename:
+            return self.get(test_case)
+        return UNKNOWN
+
 class _MyEncoder(json.JSONEncoder):
     def default(self, o):
         return o.__dict__
@@ -66,3 +75,40 @@ def store_json(root, filename):
 def load_json(filename):
     with open(filename, 'r') as f:
         return json.load(f, object_hook = _object_hook)
+
+
+class _Format:
+    l_header = 25
+
+    def header(message):
+        printed = message.ljust(_Format.l_header)
+        print(printed, end="")
+        return len(printed)
+
+    def case(message, fill):
+        printed = " " * fill + "|" + message.ljust(_Format.l_header) + "|"
+        print(printed, end="")
+        return len(printed)
+
+
+def compare(base, results, comparator, full):
+    # first we need to sort the items
+    s_base = sorted(base.items(), key=operator.itemgetter(0))
+
+    for entry in s_base:
+
+        suite_name, tcdata = entry
+        h_size = _Format.header(suite_name)
+        first = True
+
+        for case_name, case_result in tcdata.cases.items():
+
+            c_size = _Format.case(case_name, 0 if first else h_size)
+            first = False
+
+            for r in results:
+                r_tcdata = r.get(suite_name, None)
+                r_case_result = r_tcdata.outer_get(tcdata.basename, case_name)
+                if full == 1 or r_case_result:
+                    print(" " + str(r_case_result) + " |", end="")
+            print()
