@@ -51,3 +51,6 @@ def magneta(message):
 
 def bg_yellow(message):
     return c(Colors.c.bg_yellow, message)
+
+def id(message):
+    return message

@@ -12,6 +12,7 @@ _color_mapping = {
         RUN : colors.green,
         FAIL: colors.magneta,
         ERROR : colors.red,
+        UNKNOWN : colors.id,
         }
 
 class TCData:
@@ -67,7 +68,7 @@ def _object_hook(d):
         return obj
     return d
 
-
+# SQL serialization may be useful as well
 def store_json(root, filename):
     with open(filename, 'w') as f:
         json.dump(root, f, cls=_MyEncoder, indent=4)
@@ -80,35 +81,80 @@ def load_json(filename):
 class _Format:
     l_header = 25
 
-    def header(message):
-        printed = message.ljust(_Format.l_header)
+    def header(self, message):
+        self._header = message
+        self.h_queued = True
+
+    def case(self, message):
+        self._case = message
+
+    def _header_dump(self):
+        if not self.h_queued:
+            return
+        self.h_queued = False
+
+        printed = self._header.ljust(_Format.l_header)
+        self.h_fill = len(printed)
+
         print(printed, end="")
-        return len(printed)
+        self.present_header = True
 
-    def case(message, fill):
-        printed = " " * fill + "|" + message.ljust(_Format.l_header) + "|"
+    def _case_dump(self):
+        fill = 0 if self.present_header else self.h_fill
+        printed = " " * fill + "|" + self._case.ljust(_Format.l_header) + "|"
+
         print(printed, end="")
-        return len(printed)
+        self.present_header = False
 
+    def _res_dump(self, result):
+        print(" " + str(result) + " |", end="")
 
-def compare(base, results, comparator, full):
+    # TODO: Print something else than numbers with verbosity = 2
+    def dump(self, results, verbosity, original):
+
+        # Print everything and really verbose
+        if verbosity == 2:
+            self._header_dump()
+            self._case_dump()
+            self._res_dump(original)
+            for r in results:
+                print(" ", _color_mapping[r](str(r)), " |", end="")
+            print()
+
+        if verbosity == 0:
+            if all(r == original for r in results):
+                return
+
+            self._header_dump()
+            self._case_dump()
+            self._res_dump(original)
+            for r in results:
+                if r == original:
+                    print(" " * 3 + "|", end="")
+                else:
+                    print(" ", _color_mapping[r](str(r)), " |", end="")
+            print()
+
+# Compare test results to some base and print them in reasonable way
+# f is formatter -> first suite name and then case are preset and when dump() is called
+# actual results are printed based on verbosity level
+def compare(base, results, f, full):
     # first we need to sort the items
     s_base = sorted(base.items(), key=operator.itemgetter(0))
 
     for entry in s_base:
 
         suite_name, tcdata = entry
-        h_size = _Format.header(suite_name)
+        h_size = f.header(suite_name)
         first = True
 
         for case_name, case_result in tcdata.cases.items():
 
-            c_size = _Format.case(case_name, 0 if first else h_size)
+            c_size = f.case(case_name)
             first = False
 
+            r_case_results = []
             for r in results:
                 r_tcdata = r.get(suite_name, None)
-                r_case_result = r_tcdata.outer_get(tcdata.basename, case_name)
-                if full == 1 or r_case_result:
-                    print(" " + str(r_case_result) + " |", end="")
-            print()
+                r_case_results.append(r_tcdata.outer_get(tcdata.basename, case_name))
+            f.dump(r_case_results, full, case_result)
