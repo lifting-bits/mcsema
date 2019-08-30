@@ -1,3 +1,4 @@
+import json
 import operator
 
 import colors
@@ -46,4 +47,22 @@ class TCData:
             for case, val in sorted(self.cases.items(), key = operator.itemgetter(0)):
                 print(" " * 2, _color_mapping[val](case))
 
+class _MyEncoder(json.JSONEncoder):
+    def default(self, o):
+        return o.__dict__
 
+def _object_hook(d):
+    if "binary" in d:
+        obj = TCData()
+        obj.__dict__.update(d)
+        return obj
+    return d
+
+
+def store_json(root, filename):
+    with open(filename, 'w') as f:
+        json.dump(root, f, cls=_MyEncoder, indent=4)
+
+def load_json(filename):
+    with open(filename, 'r') as f:
+        return json.load(f, object_hook = _object_hook)
