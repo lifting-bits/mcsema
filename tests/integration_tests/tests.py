@@ -130,6 +130,10 @@ class BaseTest(unittest.TestCase):
     def wrapper(self, args, files):
         self.wrapper_impl(args, files, string="")
 
+    def wrapper_file(self, args, files, stdin):
+        with open(stdin, 'r') as f:
+            self.wrapper_impl(args, files, filename=f)
+
     def wrapper_impl(self, args, files, **kwargs):
         BaseTest.cases[self.name].total += 1
         self.run_test(self.name, args, files, **kwargs)
@@ -246,8 +250,8 @@ def init():
         "pointers", "rand_and_strtol",
         "simple_array", "simple_exit", "simple_for_loop", "simple_main",
         "struct", "x86_bts", "globals_and_io", "global_array", "qsort",
-        "global_var", "pthread", "iostream_basics", "operator_new", "virtual", "virtual_simpler",
-        "fmodf", "printf_floats"])
+        "global_var", "pthread", "iostream_basics", "operator_new", "virtual",
+        "virtual_simpler", "fmodf", "printf_floats", "hello_c", "hello_cpp"])
 
     CreateSimpleRunnerSuites({
         "qsort_function_ptrs": [["23"], ["43"]],
@@ -261,6 +265,12 @@ def init():
 
     StdinFromString({
         "struct_func_ptr" : ["4\n4\n", "5\n5\n"]
+        })
+
+    StdinFromFile({
+        "calc" : ["calc_input1.txt", "calc_input2.txt",
+                  "calc_input3.txt", "calc_input4.txt",]
+
         })
 
 def CreateSimpleSuite(binary, args):
@@ -278,9 +288,23 @@ def StdinFromString(binaries):
         counter = 0
         methods = dict()
         for case in stdins:
-            methods["test_" + str(counter)] = lambda x, c=case: x.wrapper_impl([], [], stdin=c)
+            methods["test_" + str(counter)] = \
+                lambda x, c=case: x.wrapper_impl([], [], stdin=c)
             counter += 1
         globals()[suite_name] = type(suite_name, (BaseTest,), methods)
+
+def StdinFromFile(binaries):
+    for binary, stdins in binaries.items():
+        suite_name = binary + "_suite"
+        counter = 0
+        methods = dict()
+        for case in stdins:
+            filepath = os.path.join(input_dir, case)
+            methods["test_" + str(counter)] = \
+                lambda x, c=filepath: x.wrapper_file([], [], c)
+            counter += 1
+        globals()[suite_name] = type(suite_name, (BaseTest,), methods)
+
 
 
 def CreateJustRunSuites(binaries):
