@@ -54,6 +54,9 @@ def compilation(std, f):
 
 def add_tags(tags_list, f):
     print(tags_list)
+    if tags_list is None:
+        return
+
     basename, ext = os.path.splitext(f)
     tag_file = os.path.join(tags_dir, basename + '.tag')
 
