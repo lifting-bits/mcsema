@@ -27,6 +27,7 @@ import unittest
 
 import tests
 import colors
+import result_data
 
 llvm_version = 0
 
@@ -40,38 +41,23 @@ batches = []
 shared_libs = None
 libc = None
 
-class TCData:
-    def __init__(self, basename = None, bin_p = None, recompiled_p = None):
-        self.binary = bin_p
-        self.recompiled = recompiled_p
-        self.basename = basename
-        self.total = 0
-        self.success = 0
-
-    def is_recompiled(self):
-        return self.recompiled is not None
-
-    def print(self):
-        print("{:<30s}".format(self.basename), end=" ")
-        if not self.is_recompiled():
-            print("\tRecompilation failed: ERROR")
-            return
-
-        if self.total == 0:
-            print(colors.Colors.MAGNETA + "\tNo tests were executed" + colors.clean())
-            return
-
-        print(colors.get_result_color(self.total, self.success) +
-              "{:>5s}".format(str(self.success) + "/" + str(self.total)) +
-              colors.clean())
-
 def get_recompiled_name(name):
     return name
 
 # Print results of tests
 def print_results(t_cases):
     for key, val in sorted(t_cases.items(), key = operator.itemgetter(0)):
-        val.print()
+        val.print(1)
+
+def log_results(result, into):
+    for entry in result.failures:
+        what = entry[0]
+        into[what.name].cases[what._testMethodName] = result_data.FAIL
+
+    for entry in result.errors:
+        what = entry[0]
+        into[what.name].cases[what._testMethodName] = result_data.ERROR
+
 
 # Fill global variables
 # TODO: Rework, this is really ugly
@@ -263,7 +249,7 @@ def main():
             recompiled = build_test(os.path.join(batch, f), test_dir, args.lift_args )
 
             basename = os.path.splitext(f)[0]
-            tc = TCData(basename,
+            tc = result_data.TCData(basename,
                         os.path.join(os.getcwd(), os.path.join(bin_dir, basename)),
                         recompiled)
             tests.BaseTest.cases[basename] = tc
@@ -289,6 +275,7 @@ def main():
     suite = unittest.TestSuite(suite_cases)
     result = unittest.TextTestRunner(verbosity = 0).run(suite)
 
+    log_results(result, tests.BaseTest.cases)
     print_results(tests.BaseTest.cases)
 
 if __name__ == '__main__':

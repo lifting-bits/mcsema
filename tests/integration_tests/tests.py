@@ -21,6 +21,8 @@ import tempfile
 import unittest
 import io
 
+import result_data
+
 # Base class for tests, provides basic lift functionality
 # Classes that inherit from it only need to specify the tests themselves
 class BaseTest(unittest.TestCase):
@@ -62,6 +64,7 @@ class BaseTest(unittest.TestCase):
     def run_test(self, filename, args, files, stdin):
         # It should be guaranteed that cases contains TCData
         tc = BaseTest.cases[filename]
+        tc.cases[self._testMethodName] = result_data.RUN
 
         # To avoid calling system-wide installed binaries
         filename = './' + filename
