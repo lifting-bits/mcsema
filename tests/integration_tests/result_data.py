@@ -138,23 +138,21 @@ class _Format:
 # Compare test results to some base and print them in reasonable way
 # f is formatter -> first suite name and then case are preset and when dump() is called
 # actual results are printed based on verbosity level
-def compare(base, results, f, full):
+def compare(base, results, formatter, full):
     # first we need to sort the items
     s_base = sorted(base.items(), key=operator.itemgetter(0))
 
     for entry in s_base:
 
         suite_name, tcdata = entry
-        h_size = f.header(suite_name)
-        first = True
+        formatter.header(suite_name)
 
         for case_name, case_result in tcdata.cases.items():
 
-            c_size = f.case(case_name)
-            first = False
-
+            formatter.case(case_name)
             r_case_results = []
+
             for r in results:
                 r_tcdata = r.get(suite_name, None)
                 r_case_results.append(r_tcdata.outer_get(tcdata.basename, case_name))
-            f.dump(r_case_results, full, case_result)
+            formatter.dump(r_case_results, full, case_result)
