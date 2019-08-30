@@ -1,27 +1,28 @@
 class Colors:
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    MAGNETA = '\033[95m'
+    class c:
+        green = '\033[92m'
+        yellow = '\033[93m'
+        red = '\033[91m'
+        magneta = '\033[95m'
+        bg_yellow = '\033[43m'
     RESET = '\033[0m'
 
-    BG_YELLOW = '\033[43m'
 
 def get_result_color(total, success):
     if total == 0:
-        return Colors.MAGNETA
+        return Colors.c.magneta
     if total == success:
-        return Colors.GREEN
+        return Colors.c.green
     if success == 0:
-        return Colors.RED
-    return Colors.YELLOW
+        return Colors.c.red
+    return Colors.c.yellow
 
 def get_bin_result(result):
     if result == 1:
-        return Colors.GREEN
+        return Colors.c.green
     if result == 0:
-        return Colors.RED
-    return Colors.MAGNETA
+        return Colors.c.red
+    return Colors.c.magneta
 
 def clean():
     return Colors.RESET
@@ -30,23 +31,23 @@ def c(color, message):
     return color + message + clean()
 
 def fail():
-    return Colors.RED
+    return Colors.c.red
 
 def succ():
-    return Colors.GREEN
+    return Colors.c.green
 
-#TODO: Generate from static attrs
+#TODO: Not sure if it's worth to generate these for each color from attrs dynamically
 def green(message):
-    return c(Colors.GREEN, message)
+    return c(Colors.c.green, message)
 
 def red(message):
-    return c(Colors.RED, message)
+    return c(Colors.c.red, message)
 
 def yellow(message):
-    return c(Colors.YELLOW, message)
+    return c(Colors.c.yellow, message)
 
 def magneta(message):
-    return c(Colors.MAGNETA, message)
+    return c(Colors.c.magneta, message)
 
 def bg_yellow(message):
-    return c(Colors.BG_YELLOW, message)
+    return c(Colors.c.bg_yellow, message)
