@@ -44,3 +44,6 @@ def red(message):
 
 def yellow(message):
     return c(Colors.YELLOW, message)
+
+def magneta(message):
+    return c(Colors.MAGNETA, message)
