@@ -7,7 +7,6 @@ class Colors:
 
     BG_YELLOW = '\033[43m'
 
-
 def get_result_color(total, success):
     if total == 0:
         return Colors.MAGNETA
@@ -26,3 +25,22 @@ def get_bin_result(result):
 
 def clean():
     return Colors.RESET
+
+def c(color, message):
+    return color + message + clean()
+
+def fail():
+    return Colors.RED
+
+def succ():
+    return Colors.GREEN
+
+#TODO: Generate from static attrs
+def green(message):
+    return c(Colors.GREEN, message)
+
+def red(message):
+    return c(Colors.RED, message)
+
+def yellow(message):
+    return c(Colors.YELLOW, message)
