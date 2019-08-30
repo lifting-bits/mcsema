@@ -74,7 +74,7 @@ def get_binaries_from_flavours(flavors):
                 if get_all or line.rstrip("\n") in flavors:
                     if not is_valid_binary(binary_name):
                         print(colors.bg_yellow(
-                            " > Skipping " + binary_name + " : file missing")
+                            " > Skipping " + binary_name + " : file missing"))
                         missing = missing + 1
                         break
                     print(" > Selecting " + binary_name)
