@@ -226,9 +226,14 @@ def main():
                             help = 'Do not run any tests',
                             required = False)
 
+    arg_parser.add_argument('--save_log',
+                            help = "Name of file to save result in json format",
+                            required = False)
+
     arg_parser.add_argument('lift_args',
                             help = "Additional arguments passed to mcsema-lift",
                             nargs = argparse.REMAINDER)
+
 
     args, command_args = arg_parser.parse_known_args()
     check_arguments(args)
@@ -278,5 +283,9 @@ def main():
     log_results(result, tests.BaseTest.cases)
     print_results(tests.BaseTest.cases)
 
+    log_file = args.save_log
+    if log_file is not None:
+        result_data.store_json(tests.BaseTest.cases, log_file)
+
 if __name__ == '__main__':
-   main()
+    main()

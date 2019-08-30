@@ -1,5 +1,6 @@
 import json
 import operator
+import os
 
 import colors
 
@@ -70,6 +71,9 @@ def _object_hook(d):
 
 # SQL serialization may be useful as well
 def store_json(root, filename):
+    if os.path.isfile(filename):
+        print("Log file already exists")
+        return
     with open(filename, 'w') as f:
         json.dump(root, f, cls=_MyEncoder, indent=4)
 

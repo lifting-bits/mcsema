@@ -98,9 +98,6 @@ are compared. In case they are different the test is a failure.
 Please note that `data.txt` must be inside `inputs` folder, i.e.`inputs/data.txt` must exist.
 
 
-TODO: Test cases currently do not support programs that interact with user (stdin)
-
-
 Directory structure:
 
 get_cfg.py # script to create new cfg files
