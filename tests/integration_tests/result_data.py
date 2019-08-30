@@ -8,7 +8,7 @@ ERROR = 3
 
 _color_mapping = {
         RUN : colors.green,
-        FAIL: colors.yellow,
+        FAIL: colors.magneta,
         ERROR : colors.red,
         }
 
@@ -25,7 +25,11 @@ class TCData:
         return self.recompiled is not None
 
     def print(self, verbosity):
-        print("{:<30s}".format(self.basename), end=" ")
+        end = "\n"
+        if verbosity == 0:
+            end = " "
+
+        print("{:<30s}".format(self.basename), end=end)
         if not self.is_recompiled():
             print("\tRecompilation failed: ERROR")
             return
@@ -40,6 +44,6 @@ class TCData:
                   colors.clean())
         elif verbosity == 1:
             for case, val in sorted(self.cases.items(), key = operator.itemgetter(0)):
-                print(_color_mapping[val](case))
+                print(" " * 2, _color_mapping[val](case))
 
 
