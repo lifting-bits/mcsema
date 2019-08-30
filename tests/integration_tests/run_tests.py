@@ -34,7 +34,6 @@ llvm_version = 0
 lift = None
 bin_dir = "bin"
 lib_dir = None
-input_dir = "inputs"
 recompiled_dir = "recompiled"
 
 batches = []

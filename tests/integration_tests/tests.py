@@ -23,6 +23,8 @@ import io
 
 import result_data
 
+input_dir = "inputs"
+
 # Base class for tests, provides basic lift functionality
 # Classes that inherit from it only need to specify the tests themselves
 class BaseTest(unittest.TestCase):
