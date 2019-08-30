@@ -61,7 +61,7 @@ class BaseTest(unittest.TestCase):
         os.chdir(t_dir)
 
         stdin = kwargs.get("string", None)
-        stdin = kwargs.get("filename") if stdin is None else stdin
+        stdin = kwargs.get("stdin_filename").read() if stdin is None else stdin
 
         pipes = subprocess.Popen(
                 args, stdout = subprocess.PIPE,
@@ -69,8 +69,8 @@ class BaseTest(unittest.TestCase):
         std_out, std_err = pipes.communicate(input=stdin)
         ret_code = pipes.returncode
 
-        if "filename" in kwargs:
-            stdin.seek(0)
+        if "stdin_filename" in kwargs:
+            kwargs.get("stdin_filename").seek(0)
 
         return std_out, std_err, ret_code
 
@@ -131,8 +131,8 @@ class BaseTest(unittest.TestCase):
         self.wrapper_impl(args, files, string="")
 
     def wrapper_file(self, args, files, stdin):
-        with open(stdin, 'r') as f:
-            self.wrapper_impl(args, files, filename=f)
+        with open(stdin, 'rb') as f:
+            self.wrapper_impl(args, files, stdin_filename=f)
 
     def wrapper_impl(self, args, files, **kwargs):
         BaseTest.cases[self.name].total += 1
@@ -264,7 +264,7 @@ def init():
         })
 
     StdinFromString({
-        "struct_func_ptr" : ["4\n4\n", "5\n5\n"]
+        "struct_func_ptr" : [b"4\n4\n", b"5\n5\n"]
         })
 
     StdinFromFile({
@@ -289,7 +289,7 @@ def StdinFromString(binaries):
         methods = dict()
         for case in stdins:
             methods["test_" + str(counter)] = \
-                lambda x, c=case: x.wrapper_impl([], [], stdin=c)
+                lambda x, c=case: x.wrapper_impl([], [], string=c)
             counter += 1
         globals()[suite_name] = type(suite_name, (BaseTest,), methods)
 
@@ -299,8 +299,8 @@ def StdinFromFile(binaries):
         counter = 0
         methods = dict()
         for case in stdins:
-            filepath = os.path.join(input_dir, case)
-            methods["test_" + str(counter)] = \
+            filepath = os.path.join("stdin", case)
+            methods["test_" + case] = \
                 lambda x, c=filepath: x.wrapper_file([], [], c)
             counter += 1
         globals()[suite_name] = type(suite_name, (BaseTest,), methods)
