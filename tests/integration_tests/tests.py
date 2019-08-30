@@ -55,13 +55,29 @@ class BaseTest(unittest.TestCase):
                 shutil.copyfile(full_name, f_name)
                 shutil.copyfile(full_name, b_name)
 
+    def exec_test(self, t_dir, args, **kwargs):
+        os.chdir(t_dir)
+
+        stdin = kwargs.get("string", None)
+        stdin = kwargs.get("filename") if stdin is None else stdin
+
+        pipes = subprocess.Popen(
+                args, stdout = subprocess.PIPE,
+                stderr = subprocess.PIPE,stdin=subprocess.PIPE)
+        std_out, std_err = pipes.communicate(input=stdin)
+        ret_code = pipes.returncode
+
+        if "filename" in kwargs:
+            stdin.seek(0)
+
+        return std_out, std_err, ret_code
 
     # Execute the test
     # A little hack is used -> binary & recompiled binary paths are stored in cases
     # under filename as key
     # TODO: Solve it somehow better
     # Compares only stdout + stderr + return value!
-    def run_test(self, filename, args, files, stdin):
+    def run_test(self, filename, args, files, **kwargs):
         # It should be guaranteed that cases contains TCData
         tc = BaseTest.cases[filename]
         tc.cases[self._testMethodName] = result_data.RUN
@@ -71,8 +87,8 @@ class BaseTest(unittest.TestCase):
 
         # Unfortunately there is no way to create files in respective test dirs
         # in setUp since filename is not available there
-        # We need to have binaries themselves in the directories, because --help often prints
-        # the whole path
+        # We need to have binaries themselves in the directories,
+        # because --help often prints the whole path
         os.symlink(tc.binary, os.path.join(self.t_bin, filename))
         os.symlink(tc.recompiled, os.path.join(self.t_recompiled, filename))
 
@@ -86,24 +102,11 @@ class BaseTest(unittest.TestCase):
         self.copy_files(filename, args, files)
 
         # Generate the expected output
-        os.chdir(self.t_bin)
+        original_std_out, original_std_err, original_ret = \
+                self.exec_test(self.t_bin, [filename] + args, **kwargs)
 
-        original_pipes = subprocess.Popen(
-                [filename] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        original_std_out, original_std_err = original_pipes.communicate(input=stdin)
-        original_ret = original_pipes.returncode
-
-        stdin.seek(0)
-
-        # Generate actual output
-        os.chdir(self.t_recompiled)
-
-        lifted_pipes = subprocess.Popen(
-                [filename] + args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        lifted_std_out, lifted_std_err = lifted_pipes.communicate(input=stdin)
-        lifted_ret = lifted_pipes.returncode
-
-        stdin.seek(0)
+        lifted_std_out, lifted_std_err, lifted_ret = \
+                self.exec_test(self.t_recompiled, [filename] + args, **kwargs)
 
         # Asserts on stderr, stdout, return value
         self.assertEqual(original_ret, lifted_ret)
@@ -123,22 +126,12 @@ class BaseTest(unittest.TestCase):
 
     # Wrapper around tests, used for test counting
     def wrapper(self, args, files):
-        self.wrapper_string_stdin(args, files, "")
+        self.wrapper_impl(args, files, string="")
 
-    def wrapper_file_stdin(self, args, files, stdin):
-        with open(stdin, 'r') as stdin_f:
-            self.wrapper_impl(args, files, stdin_f)
-
-    def wrapper_string_stdin(self, args, files, stdin):
-        print(stdin)
-        self.wrapper_impl(args, files, io.StringIO(stdin))
-
-    def wrapper_impl(self, args, files, stdin):
+    def wrapper_impl(self, args, files, **kwargs):
         BaseTest.cases[self.name].total += 1
-        self.run_test(self.name, args, files, stdin)
+        self.run_test(self.name, args, files, **kwargs)
         BaseTest.cases[self.name].success += 1
-
-
 
 
 # Implements two invocations that are usually tested on everything
@@ -274,7 +267,7 @@ def CreateSimpleSuite(binary, args):
     methods = dict()
     for case in args:
         methods["test_" + str(counter)] = lambda x,case=case: x.wrapper(case, [])
-        counter = counter + 1
+        counter += 1
     globals()[suite_name] = type(suite_name, (BaseTest,), methods)
 
 def StdinFromString(binaries):
@@ -283,8 +276,8 @@ def StdinFromString(binaries):
         counter = 0
         methods = dict()
         for case in stdins:
-            methods["test_" + str(counter)] = lambda x, c=case: x.wrapper_string_stdin([], [], c)
-            counter = counter + 1
+            methods["test_" + str(counter)] = lambda x, c=case: x.wrapper_impl([], [], stdin=c)
+            counter += 1
         globals()[suite_name] = type(suite_name, (BaseTest,), methods)
 
 
