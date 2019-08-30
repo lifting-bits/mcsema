@@ -35,7 +35,7 @@ class TCData:
             return
 
         if self.total == 0:
-            print(colors.Colors.MAGNETA + "\tNo tests were executed" + colors.clean())
+            print(colors.magneta("\tNo tests were executed"))
             return
 
         if verbosity == 0:

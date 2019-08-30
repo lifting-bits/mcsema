@@ -268,7 +268,7 @@ def main():
                 suite_cases.append(loader.loadTestsFromTestCase(tc_class))
             except KeyError:
                 print(" > " + suite_name + " was not found in module!")
-                print(colors.Colors.BG_YELLOW + " > Skipping test" + colors.clean())
+                print(colors.bg_yellow(" > Skipping test"))
                 continue
 
     print()

@@ -47,3 +47,6 @@ def yellow(message):
 
 def magneta(message):
     return c(Colors.MAGNETA, message)
+
+def bg_yellow(message):
+    return c(Colors.BG_YELLOW, message)
