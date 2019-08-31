@@ -702,20 +702,38 @@ void WriteDisplacement(
 
 // For instruction to have MemoryDisplacement it has among other things
 // be of type BinaryFunction
-Address DisplacementHelper(Dyninst::InstructionAPI::Expression *expr) {
+Maybe<Address> DisplacementHelper(Dyninst::InstructionAPI::Expression *expr) {
 
-  if (auto bin_func = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
+  if (auto top_level = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
+    if (!top_level->isAdd()) {
+      return 0;
+    }
+
     std::vector<InstructionAPI::InstructionAST::Ptr> inner_operands;
-    bin_func->getChildren(inner_operands);
+    top_level->getChildren(inner_operands);
 
-    for (auto &inner_op : inner_operands) {
-      if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(inner_op.get())) {
-        return imm->eval().convert<Address>();
+    InstructionAPI::BinaryFunction *mid_op = nullptr;
+    InstructionAPI::Immediate *mid_imm = nullptr;
+
+    for (auto & inner_op : inner_operands) {
+
+      if (auto middle_level =
+          dynamic_cast<InstructionAPI::BinaryFunction *>(inner_op.get())) {
+        mid_op = middle_level;
+      }
+
+      if (auto middle_level =
+          dynamic_cast<InstructionAPI::Immediate *>(inner_op.get())) {
+        mid_imm = middle_level;
       }
     }
-  }
 
-  return 0;
+    if (mid_op && mid_imm) {
+      return { mid_imm->eval().convert<Address>() };
+    }
+
+  }
+  return {};
 }
 
 void CFGWriter::CheckDisplacement(Dyninst::InstructionAPI::Expression *expr,
@@ -737,7 +755,7 @@ void CFGWriter::CheckDisplacement(Dyninst::InstructionAPI::Expression *expr,
               dynamic_cast<InstructionAPI::Expression *>(op.get())) {
 
         if (auto displacement = DisplacementHelper(inner_expr)) {
-          WriteDisplacement(ctx, section_m, cfg_instruction, displacement);
+          WriteDisplacement(ctx, section_m, cfg_instruction, *displacement);
         }
       }
     }
@@ -746,7 +764,7 @@ void CFGWriter::CheckDisplacement(Dyninst::InstructionAPI::Expression *expr,
 
 
   if (auto displacement = DisplacementHelper(expr)) {
-    WriteDisplacement(ctx, section_m, cfg_instruction, displacement);
+    WriteDisplacement(ctx, section_m, cfg_instruction, *displacement);
   }
 }
 
