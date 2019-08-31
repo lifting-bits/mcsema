@@ -23,6 +23,25 @@
 #include "OffsetTable.h"
 #include "SectionManager.h"
 
+// Sometimes there are no good candidates -> try every possibility
+Maybe<Dyninst::Address> OffsetTable::BlindMatch(
+    const std::set<Dyninst::Address> &succ) const {
+
+  auto it = start_ea;
+
+  while (it != start_ea + size) {
+
+    if (Recompute(it).Match(succ)) {
+      return it;
+    }
+    // TODO: Entries are smaller (maybe move by 8?)
+    it += 4;
+
+  }
+
+  return {};
+}
+
 bool OffsetTable::contains(Dyninst::Address addr) const {
   if (addr < start_ea) {
     return false;
@@ -36,6 +55,10 @@ bool OffsetTable::contains(Dyninst::Address addr) const {
 Maybe<Dyninst::Address> OffsetTable::Match(
     const std::set<Dyninst::Address> &succs,
     const std::set<Dyninst::Address> &xrefs) const {
+
+  if (xrefs.empty()) {
+    return BlindMatch(succs);
+  }
 
   if (Match(succs)) {
     return start_ea;
