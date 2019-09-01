@@ -385,6 +385,9 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   }
 }
 
+// Build replacement for .text section
+// Only start address and size is needed, so that references into this section
+// can be resolved as correct and do not cause assertion failure
 void BuildCode(NativeSegment *segment, const NativeInstruction *inst) {
   static bool init = false;
   if (!init) {
@@ -923,7 +926,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
   // reference information available.
   module->ea_to_func.reserve(static_cast<size_t>(cfg.funcs_size()));
 
-  std::vector<std::pair<NativeInstruction *, const Instruction *>> to_resolve;
+  std::vector<std::pair<NativeInstruction *, const Instruction *>> inst_with_xref;
   for (const auto &cfg_func : cfg.funcs()) {
     auto func = const_cast<NativeFunction *>(
         module->ea_to_func[static_cast<uint64_t>(cfg_func.ea())]);
