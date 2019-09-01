@@ -1036,11 +1036,19 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     }
   }
 
-  for (auto &entry : to_resolve) {
+  // Add our fake segment into the module temporarly
+  module->segments[code_segment->ea] = code_segment;
+
+  for (auto &entry : inst_with_xref) {
     for (auto &cfg_ref : entry.second->xrefs()) {
       AddXref(module, entry.first, cfg_ref, pointer_size);
     }
   }
+
+  // Remove fake segment, since we do not want it in the bitcode
+  // But do not deallocate it, since it may be required by those xrefs of instructions
+  // later.
+  module->segments.erase(code_segment->ea);
 
   return module;
 }
