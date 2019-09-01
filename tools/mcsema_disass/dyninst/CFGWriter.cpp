@@ -569,7 +569,16 @@ void CFGWriter::WriteFunctionBlocks(ParseAPI::Function *func,
         }
       }
     }
-    CHECK(unknown.empty()) << "Unresolved succ of bb was not match to a func";
+
+    if (!unknown.empty()) {
+      std::stringstream targets;
+      for (const auto trg: unknown) {
+        targets << std::hex << trg << " ";
+      }
+      LOG(ERROR)
+        << "Unresolved succ of bb was not match to a func: " << std::hex
+        << func->addr() << "[ " << targets.str() << " ]";
+    }
 }
 
 std::set<Address>
@@ -691,6 +700,8 @@ void WriteDisplacement(
     DisassContext &ctx, SectionManager &section_m,
     mcsema::Instruction *cfg_instruction, Address &address) {
 
+  // Memory displacement only makes sense if (+ constant) is some xref, otherwise
+  // McSema just fills the constant there and there is no need to specify it in cfg
   if (ctx.HandleCodeXref(
       {static_cast<Address>(cfg_instruction->ea()),
       address, cfg_instruction}, section_m)) {
