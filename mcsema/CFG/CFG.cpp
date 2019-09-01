@@ -385,6 +385,29 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   }
 }
 
+void BuildCode(NativeSegment *segment, const NativeInstruction *inst) {
+  static bool init = false;
+  if (!init) {
+    segment->ea = inst->ea;
+    segment->size = inst->bytes.size();
+    init = true;
+    return;
+  }
+
+  auto end = segment->ea + segment->size;
+
+  if (inst->ea > end) {
+    segment->size = inst->ea + inst->bytes.size() - segment->ea;
+    return;
+  }
+
+  if (inst->ea < segment->ea) {
+    segment->size = segment->ea - inst->ea;
+    segment->ea = inst->ea;
+    return;
+  }
+}
+
 }  // namespace
 
 NativeObject::NativeObject(void)
@@ -451,6 +474,8 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       << file_name;
 
   auto module = new NativeModule;
+
+  auto code_segment = new NativeSegment;
 
   // Collect variables from within the data sections. We set up the segment
   // information by not their data. We leave that until later when all
@@ -897,6 +922,8 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
   // Add in each of the function's blocks. At this stage we have all cross-
   // reference information available.
   module->ea_to_func.reserve(static_cast<size_t>(cfg.funcs_size()));
+
+  std::vector<std::pair<NativeInstruction *, const Instruction *>> to_resolve;
   for (const auto &cfg_func : cfg.funcs()) {
     auto func = const_cast<NativeFunction *>(
         module->ea_to_func[static_cast<uint64_t>(cfg_func.ea())]);
@@ -972,9 +999,8 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         inst->offset_table = nullptr;
         inst->stack_var = nullptr;
 
-        for (const auto &cfg_ref : cfg_inst.xrefs()) {
-          AddXref(module, inst, cfg_ref, pointer_size);
-        }
+        to_resolve.emplace_back(inst, &cfg_inst);
+        BuildCode(code_segment, inst);
 
         for (const auto &var : func->stack_vars) {
           for (auto ref : var->refs) {
@@ -1004,6 +1030,12 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
             << " in function " << static_cast<uint64_t>(cfg_func.ea())
             << " does not exist";
       }
+    }
+  }
+
+  for (auto &entry : to_resolve) {
+    for (auto &cfg_ref : entry.second->xrefs()) {
+      AddXref(module, entry.first, cfg_ref, pointer_size);
     }
   }
 
