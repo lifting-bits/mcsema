@@ -1002,7 +1002,9 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         inst->offset_table = nullptr;
         inst->stack_var = nullptr;
 
-        to_resolve.emplace_back(inst, &cfg_inst);
+        if (cfg_inst.xrefs_size()) {
+          inst_with_xref.emplace_back(inst, &cfg_inst);
+        }
         BuildCode(code_segment, inst);
 
         for (const auto &var : func->stack_vars) {
