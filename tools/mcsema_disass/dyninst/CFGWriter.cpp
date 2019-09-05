@@ -305,9 +305,7 @@ void CFGWriter::WriteFunction(Dyninst::ParseAPI::Function *func,
 
   cfg_internal_func->set_is_entrypoint(func);
 
-  for (ParseAPI::Block *block : func->blocks()) {
-    WriteBlock(block, func, cfg_internal_func);
-  }
+  WriteFunctionBlocks(func, cfg_internal_func);
 
   cfg_internal_func->set_name(func->name());
   LOG(INFO) << "Added " << func->name() << " into module, found via xref";
@@ -537,66 +535,109 @@ void CFGWriter::WriteInternalFunctions() {
     auto cfg_internal_func = ctx.getInternalFunction(func->addr());
 
     ParseAPI::Block *entryBlock = func->entry();
-    CHECK(entryBlock->start() == cfg_internal_func->ea())
+    CHECK(entryBlock->start() == static_cast<Address>(cfg_internal_func->ea()))
         << "Start of the block is not equal to function ea";
 
     cfg_internal_func->set_is_entrypoint(
         not_entrypoints.find(func->name()) == not_entrypoints.end());
 
-    for (ParseAPI::Block *block : func->blocks()) {
-      WriteBlock(block, func, cfg_internal_func);
-    }
+    WriteFunctionBlocks(func, cfg_internal_func);
   }
 }
 
+// Sometimes Dyninst finds block that ends with instruction in form of
+// jmpq absolute_address
+// and does not properly set the successor. We check if the target is parsed as
+// function already and if yes we add the whole function into the current one
+void CFGWriter::WriteFunctionBlocks(ParseAPI::Function *func,
+                                    mcsema::Function *cfg_internal_func) {
 
-//TODO(lukas): This one is basically unchanged from original PR.
-void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
-                           mcsema::Function *cfg_internal_func) {
-
-  mcsema::Block *cfg_block = cfg_internal_func->add_blocks();
-  cfg_block->set_ea(block->start());
-
-  // Set outgoing edges
-  std::set<Address> successors;
-  for (auto edge : block->targets()) {
-
-    // Is this block part of the current function?
-    bool found = false;
-
-    for (auto bl : func->blocks()) {
-      if (bl->start() == edge->trg()->start()) {
-        found = true;
-        break;
-      }
+    std::set<ParseAPI::Block *> written;
+    std::set<Address> unknown;
+    for (ParseAPI::Block *block : func->blocks()) {
+      auto found = WriteBlock(block, func, cfg_internal_func, written);
+      unknown.insert(found.begin(), found.end());
     }
 
-    if ((!found) || (edge->trg()->start() == -1)) {
-      continue;
-    }
-
-    // Handle recursive calls
-    found = false;
-
-    if (edge->trg()->start() == func->entry()->start()) {
-      for (auto call_edge : func->callEdges()) {
-        if ((call_edge->src()->start() == block->start()) &&
-            (call_edge->trg()->start() == func->entry()->start())) {
-          // Looks like a recursive call, so no block_follows edge here
-          found = true;
-          break;
+    // TODO: More efficient implementation
+    for (auto &f : code_object.funcs()) {
+      if (unknown.count(f->addr())) {
+        for (auto bb : f->blocks()) {
+          // This may require calling WriteFunctionBlocks, possible CFG bloat?
+          WriteBlock(bb, f, cfg_internal_func, written);
+          unknown.erase(f->addr());
         }
       }
     }
 
-    if (!found) {
-      // TODO(lukas): Exception handling
-      // For now ignore catch blocks
-      if (edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CATCH &&
-          edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::RET &&
-          edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CALL) {
-        successors.insert(edge->trg()->start());
-        cfg_block->add_successor_eas(edge->trg()->start());
+    if (!unknown.empty()) {
+      std::stringstream targets;
+      for (const auto trg: unknown) {
+        targets << std::hex << trg << " ";
+      }
+      LOG(ERROR)
+        << "Unresolved succ of bb was not match to a func: " << std::hex
+        << func->addr() << "[ " << targets.str() << " ]";
+    }
+}
+
+std::set<Address>
+CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
+                      mcsema::Function *cfg_internal_func,
+                      std::set<ParseAPI::Block *> &written) {
+
+  if (written.count(block)) {
+    return {};
+  }
+
+  std::set<Address> unresolved_edges;
+
+  mcsema::Block *cfg_block = cfg_internal_func->add_blocks();
+  written.insert(block);
+  cfg_block->set_ea(block->start());
+
+
+  std::map<Offset, InstructionAPI::Instruction::Ptr> instructions;
+  block->getInsns(instructions);
+
+  std::set<Address> successors;
+
+  for (auto edge : block->targets()) {
+
+    // TODO(lukas): Exception handling
+    // For now ignore catch blocks
+    if (edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CATCH &&
+        edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::RET &&
+        edge->type() != Dyninst::ParseAPI::EdgeTypeEnum::CALL) {
+
+      auto next = edge->trg()->start();
+      auto last_inst = std::prev(instructions.end())->second;
+      auto rip = std::prev(instructions.end())->first;
+
+      // Try to compute succ manually, as it can happen that ParseAPI returns -1
+      auto manual = TryEval(last_inst->getOperand(0).getValue().get(),
+                            rip, last_inst->size());
+
+      // We cannot statically tell anything about this edge
+      if (!manual && next == -1) {
+        continue;
+      }
+
+      auto target = (next == -1) ? *manual : next;
+
+      // There cannot be succs outside of code section
+      if (!section_m.IsCode(target)) {
+        continue;
+      }
+
+      successors.insert(target);
+      cfg_block->add_successor_eas(target);
+
+      // We did not find it yet is direct jump -> it is probably beginning of some other
+      // function. Target is returned to caller
+      if (edge->type() == Dyninst::ParseAPI::EdgeTypeEnum::DIRECT &&
+          !func->contains(edge->trg())) {
+        unresolved_edges.insert(target);
       }
     }
   }
@@ -609,16 +650,13 @@ void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     bool all = std::all_of(successors.cbegin(), successors.cend(), [&](auto succ){
         return code_xrefs_to_resolve.count(succ);
     });
+
     if (all) {
       for (const auto &succ : successors) {
         code_xrefs_to_resolve.erase(succ);
       }
     }
   }
-
-  // Write instructions
-  std::map<Offset, InstructionAPI::Instruction::Ptr> instructions;
-  block->getInsns(instructions);
 
   Address ip = block->start();
 
@@ -629,10 +667,8 @@ void CFGWriter::WriteBlock(ParseAPI::Block *block, ParseAPI::Function *func,
     ip += instruction->size();
   }
 
-  LOG(INFO) << "Block at 0x" << std::hex << block->start() << std::dec
-            << " has " << successors.size() << " successors";
-
   ResolveOffsetTable(successors, cfg_block, offset_tables);
+  return unresolved_edges;
 }
 
 void CFGWriter::WriteInstruction(InstructionAPI::Instruction *instruction,
@@ -642,7 +678,7 @@ void CFGWriter::WriteInstruction(InstructionAPI::Instruction *instruction,
   mcsema::Instruction *cfg_instruction = cfg_block->add_instructions();
 
   std::string instBytes;
-  for (int offset = 0; offset < instruction->size(); ++offset) {
+  for (auto offset = 0U; offset < instruction->size(); ++offset) {
     instBytes += (int)instruction->rawByte(offset);
   }
 
@@ -664,6 +700,8 @@ void WriteDisplacement(
     DisassContext &ctx, SectionManager &section_m,
     mcsema::Instruction *cfg_instruction, Address &address) {
 
+  // Memory displacement only makes sense if (+ constant) is some xref, otherwise
+  // McSema just fills the constant there and there is no need to specify it in cfg
   if (ctx.HandleCodeXref(
       {static_cast<Address>(cfg_instruction->ea()),
       address, cfg_instruction}, section_m)) {
@@ -675,18 +713,38 @@ void WriteDisplacement(
 
 // For instruction to have MemoryDisplacement it has among other things
 // be of type BinaryFunction
-Address DisplacementHelper(Dyninst::InstructionAPI::Expression *expr) {
-  if (auto bin_func = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
-    std::vector<InstructionAPI::InstructionAST::Ptr> inner_operands;
-    bin_func->getChildren(inner_operands);
+Maybe<Address> DisplacementHelper(Dyninst::InstructionAPI::Expression *expr) {
 
-    for (auto &inner_op : inner_operands) {
-      if (auto imm = dynamic_cast<InstructionAPI::Immediate *>(inner_op.get())) {
-        return imm->eval().convert<Address>();
+  if (auto top_level = dynamic_cast<InstructionAPI::BinaryFunction *>(expr)) {
+    if (!top_level->isAdd()) {
+      return 0;
+    }
+
+    std::vector<InstructionAPI::InstructionAST::Ptr> inner_operands;
+    top_level->getChildren(inner_operands);
+
+    InstructionAPI::BinaryFunction *mid_op = nullptr;
+    InstructionAPI::Immediate *mid_imm = nullptr;
+
+    for (auto & inner_op : inner_operands) {
+
+      if (auto middle_level =
+          dynamic_cast<InstructionAPI::BinaryFunction *>(inner_op.get())) {
+        mid_op = middle_level;
+      }
+
+      if (auto middle_level =
+          dynamic_cast<InstructionAPI::Immediate *>(inner_op.get())) {
+        mid_imm = middle_level;
       }
     }
+
+    if (mid_op && mid_imm) {
+      return { mid_imm->eval().convert<Address>() };
+    }
+
   }
-  return 0;
+  return {};
 }
 
 void CFGWriter::CheckDisplacement(Dyninst::InstructionAPI::Expression *expr,
@@ -697,22 +755,27 @@ void CFGWriter::CheckDisplacement(Dyninst::InstructionAPI::Expression *expr,
   if (cfg_instruction->xrefs_size()) {
     return;
   }
+
   if (auto deref = dynamic_cast<InstructionAPI::Dereference *>(expr)) {
     std::vector<InstructionAPI::InstructionAST::Ptr> inner_operands;
     deref->getChildren(inner_operands);
 
     for (auto &op : inner_operands) {
+
       if (auto inner_expr =
               dynamic_cast<InstructionAPI::Expression *>(op.get())) {
+
         if (auto displacement = DisplacementHelper(inner_expr)) {
-          WriteDisplacement(ctx, section_m, cfg_instruction, displacement);
+          WriteDisplacement(ctx, section_m, cfg_instruction, *displacement);
         }
       }
     }
-  } else {
-    if (auto displacement = DisplacementHelper(expr)) {
-      WriteDisplacement(ctx, section_m, cfg_instruction, displacement);
-    }
+    return;
+  }
+
+
+  if (auto displacement = DisplacementHelper(expr)) {
+    WriteDisplacement(ctx, section_m, cfg_instruction, *displacement);
   }
 }
 
@@ -780,6 +843,7 @@ Address CFGWriter::immediateNonCall(InstructionAPI::Immediate* imm,
                   CodeReference::ImmediateOperand,
                   CodeReference::Internal,
                   a);
+
       LOG(INFO) << std::hex
                 << "IMM may be working with new function starting at" << a;
       inst_xrefs_to_resolve.insert({a, {}});
@@ -787,6 +851,7 @@ Address CFGWriter::immediateNonCall(InstructionAPI::Immediate* imm,
     }
     return 0;
   }
+
   GetLastXref(cfg_instruction)->set_operand_type(CodeReference::ImmediateOperand);
   return a;
 
@@ -878,19 +943,10 @@ void CFGWriter::HandleNonCallInstruction(
         }
 
       } else if (instruction->getCategory() == InstructionAPI::c_BranchInsn) {
+
         // This has + |instruction| in AST
         if (auto a = TryEval(expr.get(), addr - instruction->size())) {
-          if (is_last) {
-            for (auto succ : cfg_block->successor_eas()) {
-              if (*a == succ) {
-                AddCodeXref(cfg_instruction,
-                            mcsema::CodeReference::CodeTarget,
-                            mcsema::CodeReference::ControlFlowOperand,
-                            mcsema::CodeReference::Internal,
-                            *a);
-              }
-            }
-          }
+
           // ea is not really that important
           // in CrossXref<mcsema::Instruction>
           if (ctx.HandleCodeXref({0, *a, cfg_instruction}, section_m)) {
@@ -902,8 +958,13 @@ void CFGWriter::HandleNonCallInstruction(
         }
       }
     }
+
     ++i;
-    CheckDisplacement(expr.get(), cfg_instruction);
+
+    // If we can get value, it is almost certainly not a displacement
+    if (!TryEval(expr.get(), addr, instruction->size())) {
+      CheckDisplacement(expr.get(), cfg_instruction);
+    }
   }
 
   // We may be storing some address wich is quite possibly entrypoint of
@@ -977,7 +1038,7 @@ void WriteAsRaw(std::string& data, uint64_t number, int64_t offset) {
     LOG(FATAL) << "Trying to Write raw on negative offset";
   }
 
-  if (offset + 3 >= data.size()) {
+  if (static_cast<std::string::size_type>(offset) + 3 >= data.size()) {
     data.resize(offset + 3, '\0');
   }
 

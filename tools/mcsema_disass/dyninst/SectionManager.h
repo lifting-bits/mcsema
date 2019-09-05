@@ -29,9 +29,9 @@ namespace mcsema {
 }
 
 struct Section {
-  Dyninst::SymtabAPI::Region *region;
+  Dyninst::SymtabAPI::Region *region = nullptr;
   std::string name;
-  mcsema::Segment *cfg_segment;
+  mcsema::Segment *cfg_segment = nullptr;
 };
 
 struct SectionManager {

@@ -51,7 +51,7 @@ struct MagicSection {
     }
 
     for (auto &func : ext_funcs) {
-      if (func->ea() == ea->second) {
+      if (static_cast<Dyninst::Address>(func->ea()) == ea->second) {
         return func;
       }
     }

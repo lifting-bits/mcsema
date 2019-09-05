@@ -105,7 +105,7 @@ void SectionManager::AddRegion(Dyninst::SymtabAPI::Region *r) {
       should_write = false;
     }
   }
-  regions.push_back({r, r->getRegionName()});
+  regions.push_back({r, r->getRegionName(), nullptr});
 }
 
 std::vector<Dyninst::SymtabAPI::Symbol *>
