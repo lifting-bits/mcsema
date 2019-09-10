@@ -18,6 +18,8 @@ import os
 import shutil
 import stat
 
+import colors
+
 tags_dir = "tags"
 bin_dir = "bin"
 
@@ -25,7 +27,7 @@ def try_find(locations, basename):
     for p in locations:
         maybe = os.path.join(p, basename)
         if os.path.isfile(maybe):
-            print(" > Found " + maybe)
+            print(" > ", colors.green("Found " + maybe))
             new_file = os.path.join(bin_dir, basename)
             shutil.copyfile(maybe, new_file)
             st = os.stat(new_file)
@@ -53,7 +55,7 @@ def main():
             continue
 
         if not try_find(locations, basename):
-            print(" > " + basename + " not found anywhere")
+            print(" > " + colors.red(basename + " not found anywhere"))
 
 if __name__ == '__main__':
     main()
