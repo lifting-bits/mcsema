@@ -18,6 +18,8 @@ import argparse
 import filecmp
 import operator
 import os
+import queue
+import threading
 import shutil
 import subprocess
 from subprocess import CalledProcessError
@@ -171,15 +173,54 @@ def build_test(cfg, build_dir, extra_args):
 
     # Recompile it
     lifted = os.path.join(build_dir, get_recompiled_name(binary_base_name))
-    lib = lib_dir + "/"+ "libmcsema_rt64-{}.a".format(llvm_version)
+    lib = lib_dir + "/"+ "libmcsema_rt64-6.0.a"
 
 
     recompile_args =[ "clang-{}".format(llvm_version), bc,
                       "-o", lifted, lib,
-                      "-lpthread", "-lm", "-llzma", "-ldl"] + shared_libs
+                      "-lpthread", "-lm", "-ldl"] + shared_libs
     if not exec_and_log_fail(recompile_args):
         return None
     return lifted
+
+
+def thread_lift(*t_args, **kwargs):
+    todo, suite_cases, test_dir, args = t_args
+    while not todo.empty():
+
+        try:
+            batch, f = todo.get()
+        except queue.Empty:
+            return
+
+        print("\n > Handling : " + f)
+        recompiled = build_test(os.path.join(batch, f), test_dir, args.lift_args )
+
+        basename = os.path.splitext(f)[0]
+        tc = result_data.TCData(basename,
+                    os.path.join(os.getcwd(), os.path.join(bin_dir, basename)),
+                    recompiled)
+        tests.BaseTest.cases[basename] = tc
+
+        # Lift failed for some reason, ignore this case
+        if recompiled is None:
+            continue
+
+        # Dynamically load only test cases for binaries that were successfully lifted
+        # Therefore ignored are fails and binaries not present in a batch
+        # TODO: Solve missing test case class
+        suite_name = basename + "_suite"
+
+        try:
+            tc_class = tests.__dict__[suite_name]
+            loader = unittest.TestLoader()
+            suite_cases.put_nowait(item=loader.loadTestsFromTestCase(tc_class))
+        except KeyError:
+            print(" > " + suite_name + " was not found in module!")
+            print(colors.bg_yellow(" > Skipping test"))
+            continue
+    return
+
 
 # Right now batches are combined, maybe it would make sense to separate batches from each other
 # that can be useful when comparing performance of frontends
@@ -244,39 +285,24 @@ def main():
     # maybe we want some --preserve option
     test_dir = tempfile.mkdtemp(dir=os.getcwd())
 
-    loader = unittest.TestLoader()
-    suite_cases = []
+    suite_cases = queue.Queue()
+    todo = queue.Queue()
 
     for batch in batches:
-        print("\n > Handling : " + batch)
         for f in os.listdir(batch):
-            recompiled = build_test(os.path.join(batch, f), test_dir, args.lift_args )
+            todo.put((batch, f))
 
-            basename = os.path.splitext(f)[0]
-            tc = result_data.TCData(basename,
-                        os.path.join(os.getcwd(), os.path.join(bin_dir, basename)),
-                        recompiled)
-            tests.BaseTest.cases[basename] = tc
+    threads = []
+    for i in range(8):
+        t = threading.Thread(target=thread_lift, args=(todo, suite_cases, test_dir, args))
+        t.start()
+        threads.append(t)
 
-            # Lift failed for some reason, ignore this case
-            if recompiled is None:
-                continue
-
-            # Dynamically load only test cases for binaries that were successfully lifted
-            # Therefore ignored are fails and binaries not present in a batch
-            # TODO: Solve missing test case class
-            suite_name = basename + "_suite"
-
-            try:
-                tc_class = tests.__dict__[suite_name]
-                suite_cases.append(loader.loadTestsFromTestCase(tc_class))
-            except KeyError:
-                print(" > " + suite_name + " was not found in module!")
-                print(colors.bg_yellow(" > Skipping test"))
-                continue
+    for t in threads:
+        t.join()
 
     print()
-    suite = unittest.TestSuite(suite_cases)
+    suite = unittest.TestSuite(list(suite_cases.queue))
     result = unittest.TextTestRunner(verbosity = 0).run(suite)
 
     log_results(result, tests.BaseTest.cases)
