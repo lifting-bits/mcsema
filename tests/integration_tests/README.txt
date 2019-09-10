@@ -15,8 +15,9 @@ Example:
  > Found /bin/gre
 ```
 
+2) In case you want to try your own sources you can use `compile.py` which compiles all sources from `src` directory. If option `--stub_tags` is used, the corresponding tag files are created.
 
-2) First create a batch of cfg file using `get_cfg.py` -- you can select flavors to run only subset of all tests (they are specified in `tags` directory).
+3) First create a batch of cfg file using `get_cfg.py` -- you can select flavors to run only subset of all tests (they are specified in `tags` directory).
   + tag all will get cfg for every file in `bin`
   + there are several policies that allows modification of already existing batches
 
@@ -34,7 +35,7 @@ python get_cfg.py --disass dyninst --flavors C --batch first_batch --batch_polic
 python get_cfg.py --disass dyninst --flavors echo --batch first_batch --batch_policy U
 ```
 
-3) Once batch is created `run_tests.py` can be run
+4) Once batch is created `run_tests.py` can be run
 
 Extending test:
 
