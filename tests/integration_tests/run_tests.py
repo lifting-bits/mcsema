@@ -270,6 +270,11 @@ def main():
                             help = "Name of file to save result in json format",
                             required = False)
 
+    arg_parser.add_argument('--jobs',
+                            help = "Number of threads to use",
+                            default = 1,
+                            required = False)
+
     arg_parser.add_argument('lift_args',
                             help = "Additional arguments passed to mcsema-lift",
                             nargs = argparse.REMAINDER)
@@ -293,7 +298,7 @@ def main():
             todo.put((batch, f))
 
     threads = []
-    for i in range(8):
+    for i in range(int(args.jobs)):
         t = threading.Thread(target=thread_lift, args=(todo, suite_cases, test_dir, args))
         t.start()
         threads.append(t)
