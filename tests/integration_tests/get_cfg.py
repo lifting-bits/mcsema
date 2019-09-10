@@ -17,6 +17,8 @@
 import argparse
 import operator
 import os
+import queue
+import threading
 import shutil
 import sys
 import subprocess
@@ -219,13 +221,22 @@ def binja_frontend(binary, cfg, args):
 
 # TODO: We may want for each file to be lifted in separate directory and on a copy
 # (in the case frontend is broken and modifies the original itself)
-def get_cfg(binary, cfg, args, lifter):
-    bin_path = os.path.join(bin_dir, binary)
+def get_cfg(*t_args, **kwargs):
+    todo, args, lifter, result = t_args
 
-    print("\n > Processing " + bin_path)
-    update_shared_libraries(bin_path)
+    while not todo.empty():
 
-    return lifter(bin_path, cfg, args)
+        try:
+            binary, cfg = todo.get()
+        except queue.Empty:
+            return
+
+        bin_path = os.path.join(bin_dir, binary)
+
+        print("\n > Processing " + bin_path)
+        update_shared_libraries(bin_path)
+
+        result[binary] = lifter(bin_path, cfg, args)
 
 # TODO: Handle other frontends
 def get_lifter(disass):
@@ -300,6 +311,12 @@ def main():
         default="../../tools/mcsema_disass/defs/linux.txt",
         required=False)
 
+    arg_parser.add_argument(
+        '--jobs',
+        help = "Number of threads to use",
+        default = 1,
+        required = False)
+
     args, command_args = arg_parser.parse_known_args()
 
 
@@ -319,13 +336,26 @@ def main():
 
     result = dict()
     print("\nIterating over binaries")
+
+    todo = queue.Queue()
+
     for b in binaries:
         cfg = os.path.join(batch_dir, b + ".cfg")
         if args.batch_policy == "C" and os.path.isfile(cfg):
             print(" \t> " + cfg + " is already present, not updating")
             result[b] = IGNORED
         else:
-            result[b] = get_cfg(b, cfg, args, get_lifter(args.disass))
+            todo.put((b, cfg))
+
+    threads = []
+    for i in range(int(args.jobs)):
+        t = threading.Thread(
+                target=get_cfg, args=(todo, args, get_lifter(args.disass), result))
+        t.start()
+        threads.append(t)
+
+    for t in threads:
+        t.join()
 
     print_result(result, missing)
 
