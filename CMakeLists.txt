@@ -34,6 +34,11 @@ if(NOT DEFINED WIN32)
   )
 endif()
 
+#sqlite
+find_package(SQLite3 REQUIRED)
+list(APPEND PROJECT_LIBRARIES ${SQLite3_LIBRARIES})
+list(APPEND PROJECT_INCLUDEDIRECTORIES ${SQLite3_INCLUDE_DIR})
+
 # protobuf
 find_package(Protobuf REQUIRED)
 list(APPEND PROJECT_LIBRARIES ${Protobuf_LIBRARIES})
