@@ -31,7 +31,7 @@ import tests
 import colors
 import result_data
 
-llvm_version = 0
+llvm_version = 8
 
 lift = None
 bin_dir = "bin"
@@ -71,9 +71,6 @@ def check_arguments(args):
         sys.exit (1)
     global lift
     lift = args.lift
-
-    global llvm_version
-    prefix, sep, llvm_version = lift.rpartition('-')
 
     if not os.path.isfile(args.runtime_lib):
         print ("{} passed to --runtime_lib is not a valid file".format(args.runtime_lib))
