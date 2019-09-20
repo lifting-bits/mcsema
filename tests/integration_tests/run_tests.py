@@ -35,7 +35,7 @@ llvm_version = 0
 
 lift = None
 bin_dir = "bin"
-lib_dir = None
+libmcsema = None
 recompiled_dir = "recompiled"
 
 batches = []
@@ -75,11 +75,11 @@ def check_arguments(args):
     global llvm_version
     prefix, sep, llvm_version = lift.rpartition('-')
 
-    if not os.path.isdir(args.lib_dir):
-        print ("{} passed to --lib_dir is not a valid directory".format(args.lib_dir))
+    if not os.path.isfile(args.runtime_lib):
+        print ("{} passed to --runtime_lib is not a valid file".format(args.runtime_lib))
         sys.exit (1)
-    global lib_dir
-    lib_dir = args.lib_dir
+    global libmcsema
+    libmcsema = args.runtime_lib
 
     if not os.path.isdir(args.bin_dir):
         print("{} passed to --bin_dir is not a valid directory".format(args.bin_dir))
@@ -173,11 +173,9 @@ def build_test(cfg, build_dir, extra_args):
 
     # Recompile it
     lifted = os.path.join(build_dir, get_recompiled_name(binary_base_name))
-    lib = lib_dir + "/"+ "libmcsema_rt64-6.0.a"
-
 
     recompile_args =[ "clang-{}".format(llvm_version), bc,
-                      "-o", lifted, lib,
+                      "-o", lifted, libmcsema,
                       "-lpthread", "-lm", "-ldl"] + shared_libs
     if not exec_and_log_fail(recompile_args):
         return None
@@ -232,8 +230,9 @@ def main():
                             help = "Path to the mcsema-lift binary",
                             required = True)
 
-    arg_parser.add_argument('--lib_dir',
-                            help = "Directory that contains libmcsema_rt64.a",
+    arg_parser.add_argument('--runtime_lib',
+                            help = "Runtime library for lifted bitcode \
+                                    (e.g. libmcsema-rt64-6.0.a",
                             required = True)
 
     arg_parser.add_argument('--shared_lib_dir',
