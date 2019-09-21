@@ -291,7 +291,8 @@ def main():
 
     for batch in batches:
         for f in os.listdir(batch):
-            todo.put((batch, f))
+            if os.path.isfile(os.path.join(batch, f)):
+                todo.put((batch, f))
 
     threads = []
     for i in range(int(args.jobs)):

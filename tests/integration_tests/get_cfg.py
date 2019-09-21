@@ -41,6 +41,8 @@ MESSAGES = { FAIL: "Fail", SUCCESS: "Success", IGNORED: "Skipped" }
 
 INDENT = 2
 
+log_dir_name = "logs"
+
 def make_dir(path):
     print(" > Creating directory: " + path)
     try:
@@ -52,7 +54,10 @@ def make_dir(path):
 def is_batch_dir_sane(batch_name):
     for filename in os.listdir(batch_name):
         name, extension =  os.path.splitext(filename)
-        if extension != ".cfg" or os.path.isdir(filename):
+
+        fullname = os.path.join(batch_name, filename)
+        if ((os.path.isfile(fullname) and extension != ".cfg") or \
+           (os.path.isdir(fullname) and filename != log_dir_name)):
             return False
     return True
 
@@ -89,6 +94,7 @@ def create_batch_dir(batch, policy):
     if batch_name not in os.listdir():
         print(" > Batch name is unique")
         make_dir(batch_name)
+        make_dir(os.path.join(batch_name, log_dir_name))
         return batch_name
 
     print(" > Batch with same name already exists")
@@ -99,6 +105,7 @@ def create_batch_dir(batch, policy):
         if is_batch_dir_sane(batch_name):
             shutil.rmtree(batch_name)
             make_dir(batch_name)
+            make_dir(os.path.join(batch_name, log_dir_name))
         else:
             print(" > Batch folder is not sane, remove manually")
             sys.exit(1)
@@ -202,7 +209,7 @@ def ida_frontend(binary, cfg, args):
         '--binary', quote(binary),
         '--output', quote(cfg),
         '--entrypoint', 'main',
-        '--log_file', quote(cfg + ".log"),
+        '--log_file', quote(os.path.join(log_dir_name, cfg + ".log")),
         '--disassembler', args.path_to_disass]
 
     if is_pie:
