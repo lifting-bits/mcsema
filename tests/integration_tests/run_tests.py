@@ -40,7 +40,7 @@ recompiled_dir = "recompiled"
 
 batches = []
 shared_libs = None
-libc = None
+abi_lib_dir = None
 
 def get_recompiled_name(name):
     return name
@@ -95,18 +95,18 @@ def check_arguments(args):
     print("\n > Shared libraries: ")
     print(shared_libs)
 
-    if not os.path.isdir(args.libc_dir):
-        print ("{} passed to --libc_dir is not a valid directory".format(args.libc_dir))
+    if not os.path.isdir(args.abi_lib_dir):
+        print ("{} passed to --abi_lib_dir is not a valid directory".format(args.abi_lib_dir))
         sys.exit (1)
 
-    global libc
-    libc = ''
-    for lib_name in os.listdir(args.libc_dir):
+    global abi_lib_dir
+    abi_lib_dir = ''
+    for lib_name in os.listdir(args.abi_lib_dir):
         if lib_name.endswith(".bc"):
-            libc += os.path.join(args.libc_dir, lib_name + ',')
+            abi_lib_dir += os.path.join(args.abi_lib_dir, lib_name + ',')
 
     print("\n > --abi_libraries files:")
-    print(libc)
+    print(abi_lib_dir)
 
     # TODO: This whole snippet can be done using argparser and some actions
     if args.batch is not None:
@@ -161,7 +161,7 @@ def build_test(cfg, build_dir, extra_args):
                   "-os", "linux",
                   "-arch", "amd64",
                   "-cfg", cfg,
-                  "-abi_libraries", libc,
+                  "-abi_libraries", abi_lib_dir,
                   "-output", bc ]
     lift_args += extra_args
 
@@ -254,7 +254,7 @@ def main():
                             nargs = '+',
                             required = False)
 
-    arg_parser.add_argument('--libc_dir',
+    arg_parser.add_argument('--abi_lib_dir',
                             help = "Directory that contains bitcode types of external functions",
                             required = True)
 
