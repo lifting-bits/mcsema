@@ -172,7 +172,7 @@ def binary_info(binary):
     return address_size, arch, is_pie
 
 
-def dyninst_frontend(binary, cfg, args):
+def dyninst_frontend(binary, cfg, args, log_file):
     address_size, arch, is_pie = binary_info(binary)
 
     disass_args = [
@@ -199,7 +199,7 @@ def dyninst_frontend(binary, cfg, args):
     return SUCCESS
 
 # TODO: Testing REQUIRED
-def ida_frontend(binary, cfg, args):
+def ida_frontend(binary, cfg, args, log_file):
     address_size, arch, is_pie = binary_info(binary)
 
     disass_args = [
@@ -209,7 +209,7 @@ def ida_frontend(binary, cfg, args):
         '--binary', quote(binary),
         '--output', quote(cfg),
         '--entrypoint', 'main',
-        '--log_file', quote(os.path.join(log_dir_name, cfg + ".log")),
+        '--log_file', log_file,
         '--disassembler', args.path_to_disass]
 
     if is_pie:
@@ -221,7 +221,7 @@ def ida_frontend(binary, cfg, args):
         return FAIL
     return SUCCESS
 
-def binja_frontend(binary, cfg, args):
+def binja_frontend(binary, cfg, args, log_file):
     print(" > Not implemented")
     sys.exit(1)
 
@@ -243,7 +243,8 @@ def get_cfg(*t_args, **kwargs):
         print("\n > Processing " + bin_path)
         update_shared_libraries(bin_path)
 
-        result[binary] = lifter(bin_path, cfg, args)
+        log_file = os.path.join(args.batch + "_cfg", log_dir_name, binary + ".log")
+        result[binary] = lifter(bin_path, cfg, args, log_file)
 
 # TODO: Handle other frontends
 def get_lifter(disass):
