@@ -76,17 +76,25 @@ def get_binaries_from_flavours(flavors):
     for filename in os.listdir(tags_dir):
         binary_name = filename.split('.')[0]
 
+        present_tag = get_all
         with open(os.path.join(tags_dir, filename)) as f:
             for line in f:
-                if get_all or line.rstrip("\n") in flavors:
-                    if not is_valid_binary(binary_name):
-                        print(colors.bg_yellow(
-                            " > Skipping " + binary_name + " : file missing"))
-                        missing = missing + 1
-                        break
-                    print(" > Selecting " + binary_name)
-                    binaries.append(binary_name)
+                present_tag = present_tag or (line.rstrip('\n') in flavors)
+
+                # We found what we came for
+                if present_tag:
                     break
+
+        if get_all or present_tag:
+            if not is_valid_binary(binary_name):
+                print(colors.bg_yellow(
+                    " > Skipping " + binary_name + " : file missing"))
+                missing = missing + 1
+                break
+            print(" > Selecting " + binary_name)
+            binaries.append(binary_name)
+
+
     return (binaries, missing)
 
 def create_batch_dir(batch, policy):
