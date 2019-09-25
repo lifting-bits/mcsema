@@ -26,6 +26,7 @@ After you have the source codes for correct version you can build according to i
 In case you are using newer distributions (archlinux in particular) you may encounter some errors during build process. They should correspond to issues that are resolved in newer versions:
 
 https://github.com/dyninst/dyninst/issues/486
+
 https://github.com/dyninst/dyninst/issues/526
 
 ### Building mcsema frontend
