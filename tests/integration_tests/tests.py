@@ -230,6 +230,15 @@ class grep_suite(BasicTest):
         self.wrapper(["TEST", "./dummy.txt"], ["dummy.txt"])
     def test_grep_i(self):
         self.wrapper(["-i","TeSt", "./dummy.txt"], ["dummy.txt"])
+    def test_grep_test_non_ex_f(self):
+        self.wrapper(["-F", "TMP", "./dummy.txt"], ["dummy.txt"])
+    def test_grep_test_exists_f(self):
+        self.wrapper(["-F", "TEST", "./dummy.txt"], ["dummy.txt"])
+    def test_file_not_exists_f(self):
+        self.wrapper(["-F", "TEST", "not_exists.txt"], [])
+    def test_from_stdin_f(self):
+        self.wrapper_impl(["-F", "F"], [], string=b"T\nF\n\D\n")
+
 
 class ld_suite(BasicTest):
     pass
