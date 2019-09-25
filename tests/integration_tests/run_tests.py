@@ -57,7 +57,9 @@ def log_results(result, into):
 
     for entry in result.errors:
         what = entry[0]
-        into[what.name].cases[what._testMethodName] = result_data.ERROR
+        # Do not overwrite timeouts
+        if into[what.name].cases[what._testMethodName] != result_data.TIMEOUT:
+            into[what.name].cases[what._testMethodName] = result_data.ERROR
 
 
 # Fill global variables

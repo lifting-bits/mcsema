@@ -5,6 +5,7 @@ class Colors:
         red = '\033[91m'
         magneta = '\033[95m'
         bg_yellow = '\033[43m'
+        orange = '\033[38;5;202m'
     RESET = '\033[0m'
 
 
@@ -51,6 +52,9 @@ def magneta(message):
 
 def bg_yellow(message):
     return c(Colors.c.bg_yellow, message)
+
+def orange(message):
+    return c(Colors.c.orange, message)
 
 def id(message):
     return message

@@ -111,24 +111,30 @@ class BaseTest(unittest.TestCase):
 
         self.copy_files(filename, args, files)
 
-        # Generate the expected output
-        original_std_out, original_std_err, original_ret = \
-                self.exec_test(self.t_bin, [filename] + args, **kwargs)
+        try:
+            # Generate the expected output
+            original_std_out, original_std_err, original_ret = \
+                    self.exec_test(self.t_bin, [filename] + args, **kwargs)
 
-        if "stdin_filename" in kwargs:
-            kwargs.get("stdin_filename").seek(0)
+            if "stdin_filename" in kwargs:
+                kwargs.get("stdin_filename").seek(0)
 
-        lifted_std_out, lifted_std_err, lifted_ret = \
-                self.exec_test(self.t_recompiled, [filename] + args, **kwargs)
+            lifted_std_out, lifted_std_err, lifted_ret = \
+                    self.exec_test(self.t_recompiled, [filename] + args, **kwargs)
 
-        # Asserts on stderr, stdout, return value
-        self.assertEqual(original_ret, lifted_ret)
-        self.assertEqual(
-                original_std_out,
-                lifted_std_out)
-        self.assertEqual(
-                original_std_err,
-                lifted_std_err)
+            # Asserts on stderr, stdout, return value
+            self.assertEqual(original_ret, lifted_ret)
+            self.assertEqual(
+                    original_std_out,
+                    lifted_std_out)
+            self.assertEqual(
+                    original_std_err,
+                    lifted_std_err)
+
+        except subprocess.TimeoutExpired as e:
+            tc.cases[self._testMethodName] = result_data.TIMEOUT
+            raise e
+
 
     # Compare files created as by-products of tests (e.g output of gzip)
     def check_files(self, name):

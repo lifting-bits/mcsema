@@ -8,11 +8,13 @@ UNKNOWN = 0
 RUN = 1
 FAIL = 2
 ERROR = 3
+TIMEOUT = 4
 
 _color_mapping = {
         RUN : colors.green,
-        FAIL: colors.magneta,
+        FAIL: colors.orange,
         ERROR : colors.red,
+        TIMEOUT: colors.magneta,
         UNKNOWN : colors.id,
         }
 
@@ -28,12 +30,24 @@ class TCData:
     def is_recompiled(self):
         return self.recompiled is not None
 
+    def get_result_color(self):
+        if self.total == 0:
+            return colors.magneta
+
+        if self.total == self.success:
+            return colors.green
+
+        if self.success == 0:
+            return colors.red
+
+        return colors.orange
+
     def print(self, verbosity):
         end = "\n"
         if verbosity == 0:
             end = " "
 
-        print("{:<30s}".format(self.basename), end=end)
+        print("{:<30s}".format(self.get_result_color()(self.basename)), end=end)
         if not self.is_recompiled():
             print("\tRecompilation failed: ERROR")
             return
