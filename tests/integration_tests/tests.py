@@ -40,6 +40,7 @@ class BaseTest(unittest.TestCase):
         self.t_recompiled = tempfile.mkdtemp(dir=os.getcwd(), prefix="recompiled_t")
         self.saved_cwd = os.getcwd()
 
+
     def tearDown(self):
         os.chdir(self.saved_cwd)
         shutil.rmtree(self.t_bin)
@@ -57,21 +58,27 @@ class BaseTest(unittest.TestCase):
                 shutil.copyfile(full_name, f_name)
                 shutil.copyfile(full_name, b_name)
 
+    def _kill(self, proc):
+        proc.terminate()
+
     def exec_test(self, t_dir, args, **kwargs):
         os.chdir(t_dir)
 
         stdin = kwargs.get("string", None)
         stdin = kwargs.get("stdin_filename").read() if stdin is None else stdin
 
-        pipes = subprocess.Popen(
-                args, stdout = subprocess.PIPE,
-                stderr = subprocess.PIPE,stdin=subprocess.PIPE)
-        std_out, std_err = pipes.communicate(input=stdin)
-        ret_code = pipes.returncode
+        std_out, std_err, ret_code = None, None, None
 
-        if "stdin_filename" in kwargs:
-            kwargs.get("stdin_filename").seek(0)
+        try:
+            pipes = subprocess.Popen(
+                    args, stdout = subprocess.PIPE,
+                    stderr = subprocess.PIPE,stdin=subprocess.PIPE)
+            std_out, std_err = pipes.communicate(input=stdin, timeout=5)
+            ret_code = pipes.returncode
 
+        except subprocess.TimeoutExpired as e:
+            self._kill(pipes)
+            raise e
         return std_out, std_err, ret_code
 
     # Execute the test
@@ -106,6 +113,9 @@ class BaseTest(unittest.TestCase):
         # Generate the expected output
         original_std_out, original_std_err, original_ret = \
                 self.exec_test(self.t_bin, [filename] + args, **kwargs)
+
+        if "stdin_filename" in kwargs:
+            kwargs.get("stdin_filename").seek(0)
 
         lifted_std_out, lifted_std_err, lifted_ret = \
                 self.exec_test(self.t_recompiled, [filename] + args, **kwargs)
