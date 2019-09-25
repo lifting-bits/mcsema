@@ -29,6 +29,7 @@ input_dir = "inputs"
 # Classes that inherit from it only need to specify the tests themselves
 class BaseTest(unittest.TestCase):
 
+    timeout = 5
     cases = {}
 
     # Create directories where the test will be executed
@@ -73,7 +74,7 @@ class BaseTest(unittest.TestCase):
             pipes = subprocess.Popen(
                     args, stdout = subprocess.PIPE,
                     stderr = subprocess.PIPE,stdin=subprocess.PIPE)
-            std_out, std_err = pipes.communicate(input=stdin, timeout=5)
+            std_out, std_err = pipes.communicate(input=stdin, timeout=self.timeout)
             ret_code = pipes.returncode
 
         except subprocess.TimeoutExpired as e:
