@@ -307,28 +307,30 @@ You should now have the following directories: C:\mcsema, C:\remill.
 
 #### Step 7: Running McSema
 
-Add the following folders to the PATH environment variable
+**Add the McSema python package to Python**
 
-* `C:\remill\bin`
-* `C:\mcsema\Scripts`
-* `C:\mcsema\bin`
+Make extra sure it only contains ASCII characters with no newlines! The following command should work fine under cmd:
 
-Add the following folder to the PYTHONPATH environment variable:
+```
+echo|set /p="C:\mcsema\Lib\site-packages" > "C:\Python27\Lib\site-packages\mcsema.pth"
+```
 
-* `C:\mcsema\Lib\site-packages`
+**Install the libmagic DLL**
 
-**Example, with cmd**
+```
+pip install python-magic-bin
+```
+
+**Update the PATH (cmd)**
 
 ```
 set PATH=%PATH%;C:\remill\bin;C:\mcsema\bin;C:\mcsema\Scripts
-set PYTHONPATH=%PYTHONPATH%;C:\mcsema\Lib\site-packages
 ```
 
-**Example, with PowerShell**
+**Update the PATH (PowerShell)**
 
 ```
 $env:PATH+="C:\remill\bin;C:\mcsema\bin;C:\mcsema\Scripts"
-$env:PYTHONPATH+="C:\mcsema\Lib\site-packages"
 ```
 
 ### Dyninst frontend
