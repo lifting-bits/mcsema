@@ -233,9 +233,11 @@ set(python_package_installer "${CMAKE_CURRENT_SOURCE_DIR}/tools/setup_launcher")
 if(DEFINED WIN32)
   string(REPLACE "/" "\\" python_package_install_path "${install_folder}")
   set(python_package_installer "${python_package_installer}.bat")
+  set(interpreter "cmd.exe /C")
 else()
   set(python_package_install_path "${install_folder}")
   set(python_package_installer "${python_package_installer}.sh")
+  set(interpreter "bash -c")
 endif()
 
 # target for dyninst frontend
@@ -246,7 +248,7 @@ if (DEFINED BUILD_MCSEMA_DYNINST_DISASS)
 endif()
 
 install(CODE
-  "execute_process(COMMAND \"${python_package_installer}\" \"${python_package_install_path}\" WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tools RESULT_VARIABLE exit_code)
+  "execute_process(COMMAND ${interpreter} \"${python_package_installer}\" \"${python_package_install_path}\" WORKING_DIRECTORY \"${PROJECT_SOURCE_DIR}/tools\" RESULT_VARIABLE exit_code)
    if(NOT exit_code EQUAL 0)
      message(FATAL_ERROR \"Failed to install the Python package\")
    endif()"
