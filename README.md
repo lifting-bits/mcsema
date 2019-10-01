@@ -226,20 +226,20 @@ In order to verify that McSema works correctly as built, head on over to [the do
 ### On Windows
 #### Step 1: Installing the toolchain
 **Visual Studio**
-1. Download the "Build Tools for Visual Studio 2017" installer from the following page: https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2017
-2. Run the setup and select "Visual C++ build tools"
+1. Click on "Tools for Visual Studio 2019" and download the "Build Tools for Visual Studio 2019" installer from the [Visual Studio downloads page](https://visualstudio.microsoft.com/downloads/)
+2. Select "MSVC v142 - VS 2019 C++ x64/x86 build tools" and confirm the installation
 
 **LLVM**
-1. Get the LLVM 7.0.1 (x64) installer from the LLVM download page: http://releases.llvm.org
+1. Get the LLVM 9 (x64) installer from the LLVM download page: http://releases.llvm.org
 2. Do **NOT** enable "Add to PATH"
 
 **Python**
 1. Get the latest Python 2.7 (X64) installer from the official download page: https://www.python.org/downloads/windows/
-2. Enable "Add to PATH" when possible
+2. Enable "Add to PATH"
 
 **CMake**
 1. Download the CMake (x64) installer from https://cmake.org/download
-2. Enable "Add to PATH" when possible
+2. Enable "Add to PATH"
 
 #### Step 2: Obtaining the source code
 ```
@@ -255,14 +255,24 @@ git fetch --unshallow
 git checkout -b production `cat tools/mcsema/.remill_commit_id`
 ```
 
-#### Step 3: Dependencies
-First, set up LLVM Toolchain Support for Visual Studio 2017 Build Tools. There is a script in remill to automate this for you.
-```
-cd C:\Projects\remill\scripts\windows (or wherever you cloned remill)
-powershell -nologo -executionpolicy bypass -File llvm_toolchain_vs2017.ps1
-```
+#### Step 3: Enabling the LLVM toolchain for Visual Studio
 
-Next, its time to fetch library dependencies. You can either build them yourself using our [cxx-common](https://github.com/trailofbits/cxx-common) dependency manager or download a pre-built package.
+Download the official extension from the market place: https://marketplace.visualstudio.com/items?itemName=LLVMExtensions.llvm-toolchain
+
+##### Automatic installation
+
+Only works for the full Visual Studio IDE. Double clicking the extension should automatically install it.
+
+##### Manual installation
+
+The extension is in fact a ZIP archive; extract it and copy the VCTargets folder to the right location.
+
+* Full Visual Studio: `C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\IDE\VC\VCTargets`
+* Visual Studio Build Tools: `C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Microsoft\VC\v160`
+
+#### Step 3: Dependencies
+
+Its time to fetch library dependencies. You can either build them yourself using our [cxx-common](https://github.com/trailofbits/cxx-common) dependency manager or download a pre-built package.
 
 There are two versions of LLVM used by remill and mcsema. One version (currently 7.0.1) builds remill and mcsema. Another version (currently 5.0.1) is used to build the translation semantics. 
 
@@ -278,7 +288,7 @@ Make sure to always execute the `vcvars64.bat` script from the "x64 Native Tools
 mkdir remill_build
 cd remill_build
 
-cmake -G "Visual Studio 15 2017" -T llvm -A x64 -DCMAKE_BUILD_TYPE=Release -DLIBRARY_REPOSITORY_ROOT=C:\Projects\tob_libraries -DCMAKE_INSTALL_PREFIX=C:\ ..\remill
+cmake -G "Visual Studio 16 2019" -T llvm -A x64 -DCMAKE_BUILD_TYPE=Release -DLIBRARY_REPOSITORY_ROOT=C:\Projects\tob_libraries -DCMAKE_INSTALL_PREFIX=C:\ ..\remill
 cmake --build . --config Release -- /maxcpucount:4
 ```
 
