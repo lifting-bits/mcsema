@@ -289,13 +289,13 @@ mkdir remill_build
 cd remill_build
 
 cmake -G "Visual Studio 16 2019" -T llvm -A x64 -DCMAKE_BUILD_TYPE=Release -DLIBRARY_REPOSITORY_ROOT=C:\Projects\tob_libraries -DCMAKE_INSTALL_PREFIX=C:\ ..\remill
-cmake --build . --config Release -- /maxcpucount:4
+cmake --build . --config Release -- /maxcpucount:%NUMBER_OF_PROCESSORS%
 ```
 
 If you are using a recent CMake version (> 3.13) you can also use the newly introduced cross-platform `-j` parameter:
 
 ```
-cmake --build . --config Release -j 4
+cmake --build . --config Release -j %NUMBER_OF_PROCESSORS%
 ```
 
 #### Step 6: Installing
