@@ -305,12 +305,31 @@ cmake --build . --config Release --target install
 
 You should now have the following directories: C:\mcsema, C:\remill.
 
-Add the following folders to your PATH environment variable:
-* C:\remill\bin
-* C:\mcsema\Scripts
-* C:\mcsema\bin
+#### Step 7: Running McSema
 
-Also update your PYTHONPATH: C:\mcsema\Lib\site-packages
+Add the following folders to the PATH environment variable
+
+* `C:\remill\bin`
+* `C:\mcsema\Scripts`
+* `C:\mcsema\bin`
+
+Add the following folder to the PYTHONPATH environment variable:
+
+* `C:\mcsema\Lib\site-packages`
+
+**Example, with cmd**
+
+```
+set PATH=%PATH%;C:\remill\bin;C:\mcsema\bin;C:\mcsema\Scripts
+set PYTHONPATH=%PYTHONPATH%;C:\mcsema\Lib\site-packages
+```
+
+**Example, with PowerShell**
+
+```
+$env:PATH+="C:\remill\bin;C:\mcsema\bin;C:\mcsema\Scripts"
+$env:PYTHONPATH+="C:\mcsema\Lib\site-packages"
+```
 
 ### Dyninst frontend
 
