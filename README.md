@@ -270,7 +270,7 @@ The extension is in fact a ZIP archive; extract it and copy the VCTargets folder
 * Full Visual Studio: `C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\Common7\IDE\VC\VCTargets`
 * Visual Studio Build Tools: `C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Microsoft\VC\v160`
 
-#### Step 3: Dependencies
+#### Step 4: Dependencies
 
 Its time to fetch library dependencies. You can either build them yourself using our [cxx-common](https://github.com/trailofbits/cxx-common) dependency manager or download a pre-built package.
 
@@ -281,7 +281,7 @@ On Windows, only the LLVM 5.0.1 package is supported for building semantics. If 
 Binaries (extract to C:\Projects\tob_libraries)
 * [LLVM 5](https://s3.amazonaws.com/cxx-common/libraries-llvm50-windows10-amd64.7z)
 
-#### Step 4: Building
+#### Step 5: Building
 Make sure to always execute the `vcvars64.bat` script from the "x64 Native Tools Command Prompt": `C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvars64.bat`.
 
 ```
@@ -298,7 +298,7 @@ If you are using a recent CMake version (> 3.13) you can also use the newly intr
 cmake --build . --config Release -j 4
 ```
 
-#### Step 5: Installing
+#### Step 6: Installing
 ```
 cmake --build . --config Release --target install
 ```
