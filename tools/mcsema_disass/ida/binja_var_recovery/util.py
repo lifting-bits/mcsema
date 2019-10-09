@@ -55,7 +55,7 @@ VARIABLE_SET_REFS = collections.defaultdict()
 
 def set_comments(bv, addr, str):
   functions = bv.get_functions_containing(addr)
-  if functions is None:
+  if not functions:
     return
 
   for func in functions:

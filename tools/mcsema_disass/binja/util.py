@@ -129,7 +129,7 @@ def get_func_containing(bv, addr):
     binja.Function
   """
   funcs = bv.get_functions_containing(addr)
-  return funcs[0] if funcs is not None else None
+  return funcs[0] if funcs else None
 
 
 def get_section_at(bv, addr):
