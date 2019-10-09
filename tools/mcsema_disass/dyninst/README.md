@@ -11,7 +11,7 @@ You won't need IDA Pro to run mcsema-dyninst-disass, but Git, CMake, Google Prot
 
 ## Building mcsema-dyninst-disass
 
-Build process can be split into two separate phases: Dyninst API itself and McSema with this frontend. Frontend itself is not depended on McSema (it is not linked with McSema or Remill) but they do share some dependencies.
+The build process can be split into two separate phases: Dyninst API itself and McSema with this frontend. Frontend itself is not depended on McSema (it is not linked with McSema or Remill) but they do share some dependencies.
 
 ### Building Dyninst
 
@@ -21,13 +21,12 @@ Firstly you will need to build [Dyninst API](https://github.com/dyninst/dyninst)
 git checkout v9.3.2
 ```
 
-After you have the source codes for correct version you can build according to instructions found there.
+After checking out the correct version of the DynInst source code, we recommend following DynInst's build instructions, which can be found in its repository.
 
-In case you are using newer distributions (archlinux in particular) you may encounter some errors during build process. They should correspond to issues that are resolved in newer versions:
+If you are using a newer distributions (e.g. archlinux), then you may encounter some errors during the build process. They should correspond to issues that are resolved in newer versions:
 
-https://github.com/dyninst/dyninst/issues/486
-
-https://github.com/dyninst/dyninst/issues/526
+ * https://github.com/dyninst/dyninst/issues/486
+ * https://github.com/dyninst/dyninst/issues/526
 
 ### Building mcsema frontend
 
@@ -44,13 +43,13 @@ Compiler with C++14 support is required.
 
 ## Using mcsema-dyninst-disass
 
-mcsema-dyninst-disass replaces the IDA Pro frontend in the sense that both take a binary file as input and produce a Google Protocol Buffer file as output. The output can then be fed into mcsema-lift for further processing. Command line arguments are the same as for other frontends.
+`mcsema-dyninst-disass` replaces the IDA Pro frontend in the sense that both take a binary file as input and produce a Google Protocol Buffer file as output. The output can then be fed into mcsema-lift for further processing. Command line arguments are the same as for other frontends.
 
 In case you encounter any errors or problems during build or lift process you simply cannot get your head around, feel free to visit `#binary-lifting` channel of the [Empire Hacking Slack](https://empireslacking.herokuapp.com/). Also feel free to drop-by in case you want to discuss why the frontend cannot lift your binary, maybe it can be fixed quite easily!
 
 
 ## Known limitations
-Pull request fixing bugs or implementing missing features are welcomed!
+Please keep in mind the following list of limitations; we welcome pull requests for fixing bugs or implementing missing features!
 * Tested *only* 64-bit ELF files, but there should not be fundamental problem with 32-bit. Support of other binary formats is possible as long as Dyninst is able to parse them. In such case a few classes would need different implementation based on chosen format specific information (jump table heuristics, recognition of xrefs in sections).
 * Has *only* been tested on Linux
 * Shared library are not lifted correctly
