@@ -122,8 +122,8 @@ static const char *gABISearchPaths[] = {
 bool HasFunctionPtrArg(const llvm::Function &func) {
   for (auto &arg : func.args()) {
 
-    if (auto ptr = llvm::dyn_cast<llvm::PointerType>(arg.getType());
-        !ptr || !ptr->getElementType()->isFunctionTy()) {
+    auto ptr = llvm::dyn_cast<llvm::PointerType>(arg.getType());
+    if(!ptr || !ptr->getElementType()->isFunctionTy()) {
       return true;
     }
   }
