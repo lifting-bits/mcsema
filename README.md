@@ -102,7 +102,7 @@ RUN /root/binaryninja/scripts/linux-setup.sh
 
 #### Step 3: Build & Run Dockerfile
 
-This will build the container for you and run it with your local directory mounted into the container (at /home/user/local) such that your work in the container is saved locally: 
+This will build the container for you and run it with your local directory mounted into the container (at /home/user/local) such that your work in the container is saved locally:
 `docker build -t=mcsema . && docker run --rm -it --ipc=host -v "${PWD}":/home/user/local mcsema`
 
 ### On Linux
@@ -143,7 +143,7 @@ mkdir mcsema-ve
 virtualenv mcsema-ve
 cd mcsema-ve
 source bin/activate
-``` 
+```
 ##### Fixing IDA Pro's Python installation (Ubuntu 14.04)
 
 Note: If you are using IDA on 64 bit Ubuntu and your IDA install does not use the system Python, you can add the `protobuf` library manually to IDA's zip of modules.
@@ -274,7 +274,7 @@ The extension is in fact a ZIP archive; extract it and copy the VCTargets folder
 
 Its time to fetch library dependencies. You can either build them yourself using our [cxx-common](https://github.com/trailofbits/cxx-common) dependency manager or download a pre-built package.
 
-There are two versions of LLVM used by remill and mcsema. One version (currently 7.0.1) builds remill and mcsema. Another version (currently 5.0.1) is used to build the translation semantics. 
+There are two versions of LLVM used by remill and mcsema. One version (currently 7.0.1) builds remill and mcsema. Another version (currently 5.0.1) is used to build the translation semantics.
 
 On Windows, only the LLVM 5.0.1 package is supported for building semantics. If you build it yourself, use the Visual Studio 2017 Win64 generator with the LLVM 5.0.1 toolchain. The cxx-common script will automatically take care of this requirement.
 
@@ -335,7 +335,7 @@ $env:PATH+="C:\remill\bin;C:\mcsema\bin;C:\mcsema\Scripts"
 
 ### Dyninst frontend
 
-Dyninst frontend can be build with ```./build.sh --dyninst-frontend```. More information can be found in ```tools/mcsema_disass/dyninst/README.md```.
+[Dyninst frontend](tools/mcsema_disass/dyninst/README.md) can be build with ```./build.sh --dyninst-frontend```. More information can be found in ```tools/mcsema_disass/dyninst/README.md```.
 
 ## Additional Documentation
 
@@ -360,7 +360,7 @@ This is a hotly contested issue. We must explore the etymology of the name to fi
 
 ### Why do I need IDA Pro to use McSema
 
-You don't! You can also use Binary Ninja or Dyninst to fill the role of IDA Pro; however, in our experiments, IDA Pro tends to be most reliable and both the product itself, and our scripts using it, have more person-years of development behind them. 
+You don't! You can also use Binary Ninja or [Dyninst](tools/mcsema_disass/dyninst/README.md) to fill the role of IDA Pro; however, in our experiments, IDA Pro tends to be most reliable and both the product itself, and our scripts using it, have more person-years of development behind them.
 
 ### What is Remill, and why does McSema need it
 
