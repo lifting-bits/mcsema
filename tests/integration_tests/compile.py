@@ -87,7 +87,25 @@ def main():
         required=False,
         nargs='*')
 
+    arg_parser.add_argument(
+        '--cxx',
+        help='Path to C++ compiler to use',
+        required=False)
+
+    arg_parser.add_argument(
+        '--cc',
+        help='Path to C compiler to use',
+        required=False)
+
     args, extra_args = arg_parser.parse_known_args()
+
+    if args.cc is not None:
+        global cc_comp
+        cc_comp = args.cc
+
+    if args.cxx is not None:
+        global cxx_comp
+        cxx_comp = args.cxx
 
     # If `bin` does not exist create it first
     if not os.path.isdir(bin_dir):
