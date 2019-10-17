@@ -1,3 +1,4 @@
+/* TAGS: min c */
 /*
  * Copyright (c) 2018 Trail of Bits, Inc.
  *

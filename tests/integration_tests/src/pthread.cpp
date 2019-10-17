@@ -1,3 +1,4 @@
+/* TAGS: min cpp */
 /*
  * Copyright (c) 2017 Trail of Bits, Inc.
  *
