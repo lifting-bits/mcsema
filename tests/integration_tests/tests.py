@@ -277,7 +277,8 @@ def init():
         "simple_array", "simple_exit", "simple_for_loop", "simple_main",
         "struct", "x86_bts", "globals_and_io", "global_array", "qsort",
         "global_var", "pthread", "iostream_basics", "operator_new", "virtual",
-        "virtual_simpler", "fmodf", "printf_floats", "hello_c", "hello_cpp"])
+        "virtual_simpler", "fmodf", "printf_floats", "hello_c", "hello_cpp",
+        "global-ctors-dtors.c", "global-ctors-dtors-return-type.c"])
 
     CreateSimpleRunnerSuites({
         "qsort_function_ptrs": [["23"], ["43"]],
