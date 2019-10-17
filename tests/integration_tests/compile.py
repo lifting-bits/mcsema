@@ -52,10 +52,27 @@ def compilation(std, f):
         print("\n** stderr:")
         print(std_err)
 
+def parse_tagline(line):
+    # Get rid of /*, TAGS:, */
+    t = line.split(' ')[2:][:-1]
+    return t
+
+def src_tags(f):
+    with open(os.path.join(src_dir, f), 'r') as src:
+        for _ in range(2):
+            line = src.readline()
+            # TODO: Regex
+            line = line.rstrip()
+            if '/*' in line and 'TAGS' in line:
+                return parse_tagline(line)
+
 def add_tags(tags_list, f):
-    print(tags_list)
-    if tags_list is None:
-        return
+    tags = []
+    file_tags = src_tags(f)
+    if file_tags is not None:
+        tags += file_tags
+    tags += tags_list
+    print(tags)
 
     basename, ext = os.path.splitext(f)
     tag_file = os.path.join(tags_dir, basename + '.tag')
@@ -67,7 +84,7 @@ def add_tags(tags_list, f):
         for line in reader:
             present.add(line.rstrip())
 
-        for t in tags_list:
+        for t in tags:
             if t not in present:
                 reader.write(t + '\n')
 
@@ -113,7 +130,8 @@ def main():
 
     for f in os.listdir(src_dir):
         compilation(args.std, f)
-        add_tags(args.stub_tags, f)
+        tags = [] if args.stub_tags is None else args.stub_tags
+        add_tags(tags, f)
 
 if __name__ == '__main__':
     main()
