@@ -1,4 +1,5 @@
 /* TAGS: min c */
+/* LD_OPTS: -lm */
 /*
  * Copyright (c) 2018 Trail of Bits, Inc.
  *

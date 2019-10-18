@@ -1,4 +1,5 @@
 /* TAGS: min cpp */
+/* LD_OPTS: -lpthread */
 /*
  * Copyright (c) 2017 Trail of Bits, Inc.
  *
