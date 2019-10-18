@@ -25,6 +25,89 @@ src_dir = "src"
 cxx_comp = 'clang++'
 cc_comp = 'clang'
 
+class Config:
+    allowed = ['TAGS', 'CC_OPTS', 'LD_OPTS', 'LIFT_OPTS', 'TEST']
+
+    def __init__(self, filename):
+        self.lift_opts = []
+        self.tests = []
+        self._parse_header(filename)
+
+    def _cc_opts(self, opts):
+        # Strip leading option specifier
+        self.cc_opts = opts[1:]
+
+    def _ld_opts(self, opts):
+        # Strip leading option specifier
+        self.ld_opts = opts[1:]
+
+    def _lift_opts(self, opts):
+        self.lift_opts.append((opts[1], opts[2:]))
+
+    def _tags(self, opts):
+        self.tags = opts[1:]
+
+    def _test(self, opts):
+        self.tests.append((opts[1:], None))
+
+    def _stdin(self, opts):
+        test, stdin = self.tests[-1]
+        if stdin is not None:
+            raise Exception("Two consecutive STDINs are not allowed")
+        self.tests[-1] = (test, ' '.join(opts[1:]))
+        print(self.tests)
+
+    def _parse_header(self, filename):
+        basename, ext = os.path.splitext(os.path.basename(filename))
+        self.name = basename
+        with open(filename, 'r') as src:
+            while 1:
+                line = src.readline()
+
+                line = line.rstrip('\n')
+                tokens = line.split(' ')
+
+                print(tokens)
+                # Arrived at line that is not config information
+                if not tokens or (tokens[0] != '/*' or tokens[-1] != '*/'):
+                    return
+
+                tokens = tokens[1:][:-1]
+                dispatch = {
+                        'TAGS:' : Config._tags,
+                        'CC_OPTS:' : Config._cc_opts,
+                        'LD_OPTS:' : Config._ld_opts,
+                        'LIFT_OPTS:' : Config._lift_opts,
+                        'TEST:' : Config._test,
+                        'STDIN:' : Config._stdin,
+                }
+
+                if tokens[0] not in dispatch:
+                    raise Exception(tokens[0] + " is not allowed as entry header!")
+                dispatch[tokens[0]](self, tokens)
+
+    def create_config(self, name, opts, dst_dir):
+        with open(os.path.join(dst_dir, self.name + '.' + name + '.config'), 'w') as cfg:
+            cfg.write("TAGS: " + ' '.join(self.tags) + '\n')
+            cfg.write("LIFT_OPTS: " + ' '.join(opts) + '\n')
+
+    def create_test(self, dst_dir):
+        with open(os.path.join(dst_dir, self.name + '.test'), 'w') as test:
+            for case, stdin in self.tests:
+                test.write(' '.join(case) + '\n')
+                if stdin is not None:
+                    test.write('STDIN:' + stdin + '\n')
+
+
+    def create_configs(self, dst_dir):
+        if not self.lift_opts:
+            self.create_config('default', [''], dst_dir)
+        else:
+            for name, opts in self.lift_opts:
+                self.create_config(name, opts, dst_dir)
+        self.create_test(dst_dir)
+
+
 def compilation(std, f):
     basename, ext = os.path.splitext(f)
     ext_map = { '.cpp' : cxx_comp,
@@ -129,6 +212,8 @@ def main():
         os.mkdir(bin_dir)
 
     for f in os.listdir(src_dir):
+        c = Config(os.path.join(src_dir, f))
+        c.create_configs('tags')
         compilation(args.std, f)
         tags = [] if args.stub_tags is None else args.stub_tags
         add_tags(tags, f)
