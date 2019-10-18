@@ -20,3 +20,33 @@ def strip_whole_config(filename):
     filename = filename.rstrip(".config")
     basename, ext = os.path.splitext(filename)
     return basename
+
+def get_binaries(directory):
+    result = set()
+    for f in os.listdir(directory):
+        filename = strip_whole_config(f)
+        if filename:
+            result.add(filename)
+    return result
+
+def get_tags(config):
+    with open(config, 'r') as f:
+        line = f.readline().rstrip('\n')
+        tokens = line.split(' ')
+        if tokens[0] != 'TAGS:':
+            return []
+        return tokens[1:]
+
+def get_bin2tags(directory):
+    result = {}
+    for f in os.listdir(directory):
+        filename = strip_whole_config(f)
+        if not filename:
+            continue
+
+        tags = get_tags(os.path.join(directory, f))
+        if filename not in result:
+            result[filename] = tags
+        else:
+            result[filename].append(tags)
+    return result

@@ -26,6 +26,7 @@ import tempfile
 from shlex import quote
 
 import colors
+import util
 
 tags_dir="tags"
 so_dir="shared_libs"
@@ -66,34 +67,24 @@ def is_valid_binary(binary_name):
     return os.path.isfile(bin_path)
 
 # Return (list of filtered names, number of files that are missing)
-def get_binaries_from_tags(tags):
+def get_binaries_from_tags(desired):
     binaries = []
     missing = 0
 
     # We want to get cfg for everything
-    get_all = ALL_TAG in tags
+    get_all = ALL_TAG in desired
 
-    for filename in os.listdir(tags_dir):
-        binary_name = filename.split('.')[0]
+    bin2tag = util.get_bin2tags(tags_dir)
 
-        present_tag = get_all
-        with open(os.path.join(tags_dir, filename)) as f:
-            for line in f:
-                present_tag = present_tag or (line.rstrip('\n') in tags)
-
-                # We found what we came for
-                if present_tag:
-                    break
-
-        if get_all or present_tag:
-            if not is_valid_binary(binary_name):
+    for binary, tags in bin2tag.items():
+        if get_all or any(x in desired for x in tags):
+            if not is_valid_binary(binary):
                 print(colors.bg_yellow(
-                    " > Skipping " + binary_name + " : file missing"))
+                    " > Skipping " + binary+ " : file missing"))
                 missing = missing + 1
-                break
-            print(" > Selecting " + binary_name)
-            binaries.append(binary_name)
-
+            else:
+                print(" > Selecting " + binary)
+                binaries.append(binary)
 
     return (binaries, missing)
 
