@@ -31,6 +31,8 @@ class Config:
     def __init__(self, filename):
         self.lift_opts = []
         self.tests = []
+        self.cc_opts = []
+        self.ld_opts = []
         self._parse_header(filename)
 
     def _cc_opts(self, opts):
@@ -60,6 +62,7 @@ class Config:
     def _parse_header(self, filename):
         basename, ext = os.path.splitext(os.path.basename(filename))
         self.name = basename
+        self.ext = ext
         with open(filename, 'r') as src:
             while 1:
                 line = src.readline()
@@ -107,80 +110,33 @@ class Config:
                 self.create_config(name, opts, dst_dir)
         self.create_test(dst_dir)
 
+    def compile(self):
+        ext_map = { '.cpp' : cxx_comp,
+                    '.c'   : cc_comp }
 
-def compilation(std, f):
-    basename, ext = os.path.splitext(f)
-    ext_map = { '.cpp' : cxx_comp,
-                '.c'   : cc_comp }
+        cc = ext_map.get(self.ext, None)
+        if cc is None:
+            print(" > " + self.name + " has unknown extension")
+            return
 
-    cc = ext_map.get(ext, None)
-    if cc is None:
-        print(" > " + f + " has unknown extension")
-        return
+        out = os.path.join(bin_dir, self.name)
+        args = [cc, os.path.join(src_dir, self.name + self.ext), '-o', out] \
+               + self.cc_opts + self.ld_opts
 
-    out = os.path.join(bin_dir, basename)
-    args = [cc, os.path.join(src_dir, f), '-o', out, '-lm', '-lpthread']
-    if cc == cxx_comp:
-        args += ['-std=' + std]
+        #print(args)
+        pipes = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        std_out, std_err = pipes.communicate()
+        ret_code = pipes.returncode
 
-    print(args)
-    pipes = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    std_out, std_err = pipes.communicate()
-    ret_code = pipes.returncode
-
-    if ret_code:
-        print("*** Compilation failed ***")
-        print("\n** stdout:")
-        print(std_out)
-        print("\n** stderr:")
-        print(std_err)
-
-def parse_tagline(line):
-    # Get rid of /*, TAGS:, */
-    t = line.split(' ')[2:][:-1]
-    return t
-
-def src_tags(f):
-    with open(os.path.join(src_dir, f), 'r') as src:
-        for _ in range(2):
-            line = src.readline()
-            # TODO: Regex
-            line = line.rstrip()
-            if '/*' in line and 'TAGS' in line:
-                return parse_tagline(line)
-
-def add_tags(tags_list, f):
-    tags = []
-    file_tags = src_tags(f)
-    if file_tags is not None:
-        tags += file_tags
-    tags += tags_list
-    print(tags)
-
-    basename, ext = os.path.splitext(f)
-    tag_file = os.path.join(tags_dir, basename + '.tag')
-
-    # File is already present -> just update the tag if it's missing
-    present = set()
-    with open(tag_file, 'a+') as reader:
-        reader.seek(0)
-        for line in reader:
-            present.add(line.rstrip())
-
-        for t in tags:
-            if t not in present:
-                reader.write(t + '\n')
-
+        if ret_code:
+            print("*** Compilation failed ***")
+            print("\n** stdout:")
+            print(std_out)
+            print("\n** stderr:")
+            print(std_err)
 
 def main():
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument(
-        '--std',
-        help='C++ standard to use',
-        choices=['c++11', 'c++14', 'c++17'],
-        default='c++17',
-        required=False)
-
     arg_parser.add_argument(
         '--stub_tags',
         help='Create tag files with corresponding tags, possibly empty',
@@ -213,10 +169,10 @@ def main():
 
     for f in os.listdir(src_dir):
         c = Config(os.path.join(src_dir, f))
+        if args.stub_tags is not None:
+            c.tags += args.stub_tags
         c.create_configs('tags')
-        compilation(args.std, f)
-        tags = [] if args.stub_tags is None else args.stub_tags
-        add_tags(tags, f)
+        c.compile()
 
 if __name__ == '__main__':
     main()
