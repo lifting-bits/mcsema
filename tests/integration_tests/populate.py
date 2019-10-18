@@ -19,6 +19,7 @@ import shutil
 import stat
 
 import colors
+import util
 
 tags_dir = "tags"
 bin_dir = "bin"
@@ -27,7 +28,7 @@ def try_find(locations, basename):
     for p in locations:
         maybe = os.path.join(p, basename)
         if os.path.isfile(maybe):
-            print(" > ", colors.green("Found " + maybe))
+            print(" > " + colors.green("Found " + maybe))
             new_file = os.path.join(bin_dir, basename)
             shutil.copyfile(maybe, new_file)
             st = os.stat(new_file)
@@ -49,7 +50,10 @@ def main():
         current.add(f)
 
     for f in os.listdir(tags_dir):
-        basename, ext = os.path.splitext(f)
+        basename = util.strip_whole_config(f)
+        if not basename:
+            continue
+
         if basename in current:
             print(" > " + basename + " is present in " + tags_dir)
             continue
