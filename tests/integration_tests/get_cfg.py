@@ -66,12 +66,12 @@ def is_valid_binary(binary_name):
     return os.path.isfile(bin_path)
 
 # Return (list of filtered names, number of files that are missing)
-def get_binaries_from_flavours(flavors):
+def get_binaries_from_tags(tags):
     binaries = []
     missing = 0
 
     # We want to get cfg for everything
-    get_all = ALL_TAG in flavors
+    get_all = ALL_TAG in tags
 
     for filename in os.listdir(tags_dir):
         binary_name = filename.split('.')[0]
@@ -79,7 +79,7 @@ def get_binaries_from_flavours(flavors):
         present_tag = get_all
         with open(os.path.join(tags_dir, filename)) as f:
             for line in f:
-                present_tag = present_tag or (line.rstrip('\n') in flavors)
+                present_tag = present_tag or (line.rstrip('\n') in tags)
 
                 # We found what we came for
                 if present_tag:
@@ -299,7 +299,7 @@ def main():
         required=False)
 
     arg_parser.add_argument(
-        "--flavors",
+        "--tags",
         help="Flavors to be lifted",
         nargs="+",
         required=True)
@@ -347,8 +347,8 @@ def main():
     print("Checking batch name")
     batch_dir = create_batch_dir(args.batch, args.batch_policy)
 
-    print("Select all binaries, specified by flavors")
-    binaries, missing = get_binaries_from_flavours(args.flavors)
+    print("Select all binaries, specified by tags")
+    binaries, missing = get_binaries_from_tags(args.tags)
 
     result = dict()
     print("\nIterating over binaries")
