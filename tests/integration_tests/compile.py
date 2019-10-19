@@ -57,7 +57,6 @@ class Config:
         if stdin is not None:
             raise Exception("Two consecutive STDINs are not allowed")
         self.tests[-1] = (test, ' '.join(opts[1:]))
-        print(self.tests)
 
     def _parse_header(self, filename):
         basename, ext = os.path.splitext(os.path.basename(filename))
@@ -70,7 +69,6 @@ class Config:
                 line = line.rstrip('\n')
                 tokens = line.split(' ')
 
-                print(tokens)
                 # Arrived at line that is not config information
                 if not tokens or (tokens[0] != '/*' or tokens[-1] != '*/'):
                     return
@@ -99,7 +97,7 @@ class Config:
             for case, stdin in self.tests:
                 test.write(' '.join(case) + '\n')
                 if stdin is not None:
-                    test.write('STDIN:' + stdin + '\n')
+                    test.write('STDIN: ' + stdin + '\n')
 
 
     def create_configs(self, dst_dir):

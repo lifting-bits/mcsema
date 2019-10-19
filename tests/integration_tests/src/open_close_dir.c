@@ -1,4 +1,6 @@
 /* TAGS: min c */
+/* TEST: /usr */
+/* TEST: /eqeqeqwe */
 /*
  * Copyright (c) 2018 Trail of Bits, Inc.
  *

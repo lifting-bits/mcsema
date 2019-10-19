@@ -1,4 +1,7 @@
 /* TAGS: min c */
+/* TEST: 12 */
+/* TEST: 26 */
+/* TEST: 2 */
 /*
  * Copyright (c) 2018 Trail of Bits, Inc.
  *

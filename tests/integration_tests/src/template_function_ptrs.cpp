@@ -1,4 +1,7 @@
 /* TAGS: min cpp */
+/* TEST: 42 */
+/* TEST: -543 */
+/* TEST: 21 */
 /*
  * Copyright (c) 2018 Trail of Bits, Inc.
  *

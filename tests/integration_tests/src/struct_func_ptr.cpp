@@ -1,4 +1,8 @@
 /* TAGS: min cpp */
+/* TEST: */
+/* STDIN: 4\n4\n */
+/* TEST: */
+/* STDIN: 5\n5\n */
 /*
  * Copyright (c) 2018 Trail of Bits, Inc.
  *

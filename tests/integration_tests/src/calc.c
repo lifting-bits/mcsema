@@ -1,4 +1,12 @@
 /* TAGS: min c */
+/* TEST: */
+/* STDIN: Finputs/calc_input1.txt */
+/* TEST: */
+/* STDIN: Finputs/calc_input2.txt */
+/* TEST: */
+/* STDIN: Finputs/calc_input3.txt */
+/* TEST: */
+/* STDIN: Finputs/calc_input4.txt */
 /*
  * Copyright (c) 2018 Trail of Bits, Inc.
  *

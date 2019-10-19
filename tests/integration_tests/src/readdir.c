@@ -1,4 +1,7 @@
 /* TAGS: min c */
+/* TEST: readdir.c */
+/* TEST: /tmp */
+/* TEST: file-that-does-not-exist */
 /*
  * Copyright (c) 2018 Trail of Bits, Inc.
  *
