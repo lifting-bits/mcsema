@@ -27,9 +27,10 @@ import sys
 import tempfile
 import unittest
 
-import tests
 import colors
 import result_data
+import tests
+import util
 
 llvm_version = 8
 
@@ -37,6 +38,7 @@ lift = None
 bin_dir = "bin"
 libmcsema = None
 recompiled_dir = "recompiled"
+tags_dir = 'tags'
 
 batches = []
 shared_libs = None
@@ -218,6 +220,79 @@ def thread_lift(*t_args, **kwargs):
             continue
     return
 
+
+class Config:
+    defaults = [ lift, '-os', 'linux', '-arch', 'amd64' ]
+    togglable = {
+            'abi_libraries' : ['-abi_libraries', abi_lib_dir],
+    }
+
+    # Since strings are immutable, hotfix is needed once abi_lib_dir is set
+    def _fix_excludes(self):
+        flag, opt = self.togglable['abi_libraries']
+        self.togglable['abi_libraries'] = (flag, abi_lib_dir)
+
+    def __init__(self, name, src):
+        self.name = name
+        self.lift_args = []
+        self.exclude_args = []
+        self.tags = []
+        self._fix_excludes()
+        self._parse_config(src)
+
+    def _tags(self, line):
+        self.tags = line.split(' ')[1:]
+
+    def _lift_opts(self, line):
+        tokens = line.split(' ')[1:]
+        # LIFT_OPTS are empty
+        if not tokens:
+            return
+
+        exclude = []
+        for opt in tokens:
+            if not opt:
+                break
+            elif opt[0] == '+':
+                self.lift_args.append(opt[1:])
+            elif opt[0] != '!':
+                self.lift_args.append(opt)
+            else:
+                exclude.append(opt[1:])
+
+        for key, val in Config.togglable.items():
+            if key in exclude:
+                continue
+            self.lift_args += val
+
+
+    def _parse_config(self, src):
+        print(' > Parsing', src)
+        with open(os.path.join(tags_dir, src), 'r') as cfg:
+            for line in cfg:
+                line = line.rstrip('\n')
+                header = line.split(' ', 1)[0]
+
+                print(line)
+                header_dispatch = {
+                    'TAGS:' : Config._tags,
+                    'LIFT_OPTS:' : Config._lift_opts,
+                }
+
+                if header not in header_dispatch:
+                    raise Exception("Unknown header {}".format(header))
+                header_dispatch[header](self, line)
+
+def get_configs(directory, allowed_tags):
+    result = []
+    for f in os.listdir(directory):
+        name = util.strip_whole_config(f)
+        if not name:
+            continue
+        c = Config(name, f)
+        if any(x in allowed_tags for x in c.tags):
+            result.append(Config(name, f))
+    return result
 
 # Right now batches are combined, maybe it would make sense to separate batches from each other
 # that can be useful when comparing performance of frontends
