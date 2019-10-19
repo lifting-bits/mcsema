@@ -222,7 +222,12 @@ def thread_lift(*t_args, **kwargs):
 
 
 class Config:
-    defaults = [ lift, '-os', 'linux', '-arch', 'amd64' ]
+    class Result:
+        SUCCESS = 0
+        LIFT_FAIL = 1
+        RECOMPILE_FAIL = 2
+
+    defaults = [ '-os', 'linux', '-arch', 'amd64' ]
     togglable = {
             'abi_libraries' : ['-abi_libraries', abi_lib_dir],
     }
@@ -232,8 +237,10 @@ class Config:
         flag, opt = self.togglable['abi_libraries']
         self.togglable['abi_libraries'] = (flag, abi_lib_dir)
 
-    def __init__(self, name, src):
+    def __init__(self, name, src, cfg_path):
         self.name = name
+        self.config = src.rsplit('.', 2)[1]
+        self.cfg = cfg_path
         self.lift_args = []
         self.exclude_args = []
         self.tags = []
@@ -283,15 +290,59 @@ class Config:
                     raise Exception("Unknown header {}".format(header))
                 header_dispatch[header](self, line)
 
-def get_configs(directory, allowed_tags):
+    def lift(self, test_dir):
+        print(" > Lifting", self.name + self.config)
+
+        self.bc = os.path.join(test_dir, '.'.join([self.name, self.config, 'bc']))
+        self.recompiled = os.path.join(test_dir, self.name + self.config)
+
+        args = [lift] + self.defaults + self.lift_args + \
+               ['-output', self.bc, '-cfg', self.cfg]
+        print(args)
+        if not exec_and_log_fail(args):
+            return Config.Result.LIFT_FAIL
+
+        return self.recompile()
+
+    def recompile(self):
+        compiler = None
+        if 'c' in self.tags:
+            compiler = "clang-{}"
+        elif 'cpp' in self.tags:
+            compiler = "clang++-{}"
+        else:
+            print(" > Cannot decide on compiler when recompiling",\
+                  self.name + '.' + self.config)
+            return Config.Result.RECOMPILE_FAIL
+
+        compiler = compiler.format(llvm_version)
+        args = [compiler, self.bc, '-o', self.recompiled, \
+                libmcsema, '-lpthread', '-lm', '-ldl'] + shared_libs
+
+        if not exec_and_log_fail(args):
+            return Config.Result.RECOMPILE_FAIL
+        return Config.Result.SUCCESS
+
+
+def parallel_lift(*t_args):
+    todo, test_dir = t_args
+    while not todo.empty():
+        try:
+            config = todo.get()
+        except queue.Empty:
+            return
+
+        config.lift(test_dir)
+
+def get_configs(directory, allowed_tags, batched):
     result = []
     for f in os.listdir(directory):
         name = util.strip_whole_config(f)
-        if not name:
+        if not name or name not in batched:
             continue
-        c = Config(name, f)
+        c = Config(name, f, batched[name])
         if any(x in allowed_tags for x in c.tags):
-            result.append(Config(name, f))
+            result.append(c)
     return result
 
 # Right now batches are combined, maybe it would make sense to separate batches from each other
@@ -359,10 +410,33 @@ def main():
     tests.init()
 
     # Create directory to store recompiled binaries
-    # TemporaryDirectory() is not used, since we may want to have a look at recompiled code,
-    # maybe we want some --preserve option
+    # TemporaryDirectory() is not used, since we may want to have a look at recompiled
+    # code, maybe we want some --preserve option
     test_dir = tempfile.mkdtemp(dir=os.getcwd())
 
+    # basename -> path
+    batched = {}
+    for batch in batches:
+        for f in os.listdir(batch):
+            if os.path.isfile(os.path.join(batch, f)):
+                    basename, ext = os.path.splitext(f)
+                    batched[basename] = os.path.join(batch, f)
+
+
+    configs = get_configs(tags_dir, ['cpp'], batched)
+    _todo = queue.Queue()
+    for c in configs:
+        _todo.put(c)
+
+    threads = []
+    for i in range(int(args.jobs)):
+        t = threading.Thread(target=parallel_lift, args=(_todo, test_dir))
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join()
+
+    return
     suite_cases = queue.Queue()
     todo = queue.Queue()
 

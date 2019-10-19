@@ -50,3 +50,6 @@ def get_bin2tags(directory):
         else:
             result[filename].append(tags)
     return result
+
+def get_cfg(directory, name):
+    return os.path.join(directory, name + '.cfg')
