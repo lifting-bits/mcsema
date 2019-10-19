@@ -121,7 +121,7 @@ class Config:
         args = [cc, os.path.join(src_dir, self.name + self.ext), '-o', out] \
                + self.cc_opts + self.ld_opts
 
-        #print(args)
+        print(args)
         pipes = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         std_out, std_err = pipes.communicate()
         ret_code = pipes.returncode

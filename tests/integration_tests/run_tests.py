@@ -30,7 +30,6 @@ import unittest
 
 import colors
 import result_data
-import tests
 import util
 
 llvm_version = 8
@@ -51,7 +50,7 @@ def get_recompiled_name(name):
 # Print results of tests
 def print_results(t_cases):
     for key, val in sorted(t_cases.items(), key = operator.itemgetter(0)):
-        val.print(1)
+        val.print(0)
     for key, val in sorted(t_cases.items(), key = operator.itemgetter(0)):
         val.print_ces()
 
@@ -253,14 +252,17 @@ class Config:
 
 
 def parallel_lift(*t_args):
-    todo, test_dir = t_args
+    todo, test_dir, results = t_args
     while not todo.empty():
         try:
             config = todo.get()
         except queue.Empty:
             return
 
-        config.lift(test_dir)
+        res = config.lift(test_dir)
+        # TODO: More fine grained log
+        if res != Config.Result.SUCCESS:
+            results[self.id] = result_data.TCData(self.id, self.recompiled, self.binary)
 
 def get_configs(directory, allowed_tags, batched):
     result = []
@@ -282,6 +284,23 @@ class TestDetails:
         self.files = None
         self.stdin = None
         self.f_stdin = None
+        self.check = []
+
+    def set_files(self, files):
+        self.files = files
+        return self
+
+    def set_check(self, check):
+        self.check = check
+        return self
+
+    def set_f_stdin(self, f_stdin):
+        self.f_stdin = f_stdin
+        return self
+
+    def set_stdin(self, stdin):
+        self.stdin = stdin
+        return self
 
     def files(self, files):
         if self.files is not None:
@@ -295,9 +314,10 @@ class TestDetails:
         self.f_stdin = os.path.abspath(stdin[1:])
 
 class TestCase:
-    def __init__(self, src):
+    def __init__(self, src=None):
         self.details = []
-        self._parse(src)
+        if src is not None:
+            self._parse(src)
 
     def _parse(self, src):
         dispatch = {
@@ -311,10 +331,10 @@ class TestCase:
                 if head in dispatch:
                     dispatch[head](self.details[-1], line.split(' ', 1)[1])
                 else:
-                    self.details.append(TestDetails(line))
+                    self.details.append(TestDetails(line.split(' ')))
         # .test was present but empty
         if not self.details:
-            self.details.append(TestDetails(''))
+            self.details.append(TestDetails(['']))
 
 
 class Runner:
@@ -338,37 +358,52 @@ class Runner:
 
     def copy_files(self, detail):
         if detail.files is not None:
-            for f in files:
+            for f in detail.files:
                 basename = os.path.basename(f)
-                full_name = os.path.join(input_dir, f)
+                full_name = f
                 r = os.path.join(self.t_recompiled, basename)
                 b = os.path.join(self.t_bin, basename)
                 shutil.copyfile(full_name, r)
                 shutil.copyfile(full_name, b)
 
-    def compare(self, expected, actual):
+    def compare(self, expected, actual, files):
         e_out, e_err, e_ret = expected
         a_out, a_err, a_ret = actual
 
         correct = True
         counterexample = ''
-        if a_out != e_out:
-            counterexample += 'stdout:\n'
-            counterexample += '\tExpected:\n'
-            counterexample += e_out.decode() + '\n'
-            counterexample += '\tGot:\n'
-            counterexample += a_out.decode() + '\n'
-            correct = correct and False
-        if a_err != e_err:
-            counterexample += 'stderr:'+ '\n'
-            counterexample += '\tExpected:'+ '\n'
-            counterexample += e_err.decode()+ '\n'
-            counterexample += '\tGot:'+ '\n'
-            counterexample += a_err.decode()+ '\n'
-            correct = correct and False
+        # TODO: This cannot be more hacky than this
+        try:
+            if a_out != e_out:
+                counterexample += 'stdout:\n'
+                counterexample += '\tExpected:\n'
+                counterexample += e_out.decode() + '\n'
+                counterexample += '\tGot:\n'
+                counterexample += a_out.decode() + '\n'
+                correct = correct and False
+            if a_err != e_err:
+                counterexample += 'stderr:'+ '\n'
+                counterexample += '\tExpected:'+ '\n'
+                counterexample += e_err.decode()+ '\n'
+                counterexample += '\tGot:'+ '\n'
+                counterexample += a_err.decode()+ '\n'
+                correct = correct and False
+        except UnicodeDecodeError as e:
+            correct = False
+            counterexample += str(e) + '\n'
+
         if e_ret != e_ret:
             counterexample += "Return code: " + str(e_ret) + ' != ' + str(a_ret) + '\n'
             correct = correct and False
+
+        for name in files:
+            base_name = os.path.basename(name)
+            actual = os.path.join(self.t_recompiled, base_name)
+            expected = os.path.join(self.t_bin, base_name)
+            if not filecmp.cmp(expected, actual):
+                counterexample += 'Files do not match: ' + basename + '\n'
+                correct = correct and False
+
 
         result = result_data.RUN if correct else result_data.FAIL
         return (result, counterexample)
@@ -388,13 +423,14 @@ class Runner:
             out, err = pipes.communicate(stdin, timeout=5)
             ret = pipes.returncode
 
+            os.chdir(self.sawed_cwd)
             return (out, err, ret)
         except subprocess.TimeoutExpired as e:
             pipes.terminate()
             raise e
 
 
-    def exec(self, detail):
+    def exec(self, detail, files):
         # To avoid calling system-wide installed binaries
         filename = './' + self.config.name
 
@@ -402,9 +438,10 @@ class Runner:
         stdin = detail.f_stdin if detail.f_stdin is not None else detail.stdin
 
         try:
-            expected = _exec(self, self.t_bin, [filename] + detail.cmd.split(' '), stdin)
-            actual = _exec(self, self.t_recompiled, [filename] + detail.cmd.split(' '), stdin)
-            return self.compare(expected, actual)
+            print(detail.cmd)
+            expected = _exec(self, self.t_bin, [filename] + detail.cmd, stdin)
+            actual = _exec(self, self.t_recompiled, [filename] + detail.cmd, stdin)
+            return self.compare(expected, actual, files)
         except subprocess.TimeoutExpired as e:
             return result_data.TIMEOUT
 
@@ -412,7 +449,7 @@ class Runner:
     def run(self, detail):
         self.set_up()
         self.copy_files(detail)
-        result, ce = self.exec(detail)
+        result, ce = self.exec(detail, detail.check)
         self.tear_down()
         return (result, ce)
 
@@ -421,15 +458,14 @@ class Runner:
         c = self.config
         results[c.id] = result_data.TCData(c.id, c.recompiled, c.binary)
         for tc in self.test_case:
-            print(len(tc.details))
             for d in tc.details:
                 result, ce = self.run(d)
-                results[c.id].cases[d.cmd] = result
+                results[c.id].cases[' '.join(d.cmd)] = result
                 results[c.id].total += 1
                 if result == result_data.RUN:
                     results[c.id].success += 1
                 else:
-                    results[c.id].ces[d.cmd] = ce
+                    results[c.id].ces[' '.join(d.cmd)] = ce
 
 class Tester:
 
@@ -445,16 +481,55 @@ class Tester:
             if ext != '.test':
                 continue
 
-            print(' > Found tests for ' + basename)
             tc = TestCase(os.path.join(test_def_dir, f))
             for key, val in self.cases.items():
                 if key.name == basename:
                     val.append(tc)
 
+        for key, val in g_complex_test.items():
+            for k, v in self.cases.items():
+                if k.name == key:
+                    tc = TestCase()
+                    tc.details = val
+                    v.append(tc)
+
     def run(self, results):
         for key, val in self.cases.items():
+            print(key.id, 'number of tests:', len(val))
             r = Runner(key, val)
             r.evaluate(results)
+
+
+g_complex_test = {
+    "gzip" :
+    [
+        TestDetails(['--help']),
+        TestDetails(['--version']),
+        TestDetails(['-asda']),
+        TestDetails(['-f', './data.txt']).set_files(['inputs/data.txt']). \
+                    set_check(['data.txt.gz']),
+        TestDetails(['-l', './dec_data.txt.gz']).set_files(['inputs/dec_data.txt.gz']),
+        TestDetails(['-df', './dec_data.txt.gz']).set_files(['inputs/dec_data.txt.gz']).\
+                    set_check(['dec_data.txt']),
+    ],
+
+    "cat":
+    [
+        TestDetails(['--help']),
+        TestDetails(['--version']),
+        TestDetails(['data.txt']).set_files(['inputs/data.txt']),
+        TestDetails(['-n', 'data.txt']).set_files(['inputs/data.txt']),
+    ],
+
+    "echo":
+    [
+        TestDetails(['--help']),
+        TestDetails(['--version']),
+        TestDetails(['Hello Wordl!']),
+    ],
+
+
+}
 
 
 
@@ -519,7 +594,6 @@ def main():
     args, command_args = arg_parser.parse_known_args()
     check_arguments(args)
 
-    tests.init()
 
     # Create directory to store recompiled binaries
     # TemporaryDirectory() is not used, since we may want to have a look at recompiled
@@ -541,14 +615,14 @@ def main():
         _todo.put(c)
 
     threads = []
+    results = {}
     for i in range(int(args.jobs)):
-        t = threading.Thread(target=parallel_lift, args=(_todo, test_dir))
+        t = threading.Thread(target=parallel_lift, args=(_todo, test_dir, results))
         t.start()
         threads.append(t)
     for t in threads:
         t.join()
 
-    results = {}
     Tester(configs, tags_dir).run(results)
     print_results(results)
 

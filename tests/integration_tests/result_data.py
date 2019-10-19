@@ -67,7 +67,7 @@ class TCData:
 
     def print_ces(self):
         for case, ce in self.ces.items():
-            print(colors.red(self.basename) + ': '+ 'without_args' if not case else case)
+            print(colors.red(self.basename) + ': '+ ('without_args' if not case else case))
             print(ce)
 
     def get(self, test_case):
