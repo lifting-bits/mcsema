@@ -3,7 +3,7 @@ New attempt to create a better test suite. In development process, use at your o
 Use:
 
 1) You can use `populate.py` to copy binaries to be tested from `/bin` or `/usr/bin`.
-Directory that contains tags is iterated and each binary that has present tag file is searched for.
+Directory that contains configs is iterated and each binary that has present at least one config file is searched for.
 In case it is not found error is written on standard output, but the script continues with the rest.
 
 Example:
@@ -12,91 +12,84 @@ Example:
 ./populate.py
  > not_exists not found anywhere
  > Found /bin/echo
- > Found /bin/gre
+ > Found /bin/grep
 ```
 
 2) In case you want to try your own sources you can use `compile.py` which compiles all sources from `src` directory. If option `--stub_tags` is used, the corresponding tag files are created.
 
-3) First create a batch of cfg file using `get_cfg.py` -- you can select flavors to run only subset of all tests (they are specified in `tags` directory).
-  + tag all will get cfg for every file in `bin`
+3) First create a batch of cfg file using `get_cfg.py` -- you can select tags to run only subset of all tests (they are specified in `tags` directory).
+  + tag all will get cfg for every file with at least one config present
   + there are several policies that allows modification of already existing batches
 
 Example:
 ```
 # Every file present in the `bin` directory will be lifted into cfg file.
 # If a batch with name first_batch is present it will be deleted.
-python get_cfg.py --disass dyninst --flavors all --batch first_batch --batch_policy D
+python get_cfg.py --disass dyninst --tags all --batch first_batch --batch_policy D
 
-# Lifts all missing files that have flavor C. In case some file has already present cfg,
+# Lifts all missing files that have tags C. In case some file has already present cfg,
 # it is not replaced
-python get_cfg.py --disass dyninst --flavors C --batch first_batch --batch_policy C
+python get_cfg.py --disass dyninst --tags C --batch first_batch --batch_policy C
 
-# Updates all files with flavor echo, leaves rest of the batch untouched
-python get_cfg.py --disass dyninst --flavors echo --batch first_batch --batch_policy U
+# Updates all files with tag echo, leaves rest of the batch untouched
+python get_cfg.py --disass dyninst --tags echo --batch first_batch --batch_policy U
 ```
 
 4) Once batch is created `run_tests.py` can be run
 
-Extending test:
+Config/Test files:
 
-To extend tests (for new binary B) several things should be provided:
+Directory tags (name to be changed) contains two types of files (beware, whitespaces are used as delimiters, therefore they matter):
 
-Do not use "." (dot) in the name of the tested binaries! (Use "_" or something else)
-* binary B should be stored in `bin` folder (`compile.py` or `populate.py` can be used)
-* appropriate tags should be specified in `tags` folder (`tags/B.tag`)
-* in `run_tests.py` special class names `B_suite` (correct naming is important!) should be
-  implemented -> the actual tests are specified here
+1) `binary.kind.config`, which has following internal structure:
+```
+TAGS: one two ...
+LIFT_OPTS: +one +two 87 !three
+```
+`TAGS` specify tags of this config, while `LIFT_OPTS` represent specific lift options. Options prefixed by `+` are added and prefix `!` means that the options is not used even though it would be by default.
+One binary can have multiple config files.
 
-There are two classes new B_suite can inherit from:
-* `BaseTest` - provides all the necessary methods to do the actual testing (setup, input setup,
-  execution, actual comparison, cleanup) -- it is not necessary the new suite inherits from this
-  class but it is recommended
-* `BasicTest` - provides tests for `--help` and `--version` invocations, which are typical uses
-  of many binaries
+2) `binary.test`, which has following internal structure:
+```
+TEST: cmd_option1 ...
+STDIN: -Fpath/to/file/ or string
+FILES: Not implemented yet
+TEST: ...
+...
+```
+For simple test cases it is easier to write this test specification. `STDIN:` after file is optional and so is `FILES:`. If value of `STDINL:` is prefixed by F corresponding file is loaded (it can be relative to the root of test dir) and used as stdin.
 
-Example of the test class hierarchy:
+Src
 
-    BaseTest
-   _____|_____
-   |         |
-BasicTest   custom_binary_suite
-   |
-readelf_suite
+Files presented in `src` are meant to be compiled by `compile.py` and can have special header:
+```
+/* TAGS: ... */
+/* CC_OPTS: ... */
+/* LD_OPTS: ... */
+/* LIFT_OPTS: kind1 ... */
+/* LIFT_OPTS: kind2 ... */
+...
+/* TEST: */
+/* STDIN: */
+...
+```
+Everything except `CC_OPTS:` and `LD_OPTS:` is used to generated appropriate `.config/.test` files. `CC_OPTS:` and `LD_OPTS:` are sent to the compiler.
 
-For each invocation of the binary separate method in the B_suite should be implemented:
-We already have:
+Complex tests:
+Not every test can be described by simple "language" of the `.test` files, therefore it is needed to have a way to define those more complex ones.
+In `run_tests.py` a global array is present `g_complex_test` which is used to store more advanced configurations. It has following type:
 
 ```
-class B_suite(BaseTest):
-  pass
+{ str : [ TestDetails ] }
 ```
-
-Let's say we want to test invocation with `--help` as command line argument, therefore we need to
-add a method to `B_suite`. It is important the name of the method starts with `test_` since
-`unittest` is used.
-
+The structure is rather intuitive -- each binary has one entry and can have multiple test cases stored in array of `TestDetails`. `TestDetails` currently have following options:
 ```
-class B_suite(BaseTest):
-  def test_help(self):
-    self.wrapper(["--help"], [])
-
+cmd (set in __init___): array of command line arguments
+files: files that are used by the program -> it is needed to copy them into appropriate location.
+check: files that are output of the program -> it is needed to compare them
 ```
+As usual, files can be specified by relative paths from root directory of tests.
 
-`BaseTest::wrapper` is used since it does some statistics over the suite.
-First argument are the command line arguments,
-second are the files that may be used by the program (the file must reside in `inputs`).
-
-In the case the invocation creates file as byproduct, the method needs to be slightly modified:
-
-```
-def test_output(self):
-  self.wrapper(["--input data.txt", "--outout data.compressed"], ["data.txt"])
-  self.check_files("data.compressed")
-```
-Both original and recompiled binary create their own version of `data.compressed` and these files
-are compared. In case they are different the test is a failure.
-
-Please note that `data.txt` must be inside `inputs` folder, i.e.`inputs/data.txt` must exist.
 
 
 Directory structure:
@@ -109,8 +102,10 @@ bin
   |- ... rest of tested binaries
 
 tags
-  |- base_test.flag
-  |- ... for each binary a list of its tags (flavors)
+  |- base_test.default.config
+  |- ... for each binary at least one config file
+  |- base.test
+  |- .. optional test files
 
 # Folders containing cfg files (there may be a reason you want to have several,
 # for example compare frontends or have cfgs of some special flavor)
