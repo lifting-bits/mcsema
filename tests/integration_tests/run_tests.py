@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import argparse
+import difflib
 import filecmp
 import operator
 import os
@@ -51,6 +52,8 @@ def get_recompiled_name(name):
 def print_results(t_cases):
     for key, val in sorted(t_cases.items(), key = operator.itemgetter(0)):
         val.print(1)
+    for key, val in sorted(t_cases.items(), key = operator.itemgetter(0)):
+        val.print_ces()
 
 def log_results(result, into):
     for entry in result.failures:
@@ -67,9 +70,6 @@ def log_results(result, into):
 # Fill global variables
 # TODO: Rework, this is really ugly
 def check_arguments(args):
-    if args.lift_args and args.lift_args[0] == "--":
-        args.lift_args = args.lift_args[1:]
-
     if not os.path.isfile(args.lift):
         print("{} passed to --lift is not a valid file".format(args.lift))
         sys.exit (1)
@@ -148,79 +148,6 @@ def exec_and_log_fail(args):
         return False
     return True
 
-
-
-# Recompile the binary from lifted .bc
-# Return None in case error happens
-# Otherwise return path to the newly created binary
-def build_test(cfg, build_dir, extra_args):
-    print("Lifting " + cfg)
-
-    # Create build directory for given test case
-    binary_base_name = os.path.splitext(os.path.basename(cfg))[0]
-    bc = os.path.join( build_dir, binary_base_name + ".bc")
-
-    # TODO: arch type
-    lift_args = [ lift,
-                  "-os", "linux",
-                  "-arch", "amd64",
-                  "-cfg", cfg,
-                  "-abi_libraries", abi_lib_dir,
-                  "-output", bc ]
-    lift_args += extra_args
-
-    if not exec_and_log_fail(lift_args):
-        return None
-
-    # Recompile it
-    lifted = os.path.join(build_dir, get_recompiled_name(binary_base_name))
-
-    recompile_args =[ "clang-{}".format(llvm_version), bc,
-                      "-o", lifted, libmcsema,
-                      "-lpthread", "-lm", "-ldl"] + shared_libs
-    if not exec_and_log_fail(recompile_args):
-        return None
-    return lifted
-
-
-def thread_lift(*t_args, **kwargs):
-    todo, suite_cases, test_dir, args = t_args
-    while not todo.empty():
-
-        try:
-            batch, f = todo.get()
-        except queue.Empty:
-            return
-
-        print("\n > Handling : " + f)
-        recompiled = build_test(os.path.join(batch, f), test_dir, args.lift_args )
-
-        basename = os.path.splitext(f)[0]
-        tc = result_data.TCData(basename,
-                    os.path.join(os.getcwd(), os.path.join(bin_dir, basename)),
-                    recompiled)
-        tests.BaseTest.cases[basename] = tc
-
-        # Lift failed for some reason, ignore this case
-        if recompiled is None:
-            continue
-
-        # Dynamically load only test cases for binaries that were successfully lifted
-        # Therefore ignored are fails and binaries not present in a batch
-        # TODO: Solve missing test case class
-        suite_name = basename + "_suite"
-
-        try:
-            tc_class = tests.__dict__[suite_name]
-            loader = unittest.TestLoader()
-            suite_cases.put_nowait(item=loader.loadTestsFromTestCase(tc_class))
-        except KeyError:
-            print(" > " + suite_name + " was not found in module!")
-            print(colors.bg_yellow(" > Skipping test"))
-            continue
-    return
-
-
 class Config:
     class Result:
         SUCCESS = 0
@@ -239,7 +166,9 @@ class Config:
 
     def __init__(self, name, src, cfg_path):
         self.name = name
+        self.binary = os.path.join(bin_dir, name)
         self.config = src.rsplit('.', 2)[1]
+        self.id = self.name + '.' + self.config
         self.cfg = cfg_path
         self.lift_args = []
         self.exclude_args = []
@@ -280,7 +209,6 @@ class Config:
                 line = line.rstrip('\n')
                 header = line.split(' ', 1)[0]
 
-                print(line)
                 header_dispatch = {
                     'TAGS:' : Config._tags,
                     'LIFT_OPTS:' : Config._lift_opts,
@@ -294,7 +222,7 @@ class Config:
         print(" > Lifting", self.name + self.config)
 
         self.bc = os.path.join(test_dir, '.'.join([self.name, self.config, 'bc']))
-        self.recompiled = os.path.join(test_dir, self.name + self.config)
+        self.recompiled = os.path.join(test_dir, self.name + '.' + self.config)
 
         args = [lift] + self.defaults + self.lift_args + \
                ['-output', self.bc, '-cfg', self.cfg]
@@ -341,9 +269,194 @@ def get_configs(directory, allowed_tags, batched):
         if not name or name not in batched:
             continue
         c = Config(name, f, batched[name])
-        if any(x in allowed_tags for x in c.tags):
+
+        if allowed_tags is None:
+            result.append(c)
+        elif any(x in allowed_tags for x in c.tags):
             result.append(c)
     return result
+
+class TestDetails:
+    def __init__(self, cmd):
+        self.cmd = cmd
+        self.files = None
+        self.stdin = None
+        self.f_stdin = None
+
+    def files(self, files):
+        if self.files is not None:
+           raise Exception("Incorrect format of test case")
+        self.files = files
+
+    def stdin(self, stdin):
+        if stdin[0] != 'F':
+            self.stdin = stdin.encode()
+            return
+        self.f_stdin = os.path.abspath(stdin[1:])
+
+class TestCase:
+    def __init__(self, src):
+        self.details = []
+        self._parse(src)
+
+    def _parse(self, src):
+        dispatch = {
+                'STDIN:' : TestDetails.stdin,
+                'FILES:' : TestDetails.files,
+        }
+        with open(src, 'r') as f:
+            for line in f:
+                line = line.rstrip('\n')
+                head = line.split(' ', 1)[0]
+                if head in dispatch:
+                    dispatch[head](self.details[-1], line.split(' ', 1)[1])
+                else:
+                    self.details.append(TestDetails(line))
+        # .test was present but empty
+        if not self.details:
+            self.details.append(TestDetails(''))
+
+
+class Runner:
+    def __init__(self, config, test_case):
+        self.config = config
+        self.test_case = test_case
+
+    def set_up(self):
+        self.t_bin = tempfile.mkdtemp(dir=os.getcwd(), prefix='bin_t')
+        self.t_recompiled = tempfile.mkdtemp(dir=os.getcwd(), prefix='recompiled_t')
+        self.sawed_cwd = os.getcwd()
+
+        cfg = self.config
+        os.symlink(os.path.abspath(cfg.binary), os.path.join(self.t_bin, cfg.name))
+        os.symlink(cfg.recompiled, os.path.join(self.t_recompiled, cfg.name))
+
+    def tear_down(self):
+        os.chdir(self.sawed_cwd)
+        shutil.rmtree(self.t_recompiled)
+        shutil.rmtree(self.t_bin)
+
+    def copy_files(self, detail):
+        if detail.files is not None:
+            for f in files:
+                basename = os.path.basename(f)
+                full_name = os.path.join(input_dir, f)
+                r = os.path.join(self.t_recompiled, basename)
+                b = os.path.join(self.t_bin, basename)
+                shutil.copyfile(full_name, r)
+                shutil.copyfile(full_name, b)
+
+    def compare(self, expected, actual):
+        e_out, e_err, e_ret = expected
+        a_out, a_err, a_ret = actual
+
+        correct = True
+        counterexample = ''
+        if a_out != e_out:
+            counterexample += 'stdout:\n'
+            counterexample += '\tExpected:\n'
+            counterexample += e_out.decode() + '\n'
+            counterexample += '\tGot:\n'
+            counterexample += a_out.decode() + '\n'
+            correct = correct and False
+        if a_err != e_err:
+            counterexample += 'stderr:'+ '\n'
+            counterexample += '\tExpected:'+ '\n'
+            counterexample += e_err.decode()+ '\n'
+            counterexample += '\tGot:'+ '\n'
+            counterexample += a_err.decode()+ '\n'
+            correct = correct and False
+        if e_ret != e_ret:
+            counterexample += "Return code: " + str(e_ret) + ' != ' + str(a_ret) + '\n'
+            correct = correct and False
+
+        result = result_data.RUN if correct else result_data.FAIL
+        return (result, counterexample)
+
+    def open_stdin(self, t_dir, args, stdin):
+        with open(stdin, 'rb') as f:
+            r = f.read()
+            return self.exec_(t_dir, args, r)
+
+    def exec_(self, t_dir, args, stdin):
+        os.chdir(t_dir)
+        try:
+            pipes = subprocess.Popen(
+                    args, stdout=subprocess.PIPE,
+                    stderr = subprocess.PIPE,
+                    stdin = subprocess.PIPE)
+            out, err = pipes.communicate(stdin, timeout=5)
+            ret = pipes.returncode
+
+            return (out, err, ret)
+        except subprocess.TimeoutExpired as e:
+            pipes.terminate()
+            raise e
+
+
+    def exec(self, detail):
+        # To avoid calling system-wide installed binaries
+        filename = './' + self.config.name
+
+        _exec = Runner.exec_ if detail.f_stdin is None else Runner.open_stdin
+        stdin = detail.f_stdin if detail.f_stdin is not None else detail.stdin
+
+        try:
+            expected = _exec(self, self.t_bin, [filename] + detail.cmd.split(' '), stdin)
+            actual = _exec(self, self.t_recompiled, [filename] + detail.cmd.split(' '), stdin)
+            return self.compare(expected, actual)
+        except subprocess.TimeoutExpired as e:
+            return result_data.TIMEOUT
+
+
+    def run(self, detail):
+        self.set_up()
+        self.copy_files(detail)
+        result, ce = self.exec(detail)
+        self.tear_down()
+        return (result, ce)
+
+
+    def evaluate(self, results):
+        c = self.config
+        results[c.id] = result_data.TCData(c.id, c.recompiled, c.binary)
+        for tc in self.test_case:
+            print(len(tc.details))
+            for d in tc.details:
+                result, ce = self.run(d)
+                results[c.id].cases[d.cmd] = result
+                results[c.id].total += 1
+                if result == result_data.RUN:
+                    results[c.id].success += 1
+                else:
+                    results[c.id].ces[d.cmd] = ce
+
+class Tester:
+
+    def __init__(self, configs, test_def_dir):
+        # Config -> TestCase
+        self.cases = {}
+
+        for c in configs:
+            self.cases[c] = []
+
+        for f in os.listdir(test_def_dir):
+            basename, ext = os.path.splitext(f)
+            if ext != '.test':
+                continue
+
+            print(' > Found tests for ' + basename)
+            tc = TestCase(os.path.join(test_def_dir, f))
+            for key, val in self.cases.items():
+                if key.name == basename:
+                    val.append(tc)
+
+    def run(self, results):
+        for key, val in self.cases.items():
+            r = Runner(key, val)
+            r.evaluate(results)
+
+
 
 # Right now batches are combined, maybe it would make sense to separate batches from each other
 # that can be useful when comparing performance of frontends
@@ -399,10 +512,9 @@ def main():
                             default = 1,
                             required = False)
 
-    arg_parser.add_argument('lift_args',
-                            help = "Additional arguments passed to mcsema-lift",
-                            nargs = argparse.REMAINDER)
-
+    arg_parser.add_argument('--tags',
+                           help = "Test only these tags from batch",
+                           required = False)
 
     args, command_args = arg_parser.parse_known_args()
     check_arguments(args)
@@ -423,7 +535,7 @@ def main():
                     batched[basename] = os.path.join(batch, f)
 
 
-    configs = get_configs(tags_dir, ['cpp'], batched)
+    configs = get_configs(tags_dir, args.tags, batched)
     _todo = queue.Queue()
     for c in configs:
         _todo.put(c)
@@ -436,34 +548,11 @@ def main():
     for t in threads:
         t.join()
 
+    results = {}
+    Tester(configs, tags_dir).run(results)
+    print_results(results)
+
     return
-    suite_cases = queue.Queue()
-    todo = queue.Queue()
-
-    for batch in batches:
-        for f in os.listdir(batch):
-            if os.path.isfile(os.path.join(batch, f)):
-                todo.put((batch, f))
-
-    threads = []
-    for i in range(int(args.jobs)):
-        t = threading.Thread(target=thread_lift, args=(todo, suite_cases, test_dir, args))
-        t.start()
-        threads.append(t)
-
-    for t in threads:
-        t.join()
-
-    print()
-    suite = unittest.TestSuite(list(suite_cases.queue))
-    result = unittest.TextTestRunner(verbosity = 0).run(suite)
-
-    log_results(result, tests.BaseTest.cases)
-    print_results(tests.BaseTest.cases)
-
-    log_file = args.save_log
-    if log_file is not None:
-        result_data.store_json(tests.BaseTest.cases, log_file)
 
 if __name__ == '__main__':
     main()

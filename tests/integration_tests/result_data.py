@@ -26,6 +26,7 @@ class TCData:
         self.total = 0
         self.success = 0
         self.cases = {}
+        self.ces = {}
 
     def is_recompiled(self):
         return self.recompiled is not None
@@ -63,6 +64,11 @@ class TCData:
         elif verbosity == 1:
             for case, val in sorted(self.cases.items(), key = operator.itemgetter(0)):
                 print(" " * 2, _color_mapping[val](case))
+
+    def print_ces(self):
+        for case, ce in self.ces.items():
+            print(colors.red(self.basename) + ': '+ 'without_args' if not case else case)
+            print(ce)
 
     def get(self, test_case):
         return self.cases.get(test_case, UNKNOWN)
