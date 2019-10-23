@@ -75,11 +75,7 @@ static bool IsZero(const std::string &data) {
 static bool IsZero(const NativeSegment *cfg_seg) {
   for (const auto &cfg_seg_entry : cfg_seg->entries) {
     auto &entry = cfg_seg_entry.second;
-    if (entry.blob) {
-      if (!IsZero(entry.blob->data)) {
-        return false;
-      }
-    } else {
+    if (!entry.blob || !IsZero(entry.blob->data)) {
       return false;
     }
   }
