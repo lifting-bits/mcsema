@@ -140,9 +140,9 @@ bool IsBlacklisted(const llvm::Function &func) {
     return true;
   }
 
-  // We simply cannot handle va_args properly yet
+  // We simply cannot handle va_args properly yet. (Issue #599)
   if (func.isVarArg()) {
-    LOG(INFO) << "Skipped " << func.getName().str() << ": va_args";
+    LOG(WARNING) << "Skipped " << func.getName().str() << ": va_args. (See Issue #599)";
     return true;
   }
 
@@ -150,7 +150,7 @@ bool IsBlacklisted(const llvm::Function &func) {
   // without explicit args and function ptrs (entrypoint behaviour)
   if (!FLAGS_explicit_args) {
     if (HasFunctionPtrArg(func)) {
-      LOG(INFO) << "Skipped " << func.getName().str() << ": function pointer in arguments";
+      LOG(WARNING) << "Skipped " << func.getName().str() << ": function pointer in arguments. (See Issue #599)";
       return true;
     }
   }
