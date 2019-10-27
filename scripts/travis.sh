@@ -246,7 +246,7 @@ linux_build_helper() {
     return 1
   fi
 
-  git clone "https://github.com/trailofbits/remill.git" > "${log_file}" 2>&1
+  git clone "https://github.com/lifting-bits/remill.git" > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to clone the remill repository. Error output follows:\n"
     printf "===\n"

@@ -15,9 +15,9 @@ RUN apt-get install git curl cmake python2.7 python-pip python-virtualenv wget b
 WORKDIR /home/ToB
 
 # Download everything and set up folder structure
-RUN git clone --depth 1 https://github.com/trailofbits/mcsema.git && \ 
+RUN git clone --depth 1 https://github.com/lifting-bits/mcsema.git && \
     export REMILL_VERSION=`cat ./mcsema/.remill_commit_id` && \
-    git clone https://github.com/trailofbits/remill.git && \
+    git clone https://github.com/lifting-bits/remill.git && \
     cd remill && \
     git checkout -b temp ${REMILL_VERSION} && \
     mv ../mcsema tools
