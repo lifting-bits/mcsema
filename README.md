@@ -7,11 +7,11 @@
 
 McSema is an executable lifter. It translates ("lifts") executable binaries from native machine code to LLVM bitcode. LLVM bitcode is an [intermediate representation](https://en.wikipedia.org/wiki/Intermediate_representation) form of a program that was originally created for the [retargetable LLVM compiler](https://llvm.org), but which is also very useful for performing program analysis methods that would not be possible to perform on an executable binary directly.
 
-McSema enables analysts to find and retroactively harden binary programs against security bugs, independently validate vendor source code, and generate application tests with high code coverage. McSema isn’t just for static analysis. The lifted LLVM bitcode can also be [fuzzed with libFuzzer](https://github.com/trailofbits/mcsema/blob/master/docs/UsingLibFuzzer.md), an LLVM-based instrumented fuzzer that would otherwise require the target source code. The lifted bitcode can even be [compiled](https://github.com/trailofbits/mcsema/blob/master/docs/UsingLibFuzzer.md) back into a [runnable program](https://github.com/trailofbits/mcsema/blob/master/docs/McSemaWalkthrough.md)! This is a procedure known as static binary rewriting, binary translation, or binary recompilation.
+McSema enables analysts to find and retroactively harden binary programs against security bugs, independently validate vendor source code, and generate application tests with high code coverage. McSema isn’t just for static analysis. The lifted LLVM bitcode can also be [fuzzed with libFuzzer](https://github.com/lifting-bits/mcsema/blob/master/docs/UsingLibFuzzer.md), an LLVM-based instrumented fuzzer that would otherwise require the target source code. The lifted bitcode can even be [compiled](https://github.com/lifting-bits/mcsema/blob/master/docs/UsingLibFuzzer.md) back into a [runnable program](https://github.com/lifting-bits/mcsema/blob/master/docs/McSemaWalkthrough.md)! This is a procedure known as static binary rewriting, binary translation, or binary recompilation.
 
 McSema supports lifting both Linux (ELF) and Windows (PE) executables, and understands most x86 and amd64 instructions, including integer, X87, MMX, SSE and AVX operations. AARCH64 (ARMv8) instruction support is in active development.
 
-Using McSema is a two-step process: control flow recovery, and instruction translation. Control flow recovery is performed using the `mcsema-disass` tool, which relies on IDA Pro, Binary Ninja, or DynInst to disassemble a binary file and produce a control flow graph. Instruction translation is then performed using the `mcsema-lift` tool, which converts the control flow graph into LLVM bitcode. Under the hood, the instruction translation capability of `mcsema-lift` is implemented in the [`remill` library](https://github.com/trailofbits/remill). The development of `remill` was a result of refactoring and improvements to McSema, and was first introduced with McSema version 2.0.0. Read more about `remill` [here](https://github.com/trailofbits/remill).
+Using McSema is a two-step process: control flow recovery, and instruction translation. Control flow recovery is performed using the `mcsema-disass` tool, which relies on IDA Pro, Binary Ninja, or DynInst to disassemble a binary file and produce a control flow graph. Instruction translation is then performed using the `mcsema-lift` tool, which converts the control flow graph into LLVM bitcode. Under the hood, the instruction translation capability of `mcsema-lift` is implemented in the [`remill` library](https://github.com/lifting-bits/remill). The development of `remill` was a result of refactoring and improvements to McSema, and was first introduced with McSema version 2.0.0. Read more about `remill` [here](https://github.com/lifting-bits/remill).
 
 McSema and `remill` were developed and are maintained by Trail of Bits, funded by and used in research for DARPA and the US Department of Defense.
 
@@ -89,7 +89,7 @@ Why would anyone translate binaries *back* to bitcode?
 
 #### Step 1: Download Dockerfile
 
-`wget https://raw.githubusercontent.com/trailofbits/mcsema/master/tools/Dockerfile`
+`wget https://raw.githubusercontent.com/lifting-bits/mcsema/master/tools/Dockerfile`
 
 #### Step 2: Add your disassembler
 
@@ -161,15 +161,15 @@ popd
 
 #### Step 2: Clone the repository
 
-The next step is to clone the [Remill](https://github.com/trailofbits/remill) repository. We then clone the McSema repository into the `tools` subdirectory of Remill. This is kind of like how Clang and LLVM are distributed separately, and the Clang source code needs to be put into LLVM's tools directory.
+The next step is to clone the [Remill](https://github.com/lifting-bits/remill) repository. We then clone the McSema repository into the `tools` subdirectory of Remill. This is kind of like how Clang and LLVM are distributed separately, and the Clang source code needs to be put into LLVM's tools directory.
 
 **Notice that when building McSema, you should always use a specific Remill commit hash (the one we test). This hash can be found in the .remill_commit_id file**.
 
 ```shell
-git clone --depth 1 https://github.com/trailofbits/mcsema.git
+git clone --depth 1 https://github.com/lifting-bits/mcsema.git
 export REMILL_VERSION=`cat ./mcsema/.remill_commit_id`
 
-git clone https://github.com/trailofbits/remill.git
+git clone https://github.com/lifting-bits/remill.git
 cd remill
 git checkout -b temp ${REMILL_VERSION}
 
@@ -243,8 +243,8 @@ In order to verify that McSema works correctly as built, head on over to [the do
 
 #### Step 2: Obtaining the source code
 ```
-git clone https://github.com/trailofbits/remill.git --depth=1
-git clone https://github.com/trailofbits/mcsema.git --depth=1 remill/tools/mcsema
+git clone https://github.com/lifting-bits/remill.git --depth=1
+git clone https://github.com/lifting-bits/mcsema.git --depth=1 remill/tools/mcsema
 ```
 
 Note that for production usage you should always use a specific remill commit (`remill/tools/mcsema/.remill_commit_id`) when building mcsema. At the time of writing, it is however best to use HEAD (or at least make sure that commit `e7795be` is present in the remill branch).
@@ -310,7 +310,7 @@ Also update your PYTHONPATH: C:\mcsema\Lib\site-packages
 
 * [McSema command line reference](docs/CommandLineReference.md)
 * [Common Errors](docs/CommonErrors.md) and [Debugging Tips](docs/DebuggingTips.md)
-* [How to add support for a new instruction](https://github.com/trailofbits/remill/blob/master/docs/ADD_AN_INSTRUCTION.md)
+* [How to add support for a new instruction](https://github.com/lifting-bits/remill/blob/master/docs/ADD_AN_INSTRUCTION.md)
 * [How to use McSema: A walkthrough](docs/McSemaWalkthrough.md)
 * [Life of an instruction](docs/LifeOfAnInstruction.md)
 * [Limitations](docs/Limitations.md)
@@ -333,8 +333,8 @@ You don't! You can also use Binary Ninja or [Dyninst](tools/mcsema_disass/dynins
 
 ### What is Remill, and why does McSema need it
 
-[Remill](https://github.com/trailofbits/remill) is a library that McSema uses to lift individual machine code instructions to LLVM IR. You can think of McSema being to Remill as Clang is to LLVM. Remill's scope is small: it focuses on instruction semantics only, and it provides semantics for x86, x86-64, and AArch64 instruction semantics. McSema's scope is much bigger: it focuses on lifting entire programs. To do so, McSema must lift the individual instructions, but there's a lot more to lifting programs than just the instructions; there are code and data cross-references, segments, etc.
+[Remill](https://github.com/lifting-bits/remill) is a library that McSema uses to lift individual machine code instructions to LLVM IR. You can think of McSema being to Remill as Clang is to LLVM. Remill's scope is small: it focuses on instruction semantics only, and it provides semantics for x86, x86-64, and AArch64 instruction semantics. McSema's scope is much bigger: it focuses on lifting entire programs. To do so, McSema must lift the individual instructions, but there's a lot more to lifting programs than just the instructions; there are code and data cross-references, segments, etc.
 
 ### I'm a student and I'd like to contribute to McSema: how can I help
 
-We would love to take you on as an intern to help improve McSema. We have several project ideas labelled [`intern project`](https://github.com/trailofbits/mcsema/labels/intern%20project), as well as having smaller scale to-dos labelled under [`good first issue`](https://github.com/trailofbits/mcsema/labels/good%20first%20issue) and [`help wanted`](https://github.com/trailofbits/mcsema/labels/help%20wanted) on our issue tracker. You are not limited to those items: if you think of a great feature you want in McSema, let us know and we will sponsor it. Simply contact us on our [Slack channel](https://empireslacking.herokuapp.com/) or via mcsema@trailofbits.com and let us know what you'd want to work on and why.
+We would love to take you on as an intern to help improve McSema. We have several project ideas labelled [`intern project`](https://github.com/lifting-bits/mcsema/labels/intern%20project), as well as having smaller scale to-dos labelled under [`good first issue`](https://github.com/lifting-bits/mcsema/labels/good%20first%20issue) and [`help wanted`](https://github.com/lifting-bits/mcsema/labels/help%20wanted) on our issue tracker. You are not limited to those items: if you think of a great feature you want in McSema, let us know and we will sponsor it. Simply contact us on our [Slack channel](https://empireslacking.herokuapp.com/) or via mcsema@trailofbits.com and let us know what you'd want to work on and why.
