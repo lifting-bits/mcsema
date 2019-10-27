@@ -349,7 +349,8 @@ int main(int argc, char *argv[]) {
     FLAGS_disable_optimizer = false;
   }
 
-  mcsema::gModule = remill::LoadTargetSemantics(mcsema::gContext);
+  mcsema::gModule = remill::LoadTargetSemantics(
+      *mcsema::gContext);
   mcsema::gArch->PrepareModule(mcsema::gModule);
 
   // Load in a special library before CFG processing. This affects the
