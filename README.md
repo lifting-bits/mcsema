@@ -19,7 +19,7 @@ McSema and `remill` were developed and are maintained by Trail of Bits, funded b
 
 |       | master                                   |
 | ----- | ---------------------------------------- |
-| Linux | [![Build Status](https://travis-ci.org/trailofbits/mcsema.svg?branch=master)](https://travis-ci.org/trailofbits/mcsema) |
+| Linux | [![Build Status](https://travis-ci.org/lifting-bits/mcsema.svg?branch=master)](https://travis-ci.org/lifting-bits/mcsema) |
 
 ## Features
 
