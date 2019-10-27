@@ -49,7 +49,7 @@ Exception: Unknown external: cs_open
 
 **Technical Background:** McSema needs to know how to call external functions, including the function calling convention and number of arguments. It knows how to call many common functions, but you hit one that it does not know about.
 
-**Possible Fixes:** Add an entry to the [external function definitions file](https://github.com/trailofbits/mcsema/tree/master/tools/mcsema_disass/defs) describing the function's calling convention and number of arguments. Don't forget to re-build `mcsema-disass`. Submit a pull request so we can include it in future McSema releases. Alternatively, you can specify a custom definitions file location by using the `--std-defs` argument (e.g. `mcsema-disass --std-defs /path/to/my/defs/file.txt ...`).
+**Possible Fixes:** Add an entry to the [external function definitions file](https://github.com/lifting-bits/mcsema/tree/master/tools/mcsema_disass/defs) describing the function's calling convention and number of arguments. Don't forget to re-build `mcsema-disass`. Submit a pull request so we can include it in future McSema releases. Alternatively, you can specify a custom definitions file location by using the `--std-defs` argument (e.g. `mcsema-disass --std-defs /path/to/my/defs/file.txt ...`).
 
 ### Could not parse function type
 
