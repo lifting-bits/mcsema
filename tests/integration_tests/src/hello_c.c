@@ -1,4 +1,6 @@
 /* TAGS: min c */
+/* LIFT_OPTS: explicit +--explicit_args +--explicit_args_count 8 */
+/* LIFT_OPTS: default */
 /*
  * Copyright (c) 2019 Trail of Bits, Inc.
  *
