@@ -520,6 +520,7 @@ g_complex_test = {
         TestDetails(['-l', './dec_data.txt.gz']).set_files(['inputs/dec_data.txt.gz']),
         TestDetails(['-df', './dec_data.txt.gz']).set_files(['inputs/dec_data.txt.gz']).\
                     set_check(['dec_data.txt']),
+        TestDetails(['']),
     ],
 
     "cat":
