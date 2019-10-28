@@ -400,10 +400,13 @@ class Runner:
             base_name = os.path.basename(name)
             actual = os.path.join(self.t_recompiled, base_name)
             expected = os.path.join(self.t_bin, base_name)
-            if not filecmp.cmp(expected, actual):
-                counterexample += 'Files do not match: ' + basename + '\n'
+            try:
+                if not filecmp.cmp(expected, actual):
+                    counterexample += 'Files do not match: ' + base_name + '\n'
+                    correct = correct and False
+            except FileNotFoundError as e:
+                counterexample += 'File {} not found/produced! '.format(base_name)
                 correct = correct and False
-
 
         result = result_data.RUN if correct else result_data.FAIL
         return (result, counterexample)
