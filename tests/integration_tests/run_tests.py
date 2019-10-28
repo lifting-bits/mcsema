@@ -135,9 +135,14 @@ def check_arguments(args):
 
 
 def exec_and_log_fail(args):
-    pipes = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    std_out, std_err = pipes.communicate()
-    ret_code = pipes.returncode
+    try:
+        pipes = subprocess.Popen(args, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        std_out, std_err = pipes.communicate(timeout = 180)
+        ret_code = pipes.returncode
+    except subprocess.TimeoutExpired as e:
+        pipes.terminate()
+        print("Timeout!")
+        return False
 
     if ret_code:
         print("** stdout:")
@@ -262,7 +267,7 @@ def parallel_lift(*t_args):
         res = config.lift(test_dir)
         # TODO: More fine grained log
         if res != Config.Result.SUCCESS:
-            results[self.id] = result_data.TCData(self.id, self.recompiled, self.binary)
+            results[config.id] = result_data.TCData(config.id,config.recompiled, config.binary)
 
 def get_configs(directory, allowed_tags, batched):
     result = []
@@ -446,8 +451,9 @@ class Runner:
             actual = _exec(self, self.t_recompiled, [filename] + detail.cmd, stdin)
             return self.compare(expected, actual, files)
         except subprocess.TimeoutExpired as e:
-            return result_data.TIMEOUT
-
+            return result_data.TIMEOUT, "Timeout"
+        except FileNotFoundError as e:
+            return result_data.ERROR, "File not found"
 
     def run(self, detail):
         self.set_up()
