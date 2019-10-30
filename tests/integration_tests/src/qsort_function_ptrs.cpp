@@ -1,4 +1,6 @@
 /* TAGS: min cpp */
+/* LIFT_OPTS: explicit +--explicit_args +--explicit_args_count 8 */
+/* LIFT_OPTS: default */
 /* TEST: 23 */
 /* TEST: 43 */
 /* TEST: 435 */
