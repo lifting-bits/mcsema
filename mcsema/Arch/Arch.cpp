@@ -38,13 +38,15 @@
 
 namespace mcsema {
 
+extern llvm::LLVMContext *gContext;
+
 const remill::Arch *gArch = nullptr;
 
 bool InitArch(const std::string &os, const std::string &arch) {
   LOG(INFO)
       << "Initializing for " << arch << " code on " << os;
 
-  gArch = remill::GetTargetArch();
+  gArch = remill::GetTargetArch(*gContext);
   gWordType = llvm::Type::getIntNTy(
       *gContext, static_cast<unsigned>(gArch->address_size));
   return true;
