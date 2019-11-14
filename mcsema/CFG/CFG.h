@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef MCSEMA_CFG_CFG_H_
-#define MCSEMA_CFG_CFG_H_
+#pragma once
 
 #include <cstdint>
 #include <map>
@@ -62,8 +61,7 @@ struct NativeInstruction {
 
 struct NativeBlock {
   uint64_t ea = 0;
-  std::string lifted_name;
-  std::vector<const NativeInstruction *> instructions;
+  std::vector<std::unique_ptr<NativeInstruction>> instructions;
   std::unordered_set<uint64_t> successor_eas;
 };
 
@@ -90,9 +88,15 @@ struct NativeObject {
   NativeObject *Get(void);
 };
 
+// Global variable defined inside of the lifted binary.
+struct NativeVariable : public NativeObject {
+  const NativeSegment *segment = nullptr;
+  mutable llvm::Constant *address = nullptr;
+};
+
 // Function that is defined inside the binary.
 struct NativeFunction : public NativeObject {
-  std::unordered_map<uint64_t, const NativeBlock *> blocks;
+  std::unordered_map<uint64_t, std::unique_ptr<NativeBlock>> blocks;
   std::vector<struct NativeStackVariable *> stack_vars;
   std::vector<struct NativeExceptionFrame *> eh_frame;
   mutable llvm::Function *function = nullptr;
@@ -124,12 +128,6 @@ struct NativeExternalFunction : public NativeFunction {
   bool is_weak = false;
   unsigned num_args = 0;
   llvm::CallingConv::ID cc;
-};
-
-// Global variable defined inside of the lifted binary.
-struct NativeVariable : public NativeObject {
-  const NativeSegment *segment = nullptr;
-  mutable llvm::Constant *address = nullptr;
 };
 
 // Global variable defined outside of the lifted binary.
@@ -172,8 +170,8 @@ struct NativeSegment : public NativeObject {
 
     uint64_t ea = 0;
     uint64_t next_ea = 0;
-    const NativeXref *xref = nullptr;
-    const NativeBlob *blob = nullptr;
+    std::unique_ptr<NativeXref> xref;
+    std::unique_ptr<NativeBlob> blob;
   };
 
   uint64_t size = 0;
@@ -190,7 +188,7 @@ struct NativeSegment : public NativeObject {
 // NOTE(pag): Using an `std::map` (as opposed to an `std::unordered_map`) is
 //            intentional so that we can get the ordering of `NativeSegment`s
 //            by their `ea`s.
-using SegmentMap = std::map<uint64_t, NativeSegment *>;
+using SegmentMap = std::map<uint64_t, std::unique_ptr<NativeSegment>>;
 
 struct NativeModule {
   std::unordered_set<uint64_t> exported_vars;
@@ -198,23 +196,23 @@ struct NativeModule {
 
   SegmentMap segments;
 
-  std::unordered_map<uint64_t, const NativeFunction *> ea_to_func;
+  std::unordered_map<uint64_t, std::unique_ptr<NativeFunction>> ea_to_func;
 
   std::unordered_map<std::string, const NativeExternalFunction *>
       name_to_extern_func;
 
   // Represent global and external variables.
-  std::unordered_map<uint64_t, const NativeVariable *> ea_to_var;
+  std::unordered_map<uint64_t, std::unique_ptr<NativeVariable>> ea_to_var;
   std::unordered_map<std::string, const NativeExternalVariable *>
       name_to_extern_var;
 
-  const NativeFunction *TryGetFunction(uint64_t ea) const;
-  const NativeVariable *TryGetVariable(uint64_t ea) const;
+  NativeFunction *TryGetFunction(uint64_t ea) const;
+  NativeVariable *TryGetVariable(uint64_t ea) const;
+
+  std::vector<std::unique_ptr<NativeVariable>> dead_vars;
 };
 
 NativeModule *ReadProtoBuf(const std::string &file_name,
                            uint64_t pointer_size);
 
 }  // namespace mcsema
-
-#endif  // MCSEMA_CFG_CFG_H_

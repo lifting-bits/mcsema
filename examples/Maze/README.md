@@ -81,16 +81,16 @@ sudo pip install --upgrade pip
 sudo pip install 'protobuf==3.2.0'
 ```
 
-Now that we have the dependencies we need, we should clone [Remill](https://github.com/trailofbits/remill).
+Now that we have the dependencies we need, we should clone [Remill](https://github.com/lifting-bits/remill).
 
 ```bash
 cd ~/data
-git clone git@github.com:trailofbits/remill.git
+git clone https://github.com/lifting-bits/remill.git
 ```
 
 ### Step 2: Build Remill, McSema, and KLEE
 
-We have provided a convenient [script](https://github.com/trailofbits/remill/blob/master/scripts/build_klee.sh) for this walkthrough. The script will clone the latest version of McSema into the Remill checkout, as well as clone a version of KLEE that is compatible with Remill. You might already have McSema installed, and it might be a version that is not compatible with KLEE. That is not a problem. The script will ensure that the proper toolchain is built *within* the directory in which you invoke the script.
+We have provided a convenient [script](https://github.com/lifting-bits/remill/blob/master/scripts/build_klee.sh) for this walkthrough. The script will clone the latest version of McSema into the Remill checkout, as well as clone a version of KLEE that is compatible with Remill. You might already have McSema installed, and it might be a version that is not compatible with KLEE. That is not a problem. The script will ensure that the proper toolchain is built *within* the directory in which you invoke the script.
 
 ```bash
 mkdir /tmp/klee_ws

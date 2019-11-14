@@ -54,7 +54,7 @@ Let's walk through each option:
 
 ### Fixing Errors
 
-This section documents how to fix a common CFG recovery problem: undefined external functions. By the time you are reading this guide, the functions described here may have already been added to the [list of common external Linux functions that comes with mcsema](https://github.com/trailofbits/mcsema/blob/master/tools/mcsema_disass/defs/linux.txt) and you can skip this section.
+This section documents how to fix a common CFG recovery problem: undefined external functions. By the time you are reading this guide, the functions described here may have already been added to the [list of common external Linux functions that comes with mcsema](https://github.com/lifting-bits/mcsema/blob/master/tools/mcsema_disass/defs/linux.txt) and you can skip this section.
 
 The previous command may have failed (as in this snippet). If it did, read on. If not, skip this section and move on to Translation To Bitcode.
 
