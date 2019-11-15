@@ -3,6 +3,7 @@
 #include <utility>
 
 #include "mcsema/CFG/SQLiteWrapper.h"
+#include "mcsema/CFG/Util.h"
 
 namespace mcsema {
 namespace cfg {
@@ -14,20 +15,6 @@ using Result_ = typename sqlite::Database< db >::QueryResult;
 
 template< auto db >
 using Database_ = sqlite::Database< db >;
-
-namespace util
-{
-
-template< typename R, typename Yield, typename ...Args >
-void iterate( R &&r, Yield yield, Args &&...args )
-{
-  while( r( std::forward< Args >( args ) ...  ) )
-  {
-    yield( std::forward< Args >( args ) ...  );
-  }
-}
-} // namespace util
-
 
 template< const auto &name >
 struct Module {
