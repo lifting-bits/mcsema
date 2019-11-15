@@ -257,32 +257,28 @@ struct ea_based_ops_: _crtp< Self, ea_based_ops_ >
 };
 
 template< typename Self >
-struct concrete_ea_based_ops_ : _crtp< Self, concrete_ea_based_ops_ > {};
+struct concrete_ea_based_ops_ : ea_based_ops_< Self >
+{
+  using _parent = ea_based_ops_< Self >;
 
-template< typename Self >
-struct ea_primary_key_ : ea_based_ops_< Self >, all_< Self > {};
+  auto get() { return _parent::get( this->self().ea ); }
+  auto erase() { return _parent::erase( this->self().ea ); }
+
+};
 
 // Forward-declare concrete
 template< const auto &db_name >
-struct concrete_func;
+struct ConcreteFunc;
 
 template< const auto &db_name >
-struct concrete_bb;
+struct ConcreteBB;
 
-template< const auto &db_name, typename Concrete = concrete_func< db_name > >
-struct func_ops : ea_primary_key_< func_ops< db_name > >
+template< typename Self >
+struct func_ops_ : _crtp< Self, func_ops_ >
 {
-  sqlite::Database< db_name > _db;
 
-  static constexpr Query table_name = R"(functions)";
-
-  Concrete insert_bare( uint64_t ea, bool is_entrypoint, const std::string &name )
-  {
-    constexpr static Query q_insert_bare =
-      R"(insert into functions values (?1, ?2, ?3))";
-    _db.template query< q_insert_bare >( ea, is_entrypoint, name );
-    return Concrete{ ea };
-  }
+  using parent_ = _crtp< Self, func_ops_ >;
+  using parent_::self;
 
   auto bbs( uint64_t ea )
   {
@@ -290,26 +286,79 @@ struct func_ops : ea_primary_key_< func_ops< db_name > >
 
       R"(select * from blocks inner join func_to_block on
             blocks.ea = func_to_block.bb_ea and func_to_block.func_ea = ?1)";
-    return _db.template query< q_bbs >( ea );
+    return this->self()._db.template query< q_bbs >( ea );
   }
 
   template < typename Container = std::vector< uint64_t > >
-  auto unbind_bbs( uint64_t self, const Container &to_unbind)
+  auto unbind_bbs( uint64_t ea, const Container &to_unbind)
   {
     constexpr static Query q_unbind_bbs =
       R"(delete from func_to_block where func_ea = ?1 and bb_ea = ?2 )";
     for ( auto &other : to_unbind )
-      _db.template query< q_unbind_bbs >( self, other );
+      this->self()._db.template query< q_unbind_bbs >( ea, other );
   }
 
   template< typename Container = std::vector< uint64_t > >
-  auto bind_bbs( uint64_t self, const Container &to_bind )
+  auto bind_bbs( uint64_t ea, const Container &to_bind )
   {
     constexpr static Query q_bind_bbs =
       R"(insert into func_to_block values (?1, ?2))";
     for ( auto &other : to_bind )
-      _db.template query< q_bind_bbs >( self, other );
+      this->self()._db.template query< q_bind_bbs >( ea, other );
 
+  }
+
+};
+
+template< typename Self >
+struct concrete_func_ops_: func_ops_< Self >
+{
+  using parent_ = func_ops_< Self >;
+  using parent_::self;
+
+  auto bbs() { this->parent_::bbs( self().ea ); }
+
+  template < typename Container = std::vector< uint64_t > >
+  auto unbind_bbs( const Container &to_unbind)
+  {
+    this->parent_::unbind_bbs( self().ea, to_unbind );
+  }
+
+  template< typename Container = std::vector< uint64_t > >
+  auto bind_bbs( const Container &to_bind )
+  {
+    this->parent_::bind_bbs( self().ea, to_bind );
+  }
+
+};
+
+
+template< typename Self >
+struct func_ops_mixin :
+  func_ops_< Self >,
+  all_< Self >,
+  ea_based_ops_< Self >
+{};
+
+template< typename Self >
+struct concrete_func_ops_mixin :
+  concrete_func_ops_< Self >,
+  all_< Self >,
+  concrete_ea_based_ops_< Self >
+{};
+
+template< const auto &db_name, typename Concrete = ConcreteFunc< db_name > >
+struct Func : func_ops_mixin< Func< db_name, Concrete > >
+{
+  static constexpr Query table_name = R"(functions)";
+  sqlite::Database< db_name > _db;
+
+  Concrete insert_bare( uint64_t ea, bool is_entrypoint, const std::string &name )
+  {
+    constexpr static Query q_insert_bare =
+      R"(insert into functions values (?1, ?2, ?3))";
+    _db.template query< q_insert_bare >( ea, is_entrypoint, name );
+    return Concrete{ ea };
   }
 
   struct bare
@@ -330,7 +379,7 @@ struct func_ops : ea_primary_key_< func_ops< db_name > >
 
   auto print_f()
   {
-    return &func_ops::print;
+    return &Func::print;
   }
 
   static void print( uint64_t ea, bool is_entrypoint, const std::string &name )
@@ -340,73 +389,53 @@ struct func_ops : ea_primary_key_< func_ops< db_name > >
 
 };
 
-template < const auto &db_name >
-struct concrete_func : func_ops< db_name >
+template< const auto &db_name >
+struct ConcreteFunc : concrete_func_ops_mixin< ConcreteFunc< db_name > >
 {
-  using ops = func_ops< db_name >;
+  static constexpr Query table_name = R"(functions)";
+  sqlite::Database< db_name > _db;
+  uint64_t ea;
 
-  uint64_t _ea;
+  ConcreteFunc( uint64_t address ) : ea( address ) {}
+};
 
-  concrete_func( uint64_t ea ) : _ea( ea ) {}
-
-  template< typename QResult >
-  static auto construct( QResult r )
+template< typename Self >
+struct bb_ops_ : _crtp< Self, bb_ops_ >
+{
+  template< typename Data >
+  auto insert( uint64_t ea, Data &&bytes )
   {
-    typename ops::bare col;
-    r( col.ea, col.is_entrypoint, col.name );
-    return concrete_func{ col.ea };
+    constexpr static Query q_insert = R"(insert into blocks values (?1, ?2))";
+    return this->self()._db.template query< q_insert >( ea, bytes );
   }
 
-  template< typename Container = std::vector< uint64_t > >
-  auto bind_bbs( const Container &to_bind )
-  {
-    return this->ops::bind_bbs( _ea, to_bind );
-  }
+};
 
-  template < typename Container = std::vector< uint64_t > >
-  auto unbind_bbs( const Container &to_unbind)
-  {
-    return this->ops::unbind_bbs( _ea, to_unbind );
-  }
+template< typename Self >
+struct bb_mixin : bb_ops_< Self >,
+                  ea_based_ops_< Self >,
+                  all_< Self > {};
 
-  auto bbs() { return bbs( _ea ); }
+template< typename Self >
+struct concrete_bb_mixin : concrete_ea_based_ops_< Self >,
+                            all_< Self > {};
+
+
+template< const auto &db_name, typename Concrete = ConcreteBB< db_name > >
+struct bb_ops : bb_mixin< bb_ops< db_name, Concrete > >
+{
+  sqlite::Database< db_name > _db;
+  constexpr static Query table_name = R"(blocks)";
 
 };
 
 
 template< const auto &db_name >
-struct bb_ops : ea_primary_key_< bb_ops< db_name > >
+struct ConcreteBB : concrete_bb_mixin< ConcreteBB< db_name > >
 {
+  uint64_t ea;
   sqlite::Database< db_name > _db;
-
   constexpr static Query table_name = R"(blocks)";
-
-  constexpr static Query q_insert = R"(insert into blocks values (?1, ?2))";
-  constexpr static Query q_fetch = R"(select * from blocks where ea = ?1)";
-
-  template< typename Data >
-  auto insert( uint64_t ea, Data &&bytes )
-  {
-    return _db.template query< q_insert >( ea, bytes );
-  }
-
-  template< typename DB >
-  static auto fetch( DB db, uint64_t ea )
-  {
-    return db.query< q_fetch >( ea );
-  }
-
-  auto get( uint64_t ea )
-  {
-    static Query q_get = R"(select * from blocks where ea = ?1)";
-    return exec< q_get >( ea );
-  }
-
-  template< const auto &q, typename ...Args >
-  auto exec( Args ...args) {
-    return _db.template query< q >(args...);
-  }
-
 };
 
 template< const auto &db_name >
@@ -422,7 +451,7 @@ struct Letter_
 
   auto func()
   {
-    return func_ops< db_name >();
+    return Func< db_name >{};
   }
 
   auto bb()
