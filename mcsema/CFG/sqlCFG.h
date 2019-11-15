@@ -71,6 +71,18 @@ struct Module {
 
   }
 
+  static void CreateNMTables()
+  {
+    static Query q_func_2_block =
+      R"(create table if not exists func_to_block(
+         func_ea integer,
+         bb_ea integer,
+         FOREIGN KEY(func_ea) REFERENCES functions(ea),
+         FOREIGN KEY(bb_ea) REFERENCES blocks(ea)
+        ))";
+    db::template query< q_func_2_block >();
+  }
+
   static void CreateScheme() {
     CreateEnums();
 
@@ -161,6 +173,8 @@ struct Module {
           name text
           ))";
     db::template query<code_xrefs>();
+
+    CreateNMTables();
   }
 
 };
