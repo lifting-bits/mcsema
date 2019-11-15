@@ -191,23 +191,50 @@ struct _exec_mixin {
 
 };
 
-template< typename Self >
-struct _get_mixin
+// Second template is to avoid DDD( Dreadful Diamond of Derivation ) without using
+// virtual inheritance. Since this is strictly mixin inheritance it is okay
+template< typename Self, template< typename > class Derived >
+struct _crtp
 {
-  static std::string _q_all() {
+  Self &self() { return static_cast< Self & >( *this ); }
+  const Self &self() const { return static_cast< const Self & >( *this ); }
+};
+
+template< typename Self >
+struct all_ : _crtp< Self, all_ >
+{
+  static std::string _q_all()
+  {
     return std::string{ "select * from " } + Self::table_name;
   }
 
   auto all()
   {
-    auto self = static_cast< const Self* >( this );
-    return self->_db.template query< _q_all >();
+    return this->self()._db.template query< _q_all >();
   }
 
 };
 
+template< typename Self >
+struct get_ea_ : _crtp< Self, get_ea_ >
+{
+  static std::string _q_get()
+  {
+    return std::string{ "select * from " } + Self::table_name + " where ea = ?1";
+  }
+
+  auto get( uint64_t ea )
+  {
+    return this->self()._db.template query< _q_get >( ea );
+  }
+
+};
+
+template< typename Self >
+struct ea_primary_key_ : get_ea_< Self >, all_< Self > {};
+
 template< const auto &db_name >
-struct func_ops : _get_mixin< func_ops< db_name > >
+struct func_ops : ea_primary_key_< func_ops< db_name > >
 {
   sqlite::Database< db_name > _db;
 
@@ -270,7 +297,7 @@ struct func_ops : _get_mixin< func_ops< db_name > >
 
 
 template< const auto &db_name >
-struct bb_ops : _get_mixin< bb_ops< db_name > >
+struct bb_ops : ea_primary_key_< bb_ops< db_name > >
 {
   sqlite::Database< db_name > _db;
 
