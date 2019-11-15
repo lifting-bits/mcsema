@@ -232,7 +232,7 @@ struct all_ : _crtp< Self, all_ >
 };
 
 template< typename Self >
-struct get_ea_ : _crtp< Self, get_ea_ >
+struct ea_based_ops_: _crtp< Self, ea_based_ops_ >
 {
   static std::string _q_get()
   {
@@ -244,14 +244,30 @@ struct get_ea_ : _crtp< Self, get_ea_ >
     return this->self()._db.template query< _q_get >( ea );
   }
 
+  static std::string _q_remove( uint64_t ea )
+  {
+    return std::string{ "delete from " } + Self::table_name + " where ea = ?1";
+  }
+
+  auto erase( uint64_t ea )
+  {
+    return this->self()._db.template query< _q_remove >( ea );
+  }
+
 };
 
 template< typename Self >
-struct ea_primary_key_ : get_ea_< Self >, all_< Self > {};
+struct concrete_ea_based_ops_ : _crtp< Self, concrete_ea_based_ops_ > {};
 
-// Forward-declare
+template< typename Self >
+struct ea_primary_key_ : ea_based_ops_< Self >, all_< Self > {};
+
+// Forward-declare concrete
 template< const auto &db_name >
 struct concrete_func;
+
+template< const auto &db_name >
+struct concrete_bb;
 
 template< const auto &db_name, typename Concrete = concrete_func< db_name > >
 struct func_ops : ea_primary_key_< func_ops< db_name > >
