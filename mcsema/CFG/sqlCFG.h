@@ -191,11 +191,27 @@ struct _exec_mixin {
 
 };
 
+template< typename Self >
+struct _get_mixin
+{
+  static std::string _q_all() {
+    return std::string{ "select * from " } + Self::table_name;
+  }
+
+  auto all()
+  {
+    auto self = static_cast< const Self* >( this );
+    return self->_db.template query< _q_all >();
+  }
+
+};
 
 template< const auto &db_name >
-struct func_ops
+struct func_ops : _get_mixin< func_ops< db_name > >
 {
   sqlite::Database< db_name > _db;
+
+  static constexpr Query table_name = R"(functions)";
 
   auto insert_bare( uint64_t ea, bool is_entrypoint, const std::string &name )
   {
@@ -204,11 +220,23 @@ struct func_ops
     return _db.template query< q_insert_bare >( ea, is_entrypoint, name );
   }
 
-
-  auto all()
+  auto bbs( uint64_t ea )
   {
-    constexpr static Query q_all = R"(select * from functions)";
-    return _db.template query< q_all >();
+    constexpr static Query q_bbs =
+
+      R"(select * from blocks inner join func_to_block on
+            blocks.ea = func_to_block.bb_ea and func_to_block.func_ea = ?1)";
+    return _db.template query< q_bbs >( ea );
+  }
+
+  template< typename Container = std::vector< uint64_t > >
+  auto add_bbs( uint64_t self, const Container &to_add )
+  {
+    constexpr static Query q_add_bbs =
+      R"(insert into func_to_block values (?1, ?2))";
+    for ( auto &other : to_add )
+      _db.template query< q_add_bbs >( self, other );
+
   }
 
   struct bare
@@ -242,11 +270,12 @@ struct func_ops
 
 
 template< const auto &db_name >
-struct bb_ops
+struct bb_ops : _get_mixin< bb_ops< db_name > >
 {
   sqlite::Database< db_name > _db;
 
-  constexpr static Query q_all = R"(select * from blocks)";
+  constexpr static Query table_name = R"(blocks)";
+
   constexpr static Query q_insert = R"(insert into blocks values (?1, ?2))";
   constexpr static Query q_fetch = R"(select * from blocks where ea = ?1)";
 
@@ -260,11 +289,6 @@ struct bb_ops
   static auto fetch( DB db, uint64_t ea )
   {
     return db.query< q_fetch >( ea );
-  }
-
-  auto all()
-  {
-    return _db.template query< q_all >( );
   }
 
   auto get( uint64_t ea )
