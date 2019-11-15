@@ -1,9 +1,33 @@
 #pragma once
 
+#include <utility>
+
 #include "mcsema/CFG/SQLiteWrapper.h"
 
 namespace mcsema {
-namespace sqlcfg {
+namespace cfg {
+
+using Query = const char *;
+
+template< auto db >
+using Result_ = typename sqlite::Database< db >::QueryResult;
+
+template< auto db >
+using Database_ = sqlite::Database< db >;
+
+namespace util
+{
+
+template< typename R, typename Yield, typename ...Args >
+void iterate( R &&r, Yield yield, Args &&...args )
+{
+  while( r( std::forward< Args >( args ) ...  ) )
+  {
+    yield( std::forward< Args >( args ) ...  );
+  }
+}
+} // namespace util
+
 
 template< const auto &name >
 struct Module {
@@ -137,7 +161,7 @@ struct Module {
     db::template query<functions>();
 
     static Query blocks = R"(create table if not exists blocks(
-          ea integer,
+          ea integer PRIMARY KEY NOT NULL,
           bytes blob
           ))";
     db::template query<blocks>();
@@ -151,8 +175,139 @@ struct Module {
           ))";
     db::template query<code_xrefs>();
   }
+
+};
+
+template< typename Self >
+struct _exec_mixin {
+
+  template< const auto &q, typename ...Args >
+  auto exec( Args ...args )
+  {
+    auto self = static_cast< const Self* >( this );
+    return self._db.template query< q >( args... );
+  }
+
 };
 
 
-} // namespace sqlcfg
+template< const auto &db_name >
+struct func_ops
+{
+  sqlite::Database< db_name > _db;
+
+  auto insert_bare( uint64_t ea, bool is_entrypoint, const std::string &name )
+  {
+    constexpr static Query q_insert_bare =
+      R"(insert into functions values (?1, ?2, ?3))";
+    return _db.template query< q_insert_bare >( ea, is_entrypoint, name );
+  }
+
+
+  auto all()
+  {
+    constexpr static Query q_all = R"(select * from functions)";
+    return _db.template query< q_all >();
+  }
+
+  struct bare
+  {
+    uint64_t ea;
+    bool is_entrypoint;
+    std::string name;
+  };
+
+  template< typename R, typename Yield >
+  static void iterate( R &&r, Yield yield )
+  {
+    bare _values;
+    return util::iterate(
+        std::forward< R >( r ), yield,
+        _values.ea, _values.is_entrypoint, _values.name );
+  }
+
+  auto print_f()
+  {
+    return &func_ops::print;
+  }
+
+  static void print( uint64_t ea, bool is_entrypoint, const std::string &name )
+  {
+    std::cerr << ea << " " << is_entrypoint << " " << name << std::endl;
+  }
+
+};
+
+
+
+template< const auto &db_name >
+struct bb_ops
+{
+  sqlite::Database< db_name > _db;
+
+  constexpr static Query q_all = R"(select * from blocks)";
+  constexpr static Query q_insert = R"(insert into blocks values (?1, ?2))";
+  constexpr static Query q_fetch = R"(select * from blocks where ea = ?1)";
+
+  template< typename Data >
+  auto insert( uint64_t ea, Data &&bytes )
+  {
+    return _db.template query< q_insert >( ea, bytes );
+  }
+
+  template< typename DB >
+  static auto fetch( DB db, uint64_t ea )
+  {
+    return db.query< q_fetch >( ea );
+  }
+
+  auto all()
+  {
+    return _db.template query< q_all >( );
+  }
+
+  auto get( uint64_t ea )
+  {
+    static Query q_get = R"(select * from blocks where ea = ?1)";
+    return exec< q_get >( ea );
+  }
+
+  template< const auto &q, typename ...Args >
+  auto exec( Args ...args) {
+    return _db.template query< q >(args...);
+  }
+
+};
+
+template< const auto &db_name >
+struct Letter_
+{
+  sqlite::Database< db_name > _db;
+
+
+  void create_scheme()
+  {
+    Module<db_name>::CreateScheme();
+  }
+
+  auto func()
+  {
+    return func_ops< db_name >();
+  }
+
+  auto bb()
+  {
+    return bb_ops< db_name >();
+  }
+
+  template< typename Data >
+  auto add_bb( uint64_t ea, Data &&bytes )
+  {
+    return bb_ops< db_name >{}.insert( ea, std::forward< Data >( bytes ) );
+  }
+
+};
+
+
+} // namespace cfg
 } // namespace mcsema
