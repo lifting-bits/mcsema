@@ -90,8 +90,8 @@ struct Schema {
   {
     static Query q_func_2_block =
       R"(create table if not exists func_to_block(
-         func_ea integer,
-         bb_ea integer,
+         func_ea integer NOT NULL,
+         bb_ea integer NOT NULL,
          FOREIGN KEY(func_ea) REFERENCES functions(ea),
          FOREIGN KEY(bb_ea) REFERENCES blocks(ea)
         ))";
@@ -101,12 +101,38 @@ struct Schema {
   static void CreateSchema(Database &db) {
     CreateEnums(db);
 
+    static Query c_module =
+      R"(create table if not exists modules(
+         name text,
+         id integer PRIMARY KEY
+        ))";
+    db.template query<c_module>;
+
     static Query c_module_meta =
       R"(create table if not exists module_meta(
          name text,
          arch text,
          os text))";
     db.template query<c_module_meta>();
+
+    static Query functions = R"(create table if not exists functions(
+          ea integer NOT NULL,
+          is_entrypoint integer,
+          name text,
+          module integer,
+          id integer PRIMARY KEY,
+          FOREIGN KEY(module) REFERENCES modules(id)
+          ))";
+    db.template query<functions>();
+
+    static Query blocks = R"(create table if not exists blocks(
+          ea integer NOT NULL,
+          bytes blob,
+          module integer,
+          id integer PRIMARY KEY,
+          FOREIGN KEY(module) REFERENCES modules(id)
+          ))";
+    db.template query<blocks>();
 
     static Query g_vars = R"(create table if not exists global_variables(
           ea integer,
@@ -166,19 +192,6 @@ struct Schema {
           signature text
           ))";
     db.template query<external_functions>();
-
-    static Query functions = R"(create table if not exists functions(
-          ea integer,
-          is_entrypoint integer,
-          name text
-          ))";
-    db.template query<functions>();
-
-    static Query blocks = R"(create table if not exists blocks(
-          ea integer PRIMARY KEY NOT NULL,
-          bytes blob
-          ))";
-    db.template query<blocks>();
 
     static Query code_xrefs = R"(create table if not exists code_references(
           ea integer,
