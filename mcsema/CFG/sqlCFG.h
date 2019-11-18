@@ -65,9 +65,14 @@ private:
 class Function {
 
 public:
-  void BindBB(const BasicBlock &bb);
+  void AttachBlock(const BasicBlock &bb);
 
-  void BindBBs(const std::vector<BasicBlock> &bbs);
+  template<typename Collection = std::vector<BasicBlock>>
+  void AttachBlocks(const Collection &bbs) {
+    for (auto bb : bbs) {
+      AttachBlock(bb);
+    }
+  }
 
 private:
   Function(int64_t rowid) : id( rowid ) {}

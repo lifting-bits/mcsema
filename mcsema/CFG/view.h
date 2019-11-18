@@ -40,10 +40,10 @@ void run()
   auto entry_bb = bin.AddBasicBlock(400400, 8, text);
   auto exit_bb = bin.AddBasicBlock(400415, 7, text);
 
-  main.BindBB(entry_bb);
-  main.BindBB(exit_bb);
+  main.AttachBlock(entry_bb);
+  main.AttachBlock(exit_bb);
 
-  foo.BindBBs( { entry_bb, exit_bb } );
+  foo.AttachBlocks( { entry_bb, exit_bb } );
 }
 
 

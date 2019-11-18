@@ -402,15 +402,7 @@ BasicBlock Module::AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &me
 
 /* Function */
 
-void Function::BindBBs(const std::vector<BasicBlock> &bbs) {
-  // TODO: Can this be done smarter?
-  auto dispatch = Function_{};
-  for ( auto &bb : bbs ) {
-    dispatch.bind_bb(id, bb.id);
-  }
-}
-
-void Function::BindBB(const BasicBlock &bb) {
+void Function::AttachBlock(const BasicBlock &bb) {
   Function_<Function>{}.bind_bb(id, bb.id);
 }
 
