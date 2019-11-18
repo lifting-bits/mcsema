@@ -32,6 +32,8 @@ struct _crtp
 template< typename Self >
 struct id_based_ops_: _crtp< Self, id_based_ops_ >
 {
+  using _crtp< Self, id_based_ops_ >::self;
+
   int64_t last_rowid()
   {
     constexpr static Query q_last_row_id =
@@ -62,6 +64,12 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
   auto erase( uint64_t id )
   {
     return this->self()._db.template query< _q_remove >( id );
+  }
+
+  template<typename ...Args>
+  auto insert(Args ...args) {
+    self()._db.template query<Self::q_insert>(args...);
+    return this->last_rowid();
   }
 
 };
