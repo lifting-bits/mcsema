@@ -242,12 +242,8 @@ struct Module_ : module_ops_mixin< Module_< Concrete > > {
 
   Module_( Database db ) : _db( db ) {}
 
-  auto insert(const std::string &name) {
-     constexpr static Query q_insert =
-       R"(insert into modules(name) values (?1))";
-     _db.template query<q_insert>(name);
-     return this->last_rowid();
-  }
+  constexpr static Query q_insert =
+    R"(insert into modules(name) values (?1))";
 
 };
 
@@ -320,14 +316,9 @@ struct BasicBlock_: bb_mixin< BasicBlock_< Concrete > >
   BasicBlock_() = default;
   BasicBlock_( Database db ) : _db( db ) {}
 
-  auto insert(int64_t module_id, int64_t ea, int64_t size, int64_t mem_id)
-  {
     constexpr static Query q_insert =
       R"(insert into blocks(module_rowid, ea, size, memory_rowid)
           values (?1, ?2, ?3, ?4))";
-    _db.template query< q_insert >( module_id, ea, size, mem_id );
-    return this->last_rowid();
-  }
 
 };
 
