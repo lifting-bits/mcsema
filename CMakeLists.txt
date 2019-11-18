@@ -91,6 +91,7 @@ add_executable(${MCSEMA_LIFT}
   mcsema/Arch/Arch.cpp
 
   mcsema/CFG/CFG.cpp
+  mcsema/CFG/sqlCFG.cpp
 
   mcsema/BC/Callback.cpp
   mcsema/BC/External.cpp
