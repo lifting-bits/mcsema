@@ -26,7 +26,15 @@ void run()
   // Letter from frontend to backend with possibly several Modules
   Letter_< db_name > letter;
 
-  letter.create_scheme();
+  // Insert
+  letter.CreateSchema();
+  auto lib = letter.module("lib.so");
+  auto bin = letter.module("bin.out");
+
+  auto main = letter.func(bin, 12, true);
+  auto foo = letter.func(bin, 32, false);
+  auto library_func = letter.func(lib, 0, false);
+#if 0
 
   // Ask for an "abstract" class that does not encapsulate any particular bb
   auto bb = letter.bb();
@@ -81,6 +89,7 @@ void run()
       []( auto ea, auto data ) { std::cerr << ea << " " << data << std::endl; };
     util::iterate( f.bbs( 0 ), print, ea, data );
   }
+#endif
 }
 
 

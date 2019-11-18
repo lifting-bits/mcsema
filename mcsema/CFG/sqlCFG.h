@@ -19,6 +19,7 @@
 #include <utility>
 
 #include "mcsema/CFG/SQLiteWrapper.h"
+#include "mcsema/CFG/Types.h"
 #include "mcsema/CFG/Util.h"
 
 namespace mcsema {
@@ -106,7 +107,7 @@ struct Schema {
          name text,
          id integer PRIMARY KEY
         ))";
-    db.template query<c_module>;
+    db.template query<c_module>();
 
     static Query c_module_meta =
       R"(create table if not exists module_meta(
@@ -127,6 +128,7 @@ struct Schema {
 
     static Query blocks = R"(create table if not exists blocks(
           ea integer NOT NULL,
+          size integer,
           bytes blob,
           module integer,
           id integer PRIMARY KEY,
@@ -207,170 +209,84 @@ struct Schema {
 
 };
 
-template< typename Self >
-struct _exec_mixin {
-
-  template< const auto &q, typename ...Args >
-  auto exec( Args ...args )
-  {
-    auto self = static_cast< const Self* >( this );
-    return self._db.template query< q >( args... );
-  }
-
-};
-
-// Second template is to avoid DDD( Dreadful Diamond of Derivation ) without using
-// virtual inheritance. Since this is strictly mixin inheritance it is okay
-template< typename Self, template< typename > class Derived >
-struct _crtp
-{
-  Self &self() { return static_cast< Self & >( *this ); }
-  const Self &self() const { return static_cast< const Self & >( *this ); }
-};
-
-template< typename Self >
-struct all_ : _crtp< Self, all_ >
-{
-  static std::string _q_all()
-  {
-    return std::string{ "select * from " } + Self::table_name;
-  }
-
-  auto all()
-  {
-    return this->self()._db.template query< _q_all >();
-  }
-
-};
-
-template< typename Self >
-struct ea_based_ops_: _crtp< Self, ea_based_ops_ >
-{
-  static std::string _q_get()
-  {
-    return std::string{ "select * from " } + Self::table_name + " where ea = ?1";
-  }
-
-  auto get( uint64_t ea )
-  {
-    return this->self()._db.template query< _q_get >( ea );
-  }
-
-  static std::string _q_remove( uint64_t ea )
-  {
-    return std::string{ "delete from " } + Self::table_name + " where ea = ?1";
-  }
-
-  auto erase( uint64_t ea )
-  {
-    return this->self()._db.template query< _q_remove >( ea );
-  }
-
-};
-
-template< typename Self >
-struct concrete_ea_based_ops_ : ea_based_ops_< Self >
-{
-  using _parent = ea_based_ops_< Self >;
-
-  auto get() { return _parent::get( this->self().ea ); }
-  auto erase() { return _parent::erase( this->self().ea ); }
-
-};
-
 // Forward-declare concrete
-template< const auto &db_name >
-struct ConcreteFunc;
+struct Function;
+struct BasicBlock;
+struct Module;
 
-template< const auto &db_name >
-struct ConcreteBB;
+
+struct Module {
+
+  Module(int64_t rowid) : id( rowid ) {}
+
+  Function AddFunction(uint64_t ea, bool is_entrypoint);
+
+  int64_t id;
+};
+
+
+struct BasicBlock
+{
+  BasicBlock(int64_t rowid) : id(rowid) {}
+
+  int64_t id;
+};
+
+
+struct Function
+{
+  Function(int64_t rowid) : id( rowid ) {}
+
+  int64_t id;
+};
+
+
+Function Module::AddFunction(uint64_t ea, bool is_entrypoint ) {
+  return Function_{}.insert( id, ea, is_entrypoint );
+}
 
 template< typename Self >
-struct func_ops_ : _crtp< Self, func_ops_ >
-{
+struct module_ops_mixin : id_based_ops_< Self >,
+                          all_ < Self > {};
 
-  using parent_ = _crtp< Self, func_ops_ >;
-  using parent_::self;
+template< const auto &db_name, typename Concrete = Module >
+struct Module_ : module_ops_mixin< Module_< db_name, Concrete > > {
 
-  auto bbs( uint64_t ea )
-  {
-    constexpr static Query q_bbs =
+  static constexpr Query table_name = R"(modules)";
+  sqlite::Database< db_name > _db;
 
-      R"(select * from blocks inner join func_to_block on
-            blocks.ea = func_to_block.bb_ea and func_to_block.func_ea = ?1)";
-    return this->self()._db.template query< q_bbs >( ea );
-  }
-
-  template < typename Container = std::vector< uint64_t > >
-  auto unbind_bbs( uint64_t ea, const Container &to_unbind)
-  {
-    constexpr static Query q_unbind_bbs =
-      R"(delete from func_to_block where func_ea = ?1 and bb_ea = ?2 )";
-    for ( auto &other : to_unbind )
-      this->self()._db.template query< q_unbind_bbs >( ea, other );
-  }
-
-  template< typename Container = std::vector< uint64_t > >
-  auto bind_bbs( uint64_t ea, const Container &to_bind )
-  {
-    constexpr static Query q_bind_bbs =
-      R"(insert into func_to_block values (?1, ?2))";
-    for ( auto &other : to_bind )
-      this->self()._db.template query< q_bind_bbs >( ea, other );
-
-  }
+ Concrete insert(const std::string &name) {
+    constexpr static Query q_insert =
+      R"(insert into modules(name) values (?1))";
+    _db.template query<q_insert>(name);
+    return Concrete{ this->last_rowid() };
+ }
 
 };
 
-template< typename Self >
-struct concrete_func_ops_: func_ops_< Self >
-{
-  using parent_ = func_ops_< Self >;
-  using parent_::self;
-
-  auto bbs() { this->parent_::bbs( self().ea ); }
-
-  template < typename Container = std::vector< uint64_t > >
-  auto unbind_bbs( const Container &to_unbind)
-  {
-    this->parent_::unbind_bbs( self().ea, to_unbind );
-  }
-
-  template< typename Container = std::vector< uint64_t > >
-  auto bind_bbs( const Container &to_bind )
-  {
-    this->parent_::bind_bbs( self().ea, to_bind );
-  }
-
-};
 
 
 template< typename Self >
 struct func_ops_mixin :
   func_ops_< Self >,
   all_< Self >,
-  ea_based_ops_< Self >
+  id_based_ops_< Self >
 {};
 
-template< typename Self >
-struct concrete_func_ops_mixin :
-  concrete_func_ops_< Self >,
-  all_< Self >,
-  concrete_ea_based_ops_< Self >
-{};
 
-template< const auto &db_name, typename Concrete = ConcreteFunc< db_name > >
-struct Func : func_ops_mixin< Func< db_name, Concrete > >
+template< const auto &db_name, typename Concrete = Function >
+struct Function_ : func_ops_mixin< Function_< db_name, Concrete > >
 {
   static constexpr Query table_name = R"(functions)";
   sqlite::Database< db_name > _db;
 
-  Concrete insert_bare( uint64_t ea, bool is_entrypoint, const std::string &name )
+  Concrete insert(
+      Module module, uint64_t ea, bool is_entrypoint )
   {
-    constexpr static Query q_insert_bare =
-      R"(insert into functions values (?1, ?2, ?3))";
-    _db.template query< q_insert_bare >( ea, is_entrypoint, name );
-    return Concrete{ ea };
+    constexpr static Query q_insert =
+      R"(insert into functions(module, ea, is_entrypoint) values (?1, ?2, ?3))";
+    _db.template query< q_insert >( module.id, ea, is_entrypoint);
+    return Concrete{ this->last_rowid() };
   }
 
   struct bare
@@ -391,7 +307,7 @@ struct Func : func_ops_mixin< Func< db_name, Concrete > >
 
   auto print_f()
   {
-    return &Func::print;
+    return &Function_<db_name, Concrete>::print;
   }
 
   static void print( uint64_t ea, bool is_entrypoint, const std::string &name )
@@ -401,54 +317,28 @@ struct Func : func_ops_mixin< Func< db_name, Concrete > >
 
 };
 
-template< const auto &db_name >
-struct ConcreteFunc : concrete_func_ops_mixin< ConcreteFunc< db_name > >
-{
-  static constexpr Query table_name = R"(functions)";
-  sqlite::Database< db_name > _db;
-  uint64_t ea;
-
-  ConcreteFunc( uint64_t address ) : ea( address ) {}
-};
 
 template< typename Self >
-struct bb_ops_ : _crtp< Self, bb_ops_ >
+struct bb_mixin : id_based_ops_< Self >,
+                  all_< Self > {};
+
+template< const auto &db_name, typename Concrete = BasicBlock >
+struct BasicBlock_: bb_mixin< BasicBlock_< db_name, Concrete > >
 {
-  template< typename Data >
-  auto insert( uint64_t ea, Data &&bytes )
+  sqlite::Database< db_name > _db;
+  constexpr static Query table_name = R"(blocks)";
+
+  template< typename Module, typename Data >
+  auto insert( Module &&module, uint64_t ea, uint64_t size, Data &&bytes )
   {
-    constexpr static Query q_insert = R"(insert into blocks values (?1, ?2))";
-    return this->self()._db.template query< q_insert >( ea, bytes );
+    constexpr static Query q_insert =
+      R"(insert into blocks(module, ea, size, bytes) values (?1, ?2, ?3, ?4))";
+    _db.template query< q_insert >( module.id, ea, size, bytes );
+    return Concrete{ this->last_rowid() };
   }
 
 };
 
-template< typename Self >
-struct bb_mixin : bb_ops_< Self >,
-                  ea_based_ops_< Self >,
-                  all_< Self > {};
-
-template< typename Self >
-struct concrete_bb_mixin : concrete_ea_based_ops_< Self >,
-                            all_< Self > {};
-
-
-template< const auto &db_name, typename Concrete = ConcreteBB< db_name > >
-struct bb_ops : bb_mixin< bb_ops< db_name, Concrete > >
-{
-  sqlite::Database< db_name > _db;
-  constexpr static Query table_name = R"(blocks)";
-
-};
-
-
-template< const auto &db_name >
-struct ConcreteBB : concrete_bb_mixin< ConcreteBB< db_name > >
-{
-  uint64_t ea;
-  sqlite::Database< db_name > _db;
-  constexpr static Query table_name = R"(blocks)";
-};
 
 template< const auto &db_name >
 struct Letter_
@@ -461,20 +351,18 @@ struct Letter_
     Schema<dbT>::CreateSchema( _db );
   }
 
-  auto func()
-  {
-    return Func< db_name >{};
+  Module module(const std::string &name) {
+    return Module_< db_name >{}.insert(name);
   }
 
-  auto bb()
+  Function func(Module module, uint64_t ea, bool is_entrypoint)
   {
-    return bb_ops< db_name >();
+    return Function_< db_name >{}.insert(module, ea, is_entrypoint);
   }
 
-  template< typename Data >
-  auto add_bb( uint64_t ea, Data &&bytes )
+  BasicBlock bb(Module module, uint64_t ea, uint64_t range, std::string_view data)
   {
-    return bb_ops< db_name >{}.insert( ea, std::forward< Data >( bytes ) );
+    return BasicBlock_< db_name >{}.insert(module, ea, range, data);
   }
 
 };

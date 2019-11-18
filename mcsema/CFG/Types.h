@@ -35,8 +35,8 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
   int64_t last_rowid()
   {
     constexpr static Query q_last_row_id =
-      R"(SELECT last_insert_rowid)";
-    auto r = this->self()._db::template query< q_last_row_id >();
+      R"(SELECT last_insert_rowid())";
+    auto r = this->self()._db.template query< q_last_row_id >();
 
     int64_t result;
     r( result );
@@ -116,13 +116,11 @@ struct func_ops_ : _crtp< Self, func_ops_ >
       this->self()._db.template query< q_unbind_bbs >( ea, other );
   }
 
-  template< typename Container = std::vector< uint64_t > >
-  auto bind_bbs( uint64_t ea, const Container &to_bind )
+  auto bind_bb( uint64_t f_id, uint64_t bb_id )
   {
     constexpr static Query q_bind_bbs =
-      R"(insert into func_to_block values (?1, ?2))";
-    for ( auto &other : to_bind )
-      this->self()._db.template query< q_bind_bbs >( ea, other );
+      R"(insert into func_to_block (func_ea, bb_ea) values (?1, ?2))";
+    this->self()._db.template query< q_bind_bbs >( f_id, bb_id);
 
   }
 
@@ -153,11 +151,12 @@ struct concrete_func_ops_: func_ops_< Self >
 template< typename Self >
 struct bb_ops_ : _crtp< Self, bb_ops_ >
 {
-  template< typename Data >
-  auto insert( uint64_t ea, Data &&bytes )
+  template< typename Module, typename Data >
+  auto insert( Module &&module, uint64_t ea, uint64_t size, Data &&bytes )
   {
-    constexpr static Query q_insert = R"(insert into blocks values (?1, ?2))";
-    return this->self()._db.template query< q_insert >( ea, bytes );
+    constexpr static Query q_insert =
+      R"(insert into blocks(module, ea, size, bytes) values (?1, ?2, ?3, ?4))";
+    return this->self()._db.template query< q_insert >( module.id, ea, size, bytes );
   }
 
 };

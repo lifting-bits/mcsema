@@ -36,6 +36,7 @@
 #include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Util.h"
 
+#include "mcsema/CFG/view.h"
 #ifndef LLVM_VERSION_STRING
 # define LLVM_VERSION_STRING LLVM_VERSION_MAJOR << "." << LLVM_VERSION_MINOR
 #endif
@@ -340,6 +341,9 @@ int main(int argc, char *argv[]) {
   google::InitGoogleLogging(argv[0]);
   google::SetUsageMessage(ss.str());
   google::ParseCommandLineFlags(&argc, &argv, true);
+
+  mcsema::cfg::run();
+  return 0;
 
   if (FLAGS_version) {
     PrintVersion();
