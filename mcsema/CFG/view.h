@@ -21,10 +21,9 @@ namespace cfg {
 
 void run()
 {
-  static const char * db_name = R"(example.sql)";
   // So far Letter_ is the top level class of the API
   // Letter from frontend to backend with possibly several Modules
-  Letter_< db_name > letter;
+  Letter letter;
 
   // Insert
   letter.CreateSchema();
@@ -34,62 +33,17 @@ void run()
   auto main = letter.func(bin, 12, true);
   auto foo = letter.func(bin, 32, false);
   auto library_func = letter.func(lib, 0, false);
-#if 0
 
-  // Ask for an "abstract" class that does not encapsulate any particular bb
-  auto bb = letter.bb();
+  // TODO: Calculate automatically size
+  auto text = bin.AddMemoryRange(400400, 20, "push rax ... pop rax");
 
-  // Two ways to add bb
-  bb.insert( 8, "Hello" );
+  auto entry_bb = bin.AddBasicBlock(400400, 8, text);
+  auto exit_bb = bin.AddBasicBlock(400415, 7, text);
 
-  // Probably remove this one though
-  letter.add_bb( 12, "World" );
+  main.BindBB(entry_bb);
+  main.BindBB(exit_bb);
 
-  {
-    uint64_t ea;
-    std::string data;
-    auto print =
-      []( auto ea, auto data ) { std::cerr << ea << " " << data << std::endl; };
-
-    util::iterate( letter.bb().all(), print, ea, data );
-  }
-
-  // Same "abstract" class to handle functions
-  auto f = letter.func();
-  f.insert_bare( 0, true, "hello" );
-
-  // concrete_f is now one particular function, one that starts at ea 0
-  auto concrete_f = f.insert_bare( 0, false, "targ124" );
-
-  // Same as f.bind_bbs( 0, { 8, 12 } ) but more convenient
-  concrete_f.bind_bbs( { 8, 12 } );
-
-  // Special iteration over "bare" function e.g only "metadata" without bbs
-  f.iterate( f.all(), f.print_f() );
-
-
-  f.bind_bbs( 1, { 12 } );
-
-  // Some tests
-  std::cerr << "Example" << std::endl;
-  {
-    uint64_t ea;
-    std::string data;
-    auto print =
-      []( auto ea, auto data ) { std::cerr << ea << " " << data << std::endl; };
-    util::iterate( f.bbs( 0 ), print, ea, data );
-  }
-
-  f.unbind_bbs( 0, { 8 } );
-  std::cerr << "After unbind" << std::endl;
-  {
-    uint64_t ea;
-    std::string data;
-    auto print =
-      []( auto ea, auto data ) { std::cerr << ea << " " << data << std::endl; };
-    util::iterate( f.bbs( 0 ), print, ea, data );
-  }
-#endif
+  foo.BindBBs( { entry_bb, exit_bb } );
 }
 
 
