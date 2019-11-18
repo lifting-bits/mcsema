@@ -110,8 +110,8 @@ struct func_ops_ : _crtp< Self, func_ops_ >
   {
     constexpr static Query q_bbs =
 
-      R"(select * from blocks inner join func_to_block on
-            blocks.ea = func_to_block.bb_ea and func_to_block.func_ea = ?1)";
+      R"(select * from blocks inner join function_to_block on
+            blocks.ea = function_to_block.bb_rowid and function_to_block.function_rowid = ?1)";
     return this->self()._db.template query< q_bbs >( ea );
   }
 
@@ -119,7 +119,7 @@ struct func_ops_ : _crtp< Self, func_ops_ >
   auto unbind_bbs( uint64_t ea, const Container &to_unbind)
   {
     constexpr static Query q_unbind_bbs =
-      R"(delete from func_to_block where func_ea = ?1 and bb_ea = ?2 )";
+      R"(delete from function_to_block where function_rowid = ?1 and bb_rowid = ?2 )";
     for ( auto &other : to_unbind )
       this->self()._db.template query< q_unbind_bbs >( ea, other );
   }
@@ -127,11 +127,10 @@ struct func_ops_ : _crtp< Self, func_ops_ >
   auto bind_bb( int64_t f_id, int64_t bb_id )
   {
     constexpr static Query q_bind_bbs =
-      R"(insert into func_to_block (func_ea, bb_ea) values (?1, ?2))";
+      R"(insert into function_to_block (function_rowid, bb_rowid) values (?1, ?2))";
     this->self()._db.template query< q_bind_bbs >( f_id, bb_id);
 
   }
-
 };
 
 template< typename Self >

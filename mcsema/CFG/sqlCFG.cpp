@@ -86,11 +86,12 @@ struct Schema {
   static void CreateNMTables(Database db)
   {
     static Query q_func_2_block =
-      R"(create table if not exists func_to_block(
-         func_ea integer NOT NULL,
-         bb_ea integer NOT NULL,
-         FOREIGN KEY(func_ea) REFERENCES functions(ea),
-         FOREIGN KEY(bb_ea) REFERENCES blocks(ea)
+      R"(create table if not exists function_to_block(
+         function_rowid integer NOT NULL,
+         bb_rowid integer NOT NULL,
+         UNIQUE(function_rowid, bb_rowid),
+         FOREIGN KEY(function_rowid) REFERENCES functions(rowid),
+         FOREIGN KEY(bb_rowid) REFERENCES blocks(rowid)
         ))";
     db.template query< q_func_2_block >();
   }
@@ -101,8 +102,7 @@ struct Schema {
 
     static Query c_module =
       R"(create table if not exists modules(
-         name text,
-         id integer PRIMARY KEY
+         name text
         ))";
     db.template query<c_module>();
 
@@ -117,19 +117,17 @@ struct Schema {
           ea integer NOT NULL,
           is_entrypoint integer,
           name text,
-          module integer,
-          id integer PRIMARY KEY,
-          FOREIGN KEY(module) REFERENCES modules(id)
+          module_rowid integer,
+          FOREIGN KEY(module_rowid) REFERENCES modules(rowid)
           ))";
     db.template query<functions>();
 
     static Query memory_ranges = R"(create table if not exists memory_ranges(
       ea integer NOT NULL,
       size integer,
-      module integer,
+      module_rowid integer,
       bytes blob,
-      id integer PRIMARY KEY,
-      FOREIGN KEY(module) REFERENCES modules(id)
+      FOREIGN KEY(module_rowid) REFERENCES modules(rowid)
     ))";
 
     db.template query<memory_ranges>();
@@ -137,11 +135,10 @@ struct Schema {
     static Query blocks = R"(create table if not exists blocks(
           ea integer NOT NULL,
           size integer,
-          module integer,
-          memory integer,
-          id integer PRIMARY KEY,
-          FOREIGN KEY(module) REFERENCES modules(id),
-          FOREIGN KEY(memory) REFERENCES memory_ranges(id)
+          module_rowid integer,
+          memory_rowid integer,
+          FOREIGN KEY(module_rowid) REFERENCES modules(rowid),
+          FOREIGN KEY(memory_rowid) REFERENCES memory_ranges(rowid)
           ))";
     db.template query<blocks>();
 
@@ -220,24 +217,16 @@ struct Schema {
 
 };
 
-template< typename Concrete = MemoryRange >
-struct MemoryRange_ : id_based_ops_< MemoryRange_< Concrete > >,
-                      all_ < MemoryRange_< Concrete > > {
+struct MemoryRange_ : id_based_ops_< MemoryRange_ >,
+                      all_ < MemoryRange_ > {
 
   static constexpr Query table_name = R"(memory_ranges)";
   Database _db;
 
+  constexpr static Query q_insert =
+      R"(insert into memory_ranges(ea, size, module_rowid, bytes)
+      values (?1, ?2, ?3, ?4))";
 
-  auto insert(int64_t module_id,
-                  int64_t ea,
-                  int64_t size,
-                  std::string_view data)
-  {
-    constexpr static Query q_insert =
-      R"(insert into memory_ranges(ea, size, module, bytes) values (?1, ?2, ?3, ?4))";
-    _db.template query<q_insert>(ea, size, module_id, data.data());
-    return this->last_rowid();
-  }
 };
 
 
@@ -284,7 +273,7 @@ struct Function_ : func_ops_mixin< Function_< Concrete > >
   auto insert(int64_t module_id, int64_t ea, bool is_entrypoint )
   {
     constexpr static Query q_insert =
-      R"(insert into functions(module, ea, is_entrypoint) values (?1, ?2, ?3))";
+      R"(insert into functions(module_rowid, ea, is_entrypoint) values (?1, ?2, ?3))";
     _db.template query< q_insert >( module_id, ea, is_entrypoint);
     return this->last_rowid();
   }
@@ -334,7 +323,8 @@ struct BasicBlock_: bb_mixin< BasicBlock_< Concrete > >
   auto insert(int64_t module_id, int64_t ea, int64_t size, int64_t mem_id)
   {
     constexpr static Query q_insert =
-      R"(insert into blocks(module, ea, size, memory) values (?1, ?2, ?3, ?4))";
+      R"(insert into blocks(module_rowid, ea, size, memory_rowid)
+          values (?1, ?2, ?3, ?4))";
     _db.template query< q_insert >( module_id, ea, size, mem_id );
     return this->last_rowid();
   }
@@ -383,7 +373,7 @@ MemoryRange Letter::AddMemoryRange(const Module &module,
                                    int64_t ea,
                                    int64_t size,
                                    std::string_view data) {
-  return { MemoryRange_{}.insert(module.id, ea, size, data) };
+  return { MemoryRange_{}.insert(module.id, ea, size, data.data()) };
 }
 
 /* Module */
@@ -393,7 +383,7 @@ Function Module::AddFunction(int64_t ea, bool is_entrypoint ) {
 }
 
 MemoryRange Module::AddMemoryRange(int64_t ea, int64_t size, std::string_view data) {
-  return { MemoryRange_{}.insert(id, ea, size, data) };
+  return { MemoryRange_{}.insert(id, ea, size, data.data()) };
 }
 
 BasicBlock Module::AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &mem) {
