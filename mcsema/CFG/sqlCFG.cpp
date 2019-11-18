@@ -220,14 +220,6 @@ struct Schema {
 
 };
 
-// Forward-declare concrete
-struct Function;
-struct BasicBlock;
-struct Module;
-struct MemoryRange;
-
-
-
 template< typename Concrete = MemoryRange >
 struct MemoryRange_ : id_based_ops_< MemoryRange_< Concrete > >,
                       all_ < MemoryRange_< Concrete > > {
@@ -236,15 +228,15 @@ struct MemoryRange_ : id_based_ops_< MemoryRange_< Concrete > >,
   Database _db;
 
 
-  Concrete insert(const Module &module,
-                  uint64_t ea,
-                  uint64_t size,
+  auto insert(int64_t module_id,
+                  int64_t ea,
+                  int64_t size,
                   std::string_view data)
   {
     constexpr static Query q_insert =
       R"(insert into memory_ranges(ea, size, module, bytes) values (?1, ?2, ?3, ?4))";
-    _db.template query<q_insert>(ea, size, module.id, data.data());
-    return Concrete{ this->last_rowid() };
+    _db.template query<q_insert>(ea, size, module_id, data.data());
+    return this->last_rowid();
   }
 };
 
@@ -261,11 +253,11 @@ struct Module_ : module_ops_mixin< Module_< Concrete > > {
 
   Module_( Database db ) : _db( db ) {}
 
-  Concrete insert(const std::string &name) {
+  auto insert(const std::string &name) {
      constexpr static Query q_insert =
        R"(insert into modules(name) values (?1))";
      _db.template query<q_insert>(name);
-     return Concrete{ this->last_rowid() };
+     return this->last_rowid();
   }
 
 };
@@ -289,18 +281,17 @@ struct Function_ : func_ops_mixin< Function_< Concrete > >
   Function_() = default;
   Function_( Database db ) : _db( db ) {}
 
-  Concrete insert(
-      Module module, uint64_t ea, bool is_entrypoint )
+  auto insert(int64_t module_id, int64_t ea, bool is_entrypoint )
   {
     constexpr static Query q_insert =
       R"(insert into functions(module, ea, is_entrypoint) values (?1, ?2, ?3))";
-    _db.template query< q_insert >( module.id, ea, is_entrypoint);
-    return Concrete{ this->last_rowid() };
+    _db.template query< q_insert >( module_id, ea, is_entrypoint);
+    return this->last_rowid();
   }
 
   struct bare
   {
-    uint64_t ea;
+    int64_t ea;
     bool is_entrypoint;
     std::string name;
   };
@@ -319,7 +310,7 @@ struct Function_ : func_ops_mixin< Function_< Concrete > >
     return &Function_< Concrete>::print;
   }
 
-  static void print( uint64_t ea, bool is_entrypoint, const std::string &name )
+  static void print( int64_t ea, bool is_entrypoint, const std::string &name )
   {
     std::cerr << ea << " " << is_entrypoint << " " << name << std::endl;
   }
@@ -340,12 +331,12 @@ struct BasicBlock_: bb_mixin< BasicBlock_< Concrete > >
   BasicBlock_() = default;
   BasicBlock_( Database db ) : _db( db ) {}
 
-  auto insert( const Module &module, uint64_t ea, uint64_t size, const MemoryRange &mem)
+  auto insert(int64_t module_id, int64_t ea, int64_t size, int64_t mem_id)
   {
     constexpr static Query q_insert =
       R"(insert into blocks(module, ea, size, memory) values (?1, ?2, ?3, ?4))";
-    _db.template query< q_insert >( module.id, ea, size, mem.id );
-    return Concrete{ this->last_rowid() };
+    _db.template query< q_insert >( module_id, ea, size, mem_id );
+    return this->last_rowid();
   }
 
 };
@@ -372,41 +363,41 @@ void Letter::CreateSchema()
 }
 
 Module Letter::module(const std::string &name) {
-  return Module_{ impl->_db }.insert(name);
+  return { Module_{ impl->_db }.insert(name) };
 }
 
-Function Letter::func(const Module &module, uint64_t ea, bool is_entrypoint)
+Function Letter::func(const Module &module, int64_t ea, bool is_entrypoint)
 {
-  return Function_{ impl->_db }.insert(module, ea, is_entrypoint);
+  return { Function_{ impl->_db }.insert(module.id, ea, is_entrypoint) };
 }
 
 BasicBlock Letter::bb(const Module &module,
-                      uint64_t ea,
-                      uint64_t size,
+                      int64_t ea,
+                      int64_t size,
                       const MemoryRange &range)
 {
-  return BasicBlock_{ impl->_db }.insert(module, ea, size, range);
+  return { BasicBlock_{ impl->_db }.insert(module.id, ea, size, range.id) };
 }
 
 MemoryRange Letter::AddMemoryRange(const Module &module,
-                                   uint64_t ea,
-                                   uint64_t size,
+                                   int64_t ea,
+                                   int64_t size,
                                    std::string_view data) {
-  return MemoryRange_{}.insert(module.id, ea, size, data);
+  return { MemoryRange_{}.insert(module.id, ea, size, data) };
 }
 
 /* Module */
 
-Function Module::AddFunction(uint64_t ea, bool is_entrypoint ) {
-  return Function_{}.insert( id, ea, is_entrypoint );
+Function Module::AddFunction(int64_t ea, bool is_entrypoint ) {
+  return { Function_{}.insert( id, ea, is_entrypoint ) };
 }
 
-MemoryRange Module::AddMemoryRange(uint64_t ea, uint64_t size, std::string_view data) {
-  return MemoryRange_{}.insert(id, ea, size, data);
+MemoryRange Module::AddMemoryRange(int64_t ea, int64_t size, std::string_view data) {
+  return { MemoryRange_{}.insert(id, ea, size, data) };
 }
 
-BasicBlock Module::AddBasicBlock(uint64_t ea, uint64_t size, const MemoryRange &mem) {
-  return BasicBlock_{}.insert(id, ea, size, mem.id);
+BasicBlock Module::AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &mem) {
+  return { BasicBlock_{}.insert(id, ea, size, mem.id) };
 }
 
 /* Function */

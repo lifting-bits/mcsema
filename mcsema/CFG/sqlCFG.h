@@ -25,50 +25,70 @@ namespace mcsema {
 namespace cfg {
 
 // Forward-declare concrete
-struct Function;
-struct BasicBlock;
-struct Module;
-struct MemoryRange;
+class Function;
+class BasicBlock;
+class Module;
+class MemoryRange;
 
-struct Module {
+class Module {
 
+public:
+
+  Function AddFunction(int64_t ea, bool is_entrypoint);
+
+  MemoryRange AddMemoryRange(int64_t ea, int64_t range, std::string_view data);
+
+  BasicBlock AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &memory);
+
+private:
   Module(int64_t rowid) : id( rowid ) {}
 
-  Function AddFunction(uint64_t ea, bool is_entrypoint);
-
-  MemoryRange AddMemoryRange(uint64_t ea, uint64_t range, std::string_view data);
-
-  BasicBlock AddBasicBlock(uint64_t ea, uint64_t size, const MemoryRange &memory);
-
   int64_t id;
+
+  friend class Letter;
 };
 
 
-struct BasicBlock
-{
+class BasicBlock {
+
+private:
   BasicBlock(int64_t rowid) : id(rowid) {}
 
   int64_t id;
+
+  friend class Function;
+  friend class Letter;
+  friend class Module;
 };
 
 
-struct Function
-{
-  Function(int64_t rowid) : id( rowid ) {}
+class Function {
 
+public:
   void BindBB(const BasicBlock &bb);
 
   void BindBBs(const std::vector<BasicBlock> &bbs);
 
+private:
+  Function(int64_t rowid) : id( rowid ) {}
+
   int64_t id;
+
+  friend class Letter;
+  friend class Module;
 };
 
 // TODO: Insert for empty like .bbs
-struct MemoryRange
-{
+class MemoryRange {
+
+private:
+  friend class Letter;
+  friend class Module;
+
   MemoryRange(int64_t rowid) : id( rowid ) {}
 
   int64_t id;
+
 };
 
 
@@ -81,17 +101,18 @@ struct Letter
 
   Module module(const std::string &name);
 
-  Function func(const Module &module, uint64_t ea, bool is_entrypoint);
+  Function func(const Module &module, int64_t ea, bool is_entrypoint);
 
   BasicBlock bb(const Module &module,
-                uint64_t ea,
-                uint64_t size,
+                int64_t ea,
+                int64_t size,
                 const MemoryRange &range);
 
   MemoryRange AddMemoryRange(const Module &module,
-                             uint64_t ea,
-                             uint64_t range,
+                             int64_t ea,
+                             int64_t range,
                              std::string_view data);
+private:
 
   struct Letter_impl;
   Letter_impl *impl;

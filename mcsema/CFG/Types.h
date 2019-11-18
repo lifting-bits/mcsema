@@ -116,7 +116,7 @@ struct func_ops_ : _crtp< Self, func_ops_ >
       this->self()._db.template query< q_unbind_bbs >( ea, other );
   }
 
-  auto bind_bb( uint64_t f_id, uint64_t bb_id )
+  auto bind_bb( int64_t f_id, int64_t bb_id )
   {
     constexpr static Query q_bind_bbs =
       R"(insert into func_to_block (func_ea, bb_ea) values (?1, ?2))";
