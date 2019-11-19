@@ -948,7 +948,6 @@ static llvm::Function *LiftFunction(
 
   // Create basic blocks for each basic block in the original function.
   for (auto &block_info : cfg_func->blocks) {
-    auto &cfg_block = block_info.second;
     std::stringstream ss;
     ss << "block_" << std::hex << block_info.first;
     ctx.ea_to_block[block_info.first] = llvm::BasicBlock::Create(
