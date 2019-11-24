@@ -124,7 +124,8 @@ sudo apt-get install \
      libtinfo-dev \
      lsb-release \
      realpath \
-     zlib1g-dev
+     zlib1g-dev \
+     ccache
 ```
 
 If you are going to be using IDA Pro for CFG recovery also do the following:
