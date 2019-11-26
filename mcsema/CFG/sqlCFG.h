@@ -30,6 +30,7 @@ class Function;
 class BasicBlock;
 class Module;
 class MemoryRange;
+class Segment;
 
 class Module {
 
@@ -87,14 +88,39 @@ private:
   friend class Module;
 };
 
+class Segment {
+public:
+
+struct Flags {
+  bool read_only;
+  bool is_external;
+  bool is_exported;
+  bool is_thread_local;
+};
+
+private:
+  friend class MemoryRange;
+  friend class Module;
+  friend class Letter;
+
+  Segment(int64_t rowid) : id(rowid) {}
+
+  int64_t id;
+};
+
 // TODO: Insert for empty like .bbs
 class MemoryRange {
+public:
+  Segment AddSegment(int64_t ea,
+                     int64_t size,
+                     const Segment::Flags &flags,
+                     const std::string &name);
 
 private:
   friend class Letter;
   friend class Module;
 
-  MemoryRange(int64_t rowid) : id( rowid ) {}
+  MemoryRange(int64_t rowid) : id(rowid) {}
 
   int64_t id;
 
@@ -121,6 +147,14 @@ struct Letter
                              int64_t ea,
                              int64_t range,
                              std::string_view data);
+
+  Segment AddSegment(const Module &module,
+                     int64_t ea,
+                     int64_t size,
+                     const Segment::Flags &flags,
+                     const std::string &name,
+                     MemoryRange &mem);
+
 private:
 
   struct Letter_impl;

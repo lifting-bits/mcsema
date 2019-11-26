@@ -155,13 +155,15 @@ struct Schema {
     db.template query<vars>();
 
     static Query segments = R"(create table if not exists segments(
-          ea integer,
-          data blob,
+          ea integer NOT NULL,
+          size integer,
           read_only integer,
           is_external integer,
           is_exported integer,
           is_thread_local integer,
-          variable_name text
+          variable_name text,
+          memory_rowid integer,
+          FOREIGN KEY(memory_rowid) REFERENCES memory_ranges(rowid)
           ))";
     db.template query<segments>();
 
@@ -315,9 +317,9 @@ struct BasicBlock_: bb_mixin< BasicBlock_< Concrete > >
   BasicBlock_() = default;
   BasicBlock_( Database db ) : _db( db ) {}
 
-    constexpr static Query q_insert =
-      R"(insert into blocks(module_rowid, ea, size, memory_rowid)
-          values (?1, ?2, ?3, ?4))";
+  constexpr static Query q_insert =
+    R"(insert into blocks(module_rowid, ea, size, memory_rowid)
+        values (?1, ?2, ?3, ?4))";
 
   std::string_view data(int64_t id) {
     constexpr static Query q_data =
@@ -328,6 +330,32 @@ struct BasicBlock_: bb_mixin< BasicBlock_< Concrete > >
     sqlite::blob_view data_view;
     _db.template query<q_data>(id)(data_view);
     return data_view;
+  }
+};
+
+template< typename Concrete = Segment >
+struct Segment_ : id_based_ops_< Segment_< Concrete > > {
+  Database _db;
+  constexpr static Query table_name = R"(segments)";
+
+  Segment_() = default;
+
+  constexpr static Query q_insert =
+    R"(insert into segments(
+        ea, size,
+        read_only, is_external, is_exported, is_thread_local,
+        variable_name, memory_rowid) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8))";
+
+  auto _insert(int64_t ea,
+               int64_t size,
+               const Segment::Flags &flags,
+               const std::string &name,
+               int64_t memory_rowid) {
+
+    return this->insert(ea, size,
+                        flags.read_only, flags.is_external, flags.is_exported,
+                        flags.is_thread_local,
+                        name, memory_rowid);
   }
 };
 
@@ -400,6 +428,19 @@ void Function::AttachBlock(const BasicBlock &bb) {
 std::string_view BasicBlock::data() {
     return BasicBlock_{}.data(id);
 }
+
+
+/* Segment */
+
+/* MemoryRange */
+
+Segment MemoryRange::AddSegment(int64_t ea,
+                                 int64_t size,
+                                 const Segment::Flags &flags,
+                                 const std::string &name) {
+  return Segment_{}._insert( ea, size, flags, name, id );
+}
+
 
 } // namespace cfg
 } // namespace mcsema
