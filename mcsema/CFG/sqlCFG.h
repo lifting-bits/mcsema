@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -50,6 +51,9 @@ private:
 
 
 class BasicBlock {
+public:
+
+    std::string_view data();
 
 private:
   BasicBlock(int64_t rowid) : id(rowid) {}

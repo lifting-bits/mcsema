@@ -223,7 +223,7 @@ struct MemoryRange_ : id_based_ops_< MemoryRange_ >,
   Database _db;
 
   constexpr static Query q_insert =
-      R"(insert into memory_ranges(ea, size, module_rowid, bytes)
+      R"(insert into memory_ranges(module_rowid, ea, size, bytes)
       values (?1, ?2, ?3, ?4))";
 
 };
@@ -319,6 +319,16 @@ struct BasicBlock_: bb_mixin< BasicBlock_< Concrete > >
       R"(insert into blocks(module_rowid, ea, size, memory_rowid)
           values (?1, ?2, ?3, ?4))";
 
+  std::string_view data(int64_t id) {
+    constexpr static Query q_data =
+      R"(SELECT SUBSTR(mr.bytes, bb.ea - mr.ea) FROM
+          blocks as bb JOIN
+          memory_ranges as mr ON
+          mr.rowid = bb.memory_rowid and bb.rowid = ?1)";
+    sqlite::blob_view data_view;
+    _db.template query<q_data>(id)(data_view);
+    return data_view;
+  }
 };
 
 struct Letter::Letter_impl
@@ -384,6 +394,11 @@ BasicBlock Module::AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &me
 
 void Function::AttachBlock(const BasicBlock &bb) {
   Function_<Function>{}.bind_bb(id, bb.id);
+}
+
+/* BasicBlock */
+std::string_view BasicBlock::data() {
+    return BasicBlock_{}.data(id);
 }
 
 } // namespace cfg
