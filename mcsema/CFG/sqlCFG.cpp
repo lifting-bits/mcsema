@@ -141,19 +141,6 @@ struct Schema {
           ))";
     db.template query<blocks>();
 
-
-
-    static Query g_vars = R"(create table if not exists global_variables(
-          ea integer,
-          name text,
-          size integer))";
-    db.template query<g_vars>();
-
-    static Query vars = R"(create table if not exists variables(
-          ea integer,
-          name text))";
-    db.template query<vars>();
-
     static Query segments = R"(create table if not exists segments(
           ea integer NOT NULL,
           size integer,
@@ -166,6 +153,20 @@ struct Schema {
           FOREIGN KEY(memory_rowid) REFERENCES memory_ranges(rowid)
           ))";
     db.template query<segments>();
+
+
+    // TODO: Rework/Check below
+
+    static Query g_vars = R"(create table if not exists global_variables(
+          ea integer,
+          name text,
+          size integer))";
+    db.template query<g_vars>();
+
+    static Query vars = R"(create table if not exists variables(
+          ea integer,
+          name text))";
+    db.template query<vars>();
 
     static Query stack_vars = R"(create table if not exists stack_variables(
           name text,
