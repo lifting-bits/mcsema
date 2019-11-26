@@ -24,6 +24,7 @@ namespace cfg {
 
 void run()
 {
+  using namespace std::string_literals;
   // So far Letter_ is the top level class of the API
   // Letter from frontend to backend with possibly several Modules
   Letter letter;
@@ -43,8 +44,14 @@ void run()
   auto entry_bb = bin.AddBasicBlock(400400, 8, text);
   auto exit_bb = bin.AddBasicBlock(400415, 7, text);
 
-  std::cout << entry_bb.data().size() << "_" << entry_bb.data()[0] << "_" << std::endl;
-  std::cout << exit_bb.data().size() << std::endl;
+  //std::cout << entry_bb.data().size() << "_" << entry_bb.data()[0] << "_" << std::endl;
+  //std::cout << exit_bb.data().size() << std::endl;
+
+  std::string my_favorite_str = "Hello\0\0World\n\0\0"s;
+  auto rodata = bin.AddMemoryRange(600800, my_favorite_str.size(), my_favorite_str);
+
+  rodata.AddSegment(600800, 6, { true, true, false, false }, "hello");
+  rodata.AddSegment(600806, 9, { true, true, false, false }, "rest_of_rodata");
 
   main.AttachBlock(entry_bb);
   main.AttachBlock(exit_bb);
