@@ -13,8 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#pragma once
 
 #include "mcsema/CFG/sqlCFG.h"
+
+#include <iostream>
 
 namespace mcsema {
 namespace cfg {
@@ -39,6 +42,9 @@ void run()
 
   auto entry_bb = bin.AddBasicBlock(400400, 8, text);
   auto exit_bb = bin.AddBasicBlock(400415, 7, text);
+
+  std::cout << entry_bb.data().size() << "_" << entry_bb.data()[0] << "_" << std::endl;
+  std::cout << exit_bb.data().size() << std::endl;
 
   main.AttachBlock(entry_bb);
   main.AttachBlock(exit_bb);
