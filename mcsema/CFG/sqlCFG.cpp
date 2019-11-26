@@ -358,6 +358,28 @@ struct Segment_ : id_based_ops_< Segment_< Concrete > > {
                         flags.is_thread_local,
                         name, memory_rowid);
   }
+
+
+  std::string_view data(int64_t id) {
+    constexpr static Query q_data =
+      R"(SELECT SUBSTR(mr.bytes, s.ea - mr.ea, s.size) FROM
+          segments as s JOIN
+          memory_ranges as mr ON
+          mr.rowid = s.memory_rowid)";
+    std::string_view data_view;
+    _db.template query<q_data>(id)(data_view);
+    return data_view;
+  }
+
+  void SetFlags(int64_t id, const Segment::Flags &flags) {
+    constexpr static Query q_set_flags =
+      R"(UPDATE segments SET
+        (read_only, is_external, is_exported, is_thread_local) =
+        (?2, ?3, ?4, ?5) WHERE rowid = ?1)";
+    _db.template query<q_set_flags>(id,
+                                    flags.read_only, flags.is_external,
+                                    flags.is_exported, flags.is_thread_local);
+  }
 };
 
 struct Letter::Letter_impl
@@ -432,6 +454,16 @@ std::string_view BasicBlock::data() {
 
 
 /* Segment */
+
+std::string_view Segment::Data() {
+  return Segment_{}.data(id);
+}
+
+void Segment::SetFlags(const Flags &flags) {
+  return Segment_{}.SetFlags(id, flags);
+}
+
+
 
 /* MemoryRange */
 

@@ -91,12 +91,15 @@ private:
 class Segment {
 public:
 
-struct Flags {
-  bool read_only;
-  bool is_external;
-  bool is_exported;
-  bool is_thread_local;
-};
+  struct Flags {
+    bool read_only;
+    bool is_external;
+    bool is_exported;
+    bool is_thread_local;
+  };
+
+  std::string_view Data();
+  void SetFlags(const Flags &flags);
 
 private:
   friend class MemoryRange;
