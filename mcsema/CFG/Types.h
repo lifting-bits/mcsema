@@ -16,6 +16,10 @@
 
 #pragma once
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
 namespace mcsema::cfg {
 
 using Query = const char *;

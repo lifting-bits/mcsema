@@ -19,7 +19,7 @@
 #include <utility>
 #include <vector>
 
-#include "mcsema/CFG/SQLiteWrapper.h"
+#include <mcsema/CFG/SQLiteWrapper.h>
 
 namespace mcsema {
 namespace cfg {

@@ -16,11 +16,10 @@
 
 #include <utility>
 
-#include "mcsema/CFG/SQLiteWrapper.h"
-#include "mcsema/CFG/Types.h"
-#include "mcsema/CFG/Util.h"
+#include <mcsema/CFG/Types.h>
+#include <mcsema/CFG/Util.h>
 
-#include "mcsema/CFG/sqlCFG.h"
+#include <mcsema/CFG/sqlCFG.h>
 
 namespace mcsema {
 namespace cfg {
