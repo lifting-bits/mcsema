@@ -424,7 +424,9 @@ MemoryRange Letter::AddMemoryRange(const Module &module,
                                    int64_t ea,
                                    int64_t size,
                                    std::string_view data) {
-  return { MemoryRange_{}.insert(module.id, ea, size, data.data()) };
+  // TODO: Check if this copy to sqlite::blob is required
+  return { MemoryRange_{}.insert(module.id, ea, size,
+                                 sqlite::blob( data.begin(), data.end() ) ) };
 }
 
 /* Module */
@@ -434,7 +436,9 @@ Function Module::AddFunction(int64_t ea, bool is_entrypoint ) {
 }
 
 MemoryRange Module::AddMemoryRange(int64_t ea, int64_t size, std::string_view data) {
-  return { MemoryRange_{}.insert(id, ea, size, data.data()) };
+  // TODO: Check if this copy to sqlite::blob is required
+  return { MemoryRange_{}.insert(id, ea, size,
+                                 sqlite::blob( data.begin(), data.end() ) ) };
 }
 
 BasicBlock Module::AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &mem) {
