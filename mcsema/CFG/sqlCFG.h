@@ -32,6 +32,11 @@ class Module;
 class MemoryRange;
 class Segment;
 
+
+// Must be called first with the name of CFG file to open/create
+void Init(const std::string &name);
+
+
 class Module {
 
 public:

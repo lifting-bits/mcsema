@@ -28,6 +28,10 @@ using Query = const char *;
 std::string _db_name = "example.sql";
 using Database = sqlite::Database< _db_name >;
 
+void Init(const std::string &name) {
+  _db_name = name;
+}
+
 struct Schema {
 
   template< typename Database >
