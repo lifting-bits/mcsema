@@ -96,15 +96,8 @@ struct Function_ : has_context,
 {
   using has_context::has_context;
   static constexpr Query table_name = R"(functions)";
-
-  // Refactor
-  auto insert(int64_t module_id, int64_t ea, bool is_entrypoint )
-  {
-    constexpr static Query q_insert =
+  static constexpr Query q_insert =
       R"(insert into functions(module_rowid, ea, is_entrypoint) values (?1, ?2, ?3))";
-    _ctx->db.template query< q_insert >( module_id, ea, is_entrypoint);
-    return this->last_rowid();
-  }
 
   struct bare
   {
