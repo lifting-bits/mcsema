@@ -25,7 +25,14 @@ namespace mcsema::cfg {
 
 using Query = const char *;
 
+// This function should be called first to specify name for the db to open
+// Default value is set to "example.sql"
+// TODO: Currently only ONE DB PER PROGRAM INVOCATION CAN BE OPEN
+//       To fix this we most likely need to patch SQLite wrapper to work with multiple
+//       connection via one class.
 void Init(const std::string &name);
+
+// Get current name
 std::string Name();
 
 using Database = sqlite::Database< Name >;
