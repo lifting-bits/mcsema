@@ -126,8 +126,9 @@ struct BasicBlock_: bb_mixin< BasicBlock_< Concrete > >
         values (?1, ?2, ?3, ?4))";
 
   std::string data(int64_t id) {
+    // SUBSTR index starts from 0, therefore we need + 1
     constexpr static Query q_data =
-      R"(SELECT SUBSTR(mr.bytes, bb.ea - mr.ea) FROM
+      R"(SELECT SUBSTR(mr.bytes, bb.ea - mr.ea + 1) FROM
           blocks as bb JOIN
           memory_ranges as mr ON
           mr.rowid = bb.memory_rowid and bb.rowid = ?1)";
@@ -165,10 +166,10 @@ struct Segment_ : id_based_ops_< Segment_< Concrete > > {
 
   std::string data(int64_t id) {
     constexpr static Query q_data =
-      R"(SELECT SUBSTR(mr.bytes, s.ea - mr.ea, s.size) FROM
+      R"(SELECT SUBSTR(mr.bytes, s.ea - mr.ea + 1, s.size) FROM
           segments as s JOIN
           memory_ranges as mr ON
-          mr.rowid = s.memory_rowid)";
+          mr.rowid = s.memory_rowid and s.rowid = ?1)";
     sqlite::blob data_view;
     _db.template query<q_data>(id)(data_view);
     return std::move(data_view);
@@ -232,6 +233,12 @@ MemoryRange Letter::AddMemoryRange(const Module &module,
                                  sqlite::blob( data.begin(), data.end() ) ) };
 }
 
+MemoryRange Letter::AddMemoryRange(const Module &module,
+                                   int64_t ea,
+                                   std::string_view data) {
+  return AddMemoryRange(module, ea, data.size(), data);
+}
+
 /* Module */
 
 Function Module::AddFunction(int64_t ea, bool is_entrypoint ) {
@@ -242,6 +249,10 @@ MemoryRange Module::AddMemoryRange(int64_t ea, int64_t size, std::string_view da
   // TODO: Check if this copy to sqlite::blob is required
   return { MemoryRange_{}.insert(id, ea, size,
                                  sqlite::blob( data.begin(), data.end() ) ) };
+}
+
+MemoryRange Module::AddMemoryRange(int64_t ea, std::string_view data) {
+  return AddMemoryRange(ea, data.size(), data);
 }
 
 BasicBlock Module::AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &mem) {

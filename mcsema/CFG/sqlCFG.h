@@ -40,6 +40,8 @@ public:
 
   MemoryRange AddMemoryRange(int64_t ea, int64_t range, std::string_view data);
 
+  MemoryRange AddMemoryRange(int64_t ea, std::string_view data);
+
   BasicBlock AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &memory);
 
 private:
@@ -153,6 +155,14 @@ struct Letter
                              int64_t ea,
                              int64_t range,
                              std::string_view data);
+
+  MemoryRange AddMemoryRange(const Module &module,
+                             int64_t ea,
+                             std::string_view data);
+
+
+
+
 
   Segment AddSegment(const Module &module,
                      int64_t ea,
