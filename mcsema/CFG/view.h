@@ -27,8 +27,7 @@ void run()
   using namespace std::string_literals;
   // So far Letter_ is the top level class of the API
   // Letter from frontend to backend with possibly several Modules
-  Init("example.sql");
-  Letter letter;
+  Letter letter("example.sql");
 
   // Insert
   letter.CreateSchema();
