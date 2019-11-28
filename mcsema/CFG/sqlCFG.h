@@ -31,6 +31,24 @@ class BasicBlock;
 class Module;
 class MemoryRange;
 class Segment;
+class SymtabEntry;
+
+class SymtabEntry {
+public:
+
+  enum class Type : unsigned char { Imported = 1, // TODO:
+                                    Exported = 2, // Externally visible
+                                    Internal = 3, // Internal
+                                    Artificial = 4 }; // Not from module
+
+private:
+  friend class Module;
+
+  SymtabEntry(int64_t rowid) : id(rowid) {}
+
+  int64_t id;
+
+};
 
 class Module {
 
@@ -43,6 +61,8 @@ public:
   MemoryRange AddMemoryRange(int64_t ea, std::string_view data);
 
   BasicBlock AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &memory);
+
+  SymtabEntry AddSymtabEntry(const std::string &name, SymtabEntry::Type type);
 
 private:
   Module(int64_t rowid) : id( rowid ) {}

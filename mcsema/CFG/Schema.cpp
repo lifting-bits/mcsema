@@ -73,11 +73,12 @@ void Schema::CreateEnums(Database db) {
       ))";
   db.template query<symtab_types>();
 
-  static Query populate_symtab_types = R"(insert into symtab_types(type) values(?1))";
-  db.template query<populate_symtab_types>("internal");
-  db.template query<populate_symtab_types>("external");
-  db.template query<populate_symtab_types>("artificial");
-  db.template query<populate_symtab_types>("exported");
+  static Query populate_symtab_types =
+    R"(insert into symtab_types(type, rowid) values(?1, ?2))";
+  db.template query<populate_symtab_types>("imported", 1);
+  db.template query<populate_symtab_types>("exported", 2);
+  db.template query<populate_symtab_types>("internal", 3);
+  db.template query<populate_symtab_types>("artificial", 4);
 }
 
 void Schema::CreateNMTables(Database db)

@@ -35,6 +35,8 @@ void run()
   auto lib = letter.module("lib.so");
   auto bin = letter.module("bin.out");
 
+  auto s_main = bin.AddSymtabEntry("main", SymtabEntry::Type::Internal);
+
   auto main = letter.func(bin, 12, true);
   auto foo = letter.func(bin, 32, false);
   auto library_func = letter.func(lib, 0, false);

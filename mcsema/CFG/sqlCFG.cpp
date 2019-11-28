@@ -26,6 +26,17 @@
 namespace mcsema {
 namespace cfg {
 
+template< typename Concrete = SymtabEntry >
+struct SymtabEntry_ : id_based_ops_< SymtabEntry_< Concrete > >,
+                      all_< SymtabEntry_< Concrete > > {
+  static constexpr Query table_name = R"(symtabs)";
+  Database _db;
+
+  constexpr static Query q_insert =
+    R"(insert into symtabs(name, module_rowid, type_rowid) values (?1, ?2, ?3))";
+
+};
+
 struct MemoryRange_ : id_based_ops_< MemoryRange_ >,
                       all_ < MemoryRange_ > {
 
@@ -258,6 +269,11 @@ MemoryRange Module::AddMemoryRange(int64_t ea, std::string_view data) {
 BasicBlock Module::AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &mem) {
   return { BasicBlock_{}.insert(id, ea, size, mem.id) };
 }
+
+SymtabEntry Module::AddSymtabEntry(const std::string &name, SymtabEntry::Type type) {
+  return SymtabEntry_{}.insert(id, name, static_cast<unsigned char>(type));
+}
+
 
 /* Function */
 
