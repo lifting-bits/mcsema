@@ -16,11 +16,10 @@
 
 #pragma once
 
+#include <memory>
 #include <string_view>
 #include <utility>
 #include <vector>
-
-#include <mcsema/CFG/Init.h>
 
 namespace mcsema {
 namespace cfg {
@@ -33,7 +32,21 @@ class MemoryRange;
 class Segment;
 class SymtabEntry;
 
-class SymtabEntry {
+class Context;
+using CtxPtr = std::shared_ptr<Context>;
+
+class _Context {
+
+protected:
+  _Context(int64_t id, CtxPtr &ctx) : _id(id), _ctx(ctx) {}
+
+  int64_t _id;
+  CtxPtr _ctx;
+
+};
+
+
+class SymtabEntry : _Context {
 public:
 
   enum class Type : unsigned char { Imported = 1, // TODO:
@@ -44,13 +57,10 @@ public:
 private:
   friend class Module;
 
-  SymtabEntry(int64_t rowid) : id(rowid) {}
-
-  int64_t id;
-
+  using _Context::_Context;
 };
 
-class Module {
+class Module : _Context {
 
 public:
 
@@ -65,31 +75,28 @@ public:
   SymtabEntry AddSymtabEntry(const std::string &name, SymtabEntry::Type type);
 
 private:
-  Module(int64_t rowid) : id( rowid ) {}
-
-  int64_t id;
+  using _Context::_Context;
 
   friend class Letter;
 };
 
 
-class BasicBlock {
+class BasicBlock : _Context {
 public:
 
     std::string Data();
 
 private:
-  BasicBlock(int64_t rowid) : id(rowid) {}
-
-  int64_t id;
 
   friend class Function;
   friend class Letter;
   friend class Module;
+
+  using _Context::_Context;
 };
 
 
-class Function {
+class Function : _Context {
 
 public:
   void AttachBlock(const BasicBlock &bb);
@@ -102,15 +109,13 @@ public:
   }
 
 private:
-  Function(int64_t rowid) : id( rowid ) {}
-
-  int64_t id;
+  using _Context::_Context;
 
   friend class Letter;
   friend class Module;
 };
 
-class Segment {
+class Segment : _Context {
 public:
 
   struct Flags {
@@ -131,13 +136,11 @@ private:
   friend class Module;
   friend class Letter;
 
-  Segment(int64_t rowid) : id(rowid) {}
-
-  int64_t id;
+  using _Context::_Context;
 };
 
 // TODO: Insert for empty like .bbs
-class MemoryRange {
+class MemoryRange : _Context {
 public:
   Segment AddSegment(int64_t ea,
                      int64_t size,
@@ -148,17 +151,13 @@ private:
   friend class Letter;
   friend class Module;
 
-  MemoryRange(int64_t rowid) : id(rowid) {}
-
-  int64_t id;
-
+  using _Context::_Context;
 };
 
 
 struct Letter
 {
-  Letter();
-  ~Letter();
+  Letter(const std::string &db_name);
 
   void CreateSchema();
 
@@ -192,10 +191,7 @@ struct Letter
                      MemoryRange &mem);
 
 private:
-
-  struct Letter_impl;
-  Letter_impl *impl;
-
+  std::shared_ptr<Context> _ctx;
 };
 
 

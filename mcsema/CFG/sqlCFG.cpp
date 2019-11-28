@@ -14,34 +14,52 @@
  * limitations under the License.
  */
 
+#include <memory>
 #include <utility>
 
-#include <mcsema/CFG/Init.h>
 #include <mcsema/CFG/Types.h>
 #include <mcsema/CFG/Util.h>
 
 #include <mcsema/CFG/sqlCFG.h>
 #include <mcsema/CFG/Schema.h>
+#include <mcsema/CFG/Context.h>
 
 namespace mcsema {
 namespace cfg {
 
+using Database = decltype(Context::db);
+
+using CtxPtr = std::shared_ptr<Context>;
+using CtxR = Context *;
+
+template<typename Ctx>
+struct with_context {
+
+  with_context(CtxPtr &shared_ctx) : _ctx(shared_ctx.get()) {}
+
+  CtxR _ctx;
+};
+
+using has_context = with_context< Context >;
+
 template< typename Concrete = SymtabEntry >
-struct SymtabEntry_ : id_based_ops_< SymtabEntry_< Concrete > >,
+struct SymtabEntry_ : has_context,
+                      id_based_ops_< SymtabEntry_< Concrete > >,
                       all_< SymtabEntry_< Concrete > > {
+  using has_context::has_context;
   static constexpr Query table_name = R"(symtabs)";
-  Database _db;
 
   constexpr static Query q_insert =
     R"(insert into symtabs(name, module_rowid, type_rowid) values (?1, ?2, ?3))";
 
 };
 
-struct MemoryRange_ : id_based_ops_< MemoryRange_ >,
+struct MemoryRange_ : has_context,
+                      id_based_ops_< MemoryRange_ >,
                       all_ < MemoryRange_ > {
 
+  using has_context::has_context;
   static constexpr Query table_name = R"(memory_ranges)";
-  Database _db;
 
   constexpr static Query q_insert =
       R"(insert into memory_ranges(module_rowid, ea, size, bytes)
@@ -53,12 +71,11 @@ struct module_ops_mixin : id_based_ops_< Self >,
                           all_ < Self > {};
 
 template< typename Concrete = Module >
-struct Module_ : module_ops_mixin< Module_< Concrete > > {
+struct Module_ : has_context,
+                 module_ops_mixin< Module_< Concrete > > {
 
+  using has_context::has_context;
   static constexpr Query table_name = R"(modules)";
-  Database _db;
-
-  Module_( Database db ) : _db( db ) {}
 
   constexpr static Query q_insert =
     R"(insert into modules(name) values (?1))";
@@ -74,19 +91,18 @@ struct func_ops_mixin :
 
 
 template< typename Concrete = Function >
-struct Function_ : func_ops_mixin< Function_< Concrete > >
+struct Function_ : has_context,
+                   func_ops_mixin< Function_< Concrete > >
 {
+  using has_context::has_context;
   static constexpr Query table_name = R"(functions)";
-  Database _db;
 
-  Function_() = default;
-  Function_( Database db ) : _db( db ) {}
-
+  // Refactor
   auto insert(int64_t module_id, int64_t ea, bool is_entrypoint )
   {
     constexpr static Query q_insert =
       R"(insert into functions(module_rowid, ea, is_entrypoint) values (?1, ?2, ?3))";
-    _db.template query< q_insert >( module_id, ea, is_entrypoint);
+    _ctx->db.template query< q_insert >( module_id, ea, is_entrypoint);
     return this->last_rowid();
   }
 
@@ -124,13 +140,11 @@ struct bb_mixin : id_based_ops_< Self >,
                   all_< Self > {};
 
 template< typename Concrete = BasicBlock >
-struct BasicBlock_: bb_mixin< BasicBlock_< Concrete > >
+struct BasicBlock_: has_context,
+                    bb_mixin< BasicBlock_< Concrete > >
 {
-  Database _db;
+  using has_context::has_context;
   constexpr static Query table_name = R"(blocks)";
-
-  BasicBlock_() = default;
-  BasicBlock_( Database db ) : _db( db ) {}
 
   constexpr static Query q_insert =
     R"(insert into blocks(module_rowid, ea, size, memory_rowid)
@@ -144,14 +158,15 @@ struct BasicBlock_: bb_mixin< BasicBlock_< Concrete > >
           memory_ranges as mr ON
           mr.rowid = bb.memory_rowid and bb.rowid = ?1)";
     sqlite::blob data_view;
-    _db.template query<q_data>(id)(data_view);
+    _ctx->db.template query<q_data>(id)(data_view);
     return std::move(data_view);
   }
 };
 
 template< typename Concrete = Segment >
-struct Segment_ : id_based_ops_< Segment_< Concrete > > {
-  Database _db;
+struct Segment_ : has_context,
+                  id_based_ops_< Segment_< Concrete > > {
+  using has_context::has_context;
   constexpr static Query table_name = R"(segments)";
 
   Segment_() = default;
@@ -182,7 +197,7 @@ struct Segment_ : id_based_ops_< Segment_< Concrete > > {
           memory_ranges as mr ON
           mr.rowid = s.memory_rowid and s.rowid = ?1)";
     sqlite::blob data_view;
-    _db.template query<q_data>(id)(data_view);
+    this->db().template query<q_data>(id)(data_view);
     return std::move(data_view);
   }
 
@@ -191,40 +206,27 @@ struct Segment_ : id_based_ops_< Segment_< Concrete > > {
       R"(UPDATE segments SET
         (read_only, is_external, is_exported, is_thread_local) =
         (?2, ?3, ?4, ?5) WHERE rowid = ?1)";
-    _db.template query<q_set_flags>(id,
+    this->db().template query<q_set_flags>(id,
                                     flags.read_only, flags.is_external,
                                     flags.is_exported, flags.is_thread_local);
   }
 };
 
-struct Letter::Letter_impl
-{
-  Database _db;
 
-};
-
-/* Letter */
-Letter::Letter() : impl( new Letter_impl ) {}
-
-Letter::~Letter()
-{
-  delete impl;
-}
-
-
+Letter::Letter(const std::string &name) : _ctx(std::make_shared<Context>(name)) {}
 
 void Letter::CreateSchema()
 {
-  Schema::CreateSchema( impl->_db );
+  Schema::CreateSchema( *_ctx );
 }
 
 Module Letter::module(const std::string &name) {
-  return { Module_{ impl->_db }.insert(name) };
+  return { Module_{ _ctx }.insert(name), _ctx };
 }
 
 Function Letter::func(const Module &module, int64_t ea, bool is_entrypoint)
 {
-  return { Function_{ impl->_db }.insert(module.id, ea, is_entrypoint) };
+  return { Function_{ _ctx }.insert(module._id, ea, is_entrypoint), _ctx };
 }
 
 BasicBlock Letter::bb(const Module &module,
@@ -232,7 +234,7 @@ BasicBlock Letter::bb(const Module &module,
                       int64_t size,
                       const MemoryRange &range)
 {
-  return { BasicBlock_{ impl->_db }.insert(module.id, ea, size, range.id) };
+  return { BasicBlock_{ _ctx }.insert(module._id, ea, size, range._id), _ctx };
 }
 
 MemoryRange Letter::AddMemoryRange(const Module &module,
@@ -240,8 +242,9 @@ MemoryRange Letter::AddMemoryRange(const Module &module,
                                    int64_t size,
                                    std::string_view data) {
   // TODO: Check if this copy to sqlite::blob is required
-  return { MemoryRange_{}.insert(module.id, ea, size,
-                                 sqlite::blob( data.begin(), data.end() ) ) };
+  return { MemoryRange_{ _ctx }.insert(module._id, ea, size,
+                                 sqlite::blob( data.begin(), data.end() ) ),
+            _ctx };
 }
 
 MemoryRange Letter::AddMemoryRange(const Module &module,
@@ -253,13 +256,14 @@ MemoryRange Letter::AddMemoryRange(const Module &module,
 /* Module */
 
 Function Module::AddFunction(int64_t ea, bool is_entrypoint ) {
-  return { Function_{}.insert( id, ea, is_entrypoint ) };
+  return { Function_{ _ctx }.insert( _id, ea, is_entrypoint ), _ctx };
 }
 
 MemoryRange Module::AddMemoryRange(int64_t ea, int64_t size, std::string_view data) {
   // TODO: Check if this copy to sqlite::blob is required
-  return { MemoryRange_{}.insert(id, ea, size,
-                                 sqlite::blob( data.begin(), data.end() ) ) };
+  return { MemoryRange_{ _ctx }.insert(_id, ea, size,
+                                 sqlite::blob( data.begin(), data.end() ) ),
+           _ctx };
 }
 
 MemoryRange Module::AddMemoryRange(int64_t ea, std::string_view data) {
@@ -267,34 +271,35 @@ MemoryRange Module::AddMemoryRange(int64_t ea, std::string_view data) {
 }
 
 BasicBlock Module::AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &mem) {
-  return { BasicBlock_{}.insert(id, ea, size, mem.id) };
+  return { BasicBlock_{ _ctx }.insert(_id, ea, size, mem._id), _ctx };
 }
 
 SymtabEntry Module::AddSymtabEntry(const std::string &name, SymtabEntry::Type type) {
-  return SymtabEntry_{}.insert(id, name, static_cast<unsigned char>(type));
+  return { SymtabEntry_{ _ctx }.insert(_id, name, static_cast<unsigned char>(type)),
+           _ctx };
 }
 
 
 /* Function */
 
 void Function::AttachBlock(const BasicBlock &bb) {
-  Function_<Function>{}.bind_bb(id, bb.id);
+  Function_<Function>{ _ctx }.bind_bb(_id, bb._id);
 }
 
 /* BasicBlock */
 std::string BasicBlock::Data() {
-    return BasicBlock_{}.data(id);
+    return BasicBlock_{ _ctx }.data(_id);
 }
 
 
 /* Segment */
 
 std::string Segment::Data() {
-  return Segment_{}.data(id);
+  return Segment_{ _ctx }.data(_id);
 }
 
 void Segment::SetFlags(const Flags &flags) {
-  return Segment_{}.SetFlags(id, flags);
+  return Segment_{ _ctx }.SetFlags(_id, flags);
 }
 
 
@@ -305,7 +310,7 @@ Segment MemoryRange::AddSegment(int64_t ea,
                                  int64_t size,
                                  const Segment::Flags &flags,
                                  const std::string &name) {
-  return Segment_{}._insert( ea, size, flags, name, id );
+  return { Segment_{ _ctx }._insert( ea, size, flags, name, _id ), _ctx };
 }
 
 

@@ -31,6 +31,8 @@ struct _crtp
 {
   Self &self() { return static_cast< Self & >( *this ); }
   const Self &self() const { return static_cast< const Self & >( *this ); }
+
+  auto db() { return self()._ctx->db; }
 };
 
 template< typename Self >
@@ -42,7 +44,7 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
   {
     constexpr static Query q_last_row_id =
       R"(SELECT last_insert_rowid())";
-    auto r = this->self()._db.template query< q_last_row_id >();
+    auto r = this->db().template query< q_last_row_id >();
 
     int64_t result;
     r( result );
@@ -57,7 +59,7 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
 
   auto get( uint64_t id )
   {
-    return this->self()._db.template query< _q_get >( id );
+    return this->db().template query< _q_get >( id );
   }
 
   static std::string _q_remove( uint64_t ea )
@@ -67,12 +69,12 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
 
   auto erase( uint64_t id )
   {
-    return this->self()._db.template query< _q_remove >( id );
+    return this->db().template query< _q_remove >( id );
   }
 
   template<typename ...Args>
   auto insert(Args ...args) {
-    self()._db.template query<Self::q_insert>(args...);
+    this->db().template query<Self::q_insert>(args...);
     return this->last_rowid();
   }
 
@@ -98,7 +100,7 @@ struct all_ : _crtp< Self, all_ >
 
   auto all()
   {
-    return this->self()._db.template query< _q_all >();
+    return this->db().template query< _q_all >();
   }
 
 };
@@ -116,7 +118,7 @@ struct func_ops_ : _crtp< Self, func_ops_ >
 
       R"(select * from blocks inner join function_to_block on
             blocks.ea = function_to_block.bb_rowid and function_to_block.function_rowid = ?1)";
-    return this->self()._db.template query< q_bbs >( ea );
+    return this->db().template query< q_bbs >( ea );
   }
 
   template < typename Container = std::vector< uint64_t > >
@@ -125,14 +127,14 @@ struct func_ops_ : _crtp< Self, func_ops_ >
     constexpr static Query q_unbind_bbs =
       R"(delete from function_to_block where function_rowid = ?1 and bb_rowid = ?2 )";
     for ( auto &other : to_unbind )
-      this->self()._db.template query< q_unbind_bbs >( ea, other );
+      this->db().template query< q_unbind_bbs >( ea, other );
   }
 
   auto bind_bb( int64_t f_id, int64_t bb_id )
   {
     constexpr static Query q_bind_bbs =
       R"(insert into function_to_block (function_rowid, bb_rowid) values (?1, ?2))";
-    this->self()._db.template query< q_bind_bbs >( f_id, bb_id);
+    this->db().template query< q_bind_bbs >( f_id, bb_id);
 
   }
 };
@@ -167,7 +169,7 @@ struct bb_ops_ : _crtp< Self, bb_ops_ >
   {
     constexpr static Query q_insert =
       R"(insert into blocks(module, ea, size, bytes) values (?1, ?2, ?3, ?4))";
-    return this->self()._db.template query< q_insert >( module.id, ea, size, bytes );
+    return this->db().template query< q_insert >( module.id, ea, size, bytes );
   }
 
 };

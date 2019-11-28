@@ -15,11 +15,14 @@
  */
 
 
+#include <mcsema/CFG/Context.h>
 #include <mcsema/CFG/Schema.h>
+
 
 namespace mcsema::cfg {
 
-void Schema::CreateEnums(Database db) {
+void Schema::CreateEnums(Context &ctx) {
+  auto &db = ctx.db;
 
   static Query action_enum = R"(create table if not exists exception_frame_actions(
         key integer PRIMARY KEY NOT NULL,
@@ -81,8 +84,9 @@ void Schema::CreateEnums(Database db) {
   db.template query<populate_symtab_types>("artificial", 4);
 }
 
-void Schema::CreateNMTables(Database db)
-{
+void Schema::CreateNMTables(Context &ctx) {
+  auto db = ctx.db;
+
   static Query q_func_2_block =
     R"(create table if not exists function_to_block(
        function_rowid integer NOT NULL,
@@ -94,8 +98,10 @@ void Schema::CreateNMTables(Database db)
   db.template query< q_func_2_block >();
 }
 
-void Schema::CreateSchema(Database db) {
-  CreateEnums(db);
+void Schema::CreateSchema(Context &ctx) {
+  auto db = ctx.db;
+
+  CreateEnums(ctx);
 
   static Query c_module =
     R"(create table if not exists modules(
@@ -220,7 +226,7 @@ void Schema::CreateSchema(Database db) {
         ))";
   db.template query<code_xrefs>();
 
-  CreateNMTables(db);
+  CreateNMTables(ctx);
 }
 
 } // namespace mcsema::cfg

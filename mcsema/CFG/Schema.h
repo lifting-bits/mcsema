@@ -17,17 +17,17 @@
 
 #pragma once
 
-#include <mcsema/CFG/Init.h>
-
 namespace mcsema::cfg {
+
+class Context;
 
 struct Schema {
 
-  static void CreateEnums(Database db);
+  static void CreateEnums(Context &ctx);
 
-  static void CreateNMTables(Database db);
+  static void CreateNMTables(Context &ctx);
 
-  static void CreateSchema(Database db);
+  static void CreateSchema(Context &ctx);
 
 };
 
