@@ -322,15 +322,15 @@ struct BasicBlock_: bb_mixin< BasicBlock_< Concrete > >
     R"(insert into blocks(module_rowid, ea, size, memory_rowid)
         values (?1, ?2, ?3, ?4))";
 
-  std::string_view data(int64_t id) {
+  std::string data(int64_t id) {
     constexpr static Query q_data =
       R"(SELECT SUBSTR(mr.bytes, bb.ea - mr.ea) FROM
           blocks as bb JOIN
           memory_ranges as mr ON
           mr.rowid = bb.memory_rowid and bb.rowid = ?1)";
-    sqlite::blob_view data_view;
+    sqlite::blob data_view;
     _db.template query<q_data>(id)(data_view);
-    return data_view;
+    return std::move(data_view);
   }
 };
 
@@ -360,15 +360,15 @@ struct Segment_ : id_based_ops_< Segment_< Concrete > > {
   }
 
 
-  std::string_view data(int64_t id) {
+  std::string data(int64_t id) {
     constexpr static Query q_data =
       R"(SELECT SUBSTR(mr.bytes, s.ea - mr.ea, s.size) FROM
           segments as s JOIN
           memory_ranges as mr ON
           mr.rowid = s.memory_rowid)";
-    std::string_view data_view;
+    sqlite::blob data_view;
     _db.template query<q_data>(id)(data_view);
-    return data_view;
+    return std::move(data_view);
   }
 
   void SetFlags(int64_t id, const Segment::Flags &flags) {
@@ -452,14 +452,14 @@ void Function::AttachBlock(const BasicBlock &bb) {
 }
 
 /* BasicBlock */
-std::string_view BasicBlock::data() {
+std::string BasicBlock::Data() {
     return BasicBlock_{}.data(id);
 }
 
 
 /* Segment */
 
-std::string_view Segment::Data() {
+std::string Segment::Data() {
   return Segment_{}.data(id);
 }
 
