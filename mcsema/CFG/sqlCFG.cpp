@@ -79,6 +79,17 @@ struct Schema {
     db.template query<populate_locations>(0, "Internal");
     db.template query<populate_locations>(1, "External");
 
+
+    static Query symtab_types = R"(create table if not exists symtab_types(
+        type text NOT NULL
+        ))";
+    db.template query<symtab_types>();
+
+    static Query populate_symtab_types = R"(insert into symtab_types(type) values(?1))";
+    db.template query<populate_symtab_types>("internal");
+    db.template query<populate_symtab_types>("external");
+    db.template query<populate_symtab_types>("artificial");
+    db.template query<populate_symtab_types>("exported");
   }
 
   template< typename Database >
@@ -154,6 +165,14 @@ struct Schema {
           ))";
     db.template query<segments>();
 
+    static Query symtabs = R"(create table if not exists symtabs(
+          name text NOT NULL,
+          module_rowid integer NOT NULL,
+          type_rowid integer NOT NULL,
+          FOREIGN KEY(type_rowid) REFERENCES symtab_types(rowid),
+          FOREIGN KEY(module_rowid) REFERENCES modules(rowid)
+          ))";
+    db.template query<symtabs>();
 
     // TODO: Rework/Check below
 
