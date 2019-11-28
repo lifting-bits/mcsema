@@ -20,7 +20,7 @@
 #include <utility>
 #include <vector>
 
-#include <mcsema/CFG/SQLiteWrapper.h>
+#include <mcsema/CFG/Init.h>
 
 namespace mcsema {
 namespace cfg {
@@ -31,11 +31,6 @@ class BasicBlock;
 class Module;
 class MemoryRange;
 class Segment;
-
-
-// Must be called first with the name of CFG file to open/create
-void Init(const std::string &name);
-
 
 class Module {
 
