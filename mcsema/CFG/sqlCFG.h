@@ -32,21 +32,25 @@ class MemoryRange;
 class Segment;
 class SymtabEntry;
 
+// Context that represents the file and other helper data part of internal implemenation
 class Context;
-using CtxPtr = std::shared_ptr<Context>;
 
-class _Context {
+namespace details {
+
+using CtxPtr = std::shared_ptr<Context>;
+class Internals {
 
 protected:
-  _Context(int64_t id, CtxPtr &ctx) : _id(id), _ctx(ctx) {}
+  Internals(int64_t id, CtxPtr &ctx) : _id(id), _ctx(ctx) {}
 
   int64_t _id;
   CtxPtr _ctx;
 
 };
 
+} // details
 
-class SymtabEntry : _Context {
+class SymtabEntry : details::Internals {
 public:
 
   enum class Type : unsigned char { Imported = 1, // TODO:
@@ -57,10 +61,10 @@ public:
 private:
   friend class Module;
 
-  using _Context::_Context;
+  using details::Internals::Internals;
 };
 
-class Module : _Context {
+class Module : details::Internals {
 
 public:
 
@@ -75,13 +79,13 @@ public:
   SymtabEntry AddSymtabEntry(const std::string &name, SymtabEntry::Type type);
 
 private:
-  using _Context::_Context;
+  using details::Internals::Internals;
 
   friend class Letter;
 };
 
 
-class BasicBlock : _Context {
+class BasicBlock : details::Internals {
 public:
 
     std::string Data();
@@ -92,11 +96,11 @@ private:
   friend class Letter;
   friend class Module;
 
-  using _Context::_Context;
+  using details::Internals::Internals;
 };
 
 
-class Function : _Context {
+class Function : details::Internals {
 
 public:
   void AttachBlock(const BasicBlock &bb);
@@ -109,13 +113,13 @@ public:
   }
 
 private:
-  using _Context::_Context;
+  using details::Internals::Internals;
 
   friend class Letter;
   friend class Module;
 };
 
-class Segment : _Context {
+class Segment : details::Internals {
 public:
 
   struct Flags {
@@ -136,11 +140,11 @@ private:
   friend class Module;
   friend class Letter;
 
-  using _Context::_Context;
+  using details::Internals::Internals;
 };
 
 // TODO: Insert for empty like .bbs
-class MemoryRange : _Context {
+class MemoryRange : details::Internals {
 public:
   Segment AddSegment(int64_t ea,
                      int64_t size,
@@ -151,7 +155,7 @@ private:
   friend class Letter;
   friend class Module;
 
-  using _Context::_Context;
+  using details::Internals::Internals;
 };
 
 
