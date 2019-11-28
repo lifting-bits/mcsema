@@ -119,9 +119,10 @@ void Schema::CreateSchema(Context &ctx) {
   static Query functions = R"(create table if not exists functions(
         ea integer NOT NULL,
         is_entrypoint integer,
-        name text,
-        module_rowid integer,
-        FOREIGN KEY(module_rowid) REFERENCES modules(rowid)
+        symtab_rowid integer,
+        module_rowid integer NOT NULL,
+        FOREIGN KEY(module_rowid) REFERENCES modules(rowid),
+        FOREIGN KEY(symtab_rowid) REFERENCES symtabs(rowid)
         ))";
   db.template query<functions>();
 
