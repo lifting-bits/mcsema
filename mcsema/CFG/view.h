@@ -22,6 +22,16 @@
 namespace mcsema {
 namespace cfg {
 
+template<typename T>
+void CheckName(T &t, const std::string& who) {
+  auto maybe_name = t.Name();
+  if (maybe_name) {
+    std::cout << who << ": has name" << std::endl;
+  } else {
+    std::cout << who << ": does not have name" << std::endl;
+  }
+}
+
 void run()
 {
   using namespace std::string_literals;
@@ -36,8 +46,17 @@ void run()
 
   auto s_main = bin.AddSymtabEntry("main", SymtabEntry::Type::Internal);
 
-  auto main = letter.func(bin, 12, true);
+  auto main = letter.func(bin, 12, true).Name(s_main);
   auto foo = letter.func(bin, 32, false);
+
+  CheckName(main, "main");
+  CheckName(foo, "foo");
+
+  std::cout << "s_main holds " << (*s_main).name << " with type "
+            << static_cast<int>((*s_main).type)
+            << std::endl;
+  std::cout << "main has name: " << (**(main.Name())).name << std::endl;
+
   auto library_func = letter.func(lib, 0, false);
 
   // TODO: Calculate automatically size
