@@ -79,6 +79,10 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
     return this->last_rowid();
   }
 
+  auto get(int64_t id) {
+    return this->db().template query<Self::q_get>(id);
+  }
+
 };
 
 template< typename Self >
