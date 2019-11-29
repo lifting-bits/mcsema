@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -171,8 +172,34 @@ struct bb_ops_ : _crtp< Self, bb_ops_ >
       R"(insert into blocks(module, ea, size, bytes) values (?1, ?2, ?3, ?4))";
     return this->db().template query< q_insert >( module.id, ea, size, bytes );
   }
-
 };
 
+template< typename Self >
+struct has_symtab_name : _crtp< Self, has_symtab_name >
+{
+
+  static std::string q_set_name() {
+    return std::string{ "UPDATE " } + Self::table_name +
+      " SET(symtab_rowid) = (?2) WHERE rowid = ?1";
+  }
+
+  static std::string q_get_name() {
+    return std::string { "SELECT symtab_rowid FROM " } + Self::table_name +
+           " WHERE rowid = ?1 and symtab_rowid NOT NULL";
+  }
+
+  auto Name(int64_t id, int64_t new_symbol_id) {
+    this->db().template query<q_set_name>( id, new_symbol_id );
+  }
+
+  std::optional<int64_t> Name(int64_t id) {
+    int64_t symbol_id = -12;
+    if (this->db().template query<q_get_name>( id )( symbol_id )) {
+      return { symbol_id };
+    }
+    return {};
+  }
+
+};
 
 } // namespace mcsema::cfg
