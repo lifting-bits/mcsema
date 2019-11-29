@@ -119,7 +119,7 @@ void Schema::CreateSchema(Context &ctx) {
   static Query functions = R"(create table if not exists functions(
         ea integer NOT NULL,
         is_entrypoint integer,
-        symtab_rowid integer,
+        symtab_rowid integer DEFAULT NULL,
         module_rowid integer NOT NULL,
         FOREIGN KEY(module_rowid) REFERENCES modules(rowid),
         FOREIGN KEY(symtab_rowid) REFERENCES symtabs(rowid)
