@@ -35,16 +35,18 @@ void Schema::CreateEnums(Context &ctx) {
   db.template query<populate_action_enum>(0, "Cleanup");
   db.template query<populate_action_enum>(1, "Catch");
 
+  // rowid corresponds to llvm value for given cc
   static Query cc = R"(create table if not exists calling_conventions(
-        key integer PRIMARY KEY NOT NULL,
-        calling_convention text NOT NULL
+        name text NOT NULL
         ))";
   db.template query<cc>();
 
-  static Query populate_cc = R"(insert into calling_conventions values(?1, ?2))";
-  db.template query<populate_cc>(0, "CallerCleanup");
-  db.template query<populate_cc>(1, "CalleeCleanup");
-  db.template query<populate_cc>(2, "FastCall");
+  static Query populate_cc = R"(insert into calling_conventions(rowid, name) values(?1, ?2))";
+  db.template query<populate_cc>(0, "C");
+  db.template query<populate_cc>(64, "X86_StdCall");
+  db.template query<populate_cc>(65, "X86_FastCall");
+  db.template query<populate_cc>(78, "X86_64_SysV");
+  db.template query<populate_cc>(79, "Win64");
 
   static Query operand_types = R"(create table if not exists operand_types(
       key PRIMARY KEY NOT NULL,
