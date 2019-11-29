@@ -53,13 +53,22 @@ protected:
 class SymtabEntry : details::Internals {
 public:
 
-  enum class Type : unsigned char { Imported = 1, // TODO:
+  enum class Type : unsigned char { Imported = 1, // Names from another object file
                                     Exported = 2, // Externally visible
                                     Internal = 3, // Internal
-                                    Artificial = 4 }; // Not from module
+                                    Artificial = 4 }; // Made up by person that inserts it
+
+  struct Data {
+    std::string name;
+    Type type;
+  };
+
+  Data operator*() const;
+
 
 private:
   friend class Module;
+  friend class Function;
 
   using details::Internals::Internals;
 };

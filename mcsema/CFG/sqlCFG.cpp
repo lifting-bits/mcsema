@@ -52,6 +52,9 @@ struct SymtabEntry_ : has_context,
   constexpr static Query q_insert =
     R"(insert into symtabs(name, module_rowid, type_rowid) values (?1, ?2, ?3))";
 
+  constexpr static Query q_get =
+    R"(select name, type_rowid from symtabs where rowid = ?1)";
+
 };
 
 struct MemoryRange_ : has_context,
@@ -206,6 +209,7 @@ struct Segment_ : has_context,
   }
 };
 
+/* Letter */
 
 Letter::Letter(const std::string &name) : _ctx(std::make_shared<Context>(name)) {}
 
@@ -269,9 +273,19 @@ BasicBlock Module::AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &me
 }
 
 SymtabEntry Module::AddSymtabEntry(const std::string &name, SymtabEntry::Type type) {
-  return { SymtabEntry_{ _ctx }.insert(_id, name, static_cast<unsigned char>(type)),
+  return { SymtabEntry_{ _ctx }.insert(name, _id, static_cast<unsigned char>(type)),
            _ctx };
 }
+
+/* SymtabEntry */
+SymtabEntry::Data SymtabEntry::operator*() const {
+  SymtabEntry::Data out;
+  unsigned char a;
+  SymtabEntry_{ _ctx }.get(_id)(out.name, a);
+  out.type = static_cast<Type>(a);
+  return out;
+}
+
 
 
 /* Function */
