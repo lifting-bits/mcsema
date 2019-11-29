@@ -86,7 +86,8 @@ template< typename Self >
 struct func_ops_mixin :
   func_ops_< Self >,
   all_< Self >,
-  id_based_ops_< Self >
+  id_based_ops_< Self >,
+  has_symtab_name< Self >
 {};
 
 
@@ -277,6 +278,19 @@ SymtabEntry Module::AddSymtabEntry(const std::string &name, SymtabEntry::Type ty
 
 void Function::AttachBlock(const BasicBlock &bb) {
   Function_<Function>{ _ctx }.bind_bb(_id, bb._id);
+}
+
+Function &Function::Name(const SymtabEntry &entry) {
+  Function_{ _ctx }.Name(_id, entry._id);
+  return *this;
+}
+
+std::optional<SymtabEntry> Function::Name() {
+  auto maybe_id = Function_{ _ctx }.Name(_id);
+  if (maybe_id) {
+    return { { *maybe_id, _ctx } };
+  }
+  return {};
 }
 
 /* BasicBlock */

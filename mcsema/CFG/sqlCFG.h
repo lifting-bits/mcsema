@@ -44,7 +44,7 @@ protected:
   Internals(int64_t id, CtxPtr &ctx) : _id(id), _ctx(ctx) {}
 
   int64_t _id;
-  CtxPtr _ctx;
+  mutable CtxPtr _ctx;
 
 };
 
@@ -111,6 +111,9 @@ public:
       AttachBlock(bb);
     }
   }
+
+  Function &Name(const SymtabEntry &entry);
+  std::optional<SymtabEntry> Name();
 
 private:
   using details::Internals::Internals;
