@@ -93,6 +93,12 @@ void run()
   main.AttachBlock(exit_bb);
 
   foo.AttachBlocks( { entry_bb, exit_bb } );
+
+  auto matrix_add = bin.AddExternalFunction(
+      600650,
+      bin.AddSymtabEntry("matrix_add", SymtabEntry::Type::Imported),
+      CC::X86_64_SysV, true, true);
+  std::cout << "External functiom matrix_add has name: " << matrix_add.Name() << std::endl;
 }
 
 
