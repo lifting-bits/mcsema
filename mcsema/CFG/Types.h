@@ -182,28 +182,38 @@ template< typename Self >
 struct has_symtab_name : _crtp< Self, has_symtab_name >
 {
 
-  static std::string q_set_name() {
+  static std::string q_set_symtabentry() {
     return std::string{ "UPDATE " } + Self::table_name +
       " SET(symtab_rowid) = (?2) WHERE rowid = ?1";
   }
 
-  static std::string q_get_name() {
+  static std::string q_get_symtabentry() {
     return std::string { "SELECT symtab_rowid FROM " } + Self::table_name +
            " WHERE rowid = ?1 and symtab_rowid NOT NULL";
   }
 
+  static std::string q_get_name() {
+    return std::string { "SELECT s.name FROM symtabs AS s JOIN "} + Self::table_name +
+      " AS self ON self.rowid = ?1 and self.symtab_rowid = s.rowid";
+  }
+
   auto Name(int64_t id, int64_t new_symbol_id) {
-    this->db().template query<q_set_name>( id, new_symbol_id );
+    this->db().template query<q_set_symtabentry>( id, new_symbol_id );
   }
 
   std::optional<int64_t> Name(int64_t id) {
     int64_t symbol_id = -12;
-    if (this->db().template query<q_get_name>( id )( symbol_id )) {
+    if (this->db().template query<q_get_symtabentry>( id )( symbol_id )) {
       return { symbol_id };
     }
     return {};
   }
 
+  std::string GetName(int64_t id) {
+    std::string out;
+    this->db().template query<q_get_name>(id)(out);
+    return std::move( out );
+  }
 };
 
 } // namespace mcsema::cfg
