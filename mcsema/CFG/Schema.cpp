@@ -170,6 +170,22 @@ void Schema::CreateSchema(Context &ctx) {
         ))";
   db.template query<symtabs>();
 
+  // TODO: Signature
+  static Query external_functions = R"(create table if not exists external_functions(
+        ea integer NOT NULL,
+        calling_convention_rowid integer NOT NULL,
+        symtab_rowid integer NOT NULL,
+        module_rowid integer NOT NULL,
+        has_return integer,
+        is_weak integer,
+        signature text,
+        FOREIGN KEY(calling_convention_rowid) REFERENCES calling_conventions(rowid),
+        FOREIGN KEY(symtab_rowid) REFERENCES symtabs(rowid),
+        FOREIGN KEY(module_rowid) REFERENCES modules(rowid)
+        ))";
+  db.template query<external_functions>();
+
+
   // TODO: Rework/Check below
 
   static Query g_vars = R"(create table if not exists global_variables(
@@ -209,16 +225,6 @@ void Schema::CreateSchema(Context &ctx) {
         is_thread_local integer
         ))";
   db.template query<external_vars>();
-
-  static Query external_functions = R"(create table if not exists external_functions(
-        ea integer,
-        name text,
-        cc NOT NULL REFERENCES calling_conventions(key),
-        has_return integer,
-        is_weak integer,
-        signature text
-        ))";
-  db.template query<external_functions>();
 
   static Query code_xrefs = R"(create table if not exists code_references(
         ea integer,

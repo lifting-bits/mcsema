@@ -209,6 +209,21 @@ struct Segment_ : has_context,
   }
 };
 
+template<typename Concrete = ExternalFunction>
+struct ExternalFunction_ : has_context,
+                           has_symtab_name<ExternalFunction_<Concrete>>,
+                           id_based_ops_<ExternalFunction_<Concrete>> {
+  using has_context::has_context;
+  constexpr static Query table_name = R"(external_functions)";
+
+  constexpr static Query q_insert =
+    R"(insert into external_functions(
+        ea, calling_convention_rowid, symtab_rowid, module_rowid, has_return, is_weak)
+        values (?1, ?2, ?3, ?4, ?5, ?6))";
+
+
+};
+
 /* Letter */
 
 Letter::Letter(const std::string &name) : _ctx(std::make_shared<Context>(name)) {}
@@ -277,6 +292,19 @@ SymtabEntry Module::AddSymtabEntry(const std::string &name, SymtabEntry::Type ty
            _ctx };
 }
 
+ExternalFunction Module::AddExternalFunction(int64_t ea,
+                                             const SymtabEntry &name,
+                                             CC cc,
+                                             bool has_return, bool is_weak) {
+  return { ExternalFunction_{ _ctx }.insert(ea,
+                                            static_cast<unsigned char>(cc),
+                                            name._id,
+                                            _id,
+                                            has_return,
+                                            is_weak),
+           _ctx };
+}
+
 /* SymtabEntry */
 SymtabEntry::Data SymtabEntry::operator*() const {
   SymtabEntry::Data out;
@@ -334,6 +362,11 @@ Segment MemoryRange::AddSegment(int64_t ea,
   return { Segment_{ _ctx }._insert( ea, size, flags, name, _id ), _ctx };
 }
 
+
+/* ExternalFunction */
+std::string ExternalFunction::Name() const {
+  return ExternalFunction_{ _ctx }.GetName(_id);
+}
 
 } // namespace cfg
 } // namespace mcsema

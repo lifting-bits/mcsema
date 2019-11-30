@@ -26,6 +26,7 @@ namespace cfg {
 
 // Forward-declare concrete
 class Function;
+class ExternalFunction;
 class BasicBlock;
 class Module;
 class MemoryRange;
@@ -73,6 +74,15 @@ private:
   using details::Internals::Internals;
 };
 
+
+// Corresponds to llvm calling convention numbering
+enum class CC : unsigned char { C = 0,
+                                X86_StdCall = 64,
+                                X86_FastCall = 65,
+                                X86_64_SysV = 78,
+                                Win64 = 79
+};
+
 class Module : details::Internals {
 
 public:
@@ -87,12 +97,27 @@ public:
 
   SymtabEntry AddSymtabEntry(const std::string &name, SymtabEntry::Type type);
 
+  ExternalFunction AddExternalFunction(int64_t ea,
+                                       const SymtabEntry &name,
+                                       CC cc,
+                                       bool has_return, bool is_weak);
+
 private:
   using details::Internals::Internals;
 
   friend class Letter;
 };
 
+class ExternalFunction : details::Internals {
+public:
+
+  std::string Name() const;
+
+private:
+  friend class Module;
+
+  using details::Internals::Internals;
+};
 
 class BasicBlock : details::Internals {
 public:
