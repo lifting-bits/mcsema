@@ -98,7 +98,8 @@ void run()
       600650,
       bin.AddSymtabEntry("matrix_add", SymtabEntry::Type::Imported),
       CC::X86_64_SysV, true, true);
-  std::cout << "External functiom matrix_add has name: " << matrix_add.Name() << std::endl;
+  std::cout << "External functiom matrix_add has name: " << matrix_add.Name()
+            << ", and ea: " << matrix_add.ea() << std::endl;
 }
 
 
