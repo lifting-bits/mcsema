@@ -214,6 +214,24 @@ struct has_symtab_name : _crtp< Self, has_symtab_name >
     this->db().template query<q_get_name>(id)(out);
     return std::move( out );
   }
+
 };
+
+
+template<typename Self>
+struct has_ea : _crtp<Self, has_ea> {
+
+  static std::string q_get_ea() {
+    return std::string { "SELECT ea FROM " } + Self::table_name + " WHERE rowid = ?1";
+  }
+
+  int64_t get_ea(int64_t id) {
+    int64_t ea;
+    this->db().template query<q_get_ea>(id)(ea);
+    return ea;
+  }
+
+};
+
 
 } // namespace mcsema::cfg
