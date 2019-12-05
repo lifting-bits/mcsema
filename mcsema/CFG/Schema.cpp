@@ -49,12 +49,12 @@ void Schema::CreateEnums(Context &ctx) {
   db.template query<populate_cc>(79, "Win64");
 
   static Query operand_types = R"(create table if not exists operand_types(
-      key PRIMARY KEY NOT NULL,
-      type text
+      type text NOT NULL
       ))";
   db.template query<operand_types>();
 
-  static Query populate_operad_types = R"(insert into operand_types values(?1, ?2))";
+  static Query populate_operad_types =
+    R"(insert into operand_types(rowid, type) values(?1, ?2))";
   db.template query<populate_operad_types>(0, "Immediate operand");
   db.template query<populate_operad_types>(1, "Memory operand");
   db.template query<populate_operad_types>(2, "MemoryDisplacement operand");
@@ -63,12 +63,12 @@ void Schema::CreateEnums(Context &ctx) {
 
 
   static Query locations = R"(create table if not exists locations(
-        key integer PRIMARY KEY NOT NULL,
         location text NOT NULL
         ))";
   db.template query<locations>();
 
-  static Query populate_locations = R"(insert into locations values(?1, ?2))";
+  static Query populate_locations =
+    R"(insert into locations(rowid, location) values(?1, ?2))";
   db.template query<populate_locations>(0, "Internal");
   db.template query<populate_locations>(1, "External");
 
@@ -185,6 +185,20 @@ void Schema::CreateSchema(Context &ctx) {
         ))";
   db.template query<external_functions>();
 
+  static Query code_xrefs = R"(create table if not exists code_references(
+        ea integer NOT NULL,
+        bb_rowid NOT NULL,
+        operand_type_rowid NOT NULL,
+        location_rowid NOT NULL,
+        mask integer,
+        symtab_rowid,
+        FOREIGN KEY(bb_rowid) REFERENCES blocks(rowid),
+        FOREIGN KEY(operand_type_rowid) REFERENCES operand_types(rowid),
+        FOREIGN KEY(location_rowid) REFERENCES locations(rowid),
+        FOREIGN KEY(symtab_rowid) REFERENCES symtabs(rowid)
+        ))";
+  db.template query<code_xrefs>();
+
 
   // TODO: Rework/Check below
 
@@ -225,15 +239,6 @@ void Schema::CreateSchema(Context &ctx) {
         is_thread_local integer
         ))";
   db.template query<external_vars>();
-
-  static Query code_xrefs = R"(create table if not exists code_references(
-        ea integer,
-        target_type NOT NULL REFERENCES operand_types(key),
-        location NOT NULL REFERENCES locations(key),
-        mask integer,
-        name text
-        ))";
-  db.template query<code_xrefs>();
 
   CreateNMTables(ctx);
 }
