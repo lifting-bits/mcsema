@@ -212,6 +212,7 @@ struct Segment_ : has_context,
 template<typename Concrete = ExternalFunction>
 struct ExternalFunction_ : has_context,
                            has_symtab_name<ExternalFunction_<Concrete>>,
+                           has_ea<ExternalFunction_<Concrete>>,
                            id_based_ops_<ExternalFunction_<Concrete>> {
   using has_context::has_context;
   constexpr static Query table_name = R"(external_functions)";
@@ -368,5 +369,16 @@ std::string ExternalFunction::Name() const {
   return ExternalFunction_{ _ctx }.GetName(_id);
 }
 
+template<typename Self>
+int64_t interface::Ea<Self>::ea() {
+  auto self = static_cast<Self *>(this);
+  return impl_t<decltype(self)>{ self->_ctx }.get_ea( self->_id );
+}
+
+namespace interface {
+
+template struct Ea<ExternalFunction>;
+
+} // namespace interface
 } // namespace cfg
 } // namespace mcsema

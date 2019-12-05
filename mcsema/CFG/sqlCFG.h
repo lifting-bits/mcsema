@@ -49,7 +49,19 @@ protected:
 
 };
 
-} // details
+} // namespace details
+
+
+namespace interface {
+
+template<typename Self>
+struct Ea {
+  int64_t ea();
+};
+
+} // namespace interface
+
+
 
 class SymtabEntry : details::Internals {
 public:
@@ -108,13 +120,17 @@ private:
   friend class Letter;
 };
 
-class ExternalFunction : details::Internals {
+
+
+class ExternalFunction : public details::Internals,
+                         public interface::Ea<ExternalFunction> {
 public:
 
   std::string Name() const;
 
 private:
   friend class Module;
+  friend class interface::Ea<ExternalFunction>;
 
   using details::Internals::Internals;
 };
