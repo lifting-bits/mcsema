@@ -175,6 +175,7 @@ void Schema::CreateSchema(Context &ctx) {
 
   static Query code_xrefs = R"(create table if not exists code_references(
         ea integer NOT NULL,
+        target_ea integer NOT NULL,
         bb_rowid NOT NULL,
         operand_type_rowid NOT NULL,
         mask integer,
