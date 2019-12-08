@@ -61,18 +61,6 @@ void Schema::CreateEnums(Context &ctx) {
   db.template query<populate_operad_types>(3, "ControlFlow operand");
   db.template query<populate_operad_types>(4, "OffsetTable operand");
 
-
-  static Query locations = R"(create table if not exists locations(
-        location text NOT NULL
-        ))";
-  db.template query<locations>();
-
-  static Query populate_locations =
-    R"(insert into locations(rowid, location) values(?1, ?2))";
-  db.template query<populate_locations>(0, "Internal");
-  db.template query<populate_locations>(1, "External");
-
-
   static Query symtab_types = R"(create table if not exists symtab_types(
       type text NOT NULL
       ))";
@@ -189,12 +177,10 @@ void Schema::CreateSchema(Context &ctx) {
         ea integer NOT NULL,
         bb_rowid NOT NULL,
         operand_type_rowid NOT NULL,
-        location_rowid NOT NULL,
         mask integer,
         symtab_rowid,
         FOREIGN KEY(bb_rowid) REFERENCES blocks(rowid),
         FOREIGN KEY(operand_type_rowid) REFERENCES operand_types(rowid),
-        FOREIGN KEY(location_rowid) REFERENCES locations(rowid),
         FOREIGN KEY(symtab_rowid) REFERENCES symtabs(rowid)
         ))";
   db.template query<code_xrefs>();
