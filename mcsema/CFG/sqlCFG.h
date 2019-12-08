@@ -32,6 +32,7 @@ class Module;
 class MemoryRange;
 class Segment;
 class SymtabEntry;
+class CodeXref;
 
 // Context that represents the file and other helper data part of internal implemenation
 class Context;
@@ -63,7 +64,7 @@ struct Ea {
 
 
 
-class SymtabEntry : details::Internals {
+class SymtabEntry : public details::Internals {
 public:
 
   enum class Type : unsigned char { Imported = 1, // Names from another object file
@@ -82,6 +83,8 @@ public:
 private:
   friend class Module;
   friend class Function;
+  friend class CodeXref;
+  friend class BasicBlock;
 
   using details::Internals::Internals;
 };
@@ -94,6 +97,15 @@ enum class CC : unsigned char { C = 0,
                                 X86_64_SysV = 78,
                                 Win64 = 79
 };
+
+enum class OperandType : unsigned char {
+  Immediate = 0,
+  Memory = 1,
+  MemoryDisplacement = 2,
+  ControlFlow = 3,
+  OffsetTable = 4
+};
+
 
 class Module : details::Internals {
 
@@ -139,6 +151,13 @@ class BasicBlock : details::Internals {
 public:
 
     std::string Data();
+
+    CodeXref AddXref(int64_t ea, int64_t target_ea, OperandType op_type);
+    CodeXref AddXref(int64_t ea,
+                     int64_t target_ea,
+                     OperandType op_type,
+                     const SymtabEntry &name,
+                     std::optional<int64_t> mask={});
 
 private:
 
@@ -211,6 +230,19 @@ private:
   using details::Internals::Internals;
 };
 
+
+class CodeXref : details::Internals,
+                 interface::Ea<CodeXref> {
+
+public:
+
+private:
+  friend class Module;
+  friend class BasicBlock;
+  friend class interface::Ea<CodeXref>;
+
+  using details::Internals::Internals;
+};
 
 struct Letter
 {

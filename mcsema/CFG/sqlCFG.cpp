@@ -209,6 +209,22 @@ struct Segment_ : has_context,
   }
 };
 
+
+template<typename Concrete = CodeXref >
+struct CodeXref_ : has_context,
+                   has_symtab_name<CodeXref_<Concrete>>,
+                   has_ea<CodeXref_<Concrete>>,
+                   id_based_ops_<CodeXref_<Concrete>> {
+  using has_context::has_context;
+  constexpr static Query table_name = R"(code_references)";
+
+  constexpr static Query q_insert =
+    R"(insert into code_references(
+         ea, target_ea, bb_rowid, operand_type_rowid, mask, symtab_rowid)
+       values(?1, ?2, ?3, ?4, ?5, ?6))";
+
+};
+
 template<typename Concrete = ExternalFunction>
 struct ExternalFunction_ : has_context,
                            has_symtab_name<ExternalFunction_<Concrete>>,
@@ -341,6 +357,30 @@ std::string BasicBlock::Data() {
     return BasicBlock_{ _ctx }.data(_id);
 }
 
+CodeXref BasicBlock::AddXref(int64_t ea, int64_t target_ea, OperandType op_type) {
+  return { CodeXref_{ _ctx }.insert(ea,
+                                    target_ea,
+                                    _id,
+                                    static_cast<unsigned char>(op_type),
+                                    NULL,
+                                    NULL),
+          _ctx };
+}
+
+
+CodeXref BasicBlock::AddXref(int64_t ea,
+                             int64_t target_ea,
+                             OperandType op_type,
+                             const SymtabEntry &name,
+                             std::optional<int64_t> mask) {
+  return { CodeXref_{ _ctx }.insert(ea,
+                                    target_ea,
+                                    _id,
+                                    static_cast<unsigned char>(op_type),
+                                    (mask) ? *mask : NULL,
+                                    name._id),
+          _ctx };
+}
 
 /* Segment */
 
