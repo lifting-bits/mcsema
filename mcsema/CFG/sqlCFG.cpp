@@ -225,6 +225,22 @@ struct CodeXref_ : has_context,
 
 };
 
+template<typename Concrete = DataXref>
+struct DataXref_ : has_context,
+                   has_symtab_name<DataXref_<Concrete>>,
+                   has_ea<DataXref_<Concrete>>,
+                   id_based_ops_<DataXref_<Concrete>> {
+
+  using has_context::has_context;
+  constexpr static Query table_name = R"(data_references)";
+
+  constexpr static Query q_insert =
+    R"(insert into data_references(
+          ea, width, target_ea, segment_rowid, fixup_kind_rowid, symtab_rowid)
+       values(?1, ?2, ?3, ?4, ?5, ?6))";
+
+};
+
 template<typename Concrete = ExternalFunction>
 struct ExternalFunction_ : has_context,
                            has_symtab_name<ExternalFunction_<Concrete>>,
@@ -392,6 +408,22 @@ void Segment::SetFlags(const Flags &flags) {
   return Segment_{ _ctx }.SetFlags(_id, flags);
 }
 
+DataXref Segment::AddXref(int64_t ea, int64_t target_ea, int64_t width, FixupKind fixup) {
+  return { DataXref_{ _ctx }.insert(ea, width, target_ea, _id,
+                                    static_cast<unsigned char>(fixup),
+                                    NULL),
+          _ctx };
+}
+
+DataXref Segment::AddXref(int64_t ea, int64_t target_ea,
+                          int64_t width, FixupKind fixup, const SymtabEntry &name) {
+
+  return { DataXref_{ _ctx }.insert(ea, width, target_ea, _id,
+                                    static_cast<unsigned char>(fixup),
+                                    name._id),
+         _ctx };
+}
+
 
 
 /* MemoryRange */
@@ -403,10 +435,28 @@ Segment MemoryRange::AddSegment(int64_t ea,
   return { Segment_{ _ctx }._insert( ea, size, flags, name, _id ), _ctx };
 }
 
+/* CodeXref */
+
+
+
+template<typename T>
+struct dispatch { using type = void;  };
+template<>
+struct dispatch<ExternalFunction> { using type = ExternalFunction_<ExternalFunction>; };
+template<>
+struct dispatch<CodeXref> { using type = CodeXref_<CodeXref>; };
+template<>
+struct dispatch<DataXref> { using type = DataXref_<DataXref>; };
+
+template<typename T>
+using remove_cvp_t = typename std::remove_cv_t<std::remove_pointer_t<T>>;
+
+template<typename T>
+using impl_t = typename dispatch<remove_cvp_t<T>>::type;
 
 /* ExternalFunction */
 std::string ExternalFunction::Name() const {
-  return ExternalFunction_{ _ctx }.GetName(_id);
+  return impl_t<decltype(this)>{ _ctx }.GetName(_id);
 }
 
 template<typename Self>
@@ -417,8 +467,11 @@ int64_t interface::Ea<Self>::ea() {
 
 namespace interface {
 
+template struct Ea<CodeXref>;
+template struct Ea<DataXref>;
 template struct Ea<ExternalFunction>;
 
 } // namespace interface
+
 } // namespace cfg
 } // namespace mcsema

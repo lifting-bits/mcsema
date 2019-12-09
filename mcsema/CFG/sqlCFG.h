@@ -33,6 +33,7 @@ class MemoryRange;
 class Segment;
 class SymtabEntry;
 class CodeXref;
+class DataXref;
 
 // Context that represents the file and other helper data part of internal implemenation
 class Context;
@@ -84,6 +85,7 @@ private:
   friend class Module;
   friend class Function;
   friend class CodeXref;
+  friend class Segment;
   friend class BasicBlock;
 
   using details::Internals::Internals;
@@ -106,6 +108,10 @@ enum class OperandType : unsigned char {
   OffsetTable = 4
 };
 
+enum class FixupKind : unsigned char {
+  Absolute = 0,
+  OffsetFromThreadBase = 1
+};
 
 class Module : details::Internals {
 
@@ -207,6 +213,10 @@ public:
   std::string Data();
   void SetFlags(const Flags &flags);
 
+  DataXref AddXref(int64_t ea, int64_t target_ea, int64_t width, FixupKind fixup);
+  DataXref AddXref(int64_t ea, int64_t target_ea,
+                   int64_t width, FixupKind fixup, const SymtabEntry &name);
+
 private:
   friend class MemoryRange;
   friend class Module;
@@ -231,8 +241,8 @@ private:
 };
 
 
-class CodeXref : details::Internals,
-                 interface::Ea<CodeXref> {
+class CodeXref : public details::Internals,
+                 public interface::Ea<CodeXref> {
 
 public:
 
@@ -240,6 +250,19 @@ private:
   friend class Module;
   friend class BasicBlock;
   friend class interface::Ea<CodeXref>;
+
+  using details::Internals::Internals;
+};
+
+
+class DataXref : public details::Internals,
+                 public interface::Ea<DataXref> {
+
+public:
+
+private:
+  friend class Segment;
+  friend class interface::Ea<DataXref>;
 
   using details::Internals::Internals;
 };
