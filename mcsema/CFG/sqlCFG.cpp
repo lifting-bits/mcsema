@@ -320,7 +320,7 @@ BasicBlock Module::AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &me
   return { BasicBlock_{ _ctx }.insert(_id, ea, size, mem._id), _ctx };
 }
 
-SymtabEntry Module::AddSymtabEntry(const std::string &name, SymtabEntry::Type type) {
+SymtabEntry Module::AddSymtabEntry(const std::string &name, SymtabEntryType type) {
   return { SymtabEntry_{ _ctx }.insert(name, _id, static_cast<unsigned char>(type)),
            _ctx };
 }
@@ -343,7 +343,7 @@ SymtabEntry::Data SymtabEntry::operator*() const {
   SymtabEntry::Data out;
   unsigned char a;
   SymtabEntry_{ _ctx }.get(_id)(out.name, a);
-  out.type = static_cast<Type>(a);
+  out.type = static_cast<SymtabEntryType>(a);
   return out;
 }
 
@@ -460,16 +460,16 @@ std::string ExternalFunction::Name() const {
 }
 
 template<typename Self>
-int64_t interface::Ea<Self>::ea() {
+int64_t interface::HasEa<Self>::ea() {
   auto self = static_cast<Self *>(this);
   return impl_t<decltype(self)>{ self->_ctx }.get_ea( self->_id );
 }
 
 namespace interface {
 
-template struct Ea<CodeXref>;
-template struct Ea<DataXref>;
-template struct Ea<ExternalFunction>;
+template struct HasEa<CodeXref>;
+template struct HasEa<DataXref>;
+template struct HasEa<ExternalFunction>;
 
 } // namespace interface
 

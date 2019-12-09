@@ -53,43 +53,11 @@ protected:
 
 } // namespace details
 
-
-namespace interface {
-
-template<typename Self>
-struct Ea {
-  int64_t ea();
-};
-
-} // namespace interface
-
-
-
-class SymtabEntry : public details::Internals {
-public:
-
-  enum class Type : unsigned char { Imported = 1, // Names from another object file
-                                    Exported = 2, // Externally visible
-                                    Internal = 3, // Internal
-                                    Artificial = 4 }; // Made up by person that inserts it
-
-  struct Data {
-    std::string name;
-    Type type;
-  };
-
-  Data operator*() const;
-
-
-private:
-  friend class Module;
-  friend class Function;
-  friend class CodeXref;
-  friend class Segment;
-  friend class BasicBlock;
-
-  using details::Internals::Internals;
-};
+enum class SymtabEntryType : unsigned char {
+  Imported = 1, // Names from another object file
+  Exported = 2, // Externally visible
+  Internal = 3, // Internal
+  Artificial = 4 }; // Made up by person that inserts it
 
 
 // Corresponds to llvm calling convention numbering
@@ -113,6 +81,45 @@ enum class FixupKind : unsigned char {
   OffsetFromThreadBase = 1
 };
 
+// TODO: Do we want things like this or not?
+namespace interface {
+
+template<typename Self>
+struct HasEa {
+  int64_t ea();
+};
+
+template<typename Self>
+struct HasSymtabEntry {
+  std::optional<std::string> Name();
+  SymtabEntry AddSymtabEntry(const std::string &name, SymtabEntryType type);
+};
+
+} // namespace interface
+
+
+
+class SymtabEntry : public details::Internals {
+public:
+
+  struct Data {
+    std::string name;
+    SymtabEntryType type;
+  };
+
+  Data operator*() const;
+
+
+private:
+  friend class Module;
+  friend class Function;
+  friend class CodeXref;
+  friend class Segment;
+  friend class BasicBlock;
+
+  using details::Internals::Internals;
+};
+
 class Module : details::Internals {
 
 public:
@@ -125,7 +132,7 @@ public:
 
   BasicBlock AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &memory);
 
-  SymtabEntry AddSymtabEntry(const std::string &name, SymtabEntry::Type type);
+  SymtabEntry AddSymtabEntry(const std::string &name, SymtabEntryType type);
 
   ExternalFunction AddExternalFunction(int64_t ea,
                                        const SymtabEntry &name,
@@ -141,14 +148,14 @@ private:
 
 
 class ExternalFunction : public details::Internals,
-                         public interface::Ea<ExternalFunction> {
+                         public interface::HasEa<ExternalFunction> {
 public:
 
   std::string Name() const;
 
 private:
   friend class Module;
-  friend class interface::Ea<ExternalFunction>;
+  friend class interface::HasEa<ExternalFunction>;
 
   using details::Internals::Internals;
 };
@@ -242,27 +249,27 @@ private:
 
 
 class CodeXref : public details::Internals,
-                 public interface::Ea<CodeXref> {
+                 public interface::HasEa<CodeXref> {
 
 public:
 
 private:
   friend class Module;
   friend class BasicBlock;
-  friend class interface::Ea<CodeXref>;
+  friend class interface::HasEa<CodeXref>;
 
   using details::Internals::Internals;
 };
 
 
 class DataXref : public details::Internals,
-                 public interface::Ea<DataXref> {
+                 public interface::HasEa<DataXref> {
 
 public:
 
 private:
   friend class Segment;
-  friend class interface::Ea<DataXref>;
+  friend class interface::HasEa<DataXref>;
 
   using details::Internals::Internals;
 };
