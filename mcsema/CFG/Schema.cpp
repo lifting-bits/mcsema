@@ -198,6 +198,19 @@ void Schema::CreateSchema(Context &ctx) {
   db.template query<code_xrefs>();
 
 
+  static Query data_xrefs = R"(create table if not exists data_references(
+        ea integer NOT NULL,
+        width integer NOT NULL,
+        target_ea integer NOT NULL,
+        segment_rowid integer NOT NULL,
+        fixup_kind_rowid integer NOT NULL,
+        symtab_rowid integer,
+        FOREIGN KEY(segment_rowid) REFERENCES segments(rowid),
+        FOREIGN KEY(fixup_kind_rowid) REFERENCES fixup_kinds(rowid),
+        FOREIGN KEY(symtab_rowid) REFERENCES symtabs(rowid)
+        ))";
+  db.template query<data_xrefs>();
+
   // TODO: Rework/Check below
 
   static Query g_vars = R"(create table if not exists global_variables(
