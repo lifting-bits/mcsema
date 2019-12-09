@@ -72,6 +72,17 @@ void Schema::CreateEnums(Context &ctx) {
   db.template query<populate_symtab_types>("exported", 2);
   db.template query<populate_symtab_types>("internal", 3);
   db.template query<populate_symtab_types>("artificial", 4);
+
+  static Query fixup_kinds =
+    R"(create table if not exists fixup_kinds(
+      type text NOT NULL
+      ))";
+  db.template query<fixup_kinds>();
+
+  static Query populate_fixup_kinds =
+    R"(insert into fixup_kinds(rowid, type) values(?1,?2))";
+  db.template query<populate_fixup_kinds>(0, "Absolute");
+  db.template query<populate_fixup_kinds>(1, "OffsetFromThreadBase");
 }
 
 void Schema::CreateNMTables(Context &ctx) {
