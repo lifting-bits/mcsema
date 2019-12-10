@@ -87,6 +87,11 @@ struct Module_ : has_context,
   constexpr static Query q_insert =
     R"(insert into modules(name) values (?1))";
 
+  auto all_functions(int64_t id) {
+    constexpr static Query q_data =
+      R"(select ea, is_entrypoint from functions where module_rowid = ?1)";
+    return _ctx->db.template query<q_data>(id);
+  }
 };
 
 template< typename Self >
@@ -346,6 +351,17 @@ ExternalFunction Module::AddExternalFunction(int64_t ea,
                                             has_return,
                                             is_weak),
            _ctx };
+}
+
+std::vector<Function::Data> Module::AllFunctions() {
+  auto result = Module_{ _ctx }.all_functions( _id );
+  std::vector<Function::Data> out;
+  int64_t ea;
+  bool is_entrypoint;
+  while(result(ea, is_entrypoint)) {
+    out.push_back({ea, is_entrypoint});
+  }
+  return out;
 }
 
 /* SymtabEntry */

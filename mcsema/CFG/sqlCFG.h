@@ -124,32 +124,9 @@ private:
   friend class BasicBlock;
 
   using details::Internals::Internals;
+
 };
 
-class Module : details::Internals {
-
-public:
-
-  Function AddFunction(int64_t ea, bool is_entrypoint);
-
-  MemoryRange AddMemoryRange(int64_t ea, int64_t range, std::string_view data);
-
-  MemoryRange AddMemoryRange(int64_t ea, std::string_view data);
-
-  BasicBlock AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &memory);
-
-  SymtabEntry AddSymtabEntry(const std::string &name, SymtabEntryType type);
-
-  ExternalFunction AddExternalFunction(int64_t ea,
-                                       const SymtabEntry &name,
-                                       CC cc,
-                                       bool has_return, bool is_weak);
-
-private:
-  using details::Internals::Internals;
-
-  friend class Letter;
-};
 
 
 
@@ -191,6 +168,16 @@ private:
 class Function : details::Internals {
 
 public:
+
+  struct Data {
+    int64_t ea;
+    bool is_entrypoint;
+    //std::optional<SymtabEntry::Data> symbol;
+
+    // TODO:
+    // Get all bbs?
+  };
+
   void AttachBlock(const BasicBlock &bb);
 
   template<typename Collection = std::vector<BasicBlock>>
@@ -279,6 +266,33 @@ private:
   friend class interface::HasEa<DataXref>;
 
   using details::Internals::Internals;
+};
+
+class Module : details::Internals {
+
+public:
+
+  Function AddFunction(int64_t ea, bool is_entrypoint);
+
+  MemoryRange AddMemoryRange(int64_t ea, int64_t range, std::string_view data);
+
+  MemoryRange AddMemoryRange(int64_t ea, std::string_view data);
+
+  BasicBlock AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &memory);
+
+  SymtabEntry AddSymtabEntry(const std::string &name, SymtabEntryType type);
+
+  ExternalFunction AddExternalFunction(int64_t ea,
+                                       const SymtabEntry &name,
+                                       CC cc,
+                                       bool has_return, bool is_weak);
+
+  std::vector<Function::Data> AllFunctions();
+
+private:
+  using details::Internals::Internals;
+
+  friend class Letter;
 };
 
 struct Letter
