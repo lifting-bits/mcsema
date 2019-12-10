@@ -44,7 +44,7 @@ void run()
   auto lib = letter.module("lib.so");
   auto bin = letter.module("bin.out");
 
-  auto s_main = bin.AddSymtabEntry("main", SymtabEntry::Type::Internal);
+  auto s_main = bin.AddSymtabEntry("main", SymtabEntryType::Internal);
 
   auto main = letter.func(bin, 12, true).Name(s_main);
   auto foo = letter.func(bin, 32, false);
@@ -59,7 +59,6 @@ void run()
 
   auto library_func = letter.func(lib, 0, false);
 
-  // TODO: Calculate automatically size
   std::string bin_data = "push rax ... pop rax\0";
   auto text = bin.AddMemoryRange(400400, 20, bin_data);
   auto copy_of_text = bin.AddMemoryRange(400400, bin_data);
@@ -70,6 +69,37 @@ void run()
   std::cout << "*** BasicBlock::Data()" << std::endl;
   std::cout << entry_bb.Data().size() << ": " << entry_bb.Data() << std::endl;
   std::cout << exit_bb.Data().size() << ": " << exit_bb.Data() << std::endl;
+
+  // Add CodeXrefs
+  {
+    // TODO: Check validity of entry
+    auto xref = entry_bb.AddXref(400407, 600800, OperandType::Immediate);
+    auto masked_xref = entry_bb.AddXref(400407, 600800,
+                                        OperandType::Immediate,
+                                        bin.AddSymtabEntry("Reference 1",
+                                                           SymtabEntryType::Artificial),
+                                        0xffffffff);
+
+    auto maybe_masked_xref_name = masked_xref.Name();
+    std::cout << "Name of code xref at " << masked_xref.ea() << " is "
+              << ((maybe_masked_xref_name) ? *maybe_masked_xref_name : "NOT SET!")
+              << std::endl;
+
+    auto c_xref = exit_bb.AddXref(400415, 600825, OperandType::Immediate);
+    auto maybe_c_xref_name = c_xref.Name();
+    std::cout << "Name of code xref at " << c_xref.ea() << " is "
+              << ((maybe_c_xref_name) ? *maybe_c_xref_name : "NOT SET!")
+              << std::endl;
+
+    std::cout << "Giving name to the poor thingy." << std::endl;
+    c_xref.Name(s_main);
+    maybe_c_xref_name = c_xref.Name();
+    std::cout << "Name of code xref at " << c_xref.ea() << " is "
+              << ((maybe_c_xref_name) ? *maybe_c_xref_name : "NOT SET!")
+              << std::endl;
+
+  }
+
 
   std::string my_favorite_str = "Hello\0\0World\n\0\0\0\0\0\0\0\0\0\0L"s;
   auto rodata = bin.AddMemoryRange(600800, my_favorite_str.size(), my_favorite_str);
@@ -85,6 +115,18 @@ void run()
   std::cout << one_off.Data().size() << " " << one_off.Data() << std::endl;
   std::cout << last.Data().size() << " " << last.Data() << std::endl;
 
+  // Add DataXrefs
+  {
+    auto d_xref = hello.AddXref(600800, 600823, 8,
+                                FixupKind::Absolute,
+                                bin.AddSymtabEntry("Variable X",
+                                                   SymtabEntryType::Artificial)
+                                );
+    std::cout << "d_xref has ea: " << d_xref.ea() << std::endl;
+  }
+  {
+
+  }
 
   Segment::Flags new_flags = { true, true, false, true };
   res.SetFlags( new_flags );
@@ -96,7 +138,7 @@ void run()
 
   auto matrix_add = bin.AddExternalFunction(
       600650,
-      bin.AddSymtabEntry("matrix_add", SymtabEntry::Type::Imported),
+      bin.AddSymtabEntry("matrix_add", SymtabEntryType::Imported),
       CC::X86_64_SysV, true, true);
   std::cout << "External functiom matrix_add has name: " << matrix_add.Name()
             << ", and ea: " << matrix_add.ea() << std::endl;
