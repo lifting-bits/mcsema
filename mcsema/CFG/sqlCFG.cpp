@@ -16,6 +16,7 @@
 
 #include <memory>
 #include <utility>
+#include <type_traits>
 
 #include <mcsema/CFG/Types.h>
 #include <mcsema/CFG/Util.h>
