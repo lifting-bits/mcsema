@@ -466,11 +466,19 @@ int64_t interface::HasEa<Self>::ea() {
   return impl_t<decltype(self)>{ self->_ctx }.get_ea( self->_id );
 }
 
+template<typename Self>
+std::optional<std::string> interface::HasSymtabEntry<Self>::Name() {
+  auto self = static_cast<Self *>(this);
+  return impl_t<decltype(self)>{ self->_ctx }.GetName( self->_id );
+}
+
 namespace interface {
 
 template struct HasEa<CodeXref>;
 template struct HasEa<DataXref>;
 template struct HasEa<ExternalFunction>;
+
+template struct HasSymtabEntry<CodeXref>;
 
 } // namespace interface
 

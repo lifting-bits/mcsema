@@ -249,7 +249,8 @@ private:
 
 
 class CodeXref : public details::Internals,
-                 public interface::HasEa<CodeXref> {
+                 public interface::HasEa<CodeXref>,
+                 public interface::HasSymtabEntry<CodeXref> {
 
 public:
 
@@ -257,6 +258,7 @@ private:
   friend class Module;
   friend class BasicBlock;
   friend class interface::HasEa<CodeXref>;
+  friend class interface::HasSymtabEntry<CodeXref>;
 
   using details::Internals::Internals;
 };
