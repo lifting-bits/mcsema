@@ -481,6 +481,14 @@ std::optional<std::string> interface::HasSymtabEntry<Self>::Name() {
   return impl_t<decltype(self)>{ self->_ctx }.GetName( self->_id );
 }
 
+template<typename Self>
+void interface::HasSymtabEntry<Self>::Name(
+    const SymtabEntry &name) {
+
+  auto self = static_cast<Self *>(this);
+  return impl_t<decltype(self)>{ self->_ctx }.Name( self->_id, name._id );
+}
+
 #if 0
 template<typename Self>
 SymtabEntry interface::HasSymtabEntry<Self>::AddSymtabEntry(

@@ -78,6 +78,7 @@ namespace interface {
   template<typename Self>
   struct HasSymtabEntry {
     std::optional<std::string> Name();
+    void Name(const SymtabEntry& name);
   };
 
   // TODO: Can create symtabentry
