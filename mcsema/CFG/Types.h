@@ -83,6 +83,20 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
     return this->db().template query<Self::q_get>(id);
   }
 
+  template<typename SymtabImpl>
+  static std::string q_inject_symtabentry() {
+    auto insert_query = std::string(SymtabImpl::s_insert_module_rowid);
+    auto substitured = insert_query.replace(
+        insert_query.find("#1"), 2,
+        std::string("(") + Self::q_get_module_rowid + ")");
+    return substitured;
+  }
+
+  template<typename SymtabImpl>
+  int64_t inject_symtabentry(const std::string &name, int64_t type) {
+    this->db().template query<q_inject_symtabentry<SymtabImpl>>(name, type);
+    return this->last_rowid();
+  }
 };
 
 template< typename Self >
@@ -197,7 +211,7 @@ struct has_symtab_name : _crtp< Self, has_symtab_name >
       " AS self ON self.rowid = ?1 and self.symtab_rowid = s.rowid";
   }
 
-  auto Name(int64_t id, int64_t new_symbol_id) {
+ auto Name(int64_t id, int64_t new_symbol_id) {
     this->db().template query<q_set_symtabentry>( id, new_symbol_id );
   }
 
@@ -209,10 +223,12 @@ struct has_symtab_name : _crtp< Self, has_symtab_name >
     return {};
   }
 
-  std::string GetName(int64_t id) {
+  std::optional<std::string> GetName(int64_t id) {
     std::string out;
-    this->db().template query<q_get_name>(id)(out);
-    return std::move( out );
+    if (this->db().template query<q_get_name>(id)(out)) {
+      return { std::move( out ) };
+    }
+    return { };
   }
 
 };
