@@ -56,6 +56,9 @@ struct SymtabEntry_ : has_context,
   constexpr static Query q_get =
     R"(select name, type_rowid from symtabs where rowid = ?1)";
 
+  constexpr static Query s_insert_module_rowid =
+    R"(insert into symtabs(name, module_rowid, type_rowid) values (?1, #1, ?2))";
+
 };
 
 struct MemoryRange_ : has_context,
@@ -224,6 +227,12 @@ struct CodeXref_ : has_context,
          ea, target_ea, bb_rowid, operand_type_rowid, mask, symtab_rowid)
        values(?1, ?2, ?3, ?4, ?5, ?6))";
 
+  constexpr static Query q_get_module_rowid =
+    R"(SELECT mr.module_rowid FROM data_references as dr
+                              JOIN segments as seg
+                              JOIN memory_ranges as mr
+                              ON dr.segment_rowid = seg.rowid
+                                 and seg.memory_rowid = mr.rowid)";
 };
 
 template<typename Concrete = DataXref>
@@ -457,7 +466,7 @@ using impl_t = typename dispatch<remove_cvp_t<T>>::type;
 
 /* ExternalFunction */
 std::string ExternalFunction::Name() const {
-  return impl_t<decltype(this)>{ _ctx }.GetName(_id);
+  return *impl_t<decltype(this)>{ _ctx }.GetName(_id);
 }
 
 template<typename Self>
@@ -472,6 +481,19 @@ std::optional<std::string> interface::HasSymtabEntry<Self>::Name() {
   return impl_t<decltype(self)>{ self->_ctx }.GetName( self->_id );
 }
 
+#if 0
+template<typename Self>
+SymtabEntry interface::HasSymtabEntry<Self>::AddSymtabEntry(
+    const std::string &name,
+    SymtabEntryType type) {
+  auto self = static_cast<Self *>(this);
+  return {impl_t<decltype(self)>{ self->_ctx }
+            .template inject_symtabentry<SymtabEntry_<SymtabEntry>>(
+                name, static_cast<unsigned char>(type)),
+          self->_ctx };
+}
+
+#endif
 namespace interface {
 
 template struct HasEa<CodeXref>;

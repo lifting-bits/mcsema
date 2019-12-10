@@ -38,21 +38,6 @@ class DataXref;
 // Context that represents the file and other helper data part of internal implemenation
 class Context;
 
-namespace details {
-
-using CtxPtr = std::shared_ptr<Context>;
-class Internals {
-
-protected:
-  Internals(int64_t id, CtxPtr &ctx) : _id(id), _ctx(ctx) {}
-
-  int64_t _id;
-  mutable CtxPtr _ctx;
-
-};
-
-} // namespace details
-
 enum class SymtabEntryType : unsigned char {
   Imported = 1, // Names from another object file
   Exported = 2, // Externally visible
@@ -81,23 +66,42 @@ enum class FixupKind : unsigned char {
   OffsetFromThreadBase = 1
 };
 
+
 // TODO: Do we want things like this or not?
 namespace interface {
 
-template<typename Self>
-struct HasEa {
-  int64_t ea();
-};
+  template<typename Self>
+  struct HasEa {
+    int64_t ea();
+  };
 
-template<typename Self>
-struct HasSymtabEntry {
-  std::optional<std::string> Name();
-  SymtabEntry AddSymtabEntry(const std::string &name, SymtabEntryType type);
-};
+  template<typename Self>
+  struct HasSymtabEntry {
+    std::optional<std::string> Name();
+  };
+
+  // TODO: Can create symtabentry
+  // SymtabEntry AddSymtabEntry(const std::string &name, SymtabEntryType type);
 
 } // namespace interface
 
 
+namespace details {
+
+using CtxPtr = std::shared_ptr<Context>;
+class Internals {
+
+protected:
+  Internals(int64_t id, CtxPtr &ctx) : _id(id), _ctx(ctx) {}
+
+  int64_t _id;
+  mutable CtxPtr _ctx;
+
+  friend class interface::HasSymtabEntry<CodeXref>;
+
+};
+
+} // namespace details
 
 class SymtabEntry : public details::Internals {
 public:
@@ -114,6 +118,7 @@ private:
   friend class Module;
   friend class Function;
   friend class CodeXref;
+  friend class DataXref;
   friend class Segment;
   friend class BasicBlock;
 
@@ -258,7 +263,6 @@ private:
   friend class Module;
   friend class BasicBlock;
   friend class interface::HasEa<CodeXref>;
-  friend class interface::HasSymtabEntry<CodeXref>;
 
   using details::Internals::Internals;
 };
