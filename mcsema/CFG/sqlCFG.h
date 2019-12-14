@@ -21,6 +21,8 @@
 #include <utility>
 #include <vector>
 
+#include <mcsema/CFG/Iterator.h>
+
 namespace mcsema {
 namespace cfg {
 
@@ -112,8 +114,9 @@ public:
     SymtabEntryType type;
   };
 
-  Data operator*() const;
+  using data_t = Data;
 
+  Data operator*() const;
 
 private:
   friend class Module;
@@ -288,6 +291,8 @@ public:
                                        bool has_return, bool is_weak);
 
   std::vector<Function::Data> AllFunctions();
+
+  WeakIterator<SymtabEntry> Symbols();
 
 private:
   using details::Internals::Internals;

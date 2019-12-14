@@ -92,6 +92,12 @@ struct Module_ : has_context,
       R"(select ea, is_entrypoint from functions where module_rowid = ?1)";
     return _ctx->db.template query<q_data>(id);
   }
+
+  auto all_symbols(int64_t id) {
+    constexpr static Query q_data =
+      R"(select name, type_rowid from symtabs where module_rowid = ?1)";
+    return _ctx->db.template query<q_data>(id);
+  }
 };
 
 template< typename Self >
@@ -111,6 +117,9 @@ struct Function_ : has_context,
   static constexpr Query table_name = R"(functions)";
   static constexpr Query q_insert =
       R"(insert into functions(module_rowid, ea, is_entrypoint) values (?1, ?2, ?3))";
+
+  static constexpr Query q_data =
+    R"(select ea, is_entrypoint from functions)";
 
   struct bare
   {
@@ -272,6 +281,65 @@ struct ExternalFunction_ : has_context,
 
 };
 
+
+template<typename T>
+struct dispatch { using type = void;  };
+template<>
+struct dispatch<ExternalFunction> { using type = ExternalFunction_<ExternalFunction>; };
+template<>
+struct dispatch<CodeXref> { using type = CodeXref_<CodeXref>; };
+template<>
+struct dispatch<DataXref> { using type = DataXref_<DataXref>; };
+
+template<typename T>
+using remove_cvp_t = typename std::remove_cv_t<std::remove_pointer_t<T>>;
+
+template<typename T>
+using impl_t = typename dispatch<remove_cvp_t<T>>::type;
+
+#define ENABLE_IF(name) \
+  typename std::enable_if_t< std::is_same_v< name, Data >, std::optional< Data > >
+
+
+template<typename Data, typename Result>
+auto Get( Result &result ) -> ENABLE_IF( SymtabEntry::Data ) {
+  std::string name;
+  unsigned char type;
+  if (result(name, type)) {
+    return { { name, static_cast<SymtabEntryType>(type)} };
+  }
+  return {};
+}
+
+#undef ENABLE_IF
+
+namespace details {
+struct Iterator_impl {
+  using Result_t = Context::Result_t;
+  Result_t result;
+
+  Iterator_impl(Result_t &&r) : result(std::move(r)) {}
+
+  template< typename Data >
+  auto Fetch() {
+    return Get<Data>( result );
+  }
+
+};
+
+} // namespace details
+
+template<typename Entry>
+WeakIterator<Entry>::WeakIterator(Impl_t &&init) : impl(std::move(init)) {}
+
+template<typename Entry>
+auto WeakIterator<Entry>::Fetch() -> maybe_data_t {
+  return impl->Fetch<data_t>();
+}
+
+template<typename Entry>
+WeakIterator<Entry>::~WeakIterator() {}
+
 /* Letter */
 
 Letter::Letter(const std::string &name) : _ctx(std::make_shared<Context>(name)) {}
@@ -362,6 +430,11 @@ std::vector<Function::Data> Module::AllFunctions() {
     out.push_back({ea, is_entrypoint});
   }
   return out;
+}
+
+WeakIterator<SymtabEntry> Module::Symbols() {
+  auto result = Module_{_ctx }.all_symbols(_id);
+  return { std::make_unique<details::Iterator_impl>(std::move(result)) };
 }
 
 /* SymtabEntry */
@@ -463,23 +536,6 @@ Segment MemoryRange::AddSegment(int64_t ea,
 
 /* CodeXref */
 
-
-
-template<typename T>
-struct dispatch { using type = void;  };
-template<>
-struct dispatch<ExternalFunction> { using type = ExternalFunction_<ExternalFunction>; };
-template<>
-struct dispatch<CodeXref> { using type = CodeXref_<CodeXref>; };
-template<>
-struct dispatch<DataXref> { using type = DataXref_<DataXref>; };
-
-template<typename T>
-using remove_cvp_t = typename std::remove_cv_t<std::remove_pointer_t<T>>;
-
-template<typename T>
-using impl_t = typename dispatch<remove_cvp_t<T>>::type;
-
 /* ExternalFunction */
 std::string ExternalFunction::Name() const {
   return *impl_t<decltype(this)>{ _ctx }.GetName(_id);
@@ -528,5 +584,6 @@ template struct HasSymtabEntry<CodeXref>;
 
 } // namespace interface
 
+template struct WeakIterator<SymtabEntry>;
 } // namespace cfg
 } // namespace mcsema
