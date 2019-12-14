@@ -487,6 +487,14 @@ class Database {
       return *this;
     }
 
+    QueryResult(QueryResult &&other) {
+      using std::swap;
+      swap(stmt, other.stmt);
+      swap(put_cb, other.put_cb);
+      swap(ret, other.ret);
+      swap(first_invocation, other.first_invocation);
+    }
+
     ~QueryResult() {
       if (stmt == nullptr) {
         return;
