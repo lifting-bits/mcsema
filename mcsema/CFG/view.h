@@ -124,9 +124,6 @@ void run()
                                 );
     std::cout << "d_xref has ea: " << d_xref.ea() << std::endl;
   }
-  {
-
-  }
 
   Segment::Flags new_flags = { true, true, false, true };
   res.SetFlags( new_flags );
@@ -142,6 +139,22 @@ void run()
       CC::X86_64_SysV, true, true);
   std::cout << "External functiom matrix_add has name: " << matrix_add.Name()
             << ", and ea: " << matrix_add.ea() << std::endl;
+
+  // Get us all function eas
+  {
+    std::cout << "Let's print all internal functions" << std::endl;
+    for (auto &func: bin.AllFunctions()) {
+      std::cout << func.ea << std::endl;
+    }
+  }
+
+  // Iterate over all symtab entries
+  {
+    std::cout << "Going to print all symbols" << std::endl;
+    for (auto weak_it = bin.Symbols(); auto data = weak_it.Fetch(); ) {
+      std::cout << (*data).name << std::endl;
+    }
+  }
 }
 
 
