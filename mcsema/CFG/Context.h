@@ -32,6 +32,7 @@ class Context {
 public:
   Context(const std::string &db_name) : _db_name(db_name) {}
 
+  using Result_t = sqlite::Database<Name>::QueryResult;
   std::string _db_name;
   sqlite::Database<Name> db;
 };
