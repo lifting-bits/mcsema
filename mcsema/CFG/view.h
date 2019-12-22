@@ -154,6 +154,13 @@ void run()
     for (auto weak_it = bin.Symbols(); auto data = weak_it.Fetch(); ) {
       std::cout << (*data).name << std::endl;
     }
+
+    std::cout << "Print all symbols names and types" << std::endl;
+    auto printer= [](const auto& data) {
+      std::cout << data.name << ", type: "
+                << static_cast<int>(data.type) << std::endl;
+    };
+    bin.ForEachSymbol(printer);
   }
 }
 

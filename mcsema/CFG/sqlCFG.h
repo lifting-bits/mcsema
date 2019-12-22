@@ -290,9 +290,17 @@ public:
                                        CC cc,
                                        bool has_return, bool is_weak);
 
+  // Three examples of iteration
   std::vector<Function::Data> AllFunctions();
 
   WeakIterator<SymtabEntry> Symbols();
+
+  template<typename Unary>
+  void ForEachSymbol(Unary f) {
+    for (auto weak_it = Symbols(); auto data = weak_it.Fetch();) {
+      f(*data);
+    }
+  }
 
 private:
   using details::Internals::Internals;
