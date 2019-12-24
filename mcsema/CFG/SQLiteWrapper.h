@@ -85,6 +85,12 @@ inline void sqlite_error_log_callback(void *, int err_code, const char *msg) {
   std::cerr << "SQLite error (" << err_code << "): " << msg << std::endl;
 }
 
+template<class T, class...Ts>
+struct is_one_of : std::disjunction<std::is_same<T, Ts>...> {};
+
+template<class T, class...Ts>
+inline constexpr bool is_one_of_v = is_one_of<T, Ts...>::value;
+
 } // namespace detail
 
 // Define an explicit specialization `user_serialize_fn<T>` or perhaps
