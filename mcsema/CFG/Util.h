@@ -17,11 +17,29 @@
 
 #pragma once
 
+#include <tuple>
+#include <type_traits>
 #include <utility>
+
 
 namespace mcsema::cfg {
 namespace util
 {
+
+
+template<typename To, size_t ...Indices, typename From>
+To to_struct_(std::index_sequence<Indices ...>, From &&from) {
+  return { std::get<Indices>(std::forward<From>(from))... };
+}
+
+
+template<typename To, typename From>
+To to_struct(From &&from) {
+  using From_t = std::decay_t<From>;
+  return to_struct_<To>(
+      std::make_index_sequence<std::tuple_size_v<From_t>>(),
+      std::forward<From>(from));
+}
 
 template< typename R, typename Yield, typename ...Args >
 void iterate( R &&r, Yield yield, Args &&...args )
