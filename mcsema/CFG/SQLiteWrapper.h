@@ -525,6 +525,12 @@ class Database {
       return ret;
     }
 
+    template<class Arg, int64_t idx>
+    std::enable_if_t<std::is_enum_v<Arg>, Arg>
+    _Get() {
+      using target_t = std::underlying_type_t<Arg>;
+      return static_cast<Arg>(_Get<target_t, idx>());
+    }
 
     template<class Arg, int64_t idx>
     std::enable_if_t<detail::is_one_of_v<Arg, std::string, std::string_view>, Arg>
