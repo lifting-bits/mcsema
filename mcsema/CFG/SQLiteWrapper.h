@@ -27,6 +27,7 @@
 #include <cstring>
 #include <functional>
 #include <unordered_map>
+#include <utility>
 
 namespace sqlite {
 
@@ -522,6 +523,63 @@ class Database {
     // on the prepared statement.
     int resultCode(void) {
       return ret;
+    }
+
+
+    template<class Arg, int64_t idx>
+    std::enable_if_t<detail::is_one_of_v<Arg, std::string, std::string_view>, Arg>
+    _Get() {
+      return { reinterpret_cast<const char*>(sqlite3_column_text(stmt, idx)),
+               sqlite3_column_bytes(stmt, idx) };
+    }
+
+    template<class Arg, int64_t idx>
+    std::enable_if_t<detail::is_one_of_v<Arg, sqlite::blob, sqlite::blob_view>, Arg>
+    _Get() {
+      return { reinterpret_cast<const char *>(sqlite3_column_blob(stmt, idx)),
+               sqlite3_column_bytes(stmt, idx) };
+    }
+
+    template<class Arg, int64_t idx>
+    std::enable_if_t<std::is_integral_v<Arg>, Arg>
+    _Get() {
+      return sqlite3_column_int64(stmt, idx);
+    }
+
+    template<class Arg, int64_t idx>
+    std::enable_if_t<std::is_same_v<std::nullopt_t, Arg>, Arg>
+    _Get() {
+      return {};
+    }
+
+    template<class Arg, int64_t idx>
+    std::enable_if_t<detail::is_std_optional_type<Arg>, Arg>
+    _Get() {
+      if (sqlite3_column_type(stmt, idx) == SQLITE_NULL) {
+        return {};
+      }
+      return { _Get<Arg::value_type>(idx) };
+    }
+
+    template<typename ...Ts, int64_t ...indices>
+    std::tuple<Ts ...> Get_helper(std::integer_sequence<int64_t, indices ...>) {
+      return std::make_tuple<Ts ...>( _Get<Ts, indices>() ...);
+    }
+
+    template<typename... Ts>
+    std::optional<std::tuple<Ts...>> Get() {
+      if (static_cast<int>(sizeof...(Ts)) > sqlite3_column_count(stmt)) {
+        throw incorrect_query{SQLITE_ERROR, "Get argument count is greater than allowed"};
+      }
+      if (!first_invocation) {
+        ret = sqlite3_step(stmt);
+      }
+      if (ret != SQLITE_ROW) {
+        return {};
+      }
+
+      using seq_t = std::make_integer_sequence<int64_t, sizeof ... (Ts)>;
+      return { Get_helper<Ts...>(seq_t{}) };
     }
 
     // Step through a row of results, binding the columns of the current row to
