@@ -580,6 +580,8 @@ class Database {
       if (!first_invocation) {
         ret = sqlite3_step(stmt);
       }
+      first_invocation = false;
+
       if (ret != SQLITE_ROW) {
         return {};
       }
