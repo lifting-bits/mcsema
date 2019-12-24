@@ -147,6 +147,14 @@ class error : public std::exception {
   error (int code) : err_code(code) { }
 };
 
+class incorrect_query : public std::runtime_error {
+public:
+
+  incorrect_query(int code_, const std::string &mssg_)
+    : std::runtime_error(std::string("E") + std::to_string(code_) + ": " + mssg_)
+  {}
+};
+
 namespace detail {
 
 inline std::vector<std::function<void(sqlite3 *)>> function_creation_hooks;
