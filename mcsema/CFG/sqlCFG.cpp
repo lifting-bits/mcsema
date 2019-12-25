@@ -48,6 +48,9 @@ struct SymtabEntry_ : has_context,
                       id_based_ops_< SymtabEntry_< Concrete > >,
                       all_< SymtabEntry_< Concrete > > {
   using has_context::has_context;
+  using concrete_t = Concrete;
+
+
   static constexpr Query table_name = R"(symtabs)";
 
   constexpr static Query q_insert =
@@ -120,33 +123,6 @@ struct Function_ : has_context,
 
   static constexpr Query q_data =
     R"(select ea, is_entrypoint from functions)";
-
-  struct bare
-  {
-    int64_t ea;
-    bool is_entrypoint;
-    std::string name;
-  };
-
-  template< typename R, typename Yield >
-  static void iterate( R &&r, Yield yield )
-  {
-    bare _values;
-    return util::iterate(
-        std::forward< R >( r ), yield,
-        _values.ea, _values.is_entrypoint, _values.name );
-  }
-
-  auto print_f()
-  {
-    return &Function_< Concrete>::print;
-  }
-
-  static void print( int64_t ea, bool is_entrypoint, const std::string &name )
-  {
-    std::cerr << ea << " " << is_entrypoint << " " << name << std::endl;
-  }
-
 };
 
 
@@ -304,7 +280,7 @@ using impl_t = typename dispatch<remove_cvp_t<T>>::type;
 template<typename Data, typename Result>
 auto Get( Result &result ) -> ENABLE_IF( SymtabEntry::Data ) {
   if (auto out = result.template Get<std::string, SymtabEntryType>()) {
-    return util::to_struct<Data>(*out);
+    return util::to_struct<Data>( std::move(*out) );
   }
   return {};
 }
