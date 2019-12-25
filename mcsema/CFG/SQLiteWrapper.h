@@ -597,7 +597,8 @@ class Database {
     template<typename T>
     std::optional<T> GetScalar() {
       if (sqlite3_column_count(stmt) == 0) {
-        throw incorrect_query{SQLITE_ERROR, "Get argument count is greater than allowed"};
+        throw incorrect_query{SQLITE_ERROR,
+                              "GetScalar argument count is greater than allowed"};
       }
 
       Step();
