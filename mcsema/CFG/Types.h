@@ -35,7 +35,8 @@ struct _crtp
   Self &self() { return static_cast< Self & >( *this ); }
   const Self &self() const { return static_cast< const Self & >( *this ); }
 
-  auto db() { return self()._ctx->db; }
+  auto &db() { return self()._ctx->db; }
+  auto &cache() { return self()._ctx->cache; }
 
   template<typename QueryResult, typename ...Ts>
   auto to_concrete(QueryResult &result) {
