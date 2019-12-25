@@ -21,6 +21,8 @@
 #include <string>
 #include <vector>
 
+#include <mcsema/CFG/Util.h>
+
 namespace mcsema::cfg {
 
 using Query = const char *;
@@ -34,6 +36,12 @@ struct _crtp
   const Self &self() const { return static_cast< const Self & >( *this ); }
 
   auto db() { return self()._ctx->db; }
+
+  template<typename QueryResult, typename ...Ts>
+  auto to_concrete(QueryResult &result) {
+    return util::to_struct<Self::Concrete_t>(result.template Get<Ts...>());
+  }
+
 };
 
 template< typename Self >
@@ -81,6 +89,12 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
 
   auto get(int64_t id) {
     return this->db().template query<Self::q_get>(id);
+  }
+
+  template<typename Concrete, typename ...Fields>
+  auto c_get(int64_t id) {
+    auto result = this->db().template query<Self::q_get>(id);
+    return util::to_struct<Concrete>(*result.template Get<Fields...>());
   }
 
   template<typename SymtabImpl>
@@ -135,6 +149,7 @@ struct func_ops_ : _crtp< Self, func_ops_ >
   {
     constexpr static Query q_unbind_bbs =
       R"(delete from function_to_block where function_rowid = ?1 and bb_rowid = ?2 )";
+    // FIXME: This can most likely be done in one query
     for ( auto &other : to_unbind )
       this->db().template query< q_unbind_bbs >( ea, other );
   }
@@ -184,19 +199,14 @@ struct has_symtab_name : _crtp< Self, has_symtab_name >
   }
 
   std::optional<int64_t> Name(int64_t id) {
-    int64_t symbol_id = -12;
-    if (this->db().template query<q_get_symtabentry>( id )( symbol_id )) {
-      return { symbol_id };
-    }
-    return {};
+    return this->db().template query<q_get_symtabentry>(id)
+                     .template GetScalar<int64_t>();
+
   }
 
   std::optional<std::string> GetName(int64_t id) {
-    std::string out;
-    if (this->db().template query<q_get_name>(id)(out)) {
-      return { std::move( out ) };
-    }
-    return { };
+    return this->db().template query<q_get_name>(id)
+                     .template GetScalar<std::string>();
   }
 
 };
@@ -210,9 +220,8 @@ struct has_ea : _crtp<Self, has_ea> {
   }
 
   int64_t get_ea(int64_t id) {
-    int64_t ea;
-    this->db().template query<q_get_ea>(id)(ea);
-    return ea;
+    return this->db().template query<q_get_ea>(id)
+                     .template GetScalar_r<int64_t>();
   }
 
 };
