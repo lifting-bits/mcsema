@@ -594,6 +594,26 @@ class Database {
       return { Get_helper<Ts...>(seq_t{}) };
     }
 
+    template<typename T>
+    std::optional<T> GetScalar() {
+      if (sqlite3_column_count(stmt) == 0) {
+        throw incorrect_query{SQLITE_ERROR, "Get argument count is greater than allowed"};
+      }
+
+      Step();
+
+      if (ret != SQLITE_ROW) {
+        return {};
+      }
+
+      return { _Get<T, 0>() };
+    }
+
+    template<typename T>
+    T GetScalar_r() {
+      return *GetScalar<T>();
+    }
+
     // Step through a row of results, binding the columns of the current row to
     // ARGS in order.  If there are no more rows, returns false.  Otherwise,
     // returns true.
