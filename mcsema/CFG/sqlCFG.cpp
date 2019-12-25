@@ -74,6 +74,9 @@ struct MemoryRange_ : has_context,
   constexpr static Query q_insert =
       R"(insert into memory_ranges(module_rowid, ea, size, bytes)
       values (?1, ?2, ?3, ?4))";
+
+  constexpr static Query q_data =
+      R"(select bytes from memory_ranges where rowid = ?1)";
 };
 
 template< typename Self >
@@ -181,15 +184,20 @@ struct Segment_ : has_context,
   }
 
 
-  std::string data(int64_t id) {
+  std::string_view data(int64_t id) {
     constexpr static Query q_data =
-      R"(SELECT SUBSTR(mr.bytes, s.ea - mr.ea + 1, s.size) FROM
+      R"(SELECT mr.rowid, s.ea - mr.ea, s.size FROM
           segments as s JOIN
           memory_ranges as mr ON
           mr.rowid = s.memory_rowid and s.rowid = ?1)";
-    sqlite::blob data_view;
-    this->db().template query<q_data>(id)(data_view);
-    return std::move(data_view);
+    int64_t mr_rowid,
+            offset,
+            size;
+    std::tie(mr_rowid, offset, size) =
+      *this->db().template query<q_data>(id)
+                 .template Get<int64_t, int64_t, int64_t>();
+    auto c_data = this->cache().template Find<Segment, MemoryRange_::q_data>(mr_rowid);
+    return c_data.substr(offset, size);
   }
 
   void SetFlags(int64_t id, const Segment::Flags &flags) {
@@ -469,8 +477,8 @@ CodeXref BasicBlock::AddXref(int64_t ea,
 
 /* Segment */
 
-std::string Segment::Data() {
-  return Segment_{ _ctx }.data(_id);
+std::string_view Segment::Data() {
+  return Segment_( _ctx ).data(_id);
 }
 
 void Segment::SetFlags(const Flags &flags) {

@@ -210,10 +210,9 @@ public:
     bool is_thread_local;
   };
 
-  // TODO: Cache and return std::string_view
   // NOTE: std::string is implicitly converted to std::string_view so in case this returns
   // nonsense double check return types.
-  std::string Data();
+  std::string_view Data();
   void SetFlags(const Flags &flags);
 
   DataXref AddXref(int64_t ea, int64_t target_ea, int64_t width, FixupKind fixup);
