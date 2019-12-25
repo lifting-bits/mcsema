@@ -100,16 +100,6 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
 };
 
 template< typename Self >
-struct concrete_id_based_ops_ : id_based_ops_< Self >
-{
-  using _parent = id_based_ops_< Self >;
-
-  auto get() { return _parent::get( this->self().id ); }
-  auto erase() { return _parent::erase( this->self().id ); }
-
-};
-
-template< typename Self >
 struct all_ : _crtp< Self, all_ >
 {
   static std::string _q_all()
@@ -156,28 +146,6 @@ struct func_ops_ : _crtp< Self, func_ops_ >
     this->db().template query< q_bind_bbs >( f_id, bb_id);
 
   }
-};
-
-template< typename Self >
-struct concrete_func_ops_: func_ops_< Self >
-{
-  using parent_ = func_ops_< Self >;
-  using parent_::self;
-
-  auto bbs() { this->parent_::bbs( self().ea ); }
-
-  template < typename Container = std::vector< uint64_t > >
-  auto unbind_bbs( const Container &to_unbind)
-  {
-    this->parent_::unbind_bbs( self().ea, to_unbind );
-  }
-
-  template< typename Container = std::vector< uint64_t > >
-  auto bind_bbs( const Container &to_bind )
-  {
-    this->parent_::bind_bbs( self().ea, to_bind );
-  }
-
 };
 
 template< typename Self >
