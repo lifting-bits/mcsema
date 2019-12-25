@@ -303,10 +303,8 @@ using impl_t = typename dispatch<remove_cvp_t<T>>::type;
 
 template<typename Data, typename Result>
 auto Get( Result &result ) -> ENABLE_IF( SymtabEntry::Data ) {
-  std::string name;
-  unsigned char type;
-  if (result(name, type)) {
-    return { { name, static_cast<SymtabEntryType>(type)} };
+  if (auto out = result.template Get<std::string, SymtabEntryType>()) {
+    return util::to_struct<Data>(*out);
   }
   return {};
 }
@@ -439,11 +437,7 @@ WeakIterator<SymtabEntry> Module::Symbols() {
 
 /* SymtabEntry */
 SymtabEntry::Data SymtabEntry::operator*() const {
-  SymtabEntry::Data out;
-  unsigned char a;
-  SymtabEntry_{ _ctx }.get(_id)(out.name, a);
-  out.type = static_cast<SymtabEntryType>(a);
-  return out;
+  return SymtabEntry_{ _ctx }.c_get<SymtabEntry::Data, std::string, SymtabEntryType>(_id);
 }
 
 
