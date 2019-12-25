@@ -572,16 +572,20 @@ class Database {
       return std::make_tuple<Ts ...>( _Get<Ts, indices>() ...);
     }
 
+    void Step() {
+      if (!first_invocation) {
+        ret = sqlite3_step(stmt);
+      }
+      first_invocation = false;
+    }
+
     template<typename... Ts>
     std::optional<std::tuple<Ts...>> Get() {
       if (static_cast<int>(sizeof...(Ts)) > sqlite3_column_count(stmt)) {
         throw incorrect_query{SQLITE_ERROR, "Get argument count is greater than allowed"};
       }
-      if (!first_invocation) {
-        ret = sqlite3_step(stmt);
-      }
-      first_invocation = false;
 
+      Step();
       if (ret != SQLITE_ROW) {
         return {};
       }
