@@ -19,6 +19,7 @@
 #include <string>
 
 #include <mcsema/CFG/SQLiteWrapper.h>
+#include <mcsema/CFG/Cache.h>
 
 namespace mcsema::cfg {
 
@@ -32,9 +33,11 @@ class Context {
 public:
   Context(const std::string &db_name) : _db_name(db_name) {}
 
+  using DB_t = sqlite::Database<Name>;
   using Result_t = sqlite::Database<Name>::QueryResult;
   std::string _db_name;
-  sqlite::Database<Name> db;
+  DB_t db;
+  mcsema::cfg::SegmentCache_t<DB_t> cache = ( db );
 };
 
 } // namespace mcsema::cfg
