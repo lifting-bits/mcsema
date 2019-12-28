@@ -286,7 +286,8 @@ template<>
 struct dispatch<Segment> { using type = Segment_<Segment>; };
 template<>
 struct dispatch<MemoryRange> { using type = MemoryRange_<MemoryRange>; };
-
+template<>
+struct dispatch<SymtabEntry> { using type = SymtabEntry_<SymtabEntry>; };
 
 template<typename T>
 using remove_cvp_t = typename std::remove_cv_t<std::remove_pointer_t<T>>;
