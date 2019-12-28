@@ -83,9 +83,6 @@ namespace interface {
     void Name(const SymtabEntry& name);
   };
 
-  // TODO: Can create symtabentry
-  // SymtabEntry AddSymtabEntry(const std::string &name, SymtabEntryType type);
-
 } // namespace interface
 
 
@@ -352,9 +349,7 @@ public:
                                        CC cc,
                                        bool has_return, bool is_weak);
 
-  // Three examples of iteration
-  std::vector<Function::Data> AllFunctions();
-
+  // Two examples of iteration
   WeakIterator<SymtabEntry> Symbols();
 
   template<typename Unary>

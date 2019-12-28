@@ -418,17 +418,6 @@ ExternalFunction Module::AddExternalFunction(int64_t ea,
            _ctx };
 }
 
-std::vector<Function::Data> Module::AllFunctions() {
-  auto result = Module_{ _ctx }.all_functions( _id );
-  std::vector<Function::Data> out;
-  int64_t ea;
-  bool is_entrypoint;
-  while(result(ea, is_entrypoint)) {
-    out.push_back({ea, is_entrypoint});
-  }
-  return out;
-}
-
 WeakIterator<SymtabEntry> Module::Symbols() {
   auto result = Module_{_ctx }.all_symbols(_id);
   return { std::make_unique<details::Iterator_impl>(std::move(result)) };
