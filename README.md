@@ -123,10 +123,11 @@ sudo apt-get install \
      gcc-multilib g++-multilib \
      libtinfo-dev \
      lsb-release \
-     realpath \
      zlib1g-dev \
      ccache
 ```
+
+For Ubuntu 16.04 and 14.04 you also need to install the realpath package.
 
 If you are going to be using IDA Pro for CFG recovery also do the following:
 
@@ -193,6 +194,20 @@ else
   ./scripts/build.sh --prefix $(realpath ../)
 fi
 ```
+
+In case you want to use Dyninst as the frontend do this instead (after Dyninst 9.3.2 has been installed to the standard /usr/local location):
+```shell
+export CMAKE_PREFIX_PATH=/usr/local/lib/cmake/Dyninst
+if [ -z "${VIRTUAL_ENV}" ]
+then
+  # no virtualenv; global install for all users
+  ./scripts/build.sh --dyninst-frontend
+else
+  # found a virtualenv; local install
+  ./scripts/build.sh --dyninst-frontend --prefix $(realpath ../)
+fi
+```
+Details can be found in [Dyninst frontend](tools/mcsema_disass/dyninst/README.md).
 
 This script accepts several command line options:
 
@@ -333,10 +348,6 @@ set PATH=%PATH%;C:\remill\bin;C:\mcsema\bin;C:\mcsema\Scripts
 ```
 $env:PATH+="C:\remill\bin;C:\mcsema\bin;C:\mcsema\Scripts"
 ```
-
-### Dyninst frontend
-
-[Dyninst frontend](tools/mcsema_disass/dyninst/README.md) can be build with ```./build.sh --dyninst-frontend```. More information can be found in ```tools/mcsema_disass/dyninst/README.md```.
 
 ## Additional Documentation
 
