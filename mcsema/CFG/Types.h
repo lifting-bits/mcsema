@@ -64,7 +64,7 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
 
   static std::string _q_get()
   {
-    return std::string{ "select * from " } + Self::table_name + " where id = ?1";
+    return std::string{ "select * from " } + Self::table_name + " where rowid = ?1";
   }
 
   auto get( uint64_t id )
@@ -72,12 +72,12 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
     return this->db().template query< _q_get >( id );
   }
 
-  static std::string _q_remove( uint64_t ea )
+  static std::string _q_remove()
   {
-    return std::string{ "delete from " } + Self::table_name + " where id = ?1";
+    return std::string{ "delete from " } + Self::table_name + " where rowid = ?1";
   }
 
-  auto erase( uint64_t id )
+  auto erase( int64_t id )
   {
     return this->db().template query< _q_remove >( id );
   }
