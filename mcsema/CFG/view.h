@@ -48,7 +48,8 @@ void run()
   auto error_name = bin.AddSymtabEntry("error_name", SymtabEntryType::Internal);
   error_name.Erase();
 
-  auto main = letter.func(bin, 12, true).Name(s_main);
+  auto main = letter.func(bin, 12, true);
+  main.Name(s_main);
   auto foo = letter.func(bin, 32, false);
 
   CheckName(main, "main");
@@ -57,7 +58,7 @@ void run()
   std::cout << "s_main holds " << (*s_main).name << " with type "
             << static_cast<int>((*s_main).type)
             << std::endl;
-  std::cout << "main has name: " << (**(main.Name())).name << std::endl;
+  std::cout << "main has name: " << (*(main.Name())) << std::endl;
 
   auto library_func = letter.func(lib, 0, false);
 
@@ -73,34 +74,31 @@ void run()
   std::cout << exit_bb.Data().size() << ": " << exit_bb.Data() << std::endl;
 
   // Add CodeXrefs
-  {
-    // TODO: Check validity of entry
-    auto xref = entry_bb.AddXref(400407, 600800, OperandType::Immediate);
-    auto masked_xref = entry_bb.AddXref(400407, 600800,
-                                        OperandType::Immediate,
-                                        bin.AddSymtabEntry("Reference 1",
-                                                           SymtabEntryType::Artificial),
-                                        0xffffffff);
+  // TODO: Check validity of entry
+  auto xref = entry_bb.AddXref(400407, 600800, OperandType::Immediate);
+  auto masked_xref = entry_bb.AddXref(400407, 600800,
+                                      OperandType::Immediate,
+                                      bin.AddSymtabEntry("Reference 1",
+                                                         SymtabEntryType::Artificial),
+                                      0xffffffff);
 
-    auto maybe_masked_xref_name = masked_xref.Name();
-    std::cout << "Name of code xref at " << masked_xref.ea() << " is "
-              << ((maybe_masked_xref_name) ? *maybe_masked_xref_name : "NOT SET!")
-              << std::endl;
+  auto maybe_masked_xref_name = masked_xref.Name();
+  std::cout << "Name of code xref at " << masked_xref.ea() << " is "
+            << ((maybe_masked_xref_name) ? *maybe_masked_xref_name : "NOT SET!")
+            << std::endl;
 
-    auto c_xref = exit_bb.AddXref(400415, 600825, OperandType::Immediate);
-    auto maybe_c_xref_name = c_xref.Name();
-    std::cout << "Name of code xref at " << c_xref.ea() << " is "
-              << ((maybe_c_xref_name) ? *maybe_c_xref_name : "NOT SET!")
-              << std::endl;
+  auto c_xref = exit_bb.AddXref(400415, 600825, OperandType::Immediate);
+  auto maybe_c_xref_name = c_xref.Name();
+  std::cout << "Name of code xref at " << c_xref.ea() << " is "
+            << ((maybe_c_xref_name) ? *maybe_c_xref_name : "NOT SET!")
+            << std::endl;
 
-    std::cout << "Giving name to the poor thingy." << std::endl;
-    c_xref.Name(s_main);
-    maybe_c_xref_name = c_xref.Name();
-    std::cout << "Name of code xref at " << c_xref.ea() << " is "
-              << ((maybe_c_xref_name) ? *maybe_c_xref_name : "NOT SET!")
-              << std::endl;
-
-  }
+  std::cout << "Giving name to the poor thingy." << std::endl;
+  c_xref.Name(s_main);
+  maybe_c_xref_name = c_xref.Name();
+  std::cout << "Name of code xref at " << c_xref.ea() << " is "
+            << ((maybe_c_xref_name) ? *maybe_c_xref_name : "NOT SET!")
+            << std::endl;
 
 
   std::string my_favorite_str = "Hello\0\0World\n\0\0\0\0\0\0\0\0\0\0L"s;
@@ -118,14 +116,12 @@ void run()
   std::cout << last.Data().size() << " " << last.Data() << std::endl;
 
   // Add DataXrefs
-  {
-    auto d_xref = hello.AddXref(600800, 600823, 8,
-                                FixupKind::Absolute,
-                                bin.AddSymtabEntry("Variable X",
-                                                   SymtabEntryType::Artificial)
-                                );
-    std::cout << "d_xref has ea: " << d_xref.ea() << std::endl;
-  }
+  auto d_xref = hello.AddXref(600800, 600823, 8,
+                              FixupKind::Absolute,
+                              bin.AddSymtabEntry("Variable X",
+                                                 SymtabEntryType::Artificial)
+                              );
+  std::cout << "d_xref has ea: " << d_xref.ea() << std::endl;
 
   Segment::Flags new_flags = { true, true, false, true };
   res.SetFlags( new_flags );
@@ -155,6 +151,26 @@ void run()
                 << static_cast<int>(data.type) << std::endl;
     };
     bin.ForEachSymbol(printer);
+  }
+
+  // Try all data_t operator*() const;
+  {
+    auto main_data = *main;
+    auto foo_data = *foo;
+
+    auto s_main_data = *s_main;
+    auto main_symbol = main.Symbol();
+
+    auto text_data = *text;
+
+    auto entry_bb_data = *entry_bb;
+
+    auto xref_data = *xref;
+    auto masked_xref_data = *masked_xref;
+    auto c_cref_data = *c_xref;
+
+    auto d_xref_data = *d_xref;
+
   }
 }
 
