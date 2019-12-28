@@ -115,14 +115,14 @@ protected:
 class SymtabEntry : public details::Internals {
 public:
 
-  struct Data {
+  struct Data_ {
     std::string name;
     SymtabEntryType type;
   };
 
-  using data_t = Data;
+  using data_t = Data_;
 
-  Data operator*() const;
+  data_t operator*() const;
 
   void Erase();
 
@@ -153,13 +153,15 @@ class ExternalFunction : public details::Internals,
                          public interface::HasSymtabEntry<ExternalFunction> {
 public:
 
-  struct Data {
+  struct Data_ {
     int64_t ea;
-    SymtabEntry name;
     CC cc;
     bool has_return;
     bool weak;
   };
+
+  using data_t = Data_;
+  data_t operator*() const;
 
   std::string Name() const;
 
@@ -178,10 +180,13 @@ public:
 
     // We are not including underlying data, since they are being cached and need
     // separate query anyway
-    struct Data {
+    struct Data_ {
       int64_t ea;
       int64_t size;
     };
+
+    using data_t = Data_;
+    data_t operator*() const;
 
     std::string Data();
 
@@ -209,12 +214,12 @@ class Function : public details::Internals,
 
 public:
 
-  struct Data {
+  struct Data_ {
     int64_t ea;
     bool is_entrypoint;
-    std::optional<SymtabEntry> name;
-    std::vector<BasicBlock> bbs;
   };
+  using data_t = Data_;
+  data_t operator*() const;
 
   void AttachBlock(const BasicBlock &bb);
 
@@ -246,13 +251,18 @@ public:
     bool is_thread_local;
   };
 
-  struct Data {
+  struct Data_ {
     int64_t ea;
     int64_t size;
-    Flags flags;
-    // TODO: Maybe use SymtabEntry
-    std::string name;
+    // TODO: Fold this to Flags
+    bool read_only;
+    bool is_external;
+    bool is_exported;
+    bool is_thread_local;
   };
+
+  using data_t = Data_;
+  data_t operator*() const;
 
   // NOTE: std::string is implicitly converted to std::string_view so in case this returns
   // nonsense double check return types.
@@ -284,12 +294,13 @@ class MemoryRange : public details::Internals,
                     public interface::HasEa<MemoryRange> {
 public:
 
-  struct Data {
+  struct Data_ {
     int64_t ea;
     int64_t range;
-    std::string_view data;
   };
 
+  using data_t = Data_;
+  data_t operator*() const;
 
   Segment AddSegment(int64_t ea,
                      int64_t size,
@@ -312,14 +323,15 @@ class CodeXref : public details::Internals,
 
 public:
 
-  struct Data {
+  struct Data_ {
     int64_t ea;
     int64_t target_ea;
     OperandType op_type;
-    std::optional<SymtabEntry> name;
     std::optional<int64_t> mask;
   };
 
+  using data_t = Data_;
+  data_t operator*() const;
 
   void Erase();
 
@@ -339,15 +351,15 @@ class DataXref : public details::Internals,
 
 public:
 
-  struct Data {
+  struct Data_ {
     int64_t ea;
     int64_t target_ea;
     int64_t width;
     FixupKind fixup;
-    // TODO: Maybe we want to inline this?
-    std::optional<SymtabEntry> name;
   };
 
+  using data_t = Data_;
+  data_t operator*() const;
 
   void Erase();
 private:

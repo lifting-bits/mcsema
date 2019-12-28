@@ -78,6 +78,11 @@ struct MemoryRange_ : has_context,
 
   constexpr static Query q_data =
       R"(select bytes from memory_ranges where rowid = ?1)";
+
+  constexpr static Query q_get =
+      R"(SELECT ea, size
+         FROM memory_ranges
+         WHERE rowid = ?1)";
 };
 
 template< typename Self >
@@ -124,7 +129,7 @@ struct Function_ : has_context,
   static constexpr Query q_insert =
       R"(insert into functions(module_rowid, ea, is_entrypoint) values (?1, ?2, ?3))";
 
-  static constexpr Query q_data =
+  static constexpr Query q_get =
     R"(select ea, is_entrypoint from functions)";
 };
 
@@ -143,6 +148,12 @@ struct BasicBlock_: has_context,
   constexpr static Query q_insert =
     R"(insert into blocks(module_rowid, ea, size, memory_rowid)
         values (?1, ?2, ?3, ?4))";
+
+  constexpr static Query q_get =
+    R"(SELECT ea, size
+       FROM blocks
+       WHERE rowid = ?1)";
+
 
   std::string data(int64_t id) {
     // SUBSTR index starts from 0, therefore we need + 1
@@ -173,6 +184,11 @@ struct Segment_ : has_context,
         ea, size,
         read_only, is_external, is_exported, is_thread_local,
         variable_name, memory_rowid) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8))";
+
+  constexpr static Query q_get =
+    R"(SELECT ea, size read_only, is_external, is_exported
+       FROM segments,
+       WHERE rowid = ?1)";
 
   auto _insert(int64_t ea,
                int64_t size,
@@ -235,6 +251,12 @@ struct CodeXref_ : has_context,
                               JOIN memory_ranges as mr
                               ON dr.segment_rowid = seg.rowid
                                  and seg.memory_rowid = mr.rowid)";
+
+  constexpr static Query q_get =
+    R"(SELECT ea, target_ea, operand_type_rowid, mask
+       FROM code_references
+       WHERE rowid = ?1)";
+
 };
 
 template<typename Concrete = DataXref>
@@ -251,6 +273,11 @@ struct DataXref_ : has_context,
           ea, width, target_ea, segment_rowid, fixup_kind_rowid, symtab_rowid)
        values(?1, ?2, ?3, ?4, ?5, ?6))";
 
+  constexpr static Query q_get =
+    R"(SELECT ea, width, target_ea, fixup_kind_rowid
+       FROM data_references
+       WHERE rowid = ?1)";
+
 };
 
 template<typename Concrete = ExternalFunction>
@@ -266,6 +293,10 @@ struct ExternalFunction_ : has_context,
         ea, calling_convention_rowid, symtab_rowid, module_rowid, has_return, is_weak)
         values (?1, ?2, ?3, ?4, ?5, ?6))";
 
+  constexpr static Query q_get =
+    R"(SELECT ea, calling_convention_rowid, has_return, is_weak
+       FROM external_functions
+       WHERE rowdid = ?1)";
 
 };
 
@@ -288,7 +319,9 @@ struct dispatch<Segment> { using type = Segment_<Segment>; };
 template<>
 struct dispatch<MemoryRange> { using type = MemoryRange_<MemoryRange>; };
 template<>
-struct dispatch<SymtabEntry> { using type = SymtabEntry_<SymtabEntry>; };
+struct dispatch<SymtabEntry> {
+  using type = SymtabEntry_<SymtabEntry>;
+};
 
 template<typename T>
 using remove_cvp_t = typename std::remove_cv_t<std::remove_pointer_t<T>>;
@@ -503,6 +536,61 @@ Segment MemoryRange::AddSegment(int64_t ea,
 std::string ExternalFunction::Name() const {
   return *impl_t<decltype(this)>{ _ctx }.GetName(_id);
 }
+
+/* operator*() */
+SymtabEntry::data_t SymtabEntry::operator*() const {
+  using self_t = remove_cvp_t<decltype(this)>;
+  return impl_t<self_t>{_ctx}.c_get<typename self_t::data_t,
+                                    std::string, SymtabEntryType>(_id);
+}
+
+ExternalFunction::data_t ExternalFunction::operator*() const {
+  using self_t = remove_cvp_t<decltype(this)>;
+  return impl_t<self_t>{_ctx}.c_get<typename self_t::data_t,
+                                    int64_t, CC, bool, bool>(_id);
+}
+
+BasicBlock::data_t BasicBlock::operator*() const {
+  using self_t = remove_cvp_t<decltype(this)>;
+  return impl_t<self_t>{ _ctx }.c_get<typename self_t::data_t,
+                                      int64_t, int64_t>(_id);
+}
+
+Function::data_t Function::operator*() const {
+  using self_t = remove_cvp_t<decltype(this)>;
+  return impl_t<self_t>{ _ctx }.c_get<typename self_t::data_t,
+                                       int64_t, bool>(_id);
+}
+
+Segment::data_t Segment::operator*() const {
+  using self_t = remove_cvp_t<decltype(this)>;
+  return impl_t<self_t>{ _ctx }.c_get<typename self_t::data_t,
+                                      int, int, bool, bool, bool, bool>(_id);
+}
+
+MemoryRange::data_t MemoryRange::operator*() const {
+  using self_t = remove_cvp_t<decltype(this)>;
+  return impl_t<self_t>{ _ctx }.c_get<typename self_t::data_t,
+                                      int64_t, int64_t>(_id);
+
+}
+
+CodeXref::data_t CodeXref::operator*() const {
+  using self_t = remove_cvp_t<decltype(this)>;
+  return impl_t<self_t>{ _ctx }.c_get<typename self_t::data_t,
+                                      int64_t, int64_t, OperandType,
+                                      std::optional<int64_t>>(_id);
+
+}
+
+
+DataXref::data_t DataXref::operator*() const {
+  using self_t = remove_cvp_t<decltype(this)>;
+  return impl_t<self_t>{ _ctx }.c_get<typename self_t::data_t,
+                                      int64_t, int64_t, int64_t, FixupKind>(_id);
+
+}
+
 
 /* Erasable */
 
