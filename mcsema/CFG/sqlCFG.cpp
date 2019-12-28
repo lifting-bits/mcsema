@@ -43,10 +43,10 @@ struct with_context {
 
 using has_context = with_context< Context >;
 
-template< typename Concrete = SymtabEntry >
+template<typename Concrete = SymtabEntry>
 struct SymtabEntry_ : has_context,
-                      id_based_ops_< SymtabEntry_< Concrete > >,
-                      all_< SymtabEntry_< Concrete > > {
+                      id_based_ops_<SymtabEntry_<Concrete>>
+{
   using has_context::has_context;
   using concrete_t = Concrete;
 
@@ -64,9 +64,10 @@ struct SymtabEntry_ : has_context,
 
 };
 
+template<typename Concrete = MemoryRange>
 struct MemoryRange_ : has_context,
-                      id_based_ops_< MemoryRange_ >,
-                      all_ < MemoryRange_ > {
+                      id_based_ops_<MemoryRange_<Concrete>>,
+                      has_ea<MemoryRange_<Concrete>> {
 
   using has_context::has_context;
   static constexpr Query table_name = R"(memory_ranges)";
@@ -80,8 +81,7 @@ struct MemoryRange_ : has_context,
 };
 
 template< typename Self >
-struct module_ops_mixin : id_based_ops_< Self >,
-                          all_ < Self > {};
+struct module_ops_mixin : id_based_ops_< Self > {};
 
 template< typename Concrete = Module >
 struct Module_ : has_context,
@@ -109,15 +109,15 @@ struct Module_ : has_context,
 template< typename Self >
 struct func_ops_mixin :
   func_ops_< Self >,
-  all_< Self >,
   id_based_ops_< Self >,
   has_symtab_name< Self >
 {};
 
 
-template< typename Concrete = Function >
+template<typename Concrete = Function>
 struct Function_ : has_context,
-                   func_ops_mixin< Function_< Concrete > >
+                   func_ops_mixin<Function_<Concrete>>,
+                   has_ea<Function_<Concrete>>
 {
   using has_context::has_context;
   static constexpr Query table_name = R"(functions)";
@@ -129,9 +129,9 @@ struct Function_ : has_context,
 };
 
 
-template< typename Self >
-struct bb_mixin : id_based_ops_< Self >,
-                  all_< Self > {};
+template<typename Self>
+struct bb_mixin : id_based_ops_<Self>,
+                  has_ea<Self>{};
 
 template< typename Concrete = BasicBlock >
 struct BasicBlock_: has_context,
@@ -157,10 +157,13 @@ struct BasicBlock_: has_context,
   }
 };
 
-template< typename Concrete = Segment >
+
+template<typename Concrete = Segment>
 struct Segment_ : has_context,
-                  id_based_ops_< Segment_< Concrete > > {
+                  id_based_ops_<Segment_<Concrete>>,
+                  has_ea<Segment_<Concrete>> {
   using has_context::has_context;
+
   constexpr static Query table_name = R"(segments)";
 
   Segment_() = default;
@@ -266,6 +269,7 @@ struct ExternalFunction_ : has_context,
 };
 
 
+/* Dispatch table used to implement generic interface traits for top level API */
 template<typename T>
 struct dispatch { using type = void;  };
 template<>
@@ -274,6 +278,15 @@ template<>
 struct dispatch<CodeXref> { using type = CodeXref_<CodeXref>; };
 template<>
 struct dispatch<DataXref> { using type = DataXref_<DataXref>; };
+template<>
+struct dispatch<Function> { using type = Function_<Function>; };
+template<>
+struct dispatch<BasicBlock> { using type = BasicBlock_<BasicBlock>; };
+template<>
+struct dispatch<Segment> { using type = Segment_<Segment>; };
+template<>
+struct dispatch<MemoryRange> { using type = MemoryRange_<MemoryRange>; };
+
 
 template<typename T>
 using remove_cvp_t = typename std::remove_cv_t<std::remove_pointer_t<T>>;
@@ -519,6 +532,8 @@ std::string ExternalFunction::Name() const {
   return *impl_t<decltype(this)>{ _ctx }.GetName(_id);
 }
 
+/* Traits */
+
 template<typename Self>
 int64_t interface::HasEa<Self>::ea() {
   auto self = static_cast<Self *>(this);
@@ -539,25 +554,25 @@ void interface::HasSymtabEntry<Self>::Name(
   return impl_t<decltype(self)>{ self->_ctx }.Name( self->_id, name._id );
 }
 
-#if 0
-template<typename Self>
-SymtabEntry interface::HasSymtabEntry<Self>::AddSymtabEntry(
-    const std::string &name,
-    SymtabEntryType type) {
-  auto self = static_cast<Self *>(this);
-  return {impl_t<decltype(self)>{ self->_ctx }
-            .template inject_symtabentry<SymtabEntry_<SymtabEntry>>(
-                name, static_cast<unsigned char>(type)),
-          self->_ctx };
-}
-
-#endif
 namespace interface {
 
-template struct HasEa<CodeXref>;
-template struct HasEa<DataXref>;
-template struct HasEa<ExternalFunction>;
+/* We must explicitly instantiate all templates */
 
+template struct HasEa<DataXref>;
+template struct HasSymtabEntry<DataXref>;
+
+template struct HasEa<MemoryRange>;
+
+template struct HasEa<Segment>;
+
+template struct HasEa<Function>;
+
+template struct HasEa<BasicBlock>;
+
+template struct HasEa<ExternalFunction>;
+template struct HasSymtabEntry<ExternalFunction>;
+
+template struct HasEa<CodeXref>;
 template struct HasSymtabEntry<CodeXref>;
 
 } // namespace interface

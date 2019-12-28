@@ -101,7 +101,14 @@ protected:
   mutable CtxPtr _ctx;
 
   friend class interface::HasSymtabEntry<CodeXref>;
+  friend class interface::HasSymtabEntry<ExternalFunction>;
 
+  friend class interface::HasEa<DataXref>;
+  friend class interface::HasSymtabEntry<DataXref>;
+
+  friend class interface::HasEa<MemoryRange>;
+
+  friend class interface::HasEa<BasicBlock>;
 };
 
 } // namespace details
@@ -134,8 +141,17 @@ private:
 
 
 class ExternalFunction : public details::Internals,
-                         public interface::HasEa<ExternalFunction> {
+                         public interface::HasEa<ExternalFunction>,
+                         public interface::HasSymtabEntry<ExternalFunction> {
 public:
+
+  struct Data {
+    int64_t ea;
+    SymtabEntry name;
+    CC cc;
+    bool has_return;
+    bool weak;
+  };
 
   std::string Name() const;
 
@@ -146,8 +162,16 @@ private:
   using details::Internals::Internals;
 };
 
-class BasicBlock : details::Internals {
+class BasicBlock : public details::Internals,
+                   public interface::HasEa<BasicBlock> {
 public:
+
+    // We are not including underlying data, since they are being cached and need
+    // separate query anyway
+    struct Data {
+      int64_t ea;
+      int64_t size;
+    };
 
     std::string Data();
 
@@ -163,22 +187,22 @@ private:
   friend class Function;
   friend class Letter;
   friend class Module;
+  friend class interface::HasEa<BasicBlock>;
 
   using details::Internals::Internals;
 };
 
 
-class Function : details::Internals {
+class Function : public details::Internals,
+                 public interface::HasEa<Function> {
 
 public:
 
   struct Data {
     int64_t ea;
     bool is_entrypoint;
-    //std::optional<SymtabEntry::Data> symbol;
-
-    // TODO:
-    // Get all bbs?
+    std::optional<SymtabEntry> name;
+    std::vector<BasicBlock> bbs;
   };
 
   void AttachBlock(const BasicBlock &bb);
@@ -198,9 +222,11 @@ private:
 
   friend class Letter;
   friend class Module;
+  friend class interface::HasEa<Function>;
 };
 
-class Segment : details::Internals {
+class Segment : public details::Internals,
+                public interface::HasEa<Segment> {
 public:
 
   struct Flags {
@@ -208,6 +234,14 @@ public:
     bool is_external;
     bool is_exported;
     bool is_thread_local;
+  };
+
+  struct Data {
+    int64_t ea;
+    int64_t size;
+    Flags flags;
+    // TODO: Maybe use SymtabEntry
+    std::string name;
   };
 
   // NOTE: std::string is implicitly converted to std::string_view so in case this returns
@@ -223,13 +257,23 @@ private:
   friend class MemoryRange;
   friend class Module;
   friend class Letter;
+  friend class interface::HasEa<Segment>;
 
   using details::Internals::Internals;
 };
 
 // TODO: Insert for empty like .bbs
-class MemoryRange : details::Internals {
+class MemoryRange : public details::Internals,
+                    public interface::HasEa<MemoryRange> {
 public:
+
+  struct Data {
+    int64_t ea;
+    int64_t range;
+    std::string_view data;
+  };
+
+
   Segment AddSegment(int64_t ea,
                      int64_t size,
                      const Segment::Flags &flags,
@@ -249,28 +293,47 @@ class CodeXref : public details::Internals,
 
 public:
 
+  struct Data {
+    int64_t ea;
+    int64_t target_ea;
+    OperandType op_type;
+    std::optional<SymtabEntry> name;
+    std::optional<int64_t> mask;
+  };
+
+
 private:
   friend class Module;
   friend class BasicBlock;
   friend class interface::HasEa<CodeXref>;
+  friend class interface::HasSymtabEntry<CodeXref>;
 
   using details::Internals::Internals;
 };
 
 
 class DataXref : public details::Internals,
-                 public interface::HasEa<DataXref> {
+                 public interface::HasEa<DataXref>,
+                 public interface::HasSymtabEntry<DataXref> {
 
 public:
 
+  struct Data {
+    int64_t ea;
+    int64_t target_ea;
+    int64_t width;
+    FixupKind fixup;
+    // TODO: Maybe we want to inline this?
+    std::optional<SymtabEntry> name;
+  };
+
 private:
   friend class Segment;
-  friend class interface::HasEa<DataXref>;
 
   using details::Internals::Internals;
 };
 
-class Module : details::Internals {
+class Module : public details::Internals {
 
 public:
 
