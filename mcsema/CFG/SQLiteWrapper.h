@@ -564,7 +564,7 @@ class Database {
       if (sqlite3_column_type(stmt, idx) == SQLITE_NULL) {
         return {};
       }
-      return { _Get<Arg::value_type>(idx) };
+      return { _Get<typename Arg::value_type, idx>() };
     }
 
     template<typename ...Ts, int64_t ...indices>
