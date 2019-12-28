@@ -195,7 +195,17 @@ struct has_symtab_name : _crtp< Self, has_symtab_name >
       " AS self ON self.rowid = ?1 and self.symtab_rowid = s.rowid";
   }
 
- auto Name(int64_t id, int64_t new_symbol_id) {
+  static std::string q_get_symbol() {
+    return std::string { "SELECT s.name, s.type_rowid FROM symtabs AS s JOIN "} +
+      Self::table_name +
+      " AS self ON self.rowid = ?1 and self.symtab_rowid = s.rowid";
+  }
+
+  auto Symbol(int64_t id) {
+    return this->db().template query<q_get_symbol>(id);
+  }
+
+  auto Name(int64_t id, int64_t new_symbol_id) {
     this->db().template query<q_set_symtabentry>( id, new_symbol_id );
   }
 
