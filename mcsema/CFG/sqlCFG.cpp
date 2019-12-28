@@ -197,9 +197,10 @@ struct Segment_ : has_context,
             offset,
             size;
     std::tie(mr_rowid, offset, size) =
-      *this->db().template query<q_data>(id)
+      *this->_ctx->db.template query<q_data>(id)
                  .template Get<int64_t, int64_t, int64_t>();
-    auto c_data = this->cache().template Find<Segment, MemoryRange_::q_data>(mr_rowid);
+    auto c_data = this->_ctx->cache
+                  .template Find<Segment, MemoryRange_<MemoryRange>::q_data>(mr_rowid);
     return c_data.substr(offset, size);
   }
 
@@ -208,7 +209,7 @@ struct Segment_ : has_context,
       R"(UPDATE segments SET
         (read_only, is_external, is_exported, is_thread_local) =
         (?2, ?3, ?4, ?5) WHERE rowid = ?1)";
-    this->db().template query<q_set_flags>(id,
+    this->_ctx->db.template query<q_set_flags>(id,
                                     flags.read_only, flags.is_external,
                                     flags.is_exported, flags.is_thread_local);
   }
