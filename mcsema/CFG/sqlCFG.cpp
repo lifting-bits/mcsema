@@ -423,31 +423,12 @@ WeakIterator<SymtabEntry> Module::Symbols() {
   return { std::make_unique<details::Iterator_impl>(std::move(result)) };
 }
 
-/* SymtabEntry */
-SymtabEntry::Data SymtabEntry::operator*() const {
-  return SymtabEntry_{ _ctx }.c_get<SymtabEntry::Data, std::string, SymtabEntryType>(_id);
-}
-
-
-
 /* Function */
 
 void Function::AttachBlock(const BasicBlock &bb) {
   Function_<Function>{ _ctx }.bind_bb(_id, bb._id);
 }
 
-Function &Function::Name(const SymtabEntry &entry) {
-  Function_{ _ctx }.Name(_id, entry._id);
-  return *this;
-}
-
-std::optional<SymtabEntry> Function::Name() {
-  auto maybe_id = Function_{ _ctx }.Name(_id);
-  if (maybe_id) {
-    return { { *maybe_id, _ctx } };
-  }
-  return {};
-}
 
 /* BasicBlock */
 std::string BasicBlock::Data() {
@@ -562,6 +543,15 @@ void interface::HasSymtabEntry<Self>::Name(
   return impl_t<decltype(self)>{ self->_ctx }.Name( self->_id, name._id );
 }
 
+template<typename Self>
+std::optional<SymtabEntry::data_t> interface::HasSymtabEntry<Self>::Symbol() {
+  auto self = static_cast<Self *>(this);
+
+  auto res = impl_t<decltype(self)>{self->_ctx}.Symbol(self->_id);
+  return util::maybe_to_struct<SymtabEntry::data_t>(
+      res.template Get<std::string, SymtabEntryType>());
+}
+
 namespace interface {
 
 /* We must explicitly instantiate all templates */
@@ -572,8 +562,11 @@ template struct HasSymtabEntry<DataXref>;
 template struct HasEa<MemoryRange>;
 
 template struct HasEa<Segment>;
+// TODO: Implement
+//template struct HasSymtabEntry<Segment>;
 
 template struct HasEa<Function>;
+template struct HasSymtabEntry<Function>;
 
 template struct HasEa<BasicBlock>;
 

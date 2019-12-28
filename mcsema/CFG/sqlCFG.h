@@ -78,11 +78,7 @@ namespace interface {
   };
 
   template<typename Self>
-  struct HasSymtabEntry {
-    std::optional<std::string> Name();
-    void Name(const SymtabEntry& name);
-  };
-
+  struct HasSymtabEntry;
 } // namespace interface
 
 
@@ -106,6 +102,12 @@ protected:
   friend class interface::HasEa<MemoryRange>;
 
   friend class interface::HasEa<BasicBlock>;
+
+  friend class interface::HasEa<Function>;
+  friend class interface::HasSymtabEntry<Function>;
+
+  friend class interface::HasEa<Segment>;
+  friend class interface::HasSymtabEntry<Segment>;
 };
 
 } // namespace details
@@ -136,7 +138,14 @@ private:
 
 };
 
-
+namespace interface {
+  template<typename Self>
+  struct HasSymtabEntry {
+    std::optional<std::string> Name();
+    void Name(const SymtabEntry& name);
+    std::optional<SymtabEntry::data_t> Symbol();
+  };
+} // namespace interface
 
 
 class ExternalFunction : public details::Internals,
@@ -195,7 +204,8 @@ private:
 
 
 class Function : public details::Internals,
-                 public interface::HasEa<Function> {
+                 public interface::HasEa<Function>,
+                 public interface::HasSymtabEntry<Function> {
 
 public:
 
@@ -215,9 +225,6 @@ public:
     }
   }
 
-  Function &Name(const SymtabEntry &entry);
-  std::optional<SymtabEntry> Name();
-
   void Erase();
 
 private:
@@ -225,11 +232,11 @@ private:
 
   friend class Letter;
   friend class Module;
-  friend class interface::HasEa<Function>;
 };
 
 class Segment : public details::Internals,
-                public interface::HasEa<Segment> {
+                public interface::HasEa<Segment>,
+                public interface::HasSymtabEntry<Segment> {
 public:
 
   struct Flags {
@@ -267,7 +274,7 @@ private:
   friend class MemoryRange;
   friend class Module;
   friend class Letter;
-  friend class interface::HasEa<Segment>;
+
 
   using details::Internals::Internals;
 };
