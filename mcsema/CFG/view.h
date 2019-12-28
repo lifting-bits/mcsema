@@ -45,6 +45,8 @@ void run()
   auto bin = letter.module("bin.out");
 
   auto s_main = bin.AddSymtabEntry("main", SymtabEntryType::Internal);
+  auto error_name = bin.AddSymtabEntry("error_name", SymtabEntryType::Internal);
+  error_name.Erase();
 
   auto main = letter.func(bin, 12, true).Name(s_main);
   auto foo = letter.func(bin, 32, false);
@@ -139,14 +141,6 @@ void run()
       CC::X86_64_SysV, true, true);
   std::cout << "External functiom matrix_add has name: " << matrix_add.Name()
             << ", and ea: " << matrix_add.ea() << std::endl;
-
-  // Get us all function eas
-  {
-    std::cout << "Let's print all internal functions" << std::endl;
-    for (auto &func: bin.AllFunctions()) {
-      std::cout << func.ea << std::endl;
-    }
-  }
 
   // Iterate over all symtab entries
   {
