@@ -523,6 +523,23 @@ std::string ExternalFunction::Name() const {
   return *impl_t<decltype(this)>{ _ctx }.GetName(_id);
 }
 
+/* Erasable */
+
+#define DEF_ERASE(self) \
+  void self::Erase() { \
+    impl_t<decltype(this)>{_ctx}.erase(_id); \
+  }
+
+DEF_ERASE(SymtabEntry)
+DEF_ERASE(ExternalFunction)
+DEF_ERASE(Function)
+DEF_ERASE(Segment)
+DEF_ERASE(MemoryRange)
+DEF_ERASE(CodeXref)
+DEF_ERASE(DataXref)
+
+#undef DEF_ERASE
+
 /* Traits */
 
 template<typename Self>

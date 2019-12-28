@@ -122,6 +122,8 @@ public:
 
   Data operator*() const;
 
+  void Erase();
+
 private:
   friend class Module;
   friend class Function;
@@ -151,6 +153,8 @@ public:
   };
 
   std::string Name() const;
+
+  void Erase();
 
 private:
   friend class Module;
@@ -214,6 +218,8 @@ public:
   Function &Name(const SymtabEntry &entry);
   std::optional<SymtabEntry> Name();
 
+  void Erase();
+
 private:
   using details::Internals::Internals;
 
@@ -250,6 +256,13 @@ public:
   DataXref AddXref(int64_t ea, int64_t target_ea,
                    int64_t width, FixupKind fixup, const SymtabEntry &name);
 
+  // FIXME: This does not remove xrefs, maybe add either:
+  // void EraseAll()
+  // or:
+  // void EraseOnly()
+  void Erase();
+
+
 private:
   friend class MemoryRange;
   friend class Module;
@@ -276,6 +289,8 @@ public:
                      const Segment::Flags &flags,
                      const std::string &name);
 
+  // FIXME: This does not remove Segments or BBs
+  void Erase();
 private:
   friend class Letter;
   friend class Module;
@@ -298,6 +313,8 @@ public:
     std::optional<int64_t> mask;
   };
 
+
+  void Erase();
 
 private:
   friend class Module;
@@ -324,6 +341,8 @@ public:
     std::optional<SymtabEntry> name;
   };
 
+
+  void Erase();
 private:
   friend class Segment;
 
@@ -359,6 +378,9 @@ public:
     }
   }
 
+
+  // FIXME: This should probably also delete all module-binded data?
+  // void Erase();
 private:
   using details::Internals::Internals;
 
