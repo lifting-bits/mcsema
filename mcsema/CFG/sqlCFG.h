@@ -235,6 +235,8 @@ public:
 private:
   using details::Internals::Internals;
 
+  friend class details::ObjectIterator_impl;
+
   friend class Letter;
   friend class Module;
 };
@@ -387,12 +389,21 @@ public:
                                        CC cc,
                                        bool has_return, bool is_weak);
 
-  // Two examples of iteration
-  WeakIterator<SymtabEntry> Symbols();
+  /* Iteration */
+
+  // Difference here is that *_d already applies operator*() on sql level,
+  // which saves query per object. (This should be reasonable optimization)
+  WeakDataIterator<SymtabEntry> Symbols_d();
+  WeakObjectIterator<Function> Functions();
+
+  // TODO:
+  //WeakIterator<ExternalFunction> ExtFunctions();
+  //WeakIterator<MemoryRange> MemoryRanges();
+  //WeakIterator<Segment> Segments();
 
   template<typename Unary>
-  void ForEachSymbol(Unary f) {
-    for (auto weak_it = Symbols(); auto data = weak_it.Fetch();) {
+  void ForEachSymbol_d(Unary f) {
+    for (auto weak_it = Symbols_d(); auto data = weak_it.Fetch();) {
       f(*data);
     }
   }

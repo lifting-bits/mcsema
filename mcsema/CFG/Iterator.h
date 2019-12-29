@@ -22,26 +22,45 @@
 namespace mcsema::cfg {
 
 namespace details {
-  struct Iterator_impl;
+  struct DataIterator_impl;
+  struct ObjectIterator_impl;
 } // namespace details
 
 class Module;
 
 template<typename Entry>
-struct WeakIterator {
+struct WeakObjectIterator {
+  using data_t = Entry;
+  using maybe_data_t = std::optional<data_t>;
+
+  maybe_data_t Fetch();
+
+  ~WeakObjectIterator();
+
+private:
+  friend Module;
+
+  using Impl_t = std::unique_ptr<details::ObjectIterator_impl>;
+  WeakObjectIterator(Impl_t &&impl);
+
+  Impl_t impl;
+};
+
+template<typename Entry>
+struct WeakDataIterator {
 
   using data_t = typename Entry::data_t;
   using maybe_data_t = std::optional<data_t>;
 
   maybe_data_t Fetch();
 
-  ~WeakIterator();
+  ~WeakDataIterator();
 
 private:
   friend Module;
 
-  using Impl_t = std::unique_ptr<details::Iterator_impl>;
-  WeakIterator(Impl_t &&impl);
+  using Impl_t = std::unique_ptr<details::DataIterator_impl>;
+  WeakDataIterator(Impl_t &&impl);
 
   Impl_t impl;
 };
