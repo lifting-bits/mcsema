@@ -162,6 +162,16 @@ struct BasicBlock_: has_context,
        FROM blocks
        WHERE rowid = ?1)";
 
+  constexpr static Query q_orphans =
+    R"(SELECT bb.rowid
+       FROM blocks AS bb
+       WHERE bb.rowid NOT IN (SELECT bb_rowid
+                              FROM function_to_block))";
+
+
+  auto orphaned() {
+    return _ctx->db.template query<q_orphans>();
+  }
 
   std::string data(int64_t id) {
     // SUBSTR index starts from 0, therefore we need + 1
@@ -505,6 +515,12 @@ ExternalFunction Module::AddExternalFunction(int64_t ea,
            _ctx };
 }
 
+WeakObjectIterator<BasicBlock> Module::OrphanedBasicBlocks() {
+  auto result = BasicBlock_{ _ctx }.orphaned();
+  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
+}
+
+
 WeakDataIterator<SymtabEntry> Module::Symbols_d() {
   auto result = Module_{_ctx }.all_symbols(_id);
   return { std::make_unique<details::DataIterator_impl>(std::move(result)) };
@@ -727,5 +743,6 @@ template struct HasSymtabEntry<CodeXref>;
 
 template struct WeakDataIterator<SymtabEntry>;
 template struct WeakObjectIterator<Function>;
+template struct WeakObjectIterator<BasicBlock>;
 } // namespace cfg
 } // namespace mcsema

@@ -202,7 +202,7 @@ private:
   friend class Function;
   friend class Letter;
   friend class Module;
-  friend class interface::HasEa<BasicBlock>;
+  friend details::ObjectIterator_impl;
 
   using details::Internals::Internals;
 };
@@ -408,6 +408,9 @@ public:
     }
   }
 
+  // TODO: This is probably really handy if we allow Erase without removing dependent
+  // objects.
+  WeakObjectIterator<BasicBlock> OrphanedBasicBlocks();
 
   // FIXME: This should probably also delete all module-binded data?
   // void Erase();
