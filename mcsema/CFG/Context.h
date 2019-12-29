@@ -37,7 +37,7 @@ public:
   using Result_t = sqlite::Database<Name>::QueryResult;
   std::string _db_name;
   DB_t db;
-  mcsema::cfg::SegmentCache_t<DB_t> cache = ( db );
+  mcsema::cfg::MemoryRangeCache<DB_t> cache = ( db );
 };
 
 } // namespace mcsema::cfg

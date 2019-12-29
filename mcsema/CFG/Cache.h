@@ -71,8 +71,8 @@ struct Cache : Next {
   #undef ENABLE_IF
 };
 
-class Segment;
+class MemoryRange;
 template<typename DB>
-using SegmentCache_t = Cache<Segment, std::string, int64_t, Base<DB>>;
+using MemoryRangeCache = Cache<MemoryRange, std::string, int64_t, Base<DB>>;
 
 } // namespace mcsema::cfg

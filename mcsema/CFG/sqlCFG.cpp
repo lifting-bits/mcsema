@@ -234,7 +234,7 @@ struct Segment_ : has_context,
       *this->_ctx->db.template query<q_data>(id)
                  .template Get<int64_t, int64_t, int64_t>();
     auto c_data = this->_ctx->cache
-                  .template Find<Segment, MemoryRange_<MemoryRange>::q_data>(mr_rowid);
+                  .template Find<MemoryRange, MemoryRange_<MemoryRange>::q_data>(mr_rowid);
     return c_data.substr(offset, size);
   }
 
