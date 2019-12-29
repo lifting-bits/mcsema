@@ -40,6 +40,8 @@ class DataXref;
 // Context that represents the file and other helper data part of internal implemenation
 class Context;
 
+
+/* Enums */
 enum class SymtabEntryType : unsigned char {
   Imported = 1, // Names from another object file
   Exported = 2, // Externally visible
@@ -69,7 +71,8 @@ enum class FixupKind : unsigned char {
 };
 
 
-// TODO: Do we want things like this or not?
+
+// Each object can implement some of the following interfaces
 namespace interface {
 
   template<typename Self>
@@ -77,11 +80,13 @@ namespace interface {
     int64_t ea();
   };
 
+  // Defition uses SymtabEntry class, therefore can be found lower
   template<typename Self>
   struct HasSymtabEntry;
 } // namespace interface
 
 
+// Internal stuff that could not be hidden away in .cpp file, plese pretend it is not here
 namespace details {
 
 using CtxPtr = std::shared_ptr<Context>;
@@ -112,6 +117,24 @@ protected:
 
 } // namespace details
 
+
+/* Each of the following objects is rather opaque and typically correspond to some
+ * "object" in binaries. Some are abstract (BasicBlock, Segment, Function) but other
+ * can be verbatim copies of data (for example MemoryRange).
+ *
+ * Even thought they do not share any general interface in their inheritance, they have
+ * some similar features:
+ *
+ *   -> data_t is returned by operator*() and encapsulates almost all important
+ *      information stored about the object, for those not included there are separate
+ *      getters.
+ *   -> TODO: Erase/ReplaceWith
+ */
+
+
+// Represent Symbol (name). It does not have to come from any binary (user can name
+// things as desired with Artificial type to signify that they do not origin
+// from the  binary)
 class SymtabEntry : public details::Internals {
 public:
 
@@ -138,13 +161,18 @@ private:
 
 };
 
+
 namespace interface {
+
+  // Some objects can (sometimes it is not required!) have name -- this interface
+  // allows manipulation with it
   template<typename Self>
   struct HasSymtabEntry {
     std::optional<std::string> Name();
     void Name(const SymtabEntry& name);
     std::optional<SymtabEntry::data_t> Symbol();
   };
+
 } // namespace interface
 
 
@@ -198,6 +226,8 @@ public:
                      const SymtabEntry &name,
                      std::optional<int64_t> mask={});
 
+    // TODO: Implement and erase also xrefs
+    void Erase();
 private:
 
   friend class Function;
@@ -231,6 +261,11 @@ public:
     }
   }
 
+  // Iterate over all attached block
+  WeakObjectIterator<BasicBlock> BasicBlocks();
+  // TODO: De-attach
+
+
   void Erase();
 
 private:
@@ -242,6 +277,8 @@ private:
   friend class Module;
 };
 
+
+// Named part of some memory range
 class Segment : public details::Internals,
                 public interface::HasEa<Segment>,
                 public interface::HasSymtabEntry<Segment> {
@@ -293,6 +330,7 @@ private:
   using details::Internals::Internals;
 };
 
+// Verbatim copy of some data in binary
 // TODO: Insert for empty like .bbs
 class MemoryRange : public details::Internals,
                     public interface::HasEa<MemoryRange> {
@@ -324,6 +362,8 @@ private:
 };
 
 
+// Reference in some BasicBlock. It is bound to it and cannot be moved.
+// If the underlying basic block is removed, reference is removed as well.
 class CodeXref : public details::Internals,
                  public interface::HasEa<CodeXref>,
                  public interface::HasSymtabEntry<CodeXref> {
@@ -352,6 +392,8 @@ private:
 };
 
 
+// Reference in some Segment. It is bound to it and cannot be moved.
+// If the underlying Segment if removed, reference is removed as well.
 class DataXref : public details::Internals,
                  public interface::HasEa<DataXref>,
                  public interface::HasSymtabEntry<DataXref> {
@@ -375,6 +417,7 @@ private:
   using details::Internals::Internals;
 };
 
+// One object file -- compiled binary or shared library for example.
 class Module : public details::Internals {
 
 public:
@@ -425,6 +468,8 @@ private:
   friend class Letter;
 };
 
+
+// Top-level object, encapsulates several separate object files.
 struct Letter
 {
   Letter(const std::string &db_name);
