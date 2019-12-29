@@ -138,10 +138,10 @@ void run()
   std::cout << "External functiom matrix_add has name: " << matrix_add.Name()
             << ", and ea: " << matrix_add.ea() << std::endl;
 
-  // Iterate over all symtab entries
+  // Iterate over all symtab entry data_t
   {
     std::cout << "Going to print all symbols" << std::endl;
-    for (auto weak_it = bin.Symbols(); auto data = weak_it.Fetch(); ) {
+    for (auto weak_it = bin.Symbols_d(); auto data = weak_it.Fetch(); ) {
       std::cout << (*data).name << std::endl;
     }
 
@@ -150,7 +150,16 @@ void run()
       std::cout << data.name << ", type: "
                 << static_cast<int>(data.type) << std::endl;
     };
-    bin.ForEachSymbol(printer);
+    bin.ForEachSymbol_d(printer);
+  }
+
+  // Iterate over all Function objects
+  {
+    std::cout << "Iterating over all functions, printing eas" << std::endl;
+    for (auto weak_it = bin.Functions(); auto obj = weak_it.Fetch(); ) {
+      std::cout << (*obj).ea() << std::endl;
+    }
+
   }
 
   // Try all data_t operator*() const;
