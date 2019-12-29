@@ -188,7 +188,8 @@ public:
     using data_t = Data_;
     data_t operator*() const;
 
-    std::string Data();
+    // Cached
+    std::string_view Data();
 
     CodeXref AddXref(int64_t ea, int64_t target_ea, OperandType op_type);
     CodeXref AddXref(int64_t ea,
@@ -268,6 +269,7 @@ public:
 
   // NOTE: std::string is implicitly converted to std::string_view so in case this returns
   // nonsense double check return types.
+  // Cached
   std::string_view Data();
   void SetFlags(const Flags &flags);
 
@@ -308,6 +310,9 @@ public:
                      int64_t size,
                      const Segment::Flags &flags,
                      const std::string &name);
+
+  // Cached
+  std::string_view Data();
 
   // FIXME: This does not remove Segments or BBs
   void Erase();

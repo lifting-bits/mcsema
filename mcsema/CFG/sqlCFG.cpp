@@ -83,6 +83,11 @@ struct MemoryRange_ : has_context,
       R"(SELECT ea, size
          FROM memory_ranges
          WHERE rowid = ?1)";
+
+  std::string_view data(int64_t id) {
+    return this->_ctx->cache
+           .template Find<MemoryRange, MemoryRange_<MemoryRange>::q_data>(id);
+  }
 };
 
 template< typename Self >
@@ -173,16 +178,20 @@ struct BasicBlock_: has_context,
     return _ctx->db.template query<q_orphans>();
   }
 
-  std::string data(int64_t id) {
+  std::string_view data(int64_t id) {
     // SUBSTR index starts from 0, therefore we need + 1
     constexpr static Query q_data =
-      R"(SELECT SUBSTR(mr.bytes, bb.ea - mr.ea + 1) FROM
+      R"(SELECT mr.rowid, bb.ea - mr.ea FROM
           blocks as bb JOIN
           memory_ranges as mr ON
           mr.rowid = bb.memory_rowid and bb.rowid = ?1)";
-    sqlite::blob data_view;
-    _ctx->db.template query<q_data>(id)(data_view);
-    return std::move(data_view);
+   int64_t mr_rowid,
+           offset;
+    std::tie(mr_rowid, offset) = *this->_ctx->db.template query<q_data>(id)
+                                                .template Get<int64_t, int64_t>();
+    auto c_data = this->_ctx->cache
+                  .template Find<MemoryRange, MemoryRange_<MemoryRange>::q_data>(mr_rowid);
+    return c_data.substr(offset);
   }
 };
 
@@ -539,7 +548,7 @@ void Function::AttachBlock(const BasicBlock &bb) {
 
 
 /* BasicBlock */
-std::string BasicBlock::Data() {
+std::string_view BasicBlock::Data() {
     return BasicBlock_{ _ctx }.data(_id);
 }
 
@@ -603,6 +612,10 @@ Segment MemoryRange::AddSegment(int64_t ea,
                                  const Segment::Flags &flags,
                                  const std::string &name) {
   return { Segment_{ _ctx }._insert( ea, size, flags, name, _id ), _ctx };
+}
+
+std::string_view MemoryRange::Data() {
+  return impl_t<decltype(this)>{ _ctx }.data(_id);
 }
 
 /* CodeXref */
