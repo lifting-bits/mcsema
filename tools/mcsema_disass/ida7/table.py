@@ -145,7 +145,7 @@ def get_num_jump_table_entries(builder):
 
   # The candidate targets have given us some rough bounds on the function,
   # now lets go and check all the targets
-  max_i = max(curr_num_targets, 1024)
+  max_i = max(curr_num_targets, 2048)
   entry_addr = builder.table_ea
   table_seg_ea = idc.get_segm_start(builder.table_ea)
   for i in xrange(max_i):
@@ -285,7 +285,11 @@ def get_ida_jump_table_reader(builder, si):
     builder.entry_mult = -1
 
   DEBUG("IDA inferred jump table entry size: {}".format(builder.entry_size))
-
+  
+  if builder.entry_size not in (4, 8):
+    builder.entry_size = get_address_size_in_bits() / 8
+    DEBUG("Using jump table entry size {} instead".format(builder.entry_size))
+    
   # Check if this is an offset based jump table, and if so, create an
   # appropriate wrapper that uses the displacement from the table base
   # address to find the actual jump target.
