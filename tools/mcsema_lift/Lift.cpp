@@ -120,6 +120,46 @@ static const char *gABISearchPaths[] = {
     "/share/mcsema/" MAJOR_MINOR "/ABI/",
 };
 
+bool HasFunctionPtrArg(const llvm::Function &func) {
+  for (auto &arg : func.args()) {
+
+    auto ptr = llvm::dyn_cast<llvm::PointerType>(arg.getType());
+    if(!ptr || !ptr->getElementType()->isFunctionTy()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool IsBlacklisted(const llvm::Function &func) {
+  auto func_name = func.getName();
+  if (func_name.startswith("__mcsema") || func_name.startswith("__remill")) {
+    return true;
+  }
+
+  if (!func.hasExternalLinkage()) {
+    return true;
+  }
+
+  // We simply cannot handle va_args properly yet. (Issue #599)
+  if (func.isVarArg()) {
+    LOG(WARNING) << "Skipped " << func.getName().str() << ": va_args. (See Issue #599)";
+    return true;
+  }
+
+  // There are some problems related to native <-> lifted synchronization
+  // without explicit args and function ptrs (entrypoint behaviour)
+  if (!FLAGS_explicit_args) {
+    if (HasFunctionPtrArg(func)) {
+      LOG(WARNING) << "Skipped " << func.getName().str() << ": function pointer in arguments. (See Issue #599)";
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
 // Load in a separate bitcode or IR library, and copy function and variable
 // declarations from that library into our module. We can use this feature
 // to provide better type information to McSema.
@@ -148,16 +188,11 @@ static void LoadLibraryIntoModule(const std::string &path) {
 
   // Declare the functions from the library in McSema's target module.
   for (auto &func : *gLibrary) {
+
     auto func_name = func.getName();
-    if (func_name.startswith("__mcsema") || func_name.startswith("__remill")) {
-      continue;
-    }
 
-    if (!func.hasExternalLinkage()) {
-      continue;
-    }
-
-    if (mcsema::gModule->getFunction(func_name)) {
+    if (mcsema::gModule->getFunction(func_name) ||
+        IsBlacklisted(func)) {
       continue;
     }
 
@@ -351,7 +386,8 @@ int main(int argc, char *argv[]) {
     FLAGS_disable_optimizer = false;
   }
 
-  mcsema::gModule = remill::LoadTargetSemantics(mcsema::gContext);
+  mcsema::gModule = remill::LoadTargetSemantics(
+      *mcsema::gContext);
   mcsema::gArch->PrepareModule(mcsema::gModule);
 
   // Load in a special library before CFG processing. This affects the

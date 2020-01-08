@@ -590,15 +590,15 @@ static void LiftIndirectJump(TranslationContext &ctx,
     // time so that we can find blocks that have no predecessors.
     std::unordered_set<uint64_t> succ_eas;
     succ_eas.insert(ctx.cfg_func->ea);
-    for (auto block_entry : ctx.cfg_func->blocks) {
-      auto cfg_block = block_entry.second;
+    for (auto &block_entry : ctx.cfg_func->blocks) {
+      auto &cfg_block = block_entry.second;
       succ_eas.insert(cfg_block->successor_eas.begin(),
                       cfg_block->successor_eas.end());
     }
 
     // We'll augment our block map to also target unreachable blocks, just in
     // case our disassembly failed to find some of the targets.
-    for (auto block_entry : ctx.cfg_func->blocks) {
+    for (auto &block_entry : ctx.cfg_func->blocks) {
       auto target_ea = block_entry.first;
       if (!succ_eas.count(target_ea)) {
         LOG(WARNING)
@@ -796,7 +796,6 @@ static bool LiftInstIntoBlock(TranslationContext &ctx,
 
 // Lift a decoded block into a function.
 static void LiftBlockIntoFunction(TranslationContext &ctx) {
-  auto block_name = ctx.cfg_block->lifted_name;
   auto block_pc = ctx.cfg_block->ea;
   auto block = ctx.ea_to_block[block_pc];
 
@@ -805,8 +804,8 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
   // Lift each instruction into the block.
   size_t i = 0;
   const auto num_insts = ctx.cfg_block->instructions.size();
-  for (auto cfg_inst : ctx.cfg_block->instructions) {
-    ctx.cfg_inst = cfg_inst;
+  for (auto &cfg_inst : ctx.cfg_block->instructions) {
+    ctx.cfg_inst = cfg_inst.get();
     auto is_last = (++i) >= num_insts;
 
     if (!LiftInstIntoBlock(ctx, block, is_last)) {
@@ -949,10 +948,11 @@ static llvm::Function *LiftFunction(
 
 
   // Create basic blocks for each basic block in the original function.
-  for (auto block_info : cfg_func->blocks) {
-    auto cfg_block = block_info.second;
+  for (auto &block_info : cfg_func->blocks) {
+    std::stringstream ss;
+    ss << "block_" << std::hex << block_info.first;
     ctx.ea_to_block[block_info.first] = llvm::BasicBlock::Create(
-        *gContext, cfg_block->lifted_name, lifted_func);
+        *gContext, ss.str(), lifted_func);
   }
 
   // Allocate the stack variable recovered in the function
@@ -965,8 +965,8 @@ static llvm::Function *LiftFunction(
   llvm::BranchInst::Create(ctx.ea_to_block[cfg_func->ea],
                            &(lifted_func->front()));
 
-  for (auto block_info : cfg_func->blocks) {
-    ctx.cfg_block = block_info.second;
+  for (auto &block_info : cfg_func->blocks) {
+    ctx.cfg_block = block_info.second.get();
     LiftBlockIntoFunction(ctx);
   }
 
@@ -990,7 +990,7 @@ static llvm::Function *LiftFunction(
 // references are resolved before any data or instructions can use
 // those references.
 void DeclareLiftedFunctions(const NativeModule *cfg_module) {
-  for (auto func : cfg_module->ea_to_func) {
+  for (auto &func : cfg_module->ea_to_func) {
     auto cfg_func = func.second->Get();
     if (cfg_func->is_external) {
       continue;

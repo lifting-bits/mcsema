@@ -66,7 +66,7 @@ void ExternalFunctionManager::AddExternalSymbol(const std::string &s) {
   }
 
   std::string rest = s;
-  int n = rest.find(' ');
+  auto n = rest.find(' ');
 
   if (n != std::string::npos) {
     std::string symbolName = rest.substr(0, n);

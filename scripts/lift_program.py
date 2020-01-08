@@ -28,7 +28,7 @@ except:
 
 def binary_info(binary):
   res = subprocess.check_output(['file', binary])
-  is_pie = 'LSB shared object' in res or 'Mach-O 64' in res
+  is_pie = 'LSB shared object' in res or 'Mach-O 64' in res or 'LSB pie executable' in res
   address_size = 64
 
   if 'aarch64' in res:
@@ -55,7 +55,7 @@ def binary_libraries(binary):
     path_and_addr = path_and_addr.strip(" ")
     if not path_and_addr.startswith("/"):
       continue
-    
+
     lib = " ".join(path_and_addr.split(" ")[:-1])
     lib = os.path.realpath(lib)
 

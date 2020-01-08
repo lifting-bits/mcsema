@@ -23,6 +23,25 @@
 #include "OffsetTable.h"
 #include "SectionManager.h"
 
+// Sometimes there are no good candidates -> try every possibility
+Maybe<Dyninst::Address> OffsetTable::BlindMatch(
+    const std::set<Dyninst::Address> &succ) const {
+
+  auto it = start_ea;
+
+  while (it != start_ea + size) {
+
+    if (Recompute(it).Match(succ)) {
+      return it;
+    }
+    // TODO: Entries are smaller (maybe move by 8?)
+    it += 4;
+
+  }
+
+  return {};
+}
+
 bool OffsetTable::contains(Dyninst::Address addr) const {
   if (addr < start_ea) {
     return false;
@@ -36,6 +55,10 @@ bool OffsetTable::contains(Dyninst::Address addr) const {
 Maybe<Dyninst::Address> OffsetTable::Match(
     const std::set<Dyninst::Address> &succs,
     const std::set<Dyninst::Address> &xrefs) const {
+
+  if (xrefs.empty()) {
+    return BlindMatch(succs);
+  }
 
   if (Match(succs)) {
     return start_ea;
@@ -60,18 +83,25 @@ OffsetTable OffsetTable::Recompute(Dyninst::Address new_start_ea) const {
   OffsetTable table(new_start_ea, region, size - diff);
 
   auto it = entries.find(new_start_ea);
+
   while (it != entries.end()) {
+
     Dyninst::Address recalculated_target = it->second + diff;
+
     table.entries.insert({it->first, recalculated_target});
     table.targets.insert(recalculated_target);
     ++it;
   }
+
   return table;
 }
 
 // Tries to match with taking into account that it can be in the middle
 bool OffsetTable::Match(const std::set<Dyninst::Address> &succs) const {
-  CHECK(!targets.empty()) << "Trying to match offset table with no targets";
+  if (targets.empty()) {
+    DLOG(WARNING) << "Trying to match offset table with no targets";
+    return false;
+  }
 
   // Does it contain every successor?
   for (const auto &s : succs) {
@@ -80,8 +110,8 @@ bool OffsetTable::Match(const std::set<Dyninst::Address> &succs) const {
     }
   }
 
-  // This offset table contains all targets, but now we need to check
-  // they are really part of one table
+  // For big contiguous tables there might be some need to check if the entries are
+  // close enough, but for now this solution works
   auto entry = entries.begin();
   while (!succs.count(entry->second)) {
     ++entry;
@@ -90,16 +120,7 @@ bool OffsetTable::Match(const std::set<Dyninst::Address> &succs) const {
     }
   }
 
-  // We encountered first one, now we need to iterate all the known ones
-  while (!(entry == entries.end()) && succs.count(entry->second)) {
-    ++entry;
-  }
-
-  while (!(entry == entries.end()) && !succs.count(entry->second)) {
-    ++entry;
-  }
-
-  return entry == entries.end();
+  return true;
 }
 
 // This is just a bunch of 64-bit ELF specific heuristics
@@ -124,11 +145,14 @@ Maybe<OffsetTable> OffsetTable::Parse(
 
     // Get what is that entry truly pointing to
     auto target_ea = table.start_ea - ~(*reader) - 1;
+
     if (section_m.IsCode(target_ea)) {
       table.targets.insert({target_ea});
       table.entries.insert({it_ea, target_ea});
+
     } else if (target_ea == start_ea) {
       table.start_ea += 4;
+
     } else {
       // It doesn't point into text, it is not a jump table
       return {};
@@ -140,7 +164,8 @@ Maybe<OffsetTable> OffsetTable::Parse(
   }
 
   LOG(INFO) << "Parsed offset table starting at 0x" << std::hex << start_ea
-            << " containing " << std::dec << table.entries.size();
+            << " -> " << table.entries.size() * 4 + start_ea << " (contains "
+            << std::dec << table.entries.size() << ")";
 
   return {std::move(table)};
 }

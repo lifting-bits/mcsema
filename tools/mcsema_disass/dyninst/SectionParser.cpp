@@ -102,7 +102,7 @@ bool SectionParser::TryOffsetTable(uint64_t &offset,
     ++entry_reader;
   }
 
-  // Try to build the table from it, depending on number of entries shoudl succeed.
+  // Try to build the table from it, depending on number of entries should succeed.
   auto table = OffsetTable::Parse(section_manager, ea,
                                   reinterpret_cast<int32_t *>(reader),
                                   region, size);

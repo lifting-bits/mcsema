@@ -62,6 +62,7 @@ private:
               Dyninst::SymtabAPI::Region *region,
               size_t size) : start_ea(start_ea), region(region), size(size) {}
 
+  Maybe<Dyninst::Address> BlindMatch(const std::set<Dyninst::Address> &succ) const;
 
   Dyninst::Address start_ea;
   Dyninst::SymtabAPI::Region *region;

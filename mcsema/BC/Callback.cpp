@@ -333,13 +333,14 @@ static llvm::GlobalVariable *GetStatePointer(void) {
 static llvm::Function *CreateVerifyRegState(void) {
   auto *func_type = llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext),
                                             {}, false);
-  llvm::Constant *c_func = gModule->getOrInsertFunction(
+  auto new_func = gModule->getOrInsertFunction(
       "__mcsema_verify_reg_state",
       func_type);
-  auto func = llvm::dyn_cast<llvm::Function>(c_func);
-  CHECK(func) << "Could not cast "
-      << remill::LLVMThingToString(c_func)
-      << " to llvm::Function *";
+  auto func = llvm::dyn_cast<llvm::Function>(
+      new_func IF_LLVM_GTE_900(.getCallee()));
+
+  CHECK(func != nullptr)
+      << "Could not get or create function '__mcsema_verify_reg_state'";
 
   auto sp_offset = GetStackPointerOffset();
   auto reg_state = GetStatePointer();

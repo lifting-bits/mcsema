@@ -127,7 +127,8 @@ linux_initialize() {
                             liblzma-dev \
                             zlib1g-dev \
                             libprotobuf-dev \
-                            protobuf-compiler
+                            protobuf-compiler \
+                            ccache
 
   sudo apt-get install -qqy libc6:i386 \
                             libstdc++6:i386 \
@@ -207,6 +208,23 @@ linux_build() {
       fi
     fi
 
+    # create the cache folder for ccache
+    local cache_folder_name="ccache_llvm${llvm_version}"
+    printf " > Setting up ccache folder...\n"
+
+    if [ ! -d "${cache_folder_name}" ] ; then
+      mkdir "${cache_folder_name}" > "${log_file}" 2>&1
+      if [ $? -ne 0 ] ; then
+          printf " x Failed to create the ccache folder: ${cache_folder_name}. Error output follows:\n"
+          printf "===\n"
+          cat "${log_file}"
+          return 1
+      fi
+    fi
+
+    export CCACHE_DIR="$(realpath ${cache_folder_name})"
+    printf " i ${CCACHE_DIR}\n"
+
     linux_build_helper "${llvm_version}"
     if [ $? -ne 0 ] ; then
       printf " ! One or more tests have failed for LLVM ${llvm_version}\n"
@@ -246,7 +264,7 @@ linux_build_helper() {
     return 1
   fi
 
-  git clone "https://github.com/trailofbits/remill.git" > "${log_file}" 2>&1
+  git clone "https://github.com/lifting-bits/remill.git" > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to clone the remill repository. Error output follows:\n"
     printf "===\n"
