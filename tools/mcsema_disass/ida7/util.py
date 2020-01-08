@@ -30,6 +30,8 @@ _INFO = idaapi.get_inf_structure()
 # like the number of agruments and calling convention of the function.
 _NORETURN_EXTERNAL_FUNC = {}
 
+FUNC_LSDA_ENTRIES = collections.defaultdict()
+
 IS_ARM = "ARM" in _INFO.procName
 
 # True if we are running on an ELF file.
@@ -512,6 +514,7 @@ def is_noreturn_function(ea):
   flags = idc.get_func_attr(ea, idc.FUNCATTR_FLAGS)
   return 0 < flags and \
          (flags & idaapi.FUNC_NORET) and \
+         ea not in FUNC_LSDA_ENTRIES.keys() and \
          "cxa_throw" not in get_symbol_name(ea)
 
 _CREFS_FROM = collections.defaultdict(set)

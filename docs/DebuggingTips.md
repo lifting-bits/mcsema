@@ -1,6 +1,6 @@
 # Things have gone wrong, now what
 
-This document describes some approaches to debugging the lifted bitcode produced by McSema on Linux. This document does not describe [how to add missing instructions](https://github.com/trailofbits/remill/blob/master/docs/ADD_AN_INSTRUCTION.md), or how to [resolve common errors](CommonErrors.md).
+This document describes some approaches to debugging the lifted bitcode produced by McSema on Linux. This document does not describe [how to add missing instructions](https://github.com/lifting-bits/remill/blob/master/docs/ADD_AN_INSTRUCTION.md), or how to [resolve common errors](CommonErrors.md).
 
 ## Terminology
 
@@ -43,7 +43,7 @@ There are opportunities and drawbacks to debugging lifted code.
 
 ### Opportunities
 
-* The [`State`](https://github.com/trailofbits/remill/blob/master/remill/Arch/X86/Runtime/State.h) is stored in memory. The advantage to this is that one can set data breakpoints (hardware watchpoints) on individual registers in the state structure. This is incredibly useful if you have a [time-travelling debugger](http://undo.io/products/undodb/).
+* The [`State`](https://github.com/lifting-bits/remill/blob/master/remill/Arch/X86/Runtime/State.h) is stored in memory. The advantage to this is that one can set data breakpoints (hardware watchpoints) on individual registers in the state structure. This is incredibly useful if you have a [time-travelling debugger](http://undo.io/products/undodb/).
 * Lifted bitcode can be instrumented using the LLVM toolchain. Some useful-for-debugging instrumentations come built-in to `mcsema-lift`.
 
 #### Built-in instrumentation
@@ -522,7 +522,7 @@ $4 = 30
 
 Alright, we have confirmation, the lifted code for `cvtsi2ss` is definitely doing the wrong thing. Time to see the C++ code implementing this instruction.
 
-**NOTE:** How McSema lifts instructions has changed since this walkthrough was originally written. The remainder of this document has been preserved for posterity. Instruction semantics are no longer implemented within McSema, and are instead implemented (and tested) in the [Remill](https://github.com/trailofbits/remill) project.
+**NOTE:** How McSema lifts instructions has changed since this walkthrough was originally written. The remainder of this document has been preserved for posterity. Instruction semantics are no longer implemented within McSema, and are instead implemented (and tested) in the [Remill](https://github.com/lifting-bits/remill) project.
 
 First, we'll figure out what LLVM opcode implements this instruction.
 
@@ -573,6 +573,6 @@ Let's make this change, rebuild and install McSema, re-run `mcsema-lift`, compil
 
 #### Closing comments
 
-This document presented a few of the helpful commands provided for debugging, and then walked through the diagnosis and fixing of a specific bug that was present in McSema at commit [409abe3d31a7b0d09b1fee9c60e1d190de39cced](https://github.com/trailofbits/mcsema/commit/409abe3d31a7b0d09b1fee9c60e1d190de39cced).
+This document presented a few of the helpful commands provided for debugging, and then walked through the diagnosis and fixing of a specific bug that was present in McSema at commit [409abe3d31a7b0d09b1fee9c60e1d190de39cced](https://github.com/lifting-bits/mcsema/commit/409abe3d31a7b0d09b1fee9c60e1d190de39cced).
 
 There is a lot of information in this document. Despite this, the same techniques used in this document can be productively applied to may similar types of bugs.

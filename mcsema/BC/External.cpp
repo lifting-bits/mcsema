@@ -93,7 +93,8 @@ void DeclareExternals(const NativeModule *cfg_module) {
     auto cfg_var = reinterpret_cast<const NativeExternalVariable *>(
         entry.second->Get());
 
-    auto ll_var = gModule->getGlobalVariable(cfg_var->name);
+    auto ll_var = gModule->getGlobalVariable(cfg_var->name,
+                                             true  /* AllowInternal */);
     if (!ll_var) {
       LOG(INFO)
           << "Adding external variable " << cfg_var->name;
@@ -139,6 +140,19 @@ void DeclareExternals(const NativeModule *cfg_module) {
       if (cfg_var->ea) {
         ll_var->setAlignment(1 << __builtin_ctzl(cfg_var->ea));
       }
+
+    // This could happen if the variable is declared as a segment variable,
+    // but is not exported, and there is also another exported/imported
+    // global of the same name.
+    //
+    // TODO(pag): Another reasonable interpretation of this is to rename the
+    //            existing symbol so that the names don't clash.
+    } else {
+      LOG_IF(ERROR, !ll_var->hasExternalLinkage())
+          << "Variable '" << cfg_var->name
+          << "' is external but was not previously declared as such";
+
+      ll_var->setLinkage(llvm::GlobalValue::ExternalLinkage);
     }
 
     if (!cfg_var->address) {

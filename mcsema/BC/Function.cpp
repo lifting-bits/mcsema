@@ -32,8 +32,6 @@
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/Type.h>
 
-#include <llvm/Transforms/Scalar.h>
-
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
@@ -42,6 +40,7 @@
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Instruction.h"
 #include "remill/BC/ABI.h"
+#include "remill/BC/Compat/ScalarTransforms.h"
 #include "remill/BC/IntrinsicTable.h"
 #include "remill/BC/Lifter.h"
 #include "remill/BC/Util.h"
@@ -424,15 +423,17 @@ static void CreateLandingPad(TranslationContext &ctx,
     auto catch_all = false;
     unsigned long catch_all_index = 0;
 
-    for (auto index = eh_entry->type_var.size(); index > 0; index--) {
-      auto type = eh_entry->type_var[index];
+    for (auto &it : eh_entry->type_var) {
+      // Check the ttype variables are not null
+      auto type = it.second;
+      CHECK_NOTNULL(type);
       if (type->ea) {
         lpad->addClause(gModule->getGlobalVariable(type->name));
-        auto value = llvm::ConstantInt::get(dword_type, index);
+        auto value = llvm::ConstantInt::get(dword_type, type->size);
         array_value_const.push_back(value);
       } else {
         catch_all = true;
-        catch_all_index = index;
+        catch_all_index = type->size;
       }
     }
 
@@ -588,15 +589,15 @@ static void LiftIndirectJump(TranslationContext &ctx,
     // time so that we can find blocks that have no predecessors.
     std::unordered_set<uint64_t> succ_eas;
     succ_eas.insert(ctx.cfg_func->ea);
-    for (auto block_entry : ctx.cfg_func->blocks) {
-      auto cfg_block = block_entry.second;
+    for (auto &block_entry : ctx.cfg_func->blocks) {
+      auto &cfg_block = block_entry.second;
       succ_eas.insert(cfg_block->successor_eas.begin(),
                       cfg_block->successor_eas.end());
     }
 
     // We'll augment our block map to also target unreachable blocks, just in
     // case our disassembly failed to find some of the targets.
-    for (auto block_entry : ctx.cfg_func->blocks) {
+    for (auto &block_entry : ctx.cfg_func->blocks) {
       auto target_ea = block_entry.first;
       if (!succ_eas.count(target_ea)) {
         LOG(WARNING)
@@ -794,7 +795,6 @@ static bool LiftInstIntoBlock(TranslationContext &ctx,
 
 // Lift a decoded block into a function.
 static void LiftBlockIntoFunction(TranslationContext &ctx) {
-  auto block_name = ctx.cfg_block->lifted_name;
   auto block_pc = ctx.cfg_block->ea;
   auto block = ctx.ea_to_block[block_pc];
 
@@ -803,8 +803,8 @@ static void LiftBlockIntoFunction(TranslationContext &ctx) {
   // Lift each instruction into the block.
   size_t i = 0;
   const auto num_insts = ctx.cfg_block->instructions.size();
-  for (auto cfg_inst : ctx.cfg_block->instructions) {
-    ctx.cfg_inst = cfg_inst;
+  for (auto &cfg_inst : ctx.cfg_block->instructions) {
+    ctx.cfg_inst = cfg_inst.get();
     auto is_last = (++i) >= num_insts;
 
     if (!LiftInstIntoBlock(ctx, block, is_last)) {
@@ -899,6 +899,7 @@ static llvm::Function *LiftFunction(
   auto lifted_func = gModule->getFunction(cfg_func->lifted_name);
   CHECK(nullptr != lifted_func)
       << "Could not find declaration for " << cfg_func->lifted_name;
+  cfg_func->function = lifted_func;
 
   // This can happen due to deduplication of functions during the
   // CFG decoding process. In practice, though, that only really
@@ -946,10 +947,11 @@ static llvm::Function *LiftFunction(
 
 
   // Create basic blocks for each basic block in the original function.
-  for (auto block_info : cfg_func->blocks) {
-    auto cfg_block = block_info.second;
+  for (auto &block_info : cfg_func->blocks) {
+    std::stringstream ss;
+    ss << "block_" << std::hex << block_info.first;
     ctx.ea_to_block[block_info.first] = llvm::BasicBlock::Create(
-        *gContext, cfg_block->lifted_name, lifted_func);
+        *gContext, ss.str(), lifted_func);
   }
 
   // Allocate the stack variable recovered in the function
@@ -962,8 +964,8 @@ static llvm::Function *LiftFunction(
   llvm::BranchInst::Create(ctx.ea_to_block[cfg_func->ea],
                            &(lifted_func->front()));
 
-  for (auto block_info : cfg_func->blocks) {
-    ctx.cfg_block = block_info.second;
+  for (auto &block_info : cfg_func->blocks) {
+    ctx.cfg_block = block_info.second.get();
     LiftBlockIntoFunction(ctx);
   }
 
@@ -985,7 +987,7 @@ static llvm::Function *LiftFunction(
 // references are resolved before any data or instructions can use
 // those references.
 void DeclareLiftedFunctions(const NativeModule *cfg_module) {
-  for (auto func : cfg_module->ea_to_func) {
+  for (auto &func : cfg_module->ea_to_func) {
     auto cfg_func = func.second->Get();
     if (cfg_func->is_external) {
       continue;

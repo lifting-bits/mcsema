@@ -30,9 +30,8 @@ from collections import namedtuple
 # Bring in utility libraries.
 from util import *
 
-frame_entry = namedtuple('frame_entry', ['cs_start', 'cs_end', 'cs_lp', 'cs_action'])
+frame_entry = namedtuple('frame_entry', ['cs_start', 'cs_end', 'cs_lp', 'cs_action', 'action_list'])
 _FUNC_UNWIND_FRAME_EAS = set()
-_FUNC_LSDA_ENTRIES = dict()
 
 _EXCEPTION_BLOCKS_EAS = dict()
 
@@ -159,46 +158,18 @@ def read_enc_value(ea, enc):
 
   return val, ea
 
-def _create_frame_entry(start = None, end = None, lp = None, action = None):
-    return frame_entry(start, end, lp, action)
+def _create_frame_entry(start = None, end = None, lp = None, action = None, act_list = None):
+    return frame_entry(start, end, lp, action, act_list)
 
-def format_lsda_action(action_tbl, type_addr, type_enc, act_id):
+def format_lsda_actions(action_tbl, act_ea, type_addr, type_enc, act_id):
   """ Recover the exception actions and type info
   """
   action_list = []
   if action_tbl == idc.BADADDR:
     return
 
-  act_ea = action_tbl + act_id - 1
-  ar_filter,ea2 = read_enc_value(act_ea, DW_EH_PE_sleb128)
-  ar_disp,  ea3 = read_enc_value(ea2, DW_EH_PE_sleb128)
-  
-  if ar_filter > 0:
-    type_slot = type_addr - ar_filter * enc_size(type_enc)
-    type_ea, eatmp = read_enc_value(type_slot, type_enc)
-    DEBUG("catch type typeinfo = {:x} {}".format(type_ea, get_symbol_name(type_ea)))
-
-  if ar_disp == 0:
-    return
-
-  next_ea = ea2 + ar_disp
-  next_act = next_ea - act_ea + act_id
-
-  #action_list.append((ar_disp, ar_filter, type_ea))
-  #DEBUG("ea {:x}: ar_disp[{}]: {} ({:x})".format(act_ea, act_id, ar_disp, ar_filter))
-  #return action_list
-
-def format_lsda_actions(action_tbl, actions, type_addr, type_enc, act_id):
-  """ Recover the exception actions and type info
-  """
-  action_list = []
-  if action_tbl == idc.BADADDR:
-    return
-
-  DEBUG("No of Actions : {0}".format(len(actions)))
-  while len(actions):
-    act_id = actions.pop()
-    act_ea = action_tbl + act_id - 1
+  DEBUG("start action ea : {:x}".format(act_ea))
+  while True:
     ar_filter,ea2 = read_enc_value(act_ea, DW_EH_PE_sleb128)
     ar_disp,  ea3 = read_enc_value(ea2, DW_EH_PE_sleb128)
   
@@ -206,17 +177,14 @@ def format_lsda_actions(action_tbl, actions, type_addr, type_enc, act_id):
       type_slot = type_addr - ar_filter * enc_size(type_enc)
       type_ea, eatmp = read_enc_value(type_slot, type_enc)
       DEBUG("catch type typeinfo = {:x} {} {}".format(type_ea, get_symbol_name(type_ea), ar_filter))
-      if (ar_disp, ar_filter, type_ea) not in action_list:
-        action_list.append((ar_disp, ar_filter, type_ea))
+      action_list.append((ar_disp, ar_filter, type_ea))
 
+    #DEBUG(" format_lsda_actions ea {:x}: ar_disp[{}]: {} ({:x})".format(act_ea, act_id, ar_disp, ar_filter))
     if ar_disp == 0:
-      continue
+      break
 
-    next_ea = ea2 + ar_disp
-    next_act = next_ea - act_ea + act_id
-    actions.append(next_act)
+    act_ea = ea2 + ar_disp
 
-  #DEBUG("ea {:x}: ar_disp[{}]: {} ({:x})".format(act_ea, act_id, ar_disp, ar_filter))
   return action_list
 
 def create_block_entries(start_ea, heads):
@@ -242,7 +210,7 @@ def create_block_entries(start_ea, heads):
 def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
   """  Recover the language specific data area
   """
-  lsda_entries = set()
+  lsda_entries = list()
   heads = set()
   lpstart_enc, ea = read_byte(lsda_ptr), lsda_ptr + 1
   if lpstart_enc != DW_EH_PE_omit:
@@ -306,16 +274,17 @@ def format_lsda(lsda_ptr, start_ea, range = None,  sjlj = False):
       DEBUG("Landing pad for {0:x}..{1:x}".format(cs_start, cs_start + cs_len))
       DEBUG_POP()
 
-    lsda_entries.add(_create_frame_entry(cs_start, cs_start + cs_len, cs_lp, cs_action != 0))
-    #lsda_entries.add(_create_frame_entry(cs_start, cs_start + cs_len, cs_lp, cs_action))
+    if cs_action != 0:
+      action_offset = action_tbl + cs_action - 1
+      action_list = format_lsda_actions(action_tbl, action_offset, type_addr, type_enc, cs_action)
+
+    lsda_entries.append(_create_frame_entry(cs_start, cs_start + cs_len, cs_lp, cs_action, action_list))
+
     DEBUG("ea {:x}: cs_action[{}] = {}".format(act_ea, i, cs_action))
     i += 1
 
-  #if cs_action != 0:
-  action_list = format_lsda_actions(action_tbl, actions, type_addr, type_enc, cs_action)
-
   create_block_entries(start_ea, sorted(heads))
-  _FUNC_LSDA_ENTRIES[start_ea] = (lsda_entries, action_list)
+  FUNC_LSDA_ENTRIES[start_ea] = lsda_entries
 
 class AugmentationData:
   def __init__(self):
@@ -443,9 +412,9 @@ def recover_exception_table():
   recover_rtti()
 
 def recover_exception_entries(F, func_ea):
-  has_unwind_frame = func_ea in _FUNC_LSDA_ENTRIES.keys()
+  has_unwind_frame = func_ea in FUNC_LSDA_ENTRIES.keys()
   if has_unwind_frame:
-    lsda_entries, action_list = _FUNC_LSDA_ENTRIES[func_ea]
+    lsda_entries = FUNC_LSDA_ENTRIES[func_ea]
 
     for entry in lsda_entries:
       EH = F.eh_frame.add()
@@ -453,9 +422,9 @@ def recover_exception_entries(F, func_ea):
       EH.start_ea = entry.cs_start
       EH.end_ea = entry.cs_end
       EH.lp_ea = entry.cs_lp
-      EH.action = entry.cs_action
+      EH.action = entry.cs_action != 0
 
-      for ar_disp, ar_filter, type_ea  in action_list:
+      for ar_disp, ar_filter, type_ea  in entry.action_list:
         AC = EH.ttype.add()
         AC.ea = type_ea
         AC.name = get_symbol_name(type_ea)
@@ -470,9 +439,9 @@ def fix_function_bounds(min_ea, max_ea):
   return min_ea, max_ea
 
 def get_exception_landingpad(F, insn_ea):
-  has_lp = F.ea in _FUNC_LSDA_ENTRIES.keys()
+  has_lp = F.ea in FUNC_LSDA_ENTRIES.keys()
   if has_lp:
-    lsda_entries, action_list = _FUNC_LSDA_ENTRIES[F.ea]
+    lsda_entries = FUNC_LSDA_ENTRIES[F.ea]
     for entry in lsda_entries:
       if insn_ea >= entry.cs_start and insn_ea < entry.cs_end:
         return entry.cs_lp

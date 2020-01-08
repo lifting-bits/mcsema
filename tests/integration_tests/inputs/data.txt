@@ -1,0 +1,5 @@
+What a beauty!
+int main() {
+  return 0;
+}
+Cras cras, semper cras sic evadit eatas.

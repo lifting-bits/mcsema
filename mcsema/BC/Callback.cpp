@@ -330,13 +330,14 @@ static llvm::GlobalVariable *GetStatePointer(void) {
 static llvm::Function *CreateVerifyRegState(void) {
   auto *func_type = llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext),
                                             {}, false);
-  llvm::Constant *c_func = gModule->getOrInsertFunction(
+  auto new_func = gModule->getOrInsertFunction(
       "__mcsema_verify_reg_state",
       func_type);
-  auto func = llvm::dyn_cast<llvm::Function>(c_func);
-  CHECK(func) << "Could not cast "
-      << remill::LLVMThingToString(c_func)
-      << " to llvm::Function *";
+  auto func = llvm::dyn_cast<llvm::Function>(
+      new_func IF_LLVM_GTE_900(.getCallee()));
+
+  CHECK(func != nullptr)
+      << "Could not get or create function '__mcsema_verify_reg_state'";
 
   auto sp_offset = GetStackPointerOffset();
   auto reg_state = GetStatePointer();
@@ -431,6 +432,14 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
     }
   }
 
+  // Get correct return type -> i32 for main
+  auto ret_type = [&]() -> llvm::Type* {
+    if (name == "main") {
+      return llvm::Type::getInt32Ty(*gContext);
+    }
+    return remill::AddressType(gModule);
+  }();
+
   // The the lifted function type so that we can get things like the memory
   // pointer type and stuff.
   auto bb = remill::BasicBlockFunction(gModule);
@@ -445,7 +454,7 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
 
   std::vector<llvm::Type *> arg_types(num_args, pc_type);
 
-  auto func_type = llvm::FunctionType::get(pc_type, arg_types, false);
+  auto func_type = llvm::FunctionType::get(ret_type, arg_types, false);
   auto func = llvm::Function::Create(
       func_type, llvm::GlobalValue::InternalLinkage, name, gModule);
 
@@ -509,8 +518,10 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
   loader.StoreStackPointer(block, old_sp);
 
   // Extract and return the return value from the state structure/memory.
-  llvm::ReturnInst::Create(
-      *gContext, loader.LoadReturnValue(block, pc_type), block);
+  auto ret = loader.LoadReturnValue(block, pc_type);
+  auto casted = llvm::CastInst::CreateTruncOrBitCast(
+      ret, func_type->getReturnType(), "", block);
+  llvm::ReturnInst::Create(*gContext, casted, block);
 
   if (!FLAGS_pc_annotation.empty()) {
     legacy::AnnotateInsts(func, cfg_func->ea);
@@ -721,9 +732,6 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
 
   remill::CloneBlockFunctionInto(callback_func);
 
-  // We don't want this function to be inlined, since it was causing problems
-  // with llvm optimizations run by runO3
-
   CallingConvention loader(gArch->DefaultCallingConv());
 
   auto block = &(callback_func->back());
@@ -738,7 +746,7 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
 
   auto pc = remill::LoadProgramCounter(block);
   auto func_ptr_ty = llvm::PointerType::get(
-      llvm::FunctionType::get(call_args[0]->getType(), arg_types, false), 0);
+      llvm::FunctionType::get(remill::AddressType(gModule), arg_types, false), 0);
 
   llvm::IRBuilder<> ir(block);
   loader.StoreReturnValue(

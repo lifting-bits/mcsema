@@ -49,13 +49,11 @@ namespace {
 
 static std::string SaneName(const std::string &name) {
   std::stringstream ss;
-  if (!name.empty()) {
-    for (auto c : name) {
-      if (isalnum(c)) {
-        ss << c;
-      } else {
-        ss << "_";
-      }
+  for (auto c : name) {
+    if (isalnum(c)) {
+      ss << c;
+    } else {
+      ss << "_";
     }
   }
   return ss.str();
@@ -75,8 +73,8 @@ static std::string LiftedSegmentName(const Segment &cfg_segment) {
   if (cfg_segment.has_variable_name()) {
     auto has_name = !cfg_segment.variable_name().empty();
     LOG_IF(ERROR, !has_name)
-        << "CFG variable segment " << cfg_segment.name() << " at " << std::hex
-        << cfg_segment.ea() << std::dec << " has an empty name.";
+            << "CFG variable segment " << cfg_segment.name() << " at " << std::hex
+            << cfg_segment.ea() << std::dec << " has an empty name.";
 
     if (has_name && cfg_segment.is_exported()) {
       ss << cfg_segment.variable_name();
@@ -97,12 +95,6 @@ static std::string LiftedVarName(const Variable &cfg_var) {
   return ss.str();
 }
 
-static std::string LiftedBlockName(const Block &cfg_block) {
-  std::stringstream ss;
-  ss << "block_" << std::hex << cfg_block.ea();
-  return ss.str();
-}
-
 static std::string ExternalFuncName(const ExternalFunction &cfg_func) {
   std::stringstream ss;
   ss << "ext_" << std::hex << cfg_func.ea()
@@ -117,13 +109,15 @@ static std::string LiftedStackVariableName(const StackVariable &cfg_stack) {
 }
 
 // Find the segment containing the data at `ea`.
+//
+// TODO(pag): Re-implement with a call to `lower_bound` or `upper_bound`.
 static const NativeSegment *FindSegment(const NativeModule *module,
                                         uint64_t ea) {
   for (const auto &entry : module->segments) {
-    auto seg = entry.second;
+    const auto &seg = entry.second;
     auto seg_end = seg->ea + seg->size;
     if (seg->ea <= ea && ea < seg_end) {
-      return seg;
+      return seg.get();
     }
   }
   return nullptr;
@@ -131,19 +125,14 @@ static const NativeSegment *FindSegment(const NativeModule *module,
 
 // Resolve `xref` to a location.
 static bool ResolveReference(NativeModule *module, NativeXref *xref) {
-  xref->var = nullptr;
   xref->func = nullptr;
-
-  auto var_it = module->ea_to_var.find(xref->target_ea);
-  if (var_it != module->ea_to_var.end()) {
-    xref->var = reinterpret_cast<const NativeVariable *>(var_it->second->Get());
+  xref->var = module->TryGetVariable(xref->target_ea);
+  if (xref->var) {
     return true;
   }
 
-  auto func_it = module->ea_to_func.find(xref->target_ea);
-  if (func_it != module->ea_to_func.end()) {
-    xref->func = reinterpret_cast<const NativeFunction *>(
-        func_it->second->Get());
+  xref->func = module->TryGetFunction(xref->target_ea);
+  if (xref->func) {
     return true;
   }
 
@@ -167,39 +156,56 @@ static bool ResolveReference(NativeModule *module, NativeXref *xref) {
     return true;
   }
 
-  // Try to recover by finding a local variable.
+  // Try to recover by finding a global variable.
   for (const auto &entry : module->ea_to_var) {
-    auto var = entry.second;
-    if (var->name == xref->target_name) {
-      auto final_var = reinterpret_cast<const NativeVariable *>(var->Get());
-      xref->var = final_var;
-      xref->target_segment = final_var->segment;
-      module->ea_to_var[xref->target_ea] = final_var;
-
-      LOG(ERROR)
-          << "Attempting reference fix at " << std::hex << xref->ea
-          << " targeting " << xref->target_name << " using variable "
-          << std::hex << var->ea << ", resolving to variable "
-          << final_var->name << " at " << std::hex << final_var->ea;
-      return true;
+    const auto &var = entry.second;
+    if (var->name != xref->target_name) {
+      continue;
     }
+
+    const auto new_var = new NativeVariable;
+    const auto final_var = reinterpret_cast<const NativeVariable *>(var->Get());
+    new_var->forward = var->Get();
+    new_var->ea = xref->target_ea;
+    new_var->name = xref->target_name;
+    new_var->segment = final_var->segment;
+    module->ea_to_var[new_var->ea].reset(new_var);
+
+    xref->var = reinterpret_cast<const NativeVariable *>(new_var->forward);
+    xref->target_segment = new_var->segment;
+
+    LOG(WARNING)
+        << "Attempting reference fix at " << std::hex << xref->ea
+        << " targeting " << xref->target_name << " using variable "
+        << std::hex << var->ea << ", resolving to variable "
+        << final_var->name << " at " << std::hex << final_var->ea;
+
+    return true;
   }
 
-  // Try to recover by finding a local variable.
+  // Try to recover by finding a function with the same name.
   for (const auto &entry : module->ea_to_func) {
-    auto func = entry.second;
-    if (func->name == xref->target_name) {
-      auto final_func = reinterpret_cast<const NativeFunction *>(func->Get());
-      xref->func = final_func;
-      module->ea_to_func[xref->target_ea] = final_func;
-
-      LOG(ERROR)
-          << "Attempting reference fix at " << std::hex << xref->ea
-          << " targeting " << xref->target_name << " using variable "
-          << std::hex << func->ea << ", resolving to function "
-          << final_func->name << " at " << std::hex << final_func->ea;
-      return true;
+    const auto &func = entry.second;
+    if (func->name != xref->target_name) {
+      continue;
     }
+
+    const auto new_func = new NativeFunction;
+    new_func->forward = func->Get();
+    new_func->ea = xref->target_ea;
+    new_func->name = xref->target_name;
+    module->ea_to_func[new_func->ea].reset(new_func);
+
+    xref->func = reinterpret_cast<NativeFunction *>(new_func->forward);
+
+    LOG(WARNING)
+        << "Attempting reference fix at " << std::hex << xref->ea
+        << " targeting " << xref->target_name << " using function "
+        << std::hex << func->ea << ", resolving to function "
+        << new_func->forward->name << " at " << std::hex
+        << new_func->forward->ea << std::dec;
+
+    return true;
   }
 
   if (xref->target_segment) {
@@ -212,14 +218,14 @@ static bool ResolveReference(NativeModule *module, NativeXref *xref) {
   }
 
   if (xref->target_name.empty()) {
-    LOG(ERROR)
+    LOG(WARNING)
         << "Data cross reference at " << std::hex << xref->ea
         << " targeting " << std::hex << xref->target_ea
         << " does not match any known externals and is not "
         << "contained within any data segments.";
 
   } else {
-    LOG(ERROR)
+    LOG(WARNING)
         << "Data cross reference at " << std::hex << xref->ea
         << " targeting " << xref->target_name << " at "
         << std::hex << xref->target_ea << " does not match any known "
@@ -245,8 +251,8 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   xref->target_segment = FindSegment(module, xref->target_ea);
 
   CHECK(xref->segment != nullptr)
-      << "Could not identify segment containing cross-reference from "
-      << std::hex << xref->ea << " to " << std::hex << xref->target_ea;
+          << "Could not identify segment containing cross-reference from "
+          << std::hex << xref->ea << " to " << std::hex << xref->target_ea;
 
   if (cfg_ref.has_mask()) {
     xref->mask = static_cast<uint64_t>(cfg_ref.mask());
@@ -262,19 +268,17 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   }
 
   bool xref_is_external = false;
-  bool xref_is_code = false;
 
   // Does the XREF think its target is external?
   if (xref->func) {
     xref_is_external = xref->func->is_external;
-    xref_is_code = true;
 
   } else if (xref->var) {
     xref_is_external = xref->var->is_external;
 
-  // `mcsema-disass` does not recover external segments (e.g. `extern`), so
-  // a cross-reference that targets a NULL segment is, in practice, an
-  // external reference.
+    // `mcsema-disass` does not recover external segments (e.g. `extern`), so
+    // a cross-reference that targets a NULL segment is, in practice, an
+    // external reference.
   } else if (!xref->target_segment) {
     LOG(WARNING)
         << "Reference from " << std::hex << inst->ea
@@ -290,20 +294,20 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
         << " targets the segment " << xref->target_segment->name
         << " but was not resolved to a named symbol.";
     xref_is_external = xref->segment->is_external ||
-                       xref->target_segment->is_external;
+        xref->target_segment->is_external;
   }
 
   CHECK(!xref_is_external || !xref->target_name.empty())
-      << "External reference from " << std::hex << inst->ea
-      << " to " << xref->target_ea << std::dec << " does not have a name!";
+          << "External reference from " << std::hex << inst->ea
+          << " to " << xref->target_ea << std::dec << " does not have a name!";
 
   // Does the CFG reference target type agree with the resolved code/data
   // nature of the xref?
   if (cfg_ref.target_type() == CodeReference_TargetType_CodeTarget) {
     LOG_IF(WARNING, nullptr == xref->func)
-        << "Code cross-reference from " << std::hex << inst->ea
-        << " to " << std::hex << xref->target_ea << std::dec
-        << " is not actually a code cross-reference";
+            << "Code cross-reference from " << std::hex << inst->ea
+            << " to " << std::hex << xref->target_ea << std::dec
+            << " is not actually a code cross-reference";
   } else {
 
     // NOTE(pag): This will come up a lot with the `.idata` section in PE
@@ -332,9 +336,9 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
     //            instruction as loading the bytes of the instruction itself,
     //            though.
     LOG_IF(WARNING, nullptr != xref->func)
-        << "Data cross-reference from " << std::hex << inst->ea
-        << " to " << xref->target_ea << std::dec
-        << " is actually a code cross-reference";
+            << "Data cross-reference from " << std::hex << inst->ea
+            << " to " << xref->target_ea << std::dec
+            << " is actually a code cross-reference";
   }
 
   // Does the CFG reference target location agree with the resolved
@@ -344,48 +348,48 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
   // `stderr` will be placed.
   if (cfg_ref.location() == CodeReference_Location_External) {
     LOG_IF(WARNING, !xref_is_external)
-        << "External reference from " << std::hex << inst->ea
-        << " to " << xref->target_ea << std::dec << " is actually internal";
+            << "External reference from " << std::hex << inst->ea
+            << " to " << xref->target_ea << std::dec << " is actually internal";
   } else {
     LOG_IF(WARNING, xref_is_external)
-        << "Internal reference from " << std::hex << inst->ea
-        << " to " << xref->target_ea << std::dec << " (" << xref->target_name
-        << ") is actually external";
+            << "Internal reference from " << std::hex << inst->ea
+            << " to " << xref->target_ea << std::dec << " (" << xref->target_name
+            << ") is actually external";
   }
 
   switch (cfg_ref.operand_type()) {
     case CodeReference_OperandType_ImmediateOperand:
-      LOG_IF(ERROR, inst->imm != nullptr)
-          << "Overwriting existing immediate reference at instruction "
-          << std::hex << inst->ea << std::dec;
+      LOG_IF(WARNING, inst->imm != nullptr)
+              << "Overwriting existing immediate reference at instruction "
+              << std::hex << inst->ea << std::dec;
       inst->imm = xref;
       break;
 
     case CodeReference_OperandType_MemoryOperand:
-      LOG_IF(ERROR, inst->mem != nullptr)
-          << "Overwriting existing absolute reference at instruction "
-          << std::hex << inst->ea << std::dec;
+      LOG_IF(WARNING, inst->mem != nullptr)
+              << "Overwriting existing absolute reference at instruction "
+              << std::hex << inst->ea << std::dec;
       inst->mem = xref;
       break;
 
     case CodeReference_OperandType_MemoryDisplacementOperand:
-      LOG_IF(ERROR, inst->disp != nullptr)
-          << "Overwriting existing displacement reference at instruction "
-          << std::hex << inst->ea << std::dec;
+      LOG_IF(WARNING, inst->disp != nullptr)
+              << "Overwriting existing displacement reference at instruction "
+              << std::hex << inst->ea << std::dec;
       inst->disp = xref;
       break;
 
     case CodeReference_OperandType_ControlFlowOperand:
-      LOG_IF(ERROR, inst->flow != nullptr)
-          << "Overwriting existing flow reference at instruction "
-          << std::hex << inst->ea << std::dec;
+      LOG_IF(WARNING, inst->flow != nullptr)
+              << "Overwriting existing flow reference at instruction "
+              << std::hex << inst->ea << std::dec;
       inst->flow = xref;
       break;
 
     case CodeReference_OperandType_OffsetTable:
-      LOG_IF(ERROR, inst->offset_table != nullptr)
-          << "Overwriting existing offset table reference at instruction "
-          << std::hex << inst->ea << std::dec;
+      LOG_IF(WARNING, inst->offset_table != nullptr)
+              << "Overwriting existing offset table reference at instruction "
+              << std::hex << inst->ea << std::dec;
       inst->offset_table = xref;
       break;
   }
@@ -394,39 +398,14 @@ static void AddXref(NativeModule *module, NativeInstruction *inst,
 }  // namespace
 
 NativeObject::NativeObject(void)
-    : forward(this),
-      ea(0),
-      name(),
-      lifted_name(),
-      is_external(false),
-      is_exported(false),
-      is_thread_local(false) {}
-
-NativeFunction::NativeFunction(void)
-    : blocks(),
-      function(nullptr) {}
+    : forward(this) {}
 
 NativeExternalFunction::NativeExternalFunction(void)
-    : is_explicit(false),
-      is_weak(false),
-      num_args(0),
-      cc(gArch->DefaultCallingConv()) {}
+    : cc(gArch->DefaultCallingConv()) {}
 
-NativeVariable::NativeVariable(void)
-    : segment(nullptr),
-      address(nullptr) {}
-
-NativeStackVariable::NativeStackVariable(void)
-    : size(0),
-      offset(0),
-      llvm_var(nullptr){}
-
-NativeExceptionFrame::NativeExceptionFrame()
-    : start_ea(0),
-      end_ea(0),
-      lp_ea(0),
-      action_index(0),
-      lp_var(nullptr){}
+NativeSegment::Entry::Entry(
+    uint64_t o_ea, uint64_t o_next_ea, NativeXref *o_xref, NativeBlob *o_blob) :
+    ea(o_ea), next_ea(o_next_ea), xref(o_xref), blob(o_blob) {}
 
 void NativeObject::ForwardTo(NativeObject *dest) const {
   if (forward != this) {
@@ -456,6 +435,11 @@ static void MergeVariables(NativeVariable *var, const NativeVariable *old_var) {
   var->is_thread_local = var->is_thread_local || old_var->is_thread_local;
 }
 
+static void UpdateVariable(NativeVariable *var, const NativeSegment *seg) {
+  var->is_exported = var->is_exported || seg->is_exported;
+  var->is_thread_local = var->is_thread_local || seg->is_thread_local;
+}
+
 // Convert the protobuf into an in-memory data structure. This does a fair
 // amount of checking and tries to correct errors in favor of converting
 // variables into functions, and internals into externals. The intuition is
@@ -468,14 +452,14 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
 
   std::ifstream fstream(file_name, std::ios::binary);
   CHECK(fstream.good())
-      << "Unable to open CFG file " << file_name;
+          << "Unable to open CFG file " << file_name;
 
   google::protobuf::io::IstreamInputStream pstream(&fstream);
   google::protobuf::io::CodedInputStream cstream(&pstream);
   cstream.SetTotalBytesLimit(512 * 1024 * 1024, -1);
   Module cfg;
   CHECK(cfg.ParseFromCodedStream(&cstream))
-      << "Unable to read module from CFG file " << file_name;
+          << "Unable to read module from CFG file " << file_name;
 
   LOG(INFO)
       << "Lifting program " << cfg.name() << " via CFG protobuf in "
@@ -483,99 +467,44 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
 
   auto module = new NativeModule;
 
-  // Collect variables from within the data sections. We set up the segment
-  // information by not their data. We leave that until later when all
-  // cross-references have been resolved.
-  for (const auto &cfg_segment : cfg.segments()) {
-    auto segment = new NativeSegment;
-    segment->ea = static_cast<uint64_t>(cfg_segment.ea());
-    segment->size = cfg_segment.data().size();
-    if (cfg_segment.has_name()) {
-      segment->name = cfg_segment.name();
-    }
-    segment->lifted_name = LiftedSegmentName(cfg_segment);
-    segment->is_read_only = cfg_segment.read_only();
-    segment->is_external = cfg_segment.is_external();
-    segment->is_exported = cfg_segment.is_exported();
-    segment->is_thread_local = cfg_segment.is_thread_local();
-    segment->seg_var = nullptr;
-
-    // Collect the variables.
-    for (const auto &cfg_var : cfg_segment.vars()) {
-      CHECK(!cfg_var.name().empty())
-          << "Unnamed variable at " << std::hex << cfg_var.ea() << std::dec
-          << " in segment " << segment->name;
-
-      auto var = new NativeVariable;
-      var->ea = static_cast<uint64_t>(cfg_var.ea());
-      var->name = cfg_var.name();
-      var->lifted_name = LiftedVarName(cfg_var);
-      var->segment = segment;
-
-      auto ea_var_it = module->ea_to_var.find(var->ea);
-      if (ea_var_it != module->ea_to_var.end()) {
-        LOG(ERROR)
-            << "Duplicate (non-external) variable at " << std::hex << var->ea
-            << std::dec << " in segment " << segment->name;
-
-        MergeVariables(var, ea_var_it->second);
-        ea_var_it->second->ForwardTo(var);
-      }
-      module->ea_to_var[var->ea] = var;
-
-      LOG(INFO)
-          << "Found variable " << var->name << " at " << std::hex
-          << var->ea << std::dec;
-    }
-
-    module->segments[segment->ea] = segment;
-
-    LOG(INFO)
-        << "Found segment " << segment->name << " [" << std::hex << segment->ea
-        << ", " << (segment->ea + segment->size) << std::dec << ")";
-  }
-
   // Bring in the functions, although not their blocks or instructions. This
   // first step enables better cross-reference resolution when we deserialize
   // the instructions.
   module->ea_to_func.reserve(static_cast<size_t>(cfg.funcs_size()));
-  for (const auto &cfg_func : cfg.funcs()) {
-    auto func = new NativeFunction;
-    func->ea = static_cast<uint64_t>(cfg_func.ea());
-    func->lifted_name = LiftedFunctionName(cfg_func);
-    func->name = cfg_func.has_name() ? cfg_func.name() : func->lifted_name;
-    func->blocks.reserve(static_cast<size_t>(cfg_func.blocks_size()));
-    func->is_exported = cfg_func.is_entrypoint();
+  for (auto f = 0, max_f = cfg.funcs_size(); f < max_f; ++f) {
+    const auto cfg_func = cfg.mutable_funcs(f);
+    const auto func_ea = static_cast<uint64_t>(cfg_func->ea());
+    if (auto found_func = module->TryGetFunction(func_ea)) {
+      // TODO(pag): Add some kind of name->var mapping so that we can
+      //            cover this.
 
-    auto func_it = module->ea_to_func.find(func->ea);
-    if (func_it != module->ea_to_func.end()) {
-      LOG(ERROR)
-          << "Duplicate function at " << std::hex << func->ea << std::dec;
-      delete func_it->second;
+      LOG_IF(WARNING, found_func->name != cfg_func->name())
+              << "Two or more names for function at " << std::hex
+              << found_func->ea << std::dec << ": '" << found_func->name
+              << "' and '" << cfg_func->name() << "'";
+      continue;
     }
 
-    module->ea_to_func[func->ea] = func;
+    const auto func = new NativeFunction;
+    func->ea = func_ea;
+    func->lifted_name = LiftedFunctionName(*cfg_func);
+    if (cfg_func->has_name()) {
+      func->name = std::move(*(cfg_func->mutable_name()));
+    } else {
+      func->name = func->lifted_name;
+    }
+    func->blocks.reserve(static_cast<size_t>(cfg_func->blocks_size()));
+    func->is_exported = cfg_func->is_entrypoint();
 
+    module->ea_to_func[func->ea].reset(func);
     LOG(INFO)
         << "Found function " << func->name << " at " << std::hex
         << func->ea << std::dec;
 
-    auto var_it = module->ea_to_var.find(func->ea);
-    if (var_it != module->ea_to_var.end()) {
-      auto dup_var = var_it->second;
-      LOG(ERROR)
-          << "Function " << func->name << " at " << std::hex << func->ea
-          << std::dec << " is also defined as an internal variable "
-          << dup_var->name;
-      module->ea_to_var.erase(var_it);
-      module->exported_vars.erase(func->ea);
-      delete dup_var;
-    }
-
     if (func->is_exported) {
       CHECK(!func->name.empty())
-          << "Exported function at address " << std::hex << func->ea << std::dec
-          << " does not have a name";
+              << "Exported function at address " << std::hex << func->ea << std::dec
+              << " does not have a name";
 
       LOG(INFO)
           << "Exported function " << func->name << " at " << std::hex
@@ -585,85 +514,56 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     }
   }
 
-  // Bring in the external variables.
-  for (const auto &cfg_extern_var : cfg.external_vars()) {
-    auto var = new NativeExternalVariable;
-    var->ea = static_cast<uint64_t>(cfg_extern_var.ea());
-    var->name = cfg_extern_var.name();
-    var->is_external = true;
-    var->is_exported = true;
-    var->is_thread_local = cfg_extern_var.is_thread_local();
-    var->lifted_name = var->name;
-    var->is_weak = cfg_extern_var.is_weak();
-    var->size = static_cast<uint64_t>(cfg_extern_var.size());
+  const bool is_windows = remill::kOSWindows == gArch->os_name;
 
-    LOG(INFO)
-        << "Found external variable " << var->name << " at "
-        << std::hex << var->ea << std::dec;
+  // Bring in the external functions. If an internal function can take its
+  // place, then we use it.
+  for (auto f = 0, max_f = cfg.external_funcs_size(); f < max_f; ++f) {
+    const auto cfg_extern_func = cfg.mutable_external_funcs(f);
+    const auto func_ea = static_cast<uint64_t>(cfg_extern_func->ea());
 
-    CHECK(!var->name.empty())
-        << "Unnamed external variable at " << std::hex << var->ea << std::dec;
+    if (!cfg_extern_func->has_name()) {
+      LOG(WARNING)
+          << "Ignoring external function at " << std::hex
+          << func_ea << std::dec << " with no name.";
+      continue;
+    }
 
-    CHECK(!module->ea_to_func.count(var->ea))
-        << "Internal function at " << std::hex << var->ea << std::dec
-        << " has the same name as the external variable " << var->name;
+    if (auto found_func = module->TryGetFunction(func_ea)) {
+      if (!found_func->is_exported) {
+        found_func->is_exported = true;
+        found_func->name = std::move(*(cfg_extern_func->mutable_name()));
+        module->exported_funcs.insert(found_func->ea);
 
-    // Look for two extern variables with the same name.
-    auto extern_var_it = module->name_to_extern_var.find(var->name);
-    if (extern_var_it != module->name_to_extern_var.end()) {
-      auto dup_var = extern_var_it->second;
-      MergeVariables(var, dup_var);
-      dup_var->ForwardTo(var);
+        LOG(INFO)
+            << "Exported function " << found_func->name << " at " << std::hex
+            << found_func->ea << std::dec << " is implemented by "
+            << found_func->lifted_name;
 
-      if (dup_var->ea != var->ea) {
+      } else if (found_func->name != cfg_extern_func->name()) {
+        LOG(ERROR)
+            << "Duplicate conflicting names for function at " << std::hex
+            << func_ea << std::dec << ": '" << found_func->name << "' and '"
+            << cfg_extern_func->name() << "'";
+
+      } else {
         LOG(WARNING)
-            << "External variable " << var->name << " at " << std::hex
-            << var->ea << " is also defined at " << dup_var->ea << std::dec;
-        module->ea_to_var[dup_var->ea] = var;
-      } else {
-        LOG(ERROR)
-            << "External variable " << var->name << " at " << std::hex
-            << var->ea << " has the same name of external variable at "
-            << dup_var->ea << std::dec;
+            << "Ignoring external function '" << found_func->name
+            << "' at " << std::hex << func_ea << std::dec
+            << " that shadows internal function at same address";
       }
+      continue;
     }
 
-    // Look for two variables with the same address.
-    auto var_it = module->ea_to_var.find(var->ea);
-    if (var_it != module->ea_to_var.end()) {
-      auto dup_var = var_it->second;
-      MergeVariables(var, dup_var);
-      dup_var->ForwardTo(var);
-
-      if (dup_var->name != var->name) {
-        LOG(ERROR)
-            << "External variable " << var->name << " at " << std::hex
-            << var->ea << std::dec << " is also defined as " << dup_var->name;
-        module->name_to_extern_var[dup_var->name] = var;
-      } else {
-        LOG(ERROR)
-            << "External variable " << var->name << " at " << std::hex
-            << var->ea << std::dec << " is defined twice";
-      }
-
-      // Note:  Intentional leak, not doing `delete dup_var`. Could be solved
-      //        using `std::shared_ptr`, but we never free the CFG anyway.
-    }
-
-    module->ea_to_var[var->ea] = var;
-    module->name_to_extern_var[var->name] = var;
-  }
-
-  // Bring in the external functions.
-  for (const auto &cfg_extern_func : cfg.external_funcs()) {
     auto func = new NativeExternalFunction;
-    func->name = cfg_extern_func.name();
-    func->ea = static_cast<uint64_t>(cfg_extern_func.ea());
+    func->lifted_name = ExternalFuncName(*cfg_extern_func);
+    func->name = std::move(*(cfg_extern_func->mutable_name()));
+    const auto ll_func = gModule->getFunction(func->name);
+    func->ea = func_ea;
     func->is_external = true;
     func->is_exported = true;
-    func->is_explicit = FLAGS_explicit_args || nullptr != gModule->getFunction(func->name);
-    func->is_weak = cfg_extern_func.is_weak();
-    func->lifted_name = ExternalFuncName(cfg_extern_func);
+    func->is_explicit = FLAGS_explicit_args || nullptr != ll_func;
+    func->is_weak = cfg_extern_func->is_weak();
     func->num_args = 0;
     func->cc = gArch->DefaultCallingConv();
 
@@ -671,11 +571,11 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         << "Found external function " << func->name << " at "
         << std::hex << func->ea << std::dec;
 
-    if (cfg_extern_func.has_argument_count()) {
-      func->num_args = static_cast<unsigned>(cfg_extern_func.argument_count());
+    if (ll_func) {
+      func->num_args = static_cast<unsigned>(ll_func->arg_size());
+    } else if (cfg_extern_func->has_argument_count()) {
+      func->num_args = static_cast<unsigned>(cfg_extern_func->argument_count());
     }
-
-    bool is_windows = remill::kOSWindows == gArch->os_name;
 
     // Most calling convention stuff is actually only meaningful for 32-bit,
     // x86 code. McSema was originally designed for 32-bit X86, so there needed
@@ -685,7 +585,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     // specified, but only in a way that is relevant to 32-bit x86, so we need
     // to ignore it in some places and not others.
     if (gArch->IsX86()) {
-      switch (cfg_extern_func.cc()) {
+      switch (cfg_extern_func->cc()) {
         case ExternalFunction_CallingConvention_CalleeCleanup:
           func->cc = llvm::CallingConv::X86_StdCall;
           break;
@@ -713,109 +613,191 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       }
     }
 
-    CHECK(!func->name.empty())
-        << "External function at " << std::hex << func->ea << " has no name.";
-
-    LOG_IF(ERROR, module->ea_to_var.count(func->ea))
-        << "Internal variable at " << std::hex << func->ea
-        << " has the same name as the external function " << func->name;
+    LOG_IF(WARNING, module->ea_to_var.count(func->ea))
+            << "Internal variable at " << std::hex << func->ea
+            << " has the same name as the external function " << func->name;
 
     LOG(INFO)
         << "Found external function " << func->name << " via "
         << std::hex << func->ea;
 
-    // Check to see if this function has previously been marked as a variable.
-    auto var_it = module->name_to_extern_var.find(func->name);
-    if (var_it != module->name_to_extern_var.end()) {
-      auto dup_var = var_it->second;
-      dup_var->ForwardTo(func);
-
-      if (dup_var->ea != func->ea) {
-        LOG(ERROR)
-            << "External variable at " << std::hex << dup_var->ea
-            << " has the same name as the external function "
-            << func->name << " at " << std::hex << func->ea;
-
-        module->ea_to_func[dup_var->ea] = func;
-      } else {
-        LOG(WARNING)
-            << "External variable at " << std::hex << dup_var->ea
-            << " is actually an external function.";
-      }
-
-      module->ea_to_var.erase(dup_var->ea);
-      module->name_to_extern_var.erase(var_it);
-
-      // Note:  Intentional leak, not doing `delete dup_var`. Could be solved
-      //        using `std::shared_ptr`, but we never free the CFG anyway.
-    }
-
     // Check to see if an external function with the same name was already
     // added. This is possible if there are things like thunks calling thunks,
     // or thin wrappers around thunks.
     auto extern_func_it = module->name_to_extern_func.find(func->name);
-    auto will_find_ea = false;
     if (extern_func_it != module->name_to_extern_func.end()) {
       auto dup_func = extern_func_it->second;
       dup_func->ForwardTo(func);
 
-      if (dup_func->ea != func->ea) {
-        LOG(WARNING)
-            << "External function " << func->name << " at " << std::hex
-            << func->ea << " is also defined at " << std::hex << dup_func->ea;
+      CHECK_NE(dup_func->ea, func->ea);
 
-        module->ea_to_func[dup_func->ea] = func;
-        will_find_ea = true;
+      LOG(WARNING)
+          << "External function " << func->name << " at " << std::hex
+          << func->ea << " is also defined at " << std::hex << dup_func->ea;
+    }
+
+    module->name_to_extern_func[func->name] = func;
+    module->ea_to_func[func->ea].reset(func);
+  }
+
+  // Bring in the external variables.
+  for (auto v = 0, max_v = cfg.external_vars_size(); v < max_v; ++v) {
+    const auto cfg_extern_var = cfg.mutable_external_vars(v);
+    const auto var_ea = static_cast<uint64_t>(cfg_extern_var->ea());
+    if (!cfg_extern_var->has_name()) {
+      LOG(WARNING)
+          << "Ignoring unnamed external variable at " << std::hex
+          << var_ea << std::dec;
+      continue;
+    }
+
+    if (auto found_func = module->TryGetFunction(var_ea)) {
+      if (!found_func->is_exported) {
+        found_func->is_exported = true;
+        found_func->name = std::move(*(cfg_extern_var->mutable_name()));
+        module->exported_funcs.insert(found_func->ea);
+
+        LOG(INFO)
+            << "Exported function " << found_func->name << " at " << std::hex
+            << found_func->ea << std::dec << " is implemented by "
+            << found_func->lifted_name << " using hint from external variable";
+
+      } else if (found_func->name != cfg_extern_var->name()) {
+        LOG(ERROR)
+            << "Duplicate conflicting names for function at " << std::hex
+            << var_ea << std::dec << " '" << found_func->name
+            << "' and variable '" << cfg_extern_var->name() << "'";
 
       } else {
+        LOG(WARNING)
+            << "Ignoring external variable '" << found_func->name
+            << "' at " << std::hex << var_ea << std::dec
+            << " that shadows function at same address";
+      }
+      continue;
+    }
+
+    auto var = new NativeExternalVariable;
+    var->ea = var_ea;
+    var->name = std::move(*(cfg_extern_var->mutable_name()));
+    var->lifted_name = var->name;
+    var->is_external = true;
+    var->is_exported = true;
+    var->is_thread_local = cfg_extern_var->is_thread_local();
+    var->is_weak = cfg_extern_var->is_weak();
+    var->size = static_cast<uint64_t>(cfg_extern_var->size());
+
+    LOG(INFO)
+        << "Found external variable " << var->name << " at "
+        << std::hex << var->ea << std::dec;
+
+    // Look for two extern variables with the same name.
+    auto extern_var_it = module->name_to_extern_var.find(var->name);
+    if (extern_var_it != module->name_to_extern_var.end()) {
+      auto dup_var = extern_var_it->second;
+      MergeVariables(var, dup_var);
+      dup_var->ForwardTo(var);
+
+      CHECK_NE(dup_var->ea, var->ea);
+
+      LOG(WARNING)
+          << "External variable " << var->name << " at " << std::hex
+          << var->ea << " is also defined at " << dup_var->ea << std::dec;
+    }
+
+    module->ea_to_var[var->ea].reset(var);
+    module->name_to_extern_var[var->name] = var;
+  }
+
+  // Collect variables from within the data sections. We set up the segment
+  // information by not their data. We leave that until later when all
+  // cross-references have been resolved.
+  for (auto s = 0, max_s = cfg.segments_size(); s < max_s; ++s) {
+    auto cfg_segment = cfg.mutable_segments(s);
+
+    auto segment = new NativeSegment;
+    segment->ea = static_cast<uint64_t>(cfg_segment->ea());
+    segment->size = cfg_segment->data().size();
+    segment->lifted_name = LiftedSegmentName(*cfg_segment);
+    if (cfg_segment->has_name()) {
+      segment->name = std::move(*(cfg_segment->mutable_name()));
+    }
+
+    segment->is_read_only = cfg_segment->read_only();
+    segment->needs_initializer = true;
+    segment->is_external = cfg_segment->is_external();
+    segment->is_exported = cfg_segment->is_exported();
+    segment->is_thread_local = cfg_segment->is_thread_local();
+    segment->seg_var = nullptr;
+
+    // Collect the variables.
+    for (auto v = 0, max_v = cfg_segment->vars_size(); v < max_v; ++v) {
+      auto cfg_var = cfg_segment->mutable_vars(v);
+      const auto var_ea = static_cast<uint64_t>(cfg_var->ea());
+
+      if (auto found_var = module->TryGetVariable(var_ea)) {
+
+        // TODO(pag): Add some kind of name->var mapping so that we can
+        //            cover this.
+
+        LOG_IF(WARNING, found_var->name != cfg_var->name())
+                << "Two or more names for variable at " << std::hex
+                << found_var->ea << std::dec << ": '" << found_var->name
+                << "' and '" << cfg_var->name() << "'";
+
+        UpdateVariable(found_var, segment);
+
+      } else if (auto found_func = module->TryGetFunction(var_ea)) {
+        LOG(WARNING)
+            << "Ignoring variable '" << cfg_var->name() << "' at " << std::hex
+            << var_ea << std::dec << " that shadows function '"
+            << found_func->name << "'";
+
+      } else if (!cfg_var->has_name()) {
         LOG(ERROR)
-            << "External function " << func->name << " at " << std::hex
-            << func->ea << " is defined twice (by address)";
+            << "Unnamed variable at " << std::hex << cfg_var->ea() << std::dec
+            << " in segment " << segment->name;
+
+      } else {
+        auto var = new NativeVariable;
+        var->ea = var_ea;
+        var->lifted_name = LiftedVarName(*cfg_var);
+        var->name = std::move(*(cfg_var->mutable_name()));
+        var->segment = segment;
+        module->ea_to_var[var->ea].reset(var);
+
+        LOG(INFO)
+            << "Found variable " << var->name << " at " << std::hex
+            << var->ea << std::dec;
       }
     }
 
-    auto func_it = module->ea_to_func.find(func->ea);
-    if (func_it != module->ea_to_func.end()) {
-      auto dup_func = func_it->second;
-      dup_func->ForwardTo(func);
+    module->segments[segment->ea].reset(segment);
 
-      if (dup_func->name != func->name) {
-        LOG(ERROR)
-            << "External function " << func->name << " at " << std::hex
-            << func->ea << " is also defined as " << dup_func->name;
-        module->name_to_extern_func[dup_func->name] = func;
-
-      } else if (!will_find_ea) {
-        LOG(ERROR)
-            << "External function " << func->name << " at " << std::hex
-            << func->ea << " is defined twice (by name)";
-      }
-    }
-
-    module->exported_funcs.erase(func->ea);
-    module->name_to_extern_func[func->name] = func;
-    module->ea_to_func[func->ea] = func;
+    LOG(INFO)
+        << "Found segment " << segment->name << " [" << std::hex << segment->ea
+        << ", " << (segment->ea + segment->size) << std::dec << ")";
   }
 
   // Fill in the cross-reference entries for each segment.
   for (const auto &cfg_segment : cfg.segments()) {
     auto ea = static_cast<uint64_t>(cfg_segment.ea());
-    auto segment = module->segments[ea];
+    const auto &segment = module->segments[ea];
 
     std::map<uint64_t, const NativeXref *> xrefs;
     for (const auto &cfg_xref : cfg_segment.xrefs()) {
-      auto xref = new NativeXref;
+      std::unique_ptr<NativeXref> xref(new NativeXref);
       xref->ea = static_cast<uint64_t>(cfg_xref.ea());
-      xref->segment = segment;
+      xref->segment = segment.get();
       xref->width = static_cast<uint64_t>(cfg_xref.width());
       xref->target_ea = static_cast<uint64_t>(cfg_xref.target_ea());
       xref->target_name = cfg_xref.target_name();
       xref->target_segment = FindSegment(module, xref->target_ea);
 
       CHECK(xref->width <= pointer_size)
-          << "Cross reference at " << std::hex << xref->ea << " to "
-          << xref->target_name << " at " << std::hex << xref->target_ea
-          << " is too wide at " << xref->width << " bytes";
+              << "Cross reference at " << std::hex << xref->ea << " to "
+              << xref->target_name << " at " << std::hex << xref->target_ea
+              << " is too wide at " << xref->width << " bytes";
 
       switch (cfg_xref.target_fixup_kind()) {
         case DataReference_TargetFixupKind_Absolute:
@@ -826,25 +808,28 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
           break;
       }
 
-      if (!ResolveReference(module, xref)) {
-        delete xref;
+      if (!ResolveReference(module, xref.get())) {
         continue;
       }
 
-      segment->entries[xref->ea] = {
-          xref->ea, (xref->ea + xref->width), xref, nullptr};
+      auto &entry = segment->entries[xref->ea];
+      entry.ea = xref->ea;
+      entry.next_ea = xref->ea + xref->width;
+      entry.xref = std::move(xref);
     }
   }
 
   // Fill in the blob data entries for each segment.
   for (const auto &cfg_segment : cfg.segments()) {
     auto ea = static_cast<uint64_t>(cfg_segment.ea());
-    auto segment = module->segments[ea];
+    const auto &segment = module->segments[ea];
     std::vector<NativeSegment::Entry> blobs;
 
     // Sentinel.
     auto seg_end_ea = ea + segment->size;
-    segment->entries[seg_end_ea] = {seg_end_ea, seg_end_ea, nullptr, nullptr};
+    auto &entry = segment->entries[seg_end_ea];
+    entry.ea = seg_end_ea;
+    entry.next_ea = seg_end_ea;
 
     for (const auto &xref_entry : segment->entries) {
       const auto &entry = xref_entry.second;
@@ -874,7 +859,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       }
 
       CHECK(ea == entry.ea)
-          << "Invalid partitioning of data before " << std::hex << entry.ea;
+              << "Invalid partitioning of data before " << std::hex << entry.ea;
 
       if (ea == seg_end_ea) {
         break;
@@ -885,19 +870,19 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
       for (ea += 1; ea < entry.next_ea; ++ea) {
         auto var_it = module->ea_to_var.find(ea);
         LOG_IF(ERROR, var_it != module->ea_to_var.end())
-            << "Variable " << var_it->second->name << " at "
-            << std::hex << var_it->second->ea
-            << " points into a cross reference, located at " << std::hex
-            << entry.xref->ea << " and targeting " << std::hex
-            << entry.xref->target_ea;
+                << "Variable " << var_it->second->name << " at "
+                << std::hex << var_it->second->ea
+                << " points into a cross reference, located at " << std::hex
+                << entry.xref->ea << " and targeting " << std::hex
+                << entry.xref->target_ea;
       }
     }
 
     segment->entries.erase(seg_end_ea);
 
     // Add the blobs into the partition.
-    for (const auto &entry : blobs) {
-      segment->entries[entry.ea] = entry;
+    for (auto &entry : blobs) {
+      segment->entries.emplace(entry.ea, std::move(entry));
     }
 
     // Verify the partitioning of this segment's data.
@@ -905,31 +890,29 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     unsigned entry_num = 0;
     for (const auto &entry : segment->entries) {
       CHECK(entry.first == ea)
-          << "Invalid partitioning of segment " << segment->name
-          << "; entry #" << std::dec << entry_num << " EA address "
-          << std::hex << entry.first << " does not match "
-          << "up with expected entry EA " << std::hex << ea;
+              << "Invalid partitioning of segment " << segment->name
+              << "; entry #" << std::dec << entry_num << " EA address "
+              << std::hex << entry.first << " does not match "
+              << "up with expected entry EA " << std::hex << ea;
 
       CHECK(entry.second.ea == ea)
-          << "Invalid partitioning of segment " << segment->name;
+              << "Invalid partitioning of segment " << segment->name;
 
       CHECK(entry.second.next_ea > entry.second.ea)
-          << "Invalid partitioning of segment " << segment->name;
+              << "Invalid partitioning of segment " << segment->name;
 
       ea = entry.second.next_ea;
       entry_num++;
     }
 
     CHECK(ea == (segment->ea + segment->size))
-        << "Invalid partitioning of segment " << segment->name;
+            << "Invalid partitioning of segment " << segment->name;
   }
 
   // Add in each of the function's blocks. At this stage we have all cross-
   // reference information available.
-  module->ea_to_func.reserve(static_cast<size_t>(cfg.funcs_size()));
   for (const auto &cfg_func : cfg.funcs()) {
-    auto func = const_cast<NativeFunction *>(
-        module->ea_to_func[static_cast<uint64_t>(cfg_func.ea())]);
+    auto func = module->TryGetFunction(static_cast<uint64_t>(cfg_func.ea()));
 
     // Extract the stack variables associated with the function
     for (const auto &stack_var : cfg_func.stack_vars()) {
@@ -945,7 +928,8 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
 
       for(auto ref_ea : stack_var.ref_eas()){
         nat_sv->refs[ref_ea.inst_ea()] = ref_ea.offset();
-        LOG(INFO) << "Retrive the ref ea : " << std::hex
+        LOG(INFO)
+            << "Retrieve the referenced ea : " << std::hex
             << ref_ea.inst_ea() << std::dec << " offset " << ref_ea.offset();
       }
     }
@@ -971,7 +955,7 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         var->is_weak = extern_var.is_weak();
         var->size = static_cast<uint64_t>(extern_var.size());
         frame_var->type_var[static_cast<uint64_t>(extern_var.size())] = var;
-       }
+      }
 
       func->eh_frame.push_back(frame_var);
     }
@@ -979,7 +963,6 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
     for (const auto &cfg_block : cfg_func.blocks()) {
       auto block = new NativeBlock;
       block->ea = static_cast<uint64_t>(cfg_block.ea());
-      block->lifted_name = LiftedBlockName(cfg_block);
       block->instructions.reserve(
           static_cast<size_t>(cfg_block.instructions_size()));
 
@@ -1009,16 +992,15 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         for (const auto &var : func->stack_vars) {
           for (auto ref : var->refs) {
             if (inst->ea == ref.first) {
-              LOG(INFO) << "The stack variable references at : " << std::hex << inst->ea;
               inst->stack_var = var;
             }
           }
         }
 
-        block->instructions.push_back(inst);
+        block->instructions.emplace_back(inst);
       }
 
-      func->blocks[block->ea] = block;
+      func->blocks[block->ea].reset(block);
     }
 
     // Validate the successor relationships of this block.
@@ -1029,10 +1011,10 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
         auto succ_is_func = module->ea_to_func.count(ea);
 
         LOG_IF(ERROR, !succ_is_block && !succ_is_func)
-            << "Successor " << std::hex << ea << " of block "
-            << std::hex << static_cast<uint64_t>(cfg_block.ea())
-            << " in function " << static_cast<uint64_t>(cfg_func.ea())
-            << " does not exist";
+                << "Successor " << std::hex << ea << " of block "
+                << std::hex << static_cast<uint64_t>(cfg_block.ea())
+                << " in function " << static_cast<uint64_t>(cfg_func.ea())
+                << " does not exist";
       }
     }
   }
@@ -1040,20 +1022,20 @@ NativeModule *ReadProtoBuf(const std::string &file_name,
   return module;
 }
 
-const NativeFunction *NativeModule::TryGetFunction(uint64_t ea) const {
+NativeFunction *NativeModule::TryGetFunction(uint64_t ea) const {
   auto func_it = ea_to_func.find(ea);
   if (func_it == ea_to_func.end()) {
     return nullptr;
   }
-  return reinterpret_cast<const NativeFunction *>(func_it->second->Get());
+  return reinterpret_cast<NativeFunction *>(func_it->second->Get());
 }
 
-const NativeVariable *NativeModule::TryGetVariable(uint64_t ea) const {
+NativeVariable *NativeModule::TryGetVariable(uint64_t ea) const {
   auto var_it = ea_to_var.find(ea);
   if (var_it == ea_to_var.end()) {
     return nullptr;
   }
-  return reinterpret_cast<const NativeVariable *>(var_it->second->Get());
+  return reinterpret_cast<NativeVariable *>(var_it->second->Get());
 }
 
 }  // namespace mcsema

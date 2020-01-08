@@ -17,6 +17,7 @@ import argparse
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import traceback
@@ -64,7 +65,7 @@ def main():
 
   arg_parser.add_argument(
       '--disassembler',
-      help='Path to disassembler binary',
+      help='Path to disassembler binary, or dyninst (binary must be in path)',
       required=True)
 
   arg_parser.add_argument(
@@ -169,6 +170,18 @@ def main():
         arg_parser.error("Could not `import binaryninja`. Is it in your PYTHONPATH?")
       from binja.cfg import get_cfg
       ret = get_cfg(args, fixed_command_args)
+    elif 'dyninst' in args.disassembler:
+      # TODO: This can almost certainly be done in cleaner way
+      pass_args = [
+        "mcsema-dyninst-disass",
+        "--binary", args.binary,
+        "--arch", args.arch,
+        "--entrypoint", args.entrypoint,
+        "--os", args.os,
+        "--output", args.output,
+        "--binary", args.binary
+      ]
+      subprocess.run(pass_args)
     else:
       arg_parser.error("{} passed to --disassembler is not known.".format(
           args.disassembler))
