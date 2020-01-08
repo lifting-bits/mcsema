@@ -74,16 +74,12 @@ static bool IsZero(const std::string &data) {
 // direct LLVM to put this data into the `.bss` segment.
 static bool IsZero(const NativeSegment *cfg_seg) {
   for (const auto &cfg_seg_entry : cfg_seg->entries) {
-    auto entry = cfg_seg_entry.second;
-    if (entry.blob) {
-      if (!IsZero(entry.blob->data)) {
-        return false;
-      }
-    } else {
+    auto &entry = cfg_seg_entry.second;
+    if (!entry.blob || !IsZero(entry.blob->data)) {
       return false;
     }
   }
-  return false;
+  return true;
 }
 
 // The type of the segment is a packed structure that is a sequence of opaque
@@ -94,7 +90,7 @@ static llvm::StructType *GetSegmentType(const NativeSegment *cfg_seg) {
 
   auto byte_type = llvm::Type::getInt8Ty(*gContext);
   for (const auto &cfg_seg_entry : cfg_seg->entries) {
-    auto entry = cfg_seg_entry.second;
+    auto &entry = cfg_seg_entry.second;
     if (entry.blob) {
       auto arr_type = llvm::ArrayType::get(byte_type, entry.blob->data.size());
       entry_types.push_back(arr_type);
@@ -137,22 +133,47 @@ static llvm::GlobalValue::ThreadLocalMode ThreadLocalMode(
   }
 }
 
-// Declare a data segment, and return a global value pointing to that segment.
-static llvm::GlobalVariable *DeclareSegment(const NativeSegment *cfg_seg) {
+static llvm::GlobalVariable *GlobalVariable(
+    const NativeSegment *cfg_seg, std::string lifted_name) {
   auto seg_type = GetSegmentType(cfg_seg);
-  auto seg = new llvm::GlobalVariable(
+
+  auto seg_var = new llvm::GlobalVariable(
       *gModule, seg_type, cfg_seg->is_read_only,
       llvm::GlobalValue::InternalLinkage, nullptr,
-      cfg_seg->lifted_name, nullptr, ThreadLocalMode(cfg_seg));
+      lifted_name, nullptr, ThreadLocalMode(cfg_seg));
 
   if (cfg_seg->is_exported) {
-    seg->setLinkage(llvm::GlobalValue::ExternalLinkage);
-    seg->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
+    seg_var->setLinkage(llvm::GlobalValue::ExternalLinkage);
   }
 
-  cfg_seg->seg_var = seg;
+  return seg_var;
+}
 
-  return seg;
+// Declare a data segment, and return a global value pointing to that segment.
+static void DeclareSegment(const NativeSegment *cfg_seg) {
+  cfg_seg->seg_var = gModule->getGlobalVariable(cfg_seg->lifted_name);
+
+  if (cfg_seg->seg_var) {
+    // If the variable is exported and zero initialized (not having xrefs),
+    // No need to initialize these variables
+    if (cfg_seg->is_exported && cfg_seg->seg_var->hasExternalLinkage()) {
+      cfg_seg->needs_initializer = !IsZero(cfg_seg);
+    } else {
+      // If there is a variable with the same name, rename the variable
+      // and set the needs_initializer flag;
+      std::stringstream ss;
+      ss << "internal_" << cfg_seg->lifted_name;
+      cfg_seg->seg_var = GlobalVariable(cfg_seg, ss.str());
+
+      LOG(ERROR)
+          << "Segment variable '" << cfg_seg->lifted_name
+          << "' was already defined";
+
+      cfg_seg->needs_initializer = true;
+    }
+  } else {
+    cfg_seg->seg_var = GlobalVariable(cfg_seg, cfg_seg->lifted_name);
+  }
 }
 
 // Declare named variables that point into the data segment. The program being
@@ -160,7 +181,7 @@ static llvm::GlobalVariable *DeclareSegment(const NativeSegment *cfg_seg) {
 // variables within a segment, so we want to try to preserve those names,
 // treating them as GEPs into the segment's data.
 static void DeclareVariables(const NativeModule *cfg_module) {
-  for (auto entry : cfg_module->ea_to_var) {
+  for (auto &entry : cfg_module->ea_to_var) {
     auto cfg_var = reinterpret_cast<const NativeVariable *>(
         entry.second->Get());
 
@@ -238,7 +259,7 @@ static llvm::Function *CreateMcSemaInitFiniImpl(
   auto arr_type = llvm::ArrayType::get(el_type, new_elems.size());
   auto arr_init = llvm::ConstantArray::get(arr_type, new_elems);
   auto arr = new llvm::GlobalVariable(
-      *gModule, arr_type, true /* isConstant */,
+      *gModule, arr_type, false /* isConstant */,
       llvm::GlobalVariable::AppendingLinkage,
       arr_init, global_ctors ? "__mcsema.temp_array" : arr_name);
 
@@ -371,7 +392,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
   std::vector<llvm::Constant *> entry_vals;
   for (const auto &cfg_seg_entry : cfg_seg->entries) {
 
-    auto entry = cfg_seg_entry.second;
+    auto &entry = cfg_seg_entry.second;
     auto entry_type = seg_type->getContainedType(i++);
 
     // This entry is an opaque sequence of bytes.
@@ -400,7 +421,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
 
       auto val_size = static_cast<unsigned>(entry.xref->width * 8);
       auto val_type = llvm::Type::getIntNTy(*gContext, val_size);
-      auto xref = entry.xref;
+      auto &xref = entry.xref;
       llvm::Constant *val = nullptr;
 
       CHECK(val_size <= gArch->address_size)
@@ -435,7 +456,7 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
               << "Adding runtime initializer for cross reference to variable "
               << cfg_var->name << " at " << std::hex << cfg_seg_entry.first
               << " in segment " << cfg_seg->name;
-          LazyInitXRef(xref, val_type, val);
+          LazyInitXRef(xref.get(), val_type, val);
           val = llvm::Constant::getNullValue(gWordType);
         } else {
           val = cfg_var->address;
@@ -463,8 +484,12 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
       //    .long   _ZTI12out_of_range&-1
       //    .long   _ZTI17special_condition&-1
       } else if (val_size < gArch->address_size) {
-        LazyInitXRef(xref, val_type, val);
-        val = llvm::ConstantInt::getNullValue(val_type);
+        if (xref->var != nullptr) {
+          LazyInitXRef(xref.get(), val_type, val);
+          val = llvm::ConstantInt::getNullValue(val_type);
+        } else {
+          val = llvm::ConstantExpr::getTrunc(val, val_type);
+        }
       }
 
       CHECK(val->getType() == entry_type)
@@ -481,10 +506,17 @@ static llvm::Constant *FillDataSegment(const NativeSegment *cfg_seg,
 }
 
 // Fill all the data segments in a given region.
-static void FillSegment(llvm::GlobalVariable *seg,
-                        const NativeSegment *cfg_seg) {
-  auto seg_type = llvm::dyn_cast<llvm::StructType>(remill::GetValueType(seg));
-  seg->setInitializer(FillDataSegment(cfg_seg, seg_type));
+static void FillSegment(const NativeSegment *cfg_seg) {
+  auto seg = cfg_seg->seg_var;
+  if (cfg_seg->needs_initializer) {
+    CHECK_NOTNULL(seg);
+    auto seg_type = llvm::dyn_cast<llvm::StructType>(remill::GetValueType(seg));
+
+    // This might be null if there are two lifted variables with same name and one of them is exported
+    // and the exported variable is having xrefs or notnull.
+    CHECK_NOTNULL(seg_type);
+    seg->setInitializer(FillDataSegment(cfg_seg, seg_type));
+  }
 }
 
 }  // namespace
@@ -525,18 +557,17 @@ llvm::Function *GetOrCreateMcSemaInitializer(void) {
   return gInitFunc;
 }
 
-void AddDataSegments(const NativeModule *cfg_module) {
-
-  std::vector<llvm::GlobalVariable *> seg_vars;
-  for (auto cfg_seg_entry : cfg_module->segments) {
-    seg_vars.push_back(DeclareSegment(cfg_seg_entry.second));
+void DeclareDataSegments(const NativeModule *cfg_module) {
+  for (auto &cfg_seg_entry : cfg_module->segments) {
+    DeclareSegment(cfg_seg_entry.second.get());
   }
 
   DeclareVariables(cfg_module);
+}
 
-  unsigned i = 0;
-  for (auto cfg_seg_entry : cfg_module->segments) {
-    FillSegment(seg_vars[i++], cfg_seg_entry.second);
+void DefineDataSegments(const NativeModule *cfg_module) {
+  for (auto &cfg_seg_entry : cfg_module->segments) {
+    FillSegment(cfg_seg_entry.second.get());
   }
 }
 
@@ -585,19 +616,19 @@ void CallInitFiniCode(const NativeModule *cfg_module) {
   }
 
   for (const auto &entry : cfg_module->ea_to_func) {
-    auto cfg_func = entry.second;
+    auto &cfg_func = entry.second;
     llvm::Function *callback = nullptr;
     llvm::Instruction *insert_point = nullptr;
 
     if (FLAGS_libc_constructor.size() &&
         FLAGS_libc_constructor == cfg_func->name) {
-      callback = GetNativeToLiftedCallback(cfg_func);
+      callback = GetNativeToLiftedCallback(cfg_func.get());
       auto init_func = GetOrCreateMcSemaConstructor();
       insert_point = &(init_func->front().back());
 
     } else if (FLAGS_libc_destructor.size() &&
                FLAGS_libc_destructor == cfg_func->name) {
-      callback = GetNativeToLiftedCallback(cfg_func);
+      callback = GetNativeToLiftedCallback(cfg_func.get());
       auto fini_func = GetOrCreateMcSemaDestructor();
       insert_point = &(fini_func->front().front());
     }

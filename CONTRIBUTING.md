@@ -20,7 +20,7 @@ To get started, use git to clone the `remill` repo, and start a new branch that 
 
 ## Adding a New Instruction
 
-To add support for lifting a new instruction, you will be extending the `remill` library. That is where the instruction semantics are implemented. We have created a whole guide to adding an instruction, which [you can find here](https://github.com/trailofbits/remill/blob/master/docs/ADD_AN_INSTRUCTION.md).
+To add support for lifting a new instruction, you will be extending the `remill` library. That is where the instruction semantics are implemented. We have created a whole guide to adding an instruction, which [you can find here](https://github.com/lifting-bits/remill/blob/master/docs/ADD_AN_INSTRUCTION.md).
 
 ## Creating Your GitHub Pull Request
 
@@ -48,7 +48,7 @@ Before you create your pull request, we ask that you conform your code to our pr
 ## Advice and Guidance for New Contributors
 
 Please take a look at our McSema documentation! We try to keep it updated with
-[debugging tips](https://github.com/trailofbits/mcsema/blob/master/docs/DebuggingTips.md), [common errors you might encounter](https://github.com/trailofbits/mcsema/blob/master/docs/CommonErrors.md), and [how to get acquainted with the codebase](https://github.com/trailofbits/mcsema/blob/master/docs/NavigatingTheCode.md).
+[debugging tips](https://github.com/lifting-bits/mcsema/blob/master/docs/DebuggingTips.md), [common errors you might encounter](https://github.com/lifting-bits/mcsema/blob/master/docs/CommonErrors.md), and [how to get acquainted with the codebase](https://github.com/lifting-bits/mcsema/blob/master/docs/NavigatingTheCode.md).
 
 ## Useful External Links
 

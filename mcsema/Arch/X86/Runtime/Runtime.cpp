@@ -26,6 +26,14 @@
 #include "remill/Arch/X86/Runtime/State.h"
 #include "mcsema/Arch/X86/Runtime/Registers.h"
 
+#ifndef PRIx64
+# define PRIx64 "llx"
+#endif
+
+#ifndef PRIx32
+# define PRIx32 "x"
+#endif
+
 extern "C" {
 
 // Debug registers.
@@ -39,12 +47,12 @@ uint64_t DR6;
 uint64_t DR7;
 
 // Control regs.
-CR0Reg CR0;
-CR1Reg CR1;
-CR2Reg CR2;
-CR3Reg CR3;
-CR4Reg CR4;
-CR8Reg CR8;
+CR0Reg gCR0;
+CR1Reg gCR1;
+CR2Reg gCR2;
+CR3Reg gCR3;
+CR4Reg gCR4;
+CR8Reg gCR8;
 
 // enum : size_t {
 //   kStackSize = 1UL << 20UL

@@ -30,6 +30,8 @@ _INFO = idaapi.get_inf_structure()
 # like the number of agruments and calling convention of the function.
 _NORETURN_EXTERNAL_FUNC = {}
 
+FUNC_LSDA_ENTRIES = collections.defaultdict()
+
 IS_ARM = "ARM" in _INFO.procName
 
 # True if we are running on an ELF file.
@@ -512,6 +514,7 @@ def is_noreturn_function(ea):
   flags = idc.get_func_attr(ea, idc.FUNCATTR_FLAGS)
   return 0 < flags and \
          (flags & idaapi.FUNC_NORET) and \
+         ea not in FUNC_LSDA_ENTRIES.keys() and \
          "cxa_throw" not in get_symbol_name(ea)
 
 _CREFS_FROM = collections.defaultdict(set)
@@ -537,8 +540,14 @@ def make_xref(from_ea, to_ea, data_type, xref_size):
   # If we can't make a head, then it probably means that we're at the
   # end of the binary, e.g. the last thing in the `.extern` segment.
   # or in the middle of structure. Return False in such case
-  if not make_head(from_ea + xref_size):
-    return False
+  #
+  # NOTE(artem): Commenting out since this breaks recovery of C++ applications
+  # with IDA7. The failure occurs when processign references in .init_array
+  # when the below code is enabled, those references are not treated as
+  # references because make_head fails.
+  #
+  #if not make_head(from_ea + xref_size):
+  #  return False
 
   ida_bytes.del_items(from_ea, idc.DELIT_EXPAND, xref_size)
 

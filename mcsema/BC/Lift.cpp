@@ -96,7 +96,6 @@ static void ExportVariables(const NativeModule *cfg_module) {
 
     var->setName(cfg_var->name);
     var->setLinkage(llvm::GlobalValue::ExternalLinkage);
-    var->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
   }
 }
 
@@ -162,12 +161,16 @@ static void DefineErrorIntrinsics(llvm::FunctionType *lifted_func_type) {
 }  // namespace
 
 bool LiftCodeIntoModule(const NativeModule *cfg_module) {
+
   DeclareExternals(cfg_module);
   DeclareLiftedFunctions(cfg_module);
 
-  // Segments are inserted after the lifted function declarations are added
-  // so that cross-references to lifted code are handled.
-  AddDataSegments(cfg_module);
+  DeclareDataSegments(cfg_module);
+
+  // Segments are only filled in after the lifted function declarations,
+  // external vars, and segments are declared so that cross-references to
+  // lifted things can be resolved.
+  DefineDataSegments(cfg_module);
 
   auto lifted_func_type = remill::LiftedFunctionType(gModule);
 

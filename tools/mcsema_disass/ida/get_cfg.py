@@ -107,9 +107,6 @@ def is_ELF_got_pointer(ea):
     return False
 
   name = get_symbol_name(ea)
-  if not name.endswith("_ptr"):
-    return False
-
   target_ea = get_reference_target(ea)
   target_name = get_true_external_name(get_symbol_name(target_ea))
 
@@ -473,7 +470,7 @@ def is_start_of_function(ea):
   if not is_code(ea):
     return False
 
-  name = idc.GetFunctionName(ea) or idc.GetTrueName(ea)
+  name = idc.GetTrueName(ea) or idc.GetFunctionName(ea)
   return ea == idc.LocByName(name)
 
 _REFERENCE_OPERAND_TYPE = {
@@ -890,14 +887,19 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
   ea, next_ea = seg_ea, seg_ea
   while next_ea < seg_end_ea:
     ea = next_ea
+
     # The item size is 1 in some of the cases where it refer to the external data. The
     # references in such cases get ignored. Assign the address size if there is reference
     # to the external data.
-    item_size = idc.ItemSize(ea) if not is_runtime_external_data_reference(ea) else get_address_size_in_bytes()
+    item_size = idc.ItemSize(ea)
     xref_width = min(max(item_size, 4), max_xref_width)
     next_ea = min(ea + xref_width,
                   # idc.GetNextFixupEA(ea),
                   idc.NextHead(ea, seg_end_ea))
+
+    # This data is a copy of shared data.
+    if is_runtime_external_data_reference(ea):
+      continue
 
     # We don't want to fill the jump table bytes with their actual
     # code cross-references. This is because we can't get the address
@@ -1356,7 +1358,8 @@ def identify_program_entrypoints(func_eas):
   DEBUG_PUSH()
 
   exclude = set(["_start", "__libc_csu_fini", "__libc_csu_init", "main",
-                 "__data_start", "__dso_handle", "_IO_stdin_used"])
+                 "__data_start", "__dso_handle", "_IO_stdin_used",
+                 "_dl_relocate_static_pie"])
 
   exported_funcs = set()
   exported_vars = set()

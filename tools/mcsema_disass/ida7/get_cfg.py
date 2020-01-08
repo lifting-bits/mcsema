@@ -107,9 +107,6 @@ def is_ELF_got_pointer(ea):
     return False
 
   name = get_symbol_name(ea)
-  if not name.endswith("_ptr"):
-    return False
-
   target_ea = get_reference_target(ea)
   target_name = get_true_external_name(get_symbol_name(target_ea))
 
@@ -473,7 +470,7 @@ def is_start_of_function(ea):
   if not is_code(ea):
     return False
 
-  name = idc.get_func_name(ea) or idc.GetTrueName(ea)
+  name = idc.GetTrueName(ea) or idc.get_func_name(ea)
   return ea == idc.get_name_ea_simple(name)
 
 _REFERENCE_OPERAND_TYPE = {
@@ -792,7 +789,9 @@ def recover_function(M, func_ea, new_func_eas, entrypoints):
 
   _RECOVERED_FUNCS.add(func_ea)
 
-  if not is_start_of_function(func_ea):
+  # `func_ea` could be the entrypoint but may not be identified
+  # as the start of the function.
+  if not is_start_of_function(func_ea): # and func_ea not in entrypoints:
     DEBUG("{:x} is not a function! Not recovering.".format(func_ea))
     return
 
@@ -890,14 +889,19 @@ def recover_region_cross_references(M, S, seg_ea, seg_end_ea):
   ea, next_ea = seg_ea, seg_ea
   while next_ea < seg_end_ea:
     ea = next_ea
+
     # The item size is 1 in some of the cases where it refer to the external data. The
     # references in such cases get ignored. Assign the address size if there is reference
     # to the external data.
-    item_size = idc.get_item_size(ea) if not is_runtime_external_data_reference(ea) else get_address_size_in_bytes()
+    item_size = idc.get_item_size(ea)
     xref_width = min(max(item_size, 4), max_xref_width)
     next_ea = min(ea + xref_width,
                   # idc.GetNextFixupEA(ea),
                   idc.next_head(ea, seg_end_ea))
+
+    # This data is a copy of shared data.
+    if is_runtime_external_data_reference(ea):
+      continue
 
     # We don't want to fill the jump table bytes with their actual
     # code cross-references. This is because we can't get the address
@@ -1178,9 +1182,9 @@ def recover_external_variables(M):
     else:
       EV.size = idc.get_item_size(ea)
     if EV.is_thread_local:
-      DEBUG("Recovering extern TLS variable {} at {:x}".format(name, ea))
+      DEBUG("Recovering extern TLS variable {} at {:x} [size: {}]".format(name, ea, EV.size))
     else:
-      DEBUG("Recovering extern variable {} at {:x}".format(name, ea))
+      DEBUG("Recovering extern variable {} at {:x} [size: {}]".format(name, ea, EV.size))
 
 def recover_external_symbols(M):
   recover_external_functions(M)
@@ -1356,7 +1360,8 @@ def identify_program_entrypoints(func_eas):
   DEBUG_PUSH()
 
   exclude = set(["_start", "__libc_csu_fini", "__libc_csu_init", "main",
-                 "__data_start", "__dso_handle", "_IO_stdin_used"])
+                 "__data_start", "__dso_handle", "_IO_stdin_used",
+                 "_dl_relocate_static_pie"])
 
   exported_funcs = set()
   exported_vars = set()
@@ -1438,7 +1443,6 @@ def recover_module(entrypoint, gvar_infile = None):
   DEBUG("Recovering module {}".format(M.name))
 
   entry_ea = idc.get_name_ea_simple(args.entrypoint)
-
   # If the entrypoint is `main`, then we'll try to find `main` via another
   # means.
   if is_invalid_ea(entry_ea):

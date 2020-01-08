@@ -1,7 +1,10 @@
-_ZdlPv 2 C N
-_ZdaPv 2 C N
-_Znam 2 C N
-_Znwm 2 C N
+_ZdlPv 1 C N
+_ZdaPv 1 C N
+_Znam 1 C N
+_Znwm 1 C N
+
+_ZnwmRKSt9nothrow_t 2 C N
+_ZnamRKSt9nothrow_t 2 C N
 
 __strtol_internal 4 C N
 
@@ -39,12 +42,9 @@ __cxa_guard_release 5 C N
 _ITM_deregisterTMCloneTable 5 C N
 _ITM_registerTMCloneTable 5 C N
 __libc_start_main 5 C N
-_ZdaPv 5 C N
-_ZdlPv 5 C N
-_Znam 5 C N
+
 _ZNSt8__detail15_List_node_base7_M_hookEPS0_ 5 C N
 _ZNSt8__detail15_List_node_base9_M_unhookEv 5 C N
-_Znwm 5 C N
 _ZSt17__throw_bad_allocv 5 C N
 _ZSt18_Rb_tree_decrementPSt18_Rb_tree_node_base 5 C N
 _ZSt18_Rb_tree_incrementPKSt18_Rb_tree_node_base 5 C N

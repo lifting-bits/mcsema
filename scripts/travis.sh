@@ -13,6 +13,66 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specifi
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+SOURCE_DIR="${SCRIPT_DIR}/../"
+
+install_binja () {
+  # this file is the decrypted version and placed there by the
+  # before-install action in .travis.yml
+  local BINJA_TARGZ="${SCRIPT_DIR}/mcsema_binja.tar.gz"
+	local BINJA_INSTALL="${SOURCE_DIR}/binaryninja"
+
+  # make sure our PYTHONPATH is setup for binja
+  export PYTHONPATH=${BINJA_INSTALL}/python
+	python2.7 -c "import binaryninja" 2>/dev/null
+	if [ ! "$?" = "0" ]; then
+		if [ ! -e ${BINJA_INSTALL}/python/binaryninja/__init__.py ]; then
+
+			echo "Extracting Binary Ninja" && \
+        tar -xzf ${BINJA_TARGZ} -C ${SOURCE_DIR} && \
+        echo "Extracted to ${SOURCE_DIR}"
+
+			if [ ! "$?" = "0" ]; then
+				echo "FAILED: Binja extraction failed"
+				return 1
+			fi
+
+		else
+			echo "Found a copy of Binja, skipping install, using existing copy"
+		fi
+
+		if [ ! -e ${HOME}/.binaryninja/license.dat ]; then
+			echo "Could not find Binja license, checking for ~/.binaryninja"
+			if [ ! -e ${HOME}/.binaryninja ]; then
+				echo "~/.binaryninja does not exist, creating directory..."
+				mkdir ${HOME}/.binaryninja
+			fi
+
+			echo "Copying our CI Binja license to ${HOME}/.binaryninja/license.dat"
+			cp ${BINJA_INSTALL}/mcsema_binja_license.txt ${HOME}/.binaryninja/license.dat
+		else
+			echo "Found existing Binja license, ignoring..."
+		fi
+
+    # sanity check the install
+    python2.7 -c "import binaryninja" 2>/dev/null
+    if [ ! "$?" = "0" ]; then
+      echo "FAILED: still can't use Binary Ninja, aborting"
+      return 1
+    else
+      echo "BinaryNinja installed successfully"
+    fi
+
+    echo "Updating Binary Ninja to Dev Channel latest"
+    python2.7 ${SCRIPT_DIR}/update_binja.py
+
+	else
+		echo "Binja already exists; skipping..."
+	fi
+
+  return 0
+}
+
 main() {
   if [ $# -ne 2 ] ; then
     printf "Usage:\n\ttravis.sh <linux|osx> <initialize|build>\n"
@@ -67,7 +127,8 @@ linux_initialize() {
                             liblzma-dev \
                             zlib1g-dev \
                             libprotobuf-dev \
-                            protobuf-compiler
+                            protobuf-compiler \
+                            ccache
 
   sudo apt-get install -qqy libc6:i386 \
                             libstdc++6:i386 \
@@ -76,6 +137,12 @@ linux_initialize() {
                             libtinfo-dev:i386 
   if [ $? -ne 0 ] ; then
     printf " x Could not install the required dependencies\n"
+    return 1
+  fi
+
+  install_binja
+  if [ $? -ne 0 ] ; then
+    printf " x Could not install binary ninja"
     return 1
   fi
 
@@ -96,8 +163,8 @@ linux_build() {
   local log_file=`mktemp`
 
   # set up ada support for cmake
-
-  llvm_version_list=( "35" "36" "37" "38" "39" "40" "50" )
+  # Old supported versions: "35" "36" "37" "38" "39" "40" 
+  llvm_version_list=( "50" "60" )
   for llvm_version in "${llvm_version_list[@]}" ; do
     printf "#\n"
     printf "# Running CI tests for LLVM version ${llvm_version}...\n"
@@ -141,6 +208,23 @@ linux_build() {
       fi
     fi
 
+    # create the cache folder for ccache
+    local cache_folder_name="ccache_llvm${llvm_version}"
+    printf " > Setting up ccache folder...\n"
+
+    if [ ! -d "${cache_folder_name}" ] ; then
+      mkdir "${cache_folder_name}" > "${log_file}" 2>&1
+      if [ $? -ne 0 ] ; then
+          printf " x Failed to create the ccache folder: ${cache_folder_name}. Error output follows:\n"
+          printf "===\n"
+          cat "${log_file}"
+          return 1
+      fi
+    fi
+
+    export CCACHE_DIR="$(realpath ${cache_folder_name})"
+    printf " i ${CCACHE_DIR}\n"
+
     linux_build_helper "${llvm_version}"
     if [ $? -ne 0 ] ; then
       printf " ! One or more tests have failed for LLVM ${llvm_version}\n"
@@ -180,7 +264,7 @@ linux_build_helper() {
     return 1
   fi
 
-  git clone "https://github.com/trailofbits/remill.git" > "${log_file}" 2>&1
+  git clone "https://github.com/lifting-bits/remill.git" > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to clone the remill repository. Error output follows:\n"
     printf "===\n"
@@ -294,7 +378,7 @@ linux_build_helper() {
   fi
 
   printf " > Installing...\n"
-  ( cd build && sudo make install ) > "${log_file}" 2>&1
+  ( cd build && sudo make install -j `nproc` ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to install the project. Error output follows:\n"
     printf "===\n"
@@ -315,7 +399,7 @@ linux_build_helper() {
     return 1
   fi
 
-  ( cd build && make ) > "${log_file}" 2>&1
+  ( cd build && make -j `nproc` ) > "${log_file}" 2>&1
   if [ $? -ne 0 ] ; then
     printf " x Failed to build test suite. Output below:\n"
     printf "===\n"

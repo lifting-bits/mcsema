@@ -1,4 +1,4 @@
-# Copyright (c) 2017 Trail of Bits, Inc.
+# Copyright (c) 2018 Trail of Bits, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,15 +17,21 @@ cmake_minimum_required(VERSION 3.2)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/settings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/ccache.cmake")
 
+configureCcache()
 FindAndSelectClangCompiler()
 
 set(MCSEMA_SOURCE_DIR "${PROJECT_SOURCE_DIR}")
 
+option(MCSEMA_ENABLE_RUNTIME "Should runtimes for re-compilation of bitcode be produced?" ON)
+
 # warnings and compiler settings
 if(NOT DEFINED WIN32)
   set(PROJECT_CXXFLAGS
-    ${GLOBAL_CXXFLAGS} -Werror -Wconversion -pedantic 
+    ${GLOBAL_CXXFLAGS}
+    -Wconversion
+    -pedantic 
     -Wno-unreachable-code-return 
   )
 endif()
@@ -95,6 +101,7 @@ add_executable(${MCSEMA_LIFT}
 
   tools/mcsema_lift/Lift.cpp
 )
+
 
 # Copy mcsema-disass in
 add_custom_command(
@@ -172,7 +179,7 @@ target_include_directories(${MCSEMA_LIFT} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTO
 target_compile_definitions(${MCSEMA_LIFT} PUBLIC ${PROJECT_DEFINITIONS})
 target_compile_options(${MCSEMA_LIFT} PRIVATE ${PROJECT_CXXFLAGS})
 
-if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "x86_64" AND MCSEMA_ENABLE_RUNTIME)
   add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mcsema/Arch/X86/Runtime)
 endif()
 
@@ -228,13 +235,21 @@ set(python_package_installer "${CMAKE_CURRENT_SOURCE_DIR}/tools/setup_launcher")
 if(DEFINED WIN32)
   string(REPLACE "/" "\\" python_package_install_path "${install_folder}")
   set(python_package_installer "${python_package_installer}.bat")
+  set(optional_interpreter "cmd.exe /C")
 else()
   set(python_package_install_path "${install_folder}")
   set(python_package_installer "${python_package_installer}.sh")
 endif()
 
+# target for dyninst frontend
+if (DEFINED BUILD_MCSEMA_DYNINST_DISASS)
+    if(${BUILD_MCSEMA_DYNINST_DISASS} EQUAL 1)
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tools/mcsema_disass/dyninst)
+    endif()
+endif()
+
 install(CODE
-  "execute_process(COMMAND \"${python_package_installer}\" \"${python_package_install_path}\" WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tools RESULT_VARIABLE exit_code)
+  "execute_process(COMMAND ${optional_interpreter} \"${python_package_installer}\" \"${python_package_install_path}\" WORKING_DIRECTORY \"${PROJECT_SOURCE_DIR}/tools\" RESULT_VARIABLE exit_code)
    if(NOT exit_code EQUAL 0)
      message(FATAL_ERROR \"Failed to install the Python package\")
    endif()"

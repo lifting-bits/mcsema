@@ -125,14 +125,14 @@ static void RunO3(void) {
       std::numeric_limits<int>::max());
   builder.LibraryInfo = TLI;  // Deleted by `llvm::~PassManagerBuilder`.
   builder.DisableUnrollLoops = false;  // Unroll loops!
-  builder.DisableUnitAtATime = false;
+  IF_LLVM_LT_900(builder.DisableUnitAtATime = false;)
   builder.SLPVectorize = false;
   builder.LoopVectorize = false;
+  IF_LLVM_GTE_360(builder.VerifyInput = false;)
+  IF_LLVM_GTE_360(builder.VerifyOutput = false;)
 
-  // TODO(pag): Not sure when these became available.
-  // builder.MergeFunctions = false;  // Try to deduplicate functions.
-  // builder.VerifyInput = false;
-  // builder.VerifyOutput = false;
+  // TODO(pag): Not sure when this became available.
+  IF_LLVM_GTE_800(builder.MergeFunctions = false;)
 
   builder.populateFunctionPassManager(func_manager);
   builder.populateModulePassManager(module_manager);
