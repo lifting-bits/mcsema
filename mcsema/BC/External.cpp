@@ -26,6 +26,7 @@
 
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Name.h"
+#include "remill/BC/Annotate.h"
 
 #include "mcsema/Arch/Arch.h"
 #include "mcsema/BC/Callback.h"
@@ -56,6 +57,8 @@ static void DeclareExternal(
 
   extfun->setCallingConv(cfg_func->cc);
   extfun->addFnAttr(llvm::Attribute::NoInline);
+
+  remill::Annotate<remill::CFGExternal>(extfun);
 }
 
 static llvm::GlobalValue::ThreadLocalMode ThreadLocalMode(

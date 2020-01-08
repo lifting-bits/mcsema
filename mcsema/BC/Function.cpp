@@ -40,6 +40,7 @@
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Instruction.h"
 #include "remill/BC/ABI.h"
+#include "remill/BC/Annotate.h"
 #include "remill/BC/Compat/ScalarTransforms.h"
 #include "remill/BC/IntrinsicTable.h"
 #include "remill/BC/Lifter.h"
@@ -976,6 +977,8 @@ static llvm::Function *LiftFunction(
         << "Lifted block " << std::hex << block_info.first
         << " has no terminator!" << std::dec;
   }
+
+  remill::Annotate<remill::LiftedFunction>(lifted_func);
 
   return lifted_func;
 }

@@ -33,6 +33,7 @@
 #include "remill/Arch/Arch.h"
 #include "remill/Arch/Name.h"
 #include "remill/BC/ABI.h"
+#include "remill/BC/Annotate.h"
 #include "remill/BC/Util.h"
 #include "remill/BC/Version.h"
 
@@ -76,6 +77,7 @@ static llvm::Function *GetAttachCallFunc(void) {
         callback_type, llvm::GlobalValue::ExternalLinkage,
         "__mcsema_attach_call", gModule);
     handler->addFnAttr(llvm::Attribute::NoInline);
+    remill::Annotate<remill::McSemaHelper>(handler);
   }
   return handler;
 }
@@ -327,6 +329,7 @@ static llvm::GlobalVariable *GetStatePointer(void) {
   return state_ptr;
 }
 
+// note(lukas): We don't need to annotate, it will always be inlined
 static llvm::Function *CreateVerifyRegState(void) {
   auto *func_type = llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext),
                                             {}, false);
@@ -353,14 +356,9 @@ static llvm::Function *CreateVerifyRegState(void) {
   unsigned ptr_size = static_cast<unsigned>(gArch->address_size);
   auto reg_ptr_ty = llvm::PointerType::getIntNPtrTy(*gContext, ptr_size);
 
-  //TODO(lukas): remove after abi_libraries patch gets merged into master
-  auto GetConstantInt = [&](unsigned size, uint64_t value) {
-    return llvm::ConstantInt::get(
-        llvm::Type::getIntNTy(*gContext, size), value);
-  };
+
   auto casted_reg_state = ir.CreateBitCast(reg_state, byte_ty);
-  auto rsp = ir.CreateGEP(casted_reg_state,
-                          GetConstantInt(64, sp_offset));
+  auto rsp = ir.CreateGEP(casted_reg_state, ir.getInt64(sp_offset));
   auto casted_rsp = ir.CreateBitCast(rsp, reg_ptr_ty);
   auto rsp_val = ir.CreateLoad(casted_rsp,
                                llvm::Type::getIntNTy(*gContext, ptr_size));
@@ -378,10 +376,6 @@ static llvm::Function *CreateVerifyRegState(void) {
 
   return func;
 }
-
-// TODO(lukas): VerifyRegState is probably not the best name.
-//              Maybe VerifyStackPointer?
-//              Opened to suggestions.
 
 // Because of possible parallelism, both global stack and state must be
 // thread_local. However after new thread is created, its stack and state
@@ -759,6 +753,8 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
   loader.FreeReturnAddress(block);
 
   ir.CreateRet(remill::LoadMemoryPointer(block));
+
+  remill::Annotate<remill::McSemaHelper>(callback_func);
 
   return callback_func;
 }
