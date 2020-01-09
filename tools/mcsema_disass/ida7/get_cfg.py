@@ -469,8 +469,10 @@ def is_start_of_function(ea):
   """Returns `True` if `ea` is the start of a function."""
   if not is_code(ea):
     return False
-
-  name = idc.GetTrueName(ea) or idc.get_func_name(ea)
+   
+  # originally name = idc.GetTrueName(ea) or idc.get_func_name(ea)
+  # removed since ida 7.4 not supported
+  name = idc.get_func_name(ea)
   return ea == idc.get_name_ea_simple(name)
 
 _REFERENCE_OPERAND_TYPE = {
