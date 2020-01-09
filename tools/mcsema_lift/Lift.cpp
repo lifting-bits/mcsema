@@ -29,6 +29,7 @@
 #include <llvm/IR/Module.h>
 
 #include <remill/Arch/Arch.h>
+#include <remill/BC/Annotate.h>
 #include <remill/BC/Util.h>
 #include <remill/BC/Version.h>
 
@@ -201,6 +202,7 @@ static void LoadLibraryIntoModule(const std::string &path) {
 
     dest_func->copyAttributesFrom(&func);
     dest_func->setVisibility(func.getVisibility());
+    remill::Annotate<remill::AbiLibraries>(dest_func);
   }
 
   // Declare the global variables from the library in McSema's target module.
