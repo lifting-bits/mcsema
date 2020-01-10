@@ -116,28 +116,32 @@ class Operand(object):
     self._base_id = None
     self._displ = None
     self._scale = None
-        
+
     if self._type in (idaapi.o_displ, idaapi.o_phrase):
       specflag1 = self.op_t.specflag1
       specflag2 = self.op_t.specflag2
       scale = 1 << ((specflag2 & 0xC0) >> 6)
       offset = self.op_t.addr
-            
+
       if specflag1 == 0:
-        index = None
+        index_ = None
         base_ = self.op_t.reg
       elif specflag1 == 1:
-        index = (specflag2 & 0x38) >> 3
+        index_ = (specflag2 & 0x38) >> 3
         base_ = (specflag2 & 0x07) >> 0
-                
+
         if self.op_t.reg == 0xC:
-          if base_ & 4:
-            base_ += 8
-          if index & 4:
-            index += 8
-                        
+          base_ += 8
+          # HACK: Check if the index register is there in the operand
+          # It will fix the issue if `rsi` is getting used as index register
+          if (index_ & 4) and get_register_name(index_) not in idc.GetOpnd(self._ea, opnd.n):
+            index_ += 8
+
+      if (index_ == base_ == idautils.procregs.sp.reg) and (scale == 1):
+        index_ = None
+
       self._scale = scale
-      self._index_id = index
+      self._index_id = index_
       self._base_id = base_
       self._displ = offset
                
