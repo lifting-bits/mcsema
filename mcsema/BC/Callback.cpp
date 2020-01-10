@@ -576,12 +576,15 @@ static void ImplementExplicitArgsExitPoint(
 
   remill::CloneBlockFunctionInto(callback_func);
 
-  // Always inline so that static analyses of the bitcode don't need to dive
+  // Inline so that static analyses of the bitcode don't need to dive
   // into an extra function just to see the intended call.
-  callback_func->removeFnAttr(llvm::Attribute::NoInline);
-  callback_func->addFnAttr(llvm::Attribute::InlineHint);
-  callback_func->addFnAttr(llvm::Attribute::AlwaysInline);
-  callback_func->removeFnAttr(llvm::Attribute::NoUnwind);
+  // With explicit_args breaks DSE, so we rather not inline it
+  if (!FLAGS_explicit_args) {
+    callback_func->removeFnAttr(llvm::Attribute::NoInline);
+    callback_func->addFnAttr(llvm::Attribute::InlineHint);
+    callback_func->addFnAttr(llvm::Attribute::AlwaysInline);
+    callback_func->removeFnAttr(llvm::Attribute::NoUnwind);
+  }
 
   if (FLAGS_stack_protector) {
     callback_func->addFnAttr(llvm::Attribute::StackProtectReq);
