@@ -220,14 +220,14 @@
 #define ST6 st.elems[6].val
 #define ST7 st.elems[7].val
 
-#define MMX0 mmx.elems[0].val.qwords.elems[0]
-#define MMX1 mmx.elems[1].val.qwords.elems[0]
-#define MMX2 mmx.elems[2].val.qwords.elems[0]
-#define MMX3 mmx.elems[3].val.qwords.elems[0]
-#define MMX4 mmx.elems[4].val.qwords.elems[0]
-#define MMX5 mmx.elems[5].val.qwords.elems[0]
-#define MMX6 mmx.elems[6].val.qwords.elems[0]
-#define MMX7 mmx.elems[7].val.qwords.elems[0]
+#define MM0 mmx.elems[0].val.qwords.elems[0]
+#define MM1 mmx.elems[1].val.qwords.elems[0]
+#define MM2 mmx.elems[2].val.qwords.elems[0]
+#define MM3 mmx.elems[3].val.qwords.elems[0]
+#define MM4 mmx.elems[4].val.qwords.elems[0]
+#define MM5 mmx.elems[5].val.qwords.elems[0]
+#define MM6 mmx.elems[6].val.qwords.elems[0]
+#define MM7 mmx.elems[7].val.qwords.elems[0]
 
 #define AF aflag.af
 #define CF aflag.cf

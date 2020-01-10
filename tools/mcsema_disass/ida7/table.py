@@ -185,8 +185,9 @@ def get_num_jump_table_entries(builder):
     #      a reference into the Nth byte of what could be the
     #      next address.
     elif len(list(idautils.DataRefsTo(entry_addr))):
-      DEBUG("    Ignoring entry {:x} is referenced by data.".format(entry_data))
-      break
+      if 0 < i:  # The first entry's reference might be a dref in an instruction.
+        DEBUG("    Ignoring entry {:x} is referenced by data.".format(entry_data))
+        break
     elif len(list(idautils.CodeRefsTo(entry_addr, 0))):
       DEBUG("    Ignoring entry {:x} is referenced by code (0).".format(entry_data))
       break
@@ -197,8 +198,8 @@ def get_num_jump_table_entries(builder):
     entry_addr = next_entry_addr
 
   if i != curr_num_targets:
-    DEBUG("Jump table at {:x} actually has {} entries".format(
-        builder.table_ea, i))
+    DEBUG("Jump table at {:x} actually has {} != {} entries".format(
+        builder.table_ea, i, curr_num_targets))
 
   return i
 
@@ -458,12 +459,13 @@ def get_jump_table_reader(builder):
     return get_manual_jump_table_reader(builder)
 
 _JMP_THROUGH_TABLE_INFO = {}
+_TABLE_INFO = {}
 _NOT_A_JMP_THROUGH_TABLE = set()
 
 def get_jump_table(inst, binary_is_pie=False):
   """Returns an instance of JumpTable, or None depending on whether or not
   a jump table was discovered."""
-  global _JMP_THROUGH_TABLE_INFO, _NOT_A_JMP_THROUGH_TABLE
+  global _JMP_THROUGH_TABLE_INFO, _NOT_A_JMP_THROUGH_TABLE, _TABLE_INFO
   global _INVALID_JMP_TABLE
 
   if not inst or not is_indirect_jump(inst):
@@ -487,6 +489,12 @@ def get_jump_table(inst, binary_is_pie=False):
 
   DEBUG("Jump table candidate at {:x} referenced by instruction {:x}".format(
       builder.table_ea, builder.jump_ea))
+
+  if builder.table_ea in _TABLE_INFO:
+    DEBUG("  Using pre-existing jump table info")
+    table = _TABLE_INFO[builder.table_ea]
+    _JMP_THROUGH_TABLE_INFO[builder.jump_ea] = table
+    return table
 
   get_default_jump_table_entries(builder)
 
@@ -515,6 +523,7 @@ def get_jump_table(inst, binary_is_pie=False):
 
   table = JumpTable(builder, entries)
   _JMP_THROUGH_TABLE_INFO[builder.jump_ea] = table
+  _TABLE_INFO[builder.table_ea] = table
 
   return table
 
