@@ -36,7 +36,7 @@ IS_ARM = "ARM" in _INFO.procName
 
 # True if we are running on an ELF file.
 IS_ELF = (idaapi.f_ELF == _INFO.filetype) or \
-         (idc.GetLongPrm(idc.INF_FILETYPE) == idc.FT_ELF)
+         (idc.get_inf_attr(idc.INF_FILETYPE) == idc.FT_ELF)
 
 # True if this is a Windows PE file.
 IS_PE = idaapi.f_PE == _INFO.filetype

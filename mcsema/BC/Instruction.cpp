@@ -122,15 +122,7 @@ InstructionLifter::~InstructionLifter(void) {}
 InstructionLifter::InstructionLifter(const remill::IntrinsicTable *intrinsics_,
                                      TranslationContext &ctx_)
       : remill::InstructionLifter(gArch, intrinsics_),
-        ctx(ctx_),
-        inst_ptr(nullptr),
-        block(nullptr),
-        mem_ref(nullptr),
-        disp_ref(nullptr),
-        imm_ref(nullptr),
-        mem_ref_used(false),
-        disp_ref_used(false),
-        imm_ref_used(false) {}
+        ctx(ctx_) {}
 
 // Lift a single instruction into a basic block.
 remill::LiftStatus InstructionLifter::LiftIntoBlock(
@@ -377,11 +369,6 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
     }
 
   } else {
-    LOG_IF(ERROR, mem_ref != nullptr)
-        << "IDA probably incorrectly decoded memory operand "
-        << op.Serialize() << " of instruction " << std::hex << inst.pc
-        << " as an absolute memory reference when it should be treated as a "
-        << "displacement memory reference.";
 
     // It's a reference located in the displacement. We'll clear out the
     // displacement, calculate the address operand stuff, then add the address
@@ -393,6 +380,20 @@ llvm::Value *InstructionLifter::LiftAddressOperand(
           inst, block, arg, op);
       llvm::IRBuilder<> ir(block);
       return ir.CreateAdd(dynamic_addr, disp_ref);
+
+    } else if (mem_ref && static_cast<uint64_t>(op.addr.displacement) ==
+                          ctx.cfg_inst->mem->target_ea) {
+      LOG(ERROR)
+          << "IDA probably incorrectly decoded memory operand "
+          << op.Serialize() << " of instruction " << std::hex << inst.pc
+          << " as an absolute memory reference when it should be treated as a "
+          << "displacement memory reference.";
+      mem_ref_used = true;
+      mem.displacement = 0;
+      auto dynamic_addr = this->remill::InstructionLifter::LiftAddressOperand(
+          inst, block, arg, op);
+      llvm::IRBuilder<> ir(block);
+      return ir.CreateAdd(dynamic_addr, mem_ref);
     }
   }
 

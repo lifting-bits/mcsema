@@ -14,7 +14,7 @@
 
 from flow import *
 from table import *
-
+import ida_bytes
 
 def is_sane_reference_target(ea):
   """Returns `True` if `target_ea` looks like the address of some code/data."""
@@ -264,7 +264,7 @@ def find_missing_xrefs_in_segment(seg_ea, seg_end_ea, binary_is_pie):
     if not is_invalid_ea(target_ea) and 0 != (qword_data | dword_data):
       DEBUG("WARNING: Removing likely in-object reference from nearby {:x} to {:x}".format(
           ea, target_ea))
-      idaapi.do_unknown_range(ea, 4, idc.DOUNK_EXPAND)
+      ida_bytes.del_items(ea, 4, ida_bytes.DELIT_EXPAND)
 
     next_ea = ea + 4
 
