@@ -27,13 +27,13 @@ namespace mcsema::cfg {
 
 using Query = const char *;
 
-// Second template is to avoid DDD( Dreadful Diamond of Derivation ) without using
+// Second template is to avoid DDD(Dreadful Diamond of Derivation) without using
 // virtual inheritance. Since this is strictly mixin inheritance it is okay
-template< typename Self, template< typename > class Derived >
+template<typename Self, template<typename> class Derived>
 struct _crtp
 {
-  Self &self() { return static_cast< Self & >( *this ); }
-  const Self &self() const { return static_cast< const Self & >( *this ); }
+  Self &self() { return static_cast<Self &>(*this); }
+  const Self &self() const { return static_cast<const Self &>(*this); }
 
   auto &db() { return self()._ctx->db; }
   auto &cache() { return self()._ctx->cache; }
@@ -45,19 +45,19 @@ struct _crtp
 
 };
 
-template< typename Self >
-struct id_based_ops_: _crtp< Self, id_based_ops_ >
+template<typename Self>
+struct id_based_ops_: _crtp<Self, id_based_ops_>
 {
-  using _crtp< Self, id_based_ops_ >::self;
+  using _crtp<Self, id_based_ops_>::self;
 
   int64_t last_rowid()
   {
     constexpr static Query q_last_row_id =
       R"(SELECT last_insert_rowid())";
-    auto r = this->db().template query< q_last_row_id >();
+    auto r = this->db().template query<q_last_row_id>();
 
     int64_t result;
-    r( result );
+    r(result);
 
     return result;
   }
@@ -67,9 +67,9 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
     return std::string{ "select * from " } + Self::table_name + " where rowid = ?1";
   }
 
-  auto get( uint64_t id )
+  auto get(uint64_t id)
   {
-    return this->db().template query< _q_get >( id );
+    return this->db().template query<_q_get>(id);
   }
 
   static std::string _q_remove()
@@ -77,9 +77,9 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
     return std::string{ "delete from " } + Self::table_name + " where rowid = ?1";
   }
 
-  auto erase( int64_t id )
+  auto erase(int64_t id)
   {
-    return this->db().template query< _q_remove >( id );
+    return this->db().template query<_q_remove>(id);
   }
 
   template<typename ...Args>
@@ -114,8 +114,8 @@ struct id_based_ops_: _crtp< Self, id_based_ops_ >
   }
 };
 
-template< typename Self >
-struct all_ : _crtp< Self, all_ >
+template<typename Self>
+struct all_ : _crtp<Self, all_>
 {
   static std::string _q_all()
   {
@@ -124,60 +124,64 @@ struct all_ : _crtp< Self, all_ >
 
   auto all()
   {
-    return this->db().template query< _q_all >();
+    return this->db().template query<_q_all>();
+  }
+
+  auto all_data() {
+    return this->db().template query<Self::q_data>();
   }
 
 };
 
-template< typename Self >
-struct func_ops_ : _crtp< Self, func_ops_ >
+template<typename Self>
+struct func_ops_ : _crtp<Self, func_ops_>
 {
 
-  using parent_ = _crtp< Self, func_ops_ >;
+  using parent_ = _crtp<Self, func_ops_>;
   using parent_::self;
 
-  auto bbs( uint64_t ea )
+  auto bbs(uint64_t ea)
   {
     constexpr static Query q_bbs =
 
       R"(select * from blocks inner join function_to_block on
             blocks.ea = function_to_block.bb_rowid and function_to_block.function_rowid = ?1)";
-    return this->db().template query< q_bbs >( ea );
+    return this->db().template query<q_bbs>(ea);
   }
 
-  template < typename Container = std::vector< uint64_t > >
-  auto unbind_bbs( uint64_t ea, const Container &to_unbind)
+  template <typename Container = std::vector<uint64_t>>
+  auto unbind_bbs(uint64_t ea, const Container &to_unbind)
   {
     constexpr static Query q_unbind_bbs =
-      R"(delete from function_to_block where function_rowid = ?1 and bb_rowid = ?2 )";
+      R"(delete from function_to_block where function_rowid = ?1 and bb_rowid = ?2)";
     // FIXME: This can most likely be done in one query
-    for ( auto &other : to_unbind )
-      this->db().template query< q_unbind_bbs >( ea, other );
+    for (auto &other : to_unbind)
+      this->db().template query<q_unbind_bbs>(ea, other);
   }
 
-  auto bind_bb( int64_t f_id, int64_t bb_id )
+  auto bind_bb(int64_t f_id, int64_t bb_id)
   {
     constexpr static Query q_bind_bbs =
       R"(insert into function_to_block (function_rowid, bb_rowid) values (?1, ?2))";
-    this->db().template query< q_bind_bbs >( f_id, bb_id);
+    this->db().template query<q_bind_bbs>(f_id, bb_id);
 
   }
 };
 
-template< typename Self >
-struct bb_ops_ : _crtp< Self, bb_ops_ >
+template<typename Self>
+struct bb_ops_ : _crtp<Self, bb_ops_>
 {
-  template< typename Module, typename Data >
-  auto insert( Module &&module, uint64_t ea, uint64_t size, Data &&bytes )
+  template<typename Module, typename Data>
+  auto insert(Module &&module, uint64_t ea, uint64_t size, Data &&bytes)
   {
     constexpr static Query q_insert =
       R"(insert into blocks(module, ea, size, bytes) values (?1, ?2, ?3, ?4))";
-    return this->db().template query< q_insert >( module.id, ea, size, bytes );
+    return this->db().template query<q_insert>(module.id, ea, size, bytes);
   }
 };
 
-template< typename Self >
-struct has_symtab_name : _crtp< Self, has_symtab_name >
+template<typename Self>
+struct has_symtab_name : _crtp<Self, has_symtab_name>
 {
 
   static std::string q_set_symtabentry() {
@@ -206,7 +210,7 @@ struct has_symtab_name : _crtp< Self, has_symtab_name >
   }
 
   auto Name(int64_t id, int64_t new_symbol_id) {
-    this->db().template query<q_set_symtabentry>( id, new_symbol_id );
+    this->db().template query<q_set_symtabentry>(id, new_symbol_id);
   }
 
   std::optional<int64_t> Name(int64_t id) {

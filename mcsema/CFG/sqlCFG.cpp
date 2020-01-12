@@ -41,7 +41,7 @@ struct with_context {
   CtxR _ctx;
 };
 
-using has_context = with_context< Context >;
+using has_context = with_context<Context>;
 
 template<typename Concrete = SymtabEntry>
 struct SymtabEntry_ : has_context,
@@ -90,12 +90,12 @@ struct MemoryRange_ : has_context,
   }
 };
 
-template< typename Self >
-struct module_ops_mixin : id_based_ops_< Self > {};
+template<typename Self>
+struct module_ops_mixin : id_based_ops_<Self> {};
 
-template< typename Concrete = Module >
+template<typename Concrete = Module>
 struct Module_ : has_context,
-                 module_ops_mixin< Module_< Concrete > > {
+                 module_ops_mixin<Module_<Concrete>> {
 
   using has_context::has_context;
   static constexpr Query table_name = R"(modules)";
@@ -124,11 +124,11 @@ struct Module_ : has_context,
   }
 };
 
-template< typename Self >
+template<typename Self>
 struct func_ops_mixin :
-  func_ops_< Self >,
-  id_based_ops_< Self >,
-  has_symtab_name< Self >
+  func_ops_<Self>,
+  id_based_ops_<Self>,
+  has_symtab_name<Self>
 {};
 
 
@@ -151,9 +151,9 @@ template<typename Self>
 struct bb_mixin : id_based_ops_<Self>,
                   has_ea<Self>{};
 
-template< typename Concrete = BasicBlock >
+template<typename Concrete = BasicBlock>
 struct BasicBlock_: has_context,
-                    bb_mixin< BasicBlock_< Concrete > >
+                    bb_mixin<BasicBlock_<Concrete>>
 {
   using has_context::has_context;
   constexpr static Query table_name = R"(blocks)";
@@ -259,7 +259,7 @@ struct Segment_ : has_context,
 };
 
 
-template<typename Concrete = CodeXref >
+template<typename Concrete = CodeXref>
 struct CodeXref_ : has_context,
                    has_symtab_name<CodeXref_<Concrete>>,
                    has_ea<CodeXref_<Concrete>>,
@@ -357,13 +357,13 @@ template<typename T>
 using impl_t = typename dispatch<remove_cvp_t<T>>::type;
 
 #define ENABLE_IF(name) \
-  typename std::enable_if_t< std::is_same_v< name::data_t, Data >, std::optional< Data > >
+  typename std::enable_if_t<std::is_same_v<name::data_t, Data>, std::optional<Data>>
 
 
 template<typename Data, typename Result>
 auto Get(Result &result) -> ENABLE_IF(SymtabEntry) {
   auto out = result.template Get<std::string, SymtabEntryType>();
-  return util::maybe_to_struct<Data>( std::move(out) );
+  return util::maybe_to_struct<Data>(std::move(out));
 }
 
 #undef ENABLE_IF
@@ -377,7 +377,7 @@ struct DataIterator_impl {
 
   DataIterator_impl(Result_t &&r) : result(std::move(r)) {}
 
-  template< typename Data >
+  template<typename Data>
   auto Fetch() {
     return Get<Data>(result) ;
   }
@@ -449,7 +449,7 @@ Letter::Letter(const std::string &name) : _ctx(std::make_shared<Context>(name)) 
 
 void Letter::CreateSchema()
 {
-  Schema::CreateSchema( *_ctx );
+  Schema::CreateSchema(*_ctx);
 }
 
 Module Letter::module(const std::string &name) {
@@ -475,7 +475,7 @@ MemoryRange Letter::AddMemoryRange(const Module &module,
                                    std::string_view data) {
   // TODO: Check if this copy to sqlite::blob is required
   return { MemoryRange_{ _ctx }.insert(module._id, ea, size,
-                                 sqlite::blob( data.begin(), data.end() ) ),
+                                 sqlite::blob(data.begin(), data.end())),
             _ctx };
 }
 
@@ -487,14 +487,14 @@ MemoryRange Letter::AddMemoryRange(const Module &module,
 
 /* Module */
 
-Function Module::AddFunction(int64_t ea, bool is_entrypoint ) {
-  return { Function_{ _ctx }.insert( _id, ea, is_entrypoint ), _ctx };
+Function Module::AddFunction(int64_t ea, bool is_entrypoint) {
+  return { Function_{ _ctx }.insert(_id, ea, is_entrypoint), _ctx };
 }
 
 MemoryRange Module::AddMemoryRange(int64_t ea, int64_t size, std::string_view data) {
   // TODO: Check if this copy to sqlite::blob is required
   return { MemoryRange_{ _ctx }.insert(_id, ea, size,
-                                 sqlite::blob( data.begin(), data.end() ) ),
+                                 sqlite::blob(data.begin(), data.end())),
            _ctx };
 }
 
@@ -537,7 +537,7 @@ WeakDataIterator<SymtabEntry> Module::Symbols_d() {
 
 WeakObjectIterator<Function> Module::Functions() {
   auto result = Module_{ _ctx }.all_functions_r(_id);
-  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx ) };
+  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
 }
 
 /* Function */
@@ -580,7 +580,7 @@ CodeXref BasicBlock::AddXref(int64_t ea,
 /* Segment */
 
 std::string_view Segment::Data() {
-  return Segment_( _ctx ).data(_id);
+  return Segment_(_ctx).data(_id);
 }
 
 void Segment::SetFlags(const Flags &flags) {
@@ -611,7 +611,7 @@ Segment MemoryRange::AddSegment(int64_t ea,
                                  int64_t size,
                                  const Segment::Flags &flags,
                                  const std::string &name) {
-  return { Segment_{ _ctx }._insert( ea, size, flags, name, _id ), _ctx };
+  return { Segment_{ _ctx }._insert(ea, size, flags, name, _id), _ctx };
 }
 
 std::string_view MemoryRange::Data() {
@@ -702,13 +702,13 @@ DEF_ERASE(DataXref)
 template<typename Self>
 int64_t interface::HasEa<Self>::ea() {
   auto self = static_cast<Self *>(this);
-  return impl_t<decltype(self)>{ self->_ctx }.get_ea( self->_id );
+  return impl_t<decltype(self)>{ self->_ctx }.get_ea(self->_id);
 }
 
 template<typename Self>
 std::optional<std::string> interface::HasSymtabEntry<Self>::Name() {
   auto self = static_cast<Self *>(this);
-  return impl_t<decltype(self)>{ self->_ctx }.GetName( self->_id );
+  return impl_t<decltype(self)>{ self->_ctx }.GetName(self->_id);
 }
 
 template<typename Self>
@@ -716,7 +716,7 @@ void interface::HasSymtabEntry<Self>::Name(
     const SymtabEntry &name) {
 
   auto self = static_cast<Self *>(this);
-  return impl_t<decltype(self)>{ self->_ctx }.Name( self->_id, name._id );
+  return impl_t<decltype(self)>{ self->_ctx }.Name(self->_id, name._id);
 }
 
 template<typename Self>
