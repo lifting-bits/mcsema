@@ -293,7 +293,8 @@ def get_ida_jump_table_reader(builder, si):
     builder.offset = si.elbase
     
     # Figure out if we need to subtract the offset instead of add it.
-    if (si.flags2 & idaapi.SWI2_SUBTRACT) == idaapi.SWI2_SUBTRACT:
+    SWI2_SUBTRACT = idaapi.SWI_SUBTRACT >> 16
+    if (si.flags & SWI2_SUBTRACT) == SWI2_SUBTRACT:
       builder.offset_mult = -1
 
     DEBUG("IDA inferred jump table offset: {:x}".format(builder.offset))
