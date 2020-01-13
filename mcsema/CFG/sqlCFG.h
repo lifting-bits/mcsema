@@ -226,7 +226,6 @@ public:
                      const SymtabEntry &name,
                      std::optional<int64_t> mask={});
 
-    // TODO: Implement and erase also xrefs
     void Erase();
 private:
 
