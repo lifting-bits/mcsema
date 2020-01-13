@@ -485,19 +485,19 @@ void Letter::CreateSchema()
   Schema::CreateSchema(*_ctx);
 }
 
-Module Letter::module(const std::string &name) {
+Module Letter::AddModule(const std::string &name) {
   return { Module_{ _ctx }.insert(name), _ctx };
 }
 
-Function Letter::func(const Module &module, int64_t ea, bool is_entrypoint)
+Function Letter::AddFunction(const Module &module, int64_t ea, bool is_entrypoint)
 {
   return { Function_{ _ctx }.insert(module._id, ea, is_entrypoint), _ctx };
 }
 
-BasicBlock Letter::bb(const Module &module,
-                      int64_t ea,
-                      int64_t size,
-                      const MemoryRange &range)
+BasicBlock Letter::AddBasicBlock(const Module &module,
+                                 int64_t ea,
+                                 int64_t size,
+                                 const MemoryRange &range)
 {
   return { BasicBlock_{ _ctx }.insert(module._id, ea, size, range._id), _ctx };
 }

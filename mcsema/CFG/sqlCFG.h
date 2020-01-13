@@ -488,14 +488,14 @@ struct Letter
 
   void CreateSchema();
 
-  Module module(const std::string &name);
+  Module AddModule(const std::string &name);
 
-  Function func(const Module &module, int64_t ea, bool is_entrypoint);
+  Function AddFunction(const Module &module, int64_t ea, bool is_entrypoint);
 
-  BasicBlock bb(const Module &module,
-                int64_t ea,
-                int64_t size,
-                const MemoryRange &range);
+  BasicBlock AddBasicBlock(const Module &module,
+                           int64_t ea,
+                           int64_t size,
+                           const MemoryRange &range);
 
   MemoryRange AddMemoryRange(const Module &module,
                              int64_t ea,
