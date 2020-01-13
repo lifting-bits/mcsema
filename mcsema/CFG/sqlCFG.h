@@ -121,21 +121,12 @@ protected:
   int64_t _id;
   mutable CtxPtr _ctx;
 
-  friend class interface::HasSymtabEntry<CodeXref>;
-  friend class interface::HasSymtabEntry<ExternalFunction>;
+  // TODO: Do we care if someone tries to shoot in the foot really hard?
+  template<typename T>
+  friend class interface::HasEa;
 
-  friend class interface::HasEa<DataXref>;
-  friend class interface::HasSymtabEntry<DataXref>;
-
-  friend class interface::HasEa<MemoryRange>;
-
-  friend class interface::HasEa<BasicBlock>;
-
-  friend class interface::HasEa<Function>;
-  friend class interface::HasSymtabEntry<Function>;
-
-  friend class interface::HasEa<Segment>;
-  friend class interface::HasSymtabEntry<Segment>;
+  template<typename T>
+  friend class interface::HasSymtabEntry;
 };
 
 } // namespace details
