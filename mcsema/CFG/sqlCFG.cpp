@@ -152,6 +152,13 @@ struct Function_ : has_context,
 
   static constexpr Query q_get =
     R"(select ea, is_entrypoint from functions)";
+
+  static constexpr Query q_bbs_r =
+    R"(SELECT bb_rowid FROM function_to_block WHERE function_rowid = ?1)";
+
+  auto BBs_r(int64_t id) {
+    return _ctx->db.template query<q_bbs_r>(id);
+  }
 };
 
 
