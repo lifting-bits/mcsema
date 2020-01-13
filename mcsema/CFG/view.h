@@ -33,25 +33,77 @@ void CheckName(T &t, const std::string& who) {
 }
 
 void TrySomeErase(mcsema::cfg::Module &m) {
-    std::cerr << " > Let's print all current blocks with their xrefs" << std::endl;
+    std::cout << " > Let's print all current blocks with their xrefs" << std::endl;
     // 1 query
     for (auto bb_it = m.Blocks(); auto bb = bb_it.Fetch();) {
         // |bb_it| queries
-        std::cerr << bb->ea() << std::endl;
+        std::cout << bb->ea() << std::endl;
         // |bb_it| queries
         for (auto ref_it = bb->CodeXrefs_d(); auto code_xref = ref_it.Fetch();) {
-            std::cerr << '\t' << *code_xref << std::endl;
+            std::cout << '\t' << *code_xref << std::endl;
         }
     }
 
-    std::cerr << " > Now we remove some block, let's say the second one" << std::endl;
+    std::cout << " > Now we remove some block, let's say the second one" << std::endl;
     auto bb_it = m.Blocks();
     bb_it.Fetch();
     bb_it.Fetch()->Erase();
 
-    std::cerr << " > We are left with:" << std::endl;
+    std::cout << " > We are left with:" << std::endl;
     for (auto bb_it = m.Blocks(); auto bb = bb_it.Fetch();)
-        std::cerr << bb->ea() << std::endl;
+        std::cout << bb->ea() << std::endl;
+}
+
+void TrySomeBBOps(mcsema::cfg::Module &m) {
+    auto func = m.AddFunction(0x120, true);
+    auto underlying_mem = m.AddMemoryRange(
+            0x120,
+            "This is some really dummy memory just so we can test basic blocks");
+    auto middle = m.AddBasicBlock(0x124, 0x4, underlying_mem);
+    std::cout << " > Let's print orphaned blocks, we expect only one" << std::endl;
+    auto print_ea = [](auto val) {
+        std::cout << std::hex << val.ea() << std::dec << std::endl;
+    };
+
+    util::ForEach(m.OrphanedBasicBlocks(), print_ea);
+    auto entry = m.AddBasicBlock(0x120, 0x4, underlying_mem);
+    auto dual_middle = m.AddBasicBlock(0x128, 0x4, underlying_mem);
+    auto exit = m.AddBasicBlock(0x12c, 0x4, underlying_mem);
+
+    func.AttachBlocks( {entry, dual_middle, middle, exit} );
+
+    std::cout << " > Now all blocks should be attached to some function" << std::endl;
+    util::ForEach(m.OrphanedBasicBlocks(), print_ea);
+    std::cout << " > Let's build successor relation then!" << std::endl;
+    entry.AddSuccs({ middle, dual_middle });
+    middle.AddSucc(exit);
+    dual_middle.AddSucc(exit);
+
+    auto print_succ_relation = [&](auto to) {
+        std::cout << "\t-> " << std::hex << to.ea() << std::dec << std::endl;
+    };
+    for (auto it = func.BasicBlocks(); auto bb = it.Fetch();) {
+        print_ea(*bb);
+        util::ForEach(bb->Succs(), print_succ_relation);
+    }
+
+    std::cout << " > Now we remove relation from 0x120 -> 128" << std::endl;
+    entry.RemoveSucc(dual_middle);
+    for (auto it = func.BasicBlocks(); auto bb = it.Fetch();) {
+        print_ea(*bb);
+        util::ForEach(bb->Succs(), print_succ_relation);
+    }
+}
+
+void TryCase(mcsema::cfg::Module &m) {
+  // Complexity is k queries where k is the number of possible matches
+  auto found = util::Match(m, 0x124,
+    [&](Function f) { std::cout << "It is a func!" << std::endl; },
+    [&](BasicBlock bb) { std::cout << "It is a bb!" << std::endl; }
+  );
+  if (!found) {
+    std::cout << "0x124 was not matched to anything!" << std::endl;
+  }
 }
 
 void run()
@@ -215,6 +267,8 @@ void run()
   }
 
   TrySomeErase(bin);
+  TrySomeBBOps(bin);
+  TryCase(bin);
 }
 
 
