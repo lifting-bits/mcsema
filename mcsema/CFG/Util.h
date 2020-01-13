@@ -26,6 +26,12 @@ namespace mcsema::cfg {
 namespace util
 {
 
+template<typename WeakIt, typename F>
+void ForEach(WeakIt it, F f) {
+  while (auto data = it.Fetch()) {
+    f(*data);
+  }
+}
 
 template<typename To, size_t ...Indices, typename From>
 To to_struct_(std::index_sequence<Indices ...>, From &&from) {
