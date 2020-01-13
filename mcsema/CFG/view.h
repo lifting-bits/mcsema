@@ -97,13 +97,27 @@ void TrySomeBBOps(mcsema::cfg::Module &m) {
 
 void TryCase(mcsema::cfg::Module &m) {
   // Complexity is k queries where k is the number of possible matches
-  auto found = util::Match(m, 0x124,
+  std::optional<BasicBlock> block;
+  auto found = m.MatchEa(0x124,
     [&](Function f) { std::cout << "It is a func!" << std::endl; },
-    [&](BasicBlock bb) { std::cout << "It is a bb!" << std::endl; }
+    [&](BasicBlock bb) {
+      block = bb;
+      std::cout << "It is a bb!" << std::endl;
+    }
   );
   if (!found) {
     std::cout << "0x124 was not matched to anything!" << std::endl;
   }
+
+  // TODO: This does one extra query
+  found = block->Module().MatchEa(0x120,
+      [&](Function f) { std::cout << "It is a func this time!" << std::endl; }
+  );
+
+  if (!found) {
+    std::cout << "0x120 was not matched to function!" << std::endl;
+  }
+
 }
 
 void run()
