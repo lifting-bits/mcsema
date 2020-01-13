@@ -406,6 +406,11 @@ using remove_cvp_t = typename std::remove_cv_t<std::remove_pointer_t<T>>;
 template<typename T>
 using impl_t = typename dispatch<remove_cvp_t<T>>::type;
 
+template<typename Self, typename Ctx>
+auto Impl(Self, Ctx ctx) {
+  return impl_t<Self>(ctx);
+}
+
 #define ENABLE_IF(name) \
   typename std::enable_if_t<std::is_same_v<name::data_t, Data>, std::optional<Data>>
 
@@ -638,7 +643,7 @@ CodeXref BasicBlock::AddXref(int64_t ea,
 }
 
 WeakDataIterator<CodeXref> BasicBlock::CodeXrefs_d() {
-  auto result = BasicBlock_{ _ctx }.CodeXrefs(_id);
+  auto result = Impl(*this, _ctx).CodeXrefs(_id);
   return { std::make_unique<details::DataIterator_impl>(std::move(result)) };
 }
 
