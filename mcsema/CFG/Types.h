@@ -115,25 +115,6 @@ struct id_based_ops_: _crtp<Self, id_based_ops_>
 };
 
 template<typename Self>
-struct all_ : _crtp<Self, all_>
-{
-  static std::string _q_all()
-  {
-    return std::string{ "select * from " } + Self::table_name;
-  }
-
-  auto all()
-  {
-    return this->db().template query<_q_all>();
-  }
-
-  auto all_data() {
-    return this->db().template query<Self::q_data>();
-  }
-
-};
-
-template<typename Self>
 struct func_ops_ : _crtp<Self, func_ops_>
 {
 
