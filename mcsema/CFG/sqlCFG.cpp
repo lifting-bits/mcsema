@@ -734,6 +734,7 @@ DataXref::data_t DataXref::operator*() const {
     impl_t<decltype(this)>{_ctx}.erase(_id); \
   }
 
+DEF_ERASE(BasicBlock)
 DEF_ERASE(SymtabEntry)
 DEF_ERASE(ExternalFunction)
 DEF_ERASE(Function)
