@@ -204,6 +204,18 @@ struct BasicBlock_: has_context,
   constexpr static Query q_remove_specific_succ =
     R"(DELETE FROM bb_successors WHERE from_rowid = ?1 AND to_rowid = ?2)";
 
+  auto Succs(int64_t id) {
+    return _ctx->db.template query<q_iter_succs>(id);
+  }
+
+  auto RemoveSucc(int64_t from, int64_t to) {
+    return _ctx->db.template query<q_remove_specific_succ>(from, to);
+  }
+
+  auto AddSucc(int64_t from, int64_t to) {
+    return _ctx->db.template query<q_add_succ>(from, to);
+  }
+
   auto CodeXrefs(int64_t id) {
     return _ctx->db.template query<q_iter_code_xrefs_d>(id);
   }
