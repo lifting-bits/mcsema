@@ -26,6 +26,41 @@ namespace mcsema::cfg {
 namespace util
 {
 
+namespace details {
+
+template<typename T>
+struct FirstArg {};
+
+
+template<typename F, typename Ret, typename Arg>
+struct FirstArg<Ret (F::*)(Arg)> {
+  using type = Arg;
+};
+
+
+template<typename F, typename Ret, typename Arg>
+struct FirstArg<Ret (F::*)(Arg) const> {
+  using type = Arg;
+};
+
+} // namespace details
+
+template<typename Ctx>
+bool Match(Ctx &ctx, int64_t ea) { return false; }
+
+template<typename Ctx, typename Target, typename ... Targets>
+bool Match(Ctx &ctx, int64_t ea, Target target, Targets &&...targets) {
+  using Self = typename details::FirstArg<
+      decltype(&Target::operator())
+    >::type;
+
+  if (auto obj = Self::MatchEa(ctx, ea)) {
+    target(std::move(*obj));
+    return true;
+  }
+  return Match(ctx, ea, std::forward<Targets>(targets)...);
+}
+
 template<typename WeakIt, typename F>
 void ForEach(WeakIt it, F f) {
   while (auto data = it.Fetch()) {
