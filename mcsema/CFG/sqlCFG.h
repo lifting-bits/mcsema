@@ -227,6 +227,20 @@ public:
                      const SymtabEntry &name,
                      std::optional<int64_t> mask={});
 
+    void AddSucc(const BasicBlock &bb);
+
+    template<typename Collection = std::vector<BasicBlock>>
+    void AddSuccs(const Collection &bbs) {
+      for (auto bb : bbs) {
+        AddSucc(bb);
+      }
+    }
+
+    void RemoveSucc(const BasicBlock &bb);
+    void RemoveSuccs();
+
+    WeakObjectIterator<BasicBlock> Succs();
+
     WeakObjectIterator<CodeXref> CodeXrefs();
     WeakDataIterator<CodeXref> CodeXrefs_d();
 

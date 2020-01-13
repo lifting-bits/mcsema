@@ -660,6 +660,18 @@ CodeXref BasicBlock::AddXref(int64_t ea,
           _ctx };
 }
 
+void BasicBlock::AddSucc(const BasicBlock& bb) {
+  Impl(*this, _ctx).AddSucc(_id, bb._id);
+}
+
+void BasicBlock::RemoveSucc(const BasicBlock &bb) {
+  Impl(*this, _ctx).RemoveSucc(_id, bb._id);
+}
+
+void BasicBlock::RemoveSuccs() {
+  Impl(*this, _ctx).RemoveSuccs(_id);
+}
+
 WeakDataIterator<CodeXref> BasicBlock::CodeXrefs_d() {
   auto result = Impl(*this, _ctx).CodeXrefs(_id);
   return { std::make_unique<details::DataIterator_impl>(std::move(result)) };
@@ -667,7 +679,12 @@ WeakDataIterator<CodeXref> BasicBlock::CodeXrefs_d() {
 
 
 WeakObjectIterator<CodeXref> BasicBlock::CodeXrefs() {
-  auto result = BasicBlock_{ _ctx }.CodeXrefs_r(_id);
+  auto result = Impl(*this, _ctx).CodeXrefs_r(_id);
+  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
+}
+
+WeakObjectIterator<BasicBlock> BasicBlock::Succs() {
+  auto result = BasicBlock_{ _ctx }.Succs(_id);
   return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
 }
 /* Segment */
