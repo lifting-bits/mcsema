@@ -97,6 +97,16 @@ void Schema::CreateNMTables(Context &ctx) {
        FOREIGN KEY(bb_rowid) REFERENCES blocks(rowid)
       ))";
   db.template query< q_func_2_block >();
+
+  static Query q_bb_successors =
+    R"(CREATE TABLE IF NOT EXISTS bb_successors(
+        from_rowid integer NOT NULL,
+        to_rowid integer NOT NULL,
+        UNIQUE(from_rowid, to_rowid),
+        FOREIGN KEY(from_rowid) REFERENCES blocks(rowid),
+        FOREIGN KEY(to_rowid) REFERENCES blocks(rowid)
+      ))";
+  db.template query<q_bb_successors>();
 }
 
 void Schema::CreateSchema(Context &ctx) {
@@ -263,6 +273,8 @@ void Schema::CreateTriggers(Context &ctx) {
       BEGIN
           DELETE FROM code_references WHERE OLD.rowid = code_references.bb_rowid;
           DELETE FROM function_to_block WHERE OLD.rowid = function_to_block.bb_rowid;
+          DELETE FROM bb_successors WHERE OLD.rowid IN (bb_successors.from_rowid,
+                                                        bb_successors.to_rowid);
       END
   )";
   ctx.db.template query<delete_block>();

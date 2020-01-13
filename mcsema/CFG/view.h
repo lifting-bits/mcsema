@@ -32,6 +32,28 @@ void CheckName(T &t, const std::string& who) {
   }
 }
 
+void TrySomeErase(mcsema::cfg::Module &m) {
+    std::cerr << " > Let's print all current blocks with their xrefs" << std::endl;
+    // 1 query
+    for (auto bb_it = m.Blocks(); auto bb = bb_it.Fetch();) {
+        // |bb_it| queries
+        std::cerr << bb->ea() << std::endl;
+        // |bb_it| queries
+        for (auto ref_it = bb->CodeXrefs_d(); auto code_xref = ref_it.Fetch();) {
+            std::cerr << '\t' << *code_xref << std::endl;
+        }
+    }
+
+    std::cerr << " > Now we remove some block, let's say the second one" << std::endl;
+    auto bb_it = m.Blocks();
+    bb_it.Fetch();
+    bb_it.Fetch()->Erase();
+
+    std::cerr << " > We are left with:" << std::endl;
+    for (auto bb_it = m.Blocks(); auto bb = bb_it.Fetch();)
+        std::cerr << bb->ea() << std::endl;
+}
+
 void run()
 {
   using namespace std::string_literals;
@@ -41,16 +63,19 @@ void run()
 
   // Insert
   letter.CreateSchema();
-  auto lib = letter.module("lib.so");
-  auto bin = letter.module("bin.out");
+  std::cout << " > Creating modules" << std::endl;
+  auto lib = letter.AddModule("lib.so");
+  auto bin = letter.AddModule("bin.out");
 
+  std::cout << " > Adding symtab entries to modules" << std::endl;
   auto s_main = bin.AddSymtabEntry("main", SymtabEntryType::Internal);
   auto error_name = bin.AddSymtabEntry("error_name", SymtabEntryType::Internal);
   error_name.Erase();
 
-  auto main = letter.func(bin, 12, true);
+  std::cout << " > Adding some functions to bin module" << std::endl;
+  auto main = letter.AddFunction(bin, 12, true);
   main.Name(s_main);
-  auto foo = letter.func(bin, 32, false);
+  auto foo = letter.AddFunction(bin, 32, false);
 
   CheckName(main, "main");
   CheckName(foo, "foo");
@@ -60,7 +85,7 @@ void run()
             << std::endl;
   std::cout << "main has name: " << (*(main.Name())) << std::endl;
 
-  auto library_func = letter.func(lib, 0, false);
+  auto library_func = letter.AddFunction(lib, 0, false);
 
   std::string bin_data = "push rax ... pop rax\0";
   auto text = bin.AddMemoryRange(400400, 20, bin_data);
@@ -76,7 +101,7 @@ void run()
   // Add CodeXrefs
   // TODO: Check validity of entry
   auto xref = entry_bb.AddXref(400407, 600800, OperandType::Immediate);
-  auto masked_xref = entry_bb.AddXref(400407, 600800,
+  auto masked_xref = entry_bb.AddXref(400409, 600800,
                                       OperandType::Immediate,
                                       bin.AddSymtabEntry("Reference 1",
                                                          SymtabEntryType::Artificial),
@@ -114,6 +139,13 @@ void run()
   std::cout << res.Data().size() << " " << res.Data() << std::endl;
   std::cout << one_off.Data().size() << " " << one_off.Data() << std::endl;
   std::cout << last.Data().size() << " " << last.Data() << std::endl;
+
+  std::cout << "*** MemoryRange::Data()" << std::endl;
+  std::cout << rodata.Data() << " " << rodata.Data().size() << std::endl;
+
+  std::cout << "** BasicBlock::Data()" << std::endl;
+  std::cout << entry_bb.Data() << std::endl;
+  std::cout << exit_bb.Data() << std::endl;
 
   // Add DataXrefs
   auto d_xref = hello.AddXref(600800, 600823, 8,
@@ -181,6 +213,8 @@ void run()
     auto d_xref_data = *d_xref;
 
   }
+
+  TrySomeErase(bin);
 }
 
 
