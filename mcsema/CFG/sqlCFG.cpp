@@ -625,6 +625,10 @@ void Function::AttachBlock(const BasicBlock &bb) {
   Function_<Function>{ _ctx }.bind_bb(_id, bb._id);
 }
 
+WeakObjectIterator<BasicBlock> Function::BasicBlocks() {
+  auto result = Impl(*this, _ctx).BBs_r(_id);
+  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
+}
 
 /* BasicBlock */
 std::string_view BasicBlock::Data() {
