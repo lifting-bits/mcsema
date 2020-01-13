@@ -45,20 +45,23 @@ struct FirstArg<Ret (F::*)(Arg) const> {
 
 } // namespace details
 
-template<typename Ctx>
-bool Match(Ctx &ctx, int64_t ea) { return false; }
+template<typename HasCtx>
+bool Match(HasCtx &has_ctx, int64_t module_id, int64_t ea) { return false; }
 
-template<typename Ctx, typename Target, typename ... Targets>
-bool Match(Ctx &ctx, int64_t ea, Target target, Targets &&...targets) {
+template<typename HasCtx, typename Target, typename ... Targets>
+bool Match(
+    HasCtx &has_ctx, int64_t module_id, int64_t ea,
+    Target target, Targets &&...targets) {
+
   using Self = typename details::FirstArg<
       decltype(&Target::operator())
     >::type;
 
-  if (auto obj = Self::MatchEa(ctx, ea)) {
+  if (auto obj = Self::MatchEa(has_ctx, module_id, ea)) {
     target(std::move(*obj));
     return true;
   }
-  return Match(ctx, ea, std::forward<Targets>(targets)...);
+  return Match(has_ctx, module_id, ea, std::forward<Targets>(targets)...);
 }
 
 template<typename WeakIt, typename F>

@@ -86,12 +86,22 @@ namespace interface {
     // TODO: Can this be hidden away?
     // TODO: This needs to be filtered by module_id
     template<typename HasCtx>
-    static std::optional<Self> MatchEa(const HasCtx &has_ctx, int64_t ea) {
-      return MatchEa(has_ctx._ctx, ea);
+    static std::optional<Self> MatchEa(
+        const HasCtx &has_ctx,
+        int64_t module_id, // <- FIXME: normally it is private, this is ugly workaround
+        int64_t ea) {
+
+      return MatchEa(has_ctx._ctx, module_id, ea);
     }
 
+    //TODO: Implement
+    //static std::optional<Self> MatchEa(Module &m, int64_t ea);
+
   private:
-    static std::optional<Self> MatchEa(details::CtxPtr &ctx_ptr, int64_t ea);
+    static std::optional<Self> MatchEa(
+        details::CtxPtr &ctx_ptr,
+        int64_t module_id,
+        int64_t ea);
   };
 
   // Defition uses SymtabEntry class, therefore can be found lower
@@ -504,6 +514,12 @@ public:
 
   // FIXME: This should probably also delete all module-binded data?
   // void Erase();
+
+  template<typename ...Targets>
+  bool MatchEa(int64_t ea, Targets ...targets) {
+    return util::Match(*this, this->_id, ea, std::forward<Targets>(targets) ...);
+  }
+
 private:
   using details::Internals::Internals;
 

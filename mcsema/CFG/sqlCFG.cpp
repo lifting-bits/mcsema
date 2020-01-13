@@ -842,9 +842,10 @@ std::optional<SymtabEntry::data_t> interface::HasSymtabEntry<Self>::Symbol() {
 template<typename Self>
 std::optional<Self> interface::HasEa<Self>::MatchEa(
     details::CtxPtr &ctx_ptr,
+    int64_t module_id,
     int64_t ea) {
 
-  if (auto res = impl_t<Self>{ ctx_ptr }.IdFromEa( ea )) {
+  if (auto res = impl_t<Self>{ctx_ptr}.IdFromEa(ea, module_id)) {
     return { Self(*res, ctx_ptr) };
   }
   return {};

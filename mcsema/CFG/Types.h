@@ -212,7 +212,9 @@ template<typename Self>
 struct has_ea : _crtp<Self, has_ea> {
 
   static std::string q_id_from_ea() {
-    return std::string { "SELECT rowid FROM " } + Self::table_name + " WHERE ea = ?1";
+    return std::string { "SELECT rowid FROM " }
+        + Self::table_name
+        + " WHERE ea = ?1 and module_rowid = ?2";
   }
 
   static std::string q_get_ea() {
@@ -224,8 +226,8 @@ struct has_ea : _crtp<Self, has_ea> {
                      .template GetScalar_r<int64_t>();
   }
 
-  std::optional<int64_t> IdFromEa(int64_t ea) {
-    return this->db().template query<q_id_from_ea>(ea)
+  std::optional<int64_t> IdFromEa(int64_t ea, int64_t module_id) {
+    return this->db().template query<q_id_from_ea>(ea, module_id)
                      .template GetScalar<int64_t>();
   }
 
