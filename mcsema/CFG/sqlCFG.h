@@ -94,10 +94,12 @@ namespace interface {
       return MatchEa(has_ctx._ctx, module_id, ea);
     }
 
-    //TODO: Implement
-    //static std::optional<Self> MatchEa(Module &m, int64_t ea);
+    // If something has ea it must be part of a module
+    Module Module();
 
   private:
+
+    //TODO: Make this callable from outside
     static std::optional<Self> MatchEa(
         details::CtxPtr &ctx_ptr,
         int64_t module_id,

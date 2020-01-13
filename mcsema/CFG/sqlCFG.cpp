@@ -851,6 +851,12 @@ std::optional<Self> interface::HasEa<Self>::MatchEa(
   return {};
 }
 
+template<typename Self>
+Module interface::HasEa<Self>::Module() {
+  auto self = static_cast<Self *>(this);
+  return { impl_t<Self>{self->_ctx}.GetModule(self->_id), self->_ctx };
+}
+
 namespace interface {
 
 /* We must explicitly instantiate all templates */
