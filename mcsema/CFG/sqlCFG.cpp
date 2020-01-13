@@ -193,6 +193,17 @@ struct BasicBlock_: has_context,
        FROM code_references AS cr
        WHERE cr.bb_rowid = ?1)";
 
+  constexpr static Query q_iter_succs =
+    R"(SELECT to_rowid
+       FROM bb_successors
+       WHERE from_rowid = ?1)";
+
+  constexpr static Query q_add_succ =
+    R"(INSERT INTO bb_successors(from_rowid, to_rowid) VALUES (?1, ?2))";
+
+  constexpr static Query q_remove_specific_succ =
+    R"(DELETE FROM bb_successors WHERE from_rowid = ?1 AND to_rowid = ?2)";
+
   auto CodeXrefs(int64_t id) {
     return _ctx->db.template query<q_iter_code_xrefs_d>(id);
   }
