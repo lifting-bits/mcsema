@@ -267,6 +267,16 @@ void Schema::CreateTriggers(Context &ctx) {
   )";
   ctx.db.template query<delete_block>();
 
+  static Query delete_function = R"(
+    CREATE TRIGGER delete_function_cascase
+      AFTER DELETE ON functions
+      FOR EACH ROW
+      BEGIN
+        DELETE FROM function_to_block WHERE OLD.rowid = function_to_block.function_rowid;
+      END
+  )";
+  ctx.db.template query<delete_function>();
+
 }
 
 } // namespace mcsema::cfg
