@@ -252,6 +252,20 @@ void Schema::CreateSchema(Context &ctx) {
   db.template query<external_vars>();
 
   CreateNMTables(ctx);
+  CreateTriggers(ctx);
+}
+
+void Schema::CreateTriggers(Context &ctx) {
+  static Query delete_block = R"(
+    CREATE TRIGGER delete_bb_cascade
+      AFTER DELETE ON blocks
+      FOR EACH ROW
+      BEGIN
+          DELETE FROM code_references WHERE OLD.rowid = code_references.bb_rowid;
+      END
+  )";
+  ctx.db.template query<delete_block>();
+
 }
 
 } // namespace mcsema::cfg

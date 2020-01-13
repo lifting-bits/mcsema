@@ -29,6 +29,7 @@ struct Schema {
 
   static void CreateSchema(Context &ctx);
 
+  static void CreateTriggers(Context &ctx);
 };
 
 } // namespace mcsema::cfg
