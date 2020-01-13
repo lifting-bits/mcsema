@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <iostream>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -377,6 +378,13 @@ public:
     int64_t target_ea;
     OperandType op_type;
     std::optional<int64_t> mask;
+
+    template<typename Stream>
+    friend Stream& operator<<(Stream &os, const Data_ &obj) {
+      os << std::hex << obj.ea << " -> " << obj.target_ea << std::dec
+         << static_cast<int>(obj.op_type);
+      return os;
+    }
   };
 
   using data_t = Data_;
