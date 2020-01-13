@@ -41,6 +41,13 @@ To to_struct(From &&from) {
       std::forward<From>(from));
 }
 
+template<typename To, typename From>
+std::optional<To> maybe_to_struct(std::optional<From> &&from) {
+  if (!from)
+    return {};
+  return { to_struct<To>(*from) };
+}
+
 template< typename R, typename Yield, typename ...Args >
 void iterate( R &&r, Yield yield, Args &&...args )
 {
