@@ -211,6 +211,10 @@ struct has_symtab_name : _crtp<Self, has_symtab_name>
 template<typename Self>
 struct has_ea : _crtp<Self, has_ea> {
 
+  static std::string q_id_from_ea() {
+    return std::string { "SELECT rowid FROM " } + Self::table_name + " WHERE ea = ?1";
+  }
+
   static std::string q_get_ea() {
     return std::string { "SELECT ea FROM " } + Self::table_name + " WHERE rowid = ?1";
   }
@@ -218,6 +222,11 @@ struct has_ea : _crtp<Self, has_ea> {
   int64_t get_ea(int64_t id) {
     return this->db().template query<q_get_ea>(id)
                      .template GetScalar_r<int64_t>();
+  }
+
+  std::optional<int64_t> IdFromEa(int64_t ea) {
+    return this->db().template query<q_id_from_ea>(ea)
+                     .template GetScalar<int64_t>();
   }
 
 };
