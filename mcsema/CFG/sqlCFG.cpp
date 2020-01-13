@@ -208,6 +208,9 @@ struct BasicBlock_: has_context,
   constexpr static Query q_add_succ =
     R"(INSERT INTO bb_successors(from_rowid, to_rowid) VALUES (?1, ?2))";
 
+  constexpr static Query q_remove_all_succ =
+    R"(DELETE FROM bb_successors WHERE from_rowid = ?1)";
+
   constexpr static Query q_remove_specific_succ =
     R"(DELETE FROM bb_successors WHERE from_rowid = ?1 AND to_rowid = ?2)";
 
@@ -217,6 +220,10 @@ struct BasicBlock_: has_context,
 
   auto RemoveSucc(int64_t from, int64_t to) {
     return _ctx->db.template query<q_remove_specific_succ>(from, to);
+  }
+
+  auto RemoveSuccs(int64_t from) {
+    return _ctx->db.template query<q_remove_all_succ>(from);
   }
 
   auto AddSucc(int64_t from, int64_t to) {
