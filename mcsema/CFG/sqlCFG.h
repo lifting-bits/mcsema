@@ -84,6 +84,7 @@ namespace interface {
     int64_t ea();
 
     // TODO: Can this be hidden away?
+    // TODO: This needs to be filtered by module_id
     template<typename HasCtx>
     static std::optional<Self> MatchEa(const HasCtx &has_ctx, int64_t ea) {
       return MatchEa(has_ctx._ctx, ea);
@@ -292,8 +293,6 @@ public:
 
   // Iterate over all attached block
   WeakObjectIterator<BasicBlock> BasicBlocks();
-  // TODO: De-attach
-
 
   void Erase();
 
