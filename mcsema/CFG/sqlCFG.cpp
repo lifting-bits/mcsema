@@ -117,6 +117,14 @@ struct Module_ : has_context,
       return _ctx->db.template query<q_obj>(id);
   }
 
+  auto all_blocks_r(int64_t id) {
+    constexpr static Query q_bbs =
+      R"(SELECT rowid
+         FROM blocks
+         WHERE module_rowid = ?1)";
+    return _ctx->db.template query<q_bbs>(id);
+  }
+
   auto all_symbols(int64_t id) {
     constexpr static Query q_data =
       R"(select name, type_rowid from symtabs where module_rowid = ?1)";
@@ -173,6 +181,25 @@ struct BasicBlock_: has_context,
        WHERE bb.rowid NOT IN (SELECT bb_rowid
                               FROM function_to_block))";
 
+
+  constexpr static Query q_iter_code_xrefs =
+    R"(SELECT cr.rowid
+       FROM code_references AS cr
+       WHERE cr.bb_rowid = ?1)";
+
+  // TODO: This is dependent on internals of code_references table
+  constexpr static Query q_iter_code_xrefs_d =
+    R"(SELECT cr.ea, cr.target_ea, cr.operand_type_rowid, cr.mask
+       FROM code_references AS cr
+       WHERE cr.bb_rowid = ?1)";
+
+  auto CodeXrefs(int64_t id) {
+    return _ctx->db.template query<q_iter_code_xrefs_d>(id);
+  }
+
+  auto CodeXrefs_r(int64_t id) {
+    return _ctx->db.template query<q_iter_code_xrefs>(id);
+  }
 
   auto orphaned() {
     return _ctx->db.template query<q_orphans>();
@@ -366,6 +393,12 @@ auto Get(Result &result) -> ENABLE_IF(SymtabEntry) {
   return util::maybe_to_struct<Data>(std::move(out));
 }
 
+template<typename Data, typename Result>
+auto Get(Result &result) -> ENABLE_IF(CodeXref) {
+  auto out = result.template Get<int64_t, int64_t, OperandType, std::optional<int64_t>>();
+  return util::maybe_to_struct<Data>(std::move(out));
+}
+
 #undef ENABLE_IF
 
 /* Iterators */
@@ -529,6 +562,10 @@ WeakObjectIterator<BasicBlock> Module::OrphanedBasicBlocks() {
   return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
 }
 
+WeakObjectIterator<BasicBlock> Module::Blocks() {
+  auto result = Module_{ _ctx }.all_blocks_r(_id);
+  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
+}
 
 WeakDataIterator<SymtabEntry> Module::Symbols_d() {
   auto result = Module_{_ctx }.all_symbols(_id);
@@ -577,6 +614,16 @@ CodeXref BasicBlock::AddXref(int64_t ea,
           _ctx };
 }
 
+WeakDataIterator<CodeXref> BasicBlock::CodeXrefs_d() {
+  auto result = BasicBlock_{ _ctx }.CodeXrefs(_id);
+  return { std::make_unique<details::DataIterator_impl>(std::move(result)) };
+}
+
+
+WeakObjectIterator<CodeXref> BasicBlock::CodeXrefs() {
+  auto result = BasicBlock_{ _ctx }.CodeXrefs_r(_id);
+  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
+}
 /* Segment */
 
 std::string_view Segment::Data() {
@@ -755,7 +802,12 @@ template struct HasSymtabEntry<CodeXref>;
 } // namespace interface
 
 template struct WeakDataIterator<SymtabEntry>;
+
 template struct WeakObjectIterator<Function>;
 template struct WeakObjectIterator<BasicBlock>;
+
+template struct WeakDataIterator<CodeXref>;
+template struct WeakObjectIterator<CodeXref>;
+
 } // namespace cfg
 } // namespace mcsema

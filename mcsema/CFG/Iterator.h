@@ -27,6 +27,7 @@ namespace details {
 } // namespace details
 
 class Module;
+class BasicBlock;
 
 template<typename Entry>
 struct WeakObjectIterator {
@@ -39,6 +40,7 @@ struct WeakObjectIterator {
 
 private:
   friend Module;
+  friend BasicBlock;
 
   using Impl_t = std::unique_ptr<details::ObjectIterator_impl>;
   WeakObjectIterator(Impl_t &&impl);
@@ -58,6 +60,7 @@ struct WeakDataIterator {
 
 private:
   friend Module;
+  friend BasicBlock;
 
   using Impl_t = std::unique_ptr<details::DataIterator_impl>;
   WeakDataIterator(Impl_t &&impl);
