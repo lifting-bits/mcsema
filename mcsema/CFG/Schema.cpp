@@ -262,6 +262,7 @@ void Schema::CreateTriggers(Context &ctx) {
       FOR EACH ROW
       BEGIN
           DELETE FROM code_references WHERE OLD.rowid = code_references.bb_rowid;
+          DELETE FROM function_to_block WHERE OLD.rowid = function_to_block.bb_rowid;
       END
   )";
   ctx.db.template query<delete_block>();
