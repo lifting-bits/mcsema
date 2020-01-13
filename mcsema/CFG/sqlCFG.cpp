@@ -839,6 +839,17 @@ std::optional<SymtabEntry::data_t> interface::HasSymtabEntry<Self>::Symbol() {
       res.template Get<std::string, SymtabEntryType>());
 }
 
+template<typename Self>
+std::optional<Self> interface::HasEa<Self>::MatchEa(
+    details::CtxPtr &ctx_ptr,
+    int64_t ea) {
+
+  if (auto res = impl_t<Self>{ ctx_ptr }.IdFromEa( ea )) {
+    return { Self(*res, ctx_ptr) };
+  }
+  return {};
+}
+
 namespace interface {
 
 /* We must explicitly instantiate all templates */

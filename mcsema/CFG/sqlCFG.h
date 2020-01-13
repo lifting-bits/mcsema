@@ -41,6 +41,9 @@ class DataXref;
 // Context that represents the file and other helper data part of internal implemenation
 class Context;
 
+namespace details {
+  using CtxPtr = std::shared_ptr<Context>;
+} // namespace details
 
 /* Enums */
 enum class SymtabEntryType : unsigned char {
@@ -79,6 +82,15 @@ namespace interface {
   template<typename Self>
   struct HasEa {
     int64_t ea();
+
+    // TODO: Can this be hidden away?
+    template<typename HasCtx>
+    static std::optional<Self> MatchEa(const HasCtx &has_ctx, int64_t ea) {
+      return MatchEa(has_ctx._ctx, ea);
+    }
+
+  private:
+    static std::optional<Self> MatchEa(details::CtxPtr &ctx_ptr, int64_t ea);
   };
 
   // Defition uses SymtabEntry class, therefore can be found lower
@@ -90,7 +102,6 @@ namespace interface {
 // Internal stuff that could not be hidden away in .cpp file, plese pretend it is not here
 namespace details {
 
-using CtxPtr = std::shared_ptr<Context>;
 class Internals {
 
 protected:
@@ -251,6 +262,7 @@ private:
   friend class Letter;
   friend class Module;
   friend details::ObjectIterator_impl;
+  friend interface::HasEa<BasicBlock>;
 
   using details::Internals::Internals;
 };
@@ -289,6 +301,7 @@ private:
   using details::Internals::Internals;
 
   friend class details::ObjectIterator_impl;
+  friend class interface::HasEa<Function>;
 
   friend class Letter;
   friend class Module;
@@ -343,6 +356,7 @@ private:
   friend class Module;
   friend class Letter;
 
+  friend class interface::HasEa<Segment>;
 
   using details::Internals::Internals;
 };
@@ -374,6 +388,8 @@ public:
 private:
   friend class Letter;
   friend class Module;
+
+  friend class interface::HasEa<MemoryRange>;
 
   using details::Internals::Internals;
 };
@@ -439,6 +455,7 @@ public:
 private:
   friend class Segment;
 
+  friend class interface::HasEa<DataXref>;
   using details::Internals::Internals;
 };
 
