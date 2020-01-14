@@ -321,16 +321,28 @@ public:
     bool is_external;
     bool is_exported;
     bool is_thread_local;
+
+    template<typename Stream>
+    friend Stream &operator<<(Stream &os, const Flags &self) {
+      os << "RO " << self.read_only << ", "
+         << "External: " << self.is_external << ", "
+         << "Exported: " << self.is_exported << ", "
+         << "Thread local: " << self.is_thread_local;
+      return os;
+    }
   };
 
   struct Data_ {
     int64_t ea;
     int64_t size;
-    // TODO: Fold this to Flags
-    bool read_only;
-    bool is_external;
-    bool is_exported;
-    bool is_thread_local;
+    Flags flags;
+
+    template<typename Stream>
+    friend Stream& operator<<(Stream &os, const Data_& self) {
+      os << std::hex << "0x" << self.ea << std::dec << " of size " << self.size
+         << " and flags: " << self.flags;
+      return os;
+    }
   };
 
   using data_t = Data_;
