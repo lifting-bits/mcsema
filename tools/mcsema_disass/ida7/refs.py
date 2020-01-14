@@ -428,12 +428,13 @@ def get_instruction_references(arg, binary_is_pie=False):
   all_refs = get_all_references_from(inst.ea)
 
   del _FIXUPS[:]
-  for ea in xrange(inst.ea, inst.ea + inst.size):
-    offset = ea - inst.ea
+  offset = 0
+  while offset < inst.size:
     targ_ea = idc.get_fixup_target_off(ea)
     if not is_invalid_ea(targ_ea):
       all_refs.add(targ_ea)
       _FIXUPS.append((offset, targ_ea))
+    offset += 1
 
   refs = []
   for i, op in enumerate(inst.ops):
@@ -517,11 +518,10 @@ def get_instruction_references(arg, binary_is_pie=False):
     if (inst.ea, ref.ea) not in _NOT_A_REF:
       refs.append(ref)
 
-  # Issue #623, `fixup_target_addr` can sometimes add in the wrong target. So
+  # Issue #623, `get_fixup_target_off` can sometimes add in the wrong target. So
   # go and prefer the instruction-operand focused approach, and fall back on
   # fixup targets when available.
   for offset, targ_ea in _FIXUPS:
-    offset = ea - inst.ea
     if offset not in offset_to_ref and (inst.ea, targ_ea) not in _NOT_A_REF:
       refs.append(Reference(targ_ea, offset))
 
