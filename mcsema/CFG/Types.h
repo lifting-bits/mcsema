@@ -249,12 +249,12 @@ struct has_ea : _crtp<Self, has_ea> {
   }
 
   std::optional<int64_t> IdFromEa(int64_t ea, int64_t module_id) {
-    return this->db().template query<q_id_from_ea>(ea, module_id)
+    return this->db().template query<Self::q_id_from_ea>(ea, module_id)
                      .template GetScalar<int64_t>();
   }
 
   int64_t GetModule(int64_t id) {
-    return this->db().template query<q_get_module>(id)
+    return this->db().template query<Self::q_get_module>(id)
                      .template GetScalar_r<int64_t>();
   }
 };
