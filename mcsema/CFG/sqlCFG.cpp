@@ -766,59 +766,22 @@ std::string ExternalFunction::Name() const {
 }
 
 /* operator*() */
-SymtabEntry::data_t SymtabEntry::operator*() const {
-  using self_t = remove_cvp_t<decltype(this)>;
-  return impl_t<self_t>{_ctx}.c_get<typename self_t::data_t,
-                                    std::string, SymtabEntryType>(_id);
-}
 
-ExternalFunction::data_t ExternalFunction::operator*() const {
-  using self_t = remove_cvp_t<decltype(this)>;
-  return impl_t<self_t>{_ctx}.c_get<typename self_t::data_t,
-                                    int64_t, CC, bool, bool>(_id);
-}
+#define DEFINE_DATA_OPERATOR(Type) \
+  Type::data_t Type::operator*() const { \
+    using self_t = remove_cvp_t<decltype(this)>; \
+    return impl_t<self_t>{_ctx} \
+        .c_get<typename self_t::data_t>(_id, data_fields_t<self_t>{}); \
+  }
 
-BasicBlock::data_t BasicBlock::operator*() const {
-  using self_t = remove_cvp_t<decltype(this)>;
-  return impl_t<self_t>{ _ctx }.c_get<typename self_t::data_t,
-                                      int64_t, int64_t>(_id);
-}
-
-Function::data_t Function::operator*() const {
-  using self_t = remove_cvp_t<decltype(this)>;
-  return impl_t<self_t>{ _ctx }.c_get<typename self_t::data_t,
-                                       int64_t, bool>(_id);
-}
-
-Segment::data_t Segment::operator*() const {
-  using self_t = remove_cvp_t<decltype(this)>;
-  return impl_t<self_t>{ _ctx }.c_get<typename self_t::data_t,
-                                      int, int, bool, bool, bool, bool>(_id);
-}
-
-MemoryRange::data_t MemoryRange::operator*() const {
-  using self_t = remove_cvp_t<decltype(this)>;
-  return impl_t<self_t>{ _ctx }.c_get<typename self_t::data_t,
-                                      int64_t, int64_t>(_id);
-
-}
-
-CodeXref::data_t CodeXref::operator*() const {
-  using self_t = remove_cvp_t<decltype(this)>;
-  return impl_t<self_t>{ _ctx }.c_get<typename self_t::data_t,
-                                      int64_t, int64_t, OperandType,
-                                      std::optional<int64_t>>(_id);
-
-}
-
-
-DataXref::data_t DataXref::operator*() const {
-  using self_t = remove_cvp_t<decltype(this)>;
-  return impl_t<self_t>{ _ctx }.c_get<typename self_t::data_t,
-                                      int64_t, int64_t, int64_t, FixupKind>(_id);
-
-}
-
+DEFINE_DATA_OPERATOR(SymtabEntry);
+DEFINE_DATA_OPERATOR(ExternalFunction);
+DEFINE_DATA_OPERATOR(BasicBlock);
+DEFINE_DATA_OPERATOR(Function);
+DEFINE_DATA_OPERATOR(Segment);
+DEFINE_DATA_OPERATOR(MemoryRange);
+DEFINE_DATA_OPERATOR(CodeXref);
+DEFINE_DATA_OPERATOR(DataXref);
 
 /* Erasable */
 
