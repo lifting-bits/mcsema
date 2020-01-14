@@ -277,8 +277,8 @@ struct Segment_ : has_context,
         variable_name, memory_rowid) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8))";
 
   constexpr static Query q_get =
-    R"(SELECT ea, size read_only, is_external, is_exported
-       FROM segments,
+    R"(SELECT ea, size, read_only, is_external, is_exported, is_thread_local
+       FROM segments
        WHERE rowid = ?1)";
 
   auto _insert(int64_t ea,
@@ -387,7 +387,7 @@ struct ExternalFunction_ : has_context,
   constexpr static Query q_get =
     R"(SELECT ea, calling_convention_rowid, has_return, is_weak
        FROM external_functions
-       WHERE rowdid = ?1)";
+       WHERE rowid = ?1)";
 
 };
 
