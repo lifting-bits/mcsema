@@ -221,6 +221,12 @@ struct has_ea : _crtp<Self, has_ea> {
     return std::string { "SELECT ea FROM " } + Self::table_name + " WHERE rowid = ?1";
   }
 
+  static std::string q_get_module() {
+    return std::string { "SELECT module_rowid FROM " } +
+           + Self::table_name
+           + " WHERE rowid = ?1";
+  }
+
   int64_t get_ea(int64_t id) {
     return this->db().template query<q_get_ea>(id)
                      .template GetScalar_r<int64_t>();
@@ -231,6 +237,10 @@ struct has_ea : _crtp<Self, has_ea> {
                      .template GetScalar<int64_t>();
   }
 
+  int64_t GetModule(int64_t id) {
+    return this->db().template query<q_get_module>(id)
+                     .template GetScalar_r<int64_t>();
+  }
 };
 
 
