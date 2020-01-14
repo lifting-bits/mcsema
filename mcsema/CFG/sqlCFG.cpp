@@ -399,7 +399,10 @@ struct dispatch {
 };
 
 template<>
-struct dispatch<ExternalFunction> { using type = ExternalFunction_<ExternalFunction>; };
+struct dispatch<ExternalFunction> {
+  using type = ExternalFunction_<ExternalFunction>;
+  using data_fields = util::TypeList<int64_t, CC, bool, bool>;
+};
 
 template<>
 struct dispatch<CodeXref> {
@@ -409,19 +412,34 @@ struct dispatch<CodeXref> {
 };
 
 template<>
-struct dispatch<DataXref> { using type = DataXref_<DataXref>; };
+struct dispatch<DataXref> {
+  using type = DataXref_<DataXref>;
+  using data_fields = util::TypeList<int64_t, int64_t, int64_t, FixupKind>;
+};
 
 template<>
-struct dispatch<Function> { using type = Function_<Function>; };
+struct dispatch<Function> {
+  using type = Function_<Function>;
+  using data_fields = util::TypeList<int64_t, bool>;
+};
 
 template<>
-struct dispatch<BasicBlock> { using type = BasicBlock_<BasicBlock>; };
+struct dispatch<BasicBlock> {
+  using type = BasicBlock_<BasicBlock>;
+  using data_fields = util::TypeList<int64_t, int64_t>;
+};
 
 template<>
-struct dispatch<Segment> { using type = Segment_<Segment>; };
+struct dispatch<Segment> {
+  using type = Segment_<Segment>;
+  using data_fields = util::TypeList<int64_t, int64_t, bool, bool, bool, bool>;
+};
 
 template<>
-struct dispatch<MemoryRange> { using type = MemoryRange_<MemoryRange>; };
+struct dispatch<MemoryRange> {
+  using type = MemoryRange_<MemoryRange>;
+  using data_fields = util::TypeList<int64_t, int64_t>;
+};
 
 template<>
 struct dispatch<SymtabEntry> {
