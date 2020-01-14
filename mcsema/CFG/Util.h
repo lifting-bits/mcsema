@@ -26,17 +26,18 @@ namespace mcsema::cfg {
 namespace util
 {
 
+template<typename ...Args>
+struct TypeList {};
+
 namespace details {
 
 template<typename T>
 struct FirstArg {};
 
-
 template<typename F, typename Ret, typename Arg>
 struct FirstArg<Ret (F::*)(Arg)> {
   using type = Arg;
 };
-
 
 template<typename F, typename Ret, typename Arg>
 struct FirstArg<Ret (F::*)(Arg) const> {
