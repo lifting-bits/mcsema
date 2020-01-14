@@ -443,24 +443,18 @@ auto Impl(Self, Ctx ctx) {
   return impl_t<Self>(ctx);
 }
 
-#define ENABLE_IF(name) \
-  typename std::enable_if_t<std::is_same_v<name::data_t, Data>, std::optional<Data>>
 
-
-template<typename Data, typename Result>
-auto Get(Result &result) -> ENABLE_IF(SymtabEntry) {
-  auto out = result.template Get<std::string, SymtabEntryType>();
-  return util::maybe_to_struct<Data>(std::move(out));
+template<typename Concrete, typename Result, typename ... Fields>
+auto MaybeToData(Result &result, util::TypeList<Fields...>) {
+  auto out = result.template Get<Fields...>();
+  return util::maybe_to_struct<Concrete>(std::move(out));
 }
 
-template<typename Data, typename Result>
-auto Get(Result &result) -> ENABLE_IF(CodeXref) {
-  auto out = result.template Get<int64_t, int64_t, OperandType, std::optional<int64_t>>();
-  return util::maybe_to_struct<Data>(std::move(out));
+template<typename Concrete, typename Result, typename ... Fields>
+auto ToData(Result &result, util::TypeList<Fields...>) {
+  auto out = result.template Get<Fields...>();
+  return util::to_struct<Concrete>(std::move(out));
 }
-
-#undef ENABLE_IF
-
 /* Iterators */
 namespace details {
 
@@ -470,9 +464,9 @@ struct DataIterator_impl {
 
   DataIterator_impl(Result_t &&r) : result(std::move(r)) {}
 
-  template<typename Data>
+  template<typename Entry>
   auto Fetch() {
-    return Get<Data>(result) ;
+    return MaybeToData<typename Entry::data_t>(result, data_fields_t<Entry>{}) ;
   }
 };
 
@@ -515,7 +509,7 @@ WeakDataIterator<Entry>::WeakDataIterator(Impl_t &&init) : impl(std::move(init))
 
 template<typename Entry>
 auto WeakDataIterator<Entry>::Fetch() -> maybe_data_t {
-  return impl->Fetch<data_t>();
+  return impl->Fetch<Entry>();
 }
 
 template<typename Entry>
