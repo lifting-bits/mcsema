@@ -394,24 +394,39 @@ struct ExternalFunction_ : has_context,
 
 /* Dispatch table used to implement generic interface traits for top level API */
 template<typename T>
-struct dispatch { using type = void;  };
+struct dispatch {
+  using type = void;
+};
+
 template<>
 struct dispatch<ExternalFunction> { using type = ExternalFunction_<ExternalFunction>; };
+
 template<>
-struct dispatch<CodeXref> { using type = CodeXref_<CodeXref>; };
+struct dispatch<CodeXref> {
+  using type = CodeXref_<CodeXref>;
+  using data_fields =
+    util::TypeList<int64_t, int64_t, OperandType, std::optional<int64_t>>;
+};
+
 template<>
 struct dispatch<DataXref> { using type = DataXref_<DataXref>; };
+
 template<>
 struct dispatch<Function> { using type = Function_<Function>; };
+
 template<>
 struct dispatch<BasicBlock> { using type = BasicBlock_<BasicBlock>; };
+
 template<>
 struct dispatch<Segment> { using type = Segment_<Segment>; };
+
 template<>
 struct dispatch<MemoryRange> { using type = MemoryRange_<MemoryRange>; };
+
 template<>
 struct dispatch<SymtabEntry> {
   using type = SymtabEntry_<SymtabEntry>;
+  using data_fields = util::TypeList<std::string, SymtabEntryType>;
 };
 
 template<typename T>
@@ -419,6 +434,9 @@ using remove_cvp_t = typename std::remove_cv_t<std::remove_pointer_t<T>>;
 
 template<typename T>
 using impl_t = typename dispatch<remove_cvp_t<T>>::type;
+
+template<typename T>
+using data_fields_t = typename dispatch<remove_cvp_t<T>>::data_fields;
 
 template<typename Self, typename Ctx>
 auto Impl(Self, Ctx ctx) {
