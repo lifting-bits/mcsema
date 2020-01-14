@@ -74,16 +74,16 @@ class InstructionLifter : public remill::InstructionLifter {
 
   TranslationContext &ctx;
 
-  remill::Instruction *inst_ptr;
-  llvm::BasicBlock *block;
+  remill::Instruction *inst_ptr{nullptr};
+  llvm::BasicBlock *block{nullptr};
 
-  llvm::Value *mem_ref;
-  llvm::Value *disp_ref;
-  llvm::Value *imm_ref;
+  llvm::Value *mem_ref{nullptr};
+  llvm::Value *disp_ref{nullptr};
+  llvm::Value *imm_ref{nullptr};
 
-  bool mem_ref_used;
-  bool disp_ref_used;
-  bool imm_ref_used;
+  bool mem_ref_used{false};
+  bool disp_ref_used{false};
+  bool imm_ref_used{false};
 };
 
 }  // namespace mcsema
