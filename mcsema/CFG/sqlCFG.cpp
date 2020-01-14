@@ -281,6 +281,18 @@ struct Segment_ : has_context,
        FROM segments
        WHERE rowid = ?1)";
 
+  constexpr static Query q_get_module =
+    R"(SELECT mr.module_rowid
+       FROM segments as seg
+       JOIN memory_ranges AS mr
+       WHERE seg.memory_rowid = mr.rowid and seg.rowid = ?1)";
+
+  constexpr static Query q_id_from_ea =
+    R"(SELECT seg.rowid
+       FROM segments as seg
+       JOIN memory_ranges AS mr
+       WHERE seg.memory_rowid = mr.rowid and seg.ea = ?1 and mr.module_rowid = ?2)";
+
   auto _insert(int64_t ea,
                int64_t size,
                const Segment::Flags &flags,
