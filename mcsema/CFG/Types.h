@@ -93,6 +93,22 @@ struct id_based_ops_: _crtp<Self, id_based_ops_>
   }
 
   template<typename Concrete, typename ...Fields>
+  auto maybe_c_get(int64_t id, util::TypeList<Fields...>) {
+    return maybe_c_get<Concrete, Fields...>(id);
+  }
+
+  template<typename Concrete, typename ...Fields>
+  auto maybe_c_get(int64_t id) {
+    auto result = this->db().template query<Self::q_get>(id);
+    return util::maybe_to_struct<Concrete>(*result.template Get<Fields...>());
+  }
+
+  template<typename Concrete, typename ...Fields>
+  auto c_get(int64_t id, util::TypeList<Fields...>) {
+    return c_get<Concrete, Fields...>(id);
+  }
+
+  template<typename Concrete, typename ...Fields>
   auto c_get(int64_t id) {
     auto result = this->db().template query<Self::q_get>(id);
     return util::to_struct<Concrete>(*result.template Get<Fields...>());
