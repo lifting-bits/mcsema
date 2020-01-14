@@ -28,6 +28,7 @@ namespace details {
 
 class Module;
 class BasicBlock;
+class Function;
 
 template<typename Entry>
 struct WeakObjectIterator {
@@ -40,6 +41,7 @@ struct WeakObjectIterator {
 
 private:
   friend Module;
+  friend Function;
   friend BasicBlock;
 
   using Impl_t = std::unique_ptr<details::ObjectIterator_impl>;
