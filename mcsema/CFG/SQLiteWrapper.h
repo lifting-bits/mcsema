@@ -575,6 +575,8 @@ class Database {
           } else {
             sqlite3_bind_null(stmt, idx);
           }
+        } else if constexpr (std::is_null_pointer_v<arg_t>){
+          sqlite3_bind_null(stmt, idx);
         } else {
           static_assert(detail::dependent_false<arg_t>);
         }
