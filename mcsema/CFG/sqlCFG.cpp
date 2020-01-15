@@ -566,6 +566,9 @@ Letter::Letter(const std::string &name) : _ctx(std::make_shared<Context>(name)) 
 
 void Letter::CreateSchema()
 {
+  constexpr static Query q_pragmas =
+    R"(PRAGMA foreign_keys = ON)";
+  _ctx->db.template query<q_pragmas>();
   Schema::CreateSchema(*_ctx);
 }
 
