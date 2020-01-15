@@ -726,7 +726,7 @@ CodeXref BasicBlock::AddXref(int64_t ea,
                                     target_ea,
                                     _id,
                                     static_cast<unsigned char>(op_type),
-                                    (mask) ? *mask : NULL,
+                                    (mask) ? *mask : nullptr,
                                     name._id),
           _ctx };
 }
@@ -771,7 +771,7 @@ void Segment::SetFlags(const Flags &flags) {
 DataXref Segment::AddXref(int64_t ea, int64_t target_ea, int64_t width, FixupKind fixup) {
   return { DataXref_{ _ctx }.insert(ea, width, target_ea, _id,
                                     static_cast<unsigned char>(fixup),
-                                    NULL),
+                                    nullptr),
           _ctx };
 }
 
