@@ -37,6 +37,7 @@ void Schema::CreateEnums(Context &ctx) {
 
   // rowid corresponds to llvm value for given cc
   static Query cc = R"(create table if not exists calling_conventions(
+        rowid INTEGER PRIMARY KEY,
         name text NOT NULL
         ))";
   db.template query<cc>();
@@ -49,6 +50,7 @@ void Schema::CreateEnums(Context &ctx) {
   db.template query<populate_cc>(79, "Win64");
 
   static Query operand_types = R"(create table if not exists operand_types(
+      rowid INTEGER PRIMARY KEY,
       type text NOT NULL
       ))";
   db.template query<operand_types>();
@@ -62,6 +64,7 @@ void Schema::CreateEnums(Context &ctx) {
   db.template query<populate_operad_types>(4, "OffsetTable operand");
 
   static Query symtab_types = R"(create table if not exists symtab_types(
+      rowid INTEGER PRIMARY KEY,
       type text NOT NULL
       ))";
   db.template query<symtab_types>();
@@ -75,6 +78,7 @@ void Schema::CreateEnums(Context &ctx) {
 
   static Query fixup_kinds =
     R"(create table if not exists fixup_kinds(
+      rowid INTEGER PRIMARY KEY,
       type text NOT NULL
       ))";
   db.template query<fixup_kinds>();
@@ -116,7 +120,8 @@ void Schema::CreateSchema(Context &ctx) {
 
   static Query c_module =
     R"(create table if not exists modules(
-       name text
+       name text,
+       rowid INTEGER PRIMARY KEY
       ))";
   db.template query<c_module>();
 
@@ -128,6 +133,7 @@ void Schema::CreateSchema(Context &ctx) {
   db.template query<c_module_meta>();
 
   static Query functions = R"(create table if not exists functions(
+        rowid INTEGER PRIMARY KEY,
         ea integer NOT NULL,
         is_entrypoint integer,
         symtab_rowid integer DEFAULT NULL,
@@ -138,6 +144,7 @@ void Schema::CreateSchema(Context &ctx) {
   db.template query<functions>();
 
   static Query memory_ranges = R"(create table if not exists memory_ranges(
+    rowid INTEGER PRIMARY KEY,
     ea integer NOT NULL,
     size integer,
     module_rowid integer,
@@ -148,6 +155,7 @@ void Schema::CreateSchema(Context &ctx) {
   db.template query<memory_ranges>();
 
   static Query blocks = R"(create table if not exists blocks(
+        rowid INTEGER PRIMARY KEY,
         ea integer NOT NULL,
         size integer,
         module_rowid integer,
@@ -158,6 +166,7 @@ void Schema::CreateSchema(Context &ctx) {
   db.template query<blocks>();
 
   static Query segments = R"(create table if not exists segments(
+        rowid INTEGER PRIMARY KEY,
         ea integer NOT NULL,
         size integer,
         read_only integer,
@@ -171,6 +180,7 @@ void Schema::CreateSchema(Context &ctx) {
   db.template query<segments>();
 
   static Query symtabs = R"(create table if not exists symtabs(
+        rowid INTEGER PRIMARY KEY,
         name text NOT NULL,
         module_rowid integer NOT NULL,
         type_rowid integer NOT NULL,
@@ -181,6 +191,7 @@ void Schema::CreateSchema(Context &ctx) {
 
   // TODO: Signature
   static Query external_functions = R"(create table if not exists external_functions(
+        rowid INTEGER PRIMARY KEY,
         ea integer NOT NULL,
         calling_convention_rowid integer NOT NULL,
         symtab_rowid integer NOT NULL,
@@ -195,6 +206,7 @@ void Schema::CreateSchema(Context &ctx) {
   db.template query<external_functions>();
 
   static Query code_xrefs = R"(create table if not exists code_references(
+        rowid INTEGER PRIMARY KEY,
         ea integer NOT NULL,
         target_ea integer NOT NULL,
         bb_rowid NOT NULL,
@@ -209,6 +221,7 @@ void Schema::CreateSchema(Context &ctx) {
 
 
   static Query data_xrefs = R"(create table if not exists data_references(
+        rowid INTEGER PRIMARY KEY,
         ea integer NOT NULL,
         width integer NOT NULL,
         target_ea integer NOT NULL,
