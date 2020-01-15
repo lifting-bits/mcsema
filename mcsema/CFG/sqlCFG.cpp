@@ -685,8 +685,8 @@ CodeXref BasicBlock::AddXref(int64_t ea, int64_t target_ea, OperandType op_type)
                                     target_ea,
                                     _id,
                                     static_cast<unsigned char>(op_type),
-                                    NULL,
-                                    NULL),
+                                    nullptr,
+                                    nullptr),
           _ctx };
 }
 
