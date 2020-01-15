@@ -430,7 +430,7 @@ def get_instruction_references(arg, binary_is_pie=False):
   del _FIXUPS[:]
   offset = 0
   while offset < inst.size:
-    targ_ea = idc.get_fixup_target_off(ea)
+    targ_ea = idc.get_fixup_target_off(offset + inst.ea)
     if not is_invalid_ea(targ_ea):
       all_refs.add(targ_ea)
       _FIXUPS.append((offset, targ_ea))
