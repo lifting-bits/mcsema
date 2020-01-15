@@ -30,6 +30,14 @@ class Module;
 class BasicBlock;
 class Function;
 
+/* Due to some underlying problems it was too complicated to implement proper C++
+ * iterators, so unfortunately nice for (X : A) is not viable atm.
+ *
+ * Iterators can be created only by API objects and only method Fetch is available,
+ * which returns empty `std::optional` if there are no more objects to iterate over.
+ */
+
+// Fetch returns objects
 template<typename Entry>
 struct WeakObjectIterator {
   using data_t = Entry;
@@ -50,6 +58,7 @@ private:
   Impl_t impl;
 };
 
+// Fetch returns Entry::data_t
 template<typename Entry>
 struct WeakDataIterator {
 

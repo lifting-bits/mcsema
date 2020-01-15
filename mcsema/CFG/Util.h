@@ -34,6 +34,7 @@ namespace details {
 template<typename T>
 struct FirstArg {};
 
+// Stores first argument of F in type
 template<typename F, typename Ret, typename Arg>
 struct FirstArg<Ret (F::*)(Arg)> {
   using type = Arg;
@@ -46,6 +47,12 @@ struct FirstArg<Ret (F::*)(Arg) const> {
 
 } // namespace details
 
+// Implements "switch" on ea, which is for example useful if there is a `target_ea`
+// but there is no way to tell which object it corresponds to (if any at all)
+// Match allows partial solution to this problem:
+// Match(module, _, 0x400400, [&](BasicBlock) { ... },
+//                            [&](Function) { ... } );
+// If nothing was matched, `False` is returned
 template<typename HasCtx>
 bool Match(HasCtx &has_ctx, int64_t module_id, int64_t ea) { return false; }
 
@@ -65,6 +72,7 @@ bool Match(
   return Match(has_ctx, module_id, ea, std::forward<Targets>(targets)...);
 }
 
+// Makes iteration over objects using WeakPointers shorter
 template<typename WeakIt, typename F>
 void ForEach(WeakIt it, F f) {
   while (auto data = it.Fetch()) {

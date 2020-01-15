@@ -25,10 +25,12 @@ namespace mcsema::cfg {
 
 using Query = const char *;
 
+// TODO: Allow some other names as well
 static inline std::string Name() {
   return "example.sql";
 }
 
+// General context every object of front API has. Handles db and cache.
 class Context {
 public:
   Context(const std::string &db_name) : _db_name(db_name) {}

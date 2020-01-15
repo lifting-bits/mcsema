@@ -28,11 +28,27 @@
 namespace mcsema {
 namespace cfg {
 
+/* This file contains mapping from public API -> internal implementations and definitions
+ * of these implementations.
+ * If public API has object X there should be object X_ that implements it
+ * (something like pimpl idiom).
+ * These object are templated by their Concrete (public API) objects, which was used
+ * in older version but currently is not and will probably be removed.
+ * Design tries to hide all wrapper code away in CRTP classes (see `Types.h`) and leaves
+ * implementation classes only with query definitions. (From obvious reasons this is not
+ * always possible)
+ *
+ * It is expected each implementation class should inherit from `with_context`
+ * and provide at least table_name as static attribute.
+ */
+
 using Database = decltype(Context::db);
 
 using CtxPtr = std::shared_ptr<Context>;
 using CtxR = Context *;
 
+// Each implementation needs to have access to the Context class, but since they are not
+// owning it or copying it, raw pointer is enough.
 template<typename Ctx>
 struct with_context {
 
@@ -187,7 +203,6 @@ struct BasicBlock_: has_context,
        FROM blocks AS bb
        WHERE bb.rowid NOT IN (SELECT bb_rowid
                               FROM function_to_block))";
-
 
   constexpr static Query q_iter_code_xrefs =
     R"(SELECT cr.rowid
@@ -404,11 +419,22 @@ struct ExternalFunction_ : has_context,
 };
 
 
-/* Dispatch table used to implement generic interface traits for top level API */
+/* Hardcoding each implementation class in each public object method implementation
+ * is tedious and error-prone. Following class provides this mapping at compile time
+ * and tries to eliminate as much copy-paste code as possible. */
 template<typename T>
 struct dispatch {
   using type = void;
 };
+
+/* Each specialization should have:
+ * T = public API class
+ * type = implementation class
+ * data_fields = util::TypeList<...> where ... should be types of attributes of T::data_t.
+ *               This is used to allowed easier code generation for DB -> T::data_t
+ *
+ * TODO: If tables are defined as templates table type should be here as well
+ */
 
 template<>
 struct dispatch<ExternalFunction> {
@@ -468,12 +494,14 @@ using impl_t = typename dispatch<remove_cvp_t<T>>::type;
 template<typename T>
 using data_fields_t = typename dispatch<remove_cvp_t<T>>::data_fields;
 
+// Helper to ease some writing
 template<typename Self, typename Ctx>
 auto Impl(Self, Ctx ctx) {
   return impl_t<Self>(ctx);
 }
 
-
+// Convert result of `query` into `Concrete`
+// This is used by Iterators
 template<typename Concrete, typename Result, typename ... Fields>
 auto MaybeToData(Result &result, util::TypeList<Fields...>) {
   auto out = result.template Get<Fields...>();
@@ -485,9 +513,11 @@ auto ToData(Result &result, util::TypeList<Fields...>) {
   auto out = result.template Get<Fields...>();
   return util::to_struct<Concrete>(std::move(out));
 }
-/* Iterators */
+
+/* Definition of Iterators (their hidden part) */
 namespace details {
 
+// Data iterator returns data_t
 struct DataIterator_impl {
   using Result_t = Context::Result_t;
   Result_t result;
@@ -500,7 +530,7 @@ struct DataIterator_impl {
   }
 };
 
-
+// Object Iterator returns public API objects
 struct ObjectIterator_impl {
   using Result_t = Context::Result_t;
   Result_t result;
@@ -524,16 +554,11 @@ struct ObjectIterator_impl {
     }
     return {};
   }
-
-  #define ENABLE_IF(name) \
-    typename std::enable_if_t<std::is_same_v<name, Data>, std::optional<Data>>
-  #undef ENABLE_IF
 };
-
-
 
 } // namespace details
 
+/* Define methods of iterators visible from header */
 template<typename Entry>
 WeakDataIterator<Entry>::WeakDataIterator(Impl_t &&init) : impl(std::move(init)) {}
 
@@ -558,7 +583,8 @@ WeakObjectIterator<Entry>::~WeakObjectIterator() {}
 
 
 
-
+// TODO: Use `impl_t` in methods defined before it was present.
+/* Define public API methods, typically by calling their implementations */
 
 /* Letter */
 
@@ -780,6 +806,9 @@ std::string ExternalFunction::Name() const {
   return *impl_t<decltype(this)>{ _ctx }.GetName(_id);
 }
 
+// Thanks to uniform dispatch each definition of following method looks identical,
+// therefore simple macro can be defined that is more readable.
+
 /* operator*() */
 
 #define DEFINE_DATA_OPERATOR(Type) \
@@ -816,7 +845,12 @@ DEF_ERASE(DataXref)
 
 #undef DEF_ERASE
 
-/* Traits */
+/* In public API some classes inherit from interfaces, that are CRTP.
+ * Therefore it is enough to define them once, but since they are templates we need
+ * to explicitly instantiate them. That is luckily not a problem, since we know
+ * before-hand which classes implements which interface and user is not allowed to define
+ * any new classes.
+ */
 
 template<typename Self>
 int64_t interface::HasEa<Self>::ea() {
@@ -865,6 +899,8 @@ Module interface::HasEa<Self>::Module() {
   return { impl_t<Self>{self->_ctx}.GetModule(self->_id), self->_ctx };
 }
 
+// TODO: Move into separate .cpp file
+
 namespace interface {
 
 /* We must explicitly instantiate all templates */
@@ -890,6 +926,8 @@ template struct HasEa<CodeXref>;
 template struct HasSymtabEntry<CodeXref>;
 
 } // namespace interface
+
+// Since Iterators are also templated, we must instantiate them as well
 
 template struct WeakDataIterator<SymtabEntry>;
 

@@ -45,6 +45,16 @@ struct _crtp
 
 };
 
+/* Objects in a binary typically share some properties (it extends to their db tables
+ * as well). Following CRTP classes implement some basic behaviour that is shared for
+ * many of them.
+ * If some object implements operation over table, all it needs to do is inherit from
+ * these and provide some basic static queries and gains a lot of wrapper code that would
+ * otherwise need to be written manually.
+ */
+
+
+/* Requires that table has rowid as primary key */
 template<typename Self>
 struct id_based_ops_: _crtp<Self, id_based_ops_>
 {
@@ -130,6 +140,10 @@ struct id_based_ops_: _crtp<Self, id_based_ops_>
   }
 };
 
+
+/* TODO: Generalize M:N table patterns. */
+/* FIXME: Hardcoded table names are used, therefore it probably makes sense to move it
+ *        one layer down. */
 template<typename Self>
 struct func_ops_ : _crtp<Self, func_ops_>
 {
@@ -165,6 +179,7 @@ struct func_ops_ : _crtp<Self, func_ops_>
   }
 };
 
+/* TODO, FIXME: Same as func_ops_ */
 template<typename Self>
 struct bb_ops_ : _crtp<Self, bb_ops_>
 {
@@ -177,6 +192,8 @@ struct bb_ops_ : _crtp<Self, bb_ops_>
   }
 };
 
+
+/* Requires object can have symtab name and tables have symtab_rowid */
 template<typename Self>
 struct has_symtab_name : _crtp<Self, has_symtab_name>
 {
@@ -223,7 +240,9 @@ struct has_symtab_name : _crtp<Self, has_symtab_name>
 
 };
 
-
+/* Requires object have ea and tables have module_rowid or override queries
+ * that rely on it with some other way to get module_rowid
+ */
 template<typename Self>
 struct has_ea : _crtp<Self, has_ea> {
 
