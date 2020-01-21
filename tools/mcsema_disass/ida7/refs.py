@@ -404,9 +404,11 @@ def enable_reference_caching():
   global _ENABLE_CACHING
   _ENABLE_CACHING = True
 
+_FIXUPS = []
+
 # Get a list of references from an instruction.
 def get_instruction_references(arg, binary_is_pie=False):
-  global _ENABLE_CACHING, _NOT_A_REF
+  global _ENABLE_CACHING, _NOT_A_REF, _FIXUPS
 
   inst = arg
   if isinstance(arg, (int, long)):
@@ -424,12 +426,15 @@ def get_instruction_references(arg, binary_is_pie=False):
 
   offset_to_ref = {}
   all_refs = get_all_references_from(inst.ea)
-  for ea in xrange(inst.ea, inst.ea + inst.size):
-    targ_ea = idc.get_fixup_target_off(ea)
+
+  del _FIXUPS[:]
+  offset = 0
+  while offset < inst.size:
+    targ_ea = idc.get_fixup_target_off(offset + inst.ea)
     if not is_invalid_ea(targ_ea):
       all_refs.add(targ_ea)
-      ref = Reference(targ_ea, ea - inst.ea)
-      offset_to_ref[ref.offset] = ref
+      _FIXUPS.append((offset, targ_ea))
+    offset += 1
 
   refs = []
   for i, op in enumerate(inst.ops):
@@ -512,6 +517,13 @@ def get_instruction_references(arg, binary_is_pie=False):
 
     if (inst.ea, ref.ea) not in _NOT_A_REF:
       refs.append(ref)
+
+  # Issue #623, `get_fixup_target_off` can sometimes add in the wrong target. So
+  # go and prefer the instruction-operand focused approach, and fall back on
+  # fixup targets when available.
+  for offset, targ_ea in _FIXUPS:
+    if offset not in offset_to_ref and (inst.ea, targ_ea) not in _NOT_A_REF:
+      refs.append(Reference(targ_ea, offset))
 
   for ref in refs:
     assert not is_invalid_ea(ref.ea)
