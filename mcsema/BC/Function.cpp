@@ -294,7 +294,7 @@ static llvm::Function *DevirtualizeIndirectFlow(
     // be recognized both as xref and var on the same ea
     // However later it can be changed to different value, so we can't
     // devirtualize it (issue #474)
-    if (!mem->segment->is_read_only) {
+    if (!mem->segment->is_read_only || seg == nullptr) {
       return fallback;
     }
     auto target_ea_ptr_ea = mem->target_ea;
