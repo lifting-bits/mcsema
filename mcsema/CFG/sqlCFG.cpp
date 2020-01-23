@@ -722,11 +722,20 @@ CodeXref BasicBlock::AddXref(int64_t ea,
                              OperandType op_type,
                              const SymtabEntry &name,
                              std::optional<int64_t> mask) {
+  if (!mask) {
+    return { CodeXref_{ _ctx }.insert(ea,
+                                      target_ea,
+                                      _id,
+                                      static_cast<unsigned char>(op_type),
+                                      nullptr,
+                                      name._id),
+            _ctx };
+  }
   return { CodeXref_{ _ctx }.insert(ea,
                                     target_ea,
                                     _id,
                                     static_cast<unsigned char>(op_type),
-                                    (mask) ? *mask : nullptr,
+                                    *mask,
                                     name._id),
           _ctx };
 }
