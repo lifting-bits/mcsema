@@ -34,7 +34,7 @@ class BasicBlock;
 class Module;
 class MemoryRange;
 class Segment;
-class SymtabEntry;
+class SymbolTableEntry;
 class CodeXref;
 class DataXref;
 
@@ -57,7 +57,7 @@ struct HasEa {
   template<typename HasCtx>
   static std::optional<Self> MatchEa(
       const HasCtx &has_ctx,
-      int64_t module_id, // <- FIXME: normally it is private, this is ugly workaround
+      int64_t module_id,  // <- FIXME: normally it is private, this is ugly workaround
       int64_t ea) {
 
     return MatchEa(has_ctx._ctx, module_id, ea);
@@ -75,9 +75,9 @@ private:
       int64_t ea);
 };
 
-// Defition uses SymtabEntry class, therefore can be found lower
+// Defition uses SymbolTableEntry class, therefore can be found lower
 template<typename Self>
-struct HasSymtabEntry;
+struct HasSymbolTableEntry;
 
 } // namespace interface
 
@@ -98,7 +98,7 @@ protected:
   friend class interface::HasEa;
 
   template<typename T>
-  friend class interface::HasSymtabEntry;
+  friend class interface::HasSymbolTableEntry;
 };
 
 } // namespace details
@@ -121,12 +121,12 @@ protected:
 // Represent Symbol (name). It does not have to come from any binary (user can name
 // things as desired with Artificial type to signify that they do not origin
 // from the  binary)
-class SymtabEntry : public details::Internals {
+class SymbolTableEntry : public details::Internals {
 public:
 
   struct data_t {
     std::string name;
-    SymtabEntryType type;
+    SymbolVisibility type;
   };
 
   data_t operator*() const;
@@ -151,10 +151,10 @@ namespace interface {
 // Some objects can (sometimes it is not required!) have name -- this interface
 // allows manipulation with it
 template<typename Self>
-struct HasSymtabEntry {
+struct HasSymbolTableEntry {
   std::optional<std::string> Name();
-  void Name(const SymtabEntry& name);
-  std::optional<SymtabEntry::data_t> Symbol();
+  void Name(const SymbolTableEntry& name);
+  std::optional<SymbolTableEntry::data_t> Symbol();
 };
 
 } // namespace interface
@@ -162,7 +162,7 @@ struct HasSymtabEntry {
 
 class ExternalFunction : public details::Internals,
                          public interface::HasEa<ExternalFunction>,
-                         public interface::HasSymtabEntry<ExternalFunction> {
+                         public interface::HasSymbolTableEntry<ExternalFunction> {
 public:
 
   struct data_t {
@@ -205,7 +205,7 @@ public:
     CodeXref AddXref(int64_t ea,
                      int64_t target_ea,
                      OperandType op_type,
-                     const SymtabEntry &name,
+                     const SymbolTableEntry &name,
                      std::optional<int64_t> mask={});
 
     void AddSucc(const BasicBlock &bb);
@@ -240,7 +240,7 @@ private:
 
 class Function : public details::Internals,
                  public interface::HasEa<Function>,
-                 public interface::HasSymtabEntry<Function> {
+                 public interface::HasSymbolTableEntry<Function> {
 
 public:
 
@@ -279,7 +279,7 @@ private:
 // Named part of some memory range
 class Segment : public details::Internals,
                 public interface::HasEa<Segment>,
-                public interface::HasSymtabEntry<Segment> {
+                public interface::HasSymbolTableEntry<Segment> {
 public:
 
   struct Flags {
@@ -321,7 +321,7 @@ public:
 
   DataXref AddXref(int64_t ea, int64_t target_ea, int64_t width, FixupKind fixup);
   DataXref AddXref(int64_t ea, int64_t target_ea,
-                   int64_t width, FixupKind fixup, const SymtabEntry &name);
+                   int64_t width, FixupKind fixup, const SymbolTableEntry &name);
 
   // FIXME: This does not remove xrefs, maybe add either:
   // void EraseAll()
@@ -377,7 +377,7 @@ private:
 // If the underlying basic block is removed, reference is removed as well.
 class CodeXref : public details::Internals,
                  public interface::HasEa<CodeXref>,
-                 public interface::HasSymtabEntry<CodeXref> {
+                 public interface::HasSymbolTableEntry<CodeXref> {
 
 public:
 
@@ -403,7 +403,7 @@ private:
   friend class Module;
   friend class BasicBlock;
   friend class interface::HasEa<CodeXref>;
-  friend class interface::HasSymtabEntry<CodeXref>;
+  friend class interface::HasSymbolTableEntry<CodeXref>;
   friend class details::ObjectIterator_impl;
 
   using details::Internals::Internals;
@@ -414,7 +414,7 @@ private:
 // If the underlying Segment if removed, reference is removed as well.
 class DataXref : public details::Internals,
                  public interface::HasEa<DataXref>,
-                 public interface::HasSymtabEntry<DataXref> {
+                 public interface::HasSymbolTableEntry<DataXref> {
 
 public:
 
@@ -448,10 +448,11 @@ public:
 
   BasicBlock AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &memory);
 
-  SymtabEntry AddSymtabEntry(const std::string &name, SymtabEntryType type);
+  SymbolTableEntry AddSymbolTableEntry(const std::string &name,
+                                       SymbolVisibility type);
 
   ExternalFunction AddExternalFunction(int64_t ea,
-                                       const SymtabEntry &name,
+                                       const SymbolTableEntry &name,
                                        CallingConv cc,
                                        bool has_return, bool is_weak);
 
@@ -459,7 +460,7 @@ public:
 
   // Difference here is that *Data already applies operator*() on sql level,
   // which saves query per object. (This should be reasonable optimization)
-  WeakDataIterator<SymtabEntry> SymbolsData();
+  WeakDataIterator<SymbolTableEntry> SymbolsData();
 
   WeakObjectIterator<Function> Functions();
 

@@ -19,10 +19,10 @@
 namespace mcsema::cfg {
 
 /* Enums */
-enum class SymtabEntryType : unsigned char {
-  Imported = 1, // Names from another object file
-  Exported = 2, // Externally visible
-  Internal = 3, // Internal
+enum class SymbolVisibility: unsigned char {
+  Imported = 1,  // Names from another object file
+  Exported = 2,  // Externally visible
+  Internal = 3,  // Internal
 
   // If there is an object in the binary that can have a name but does not someone may
   // want to give it a name, but since it originally was not in the binary neither

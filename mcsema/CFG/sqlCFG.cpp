@@ -59,9 +59,9 @@ struct with_context {
 
 using has_context = with_context<Context>;
 
-template<typename Concrete = SymtabEntry>
-struct SymtabEntry_ : has_context,
-                      id_based_ops_<SymtabEntry_<Concrete>>
+template<typename Concrete = SymbolTableEntry>
+struct SymbolTableEntry_ : has_context,
+                           id_based_ops_<SymbolTableEntry_<Concrete>>
 {
   using has_context::has_context;
   using concrete_t = Concrete;
@@ -480,9 +480,9 @@ struct dispatch<MemoryRange> {
 };
 
 template<>
-struct dispatch<SymtabEntry> {
-  using type = SymtabEntry_<SymtabEntry>;
-  using data_fields = util::TypeList<std::string, SymtabEntryType>;
+struct dispatch<SymbolTableEntry> {
+  using type = SymbolTableEntry_<SymbolTableEntry>;
+  using data_fields = util::TypeList<std::string, SymbolVisibility>;
 };
 
 template<typename T>
@@ -652,13 +652,14 @@ BasicBlock Module::AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &me
   return { BasicBlock_{ _ctx }.insert(_id, ea, size, mem._id), _ctx };
 }
 
-SymtabEntry Module::AddSymtabEntry(const std::string &name, SymtabEntryType type) {
-  return { SymtabEntry_{ _ctx }.insert(name, _id, static_cast<unsigned char>(type)),
+SymbolTableEntry Module::AddSymbolTableEntry(const std::string &name,
+                                             SymbolVisibility type) {
+  return { SymbolTableEntry_{ _ctx }.insert(name, _id, static_cast<unsigned char>(type)),
            _ctx };
 }
 
 ExternalFunction Module::AddExternalFunction(int64_t ea,
-                                             const SymtabEntry &name,
+                                             const SymbolTableEntry &name,
                                              CallingConv cc,
                                              bool has_return, bool is_weak) {
   return { ExternalFunction_{ _ctx }.insert(ea,
@@ -680,7 +681,7 @@ WeakObjectIterator<BasicBlock> Module::Blocks() {
   return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
 }
 
-WeakDataIterator<SymtabEntry> Module::SymbolsData() {
+WeakDataIterator<SymbolTableEntry> Module::SymbolsData() {
   auto result = Module_{_ctx }.all_symbols(_id);
   return { std::make_unique<details::DataIterator_impl>(std::move(result)) };
 }
@@ -720,7 +721,7 @@ CodeXref BasicBlock::AddXref(int64_t ea, int64_t target_ea, OperandType op_type)
 CodeXref BasicBlock::AddXref(int64_t ea,
                              int64_t target_ea,
                              OperandType op_type,
-                             const SymtabEntry &name,
+                             const SymbolTableEntry &name,
                              std::optional<int64_t> mask) {
   if (!mask) {
     return { CodeXref_{ _ctx }.insert(ea,
@@ -785,7 +786,7 @@ DataXref Segment::AddXref(int64_t ea, int64_t target_ea, int64_t width, FixupKin
 }
 
 DataXref Segment::AddXref(int64_t ea, int64_t target_ea,
-                          int64_t width, FixupKind fixup, const SymtabEntry &name) {
+                          int64_t width, FixupKind fixup, const SymbolTableEntry &name) {
 
   return { DataXref_{ _ctx }.insert(ea, width, target_ea, _id,
                                     static_cast<unsigned char>(fixup),
@@ -827,7 +828,7 @@ std::string ExternalFunction::Name() const {
         .c_get<typename self_t::data_t>(_id, data_fields_t<self_t>{}); \
   }
 
-DEFINE_DATA_OPERATOR(SymtabEntry);
+DEFINE_DATA_OPERATOR(SymbolTableEntry);
 DEFINE_DATA_OPERATOR(ExternalFunction);
 DEFINE_DATA_OPERATOR(BasicBlock);
 DEFINE_DATA_OPERATOR(Function);
@@ -844,7 +845,7 @@ DEFINE_DATA_OPERATOR(DataXref);
   }
 
 DEF_ERASE(BasicBlock)
-DEF_ERASE(SymtabEntry)
+DEF_ERASE(SymbolTableEntry)
 DEF_ERASE(ExternalFunction)
 DEF_ERASE(Function)
 DEF_ERASE(Segment)
@@ -868,26 +869,26 @@ int64_t interface::HasEa<Self>::ea() {
 }
 
 template<typename Self>
-std::optional<std::string> interface::HasSymtabEntry<Self>::Name() {
+std::optional<std::string> interface::HasSymbolTableEntry<Self>::Name() {
   auto self = static_cast<Self *>(this);
   return impl_t<decltype(self)>{ self->_ctx }.GetName(self->_id);
 }
 
 template<typename Self>
-void interface::HasSymtabEntry<Self>::Name(
-    const SymtabEntry &name) {
+void interface::HasSymbolTableEntry<Self>::Name(
+    const SymbolTableEntry &name) {
 
   auto self = static_cast<Self *>(this);
   return impl_t<decltype(self)>{ self->_ctx }.Name(self->_id, name._id);
 }
 
 template<typename Self>
-std::optional<SymtabEntry::data_t> interface::HasSymtabEntry<Self>::Symbol() {
+std::optional<SymbolTableEntry::data_t> interface::HasSymbolTableEntry<Self>::Symbol() {
   auto self = static_cast<Self *>(this);
 
   auto res = impl_t<decltype(self)>{self->_ctx}.Symbol(self->_id);
-  return util::maybe_to_struct<SymtabEntry::data_t>(
-      res.template Get<std::string, SymtabEntryType>());
+  return util::maybe_to_struct<SymbolTableEntry::data_t>(
+      res.template Get<std::string, SymbolVisibility>());
 }
 
 template<typename Self>
@@ -915,30 +916,30 @@ namespace interface {
 /* We must explicitly instantiate all templates */
 
 template struct HasEa<DataXref>;
-template struct HasSymtabEntry<DataXref>;
+template struct HasSymbolTableEntry<DataXref>;
 
 template struct HasEa<MemoryRange>;
 
 template struct HasEa<Segment>;
 // TODO: Implement
-//template struct HasSymtabEntry<Segment>;
+//template struct HasSymbolTableEntry<Segment>;
 
 template struct HasEa<Function>;
-template struct HasSymtabEntry<Function>;
+template struct HasSymbolTableEntry<Function>;
 
 template struct HasEa<BasicBlock>;
 
 template struct HasEa<ExternalFunction>;
-template struct HasSymtabEntry<ExternalFunction>;
+template struct HasSymbolTableEntry<ExternalFunction>;
 
 template struct HasEa<CodeXref>;
-template struct HasSymtabEntry<CodeXref>;
+template struct HasSymbolTableEntry<CodeXref>;
 
 } // namespace interface
 
 // Since Iterators are also templated, we must instantiate them as well
 
-template struct WeakDataIterator<SymtabEntry>;
+template struct WeakDataIterator<SymbolTableEntry>;
 
 template struct WeakObjectIterator<Function>;
 template struct WeakObjectIterator<BasicBlock>;
