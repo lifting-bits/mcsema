@@ -50,7 +50,7 @@ namespace interface {
 
 template<typename Self>
 struct HasEa {
-  int64_t ea();
+  uint64_t ea();
 
   // TODO: Can this be hidden away?
   // TODO: This needs to be filtered by module_id
@@ -58,7 +58,7 @@ struct HasEa {
   static std::optional<Self> MatchEa(
       const HasCtx &has_ctx,
       int64_t module_id,  // <- FIXME: normally it is private, this is ugly workaround
-      int64_t ea) {
+      uint64_t ea) {
 
     return MatchEa(has_ctx._ctx, module_id, ea);
   }
@@ -72,7 +72,7 @@ private:
   static std::optional<Self> MatchEa(
       details::CtxPtr &ctx_ptr,
       int64_t module_id,
-      int64_t ea);
+      uint64_t ea);
 };
 
 // Defition uses SymbolTableEntry class, therefore can be found lower
@@ -166,7 +166,7 @@ class ExternalFunction : public details::Internals,
 public:
 
   struct data_t {
-    int64_t ea;
+    uint64_t ea;
     CallingConv cc;
     bool has_return;
     bool weak;
@@ -192,8 +192,8 @@ public:
     // We are not including underlying data, since they are being cached and need
     // separate query anyway
     struct data_t {
-      int64_t ea;
-      int64_t size;
+      uint64_t ea;
+      uint64_t size;
     };
 
     data_t operator*() const;
@@ -201,9 +201,9 @@ public:
     // Cached
     std::string_view Data();
 
-    CodeXref AddXref(int64_t ea, int64_t target_ea, OperandType op_type);
-    CodeXref AddXref(int64_t ea,
-                     int64_t target_ea,
+    CodeXref AddXref(uint64_t ea, uint64_t target_ea, OperandType op_type);
+    CodeXref AddXref(uint64_t ea,
+                     uint64_t target_ea,
                      OperandType op_type,
                      const SymbolTableEntry &name,
                      std::optional<int64_t> mask={});
@@ -245,7 +245,7 @@ class Function : public details::Internals,
 public:
 
   struct data_t {
-    int64_t ea;
+    uint64_t ea;
     bool is_entrypoint;
   };
 
@@ -299,8 +299,8 @@ public:
   };
 
   struct data_t {
-    int64_t ea;
-    int64_t size;
+    uint64_t ea;
+    uint64_t size;
     Flags flags;
 
     template<typename Stream>
@@ -319,9 +319,9 @@ public:
   std::string_view Data();
   void SetFlags(const Flags &flags);
 
-  DataXref AddXref(int64_t ea, int64_t target_ea, int64_t width, FixupKind fixup);
-  DataXref AddXref(int64_t ea, int64_t target_ea,
-                   int64_t width, FixupKind fixup, const SymbolTableEntry &name);
+  DataXref AddXref(uint64_t ea, uint64_t target_ea, uint64_t width, FixupKind fixup);
+  DataXref AddXref(uint64_t ea, uint64_t target_ea,
+                   uint64_t width, FixupKind fixup, const SymbolTableEntry &name);
 
   // FIXME: This does not remove xrefs, maybe add either:
   // void EraseAll()
@@ -347,14 +347,14 @@ class MemoryRange : public details::Internals,
 public:
 
   struct data_t {
-    int64_t ea;
-    int64_t range;
+    uint64_t ea;
+    uint64_t range;
   };
 
   data_t operator*() const;
 
-  Segment AddSegment(int64_t ea,
-                     int64_t size,
+  Segment AddSegment(uint64_t ea,
+                     uint64_t size,
                      const Segment::Flags &flags,
                      const std::string &name);
 
@@ -382,8 +382,8 @@ class CodeXref : public details::Internals,
 public:
 
   struct data_t {
-    int64_t ea;
-    int64_t target_ea;
+    uint64_t ea;
+    uint64_t target_ea;
     OperandType op_type;
     std::optional<int64_t> mask;
 
@@ -419,9 +419,9 @@ class DataXref : public details::Internals,
 public:
 
   struct data_t {
-    int64_t ea;
-    int64_t target_ea;
-    int64_t width;
+    uint64_t ea;
+    uint64_t target_ea;
+    uint64_t width;
     FixupKind fixup;
   };
 
@@ -440,18 +440,18 @@ class Module : public details::Internals {
 
 public:
 
-  Function AddFunction(int64_t ea, bool is_entrypoint);
+  Function AddFunction(uint64_t ea, bool is_entrypoint);
 
-  MemoryRange AddMemoryRange(int64_t ea, int64_t range, std::string_view data);
+  MemoryRange AddMemoryRange(uint64_t ea, uint64_t range, std::string_view data);
 
-  MemoryRange AddMemoryRange(int64_t ea, std::string_view data);
+  MemoryRange AddMemoryRange(uint64_t ea, std::string_view data);
 
-  BasicBlock AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &memory);
+  BasicBlock AddBasicBlock(uint64_t ea, uint64_t size, const MemoryRange &memory);
 
   SymbolTableEntry AddSymbolTableEntry(const std::string &name,
                                        SymbolVisibility type);
 
-  ExternalFunction AddExternalFunction(int64_t ea,
+  ExternalFunction AddExternalFunction(uint64_t ea,
                                        const SymbolTableEntry &name,
                                        CallingConv cc,
                                        bool has_return, bool is_weak);
@@ -478,7 +478,7 @@ public:
   // void Erase();
 
   template<typename ...Targets>
-  bool MatchEa(int64_t ea, Targets ...targets) {
+  bool MatchEa(uint64_t ea, Targets ...targets) {
     return util::Match(*this, this->_id, ea, std::forward<Targets>(targets) ...);
   }
 
@@ -498,20 +498,20 @@ struct Letter
 
   Module AddModule(const std::string &name);
 
-  Function AddFunction(const Module &module, int64_t ea, bool is_entrypoint);
+  Function AddFunction(const Module &module, uint64_t ea, bool is_entrypoint);
 
   BasicBlock AddBasicBlock(const Module &module,
-                           int64_t ea,
-                           int64_t size,
+                           uint64_t ea,
+                           uint64_t size,
                            const MemoryRange &range);
 
   MemoryRange AddMemoryRange(const Module &module,
-                             int64_t ea,
-                             int64_t range,
+                             uint64_t ea,
+                             uint64_t range,
                              std::string_view data);
 
   MemoryRange AddMemoryRange(const Module &module,
-                             int64_t ea,
+                             uint64_t ea,
                              std::string_view data);
 
 
@@ -519,8 +519,8 @@ struct Letter
 
 
   Segment AddSegment(const Module &module,
-                     int64_t ea,
-                     int64_t size,
+                     uint64_t ea,
+                     uint64_t size,
                      const Segment::Flags &flags,
                      const std::string &name,
                      MemoryRange &mem);

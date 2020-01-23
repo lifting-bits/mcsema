@@ -264,10 +264,10 @@ struct BasicBlock_: has_context,
           blocks as bb JOIN
           memory_ranges as mr ON
           mr.rowid = bb.memory_rowid and bb.rowid = ?1)";
-   int64_t mr_rowid,
-           offset;
+   int64_t mr_rowid;
+   uint64_t offset;
     std::tie(mr_rowid, offset) = *this->_ctx->db.template query<q_data>(id)
-                                                .template Get<int64_t, int64_t>();
+                                                .template Get<int64_t, uint64_t>();
     auto c_data = this->_ctx->cache
                   .template Find<MemoryRange, MemoryRange_<MemoryRange>::q_data>(mr_rowid);
     return c_data.substr(offset);
@@ -308,8 +308,8 @@ struct Segment_ : has_context,
        JOIN memory_ranges AS mr
        WHERE seg.memory_rowid = mr.rowid and seg.ea = ?1 and mr.module_rowid = ?2)";
 
-  auto _insert(int64_t ea,
-               int64_t size,
+  auto _insert(uint64_t ea,
+               uint64_t size,
                const Segment::Flags &flags,
                const std::string &name,
                int64_t memory_rowid) {
@@ -327,12 +327,12 @@ struct Segment_ : has_context,
           segments as s JOIN
           memory_ranges as mr ON
           mr.rowid = s.memory_rowid and s.rowid = ?1)";
-    int64_t mr_rowid,
-            offset,
-            size;
+    int64_t mr_rowid;
+    uint64_t offset,
+             size;
     std::tie(mr_rowid, offset, size) =
       *this->_ctx->db.template query<q_data>(id)
-                 .template Get<int64_t, int64_t, int64_t>();
+                 .template Get<int64_t, uint64_t, uint64_t>();
     auto c_data = this->_ctx->cache
                   .template Find<MemoryRange, MemoryRange_<MemoryRange>::q_data>(mr_rowid);
     return c_data.substr(offset, size);
@@ -439,44 +439,44 @@ struct dispatch {
 template<>
 struct dispatch<ExternalFunction> {
   using type = ExternalFunction_<ExternalFunction>;
-  using data_fields = util::TypeList<int64_t, CallingConv, bool, bool>;
+  using data_fields = util::TypeList<uint64_t, CallingConv, bool, bool>;
 };
 
 template<>
 struct dispatch<CodeXref> {
   using type = CodeXref_<CodeXref>;
   using data_fields =
-    util::TypeList<int64_t, int64_t, OperandType, std::optional<int64_t>>;
+    util::TypeList<uint64_t, uint64_t, OperandType, std::optional<int64_t>>;
 };
 
 template<>
 struct dispatch<DataXref> {
   using type = DataXref_<DataXref>;
-  using data_fields = util::TypeList<int64_t, int64_t, int64_t, FixupKind>;
+  using data_fields = util::TypeList<uint64_t, uint64_t, uint64_t, FixupKind>;
 };
 
 template<>
 struct dispatch<Function> {
   using type = Function_<Function>;
-  using data_fields = util::TypeList<int64_t, bool>;
+  using data_fields = util::TypeList<uint64_t, bool>;
 };
 
 template<>
 struct dispatch<BasicBlock> {
   using type = BasicBlock_<BasicBlock>;
-  using data_fields = util::TypeList<int64_t, int64_t>;
+  using data_fields = util::TypeList<uint64_t, uint64_t>;
 };
 
 template<>
 struct dispatch<Segment> {
   using type = Segment_<Segment>;
-  using data_fields = util::TypeList<int64_t, int64_t, bool, bool, bool, bool>;
+  using data_fields = util::TypeList<uint64_t, uint64_t, bool, bool, bool, bool>;
 };
 
 template<>
 struct dispatch<MemoryRange> {
   using type = MemoryRange_<MemoryRange>;
-  using data_fields = util::TypeList<int64_t, int64_t>;
+  using data_fields = util::TypeList<uint64_t, uint64_t>;
 };
 
 template<>
@@ -602,22 +602,22 @@ Module Letter::AddModule(const std::string &name) {
   return { Module_{ _ctx }.insert(name), _ctx };
 }
 
-Function Letter::AddFunction(const Module &module, int64_t ea, bool is_entrypoint)
+Function Letter::AddFunction(const Module &module, uint64_t ea, bool is_entrypoint)
 {
   return { Function_{ _ctx }.insert(module._id, ea, is_entrypoint), _ctx };
 }
 
 BasicBlock Letter::AddBasicBlock(const Module &module,
-                                 int64_t ea,
-                                 int64_t size,
+                                 uint64_t ea,
+                                 uint64_t size,
                                  const MemoryRange &range)
 {
   return { BasicBlock_{ _ctx }.insert(module._id, ea, size, range._id), _ctx };
 }
 
 MemoryRange Letter::AddMemoryRange(const Module &module,
-                                   int64_t ea,
-                                   int64_t size,
+                                   uint64_t ea,
+                                   uint64_t size,
                                    std::string_view data) {
   // TODO: Check if this copy to sqlite::blob is required
   return { MemoryRange_{ _ctx }.insert(module._id, ea, size,
@@ -626,29 +626,29 @@ MemoryRange Letter::AddMemoryRange(const Module &module,
 }
 
 MemoryRange Letter::AddMemoryRange(const Module &module,
-                                   int64_t ea,
+                                   uint64_t ea,
                                    std::string_view data) {
   return AddMemoryRange(module, ea, data.size(), data);
 }
 
 /* Module */
 
-Function Module::AddFunction(int64_t ea, bool is_entrypoint) {
+Function Module::AddFunction(uint64_t ea, bool is_entrypoint) {
   return { Function_{ _ctx }.insert(_id, ea, is_entrypoint), _ctx };
 }
 
-MemoryRange Module::AddMemoryRange(int64_t ea, int64_t size, std::string_view data) {
+MemoryRange Module::AddMemoryRange(uint64_t ea, uint64_t size, std::string_view data) {
   // TODO: Check if this copy to sqlite::blob is required
   return { MemoryRange_{ _ctx }.insert(_id, ea, size,
                                  sqlite::blob(data.begin(), data.end())),
            _ctx };
 }
 
-MemoryRange Module::AddMemoryRange(int64_t ea, std::string_view data) {
+MemoryRange Module::AddMemoryRange(uint64_t ea, std::string_view data) {
   return AddMemoryRange(ea, data.size(), data);
 }
 
-BasicBlock Module::AddBasicBlock(int64_t ea, int64_t size, const MemoryRange &mem) {
+BasicBlock Module::AddBasicBlock(uint64_t ea, uint64_t size, const MemoryRange &mem) {
   return { BasicBlock_{ _ctx }.insert(_id, ea, size, mem._id), _ctx };
 }
 
@@ -658,7 +658,7 @@ SymbolTableEntry Module::AddSymbolTableEntry(const std::string &name,
            _ctx };
 }
 
-ExternalFunction Module::AddExternalFunction(int64_t ea,
+ExternalFunction Module::AddExternalFunction(uint64_t ea,
                                              const SymbolTableEntry &name,
                                              CallingConv cc,
                                              bool has_return, bool is_weak) {
@@ -707,7 +707,7 @@ std::string_view BasicBlock::Data() {
     return BasicBlock_{ _ctx }.data(_id);
 }
 
-CodeXref BasicBlock::AddXref(int64_t ea, int64_t target_ea, OperandType op_type) {
+CodeXref BasicBlock::AddXref(uint64_t ea, uint64_t target_ea, OperandType op_type) {
   return { CodeXref_{ _ctx }.insert(ea,
                                     target_ea,
                                     _id,
@@ -718,8 +718,8 @@ CodeXref BasicBlock::AddXref(int64_t ea, int64_t target_ea, OperandType op_type)
 }
 
 
-CodeXref BasicBlock::AddXref(int64_t ea,
-                             int64_t target_ea,
+CodeXref BasicBlock::AddXref(uint64_t ea,
+                             uint64_t target_ea,
                              OperandType op_type,
                              const SymbolTableEntry &name,
                              std::optional<int64_t> mask) {
@@ -778,15 +778,16 @@ void Segment::SetFlags(const Flags &flags) {
   return Segment_{ _ctx }.SetFlags(_id, flags);
 }
 
-DataXref Segment::AddXref(int64_t ea, int64_t target_ea, int64_t width, FixupKind fixup) {
+DataXref Segment::AddXref(uint64_t ea, uint64_t target_ea,
+                          uint64_t width, FixupKind fixup) {
   return { DataXref_{ _ctx }.insert(ea, width, target_ea, _id,
                                     static_cast<unsigned char>(fixup),
                                     nullptr),
           _ctx };
 }
 
-DataXref Segment::AddXref(int64_t ea, int64_t target_ea,
-                          int64_t width, FixupKind fixup, const SymbolTableEntry &name) {
+DataXref Segment::AddXref(uint64_t ea, uint64_t target_ea,
+                          uint64_t width, FixupKind fixup, const SymbolTableEntry &name) {
 
   return { DataXref_{ _ctx }.insert(ea, width, target_ea, _id,
                                     static_cast<unsigned char>(fixup),
@@ -798,10 +799,10 @@ DataXref Segment::AddXref(int64_t ea, int64_t target_ea,
 
 /* MemoryRange */
 
-Segment MemoryRange::AddSegment(int64_t ea,
-                                 int64_t size,
-                                 const Segment::Flags &flags,
-                                 const std::string &name) {
+Segment MemoryRange::AddSegment(uint64_t ea,
+                                uint64_t size,
+                                const Segment::Flags &flags,
+                                const std::string &name) {
   return { Segment_{ _ctx }._insert(ea, size, flags, name, _id), _ctx };
 }
 
@@ -863,7 +864,7 @@ DEF_ERASE(DataXref)
  */
 
 template<typename Self>
-int64_t interface::HasEa<Self>::ea() {
+uint64_t interface::HasEa<Self>::ea() {
   auto self = static_cast<Self *>(this);
   return impl_t<decltype(self)>{ self->_ctx }.get_ea(self->_id);
 }
@@ -895,7 +896,7 @@ template<typename Self>
 std::optional<Self> interface::HasEa<Self>::MatchEa(
     details::CtxPtr &ctx_ptr,
     int64_t module_id,
-    int64_t ea) {
+    uint64_t ea) {
 
   if (auto res = impl_t<Self>{ctx_ptr}.IdFromEa(ea, module_id)) {
     return { Self(*res, ctx_ptr) };

@@ -54,11 +54,11 @@ struct FirstArg<Ret (F::*)(Arg) const> {
 //                            [&](Function) { ... } );
 // If nothing was matched, `False` is returned
 template<typename HasCtx>
-bool Match(HasCtx &has_ctx, int64_t module_id, int64_t ea) { return false; }
+bool Match(HasCtx &has_ctx, int64_t module_id, uint64_t ea) { return false; }
 
 template<typename HasCtx, typename Target, typename ... Targets>
 bool Match(
-    HasCtx &has_ctx, int64_t module_id, int64_t ea,
+    HasCtx &has_ctx, int64_t module_id, uint64_t ea,
     Target target, Targets &&...targets) {
 
   using Self = typename details::FirstArg<
