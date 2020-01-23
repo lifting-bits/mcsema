@@ -34,11 +34,13 @@ enum class SymtabEntryType : unsigned char {
 
 
 // Corresponds to llvm calling convention numbering
-enum class CC : unsigned char { C = 0,
-                                X86_StdCall = 64,
-                                X86_FastCall = 65,
-                                X86_64_SysV = 78,
-                                Win64 = 79
+// NOTE(lukas): llvm header is not included since dependency on llvm is not worth
+enum class CallingConv : unsigned char {
+  C = 0,
+  X86_StdCall = 64,
+  X86_FastCall = 65,
+  X86_64_SysV = 78,
+  Win64 = 79
 };
 
 enum class OperandType : unsigned char {

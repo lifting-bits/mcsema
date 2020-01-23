@@ -167,7 +167,7 @@ public:
 
   struct data_t {
     int64_t ea;
-    CC cc;
+    CallingConv cc;
     bool has_return;
     bool weak;
   };
@@ -452,7 +452,7 @@ public:
 
   ExternalFunction AddExternalFunction(int64_t ea,
                                        const SymtabEntry &name,
-                                       CC cc,
+                                       CallingConv cc,
                                        bool has_return, bool is_weak);
 
   /* Iteration */

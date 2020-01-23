@@ -439,7 +439,7 @@ struct dispatch {
 template<>
 struct dispatch<ExternalFunction> {
   using type = ExternalFunction_<ExternalFunction>;
-  using data_fields = util::TypeList<int64_t, CC, bool, bool>;
+  using data_fields = util::TypeList<int64_t, CallingConv, bool, bool>;
 };
 
 template<>
@@ -659,7 +659,7 @@ SymtabEntry Module::AddSymtabEntry(const std::string &name, SymtabEntryType type
 
 ExternalFunction Module::AddExternalFunction(int64_t ea,
                                              const SymtabEntry &name,
-                                             CC cc,
+                                             CallingConv cc,
                                              bool has_return, bool is_weak) {
   return { ExternalFunction_{ _ctx }.insert(ea,
                                             static_cast<unsigned char>(cc),
