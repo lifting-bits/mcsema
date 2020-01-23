@@ -154,12 +154,10 @@ protected:
 class SymtabEntry : public details::Internals {
 public:
 
-  struct Data_ {
+  struct data_t {
     std::string name;
     SymtabEntryType type;
   };
-
-  using data_t = Data_;
 
   data_t operator*() const;
 
@@ -197,14 +195,13 @@ class ExternalFunction : public details::Internals,
                          public interface::HasSymtabEntry<ExternalFunction> {
 public:
 
-  struct Data_ {
+  struct data_t {
     int64_t ea;
     CC cc;
     bool has_return;
     bool weak;
   };
 
-  using data_t = Data_;
   data_t operator*() const;
 
   std::string Name() const;
@@ -224,12 +221,11 @@ public:
 
     // We are not including underlying data, since they are being cached and need
     // separate query anyway
-    struct Data_ {
+    struct data_t {
       int64_t ea;
       int64_t size;
     };
 
-    using data_t = Data_;
     data_t operator*() const;
 
     // Cached
@@ -278,11 +274,11 @@ class Function : public details::Internals,
 
 public:
 
-  struct Data_ {
+  struct data_t {
     int64_t ea;
     bool is_entrypoint;
   };
-  using data_t = Data_;
+
   data_t operator*() const;
 
   void AttachBlock(const BasicBlock &bb);
@@ -332,20 +328,19 @@ public:
     }
   };
 
-  struct Data_ {
+  struct data_t {
     int64_t ea;
     int64_t size;
     Flags flags;
 
     template<typename Stream>
-    friend Stream& operator<<(Stream &os, const Data_& self) {
+    friend Stream& operator<<(Stream &os, const data_t &self) {
       os << std::hex << "0x" << self.ea << std::dec << " of size " << self.size
          << " and flags: " << self.flags;
       return os;
     }
   };
 
-  using data_t = Data_;
   data_t operator*() const;
 
   // NOTE: std::string is implicitly converted to std::string_view so in case this returns
@@ -381,12 +376,11 @@ class MemoryRange : public details::Internals,
                     public interface::HasEa<MemoryRange> {
 public:
 
-  struct Data_ {
+  struct data_t {
     int64_t ea;
     int64_t range;
   };
 
-  using data_t = Data_;
   data_t operator*() const;
 
   Segment AddSegment(int64_t ea,
@@ -417,21 +411,20 @@ class CodeXref : public details::Internals,
 
 public:
 
-  struct Data_ {
+  struct data_t {
     int64_t ea;
     int64_t target_ea;
     OperandType op_type;
     std::optional<int64_t> mask;
 
     template<typename Stream>
-    friend Stream& operator<<(Stream &os, const Data_ &obj) {
+    friend Stream& operator<<(Stream &os, const data_t &obj) {
       os << std::hex << obj.ea << " -> " << obj.target_ea << std::dec
          << static_cast<int>(obj.op_type);
       return os;
     }
   };
 
-  using data_t = Data_;
   data_t operator*() const;
 
   void Erase();
@@ -455,14 +448,13 @@ class DataXref : public details::Internals,
 
 public:
 
-  struct Data_ {
+  struct data_t {
     int64_t ea;
     int64_t target_ea;
     int64_t width;
     FixupKind fixup;
   };
 
-  using data_t = Data_;
   data_t operator*() const;
 
   void Erase();
@@ -498,6 +490,7 @@ public:
   // Difference here is that *_d already applies operator*() on sql level,
   // which saves query per object. (This should be reasonable optimization)
   WeakDataIterator<SymtabEntry> Symbols_d();
+
   WeakObjectIterator<Function> Functions();
 
   // TODO:
