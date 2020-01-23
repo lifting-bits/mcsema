@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <mcsema/CFG/Iterator.h>
+#include <mcsema/CFG/Enums.h>
 
 namespace mcsema::cfg {
 
@@ -43,37 +44,6 @@ class Context;
 namespace details {
   using CtxPtr = std::shared_ptr<Context>;
 } // namespace details
-
-/* Enums */
-enum class SymtabEntryType : unsigned char {
-  Imported = 1, // Names from another object file
-  Exported = 2, // Externally visible
-  Internal = 3, // Internal
-  Artificial = 4 }; // Made up by person that inserts it
-
-
-// Corresponds to llvm calling convention numbering
-enum class CC : unsigned char { C = 0,
-                                X86_StdCall = 64,
-                                X86_FastCall = 65,
-                                X86_64_SysV = 78,
-                                Win64 = 79
-};
-
-enum class OperandType : unsigned char {
-  Immediate = 0,
-  Memory = 1,
-  MemoryDisplacement = 2,
-  ControlFlow = 3,
-  OffsetTable = 4
-};
-
-enum class FixupKind : unsigned char {
-  Absolute = 0,
-  OffsetFromThreadBase = 1
-};
-
-
 
 // Each object can implement some of the following interfaces
 namespace interface {
