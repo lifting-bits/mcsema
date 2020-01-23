@@ -680,7 +680,7 @@ WeakObjectIterator<BasicBlock> Module::Blocks() {
   return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
 }
 
-WeakDataIterator<SymtabEntry> Module::Symbols_d() {
+WeakDataIterator<SymtabEntry> Module::SymbolsData() {
   auto result = Module_{_ctx }.all_symbols(_id);
   return { std::make_unique<details::DataIterator_impl>(std::move(result)) };
 }
@@ -743,7 +743,7 @@ void BasicBlock::RemoveSuccs() {
   Impl(*this, _ctx).RemoveSuccs(_id);
 }
 
-WeakDataIterator<CodeXref> BasicBlock::CodeXrefs_d() {
+WeakDataIterator<CodeXref> BasicBlock::CodeXrefsData() {
   auto result = Impl(*this, _ctx).CodeXrefs(_id);
   return { std::make_unique<details::DataIterator_impl>(std::move(result)) };
 }

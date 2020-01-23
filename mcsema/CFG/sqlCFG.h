@@ -253,7 +253,7 @@ public:
     WeakObjectIterator<BasicBlock> Succs();
 
     WeakObjectIterator<CodeXref> CodeXrefs();
-    WeakDataIterator<CodeXref> CodeXrefs_d();
+    WeakDataIterator<CodeXref> CodeXrefsData();
 
     void Erase();
 private:
@@ -487,9 +487,9 @@ public:
 
   /* Iteration */
 
-  // Difference here is that *_d already applies operator*() on sql level,
+  // Difference here is that *Data already applies operator*() on sql level,
   // which saves query per object. (This should be reasonable optimization)
-  WeakDataIterator<SymtabEntry> Symbols_d();
+  WeakDataIterator<SymtabEntry> SymbolsData();
 
   WeakObjectIterator<Function> Functions();
 
@@ -499,8 +499,8 @@ public:
   //WeakIterator<Segment> Segments();
 
   template<typename Unary>
-  void ForEachSymbol_d(Unary f) {
-    for (auto weak_it = Symbols_d(); auto data = weak_it.Fetch();) {
+  void ForEachSymbolData(Unary f) {
+    for (auto weak_it = SymbolsData(); auto data = weak_it.Fetch();) {
       f(*data);
     }
   }
