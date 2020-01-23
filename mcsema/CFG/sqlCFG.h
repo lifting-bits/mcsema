@@ -498,13 +498,6 @@ public:
   //WeakIterator<MemoryRange> MemoryRanges();
   //WeakIterator<Segment> Segments();
 
-  template<typename Unary>
-  void ForEachSymbolData(Unary f) {
-    for (auto weak_it = SymbolsData(); auto data = weak_it.Fetch();) {
-      f(*data);
-    }
-  }
-
   // TODO: This is probably really handy if we allow Erase without removing dependent
   // objects.
   WeakObjectIterator<BasicBlock> Blocks();
