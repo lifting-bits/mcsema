@@ -24,8 +24,7 @@
 
 #include <mcsema/CFG/Iterator.h>
 
-namespace mcsema {
-namespace cfg {
+namespace mcsema::cfg {
 
 // Forward-declare concrete
 class Function;
@@ -79,36 +78,37 @@ enum class FixupKind : unsigned char {
 // Each object can implement some of the following interfaces
 namespace interface {
 
-  template<typename Self>
-  struct HasEa {
-    int64_t ea();
+template<typename Self>
+struct HasEa {
+  int64_t ea();
 
-    // TODO: Can this be hidden away?
-    // TODO: This needs to be filtered by module_id
-    template<typename HasCtx>
-    static std::optional<Self> MatchEa(
-        const HasCtx &has_ctx,
-        int64_t module_id, // <- FIXME: normally it is private, this is ugly workaround
-        int64_t ea) {
+  // TODO: Can this be hidden away?
+  // TODO: This needs to be filtered by module_id
+  template<typename HasCtx>
+  static std::optional<Self> MatchEa(
+      const HasCtx &has_ctx,
+      int64_t module_id, // <- FIXME: normally it is private, this is ugly workaround
+      int64_t ea) {
 
-      return MatchEa(has_ctx._ctx, module_id, ea);
-    }
+    return MatchEa(has_ctx._ctx, module_id, ea);
+  }
 
-    // If something has ea it must be part of a module
-    Module Module();
+  // If something has ea it must be part of a module
+  Module Module();
 
-  private:
+private:
 
-    //TODO: Make this callable from outside
-    static std::optional<Self> MatchEa(
-        details::CtxPtr &ctx_ptr,
-        int64_t module_id,
-        int64_t ea);
-  };
+  //TODO: Make this callable from outside
+  static std::optional<Self> MatchEa(
+      details::CtxPtr &ctx_ptr,
+      int64_t module_id,
+      int64_t ea);
+};
 
-  // Defition uses SymtabEntry class, therefore can be found lower
-  template<typename Self>
-  struct HasSymtabEntry;
+// Defition uses SymtabEntry class, therefore can be found lower
+template<typename Self>
+struct HasSymtabEntry;
+
 } // namespace interface
 
 
@@ -178,14 +178,14 @@ private:
 
 namespace interface {
 
-  // Some objects can (sometimes it is not required!) have name -- this interface
-  // allows manipulation with it
-  template<typename Self>
-  struct HasSymtabEntry {
-    std::optional<std::string> Name();
-    void Name(const SymtabEntry& name);
-    std::optional<SymtabEntry::data_t> Symbol();
-  };
+// Some objects can (sometimes it is not required!) have name -- this interface
+// allows manipulation with it
+template<typename Self>
+struct HasSymtabEntry {
+  std::optional<std::string> Name();
+  void Name(const SymtabEntry& name);
+  std::optional<SymtabEntry::data_t> Symbol();
+};
 
 } // namespace interface
 
@@ -559,5 +559,4 @@ private:
 };
 
 
-} // namespace cfg
-} // namespace mcsema
+} // namespace mcsema::cfg
