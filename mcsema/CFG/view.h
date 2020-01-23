@@ -39,7 +39,7 @@ void TrySomeErase(mcsema::cfg::Module &m) {
         // |bb_it| queries
         std::cout << bb->ea() << std::endl;
         // |bb_it| queries
-        for (auto ref_it = bb->CodeXrefs_d(); auto code_xref = ref_it.Fetch();) {
+        for (auto ref_it = bb->CodeXrefsData(); auto code_xref = ref_it.Fetch();) {
             std::cout << '\t' << *code_xref << std::endl;
         }
     }
@@ -118,6 +118,10 @@ void TryCase(mcsema::cfg::Module &m) {
     std::cout << "0x120 was not matched to function!" << std::endl;
   }
 
+  found = m.MatchEa(600800,
+      [&](Segment s) { std::cout << "Segment was found and has following data:\n"
+                                 << *s << std::endl; } );
+
 }
 
 void run()
@@ -134,8 +138,8 @@ void run()
   auto bin = letter.AddModule("bin.out");
 
   std::cout << " > Adding symtab entries to modules" << std::endl;
-  auto s_main = bin.AddSymtabEntry("main", SymtabEntryType::Internal);
-  auto error_name = bin.AddSymtabEntry("error_name", SymtabEntryType::Internal);
+  auto s_main = bin.AddSymbolTableEntry("main", SymbolVisibility::Internal);
+  auto error_name = bin.AddSymbolTableEntry("error_name", SymbolVisibility::Internal);
   error_name.Erase();
 
   std::cout << " > Adding some functions to bin module" << std::endl;
@@ -169,8 +173,8 @@ void run()
   auto xref = entry_bb.AddXref(400407, 600800, OperandType::Immediate);
   auto masked_xref = entry_bb.AddXref(400409, 600800,
                                       OperandType::Immediate,
-                                      bin.AddSymtabEntry("Reference 1",
-                                                         SymtabEntryType::Artificial),
+                                      bin.AddSymbolTableEntry("Reference 1",
+                                                              SymbolVisibility::Artificial),
                                       0xffffffff);
 
   auto maybe_masked_xref_name = masked_xref.Name();
@@ -216,8 +220,8 @@ void run()
   // Add DataXrefs
   auto d_xref = hello.AddXref(600800, 600823, 8,
                               FixupKind::Absolute,
-                              bin.AddSymtabEntry("Variable X",
-                                                 SymtabEntryType::Artificial)
+                              bin.AddSymbolTableEntry("Variable X",
+                                                      SymbolVisibility::Artificial)
                               );
   std::cout << "d_xref has ea: " << d_xref.ea() << std::endl;
 
@@ -231,15 +235,15 @@ void run()
 
   auto matrix_add = bin.AddExternalFunction(
       600650,
-      bin.AddSymtabEntry("matrix_add", SymtabEntryType::Imported),
-      CC::X86_64_SysV, true, true);
+      bin.AddSymbolTableEntry("matrix_add", SymbolVisibility::Imported),
+      CallingConv::X86_64_SysV, true, true);
   std::cout << "External functiom matrix_add has name: " << matrix_add.Name()
             << ", and ea: " << matrix_add.ea() << std::endl;
 
   // Iterate over all symtab entry data_t
   {
     std::cout << "Going to print all symbols" << std::endl;
-    for (auto weak_it = bin.Symbols_d(); auto data = weak_it.Fetch(); ) {
+    for (auto weak_it = bin.SymbolsData(); auto data = weak_it.Fetch(); ) {
       std::cout << (*data).name << std::endl;
     }
 
@@ -248,7 +252,8 @@ void run()
       std::cout << data.name << ", type: "
                 << static_cast<int>(data.type) << std::endl;
     };
-    bin.ForEachSymbol_d(printer);
+    util::ForEach(bin.SymbolsData(), printer);
+
   }
 
   // Iterate over all Function objects
