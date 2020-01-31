@@ -464,10 +464,42 @@ private:
   friend class Module;
 };
 
+class ExternalVar : public details::Internals,
+                    public interface::HasEa<ExternalVar> {
+public:
+  struct data_t {
+    uint64_t ea;
+    std::string name;
+    uint64_t size;
+
+    bool is_weak;
+    bool is_thread_local;
+
+    template<typename Stream>
+    friend Stream& operator<<(Stream &os, const data_t &self) {
+      os << std::hex << "0x" << self.ea << std::dec << " of size " << self.size
+         << " with name " << self.name;
+      return os;
+    }
+  };
+
+  data_t operator*() const;
+  void Erase();
+
+private:
+  using details::Internals::Internals;
+
+  friend details::ObjectIterator_impl;
+  friend class interface::HasEa<ExternalVar>;
+  friend class Module;
+};
+
 // One object file -- compiled binary or shared library for example.
 class Module : public details::Internals {
 
 public:
+  ExternalVar AddExternalVar(uint64_t ea, const std::string &name, uint64_t size,
+                             bool is_weak=false, bool is_thread_local=false);
 
   GlobalVar AddGlobalVar(uint64_t ea, const std::string &name, uint64_t size);
 
@@ -495,6 +527,7 @@ public:
 
   WeakObjectIterator<Function> Functions();
   WeakObjectIterator<GlobalVar> GlobalVars();
+  WeakObjectIterator<ExternalVar> ExternalVars();
 
   // TODO:
   //WeakIterator<ExternalFunction> ExtFunctions();
