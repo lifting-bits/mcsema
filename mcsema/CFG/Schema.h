@@ -32,4 +32,60 @@ struct Schema {
   static void CreateTriggers(Context &ctx);
 };
 
+namespace schema {
+
+template<typename C, typename T1, typename T2>
+struct Other {
+  using type = std::conditional_t< std::is_same_v<C, T1>, T2, T1>;
+};
+
+
+template<typename T1, typename T2>
+struct NMTable {
+
+  template<typename C>
+  using other = typename Other<C, T1, T2>::type;
+
+  template<typename C>
+  using self = C;
+
+  using fst = T1;
+  using snd = T2;
+};
+
+using Query = const char *;
+
+#define DEFINE_TABLE(name_, table_name_, foreign_key) \
+  struct name_ { \
+    constexpr static Query table_name = table_name_; \
+    constexpr static Query fk = foreign_key; \
+    using table = name_; \
+  }
+
+DEFINE_TABLE(SymbolTableEntry, "symtabs", "symtab_rowid");
+DEFINE_TABLE(MemoryRange, "memory_ranges", "memory_rowid");
+DEFINE_TABLE(Module, "modules", "module_rowid");
+DEFINE_TABLE(Function, "functions", "function_rowid");
+DEFINE_TABLE(BasicBlock, "blocks", "bb_rowid");
+DEFINE_TABLE(ExceptionFrame, "exception_frames", "frame_rowid");
+DEFINE_TABLE(CodeXref, "code_references", "code_xref_rowid");
+DEFINE_TABLE(DataXref, "data_references", "data_xref_rowid");
+DEFINE_TABLE(ExternalFunction, "external_functions", "ext_function_rowid");
+DEFINE_TABLE(GlobalVar, "global_variables", "g_var_rowid");
+DEFINE_TABLE(ExternalVar, "external_variables", "ext_var_rowid");
+DEFINE_TABLE(Segment, "segments", "segment_rowid");
+
+#undef DEFINE_TABLE
+
+struct FrameToFunc : NMTable<Function, ExceptionFrame> {
+  static constexpr Query table_name = "frame_to_func";
+  using table = FrameToFunc;
+};
+
+struct BbToFunc : NMTable<BasicBlock, Function> {
+  static constexpr Query table_name = "function_to_block";
+  using table = BbToFunc;
+};
+
+} // namespace schema
 } // namespace mcsema::cfg
