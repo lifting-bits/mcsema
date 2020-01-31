@@ -167,7 +167,6 @@ using Module_impl = Module_<Module>;
 template<typename Concrete = Function>
 struct Function_ : schema::Function,
                    has_context,
-                   func_ops_<Function_<Concrete>>,
                    id_based_ops_<Function_<Concrete>>,
                    has_symtab_name<Function_<Concrete>>,
                    has_ea<Function_<Concrete>> {
