@@ -438,11 +438,18 @@ private:
 class GlobalVar : public details::Internals,
                   public interface::HasEa<GlobalVar> {
 
-
+public:
   struct data_t {
     uint64_t ea;
     std::string name;
     uint64_t size;
+
+    template<typename Stream>
+    friend Stream& operator<<(Stream &os, const data_t &self) {
+      os << std::hex << "0x" << self.ea << std::dec << " of size " << self.size
+         << " with name " << self.name;
+      return os;
+    }
   };
 
   data_t operator*() const;
@@ -452,6 +459,9 @@ class GlobalVar : public details::Internals,
 private:
   using details::Internals::Internals;
 
+  friend details::ObjectIterator_impl;
+  friend class interface::HasEa<GlobalVar>;
+  friend class Module;
 };
 
 // One object file -- compiled binary or shared library for example.
@@ -484,6 +494,7 @@ public:
   WeakDataIterator<SymbolTableEntry> SymbolsData();
 
   WeakObjectIterator<Function> Functions();
+  WeakObjectIterator<GlobalVar> GlobalVars();
 
   // TODO:
   //WeakIterator<ExternalFunction> ExtFunctions();
