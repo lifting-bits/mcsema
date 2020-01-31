@@ -494,6 +494,26 @@ private:
   friend class Module;
 };
 
+class ExceptionFrame : public details::Internals {
+public:
+
+  struct data_t {
+    uint64_t start_ea;
+    uint64_t end_ea;
+    uint64_t lp_ea;
+    Action action;
+  };
+
+  data_t operator*();
+  void Erase();
+
+private:
+  using details::Internals::Internals;
+
+  friend details::ObjectIterator_impl;
+  friend class Function;
+};
+
 // One object file -- compiled binary or shared library for example.
 class Module : public details::Internals {
 
