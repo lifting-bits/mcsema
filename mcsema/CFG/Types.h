@@ -29,7 +29,7 @@ using Query = const char *;
 
 // Second template is to avoid DDD(Dreadful Diamond of Derivation) without using
 // virtual inheritance. Since this is strictly mixin inheritance it is okay
-template<typename Self, template<typename> class Derived>
+template<typename Self, template<typename...> class Derived>
 struct _crtp
 {
   Self &self() { return static_cast<Self &>(*this); }
