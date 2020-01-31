@@ -260,6 +260,9 @@ public:
     }
   }
 
+
+  void DeattachBlock(const BasicBlock &bb);
+
   // Iterate over all attached block
   WeakObjectIterator<BasicBlock> BasicBlocks();
 

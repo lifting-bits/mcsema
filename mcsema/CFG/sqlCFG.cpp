@@ -60,13 +60,12 @@ struct with_context {
 
 using has_context = with_context<Context>;
 
-template<typename Concrete = SymbolTableEntry>
-struct SymbolTableEntry_ : has_context,
-                           id_based_ops_<SymbolTableEntry_<Concrete>>
-{
+struct FrameToFunc : schema::FrameToFunc, nm_impl<FrameToFunc>, has_context {
   using has_context::has_context;
-  using concrete_t = Concrete;
-
+};
+struct BbToFunc: schema::BbToFunc, nm_impl<BbToFunc>, has_context {
+  using has_context::has_context;
+};
 
 template<typename Concrete = SymbolTableEntry>
 struct SymbolTableEntry_ : schema::SymbolTableEntry,
@@ -791,8 +790,12 @@ WeakObjectIterator<ExternalVar> Module::ExternalVars() {
 
 /* Function */
 
+void Function::DeattachBlock(const BasicBlock &bb) {
+  BbToFunc( _ctx ).UnbindFrom<Function_impl>(_id, bb._id);
+}
+
 void Function::AttachBlock(const BasicBlock &bb) {
-  Function_<Function>{ _ctx }.bind_bb(_id, bb._id);
+  BbToFunc( _ctx ).BindTo<Function_impl>(_id, bb._id);
 }
 
 WeakObjectIterator<BasicBlock> Function::BasicBlocks() {
