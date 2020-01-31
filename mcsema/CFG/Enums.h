@@ -56,4 +56,9 @@ enum class FixupKind : unsigned char {
   OffsetFromThreadBase = 1
 };
 
+enum class Action : unsigned char {
+  Cleanup = 0,
+  Catch = 1
+};
+
 }// namespace mcsema::cfg
