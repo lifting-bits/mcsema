@@ -424,6 +424,22 @@ struct ExternalFunction_ : has_context,
 
 };
 
+template<typename Concrete = GlobalVar>
+struct GlobalVar_ : has_context,
+                    has_ea<GlobalVar_<GlobalVar>>,
+                    id_based_ops_<GlobalVar_<GlobalVar>> {
+
+  using has_context::has_context;
+  constexpr static Query table_name = R"(global_variables)";
+
+  constexpr static Query q_insert =
+    R"(INSERT INTO global_variables(ea, name, size, module_rowid)
+              VALUES(?1, ?2, ?3, ?4))";
+
+  constexpr static Query q_get =
+    R"(SELECT ea, name, size FROM global_variables WHERE rowid = ?1)";
+};
+
 
 /* Hardcoding each implementation class in each public object method implementation
  * is tedious and error-prone. Following class provides this mapping at compile time
@@ -489,6 +505,12 @@ template<>
 struct dispatch<SymbolTableEntry> {
   using type = SymbolTableEntry_<SymbolTableEntry>;
   using data_fields = util::TypeList<std::string, SymbolVisibility>;
+};
+
+template<>
+struct dispatch<GlobalVar> {
+  using type = GlobalVar_<GlobalVar>;
+  using data_fields = util::TypeList<uint64_t, std::string, uint64_t>;
 };
 
 template<typename T>
@@ -677,6 +699,10 @@ ExternalFunction Module::AddExternalFunction(uint64_t ea,
            _ctx };
 }
 
+GlobalVar Module::AddGlobalVar(uint64_t ea, const std::string &name, uint64_t size) {
+  return { impl_t<GlobalVar>( _ctx ).insert( ea, name, size, _id ), _ctx };
+}
+
 WeakObjectIterator<BasicBlock> Module::OrphanedBasicBlocks() {
   auto result = BasicBlock_{ _ctx }.orphaned();
   return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
@@ -824,9 +850,13 @@ std::string_view MemoryRange::Data() {
 /* CodeXref */
 
 /* ExternalFunction */
+
 std::string ExternalFunction::Name() const {
   return *impl_t<decltype(this)>{ _ctx }.GetName(_id);
 }
+
+/* GlobalVar */
+
 
 // Thanks to uniform dispatch each definition of following method looks identical,
 // therefore simple macro can be defined that is more readable.
@@ -848,6 +878,7 @@ DEFINE_DATA_OPERATOR(Segment);
 DEFINE_DATA_OPERATOR(MemoryRange);
 DEFINE_DATA_OPERATOR(CodeXref);
 DEFINE_DATA_OPERATOR(DataXref);
+DEFINE_DATA_OPERATOR(GlobalVar);
 
 /* Erasable */
 
@@ -864,6 +895,7 @@ DEF_ERASE(Segment)
 DEF_ERASE(MemoryRange)
 DEF_ERASE(CodeXref)
 DEF_ERASE(DataXref)
+DEF_ERASE(GlobalVar)
 
 #undef DEF_ERASE
 
@@ -946,6 +978,8 @@ template struct HasSymbolTableEntry<ExternalFunction>;
 
 template struct HasEa<CodeXref>;
 template struct HasSymbolTableEntry<CodeXref>;
+
+template struct HasEa<GlobalVar>;
 
 } // namespace interface
 
