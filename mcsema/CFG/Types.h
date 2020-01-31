@@ -179,19 +179,6 @@ struct func_ops_ : _crtp<Self, func_ops_>
   }
 };
 
-/* TODO, FIXME: Same as func_ops_ */
-template<typename Self>
-struct bb_ops_ : _crtp<Self, bb_ops_>
-{
-  template<typename Module, typename Data>
-  auto insert(Module &&module, uint64_t ea, uint64_t size, Data &&bytes)
-  {
-    constexpr static Query q_insert =
-      R"(insert into blocks(module, ea, size, bytes) values (?1, ?2, ?3, ?4))";
-    return this->db().template query<q_insert>(module.id, ea, size, bytes);
-  }
-};
-
 
 /* Requires object can have symtab name and tables have symtab_rowid */
 template<typename Self>
