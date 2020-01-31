@@ -152,6 +152,12 @@ struct Module_ : has_context,
       R"(SELECT rowid FROM global_variables WHERE module_rowid = ?1)";
     return _ctx->db.template query<q_obj>(id);
   }
+
+  auto all_ext_vars_r(int64_t id) {
+    constexpr static Query q_obj =
+      R"(SELECT rowid FROM external_variables WHERE module_rowid = ?1)";
+    return _ctx->db.template query<q_obj>(id);
+  }
 };
 
 template<typename Self>
@@ -440,6 +446,22 @@ struct GlobalVar_ : has_context,
     R"(SELECT ea, name, size FROM global_variables WHERE rowid = ?1)";
 };
 
+template<typename Conrete = ExternalVar>
+struct ExternalVar_ : has_context,
+                      has_ea<ExternalVar_<ExternalVar>>,
+                      id_based_ops_<ExternalVar_<ExternalVar>> {
+
+  using has_context::has_context;
+  constexpr static Query table_name = R"(external_variables)";
+
+  constexpr static Query q_insert =
+    R"(INSERT INTO external_variables(ea, name, size, is_weak, is_thread_local, module_rowid)
+              VALUES(?1, ?2, ?3, ?4, ?5, ?6))";
+
+  constexpr static Query q_get =
+    R"(SELECT ea, name, size, is_weak, is_thread_local
+              FROM external_variables WHERE module_rowid = ?1)";
+};
 
 /* Hardcoding each implementation class in each public object method implementation
  * is tedious and error-prone. Following class provides this mapping at compile time
@@ -511,6 +533,12 @@ template<>
 struct dispatch<GlobalVar> {
   using type = GlobalVar_<GlobalVar>;
   using data_fields = util::TypeList<uint64_t, std::string, uint64_t>;
+};
+
+template<>
+struct dispatch<ExternalVar> {
+  using type = ExternalVar_<ExternalVar>;
+  using data_fields = util::TypeList<uint64_t, std::string, uint64_t, bool, bool>;
 };
 
 template<typename T>
@@ -700,7 +728,14 @@ ExternalFunction Module::AddExternalFunction(uint64_t ea,
 }
 
 GlobalVar Module::AddGlobalVar(uint64_t ea, const std::string &name, uint64_t size) {
-  return { impl_t<GlobalVar>( _ctx ).insert( ea, name, size, _id ), _ctx };
+  return { impl_t<GlobalVar>(_ctx).insert( ea, name, size, _id ), _ctx };
+}
+
+ExternalVar Module::AddExternalVar(uint64_t ea, const std::string &name, uint64_t size,
+                                   bool is_weak, bool is_thread_local) {
+  return { impl_t<ExternalVar>(_ctx).insert(ea, name, size,
+                                            is_weak, is_thread_local, _id),
+           _ctx };
 }
 
 WeakObjectIterator<BasicBlock> Module::OrphanedBasicBlocks() {
@@ -725,6 +760,11 @@ WeakObjectIterator<Function> Module::Functions() {
 
 WeakObjectIterator<GlobalVar> Module::GlobalVars() {
   auto result = Module_{ _ctx }.all_g_vars_r(_id);
+  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
+}
+
+WeakObjectIterator<ExternalVar> Module::ExternalVars() {
+  auto result = Module_{ _ctx }.all_ext_vars_r(_id);
   return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
 }
 
@@ -879,6 +919,7 @@ DEFINE_DATA_OPERATOR(MemoryRange);
 DEFINE_DATA_OPERATOR(CodeXref);
 DEFINE_DATA_OPERATOR(DataXref);
 DEFINE_DATA_OPERATOR(GlobalVar);
+DEFINE_DATA_OPERATOR(ExternalVar);
 
 /* Erasable */
 
@@ -896,6 +937,7 @@ DEF_ERASE(MemoryRange)
 DEF_ERASE(CodeXref)
 DEF_ERASE(DataXref)
 DEF_ERASE(GlobalVar)
+DEF_ERASE(ExternalVar)
 
 #undef DEF_ERASE
 
@@ -981,11 +1023,14 @@ template struct HasSymbolTableEntry<CodeXref>;
 
 template struct HasEa<GlobalVar>;
 
+template struct HasEa<ExternalVar>;
 } // namespace interface
 
 // Since Iterators are also templated, we must instantiate them as well
 
 template struct WeakObjectIterator<GlobalVar>;
+
+template struct WeakObjectIterator<ExternalVar>;
 
 template struct WeakDataIterator<SymbolTableEntry>;
 
