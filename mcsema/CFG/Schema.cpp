@@ -237,9 +237,12 @@ void Schema::CreateSchema(Context &ctx) {
   // TODO: Rework/Check below
 
   static Query g_vars = R"(create table if not exists global_variables(
+        rowid INTEGER PRIMARY KEY,
         ea integer,
         name text,
-        size integer))";
+        size integer,
+        module_rowid integer NOT NULL,
+        FOREIGN KEY(module_rowid) REFERENCES modules(rowid)))";
   db.template query<g_vars>();
 
   static Query vars = R"(create table if not exists variables(
