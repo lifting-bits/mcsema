@@ -53,6 +53,7 @@ template<typename Ctx>
 struct with_context {
 
   with_context(CtxPtr &shared_ctx) : _ctx(shared_ctx.get()) {}
+  with_context(CtxR raw_ctx) : _ctx(raw_ctx) {}
 
   CtxR _ctx;
 };
