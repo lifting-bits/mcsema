@@ -146,6 +146,12 @@ struct Module_ : has_context,
       R"(select name, type_rowid from symtabs where module_rowid = ?1)";
     return _ctx->db.template query<q_data>(id);
   }
+
+  auto all_g_vars_r(int64_t id) {
+    constexpr static Query q_obj =
+      R"(SELECT rowid FROM global_variables WHERE module_rowid = ?1)";
+    return _ctx->db.template query<q_obj>(id);
+  }
 };
 
 template<typename Self>
@@ -691,6 +697,11 @@ WeakObjectIterator<Function> Module::Functions() {
   return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
 }
 
+WeakObjectIterator<GlobalVar> Module::GlobalVars() {
+  auto result = Module_{ _ctx }.all_g_vars_r(_id);
+  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
+}
+
 /* Function */
 
 void Function::AttachBlock(const BasicBlock &bb) {
@@ -939,6 +950,8 @@ template struct HasSymbolTableEntry<CodeXref>;
 } // namespace interface
 
 // Since Iterators are also templated, we must instantiate them as well
+
+template struct WeakObjectIterator<GlobalVar>;
 
 template struct WeakDataIterator<SymbolTableEntry>;
 
