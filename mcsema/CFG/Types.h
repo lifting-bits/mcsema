@@ -226,5 +226,54 @@ struct has_ea : _crtp<Self, has_ea> {
   }
 };
 
+template<typename NMTable>
+struct nm_impl : _crtp<NMTable, nm_impl> {
+
+  template<typename Self>
+  static std::string q_get_others_r() {
+    return std::string{ "SELECT " } + NMTable::template other<Self>::fk
+           + " FROM " + NMTable::table_name
+           + " WHERE " + Self::fk + " = ?1";
+  }
+
+  template<typename Self>
+  static std::string q_bind() {
+    return std::string{ "INSERT INTO " } + NMTable::table_name + "("
+           + Self::fk + ", " + NMTable::template other<Self>::fk + ") VALUES(?1, ?2)";
+  }
+
+  template<typename Self>
+  static std::string q_unbind() {
+    return std::string{ "DELETE FROM " } + NMTable::table_name + " WHERE "
+           + Self::fk + " = ?1";
+  }
+
+  template<typename Self>
+  static std::string q_unbind_from() {
+    return std::string{ "DELETE FROM " } + NMTable::table_name + " WHERE "
+          + Self::fk + " = ?1 AND " + NMTable::template other<Self>::fk + " = ?2";
+  }
+
+  template<typename Self>
+  auto BindTo(int64_t self_id, int64_t to_be_binded_id) {
+    return this->db().template query<q_bind<Self>>(self_id, to_be_binded_id);
+  }
+
+  template<typename Self>
+  auto UnbindFrom(int64_t self_id, int64_t from_id) {
+    return this->db().template query<q_unbind_from<Self>>(self_id, from_id);
+  }
+
+  template<typename Self>
+  auto Unbind(int64_t self_id) {
+    return this->db().template query<q_unbind<Self>>(self_id);
+  }
+
+  template<typename Self>
+  auto GetOthers_r(int64_t id) {
+    return this->db().template query<q_get_others_r<Self>>(id);
+  }
+
+};
 
 } // namespace mcsema::cfg
