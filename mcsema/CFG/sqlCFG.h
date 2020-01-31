@@ -435,10 +435,31 @@ private:
   using details::Internals::Internals;
 };
 
+class GlobalVar : public details::Internals,
+                  public interface::HasEa<GlobalVar> {
+
+
+  struct data_t {
+    uint64_t ea;
+    std::string name;
+    uint64_t size;
+  };
+
+  data_t operator*() const;
+
+  void Erase();
+
+private:
+  using details::Internals::Internals;
+
+};
+
 // One object file -- compiled binary or shared library for example.
 class Module : public details::Internals {
 
 public:
+
+  GlobalVar AddGlobalVar(uint64_t ea, const std::string &name, uint64_t size);
 
   Function AddFunction(uint64_t ea, bool is_entrypoint);
 
