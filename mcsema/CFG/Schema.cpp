@@ -25,7 +25,7 @@ void Schema::CreateEnums(Context &ctx) {
   auto &db = ctx.db;
 
   static Query action_enum = R"(create table if not exists exception_frame_actions(
-        key integer PRIMARY KEY NOT NULL,
+        rowid integer PRIMARY KEY NOT NULL,
         action text NOT NULL
         ))";
   db.template query<action_enum>();
@@ -111,6 +111,27 @@ void Schema::CreateNMTables(Context &ctx) {
         FOREIGN KEY(to_rowid) REFERENCES blocks(rowid)
       ))";
   db.template query<q_bb_successors>();
+
+  static Query q_exception_frame_2_type =
+    R"(CREATE TABLE IF NOT EXISTS frame_to_type(
+        frame_rowid integer NOT NULL,
+        var_rowid integer NOT NULL,
+        UNIQUE(frame_rowid, var_rowid),
+        FOREIGN KEY(frame_rowid) REFERENCES exception_frames(rowid),
+        FOREIGN KEY(var_rowid) REFERENCES external_variables(rowid)
+        ))";
+  db.template query<q_exception_frame_2_type>();
+
+  static Query q_exception_frame_2_func =
+    R"(CREATE TABLE IF NOT EXISTS frame_to_func(
+        frame_rowid integer NOT NULL,
+        function_rowid integer NOT NULL,
+        UNIQUE(frame_rowid, function_rowid),
+        FOREIGN KEY(frame_rowid) REFERENCES exception_frames(rowid),
+        FOREIGN KEY(function_rowid) REFERENCES functions(rowid)
+        ))";
+  db.template query<q_exception_frame_2_func>();
+
 }
 
 void Schema::CreateSchema(Context &ctx) {
@@ -260,11 +281,12 @@ void Schema::CreateSchema(Context &ctx) {
   db.template query<stack_vars>();
 
   static Query exception_frames = R"(create table if not exists exception_frames(
-        func_ea integer,
+        rowid INTEGER PRIMARY KEY,
         start_ea integer,
         end_ea integer,
         lp_ea integer,
-        action NOT NULL REFERENCES exception_frame_actions(key)
+        action_rowid integer NOT NULL,
+        FOREIGN KEY(action_rowid) REFERENCES exception_frame_actions(rowid)
         ))";
   db.template query<exception_frames>();
 
