@@ -269,12 +269,14 @@ void Schema::CreateSchema(Context &ctx) {
   db.template query<exception_frames>();
 
   static Query external_vars = R"(create table if not exists external_variables(
-        ea integer,
+        rowid INTEGER PRIMARY KEY,
+        ea integer NOT NULL,
         name text,
         size integer,
         is_weak integer,
-        is_thread_local integer
-        ))";
+        is_thread_local integer,
+        module_rowid integer NOT NULL,
+        FOREIGN KEY(module_rowid) REFERENCES modules(rowid)))";
   db.template query<external_vars>();
 
   CreateNMTables(ctx);
