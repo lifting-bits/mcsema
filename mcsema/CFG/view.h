@@ -69,10 +69,14 @@ void TrySomeBBOps(mcsema::cfg::Module &m) {
     auto entry = m.AddBasicBlock(0x120, 0x4, underlying_mem);
     auto dual_middle = m.AddBasicBlock(0x128, 0x4, underlying_mem);
     auto exit = m.AddBasicBlock(0x12c, 0x4, underlying_mem);
+    auto ops = m.AddBasicBlock(0x12c21, 0x4, underlying_mem);
 
-    func.AttachBlocks( {entry, dual_middle, middle, exit} );
+    func.AttachBlocks( {entry, dual_middle, middle, exit, ops} );
 
     std::cout << " > Now all blocks should be attached to some function" << std::endl;
+    util::ForEach(m.OrphanedBasicBlocks(), print_ea);
+    std::cout << " > Let's deattach one" << std::endl;
+    func.DeattachBlock( ops );
     util::ForEach(m.OrphanedBasicBlocks(), print_ea);
     std::cout << " > Let's build successor relation then!" << std::endl;
     entry.AddSuccs({ middle, dual_middle });
@@ -122,6 +126,46 @@ void TryCase(mcsema::cfg::Module &m) {
       [&](Segment s) { std::cout << "Segment was found and has following data:\n"
                                  << *s << std::endl; } );
 
+}
+
+void TryExternalVars( mcsema::cfg::Module &m )
+{
+  auto fst = m.AddExternalVar(0x60054a, "first", 8);
+  std::cout << "Inserted global variable: " << *fst << std::endl;
+  auto snd = m.AddExternalVar(0x60021f, "second", 4, true);
+  auto third = m.AddExternalVar(0x60011c, "third", 8, true, false);
+
+  uint64_t c = 0;
+  auto printer = [&](auto obj) {
+    std::cout << std::to_string(++c) << " " << *obj << std::endl;
+  };
+  util::ForEach(m.ExternalVars(), printer);
+
+  fst.Erase();
+  third.Erase();
+
+  c = 0;
+  util::ForEach(m.ExternalVars(), printer);
+}
+
+void TryGlobalVars( mcsema::cfg::Module &m )
+{
+  auto fst = m.AddGlobalVar(0x600540, "first", 8);
+  std::cout << "Inserted global variable: " << *fst << std::endl;
+  auto snd = m.AddGlobalVar(0x600214, "second", 4);
+  auto third = m.AddGlobalVar(0x600110, "third", 8);
+
+  uint64_t c = 0;
+  auto printer = [&](auto obj) {
+    std::cout << std::to_string(++c) << " " << *obj << std::endl;
+  };
+  util::ForEach(m.GlobalVars(), printer);
+
+  fst.Erase();
+  third.Erase();
+
+  c = 0;
+  util::ForEach(m.GlobalVars(), printer);
 }
 
 void run()
@@ -288,6 +332,8 @@ void run()
   TrySomeErase(bin);
   TrySomeBBOps(bin);
   TryCase(bin);
+  TryGlobalVars(bin);
+  TryExternalVars(bin);
 }
 
 
