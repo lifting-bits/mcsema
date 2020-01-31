@@ -68,7 +68,11 @@ struct SymbolTableEntry_ : has_context,
   using concrete_t = Concrete;
 
 
-  static constexpr Query table_name = R"(symtabs)";
+template<typename Concrete = SymbolTableEntry>
+struct SymbolTableEntry_ : schema::SymbolTableEntry,
+                           has_context,
+                           id_based_ops_<SymbolTableEntry_<Concrete>> {
+  using has_context::has_context;
 
   constexpr static Query q_insert =
     R"(insert into symtabs(name, module_rowid, type_rowid) values (?1, ?2, ?3))";
@@ -80,14 +84,15 @@ struct SymbolTableEntry_ : has_context,
     R"(insert into symtabs(name, module_rowid, type_rowid) values (?1, #1, ?2))";
 
 };
+using SymbolTableEntry_impl = SymbolTableEntry_<SymbolTableEntry>;
 
 template<typename Concrete = MemoryRange>
-struct MemoryRange_ : has_context,
+struct MemoryRange_ : schema::MemoryRange,
+                      has_context,
                       id_based_ops_<MemoryRange_<Concrete>>,
                       has_ea<MemoryRange_<Concrete>> {
 
   using has_context::has_context;
-  static constexpr Query table_name = R"(memory_ranges)";
 
   constexpr static Query q_insert =
       R"(insert into memory_ranges(module_rowid, ea, size, bytes)
@@ -103,19 +108,17 @@ struct MemoryRange_ : has_context,
 
   std::string_view data(int64_t id) {
     return this->_ctx->cache
-           .template Find<MemoryRange, MemoryRange_<MemoryRange>::q_data>(id);
+           .template Find<Concrete, MemoryRange_<MemoryRange>::q_data>(id);
   }
 };
-
-template<typename Self>
-struct module_ops_mixin : id_based_ops_<Self> {};
+using MemoryRange_impl = MemoryRange_<MemoryRange>;
 
 template<typename Concrete = Module>
-struct Module_ : has_context,
-                 module_ops_mixin<Module_<Concrete>> {
+struct Module_ : schema::Module,
+                 has_context,
+                 id_based_ops_<Module_<Concrete>> {
 
   using has_context::has_context;
-  static constexpr Query table_name = R"(modules)";
 
   constexpr static Query q_insert =
     R"(insert into modules(name) values (?1))";
@@ -160,22 +163,18 @@ struct Module_ : has_context,
     return _ctx->db.template query<q_obj>(id);
   }
 };
-
-template<typename Self>
-struct func_ops_mixin :
-  func_ops_<Self>,
-  id_based_ops_<Self>,
-  has_symtab_name<Self>
-{};
-
+using Module_impl = Module_<Module>;
 
 template<typename Concrete = Function>
-struct Function_ : has_context,
-                   func_ops_mixin<Function_<Concrete>>,
-                   has_ea<Function_<Concrete>>
-{
+struct Function_ : schema::Function,
+                   has_context,
+                   func_ops_<Function_<Concrete>>,
+                   id_based_ops_<Function_<Concrete>>,
+                   has_symtab_name<Function_<Concrete>>,
+                   has_ea<Function_<Concrete>> {
   using has_context::has_context;
-  static constexpr Query table_name = R"(functions)";
+  using self_t = Function_<Function>;
+
   static constexpr Query q_insert =
       R"(insert into functions(module_rowid, ea, is_entrypoint) values (?1, ?2, ?3))";
 
@@ -189,6 +188,7 @@ struct Function_ : has_context,
     return _ctx->db.template query<q_bbs_r>(id);
   }
 };
+using Function_impl = Function_<Function>;
 
 
 template<typename Self>
@@ -196,11 +196,10 @@ struct bb_mixin : id_based_ops_<Self>,
                   has_ea<Self>{};
 
 template<typename Concrete = BasicBlock>
-struct BasicBlock_: has_context,
-                    bb_mixin<BasicBlock_<Concrete>>
-{
+struct BasicBlock_: schema::BasicBlock,
+                    has_context,
+                    bb_mixin<BasicBlock_<Concrete>> {
   using has_context::has_context;
-  constexpr static Query table_name = R"(blocks)";
 
   constexpr static Query q_insert =
     R"(insert into blocks(module_rowid, ea, size, memory_rowid)
@@ -286,17 +285,15 @@ struct BasicBlock_: has_context,
     return c_data.substr(offset);
   }
 };
+using BasicBlock_impl = BasicBlock_<BasicBlock>;
 
 
 template<typename Concrete = Segment>
-struct Segment_ : has_context,
+struct Segment_ : schema::Segment,
+                  has_context,
                   id_based_ops_<Segment_<Concrete>>,
                   has_ea<Segment_<Concrete>> {
   using has_context::has_context;
-
-  constexpr static Query table_name = R"(segments)";
-
-  Segment_() = default;
 
   constexpr static Query q_insert =
     R"(insert into segments(
@@ -323,7 +320,7 @@ struct Segment_ : has_context,
 
   auto _insert(uint64_t ea,
                uint64_t size,
-               const Segment::Flags &flags,
+               const typename Concrete::Flags &flags,
                const std::string &name,
                int64_t memory_rowid) {
 
@@ -351,7 +348,7 @@ struct Segment_ : has_context,
     return c_data.substr(offset, size);
   }
 
-  void SetFlags(int64_t id, const Segment::Flags &flags) {
+  void SetFlags(int64_t id, const typename Concrete::Flags &flags) {
     constexpr static Query q_set_flags =
       R"(UPDATE segments SET
         (read_only, is_external, is_exported, is_thread_local) =
@@ -361,15 +358,16 @@ struct Segment_ : has_context,
                                     flags.is_exported, flags.is_thread_local);
   }
 };
+using Segment_impl = Segment_<Segment>;
 
 
 template<typename Concrete = CodeXref>
-struct CodeXref_ : has_context,
+struct CodeXref_ : schema::CodeXref,
+                   has_context,
                    has_symtab_name<CodeXref_<Concrete>>,
                    has_ea<CodeXref_<Concrete>>,
                    id_based_ops_<CodeXref_<Concrete>> {
   using has_context::has_context;
-  constexpr static Query table_name = R"(code_references)";
 
   constexpr static Query q_insert =
     R"(insert into code_references(
@@ -387,17 +385,17 @@ struct CodeXref_ : has_context,
     R"(SELECT ea, target_ea, operand_type_rowid, mask
        FROM code_references
        WHERE rowid = ?1)";
-
 };
+using CodeXref_impl = CodeXref_<CodeXref>;
 
 template<typename Concrete = DataXref>
-struct DataXref_ : has_context,
+struct DataXref_ : schema::DataXref,
+                   has_context,
                    has_symtab_name<DataXref_<Concrete>>,
                    has_ea<DataXref_<Concrete>>,
                    id_based_ops_<DataXref_<Concrete>> {
 
   using has_context::has_context;
-  constexpr static Query table_name = R"(data_references)";
 
   constexpr static Query q_insert =
     R"(insert into data_references(
@@ -408,16 +406,16 @@ struct DataXref_ : has_context,
     R"(SELECT ea, width, target_ea, fixup_kind_rowid
        FROM data_references
        WHERE rowid = ?1)";
-
 };
+using DataXref_impl = DataXref_<DataXref>;
 
 template<typename Concrete = ExternalFunction>
-struct ExternalFunction_ : has_context,
+struct ExternalFunction_ : schema::ExternalFunction,
+                           has_context,
                            has_symtab_name<ExternalFunction_<Concrete>>,
                            has_ea<ExternalFunction_<Concrete>>,
                            id_based_ops_<ExternalFunction_<Concrete>> {
   using has_context::has_context;
-  constexpr static Query table_name = R"(external_functions)";
 
   constexpr static Query q_insert =
     R"(insert into external_functions(
@@ -430,14 +428,15 @@ struct ExternalFunction_ : has_context,
        WHERE rowid = ?1)";
 
 };
+using ExternalFunction_impl = ExternalFunction_<ExternalFunction>;
 
 template<typename Concrete = GlobalVar>
-struct GlobalVar_ : has_context,
+struct GlobalVar_ : schema::GlobalVar,
+                    has_context,
                     has_ea<GlobalVar_<GlobalVar>>,
                     id_based_ops_<GlobalVar_<GlobalVar>> {
 
   using has_context::has_context;
-  constexpr static Query table_name = R"(global_variables)";
 
   constexpr static Query q_insert =
     R"(INSERT INTO global_variables(ea, name, size, module_rowid)
@@ -446,14 +445,15 @@ struct GlobalVar_ : has_context,
   constexpr static Query q_get =
     R"(SELECT ea, name, size FROM global_variables WHERE rowid = ?1)";
 };
+using GlobalVar_impl = GlobalVar_<GlobalVar>;
 
 template<typename Conrete = ExternalVar>
-struct ExternalVar_ : has_context,
+struct ExternalVar_ : schema::ExternalVar,
+                      has_context,
                       has_ea<ExternalVar_<ExternalVar>>,
                       id_based_ops_<ExternalVar_<ExternalVar>> {
 
   using has_context::has_context;
-  constexpr static Query table_name = R"(external_variables)";
 
   constexpr static Query q_insert =
     R"(INSERT INTO external_variables(ea, name, size, is_weak, is_thread_local, module_rowid)
@@ -463,16 +463,14 @@ struct ExternalVar_ : has_context,
     R"(SELECT ea, name, size, is_weak, is_thread_local
               FROM external_variables WHERE rowid = ?1)";
 };
+using ExternalVar_impl = ExternalVar_<ExternalVar>;
 
 template<typename Concrete=ExceptionFrame>
-struct ExceptionFrame_ : has_context,
+struct ExceptionFrame_ : schema::ExceptionFrame,
+                         has_context,
                          id_based_ops_<ExceptionFrame_<ExceptionFrame>> {
 
   using has_context::has_context;
-  using self_t = ExceptionFrame_<ExceptionFrame>;
-
-  constexpr static Query table_name = R"(exception_frames)";
-  constexpr static Query fk = R"(frame_rowid)";
 
   constexpr static Query q_insert =
     R"(INSERT INTO exception_frames(start_ea, end_ea, lp_ea, action_rowid)
@@ -483,6 +481,8 @@ struct ExceptionFrame_ : has_context,
               WHERE rowid = ?1)";
 
 };
+using ExceptionFrame_impl = ExceptionFrame_<ExceptionFrame>;
+
 
 /* Hardcoding each implementation class in each public object method implementation
  * is tedious and error-prone. Following class provides this mapping at compile time
