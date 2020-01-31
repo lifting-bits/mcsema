@@ -460,7 +460,27 @@ struct ExternalVar_ : has_context,
 
   constexpr static Query q_get =
     R"(SELECT ea, name, size, is_weak, is_thread_local
-              FROM external_variables WHERE module_rowid = ?1)";
+              FROM external_variables WHERE rowid = ?1)";
+};
+
+template<typename Concrete=ExceptionFrame>
+struct ExceptionFrame_ : has_context,
+                         id_based_ops_<ExceptionFrame_<ExceptionFrame>> {
+
+  using has_context::has_context;
+  using self_t = ExceptionFrame_<ExceptionFrame>;
+
+  constexpr static Query table_name = R"(exception_frames)";
+  constexpr static Query fk = R"(frame_rowid)";
+
+  constexpr static Query q_insert =
+    R"(INSERT INTO exception_frames(start_ea, end_ea, lp_ea, action_rowid)
+              VALUE(?1, ?2, ?3, ?4))";
+
+  constexpr static Query q_get =
+    R"(SELECT start_ea, end_ea, lp_ea, action_rowid FROM exception_frames
+              WHERE rowid = ?1)";
+
 };
 
 /* Hardcoding each implementation class in each public object method implementation
