@@ -17,10 +17,10 @@
 
 #pragma once
 
+#include <optional>
 #include <tuple>
 #include <type_traits>
 #include <utility>
-
 
 namespace mcsema::cfg {
 namespace util
