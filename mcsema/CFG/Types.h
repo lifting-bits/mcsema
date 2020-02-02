@@ -276,4 +276,19 @@ struct nm_impl : _crtp<NMTable, nm_impl> {
 
 };
 
+struct can_obj_iterate {
+
+  template<typename Table, typename Self>
+  static std::string q_get_obj_iterator() {
+    return std::string { "SELECT " } + Table::pk + " FROM "
+           + Table::table_name + " WHERE " + Self::fk + " = ?1";
+  }
+
+  template<typename Table, typename Self>
+  static auto Get(Self &self, int64_t self_id) {
+    return self.db().template query<q_get_obj_iterator<Table, Self>>(self_id);
+  }
+
+};
+
 } // namespace mcsema::cfg
