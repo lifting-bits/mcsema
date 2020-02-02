@@ -182,6 +182,7 @@ private:
   friend class Module;
   friend class interface::HasEa<ExternalFunction>;
 
+  friend details::ObjectIterator_impl;
   using details::Internals::Internals;
 };
 
@@ -340,6 +341,7 @@ private:
 
   friend class interface::HasEa<Segment>;
 
+  friend details::ObjectIterator_impl;
   using details::Internals::Internals;
 };
 
@@ -371,6 +373,7 @@ private:
   friend class Module;
 
   friend class interface::HasEa<MemoryRange>;
+  friend details::ObjectIterator_impl;
 
   using details::Internals::Internals;
 };
@@ -552,10 +555,9 @@ public:
   WeakObjectIterator<GlobalVar> GlobalVars();
   WeakObjectIterator<ExternalVar> ExternalVars();
 
-  // TODO:
-  //WeakIterator<ExternalFunction> ExtFunctions();
-  //WeakIterator<MemoryRange> MemoryRanges();
-  //WeakIterator<Segment> Segments();
+  WeakObjectIterator<ExternalFunction> ExternalFuncs();
+  WeakObjectIterator<MemoryRange> MemoryRanges();
+  WeakObjectIterator<Segment> Segments();
 
   // TODO: This is probably really handy if we allow Erase without removing dependent
   // objects.
