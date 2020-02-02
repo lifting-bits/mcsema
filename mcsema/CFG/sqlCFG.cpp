@@ -744,7 +744,7 @@ WeakObjectIterator<BasicBlock> Module::OrphanedBasicBlocks() {
 }
 
 WeakObjectIterator<BasicBlock> Module::Blocks() {
-  auto result = Module_{ _ctx }.all_blocks_r(_id);
+  auto result = Impl(*this, _ctx).ObjIterate<schema::BasicBlock>(_id);
   return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
 }
 
@@ -754,17 +754,32 @@ WeakDataIterator<SymbolTableEntry> Module::SymbolsData() {
 }
 
 WeakObjectIterator<Function> Module::Functions() {
-  auto result = Module_{ _ctx }.all_functions_r(_id);
+  auto result = Impl(*this, _ctx).ObjIterate<schema::Function>(_id);
   return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
 }
 
 WeakObjectIterator<GlobalVar> Module::GlobalVars() {
-  auto result = Module_{ _ctx }.all_g_vars_r(_id);
+  auto result = Impl(*this, _ctx).ObjIterate<schema::GlobalVar>(_id);
   return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
 }
 
 WeakObjectIterator<ExternalVar> Module::ExternalVars() {
-  auto result = Module_{ _ctx }.all_ext_vars_r(_id);
+  auto result = Impl(*this, _ctx).ObjIterate<schema::ExternalVar>(_id);
+  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
+}
+
+WeakObjectIterator<ExternalFunction> Module::ExternalFuncs() {
+  auto result = Impl(*this, _ctx).ObjIterate<schema::ExternalFunction>(_id);
+  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
+}
+
+WeakObjectIterator<MemoryRange> Module::MemoryRanges() {
+  auto result = Impl(*this, _ctx).ObjIterate<schema::MemoryRange>(_id);
+  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
+}
+
+WeakObjectIterator<Segment> Module::Segments() {
+  auto result = Impl(*this, _ctx).ObjIterate<schema::Segment>(_id);
   return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
 }
 
@@ -1035,6 +1050,12 @@ template struct HasEa<ExternalVar>;
 template struct WeakObjectIterator<GlobalVar>;
 
 template struct WeakObjectIterator<ExternalVar>;
+
+template struct WeakObjectIterator<ExternalFunction>;
+
+template struct WeakObjectIterator<MemoryRange>;
+
+template struct WeakObjectIterator<Segment>;
 
 template struct WeakDataIterator<SymbolTableEntry>;
 
