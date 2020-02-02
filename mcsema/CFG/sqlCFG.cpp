@@ -538,6 +538,11 @@ struct dispatch<ExternalVar> {
   using data_fields = util::TypeList<uint64_t, std::string, uint64_t, bool, bool>;
 };
 
+template<>
+struct dispatch<Module> {
+  using type = Module_impl;
+};
+
 template<typename T>
 using remove_cvp_t = typename std::remove_cv_t<std::remove_pointer_t<T>>;
 
@@ -633,8 +638,6 @@ auto WeakObjectIterator<Entry>::Fetch() -> maybe_data_t {
 
 template<typename Entry>
 WeakObjectIterator<Entry>::~WeakObjectIterator() {}
-
-
 
 // TODO: Use `impl_t` in methods defined before it was present.
 /* Define public API methods, typically by calling their implementations */
