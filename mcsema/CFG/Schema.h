@@ -59,8 +59,10 @@ using Query = const char *;
   struct name_ { \
     constexpr static Query table_name = table_name_; \
     constexpr static Query fk = foreign_key; \
+    constexpr static Query pk = "rowid"; \
     using table = name_; \
   }
+
 
 DEFINE_TABLE(SymbolTableEntry, "symtabs", "symtab_rowid");
 DEFINE_TABLE(MemoryRange, "memory_ranges", "memory_rowid");
