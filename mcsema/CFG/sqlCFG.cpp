@@ -128,38 +128,15 @@ struct Module_ : schema::Module,
     return _ctx->db.template query<q_data>(id);
   }
 
-  auto all_functions_r(int64_t id) {
-    constexpr static Query q_obj =
-      R"(SELECT rowid
-         FROM functions
-         WHERE module_rowid = ?1)";
-      return _ctx->db.template query<q_obj>(id);
-  }
-
-  auto all_blocks_r(int64_t id) {
-    constexpr static Query q_bbs =
-      R"(SELECT rowid
-         FROM blocks
-         WHERE module_rowid = ?1)";
-    return _ctx->db.template query<q_bbs>(id);
-  }
-
   auto all_symbols(int64_t id) {
     constexpr static Query q_data =
       R"(select name, type_rowid from symtabs where module_rowid = ?1)";
     return _ctx->db.template query<q_data>(id);
   }
 
-  auto all_g_vars_r(int64_t id) {
-    constexpr static Query q_obj =
-      R"(SELECT rowid FROM global_variables WHERE module_rowid = ?1)";
-    return _ctx->db.template query<q_obj>(id);
-  }
-
-  auto all_ext_vars_r(int64_t id) {
-    constexpr static Query q_obj =
-      R"(SELECT rowid FROM external_variables WHERE module_rowid = ?1)";
-    return _ctx->db.template query<q_obj>(id);
+  template<typename Table>
+  auto ObjIterate(int64_t id) {
+    return can_obj_iterate::Get<Table>(*this, id);
   }
 };
 using Module_impl = Module_<Module>;
