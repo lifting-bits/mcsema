@@ -230,7 +230,7 @@ public:
 private:
 
   friend class Function;
-  friend class Letter;
+  friend class Workspace;
   friend class Module;
   friend details::ObjectIterator_impl;
   friend interface::HasEa<BasicBlock>;
@@ -275,7 +275,7 @@ private:
   friend class details::ObjectIterator_impl;
   friend class interface::HasEa<Function>;
 
-  friend class Letter;
+  friend class Workspace;
   friend class Module;
 };
 
@@ -337,7 +337,7 @@ public:
 private:
   friend class MemoryRange;
   friend class Module;
-  friend class Letter;
+  friend class Workspace;
 
   friend class interface::HasEa<Segment>;
 
@@ -369,7 +369,7 @@ public:
   // FIXME: This does not remove Segments or BBs
   void Erase();
 private:
-  friend class Letter;
+  friend class Workspace;
   friend class Module;
 
   friend class interface::HasEa<MemoryRange>;
@@ -575,14 +575,14 @@ public:
 private:
   using details::Internals::Internals;
 
-  friend class Letter;
+  friend class Workspace;
 };
 
 
 // Top-level object, encapsulates several separate object files.
-struct Letter
+struct Workspace
 {
-  Letter(const std::string &db_name);
+  Workspace(const std::string &db_name);
 
   void CreateSchema();
 

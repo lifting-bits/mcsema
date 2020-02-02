@@ -641,11 +641,11 @@ WeakObjectIterator<Entry>::~WeakObjectIterator() {}
 // TODO: Use `impl_t` in methods defined before it was present.
 /* Define public API methods, typically by calling their implementations */
 
-/* Letter */
+/* Workspace */
 
-Letter::Letter(const std::string &name) : _ctx(std::make_shared<Context>(name)) {}
+Workspace::Workspace(const std::string &name) : _ctx(std::make_shared<Context>(name)) {}
 
-void Letter::CreateSchema()
+void Workspace::CreateSchema()
 {
   constexpr static Query q_pragmas =
     R"(PRAGMA foreign_keys = ON)";
@@ -653,36 +653,36 @@ void Letter::CreateSchema()
   Schema::CreateSchema(*_ctx);
 }
 
-Module Letter::AddModule(const std::string &name) {
+Module Workspace::AddModule(const std::string &name) {
   return { Module_{ _ctx }.insert(name), _ctx };
 }
 
-Function Letter::AddFunction(const Module &module, uint64_t ea, bool is_entrypoint)
+Function Workspace::AddFunction(const Module &module, uint64_t ea, bool is_entrypoint)
 {
   return { Function_{ _ctx }.insert(module._id, ea, is_entrypoint), _ctx };
 }
 
-BasicBlock Letter::AddBasicBlock(const Module &module,
-                                 uint64_t ea,
-                                 uint64_t size,
-                                 const MemoryRange &range)
+BasicBlock Workspace::AddBasicBlock(const Module &module,
+                                    uint64_t ea,
+                                    uint64_t size,
+                                    const MemoryRange &range)
 {
   return { BasicBlock_{ _ctx }.insert(module._id, ea, size, range._id), _ctx };
 }
 
-MemoryRange Letter::AddMemoryRange(const Module &module,
-                                   uint64_t ea,
-                                   uint64_t size,
-                                   std::string_view data) {
+MemoryRange Workspace::AddMemoryRange(const Module &module,
+                                      uint64_t ea,
+                                      uint64_t size,
+                                      std::string_view data) {
   // TODO: Check if this copy to sqlite::blob is required
   return { MemoryRange_{ _ctx }.insert(module._id, ea, size,
                                  sqlite::blob(data.begin(), data.end())),
             _ctx };
 }
 
-MemoryRange Letter::AddMemoryRange(const Module &module,
-                                   uint64_t ea,
-                                   std::string_view data) {
+MemoryRange Workspace::AddMemoryRange(const Module &module,
+                                      uint64_t ea,
+                                      std::string_view data) {
   return AddMemoryRange(module, ea, data.size(), data);
 }
 
