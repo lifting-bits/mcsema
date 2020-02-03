@@ -26,6 +26,40 @@ namespace mcsema::ws {
 namespace util
 {
 
+
+// Utility class used during creation of query strings.
+// Appends whitespace at the end of each inserted token via `operator<<`. Method `append`
+// only inserts token without any formatting.
+// TODO(lukas): c++20 constexpr everything with std::string.
+template<std::size_t preallocate = 64>
+struct QString {
+  std::string _data;
+
+  using self_f = QString<preallocate>;
+
+  QString() {
+    _data.reserve(preallocate);
+  }
+
+  QString(std::string &&str, bool space=true)
+    : _data(std::move(str) + (space ? " " : "")) {
+    _data.reserve(preallocate);
+  }
+
+  std::string take() { return std::move(_data); }
+
+  self_f operator<<(const std::string &str) {
+    _data.append(str).append(" ");
+    return *this;
+  }
+
+  self_f append(const std::string &str) {
+    _data += str;
+    return *this;
+  }
+
+};
+
 template<typename ...Args>
 struct TypeList {};
 
