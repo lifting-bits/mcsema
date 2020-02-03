@@ -25,7 +25,7 @@
 #include <mcsema/CFG/Iterator.h>
 #include <mcsema/CFG/Enums.h>
 
-namespace mcsema::cfg {
+namespace mcsema::ws {
 
 // Forward-declare concrete
 class Function;
@@ -620,4 +620,4 @@ private:
 };
 
 
-} // namespace mcsema::cfg
+} // namespace mcsema::ws

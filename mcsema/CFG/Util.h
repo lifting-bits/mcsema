@@ -22,7 +22,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace mcsema::cfg {
+namespace mcsema::ws {
 namespace util
 {
 
@@ -111,4 +111,4 @@ void iterate( R &&r, Yield yield, Args &&...args )
 }
 
 } // namespace util
-} // namespace mcsema::cfg
+} // namespace mcsema::ws

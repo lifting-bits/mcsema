@@ -19,7 +19,7 @@
 #include <type_traits>
 #include <unordered_map>
 
-namespace mcsema::cfg {
+namespace mcsema::ws {
 // FIXME: This could inherit from sqlite::Database, but is it worth it?
 template<typename DB>
 struct Base {
@@ -75,4 +75,4 @@ class MemoryRange;
 template<typename DB>
 using MemoryRangeCache = Cache<MemoryRange, std::string, int64_t, Base<DB>>;
 
-} // namespace mcsema::cfg
+} // namespace mcsema::ws

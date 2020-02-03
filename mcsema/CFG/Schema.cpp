@@ -19,7 +19,7 @@
 #include <mcsema/CFG/Schema.h>
 
 
-namespace mcsema::cfg {
+namespace mcsema::ws {
 
 void Schema::CreateEnums(Context &ctx) {
   auto &db = ctx.db;
@@ -331,4 +331,4 @@ void Schema::CreateTriggers(Context &ctx) {
 
 }
 
-} // namespace mcsema::cfg
+} // namespace mcsema::ws

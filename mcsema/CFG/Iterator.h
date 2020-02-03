@@ -19,7 +19,7 @@
 #include <memory>
 #include <mcsema/CFG/Util.h>
 
-namespace mcsema::cfg {
+namespace mcsema::ws {
 
 namespace details {
   struct DataIterator_impl;
@@ -79,4 +79,4 @@ private:
   Impl_t impl;
 };
 
-} // namespace mcsema::cfg
+} // namespace mcsema::ws

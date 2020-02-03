@@ -20,7 +20,7 @@
 #include <iostream>
 
 namespace mcsema {
-namespace cfg {
+namespace ws {
 
 template<typename T>
 void CheckName(T &t, const std::string& who) {
@@ -32,7 +32,7 @@ void CheckName(T &t, const std::string& who) {
   }
 }
 
-void TrySomeErase(mcsema::cfg::Module &m) {
+void TrySomeErase(mcsema::ws::Module &m) {
     std::cout << " > Let's print all current blocks with their xrefs" << std::endl;
     // 1 query
     for (auto bb_it = m.Blocks(); auto bb = bb_it.Fetch();) {
@@ -54,7 +54,7 @@ void TrySomeErase(mcsema::cfg::Module &m) {
         std::cout << bb->ea() << std::endl;
 }
 
-void TrySomeBBOps(mcsema::cfg::Module &m) {
+void TrySomeBBOps(mcsema::ws::Module &m) {
     auto func = m.AddFunction(0x120, true);
     auto underlying_mem = m.AddMemoryRange(
             0x120,
@@ -99,7 +99,7 @@ void TrySomeBBOps(mcsema::cfg::Module &m) {
     }
 }
 
-void TryCase(mcsema::cfg::Module &m) {
+void TryCase(mcsema::ws::Module &m) {
   // Complexity is k queries where k is the number of possible matches
   std::optional<BasicBlock> block;
   auto found = m.MatchEa(0x124,
@@ -128,7 +128,7 @@ void TryCase(mcsema::cfg::Module &m) {
 
 }
 
-void TryExternalVars( mcsema::cfg::Module &m )
+void TryExternalVars( mcsema::ws::Module &m )
 {
   auto fst = m.AddExternalVar(0x60054a, "first", 8);
   std::cout << "Inserted global variable: " << *fst << std::endl;
@@ -148,7 +148,7 @@ void TryExternalVars( mcsema::cfg::Module &m )
   util::ForEach(m.ExternalVars(), printer);
 }
 
-void TryGlobalVars( mcsema::cfg::Module &m )
+void TryGlobalVars( mcsema::ws::Module &m )
 {
   auto fst = m.AddGlobalVar(0x600540, "first", 8);
   std::cout << "Inserted global variable: " << *fst << std::endl;
@@ -337,5 +337,5 @@ void run()
 }
 
 
-} // namespace cfg
+} // namespace ws
 } // namespace mcsema

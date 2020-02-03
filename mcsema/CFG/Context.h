@@ -21,7 +21,7 @@
 #include <mcsema/CFG/SQLiteWrapper.h>
 #include <mcsema/CFG/Cache.h>
 
-namespace mcsema::cfg {
+namespace mcsema::ws {
 
 using Query = const char *;
 
@@ -39,7 +39,7 @@ public:
   using Result_t = sqlite::Database<Name>::QueryResult;
   std::string _db_name;
   DB_t db;
-  mcsema::cfg::MemoryRangeCache<DB_t> cache = ( db );
+  mcsema::ws::MemoryRangeCache<DB_t> cache = ( db );
 };
 
-} // namespace mcsema::cfg
+} // namespace mcsema::ws

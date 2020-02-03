@@ -16,7 +16,7 @@
 
 #pragma once
 
-namespace mcsema::cfg {
+namespace mcsema::ws {
 
 /* Enums */
 enum class SymbolVisibility: unsigned char {
@@ -61,4 +61,4 @@ enum class Action : unsigned char {
   Catch = 1
 };
 
-}// namespace mcsema::cfg
+}// namespace mcsema::ws

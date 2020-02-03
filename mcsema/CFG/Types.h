@@ -23,7 +23,7 @@
 
 #include <mcsema/CFG/Util.h>
 
-namespace mcsema::cfg {
+namespace mcsema::ws {
 
 using Query = const char *;
 
@@ -291,4 +291,4 @@ struct can_obj_iterate {
 
 };
 
-} // namespace mcsema::cfg
+} // namespace mcsema::ws

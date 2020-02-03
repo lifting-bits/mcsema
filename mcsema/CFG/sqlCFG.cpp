@@ -25,8 +25,7 @@
 #include <mcsema/CFG/Schema.h>
 #include <mcsema/CFG/Context.h>
 
-namespace mcsema {
-namespace cfg {
+namespace mcsema::ws {
 
 /* This file contains mapping from public API -> internal implementations and definitions
  * of these implementations.
@@ -1065,5 +1064,4 @@ template struct WeakObjectIterator<BasicBlock>;
 template struct WeakDataIterator<CodeXref>;
 template struct WeakObjectIterator<CodeXref>;
 
-} // namespace cfg
-} // namespace mcsema
+} // namespace mcsema::ws
