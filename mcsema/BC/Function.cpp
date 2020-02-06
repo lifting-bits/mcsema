@@ -62,6 +62,8 @@
 #include "mcsema/CFG/CFG.h"
 
 DECLARE_bool(legacy_mode);
+DECLARE_bool(explicit_args);
+DECLARE_bool(disable_optimizer);
 
 DEFINE_bool(add_reg_tracer, false,
             "Add a debug function that prints out the register state before "
@@ -1076,7 +1078,12 @@ bool DefineLiftedFunctions(const NativeModule *cfg_module) {
       return false;
     }
 
-    InlineCalls(*lifted_func);
+    // Unfortunately there can be `return_twice` attribute on some external functions
+    // (setjmp). This prevents llvm from inlining the `ext_` wrapper, but it is mandatory
+    // that the actual call is behind a wrapper (due to how it is implemented).
+    if (FLAGS_explicit_args && !FLAGS_disable_optimizer) {
+      InlineCalls(*lifted_func);
+    }
     func_pass_manager.run(*lifted_func);
   }
 
