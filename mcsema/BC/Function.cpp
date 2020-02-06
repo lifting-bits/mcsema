@@ -17,6 +17,7 @@
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
+#include <llvm/IR/CallSite.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
@@ -31,6 +32,8 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/Type.h>
+
+#include <llvm/Transforms/Utils/Cloning.h>
 
 #include <memory>
 #include <unordered_map>
@@ -1013,6 +1016,38 @@ void DeclareLiftedFunctions(const NativeModule *cfg_module) {
   }
 }
 
+using Calls_t = std::vector<llvm::CallSite>;
+
+bool ShouldInline(const llvm::CallSite &cs) {
+  if (!cs) {
+    return false;
+  }
+  auto callee = cs.getCalledFunction();
+  return callee && remill::HasOriginType<remill::Semantics, remill::ExtWrapper>(callee);
+}
+
+Calls_t InlinableCalls(llvm::Function &func) {
+  Calls_t out;
+  for (auto &bb : func) {
+    for (auto &inst : bb) {
+      auto cs = llvm::CallSite(&inst);
+      if (ShouldInline(cs)) {
+        out.push_back(std::move(cs));
+      }
+    }
+  }
+  return out;
+}
+
+void InlineCalls(llvm::Function &func) {
+  for (auto &cs : InlinableCalls(func)) {
+    if (auto call = llvm::dyn_cast<llvm::CallInst>(cs.getInstruction())) {
+      llvm::InlineFunctionInfo info;
+      llvm::InlineFunction(call, info);
+    }
+  }
+}
+
 // Lift the blocks and instructions into the function. Some minor optimization
 // passes are applied to clean out any unneeded register variables brought
 // in from cloning the `__remill_basic_block` function.
@@ -1040,10 +1075,13 @@ bool DefineLiftedFunctions(const NativeModule *cfg_module) {
           << std::dec;
       return false;
     }
+
+    InlineCalls(*lifted_func);
     func_pass_manager.run(*lifted_func);
   }
 
   func_pass_manager.doFinalization();
+
   return true;
 }
 
