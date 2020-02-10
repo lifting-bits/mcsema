@@ -296,7 +296,7 @@ llvm::Value *InstructionLifter::LiftImmediateOperand(
   if (imm_ref) {
     imm_ref_used = true;
 
-    llvm::DataLayout data_layout(gModule);
+    llvm::DataLayout data_layout(gModule.get());
     auto arg_size = data_layout.getTypeSizeInBits(arg_type);
 
     CHECK(arg_size <= gArch->address_size)

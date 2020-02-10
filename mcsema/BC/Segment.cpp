@@ -115,7 +115,7 @@ static llvm::StructType *GetSegmentType(const NativeSegment *cfg_seg) {
       << "Unable to create structure type for segment " << cfg_seg->name
       << " beginning at " << std::hex << cfg_seg->ea;
 
-  llvm::DataLayout data_layout(gModule);
+  llvm::DataLayout data_layout(gModule.get());
   auto seg_size = data_layout.getTypeAllocSize(seg_type);
   CHECK(seg_size == cfg_seg->size)
       << "Size of structure type of segment " << cfg_seg->name
@@ -211,7 +211,7 @@ static llvm::Function *CreateMcSemaInitFiniImpl(
   auto func = llvm::Function::Create(
       llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext), false),
       llvm::GlobalValue::InternalLinkage,
-      func_name, gModule);
+      func_name, gModule.get());
 
   auto bool_type = llvm::Type::getInt1Ty(*gContext);
   auto check_var = new llvm::GlobalVariable(
@@ -530,7 +530,7 @@ llvm::Function *GetOrCreateMcSemaInitializer(void) {
     gInitFunc = llvm::Function::Create(
         llvm::FunctionType::get(llvm::Type::getVoidTy(*gContext), false),
         llvm::GlobalValue::InternalLinkage,
-        "__mcsema_early_init", gModule);
+        "__mcsema_early_init", gModule.get());
 
     auto bool_type = llvm::Type::getInt1Ty(*gContext);
     auto check_var = new llvm::GlobalVariable(

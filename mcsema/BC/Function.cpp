@@ -17,6 +17,7 @@
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
+#include <llvm/IR/CallSite.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
@@ -31,6 +32,8 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/Type.h>
+
+#include <llvm/Transforms/Utils/Cloning.h>
 
 #include <memory>
 #include <unordered_map>
@@ -59,6 +62,8 @@
 #include "mcsema/CFG/CFG.h"
 
 DECLARE_bool(legacy_mode);
+DECLARE_bool(explicit_args);
+DECLARE_bool(disable_optimizer);
 
 DEFINE_bool(add_reg_tracer, false,
             "Add a debug function that prints out the register state before "
@@ -100,7 +105,7 @@ static llvm::Function *GetPersonalityFunction(void) {
   if (personality_func == nullptr) {
     personality_func = llvm::Function::Create(
         llvm::FunctionType::get(llvm::Type::getInt32Ty(*gContext), true),
-        llvm::Function::ExternalLinkage, personality_func_name, gModule);
+        llvm::Function::ExternalLinkage, personality_func_name, gModule.get());
   }
   return personality_func;
 }
@@ -110,7 +115,7 @@ static llvm::Function *GetRegTracer(void) {
   if (!reg_tracer) {
     reg_tracer = llvm::Function::Create(
         LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
-        "__mcsema_reg_tracer", gModule);
+        "__mcsema_reg_tracer", gModule.get());
   }
   return reg_tracer;
 }
@@ -127,7 +132,7 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
 
   func = llvm::Function::Create(
       LiftedFunctionType(), llvm::GlobalValue::ExternalLinkage,
-      func_name, gModule);
+      func_name, gModule.get());
 
   // Make sure to keep this function around (along with `ExternalLinkage`).
   func->removeFnAttr(llvm::Attribute::ReadNone);
@@ -146,7 +151,7 @@ static llvm::Function *GetBreakPoint(uint64_t pc) {
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", func));
 
   if (FLAGS_check_pc_at_breakpoints) {
-    auto trap = llvm::Intrinsic::getDeclaration(gModule, llvm::Intrinsic::trap);
+    auto trap = llvm::Intrinsic::getDeclaration(gModule.get(), llvm::Intrinsic::trap);
     auto are_eq = ir.CreateICmpEQ(
         remill::NthArgument(func, remill::kPCArgNum),
         llvm::ConstantInt::get(gWordType, pc));
@@ -199,7 +204,7 @@ static llvm::Function *GetExceptionHandlerPrologue(void) {
         llvm::Type::getVoidTy(*gContext), args_type, false);
     exception_handler = llvm::Function::Create(
         func_type, llvm::Function::ExternalWeakLinkage,
-        "__mcsema_exception_ret", gModule);
+        "__mcsema_exception_ret", gModule.get());
   }
   return exception_handler;
 }
@@ -212,7 +217,7 @@ static llvm::Function *GetExceptionTypeIndex(void) {
     get_index_func = llvm::Function::Create(
         llvm::FunctionType::get(gWordType, false),
         llvm::GlobalValue::ExternalWeakLinkage,
-        "__mcsema_get_type_index", gModule);
+        "__mcsema_get_type_index", gModule.get());
   }
 
   return get_index_func;
@@ -242,7 +247,7 @@ static void InlineSubFuncInvoke(llvm::BasicBlock *block,
     get_sp_func = llvm::Function::Create(
         llvm::FunctionType::get(gWordType, false),
         llvm::GlobalValue::ExternalLinkage,
-        "__mcsema_get_stack_pointer", gModule);
+        "__mcsema_get_stack_pointer", gModule.get());
   }
   auto sp_var = ir.CreateCall(get_sp_func);
   ir.CreateStore(sp_var, cfg_func->stack_ptr_var);
@@ -252,7 +257,7 @@ static void InlineSubFuncInvoke(llvm::BasicBlock *block,
     get_bp_func = llvm::Function::Create(
         llvm::FunctionType::get(gWordType, false),
         llvm::GlobalValue::ExternalLinkage,
-        "__mcsema_get_frame_pointer", gModule);
+        "__mcsema_get_frame_pointer", gModule.get());
   }
   auto bp_var = ir.CreateCall(get_bp_func);
   ir.CreateStore(bp_var, cfg_func->frame_ptr_var);
@@ -1000,7 +1005,7 @@ void DeclareLiftedFunctions(const NativeModule *cfg_module) {
     auto lifted_func = gModule->getFunction(func_name);
 
     if (!lifted_func) {
-      lifted_func = remill::DeclareLiftedFunction(gModule, func_name);
+      lifted_func = remill::DeclareLiftedFunction(gModule.get(), func_name);
 
       // make local functions 'static'
       LOG(INFO)
@@ -1013,11 +1018,43 @@ void DeclareLiftedFunctions(const NativeModule *cfg_module) {
   }
 }
 
+using Calls_t = std::vector<llvm::CallSite>;
+
+bool ShouldInline(const llvm::CallSite &cs) {
+  if (!cs) {
+    return false;
+  }
+  auto callee = cs.getCalledFunction();
+  return callee && remill::HasOriginType<remill::Semantics, remill::ExtWrapper>(callee);
+}
+
+Calls_t InlinableCalls(llvm::Function &func) {
+  Calls_t out;
+  for (auto &bb : func) {
+    for (auto &inst : bb) {
+      auto cs = llvm::CallSite(&inst);
+      if (ShouldInline(cs)) {
+        out.push_back(std::move(cs));
+      }
+    }
+  }
+  return out;
+}
+
+void InlineCalls(llvm::Function &func) {
+  for (auto &cs : InlinableCalls(func)) {
+    if (auto call = llvm::dyn_cast<llvm::CallInst>(cs.getInstruction())) {
+      llvm::InlineFunctionInfo info;
+      llvm::InlineFunction(call, info);
+    }
+  }
+}
+
 // Lift the blocks and instructions into the function. Some minor optimization
 // passes are applied to clean out any unneeded register variables brought
 // in from cloning the `__remill_basic_block` function.
 bool DefineLiftedFunctions(const NativeModule *cfg_module) {
-  llvm::legacy::FunctionPassManager func_pass_manager(gModule);
+  llvm::legacy::FunctionPassManager func_pass_manager(gModule.get());
   func_pass_manager.add(llvm::createCFGSimplificationPass());
   func_pass_manager.add(llvm::createPromoteMemoryToRegisterPass());
   func_pass_manager.add(llvm::createReassociatePass());
@@ -1040,10 +1077,18 @@ bool DefineLiftedFunctions(const NativeModule *cfg_module) {
           << std::dec;
       return false;
     }
+
+    // Unfortunately there can be `return_twice` attribute on some external functions
+    // (setjmp). This prevents llvm from inlining the `ext_` wrapper, but it is mandatory
+    // that the actual call is behind a wrapper (due to how it is implemented).
+    if (FLAGS_explicit_args && !FLAGS_disable_optimizer) {
+      InlineCalls(*lifted_func);
+    }
     func_pass_manager.run(*lifted_func);
   }
 
   func_pass_manager.doFinalization();
+
   return true;
 }
 

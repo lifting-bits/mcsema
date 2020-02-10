@@ -66,7 +66,7 @@ static ValueKind KindOfValue(llvm::Type *type) {
   } else if (type->isVectorTy()) {
     return kVec;
   } else if (type->isIntegerTy()) {
-    llvm::DataLayout dl(gModule);
+    llvm::DataLayout dl(gModule.get());
     switch (dl.getTypeAllocSize(type)) {
       case 8: return kI64;
       case 4: return kI32;
@@ -669,7 +669,7 @@ llvm::Value *CallingConvention::LoadVectorArgument(
   llvm::Value *base_value = llvm::Constant::getNullValue(goal_type);
 
   llvm::Type *under_type = goal_type->getElementType();
-  llvm::DataLayout dl(gModule);
+  llvm::DataLayout dl(gModule.get());
   const size_t num_elements = goal_type->getNumElements();
   const ssize_t element_size = static_cast<ssize_t>(
       dl.getTypeAllocSize(under_type));
@@ -728,7 +728,7 @@ llvm::Value *CallingConvention::LoadNextSimpleArgument(
   auto addr = ir.CreateAdd(sp, offset);
   std::vector<llvm::Value *> args = {remill::LoadMemoryPointer(block), addr};
 
-  llvm::DataLayout dl(gModule);
+  llvm::DataLayout dl(gModule.get());
   auto alloc_size = dl.getTypeAllocSize(goal_type);
 
   llvm::Value *val = nullptr;
@@ -813,7 +813,7 @@ llvm::Value *CallingConvention::LoadNextArgument(llvm::BasicBlock *block,
     auto offset = llvm::ConstantInt::get(gWordType, num_loaded_stack_bytes);
     auto addr = ir.CreateAdd(stack_ptr, offset);
 
-    llvm::DataLayout dl(gModule);
+    llvm::DataLayout dl(gModule.get());
     auto ptr_type = llvm::dyn_cast<llvm::PointerType>(target_type);
 
     num_loaded_stack_bytes += dl.getTypeAllocSize(ptr_type->getElementType());
@@ -828,7 +828,7 @@ void CallingConvention::StoreVectorRetValue(llvm::BasicBlock *block,
                                             llvm::VectorType *goal_type) {
   llvm::IRBuilder<> ir(block);
   llvm::Type *under_type = goal_type->getElementType();
-  llvm::DataLayout dl(gModule);
+  llvm::DataLayout dl(gModule.get());
 
   const size_t num_elements = goal_type->getNumElements();
   const ssize_t reg_size = static_cast<ssize_t>(GetVectorRegSize());
@@ -916,7 +916,7 @@ void CallingConvention::StoreReturnValue(llvm::BasicBlock *block,
     CHECK(under_type->isIntegerTy() || under_type->isFloatTy() ||
           under_type->isDoubleTy());
 
-    llvm::DataLayout dl(gModule);
+    llvm::DataLayout dl(gModule.get());
 
     // Canonicalize integer return values into address-sized values.
     if (under_type->isIntegerTy()) {
@@ -987,7 +987,7 @@ void CallingConvention::StoreArguments(
   auto sp = LoadStackPointer(block);
   llvm::Value *memory = ir.CreateLoad(memory_ref);
 
-  llvm::DataLayout dl(gModule);
+  llvm::DataLayout dl(gModule.get());
 
   std::vector<llvm::Value *> args(3, nullptr);
 
@@ -1190,14 +1190,14 @@ llvm::Value *GetTLSBaseAddress(llvm::IRBuilder<> &ir) {
         << "Assuming the `llvm.arm.thread.pointer` intrinsic gets us the base "
         << "of thread-local storage.";
     auto func = llvm::Intrinsic::getDeclaration(
-        gModule, llvm::Intrinsic::arm_thread_pointer);
+        gModule.get(), llvm::Intrinsic::arm_thread_pointer);
     return ir.CreatePtrToInt(ir.CreateCall(func), gWordType);
 #else
     LOG(ERROR)
         << "Assuming the `thread.pointer` intrinsic gets us the base "
         << "of thread-local storage.";
     auto func = llvm::Intrinsic::getDeclaration(
-        gModule, llvm::Intrinsic::thread_pointer);
+        gModule.get(), llvm::Intrinsic::thread_pointer);
     return ir.CreatePtrToInt(ir.CreateCall(func), gWordType);
 #endif
 

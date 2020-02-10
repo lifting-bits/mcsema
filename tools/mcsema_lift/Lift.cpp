@@ -69,6 +69,7 @@ DECLARE_bool(disable_optimizer);
 DECLARE_bool(keep_memops);
 DECLARE_bool(explicit_args);
 DECLARE_string(pc_annotation);
+DECLARE_uint64(explicit_args_count);
 
 DEFINE_bool(list_supported, false,
             "List instructions that can be lifted.");
@@ -86,7 +87,7 @@ static void PrintVersion(void) {
 
 // Print a list of instructions that Remill can lift.
 static void PrintSupportedInstructions(void) {
-  remill::ForEachISel(mcsema::gModule,
+  remill::ForEachISel(mcsema::gModule.get(),
                       [=](llvm::GlobalVariable *isel, llvm::Function *) {
                         std::cout << isel->getName().str() << std::endl;
                       });
@@ -107,149 +108,252 @@ static std::vector<std::string> Split(const std::string &s, const char delim) {
 	return res;
 }
 
-static std::unique_ptr<llvm::Module> gLibrary;
-
 #define _S(x) #x
 #define S(x) _S(x)
 #define MAJOR_MINOR S(LLVM_VERSION_MAJOR) "." S(LLVM_VERSION_MINOR)
 
-static const char *gABISearchPaths[] = {
+
+struct Options {
+  bool explicit_args;
+  uint64_t explicit_args_count;
+};
+
+struct ABILibsLoader {
+
+  llvm::Module &module;
+  llvm::LLVMContext &ctx;
+
+  const Options &opts;
+
+  static constexpr const char * g_var_kind = "mcsema.abi.libraries";
+
+  std::array<std::string, 3> abi_search_paths = {
     // TODO(pag): Use build and CMake install dirs to find the libraries too.
     "/usr/local/share/mcsema/" MAJOR_MINOR "/ABI/",
     "/usr/share/mcsema/" MAJOR_MINOR "/ABI/",
     "/share/mcsema/" MAJOR_MINOR "/ABI/",
-};
+  };
 
-bool HasFunctionPtrArg(const llvm::Function &func) {
-  for (auto &arg : func.args()) {
+  ABILibsLoader(llvm::Module &module_, const Options &opts_)
+    : module(module_),
+      ctx(module.getContext()),
+      opts(opts_)
+  {}
 
-    auto ptr = llvm::dyn_cast<llvm::PointerType>(arg.getType());
-    if(!ptr || !ptr->getElementType()->isFunctionTy()) {
+  bool IsBlacklisted(const llvm::Function &func) {
+    auto func_name = func.getName();
+    if (func_name.startswith("__mcsema")
+        || func_name.startswith("__remill")) {
       return true;
     }
-  }
-  return false;
-}
 
-bool IsBlacklisted(const llvm::Function &func) {
-  auto func_name = func.getName();
-  if (func_name.startswith("__mcsema") || func_name.startswith("__remill")) {
-    return true;
-  }
-
-  if (!func.hasExternalLinkage()) {
-    return true;
-  }
-
-  // We simply cannot handle va_args properly yet. (Issue #599)
-  if (func.isVarArg()) {
-    LOG(WARNING) << "Skipped " << func.getName().str() << ": va_args. (See Issue #599)";
-    return true;
-  }
-
-  // There are some problems related to native <-> lifted synchronization
-  // without explicit args and function ptrs (entrypoint behaviour)
-  if (!FLAGS_explicit_args) {
-    if (HasFunctionPtrArg(func)) {
-      LOG(WARNING) << "Skipped " << func.getName().str() << ": function pointer in arguments. (See Issue #599)";
+    if (!func.hasExternalLinkage()) {
       return true;
+    }
+
+    // We simply cannot handle va_args properly yet. (Issue #599)
+    if (func.isVarArg() && !opts.explicit_args) {
+        LOG(WARNING) << "Skipped " << func.getName().str()
+                     << ": va_args. (See Issue #599)";
+        return true;
+    }
+
+    // There are some problems related to native <-> lifted synchronization
+    // without explicit args and function ptrs (entrypoint behaviour)
+    if (!FLAGS_explicit_args) {
+      if (HasFunctionPtrArg(func)) {
+        LOG(WARNING) << "Skipped " << func.getName().str()
+                     << ": function pointer in arguments. (See Issue #599)";
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  void Load(const std::string &paths, char delim) {
+    Load( Split(FLAGS_abi_libraries, kPathDelimeter) );
+  }
+
+  void Load(const std::string &path) {
+      LOG(INFO) << "Loading ABI Library: " << path;
+      LoadLibraryIntoModule(path);
+  }
+
+  void Load(const std::vector<std::string> &files) {
+    for (auto file : files) {
+      Load(file);
     }
   }
 
-  return false;
-}
+  // Note(lukas): Not sure, which util file this belongs to
+  bool HasFunctionPtrArg(const llvm::Function &func) {
+    for (auto &arg : func.args()) {
+
+      auto ptr = llvm::dyn_cast<llvm::PointerType>(arg.getType());
+      if(!ptr || !ptr->getElementType()->isFunctionTy()) {
+        return true;
+      }
+    }
+    return false;
+  }
 
 
-// Load in a separate bitcode or IR library, and copy function and variable
-// declarations from that library into our module. We can use this feature
-// to provide better type information to McSema.
-static void LoadLibraryIntoModule(const std::string &path) {
-  gLibrary.reset(remill::LoadModuleFromFile(mcsema::gContext, path, true));
+  // Copy function into module with `name` as it's name (useful if there are aliases)
+  void Copy(llvm::Function &func, llvm::FunctionType *fn_t, const std::string &name) {
 
-  // Go searching for a library.
-  if (!gLibrary) {
-    for (auto base_path : gABISearchPaths) {
+    auto dest_func = llvm::Function::Create(fn_t, func.getLinkage(),
+                                            name, &module);
+
+    dest_func->copyAttributesFrom(&func);
+    dest_func->setVisibility(func.getVisibility());
+
+    remill::Annotate<remill::AbiLibraries>(dest_func);
+  }
+
+
+  bool ShouldCopy(llvm::Function &func, const std::string &name) {
+    return !mcsema::gModule->getFunction(name) && !IsBlacklisted(func) && name != "main";
+  }
+
+  // If function is variadic, mcsema uses generic prototype in form
+  // i64 (*)(i64 x explicit_args_count)
+  // This however throws away real return type, which this function preserves.
+  llvm::FunctionType *GetFnType(llvm::Function &func, llvm::LLVMContext &ctx) {
+    if (!func.isVarArg())
+      return func.getFunctionType();
+
+    auto ret_type = func.getReturnType();
+    auto old_type = func.getFunctionType();
+
+    std::vector<llvm::Type *> args = { old_type->param_begin(), old_type->param_end() };
+    while (args.size() < opts.explicit_args_count)
+      args.push_back( llvm::Type::getInt64Ty( ctx ) );
+
+    return llvm::FunctionType::get(ret_type, args, false);
+
+  }
+
+  void CloneFunction(llvm::Function &func, const std::string &name="") {
+
+    auto new_name = (name.empty()) ? func.getName().str() : name;
+
+    if (!ShouldCopy(func, new_name)) {
+      return;
+    }
+
+    auto new_type = GetFnType(func, module.getContext());
+    Copy(func, new_type, new_name);
+  }
+
+  template<typename C>
+  std::unique_ptr<llvm::Module> LoadABILib(const std::string &path,
+                                           const C &search_paths) {
+
+    std::unique_ptr<llvm::Module> abi_lib(remill::LoadModuleFromFile(&ctx, path, true));
+    if (abi_lib) {
+      return abi_lib;
+    }
+
+    // Go searching for a library.
+    for (auto base_path : search_paths) {
       std::stringstream ss;
       ss <<  base_path << FLAGS_os << "/ABI_" << path << "_"
          << FLAGS_arch << ".bc";
+
       const auto inferred_path = ss.str();
-      gLibrary.reset(remill::LoadModuleFromFile(
-          mcsema::gContext, inferred_path, true));
-      if (gLibrary) {
-        break;
+      abi_lib = remill::LoadModuleFromFile(&ctx, inferred_path, true);
+      if (abi_lib) {
+        return abi_lib;
+      }
+    }
+
+    return {};
+  }
+
+
+  // Load in a separate bitcode or IR library, and copy function and variable
+  // declarations from that library into our module. We can use this feature
+  // to provide better type information to McSema.
+  void LoadLibraryIntoModule(const std::string &path) {
+
+    auto abi_lib = LoadABILib(path, abi_search_paths);
+    LOG_IF(FATAL, !abi_lib)
+        << "Could not load ABI library " << path;
+
+    mcsema::gArch->PrepareModuleDataLayout(abi_lib);
+
+    // Declare the functions from the library in McSema's target module.
+    for (auto &func : *abi_lib) {
+      CloneFunction(func);
+    }
+
+    for (auto &alias : abi_lib->aliases()) {
+      if (auto fn = llvm::dyn_cast<llvm::Function>(alias.getAliasee())) {
+        CloneFunction(*fn, alias.getName());
+      }
+    }
+
+    // Declare the global variables from the library in McSema's target module.
+    for (auto &var : abi_lib->globals()) {
+      auto var_name = var.getName();
+      if (var_name.startswith("__mcsema") || var_name.startswith("__remill")) {
+        continue;
+      }
+
+      if (!var.hasExternalLinkage()) {
+        continue;
+      }
+
+      if (module.getGlobalVariable(var_name)) {
+        continue;
+      }
+
+
+      auto dest_var = new llvm::GlobalVariable(
+          module, var.getType()->getElementType(),
+          var.isConstant(), var.getLinkage(), nullptr,
+          var_name, nullptr, var.getThreadLocalMode(),
+          var.getType()->getAddressSpace());
+
+      dest_var->copyAttributesFrom(&var);
+      auto node = llvm::MDNode::get(ctx, llvm::MDString::get(ctx, path));
+      dest_var->setMetadata(g_var_kind, node);
+    }
+  }
+
+  void RemoveUnused() {
+    UnloadLibraryFromModule(module);
+  }
+
+  // Remove unused functions and globals brought in from the library.
+  void UnloadLibraryFromModule(llvm::Module &module) {
+
+    auto copied_funcs = remill::GetFunctionsByOrigin<
+      std::vector<llvm::Function *>,remill::AbiLibraries>(module);
+    for (auto func : copied_funcs) {
+      if (!func->hasNUsesOrMore(1))
+        func->eraseFromParent();
+    }
+
+    for (auto &var : module.globals()) {
+      auto md = var.getMetadata(g_var_kind);
+      if (!md) {
+        continue;
+      }
+
+      if (var.hasName() && var.getName().startswith("llvm.global")) {
+        continue;
+      }
+
+      if (!var.hasNUsesOrMore(1)) {
+        var.eraseFromParent();
       }
     }
   }
 
-  LOG_IF(FATAL, !gLibrary)
-      << "Could not load ABI library " << path;
 
-  mcsema::gArch->PrepareModuleDataLayout(gLibrary);
-
-  // Declare the functions from the library in McSema's target module.
-  for (auto &func : *gLibrary) {
-
-    auto func_name = func.getName();
-
-    if (mcsema::gModule->getFunction(func_name) ||
-        IsBlacklisted(func)) {
-      continue;
-    }
-
-    auto dest_func = llvm::Function::Create(
-        func.getFunctionType(), func.getLinkage(),
-        func_name, mcsema::gModule);
-
-    dest_func->copyAttributesFrom(&func);
-    dest_func->setVisibility(func.getVisibility());
-    remill::Annotate<remill::AbiLibraries>(dest_func);
-  }
-
-  // Declare the global variables from the library in McSema's target module.
-  for (auto &var : gLibrary->globals()) {
-    auto var_name = var.getName();
-    if (var_name.startswith("__mcsema") || var_name.startswith("__remill")) {
-      continue;
-    }
-
-    if (!var.hasExternalLinkage()) {
-      continue;
-    }
-
-    if (mcsema::gModule->getGlobalVariable(var_name)) {
-      continue;
-    }
-
-    auto dest_var = new llvm::GlobalVariable(
-        *mcsema::gModule, var.getType()->getElementType(),
-        var.isConstant(), var.getLinkage(), nullptr,
-        var_name, nullptr, var.getThreadLocalMode(),
-        var.getType()->getAddressSpace());
-
-    dest_var->copyAttributesFrom(&var);
-  }
-}
-
-// Remove unused functions and globals brought in from the library.
-static void UnloadLibraryFromModule(void) {
-  for (auto &func : *gLibrary) {
-    auto our_func = mcsema::gModule->getFunction(func.getName());
-    if (our_func && !our_func->hasNUsesOrMore(1)) {
-      our_func->eraseFromParent();
-    }
-  }
-
-  for (auto &var : gLibrary->globals()) {
-    auto var_name = var.getName();
-    if(var_name.startswith("llvm.global")) {
-      continue;
-    }
-    auto our_var = mcsema::gModule->getGlobalVariable(var_name);
-    if (our_var && !our_var->hasNUsesOrMore(1)) {
-      our_var->eraseFromParent();
-    }
-  }
-}
+};
 
 }  // namespace
 
@@ -362,7 +466,7 @@ int main(int argc, char *argv[]) {
   CHECK(!FLAGS_cfg.empty())
       << "Must specify the path to a CFG file to --cfg.";
 
-  mcsema::gContext = new llvm::LLVMContext;
+  mcsema::gContext = std::make_shared<llvm::LLVMContext>();
 
   CHECK(mcsema::InitArch(FLAGS_os, FLAGS_arch))
       << "Cannot initialize for arch " << FLAGS_arch
@@ -386,23 +490,15 @@ int main(int argc, char *argv[]) {
     FLAGS_disable_optimizer = false;
   }
 
-  mcsema::gModule = remill::LoadTargetSemantics(
-      *mcsema::gContext);
-  mcsema::gArch->PrepareModule(mcsema::gModule);
+  mcsema::gModule = remill::LoadTargetSemantics(*mcsema::gContext);
+  mcsema::gArch->PrepareModule(mcsema::gModule.get());
 
   // Load in a special library before CFG processing. This affects the
   // renaming of exported functions.
-  if (!FLAGS_abi_libraries.empty()) {
-    auto abi_libs = Split(FLAGS_abi_libraries, kPathDelimeter);
-    for(const auto &abi_lib : abi_libs) {
-      LOG(INFO)
-          << "Loading ABI Library: " << abi_lib;
-      LoadLibraryIntoModule(abi_lib);
-    }
-  }
+  ABILibsLoader abi_loader(*mcsema::gModule, {FLAGS_explicit_args, FLAGS_explicit_args_count});
+  abi_loader.Load(FLAGS_abi_libraries, kPathDelimeter);
 
-  auto cfg_module = mcsema::ReadProtoBuf(
-      FLAGS_cfg, (mcsema::gArch->address_size / 8));
+  auto cfg_module = mcsema::ReadProtoBuf(FLAGS_cfg, (mcsema::gArch->address_size / 8));
 
   if (FLAGS_list_supported) {
     PrintSupportedInstructions();
@@ -412,12 +508,9 @@ int main(int argc, char *argv[]) {
       << "Unable to lift CFG from " << FLAGS_cfg << " into module "
       << FLAGS_output;
 
-  if (!FLAGS_abi_libraries.empty()) {
-    UnloadLibraryFromModule();
-    gLibrary.reset(nullptr);
-  }
+  abi_loader.RemoveUnused();
 
-  remill::StoreModuleToFile(mcsema::gModule, FLAGS_output);
+  remill::StoreModuleToFile(mcsema::gModule.get(), FLAGS_output);
 
   google::ShutDownCommandLineFlags();
   google::ShutdownGoogleLogging();

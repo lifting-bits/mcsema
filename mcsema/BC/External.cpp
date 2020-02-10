@@ -49,7 +49,7 @@ static void DeclareExternal(
   auto extfun = llvm::Function::Create(
       llvm::FunctionType::get(gWordType, tys, false),
       llvm::GlobalValue::ExternalLinkage,
-      cfg_func->name, gModule);
+      cfg_func->name, gModule.get());
 
   if (cfg_func->is_weak) {
     extfun->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
