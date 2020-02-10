@@ -40,9 +40,9 @@ namespace mcsema {
 
 struct NativeSegment;
 
-extern llvm::LLVMContext *gContext;
+extern std::shared_ptr<llvm::LLVMContext> gContext;
 extern llvm::IntegerType *gWordType;
-extern llvm::Module *gModule;
+extern std::unique_ptr<llvm::Module> gModule;
 
 
 llvm::Value *GetConstantInt(unsigned size, uint64_t value);

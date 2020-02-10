@@ -110,7 +110,7 @@ static void RemoveUndefFuncCalls(void) {
 }
 
 static void RunO3(void) {
-  llvm::legacy::FunctionPassManager func_manager(gModule);
+  llvm::legacy::FunctionPassManager func_manager(gModule.get());
   llvm::legacy::PassManager module_manager;
 
   auto TLI = new llvm::TargetLibraryInfoImpl(
@@ -148,7 +148,7 @@ static void RunO3(void) {
 static std::vector<llvm::GlobalVariable *> FindISELs(void) {
   std::vector<llvm::GlobalVariable *> isels;
   remill::ForEachISel(
-      gModule, [&](llvm::GlobalVariable *isel, llvm::Function *) {
+      gModule.get(), [&](llvm::GlobalVariable *isel, llvm::Function *) {
         isels.push_back(isel);
       });
   return isels;
@@ -350,10 +350,10 @@ void OptimizeModule(void) {
   PrivatizeISELs(isels);
 
   if (!FLAGS_disable_optimizer) {
-    auto bb_func = remill::BasicBlockFunction(gModule);
-    auto slots = remill::StateSlots(gModule);
+    auto bb_func = remill::BasicBlockFunction(gModule.get());
+    auto slots = remill::StateSlots(gModule.get());
     RunO3();
-    remill::RemoveDeadStores(gModule, bb_func, slots);
+    remill::RemoveDeadStores(gModule.get(), bb_func, slots);
   }
 
   RemoveIntrinsics();

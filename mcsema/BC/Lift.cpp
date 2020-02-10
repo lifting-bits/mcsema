@@ -137,7 +137,7 @@ static void DefineDebugGetRegState(void) {
   // ExternalWeakLinkage causes crash with --explicit_args. The function is not available in the library
   get_reg_state = llvm::Function::Create(
       reg_func_type, llvm::GlobalValue::ExternalLinkage,
-      "__mcsema_debug_get_reg_state", gModule);
+      "__mcsema_debug_get_reg_state", gModule.get());
 
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", get_reg_state));
   ir.CreateRet(reg_state);
@@ -149,7 +149,7 @@ static void DefineDebugGetRegState(void) {
 // Define some of the remill error intrinsics.
 static void DefineErrorIntrinsics(llvm::FunctionType *lifted_func_type) {
   const char *func_names[] = {"__remill_error", "__remill_missing_block"};
-  auto trap = llvm::Intrinsic::getDeclaration(gModule, llvm::Intrinsic::trap);
+  auto trap = llvm::Intrinsic::getDeclaration(gModule.get(), llvm::Intrinsic::trap);
   for (auto func_name : func_names) {
     auto func = gModule->getFunction(func_name);
     if (!func) {
@@ -177,7 +177,7 @@ bool LiftCodeIntoModule(const NativeModule *cfg_module) {
   // lifted things can be resolved.
   DefineDataSegments(cfg_module);
 
-  auto lifted_func_type = remill::LiftedFunctionType(gModule);
+  auto lifted_func_type = remill::LiftedFunctionType(gModule.get());
 
   // Lift the blocks of instructions into the declared functions.
   if (!DefineLiftedFunctions(cfg_module)) {

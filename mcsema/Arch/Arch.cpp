@@ -38,7 +38,7 @@
 
 namespace mcsema {
 
-extern llvm::LLVMContext *gContext;
+extern std::shared_ptr<llvm::LLVMContext> gContext;
 
 const remill::Arch *gArch = nullptr;
 

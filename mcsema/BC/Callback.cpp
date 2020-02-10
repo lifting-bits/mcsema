@@ -75,7 +75,7 @@ static llvm::Function *GetAttachCallFunc(void) {
     auto callback_type = llvm::FunctionType::get(void_type, false);
     handler = llvm::Function::Create(
         callback_type, llvm::GlobalValue::ExternalLinkage,
-        "__mcsema_attach_call", gModule);
+        "__mcsema_attach_call", gModule.get());
     handler->addFnAttr(llvm::Attribute::NoInline);
     remill::Annotate<remill::McSemaHelper>(handler);
   }
@@ -155,7 +155,7 @@ static llvm::Function *ImplementNativeToLiftedCallback(
   auto callback_type = llvm::FunctionType::get(void_type, false);
   auto callback_func = llvm::Function::Create(
       callback_type, llvm::GlobalValue::InternalLinkage,  // Tentative linkage.
-      callback_name, gModule);
+      callback_name, gModule.get());
 
   callback_func->setVisibility(llvm::GlobalValue::DefaultVisibility);
   callback_func->addFnAttr(llvm::Attribute::Naked);
@@ -188,7 +188,7 @@ static llvm::Function *ImplementNativeToLiftedCallback(
   func_wrapper_name << "_wrapper";
   auto func_wrapper = llvm::Function::Create(
       func->getFunctionType(), llvm::GlobalValue::InternalLinkage,
-	  func_wrapper_name.str(), gModule);
+	  func_wrapper_name.str(), gModule.get());
   auto arg_it = func_wrapper->arg_begin();
 
   llvm::IRBuilder<> ir(llvm::BasicBlock::Create(*gContext, "", func_wrapper));
@@ -431,12 +431,12 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
     if (name == "main") {
       return llvm::Type::getInt32Ty(*gContext);
     }
-    return remill::AddressType(gModule);
+    return remill::AddressType(gModule.get());
   }();
 
   // The the lifted function type so that we can get things like the memory
   // pointer type and stuff.
-  auto bb = remill::BasicBlockFunction(gModule);
+  auto bb = remill::BasicBlockFunction(gModule.get());
   auto state_ptr_arg = remill::NthArgument(bb, remill::kStatePointerArgNum);
   auto mem_ptr_arg = remill::NthArgument(bb, remill::kMemoryPointerArgNum);
   auto pc_arg = remill::NthArgument(bb, remill::kPCArgNum);
@@ -450,7 +450,7 @@ static llvm::Function *ImplementExplicitArgsEntryPoint(
 
   auto func_type = llvm::FunctionType::get(ret_type, arg_types, false);
   auto func = llvm::Function::Create(
-      func_type, llvm::GlobalValue::InternalLinkage, name, gModule);
+      func_type, llvm::GlobalValue::InternalLinkage, name, gModule.get());
 
   remill::ValueMap value_map;
   value_map[mem_ptr_arg] = llvm::Constant::getNullValue(mem_ptr_arg->getType());
@@ -684,7 +684,7 @@ llvm::Function *GetLiftedToNativeExitPoint(const NativeObject *cfg_func_) {
   // Stub that will marshal lifted state into the native state.
   callback_func = llvm::Function::Create(LiftedFunctionType(),
                                          llvm::GlobalValue::InternalLinkage,
-                                         cfg_func->lifted_name, gModule);
+                                         cfg_func->lifted_name, gModule.get());
 
   // Pass through the memory and state pointers, and pass the destination
   // (native external function address) as the PC argument.
@@ -725,7 +725,7 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
   // Stub that will marshal lifted state into the native state.
   callback_func = llvm::Function::Create(LiftedFunctionType(),
                                          llvm::GlobalValue::InternalLinkage,
-                                         "__mcsema_detach_call_value", gModule);
+                                         "__mcsema_detach_call_value", gModule.get());
 
   remill::CloneBlockFunctionInto(callback_func);
 
@@ -739,11 +739,11 @@ llvm::Function *GetLiftedToNativeExitPoint(ExitPointKind kind) {
   }
 
   std::vector<llvm::Type *> arg_types(FLAGS_explicit_args_count,
-                                      remill::AddressType(gModule));
+                                      remill::AddressType(gModule.get()));
 
   auto pc = remill::LoadProgramCounter(block);
   auto func_ptr_ty = llvm::PointerType::get(
-      llvm::FunctionType::get(remill::AddressType(gModule), arg_types, false), 0);
+      llvm::FunctionType::get(remill::AddressType(gModule.get()), arg_types, false), 0);
 
   llvm::IRBuilder<> ir(block);
   loader.StoreReturnValue(

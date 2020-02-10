@@ -87,7 +87,7 @@ static void PrintVersion(void) {
 
 // Print a list of instructions that Remill can lift.
 static void PrintSupportedInstructions(void) {
-  remill::ForEachISel(mcsema::gModule,
+  remill::ForEachISel(mcsema::gModule.get(),
                       [=](llvm::GlobalVariable *isel, llvm::Function *) {
                         std::cout << isel->getName().str() << std::endl;
                       });
@@ -466,7 +466,7 @@ int main(int argc, char *argv[]) {
   CHECK(!FLAGS_cfg.empty())
       << "Must specify the path to a CFG file to --cfg.";
 
-  mcsema::gContext = new llvm::LLVMContext;
+  mcsema::gContext = std::make_shared<llvm::LLVMContext>();
 
   CHECK(mcsema::InitArch(FLAGS_os, FLAGS_arch))
       << "Cannot initialize for arch " << FLAGS_arch
@@ -491,7 +491,7 @@ int main(int argc, char *argv[]) {
   }
 
   mcsema::gModule = remill::LoadTargetSemantics(*mcsema::gContext);
-  mcsema::gArch->PrepareModule(mcsema::gModule);
+  mcsema::gArch->PrepareModule(mcsema::gModule.get());
 
   // Load in a special library before CFG processing. This affects the
   // renaming of exported functions.
@@ -510,7 +510,7 @@ int main(int argc, char *argv[]) {
 
   abi_loader.RemoveUnused();
 
-  remill::StoreModuleToFile(mcsema::gModule, FLAGS_output);
+  remill::StoreModuleToFile(mcsema::gModule.get(), FLAGS_output);
 
   google::ShutDownCommandLineFlags();
   google::ShutdownGoogleLogging();
