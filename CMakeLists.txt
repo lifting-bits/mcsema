@@ -87,7 +87,7 @@ set(MCSEMA_WS mcsema-ws)
 set(MCSEMA_INIT mcsema-init)
 
 add_library(${MCSEMA_WS}
-  mcsema/CFG/sqlCFG.cpp
+  mcsema/CFG/WS.cpp
   mcsema/CFG/Schema.cpp
 )
 
