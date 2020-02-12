@@ -172,73 +172,286 @@ struct decay_tuple_args<std::tuple<Ts...>> {
 
 } // namespace detail
 
+using hook_t = void(*)(sqlite3 *);
+
+
+struct Connection {
+  sqlite3 *db_handle;
+
+  Connection(const Connection &) = delete;
+  Connection &operator=(const Connection &) = delete;
+
+  Connection(const std::string &db_name, hook_t post_connection_hook = nullptr) {
+    // Since each thread has its own exclusive connection to the database, we
+    // can safely set SQLITE_CONFIG_MULTITHREAD so that SQLite may assume
+    // the database will not be accessed from the same connection by two
+    // threads simultaneously.
+    do {
+      std::lock_guard<std::mutex> guard(detail::sqlite3_config_mutex);
+      if (!detail::sqlite3_configured) {
+        sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
+        sqlite3_config(SQLITE_CONFIG_LOG,
+                       detail::sqlite_error_log_callback, nullptr);
+        detail::sqlite3_configured = true;
+      }
+    } while (0);
+    auto ret = sqlite3_open(db_name.c_str(), &db_handle);
+    if (ret != SQLITE_OK) {
+      throw error{ret};
+    }
+
+    // When the database has been temporarily locked by another process, this
+    // tells SQLite to retry the command/query until it succeeds, rather than
+    // returning SQLITE_BUSY immediately.
+    sqlite3_busy_handler(db_handle,
+        [](void *, int) {
+          std::this_thread::yield();
+          return 1;
+        },
+        nullptr);
+
+    if (post_connection_hook) {
+      post_connection_hook(db_handle);
+    }
+
+    for (auto &function_creation_hook : detail::function_creation_hooks) {
+      function_creation_hook(db_handle);
+    }
+  }
+
+  ~Connection(void) {
+    // To close the database, we use sqlite3_close_v2() because unlike
+    // sqlite3_close(), this function allows there to be un-finalized
+    // prepared statements.  The database handle will close once
+    // all prepared statements have been finalized by the thread-local
+    // `PreparedStmtCache` destructors.
+    sqlite3_close_v2(db_handle);
+  }
+};
+
+// QueryResult corresponds to the results of a query executed by query().
+// Results can be stepped through row-by-row by invoking the QueryResult
+// directly.  When a QueryResult gets destroyed, the prepared statement is
+// cleaned up and gets placed into the prepared-statement cache it came from
+// for later reuse.
+class QueryResult {
+ public:
+  QueryResult() = default;
+
+  QueryResult &operator=(QueryResult &&other) {
+    if (this != &other) {
+      std::swap(stmt, other.stmt);
+      std::swap(put_cb, other.put_cb);
+      std::swap(ret, other.ret);
+      std::swap(first_invocation, other.first_invocation);
+    }
+    return *this;
+  }
+
+  QueryResult(QueryResult &&other) {
+    using std::swap;
+    swap(stmt, other.stmt);
+    swap(put_cb, other.put_cb);
+    swap(ret, other.ret);
+    swap(first_invocation, other.first_invocation);
+  }
+
+  ~QueryResult() {
+    if (stmt == nullptr) {
+      return;
+    }
+    sqlite3_clear_bindings(stmt);
+    sqlite3_reset(stmt);
+    put_cb(stmt);
+  }
+
+  // Returns the SQLite result code of the most recent call to sqlite3_step()
+  // on the prepared statement.
+  int resultCode(void) {
+    return ret;
+  }
+
+  template<class Arg, int64_t idx>
+  std::enable_if_t<std::is_enum_v<Arg>, Arg>
+  _Get() {
+    using target_t = std::underlying_type_t<Arg>;
+    return static_cast<Arg>(_Get<target_t, idx>());
+  }
+
+  template<class Arg, int64_t idx>
+  std::enable_if_t<detail::is_one_of_v<Arg, std::string, std::string_view>, Arg>
+  _Get() {
+    return { reinterpret_cast<const char*>(sqlite3_column_text(stmt, idx)),
+             sqlite3_column_bytes(stmt, idx) };
+  }
+
+  template<class Arg, int64_t idx>
+  std::enable_if_t<detail::is_one_of_v<Arg, sqlite::blob, sqlite::blob_view>, Arg>
+  _Get() {
+    return { reinterpret_cast<const char *>(sqlite3_column_blob(stmt, idx)),
+             sqlite3_column_bytes(stmt, idx) };
+  }
+
+  template<class Arg, int64_t idx>
+  std::enable_if_t<std::is_integral_v<Arg>, Arg>
+  _Get() {
+    return sqlite3_column_int64(stmt, idx);
+  }
+
+  template<class Arg, int64_t idx>
+  std::enable_if_t<std::is_same_v<std::nullopt_t, Arg>, Arg>
+  _Get() {
+    return {};
+  }
+
+  template<class Arg, int64_t idx>
+  std::enable_if_t<detail::is_std_optional_type<Arg>, Arg>
+  _Get() {
+    if (sqlite3_column_type(stmt, idx) == SQLITE_NULL) {
+      return {};
+    }
+    return { _Get<typename Arg::value_type, idx>() };
+  }
+
+  template<typename ...Ts, int64_t ...indices>
+  std::tuple<Ts ...> Get_helper(std::integer_sequence<int64_t, indices ...>) {
+    return std::make_tuple<Ts ...>( _Get<Ts, indices>() ...);
+  }
+
+  void Step() {
+    if (!first_invocation) {
+      ret = sqlite3_step(stmt);
+    }
+    first_invocation = false;
+  }
+
+  template<typename... Ts>
+  std::optional<std::tuple<Ts...>> Get() {
+    if (static_cast<int>(sizeof...(Ts)) > sqlite3_column_count(stmt)) {
+      throw incorrect_query{SQLITE_ERROR, "Get argument count is greater than allowed"};
+    }
+
+    Step();
+    if (ret != SQLITE_ROW) {
+      return {};
+    }
+
+    using seq_t = std::make_integer_sequence<int64_t, sizeof ... (Ts)>;
+    return { Get_helper<Ts...>(seq_t{}) };
+  }
+
+  template<typename T>
+  std::optional<T> GetScalar() {
+    if (sqlite3_column_count(stmt) == 0) {
+      throw incorrect_query{SQLITE_ERROR,
+                            "GetScalar argument count is greater than allowed"};
+    }
+
+    Step();
+
+    if (ret != SQLITE_ROW) {
+      return {};
+    }
+
+    return { _Get<T, 0>() };
+  }
+
+  template<typename T>
+  T GetScalar_r() {
+    return *GetScalar<T>();
+  }
+
+  // Step through a row of results, binding the columns of the current row to
+  // ARGS in order.  If there are no more rows, returns false.  Otherwise,
+  // returns true.
+  template <typename... Ts>
+  bool operator()(Ts &&...args) {
+    if (static_cast<int>(sizeof...(args)) > sqlite3_column_count(stmt)) {
+      throw error{SQLITE_ERROR};
+    }
+    if (!first_invocation) {
+      ret = sqlite3_step(stmt);
+    }
+    if (ret != SQLITE_ROW) {
+      return false;
+    }
+    int idx = 0;
+    auto column_dispatcher = [this, &idx] (auto &&arg, auto &self) {
+
+      using arg_t = std::decay_t<decltype(arg)>;
+      if constexpr (std::is_integral_v<arg_t>) {
+        arg = sqlite3_column_int64(stmt, idx);
+      } else if constexpr (std::is_same_v<std::string, arg_t> ||
+                           std::is_same_v<std::string_view, arg_t>) {
+        auto ptr = (const char *)sqlite3_column_text(stmt, idx);
+        auto len = sqlite3_column_bytes(stmt, idx);
+        arg = arg_t(ptr, len);
+      } else if constexpr (std::is_same_v<sqlite::blob, arg_t> ||
+                           std::is_same_v<sqlite::blob_view, arg_t>) {
+        auto ptr = (const char *)sqlite3_column_blob(stmt, idx);
+        auto len = sqlite3_column_bytes(stmt, idx);
+        arg = arg_t(ptr, len);
+      } else if constexpr (std::is_same_v<std::nullopt_t, arg_t>) {
+        ;
+      } else if constexpr (detail::is_std_optional_type<arg_t>) {
+        if (sqlite3_column_type(stmt, idx) == SQLITE_NULL) {
+          arg.reset();
+        } else {
+          typename arg_t::value_type nonnull_arg;
+          self(nonnull_arg, self);
+          arg = std::move(nonnull_arg);
+          return;
+        }
+      } else if constexpr (user_deserialize_fn<arg_t> != nullptr) {
+        auto *fn_ptr = +user_deserialize_fn<arg_t>;
+        using fn_info = detail::get_fn_info<decltype(fn_ptr)>;
+        using from_type = typename fn_info::template arg_type<0>;
+        std::decay_t<from_type> from_arg;
+        self(from_arg, self);
+        arg = fn_ptr(std::move(from_arg));
+        return;
+      } else {
+        static_assert(detail::dependent_false<arg_t>);
+      }
+      idx++;
+
+    };
+    (void)column_dispatcher;
+    (column_dispatcher(std::forward<Ts>(args), column_dispatcher), ...);
+    first_invocation = false;
+    return true;
+  }
+
+  using PutCallbackType = void (sqlite3_stmt *);
+
+  QueryResult(sqlite3_stmt *stmt_, PutCallbackType *put_cb_)
+      : stmt(stmt_), put_cb(put_cb_) {
+    ret = sqlite3_step(stmt);
+  }
+
+  QueryResult(const QueryResult &) = delete;
+  QueryResult &operator=(const QueryResult &) = delete;
+
+  sqlite3_stmt *stmt = nullptr;
+  PutCallbackType *put_cb = nullptr;
+  int ret = -1;
+  bool first_invocation = true;
+
+};
+
+
 
 template <const auto &db_name>
 class Database {
  public:
   // This hook is called every time a connection is made, taking as argument
   // the database handle corresponding to the new connection.
-  static inline std::function<void(sqlite3 *)> post_connection_hook;
 
  private:
-  struct Connection {
-    sqlite3 *db_handle;
-
-    Connection(const Connection &) = delete;
-    Connection &operator=(const Connection &) = delete;
-
-    Connection(void) {
-      // Since each thread has its own exclusive connection to the database, we
-      // can safely set SQLITE_CONFIG_MULTITHREAD so that SQLite may assume
-      // the database will not be accessed from the same connection by two
-      // threads simultaneously.
-      do {
-        std::lock_guard<std::mutex> guard(detail::sqlite3_config_mutex);
-        if (!detail::sqlite3_configured) {
-          sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
-          sqlite3_config(SQLITE_CONFIG_LOG,
-                         detail::sqlite_error_log_callback, nullptr);
-          detail::sqlite3_configured = true;
-        }
-      } while (0);
-      static const auto saved_db_name = detail::maybe_invoke(db_name);
-      auto ret = sqlite3_open(&saved_db_name[0], &db_handle);
-      if (ret != SQLITE_OK) {
-        throw error{ret};
-      }
-
-      // When the database has been temporarily locked by another process, this
-      // tells SQLite to retry the command/query until it succeeds, rather than
-      // returning SQLITE_BUSY immediately.
-      sqlite3_busy_handler(db_handle,
-          [](void *, int) {
-            std::this_thread::yield();
-            return 1;
-          },
-          nullptr);
-
-      if (post_connection_hook) {
-        post_connection_hook(db_handle);
-      }
-
-      for (auto &function_creation_hook : detail::function_creation_hooks) {
-        function_creation_hook(db_handle);
-      }
-    }
-
-    ~Connection(void) {
-      // To close the database, we use sqlite3_close_v2() because unlike
-      // sqlite3_close(), this function allows there to be un-finalized
-      // prepared statements.  The database handle will close once
-      // all prepared statements have been finalized by the thread-local
-      // `PreparedStmtCache` destructors.
-      sqlite3_close_v2(db_handle);
-    }
-  };
 
   // The connection to the database at `db_name` is thread-local.
   static Connection &connection_tls(void) {
-    static thread_local Connection object;
+    static thread_local Connection object (std::string(detail::maybe_invoke(db_name)));
     return object;
   }
 
@@ -313,7 +526,6 @@ class Database {
   };
 
  public:
-  class QueryResult;
 
   // Prepare or reuse a statement corresponding to the query string QUERY_STR,
   // binding BIND_ARGS to the parameters ?1, ?2, ..., of the statement.
@@ -375,218 +587,6 @@ class Database {
       return QueryResult(stmt, &PreparedStmtCache<query_str>::put_tls);
     }
   }
-
-  // QueryResult corresponds to the results of a query executed by query().
-  // Results can be stepped through row-by-row by invoking the QueryResult
-  // directly.  When a QueryResult gets destroyed, the prepared statement is
-  // cleaned up and gets placed into the prepared-statement cache it came from
-  // for later reuse.
-  class QueryResult {
-   public:
-    QueryResult() = default;
-
-    QueryResult &operator=(QueryResult &&other) {
-      if (this != &other) {
-        std::swap(stmt, other.stmt);
-        std::swap(put_cb, other.put_cb);
-        std::swap(ret, other.ret);
-        std::swap(first_invocation, other.first_invocation);
-      }
-      return *this;
-    }
-
-    QueryResult(QueryResult &&other) {
-      using std::swap;
-      swap(stmt, other.stmt);
-      swap(put_cb, other.put_cb);
-      swap(ret, other.ret);
-      swap(first_invocation, other.first_invocation);
-    }
-
-    ~QueryResult() {
-      if (stmt == nullptr) {
-        return;
-      }
-      sqlite3_clear_bindings(stmt);
-      sqlite3_reset(stmt);
-      put_cb(stmt);
-    }
-
-    // Returns the SQLite result code of the most recent call to sqlite3_step()
-    // on the prepared statement.
-    int resultCode(void) {
-      return ret;
-    }
-
-    template<class Arg, int64_t idx>
-    std::enable_if_t<std::is_enum_v<Arg>, Arg>
-    _Get() {
-      using target_t = std::underlying_type_t<Arg>;
-      return static_cast<Arg>(_Get<target_t, idx>());
-    }
-
-    template<class Arg, int64_t idx>
-    std::enable_if_t<detail::is_one_of_v<Arg, std::string, std::string_view>, Arg>
-    _Get() {
-      return { reinterpret_cast<const char*>(sqlite3_column_text(stmt, idx)),
-               sqlite3_column_bytes(stmt, idx) };
-    }
-
-    template<class Arg, int64_t idx>
-    std::enable_if_t<detail::is_one_of_v<Arg, sqlite::blob, sqlite::blob_view>, Arg>
-    _Get() {
-      return { reinterpret_cast<const char *>(sqlite3_column_blob(stmt, idx)),
-               sqlite3_column_bytes(stmt, idx) };
-    }
-
-    template<class Arg, int64_t idx>
-    std::enable_if_t<std::is_integral_v<Arg>, Arg>
-    _Get() {
-      return sqlite3_column_int64(stmt, idx);
-    }
-
-    template<class Arg, int64_t idx>
-    std::enable_if_t<std::is_same_v<std::nullopt_t, Arg>, Arg>
-    _Get() {
-      return {};
-    }
-
-    template<class Arg, int64_t idx>
-    std::enable_if_t<detail::is_std_optional_type<Arg>, Arg>
-    _Get() {
-      if (sqlite3_column_type(stmt, idx) == SQLITE_NULL) {
-        return {};
-      }
-      return { _Get<typename Arg::value_type, idx>() };
-    }
-
-    template<typename ...Ts, int64_t ...indices>
-    std::tuple<Ts ...> Get_helper(std::integer_sequence<int64_t, indices ...>) {
-      return std::make_tuple<Ts ...>( _Get<Ts, indices>() ...);
-    }
-
-    void Step() {
-      if (!first_invocation) {
-        ret = sqlite3_step(stmt);
-      }
-      first_invocation = false;
-    }
-
-    template<typename... Ts>
-    std::optional<std::tuple<Ts...>> Get() {
-      if (static_cast<int>(sizeof...(Ts)) > sqlite3_column_count(stmt)) {
-        throw incorrect_query{SQLITE_ERROR, "Get argument count is greater than allowed"};
-      }
-
-      Step();
-      if (ret != SQLITE_ROW) {
-        return {};
-      }
-
-      using seq_t = std::make_integer_sequence<int64_t, sizeof ... (Ts)>;
-      return { Get_helper<Ts...>(seq_t{}) };
-    }
-
-    template<typename T>
-    std::optional<T> GetScalar() {
-      if (sqlite3_column_count(stmt) == 0) {
-        throw incorrect_query{SQLITE_ERROR,
-                              "GetScalar argument count is greater than allowed"};
-      }
-
-      Step();
-
-      if (ret != SQLITE_ROW) {
-        return {};
-      }
-
-      return { _Get<T, 0>() };
-    }
-
-    template<typename T>
-    T GetScalar_r() {
-      return *GetScalar<T>();
-    }
-
-    // Step through a row of results, binding the columns of the current row to
-    // ARGS in order.  If there are no more rows, returns false.  Otherwise,
-    // returns true.
-    template <typename... Ts>
-    bool operator()(Ts &&...args) {
-      if (static_cast<int>(sizeof...(args)) > sqlite3_column_count(stmt)) {
-        throw error{SQLITE_ERROR};
-      }
-      if (!first_invocation) {
-        ret = sqlite3_step(stmt);
-      }
-      if (ret != SQLITE_ROW) {
-        return false;
-      }
-      int idx = 0;
-      auto column_dispatcher = [this, &idx] (auto &&arg, auto &self) {
-
-        using arg_t = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_integral_v<arg_t>) {
-          arg = sqlite3_column_int64(stmt, idx);
-        } else if constexpr (std::is_same_v<std::string, arg_t> ||
-                             std::is_same_v<std::string_view, arg_t>) {
-          auto ptr = (const char *)sqlite3_column_text(stmt, idx);
-          auto len = sqlite3_column_bytes(stmt, idx);
-          arg = arg_t(ptr, len);
-        } else if constexpr (std::is_same_v<sqlite::blob, arg_t> ||
-                             std::is_same_v<sqlite::blob_view, arg_t>) {
-          auto ptr = (const char *)sqlite3_column_blob(stmt, idx);
-          auto len = sqlite3_column_bytes(stmt, idx);
-          arg = arg_t(ptr, len);
-        } else if constexpr (std::is_same_v<std::nullopt_t, arg_t>) {
-          ;
-        } else if constexpr (detail::is_std_optional_type<arg_t>) {
-          if (sqlite3_column_type(stmt, idx) == SQLITE_NULL) {
-            arg.reset();
-          } else {
-            typename arg_t::value_type nonnull_arg;
-            self(nonnull_arg, self);
-            arg = std::move(nonnull_arg);
-            return;
-          }
-        } else if constexpr (user_deserialize_fn<arg_t> != nullptr) {
-          auto *fn_ptr = +user_deserialize_fn<arg_t>;
-          using fn_info = detail::get_fn_info<decltype(fn_ptr)>;
-          using from_type = typename fn_info::template arg_type<0>;
-          std::decay_t<from_type> from_arg;
-          self(from_arg, self);
-          arg = fn_ptr(std::move(from_arg));
-          return;
-        } else {
-          static_assert(detail::dependent_false<arg_t>);
-        }
-        idx++;
-
-      };
-      (void)column_dispatcher;
-      (column_dispatcher(std::forward<Ts>(args), column_dispatcher), ...);
-      first_invocation = false;
-      return true;
-    }
-
-   private:
-    using PutCallbackType = void (sqlite3_stmt *);
-
-    QueryResult(sqlite3_stmt *stmt_, PutCallbackType *put_cb_)
-        : stmt(stmt_), put_cb(put_cb_) {
-      ret = sqlite3_step(stmt);
-    }
-
-    QueryResult(const QueryResult &) = delete;
-    QueryResult &operator=(const QueryResult &) = delete;
-
-    sqlite3_stmt *stmt = nullptr;
-    PutCallbackType *put_cb = nullptr;
-    int ret = -1;
-    bool first_invocation = true;
-
-    friend class Database<db_name>;
-  };
 
   // A TransactionGuard object starts a SQLite transaction when constructed,
   // and when destructed either commits or rolls back the transaction,
