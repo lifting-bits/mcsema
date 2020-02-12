@@ -21,7 +21,7 @@
 #include <mcsema/CFG/Types.h>
 #include <mcsema/CFG/Util.h>
 
-#include <mcsema/CFG/sqlCFG.h>
+#include <mcsema/CFG/WS.h>
 #include <mcsema/CFG/Schema.h>
 #include <mcsema/CFG/Context.h>
 
