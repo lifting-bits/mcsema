@@ -76,6 +76,10 @@ DEFINE_TABLE(ExternalFunction, "external_functions", "ext_function_rowid");
 DEFINE_TABLE(GlobalVar, "global_variables", "g_var_rowid");
 DEFINE_TABLE(ExternalVar, "external_variables", "ext_var_rowid");
 DEFINE_TABLE(Segment, "segments", "segment_rowid");
+DEFINE_TABLE(CallingConv, "calling_conventions", "calling_convention_rowid");
+DEFINE_TABLE(OperandType, "operand_types", "operand_type_rowid");
+DEFINE_TABLE(SymbolTableEntryType, "symtab_types", "type_rowid");
+DEFINE_TABLE(FixupKind, "fixup_kinds", "fixup_kind_rowid");
 
 #undef DEFINE_TABLE
 
