@@ -85,6 +85,7 @@ set_source_files_properties(${PROJECT_PROTOBUFHEADERFILES} PROPERTIES
 set(MCSEMA_LIFT mcsema-lift-${REMILL_LLVM_VERSION})
 set(MCSEMA_WS mcsema-ws)
 set(MCSEMA_INIT mcsema-init)
+set(MCSEMA_CFG mcsema-cfg)
 
 add_library(${MCSEMA_WS}
   mcsema/CFG/WS.cpp
@@ -95,15 +96,25 @@ add_executable(${MCSEMA_INIT}
   tools/mcsema_init/main.cpp
 )
 
-foreach(P ${MCSEMA_WS} ${MCSEMA_INIT})
-  target_include_directories(${P} SYSTEM PUBLIC ${CFG_INCLUDE})
+add_library(${MCSEMA_CFG}
+  ${PROJECT_PROTOBUFSOURCEFILES}
+
+  mcsema/CFG/FromProto.cpp
+)
+
+
+foreach(P ${MCSEMA_WS} ${MCSEMA_INIT} ${MCSEMA_CFG})
   target_compile_options(${P} PRIVATE ${PROJECT_CXXFLAGS})
   # ${PROJECT_INCLUDEDIRECTORIES} has too many entries these project do not need atm
   target_include_directories(${P} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
 
+target_include_directories(${MCSEMA_CFG} SYSTEM PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(${MCSEMA_CFG} SYSTEM PUBLIC ${PROJECT_INCLUDEDIRECTORIES})
+
 target_link_libraries(${MCSEMA_WS} sqlite3)
-target_link_libraries(${MCSEMA_INIT} ${MCSEMA_WS})
+target_link_libraries(${MCSEMA_CFG} ${MCSEMA_WS} ${Protobuf_LIBRARIES})
+target_link_libraries(${MCSEMA_INIT} ${MCSEMA_CFG})
 
 add_executable(${MCSEMA_LIFT}
   ${PROJECT_PROTOBUFSOURCEFILES}
