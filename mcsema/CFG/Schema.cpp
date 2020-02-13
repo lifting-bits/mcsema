@@ -90,7 +90,7 @@ void Schema::CreateEnums(Context &ctx) {
 }
 
 void Schema::CreateNMTables(Context &ctx) {
-  auto db = ctx.db;
+  auto &db = ctx.db;
 
   static Query q_func_2_block =
     R"(create table if not exists function_to_block(
@@ -135,7 +135,7 @@ void Schema::CreateNMTables(Context &ctx) {
 }
 
 void Schema::CreateSchema(Context &ctx) {
-  auto db = ctx.db;
+  auto &db = ctx.db;
 
   CreateEnums(ctx);
 
