@@ -17,7 +17,7 @@
 
 #pragma once
 
-namespace mcsema::cfg {
+namespace mcsema::ws {
 
 class Context;
 
@@ -90,4 +90,4 @@ struct BbToFunc : NMTable<BasicBlock, Function> {
 };
 
 } // namespace schema
-} // namespace mcsema::cfg
+} // namespace mcsema::ws
