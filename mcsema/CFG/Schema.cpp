@@ -21,6 +21,12 @@
 
 namespace mcsema::ws {
 
+template<typename Table>
+int64_t RowCount(Context &ctx) {
+  return ctx.db.template query<schema::ExceptionFrame::is_populated>()
+               .template GetScalar_r<int64_t>();
+}
+
 void Schema::CreateEnums(Context &ctx) {
   auto &db = ctx.db;
 
