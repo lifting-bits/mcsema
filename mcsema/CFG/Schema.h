@@ -81,6 +81,7 @@ DEFINE_TABLE(CallingConv, "calling_conventions", "calling_convention_rowid");
 DEFINE_TABLE(OperandType, "operand_types", "operand_type_rowid");
 DEFINE_TABLE(SymbolTableEntryType, "symtab_types", "type_rowid");
 DEFINE_TABLE(FixupKind, "fixup_kinds", "fixup_kind_rowid");
+DEFINE_TABLE(ExceptionFrameAction, "exception_frame_actions", "action");
 
 #undef DEFINE_TABLE
 

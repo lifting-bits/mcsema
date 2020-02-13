@@ -38,9 +38,11 @@ void Schema::CreateEnums(Context &ctx) {
 
   static Query populate_action_enum =
     R"(insert into exception_frame_actions values(?1, ?2))";
-  db.template query<populate_action_enum>(0, "Cleanup");
-  db.template query<populate_action_enum>(1, "Catch");
 
+  if (RowCount<schema::ExceptionFrameAction>(ctx)) {
+    db.template query<populate_action_enum>(0, "Cleanup");
+    db.template query<populate_action_enum>(1, "Catch");
+  }
   // rowid corresponds to llvm value for given cc
   static Query cc = R"(create table if not exists calling_conventions(
         rowid INTEGER PRIMARY KEY,
@@ -49,11 +51,13 @@ void Schema::CreateEnums(Context &ctx) {
   db.template query<cc>();
 
   static Query populate_cc = R"(insert into calling_conventions(rowid, name) values(?1, ?2))";
-  db.template query<populate_cc>(0, "C");
-  db.template query<populate_cc>(64, "X86_StdCall");
-  db.template query<populate_cc>(65, "X86_FastCall");
-  db.template query<populate_cc>(78, "X86_64_SysV");
-  db.template query<populate_cc>(79, "Win64");
+  if (RowCount<schema::CallingConv>(ctx)) {
+    db.template query<populate_cc>(0, "C");
+    db.template query<populate_cc>(64, "X86_StdCall");
+    db.template query<populate_cc>(65, "X86_FastCall");
+    db.template query<populate_cc>(78, "X86_64_SysV");
+    db.template query<populate_cc>(79, "Win64");
+  }
 
   static Query operand_types = R"(create table if not exists operand_types(
       rowid INTEGER PRIMARY KEY,
@@ -63,11 +67,14 @@ void Schema::CreateEnums(Context &ctx) {
 
   static Query populate_operad_types =
     R"(insert into operand_types(rowid, type) values(?1, ?2))";
-  db.template query<populate_operad_types>(0, "Immediate operand");
-  db.template query<populate_operad_types>(1, "Memory operand");
-  db.template query<populate_operad_types>(2, "MemoryDisplacement operand");
-  db.template query<populate_operad_types>(3, "ControlFlow operand");
-  db.template query<populate_operad_types>(4, "OffsetTable operand");
+
+  if (RowCount<schema::OperandType>(ctx)) {
+    db.template query<populate_operad_types>(0, "Immediate operand");
+    db.template query<populate_operad_types>(1, "Memory operand");
+    db.template query<populate_operad_types>(2, "MemoryDisplacement operand");
+    db.template query<populate_operad_types>(3, "ControlFlow operand");
+    db.template query<populate_operad_types>(4, "OffsetTable operand");
+  }
 
   static Query symtab_types = R"(create table if not exists symtab_types(
       rowid INTEGER PRIMARY KEY,
@@ -77,10 +84,13 @@ void Schema::CreateEnums(Context &ctx) {
 
   static Query populate_symtab_types =
     R"(insert into symtab_types(type, rowid) values(?1, ?2))";
-  db.template query<populate_symtab_types>("imported", 1);
-  db.template query<populate_symtab_types>("exported", 2);
-  db.template query<populate_symtab_types>("internal", 3);
-  db.template query<populate_symtab_types>("artificial", 4);
+
+  if (RowCount<schema::SymbolTableEntryType>(ctx)) {
+    db.template query<populate_symtab_types>("imported", 1);
+    db.template query<populate_symtab_types>("exported", 2);
+    db.template query<populate_symtab_types>("internal", 3);
+    db.template query<populate_symtab_types>("artificial", 4);
+  }
 
   static Query fixup_kinds =
     R"(create table if not exists fixup_kinds(
@@ -91,8 +101,11 @@ void Schema::CreateEnums(Context &ctx) {
 
   static Query populate_fixup_kinds =
     R"(insert into fixup_kinds(rowid, type) values(?1,?2))";
-  db.template query<populate_fixup_kinds>(0, "Absolute");
-  db.template query<populate_fixup_kinds>(1, "OffsetFromThreadBase");
+
+  if (RowCount<schema::FixupKind>(ctx)) {
+    db.template query<populate_fixup_kinds>(0, "Absolute");
+    db.template query<populate_fixup_kinds>(1, "OffsetFromThreadBase");
+  }
 }
 
 void Schema::CreateNMTables(Context &ctx) {
