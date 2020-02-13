@@ -313,7 +313,7 @@ void Schema::CreateSchema(Context &ctx) {
 
 void Schema::CreateTriggers(Context &ctx) {
   static Query delete_block = R"(
-    CREATE TRIGGER delete_bb_cascade
+    CREATE TRIGGER IF NOT EXISTS delete_bb_cascade
       AFTER DELETE ON blocks
       FOR EACH ROW
       BEGIN
@@ -326,7 +326,7 @@ void Schema::CreateTriggers(Context &ctx) {
   ctx.db.template query<delete_block>();
 
   static Query delete_function = R"(
-    CREATE TRIGGER delete_function_cascase
+    CREATE TRIGGER IF NOT EXISTS delete_function_cascase
       AFTER DELETE ON functions
       FOR EACH ROW
       BEGIN
