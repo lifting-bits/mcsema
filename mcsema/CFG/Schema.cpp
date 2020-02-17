@@ -160,7 +160,7 @@ void Schema::CreateSchema(Context &ctx) {
 
   static Query c_module =
     R"(create table if not exists modules(
-       name text,
+       name text UNIQUE,
        rowid INTEGER PRIMARY KEY
       ))";
   db.template query<c_module>();
