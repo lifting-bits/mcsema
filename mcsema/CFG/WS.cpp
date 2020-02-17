@@ -137,6 +137,11 @@ struct Module_ : schema::Module,
   auto ObjIterate(int64_t id) {
     return can_obj_iterate::Get<Table>(*this, id);
   }
+
+  auto Get(const std::string &name) {
+    const static std::string q_user_get = "SELECT rowid FROM modules WHERE name = ?1";
+    return _ctx->db.template query<q_user_get>(name).GetScalar<int64_t>();
+  }
 };
 using Module_impl = Module_<Module>;
 
@@ -655,6 +660,14 @@ void Workspace::CreateSchema()
 
 Module Workspace::AddModule(const std::string &name) {
   return { Module_{ _ctx }.insert(name), _ctx };
+}
+
+
+std::optional<Module> Workspace::GetModule(const std::string &name) {
+  if (auto maybe_id = impl_t<Module>(_ctx).Get(name)) {
+    return { Module(*maybe_id, _ctx) };
+  }
+  return {};
 }
 
 Function Workspace::AddFunction(const Module &module, uint64_t ea, bool is_entrypoint)

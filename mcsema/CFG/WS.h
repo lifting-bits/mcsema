@@ -588,6 +588,8 @@ struct Workspace
 
   Module AddModule(const std::string &name);
 
+  std::optional<Module> GetModule(const std::string &name);
+
   Function AddFunction(const Module &module, uint64_t ea, bool is_entrypoint);
 
   BasicBlock AddBasicBlock(const Module &module,
