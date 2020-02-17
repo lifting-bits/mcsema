@@ -60,7 +60,7 @@ using Query = const char *;
     constexpr static Query table_name = table_name_; \
     constexpr static Query fk = foreign_key; \
     constexpr static Query pk = "rowid"; \
-    constexpr static Query is_populated = "SELECT COUNT(*) FROM " # table_name_; \
+    constexpr static Query is_populated = "SELECT COUNT(*) FROM " table_name_; \
     using table = name_; \
   }
 
