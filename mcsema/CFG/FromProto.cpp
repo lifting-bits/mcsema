@@ -41,8 +41,62 @@ mcsema::Module LoadProto(const std::string &filename) {
   return cfg;
 }
 
-ws::Workspace FromProto(const std::string &from, const std::string &ws) {
-  return ws::Workspace(ws);
+
+struct ProtoWriter {
+
+  ws::Module &_module;
+  mcsema::Module &_proto;
+
+  ProtoWriter(ws::Module &module, mcsema::Module &proto)
+    : _module(module), _proto(proto)
+  {}
+
+  ws::SymbolTableEntry ToSymbol(const std::string &name) {
+    // Note(lukas): In protobuf there no way to know visibility
+    return _module.AddSymbolTableEntry(name, ws::SymbolVisibility::Artificial);
+  }
+
+  // FIXME: In mcsema it depends on arch
+  ws::CallingConv CC(mcsema::ExternalFunction::CallingConvention cc) {
+    switch(cc) {
+      case ExternalFunction_CallingConvention_CalleeCleanup:
+        return ws::CallingConv::X86_StdCall;
+      case ExternalFunction_CallingConvention_FastCall:
+        return ws::CallingConv::X86_FastCall;
+      case ExternalFunction_CallingConvention_CallerCleanup:
+        return ws::CallingConv::X86_StdCall;
+    }
+  }
+
+  void ExternalFunctions() {
+    for (auto ext_func : _proto.external_funcs()) {
+      _module.AddExternalFunction(
+          ext_func.ea(),
+          ToSymbol(ext_func.name()),
+          CC(ext_func.cc()), ext_func.has_return(), ext_func.is_weak());
+    }
+  }
+
+  void Write() {
+    ExternalFunctions();
+  }
+};
+
+
+ws::Workspace FromProto(const std::string &from, const std::string &ws_name) {
+  auto ws = ws::Workspace(ws_name);
+
+  ws.CreateSchema();
+
+  auto proto = LoadProto(from);
+
+  if (ws.GetModule(proto.name()))
+    return ws;
+
+  auto ws_module = ws.AddModule(proto.name());
+  ProtoWriter(ws_module, proto).Write();
+  return ws;
+
 }
 
 } // namespace mcsema::init
