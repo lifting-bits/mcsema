@@ -88,15 +88,26 @@ ws::Workspace FromProto(const std::string &from, const std::string &ws_name) {
 
   ws.CreateSchema();
 
+  Enhance(from, ws);
+  return ws;
+}
+
+bool Enhance(const std::string &from, ws::Workspace &ws) {
   auto proto = LoadProto(from);
 
   if (ws.GetModule(proto.name()))
-    return ws;
+    return false;
 
   auto ws_module = ws.AddModule(proto.name());
   ProtoWriter(ws_module, proto).Write();
-  return ws;
-
+  return true;
 }
+
+void Enhance(const std::string &from, ws::Module &module) {
+  auto proto = LoadProto(from);
+  ProtoWriter(module, proto).Write();
+}
+
+
 
 } // namespace mcsema::init

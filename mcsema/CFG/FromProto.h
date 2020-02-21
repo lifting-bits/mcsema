@@ -21,6 +21,18 @@
 
 namespace mcsema::cfg {
 
+  // Add information from protobuf `from` to already existing workspace `ws`.
+  // Returns `true` if anything was added to the workspace.
+  bool Enhance(const std::string &from, ws::Workspace &ws);
+
+  // Add information from protobuf `from` to already existing module `module`.
+  // If protobuf contains information that collides with one already in `module`,
+  // behaviour is undefined.
+  // TODO(lukas): Resolve colisions.
+  void Enhance(const std::string &from, ws::Module &module);
+
+  // Transcribes protobuf in file `from` into new workspace `ws`.
+  // If `ws` already contains Module contained in `from`, `ws` is not modified.
   ws::Workspace FromProto(const std::string &from, const std::string &ws);
 
 } // namespace mcsema::init
