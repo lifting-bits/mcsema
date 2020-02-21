@@ -21,6 +21,7 @@
 #include <google/protobuf/io/coded_stream.h>
 
 #include <fstream>
+#include <unordered_map>
 
 namespace mcsema::cfg {
 
@@ -61,6 +62,11 @@ struct ProtoWriter_impl : Configuration {
   // handle to the code section.
   std::optional<ws::MemoryRange> code_mem_range;
 
+  template<typename Target>
+  using ea_map = std::unordered_map<uint64_t, Target>;
+
+  ea_map<ws::BasicBlock> ea_to_bb;
+  ea_map<uint64_t> successor_relation;
 
   ProtoWriter_impl(ws::Module &module, mcsema::Module &proto)
     : _module(module), _proto(proto)
@@ -89,6 +95,21 @@ struct ProtoWriter_impl : Configuration {
         return ws::CallingConv::X86_FastCall;
       case ExternalFunction_CallingConvention_CallerCleanup:
         return ws::CallingConv::X86_StdCall;
+    }
+  }
+
+  ws::OperandType ConvertOperandType(mcsema::CodeReference::OperandType op_type) {
+    switch(op_type) {
+      case CodeReference_OperandType_ImmediateOperand:
+        return ws::OperandType::Immediate;
+      case CodeReference_OperandType_MemoryOperand:
+        return ws::OperandType::Memory;
+      case CodeReference_OperandType_MemoryDisplacementOperand:
+        return ws::OperandType::MemoryDisplacement;
+      case CodeReference_OperandType_ControlFlowOperand:
+        return ws::OperandType::ControlFlow;
+      case CodeReference_OperandType_OffsetTable:
+        return ws::OperandType::OffsetTable;
     }
   }
 
@@ -166,11 +187,96 @@ struct ProtoWriter_impl : Configuration {
     }
   }
 
+
+  template<typename BB>
+  uint64_t BBSize(BB &bb) {
+    uint64_t out = 0;
+    for (auto inst : bb.instructions()) {
+      out += inst.bytes().size();
+    }
+    return out;
+  }
+
+  // Thrown away: location
+  //              target_type
+  template<typename BB>
+  void CodeXref(BB &bb, ws::BasicBlock &ws_bb) {
+    for (auto inst : bb.instructions()) {
+      for (auto c_xref: inst.xrefs()) {
+        if (c_xref.name().empty()) {
+          ws_bb.AddXref(static_cast<uint64_t>(inst.ea()),
+                        static_cast<uint64_t>(c_xref.ea()),
+                        ConvertOperandType(c_xref.operand_type()));
+        } else {
+          ws_bb.AddXref(static_cast<uint64_t>(inst.ea()),
+                        static_cast<uint64_t>(c_xref.ea()),
+                        ConvertOperandType(c_xref.operand_type()),
+                        ToSymbol(c_xref.name()),
+                        static_cast<uint64_t>(c_xref.mask()));
+        }
+      }
+    }
+  }
+
+
+  template<typename BB>
+  ws::BasicBlock GetBB(BB &bb) {
+    auto ea = static_cast<uint64_t>(bb.ea());
+
+    // TODO(lukas): What if `code_mem_range` is not set?
+    auto [it, res] =
+      ea_to_bb.try_emplace(ea, _module.AddBasicBlock(ea, BBSize(bb), *code_mem_range));
+
+    if (res)
+      CodeXref(bb, it->second);
+    return it->second;
+  }
+
+  template<typename BB>
+  void SetSuccessors(BB &bb) {
+    auto ws_bb = GetBB(bb);
+    for (auto succ_ea : bb.successor_eas()) {
+      auto [it, res] = successor_relation.try_emplace(static_cast<uint64_t>(bb.ea(),
+                                                      static_cast<uint64_t>(succ_ea)));
+      if (res) {
+        ws_bb.AddSucc(ea_to_bb.at(static_cast<uint64_t>(succ_ea)));
+      }
+    }
+
+  }
+
+  template<typename F>
+  void BBs(F &f, ws::Function &ws_f) {
+    for (auto bb : f.blocks()) {
+      auto ws_bb = GetBB(bb);
+      ws_f.AttachBlock(ws_bb);
+    }
+
+    for (auto bb: f.blocks()) {
+      SetSuccessors(bb);
+    }
+  }
+
+  // Thrown away: StackVariables
+  //              ExceptionFrames
+  void Functions() {
+    for (auto f: _proto.funcs()) {
+      auto ws_f = _module.AddFunction(
+          static_cast<uint64_t>(f.ea()),
+          f.is_entrypoint()
+      );
+      ws_f.Name(ToSymbol(f.name()));
+
+      BBs(f, ws_f);
+    }
+  }
+
   void Write() {
     ExternalFunctions();
     ExternalVariables();
     GlobalVariables();
     Segments();
+    Functions();
   }
 };
 
