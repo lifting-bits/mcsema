@@ -80,7 +80,7 @@ struct ProtoWriter {
   void ExternalFunctions() {
     for (auto ext_func : _proto.external_funcs()) {
       _module.AddExternalFunction(
-          ext_func.ea(),
+          static_cast<uint64_t>(ext_func.ea()),
           ToSymbol(ext_func.name()),
           CC(ext_func.cc()), ext_func.has_return(), ext_func.is_weak());
     }
