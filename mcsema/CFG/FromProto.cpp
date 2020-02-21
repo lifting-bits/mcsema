@@ -77,8 +77,22 @@ struct ProtoWriter {
     }
   }
 
+  void ExternalVariables() {
+    for (auto ext_v : _proto.external_vars()) {
+      _module.AddExternalVar(
+          static_cast<uint64_t>(ext_v.ea()),
+          ext_v.name(),
+          static_cast<uint64_t>(ext_v.size()),
+          ext_v.is_weak(),
+          ext_v.is_thread_local()
+      );
+
+    }
+  }
+
   void Write() {
     ExternalFunctions();
+    ExternalVariables();
   }
 };
 
