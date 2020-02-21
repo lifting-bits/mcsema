@@ -56,6 +56,15 @@ struct ProtoWriter {
     return _module.AddSymbolTableEntry(name, ws::SymbolVisibility::Artificial);
   }
 
+  ws::FixupKind ConvertFixupKind(mcsema::DataReference::TargetFixupKind kind) {
+    switch(kind) {
+      case DataReference_TargetFixupKind_Absolute:
+        return ws::FixupKind::Absolute;
+      case DataReference_TargetFixupKind_OffsetFromThreadBase:
+        return ws::FixupKind::OffsetFromThreadBase;
+    }
+  }
+
   // FIXME: In mcsema it depends on arch
   ws::CallingConv CC(mcsema::ExternalFunction::CallingConvention cc) {
     switch(cc) {
@@ -100,10 +109,49 @@ struct ProtoWriter {
     }
   }
 
+  template<typename Segment>
+  ws::Segment SegmentMeta(const Segment &s, ws::MemoryRange &mem_r) {
+    return mem_r.AddSegment(
+        static_cast<uint64_t>(s.ea()),
+        static_cast<uint64_t>(s.data().size()),
+        { s.read_only(), s.is_external(), s.is_exported(), s.is_thread_local() },
+        s.name()
+    );
+  }
+
+  // Thrown away: target_is_code -> mcsema should be able to deduce it from target_ea
+  template<typename Segment>
+  void DataXrefs(const Segment &s, ws::Segment ws_s) {
+    for (auto d_xref : s.xrefs()) {
+      ws_s.AddXref(
+          static_cast<uint64_t>(d_xref.ea()),
+          static_cast<uint64_t>(d_xref.target_ea()),
+          static_cast<uint64_t>(d_xref.width()),
+          ConvertFixupKind(d_xref.target_fixup_kind()),
+          // TODO(lukas): It may make sense to have get_or_create here
+          ToSymbol(d_xref.target_name())
+      );
+    }
+  }
+
+  // Thrown away: Segment::Variable
+  void Segments() {
+    for (auto s : _proto.segments()) {
+      auto mem_r = _module.AddMemoryRange(
+          static_cast<uint64_t>(s.ea()),
+          s.data());
+
+      auto ws_s = SegmentMeta(s, mem_r);
+
+      DataXrefs(s, ws_s);
+    }
+  }
+
   void Write() {
     ExternalFunctions();
     ExternalVariables();
     GlobalVariables();
+    Segments();
   }
 };
 
