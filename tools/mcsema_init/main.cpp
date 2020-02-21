@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-#include <mcsema/CFG/view.h>
+#include <mcsema/CFG/FromProto.h>
 
 int main(int argc, char *argv[]) {
-  return 0;
+  // TODO: UI parser
+  //mcsema::cfg::FromProto("testcase.cfg", "mcsema_example.sql");
 }
