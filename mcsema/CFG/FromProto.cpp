@@ -90,9 +90,20 @@ struct ProtoWriter {
     }
   }
 
+  void GlobalVariables() {
+    for (auto g_var : _proto.global_vars()) {
+      _module.AddGlobalVar(
+          static_cast<uint64_t>(g_var.ea()),
+           g_var.name(),
+           static_cast<uint64_t>(g_var.size())
+      );
+    }
+  }
+
   void Write() {
     ExternalFunctions();
     ExternalVariables();
+    GlobalVariables();
   }
 };
 
