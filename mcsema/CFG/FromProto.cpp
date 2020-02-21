@@ -42,12 +42,27 @@ mcsema::Module LoadProto(const std::string &filename) {
 }
 
 
-struct ProtoWriter {
+struct Default {
+  constexpr static const std::string_view code_section_name = ".text";
+};
+
+
+template<typename Configuration>
+struct ProtoWriter_impl : Configuration {
+
+  using Configuration::code_section_name;
 
   ws::Module &_module;
   mcsema::Module &_proto;
 
-  ProtoWriter(ws::Module &module, mcsema::Module &proto)
+  // ws::MemoryRange does not have default ctor
+  // Since ws::BasicBlock needs to be associated with memory range and memory ranges are
+  // inserted before + information about their name is forgotten, it helps to remember
+  // handle to the code section.
+  std::optional<ws::MemoryRange> code_mem_range;
+
+
+  ProtoWriter_impl(ws::Module &module, mcsema::Module &proto)
     : _module(module), _proto(proto)
   {}
 
@@ -143,6 +158,10 @@ struct ProtoWriter {
 
       auto ws_s = SegmentMeta(s, mem_r);
 
+      if (s.name() == code_section_name) {
+        code_mem_range = mem_r;
+      }
+
       DataXrefs(s, ws_s);
     }
   }
@@ -155,6 +174,7 @@ struct ProtoWriter {
   }
 };
 
+using ProtoWriter = ProtoWriter_impl<Default>;
 
 ws::Workspace FromProto(const std::string &from, const std::string &ws_name) {
   auto ws = ws::Workspace(ws_name);
