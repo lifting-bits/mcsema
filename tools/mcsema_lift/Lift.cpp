@@ -123,7 +123,7 @@ struct ABILibsLoader {
   llvm::Module &module;
   llvm::LLVMContext &ctx;
 
-  const Options &opts;
+  Options opts;
 
   static constexpr const char * g_var_kind = "mcsema.abi.libraries";
 
