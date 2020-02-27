@@ -228,6 +228,37 @@ static void ReplaceBarrier(const char *name) {
   }
 }
 
+bool ShouldVolatilize(llvm::Value *pointer_op) {
+  // We have what we are looking for
+  if (llvm::isa<llvm::GlobalVariable>(pointer_op))
+    return true;
+
+  // TODO: If pointer came through some other llvm registers, not much can be done
+  auto c_expr = llvm::dyn_cast<llvm::ConstantExpr>(pointer_op);
+  if (!c_expr) {
+    return false;
+  }
+
+  for (auto &op : c_expr->operands()) {
+    if (ShouldVolatilize(op)) {
+      return true;
+    }
+  }
+}
+
+// Read/Write to global memory should be volatile, as original variables
+// there may have been volatile. If the memory access operation are not marked
+// as volatile, llvm-opt passes that are invoked may eliminate some, even thought this
+// optimization breaks semantic of the original program.
+template<typename TargetInst>
+void Volatilize(llvm::Value *inst) {
+  if (auto target = llvm::dyn_cast<TargetInst>(inst)) {
+    if (ShouldVolatilize(target->getPointerOperand())) {
+      target->setVolatile(true);
+    }
+  }
+}
+
 // Lower a memory read intrinsic into a `load` instruction.
 static void ReplaceMemReadOp(const char *name, llvm::Type *val_type) {
   auto func = gModule->getFunction(name);
@@ -258,6 +289,7 @@ static void ReplaceMemReadOp(const char *name, llvm::Type *val_type) {
       val = ir.CreateFPTrunc(val, func->getReturnType());
     }
     call_inst->replaceAllUsesWith(val);
+    Volatilize<llvm::LoadInst>(val);
   }
   for (auto call_inst : callers) {
     call_inst->eraseFromParent();
@@ -297,8 +329,9 @@ static void ReplaceMemWriteOp(const char *name, llvm::Type *val_type) {
       val = ir.CreateFPExt(val, val_type);
     }
 
-    ir.CreateStore(val, ptr);
+    auto store = ir.CreateStore(val, ptr);
     call_inst->replaceAllUsesWith(mem_ptr);
+    Volatilize<llvm::StoreInst>(store);
   }
   for (auto call_inst : callers) {
     call_inst->eraseFromParent();
