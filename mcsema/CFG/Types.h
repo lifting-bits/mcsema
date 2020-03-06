@@ -256,8 +256,9 @@ struct nm_impl : _crtp<NMTable, nm_impl> {
 
   template<typename Self>
   static std::string q_unbind_from() {
-    return std::string{ "DELETE FROM " } + NMTable::table_name + " WHERE "
-          + Self::fk + " = ?1 AND " + NMTable::template other<Self>::fk + " = ?2";
+    return (util::QString("DELETE FROM") << NMTable::table_name << "WHERE"
+           << Self::fk << "= ?1 AND" << NMTable::template other<Self>::fk << "= ?2")
+          .take();
   }
 
   template<typename Self>
@@ -286,8 +287,8 @@ struct can_obj_iterate {
 
   template<typename Table, typename Self>
   static std::string q_get_obj_iterator() {
-    return std::string { "SELECT " } + Table::pk + " FROM "
-           + Table::table_name + " WHERE " + Self::fk + " = ?1";
+    return (util::QString("SELECT") << Table::pk << "FROM" << Table::table_name
+                                    << "WHERE" << Self::fk << "= ?1").take();
   }
 
   template<typename Table, typename Self>
