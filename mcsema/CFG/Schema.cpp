@@ -39,7 +39,7 @@ void Schema::CreateEnums(Context &ctx) {
   static Query populate_action_enum =
     R"(insert into exception_frame_actions values(?1, ?2))";
 
-  if (RowCount<schema::ExceptionFrameAction>(ctx)) {
+  if (!RowCount<schema::ExceptionFrameAction>(ctx)) {
     db.template query<populate_action_enum>(0, "Cleanup");
     db.template query<populate_action_enum>(1, "Catch");
   }
@@ -51,7 +51,7 @@ void Schema::CreateEnums(Context &ctx) {
   db.template query<cc>();
 
   static Query populate_cc = R"(insert into calling_conventions(rowid, name) values(?1, ?2))";
-  if (RowCount<schema::CallingConv>(ctx)) {
+  if (!RowCount<schema::CallingConv>(ctx)) {
     db.template query<populate_cc>(0, "C");
     db.template query<populate_cc>(64, "X86_StdCall");
     db.template query<populate_cc>(65, "X86_FastCall");
@@ -68,7 +68,7 @@ void Schema::CreateEnums(Context &ctx) {
   static Query populate_operad_types =
     R"(insert into operand_types(rowid, type) values(?1, ?2))";
 
-  if (RowCount<schema::OperandType>(ctx)) {
+  if (!RowCount<schema::OperandType>(ctx)) {
     db.template query<populate_operad_types>(0, "Immediate operand");
     db.template query<populate_operad_types>(1, "Memory operand");
     db.template query<populate_operad_types>(2, "MemoryDisplacement operand");
@@ -85,7 +85,7 @@ void Schema::CreateEnums(Context &ctx) {
   static Query populate_symtab_types =
     R"(insert into symtab_types(type, rowid) values(?1, ?2))";
 
-  if (RowCount<schema::SymbolTableEntryType>(ctx)) {
+  if (!RowCount<schema::SymbolTableEntryType>(ctx)) {
     db.template query<populate_symtab_types>("imported", 1);
     db.template query<populate_symtab_types>("exported", 2);
     db.template query<populate_symtab_types>("internal", 3);
@@ -102,7 +102,7 @@ void Schema::CreateEnums(Context &ctx) {
   static Query populate_fixup_kinds =
     R"(insert into fixup_kinds(rowid, type) values(?1,?2))";
 
-  if (RowCount<schema::FixupKind>(ctx)) {
+  if (!RowCount<schema::FixupKind>(ctx)) {
     db.template query<populate_fixup_kinds>(0, "Absolute");
     db.template query<populate_fixup_kinds>(1, "OffsetFromThreadBase");
   }
