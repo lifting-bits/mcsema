@@ -398,9 +398,8 @@ class QueryResult {
 
 struct CacheBucket {
 
-  CacheBucket(Connection &connection, std::string query)
-    : query_str( query ),
-      _connection(connection)
+  CacheBucket(Connection &connection)
+    : _connection(connection)
   {}
 
   ~CacheBucket(void) {
@@ -410,7 +409,7 @@ struct CacheBucket {
     }
   }
 
-  sqlite3_stmt *get(void) {
+  sqlite3_stmt *get(std::string_view query_str_view) {
     if (first_free_stmt != nullptr) {
       sqlite3_stmt *stmt = nullptr;
       std::swap(first_free_stmt, stmt);
@@ -425,7 +424,6 @@ struct CacheBucket {
 
     // If no prepared statement is available for reuse, make a new one.
     sqlite3_stmt *stmt;
-    std::string_view query_str_view = query_str;
     auto ret = sqlite3_prepare_v3(_connection.db_handle,
                                   query_str_view.data(),
                                   query_str_view.length() + 1,
@@ -449,7 +447,6 @@ struct CacheBucket {
     }
   }
 
-  std::string query_str;
   Connection &_connection;
   sqlite3_stmt *first_free_stmt = nullptr;
   std::vector<sqlite3_stmt *> other_free_stmts;
@@ -463,25 +460,41 @@ class PreparedStmtCache {
 public:
   PreparedStmtCache(Connection &connection) : _connection(connection) {}
 
+
+  template<typename Key>
+  auto &get_cache(Key) {
+    if constexpr ( std::is_same_v<Key, std::string_view> )
+      return sv_cache;
+    else
+      return s_cache;
+  }
+
   template<const auto &query_str>
   sqlite3_stmt *get(void) {
-    auto key = std::string( detail::maybe_invoke(query_str) );
+    auto key = detail::maybe_invoke(query_str);
+    auto &cache = get_cache(key);
     if (!cache.count(key)) {
-      cache.emplace( key, CacheBucket(_connection, key) );
+      cache.emplace( key, CacheBucket( _connection ) );
     }
-    return cache.at( key ).get();
+    return cache.at( key ).get( key );
   }
 
   // This is called by the row fetcher returned by query<query_str, ...>().
   template<const auto &query_str>
   void put(sqlite3_stmt *stmt) {
-    auto key = std::string( detail::maybe_invoke(query_str) );
+    auto key = detail::maybe_invoke(query_str);
+    auto &cache = get_cache(key);
     return cache.at( key ).put( stmt );
   }
 
+
 private:
-  using cache_t = std::unordered_map<std::string, CacheBucket >;
-  cache_t cache;
+
+  template<typename Key>
+  using cache_t = std::unordered_map<Key, CacheBucket>;
+
+  cache_t<std::string> s_cache;
+  cache_t<std::string_view> sv_cache;
 
   Connection &_connection;
 };
