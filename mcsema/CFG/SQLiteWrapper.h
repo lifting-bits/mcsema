@@ -196,6 +196,43 @@ struct Connection {
   }
 };
 
+
+struct CacheBucket;
+
+struct with_stmt {
+  using stmt_ptr = sqlite3_stmt *;
+
+  stmt_ptr stmt;
+
+  with_stmt() = default;
+  with_stmt( stmt_ptr s ) : stmt( s ) {}
+};
+
+struct owned_stmt : with_stmt {
+
+  using with_stmt::with_stmt;
+  using destroy_t = std::function<void(stmt_ptr)>;
+  destroy_t destroy;
+
+  owned_stmt( stmt_ptr s, destroy_t d ) : with_stmt( s ), destroy( d ) {}
+  owned_stmt( const owned_stmt& ) = delete;
+  owned_stmt( owned_stmt &&other )
+    : with_stmt( std::move( other.stmt ) ),
+      destroy( std::move( other.destroy ) )
+  {}
+
+  owned_stmt &operator=( owned_stmt other ) {
+    if ( this != &other ) {
+      using std::swap;
+      swap( stmt, other.stmt );
+      swap( destroy, other.destroy );
+    }
+    return *this;
+  }
+
+  ~owned_stmt();
+};
+
 // QueryResult corresponds to the results of a query executed by query().
 // Results can be stepped through row-by-row by invoking the QueryResult
 // directly.  When a QueryResult gets destroyed, the prepared statement is
@@ -638,6 +675,12 @@ private:
 
 inline auto Database::transactionGuard(void) {
     return TransactionGuard(*this);
+}
+
+inline owned_stmt::~owned_stmt() {
+  if ( destroy && stmt ) {
+    destroy( stmt );
+  }
 }
 
 } // namespace sqlite
