@@ -416,22 +416,75 @@ class QueryResult {
     return true;
   }
 
-  using PutCallbackType = std::function<void(sqlite3_stmt *)>;
-
-  QueryResult(sqlite3_stmt *stmt_, PutCallbackType put_cb_)
-      : stmt(stmt_), put_cb(put_cb_) {
+  QueryResult( owned_stmt &&owned ) : owned_stmt( std::move( owned ) ) {
     ret = sqlite3_step(stmt);
   }
 
   QueryResult(const QueryResult &) = delete;
   QueryResult &operator=(const QueryResult &) = delete;
 
-  sqlite3_stmt *stmt = nullptr;
-  PutCallbackType put_cb;
   int ret = -1;
   bool first_invocation = true;
 
 };
+
+
+
+template<typename Stmt>
+struct Statement_ : Stmt {
+
+  using Stmt::Stmt;
+  using Self_t = Statement_<Stmt>;
+
+  // Prepare or reuse a statement corresponding to the query string QUERY_STR,
+  // binding BIND_ARGS to the parameters ?1, ?2, ..., of the statement.
+  // Returns a QueryResult object, with which one can step through the results
+  // returned by the query.
+  template<typename ...Ts>
+  Self_t &Bind(Ts &&...bind_args) {
+    int idx = 1;
+
+    auto bind_dispatcher = [ & ] (const auto &arg, auto &self) {
+      using arg_t = std::decay_t<decltype(arg)>;
+      if constexpr (std::is_integral_v<arg_t>) {
+        sqlite3_bind_int64(this->stmt, idx, arg);
+      } else if constexpr (std::is_same_v<const char *, arg_t> ||
+                           std::is_same_v<char *, arg_t>) {
+        sqlite3_bind_text(this->stmt, idx, arg, strlen(arg), SQLITE_STATIC);
+      } else if constexpr (std::is_same_v<std::string, arg_t>) {
+        sqlite3_bind_text(this->stmt, idx, &arg[0], arg.size(), SQLITE_STATIC);
+      } else if constexpr (std::is_same_v<blob, arg_t> ||
+                           std::is_same_v<blob_view, arg_t>) {
+        sqlite3_bind_blob(this->stmt, idx, &arg[0], arg.size(), SQLITE_STATIC);
+      } else if constexpr (std::is_same_v<std::nullopt_t, arg_t>) {
+        sqlite3_bind_null(this->stmt, idx);
+      } else if constexpr (detail::is_std_optional_type<arg_t>) {
+        if (arg) {
+          self(*arg, self);
+          return;
+        } else {
+          sqlite3_bind_null(this->stmt, idx);
+        }
+      } else if constexpr (std::is_null_pointer_v<arg_t>){
+        sqlite3_bind_null(this->stmt, idx);
+      } else {
+        static_assert(detail::dependent_false<arg_t>);
+      }
+      idx++;
+
+    };
+    (bind_dispatcher(std::forward<Ts>(bind_args), bind_dispatcher), ...);
+
+    return *this;
+  }
+
+  QueryResult Execute() {
+    return QueryResult( std::move( *this ) );
+  }
+
+};
+
+using Statement = Statement_<owned_stmt>;
 
 struct CacheBucket {
 
