@@ -436,152 +436,129 @@ class QueryResult {
 
 };
 
+// The `PreparedStmtCache` is a cache of available prepared statements for
+// reuse corresponding to the query given by `query_str`.
+template <const auto &query_str>
+class PreparedStmtCache {
 
-
-template <const auto &db_name>
-class Database {
  public:
-  // This hook is called every time a connection is made, taking as argument
-  // the database handle corresponding to the new connection.
+  static inline void put_tls(sqlite3_stmt *stmt, Connection &connection) {
+    singleton_tls(connection).internal_put(stmt);
+  }
+
+  static inline sqlite3_stmt *get_tls(Connection &connection) {
+    return singleton_tls(connection).internal_get();
+  }
 
  private:
+  PreparedStmtCache(Connection &connection)
+    : _connection(connection),
+      first_free_stmt(nullptr), other_free_stmts() { }
 
-  // The connection to the database at `db_name` is thread-local.
-  static Connection &connection_tls(void) {
-    static thread_local Connection object (std::string(detail::maybe_invoke(db_name)));
+  ~PreparedStmtCache(void) {
+    sqlite3_finalize(first_free_stmt);
+    for (auto stmt : other_free_stmts) {
+      sqlite3_finalize(stmt);
+    }
+  }
+
+  static PreparedStmtCache<query_str> &singleton_tls(Connection &connection) {
+    static thread_local PreparedStmtCache<query_str> object(connection);
     return object;
   }
 
-  // The `PreparedStmtCache` is a cache of available prepared statements for
-  // reuse corresponding to the query given by `query_str`.
-  template <const auto &query_str>
-  class PreparedStmtCache {
-   public:
-    static inline void put_tls(sqlite3_stmt *stmt) {
-      singleton_tls().internal_put(stmt);
-    }
-
-    static inline sqlite3_stmt *get_tls(void) {
-      return singleton_tls().internal_get();
-    }
-
-   private:
-    PreparedStmtCache(void)
-      : db_handle(connection_tls().db_handle),
-        first_free_stmt(nullptr), other_free_stmts() { }
-
-    ~PreparedStmtCache(void) {
-      sqlite3_finalize(first_free_stmt);
-      for (auto stmt : other_free_stmts) {
-        sqlite3_finalize(stmt);
+  sqlite3_stmt *internal_get(void) {
+    if (first_free_stmt != nullptr) {
+      sqlite3_stmt *stmt = nullptr;
+      std::swap(first_free_stmt, stmt);
+      return stmt;
+    } else if (!other_free_stmts.empty()) {
+      sqlite3_stmt *stmt = other_free_stmts.back();
+      other_free_stmts.pop_back();
+      return stmt;
+    } else {
+      static const auto saved_query_str = detail::maybe_invoke(query_str);
+      // If no prepared statement is available for reuse, make a new one.
+      sqlite3_stmt *stmt;
+      std::string_view query_str_view = saved_query_str;
+      auto ret = sqlite3_prepare_v3(_connection.db_handle,
+                                    query_str_view.data(),
+                                    query_str_view.length() + 1,
+                                    SQLITE_PREPARE_PERSISTENT,
+                                    &stmt, nullptr);
+      if (ret != SQLITE_OK) {
+        throw error{ret};
       }
+      return stmt;
     }
+  }
 
-    static PreparedStmtCache<query_str> &singleton_tls() {
-      static thread_local PreparedStmtCache<query_str> object;
-      return object;
+  // This is called by the row fetcher returned by query<query_str, ...>().
+  void internal_put(sqlite3_stmt *stmt) {
+    if (first_free_stmt == nullptr) {
+      first_free_stmt = stmt;
+    } else {
+      other_free_stmts.push_back(stmt);
     }
+  }
 
-    sqlite3_stmt *internal_get(void) {
-      if (first_free_stmt != nullptr) {
-        sqlite3_stmt *stmt = nullptr;
-        std::swap(first_free_stmt, stmt);
-        return stmt;
-      } else if (!other_free_stmts.empty()) {
-        sqlite3_stmt *stmt = other_free_stmts.back();
-        other_free_stmts.pop_back();
-        return stmt;
-      } else {
-        static const auto saved_query_str = detail::maybe_invoke(query_str);
-        // If no prepared statement is available for reuse, make a new one.
-        sqlite3_stmt *stmt;
-        std::string_view query_str_view = saved_query_str;
-        auto ret = sqlite3_prepare_v3(db_handle,
-                                      query_str_view.data(),
-                                      query_str_view.length() + 1,
-                                      SQLITE_PREPARE_PERSISTENT,
-                                      &stmt, nullptr);
-        if (ret != SQLITE_OK) {
-          throw error{ret};
-        }
-        return stmt;
-      }
-    }
+  Connection &_connection;
+  sqlite3_stmt *first_free_stmt;
+  std::vector<sqlite3_stmt *> other_free_stmts;
+};
 
-    // This is called by the row fetcher returned by query<query_str, ...>().
-    void internal_put(sqlite3_stmt *stmt) {
-      if (first_free_stmt == nullptr) {
-        first_free_stmt = stmt;
-      } else {
-        other_free_stmts.push_back(stmt);
-      }
-    }
+class Database {
+public:
 
-    sqlite3 *db_handle;
-    sqlite3_stmt *first_free_stmt;
-    std::vector<sqlite3_stmt *> other_free_stmts;
-  };
+  Database(const std::string &name)
+    : _db_name(name), _connection(name) {}
 
- public:
-
+public:
   // Prepare or reuse a statement corresponding to the query string QUERY_STR,
   // binding BIND_ARGS to the parameters ?1, ?2, ..., of the statement.
   // Returns a QueryResult object, with which one can step through the results
   // returned by the query.
   template <const auto &query_str, typename... Ts>
-  static QueryResult query(Ts &&...bind_args) {
-    // If we need to use any user-defined conversion functions, perform the
-    // conversions and recursively call query() with the converted arguments.
-    if constexpr (((user_serialize_fn<std::decay_t<Ts>> != nullptr) || ...)) {
-      auto maybe_serialize = [] (auto &&arg) -> decltype(auto) {
-        using arg_t = std::decay_t<decltype(arg)>;
-        if constexpr (user_serialize_fn<arg_t> != nullptr) {
-          return user_serialize_fn<arg_t>(std::forward<decltype(arg)>(arg));
+  QueryResult query(Ts &&...bind_args) {
+    auto stmt = PreparedStmtCache<query_str>::get_tls(_connection);
+
+    // Via the fold expression right below, `bind_dispatcher` is called on
+    // each argument passed in to `query()` and binds the argument to the
+    // statement according to the argument's type, using the correct SQL C
+    // API function.
+    int idx = 1;
+    auto bind_dispatcher = [&stmt, &idx] (const auto &arg, auto &self) {
+
+      using arg_t = std::decay_t<decltype(arg)>;
+      if constexpr (std::is_integral_v<arg_t>) {
+        sqlite3_bind_int64(stmt, idx, arg);
+      } else if constexpr (std::is_same_v<const char *, arg_t> ||
+                           std::is_same_v<char *, arg_t>) {
+        sqlite3_bind_text(stmt, idx, arg, strlen(arg), SQLITE_STATIC);
+      } else if constexpr (std::is_same_v<std::string, arg_t>) {
+        sqlite3_bind_text(stmt, idx, &arg[0], arg.size(), SQLITE_STATIC);
+      } else if constexpr (std::is_same_v<blob, arg_t> ||
+                           std::is_same_v<blob_view, arg_t>) {
+        sqlite3_bind_blob(stmt, idx, &arg[0], arg.size(), SQLITE_STATIC);
+      } else if constexpr (std::is_same_v<std::nullopt_t, arg_t>) {
+        sqlite3_bind_null(stmt, idx);
+      } else if constexpr (detail::is_std_optional_type<arg_t>) {
+        if (arg) {
+          self(*arg, self);
+          return;
         } else {
-          return std::forward<decltype(arg)>(arg);
-        }
-      };
-      return query<query_str>(maybe_serialize(std::forward<Ts>(bind_args))...);
-    } else {
-      sqlite3_stmt *stmt = PreparedStmtCache<query_str>::get_tls();
-
-      // Via the fold expression right below, `bind_dispatcher` is called on
-      // each argument passed in to `query()` and binds the argument to the
-      // statement according to the argument's type, using the correct SQL C
-      // API function.
-      int idx = 1;
-      auto bind_dispatcher = [stmt, &idx] (const auto &arg, auto &self) {
-
-        using arg_t = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_integral_v<arg_t>) {
-          sqlite3_bind_int64(stmt, idx, arg);
-        } else if constexpr (std::is_same_v<const char *, arg_t> ||
-                             std::is_same_v<char *, arg_t>) {
-          sqlite3_bind_text(stmt, idx, arg, strlen(arg), SQLITE_STATIC);
-        } else if constexpr (std::is_same_v<std::string, arg_t>) {
-          sqlite3_bind_text(stmt, idx, &arg[0], arg.size(), SQLITE_STATIC);
-        } else if constexpr (std::is_same_v<blob, arg_t> ||
-                             std::is_same_v<blob_view, arg_t>) {
-          sqlite3_bind_blob(stmt, idx, &arg[0], arg.size(), SQLITE_STATIC);
-        } else if constexpr (std::is_same_v<std::nullopt_t, arg_t>) {
           sqlite3_bind_null(stmt, idx);
-        } else if constexpr (detail::is_std_optional_type<arg_t>) {
-          if (arg) {
-            self(*arg, self);
-            return;
-          } else {
-            sqlite3_bind_null(stmt, idx);
-          }
-        } else if constexpr (std::is_null_pointer_v<arg_t>){
-          sqlite3_bind_null(stmt, idx);
-        } else {
-          static_assert(detail::dependent_false<arg_t>);
         }
-        idx++;
+      } else if constexpr (std::is_null_pointer_v<arg_t>){
+        sqlite3_bind_null(stmt, idx);
+      } else {
+        static_assert(detail::dependent_false<arg_t>);
+      }
+      idx++;
 
-      };
-      (void)bind_dispatcher;
-      (bind_dispatcher(std::forward<Ts>(bind_args), bind_dispatcher), ...);
+    };
+    (void)bind_dispatcher;
+    (bind_dispatcher(std::forward<Ts>(bind_args), bind_dispatcher), ...);
 
     auto put_tls = [&]( auto s ) {
       return PreparedStmtCache<query_str>::put_tls(s, _connection);
@@ -589,72 +566,85 @@ class Database {
     return QueryResult(stmt, put_tls);
   }
 
-  // A TransactionGuard object starts a SQLite transaction when constructed,
-  // and when destructed either commits or rolls back the transaction,
-  // depending on whether the object is being destroyed as a result of stack
-  // unwinding caused by an uncaught exception.
-  class TransactionGuard {
-   public:
-    TransactionGuard() {
-      beginTransaction();
-      transaction_active = true;
+  auto transactionGuard(void);
+
+private:
+
+  Connection _connection;
+  std::string _db_name;
+};
+
+
+// A TransactionGuard object starts a SQLite transaction when constructed,
+// and when destructed either commits or rolls back the transaction,
+// depending on whether the object is being destroyed as a result of stack
+// unwinding caused by an uncaught exception.
+class TransactionGuard {
+public:
+
+  void rollback() {
+    if (!transaction_active) {
+      throw error{SQLITE_ERROR};
     }
+    rollbackTransaction();
+    transaction_active = false;
+  }
 
-    ~TransactionGuard() {
-      if (!transaction_active)
-        return;
-      if (std::uncaught_exceptions() == uncaught_exception_count) {
-        commit();
-      } else {
-        rollback();
-      }
+  void commit() {
+    if (!transaction_active) {
+      throw error{SQLITE_ERROR};
     }
+    commitTransaction();
+    transaction_active = false;
+  }
 
-    void rollback() {
-      if (!transaction_active) {
-        throw error{SQLITE_ERROR};
-      }
-      rollbackTransaction();
-      transaction_active = false;
+  TransactionGuard(const TransactionGuard &) = delete;
+  TransactionGuard &operator=(const TransactionGuard &) = delete;
+
+private:
+
+  TransactionGuard(Database &db) : _db(db) {
+    beginTransaction();
+    transaction_active = true;
+  }
+
+  ~TransactionGuard() {
+    if (!transaction_active)
+      return;
+    if (std::uncaught_exceptions() == uncaught_exception_count) {
+      commit();
+    } else {
+      rollback();
     }
-
-    void commit() {
-      if (!transaction_active) {
-        throw error{SQLITE_ERROR};
-      }
-      commitTransaction();
-      transaction_active = false;
-    }
-
-    TransactionGuard(const TransactionGuard &) = delete;
-    TransactionGuard &operator=(const TransactionGuard &) = delete;
-
-   private:
-    const int uncaught_exception_count = std::uncaught_exceptions();
-    bool transaction_active;
-  };
-
-  static auto transactionGuard(void) {
-    return TransactionGuard();
   }
 
   // Begin a SQLite transaction.
-  static void beginTransaction(void) {
+  void beginTransaction(void) {
     static const char begin_transaction_query[] = "begin transaction";
-    query<begin_transaction_query>();
+    _db.query<begin_transaction_query>();
   }
 
   // Commit the active SQLite transaction.
-  static void commitTransaction(void) {
+  void commitTransaction(void) {
     static const char commit_transaction_query[] = "commit transaction";
-    query<commit_transaction_query>();
+    _db.query<commit_transaction_query>();
   }
 
   // Roll back the active SQLite transaction.
-  static void rollbackTransaction(void) {
+  void rollbackTransaction(void) {
     static const char rollback_transaction_query[] = "rollback transaction";
-    query<rollback_transaction_query>();
+    _db.query<rollback_transaction_query>();
   }
+
+  friend Database;
+
+  Database &_db;
+  const int uncaught_exception_count = std::uncaught_exceptions();
+  bool transaction_active;
 };
+
+inline auto Database::transactionGuard(void) {
+    return TransactionGuard(*this);
+}
 
 } // namespace sqlite
