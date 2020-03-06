@@ -94,36 +94,6 @@ inline constexpr bool is_one_of_v = is_one_of<T, Ts...>::value;
 
 } // namespace detail
 
-// Define an explicit specialization `user_serialize_fn<T>` or perhaps
-// `user_serialize_fn<T, std::enable_if_t<...>>` if you want to be able to pass
-// objects of type `T` to `query()` invocations.  The specialization should be
-// a function that takes as argument a `T` object and whose return type is one
-// which is already convertible e.g. an integral type, an
-// `std::optional<std::string>`, etc.
-
-template <typename T, typename = void>
-constexpr auto user_serialize_fn = nullptr;
-
-// This explicit specialization allows binding `std::optional<T>` when `T` is a
-// convertible user type.
-template <typename T>
-constexpr auto user_serialize_fn<std::optional<T>,
-                                 std::enable_if_t<user_serialize_fn<T> != nullptr>>
-  = [] (const std::optional<T> &arg) {
-    return (arg ? std::make_optional(user_serialize_fn<T>(*arg))
-                : std::nullopt);
-  };
-
-// Define an explicit specialization `user_deserialize_fn<T>` or perhaps
-// `user_deserialize_fn<T, std::enable_if_t<...>>` if you want to be able
-// convert SQLite result values to `T` objects, allowing you to pass objects of
-// type `T` to QueryResult invocations.  The specialization should be a
-// function whose argument type is something that we know how to convert an
-// SQLite value to, and whose return type is an object of type `T`.
-template <typename T, typename = void>
-constexpr auto user_deserialize_fn = nullptr;
-
-
 // This class behaves just like `std::string`, except that we bind values of
 // this type as BLOBs rather than TEXT.
 class blob : public std::string {
@@ -399,14 +369,6 @@ class QueryResult {
           arg = std::move(nonnull_arg);
           return;
         }
-      } else if constexpr (user_deserialize_fn<arg_t> != nullptr) {
-        auto *fn_ptr = +user_deserialize_fn<arg_t>;
-        using fn_info = detail::get_fn_info<decltype(fn_ptr)>;
-        using from_type = typename fn_info::template arg_type<0>;
-        std::decay_t<from_type> from_arg;
-        self(from_arg, self);
-        arg = fn_ptr(std::move(from_arg));
-        return;
       } else {
         static_assert(detail::dependent_false<arg_t>);
       }
