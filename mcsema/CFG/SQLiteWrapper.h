@@ -238,14 +238,13 @@ struct owned_stmt : with_stmt {
 // directly.  When a QueryResult gets destroyed, the prepared statement is
 // cleaned up and gets placed into the prepared-statement cache it came from
 // for later reuse.
-class QueryResult {
+class QueryResult : owned_stmt {
  public:
   QueryResult() = default;
 
   QueryResult &operator=(QueryResult &&other) {
     if (this != &other) {
-      std::swap(stmt, other.stmt);
-      std::swap(put_cb, other.put_cb);
+      owned_stmt::operator=(std::move(other));
       std::swap(ret, other.ret);
       std::swap(first_invocation, other.first_invocation);
     }
@@ -254,17 +253,9 @@ class QueryResult {
 
   QueryResult(QueryResult &&other) {
     using std::swap;
-    swap(stmt, other.stmt);
-    swap(put_cb, other.put_cb);
+    owned_stmt::operator=(std::move(other));
     swap(ret, other.ret);
     swap(first_invocation, other.first_invocation);
-  }
-
-  ~QueryResult() {
-    if (stmt == nullptr) {
-      return;
-    }
-    put_cb(stmt);
   }
 
   // Returns the SQLite result code of the most recent call to sqlite3_step()
