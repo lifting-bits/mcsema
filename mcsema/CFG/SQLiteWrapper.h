@@ -158,8 +158,6 @@ public:
 
 namespace detail {
 
-inline std::vector<std::function<void(sqlite3 *)>> function_creation_hooks;
-
 template <typename T>
 struct decay_tuple_args {
   static_assert(dependent_false<T>);
@@ -173,7 +171,9 @@ struct decay_tuple_args<std::tuple<Ts...>> {
 } // namespace detail
 
 using hook_t = void(*)(sqlite3 *);
+using hooks_t = std::vector< hook_t >;
 
+class TransactionGuard;
 
 struct Connection {
   sqlite3 *db_handle;
@@ -181,7 +181,8 @@ struct Connection {
   Connection(const Connection &) = delete;
   Connection &operator=(const Connection &) = delete;
 
-  Connection(const std::string &db_name, hook_t post_connection_hook = nullptr) {
+  Connection(const std::string &db_name,
+             const hooks_t &post_connection_hooks = {}) {
     // Since each thread has its own exclusive connection to the database, we
     // can safely set SQLITE_CONFIG_MULTITHREAD so that SQLite may assume
     // the database will not be accessed from the same connection by two
@@ -210,12 +211,8 @@ struct Connection {
         },
         nullptr);
 
-    if (post_connection_hook) {
-      post_connection_hook(db_handle);
-    }
-
-    for (auto &function_creation_hook : detail::function_creation_hooks) {
-      function_creation_hook(db_handle);
+    for (auto &post_hook : post_connection_hooks ) {
+      post_hook(db_handle);
     }
   }
 
