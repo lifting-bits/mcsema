@@ -419,9 +419,9 @@ class QueryResult {
     return true;
   }
 
-  using PutCallbackType = void (sqlite3_stmt *);
+  using PutCallbackType = std::function<void(sqlite3_stmt *)>;
 
-  QueryResult(sqlite3_stmt *stmt_, PutCallbackType *put_cb_)
+  QueryResult(sqlite3_stmt *stmt_, PutCallbackType put_cb_)
       : stmt(stmt_), put_cb(put_cb_) {
     ret = sqlite3_step(stmt);
   }
@@ -430,7 +430,7 @@ class QueryResult {
   QueryResult &operator=(const QueryResult &) = delete;
 
   sqlite3_stmt *stmt = nullptr;
-  PutCallbackType *put_cb = nullptr;
+  PutCallbackType put_cb;
   int ret = -1;
   bool first_invocation = true;
 
@@ -583,8 +583,10 @@ class Database {
       (void)bind_dispatcher;
       (bind_dispatcher(std::forward<Ts>(bind_args), bind_dispatcher), ...);
 
-      return QueryResult(stmt, &PreparedStmtCache<query_str>::put_tls);
-    }
+    auto put_tls = [&]( auto s ) {
+      return PreparedStmtCache<query_str>::put_tls(s, _connection);
+    };
+    return QueryResult(stmt, put_tls);
   }
 
   // A TransactionGuard object starts a SQLite transaction when constructed,
