@@ -33,10 +33,10 @@ static inline std::string Name() {
 // General context every object of front API has. Handles db and cache.
 class Context {
 public:
-  Context(const std::string &db_name) : _db_name(db_name) {}
+  Context(const std::string &db_name) : _db_name(db_name), db(db_name) {}
 
-  using DB_t = sqlite::Database<Name>;
-  using Result_t = sqlite::Database<Name>::QueryResult;
+  using DB_t = sqlite::Database;
+  using Result_t = sqlite::QueryResult;
   std::string _db_name;
   DB_t db;
   mcsema::ws::MemoryRangeCache<DB_t> cache = ( db );
