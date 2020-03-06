@@ -457,29 +457,13 @@ struct CacheBucket {
 
 // The `PreparedStmtCache` is a cache of available prepared statements for
 // reuse corresponding to the query given by `query_str`.
-template <const auto &query_str>
 class PreparedStmtCache {
 
- public:
-
-  static inline void put_tls(sqlite3_stmt *stmt, Connection &connection) {
-    singleton_tls(connection).internal_put(stmt);
-  }
-
-  static inline sqlite3_stmt *get_tls(Connection &connection) {
-    return singleton_tls(connection).internal_get();
-  }
-
- private:
+public:
   PreparedStmtCache(Connection &connection) : _connection(connection) {}
 
-
-  static PreparedStmtCache<query_str> &singleton_tls(Connection &connection) {
-    static thread_local PreparedStmtCache<query_str> object(connection);
-    return object;
-  }
-
-  sqlite3_stmt *internal_get(void) {
+  template<const auto &query_str>
+  sqlite3_stmt *get(void) {
     auto key = std::string( detail::maybe_invoke(query_str) );
     if (!cache.count(key)) {
       cache.emplace( key, CacheBucket(_connection, key) );
@@ -488,11 +472,13 @@ class PreparedStmtCache {
   }
 
   // This is called by the row fetcher returned by query<query_str, ...>().
-  void internal_put(sqlite3_stmt *stmt) {
+  template<const auto &query_str>
+  void put(sqlite3_stmt *stmt) {
     auto key = std::string( detail::maybe_invoke(query_str) );
     return cache.at( key ).put( stmt );
   }
 
+private:
   using cache_t = std::unordered_map<std::string, CacheBucket >;
   cache_t cache;
 
@@ -503,7 +489,7 @@ class Database {
 public:
 
   Database(const std::string &name)
-    : _db_name(name), _connection(name) {}
+    : _db_name(name), _connection(name), _stmt_cache(_connection) {}
 
 public:
   // Prepare or reuse a statement corresponding to the query string QUERY_STR,
@@ -512,7 +498,7 @@ public:
   // returned by the query.
   template <const auto &query_str, typename... Ts>
   QueryResult query(Ts &&...bind_args) {
-    auto stmt = PreparedStmtCache<query_str>::get_tls(_connection);
+    auto stmt = _stmt_cache.template get<query_str>();
 
     // Via the fold expression right below, `bind_dispatcher` is called on
     // each argument passed in to `query()` and binds the argument to the
@@ -553,7 +539,7 @@ public:
     (bind_dispatcher(std::forward<Ts>(bind_args), bind_dispatcher), ...);
 
     auto put_tls = [&]( auto s ) {
-      return PreparedStmtCache<query_str>::put_tls(s, _connection);
+      return _stmt_cache.template put<query_str>(s);
     };
     return QueryResult(stmt, put_tls);
   }
@@ -564,6 +550,7 @@ private:
 
   Connection _connection;
   std::string _db_name;
+  PreparedStmtCache _stmt_cache;
 };
 
 
