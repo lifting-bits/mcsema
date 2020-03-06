@@ -227,8 +227,6 @@ class QueryResult {
     if (stmt == nullptr) {
       return;
     }
-    sqlite3_clear_bindings(stmt);
-    sqlite3_reset(stmt);
     put_cb(stmt);
   }
 
@@ -441,6 +439,9 @@ struct CacheBucket {
 
   // This is called by the row fetcher returned by query<query_str, ...>().
   void put(sqlite3_stmt *stmt) {
+    sqlite3_clear_bindings(stmt);
+    sqlite3_reset(stmt);
+
     if (first_free_stmt == nullptr) {
       first_free_stmt = stmt;
     } else {
