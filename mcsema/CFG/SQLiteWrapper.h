@@ -398,12 +398,70 @@ class QueryResult {
 
 };
 
+struct CacheBucket {
+
+  CacheBucket(Connection &connection, std::string query)
+    : query_str( query ),
+      _connection(connection)
+  {}
+
+  ~CacheBucket(void) {
+    sqlite3_finalize(first_free_stmt);
+    for (auto stmt : other_free_stmts) {
+      sqlite3_finalize(stmt);
+    }
+  }
+
+  sqlite3_stmt *get(void) {
+    if (first_free_stmt != nullptr) {
+      sqlite3_stmt *stmt = nullptr;
+      std::swap(first_free_stmt, stmt);
+      return stmt;
+    }
+
+    if (!other_free_stmts.empty()) {
+      sqlite3_stmt *stmt = other_free_stmts.back();
+      other_free_stmts.pop_back();
+      return stmt;
+    }
+
+    // If no prepared statement is available for reuse, make a new one.
+    sqlite3_stmt *stmt;
+    std::string_view query_str_view = query_str;
+    auto ret = sqlite3_prepare_v3(_connection.db_handle,
+                                  query_str_view.data(),
+                                  query_str_view.length() + 1,
+                                  SQLITE_PREPARE_PERSISTENT,
+                                  &stmt, nullptr);
+    if (ret != SQLITE_OK) {
+      throw error{ret};
+    }
+    return stmt;
+  }
+
+  // This is called by the row fetcher returned by query<query_str, ...>().
+  void put(sqlite3_stmt *stmt) {
+    if (first_free_stmt == nullptr) {
+      first_free_stmt = stmt;
+    } else {
+      other_free_stmts.push_back(stmt);
+    }
+  }
+
+  std::string query_str;
+  Connection &_connection;
+  sqlite3_stmt *first_free_stmt = nullptr;
+  std::vector<sqlite3_stmt *> other_free_stmts;
+
+};
+
 // The `PreparedStmtCache` is a cache of available prepared statements for
 // reuse corresponding to the query given by `query_str`.
 template <const auto &query_str>
 class PreparedStmtCache {
 
  public:
+
   static inline void put_tls(sqlite3_stmt *stmt, Connection &connection) {
     singleton_tls(connection).internal_put(stmt);
   }
@@ -413,16 +471,8 @@ class PreparedStmtCache {
   }
 
  private:
-  PreparedStmtCache(Connection &connection)
-    : _connection(connection),
-      first_free_stmt(nullptr), other_free_stmts() { }
+  PreparedStmtCache(Connection &connection) : _connection(connection) {}
 
-  ~PreparedStmtCache(void) {
-    sqlite3_finalize(first_free_stmt);
-    for (auto stmt : other_free_stmts) {
-      sqlite3_finalize(stmt);
-    }
-  }
 
   static PreparedStmtCache<query_str> &singleton_tls(Connection &connection) {
     static thread_local PreparedStmtCache<query_str> object(connection);
@@ -430,43 +480,23 @@ class PreparedStmtCache {
   }
 
   sqlite3_stmt *internal_get(void) {
-    if (first_free_stmt != nullptr) {
-      sqlite3_stmt *stmt = nullptr;
-      std::swap(first_free_stmt, stmt);
-      return stmt;
-    } else if (!other_free_stmts.empty()) {
-      sqlite3_stmt *stmt = other_free_stmts.back();
-      other_free_stmts.pop_back();
-      return stmt;
-    } else {
-      static const auto saved_query_str = detail::maybe_invoke(query_str);
-      // If no prepared statement is available for reuse, make a new one.
-      sqlite3_stmt *stmt;
-      std::string_view query_str_view = saved_query_str;
-      auto ret = sqlite3_prepare_v3(_connection.db_handle,
-                                    query_str_view.data(),
-                                    query_str_view.length() + 1,
-                                    SQLITE_PREPARE_PERSISTENT,
-                                    &stmt, nullptr);
-      if (ret != SQLITE_OK) {
-        throw error{ret};
-      }
-      return stmt;
+    auto key = std::string( detail::maybe_invoke(query_str) );
+    if (!cache.count(key)) {
+      cache.emplace( key, CacheBucket(_connection, key) );
     }
+    return cache.at( key ).get();
   }
 
   // This is called by the row fetcher returned by query<query_str, ...>().
   void internal_put(sqlite3_stmt *stmt) {
-    if (first_free_stmt == nullptr) {
-      first_free_stmt = stmt;
-    } else {
-      other_free_stmts.push_back(stmt);
-    }
+    auto key = std::string( detail::maybe_invoke(query_str) );
+    return cache.at( key ).put( stmt );
   }
 
+  using cache_t = std::unordered_map<std::string, CacheBucket >;
+  cache_t cache;
+
   Connection &_connection;
-  sqlite3_stmt *first_free_stmt;
-  std::vector<sqlite3_stmt *> other_free_stmts;
 };
 
 class Database {
