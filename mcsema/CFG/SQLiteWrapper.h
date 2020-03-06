@@ -490,17 +490,22 @@ struct CacheBucket {
     }
   }
 
-  sqlite3_stmt *get(std::string_view query_str_view) {
+
+  auto put() {
+    return [ & ](auto s) { put(s); };
+  }
+
+  Statement get(std::string_view query_str_view) {
     if (first_free_stmt != nullptr) {
       sqlite3_stmt *stmt = nullptr;
       std::swap(first_free_stmt, stmt);
-      return stmt;
+      return { stmt, put() };
     }
 
     if (!other_free_stmts.empty()) {
       sqlite3_stmt *stmt = other_free_stmts.back();
       other_free_stmts.pop_back();
-      return stmt;
+      return { stmt, put() };
     }
 
     // If no prepared statement is available for reuse, make a new one.
@@ -513,8 +518,9 @@ struct CacheBucket {
     if (ret != SQLITE_OK) {
       throw error{ret};
     }
-    return stmt;
+    return { stmt, put() };
   }
+
 
   // This is called by the row fetcher returned by query<query_str, ...>().
   void put(sqlite3_stmt *stmt) {
@@ -551,7 +557,7 @@ public:
   }
 
   template<const auto &query_str>
-  sqlite3_stmt *get(void) {
+  Statement get(void) {
     auto key = detail::maybe_invoke(query_str);
     auto &cache = get_cache(key);
     if (!cache.count(key)) {
@@ -587,56 +593,11 @@ public:
     : _db_name(name), _connection(name), _stmt_cache(_connection) {}
 
 public:
-  // Prepare or reuse a statement corresponding to the query string QUERY_STR,
-  // binding BIND_ARGS to the parameters ?1, ?2, ..., of the statement.
-  // Returns a QueryResult object, with which one can step through the results
-  // returned by the query.
+
   template <const auto &query_str, typename... Ts>
   QueryResult query(Ts &&...bind_args) {
     auto stmt = _stmt_cache.template get<query_str>();
-
-    // Via the fold expression right below, `bind_dispatcher` is called on
-    // each argument passed in to `query()` and binds the argument to the
-    // statement according to the argument's type, using the correct SQL C
-    // API function.
-    int idx = 1;
-    auto bind_dispatcher = [&stmt, &idx] (const auto &arg, auto &self) {
-
-      using arg_t = std::decay_t<decltype(arg)>;
-      if constexpr (std::is_integral_v<arg_t>) {
-        sqlite3_bind_int64(stmt, idx, arg);
-      } else if constexpr (std::is_same_v<const char *, arg_t> ||
-                           std::is_same_v<char *, arg_t>) {
-        sqlite3_bind_text(stmt, idx, arg, strlen(arg), SQLITE_STATIC);
-      } else if constexpr (std::is_same_v<std::string, arg_t>) {
-        sqlite3_bind_text(stmt, idx, &arg[0], arg.size(), SQLITE_STATIC);
-      } else if constexpr (std::is_same_v<blob, arg_t> ||
-                           std::is_same_v<blob_view, arg_t>) {
-        sqlite3_bind_blob(stmt, idx, &arg[0], arg.size(), SQLITE_STATIC);
-      } else if constexpr (std::is_same_v<std::nullopt_t, arg_t>) {
-        sqlite3_bind_null(stmt, idx);
-      } else if constexpr (detail::is_std_optional_type<arg_t>) {
-        if (arg) {
-          self(*arg, self);
-          return;
-        } else {
-          sqlite3_bind_null(stmt, idx);
-        }
-      } else if constexpr (std::is_null_pointer_v<arg_t>){
-        sqlite3_bind_null(stmt, idx);
-      } else {
-        static_assert(detail::dependent_false<arg_t>);
-      }
-      idx++;
-
-    };
-    (void)bind_dispatcher;
-    (bind_dispatcher(std::forward<Ts>(bind_args), bind_dispatcher), ...);
-
-    auto put_tls = [&]( auto s ) {
-      return _stmt_cache.template put<query_str>(s);
-    };
-    return QueryResult(stmt, put_tls);
+    return stmt.Bind(std::forward<Ts>(bind_args)...).Execute();
   }
 
   auto transactionGuard(void);
