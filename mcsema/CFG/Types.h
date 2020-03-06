@@ -72,9 +72,11 @@ struct id_based_ops_: _crtp<Self, id_based_ops_>
     return result;
   }
 
-  static std::string _q_get()
+  static std::string_view _q_get()
   {
-    return std::string{ "select * from " } + Self::table_name + " where rowid = ?1";
+    static const std::string query =
+      std::string{ "select * from " } + Self::table_name + " where rowid = ?1";
+    return query;
   }
 
   auto get(uint64_t id)
@@ -82,9 +84,11 @@ struct id_based_ops_: _crtp<Self, id_based_ops_>
     return this->db().template query<_q_get>(id);
   }
 
-  static std::string _q_remove()
+  static std::string_view _q_remove()
   {
-    return std::string{ "delete from " } + Self::table_name + " where rowid = ?1";
+    static const std::string query =
+      std::string{ "delete from " } + Self::table_name + " where rowid = ?1";
+    return query;
   }
 
   auto erase(int64_t id)
@@ -146,9 +150,11 @@ template<typename Self>
 struct has_symtab_name : _crtp<Self, has_symtab_name>
 {
 
-  static std::string q_set_symtabentry() {
-    return std::string{ "UPDATE " } + Self::table_name +
+  static std::string_view q_set_symtabentry() {
+    static const std::string query =
+      std::string{ "UPDATE " } + Self::table_name +
       " SET(symtab_rowid) = (?2) WHERE rowid = ?1";
+    return query;
   }
 
   static std::string q_get_symtabentry() {
