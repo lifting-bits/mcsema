@@ -15,7 +15,7 @@
  */
 #pragma once
 
-#include "mcsema/CFG/sqlCFG.h"
+#include "mcsema/CFG/WS.h"
 
 #include <iostream>
 
@@ -171,9 +171,9 @@ void TryGlobalVars( mcsema::ws::Module &m )
 void run()
 {
   using namespace std::string_literals;
-  // So far Letter_ is the top level class of the API
-  // Letter from frontend to backend with possibly several Modules
-  Letter letter("example.sql");
+  // So far Workspace_ is the top level class of the API
+  // Workspace from frontend to backend with possibly several Modules
+  Workspace letter("mcsema_ws.sql");
 
   // Insert
   letter.CreateSchema();
