@@ -61,7 +61,14 @@ struct QString {
 };
 
 template<typename ...Args>
-struct TypeList {};
+struct TypeList {
+  constexpr static uint64_t size = sizeof ...(Args);
+
+  template<typename ... rhs>
+  constexpr static auto concat( TypeList<rhs...>) {
+    return TypeList<Args..., rhs...>();
+  }
+};
 
 namespace details {
 
