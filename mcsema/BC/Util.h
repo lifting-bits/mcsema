@@ -26,6 +26,8 @@
 
 #include "mcsema/CFG/CFG.h"
 
+#include "remill/BC/Annotate.h"
+
 namespace llvm {
 
 class BasicBlock;
@@ -110,6 +112,14 @@ llvm::FunctionType *LiftedFunctionType(void);
 // Translate `ea` into an LLVM value that is an address that points into the
 // lifted segment associated with `seg`.
 llvm::Constant *LiftEA(const NativeSegment *seg, uint64_t ea);
+
+template<typename Yield>
+void ForEachLifted( llvm::Module &_module, Yield yield ) {
+  using funcs = std::vector<llvm::Function *>;
+  for (auto f : remill::GetFunctionsByOrigin<funcs, remill::LiftedFunction>(_module )) {
+    yield( f );
+  }
+}
 
 }  // namespace mcsema
 
