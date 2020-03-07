@@ -19,7 +19,9 @@
 
 #include <remill/BC/Util.h>
 
-namespace mcsema::info {
+// TODO(lukas): Nested declaration once C++17 is available
+namespace mcsema {
+namespace info {
 
 void Set(const Info &meta, llvm::Function &func) {
   SetMetadata(func, Kinds::ea_kind, std::to_string(meta.ea));
@@ -44,6 +46,7 @@ uint64_t EA(llvm::Function &func) {
   return stoul( as_str );
 }
 
-} // namespace mcsema::info
+} // namespace info
+} // namespace mcsema
 
 
