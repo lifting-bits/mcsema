@@ -54,6 +54,7 @@
 #include "mcsema/BC/Callback.h"
 #include "mcsema/BC/Function.h"
 #include "mcsema/BC/Instruction.h"
+#include "mcsema/BC/Info.h"
 #include "mcsema/BC/Legacy.h"
 #include "mcsema/BC/Lift.h"
 #include "mcsema/BC/Optimize.h"
@@ -1015,7 +1016,10 @@ void DeclareLiftedFunctions(const NativeModule *cfg_module) {
       LOG(INFO)
           << "Already inserted function: " << func_name << ", skipping.";
     }
+
+    info::Set( { cfg_func->name, cfg_func->ea }, *lifted_func );
   }
+
 }
 
 using Calls_t = std::vector<llvm::CallSite>;
