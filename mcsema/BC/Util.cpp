@@ -73,4 +73,28 @@ llvm::Constant *LiftEA(const NativeSegment *cfg_seg, uint64_t ea) {
       llvm::ConstantInt::get(gWordType, offset));
 }
 
+void SetMetadata(llvm::GlobalObject &go,
+                 const std::string &kind, const std::string &val) {
+  if (go.hasMetadata(kind)) {
+    LOG(WARNING) << remill::LLVMThingToString(&go) << " already has metadata of kind: "
+                 << kind;
+  }
+  auto &ctx = go.getContext();
+  auto node = llvm::MDNode::get(ctx, llvm::MDString::get(ctx, val));
+  go.setMetadata(kind, node);
+}
+
+std::string GetMetadata(llvm::GlobalObject &go, const std::string &kind) {
+  auto node = go.getMetadata(kind);
+  if (!node) {
+    return {};
+  }
+
+  CHECK(node->getNumOperands() == 1)
+    << "util::GetMetada does not support nodes with more than one operand";
+
+  return llvm::cast<llvm::MDString>(node)->getString().str();
+}
+
+
 }  // namespace mcsema

@@ -121,6 +121,9 @@ void ForEachLifted( llvm::Module &_module, Yield yield ) {
   }
 }
 
+void SetMetadata(llvm::GlobalObject &go, const std::string &kind, const std::string &val);
+std::string GetMetadata(llvm::GlobalObject &go, const std::string &kind);
+
 }  // namespace mcsema
 
 #endif  // MCSEMA_BC_UTIL_H_
