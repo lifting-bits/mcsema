@@ -93,7 +93,7 @@ std::string GetMetadata(llvm::GlobalObject &go, const std::string &kind) {
   CHECK(node->getNumOperands() == 1)
     << "util::GetMetada does not support nodes with more than one operand";
 
-  return llvm::cast<llvm::MDString>(node)->getString().str();
+  return llvm::cast<llvm::MDString>(node->getOperand(0))->getString().str();
 }
 
 
