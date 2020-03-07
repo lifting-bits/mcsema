@@ -991,6 +991,22 @@ static llvm::Function *LiftFunction(
 
 }  // namespace
 
+void DeclareLiftedFunction(const NativeObject *cfg_func) {
+  const auto &func_name = cfg_func->lifted_name;
+  auto lifted_func = gModule->getFunction(func_name);
+
+  if (lifted_func) {
+    LOG(INFO) << "Already inserted function: " << func_name << ", skipping.";
+    return;
+  }
+
+  lifted_func = remill::DeclareLiftedFunction(gModule.get(), func_name);
+  // make local functions 'static'
+  LOG(INFO) << "Inserted function: " << func_name;
+
+  info::Set( { cfg_func->name, cfg_func->ea }, *lifted_func );
+}
+
 // Declare the lifted functions. This is a separate step from defining
 // functions because it's important that all possible code- and data-cross
 // references are resolved before any data or instructions can use
@@ -1001,25 +1017,8 @@ void DeclareLiftedFunctions(const NativeModule *cfg_module) {
     if (cfg_func->is_external) {
       continue;
     }
-
-    const auto &func_name = cfg_func->lifted_name;
-    auto lifted_func = gModule->getFunction(func_name);
-
-    if (!lifted_func) {
-      lifted_func = remill::DeclareLiftedFunction(gModule.get(), func_name);
-
-      // make local functions 'static'
-      LOG(INFO)
-          << "Inserted function: " << func_name;
-
-    } else {
-      LOG(INFO)
-          << "Already inserted function: " << func_name << ", skipping.";
-    }
-
-    info::Set( { cfg_func->name, cfg_func->ea }, *lifted_func );
+    DeclareLiftedFunction(cfg_func);
   }
-
 }
 
 using Calls_t = std::vector<llvm::CallSite>;
