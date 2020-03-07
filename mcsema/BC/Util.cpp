@@ -75,7 +75,7 @@ llvm::Constant *LiftEA(const NativeSegment *cfg_seg, uint64_t ea) {
 
 void SetMetadata(llvm::GlobalObject &go,
                  const std::string &kind, const std::string &val) {
-  if (go.hasMetadata(kind)) {
+  if (go.getMetadata(kind)) {
     LOG(WARNING) << remill::LLVMThingToString(&go) << " already has metadata of kind: "
                  << kind;
   }
