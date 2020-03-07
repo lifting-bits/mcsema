@@ -22,6 +22,7 @@
 #include <vector>
 
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Module.h>
 
 #include "mcsema/CFG/CFG.h"
 
@@ -44,6 +45,62 @@ extern std::shared_ptr<llvm::LLVMContext> gContext;
 extern llvm::IntegerType *gWordType;
 extern std::unique_ptr<llvm::Module> gModule;
 
+template <typename Self>
+struct LLVMConstants {
+
+  llvm::ConstantInt *i32(int32_t value) {
+    return GetConstantInt(value, 32);
+  }
+
+  llvm::ConstantInt *i64(int64_t value) {
+    return GetConstantInt(value, 64);
+  }
+
+  llvm::ConstantInt *GetConstantInt(int64_t value, int64_t size) {
+    return llvm::ConstantInt::get(
+        llvm::Type::getIntNTy(static_cast<Self &>(*this).context, size), value);
+  }
+
+  llvm::Type *i64_t() {
+    return llvm::Type::getInt64Ty(static_cast<Self &>(*this).context);
+  }
+
+  llvm::Type *i64_ptr_t() {
+    return llvm::Type::getInt64PtrTy(static_cast<Self &>(*this).context);
+  }
+
+  llvm::Type *i_n_ptr_t(uint64_t size) {
+    return llvm::Type::getIntNPtrTy(static_cast<Self &>(*this).context, size);
+  }
+
+  llvm::Type *i8_t() {
+    return llvm::Type::getInt8Ty(static_cast<Self &>(*this).context);
+  }
+
+  llvm::Type *i8P_ptr_t() {
+    return llvm::Type::getInt8PtrTy(static_cast<Self &>(*this).context);
+  }
+
+  llvm::Type *i_n_ty(uint64_t size) {
+    return llvm::Type::getIntNTy(static_cast<Self &>(*this).context, size);
+  }
+
+  llvm::Value *undef(llvm::Type *type) {
+    return llvm::UndefValue::get(type);
+  }
+
+  llvm::Type *ptr(llvm::Type *type, unsigned addr_space=0) {
+    return llvm::PointerType::get(type, addr_space);
+  }
+
+};
+
+template<typename Self>
+struct ModuleUtil {
+  llvm::Function &function(const std::string &name) {
+    return *static_cast<Self &>(*this).module.getFunction(name);
+  }
+};
 
 llvm::Value *GetConstantInt(unsigned size, uint64_t value);
 
