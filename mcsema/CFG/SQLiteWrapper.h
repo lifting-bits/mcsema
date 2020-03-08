@@ -181,7 +181,7 @@ struct Connection {
         },
         nullptr);
 
-    for (auto &post_hook : post_connection_hooks ) {
+    for (auto &post_hook : post_connection_hooks) {
       post_hook(db_handle);
     }
   }
@@ -205,7 +205,7 @@ struct with_stmt {
   stmt_ptr stmt;
 
   with_stmt() = default;
-  with_stmt( stmt_ptr s ) : stmt( s ) {}
+  with_stmt(stmt_ptr s) : stmt(s) {}
 };
 
 struct owned_stmt : with_stmt {
@@ -214,18 +214,18 @@ struct owned_stmt : with_stmt {
   using destroy_t = std::function<void(stmt_ptr)>;
   destroy_t destroy;
 
-  owned_stmt( stmt_ptr s, destroy_t d ) : with_stmt( s ), destroy( d ) {}
-  owned_stmt( const owned_stmt& ) = delete;
-  owned_stmt( owned_stmt &&other )
-    : with_stmt( std::move( other.stmt ) ),
-      destroy( std::move( other.destroy ) )
+  owned_stmt(stmt_ptr s, destroy_t d) : with_stmt(s), destroy(d) {}
+  owned_stmt(const owned_stmt&) = delete;
+  owned_stmt(owned_stmt &&other)
+    : with_stmt(std::move( other.stmt)),
+      destroy(std::move( other.destroy))
   {}
 
-  owned_stmt &operator=( owned_stmt other ) {
-    if ( this != &other ) {
+  owned_stmt &operator=(owned_stmt other) {
+    if (this != &other) {
       using std::swap;
-      swap( stmt, other.stmt );
-      swap( destroy, other.destroy );
+      swap(stmt, other.stmt);
+      swap(destroy, other.destroy);
     }
     return *this;
   }
@@ -407,7 +407,7 @@ class QueryResult : owned_stmt {
     return true;
   }
 
-  QueryResult( owned_stmt &&owned ) : owned_stmt( std::move( owned ) ) {
+  QueryResult(owned_stmt &&owned) : owned_stmt(std::move(owned)) {
     ret = sqlite3_step(stmt);
   }
 
@@ -470,7 +470,7 @@ struct Statement_ : Stmt {
   }
 
   QueryResult Execute() {
-    return QueryResult( std::move( *this ) );
+    return QueryResult(std::move(*this));
   }
 
 };
@@ -556,7 +556,7 @@ public:
 
   template<typename Key>
   auto &get_cache(Key) {
-    if constexpr ( std::is_same_v<Key, std::string_view> )
+    if constexpr (std::is_same_v<Key, std::string_view>)
       return sv_cache;
     else
       return s_cache;
@@ -567,9 +567,9 @@ public:
     auto key = detail::maybe_invoke(query_str);
     auto &cache = get_cache(key);
     if (!cache.count(key)) {
-      cache.emplace( key, CacheBucket( _connection ) );
+      cache.emplace(key, CacheBucket(_connection));
     }
-    return cache.at( key ).get( key );
+    return cache.at(key).get(key);
   }
 
 
@@ -681,8 +681,8 @@ inline auto Database::transactionGuard(void) {
 }
 
 inline owned_stmt::~owned_stmt() {
-  if ( destroy && stmt ) {
-    destroy( stmt );
+  if (destroy && stmt) {
+    destroy(stmt);
   }
 }
 
