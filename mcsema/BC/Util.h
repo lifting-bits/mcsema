@@ -114,10 +114,10 @@ llvm::FunctionType *LiftedFunctionType(void);
 llvm::Constant *LiftEA(const NativeSegment *seg, uint64_t ea);
 
 template<typename Yield>
-void ForEachLifted( llvm::Module &_module, Yield yield ) {
+void ForEachLifted(llvm::Module &_module, Yield yield) {
   using funcs = std::vector<llvm::Function *>;
-  for (auto f : remill::GetFunctionsByOrigin<funcs, remill::LiftedFunction>(_module )) {
-    yield( f );
+  for (auto f : remill::GetFunctionsByOrigin<funcs, remill::LiftedFunction>(_module)) {
+    yield(f);
   }
 }
 
