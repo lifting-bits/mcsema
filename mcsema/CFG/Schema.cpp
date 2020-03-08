@@ -323,8 +323,21 @@ void Schema::CreateSchema(Context &ctx) {
   static Query memory_locations = R"(create table if not exists memory_locations(
         rowid INTEGER PRIMARY KEY,
         register text NOT NULL,
-        offset size))";
+        offset size,
+        UNIQUE(text, size)))";
   db.template query<memory_locations>();
+
+  // TODO: Index
+  static Query value_decls = R"(create table if not exists value_decls(
+        rowid INTEGER PRIMARY KEY,
+        type text NOT NULL,
+        register text,
+        name text,
+        memory_location_rowid integer,
+        FOREIGN(memory_location_rowid) REFERENCES memory_locations (rowid),
+        UNIQUE(type, register, name, memory_location_rowid)
+        ))";
+  db.template query<value_decls>();
 
   CreateNMTables(ctx);
   CreateTriggers(ctx);
