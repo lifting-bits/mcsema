@@ -320,6 +320,12 @@ void Schema::CreateSchema(Context &ctx) {
         FOREIGN KEY(module_rowid) REFERENCES modules(rowid)))";
   db.template query<external_vars>();
 
+  static Query memory_locations = R"(create table if not exists memory_locations(
+        rowid INTEGER PRIMARY KEY,
+        register text NOT NULL,
+        offset size))";
+  db.template query<memory_locations>();
+
   CreateNMTables(ctx);
   CreateTriggers(ctx);
 }
