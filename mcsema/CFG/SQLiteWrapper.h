@@ -566,14 +566,6 @@ public:
     return cache.at( key ).get( key );
   }
 
-  // This is called by the row fetcher returned by query<query_str, ...>().
-  template<const auto &query_str>
-  void put(sqlite3_stmt *stmt) {
-    auto key = detail::maybe_invoke(query_str);
-    auto &cache = get_cache(key);
-    return cache.at( key ).put( stmt );
-  }
-
 
 private:
 
