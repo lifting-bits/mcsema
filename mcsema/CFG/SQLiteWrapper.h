@@ -478,6 +478,7 @@ struct Statement_ : Stmt {
 using Statement = Statement_<owned_stmt>;
 
 struct CacheBucket {
+  using stmt_ptr = sqlite3_stmt *;
 
   CacheBucket(Connection &connection)
     : _connection(connection)
@@ -495,17 +496,18 @@ struct CacheBucket {
     return [ & ](auto s) { put(s); };
   }
 
-  Statement get(std::string_view query_str_view) {
+
+  stmt_ptr get_r(std::string_view query_str_view) {
     if (first_free_stmt != nullptr) {
       sqlite3_stmt *stmt = nullptr;
       std::swap(first_free_stmt, stmt);
-      return { stmt, put() };
+      return stmt;
     }
 
     if (!other_free_stmts.empty()) {
       sqlite3_stmt *stmt = other_free_stmts.back();
       other_free_stmts.pop_back();
-      return { stmt, put() };
+      return stmt;
     }
 
     // If no prepared statement is available for reuse, make a new one.
@@ -518,7 +520,11 @@ struct CacheBucket {
     if (ret != SQLITE_OK) {
       throw error{ret};
     }
-    return { stmt, put() };
+    return stmt;
+  }
+
+  Statement get(std::string_view query_str_view) {
+    return { get_r(query_str_view), put() };
   }
 
 
