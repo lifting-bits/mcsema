@@ -79,7 +79,7 @@ struct LLVMConstants {
     return llvm::Type::getInt8Ty(static_cast<Self &>(*this).context);
   }
 
-  llvm::Type *i8P_ptr_t() {
+  llvm::Type *i8_ptr_t() {
     return llvm::Type::getInt8PtrTy(static_cast<Self &>(*this).context);
   }
 
