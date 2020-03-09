@@ -624,8 +624,10 @@ public:
   void Erase();
 
 private:
-  friend Module;
   using details::Internals::Internals;
+
+  friend class Module;
+  friend details::ObjectIterator_impl;
 };
 
 
@@ -664,18 +666,18 @@ public:
   // which saves query per object. (This should be reasonable optimization)
   WeakDataIterator<SymbolTableEntry> SymbolsData();
 
+  // TODO: With current architecture this is harder than it seems
+  //WeakDataIterator<PreservedRegs> PreservedRegsData();
+
   WeakObjectIterator<Function> Functions();
   WeakObjectIterator<GlobalVar> GlobalVars();
   WeakObjectIterator<ExternalVar> ExternalVars();
-
   WeakObjectIterator<ExternalFunction> ExternalFuncs();
   WeakObjectIterator<MemoryRange> MemoryRanges();
   WeakObjectIterator<Segment> Segments();
-
-  // TODO: This is probably really handy if we allow Erase without removing dependent
-  // objects.
   WeakObjectIterator<BasicBlock> Blocks();
   WeakObjectIterator<BasicBlock> OrphanedBasicBlocks();
+  WeakObjectIterator<PreservedRegs> PreservedRegs();
 
   // FIXME: This should probably also delete all module-binded data?
   // void Erase();

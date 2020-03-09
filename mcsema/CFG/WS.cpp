@@ -860,6 +860,16 @@ PreservedRegs Module::AddPreservedRegs(const PreservedRegs::Ranges &ranges,
   return { impl_t<PreservedRegs>(_ctx).insert(ranges, regs, is_alive, _id), _ctx };
 }
 
+#define DEF_WOBJ_IT(who, what_obj, method) \
+  WeakObjectIterator<what_obj> who::method() { \
+    auto result = Impl(*this, _ctx).ObjIterate<schema::what_obj>(_id); \
+    return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) }; \
+  }
+
+DEF_WOBJ_IT(Module, PreservedRegs, PreservedRegs);
+
+#undef DEF_WOBJ_IT
+
 
 WeakObjectIterator<BasicBlock> Module::OrphanedBasicBlocks() {
   auto result = BasicBlock_{ _ctx }.orphaned();
@@ -1202,5 +1212,7 @@ template struct WeakObjectIterator<BasicBlock>;
 
 template struct WeakDataIterator<CodeXref>;
 template struct WeakObjectIterator<CodeXref>;
+
+template struct WeakObjectIterator<PreservedRegs>;
 
 } // namespace mcsema::ws
