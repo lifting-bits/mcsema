@@ -463,6 +463,82 @@ struct ExceptionFrame_ : schema::ExceptionFrame,
 };
 using ExceptionFrame_impl = ExceptionFrame_<ExceptionFrame>;
 
+template<typename Concrete=PreservedRegs>
+struct PreservedRegs_ : schema::PreservedRegs,
+                        has_context,
+                        id_based_ops_<PreservedRegs_<Concrete>> {
+
+  using has_context::has_context;
+  using id_ops = id_based_ops_<PreservedRegs_<Concrete>>;
+
+  constexpr static Query q_insert =
+    R"(INSERT INTO preserved_regs(module_rowid, is_alive) VALUES(?1, ?2))";
+
+  constexpr static Query q_get =
+    R"(SELECT)";
+
+  int64_t insert(const typename Concrete::Ranges &ranges,
+                 const typename Concrete::Regs &regs,
+                 bool is_alive, int64_t module_rowid) {
+    auto self = this->id_ops::insert(module_rowid, is_alive);
+
+    InsertRegs(self, regs);
+    InsertRanges(self, ranges);
+
+    return self;
+  }
+
+  void InsertRegs(int64_t id, const typename Concrete::Regs &regs) {
+    static constexpr Query q_insert_reg =
+      R"(INSERT INTO preserved_regs_regs(preserved_regs_rowid, reg) VALUES(?1, ?2))";
+    for (auto &reg : regs) {
+      _ctx->db.template query<q_insert_reg>(id, reg);
+    }
+  }
+
+  void InsertRanges(int64_t id, const typename Concrete::Ranges &ranges) {
+    static constexpr Query q_insert_range =
+      R"(INSERT INTO preservation_range(preserved_regs_rowid, begin, end)
+                VALUES(?1, ?2, ?3))";
+    for (auto &[begin, end] : ranges) {
+      _ctx->db.template query<q_insert_range>(id, begin, end);
+    }
+  }
+
+  auto GetRegs(int64_t id) -> typename Concrete::Regs {
+    static constexpr Query q_get_regs =
+      R"(SELECT reg FROM preserved_regs_regs WHERE preserved_regs_rowid = ?1)";
+    auto regs_res = _ctx->db.template query<q_get_regs>(id);
+
+    typename Concrete::Regs out;
+    while (auto c = regs_res.GetScalar<std::string>()) {
+      out.push_back(std::move(*c));
+    }
+    return out;
+
+  }
+
+  auto GetRanges(int64_t id) -> typename Concrete::Ranges {
+    static constexpr Query q_get_ranges =
+      R"(SELECT begin, end FROM preservation_range WHERE preserved_regs_rowid = ?1)";
+    auto ranges_res = _ctx->db.template query<q_get_ranges>(id);
+
+    typename Concrete::Ranges out;
+    while (auto c = ranges_res.Get<int64_t, std::optional<int64_t>>()) {
+      out.emplace_back(std::get<0>(*c), std::get<1>(*c));
+    }
+    return out;
+  }
+
+  auto get(int64_t id) -> typename Concrete::data_t {
+    auto is_alive = _ctx->db.template query<id_ops::_q_get>()
+                            .template GetScalar_r<bool>();
+
+    return {is_alive, GetRegs(id), GetRanges(id)};
+  }
+
+};
+using PreservedRegs_impl = PreservedRegs_<PreservedRegs>;
 
 /* Hardcoding each implementation class in each public object method implementation
  * is tedious and error-prone. Following class provides this mapping at compile time
@@ -540,6 +616,13 @@ template<>
 struct dispatch<ExternalVar> {
   using type = ExternalVar_<ExternalVar>;
   using data_fields = util::TypeList<uint64_t, std::string, uint64_t, bool, bool>;
+};
+
+template<>
+struct dispatch<PreservedRegs> {
+  using type = PreservedRegs_impl;
+  // This is NOT from definition of PreservedRegs::data_t!
+  using data_fields = util::TypeList<bool>;
 };
 
 template<>
@@ -750,6 +833,13 @@ ExternalVar Module::AddExternalVar(uint64_t ea, const std::string &name, uint64_
            _ctx };
 }
 
+PreservedRegs Module::AddPreservedRegs(const PreservedRegs::Ranges &ranges,
+                                       const PreservedRegs::Regs &regs,
+                                       bool is_alive) {
+  return { impl_t<PreservedRegs>(_ctx).insert(ranges, regs, is_alive, _id), _ctx };
+}
+
+
 WeakObjectIterator<BasicBlock> Module::OrphanedBasicBlocks() {
   auto result = BasicBlock_{ _ctx }.orphaned();
   return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
@@ -928,6 +1018,14 @@ std::string ExternalFunction::Name() const {
 
 /* GlobalVar */
 
+/* PreservedRegs */
+void PreservedRegs::AddRanges(const PreservedRegs::Ranges &ranges) {
+  Impl(*this, _ctx).InsertRanges(_id, ranges);
+};
+
+void PreservedRegs::AddRegs(const PreservedRegs::Regs &regs) {
+  Impl(*this, _ctx).InsertRegs(_id, regs);
+}
 
 // Thanks to uniform dispatch each definition of following method looks identical,
 // therefore simple macro can be defined that is more readable.
@@ -955,6 +1053,10 @@ DEFINE_DATA_OPERATOR(ExternalVar);
 /* Erasable */
 
 #undef DEFINE_DATA_OPERATOR
+
+PreservedRegs::data_t PreservedRegs::operator*() const {
+  return impl_t<PreservedRegs>(_ctx).get(_id);
+}
 
 #define DEF_ERASE(self) \
   void self::Erase() { \
