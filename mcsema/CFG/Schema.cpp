@@ -374,8 +374,8 @@ void Schema::CreateSchema(Context &ctx) {
   static Query memory_locations = R"(create table if not exists memory_locations(
         rowid INTEGER PRIMARY KEY,
         register text NOT NULL,
-        offset size,
-        UNIQUE(text, size)))";
+        offset integer,
+        UNIQUE(register, offset)))";
   db.template query<memory_locations>();
 
   // TODO: Index
@@ -385,7 +385,7 @@ void Schema::CreateSchema(Context &ctx) {
         register text,
         name text,
         memory_location_rowid integer,
-        FOREIGN(memory_location_rowid) REFERENCES memory_locations (rowid),
+        FOREIGN KEY(memory_location_rowid) REFERENCES memory_locations (rowid),
         UNIQUE(type, register, name, memory_location_rowid)
         ))";
   db.template query<value_decls>();
