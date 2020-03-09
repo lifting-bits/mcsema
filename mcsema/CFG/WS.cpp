@@ -954,6 +954,8 @@ DEFINE_DATA_OPERATOR(ExternalVar);
 
 /* Erasable */
 
+#undef DEFINE_DATA_OPERATOR
+
 #define DEF_ERASE(self) \
   void self::Erase() { \
     impl_t<decltype(this)>{_ctx}.erase(_id); \
