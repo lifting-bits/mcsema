@@ -307,7 +307,7 @@ namespace details {
       if (!key) {
         return {};
       }
-      return { *key, std::move(ctx) };
+      return { { *key, std::move(ctx) } };
     }
 
     template<typename T, typename Ctx>
