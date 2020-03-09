@@ -530,11 +530,32 @@ struct PreservedRegs_ : schema::PreservedRegs,
     return out;
   }
 
-  auto get(int64_t id) -> typename Concrete::data_t {
-    auto is_alive = _ctx->db.template query<id_ops::_q_get>()
-                            .template GetScalar_r<bool>();
+  bool IsAlive(int64_t id) {
+    static constexpr Query q_is_alive =
+      R"(SELECT is_alive FROM preserved_regs WHERE rowid = ?1)";
+    return _ctx->db.template query<q_is_alive>(id).template GetScalar_r<bool>();
+  }
 
-    return {is_alive, GetRegs(id), GetRanges(id)};
+  auto get(int64_t id) -> typename Concrete::data_t {
+    return {IsAlive(id), GetRegs(id), GetRanges(id)};
+  }
+
+  void erase(int64_t id) {
+    EraseRanges(id);
+    EraseRegs(id);
+    id_ops::erase(id);
+  }
+
+  void EraseRanges(int64_t fk_id) {
+    static constexpr Query q_erase =
+      R"(DELETE FROM preservation_range WHERE preserved_regs_rowid = ?1)";
+    _ctx->db.template query<q_erase>(fk_id);
+  }
+
+  void EraseRegs(int64_t fk_id) {
+    static constexpr Query q_erase =
+      R"(DELETE FROM preserved_regs_regs WHERE preserved_regs_rowid = ?1)";
+    _ctx->db.template query<q_erase>(fk_id);
   }
 
 };
@@ -1073,6 +1094,7 @@ DEF_ERASE(CodeXref)
 DEF_ERASE(DataXref)
 DEF_ERASE(GlobalVar)
 DEF_ERASE(ExternalVar)
+DEF_ERASE(PreservedRegs)
 
 #undef DEF_ERASE
 

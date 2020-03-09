@@ -618,9 +618,10 @@ public:
 
   data_t operator*() const;
 
-  // TODO: Erase
   void AddRanges(const Ranges &range);
   void AddRegs(const Regs &regs);
+
+  void Erase();
 
 private:
   friend Module;
