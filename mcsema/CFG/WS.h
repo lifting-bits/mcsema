@@ -37,6 +37,10 @@ class Segment;
 class SymbolTableEntry;
 class CodeXref;
 class DataXref;
+class MemoryLocation;
+class ValueDecl;
+class FunctionDecl;
+class PreservedRegs;
 
 // Context that represents the file and other helper data part of internal implemenation
 class Context;
@@ -520,6 +524,90 @@ private:
   friend class Function;
 };
 
+class MemoryLocation : public details::Internals {
+public:
+
+  struct data_t {
+    std::string reg;
+    std::optional<int64_t> offset;
+
+    template<typename Stream>
+    friend Stream& operator<<(Stream &os, const data_t &self) {
+      os << self.reg
+         << " offset " << ((self.offset) ? std::to_string(*self.offset) : "(not set)");
+      return os;
+    }
+  };
+
+  data_t operator*() const;
+
+private:
+  using details::Internals::Internals;
+};
+
+class ValueDecl : public details::Internals {
+public:
+
+  struct data_t {
+    std::string type;
+    // std::optional<MemoryLocation>
+    std::optional<std::string> reg;
+    std::optional<std::string> name;
+
+    template<typename Stream>
+    friend Stream &operator<<(Stream &os, const data_t &self) {
+      os << self.type
+         <<  " reg: " << ((self.reg) ? *self.reg : "(not set)")
+         <<  " name: " << ((self.name) ? *self.name : "(not set)");
+      return os;
+    }
+  };
+
+  data_t operator*() const;
+
+private:
+  using details::Internals::Internals;
+};
+
+
+class FuncDecl : public details::Internals {
+public:
+  using ValueDecls = std::vector<ValueDecl>;
+
+  struct data_t {
+    ValueDecl ret_address;
+    ValueDecls params;
+    ValueDecls rets;
+  };
+
+  data_t operator*() const;
+
+private:
+  using details::Internals::Internals;
+};
+
+class PreservedRegs : public details::Internals {
+public:
+  using PreservationRange = std::pair<int64_t, std::optional<int64_t>>;
+  using Ranges = std::vector<PreservationRange>;
+  using Regs = std::vector<std::string>;
+
+  struct data_t {
+    bool is_alive;
+    Regs regs;
+    Ranges ranges;
+  };
+
+  data_t operator*() const;
+
+  void AddRange(const Ranges &range);
+  void SetRegs(const Regs &regs);
+
+private:
+  using details::Internals::Internals;
+};
+
+
 // One object file -- compiled binary or shared library for example.
 class Module : public details::Internals {
 
@@ -544,6 +632,10 @@ public:
                                        const SymbolTableEntry &name,
                                        CallingConv cc,
                                        bool has_return, bool is_weak);
+
+  PreservedRegs AddPreservedRegs(const PreservedRegs::Ranges &ranges,
+                                 const PreservedRegs::Regs &regs,
+                                 bool is_alive);
 
   /* Iteration */
 
@@ -606,16 +698,20 @@ struct Workspace
                              uint64_t ea,
                              std::string_view data);
 
-
-
-
-
   Segment AddSegment(const Module &module,
                      uint64_t ea,
                      uint64_t size,
                      const Segment::Flags &flags,
                      const std::string &name,
                      MemoryRange &mem);
+
+  MemoryLocation AddMemoryLoc(const std::string &reg);
+  MemoryLocation AddMemoryLoc(const std::string &reg, int64_t offset);
+
+  ValueDecl AddValueDecl(const std::string &type,
+                         std::optional<MemoryLocation> mem_loc,
+                         std::optional<std::string> reg,
+                         std::optional<std::string> name);
 
 private:
   std::shared_ptr<Context> _ctx;
