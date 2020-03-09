@@ -561,6 +561,21 @@ struct PreservedRegs_ : schema::PreservedRegs,
 };
 using PreservedRegs_impl = PreservedRegs_<PreservedRegs>;
 
+template<typename Concrete=MemoryLocation>
+struct MemoryLocation_ : schema::MemoryLocation,
+                         has_context,
+                         id_based_ops_<MemoryLocation_<Concrete>> {
+  using has_context::has_context;
+
+  static constexpr Query q_insert =
+    R"(INSERT INTO memory_locations(register, offset) VALUES(?1, ?2))";
+
+  static constexpr Query q_get =
+    R"(SELECT register, offset FROM memory_locations WHERE rowid = ?1)";
+
+};
+using MemoryLocation_impl = MemoryLocation_<MemoryLocation>;
+
 /* Hardcoding each implementation class in each public object method implementation
  * is tedious and error-prone. Following class provides this mapping at compile time
  * and tries to eliminate as much copy-paste code as possible. */
@@ -644,6 +659,12 @@ struct dispatch<PreservedRegs> {
   using type = PreservedRegs_impl;
   // This is NOT from definition of PreservedRegs::data_t!
   using data_fields = util::TypeList<bool>;
+};
+
+template<>
+struct dispatch<MemoryLocation> {
+  using type = MemoryLocation_impl;
+  using data_fields = util::TypeList<std::string, std::optional<int64_t>>;
 };
 
 template<>
@@ -801,6 +822,14 @@ MemoryRange Workspace::AddMemoryRange(const Module &module,
                                       uint64_t ea,
                                       std::string_view data) {
   return AddMemoryRange(module, ea, data.size(), data);
+}
+
+MemoryLocation Workspace::AddMemoryLoc(const std::string &reg) {
+  return { impl_t<MemoryLocation>(_ctx).insert(reg, nullptr), _ctx };
+}
+
+MemoryLocation Workspace::AddMemoryLoc(const std::string &reg, int64_t offset) {
+  return { impl_t<MemoryLocation>(_ctx).insert(reg, offset), _ctx };
 }
 
 /* Module */
@@ -1054,6 +1083,7 @@ DEFINE_DATA_OPERATOR(CodeXref);
 DEFINE_DATA_OPERATOR(DataXref);
 DEFINE_DATA_OPERATOR(GlobalVar);
 DEFINE_DATA_OPERATOR(ExternalVar);
+DEFINE_DATA_OPERATOR(MemoryLocation);
 
 /* Erasable */
 
@@ -1079,6 +1109,7 @@ DEF_ERASE(DataXref)
 DEF_ERASE(GlobalVar)
 DEF_ERASE(ExternalVar)
 DEF_ERASE(PreservedRegs)
+DEF_ERASE(MemoryLocation)
 
 #undef DEF_ERASE
 

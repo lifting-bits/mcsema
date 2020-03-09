@@ -536,15 +536,19 @@ public:
     template<typename Stream>
     friend Stream& operator<<(Stream &os, const data_t &self) {
       os << self.reg
-         << " offset " << ((self.offset) ? std::to_string(*self.offset) : "(not set)");
+         << ", offset: " << ((self.offset) ? std::to_string(*self.offset) : "(not set)");
       return os;
     }
   };
 
   data_t operator*() const;
+  void Erase();
 
 private:
   using details::Internals::Internals;
+
+  friend class Workspace;
+  friend class Module;
 };
 
 class ValueDecl : public details::Internals {
