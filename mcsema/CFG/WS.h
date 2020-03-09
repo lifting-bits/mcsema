@@ -556,23 +556,26 @@ public:
 
   struct data_t {
     std::string type;
-    // std::optional<MemoryLocation>
     maybe_str reg;
     maybe_str name;
+    // TODO
+    // std::optional<MemoryLocation>
 
     template<typename Stream>
     friend Stream &operator<<(Stream &os, const data_t &self) {
       os << self.type
-         <<  " reg: " << ((self.reg) ? *self.reg : "(not set)")
-         <<  " name: " << ((self.name) ? *self.name : "(not set)");
+         <<  ", reg: " << ((self.reg) ? *self.reg : "(not set)")
+         <<  ", name: " << ((self.name) ? *self.name : "(not set)");
       return os;
     }
   };
 
   data_t operator*() const;
+  void Erase();
 
 private:
   using details::Internals::Internals;
+  friend class Workspace;
 };
 
 
@@ -736,9 +739,9 @@ struct Workspace
   MemoryLocation AddMemoryLoc(const std::string &reg, int64_t offset);
 
   ValueDecl AddValueDecl(const std::string &type,
-                         std::optional<MemoryLocation> mem_loc,
                          maybe_str reg,
-                         maybe_str name);
+                         maybe_str name,
+                         std::optional<MemoryLocation> mem_loc);
 
 private:
   std::shared_ptr<Context> _ctx;

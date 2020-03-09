@@ -576,6 +576,23 @@ struct MemoryLocation_ : schema::MemoryLocation,
 };
 using MemoryLocation_impl = MemoryLocation_<MemoryLocation>;
 
+template<typename Concrete=ValueDecl>
+struct ValueDecl_ : schema::ValueDecl,
+                    has_context,
+                    id_based_ops_<ValueDecl_<Concrete>> {
+
+  using has_context::has_context;
+
+  static constexpr Query q_insert =
+    R"(INSERT INTO value_decls(type, register, name, memory_location_rowid)
+              VALUES(?1, ?2, ?3, ?4))";
+
+  static constexpr Query q_get =
+    R"(SELECT type, register, name, memory_location_rowid FROM value_decls
+                                                          WHERE rowid = ?1)";
+};
+using ValueDecl_impl = ValueDecl_<ValueDecl>;
+
 /* Hardcoding each implementation class in each public object method implementation
  * is tedious and error-prone. Following class provides this mapping at compile time
  * and tries to eliminate as much copy-paste code as possible. */
@@ -665,6 +682,12 @@ template<>
 struct dispatch<MemoryLocation> {
   using type = MemoryLocation_impl;
   using data_fields = util::TypeList<std::string, std::optional<int64_t>>;
+};
+
+template<>
+struct dispatch<ValueDecl> {
+  using type = ValueDecl_impl;
+  using data_fields = util::TypeList<std::string, maybe_str, maybe_str>;
 };
 
 template<>
@@ -830,6 +853,16 @@ MemoryLocation Workspace::AddMemoryLoc(const std::string &reg) {
 
 MemoryLocation Workspace::AddMemoryLoc(const std::string &reg, int64_t offset) {
   return { impl_t<MemoryLocation>(_ctx).insert(reg, offset), _ctx };
+}
+
+ValueDecl Workspace::AddValueDecl(const std::string &type,
+                                  maybe_str reg,
+                                  maybe_str name,
+                                  std::optional<MemoryLocation> mem_loc) {
+  if (mem_loc) {
+    return { impl_t<ValueDecl>(_ctx).insert(type, reg, name, mem_loc->_id), _ctx };
+  }
+  return { impl_t<ValueDecl>(_ctx).insert(type, reg, name, nullptr), _ctx };
 }
 
 /* Module */
@@ -1084,6 +1117,7 @@ DEFINE_DATA_OPERATOR(DataXref);
 DEFINE_DATA_OPERATOR(GlobalVar);
 DEFINE_DATA_OPERATOR(ExternalVar);
 DEFINE_DATA_OPERATOR(MemoryLocation);
+DEFINE_DATA_OPERATOR(ValueDecl);
 
 /* Erasable */
 
@@ -1110,6 +1144,7 @@ DEF_ERASE(GlobalVar)
 DEF_ERASE(ExternalVar)
 DEF_ERASE(PreservedRegs)
 DEF_ERASE(MemoryLocation)
+DEF_ERASE(ValueDecl)
 
 #undef DEF_ERASE
 
