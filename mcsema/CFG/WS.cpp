@@ -480,9 +480,6 @@ struct PreservedRegs_ : schema::PreservedRegs,
   constexpr static Query q_insert =
     R"(INSERT INTO preserved_regs(module_rowid, is_alive) VALUES(?1, ?2))";
 
-  constexpr static Query q_get =
-    R"(SELECT)";
-
   int64_t insert(const typename Concrete::Ranges &ranges,
                  const typename Concrete::Regs &regs,
                  bool is_alive, int64_t module_rowid) {
@@ -844,8 +841,7 @@ WeakObjectIterator<Entry>::~WeakObjectIterator() {}
 
 Workspace::Workspace(const std::string &name) : _ctx(std::make_shared<Context>(name)) {}
 
-void Workspace::CreateSchema()
-{
+void Workspace::CreateSchema() {
   constexpr static Query q_pragmas =
     R"(PRAGMA foreign_keys = ON)";
   _ctx->db.template query<q_pragmas>();
@@ -864,16 +860,14 @@ std::optional<Module> Workspace::GetModule(const std::string &name) {
   return {};
 }
 
-Function Workspace::AddFunction(const Module &module, uint64_t ea, bool is_entrypoint)
-{
+Function Workspace::AddFunction(const Module &module, uint64_t ea, bool is_entrypoint) {
   return { Function_{ _ctx }.insert(module._id, ea, is_entrypoint), _ctx };
 }
 
 BasicBlock Workspace::AddBasicBlock(const Module &module,
                                     uint64_t ea,
                                     uint64_t size,
-                                    const MemoryRange &range)
-{
+                                    const MemoryRange &range) {
   return { BasicBlock_{ _ctx }.insert(module._id, ea, size, range._id), _ctx };
 }
 
@@ -992,7 +986,6 @@ DEF_WOBJ_IT(Module, ExternalVar, ExternalVars);
 DEF_WOBJ_IT(Module, ExternalFunction, ExternalFuncs);
 DEF_WOBJ_IT(Module, MemoryRange, MemoryRanges);
 DEF_WOBJ_IT(Module, Segment, Segments);
-
 
 #undef DEF_WOBJ_IT
 
