@@ -39,7 +39,7 @@ class CodeXref;
 class DataXref;
 class MemoryLocation;
 class ValueDecl;
-class FunctionDecl;
+class FuncDecl;
 class PreservedRegs;
 
 // Context that represents the file and other helper data part of internal implemenation
@@ -49,6 +49,7 @@ using maybe_str = std::optional<std::string>;
 
 namespace details {
   using CtxPtr = std::shared_ptr<Context>;
+  struct Construct;
 } // namespace details
 
 // Each object can implement some of the following interfaces
@@ -92,12 +93,16 @@ struct HasSymbolTableEntry;
 namespace details {
 
 class Internals {
+  static constexpr bool is_public_api = true;
 
 protected:
   Internals(int64_t id, CtxPtr &ctx) : _id(id), _ctx(ctx) {}
+  Internals(int64_t id, CtxPtr &&ctx) : _id(id), _ctx(std::move(ctx)) {}
 
   int64_t _id;
   mutable CtxPtr _ctx;
+
+  friend details::Construct;
 
   // TODO: Do we care if someone tries to shoot in the foot really hard?
   template<typename T>
@@ -576,23 +581,63 @@ public:
 private:
   using details::Internals::Internals;
   friend class Workspace;
+  friend class FuncDecl;
+  friend class details::Construct;
 };
 
 
 class FuncDecl : public details::Internals {
 public:
   using ValueDecls = std::vector<ValueDecl>;
+  using ValueDecl_it = WeakObjectIterator<ValueDecl>;
 
   struct data_t {
     ValueDecl ret_address;
     ValueDecls params;
     ValueDecls rets;
+
+    template<typename Stream>
+    friend Stream &operator<<(Stream &os, const data_t &self) {
+      os << "Ret_addr: " << *self.ret_address << std::endl;
+      os << "Params:" << std::endl;
+      for (auto &param: self.params) {
+        os << "\t" << *param << std::endl;
+      }
+
+      os << "Rets:" << std::endl;
+      for (auto &ret: self.rets) {
+        os << "\t" << *ret << std::endl;
+      }
+      return os;
+    }
   };
 
   data_t operator*() const;
 
+  void AddParam(const ValueDecl &val_dec);
+  void AddRet(const ValueDecl &val_dec);
+
+  template<typename Container>
+  void AddParams(const Container &val_decs) {
+    for (auto &val_dec : val_decs) {
+      AddParam(val_dec);
+    }
+  }
+
+
+  template<typename Container>
+  void AddRets(const Container &val_decs) {
+    for (auto &val_dec : val_decs) {
+      AddRet(val_dec);
+    }
+  }
+
+
 private:
   using details::Internals::Internals;
+  friend class Function;
+  friend class ExternalFunction;
+  friend class Workspace;
 };
 
 class PreservedRegs : public details::Internals {
@@ -742,6 +787,10 @@ struct Workspace
                          maybe_str reg,
                          maybe_str name,
                          std::optional<MemoryLocation> mem_loc);
+
+  FuncDecl AddFuncDecl(const ValueDecl &ret_address,
+                       const FuncDecl::ValueDecls &params,
+                       const FuncDecl::ValueDecls &rets);
 
 private:
   std::shared_ptr<Context> _ctx;

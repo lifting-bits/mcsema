@@ -65,6 +65,12 @@ struct FrameToFunc : schema::FrameToFunc, nm_impl<FrameToFunc>, has_context {
 struct BbToFunc: schema::BbToFunc, nm_impl<BbToFunc>, has_context {
   using has_context::has_context;
 };
+struct FuncDeclParams : schema::FuncDeclParams, nm_impl<FuncDeclParams>, has_context {
+  using has_context::has_context;
+};
+struct FuncDeclRets : schema::FuncDeclRets, nm_impl<FuncDeclRets>, has_context {
+  using has_context::has_context;
+};
 
 template<typename Concrete = SymbolTableEntry>
 struct SymbolTableEntry_ : schema::SymbolTableEntry,
@@ -593,6 +599,41 @@ struct ValueDecl_ : schema::ValueDecl,
 };
 using ValueDecl_impl = ValueDecl_<ValueDecl>;
 
+template<typename Concrete=FuncDecl>
+struct FuncDecl_ : schema::FuncDecl,
+                   has_context,
+                   id_based_ops_<FuncDecl_<Concrete>> {
+  using has_context::has_context;
+  using c_data_t = typename Concrete::data_t;
+  using id_ops = id_based_ops_<FuncDecl_<Concrete>>;
+
+  static constexpr Query q_insert =
+    R"(INSERT INTO func_decls(ret_address_rowid) VALUES(?1))";
+
+  static constexpr Query q_get =
+    R"(SELECT ret_address_rowid FROM func_decls WHERE rowid = ?1)";
+
+  auto RetAddress(int64_t id) {
+    return id_ops::get(id).template GetScalar_r<int64_t>();
+  }
+
+  auto GetParams(int64_t id, CtxPtr &full_ctx) -> typename Concrete::ValueDecls {
+    auto param_it = FuncDeclParams(_ctx).GetOthers_r<schema::FuncDecl>(id);
+    return details::Construct::CreateAll<ValueDecl>(param_it, full_ctx);
+  }
+
+  auto GetRets(int64_t id, CtxPtr full_ctx) -> typename Concrete::ValueDecls {
+    auto ret_it = FuncDeclRets(_ctx).GetOthers_r<schema::FuncDecl>(id);
+    return details::Construct::CreateAll<ValueDecl>(ret_it, full_ctx);
+  }
+
+  c_data_t GetData(int64_t id, CtxPtr &full_ctx) {
+    auto ret_addr = details::Construct::Create<ValueDecl>(RetAddress(id), full_ctx);
+    return { ret_addr, GetParams(id, full_ctx), GetRets(id, full_ctx)};
+  }
+};
+using FuncDecl_impl = FuncDecl_<FuncDecl>;
+
 /* Hardcoding each implementation class in each public object method implementation
  * is tedious and error-prone. Following class provides this mapping at compile time
  * and tries to eliminate as much copy-paste code as possible. */
@@ -688,6 +729,11 @@ template<>
 struct dispatch<ValueDecl> {
   using type = ValueDecl_impl;
   using data_fields = util::TypeList<std::string, maybe_str, maybe_str>;
+};
+
+template<>
+struct dispatch<FuncDecl> {
+  using type = FuncDecl_impl;
 };
 
 template<>
@@ -863,6 +909,15 @@ ValueDecl Workspace::AddValueDecl(const std::string &type,
     return { impl_t<ValueDecl>(_ctx).insert(type, reg, name, mem_loc->_id), _ctx };
   }
   return { impl_t<ValueDecl>(_ctx).insert(type, reg, name, nullptr), _ctx };
+}
+
+FuncDecl Workspace::AddFuncDecl(const ValueDecl &ret_address,
+                                const FuncDecl::ValueDecls &params,
+                                const FuncDecl::ValueDecls &rets) {
+  auto out = FuncDecl{ impl_t<FuncDecl>(_ctx).insert(ret_address._id), _ctx };
+  out.AddRets(rets);
+  out.AddParams(params);
+  return out;
 }
 
 /* Module */
@@ -1092,6 +1147,20 @@ void PreservedRegs::AddRanges(const PreservedRegs::Ranges &ranges) {
 
 void PreservedRegs::AddRegs(const PreservedRegs::Regs &regs) {
   Impl(*this, _ctx).InsertRegs(_id, regs);
+}
+
+/* FuncDecl */
+
+void FuncDecl::AddParam(const ValueDecl &val_dec) {
+  FuncDeclParams(_ctx).BindTo<schema::FuncDecl>(_id, val_dec._id);
+}
+
+void FuncDecl::AddRet(const ValueDecl &val_dec) {
+  FuncDeclRets(_ctx).BindTo<schema::FuncDecl>(_id, val_dec._id);
+}
+
+auto FuncDecl::operator*() const -> data_t {
+  return Impl(*this, _ctx).GetData(_id, _ctx);
 }
 
 // Thanks to uniform dispatch each definition of following method looks identical,
