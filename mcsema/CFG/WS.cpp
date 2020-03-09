@@ -867,6 +867,14 @@ PreservedRegs Module::AddPreservedRegs(const PreservedRegs::Ranges &ranges,
   }
 
 DEF_WOBJ_IT(Module, PreservedRegs, PreservedRegs);
+DEF_WOBJ_IT(Module, BasicBlock, Blocks);
+DEF_WOBJ_IT(Module, Function, Functions);
+DEF_WOBJ_IT(Module, GlobalVar, GlobalVars);
+DEF_WOBJ_IT(Module, ExternalVar, ExternalVars);
+DEF_WOBJ_IT(Module, ExternalFunction, ExternalFuncs);
+DEF_WOBJ_IT(Module, MemoryRange, MemoryRanges);
+DEF_WOBJ_IT(Module, Segment, Segments);
+
 
 #undef DEF_WOBJ_IT
 
@@ -876,44 +884,9 @@ WeakObjectIterator<BasicBlock> Module::OrphanedBasicBlocks() {
   return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
 }
 
-WeakObjectIterator<BasicBlock> Module::Blocks() {
-  auto result = Impl(*this, _ctx).ObjIterate<schema::BasicBlock>(_id);
-  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
-}
-
 WeakDataIterator<SymbolTableEntry> Module::SymbolsData() {
   auto result = Module_{_ctx }.all_symbols(_id);
   return { std::make_unique<details::DataIterator_impl>(std::move(result)) };
-}
-
-WeakObjectIterator<Function> Module::Functions() {
-  auto result = Impl(*this, _ctx).ObjIterate<schema::Function>(_id);
-  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
-}
-
-WeakObjectIterator<GlobalVar> Module::GlobalVars() {
-  auto result = Impl(*this, _ctx).ObjIterate<schema::GlobalVar>(_id);
-  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
-}
-
-WeakObjectIterator<ExternalVar> Module::ExternalVars() {
-  auto result = Impl(*this, _ctx).ObjIterate<schema::ExternalVar>(_id);
-  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
-}
-
-WeakObjectIterator<ExternalFunction> Module::ExternalFuncs() {
-  auto result = Impl(*this, _ctx).ObjIterate<schema::ExternalFunction>(_id);
-  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
-}
-
-WeakObjectIterator<MemoryRange> Module::MemoryRanges() {
-  auto result = Impl(*this, _ctx).ObjIterate<schema::MemoryRange>(_id);
-  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
-}
-
-WeakObjectIterator<Segment> Module::Segments() {
-  auto result = Impl(*this, _ctx).ObjIterate<schema::Segment>(_id);
-  return { std::make_unique<details::ObjectIterator_impl>(std::move(result), _ctx) };
 }
 
 /* Function */
