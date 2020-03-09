@@ -71,6 +71,13 @@ struct FuncDeclParams : schema::FuncDeclParams, nm_impl<FuncDeclParams>, has_con
 struct FuncDeclRets : schema::FuncDeclRets, nm_impl<FuncDeclRets>, has_context {
   using has_context::has_context;
 };
+struct FuncSpec : schema::FuncSpec, nm_impl<FuncSpec>, has_context {
+  using has_context::has_context;
+};
+struct ExtFuncSpec : schema::ExtFuncSpec, nm_impl<ExtFuncSpec>, has_context {
+  using has_context::has_context;
+};
+
 
 template<typename Concrete = SymbolTableEntry>
 struct SymbolTableEntry_ : schema::SymbolTableEntry,
@@ -1002,6 +1009,16 @@ WeakDataIterator<SymbolTableEntry> Module::SymbolsData() {
 
 /* Function */
 
+std::optional<FuncDecl> Function::GetFuncDecl() {
+  auto maybe_spec = FuncSpec(_ctx).GetOthers_r<schema::Function>(_id)
+                                  .GetScalar<int64_t>();
+  return details::Construct::Create<FuncDecl>(maybe_spec, _ctx);
+}
+
+void Function::SetFuncDecl(const FuncDecl &func_decl) {
+  FuncSpec(_ctx).BindTo<schema::Function>(_id, func_decl._id);
+}
+
 void Function::DeattachBlock(const BasicBlock &bb) {
   BbToFunc( _ctx ).UnbindFrom<Function_impl>(_id, bb._id);
 }
@@ -1126,6 +1143,16 @@ std::string_view MemoryRange::Data() {
 /* CodeXref */
 
 /* ExternalFunction */
+
+std::optional<FuncDecl> ExternalFunction::GetFuncDecl() {
+  auto maybe_spec = ExtFuncSpec(_ctx).GetOthers_r<schema::ExternalFunction>(_id)
+                                     .GetScalar<int64_t>();
+  return details::Construct::Create<FuncDecl>(maybe_spec, _ctx);
+}
+
+void ExternalFunction::SetFuncDecl(const FuncDecl &func_decl) {
+  ExtFuncSpec(_ctx).BindTo<schema::ExternalFunction>(_id, func_decl._id);
+}
 
 std::string ExternalFunction::Name() const {
   return *impl_t<decltype(this)>{ _ctx }.GetName(_id);

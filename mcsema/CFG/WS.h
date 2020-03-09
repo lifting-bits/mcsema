@@ -185,6 +185,9 @@ public:
 
   data_t operator*() const;
 
+  std::optional<FuncDecl> GetFuncDecl();
+  void SetFuncDecl(const FuncDecl &func_decl);
+
   std::string Name() const;
 
   void Erase();
@@ -272,6 +275,9 @@ public:
     }
   }
 
+
+  std::optional<FuncDecl> GetFuncDecl();
+  void SetFuncDecl(const FuncDecl &func_decl);
 
   void DeattachBlock(const BasicBlock &bb);
 
