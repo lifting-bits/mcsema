@@ -151,6 +151,41 @@ void Schema::CreateNMTables(Context &ctx) {
         ))";
   db.template query<q_exception_frame_2_func>();
 
+  static Query q_func_decl_params = R"(CREATE TABLE IF NOT EXISTS func_decl_params(
+        value_decl_rowid integer NOT NULL,
+        func_decl_rowid integer NOT NULL,
+        UNIQUE(value_decl_rowid, func_decl_rowid),
+        FOREIGN KEY(value_decl_rowid) REFERENCES value_decls(rowid),
+        FOREIGN KEY(func_decl_rowid) REFERENCES func_decls(rowid)
+        ))";
+  db.template query<q_func_decl_params>();
+
+  static Query q_func_decl_rets = R"(CREATE TABLE IF NOT EXISTS func_decl_rets(
+        value_decl_rowid integer NOT NULL,
+        func_decl_rowid integer NOT NULL,
+        UNIQUE(value_decl_rowid, func_decl_rowid),
+        FOREIGN KEY(value_decl_rowid) REFERENCES value_decls(rowid),
+        FOREIGN KEY(func_decl_rowid) REFERENCES func_decls(rowid)
+        ))";
+  db.template query<q_func_decl_rets>();
+
+  static Query q_func_spec = R"(CREATE TABLE IF NOT EXISTS func_spec(
+        function_rowid integer NOT NULL,
+        func_decl_rowid integer NOT NULL,
+        UNIQUE(function_rowid, func_decl_rowid),
+        FOREIGN KEY(function_rowid) REFERENCES functions(rowid),
+        FOREIGN KEY(func_decl_rowid) REFERENCES func_decls(rowid)
+        ))";
+  db.template query<q_func_spec>();
+
+  static Query q_ext_func_spec = R"(CREATE TABLE IF NOT EXISTS ext_func_spec(
+        ext_function_rowid integer NOT NULL,
+        func_decl_rowid integer NOT NULL,
+        UNIQUE(ext_function_rowid, func_decl_rowid),
+        FOREIGN KEY(ext_function_rowid) REFERENCES external_functions(rowid),
+        FOREIGN KEY(func_decl_rowid) REFERENCES func_decls(rowid)
+        ))";
+  db.template query<q_ext_func_spec>();
 }
 
 void Schema::CreateSchema(Context &ctx) {
@@ -338,6 +373,13 @@ void Schema::CreateSchema(Context &ctx) {
         UNIQUE(type, register, name, memory_location_rowid)
         ))";
   db.template query<value_decls>();
+
+  static Query func_decls = R"(create table if not exists func_decls(
+        rowid INTEGER PRIMARY KEY,
+        ret_address_rowid integer,
+        FOREIGN KEY(ret_address_rowid) REFERENCES value_decls(rowid)
+        ))";
+  db.template query<func_decls>();
 
   CreateNMTables(ctx);
   CreateTriggers(ctx);

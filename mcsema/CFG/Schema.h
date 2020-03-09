@@ -84,6 +84,7 @@ DEFINE_TABLE(FixupKind, "fixup_kinds", "fixup_kind_rowid");
 DEFINE_TABLE(ExceptionFrameAction, "exception_frame_actions", "action");
 DEFINE_TABLE(MemoryLocation, "memory_locations", "memory_location_rowid");
 DEFINE_TABLE(ValueDecl, "value_decls", "value_decl_rowid");
+DEFINE_TABLE(FuncDecl, "func_decls", "func_decl_rowid");
 
 #undef DEFINE_TABLE
 
@@ -95,6 +96,26 @@ struct FrameToFunc : NMTable<Function, ExceptionFrame> {
 struct BbToFunc : NMTable<BasicBlock, Function> {
   static constexpr Query table_name = "function_to_block";
   using table = BbToFunc;
+};
+
+struct FuncDeclParams : NMTable<FuncDecl, ValueDecl> {
+  static constexpr Query table_name = "func_decl_params";
+  using table = FuncDeclParams;
+};
+
+struct FuncDeclRets : NMTable<FuncDecl, ValueDecl> {
+  static constexpr Query table_name = "func_decl_rets";
+  using table = FuncDeclRets;
+};
+
+struct FuncSpec : NMTable<Function, FuncDecl> {
+  static constexpr Query table_name = "func_spec";
+  using table = FuncSpec;
+};
+
+struct ExtFuncSpec : NMTable<Function, FuncDecl> {
+  static constexpr Query table_name = "ext_func_spec";
+  using table = ExtFuncSpec;
 };
 
 } // namespace schema
