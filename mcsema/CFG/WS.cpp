@@ -857,7 +857,8 @@ ExternalVar Module::AddExternalVar(uint64_t ea, const std::string &name, uint64_
 PreservedRegs Module::AddPreservedRegs(const PreservedRegs::Ranges &ranges,
                                        const PreservedRegs::Regs &regs,
                                        bool is_alive) {
-  return { impl_t<PreservedRegs>(_ctx).insert(ranges, regs, is_alive, _id), _ctx };
+  return { impl_t<mcsema::ws::PreservedRegs>(_ctx).insert(ranges, regs, is_alive, _id),
+           _ctx };
 }
 
 #define DEF_WOBJ_IT(who, what_obj, method) \
