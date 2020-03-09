@@ -164,7 +164,7 @@ struct Function_ : schema::Function,
       R"(insert into functions(module_rowid, ea, is_entrypoint) values (?1, ?2, ?3))";
 
   static constexpr Query q_get =
-    R"(select ea, is_entrypoint from functions)";
+    R"(select ea, is_entrypoint from functions where rowid = ?1)";
 
   auto BBs_r(int64_t id) {
     return BbToFunc( _ctx ).GetOthers_r<self_t>(id);
