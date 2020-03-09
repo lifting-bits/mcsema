@@ -186,6 +186,22 @@ void Schema::CreateNMTables(Context &ctx) {
         FOREIGN KEY(func_decl_rowid) REFERENCES func_decls(rowid)
         ))";
   db.template query<q_ext_func_spec>();
+
+  static Query q_preservation_range = R"(CREATE TABLE IF NOT EXISTS preservation_range(
+        preserved_regs_rowid integer NOT NULL,
+        begin integer NOT NULL,
+        end integer,
+        FOREIGN KEY(preserved_regs_rowid) REFERENCES preserved_regs(rowid)
+        ))";
+  db.template query<q_preservation_range>();
+
+  static Query q_preserved_regs_regs = R"(CREATE TABLE IF NOT EXISTS preserved_regs_regs(
+        preserved_regs_rowid integer NOT NULL,
+        reg text NOT NULL,
+        FOREIGN KEY(preserved_regs_rowid) REFERENCES preserved_regs(rowid)
+        ))";
+  db.template query<q_preserved_regs_regs>();
+
 }
 
 void Schema::CreateSchema(Context &ctx) {
@@ -380,6 +396,14 @@ void Schema::CreateSchema(Context &ctx) {
         FOREIGN KEY(ret_address_rowid) REFERENCES value_decls(rowid)
         ))";
   db.template query<func_decls>();
+
+  static Query preserved_regs = R"(create table if not exists preserved_regs(
+        rowid INTEGER PRIMARY KEY,
+        module_rowid integer NOT NULL,
+        is_alive integer NOT NULL,
+        FOREIGN KEY(module_rowid) REFERENCES modules(rowid)
+        ))";
+  db.template query<preserved_regs>();
 
   CreateNMTables(ctx);
   CreateTriggers(ctx);

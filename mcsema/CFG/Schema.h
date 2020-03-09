@@ -85,6 +85,7 @@ DEFINE_TABLE(ExceptionFrameAction, "exception_frame_actions", "action");
 DEFINE_TABLE(MemoryLocation, "memory_locations", "memory_location_rowid");
 DEFINE_TABLE(ValueDecl, "value_decls", "value_decl_rowid");
 DEFINE_TABLE(FuncDecl, "func_decls", "func_decl_rowid");
+DEFINE_TABLE(PreservedRegs, "preserved_regs", "preserved_regs_rowid");
 
 #undef DEFINE_TABLE
 
