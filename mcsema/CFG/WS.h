@@ -45,6 +45,8 @@ class PreservedRegs;
 // Context that represents the file and other helper data part of internal implemenation
 class Context;
 
+using maybe_str = std::optional<std::string>;
+
 namespace details {
   using CtxPtr = std::shared_ptr<Context>;
 } // namespace details
@@ -156,7 +158,7 @@ namespace interface {
 // allows manipulation with it
 template<typename Self>
 struct HasSymbolTableEntry {
-  std::optional<std::string> Name();
+  maybe_str Name();
   void Name(const SymbolTableEntry& name);
   std::optional<SymbolTableEntry::data_t> Symbol();
 };
@@ -551,8 +553,8 @@ public:
   struct data_t {
     std::string type;
     // std::optional<MemoryLocation>
-    std::optional<std::string> reg;
-    std::optional<std::string> name;
+    maybe_str reg;
+    maybe_str name;
 
     template<typename Stream>
     friend Stream &operator<<(Stream &os, const data_t &self) {
@@ -710,8 +712,8 @@ struct Workspace
 
   ValueDecl AddValueDecl(const std::string &type,
                          std::optional<MemoryLocation> mem_loc,
-                         std::optional<std::string> reg,
-                         std::optional<std::string> name);
+                         maybe_str reg,
+                         maybe_str name);
 
 private:
   std::shared_ptr<Context> _ctx;
