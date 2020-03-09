@@ -598,14 +598,32 @@ public:
     bool is_alive;
     Regs regs;
     Ranges ranges;
+
+    template<typename Stream>
+    friend Stream& operator<<(Stream &os, const data_t &self) {
+      os << "Alive: " << self.is_alive << std::endl;
+      os << "Regs: ";
+      for (auto &reg : self.regs) {
+        os << reg << " ";
+      }
+      os << std::endl << "Ranges: ";
+      for (auto &[begin, end] : self.ranges) {
+        os << "[ " << begin << ", "
+           << ((end) ? std::to_string(*end) : "(not set)") << " ] ";
+      }
+      return os;
+
+    }
   };
 
   data_t operator*() const;
 
+  // TODO: Erase
   void AddRange(const Ranges &range);
   void SetRegs(const Regs &regs);
 
 private:
+  friend Module;
   using details::Internals::Internals;
 };
 
