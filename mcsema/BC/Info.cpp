@@ -40,12 +40,10 @@ std::optional<std::string> Name(llvm::Function &func) {
 
 std::optional<uint64_t> EA(llvm::Function &func) {
   auto as_str = GetMetadata(func, Kinds::ea_kind);
-  if (as_str.empty()) {
-    LOG(WARNING) << remill::LLVMThingToString(&func) << " does not have set "
-                 << Kinds::ea_kind;
-    return 0xffffffff;
+  if (!as_str) {
+    return {};
   }
-  return stoul( as_str );
+  return { stoul(*as_str) };
 }
 
 } // namespace info
