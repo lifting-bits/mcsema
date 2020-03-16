@@ -84,7 +84,7 @@ void SetMetadata(llvm::GlobalObject &go,
   go.setMetadata(kind, node);
 }
 
-std::string GetMetadata(llvm::GlobalObject &go, const std::string &kind) {
+MetaValue GetMetadata(llvm::GlobalObject &go, const std::string &kind) {
   auto node = go.getMetadata(kind);
   if (!node) {
     return {};
@@ -93,7 +93,7 @@ std::string GetMetadata(llvm::GlobalObject &go, const std::string &kind) {
   CHECK(node->getNumOperands() == 1)
     << "util::GetMetada does not support nodes with more than one operand";
 
-  return llvm::cast<llvm::MDString>(node->getOperand(0))->getString().str();
+  return { llvm::cast<llvm::MDString>(node->getOperand(0))->getString().str() };
 }
 
 
