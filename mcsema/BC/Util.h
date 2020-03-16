@@ -19,6 +19,7 @@
 
 #include <cstdint>
 #include <list>
+#include <optional>
 #include <vector>
 
 #include <llvm/IR/IRBuilder.h>
@@ -121,8 +122,10 @@ void ForEachLifted(llvm::Module &_module, Yield yield) {
   }
 }
 
+using MetaValue = std::optional<std::string>;
+
 void SetMetadata(llvm::GlobalObject &go, const std::string &kind, const std::string &val);
-std::string GetMetadata(llvm::GlobalObject &go, const std::string &kind);
+MetaValue GetMetadata(llvm::GlobalObject &go, const std::string &kind);
 
 }  // namespace mcsema
 
