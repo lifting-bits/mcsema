@@ -17,6 +17,7 @@
 #pragma once
 
 #include <iostream>
+#include <optional>
 #include <string>
 
 namespace llvm {
@@ -32,12 +33,18 @@ struct Kinds {
 };
 
 struct Info {
-  std::string name;
-  uint64_t ea;
+  std::optional<std::string> name;
+  std::optional<uint64_t> ea;
 
   template<typename Stream>
   friend Stream &operator<<(Stream &os, const Info &info) {
-    os << "0x" << std::hex << info.ea << std::dec << ": " << info.name << std::endl;
+    if ( info.ea ) {
+      os << "0x" << std::hex << *info.ea << std::dec;
+    } else {
+      os << "(unknown)";
+    }
+
+    os << ": " << ((info.name) ? *info.name : "(unknown)") << std::endl;
     return os;
   }
 };
@@ -45,8 +52,8 @@ struct Info {
 void Set(const Info &meta, llvm::Function &func);
 Info Get(llvm::Function &func);
 
-std::string Name(llvm::Function &func);
-uint64_t EA(llvm::Function &func);
+std::optional<std::string> Name(llvm::Function &func);
+std::optional<uint64_t> EA(llvm::Function &func);
 
 } // namespace mcsema::info
 
