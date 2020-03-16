@@ -24,19 +24,21 @@ namespace mcsema {
 namespace info {
 
 void Set(const Info &meta, llvm::Function &func) {
-  SetMetadata(func, Kinds::ea_kind, std::to_string(meta.ea));
-  SetMetadata(func, Kinds::name_kind, meta.name);
+  if (meta.ea)
+    SetMetadata(func, Kinds::ea_kind, std::to_string(*meta.ea));
+  if (meta.name)
+    SetMetadata(func, Kinds::name_kind, *meta.name);
 }
 
 Info Get(llvm::Function &func) {
   return { Name(func), EA(func) };
 }
 
-std::string Name(llvm::Function &func) {
+std::optional<std::string> Name(llvm::Function &func) {
   return GetMetadata(func, Kinds::name_kind);
 }
 
-uint64_t EA(llvm::Function &func) {
+std::optional<uint64_t> EA(llvm::Function &func) {
   auto as_str = GetMetadata(func, Kinds::ea_kind);
   if (as_str.empty()) {
     LOG(WARNING) << remill::LLVMThingToString(&func) << " does not have set "
