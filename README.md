@@ -214,7 +214,7 @@ This script accepts several command line options:
 * `--prefix PATH`: Install files to `PATH`. By default, `PATH` is `/usr/local`.
 * `--llvm-version MAJOR.MINOR`: Download pre-built dependencies for LLVM version MAJOR.MINOR. The default is to use LLVM 4.0.
 * `--build-dir PATH`: Produce all intermediate build files in `PATH`. By default, `PATH` is `$CWD/remill-build`.
-* `--use-system-compiler`: Compile Remill+McSema using the system compiler toolchain (typically the GCC). **If you encounter linker errors when compiling McSema, and did not use this option, then re-try with this option.**
+* `--use-host-compiler`: Compile Remill+McSema using the system compiler toolchain (typically the GCC). **If you encounter linker errors when compiling McSema, and did not use this option, then re-try with this option.**
 * `--debug`: Build McSema and Remill with debug symbols. If you're trying to debug McSema, then this option is for you.
 
 #### Step 4: Install McSema
