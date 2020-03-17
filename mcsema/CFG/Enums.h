@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <string_view>
+
 namespace mcsema::ws {
 
 /* Enums */
@@ -32,6 +34,16 @@ enum class SymbolVisibility: unsigned char {
   Artificial = 4
 };
 
+static inline constexpr std::string_view to_string(SymbolVisibility sv) {
+  using namespace std::literals;
+  switch(sv) {
+    case SymbolVisibility::Imported  : return "Imported"sv;
+    case SymbolVisibility::Exported  : return "Exported"sv;
+    case SymbolVisibility::Internal  : return "Internal"sv;
+    case SymbolVisibility::Artificial: return "Artificial"sv;
+
+  }
+}
 
 // Corresponds to llvm calling convention numbering
 // NOTE(lukas): llvm header is not included since dependency on llvm is not worth
@@ -46,16 +58,17 @@ enum class CallingConv : unsigned char {
   AArch64_VectorCall = 97
 };
 
-static inline std::string to_string(CallingConv c) {
+static inline constexpr std::string_view to_string(CallingConv c) {
+  using namespace std::literals;
   switch (c) {
-    case CallingConv::C :                return "C";
-    case CallingConv::X86_StdCall :      return "X86_StdCall";
-    case CallingConv::X86_FastCall :     return "X86_FastCall";
-    case CallingConv::X86_64_SysV :      return "X86_64_SysV";
-    case CallingConv::Win64 :            return "Win64";
-    case CallingConv::X86_VectorCall :   return "X86_VectorCall";
-    case CallingConv::X86_RegCall:        return "X86_RegCall";
-    case CallingConv::AArch64_VectorCall: return "AArch64_VectorCall";
+    case CallingConv::C                  : return "C"sv;
+    case CallingConv::X86_StdCall        : return "X86_StdCall"sv;
+    case CallingConv::X86_FastCall       : return "X86_FastCall"sv;
+    case CallingConv::X86_64_SysV        : return "X86_64_SysV"sv;
+    case CallingConv::Win64              : return "Win64"sv;
+    case CallingConv::X86_VectorCall     : return "X86_VectorCall"sv;
+    case CallingConv::X86_RegCall        : return "X86_RegCall"sv;
+    case CallingConv::AArch64_VectorCall : return "AArch64_VectorCall"sv;
   }
 }
 
@@ -67,14 +80,41 @@ enum class OperandType : unsigned char {
   OffsetTable = 4
 };
 
+static inline constexpr std::string_view to_string(OperandType ot) {
+  using namespace std::literals;
+  switch(ot) {
+    case OperandType::Immediate          : return "Immediate"sv;
+    case OperandType::Memory             : return "Memory"sv;
+    case OperandType::MemoryDisplacement : return "MemoryDisplacement"sv;
+    case OperandType::ControlFlow        : return "ControlFlow"sv;
+    case OperandType::OffsetTable        : return "OffsetTable"sv;
+  }
+}
+
 enum class FixupKind : unsigned char {
   Absolute = 0,
   OffsetFromThreadBase = 1
 };
 
+static inline constexpr std::string_view to_string(FixupKind fk) {
+  using namespace std::literals;
+  switch(fk) {
+    case FixupKind::Absolute             : return "Absolute"sv;
+    case FixupKind::OffsetFromThreadBase : return "OffsetFromThreadBase"sv;
+  }
+}
+
 enum class Action : unsigned char {
   Cleanup = 0,
   Catch = 1
 };
+
+static inline constexpr std::string_view to_string(Action a) {
+  using namespace std::literals;
+  switch(a) {
+    case Action::Cleanup : return "Cleanup"sv;
+    case Action::Catch   : return "Catch"sv;
+  }
+}
 
 }// namespace mcsema::ws
