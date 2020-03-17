@@ -451,8 +451,14 @@ void Schema::CreateSchema(Context &ctx) {
 
   static Query func_decls = R"(create table if not exists func_decls(
         rowid INTEGER PRIMARY KEY,
-        ret_address_rowid integer,
+        ret_address_rowid integer NOT NULL,
+        ret_stack_ptr_rowid integer NOT NULL,
+        is_variadic integer NOT NULL,
+        is_noreturn integer NOT NULL,
+        calling_convention_rowid integer,
         FOREIGN KEY(ret_address_rowid) REFERENCES value_decls(rowid)
+        FOREIGN KEY(ret_stack_ptr_rowid) REFERENCES value_decls(rowid)
+        FOREIGN KEY(calling_convention_rowid) REFERENCES calling_conventions(rowid)
         ))";
   db.template query<func_decls>();
 
