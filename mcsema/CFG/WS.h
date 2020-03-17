@@ -601,10 +601,17 @@ public:
     ValueDecl ret_address;
     ValueDecls params;
     ValueDecls rets;
+    ValueDecl return_stack_ptr;
+    bool is_variadic;
+    bool is_noreturn;
+    CallingConv cc;
 
     template<typename Stream>
     friend Stream &operator<<(Stream &os, const data_t &self) {
+      os << "varargs: " << self.is_variadic << ", noreturn: " << self.is_noreturn
+         << ", cc: " << to_string(self.cc) << std::endl;
       os << "Ret_addr: " << *self.ret_address << std::endl;
+      os << "Ret_stack_ptr" << *self.return_stack_ptr << std::endl;
       os << "Params:" << std::endl;
       for (auto &param: self.params) {
         os << "\t" << *param << std::endl;
@@ -795,8 +802,10 @@ struct Workspace
                          std::optional<MemoryLocation> mem_loc);
 
   FuncDecl AddFuncDecl(const ValueDecl &ret_address,
+                       const ValueDecl &ret_stack_addr,
                        const FuncDecl::ValueDecls &params,
-                       const FuncDecl::ValueDecls &rets);
+                       const FuncDecl::ValueDecls &rets,
+                       bool is_variadic, bool is_noreturn, CallingConv cc);
 
 private:
   std::shared_ptr<Context> _ctx;
