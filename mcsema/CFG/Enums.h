@@ -46,6 +46,19 @@ enum class CallingConv : unsigned char {
   AArch64_VectorCall = 97
 };
 
+static inline std::string to_string(CallingConv c) {
+  switch (c) {
+    case CallingConv::C :                return "C";
+    case CallingConv::X86_StdCall :      return "X86_StdCall";
+    case CallingConv::X86_FastCall :     return "X86_FastCall";
+    case CallingConv::X86_64_SysV :      return "X86_64_SysV";
+    case CallingConv::Win64 :            return "Win64";
+    case CallingConv::X86_VectorCall :   return "X86_VectorCall";
+    case CallingConv::X86_RegCall:        return "X86_RegCall";
+    case CallingConv::AArch64_VectorCall: return "AArch64_VectorCall";
+  }
+}
+
 enum class OperandType : unsigned char {
   Immediate = 0,
   Memory = 1,
