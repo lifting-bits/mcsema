@@ -45,8 +45,13 @@ void Schema::CreateEnums(Context &ctx) {
     R"(insert into exception_frame_actions values(?1, ?2))";
 
   if (!RowCount<schema::ExceptionFrameAction>(ctx)) {
-    db.template query<populate_action_enum>(0, "Cleanup");
-    db.template query<populate_action_enum>(1, "Catch");
+    db.template query<populate_action_enum>(
+        lower(    Action::Cleanup),
+        to_string(Action::Cleanup));
+
+    db.template query<populate_action_enum>(
+        lower(    Action::Cleanup),
+        to_string(Action::Cleanup));
   }
   // rowid corresponds to llvm value for given cc
   static Query cc = R"(create table if not exists calling_conventions(
@@ -57,21 +62,28 @@ void Schema::CreateEnums(Context &ctx) {
 
   static Query populate_cc = R"(insert into calling_conventions(rowid, name) values(?1, ?2))";
   if (!RowCount<schema::CallingConv>(ctx)) {
-    db.template query<populate_cc>(lower(CallingConv::C),
+    db.template query<populate_cc>(lower(    CallingConv::C),
                                    to_string(CallingConv::C));
-    db.template query<populate_cc>(lower(CallingConv::X86_StdCall),
+
+    db.template query<populate_cc>(lower(    CallingConv::X86_StdCall),
                                    to_string(CallingConv::X86_StdCall));
-    db.template query<populate_cc>(lower(CallingConv::X86_FastCall),
+
+    db.template query<populate_cc>(lower(    CallingConv::X86_FastCall),
                                    to_string(CallingConv::X86_FastCall));
-    db.template query<populate_cc>(lower(CallingConv::X86_64_SysV),
+
+    db.template query<populate_cc>(lower(    CallingConv::X86_64_SysV),
                                    to_string(CallingConv::X86_64_SysV));
-    db.template query<populate_cc>(lower(CallingConv::Win64),
+
+    db.template query<populate_cc>(lower(    CallingConv::Win64),
                                    to_string(CallingConv::Win64));
-    db.template query<populate_cc>(lower(CallingConv::X86_VectorCall),
+
+    db.template query<populate_cc>(lower(    CallingConv::X86_VectorCall),
                                    to_string(CallingConv::X86_VectorCall));
-    db.template query<populate_cc>(lower(CallingConv::X86_RegCall),
+
+    db.template query<populate_cc>(lower(    CallingConv::X86_RegCall),
                                    to_string(CallingConv::X86_RegCall));
-    db.template query<populate_cc>(lower(CallingConv::AArch64_VectorCall),
+
+    db.template query<populate_cc>(lower(    CallingConv::AArch64_VectorCall),
                                    to_string(CallingConv::AArch64_VectorCall));
   }
 
@@ -85,11 +97,26 @@ void Schema::CreateEnums(Context &ctx) {
     R"(insert into operand_types(rowid, type) values(?1, ?2))";
 
   if (!RowCount<schema::OperandType>(ctx)) {
-    db.template query<populate_operad_types>(0, "Immediate operand");
-    db.template query<populate_operad_types>(1, "Memory operand");
-    db.template query<populate_operad_types>(2, "MemoryDisplacement operand");
-    db.template query<populate_operad_types>(3, "ControlFlow operand");
-    db.template query<populate_operad_types>(4, "OffsetTable operand");
+
+    db.template query<populate_operad_types>(
+        lower(    OperandType::Immediate),
+        to_string(OperandType::Immediate));
+
+    db.template query<populate_operad_types>(
+        lower(    OperandType::Memory),
+        to_string(OperandType::Memory));
+
+    db.template query<populate_operad_types>(
+        lower(    OperandType::MemoryDisplacement),
+        to_string(OperandType::MemoryDisplacement));
+
+    db.template query<populate_operad_types>(
+        lower(    OperandType::ControlFlow),
+        to_string(OperandType::ControlFlow));
+
+    db.template query<populate_operad_types>(
+        lower(    OperandType::OffsetTable),
+        to_string(OperandType::OffsetTable));
   }
 
   static Query symtab_types = R"(create table if not exists symtab_types(
@@ -102,10 +129,21 @@ void Schema::CreateEnums(Context &ctx) {
     R"(insert into symtab_types(type, rowid) values(?1, ?2))";
 
   if (!RowCount<schema::SymbolTableEntryType>(ctx)) {
-    db.template query<populate_symtab_types>("imported", 1);
-    db.template query<populate_symtab_types>("exported", 2);
-    db.template query<populate_symtab_types>("internal", 3);
-    db.template query<populate_symtab_types>("artificial", 4);
+    db.template query<populate_symtab_types>(
+        lower(    SymbolVisibility::Imported),
+        to_string(SymbolVisibility::Imported));
+
+    db.template query<populate_symtab_types>(
+        lower(    SymbolVisibility::Exported),
+        to_string(SymbolVisibility::Exported));
+
+    db.template query<populate_symtab_types>(
+        lower(    SymbolVisibility::Internal),
+        to_string(SymbolVisibility::Internal));
+
+    db.template query<populate_symtab_types>(
+        lower(    SymbolVisibility::Artificial),
+        to_string(SymbolVisibility::Artificial));
   }
 
   static Query fixup_kinds =
@@ -119,8 +157,13 @@ void Schema::CreateEnums(Context &ctx) {
     R"(insert into fixup_kinds(rowid, type) values(?1,?2))";
 
   if (!RowCount<schema::FixupKind>(ctx)) {
-    db.template query<populate_fixup_kinds>(0, "Absolute");
-    db.template query<populate_fixup_kinds>(1, "OffsetFromThreadBase");
+    db.template query<populate_fixup_kinds>(
+        lower(    FixupKind::Absolute),
+        to_string(FixupKind::Absolute));
+
+    db.template query<populate_fixup_kinds>(
+        lower(    FixupKind::OffsetFromThreadBase),
+        to_string(FixupKind::OffsetFromThreadBase));
   }
 }
 
