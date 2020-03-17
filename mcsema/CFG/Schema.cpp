@@ -27,6 +27,11 @@ int64_t RowCount(Context &ctx) {
                .template GetScalar_r<int64_t>();
 }
 
+template<typename E>
+constexpr auto lower(E e) {
+  return static_cast<std::underlying_type_t<E>>(e);
+}
+
 void Schema::CreateEnums(Context &ctx) {
   auto &db = ctx.db;
 
