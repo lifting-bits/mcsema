@@ -17,7 +17,7 @@
 
 #include <mcsema/CFG/Context.h>
 #include <mcsema/CFG/Schema.h>
-
+#include <mcsema/CFG/Enums.h>
 
 namespace mcsema::ws {
 
@@ -57,11 +57,22 @@ void Schema::CreateEnums(Context &ctx) {
 
   static Query populate_cc = R"(insert into calling_conventions(rowid, name) values(?1, ?2))";
   if (!RowCount<schema::CallingConv>(ctx)) {
-    db.template query<populate_cc>(0, "C");
-    db.template query<populate_cc>(64, "X86_StdCall");
-    db.template query<populate_cc>(65, "X86_FastCall");
-    db.template query<populate_cc>(78, "X86_64_SysV");
-    db.template query<populate_cc>(79, "Win64");
+    db.template query<populate_cc>(lower(CallingConv::C),
+                                   to_string(CallingConv::C));
+    db.template query<populate_cc>(lower(CallingConv::X86_StdCall),
+                                   to_string(CallingConv::X86_StdCall));
+    db.template query<populate_cc>(lower(CallingConv::X86_FastCall),
+                                   to_string(CallingConv::X86_FastCall));
+    db.template query<populate_cc>(lower(CallingConv::X86_64_SysV),
+                                   to_string(CallingConv::X86_64_SysV));
+    db.template query<populate_cc>(lower(CallingConv::Win64),
+                                   to_string(CallingConv::Win64));
+    db.template query<populate_cc>(lower(CallingConv::X86_VectorCall),
+                                   to_string(CallingConv::X86_VectorCall));
+    db.template query<populate_cc>(lower(CallingConv::X86_RegCall),
+                                   to_string(CallingConv::X86_RegCall));
+    db.template query<populate_cc>(lower(CallingConv::AArch64_VectorCall),
+                                   to_string(CallingConv::AArch64_VectorCall));
   }
 
   static Query operand_types = R"(create table if not exists operand_types(
