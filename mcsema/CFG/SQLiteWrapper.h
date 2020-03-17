@@ -450,6 +450,9 @@ struct Statement_ : Stmt {
         sqlite3_bind_blob(this->stmt, idx, &arg[0], arg.size(), SQLITE_STATIC);
       } else if constexpr (std::is_same_v<std::nullopt_t, arg_t>) {
         sqlite3_bind_null(this->stmt, idx);
+      } else if constexpr (std::is_enum_v<arg_t>) {
+        auto lowered_arg = static_cast<std::underlying_type_t<arg_t>>(arg);
+        sqlite3_bind_int64(this->stmt, idx, lowered_arg);
       } else if constexpr (detail::is_std_optional_type<arg_t>) {
         if (arg) {
           self(*arg, self);
