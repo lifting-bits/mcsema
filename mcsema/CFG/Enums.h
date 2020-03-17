@@ -40,7 +40,10 @@ enum class CallingConv : unsigned char {
   X86_StdCall = 64,
   X86_FastCall = 65,
   X86_64_SysV = 78,
-  Win64 = 79
+  Win64 = 79,
+  X86_VectorCall = 80,
+  X86_RegCall = 92,
+  AArch64_VectorCall = 97
 };
 
 enum class OperandType : unsigned char {
