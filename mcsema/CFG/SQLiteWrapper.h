@@ -442,7 +442,8 @@ struct Statement_ : Stmt {
       } else if constexpr (std::is_same_v<const char *, arg_t> ||
                            std::is_same_v<char *, arg_t>) {
         sqlite3_bind_text(this->stmt, idx, arg, strlen(arg), SQLITE_STATIC);
-      } else if constexpr (std::is_same_v<std::string, arg_t>) {
+      } else if constexpr (std::is_same_v<std::string, arg_t> ||
+                           std::is_same_v<std::string_view, arg_t>) {
         sqlite3_bind_text(this->stmt, idx, &arg[0], arg.size(), SQLITE_STATIC);
       } else if constexpr (std::is_same_v<blob, arg_t> ||
                            std::is_same_v<blob_view, arg_t>) {
