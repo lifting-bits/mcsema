@@ -612,14 +612,16 @@ struct FuncDecl_ : schema::FuncDecl,
   using id_ops = id_based_ops_<FuncDecl_<Concrete>>;
 
   static constexpr Query q_insert =
-    R"(INSERT INTO func_decls(ret_address_rowid) VALUES(?1))";
+    R"(INSERT INTO func_decls(
+        ret_address_rowid, ret_stack_ptr_rowid,
+        is_variadic, is_noreturn, calling_convention_rowid)
+      VALUES(?1, ?2, ?3, ?4, ?5))";
 
   static constexpr Query q_get =
-    R"(SELECT ret_address_rowid FROM func_decls WHERE rowid = ?1)";
-
-  auto RetAddress(int64_t id) {
-    return id_ops::get(id).template GetScalar_r<int64_t>();
-  }
+    R"(SELECT
+        ret_address_rowid, ret_stack_ptr_rowid,
+        is_variadic, is_noreturn, calling_convention_rowid
+       FROM func_decls WHERE rowid = ?1)";
 
   auto GetParams(int64_t id, CtxPtr &full_ctx) -> typename Concrete::ValueDecls {
     auto param_it = FuncDeclParams(_ctx).GetOthers_r<schema::FuncDecl>(id);
@@ -632,8 +634,12 @@ struct FuncDecl_ : schema::FuncDecl,
   }
 
   c_data_t GetData(int64_t id, CtxPtr &full_ctx) {
-    auto ret_addr = details::Construct::Create<ValueDecl>(RetAddress(id), full_ctx);
-    return { ret_addr, GetParams(id, full_ctx), GetRets(id, full_ctx)};
+    auto [ ret_addr_, ret_sp_, is_v, is_n, cc ] = *(id_ops::get(id)
+      .template Get<int64_t, int64_t, bool, bool, CallingConv>());
+    auto ret_addr = details::Construct::Create<ValueDecl>(ret_addr_, full_ctx);
+    auto ret_sp = details::Construct::Create<ValueDecl>(ret_sp_, full_ctx);
+    return { ret_addr, GetParams(id, full_ctx), GetRets(id, full_ctx),
+             ret_sp, is_v, is_n, cc };
   }
 };
 using FuncDecl_impl = FuncDecl_<FuncDecl>;
@@ -913,9 +919,14 @@ ValueDecl Workspace::AddValueDecl(const std::string &type,
 }
 
 FuncDecl Workspace::AddFuncDecl(const ValueDecl &ret_address,
+                                const ValueDecl &ret_stack_addr,
                                 const FuncDecl::ValueDecls &params,
-                                const FuncDecl::ValueDecls &rets) {
-  auto out = FuncDecl{ impl_t<FuncDecl>(_ctx).insert(ret_address._id), _ctx };
+                                const FuncDecl::ValueDecls &rets,
+                                bool is_variadic, bool is_noreturn, CallingConv cc) {
+  FuncDecl out {
+      impl_t<FuncDecl>(_ctx).insert(ret_address._id, ret_stack_addr._id,
+                                    is_variadic, is_noreturn, cc),
+      _ctx  };
   out.AddRets(rets);
   out.AddParams(params);
   return out;
