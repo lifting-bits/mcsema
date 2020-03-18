@@ -27,6 +27,39 @@ namespace mcsema::ws {
 
 using Query = const char *;
 
+namespace details {
+
+  struct Construct {
+
+    template<typename T, typename Ctx>
+    static std::optional<T> Create(std::optional<int64_t> &key, Ctx ctx) {
+      if (!key) {
+        return {};
+      }
+      return { { *key, std::move(ctx) } };
+    }
+
+    template<typename T, typename Ctx>
+    static T Create(int64_t key, Ctx ctx) {
+      return { key, std::move(ctx) };
+    }
+
+    template<typename T, typename R, typename Ctx>
+    static std::vector<T> CreateAll(R &r, Ctx &ctx) {
+      std::vector<T> out;
+      while (auto c = r.template GetScalar<int64_t>()) {
+        out.push_back(T(*c, ctx));
+      }
+      return out;
+    }
+  };
+
+
+} // namespace details
+
+
+
+
 // Second template is to avoid DDD(Dreadful Diamond of Derivation) without using
 // virtual inheritance. Since this is strictly mixin inheritance it is okay
 template<typename Self, template<typename...> class Derived>
@@ -297,35 +330,5 @@ struct can_obj_iterate {
   }
 
 };
-
-namespace details {
-
-  struct Construct {
-
-    template<typename T, typename Ctx>
-    static std::optional<T> Create(std::optional<int64_t> &key, Ctx ctx) {
-      if (!key) {
-        return {};
-      }
-      return { { *key, std::move(ctx) } };
-    }
-
-    template<typename T, typename Ctx>
-    static T Create(int64_t key, Ctx ctx) {
-      return { key, std::move(ctx) };
-    }
-
-    template<typename T, typename R, typename Ctx>
-    static std::vector<T> CreateAll(R &r, Ctx &ctx) {
-      std::vector<T> out;
-      while (auto c = r.template GetScalar<int64_t>()) {
-        out.push_back(T(*c, ctx));
-      }
-      return out;
-    }
-  };
-
-
-} // namespace details
 
 } // namespace mcsema::ws
