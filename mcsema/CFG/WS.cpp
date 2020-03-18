@@ -738,7 +738,8 @@ struct dispatch<MemoryLocation> {
 template<>
 struct dispatch<ValueDecl> {
   using type = ValueDecl_impl;
-  using data_fields = util::TypeList<std::string, maybe_str, maybe_str>;
+  using data_fields =
+    util::TypeList<std::string, maybe_str, maybe_str, std::optional<MemoryLocation>>;
 };
 
 template<>
@@ -1206,6 +1207,14 @@ auto FuncDecl::operator*() const -> data_t {
         .c_get<typename self_t::data_t>(_id, data_fields_t<self_t>{}); \
   }
 
+#define DEFINE_FULL_DATA_OPERATOR(Type) \
+  Type::data_t Type::operator*() const { \
+    using self_t = remove_cvp_t<decltype(this)>; \
+    return impl_t<self_t>{_ctx} \
+        .c_get_f<typename self_t::data_t>(_id, data_fields_t<self_t>{}, _ctx); \
+  }
+
+
 DEFINE_DATA_OPERATOR(SymbolTableEntry);
 DEFINE_DATA_OPERATOR(ExternalFunction);
 DEFINE_DATA_OPERATOR(BasicBlock);
@@ -1217,10 +1226,12 @@ DEFINE_DATA_OPERATOR(DataXref);
 DEFINE_DATA_OPERATOR(GlobalVar);
 DEFINE_DATA_OPERATOR(ExternalVar);
 DEFINE_DATA_OPERATOR(MemoryLocation);
-DEFINE_DATA_OPERATOR(ValueDecl);
+
+DEFINE_FULL_DATA_OPERATOR(ValueDecl);
 
 /* Erasable */
 
+#undef DEFINE_FULL_DATA_OPERATOR
 #undef DEFINE_DATA_OPERATOR
 
 PreservedRegs::data_t PreservedRegs::operator*() const {
