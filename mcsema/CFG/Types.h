@@ -175,6 +175,46 @@ struct id_based_ops_: _crtp<Self, id_based_ops_>
     this->db().template query<q_inject_symtabentry<SymtabImpl>>(name, type);
     return this->last_rowid();
   }
+
+  template<class ...Args>
+  using TypeList = util::TypeList<Args...>;
+
+  template<typename Concrete, typename Ctx, typename ...Fields>
+  auto c_get_f(int64_t id, util::TypeList<Fields...>, Ctx full_ctx) {
+    auto result = this->db().template query<Self::q_get>(id);
+    using lowered = typename util::StripAPI<Fields...>::type;
+
+    auto raw_result = util::GetFromList(result, lowered{});
+    auto merged = Merge(TypeList<Fields...>(), raw_result, full_ctx);
+    return util::to_struct<Concrete>(std::move(merged));
+  }
+
+  template<typename ...Original, typename From, typename Ctx>
+  auto Merge(TypeList<Original...> o, From &&from, Ctx &ctx) {
+    using T = std::decay_t<From>;
+    auto seq = std::make_index_sequence<std::tuple_size_v<T>>();
+    return Merge(o, std::forward<From>(from), ctx, seq);
+  }
+
+  template<typename ...Original, typename From, typename Ctx, size_t ...Indices>
+  auto Merge(TypeList<Original...>, From &&from, Ctx &ctx, std::index_sequence<Indices...>) {
+    using TL = TypeList<Original...>;
+    return std::make_tuple<Original...>(Merge<TL, Indices>(
+          std::get<Indices>(std::forward<From>(from)), ctx)... );
+  }
+
+  template<typename TL, size_t Idx, typename Lowered, typename Ctx>
+  auto Merge(Lowered t, Ctx &full_ctx) {
+    using To = typename TL::template Get<Idx>;
+    if constexpr (!util::HasPublicAPI<To>::value) {
+      return t;
+    } else if constexpr (util::is_std_optional_t<To>) {
+      using trg_t = typename To::value_type;
+      return details::Construct::Create<trg_t>(std::forward<Lowered>(t), full_ctx);
+    } else {
+      return details::Construct::Create<To>(std::forward<Lowered>(t), full_ctx);
+    }
+  }
 };
 
 
