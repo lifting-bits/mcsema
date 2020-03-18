@@ -573,14 +573,19 @@ public:
     std::string type;
     maybe_str reg;
     maybe_str name;
-    // TODO
-    // std::optional<MemoryLocation>
+    std::optional<MemoryLocation> mem_loc;
 
     template<typename Stream>
     friend Stream &operator<<(Stream &os, const data_t &self) {
       os << self.type
          <<  ", reg: " << ((self.reg) ? *self.reg : "(not set)")
-         <<  ", name: " << ((self.name) ? *self.name : "(not set)");
+         <<  ", name: " << ((self.name) ? *self.name : "(not set)") << std::endl;
+      os << "mem_loc: ";
+      if (self.mem_loc) {
+        os << **self.mem_loc;
+      } else{
+        os << "(not set)";
+      }
       return os;
     }
   };
@@ -641,14 +646,12 @@ public:
     }
   }
 
-
   template<typename Container>
   void AddRets(const Container &val_decs) {
     for (auto &val_dec : val_decs) {
       AddRet(val_dec);
     }
   }
-
 
 private:
   using details::Internals::Internals;
