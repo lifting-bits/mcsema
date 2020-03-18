@@ -32,7 +32,7 @@ namespace details {
   struct Construct {
 
     template<typename T, typename Ctx>
-    static std::optional<T> Create(std::optional<int64_t> &key, Ctx ctx) {
+    static std::optional<T> Create(const std::optional<int64_t> &key, Ctx ctx) {
       if (!key) {
         return {};
       }
