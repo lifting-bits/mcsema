@@ -60,6 +60,25 @@ struct QString {
 
 };
 
+// TODO(lukas): Refactor out
+template<typename T> constexpr bool is_std_optional_t = false;
+template<typename T> constexpr bool is_std_optional_t<std::optional<T>> = true;
+
+template<size_t, typename ...>
+struct Get_impl {};
+
+template<typename H, typename ...Tail>
+struct Get_impl<0, H, Tail...> {
+  using type = H;
+};
+
+
+template< size_t Idx, typename H, typename ...Tail>
+struct Get_impl<Idx, H, Tail...> {
+  using type = typename Get_impl<Idx - 1, Tail...>::type;
+};
+
+
 template<typename ...Args>
 struct TypeList {
   constexpr static uint64_t size = sizeof ...(Args);
@@ -68,6 +87,35 @@ struct TypeList {
   constexpr static auto concat( TypeList<rhs...>) {
     return TypeList<Args..., rhs...>();
   }
+
+  template<size_t idx>
+  using Get = typename Get_impl<idx, Args...>::type;
+
+};
+
+template<typename T, typename = int>
+struct HasPublicAPI : std::false_type {};
+
+template<typename T>
+struct HasPublicAPI <T, decltype((void) T::is_public_api, 0)> : std::true_type {};
+
+template<typename T>
+struct HasPublicAPI<std::optional<T>> : HasPublicAPI<T> {};
+
+template<typename Arg>
+struct StripAPI_ {
+  using type = std::conditional_t<HasPublicAPI<Arg>::value, int64_t, Arg>;
+};
+
+template<typename Arg>
+struct StripAPI_<std::optional<Arg>> {
+  using type = std::conditional_t<HasPublicAPI<Arg>::value, std::optional<int64_t>,
+                                                            std::optional<Arg>>;
+};
+
+template<class ...Args>
+struct StripAPI {
+  using type = TypeList<typename StripAPI_<Args>::type...>;
 };
 
 namespace details {
