@@ -93,6 +93,10 @@ struct HasSymbolTableEntry;
 namespace details {
 
 class Internals {
+public:
+
+  // This is used to allow automatic meta-conversion from object of this hierarchy
+  // to their ids.
   static constexpr bool is_public_api = true;
 
 protected:
