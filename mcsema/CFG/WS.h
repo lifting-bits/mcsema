@@ -718,6 +718,9 @@ public:
 
   MemoryRange AddMemoryRange(uint64_t ea, std::string_view data);
 
+  // Zero-initialized MemoryRange
+  MemoryRange AddMemoryRange(uint64_t ea, uint64_t range);
+
   BasicBlock AddBasicBlock(uint64_t ea, uint64_t size, const MemoryRange &memory);
 
   SymbolTableEntry AddSymbolTableEntry(const std::string &name,

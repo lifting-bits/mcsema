@@ -950,6 +950,10 @@ MemoryRange Module::AddMemoryRange(uint64_t ea, std::string_view data) {
   return AddMemoryRange(ea, data.size(), data);
 }
 
+MemoryRange Module::AddMemoryRange(uint64_t ea, uint64_t size) {
+  return AddMemoryRange(ea, size, std::string(size, 0));
+}
+
 BasicBlock Module::AddBasicBlock(uint64_t ea, uint64_t size, const MemoryRange &mem) {
   return { BasicBlock_{ _ctx }.insert(_id, ea, size, mem._id), _ctx };
 }
