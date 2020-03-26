@@ -72,10 +72,10 @@ The most important high-level structures recorded in the CFG file are:
 
 The `mcsema-lift-M.m` command is used to lift CFG files to LLVM bitcode. The four most important arguments to `mcsema-lift` are:
 
-  1.`--os`: The operating system of the code being lifted. In practice, each binary format is specific to an operating system. ELF files are for Linux, Mach-O files for macOS, and DLL files for Windows. This is one of `linux`, `macos`, or `windows`.
-  2.`--arch`: The architecture of the code being lifted. This is one of `x86`, `x86_avx`, `amd64`, `amd64_avx`, or `aarch64`.
-  3.`--cfg`: The path for the CFG file produced by `mcsema-disass`.
-  4.`--output`: The path to the bitcode file to save/produce.
+1. `--os`: The operating system of the code being lifted. In practice, each binary format is specific to an operating system. ELF files are for Linux, Mach-O files for macOS, and DLL files for Windows. This is one of `linux`, `macos`, or `windows`.
+2. `--arch`: The architecture of the code being lifted. This is one of `x86`, `x86_avx`, `amd64`, `amd64_avx`, or `aarch64`.
+3. `--cfg`: The path for the CFG file produced by `mcsema-disass`.
+4. `--output`: The path to the bitcode file to save/produce.
 
 The above arguments instruct the [lifter](/tools/mcsema_lift/Lift.cpp) on how to configure the bitcode file.
 
