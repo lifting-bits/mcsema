@@ -113,7 +113,7 @@ def recover_ext_func(bv, pb_mod, sym):
     # Assume cdecl if the type is unknown
     cconv = ftype.calling_convention
     if cconv is not None and cconv.name in BINJA_CCONV_TYPES:
-      pb_extfn.cc = BINJA_CCONV_TYPES[cconv]
+      pb_extfn.cc = BINJA_CCONV_TYPES[str(cconv)]
     else:
       pb_extfn.cc = CFG_pb2.ExternalFunction.CallerCleanup
 
