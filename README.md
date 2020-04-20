@@ -49,10 +49,10 @@ Why would anyone translate binaries *back* to bitcode?
 |  ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ | ------ |
 |  Actively maintained? | Yes | No | Yes | Yes | Yes | No | Maybe | Maybe | Maybe | No | Yes |
 |  Commercial support available? | Yes | No | No | No | Maybe | No | No | No | No | Maybe | No |
-|  LLVM versions | 3.5 - current | 5 | current | 3.9.1 | 3.8 | 3.8 | 3.2 | 4 | 3.9 | 3.4 | 6 |
+|  LLVM versions | 3.5 - current | 5 | current | 4.0 | 3.8 | 3.8 | 3.2 | 4 | 3.9 | 3.4 | 6 |
 |  Builds with CI? | Yes | No | No | Yes | No | No | Yes | Maybe | Maybe | No | No |
 |  32-bit architectures | x86 | x86 | ARM | x86, ARM, MIPS, PIC32, PowerPC |  | ARM, MIPS | S2E | S2E | S2E | ARM, x86 |  |
-|  64-bit architectures | x86-64, AArch64 | x86-64, [AArch64](https://github.com/IAIK/ios-analysis-dagger/)) | x86-64 |  | x86-64 | x86-64 |  | S2E | S2E | PowerPC | x86-64 |
+|  64-bit architectures | x86-64, AArch64 | x86-64, [AArch64](https://github.com/IAIK/ios-analysis-dagger/)) | x86-64 | x86-64, arm64 & more | x86-64 | x86-64 |  | S2E | S2E | PowerPC | x86-64 |
 |  Control-flow recovery | IDA Pro, Binary Ninja, DynInst | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | Ad-hoc | McSema | Ad-hoc | Ad-hoc |
 |  File formats | ELF, PE | ELF, Mach-O |  | ELF, PE, Mach-O, COFF, AR, Intel HEX, Raw | ELF | ELF | ELF |  | ELF, PE | ELF, Mach-O (maybe) | ELF |
 |  Bitcode is executable? | Yes | Yes | Yes | Yes | Yes | Yes | No | No | CGC | No | No |
@@ -214,7 +214,7 @@ This script accepts several command line options:
 * `--prefix PATH`: Install files to `PATH`. By default, `PATH` is `/usr/local`.
 * `--llvm-version MAJOR.MINOR`: Download pre-built dependencies for LLVM version MAJOR.MINOR. The default is to use LLVM 4.0.
 * `--build-dir PATH`: Produce all intermediate build files in `PATH`. By default, `PATH` is `$CWD/remill-build`.
-* `--use-system-compiler`: Compile Remill+McSema using the system compiler toolchain (typically the GCC). **If you encounter linker errors when compiling McSema, and did not use this option, then re-try with this option.**
+* `--use-host-compiler`: Compile Remill+McSema using the system compiler toolchain (typically the GCC). **If you encounter linker errors when compiling McSema, and did not use this option, then re-try with this option.**
 * `--debug`: Build McSema and Remill with debug symbols. If you're trying to debug McSema, then this option is for you.
 
 #### Step 4: Install McSema
