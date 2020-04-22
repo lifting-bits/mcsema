@@ -51,6 +51,7 @@ enum class CallingConv : unsigned char {
   C = 0,
   X86_StdCall = 64,
   X86_FastCall = 65,
+  X86_ThisCall = 70,
   X86_64_SysV = 78,
   Win64 = 79,
   X86_VectorCall = 80,
@@ -64,6 +65,7 @@ static inline constexpr std::string_view to_string(CallingConv c) {
     case CallingConv::C                  : return "C"sv;
     case CallingConv::X86_StdCall        : return "X86_StdCall"sv;
     case CallingConv::X86_FastCall       : return "X86_FastCall"sv;
+    case CallingConv::X86_ThisCall       : return "X86_ThisCall"sv;
     case CallingConv::X86_64_SysV        : return "X86_64_SysV"sv;
     case CallingConv::Win64              : return "Win64"sv;
     case CallingConv::X86_VectorCall     : return "X86_VectorCall"sv;
