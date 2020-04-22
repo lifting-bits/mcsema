@@ -851,6 +851,11 @@ WeakObjectIterator<Entry>::~WeakObjectIterator() {}
 // TODO: Use `impl_t` in methods defined before it was present.
 /* Define public API methods, typically by calling their implementations */
 
+/* Internals */
+Workspace details::Internals::GetWS() {
+  return details::Construct::Wrap<Workspace>( _ctx );
+}
+
 /* Workspace */
 
 Workspace::Workspace(const std::string &name) : _ctx(std::make_shared<Context>(name)) {}

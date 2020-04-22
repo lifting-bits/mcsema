@@ -28,6 +28,7 @@
 namespace mcsema::ws {
 
 // Forward-declare concrete
+class Workspace;
 class Function;
 class ExternalFunction;
 class BasicBlock;
@@ -99,6 +100,7 @@ public:
   // to their ids.
   static constexpr bool is_public_api = true;
 
+  Workspace GetWS();
 protected:
   Internals(int64_t id, CtxPtr &ctx) : _id(id), _ctx(ctx) {}
   Internals(int64_t id, CtxPtr &&ctx) : _id(id), _ctx(std::move(ctx)) {}
@@ -818,6 +820,10 @@ struct Workspace
                        bool is_variadic, bool is_noreturn, CallingConv cc);
 
 private:
+  friend class details::Construct;
+
+  Workspace(std::shared_ptr<Context> c) :_ctx(std::move(c)) {}
+
   std::shared_ptr<Context> _ctx;
 };
 
