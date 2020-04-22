@@ -98,6 +98,28 @@ struct ProtoWriter_impl : Configuration {
     }
   }
 
+  ws::CallingConv CC(mcsema::CallingConvention cc) {
+    switch(cc) {
+      case C:
+      case X86_StdCall:
+        return ws::CallingConv::X86_StdCall;
+      case X86_FastCall:
+        return ws::CallingConv::X86_FastCall;
+      case X86_ThisCall:
+        return ws::CallingConv::X86_ThisCall;
+      case X86_64_SysV:
+        return ws::CallingConv::X86_64_SysV;
+      case Win64:
+        return ws::CallingConv::Win64;
+      case X86_VectorCall:
+        return ws::CallingConv::X86_VectorCall;
+      case X86_RegCall:
+        return ws::CallingConv::X86_RegCall;
+      case AArch64_VectorCall:
+        return ws::CallingConv::AArch64_VectorCall;
+    }
+  }
+
   ws::OperandType ConvertOperandType(mcsema::CodeReference::OperandType op_type) {
     switch(op_type) {
       case CodeReference_OperandType_ImmediateOperand:
