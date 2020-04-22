@@ -689,7 +689,7 @@ struct dispatch<Function> {
 template<>
 struct dispatch<BasicBlock> {
   using type = BasicBlock_<BasicBlock>;
-  using data_fields = util::TypeList<uint64_t, uint64_t>;
+  using data_fields = util::TypeList<uint64_t, std::optional<uint64_t>>;
 };
 
 template<>
@@ -880,7 +880,7 @@ Function Workspace::AddFunction(const Module &module, uint64_t ea, bool is_entry
 
 BasicBlock Workspace::AddBasicBlock(const Module &module,
                                     uint64_t ea,
-                                    uint64_t size,
+                                    std::optional<uint64_t> size,
                                     const MemoryRange &range) {
   return { BasicBlock_{ _ctx }.insert(module._id, ea, size, range._id), _ctx };
 }
@@ -954,7 +954,7 @@ MemoryRange Module::AddMemoryRange(uint64_t ea, uint64_t size) {
   return AddMemoryRange(ea, size, std::string(size, 0));
 }
 
-BasicBlock Module::AddBasicBlock(uint64_t ea, uint64_t size, const MemoryRange &mem) {
+BasicBlock Module::AddBasicBlock(uint64_t ea, std::optional<uint64_t> size, const MemoryRange &mem) {
   return { BasicBlock_{ _ctx }.insert(_id, ea, size, mem._id), _ctx };
 }
 

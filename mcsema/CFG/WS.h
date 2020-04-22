@@ -212,7 +212,7 @@ public:
     // separate query anyway
     struct data_t {
       uint64_t ea;
-      uint64_t size;
+      std::optional<uint64_t> size;
     };
 
     data_t operator*() const;
@@ -721,7 +721,7 @@ public:
   // Zero-initialized MemoryRange
   MemoryRange AddMemoryRange(uint64_t ea, uint64_t range);
 
-  BasicBlock AddBasicBlock(uint64_t ea, uint64_t size, const MemoryRange &memory);
+  BasicBlock AddBasicBlock(uint64_t ea, std::optional<uint64_t> size, const MemoryRange &memory);
 
   SymbolTableEntry AddSymbolTableEntry(const std::string &name,
                                        SymbolVisibility type);
@@ -784,7 +784,7 @@ struct Workspace
 
   BasicBlock AddBasicBlock(const Module &module,
                            uint64_t ea,
-                           uint64_t size,
+                           std::optional<uint64_t> size,
                            const MemoryRange &range);
 
   MemoryRange AddMemoryRange(const Module &module,
