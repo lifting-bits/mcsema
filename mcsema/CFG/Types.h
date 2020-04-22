@@ -29,6 +29,11 @@ using Query = const char *;
 
 namespace details {
 
+  // This class represents a compromise between public ctors in public API and long ropes of friend
+  // declaration. Each public class has this class as a friend and the sole purpose of this class
+  // is to construct those public classes.
+  // Yes, someone can possibly create this class and create internal classes, which can break the
+  // consistency of the API, but it would require conscious effort.
   struct Construct {
 
     template<typename T, typename Ctx>
@@ -52,8 +57,12 @@ namespace details {
       }
       return out;
     }
-  };
 
+    template<typename T, typename Ctx>
+    static T Wrap( Ctx ctx ) {
+      return { std::move( ctx ) };
+    }
+  };
 
 } // namespace details
 
