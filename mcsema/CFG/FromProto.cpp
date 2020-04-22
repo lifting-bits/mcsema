@@ -163,9 +163,7 @@ struct ProtoWriter_impl : Configuration {
           static_cast<uint64_t>(d_xref.ea()),
           static_cast<uint64_t>(d_xref.target_ea()),
           static_cast<uint64_t>(d_xref.width()),
-          ConvertFixupKind(d_xref.target_fixup_kind()),
-          // TODO(lukas): It may make sense to have get_or_create here
-          ToSymbol(d_xref.target_name())
+          ConvertFixupKind(d_xref.target_fixup_kind())
       );
     }
   }
@@ -187,33 +185,15 @@ struct ProtoWriter_impl : Configuration {
     }
   }
 
-
-  template<typename BB>
-  uint64_t BBSize(BB &bb) {
-    uint64_t out = 0;
-    for (auto inst : bb.instructions()) {
-      out += inst.bytes().size();
-    }
-    return out;
-  }
-
   // Thrown away: location
   //              target_type
   template<typename BB>
   void CodeXref(BB &bb, ws::BasicBlock &ws_bb) {
     for (auto inst : bb.instructions()) {
       for (auto c_xref: inst.xrefs()) {
-        if (c_xref.name().empty()) {
-          ws_bb.AddXref(static_cast<uint64_t>(inst.ea()),
-                        static_cast<uint64_t>(c_xref.ea()),
-                        ConvertOperandType(c_xref.operand_type()));
-        } else {
-          ws_bb.AddXref(static_cast<uint64_t>(inst.ea()),
-                        static_cast<uint64_t>(c_xref.ea()),
-                        ConvertOperandType(c_xref.operand_type()),
-                        ToSymbol(c_xref.name()),
-                        static_cast<uint64_t>(c_xref.mask()));
-        }
+        ws_bb.AddXref(static_cast<uint64_t>(inst.ea()),
+                      static_cast<uint64_t>(c_xref.ea()),
+                      ConvertOperandType(c_xref.operand_type()));
       }
     }
   }
@@ -225,7 +205,7 @@ struct ProtoWriter_impl : Configuration {
 
     // TODO(lukas): What if `code_mem_range` is not set?
     auto [it, res] =
-      ea_to_bb.try_emplace(ea, _module.AddBasicBlock(ea, BBSize(bb), *code_mem_range));
+      ea_to_bb.try_emplace(ea, _module.AddBasicBlock(ea, {}, *code_mem_range));
 
     if (res)
       CodeXref(bb, it->second);
