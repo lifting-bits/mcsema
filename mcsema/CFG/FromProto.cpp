@@ -137,10 +137,11 @@ struct ProtoWriter_impl : Configuration {
 
   void ExternalFunctions() {
     for (auto ext_func : _proto.external_funcs()) {
-      _module.AddExternalFunction(
+      auto func = _module.AddExternalFunction(
           static_cast<uint64_t>(ext_func.ea()),
           ToSymbol(ext_func.name()),
           CC(ext_func.cc()), ext_func.has_return(), ext_func.is_weak());
+      func.SetFuncDecl(FuncDecl(ext_func.decl()));
     }
   }
 
@@ -271,6 +272,45 @@ struct ProtoWriter_impl : Configuration {
 
       BBs(f, ws_f);
     }
+  }
+
+  template<typename FD>
+  ws::FuncDecl FuncDecl(const FD &fd) {
+    using decls = ws::FuncDecl::ValueDecls;
+    decls params;
+    for (auto p : fd.parameters()) {
+      params.push_back(ValueDecl(p));
+    }
+
+    decls rets;
+    for (auto r : fd.return_values()) {
+      rets.push_back(ValueDecl(r));
+    }
+
+    return _module.GetWS().AddFuncDecl(ValueDecl(fd.return_address()),
+                                       ValueDecl(fd.return_stack_pointer()),
+                                       params,
+                                       rets,
+                                       fd.is_variadic(), fd.is_noreturn(),
+                                       CC(fd.calling_convention()));
+  }
+
+  template<typename VD>
+  ws::ValueDecl ValueDecl(const VD &vd) {
+    return _module.GetWS().AddValueDecl(
+          vd.type(),
+          (vd.has_register_() ? vd.register_() : std::optional<std::string>()),
+          (vd.has_name() ? vd.name() : std::optional<std::string>()),
+          (vd.has_memory() ? MemoryLoc(vd.memory()) : std::optional<ws::MemoryLocation>())
+        );
+  }
+
+  template<typename ML>
+  ws::MemoryLocation MemoryLoc(const ML &ml) {
+    if (ml.has_offset()) {
+      return _module.GetWS().AddMemoryLoc(ml.register_(), ml.offset());
+    }
+    return _module.GetWS().AddMemoryLoc(ml.register_());
   }
 
   void Write() {
