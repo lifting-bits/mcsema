@@ -313,12 +313,39 @@ struct ProtoWriter_impl : Configuration {
     return _module.GetWS().AddMemoryLoc(ml.register_());
   }
 
+  template<typename PReg>
+  ws::PreservedRegs PreservedRegs(const PReg &p_reg, bool is_alive) {
+    ws::PreservedRegs::Regs regs;
+    for (auto r : p_reg.registers()) {
+      regs.push_back(r);
+    }
+
+    using maybe_end_t = ws::PreservedRegs::Ranges::value_type::second_type;
+    ws::PreservedRegs::Ranges ranges;
+    for (auto r : p_reg.ranges()) {
+      ranges.push_back( {r.begin_ea(), (r.has_end_ea() ? maybe_end_t(r.end_ea()) : maybe_end_t()) } );
+    }
+
+    return _module.AddPreservedRegs(ranges, regs, is_alive);
+  }
+
+  void PreservedRegs() {
+    for (auto r : _proto.preserved_regs()) {
+      PreservedRegs(r, true);
+    }
+
+    for (auto r : _proto.dead_regs()) {
+      PreservedRegs(r, false);
+    }
+  }
+
   void Write() {
     ExternalFunctions();
     ExternalVariables();
     GlobalVariables();
     Segments();
     Functions();
+    PreservedRegs();
   }
 };
 
