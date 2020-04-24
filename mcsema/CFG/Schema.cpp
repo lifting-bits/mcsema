@@ -62,29 +62,9 @@ void Schema::CreateEnums(Context &ctx) {
 
   static Query populate_cc = R"(insert into calling_conventions(rowid, name) values(?1, ?2))";
   if (!RowCount<schema::CallingConv>(ctx)) {
-    db.template query<populate_cc>(lower(    CallingConv::C),
-                                   to_string(CallingConv::C));
-
-    db.template query<populate_cc>(lower(    CallingConv::X86_StdCall),
-                                   to_string(CallingConv::X86_StdCall));
-
-    db.template query<populate_cc>(lower(    CallingConv::X86_FastCall),
-                                   to_string(CallingConv::X86_FastCall));
-
-    db.template query<populate_cc>(lower(    CallingConv::X86_64_SysV),
-                                   to_string(CallingConv::X86_64_SysV));
-
-    db.template query<populate_cc>(lower(    CallingConv::Win64),
-                                   to_string(CallingConv::Win64));
-
-    db.template query<populate_cc>(lower(    CallingConv::X86_VectorCall),
-                                   to_string(CallingConv::X86_VectorCall));
-
-    db.template query<populate_cc>(lower(    CallingConv::X86_RegCall),
-                                   to_string(CallingConv::X86_RegCall));
-
-    db.template query<populate_cc>(lower(    CallingConv::AArch64_VectorCall),
-                                   to_string(CallingConv::AArch64_VectorCall));
+    for (auto cc : AllCCs()) {
+      db.template query<populate_cc>(lower(cc), to_string(cc));
+    }
   }
 
   static Query operand_types = R"(create table if not exists operand_types(
@@ -97,26 +77,9 @@ void Schema::CreateEnums(Context &ctx) {
     R"(insert into operand_types(rowid, type) values(?1, ?2))";
 
   if (!RowCount<schema::OperandType>(ctx)) {
-
-    db.template query<populate_operad_types>(
-        lower(    OperandType::Immediate),
-        to_string(OperandType::Immediate));
-
-    db.template query<populate_operad_types>(
-        lower(    OperandType::Memory),
-        to_string(OperandType::Memory));
-
-    db.template query<populate_operad_types>(
-        lower(    OperandType::MemoryDisplacement),
-        to_string(OperandType::MemoryDisplacement));
-
-    db.template query<populate_operad_types>(
-        lower(    OperandType::ControlFlow),
-        to_string(OperandType::ControlFlow));
-
-    db.template query<populate_operad_types>(
-        lower(    OperandType::OffsetTable),
-        to_string(OperandType::OffsetTable));
+    for (auto ot : AllOperandTypes()) {
+      db.template query<populate_operad_types>(lower(ot), to_string(ot));
+    }
   }
 
   static Query symtab_types = R"(create table if not exists symtab_types(
@@ -126,24 +89,12 @@ void Schema::CreateEnums(Context &ctx) {
   db.template query<symtab_types>();
 
   static Query populate_symtab_types =
-    R"(insert into symtab_types(type, rowid) values(?1, ?2))";
+    R"(insert into symtab_types(type, rowid) values(?2, ?1))";
 
   if (!RowCount<schema::SymbolTableEntryType>(ctx)) {
-    db.template query<populate_symtab_types>(
-        lower(    SymbolVisibility::Imported),
-        to_string(SymbolVisibility::Imported));
-
-    db.template query<populate_symtab_types>(
-        lower(    SymbolVisibility::Exported),
-        to_string(SymbolVisibility::Exported));
-
-    db.template query<populate_symtab_types>(
-        lower(    SymbolVisibility::Internal),
-        to_string(SymbolVisibility::Internal));
-
-    db.template query<populate_symtab_types>(
-        lower(    SymbolVisibility::Artificial),
-        to_string(SymbolVisibility::Artificial));
+    for (auto sv_ : AllSymbolVisibilities()) {
+      db.template query<populate_symtab_types>(lower(sv_), to_string(sv_));
+    }
   }
 
   static Query fixup_kinds =
