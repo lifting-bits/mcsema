@@ -45,6 +45,13 @@ static inline constexpr std::string_view to_string(SymbolVisibility sv) {
   }
 }
 
+using SymbolVisibilities = std::vector<SymbolVisibility>;
+
+static inline SymbolVisibilities AllSymbolVisibilities() {
+  return { SymbolVisibility::Imported, SymbolVisibility::Exported,
+           SymbolVisibility::Internal, SymbolVisibility::Artificial };
+}
+
 // Corresponds to llvm calling convention numbering
 // NOTE(lukas): llvm header is not included since dependency on llvm is not worth
 enum class CallingConv : unsigned char {
@@ -74,6 +81,14 @@ static inline constexpr std::string_view to_string(CallingConv c) {
   }
 }
 
+using CallingConvs = std::vector<CallingConv>;
+
+static inline CallingConvs AllCCs() {
+  return { CallingConv::C, CallingConv::X86_StdCall, CallingConv::X86_FastCall,
+           CallingConv::X86_ThisCall, CallingConv::X86_64_SysV, CallingConv::Win64,
+           CallingConv::X86_VectorCall, CallingConv::X86_RegCall, CallingConv::AArch64_VectorCall };
+}
+
 enum class OperandType : unsigned char {
   Immediate = 0,
   Memory = 1,
@@ -91,6 +106,13 @@ static inline constexpr std::string_view to_string(OperandType ot) {
     case OperandType::ControlFlow        : return "ControlFlow"sv;
     case OperandType::OffsetTable        : return "OffsetTable"sv;
   }
+}
+
+using OperandTypes = std::vector<OperandType>;
+
+static inline OperandTypes AllOperandTypes() {
+  return { OperandType::Immediate, OperandType::Memory, OperandType::MemoryDisplacement,
+           OperandType::ControlFlow, OperandType::OffsetTable };
 }
 
 enum class FixupKind : unsigned char {
