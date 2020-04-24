@@ -42,7 +42,7 @@ void Schema::CreateEnums(Context &ctx) {
   db.template query<action_enum>();
 
   static Query populate_action_enum =
-    R"(insert into exception_frame_actions values(?1, ?2))";
+    R"(insert into exception_frame_actions(rowid, action) values(?1, ?2))";
 
   if (!RowCount<schema::ExceptionFrameAction>(ctx)) {
     db.template query<populate_action_enum>(
@@ -50,8 +50,8 @@ void Schema::CreateEnums(Context &ctx) {
         to_string(Action::Cleanup));
 
     db.template query<populate_action_enum>(
-        lower(    Action::Cleanup),
-        to_string(Action::Cleanup));
+        lower(    Action::Catch),
+        to_string(Action::Catch));
   }
   // rowid corresponds to llvm value for given cc
   static Query cc = R"(create table if not exists calling_conventions(
