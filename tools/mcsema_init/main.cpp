@@ -16,7 +16,25 @@
 
 #include <mcsema/CFG/FromProto.h>
 
+#include <iostream>
+#include <string>
+
+
+std::string help() {
+  std::string out;
+  out += "usage: mcsema-init input output \n";
+  out += "\tinput: CFG file produced by a mcsema frontend\n";
+  out += "\toutput: path to mcsema-ws database. If db already exists, entries from cfg are added only if db does not contain such module already.";
+  return out;
+}
+
+// Note(lukas): For now we do not use gflags as there are almost no options and it introduces
+//              a dependency. For the same reason `std::cout` is used, opposed to glog.
 int main(int argc, char *argv[]) {
-  // TODO: UI parser
-  //mcsema::cfg::FromProto("testcase.cfg", "mcsema_example.sql");
+  if (argc != 3) {
+    std::cout << help();
+    return 0;
+  }
+  mcsema::cfg::FromProto(argv[1], argv[2]);
+  return 0;
 }
