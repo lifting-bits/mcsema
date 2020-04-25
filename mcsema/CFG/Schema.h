@@ -39,6 +39,12 @@ struct Other {
   using type = std::conditional_t< std::is_same_v<C, T1>, T2, T1>;
 };
 
+// Many of the simple tables that implement the storage follow the same structure,
+// therefore a lot of queries can be automatically generated.
+// Metaclasses below define minimum information that is required to do so.
+// TODO(lukas): Since they are quite simple it would be perfect is queries that create
+//              them would be derived automatically as well, but it sounds like non-trivial
+//              work.
 
 template<typename T1, typename T2>
 struct NMTable {
@@ -55,6 +61,7 @@ struct NMTable {
 
 using Query = const char *;
 
+// `fk` represent the name this table uses for itself in other tables (e.g. n:m tables)
 #define DEFINE_TABLE(name_, table_name_, foreign_key) \
   struct name_ { \
     constexpr static Query table_name = table_name_; \
