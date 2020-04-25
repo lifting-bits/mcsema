@@ -299,7 +299,6 @@ void Schema::CreateSchema(Context &ctx) {
         module_rowid integer NOT NULL,
         has_return integer,
         is_weak integer,
-        signature text,
         FOREIGN KEY(calling_convention_rowid) REFERENCES calling_conventions(rowid),
         FOREIGN KEY(symtab_rowid) REFERENCES symtabs(rowid),
         FOREIGN KEY(module_rowid) REFERENCES modules(rowid)
