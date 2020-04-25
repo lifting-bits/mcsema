@@ -126,8 +126,8 @@ void Schema::CreateNMTables(Context &ctx) {
        function_rowid integer NOT NULL,
        bb_rowid integer NOT NULL,
        UNIQUE(function_rowid, bb_rowid),
-       FOREIGN KEY(function_rowid) REFERENCES functions(rowid),
-       FOREIGN KEY(bb_rowid) REFERENCES blocks(rowid)
+       FOREIGN KEY(function_rowid) REFERENCES functions(rowid) ON DELETE CASCADE,
+       FOREIGN KEY(bb_rowid) REFERENCES blocks(rowid) ON DELETE CASCADE
       ))";
   db.template query< q_func_2_block >();
 
@@ -136,8 +136,8 @@ void Schema::CreateNMTables(Context &ctx) {
         from_rowid integer NOT NULL,
         to_rowid integer NOT NULL,
         UNIQUE(from_rowid, to_rowid),
-        FOREIGN KEY(from_rowid) REFERENCES blocks(rowid),
-        FOREIGN KEY(to_rowid) REFERENCES blocks(rowid)
+        FOREIGN KEY(from_rowid) REFERENCES blocks(rowid) ON DELETE CASCADE,
+        FOREIGN KEY(to_rowid) REFERENCES blocks(rowid) ON DELETE CASCADE
       ))";
   db.template query<q_bb_successors>();
 
@@ -146,8 +146,8 @@ void Schema::CreateNMTables(Context &ctx) {
         frame_rowid integer NOT NULL,
         var_rowid integer NOT NULL,
         UNIQUE(frame_rowid, var_rowid),
-        FOREIGN KEY(frame_rowid) REFERENCES exception_frames(rowid),
-        FOREIGN KEY(var_rowid) REFERENCES external_variables(rowid)
+        FOREIGN KEY(frame_rowid) REFERENCES exception_frames(rowid) ON DELETE CASCADE,
+        FOREIGN KEY(var_rowid) REFERENCES external_variables(rowid) ON DELETE CASCADE
         ))";
   db.template query<q_exception_frame_2_type>();
 
@@ -156,8 +156,8 @@ void Schema::CreateNMTables(Context &ctx) {
         frame_rowid integer NOT NULL,
         function_rowid integer NOT NULL,
         UNIQUE(frame_rowid, function_rowid),
-        FOREIGN KEY(frame_rowid) REFERENCES exception_frames(rowid),
-        FOREIGN KEY(function_rowid) REFERENCES functions(rowid)
+        FOREIGN KEY(frame_rowid) REFERENCES exception_frames(rowid) ON DELETE CASCADE,
+        FOREIGN KEY(function_rowid) REFERENCES functions(rowid) ON DELETE CASCADE
         ))";
   db.template query<q_exception_frame_2_func>();
 
@@ -165,8 +165,8 @@ void Schema::CreateNMTables(Context &ctx) {
         value_decl_rowid integer NOT NULL,
         func_decl_rowid integer NOT NULL,
         UNIQUE(value_decl_rowid, func_decl_rowid),
-        FOREIGN KEY(value_decl_rowid) REFERENCES value_decls(rowid),
-        FOREIGN KEY(func_decl_rowid) REFERENCES func_decls(rowid)
+        FOREIGN KEY(value_decl_rowid) REFERENCES value_decls(rowid) ON DELETE CASCADE,
+        FOREIGN KEY(func_decl_rowid) REFERENCES func_decls(rowid) ON DELETE CASCADE
         ))";
   db.template query<q_func_decl_params>();
 
@@ -174,8 +174,8 @@ void Schema::CreateNMTables(Context &ctx) {
         value_decl_rowid integer NOT NULL,
         func_decl_rowid integer NOT NULL,
         UNIQUE(value_decl_rowid, func_decl_rowid),
-        FOREIGN KEY(value_decl_rowid) REFERENCES value_decls(rowid),
-        FOREIGN KEY(func_decl_rowid) REFERENCES func_decls(rowid)
+        FOREIGN KEY(value_decl_rowid) REFERENCES value_decls(rowid) ON DELETE CASCADE,
+        FOREIGN KEY(func_decl_rowid) REFERENCES func_decls(rowid) ON DELETE CASCADE
         ))";
   db.template query<q_func_decl_rets>();
 
@@ -183,8 +183,8 @@ void Schema::CreateNMTables(Context &ctx) {
         function_rowid integer NOT NULL,
         func_decl_rowid integer NOT NULL,
         UNIQUE(function_rowid, func_decl_rowid),
-        FOREIGN KEY(function_rowid) REFERENCES functions(rowid),
-        FOREIGN KEY(func_decl_rowid) REFERENCES func_decls(rowid)
+        FOREIGN KEY(function_rowid) REFERENCES functions(rowid) ON DELETE CASCADE,
+        FOREIGN KEY(func_decl_rowid) REFERENCES func_decls(rowid) ON DELETE CASCADE
         ))";
   db.template query<q_func_spec>();
 
@@ -192,8 +192,8 @@ void Schema::CreateNMTables(Context &ctx) {
         ext_function_rowid integer NOT NULL,
         func_decl_rowid integer NOT NULL,
         UNIQUE(ext_function_rowid, func_decl_rowid),
-        FOREIGN KEY(ext_function_rowid) REFERENCES external_functions(rowid),
-        FOREIGN KEY(func_decl_rowid) REFERENCES func_decls(rowid)
+        FOREIGN KEY(ext_function_rowid) REFERENCES external_functions(rowid) ON DELETE CASCADE,
+        FOREIGN KEY(func_decl_rowid) REFERENCES func_decls(rowid) ON DELETE CASCADE
         ))";
   db.template query<q_ext_func_spec>();
 
