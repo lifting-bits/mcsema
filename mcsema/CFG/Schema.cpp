@@ -431,23 +431,9 @@ void Schema::CreateTriggers(Context &ctx) {
       FOR EACH ROW
       BEGIN
           DELETE FROM code_references WHERE OLD.rowid = code_references.bb_rowid;
-          DELETE FROM function_to_block WHERE OLD.rowid = function_to_block.bb_rowid;
-          DELETE FROM bb_successors WHERE OLD.rowid IN (bb_successors.from_rowid,
-                                                        bb_successors.to_rowid);
       END
   )";
   ctx.db.template query<delete_block>();
-
-  static Query delete_function = R"(
-    CREATE TRIGGER IF NOT EXISTS delete_function_cascase
-      AFTER DELETE ON functions
-      FOR EACH ROW
-      BEGIN
-        DELETE FROM function_to_block WHERE OLD.rowid = function_to_block.function_rowid;
-      END
-  )";
-  ctx.db.template query<delete_function>();
-
 }
 
 } // namespace mcsema::ws
