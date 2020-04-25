@@ -148,6 +148,9 @@ struct id_based_ops_: _crtp<Self, id_based_ops_>
     return this->db().template query<Self::q_get>(id);
   }
 
+  // Retrieve entry with `rowid = id`, select `Fields...` and convert them to `Concrete` struct
+  // that need to have public ctor and same must hold for its attributes.
+  // Typical usage is to retrieve `data_t` for given class.
   template<typename Concrete, typename ...Fields>
   auto maybe_c_get(int64_t id, util::TypeList<Fields...>) {
     return maybe_c_get<Concrete, Fields...>(id);
@@ -188,6 +191,10 @@ struct id_based_ops_: _crtp<Self, id_based_ops_>
   template<class ...Args>
   using TypeList = util::TypeList<Args...>;
 
+  // Same as `c_get` but `Concrete` can contain public API classes as attributes
+  // Each attribute is checked whether it is part of public api; if yes
+  // int64_t is selected from db that is later built into the object.
+  // Note(lukas): This may be too complicated, but allows the same more flexibility.
   template<typename Concrete, typename Ctx, typename ...Fields>
   auto c_get_f(int64_t id, util::TypeList<Fields...>, Ctx full_ctx) {
     auto result = this->db().template query<Self::q_get>(id);
@@ -314,6 +321,8 @@ struct has_ea : _crtp<Self, has_ea> {
   }
 };
 
+
+// Simple query generation for tables that only represent some form of N:M mapping.
 template<typename NMTable>
 struct nm_impl : _crtp<NMTable, nm_impl> {
 
@@ -365,6 +374,8 @@ struct nm_impl : _crtp<NMTable, nm_impl> {
 
 };
 
+// If there is a simple N:M table this wrapper allows iteration over all entries that have one
+// id fixed, i.e returns all `M`s that are in a row with given `N`.
 struct can_obj_iterate {
 
   template<typename Table, typename Self>
