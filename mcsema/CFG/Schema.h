@@ -121,7 +121,7 @@ struct FuncSpec : NMTable<Function, FuncDecl> {
   using table = FuncSpec;
 };
 
-struct ExtFuncSpec : NMTable<Function, FuncDecl> {
+struct ExtFuncSpec : NMTable<ExternalFunction, FuncDecl> {
   static constexpr Query table_name = "ext_func_spec";
   using table = ExtFuncSpec;
 };
