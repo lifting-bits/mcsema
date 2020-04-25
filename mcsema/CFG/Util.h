@@ -165,7 +165,6 @@ bool Match(
 template<typename WeakIt, typename F>
 void ForEach(WeakIt it, F f) {
   while (auto data = it.Fetch()) {
-    //std::cout << data->_id << std::endl;
     f(*data);
   }
 }
@@ -173,15 +172,6 @@ void ForEach(WeakIt it, F f) {
 template<typename ...Fields, typename Result>
 auto GetFromList(Result &r, TypeList<Fields...>) {
   return *r.template Get<Fields...>();
-}
-
-template<typename ...Fields, typename R>
-auto GetAll(R &r, TypeList<Fields...>) {
-  std::vector<Fields...> out;
-  while (auto c = r.template Get<Fields...>()) {
-    out.insert(std::move(*c), out.end());
-  }
-  return out;
 }
 
 template<typename To, size_t ...Indices, typename From>
