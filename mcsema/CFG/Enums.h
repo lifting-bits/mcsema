@@ -16,9 +16,30 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string_view>
 
+
 namespace mcsema::ws {
+
+enum class OS : unsigned char {
+  Linux = 0,
+  Windows = 1,
+  OSX = 2,
+};
+
+static inline constexpr std::string_view to_string(OS os) {
+  using namespace std::literals;
+  switch(os) {
+    case OS::Linux   : return "Linux"sv;
+    case OS::Windows : return "Windows"sv;
+    case OS::OSX     : return "OSX"sv;
+  }
+};
+
+static inline std::vector<OS> AllOS() {
+  return { OS::Linux, OS::Windows, OS::OSX };
+}
 
 /* Enums */
 enum class SymbolVisibility: unsigned char {
