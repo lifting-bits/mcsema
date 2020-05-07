@@ -10,7 +10,7 @@ ARG LIBRARIES
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get install -qqy python-pip python-virtualenv wget zlib1g-dev && \
+    apt-get install -qqy wget zlib1g-dev && \
     if [ "$(uname -m)" = "x86_64" ]; then dpkg --add-architecture i386 && apt-get update && apt-get install -qqy zip zlib1g-dev:i386; fi && \
     rm -rf /var/lib/apt/lists/*
 
