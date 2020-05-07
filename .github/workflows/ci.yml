@@ -8,35 +8,6 @@ on:
     # run CI every day even if no PRs/merges occur
     - cron:  '0 6 * * *'
 jobs:
-  MacOS:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions/cache@v1
-      name: Cache LLVM 4 artifacts
-      with:
-        path: ccache_llvm40
-        key: ${{ runner.os }}-llvm4
-        restore-keys: |
-          ${{ runner.os }}-llvm4
-    - uses: actions/cache@v1
-      name: Cache LLVM 5 artifacts
-      with:
-        path: ccache_llvm50
-        key: ${{ runner.os }}-llvm5
-        restore-keys: |
-          ${{ runner.os }}-llvm5
-    - uses: actions/cache@v1
-      name: Cache LLVM 6 artifacts
-      with:
-        path: ccache_llvm60
-        key: ${{ runner.os }}-llvm6
-        restore-keys: |
-          ${{ runner.os }}-llvm6
-    - name: Run Tests
-      run: |
-        ./scripts/travis.sh macos-latest initialize
-        ./scripts/travis.sh macos-latest build
   Docker_Linux:
     runs-on: ubuntu-latest
     strategy:
