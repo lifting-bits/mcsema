@@ -18,14 +18,14 @@ jobs:
     - uses: actions/checkout@v2
     - name: Build LLVM ${{ matrix.llvm }} on ${{ matrix.ubuntu }}
       run: |
-        docker build . -t docker.pkg.github.com/lifting-bits/mcsema/llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest -f Dockerfile --build-arg DISTRO_BASE=ubuntu${{ matrix.ubuntu }} --build-arg ARCH=amd64 --build-arg LLVM_VERSION=${{ matrix.llvm }}
+        docker build . -t docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest -f Dockerfile --build-arg DISTRO_BASE=ubuntu${{ matrix.ubuntu }} --build-arg ARCH=amd64 --build-arg LLVM_VERSION=${{ matrix.llvm }}
     - name: Push Image for LLVM ${{ matrix.llvm }} on ${{ matrix.ubuntu }}
       if: github.event_name == 'push' && github.ref == 'refs/heads/master'
       run: |
         docker login docker.pkg.github.com -u "${GH_USER}" -p "${GH_TOKEN}"
-        docker push docker.pkg.github.com/lifting-bits/mcsema/llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest
+        docker push docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest
         docker login -u "${DOCKER_HUB_USER}" -p "${DOCKER_HUB_TOKEN}"
-        docker tag docker.pkg.github.com/lifting-bits/mcsema/llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest trailofbits/mcsema:llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64
+        docker tag docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest trailofbits/mcsema:llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64
         docker push trailofbits/mcsema:llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64
       env:
         GH_USER: ${{ github.actor }}
