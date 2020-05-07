@@ -10,9 +10,12 @@ ARG LIBRARIES
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get install -qqy wget zlib1g-dev && \
+    apt-get install -qqy python2.7 wget zlib1g-dev && \
     if [ "$(uname -m)" = "x86_64" ]; then dpkg --add-architecture i386 && apt-get update && apt-get install -qqy zip zlib1g-dev:i386; fi && \
     rm -rf /var/lib/apt/lists/*
+
+# needed for 20.04 support until we migrate to py3
+RUN curl https://bootstrap.pypa.io/get-pip.py --output get-pip.py && python2.7 get-pip.py
 
 # Using this file:
 # 1. wget https://raw.githubusercontent.com/trailofbits/mcsema/master/tools/Dockerfile
