@@ -89,7 +89,7 @@ Why would anyone translate binaries *back* to bitcode?
 
 #### Step 1: Download Dockerfile
 
-`wget https://raw.githubusercontent.com/lifting-bits/mcsema/master/tools/Dockerfile`
+`wget https://raw.githubusercontent.com/lifting-bits/mcsema/master/Dockerfile`
 
 #### Step 2: Add your disassembler
 
@@ -102,8 +102,8 @@ RUN /root/binaryninja/scripts/linux-setup.sh
 
 #### Step 3: Build & Run Dockerfile
 
-This will build the container for you and run it with your local directory mounted into the container (at /home/user/local) such that your work in the container is saved locally:
-`docker build -t=mcsema . && docker run --rm -it --ipc=host -v "${PWD}":/home/user/local mcsema`
+This will build the container for you and run it with your local directory mounted into the container (at `/mcsema/local`) such that your work in the container is saved locally:
+`docker build -t=mcsema . && docker run --rm -it --ipc=host -v "${PWD}":/mcsema/local mcsema`
 
 ### On Linux
 
