@@ -53,5 +53,5 @@ RUN cd /remill/build && cmake .. && cmake --build . --target install
 
 
 # Allow for mounting of local folder
-RUN mkdir /mcsema/local
+RUN mkdir -p /mcsema/local
 # CMD /bin/bash
