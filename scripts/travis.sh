@@ -82,6 +82,13 @@ main() {
   local platform_name="$1"
   local operation_type="$2"
 
+  # This makes life simpler for github actions
+  if [[ "${platform_name}" == "macos-latest" ]] ; then
+    platform_name="osx"
+  elif [[ "${platform_name}" == "ubuntu-latest" ]] ; then
+    platform_name="linux"
+  fi
+
   if [[ "${platform_name}" != "osx" && "${platform_name}" != "linux" ]] ; then
     printf "Invalid platform: ${platform_name}\n"
     return 1

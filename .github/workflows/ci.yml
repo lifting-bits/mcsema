@@ -1,0 +1,34 @@
+name: CI
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  schedule:
+    # run CI every day even if no PRs/merges occur
+    - cron:  '0 6 * * *'
+jobs:
+  Docker_Linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        llvm: ["800", "900"]
+        ubuntu: ["20.04", "19.10", "18.04"]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build LLVM ${{ matrix.llvm }} on ${{ matrix.ubuntu }}
+      run: |
+        docker build . -t docker.pkg.github.com/lifting-bits/mcsema/llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest -f Dockerfile --build-arg DISTRO_BASE=ubuntu${{ matrix.ubuntu }} --build-arg ARCH=amd64 --build-arg LLVM_VERSION=${{ matrix.llvm }}
+    - name: Push Image for LLVM ${{ matrix.llvm }} on ${{ matrix.ubuntu }}
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      run: |
+        docker login docker.pkg.github.com -u "${GH_USER}" -p "${GH_TOKEN}"
+        docker push docker.pkg.github.com/lifting-bits/mcsema/llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest
+        docker login -u "${DOCKER_HUB_USER}" -p "${DOCKER_HUB_TOKEN}"
+        docker tag docker.pkg.github.com/lifting-bits/mcsema/llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest trailofbits/mcsema:llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64
+        docker push trailofbits/mcsema:llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64
+      env:
+        GH_USER: ${{ github.actor }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        DOCKER_HUB_USER: ${{  secrets.DOCKER_HUB_USER  }}
+        DOCKER_HUB_TOKEN: ${{  secrets.DOCKER_HUB_TOKEN  }}
