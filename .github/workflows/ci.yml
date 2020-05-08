@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        llvm: ["800", "900"]
+        llvm: ["800", "900", "1000"]
         ubuntu: ["20.04", "19.10", "18.04"]
     steps:
     - uses: actions/checkout@v2
@@ -23,7 +23,7 @@ jobs:
       if: github.event_name == 'push' && github.ref == 'refs/heads/master'
       run: |
         docker login docker.pkg.github.com -u "${GH_USER}" -p "${GH_TOKEN}"
-        docker push docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest
+        for i in 1 2 3; do docker push docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest && break || sleep 10; done
         docker login -u "${DOCKER_HUB_USER}" -p "${DOCKER_HUB_TOKEN}"
         docker tag docker.pkg.github.com/lifting-bits/mcsema/mcsema-llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64:latest trailofbits/mcsema:llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64
         docker push trailofbits/mcsema:llvm${{ matrix.llvm }}-ubuntu${{ matrix.ubuntu }}-amd64
