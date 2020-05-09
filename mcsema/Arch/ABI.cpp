@@ -722,14 +722,14 @@ llvm::Value *CallingConvention::LoadNextSimpleArgument(
   auto sp = LoadStackPointer(block);
   CHECK(sp->getType() == gWordType);
 
-  auto addr_size = gArch->address_size / 8U;
+  auto addr_size = static_cast<uint64_t>(gArch->address_size / 8U);
   auto offset = llvm::ConstantInt::get(gWordType, num_loaded_stack_bytes);
 
   auto addr = ir.CreateAdd(sp, offset);
   std::vector<llvm::Value *> args = {remill::LoadMemoryPointer(block), addr};
 
   llvm::DataLayout dl(gModule.get());
-  auto alloc_size = dl.getTypeAllocSize(goal_type);
+  auto alloc_size = static_cast<uint64_t>(dl.getTypeAllocSize(goal_type));
 
   llvm::Value *val = nullptr;
 
@@ -983,7 +983,7 @@ void CallingConvention::StoreArguments(
   CHECK(gArch->IsX86() || gArch->IsAMD64() || gArch->IsAArch64());
   std::reverse(stack_arg_vals.begin(), stack_arg_vals.end());
 
-  auto addr_size = gArch->address_size / 8;
+  auto addr_size = static_cast<uint64_t>(gArch->address_size / 8U);
   auto sp = LoadStackPointer(block);
   llvm::Value *memory = ir.CreateLoad(memory_ref);
 
@@ -993,7 +993,7 @@ void CallingConvention::StoreArguments(
 
   for (auto arg_val : stack_arg_vals) {
     auto arg_type = arg_val->getType();
-    auto alloc_size = dl.getTypeAllocSize(arg_type);
+    auto alloc_size = static_cast<uint64_t>(dl.getTypeAllocSize(arg_type));
     llvm::Function *func = nullptr;
 
     if (arg_type->isX86_FP80Ty()) {
