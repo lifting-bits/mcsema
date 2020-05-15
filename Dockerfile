@@ -61,6 +61,11 @@ RUN mkdir -p ./build && cd ./build && \
     cmake -G Ninja -DCMAKE_PREFIX_PATH=/opt/trailofbits/remill -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/mcsema .. && \
     cmake --build . --target install
 
+RUN cd mcsema/OS/Linux && \
+    mkdir -p build && cd build && \
+    cmake -G Ninja -DCMAKE_PREFIX_PATH=/opt/trailofbits/remill:/remill -DCMAKE_MODULE_PATH=/remill -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/mcsema .. && \
+    cmake --build . --target install
+
 WORKDIR tests/test_suite_generator
 RUN mkdir -p build && \
     cd build && \
@@ -69,6 +74,7 @@ RUN mkdir -p build && \
 	  -DMCSEMADISASS_PATH=/opt/trailofbits/mcsema/bin \
 	  .. && \
     cmake --build . --target install
+
 RUN cd test_suite && \
     PATH="/opt/trailofbits/mcsema/bin:${PATH}" python2 start.py
 

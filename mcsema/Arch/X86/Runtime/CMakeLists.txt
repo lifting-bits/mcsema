@@ -43,8 +43,8 @@ else()
   foreach (_variableName ${_variableNames})
       message(STATUS "${_variableName}=${${_variableName}}")
   endforeach()
-  set(MCSMEMA_RT32 mcsema_rt32-${LLVM_VERSION})
-  set(MCSMEMA_RT64 mcsema_rt64-${LLVM_VERSION})
+  set(MCSMEMA_RT32 mcsema_rt32-${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION})
+  set(MCSMEMA_RT64 mcsema_rt64-${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION})
 
   if(WIN32)
     add_executable(mcsema-print-runtime-x86
