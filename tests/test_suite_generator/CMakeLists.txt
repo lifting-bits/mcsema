@@ -155,7 +155,7 @@ function (ExportCFG target_name architecture binary_path)
   else ()
     add_custom_command(
       OUTPUT "${output_file}"
-      COMMAND "${MCSEMADISASS_PATH}" --disassembler "${IDAT64_PATH}" --arch "${architecture}" --os "${platform}" --binary "${binary_path}" --output "${output_file}" --entrypoint main
+      COMMAND "${MCSEMADISASS_EXE}" --disassembler "${IDAT64_PATH}" --arch "${architecture}" --os "${platform}" --binary "${binary_path}" --output "${output_file}" --entrypoint main
       DEPENDS "${binary_path}"
       VERBATIM
     )
@@ -224,7 +224,7 @@ function (AddBinaryTest target_name)
 
     add_custom_command(
       OUTPUT "${bc_file_name}"
-      COMMAND "${MCSEMALIFT_PATH}" --arch "${architecture}" --os "${platform}" --cfg "${cfg_file_name}" --output "${bc_file_name}"
+      COMMAND "${MCSEMALIFT_EXE}" --arch "${architecture}" --os "${platform}" --cfg "${cfg_file_name}" --output "${bc_file_name}"
       DEPENDS "${cfg_file_name}"
       VERBATIM
     )
@@ -309,7 +309,7 @@ function (GenerateTest target_name)
 
       add_custom_command(
         OUTPUT "${current_target_name}.bc"
-        COMMAND "${MCSEMALIFT_PATH}" --arch "${architecture}" --os "${platform}" --cfg "${current_target_name}.cfg" --output "${current_target_name}.bc"
+	COMMAND "${MCSEMALIFT_EXE}" --arch "${architecture}" --os "${platform}" --cfg "${current_target_name}.cfg" --output "${current_target_name}.bc"
         DEPENDS "${current_target_name}.cfg"
         VERBATIM
       )
@@ -353,6 +353,7 @@ find_program(MCSEMALIFT_PATH "mcsema-lift${LLVM_VERSION_SUFFIX}")
 if ("${MCSEMALIFT_PATH}" STREQUAL "MCSEMALIFT_PATH-NOTFOUND")
   message(FATAL_ERROR "Failed to locate the mcsema-lift${LLVM_VERSION_SUFFIX} executable!")
 endif ()
+set(MCSEMALIFT_EXE "${MCSEMALIFT_PATH}/mcsema-lift${LLVM_VERSION_SUFFIX}")
 
 find_program(IDAT64_PATH "idat64")
 if ("${IDAT64_PATH}" STREQUAL "IDAT64_PATH-NOTFOUND")
@@ -370,16 +371,17 @@ find_program(MCSEMADISASS_PATH "mcsema-disass")
 if ("${MCSEMADISASS_PATH}" STREQUAL "MCSEMADISASS_PATH-NOTFOUND")
   message(FATAL_ERROR "Failed to locate the mcsema-disass executable!")
 endif ()
+set(MCSEMADISASS_EXE "${MCSEMADISASS_PATH}/mcsema-disass")
 
 message("Toolset")
-message(" > mcsema-lift: ${MCSEMALIFT_PATH}")
+message(" > mcsema-lift: ${MCSEMALIFT_EXE}")
 message(" > clang: ${CLANG_PATH}")
 if (NOT "${IDAT64_PATH}" STREQUAL "IDAT64_PATH-NOTFOUND")
   message(" > idat64: ${IDAT64_PATH}")
 else()
   message(" > using prebuilt cfgs: ${MCSEMA_PREBUILT_CFG_PATH}")
 endif ()
-message(" > mcsema-disass: ${MCSEMADISASS_PATH}")
+message(" > mcsema-disass: ${MCSEMADISASS_EXE}")
 
 set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/test_suite")
 

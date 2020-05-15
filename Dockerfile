@@ -26,6 +26,7 @@ RUN apt-get update && \
 # needed for 20.04 support until we migrate to py3
 RUN curl https://bootstrap.pypa.io/get-pip.py --output get-pip.py && python2.7 get-pip.py
 
+WORKDIR /
 COPY .remill_commit_id ./
 RUN git clone https://github.com/lifting-bits/remill.git && \
     cd remill && \
@@ -37,7 +38,7 @@ ENV PATH="${LIBRARIES}/llvm/bin:${LIBRARIES}/cmake/bin:${LIBRARIES}/protobuf/bin
     CXX="${LIBRARIES}/llvm/bin/clang++" \
     TRAILOFBITS_LIBRARIES="${LIBRARIES}"
 
-WORKDIR remill
+WORKDIR /remill
 RUN mkdir -p build && cd build && \
     cmake -G Ninja -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/remill .. && \
     cmake --build . --target install
@@ -60,13 +61,16 @@ RUN mkdir -p ./build && cd ./build && \
     cmake -G Ninja -DCMAKE_PREFIX_PATH=/opt/trailofbits/remill -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/mcsema .. && \
     cmake --build . --target install
 
-RUN cd tests/test_suite_generator && \
-    mkdir -p build && \
+WORKDIR tests/test_suite_generator
+RUN mkdir -p build && \
     cd build && \
-    cmake .. && \
+    cmake -DMCSEMALIFT_PATH=/opt/trailofbits/mcsema/bin \
+          -DMCSEMA_PREBUILT_CFG_PATH="$(pwd)/../generated/prebuilt_cfg/" \
+	  -DMCSEMADISASS_PATH=/opt/trailofbits/mcsema/bin \
+	  .. && \
     cmake --build . --target install
-RUN cd ../test_suite && \
-    python2 start.py
+RUN cd test_suite && \
+    PATH="/opt/trailofbits/mcsema/bin:${PATH}" python2 start.py
 
 
 
