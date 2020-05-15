@@ -15,8 +15,7 @@ RUN apt-get update && \
 
 
 # Build-time dependencies go here
-# FROM trailofbits/remill:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as base
-FROM ek-cxx-common as deps
+FROM trailofbits/cxx-common:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as deps
 ARG LIBRARIES
 
 RUN apt-get update && \
@@ -38,15 +37,15 @@ ENV PATH="${LIBRARIES}/llvm/bin:${LIBRARIES}/cmake/bin:${LIBRARIES}/protobuf/bin
     CXX="${LIBRARIES}/llvm/bin/clang++" \
     TRAILOFBITS_LIBRARIES="${LIBRARIES}"
 
-RUN mkdir /remill/build && cd /remill/build && \
+WORKDIR remill
+RUN mkdir -p build && cd build && \
     cmake -G Ninja -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/remill .. && \
     cmake --build . --target install
 
-WORKDIR /remill/tools/mcsema
+WORKDIR tools/mcsema
 
 # Source code build
 FROM deps as build
-ARG LIBRARIES
 # Using this file:
 # 1. wget https://raw.githubusercontent.com/trailofbits/mcsema/master/tools/Dockerfile
 # 2. docker build -t=mcsema .
@@ -61,6 +60,16 @@ RUN mkdir -p ./build && cd ./build && \
     cmake -G Ninja -DCMAKE_PREFIX_PATH=/opt/trailofbits/remill -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/mcsema .. && \
     cmake --build . --target install
 
+RUN cd tests/test_suite_generator && \
+    mkdir -p build && \
+    cd build && \
+    cmake .. && \
+    cmake --build . --target install
+RUN cd ../test_suite && \
+    python2 start.py
+
+
+
 ################################
 # Left to reader to install    #
 #  their disassembler (IDA/BN) #
@@ -72,6 +81,7 @@ RUN mkdir -p ./build && cd ./build && \
 
 
 FROM base as dist
+ARG LLVM_VERSION
 
 # Allow for mounting of local folder
 RUN mkdir -p /mcsema/local
