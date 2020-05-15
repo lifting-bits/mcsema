@@ -38,11 +38,6 @@ else()
   # Create the runtimes
   # 32-bit binaries work on both 32 and 64 bit platforms
 
-  get_cmake_property(_variableNames VARIABLES)
-  list (SORT _variableNames)
-  foreach (_variableName ${_variableNames})
-      message(STATUS "${_variableName}=${${_variableName}}")
-  endforeach()
   set(MCSMEMA_RT32 mcsema_rt32-${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION})
   set(MCSMEMA_RT64 mcsema_rt64-${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION})
 

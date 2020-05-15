@@ -17,6 +17,7 @@ cmake_minimum_required(VERSION 3.2)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/settings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/BCCompiler.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/ccache.cmake")
 
 configureCcache()

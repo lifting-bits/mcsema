@@ -210,7 +210,6 @@ extern char *gets(char *s);
 #include <stropts.h>
 #include <values.h>
 #include <crypt.h>
-#include <xlocale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sgtty.h>
