@@ -60,7 +60,7 @@ extern char *gets(char *s);
 //#include <rpcsvc/yp_prot.h>
 #include <rpcsvc/bootparam_prot.h>
 #include <netipx/ipx.h>
-#include <_G_config.h>
+//#include <_G_config.h>
 #include <libio.h>
 #include <strings.h>
 #include <nss.h>
