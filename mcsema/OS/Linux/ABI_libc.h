@@ -61,7 +61,7 @@ extern char *gets(char *s);
 #include <rpcsvc/bootparam_prot.h>
 #include <netipx/ipx.h>
 //#include <_G_config.h>
-#include <libio.h>
+//#include <libio.h>
 #include <strings.h>
 #include <nss.h>
 #include <netrom/netrom.h>
