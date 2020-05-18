@@ -30,8 +30,8 @@ WORKDIR /
 COPY .remill_commit_id ./
 RUN git clone https://github.com/lifting-bits/remill.git && \
     cd remill && \
-    echo "Using remill commit" "$(cat ../.remill_commit_id)" && \
-    git checkout "$(cat ../.remill_commit_id)"
+    echo "Using remill commit $(cat ../.remill_commit_id)" && \
+    git checkout $(cat ../.remill_commit_id)
 
 ENV PATH="${LIBRARIES}/llvm/bin:${LIBRARIES}/cmake/bin:${LIBRARIES}/protobuf/bin:${PATH}" \
     CC="${LIBRARIES}/llvm/bin/clang" \
