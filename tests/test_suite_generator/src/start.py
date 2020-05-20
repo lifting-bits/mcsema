@@ -242,7 +242,7 @@ def acquire_toolset():
         mcsema_root,
         "share",
         "mcsema",
-        llvm_version[:3],
+        mcsema_llvm_version,
         "ABI",
         "linux",
         "ABI_{abi}_{arch}.bc".format(abi=abi, arch=arch))
