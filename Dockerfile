@@ -10,7 +10,7 @@ ARG LIBRARIES=/opt/trailofbits/libraries
 FROM ${BUILD_BASE} as base
 ARG LIBRARIES
 RUN apt-get update && \
-    apt-get install -qqy --no-install-recommends libtinfo5 zlib1g && \
+    apt-get install -qqy --no-install-recommends libtinfo5 liblzma5 zlib1g && \
     rm -rf /var/lib/apt/lists/*
 
 
@@ -71,7 +71,7 @@ RUN mkdir -p build && \
     cmake --build . --target install
 
 RUN cd test_suite && \
-    PATH="/opt/trailofbits/mcsema/bin:${PATH}" python2 start.py
+    PATH="/opt/trailofbits/mcsema/bin:${PATH}" python2.7 start.py
 
 
 

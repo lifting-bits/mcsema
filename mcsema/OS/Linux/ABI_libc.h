@@ -103,7 +103,7 @@ extern char *gets(char *s);
 #include <x86_64-linux-gnu/sys/epoll.h>
 #include <x86_64-linux-gnu/sys/quota.h>
 #include <x86_64-linux-gnu/sys/ptrace.h>
-#include <x86_64-linux-gnu/sys/stropts.h>
+//#include <x86_64-linux-gnu/sys/stropts.h>
 #include <x86_64-linux-gnu/sys/cdefs.h>
 #include <x86_64-linux-gnu/sys/personality.h>
 #include <x86_64-linux-gnu/sys/dir.h>
@@ -147,7 +147,7 @@ extern char *gets(char *s);
 #include <x86_64-linux-gnu/sys/pci.h>
 #include <x86_64-linux-gnu/sys/types.h>
 #include <x86_64-linux-gnu/sys/io.h>
-#include <x86_64-linux-gnu/sys/ustat.h>
+//#include <x86_64-linux-gnu/sys/ustat.h>
 #include <x86_64-linux-gnu/sys/vlimit.h>
 #include <x86_64-linux-gnu/sys/time.h>
 #include <x86_64-linux-gnu/a.out.h>
@@ -207,7 +207,7 @@ extern char *gets(char *s);
 #include <assert.h>
 #include <fmtmsg.h>
 #include <endian.h>
-#include <stropts.h>
+//#include <stropts.h>
 #include <values.h>
 #include <crypt.h>
 #include <stdio.h>
@@ -253,7 +253,7 @@ extern char *gets(char *s);
 #include <libgen.h>
 #include <sched.h>
 #include <gshadow.h>
-#include <rpc/des_crypt.h>
+//#include <rpc/des_crypt.h>
 #include <rpc/xdr.h>
 #include <rpc/auth_des.h>
 #include <rpc/pmap_prot.h>
@@ -267,7 +267,7 @@ extern char *gets(char *s);
 #include <rpc/rpc.h>
 #include <rpc/svc.h>
 #include <rpc/auth_unix.h>
-#include <rpc/rpc_des.h>
+//#include <rpc/rpc_des.h>
 #include <rpc/types.h>
 #include <rpc/auth.h>
 #include <wait.h>
@@ -292,7 +292,7 @@ extern char *gets(char *s);
 #include <elf.h>
 #include <tar.h>
 #include <fts.h>
-#include <ustat.h>
+//#include <ustat.h>
 #include <time.h>
 #include <err.h>
 #include <netax25/ax25.h>
