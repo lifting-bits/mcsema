@@ -8,9 +8,15 @@ ARG LIBRARIES=/opt/trailofbits/libraries
 
 # Run-time dependencies go here
 FROM ${BUILD_BASE} as base
+ARG UBUNTU_VERSION
 ARG LIBRARIES
 RUN apt-get update && \
-    apt-get install -qqy --no-install-recommends libtinfo5 zlib1g && \
+    apt-get install -qqy --no-install-recommends zlib1g && \
+    if [ "${UBUNTU_VERSION}" = "18.04" ] ; then \
+      apt-get install -qqy --no-install-recommends libtinfo5 ; \
+    else \
+      apt-get install -qqy --no-install-recommends libtinfo6 ; \
+    fi && \
     rm -rf /var/lib/apt/lists/*
 
 
