@@ -10,7 +10,7 @@ ARG LIBRARIES=/opt/trailofbits/libraries
 FROM ${BUILD_BASE} as base
 ARG LIBRARIES
 RUN apt-get update && \
-    apt-get install -qqy --no-install-recommends libtinfo5 liblzma5 zlib1g && \
+    apt-get install -qqy --no-install-recommends libtinfo5 zlib1g && \
     rm -rf /var/lib/apt/lists/*
 
 
@@ -19,7 +19,7 @@ FROM trailofbits/cxx-common:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as deps
 ARG LIBRARIES
 
 RUN apt-get update && \
-    apt-get install -qqy python2.7 libc6-dev wget zlib1g-dev libtinfo-dev curl git build-essential ninja-build ccache && \
+    apt-get install -qqy python2.7 libc6-dev wget liblzma-dev zlib1g-dev libtinfo-dev curl git build-essential ninja-build ccache && \
     if [ "$(uname -m)" = "x86_64" ]; then dpkg --add-architecture i386 && apt-get update && apt-get install -qqy gcc-multilib g++-multilib zip zlib1g-dev:i386; fi && \
     rm -rf /var/lib/apt/lists/*
 
