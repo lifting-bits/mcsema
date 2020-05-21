@@ -20,6 +20,10 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 
+# Will copy remill installation from here
+FROM trailofbits/remill:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as remill
+
+
 # Build-time dependencies go here
 FROM trailofbits/cxx-common:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as deps
 ARG LIBRARIES
@@ -32,24 +36,14 @@ RUN apt-get update && \
 # needed for 20.04 support until we migrate to py3
 RUN curl https://bootstrap.pypa.io/get-pip.py --output get-pip.py && python2.7 get-pip.py
 
-WORKDIR /
-COPY .remill_commit_id ./
-RUN git clone https://github.com/lifting-bits/remill.git && \
-    cd remill && \
-    echo "Using remill commit $(cat ../.remill_commit_id)" && \
-    git checkout $(cat ../.remill_commit_id)
+COPY --from=remill /opt/trailofbits/remill /opt/trailofbits/remill
 
 ENV PATH="${LIBRARIES}/llvm/bin:${LIBRARIES}/cmake/bin:${LIBRARIES}/protobuf/bin:${PATH}" \
     CC="${LIBRARIES}/llvm/bin/clang" \
     CXX="${LIBRARIES}/llvm/bin/clang++" \
     TRAILOFBITS_LIBRARIES="${LIBRARIES}"
 
-WORKDIR /remill
-RUN mkdir -p build && cd build && \
-    cmake -G Ninja -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/remill .. && \
-    cmake --build . --target install
-
-WORKDIR tools/mcsema
+WORKDIR /mcsema
 
 # Source code build
 FROM deps as build
