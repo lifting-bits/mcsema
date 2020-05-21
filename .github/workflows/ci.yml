@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         llvm: ["800", "900", "1000"]
-        ubuntu: ["19.10", "18.04"]
+        ubuntu: ["20.04", "19.10", "18.04"]
     steps:
     - uses: actions/checkout@v2
     - name: Build LLVM ${{ matrix.llvm }} on ${{ matrix.ubuntu }}
