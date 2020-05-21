@@ -3310,7 +3310,7 @@ void *__mcsema_externs[] = {
   //BuiltIn(void) tzset();
   (void *)(tzset),
   //BuiltIn(int) stime(Pointer(Attributed(const , Use(TypeDef(time_t, Use(TypeDef(__time_t, BuiltIn(long))))))));
-  (void *)(stime),
+  //(void *)(stime),
   //Use(TypeDef(time_t, Use(TypeDef(__time_t, BuiltIn(long))))) timegm(Pointer(Use(Struct(struct tm))));
   (void *)(timegm),
   //Use(TypeDef(time_t, Use(TypeDef(__time_t, BuiltIn(long))))) timelocal(Pointer(Use(Struct(struct tm))));
