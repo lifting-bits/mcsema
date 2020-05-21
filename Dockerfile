@@ -8,9 +8,15 @@ ARG LIBRARIES=/opt/trailofbits/libraries
 
 # Run-time dependencies go here
 FROM ${BUILD_BASE} as base
+ARG UBUNTU_VERSION
 ARG LIBRARIES
 RUN apt-get update && \
-    apt-get install -qqy --no-install-recommends libtinfo5 zlib1g && \
+    apt-get install -qqy --no-install-recommends zlib1g && \
+    if [ "${UBUNTU_VERSION}" = "18.04" ] ; then \
+      apt-get install -qqy --no-install-recommends libtinfo5 ; \
+    else \
+      apt-get install -qqy --no-install-recommends libtinfo6 ; \
+    fi && \
     rm -rf /var/lib/apt/lists/*
 
 
@@ -92,3 +98,7 @@ ARG LLVM_VERSION
 RUN mkdir -p /mcsema/local
 
 COPY --from=build /opt/trailofbits/mcsema /opt/trailofbits/mcsema
+COPY scripts/docker-lifter-entrypoint.sh /opt/trailofbits/mcsema
+ENV LLVM_VERSION=llvm${LLVM_VERSION} \
+    PATH="/opt/trailofbits/mcsema/bin:${PATH}"
+ENTRYPOINT ["/opt/trailofbits/mcsema/docker-lifter-entrypoint.sh"]
