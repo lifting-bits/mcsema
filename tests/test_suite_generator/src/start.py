@@ -187,11 +187,11 @@ def acquire_toolset():
   if sys.platform == "win32":
     toolset["llvm-dis"] += ".exe"
 
-  llvm_version = subprocess.check_output([toolset["clang"], "--version"]).split(" ")[2]
+  llvm_version = subprocess.check_output([toolset["clang"], "--version"]).split(" ")[2].split("-")[0]
   print(" i Found LLVM version: " + llvm_version)
   print("   in: {}".format(os.path.dirname(toolset["clang"])))
 
-  mcsema_llvm_version = llvm_version[0:3]
+  mcsema_llvm_version = llvm_version.rsplit('.', 1)[0]
   print(" i Using the following mcsema tools: " + mcsema_llvm_version)
 
   toolset["mcsema-lift"] = spawn.find_executable("mcsema-lift-" + mcsema_llvm_version)
@@ -219,15 +219,17 @@ def acquire_toolset():
     # assumes this must be Windows
     lib_suffix = ".lib"
 
-  toolset["libmcsema_rt32"] = os.path.join(mcsema_root, "lib", "libmcsema_rt32-" + mcsema_llvm_version + lib_suffix)
-  toolset["libmcsema_rt64"] = os.path.join(mcsema_root, "lib", "libmcsema_rt64-" + mcsema_llvm_version + lib_suffix)
+  rt_32 = "libmcsema_rt32-" + mcsema_llvm_version + lib_suffix
+  rt_64 = "libmcsema_rt64-" + mcsema_llvm_version + lib_suffix
+  toolset["libmcsema_rt32"] = os.path.join(mcsema_root, "lib", rt_32)
+  toolset["libmcsema_rt64"] = os.path.join(mcsema_root, "lib", rt_64)
 
   if not os.path.isfile(toolset["libmcsema_rt32"]):
-    print(" x Failed to locate the 32-bit mcsema runtime")
+    print(" x Failed to locate the 32-bit mcsema runtime: " + rt_32)
     return None
 
   if not os.path.isfile(toolset["libmcsema_rt64"]):
-    print(" x Failed to locate the 64-bit mcsema runtime")
+    print(" x Failed to locate the 64-bit mcsema runtime" + rt_64)
     return None
 
   #TODO(artem): support other architectures
@@ -240,7 +242,7 @@ def acquire_toolset():
         mcsema_root,
         "share",
         "mcsema",
-        llvm_version[:3],
+        mcsema_llvm_version,
         "ABI",
         "linux",
         "ABI_{abi}_{arch}.bc".format(abi=abi, arch=arch))

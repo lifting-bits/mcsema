@@ -37,8 +37,9 @@ elseif(APPLE)
 else()    
   # Create the runtimes
   # 32-bit binaries work on both 32 and 64 bit platforms
-  set(MCSMEMA_RT32 mcsema_rt32-${REMILL_LLVM_VERSION})
-  set(MCSMEMA_RT64 mcsema_rt64-${REMILL_LLVM_VERSION})
+
+  set(MCSMEMA_RT32 mcsema_rt32-${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION})
+  set(MCSMEMA_RT64 mcsema_rt64-${LLVM_MAJOR_VERSION}.${LLVM_MINOR_VERSION})
 
   if(WIN32)
     add_executable(mcsema-print-runtime-x86
@@ -48,7 +49,7 @@ else()
     # this is going to import the public include headers of remill
     target_link_libraries(mcsema-print-runtime-x86 PRIVATE remill)
     target_include_directories(mcsema-print-runtime-x86 PRIVATE
-      "${REMILL_SOURCE_DIR}" "${MCSEMA_SOURCE_DIR}"
+      "${REMILL_INCLUDE_LOCATION}" "${MCSEMA_SOURCE_DIR}"
     )
 
     # build a static library from this generated object
@@ -96,7 +97,7 @@ else()
     # this is going to import the public include headers of remill
     target_link_libraries(mcsema-print-runtime-x86 PRIVATE remill)
     target_include_directories(mcsema-print-runtime-x86 PRIVATE
-      "${REMILL_SOURCE_DIR}" "${MCSEMA_SOURCE_DIR}"
+      "${REMILL_INCLUDE_LOCATION}" "${MCSEMA_SOURCE_DIR}"
     )
 
     add_library(${MCSMEMA_RT32} STATIC runtime_32.S runtime_32.o)
@@ -130,7 +131,7 @@ else()
       # this is going to import the public include headers of remill
       target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill)
       target_include_directories(mcsema-print-runtime-amd64 PRIVATE
-        "${REMILL_SOURCE_DIR}" "${MCSEMA_SOURCE_DIR}"
+        "${REMILL_INCLUDE_LOCATION}" "${MCSEMA_SOURCE_DIR}"
       )
 
       # build a static library from this generated object
@@ -179,7 +180,7 @@ else()
       target_link_libraries(mcsema-print-runtime-amd64 PRIVATE remill)
 
       target_include_directories(mcsema-print-runtime-amd64 PRIVATE
-        "${REMILL_SOURCE_DIR}" "${MCSEMA_SOURCE_DIR}"
+        "${REMILL_INCLUDE_LOCATION}" "${MCSEMA_SOURCE_DIR}"
       )
 
       add_library(${MCSMEMA_RT64} STATIC runtime_64.S runtime_64.o)
@@ -208,7 +209,7 @@ endif()
 # Create a runtime.
 add_custom_command(
   OUTPUT runtime_32.o
-  COMMAND "${CMAKE_BC_COMPILER}" -std=gnu++11 -isystem "${REMILL_SOURCE_DIR}" -isystem "${MCSEMA_SOURCE_DIR}" -m32 -fPIC -c "${CMAKE_CURRENT_SOURCE_DIR}/Runtime.cpp" -o runtime_32.o
+  COMMAND "${CMAKE_CXX_COMPILER}" -std=gnu++11 -isystem "${REMILL_INCLUDE_LOCATION}" -isystem "${MCSEMA_SOURCE_DIR}" -m32 -fPIC -c "${CMAKE_CURRENT_SOURCE_DIR}/Runtime.cpp" -o runtime_32.o
   DEPENDS Runtime.cpp
   COMMENT "Building 32-bit runtime"
 )
@@ -224,7 +225,7 @@ set_source_files_properties(
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   add_custom_command(
     OUTPUT runtime_64.o
-    COMMAND "${CMAKE_BC_COMPILER}" -std=gnu++11 -isystem "${REMILL_SOURCE_DIR}" -isystem "${MCSEMA_SOURCE_DIR}" -m64  -fPIC -c "${CMAKE_CURRENT_SOURCE_DIR}/Runtime.cpp" -o runtime_64.o
+    COMMAND "${CMAKE_CXX_COMPILER}" -std=gnu++11 -isystem "${REMILL_INCLUDE_LOCATION}" -isystem "${MCSEMA_SOURCE_DIR}" -m64  -fPIC -c "${CMAKE_CURRENT_SOURCE_DIR}/Runtime.cpp" -o runtime_64.o
     DEPENDS Runtime.cpp
     COMMENT "Building 64-bit runtime"
   )

@@ -284,46 +284,46 @@ void *__mcsema_externs[] = {
   //Pointer(BuiltIn(char)) crypt(Pointer(Attributed(const , BuiltIn(char))), Pointer(Attributed(const , BuiltIn(char))));
   (void *)(crypt),
   //BuiltIn(void) encrypt(Pointer(BuiltIn(char)), BuiltIn(int));
-  (void *)(encrypt),
+//  (void *)(encrypt),
   //BuiltIn(void) swab(Pointer(restrict Attributed(const , BuiltIn(void))), Pointer(restrict BuiltIn(void)), Use(TypeDef(ssize_t, Use(TypeDef(__ssize_t, BuiltIn(long))))));
   (void *)(swab),
   // skipping because function pointer args: _IO_cookie_init
   //BuiltIn(int) __underflow(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
-  (void *)(__underflow),
+//  (void *)(__underflow),
   //BuiltIn(int) __uflow(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
   (void *)(__uflow),
   //BuiltIn(int) __overflow(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))), BuiltIn(int));
   (void *)(__overflow),
   //BuiltIn(int) _IO_getc(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
-  (void *)(_IO_getc),
-  //BuiltIn(int) _IO_putc(BuiltIn(int), Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
-  (void *)(_IO_putc),
-  //BuiltIn(int) _IO_feof(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
-  (void *)(_IO_feof),
-  //BuiltIn(int) _IO_ferror(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
-  (void *)(_IO_ferror),
-  //BuiltIn(int) _IO_peekc_locked(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
-  (void *)(_IO_peekc_locked),
-  //BuiltIn(void) _IO_flockfile(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
-  (void *)(_IO_flockfile),
-  //BuiltIn(void) _IO_funlockfile(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
-  (void *)(_IO_funlockfile),
-  //BuiltIn(int) _IO_ftrylockfile(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
-  (void *)(_IO_ftrylockfile),
-  //BuiltIn(int) _IO_vfscanf(Pointer(restrict Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))), Pointer(restrict Attributed(const , BuiltIn(char))), Use(TypeDef(__gnuc_va_list, BuiltIn(__builtin_va_list))), Pointer(restrict BuiltIn(int)));
-  (void *)(_IO_vfscanf),
-  //BuiltIn(int) _IO_vfprintf(Pointer(restrict Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))), Pointer(restrict Attributed(const , BuiltIn(char))), Use(TypeDef(__gnuc_va_list, BuiltIn(__builtin_va_list))));
-  (void *)(_IO_vfprintf),
-  //Use(TypeDef(__ssize_t, BuiltIn(long))) _IO_padn(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))), BuiltIn(int), Use(TypeDef(__ssize_t, BuiltIn(long))));
-  (void *)(_IO_padn),
-  //Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))) _IO_sgetn(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))), Pointer(BuiltIn(void)), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
-  (void *)(_IO_sgetn),
-  //Use(TypeDef(__off64_t, BuiltIn(long))) _IO_seekoff(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))), Use(TypeDef(__off64_t, BuiltIn(long))), BuiltIn(int), BuiltIn(int));
-  (void *)(_IO_seekoff),
-  //Use(TypeDef(__off64_t, BuiltIn(long))) _IO_seekpos(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))), Use(TypeDef(__off64_t, BuiltIn(long))), BuiltIn(int));
-  (void *)(_IO_seekpos),
-  //BuiltIn(void) _IO_free_backup_area(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
-  (void *)(_IO_free_backup_area),
+//  (void *)(_IO_getc),
+//  //BuiltIn(int) _IO_putc(BuiltIn(int), Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
+//  (void *)(_IO_putc),
+//  //BuiltIn(int) _IO_feof(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
+//  (void *)(_IO_feof),
+//  //BuiltIn(int) _IO_ferror(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
+//  (void *)(_IO_ferror),
+//  //BuiltIn(int) _IO_peekc_locked(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
+//  (void *)(_IO_peekc_locked),
+//  //BuiltIn(void) _IO_flockfile(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
+//  (void *)(_IO_flockfile),
+//  //BuiltIn(void) _IO_funlockfile(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
+//  (void *)(_IO_funlockfile),
+//  //BuiltIn(int) _IO_ftrylockfile(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
+//  (void *)(_IO_ftrylockfile),
+//  //BuiltIn(int) _IO_vfscanf(Pointer(restrict Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))), Pointer(restrict Attributed(const , BuiltIn(char))), Use(TypeDef(__gnuc_va_list, BuiltIn(__builtin_va_list))), Pointer(restrict BuiltIn(int)));
+//  (void *)(_IO_vfscanf),
+//  //BuiltIn(int) _IO_vfprintf(Pointer(restrict Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))), Pointer(restrict Attributed(const , BuiltIn(char))), Use(TypeDef(__gnuc_va_list, BuiltIn(__builtin_va_list))));
+//  (void *)(_IO_vfprintf),
+//  //Use(TypeDef(__ssize_t, BuiltIn(long))) _IO_padn(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))), BuiltIn(int), Use(TypeDef(__ssize_t, BuiltIn(long))));
+//  (void *)(_IO_padn),
+//  //Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))) _IO_sgetn(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))), Pointer(BuiltIn(void)), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
+//  (void *)(_IO_sgetn),
+//  //Use(TypeDef(__off64_t, BuiltIn(long))) _IO_seekoff(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))), Use(TypeDef(__off64_t, BuiltIn(long))), BuiltIn(int), BuiltIn(int));
+//  (void *)(_IO_seekoff),
+//  //Use(TypeDef(__off64_t, BuiltIn(long))) _IO_seekpos(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))), Use(TypeDef(__off64_t, BuiltIn(long))), BuiltIn(int));
+//  (void *)(_IO_seekpos),
+//  //BuiltIn(void) _IO_free_backup_area(Pointer(Use(TypeDef(_IO_FILE, Use(Struct(struct _IO_FILE))))));
+//  (void *)(_IO_free_backup_area),
   //BuiltIn(int) remove(Pointer(Attributed(const , BuiltIn(char))));
   (void *)(remove),
   //BuiltIn(int) rename(Pointer(Attributed(const , BuiltIn(char))), Pointer(Attributed(const , BuiltIn(char))));
@@ -860,8 +860,8 @@ void *__mcsema_externs[] = {
   (void *)(strerror_r),
   //Pointer(BuiltIn(char)) strerror_l(BuiltIn(int), Use(TypeDef(__locale_t, Pointer(Struct(struct __locale_struct)))));
   (void *)(strerror_l),
-  //BuiltIn(void) __bzero(Pointer(BuiltIn(void)), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
-  (void *)(__bzero),
+  //BuiltIn(void) bzero(Pointer(BuiltIn(void)), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
+  (void *)(bzero),
   //BuiltIn(void) bcopy(Pointer(Attributed(const , BuiltIn(void))), Pointer(BuiltIn(void)), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
   (void *)(bcopy),
   //BuiltIn(void) bzero(Pointer(BuiltIn(void)), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
@@ -994,10 +994,6 @@ void *__mcsema_externs[] = {
   (void *)(exp10),
   //BuiltIn(double) __exp10(BuiltIn(double));
   (void *)(__exp10),
-  //BuiltIn(double) pow10(BuiltIn(double));
-  (void *)(pow10),
-  //BuiltIn(double) __pow10(BuiltIn(double));
-  (void *)(__pow10),
   //BuiltIn(double) expm1(BuiltIn(double));
   (void *)(expm1),
   //BuiltIn(double) __expm1(BuiltIn(double));
@@ -1294,10 +1290,6 @@ void *__mcsema_externs[] = {
   (void *)(exp10f),
   //BuiltIn(float) __exp10f(BuiltIn(float));
   (void *)(__exp10f),
-  //BuiltIn(float) pow10f(BuiltIn(float));
-  (void *)(pow10f),
-  //BuiltIn(float) __pow10f(BuiltIn(float));
-  (void *)(__pow10f),
   //BuiltIn(float) expm1f(BuiltIn(float));
   (void *)(expm1f),
   //BuiltIn(float) __expm1f(BuiltIn(float));
@@ -1594,10 +1586,6 @@ void *__mcsema_externs[] = {
   (void *)(exp10l),
   //BuiltIn(long double) __exp10l(BuiltIn(long double));
   (void *)(__exp10l),
-  //BuiltIn(long double) pow10l(BuiltIn(long double));
-  (void *)(pow10l),
-  //BuiltIn(long double) __pow10l(BuiltIn(long double));
-  (void *)(__pow10l),
   //BuiltIn(long double) expm1l(BuiltIn(long double));
   (void *)(expm1l),
   //BuiltIn(long double) __expm1l(BuiltIn(long double));
@@ -1810,8 +1798,6 @@ void *__mcsema_externs[] = {
   (void *)(scalbl),
   //BuiltIn(long double) __scalbl(BuiltIn(long double), BuiltIn(long double));
   (void *)(__scalbl),
-  //BuiltIn(int) matherr(Pointer(Use(Struct(struct exception))));
-  (void *)(matherr),
   //BuiltIn(double _Complex) cacos(BuiltIn(double _Complex));
   (void *)(cacos),
   //BuiltIn(double _Complex) __cacos(BuiltIn(double _Complex));
@@ -2258,8 +2244,6 @@ void *__mcsema_externs[] = {
   (void *)(realloc),
   //BuiltIn(void) free(Pointer(BuiltIn(void)));
   (void *)(free),
-  //BuiltIn(void) cfree(Pointer(BuiltIn(void)));
-  (void *)(cfree),
   //Pointer(BuiltIn(void)) alloca(Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
   (void *)(alloca),
   //Pointer(BuiltIn(void)) valloc(Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
@@ -2367,7 +2351,7 @@ void *__mcsema_externs[] = {
   //BuiltIn(int) getsubopt(Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Pointer(const BuiltIn(char))), Pointer(restrict Pointer(BuiltIn(char))));
   (void *)(getsubopt),
   //BuiltIn(void) setkey(Pointer(Attributed(const , BuiltIn(char))));
-  (void *)(setkey),
+//  (void *)(setkey),
   //BuiltIn(int) posix_openpt(BuiltIn(int));
   (void *)(posix_openpt),
   //BuiltIn(int) grantpt(BuiltIn(int));
@@ -2400,12 +2384,6 @@ void *__mcsema_externs[] = {
   (void *)(futimes),
   //BuiltIn(int) futimesat(BuiltIn(int), Pointer(Attributed(const , BuiltIn(char))), Array(Attributed(const , Use(Struct(struct timeval)))));
   (void *)(futimesat),
-  //BuiltIn(int) __sigismember(Pointer(Attributed(const , Use(TypeDef(__sigset_t, Struct(struct anon_struct_23))))), BuiltIn(int));
-  (void *)(__sigismember),
-  //BuiltIn(int) __sigaddset(Pointer(Use(TypeDef(__sigset_t, Struct(struct anon_struct_23)))), BuiltIn(int));
-  (void *)(__sigaddset),
-  //BuiltIn(int) __sigdelset(Pointer(Use(TypeDef(__sigset_t, Struct(struct anon_struct_23)))), BuiltIn(int));
-  (void *)(__sigdelset),
   // skipping because function pointer args: __sysv_signal
   // skipping because function pointer args: sysv_signal
   // skipping because function pointer args: signal
@@ -2961,8 +2939,6 @@ void *__mcsema_externs[] = {
   (void *)(__nis_finddirectory),
   //BuiltIn(void) __free_fdresult(Pointer(Use(TypeDef(fd_result, Use(Struct(struct fd_result))))));
   (void *)(__free_fdresult),
-  //Use(TypeDef(uint32_t, Attributed(unsigned , BuiltIn(int)))) __nis_hash(Pointer(Attributed(const , BuiltIn(void))), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
-  (void *)(__nis_hash),
   //BuiltIn(int) __nis_lock_cache();
   (void *)(__nis_lock_cache),
   //BuiltIn(int) __nis_unlock_cache();
@@ -3277,8 +3253,6 @@ void *__mcsema_externs[] = {
   (void *)(realloc),
   //BuiltIn(void) free(Pointer(BuiltIn(void)));
   (void *)(free),
-  //BuiltIn(void) cfree(Pointer(BuiltIn(void)));
-  (void *)(cfree),
   //Pointer(BuiltIn(void)) memalign(Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
   (void *)(memalign),
   //Pointer(BuiltIn(void)) valloc(Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
@@ -3295,16 +3269,10 @@ void *__mcsema_externs[] = {
   (void *)(malloc_trim),
   //Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))) malloc_usable_size(Pointer(BuiltIn(void)));
   (void *)(malloc_usable_size),
-  //BuiltIn(void) malloc_stats();
-  (void *)(malloc_stats),
   //BuiltIn(int) malloc_info(BuiltIn(int), Pointer(Use(TypeDef(FILE, Use(Struct(struct _IO_FILE))))));
   (void *)(malloc_info),
-  //Pointer(BuiltIn(void)) malloc_get_state();
-  (void *)(malloc_get_state),
-  //BuiltIn(int) malloc_set_state(Pointer(BuiltIn(void)));
-  (void *)(malloc_set_state),
   //BuiltIn(void) __malloc_check_init();
-  (void *)(__malloc_check_init),
+//  (void *)(__malloc_check_init),
   //BuiltIn(int) clock_adjtime(Use(TypeDef(__clockid_t, BuiltIn(int))), Pointer(Use(Struct(struct timex))));
   (void *)(clock_adjtime),
   //Use(TypeDef(clock_t, Use(TypeDef(__clock_t, BuiltIn(long))))) clock();
@@ -3342,7 +3310,7 @@ void *__mcsema_externs[] = {
   //BuiltIn(void) tzset();
   (void *)(tzset),
   //BuiltIn(int) stime(Pointer(Attributed(const , Use(TypeDef(time_t, Use(TypeDef(__time_t, BuiltIn(long))))))));
-  (void *)(stime),
+  //(void *)(stime),
   //Use(TypeDef(time_t, Use(TypeDef(__time_t, BuiltIn(long))))) timegm(Pointer(Use(Struct(struct tm))));
   (void *)(timegm),
   //Use(TypeDef(time_t, Use(TypeDef(__time_t, BuiltIn(long))))) timelocal(Pointer(Use(Struct(struct tm))));
@@ -3597,21 +3565,21 @@ void *__mcsema_externs[] = {
   //BuiltIn(int) quotactl(BuiltIn(int), Pointer(Attributed(const , BuiltIn(char))), BuiltIn(int), Use(TypeDef(caddr_t, Use(TypeDef(__caddr_t, Pointer(BuiltIn(char)))))));
   (void *)(quotactl),
   // skipping because varargs function: ptrace
-  //BuiltIn(int) isastream(BuiltIn(int));
-  (void *)(isastream),
-  //BuiltIn(int) getmsg(BuiltIn(int), Pointer(restrict Use(Struct(struct strbuf))), Pointer(restrict Use(Struct(struct strbuf))), Pointer(restrict BuiltIn(int)));
-  (void *)(getmsg),
-  //BuiltIn(int) getpmsg(BuiltIn(int), Pointer(restrict Use(Struct(struct strbuf))), Pointer(restrict Use(Struct(struct strbuf))), Pointer(restrict BuiltIn(int)), Pointer(restrict BuiltIn(int)));
-  (void *)(getpmsg),
-  // skipping because varargs function: ioctl
-  //BuiltIn(int) putmsg(BuiltIn(int), Pointer(Attributed(const , Use(Struct(struct strbuf)))), Pointer(Attributed(const , Use(Struct(struct strbuf)))), BuiltIn(int));
-  (void *)(putmsg),
-  //BuiltIn(int) putpmsg(BuiltIn(int), Pointer(Attributed(const , Use(Struct(struct strbuf)))), Pointer(Attributed(const , Use(Struct(struct strbuf)))), BuiltIn(int), BuiltIn(int));
-  (void *)(putpmsg),
+//  //BuiltIn(int) isastream(BuiltIn(int));
+//  (void *)(isastream),
+//  //BuiltIn(int) getmsg(BuiltIn(int), Pointer(restrict Use(Struct(struct strbuf))), Pointer(restrict Use(Struct(struct strbuf))), Pointer(restrict BuiltIn(int)));
+//  (void *)(getmsg),
+//  //BuiltIn(int) getpmsg(BuiltIn(int), Pointer(restrict Use(Struct(struct strbuf))), Pointer(restrict Use(Struct(struct strbuf))), Pointer(restrict BuiltIn(int)), Pointer(restrict BuiltIn(int)));
+//  (void *)(getpmsg),
+//  // skipping because varargs function: ioctl
+//  //BuiltIn(int) putmsg(BuiltIn(int), Pointer(Attributed(const , Use(Struct(struct strbuf)))), Pointer(Attributed(const , Use(Struct(struct strbuf)))), BuiltIn(int));
+//  (void *)(putmsg),
+//  //BuiltIn(int) putpmsg(BuiltIn(int), Pointer(Attributed(const , Use(Struct(struct strbuf)))), Pointer(Attributed(const , Use(Struct(struct strbuf)))), BuiltIn(int), BuiltIn(int));
+//  (void *)(putpmsg),
   //BuiltIn(int) fattach(BuiltIn(int), Pointer(Attributed(const , BuiltIn(char))));
-  (void *)(fattach),
-  //BuiltIn(int) fdetach(Pointer(Attributed(const , BuiltIn(char))));
-  (void *)(fdetach),
+//  (void *)(fattach),
+//  //BuiltIn(int) fdetach(Pointer(Attributed(const , BuiltIn(char))));
+//  (void *)(fdetach),
   //BuiltIn(int) personality(Attributed(unsigned , BuiltIn(long)));
   (void *)(personality),
   //Pointer(Use(TypeDef(DIR, Use(Struct(struct __dirstream))))) opendir(Pointer(Attributed(const , BuiltIn(char))));
@@ -3849,7 +3817,7 @@ void *__mcsema_externs[] = {
   //BuiltIn(void) outsl(Attributed(unsigned , BuiltIn(short)), Pointer(Attributed(const , BuiltIn(void))), Attributed(unsigned , BuiltIn(long)));
   (void *)(outsl),
   //BuiltIn(int) ustat(Use(TypeDef(__dev_t, Attributed(unsigned , BuiltIn(long)))), Pointer(Use(Struct(struct ustat))));
-  (void *)(ustat),
+//  (void *)(ustat),
   //BuiltIn(int) vlimit(Use(Enum(enum __vlimit_resource)), BuiltIn(int));
   (void *)(vlimit),
   //Pointer(Attributed(const , BuiltIn(char))) gnu_get_libc_release();
@@ -3955,24 +3923,6 @@ void *__mcsema_externs[] = {
   (void *)(ns_name_skip),
   //BuiltIn(void) ns_name_rollback(Pointer(Attributed(const , Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))), Pointer(Pointer(Attributed(const , Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))))), Pointer(Pointer(Attributed(const , Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))))));
   (void *)(ns_name_rollback),
-  //BuiltIn(int) ns_sign(Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))), Pointer(BuiltIn(int)), BuiltIn(int), BuiltIn(int), Pointer(BuiltIn(void)), Pointer(Attributed(const , Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))), BuiltIn(int), Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))), Pointer(BuiltIn(int)), Use(TypeDef(time_t, Use(TypeDef(__time_t, BuiltIn(long))))));
-  (void *)(ns_sign),
-  //BuiltIn(int) ns_sign2(Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))), Pointer(BuiltIn(int)), BuiltIn(int), BuiltIn(int), Pointer(BuiltIn(void)), Pointer(Attributed(const , Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))), BuiltIn(int), Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))), Pointer(BuiltIn(int)), Use(TypeDef(time_t, Use(TypeDef(__time_t, BuiltIn(long))))), Pointer(Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))), Pointer(Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))));
-  (void *)(ns_sign2),
-  //BuiltIn(int) ns_sign_tcp(Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))), Pointer(BuiltIn(int)), BuiltIn(int), BuiltIn(int), Pointer(Use(TypeDef(ns_tcp_tsig_state, Use(Struct(struct ns_tcp_tsig_state))))), BuiltIn(int));
-  (void *)(ns_sign_tcp),
-  //BuiltIn(int) ns_sign_tcp2(Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))), Pointer(BuiltIn(int)), BuiltIn(int), BuiltIn(int), Pointer(Use(TypeDef(ns_tcp_tsig_state, Use(Struct(struct ns_tcp_tsig_state))))), BuiltIn(int), Pointer(Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))), Pointer(Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))));
-  (void *)(ns_sign_tcp2),
-  //BuiltIn(int) ns_sign_tcp_init(Pointer(BuiltIn(void)), Pointer(Attributed(const , Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))), BuiltIn(int), Pointer(Use(TypeDef(ns_tcp_tsig_state, Use(Struct(struct ns_tcp_tsig_state))))));
-  (void *)(ns_sign_tcp_init),
-  //Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))) ns_find_tsig(Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))), Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))));
-  (void *)(ns_find_tsig),
-  //BuiltIn(int) ns_verify(Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))), Pointer(BuiltIn(int)), Pointer(BuiltIn(void)), Pointer(Attributed(const , Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))), BuiltIn(int), Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))), Pointer(BuiltIn(int)), Pointer(Use(TypeDef(time_t, Use(TypeDef(__time_t, BuiltIn(long)))))), BuiltIn(int));
-  (void *)(ns_verify),
-  //BuiltIn(int) ns_verify_tcp(Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))), Pointer(BuiltIn(int)), Pointer(Use(TypeDef(ns_tcp_tsig_state, Use(Struct(struct ns_tcp_tsig_state))))), BuiltIn(int));
-  (void *)(ns_verify_tcp),
-  //BuiltIn(int) ns_verify_tcp_init(Pointer(BuiltIn(void)), Pointer(Attributed(const , Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))), BuiltIn(int), Pointer(Use(TypeDef(ns_tcp_tsig_state, Use(Struct(struct ns_tcp_tsig_state))))));
-  (void *)(ns_verify_tcp_init),
   //BuiltIn(int) ns_samedomain(Pointer(Attributed(const , BuiltIn(char))), Pointer(Attributed(const , BuiltIn(char))));
   (void *)(ns_samedomain),
   //BuiltIn(int) ns_subdomain(Pointer(Attributed(const , BuiltIn(char))), Pointer(Attributed(const , BuiltIn(char))));
@@ -4053,8 +4003,6 @@ void *__mcsema_externs[] = {
   (void *)(__p_fqname),
   //Pointer(Attributed(const , BuiltIn(char))) __p_option(Use(TypeDef(u_long, Use(TypeDef(__u_long, Attributed(unsigned , BuiltIn(long)))))));
   (void *)(__p_option),
-  //Pointer(BuiltIn(char)) __p_secstodate(Use(TypeDef(u_long, Use(TypeDef(__u_long, Attributed(unsigned , BuiltIn(long)))))));
-  (void *)(__p_secstodate),
   //BuiltIn(int) __dn_count_labels(Pointer(Attributed(const , BuiltIn(char))));
   (void *)(__dn_count_labels),
   //BuiltIn(int) __dn_comp(Pointer(Attributed(const , BuiltIn(char))), Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char))))))), BuiltIn(int), Pointer(Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))), Pointer(Pointer(Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))));
@@ -4067,15 +4015,9 @@ void *__mcsema_externs[] = {
   (void *)(__res_nameinquery),
   //BuiltIn(int) __res_queriesmatch(Pointer(Attributed(const , Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))), Pointer(Attributed(const , Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))), Pointer(Attributed(const , Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))), Pointer(Attributed(const , Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))));
   (void *)(__res_queriesmatch),
-  //Pointer(Attributed(const , BuiltIn(char))) __p_section(BuiltIn(int), BuiltIn(int));
-  (void *)(__p_section),
   // skipping because function pointer args: __res_ninit
-  //BuiltIn(int) __res_nisourserver(Attributed(const , Use(TypeDef(res_state, Pointer(Use(Struct(struct __res_state)))))), Pointer(Attributed(const , Use(Struct(struct sockaddr_in)))));
-  (void *)(__res_nisourserver),
   //BuiltIn(void) __fp_resstat(Attributed(const , Use(TypeDef(res_state, Pointer(Use(Struct(struct __res_state)))))), Pointer(Use(TypeDef(FILE, Use(Struct(struct _IO_FILE))))));
   (void *)(__fp_resstat),
-  //BuiltIn(void) __res_npquery(Attributed(const , Use(TypeDef(res_state, Pointer(Use(Struct(struct __res_state)))))), Pointer(Attributed(const , Use(TypeDef(u_char, Use(TypeDef(__u_char, Attributed(unsigned , BuiltIn(char)))))))), BuiltIn(int), Pointer(Use(TypeDef(FILE, Use(Struct(struct _IO_FILE))))));
-  (void *)(__res_npquery),
   //Pointer(Attributed(const , BuiltIn(char))) __res_hostalias(Attributed(const , Use(TypeDef(res_state, Pointer(Use(Struct(struct __res_state)))))), Pointer(Attributed(const , BuiltIn(char))), Pointer(BuiltIn(char)), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
   (void *)(__res_hostalias),
   // skipping because function pointer args: __res_nquery
@@ -4190,15 +4132,15 @@ void *__mcsema_externs[] = {
   //Pointer(BuiltIn(char)) crypt(Pointer(Attributed(const , BuiltIn(char))), Pointer(Attributed(const , BuiltIn(char))));
   (void *)(crypt),
   //BuiltIn(void) setkey(Pointer(Attributed(const , BuiltIn(char))));
-  (void *)(setkey),
+//  (void *)(setkey),
   //BuiltIn(void) encrypt(Pointer(BuiltIn(char)), BuiltIn(int));
-  (void *)(encrypt),
+//  (void *)(encrypt),
   //Pointer(BuiltIn(char)) crypt_r(Pointer(Attributed(const , BuiltIn(char))), Pointer(Attributed(const , BuiltIn(char))), Pointer(restrict Use(Struct(struct crypt_data))));
   (void *)(crypt_r),
   //BuiltIn(void) setkey_r(Pointer(Attributed(const , BuiltIn(char))), Pointer(restrict Use(Struct(struct crypt_data))));
-  (void *)(setkey_r),
+ // (void *)(setkey_r),
   //BuiltIn(void) encrypt_r(Pointer(BuiltIn(char)), BuiltIn(int), Pointer(restrict Use(Struct(struct crypt_data))));
-  (void *)(encrypt_r),
+//  (void *)(encrypt_r),
   //BuiltIn(int) gtty(BuiltIn(int), Pointer(Use(Struct(struct sgttyb))));
   (void *)(gtty),
   //BuiltIn(int) stty(BuiltIn(int), Pointer(Attributed(const , Use(Struct(struct sgttyb)))));
@@ -4691,8 +4633,6 @@ void *__mcsema_externs[] = {
   (void *)(__argz_create),
   //Use(TypeDef(error_t, BuiltIn(int))) argz_create(Array(Pointer(const BuiltIn(char))), Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))));
   (void *)(argz_create),
-  //Use(TypeDef(error_t, BuiltIn(int))) __argz_create_sep(Pointer(restrict Attributed(const , BuiltIn(char))), BuiltIn(int), Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))));
-  (void *)(__argz_create_sep),
   //Use(TypeDef(error_t, BuiltIn(int))) argz_create_sep(Pointer(restrict Attributed(const , BuiltIn(char))), BuiltIn(int), Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))));
   (void *)(argz_create_sep),
   //Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))) __argz_count(Pointer(Attributed(const , BuiltIn(char))), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
@@ -4707,28 +4647,16 @@ void *__mcsema_externs[] = {
   (void *)(__argz_stringify),
   //BuiltIn(void) argz_stringify(Pointer(BuiltIn(char)), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))), BuiltIn(int));
   (void *)(argz_stringify),
-  //Use(TypeDef(error_t, BuiltIn(int))) __argz_append(Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))), Pointer(restrict Attributed(const , BuiltIn(char))), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
-  (void *)(__argz_append),
   //Use(TypeDef(error_t, BuiltIn(int))) argz_append(Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))), Pointer(restrict Attributed(const , BuiltIn(char))), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))));
   (void *)(argz_append),
-  //Use(TypeDef(error_t, BuiltIn(int))) __argz_add(Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))), Pointer(restrict Attributed(const , BuiltIn(char))));
-  (void *)(__argz_add),
   //Use(TypeDef(error_t, BuiltIn(int))) argz_add(Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))), Pointer(restrict Attributed(const , BuiltIn(char))));
   (void *)(argz_add),
-  //Use(TypeDef(error_t, BuiltIn(int))) __argz_add_sep(Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))), Pointer(restrict Attributed(const , BuiltIn(char))), BuiltIn(int));
-  (void *)(__argz_add_sep),
   //Use(TypeDef(error_t, BuiltIn(int))) argz_add_sep(Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))), Pointer(restrict Attributed(const , BuiltIn(char))), BuiltIn(int));
   (void *)(argz_add_sep),
-  //BuiltIn(void) __argz_delete(Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))), Pointer(restrict BuiltIn(char)));
-  (void *)(__argz_delete),
   //BuiltIn(void) argz_delete(Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))), Pointer(restrict BuiltIn(char)));
   (void *)(argz_delete),
-  //Use(TypeDef(error_t, BuiltIn(int))) __argz_insert(Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))), Pointer(restrict BuiltIn(char)), Pointer(restrict Attributed(const , BuiltIn(char))));
-  (void *)(__argz_insert),
   //Use(TypeDef(error_t, BuiltIn(int))) argz_insert(Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))), Pointer(restrict BuiltIn(char)), Pointer(restrict Attributed(const , BuiltIn(char))));
   (void *)(argz_insert),
-  //Use(TypeDef(error_t, BuiltIn(int))) __argz_replace(Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))), Pointer(restrict Attributed(const , BuiltIn(char))), Pointer(restrict Attributed(const , BuiltIn(char))), Pointer(restrict Attributed(unsigned , BuiltIn(int))));
-  (void *)(__argz_replace),
   //Use(TypeDef(error_t, BuiltIn(int))) argz_replace(Pointer(restrict Pointer(BuiltIn(char))), Pointer(restrict Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long)))))), Pointer(restrict Attributed(const , BuiltIn(char))), Pointer(restrict Attributed(const , BuiltIn(char))), Pointer(restrict Attributed(unsigned , BuiltIn(int))));
   (void *)(argz_replace),
   //Pointer(BuiltIn(char)) __argz_next(Pointer(restrict Attributed(const , BuiltIn(char))), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))), Pointer(restrict Attributed(const , BuiltIn(char))));
@@ -5262,11 +5190,11 @@ void *__mcsema_externs[] = {
   //BuiltIn(int) fgetsgent_r(Pointer(Use(TypeDef(FILE, Use(Struct(struct _IO_FILE))))), Pointer(Use(Struct(struct sgrp))), Pointer(BuiltIn(char)), Use(TypeDef(size_t, TypeDef(size_t, Attributed(unsigned , BuiltIn(long))))), Pointer(Pointer(Use(Struct(struct sgrp)))));
   (void *)(fgetsgent_r),
   //BuiltIn(int) cbc_crypt(Pointer(BuiltIn(char)), Pointer(BuiltIn(char)), Attributed(unsigned , BuiltIn(int)), Attributed(unsigned , BuiltIn(int)), Pointer(BuiltIn(char)));
-  (void *)(cbc_crypt),
+//  (void *)(cbc_crypt),
   //BuiltIn(int) ecb_crypt(Pointer(BuiltIn(char)), Pointer(BuiltIn(char)), Attributed(unsigned , BuiltIn(int)), Attributed(unsigned , BuiltIn(int)));
-  (void *)(ecb_crypt),
+//  (void *)(ecb_crypt),
   //BuiltIn(void) des_setparity(Pointer(BuiltIn(char)));
-  (void *)(des_setparity),
+//  (void *)(des_setparity),
   // skipping because function pointer args: xdr_pmap
   // skipping because function pointer args: xdr_pmaplist
   // skipping because function pointer args: xdr_rmtcall_args

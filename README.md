@@ -87,13 +87,16 @@ Why would anyone translate binaries *back* to bitcode?
 
 ### Docker
 
-#### Step 1: Download Dockerfile
+#### Step 1: Clone McSema
 
-`wget https://raw.githubusercontent.com/lifting-bits/mcsema/master/Dockerfile`
+```sh
+git clone --depth 1 https://github.com/lifting-bits/mcsema.git
+cd mcsema
+```
 
-#### Step 2: Add your disassembler
+#### Step 2: Add your disassembler (optional)
 
-Currently IDA, Binary Ninja, and Dyninst are supported for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice, but an example of installing Binary Ninja is provided (remember for Docker that paths need to be relative to where you built from):
+Currently IDA, Binary Ninja, and Dyninst are supported for control-flow recovery, it's left as an exercise to the reader to install your disassembler of choice in a Dockerfile, but an example of installing Binary Ninja is provided (remember for Docker that paths need to be relative to where you built from):
 ```
 ADD local-relative/path/to/binaryninja/ /root/binaryninja/
 ADD local-relative/path/to/.binaryninja/ /root/.binaryninja/ # <- Make sure there's no `lastrun` file
@@ -103,9 +106,21 @@ RUN /root/binaryninja/scripts/linux-setup.sh
 #### Step 3: Build & Run Dockerfile
 
 This will build the container for you and run it with your local directory mounted into the container (at `/mcsema/local`) such that your work in the container is saved locally:
-`docker build -t=mcsema . && docker run --rm -it --ipc=host -v "${PWD}":/mcsema/local mcsema`
 
-### On Linux
+```sh
+# build mcsema container
+ARCH=amd64; UBUNTU=18.04; LLVM=800; docker build . \
+  -t mcsema:llvm${LLVM}-ubuntu${UBUNTU}-${ARCH} \
+  -f Dockerfile \
+  --build-arg UBUNTU_VERSION=${UBUNTU} \
+  --build-arg LLVM_VERSION=${LLVM} \
+  --build-arg ARCH=${ARCH}
+
+# run mcsema container
+docker run --rm -it --ipc=host -v "$(pwd)":/mcsema/local mcsema:llvm${LLVM}-ubuntu{$UBUNTU}-${ARCH}
+```
+
+### Native Build On Linux
 
 #### Step 1: Install dependencies
 

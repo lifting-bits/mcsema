@@ -1,22 +1,58 @@
 ARG LLVM_VERSION=800
 ARG ARCH=amd64
+ARG UBUNTU_VERSION=18.04
+ARG DISTRO_BASE=ubuntu${UBUNTU_VERSION}
+ARG BUILD_BASE=ubuntu:${UBUNTU_VERSION}
 ARG LIBRARIES=/opt/trailofbits/libraries
-ARG DISTRO_BASE=ubuntu18.04
 
-#FROM trailofbits/remill/llvm${LLVM_VERSION}-${DISTRO_BASE}-${arch}:latest as base
-FROM trailofbits/remill:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as base
+
+# Run-time dependencies go here
+FROM ${BUILD_BASE} as base
+ARG UBUNTU_VERSION
+ARG LIBRARIES
+RUN apt-get update && \
+    apt-get install -qqy --no-install-recommends zlib1g && \
+    if [ "${UBUNTU_VERSION}" = "18.04" ] ; then \
+      apt-get install -qqy --no-install-recommends libtinfo5 ; \
+    else \
+      apt-get install -qqy --no-install-recommends libtinfo6 ; \
+    fi && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# Build-time dependencies go here
+FROM trailofbits/cxx-common:llvm${LLVM_VERSION}-${DISTRO_BASE}-${ARCH} as deps
 ARG LIBRARIES
 
-ENV DEBIAN_FRONTEND=noninteractive
-
 RUN apt-get update && \
-    apt-get install -qqy python2.7 wget zlib1g-dev && \
-    if [ "$(uname -m)" = "x86_64" ]; then dpkg --add-architecture i386 && apt-get update && apt-get install -qqy zip zlib1g-dev:i386; fi && \
+    apt-get install -qqy python2.7 libc6-dev wget liblzma-dev zlib1g-dev libtinfo-dev curl git build-essential ninja-build ccache && \
+    if [ "$(uname -m)" = "x86_64" ]; then dpkg --add-architecture i386 && apt-get update && apt-get install -qqy gcc-multilib g++-multilib zip zlib1g-dev:i386; fi && \
     rm -rf /var/lib/apt/lists/*
 
 # needed for 20.04 support until we migrate to py3
 RUN curl https://bootstrap.pypa.io/get-pip.py --output get-pip.py && python2.7 get-pip.py
 
+WORKDIR /
+COPY .remill_commit_id ./
+RUN git clone https://github.com/lifting-bits/remill.git && \
+    cd remill && \
+    echo "Using remill commit $(cat ../.remill_commit_id)" && \
+    git checkout $(cat ../.remill_commit_id)
+
+ENV PATH="${LIBRARIES}/llvm/bin:${LIBRARIES}/cmake/bin:${LIBRARIES}/protobuf/bin:${PATH}" \
+    CC="${LIBRARIES}/llvm/bin/clang" \
+    CXX="${LIBRARIES}/llvm/bin/clang++" \
+    TRAILOFBITS_LIBRARIES="${LIBRARIES}"
+
+WORKDIR /remill
+RUN mkdir -p build && cd build && \
+    cmake -G Ninja -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/remill .. && \
+    cmake --build . --target install
+
+WORKDIR tools/mcsema
+
+# Source code build
+FROM deps as build
 # Using this file:
 # 1. wget https://raw.githubusercontent.com/trailofbits/mcsema/master/tools/Dockerfile
 # 2. docker build -t=mcsema .
@@ -25,23 +61,26 @@ RUN curl https://bootstrap.pypa.io/get-pip.py --output get-pip.py && python2.7 g
 # If using IDA for CFG recovery, uncomment the following line:
 # RUN sudo dpkg --add-architecture i386 && sudo apt-get install zip zlib1g-dev:i386 -y
 
-# Build in the remill build directory
-RUN mkdir -p /remill/tools/mcsema
-WORKDIR /remill/tools/mcsema
-
 COPY . ./
 
-#TODO(artem): find a way to use remill commit id; for now just use latest build of remill
-# RUN cd /remill && git checkout -b temp $(</remill/tools/mcsema/.remil_commit_id) && cd /remill/tools/mcsema
+RUN mkdir -p ./build && cd ./build && \
+    cmake -G Ninja -DCMAKE_PREFIX_PATH=/opt/trailofbits/remill -DMCSEMA_DISABLED_ABI_LIBRARIES:STRING="" -DCMAKE_VERBOSE_MAKEFILE=True -DCMAKE_INSTALL_PREFIX=/opt/trailofbits/mcsema .. && \
+    cmake --build . --target install
 
-ENV PATH="${LIBRARIES}/llvm/bin:${LIBRARIES}/cmake/bin:${LIBRARIES}/protobuf/bin:${PATH}"
-ENV CC="${LIBRARIES}/llvm/bin/clang"
-ENV CXX="${LIBRARIES}/llvm/bin/clang++"
-ENV TRAILOFBITS_LIBRARIES="${LIBRARIES}"
+WORKDIR tests/test_suite_generator
+RUN mkdir -p build && \
+    cd build && \
+    cmake -DMCSEMALIFT_PATH=/opt/trailofbits/mcsema/bin \
+          -DMCSEMA_PREBUILT_CFG_PATH="$(pwd)/../generated/prebuilt_cfg/" \
+	  -DMCSEMADISASS_PATH=/opt/trailofbits/mcsema/bin \
+	  .. && \
+    cmake --build . --target install
 
-RUN cd /remill/build && cmake .. && cmake --build . --target install
+RUN cd test_suite && \
+    PATH="/opt/trailofbits/mcsema/bin:${PATH}" python2.7 start.py
 
-#WORKDIR /home/user
+
+
 ################################
 # Left to reader to install    #
 #  their disassembler (IDA/BN) #
@@ -52,6 +91,14 @@ RUN cd /remill/build && cmake .. && cmake --build . --target install
 # RUN /root/binaryninja/scripts/linux-setup.sh
 
 
+FROM base as dist
+ARG LLVM_VERSION
+
 # Allow for mounting of local folder
 RUN mkdir -p /mcsema/local
-# CMD /bin/bash
+
+COPY --from=build /opt/trailofbits/mcsema /opt/trailofbits/mcsema
+COPY scripts/docker-lifter-entrypoint.sh /opt/trailofbits/mcsema
+ENV LLVM_VERSION=llvm${LLVM_VERSION} \
+    PATH="/opt/trailofbits/mcsema/bin:${PATH}"
+ENTRYPOINT ["/opt/trailofbits/mcsema/docker-lifter-entrypoint.sh"]

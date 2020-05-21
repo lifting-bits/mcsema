@@ -26,9 +26,9 @@ function(add_runtime_helper target_name source_file address_bit_size)
   endif()
 
   if(DEFINED WIN32)
-    set(install_folder "${CMAKE_INSTALL_PREFIX}/mcsema/${REMILL_LLVM_VERSION}/ABI/linux")
+    set(install_folder "${CMAKE_INSTALL_PREFIX}/mcsema/${MCSEMA_LLVM_VERSION}/ABI/linux")
   else()
-    set(install_folder "${CMAKE_INSTALL_PREFIX}/share/mcsema/${REMILL_LLVM_VERSION}/ABI/linux")
+    set(install_folder "${CMAKE_INSTALL_PREFIX}/share/mcsema/${MCSEMA_LLVM_VERSION}/ABI/linux")
   endif()
 
   if("${source_file}" MATCHES "\.c$")
