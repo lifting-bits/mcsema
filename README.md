@@ -180,15 +180,11 @@ popd
 
 The next step is to clone the [Remill](https://github.com/lifting-bits/remill) repository. We then clone the McSema repository into the `tools` subdirectory of Remill. This is kind of like how Clang and LLVM are distributed separately, and the Clang source code needs to be put into LLVM's tools directory.
 
-**Notice that when building McSema, you should always use a specific Remill commit hash (the one we test). This hash can be found in the .remill_commit_id file**.
-
 ```shell
 git clone --depth 1 https://github.com/lifting-bits/mcsema.git
-export REMILL_VERSION=`cat ./mcsema/.remill_commit_id`
 
 git clone https://github.com/lifting-bits/remill.git
 cd remill
-git checkout -b temp ${REMILL_VERSION}
 
 mv ../mcsema tools
 ```
@@ -278,12 +274,12 @@ git clone https://github.com/lifting-bits/remill.git --depth=1
 git clone https://github.com/lifting-bits/mcsema.git --depth=1 remill/tools/mcsema
 ```
 
-Note that for production usage you should always use a specific remill commit (`remill/tools/mcsema/.remill_commit_id`) when building mcsema. At the time of writing, it is however best to use HEAD (or at least make sure that commit `e7795be` is present in the remill branch).
+Note that for production usage you should always use a specific remill commit when building mcsema. At the time of writing, it is however best to use HEAD (or at least make sure that commit `e7795be` is present in the remill branch).
 
 ```
 cd remill
 git fetch --unshallow
-git checkout -b production `cat tools/mcsema/.remill_commit_id`
+git checkout -b production <commit>
 ```
 
 #### Step 3: Enabling the LLVM toolchain for Visual Studio
