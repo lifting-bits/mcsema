@@ -19,6 +19,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/settings.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/BCCompiler.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/ccache.cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 configureCcache()
 FindAndSelectClangCompiler()
@@ -93,6 +94,22 @@ list(APPEND PROJECT_INCLUDEDIRECTORIES ${remill_INCLUDE_DIRS})
 
 # llvm
 find_package(LLVM REQUIRED CONFIG HINTS ${FINDPACKAGE_LLVM_HINTS})
+
+if (LLVM_Z3_INSTALL_DIR)
+  set(need_z3 TRUE)
+elseif(DEFINED ENV{TRAILOFBITS_LIBRARIES})
+  set(LLVM_Z3_INSTALL_DIR "$ENV{TRAILOFBITS_LIBRARIES}/z3")
+  set(need_z3 TRUE)
+else()
+  set(need_z3 FALSE)
+endif()
+
+if(need_z3)
+  find_package(Z3 4.7.1)
+  if (NOT Z3_FOUND)
+    message(WARNING "Z3 >= 4.7.1 has not been found in LLVM_Z3_INSTALL_DIR: ${LLVM_Z3_INSTALL_DIR}.")
+  endif()
+endif()
 
 string(REPLACE "." ";" LLVM_VERSION_LIST ${LLVM_PACKAGE_VERSION})
 list(GET LLVM_VERSION_LIST 0 LLVM_MAJOR_VERSION)
